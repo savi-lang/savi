@@ -1,0 +1,17 @@
+name: mare
+version: 0.1.0
+
+authors:
+  - Joe Eli McIlvain <joe.eli.mac@gmail.com>
+
+targets:
+  mare:
+    main: src/mare.cr
+
+dependencies:
+  lingo:
+    github: rmosolgo/lingo
+
+crystal: 0.26.1
+
+license: MPLv2

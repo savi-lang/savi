@@ -1,0 +1,3 @@
+class Example:
+  prop name String:
+  fun ref greeting String:
