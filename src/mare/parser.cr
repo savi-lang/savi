@@ -23,13 +23,26 @@ module Mare
     rule :dterms { dterm >> s >> dterms.maybe }
     rule :dterm { ident }
     
-    rule :terms { (t1 >> s).repeat }
-    rule :t1 { (t2 >> s >> (op1 >> s >> t2 >> s).repeat).named(:relate) | t2 }
-    rule :t2 { ident | string }
+    rule :terms { (t0 >> s).repeat }
+    rule :t0 { (t1 >> (sn >> op1 >> sn >> t1 >> s).repeat).named(:relate) | t1 }
+    rule :t1 { (t2 >> (sn >> op2 >> sn >> t2 >> s).repeat).named(:relate) | t2 }
+    rule :t2 { (t3 >> (sn >> op3 >> sn >> t3 >> s).repeat).named(:relate) | t3 }
+    rule :t3 { (t4 >> (sn >> op4 >> sn >> t4 >> s).repeat).named(:relate) | t4 }
+    rule :t4 { (t5 >> (sn >> op5 >> sn >> t5 >> s).repeat).named(:relate) | t5 }
+    rule :t5 { (t6 >> (sn >> op6 >> sn >> t6 >> s).repeat).named(:relate) | t6 }
+    rule :t6 { (t7 >> (sn >> op7 >> sn >> t7 >> s).repeat).named(:relate) | t7 }
+    rule :t7 { ident | string }
     
-    rule :op1 { match(/[+-]/).named(:op) }
+    rule :op1 { match(/(&&|\|\|)/).named(:op) }
+    rule :op2 { match(/(===|==|!==|!=|=~)/).named(:op) }
+    rule :op3 { match(/(>=|<=|<|>)(?![><~|])/).named(:op) }
+    rule :op4 { match(/(<\|>|<~>|<<<|>>>|<<~|~>>|<<|>>|<~|~>)/).named(:op) }
+    rule :op5 { match(/(\.\.|<>)/).named(:op) }
+    rule :op6 { match(/(\+|-)/).named(:op) }
+    rule :op7 { match(/(\*|\/)/).named(:op) }
     
     rule :s { match(/( |\t|\r|\\\r?\n)*/) }
+    rule :sn { match(/( |\t|\r|\\\r?\n|\n)*/) }
     rule :ident { match(/\b\w+\b/).named(:ident) }
     rule :string { str("\"") >> match(/[^"]*/).named(:string) >> str("\"") }
   end

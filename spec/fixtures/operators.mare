@@ -1,0 +1,13 @@
+describe operators:
+  demo all: // in order of precedence, from "weakest" to "strongest"
+    x && x ||
+    x === x == x !== x != x =~
+    x >= x <= x < x >
+    x <|> x <~> x <<< x >>> x <<~ x ~>> x << x >> x <~ x ~>
+    x .. x <>
+    x + x -
+    x * x /
+    x
+  
+  demo mixed:
+    a != b && c > d / x + e / y || i..j > k << l
