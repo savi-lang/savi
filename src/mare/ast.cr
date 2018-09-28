@@ -26,7 +26,8 @@ module Mare
     end
     
     alias Term = Identifier \
-      | LiteralString | LiteralInteger | LiteralFloat | Operator | Relate
+      | LiteralString | LiteralInteger | LiteralFloat \
+      | Operator | Relate | Group
     
     struct Identifier
       property value
@@ -66,6 +67,20 @@ module Mare
       end
       def name; :op end
       def to_a: Array(A); [name, value] of A end
+    end
+    
+    struct Group
+      property style
+      property terms
+      def initialize(@style : String, @terms = [] of Term)
+      end
+      def name; :group end
+      def to_a: Array(A)
+        res = [name] of A
+        res << style
+        terms.each { |x| res << x.to_a }
+        res
+      end
     end
     
     struct Relate

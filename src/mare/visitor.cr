@@ -48,6 +48,16 @@ module Mare
       visitor.target << AST::Operator.new(node.full_value)
     end
     
+    enter :group do
+      group = AST::Group.new(node.children[0].children[0].full_value)
+      visitor.target << group
+      visitor.targets << group.terms
+    end
+    
+    exit :group do
+      visitor.targets.pop
+    end
+    
     enter :relate do
       relate = AST::Relate.new
       visitor.target << relate
