@@ -1,10 +1,24 @@
 module Mare
   module AST
-    alias Node = Identifier
+    struct Declare
+      property head
+      property body
+      def initialize(
+        @head = [] of Identifier,
+        @body = [] of LiteralString)
+      end
+    end
     
     struct Identifier
-      property name : String
-      def initialize(@name) end
+      property name
+      def initialize(@name : String)
+      end
+    end
+    
+    struct LiteralString
+      property value
+      def initialize(@value : String)
+      end
     end
   end
 end

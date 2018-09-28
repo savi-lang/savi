@@ -10,21 +10,25 @@ describe Mare do
     visitor = Mare::Visitor.new
     visitor.visit(ast)
     visitor.doc.should eq [
-      [
+      Mare::AST::Declare.new([
         Mare::AST::Identifier.new("class"),
         Mare::AST::Identifier.new("Example"),
-      ],
-      [
+      ]),
+      Mare::AST::Declare.new([
         Mare::AST::Identifier.new("prop"),
         Mare::AST::Identifier.new("name"),
         Mare::AST::Identifier.new("String"),
-      ],
-      [
+      ], [
+        Mare::AST::LiteralString.new("World"),
+      ]),
+      Mare::AST::Declare.new([
         Mare::AST::Identifier.new("fun"),
         Mare::AST::Identifier.new("ref"),
         Mare::AST::Identifier.new("greeting"),
         Mare::AST::Identifier.new("String"),
-      ],
+      ], [
+        Mare::AST::LiteralString.new("Hello"),
+      ]),
     ]
   end
 end

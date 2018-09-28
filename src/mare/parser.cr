@@ -12,16 +12,21 @@ module Mare
       >> s
     }
     
-    rule :normal_item { decl.named(:decl) }
+    rule :normal_item {
+      (decl.named(:decl) >> impr.maybe) | impr
+    }
     
     rule :eol_item { eol_comment }
     rule :eol_comment { str("//") >> (str("\n").absent >> any).repeat(0) }
     
-    rule :decl { dterms >> s >> str(":") }
+    rule :decl { dterms >> s >> str(":") >> s }
     rule :dterms { dterm >> s >> dterms.maybe }
     rule :dterm { ident.named(:decl_ident) }
     
+    rule :impr { string }
+    
     rule :s { match(/( |\t|\r|\\\r?\n)*/) }
-    rule :ident { match(/\b\w+\b/) }
+    rule :ident { match(/\b\w+\b/).named(:ident) }
+    rule :string { str("\"") >> match(/[^"]*/).named(:string) >> str("\"") }
   end
 end

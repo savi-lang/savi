@@ -2,21 +2,25 @@ require "lingo"
 
 module Mare
   class Visitor < Lingo::Visitor
-    property doc  : Array(Array(AST::Node))
-    property decl : Array(AST::Node)
+    property doc  : Array(AST::Declare)
+    property decl : AST::Declare
     
     def initialize
-      @doc = [] of Array(AST::Node)
-      @decl = [] of AST::Node
+      @doc = [] of AST::Declare
+      @decl = AST::Declare.new
     end
     
     enter :decl do
-      visitor.decl = [] of AST::Node
+      visitor.decl = AST::Declare.new
       visitor.doc << visitor.decl
     end
     
     enter :decl_ident do
-      visitor.decl << AST::Identifier.new(node.full_value)
+      visitor.decl.head << AST::Identifier.new(node.full_value)
+    end
+    
+    enter :string do
+      visitor.decl.body << AST::LiteralString.new(node.full_value)
     end
   end
 end
