@@ -1,7 +1,7 @@
 require "lingo"
 
-module Mare
-  class Parser < Lingo::Parser
+class Mare::Parser
+  class Lexer < Lingo::Parser
     root :doc
     
     rule :doc { (line >> str("\n").named(:nl)).repeat >> line }

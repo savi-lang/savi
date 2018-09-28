@@ -1,7 +1,8 @@
 require "lingo"
+require "../ast"
 
-module Mare
-  class Visitor < Lingo::Visitor
+class Mare::Parser
+  class Builder < Lingo::Visitor
     property doc
     property decl
     property targets

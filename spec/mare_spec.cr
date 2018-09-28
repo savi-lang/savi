@@ -6,12 +6,10 @@ describe Mare do
     
     ast = Mare::Parser.new.parse(source)
     ast.should be_truthy
-    
-    visitor = Mare::Visitor.new
-    visitor.visit(ast)
+    next unless ast
     
     ll = [] of Mare::AST::A
-    visitor.doc.to_a.should eq [:doc,
+    ast.to_a.should eq [:doc,
       [:declare, [[:ident, "class"], [:ident, "Example"]], ll],
       [:declare,
         [[:ident, "prop"], [:ident, "name"], [:ident, "String"]],
@@ -48,12 +46,10 @@ describe Mare do
     
     ast = Mare::Parser.new.parse(source)
     ast.should be_truthy
-    
-    visitor = Mare::Visitor.new
-    visitor.visit(ast)
+    next unless ast
     
     ll = [] of Mare::AST::A
-    visitor.doc.to_a.should eq [:doc,
+    ast.to_a.should eq [:doc,
       [:declare, [[:ident, "describe"], [:ident, "operators"]], ll],
       [:declare, [[:ident, "demo"], [:ident, "all"]],
         [[:relate,

@@ -4,4 +4,3 @@ end
 
 require "./mare/ast"
 require "./mare/parser"
-require "./mare/visitor"
