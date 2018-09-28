@@ -3,11 +3,11 @@ module Mare
     struct Declare
       property head
       property body
-      def initialize(
-        @head = [] of Identifier,
-        @body = [] of LiteralString)
+      def initialize(@head = [] of Term, @body = [] of Term)
       end
     end
+    
+    alias Term = Identifier | LiteralString | Relate
     
     struct Identifier
       property name
@@ -18,6 +18,13 @@ module Mare
     struct LiteralString
       property value
       def initialize(@value : String)
+      end
+    end
+    
+    struct Relate
+      property op
+      property terms
+      def initialize(@op : String, @terms = [] of Term)
       end
     end
   end

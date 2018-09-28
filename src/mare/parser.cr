@@ -13,7 +13,7 @@ module Mare
     }
     
     rule :normal_item {
-      (decl.named(:decl) >> impr.maybe) | impr
+      (decl.named(:decl) >> terms.maybe) | terms
     }
     
     rule :eol_item { eol_comment }
@@ -21,9 +21,13 @@ module Mare
     
     rule :decl { dterms >> s >> str(":") >> s }
     rule :dterms { dterm >> s >> dterms.maybe }
-    rule :dterm { ident.named(:decl_ident) }
+    rule :dterm { ident }
     
-    rule :impr { string }
+    rule :terms { (term1 >> s >> terms) | term1 }
+    rule :term1 { (term2 >> s >> binop1 >> s >> term1).named(:relate) | term2 }
+    rule :term2 { ident | string }
+    
+    rule :binop1 { str("+") }
     
     rule :s { match(/( |\t|\r|\\\r?\n)*/) }
     rule :ident { match(/\b\w+\b/).named(:ident) }

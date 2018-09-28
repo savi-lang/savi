@@ -13,22 +13,28 @@ describe Mare do
       Mare::AST::Declare.new([
         Mare::AST::Identifier.new("class"),
         Mare::AST::Identifier.new("Example"),
-      ]),
+      ] of Mare::AST::Term),
       Mare::AST::Declare.new([
         Mare::AST::Identifier.new("prop"),
         Mare::AST::Identifier.new("name"),
         Mare::AST::Identifier.new("String"),
-      ], [
+      ] of Mare::AST::Term, [
         Mare::AST::LiteralString.new("World"),
-      ]),
+      ] of Mare::AST::Term),
       Mare::AST::Declare.new([
         Mare::AST::Identifier.new("fun"),
         Mare::AST::Identifier.new("ref"),
         Mare::AST::Identifier.new("greeting"),
         Mare::AST::Identifier.new("String"),
-      ], [
-        Mare::AST::LiteralString.new("Hello"),
-      ]),
+      ] of Mare::AST::Term, [
+        Mare::AST::Relate.new("+", [
+          Mare::AST::LiteralString.new("Hello, "),
+          Mare::AST::Relate.new("+", [
+            Mare::AST::Identifier.new("name"),
+            Mare::AST::LiteralString.new("!"),
+          ] of Mare::AST::Term),
+        ] of Mare::AST::Term),
+      ] of Mare::AST::Term),
     ]
   end
 end
