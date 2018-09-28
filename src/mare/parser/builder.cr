@@ -9,7 +9,8 @@ class Mare::Parser
       @targets = [] of Array(AST::Term)
     end
     
-    def build_from(node)
+    def build(node)
+      initialize
       visit(node)
       @doc
     end

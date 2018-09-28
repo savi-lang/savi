@@ -10,9 +10,8 @@ module Mare
     
     def parse(source)
       ast = @lexer.parse(source)
-      return unless ast
       
-      Builder.new.build_from(ast)
+      @builder.build(ast) if ast
     end
   end
 end
