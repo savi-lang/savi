@@ -31,7 +31,7 @@ module Mare
     rule :t4 { (t5 >> (sn >> op5 >> sn >> t5 >> s).repeat).named(:relate) | t5 }
     rule :t5 { (t6 >> (sn >> op6 >> sn >> t6 >> s).repeat).named(:relate) | t6 }
     rule :t6 { (t7 >> (sn >> op7 >> sn >> t7 >> s).repeat).named(:relate) | t7 }
-    rule :t7 { ident | string }
+    rule :t7 { string | float | integer | ident }
     
     rule :op1 { match(/(&&|\|\|)/).named(:op) }
     rule :op2 { match(/(===|==|!==|!=|=~)/).named(:op) }
@@ -43,7 +43,10 @@ module Mare
     
     rule :s { match(/( |\t|\r|\\\r?\n)*/) }
     rule :sn { match(/( |\t|\r|\\\r?\n|\n)*/) }
-    rule :ident { match(/\b\w+\b/).named(:ident) }
+    
     rule :string { str("\"") >> match(/[^"]*/).named(:string) >> str("\"") }
+    rule :float { match(/\b[0-9][_0-9]*\.[_0-9]+\b/).named(:float) }
+    rule :integer { match(/\b[1-9][_0-9]*\b/).named(:integer) }
+    rule :ident { match(/\b\w+\b/).named(:ident) }
   end
 end

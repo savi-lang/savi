@@ -5,4 +5,4 @@ class Example:
     "Hello, " + name + "!"
   
   fun degreesF F64:
-    c * 9 / 5 + 32
+    c * 9 / 5 + 32.0

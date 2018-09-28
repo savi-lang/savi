@@ -30,10 +30,10 @@ describe Mare do
         [[:relate,
           [:relate,
             [:ident, "c"],
-            [:op, "*"], [:ident, "9"],
-            [:op, "/"], [:ident, "5"]
+            [:op, "*"], [:integer, 9],
+            [:op, "/"], [:integer, 5]
           ],
-          [:op, "+"], [:ident, "32"],
+          [:op, "+"], [:float, 32.0],
         ]],
       ],
     ]

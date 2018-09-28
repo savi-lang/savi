@@ -1,6 +1,6 @@
 module Mare
   module AST
-    alias A = Symbol | String | Array(A)
+    alias A = Symbol | String | UInt64 | Float64 | Array(A)
     
     struct Document
       property list
@@ -20,8 +20,6 @@ module Mare
       def initialize(@head = [] of Term, @body = [] of Term)
       end
       def name; :declare end
-      def to_a: Array(A);  of A end
-      
       def to_a: Array(A)
         [
           name,
@@ -31,7 +29,8 @@ module Mare
       end
     end
     
-    alias Term = Identifier | LiteralString | Operator | Relate
+    alias Term = Identifier \
+      | LiteralString | LiteralInteger | LiteralFloat | Operator | Relate
     
     struct Identifier
       property value
@@ -46,6 +45,22 @@ module Mare
       def initialize(@value : String)
       end
       def name; :string end
+      def to_a: Array(A); [name, value] of A end
+    end
+    
+    struct LiteralInteger
+      property value
+      def initialize(@value : UInt64)
+      end
+      def name; :integer end
+      def to_a: Array(A); [name, value] of A end
+    end
+    
+    struct LiteralFloat
+      property value
+      def initialize(@value : Float64)
+      end
+      def name; :float end
       def to_a: Array(A); [name, value] of A end
     end
     

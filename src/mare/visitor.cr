@@ -36,6 +36,14 @@ module Mare
       visitor.target << AST::LiteralString.new(node.full_value)
     end
     
+    enter :integer do
+      visitor.target << AST::LiteralInteger.new(node.full_value.to_u64)
+    end
+    
+    enter :float do
+      visitor.target << AST::LiteralFloat.new(node.full_value.to_f)
+    end
+    
     enter :op do
       visitor.target << AST::Operator.new(node.full_value)
     end
