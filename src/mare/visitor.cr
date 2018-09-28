@@ -7,7 +7,7 @@ module Mare
     property targets
     
     def initialize
-      @doc = [] of AST::Declare
+      @doc = AST::Document.new
       @decl = AST::Declare.new
       @targets = [] of Array(AST::Term)
     end
@@ -18,7 +18,7 @@ module Mare
     
     enter :decl do
       visitor.decl = AST::Declare.new
-      visitor.doc << visitor.decl
+      visitor.doc.list << visitor.decl
       visitor.targets.pop if visitor.targets.size > 0
       visitor.targets << visitor.decl.head
     end

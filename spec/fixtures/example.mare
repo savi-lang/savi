@@ -1,4 +1,4 @@
 class Example:
   prop name String: "World"
-  fun ref greeting String:
+  fun greeting String:
     "Hello, " + name + "!"

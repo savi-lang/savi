@@ -9,32 +9,22 @@ describe Mare do
     
     visitor = Mare::Visitor.new
     visitor.visit(ast)
-    visitor.doc.should eq [
-      Mare::AST::Declare.new([
-        Mare::AST::Identifier.new("class"),
-        Mare::AST::Identifier.new("Example"),
-      ] of Mare::AST::Term),
-      Mare::AST::Declare.new([
-        Mare::AST::Identifier.new("prop"),
-        Mare::AST::Identifier.new("name"),
-        Mare::AST::Identifier.new("String"),
-      ] of Mare::AST::Term, [
-        Mare::AST::LiteralString.new("World"),
-      ] of Mare::AST::Term),
-      Mare::AST::Declare.new([
-        Mare::AST::Identifier.new("fun"),
-        Mare::AST::Identifier.new("ref"),
-        Mare::AST::Identifier.new("greeting"),
-        Mare::AST::Identifier.new("String"),
-      ] of Mare::AST::Term, [
-        Mare::AST::Relate.new([
-          Mare::AST::LiteralString.new("Hello, "),
-          Mare::AST::Operator.new("+"),
-          Mare::AST::Identifier.new("name"),
-          Mare::AST::Operator.new("+"),
-          Mare::AST::LiteralString.new("!"),
-        ] of Mare::AST::Term),
-      ] of Mare::AST::Term),
+    
+    ll = [] of Mare::AST::A
+    visitor.doc.to_a.should eq [:doc,
+      [:declare, [[:ident, "class"], [:ident, "Example"]], ll],
+      [:declare,
+        [[:ident, "prop"], [:ident, "name"], [:ident, "String"]],
+        [[:string, "World"]]
+      ],
+      [:declare,
+        [[:ident, "fun"], [:ident, "greeting"], [:ident, "String"]],
+        [[:relate,
+          [:string, "Hello, "],
+          [:op, "+"], [:ident, "name"],
+          [:op, "+"], [:string, "!"]
+        ]]
+      ]
     ]
   end
 end
