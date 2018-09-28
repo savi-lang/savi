@@ -12,9 +12,7 @@ module Mare
       >> s
     }
     
-    rule :normal_item {
-      (decl.named(:decl) >> terms.maybe) | terms
-    }
+    rule :normal_item { (decl.named(:decl) >> terms.maybe) | terms }
     
     rule :eol_item { eol_comment }
     rule :eol_comment { str("//") >> (str("\n").absent >> any).repeat(0) }

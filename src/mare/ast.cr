@@ -21,11 +21,7 @@ module Mare
       end
       def name; :declare end
       def to_a: Array(A)
-        [
-          name,
-          head.map { |x| x.to_a },
-          body.map { |x| x.to_a },
-        ] of A
+        [name, head.map(&.to_a), body.map(&.to_a)] of A
       end
     end
     
