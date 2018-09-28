@@ -7,11 +7,11 @@ module Mare
       end
     end
     
-    alias Term = Identifier | LiteralString | Relate
+    alias Term = Identifier | LiteralString | Operator | Relate
     
     struct Identifier
-      property name
-      def initialize(@name : String)
+      property value
+      def initialize(@value : String)
       end
     end
     
@@ -21,10 +21,15 @@ module Mare
       end
     end
     
+    struct Operator
+      property value
+      def initialize(@value : String)
+      end
+    end
+    
     struct Relate
-      property op
       property terms
-      def initialize(@op : String, @terms = [] of Term)
+      def initialize(@terms = [] of Term)
       end
     end
   end

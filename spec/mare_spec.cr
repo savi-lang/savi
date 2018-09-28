@@ -27,12 +27,12 @@ describe Mare do
         Mare::AST::Identifier.new("greeting"),
         Mare::AST::Identifier.new("String"),
       ] of Mare::AST::Term, [
-        Mare::AST::Relate.new("+", [
+        Mare::AST::Relate.new([
           Mare::AST::LiteralString.new("Hello, "),
-          Mare::AST::Relate.new("+", [
-            Mare::AST::Identifier.new("name"),
-            Mare::AST::LiteralString.new("!"),
-          ] of Mare::AST::Term),
+          Mare::AST::Operator.new("+"),
+          Mare::AST::Identifier.new("name"),
+          Mare::AST::Operator.new("+"),
+          Mare::AST::LiteralString.new("!"),
         ] of Mare::AST::Term),
       ] of Mare::AST::Term),
     ]

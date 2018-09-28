@@ -23,11 +23,11 @@ module Mare
     rule :dterms { dterm >> s >> dterms.maybe }
     rule :dterm { ident }
     
-    rule :terms { (term1 >> s >> terms) | term1 }
-    rule :term1 { (term2 >> s >> binop1 >> s >> term1).named(:relate) | term2 }
-    rule :term2 { ident | string }
+    rule :terms { (t1 >> s).repeat }
+    rule :t1 { (t2 >> s >> (op1 >> s >> t2 >> s).repeat).named(:relate) | t2 }
+    rule :t2 { ident | string }
     
-    rule :binop1 { str("+") }
+    rule :op1 { match(/[+-]/).named(:op) }
     
     rule :s { match(/( |\t|\r|\\\r?\n)*/) }
     rule :ident { match(/\b\w+\b/).named(:ident) }

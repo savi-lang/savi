@@ -36,8 +36,12 @@ module Mare
       visitor.target << AST::LiteralString.new(node.full_value)
     end
     
+    enter :op do
+      visitor.target << AST::Operator.new(node.full_value)
+    end
+    
     enter :relate do
-      relate = AST::Relate.new(node.children[0].children[2].full_value)
+      relate = AST::Relate.new
       visitor.target << relate
       visitor.targets << relate.terms
     end
