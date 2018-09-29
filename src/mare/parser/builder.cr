@@ -24,7 +24,7 @@ class Mare::Parser
     private def handle(node, tuple)
       case tuple
       when {:enter, :decl}
-        @decl = AST::Declare.new
+        @decl = AST::Declare.new.with_pos(node)
         @doc.list << @decl
         @targets.pop if @targets.size > 0
         @targets << @decl.head
@@ -34,22 +34,28 @@ class Mare::Parser
         @targets << @decl.body
       
       when {:enter, :ident}
-        @targets.last << AST::Identifier.new(node.full_value)
+        value = node.full_value
+        @targets.last << AST::Identifier.new(value).with_pos(node)
       
       when {:enter, :string}
-        @targets.last << AST::LiteralString.new(node.full_value)
+        value = node.full_value
+        @targets.last << AST::LiteralString.new(value).with_pos(node)
       
       when {:enter, :integer}
-        @targets.last << AST::LiteralInteger.new(node.full_value.to_u64)
+        value = node.full_value.to_u64
+        @targets.last << AST::LiteralInteger.new(value).with_pos(node)
       
       when {:enter, :float}
-        @targets.last << AST::LiteralFloat.new(node.full_value.to_f)
+        value = node.full_value.to_f
+        @targets.last << AST::LiteralFloat.new(value).with_pos(node)
       
       when {:enter, :op}
-        @targets.last << AST::Operator.new(node.full_value)
+        value = node.full_value
+        @targets.last << AST::Operator.new(value).with_pos(node)
       
       when {:enter, :group}
-        group = AST::Group.new(node.children[0].children[0].full_value)
+        style = node.children[0].children[0].full_value
+        group = AST::Group.new(style).with_pos(node)
         @targets.last << group
         @targets << group.terms
       
@@ -57,7 +63,7 @@ class Mare::Parser
         @targets.pop
       
       when {:enter, :relate}
-        relate = AST::Relate.new
+        relate = AST::Relate.new.with_pos(node)
         @targets.last << relate
         @targets << relate.terms
       
