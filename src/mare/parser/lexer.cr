@@ -30,7 +30,7 @@ class Mare::Parser
     rule :t4 { (t5 >> (sn >> op5 >> sn >> t5 >> s).repeat).named(:relate) | t5 }
     rule :t5 { (t6 >> (sn >> op6 >> sn >> t6 >> s).repeat).named(:relate) | t6 }
     rule :t6 { (t7 >> (sn >> op7 >> sn >> t7 >> s).repeat).named(:relate) | t7 }
-    rule :t7 { atom }
+    rule :t7 { prefixed | atom }
     
     rule :opw { str(" ").named(:op) }
     rule :op1 { match(/(&&|\|\|)/).named(:op) }
@@ -40,6 +40,9 @@ class Mare::Parser
     rule :op5 { match(/(\.\.|<>)/).named(:op) }
     rule :op6 { match(/(\+|-)/).named(:op) }
     rule :op7 { match(/(\*|\/)/).named(:op) }
+    
+    rule :prefixed { (prefixop >> atom).named(:prefix) }
+    rule :prefixop { match(/@/).named(:op) }
     
     rule :atom { parens | string | float | integer | ident }
     

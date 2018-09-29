@@ -55,6 +55,18 @@ class Mare::Parser
         value = node.full_value
         @targets.last << AST::Operator.new(value).with_pos(@source, node)
       
+      when {:enter, :prefix}
+        placeholder = AST::Operator.new("") # replace this later
+        prefix = AST::Prefix.new(placeholder).with_pos(@source, node)
+        @targets.last << prefix
+        @targets << prefix.terms
+      
+      when {:exit, :prefix}
+        terms = @targets.pop
+        prefix = @targets.last.pop.as(AST::Prefix)
+        prefix.op = terms.shift.as(AST::Operator)
+        @targets.last << prefix
+      
       when {:enter, :group}
         style = node.children[0].children[0].full_value
         group = AST::Group.new(style).with_pos(@source, node)

@@ -19,7 +19,7 @@ describe Mare::Parser do
         [[:ident, "fun"], [:ident, "greeting"], [:ident, "String"]],
         [[:relate,
           [:string, "Hello, "],
-          [:op, "+"], [:ident, "name"],
+          [:op, "+"], [:prefix, [:op, "@"], [:ident, "name"]],
           [:op, "+"], [:string, "!"]
         ]]
       ],

@@ -38,7 +38,7 @@ module Mare
     
     alias Term = Identifier \
       | LiteralString | LiteralInteger | LiteralFloat \
-      | Operator | Relate | Group
+      | Operator | Prefix | Relate | Group
     
     struct Identifier < Node
       property value
@@ -78,6 +78,20 @@ module Mare
       end
       def name; :op end
       def to_a: Array(A); [name, value] of A end
+    end
+    
+    struct Prefix < Node
+      property op
+      property terms
+      def initialize(@op : Operator, @terms = [] of Term)
+      end
+      def name; :prefix end
+      def to_a: Array(A)
+        res = [name] of A
+        res << op.to_a
+        terms.each { |x| res << x.to_a }
+        res
+      end
     end
     
     struct Group < Node
