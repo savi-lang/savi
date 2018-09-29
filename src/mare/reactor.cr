@@ -17,6 +17,12 @@ module Mare
       ex.as(Expectations(X)).fulfill(path, x)
     end
     
+    def show_remaining(list = [] of String)
+      @expectations.each_value { |ex| ex.show_remaining(list) }
+      
+      list
+    end
+    
     abstract struct ExpectationsAny; end
     struct Expectations(X) < ExpectationsAny
       def initialize
@@ -45,6 +51,16 @@ module Mare
         end
         
         @map[path] = x
+      end
+      
+      def show_remaining(list = [] of String)
+        @map.each do |path, res|
+          if res.is_a? Array(X -> Nil)
+            list << "- #{X.inspect} #{path.inspect}"
+          end
+        end
+        
+        list
       end
     end
   end
