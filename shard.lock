@@ -2,5 +2,5 @@ version: 1.0
 shards:
   lingo:
     github: rmosolgo/lingo
-    commit: 4e1d6e7454db645d47de361b044bc78e3a333e42
+    commit: 9b7f63dffa8d03a34686758bc6ddaa6db222108c
 
