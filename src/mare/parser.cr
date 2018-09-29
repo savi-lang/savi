@@ -9,9 +9,9 @@ module Mare
     end
     
     def parse(source)
-      ast = @lexer.parse(source)
+      ast = @lexer.parse(source.content)
       
-      @builder.build(ast) if ast
+      @builder.build(source, ast) if ast
     end
   end
 end

@@ -7,10 +7,12 @@ class Mare::Parser
       @doc = AST::Document.new
       @decl = AST::Declare.new
       @targets = [] of Array(AST::Term)
+      @source = Source.none
     end
     
-    def build(node)
+    def build(source, node)
       initialize
+      @source = source
       visit(node)
       @doc
     end
@@ -24,7 +26,7 @@ class Mare::Parser
     private def handle(node, tuple)
       case tuple
       when {:enter, :decl}
-        @decl = AST::Declare.new.with_pos(node)
+        @decl = AST::Declare.new.with_pos(@source, node)
         @doc.list << @decl
         @targets.pop if @targets.size > 0
         @targets << @decl.head
@@ -35,27 +37,27 @@ class Mare::Parser
       
       when {:enter, :ident}
         value = node.full_value
-        @targets.last << AST::Identifier.new(value).with_pos(node)
+        @targets.last << AST::Identifier.new(value).with_pos(@source, node)
       
       when {:enter, :string}
         value = node.full_value
-        @targets.last << AST::LiteralString.new(value).with_pos(node)
+        @targets.last << AST::LiteralString.new(value).with_pos(@source, node)
       
       when {:enter, :integer}
         value = node.full_value.to_u64
-        @targets.last << AST::LiteralInteger.new(value).with_pos(node)
+        @targets.last << AST::LiteralInteger.new(value).with_pos(@source, node)
       
       when {:enter, :float}
         value = node.full_value.to_f
-        @targets.last << AST::LiteralFloat.new(value).with_pos(node)
+        @targets.last << AST::LiteralFloat.new(value).with_pos(@source, node)
       
       when {:enter, :op}
         value = node.full_value
-        @targets.last << AST::Operator.new(value).with_pos(node)
+        @targets.last << AST::Operator.new(value).with_pos(@source, node)
       
       when {:enter, :group}
         style = node.children[0].children[0].full_value
-        group = AST::Group.new(style).with_pos(node)
+        group = AST::Group.new(style).with_pos(@source, node)
         @targets.last << group
         @targets << group.terms
       
@@ -63,7 +65,7 @@ class Mare::Parser
         @targets.pop
       
       when {:enter, :relate}
-        relate = AST::Relate.new.with_pos(node)
+        relate = AST::Relate.new.with_pos(@source, node)
         @targets.last << relate
         @targets << relate.terms
       

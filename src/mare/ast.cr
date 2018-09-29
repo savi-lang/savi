@@ -5,12 +5,10 @@ module Mare
     alias A = Symbol | String | UInt64 | Float64 | Array(A)
     
     abstract struct Node
-      getter row
-      getter col
+      getter pos
       
-      def with_pos(node : Lingo::Node)
-        @row = node.line.as(Int32)
-        @col = node.column.as(Int32)
+      def with_pos(source : Source, node : Lingo::Node)
+        @pos = SourcePos.new(source, node.line, node.column)
         self
       end
     end
