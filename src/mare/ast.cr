@@ -34,6 +34,10 @@ module Mare
       def to_a: Array(A)
         [name, head.map(&.to_a), body.map(&.to_a)] of A
       end
+      
+      def keyword
+        head.first.as(Identifier).value
+      end
     end
     
     alias Term = Identifier \
