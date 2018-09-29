@@ -1,6 +1,3 @@
-require "lingo"
-require "../ast"
-
 class Mare::Parser
   class Builder
     def initialize

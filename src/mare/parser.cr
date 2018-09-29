@@ -1,6 +1,3 @@
-require "./parser/lexer"
-require "./parser/builder"
-
 module Mare
   class Parser
     def initialize
