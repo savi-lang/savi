@@ -9,6 +9,8 @@ targets:
     main: src/mare.cr
 
 dependencies:
+  lsp:
+    github: crystal-lang-tools/lsp
   lingo:
     github: rmosolgo/lingo
 
