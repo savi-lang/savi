@@ -6,13 +6,13 @@ authors:
 
 targets:
   mare:
-    main: src/mare.cr
+    main: main.cr
 
 dependencies:
-  lsp:
-    github: crystal-lang-tools/lsp
   lingo:
     github: rmosolgo/lingo
+  lsp:
+    github: jemc/crystal-lsp
 
 crystal: 0.26.1
 

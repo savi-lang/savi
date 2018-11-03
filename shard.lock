@@ -1,10 +1,10 @@
 version: 1.0
 shards:
-  lsp:
-    github: crystal-lang-tools/lsp
-    commit: 19e5f71fb64fa79c5e077e45b60802c06b807353
-
   lingo:
     github: rmosolgo/lingo
-    commit: 9b7f63dffa8d03a34686758bc6ddaa6db222108c
+    commit: 2c091c352df904dd16efe777c0ace1a27e2cebde
+
+  lsp:
+    github: jemc/crystal-lsp
+    commit: 7964e6fe5a4f111a5226af8606f76f308a8e9a1e
 
