@@ -1,4 +1,5 @@
 require "lsp"
+require "uri"
 
 class Mare::Server
   def initialize(
@@ -6,6 +7,7 @@ class Mare::Server
     @stdout : IO = STDOUT,
     @stderr : IO = STDERR)
     @wire = LSP::Wire.new(@stdin, @stdout)
+    @open_files = {} of URI => String
   end
   
   def run
@@ -55,12 +57,31 @@ class Mare::Server
     Process.exit
   end
   
+  def handle(msg : LSP::Message::DidOpen)
+    @open_files[msg.params.text_document.uri] =
+      msg.params.text_document.text
+  end
+  
+  def handle(msg : LSP::Message::DidChange)
+    @open_files[msg.params.text_document.uri] =
+      msg.params.content_changes.last.text
+  end
+  
+  def handle(msg : LSP::Message::DidClose)
+    @open_files.delete(msg.params.text_document.uri)
+  end
+  
+  def handle(msg : LSP::Message::DidSave)
+    # Ignore.
+  end
+  
   # TODO: Hover support.
   def handle(msg : LSP::Message::Hover)
     pos = msg.params.position
+    text = @open_files[msg.params.text_document.uri] rescue ""
     @wire.respond msg do |msg|
       msg.result.contents.kind = "markdown"
-      msg.result.contents.value = "# TODO: Hover\n`#{pos.to_json}`"
+      msg.result.contents.value = "# TODO: Hover\n`#{pos.to_json}`\n```ruby\n#{text}\n```\n"
       msg
     end
   end
