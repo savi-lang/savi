@@ -55,6 +55,16 @@ class Mare::Server
     Process.exit
   end
   
+  # TODO: Hover support.
+  def handle(msg : LSP::Message::Hover)
+    pos = msg.params.position
+    @wire.respond msg do |msg|
+      msg.result.contents.kind = "markdown"
+      msg.result.contents.value = "# TODO: Hover\n`#{pos.to_json}`"
+      msg
+    end
+  end
+  
   def handle(msg)
     @stderr.puts "Unhandled incoming message!"
     @stderr.puts msg.to_json
