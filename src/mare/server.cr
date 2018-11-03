@@ -92,7 +92,8 @@ class Mare::Server
     text = @open_files[msg.params.text_document.uri] rescue ""
     @wire.respond msg do |msg|
       msg.result.contents.kind = "markdown"
-      msg.result.contents.value = "# TODO: Hover\n`#{pos.to_json}`\n```ruby\n#{text}\n```\n"
+      msg.result.contents.value =
+        "# TODO: Hover\n`#{pos.to_json}`\n```ruby\n#{text}\n```\n"
       msg
     end
   end
