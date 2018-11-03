@@ -43,11 +43,11 @@ class Mare::Server
   end
   
   def handle(msg : LSP::Message::Initialized)
-    # Start server resources
+    # TODO: Start server resources.
   end
   
   def handle(msg : LSP::Message::Shutdown)
-    # Stop server resources
+    # TODO: Stop server resources.
     @wire.respond(msg) { |msg| msg }
   end
   
