@@ -8,7 +8,13 @@ module Mare
       getter pos
       
       def with_pos(source : Source, node : Lingo::Node)
-        @pos = SourcePos.new(source, node.line, node.column)
+        size = node.full_value.size
+        @pos = SourcePos.new(
+          source,
+          node.line,
+          node.column,
+          node.line, # TODO: account for newlines in node.full_value
+          node.column + size)
         self
       end
     end
