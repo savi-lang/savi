@@ -40,10 +40,12 @@ class Mare::Server
   # When told to initialize, respond with info about our capabilities.
   def handle(msg : LSP::Message::Initialize)
     @wire.respond msg do |msg|
-      msg.result.capabilities.hover_provider = true
       msg.result.capabilities.text_document_sync.open_close = true
       msg.result.capabilities.text_document_sync.change =
         LSP::Data::TextDocumentSyncKind::Full
+      msg.result.capabilities.hover_provider = true
+      msg.result.capabilities.completion_provider =
+        LSP::Data::ServerCapabilities::CompletionOptions.new
       msg
     end
   end
@@ -86,7 +88,7 @@ class Mare::Server
     # Ignore.
   end
   
-  # TODO: Hover support.
+  # TODO: Proper hover support.
   def handle(msg : LSP::Message::Hover)
     pos = msg.params.position
     text = @open_files[msg.params.text_document.uri] rescue ""
@@ -94,6 +96,26 @@ class Mare::Server
       msg.result.contents.kind = "markdown"
       msg.result.contents.value =
         "# TODO: Hover\n`#{pos.to_json}`\n```ruby\n#{text}\n```\n"
+      msg
+    end
+  end
+  
+  # TODO: Proper completion support.
+  def handle(msg : LSP::Message::Completion)
+    pos = msg.params.position
+    text = @open_files[msg.params.text_document.uri] rescue ""
+    @wire.respond msg do |msg|
+      msg.result.items =
+        ["class ", "prop ", "fun "].map do |label|
+          LSP::Data::CompletionItem.new.try do |item|
+            item.label = label
+            item.kind = LSP::Data::CompletionItemKind::Method
+            item.detail = "declare a #{label}"
+            item.documentation = LSP::Data::MarkupContent.new "markdown",
+              "# TODO: Completion\n`#{pos.to_json}`\n```ruby\n#{text}\n```\n"
+            item
+          end
+        end
       msg
     end
   end
