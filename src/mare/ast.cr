@@ -1,4 +1,4 @@
-require "lingo"
+require "pegmatite"
 
 module Mare
   module AST
@@ -7,14 +7,8 @@ module Mare
     abstract struct Node
       getter pos
       
-      def with_pos(source : Source, node : Lingo::Node)
-        size = node.full_value.size
-        @pos = SourcePos.new(
-          source,
-          node.line,
-          node.column,
-          node.line, # TODO: account for newlines in node.full_value
-          node.column + size)
+      def with_pos(source : Source, token : Pegmatite::Token)
+        @pos = SourcePos.new(source, token[1], token[2])
         self
       end
     end
@@ -100,6 +94,20 @@ module Mare
         res = [name] of A
         res << op.to_a
         terms.each { |x| res << x.to_a }
+        res
+      end
+    end
+    
+    struct Qualify < Node
+      property terms
+      property group
+      def initialize(@group : Group, @terms = [] of Term)
+      end
+      def name; :qualify end
+      def to_a: Array(A)
+        res = [name] of A
+        terms.each { |x| res << x.to_a }
+        res << group.to_a
         res
       end
     end

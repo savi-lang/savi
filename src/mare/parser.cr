@@ -1,14 +1,11 @@
+require "pegmatite"
+
 module Mare
-  class Parser
-    def initialize
-      @lexer = Lexer.new
-      @builder = Builder.new
-    end
-    
-    def parse(source)
-      ast = @lexer.parse(source.content)
+  module Parser
+    def self.parse(source)
+      tokens = Pegmatite.tokenize(Grammar, source.content)
       
-      @builder.build(source, ast) if ast
+      Builder.build(tokens, source)
     end
   end
 end

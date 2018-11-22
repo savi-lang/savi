@@ -4,7 +4,7 @@ describe Mare::Parser do
   it "parses an example" do
     source = fixture "example.mare"
     
-    ast = Mare::Parser.new.parse(source)
+    ast = Mare::Parser.parse(source)
     ast.should be_truthy
     next unless ast
     
@@ -28,7 +28,8 @@ describe Mare::Parser do
           [:ident, "fun"],
           [:ident, "degreesF"],
           [:group, "(", [:relate, [:ident, "c"], [:op, " "], [:ident, "F64"]]],
-          [:ident, "F64"]],
+          [:ident, "F64"]
+        ],
         [[:relate,
           [:relate,
             [:ident, "c"],
@@ -36,7 +37,26 @@ describe Mare::Parser do
             [:op, "/"], [:integer, 5]
           ],
           [:op, "+"], [:float, 32.0],
-        ]],
+        ]]
+      ],
+      [:declare,
+        [[:ident, "fun"], [:ident, "caller"]],
+        [[:qualify,
+          [:prefix, [:op, "@"], [:ident, "degreesF"]],
+          [:group, "(",
+            [:relate,
+              [:integer, 10],
+              [:op, "."], [:qualify,
+                [:ident, "add"],
+                [:group, "(", [:integer, 2]],
+              ],
+              [:op, "."], [:qualify,
+                [:ident, "sub"],
+                [:group, "(", [:integer, 1]],
+              ],
+            ],
+          ],
+        ]]
       ],
     ]
   end
@@ -44,7 +64,7 @@ describe Mare::Parser do
   it "parses operators" do
     source = fixture "operators.mare"
     
-    ast = Mare::Parser.new.parse(source)
+    ast = Mare::Parser.parse(source)
     ast.should be_truthy
     next unless ast
     

@@ -57,8 +57,8 @@ module Mare
           head = decl.head.dup
           head.shift # discard the keyword
           ident = head.shift.as(AST::Identifier)
-          params = head.shift.as(AST::Group) if head[0].is_a?(AST::Group)
-          ret = head.shift.as(AST::Identifier)
+          params = head.shift.as(AST::Group) if head[0]?.is_a?(AST::Group)
+          ret = head.shift.as(AST::Identifier) if head[0]?
           
           @functions << Function.new(ident, params, ret, decl.body)
         end
@@ -76,8 +76,8 @@ module Mare
     class Function
       def initialize(
         @ident : AST::Identifier,
-        @params : AST::Group | Nil,
-        @ret : AST::Identifier,
+        @params : AST::Group?,
+        @ret : AST::Identifier?,
         @body : Array(AST::Term))
       end
     end

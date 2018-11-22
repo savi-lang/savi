@@ -11,22 +11,18 @@ module Mare
   
   struct SourcePos
     property source
-    property row
-    property col
-    property end_row
-    property end_col
+    property start
+    property finish
     def initialize(
       @source : Source,
-      @row : Int32,
-      @col : Int32,
-      @end_row : Int32,
-      @end_col : Int32)
+      @start : Int32,
+      @finish : Int32)
     end
     
     # Override inspect to avoid verbosely printing Source#content every time.
     def inspect(io)
       io <<
-        "`#{source.path.split("/").last}:#{row}:#{col}-#{end_row}:#{end_col}`"
+        "`#{source.path.split("/").last}:#{start}-#{finish}`"
     end
   end
 end

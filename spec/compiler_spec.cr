@@ -4,7 +4,7 @@ describe Mare::Compiler::Default do
   it "compiles an example" do
     source = fixture "example.mare"
     
-    ast = Mare::Parser.new.parse(source)
+    ast = Mare::Parser.parse(source)
     ast.should be_truthy
     next unless ast
     

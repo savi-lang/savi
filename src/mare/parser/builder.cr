@@ -1,88 +1,118 @@
-class Mare::Parser
-  class Builder
-    def initialize
-      @doc = AST::Document.new
-      @decl = AST::Declare.new
-      @targets = [] of Array(AST::Term)
-      @source = Source.none
+require "pegmatite"
+
+module Mare::Parser
+  module Builder
+    def self.build(tokens, source)
+      iter = Pegmatite::TokenIterator.new(tokens)
+      main = iter.next
+      build_doc(main, iter, source)
     end
     
-    def build(source, node)
-      initialize
-      @source = source
-      visit(node)
-      @doc
+    private def self.assert_kind(token, kind)
+      raise "Unexpected token: #{token.inspect}; expected: #{kind.inspect}" \
+        unless token[0] == kind
     end
     
-    private def visit(node)
-      handle(node, {:enter, node.name})
-      node.children.each { |child| visit(child) }
-      handle(node, {:exit, node.name})
-    end
-    
-    private def handle(node, tuple)
-      case tuple
-      when {:enter, :decl}
-        @decl = AST::Declare.new.with_pos(@source, node)
-        @doc.list << @decl
-        @targets.pop if @targets.size > 0
-        @targets << @decl.head
+    private def self.build_doc(main, iter, source)
+      assert_kind(main, :doc)
+      doc = AST::Document.new
+      decl : AST::Declare? = nil
       
-      when {:exit, :decl}
-        @targets.pop
-        @targets << @decl.body
-      
-      when {:enter, :ident}
-        value = node.full_value
-        @targets.last << AST::Identifier.new(value).with_pos(@source, node)
-      
-      when {:enter, :string}
-        value = node.full_value
-        @targets.last << AST::LiteralString.new(value).with_pos(@source, node)
-      
-      when {:enter, :integer}
-        value = node.full_value.to_u64
-        @targets.last << AST::LiteralInteger.new(value).with_pos(@source, node)
-      
-      when {:enter, :float}
-        value = node.full_value.to_f
-        @targets.last << AST::LiteralFloat.new(value).with_pos(@source, node)
-      
-      when {:enter, :op}
-        value = node.full_value
-        @targets.last << AST::Operator.new(value).with_pos(@source, node)
-      
-      when {:enter, :prefix}
-        placeholder = AST::Operator.new("") # replace this later
-        pos_node = node.children[0].children[0]
-        prefix = AST::Prefix.new(placeholder).with_pos(@source, pos_node)
-        @targets.last << prefix
-        @targets << prefix.terms
-      
-      when {:exit, :prefix}
-        terms = @targets.pop
-        prefix = @targets.last.pop.as(AST::Prefix)
-        prefix.op = terms.shift.as(AST::Operator)
-        @targets.last << prefix
-      
-      when {:enter, :group}
-        pos_node = node.children[0].children[0]
-        style = pos_node.full_value
-        group = AST::Group.new(style).with_pos(@source, pos_node)
-        @targets.last << group
-        @targets << group.terms
-      
-      when {:exit, :group}
-        @targets.pop
-      
-      when {:enter, :relate}
-        relate = AST::Relate.new.with_pos(@source, node)
-        @targets.last << relate
-        @targets << relate.terms
-      
-      when {:exit, :relate}
-        @targets.pop
+      iter.while_next_is_child_of(main) do |child|
+        if child[0] == :decl
+          decl = build_decl(child, iter, source)
+          doc.list << decl
+        else
+          decl.as(AST::Declare).body << build_term(child, iter, source)
+        end
       end
+      
+      doc
+    end
+    
+    private def self.build_decl(main, iter, source)
+      assert_kind(main, :decl)
+      decl = AST::Declare.new.with_pos(source, main)
+      
+      iter.while_next_is_child_of(main) do |child|
+        decl.head << build_term(child, iter, source)
+      end
+      
+      decl
+    end
+    
+    private def self.build_term(main, iter, source)
+      kind, start, finish = main
+      case kind
+      when :ident
+        value = source.content[start...finish]
+        AST::Identifier.new(value).with_pos(source, main)
+      when :string
+        value = source.content[start...finish]
+        AST::LiteralString.new(value).with_pos(source, main)
+      when :integer
+        value = source.content[start...finish].to_u64
+        AST::LiteralInteger.new(value).with_pos(source, main)
+      when :float
+        value = source.content[start...finish].to_f
+        AST::LiteralFloat.new(value).with_pos(source, main)
+      when :op
+        value = source.content[start...finish]
+        AST::Operator.new(value).with_pos(source, main)
+      when :relate  then build_relate(main, iter, source)
+      when :group   then build_group(main, iter, source)
+      when :prefix  then build_prefix(main, iter, source)
+      when :qualify then build_qualify(main, iter, source)
+      else
+        raise NotImplementedError.new(kind)
+      end
+    end
+    
+    private def self.build_relate(main, iter, source)
+      assert_kind(main, :relate)
+      relate = AST::Relate.new.with_pos(source, main)
+      
+      iter.while_next_is_child_of(main) do |child|
+        relate.terms << build_term(child, iter, source)
+      end
+      
+      relate
+    end
+    
+    private def self.build_group(main, iter, source)
+      assert_kind(main, :group)
+      style = source.content[main[1]..main[1]]
+      group = AST::Group.new(style).with_pos(source, main)
+      
+      iter.while_next_is_child_of(main) do |child|
+        group.terms << build_term(child, iter, source)
+      end
+      
+      group
+    end
+    
+    private def self.build_prefix(main, iter, source)
+      assert_kind(main, :prefix)
+      
+      op = build_term(iter.next_as_child_of(main), iter, source)
+      op = op.as(AST::Operator)
+      
+      term = build_term(iter.next_as_child_of(main), iter, source)
+      
+      # TODO: Don't use array of terms here.
+      AST::Prefix.new(op, [term]).with_pos(source, main)
+    end
+    
+    private def self.build_qualify(main, iter, source)
+      assert_kind(main, :qualify)
+      
+      term = build_term(iter.next_as_child_of(main), iter, source)
+      
+      group = build_term(iter.next_as_child_of(main), iter, source)
+      group = group.as(AST::Group)
+      
+      # TODO: Flip order and don't use array of terms here.
+      AST::Qualify.new(group, [term]).with_pos(source, main)
     end
   end
 end

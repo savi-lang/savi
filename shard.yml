@@ -9,8 +9,8 @@ targets:
     main: main.cr
 
 dependencies:
-  lingo:
-    github: rmosolgo/lingo
+  pegmatite:
+    github: jemc/crystal-pegmatite
   lsp:
     github: jemc/crystal-lsp
 

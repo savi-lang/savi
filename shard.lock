@@ -1,10 +1,10 @@
 version: 1.0
 shards:
-  lingo:
-    github: rmosolgo/lingo
-    commit: 2c091c352df904dd16efe777c0ace1a27e2cebde
-
   lsp:
     github: jemc/crystal-lsp
     commit: 7964e6fe5a4f111a5226af8606f76f308a8e9a1e
+
+  pegmatite:
+    github: jemc/crystal-pegmatite
+    commit: 5684f34d18693c88979a028577deb270634ccc6c
 
