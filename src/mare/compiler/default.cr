@@ -1,9 +1,14 @@
 module Mare
   class Compiler::Default < Compiler
-    def keywords; ["class"] end
+    def keywords; ["actor", "class"] end
     
     def compile(context, decl)
       case decl.keyword
+      when "actor"
+        context.push Type.new(
+          Type::Kind::Actor,
+          decl.head.last.as(AST::Identifier),
+        )
       when "class"
         context.push Type.new(
           Type::Kind::Class,
@@ -13,7 +18,10 @@ module Mare
     end
     
     class Type < Compiler
-      enum Kind; Class end
+      enum Kind
+        Actor
+        Class
+      end
       
       def initialize(@kind : Kind, @ident : AST::Identifier)
         @properties = [] of Property
