@@ -16,17 +16,19 @@ class Mare::CodeGen
     res = 0
     
     ctx.on Compiler::Default::Function, ["fun", "Main", "main"] do |f|
-      # Get the return value from the end of the function body, as an I32.
-      ret_val = f.body.last.as(AST::LiteralInteger).value.to_i32
-      
       # Declare the main function.
       main = @mod.functions.add("main", ([] of LLVM::Type), @llvm.int32)
       main.linkage = LLVM::Linkage::External
       
-      # Write the return statement just inside the main block.
+      # Create a basic block to hold the implementation of the main function.
       bb = main.basic_blocks.append("entry")
       @builder.position_at_end bb
-      @builder.ret(@llvm.int32.const_int(ret_val))
+      
+      # Call gen_expr on each expression, treating the last one as the ret_val.
+      ret_val = nil
+      f.body.each { |expr| ret_val = gen_expr(expr) }
+      raise "main is an empty function" unless ret_val
+      @builder.ret(ret_val)
       
       # Run the function!
       res = LLVM::JITCompiler.new @mod do |jit|
@@ -37,5 +39,15 @@ class Mare::CodeGen
     ctx.finish
     
     res
+  end
+  
+  def gen_expr(expr) : LLVM::Value
+    case expr
+    when AST::LiteralInteger
+      # TODO: Allow for non-I32 integers, based on inference.
+      @llvm.int32.const_int(expr.value.to_i32)
+    else
+      raise NotImplementedError.new(expr.inspect)
+    end
   end
 end

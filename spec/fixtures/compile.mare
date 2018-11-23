@@ -1,2 +1,4 @@
 actor Main:
-  fun main: 42
+  fun main:
+    10
+    42
