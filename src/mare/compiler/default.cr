@@ -23,7 +23,10 @@ module Mare
         Class
       end
       
-      def initialize(@kind : Kind, @ident : AST::Identifier)
+      getter kind : Kind
+      getter ident : AST::Identifier
+      
+      def initialize(@kind, @ident)
         @properties = [] of Property
         @functions = [] of Function
       end
@@ -74,19 +77,21 @@ module Mare
     end
     
     class Property
-      def initialize(
-        @ident : AST::Identifier,
-        @ret : AST::Identifier,
-        @body : Array(AST::Term))
+      getter ident : AST::Identifier
+      getter ret : AST::Identifier
+      getter body : Array(AST::Term)
+      
+      def initialize(@ident, @ret, @body)
       end
     end
     
     class Function
-      def initialize(
-        @ident : AST::Identifier,
-        @params : AST::Group?,
-        @ret : AST::Identifier?,
-        @body : Array(AST::Term))
+      getter ident : AST::Identifier
+      getter params : AST::Group?
+      getter ret : AST::Identifier?
+      getter body : Array(AST::Term)
+      
+      def initialize(@ident, @params, @ret, @body)
       end
     end
   end
