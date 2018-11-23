@@ -10,7 +10,7 @@ describe Mare::Compiler::Default do
     
     context = Mare::Context.new
     context.compile(ast)
-    context.run(Mare::CodeGen.new)
     context.finish
+    context.run(Mare::CodeGen.new).should eq 42
   end
 end

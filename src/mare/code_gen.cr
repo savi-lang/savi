@@ -13,8 +13,8 @@ class Mare::CodeGen
   end
   
   def run(ctx = Context)
-    # TODO: Rework this to use Fibers/blocking instead of callbacks,
-    # so that we can return the result at the end of this function.
+    res = 0
+    
     ctx.on Compiler::Default::Function, ["fun", "Main", "main"] do |f|
       # Get the return value from the end of the function body, as an I32.
       ret_val = f.body.last.as(AST::LiteralInteger).value.to_i32
@@ -32,9 +32,10 @@ class Mare::CodeGen
       res = LLVM::JITCompiler.new @mod do |jit|
         jit.run_function(@mod.functions["main"], @llvm).to_i
       end
-      
-      # Prove that the return value is correct.
-      raise "expected #{ret_val}; got #{res}" unless res == ret_val
     end
+    
+    ctx.finish
+    
+    res
   end
 end
