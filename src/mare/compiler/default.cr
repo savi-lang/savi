@@ -71,7 +71,10 @@ module Mare
           params = head.shift.as(AST::Group) if head[0]?.is_a?(AST::Group)
           ret = head.shift.as(AST::Identifier) if head[0]?
           
-          @functions << Function.new(ident, params, ret, decl.body)
+          function = Function.new(ident, params, ret, decl.body)
+          context.fulfill ["fun", @ident.value, ident.value], function
+          
+          @functions << function
         end
       end
     end

@@ -1,0 +1,2 @@
+actor Main:
+  fun main: 42
