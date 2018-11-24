@@ -27,16 +27,17 @@ class Mare::CodeGen
   @mod : LLVM::Module
   @builder : LLVM::Builder
   
+  getter return_value
+  
   def initialize
     LLVM.init_x86
     @llvm = LLVM::Context.new
     @mod = @llvm.new_module("minimal")
     @builder = @llvm.new_builder
+    @return_value = 0
   end
   
   def run(ctx = Context)
-    res = 0
-    
     # CodeGen for all FFI declarations.
     ctx.program.types.each do |t|
       next unless t.kind == Program::Type::Kind::FFI
@@ -61,13 +62,9 @@ class Mare::CodeGen
     @builder.ret(ret_val)
     
     # Run the function!
-    res = LLVM::JITCompiler.new @mod do |jit|
+    @return_value = LLVM::JITCompiler.new @mod do |jit|
       jit.run_function(@mod.functions["main"], @llvm).to_i
     end
-    
-    ctx.finish
-    
-    res
   end
   
   def ffi_type_for(ident)

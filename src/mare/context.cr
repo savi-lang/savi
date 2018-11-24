@@ -11,6 +11,7 @@ module Mare
     def compile(doc : AST::Document)
       doc.list.each { |decl| compile(decl) }
       @stack.reverse_each &.finished(self)
+      finish
     end
     
     def compile(decl : AST::Declare)
@@ -44,6 +45,8 @@ module Mare
     
     def run(obj)
       obj.run(self)
+      finish
+      obj
     end
   end
 end
