@@ -1,4 +1,7 @@
+ffi LibC:
+  fun puts (CString) I32:
+
 actor Main:
   fun main:
-    10
+    LibC.puts("Hello, World!")
     42

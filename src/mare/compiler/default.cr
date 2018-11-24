@@ -1,19 +1,31 @@
 module Mare
   class Compiler::Default < Compiler
-    def keywords; ["actor", "class"] end
+    getter types
+    
+    def initialize
+      @types = [] of Type
+    end
+    
+    def finished(context)
+      context.fulfill ["doc"], self
+    end
+    
+    def keywords; ["actor", "class", "ffi"] end
     
     def compile(context, decl)
       case decl.keyword
       when "actor"
-        context.push Type.new(
-          Type::Kind::Actor,
-          decl.head.last.as(AST::Identifier),
-        )
+        t = Type.new(Type::Kind::Actor, decl.head.last.as(AST::Identifier))
+        @types << t
+        context.push t
       when "class"
-        context.push Type.new(
-          Type::Kind::Class,
-          decl.head.last.as(AST::Identifier),
-        )
+        t = Type.new(Type::Kind::Class, decl.head.last.as(AST::Identifier))
+        @types << t
+        context.push t
+      when "ffi"
+        t = Type.new(Type::Kind::FFI, decl.head.last.as(AST::Identifier))
+        @types << t
+        context.push t
       end
     end
     
@@ -21,10 +33,13 @@ module Mare
       enum Kind
         Actor
         Class
+        FFI
       end
       
       getter kind : Kind
       getter ident : AST::Identifier
+      getter properties
+      getter functions
       
       def initialize(@kind, @ident)
         @properties = [] of Property
@@ -50,6 +65,10 @@ module Mare
       #       "the return type to use for this function"},
       #   ],
       # }
+      
+      def finished(context)
+        context.fulfill ["type", ident.value], self
+      end
       
       def compile(context, decl)
         case decl.keyword
@@ -86,6 +105,9 @@ module Mare
       
       def initialize(@ident, @ret, @body)
       end
+      
+      def finished(context)
+      end
     end
     
     class Function
@@ -95,6 +117,9 @@ module Mare
       getter body : Array(AST::Term)
       
       def initialize(@ident, @params, @ret, @body)
+      end
+      
+      def finished(context)
       end
     end
   end

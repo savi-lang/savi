@@ -7,9 +7,16 @@ module Mare
     
     def compile(doc : AST::Document)
       doc.list.each { |decl| compile(decl) }
+      @stack.reverse_each &.finished(self)
     end
     
     def compile(decl : AST::Declare)
+      loop do
+        raise "Unrecognized keyword: #{decl.keyword}" if @stack.size == 0
+        break if @stack.last.keywords.includes?(decl.keyword)
+        @stack.pop.finished(self)
+      end
+      
       @stack.last.compile(self, decl)
     end
     
