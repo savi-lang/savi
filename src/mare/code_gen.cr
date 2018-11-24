@@ -35,6 +35,10 @@ class Mare::CodeGen
     @mod = @llvm.new_module("minimal")
     @builder = @llvm.new_builder
     @return_value = 0
+    
+    @ptr   = @llvm.int8.pointer.as(LLVM::Type)
+    @i32   = @llvm.int32.as(LLVM::Type)
+    @i32_0 = @llvm.int32.const_int(0).as(LLVM::Value)
   end
   
   def run(ctx = Context)
@@ -48,7 +52,7 @@ class Mare::CodeGen
     f = ctx.program.find_func!("Main", "main")
     
     # Declare the main function.
-    main = @mod.functions.add("main", ([] of LLVM::Type), @llvm.int32)
+    main = @mod.functions.add("main", ([] of LLVM::Type), @i32)
     main.linkage = LLVM::Linkage::External
     
     # Create a basic block to hold the implementation of the main function.
@@ -69,8 +73,8 @@ class Mare::CodeGen
   
   def ffi_type_for(ident)
     case ident.value
-    when "I32"     then @llvm.int32
-    when "CString" then @llvm.int8.pointer
+    when "I32"     then @i32
+    when "CString" then @ptr
     else raise NotImplementedError.new(ident.value)
     end
   end
@@ -103,18 +107,9 @@ class Mare::CodeGen
     case expr
     when AST::LiteralInteger
       # TODO: Allow for non-I32 integers, based on inference.
-      @llvm.int32.const_int(expr.value.to_i32)
+      @i32.const_int(expr.value.to_i32)
     when AST::LiteralString
-      # TODO: Use a string table here to avoid redundant const global strings.
-      value = @llvm.const_string(expr.value)
-      global = @mod.globals.add(value.type, "")
-      global.linkage = LLVM::Linkage::External
-      global.initializer = value
-      global.global_constant = true
-      global.unnamed_addr = true
-      
-      zero = @llvm.int32.const_int(0)
-      @llvm.const_inbounds_gep(global, [zero, zero])
+      @llvm.const_inbounds_gep(gen_string_global(expr), [@i32_0, @i32_0])
     when AST::Relate
       # TODO: handle all cases of stuff here...
       if expr.terms[1].as(AST::Operator).value == "."
@@ -124,5 +119,16 @@ class Mare::CodeGen
     else
       raise NotImplementedError.new(expr.inspect)
     end
+  end
+  
+  def gen_string_global(expr : AST::LiteralString) : LLVM::Value
+    # TODO: Use a string table here to avoid redundant const global strings.
+    value = @llvm.const_string(expr.value)
+    global = @mod.globals.add(value.type, "")
+    global.linkage = LLVM::Linkage::External
+    global.initializer = value
+    global.global_constant = true
+    global.unnamed_addr = true
+    global
   end
 end
