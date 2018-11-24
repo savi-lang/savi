@@ -37,32 +37,32 @@ class Mare::CodeGen
   def run(ctx = Context)
     res = 0
     
-    ctx.on Compiler::Default, ["doc"] do |doc|
-      doc.types.each do |t|
-        next unless t.kind == Compiler::Default::Type::Kind::FFI
-        t.functions.each { |f| gen_ffi_decl(f) }
-      end
-      
-      ctx.on Compiler::Default::Function, ["fun", "Main", "main"] do |f|
-        # Declare the main function.
-        main = @mod.functions.add("main", ([] of LLVM::Type), @llvm.int32)
-        main.linkage = LLVM::Linkage::External
-        
-        # Create a basic block to hold the implementation of the main function.
-        bb = main.basic_blocks.append("entry")
-        @builder.position_at_end bb
-        
-        # Call gen_expr on each expression, treating the last one as the return.
-        ret_val = nil
-        f.body.each { |expr| ret_val = gen_expr(expr) }
-        raise "main is an empty function" unless ret_val
-        @builder.ret(ret_val)
-        
-        # Run the function!
-        res = LLVM::JITCompiler.new @mod do |jit|
-          jit.run_function(@mod.functions["main"], @llvm).to_i
-        end
-      end
+    # CodeGen for all FFI declarations.
+    ctx.program.types.each do |t|
+      next unless t.kind == Program::Type::Kind::FFI
+      t.functions.each { |f| gen_ffi_decl(f) }
+    end
+    
+    # Find the main function.
+    f = ctx.program.find_func!("Main", "main")
+    
+    # Declare the main function.
+    main = @mod.functions.add("main", ([] of LLVM::Type), @llvm.int32)
+    main.linkage = LLVM::Linkage::External
+    
+    # Create a basic block to hold the implementation of the main function.
+    bb = main.basic_blocks.append("entry")
+    @builder.position_at_end bb
+    
+    # Call gen_expr on each expression, treating the last one as the return.
+    ret_val = nil
+    f.body.each { |expr| ret_val = gen_expr(expr) }
+    raise "main is an empty function" unless ret_val
+    @builder.ret(ret_val)
+    
+    # Run the function!
+    res = LLVM::JITCompiler.new @mod do |jit|
+      jit.run_function(@mod.functions["main"], @llvm).to_i
     end
     
     ctx.finish

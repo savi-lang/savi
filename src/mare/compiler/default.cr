@@ -1,13 +1,10 @@
 module Mare
   class Compiler::Default < Compiler
-    getter types
-    
-    def initialize
-      @types = [] of Type
+    def initialize(@program : Program)
     end
     
     def finished(context)
-      context.fulfill ["doc"], self
+      context.fulfill ["doc"], @program
     end
     
     def keywords; ["actor", "class", "ffi"] end
@@ -15,35 +12,24 @@ module Mare
     def compile(context, decl)
       case decl.keyword
       when "actor"
-        t = Type.new(Type::Kind::Actor, decl.head.last.as(AST::Identifier))
-        @types << t
+        t = Type.new(Program::Type.new(Program::Type::Kind::Actor, decl.head.last.as(AST::Identifier)))
+        @program.types << t.type
         context.push t
       when "class"
-        t = Type.new(Type::Kind::Class, decl.head.last.as(AST::Identifier))
-        @types << t
+        t = Type.new(Program::Type.new(Program::Type::Kind::Class, decl.head.last.as(AST::Identifier)))
+        @program.types << t.type
         context.push t
       when "ffi"
-        t = Type.new(Type::Kind::FFI, decl.head.last.as(AST::Identifier))
-        @types << t
+        t = Type.new(Program::Type.new(Program::Type::Kind::FFI, decl.head.last.as(AST::Identifier)))
+        @program.types << t.type
         context.push t
       end
     end
     
     class Type < Compiler
-      enum Kind
-        Actor
-        Class
-        FFI
-      end
+      getter type
       
-      getter kind : Kind
-      getter ident : AST::Identifier
-      getter properties
-      getter functions
-      
-      def initialize(@kind, @ident)
-        @properties = [] of Property
-        @functions = [] of Function
+      def initialize(@type : Program::Type)
       end
       
       def keywords; ["prop", "fun"] end
@@ -67,7 +53,7 @@ module Mare
       # }
       
       def finished(context)
-        context.fulfill ["type", ident.value], self
+        context.fulfill ["type", @type.ident.value], @type
       end
       
       def compile(context, decl)
@@ -80,7 +66,7 @@ module Mare
           ident = head.shift.as(AST::Identifier)
           ret = head.shift.as(AST::Identifier)
           
-          @properties << Property.new(ident, ret, decl.body)
+          @type.properties << Program::Property.new(ident, ret, decl.body)
         when "fun"
           # TODO: common abstraction to extract decl head terms,
           # with nice error collection for reporting to the user/tool.
@@ -90,36 +76,11 @@ module Mare
           params = head.shift.as(AST::Group) if head[0]?.is_a?(AST::Group)
           ret = head.shift.as(AST::Identifier) if head[0]?
           
-          function = Function.new(ident, params, ret, decl.body)
-          context.fulfill ["fun", @ident.value, ident.value], function
+          function = Program::Function.new(ident, params, ret, decl.body)
+          context.fulfill ["fun", @type.ident.value, ident.value], function
           
-          @functions << function
+          @type.functions << function
         end
-      end
-    end
-    
-    class Property
-      getter ident : AST::Identifier
-      getter ret : AST::Identifier
-      getter body : Array(AST::Term)
-      
-      def initialize(@ident, @ret, @body)
-      end
-      
-      def finished(context)
-      end
-    end
-    
-    class Function
-      getter ident : AST::Identifier
-      getter params : AST::Group?
-      getter ret : AST::Identifier?
-      getter body : Array(AST::Term)
-      
-      def initialize(@ident, @params, @ret, @body)
-      end
-      
-      def finished(context)
       end
     end
   end

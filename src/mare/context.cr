@@ -1,8 +1,11 @@
 module Mare
   class Context
-    def initialize(
-      @stack = [Compiler::Default.new] of Compiler,
-      @reactor = Reactor.new)
+    getter program
+    
+    def initialize
+      @program = Program.new
+      @stack = [Compiler::Default.new(@program)] of Compiler
+      @reactor = Reactor.new
     end
     
     def compile(doc : AST::Document)
