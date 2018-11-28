@@ -187,13 +187,18 @@ class Mare::CodeGen
   end
   
   def run(ctx : Context)
-    # CodeGen for all FFI declarations.
+    # CodeGen for all function declarations.
     ctx.program.types.each do |t|
-      next unless t.kind == Program::Type::Kind::FFI
-      t.functions.each { |f| gen_ffi_decl(f) }
+      case t.kind
+      when Program::Type::Kind::Actor,
+           Program::Type::Kind::Class,
+           Program::Type::Kind::Primitive
+        t.functions.each { |f| gen_fun_decl(t, f) }
+      when Program::Type::Kind::FFI
+        t.functions.each { |f| gen_ffi_decl(f) }
+      else raise NotImplementedError.new(t.kind)
+      end
     end
-    
-    @mod.functions.add("Main.create", [] of LLVM::Type, @void)
     
     # CodeGen for all types.
     # TODO: dynamically gather these from ctx.program.
@@ -205,15 +210,25 @@ class Mare::CodeGen
       @gtypes[name] = GenType.new(self, rtype)
     end
     
+    # CodeGen for all function bodies.
+    ctx.program.types.each do |t|
+      case t.kind
+      when Program::Type::Kind::Actor,
+           Program::Type::Kind::Class,
+           Program::Type::Kind::Primitive
+        t.functions.each { |f| gen_fun_body(ctx, t, f) }
+      when Program::Type::Kind::FFI then nil
+      else raise NotImplementedError.new(t.kind)
+      end
+    end
+    
     # Generate the internal main function.
     gen_main(ctx)
     
     # Generate the wrapper main function.
     gen_wrapper
     
-    # Generate the actor Main.create function.
-    gen_main_create(ctx)
-    
+    # Run LLVM sanity checks on the generated module.
     @mod.verify
     
     # Run the function!
@@ -353,21 +368,6 @@ class Mare::CodeGen
     main
   end
   
-  def gen_main_create(ctx : Context)
-    func = @mod.functions["Main.create"]
-    
-    gen_func_start(func)
-    
-    # Find the main function in the program.
-    # Call gen_expr on each expression, treating the last one as the return.
-    f = ctx.program.find_func!("Main", "create")
-    f.body.each { |expr| gen_expr(ctx, expr) }
-    
-    @builder.ret
-    
-    gen_func_end
-  end
-  
   def gen_func_start(func)
     @frames << Frame.new(func)
     
@@ -401,20 +401,64 @@ class Mare::CodeGen
       ffi_type_for(param.as(AST::Identifier))
     end
     ret = ffi_type_for(f.ret.not_nil!)
+    
     @mod.functions.add(f.ident.value, params, ret)
   end
   
-  def gen_ffi_calls(ctx, relate)
-    lhs = relate.lhs.as(AST::Identifier)
-    op = relate.op.as(AST::Operator)
-    rhs = relate.rhs.as(AST::Qualify)
+  def gen_fun_decl(t, f)
+    # TODO: these should probably not use the ffi_type_for each type?
+    params = [] of LLVM::Type
+    f.params.try do |param_idents|
+      param_idents.terms.map do |param|
+        params << ffi_type_for(param.as(AST::Identifier))
+      end
+    end
+    ret = f.ret.try { |ret_ident| ffi_type_for(ret_ident) } || @void
     
-    raise NotImplementedError.new(lhs.value) \
-      if ctx.program.find_type!(lhs.value).kind != Program::Type::Kind::FFI
+    ident = "#{t.ident.value}.#{f.ident.value}"
+    @mod.functions.add(ident, params, ret)
+  end
+  
+  def gen_fun_body(ctx, t, f)
+    func = @mod.functions["#{t.ident.value}.#{f.ident.value}"]
     
-    ffi_name = rhs.term.as(AST::Identifier).value
-    call_args = rhs.group.terms.map { |expr| gen_expr(ctx, expr).as(LLVM::Value) }
-    @builder.call(@mod.functions[ffi_name], call_args)
+    gen_func_start(func)
+    
+    last_value = nil
+    f.body.each { |expr| last_value = gen_expr(ctx, expr) }
+    
+    if f.ret
+      @builder.ret(last_value.not_nil!)
+    else
+      @builder.ret
+    end
+    
+    gen_func_end
+  end
+  
+  def gen_dot(ctx, relate)
+    receiver = relate.lhs.as(AST::Identifier).value
+    rhs = relate.rhs
+    
+    case rhs
+    when AST::Identifier
+      member = rhs.value
+      args = [] of LLVM::Value
+    when AST::Qualify
+      member = rhs.term.as(AST::Identifier).value
+      args = rhs.group.terms.map { |expr| gen_expr(ctx, expr).as(LLVM::Value) }
+    else raise NotImplementedError.new(rhs)
+    end
+    
+    receiver_type = ctx.program.find_type!(receiver)
+    
+    case receiver_type.kind
+    when Program::Type::Kind::FFI
+      @builder.call(@mod.functions[member], args)
+    when Program::Type::Kind::Primitive
+      @builder.call(@mod.functions["#{receiver}.#{member}"], args)
+    else raise NotImplementedError.new(receiver_type)
+    end
   end
   
   def gen_expr(ctx, expr) : LLVM::Value
@@ -425,9 +469,8 @@ class Mare::CodeGen
     when AST::LiteralString
       gen_string(expr)
     when AST::Relate
-      # TODO: handle all cases of stuff here...
       if expr.op.as(AST::Operator).value == "."
-        gen_ffi_calls(ctx, expr)
+        gen_dot(ctx, expr)
       else raise NotImplementedError.new(expr.inspect)
       end
     else

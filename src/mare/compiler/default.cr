@@ -7,7 +7,7 @@ module Mare
       context.fulfill ["doc"], @program
     end
     
-    def keywords; ["actor", "class", "ffi"] end
+    def keywords; ["actor", "class", "primitive", "ffi"] end
     
     def compile(context, decl)
       case decl.keyword
@@ -17,6 +17,10 @@ module Mare
         context.push t
       when "class"
         t = Type.new(Program::Type.new(Program::Type::Kind::Class, decl.head.last.as(AST::Identifier)))
+        @program.types << t.type
+        context.push t
+      when "primitive"
+        t = Type.new(Program::Type.new(Program::Type::Kind::Primitive, decl.head.last.as(AST::Identifier)))
         @program.types << t.type
         context.push t
       when "ffi"

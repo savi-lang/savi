@@ -19,6 +19,7 @@ class Mare::Program
     enum Kind
       Actor
       Class
+      Primitive
       FFI
     end
     

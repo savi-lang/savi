@@ -80,7 +80,7 @@ module Mare::Parser
     
     # Define groups that are comma-separated lists of terms.
     terms = t >> s >> (char(',') >> sn >> t >> s).repeat
-    parens.define (char('(') >> s >> terms >> s >> char(')')).named(:group)
+    parens.define (char('(') >> s >> terms.maybe >> s >> char(')')).named(:group)
     
     # Define what a declaration head of terms looks like.
     dterm = atom

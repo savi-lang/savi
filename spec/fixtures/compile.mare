@@ -4,7 +4,11 @@ ffi LibC:
 ffi LibPonyRT:
   fun pony_exitcode (I32) None:
 
+primitive Greeting:
+  fun hello CString:
+    "Hello, World!"
+
 actor Main:
   new create:
-    LibC.puts("Hello, World!")
+    LibC.puts(Greeting.hello)
     LibPonyRT.pony_exitcode(42)
