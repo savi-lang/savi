@@ -67,16 +67,15 @@ module Mare::Parser
     opw = (char(' ') | char('\t')).named(:op)
     
     # Construct the nested possible relations for each group of operators.
-    # TODO: Simplify this construction without reducing performance.
     t1 = suffixed | atom
-    t2 = t1 >> ~(sn >> op1) | (t1 >> (sn >> op1 >> sn >> t1 >> s).repeat(1)).named(:relate) | t1
-    t3 = t2 >> ~(sn >> op2) | (t2 >> (sn >> op2 >> sn >> t2 >> s).repeat(1)).named(:relate) | t2
-    t4 = t3 >> ~(sn >> op3) | (t3 >> (sn >> op3 >> sn >> t3 >> s).repeat(1)).named(:relate) | t3
-    t5 = t4 >> ~(sn >> op4) | (t4 >> (sn >> op4 >> sn >> t4 >> s).repeat(1)).named(:relate) | t4
-    t6 = t5 >> ~(sn >> op5) | (t5 >> (sn >> op5 >> sn >> t5 >> s).repeat(1)).named(:relate) | t5
-    t7 = t6 >> ~(sn >> op6) | (t6 >> (sn >> op6 >> sn >> t6 >> s).repeat(1)).named(:relate) | t6
-    t8 = t7 >> ~(sn >> op7) | (t7 >> (sn >> op7 >> sn >> t7 >> s).repeat(1)).named(:relate) | t7
-    tw = t8 >> ~(sn >> op8) | (t8 >> (sn >> op8 >> sn >> t8 >> s).repeat(1)).named(:relate) | t8
+    t2 = (t1 >> (sn >> op1 >> sn >> t1 >> s).repeat).named(:relate)
+    t3 = (t2 >> (sn >> op2 >> sn >> t2 >> s).repeat).named(:relate)
+    t4 = (t3 >> (sn >> op3 >> sn >> t3 >> s).repeat).named(:relate)
+    t5 = (t4 >> (sn >> op4 >> sn >> t4 >> s).repeat).named(:relate)
+    t6 = (t5 >> (sn >> op5 >> sn >> t5 >> s).repeat).named(:relate)
+    t7 = (t6 >> (sn >> op6 >> sn >> t6 >> s).repeat).named(:relate)
+    t8 = (t7 >> (sn >> op7 >> sn >> t7 >> s).repeat).named(:relate)
+    tw = (t8 >> (sn >> op8 >> sn >> t8 >> s).repeat).named(:relate)
     t = (tw >> (opw >> tw >> s).repeat(1)).named(:relate) | tw
     
     # Define groups that are comma-separated lists of terms.

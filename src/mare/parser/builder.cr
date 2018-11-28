@@ -76,6 +76,11 @@ module Mare::Parser
         terms << build_term(child, iter, source)
       end
       
+      # Parsing operator precedeence without too much nested backtracking
+      # requires us to generate a lot of false positive relates in the grammar
+      # (:relate nodes with no operator and only one term); cleanse those here.
+      return terms.shift if terms.size == 1
+      
       # Build a left-leaning tree of Relate nodes, each with a left-hand-side,
       # a right-hand-side, and an operator betwixt the two of those terms.
       terms.each_slice(2).reduce(terms.shift) do |lhs, (op, rhs)|
