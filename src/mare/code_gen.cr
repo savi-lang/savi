@@ -405,13 +405,9 @@ class Mare::CodeGen
   end
   
   def gen_ffi_calls(ctx, relate)
-    raise NotImplementedError.new(relate.terms.size) if relate.terms.size != 3
-    
-    # TODO: Assemble this earlier in Compiler::Default?
-    iter = relate.terms.each
-    lhs = iter.next.as(AST::Identifier)
-    op = iter.next.as(AST::Operator)
-    rhs = iter.next.as(AST::Qualify)
+    lhs = relate.lhs.as(AST::Identifier)
+    op = relate.op.as(AST::Operator)
+    rhs = relate.rhs.as(AST::Qualify)
     
     raise NotImplementedError.new(lhs.value) \
       if ctx.program.find_type!(lhs.value).kind != Program::Type::Kind::FFI
@@ -430,7 +426,7 @@ class Mare::CodeGen
       gen_string(expr)
     when AST::Relate
       # TODO: handle all cases of stuff here...
-      if expr.terms[1].as(AST::Operator).value == "."
+      if expr.op.as(AST::Operator).value == "."
         gen_ffi_calls(ctx, expr)
       else raise NotImplementedError.new(expr.inspect)
       end

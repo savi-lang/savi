@@ -70,13 +70,17 @@ module Mare::Parser
     
     private def self.build_relate(main, iter, source)
       assert_kind(main, :relate)
-      relate = AST::Relate.new.with_pos(source, main)
+      terms = [] of AST::Term
       
       iter.while_next_is_child_of(main) do |child|
-        relate.terms << build_term(child, iter, source)
+        terms << build_term(child, iter, source)
       end
       
-      relate
+      # Build a left-leaning tree of Relate nodes, each with a left-hand-side,
+      # a right-hand-side, and an operator betwixt the two of those terms.
+      terms.each_slice(2).reduce(terms.shift) do |lhs, (op, rhs)|
+        AST::Relate.new(lhs, op.as(AST::Operator), rhs).with_pos(source, main)
+      end
     end
     
     private def self.build_group(main, iter, source)

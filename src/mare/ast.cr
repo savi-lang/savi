@@ -117,15 +117,13 @@ module Mare
     end
     
     class Relate < Node
-      property terms
-      def initialize(@terms = [] of Term)
+      property lhs
+      property op
+      property rhs
+      def initialize(@lhs : Term, @op : Operator, @rhs : Term)
       end
       def name; :relate end
-      def to_a: Array(A)
-        res = [name] of A
-        terms.each { |x| res << x.to_a }
-        res
-      end
+      def to_a; [name, lhs.to_a, op.to_a, rhs.to_a] of A end
     end
   end
 end
