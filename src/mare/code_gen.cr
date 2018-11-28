@@ -1,97 +1,11 @@
 require "llvm"
+require "./ext/llvm" # TODO: get these merged into crystal standard library
 require "compiler/crystal/config" # TODO: remove
 
 @[Link("ponyrt")]
 lib LibPonyRT
   fun int_heap_index = ponyint_heap_index(size : LibC::SizeT) : UInt32
   fun int_pool_index = ponyint_pool_index(size : LibC::SizeT) : LibC::SizeT
-end
-
-lib LibLLVM
-  fun intptr_type_in_context = LLVMIntPtrTypeInContext(ContextRef, TargetDataRef) : TypeRef
-  fun build_struct_gep = LLVMBuildStructGEP(builder : BuilderRef, pointer : ValueRef, index : UInt32, name : UInt8*) : ValueRef
-  fun const_named_struct = LLVMConstNamedStruct(type : TypeRef, values : ValueRef*, num_values : UInt32) : ValueRef
-  fun const_inbounds_gep = LLVMConstInBoundsGEP(value : ValueRef, indices : ValueRef*, num_indices : UInt32) : ValueRef
-  fun const_bit_cast = LLVMConstBitCast(value : ValueRef, to_type : TypeRef) : ValueRef
-  fun set_unnamed_addr = LLVMSetUnnamedAddr(global : ValueRef, is_unnamed_addr : Int32)
-  fun is_unnamed_addr = LLVMIsUnnamedAddr(global : ValueRef) : Int32
-  fun parse_bitcode_in_context = LLVMParseBitcodeInContext(context : ContextRef, mem_buf : MemoryBufferRef, out_m : ModuleRef*, out_message : UInt8**) : Int32
-  fun link_modules = LLVMLinkModules2 (dest : ModuleRef, src : ModuleRef) : Int32
-end
-
-class LLVM::Context
-  def intptr(target_data : TargetData) : Type
-    Type.new LibLLVM.intptr_type_in_context(self, target_data)
-  end
-
-  def opaque_struct(name : String) : Type
-    Type.new LibLLVM.struct_create_named(self, name)
-  end
-  
-  def const_inbounds_gep(value : Value, indices : Array(Value))
-    Value.new LibLLVM.const_inbounds_gep(value, indices.to_unsafe.as(LibLLVM::ValueRef*), indices.size)
-  end
-  
-  def const_bit_cast(value : Value, to_type : Type)
-    Value.new LibLLVM.const_bit_cast(value, to_type)
-  end
-  
-  # (derived from existing parse_ir method)
-  def parse_bitcode(buf : MemoryBuffer)
-    ret = LibLLVM.parse_bitcode_in_context(self, buf, out mod, out msg)
-    if ret != 0 && msg
-      raise LLVM.string_and_dispose(msg)
-    end
-    {% if LibLLVM::IS_38 %}
-      Module.new(mod, "unknown", self)
-    {% else %} # LLVM >= 3.9
-      Module.new(mod, self)
-    {% end %}
-  end
-end
-
-module LLVM::ValueMethods
-  def unnamed_addr=(unnamed_addr)
-    LibLLVM.set_unnamed_addr(self, unnamed_addr ? 1 : 0)
-  end
-  
-  def unnamed_addr?
-    LibLLVM.is_unnamed_addr(self) != 0
-  end
-  
-  def to_value
-    Value.new to_unsafe
-  end
-end
-
-struct LLVM::Type
-  def const_struct(values : Array(Value))
-    Value.new LibLLVM.const_named_struct(self,
-      (values.to_unsafe.as(LibLLVM::ValueRef*)), values.size)
-  end
-end
-
-struct LLVM::FunctionCollection
-  def add(name, fun_type : LLVM::Type)
-    # check_types_context(name, arg_types, ret_type)
-
-    func = LibLLVM.add_function(@mod, name, fun_type)
-    Function.new(func)
-  end
-
-  def add(name, fun_type : LLVM::Type)
-    func = add(name, fun_type)
-    yield func
-    func
-  end
-end
-
-class LLVM::Builder
-  def struct_gep(value, index, name = "")
-    # check_value(value)
-
-    Value.new LibLLVM.build_struct_gep(self, value, index.to_u32, name)
-  end
 end
 
 class Mare::CodeGen
