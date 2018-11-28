@@ -4,7 +4,7 @@ module Mare
   module AST
     alias A = Symbol | String | UInt64 | Float64 | Array(A)
     
-    abstract struct Node
+    abstract class Node
       getter pos
       
       def with_pos(source : Source, token : Pegmatite::Token)
@@ -13,7 +13,7 @@ module Mare
       end
     end
     
-    struct Document < Node
+    class Document < Node
       property list
       def initialize(@list = [] of Declare)
       end
@@ -25,7 +25,7 @@ module Mare
       end
     end
     
-    struct Declare < Node
+    class Declare < Node
       property head
       property body
       def initialize(@head = [] of Term, @body = [] of Term)
@@ -44,7 +44,7 @@ module Mare
       | LiteralString | LiteralInteger | LiteralFloat \
       | Operator | Prefix | Relate | Group
     
-    struct Identifier < Node
+    class Identifier < Node
       property value
       def initialize(@value : String)
       end
@@ -52,7 +52,7 @@ module Mare
       def to_a: Array(A); [name, value] of A end
     end
     
-    struct LiteralString < Node
+    class LiteralString < Node
       property value
       def initialize(@value : String)
       end
@@ -60,7 +60,7 @@ module Mare
       def to_a: Array(A); [name, value] of A end
     end
     
-    struct LiteralInteger < Node
+    class LiteralInteger < Node
       property value
       def initialize(@value : UInt64)
       end
@@ -68,7 +68,7 @@ module Mare
       def to_a: Array(A); [name, value] of A end
     end
     
-    struct LiteralFloat < Node
+    class LiteralFloat < Node
       property value
       def initialize(@value : Float64)
       end
@@ -76,7 +76,7 @@ module Mare
       def to_a: Array(A); [name, value] of A end
     end
     
-    struct Operator < Node
+    class Operator < Node
       property value
       def initialize(@value : String)
       end
@@ -84,7 +84,7 @@ module Mare
       def to_a: Array(A); [name, value] of A end
     end
     
-    struct Prefix < Node
+    class Prefix < Node
       property op
       property terms
       def initialize(@op : Operator, @terms = [] of Term)
@@ -98,7 +98,7 @@ module Mare
       end
     end
     
-    struct Qualify < Node
+    class Qualify < Node
       property terms
       property group
       def initialize(@group : Group, @terms = [] of Term)
@@ -112,7 +112,7 @@ module Mare
       end
     end
     
-    struct Group < Node
+    class Group < Node
       property style
       property terms
       def initialize(@style : String, @terms = [] of Term)
@@ -126,7 +126,7 @@ module Mare
       end
     end
     
-    struct Relate < Node
+    class Relate < Node
       property terms
       def initialize(@terms = [] of Term)
       end
