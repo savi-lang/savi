@@ -86,30 +86,20 @@ module Mare
     
     class Prefix < Node
       property op
-      property terms
-      def initialize(@op : Operator, @terms = [] of Term)
+      property term
+      def initialize(@op : Operator, @term : Term)
       end
       def name; :prefix end
-      def to_a: Array(A)
-        res = [name] of A
-        res << op.to_a
-        terms.each { |x| res << x.to_a }
-        res
-      end
+      def to_a; [name, op.to_a, term.to_a] of A end
     end
     
     class Qualify < Node
-      property terms
+      property term
       property group
-      def initialize(@group : Group, @terms = [] of Term)
+      def initialize(@term : Term, @group : Group)
       end
       def name; :qualify end
-      def to_a: Array(A)
-        res = [name] of A
-        terms.each { |x| res << x.to_a }
-        res << group.to_a
-        res
-      end
+      def to_a; [name, term.to_a, group.to_a] of A end
     end
     
     class Group < Node

@@ -501,7 +501,7 @@ class Mare::CodeGen
     
     raise NotImplementedError.new(lhs.value) if lhs.value != "LibC"
     
-    ffi_name = rhs.terms[0].as(AST::Identifier).value
+    ffi_name = rhs.term.as(AST::Identifier).value
     call_args = rhs.group.terms.map { |expr| gen_expr(expr).as(LLVM::Value) }
     @builder.call(@mod.functions[ffi_name], call_args)
   end

@@ -99,8 +99,7 @@ module Mare::Parser
       
       term = build_term(iter.next_as_child_of(main), iter, source)
       
-      # TODO: Don't use array of terms here.
-      AST::Prefix.new(op, [term]).with_pos(source, main)
+      AST::Prefix.new(op, term).with_pos(source, main)
     end
     
     private def self.build_qualify(main, iter, source)
@@ -111,8 +110,7 @@ module Mare::Parser
       group = build_term(iter.next_as_child_of(main), iter, source)
       group = group.as(AST::Group)
       
-      # TODO: Flip order and don't use array of terms here.
-      AST::Qualify.new(group, [term]).with_pos(source, main)
+      AST::Qualify.new(term, group).with_pos(source, main)
     end
   end
 end
