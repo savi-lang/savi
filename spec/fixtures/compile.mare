@@ -1,7 +1,8 @@
 ffi LibC:
   fun puts (CString) I32:
+  fun pony_exitcode (I32) None:
 
 actor Main:
-  fun main:
+  fun create:
     LibC.puts("Hello, World!")
-    42
+    LibC.pony_exitcode(42)

@@ -1,5 +1,6 @@
 require "spec"
 require "../src/mare"
+require "./*"
 
 module Spec::Methods
   def fixture(*parts)
