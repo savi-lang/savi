@@ -3,6 +3,6 @@ ffi LibC:
   fun pony_exitcode (I32) None:
 
 actor Main:
-  fun create:
+  new create:
     LibC.puts("Hello, World!")
     LibC.pony_exitcode(42)

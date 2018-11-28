@@ -32,7 +32,7 @@ module Mare
       def initialize(@type : Program::Type)
       end
       
-      def keywords; ["prop", "fun"] end
+      def keywords; ["prop", "fun", "new"] end
       
       # # TODO: make these into macro-like declarations that do stuff
       # {
@@ -67,7 +67,7 @@ module Mare
           ret = head.shift.as(AST::Identifier)
           
           @type.properties << Program::Property.new(ident, ret, decl.body)
-        when "fun"
+        when "fun", "new"
           # TODO: common abstraction to extract decl head terms,
           # with nice error collection for reporting to the user/tool.
           head = decl.head.dup
