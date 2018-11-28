@@ -6,8 +6,12 @@ class Mare::Program
     @types = [] of Type
   end
   
-  def find_func!(type_name, func_name)
+  def find_type!(type_name)
     @types.find { |t| t.ident.value == type_name }.not_nil!
+  end
+  
+  def find_func!(type_name, func_name)
+    find_type!(type_name)
       .functions.find { |f| f.ident.value == func_name }.not_nil!
   end
   

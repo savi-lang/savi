@@ -361,7 +361,7 @@ class Mare::CodeGen
     # Find the main function in the program.
     # Call gen_expr on each expression, treating the last one as the return.
     f = ctx.program.find_func!("Main", "create")
-    f.body.each { |expr| gen_expr(expr) }
+    f.body.each { |expr| gen_expr(ctx, expr) }
     
     @builder.ret
     
@@ -404,7 +404,7 @@ class Mare::CodeGen
     @mod.functions.add(f.ident.value, params, ret)
   end
   
-  def gen_ffi_calls(relate)
+  def gen_ffi_calls(ctx, relate)
     raise NotImplementedError.new(relate.terms.size) if relate.terms.size != 3
     
     # TODO: Assemble this earlier in Compiler::Default?
@@ -413,14 +413,15 @@ class Mare::CodeGen
     op = iter.next.as(AST::Operator)
     rhs = iter.next.as(AST::Qualify)
     
-    raise NotImplementedError.new(lhs.value) if lhs.value != "LibC"
+    raise NotImplementedError.new(lhs.value) \
+      if ctx.program.find_type!(lhs.value).kind != Program::Type::Kind::FFI
     
     ffi_name = rhs.term.as(AST::Identifier).value
-    call_args = rhs.group.terms.map { |expr| gen_expr(expr).as(LLVM::Value) }
+    call_args = rhs.group.terms.map { |expr| gen_expr(ctx, expr).as(LLVM::Value) }
     @builder.call(@mod.functions[ffi_name], call_args)
   end
   
-  def gen_expr(expr) : LLVM::Value
+  def gen_expr(ctx, expr) : LLVM::Value
     case expr
     when AST::LiteralInteger
       # TODO: Allow for non-I32 integers, based on inference.
@@ -430,7 +431,7 @@ class Mare::CodeGen
     when AST::Relate
       # TODO: handle all cases of stuff here...
       if expr.terms[1].as(AST::Operator).value == "."
-        gen_ffi_calls(expr)
+        gen_ffi_calls(ctx, expr)
       else raise NotImplementedError.new(expr.inspect)
       end
     else
