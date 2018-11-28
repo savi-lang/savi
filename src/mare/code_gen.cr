@@ -342,9 +342,6 @@ class Mare::CodeGen
     
     gen_func_start(main)
     
-    # bb_start_fail = gen_block("start_fail")
-    # bb_post       = gen_block("post")
-    
     argc = main.params[0].tap &.name=("argc")
     argv = main.params[1].tap &.name=("argv")
     envp = main.params[2].tap &.name=("envp")
