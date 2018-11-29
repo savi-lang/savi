@@ -8,6 +8,8 @@ describe Mare::Compiler::Default do
     ast.should be_truthy
     next unless ast
     
+    ast.accept(Mare::Sugar.new)
+    
     context = Mare::Context.new
     context.compile(ast)
     context.run(Mare::CodeGen.new).return_value.should eq 42

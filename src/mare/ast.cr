@@ -4,12 +4,48 @@ module Mare
   module AST
     alias A = Symbol | String | UInt64 | Float64 | Array(A)
     
+    class Visitor
+      def visit_any?(node : Node)
+        true
+      end
+      
+      def visit_children?(node : Node)
+        true
+      end
+      
+      def visit_pre(node : Node)
+        node
+      end
+      
+      def visit(node : Node)
+        node
+      end
+    end
+    
     abstract class Node
       getter pos
       
       def with_pos(source : Source, token : Pegmatite::Token)
         @pos = SourcePos.new(source, token[1], token[2])
         self
+      end
+      
+      def from(other : Node)
+        @pos = other.pos
+        self
+      end
+      
+      def accept(visitor)
+        node = self
+        if visitor.visit_any?(node)
+          node = visitor.visit_pre(node)
+          children_accept(visitor) if visitor.visit_children?(node)
+          node = visitor.visit(node)
+        end
+        node
+      end
+      
+      def children_accept(visitor)
       end
     end
     
@@ -23,6 +59,9 @@ module Mare
         list.each { |x| res << x.to_a }
         res
       end
+      def children_accept(visitor)
+        @list.map! { |decl| decl.accept(visitor) }
+      end
     end
     
     class Declare < Node
@@ -33,6 +72,10 @@ module Mare
       def name; :declare end
       def to_a: Array(A)
         [name, head.map(&.to_a), body.to_a] of A
+      end
+      def children_accept(visitor)
+        @head.map! { |term| term.accept(visitor) }
+        @body = @body.accept(visitor)
       end
       
       def keyword
@@ -91,6 +134,10 @@ module Mare
       end
       def name; :prefix end
       def to_a; [name, op.to_a, term.to_a] of A end
+      def children_accept(visitor)
+        @op = @op.accept(visitor)
+        @term = @term.accept(visitor)
+      end
     end
     
     class Qualify < Node
@@ -100,6 +147,10 @@ module Mare
       end
       def name; :qualify end
       def to_a; [name, term.to_a, group.to_a] of A end
+      def children_accept(visitor)
+        @term = @term.accept(visitor)
+        @group = @group.accept(visitor)
+      end
     end
     
     class Group < Node
@@ -114,6 +165,9 @@ module Mare
         terms.each { |x| res << x.to_a }
         res
       end
+      def children_accept(visitor)
+        @terms.map! { |x| x.accept(visitor) }
+      end
     end
     
     class Relate < Node
@@ -124,6 +178,11 @@ module Mare
       end
       def name; :relate end
       def to_a; [name, lhs.to_a, op.to_a, rhs.to_a] of A end
+      def children_accept(visitor)
+        @lhs = @lhs.accept(visitor)
+        @op = @op.accept(visitor)
+        @rhs = @rhs.accept(visitor)
+      end
     end
   end
 end
