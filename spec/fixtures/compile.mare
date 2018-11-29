@@ -8,7 +8,12 @@ primitive Greeting:
   fun hello CString:
     "Hello, World!"
 
+primitive FortyTwo:
+  fun "+" (I32) I32:
+    // TODO: add other here
+    42
+
 actor Main:
   new create:
     LibC.puts(Greeting.hello)
-    LibPonyRT.pony_exitcode(42)
+    LibPonyRT.pony_exitcode(FortyTwo + 0)

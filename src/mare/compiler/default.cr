@@ -67,8 +67,12 @@ module Mare
           # with nice error collection for reporting to the user/tool.
           head = decl.head.dup
           head.shift # discard the keyword
-          ident = head.shift.as(AST::Identifier)
+          ident = head.shift.as(AST::Identifier | AST::LiteralString)
           ret = head.shift.as(AST::Identifier)
+          
+          ident = AST::Identifier.new(ident.value).from(ident) \
+            if ident.is_a?(AST::LiteralString)
+          ident = ident.as(AST::Identifier)
           
           @type.properties << Program::Property.new(ident, ret, decl.body)
         when "fun", "new"
@@ -76,9 +80,13 @@ module Mare
           # with nice error collection for reporting to the user/tool.
           head = decl.head.dup
           head.shift # discard the keyword
-          ident = head.shift.as(AST::Identifier)
+          ident = head.shift.as(AST::Identifier | AST::LiteralString)
           params = head.shift.as(AST::Group) if head[0]?.is_a?(AST::Group)
           ret = head.shift.as(AST::Identifier) if head[0]?
+          
+          ident = AST::Identifier.new(ident.value).from(ident) \
+            if ident.is_a?(AST::LiteralString)
+          ident = ident.as(AST::Identifier)
           
           function = Program::Function.new(ident, params, ret, decl.body)
           context.fulfill ["fun", @type.ident.value, ident.value], function
