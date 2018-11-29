@@ -23,7 +23,7 @@ module Mare::Parser
           decl = build_decl(child, iter, source)
           doc.list << decl
         else
-          decl.as(AST::Declare).body << build_term(child, iter, source)
+          decl.as(AST::Declare).body.terms << build_term(child, iter, source)
         end
       end
       

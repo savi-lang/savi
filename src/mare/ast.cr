@@ -28,11 +28,11 @@ module Mare
     class Declare < Node
       property head
       property body
-      def initialize(@head = [] of Term, @body = [] of Term)
+      def initialize(@head = [] of Term, @body = Group.new(":"))
       end
       def name; :declare end
       def to_a: Array(A)
-        [name, head.map(&.to_a), body.map(&.to_a)] of A
+        [name, head.map(&.to_a), body.to_a] of A
       end
       
       def keyword

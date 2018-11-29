@@ -8,16 +8,15 @@ describe Mare::Parser do
     ast.should be_truthy
     next unless ast
     
-    ll = [] of Mare::AST::A
     ast.to_a.should eq [:doc,
-      [:declare, [[:ident, "class"], [:ident, "Example"]], ll],
+      [:declare, [[:ident, "class"], [:ident, "Example"]], [:group, ":"]],
       [:declare,
         [[:ident, "prop"], [:ident, "name"], [:ident, "String"]],
-        [[:string, "World"]]
+        [:group, ":", [:string, "World"]]
       ],
       [:declare,
         [[:ident, "fun"], [:ident, "greeting"], [:ident, "String"]],
-        [[:relate,
+        [:group, ":", [:relate,
           [:relate,
             [:string, "Hello, "],
             [:op, "+"],
@@ -34,7 +33,7 @@ describe Mare::Parser do
           [:group, "(", [:relate, [:ident, "c"], [:op, " "], [:ident, "F64"]]],
           [:ident, "F64"]
         ],
-        [[:relate,
+        [:group, ":", [:relate,
           [:relate,
             [:relate, [:ident, "c"], [:op, "*"], [:integer, 9]],
             [:op, "/"],
@@ -45,7 +44,7 @@ describe Mare::Parser do
       ],
       [:declare,
         [[:ident, "fun"], [:ident, "caller"]],
-        [[:qualify,
+        [:group, ":", [:qualify,
           [:prefix, [:op, "@"], [:ident, "degreesF"]],
           [:group, "(",
             [:relate,
@@ -76,10 +75,12 @@ describe Mare::Parser do
     # See https://github.com/crystal-lang/crystal/issues/5792
     ast.to_a.pretty_inspect(74).should eq <<-AST
     [:doc,
-     [:declare, [[:ident, "describe"], [:ident, "operators"]], []],
+     [:declare, [[:ident, "describe"], [:ident, "operators"]], [:group, ":"]],
      [:declare,
       [[:ident, "demo"], [:ident, "all"]],
-      [[:relate,
+      [:group,
+       ":",
+       [:relate,
         [:ident, "x"],
         [:op, " "],
         [:relate,
@@ -145,7 +146,9 @@ describe Mare::Parser do
                [:ident, "x"]]]]]]]]]]],
      [:declare,
       [[:ident, "demo"], [:ident, "mixed"]],
-      [[:relate,
+      [:group,
+       ":",
+       [:relate,
         [:relate,
          [:relate, [:ident, "a"], [:op, "!="], [:ident, "b"]],
          [:op, "&&"],

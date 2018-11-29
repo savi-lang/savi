@@ -37,7 +37,7 @@ class Mare::Program
   class Property
     getter ident : AST::Identifier
     getter ret : AST::Identifier
-    getter body : Array(AST::Term)
+    getter body : AST::Group
     
     def initialize(@ident, @ret, @body)
     end
@@ -47,7 +47,7 @@ class Mare::Program
     getter ident : AST::Identifier
     getter params : AST::Group?
     getter ret : AST::Identifier?
-    getter body : Array(AST::Term)
+    getter body : AST::Group
     
     def initialize(@ident, @params, @ret, @body)
     end
