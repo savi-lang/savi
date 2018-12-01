@@ -45,8 +45,8 @@ module Mare::Parser
     prefixop = char('@').named(:op)
     prefixed.define (prefixop >> atom).named(:prefix)
     
-    # Define a qualified term to be followed by a parenthesized group.
-    qualify = (atom >> s >> parens).named(:qualify)
+    # Define a qualified term to be immediately followed by a parens group.
+    qualify = (atom >> parens).named(:qualify)
     suffixed = qualify
     
     # Define groups of operators, in order of precedence,
