@@ -1,4 +1,13 @@
 class Mare::Sugar < Mare::AST::Visitor
+  def self.run(ctx)
+    sugar = new
+    ctx.program.types.each do |t|
+      t.functions.each do |f|
+        f.body.accept(sugar)
+      end
+    end
+  end
+  
   def visit(node : AST::Relate)
     case node.op.value
     when ".", "&&", "||" then node # skip these special-case operators.
