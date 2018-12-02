@@ -10,7 +10,7 @@ class Mare::Sugar < Mare::AST::Visitor
   
   def visit(node : AST::Relate)
     case node.op.value
-    when ".", "&&", "||" then node # skip these special-case operators.
+    when ".", "&&", "||", "=" then node # skip these special-case operators.
     else
       # Convert the operator relation into a single-argument method call.
       ident = AST::Identifier.new(node.op.value).from(node.op)

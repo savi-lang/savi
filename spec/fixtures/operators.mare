@@ -1,6 +1,6 @@
 describe operators:
   demo all: // in order of precedence, from "weakest" to "strongest"
-    x x
+    y = x x
     && x || x
     === x == x !== x != x =~ x
     >= x <= x < x > x
