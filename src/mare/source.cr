@@ -1,8 +1,8 @@
 module Mare
   class Source
-    property path
-    property content
-    def initialize(@path : String, @content : String)
+    property path : String
+    property content : String
+    def initialize(@path, @content)
     end
     def self.none
       new("(none)", "")
@@ -10,13 +10,10 @@ module Mare
   end
   
   struct SourcePos
-    property source
-    property start
-    property finish
-    def initialize(
-      @source : Source,
-      @start : Int32,
-      @finish : Int32)
+    property source : Source
+    property start : Int32
+    property finish : Int32
+    def initialize(@source, @start, @finish)
     end
     
     # Override inspect to avoid verbosely printing Source#content every time.
