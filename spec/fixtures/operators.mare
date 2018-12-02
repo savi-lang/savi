@@ -7,7 +7,7 @@ describe operators:
     <|> x <~> x <<< x >>> x <<~ x ~>> x << x >> x <~ x ~> x
     .. x <> x
     + x - x
-    * x / x
+    * x / x.y
   
   demo mixed:
     a != b && c > d / x + e / y || i..j > k << l

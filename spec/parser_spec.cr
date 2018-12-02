@@ -143,7 +143,7 @@ describe Mare::Parser do
               [:relate,
                [:relate, [:ident, "x"], [:op, "*"], [:ident, "x"]],
                [:op, "/"],
-               [:ident, "x"]]]]]]]]]]],
+               [:relate, [:ident, "x"], [:op, "."], [:ident, "y"]]]]]]]]]]]],
      [:declare,
       [[:ident, "demo"], [:ident, "mixed"]],
       [:group,
