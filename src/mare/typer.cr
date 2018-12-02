@@ -160,10 +160,6 @@ class Mare::Typer < Mare::AST::Visitor
     node
   end
   
-  def touch(node : AST::Document | AST::Declare)
-    # We don't do any type-checking at this level.
-  end
-  
   def touch(node : AST::Identifier)
     # If it starts with a capital letter, treat it as a type name.
     # TODO: make this less fiddly-special
