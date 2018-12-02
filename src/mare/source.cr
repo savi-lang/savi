@@ -4,9 +4,8 @@ module Mare
     property content : String
     def initialize(@path, @content)
     end
-    def self.none
-      new("(none)", "")
-    end
+    NONE = new("(none)", "")
+    def self.none; NONE end
   end
   
   struct SourcePos
@@ -15,6 +14,8 @@ module Mare
     property finish : Int32
     def initialize(@source, @start, @finish)
     end
+    NONE = new(Source.none, 0, 0)
+    def self.none; NONE end
     
     # Override inspect to avoid verbosely printing Source#content every time.
     def inspect(io)
