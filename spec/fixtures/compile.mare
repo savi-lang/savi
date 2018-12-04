@@ -18,5 +18,6 @@ primitive Zero:
 
 actor Main:
   new create:
+    exitcode = Zero + 42
     LibC.puts(Greeting.hello)
-    LibPonyRT.pony_exitcode(Zero + 42)
+    LibPonyRT.pony_exitcode(exitcode)

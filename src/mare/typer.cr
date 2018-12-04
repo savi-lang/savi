@@ -135,11 +135,11 @@ class Mare::Typer < Mare::AST::Visitor
       receiver_type = @constraints[call.lhs].resolve!
       
       call_func = ctx.program.find_func!(receiver_type, call.member)
+      
       # TODO: copying to diverging specializations of the function
       # TODO: apply argument constraints to the parameters
       # TODO: detect and halt recursion by noticing what's been seen
-      typer = self.class.new
-      typer.run(ctx, call_func)
+      typer = call_func.typer? || self.class.new.tap(&.run(ctx, call_func))
       
       typer.constraints[call_func.body.tid].iter.each { |c| constrain(tid) << c }
     end
@@ -233,6 +233,10 @@ class Mare::Typer < Mare::AST::Visitor
   
   def touch(node : AST::Relate)
     case node.op.value
+    when "="
+      # TODO: join the tids instead of just copying constraints
+      constrain(node.lhs.tid).copy_from(constrain(node.rhs.tid))
+      transfer_tid(node.rhs, node)
     when "."
       lhs = node.lhs
       rhs = node.rhs

@@ -19,8 +19,10 @@ class Mare::CodeGen
   class Frame
     getter func : LLVM::Function?
     setter pony_ctx : LLVM::Value?
+    getter current_locals
     
     def initialize(@func = nil)
+      @current_locals = {} of Refer::Local => LLVM::Value
     end
     
     def func?
@@ -449,6 +451,20 @@ class Mare::CodeGen
     end
   end
   
+  def gen_eq(ctx, f, relate)
+    ref = f.refer[relate.lhs]
+    if ref.is_a?(Refer::Local)
+      rhs = gen_expr(ctx, f, relate.rhs).as(LLVM::Value)
+      
+      raise "local already declared: #{ref.inspect}" \
+        if func_frame.current_locals[ref]?
+      
+      rhs.name = ref.name
+      func_frame.current_locals[ref] = rhs
+    else raise NotImplementedError.new(relate.inspect)
+    end
+  end
+  
   def gen_expr(ctx, f, expr) : LLVM::Value
     case expr
     when AST::Identifier
@@ -456,6 +472,8 @@ class Mare::CodeGen
       if ref.is_a?(Refer::Local) && ref.param_idx
         param_idx = ref.param_idx.not_nil! - 1 # TODO: only for primitive calls
         frame.func.params[param_idx]
+      elsif ref.is_a?(Refer::Local)
+        func_frame.current_locals[ref]
       else
         raise NotImplementedError.new(ref)
       end
@@ -465,8 +483,9 @@ class Mare::CodeGen
     when AST::LiteralString
       gen_string(expr)
     when AST::Relate
-      if expr.op.as(AST::Operator).value == "."
-        gen_dot(ctx, f, expr)
+      case expr.op.as(AST::Operator).value
+      when "." then gen_dot(ctx, f, expr)
+      when "=" then gen_eq(ctx, f, expr)
       else raise NotImplementedError.new(expr.inspect)
       end
     else

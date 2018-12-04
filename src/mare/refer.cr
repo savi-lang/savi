@@ -100,34 +100,34 @@ class Mare::Refer < Mare::AST::Visitor
   # For a Relate, pay attention to any relations that are relevant to us.
   def touch(node : AST::Relate)
     if node.op.value == " " && @create_params
-      # Treat this as a local declaration site, with the lhs being the
-      # identifier of the new local and the rhs being the type reference.
-      ident = node.lhs.as(AST::Identifier)
-      type_ref = node.rhs.as(AST::Identifier)
-      
-      # This will be a new local, so if the identifier already matched an
-      # existing local, it would shadow that, which we don't currently allow.
-      if @rids[ident.rid].is_a?(Local)
-        raise Error.new([
-          "This local shadows an existing local:",
-          ident.pos.show,
-          "- the first definition was here:",
-          @rids[ident.rid].pos.show,
-        ].join("\n"))
-      end
-      
-      # This local is a parameter, so set the new parameter index.
-      # TODO: handle non-parameter locals
-      @last_param += 1
-      
-      # Create the local entry, so later references to this name will see it.
-      local = Local.new(ident.pos, ident.value, ident.rid, @last_param)
-      @current_locals[ident.value] = local
-      @rids[ident.rid] = local
+      create_local(node.lhs.as(AST::Identifier), true)
+    elsif node.op.value == "="
+      create_local(node.lhs.as(AST::Identifier))
     end
   end
   
   def touch(node : AST::Node)
     # On all other nodes, do nothing.
+  end
+  
+  def create_local(node : AST::Identifier, param = false)
+    # This will be a new local, so if the identifier already matched an
+    # existing local, it would shadow that, which we don't currently allow.
+    if @rids[node.rid].is_a?(Local)
+      raise Error.new([
+        "This local shadows an existing local:",
+        node.pos.show,
+        "- the first definition was here:",
+        @rids[node.rid].pos.show,
+      ].join("\n"))
+    end
+    
+    # This local is a parameter, so set the new parameter index.
+    param_idx = (@last_param += 1) if param
+    
+    # Create the local entry, so later references to this name will see it.
+    local = Local.new(node.pos, node.value, node.rid, param_idx)
+    @current_locals[node.value] = local
+    @rids[node.rid] = local
   end
 end
