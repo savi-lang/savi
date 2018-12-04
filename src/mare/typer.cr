@@ -245,9 +245,14 @@ class Mare::Typer < Mare::AST::Visitor
   end
   
   def touch(node : AST::Group)
-    # A group always has the tid of its final child,
-    # though if the group is empty we'll leave the group's tid as zero.
-    transfer_tid(node.terms.last, node) unless node.terms.empty?
+    if node.terms.empty?
+      # TODO: constrain with a Domain of [None], so that something like:
+      #   `number I32 = ()`
+      # will fail because [I32] & [None] is [].
+    else
+      # A non-empty group always has the tid of its final child.
+      transfer_tid(node.terms.last, node)
+    end
   end
   
   def touch(node : AST::Relate)
