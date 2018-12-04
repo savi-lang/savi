@@ -67,7 +67,7 @@ class Mare::Refer < Mare::AST::Visitor
     with_create_params { func.params.try { |params| params.accept(self) } }
     
     # Now read the function body.
-    func.body.accept(self)
+    func.body.try { |body| body.accept(self) }
   end
   
   # Yield with @create_params set to true, then after running the given block
@@ -101,8 +101,9 @@ class Mare::Refer < Mare::AST::Visitor
   def touch(node : AST::Relate)
     if node.op.value == " " && @create_params
       create_local(node.lhs.as(AST::Identifier), true)
+      node.rid = node.lhs.rid
     elsif node.op.value == "="
-      create_local(node.lhs.as(AST::Identifier))
+      create_local(node.lhs, false)
     end
   end
   
@@ -110,7 +111,7 @@ class Mare::Refer < Mare::AST::Visitor
     # On all other nodes, do nothing.
   end
   
-  def create_local(node : AST::Identifier, param = false)
+  def create_local(node : AST::Identifier, is_param : Bool)
     # This will be a new local, so if the identifier already matched an
     # existing local, it would shadow that, which we don't currently allow.
     if @rids[node.rid].is_a?(Local)
@@ -123,11 +124,19 @@ class Mare::Refer < Mare::AST::Visitor
     end
     
     # This local is a parameter, so set the new parameter index.
-    param_idx = (@last_param += 1) if param
+    param_idx = (@last_param += 1) if is_param
     
     # Create the local entry, so later references to this name will see it.
     local = Local.new(node.pos, node.value, node.rid, param_idx)
     @current_locals[node.value] = local
     @rids[node.rid] = local
+  end
+  
+  def create_local(node : AST::Node, is_param : Bool)
+    raise NotImplementedError.new(node.to_a) \
+      unless node.is_a?(AST::Relate) && node.op.value == " "
+    
+    create_local(node.lhs, is_param)
+    node.rid = node.lhs.rid
   end
 end

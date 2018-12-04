@@ -47,7 +47,7 @@ class Mare::Program
     getter ident : AST::Identifier
     getter params : AST::Group?
     getter ret : AST::Identifier?
-    getter body : AST::Group
+    getter body : AST::Group?
     
     property! refer : Mare::Refer
     property! typer : Mare::Typer

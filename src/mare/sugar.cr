@@ -3,14 +3,15 @@ class Mare::Sugar < Mare::AST::Visitor
     sugar = new
     ctx.program.types.each do |t|
       t.functions.each do |f|
-        f.body.accept(sugar)
+        # TODO also run in parameter signature?
+        f.body.try { |body| body.accept(sugar) }
       end
     end
   end
   
   def visit(node : AST::Relate)
     case node.op.value
-    when ".", "&&", "||", "=" then node # skip these special-case operators.
+    when ".", "&&", "||", " ", "=" then node # skip these special-case operators
     else
       # Convert the operator relation into a single-argument method call.
       ident = AST::Identifier.new(node.op.value).from(node.op)

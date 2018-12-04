@@ -113,12 +113,27 @@ class Mare::Typer < Mare::AST::Visitor
     # Visit the function parameters, noting any declared types there.
     func.params.try { |params| params.accept(self) }
     
+    # Take note of the return type constraint if given.
+    func_ret = func.ret
+    new_tid(func_ret) << Domain.new(func_ret.pos, [func_ret.value]) if func_ret
+    
+    # Complain if neither return type nor function body were specified.
+    raise Error.new([
+      "This function's return type is totally unconstrained:",
+      func.ident.pos.show,
+    ].join("\n")) unless func_ret || func.body
+    
+    # Don't bother further typechecking functions that have no body
+    # (such as FFI function declarations).
+    func_body = func.body
+    return unless func_body
+    
     # Visit the function body, taking note of all observed constraints.
-    func.body.accept(self)
+    func_body.accept(self)
     
     # Constrain the function body with the return type if given.
-    ret = func.ret
-    constrain(func.body.tid) << Domain.new(ret.pos, [ret.value]) if ret
+    # TODO: join the tids instead of just copying constraints
+    constrain(func_body.tid).copy_from(constrain(func_ret.tid)) if func_ret
     
     # Gather all the function calls that were encountered.
     calls =
@@ -141,7 +156,10 @@ class Mare::Typer < Mare::AST::Visitor
       # TODO: detect and halt recursion by noticing what's been seen
       typer = call_func.typer? || self.class.new.tap(&.run(ctx, call_func))
       
-      typer.constraints[call_func.body.tid].iter.each { |c| constrain(tid) << c }
+      # Don't bother typechecking functions that have no body
+      # (such as FFI function declarations).
+      call_ret = (call_func.ret || call_func.body).not_nil!
+      typer.constraints[call_ret.tid].iter.each { |c| constrain(tid) << c }
     end
     
     # TODO: Assign the resolved types to a new map of TID => type.
@@ -167,6 +185,7 @@ class Mare::Typer < Mare::AST::Visitor
   end
   
   def constrain(tid : TID)
+    raise "can't constrain tid zero" if tid == 0
     (@constraints[tid] ||= Constraints.new).not_nil!
   end
   
@@ -256,17 +275,23 @@ class Mare::Typer < Mare::AST::Visitor
       local = refer[node.lhs]
       if local.is_a?(Refer::Local) && local.defn_rid == node.lhs.rid
         local_tid = @local_tids[local]
+        require_nonzero(node.rhs)
         # TODO: join the tids instead of just copying constraints
         constrain(local_tid).copy_from(constrain(node.rhs.tid))
         transfer_tid(local_tid, node)
       else
-        raise NotImplementedError.new(node.inspect)
+        raise NotImplementedError.new(node.to_a)
       end
     else raise NotImplementedError.new(node.op.value)
     end
   end
   
   def touch(node : AST::Node)
-    raise NotImplementedError.new(node.class)
+    raise NotImplementedError.new(node.to_a)
+  end
+  
+  def require_nonzero(node : AST::Node)
+    return if node.tid != 0
+    raise Error.new("This type couldn't be resolved:\n#{node.pos.show}")
   end
 end

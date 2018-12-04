@@ -88,7 +88,10 @@ module Mare
             if ident.is_a?(AST::LiteralString)
           ident = ident.as(AST::Identifier)
           
-          function = Program::Function.new(ident, params, ret, decl.body)
+          body = decl.body
+          body = nil if @type.kind == Program::Type::Kind::FFI
+          
+          function = Program::Function.new(ident, params, ret, body)
           context.fulfill ["fun", @type.ident.value, ident.value], function
           
           @type.functions << function

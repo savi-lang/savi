@@ -415,7 +415,7 @@ class Mare::CodeGen
     gen_func_start(func)
     
     last_value = nil
-    f.body.terms.each { |expr| last_value = gen_expr(ctx, f, expr) }
+    f.body.not_nil!.terms.each { |expr| last_value = gen_expr(ctx, f, expr) }
     
     if f.ret
       @builder.ret(last_value.not_nil!)
