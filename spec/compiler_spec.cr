@@ -11,6 +11,7 @@ describe Mare::Compiler::Default do
     context = Mare::Context.new
     context.compile(ast)
     context.run(Mare::Sugar)
+    context.run(Mare::Refer)
     context.run(Mare::Typer)
     context.run(Mare::CodeGen.new).return_value.should eq 42
   end

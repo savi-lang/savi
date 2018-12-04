@@ -391,7 +391,14 @@ class Mare::CodeGen
     params = [] of LLVM::Type
     f.params.try do |param_idents|
       param_idents.terms.map do |param|
-        params << ffi_type_for(param.as(AST::Identifier))
+        param_type_ident =
+          case param
+          when AST::Identifier then param
+          when AST::Relate then param.rhs.as(AST::Identifier)
+          else raise NotImplementedError.new(param)
+          end
+        
+        params << ffi_type_for(param_type_ident)
       end
     end
     ret = f.ret.try { |ret_ident| ffi_type_for(ret_ident) } || @void
@@ -406,7 +413,7 @@ class Mare::CodeGen
     gen_func_start(func)
     
     last_value = nil
-    f.body.terms.each { |expr| last_value = gen_expr(ctx, expr) }
+    f.body.terms.each { |expr| last_value = gen_expr(ctx, f, expr) }
     
     if f.ret
       @builder.ret(last_value.not_nil!)
@@ -417,7 +424,7 @@ class Mare::CodeGen
     gen_func_end
   end
   
-  def gen_dot(ctx, relate)
+  def gen_dot(ctx, f, relate)
     receiver = relate.lhs.as(AST::Identifier).value
     rhs = relate.rhs
     
@@ -427,7 +434,7 @@ class Mare::CodeGen
       args = [] of LLVM::Value
     when AST::Qualify
       member = rhs.term.as(AST::Identifier).value
-      args = rhs.group.terms.map { |expr| gen_expr(ctx, expr).as(LLVM::Value) }
+      args = rhs.group.terms.map { |expr| gen_expr(ctx, f, expr).as(LLVM::Value) }
     else raise NotImplementedError.new(rhs)
     end
     
@@ -442,8 +449,16 @@ class Mare::CodeGen
     end
   end
   
-  def gen_expr(ctx, expr) : LLVM::Value
+  def gen_expr(ctx, f, expr) : LLVM::Value
     case expr
+    when AST::Identifier
+      ref = f.refer[expr]
+      if ref.is_a?(Refer::Local) && ref.param_idx
+        param_idx = ref.param_idx.not_nil! - 1 # TODO: only for primitive calls
+        frame.func.params[param_idx]
+      else
+        raise NotImplementedError.new(ref)
+      end
     when AST::LiteralInteger
       # TODO: Allow for non-I32 integers, based on inference.
       @i32.const_int(expr.value.to_i32)
@@ -451,7 +466,7 @@ class Mare::CodeGen
       gen_string(expr)
     when AST::Relate
       if expr.op.as(AST::Operator).value == "."
-        gen_dot(ctx, expr)
+        gen_dot(ctx, f, expr)
       else raise NotImplementedError.new(expr.inspect)
       end
     else

@@ -68,6 +68,10 @@ class Mare::Typer < Mare::AST::Visitor
       @domains.each.chain(@calls.each)
     end
     
+    def copy_from(other : Constraints)
+      other.iter.each { |c| self << c }
+    end
+    
     def resolve!
       total_domain = @total_domain
       if total_domain.nil?
@@ -87,10 +91,12 @@ class Mare::Typer < Mare::AST::Visitor
   end
   
   getter constraints
+  property! refer : Mare::Refer
   
   def initialize
     # TODO: When we have branching, we'll need some form of divergence.
     @constraints = Hash(TID, Constraints).new
+    @local_tids = Hash(Refer::Local, TID).new
     @last_tid = 0_u64
   end
   
@@ -101,6 +107,12 @@ class Mare::Typer < Mare::AST::Visitor
   end
   
   def run(ctx, func)
+    func.typer = self
+    @refer = func.refer
+    
+    # Visit the function parameters, noting any declared types there.
+    func.params.try { |params| params.accept(self) }
+    
     # Visit the function body, taking note of all observed constraints.
     func.body.accept(self)
     
@@ -142,9 +154,15 @@ class Mare::Typer < Mare::AST::Visitor
     constrain(node.tid)
   end
   
+  def transfer_tid(from_tid : TID, to)
+    raise "this already has a tid: #{to.inspect}" if to.tid != 0
+    raise "this tid to transfer was zero" if from_tid == 0
+    to.tid = from_tid
+  end
+  
   def transfer_tid(from, to)
-    raise "this already has a tid: #{to}" if to.tid != 0
-    raise "this doesn't have a tid to transfer: #{from}" if from.tid == 0
+    raise "this already has a tid: #{to.inspect}" if to.tid != 0
+    raise "this doesn't have a tid to transfer: #{from.inspect}" if from.tid == 0
     to.tid = from.tid
   end
   
@@ -161,13 +179,26 @@ class Mare::Typer < Mare::AST::Visitor
   end
   
   def touch(node : AST::Identifier)
-    # If it starts with a capital letter, treat it as a type name.
-    # TODO: make this less fiddly-special
-    first_char = node.value[0]
-    if first_char >= 'A' && first_char <= 'Z'
+    ref = refer[node]
+    case ref
+    when Refer::Const
+      # If it's a const, treat it as a type name.
+      # TODO: populate the ref.defn in the domain set instead of the name.
       new_tid(node) << Domain.new(node.pos, [node.value])
+    when Refer::Local
+      # If it's a local, track the possibly new tid in our @local_tids map.
+      local_tid = @local_tids[ref]?
+      if local_tid
+        transfer_tid(local_tid, node)
+      else
+        new_tid(node)
+        @local_tids[ref] = node.tid
+      end
+    when Refer::Unresolved.class
+      # Leave the tid as zero - this identifier has no known type.
+    else
+      raise NotImplementedError.new(ref)
     end
-    # Otherwise, leave the tid as zero.
   end
   
   def touch(node : AST::LiteralString)
@@ -217,6 +248,16 @@ class Mare::Typer < Mare::AST::Visitor
       end
       
       new_tid(node) << Call.new(member.pos, lhs.tid, member.value, args)
+    when " "
+      local = refer[node.lhs]
+      if local.is_a?(Refer::Local) && local.defn_rid == node.lhs.rid
+        local_tid = @local_tids[local]
+        # TODO: join the tids instead of just copying constraints
+        constrain(local_tid).copy_from(constrain(node.rhs.tid))
+        transfer_tid(local_tid, node)
+      else
+        raise NotImplementedError.new(node.inspect)
+      end
     else raise NotImplementedError.new(node.op.value)
     end
   end

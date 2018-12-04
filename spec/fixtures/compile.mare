@@ -1,3 +1,7 @@
+primitive I32:     // TODO: implicit prelude with builtin types
+primitive CString: // TODO: implicit prelude with builtin types
+primitive None:    // TODO: implicit prelude with builtin types
+
 ffi LibC:
   fun puts (CString) I32:
 
@@ -8,12 +12,11 @@ primitive Greeting:
   fun hello CString:
     "Hello, World!"
 
-primitive FortyTwo:
-  fun "+" (I32) I32:
-    // TODO: add other here
-    42
+primitive Zero:
+  fun "+" (other I32) I32:
+    other
 
 actor Main:
   new create:
     LibC.puts(Greeting.hello)
-    LibPonyRT.pony_exitcode(FortyTwo + 0)
+    LibPonyRT.pony_exitcode(Zero + 42)

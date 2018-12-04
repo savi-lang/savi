@@ -19,6 +19,7 @@ describe Mare::Typer do
     context = Mare::Context.new
     context.compile(ast)
     context.run(Mare::Sugar)
+    context.run(Mare::Refer)
     
     expected = <<-MSG
     This value's type is unresolvable due to conflicting constraints:

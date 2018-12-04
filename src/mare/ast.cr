@@ -25,6 +25,7 @@ module Mare
     abstract class Node
       getter! pos
       property tid : UInt64 = 0
+      property rid : UInt64 = 0
       
       def with_pos(source : Source, token : Pegmatite::Token)
         @pos = SourcePos.new(source, token[1], token[2])
