@@ -195,14 +195,7 @@ class Mare::CodeGen
     
     # CodeGen for all function bodies.
     ctx.program.types.each do |t|
-      case t.kind
-      when Program::Type::Kind::Actor,
-           Program::Type::Kind::Class,
-           Program::Type::Kind::Primitive
-        t.functions.each { |f| gen_fun_body(ctx, t, f) }
-      when Program::Type::Kind::FFI then nil
-      else raise NotImplementedError.new(t.kind)
-      end
+      t.functions.each { |f| gen_fun_body(ctx, t, f) if f.body }
     end
     
     # Generate the internal main function.
