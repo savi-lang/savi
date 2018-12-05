@@ -80,12 +80,13 @@ module Mare
           # with nice error collection for reporting to the user/tool.
           head = decl.head.dup
           head.shift # discard the keyword
-          ident = head.shift.as(AST::Identifier | AST::LiteralString)
+          ident = head.shift if head[0]?
           params = head.shift.as(AST::Group) if head[0]?.is_a?(AST::Group)
           ret = head.shift.as(AST::Identifier) if head[0]?
           
           ident = AST::Identifier.new(ident.value).from(ident) \
             if ident.is_a?(AST::LiteralString)
+          ident = decl.head.first if ident.nil? && decl.keyword == "new"
           ident = ident.as(AST::Identifier)
           
           body = decl.body

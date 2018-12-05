@@ -11,7 +11,7 @@ describe Mare::Typer do
         "not a number at all"
     
     actor Main:
-      new new:
+      new:
         Example.number
     SOURCE
     
@@ -52,7 +52,7 @@ describe Mare::Typer do
         42
     
     actor Main:
-      new new:
+      new:
         name CString = Example.number
     SOURCE
     
