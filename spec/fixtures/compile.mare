@@ -17,7 +17,7 @@ primitive Zero:
     other
 
 actor Main:
-  new create:
+  new new:
     exitcode I32 = Zero + 42
     LibC.puts(Greeting.hello)
     LibPonyRT.pony_exitcode(exitcode)

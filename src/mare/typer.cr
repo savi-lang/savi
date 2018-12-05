@@ -101,7 +101,7 @@ class Mare::Typer < Mare::AST::Visitor
   end
   
   def self.run(ctx)
-    func = ctx.program.find_func!("Main", "create")
+    func = ctx.program.find_func!("Main", "new")
     
     new.run(ctx, func)
   end

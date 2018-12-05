@@ -280,7 +280,7 @@ class Mare::CodeGen
     
     # Create a one-off message type and allocate a message.
     msg_type = @llvm.struct([@i32, @i32, @ptr, env.type])
-    vtable_index = 0 # TODO: get actual vtable of Main.create
+    vtable_index = 0 # TODO: get actual vtable of Main.new
     msg_size = @target_machine.data_layout.abi_size(msg_type)
     pool_index = LibPonyRT.int_pool_index(msg_size)
     msg_opaque = @builder.call(@mod.functions["pony_alloc_msg"],
@@ -554,7 +554,7 @@ class Mare::CodeGen
         
         gen_func_start(fn)
         
-        @builder.call(@mod.functions["Main.create"])
+        @builder.call(@mod.functions["Main.new"])
         
         @builder.ret
         
