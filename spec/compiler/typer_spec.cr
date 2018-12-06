@@ -1,4 +1,42 @@
 describe Mare::Compiler::Typer do
+  it "complains when the type identifier couldn't be resolved" do
+    source = Mare::Source.new "(example)", <<-SOURCE
+    actor Main:
+      new:
+        x BogusType = 42
+    SOURCE
+    
+    expected = <<-MSG
+    This identifer couldn't be resolved:
+    from (example):3:
+        x BogusType = 42
+          ^~~~~~~~~
+    MSG
+    
+    expect_raises Mare::Compiler::Typer::Error, expected do
+      Mare::Compiler.compile(source, limit: Mare::Compiler::Typer)
+    end
+  end
+  
+  it "complains when the local identifier couldn't be resolved" do
+    source = Mare::Source.new "(example)", <<-SOURCE
+    actor Main:
+      new:
+        x = y
+    SOURCE
+    
+    expected = <<-MSG
+    This identifer couldn't be resolved:
+    from (example):3:
+        x = y
+            ^
+    MSG
+    
+    expect_raises Mare::Compiler::Typer::Error, expected do
+      Mare::Compiler.compile(source, limit: Mare::Compiler::Typer)
+    end
+  end
+  
   it "complains when the function body doesn't match the return type" do
     source = Mare::Source.new "(example)", <<-SOURCE
     primitive Example:

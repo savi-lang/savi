@@ -235,7 +235,11 @@ class Mare::Compiler::Typer < Mare::AST::Visitor
         @local_tids[ref] = node.tid
       end
     when Refer::Unresolved.class
-      # Leave the tid as zero - this identifier has no known type.
+      # Leave the tid as zero if this identifer needs no value.
+      return if node.value_not_needed?
+      
+      # Otherwise, raise an error to the user:
+      raise Error.new("This identifer couldn't be resolved:\n#{node.pos.show}")
     else
       raise NotImplementedError.new(ref)
     end
