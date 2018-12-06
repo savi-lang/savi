@@ -37,7 +37,7 @@ describe Mare::Compiler::Typer do
     
     expected = <<-MSG
     This value's type is unresolvable due to conflicting constraints:
-    - it must be a subtype of (U8, U32, U64, I8, I32, I64, F32, F64):
+    - it must be a subtype of (U8 | U32 | U64 | I8 | I32 | I64 | F32 | F64):
       from (example):3:
         name CString = 42
                        ^~

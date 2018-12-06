@@ -13,7 +13,7 @@ class Mare::Compiler::Typer < Mare::AST::Visitor
     end
     
     def show
-      "- it must be a subtype of (#{names.join(", ")}):\n" \
+      "- it must be a subtype of (#{names.join(" | ")}):\n" \
       "  #{pos.show}\n"
     end
     
