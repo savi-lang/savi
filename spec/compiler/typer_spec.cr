@@ -30,26 +30,22 @@ describe Mare::Compiler::Typer do
   
   it "complains when the assignment type doesn't match the right-hand-side" do
     source = Mare::Source.new "(example)", <<-SOURCE
-    primitive Example:
-      fun number I32:
-        42
-    
     actor Main:
       new:
-        name CString = Example.number
+        name CString = 42
     SOURCE
     
     expected = <<-MSG
     This value's type is unresolvable due to conflicting constraints:
-    - it must be a subtype of (CString):
-      from (example):7:
-        name CString = Example.number
-             ^~~~~~~
+    - it must be a subtype of (U8, U32, U64, I8, I32, I64, F32, F64):
+      from (example):3:
+        name CString = 42
+                       ^~
     
-    - it must be a subtype of (I32):
-      from (example):2:
-      fun number I32:
-                 ^~~
+    - it must be a subtype of (CString):
+      from (example):3:
+        name CString = 42
+             ^~~~~~~
     MSG
     
     expect_raises Mare::Compiler::Typer::Error, expected do

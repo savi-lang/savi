@@ -157,10 +157,17 @@ class Mare::Compiler::Typer < Mare::AST::Visitor
       # TODO: detect and halt recursion by noticing what's been seen
       typer = call_func.typer? || self.class.new.tap(&.run(ctx, call_func))
       
-      # Don't bother typechecking functions that have no body
-      # (such as FFI function declarations).
+      # Apply constraints to the return type.
       call_ret = (call_func.ret || call_func.body).not_nil!
-      typer.constrain(call_ret.tid).iter.each { |c| constrain(tid) << c }
+      constrain(tid).copy_from(typer.constrain(call_ret.tid))
+      
+      # Apply constraints to each of the argument types.
+      # TODO: handle case where number of args differs from number of params.
+      unless call.args.empty?
+        call.args.zip(call_func.params.not_nil!.terms).each do |arg_tid, param|
+          constrain(arg_tid).copy_from(typer.constrain(param.tid))
+        end
+      end
     end
     
     # TODO: Assign the resolved types to a new map of TID => type.
@@ -239,12 +246,15 @@ class Mare::Compiler::Typer < Mare::AST::Visitor
     new_tid(node) << Domain.new(node.pos, ["CString"])
   end
   
+  # A literal integer could be any integer or floating-point machine type.
   def touch(node : AST::LiteralInteger)
-    new_tid(node) << Domain.new(node.pos, ["I32"]) # TODO: all int types?
+    new_tid(node) << Domain.new(node.pos,
+      ["U8", "U32", "U64", "I8", "I32", "I64", "F32", "F64"])
   end
   
+  # A literal float could be any floating-point machine type.
   def touch(node : AST::LiteralFloat)
-    new_tid(node) << Domain.new(node.pos, ["F64"]) # TODO: all float types?
+    new_tid(node) << Domain.new(node.pos, ["F32", "F64"])
   end
   
   def touch(node : AST::Operator)

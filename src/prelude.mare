@@ -1,3 +1,15 @@
+// Integers
+primitive U8:
+primitive U32:
+primitive U64:
+primitive I8:
 primitive I32:
+primitive I64:
+
+// Floats
+primitive F32:
+primitive F64:
+
 primitive CString:
+
 primitive None:
