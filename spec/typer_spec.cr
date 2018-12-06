@@ -26,15 +26,15 @@ describe Mare::Typer do
     
     expected = <<-MSG
     This value's type is unresolvable due to conflicting constraints:
-    - it must be a subtype of (CString):
-      from (example):6:
-        "not a number at all"
-         ^~~~~~~~~~~~~~~~~~~
-    
     - it must be a subtype of (I32):
       from (example):5:
       fun number I32:
                  ^~~
+    
+    - it must be a subtype of (CString):
+      from (example):6:
+        "not a number at all"
+         ^~~~~~~~~~~~~~~~~~~
     MSG
     
     expect_raises Mare::Typer::Error, expected do

@@ -95,6 +95,7 @@ class Mare::Typer < Mare::AST::Visitor
   
   def initialize
     # TODO: When we have branching, we'll need some form of divergence.
+    @redirects = Hash(TID, TID).new
     @constraints = Hash(TID, Constraints).new
     @local_tids = Hash(Refer::Local, TID).new
     @last_tid = 0_u64
@@ -133,7 +134,7 @@ class Mare::Typer < Mare::AST::Visitor
     
     # Constrain the function body with the return type if given.
     # TODO: join the tids instead of just copying constraints
-    constrain(func_body.tid).copy_from(constrain(func_ret.tid)) if func_ret
+    unify_tids(func_body.tid, func_ret.tid) if func_ret
     
     # Gather all the function calls that were encountered.
     calls =
@@ -147,7 +148,7 @@ class Mare::Typer < Mare::AST::Visitor
     calls.each do |tid, call|
       # Confirm that by now, there is exactly one type in the domain.
       # TODO: is it possible to proceed without Domain?
-      receiver_type = @constraints[call.lhs].resolve!
+      receiver_type = constrain(call.lhs).resolve!
       
       call_func = ctx.program.find_func!(receiver_type, call.member)
       
@@ -159,11 +160,21 @@ class Mare::Typer < Mare::AST::Visitor
       # Don't bother typechecking functions that have no body
       # (such as FFI function declarations).
       call_ret = (call_func.ret || call_func.body).not_nil!
-      typer.constraints[call_ret.tid].iter.each { |c| constrain(tid) << c }
+      typer.constrain(call_ret.tid).iter.each { |c| constrain(tid) << c }
     end
     
     # TODO: Assign the resolved types to a new map of TID => type.
     @constraints.each_value(&.resolve!)
+  end
+  
+  def constrain(tid : TID)
+    raise "can't constrain tid zero" if tid == 0
+    
+    while @redirects.has_key?(tid)
+      tid = @redirects[tid]
+    end
+    
+    (@constraints[tid] ||= Constraints.new).not_nil!
   end
   
   def new_tid(node)
@@ -184,9 +195,10 @@ class Mare::Typer < Mare::AST::Visitor
     to.tid = from.tid
   end
   
-  def constrain(tid : TID)
-    raise "can't constrain tid zero" if tid == 0
-    (@constraints[tid] ||= Constraints.new).not_nil!
+  def unify_tids(from : TID, to : TID)
+    constrain(to).copy_from(constrain(from))
+    @redirects[from] = to
+    @constraints.delete(from)
   end
   
   # This visitor never replaces nodes, it just touches them and returns them.
@@ -258,8 +270,7 @@ class Mare::Typer < Mare::AST::Visitor
   def touch(node : AST::Relate)
     case node.op.value
     when "="
-      # TODO: join the tids instead of just copying constraints
-      constrain(node.lhs.tid).copy_from(constrain(node.rhs.tid))
+      unify_tids(node.lhs.tid, node.rhs.tid)
       transfer_tid(node.rhs, node)
     when "."
       lhs = node.lhs
@@ -281,9 +292,8 @@ class Mare::Typer < Mare::AST::Visitor
       if local.is_a?(Refer::Local) && local.defn_rid == node.lhs.rid
         local_tid = @local_tids[local]
         require_nonzero(node.rhs)
-        # TODO: join the tids instead of just copying constraints
-        constrain(local_tid).copy_from(constrain(node.rhs.tid))
-        transfer_tid(local_tid, node)
+        unify_tids(local_tid, node.rhs.tid)
+        transfer_tid(node.rhs.tid, node)
       else
         raise NotImplementedError.new(node.to_a)
       end
