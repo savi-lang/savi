@@ -133,7 +133,6 @@ class Mare::Compiler::Typer < Mare::AST::Visitor
     func_body.accept(self)
     
     # Constrain the function body with the return type if given.
-    # TODO: join the tids instead of just copying constraints
     unify_tids(func_body.tid, func_ret.tid) if func_ret
     
     # Gather all the function calls that were encountered.
