@@ -1,6 +1,7 @@
 class Mare::Program
   # TODO: add Package delineation here
   getter types
+  property! code_gen : Mare::Compiler::CodeGen
   
   def initialize
     @types = [] of Type

@@ -5,8 +5,6 @@ describe Mare::Parser do
     source = fixture "example.mare"
     
     ast = Mare::Parser.parse(source)
-    ast.should be_truthy
-    next unless ast
     
     ast.to_a.should eq [:doc,
       [:declare, [[:ident, "class"], [:ident, "Example"]], [:group, ":"]],
@@ -68,8 +66,6 @@ describe Mare::Parser do
     source = fixture "operators.mare"
     
     ast = Mare::Parser.parse(source)
-    ast.should be_truthy
-    next unless ast
     
     # Can't use array literals here because Crystal is too slow to compile them.
     # See https://github.com/crystal-lang/crystal/issues/5792

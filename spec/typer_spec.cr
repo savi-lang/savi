@@ -15,16 +15,6 @@ describe Mare::Compiler::Typer do
         Example.number
     SOURCE
     
-    ast = Mare::Parser.parse(source)
-    ast.should be_truthy
-    next unless ast
-    
-    context = Mare::Compiler::Context.new
-    context.compile(ast)
-    context.run(Mare::Compiler::Sugar)
-    context.run(Mare::Compiler::Flagger)
-    context.run(Mare::Compiler::Refer)
-    
     expected = <<-MSG
     This value's type is unresolvable due to conflicting constraints:
     - it must be a subtype of (I32):
@@ -39,7 +29,7 @@ describe Mare::Compiler::Typer do
     MSG
     
     expect_raises Mare::Compiler::Typer::Error, expected do
-      context.run(Mare::Compiler::Typer)
+      Mare::Compiler.compile(source, limit: Mare::Compiler::Typer)
     end
   end
   
@@ -57,16 +47,6 @@ describe Mare::Compiler::Typer do
         name CString = Example.number
     SOURCE
     
-    ast = Mare::Parser.parse(source)
-    ast.should be_truthy
-    next unless ast
-    
-    context = Mare::Compiler::Context.new
-    context.compile(ast)
-    context.run(Mare::Compiler::Sugar)
-    context.run(Mare::Compiler::Flagger)
-    context.run(Mare::Compiler::Refer)
-    
     expected = <<-MSG
     This value's type is unresolvable due to conflicting constraints:
     - it must be a subtype of (CString):
@@ -81,7 +61,7 @@ describe Mare::Compiler::Typer do
     MSG
     
     expect_raises Mare::Compiler::Typer::Error, expected do
-      context.run(Mare::Compiler::Typer)
+      Mare::Compiler.compile(source, limit: Mare::Compiler::Typer)
     end
   end
 end

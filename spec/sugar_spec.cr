@@ -9,8 +9,6 @@ describe Mare::Compiler::Sugar do
     SOURCE
     
     ast = Mare::Parser.parse(source)
-    ast.should be_truthy
-    next unless ast
     
     ast.to_a.should eq [:doc,
       [:declare, [[:ident, "class"], [:ident, "Example"]], [:group, ":"]],
@@ -19,17 +17,15 @@ describe Mare::Compiler::Sugar do
       ]],
     ]
     
-    ast.accept Mare::Compiler::Sugar.new
+    ctx = Mare::Compiler.compile(ast, limit: Mare::Compiler::Sugar)
     
-    ast.to_a.should eq [:doc,
-      [:declare, [[:ident, "class"], [:ident, "Example"]], [:group, ":"]],
-      [:declare, [[:ident, "fun"], [:ident, "plus"]], [:group, ":",
-        [:relate,
-          [:ident, "x"],
-          [:op, "."],
-          [:qualify, [:ident, "+"], [:group, "(", [:ident, "y"]]]
-        ],
-      ]],
+    func = ctx.program.find_func!("Example", "plus")
+    func.body.not_nil!.to_a.should eq [:group, ":",
+      [:relate,
+        [:ident, "x"],
+        [:op, "."],
+        [:qualify, [:ident, "+"], [:group, "(", [:ident, "y"]]]
+      ],
     ]
   end
 end

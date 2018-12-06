@@ -169,7 +169,13 @@ class Mare::Compiler::CodeGen
     @frames.reverse_each.find { |f| f.func? }.not_nil!
   end
   
+  def self.run(ctx)
+    new.run(ctx)
+  end
+  
   def run(ctx : Context)
+    ctx.program.code_gen = self
+    
     # CodeGen for all function declarations.
     ctx.program.types.each do |t|
       case t.kind
