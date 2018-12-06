@@ -1,9 +1,6 @@
 describe Mare::Compiler::Typer do
   it "complains when the function body doesn't match the return type" do
     source = Mare::Source.new "(example)", <<-SOURCE
-    primitive I32:     // TODO: implicit prelude with builtin types
-    primitive CString: // TODO: implicit prelude with builtin types
-    
     primitive Example:
       fun number I32:
         "not a number at all"
@@ -16,12 +13,12 @@ describe Mare::Compiler::Typer do
     expected = <<-MSG
     This value's type is unresolvable due to conflicting constraints:
     - it must be a subtype of (I32):
-      from (example):5:
+      from (example):2:
       fun number I32:
                  ^~~
     
     - it must be a subtype of (CString):
-      from (example):6:
+      from (example):3:
         "not a number at all"
          ^~~~~~~~~~~~~~~~~~~
     MSG
@@ -33,9 +30,6 @@ describe Mare::Compiler::Typer do
   
   it "complains when the assignment type doesn't match the right-hand-side" do
     source = Mare::Source.new "(example)", <<-SOURCE
-    primitive I32:     // TODO: implicit prelude with builtin types
-    primitive CString: // TODO: implicit prelude with builtin types
-    
     primitive Example:
       fun number I32:
         42
@@ -48,12 +42,12 @@ describe Mare::Compiler::Typer do
     expected = <<-MSG
     This value's type is unresolvable due to conflicting constraints:
     - it must be a subtype of (CString):
-      from (example):10:
+      from (example):7:
         name CString = Example.number
              ^~~~~~~
     
     - it must be a subtype of (I32):
-      from (example):5:
+      from (example):2:
       fun number I32:
                  ^~~
     MSG

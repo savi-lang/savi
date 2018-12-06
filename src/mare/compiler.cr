@@ -12,6 +12,8 @@ module Mare::Compiler
   end
   
   def self.compile(doc : AST::Document, limit : LIMIT = CodeGen)
+    doc.list.concat(prelude_doc.list)
+    
     ctx = Context.new
     ctx.compile(doc)
     return ctx if limit == Interpreter
@@ -30,5 +32,12 @@ module Mare::Compiler
     
     ctx.run(CodeGen)
     ctx
+  end
+  
+  def self.prelude_doc
+    path = File.join(__DIR__, "../prelude.mare")
+    content = File.read(path)
+    source = Source.new(path, content)
+    Parser.parse(source)
   end
 end

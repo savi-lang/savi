@@ -1,7 +1,3 @@
-primitive I32:     // TODO: implicit prelude with builtin types
-primitive CString: // TODO: implicit prelude with builtin types
-primitive None:    // TODO: implicit prelude with builtin types
-
 ffi LibC:
   fun puts (CString) I32:
 
