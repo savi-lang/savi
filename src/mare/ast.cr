@@ -28,7 +28,7 @@ module Mare::AST
     @flags : UInt64 = 0
     
     def with_pos(source : Source, token : Pegmatite::Token)
-      @pos = SourcePos.new(source, token[1], token[2])
+      @pos = Source::Pos.new(source, token[1], token[2])
       self
     end
     

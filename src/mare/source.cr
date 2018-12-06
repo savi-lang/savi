@@ -7,7 +7,7 @@ class Mare::Source
   def self.none; NONE end
 end
 
-struct Mare::SourcePos
+struct Mare::Source::Pos
   property source : Source
   property start : Int32
   property finish : Int32

@@ -5,7 +5,7 @@ class Mare::Compiler::Typer < Mare::AST::Visitor
   end
   
   struct Domain
-    property pos : SourcePos
+    property pos : Source::Pos
     property names
     
     def initialize(@pos, names)
@@ -23,7 +23,7 @@ class Mare::Compiler::Typer < Mare::AST::Visitor
   end
   
   struct Call
-    property pos : SourcePos
+    property pos : Source::Pos
     property lhs : TID
     property member : String
     property args : Array(TID)

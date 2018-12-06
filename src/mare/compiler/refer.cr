@@ -6,12 +6,12 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
   
   module Unresolved
     def self.pos
-      SourcePos.none
+      Source::Pos.none
     end
   end
   
   class Local
-    getter pos : SourcePos
+    getter pos : Source::Pos
     getter name : String
     getter defn_rid : RID
     getter param_idx : Int32?
