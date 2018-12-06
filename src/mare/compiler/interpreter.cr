@@ -1,4 +1,4 @@
-module Mare
+module Mare::Compiler
   abstract class Interpreter
     # Return the list of declare keywords that this interpreter recognizes.
     abstract def keywords: Array(String)

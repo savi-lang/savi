@@ -1,5 +1,5 @@
 require "llvm"
-require "./ext/llvm" # TODO: get these merged into crystal standard library
+require "../ext/llvm" # TODO: get these merged into crystal standard library
 require "compiler/crystal/config" # TODO: remove
 require "./code_gen/*"
 
@@ -9,7 +9,7 @@ lib LibPonyRT
   fun int_pool_index = ponyint_pool_index(size : LibC::SizeT) : LibC::SizeT
 end
 
-class Mare::CodeGen
+class Mare::Compiler::CodeGen
   @llvm : LLVM::Context
   @mod : LLVM::Module
   @builder : LLVM::Builder

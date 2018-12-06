@@ -1,0 +1,2 @@
+module Mare::Compiler
+end

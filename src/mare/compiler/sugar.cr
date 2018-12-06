@@ -1,4 +1,4 @@
-class Mare::Sugar < Mare::AST::Visitor
+class Mare::Compiler::Sugar < Mare::AST::Visitor
   def self.run(ctx)
     sugar = new
     ctx.program.types.each do |t|

@@ -1,4 +1,4 @@
-module Mare
+module Mare::Compiler
   class Context
     getter program
     

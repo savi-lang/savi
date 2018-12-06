@@ -49,8 +49,8 @@ class Mare::Program
     getter ret : AST::Identifier?
     getter body : AST::Group?
     
-    property! refer : Mare::Refer
-    property! typer : Mare::Typer
+    property! refer : Mare::Compiler::Refer
+    property! typer : Mare::Compiler::Typer
     
     def initialize(@ident, @params, @ret, @body)
     end

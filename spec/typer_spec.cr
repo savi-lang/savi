@@ -1,6 +1,6 @@
 require "./spec_helper"
 
-describe Mare::Typer do
+describe Mare::Compiler::Typer do
   it "complains when the function body doesn't match the return type" do
     source = Mare::Source.new "(example)", <<-SOURCE
     primitive I32:     // TODO: implicit prelude with builtin types
@@ -19,11 +19,11 @@ describe Mare::Typer do
     ast.should be_truthy
     next unless ast
     
-    context = Mare::Context.new
+    context = Mare::Compiler::Context.new
     context.compile(ast)
-    context.run(Mare::Sugar)
-    context.run(Mare::Flagger)
-    context.run(Mare::Refer)
+    context.run(Mare::Compiler::Sugar)
+    context.run(Mare::Compiler::Flagger)
+    context.run(Mare::Compiler::Refer)
     
     expected = <<-MSG
     This value's type is unresolvable due to conflicting constraints:
@@ -38,8 +38,8 @@ describe Mare::Typer do
          ^~~~~~~~~~~~~~~~~~~
     MSG
     
-    expect_raises Mare::Typer::Error, expected do
-      context.run(Mare::Typer)
+    expect_raises Mare::Compiler::Typer::Error, expected do
+      context.run(Mare::Compiler::Typer)
     end
   end
   
@@ -61,11 +61,11 @@ describe Mare::Typer do
     ast.should be_truthy
     next unless ast
     
-    context = Mare::Context.new
+    context = Mare::Compiler::Context.new
     context.compile(ast)
-    context.run(Mare::Sugar)
-    context.run(Mare::Flagger)
-    context.run(Mare::Refer)
+    context.run(Mare::Compiler::Sugar)
+    context.run(Mare::Compiler::Flagger)
+    context.run(Mare::Compiler::Refer)
     
     expected = <<-MSG
     This value's type is unresolvable due to conflicting constraints:
@@ -80,8 +80,8 @@ describe Mare::Typer do
                  ^~~
     MSG
     
-    expect_raises Mare::Typer::Error, expected do
-      context.run(Mare::Typer)
+    expect_raises Mare::Compiler::Typer::Error, expected do
+      context.run(Mare::Compiler::Typer)
     end
   end
 end

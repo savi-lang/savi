@@ -8,12 +8,12 @@ describe Mare do
     ast.should be_truthy
     next unless ast
     
-    context = Mare::Context.new
+    context = Mare::Compiler::Context.new
     context.compile(ast)
-    context.run(Mare::Sugar)
-    context.run(Mare::Flagger)
-    context.run(Mare::Refer)
-    context.run(Mare::Typer)
-    context.run(Mare::CodeGen.new).return_value.should eq 42
+    context.run(Mare::Compiler::Sugar)
+    context.run(Mare::Compiler::Flagger)
+    context.run(Mare::Compiler::Refer)
+    context.run(Mare::Compiler::Typer)
+    context.run(Mare::Compiler::CodeGen.new).return_value.should eq 42
   end
 end

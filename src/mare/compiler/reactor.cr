@@ -1,4 +1,4 @@
-module Mare
+module Mare::Compiler
   class Reactor
     def initialize
       # TODO: is it possible to use the Class object as the key?

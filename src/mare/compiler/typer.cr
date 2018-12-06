@@ -1,4 +1,4 @@
-class Mare::Typer < Mare::AST::Visitor
+class Mare::Compiler::Typer < Mare::AST::Visitor
   alias TID = UInt64
   
   class Error < Exception
@@ -91,7 +91,7 @@ class Mare::Typer < Mare::AST::Visitor
   end
   
   getter constraints
-  property! refer : Mare::Refer
+  property! refer : Mare::Compiler::Refer
   
   def initialize
     # TODO: When we have branching, we'll need some form of divergence.

@@ -1,6 +1,6 @@
 require "./spec_helper"
 
-describe Mare::Sugar do
+describe Mare::Compiler::Sugar do
   it "transforms an operator to a method call" do
     source = Mare::Source.new "(example)", <<-SOURCE
     class Example:
@@ -19,7 +19,7 @@ describe Mare::Sugar do
       ]],
     ]
     
-    ast.accept Mare::Sugar.new
+    ast.accept Mare::Compiler::Sugar.new
     
     ast.to_a.should eq [:doc,
       [:declare, [[:ident, "class"], [:ident, "Example"]], [:group, ":"]],

@@ -1,4 +1,4 @@
-class Mare::Flagger < Mare::AST::Visitor
+class Mare::Compiler::Flagger < Mare::AST::Visitor
   alias RID = UInt64
   
   def self.run(ctx)

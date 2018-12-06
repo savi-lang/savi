@@ -1,4 +1,4 @@
-module Mare
+module Mare::Compiler
   class Interpreter::Default < Interpreter
     def initialize(@program : Program)
     end

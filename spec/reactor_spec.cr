@@ -1,8 +1,8 @@
 require "./spec_helper"
 
-describe Mare::Reactor do
+describe Mare::Compiler::Reactor do
   it "calls back to blocks that existed before fulfillment" do
-    r = Mare::Reactor.new
+    r = Mare::Compiler::Reactor.new
     
     results = [] of Int32
     
@@ -17,7 +17,7 @@ describe Mare::Reactor do
   end
   
   it "calls back to blocks that are created after fulfillment" do
-    r = Mare::Reactor.new
+    r = Mare::Compiler::Reactor.new
     
     results = [] of Int32
     
@@ -32,7 +32,7 @@ describe Mare::Reactor do
   end
   
   it "calls back to blocks that are created both before and after" do
-    r = Mare::Reactor.new
+    r = Mare::Compiler::Reactor.new
     
     results = [] of Int32
     
@@ -48,7 +48,7 @@ describe Mare::Reactor do
   end
   
   it "shows remaining expectations that were never fulfilled" do
-    r = Mare::Reactor.new
+    r = Mare::Compiler::Reactor.new
     
     r.on(Int32, ["test", "foo"]) { }
     r.on(Int32, ["test", "bar"]) { }

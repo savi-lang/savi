@@ -1,4 +1,4 @@
-class Mare::Refer < Mare::AST::Visitor
+class Mare::Compiler::Refer < Mare::AST::Visitor
   alias RID = UInt64
   
   class Error < Exception
