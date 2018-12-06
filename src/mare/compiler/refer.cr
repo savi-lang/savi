@@ -105,11 +105,8 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
   end
   
   def touch(node : AST::Group)
-    # TODO: handle this at the "(" group level instead, iterating over each.
-    if node.style == " " && @create_params
-      ident = node.terms[0]
-      create_local(ident.as(AST::Identifier), true)
-      node.rid = ident.rid
+    if node.style == "(" && @create_params
+      node.terms.each { |child| create_local(child, true) }
     end
   end
   
