@@ -178,6 +178,7 @@ class Mare::Typer < Mare::AST::Visitor
   end
   
   def new_tid(node)
+    raise "this alread has a tid: #{node.inspect}" if node.tid != 0
     node.tid = @last_tid += 1
     raise "type id overflow" if node.tid == 0
     constrain(node.tid)
