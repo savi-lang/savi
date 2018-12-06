@@ -4,7 +4,7 @@ module Mare
     
     def initialize
       @program = Program.new
-      @stack = [Compiler::Default.new(@program)] of Compiler
+      @stack = [Interpreter::Default.new(@program)] of Interpreter
       @reactor = Reactor.new
     end
     

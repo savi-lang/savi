@@ -1,6 +1,6 @@
 module Mare
-  abstract class Compiler
-    # Return the list of declare keywords that this compiler recognizes.
+  abstract class Interpreter
+    # Return the list of declare keywords that this interpreter recognizes.
     abstract def keywords: Array(String)
     
     # Compile the given declare statement.

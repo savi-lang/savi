@@ -1,6 +1,6 @@
 require "./spec_helper"
 
-describe Mare::Compiler::Default do
+describe Mare do
   it "compiles an example" do
     source = fixture "compile.mare"
     

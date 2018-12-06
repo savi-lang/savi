@@ -1,5 +1,5 @@
 module Mare
-  class Compiler::Default < Compiler
+  class Interpreter::Default < Interpreter
     def initialize(@program : Program)
     end
     
@@ -30,7 +30,7 @@ module Mare
       end
     end
     
-    class Type < Compiler
+    class Type < Interpreter
       getter type
       
       def initialize(@type : Program::Type)
