@@ -1,6 +1,7 @@
 module Mare::Compiler
   alias LIMIT = (
     Interpreter.class |
+    Macros.class |
     Sugar.class |
     Flagger.class |
     Refer.class |
@@ -8,7 +9,7 @@ module Mare::Compiler
     CodeGen.class )
   
   def self.compile(source : Source, limit : LIMIT = CodeGen)
-    compile(Parser.parse(source))
+    compile(Parser.parse(source), limit)
   end
   
   def self.compile(doc : AST::Document, limit : LIMIT = CodeGen)
@@ -17,6 +18,9 @@ module Mare::Compiler
     ctx = Context.new
     ctx.compile(doc)
     return ctx if limit == Interpreter
+    
+    ctx.run(Macros)
+    return ctx if limit == Macros
     
     ctx.run(Sugar)
     return ctx if limit == Sugar

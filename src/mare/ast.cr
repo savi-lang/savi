@@ -193,4 +193,22 @@ module Mare::AST
       @rhs = @rhs.accept(visitor)
     end
   end
+  
+  class Choice < Node
+    property list
+    def initialize(@list : Array({Term, Term}))
+    end
+    def name; :choice end
+    def to_a: Array(A)
+      res = [name] of A
+      list.each { |cond, body| res << [cond.to_a, body.to_a] }
+      res
+    end
+    def children_accept(visitor)
+      @list.each do |cond, body|
+        cond.accept(visitor)
+        body.accept(visitor)
+      end
+    end
+  end
 end

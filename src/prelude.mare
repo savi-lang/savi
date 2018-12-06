@@ -1,3 +1,10 @@
+// None
+primitive None:
+
+// Booleans
+primitive True:
+primitive False:
+
 // Integers
 primitive U8:
 primitive U32:
@@ -10,6 +17,7 @@ primitive I64:
 primitive F32:
 primitive F64:
 
+// ...
+
 primitive CString:
 
-primitive None:

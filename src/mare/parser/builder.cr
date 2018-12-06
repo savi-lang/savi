@@ -108,8 +108,6 @@ module Mare::Parser::Builder
       group.terms << build_term(child, iter, source)
     end
     
-    return group.terms.shift if group.terms.size == 1
-    
     group
   end
   

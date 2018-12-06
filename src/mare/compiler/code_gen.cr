@@ -488,6 +488,32 @@ class Mare::Compiler::CodeGen
       when "=" then gen_eq(ctx, f, expr)
       else raise NotImplementedError.new(expr.inspect)
       end
+    when AST::Group
+      # TODO: Use None as a value when sequence group size is zero.
+      raise NotImplementedError.new(expr.terms.size) if expr.terms.size == 0
+      
+      # TODO: Push a scope frame?
+      
+      final : LLVM::Value? = nil
+      expr.terms.each { |term| final = gen_expr(ctx, f, term) }
+      final.not_nil!
+      
+      # TODO: Pop the scope frame?
+    when AST::Choice
+      # TODO: Support more than one clause.
+      raise NotImplementedError.new(expr.list.size) if expr.list.size != 1
+      
+      cond = expr.list.first[0]
+      body = expr.list.first[1]
+      
+      # TODO: Support actual runtime branching.
+      # TODO: Use typer resolution for static True/False finding where possible,
+      # instead of hard-coding this dumb rule here.
+      if cond.is_a?(AST::Identifier) && cond.value == "True"
+        gen_expr(ctx, f, body)
+      else
+        @i1.const_int(0) # TODO: None as a value
+      end
     else
       raise NotImplementedError.new(expr.inspect)
     end

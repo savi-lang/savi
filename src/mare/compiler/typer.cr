@@ -321,6 +321,11 @@ class Mare::Compiler::Typer < Mare::AST::Visitor
     end
   end
   
+  def touch(node : AST::Choice)
+    # TODO: give Choice the union of the types of all clauses
+    new_tid(node) << Domain.new(node.pos, ["None"])
+  end
+  
   def touch(node : AST::Node)
     raise NotImplementedError.new(node.to_a)
   end
