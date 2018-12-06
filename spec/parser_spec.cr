@@ -28,7 +28,7 @@ describe Mare::Parser do
         [
           [:ident, "fun"],
           [:ident, "degreesF"],
-          [:group, "(", [:relate, [:ident, "c"], [:op, " "], [:ident, "F64"]]],
+          [:group, "(", [:group, " ", [:ident, "c"], [:ident, "F64"]]],
           [:ident, "F64"]
         ],
         [:group, ":", [:relate,
@@ -79,9 +79,9 @@ describe Mare::Parser do
        [:relate,
         [:ident, "y"],
         [:op, "="],
-        [:relate,
+        [:group,
+         " ",
          [:ident, "x"],
-         [:op, " "],
          [:relate,
           [:relate, [:ident, "x"], [:op, "&&"], [:ident, "x"]],
           [:op, "||"],

@@ -64,7 +64,7 @@ module Mare::Parser
     op7 = (str("===") | str("==") | str("!==") | str("!=") |
             str("=~")).named(:op)
     op8 = (str("&&") | str("||")).named(:op)
-    opw = (char(' ') | char('\t')).named(:op)
+    opw = (char(' ') | char('\t'))
     ope = char('=').named(:op)
     
     # Construct the nested possible relations for each group of operators.
@@ -77,7 +77,7 @@ module Mare::Parser
     t7 = (t6 >> (sn >> op6 >> sn >> t6 >> s).repeat).named(:relate)
     t8 = (t7 >> (sn >> op7 >> sn >> t7 >> s).repeat).named(:relate)
     tw = (t8 >> (sn >> op8 >> sn >> t8 >> s).repeat).named(:relate)
-    te = (tw >> (opw >> tw >> s).repeat(1)).named(:relate) | tw
+    te = (tw >> (opw >> tw >> s).repeat(1)).named(:group_w) | tw
     t = (te >> (sn >> ope >> sn >> te >> s).repeat).named(:relate)
     
     # Define groups that are comma-separated lists of terms.

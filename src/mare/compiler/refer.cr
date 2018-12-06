@@ -99,11 +99,17 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
   
   # For a Relate, pay attention to any relations that are relevant to us.
   def touch(node : AST::Relate)
-    if node.op.value == " " && @create_params
-      create_local(node.lhs.as(AST::Identifier), true)
-      node.rid = node.lhs.rid
-    elsif node.op.value == "="
+    if node.op.value == "="
       create_local(node.lhs, false)
+    end
+  end
+  
+  def touch(node : AST::Group)
+    # TODO: handle this at the "(" group level instead, iterating over each.
+    if node.style == " " && @create_params
+      ident = node.terms[0]
+      create_local(ident.as(AST::Identifier), true)
+      node.rid = ident.rid
     end
   end
   
@@ -134,9 +140,9 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
   
   def create_local(node : AST::Node, is_param : Bool)
     raise NotImplementedError.new(node.to_a) \
-      unless node.is_a?(AST::Relate) && node.op.value == " "
+      unless node.is_a?(AST::Group) && node.style == " "
     
-    create_local(node.lhs, is_param)
-    node.rid = node.lhs.rid
+    create_local(node.terms[0], is_param)
+    node.rid = node.terms[0].rid
   end
 end

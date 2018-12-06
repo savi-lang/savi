@@ -270,13 +270,27 @@ class Mare::Compiler::Typer < Mare::AST::Visitor
   end
   
   def touch(node : AST::Group)
-    if node.terms.empty?
-      # TODO: constrain with a Domain of [None], so that something like:
-      #   `number I32 = ()`
-      # will fail because [I32] & [None] is [].
-    else
-      # A non-empty group always has the tid of its final child.
-      transfer_tid(node.terms.last, node)
+    case node.style
+    when "(", ":"
+      if node.terms.empty?
+        # TODO: constrain with a Domain of [None], so that something like:
+        #   `number I32 = ()`
+        # will fail because [I32] & [None] is [].
+      else
+        # A non-empty group always has the tid of its final child.
+        transfer_tid(node.terms.last, node)
+      end
+    when " "
+      local = refer[node.terms[0]]
+      if local.is_a?(Refer::Local) && local.defn_rid == node.terms[0].rid
+        local_tid = @local_tids[local]
+        require_nonzero(node.terms[1])
+        unify_tids(local_tid, node.terms[1].tid)
+        transfer_tid(node.terms[1].tid, node)
+      else
+        raise NotImplementedError.new(node.to_a)
+      end
+    else raise NotImplementedError.new(node.style)
     end
   end
   
@@ -300,16 +314,6 @@ class Mare::Compiler::Typer < Mare::AST::Visitor
       end
       
       new_tid(node) << Call.new(member.pos, lhs.tid, member.value, args)
-    when " "
-      local = refer[node.lhs]
-      if local.is_a?(Refer::Local) && local.defn_rid == node.lhs.rid
-        local_tid = @local_tids[local]
-        require_nonzero(node.rhs)
-        unify_tids(local_tid, node.rhs.tid)
-        transfer_tid(node.rhs.tid, node)
-      else
-        raise NotImplementedError.new(node.to_a)
-      end
     else raise NotImplementedError.new(node.op.value)
     end
   end

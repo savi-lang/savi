@@ -60,6 +60,7 @@ module Mare::Parser::Builder
       AST::Operator.new(value).with_pos(source, main)
     when :relate  then build_relate(main, iter, source)
     when :group   then build_group(main, iter, source)
+    when :group_w then build_group_w(main, iter, source)
     when :prefix  then build_prefix(main, iter, source)
     when :qualify then build_qualify(main, iter, source)
     else
@@ -95,6 +96,19 @@ module Mare::Parser::Builder
     iter.while_next_is_child_of(main) do |child|
       group.terms << build_term(child, iter, source)
     end
+    
+    group
+  end
+  
+  private def self.build_group_w(main, iter, source)
+    assert_kind(main, :group_w)
+    group = AST::Group.new(" ").with_pos(source, main)
+    
+    iter.while_next_is_child_of(main) do |child|
+      group.terms << build_term(child, iter, source)
+    end
+    
+    return group.terms.shift if group.terms.size == 1
     
     group
   end

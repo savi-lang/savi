@@ -396,7 +396,7 @@ class Mare::Compiler::CodeGen
         param_type_ident =
           case param
           when AST::Identifier then param
-          when AST::Relate then param.rhs.as(AST::Identifier)
+          when AST::Group then param.terms[1].as(AST::Identifier)
           else raise NotImplementedError.new(param)
           end
         

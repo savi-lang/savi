@@ -25,10 +25,13 @@ class Mare::Compiler::Flagger < Mare::AST::Visitor
     op.value_not_needed!
   end
   
-  # In a Group, only the value of the final term is needed.
   def touch(group : AST::Group)
-    group.terms.each(&.value_not_needed!)
-    group.terms.last.value_needed! unless group.terms.empty?
+    case group.style
+    when "(", ":"
+      # In a sequence-style group, only the value of the final term is needed.
+      group.terms.each(&.value_not_needed!)
+      group.terms.last.value_needed! unless group.terms.empty?
+    end
   end
   
   # However, in a Qualify, a value is needed in all terms of its Group.
