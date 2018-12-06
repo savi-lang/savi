@@ -91,7 +91,7 @@ class Mare::Compiler::Typer < Mare::AST::Visitor
   end
   
   getter constraints
-  property! refer : Mare::Compiler::Refer
+  property! refer : Compiler::Refer
   
   def initialize
     # TODO: When we have branching, we'll need some form of divergence.

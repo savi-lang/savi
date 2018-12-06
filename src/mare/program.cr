@@ -1,7 +1,7 @@
 class Mare::Program
   # TODO: add Package delineation here
   getter types
-  property! code_gen : Mare::Compiler::CodeGen
+  property! code_gen : Compiler::CodeGen
   
   def initialize
     @types = [] of Type
@@ -50,8 +50,8 @@ class Mare::Program
     getter ret : AST::Identifier?
     getter body : AST::Group?
     
-    property! refer : Mare::Compiler::Refer
-    property! typer : Mare::Compiler::Typer
+    property! refer : Compiler::Refer
+    property! typer : Compiler::Typer
     
     def initialize(@ident, @params, @ret, @body)
     end
