@@ -14,8 +14,6 @@ class Mare::Compiler::CodeGen
   @mod : LLVM::Module
   @builder : LLVM::Builder
   
-  getter return_value
-  
   class Frame
     getter func : LLVM::Function?
     setter pony_ctx : LLVM::Value?
@@ -112,7 +110,6 @@ class Mare::Compiler::CodeGen
     @llvm = LLVM::Context.new
     @mod = @llvm.new_module("minimal")
     @builder = @llvm.new_builder
-    @return_value = 0
     
     @default_linkage = LLVM::Linkage::External
     
@@ -213,9 +210,13 @@ class Mare::Compiler::CodeGen
     # Run LLVM sanity checks on the generated module.
     @mod.verify
     
-    # Run the function!
+    # # Link the pony runtime bitcode into the generated module.
     # LibLLVM.link_modules(@mod.to_unsafe, @ponyrt.to_unsafe)
-    @return_value = LLVM::JITCompiler.new @mod do |jit|
+  end
+  
+  def jit!
+    # Run the function!
+    LLVM::JITCompiler.new @mod do |jit|
       jit.run_function(@mod.functions["__mare_jit"], @llvm).to_i
     end
   end
