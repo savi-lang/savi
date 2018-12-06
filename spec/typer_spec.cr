@@ -22,6 +22,7 @@ describe Mare::Typer do
     context = Mare::Context.new
     context.compile(ast)
     context.run(Mare::Sugar)
+    context.run(Mare::Flagger)
     context.run(Mare::Refer)
     
     expected = <<-MSG
@@ -63,6 +64,7 @@ describe Mare::Typer do
     context = Mare::Context.new
     context.compile(ast)
     context.run(Mare::Sugar)
+    context.run(Mare::Flagger)
     context.run(Mare::Refer)
     
     expected = <<-MSG

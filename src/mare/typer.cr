@@ -205,8 +205,10 @@ class Mare::Typer < Mare::AST::Visitor
   # This visitor never replaces nodes, it just touches them and returns them.
   def visit(node)
     touch(node)
-    # TODO: Raise an internal implementation error if we know the node's value
-    # is needed but we didn't assign a tid to it during the touch method.
+    
+    raise "didn't assign a tid to: #{node.inspect}" \
+      if node.tid == 0 && node.value_needed?
+    
     node
   end
   
