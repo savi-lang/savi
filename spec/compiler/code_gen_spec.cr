@@ -1,5 +1,3 @@
-require "./spec_helper"
-
 describe Mare::Compiler::CodeGen do
   it "compiles an example" do
     source = fixture "compile.mare"

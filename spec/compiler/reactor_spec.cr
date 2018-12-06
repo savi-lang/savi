@@ -1,5 +1,3 @@
-require "./spec_helper"
-
 describe Mare::Compiler::Reactor do
   it "calls back to blocks that existed before fulfillment" do
     r = Mare::Compiler::Reactor.new

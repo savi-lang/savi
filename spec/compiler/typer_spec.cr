@@ -1,5 +1,3 @@
-require "./spec_helper"
-
 describe Mare::Compiler::Typer do
   it "complains when the function body doesn't match the return type" do
     source = Mare::Source.new "(example)", <<-SOURCE

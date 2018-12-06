@@ -1,5 +1,3 @@
-require "./spec_helper"
-
 describe Mare::Compiler::Sugar do
   it "transforms an operator to a method call" do
     source = Mare::Source.new "(example)", <<-SOURCE
