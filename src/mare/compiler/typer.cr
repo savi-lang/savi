@@ -269,18 +269,6 @@ class Mare::Compiler::Typer < Mare::AST::Visitor
     ])
   end
   
-  def touch(node : AST::Operator)
-    # TODO?
-  end
-  
-  def touch(node : AST::Prefix)
-    # TODO?
-  end
-  
-  def touch(node : AST::Qualify)
-    # TODO?
-  end
-  
   def touch(node : AST::Group)
     case node.style
     when "(", ":"
