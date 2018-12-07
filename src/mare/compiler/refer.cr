@@ -33,26 +33,38 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
   
   alias Info = (Unresolved.class | Local | Const)
   
-  def initialize(consts : Hash(String, Const))
+  def initialize(@consts : Hash(String, Const))
     @create_params = false
     @last_rid = 0_u64
     @last_param = 0
     @rids = {} of RID => Info
     @current_locals = {} of String => Local
-    @current_consts = consts.dup.as(Hash(String, Const))
+  end
+  
+  private def new_rid(info : Info)
+    rid = (@last_rid += 1)
+    raise "refer id overflow" if rid == 0
+    @rids[rid] = info
+    rid
   end
   
   def [](node)
     @rids[node.rid]
   end
   
+  def const(name)
+    @consts[name]
+  end
+  
   def self.run(ctx)
+    # Gather all the types in the program as Consts.
     consts = {} of String => Const
     ctx.program.types.each_with_index do |t, index|
       name = t.ident.value
       consts[name] = Const.new(t)
     end
     
+    # For each function in the program, run with a new instance.
     ctx.program.types.each do |t|
       t.functions.each do |f|
         new(consts).run(f)
@@ -87,14 +99,10 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
   
   # For an Identifier, resolve it to any known local or constant if possible.
   def touch(node : AST::Identifier)
-    name = node.value
-    rid = (@last_rid += 1)
-    
     # First, try to resolve as a local, then try consts, else it's unresolved.
-    info = @current_locals[name]? || @current_consts[name]? || Unresolved
-    
-    node.rid = rid
-    @rids[rid] = info
+    name = node.value
+    info = @current_locals[name]? || @consts[name]? || Unresolved
+    node.rid = new_rid(info)
   end
   
   # For a Relate, pay attention to any relations that are relevant to us.
