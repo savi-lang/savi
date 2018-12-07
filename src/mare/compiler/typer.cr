@@ -322,6 +322,10 @@ class Mare::Compiler::Typer < Mare::AST::Visitor
   end
   
   def touch(node : AST::Choice)
+    node.list.each do |cond, body|
+      constrain(cond.tid) << Domain.new(node.pos, ["True", "False"])
+    end
+    
     # TODO: give Choice the union of the types of all clauses
     new_tid(node) << Domain.new(node.pos, ["None"])
   end

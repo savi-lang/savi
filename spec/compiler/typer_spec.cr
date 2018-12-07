@@ -90,4 +90,29 @@ describe Mare::Compiler::Typer do
       Mare::Compiler.compile(source, limit: Mare::Compiler::Typer)
     end
   end
+  
+  it "complains when a choice condition type isn't boolean" do
+    source = Mare::Source.new "(example)", <<-SOURCE
+    actor Main:
+      new:
+        if "not a boolean" 42
+    SOURCE
+    
+    expected = <<-MSG
+    This value's type is unresolvable due to conflicting constraints:
+    - it must be a subtype of (CString):
+      from (example):3:
+        if "not a boolean" 42
+            ^~~~~~~~~~~~~
+    
+    - it must be a subtype of (True | False):
+      from (example):3:
+        if "not a boolean" 42
+        ^~
+    MSG
+    
+    expect_raises Mare::Compiler::Typer::Error, expected do
+      Mare::Compiler.compile(source, limit: Mare::Compiler::Typer)
+    end
+  end
 end
