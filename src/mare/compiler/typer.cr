@@ -93,13 +93,13 @@ class Mare::Compiler::Typer < Mare::AST::Visitor
     end
   end
   
-  getter constraints
+  getter all_constraints
   property! refer : Compiler::Refer
   
   def initialize
     # TODO: When we have branching, we'll need some form of divergence.
     @redirects = Hash(TID, TID).new
-    @constraints = Hash(TID, Constraints).new
+    @all_constraints = Hash(TID, Constraints).new
     @local_tids = Hash(Refer::Local, TID).new
     @last_tid = 0_u64
   end
@@ -138,7 +138,7 @@ class Mare::Compiler::Typer < Mare::AST::Visitor
     
     # Gather all the function calls that were encountered.
     calls =
-      constraints.flat_map do |tid, list|
+      all_constraints.flat_map do |tid, list|
         list.calls.map do |call|
           {tid, call}
         end
@@ -148,7 +148,7 @@ class Mare::Compiler::Typer < Mare::AST::Visitor
     calls.each do |tid, call|
       # Confirm that by now, there is exactly one type in the domain.
       # TODO: is it possible to proceed without Domain?
-      call_func = constrain(call.lhs).resolve!.find_func!(call.member)
+      call_func = constraints(call.lhs).resolve!.find_func!(call.member)
       
       # TODO: copying to diverging specializations of the function
       # TODO: apply argument constraints to the parameters
@@ -157,36 +157,36 @@ class Mare::Compiler::Typer < Mare::AST::Visitor
       
       # Apply constraints to the return type.
       call_ret = (call_func.ret || call_func.body).not_nil!
-      constrain(tid).copy_from(typer.constrain(call_ret.tid))
+      constraints(tid).copy_from(typer.constraints(call_ret.tid))
       
       # Apply constraints to each of the argument types.
       # TODO: handle case where number of args differs from number of params.
       unless call.args.empty?
         call.args.zip(call_func.params.not_nil!.terms).each do |arg_tid, param|
-          constrain(arg_tid).copy_from(typer.constrain(param.tid))
+          constraints(arg_tid).copy_from(typer.constraints(param.tid))
         end
       end
     end
     
     # TODO: Assign the resolved types to a new map of TID => type.
-    @constraints.each_value(&.resolve!)
+    @all_constraints.each_value(&.resolve!)
   end
   
-  def constrain(tid : TID)
+  def constraints(tid : TID)
     raise "can't constrain tid zero" if tid == 0
     
     while @redirects.has_key?(tid)
       tid = @redirects[tid]
     end
     
-    (@constraints[tid] ||= Constraints.new).not_nil!
+    (@all_constraints[tid] ||= Constraints.new).not_nil!
   end
   
   def new_tid(node)
     raise "this alread has a tid: #{node.inspect}" if node.tid != 0
     node.tid = @last_tid += 1
     raise "type id overflow" if node.tid == 0
-    constrain(node.tid)
+    constraints(node.tid)
   end
   
   def transfer_tid(from_tid : TID, to)
@@ -202,9 +202,9 @@ class Mare::Compiler::Typer < Mare::AST::Visitor
   end
   
   def unify_tids(from : TID, to : TID)
-    constrain(to).copy_from(constrain(from))
+    constraints(to).copy_from(constraints(from))
     @redirects[from] = to
-    @constraints.delete(from)
+    @all_constraints.delete(from)
   end
   
   # This visitor never replaces nodes, it just touches them and returns them.
@@ -316,7 +316,7 @@ class Mare::Compiler::Typer < Mare::AST::Visitor
   
   def touch(node : AST::Choice)
     node.list.each do |cond, body|
-      constrain(cond.tid) << Domain.new(node.pos, [
+      constraints(cond.tid) << Domain.new(node.pos, [
         refer.const("True").defn, refer.const("False").defn,
       ])
     end
