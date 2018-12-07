@@ -330,7 +330,7 @@ class Mare::Compiler::Typer < Mare::AST::Visitor
   end
   
   def touch(node : AST::Node)
-    raise NotImplementedError.new(node.to_a)
+    # Do nothing for other nodes.
   end
   
   def require_nonzero(node : AST::Node)
