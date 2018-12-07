@@ -105,12 +105,10 @@ class Mare::Compiler::Typer < Mare::AST::Visitor
   end
   
   def self.run(ctx)
-    func = ctx.program.find_func!("Main", "new")
-    
-    new.run(ctx, func)
+    new.run(ctx.program.find_func!("Main", "new"))
   end
   
-  def run(ctx, func)
+  def run(func)
     func.typer = self
     @refer = func.refer
     
@@ -150,14 +148,12 @@ class Mare::Compiler::Typer < Mare::AST::Visitor
     calls.each do |tid, call|
       # Confirm that by now, there is exactly one type in the domain.
       # TODO: is it possible to proceed without Domain?
-      receiver_type = constrain(call.lhs).resolve!.ident.value
-      
-      call_func = ctx.program.find_func!(receiver_type, call.member)
+      call_func = constrain(call.lhs).resolve!.find_func!(call.member)
       
       # TODO: copying to diverging specializations of the function
       # TODO: apply argument constraints to the parameters
       # TODO: detect and halt recursion by noticing what's been seen
-      typer = call_func.typer? || self.class.new.tap(&.run(ctx, call_func))
+      typer = call_func.typer? || self.class.new.tap(&.run(call_func))
       
       # Apply constraints to the return type.
       call_ret = (call_func.ret || call_func.body).not_nil!

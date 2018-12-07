@@ -12,8 +12,7 @@ class Mare::Program
   end
   
   def find_func!(type_name, func_name)
-    find_type!(type_name)
-      .functions.find { |f| f.ident.value == func_name }.not_nil!
+    find_type!(type_name).find_func!(func_name)
   end
   
   class Type
@@ -32,6 +31,10 @@ class Mare::Program
     def initialize(@kind, @ident)
       @properties = [] of Property
       @functions = [] of Function
+    end
+    
+    def find_func!(func_name)
+      @functions.find { |f| f.ident.value == func_name }.not_nil!
     end
     
     def is_terminal?
