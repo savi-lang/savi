@@ -65,10 +65,17 @@ struct Mare::Source::Pos
     twiddle_width = 1 if twiddle_width == 0
     twiddle_width -= 1
     
+    tail = ""
+    max_width = info[:line_finish] - info[:line_start] - info[:col]
+    if twiddle_width > max_width
+      twiddle_width = max_width
+      tail = "···"
+    end
+    
     [
       "from #{source.path}:#{info[:row] + 1}:",
       content[info[:line_start]..info[:line_finish]],
-      (" " * info[:col]) + "^" + ("~" * twiddle_width),
+      (" " * info[:col]) + "^" + ("~" * twiddle_width) + tail,
     ].join("\n")
   end
 end

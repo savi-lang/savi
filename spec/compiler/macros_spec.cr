@@ -23,31 +23,33 @@ describe Mare::Compiler::Macros do
       source = Mare::Source.new "(example)", <<-SOURCE
       actor Main:
         new:
-          if True False what now
+          if True (
+            False
+          ) what now
       SOURCE
       
       expected = <<-MSG
       This macro has too many terms:
       from (example):3:
-          if True False what now
-          ^~~~~~~~~~~~~~~~~~~~~~
+          if True (
+          ^~~~~~~~~···
       - this term is the condition to be satisfied:
       from (example):3:
-          if True False what now
+          if True (
              ^~~~
       - this term is the body to be conditionally executed,
         including an optional else clause partitioned by `|`:
       from (example):3:
-          if True False what now
-                  ^~~~~
+          if True (
+                  ^···
       - this is an excessive term:
-      from (example):3:
-          if True False what now
-                        ^~~~
+      from (example):5:
+          ) what now
+            ^~~~
       - this is an excessive term:
-      from (example):3:
-          if True False what now
-                             ^~~
+      from (example):5:
+          ) what now
+                 ^~~
       MSG
       
       expect_raises Mare::Compiler::Macros::Error, expected do
