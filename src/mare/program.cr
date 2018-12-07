@@ -33,6 +33,22 @@ class Mare::Program
       @properties = [] of Property
       @functions = [] of Function
     end
+    
+    def is_terminal?
+      case kind
+      when Kind::Actor, Kind::Class, Kind::Primitive, Kind::FFI
+        true
+      else false
+      end
+    end
+    
+    def is_instantiable?
+      case kind
+      when Kind::Actor, Kind::Class
+        true
+      else false
+      end
+    end
   end
   
   class Property

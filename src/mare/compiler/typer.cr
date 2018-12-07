@@ -6,19 +6,22 @@ class Mare::Compiler::Typer < Mare::AST::Visitor
   
   struct Domain
     property pos : Source::Pos
-    property names
+    property types
     
-    def initialize(@pos, names)
-      @names = Set(String).new(names)
-    end
-    
-    def show
-      "- it must be a subtype of (#{names.join(" | ")}):\n" \
-      "  #{pos.show}\n"
+    def initialize(@pos, types : Array(Program::Type))
+      raise NotImplementedError.new(types) unless types.all?(&.is_terminal?)
+      
+      @types = Set(Program::Type).new(types)
     end
     
     def empty?
-      names.empty?
+      types.empty?
+    end
+    
+    def show
+      names = @types.map(&.ident).map(&.value)
+      "- it must be a subtype of (#{names.join(" | ")}):\n" \
+      "  #{pos.show}\n"
     end
   end
   
@@ -39,7 +42,7 @@ class Mare::Compiler::Typer < Mare::AST::Visitor
   class Constraints
     getter domains
     getter calls
-    getter total_domain : Set(String)?
+    getter total_domain : Set(Program::Type)?
     
     def initialize
       @domains = [] of Domain
@@ -54,9 +57,9 @@ class Mare::Compiler::Typer < Mare::AST::Visitor
       # and the current total_domain.
       total_domain = @total_domain
       if total_domain
-        @total_domain = total_domain & constraint.names
+        @total_domain = total_domain & constraint.types
       else
-        @total_domain = constraint.names
+        @total_domain = constraint.types
       end
     end
     
@@ -116,7 +119,7 @@ class Mare::Compiler::Typer < Mare::AST::Visitor
     
     # Take note of the return type constraint if given.
     func_ret = func.ret
-    new_tid(func_ret) << Domain.new(func_ret.pos, [func_ret.value]) if func_ret
+    new_tid(func_ret) << Domain.new(func_ret.pos, [refer.const(func_ret.value).defn]) if func_ret
     
     # Complain if neither return type nor function body were specified.
     raise Error.new([
@@ -147,7 +150,7 @@ class Mare::Compiler::Typer < Mare::AST::Visitor
     calls.each do |tid, call|
       # Confirm that by now, there is exactly one type in the domain.
       # TODO: is it possible to proceed without Domain?
-      receiver_type = constrain(call.lhs).resolve!
+      receiver_type = constrain(call.lhs).resolve!.ident.value
       
       call_func = ctx.program.find_func!(receiver_type, call.member)
       
@@ -222,9 +225,10 @@ class Mare::Compiler::Typer < Mare::AST::Visitor
     ref = refer[node]
     case ref
     when Refer::Const
-      # If it's a const, treat it as a type name.
-      # TODO: populate the ref.defn in the domain set instead of the name.
-      new_tid(node) << Domain.new(node.pos, [node.value])
+      # If it's a const, treat it as a type reference.
+      # TODO: handle instantiable type references as having a meta-type.
+      raise NotImplementedError.new(node.value) if ref.defn.is_instantiable?
+      new_tid(node) << Domain.new(node.pos, [ref.defn])
     when Refer::Local
       # If it's a local, track the possibly new tid in our @local_tids map.
       local_tid = @local_tids[ref]?
@@ -246,18 +250,23 @@ class Mare::Compiler::Typer < Mare::AST::Visitor
   end
   
   def touch(node : AST::LiteralString)
-    new_tid(node) << Domain.new(node.pos, ["CString"])
+    new_tid(node) << Domain.new(node.pos, [refer.const("CString").defn])
   end
   
   # A literal integer could be any integer or floating-point machine type.
   def touch(node : AST::LiteralInteger)
-    new_tid(node) << Domain.new(node.pos,
-      ["U8", "U32", "U64", "I8", "I32", "I64", "F32", "F64"])
+    new_tid(node) << Domain.new(node.pos, [
+      refer.const("U8").defn, refer.const("U32").defn, refer.const("U64").defn,
+      refer.const("I8").defn, refer.const("I32").defn, refer.const("I64").defn,
+      refer.const("F32").defn, refer.const("F64").defn,
+    ])
   end
   
   # A literal float could be any floating-point machine type.
   def touch(node : AST::LiteralFloat)
-    new_tid(node) << Domain.new(node.pos, ["F32", "F64"])
+    new_tid(node) << Domain.new(node.pos, [
+      refer.const("F32").defn, refer.const("F64").defn,
+    ])
   end
   
   def touch(node : AST::Operator)
@@ -323,11 +332,13 @@ class Mare::Compiler::Typer < Mare::AST::Visitor
   
   def touch(node : AST::Choice)
     node.list.each do |cond, body|
-      constrain(cond.tid) << Domain.new(node.pos, ["True", "False"])
+      constrain(cond.tid) << Domain.new(node.pos, [
+        refer.const("True").defn, refer.const("False").defn,
+      ])
     end
     
     # TODO: give Choice the union of the types of all clauses
-    new_tid(node) << Domain.new(node.pos, ["None"])
+    new_tid(node) << Domain.new(node.pos, [refer.const("None").defn])
   end
   
   def touch(node : AST::Node)
