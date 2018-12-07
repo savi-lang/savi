@@ -157,13 +157,13 @@ class Mare::Compiler::Typer < Mare::AST::Visitor
       
       # Apply constraints to the return type.
       call_ret = (call_func.ret || call_func.body).not_nil!
-      constraints(tid).copy_from(typer.constraints(call_ret.tid))
+      constraints(tid).copy_from(typer.constraints(call_ret))
       
       # Apply constraints to each of the argument types.
       # TODO: handle case where number of args differs from number of params.
       unless call.args.empty?
         call.args.zip(call_func.params.not_nil!.terms).each do |arg_tid, param|
-          constraints(arg_tid).copy_from(typer.constraints(param.tid))
+          constraints(arg_tid).copy_from(typer.constraints(param))
         end
       end
     end
@@ -182,11 +182,17 @@ class Mare::Compiler::Typer < Mare::AST::Visitor
     (@all_constraints[tid] ||= Constraints.new).not_nil!
   end
   
+  def constraints(node)
+    raise "this has a tid of zero: #{node.inspect}" if node.tid == 0
+    
+    constraints(node.tid)
+  end
+  
   def new_tid(node)
-    raise "this alread has a tid: #{node.inspect}" if node.tid != 0
+    raise "this already has a tid: #{node.inspect}" if node.tid != 0
     node.tid = @last_tid += 1
     raise "type id overflow" if node.tid == 0
-    constraints(node.tid)
+    constraints(node)
   end
   
   def transfer_tid(from_tid : TID, to)
@@ -316,7 +322,7 @@ class Mare::Compiler::Typer < Mare::AST::Visitor
   
   def touch(node : AST::Choice)
     node.list.each do |cond, body|
-      constraints(cond.tid) << Domain.new(node.pos, [
+      constraints(cond) << Domain.new(node.pos, [
         refer.const("True").defn, refer.const("False").defn,
       ])
     end
