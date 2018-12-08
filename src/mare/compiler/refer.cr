@@ -31,7 +31,15 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
     end
   end
   
-  alias Info = (Unresolved.class | Local | Const)
+  class ConstUnion
+    getter pos : Source::Pos
+    getter list : Array(Const)
+    
+    def initialize(@pos, @list)
+    end
+  end
+  
+  alias Info = (Unresolved.class | Local | Const | ConstUnion)
   
   def initialize(@consts : Hash(String, Const))
     @create_params = false
@@ -115,6 +123,12 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
   def touch(node : AST::Group)
     if node.style == "(" && @create_params
       node.terms.each { |child| create_local(child, true) }
+    elsif node.style == "|"
+      # TODO: nice error here if this doesn't match the expected form.
+      consts = node.terms.map do |child|
+        self[child.as(AST::Group).terms.last].as(Const)
+      end
+      node.rid = new_rid(ConstUnion.new(node.pos, consts))
     end
   end
   

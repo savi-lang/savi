@@ -91,13 +91,34 @@ module Mare::Parser::Builder
   private def self.build_group(main, iter, source)
     assert_kind(main, :group)
     style = source.content[main[1]..main[1]]
-    group = AST::Group.new(style).with_pos(source, main)
+    terms_lists = [[] of AST::Term]
+    partitions = [main] # TODO: use the appropriate subset span of main
     
     iter.while_next_is_child_of(main) do |child|
-      group.terms << build_term(child, iter, source)
+      term = build_term(child, iter, source)
+      
+      if term.is_a?(AST::Operator)
+        raise "stray operator: #{term}" unless term.value == "|"
+        
+        # This is a partition operator; create a new partition.
+        partitions << child
+        terms_lists << [] of AST::Term
+      else
+        # Otherwise, insert into the current partition as normal.
+        terms_lists.last << term
+      end
     end
     
-    group
+    if terms_lists.size <= 1
+      # This is a flat group with just one partition.
+      AST::Group.new(style, terms_lists.first).with_pos(source, main)
+    else
+      # This is a partitioned group, built as a nested group.
+      top_terms = terms_lists.zip(partitions).map do |terms, pos|
+        AST::Group.new(style, terms).with_pos(source, pos).as(AST::Node)
+      end
+      AST::Group.new("|", top_terms).with_pos(source, main)
+    end
   end
   
   private def self.build_group_w(main, iter, source)
@@ -105,7 +126,11 @@ module Mare::Parser::Builder
     group = AST::Group.new(" ").with_pos(source, main)
     
     iter.while_next_is_child_of(main) do |child|
-      group.terms << build_term(child, iter, source)
+      term = build_term(child, iter, source)
+      
+      raise "stray operator: #{term}" if term.is_a?(AST::Operator)
+      
+      group.terms << term
     end
     
     group

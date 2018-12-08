@@ -115,4 +115,24 @@ describe Mare::Compiler::Typer do
       Mare::Compiler.compile(source, limit: Mare::Compiler::Typer)
     end
   end
+  
+  it "infers an integer literal based on an assignment" do
+    source = Mare::Source.new "(example)", <<-SOURCE
+    actor Main:
+      new:
+        x (U64 | None) = 42
+    SOURCE
+    
+    ctx = Mare::Compiler.compile(source, limit: Mare::Compiler::Typer)
+    
+    func = ctx.program.find_func!("Main", "new")
+    body = func.body.not_nil!
+    assign = body.terms.first.as(Mare::AST::Relate)
+    
+    local_types = func.typer.constraints(assign.lhs).resolve!
+    local_types.map(&.ident).map(&.value).should eq ["U64", "None"]
+    
+    literal_types = func.typer.constraints(assign.rhs).resolve!
+    literal_types.map(&.ident).map(&.value).should eq ["U64"]
+  end
 end

@@ -48,6 +48,15 @@ class Mare::Compiler::Typer < Mare::AST::Visitor
       @domains = [] of Domain
       @calls = [] of Call
       @total_domain = nil
+      @needs_terminal = false
+    end
+    
+    def needs_terminal!
+      @needs_terminal = true
+    end
+    
+    def needs_terminal?
+      @needs_terminal
     end
     
     def <<(constraint : Domain)
@@ -71,6 +80,10 @@ class Mare::Compiler::Typer < Mare::AST::Visitor
       @domains.each.chain(@calls.each)
     end
     
+    def totally_unconstrained?
+      @domains.empty? && @calls.empty?
+    end
+    
     def copy_from(other : Constraints)
       other.iter.each { |c| self << c }
     end
@@ -78,18 +91,35 @@ class Mare::Compiler::Typer < Mare::AST::Visitor
     def resolve!
       total_domain = @total_domain
       if total_domain.nil?
-        raise Error.new("This value's type domain is totally unconstrained:\n#{iter.first.pos.show}")
-      elsif total_domain.size == 0
-        message = \
+        raise Error.new([
+          "This value's type domain is totally unconstrained:",
+          iter.first.pos.show,
+        ].join("\n"))
+      end
+      
+      if total_domain.size == 0
+        raise Error.new(@domains.map(&.show).unshift(
           "This value's type is unresolvable due to conflicting constraints:"
-        raise Error.new(@domains.map(&.show).unshift(message).join("\n"))
-      elsif total_domain.size > 1
-        raise NotImplementedError.new("multiplicit domains")
+        ).join("\n"))
+      end
+      
+      if needs_terminal?
+        if total_domain.size > 1
+          raise Error.new(@domains.map(&.show).unshift(
+            "This value couldn't be inferred as a single concrete type:"
+          ).join("\n"))
+        end
+        
+        if !total_domain.first.is_terminal?
+          raise Error.new(@domains.map(&.show).unshift(
+            "This value couldn't be inferred as a concrete type:"
+          ).join("\n"))
+        end
       end
       
       # TODO: Constrain by calls as well.
       
-      total_domain.first
+      total_domain
     end
   end
   
@@ -148,7 +178,13 @@ class Mare::Compiler::Typer < Mare::AST::Visitor
     calls.each do |tid, call|
       # Confirm that by now, there is exactly one type in the domain.
       # TODO: is it possible to proceed without Domain?
-      call_func = constraints(call.lhs).resolve!.find_func!(call.member)
+      call_funcs = constraints(call.lhs).resolve!.map do |defn|
+        defn.find_func!(call.member)
+      end
+      
+      # TODO: handle multiple call funcs by branching.
+      raise NotImplementedError.new(call_funcs.inspect) if call_funcs.size > 1
+      call_func = call_funcs.first
       
       # TODO: copying to diverging specializations of the function
       # TODO: apply argument constraints to the parameters
@@ -292,6 +328,13 @@ class Mare::Compiler::Typer < Mare::AST::Visitor
       else
         raise NotImplementedError.new(node.to_a)
       end
+    when "|"
+      ref = refer[node]
+      if ref.is_a?(Refer::ConstUnion)
+        new_tid(node) << Domain.new(node.pos, ref.list.map(&.defn))
+      else
+        raise NotImplementedError.new(node.to_a)
+      end
     else raise NotImplementedError.new(node.style)
     end
   end
@@ -299,8 +342,13 @@ class Mare::Compiler::Typer < Mare::AST::Visitor
   def touch(node : AST::Relate)
     case node.op.value
     when "="
-      unify_tids(node.lhs.tid, node.rhs.tid)
-      transfer_tid(node.rhs, node)
+      if constraints(node.lhs).totally_unconstrained?
+        unify_tids(node.lhs.tid, node.rhs.tid)
+        transfer_tid(node.rhs, node)
+      else
+        constraints(node.rhs).copy_from(constraints(node.lhs))
+        transfer_tid(node.lhs, node)
+      end
     when "."
       lhs = node.lhs
       rhs = node.rhs

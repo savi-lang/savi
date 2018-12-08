@@ -80,9 +80,10 @@ module Mare::Parser
     te = (tw >> (opw >> s >> tw).repeat(1) >> s).named(:group_w) | tw
     t = (te >> (sn >> ope >> sn >> te >> s).repeat).named(:relate)
     
-    # Define groups that are comma-separated lists of terms.
-    terms = t >> s >> (char(',') >> sn >> t >> s).repeat
-    parens.define (char('(') >> sn >> terms.maybe >> sn >> char(')')).named(:group)
+    # Define groups that are pipe-partitioned lists of comma-separated terms.
+    psep = char(',') | char('|').named(:op)
+    pterms = t >> s >> (psep >> sn >> t >> s).repeat
+    parens.define (char('(') >> sn >> pterms.maybe >> sn >> char(')')).named(:group)
     
     # Define what a declaration head of terms looks like.
     dterm = atom
@@ -94,6 +95,7 @@ module Mare::Parser
     eol_item = eol_comment
     
     # Define what a line looks like.
+    terms = t >> s >> (char(',') >> sn >> t >> s).repeat
     line_item = (decl >> terms.maybe) | terms
     line =
       s >>
