@@ -144,6 +144,23 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
   end
   
+  class Choice < Info
+    getter clauses : Array(Info)
+    
+    def initialize(@pos, @clauses)
+    end
+    
+    def resolve!
+      clauses.reduce(Set(Program::Type).new) do |total, clause|
+        total | clause.resolve!.to_set
+      end.to_a
+    end
+    
+    def within_domain!(domain_pos : Source::Pos, list : Array(Program::Type))
+      clauses.each(&.within_domain!(domain_pos, list))
+    end
+  end
+  
   class FromCall < Info
     getter lhs : TID
     getter member : String
@@ -400,15 +417,19 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   end
   
   def touch(node : AST::Choice)
+    body_types = [] of Info
     node.list.each do |cond, body|
       # Each condition in a choice must evaluate to a type of (True | False).
       self[cond].within_domain!(node.pos, [
         refer.const("True").defn, refer.const("False").defn,
       ])
+      
+      # Hold on to the body type for later in this function.
+      body_types << self[body]
     end
     
-    # TODO: give Choice the union of the types of all clauses
-    new_tid(node, Const.new(node.pos, refer.const("None").defn))
+    # TODO: also track cond types in branch, for analyzing exhausted choices.
+    new_tid(node, Choice.new(node.pos, body_types))
   end
   
   def touch(node : AST::Node)

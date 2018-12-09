@@ -14,6 +14,7 @@ describe Mare::Compiler::Macros do
         [:group, "(",
           [:choice,
             [[:ident, "True"], [:integer, 42]],
+            [[:ident, "True"], [:ident, "None"]],
           ],
         ],
       ]

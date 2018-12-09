@@ -135,4 +135,31 @@ describe Mare::Compiler::Infer do
     literal_types = func.infer[assign.rhs].resolve!
     literal_types.map(&.ident).map(&.value).should eq ["U64"]
   end
+  
+  it "infers an integer literal through an if statement" do
+    source = Mare::Source.new "(example)", <<-SOURCE
+    actor Main:
+      new:
+        x (U64 | CString | None) = if True 42
+    SOURCE
+    
+    ctx = Mare::Compiler.compile(source, limit: Mare::Compiler::Infer)
+    
+    func = ctx.program.find_func!("Main", "new")
+    body = func.body.not_nil!
+    assign = body.terms.first.as(Mare::AST::Relate)
+    literal = assign.rhs
+      .as(Mare::AST::Group).terms.last
+      .as(Mare::AST::Choice).list[0][1]
+      .as(Mare::AST::LiteralInteger)
+    
+    local_types = func.infer[assign.lhs].resolve!
+    local_types.map(&.ident).map(&.value).should eq ["U64", "CString", "None"]
+    
+    choice_types = func.infer[assign.rhs].resolve!
+    choice_types.map(&.ident).map(&.value).should eq ["U64", "None"]
+    
+    literal_types = func.infer[literal].resolve!
+    literal_types.map(&.ident).map(&.value).should eq ["U64"]
+  end
 end

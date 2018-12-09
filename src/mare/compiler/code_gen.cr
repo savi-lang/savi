@@ -444,7 +444,10 @@ class Mare::Compiler::CodeGen
     
     case receiver_type.kind
     when Program::Type::Kind::FFI
-      @builder.call(@mod.functions[member], args)
+      ffi = @mod.functions[member]
+      value = @builder.call(ffi, args)
+      value = gen_none if ffi.return_type == @void
+      value
     when Program::Type::Kind::Primitive
       @builder.call(@mod.functions["#{receiver}.#{member}"], args)
     else raise NotImplementedError.new(receiver_type)
@@ -474,6 +477,13 @@ class Mare::Compiler::CodeGen
         frame.func.params[param_idx]
       elsif ref.is_a?(Refer::Local)
         func_frame.current_locals[ref]
+      elsif ref.is_a?(Refer::Const)
+        case ref.defn.ident.value # TODO: deal with namespacing properly
+        when "True"  then gen_bool(true)
+        when "False" then gen_bool(false)
+        when "None"  then gen_none
+        else raise NotImplementedError.new(ref.defn.ident.value)
+        end
       else
         raise NotImplementedError.new(ref)
       end
@@ -500,23 +510,43 @@ class Mare::Compiler::CodeGen
       
       # TODO: Pop the scope frame?
     when AST::Choice
-      # TODO: Support more than one clause.
-      raise NotImplementedError.new(expr.list.size) if expr.list.size != 1
+      # TODO: Support more than a simple if/else choice.
+      raise NotImplementedError.new(expr.list.size) if expr.list.size != 2
       
-      cond = expr.list.first[0]
-      body = expr.list.first[1]
+      if_clause = expr.list.first
+      else_clause = expr.list.last
       
-      # TODO: Support actual runtime branching.
-      # TODO: Use infer resolution for static True/False finding where possible,
-      # instead of hard-coding this dumb rule here.
-      if cond.is_a?(AST::Identifier) && cond.value == "True"
-        gen_expr(ctx, f, body)
-      else
-        @i1.const_int(0) # TODO: None as a value
-      end
+      cond_value = gen_expr(ctx, f, if_clause[0])
+      
+      bb_body1 = gen_block("body1choice")
+      bb_body2 = gen_block("body2choice")
+      bb_post  = gen_block("postchoice")
+      
+      # TODO: Use infer resolution for static True/False finding where possible.
+      @builder.cond(cond_value, bb_body1, bb_body2)
+      
+      @builder.position_at_end(bb_body1)
+      value1 = gen_expr(ctx, f, if_clause[1])
+      @builder.br(bb_post)
+      
+      @builder.position_at_end(bb_body2)
+      value2 = gen_expr(ctx, f, else_clause[1])
+      @builder.br(bb_post)
+      
+      @builder.position_at_end(bb_post)
+      phi_type = @ptr # TODO: the real type
+      @builder.phi(@ptr, [bb_body1, bb_body2], [value1, value2], "phichoice")
     else
       raise NotImplementedError.new(expr.inspect)
     end
+  end
+  
+  def gen_none
+    @ptr.null # TODO: the real value
+  end
+  
+  def gen_bool(bool)
+    @i1.const_int(bool ? 1 : 0)
   end
   
   def gen_string(expr_or_value)

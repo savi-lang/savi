@@ -88,9 +88,18 @@ class Mare::Compiler::Macros < Mare::AST::Visitor
     if_ident = node.terms[0]
     cond = node.terms[1]
     body = node.terms[2] # TODO: handle else clause delimited by `|`
+    clauses = [{cond, body}]
+    
+    # Create an implicit else clause that covers all remaining cases.
+    # TODO: add a pass to detect a Choice that doesn't have this,
+    # or maybe implicitly assume it later without adding it to the AST?
+    clauses << {
+      AST::Identifier.new("True").from(if_ident),
+      AST::Identifier.new("None").from(if_ident),
+    }
     
     group = AST::Group.new("(").from(node)
-    group.terms << AST::Choice.new([{cond, body}]).from(if_ident)
+    group.terms << AST::Choice.new(clauses).from(if_ident)
     group
   end
 end
