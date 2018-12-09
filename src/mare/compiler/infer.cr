@@ -401,6 +401,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   
   def touch(node : AST::Choice)
     node.list.each do |cond, body|
+      # Each condition in a choice must evaluate to a type of (True | False).
       self[cond].within_domain!(node.pos, [
         refer.const("True").defn, refer.const("False").defn,
       ])
