@@ -70,7 +70,7 @@ class Mare::Program
     getter body : AST::Group?
     
     property! refer : Compiler::Refer
-    property! typer : Compiler::Typer
+    property! infer : Compiler::Infer
     
     def initialize(@ident, @params, @ret, @body)
     end

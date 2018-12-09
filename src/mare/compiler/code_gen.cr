@@ -507,7 +507,7 @@ class Mare::Compiler::CodeGen
       body = expr.list.first[1]
       
       # TODO: Support actual runtime branching.
-      # TODO: Use typer resolution for static True/False finding where possible,
+      # TODO: Use infer resolution for static True/False finding where possible,
       # instead of hard-coding this dumb rule here.
       if cond.is_a?(AST::Identifier) && cond.value == "True"
         gen_expr(ctx, f, body)

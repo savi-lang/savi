@@ -5,7 +5,7 @@ module Mare::Compiler
     Sugar.class |
     Flagger.class |
     Refer.class |
-    Typer.class |
+    Infer.class |
     CodeGen.class )
   
   def self.compile(source : Source, limit : LIMIT = CodeGen)
@@ -31,8 +31,8 @@ module Mare::Compiler
     ctx.run(Refer)
     return ctx if limit == Refer
     
-    ctx.run(Typer)
-    return ctx if limit == Typer
+    ctx.run(Infer)
+    return ctx if limit == Infer
     
     ctx.run(CodeGen)
     ctx

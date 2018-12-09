@@ -1,4 +1,4 @@
-describe Mare::Compiler::Typer do
+describe Mare::Compiler::Infer do
   it "complains when the type identifier couldn't be resolved" do
     source = Mare::Source.new "(example)", <<-SOURCE
     actor Main:
@@ -13,8 +13,8 @@ describe Mare::Compiler::Typer do
           ^~~~~~~~~
     MSG
     
-    expect_raises Mare::Compiler::Typer::Error, expected do
-      Mare::Compiler.compile(source, limit: Mare::Compiler::Typer)
+    expect_raises Mare::Compiler::Infer::Error, expected do
+      Mare::Compiler.compile(source, limit: Mare::Compiler::Infer)
     end
   end
   
@@ -32,8 +32,8 @@ describe Mare::Compiler::Typer do
             ^
     MSG
     
-    expect_raises Mare::Compiler::Typer::Error, expected do
-      Mare::Compiler.compile(source, limit: Mare::Compiler::Typer)
+    expect_raises Mare::Compiler::Infer::Error, expected do
+      Mare::Compiler.compile(source, limit: Mare::Compiler::Infer)
     end
   end
   
@@ -61,8 +61,8 @@ describe Mare::Compiler::Typer do
                  ^~~
     MSG
     
-    expect_raises Mare::Compiler::Typer::Error, expected do
-      Mare::Compiler.compile(source, limit: Mare::Compiler::Typer)
+    expect_raises Mare::Compiler::Infer::Error, expected do
+      Mare::Compiler.compile(source, limit: Mare::Compiler::Infer)
     end
   end
   
@@ -86,8 +86,8 @@ describe Mare::Compiler::Typer do
              ^~~~~~~
     MSG
     
-    expect_raises Mare::Compiler::Typer::Error, expected do
-      Mare::Compiler.compile(source, limit: Mare::Compiler::Typer)
+    expect_raises Mare::Compiler::Infer::Error, expected do
+      Mare::Compiler.compile(source, limit: Mare::Compiler::Infer)
     end
   end
   
@@ -111,8 +111,8 @@ describe Mare::Compiler::Typer do
         ^~
     MSG
     
-    expect_raises Mare::Compiler::Typer::Error, expected do
-      Mare::Compiler.compile(source, limit: Mare::Compiler::Typer)
+    expect_raises Mare::Compiler::Infer::Error, expected do
+      Mare::Compiler.compile(source, limit: Mare::Compiler::Infer)
     end
   end
   
@@ -123,16 +123,16 @@ describe Mare::Compiler::Typer do
         x (U64 | None) = 42
     SOURCE
     
-    ctx = Mare::Compiler.compile(source, limit: Mare::Compiler::Typer)
+    ctx = Mare::Compiler.compile(source, limit: Mare::Compiler::Infer)
     
     func = ctx.program.find_func!("Main", "new")
     body = func.body.not_nil!
     assign = body.terms.first.as(Mare::AST::Relate)
     
-    local_types = func.typer[assign.lhs].resolve!
+    local_types = func.infer[assign.lhs].resolve!
     local_types.map(&.ident).map(&.value).should eq ["U64", "None"]
     
-    literal_types = func.typer[assign.rhs].resolve!
+    literal_types = func.infer[assign.rhs].resolve!
     literal_types.map(&.ident).map(&.value).should eq ["U64"]
   end
 end

@@ -1,4 +1,4 @@
-class Mare::Compiler::Typer < Mare::AST::Visitor
+class Mare::Compiler::Infer < Mare::AST::Visitor
   alias TID = UInt64
   
   class Error < Exception
@@ -203,7 +203,7 @@ class Mare::Compiler::Typer < Mare::AST::Visitor
   end
   
   def run(func)
-    func.typer = self
+    func.infer = self
     @refer = func.refer
     
     # Visit the function parameters, noting any declared types there.
@@ -247,17 +247,17 @@ class Mare::Compiler::Typer < Mare::AST::Visitor
       # TODO: copying to diverging specializations of the function
       # TODO: apply argument constraints to the parameters
       # TODO: detect and halt recursion by noticing what's been seen
-      typer = call_func.typer? || self.class.new.tap(&.run(call_func))
+      infer = call_func.infer? || self.class.new.tap(&.run(call_func))
       
       # Apply constraints to the return type.
       call_ret = (call_func.ret || call_func.body).not_nil!
-      call.set_return(typer[call_ret].resolve!)
+      call.set_return(infer[call_ret].resolve!)
       
       # Apply constraints to each of the argument types.
       # TODO: handle case where number of args differs from number of params.
       unless call.args.empty?
         call.args.zip(call_func.params.not_nil!.terms).each do |arg_tid, param|
-          typer[param].as(Local).assign(self[arg_tid])
+          infer[param].as(Local).assign(self[arg_tid])
         end
       end
     end
