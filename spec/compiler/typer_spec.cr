@@ -50,15 +50,15 @@ describe Mare::Compiler::Typer do
     
     expected = <<-MSG
     This value's type is unresolvable due to conflicting constraints:
-    - it must be a subtype of (I32):
-      from (example):2:
-      fun number I32:
-                 ^~~
-    
     - it must be a subtype of (CString):
       from (example):3:
         "not a number at all"
          ^~~~~~~~~~~~~~~~~~~
+    
+    - it must be a subtype of (I32):
+      from (example):2:
+      fun number I32:
+                 ^~~
     MSG
     
     expect_raises Mare::Compiler::Typer::Error, expected do
@@ -129,10 +129,10 @@ describe Mare::Compiler::Typer do
     body = func.body.not_nil!
     assign = body.terms.first.as(Mare::AST::Relate)
     
-    local_types = func.typer.constraints(assign.lhs).resolve!
+    local_types = func.typer[assign.lhs].resolve!
     local_types.map(&.ident).map(&.value).should eq ["U64", "None"]
     
-    literal_types = func.typer.constraints(assign.rhs).resolve!
+    literal_types = func.typer[assign.rhs].resolve!
     literal_types.map(&.ident).map(&.value).should eq ["U64"]
   end
 end

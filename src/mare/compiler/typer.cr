@@ -4,134 +4,198 @@ class Mare::Compiler::Typer < Mare::AST::Visitor
   class Error < Exception
   end
   
-  struct Domain
-    property pos : Source::Pos
-    property types
+  abstract class Info
+    property pos : Source::Pos = Source::Pos.none
     
-    def initialize(@pos, types : Array(Program::Type))
-      raise NotImplementedError.new(types) unless types.all?(&.is_terminal?)
+    abstract def resolve! : Array(Program::Type)
+    abstract def within_domain!(
+      domain_pos : Source::Pos,
+      list : Array(Program::Type),
+    )
+    
+    def show_domain(d : {Source::Pos, Enumerable(Program::Type)})
+      names = d[1].map(&.ident).map(&.value)
       
-      @types = Set(Program::Type).new(types)
-    end
-    
-    def empty?
-      types.empty?
-    end
-    
-    def show
-      names = @types.map(&.ident).map(&.value)
-      "- it must be a subtype of (#{names.join(" | ")}):\n" \
-      "  #{pos.show}\n"
+      "- it must be a subtype of (#{names.join(" | ")}):\n  #{d[0].show}\n"
     end
   end
   
-  struct Call
-    property pos : Source::Pos
-    property lhs : TID
-    property member : String
-    property args : Array(TID)
-    
-    def show
-      "- it must be the return type of this method:\n#{pos.show}"
-    end
-    
-    def initialize(@pos, @lhs, @member, @args)
-    end
-  end
-  
-  class Constraints
-    getter domains
-    getter calls
-    getter total_domain : Set(Program::Type)?
-    
-    def initialize
-      @domains = [] of Domain
-      @calls = [] of Call
-      @total_domain = nil
-      @needs_terminal = false
-    end
-    
-    def needs_terminal!
-      @needs_terminal = true
-    end
-    
-    def needs_terminal?
-      @needs_terminal
-    end
-    
-    def <<(constraint : Domain)
-      @domains << constraint
-      
-      # Set the new total_domain to be the intersection of the new domain
-      # and the current total_domain.
-      total_domain = @total_domain
-      if total_domain
-        @total_domain = total_domain & constraint.types
-      else
-        @total_domain = constraint.types
-      end
-    end
-    
-    def <<(constraint : Call)
-      @calls << constraint
-    end
-    
-    def iter
-      @domains.each.chain(@calls.each)
-    end
-    
-    def totally_unconstrained?
-      @domains.empty? && @calls.empty?
-    end
-    
-    def copy_from(other : Constraints)
-      other.iter.each { |c| self << c }
+  class Literal < Info
+    def initialize(@pos, possible : Array(Program::Type))
+      @domain = Set(Program::Type).new(possible)
+      @domain_constraints = [] of {Source::Pos, Set(Program::Type)}
+      @domain_constraints << {@pos, @domain.dup}
     end
     
     def resolve!
-      total_domain = @total_domain
-      if total_domain.nil?
-        raise Error.new([
-          "This value's type domain is totally unconstrained:",
-          iter.first.pos.show,
-        ].join("\n"))
-      end
-      
-      if total_domain.size == 0
-        raise Error.new(@domains.map(&.show).unshift(
+      if @domain.size == 0
+        raise Error.new(@domain_constraints.map { |c| show_domain(c) }.unshift(
           "This value's type is unresolvable due to conflicting constraints:"
         ).join("\n"))
       end
       
-      if needs_terminal?
-        if total_domain.size > 1
-          raise Error.new(@domains.map(&.show).unshift(
-            "This value couldn't be inferred as a single concrete type:"
-          ).join("\n"))
-        end
-        
-        if !total_domain.first.is_terminal?
-          raise Error.new(@domains.map(&.show).unshift(
-            "This value couldn't be inferred as a concrete type:"
-          ).join("\n"))
-        end
+      if @domain.size > 1
+        raise Error.new(@domain_constraints.map { |c| show_domain(c) }.unshift(
+          "This value couldn't be inferred as a single concrete type:"
+        ).join("\n"))
       end
       
-      # TODO: Constrain by calls as well.
+      [@domain.first]
+    end
+    
+    def within_domain!(domain_pos : Source::Pos, list : Array(Program::Type))
+      set = list.to_set
+      @domain = @domain & set
+      @domain_constraints << {domain_pos, set}
       
-      total_domain
+      return unless @domain.empty?
+      
+      raise Error.new(@domain_constraints.map { |c| show_domain(c) }.unshift(
+        "This value's type is unresolvable due to conflicting constraints:"
+      ).join("\n"))
     end
   end
   
-  getter all_constraints
+  class Local < Info
+    @explicit : (Const | ConstUnion | Nil)
+    @upstream : Info?
+    
+    def initialize(@pos)
+    end
+    
+    def resolve!
+      if @explicit
+        @explicit.not_nil!.resolve!
+      else
+        @upstream.not_nil!.resolve!
+      end
+    end
+    
+    def set_explicit(info : Info)
+      raise "already set_explicit" if @explicit
+      raise "shouldn't have an upstream yet" unless @upstream.nil?
+      
+      @explicit = info.as(Const | ConstUnion)
+    end
+    
+    def within_domain!(domain_pos : Source::Pos, list : Array(Program::Type))
+      if @explicit
+        @explicit.not_nil!.within_domain!(domain_pos, list)
+      else
+        @upstream.not_nil!.within_domain!(domain_pos, list)
+      end
+    end
+    
+    def assign(info : Info)
+      explicit = @explicit
+      case explicit
+      when Const
+        info.within_domain!(explicit.pos, [explicit.defn])
+      when ConstUnion
+        info.within_domain!(explicit.pos, explicit.defns)
+      else # do nothing for Nil
+      end
+      
+      raise "already assigned an upstream" if @upstream
+      @upstream = info
+    end
+  end
+  
+  class Const < Info
+    getter defn : Program::Type
+    
+    def initialize(@pos, @defn)
+    end
+    
+    def resolve!
+      [@defn]
+    end
+    
+    def within_domain!(domain_pos : Source::Pos, list : Array(Program::Type))
+      return if list.includes?(defn)
+      
+      raise Error.new([
+        "This type declaration conflicts with another constraint:",
+        pos.show,
+        show_domain({domain_pos, list}),
+      ].join("\n"))
+    end
+  end
+  
+  class ConstUnion < Info
+    getter defns : Array(Program::Type)
+    
+    def initialize(@pos, @defns)
+    end
+    
+    def resolve!
+      @defns
+    end
+    
+    def within_domain!(domain_pos : Source::Pos, list : Array(Program::Type))
+      extra = defns.to_set - list.to_set
+      return if extra.empty?
+      
+      raise Error.new([
+        "This type union has elements outside of a constraint:",
+        pos.show,
+        show_domain({domain_pos, list}),
+      ].join("\n"))
+    end
+  end
+  
+  class FromCall < Info
+    getter lhs : TID
+    getter member : String
+    getter args : Array(TID)
+    @ret : Array(Program::Type)?
+    
+    def initialize(@pos, @lhs, @member, @args)
+      @domain_constraints = [] of {Source::Pos, Set(Program::Type)}
+    end
+    
+    def resolve!
+      raise "unresolved ret for #{self.inspect}" unless @ret
+      @ret.not_nil!
+    end
+    
+    def within_domain!(domain_pos : Source::Pos, list : Array(Program::Type))
+      raise "already resolved ret for #{self.inspect}" if @ret
+      @domain_constraints << {domain_pos, list.to_set}
+    end
+    
+    def set_return(domain : Array(Program::Type))
+      @ret = domain.dup
+      
+      extra = @domain_constraints.reduce domain.to_set do |domain, (_, list)|
+        domain - list
+      end
+      return if extra.empty? || @domain_constraints.empty?
+      
+      raise Error.new(@domain_constraints.map { |c| show_domain(c) }.unshift(
+        "This return value is outside of its constraints:\n#{pos.show}",
+      ).join("\n"))
+    end
+  end
+  
   property! refer : Compiler::Refer
   
   def initialize
     # TODO: When we have branching, we'll need some form of divergence.
     @redirects = Hash(TID, TID).new
-    @all_constraints = Hash(TID, Constraints).new
     @local_tids = Hash(Refer::Local, TID).new
+    @tids = Hash(TID, Info).new
     @last_tid = 0_u64
+  end
+  
+  def [](tid : TID)
+    raise "tid of zero" if tid == 0
+    @tids[tid]
+  end
+  
+  def [](node)
+    raise "this has a tid of zero: #{node.inspect}" if node.tid == 0
+    @tids[node.tid]
   end
   
   def self.run(ctx)
@@ -147,7 +211,7 @@ class Mare::Compiler::Typer < Mare::AST::Visitor
     
     # Take note of the return type constraint if given.
     func_ret = func.ret
-    new_tid(func_ret) << Domain.new(func_ret.pos, [refer.const(func_ret.value).defn]) if func_ret
+    new_tid(func_ret, Const.new(func_ret.pos, refer.const(func_ret.value).defn)) if func_ret
     
     # Complain if neither return type nor function body were specified.
     raise Error.new([
@@ -164,21 +228,15 @@ class Mare::Compiler::Typer < Mare::AST::Visitor
     func_body.accept(self)
     
     # Constrain the function body with the return type if given.
-    unify_tids(func_body.tid, func_ret.tid) if func_ret
-    
-    # Gather all the function calls that were encountered.
-    calls =
-      all_constraints.flat_map do |tid, list|
-        list.calls.map do |call|
-          {tid, call}
-        end
-      end
+    self[func_body].within_domain!(func_ret.pos, [self[func_ret].as(Const).defn]) if func_ret
     
     # For each call that was encountered in the function body:
-    calls.each do |tid, call|
+    @tids.each_value do |call|
+      next unless call.is_a?(FromCall)
+      
       # Confirm that by now, there is exactly one type in the domain.
       # TODO: is it possible to proceed without Domain?
-      call_funcs = constraints(call.lhs).resolve!.map do |defn|
+      call_funcs = self[call.lhs].resolve!.map do |defn|
         defn.find_func!(call.member)
       end
       
@@ -193,42 +251,26 @@ class Mare::Compiler::Typer < Mare::AST::Visitor
       
       # Apply constraints to the return type.
       call_ret = (call_func.ret || call_func.body).not_nil!
-      constraints(tid).copy_from(typer.constraints(call_ret))
+      call.set_return(typer[call_ret].resolve!)
       
       # Apply constraints to each of the argument types.
       # TODO: handle case where number of args differs from number of params.
       unless call.args.empty?
         call.args.zip(call_func.params.not_nil!.terms).each do |arg_tid, param|
-          constraints(arg_tid).copy_from(typer.constraints(param))
+          typer[param].as(Local).assign(self[arg_tid])
         end
       end
     end
     
-    # TODO: Assign the resolved types to a new map of TID => type.
-    @all_constraints.each_value(&.resolve!)
+    # # TODO: Assign the resolved types to a new map of TID => type.
+    # @tids.each_value(&.resolve!)
   end
   
-  def constraints(tid : TID)
-    raise "can't constrain tid zero" if tid == 0
-    
-    while @redirects.has_key?(tid)
-      tid = @redirects[tid]
-    end
-    
-    (@all_constraints[tid] ||= Constraints.new).not_nil!
-  end
-  
-  def constraints(node)
-    raise "this has a tid of zero: #{node.inspect}" if node.tid == 0
-    
-    constraints(node.tid)
-  end
-  
-  def new_tid(node)
+  def new_tid(node, info)
     raise "this already has a tid: #{node.inspect}" if node.tid != 0
     node.tid = @last_tid += 1
     raise "type id overflow" if node.tid == 0
-    constraints(node)
+    @tids[node.tid] = info
   end
   
   def transfer_tid(from_tid : TID, to)
@@ -241,12 +283,6 @@ class Mare::Compiler::Typer < Mare::AST::Visitor
     raise "this already has a tid: #{to.inspect}" if to.tid != 0
     raise "this doesn't have a tid to transfer: #{from.inspect}" if from.tid == 0
     to.tid = from.tid
-  end
-  
-  def unify_tids(from : TID, to : TID)
-    constraints(to).copy_from(constraints(from))
-    @redirects[from] = to
-    @all_constraints.delete(from)
   end
   
   # This visitor never replaces nodes, it just touches them and returns them.
@@ -266,14 +302,14 @@ class Mare::Compiler::Typer < Mare::AST::Visitor
       # If it's a const, treat it as a type reference.
       # TODO: handle instantiable type references as having a meta-type.
       raise NotImplementedError.new(node.value) if ref.defn.is_instantiable?
-      new_tid(node) << Domain.new(node.pos, [ref.defn])
+      new_tid(node, Const.new(node.pos, ref.defn))
     when Refer::Local
       # If it's a local, track the possibly new tid in our @local_tids map.
       local_tid = @local_tids[ref]?
       if local_tid
         transfer_tid(local_tid, node)
       else
-        new_tid(node)
+        new_tid(node, Local.new(node.pos))
         @local_tids[ref] = node.tid
       end
     when Refer::Unresolved.class
@@ -288,23 +324,23 @@ class Mare::Compiler::Typer < Mare::AST::Visitor
   end
   
   def touch(node : AST::LiteralString)
-    new_tid(node) << Domain.new(node.pos, [refer.const("CString").defn])
+    new_tid(node, Literal.new(node.pos, [refer.const("CString").defn]))
   end
   
   # A literal integer could be any integer or floating-point machine type.
   def touch(node : AST::LiteralInteger)
-    new_tid(node) << Domain.new(node.pos, [
+    new_tid(node, Literal.new(node.pos, [
       refer.const("U8").defn, refer.const("U32").defn, refer.const("U64").defn,
       refer.const("I8").defn, refer.const("I32").defn, refer.const("I64").defn,
       refer.const("F32").defn, refer.const("F64").defn,
-    ])
+    ]))
   end
   
   # A literal float could be any floating-point machine type.
   def touch(node : AST::LiteralFloat)
-    new_tid(node) << Domain.new(node.pos, [
+    new_tid(node, Literal.new(node.pos, [
       refer.const("F32").defn, refer.const("F64").defn,
-    ])
+    ]))
   end
   
   def touch(node : AST::Group)
@@ -319,19 +355,19 @@ class Mare::Compiler::Typer < Mare::AST::Visitor
         transfer_tid(node.terms.last, node)
       end
     when " "
-      local = refer[node.terms[0]]
-      if local.is_a?(Refer::Local) && local.defn_rid == node.terms[0].rid
-        local_tid = @local_tids[local]
+      ref = refer[node.terms[0]]
+      if ref.is_a?(Refer::Local) && ref.defn_rid == node.terms[0].rid
+        local_tid = @local_tids[ref]
         require_nonzero(node.terms[1])
-        unify_tids(local_tid, node.terms[1].tid)
-        transfer_tid(node.terms[1].tid, node)
+        self[local_tid].as(Local).set_explicit(self[node.terms[1]])
+        transfer_tid(local_tid, node)
       else
         raise NotImplementedError.new(node.to_a)
       end
     when "|"
       ref = refer[node]
       if ref.is_a?(Refer::ConstUnion)
-        new_tid(node) << Domain.new(node.pos, ref.list.map(&.defn))
+        new_tid(node, ConstUnion.new(node.pos, ref.list.map(&.defn)))
       else
         raise NotImplementedError.new(node.to_a)
       end
@@ -342,13 +378,8 @@ class Mare::Compiler::Typer < Mare::AST::Visitor
   def touch(node : AST::Relate)
     case node.op.value
     when "="
-      if constraints(node.lhs).totally_unconstrained?
-        unify_tids(node.lhs.tid, node.rhs.tid)
-        transfer_tid(node.rhs, node)
-      else
-        constraints(node.rhs).copy_from(constraints(node.lhs))
-        transfer_tid(node.lhs, node)
-      end
+      self[node.lhs].as(Local).assign(self[node.rhs])
+      transfer_tid(node.lhs, node)
     when "."
       lhs = node.lhs
       rhs = node.rhs
@@ -363,20 +394,20 @@ class Mare::Compiler::Typer < Mare::AST::Visitor
       else raise NotImplementedError.new(rhs)
       end
       
-      new_tid(node) << Call.new(member.pos, lhs.tid, member.value, args)
+      new_tid(node, FromCall.new(member.pos, lhs.tid, member.value, args))
     else raise NotImplementedError.new(node.op.value)
     end
   end
   
   def touch(node : AST::Choice)
     node.list.each do |cond, body|
-      constraints(cond) << Domain.new(node.pos, [
+      self[cond].within_domain!(node.pos, [
         refer.const("True").defn, refer.const("False").defn,
       ])
     end
     
     # TODO: give Choice the union of the types of all clauses
-    new_tid(node) << Domain.new(node.pos, [refer.const("None").defn])
+    new_tid(node, Const.new(node.pos, refer.const("None").defn))
   end
   
   def touch(node : AST::Node)
