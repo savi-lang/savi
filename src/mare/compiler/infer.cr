@@ -7,8 +7,9 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   abstract class Info
     property pos : Source::Pos = Source::Pos.none
     
-    abstract def resolve! : Array(Program::Type)
+    abstract def resolve!(infer : Infer) : Array(Program::Type)
     abstract def within_domain!(
+      infer : Infer,
       domain_pos : Source::Pos,
       list : Array(Program::Type),
     )
@@ -27,7 +28,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       @domain_constraints << {@pos, @domain.dup}
     end
     
-    def resolve!
+    def resolve!(infer : Infer)
       if @domain.size == 0
         raise Error.new(@domain_constraints.map { |c| show_domain(c) }.unshift(
           "This value's type is unresolvable due to conflicting constraints:"
@@ -43,7 +44,11 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       [@domain.first]
     end
     
-    def within_domain!(domain_pos : Source::Pos, list : Array(Program::Type))
+    def within_domain!(
+      infer : Infer,
+      domain_pos : Source::Pos,
+      list : Array(Program::Type),
+    )
       set = list.to_set
       @domain = @domain & set
       @domain_constraints << {domain_pos, set}
@@ -57,47 +62,53 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   end
   
   class Local < Info
-    @explicit : (Const | ConstUnion | Nil)
-    @upstream : Info?
+    @explicit : TID?
+    @upstream : TID?
     
     def initialize(@pos)
     end
     
-    def resolve!
+    def resolve!(infer : Infer)
       if @explicit
-        @explicit.not_nil!.resolve!
+        infer[@explicit.not_nil!].resolve!(infer)
       else
-        @upstream.not_nil!.resolve!
+        infer[@upstream.not_nil!].resolve!(infer)
       end
     end
     
-    def set_explicit(info : Info)
+    def set_explicit(infer : Infer, tid : TID)
       raise "already set_explicit" if @explicit
       raise "shouldn't have an upstream yet" unless @upstream.nil?
       
-      @explicit = info.as(Const | ConstUnion)
+      @explicit = tid
     end
     
-    def within_domain!(domain_pos : Source::Pos, list : Array(Program::Type))
+    def within_domain!(
+      infer : Infer,
+      domain_pos : Source::Pos,
+      list : Array(Program::Type),
+    )
       if @explicit
-        @explicit.not_nil!.within_domain!(domain_pos, list)
+        infer[@explicit.not_nil!].within_domain!(infer, domain_pos, list)
       else
-        @upstream.not_nil!.within_domain!(domain_pos, list)
+        infer[@upstream.not_nil!].within_domain!(infer, domain_pos, list)
       end
     end
     
-    def assign(info : Info)
-      explicit = @explicit
-      case explicit
-      when Const
-        info.within_domain!(explicit.pos, [explicit.defn])
-      when ConstUnion
-        info.within_domain!(explicit.pos, explicit.defns)
-      else # do nothing for Nil
+    def assign(infer : Infer, tid : TID)
+      if @explicit
+        explicit = infer[@explicit.not_nil!]
+        case explicit
+        when Const
+          infer[tid].within_domain!(infer, explicit.pos, [explicit.defn])
+        when ConstUnion
+          infer[tid].within_domain!(infer, explicit.pos, explicit.defns)
+        else raise NotImplementedError.new(explicit)
+        end
       end
       
       raise "already assigned an upstream" if @upstream
-      @upstream = info
+      @upstream = tid
     end
   end
   
@@ -107,11 +118,15 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     def initialize(@pos, @defn)
     end
     
-    def resolve!
+    def resolve!(infer : Infer)
       [@defn]
     end
     
-    def within_domain!(domain_pos : Source::Pos, list : Array(Program::Type))
+    def within_domain!(
+      infer : Infer,
+      domain_pos : Source::Pos,
+      list : Array(Program::Type),
+    )
       return if list.includes?(defn)
       
       raise Error.new([
@@ -128,11 +143,15 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     def initialize(@pos, @defns)
     end
     
-    def resolve!
+    def resolve!(infer : Infer)
       @defns
     end
     
-    def within_domain!(domain_pos : Source::Pos, list : Array(Program::Type))
+    def within_domain!(
+      infer : Infer,
+      domain_pos : Source::Pos,
+      list : Array(Program::Type),
+    )
       extra = defns.to_set - list.to_set
       return if extra.empty?
       
@@ -145,19 +164,23 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   end
   
   class Choice < Info
-    getter clauses : Array(Info)
+    getter clauses : Array(TID)
     
     def initialize(@pos, @clauses)
     end
     
-    def resolve!
-      clauses.reduce(Set(Program::Type).new) do |total, clause|
-        total | clause.resolve!.to_set
+    def resolve!(infer : Infer)
+      clauses.reduce(Set(Program::Type).new) do |total, clause_tid|
+        total | infer[clause_tid].resolve!(infer).to_set
       end.to_a
     end
     
-    def within_domain!(domain_pos : Source::Pos, list : Array(Program::Type))
-      clauses.each(&.within_domain!(domain_pos, list))
+    def within_domain!(
+      infer : Infer,
+      domain_pos : Source::Pos,
+      list : Array(Program::Type),
+    )
+      clauses.each { |tid| infer[tid].within_domain!(infer, domain_pos, list) }
     end
   end
   
@@ -171,12 +194,16 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       @domain_constraints = [] of {Source::Pos, Set(Program::Type)}
     end
     
-    def resolve!
+    def resolve!(infer : Infer)
       raise "unresolved ret for #{self.inspect}" unless @ret
       @ret.not_nil!
     end
     
-    def within_domain!(domain_pos : Source::Pos, list : Array(Program::Type))
+    def within_domain!(
+      infer : Infer,
+      domain_pos : Source::Pos,
+      list : Array(Program::Type),
+    )
       raise "already resolved ret for #{self.inspect}" if @ret
       @domain_constraints << {domain_pos, list.to_set}
     end
@@ -227,14 +254,15 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     func.params.try { |params| params.accept(self) }
     
     # Take note of the return type constraint if given.
-    func_ret = func.ret
-    new_tid(func_ret, Const.new(func_ret.pos, refer.const(func_ret.value).defn)) if func_ret
+    func.ret.try do |ret|
+      new_tid(ret, Const.new(ret.pos, refer.const(ret.value).defn))
+    end
     
     # Complain if neither return type nor function body were specified.
     raise Error.new([
       "This function's return type is totally unconstrained:",
       func.ident.pos.show,
-    ].join("\n")) unless func_ret || func.body
+    ].join("\n")) unless func.ret || func.body
     
     # Don't bother further typechecking functions that have no body
     # (such as FFI function declarations).
@@ -245,7 +273,9 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     func_body.accept(self)
     
     # Constrain the function body with the return type if given.
-    self[func_body].within_domain!(func_ret.pos, [self[func_ret].as(Const).defn]) if func_ret
+    func.ret.try do |ret|
+      self[func_body].within_domain!(self, ret.pos, [self[ret].as(Const).defn])
+    end
     
     # For each call that was encountered in the function body:
     @tids.each_value do |call|
@@ -253,7 +283,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       
       # Confirm that by now, there is exactly one type in the domain.
       # TODO: is it possible to proceed without Domain?
-      call_funcs = self[call.lhs].resolve!.map do |defn|
+      call_funcs = self[call.lhs].resolve!(self).map do |defn|
         defn.find_func!(call.member)
       end
       
@@ -268,13 +298,15 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       
       # Apply constraints to the return type.
       call_ret = (call_func.ret || call_func.body).not_nil!
-      call.set_return(infer[call_ret].resolve!)
+      call.set_return(infer[call_ret].resolve!(self))
       
       # Apply constraints to each of the argument types.
       # TODO: handle case where number of args differs from number of params.
       unless call.args.empty?
         call.args.zip(call_func.params.not_nil!.terms).each do |arg_tid, param|
-          infer[param].as(Local).assign(self[arg_tid])
+          # TODO: Use a Param type instead of a Local type,
+          # as this needs to be treated differently when the tid is foreign?
+          infer[param].as(Local).assign(self, arg_tid)
         end
       end
     end
@@ -376,7 +408,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       if ref.is_a?(Refer::Local) && ref.defn_rid == node.terms[0].rid
         local_tid = @local_tids[ref]
         require_nonzero(node.terms[1])
-        self[local_tid].as(Local).set_explicit(self[node.terms[1]])
+        self[local_tid].as(Local).set_explicit(self, node.terms[1].tid)
         transfer_tid(local_tid, node)
       else
         raise NotImplementedError.new(node.to_a)
@@ -395,7 +427,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   def touch(node : AST::Relate)
     case node.op.value
     when "="
-      self[node.lhs].as(Local).assign(self[node.rhs])
+      self[node.lhs].as(Local).assign(self, node.rhs.tid)
       transfer_tid(node.lhs, node)
     when "."
       lhs = node.lhs
@@ -417,19 +449,19 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   end
   
   def touch(node : AST::Choice)
-    body_types = [] of Info
+    body_tids = [] of TID
     node.list.each do |cond, body|
       # Each condition in a choice must evaluate to a type of (True | False).
-      self[cond].within_domain!(node.pos, [
+      self[cond].within_domain!(self, node.pos, [
         refer.const("True").defn, refer.const("False").defn,
       ])
       
       # Hold on to the body type for later in this function.
-      body_types << self[body]
+      body_tids << body.tid
     end
     
     # TODO: also track cond types in branch, for analyzing exhausted choices.
-    new_tid(node, Choice.new(node.pos, body_types))
+    new_tid(node, Choice.new(node.pos, body_tids))
   end
   
   def touch(node : AST::Node)

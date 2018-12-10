@@ -129,10 +129,10 @@ describe Mare::Compiler::Infer do
     body = func.body.not_nil!
     assign = body.terms.first.as(Mare::AST::Relate)
     
-    local_types = func.infer[assign.lhs].resolve!
+    local_types = func.infer[assign.lhs].resolve!(func.infer)
     local_types.map(&.ident).map(&.value).should eq ["U64", "None"]
     
-    literal_types = func.infer[assign.rhs].resolve!
+    literal_types = func.infer[assign.rhs].resolve!(func.infer)
     literal_types.map(&.ident).map(&.value).should eq ["U64"]
   end
   
@@ -153,13 +153,13 @@ describe Mare::Compiler::Infer do
       .as(Mare::AST::Choice).list[0][1]
       .as(Mare::AST::LiteralInteger)
     
-    local_types = func.infer[assign.lhs].resolve!
+    local_types = func.infer[assign.lhs].resolve!(func.infer)
     local_types.map(&.ident).map(&.value).should eq ["U64", "CString", "None"]
     
-    choice_types = func.infer[assign.rhs].resolve!
+    choice_types = func.infer[assign.rhs].resolve!(func.infer)
     choice_types.map(&.ident).map(&.value).should eq ["U64", "None"]
     
-    literal_types = func.infer[literal].resolve!
+    literal_types = func.infer[literal].resolve!(func.infer)
     literal_types.map(&.ident).map(&.value).should eq ["U64"]
   end
 end
