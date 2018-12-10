@@ -62,23 +62,23 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   end
   
   class Local < Info
-    @explicit : TID?
-    @upstream : TID?
+    @explicit : TID = 0
+    @upstream : TID = 0
     
     def initialize(@pos)
     end
     
     def resolve!(infer : Infer)
-      if @explicit
-        infer[@explicit.not_nil!].resolve!(infer)
+      if @explicit != 0
+        infer[@explicit].resolve!(infer)
       else
-        infer[@upstream.not_nil!].resolve!(infer)
+        infer[@upstream].resolve!(infer)
       end
     end
     
     def set_explicit(infer : Infer, tid : TID)
-      raise "already set_explicit" if @explicit
-      raise "shouldn't have an upstream yet" unless @upstream.nil?
+      raise "already set_explicit" if @explicit != 0
+      raise "shouldn't have an upstream yet" if @upstream != 0
       
       @explicit = tid
     end
@@ -88,16 +88,16 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       domain_pos : Source::Pos,
       list : Array(Program::Type),
     )
-      if @explicit
-        infer[@explicit.not_nil!].within_domain!(infer, domain_pos, list)
+      if @explicit != 0
+        infer[@explicit].within_domain!(infer, domain_pos, list)
       else
-        infer[@upstream.not_nil!].within_domain!(infer, domain_pos, list)
+        infer[@upstream].within_domain!(infer, domain_pos, list)
       end
     end
     
     def assign(infer : Infer, tid : TID)
-      if @explicit
-        explicit = infer[@explicit.not_nil!]
+      if @explicit != 0
+        explicit = infer[@explicit]
         case explicit
         when Const
           infer[tid].within_domain!(infer, explicit.pos, [explicit.defn])
@@ -107,7 +107,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         end
       end
       
-      raise "already assigned an upstream" if @upstream
+      raise "already assigned an upstream" if @upstream != 0
       @upstream = tid
     end
   end
