@@ -116,13 +116,13 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
   # For a Relate, pay attention to any relations that are relevant to us.
   def touch(node : AST::Relate)
     if node.op.value == "="
-      create_local(node.lhs, false)
+      create_local(node.lhs)
     end
   end
   
   def touch(node : AST::Group)
     if node.style == "(" && @create_params
-      node.terms.each { |child| create_local(child, true) }
+      node.terms.each { |child| create_param_local(child) }
     elsif node.style == "|"
       # TODO: nice error here if this doesn't match the expected form.
       consts = node.terms.map do |child|
@@ -136,7 +136,7 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
     # On all other nodes, do nothing.
   end
   
-  def create_local(node : AST::Identifier, is_param : Bool)
+  def create_local(node : AST::Identifier)
     # This will be a new local, so if the identifier already matched an
     # existing local, it would shadow that, which we don't currently allow.
     if @rids[node.rid].is_a?(Local)
@@ -148,20 +148,39 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
       ].join("\n"))
     end
     
-    # This local is a parameter, so set the new parameter index.
-    param_idx = (@last_param += 1) if is_param
-    
     # Create the local entry, so later references to this name will see it.
-    local = Local.new(node.pos, node.value, node.rid, param_idx)
-    @current_locals[node.value] = local
+    local = Local.new(node.pos, node.value, node.rid)
+    @current_locals[node.value] = local unless node.value == "_"
     @rids[node.rid] = local
   end
   
-  def create_local(node : AST::Node, is_param : Bool)
+  def create_local(node : AST::Node)
     raise NotImplementedError.new(node.to_a) \
-      unless node.is_a?(AST::Group) && node.style == " "
+      unless node.is_a?(AST::Group) && node.style == " " && node.terms.size == 2
     
-    create_local(node.terms[0], is_param)
+    create_local(node.terms[0])
     node.rid = node.terms[0].rid
+  end
+  
+  def create_param_local(node : AST::Identifier)
+    # Treat this as a parameter with only a type and no identifier.
+    # Do nothing other than increment the parameter count, because
+    # we don't want to overwrite the Const info for this node's rid.
+    # We don't need to create a Local anyway, because there's no way to
+    # fetch the value of this parameter later (because it has no identifier).
+    @last_param += 1
+  end
+  
+  def create_param_local(node : AST::Node)
+    raise NotImplementedError.new(node.to_a) \
+      unless node.is_a?(AST::Group) && node.style == " " && node.terms.size == 2
+    
+    ident = node.terms[0].as(AST::Identifier)
+    
+    local = Local.new(node.pos, ident.value, ident.rid, @last_param += 1)
+    @current_locals[ident.value] = local unless ident.value == "_"
+    @rids[ident.rid] = local
+    
+    node.rid = ident.rid
   end
 end

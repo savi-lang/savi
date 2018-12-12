@@ -112,6 +112,57 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
   end
   
+  class Param < Info
+    @explicit : TID = 0
+    
+    def initialize(@pos)
+    end
+    
+    private def require_explicit
+      if @explicit == 0
+        raise Error.new([
+          "This parameter's type was not specified:",
+          pos.show,
+        ].join("\n"))
+      end
+    end
+    
+    def resolve!(infer : Infer)
+      require_explicit
+      infer[@explicit].resolve!(infer)
+    end
+    
+    def set_explicit(infer : Infer, tid : TID)
+      raise "already set_explicit" if @explicit != 0
+      
+      @explicit = tid
+    end
+    
+    def within_domain!(
+      infer : Infer,
+      domain_pos : Source::Pos,
+      list : Array(Program::Type),
+    )
+      require_explicit
+      infer[@explicit].within_domain!(infer, domain_pos, list)
+    end
+    
+    def verify_arg(infer : Infer, arg_infer : Infer, arg_tid : TID)
+      require_explicit
+      
+      explicit = infer[@explicit]
+      case explicit
+      when Const
+        arg = arg_infer[arg_tid]
+        arg.within_domain!(arg_infer, explicit.pos, [explicit.defn])
+      when ConstUnion
+        arg = arg_infer[arg_tid]
+        arg.within_domain!(arg_infer, explicit.pos, explicit.defns)
+      else raise NotImplementedError.new(explicit)
+      end
+    end
+  end
+  
   class Const < Info
     getter defn : Program::Type
     
@@ -204,14 +255,19 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       domain_pos : Source::Pos,
       list : Array(Program::Type),
     )
-      raise "already resolved ret for #{self.inspect}" if @ret
       @domain_constraints << {domain_pos, list.to_set}
+      verify_constraints! if @ret
     end
     
     def set_return(domain : Array(Program::Type))
       @ret = domain.dup
       
-      extra = @domain_constraints.reduce domain.to_set do |domain, (_, list)|
+      verify_constraints!
+    end
+    
+    private def verify_constraints!
+      domain = @ret.not_nil!.to_set
+      extra = @domain_constraints.reduce domain do |domain, (_, list)|
         domain - list
       end
       return if extra.empty? || @domain_constraints.empty?
@@ -251,7 +307,13 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     @refer = func.refer
     
     # Visit the function parameters, noting any declared types there.
-    func.params.try { |params| params.accept(self) }
+    # We may need to apply some parameter-specific finishing touches.
+    func.params.try do |params|
+      params.accept(self)
+      params.terms.each do |param|
+        finish_param(param, self[param]) unless self[param].is_a?(Param)
+      end
+    end
     
     # Take note of the return type constraint if given.
     func.ret.try do |ret|
@@ -304,9 +366,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       # TODO: handle case where number of args differs from number of params.
       unless call.args.empty?
         call.args.zip(call_func.params.not_nil!.terms).each do |arg_tid, param|
-          # TODO: Use a Param type instead of a Local type,
-          # as this needs to be treated differently when the tid is foreign?
-          infer[param].as(Local).assign(self, arg_tid)
+          infer[param].as(Param).verify_arg(infer, self, arg_tid)
         end
       end
     end
@@ -317,9 +377,14 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   
   def new_tid(node, info)
     raise "this already has a tid: #{node.inspect}" if node.tid != 0
-    node.tid = @last_tid += 1
-    raise "type id overflow" if node.tid == 0
-    @tids[node.tid] = info
+    node.tid = new_tid_detached(info)
+  end
+  
+  def new_tid_detached(info) : TID
+    tid = @last_tid += 1
+    raise "type id overflow" if tid == 0
+    @tids[tid] = info
+    tid
   end
   
   def transfer_tid(from_tid : TID, to)
@@ -358,7 +423,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       if local_tid
         transfer_tid(local_tid, node)
       else
-        new_tid(node, Local.new(node.pos))
+        new_tid(node, ref.param_idx ? Param.new(node.pos) : Local.new(node.pos))
         @local_tids[ref] = node.tid
       end
     when Refer::Unresolved.class
@@ -408,7 +473,16 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       if ref.is_a?(Refer::Local) && ref.defn_rid == node.terms[0].rid
         local_tid = @local_tids[ref]
         require_nonzero(node.terms[1])
-        self[local_tid].as(Local).set_explicit(self, node.terms[1].tid)
+        
+        local = self[local_tid]
+        case local
+        when Local
+          local.set_explicit(self, node.terms[1].tid)
+        when Param
+          local.set_explicit(self, node.terms[1].tid)
+        else raise NotImplementedError.new(local)
+        end
+        
         transfer_tid(local_tid, node)
       else
         raise NotImplementedError.new(node.to_a)
@@ -466,6 +540,23 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   
   def touch(node : AST::Node)
     # Do nothing for other nodes.
+  end
+  
+  def finish_param(node : AST::Node, ref : Info)
+    case ref
+    when Const
+      param = Param.new(node.pos)
+      param.set_explicit(self, node.tid)
+      node.tid = 0 # clear to make room for new info
+      new_tid(node, param)
+    when ConstUnion
+      param = Param.new(node.pos)
+      param.set_explicit(self, node.tid)
+      node.tid = 0 # clear to make room for new info
+      new_tid(node, param)
+    else
+      raise NotImplementedError.new([node, ref].inspect)
+    end
   end
   
   def require_nonzero(node : AST::Node)
