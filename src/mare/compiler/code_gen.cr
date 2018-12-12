@@ -16,10 +16,11 @@ class Mare::Compiler::CodeGen
   
   class Frame
     getter func : LLVM::Function?
+    getter program_func : Program::Function?
     setter pony_ctx : LLVM::Value?
     getter current_locals
     
-    def initialize(@func = nil)
+    def initialize(@func = nil, @program_func = nil)
       @current_locals = {} of Refer::Local => LLVM::Value
     end
     
@@ -37,6 +38,10 @@ class Mare::Compiler::CodeGen
     
     def pony_ctx
       @pony_ctx.as(LLVM::Value)
+    end
+    
+    def refer
+      @program_func.as(Program::Function).refer
     end
   end
   
@@ -351,8 +356,8 @@ class Mare::Compiler::CodeGen
     main
   end
   
-  def gen_func_start(func)
-    @frames << Frame.new(func)
+  def gen_func_start(func, program_func : Program::Function? = nil)
+    @frames << Frame.new(func, program_func)
     
     # Create an entry block and start building from there.
     @builder.position_at_end(gen_block("entry"))
@@ -412,10 +417,10 @@ class Mare::Compiler::CodeGen
   def gen_fun_body(ctx, t, f)
     func = @mod.functions["#{t.ident.value}.#{f.ident.value}"]
     
-    gen_func_start(func)
+    gen_func_start(func, f)
     
     last_value = nil
-    f.body.not_nil!.terms.each { |expr| last_value = gen_expr(ctx, f, expr) }
+    f.body.not_nil!.terms.each { |expr| last_value = gen_expr(ctx, expr) }
     
     if f.ret
       @builder.ret(last_value.not_nil!)
@@ -426,7 +431,7 @@ class Mare::Compiler::CodeGen
     gen_func_end
   end
   
-  def gen_dot(ctx, f, relate)
+  def gen_dot(ctx, relate)
     receiver = relate.lhs.as(AST::Identifier).value
     rhs = relate.rhs
     
@@ -436,7 +441,7 @@ class Mare::Compiler::CodeGen
       args = [] of LLVM::Value
     when AST::Qualify
       member = rhs.term.as(AST::Identifier).value
-      args = rhs.group.terms.map { |expr| gen_expr(ctx, f, expr).as(LLVM::Value) }
+      args = rhs.group.terms.map { |expr| gen_expr(ctx, expr).as(LLVM::Value) }
     else raise NotImplementedError.new(rhs)
     end
     
@@ -454,10 +459,10 @@ class Mare::Compiler::CodeGen
     end
   end
   
-  def gen_eq(ctx, f, relate)
-    ref = f.refer[relate.lhs]
+  def gen_eq(ctx, relate)
+    ref = func_frame.refer[relate.lhs]
     if ref.is_a?(Refer::Local)
-      rhs = gen_expr(ctx, f, relate.rhs).as(LLVM::Value)
+      rhs = gen_expr(ctx, relate.rhs).as(LLVM::Value)
       
       raise "local already declared: #{ref.inspect}" \
         if func_frame.current_locals[ref]?
@@ -468,10 +473,10 @@ class Mare::Compiler::CodeGen
     end
   end
   
-  def gen_expr(ctx, f, expr) : LLVM::Value
+  def gen_expr(ctx, expr) : LLVM::Value
     case expr
     when AST::Identifier
-      ref = f.refer[expr]
+      ref = func_frame.refer[expr]
       if ref.is_a?(Refer::Local) && ref.param_idx
         param_idx = ref.param_idx.not_nil! - 1 # TODO: only for primitive calls
         frame.func.params[param_idx]
@@ -493,17 +498,17 @@ class Mare::Compiler::CodeGen
       gen_string(expr)
     when AST::Relate
       case expr.op.as(AST::Operator).value
-      when "." then gen_dot(ctx, f, expr)
-      when "=" then gen_eq(ctx, f, expr)
+      when "." then gen_dot(ctx, expr)
+      when "=" then gen_eq(ctx, expr)
       else raise NotImplementedError.new(expr.inspect)
       end
     when AST::Group
       case expr.style
-      when "(" then gen_sequence(ctx, f, expr)
+      when "(" then gen_sequence(ctx, expr)
       else raise NotImplementedError.new(expr.inspect)
       end
     when AST::Choice
-      gen_choice(ctx, f, expr)
+      gen_choice(ctx, expr)
     else
       raise NotImplementedError.new(expr.inspect)
     end
@@ -543,27 +548,27 @@ class Mare::Compiler::CodeGen
     end
   end
   
-  def gen_sequence(ctx, f, expr : AST::Group)
+  def gen_sequence(ctx, expr : AST::Group)
     # TODO: Use None as a value when sequence group size is zero.
     raise NotImplementedError.new(expr.terms.size) if expr.terms.size == 0
     
     # TODO: Push a scope frame?
     
     final : LLVM::Value? = nil
-    expr.terms.each { |term| final = gen_expr(ctx, f, term) }
+    expr.terms.each { |term| final = gen_expr(ctx, term) }
     final.not_nil!
     
     # TODO: Pop the scope frame?
   end
   
-  def gen_choice(ctx, f, expr : AST::Choice)
+  def gen_choice(ctx, expr : AST::Choice)
     # TODO: Support more than a simple if/else choice.
     raise NotImplementedError.new(expr.list.size) if expr.list.size != 2
     
     if_clause = expr.list.first
     else_clause = expr.list.last
     
-    cond_value = gen_expr(ctx, f, if_clause[0])
+    cond_value = gen_expr(ctx, if_clause[0])
     
     bb_body1 = gen_block("body1choice")
     bb_body2 = gen_block("body2choice")
@@ -573,11 +578,11 @@ class Mare::Compiler::CodeGen
     @builder.cond(cond_value, bb_body1, bb_body2)
     
     @builder.position_at_end(bb_body1)
-    value1 = gen_expr(ctx, f, if_clause[1])
+    value1 = gen_expr(ctx, if_clause[1])
     @builder.br(bb_post)
     
     @builder.position_at_end(bb_body2)
-    value2 = gen_expr(ctx, f, else_clause[1])
+    value2 = gen_expr(ctx, else_clause[1])
     @builder.br(bb_post)
     
     @builder.position_at_end(bb_post)
