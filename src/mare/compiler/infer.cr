@@ -15,9 +15,11 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     )
     
     def show_domain(d : {Source::Pos, Enumerable(Program::Type)})
-      names = d[1].map(&.ident).map(&.value)
-      
-      "- it must be a subtype of (#{names.join(" | ")}):\n  #{d[0].show}\n"
+      "- it must be a subtype of #{show_type(d[1])}:\n  #{d[0].show}\n"
+    end
+    
+    def show_type(types : Enumerable(Program::Type))
+      "(#{types.map(&.ident).map(&.value).join(" | ")})"
     end
   end
   
@@ -71,8 +73,13 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     def resolve!(infer : Infer)
       if @explicit != 0
         infer[@explicit].resolve!(infer)
-      else
+      elsif @upstream != 0
         infer[@upstream].resolve!(infer)
+      else
+        raise Error.new([
+          "This needs an explicit type; it could not be inferred:",
+          pos.show,
+        ].join("\n"))
       end
     end
     
@@ -274,11 +281,15 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       
       raise Error.new(@domain_constraints.map { |c| show_domain(c) }.unshift(
         "This return value is outside of its constraints:\n#{pos.show}",
+      ).push(
+        "- but it had a return type of #{show_type(domain)}\n"
       ).join("\n"))
     end
   end
   
   property! refer : Compiler::Refer
+  getter param_tids : Array(TID) = [] of TID
+  getter! ret_tid : TID
   
   def initialize
     # TODO: When we have branching, we'll need some form of divergence.
@@ -298,7 +309,19 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   end
   
   def self.run(ctx)
+    # Start by running an instance of inference at the Main.new function,
+    # and recurse into checking other functions that are reachable from there.
     new.run(ctx.program.find_func!("Main", "new"))
+    
+    # For each function in the program, run with a new instance,
+    # unless that function has already been reached with an infer instance.
+    # We probably reached most of them already by starting from Main.new,
+    # so this second pass just takes care of typechecking unreachable functions.
+    ctx.program.types.each do |t|
+      t.functions.each do |f|
+        new.run(f) unless f.infer?
+      end
+    end
   end
   
   def run(func)
@@ -306,25 +329,31 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     func.infer = self
     @refer = func.refer
     
+    # Complain if neither return type nor function body were specified.
+    raise Error.new([
+      "This function's return type is totally unconstrained:",
+      func.ident.pos.show,
+    ].join("\n")) unless func.ret || func.body
+    
     # Visit the function parameters, noting any declared types there.
     # We may need to apply some parameter-specific finishing touches.
     func.params.try do |params|
       params.accept(self)
       params.terms.each do |param|
         finish_param(param, self[param]) unless self[param].is_a?(Param)
+        @param_tids << param.tid
       end
     end
     
-    # Take note of the return type constraint if given.
-    func.ret.try do |ret|
-      new_tid(ret, Const.new(ret.pos, refer.const(ret.value).defn))
-    end
+    # Create a fake local variable that represents the return value.
+    new_tid(func.ident, Local.new(func.ident.pos))
+    @ret_tid = func.ident.tid
     
-    # Complain if neither return type nor function body were specified.
-    raise Error.new([
-      "This function's return type is totally unconstrained:",
-      func.ident.pos.show,
-    ].join("\n")) unless func.ret || func.body
+    # Take note of the return type constraint if given.
+    func.ret.try do |ret_t|
+      new_tid(ret_t, Const.new(ret_t.pos, refer.const(ret_t.value).defn))
+      self[ret_tid].as(Local).set_explicit(self, ret_t.tid)
+    end
     
     # Don't bother further typechecking functions that have no body
     # (such as FFI function declarations).
@@ -334,45 +363,41 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     # Visit the function body, taking note of all observed constraints.
     func_body.accept(self)
     
-    # Constrain the function body with the return type if given.
-    func.ret.try do |ret|
-      self[func_body].within_domain!(self, ret.pos, [self[ret].as(Const).defn])
-    end
-    
-    # For each call that was encountered in the function body:
-    @tids.each_value do |call|
-      next unless call.is_a?(FromCall)
-      
-      # Confirm that by now, there is exactly one type in the domain.
-      # TODO: is it possible to proceed without Domain?
-      call_funcs = self[call.lhs].resolve!(self).map do |defn|
-        defn.find_func!(call.member)
-      end
-      
-      # TODO: handle multiple call funcs by branching.
-      raise NotImplementedError.new(call_funcs.inspect) if call_funcs.size > 1
-      call_func = call_funcs.first
-      
-      # TODO: copying to diverging specializations of the function
-      # TODO: apply argument constraints to the parameters
-      # TODO: detect and halt recursion by noticing what's been seen
-      infer = call_func.infer? || self.class.new.tap(&.run(call_func))
-      
-      # Apply constraints to the return type.
-      call_ret = (call_func.ret || call_func.body).not_nil!
-      call.set_return(infer[call_ret].resolve!(self))
-      
-      # Apply constraints to each of the argument types.
-      # TODO: handle case where number of args differs from number of params.
-      unless call.args.empty?
-        call.args.zip(call_func.params.not_nil!.terms).each do |arg_tid, param|
-          infer[param].as(Param).verify_arg(infer, self, arg_tid)
-        end
-      end
-    end
+    # Assign the function body value to the fake return value local.
+    # This has the effect of constraining it to any given explicit type,
+    # and also of allowing inference if there is no explicit type.
+    self[ret_tid].as(Local).assign(self, func_body.tid)
     
     # # TODO: Assign the resolved types to a new map of TID => type.
     # @tids.each_value(&.resolve!)
+  end
+  
+  def follow_call(call : FromCall)
+    # Confirm that by now, there is exactly one type in the domain.
+    # TODO: is it possible to proceed without Domain?
+    call_funcs = self[call.lhs].resolve!(self).map do |defn|
+      defn.find_func!(call.member)
+    end
+    
+    # TODO: handle multiple call funcs by branching.
+    raise NotImplementedError.new(call_funcs.inspect) if call_funcs.size > 1
+    call_func = call_funcs.first
+    
+    # TODO: copying to diverging specializations of the function
+    # TODO: apply argument constraints to the parameters
+    # TODO: detect and halt recursion by noticing what's been seen
+    infer = call_func.infer? || self.class.new.tap(&.run(call_func))
+    
+    # Apply constraints to the return type.
+    call.set_return(infer[infer.ret_tid].resolve!(infer))
+    
+    # Apply constraints to each of the argument types.
+    # TODO: handle case where number of args differs from number of params.
+    unless call.args.empty?
+      call.args.zip(infer.param_tids).each do |arg_tid, param_tid|
+        infer[param_tid].as(Param).verify_arg(infer, self, arg_tid)
+      end
+    end
   end
   
   def new_tid(node, info)
@@ -517,7 +542,10 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       else raise NotImplementedError.new(rhs)
       end
       
-      new_tid(node, FromCall.new(member.pos, lhs.tid, member.value, args))
+      call = FromCall.new(member.pos, lhs.tid, member.value, args)
+      new_tid(node, call)
+      
+      follow_call(call)
     else raise NotImplementedError.new(node.op.value)
     end
   end

@@ -162,4 +162,80 @@ describe Mare::Compiler::Infer do
     literal_types = func.infer[literal].resolve!(func.infer)
     literal_types.map(&.ident).map(&.value).should eq ["U64"]
   end
+  
+  it "infers return type from param type or another return type" do
+    source = Mare::Source.new "(example)", <<-SOURCE
+    primitive Infer:
+      fun from_param (n I32): n
+      fun from_call_return (n I32): Infer.from_param(n)
+    
+    actor Main:
+      new:
+        Infer.from_call_return(42)
+    SOURCE
+    
+    ctx = Mare::Compiler.compile(source, limit: Mare::Compiler::Infer)
+    
+    [
+      {"Infer", "from_param"},
+      {"Infer", "from_call_return"},
+      {"Main", "new"},
+    ].each do |t_name, f_name|
+      func = ctx.program.find_func!(t_name, f_name)
+      call = func.body.not_nil!.terms.first
+      
+      call_types = func.infer[call].resolve!(func.infer)
+      call_types.map(&.ident).map(&.value).should eq ["I32"]
+    end
+  end
+  
+  it "complains when unable to infer mutually recursive return types" do
+    source = Mare::Source.new "(example)", <<-SOURCE
+    primitive Tweedle:
+      fun dee (n I32): Tweedle.dum(n)
+      fun dum (n I32): Tweedle.dee(n)
+    
+    actor Main:
+      new:
+        Tweedle.dum(42)
+    SOURCE
+    
+    expected = <<-MSG
+    This needs an explicit type; it could not be inferred:
+    from (example):3:
+      fun dum (n I32): Tweedle.dee(n)
+          ^~~
+    MSG
+    
+    expect_raises Mare::Compiler::Infer::Error, expected do
+      Mare::Compiler.compile(source, limit: Mare::Compiler::Infer)
+    end
+  end
+  
+  it "complains about problems with unreachable functions too" do
+    source = Mare::Source.new "(example)", <<-SOURCE
+    primitive NeverCalled:
+      fun call:
+        x False = True
+    
+    actor Main:
+      new:
+        None
+    SOURCE
+    
+    expected = <<-MSG
+    This type declaration conflicts with another constraint:
+    from (example):3:
+        x False = True
+                  ^~~~
+    - it must be a subtype of (False):
+      from (example):3:
+        x False = True
+          ^~~~~
+    MSG
+    
+    expect_raises Mare::Compiler::Infer::Error, expected do
+      Mare::Compiler.compile(source, limit: Mare::Compiler::Infer)
+    end
+  end
 end
