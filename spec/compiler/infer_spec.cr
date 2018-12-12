@@ -163,6 +163,31 @@ describe Mare::Compiler::Infer do
     literal_types.map(&.ident).map(&.value).should eq ["U64"]
   end
   
+  it "complains when a literal couldn't be resolved to a single type" do
+    source = Mare::Source.new "(example)", <<-SOURCE
+    actor Main:
+      new:
+        x (F64 | U64) = 42
+    SOURCE
+    
+    expected = <<-MSG
+    This value couldn't be inferred as a single concrete type:
+    - it must be a subtype of (U8 | U32 | U64 | I8 | I32 | I64 | F32 | F64):
+      from (example):3:
+        x (F64 | U64) = 42
+                        ^~
+    
+    - it must be a subtype of (F64 | U64):
+      from (example):3:
+        x (F64 | U64) = 42
+          ^~~~~~~~~~~
+    MSG
+    
+    expect_raises Mare::Compiler::Infer::Error, expected do
+      Mare::Compiler.compile(source, limit: Mare::Compiler::Infer)
+    end
+  end
+  
   it "infers return type from param type or another return type" do
     source = Mare::Source.new "(example)", <<-SOURCE
     primitive Infer:

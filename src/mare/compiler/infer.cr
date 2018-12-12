@@ -296,6 +296,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     @local_tids = Hash(Refer::Local, TID).new
     @tids = Hash(TID, Info).new
     @last_tid = 0_u64
+    @types = Hash(TID, Array(Program::Type)).new
   end
   
   def [](tid : TID)
@@ -368,8 +369,11 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     # and also of allowing inference if there is no explicit type.
     self[ret_tid].as(Local).assign(self, func_body.tid)
     
-    # # TODO: Assign the resolved types to a new map of TID => type.
-    # @tids.each_value(&.resolve!)
+    # Assign the resolved types to a map for safekeeping.
+    # This also has the effect of running some final checks on everything.
+    @tids.each do |tid, info|
+      @types[tid] = info.resolve!(self)
+    end
   end
   
   def follow_call(call : FromCall)
