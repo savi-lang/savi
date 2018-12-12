@@ -282,7 +282,6 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   
   def initialize
     # TODO: When we have branching, we'll need some form of divergence.
-    @redirects = Hash(TID, TID).new
     @local_tids = Hash(Refer::Local, TID).new
     @tids = Hash(TID, Info).new
     @last_tid = 0_u64
