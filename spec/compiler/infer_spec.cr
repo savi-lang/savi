@@ -129,11 +129,11 @@ describe Mare::Compiler::Infer do
     body = func.body.not_nil!
     assign = body.terms.first.as(Mare::AST::Relate)
     
-    local_types = func.infer[assign.lhs].resolve!(func.infer)
-    local_types.map(&.ident).map(&.value).should eq ["U64", "None"]
+    func.infer.types(assign.lhs).map(&.ident).map(&.value).should eq \
+      ["U64", "None"]
     
-    literal_types = func.infer[assign.rhs].resolve!(func.infer)
-    literal_types.map(&.ident).map(&.value).should eq ["U64"]
+    func.infer.types(assign.rhs).map(&.ident).map(&.value).should eq \
+      ["U64"]
   end
   
   it "infers an integer literal through an if statement" do
@@ -153,14 +153,14 @@ describe Mare::Compiler::Infer do
       .as(Mare::AST::Choice).list[0][1]
       .as(Mare::AST::LiteralInteger)
     
-    local_types = func.infer[assign.lhs].resolve!(func.infer)
-    local_types.map(&.ident).map(&.value).should eq ["U64", "CString", "None"]
+    func.infer.types(assign.lhs).map(&.ident).map(&.value).should eq \
+      ["U64", "CString", "None"]
     
-    choice_types = func.infer[assign.rhs].resolve!(func.infer)
-    choice_types.map(&.ident).map(&.value).should eq ["U64", "None"]
+    func.infer.types(assign.rhs).map(&.ident).map(&.value).should eq \
+      ["U64", "None"]
     
-    literal_types = func.infer[literal].resolve!(func.infer)
-    literal_types.map(&.ident).map(&.value).should eq ["U64"]
+    func.infer.types(literal).map(&.ident).map(&.value).should eq \
+      ["U64"]
   end
   
   it "complains when a literal couldn't be resolved to a single type" do
@@ -209,8 +209,8 @@ describe Mare::Compiler::Infer do
       func = ctx.program.find_func!(t_name, f_name)
       call = func.body.not_nil!.terms.first
       
-      call_types = func.infer[call].resolve!(func.infer)
-      call_types.map(&.ident).map(&.value).should eq ["I32"]
+      func.infer.types(call).map(&.ident).map(&.value).should eq \
+        ["I32"]
     end
   end
   

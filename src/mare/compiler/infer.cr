@@ -309,6 +309,16 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     @tids[node.tid]
   end
   
+  def types(tid : TID) : Array(Program::Type)
+    raise "tid of zero" if tid == 0
+    @types[tid]
+  end
+  
+  def types(node) : Array(Program::Type)
+    raise "this has a tid of zero: #{node.inspect}" if node.tid == 0
+    @types[node.tid]
+  end
+  
   def self.run(ctx)
     # Start by running an instance of inference at the Main.new function,
     # and recurse into checking other functions that are reachable from there.
