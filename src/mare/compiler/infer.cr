@@ -303,6 +303,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   end
   
   def run(func)
+    raise "this func already has an infer: #{func.inspect}" if func.infer?
     func.infer = self
     @refer = func.refer
     
