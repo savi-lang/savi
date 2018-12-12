@@ -43,6 +43,10 @@ class Mare::Compiler::CodeGen
     def refer
       @program_func.as(Program::Function).refer
     end
+    
+    def types(node)
+      @program_func.as(Program::Function).infer.types(node)
+    end
   end
   
   class ReachType
@@ -523,8 +527,20 @@ class Mare::Compiler::CodeGen
   end
   
   def gen_integer(expr : AST::LiteralInteger)
-    # TODO: Allow for non-I32 integers, based on inference.
-    @i32.const_int(expr.value.to_i32)
+    types = func_frame.types(expr)
+    raise "non-concrete literal type: #{types}" if types.size != 1
+    
+    case types.first.ident.value # TODO: deal with namespacing properly
+    when "U8" then @i8.const_int(expr.value.to_i8)
+    when "U32" then @i32.const_int(expr.value.to_i32)
+    when "U64" then @i64.const_int(expr.value.to_i64)
+    when "I8" then @i8.const_int(expr.value.to_i8)
+    when "I32" then @i32.const_int(expr.value.to_i32)
+    when "I64" then @i64.const_int(expr.value.to_i64)
+    when "F32" then raise NotImplementedError.new("float literals")
+    when "F64" then raise NotImplementedError.new("float literals")
+    else raise "invalid numeric literal type: #{types.first.inspect}"
+    end
   end
   
   def gen_string(expr_or_value)
