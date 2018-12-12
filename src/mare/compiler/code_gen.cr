@@ -488,8 +488,7 @@ class Mare::Compiler::CodeGen
         raise NotImplementedError.new(ref)
       end
     when AST::LiteralInteger
-      # TODO: Allow for non-I32 integers, based on inference.
-      @i32.const_int(expr.value.to_i32)
+      gen_integer(expr)
     when AST::LiteralString
       gen_string(expr)
     when AST::Relate
@@ -499,43 +498,12 @@ class Mare::Compiler::CodeGen
       else raise NotImplementedError.new(expr.inspect)
       end
     when AST::Group
-      # TODO: Use None as a value when sequence group size is zero.
-      raise NotImplementedError.new(expr.terms.size) if expr.terms.size == 0
-      
-      # TODO: Push a scope frame?
-      
-      final : LLVM::Value? = nil
-      expr.terms.each { |term| final = gen_expr(ctx, f, term) }
-      final.not_nil!
-      
-      # TODO: Pop the scope frame?
+      case expr.style
+      when "(" then gen_sequence(ctx, f, expr)
+      else raise NotImplementedError.new(expr.inspect)
+      end
     when AST::Choice
-      # TODO: Support more than a simple if/else choice.
-      raise NotImplementedError.new(expr.list.size) if expr.list.size != 2
-      
-      if_clause = expr.list.first
-      else_clause = expr.list.last
-      
-      cond_value = gen_expr(ctx, f, if_clause[0])
-      
-      bb_body1 = gen_block("body1choice")
-      bb_body2 = gen_block("body2choice")
-      bb_post  = gen_block("postchoice")
-      
-      # TODO: Use infer resolution for static True/False finding where possible.
-      @builder.cond(cond_value, bb_body1, bb_body2)
-      
-      @builder.position_at_end(bb_body1)
-      value1 = gen_expr(ctx, f, if_clause[1])
-      @builder.br(bb_post)
-      
-      @builder.position_at_end(bb_body2)
-      value2 = gen_expr(ctx, f, else_clause[1])
-      @builder.br(bb_post)
-      
-      @builder.position_at_end(bb_post)
-      phi_type = @ptr # TODO: the real type
-      @builder.phi(@ptr, [bb_body1, bb_body2], [value1, value2], "phichoice")
+      gen_choice(ctx, f, expr)
     else
       raise NotImplementedError.new(expr.inspect)
     end
@@ -547,6 +515,11 @@ class Mare::Compiler::CodeGen
   
   def gen_bool(bool)
     @i1.const_int(bool ? 1 : 0)
+  end
+  
+  def gen_integer(expr : AST::LiteralInteger)
+    # TODO: Allow for non-I32 integers, based on inference.
+    @i32.const_int(expr.value.to_i32)
   end
   
   def gen_string(expr_or_value)
@@ -568,6 +541,48 @@ class Mare::Compiler::CodeGen
       
       @string_globals[value] = global
     end
+  end
+  
+  def gen_sequence(ctx, f, expr : AST::Group)
+    # TODO: Use None as a value when sequence group size is zero.
+    raise NotImplementedError.new(expr.terms.size) if expr.terms.size == 0
+    
+    # TODO: Push a scope frame?
+    
+    final : LLVM::Value? = nil
+    expr.terms.each { |term| final = gen_expr(ctx, f, term) }
+    final.not_nil!
+    
+    # TODO: Pop the scope frame?
+  end
+  
+  def gen_choice(ctx, f, expr : AST::Choice)
+    # TODO: Support more than a simple if/else choice.
+    raise NotImplementedError.new(expr.list.size) if expr.list.size != 2
+    
+    if_clause = expr.list.first
+    else_clause = expr.list.last
+    
+    cond_value = gen_expr(ctx, f, if_clause[0])
+    
+    bb_body1 = gen_block("body1choice")
+    bb_body2 = gen_block("body2choice")
+    bb_post  = gen_block("postchoice")
+    
+    # TODO: Use infer resolution for static True/False finding where possible.
+    @builder.cond(cond_value, bb_body1, bb_body2)
+    
+    @builder.position_at_end(bb_body1)
+    value1 = gen_expr(ctx, f, if_clause[1])
+    @builder.br(bb_post)
+    
+    @builder.position_at_end(bb_body2)
+    value2 = gen_expr(ctx, f, else_clause[1])
+    @builder.br(bb_post)
+    
+    @builder.position_at_end(bb_post)
+    phi_type = @ptr # TODO: the real type
+    @builder.phi(@ptr, [bb_body1, bb_body2], [value1, value2], "phichoice")
   end
   
   def gen_desc_type(rtype)
