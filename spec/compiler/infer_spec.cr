@@ -129,10 +129,10 @@ describe Mare::Compiler::Infer do
     body = func.body.not_nil!
     assign = body.terms.first.as(Mare::AST::Relate)
     
-    func.infer.types(assign.lhs).map(&.ident).map(&.value).should eq \
+    func.infer.types(assign.lhs).defns.map(&.ident).map(&.value).should eq \
       ["U64", "None"]
     
-    func.infer.types(assign.rhs).map(&.ident).map(&.value).should eq \
+    func.infer.types(assign.rhs).defns.map(&.ident).map(&.value).should eq \
       ["U64"]
   end
   
@@ -153,13 +153,13 @@ describe Mare::Compiler::Infer do
       .as(Mare::AST::Choice).list[0][1]
       .as(Mare::AST::LiteralInteger)
     
-    func.infer.types(assign.lhs).map(&.ident).map(&.value).should eq \
+    func.infer.types(assign.lhs).defns.map(&.ident).map(&.value).should eq \
       ["U64", "CString", "None"]
     
-    func.infer.types(assign.rhs).map(&.ident).map(&.value).should eq \
+    func.infer.types(assign.rhs).defns.map(&.ident).map(&.value).should eq \
       ["U64", "None"]
     
-    func.infer.types(literal).map(&.ident).map(&.value).should eq \
+    func.infer.types(literal).defns.map(&.ident).map(&.value).should eq \
       ["U64"]
   end
   
@@ -209,7 +209,7 @@ describe Mare::Compiler::Infer do
       func = ctx.program.find_func!(t_name, f_name)
       call = func.body.not_nil!.terms.first
       
-      func.infer.types(call).map(&.ident).map(&.value).should eq \
+      func.infer.types(call).defns.map(&.ident).map(&.value).should eq \
         ["I32"]
     end
   end

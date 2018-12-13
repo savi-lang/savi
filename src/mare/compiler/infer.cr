@@ -52,7 +52,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   abstract class Info
     property pos : Source::Pos = Source::Pos.none
     
-    abstract def resolve!(infer : Infer) : Array(Program::Type)
+    abstract def resolve!(infer : Infer) : MetaType
     abstract def within_domain!(infer : Infer, constraint : MetaType)
   end
   
@@ -63,7 +63,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
     
     def resolve!(infer : Infer)
-      @inner.resolve!
+      @inner
     end
     
     def within_domain!(infer : Infer, constraint : MetaType)
@@ -96,7 +96,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         ).join("\n"))
       end
       
-      @domain.resolve!
+      @domain
     end
     
     def within_domain!(infer : Infer, constraint : MetaType)
@@ -202,9 +202,12 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
     
     def resolve!(infer : Infer)
-      clauses.reduce(Set(Program::Type).new) do |total, clause_tid|
-        total | infer[clause_tid].resolve!(infer).to_set
-      end.to_a
+      # TODO: add `|` operator to MetaType and avoid som hassle here
+      domain =
+        clauses.reduce(Set(Program::Type).new) do |total, clause_tid|
+          total | infer[clause_tid].resolve!(infer).defns.to_set
+        end.to_a
+      MetaType.new(pos, domain)
     end
     
     def within_domain!(infer : Infer, constraint : MetaType)
@@ -224,7 +227,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     
     def resolve!(infer : Infer)
       raise "unresolved ret for #{self.inspect}" unless @ret
-      @ret.not_nil!.resolve!
+      @ret.not_nil!
     end
     
     def within_domain!(infer : Infer, constraint : MetaType)
@@ -232,8 +235,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       verify_constraints! if @ret
     end
     
-    def set_return(pos : Source::Pos, domain : Array(Program::Type))
-      @ret = MetaType.new(pos, domain)
+    def set_return(pos : Source::Pos, ret : MetaType)
+      @ret = ret
       verify_constraints!
     end
     
@@ -257,7 +260,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     @local_tids = Hash(Refer::Local, TID).new
     @tids = Hash(TID, Info).new
     @last_tid = 0_u64
-    @types = Hash(TID, Array(Program::Type)).new
+    @types = Hash(TID, MetaType).new
   end
   
   def [](tid : TID)
@@ -270,12 +273,12 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     @tids[node.tid]
   end
   
-  def types(tid : TID) : Array(Program::Type)
+  def types(tid : TID) : MetaType
     raise "tid of zero" if tid == 0
     @types[tid]
   end
   
-  def types(node) : Array(Program::Type)
+  def types(node) : MetaType
     raise "this has a tid of zero: #{node.inspect}" if node.tid == 0
     @types[node.tid]
   end
@@ -351,7 +354,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   def follow_call(call : FromCall)
     # Confirm that by now, there is exactly one type in the domain.
     # TODO: is it possible to proceed without Domain?
-    call_funcs = self[call.lhs].resolve!(self).map do |defn|
+    call_funcs = self[call.lhs].resolve!(self).defns.map do |defn|
       defn.find_func!(call.member)
     end
     

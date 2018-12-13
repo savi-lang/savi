@@ -528,9 +528,9 @@ class Mare::Compiler::CodeGen
   
   def gen_integer(expr : AST::LiteralInteger)
     types = func_frame.types(expr)
-    raise "non-concrete literal type: #{types}" if types.size != 1
+    raise "non-concrete literal type: #{types}" if !types.singular?
     
-    case types.first.ident.value # TODO: deal with namespacing properly
+    case types.defns.first.ident.value # TODO: deal with namespacing properly
     when "U8" then @i8.const_int(expr.value.to_i8)
     when "U32" then @i32.const_int(expr.value.to_i32)
     when "U64" then @i64.const_int(expr.value.to_i64)
@@ -539,7 +539,7 @@ class Mare::Compiler::CodeGen
     when "I64" then @i64.const_int(expr.value.to_i64)
     when "F32" then raise NotImplementedError.new("float literals")
     when "F64" then raise NotImplementedError.new("float literals")
-    else raise "invalid numeric literal type: #{types.first.inspect}"
+    else raise "invalid numeric literal type: #{types.defns.first.inspect}"
     end
   end
   
