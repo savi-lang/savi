@@ -4,14 +4,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   class Error < Exception
   end
   
-  abstract class Info
-    property pos : Source::Pos = Source::Pos.none
-    
-    abstract def resolve!(infer : Infer) : Array(Program::Type)
-    abstract def within_domain!(infer : Infer, constraint : MetaType)
-  end
-  
-  class MetaType < Info
+  class MetaType
     property pos : Source::Pos
     
     def initialize(@pos, @union = Array(Program::Type).new)
@@ -22,7 +15,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       @union
     end
     
-    def resolve!(infer : Infer)
+    def resolve!
       @union
     end
     
@@ -54,13 +47,31 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       end
       unconstrained || extra.empty?
     end
+  end
+  
+  abstract class Info
+    property pos : Source::Pos = Source::Pos.none
+    
+    abstract def resolve!(infer : Infer) : Array(Program::Type)
+    abstract def within_domain!(infer : Infer, constraint : MetaType)
+  end
+  
+  class Fixed < Info
+    property inner : MetaType
+    
+    def initialize(@inner)
+    end
+    
+    def resolve!(infer : Infer)
+      @inner.resolve!
+    end
     
     def within_domain!(infer : Infer, constraint : MetaType)
-      return if within_constraints?([constraint])
+      return if @inner.within_constraints?([constraint])
       
       raise Error.new([
         "This type is outside of a constraint:",
-        pos.show,
+        @inner.pos.show,
         constraint.show,
       ].join("\n"))
     end
@@ -85,7 +96,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         ).join("\n"))
       end
       
-      @domain.resolve!(infer)
+      @domain.resolve!
     end
     
     def within_domain!(infer : Infer, constraint : MetaType)
@@ -137,7 +148,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     
     def assign(infer : Infer, tid : TID)
       if @explicit != 0
-        infer[tid].within_domain!(infer, infer[@explicit].as(MetaType))
+        infer[tid].within_domain!(infer, infer[@explicit].as(Fixed).inner)
       end
       
       raise "already assigned an upstream" if @upstream != 0
@@ -180,7 +191,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       require_explicit
       
       arg = arg_infer[arg_tid]
-      arg.within_domain!(arg_infer, infer[@explicit].as(MetaType))
+      arg.within_domain!(arg_infer, infer[@explicit].as(Fixed).inner)
     end
   end
   
@@ -213,7 +224,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     
     def resolve!(infer : Infer)
       raise "unresolved ret for #{self.inspect}" unless @ret
-      @ret.not_nil!.resolve!(infer)
+      @ret.not_nil!.resolve!
     end
     
     def within_domain!(infer : Infer, constraint : MetaType)
@@ -312,7 +323,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     
     # Take note of the return type constraint if given.
     func.ret.try do |ret_t|
-      new_tid(ret_t, MetaType.new(ret_t.pos, [refer.const(ret_t.value).defn]))
+      meta_type = MetaType.new(ret_t.pos, [refer.const(ret_t.value).defn])
+      new_tid(ret_t, Fixed.new(meta_type))
       self[ret_tid].as(Local).set_explicit(self, ret_t.tid)
     end
     
@@ -406,7 +418,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       # If it's a const, treat it as a type reference.
       # TODO: handle instantiable type references as having a meta-type.
       raise NotImplementedError.new(node.value) if ref.defn.is_instantiable?
-      new_tid(node, MetaType.new(node.pos, [ref.defn]))
+      new_tid(node, Fixed.new(MetaType.new(node.pos, [ref.defn])))
     when Refer::Local
       # If it's a local, track the possibly new tid in our @local_tids map.
       local_tid = @local_tids[ref]?
@@ -480,7 +492,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     when "|"
       ref = refer[node]
       if ref.is_a?(Refer::ConstUnion)
-        new_tid(node, MetaType.new(node.pos, ref.list.map(&.defn)))
+        new_tid(node, Fixed.new(MetaType.new(node.pos, ref.list.map(&.defn))))
       else
         raise NotImplementedError.new(node.to_a)
       end
@@ -537,7 +549,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   
   def finish_param(node : AST::Node, ref : Info)
     case ref
-    when MetaType
+    when Fixed
       param = Param.new(node.pos)
       param.set_explicit(self, node.tid)
       node.tid = 0 # clear to make room for new info
