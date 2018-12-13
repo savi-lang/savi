@@ -10,6 +10,14 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     def initialize(@pos, @union = Array(Program::Type).new)
     end
     
+    def self.new_union(pos, types : Iterable(MetaType))
+      new(pos,
+        types.reduce(Set(Program::Type).new) do |total, other|
+          total | other.defns.to_set
+        end.to_a
+      )
+    end
+    
     # TODO: remove this method:
     def defns
       @union
@@ -202,12 +210,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
     
     def resolve!(infer : Infer)
-      # TODO: add `|` operator to MetaType and avoid som hassle here
-      domain =
-        clauses.reduce(Set(Program::Type).new) do |total, clause_tid|
-          total | infer[clause_tid].resolve!(infer).defns.to_set
-        end.to_a
-      MetaType.new(pos, domain)
+      MetaType.new_union(@pos, clauses.map { |tid| infer[tid].resolve!(infer) })
     end
     
     def within_domain!(infer : Infer, constraint : MetaType)
