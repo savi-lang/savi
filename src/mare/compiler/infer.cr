@@ -8,56 +8,38 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     property pos : Source::Pos = Source::Pos.none
     
     abstract def resolve!(infer : Infer) : Array(Program::Type)
-    abstract def within_domain!(
-      infer : Infer,
-      domain_pos : Source::Pos,
-      list : Array(Program::Type),
-    )
-    
-    def show_domain(d : {Source::Pos, Enumerable(Program::Type)})
-      "- it must be a subtype of #{show_type(d[1])}:\n  #{d[0].show}\n"
-    end
-    
-    def show_type(types : Enumerable(Program::Type))
-      "(#{types.map(&.ident).map(&.value).join(" | ")})"
-    end
+    abstract def within_domain!(infer : Infer, constraint : MetaType)
   end
   
   class Literal < Info
     def initialize(@pos, possible : Array(Program::Type))
-      @domain = Set(Program::Type).new(possible)
-      @domain_constraints = [] of {Source::Pos, Set(Program::Type)}
-      @domain_constraints << {@pos, @domain.dup}
+      @domain = MetaType.new(@pos, possible)
+      @domain_constraints = [MetaType.new(@pos, possible)]
     end
     
     def resolve!(infer : Infer)
-      if @domain.size == 0
-        raise Error.new(@domain_constraints.map { |c| show_domain(c) }.unshift(
+      if @domain.empty?
+        raise Error.new(@domain_constraints.map(&.show).unshift(
           "This value's type is unresolvable due to conflicting constraints:"
         ).join("\n"))
       end
       
-      if @domain.size > 1
-        raise Error.new(@domain_constraints.map { |c| show_domain(c) }.unshift(
+      if !@domain.singular?
+        raise Error.new(@domain_constraints.map(&.show).unshift(
           "This value couldn't be inferred as a single concrete type:"
         ).join("\n"))
       end
       
-      [@domain.first]
+      @domain.resolve!(infer)
     end
     
-    def within_domain!(
-      infer : Infer,
-      domain_pos : Source::Pos,
-      list : Array(Program::Type),
-    )
-      set = list.to_set
-      @domain = @domain & set
-      @domain_constraints << {domain_pos, set}
+    def within_domain!(infer : Infer, constraint : MetaType)
+      @domain = @domain & constraint
+      @domain_constraints << constraint
       
       return unless @domain.empty?
       
-      raise Error.new(@domain_constraints.map { |c| show_domain(c) }.unshift(
+      raise Error.new(@domain_constraints.map(&.show).unshift(
         "This value's type is unresolvable due to conflicting constraints:"
       ).join("\n"))
     end
@@ -90,22 +72,17 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       @explicit = tid
     end
     
-    def within_domain!(
-      infer : Infer,
-      domain_pos : Source::Pos,
-      list : Array(Program::Type),
-    )
+    def within_domain!(infer : Infer, constraint : MetaType)
       if @explicit != 0
-        infer[@explicit].within_domain!(infer, domain_pos, list)
+        infer[@explicit].within_domain!(infer, constraint)
       else
-        infer[@upstream].within_domain!(infer, domain_pos, list)
+        infer[@upstream].within_domain!(infer, constraint)
       end
     end
     
     def assign(infer : Infer, tid : TID)
       if @explicit != 0
-        explicit = infer[@explicit].as(MetaType)
-        infer[tid].within_domain!(infer, explicit.pos, explicit.resolve!(infer))
+        infer[tid].within_domain!(infer, infer[@explicit].as(MetaType))
       end
       
       raise "already assigned an upstream" if @upstream != 0
@@ -139,21 +116,16 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       @explicit = tid
     end
     
-    def within_domain!(
-      infer : Infer,
-      domain_pos : Source::Pos,
-      list : Array(Program::Type),
-    )
+    def within_domain!(infer : Infer, constraint : MetaType)
       require_explicit
-      infer[@explicit].within_domain!(infer, domain_pos, list)
+      infer[@explicit].within_domain!(infer, constraint)
     end
     
     def verify_arg(infer : Infer, arg_infer : Infer, arg_tid : TID)
       require_explicit
       
-      explicit = infer[@explicit].as(MetaType)
       arg = arg_infer[arg_tid]
-      arg.within_domain!(arg_infer, explicit.pos, explicit.resolve!(infer))
+      arg.within_domain!(arg_infer, infer[@explicit].as(MetaType))
     end
   end
   
@@ -161,33 +133,53 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     property pos : Source::Pos
     
     def initialize(@pos, @union = Array(Program::Type).new)
-      raise "empty metatype" if @union.empty?
+    end
+    
+    # TODO: remove this method:
+    def defns
+      @union
     end
     
     def resolve!(infer : Infer)
       @union
     end
     
-    def within_constraints?(list : Iterable(Enumerable(Program::Type)))
+    def empty?
+      @union.empty?
+    end
+    
+    def singular?
+      @union.size == 1
+    end
+    
+    def &(other)
+      MetaType.new(@pos, @union & other.defns)
+    end
+    
+    def show
+      "- it must be a subtype of #{show_type}:\n  #{pos.show}\n"
+    end
+    
+    def show_type
+      "(#{@union.map(&.ident).map(&.value).join(" | ")})"
+    end
+    
+    def within_constraints?(list : Iterable(MetaType))
       unconstrained = true
-      extra = list.reduce @union.to_set do |set, constraints|
+      extra = list.reduce @union.to_set do |set, constraint|
         unconstrained = false
-        set - constraints.to_set
+        set - constraint.defns.to_set
       end
       unconstrained || extra.empty?
     end
     
-    def within_domain!(
-      infer : Infer,
-      domain_pos : Source::Pos,
-      list : Array(Program::Type),
-    )
-      return if within_constraints?([list])
+    def within_domain!(infer : Infer, constraint : MetaType)
+      return if within_constraints?([constraint])
       
       raise Error.new([
         "This type is outside of a constraint:",
         pos.show,
-        show_domain({domain_pos, list}),
+        constraint.show,
       ].join("\n"))
     end
   end
@@ -204,12 +196,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       end.to_a
     end
     
-    def within_domain!(
-      infer : Infer,
-      domain_pos : Source::Pos,
-      list : Array(Program::Type),
-    )
-      clauses.each { |tid| infer[tid].within_domain!(infer, domain_pos, list) }
+    def within_domain!(infer : Infer, constraint : MetaType)
+      clauses.each { |tid| infer[tid].within_domain!(infer, constraint) }
     end
   end
   
@@ -217,43 +205,34 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     getter lhs : TID
     getter member : String
     getter args : Array(TID)
-    @ret : Array(Program::Type)?
+    @ret : MetaType?
     
     def initialize(@pos, @lhs, @member, @args)
-      @domain_constraints = [] of {Source::Pos, Set(Program::Type)}
+      @domain_constraints = [] of MetaType
     end
     
     def resolve!(infer : Infer)
       raise "unresolved ret for #{self.inspect}" unless @ret
-      @ret.not_nil!
+      @ret.not_nil!.resolve!(infer)
     end
     
-    def within_domain!(
-      infer : Infer,
-      domain_pos : Source::Pos,
-      list : Array(Program::Type),
-    )
-      @domain_constraints << {domain_pos, list.to_set}
+    def within_domain!(infer : Infer, constraint : MetaType)
+      @domain_constraints << constraint
       verify_constraints! if @ret
     end
     
-    def set_return(domain : Array(Program::Type))
-      @ret = domain.dup
-      
+    def set_return(pos : Source::Pos, domain : Array(Program::Type))
+      @ret = MetaType.new(pos, domain)
       verify_constraints!
     end
     
     private def verify_constraints!
-      domain = @ret.not_nil!.to_set
-      extra = @domain_constraints.reduce domain do |domain, (_, list)|
-        domain - list
-      end
-      return if extra.empty? || @domain_constraints.empty?
+      return if @ret.not_nil!.within_constraints?(@domain_constraints)
       
-      raise Error.new(@domain_constraints.map { |c| show_domain(c) }.unshift(
+      raise Error.new(@domain_constraints.map(&.show).unshift(
         "This return value is outside of its constraints:\n#{pos.show}",
       ).push(
-        "- but it had a return type of #{show_type(domain)}\n"
+        "- but it had a return type of #{@ret.not_nil!.show_type}\n"
       ).join("\n"))
     end
   end
@@ -374,7 +353,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     infer = call_func.infer? || self.class.new.tap(&.run(call_func))
     
     # Apply constraints to the return type.
-    call.set_return(infer[infer.ret_tid].resolve!(infer))
+    ret = infer[infer.ret_tid]
+    call.set_return(ret.pos, ret.resolve!(infer))
     
     # Apply constraints to each of the argument types.
     # TODO: handle case where number of args differs from number of params.
@@ -539,9 +519,9 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     body_tids = [] of TID
     node.list.each do |cond, body|
       # Each condition in a choice must evaluate to a type of (True | False).
-      self[cond].within_domain!(self, node.pos, [
+      self[cond].within_domain!(self, MetaType.new(node.pos, [
         refer.const("True").defn, refer.const("False").defn,
-      ])
+      ]))
       
       # Hold on to the body type for later in this function.
       body_tids << body.tid
