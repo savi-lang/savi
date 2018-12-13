@@ -104,14 +104,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     
     def assign(infer : Infer, tid : TID)
       if @explicit != 0
-        explicit = infer[@explicit]
-        case explicit
-        when Const
-          infer[tid].within_domain!(infer, explicit.pos, [explicit.defn])
-        when ConstUnion
-          infer[tid].within_domain!(infer, explicit.pos, explicit.defns)
-        else raise NotImplementedError.new(explicit)
-        end
+        explicit = infer[@explicit].as(MetaType)
+        infer[tid].within_domain!(infer, explicit.pos, explicit.resolve!(infer))
       end
       
       raise "already assigned an upstream" if @upstream != 0
@@ -157,27 +151,30 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     def verify_arg(infer : Infer, arg_infer : Infer, arg_tid : TID)
       require_explicit
       
-      explicit = infer[@explicit]
-      case explicit
-      when Const
-        arg = arg_infer[arg_tid]
-        arg.within_domain!(arg_infer, explicit.pos, [explicit.defn])
-      when ConstUnion
-        arg = arg_infer[arg_tid]
-        arg.within_domain!(arg_infer, explicit.pos, explicit.defns)
-      else raise NotImplementedError.new(explicit)
+      explicit = infer[@explicit].as(MetaType)
+      arg = arg_infer[arg_tid]
+      arg.within_domain!(arg_infer, explicit.pos, explicit.resolve!(infer))
+    end
+  end
+  
+  class MetaType < Info
+    property pos : Source::Pos
+    
+    def initialize(@pos, @union = Array(Program::Type).new)
+      raise "empty metatype" if @union.empty?
+    end
+    
+    def resolve!(infer : Infer)
+      @union
+    end
+    
+    def within_constraints?(list : Iterable(Enumerable(Program::Type)))
+      unconstrained = true
+      extra = list.reduce @union.to_set do |set, constraints|
+        unconstrained = false
+        set - constraints.to_set
       end
-    end
-  end
-  
-  class Const < Info
-    getter defn : Program::Type
-    
-    def initialize(@pos, @defn)
-    end
-    
-    def resolve!(infer : Infer)
-      [@defn]
+      unconstrained || extra.empty?
     end
     
     def within_domain!(
@@ -185,36 +182,10 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       domain_pos : Source::Pos,
       list : Array(Program::Type),
     )
-      return if list.includes?(defn)
+      return if within_constraints?([list])
       
       raise Error.new([
-        "This type declaration conflicts with another constraint:",
-        pos.show,
-        show_domain({domain_pos, list}),
-      ].join("\n"))
-    end
-  end
-  
-  class ConstUnion < Info
-    getter defns : Array(Program::Type)
-    
-    def initialize(@pos, @defns)
-    end
-    
-    def resolve!(infer : Infer)
-      @defns
-    end
-    
-    def within_domain!(
-      infer : Infer,
-      domain_pos : Source::Pos,
-      list : Array(Program::Type),
-    )
-      extra = defns.to_set - list.to_set
-      return if extra.empty?
-      
-      raise Error.new([
-        "This type union has elements outside of a constraint:",
+        "This type is outside of a constraint:",
         pos.show,
         show_domain({domain_pos, list}),
       ].join("\n"))
@@ -362,7 +333,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     
     # Take note of the return type constraint if given.
     func.ret.try do |ret_t|
-      new_tid(ret_t, Const.new(ret_t.pos, refer.const(ret_t.value).defn))
+      new_tid(ret_t, MetaType.new(ret_t.pos, [refer.const(ret_t.value).defn]))
       self[ret_tid].as(Local).set_explicit(self, ret_t.tid)
     end
     
@@ -455,7 +426,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       # If it's a const, treat it as a type reference.
       # TODO: handle instantiable type references as having a meta-type.
       raise NotImplementedError.new(node.value) if ref.defn.is_instantiable?
-      new_tid(node, Const.new(node.pos, ref.defn))
+      new_tid(node, MetaType.new(node.pos, [ref.defn]))
     when Refer::Local
       # If it's a local, track the possibly new tid in our @local_tids map.
       local_tid = @local_tids[ref]?
@@ -529,7 +500,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     when "|"
       ref = refer[node]
       if ref.is_a?(Refer::ConstUnion)
-        new_tid(node, ConstUnion.new(node.pos, ref.list.map(&.defn)))
+        new_tid(node, MetaType.new(node.pos, ref.list.map(&.defn)))
       else
         raise NotImplementedError.new(node.to_a)
       end
@@ -586,12 +557,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   
   def finish_param(node : AST::Node, ref : Info)
     case ref
-    when Const
-      param = Param.new(node.pos)
-      param.set_explicit(self, node.tid)
-      node.tid = 0 # clear to make room for new info
-      new_tid(node, param)
-    when ConstUnion
+    when MetaType
       param = Param.new(node.pos)
       param.set_explicit(self, node.tid)
       node.tid = 0 # clear to make room for new info

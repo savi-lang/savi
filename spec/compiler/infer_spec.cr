@@ -249,7 +249,7 @@ describe Mare::Compiler::Infer do
     SOURCE
     
     expected = <<-MSG
-    This type declaration conflicts with another constraint:
+    This type is outside of a constraint:
     from (example):3:
         x False = True
                   ^~~~
