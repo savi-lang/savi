@@ -11,6 +11,61 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     abstract def within_domain!(infer : Infer, constraint : MetaType)
   end
   
+  class MetaType < Info
+    property pos : Source::Pos
+    
+    def initialize(@pos, @union = Array(Program::Type).new)
+    end
+    
+    # TODO: remove this method:
+    def defns
+      @union
+    end
+    
+    def resolve!(infer : Infer)
+      @union
+    end
+    
+    def empty?
+      @union.empty?
+    end
+    
+    def singular?
+      @union.size == 1
+    end
+    
+    def &(other)
+      MetaType.new(@pos, @union & other.defns)
+    end
+    
+    def show
+      "- it must be a subtype of #{show_type}:\n  #{pos.show}\n"
+    end
+    
+    def show_type
+      "(#{@union.map(&.ident).map(&.value).join(" | ")})"
+    end
+    
+    def within_constraints?(list : Iterable(MetaType))
+      unconstrained = true
+      extra = list.reduce @union.to_set do |set, constraint|
+        unconstrained = false
+        set - constraint.defns.to_set
+      end
+      unconstrained || extra.empty?
+    end
+    
+    def within_domain!(infer : Infer, constraint : MetaType)
+      return if within_constraints?([constraint])
+      
+      raise Error.new([
+        "This type is outside of a constraint:",
+        pos.show,
+        constraint.show,
+      ].join("\n"))
+    end
+  end
+  
   class Literal < Info
     def initialize(@pos, possible : Array(Program::Type))
       @domain = MetaType.new(@pos, possible)
@@ -126,61 +181,6 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       
       arg = arg_infer[arg_tid]
       arg.within_domain!(arg_infer, infer[@explicit].as(MetaType))
-    end
-  end
-  
-  class MetaType < Info
-    property pos : Source::Pos
-    
-    def initialize(@pos, @union = Array(Program::Type).new)
-    end
-    
-    # TODO: remove this method:
-    def defns
-      @union
-    end
-    
-    def resolve!(infer : Infer)
-      @union
-    end
-    
-    def empty?
-      @union.empty?
-    end
-    
-    def singular?
-      @union.size == 1
-    end
-    
-    def &(other)
-      MetaType.new(@pos, @union & other.defns)
-    end
-    
-    def show
-      "- it must be a subtype of #{show_type}:\n  #{pos.show}\n"
-    end
-    
-    def show_type
-      "(#{@union.map(&.ident).map(&.value).join(" | ")})"
-    end
-    
-    def within_constraints?(list : Iterable(MetaType))
-      unconstrained = true
-      extra = list.reduce @union.to_set do |set, constraint|
-        unconstrained = false
-        set - constraint.defns.to_set
-      end
-      unconstrained || extra.empty?
-    end
-    
-    def within_domain!(infer : Infer, constraint : MetaType)
-      return if within_constraints?([constraint])
-      
-      raise Error.new([
-        "This type is outside of a constraint:",
-        pos.show,
-        constraint.show,
-      ].join("\n"))
     end
   end
   
