@@ -263,7 +263,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     @local_tids = Hash(Refer::Local, TID).new
     @tids = Hash(TID, Info).new
     @last_tid = 0_u64
-    @types = Hash(TID, MetaType).new
+    @resolved = Hash(TID, MetaType).new
   end
   
   def [](tid : TID)
@@ -276,14 +276,14 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     @tids[node.tid]
   end
   
-  def types(tid : TID) : MetaType
+  def resolve(tid : TID) : MetaType
     raise "tid of zero" if tid == 0
-    @types[tid]
+    @resolved[tid] ||= @tids[tid].resolve!(self)
   end
   
-  def types(node) : MetaType
+  def resolve(node) : MetaType
     raise "this has a tid of zero: #{node.inspect}" if node.tid == 0
-    @types[node.tid]
+    @resolved[node.tid] ||= @tids[node.tid].resolve!(self)
   end
   
   def self.run(ctx)
@@ -350,7 +350,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     # Assign the resolved types to a map for safekeeping.
     # This also has the effect of running some final checks on everything.
     @tids.each do |tid, info|
-      @types[tid] = info.resolve!(self)
+      @resolved[tid] ||= info.resolve!(self)
     end
   end
   

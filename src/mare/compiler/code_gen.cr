@@ -45,7 +45,7 @@ class Mare::Compiler::CodeGen
     end
     
     def types(node)
-      @program_func.as(Program::Function).infer.types(node)
+      @program_func.as(Program::Function).infer.resolve(node)
     end
   end
   
