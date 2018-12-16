@@ -55,6 +55,15 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       end
       unconstrained || extra.empty?
     end
+    
+    def within_constraints!(constraints : Iterable(MetaType))
+      return if within_constraints?(constraints)
+      
+      raise Error.new([
+        "This type is outside of a constraint:",
+        pos.show,
+      ].concat(constraints.map(&.show)).join("\n"))
+    end
   end
   
   abstract class Info
@@ -75,13 +84,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
     
     def within_domain!(infer : Infer, constraint : MetaType)
-      return if @inner.within_constraints?([constraint])
-      
-      raise Error.new([
-        "This type is outside of a constraint:",
-        @inner.pos.show,
-        constraint.show,
-      ].join("\n"))
+      @inner.within_constraints!([constraint])
     end
   end
   
