@@ -123,16 +123,16 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   end
   
   class Local < Info
-    @explicit : TID = 0
+    @explicit : MetaType?
     @upstream : TID = 0
     
     def initialize(@pos)
     end
     
     def resolve!(infer : Infer)
-      if @explicit != 0
-        infer[@explicit].resolve!(infer)
-      elsif @upstream != 0
+      return @explicit.not_nil! if @explicit
+      
+      if @upstream != 0
         infer[@upstream].resolve!(infer)
       else
         raise Error.new([
@@ -142,25 +142,21 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       end
     end
     
-    def set_explicit(infer : Infer, tid : TID)
-      raise "already set_explicit" if @explicit != 0
+    def set_explicit(explicit : MetaType)
+      raise "already set_explicit" if @explicit
       raise "shouldn't have an upstream yet" if @upstream != 0
       
-      @explicit = tid
+      @explicit = explicit
     end
     
     def within_domain!(infer : Infer, constraint : MetaType)
-      if @explicit != 0
-        infer[@explicit].within_domain!(infer, constraint)
-      else
-        infer[@upstream].within_domain!(infer, constraint)
-      end
+      return @explicit.not_nil!.within_constraints!([constraint]) if @explicit
+      
+      infer[@upstream].within_domain!(infer, constraint)
     end
     
     def assign(infer : Infer, tid : TID)
-      if @explicit != 0
-        infer[tid].within_domain!(infer, infer[@explicit].as(Fixed).inner)
-      end
+      infer[tid].within_domain!(infer, @explicit.not_nil!) if @explicit
       
       raise "already assigned an upstream" if @upstream != 0
       @upstream = tid
@@ -168,13 +164,13 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   end
   
   class Param < Info
-    @explicit : TID = 0
+    @explicit : MetaType?
     
     def initialize(@pos)
     end
     
     private def require_explicit
-      if @explicit == 0
+      unless @explicit
         raise Error.new([
           "This parameter's type was not specified:",
           pos.show,
@@ -184,25 +180,25 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     
     def resolve!(infer : Infer)
       require_explicit
-      infer[@explicit].resolve!(infer)
+      @explicit.not_nil!
     end
     
-    def set_explicit(infer : Infer, tid : TID)
-      raise "already set_explicit" if @explicit != 0
+    def set_explicit(explicit : MetaType)
+      raise "already set_explicit" if @explicit
       
-      @explicit = tid
+      @explicit = explicit
     end
     
     def within_domain!(infer : Infer, constraint : MetaType)
       require_explicit
-      infer[@explicit].within_domain!(infer, constraint)
+      @explicit.not_nil!.within_constraints!([constraint]) if @explicit
     end
     
-    def verify_arg(infer : Infer, arg_infer : Infer, arg_tid : TID)
+    def verify_arg(arg_infer : Infer, arg_tid : TID)
       require_explicit
       
       arg = arg_infer[arg_tid]
-      arg.within_domain!(arg_infer, infer[@explicit].as(Fixed).inner)
+      arg.within_domain!(arg_infer, @explicit.not_nil!)
     end
   end
   
@@ -334,7 +330,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     func.ret.try do |ret_t|
       meta_type = MetaType.new(ret_t.pos, [refer.const(ret_t.value).defn])
       new_tid(ret_t, Fixed.new(meta_type))
-      self[ret_tid].as(Local).set_explicit(self, ret_t.tid)
+      self[ret_tid].as(Local).set_explicit(meta_type)
     end
     
     # Don't bother further typechecking functions that have no body
@@ -381,7 +377,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     # TODO: handle case where number of args differs from number of params.
     unless call.args.empty?
       call.args.zip(infer.param_tids).each do |arg_tid, param_tid|
-        infer[param_tid].as(Param).verify_arg(infer, self, arg_tid)
+        infer[param_tid].as(Param).verify_arg(self, arg_tid)
       end
     end
   end
@@ -488,9 +484,9 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         local = self[local_tid]
         case local
         when Local
-          local.set_explicit(self, node.terms[1].tid)
+          local.set_explicit(self[node.terms[1]].as(Fixed).inner)
         when Param
-          local.set_explicit(self, node.terms[1].tid)
+          local.set_explicit(self[node.terms[1]].as(Fixed).inner)
         else raise NotImplementedError.new(local)
         end
         
@@ -560,7 +556,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     case ref
     when Fixed
       param = Param.new(node.pos)
-      param.set_explicit(self, node.tid)
+      param.set_explicit(ref.inner)
       node.tid = 0 # clear to make room for new info
       new_tid(node, param)
     else
