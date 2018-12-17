@@ -23,10 +23,6 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       @union
     end
     
-    def resolve!
-      @union
-    end
-    
     def empty?
       @union.empty?
     end
