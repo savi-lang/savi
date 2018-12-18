@@ -6,16 +6,17 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   
   class MetaType
     property pos : Source::Pos
+    @union : Set(Program::Type)
     
-    def initialize(@pos, @union = Array(Program::Type).new)
+    def initialize(@pos, union : Enumerable(Program::Type))
+      case union
+      when Set(Program::Type) then @union = union
+      else @union = union.to_set
+      end
     end
     
     def self.new_union(pos, types : Iterable(MetaType))
-      new(pos,
-        types.reduce(Set(Program::Type).new) do |total, other|
-          total | other.defns.to_set
-        end.to_a
-      )
+      new(pos, types.reduce(Set(Program::Type).new) { |all, o| all | o.defns })
     end
     
     # TODO: remove this method:
@@ -45,9 +46,9 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     
     def within_constraints?(list : Iterable(MetaType))
       unconstrained = true
-      extra = list.reduce @union.to_set do |set, constraint|
+      extra = list.reduce @union do |set, constraint|
         unconstrained = false
-        set - constraint.defns.to_set
+        set - constraint.defns
       end
       unconstrained || extra.empty?
     end
@@ -85,7 +86,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   end
   
   class Literal < Info
-    def initialize(@pos, possible : Array(Program::Type))
+    def initialize(@pos, possible : Enumerable(Program::Type))
       @domain = MetaType.new(@pos, possible)
       @domain_constraints = [MetaType.new(@pos, possible)]
     end
@@ -493,7 +494,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     when "|"
       ref = refer[node]
       if ref.is_a?(Refer::ConstUnion)
-        new_tid(node, Fixed.new(MetaType.new(node.pos, ref.list.map(&.defn))))
+        meta_type = MetaType.new(node.pos, ref.list.map(&.defn).to_set)
+        new_tid(node, Fixed.new(meta_type))
       else
         raise NotImplementedError.new(node.to_a)
       end
