@@ -6,7 +6,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
     context.fulfill ["doc"], @program
   end
   
-  def keywords; ["actor", "class", "primitive", "ffi"] end
+  def keywords; ["actor", "class", "primitive", "numeric", "ffi"] end
   
   def compile(context, decl)
     case decl.keyword
@@ -16,6 +16,10 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
       context.push t
     when "class"
       t = Type.new(Program::Type.new(Program::Type::Kind::Class, decl.head.last.as(AST::Identifier)))
+      @program.types << t.type
+      context.push t
+    when "numeric"
+      t = Type.new(Program::Type.new(Program::Type::Kind::Numeric, decl.head.last.as(AST::Identifier)))
       @program.types << t.type
       context.push t
     when "primitive"

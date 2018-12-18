@@ -20,6 +20,7 @@ class Mare::Program
       Actor
       Class
       Primitive
+      Numeric
       FFI
     end
     
@@ -39,7 +40,7 @@ class Mare::Program
     
     def is_terminal?
       case kind
-      when Kind::Actor, Kind::Class, Kind::Primitive, Kind::FFI
+      when Kind::Actor, Kind::Class, Kind::Primitive, Kind::Numeric, Kind::FFI
         true
       else false
       end

@@ -6,16 +6,16 @@ primitive True:
 primitive False:
 
 // Integers
-primitive U8:
-primitive U32:
-primitive U64:
-primitive I8:
-primitive I32:
-primitive I64:
+numeric U8:
+numeric U32:
+numeric U64:
+numeric I8:
+numeric I32:
+numeric I64:
 
 // Floats
-primitive F32:
-primitive F64:
+numeric F32:
+numeric F64:
 
 // ...
 

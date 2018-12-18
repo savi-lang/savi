@@ -187,7 +187,8 @@ class Mare::Compiler::CodeGen
       case t.kind
       when Program::Type::Kind::Actor,
            Program::Type::Kind::Class,
-           Program::Type::Kind::Primitive
+           Program::Type::Kind::Primitive,
+           Program::Type::Kind::Numeric
         t.functions.each { |f| gen_fun_decl(t, f) }
       when Program::Type::Kind::FFI
         t.functions.each { |f| gen_ffi_decl(f) }
@@ -457,7 +458,7 @@ class Mare::Compiler::CodeGen
       value = @builder.call(ffi, args)
       value = gen_none if ffi.return_type == @void
       value
-    when Program::Type::Kind::Primitive
+    when Program::Type::Kind::Primitive, Program::Type::Kind::Numeric
       @builder.call(@mod.functions["#{receiver}.#{member}"], args)
     else raise NotImplementedError.new(receiver_type)
     end
