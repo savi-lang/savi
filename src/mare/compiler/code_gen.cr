@@ -137,8 +137,8 @@ class Mare::Compiler::CodeGen
     @string_globals = {} of String => LLVM::Value
     @gtypes = {} of String => GenType
     
-    ponyrt_bc = LLVM::MemoryBuffer.from_file(PONYRT_BC_PATH)
-    @ponyrt = @llvm.parse_bitcode(ponyrt_bc).as(LLVM::Module)
+    # ponyrt_bc = LLVM::MemoryBuffer.from_file(PONYRT_BC_PATH)
+    # @ponyrt = @llvm.parse_bitcode(ponyrt_bc).as(LLVM::Module)
     
     # Pony runtime types.
     @desc = @llvm.opaque_struct("__Desc").as(LLVM::Type)
