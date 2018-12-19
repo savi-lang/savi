@@ -32,8 +32,25 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       @union.size == 1
     end
     
+    def single!
+      raise "not singular: #{show_type}" unless singular?
+      @union.first
+    end
+    
     def &(other)
       MetaType.new(@pos, @union & other.defns)
+    end
+    
+    def each_type_def : Iterator(Program::Type)
+      @union.each
+    end
+    
+    def ==(other)
+      @union == other.defns
+    end
+    
+    def hash
+      @union.hash
     end
     
     def show
@@ -260,6 +277,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     @tids = Hash(TID, Info).new
     @last_tid = 0_u64
     @resolved = Hash(TID, MetaType).new
+    @called_funcs = Set(Program::Function).new
   end
   
   def [](tid : TID)
@@ -280,6 +298,14 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   def resolve(node) : MetaType
     raise "this has a tid of zero: #{node.inspect}" if node.tid == 0
     @resolved[node.tid] ||= @tids[node.tid].resolve!(self)
+  end
+  
+  def each_meta_type
+    @resolved.each_value
+  end
+  
+  def each_called_func
+    @called_funcs.each
   end
   
   def self.run(ctx)
@@ -360,6 +386,9 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     # TODO: handle multiple call funcs by branching.
     raise NotImplementedError.new(call_funcs.inspect) if call_funcs.size > 1
     call_func = call_funcs.first
+    
+    # Keep track that we called this function.
+    @called_funcs.add(call_func)
     
     # TODO: copying to diverging specializations of the function
     # TODO: apply argument constraints to the parameters

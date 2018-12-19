@@ -15,12 +15,13 @@ class Mare::Compiler::CodeGen
   @builder : LLVM::Builder
   
   class Frame
+    getter program : Program
     getter func : LLVM::Function?
     getter program_func : Program::Function?
     setter pony_ctx : LLVM::Value?
     getter current_locals
     
-    def initialize(@func = nil, @program_func = nil)
+    def initialize(@program : Program, @func = nil, @program_func = nil)
       @current_locals = {} of Refer::Local => LLVM::Value
     end
     
@@ -44,36 +45,24 @@ class Mare::Compiler::CodeGen
       @program_func.as(Program::Function).refer
     end
     
-    def types(node)
-      @program_func.as(Program::Function).infer.resolve(node)
-    end
-  end
-  
-  class ReachType
-    getter name : String
-    getter kind : String
-    getter id : Int32
-    getter abi_size : Int32
-    getter field_offset : Int32
-    getter fields : Array(ReachType)
-    getter methods : Array(Nil) # TODO
-    
-    def initialize(@name, @kind, @id, @abi_size, @field_offset)
-      @fields = [] of ReachType # TODO
-      @methods = [] of Nil # TODO
+    def type_of(expr)
+      inferred = @program_func.as(Program::Function).infer.resolve(expr)
+      @program.layout[inferred]
     end
   end
   
   class GenType
-    getter rtype : ReachType
+    getter type_def : Layout::Def
     getter desc_type : LLVM::Type
     getter desc : LLVM::Value
     getter structure : LLVM::Type
     
-    def initialize(g : CodeGen, @rtype)
-      @desc_type = g.gen_desc_type(@rtype)
-      @desc = g.gen_desc(@rtype, @desc_type)
-      @structure = g.gen_structure(@rtype, @desc_type)
+    def initialize(ctx : Context, g : CodeGen, program_type)
+      @type_def = ctx.program.layout[program_type]
+      
+      @desc_type = g.gen_desc_type(@type_def)
+      @desc = g.gen_desc(ctx, @type_def, @desc_type)
+      @structure = g.gen_structure(@type_def, @desc_type)
     end
   end
   
@@ -175,6 +164,10 @@ class Mare::Compiler::CodeGen
     @frames.reverse_each.find { |f| f.func? }.not_nil!
   end
   
+  def type_of(expr)
+    func_frame.type_of(expr)
+  end
+  
   def self.run(ctx)
     new.run(ctx)
   end
@@ -198,12 +191,12 @@ class Mare::Compiler::CodeGen
     
     # CodeGen for all types.
     # TODO: dynamically gather these from ctx.program.
-    rtypes = {
-      "Main" => ReachType.new("Main", "actor", 1, 256, 0),
-      "Env" => ReachType.new("Env", "class", 11, 64, 8),
+    type_defs = {
+      "Main" => ctx.program.find_type!("Main"),
+      "Env" => ctx.program.find_type!("Env"),
     }
-    rtypes.each do |name, rtype|
-      @gtypes[name] = GenType.new(self, rtype)
+    type_defs.each do |name, type_def|
+      @gtypes[name] = GenType.new(ctx, self, type_def)
     end
     
     # CodeGen for all function bodies.
@@ -262,7 +255,7 @@ class Mare::Compiler::CodeGen
     main = @mod.functions.add("main", [@i32, @pptr, @pptr], @i32)
     main.linkage = LLVM::Linkage::External
     
-    gen_func_start(main)
+    gen_func_start(ctx, main)
     
     argc = main.params[0].tap &.name=("argc")
     argv = main.params[1].tap &.name=("argv")
@@ -361,8 +354,8 @@ class Mare::Compiler::CodeGen
     main
   end
   
-  def gen_func_start(func, program_func : Program::Function? = nil)
-    @frames << Frame.new(func, program_func)
+  def gen_func_start(ctx, func, program_func : Program::Function? = nil)
+    @frames << Frame.new(ctx.program, func, program_func)
     
     # Create an entry block and start building from there.
     @builder.position_at_end(gen_block("entry"))
@@ -422,7 +415,7 @@ class Mare::Compiler::CodeGen
   def gen_fun_body(ctx, t, f)
     func = @mod.functions["#{t.ident.value}.#{f.ident.value}"]
     
-    gen_func_start(func, f)
+    gen_func_start(ctx, func, f)
     
     last_value = nil
     f.body.not_nil!.terms.each { |expr| last_value = gen_expr(ctx, expr) }
@@ -528,19 +521,17 @@ class Mare::Compiler::CodeGen
   end
   
   def gen_integer(expr : AST::LiteralInteger)
-    types = func_frame.types(expr)
-    raise "non-concrete literal type: #{types}" if !types.singular?
-    
-    case types.defns.first.ident.value # TODO: deal with namespacing properly
-    when "U8" then @i8.const_int(expr.value.to_i8)
-    when "U32" then @i32.const_int(expr.value.to_i32)
-    when "U64" then @i64.const_int(expr.value.to_i64)
-    when "I8" then @i8.const_int(expr.value.to_i8)
-    when "I32" then @i32.const_int(expr.value.to_i32)
-    when "I64" then @i64.const_int(expr.value.to_i64)
-    when "F32" then raise NotImplementedError.new("float literals")
-    when "F64" then raise NotImplementedError.new("float literals")
-    else raise "invalid numeric literal type: #{types.defns.first.inspect}"
+    type_ref = func_frame.type_of(expr)
+    case type_ref.llvm_use_type
+    when :i8 then @i8.const_int(expr.value.to_i8)
+    when :u8 then @i8.const_int(expr.value.to_u8)
+    when :u32 then @i32.const_int(expr.value.to_u32)
+    when :i32 then @i32.const_int(expr.value.to_i32)
+    when :u64 then @i64.const_int(expr.value.to_u64)
+    when :i64 then @i64.const_int(expr.value.to_i64)
+    when :f32 then raise NotImplementedError.new("float literals")
+    when :f64 then raise NotImplementedError.new("float literals")
+    else raise "invalid numeric literal type: #{type_ref}"
     end
   end
   
@@ -607,10 +598,8 @@ class Mare::Compiler::CodeGen
     @builder.phi(@ptr, [bb_body1, bb_body2], [value1, value2], "phichoice")
   end
   
-  def gen_desc_type(rtype)
-    name = rtype.name
-    
-    desc_type = @llvm.struct [
+  def gen_desc_type(type_def : Layout::Def) : LLVM::Type
+    @llvm.struct [
       @i32,                           # 0: id
       @i32,                           # 1: size
       @i32,                           # 2: field_count
@@ -628,24 +617,23 @@ class Mare::Compiler::CodeGen
       @pptr,                          # 14: TODO: traits
       @pptr,                          # 15: TODO: fields
       @pptr,                          # 16: TODO: vtable
-    ], "#{name}_Desc"
+    ], type_def.llvm_desc_name
   end
   
-  def gen_desc(rtype, desc_type)
-    name = rtype.name
-    
-    global = @mod.globals.add(desc_type, "#{name}_Desc")
+  def gen_desc(ctx, type_def, desc_type)
+    global = @mod.globals.add(desc_type, type_def.llvm_desc_name)
     global.linkage = LLVM::Linkage::LinkerPrivate
     global.global_constant = true
     global
     
-    if name == "Main"
-      dispatch_fn = @mod.functions.add("#{name}_Dispatch", @dispatch_fn) do |fn|
+    case type_def.llvm_name
+    when "Main"
+      dispatch_fn = @mod.functions.add("#{type_def.llvm_name}_Dispatch", @dispatch_fn) do |fn|
         fn.unnamed_addr = true
         fn.call_convention = LLVM::CallConvention::C
         fn.linkage = LLVM::Linkage::External
         
-        gen_func_start(fn)
+        gen_func_start(ctx, fn)
         
         @builder.call(@mod.functions["Main.new"])
         
@@ -657,7 +645,7 @@ class Mare::Compiler::CodeGen
       traits = @pptr.null # TODO
       fields = @pptr.null # TODO
       vtable = @pptr.null # TODO
-    elsif name == "Env"
+    when "Env"
       dispatch_fn = @dispatch_fn_ptr.null
       traits = @pptr.null # [1 x i64]* @Env_Traits
       fields = @pptr.null # [0 x { i32, %__Desc* }]* null
@@ -674,84 +662,69 @@ class Mare::Compiler::CodeGen
       #   i8* bitcast (%Array_String_val* (%Env*, i8*, i64)* @Env_tag__strings_from_pointers_oZo to i8*)
       # ] }
     else
-      raise NotImplementedError.new(rtype)
+      raise NotImplementedError.new(type_def.llvm_name)
     end
     
     global.initializer = desc_type.const_struct [
-      @i32.const_int(rtype.id),            # 0: id
-      @i32.const_int(rtype.abi_size),      # 1: size
-      @i32_0,                              # 2: TODO: field_count (tuples only)
-      @i32.const_int(rtype.field_offset),  # 3: field_offset
-      @obj_ptr.null,                       # 4: instance
-      @trace_fn_ptr.null,                  # 5: trace fn TODO: @#{name}_Trace
-      @trace_fn_ptr.null,                  # 6: serialise trace fn TODO: @#{name}_Trace
-      @serialise_fn_ptr.null,              # 7: serialise fn TODO: @#{name}_Serialise
-      @deserialise_fn_ptr.null,            # 8: deserialise fn TODO: @#{name}_Deserialise
-      @custom_serialise_space_fn_ptr.null, # 9: custom serialise space fn
-      @custom_deserialise_fn_ptr.null,     # 10: custom deserialise fn
-      dispatch_fn.to_value,                # 11: dispatch fn
-      @final_fn_ptr.null,                  # 12: final fn
-      @i32.const_int(-1),                  # 13: event notify TODO
-      traits,                              # 14: TODO: traits
-      fields,                              # 15: TODO: fields
-      vtable,                              # 16: TODO: vtable
+      @i32.const_int(type_def.desc_id),      # 0: id
+      @i32.const_int(type_def.abi_size),     # 1: size
+      @i32_0,                                # 2: TODO: field_count (tuples only)
+      @i32.const_int(type_def.field_offset), # 3: field_offset
+      @obj_ptr.null,                         # 4: instance
+      @trace_fn_ptr.null,                    # 5: trace fn TODO: @#{llvm_name}_Trace
+      @trace_fn_ptr.null,                    # 6: serialise trace fn TODO: @#{llvm_name}_Trace
+      @serialise_fn_ptr.null,                # 7: serialise fn TODO: @#{llvm_name}_Serialise
+      @deserialise_fn_ptr.null,              # 8: deserialise fn TODO: @#{llvm_name}_Deserialise
+      @custom_serialise_space_fn_ptr.null,   # 9: custom serialise space fn
+      @custom_deserialise_fn_ptr.null,       # 10: custom deserialise fn
+      dispatch_fn.to_value,                  # 11: dispatch fn
+      @final_fn_ptr.null,                    # 12: final fn
+      @i32.const_int(-1),                    # 13: event notify TODO
+      traits,                                # 14: TODO: traits
+      fields,                                # 15: TODO: fields
+      vtable,                                # 16: TODO: vtable
     ]
     
     global
   end
   
-  def gen_structure(rtype, desc_type)
-    has_desc = false
-    has_actor_pad = false
-    case rtype.kind
-    when "class" then has_desc = true
-    when "actor" then has_desc = has_actor_pad = true
-    else raise NotImplementedError.new(rtype)
-    end
-    
+  def gen_structure(type_def, desc_type)
     elements = [] of LLVM::Type
-    elements << desc_type.pointer if has_desc
-    elements << @actor_pad if has_actor_pad
-    rtype.fields.each do |field|
-      # TODO
-    end
+    elements << desc_type.pointer if type_def.has_desc?
+    elements << @actor_pad if type_def.has_actor_pad?
+    # TODO: fields
     
-    @llvm.struct(elements, rtype.name)
+    @llvm.struct(elements, type_def.llvm_name)
   end
   
   def gen_alloc(gtype, name = "")
-    case gtype.rtype.kind
-    when "class"
-      size = gtype.rtype.abi_size
-      size = 1 if size == 0
-      args = [func_frame.pony_ctx]
-      
-      value =
-        if size <= PONYRT_HEAP_MAX
-          index = LibPonyRT.int_heap_index(size).to_i32
-          args << @i32.const_int(index)
-          # TODO: handle case where final_fn is present (pony_alloc_small_final)
-          @builder.call(@mod.functions["pony_alloc_small"], args, "#{name}_buf")
-        else
-          args << @intptr.const_int(size)
-          # TODO: handle case where final_fn is present (pony_alloc_large_final)
-          @builder.call(@mod.functions["pony_alloc_large"], args, "#{name}_buf")
-        end
-      
-      value = @builder.bit_cast(value, gtype.structure.pointer, name)
-      gen_put_desc(value, gtype, name)
-      
-      value
-    else raise NotImplementedError.new(gtype.rtype)
-    end
+    raise NotImplementedError.new(gtype.type_def) \
+      unless gtype.type_def.has_allocation?
+    
+    size = gtype.type_def.abi_size
+    size = 1 if size == 0
+    args = [func_frame.pony_ctx]
+    
+    value =
+      if size <= PONYRT_HEAP_MAX
+        index = LibPonyRT.int_heap_index(size).to_i32
+        args << @i32.const_int(index)
+        # TODO: handle case where final_fn is present (pony_alloc_small_final)
+        @builder.call(@mod.functions["pony_alloc_small"], args, "#{name}_buf")
+      else
+        args << @intptr.const_int(size)
+        # TODO: handle case where final_fn is present (pony_alloc_large_final)
+        @builder.call(@mod.functions["pony_alloc_large"], args, "#{name}_buf")
+      end
+    
+    value = @builder.bit_cast(value, gtype.structure.pointer, name)
+    gen_put_desc(value, gtype, name)
+    
+    value
   end
   
   def gen_put_desc(value, gtype, name = "")
-    case gtype.rtype.kind
-    when "class" then :ok
-    when "actor" then :ok
-    else raise NotImplementedError.new(gtype)
-    end
+    raise NotImplementedError.new(gtype) unless gtype.type_def.has_desc?
     
     desc_p = @builder.struct_gep(value, 0, "#{name}_desc_p")
     @builder.store(gtype.desc, desc_p)

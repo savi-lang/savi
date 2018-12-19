@@ -1,6 +1,8 @@
 class Mare::Program
   # TODO: add Package delineation here
   getter types
+  
+  property! layout : Compiler::Layout
   property! code_gen : Compiler::CodeGen
   
   def initialize
@@ -29,6 +31,8 @@ class Mare::Program
     getter properties
     getter functions
     
+    property! layout : Compiler::Layout
+    
     def initialize(@kind, @ident)
       @properties = [] of Property
       @functions = [] of Function
@@ -38,7 +42,7 @@ class Mare::Program
       @functions.find { |f| f.ident.value == func_name }.not_nil!
     end
     
-    def is_terminal?
+    def is_concrete?
       case kind
       when Kind::Actor, Kind::Class, Kind::Primitive, Kind::Numeric, Kind::FFI
         true

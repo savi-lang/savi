@@ -21,3 +21,4 @@ numeric F64:
 
 primitive CString:
 
+class Env:
