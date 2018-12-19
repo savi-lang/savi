@@ -57,9 +57,7 @@ class Mare::Compiler::CodeGen
     getter desc : LLVM::Value
     getter structure : LLVM::Type
     
-    def initialize(ctx : Context, g : CodeGen, program_type)
-      @type_def = ctx.program.layout[program_type]
-      
+    def initialize(ctx : Context, g : CodeGen, @type_def)
       @desc_type = g.gen_desc_type(@type_def)
       @desc = g.gen_desc(ctx, @type_def, @desc_type)
       @structure = g.gen_structure(@type_def, @desc_type)
@@ -189,14 +187,9 @@ class Mare::Compiler::CodeGen
       end
     end
     
-    # CodeGen for all types.
-    # TODO: dynamically gather these from ctx.program.
-    type_defs = {
-      "Main" => ctx.program.find_type!("Main"),
-      "Env" => ctx.program.find_type!("Env"),
-    }
-    type_defs.each do |name, type_def|
-      @gtypes[name] = GenType.new(ctx, self, type_def)
+    # CodeGen for all type descriptors.
+    ctx.program.layout.each_type_def.each do |type_def|
+      @gtypes[type_def.llvm_name] = GenType.new(ctx, self, type_def)
     end
     
     # CodeGen for all function bodies.
@@ -645,24 +638,11 @@ class Mare::Compiler::CodeGen
       traits = @pptr.null # TODO
       fields = @pptr.null # TODO
       vtable = @pptr.null # TODO
-    when "Env"
-      dispatch_fn = @dispatch_fn_ptr.null
-      traits = @pptr.null # [1 x i64]* @Env_Traits
-      fields = @pptr.null # [0 x { i32, %__Desc* }]* null
-      vtable = @pptr.null # TODO: ~~v
-      # [9 x i8*] [
-      #   i8* bitcast (%Array_String_val* (%Env*, i8*, i64)* @Env_tag__strings_from_pointers_oZo to i8*),
-      #   i8* bitcast (i64 (%Env*, i8*)* @Env_tag__count_strings_oZ to i8*),
-      #   i8* bitcast (i64 (%Env*, i8*)* @Env_tag__count_strings_oZ to i8*),
-      #   i8* bitcast (void (%Env*, i32, i8*, i8*)* @Env_ref__create_Iooo to i8*),
-      #   i8* bitcast (%Array_String_val* (%Env*, i8*, i64)* @Env_tag__strings_from_pointers_oZo to i8*),
-      #   i8* bitcast (i64 (%Env*, i8*)* @Env_tag__count_strings_oZ to i8*),
-      #   i8* bitcast (i64 (%Env*, i8*)* @Env_tag__count_strings_oZ to i8*),
-      #   i8* bitcast (%Array_String_val* (%Env*, i8*, i64)* @Env_tag__strings_from_pointers_oZo to i8*),
-      #   i8* bitcast (%Array_String_val* (%Env*, i8*, i64)* @Env_tag__strings_from_pointers_oZo to i8*)
-      # ] }
     else
-      raise NotImplementedError.new(type_def.llvm_name)
+      dispatch_fn = @dispatch_fn_ptr.null # TODO
+      traits = @pptr.null # TODO
+      fields = @pptr.null # TODO
+      vtable = @pptr.null # TODO
     end
     
     global.initializer = desc_type.const_struct [

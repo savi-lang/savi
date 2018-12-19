@@ -89,7 +89,9 @@ class Mare::Compiler::Layout < Mare::AST::Visitor
   end
   
   class Def
-    def initialize(@program_type : Program::Type)
+    getter desc_id : Int32
+    
+    def initialize(@program_type : Program::Type, @desc_id)
     end
     
     def llvm_name : String
@@ -101,30 +103,36 @@ class Mare::Compiler::Layout < Mare::AST::Visitor
       "#{llvm_name}_Desc"
     end
     
-    def desc_id : Int32
-      # TODO: don't hard-code these here
-      case llvm_name
-      when "Main" then 1
-      when "Env" then 11
-      else raise NotImplementedError.new(self.inspect)
-      end
-    end
-    
     def abi_size : Int32
+      # TODO: move final number calculation to CodeGen side (LLVMABISizeOfType)
       # TODO: don't hard-code these here
       case llvm_name
       when "Main" then 256
       when "Env" then 64
-      else raise NotImplementedError.new(self.inspect)
+      else
+        case @program_type.kind
+        when Program::Type::Kind::FFI,
+             Program::Type::Kind::Primitive
+          8 # TODO: cross-platform
+        when Program::Type::Kind::Numeric
+          16 # TODO: cross-platform
+        else raise NotImplementedError.new(@program_type.kind)
+        end
       end
     end
     
+    def field_count
+      0 # TODO
+    end
+    
     def field_offset : Int32
-      # TODO: don't hard-code these here
-      case llvm_name
-      when "Main" then 0
-      when "Env" then 8
-      else raise NotImplementedError.new(self.inspect)
+      return 0 if field_count == 0
+      
+      # TODO: move final number calculation to CodeGen side (LLVMOffsetOfElement)
+      case @program_type.kind
+      when Program::Type::Kind::Actor then 2 * 8
+      when Program::Type::Kind::Class then 1 * 8
+      else raise NotImplementedError.new(@program_type.kind)
       end
     end
     
@@ -132,7 +140,8 @@ class Mare::Compiler::Layout < Mare::AST::Visitor
       case @program_type.kind
       when Program::Type::Kind::Actor,
            Program::Type::Kind::Class,
-           Program::Type::Kind::Primitive
+           Program::Type::Kind::Primitive,
+           Program::Type::Kind::FFI
         true
       when Program::Type::Kind::Numeric
         false
@@ -146,6 +155,7 @@ class Mare::Compiler::Layout < Mare::AST::Visitor
            Program::Type::Kind::Class
         true
       when Program::Type::Kind::Primitive,
+           Program::Type::Kind::FFI,
            Program::Type::Kind::Numeric
         false
       else raise NotImplementedError.new(@program_type.kind)
@@ -158,7 +168,8 @@ class Mare::Compiler::Layout < Mare::AST::Visitor
         true
       when Program::Type::Kind::Numeric,
            Program::Type::Kind::Class,
-           Program::Type::Kind::Primitive
+           Program::Type::Kind::Primitive,
+           Program::Type::Kind::FFI
         false
       else raise NotImplementedError.new(@program_type.kind)
       end
@@ -171,6 +182,7 @@ class Mare::Compiler::Layout < Mare::AST::Visitor
     @refs = Hash(Infer::MetaType, Ref).new
     @defs = Hash(Program::Type, Def).new
     @seen_funcs = Set(Program::Function).new
+    @last_def_id = 0 # TODO: meaningful/deterministic descriptor ids?
   end
   
   def self.run(ctx)
@@ -219,7 +231,7 @@ class Mare::Compiler::Layout < Mare::AST::Visitor
     return if @defs.has_key?(program_type)
     
     # Now, save a Def instance for this program type.
-    @defs[program_type] = Def.new(program_type)
+    @defs[program_type] = Def.new(program_type, @last_def_id += 1)
   end
   
   def [](meta_type : Infer::MetaType)
@@ -228,5 +240,9 @@ class Mare::Compiler::Layout < Mare::AST::Visitor
   
   def [](program_type : Program::Type)
     @defs[program_type]
+  end
+  
+  def each_type_def
+    @defs.each_value
   end
 end
