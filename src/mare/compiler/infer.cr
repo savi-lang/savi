@@ -459,7 +459,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         new_tid(node, ref.param_idx ? Param.new(node.pos) : Local.new(node.pos))
         @local_tids[ref] = node.tid
       end
-    when Refer::Unresolved.class
+    when Refer::Unresolved
       # Leave the tid as zero if this identifer needs no value.
       return if node.value_not_needed?
       

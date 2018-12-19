@@ -4,8 +4,10 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
   class Error < Exception
   end
   
-  module Unresolved
-    def self.pos
+  class Unresolved
+    INSTANCE = new
+    
+    def pos
       Source::Pos.none
     end
   end
@@ -39,7 +41,7 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
     end
   end
   
-  alias Info = (Unresolved.class | Local | Const | ConstUnion)
+  alias Info = (Unresolved | Local | Const | ConstUnion)
   
   def initialize(@consts : Hash(String, Const))
     @create_params = false
@@ -110,7 +112,7 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
   def touch(node : AST::Identifier)
     # First, try to resolve as a local, then try consts, else it's unresolved.
     name = node.value
-    info = @current_locals[name]? || @consts[name]? || Unresolved
+    info = @current_locals[name]? || @consts[name]? || Unresolved::INSTANCE
     node.rid = new_rid(info)
   end
   
