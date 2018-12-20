@@ -19,6 +19,8 @@ numeric F64:
 
 // ...
 
-primitive CString:
+primitive CString: // special-cased in compiler as a char pointer
+
+class String:
 
 class Env:

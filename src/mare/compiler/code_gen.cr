@@ -45,9 +45,13 @@ class Mare::Compiler::CodeGen
       @program_func.as(Program::Function).refer
     end
     
-    def type_of(expr)
+    def type_of(expr : AST::Node)
       inferred = @program_func.as(Program::Function).infer.resolve(expr)
       @program.layout[inferred]
+    end
+    
+    def type_def_of(expr : AST::Node)
+      @program.layout[type_of(expr).single!]
     end
   end
   
@@ -164,6 +168,10 @@ class Mare::Compiler::CodeGen
   
   def type_of(expr)
     func_frame.type_of(expr)
+  end
+  
+  def type_def_of(expr)
+    func_frame.type_def_of(expr)
   end
   
   def self.run(ctx)
@@ -423,7 +431,6 @@ class Mare::Compiler::CodeGen
   end
   
   def gen_dot(ctx, relate)
-    receiver = relate.lhs.as(AST::Identifier).value
     rhs = relate.rhs
     
     case rhs
@@ -436,17 +443,19 @@ class Mare::Compiler::CodeGen
     else raise NotImplementedError.new(rhs)
     end
     
-    receiver_type = ctx.program.find_type!(receiver)
+    relate.lhs.as(AST::Identifier) # assert that lhs is an identifier
+    lhs_def = type_def_of(relate.lhs)
     
-    case receiver_type.kind
-    when Program::Type::Kind::FFI
+    if lhs_def.is_ffi?
       ffi = @mod.functions[member]
       value = @builder.call(ffi, args)
       value = gen_none if ffi.return_type == @void
       value
-    when Program::Type::Kind::Primitive, Program::Type::Kind::Numeric
-      @builder.call(@mod.functions["#{receiver}.#{member}"], args)
-    else raise NotImplementedError.new(receiver_type)
+    elsif lhs_def.has_allocation?
+      # TODO: deal with passing actual receiver object as first argument.
+      @builder.call(@mod.functions["#{lhs_def.llvm_name}.#{member}"], args)
+    else
+      @builder.call(@mod.functions["#{lhs_def.llvm_name}.#{member}"], args)
     end
   end
   

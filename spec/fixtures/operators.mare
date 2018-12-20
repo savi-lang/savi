@@ -11,3 +11,6 @@ describe operators:
   
   demo mixed:
     a != b && c > d / x + e / y || i..j > k << l
+  
+  demo prefix:
+    ~x

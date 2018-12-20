@@ -11,7 +11,10 @@ module Mare::Parser
     # Define what an identifier looks like.
     ident_letter =
       range('a', 'z') | range('A', 'Z') | range('0', '9') | char('_')
-    ident = ident_letter.repeat(1).named(:ident)
+    ident = (
+      (char('@') >> ident_letter.repeat) |
+      ident_letter.repeat(1)
+    ).named(:ident)
     
     # Define what a number looks like (integer and float).
     digit19 = range('1', '9')
@@ -42,7 +45,7 @@ module Mare::Parser
     atom = prefixed | parens | string | float | integer | ident
     
     # Define a prefixed term to be preceded by a prefix operator.
-    prefixop = char('@').named(:op)
+    prefixop = char('~').named(:op)
     prefixed.define (prefixop >> atom).named(:prefix)
     
     # Define a qualified term to be immediately followed by a parens group.

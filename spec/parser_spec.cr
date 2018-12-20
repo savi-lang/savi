@@ -18,7 +18,7 @@ describe Mare::Parser do
           [:relate,
             [:string, "Hello, "],
             [:op, "+"],
-            [:prefix, [:op, "@"], [:ident, "name"]],
+            [:ident, "@name"],
           ],
           [:op, "+"],
           [:string, "!"],
@@ -43,7 +43,7 @@ describe Mare::Parser do
       [:declare,
         [[:ident, "fun"], [:ident, "caller"]],
         [:group, ":", [:qualify,
-          [:prefix, [:op, "@"], [:ident, "degreesF"]],
+          [:ident, "@degreesF"],
           [:group, "(",
             [:relate,
               [:relate, [:integer, 10], [:op, "."], [:qualify,
@@ -165,7 +165,10 @@ describe Mare::Parser do
         [:relate,
          [:relate, [:ident, "i"], [:op, ".."], [:ident, "j"]],
          [:op, ">"],
-         [:relate, [:ident, "k"], [:op, "<<"], [:ident, "l"]]]]]]]
+         [:relate, [:ident, "k"], [:op, "<<"], [:ident, "l"]]]]]],
+     [:declare,
+      [[:ident, "demo"], [:ident, "prefix"]],
+      [:group, ":", [:prefix, [:op, "~"], [:ident, "x"]]]]]
     AST
   end
 end

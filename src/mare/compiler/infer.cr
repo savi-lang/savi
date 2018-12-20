@@ -271,8 +271,9 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   getter param_tids : Array(TID) = [] of TID
   getter! ret_tid : TID
   
-  def initialize
+  def initialize(@self_type : Program::Type)
     # TODO: When we have branching, we'll need some form of divergence.
+    @self_tid = 0_u64
     @local_tids = Hash(Refer::Local, TID).new
     @tids = Hash(TID, Info).new
     @last_tid = 0_u64
@@ -311,7 +312,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   def self.run(ctx)
     # Start by running an instance of inference at the Main.new function,
     # and recurse into checking other functions that are reachable from there.
-    new.run(ctx.program.find_func!("Main", "new"))
+    t = ctx.program.find_type!("Main")
+    new(t).run(t.find_func!("new"))
     
     # For each function in the program, run with a new instance,
     # unless that function has already been reached with an infer instance.
@@ -319,7 +321,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     # so this second pass just takes care of typechecking unreachable functions.
     ctx.program.types.each do |t|
       t.functions.each do |f|
-        new.run(f) unless f.infer?
+        new(t).run(f) unless f.infer?
       end
     end
   end
@@ -379,13 +381,12 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   def follow_call(call : FromCall)
     # Confirm that by now, there is exactly one type in the domain.
     # TODO: is it possible to proceed without Domain?
-    call_funcs = self[call.lhs].resolve!(self).defns.map do |defn|
-      defn.find_func!(call.member)
-    end
+    call_defns = self[call.lhs].resolve!(self).defns
     
     # TODO: handle multiple call funcs by branching.
-    raise NotImplementedError.new(call_funcs.inspect) if call_funcs.size > 1
-    call_func = call_funcs.first
+    raise NotImplementedError.new(call_defns.inspect) if call_defns.size > 1
+    call_defn = call_defns.first
+    call_func = call_defn.find_func!(call.member)
     
     # Keep track that we called this function.
     @called_funcs.add(call_func)
@@ -393,7 +394,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     # TODO: copying to diverging specializations of the function
     # TODO: apply argument constraints to the parameters
     # TODO: detect and halt recursion by noticing what's been seen
-    infer = call_func.infer? || self.class.new.tap(&.run(call_func))
+    infer = call_func.infer? || self.class.new(call_defn).tap(&.run(call_func))
     
     # Apply constraints to the return type.
     ret = infer[infer.ret_tid]
@@ -458,6 +459,14 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       else
         new_tid(node, ref.param_idx ? Param.new(node.pos) : Local.new(node.pos))
         @local_tids[ref] = node.tid
+      end
+    when Refer::Self
+      # If it's the self, track the possibly new tid.
+      if @self_tid == 0
+        new_tid(node, Literal.new(node.pos, [@self_type]))
+        @self_tid = node.tid
+      else
+        transfer_tid(@self_tid, node)
       end
     when Refer::Unresolved
       # Leave the tid as zero if this identifer needs no value.

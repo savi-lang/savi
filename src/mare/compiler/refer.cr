@@ -12,6 +12,14 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
     end
   end
   
+  class Self
+    INSTANCE = new
+    
+    def pos
+      Source::Pos.none
+    end
+  end
+  
   class Local
     getter pos : Source::Pos
     getter name : String
@@ -41,7 +49,7 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
     end
   end
   
-  alias Info = (Unresolved | Local | Const | ConstUnion)
+  alias Info = (Unresolved | Self | Local | Const | ConstUnion)
   
   def initialize(@consts : Hash(String, Const))
     @create_params = false
@@ -110,9 +118,17 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
   
   # For an Identifier, resolve it to any known local or constant if possible.
   def touch(node : AST::Identifier)
-    # First, try to resolve as a local, then try consts, else it's unresolved.
     name = node.value
-    info = @current_locals[name]? || @consts[name]? || Unresolved::INSTANCE
+    
+    # If this is an @ symbol, it refers to the this/self object.
+    info =
+      if name == "@"
+        Self::INSTANCE
+      else
+        # First, try to resolve as local, then try consts, else it's unresolved.
+        @current_locals[name]? || @consts[name]? || Unresolved::INSTANCE
+      end
+    
     node.rid = new_rid(info)
   end
   

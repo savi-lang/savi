@@ -9,6 +9,19 @@ class Mare::Compiler::Sugar < Mare::AST::Visitor
     end
   end
   
+  def visit(node : AST::Identifier)
+    if node.value == "@"
+      node
+    elsif node.value.char_at(0) == '@'
+      lhs = AST::Identifier.new("@").from(node)
+      dot = AST::Operator.new(".").from(node)
+      rhs = AST::Identifier.new(node.value[1..-1]).from(node)
+      AST::Relate.new(lhs, dot, rhs).from(node)
+    else
+      node
+    end
+  end
+  
   def visit(node : AST::Relate)
     case node.op.value
     when ".", "&&", "||", " ", "=" then node # skip these special-case operators

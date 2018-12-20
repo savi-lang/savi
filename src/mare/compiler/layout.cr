@@ -174,6 +174,10 @@ class Mare::Compiler::Layout < Mare::AST::Visitor
       else raise NotImplementedError.new(@program_type.kind)
       end
     end
+    
+    def is_ffi?
+      @program_type.kind == Program::Type::Kind::FFI
+    end
   end
   
   property! infer : Infer
