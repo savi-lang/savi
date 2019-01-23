@@ -77,7 +77,22 @@ class Mare::Program
     property! refer : Compiler::Refer
     property! infer : Compiler::Infer
     
+    KNOWN_TAGS = [
+      :constructor,
+    ]
+    
     def initialize(@ident, @params, @ret, @body)
+      @tags = Set(Symbol).new
+    end
+    
+    def add_tag(tag : Symbol)
+      raise NotImplementedError.new(tag) unless KNOWN_TAGS.includes?(tag)
+      @tags.add(tag)
+    end
+    
+    def has_tag?(tag : Symbol)
+      raise NotImplementedError.new(tag) unless KNOWN_TAGS.includes?(tag)
+      @tags.includes?(tag)
     end
   end
 end

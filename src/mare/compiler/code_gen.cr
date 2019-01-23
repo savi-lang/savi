@@ -17,11 +17,11 @@ class Mare::Compiler::CodeGen
   class Frame
     getter program : Program
     getter func : LLVM::Function?
-    getter program_func : Program::Function?
+    getter gfunc : GenFunc?
     setter pony_ctx : LLVM::Value?
     getter current_locals
     
-    def initialize(@program : Program, @func = nil, @program_func = nil)
+    def initialize(@g : CodeGen, @program, @func = nil, @gfunc = nil)
       @current_locals = {} of Refer::Local => LLVM::Value
     end
     
@@ -42,29 +42,65 @@ class Mare::Compiler::CodeGen
     end
     
     def refer
-      @program_func.as(Program::Function).refer
+      @gfunc.as(GenFunc).func.refer
     end
     
     def type_of(expr : AST::Node)
-      inferred = @program_func.as(Program::Function).infer.resolve(expr)
+      inferred = @gfunc.as(GenFunc).func.infer.resolve(expr)
       @program.layout[inferred]
     end
     
-    def type_def_of(expr : AST::Node)
-      @program.layout[type_of(expr).single!]
+    def gtype_of(expr : AST::Node)
+      @g.gtype_by_llvm_name(@program.layout[type_of(expr).single!].llvm_name)
     end
   end
   
   class GenType
     getter type_def : Layout::Def
     getter desc_type : LLVM::Type
-    getter desc : LLVM::Value
     getter structure : LLVM::Type
+    getter! desc : LLVM::Value
     
     def initialize(ctx : Context, g : CodeGen, @type_def)
+      # Generate descriptor type and structure type.
       @desc_type = g.gen_desc_type(@type_def)
-      @desc = g.gen_desc(ctx, @type_def, @desc_type)
       @structure = g.gen_structure(@type_def, @desc_type)
+      @gfuncs = {} of String => GenFunc
+      
+      # Generate associated function declarations, some of which
+      # may be referenced in the descriptor global instance below.
+      @type_def.each_function.each do |f|
+        @gfuncs[f.ident.value] = GenFunc.new(ctx, g, self, f)
+      end
+      
+      # Generate descriptor global instance.
+      @desc = g.gen_desc(ctx, @type_def, @desc_type)
+    end
+    
+    def gen_funcs(ctx : Context, g : CodeGen)
+      @gfuncs.each_value do |gfunc|
+        g.gen_func_body(ctx, self, gfunc) if gfunc.func.body
+      end
+    end
+    
+    def [](name)
+      @gfuncs[name]
+    end
+  end
+  
+  class GenFunc
+    getter func : Program::Function
+    getter! llvm_func : LLVM::Function
+    
+    def initialize(ctx : Context, g : CodeGen, gtype : GenType, @func)
+      @needs_receiver = \
+        gtype.type_def.has_allocation? && !@func.has_tag?(:constructor)
+      
+      @llvm_func = g.gen_func_decl(gtype, self)
+    end
+    
+    def needs_receiver?
+      @needs_receiver
     end
   end
   
@@ -170,8 +206,12 @@ class Mare::Compiler::CodeGen
     func_frame.type_of(expr)
   end
   
-  def type_def_of(expr)
-    func_frame.type_def_of(expr)
+  def gtype_of(expr)
+    func_frame.gtype_of(expr)
+  end
+  
+  def gtype_by_llvm_name(llvm_name : String)
+    @gtypes[llvm_name]
   end
   
   def self.run(ctx)
@@ -181,29 +221,13 @@ class Mare::Compiler::CodeGen
   def run(ctx : Context)
     ctx.program.code_gen = self
     
-    # CodeGen for all function declarations.
-    ctx.program.types.each do |t|
-      case t.kind
-      when Program::Type::Kind::Actor,
-           Program::Type::Kind::Class,
-           Program::Type::Kind::Primitive,
-           Program::Type::Kind::Numeric
-        t.functions.each { |f| gen_fun_decl(t, f) }
-      when Program::Type::Kind::FFI
-        t.functions.each { |f| gen_ffi_decl(f) }
-      else raise NotImplementedError.new(t.kind)
-      end
-    end
-    
-    # CodeGen for all type descriptors.
+    # CodeGen for all type descriptors and function declarations.
     ctx.program.layout.each_type_def.each do |type_def|
       @gtypes[type_def.llvm_name] = GenType.new(ctx, self, type_def)
     end
     
     # CodeGen for all function bodies.
-    ctx.program.types.each do |t|
-      t.functions.each { |f| gen_fun_body(ctx, t, f) if f.body }
-    end
+    @gtypes.each_value(&.gen_funcs(ctx, self))
     
     # Generate the internal main function.
     gen_main(ctx)
@@ -355,8 +379,8 @@ class Mare::Compiler::CodeGen
     main
   end
   
-  def gen_func_start(ctx, func, program_func : Program::Function? = nil)
-    @frames << Frame.new(ctx.program, func, program_func)
+  def gen_func_start(ctx, llvm_func, gfunc : GenFunc? = nil)
+    @frames << Frame.new(self, ctx.program, llvm_func, gfunc)
     
     # Create an entry block and start building from there.
     @builder.position_at_end(gen_block("entry"))
@@ -392,10 +416,12 @@ class Mare::Compiler::CodeGen
     @mod.functions.add(f.ident.value, params, ret)
   end
   
-  def gen_fun_decl(t, f)
+  def gen_func_decl(gtype, gfunc)
+    return gen_ffi_decl(gfunc.func) if gtype.type_def.is_ffi?
+    
     # TODO: these should probably not use the ffi_type_for each type?
     params = [] of LLVM::Type
-    f.params.try do |param_idents|
+    gfunc.func.params.try do |param_idents|
       param_idents.terms.map do |param|
         param_type_ident =
           case param
@@ -407,21 +433,30 @@ class Mare::Compiler::CodeGen
         params << ffi_type_for(param_type_ident)
       end
     end
-    ret = f.ret.try { |ret_ident| ffi_type_for(ret_ident) } || @void
     
-    ident = "#{t.ident.value}.#{f.ident.value}"
-    @mod.functions.add(ident, params, ret)
+    # Add implicit receiver parameter if needed.
+    # TODO: use real receiver type (`gtype.structure.pointer`) instead of `@ptr`
+    params.unshift(@ptr) if gfunc.needs_receiver?
+    
+    ret = gfunc.func.ret.try { |ret_ident| ffi_type_for(ret_ident) } || @void
+    
+    name = "#{gtype.type_def.llvm_name}.#{gfunc.func.ident.value}"
+    @mod.functions.add(name, params, ret)
   end
   
-  def gen_fun_body(ctx, t, f)
-    func = @mod.functions["#{t.ident.value}.#{f.ident.value}"]
+  def gen_func_body(ctx, gtype, gfunc)
+    name = "#{gtype.type_def.llvm_name}.#{gfunc.func.ident.value}"
     
-    gen_func_start(ctx, func, f)
+    gen_func_start(ctx, gfunc.llvm_func, gfunc)
+    
+    # TODO: allocation rites for constructors
     
     last_value = nil
-    f.body.not_nil!.terms.each { |expr| last_value = gen_expr(ctx, expr) }
+    gfunc.func.body.not_nil!.terms.each do |expr|
+      last_value = gen_expr(ctx, expr)
+    end
     
-    if f.ret
+    if gfunc.func.ret
       @builder.ret(last_value.not_nil!)
     else
       @builder.ret
@@ -444,18 +479,21 @@ class Mare::Compiler::CodeGen
     end
     
     relate.lhs.as(AST::Identifier) # assert that lhs is an identifier
-    lhs_def = type_def_of(relate.lhs)
+    lhs_gtype = gtype_of(relate.lhs)
+    gfunc = lhs_gtype[member]
     
-    if lhs_def.is_ffi?
+    if lhs_gtype.type_def.is_ffi?
+      # TODO: unify with normal calls by making FFI types use wrapper functions.
       ffi = @mod.functions[member]
       value = @builder.call(ffi, args)
       value = gen_none if ffi.return_type == @void
       value
-    elsif lhs_def.has_allocation?
-      # TODO: deal with passing actual receiver object as first argument.
-      @builder.call(@mod.functions["#{lhs_def.llvm_name}.#{member}"], args)
+    elsif gfunc.needs_receiver?
+      receiver = gen_expr(ctx, relate.lhs)
+      args.unshift(receiver)
+      @builder.call(gfunc.llvm_func, args)
     else
-      @builder.call(@mod.functions["#{lhs_def.llvm_name}.#{member}"], args)
+      @builder.call(gfunc.llvm_func, args)
     end
   end
   
@@ -489,6 +527,9 @@ class Mare::Compiler::CodeGen
         when "None"  then gen_none
         else raise NotImplementedError.new(ref.defn.ident.value)
         end
+      elsif ref.is_a?(Refer::Self)
+        # TODO: Use real receiver value.
+        gen_none
       else
         raise NotImplementedError.new(ref)
       end

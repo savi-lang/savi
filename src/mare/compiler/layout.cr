@@ -178,6 +178,10 @@ class Mare::Compiler::Layout < Mare::AST::Visitor
     def is_ffi?
       @program_type.kind == Program::Type::Kind::FFI
     end
+    
+    def each_function
+      @program_type.functions.each
+    end
   end
   
   property! infer : Infer

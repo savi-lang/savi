@@ -98,6 +98,8 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         function = Program::Function.new(ident, params, ret, body)
         context.fulfill ["fun", @type.ident.value, ident.value], function
         
+        function.add_tag(:constructor) if decl.keyword == "new"
+        
         @type.functions << function
       end
     end
