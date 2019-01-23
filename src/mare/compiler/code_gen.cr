@@ -62,6 +62,7 @@ class Mare::Compiler::CodeGen
     getter desc_type : LLVM::Type
     getter structure : LLVM::Type
     getter! desc : LLVM::Value
+    getter! singleton : LLVM::Value
     
     def initialize(g : CodeGen, @type_def)
       @gfuncs = {} of String => GenFunc
@@ -89,6 +90,11 @@ class Mare::Compiler::CodeGen
       @gfuncs.each_value do |gfunc|
         g.gen_func_impl(self, gfunc)
       end
+    end
+    
+    # Generate other global values.
+    def gen_globals(g : CodeGen)
+      @singleton = g.gen_singleton(self) unless @type_def.has_allocation?
     end
     
     def [](name)
@@ -251,6 +257,9 @@ class Mare::Compiler::CodeGen
     # CodeGen for all function implementations.
     @gtypes.each_value(&.gen_func_impls(self))
     
+    # CodeGen for all global values associated with this type.
+    @gtypes.each_value(&.gen_globals(self))
+    
     # Generate the internal main function.
     gen_main
     
@@ -258,6 +267,7 @@ class Mare::Compiler::CodeGen
     gen_wrapper
     
     # Run LLVM sanity checks on the generated module.
+    @mod.dump
     @mod.verify
     
     # # Link the pony runtime bitcode into the generated module.
@@ -464,6 +474,8 @@ class Mare::Compiler::CodeGen
         gen_alloc(gtype)
       elsif gfunc.needs_receiver?
         gfunc.llvm_func.params[0]
+      elsif gtype.singleton?
+        gtype.singleton
       end
     
     last_value = nil
@@ -771,6 +783,18 @@ class Mare::Compiler::CodeGen
     # TODO: fields
     
     @llvm.struct(elements, type_def.llvm_name)
+  end
+  
+  def gen_singleton(gtype)
+    raise "can't generate stateful singleton" if gtype.type_def.has_allocation?
+    
+    global = @mod.globals.add(gtype.structure, gtype.type_def.llvm_name)
+    global.linkage = LLVM::Linkage::LinkerPrivate
+    global.global_constant = true
+    
+    global.initializer = gtype.structure.const_struct([gtype.desc])
+    
+    global
   end
   
   def gen_alloc(gtype, name = "@")
