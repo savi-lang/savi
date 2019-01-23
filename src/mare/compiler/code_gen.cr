@@ -15,7 +15,6 @@ class Mare::Compiler::CodeGen
   @builder : LLVM::Builder
   
   class Frame
-    getter program : Program
     getter func : LLVM::Function?
     getter gfunc : GenFunc?
     
@@ -24,7 +23,7 @@ class Mare::Compiler::CodeGen
     
     getter current_locals
     
-    def initialize(@g : CodeGen, @program, @func = nil, @gfunc = nil)
+    def initialize(@g : CodeGen, @func = nil, @gfunc = nil)
       @current_locals = {} of Refer::Local => LLVM::Value
     end
     
@@ -50,11 +49,11 @@ class Mare::Compiler::CodeGen
     
     def type_of(expr : AST::Node)
       inferred = @gfunc.as(GenFunc).func.infer.resolve(expr)
-      @program.layout[inferred]
+      @g.program.layout[inferred]
     end
     
     def gtype_of(expr : AST::Node)
-      @g.gtype_by_llvm_name(@program.layout[type_of(expr).single!].llvm_name)
+      @g.gtype_by_llvm_name(@g.program.layout[type_of(expr).single!].llvm_name)
     end
   end
   
@@ -64,7 +63,7 @@ class Mare::Compiler::CodeGen
     getter structure : LLVM::Type
     getter! desc : LLVM::Value
     
-    def initialize(ctx : Context, g : CodeGen, @type_def)
+    def initialize(g : CodeGen, @type_def)
       # Generate descriptor type and structure type.
       @desc_type = g.gen_desc_type(@type_def)
       @structure = g.gen_structure(@type_def, @desc_type)
@@ -73,16 +72,16 @@ class Mare::Compiler::CodeGen
       # Generate associated function declarations, some of which
       # may be referenced in the descriptor global instance below.
       @type_def.each_function.each do |f|
-        @gfuncs[f.ident.value] = GenFunc.new(ctx, g, self, f)
+        @gfuncs[f.ident.value] = GenFunc.new(g, self, f)
       end
       
       # Generate descriptor global instance.
-      @desc = g.gen_desc(ctx, @type_def, @desc_type)
+      @desc = g.gen_desc(@type_def, @desc_type)
     end
     
-    def gen_funcs(ctx : Context, g : CodeGen)
+    def gen_funcs(g : CodeGen)
       @gfuncs.each_value do |gfunc|
-        g.gen_func_body(ctx, self, gfunc)
+        g.gen_func_body(self, gfunc)
       end
     end
     
@@ -95,7 +94,7 @@ class Mare::Compiler::CodeGen
     getter func : Program::Function
     getter! llvm_func : LLVM::Function
     
-    def initialize(ctx : Context, g : CodeGen, gtype : GenType, @func)
+    def initialize(g : CodeGen, gtype : GenType, @func)
       @needs_receiver = \
         gtype.type_def.has_allocation? && !@func.has_tag?(:constructor)
       
@@ -140,6 +139,8 @@ class Mare::Compiler::CodeGen
   PONYRT_HEAP_MAX = (1_u64 << PONYRT_HEAP_MAXBITS)
   
   PONYRT_BC_PATH = "/home/jemc/1/code/gitx/ponyc/build/release/libponyrt.bc"
+  
+  getter! program : Program?
   
   def initialize
     LLVM.init_x86
@@ -227,18 +228,19 @@ class Mare::Compiler::CodeGen
   end
   
   def run(ctx : Context)
+    @program = ctx.program
     ctx.program.code_gen = self
     
     # CodeGen for all type descriptors and function declarations.
     ctx.program.layout.each_type_def.each do |type_def|
-      @gtypes[type_def.llvm_name] = GenType.new(ctx, self, type_def)
+      @gtypes[type_def.llvm_name] = GenType.new(self, type_def)
     end
     
     # CodeGen for all function bodies.
-    @gtypes.each_value(&.gen_funcs(ctx, self))
+    @gtypes.each_value(&.gen_funcs(self))
     
     # Generate the internal main function.
-    gen_main(ctx)
+    gen_main
     
     # Generate the wrapper main function.
     gen_wrapper
@@ -283,12 +285,12 @@ class Mare::Compiler::CodeGen
     @builder.ret(res)
   end
   
-  def gen_main(ctx : Context)
+  def gen_main
     # Declare the main function.
     main = @mod.functions.add("main", [@i32, @pptr, @pptr], @i32)
     main.linkage = LLVM::Linkage::External
     
-    gen_func_start(ctx, main)
+    gen_func_start(main)
     
     argc = main.params[0].tap &.name=("argc")
     argv = main.params[1].tap &.name=("argv")
@@ -387,8 +389,8 @@ class Mare::Compiler::CodeGen
     main
   end
   
-  def gen_func_start(ctx, llvm_func, gfunc : GenFunc? = nil)
-    @frames << Frame.new(self, ctx.program, llvm_func, gfunc)
+  def gen_func_start(llvm_func, gfunc : GenFunc? = nil)
+    @frames << Frame.new(self, llvm_func, gfunc)
     
     # Create an entry block and start building from there.
     @builder.position_at_end(gen_block("entry"))
@@ -440,10 +442,10 @@ class Mare::Compiler::CodeGen
     @mod.functions.add(name, params, ret)
   end
   
-  def gen_func_body(ctx, gtype, gfunc)
-    return gen_ffi_body(ctx, gtype, gfunc) if gtype.type_def.is_ffi?
+  def gen_func_body(gtype, gfunc)
+    return gen_ffi_body(gtype, gfunc) if gtype.type_def.is_ffi?
     
-    gen_func_start(ctx, gfunc.llvm_func, gfunc)
+    gen_func_start(gfunc.llvm_func, gfunc)
     
     func_frame.receiver_value =
       if gfunc.func.has_tag?(:constructor)
@@ -454,7 +456,7 @@ class Mare::Compiler::CodeGen
     
     last_value = nil
     gfunc.func.body.not_nil!.terms.each do |expr|
-      last_value = gen_expr(ctx, expr)
+      last_value = gen_expr(expr)
     end
     
     if gfunc.func.ret
@@ -482,10 +484,10 @@ class Mare::Compiler::CodeGen
     @mod.functions.add(gfunc.func.ident.value, params, ret)
   end
   
-  def gen_ffi_body(ctx, gtype, gfunc)
+  def gen_ffi_body(gtype, gfunc)
     llvm_ffi_func = gen_ffi_decl(gfunc)
     
-    gen_func_start(ctx, gfunc.llvm_func, gfunc)
+    gen_func_start(gfunc.llvm_func, gfunc)
     
     param_count = gfunc.llvm_func.params.size
     args = param_count.times.map { |i| gfunc.llvm_func.params[i] }.to_a
@@ -502,7 +504,7 @@ class Mare::Compiler::CodeGen
     gen_func_end
   end
   
-  def gen_dot(ctx, relate)
+  def gen_dot(relate)
     rhs = relate.rhs
     
     case rhs
@@ -511,7 +513,7 @@ class Mare::Compiler::CodeGen
       args = [] of LLVM::Value
     when AST::Qualify
       member = rhs.term.as(AST::Identifier).value
-      args = rhs.group.terms.map { |expr| gen_expr(ctx, expr).as(LLVM::Value) }
+      args = rhs.group.terms.map { |expr| gen_expr(expr).as(LLVM::Value) }
     else raise NotImplementedError.new(rhs)
     end
     
@@ -520,7 +522,7 @@ class Mare::Compiler::CodeGen
     gfunc = lhs_gtype[member]
     
     if gfunc.needs_receiver?
-      receiver = gen_expr(ctx, relate.lhs)
+      receiver = gen_expr(relate.lhs)
       args.unshift(receiver)
     end
     
@@ -529,10 +531,10 @@ class Mare::Compiler::CodeGen
     value
   end
   
-  def gen_eq(ctx, relate)
+  def gen_eq(relate)
     ref = func_frame.refer[relate.lhs]
     if ref.is_a?(Refer::Local)
-      rhs = gen_expr(ctx, relate.rhs).as(LLVM::Value)
+      rhs = gen_expr(relate.rhs).as(LLVM::Value)
       
       raise "local already declared: #{ref.inspect}" \
         if func_frame.current_locals[ref]?
@@ -543,7 +545,7 @@ class Mare::Compiler::CodeGen
     end
   end
   
-  def gen_expr(ctx, expr) : LLVM::Value
+  def gen_expr(expr) : LLVM::Value
     case expr
     when AST::Identifier
       ref = func_frame.refer[expr]
@@ -571,17 +573,17 @@ class Mare::Compiler::CodeGen
       gen_string(expr)
     when AST::Relate
       case expr.op.as(AST::Operator).value
-      when "." then gen_dot(ctx, expr)
-      when "=" then gen_eq(ctx, expr)
+      when "." then gen_dot(expr)
+      when "=" then gen_eq(expr)
       else raise NotImplementedError.new(expr.inspect)
       end
     when AST::Group
       case expr.style
-      when "(" then gen_sequence(ctx, expr)
+      when "(" then gen_sequence(expr)
       else raise NotImplementedError.new(expr.inspect)
       end
     when AST::Choice
-      gen_choice(ctx, expr)
+      gen_choice(expr)
     else
       raise NotImplementedError.new(expr.inspect)
     end
@@ -631,27 +633,27 @@ class Mare::Compiler::CodeGen
     end
   end
   
-  def gen_sequence(ctx, expr : AST::Group)
+  def gen_sequence(expr : AST::Group)
     # TODO: Use None as a value when sequence group size is zero.
     raise NotImplementedError.new(expr.terms.size) if expr.terms.size == 0
     
     # TODO: Push a scope frame?
     
     final : LLVM::Value? = nil
-    expr.terms.each { |term| final = gen_expr(ctx, term) }
+    expr.terms.each { |term| final = gen_expr(term) }
     final.not_nil!
     
     # TODO: Pop the scope frame?
   end
   
-  def gen_choice(ctx, expr : AST::Choice)
+  def gen_choice(expr : AST::Choice)
     # TODO: Support more than a simple if/else choice.
     raise NotImplementedError.new(expr.list.size) if expr.list.size != 2
     
     if_clause = expr.list.first
     else_clause = expr.list.last
     
-    cond_value = gen_expr(ctx, if_clause[0])
+    cond_value = gen_expr(if_clause[0])
     
     bb_body1 = gen_block("body1choice")
     bb_body2 = gen_block("body2choice")
@@ -661,11 +663,11 @@ class Mare::Compiler::CodeGen
     @builder.cond(cond_value, bb_body1, bb_body2)
     
     @builder.position_at_end(bb_body1)
-    value1 = gen_expr(ctx, if_clause[1])
+    value1 = gen_expr(if_clause[1])
     @builder.br(bb_post)
     
     @builder.position_at_end(bb_body2)
-    value2 = gen_expr(ctx, else_clause[1])
+    value2 = gen_expr(else_clause[1])
     @builder.br(bb_post)
     
     @builder.position_at_end(bb_post)
@@ -695,7 +697,7 @@ class Mare::Compiler::CodeGen
     ], type_def.llvm_desc_name
   end
   
-  def gen_desc(ctx, type_def, desc_type)
+  def gen_desc(type_def, desc_type)
     global = @mod.globals.add(desc_type, type_def.llvm_desc_name)
     global.linkage = LLVM::Linkage::LinkerPrivate
     global.global_constant = true
@@ -708,7 +710,7 @@ class Mare::Compiler::CodeGen
         fn.call_convention = LLVM::CallConvention::C
         fn.linkage = LLVM::Linkage::External
         
-        gen_func_start(ctx, fn)
+        gen_func_start(fn)
         
         @builder.call(@mod.functions["Main.new"])
         
