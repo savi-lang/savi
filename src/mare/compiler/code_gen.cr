@@ -175,12 +175,12 @@ class Mare::Compiler::CodeGen
     # @ponyrt = @llvm.parse_bitcode(ponyrt_bc).as(LLVM::Module)
     
     # Pony runtime types.
-    @desc = @llvm.opaque_struct("__Desc").as(LLVM::Type)
+    @desc = @llvm.opaque_struct("_.DESC").as(LLVM::Type)
     @desc_ptr = @desc.pointer.as(LLVM::Type)
-    @obj = @llvm.opaque_struct("__object").as(LLVM::Type)
+    @obj = @llvm.opaque_struct("_.OBJECT").as(LLVM::Type)
     @obj_ptr = @obj.pointer.as(LLVM::Type)
     @actor_pad = @i8.array(PONYRT_ACTOR_PAD_SIZE).as(LLVM::Type)
-    @msg = @llvm.struct([@i32, @i32], "__message").as(LLVM::Type)
+    @msg = @llvm.struct([@i32, @i32], "_.MESSAGE").as(LLVM::Type)
     @msg_ptr = @msg.pointer.as(LLVM::Type)
     @trace_fn = LLVM::Type.function([@ptr, @obj_ptr], @void).as(LLVM::Type)
     @trace_fn_ptr = @trace_fn.pointer.as(LLVM::Type)
@@ -706,18 +706,18 @@ class Mare::Compiler::CodeGen
       @pptr,                          # 14: TODO: traits
       @pptr,                          # 15: TODO: fields
       @pptr,                          # 16: TODO: vtable
-    ], type_def.llvm_desc_name
+    ], "#{type_def.llvm_name}.DESC"
   end
   
   def gen_desc(type_def, desc_type)
-    global = @mod.globals.add(desc_type, type_def.llvm_desc_name)
+    global = @mod.globals.add(desc_type, "#{type_def.llvm_name}.DESC")
     global.linkage = LLVM::Linkage::LinkerPrivate
     global.global_constant = true
     global
     
     case type_def.llvm_name
     when "Main"
-      dispatch_fn = @mod.functions.add("#{type_def.llvm_name}_Dispatch", @dispatch_fn) do |fn|
+      dispatch_fn = @mod.functions.add("#{type_def.llvm_name}.DISPATCH", @dispatch_fn) do |fn|
         fn.unnamed_addr = true
         fn.call_convention = LLVM::CallConvention::C
         fn.linkage = LLVM::Linkage::External
@@ -747,10 +747,10 @@ class Mare::Compiler::CodeGen
       @i32_0,                                # 2: TODO: field_count (tuples only)
       @i32.const_int(type_def.field_offset), # 3: field_offset
       @obj_ptr.null,                         # 4: instance
-      @trace_fn_ptr.null,                    # 5: trace fn TODO: @#{llvm_name}_Trace
-      @trace_fn_ptr.null,                    # 6: serialise trace fn TODO: @#{llvm_name}_Trace
-      @serialise_fn_ptr.null,                # 7: serialise fn TODO: @#{llvm_name}_Serialise
-      @deserialise_fn_ptr.null,              # 8: deserialise fn TODO: @#{llvm_name}_Deserialise
+      @trace_fn_ptr.null,                    # 5: trace fn TODO: @#{llvm_name}.TRACE
+      @trace_fn_ptr.null,                    # 6: serialise trace fn TODO: @#{llvm_name}.TRACE
+      @serialise_fn_ptr.null,                # 7: serialise fn TODO: @#{llvm_name}.SERIALISE
+      @deserialise_fn_ptr.null,              # 8: deserialise fn TODO: @#{llvm_name}.DESERIALISE
       @custom_serialise_space_fn_ptr.null,   # 9: custom serialise space fn
       @custom_deserialise_fn_ptr.null,       # 10: custom deserialise fn
       dispatch_fn.to_value,                  # 11: dispatch fn

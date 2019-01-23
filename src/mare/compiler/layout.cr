@@ -99,10 +99,6 @@ class Mare::Compiler::Layout < Mare::AST::Visitor
       @program_type.ident.value
     end
     
-    def llvm_desc_name : String
-      "#{llvm_name}_Desc"
-    end
-    
     def abi_size : Int32
       # TODO: move final number calculation to CodeGen side (LLVMABISizeOfType)
       # TODO: don't hard-code these here
