@@ -46,15 +46,6 @@ class Mare::Compiler::CodeGen
     def refer
       @gfunc.as(GenFunc).func.refer
     end
-    
-    def type_of(expr : AST::Node)
-      inferred = @gfunc.as(GenFunc).func.infer.resolve(expr)
-      @g.program.layout[inferred]
-    end
-    
-    def gtype_of(expr : AST::Node)
-      @g.gtype_by_llvm_name(@g.program.layout[type_of(expr).single!].llvm_name)
-    end
   end
   
   class GenType
@@ -152,7 +143,7 @@ class Mare::Compiler::CodeGen
   
   PONYRT_BC_PATH = "/home/jemc/1/code/gitx/ponyc/build/release/libponyrt.bc"
   
-  getter! program : Program?
+  getter! program : Program
   
   def initialize
     LLVM.init_x86
@@ -218,15 +209,27 @@ class Mare::Compiler::CodeGen
     @frames.reverse_each.find { |f| f.func? }.not_nil!
   end
   
-  def type_of(expr)
-    func_frame.type_of(expr)
+  def type_of(expr : AST::Node, in_gfunc : GenFunc? = nil)
+    in_gfunc ||= func_frame.gfunc.not_nil!
+    inferred = in_gfunc.func.infer.resolve(expr)
+    program.layout[inferred]
   end
   
-  def gtype_of(expr)
-    func_frame.gtype_of(expr)
+  def llvm_type_of(expr : AST::Node, in_gfunc : GenFunc? = nil)
+    ref = type_of(expr, in_gfunc)
+    case ref.llvm_use_type
+    when :i8, :u8 then @i8
+    when :i32, :u32 then @i32
+    when :i64, :u64 then @i64
+    when :ptr then @ptr
+    when :struct_ptr then
+      @gtypes[program.layout[ref.single!].llvm_name].structure.pointer
+    else raise NotImplementedError.new(ref.llvm_use_type)
+    end
   end
   
-  def gtype_by_llvm_name(llvm_name : String)
+  def gtype_of(expr : AST::Node, in_gfunc : GenFunc? = nil)
+    llvm_name = program.layout[type_of(expr, in_gfunc).single!].llvm_name
     @gtypes[llvm_name]
   end
   
@@ -254,11 +257,11 @@ class Mare::Compiler::CodeGen
     # CodeGen for all global descriptor instances.
     @gtypes.each_value(&.gen_desc(self))
     
-    # CodeGen for all function implementations.
-    @gtypes.each_value(&.gen_func_impls(self))
-    
     # CodeGen for all global values associated with this type.
     @gtypes.each_value(&.gen_globals(self))
+    
+    # CodeGen for all function implementations.
+    @gtypes.each_value(&.gen_func_impls(self))
     
     # Generate the internal main function.
     gen_main
@@ -267,7 +270,6 @@ class Mare::Compiler::CodeGen
     gen_wrapper
     
     # Run LLVM sanity checks on the generated module.
-    @mod.dump
     @mod.verify
     
     # # Link the pony runtime bitcode into the generated module.
@@ -441,27 +443,20 @@ class Mare::Compiler::CodeGen
   
   def gen_func_decl(gtype, gfunc)
     # TODO: these should probably not use the ffi_type_for each type?
-    params = [] of LLVM::Type
-    gfunc.func.params.try do |param_idents|
-      param_idents.terms.map do |param|
-        param_type_ident =
-          case param
-          when AST::Identifier then param
-          when AST::Group then param.terms[1].as(AST::Identifier)
-          else raise NotImplementedError.new(param)
-          end
-        
-        params << ffi_type_for(param_type_ident)
+    param_types = [] of LLVM::Type
+    gfunc.func.params.try do |params|
+      params.terms.map do |param|
+        param_types << llvm_type_of(param, gfunc)
       end
     end
     
     # Add implicit receiver parameter if needed.
-    params.unshift(gtype.structure.pointer) if gfunc.needs_receiver?
+    param_types.unshift(gtype.structure.pointer) if gfunc.needs_receiver?
     
-    ret = gfunc.func.ret.try { |ret_ident| ffi_type_for(ret_ident) } || @void
+    ret_type = gfunc.func.ret.try { |x| llvm_type_of(x, gfunc) } || @void
     
     name = "#{gtype.type_def.llvm_name}.#{gfunc.func.ident.value}"
-    @mod.functions.add(name, params, ret)
+    @mod.functions.add(name, param_types, ret_type)
   end
   
   def gen_func_impl(gtype, gfunc)
@@ -517,13 +512,9 @@ class Mare::Compiler::CodeGen
     args = param_count.times.map { |i| gfunc.llvm_func.params[i] }.to_a
     
     value = @builder.call llvm_ffi_func, args
+    value = gen_none if llvm_ffi_func.return_type == @void
     
-    if llvm_ffi_func.return_type == @void
-      # TODO: wrapper should return None
-      @builder.ret
-    else
-      @builder.ret(value)
-    end
+    @builder.ret(value)
     
     gen_func_end
   end
@@ -550,9 +541,7 @@ class Mare::Compiler::CodeGen
       args.unshift(receiver)
     end
     
-    value = @builder.call(gfunc.llvm_func, args)
-    value = gen_none if gfunc.llvm_func.return_type == @void # TODO: this should never happen
-    value
+    @builder.call(gfunc.llvm_func, args)
   end
   
   def gen_eq(relate)
@@ -614,7 +603,7 @@ class Mare::Compiler::CodeGen
   end
   
   def gen_none
-    @ptr.null # TODO: the real value
+    @gtypes["None"].singleton
   end
   
   def gen_bool(bool)
@@ -622,7 +611,7 @@ class Mare::Compiler::CodeGen
   end
   
   def gen_integer(expr : AST::LiteralInteger)
-    type_ref = func_frame.type_of(expr)
+    type_ref = type_of(expr)
     case type_ref.llvm_use_type
     when :i8 then @i8.const_int(expr.value.to_i8)
     when :u8 then @i8.const_int(expr.value.to_u8)
@@ -695,8 +684,7 @@ class Mare::Compiler::CodeGen
     @builder.br(bb_post)
     
     @builder.position_at_end(bb_post)
-    phi_type = @ptr # TODO: the real type
-    @builder.phi(@ptr, [bb_body1, bb_body2], [value1, value2], "phichoice")
+    @builder.phi(value1.type, [bb_body1, bb_body2], [value1, value2], "phi")
   end
   
   def gen_desc_type(type_def : Layout::Def) : LLVM::Type
