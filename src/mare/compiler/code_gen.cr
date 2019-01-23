@@ -82,7 +82,7 @@ class Mare::Compiler::CodeGen
     
     def gen_funcs(ctx : Context, g : CodeGen)
       @gfuncs.each_value do |gfunc|
-        g.gen_func_body(ctx, self, gfunc) if gfunc.func.body
+        g.gen_func_body(ctx, self, gfunc)
       end
     end
     
@@ -244,7 +244,6 @@ class Mare::Compiler::CodeGen
     gen_wrapper
     
     # Run LLVM sanity checks on the generated module.
-    @mod.dump
     @mod.verify
     
     # # Link the pony runtime bitcode into the generated module.
@@ -416,18 +415,7 @@ class Mare::Compiler::CodeGen
     @llvm.const_bit_cast(@gtypes[name].desc, @desc_ptr)
   end
   
-  def gen_ffi_decl(f)
-    params = f.params.not_nil!.terms.map do |param|
-      ffi_type_for(param.as(AST::Identifier))
-    end
-    ret = ffi_type_for(f.ret.not_nil!)
-    
-    @mod.functions.add(f.ident.value, params, ret)
-  end
-  
   def gen_func_decl(gtype, gfunc)
-    return gen_ffi_decl(gfunc.func) if gtype.type_def.is_ffi?
-    
     # TODO: these should probably not use the ffi_type_for each type?
     params = [] of LLVM::Type
     gfunc.func.params.try do |param_idents|
@@ -453,7 +441,7 @@ class Mare::Compiler::CodeGen
   end
   
   def gen_func_body(ctx, gtype, gfunc)
-    name = "#{gtype.type_def.llvm_name}.#{gfunc.func.ident.value}"
+    return gen_ffi_body(ctx, gtype, gfunc) if gtype.type_def.is_ffi?
     
     gen_func_start(ctx, gfunc.llvm_func, gfunc)
     
@@ -478,6 +466,42 @@ class Mare::Compiler::CodeGen
     gen_func_end
   end
   
+  def gen_ffi_decl(gfunc)
+    params = gfunc.func.params.not_nil!.terms.map do |param|
+      ffi_type_for(param.as(AST::Identifier))
+    end
+    ret = ffi_type_for(gfunc.func.ret.not_nil!)
+    
+    # Prevent double-declaring for common FFI functions already known to us.
+    llvm_ffi_func = @mod.functions[gfunc.func.ident.value]?
+    if llvm_ffi_func
+      # TODO: verify that parameter types and return type are compatible
+      return @mod.functions[gfunc.func.ident.value]
+    end
+    
+    @mod.functions.add(gfunc.func.ident.value, params, ret)
+  end
+  
+  def gen_ffi_body(ctx, gtype, gfunc)
+    llvm_ffi_func = gen_ffi_decl(gfunc)
+    
+    gen_func_start(ctx, gfunc.llvm_func, gfunc)
+    
+    param_count = gfunc.llvm_func.params.size
+    args = param_count.times.map { |i| gfunc.llvm_func.params[i] }.to_a
+    
+    value = @builder.call llvm_ffi_func, args
+    
+    if llvm_ffi_func.return_type == @void
+      # TODO: wrapper should return None
+      @builder.ret
+    else
+      @builder.ret(value)
+    end
+    
+    gen_func_end
+  end
+  
   def gen_dot(ctx, relate)
     rhs = relate.rhs
     
@@ -495,19 +519,14 @@ class Mare::Compiler::CodeGen
     lhs_gtype = gtype_of(relate.lhs)
     gfunc = lhs_gtype[member]
     
-    if lhs_gtype.type_def.is_ffi?
-      # TODO: unify with normal calls by making FFI types use wrapper functions.
-      ffi = @mod.functions[member]
-      value = @builder.call(ffi, args)
-      value = gen_none if ffi.return_type == @void
-      value
-    elsif gfunc.needs_receiver?
+    if gfunc.needs_receiver?
       receiver = gen_expr(ctx, relate.lhs)
       args.unshift(receiver)
-      @builder.call(gfunc.llvm_func, args)
-    else
-      @builder.call(gfunc.llvm_func, args)
     end
+    
+    value = @builder.call(gfunc.llvm_func, args)
+    value = gen_none if gfunc.llvm_func.return_type == @void # TODO: this should never happen
+    value
   end
   
   def gen_eq(ctx, relate)
