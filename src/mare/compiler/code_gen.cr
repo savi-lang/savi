@@ -219,7 +219,7 @@ class Mare::Compiler::CodeGen
   
   def pony_ctx
     return func_frame.pony_ctx if func_frame.pony_ctx?
-    func_frame.pony_ctx = @builder.call(@mod.functions["pony_ctx"], "pony_ctx")
+    func_frame.pony_ctx = @builder.call(@mod.functions["pony_ctx"], "PONY_CTX")
   end
   
   def self.run(ctx)
@@ -244,6 +244,7 @@ class Mare::Compiler::CodeGen
     gen_wrapper
     
     # Run LLVM sanity checks on the generated module.
+    @mod.dump
     @mod.verify
     
     # # Link the pony runtime bitcode into the generated module.
@@ -752,11 +753,11 @@ class Mare::Compiler::CodeGen
         index = LibPonyRT.int_heap_index(size).to_i32
         args << @i32.const_int(index)
         # TODO: handle case where final_fn is present (pony_alloc_small_final)
-        @builder.call(@mod.functions["pony_alloc_small"], args, "#{name}_buf")
+        @builder.call(@mod.functions["pony_alloc_small"], args, "#{name}.MEM")
       else
         args << @intptr.const_int(size)
         # TODO: handle case where final_fn is present (pony_alloc_large_final)
-        @builder.call(@mod.functions["pony_alloc_large"], args, "#{name}_buf")
+        @builder.call(@mod.functions["pony_alloc_large"], args, "#{name}.MEM")
       end
     
     value = @builder.bit_cast(value, gtype.structure.pointer, name)
@@ -768,7 +769,7 @@ class Mare::Compiler::CodeGen
   def gen_put_desc(value, gtype, name = "")
     raise NotImplementedError.new(gtype) unless gtype.type_def.has_desc?
     
-    desc_p = @builder.struct_gep(value, 0, "#{name}_desc_p")
+    desc_p = @builder.struct_gep(value, 0, "#{name}.DESC")
     @builder.store(gtype.desc, desc_p)
     # TODO: tbaa? (from set_descriptor in libponyc/codegen/gencall.c)
   end
