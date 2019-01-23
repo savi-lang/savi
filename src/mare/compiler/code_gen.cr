@@ -64,24 +64,30 @@ class Mare::Compiler::CodeGen
     getter! desc : LLVM::Value
     
     def initialize(g : CodeGen, @type_def)
+      @gfuncs = {} of String => GenFunc
+      
       # Generate descriptor type and structure type.
       @desc_type = g.gen_desc_type(@type_def)
       @structure = g.gen_structure(@type_def, @desc_type)
-      @gfuncs = {} of String => GenFunc
-      
+    end
+    
+    def gen_func_decls(g : CodeGen)
       # Generate associated function declarations, some of which
       # may be referenced in the descriptor global instance below.
       @type_def.each_function.each do |f|
         @gfuncs[f.ident.value] = GenFunc.new(g, self, f)
       end
-      
-      # Generate descriptor global instance.
+    end
+    
+    # Generate descriptor global instance.
+    def gen_desc(g : CodeGen)
       @desc = g.gen_desc(@type_def, @desc_type)
     end
     
-    def gen_funcs(g : CodeGen)
+    # Generate function implementations.
+    def gen_func_impls(g : CodeGen)
       @gfuncs.each_value do |gfunc|
-        g.gen_func_body(self, gfunc)
+        g.gen_func_impl(self, gfunc)
       end
     end
     
@@ -236,8 +242,14 @@ class Mare::Compiler::CodeGen
       @gtypes[type_def.llvm_name] = GenType.new(self, type_def)
     end
     
-    # CodeGen for all function bodies.
-    @gtypes.each_value(&.gen_funcs(self))
+    # CodeGen for all function declarations.
+    @gtypes.each_value(&.gen_func_decls(self))
+    
+    # CodeGen for all global descriptor instances.
+    @gtypes.each_value(&.gen_desc(self))
+    
+    # CodeGen for all function implementations.
+    @gtypes.each_value(&.gen_func_impls(self))
     
     # Generate the internal main function.
     gen_main
@@ -442,7 +454,7 @@ class Mare::Compiler::CodeGen
     @mod.functions.add(name, params, ret)
   end
   
-  def gen_func_body(gtype, gfunc)
+  def gen_func_impl(gtype, gfunc)
     return gen_ffi_body(gtype, gfunc) if gtype.type_def.is_ffi?
     
     gen_func_start(gfunc.llvm_func, gfunc)
