@@ -18,7 +18,10 @@ class Mare::Compiler::CodeGen
     getter program : Program
     getter func : LLVM::Function?
     getter gfunc : GenFunc?
+    
     setter pony_ctx : LLVM::Value?
+    property! receiver_value : LLVM::Value?
+    
     getter current_locals
     
     def initialize(@g : CodeGen, @program, @func = nil, @gfunc = nil)
@@ -212,6 +215,11 @@ class Mare::Compiler::CodeGen
   
   def gtype_by_llvm_name(llvm_name : String)
     @gtypes[llvm_name]
+  end
+  
+  def pony_ctx
+    return func_frame.pony_ctx if func_frame.pony_ctx?
+    func_frame.pony_ctx = @builder.call(@mod.functions["pony_ctx"], "pony_ctx")
   end
   
   def self.run(ctx)
@@ -435,8 +443,7 @@ class Mare::Compiler::CodeGen
     end
     
     # Add implicit receiver parameter if needed.
-    # TODO: use real receiver type (`gtype.structure.pointer`) instead of `@ptr`
-    params.unshift(@ptr) if gfunc.needs_receiver?
+    params.unshift(gtype.structure.pointer) if gfunc.needs_receiver?
     
     ret = gfunc.func.ret.try { |ret_ident| ffi_type_for(ret_ident) } || @void
     
@@ -449,7 +456,12 @@ class Mare::Compiler::CodeGen
     
     gen_func_start(ctx, gfunc.llvm_func, gfunc)
     
-    # TODO: allocation rites for constructors
+    func_frame.receiver_value =
+      if gfunc.func.has_tag?(:constructor)
+        gen_alloc(gtype)
+      elsif gfunc.needs_receiver?
+        gfunc.llvm_func.params[0]
+      end
     
     last_value = nil
     gfunc.func.body.not_nil!.terms.each do |expr|
@@ -516,7 +528,8 @@ class Mare::Compiler::CodeGen
     when AST::Identifier
       ref = func_frame.refer[expr]
       if ref.is_a?(Refer::Local) && ref.param_idx
-        param_idx = ref.param_idx.not_nil! - 1 # TODO: only for primitive calls
+        param_idx = ref.param_idx.not_nil!
+        param_idx -= 1 unless func_frame.gfunc.not_nil!.needs_receiver?
         frame.func.params[param_idx]
       elsif ref.is_a?(Refer::Local)
         func_frame.current_locals[ref]
@@ -528,8 +541,7 @@ class Mare::Compiler::CodeGen
         else raise NotImplementedError.new(ref.defn.ident.value)
         end
       elsif ref.is_a?(Refer::Self)
-        # TODO: Use real receiver value.
-        gen_none
+        func_frame.receiver_value
       else
         raise NotImplementedError.new(ref)
       end
@@ -727,13 +739,13 @@ class Mare::Compiler::CodeGen
     @llvm.struct(elements, type_def.llvm_name)
   end
   
-  def gen_alloc(gtype, name = "")
+  def gen_alloc(gtype, name = "@")
     raise NotImplementedError.new(gtype.type_def) \
       unless gtype.type_def.has_allocation?
     
     size = gtype.type_def.abi_size
     size = 1 if size == 0
-    args = [func_frame.pony_ctx]
+    args = [pony_ctx]
     
     value =
       if size <= PONYRT_HEAP_MAX
