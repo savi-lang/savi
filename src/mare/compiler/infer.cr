@@ -484,6 +484,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   
   # A literal integer could be any integer or floating-point machine type.
   def touch(node : AST::LiteralInteger)
+    # TODO: allow matching (an interface?) for user-created numeric types
     new_tid(node, Literal.new(node.pos, [
       refer.const("U8").defn, refer.const("U32").defn, refer.const("U64").defn,
       refer.const("I8").defn, refer.const("I32").defn, refer.const("I64").defn,

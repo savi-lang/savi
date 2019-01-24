@@ -68,6 +68,45 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         compile(context, default)
       end
       
+      # Numeric types need some basic metadata attached to know the native type.
+      if @type.kind == Program::Type::Kind::Numeric
+        # TODO: better generic mechanism for default consts
+        if !@type.has_func?("bit_width")
+          default = AST::Declare.new.from(@type.ident)
+          default.head << AST::Identifier.new("const").from(@type.ident)
+          default.head << AST::Identifier.new("bit_width").from(@type.ident)
+          default.head << AST::Identifier.new("U8").from(@type.ident)
+          default.body.terms << AST::LiteralInteger.new(64).from(@type.ident)
+          compile(context, default)
+        end
+        
+        bit_width_func = @type.find_func!("bit_width")
+        raise "numeric bit_width must be a const" \
+          unless bit_width_func.has_tag?(:constant_value)
+        
+        @type.metadata[:bit_width] = bit_width_func.body.not_nil!
+          .terms.last.as(AST::LiteralInteger).value.to_i32
+        
+        # TODO: better generic mechanism for default consts
+        if !@type.has_func?("is_floating_point")
+          default = AST::Declare.new.from(@type.ident)
+          default.head << AST::Identifier.new("const").from(@type.ident)
+          default.head << AST::Identifier.new("is_floating_point").from(@type.ident)
+          default.body.terms << AST::Identifier.new("False").from(@type.ident)
+          compile(context, default)
+        end
+        
+        is_float_func = @type.find_func!("is_floating_point")
+        raise "numeric is_floating_point must be a const" \
+          unless is_float_func.has_tag?(:constant_value)
+        
+        is_float = is_float_func.body.not_nil!.terms.last.as(AST::Identifier).value
+        raise "invalid numeric is_floating_point value" \
+          unless ["True", "False"].includes?(is_float)
+        
+        @type.metadata[:is_floating_point] = is_float == "True"
+      end
+      
       context.fulfill ["type", @type.ident.value], @type
     end
     

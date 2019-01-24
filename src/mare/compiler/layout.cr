@@ -59,16 +59,19 @@ class Mare::Compiler::Layout < Mare::AST::Visitor
         defn = single!
         case defn.kind
         when Program::Type::Kind::Numeric
-          # TODO: Declare this mapping in the prelude itself?
-          case defn.ident.value
-          when "I8" then :i8
-          when "U8" then :u8
-          when "I32" then :i32
-          when "U32" then :u32
-          when "I64" then :i64
-          when "U64" then :u64
-          when "F32" then :f32
-          when "F64" then :f64
+          if defn.metadata[:is_floating_point]
+            case defn.metadata[:bit_width]
+            when 32 then :f32
+            when 64 then :f64
+            raise NotImplementedError.new(defn.metadata)
+            end
+          else
+            case defn.metadata[:bit_width]
+            when 8 then :i8
+            when 32 then :i32
+            when 64 then :i64
+            raise NotImplementedError.new(defn.metadata)
+            end
           end
         # TODO: Handle Bool as :i1 (see ponyc's gentype.c:278)
         else

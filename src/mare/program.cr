@@ -28,6 +28,7 @@ class Mare::Program
     
     getter kind : Kind
     getter ident : AST::Identifier
+    getter metadata
     getter properties
     getter functions
     
@@ -36,10 +37,15 @@ class Mare::Program
     def initialize(@kind, @ident)
       @properties = [] of Property
       @functions = [] of Function
+      @metadata = Hash(Symbol, Int32 | Bool).new
     end
     
     def inspect(io : IO)
       io << "#<#{self.class} #{kind.to_s[/\w+\z/]} #{@ident.value.inspect}>"
+    end
+    
+    def has_func?(func_name)
+      @functions.any? { |f| f.ident.value == func_name }
     end
     
     def find_func!(func_name)

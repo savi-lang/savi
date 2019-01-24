@@ -629,10 +629,7 @@ class Mare::Compiler::CodeGen
     type_ref = type_of(expr)
     case type_ref.llvm_use_type
     when :i8 then @i8.const_int(expr.value.to_i8)
-    when :u8 then @i8.const_int(expr.value.to_u8)
-    when :u32 then @i32.const_int(expr.value.to_u32)
     when :i32 then @i32.const_int(expr.value.to_i32)
-    when :u64 then @i64.const_int(expr.value.to_u64)
     when :i64 then @i64.const_int(expr.value.to_i64)
     when :f32 then raise NotImplementedError.new("float literals")
     when :f64 then raise NotImplementedError.new("float literals")
