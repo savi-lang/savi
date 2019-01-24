@@ -29,13 +29,11 @@ class Mare::Program
     getter kind : Kind
     getter ident : AST::Identifier
     getter metadata
-    getter properties
     getter functions
     
     property! layout : Compiler::Layout
     
     def initialize(@kind, @ident)
-      @properties = [] of Property
       @functions = [] of Function
       @metadata = Hash(Symbol, Int32 | Bool).new
     end
@@ -66,15 +64,6 @@ class Mare::Program
         true
       else false
       end
-    end
-  end
-  
-  class Property
-    getter ident : AST::Identifier
-    getter ret : AST::Identifier
-    getter body : AST::Group
-    
-    def initialize(@ident, @ret, @body)
     end
   end
   

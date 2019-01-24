@@ -113,18 +113,26 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
     def compile(context, decl)
       case decl.keyword
       when "prop"
-        # TODO: common abstraction to extract decl head terms,
-        # with nice error collection for reporting to the user/tool.
+        raise "stateless types can't have properties" \
+          unless @type.is_instantiable?
+        
         head = decl.head.dup
         head.shift # discard the keyword
-        ident = head.shift.as(AST::Identifier | AST::LiteralString)
-        ret = head.shift.as(AST::Identifier)
+        ident = head.shift if head[0]?
+        ret = head.shift.as(AST::Identifier) if head[0]?
         
         ident = AST::Identifier.new(ident.value).from(ident) \
           if ident.is_a?(AST::LiteralString)
         ident = ident.as(AST::Identifier)
         
-        @type.properties << Program::Property.new(ident, ret, decl.body)
+        params = AST::Group.new(":").from(ident)
+        
+        body = decl.body
+        
+        function = Program::Function.new(ident, params, ret, body)
+        context.fulfill ["fun", @type.ident.value, ident.value], function
+        
+        @type.functions << function
       when "fun", "new"
         # TODO: common abstraction to extract decl head terms,
         # with nice error collection for reporting to the user/tool.

@@ -11,17 +11,19 @@ primitive Zero:
   fun "+" (other I32) I32:
     other
 
-class C:
+class Sentence:
+  prop text: Greeting.hello
 
 actor Main:
   new:
     exitcode I32 = Zero + 42
-    c = C.new
     none = ()
-    @say_hello
+    
+    @say_stuff
     
     if True \
       LibPonyRT.pony_exitcode(exitcode)
   
-  fun say_hello:
-    LibC.puts(Greeting.hello)
+  fun say_stuff:
+    sentence = Sentence.new
+    LibC.puts(sentence.text)
