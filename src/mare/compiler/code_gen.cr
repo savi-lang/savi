@@ -51,16 +51,20 @@ class Mare::Compiler::CodeGen
   class GenType
     getter type_def : Layout::Def
     getter desc_type : LLVM::Type
-    getter structure : LLVM::Type
+    getter struct_type : LLVM::Type
     getter! desc : LLVM::Value
     getter! singleton : LLVM::Value
     
     def initialize(g : CodeGen, @type_def)
       @gfuncs = {} of String => GenFunc
       
-      # Generate descriptor type and structure type.
+      # Generate descriptor type and struct type.
       @desc_type = g.gen_desc_type(@type_def)
-      @structure = g.gen_structure(@type_def, @desc_type)
+      @struct_type = g.gen_struct_type(@type_def, @desc_type)
+    end
+    
+    def llvm_type
+      @struct_type.pointer
     end
     
     def gen_func_decls(g : CodeGen)
@@ -85,7 +89,8 @@ class Mare::Compiler::CodeGen
     
     # Generate other global values.
     def gen_globals(g : CodeGen)
-      @singleton = g.gen_singleton(self) unless @type_def.has_allocation?
+      @singleton = g.gen_singleton(@type_def, @struct_type, @desc.not_nil!) \
+        unless @type_def.has_allocation?
     end
     
     def [](name)
@@ -223,7 +228,7 @@ class Mare::Compiler::CodeGen
     when :i64, :u64 then @i64
     when :ptr then @ptr
     when :struct_ptr then
-      @gtypes[program.layout[ref.single!].llvm_name].structure.pointer
+      @gtypes[program.layout[ref.single!].llvm_name].llvm_type
     else raise NotImplementedError.new(ref.llvm_use_type)
     end
   end
@@ -451,7 +456,7 @@ class Mare::Compiler::CodeGen
     end
     
     # Add implicit receiver parameter if needed.
-    param_types.unshift(gtype.structure.pointer) if gfunc.needs_receiver?
+    param_types.unshift(gtype.llvm_type) if gfunc.needs_receiver?
     
     ret_type = gfunc.func.ret.try { |x| llvm_type_of(x, gfunc) } || @void
     
@@ -569,11 +574,11 @@ class Mare::Compiler::CodeGen
       elsif ref.is_a?(Refer::Local)
         func_frame.current_locals[ref]
       elsif ref.is_a?(Refer::Const)
-        case ref.defn.ident.value # TODO: deal with namespacing properly
-        when "True"  then gen_bool(true)
-        when "False" then gen_bool(false)
-        when "None"  then gen_none
-        else raise NotImplementedError.new(ref.defn.ident.value)
+        gtype = gtype_of(expr)
+        case gtype
+        when @gtypes["True"]? then gen_bool(true)
+        when @gtypes["False"]? then gen_bool(false)
+        else gtype.singleton
         end
       elsif ref.is_a?(Refer::Self)
         func_frame.receiver_value
@@ -768,7 +773,7 @@ class Mare::Compiler::CodeGen
     global
   end
   
-  def gen_structure(type_def, desc_type)
+  def gen_struct_type(type_def, desc_type)
     elements = [] of LLVM::Type
     elements << desc_type.pointer if type_def.has_desc?
     elements << @actor_pad if type_def.has_actor_pad?
@@ -777,14 +782,14 @@ class Mare::Compiler::CodeGen
     @llvm.struct(elements, type_def.llvm_name)
   end
   
-  def gen_singleton(gtype)
-    raise "can't generate stateful singleton" if gtype.type_def.has_allocation?
+  def gen_singleton(type_def, struct_type, desc)
+    raise "can't generate stateful singleton" if type_def.has_allocation?
     
-    global = @mod.globals.add(gtype.structure, gtype.type_def.llvm_name)
+    global = @mod.globals.add(struct_type, type_def.llvm_name)
     global.linkage = LLVM::Linkage::LinkerPrivate
     global.global_constant = true
     
-    global.initializer = gtype.structure.const_struct([gtype.desc])
+    global.initializer = struct_type.const_struct([desc])
     
     global
   end
@@ -809,7 +814,7 @@ class Mare::Compiler::CodeGen
         @builder.call(@mod.functions["pony_alloc_large"], args, "#{name}.MEM")
       end
     
-    value = @builder.bit_cast(value, gtype.structure.pointer, name)
+    value = @builder.bit_cast(value, gtype.llvm_type, name)
     gen_put_desc(value, gtype, name)
     
     value
