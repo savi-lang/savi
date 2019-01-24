@@ -71,6 +71,7 @@ class Mare::Compiler::CodeGen
       # Generate associated function declarations, some of which
       # may be referenced in the descriptor global instance below.
       @type_def.each_function.each do |f|
+        next unless g.program.layout.reached_func?(f)
         @gfuncs[f.ident.value] = GenFunc.new(g, self, f)
       end
     end
@@ -83,6 +84,7 @@ class Mare::Compiler::CodeGen
     # Generate function implementations.
     def gen_func_impls(g : CodeGen)
       @gfuncs.each_value do |gfunc|
+        next unless g.program.layout.reached_func?(gfunc.func)
         g.gen_func_impl(self, gfunc)
       end
     end
@@ -104,7 +106,9 @@ class Mare::Compiler::CodeGen
     
     def initialize(g : CodeGen, gtype : GenType, @func)
       @needs_receiver = \
-        gtype.type_def.has_allocation? && !@func.has_tag?(:constructor)
+        gtype.type_def.has_allocation? &&
+        !@func.has_tag?(:constructor) &&
+        !@func.has_tag?(:constant_value)
       
       @llvm_func = g.gen_func_decl(gtype, self)
     end
@@ -480,7 +484,7 @@ class Mare::Compiler::CodeGen
     
     last_value = nil
     gfunc.func.body.not_nil!.terms.each do |expr|
-      last_value = gen_expr(expr)
+      last_value = gen_expr(expr, gfunc.func.has_tag?(:constant_value))
     end
     
     if gfunc.func.ret
@@ -563,15 +567,17 @@ class Mare::Compiler::CodeGen
     end
   end
   
-  def gen_expr(expr) : LLVM::Value
+  def gen_expr(expr, const_only = false) : LLVM::Value
     case expr
     when AST::Identifier
       ref = func_frame.refer[expr]
       if ref.is_a?(Refer::Local) && ref.param_idx
+        raise "#{ref.inspect} isn't a constant value" if const_only
         param_idx = ref.param_idx.not_nil!
         param_idx -= 1 unless func_frame.gfunc.not_nil!.needs_receiver?
         frame.func.params[param_idx]
       elsif ref.is_a?(Refer::Local)
+        raise "#{ref.inspect} isn't a constant value" if const_only
         func_frame.current_locals[ref]
       elsif ref.is_a?(Refer::Const)
         gtype = gtype_of(expr)
@@ -581,6 +587,7 @@ class Mare::Compiler::CodeGen
         else gtype.singleton
         end
       elsif ref.is_a?(Refer::Self)
+        raise "#{ref.inspect} isn't a constant value" if const_only
         func_frame.receiver_value
       else
         raise NotImplementedError.new(ref)
@@ -590,17 +597,20 @@ class Mare::Compiler::CodeGen
     when AST::LiteralString
       gen_string(expr)
     when AST::Relate
+      raise "#{expr.inspect} isn't a constant value" if const_only
       case expr.op.as(AST::Operator).value
       when "." then gen_dot(expr)
       when "=" then gen_eq(expr)
       else raise NotImplementedError.new(expr.inspect)
       end
     when AST::Group
+      raise "#{expr.inspect} isn't a constant value" if const_only
       case expr.style
       when "(" then gen_sequence(expr)
       else raise NotImplementedError.new(expr.inspect)
       end
     when AST::Choice
+      raise "#{expr.inspect} isn't a constant value" if const_only
       gen_choice(expr)
     else
       raise NotImplementedError.new(expr.inspect)

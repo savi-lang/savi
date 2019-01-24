@@ -39,7 +39,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
     def initialize(@type : Program::Type)
     end
     
-    def keywords; ["prop", "fun", "new"] end
+    def keywords; ["prop", "fun", "new", "const"] end
     
     # # TODO: make these into macro-like declarations that do stuff
     # {
@@ -115,6 +115,28 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         context.fulfill ["fun", @type.ident.value, ident.value], function
         
         function.add_tag(:constructor) if decl.keyword == "new"
+        
+        @type.functions << function
+      when "const"
+        # TODO: common abstraction to extract decl head terms,
+        # with nice error collection for reporting to the user/tool.
+        head = decl.head.dup
+        head.shift # discard the keyword
+        ident = head.shift if head[0]?
+        ret = head.shift.as(AST::Identifier) if head[0]?
+        
+        ident = AST::Identifier.new(ident.value).from(ident) \
+          if ident.is_a?(AST::LiteralString)
+        ident = ident.as(AST::Identifier)
+        
+        params = AST::Group.new(":").from(ident)
+        
+        body = decl.body
+        
+        function = Program::Function.new(ident, params, ret, body)
+        context.fulfill ["fun", @type.ident.value, ident.value], function
+        
+        function.add_tag(:constant_value)
         
         @type.functions << function
       end

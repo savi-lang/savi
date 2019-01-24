@@ -5,7 +5,7 @@ ffi LibPonyRT:
   fun pony_exitcode (I32) None:
 
 primitive Greeting:
-  fun hello CString:
+  const hello CString:
     "Hello, World!"
 
 primitive Zero:

@@ -4,18 +4,45 @@ primitive None:
 // Booleans
 primitive True:
 primitive False:
+// TODO:
+// enum Bool:
+//   const bit_width: 1
+//   member False: 0
+//   member True: 1
 
 // Integers
 numeric U8:
+  const bit_width U8: 8
+  const is_floating_point: False // TODO: make this implicit default
+
 numeric U32:
+  const bit_width U8: 32
+  const is_floating_point: False // TODO: make this implicit default
+
 numeric U64:
+  const bit_width U8: 64
+  const is_floating_point: False // TODO: make this implicit default
+
 numeric I8:
+  const bit_width U8: 8
+  const is_floating_point: False // TODO: make this implicit default
+
 numeric I32:
+  const bit_width U8: 32
+  const is_floating_point: False // TODO: make this implicit default
+
 numeric I64:
+  const bit_width U8: 64
+  const is_floating_point: False // TODO: make this implicit default
 
 // Floats
 numeric F32:
+  const bit_width U8: 32
+  const is_floating_point: True
+
 numeric F64:
+  const bit_width U8: 64
+  const is_floating_point: True
 
 // ...
 

@@ -250,6 +250,10 @@ class Mare::Compiler::Layout < Mare::AST::Visitor
     @defs[program_type]
   end
   
+  def reached_func?(program_func : Program::Function)
+    @seen_funcs.includes?(program_func)
+  end
+  
   def each_type_def
     @defs.each_value
   end
