@@ -15,6 +15,7 @@ primitive Zero:
 actor Main:
   new:
     exitcode I32 = Zero + 42
+    none = ()
     @say_hello
     
     if True \

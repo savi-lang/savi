@@ -43,6 +43,11 @@ class Mare::Compiler::Layout < Mare::AST::Visitor
       0 # TODO
     end
     
+    def is_none!
+      # TODO: better reach the one true None instead of a namespaced impostor?
+      raise "#{self} is not None" unless single!.ident.value == "None"
+    end
+    
     @llvm_use_type : Symbol?
     def llvm_use_type : Symbol
       (@llvm_use_type ||= \

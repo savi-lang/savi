@@ -91,6 +91,31 @@ describe Mare::Compiler::Infer do
     end
   end
   
+  it "treats an empty sequence as producing None" do
+    source = Mare::Source.new "(example)", <<-SOURCE
+    actor Main:
+      new:
+        name CString = ()
+    SOURCE
+    
+    expected = <<-MSG
+    This value's type is unresolvable due to conflicting constraints:
+    - it must be a subtype of (None):
+      from (example):3:
+        name CString = ()
+                       ^~
+    
+    - it must be a subtype of (CString):
+      from (example):3:
+        name CString = ()
+             ^~~~~~~
+    MSG
+    
+    expect_raises Mare::Compiler::Infer::Error, expected do
+      Mare::Compiler.compile(source, limit: Mare::Compiler::Infer)
+    end
+  end
+  
   it "complains when a choice condition type isn't boolean" do
     source = Mare::Source.new "(example)", <<-SOURCE
     actor Main:

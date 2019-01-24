@@ -647,8 +647,11 @@ class Mare::Compiler::CodeGen
   end
   
   def gen_sequence(expr : AST::Group)
-    # TODO: Use None as a value when sequence group size is zero.
-    raise NotImplementedError.new(expr.terms.size) if expr.terms.size == 0
+    # Use None as a value when the sequence group size is zero.
+    if expr.terms.size == 0
+      type_of(expr).is_none!
+      return gen_none
+    end
     
     # TODO: Push a scope frame?
     

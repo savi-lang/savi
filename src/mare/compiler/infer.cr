@@ -503,9 +503,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     case node.style
     when "(", ":"
       if node.terms.empty?
-        # TODO: constrain with a Domain of [None], so that something like:
-        #   `number I32 = ()`
-        # will fail because [I32] & [None] is [].
+        new_tid(node, Literal.new(node.pos, [refer.const("None").defn]))
       else
         # A non-empty group always has the tid of its final child.
         transfer_tid(node.terms.last, node)
