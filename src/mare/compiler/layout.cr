@@ -106,19 +106,17 @@ class Mare::Compiler::Layout < Mare::AST::Visitor
     
     def abi_size : Int32
       # TODO: move final number calculation to CodeGen side (LLVMABISizeOfType)
-      # TODO: don't hard-code these here
-      case llvm_name
-      when "Main" then 256
-      when "Env" then 64
-      else
-        case @program_type.kind
-        when Program::Type::Kind::FFI,
-             Program::Type::Kind::Primitive
-          8 # TODO: cross-platform
-        when Program::Type::Kind::Numeric
-          16 # TODO: cross-platform
-        else raise NotImplementedError.new(@program_type.kind)
-        end
+      case @program_type.kind
+      when Program::Type::Kind::FFI,
+           Program::Type::Kind::Primitive
+        8 # TODO: cross-platform
+      when Program::Type::Kind::Numeric
+        16 # TODO: cross-platform
+      when Program::Type::Kind::Class
+        64 # TODO: cross-platform and handle fields
+      when Program::Type::Kind::Actor
+        256 # TODO: cross-platform and handle fields
+      else raise NotImplementedError.new(@program_type.kind)
       end
     end
     

@@ -12,9 +12,12 @@ primitive Zero:
   fun "+" (other I32) I32:
     other
 
+class C:
+
 actor Main:
   new:
     exitcode I32 = Zero + 42
+    c = C.new
     none = ()
     @say_hello
     
