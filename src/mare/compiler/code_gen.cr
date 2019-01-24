@@ -462,7 +462,7 @@ class Mare::Compiler::CodeGen
     # Add implicit receiver parameter if needed.
     param_types.unshift(gtype.llvm_type) if gfunc.needs_receiver?
     
-    ret_type = gfunc.func.ret.try { |x| llvm_type_of(x, gfunc) } || @void
+    ret_type = llvm_type_of(gfunc.func.ident, gfunc)
     
     name = "#{gtype.type_def.llvm_name}.#{gfunc.func.ident.value}"
     @mod.functions.add(name, param_types, ret_type)
@@ -487,11 +487,7 @@ class Mare::Compiler::CodeGen
       last_value = gen_expr(expr, gfunc.func.has_tag?(:constant_value))
     end
     
-    if gfunc.func.ret
-      @builder.ret(last_value.not_nil!)
-    else
-      @builder.ret
-    end
+    @builder.ret(last_value.not_nil!)
     
     gen_func_end
   end
