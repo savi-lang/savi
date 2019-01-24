@@ -204,7 +204,8 @@ class Mare::Compiler::Layout < Mare::AST::Visitor
       instance.handle_type_def(t)
     end
     
-    # Now, reach into the program starting from Main.new.
+    # Now, reach into the program starting from Env.new and Main.new.
+    instance.run(ctx.program.find_func!("Env", "new"))
     instance.run(ctx.program.find_func!("Main", "new"))
   end
   

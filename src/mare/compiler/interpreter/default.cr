@@ -60,6 +60,14 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
     # }
     
     def finished(context)
+      # Instantiable types with no constructor get a default empty one.
+      if @type.is_instantiable? \
+      && !@type.functions.any? { |f| f.has_tag?(:constructor) }
+        default = AST::Declare.new.from(@type.ident)
+        default.head << AST::Identifier.new("new").from(@type.ident)
+        compile(context, default)
+      end
+      
       context.fulfill ["type", @type.ident.value], @type
     end
     

@@ -292,7 +292,6 @@ describe Mare::Compiler::Infer do
   it "infers assignment from an allocated class" do
     source = Mare::Source.new "(example)", <<-SOURCE
     class X:
-      new:
     
     actor Main:
       new:
