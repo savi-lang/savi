@@ -38,6 +38,10 @@ class Mare::Program
       @functions = [] of Function
     end
     
+    def inspect(io : IO)
+      io << "#<#{self.class} #{kind.to_s[/\w+\z/]} #{@ident.value.inspect}>"
+    end
+    
     def find_func!(func_name)
       @functions.find { |f| f.ident.value == func_name }.not_nil!
     end
