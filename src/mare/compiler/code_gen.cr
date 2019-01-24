@@ -246,27 +246,27 @@ class Mare::Compiler::CodeGen
     @program = ctx.program
     ctx.program.code_gen = self
     
-    # CodeGen for all type descriptors and function declarations.
+    # Generate all type descriptors and function declarations.
     ctx.program.layout.each_type_def.each do |type_def|
       @gtypes[type_def.llvm_name] = GenType.new(self, type_def)
     end
     
-    # CodeGen for all function declarations.
+    # Generate all function declarations.
     @gtypes.each_value(&.gen_func_decls(self))
     
-    # CodeGen for all global descriptor instances.
+    # Generate all global descriptor instances.
     @gtypes.each_value(&.gen_desc(self))
     
-    # CodeGen for all global values associated with this type.
+    # Generate all global values associated with this type.
     @gtypes.each_value(&.gen_globals(self))
     
-    # CodeGen for all function implementations.
+    # Generate all function implementations.
     @gtypes.each_value(&.gen_func_impls(self))
     
     # Generate the internal main function.
     gen_main
     
-    # Generate the wrapper main function.
+    # Generate the wrapper main function for the JIT.
     gen_wrapper
     
     # Run LLVM sanity checks on the generated module.
