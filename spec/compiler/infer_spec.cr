@@ -288,4 +288,27 @@ describe Mare::Compiler::Infer do
       Mare::Compiler.compile(source, limit: Mare::Compiler::Infer)
     end
   end
+  
+  it "infers assignment from an allocated class" do
+    source = Mare::Source.new "(example)", <<-SOURCE
+    class X:
+      new:
+    
+    actor Main:
+      new:
+        x = X.new
+    SOURCE
+    
+    ctx = Mare::Compiler.compile(source, limit: Mare::Compiler::Infer)
+    
+    func = ctx.program.find_func!("Main", "new")
+    body = func.body.not_nil!
+    assign = body.terms.first.as(Mare::AST::Relate)
+    
+    func.infer.resolve(assign.lhs).defns.map(&.ident).map(&.value).should eq \
+      ["X"]
+    
+    func.infer.resolve(assign.rhs).defns.map(&.ident).map(&.value).should eq \
+      ["X"]
+  end
 end

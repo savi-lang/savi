@@ -95,6 +95,14 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         body = decl.body
         body = nil if @type.kind == Program::Type::Kind::FFI
         
+        if decl.keyword == "new"
+          # Constructors always return the self (`@`).
+          # TODO: decl parse error if an explicit return type was given
+          ret ||= AST::Identifier.new("@").from(ident)
+          body ||= AST::Group.new(":")
+          body.terms << AST::Identifier.new("@").from(ident)
+        end
+        
         function = Program::Function.new(ident, params, ret, body)
         context.fulfill ["fun", @type.ident.value, ident.value], function
         

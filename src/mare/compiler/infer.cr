@@ -353,7 +353,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     
     # Take note of the return type constraint if given.
     func.ret.try do |ret_t|
-      meta_type = MetaType.new(ret_t.pos, [refer.const(ret_t.value).defn])
+      meta_type = MetaType.new(ret_t.pos, [func.refer.const(ret_t.value).defn])
       new_tid(ret_t, Fixed.new(meta_type))
       self[ret_tid].as(Local).set_explicit(meta_type)
     end
@@ -448,8 +448,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     case ref
     when Refer::Const
       # If it's a const, treat it as a type reference.
-      # TODO: handle instantiable type references as having a meta-type.
-      raise NotImplementedError.new(node.value) if ref.defn.is_instantiable?
+      # TODO: handle instantiable type references as having a opaque singleton type.
       new_tid(node, Fixed.new(MetaType.new(node.pos, [ref.defn])))
     when Refer::Local
       # If it's a local, track the possibly new tid in our @local_tids map.

@@ -17,6 +17,7 @@ describe Mare::Compiler::Macros do
             [[:ident, "True"], [:ident, "None"]],
           ],
         ],
+        [:ident, "@"],
       ]
     end
     

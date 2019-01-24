@@ -51,7 +51,7 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
   
   alias Info = (Unresolved | Self | Local | Const | ConstUnion)
   
-  def initialize(@consts : Hash(String, Const))
+  def initialize(@self_const : Const, @consts : Hash(String, Const))
     @create_params = false
     @last_rid = 0_u64
     @last_param = 0
@@ -71,6 +71,7 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
   end
   
   def const(name)
+    return @self_const if name == "@"
     @consts[name]
   end
   
@@ -84,8 +85,9 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
     
     # For each function in the program, run with a new instance.
     ctx.program.types.each do |t|
+      t_const = Const.new(t)
       t.functions.each do |f|
-        new(consts).run(f)
+        new(t_const, consts).run(f)
       end
     end
   end
