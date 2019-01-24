@@ -125,7 +125,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
           if ident.is_a?(AST::LiteralString)
         ident = ident.as(AST::Identifier)
         
-        params = AST::Group.new(":").from(ident)
+        params = AST::Group.new("(").from(ident)
         
         body = decl.body
         
@@ -176,7 +176,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
           if ident.is_a?(AST::LiteralString)
         ident = ident.as(AST::Identifier)
         
-        params = AST::Group.new(":").from(ident)
+        params = AST::Group.new("(").from(ident)
         
         body = decl.body
         
