@@ -687,7 +687,8 @@ class Mare::Compiler::CodeGen
     @builder.br(bb_post)
     
     @builder.position_at_end(bb_post)
-    @builder.phi(value1.type, [bb_body1, bb_body2], [value1, value2], "phi")
+    phi_type = value1.type # TODO: inferred union of all branch types
+    @builder.phi(phi_type, [bb_body1, bb_body2], [value1, value2], "phichoice")
   end
   
   def gen_desc_type(type_def : Layout::Def) : LLVM::Type
