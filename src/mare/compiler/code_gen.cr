@@ -133,7 +133,7 @@ class Mare::Compiler::CodeGen
       @needs_receiver = \
         gtype.type_def.has_allocation? &&
         !@func.has_tag?(:constructor) &&
-        !@func.has_tag?(:constant_value)
+        !@func.has_tag?(:constant)
       
       @llvm_name = "#{gtype.type_def.llvm_name}.#{@func.ident.value}"
       @llvm_name = "#{@llvm_name}.HYGIENIC" if func.has_tag?(:hygienic)
@@ -548,7 +548,7 @@ class Mare::Compiler::CodeGen
     # Now generate code for the expressions in the function body.
     last_value = nil
     gfunc.func.body.not_nil!.terms.each do |expr|
-      last_value = gen_expr(expr, gfunc.func.has_tag?(:constant_value))
+      last_value = gen_expr(expr, gfunc.func.has_tag?(:constant))
     end
     @builder.ret(last_value.not_nil!)
     

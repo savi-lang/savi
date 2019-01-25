@@ -83,7 +83,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         
         bit_width_func = @type.find_func!("bit_width")
         raise "numeric bit_width must be a const" \
-          unless bit_width_func.has_tag?(:constant_value)
+          unless bit_width_func.has_tag?(:constant)
         
         @type.metadata[:bit_width] = bit_width_func.body.not_nil!
           .terms.last.as(AST::LiteralInteger).value.to_i32
@@ -99,7 +99,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         
         is_float_func = @type.find_func!("is_floating_point")
         raise "numeric is_floating_point must be a const" \
-          unless is_float_func.has_tag?(:constant_value)
+          unless is_float_func.has_tag?(:constant)
         
         is_float = is_float_func.body.not_nil!.terms.last.as(AST::Identifier).value
         raise "invalid numeric is_floating_point value" \
@@ -188,7 +188,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         function = Program::Function.new(ident, params, ret, body)
         context.fulfill ["fun", @type.ident.value, ident.value], function
         
-        function.add_tag(:constant_value)
+        function.add_tag(:constant)
         
         @type.functions << function
       end

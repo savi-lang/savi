@@ -80,7 +80,7 @@ class Mare::Program
     property! infer : Compiler::Infer
     
     KNOWN_TAGS = [
-      :constant_value,
+      :constant,
       :constructor,
       :hygienic,
       :field,
