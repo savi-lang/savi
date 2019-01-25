@@ -613,15 +613,19 @@ class Mare::Compiler::CodeGen
   end
   
   def gen_eq(relate)
+    value = gen_expr(relate.rhs).as(LLVM::Value)
+    
     ref = func_frame.refer[relate.lhs]
     if ref.is_a?(Refer::Local)
-      rhs = gen_expr(relate.rhs).as(LLVM::Value)
-      
       raise "local already declared: #{ref.inspect}" \
         if func_frame.current_locals[ref]?
       
-      rhs.name = ref.name
-      func_frame.current_locals[ref] = rhs
+      value.name = ref.name
+      func_frame.current_locals[ref] = value
+    elsif ref.is_a?(Refer::Field)
+      old_value = gen_field_load(ref.name)
+      gen_field_store(ref.name, value)
+      old_value
     else raise NotImplementedError.new(relate.inspect)
     end
   end

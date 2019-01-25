@@ -138,6 +138,27 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         getter_func = Program::Function.new(ident, getter_params, ret, getter_body)
         context.fulfill ["fun", @type.ident.value, ident.value], getter_func
         @type.functions << getter_func
+        
+        setter_ident = AST::Identifier.new("#{ident.value}=").from(ident)
+        setter_param = AST::Identifier.new("value").from(ident)
+        if !ret.nil?
+          pair = AST::Group.new(" ").from(setter_param)
+          pair.terms << setter_param
+          pair.terms << ret.dup
+          setter_param = pair
+        end
+        setter_params = AST::Group.new("(").from(ident)
+        setter_params.terms << setter_param
+        setter_assign = AST::Relate.new(
+          AST::Field.new(ident.value).from(ident),
+          AST::Operator.new("=").from(ident),
+          AST::Identifier.new("value").from(ident),
+        ).from(ident)
+        setter_body = AST::Group.new(":").from(ident)
+        setter_body.terms << setter_assign
+        setter_func = Program::Function.new(setter_ident, setter_params, ret.dup, setter_body)
+        context.fulfill ["fun", @type.ident.value, setter_ident.value], setter_func
+        @type.functions << setter_func
       when "fun", "new"
         # TODO: common abstraction to extract decl head terms,
         # with nice error collection for reporting to the user/tool.

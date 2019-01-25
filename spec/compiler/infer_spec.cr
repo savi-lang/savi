@@ -186,6 +186,8 @@ describe Mare::Compiler::Infer do
   end
   
   it "infers a prop's type based on the prop initializer" do
+    next pending "infers a prop's type based on the prop initializer"
+    
     source = Mare::Source.new "(example)", <<-SOURCE
     actor Main:
       prop x: "Hello, World!"

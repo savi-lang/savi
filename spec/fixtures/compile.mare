@@ -12,8 +12,7 @@ primitive Zero:
     other
 
 class Sentence:
-  prop text: Greeting.hello
-  fun "text=" (value CString): LibC.puts("STUB!")
+  prop text CString: Greeting.hello
 
 actor Main:
   new:
