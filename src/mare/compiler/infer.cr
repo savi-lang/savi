@@ -221,12 +221,17 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   class Param < Info
     @explicit : MetaType?
     @downstreamed : MetaType?
+    @upstream : TID = 0
     
     def initialize(@pos)
     end
     
     private def already_resolved! : MetaType
+    end
+    
+    def resolve!(infer : Infer) : MetaType
       return @explicit.not_nil! unless @explicit.nil?
+      return infer[@upstream].resolve!(infer) unless @upstream == 0
       return @downstreamed.not_nil! unless @downstreamed.nil?
       
       raise Error.new([
@@ -235,13 +240,10 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       ].join("\n"))
     end
     
-    def resolve!(infer : Infer) : MetaType
-      already_resolved!
-    end
-    
     def set_explicit(explicit : MetaType)
       raise "already set_explicit" if @explicit
       raise "already have downstreams" if @downstreamed
+      raise "already have an upstream" if @upstream != 0
       
       @explicit = explicit
     end
@@ -255,11 +257,21 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       else
         @downstreamed = constraint
       end
+      
+      infer[@upstream].within_domain!(infer, constraint) if @upstream != 0
     end
     
-    def verify_arg(arg_infer : Infer, arg_tid : TID)
+    def verify_arg(infer : Infer, arg_infer : Infer, arg_tid : TID)
       arg = arg_infer[arg_tid]
-      arg.within_domain!(arg_infer, already_resolved!)
+      arg.within_domain!(arg_infer, resolve!(infer))
+    end
+    
+    def assign(infer : Infer, tid : TID)
+      infer[tid].within_domain!(infer, @explicit.not_nil!) if @explicit
+      infer[tid].within_domain!(infer, @downstreamed.not_nil!) if @downstreamed
+      
+      raise "already assigned an upstream" if @upstream != 0
+      @upstream = tid
     end
   end
   
@@ -450,7 +462,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     # TODO: handle case where number of args differs from number of params.
     unless call.args.empty?
       call.args.zip(infer.param_tids).each do |arg_tid, param_tid|
-        infer[param_tid].as(Param).verify_arg(self, arg_tid)
+        infer[param_tid].as(Param).verify_arg(infer, self, arg_tid)
       end
     end
   end
@@ -608,7 +620,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   
   def touch(node : AST::Relate)
     case node.op.value
-    when "="
+    when "=", "DEFAULTPARAM"
       lhs = self[node.lhs]
       case lhs
       when Local
@@ -617,7 +629,11 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       when Field
         lhs.assign(self, node.rhs.tid)
         transfer_tid(node.lhs, node)
-      else raise NotImplementedError.new(node.lhs)
+      when Param
+        lhs.assign(self, node.rhs.tid)
+        transfer_tid(node.lhs, node)
+      else
+        raise NotImplementedError.new(node.lhs)
       end
     when "."
       lhs = node.lhs

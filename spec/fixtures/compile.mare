@@ -14,7 +14,8 @@ primitive Zero:
 
 class Sentence:
   prop text CString:
-  new (@text):
+  new (text = "[awkward silence]"):
+    @text = text // TODO: omit this line by using @text as param name
 
 actor Main:
   new:
@@ -27,7 +28,9 @@ actor Main:
       LibPonyRT.pony_exitcode(exitcode)
   
   fun say_stuff:
-    sentence = Sentence.new(Greeting.hello)
+    sentence = Sentence.new
+    LibC.puts(sentence.text)
+    sentence.text = Greeting.hello
     LibC.puts(sentence.text)
     sentence.text = Greeting.bye
     LibC.puts(sentence.text)

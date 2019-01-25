@@ -479,6 +479,14 @@ class Mare::Compiler::CodeGen
     @frames.pop
   end
   
+  def gen_within_foreign_frame(gtype : GenType, gfunc : GenFunc)
+    @frames << Frame.new(self, gfunc.llvm_func, gtype, gfunc)
+    
+    yield
+    
+    @frames.pop
+  end
+  
   def gen_block(name)
     frame.func.basic_blocks.append(name)
   end
@@ -606,6 +614,20 @@ class Mare::Compiler::CodeGen
     relate.lhs.as(AST::Identifier) # assert that lhs is an identifier
     lhs_gtype = gtype_of(relate.lhs)
     gfunc = lhs_gtype[member]
+    
+    # For any args we are missing, try to find and use a default param value.
+    gfunc.func.params.try do |params|
+      while args.size < params.terms.size
+        param = params.terms[args.size]
+        
+        raise "missing arg #{args.size + 1} with no default param" \
+          unless param.is_a?(AST::Relate) && param.op.value == "DEFAULTPARAM"
+        
+        gen_within_foreign_frame lhs_gtype, gfunc do
+          args << gen_expr(param.rhs)
+        end
+      end
+    end
     
     if gfunc.needs_receiver?
       receiver = gen_expr(relate.lhs)

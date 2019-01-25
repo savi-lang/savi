@@ -9,6 +9,15 @@ class Mare::Compiler::Sugar < Mare::AST::Visitor
   end
   
   def run(f)
+    # If any parameters contain assignments, convert them to defaults.
+    if f.body && f.params
+      f.params.not_nil!.terms.each do |param|
+        if param.is_a?(AST::Relate) && param.op.value == "="
+          param.op.value = "DEFAULTPARAM"
+        end
+      end
+    end
+    
     # Sugar the parameter signature.
     f.params.try { |params| params.accept(self) }
     
@@ -47,11 +56,14 @@ class Mare::Compiler::Sugar < Mare::AST::Visitor
   
   def visit(node : AST::Relate)
     case node.op.value
-    when ".", "&&", "||", " " then node # skip these special-case operators
+    when ".", "&&", "||", " ", "DEFAULTPARAM"
+      node # skip these special-case operators
     when "="
-      # If assigning to a "." relation, treat as a "setter" method call.
+      # If assigning to a ".[identifier]" relation, sugar as a "setter" method.
       lhs = node.lhs
-      if lhs.is_a?(AST::Relate) && lhs.op.value == "."
+      if lhs.is_a?(AST::Relate) \
+      && lhs.op.value == "." \
+      && lhs.rhs.is_a?(AST::Identifier)
         name = "#{lhs.rhs.as(AST::Identifier).value}="
         ident = AST::Identifier.new(name).from(lhs.rhs)
         args = AST::Group.new("(", [node.rhs]).from(node.rhs)

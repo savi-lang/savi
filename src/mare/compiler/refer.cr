@@ -216,6 +216,15 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
     end
   end
   
+  def create_param_local(node : AST::Relate)
+    raise NotImplementedError.new(node.to_a) \
+      unless node.is_a?(AST::Relate) && node.op.value == "DEFAULTPARAM"
+    
+    create_param_local(node.lhs)
+    
+    node.rid = node.lhs.rid
+  end
+  
   def create_param_local(node : AST::Node)
     raise NotImplementedError.new(node.to_a) \
       unless node.is_a?(AST::Group) && node.style == " " && node.terms.size == 2
