@@ -24,7 +24,19 @@ class Mare::Compiler::Sugar < Mare::AST::Visitor
   
   def visit(node : AST::Relate)
     case node.op.value
-    when ".", "&&", "||", " ", "=" then node # skip these special-case operators
+    when ".", "&&", "||", " " then node # skip these special-case operators
+    when "="
+      # If assigning to a "." relation, treat as a "setter" method call.
+      lhs = node.lhs
+      if lhs.is_a?(AST::Relate) && lhs.op.value == "."
+        name = "#{lhs.rhs.as(AST::Identifier).value}="
+        ident = AST::Identifier.new(name).from(lhs.rhs)
+        args = AST::Group.new("(", [node.rhs]).from(node.rhs)
+        rhs = AST::Qualify.new(ident, args).from(node)
+        AST::Relate.new(lhs.lhs, lhs.op, rhs).from(node)
+      else
+        node
+      end
     else
       # Convert the operator relation into a single-argument method call.
       ident = AST::Identifier.new(node.op.value).from(node.op)
