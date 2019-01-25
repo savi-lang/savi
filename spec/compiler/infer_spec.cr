@@ -186,8 +186,6 @@ describe Mare::Compiler::Infer do
   end
   
   it "infers a prop's type based on the prop initializer" do
-    next pending "infers a prop's type based on the prop initializer"
-    
     source = Mare::Source.new "(example)", <<-SOURCE
     actor Main:
       prop x: "Hello, World!"
@@ -317,6 +315,31 @@ describe Mare::Compiler::Infer do
       
       func.infer.resolve(call).defns.map(&.ident).map(&.value).should eq \
         ["I32"]
+    end
+  end
+  
+  it "infers param type from local assignment or from the return type" do
+    source = Mare::Source.new "(example)", <<-SOURCE
+    primitive Infer:
+      fun from_assign (n): m I32 = n
+      fun from_return_type (n) I32: n
+    
+    actor Main:
+      new:
+        Infer.from_assign(42)
+        Infer.from_return_type(42)
+    SOURCE
+    
+    ctx = Mare::Compiler.compile(source, limit: Mare::Compiler::Infer)
+    
+    [
+      {"Infer", "from_assign"},
+      {"Infer", "from_return_type"},
+    ].each do |t_name, f_name|
+      func = ctx.program.find_func!(t_name, f_name)
+      expr = func.body.not_nil!.terms.first
+      
+      func.infer.resolve(expr).defns.map(&.ident).map(&.value).should eq ["I32"]
     end
   end
   

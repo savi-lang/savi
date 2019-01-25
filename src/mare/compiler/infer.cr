@@ -220,40 +220,46 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   
   class Param < Info
     @explicit : MetaType?
+    @downstreamed : MetaType?
     
     def initialize(@pos)
     end
     
-    private def require_explicit
-      unless @explicit
-        raise Error.new([
-          "This parameter's type was not specified:",
-          pos.show,
-        ].join("\n"))
-      end
+    private def already_resolved! : MetaType
+      return @explicit.not_nil! unless @explicit.nil?
+      return @downstreamed.not_nil! unless @downstreamed.nil?
+      
+      raise Error.new([
+        "This parameter's type was not specified and couldn't be inferred:",
+        pos.show,
+      ].join("\n"))
     end
     
-    def resolve!(infer : Infer)
-      require_explicit
-      @explicit.not_nil!
+    def resolve!(infer : Infer) : MetaType
+      already_resolved!
     end
     
     def set_explicit(explicit : MetaType)
       raise "already set_explicit" if @explicit
+      raise "already have downstreams" if @downstreamed
       
       @explicit = explicit
     end
     
     def within_domain!(infer : Infer, constraint : MetaType)
-      require_explicit
       @explicit.not_nil!.within_constraints!([constraint]) if @explicit
+      
+      ds = @downstreamed
+      if ds
+        @downstreamed = ds & constraint
+      else
+        @downstreamed = constraint
+      end
     end
     
     def verify_arg(arg_infer : Infer, arg_tid : TID)
-      require_explicit
-      
       arg = arg_infer[arg_tid]
-      arg.within_domain!(arg_infer, @explicit.not_nil!)
+      arg.within_domain!(arg_infer, already_resolved!)
     end
   end
   

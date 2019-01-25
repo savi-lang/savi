@@ -12,7 +12,7 @@ primitive Zero:
     other
 
 class Sentence:
-  prop text CString: Greeting.hello
+  prop text: Greeting.hello
 
 actor Main:
   new:

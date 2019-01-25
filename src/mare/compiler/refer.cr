@@ -198,12 +198,22 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
   end
   
   def create_param_local(node : AST::Identifier)
-    # Treat this as a parameter with only a type and no identifier.
-    # Do nothing other than increment the parameter count, because
-    # we don't want to overwrite the Const info for this node's rid.
-    # We don't need to create a Local anyway, because there's no way to
-    # fetch the value of this parameter later (because it has no identifier).
-    @last_param += 1
+    case self[node]
+    when Unresolved
+      # Treat this as a parameter with only an identifier and no type.
+      ident = node
+      
+      local = Local.new(node.pos, ident.value, ident.rid, @last_param += 1)
+      @current_locals[ident.value] = local unless ident.value == "_"
+      @rids[ident.rid] = local
+    else
+      # Treat this as a parameter with only a type and no identifier.
+      # Do nothing other than increment the parameter count, because
+      # we don't want to overwrite the Const info for this node's rid.
+      # We don't need to create a Local anyway, because there's no way to
+      # fetch the value of this parameter later (because it has no identifier).
+      @last_param += 1
+    end
   end
   
   def create_param_local(node : AST::Node)
