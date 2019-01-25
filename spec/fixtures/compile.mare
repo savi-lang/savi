@@ -6,6 +6,7 @@ ffi LibPonyRT:
 
 primitive Greeting:
   const hello: "Hello, World!"
+  const bye: "Goodbye, World!"
 
 primitive Zero:
   fun "+" (other I32) I32:
@@ -29,5 +30,5 @@ actor Main:
   fun say_stuff:
     sentence = Sentence.new(Greeting.hello)
     LibC.puts(sentence.text)
-    sentence.text = "Goodbye, World!"
+    sentence.text = Greeting.bye
     LibC.puts(sentence.text)
