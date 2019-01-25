@@ -14,8 +14,7 @@ primitive Zero:
 
 class Sentence:
   prop text CString:
-  new (text):
-    @text = text
+  new (@text):
 
 actor Main:
   new:

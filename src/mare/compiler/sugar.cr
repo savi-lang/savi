@@ -3,10 +3,33 @@ class Mare::Compiler::Sugar < Mare::AST::Visitor
     sugar = new
     ctx.program.types.each do |t|
       t.functions.each do |f|
-        # TODO also run in parameter signature?
-        f.body.try { |body| body.accept(sugar) }
+        sugar.run(f)
       end
     end
+  end
+  
+  def run(f)
+    # Sugar the parameter signature.
+    f.params.try { |params| params.accept(self) }
+    
+    # If any parameters contain assignables, make assignments in the body.
+    if f.body && f.params
+      f.params.not_nil!.terms.each_with_index do |param, index|
+        if param.is_a?(AST::Relate) && param.op.value == "."
+          new_name = "ASSIGNPARAM.#{index}"
+          
+          param_ident = AST::Identifier.new(new_name).from(param)
+          f.params.not_nil!.terms[index] = param_ident
+          
+          op = AST::Operator.new("=").from(param)
+          assign = AST::Relate.new(param, op, param_ident.dup).from(param)
+          f.body.not_nil!.terms.unshift(assign)
+        end
+      end
+    end
+    
+    # Sugar the body.
+    f.body.try { |body| body.accept(self) }
   end
   
   def visit(node : AST::Identifier)
