@@ -439,7 +439,6 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     @called_funcs.add(call_func)
     
     # TODO: copying to diverging specializations of the function
-    # TODO: apply argument constraints to the parameters
     # TODO: detect and halt recursion by noticing what's been seen
     infer = call_func.infer? || self.class.new(call_defn).tap(&.run(call_func))
     
