@@ -43,11 +43,14 @@ class Mare::Program
     end
     
     def has_func?(func_name)
-      @functions.any? { |f| f.ident.value == func_name }
+      @functions
+        .any? { |f| f.ident.value == func_name && !f.has_tag?(:hygienic) }
     end
     
     def find_func!(func_name)
-      @functions.find { |f| f.ident.value == func_name }.not_nil!
+      @functions
+        .find { |f| f.ident.value == func_name && !f.has_tag?(:hygienic) }
+        .not_nil!
     end
     
     def is_concrete?
@@ -79,6 +82,8 @@ class Mare::Program
     KNOWN_TAGS = [
       :constant_value,
       :constructor,
+      :hygienic,
+      :field,
     ]
     
     def initialize(@ident, @params, @ret, @body)

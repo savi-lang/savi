@@ -20,6 +20,14 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
     end
   end
   
+  class Field
+    getter pos : Source::Pos
+    getter name : String
+    
+    def initialize(@pos, @name)
+    end
+  end
+  
   class Local
     getter pos : Source::Pos
     getter name : String
@@ -49,7 +57,7 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
     end
   end
   
-  alias Info = (Unresolved | Self | Local | Const | ConstUnion)
+  alias Info = (Unresolved | Self | Local | Field | Const | ConstUnion)
   
   def initialize(@self_const : Const, @consts : Hash(String, Const))
     @create_params = false
@@ -134,10 +142,16 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
     node.rid = new_rid(info)
   end
   
+  # For a Field, take note of it by name.
+  def touch(node : AST::Field)
+    node.rid = new_rid(Field.new(node.pos, node.value))
+  end
+  
   # For a Relate, pay attention to any relations that are relevant to us.
   def touch(node : AST::Relate)
     if node.op.value == "="
-      create_local(node.lhs)
+      create_local(node.lhs) \
+        if node.lhs.rid == 0 || self[node.lhs] == Unresolved::INSTANCE
     end
   end
   

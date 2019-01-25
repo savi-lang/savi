@@ -60,12 +60,13 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
     # }
     
     def finished(context)
-      # Instantiable types with no constructor get a default empty one.
-      if @type.is_instantiable? \
-      && !@type.functions.any? { |f| f.has_tag?(:constructor) }
-        default = AST::Declare.new.from(@type.ident)
-        default.head << AST::Identifier.new("new").from(@type.ident)
-        compile(context, default)
+      if @type.is_instantiable?
+        # Instantiable types with no constructor get a default empty one.
+        if !@type.functions.any? { |f| f.has_tag?(:constructor) }
+          default = AST::Declare.new.from(@type.ident)
+          default.head << AST::Identifier.new("new").from(@type.ident)
+          compile(context, default)
+        end
       end
       
       # Numeric types need some basic metadata attached to know the native type.
@@ -125,14 +126,18 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
           if ident.is_a?(AST::LiteralString)
         ident = ident.as(AST::Identifier)
         
-        params = AST::Group.new("(").from(ident)
+        field_params = AST::Group.new("(").from(ident)
+        field_func = Program::Function.new(ident.dup, field_params, ret.dup, decl.body)
+        field_func.add_tag(:hygienic)
+        field_func.add_tag(:field)
+        @type.functions << field_func
         
-        body = decl.body
-        
-        function = Program::Function.new(ident, params, ret, body)
-        context.fulfill ["fun", @type.ident.value, ident.value], function
-        
-        @type.functions << function
+        getter_params = AST::Group.new("(").from(ident)
+        getter_body = AST::Group.new(":").from(ident)
+        getter_body.terms << AST::Field.new(ident.value).from(ident)
+        getter_func = Program::Function.new(ident, getter_params, ret, getter_body)
+        context.fulfill ["fun", @type.ident.value, ident.value], getter_func
+        @type.functions << getter_func
       when "fun", "new"
         # TODO: common abstraction to extract decl head terms,
         # with nice error collection for reporting to the user/tool.

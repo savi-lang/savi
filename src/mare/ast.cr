@@ -92,7 +92,7 @@ module Mare::AST
     end
   end
   
-  alias Term = Identifier \
+  alias Term = Identifier | Field \
     | LiteralString | LiteralInteger | LiteralFloat \
     | Operator | Prefix | Relate | Group
   
@@ -101,6 +101,14 @@ module Mare::AST
     def initialize(@value : String)
     end
     def name; :ident end
+    def to_a: Array(A); [name, value] of A end
+  end
+  
+  class Field < Node
+    property value
+    def initialize(@value : String)
+    end
+    def name; :field end
     def to_a: Array(A); [name, value] of A end
   end
   

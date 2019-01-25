@@ -91,6 +91,30 @@ describe Mare::Compiler::Infer do
     end
   end
   
+  it "complains when the prop type doesn't match the initializer value" do
+    source = Mare::Source.new "(example)", <<-SOURCE
+    actor Main:
+      prop name CString: 42
+    SOURCE
+    
+    expected = <<-MSG
+    This value's type is unresolvable due to conflicting constraints:
+    - it must be a subtype of (U8 | U32 | U64 | I8 | I32 | I64 | F32 | F64):
+      from (example):2:
+      prop name CString: 42
+                         ^~
+    
+    - it must be a subtype of (CString):
+      from (example):2:
+      prop name CString: 42
+                ^~~~~~~
+    MSG
+    
+    expect_raises Mare::Compiler::Infer::Error, expected do
+      Mare::Compiler.compile(source, limit: Mare::Compiler::Infer)
+    end
+  end
+  
   it "treats an empty sequence as producing None" do
     source = Mare::Source.new "(example)", <<-SOURCE
     actor Main:
@@ -141,6 +165,44 @@ describe Mare::Compiler::Infer do
     end
   end
   
+  it "infers a local's type based on assignment" do
+    source = Mare::Source.new "(example)", <<-SOURCE
+    actor Main:
+      new:
+        x = "Hello, World!"
+    SOURCE
+    
+    ctx = Mare::Compiler.compile(source, limit: Mare::Compiler::Infer)
+    
+    func = ctx.program.find_func!("Main", "new")
+    body = func.body.not_nil!
+    assign = body.terms.first.as(Mare::AST::Relate)
+    
+    func.infer.resolve(assign.lhs).defns.map(&.ident).map(&.value).should eq \
+      ["CString"]
+    
+    func.infer.resolve(assign.rhs).defns.map(&.ident).map(&.value).should eq \
+      ["CString"]
+  end
+  
+  it "infers a prop's type based on the prop initializer" do
+    source = Mare::Source.new "(example)", <<-SOURCE
+    actor Main:
+      prop x: "Hello, World!"
+      new:
+        @x
+    SOURCE
+    
+    ctx = Mare::Compiler.compile(source, limit: Mare::Compiler::Infer)
+    
+    func = ctx.program.find_func!("Main", "new")
+    body = func.body.not_nil!
+    prop = body.terms.first
+    
+    func.infer.resolve(prop).defns.map(&.ident).map(&.value).should eq \
+      ["CString"]
+  end
+  
   it "infers an integer literal based on an assignment" do
     source = Mare::Source.new "(example)", <<-SOURCE
     actor Main:
@@ -159,6 +221,23 @@ describe Mare::Compiler::Infer do
     
     func.infer.resolve(assign.rhs).defns.map(&.ident).map(&.value).should eq \
       ["U64"]
+  end
+  
+  it "infers an integer literal based on a prop type" do
+    source = Mare::Source.new "(example)", <<-SOURCE
+    actor Main:
+      prop x U64: 42 // TODO: test with (U64 | None) when it works
+      new:
+        @x
+    SOURCE
+    
+    ctx = Mare::Compiler.compile(source, limit: Mare::Compiler::Infer)
+    
+    func = ctx.program.find_func!("Main", "new")
+    body = func.body.not_nil!
+    prop = body.terms.first
+    
+    func.infer.resolve(prop).defns.map(&.ident).map(&.value).should eq ["U64"]
   end
   
   it "infers an integer literal through an if statement" do

@@ -1,4 +1,5 @@
 require "llvm"
+require "random"
 require "../ext/llvm" # TODO: get these merged into crystal standard library
 require "compiler/crystal/config" # TODO: remove
 require "./code_gen/*"
@@ -16,6 +17,7 @@ class Mare::Compiler::CodeGen
   
   class Frame
     getter func : LLVM::Function?
+    getter gtype : GenType?
     getter gfunc : GenFunc?
     
     setter pony_ctx : LLVM::Value?
@@ -23,7 +25,7 @@ class Mare::Compiler::CodeGen
     
     getter current_locals
     
-    def initialize(@g : CodeGen, @func = nil, @gfunc = nil)
+    def initialize(@g : CodeGen, @func = nil, @gtype = nil, @gfunc = nil)
       @current_locals = {} of Refer::Local => LLVM::Value
     end
     
@@ -50,6 +52,7 @@ class Mare::Compiler::CodeGen
   
   class GenType
     getter type_def : Layout::Def
+    getter fields : Array(Tuple(String, Layout::Ref))
     getter desc_type : LLVM::Type
     getter struct_type : LLVM::Type
     getter! desc : LLVM::Value
@@ -58,13 +61,17 @@ class Mare::Compiler::CodeGen
     def initialize(g : CodeGen, @type_def)
       @gfuncs = {} of String => GenFunc
       
+      @fields = Array(Tuple(String, Layout::Ref)).new
+      @type_def.each_function.each do |f|
+        next unless f.has_tag?(:field)
+        
+        field_type = g.program.layout[f.infer.resolve(f.ident)]
+        @fields << {f.ident.value, field_type}
+      end
+      
       # Generate descriptor type and struct type.
       @desc_type = g.gen_desc_type(@type_def)
-      @struct_type = g.gen_struct_type(@type_def, @desc_type)
-    end
-    
-    def llvm_type
-      @struct_type.pointer
+      @struct_type = g.gen_struct_type(@type_def, @desc_type, fields)
     end
     
     def gen_func_decls(g : CodeGen)
@@ -72,7 +79,10 @@ class Mare::Compiler::CodeGen
       # may be referenced in the descriptor global instance below.
       @type_def.each_function.each do |f|
         next unless g.program.layout.reached_func?(f)
-        @gfuncs[f.ident.value] = GenFunc.new(g, self, f)
+        
+        key = f.ident.value
+        key += Random::Secure.hex if f.has_tag?(:hygienic)
+        @gfuncs[key] = GenFunc.new(g, self, f)
       end
     end
     
@@ -98,23 +108,44 @@ class Mare::Compiler::CodeGen
     def [](name)
       @gfuncs[name]
     end
+    
+    def llvm_type
+      @struct_type.pointer
+    end
+    
+    def field_index(name)
+      offset = 1 # TODO: not for C-like structs
+      offset += 1 if @type_def.has_actor_pad?
+      @fields.index { |n, _| n == name }.not_nil! + offset
+    end
+    
+    def each_gfunc
+      @gfuncs.each_value
+    end
   end
   
   class GenFunc
     getter func : Program::Function
+    getter llvm_name : String
     getter! llvm_func : LLVM::Function
     
-    def initialize(g : CodeGen, gtype : GenType, @func)
+    def initialize(g : CodeGen, gtype : GenType, @func, suffix : String? = nil)
       @needs_receiver = \
         gtype.type_def.has_allocation? &&
         !@func.has_tag?(:constructor) &&
         !@func.has_tag?(:constant_value)
       
+      @llvm_name = "#{gtype.type_def.llvm_name}.#{@func.ident.value}"
+      @llvm_name = "#{@llvm_name}.HYGIENIC" if func.has_tag?(:hygienic)
       @llvm_func = g.gen_func_decl(gtype, self)
     end
     
     def needs_receiver?
       @needs_receiver
+    end
+    
+    def is_initializer?
+      func.has_tag?(:field) && !func.body.nil?
     end
   end
   
@@ -225,7 +256,10 @@ class Mare::Compiler::CodeGen
   end
   
   def llvm_type_of(expr : AST::Node, in_gfunc : GenFunc? = nil)
-    ref = type_of(expr, in_gfunc)
+    llvm_type_of(type_of(expr, in_gfunc))
+  end
+  
+  def llvm_type_of(ref : Layout::Ref)
     case ref.llvm_use_type
     when :i8, :u8 then @i8
     when :i32, :u32 then @i32
@@ -234,6 +268,18 @@ class Mare::Compiler::CodeGen
     when :struct_ptr then
       @gtypes[program.layout[ref.single!].llvm_name].llvm_type
     else raise NotImplementedError.new(ref.llvm_use_type)
+    end
+  end
+  
+  def llvm_mem_type_of(ref : Layout::Ref)
+    case ref.llvm_mem_type
+    when :i8, :u8 then @i8
+    when :i32, :u32 then @i32
+    when :i64, :u64 then @i64
+    when :ptr then @ptr
+    when :struct_ptr then
+      @gtypes[program.layout[ref.single!].llvm_name].llvm_type
+    else raise NotImplementedError.new(ref.llvm_mem_type)
     end
   end
   
@@ -422,8 +468,8 @@ class Mare::Compiler::CodeGen
     main
   end
   
-  def gen_func_start(llvm_func, gfunc : GenFunc? = nil)
-    @frames << Frame.new(self, llvm_func, gfunc)
+  def gen_func_start(llvm_func, gtype : GenType? = nil, gfunc : GenFunc? = nil)
+    @frames << Frame.new(self, llvm_func, gtype, gfunc)
     
     # Create an entry block and start building from there.
     @builder.position_at_end(gen_block("entry"))
@@ -464,15 +510,15 @@ class Mare::Compiler::CodeGen
     
     ret_type = llvm_type_of(gfunc.func.ident, gfunc)
     
-    name = "#{gtype.type_def.llvm_name}.#{gfunc.func.ident.value}"
-    @mod.functions.add(name, param_types, ret_type)
+    @mod.functions.add(gfunc.llvm_name, param_types, ret_type)
   end
   
   def gen_func_impl(gtype, gfunc)
     return gen_ffi_body(gtype, gfunc) if gtype.type_def.is_ffi?
     
-    gen_func_start(gfunc.llvm_func, gfunc)
+    gen_func_start(gfunc.llvm_func, gtype, gfunc)
     
+    # Set a receiver value (the value of the self in this function).
     func_frame.receiver_value =
       if gfunc.func.has_tag?(:constructor)
         gen_alloc(gtype)
@@ -482,11 +528,28 @@ class Mare::Compiler::CodeGen
         gtype.singleton
       end
     
+    # If this is a constructor, first assign any field initializers.
+    if gfunc.func.has_tag?(:constructor)
+      gtype.fields.each do |name, _|
+        init_func =
+          gtype.each_gfunc.find do |gfunc|
+            gfunc.func.ident.value == name &&
+            gfunc.func.has_tag?(:field) &&
+            !gfunc.func.body.nil?
+          end
+        next if init_func.nil?
+        
+        call_args = [func_frame.receiver_value]
+        init_value = @builder.call(init_func.llvm_func, call_args)
+        gen_field_store(name, init_value)
+      end
+    end
+    
+    # Now generate code for the expressions in the function body.
     last_value = nil
     gfunc.func.body.not_nil!.terms.each do |expr|
       last_value = gen_expr(expr, gfunc.func.has_tag?(:constant_value))
     end
-    
     @builder.ret(last_value.not_nil!)
     
     gen_func_end
@@ -511,7 +574,7 @@ class Mare::Compiler::CodeGen
   def gen_ffi_body(gtype, gfunc)
     llvm_ffi_func = gen_ffi_decl(gfunc)
     
-    gen_func_start(gfunc.llvm_func, gfunc)
+    gen_func_start(gfunc.llvm_func, gtype, gfunc)
     
     param_count = gfunc.llvm_func.params.size
     args = param_count.times.map { |i| gfunc.llvm_func.params[i] }.to_a
@@ -588,6 +651,8 @@ class Mare::Compiler::CodeGen
       else
         raise NotImplementedError.new(ref)
       end
+    when AST::Field
+      gen_field_load(expr.value)
     when AST::LiteralInteger
       gen_integer(expr)
     when AST::LiteralString
@@ -602,7 +667,7 @@ class Mare::Compiler::CodeGen
     when AST::Group
       raise "#{expr.inspect} isn't a constant value" if const_only
       case expr.style
-      when "(" then gen_sequence(expr)
+      when "(", ":" then gen_sequence(expr)
       else raise NotImplementedError.new(expr.inspect)
       end
     when AST::Choice
@@ -776,11 +841,12 @@ class Mare::Compiler::CodeGen
     global
   end
   
-  def gen_struct_type(type_def, desc_type)
+  def gen_struct_type(type_def, desc_type, fields)
     elements = [] of LLVM::Type
     elements << desc_type.pointer if type_def.has_desc?
     elements << @actor_pad if type_def.has_actor_pad?
-    # TODO: fields
+    
+    fields.each { |name, t| elements << llvm_mem_type_of(t) }
     
     @llvm.struct(elements, type_def.llvm_name)
   end
@@ -829,5 +895,19 @@ class Mare::Compiler::CodeGen
     desc_p = @builder.struct_gep(value, 0, "#{name}.DESC")
     @builder.store(gtype.desc, desc_p)
     # TODO: tbaa? (from set_descriptor in libponyc/codegen/gencall.c)
+  end
+  
+  def gen_field_load(name)
+    gtype = func_frame.gtype.not_nil!
+    object = func_frame.receiver_value
+    gep = @builder.struct_gep(object, gtype.field_index(name), "@.#{name}")
+    @builder.load(gep)
+  end
+  
+  def gen_field_store(name, value)
+    gtype = func_frame.gtype.not_nil!
+    object = func_frame.receiver_value
+    gep = @builder.struct_gep(object, gtype.field_index(name), "@.#{name}")
+    @builder.store(value, gep)
   end
 end

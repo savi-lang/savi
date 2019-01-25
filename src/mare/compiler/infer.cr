@@ -136,7 +136,48 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
   end
   
-  class Local < Info
+  class Local < Info # TODO: dedup implementation with Field
+    @explicit : MetaType?
+    @upstream : TID = 0
+    
+    def initialize(@pos)
+    end
+    
+    def resolve!(infer : Infer)
+      return @explicit.not_nil! if @explicit
+      
+      if @upstream != 0
+        infer[@upstream].resolve!(infer)
+      else
+        raise Error.new([
+          "This needs an explicit type; it could not be inferred:",
+          pos.show,
+        ].join("\n"))
+      end
+    end
+    
+    def set_explicit(explicit : MetaType)
+      raise "already set_explicit" if @explicit
+      raise "shouldn't have an upstream yet" if @upstream != 0
+      
+      @explicit = explicit
+    end
+    
+    def within_domain!(infer : Infer, constraint : MetaType)
+      return @explicit.not_nil!.within_constraints!([constraint]) if @explicit
+      
+      infer[@upstream].within_domain!(infer, constraint)
+    end
+    
+    def assign(infer : Infer, tid : TID)
+      infer[tid].within_domain!(infer, @explicit.not_nil!) if @explicit
+      
+      raise "already assigned an upstream" if @upstream != 0
+      @upstream = tid
+    end
+  end
+  
+  class Field < Info # TODO: dedup implementation with Local
     @explicit : MetaType?
     @upstream : TID = 0
     
@@ -409,6 +450,21 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
   end
   
+  def follow_field(field : Field, name : String)
+    field_func = @self_type.functions.find do |f|
+      f.ident.value == name && f.has_tag?(:field)
+    end.not_nil!
+    
+    # Keep track that we touched this "function".
+    @called_funcs.add(field_func)
+    
+    infer = field_func.infer? || self.class.new(@self_type).tap(&.run(field_func))
+    
+    # Apply constraints to the return type.
+    ret = infer[infer.ret_tid]
+    field.set_explicit(ret.resolve!(infer))
+  end
+  
   def new_tid(node, info)
     raise "this already has a tid: #{node.inspect}" if node.tid != 0
     node.tid = new_tid_detached(info)
@@ -419,6 +475,11 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     raise "type id overflow" if tid == 0
     @tids[tid] = info
     tid
+  end
+  
+  def self_tid(pos_node) : TID
+    return @self_tid unless @self_tid == 0
+    @self_tid = new_tid_detached(Literal.new(pos_node.pos, [@self_type]))
   end
   
   def transfer_tid(from_tid : TID, to)
@@ -461,12 +522,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       end
     when Refer::Self
       # If it's the self, track the possibly new tid.
-      if @self_tid == 0
-        new_tid(node, Literal.new(node.pos, [@self_type]))
-        @self_tid = node.tid
-      else
-        transfer_tid(@self_tid, node)
-      end
+      transfer_tid(self_tid(node), node)
     when Refer::Unresolved
       # Leave the tid as zero if this identifer needs no value.
       return if node.value_not_needed?
@@ -476,6 +532,12 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     else
       raise NotImplementedError.new(ref)
     end
+  end
+  
+  def touch(node : AST::Field)
+    field = Field.new(node.pos)
+    new_tid(node, field)
+    follow_field(field, node.value)
   end
   
   def touch(node : AST::LiteralString)
@@ -542,8 +604,16 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   def touch(node : AST::Relate)
     case node.op.value
     when "="
-      self[node.lhs].as(Local).assign(self, node.rhs.tid)
-      transfer_tid(node.lhs, node)
+      lhs = self[node.lhs]
+      case lhs
+      when Local
+        lhs.assign(self, node.rhs.tid)
+        transfer_tid(node.lhs, node)
+      when Field
+        lhs.assign(self, node.rhs.tid)
+        transfer_tid(node.lhs, node)
+      else raise NotImplementedError.new(node.lhs)
+      end
     when "."
       lhs = node.lhs
       rhs = node.rhs
