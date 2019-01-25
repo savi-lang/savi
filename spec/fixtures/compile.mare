@@ -14,8 +14,7 @@ primitive Zero:
 
 class Sentence:
   prop text CString:
-  new (text = "[awkward silence]"):
-    @text = text // TODO: omit this line by using @text as param name
+  new (@text = "[awkward silence]"):
 
 actor Main:
   new:

@@ -24,12 +24,25 @@ class Mare::Compiler::Sugar < Mare::AST::Visitor
     # If any parameters contain assignables, make assignments in the body.
     if f.body && f.params
       f.params.not_nil!.terms.each_with_index do |param, index|
+        # Dig through a default parameter value relation first if present.
+        if param.is_a?(AST::Relate) && param.op.value == "DEFAULTPARAM"
+          orig_param_with_default = param
+          param = param.lhs
+        end
+        
+        # If the param is a dot relation, treat it as an assignable.
         if param.is_a?(AST::Relate) && param.op.value == "."
           new_name = "ASSIGNPARAM.#{index}"
           
+          # Replace the parameter with our new name as the identifier.
           param_ident = AST::Identifier.new(new_name).from(param)
-          f.params.not_nil!.terms[index] = param_ident
+          if orig_param_with_default
+            orig_param_with_default.lhs = param_ident
+          else
+            f.params.not_nil!.terms[index] = param_ident
+          end
           
+          # Add the assignment statement to the top of the function body.
           op = AST::Operator.new("=").from(param)
           assign = AST::Relate.new(param, op, param_ident.dup).from(param)
           f.body.not_nil!.terms.unshift(assign)
