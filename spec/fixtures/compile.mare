@@ -12,7 +12,9 @@ primitive Zero:
     other
 
 class Sentence:
-  prop text: Greeting.hello
+  prop text CString:
+  new (text):
+    @text = text
 
 actor Main:
   new:
@@ -25,7 +27,7 @@ actor Main:
       LibPonyRT.pony_exitcode(exitcode)
   
   fun say_stuff:
-    sentence = Sentence.new
+    sentence = Sentence.new(Greeting.hello)
     LibC.puts(sentence.text)
     sentence.text = "Goodbye, World!"
     LibC.puts(sentence.text)

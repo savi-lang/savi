@@ -127,7 +127,9 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         ident = ident.as(AST::Identifier)
         
         field_params = AST::Group.new("(").from(ident)
-        field_func = Program::Function.new(ident.dup, field_params, ret.dup, decl.body)
+        field_body = decl.body
+        field_body = nil if decl.body.try { |group| group.terms.size == 0 }
+        field_func = Program::Function.new(ident.dup, field_params, ret.dup, field_body)
         field_func.add_tag(:hygienic)
         field_func.add_tag(:field)
         @type.functions << field_func
@@ -164,7 +166,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         # with nice error collection for reporting to the user/tool.
         head = decl.head.dup
         head.shift # discard the keyword
-        ident = head.shift if head[0]?
+        ident = head.shift if head[0]?.is_a?(AST::Identifier) || head[0]?.is_a?(AST::LiteralString)
         params = head.shift.as(AST::Group) if head[0]?.is_a?(AST::Group)
         ret = head.shift.as(AST::Identifier) if head[0]?
         
@@ -180,7 +182,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
           # Constructors always return the self (`@`).
           # TODO: decl parse error if an explicit return type was given
           ret ||= AST::Identifier.new("@").from(ident)
-          body ||= AST::Group.new(":")
+          body ||= AST::Group.new(":").from(ident)
           body.terms << AST::Identifier.new("@").from(ident)
         end
         

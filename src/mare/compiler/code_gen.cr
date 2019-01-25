@@ -516,6 +516,9 @@ class Mare::Compiler::CodeGen
   def gen_func_impl(gtype, gfunc)
     return gen_ffi_body(gtype, gfunc) if gtype.type_def.is_ffi?
     
+    # Fields with no initializer body can be skipped.
+    return if gfunc.func.has_tag?(:field) && gfunc.func.body.nil?
+    
     gen_func_start(gfunc.llvm_func, gtype, gfunc)
     
     # Set a receiver value (the value of the self in this function).
