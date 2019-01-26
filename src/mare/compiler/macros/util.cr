@@ -8,44 +8,37 @@ module Mare::Compiler::Macros::Util
   
   def self.require_terms(node : AST::Group, term_docs : Array(String?))
     if node.terms.size > term_docs.size
-      list = [] of String
-      list << "This macro has too many terms:"
-      list << node.pos.show
+      info = [] of Tuple(AST::Node, String)
       
       index = -1
       while (index += 1) < node.terms.size
         if index < term_docs.size
           if term_docs[index]
-            list << "- this term is #{term_docs[index]}:"
-            list << node.terms[index].pos.show
+            info << {node.terms[index], "this term is #{term_docs[index]}"}
           end
         else
-          list << "- this is an excessive term:"
-          list << node.terms[index].pos.show
+          info << {node.terms[index], "this is an excessive term"}
         end
       end
       
-      raise Error.new(list.join("\n"))
+      Error.at node, "This macro has too many terms", info
     end
     
     if node.terms.size < term_docs.size
-      list = [] of String
-      list << "This macro has too few terms:"
-      list << node.pos.show
+      info = [] of Tuple(AST::Node, String)
       
       index = -1
       while (index += 1) < term_docs.size
         if index < node.terms.size
           if term_docs[index]
-            list << "- this term is #{term_docs[index]}:"
-            list << node.terms[index].pos.show
+            info << {node.terms[index], "this term is #{term_docs[index]}"}
           end
         else
-          list << "- expected a term: #{term_docs[index]}"
+          info << {node, "expected a term: #{term_docs[index]}"}
         end
       end
       
-      raise Error.new(list.join("\n"))
+      Error.at node, "This macro has too few terms", info
     end
   end
 end

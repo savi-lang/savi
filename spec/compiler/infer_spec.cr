@@ -13,7 +13,7 @@ describe Mare::Compiler::Infer do
           ^~~~~~~~~
     MSG
     
-    expect_raises Mare::Compiler::Infer::Error, expected do
+    expect_raises Mare::Error, expected do
       Mare::Compiler.compile(source, limit: Mare::Compiler::Infer)
     end
   end
@@ -32,7 +32,7 @@ describe Mare::Compiler::Infer do
             ^
     MSG
     
-    expect_raises Mare::Compiler::Infer::Error, expected do
+    expect_raises Mare::Error, expected do
       Mare::Compiler.compile(source, limit: Mare::Compiler::Infer)
     end
   end
@@ -50,6 +50,10 @@ describe Mare::Compiler::Infer do
     
     expected = <<-MSG
     This value's type is unresolvable due to conflicting constraints:
+    from (example):3:
+        "not a number at all"
+         ^~~~~~~~~~~~~~~~~~~
+    
     - it must be a subtype of (CString):
       from (example):3:
         "not a number at all"
@@ -61,7 +65,7 @@ describe Mare::Compiler::Infer do
                  ^~~
     MSG
     
-    expect_raises Mare::Compiler::Infer::Error, expected do
+    expect_raises Mare::Error, expected do
       Mare::Compiler.compile(source, limit: Mare::Compiler::Infer)
     end
   end
@@ -75,6 +79,10 @@ describe Mare::Compiler::Infer do
     
     expected = <<-MSG
     This value's type is unresolvable due to conflicting constraints:
+    from (example):3:
+        name CString = 42
+                       ^~
+
     - it must be a subtype of (U8 | U32 | U64 | I8 | I32 | I64 | F32 | F64):
       from (example):3:
         name CString = 42
@@ -86,7 +94,7 @@ describe Mare::Compiler::Infer do
              ^~~~~~~
     MSG
     
-    expect_raises Mare::Compiler::Infer::Error, expected do
+    expect_raises Mare::Error, expected do
       Mare::Compiler.compile(source, limit: Mare::Compiler::Infer)
     end
   end
@@ -99,6 +107,10 @@ describe Mare::Compiler::Infer do
     
     expected = <<-MSG
     This value's type is unresolvable due to conflicting constraints:
+    from (example):2:
+      prop name CString: 42
+                         ^~
+    
     - it must be a subtype of (U8 | U32 | U64 | I8 | I32 | I64 | F32 | F64):
       from (example):2:
       prop name CString: 42
@@ -110,7 +122,7 @@ describe Mare::Compiler::Infer do
                 ^~~~~~~
     MSG
     
-    expect_raises Mare::Compiler::Infer::Error, expected do
+    expect_raises Mare::Error, expected do
       Mare::Compiler.compile(source, limit: Mare::Compiler::Infer)
     end
   end
@@ -124,6 +136,10 @@ describe Mare::Compiler::Infer do
     
     expected = <<-MSG
     This value's type is unresolvable due to conflicting constraints:
+    from (example):3:
+        name CString = ()
+                       ^~
+    
     - it must be a subtype of (None):
       from (example):3:
         name CString = ()
@@ -135,7 +151,7 @@ describe Mare::Compiler::Infer do
              ^~~~~~~
     MSG
     
-    expect_raises Mare::Compiler::Infer::Error, expected do
+    expect_raises Mare::Error, expected do
       Mare::Compiler.compile(source, limit: Mare::Compiler::Infer)
     end
   end
@@ -149,6 +165,10 @@ describe Mare::Compiler::Infer do
     
     expected = <<-MSG
     This value's type is unresolvable due to conflicting constraints:
+    from (example):3:
+        if "not a boolean" 42
+            ^~~~~~~~~~~~~
+    
     - it must be a subtype of (CString):
       from (example):3:
         if "not a boolean" 42
@@ -160,7 +180,7 @@ describe Mare::Compiler::Infer do
         ^~
     MSG
     
-    expect_raises Mare::Compiler::Infer::Error, expected do
+    expect_raises Mare::Error, expected do
       Mare::Compiler.compile(source, limit: Mare::Compiler::Infer)
     end
   end
@@ -276,6 +296,10 @@ describe Mare::Compiler::Infer do
     
     expected = <<-MSG
     This value couldn't be inferred as a single concrete type:
+    from (example):3:
+        x (F64 | U64) = 42
+                        ^~
+    
     - it must be a subtype of (U8 | U32 | U64 | I8 | I32 | I64 | F32 | F64):
       from (example):3:
         x (F64 | U64) = 42
@@ -287,7 +311,7 @@ describe Mare::Compiler::Infer do
           ^~~~~~~~~~~
     MSG
     
-    expect_raises Mare::Compiler::Infer::Error, expected do
+    expect_raises Mare::Error, expected do
       Mare::Compiler.compile(source, limit: Mare::Compiler::Infer)
     end
   end
@@ -361,7 +385,7 @@ describe Mare::Compiler::Infer do
           ^~~
     MSG
     
-    expect_raises Mare::Compiler::Infer::Error, expected do
+    expect_raises Mare::Error, expected do
       Mare::Compiler.compile(source, limit: Mare::Compiler::Infer)
     end
   end
@@ -382,13 +406,14 @@ describe Mare::Compiler::Infer do
     from (example):3:
         x False = True
                   ^~~~
+    
     - it must be a subtype of (False):
       from (example):3:
         x False = True
           ^~~~~
     MSG
     
-    expect_raises Mare::Compiler::Infer::Error, expected do
+    expect_raises Mare::Error, expected do
       Mare::Compiler.compile(source, limit: Mare::Compiler::Infer)
     end
   end

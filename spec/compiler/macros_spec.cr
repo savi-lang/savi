@@ -35,26 +35,30 @@ describe Mare::Compiler::Macros do
       from (example):3:
           if True (
           ^~~~~~~~~···
+      
       - this term is the condition to be satisfied:
-      from (example):3:
+        from (example):3:
           if True (
              ^~~~
+      
       - this term is the body to be conditionally executed,
         including an optional else clause partitioned by `|`:
-      from (example):3:
+        from (example):3:
           if True (
                   ^···
+      
       - this is an excessive term:
-      from (example):5:
+        from (example):5:
           ) what now
             ^~~~
+      
       - this is an excessive term:
-      from (example):5:
+        from (example):5:
           ) what now
                  ^~~
       MSG
       
-      expect_raises Mare::Compiler::Macros::Error, expected do
+      expect_raises Mare::Error, expected do
         Mare::Compiler.compile(source, limit: Mare::Compiler::Macros)
       end
     end
@@ -71,15 +75,20 @@ describe Mare::Compiler::Macros do
       from (example):3:
           if True
           ^~~~~~~
+      
       - this term is the condition to be satisfied:
-      from (example):3:
+        from (example):3:
           if True
              ^~~~
+      
       - expected a term: the body to be conditionally executed,
-        including an optional else clause partitioned by `|`
+        including an optional else clause partitioned by `|`:
+        from (example):3:
+          if True
+          ^~~~~~~
       MSG
       
-      expect_raises Mare::Compiler::Macros::Error, expected do
+      expect_raises Mare::Error, expected do
         Mare::Compiler.compile(source, limit: Mare::Compiler::Macros)
       end
     end

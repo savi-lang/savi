@@ -1,9 +1,6 @@
 class Mare::Compiler::Infer < Mare::AST::Visitor
   alias TID = UInt64
   
-  class Error < Exception
-  end
-  
   class MetaType
     property pos : Source::Pos
     @union : Set(Program::Type)
@@ -54,7 +51,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
     
     def show
-      "- it must be a subtype of #{show_type}:\n  #{pos.show}\n"
+      {self, "it must be a subtype of #{show_type}"}
     end
     
     def show_type
@@ -73,10 +70,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     def within_constraints!(constraints : Iterable(MetaType))
       return if within_constraints?(constraints)
       
-      raise Error.new([
-        "This type is outside of a constraint:",
-        pos.show,
-      ].concat(constraints.map(&.show)).join("\n"))
+      Error.at self, "This type is outside of a constraint",
+        constraints.map(&.show)
     end
   end
   
@@ -110,15 +105,15 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     
     def resolve!(infer : Infer)
       if @domain.empty?
-        raise Error.new(@domain_constraints.map(&.show).unshift(
-          "This value's type is unresolvable due to conflicting constraints:"
-        ).join("\n"))
+        Error.at self,
+          "This value's type is unresolvable due to conflicting constraints",
+          @domain_constraints.map(&.show)
       end
       
       if !@domain.singular?
-        raise Error.new(@domain_constraints.map(&.show).unshift(
-          "This value couldn't be inferred as a single concrete type:"
-        ).join("\n"))
+        Error.at self,
+          "This value couldn't be inferred as a single concrete type",
+          @domain_constraints.map(&.show)
       end
       
       @domain
@@ -130,9 +125,9 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       
       return unless @domain.empty?
       
-      raise Error.new(@domain_constraints.map(&.show).unshift(
-        "This value's type is unresolvable due to conflicting constraints:"
-      ).join("\n"))
+      Error.at self,
+        "This value's type is unresolvable due to conflicting constraints",
+        @domain_constraints.map(&.show)
     end
   end
   
@@ -149,10 +144,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       if @upstream != 0
         infer[@upstream].resolve!(infer)
       else
-        raise Error.new([
-          "This needs an explicit type; it could not be inferred:",
-          pos.show,
-        ].join("\n"))
+        Error.at self, "This needs an explicit type; it could not be inferred"
       end
     end
     
@@ -190,10 +182,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       if @upstream != 0
         infer[@upstream].resolve!(infer)
       else
-        raise Error.new([
-          "This needs an explicit type; it could not be inferred:",
-          pos.show,
-        ].join("\n"))
+        Error.at self, "This needs an explicit type; it could not be inferred"
       end
     end
     
@@ -234,10 +223,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       return infer[@upstream].resolve!(infer) unless @upstream == 0
       return @downstreamed.not_nil! unless @downstreamed.nil?
       
-      raise Error.new([
-        "This parameter's type was not specified and couldn't be inferred:",
-        pos.show,
-      ].join("\n"))
+      Error.at self,
+        "This parameter's type was not specified and couldn't be inferred"
     end
     
     def set_explicit(explicit : MetaType)
@@ -316,13 +303,12 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
     
     private def verify_constraints!
-      return if @ret.not_nil!.within_constraints?(@domain_constraints)
+      ret = @ret.not_nil!
+      return if ret.within_constraints?(@domain_constraints)
       
-      raise Error.new(@domain_constraints.map(&.show).unshift(
-        "This return value is outside of its constraints:\n#{pos.show}",
-      ).push(
-        "- but it had a return type of #{@ret.not_nil!.show_type}\n"
-      ).join("\n"))
+      Error.at self, "This return value is outside of its constraints",
+        @domain_constraints.map(&.show).push(
+          {ret, "but it had a return type of #{ret.show_type}"})
     end
   end
   
@@ -391,10 +377,10 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     @refer = func.refer
     
     # Complain if neither return type nor function body were specified.
-    raise Error.new([
-      "This function's return type is totally unconstrained:",
-      func.ident.pos.show,
-    ].join("\n")) unless func.ret || func.body
+    unless func.ret || func.body
+      Error.at func.ident, \
+        "This function's return type is totally unconstrained"
+    end
     
     # Visit the function parameters, noting any declared types there.
     # We may need to apply some parameter-specific finishing touches.
@@ -545,7 +531,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       return if node.value_not_needed?
       
       # Otherwise, raise an error to the user:
-      raise Error.new("This identifer couldn't be resolved:\n#{node.pos.show}")
+      Error.at node, "This identifer couldn't be resolved"
     else
       raise NotImplementedError.new(ref)
     end
@@ -691,6 +677,6 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   
   def require_nonzero(node : AST::Node)
     return if node.tid != 0
-    raise Error.new("This type couldn't be resolved:\n#{node.pos.show}")
+    Error.at node, "This type couldn't be resolved"
   end
 end

@@ -3,9 +3,6 @@ class Mare::Compiler::Macros < Mare::AST::Visitor
   # those the same as macro declarations in the prelude, with both getting
   # executed here dynamically instead of declared here statically.
   
-  class Error < Exception
-  end
-  
   def self.run(ctx)
     macros = new
     ctx.program.types.each do |t|

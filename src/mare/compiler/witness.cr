@@ -1,7 +1,4 @@
 class Mare::Witness
-  class Error < Exception
-  end
-  
   alias Plan = Hash(String, String | Bool)
   
   def initialize(@plans = [] of Plan)
@@ -24,7 +21,7 @@ class Mare::Witness
         begin
           @plans[plan_index]
         rescue KeyError
-          err term, "Unexpected extra term"
+          Error.at term, "Unexpected extra term"
         end
       
       # We have to set these to nil explicitly, otherwise Crystal's "feature"
@@ -52,7 +49,7 @@ class Mare::Witness
       plan = @plans[plan_index]
       
       # We're only allowed to have more plans here if they are optional.
-      err decl, "Expected more terms in this declaration" \
+      Error.at decl, "Expected more terms in this declaration" \
         unless plan["optional"]? == true
       
       # If this plan was optional, try to apply a default.
@@ -75,7 +72,7 @@ class Mare::Witness
     case plan["kind"]
     when "keyword"
       # A keyword must be an identifier that exactly matches the given name.
-      err term, "Expected keyword '#{plan["name"]}'" \
+      Error.at term, "Expected keyword '#{plan["name"]}'" \
         unless term.is_a?(AST::Identifier) && term.value == plan["name"]
     when "term"
       # If a type requirement is specified, check the type first.
@@ -83,7 +80,7 @@ class Mare::Witness
       if plan["type"]?
         types = plan["type"].as(String).split("|")
         
-        err term, "Expected a term of type: #{show_or(types)}" \
+        Error.at term, "Expected a term of type: #{show_or(types)}" \
           unless types.any? { |t| check_type(term, t) }
       end
       
@@ -129,11 +126,6 @@ class Mare::Witness
       term.is_a?(AST::Group)
     else raise NotImplementedError.new(t)
     end
-  end
-  
-  # Convenience method for raising an error that shows the position of a term.
-  def err(term : AST::Term, msg : String)
-    raise Error.new("#{msg}:\n#{term.pos.show}")
   end
   
   # Convenience method for showing the given list of strings in English syntax,

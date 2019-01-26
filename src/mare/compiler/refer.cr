@@ -1,9 +1,6 @@
 class Mare::Compiler::Refer < Mare::AST::Visitor
   alias RID = UInt64
   
-  class Error < Exception
-  end
-  
   class Unresolved
     INSTANCE = new
     
@@ -175,12 +172,9 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
     # This will be a new local, so if the identifier already matched an
     # existing local, it would shadow that, which we don't currently allow.
     if @rids[node.rid].is_a?(Local)
-      raise Error.new([
-        "This local shadows an existing local:",
-        node.pos.show,
-        "- the first definition was here:",
-        @rids[node.rid].pos.show,
-      ].join("\n"))
+      Error.at node, "This local shadows an existing local", [
+        {@rids[node.rid], "the first definition was here"},
+      ]
     end
     
     # Create the local entry, so later references to this name will see it.
