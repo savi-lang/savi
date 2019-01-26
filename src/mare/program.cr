@@ -27,7 +27,6 @@ class Mare::Program
     KNOWN_TAGS = [
       :actor,
       :allocated,
-      :ffi, # TODO: mark functions as FFI functions instead of whole types
       :no_desc,
       :numeric,
     ]
@@ -84,8 +83,9 @@ class Mare::Program
     KNOWN_TAGS = [
       :constant,
       :constructor,
-      :hygienic,
+      :ffi,
       :field,
+      :hygienic,
     ]
     
     def initialize(@ident, @params, @ret, @body)

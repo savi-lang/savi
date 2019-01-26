@@ -146,10 +146,6 @@ class Mare::Compiler::Layout < Mare::AST::Visitor
       @program_type.has_tag?(:actor)
     end
     
-    def is_ffi?
-      @program_type.has_tag?(:ffi)
-    end
-    
     def each_function
       @program_type.functions.each
     end

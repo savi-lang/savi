@@ -9,9 +9,10 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
   def keywords; ["actor", "class", "primitive", "numeric", "ffi"] end
   
   def compile(context, decl)
-    t = Type.new(Program::Type.new(decl.head.last.as(AST::Identifier)))
+    keyword = decl.keyword
+    t = Type.new(keyword, Program::Type.new(decl.head.last.as(AST::Identifier)))
     
-    case decl.keyword
+    case keyword
     when "actor"
       t.type.add_tag(:actor)
       t.type.add_tag(:allocated)
@@ -21,8 +22,9 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
       t.type.add_tag(:numeric)
       t.type.add_tag(:no_desc)
     when "primitive"
+      # no type-level tags
     when "ffi"
-      t.type.add_tag(:ffi)
+      # no type-level tags
     end
     
     @program.types << t.type
@@ -30,9 +32,10 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
   end
   
   class Type < Interpreter
-    getter type
+    getter keyword : String
+    getter type : Program::Type
     
-    def initialize(@type : Program::Type)
+    def initialize(@keyword, @type)
     end
     
     def keywords; ["prop", "fun", "new", "const"] end
@@ -66,7 +69,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
       end
       
       # Numeric types need some basic metadata attached to know the native type.
-      if @type.has_tag?(:numeric)
+      if @keyword == "numeric"
         # TODO: better generic mechanism for default consts
         if !@type.has_func?("bit_width")
           default = AST::Declare.new.from(@type.ident)
@@ -172,7 +175,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         ident = ident.as(AST::Identifier)
         
         body = decl.body
-        body = nil if @type.has_tag?(:ffi)
+        body = nil if @keyword == "ffi"
         
         if decl.keyword == "new"
           # Constructors always return the self (`@`).
@@ -185,6 +188,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         function = Program::Function.new(ident, params, ret, body)
         context.fulfill ["fun", @type.ident.value, ident.value], function
         
+        function.add_tag(:ffi) if @keyword == "ffi"
         function.add_tag(:constructor) if decl.keyword == "new"
         
         @type.functions << function

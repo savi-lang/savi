@@ -522,7 +522,7 @@ class Mare::Compiler::CodeGen
   end
   
   def gen_func_impl(gtype, gfunc)
-    return gen_ffi_body(gtype, gfunc) if gtype.type_def.is_ffi?
+    return gen_ffi_body(gtype, gfunc) if gfunc.func.has_tag?(:ffi)
     
     # Fields with no initializer body can be skipped.
     return if gfunc.func.has_tag?(:field) && gfunc.func.body.nil?
