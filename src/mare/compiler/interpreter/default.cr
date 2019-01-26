@@ -89,6 +89,14 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         
         @type.metadata[:is_floating_point] = is_float == "True"
       end
+      
+      # An FFI type's functions should be tagged as "ffi" and body removed.
+      if @keyword == "ffi"
+        @type.functions.each do |f|
+          f.add_tag(:ffi)
+          f.body = nil # TODO: change downstream to avoid this requirement
+        end
+      end
     end
     
     @@declare_fun = Witness.new([
@@ -190,10 +198,8 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
           data["ident"].as(AST::Identifier),
           data["params"]?.as(AST::Group?),
           data["ret"]?.as(AST::Identifier?),
-          (decl.body unless @keyword == "ffi"), # TODO: can this "unless" be removed?
-        ).tap do |function|
-          function.add_tag(:ffi) if @keyword == "ffi" # TODO: move this to the "finished" hook for Type?
-        end
+          decl.body,
+        )
       when "new"
         data = @@declare_new.run(decl)
         ident = data["ident"].as(AST::Identifier)

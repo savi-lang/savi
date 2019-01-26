@@ -18,7 +18,8 @@ class Mare::Program
   end
   
   class Type
-    getter ident : AST::Identifier
+    property ident : AST::Identifier
+    
     getter metadata
     getter functions
     
@@ -72,10 +73,10 @@ class Mare::Program
   end
   
   class Function
-    getter ident : AST::Identifier
-    getter params : AST::Group?
-    getter ret : AST::Identifier?
-    getter body : AST::Group?
+    property ident : AST::Identifier
+    property params : AST::Group?
+    property ret : AST::Identifier?
+    property body : AST::Group?
     
     property! refer : Compiler::Refer
     property! infer : Compiler::Infer
