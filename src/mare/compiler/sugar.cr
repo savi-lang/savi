@@ -67,6 +67,19 @@ class Mare::Compiler::Sugar < Mare::AST::Visitor
     end
   end
   
+  def visit(node : AST::Qualify)
+    # If a dot relation is within a qualify (which doesn't happen in the parser,
+    # but may happen artifically such as from the `@identifier` sugar above),
+    # then always move the qualify into the right-hand-side of the dot.
+    new_top = nil
+    while (dot = node.term).is_a?(AST::Relate) && dot.op.value == "."
+      node.term = dot.rhs
+      dot.rhs = node
+      new_top ||= dot
+    end
+    new_top || node
+  end
+  
   def visit(node : AST::Relate)
     case node.op.value
     when ".", "&&", "||", " ", "DEFAULTPARAM"

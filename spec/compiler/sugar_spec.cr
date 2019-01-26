@@ -58,4 +58,35 @@ describe Mare::Compiler::Sugar do
       ],
     ]
   end
+  
+  it "transforms an @-prefixed identifier into a method call of @" do
+    source = Mare::Source.new "(example)", <<-SOURCE
+    class Example:
+      fun selfish:
+        @x
+        @x(y)
+    SOURCE
+    
+    ast = Mare::Parser.parse(source)
+    
+    ast.to_a.should eq [:doc,
+      [:declare, [[:ident, "class"], [:ident, "Example"]], [:group, ":"]],
+      [:declare, [[:ident, "fun"], [:ident, "selfish"]], [:group, ":",
+        [:ident, "@x"],
+        [:qualify, [:ident, "@x"], [:group, "(", [:ident, "y"]]],
+      ]],
+    ]
+    
+    ctx = Mare::Compiler.compile(ast, limit: Mare::Compiler::Sugar)
+    
+    func = ctx.program.find_func!("Example", "selfish")
+    func.body.not_nil!.to_a.should eq [:group, ":",
+      [:relate, [:ident, "@"], [:op, "."], [:ident, "x"]],
+      [:relate,
+        [:ident, "@"],
+        [:op, "."],
+        [:qualify, [:ident, "x"], [:group, "(", [:ident, "y"]]],
+      ],
+    ]
+  end
 end
