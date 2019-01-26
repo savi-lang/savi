@@ -28,7 +28,7 @@ class Mare::Compiler::Layout < Mare::AST::Visitor
     
     def is_value?
       # TODO: Include Bool as a value.
-      is_tuple? || (singular? && single!.kind == Program::Type::Kind::Numeric)
+      is_tuple? || (singular? && single!.has_tag?(:no_desc))
     end
     
     def singular?
@@ -57,8 +57,7 @@ class Mare::Compiler::Layout < Mare::AST::Visitor
         :tuple
       else
         defn = single!
-        case defn.kind
-        when Program::Type::Kind::Numeric
+        if defn.has_tag?(:numeric)
           if defn.metadata[:is_floating_point]
             case defn.metadata[:bit_width]
             when 32 then :f32
@@ -109,17 +108,15 @@ class Mare::Compiler::Layout < Mare::AST::Visitor
     
     def abi_size : Int32
       # TODO: move final number calculation to CodeGen side (LLVMABISizeOfType)
-      case @program_type.kind
-      when Program::Type::Kind::FFI,
-           Program::Type::Kind::Primitive
-        8 # TODO: cross-platform
-      when Program::Type::Kind::Numeric
-        16 # TODO: cross-platform
-      when Program::Type::Kind::Class
-        64 # TODO: cross-platform and handle fields
-      when Program::Type::Kind::Actor
-        256 # TODO: cross-platform and handle fields
-      else raise NotImplementedError.new(@program_type.kind)
+      # TODO: cross-platform
+      if @program_type.has_tag?(:no_desc)
+        16 # we use the boxed size here
+      elsif !@program_type.has_tag?(:allocated)
+        8 # the size of just a descriptor pointer
+      elsif @program_type.has_tag?(:actor)
+        256 # TODO: handle fields
+      else
+        64 # TODO: handle fields
       end
     end
     
@@ -131,54 +128,26 @@ class Mare::Compiler::Layout < Mare::AST::Visitor
       return 0 if field_count == 0
       
       # TODO: move final number calculation to CodeGen side (LLVMOffsetOfElement)
-      case @program_type.kind
-      when Program::Type::Kind::Actor then 2 * 8
-      when Program::Type::Kind::Class then 1 * 8
-      else raise NotImplementedError.new(@program_type.kind)
-      end
+      offset = 0
+      offset += 8 unless @program_type.has_tag?(:no_desc)
+      offset += 8 if @program_type.has_tag?(:actor)
+      offset
     end
     
     def has_desc?
-      case @program_type.kind
-      when Program::Type::Kind::Actor,
-           Program::Type::Kind::Class,
-           Program::Type::Kind::Primitive,
-           Program::Type::Kind::FFI
-        true
-      when Program::Type::Kind::Numeric
-        false
-      else raise NotImplementedError.new(@program_type.kind)
-      end
+      !@program_type.has_tag?(:no_desc)
     end
     
     def has_allocation?
-      case @program_type.kind
-      when Program::Type::Kind::Actor,
-           Program::Type::Kind::Class
-        true
-      when Program::Type::Kind::Primitive,
-           Program::Type::Kind::FFI,
-           Program::Type::Kind::Numeric
-        false
-      else raise NotImplementedError.new(@program_type.kind)
-      end
+      @program_type.has_tag?(:allocated)
     end
     
     def has_actor_pad?
-      case @program_type.kind
-      when Program::Type::Kind::Actor
-        true
-      when Program::Type::Kind::Numeric,
-           Program::Type::Kind::Class,
-           Program::Type::Kind::Primitive,
-           Program::Type::Kind::FFI
-        false
-      else raise NotImplementedError.new(@program_type.kind)
-      end
+      @program_type.has_tag?(:actor)
     end
     
     def is_ffi?
-      @program_type.kind == Program::Type::Kind::FFI
+      @program_type.has_tag?(:ffi)
     end
     
     def each_function

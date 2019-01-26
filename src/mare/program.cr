@@ -18,28 +18,28 @@ class Mare::Program
   end
   
   class Type
-    enum Kind
-      Actor
-      Class
-      Primitive
-      Numeric
-      FFI
-    end
-    
-    getter kind : Kind
     getter ident : AST::Identifier
     getter metadata
     getter functions
     
     property! layout : Compiler::Layout
     
-    def initialize(@kind, @ident)
+    KNOWN_TAGS = [
+      :actor,
+      :allocated,
+      :ffi, # TODO: mark functions as FFI functions instead of whole types
+      :no_desc,
+      :numeric,
+    ]
+    
+    def initialize(@ident)
       @functions = [] of Function
+      @tags = Set(Symbol).new
       @metadata = Hash(Symbol, Int32 | Bool).new
     end
     
     def inspect(io : IO)
-      io << "#<#{self.class} #{kind.to_s[/\w+\z/]} #{@ident.value.inspect}>"
+      io << "#<#{self.class} #{@ident.value}>"
     end
     
     def has_func?(func_name)
@@ -53,20 +53,22 @@ class Mare::Program
         .not_nil!
     end
     
+    def add_tag(tag : Symbol)
+      raise NotImplementedError.new(tag) unless KNOWN_TAGS.includes?(tag)
+      @tags.add(tag)
+    end
+    
+    def has_tag?(tag : Symbol)
+      raise NotImplementedError.new(tag) unless KNOWN_TAGS.includes?(tag)
+      @tags.includes?(tag)
+    end
+    
     def is_concrete?
-      case kind
-      when Kind::Actor, Kind::Class, Kind::Primitive, Kind::Numeric, Kind::FFI
-        true
-      else false
-      end
+      true # TODO: interfaces, etc
     end
     
     def is_instantiable?
-      case kind
-      when Kind::Actor, Kind::Class
-        true
-      else false
-      end
+      has_tag?(:allocated)
     end
   end
   

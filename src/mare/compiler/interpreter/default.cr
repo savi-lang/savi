@@ -9,28 +9,24 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
   def keywords; ["actor", "class", "primitive", "numeric", "ffi"] end
   
   def compile(context, decl)
+    t = Type.new(Program::Type.new(decl.head.last.as(AST::Identifier)))
+    
     case decl.keyword
     when "actor"
-      t = Type.new(Program::Type.new(Program::Type::Kind::Actor, decl.head.last.as(AST::Identifier)))
-      @program.types << t.type
-      context.push t
+      t.type.add_tag(:actor)
+      t.type.add_tag(:allocated)
     when "class"
-      t = Type.new(Program::Type.new(Program::Type::Kind::Class, decl.head.last.as(AST::Identifier)))
-      @program.types << t.type
-      context.push t
+      t.type.add_tag(:allocated)
     when "numeric"
-      t = Type.new(Program::Type.new(Program::Type::Kind::Numeric, decl.head.last.as(AST::Identifier)))
-      @program.types << t.type
-      context.push t
+      t.type.add_tag(:numeric)
+      t.type.add_tag(:no_desc)
     when "primitive"
-      t = Type.new(Program::Type.new(Program::Type::Kind::Primitive, decl.head.last.as(AST::Identifier)))
-      @program.types << t.type
-      context.push t
     when "ffi"
-      t = Type.new(Program::Type.new(Program::Type::Kind::FFI, decl.head.last.as(AST::Identifier)))
-      @program.types << t.type
-      context.push t
+      t.type.add_tag(:ffi)
     end
+    
+    @program.types << t.type
+    context.push t
   end
   
   class Type < Interpreter
@@ -70,7 +66,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
       end
       
       # Numeric types need some basic metadata attached to know the native type.
-      if @type.kind == Program::Type::Kind::Numeric
+      if @type.has_tag?(:numeric)
         # TODO: better generic mechanism for default consts
         if !@type.has_func?("bit_width")
           default = AST::Declare.new.from(@type.ident)
@@ -176,7 +172,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         ident = ident.as(AST::Identifier)
         
         body = decl.body
-        body = nil if @type.kind == Program::Type::Kind::FFI
+        body = nil if @type.has_tag?(:ffi)
         
         if decl.keyword == "new"
           # Constructors always return the self (`@`).
