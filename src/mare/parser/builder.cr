@@ -23,7 +23,6 @@ module Mare::Parser::Builder
         doc.list << decl
       else
         term = build_term(child, iter, source)
-        p term if decl.nil?
         decl.as(AST::Declare).body.terms << term
       end
     end
