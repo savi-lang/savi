@@ -106,8 +106,6 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         
         @type.metadata[:is_floating_point] = is_float == "True"
       end
-      
-      context.fulfill ["type", @type.ident.value], @type
     end
     
     def compile(context, decl)
@@ -137,7 +135,6 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         getter_body = AST::Group.new(":").from(ident)
         getter_body.terms << AST::Field.new(ident.value).from(ident)
         getter_func = Program::Function.new(ident, getter_params, ret, getter_body)
-        context.fulfill ["fun", @type.ident.value, ident.value], getter_func
         @type.functions << getter_func
         
         setter_ident = AST::Identifier.new("#{ident.value}=").from(ident)
@@ -158,7 +155,6 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         setter_body = AST::Group.new(":").from(ident)
         setter_body.terms << setter_assign
         setter_func = Program::Function.new(setter_ident, setter_params, ret.dup, setter_body)
-        context.fulfill ["fun", @type.ident.value, setter_ident.value], setter_func
         @type.functions << setter_func
       when "fun", "new"
         # TODO: common abstraction to extract decl head terms,
@@ -186,7 +182,6 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         end
         
         function = Program::Function.new(ident, params, ret, body)
-        context.fulfill ["fun", @type.ident.value, ident.value], function
         
         function.add_tag(:ffi) if @keyword == "ffi"
         function.add_tag(:constructor) if decl.keyword == "new"
@@ -209,7 +204,6 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         body = decl.body
         
         function = Program::Function.new(ident, params, ret, body)
-        context.fulfill ["fun", @type.ident.value, ident.value], function
         
         function.add_tag(:constant)
         
