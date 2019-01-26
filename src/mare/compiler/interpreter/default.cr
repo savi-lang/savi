@@ -38,25 +38,8 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
     def initialize(@keyword, @type)
     end
     
+    # TODO: dedup these with the Witness mechanism.
     def keywords; ["prop", "fun", "new", "const"] end
-    
-    # # TODO: make these into macro-like declarations that do stuff
-    # {
-    #   "prop" => [
-    #     {:ident, :required, AST::Identifier,
-    #       "the identifier to use for this property"},
-    #     {:ret, :optional, AST::Identifier,
-    #       "the type to use for the value of this property"},
-    #   ],
-    #   "fun" => [
-    #     {:ident, :required, AST::Identifier,
-    #       "the identifier to use for this function"},
-    #     {:params, :optional, AST::Group,
-    #       "the parameter specification, surrounded by parenthesis"},
-    #     {:ret, :optional, AST::Identifier,
-    #       "the return type to use for this function"},
-    #   ],
-    # }
     
     def finished(context)
       if @type.is_instantiable?
@@ -108,20 +91,140 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
       end
     end
     
+    @@declare_fun = Witness.new([
+      {
+        "kind" => "keyword",
+        "name" => "fun",
+      },
+      {
+        "kind" => "term",
+        "name" => "ident",
+        "type" => "ident|string",
+        "convert_string_to_ident" => true,
+      },
+      {
+        "kind" => "term",
+        "name" => "params",
+        "type" => "params",
+        "optional" => true,
+      },
+      {
+        "kind" => "term",
+        "name" => "ret",
+        "type" => "type",
+        "optional" => true,
+      },
+    ] of Hash(String, String | Bool))
+    
+    @@declare_new = Witness.new([
+      {
+        "kind" => "keyword",
+        "name" => "new",
+      },
+      {
+        "kind" => "term",
+        "name" => "ident",
+        "type" => "ident|string",
+        "convert_string_to_ident" => true,
+        "optional" => true,
+        "default_copy_term" => "new",
+      },
+      {
+        "kind" => "term",
+        "name" => "params",
+        "type" => "params",
+        "optional" => true,
+      },
+      {
+        "kind" => "term",
+        "name" => "ret",
+        "type" => "type",
+        "optional" => true,
+      },
+    ] of Hash(String, String | Bool))
+    
+    @@declare_const = Witness.new([
+      {
+        "kind" => "keyword",
+        "name" => "const",
+      },
+      {
+        "kind" => "term",
+        "name" => "ident",
+        "type" => "ident|string",
+        "convert_string_to_ident" => true,
+      },
+      {
+        "kind" => "term",
+        "name" => "ret",
+        "type" => "type",
+        "optional" => true,
+      },
+    ] of Hash(String, String | Bool))
+    
+    @@declare_prop = Witness.new([
+      {
+        "kind" => "keyword",
+        "name" => "prop",
+      },
+      {
+        "kind" => "term",
+        "name" => "ident",
+        "type" => "ident|string",
+        "convert_string_to_ident" => true,
+      },
+      {
+        "kind" => "term",
+        "name" => "ret",
+        "type" => "type",
+        "optional" => true,
+      },
+    ] of Hash(String, String | Bool))
+    
     def compile(context, decl)
       case decl.keyword
+      when "fun"
+        data = @@declare_fun.run(decl)
+        
+        @type.functions << Program::Function.new(
+          data["ident"].as(AST::Identifier),
+          data["params"]?.as(AST::Group?),
+          data["ret"]?.as(AST::Identifier?),
+          (decl.body unless @keyword == "ffi"), # TODO: can this "unless" be removed?
+        ).tap do |function|
+          function.add_tag(:ffi) if @keyword == "ffi" # TODO: move this to the "finished" hook for Type?
+        end
+      when "new"
+        data = @@declare_new.run(decl)
+        ident = data["ident"].as(AST::Identifier)
+        
+        # A constructor always returns the self at the end of its body.
+        body = decl.body
+        body ||= AST::Group.new(":").from(ident)
+        body.terms << AST::Identifier.new("@").from(ident)
+        
+        @type.functions << Program::Function.new(
+          ident,
+          data["params"]?.as(AST::Group?),
+          AST::Identifier.new("@").from(ident),
+          body,
+        ).tap(&.add_tag(:constructor))
+      when "const"
+        data = @@declare_const.run(decl)
+        
+        @type.functions << Program::Function.new(
+          data["ident"].as(AST::Identifier),
+          nil,
+          data["ret"]?.as(AST::Identifier?),
+          decl.body,
+        ).tap(&.add_tag(:constant))
       when "prop"
         raise "stateless types can't have properties" \
           unless @type.is_instantiable?
         
-        head = decl.head.dup
-        head.shift # discard the keyword
-        ident = head.shift if head[0]?
-        ret = head.shift.as(AST::Identifier) if head[0]?
-        
-        ident = AST::Identifier.new(ident.value).from(ident) \
-          if ident.is_a?(AST::LiteralString)
-        ident = ident.as(AST::Identifier)
+        data = @@declare_prop.run(decl)
+        ident = data["ident"].as(AST::Identifier)
+        ret = data["ret"]?.as(AST::Identifier?)
         
         field_params = AST::Group.new("(").from(ident)
         field_body = decl.body
@@ -131,10 +234,9 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         field_func.add_tag(:field)
         @type.functions << field_func
         
-        getter_params = AST::Group.new("(").from(ident)
         getter_body = AST::Group.new(":").from(ident)
         getter_body.terms << AST::Field.new(ident.value).from(ident)
-        getter_func = Program::Function.new(ident, getter_params, ret, getter_body)
+        getter_func = Program::Function.new(ident, nil, ret, getter_body)
         @type.functions << getter_func
         
         setter_ident = AST::Identifier.new("#{ident.value}=").from(ident)
@@ -156,58 +258,6 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         setter_body.terms << setter_assign
         setter_func = Program::Function.new(setter_ident, setter_params, ret.dup, setter_body)
         @type.functions << setter_func
-      when "fun", "new"
-        # TODO: common abstraction to extract decl head terms,
-        # with nice error collection for reporting to the user/tool.
-        head = decl.head.dup
-        head.shift # discard the keyword
-        ident = head.shift if head[0]?.is_a?(AST::Identifier) || head[0]?.is_a?(AST::LiteralString)
-        params = head.shift.as(AST::Group) if head[0]?.is_a?(AST::Group)
-        ret = head.shift.as(AST::Identifier) if head[0]?
-        
-        ident = AST::Identifier.new(ident.value).from(ident) \
-          if ident.is_a?(AST::LiteralString)
-        ident = decl.head.first if ident.nil? && decl.keyword == "new"
-        ident = ident.as(AST::Identifier)
-        
-        body = decl.body
-        body = nil if @keyword == "ffi"
-        
-        if decl.keyword == "new"
-          # Constructors always return the self (`@`).
-          # TODO: decl parse error if an explicit return type was given
-          ret ||= AST::Identifier.new("@").from(ident)
-          body ||= AST::Group.new(":").from(ident)
-          body.terms << AST::Identifier.new("@").from(ident)
-        end
-        
-        function = Program::Function.new(ident, params, ret, body)
-        
-        function.add_tag(:ffi) if @keyword == "ffi"
-        function.add_tag(:constructor) if decl.keyword == "new"
-        
-        @type.functions << function
-      when "const"
-        # TODO: common abstraction to extract decl head terms,
-        # with nice error collection for reporting to the user/tool.
-        head = decl.head.dup
-        head.shift # discard the keyword
-        ident = head.shift if head[0]?
-        ret = head.shift.as(AST::Identifier) if head[0]?
-        
-        ident = AST::Identifier.new(ident.value).from(ident) \
-          if ident.is_a?(AST::LiteralString)
-        ident = ident.as(AST::Identifier)
-        
-        params = AST::Group.new("(").from(ident)
-        
-        body = decl.body
-        
-        function = Program::Function.new(ident, params, ret, body)
-        
-        function.add_tag(:constant)
-        
-        @type.functions << function
       end
     end
   end
