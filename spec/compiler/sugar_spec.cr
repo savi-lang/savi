@@ -2,7 +2,7 @@ describe Mare::Compiler::Sugar do
   it "transforms a property assignment into a method call" do
     source = Mare::Source.new "(example)", <<-SOURCE
     class Example:
-      fun plus:
+      fun prop_assign:
         x.y = z
     SOURCE
     
@@ -10,7 +10,7 @@ describe Mare::Compiler::Sugar do
     
     ast.to_a.should eq [:doc,
       [:declare, [[:ident, "class"], [:ident, "Example"]], [:group, ":"]],
-      [:declare, [[:ident, "fun"], [:ident, "plus"]], [:group, ":",
+      [:declare, [[:ident, "fun"], [:ident, "prop_assign"]], [:group, ":",
         [:relate,
           [:relate, [:ident, "x"], [:op, "."], [:ident, "y"]],
           [:op, "="],
@@ -21,7 +21,7 @@ describe Mare::Compiler::Sugar do
     
     ctx = Mare::Compiler.compile(ast, limit: Mare::Compiler::Sugar)
     
-    func = ctx.program.find_func!("Example", "plus")
+    func = ctx.program.find_func!("Example", "prop_assign")
     func.body.not_nil!.to_a.should eq [:group, ":",
       [:relate,
         [:ident, "x"],
