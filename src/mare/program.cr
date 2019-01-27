@@ -23,8 +23,6 @@ class Mare::Program
     getter metadata
     getter functions
     
-    property! reach : Compiler::Reach
-    
     KNOWN_TAGS = [
       :abstract,
       :actor,
