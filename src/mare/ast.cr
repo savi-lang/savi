@@ -62,6 +62,11 @@ module Mare::AST
     property list
     def initialize(@list = [] of Declare)
     end
+    
+    def dup
+      super.tap { |node| node.list = list.map { |d| d.dup.as(Declare) } }
+    end
+    
     def name; :doc end
     def to_a: Array(A)
       res = [name] of A
@@ -78,6 +83,11 @@ module Mare::AST
     property body
     def initialize(@head = [] of Term, @body = Group.new(":"))
     end
+    
+    def dup
+      super.tap { |node| node.head = @head.map(&.dup); node.body = @body.dup }
+    end
+    
     def name; :declare end
     def to_a: Array(A)
       [name, head.map(&.to_a), body.to_a] of A
@@ -149,6 +159,11 @@ module Mare::AST
     property term
     def initialize(@op : Operator, @term : Term)
     end
+    
+    def dup
+      super.tap { |node| node.op = @op.dup; node.term = @term.dup }
+    end
+    
     def name; :prefix end
     def to_a; [name, op.to_a, term.to_a] of A end
     def children_accept(visitor)
@@ -162,6 +177,11 @@ module Mare::AST
     property group
     def initialize(@term : Term, @group : Group)
     end
+    
+    def dup
+      super.tap { |node| node.term = @term.dup; node.group = @group.dup }
+    end
+    
     def name; :qualify end
     def to_a; [name, term.to_a, group.to_a] of A end
     def children_accept(visitor)
@@ -175,6 +195,11 @@ module Mare::AST
     property terms
     def initialize(@style : String, @terms = [] of Term)
     end
+    
+    def dup
+      super.tap { |node| node.terms = @terms.map(&.dup) }
+    end
+    
     def name; :group end
     def to_a: Array(A)
       res = [name] of A
@@ -193,6 +218,15 @@ module Mare::AST
     property rhs
     def initialize(@lhs : Term, @op : Operator, @rhs : Term)
     end
+    
+    def dup
+      super.tap do |node|
+        node.lhs = @lhs.dup
+        node.op = @op.dup
+        node.rhs = @rhs.dup
+      end
+    end
+    
     def name; :relate end
     def to_a; [name, lhs.to_a, op.to_a, rhs.to_a] of A end
     def children_accept(visitor)
@@ -206,6 +240,13 @@ module Mare::AST
     property list
     def initialize(@list : Array({Term, Term}))
     end
+    
+    def dup
+      super.tap do |node|
+        node.list = @list.map { |(a, b)| {a.dup, b.dup} }
+      end
+    end
+    
     def name; :choice end
     def to_a: Array(A)
       res = [name] of A

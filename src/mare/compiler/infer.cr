@@ -472,12 +472,25 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     ctx.program.types.each do |t|
       t.functions.each do |f|
         Infer.from(t, f)
+        check_is_list(t)
       end
     end
   end
   
   def self.from(t : Program::Type, f : Program::Function)
     f.infer? || new(t).tap(&.run(f))
+  end
+  
+  def self.check_is_list(t : Program::Type)
+    t.functions.each do |f|
+      next unless f.has_tag?(:is)
+      
+      infer = Infer.from(t, f)
+      iface = infer.resolve(infer.ret_tid)
+      unless MetaType.new(t.ident.pos, [t]) < iface
+        Error.at t.ident, "This type isn't a subtype of #{iface.show_type}"
+      end
+    end
   end
   
   def run(func)

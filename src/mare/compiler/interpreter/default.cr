@@ -56,6 +56,15 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
       
       # Numeric types need some basic metadata attached to know the native type.
       if @keyword == "numeric"
+        # Add "is Numeric" to the type definition so to absorb the interface.
+        iface_is = AST::Identifier.new("is").from(@type.ident)
+        iface_ret = AST::Identifier.new("Numeric").from(@type.ident)
+        iface_func = Program::Function.new(iface_is, nil, iface_ret, nil)
+        iface_func.add_tag(:hygienic)
+        iface_func.add_tag(:is)
+        @type.functions << iface_func
+        
+        # Capture bit_width constant value, or set a default if needed.
         # TODO: better generic mechanism for default consts
         if !@type.has_func?("bit_width")
           default = AST::Declare.new.from(@type.ident)
@@ -73,6 +82,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         @type.metadata[:bit_width] = bit_width_func.body.not_nil!
           .terms.last.as(AST::LiteralInteger).value.to_i32
         
+        # Capture is_floating_point constant value, or set a default if needed.
         # TODO: better generic mechanism for default consts
         if !@type.has_func?("is_floating_point")
           default = AST::Declare.new.from(@type.ident)
@@ -104,7 +114,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
       # An interface's functions should have their body removed.
       if @keyword == "interface"
         @type.functions.each do |f|
-          f.body = nil
+          f.body = nil if f.body.try(&.terms).try(&.empty?)
         end
       end
     end

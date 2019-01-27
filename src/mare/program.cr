@@ -88,10 +88,25 @@ class Mare::Program
       :ffi,
       :field,
       :hygienic,
+      :is,
     ]
     
     def initialize(@ident, @params, @ret, @body)
       @tags = Set(Symbol).new
+    end
+    
+    def dup
+      super.tap do |node|
+        node.ident = @ident.dup
+        node.params = @params.dup
+        node.ret = @ret.dup
+        node.body = @body.dup
+        
+        @tags.each { |t| node.add_tag(t) }
+        
+        raise "can't copy a refer property" if @refer
+        raise "can't copy a infer property" if @infer
+      end
     end
     
     def add_tag(tag : Symbol)

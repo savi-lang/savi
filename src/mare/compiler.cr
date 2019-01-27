@@ -5,6 +5,7 @@ module Mare::Compiler
     Sugar.class |
     Flagger.class |
     Refer.class |
+    Copy.class |
     Infer.class |
     Layout.class |
     CodeGen.class )
@@ -25,6 +26,9 @@ module Mare::Compiler
     
     ctx.run(Sugar)
     return ctx if limit == Sugar
+    
+    ctx.run(Copy)
+    return ctx if limit == Copy
     
     ctx.run(Flagger)
     return ctx if limit == Flagger
