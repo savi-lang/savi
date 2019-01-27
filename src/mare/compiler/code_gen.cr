@@ -4,12 +4,6 @@ require "../ext/llvm" # TODO: get these merged into crystal standard library
 require "compiler/crystal/config" # TODO: remove
 require "./code_gen/*"
 
-@[Link("ponyrt")]
-lib LibPonyRT
-  fun int_heap_index = ponyint_heap_index(size : LibC::SizeT) : UInt32
-  fun int_pool_index = ponyint_pool_index(size : LibC::SizeT) : LibC::SizeT
-end
-
 class Mare::Compiler::CodeGen
   @llvm : LLVM::Context
   @mod : LLVM::Module
@@ -149,38 +143,6 @@ class Mare::Compiler::CodeGen
     end
   end
   
-  # From libponyrt/pony.h
-  # Padding for actor types.
-  # 
-  # 56 bytes: initial header, not including the type descriptor
-  # 52/104 bytes: heap
-  # 48/88 bytes: gc
-  # 28/0 bytes: padding to 64 bytes, ignored
-  PONYRT_ACTOR_PAD_SIZE = 248
-  # TODO: adjust based on intptr size to account for 32-bit platforms:
-  # if INTPTR_MAX == INT64_MAX
-  #  define PONYRT_ACTOR_PAD_SIZE 248
-  # elif INTPTR_MAX == INT32_MAX
-  #  define PONYRT_ACTOR_PAD_SIZE 160
-  # endif
-  
-  # From libponyrt/pony.h
-  PONYRT_TRACE_MUTABLE = 0
-  PONYRT_TRACE_IMMUTABLE = 1
-  PONYRT_TRACE_OPAQUE = 2
-  
-  # From libponyrt/mem/pool.h
-  PONYRT_POOL_MIN_BITS = 5
-  PONYRT_POOL_MAX_BITS = 20
-  PONYRT_POOL_ALIGN_BITS = 10
-  
-  # From libponyrt/mem/heap.h
-  PONYRT_HEAP_MINBITS = 5
-  PONYRT_HEAP_MAXBITS = (PONYRT_POOL_ALIGN_BITS - 1)
-  PONYRT_HEAP_SIZECLASSES = (PONYRT_HEAP_MAXBITS - PONYRT_HEAP_MINBITS + 1)
-  PONYRT_HEAP_MIN = (1_u64 << PONYRT_HEAP_MINBITS)
-  PONYRT_HEAP_MAX = (1_u64 << PONYRT_HEAP_MAXBITS)
-  
   PONYRT_BC_PATH = "/home/jemc/1/code/gitx/ponyc/build/release/libponyrt.bc"
   
   getter! program : Program
@@ -219,7 +181,7 @@ class Mare::Compiler::CodeGen
     @desc_ptr = @desc.pointer.as(LLVM::Type)
     @obj = @llvm.opaque_struct("_.OBJECT").as(LLVM::Type)
     @obj_ptr = @obj.pointer.as(LLVM::Type)
-    @actor_pad = @i8.array(PONYRT_ACTOR_PAD_SIZE).as(LLVM::Type)
+    @actor_pad = @i8.array(PonyRT::ACTOR_PAD_SIZE).as(LLVM::Type)
     @msg = @llvm.struct([@i32, @i32], "_.MESSAGE").as(LLVM::Type)
     @msg_ptr = @msg.pointer.as(LLVM::Type)
     @trace_fn = LLVM::Type.function([@ptr, @obj_ptr], @void).as(LLVM::Type)
@@ -399,7 +361,7 @@ class Mare::Compiler::CodeGen
     msg_type = @llvm.struct([@i32, @i32, @ptr, env.type])
     vtable_index = 0 # TODO: get actual vtable of Main.new
     msg_size = @target_machine.data_layout.abi_size(msg_type)
-    pool_index = LibPonyRT.int_pool_index(msg_size)
+    pool_index = PonyRT.pool_index(msg_size)
     msg_opaque = @builder.call(@mod.functions["pony_alloc_msg"],
       [@i32.const_int(pool_index), @i32.const_int(vtable_index)], "msg_opaque")
     msg = @builder.bit_cast(msg_opaque, msg_type.pointer, "msg")
@@ -414,7 +376,7 @@ class Mare::Compiler::CodeGen
       func_frame.pony_ctx,
       @builder.bit_cast(env, @obj_ptr, "env_as_obj"),
       @llvm.const_bit_cast(@gtypes["Env"].desc, @desc_ptr),
-      @i32.const_int(PONYRT_TRACE_IMMUTABLE),
+      @i32.const_int(PonyRT::TRACE_IMMUTABLE),
     ])
     @builder.call(@mod.functions["pony_send_done"], [func_frame.pony_ctx])
     
@@ -901,8 +863,8 @@ class Mare::Compiler::CodeGen
     args = [pony_ctx]
     
     value =
-      if size <= PONYRT_HEAP_MAX
-        index = LibPonyRT.int_heap_index(size).to_i32
+      if size <= PonyRT::HEAP_MAX
+        index = PonyRT.heap_index(size).to_i32
         args << @i32.const_int(index)
         # TODO: handle case where final_fn is present (pony_alloc_small_final)
         @builder.call(@mod.functions["pony_alloc_small"], args, "#{name}.MEM")

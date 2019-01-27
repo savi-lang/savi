@@ -9,7 +9,7 @@ class Mare::Compiler::CodeGen
       {"pony_create", [@ptr, @desc_ptr], @obj_ptr, [
         LLVM::Attribute::NoUnwind, LLVM::Attribute::InaccessibleMemOrArgMemOnly,
         {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::NoAlias},
-        {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::Dereferenceable, align_width + PONYRT_ACTOR_PAD_SIZE},
+        {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::Dereferenceable, align_width + PonyRT::ACTOR_PAD_SIZE},
         {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::Alignment, align_width},
       ]},
       {"ponyint_destroy", [@obj_ptr], @void, [
@@ -24,43 +24,43 @@ class Mare::Compiler::CodeGen
       {"pony_alloc", [@ptr, @intptr], @ptr, [
         LLVM::Attribute::NoUnwind, LLVM::Attribute::InaccessibleMemOrArgMemOnly,
         {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::NoAlias},
-        {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::DereferenceableOrNull, PONYRT_HEAP_MIN},
+        {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::DereferenceableOrNull, PonyRT::HEAP_MIN},
         {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::Alignment, align_width},
       ]},
       {"pony_alloc_small", [@ptr, @i32], @ptr, [
         LLVM::Attribute::NoUnwind, LLVM::Attribute::InaccessibleMemOrArgMemOnly,
         {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::NoAlias},
-        {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::Dereferenceable, PONYRT_HEAP_MIN},
+        {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::Dereferenceable, PonyRT::HEAP_MIN},
         {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::Alignment, align_width},
       ]},
       {"pony_alloc_large", [@ptr, @intptr], @ptr, [
         LLVM::Attribute::NoUnwind, LLVM::Attribute::InaccessibleMemOrArgMemOnly,
         {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::NoAlias},
-        {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::Dereferenceable, PONYRT_HEAP_MAX << 1},
+        {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::Dereferenceable, PonyRT::HEAP_MAX << 1},
         {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::Alignment, align_width},
       ]},
       {"pony_realloc", [@ptr, @ptr, @intptr], @ptr, [
         LLVM::Attribute::NoUnwind, LLVM::Attribute::InaccessibleMemOrArgMemOnly,
         {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::NoAlias},
-        {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::DereferenceableOrNull, PONYRT_HEAP_MIN},
+        {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::DereferenceableOrNull, PonyRT::HEAP_MIN},
         {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::Alignment, align_width},
       ]},
       {"pony_alloc_final", [@ptr, @intptr], @ptr, [
         LLVM::Attribute::NoUnwind, LLVM::Attribute::InaccessibleMemOrArgMemOnly,
         {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::NoAlias},
-        {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::DereferenceableOrNull, PONYRT_HEAP_MIN},
+        {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::DereferenceableOrNull, PonyRT::HEAP_MIN},
         {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::Alignment, align_width},
       ]},
       {"pony_alloc_small_final", [@ptr, @i32], @ptr, [
         LLVM::Attribute::NoUnwind, LLVM::Attribute::InaccessibleMemOrArgMemOnly,
         {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::NoAlias},
-        {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::Dereferenceable, PONYRT_HEAP_MIN},
+        {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::Dereferenceable, PonyRT::HEAP_MIN},
         {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::Alignment, align_width},
       ]},
       {"pony_alloc_large_final", [@ptr, @intptr], @ptr, [
         LLVM::Attribute::NoUnwind, LLVM::Attribute::InaccessibleMemOrArgMemOnly,
         {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::NoAlias},
-        {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::Dereferenceable, PONYRT_HEAP_MAX << 1},
+        {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::Dereferenceable, PonyRT::HEAP_MAX << 1},
         {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::Alignment, align_width},
       ]},
       {"pony_alloc_msg", [@i32, @i32], @msg_ptr, [
