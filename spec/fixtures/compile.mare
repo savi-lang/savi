@@ -12,13 +12,17 @@ primitive Zero:
   fun "+" (other I32) I32:
     other
 
+interface Augend:
+  fun "+" (other I32) I32:
+
 class Sentence:
   prop text CString:
   new (@text = "[awkward silence]"):
 
 actor Main:
   new:
-    exitcode I32 = Zero + 42
+    augend Augend = Zero
+    exitcode I32 = Zero + 42 // TODO: augend + 42
     none = ()
     
     @say_stuff

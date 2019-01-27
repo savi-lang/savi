@@ -26,6 +26,7 @@ class Mare::Program
     property! layout : Compiler::Layout
     
     KNOWN_TAGS = [
+      :abstract,
       :actor,
       :allocated,
       :no_desc,
@@ -64,11 +65,11 @@ class Mare::Program
     end
     
     def is_concrete?
-      true # TODO: interfaces, etc
+      !has_tag?(:abstract)
     end
     
     def is_instantiable?
-      has_tag?(:allocated)
+      has_tag?(:allocated) && is_concrete?
     end
   end
   
@@ -101,6 +102,10 @@ class Mare::Program
     def has_tag?(tag : Symbol)
       raise NotImplementedError.new(tag) unless KNOWN_TAGS.includes?(tag)
       @tags.includes?(tag)
+    end
+    
+    def param_count
+      params.try { |group| group.terms.size } || 0
     end
   end
 end

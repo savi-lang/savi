@@ -3,6 +3,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   
   class MetaType
     property pos : Source::Pos
+    # TODO: represent in DNF or CNF form, to support not just union types but
+    # also intersections and exclusions in a formally reasonable way.
     @union : Set(Program::Type)
     
     def initialize(@pos, union : Enumerable(Program::Type))
@@ -34,8 +36,99 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       @union.first
     end
     
-    def &(other)
-      MetaType.new(@pos, @union & other.defns)
+    # Return a new MetaType that consists of only the parts of self
+    # that qualify as subtypes of the other MetaType.
+    def intersect_sub(other : MetaType)
+      new_union =
+        self.defns.select do |defn|
+          other.defns.includes?(defn) ||
+          other.defns.any? { |d| self.class.is_l_defn_sub_r_defn?(defn, d) }
+        end
+      
+      MetaType.new(@pos, new_union)
+    end
+    
+    # Return true if this MetaType is a subtype of the other MetaType.
+    def <(other); subtype_of?(other) end
+    def subtype_of?(other : MetaType)
+      self.defns.all? do |defn|
+        other.defns.includes?(defn) ||
+        other.defns.any? { |d| self.class.is_l_defn_sub_r_defn?(defn, d) }
+      end
+    end
+    
+    # Return true if the left type satisfies the requirements of the right type.
+    def self.is_l_defn_sub_r_defn?(l : Program::Type, r : Program::Type)
+      # TODO: for each return false, carry info about why it was false?
+      # Maybe we only want to go to the trouble of collecting this info
+      # when it is requested by the caller, so as not to slow the base case.
+      
+      # If these are literally the same type, we can trivially return true.
+      return true if r.same? l
+      
+      # We don't have subtyping of concrete types (i.e. class inheritance),
+      # so we know l can't possibly be a subtype of r if r is concrete.
+      # Note that by the time we've reached this line, we've already
+      # determined that the two types are not identical, so we're only
+      # concerned with structural subtyping from here on.
+      return false unless r.has_tag?(:abstract)
+      
+      # TODO: memoize the results of success/failure of the following steps,
+      # so we can skip them if we've already done a comparison for l and r.
+      # This could also be preserved for use in a selector coloring pass later.
+      
+      r.functions.each do |rf|
+        # Hygienic functions are not considered to be real functions for
+        # the sake of structural subtyping, so they don't have to be fulfilled.
+        next if rf.has_tag?(:hygienic)
+        
+        # The structural comparison fails if a required method is missing.
+        return false unless l.has_func?(rf.ident.value)
+        lf = l.find_func!(rf.ident.value)
+        
+        # Just asserting; we expect has_func? and find_func! to prevent this.
+        raise "found hygienic function" if lf.has_tag?(:hygienic)
+        
+        return false unless is_l_func_sub_r_func?(l, r, lf, rf)
+      end
+      
+      true
+    end
+    
+    # Return true if the left func satisfies the requirements of the right func.
+    def self.is_l_func_sub_r_func?(
+      l : Program::Type, r : Program::Type,
+      lf : Program::Function, rf : Program::Function,
+    )
+      # Get the Infer instance for both l and r functions, to compare them.
+      l_infer = Infer.from(l, lf)
+      r_infer = Infer.from(r, rf)
+      
+      # A constructor can only match another constructor.
+      return false if lf.has_tag?(:constructor) != rf.has_tag?(:constructor)
+      
+      # Must have the same number of parameters.
+      return false if lf.param_count != rf.param_count
+      
+      # TODO: Check receiver rcap (see ponyc subtype.c:240)
+      # Covariant receiver rcap for constructors.
+      # Contravariant receiver rcap for functions and behaviours.
+      
+      # Covariant return type.
+      return false unless \
+        l_infer.resolve(l_infer.ret_tid) < r_infer.resolve(r_infer.ret_tid)
+      
+      # Contravariant parameter types.
+      lf.params.try do |l_params|
+        rf.params.try do |r_params|
+          l_params.terms.zip(r_params.terms).each do |(l_param, r_param)|
+            return false unless \
+              r_infer.resolve(r_param) < l_infer.resolve(l_param)
+          end
+        end
+      end
+      
+      true
     end
     
     def each_type_def : Iterator(Program::Type)
@@ -59,12 +152,13 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
     
     def within_constraints?(list : Iterable(MetaType))
+      # TODO: verify total correctness of this algorithm and its use.
       unconstrained = true
-      extra = list.reduce @union do |set, constraint|
+      intersected = list.reduce self do |reduction, constraint|
         unconstrained = false
-        set - constraint.defns
+        reduction.intersect_sub(constraint)
       end
-      unconstrained || extra.empty?
+      unconstrained || !intersected.empty?
     end
     
     def within_constraints!(constraints : Iterable(MetaType))
@@ -120,7 +214,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
     
     def within_domain!(infer : Infer, constraint : MetaType)
-      @domain = @domain & constraint
+      @domain = @domain.intersect_sub(constraint)
       @domain_constraints << constraint
       
       return unless @domain.empty?
@@ -240,7 +334,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       
       ds = @downstreamed
       if ds
-        @downstreamed = ds & constraint
+        @downstreamed = ds.intersect_sub(constraint)
       else
         @downstreamed = constraint
       end
@@ -366,9 +460,13 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     # so this second pass just takes care of typechecking unreachable functions.
     ctx.program.types.each do |t|
       t.functions.each do |f|
-        new(t).run(f) unless f.infer?
+        Infer.from(t, f)
       end
     end
+  end
+  
+  def self.from(t : Program::Type, f : Program::Function)
+    f.infer? || new(t).tap(&.run(f))
   end
   
   def run(func)
@@ -436,9 +534,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     # Keep track that we called this function.
     @called_funcs.add(call_func)
     
-    # TODO: copying to diverging specializations of the function
-    # TODO: detect and halt recursion by noticing what's been seen
-    infer = call_func.infer? || self.class.new(call_defn).tap(&.run(call_func))
+    # Get the Infer instance for call_func, possibly creating and running it.
+    infer = Infer.from(call_defn, call_func)
     
     # Apply constraints to the return type.
     ret = infer[infer.ret_tid]
@@ -461,7 +558,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     # Keep track that we touched this "function".
     @called_funcs.add(field_func)
     
-    infer = field_func.infer? || self.class.new(@self_type).tap(&.run(field_func))
+    # Get the Infer instance for field_func, possibly creating and running it.
+    infer = Infer.from(@self_type, field_func)
     
     # Apply constraints to the return type.
     ret = infer[infer.ret_tid]

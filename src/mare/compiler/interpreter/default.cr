@@ -6,7 +6,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
     context.fulfill ["doc"], @program
   end
   
-  def keywords; ["actor", "class", "primitive", "numeric", "ffi"] end
+  def keywords; ["actor", "class", "primitive", "numeric", "ffi", "interface"] end
   
   def compile(context, decl)
     keyword = decl.keyword
@@ -17,6 +17,9 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
       t.type.add_tag(:actor)
       t.type.add_tag(:allocated)
     when "class"
+      t.type.add_tag(:allocated)
+    when "interface"
+      t.type.add_tag(:abstract)
       t.type.add_tag(:allocated)
     when "numeric"
       t.type.add_tag(:numeric)
@@ -94,7 +97,14 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
       if @keyword == "ffi"
         @type.functions.each do |f|
           f.add_tag(:ffi)
-          f.body = nil # TODO: change downstream to avoid this requirement
+          f.body = nil
+        end
+      end
+      
+      # An interface's functions should have their body removed.
+      if @keyword == "interface"
+        @type.functions.each do |f|
+          f.body = nil
         end
       end
     end
