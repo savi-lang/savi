@@ -3,6 +3,7 @@ class Mare::Program
   getter types
   
   property! reach : Compiler::Reach
+  property! paint : Compiler::Paint
   property! code_gen : Compiler::CodeGen
   
   def initialize

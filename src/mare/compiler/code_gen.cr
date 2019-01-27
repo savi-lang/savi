@@ -5,7 +5,7 @@ require "compiler/crystal/config" # TODO: remove
 require "./code_gen/*"
 
 class Mare::Compiler::CodeGen
-  @llvm : LLVM::Context
+  getter llvm : LLVM::Context
   @mod : LLVM::Module
   @builder : LLVM::Builder
   
@@ -46,57 +46,78 @@ class Mare::Compiler::CodeGen
   
   class GenType
     getter type_def : Reach::Def
+    getter gfuncs : Hash(String, GenFunc)
     getter fields : Array(Tuple(String, Reach::Ref))
+    getter vtable_size : Int32
     getter desc_type : LLVM::Type
     getter struct_type : LLVM::Type
     getter! desc : LLVM::Value
     getter! singleton : LLVM::Value
     
     def initialize(g : CodeGen, @type_def)
-      @gfuncs = {} of String => GenFunc
-      
+      @gfuncs = Hash(String, GenFunc).new
       @fields = Array(Tuple(String, Reach::Ref)).new
+      
+      # Take down info on all functions and fields.
+      @vtable_size = 0
       @type_def.each_function.each do |f|
-        next unless f.has_tag?(:field)
-        
-        field_type = g.program.reach[f.infer.resolve(f.ident)]
-        @fields << {f.ident.value, field_type}
+        if f.has_tag?(:field)
+          field_type = g.program.reach[f.infer.resolve(f.ident)]
+          @fields << {f.ident.value, field_type}
+        else
+          next unless g.program.reach.reached_func?(f)
+          
+          vtable_index = g.program.paint[f]
+          @vtable_size = (vtable_index + 1) if @vtable_size <= vtable_index
+          
+          key = f.ident.value
+          key += Random::Secure.hex if f.has_tag?(:hygienic)
+          @gfuncs[key] = GenFunc.new(@type_def, f, vtable_index)
+        end
       end
       
       # Generate descriptor type and struct type.
-      @desc_type = g.gen_desc_type(@type_def)
-      @struct_type = g.gen_struct_type(@type_def, @desc_type, fields)
+      @desc_type = g.gen_desc_type(@type_def, @vtable_size)
+      @struct_type = g.gen_struct_type(@type_def, @desc_type, @fields)
     end
     
+    # Generate function declarations.
     def gen_func_decls(g : CodeGen)
       # Generate associated function declarations, some of which
       # may be referenced in the descriptor global instance below.
-      @type_def.each_function.each do |f|
-        next unless g.program.reach.reached_func?(f)
-        
-        key = f.ident.value
-        key += Random::Secure.hex if f.has_tag?(:hygienic)
-        @gfuncs[key] = GenFunc.new(g, self, f)
+      @gfuncs.each_value do |gfunc|
+        gfunc.llvm_func = g.gen_func_decl(self, gfunc)
       end
+    end
+    
+    # Generate virtual call table.
+    def gen_vtable(g : CodeGen) : Array(LLVM::Value)
+      ptr = g.llvm.int8.pointer
+      vtable = Array(LLVM::Value).new(@vtable_size, ptr.null)
+      @gfuncs.each_value do |gfunc|
+        # TODO: try without cast?
+        # vtable[gfunc.vtable_index] = gfunc.llvm_func.to_value
+        vtable[gfunc.vtable_index] =
+          g.llvm.const_bit_cast(gfunc.llvm_func.to_value, ptr)
+      end
+      vtable
     end
     
     # Generate descriptor global instance.
     def gen_desc(g : CodeGen)
-      @desc = g.gen_desc(@type_def, @desc_type)
+      @desc = g.gen_desc(@type_def, @desc_type, gen_vtable(g))
     end
     
     # Generate function implementations.
     def gen_func_impls(g : CodeGen)
       @gfuncs.each_value do |gfunc|
-        next unless g.program.reach.reached_func?(gfunc.func)
         g.gen_func_impl(self, gfunc)
       end
     end
     
     # Generate other global values.
     def gen_globals(g : CodeGen)
-      @singleton = g.gen_singleton(@type_def, @struct_type, @desc.not_nil!) \
-        unless @type_def.has_allocation?
+      @singleton = g.gen_singleton(@type_def, @struct_type, @desc.not_nil!)
     end
     
     def [](name)
@@ -120,18 +141,18 @@ class Mare::Compiler::CodeGen
   
   class GenFunc
     getter func : Program::Function
+    getter vtable_index : Int32
     getter llvm_name : String
-    getter! llvm_func : LLVM::Function
+    property! llvm_func : LLVM::Function
     
-    def initialize(g : CodeGen, gtype : GenType, @func, suffix : String? = nil)
+    def initialize(type_def : Reach::Def, @func, @vtable_index)
       @needs_receiver = \
-        gtype.type_def.has_allocation? &&
+        type_def.has_allocation? &&
         !@func.has_tag?(:constructor) &&
         !@func.has_tag?(:constant)
       
-      @llvm_name = "#{gtype.type_def.llvm_name}.#{@func.ident.value}"
+      @llvm_name = "#{type_def.llvm_name}.#{@func.ident.value}"
       @llvm_name = "#{@llvm_name}.HYGIENIC" if func.has_tag?(:hygienic)
-      @llvm_func = g.gen_func_decl(gtype, self)
     end
     
     def needs_receiver?
@@ -359,7 +380,7 @@ class Mare::Compiler::CodeGen
     
     # Create a one-off message type and allocate a message.
     msg_type = @llvm.struct([@i32, @i32, @ptr, env.type])
-    vtable_index = 0 # TODO: get actual vtable of Main.new
+    vtable_index = @gtypes["Main"]["new"].vtable_index
     msg_size = @target_machine.data_layout.abi_size(msg_type)
     pool_index = PonyRT.pool_index(msg_size)
     msg_opaque = @builder.call(@mod.functions["pony_alloc_msg"],
@@ -591,12 +612,38 @@ class Mare::Compiler::CodeGen
       end
     end
     
-    if gfunc.needs_receiver?
-      receiver = gen_expr(relate.lhs)
-      args.unshift(receiver)
-    end
+    receiver = gen_expr(relate.lhs)
     
-    @builder.call(gfunc.llvm_func, args)
+    args.unshift(receiver) if gfunc.needs_receiver?
+    
+    @builder.call(gen_llvm_func_ref(receiver, lhs_gtype, gfunc), args)
+  end
+  
+  def gen_llvm_func_ref(
+    receiver : LLVM::Value?, gtype : GenType, gfunc : GenFunc
+  )
+    # TODO: Not every call should be virtual, but this is just commented out
+    # to prove that virtual calls work. It can be uncommented later.
+    # # Only pay the cost of a virtual call if this is an abstract type.
+    # return gfunc.llvm_func unless gtype.type_def.is_abstract?
+    
+    receiver.not_nil!
+    
+    rname = receiver.name
+    fname = "#{rname}.#{gfunc.func.ident.value}"
+    
+    # Do a virtual call for this function.
+    # Load the type descriptor of the receiver so we can read its vtable,
+    # then load the function pointer at the appropriate index of that vtable.
+    desc_gep = @builder.struct_gep(receiver, 0, "#{rname}.DESC")
+    desc = @builder.load(desc_gep, "#{rname}.DESC.LOAD")
+    vtable_gep = @builder.struct_gep(desc, DESC_VTABLE, "#{rname}.DESC.VTABLE")
+    vtable_idx = @i32.const_int(gfunc.vtable_index)
+    gep = @builder.inbounds_gep(vtable_gep, @i32_0, vtable_idx, "#{fname}.GEP")
+    load = @builder.load(gep, "#{fname}.LOAD")
+    func = @builder.bit_cast(load, gfunc.llvm_func.type, fname)
+    
+    func
   end
   
   def gen_eq(relate)
@@ -755,7 +802,25 @@ class Mare::Compiler::CodeGen
     @builder.phi(phi_type, [bb_body1, bb_body2], [value1, value2], "phichoice")
   end
   
-  def gen_desc_type(type_def : Reach::Def) : LLVM::Type
+  DESC_ID                        = 0
+  DESC_SIZE                      = 1
+  DESC_FIELD_COUNT               = 2
+  DESC_FIELD_OFFSET              = 3
+  DESC_INSTANCE                  = 4
+  DESC_TRACE_FN                  = 5
+  DESC_SERIALISE_TRACE_FN        = 6
+  DESC_SERIALISE_FN              = 7
+  DESC_DESERIALISE_FN            = 8
+  DESC_CUSTOM_SERIALISE_SPACE_FN = 9
+  DESC_CUSTOM_DESERIALISE_FN     = 10
+  DESC_DISPATCH_FN               = 11
+  DESC_FINAL_FN                  = 12
+  DESC_EVENT_NOTIFY              = 13
+  DESC_TRAITS                    = 14
+  DESC_FIELDS                    = 15
+  DESC_VTABLE                    = 16
+  
+  def gen_desc_type(type_def : Reach::Def, vtable_size : Int32) : LLVM::Type
     @llvm.struct [
       @i32,                           # 0: id
       @i32,                           # 1: size
@@ -773,43 +838,29 @@ class Mare::Compiler::CodeGen
       @i32,                           # 13: event notify
       @pptr,                          # 14: TODO: traits
       @pptr,                          # 15: TODO: fields
-      @pptr,                          # 16: TODO: vtable
+      @ptr.array(vtable_size),        # 16: vtable
     ], "#{type_def.llvm_name}.DESC"
   end
   
-  def gen_desc(type_def, desc_type)
-    global = @mod.globals.add(desc_type, "#{type_def.llvm_name}.DESC")
-    global.linkage = LLVM::Linkage::LinkerPrivate
-    global.global_constant = true
-    global
+  def gen_desc(type_def, desc_type, vtable)
+    desc = @mod.globals.add(desc_type, "#{type_def.llvm_name}.DESC")
+    desc.linkage = LLVM::Linkage::LinkerPrivate
+    desc.global_constant = true
+    desc
     
     case type_def.llvm_name
     when "Main"
-      dispatch_fn = @mod.functions.add("#{type_def.llvm_name}.DISPATCH", @dispatch_fn) do |fn|
-        fn.unnamed_addr = true
-        fn.call_convention = LLVM::CallConvention::C
-        fn.linkage = LLVM::Linkage::External
-        
-        gen_func_start(fn)
-        
-        @builder.call(@mod.functions["Main.new"])
-        
-        @builder.ret
-        
-        gen_func_end
-      end
+      dispatch_fn = @mod.functions.add("#{type_def.llvm_name}.DISPATCH", @dispatch_fn)
       
       traits = @pptr.null # TODO
       fields = @pptr.null # TODO
-      vtable = @pptr.null # TODO
     else
       dispatch_fn = @dispatch_fn_ptr.null # TODO
       traits = @pptr.null # TODO
       fields = @pptr.null # TODO
-      vtable = @pptr.null # TODO
     end
     
-    global.initializer = desc_type.const_struct [
+    desc.initializer = desc_type.const_struct [
       @i32.const_int(type_def.desc_id),      # 0: id
       @i32.const_int(type_def.abi_size),     # 1: size
       @i32_0,                                # 2: TODO: field_count (tuples only)
@@ -826,10 +877,33 @@ class Mare::Compiler::CodeGen
       @i32.const_int(-1),                    # 13: event notify TODO
       traits,                                # 14: TODO: traits
       fields,                                # 15: TODO: fields
-      vtable,                                # 16: TODO: vtable
+      @ptr.const_array(vtable),              # 16: vtable
     ]
     
-    global
+    if dispatch_fn.is_a?(LLVM::Function)
+      dispatch_fn = dispatch_fn.not_nil!
+      
+      dispatch_fn.unnamed_addr = true
+      dispatch_fn.call_convention = LLVM::CallConvention::C
+      dispatch_fn.linkage = LLVM::Linkage::External
+      
+      gen_func_start(dispatch_fn)
+      
+      msg_id_gep = @builder.struct_gep(dispatch_fn.params[2], 1, "msg.id")
+      msg_id = @builder.load(msg_id_gep)
+      
+      # TODO: ... ^
+      
+      # TODO: arguments
+      # TODO: don't special-case this
+      @builder.call(@gtypes["Main"]["new"].llvm_func)
+      
+      @builder.ret
+      
+      gen_func_end
+    end
+    
+    desc
   end
   
   def gen_struct_type(type_def, desc_type, fields)
@@ -843,8 +917,6 @@ class Mare::Compiler::CodeGen
   end
   
   def gen_singleton(type_def, struct_type, desc)
-    raise "can't generate stateful singleton" if type_def.has_allocation?
-    
     global = @mod.globals.add(struct_type, type_def.llvm_name)
     global.linkage = LLVM::Linkage::LinkerPrivate
     global.global_constant = true
@@ -892,7 +964,7 @@ class Mare::Compiler::CodeGen
     gtype = func_frame.gtype.not_nil!
     object = func_frame.receiver_value
     gep = @builder.struct_gep(object, gtype.field_index(name), "@.#{name}")
-    @builder.load(gep)
+    @builder.load(gep, "@.#{name}.LOAD")
   end
   
   def gen_field_store(name, value)

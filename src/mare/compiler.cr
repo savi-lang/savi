@@ -8,6 +8,7 @@ module Mare::Compiler
     Copy.class |
     Infer.class |
     Reach.class |
+    Paint.class |
     CodeGen.class )
   
   def self.compile(source : Source, limit : LIMIT = CodeGen)
@@ -41,6 +42,9 @@ module Mare::Compiler
     
     ctx.run(Reach)
     return ctx if limit == Reach
+    
+    ctx.run(Paint)
+    return ctx if limit == Paint
     
     ctx.run(CodeGen)
     ctx
