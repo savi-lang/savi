@@ -2,7 +2,7 @@ class Mare::Program
   # TODO: add Package delineation here
   getter types
   
-  property! layout : Compiler::Layout
+  property! reach : Compiler::Reach
   property! code_gen : Compiler::CodeGen
   
   def initialize
@@ -23,7 +23,7 @@ class Mare::Program
     getter metadata
     getter functions
     
-    property! layout : Compiler::Layout
+    property! reach : Compiler::Reach
     
     KNOWN_TAGS = [
       :abstract,

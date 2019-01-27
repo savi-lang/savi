@@ -45,8 +45,8 @@ class Mare::Compiler::CodeGen
   end
   
   class GenType
-    getter type_def : Layout::Def
-    getter fields : Array(Tuple(String, Layout::Ref))
+    getter type_def : Reach::Def
+    getter fields : Array(Tuple(String, Reach::Ref))
     getter desc_type : LLVM::Type
     getter struct_type : LLVM::Type
     getter! desc : LLVM::Value
@@ -55,11 +55,11 @@ class Mare::Compiler::CodeGen
     def initialize(g : CodeGen, @type_def)
       @gfuncs = {} of String => GenFunc
       
-      @fields = Array(Tuple(String, Layout::Ref)).new
+      @fields = Array(Tuple(String, Reach::Ref)).new
       @type_def.each_function.each do |f|
         next unless f.has_tag?(:field)
         
-        field_type = g.program.layout[f.infer.resolve(f.ident)]
+        field_type = g.program.reach[f.infer.resolve(f.ident)]
         @fields << {f.ident.value, field_type}
       end
       
@@ -72,7 +72,7 @@ class Mare::Compiler::CodeGen
       # Generate associated function declarations, some of which
       # may be referenced in the descriptor global instance below.
       @type_def.each_function.each do |f|
-        next unless g.program.layout.reached_func?(f)
+        next unless g.program.reach.reached_func?(f)
         
         key = f.ident.value
         key += Random::Secure.hex if f.has_tag?(:hygienic)
@@ -88,7 +88,7 @@ class Mare::Compiler::CodeGen
     # Generate function implementations.
     def gen_func_impls(g : CodeGen)
       @gfuncs.each_value do |gfunc|
-        next unless g.program.layout.reached_func?(gfunc.func)
+        next unless g.program.reach.reached_func?(gfunc.func)
         g.gen_func_impl(self, gfunc)
       end
     end
@@ -214,39 +214,39 @@ class Mare::Compiler::CodeGen
   def type_of(expr : AST::Node, in_gfunc : GenFunc? = nil)
     in_gfunc ||= func_frame.gfunc.not_nil!
     inferred = in_gfunc.func.infer.resolve(expr)
-    program.layout[inferred]
+    program.reach[inferred]
   end
   
   def llvm_type_of(expr : AST::Node, in_gfunc : GenFunc? = nil)
     llvm_type_of(type_of(expr, in_gfunc))
   end
   
-  def llvm_type_of(ref : Layout::Ref)
+  def llvm_type_of(ref : Reach::Ref)
     case ref.llvm_use_type
     when :i8, :u8 then @i8
     when :i32, :u32 then @i32
     when :i64, :u64 then @i64
     when :ptr then @ptr
     when :struct_ptr then
-      @gtypes[program.layout[ref.single!].llvm_name].llvm_type
+      @gtypes[program.reach[ref.single!].llvm_name].llvm_type
     else raise NotImplementedError.new(ref.llvm_use_type)
     end
   end
   
-  def llvm_mem_type_of(ref : Layout::Ref)
+  def llvm_mem_type_of(ref : Reach::Ref)
     case ref.llvm_mem_type
     when :i8, :u8 then @i8
     when :i32, :u32 then @i32
     when :i64, :u64 then @i64
     when :ptr then @ptr
     when :struct_ptr then
-      @gtypes[program.layout[ref.single!].llvm_name].llvm_type
+      @gtypes[program.reach[ref.single!].llvm_name].llvm_type
     else raise NotImplementedError.new(ref.llvm_mem_type)
     end
   end
   
   def gtype_of(expr : AST::Node, in_gfunc : GenFunc? = nil)
-    llvm_name = program.layout[type_of(expr, in_gfunc).single!].llvm_name
+    llvm_name = program.reach[type_of(expr, in_gfunc).single!].llvm_name
     @gtypes[llvm_name]
   end
   
@@ -264,7 +264,7 @@ class Mare::Compiler::CodeGen
     ctx.program.code_gen = self
     
     # Generate all type descriptors and function declarations.
-    ctx.program.layout.each_type_def.each do |type_def|
+    ctx.program.reach.each_type_def.each do |type_def|
       @gtypes[type_def.llvm_name] = GenType.new(self, type_def)
     end
     
@@ -755,7 +755,7 @@ class Mare::Compiler::CodeGen
     @builder.phi(phi_type, [bb_body1, bb_body2], [value1, value2], "phichoice")
   end
   
-  def gen_desc_type(type_def : Layout::Def) : LLVM::Type
+  def gen_desc_type(type_def : Reach::Def) : LLVM::Type
     @llvm.struct [
       @i32,                           # 0: id
       @i32,                           # 1: size

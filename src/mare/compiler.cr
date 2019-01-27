@@ -7,7 +7,7 @@ module Mare::Compiler
     Refer.class |
     Copy.class |
     Infer.class |
-    Layout.class |
+    Reach.class |
     CodeGen.class )
   
   def self.compile(source : Source, limit : LIMIT = CodeGen)
@@ -39,8 +39,8 @@ module Mare::Compiler
     ctx.run(Infer)
     return ctx if limit == Infer
     
-    ctx.run(Layout)
-    return ctx if limit == Layout
+    ctx.run(Reach)
+    return ctx if limit == Reach
     
     ctx.run(CodeGen)
     ctx

@@ -1,4 +1,4 @@
-class Mare::Compiler::Layout < Mare::AST::Visitor
+class Mare::Compiler::Reach < Mare::AST::Visitor
   class Error < Exception
   end
   
@@ -161,7 +161,7 @@ class Mare::Compiler::Layout < Mare::AST::Visitor
   end
   
   def self.run(ctx)
-    instance = ctx.program.layout = new
+    instance = ctx.program.reach = new
     
     # First, reach the "Main" and "Env" types.
     # TODO: can this special-casing of "Env" be removed?
