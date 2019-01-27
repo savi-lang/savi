@@ -36,14 +36,23 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       @union.first
     end
     
-    # Return a new MetaType that consists of only the parts of self
-    # that qualify as subtypes of the other MetaType.
-    def intersect_sub(other : MetaType)
-      new_union =
-        self.defns.select do |defn|
-          other.defns.includes?(defn) ||
-          other.defns.any? { |d| self.class.is_l_defn_sub_r_defn?(defn, d) }
+    def intersect(other : MetaType)
+      # TODO: verify total correctness of this algorithm and its use.
+      new_union = Set(Program::Type).new
+      other.defns.each do |defn|
+        if self.defns.includes?(defn)
+          new_union.add(defn)
+        elsif self.defns.any? { |d| self.class.is_l_defn_sub_r_defn?(defn, d) }
+          new_union.add(defn)
         end
+      end
+      self.defns.each do |defn|
+        if new_union.includes?(defn)
+          # skip this - it's already there
+        elsif other.defns.any? { |d| self.class.is_l_defn_sub_r_defn?(defn, d) }
+          new_union.add(defn)
+        end
+      end
       
       MetaType.new(@pos, new_union)
     end
@@ -104,8 +113,10 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       l_infer = Infer.from(l, lf)
       r_infer = Infer.from(r, rf)
       
-      # A constructor can only match another constructor.
+      # A constructor can only match another constructor, and
+      # a constant can only match another constant.
       return false if lf.has_tag?(:constructor) != rf.has_tag?(:constructor)
+      return false if lf.has_tag?(:constant) != rf.has_tag?(:constant)
       
       # Must have the same number of parameters.
       return false if lf.param_count != rf.param_count
@@ -156,7 +167,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       unconstrained = true
       intersected = list.reduce self do |reduction, constraint|
         unconstrained = false
-        reduction.intersect_sub(constraint)
+        reduction.intersect(constraint)
       end
       unconstrained || !intersected.empty?
     end
@@ -214,7 +225,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
     
     def within_domain!(infer : Infer, constraint : MetaType)
-      @domain = @domain.intersect_sub(constraint)
+      @domain = @domain.intersect(constraint)
       @domain_constraints << constraint
       
       return unless @domain.empty?
@@ -334,7 +345,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       
       ds = @downstreamed
       if ds
-        @downstreamed = ds.intersect_sub(constraint)
+        @downstreamed = ds.intersect(constraint)
       else
         @downstreamed = constraint
       end
@@ -647,12 +658,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   
   # A literal integer could be any integer or floating-point machine type.
   def touch(node : AST::LiteralInteger)
-    # TODO: allow matching (an interface?) for user-created numeric types
-    new_tid(node, Literal.new(node.pos, [
-      refer.const("U8").defn, refer.const("U32").defn, refer.const("U64").defn,
-      refer.const("I8").defn, refer.const("I32").defn, refer.const("I64").defn,
-      refer.const("F32").defn, refer.const("F64").defn,
-    ]))
+    new_tid(node, Literal.new(node.pos, [refer.const("Numeric").defn]))
   end
   
   # A literal float could be any floating-point machine type.

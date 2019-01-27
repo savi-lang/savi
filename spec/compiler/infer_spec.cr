@@ -83,7 +83,7 @@ describe Mare::Compiler::Infer do
         name CString = 42
                        ^~
 
-    - it must be a subtype of (U8 | U32 | U64 | I8 | I32 | I64 | F32 | F64):
+    - it must be a subtype of (Numeric):
       from (example):3:
         name CString = 42
                        ^~
@@ -111,7 +111,7 @@ describe Mare::Compiler::Infer do
       prop name CString: 42
                          ^~
     
-    - it must be a subtype of (U8 | U32 | U64 | I8 | I32 | I64 | F32 | F64):
+    - it must be a subtype of (Numeric):
       from (example):2:
       prop name CString: 42
                          ^~
@@ -300,7 +300,7 @@ describe Mare::Compiler::Infer do
         x (F64 | U64) = 42
                         ^~
     
-    - it must be a subtype of (U8 | U32 | U64 | I8 | I32 | I64 | F32 | F64):
+    - it must be a subtype of (Numeric):
       from (example):3:
         x (F64 | U64) = 42
                         ^~

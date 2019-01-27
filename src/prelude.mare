@@ -10,10 +10,10 @@ primitive False:
 //   member False: 0
 //   member True: 1
 
-// TODO:
-// interface Numeric: // ...
+// Numerics
+interface Numeric:
+  const bit_width U8:
 
-// Integers
 numeric U8:
   const bit_width U8: 8
 
@@ -32,7 +32,6 @@ numeric I32:
 numeric I64:
   const bit_width U8: 64
 
-// Floats
 numeric F32:
   const bit_width U8: 32
   const is_floating_point: True
