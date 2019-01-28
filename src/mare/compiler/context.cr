@@ -4,13 +4,11 @@ class Mare::Compiler::Context
   def initialize
     @program = Program.new
     @stack = [Interpreter::Default.new(@program)] of Interpreter
-    @reactor = Reactor.new
   end
   
   def compile(doc : AST::Document)
     doc.list.each { |decl| compile(decl) }
     @stack.reverse_each &.finished(self)
-    finish
   end
   
   def compile(decl : AST::Declare)
@@ -24,22 +22,11 @@ class Mare::Compiler::Context
   end
   
   def finish
-    list = @reactor.show_remaining
-    
-    raise "Failed to compile, waiting for:\n#{list.join("\n")}" \
-      unless list.empty?
+    @stack.clear
   end
   
   def push(compiler)
     @stack.push(compiler)
-  end
-  
-  def on(x_class : X.class, path, &block : X -> Nil): Nil forall X
-    @reactor.on(x_class, path, &block)
-  end
-  
-  def fulfill(path, x : X): Nil forall X
-    @reactor.fulfill(path, x)
   end
   
   def run(obj)

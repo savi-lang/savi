@@ -3,7 +3,6 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
   end
   
   def finished(context)
-    context.fulfill ["doc"], @program
   end
   
   def keywords; ["actor", "class", "primitive", "numeric", "ffi", "interface"] end
