@@ -19,7 +19,7 @@ describe Mare::Compiler::Sugar do
       ]],
     ]
     
-    ctx = Mare::Compiler.compile([ast], limit: Mare::Compiler::Sugar)
+    ctx = Mare::Compiler.compile([ast], :sugar)
     
     func = ctx.program.find_func!("Example", "prop_assign")
     func.body.not_nil!.to_a.should eq [:group, ":",
@@ -47,7 +47,7 @@ describe Mare::Compiler::Sugar do
       ]],
     ]
     
-    ctx = Mare::Compiler.compile([ast], limit: Mare::Compiler::Sugar)
+    ctx = Mare::Compiler.compile([ast], :sugar)
     
     func = ctx.program.find_func!("Example", "plus")
     func.body.not_nil!.to_a.should eq [:group, ":",
@@ -77,7 +77,7 @@ describe Mare::Compiler::Sugar do
       ]],
     ]
     
-    ctx = Mare::Compiler.compile([ast], limit: Mare::Compiler::Sugar)
+    ctx = Mare::Compiler.compile([ast], :sugar)
     
     func = ctx.program.find_func!("Example", "selfish")
     func.body.not_nil!.to_a.should eq [:group, ":",
