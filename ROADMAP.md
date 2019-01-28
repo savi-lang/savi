@@ -6,7 +6,7 @@
 - [x] - Stateful, allocated classes with constructors and methods
 - [x] - Properties (fields hidden behind getters/setters)
 - [x] - Interfaces
-- [ ] - Virtual table calls on abstract types
+- [x] - Virtual table calls on abstract types
 - [ ] - Boxed numeric values
 - [ ] - Non-looping flow control (`if`, `match`, etc)
 - [ ] - Looping flow control (`while`, etc)

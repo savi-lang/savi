@@ -86,7 +86,7 @@ class Mare::Compiler::CodeGen
       # Generate associated function declarations, some of which
       # may be referenced in the descriptor global instance below.
       @gfuncs.each_value do |gfunc|
-        gfunc.llvm_func = g.gen_func_decl(self, gfunc)
+        g.gen_func_decl(self, gfunc)
       end
     end
     
@@ -95,21 +95,22 @@ class Mare::Compiler::CodeGen
       ptr = g.llvm.int8.pointer
       vtable = Array(LLVM::Value).new(@vtable_size, ptr.null)
       @gfuncs.each_value do |gfunc|
-        # TODO: try without cast?
-        # vtable[gfunc.vtable_index] = gfunc.llvm_func.to_value
-        vtable[gfunc.vtable_index] =
-          g.llvm.const_bit_cast(gfunc.llvm_func.to_value, ptr)
+        vtable[gfunc.vtable_index] = gfunc.virtual_llvm_func.to_value
       end
       vtable
     end
     
     # Generate descriptor global instance.
     def gen_desc(g : CodeGen)
+      return if @type_def.is_abstract?
+      
       @desc = g.gen_desc(@type_def, @desc_type, gen_vtable(g))
     end
     
     # Generate function implementations.
     def gen_func_impls(g : CodeGen)
+      return if @type_def.is_abstract?
+      
       @gfuncs.each_value do |gfunc|
         g.gen_func_impl(self, gfunc)
       end
@@ -117,6 +118,8 @@ class Mare::Compiler::CodeGen
     
     # Generate other global values.
     def gen_globals(g : CodeGen)
+      return if @type_def.is_abstract?
+      
       @singleton = g.gen_singleton(@type_def, @struct_type, @desc.not_nil!)
     end
     
@@ -144,6 +147,7 @@ class Mare::Compiler::CodeGen
     getter vtable_index : Int32
     getter llvm_name : String
     property! llvm_func : LLVM::Function
+    property! virtual_llvm_func : LLVM::Function
     
     def initialize(type_def : Reach::Def, @func, @vtable_index)
       @needs_receiver = \
@@ -249,6 +253,8 @@ class Mare::Compiler::CodeGen
     when :i64, :u64 then @i64
     when :ptr then @ptr
     when :struct_ptr then
+      @gtypes[program.reach[ref.single!].llvm_name].llvm_type
+    when :object_ptr then # TODO: differentiate from struct_ptr?
       @gtypes[program.reach[ref.single!].llvm_name].llvm_type
     else raise NotImplementedError.new(ref.llvm_use_type)
     end
@@ -488,7 +494,10 @@ class Mare::Compiler::CodeGen
   end
   
   def gen_func_decl(gtype, gfunc)
-    # TODO: these should probably not use the ffi_type_for each type?
+    # Get the LLVM type to use for the return type.
+    ret_type = llvm_type_of(gfunc.func.ident, gfunc)
+    
+    # Get the LLVM types to use for the parameter types.
     param_types = [] of LLVM::Type
     gfunc.func.params.try do |params|
       params.terms.map do |param|
@@ -499,9 +508,30 @@ class Mare::Compiler::CodeGen
     # Add implicit receiver parameter if needed.
     param_types.unshift(gtype.llvm_type) if gfunc.needs_receiver?
     
-    ret_type = llvm_type_of(gfunc.func.ident, gfunc)
+    # Store the function declaration.
+    gfunc.llvm_func = @mod.functions.add(gfunc.llvm_name, param_types, ret_type)
     
-    @mod.functions.add(gfunc.llvm_name, param_types, ret_type)
+    # If we used a receiver parameter, we're done.
+    # Otherwise, we need to create a wrapper method for the vtable that
+    # includes a receiver parameter, but throws it away without using it.
+    gfunc.virtual_llvm_func =
+      if gfunc.needs_receiver?
+        gfunc.llvm_func
+      else
+        vtable_name = "#{gfunc.llvm_name}.VIRTUAL"
+        param_types.unshift(gtype.llvm_type)
+        
+        @mod.functions.add vtable_name, param_types, ret_type do |fn|
+          gen_func_start(fn)
+          
+          forward_args =
+            (param_types.size - 1).times.map { |i| fn.params[i + 1] }.to_a
+          
+          @builder.ret @builder.call(gfunc.llvm_func, forward_args)
+          
+          gen_func_end
+        end
+      end
   end
   
   def gen_func_impl(gtype, gfunc)
@@ -616,25 +646,19 @@ class Mare::Compiler::CodeGen
     
     args.unshift(receiver) if gfunc.needs_receiver?
     
-    @builder.call(gen_llvm_func_ref(receiver, lhs_gtype, gfunc), args)
+    @builder.call(gen_func_ref(receiver, lhs_gtype, gfunc), args)
   end
   
-  def gen_llvm_func_ref(
-    receiver : LLVM::Value?, gtype : GenType, gfunc : GenFunc
-  )
-    # TODO: Not every call should be virtual, but this is just commented out
-    # to prove that virtual calls work. It can be uncommented later.
-    # # Only pay the cost of a virtual call if this is an abstract type.
-    # return gfunc.llvm_func unless gtype.type_def.is_abstract?
+  def gen_func_ref(receiver : LLVM::Value, gtype : GenType, gfunc : GenFunc)
+    # Only pay the cost of a virtual call if this is an abstract type.
+    return gfunc.llvm_func unless gtype.type_def.is_abstract?
     
-    receiver.not_nil!
-    
-    rname = receiver.name
+    rname = receiver.name.empty? ? gtype.type_def.llvm_name : receiver.name
     fname = "#{rname}.#{gfunc.func.ident.value}"
     
     # Do a virtual call for this function.
     # Load the type descriptor of the receiver so we can read its vtable,
-    # then load the function pointer at the appropriate index of that vtable.
+    # then load the function pointer from the appropriate index of that vtable.
     desc_gep = @builder.struct_gep(receiver, 0, "#{rname}.DESC")
     desc = @builder.load(desc_gep, "#{rname}.DESC.LOAD")
     vtable_gep = @builder.struct_gep(desc, DESC_VTABLE, "#{rname}.DESC.VTABLE")
@@ -647,9 +671,11 @@ class Mare::Compiler::CodeGen
   end
   
   def gen_eq(relate)
+    ref = func_frame.refer[relate.lhs]
     value = gen_expr(relate.rhs).as(LLVM::Value)
     
-    ref = func_frame.refer[relate.lhs]
+    value = @builder.bit_cast(value, llvm_type_of(relate.lhs), value.name)
+    
     if ref.is_a?(Refer::Local)
       raise "local already declared: #{ref.inspect}" \
         if func_frame.current_locals[ref]?

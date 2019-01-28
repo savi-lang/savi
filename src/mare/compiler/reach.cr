@@ -175,11 +175,11 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     end
     
     # Now, reach into the program starting from Env.new and Main.new.
-    instance.run(ctx.program.find_func!("Env", "new"))
-    instance.run(ctx.program.find_func!("Main", "new"))
+    instance.run(ctx.program, ctx.program.find_func!("Env", "new"))
+    instance.run(ctx.program, ctx.program.find_func!("Main", "new"))
   end
   
-  def run(func)
+  def run(program, func)
     # Skip this function if we've already seen it.
     return if @seen_funcs.includes?(func)
     @seen_funcs.add(func)
@@ -189,9 +189,17 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       handle_type_ref(meta_type)
     end
     
+    # Now, reach all functions in the program that have the same name.
+    # TODO: only do this if a function on an abstract type.
+    # TODO: any other ways we can be more targeted with this?
+    program.types.each do |t|
+      next unless t.has_func?(func.ident.value)
+      run(program, t.find_func!(func.ident.value))
+    end
+    
     # Now, reach all functions called by this function.
     func.infer.each_called_func.each do |called_func|
-      run(called_func)
+      run(program, called_func)
     end
   end
   

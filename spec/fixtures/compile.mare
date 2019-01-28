@@ -22,7 +22,8 @@ class Sentence:
 actor Main:
   new:
     augend Augend = Zero
-    exitcode I32 = Zero + 42 // TODO: augend + 42
+    exitcode I32 = augend + 42
+    
     none = ()
     
     @say_stuff
