@@ -3,7 +3,7 @@ PHONY:
 # Prepare a docker container that has everything needed for development.
 # It runs in the background indefinitely, waiting for `docker exec` commands.
 ready: PHONY Dockerfile
-	docker build --tag mare-dev .
+	docker build --target dev --tag mare-dev .
 	docker rm -f mare-dev || echo "the mare-dev container wasn't running"
 	docker run --name mare-dev -v $(shell pwd):/opt/code -d --rm mare-dev tail -f /dev/null
 	@echo "the mare-dev container is ready!"
