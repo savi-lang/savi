@@ -95,7 +95,8 @@ class Mare::Compiler::CodeGen
       ptr = g.llvm.int8.pointer
       vtable = Array(LLVM::Value).new(@vtable_size, ptr.null)
       @gfuncs.each_value do |gfunc|
-        vtable[gfunc.vtable_index] = gfunc.virtual_llvm_func.to_value
+        vtable[gfunc.vtable_index] =
+          g.llvm.const_bit_cast(gfunc.virtual_llvm_func.to_value, ptr)
       end
       vtable
     end
@@ -934,7 +935,7 @@ class Mare::Compiler::CodeGen
   
   def gen_struct_type(type_def, desc_type, fields)
     elements = [] of LLVM::Type
-    elements << desc_type.pointer if type_def.has_desc?
+    elements << desc_type.pointer # even types with no desc have a global desc
     elements << @actor_pad if type_def.has_actor_pad?
     
     fields.each { |name, t| elements << llvm_mem_type_of(t) }
@@ -947,8 +948,16 @@ class Mare::Compiler::CodeGen
     global.linkage = LLVM::Linkage::LinkerPrivate
     global.global_constant = true
     
-    global.initializer = struct_type.const_struct([desc])
+    # For allocated types, we still generate a singleton for static use,
+    # but we need to populate the fields with something - we use zeros.
+    # We are relying on the reference capabilities part of the type system
+    # to prevent such singletons from ever having their fields dereferenced.
+    elements = struct_type.struct_element_types[1..-1].map(&.null)
     
+    # The first element is always the type descriptor.
+    elements.unshift(desc)
+    
+    global.initializer = struct_type.const_struct(elements)
     global
   end
   
