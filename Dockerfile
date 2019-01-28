@@ -4,7 +4,7 @@ FROM alpine:edge as dev
 # Install build tools, Pony dependencies, LLVM libraries, and Crystal.
 # TODO: Fix indentation style here for consistency.
 RUN apk add --no-cache --update \
-    alpine-sdk coreutils linux-headers clang-dev binutils-gold \
+    alpine-sdk coreutils linux-headers clang-dev lld \
     libexecinfo-dev libressl-dev pcre2-dev \
     llvm5-dev llvm5-static \
     crystal shards

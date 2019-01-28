@@ -24,6 +24,9 @@ module Mare::Compiler
     when :eval then
       run_passes(ctx, :codegen)
       ctx.run(Eval)
+    when :binary then
+      run_passes(ctx, :codegen)
+      ctx.run(Binary)
     else raise NotImplementedError.new(target)
     end
     

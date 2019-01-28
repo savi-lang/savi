@@ -24,4 +24,4 @@ example: PHONY
 	mkdir -p /tmp/bin
 	crystal build --debug --link-flags="-lponyrt" main.cr -o $@
 example.inner: PHONY /tmp/bin/mare
-	echo && cd example && /tmp/bin/mare
+	echo && cd example && /tmp/bin/mare && ./main

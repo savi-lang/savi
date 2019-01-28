@@ -6,6 +6,8 @@ require "./code_gen/*"
 
 class Mare::Compiler::CodeGen
   getter llvm : LLVM::Context
+  getter target : LLVM::Target
+  getter target_machine : LLVM::TargetMachine
   getter mod : LLVM::Module
   @builder : LLVM::Builder
   
@@ -169,8 +171,6 @@ class Mare::Compiler::CodeGen
     end
   end
   
-  PONYRT_BC_PATH = "/home/jemc/1/code/gitx/ponyc/build/release/libponyrt.bc"
-  
   getter! program : Program
   
   def initialize
@@ -198,9 +198,6 @@ class Mare::Compiler::CodeGen
     @frames = [] of Frame
     @string_globals = {} of String => LLVM::Value
     @gtypes = {} of String => GenType
-    
-    # ponyrt_bc = LLVM::MemoryBuffer.from_file(PONYRT_BC_PATH)
-    # @ponyrt = @llvm.parse_bitcode(ponyrt_bc).as(LLVM::Module)
     
     # Pony runtime types.
     @desc = @llvm.opaque_struct("_.DESC").as(LLVM::Type)
@@ -316,9 +313,6 @@ class Mare::Compiler::CodeGen
     
     # Run LLVM sanity checks on the generated module.
     @mod.verify
-    
-    # # Link the pony runtime bitcode into the generated module.
-    # LibLLVM.link_modules(@mod.to_unsafe, @ponyrt.to_unsafe)
   end
   
   def gen_wrapper
