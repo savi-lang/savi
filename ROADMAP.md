@@ -24,6 +24,7 @@
 - [ ] - Non-allocated class references with "static" stateless functions.
 - [ ] - Typeclasses (`implement SomeInterface for SomeClass:`)
 - [ ] - Automatic specialization of functions to avoid virtual table calls.
+- [ ] - Sourcing/overriding constant values using compile-time options
 
 ### New sugar and other conveniences
 
@@ -41,3 +42,7 @@
 - [ ] - Language Server Protocol support
 - [ ] - Doctests support
 - [ ] - Dependency manager / package manager
+
+# Miscellaneous Tasks
+
+- [ ] - Audit for entity name collision issues and restrict as necessary
