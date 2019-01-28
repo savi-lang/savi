@@ -1,7 +1,7 @@
 describe Mare::Compiler::CodeGen do
   it "compiles an example" do
-    source = fixture "compile.mare"
+    example_dir = File.join(__DIR__, "../../example")
     
-    Mare::Compiler.compile(source).program.code_gen.jit!.should eq 42
+    Mare::Compiler.compile(example_dir).program.code_gen.jit!.should eq 42
   end
 end

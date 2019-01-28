@@ -14,7 +14,7 @@ describe Mare::Compiler::Infer do
     MSG
     
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile(source, limit: Mare::Compiler::Infer)
+      Mare::Compiler.compile([source], limit: Mare::Compiler::Infer)
     end
   end
   
@@ -33,7 +33,7 @@ describe Mare::Compiler::Infer do
     MSG
     
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile(source, limit: Mare::Compiler::Infer)
+      Mare::Compiler.compile([source], limit: Mare::Compiler::Infer)
     end
   end
   
@@ -66,7 +66,7 @@ describe Mare::Compiler::Infer do
     MSG
     
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile(source, limit: Mare::Compiler::Infer)
+      Mare::Compiler.compile([source], limit: Mare::Compiler::Infer)
     end
   end
   
@@ -95,7 +95,7 @@ describe Mare::Compiler::Infer do
     MSG
     
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile(source, limit: Mare::Compiler::Infer)
+      Mare::Compiler.compile([source], limit: Mare::Compiler::Infer)
     end
   end
   
@@ -123,7 +123,7 @@ describe Mare::Compiler::Infer do
     MSG
     
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile(source, limit: Mare::Compiler::Infer)
+      Mare::Compiler.compile([source], limit: Mare::Compiler::Infer)
     end
   end
   
@@ -152,7 +152,7 @@ describe Mare::Compiler::Infer do
     MSG
     
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile(source, limit: Mare::Compiler::Infer)
+      Mare::Compiler.compile([source], limit: Mare::Compiler::Infer)
     end
   end
   
@@ -181,7 +181,7 @@ describe Mare::Compiler::Infer do
     MSG
     
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile(source, limit: Mare::Compiler::Infer)
+      Mare::Compiler.compile([source], limit: Mare::Compiler::Infer)
     end
   end
   
@@ -192,7 +192,7 @@ describe Mare::Compiler::Infer do
         x = "Hello, World!"
     SOURCE
     
-    ctx = Mare::Compiler.compile(source, limit: Mare::Compiler::Infer)
+    ctx = Mare::Compiler.compile([source], limit: Mare::Compiler::Infer)
     
     func = ctx.program.find_func!("Main", "new")
     body = func.body.not_nil!
@@ -213,7 +213,7 @@ describe Mare::Compiler::Infer do
         @x
     SOURCE
     
-    ctx = Mare::Compiler.compile(source, limit: Mare::Compiler::Infer)
+    ctx = Mare::Compiler.compile([source], limit: Mare::Compiler::Infer)
     
     func = ctx.program.find_func!("Main", "new")
     body = func.body.not_nil!
@@ -230,7 +230,7 @@ describe Mare::Compiler::Infer do
         x (U64 | None) = 42
     SOURCE
     
-    ctx = Mare::Compiler.compile(source, limit: Mare::Compiler::Infer)
+    ctx = Mare::Compiler.compile([source], limit: Mare::Compiler::Infer)
     
     func = ctx.program.find_func!("Main", "new")
     body = func.body.not_nil!
@@ -251,7 +251,7 @@ describe Mare::Compiler::Infer do
         @x
     SOURCE
     
-    ctx = Mare::Compiler.compile(source, limit: Mare::Compiler::Infer)
+    ctx = Mare::Compiler.compile([source], limit: Mare::Compiler::Infer)
     
     func = ctx.program.find_func!("Main", "new")
     body = func.body.not_nil!
@@ -267,7 +267,7 @@ describe Mare::Compiler::Infer do
         x (U64 | CString | None) = if True 42
     SOURCE
     
-    ctx = Mare::Compiler.compile(source, limit: Mare::Compiler::Infer)
+    ctx = Mare::Compiler.compile([source], limit: Mare::Compiler::Infer)
     
     func = ctx.program.find_func!("Main", "new")
     body = func.body.not_nil!
@@ -312,7 +312,7 @@ describe Mare::Compiler::Infer do
     MSG
     
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile(source, limit: Mare::Compiler::Infer)
+      Mare::Compiler.compile([source], limit: Mare::Compiler::Infer)
     end
   end
   
@@ -327,7 +327,7 @@ describe Mare::Compiler::Infer do
         Infer.from_call_return(42)
     SOURCE
     
-    ctx = Mare::Compiler.compile(source, limit: Mare::Compiler::Infer)
+    ctx = Mare::Compiler.compile([source], limit: Mare::Compiler::Infer)
     
     [
       {"Infer", "from_param"},
@@ -354,7 +354,7 @@ describe Mare::Compiler::Infer do
         Infer.from_return_type(42)
     SOURCE
     
-    ctx = Mare::Compiler.compile(source, limit: Mare::Compiler::Infer)
+    ctx = Mare::Compiler.compile([source], limit: Mare::Compiler::Infer)
     
     [
       {"Infer", "from_assign"},
@@ -386,7 +386,7 @@ describe Mare::Compiler::Infer do
     MSG
     
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile(source, limit: Mare::Compiler::Infer)
+      Mare::Compiler.compile([source], limit: Mare::Compiler::Infer)
     end
   end
   
@@ -414,7 +414,7 @@ describe Mare::Compiler::Infer do
     MSG
     
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile(source, limit: Mare::Compiler::Infer)
+      Mare::Compiler.compile([source], limit: Mare::Compiler::Infer)
     end
   end
   
@@ -427,7 +427,7 @@ describe Mare::Compiler::Infer do
         x = X.new
     SOURCE
     
-    ctx = Mare::Compiler.compile(source, limit: Mare::Compiler::Infer)
+    ctx = Mare::Compiler.compile([source], limit: Mare::Compiler::Infer)
     
     func = ctx.program.find_func!("Main", "new")
     body = func.body.not_nil!

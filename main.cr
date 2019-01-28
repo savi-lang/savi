@@ -1,4 +1,5 @@
 require "./src/mare"
 
 # TODO: Use CLI arguments to determine what to do (compile / serve / etc).
-Mare::Server.new.run
+# Mare::Server.new.run
+Mare::Compiler.compile(Dir.current).program.code_gen.jit!
