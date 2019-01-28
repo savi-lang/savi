@@ -21,13 +21,16 @@ module Mare::Compiler
       ctx.run(Reach)
       ctx.run(Paint)
       ctx.run(CodeGen)
+    when :eval then
+      run_passes(ctx, :codegen)
+      ctx.run(Eval)
     else raise NotImplementedError.new(target)
     end
     
     ctx
   end
   
-  def self.compile(dirname : String, target : Symbol = :codegen)
+  def self.compile(dirname : String, target : Symbol = :eval)
     filenames = Dir.entries(dirname).select(&.ends_with?(".mare")).to_a
     filenames.map! { |filename| File.join(dirname, filename) }
     
@@ -36,11 +39,11 @@ module Mare::Compiler
     compile(filenames.map { |name| Source.new(name, File.read(name)) }, target)
   end
   
-  def self.compile(sources : Array(Source), target : Symbol = :codegen)
+  def self.compile(sources : Array(Source), target : Symbol = :eval)
     compile(sources.map { |s| Parser.parse(s) }, target)
   end
   
-  def self.compile(docs : Array(AST::Document), target : Symbol = :codegen)
+  def self.compile(docs : Array(AST::Document), target : Symbol = :eval)
     raise "No source documents given!" if docs.empty?
     
     docs.unshift(prelude_doc)

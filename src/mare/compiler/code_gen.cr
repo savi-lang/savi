@@ -6,7 +6,7 @@ require "./code_gen/*"
 
 class Mare::Compiler::CodeGen
   getter llvm : LLVM::Context
-  @mod : LLVM::Module
+  getter mod : LLVM::Module
   @builder : LLVM::Builder
   
   class Frame
@@ -319,13 +319,6 @@ class Mare::Compiler::CodeGen
     
     # # Link the pony runtime bitcode into the generated module.
     # LibLLVM.link_modules(@mod.to_unsafe, @ponyrt.to_unsafe)
-  end
-  
-  def jit!
-    # Run the function!
-    LLVM::JITCompiler.new @mod do |jit|
-      jit.run_function(@mod.functions["__mare_jit"], @llvm).to_i
-    end
   end
   
   def gen_wrapper
