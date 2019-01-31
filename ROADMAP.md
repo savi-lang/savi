@@ -15,6 +15,7 @@
 - [ ] - For-loop iterator syntax sugar (`for x in y`)
 - [ ] - Partial functions and partial calls
 - [ ] - Generic types
+- [ ] - Array literals
 - [ ] - FFI-compatible struct types
 
 ### New features (that were *NOT* in Pony)
