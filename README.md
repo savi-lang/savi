@@ -12,8 +12,14 @@ Check out the [feature roadmap](./ROADMAP.md) and [goals summary](./GOALS.md) fo
 
 ## Developing
 
-To work on this project, you'll need `docker` and `make`. Clone the project to your development machine, then run one of the following commands:
+To work on this project, you'll need `docker` and `make`. You may also want to have `lldb` for debugging.
+
+To get started, clone the project to your development machine, then run one of the following commands within the project working directory:
 
 - Run `make ready` to prepare a docker container that has everything needed for development activities. Do this before running any of the other following commands:
 
 - Run `make test` to run the test suite.
+
+- Run `make example` to compile and run from the sources in `./example`.
+
+- Run `make example-lldb` to do the same as above, but run inside `lldb` to allow you to breakpoint and step through code.
