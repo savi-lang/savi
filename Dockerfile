@@ -1,8 +1,6 @@
-# TODO: Stabilize on alpine 3.9 when it is released.
-FROM alpine:edge as dev
+FROM alpine:3.9 as dev
 
 # Install build tools, Pony dependencies, LLVM libraries, and Crystal.
-# TODO: Fix indentation style here for consistency.
 RUN apk add --no-cache --update \
     alpine-sdk coreutils linux-headers clang-dev lld \
     libexecinfo-dev libressl-dev pcre2-dev \
