@@ -130,22 +130,22 @@ describe Mare::Compiler::Macros do
       - this section is the body to be executed when the condition is true:
         from (example):3:
           if True (42 | 7 | what | now)
-                  ^
+                   ^~~
       
       - this section is the body to be executed otherwise (the "else" case):
         from (example):3:
           if True (42 | 7 | what | now)
-                      ^
+                       ^~~
       
       - this is an excessive section:
         from (example):3:
           if True (42 | 7 | what | now)
-                          ^
+                           ^~~~~~
       
       - this is an excessive section:
         from (example):3:
           if True (42 | 7 | what | now)
-                                 ^
+                                  ^~~~
       MSG
       
       expect_raises Mare::Error, expected do

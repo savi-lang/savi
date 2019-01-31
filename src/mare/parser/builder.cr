@@ -93,7 +93,7 @@ module Mare::Parser::Builder
     assert_kind(main, :group)
     style = source.content[main[1]..main[1]]
     terms_lists = [[] of AST::Term]
-    partitions = [{:group, main[1], main[1] + 1}]
+    partitions = [main[1] + 1]
     
     iter.while_next_is_child_of(main) do |child|
       term = build_term(child, iter, source)
@@ -102,7 +102,7 @@ module Mare::Parser::Builder
         raise "stray operator: #{term}" unless term.value == "|"
         
         # This is a partition operator; create a new partition.
-        partitions << child
+        partitions << child[1] << child[2]
         terms_lists << [] of AST::Term
       else
         # Otherwise, insert into the current partition as normal.
@@ -115,7 +115,10 @@ module Mare::Parser::Builder
       AST::Group.new(style, terms_lists.first).with_pos(source, main)
     else
       # This is a partitioned group, built as a nested group.
-      top_terms = terms_lists.zip(partitions).map do |terms, pos|
+      partitions << main[2] - 1
+      positions = partitions.each_slice(2).to_a
+      top_terms = terms_lists.zip(positions).map do |terms, pos|
+        pos = {:group, pos[0], pos[1]}
         AST::Group.new(style, terms).with_pos(source, pos).as(AST::Node)
       end
       AST::Group.new("|", top_terms).with_pos(source, main)
