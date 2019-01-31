@@ -12,6 +12,10 @@ primitive Zero:
   fun "+" (other I32) I32:
     other
 
+primitive BelligerentFour:
+  fun "+" (other I32) I32:
+    4 // (belligerently ignores the summand)
+
 interface Augend:
   fun "+" (other I32) I32:
 
@@ -21,15 +25,12 @@ class Sentence:
 
 actor Main:
   new:
-    augend Augend = Zero
-    exitcode I32 = augend + 42
-    
     none = ()
     
     @say_stuff
     
-    if True \
-      LibPonyRT.pony_exitcode(exitcode)
+    augend = if True (Zero | BelligerentFour)
+    LibPonyRT.pony_exitcode(augend + 42)
   
   fun say_stuff:
     sentence = Sentence.new

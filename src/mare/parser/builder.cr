@@ -93,7 +93,7 @@ module Mare::Parser::Builder
     assert_kind(main, :group)
     style = source.content[main[1]..main[1]]
     terms_lists = [[] of AST::Term]
-    partitions = [main] # TODO: use the appropriate subset span of main
+    partitions = [{:group, main[1], main[1] + 1}]
     
     iter.while_next_is_child_of(main) do |child|
       term = build_term(child, iter, source)

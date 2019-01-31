@@ -253,8 +253,8 @@ class Mare::Compiler::CodeGen
     when :ptr then @ptr
     when :struct_ptr then
       @gtypes[program.reach[ref.single!].llvm_name].llvm_type
-    when :object_ptr then # TODO: differentiate from struct_ptr?
-      @gtypes[program.reach[ref.single!].llvm_name].llvm_type
+    when :object_ptr then
+      @obj_ptr
     else raise NotImplementedError.new(ref.llvm_use_type)
     end
   end
@@ -267,12 +267,19 @@ class Mare::Compiler::CodeGen
     when :ptr then @ptr
     when :struct_ptr then
       @gtypes[program.reach[ref.single!].llvm_name].llvm_type
+    when :object_ptr then
+      @obj_ptr
     else raise NotImplementedError.new(ref.llvm_mem_type)
     end
   end
   
   def gtype_of(expr : AST::Node, in_gfunc : GenFunc? = nil)
     llvm_name = program.reach[type_of(expr, in_gfunc).single!].llvm_name
+    @gtypes[llvm_name]
+  end
+  
+  def any_gtype_of(expr : AST::Node, in_gfunc : GenFunc? = nil)
+    llvm_name = program.reach[type_of(expr, in_gfunc).single_or_first_in_union].llvm_name
     @gtypes[llvm_name]
   end
   
@@ -624,7 +631,7 @@ class Mare::Compiler::CodeGen
     end
     
     relate.lhs.as(AST::Identifier) # assert that lhs is an identifier
-    lhs_gtype = gtype_of(relate.lhs)
+    lhs_gtype = any_gtype_of(relate.lhs)
     gfunc = lhs_gtype[member]
     
     # For any args we are missing, try to find and use a default param value.
@@ -815,19 +822,24 @@ class Mare::Compiler::CodeGen
     bb_body2 = gen_block("body2choice")
     bb_post  = gen_block("postchoice")
     
+    # Get the LLVM type for the phi that joins the final value of each branch.
+    # Each such value will needed to be bitcast to the that type.
+    phi_type = llvm_type_of(expr)
+    
     # TODO: Use infer resolution for static True/False finding where possible.
     @builder.cond(cond_value, bb_body1, bb_body2)
     
     @builder.position_at_end(bb_body1)
     value1 = gen_expr(if_clause[1])
+    value1 = @builder.bit_cast(value1, phi_type, "#{value1.name}.CAST")
     @builder.br(bb_post)
     
     @builder.position_at_end(bb_body2)
     value2 = gen_expr(else_clause[1])
+    value2 = @builder.bit_cast(value2, phi_type, "#{value2.name}.CAST")
     @builder.br(bb_post)
     
     @builder.position_at_end(bb_post)
-    phi_type = value1.type # TODO: inferred union of all branch types
     @builder.phi(phi_type, [bb_body1, bb_body2], [value1, value2], "phichoice")
   end
   

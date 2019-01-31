@@ -39,6 +39,10 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       @meta_type.single!
     end
     
+    def single_or_first_in_union
+      @meta_type.defns.first
+    end
+    
     def tuple_count
       0 # TODO
     end
@@ -51,10 +55,10 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     @llvm_use_type : Symbol?
     def llvm_use_type : Symbol
       (@llvm_use_type ||= \
-      if is_abstract?
-        :object_ptr
-      elsif is_tuple?
+      if is_tuple?
         :tuple
+      elsif !singular?
+        :object_ptr
       else
         defn = single!
         if defn.has_tag?(:numeric)

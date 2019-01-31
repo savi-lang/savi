@@ -35,15 +35,28 @@ class Mare::Compiler::Macros < Mare::AST::Visitor
     if_ident = node.terms[0]
     cond = node.terms[1]
     body = node.terms[2] # TODO: handle else clause delimited by `|`
-    clauses = [{cond, body}]
     
-    # Create an implicit else clause that covers all remaining cases.
-    # TODO: add a pass to detect a Choice that doesn't have this,
-    # or maybe implicitly assume it later without adding it to the AST?
-    clauses << {
-      AST::Identifier.new("True").from(if_ident),
-      AST::Identifier.new("None").from(if_ident),
-    }
+    if body.is_a?(AST::Group) && body.style == "|"
+      Util.require_terms(body, [
+        "the body to be executed when the condition is true",
+        "the body to be executed otherwise (the \"else\" case)",
+      ], true)
+      
+      clauses = [
+        {cond, body.terms[0]},
+        {AST::Identifier.new("True").from(if_ident), body.terms[1]},
+      ]
+    else
+      clauses = [{cond, body}]
+      
+      # Create an implicit else clause that covers all remaining cases.
+      # TODO: add a pass to detect a Choice that doesn't have this,
+      # or maybe implicitly assume it later without adding it to the AST?
+      clauses << {
+        AST::Identifier.new("True").from(if_ident),
+        AST::Identifier.new("None").from(if_ident),
+      }
+    end
     
     group = AST::Group.new("(").from(node)
     group.terms << AST::Choice.new(clauses).from(if_ident)

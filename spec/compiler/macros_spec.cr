@@ -92,5 +92,65 @@ describe Mare::Compiler::Macros do
         Mare::Compiler.compile([source], :macros)
       end
     end
+    
+    it "handles an optional else clause, delimited by |" do
+      source = Mare::Source.new "(example)", <<-SOURCE
+      actor Main:
+        new:
+          if True (42 | 7)
+      SOURCE
+      
+      ctx = Mare::Compiler.compile([source], :macros)
+      
+      func = ctx.program.find_func!("Main", "new")
+      func.body.not_nil!.to_a.should eq [:group, ":",
+        [:group, "(",
+          [:choice,
+            [[:ident, "True"], [:group, "(", [:integer, 42]]],
+            [[:ident, "True"], [:group, "(", [:integer, 7]]],
+          ],
+        ],
+        [:ident, "@"],
+      ]
+    end
+    
+    it "complains if the delimited body has more than 2 sections" do
+      source = Mare::Source.new "(example)", <<-SOURCE
+      actor Main:
+        new:
+          if True (42 | 7 | what | now)
+      SOURCE
+      
+      expected = <<-MSG
+      This grouping has too many sections:
+      from (example):3:
+          if True (42 | 7 | what | now)
+                  ^~~~~~~~~~~~~~~~~~~~~
+      
+      - this section is the body to be executed when the condition is true:
+        from (example):3:
+          if True (42 | 7 | what | now)
+                  ^
+      
+      - this section is the body to be executed otherwise (the "else" case):
+        from (example):3:
+          if True (42 | 7 | what | now)
+                      ^
+      
+      - this is an excessive section:
+        from (example):3:
+          if True (42 | 7 | what | now)
+                          ^
+      
+      - this is an excessive section:
+        from (example):3:
+          if True (42 | 7 | what | now)
+                                 ^
+      MSG
+      
+      expect_raises Mare::Error, expected do
+        Mare::Compiler.compile([source], :macros)
+      end
+    end
   end
 end

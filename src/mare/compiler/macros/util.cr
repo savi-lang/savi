@@ -6,7 +6,14 @@ module Mare::Compiler::Macros::Util
     true
   end
   
-  def self.require_terms(node : AST::Group, term_docs : Array(String?))
+  def self.require_terms(
+    node : AST::Group,
+    term_docs : Array(String?),
+    is_grouping = false,
+  )
+    thing = is_grouping ? "grouping" : "macro"
+    part = is_grouping ? "section" : "term"
+    
     if node.terms.size > term_docs.size
       info = [] of Tuple(AST::Node, String)
       
@@ -14,14 +21,14 @@ module Mare::Compiler::Macros::Util
       while (index += 1) < node.terms.size
         if index < term_docs.size
           if term_docs[index]
-            info << {node.terms[index], "this term is #{term_docs[index]}"}
+            info << {node.terms[index], "this #{part} is #{term_docs[index]}"}
           end
         else
-          info << {node.terms[index], "this is an excessive term"}
+          info << {node.terms[index], "this is an excessive #{part}"}
         end
       end
       
-      Error.at node, "This macro has too many terms", info
+      Error.at node, "This #{thing} has too many #{part}s", info
     end
     
     if node.terms.size < term_docs.size
@@ -31,14 +38,14 @@ module Mare::Compiler::Macros::Util
       while (index += 1) < term_docs.size
         if index < node.terms.size
           if term_docs[index]
-            info << {node.terms[index], "this term is #{term_docs[index]}"}
+            info << {node.terms[index], "this #{part} is #{term_docs[index]}"}
           end
         else
-          info << {node, "expected a term: #{term_docs[index]}"}
+          info << {node, "expected a #{part}: #{term_docs[index]}"}
         end
       end
       
-      Error.at node, "This macro has too few terms", info
+      Error.at node, "This #{thing} has too few #{part}s", info
     end
   end
 end

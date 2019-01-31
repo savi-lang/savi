@@ -402,7 +402,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       verify_constraints! if @ret
     end
     
-    def set_return(pos : Source::Pos, ret : MetaType)
+    def set_return(ret : MetaType)
       @ret = ret
       verify_constraints!
     end
@@ -546,32 +546,40 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   end
   
   def follow_call(call : FromCall)
-    # Confirm that by now, there is exactly one type in the domain.
-    # TODO: is it possible to proceed without Domain?
     call_defns = self[call.lhs].resolve!(self).defns
     
-    # TODO: handle multiple call funcs by branching.
-    raise NotImplementedError.new(call_defns.inspect) if call_defns.size > 1
-    call_defn = call_defns.first
-    call_func = call_defn.find_func!(call.member)
+    raise NotImplementedError.new("no defns for #{call.inspect}") \
+      if call_defns.empty?
     
-    # Keep track that we called this function.
-    @called_funcs.add(call_func)
-    
-    # Get the Infer instance for call_func, possibly creating and running it.
-    infer = Infer.from(call_defn, call_func)
-    
-    # Apply constraints to the return type.
-    ret = infer[infer.ret_tid]
-    call.set_return(ret.pos, ret.resolve!(infer))
-    
-    # Apply constraints to each of the argument types.
-    # TODO: handle case where number of args differs from number of params.
-    unless call.args.empty?
-      call.args.zip(infer.param_tids).each do |arg_tid, param_tid|
-        infer[param_tid].as(Param).verify_arg(infer, self, arg_tid)
+    # For each receiver type definition that is possible, track down the infer
+    # for the function that we're trying to call, evaluating the constraints
+    # for each possibility such that all of them must hold true.
+    rets = [] of MetaType
+    call_defns.each do |call_defn|
+      call_func = call_defn.find_func!(call.member)
+      
+      # Keep track that we called this function.
+      @called_funcs.add(call_func)
+      
+      # Get the Infer instance for call_func, possibly creating and running it.
+      infer = Infer.from(call_defn, call_func)
+      
+      # Apply parameter constraints to each of the argument types.
+      # TODO: handle case where number of args differs from number of params.
+      # TODO: enforce that all call_defns have the same param count.
+      unless call.args.empty?
+        call.args.zip(infer.param_tids).each do |arg_tid, param_tid|
+          infer[param_tid].as(Param).verify_arg(infer, self, arg_tid)
+        end
       end
+      
+      # Resolve and take note of the return type.
+      rets << infer[infer.ret_tid].resolve!(infer)
     end
+    
+    # Constrain the return value as the union of all observed return types.
+    call.set_return \
+      (rets.size == 1 ? rets.first : MetaType.new_union(call.pos, rets))
   end
   
   def follow_field(field : Field, name : String)
