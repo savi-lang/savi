@@ -37,7 +37,7 @@
 
 ### Tooling features
 
-- [ ] - Emit debugging metadata in compiled programs
+- [x] - Emit debugging metadata in compiled programs
 - [ ] - Docker image of the Mare compiler
 - [ ] - Distributable package for Linux with Mare compiler static binary
 - [ ] - Sublime Text syntax highlighting support

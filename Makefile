@@ -19,9 +19,13 @@ test.inner: PHONY /tmp/bin/spec
 
 # Compile and run the mare binary in the `example` subdirectory.
 example: PHONY
-	docker exec -ti mare-dev make example.inner
+	docker exec -ti mare-dev make example/main
+	echo && example/main
+example-lldb: PHONY
+	docker exec -ti mare-dev make example/main
+	echo && lldb -o run -- example/main
 /tmp/bin/mare: main.cr $(shell find src)
 	mkdir -p /tmp/bin
 	crystal build --debug --link-flags="-lponyrt" main.cr -o $@
-example.inner: PHONY /tmp/bin/mare
-	echo && cd example && /tmp/bin/mare && ./main
+example/main: /tmp/bin/mare $(shell find example -name '*.mare')
+	echo && cd example && /tmp/bin/mare

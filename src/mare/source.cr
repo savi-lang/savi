@@ -11,7 +11,10 @@ struct Mare::Source::Pos
   property source : Source
   property start : Int32
   property finish : Int32
+  
   def initialize(@source, @start, @finish)
+    @info = {0, 0, 0, 0}
+    @missing_info = true
   end
   NONE = new(Source.none, 0, 0)
   def self.none; NONE end
@@ -21,13 +24,20 @@ struct Mare::Source::Pos
     io << "`#{source.path.split("/").last}:#{start}-#{finish}`"
   end
   
+  def row; info[0] end
+  def col; info[1] end
+  def line_start; info[2] end
+  def line_finish; info[3] end
+  
   # Look at the source content surrounding the position to calculate
   # the following pieces of information, returned as a NamedTuple.
   # - row: the zero-indexed vertical position in the text
   # - col: the zero-indexed horizontal position in the text
   # - line_start: the character offset of the start of this line
   # - line_finish: the character offset of the end of this line
-  private def get_info
+  private def info
+    return @info unless @missing_info
+    
     # TODO: convert start and finish from byte offset to char offset first,
     # so that multi-byte characters are properly accounted for here.
     content = source.content
@@ -49,33 +59,28 @@ struct Mare::Source::Pos
       row += 1
     end
     
-    {
-      row: row,
-      col: col,
-      line_start: line_start,
-      line_finish: line_finish,
-    }
+    @missing_info = false
+    @info = {row, col, line_start, line_finish}
   end
   
   def show
     content = source.content
-    info = get_info
     
     twiddle_width = finish - start
     twiddle_width = 1 if twiddle_width == 0
     twiddle_width -= 1
     
     tail = ""
-    max_width = info[:line_finish] - info[:line_start] - info[:col]
+    max_width = line_finish - line_start - col
     if twiddle_width > max_width
       twiddle_width = max_width
       tail = "···"
     end
     
     [
-      "from #{source.path}:#{info[:row] + 1}:",
-      content[info[:line_start]..info[:line_finish]],
-      (" " * info[:col]) + "^" + ("~" * twiddle_width) + tail,
+      "from #{source.path}:#{row + 1}:",
+      content[line_start..line_finish],
+      (" " * col) + "^" + ("~" * twiddle_width) + tail,
     ].join("\n")
   end
 end

@@ -1,0 +1,2 @@
+# Remap source filenames under /opt/code to be under the current working dir.
+settings set target.source-map /opt/code .

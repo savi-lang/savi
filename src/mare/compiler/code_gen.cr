@@ -179,8 +179,9 @@ class Mare::Compiler::CodeGen
     @target = LLVM::Target.from_triple(@target_triple)
     @target_machine = @target.create_target_machine(@target_triple).as(LLVM::TargetMachine)
     @llvm = LLVM::Context.new
-    @mod = @llvm.new_module("minimal")
+    @mod = @llvm.new_module("main")
     @builder = @llvm.new_builder
+    @di = DebugInfo.new(@llvm, @mod, @builder)
     
     @default_linkage = LLVM::Linkage::External
     
@@ -310,6 +311,9 @@ class Mare::Compiler::CodeGen
     
     # Generate the wrapper main function for the JIT.
     gen_wrapper
+    
+    # Finish up debugging info.
+    @di.finish
     
     # Run LLVM sanity checks on the generated module.
     @mod.verify
@@ -448,11 +452,16 @@ class Mare::Compiler::CodeGen
   def gen_func_start(llvm_func, gtype : GenType? = nil, gfunc : GenFunc? = nil)
     @frames << Frame.new(self, llvm_func, gtype, gfunc)
     
+    # Add debug info for this function
+    @di.func_start(gfunc) if gfunc
+    
     # Create an entry block and start building from there.
     @builder.position_at_end(gen_block("entry"))
   end
   
   def gen_func_end
+    @di.func_end if @di.in_func?
+    
     @frames.pop
   end
   
@@ -558,8 +567,10 @@ class Mare::Compiler::CodeGen
     end
     
     # Now generate code for the expressions in the function body.
+    last_expr = nil
     last_value = nil
     gfunc.func.body.not_nil!.terms.each do |expr|
+      last_expr = expr
       last_value = gen_expr(expr, gfunc.func.has_tag?(:constant))
     end
     @builder.ret(last_value.not_nil!)
@@ -634,6 +645,7 @@ class Mare::Compiler::CodeGen
     
     args.unshift(receiver) if gfunc.needs_receiver?
     
+    @di.set_loc(relate.op)
     @builder.call(gen_func_ref(receiver, lhs_gtype, gfunc), args)
   end
   
@@ -664,6 +676,7 @@ class Mare::Compiler::CodeGen
     
     value = @builder.bit_cast(value, llvm_type_of(relate.lhs), value.name)
     
+    @di.set_loc(relate.op)
     if ref.is_a?(Refer::Local)
       raise "local already declared: #{ref.inspect}" \
         if func_frame.current_locals[ref]?
@@ -679,6 +692,8 @@ class Mare::Compiler::CodeGen
   end
   
   def gen_expr(expr, const_only = false) : LLVM::Value
+    @di.set_loc(expr)
+    
     case expr
     when AST::Identifier
       ref = func_frame.refer[expr]
