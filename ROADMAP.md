@@ -13,6 +13,7 @@
 - [ ] - Reference capabilities (`iso`, `trn`, `val`, `ref`, `box`, `tag`)
 - [ ] - Actors and behaviours
 - [ ] - For-loop iterator syntax sugar (`for x in y`)
+- [ ] - Partial functions and partial calls
 - [ ] - Generic types
 - [ ] - FFI-compatible struct types
 
@@ -25,6 +26,7 @@
 - [ ] - Typeclasses (`implement SomeInterface for SomeClass:`)
 - [ ] - Automatic specialization of functions to avoid virtual table calls.
 - [ ] - Sourcing/overriding constant values using compile-time options
+- [ ] - Builtin/automatic support for Pony's "Access Pattern"
 
 ### New sugar and other conveniences
 
