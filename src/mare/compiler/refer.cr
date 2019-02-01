@@ -44,6 +44,10 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
     def pos
       @defn.ident.pos
     end
+    
+    def final_decl : Decl
+      self
+    end
   end
   
   class DeclUnion
@@ -54,9 +58,26 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
     end
   end
   
-  alias Info = (Unresolved | Self | Local | Field | Decl | DeclUnion)
+  class DeclAlias
+    getter decl : Decl | DeclAlias
+    getter defn : Program::TypeAlias
+    
+    def initialize(@defn, @decl)
+    end
+    
+    def pos
+      @defn.ident.pos
+    end
+    
+    def final_decl : Decl
+      decl.final_decl
+    end
+  end
   
-  def initialize(@self_decl : Decl, @decls : Hash(String, Decl))
+  alias Info =
+    (Unresolved | Self | Local | Field | Decl | DeclUnion | DeclAlias)
+  
+  def initialize(@self_decl : Decl, @decls : Hash(String, Decl | DeclAlias))
     @create_params = false
     @last_rid = 0_u64
     @last_param = 0
@@ -75,17 +96,28 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
     @rids[node.rid]
   end
   
-  def decl(name)
+  private def decl(name)
     return @self_decl if name == "@"
     @decls[name]
   end
   
+  def decl_defn(name) : Program::Type
+    return @self_decl.final_decl.defn if name == "@"
+    @decls[name].final_decl.defn
+  end
+  
   def self.run(ctx)
     # Gather all the types in the program as Decls.
-    decls = {} of String => Decl
+    decls = {} of String => (Decl | DeclAlias)
     ctx.program.types.each_with_index do |t, index|
       name = t.ident.value
       decls[name] = Decl.new(t)
+    end
+    
+    # Gather type aliases in a similar way, dereferencing as we go.
+    ctx.program.aliases.each_with_index do |a, index|
+      name = a.ident.value
+      decls[name] = DeclAlias.new(a, decls[a.target.value])
     end
     
     # For each function in the program, run with a new instance.

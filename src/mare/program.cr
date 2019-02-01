@@ -1,6 +1,7 @@
 class Mare::Program
   # TODO: add Package delineation here
   getter types
+  getter aliases
   
   property! reach : Compiler::Reach
   property! paint : Compiler::Paint
@@ -9,6 +10,17 @@ class Mare::Program
   
   def initialize
     @types = [] of Type
+    @aliases = [] of TypeAlias
+  end
+  
+  def find_alias?(alias_name)
+    @aliases.any? { |a| a.ident.value == alias_name && !f.has_tag?(:hygienic) }
+  end
+  
+  def find_func!(func_name)
+    @functions
+      .find { |f| f.ident.value == func_name && !f.has_tag?(:hygienic) }
+      .not_nil!
   end
   
   def find_type!(type_name)
@@ -17,6 +29,23 @@ class Mare::Program
   
   def find_func!(type_name, func_name)
     find_type!(type_name).find_func!(func_name)
+  end
+  
+  class TypeAlias
+    property ident : AST::Identifier
+    property target : AST::Identifier
+    
+    getter metadata
+    
+    property! refer : Compiler::Refer
+    
+    def initialize(@ident, @target)
+      @metadata = Hash(Symbol, Int32 | Bool).new # TODO: should be UInt64?
+    end
+    
+    def inspect(io : IO)
+      io << "#<#{self.class} #{@ident.value}: #{@target.value}>"
+    end
   end
   
   class Type
@@ -36,7 +65,7 @@ class Mare::Program
     def initialize(@ident)
       @functions = [] of Function
       @tags = Set(Symbol).new
-      @metadata = Hash(Symbol, Int32 | Bool).new
+      @metadata = Hash(Symbol, Int32 | Bool).new # TODO: should be UInt64?
     end
     
     def inspect(io : IO)

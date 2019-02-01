@@ -27,7 +27,6 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     end
     
     def is_value?
-      # TODO: Include Bool as a value.
       is_tuple? || (singular? && single!.has_tag?(:no_desc))
     end
     
@@ -66,22 +65,21 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
             case defn.metadata[:bit_width]
             when 32 then :f32
             when 64 then :f64
-            raise NotImplementedError.new(defn.metadata)
+            else raise NotImplementedError.new(defn.metadata)
             end
           else
             case defn.metadata[:bit_width]
+            when 1 then :i1
             when 8 then :i8
             when 32 then :i32
             when 64 then :i64
-            raise NotImplementedError.new(defn.metadata)
+            else raise NotImplementedError.new(defn.metadata)
             end
           end
         else
           # TODO: don't special-case this in the compiler?
           case defn.ident.value
           when "CString" then :ptr
-          when "True" then :i1 # TODO: this should be handled as an enum
-          when "False" then :i1 # TODO: this should be handled as an enum
           else
             :struct_ptr
           end

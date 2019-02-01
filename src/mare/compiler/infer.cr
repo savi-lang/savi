@@ -520,7 +520,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     
     # Take note of the return type constraint if given.
     func.ret.try do |ret_t|
-      meta_type = MetaType.new(ret_t.pos, [func.refer.decl(ret_t.value).defn])
+      meta_type = MetaType.new(ret_t.pos, [func.refer.decl_defn(ret_t.value)])
       new_tid(ret_t, Fixed.new(meta_type))
       self[ret_tid].as(Local).set_explicit(meta_type)
     end
@@ -640,10 +640,10 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   def touch(node : AST::Identifier)
     ref = refer[node]
     case ref
-    when Refer::Decl
+    when Refer::Decl, Refer::DeclAlias
       # If it's a const, treat it as a type reference.
       # TODO: handle instantiable type references as having a opaque singleton type.
-      new_tid(node, Fixed.new(MetaType.new(node.pos, [ref.defn])))
+      new_tid(node, Fixed.new(MetaType.new(node.pos, [ref.final_decl.defn])))
     when Refer::Local
       # If it's a local, track the possibly new tid in our @local_tids map.
       local_tid = @local_tids[ref]?
@@ -674,18 +674,18 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   end
   
   def touch(node : AST::LiteralString)
-    new_tid(node, Literal.new(node.pos, [refer.decl("CString").defn]))
+    new_tid(node, Literal.new(node.pos, [refer.decl_defn("CString")]))
   end
   
   # A literal integer could be any integer or floating-point machine type.
   def touch(node : AST::LiteralInteger)
-    new_tid(node, Literal.new(node.pos, [refer.decl("Numeric").defn]))
+    new_tid(node, Literal.new(node.pos, [refer.decl_defn("Numeric")]))
   end
   
   # A literal float could be any floating-point machine type.
   def touch(node : AST::LiteralFloat)
     new_tid(node, Literal.new(node.pos, [
-      refer.decl("F32").defn, refer.decl("F64").defn,
+      refer.decl_defn("F32"), refer.decl_defn("F64"),
     ]))
   end
   
@@ -693,7 +693,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     case node.style
     when "(", ":"
       if node.terms.empty?
-        new_tid(node, Literal.new(node.pos, [refer.decl("None").defn]))
+        new_tid(node, Literal.new(node.pos, [refer.decl_defn("None")]))
       else
         # A non-empty group always has the tid of its final child.
         transfer_tid(node.terms.last, node)
@@ -771,10 +771,9 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   def touch(node : AST::Choice)
     body_tids = [] of TID
     node.list.each do |cond, body|
-      # Each condition in a choice must evaluate to a type of (True | False).
-      self[cond].within_domain!(self, MetaType.new(node.pos, [
-        refer.decl("True").defn, refer.decl("False").defn,
-      ]))
+      # Each condition in a choice must evaluate to a type of Bool.
+      bool = MetaType.new(node.pos, [refer.decl_defn("Bool")])
+      self[cond].within_domain!(self, bool)
       
       # Hold on to the body type for later in this function.
       body_tids << body.tid

@@ -2,13 +2,10 @@
 primitive None:
 
 // Booleans
-primitive True:
-primitive False:
-// TODO:
-// enum Bool:
-//   const bit_width: 1
-//   member False: 0
-//   member True: 1
+enum Bool:
+  const bit_width U8: 1
+  member False: 0
+  member True: 1
 
 // Numerics
 interface Numeric:

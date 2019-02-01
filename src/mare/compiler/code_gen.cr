@@ -743,12 +743,12 @@ class Mare::Compiler::CodeGen
       elsif ref.is_a?(Refer::Local)
         raise "#{ref.inspect} isn't a constant value" if const_only
         func_frame.current_locals[ref]
-      elsif ref.is_a?(Refer::Decl)
-        gtype = gtype_of(expr)
-        case gtype
-        when @gtypes["True"]? then gen_bool(true)
-        when @gtypes["False"]? then gen_bool(false)
-        else gtype.singleton
+      elsif ref.is_a?(Refer::Decl) || ref.is_a?(Refer::DeclAlias)
+        enum_value = ref.defn.metadata[:enum_value]?
+        if enum_value
+          llvm_type_of(expr).const_int(enum_value.as(Int32))
+        else
+          gtype_of(expr).singleton
         end
       elsif ref.is_a?(Refer::Self)
         raise "#{ref.inspect} isn't a constant value" if const_only

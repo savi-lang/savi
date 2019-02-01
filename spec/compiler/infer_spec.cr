@@ -174,7 +174,7 @@ describe Mare::Compiler::Infer do
         if "not a boolean" 42
             ^~~~~~~~~~~~~
     
-    - it must be a subtype of (True | False):
+    - it must be a subtype of (Bool):
       from (example):3:
         if "not a boolean" 42
         ^~
@@ -394,7 +394,7 @@ describe Mare::Compiler::Infer do
     source = Mare::Source.new "(example)", <<-SOURCE
     primitive NeverCalled:
       fun call:
-        x False = True
+        x I32 = True
     
     actor Main:
       new:
@@ -404,13 +404,13 @@ describe Mare::Compiler::Infer do
     expected = <<-MSG
     This type is outside of a constraint:
     from (example):3:
-        x False = True
-                  ^~~~
+        x I32 = True
+                ^~~~
     
-    - it must be a subtype of (False):
+    - it must be a subtype of (I32):
       from (example):3:
-        x False = True
-          ^~~~~
+        x I32 = True
+          ^~~
     MSG
     
     expect_raises Mare::Error, expected do

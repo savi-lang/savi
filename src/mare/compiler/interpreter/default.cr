@@ -5,11 +5,15 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
   def finished(context)
   end
   
-  def keywords; ["actor", "class", "primitive", "numeric", "ffi", "interface"] end
+  def keywords; %w{actor class interface numeric enum primitive ffi} end
   
   def compile(context, decl)
     keyword = decl.keyword
-    t = Type.new(keyword, Program::Type.new(decl.head.last.as(AST::Identifier)))
+    t = Type.new(
+      keyword,
+      Program::Type.new(decl.head.last.as(AST::Identifier)),
+      @program,
+    )
     
     case keyword
     when "actor"
@@ -23,6 +27,9 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
     when "numeric"
       t.type.add_tag(:numeric)
       t.type.add_tag(:no_desc)
+    when "enum"
+      t.type.add_tag(:numeric)
+      t.type.add_tag(:no_desc)
     when "primitive"
       # no type-level tags
     when "ffi"
@@ -34,14 +41,16 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
   end
   
   class Type < Interpreter
-    getter keyword : String
+    property keyword : String # TODO: read-only as getter
     getter type : Program::Type
+    getter program : Program
     
-    def initialize(@keyword, @type)
+    def initialize(@keyword, @type, @program)
     end
     
     # TODO: dedup these with the Witness mechanism.
-    def keywords; ["prop", "fun", "new", "const"] end
+    # TODO: be more specific (for example, `member` is only allowed for `enum`)
+    def keywords; ["prop", "fun", "new", "const", "member"] end
     
     def finished(context)
       if @type.is_instantiable?
@@ -54,7 +63,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
       end
       
       # Numeric types need some basic metadata attached to know the native type.
-      if @keyword == "numeric"
+      if @keyword == "numeric" || @keyword == "enum"
         # Add "is Numeric" to the type definition so to absorb the interface.
         iface_is = AST::Identifier.new("is").from(@type.ident)
         iface_ret = AST::Identifier.new("Numeric").from(@type.ident)
@@ -208,6 +217,18 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
       },
     ] of Hash(String, String | Bool))
     
+    @@declare_member = Witness.new([
+      {
+        "kind" => "keyword",
+        "name" => "member",
+      },
+      {
+        "kind" => "term",
+        "name" => "ident",
+        "type" => "ident",
+      },
+    ] of Hash(String, String | Bool))
+    
     def compile(context, decl)
       case decl.keyword
       when "fun"
@@ -220,6 +241,9 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
           decl.body,
         )
       when "new"
+        raise "stateless types can't have constructors" \
+          unless @type.is_instantiable?
+        
         data = @@declare_new.run(decl)
         ident = data["ident"].as(AST::Identifier)
         
@@ -283,6 +307,24 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         setter_body.terms << setter_assign
         setter_func = Program::Function.new(setter_ident, setter_params, ret.dup, setter_body)
         @type.functions << setter_func
+      when "member"
+        raise "only enums can have members" unless @keyword == "enum"
+        
+        data = @@declare_member.run(decl)
+        ident = data["ident"].as(AST::Identifier)
+        body = decl.body
+        
+        raise "member value must be a single integer" \
+          unless body.is_a?(AST::Group) \
+            && body.terms.size == 1 \
+            && body.terms[0].is_a?(AST::LiteralInteger)
+        value = body.terms[0].as(AST::LiteralInteger)
+        
+        type_alias = Program::TypeAlias.new(ident, @type.ident.dup)
+        type_alias.metadata[:enum_value] =
+          body.terms[0].as(AST::LiteralInteger).value.to_i32
+        
+        @program.aliases << type_alias
       end
     end
   end
