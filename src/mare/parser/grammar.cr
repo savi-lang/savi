@@ -2,11 +2,14 @@ require "pegmatite"
 
 module Mare::Parser
   Grammar = Pegmatite::DSL.define do
+    # Define what an end-of-line comment looks like.
+    eol_comment = str("//") >> (~char('\n') >> any).repeat
+    
     # Define what whitespace looks like.
     whitespace =
       char(' ') | char('\t') | char('\r') | str("\\\n") | str("\\\r\n")
     s = whitespace.repeat
-    sn = (whitespace | char('\n')).repeat
+    sn = (whitespace | (eol_comment.maybe >> char('\n'))).repeat
     
     # Define what an identifier looks like.
     ident_letter =
@@ -63,7 +66,7 @@ module Mare::Parser
             str("<<~") | str("~>>") | str("<<") | str(">>") |
             str("<~") | str("~>")).named(:op)
     op6 = ((str(">=") | str("<=") | char('<') | char('>')) >>
-            ~(char('>') | char('<') | char('~') | char('|'))).named(:op)
+            ~(char('>') | char('<'))).named(:op)
     op7 = (str("===") | str("==") | str("!==") | str("!=") |
             str("=~")).named(:op)
     op8 = (str("&&") | str("||")).named(:op)
@@ -84,26 +87,28 @@ module Mare::Parser
     t = (te >> (sn >> ope >> sn >> te >> s).repeat).named(:relate)
     
     # Define groups that are pipe-partitioned lists of comma-separated terms.
-    psep = char(',') | char('|').named(:op)
-    pterms = t >> s >> (psep >> sn >> t >> s).repeat
-    parens.define (char('(') >> sn >> pterms.maybe >> sn >> char(')')).named(:group)
+    pipesep = char('|').named(:op)
+    ptermsl = t >> s >> (char(',') >> sn >> t >> s).repeat
+    ptermsn = (ptermsl >> sn).repeat
+    ptermsp =
+      pipesep.maybe >> sn >>
+      (ptermsn >> sn >> pipesep >> sn).repeat >>
+      ptermsn >> sn >>
+      pipesep.maybe >> sn
+    parens.define (char('(') >> sn >> ptermsp.maybe >> sn >> char(')')).named(:group)
     
     # Define what a declaration head of terms looks like.
     dterm = atom
     dterms = dterm >> (s >> dterm).repeat >> s
     decl = (dterms >> s >> char(':') >> s).named(:decl)
     
-    # Define what an end-of-line comment looks like.
-    eol_comment = str("//") >> (~char('\n') >> any).repeat
-    eol_item = eol_comment
-    
     # Define what a line looks like.
     terms = t >> s >> (char(',') >> sn >> t >> s).repeat
     line_item = (decl >> terms.maybe) | terms
     line =
       s >>
-      (s >> ~eol_item >> line_item).repeat >>
-      (s >> eol_item.maybe) >>
+      (s >> ~eol_comment >> line_item).repeat >>
+      (s >> eol_comment.maybe) >>
       s
     
     # Define a total document to be a sequence of lines.
