@@ -29,7 +29,14 @@ actor Main:
     
     @say_stuff
     
-    augend = if True (Zero | BelligerentFour)
+    use_zero = False
+    please_use_zero = True
+    
+    augend = case (
+    | use_zero | Zero
+    | please_use_zero | Zero
+    | BelligerentFour
+    )
     LibPonyRT.pony_exitcode(augend + 42)
   
   fun say_stuff:

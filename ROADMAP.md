@@ -7,11 +7,12 @@
 - [x] - Properties (fields hidden behind getters/setters)
 - [x] - Interfaces
 - [x] - Virtual table calls on abstract types
+- [x] - Non-looping flow control (`if`, `case`, etc)
 - [ ] - Boxed numeric values
-- [ ] - Non-looping flow control (`if`, `match`, etc)
+- [ ] - Actors and behaviours
 - [ ] - Looping flow control (`while`, etc)
 - [ ] - Reference capabilities (`iso`, `trn`, `val`, `ref`, `box`, `tag`)
-- [ ] - Actors and behaviours
+- [ ] - Runtime type matching (`x <: Y`)
 - [ ] - For-loop iterator syntax sugar (`for x in y`)
 - [ ] - Partial functions and partial calls
 - [ ] - Generic types

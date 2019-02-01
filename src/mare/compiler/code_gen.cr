@@ -223,6 +223,10 @@ class Mare::Compiler::CodeGen
     @final_fn = LLVM::Type.function([@obj_ptr], @void).as(LLVM::Type)
     @final_fn_ptr = @final_fn.pointer.as(LLVM::Type)
     
+    # Finish defining the forward-declared @desc and @obj types
+    gen_desc_basetype
+    @obj.struct_set_body([@desc_ptr])
+    
     # Pony runtime function declarations.
     gen_runtime_decls
   end
@@ -247,6 +251,7 @@ class Mare::Compiler::CodeGen
   
   def llvm_type_of(ref : Reach::Ref)
     case ref.llvm_use_type
+    when :i1 then @i1
     when :i8, :u8 then @i8
     when :i32, :u32 then @i32
     when :i64, :u64 then @i64
@@ -261,6 +266,7 @@ class Mare::Compiler::CodeGen
   
   def llvm_mem_type_of(ref : Reach::Ref)
     case ref.llvm_mem_type
+    when :i1 then @i8 # TODO: test that this works okay 
     when :i8, :u8 then @i8
     when :i32, :u32 then @i32
     when :i64, :u64 then @i64
@@ -278,9 +284,11 @@ class Mare::Compiler::CodeGen
     @gtypes[llvm_name]
   end
   
-  def any_gtype_of(expr : AST::Node, in_gfunc : GenFunc? = nil)
-    llvm_name = program.reach[type_of(expr, in_gfunc).single_or_first_in_union].llvm_name
-    @gtypes[llvm_name]
+  def gtypes_of(expr : AST::Node, in_gfunc : GenFunc? = nil)
+    type_of(expr, in_gfunc).each_defn.map do |defn|
+      llvm_name = program.reach[defn].llvm_name
+      @gtypes[llvm_name]
+    end.to_a
   end
   
   def pony_ctx
@@ -636,7 +644,12 @@ class Mare::Compiler::CodeGen
     end
     
     relate.lhs.as(AST::Identifier) # assert that lhs is an identifier
-    lhs_gtype = any_gtype_of(relate.lhs)
+    lhs_gtypes = gtypes_of(relate.lhs)
+    
+    # Even if there are multiple possible gtypes and thus gfuncs, we choose an
+    # arbitrary one for the purposes of checking arg types against param types.
+    # We make the assumption that signature differences have been prevented.
+    lhs_gtype = lhs_gtypes.first
     gfunc = lhs_gtype[member]
     
     # For any args we are missing, try to find and use a default param value.
@@ -653,22 +666,31 @@ class Mare::Compiler::CodeGen
       end
     end
     
+    # Generate code for the receiver, whether we actually use it or not.
+    # We trust LLVM optimizations to eliminate dead code when it does nothing.
     receiver = gen_expr(relate.lhs)
     
-    args.unshift(receiver) if gfunc.needs_receiver?
-    
+    # Call the LLVM function, or do a virtual call if necessary.
     @di.set_loc(relate.op)
-    @builder.call(gen_func_ref(receiver, lhs_gtype, gfunc), args)
+    needs_virtual_call = lhs_gtypes.size > 1 || lhs_gtype.type_def.is_abstract?
+    if needs_virtual_call
+      gen_virtual_call(receiver, args, lhs_gtypes, gfunc)
+    else
+      args.unshift(receiver) if gfunc.needs_receiver?
+      @builder.call(gfunc.llvm_func, args)
+    end
   end
   
-  def gen_func_ref(receiver : LLVM::Value, gtype : GenType, gfunc : GenFunc)
-    # Only pay the cost of a virtual call if this is an abstract type.
-    return gfunc.llvm_func unless gtype.type_def.is_abstract?
-    
-    rname = receiver.name.empty? ? gtype.type_def.llvm_name : receiver.name
+  def gen_virtual_call(
+    receiver : LLVM::Value,
+    args : Array(LLVM::Value),
+    gtypes : Array(GenType),
+    gfunc : GenFunc,
+  )
+    rname = receiver.name
+    rname = gtypes.map(&.type_def).map(&.llvm_name).join("|") if rname.empty?
     fname = "#{rname}.#{gfunc.func.ident.value}"
     
-    # Do a virtual call for this function.
     # Load the type descriptor of the receiver so we can read its vtable,
     # then load the function pointer from the appropriate index of that vtable.
     desc_gep = @builder.struct_gep(receiver, 0, "#{rname}.DESC")
@@ -677,9 +699,13 @@ class Mare::Compiler::CodeGen
     vtable_idx = @i32.const_int(gfunc.vtable_index)
     gep = @builder.inbounds_gep(vtable_gep, @i32_0, vtable_idx, "#{fname}.GEP")
     load = @builder.load(gep, "#{fname}.LOAD")
-    func = @builder.bit_cast(load, gfunc.llvm_func.type, fname)
+    func = @builder.bit_cast(load, gfunc.virtual_llvm_func.type, fname)
     
-    func
+    # Cast the receiver to right type and prepend it to our args list.
+    rtype = gfunc.virtual_llvm_func.params.first.type
+    args.unshift(@builder.bit_cast(receiver, rtype, "#{rname}.CAST"))
+    
+    @builder.call(func, args)
   end
   
   def gen_eq(relate)
@@ -815,37 +841,74 @@ class Mare::Compiler::CodeGen
   end
   
   def gen_choice(expr : AST::Choice)
-    # TODO: Support more than a simple if/else choice.
-    raise NotImplementedError.new(expr.list.size) if expr.list.size != 2
-    
-    if_clause = expr.list.first
-    else_clause = expr.list.last
-    
-    cond_value = gen_expr(if_clause[0])
-    
-    bb_body1 = gen_block("body1choice")
-    bb_body2 = gen_block("body2choice")
-    bb_post  = gen_block("postchoice")
+    raise NotImplementedError.new(expr.inspect) if expr.list.empty?
     
     # Get the LLVM type for the phi that joins the final value of each branch.
     # Each such value will needed to be bitcast to the that type.
     phi_type = llvm_type_of(expr)
     
-    # TODO: Use infer resolution for static True/False finding where possible.
-    @builder.cond(cond_value, bb_body1, bb_body2)
+    j = expr.list.size
     
-    @builder.position_at_end(bb_body1)
-    value1 = gen_expr(if_clause[1])
-    value1 = @builder.bit_cast(value1, phi_type, "#{value1.name}.CAST")
-    @builder.br(bb_post)
+    case_and_cond_blocks = [] of LLVM::BasicBlock
+    expr.list.each_cons(2).to_a.each_with_index do |(fore, aft), i|
+      case_and_cond_blocks << gen_block("case#{i + 1}of#{j}_choice")
+      case_and_cond_blocks << gen_block("cond#{i + 2}of#{j}_choice")
+    end
+    case_and_cond_blocks << gen_block("case#{j}of#{j}_choice")
+    post_block = gen_block("after#{j}of#{j}_choice")
     
-    @builder.position_at_end(bb_body2)
-    value2 = gen_expr(else_clause[1])
-    value2 = @builder.bit_cast(value2, phi_type, "#{value2.name}.CAST")
-    @builder.br(bb_post)
     
-    @builder.position_at_end(bb_post)
-    @builder.phi(phi_type, [bb_body1, bb_body2], [value1, value2], "phichoice")
+    cond_value = gen_expr(expr.list.first[0])
+    
+    values = [] of LLVM::Value
+    blocks = [] of LLVM::BasicBlock
+    expr.list.each_cons(2).to_a.each_with_index do |(fore, aft), i|
+      case_block = case_and_cond_blocks.shift
+      next_block = case_and_cond_blocks.shift
+      
+      @builder.cond(cond_value, case_block, next_block)
+      
+      @builder.position_at_end(case_block)
+      value = gen_expr(fore[1])
+      value = @builder.bit_cast(value, phi_type, "#{value.name}.CAST")
+      values << value
+      blocks << case_block
+      @builder.br(post_block)
+      
+      @builder.position_at_end(next_block)
+      cond_value = gen_expr(aft[0])
+    end
+    
+    case_block = case_and_cond_blocks.shift
+    
+    @builder.br(case_block)
+    @builder.position_at_end(case_block)
+    value = gen_expr(expr.list.last[1])
+    value = @builder.bit_cast(value, phi_type, "#{value.name}.CAST")
+    values << value
+    blocks << case_block
+    @builder.br(post_block)
+    
+    # cond_value = gen_expr(if_clause[0])
+    
+    # bb_body1 = gen_block("body1choice")
+    # bb_body2 = gen_block("body2choice")
+    
+    # # TODO: Use infer resolution for static True/False finding where possible.
+    # @builder.cond(cond_value, bb_body1, bb_body2)
+    
+    # @builder.position_at_end(bb_body1)
+    # value1 = gen_expr(if_clause[1])
+    # value1 = @builder.bit_cast(value1, phi_type, "#{value1.name}.CAST")
+    # @builder.br(bb_post)
+    
+    # @builder.position_at_end(bb_body2)
+    # value2 = gen_expr(else_clause[1])
+    # value2 = @builder.bit_cast(value2, phi_type, "#{value2.name}.CAST")
+    # @builder.br(bb_post)
+    
+    @builder.position_at_end(post_block)
+    @builder.phi(phi_type, blocks, values, "phichoice")
   end
   
   DESC_ID                        = 0
@@ -865,6 +928,28 @@ class Mare::Compiler::CodeGen
   DESC_TRAITS                    = 14
   DESC_FIELDS                    = 15
   DESC_VTABLE                    = 16
+  
+  def gen_desc_basetype
+    @desc.struct_set_body [
+      @i32,                           # 0: id
+      @i32,                           # 1: size
+      @i32,                           # 2: field_count
+      @i32,                           # 3: field_offset
+      @obj_ptr,                       # 4: instance
+      @trace_fn_ptr,                  # 5: trace fn
+      @trace_fn_ptr,                  # 6: serialise trace fn
+      @serialise_fn_ptr,              # 7: serialise fn
+      @deserialise_fn_ptr,            # 8: deserialise fn
+      @custom_serialise_space_fn_ptr, # 9: custom serialise space fn
+      @custom_deserialise_fn_ptr,     # 10: custom deserialise fn
+      @dispatch_fn_ptr,               # 11: dispatch fn
+      @final_fn_ptr,                  # 12: final fn
+      @i32,                           # 13: event notify
+      @pptr,                          # 14: TODO: traits
+      @pptr,                          # 15: TODO: fields
+      @ptr.array(0),                  # 16: vtable
+    ]
+  end
   
   def gen_desc_type(type_def : Reach::Def, vtable_size : Int32) : LLVM::Type
     @llvm.struct [

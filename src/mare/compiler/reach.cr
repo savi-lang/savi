@@ -39,8 +39,8 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       @meta_type.single!
     end
     
-    def single_or_first_in_union
-      @meta_type.defns.first
+    def each_defn # TODO: get rid of this - it's too leaky of an abstraction
+      @meta_type.defns.each
     end
     
     def tuple_count
@@ -76,11 +76,12 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
             raise NotImplementedError.new(defn.metadata)
             end
           end
-        # TODO: Handle Bool as :i1 (see ponyc's gentype.c:278)
         else
           # TODO: don't special-case this in the compiler?
           case defn.ident.value
           when "CString" then :ptr
+          when "True" then :i1 # TODO: this should be handled as an enum
+          when "False" then :i1 # TODO: this should be handled as an enum
           else
             :struct_ptr
           end
