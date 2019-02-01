@@ -665,7 +665,6 @@ class Mare::Compiler::CodeGen
     else raise NotImplementedError.new(rhs)
     end
     
-    relate.lhs.as(AST::Identifier) # assert that lhs is an identifier
     lhs_gtypes = gtypes_of(relate.lhs)
     
     # Even if there are multiple possible gtypes and thus gfuncs, we choose an
