@@ -7,10 +7,33 @@ class Mare::Compiler::Macros < Mare::AST::Visitor
     macros = new
     ctx.program.types.each do |t|
       t.functions.each do |f|
+        macros.maybe_compiler_intrinsic(f)
+        
         # TODO also run in parameter signature?
         f.body.try { |body| body.accept(macros) }
       end
     end
+  end
+  
+  def maybe_compiler_intrinsic(f)
+    body = f.body
+    return unless \
+      body.is_a?(AST::Group) &&
+      body.style == ":" &&
+      body.terms.size == 1
+    
+    group = body.terms[0]
+    return unless \
+      group.is_a?(AST::Group) &&
+      group.style == " " &&
+      group.terms.size == 2 &&
+      Util.match_ident?(group, 0, "compiler") &&
+      Util.match_ident?(group, 1, "intrinsic")
+    
+    # Having confirmed that the function body contains only the phrase
+    # 'compiler intrinsic' as a macro-like form, we can tag it and delete it.
+    f.body = nil
+    f.add_tag(:compiler_intrinsic)
   end
   
   def visit(node : AST::Group)

@@ -145,6 +145,11 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       @program_type.has_tag?(:allocated)
     end
     
+    def has_state?
+      @program_type.has_tag?(:allocated) ||
+      @program_type.has_tag?(:numeric)
+    end
+    
     def has_actor_pad?
       @program_type.has_tag?(:actor)
     end
@@ -153,8 +158,16 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       @program_type.has_tag?(:abstract)
     end
     
+    def is_numeric?
+      @program_type.has_tag?(:numeric)
+    end
+    
     def each_function
       @program_type.functions.each
+    end
+    
+    def as_ref : Ref
+      Ref.new(Infer::MetaType.new(@program_type.ident.pos, [@program_type]))
     end
   end
   

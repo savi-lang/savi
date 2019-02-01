@@ -130,7 +130,7 @@ class Mare::Compiler::CodeGen
       @gfuncs[name]
     end
     
-    def llvm_type
+    def struct_ptr
       @struct_type.pointer
     end
     
@@ -154,7 +154,7 @@ class Mare::Compiler::CodeGen
     
     def initialize(type_def : Reach::Def, @func, @vtable_index)
       @needs_receiver = \
-        type_def.has_allocation? &&
+        type_def.has_state? &&
         !@func.has_tag?(:constructor) &&
         !@func.has_tag?(:constant)
       
@@ -249,6 +249,10 @@ class Mare::Compiler::CodeGen
     llvm_type_of(type_of(expr, in_gfunc))
   end
   
+  def llvm_type_of(gtype : GenType)
+    llvm_type_of(gtype.type_def.as_ref)
+  end
+  
   def llvm_type_of(ref : Reach::Ref)
     case ref.llvm_use_type
     when :i1 then @i1
@@ -257,7 +261,7 @@ class Mare::Compiler::CodeGen
     when :i64, :u64 then @i64
     when :ptr then @ptr
     when :struct_ptr then
-      @gtypes[program.reach[ref.single!].llvm_name].llvm_type
+      @gtypes[program.reach[ref.single!].llvm_name].struct_ptr
     when :object_ptr then
       @obj_ptr
     else raise NotImplementedError.new(ref.llvm_use_type)
@@ -272,7 +276,7 @@ class Mare::Compiler::CodeGen
     when :i64, :u64 then @i64
     when :ptr then @ptr
     when :struct_ptr then
-      @gtypes[program.reach[ref.single!].llvm_name].llvm_type
+      @gtypes[program.reach[ref.single!].llvm_name].struct_ptr
     when :object_ptr then
       @obj_ptr
     else raise NotImplementedError.new(ref.llvm_mem_type)
@@ -523,7 +527,7 @@ class Mare::Compiler::CodeGen
     end
     
     # Add implicit receiver parameter if needed.
-    param_types.unshift(gtype.llvm_type) if gfunc.needs_receiver?
+    param_types.unshift(llvm_type_of(gtype)) if gfunc.needs_receiver?
     
     # Store the function declaration.
     gfunc.llvm_func = @mod.functions.add(gfunc.llvm_name, param_types, ret_type)
@@ -536,7 +540,7 @@ class Mare::Compiler::CodeGen
         gfunc.llvm_func
       else
         vtable_name = "#{gfunc.llvm_name}.VIRTUAL"
-        param_types.unshift(gtype.llvm_type)
+        param_types.unshift(gtype.struct_ptr)
         
         @mod.functions.add vtable_name, param_types, ret_type do |fn|
           gen_func_start(fn)
@@ -552,6 +556,7 @@ class Mare::Compiler::CodeGen
   end
   
   def gen_func_impl(gtype, gfunc)
+    return gen_intrinsic(gtype, gfunc) if gfunc.func.has_tag?(:compiler_intrinsic)
     return gen_ffi_body(gtype, gfunc) if gfunc.func.has_tag?(:ffi)
     
     # Fields with no initializer body can be skipped.
@@ -626,6 +631,23 @@ class Mare::Compiler::CodeGen
     value = gen_none if llvm_ffi_func.return_type == @void
     
     @builder.ret(value)
+    
+    gen_func_end
+  end
+  
+  def gen_intrinsic(gtype, gfunc)
+    raise NotImplementedError.new(gtype.type_def) \
+      unless gtype.type_def.is_numeric?
+    
+    gen_func_start(gfunc.llvm_func)
+    params = gfunc.llvm_func.params
+    
+    @builder.ret \
+      case gfunc.func.ident.value
+      when "+"
+        @builder.add(params[0], params[1])
+      else raise NotImplementedError.new(gfunc.func.ident.inspect)
+      end
     
     gen_func_end
   end
@@ -1084,7 +1106,7 @@ class Mare::Compiler::CodeGen
         @builder.call(@mod.functions["pony_alloc_large"], args, "#{name}.MEM")
       end
     
-    value = @builder.bit_cast(value, gtype.llvm_type, name)
+    value = @builder.bit_cast(value, gtype.struct_ptr, name)
     gen_put_desc(value, gtype, name)
     
     value

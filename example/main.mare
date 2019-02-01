@@ -37,7 +37,10 @@ actor Main:
     | please_use_zero | Zero
     | BelligerentFour
     )
-    LibPonyRT.pony_exitcode(augend + 42)
+    
+    thirty_three I32 = 33
+    forty_two = thirty_three + 9
+    LibPonyRT.pony_exitcode(augend + forty_two)
   
   fun say_stuff:
     sentence = Sentence.new

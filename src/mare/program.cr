@@ -112,6 +112,7 @@ class Mare::Program
     property! infer : Compiler::Infer
     
     KNOWN_TAGS = [
+      :compiler_intrinsic,
       :constant,
       :constructor,
       :ffi,
