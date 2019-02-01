@@ -390,6 +390,52 @@ describe Mare::Compiler::Infer do
     end
   end
   
+  it "allows an interface to be fulfilled with a covariant return type" do
+    source = Mare::Source.new "(example)", <<-SOURCE
+    interface Interface:
+      fun example Interface:
+    
+    primitive Concrete:
+      fun example Concrete: Concrete
+    
+    actor Main:
+      new:
+        i Interface = Concrete
+    SOURCE
+    
+    Mare::Compiler.compile([source], :infer)
+  end
+  
+  it "complains when an interface has a covariant argument type" do
+    source = Mare::Source.new "(example)", <<-SOURCE
+    interface Interface:
+      fun example (arg Interface) None:
+    
+    primitive Concrete:
+      fun example (arg Concrete) None: None
+    
+    actor Main:
+      new:
+        i Interface = Concrete
+    SOURCE
+    
+    expected = <<-MSG
+    This type is outside of a constraint:
+    from (example):9:
+        i Interface = Concrete
+                      ^~~~~~~~
+    
+    - it must be a subtype of (Interface):
+      from (example):9:
+        i Interface = Concrete
+          ^~~~~~~~~
+    MSG
+    
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :infer)
+    end
+  end
+  
   it "complains about problems with unreachable functions too" do
     source = Mare::Source.new "(example)", <<-SOURCE
     primitive NeverCalled:
