@@ -840,6 +840,7 @@ class Mare::Compiler::CodeGen
     # TODO: Pop the scope frame?
   end
   
+  # TODO: Use infer resolution for static True/False finding where possible.
   def gen_choice(expr : AST::Choice)
     raise NotImplementedError.new(expr.inspect) if expr.list.empty?
     
@@ -847,8 +848,8 @@ class Mare::Compiler::CodeGen
     # Each such value will needed to be bitcast to the that type.
     phi_type = llvm_type_of(expr)
     
+    # Create all of the instruction blocks we'll need for this choice.
     j = expr.list.size
-    
     case_and_cond_blocks = [] of LLVM::BasicBlock
     expr.list.each_cons(2).to_a.each_with_index do |(fore, aft), i|
       case_and_cond_blocks << gen_block("case#{i + 1}of#{j}_choice")
@@ -857,17 +858,22 @@ class Mare::Compiler::CodeGen
     case_and_cond_blocks << gen_block("case#{j}of#{j}_choice")
     post_block = gen_block("after#{j}of#{j}_choice")
     
-    
+    # Generate code for the first condition - we always start by running this.
     cond_value = gen_expr(expr.list.first[0])
     
+    # Generate the interacting code for each consecutive pair of cases.
     values = [] of LLVM::Value
     blocks = [] of LLVM::BasicBlock
     expr.list.each_cons(2).to_a.each_with_index do |(fore, aft), i|
+      # The case block is the body to execute if the cond_value is true.
+      # Otherwise we will jump to the next block, with its next cond_value.
       case_block = case_and_cond_blocks.shift
       next_block = case_and_cond_blocks.shift
-      
       @builder.cond(cond_value, case_block, next_block)
       
+      # Generate code for the case block that we execute, finishing by
+      # jumping to the post block using the `br` instruction, where we will
+      # carry the value we just generated as one of the possible phi values.
       @builder.position_at_end(case_block)
       value = gen_expr(fore[1])
       value = @builder.bit_cast(value, phi_type, "#{value.name}.CAST")
@@ -875,13 +881,22 @@ class Mare::Compiler::CodeGen
       blocks << case_block
       @builder.br(post_block)
       
+      # Generate code for the next block, which is the condition to be
+      # checked for truthiness in the next iteration of this loop
+      # (or ignored if this is the final case, which must always be exhaustive).
       @builder.position_at_end(next_block)
       cond_value = gen_expr(aft[0])
     end
     
+    # This is the final case block - we will jump to it unconditionally,
+    # regardless of the truthiness of the preceding cond_value.
+    # Choices must always be typechecked to be exhaustive, so we can rest
+    # on the guarantee that this cond_value will always be true if we reach it.
     case_block = case_and_cond_blocks.shift
-    
     @builder.br(case_block)
+    
+    # Generate code for the final case block using exactly the same strategy
+    # that we used when we generated case blocks inside the loop above.
     @builder.position_at_end(case_block)
     value = gen_expr(expr.list.last[1])
     value = @builder.bit_cast(value, phi_type, "#{value.name}.CAST")
@@ -889,24 +904,8 @@ class Mare::Compiler::CodeGen
     blocks << case_block
     @builder.br(post_block)
     
-    # cond_value = gen_expr(if_clause[0])
-    
-    # bb_body1 = gen_block("body1choice")
-    # bb_body2 = gen_block("body2choice")
-    
-    # # TODO: Use infer resolution for static True/False finding where possible.
-    # @builder.cond(cond_value, bb_body1, bb_body2)
-    
-    # @builder.position_at_end(bb_body1)
-    # value1 = gen_expr(if_clause[1])
-    # value1 = @builder.bit_cast(value1, phi_type, "#{value1.name}.CAST")
-    # @builder.br(bb_post)
-    
-    # @builder.position_at_end(bb_body2)
-    # value2 = gen_expr(else_clause[1])
-    # value2 = @builder.bit_cast(value2, phi_type, "#{value2.name}.CAST")
-    # @builder.br(bb_post)
-    
+    # Here at the post block, we receive the value that was returned by one of
+    # the cases above, using the LLVM mechanism called a "phi" instruction.
     @builder.position_at_end(post_block)
     @builder.phi(phi_type, blocks, values, "phichoice")
   end
