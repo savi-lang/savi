@@ -323,7 +323,12 @@ class Mare::Compiler::CodeGen
     @di.finish
     
     # Run LLVM sanity checks on the generated module.
-    @mod.verify
+    begin
+      @mod.verify
+    rescue ex
+      @mod.dump
+      raise ex
+    end
   end
   
   def gen_wrapper
