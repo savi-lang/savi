@@ -743,7 +743,7 @@ class Mare::Compiler::CodeGen
       elsif ref.is_a?(Refer::Local)
         raise "#{ref.inspect} isn't a constant value" if const_only
         func_frame.current_locals[ref]
-      elsif ref.is_a?(Refer::Const)
+      elsif ref.is_a?(Refer::Decl)
         gtype = gtype_of(expr)
         case gtype
         when @gtypes["True"]? then gen_bool(true)

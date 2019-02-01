@@ -35,7 +35,7 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
     end
   end
   
-  class Const
+  class Decl
     getter defn : Program::Type
     
     def initialize(@defn)
@@ -46,17 +46,17 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
     end
   end
   
-  class ConstUnion
+  class DeclUnion
     getter pos : Source::Pos
-    getter list : Array(Const)
+    getter list : Array(Decl)
     
     def initialize(@pos, @list)
     end
   end
   
-  alias Info = (Unresolved | Self | Local | Field | Const | ConstUnion)
+  alias Info = (Unresolved | Self | Local | Field | Decl | DeclUnion)
   
-  def initialize(@self_const : Const, @consts : Hash(String, Const))
+  def initialize(@self_decl : Decl, @decls : Hash(String, Decl))
     @create_params = false
     @last_rid = 0_u64
     @last_param = 0
@@ -75,24 +75,24 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
     @rids[node.rid]
   end
   
-  def const(name)
-    return @self_const if name == "@"
-    @consts[name]
+  def decl(name)
+    return @self_decl if name == "@"
+    @decls[name]
   end
   
   def self.run(ctx)
-    # Gather all the types in the program as Consts.
-    consts = {} of String => Const
+    # Gather all the types in the program as Decls.
+    decls = {} of String => Decl
     ctx.program.types.each_with_index do |t, index|
       name = t.ident.value
-      consts[name] = Const.new(t)
+      decls[name] = Decl.new(t)
     end
     
     # For each function in the program, run with a new instance.
     ctx.program.types.each do |t|
-      t_const = Const.new(t)
+      t_decl = Decl.new(t)
       t.functions.each do |f|
-        new(t_const, consts).run(f)
+        new(t_decl, decls).run(f)
       end
     end
   end
@@ -123,7 +123,7 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
     node
   end
   
-  # For an Identifier, resolve it to any known local or constant if possible.
+  # For an Identifier, resolve it to any known local or decl if possible.
   def touch(node : AST::Identifier)
     name = node.value
     
@@ -132,8 +132,8 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
       if name == "@"
         Self::INSTANCE
       else
-        # First, try to resolve as local, then try consts, else it's unresolved.
-        @current_locals[name]? || @consts[name]? || Unresolved::INSTANCE
+        # First, try to resolve as local, then try decls, else it's unresolved.
+        @current_locals[name]? || @decls[name]? || Unresolved::INSTANCE
       end
     
     node.rid = new_rid(info)
@@ -157,10 +157,10 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
       node.terms.each { |child| create_param_local(child) }
     elsif node.style == "|"
       # TODO: nice error here if this doesn't match the expected form.
-      consts = node.terms.map do |child|
-        self[child.as(AST::Group).terms.last].as(Const)
+      decls = node.terms.map do |child|
+        self[child.as(AST::Group).terms.last].as(Decl)
       end
-      node.rid = new_rid(ConstUnion.new(node.pos, consts))
+      node.rid = new_rid(DeclUnion.new(node.pos, decls))
     end
   end
   
@@ -203,7 +203,7 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
     else
       # Treat this as a parameter with only a type and no identifier.
       # Do nothing other than increment the parameter count, because
-      # we don't want to overwrite the Const info for this node's rid.
+      # we don't want to overwrite the Decl info for this node's rid.
       # We don't need to create a Local anyway, because there's no way to
       # fetch the value of this parameter later (because it has no identifier).
       @last_param += 1

@@ -520,7 +520,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     
     # Take note of the return type constraint if given.
     func.ret.try do |ret_t|
-      meta_type = MetaType.new(ret_t.pos, [func.refer.const(ret_t.value).defn])
+      meta_type = MetaType.new(ret_t.pos, [func.refer.decl(ret_t.value).defn])
       new_tid(ret_t, Fixed.new(meta_type))
       self[ret_tid].as(Local).set_explicit(meta_type)
     end
@@ -640,7 +640,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   def touch(node : AST::Identifier)
     ref = refer[node]
     case ref
-    when Refer::Const
+    when Refer::Decl
       # If it's a const, treat it as a type reference.
       # TODO: handle instantiable type references as having a opaque singleton type.
       new_tid(node, Fixed.new(MetaType.new(node.pos, [ref.defn])))
@@ -674,18 +674,18 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   end
   
   def touch(node : AST::LiteralString)
-    new_tid(node, Literal.new(node.pos, [refer.const("CString").defn]))
+    new_tid(node, Literal.new(node.pos, [refer.decl("CString").defn]))
   end
   
   # A literal integer could be any integer or floating-point machine type.
   def touch(node : AST::LiteralInteger)
-    new_tid(node, Literal.new(node.pos, [refer.const("Numeric").defn]))
+    new_tid(node, Literal.new(node.pos, [refer.decl("Numeric").defn]))
   end
   
   # A literal float could be any floating-point machine type.
   def touch(node : AST::LiteralFloat)
     new_tid(node, Literal.new(node.pos, [
-      refer.const("F32").defn, refer.const("F64").defn,
+      refer.decl("F32").defn, refer.decl("F64").defn,
     ]))
   end
   
@@ -693,7 +693,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     case node.style
     when "(", ":"
       if node.terms.empty?
-        new_tid(node, Literal.new(node.pos, [refer.const("None").defn]))
+        new_tid(node, Literal.new(node.pos, [refer.decl("None").defn]))
       else
         # A non-empty group always has the tid of its final child.
         transfer_tid(node.terms.last, node)
@@ -719,7 +719,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       end
     when "|"
       ref = refer[node]
-      if ref.is_a?(Refer::ConstUnion)
+      if ref.is_a?(Refer::DeclUnion)
         meta_type = MetaType.new(node.pos, ref.list.map(&.defn).to_set)
         new_tid(node, Fixed.new(meta_type))
       else
@@ -773,7 +773,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     node.list.each do |cond, body|
       # Each condition in a choice must evaluate to a type of (True | False).
       self[cond].within_domain!(self, MetaType.new(node.pos, [
-        refer.const("True").defn, refer.const("False").defn,
+        refer.decl("True").defn, refer.decl("False").defn,
       ]))
       
       # Hold on to the body type for later in this function.
