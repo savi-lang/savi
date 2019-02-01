@@ -10,19 +10,19 @@ ready: PHONY Dockerfile
 
 # Run the test suite.
 test: PHONY
-	docker exec -ti mare-dev make test.inner
+	docker exec -ti mare-dev make extra_args="$(extra_args)" test.inner
 /tmp/bin/spec: $(shell find src) $(shell find spec)
 	mkdir -p /tmp/bin
 	crystal build --debug --link-flags="-lponyrt" spec/spec_helper.cr -o $@
 test.inner: PHONY /tmp/bin/spec
-	echo && /tmp/bin/spec
+	echo && /tmp/bin/spec $(extra_args)
 
 # Compile and run the mare binary in the `example` subdirectory.
 example: PHONY
-	docker exec -ti mare-dev make example/main
+	docker exec -ti mare-dev make extra_args="$(extra_args)" example/main
 	echo && example/main
 example-lldb: PHONY
-	docker exec -ti mare-dev make example/main
+	docker exec -ti mare-dev make extra_args="$(extra_args)" example/main
 	echo && lldb -o run -- example/main
 /tmp/bin/mare: main.cr $(shell find src)
 	mkdir -p /tmp/bin
