@@ -16,6 +16,9 @@ primitive BelligerentFour:
   fun "+" (other I32) I32:
     4 // (belligerently ignores the summand)
 
+primitive InfiniteZeros:
+  fun "[]" (index I64): Zero
+
 interface Augend:
   fun "+" (other I32) I32:
 
@@ -34,7 +37,7 @@ actor Main:
     
     augend = case (
     | use_zero | Zero
-    | please_use_zero | Zero
+    | please_use_zero | InfiniteZeros[999]
     | BelligerentFour
     )
     

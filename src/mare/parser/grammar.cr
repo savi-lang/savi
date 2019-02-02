@@ -95,7 +95,10 @@ module Mare::Parser
       (ptermsn >> sn >> pipesep >> sn).repeat >>
       ptermsn >> sn >>
       pipesep.maybe >> sn
-    parens.define (char('(') >> sn >> ptermsp.maybe >> sn >> char(')')).named(:group)
+    parens.define(
+      (char('(') >> sn >> ptermsp.maybe >> sn >> char(')')).named(:group) |
+      (char('[') >> sn >> ptermsp.maybe >> sn >> char(']')).named(:group)
+    )
     
     # Define what a declaration head of terms looks like.
     dterm = atom

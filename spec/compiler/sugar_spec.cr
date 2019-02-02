@@ -59,6 +59,34 @@ describe Mare::Compiler::Sugar do
     ]
   end
   
+  it "transforms a square brace qualification into a method call" do
+    source = Mare::Source.new "(example)", <<-SOURCE
+    class Example:
+      fun square:
+        x[y]
+    SOURCE
+    
+    ast = Mare::Parser.parse(source)
+    
+    ast.to_a.should eq [:doc,
+      [:declare, [[:ident, "class"], [:ident, "Example"]], [:group, ":"]],
+      [:declare, [[:ident, "fun"], [:ident, "square"]], [:group, ":",
+        [:qualify, [:ident, "x"], [:group, "[", [:ident, "y"]]],
+      ]],
+    ]
+    
+    ctx = Mare::Compiler.compile([ast], :sugar)
+    
+    func = ctx.program.find_func!("Example", "square")
+    func.body.not_nil!.to_a.should eq [:group, ":",
+      [:relate,
+        [:ident, "x"],
+        [:op, "."],
+        [:qualify, [:ident, "[]"], [:group, "(", [:ident, "y"]]]
+      ],
+    ]
+  end
+  
   it "transforms an @-prefixed identifier into a method call of @" do
     source = Mare::Source.new "(example)", <<-SOURCE
     class Example:

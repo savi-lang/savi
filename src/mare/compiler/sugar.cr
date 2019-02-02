@@ -68,8 +68,18 @@ class Mare::Compiler::Sugar < Mare::AST::Visitor
   end
   
   def visit(node : AST::Qualify)
+    # Transform square-brace qualifications into method calls
+    if node.group.style == "["
+      lhs = node.term
+      node.term = AST::Identifier.new("[]").from(node.group)
+      args = node.group.tap { |n| n.style = "(" }
+      dot = AST::Operator.new(".").from(node.group)
+      rhs = node
+      return AST::Relate.new(lhs, dot, rhs).from(node)
+    end
+    
     # If a dot relation is within a qualify (which doesn't happen in the parser,
-    # but may happen artifically such as from the `@identifier` sugar above),
+    # but may happen artifically such as the `@identifier` sugar above),
     # then always move the qualify into the right-hand-side of the dot.
     new_top = nil
     while (dot = node.term).is_a?(AST::Relate) && dot.op.value == "."
