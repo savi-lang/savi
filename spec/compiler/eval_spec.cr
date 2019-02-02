@@ -5,4 +5,13 @@ describe Mare::Compiler::Eval do
     Mare::Compiler.compile(example_dir, :eval) \
       .program.eval.exitcode.should eq 42
   end
+  
+  it "evaluates the prelude tests" do
+    source = fixture "prelude_tests.mare"
+    
+    no_test_failures =
+      Mare::Compiler.compile([source], :eval).program.eval.exitcode == 0
+    
+    no_test_failures.should eq true
+  end
 end

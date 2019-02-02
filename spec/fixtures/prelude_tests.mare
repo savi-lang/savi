@@ -1,0 +1,116 @@
+actor Main:
+  new:
+    test = MicroTest
+    LibC.puts("") // TODO: move to MicroTest constructor and finalizer
+    
+    ///
+    // Numeric facts
+    
+    test["U8  bit_width"].pass = U8 .bit_width == 8
+    test["U32 bit_width"].pass = U32.bit_width == 32
+    test["U64 bit_width"].pass = U64.bit_width == 64
+    test["I8  bit_width"].pass = I8 .bit_width == 8
+    test["I32 bit_width"].pass = I32.bit_width == 32
+    test["I64 bit_width"].pass = I64.bit_width == 64
+    test["F32 bit_width"].pass = F32.bit_width == 32
+    test["F64 bit_width"].pass = F64.bit_width == 64
+    
+    test["U8  is_signed"].pass = U8 .is_signed == False
+    test["U32 is_signed"].pass = U32.is_signed == False
+    test["U64 is_signed"].pass = U64.is_signed == False
+    test["I8  is_signed"].pass = I8 .is_signed == True
+    test["I32 is_signed"].pass = I32.is_signed == True
+    test["I64 is_signed"].pass = I64.is_signed == True
+    test["F32 is_signed"].pass = F32.is_signed == True
+    test["F64 is_signed"].pass = F64.is_signed == True
+    
+    test["U8  is_floating_point"].pass = U8 .is_floating_point == False
+    test["U32 is_floating_point"].pass = U32.is_floating_point == False
+    test["U64 is_floating_point"].pass = U64.is_floating_point == False
+    test["I8  is_floating_point"].pass = I8 .is_floating_point == False
+    test["I32 is_floating_point"].pass = I32.is_floating_point == False
+    test["I64 is_floating_point"].pass = I64.is_floating_point == False
+    test["F32 is_floating_point"].pass = F32.is_floating_point == True
+    test["F64 is_floating_point"].pass = F64.is_floating_point == True
+    
+    test["U8  bounds"].pass = U8[-1] == 255
+    test["U32 bounds"].pass = U32[-1] == 4294967295
+    test["U64 bounds"].pass = U64[-1] == 18446744073709551615
+    test["I8  bounds"].pass = I8[-128] == 128
+    test["I32 bounds"].pass = I32[-2147483648] == 2147483648
+    test["I64 bounds"].pass = I64[-9223372036854775808] == 9223372036854775808
+    
+    ///
+    // Numeric comparisons
+    
+    test["unsigned integer =="].pass = U32[31] == 31
+    test["signed integer   =="].pass = I32[31] == 31
+    test["floating point   =="].pass = F32[31] == 31
+    test["unsigned integer !="].pass = U32[31] != 93
+    test["signed integer   !="].pass = I32[31] != 93
+    test["floating point   !="].pass = F32[31] != 93
+    test["unsigned integer < "].pass = U32[31] <  93
+    test["signed integer   < "].pass = I32[31] <  93
+    test["floating point   < "].pass = F32[31] <  93
+    test["unsigned integer <="].pass = U32[31] <= 31
+    test["signed integer   <="].pass = I32[31] <= 31
+    test["floating point   <="].pass = F32[31] <= 31
+    test["unsigned integer > "].pass = U32[93] >  31
+    test["signed integer   > "].pass = I32[93] >  31
+    test["floating point   > "].pass = F32[93] >  31
+    test["unsigned integer >="].pass = U32[93] >= 93
+    test["signed integer   >="].pass = I32[93] >= 93
+    test["floating point   >="].pass = F32[93] >= 93
+    
+    ///
+    // Numeric arithmetic
+    
+    test["unsigned integer +"].pass = U32[3]  + 90  == 93
+    test["signed integer   +"].pass = I32[-3] + 90  == 87
+    test["floating point   +"].pass = F32[9]  + 0.3 == 9.3
+    test["unsigned integer -"].pass = U32[90] - 3   == 87
+    test["signed integer   -"].pass = I32[90] - -3  == 93
+    test["floating point   -"].pass = F32[9]  - 0.3 == 8.7
+    test["unsigned integer *"].pass = U32[31] * 3   == 93
+    test["signed integer   *"].pass = I32[31] * 3   == 93
+    test["floating point   *"].pass = F32[31] * 0.3 == 9.3
+    test["unsigned integer /"].pass = U32[93] / 10  == 9
+    test["signed integer   /"].pass = I32[93] / 10  == 9
+    test["floating point   /"].pass = F32[93] / 10  == 9.3
+    test["unsigned integer %"].pass = U32[93] % 10  == 3
+    test["signed integer   %"].pass = I32[93] % 10  == 3
+    test["floating point   %"].pass = F32[93] % 10  == 3
+    test["unsigned integer / by zero"].pass = U32[93] / 0 == 0
+    test["signed integer   / by zero"].pass = I32[93] / 0 == 0
+    test["unsigned integer % by zero"].pass = U32[93] % 0 == 0
+    test["signed integer   % by zero"].pass = I32[93] % 0 == 0
+    test["signed integer   / overflow"].pass = I8[-128] / -1 == 0
+    test["signed integer   % overflow"].pass = I8[-128] / -1 == 0
+    
+    LibC.puts("") // TODO: move to MicroTest constructor and finalizer
+
+primitive MicroTest:
+  fun "[]" (text CString) MicroTestInstance:
+    MicroTestInstance.new(text)
+
+class MicroTestInstance:
+  prop text CString:
+  new (@text):
+  fun "pass=" (pass Bool):
+    if pass (
+      LibC.printf("%s", ".")
+      None // TODO: shouldn't need this None
+    |
+      LibC.puts("") // TODO: fix processing of \n in string literals and use it
+      LibC.printf("failure of '%s'!", @text)
+      LibC.puts("") // TODO: fix processing of \n in string literals and use it
+      LibPonyRT.pony_exitcode(1) // Mark the entire process as a failure.
+      None // TODO: shouldn't need this None
+    )
+
+ffi LibC:
+  fun puts (CString) I32:
+  fun printf (CString, CString) I32:
+
+ffi LibPonyRT:
+  fun pony_exitcode (I32) None:

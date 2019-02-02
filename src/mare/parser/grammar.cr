@@ -59,7 +59,7 @@ module Mare::Parser
     # from most tightly binding to most loosely binding.
     # Operators in the same group have the same level of precedence.
     op1 = (char('.')).named(:op)
-    op2 = (char('*') | char('/')).named(:op)
+    op2 = (char('*') | char('/') | char('%')).named(:op)
     op3 = (char('+') | char('-')).named(:op)
     op4 = (str("..") | str("<>")).named(:op)
     op5 = (str("<|>") | str("<~>") | str("<<<") | str(">>>") |

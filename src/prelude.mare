@@ -6,52 +6,164 @@ enum Bool:
   const bit_width U8: 1
   member False: 0
   member True: 1
+  fun "==" (other Bool) Bool: compiler intrinsic
+  fun "!=" (other Bool) Bool: compiler intrinsic
 
 // Numerics
 interface Numeric:
   const bit_width U8:
+  // TODO: arithmetic method interfaces with type parameters on Numeric[A] type
 
 numeric U8:
   const bit_width U8: 8
+  
   fun "[]" (value U8) U8: value
+  
+  fun "==" (other U8) Bool: compiler intrinsic
+  fun "!=" (other U8) Bool: compiler intrinsic
+  fun "<" (other U8) Bool: compiler intrinsic
+  fun "<=" (other U8) Bool: compiler intrinsic
+  fun ">" (other U8) Bool: compiler intrinsic
+  fun ">=" (other U8) Bool: compiler intrinsic
+  
   fun "+" (other U8) U8: compiler intrinsic
+  fun "-" (other U8) U8: compiler intrinsic
+  fun "*" (other U8) U8: compiler intrinsic
+  fun "/" (other U8) U8: compiler intrinsic
+  fun "%" (other U8) U8: compiler intrinsic
 
 numeric U32:
   const bit_width U8: 32
+  
   fun "[]" (value U32) U32: value
+  
+  fun "==" (other U32) Bool: compiler intrinsic
+  fun "!=" (other U32) Bool: compiler intrinsic
+  fun "<" (other U32) Bool: compiler intrinsic
+  fun "<=" (other U32) Bool: compiler intrinsic
+  fun ">" (other U32) Bool: compiler intrinsic
+  fun ">=" (other U32) Bool: compiler intrinsic
+  
   fun "+" (other U32) U32: compiler intrinsic
+  fun "-" (other U32) U32: compiler intrinsic
+  fun "*" (other U32) U32: compiler intrinsic
+  fun "/" (other U32) U32: compiler intrinsic
+  fun "%" (other U32) U32: compiler intrinsic
 
 numeric U64:
   const bit_width U8: 64
+  
   fun "[]" (value U64) U64: value
+  
+  fun "==" (other U64) Bool: compiler intrinsic
+  fun "!=" (other U64) Bool: compiler intrinsic
+  fun "<" (other U64) Bool: compiler intrinsic
+  fun "<=" (other U64) Bool: compiler intrinsic
+  fun ">" (other U64) Bool: compiler intrinsic
+  fun ">=" (other U64) Bool: compiler intrinsic
+  
   fun "+" (other U64) U64: compiler intrinsic
+  fun "-" (other U64) U64: compiler intrinsic
+  fun "*" (other U64) U64: compiler intrinsic
+  fun "/" (other U64) U64: compiler intrinsic
+  fun "%" (other U64) U64: compiler intrinsic
 
 numeric I8:
   const bit_width U8: 8
+  const is_signed: True
+  
   fun "[]" (value I8) I8: value
+  
+  fun "==" (other I8) Bool: compiler intrinsic
+  fun "!=" (other I8) Bool: compiler intrinsic
+  fun "<" (other I8) Bool: compiler intrinsic
+  fun "<=" (other I8) Bool: compiler intrinsic
+  fun ">" (other I8) Bool: compiler intrinsic
+  fun ">=" (other I8) Bool: compiler intrinsic
+  
   fun "+" (other I8) I8: compiler intrinsic
+  fun "-" (other I8) I8: compiler intrinsic
+  fun "*" (other I8) I8: compiler intrinsic
+  fun "/" (other I8) I8: compiler intrinsic
+  fun "%" (other I8) I8: compiler intrinsic
 
 numeric I32:
   const bit_width U8: 32
+  const is_signed: True
+  
   fun "[]" (value I32) I32: value
+  
+  fun "==" (other I32) Bool: compiler intrinsic
+  fun "!=" (other I32) Bool: compiler intrinsic
+  fun "<" (other I32) Bool: compiler intrinsic
+  fun "<=" (other I32) Bool: compiler intrinsic
+  fun ">" (other I32) Bool: compiler intrinsic
+  fun ">=" (other I32) Bool: compiler intrinsic
+  
   fun "+" (other I32) I32: compiler intrinsic
+  fun "-" (other I32) I32: compiler intrinsic
+  fun "*" (other I32) I32: compiler intrinsic
+  fun "/" (other I32) I32: compiler intrinsic
+  fun "%" (other I32) I32: compiler intrinsic
 
 numeric I64:
   const bit_width U8: 64
+  const is_signed: True
+  
   fun "[]" (value I64) I64: value
+  
+  fun "==" (other I64) Bool: compiler intrinsic
+  fun "!=" (other I64) Bool: compiler intrinsic
+  fun "<" (other I64) Bool: compiler intrinsic
+  fun "<=" (other I64) Bool: compiler intrinsic
+  fun ">" (other I64) Bool: compiler intrinsic
+  fun ">=" (other I64) Bool: compiler intrinsic
+  
   fun "+" (other I64) I64: compiler intrinsic
+  fun "-" (other I64) I64: compiler intrinsic
+  fun "*" (other I64) I64: compiler intrinsic
+  fun "/" (other I64) I64: compiler intrinsic
+  fun "%" (other I64) I64: compiler intrinsic
 
 numeric F32:
   const bit_width U8: 32
+  const is_signed: True
   const is_floating_point: True
+  
   fun "[]" (value F32) F32: value
-  // TODO: fun "+" (other F32) F32: compiler intrinsic
+  
+  fun "==" (other F32) Bool: compiler intrinsic
+  fun "!=" (other F32) Bool: compiler intrinsic
+  fun "<" (other F32) Bool: compiler intrinsic
+  fun "<=" (other F32) Bool: compiler intrinsic
+  fun ">" (other F32) Bool: compiler intrinsic
+  fun ">=" (other F32) Bool: compiler intrinsic
+  
+  fun "+" (other F32) F32: compiler intrinsic
+  fun "-" (other F32) F32: compiler intrinsic
+  fun "*" (other F32) F32: compiler intrinsic
+  fun "/" (other F32) F32: compiler intrinsic
+  fun "%" (other F32) F32: compiler intrinsic
 
 numeric F64:
   const bit_width U8: 64
+  const is_signed: True
   const is_floating_point: True
+  
   fun "[]" (value F64) F64: value
-  // TODO: fun "+" (other F64) F64: compiler intrinsic
+  
+  fun "==" (other F64) Bool: compiler intrinsic
+  fun "!=" (other F64) Bool: compiler intrinsic
+  fun "<" (other F64) Bool: compiler intrinsic
+  fun "<=" (other F64) Bool: compiler intrinsic
+  fun ">" (other F64) Bool: compiler intrinsic
+  fun ">=" (other F64) Bool: compiler intrinsic
+  
+  fun "+" (other F64) F64: compiler intrinsic
+  fun "-" (other F64) F64: compiler intrinsic
+  fun "*" (other F64) F64: compiler intrinsic
+  fun "/" (other F64) F64: compiler intrinsic
+  fun "%" (other F64) F64: compiler intrinsic
 
 // ...
 

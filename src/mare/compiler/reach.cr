@@ -162,6 +162,18 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       @program_type.has_tag?(:numeric)
     end
     
+    def is_floating_point_numeric?
+      @program_type.metadata[:is_floating_point]? && is_numeric?
+    end
+    
+    def is_signed_numeric?
+      @program_type.metadata[:is_floating_point]? && is_numeric?
+    end
+    
+    def bit_width
+      @program_type.metadata[:bit_width].as(Int32)
+    end
+    
     def each_function
       @program_type.functions.each
     end

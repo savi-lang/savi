@@ -109,6 +109,26 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
           unless ["True", "False"].includes?(is_float)
         
         @type.metadata[:is_floating_point] = is_float == "True"
+        
+        # Capture is_floating_point constant value, or set a default if needed.
+        # TODO: better generic mechanism for default consts
+        if !@type.has_func?("is_signed")
+          default = AST::Declare.new.from(@type.ident)
+          default.head << AST::Identifier.new("const").from(@type.ident)
+          default.head << AST::Identifier.new("is_signed").from(@type.ident)
+          default.body.terms << AST::Identifier.new("False").from(@type.ident)
+          compile(context, default)
+        end
+        
+        is_float_func = @type.find_func!("is_signed")
+        raise "numeric is_signed must be a const" \
+          unless is_float_func.has_tag?(:constant)
+        
+        is_float = is_float_func.body.not_nil!.terms.last.as(AST::Identifier).value
+        raise "invalid numeric is_signed value" \
+          unless ["True", "False"].includes?(is_float)
+        
+        @type.metadata[:is_signed] = is_float == "True"
       end
       
       # An FFI type's functions should be tagged as "ffi" and body removed.

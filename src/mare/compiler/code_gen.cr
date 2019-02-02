@@ -648,9 +648,138 @@ class Mare::Compiler::CodeGen
     
     @builder.ret \
       case gfunc.func.ident.value
-      when "+"
-        @builder.add(params[0], params[1])
-      else raise NotImplementedError.new(gfunc.func.ident.inspect)
+      when "==" then
+        if gtype.type_def.is_floating_point_numeric?
+          @builder.fcmp(LLVM::RealPredicate::OEQ, params[0], params[1])
+        else
+          @builder.icmp(LLVM::IntPredicate::EQ, params[0], params[1])
+        end
+      when "!=" then
+        if gtype.type_def.is_floating_point_numeric?
+          @builder.fcmp(LLVM::RealPredicate::ONE, params[0], params[1])
+        else
+          @builder.icmp(LLVM::IntPredicate::NE, params[0], params[1])
+        end
+      when "<" then
+        if gtype.type_def.is_floating_point_numeric?
+          @builder.fcmp(LLVM::RealPredicate::OLT, params[0], params[1])
+        elsif gtype.type_def.is_signed_numeric?
+          @builder.icmp(LLVM::IntPredicate::SLT, params[0], params[1])
+        else
+          @builder.icmp(LLVM::IntPredicate::ULT, params[0], params[1])
+        end
+      when "<=" then
+        if gtype.type_def.is_floating_point_numeric?
+          @builder.fcmp(LLVM::RealPredicate::OLE, params[0], params[1])
+        elsif gtype.type_def.is_signed_numeric?
+          @builder.icmp(LLVM::IntPredicate::SLE, params[0], params[1])
+        else
+          @builder.icmp(LLVM::IntPredicate::ULE, params[0], params[1])
+        end
+      when ">" then
+        if gtype.type_def.is_floating_point_numeric?
+          @builder.fcmp(LLVM::RealPredicate::OGT, params[0], params[1])
+        elsif gtype.type_def.is_signed_numeric?
+          @builder.icmp(LLVM::IntPredicate::SGT, params[0], params[1])
+        else
+          @builder.icmp(LLVM::IntPredicate::UGT, params[0], params[1])
+        end
+      when ">=" then
+        if gtype.type_def.is_floating_point_numeric?
+          @builder.fcmp(LLVM::RealPredicate::OGE, params[0], params[1])
+        elsif gtype.type_def.is_signed_numeric?
+          @builder.icmp(LLVM::IntPredicate::SGE, params[0], params[1])
+        else
+          @builder.icmp(LLVM::IntPredicate::UGE, params[0], params[1])
+        end
+      when "+" then
+        if gtype.type_def.is_floating_point_numeric?
+          @builder.fadd(params[0], params[1])
+        else
+          @builder.add(params[0], params[1])
+        end
+      when "-" then
+        if gtype.type_def.is_floating_point_numeric?
+          @builder.fsub(params[0], params[1])
+        else
+          @builder.sub(params[0], params[1])
+        end
+      when "*" then
+        if gtype.type_def.is_floating_point_numeric?
+          @builder.fmul(params[0], params[1])
+        else
+          @builder.mul(params[0], params[1])
+        end
+      when "/", "%" then
+        if gtype.type_def.is_floating_point_numeric?
+          if gfunc.func.ident.value == "/"
+            @builder.fdiv(params[0], params[1])
+          else
+            @builder.frem(params[0], params[1])
+          end
+        else # we need to some extra work to avoid an undefined result value
+          params[0].name = "numerator"
+          params[1].name = "denominator"
+          
+          llvm_type = llvm_type_of(gtype)
+          zero = llvm_type.const_int(0)
+          nonzero_block = gen_block(".div.nonzero")
+          nonoverflow_block = gen_block(".div.nonoverflow") \
+            if gtype.type_def.is_signed_numeric?
+          after_block = gen_block(".div.after")
+          
+          blocks = [] of LLVM::BasicBlock
+          values = [] of LLVM::Value
+          
+          # Return zero if dividing by zero.
+          nonzero = @builder.icmp LLVM::IntPredicate::NE, params[1], zero,
+            "#{params[1].name}.nonzero"
+          @builder.cond(nonzero, nonzero_block, after_block)
+          blocks << @builder.insert_block
+          values << zero
+          @builder.position_at_end(nonzero_block)
+          
+          # If signed, return zero if this operation would overflow.
+          # This happens for exactly one case in each signed integer type.
+          # In `I8`, the overflow case is `-128 / -1`, which would be 128.
+          if gtype.type_def.is_signed_numeric?
+            bad = @builder.not(zero)
+            denom_good = @builder.icmp LLVM::IntPredicate::NE, params[1], bad,
+              "#{params[1].name}.nonoverflow"
+            
+            bits = llvm_type.const_int(gtype.type_def.bit_width - 1)
+            bad = @builder.shl(bad, bits)
+            numer_good = @builder.icmp LLVM::IntPredicate::NE, params[0], bad,
+              "#{params[0].name}.nonoverflow"
+            
+            either_good = @builder.or(numer_good, denom_good, "nonoverflow")
+            
+            @builder.cond(either_good, nonoverflow_block.not_nil!, after_block)
+            blocks << @builder.insert_block
+            values << zero
+            @builder.position_at_end(nonoverflow_block.not_nil!)
+          end
+          
+          # Otherwise, compute the result.
+          result =
+            case {gtype.type_def.is_signed_numeric?, gfunc.func.ident.value}
+            when {true, "/"} then @builder.sdiv(params[0], params[1])
+            when {true, "%"} then @builder.srem(params[0], params[1])
+            when {false, "/"} then @builder.udiv(params[0], params[1])
+            when {false, "%"} then @builder.urem(params[0], params[1])
+            else raise NotImplementedError.new(gtype.type_def.llvm_name)
+            end
+          result.name = "result"
+          @builder.br(after_block)
+          blocks << @builder.insert_block
+          values << result
+          @builder.position_at_end(after_block)
+          
+          # Get the final result, which may be zero from one of the pre-checks.
+          @builder.phi(llvm_type, blocks, values, "phidiv")
+        end
+      else
+        raise NotImplementedError.new(gfunc.func.ident.inspect)
       end
     
     gen_func_end
@@ -773,7 +902,13 @@ class Mare::Compiler::CodeGen
         if enum_value
           llvm_type_of(expr).const_int(enum_value.as(Int32))
         elsif ref.final_decl.defn.has_tag?(:numeric)
-          llvm_type_of(expr).const_int(0)
+          llvm_type = llvm_type_of(expr)
+          case llvm_type.kind
+          when LLVM::Type::Kind::Integer then llvm_type.const_int(0)
+          when LLVM::Type::Kind::Float then llvm_type.const_float(0)
+          when LLVM::Type::Kind::Double then llvm_type.const_double(0)
+          else raise NotImplementedError.new(llvm_type)
+          end
         else
           gtype_of(expr).singleton
         end
@@ -787,6 +922,8 @@ class Mare::Compiler::CodeGen
       gen_field_load(expr.value)
     when AST::LiteralInteger
       gen_integer(expr)
+    when AST::LiteralFloat
+      gen_float(expr)
     when AST::LiteralString
       gen_string(expr)
     when AST::Relate
@@ -824,9 +961,18 @@ class Mare::Compiler::CodeGen
     when :i8 then @i8.const_int(expr.value.to_i8)
     when :i32 then @i32.const_int(expr.value.to_i32)
     when :i64 then @i64.const_int(expr.value.to_i64)
-    when :f32 then raise NotImplementedError.new("float literals")
-    when :f64 then raise NotImplementedError.new("float literals")
+    when :f32 then @f32.const_float(expr.value.to_f32)
+    when :f64 then @f64.const_double(expr.value.to_f64)
     else raise "invalid numeric literal type: #{type_ref}"
+    end
+  end
+  
+  def gen_float(expr : AST::LiteralFloat)
+    type_ref = type_of(expr)
+    case type_ref.llvm_use_type
+    when :f32 then @f32.const_float(expr.value.to_f32)
+    when :f64 then @f64.const_double(expr.value.to_f64)
+    else raise "invalid floating point literal type: #{type_ref}"
     end
   end
   

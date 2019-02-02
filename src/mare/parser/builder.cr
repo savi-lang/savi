@@ -51,7 +51,8 @@ module Mare::Parser::Builder
       value = source.content[start...finish]
       AST::LiteralString.new(value).with_pos(source, main)
     when :integer
-      value = source.content[start...finish].to_u64
+      string = source.content[start...finish]
+      value = begin string.to_u64 rescue string.to_i64.to_u64 end
       AST::LiteralInteger.new(value).with_pos(source, main)
     when :float
       value = source.content[start...finish].to_f
