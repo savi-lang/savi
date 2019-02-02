@@ -30,7 +30,9 @@ actor Main:
   new:
     none = ()
     
-    @say_stuff
+    maybe_greeting (Greeting | None) = None
+    if maybe_greeting <: Greeting \
+      @say_stuff
     
     use_zero = False
     please_use_zero = True
@@ -51,3 +53,4 @@ actor Main:
     LibC.puts(sentence.text)
     sentence.text = Greeting.bye
     LibC.puts(sentence.text)
+    None // TODO: remove

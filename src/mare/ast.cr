@@ -254,10 +254,7 @@ module Mare::AST
       res
     end
     def children_accept(visitor)
-      @list.each do |cond, body|
-        cond.accept(visitor)
-        body.accept(visitor)
-      end
+      @list.map! { |cond, body| {cond.accept(visitor), body.accept(visitor)} }
     end
   end
 end

@@ -786,6 +786,15 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       new_tid(node, call)
       
       follow_call(call)
+    when "<:"
+      # TODO: check that it is a "non" cap - just being fixed isn't sufficient.
+      # For example, the type we produce for this node is Fixed,
+      # but it wouldn't be an appropriate right-hand term for this operator.
+      Error.at node.rhs, "expected this to have a fixed type at compile time" \
+        unless self[node.rhs].is_a?(Fixed)
+      
+      bool = MetaType.new(node.pos, [refer.decl_defn("Bool")])
+      new_tid(node, Fixed.new(bool))
     else raise NotImplementedError.new(node.op.value)
     end
   end

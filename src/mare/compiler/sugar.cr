@@ -92,7 +92,7 @@ class Mare::Compiler::Sugar < Mare::AST::Visitor
   
   def visit(node : AST::Relate)
     case node.op.value
-    when ".", "&&", "||", " ", "DEFAULTPARAM"
+    when ".", "&&", "||", " ", "<:", "DEFAULTPARAM"
       node # skip these special-case operators
     when "="
       # If assigning to a ".[identifier]" relation, sugar as a "setter" method.

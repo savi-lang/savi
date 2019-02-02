@@ -514,10 +514,6 @@ class Mare::Compiler::CodeGen
     end
   end
   
-  def gen_get_desc(name)
-    @llvm.const_bit_cast(@gtypes[name].desc, @desc_ptr)
-  end
-  
   def gen_func_decl(gtype, gfunc)
     # Get the LLVM type to use for the return type.
     ret_type = llvm_type_of(gfunc.func.ident, gfunc)
@@ -841,14 +837,14 @@ class Mare::Compiler::CodeGen
     gtypes : Array(GenType),
     gfunc : GenFunc,
   )
+    receiver.name = gtypes.map(&.type_def).map(&.llvm_name).join("|") \
+      if receiver.name.empty?
     rname = receiver.name
-    rname = gtypes.map(&.type_def).map(&.llvm_name).join("|") if rname.empty?
     fname = "#{rname}.#{gfunc.func.ident.value}"
     
     # Load the type descriptor of the receiver so we can read its vtable,
     # then load the function pointer from the appropriate index of that vtable.
-    desc_gep = @builder.struct_gep(receiver, 0, "#{rname}.DESC")
-    desc = @builder.load(desc_gep, "#{rname}.DESC.LOAD")
+    desc = gen_get_desc(receiver)
     vtable_gep = @builder.struct_gep(desc, DESC_VTABLE, "#{rname}.DESC.VTABLE")
     vtable_idx = @i32.const_int(gfunc.vtable_index)
     gep = @builder.inbounds_gep(vtable_gep, @i32_0, vtable_idx, "#{fname}.GEP")
@@ -881,6 +877,22 @@ class Mare::Compiler::CodeGen
       old_value
     else raise NotImplementedError.new(relate.inspect)
     end
+  end
+  
+  def gen_check_subtype(relate)
+    lhs = gen_expr(relate.lhs)
+    rhs = gen_expr(relate.rhs) # TODO: should this be removed?
+    rhs_type = type_of(relate.rhs)
+    
+    # TODO: support abstract gtypes
+    raise NotImplementedError.new(rhs_type) unless rhs_type.is_concrete?
+    rhs_gtype = @gtypes[program.reach[rhs_type.single!].llvm_name]
+    
+    lhs_desc = gen_get_desc(lhs)
+    rhs_desc = gen_get_desc(rhs_gtype)
+    
+    @builder.icmp LLVM::IntPredicate::EQ, lhs_desc, rhs_desc,
+      "#{lhs.name}<:#{rhs.name}"
   end
   
   def gen_expr(expr, const_only = false) : LLVM::Value
@@ -931,6 +943,7 @@ class Mare::Compiler::CodeGen
       case expr.op.as(AST::Operator).value
       when "." then gen_dot(expr)
       when "=" then gen_eq(expr)
+      when "<:" then gen_check_subtype(expr)
       else raise NotImplementedError.new(expr.inspect)
       end
     when AST::Group
@@ -1261,6 +1274,24 @@ class Mare::Compiler::CodeGen
     gen_put_desc(value, gtype, name)
     
     value
+  end
+  
+  def gen_get_desc(gtype_name : String)
+    gen_get_desc(@gtypes[gtype_name])
+  end
+  
+  def gen_get_desc(gtype : GenType)
+    @llvm.const_bit_cast(gtype.desc, @desc_ptr)
+  end
+  
+  def gen_get_desc(value : LLVM::Value)
+    value_type = value.type
+    raise "not a struct pointer: #{value}" \
+      unless value_type.kind == LLVM::Type::Kind::Pointer \
+        && value_type.element_type.kind == LLVM::Type::Kind::Struct
+    
+    desc_gep = @builder.struct_gep(value, 0, "#{value.name}.DESC")
+    @builder.load(desc_gep, "#{value.name}.DESC.LOAD")
   end
   
   def gen_put_desc(value, gtype, name = "")

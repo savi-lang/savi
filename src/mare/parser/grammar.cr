@@ -65,7 +65,7 @@ module Mare::Parser
     op5 = (str("<|>") | str("<~>") | str("<<<") | str(">>>") |
             str("<<~") | str("~>>") | str("<<") | str(">>") |
             str("<~") | str("~>")).named(:op)
-    op6 = ((str(">=") | str("<=") | char('<') | char('>')) >>
+    op6 = ((str("<:") | str(">=") | str("<=") | char('<') | char('>')) >>
             ~(char('>') | char('<'))).named(:op)
     op7 = (str("===") | str("==") | str("!==") | str("!=") |
             str("=~")).named(:op)
@@ -75,14 +75,14 @@ module Mare::Parser
     
     # Construct the nested possible relations for each group of operators.
     t1 = suffixed | atom
-    t2 = (t1 >> (sn >> op1 >> sn >> t1 >> s).repeat).named(:relate)
-    t3 = (t2 >> (sn >> op2 >> sn >> t2 >> s).repeat).named(:relate)
-    t4 = (t3 >> (sn >> op3 >> sn >> t3 >> s).repeat).named(:relate)
-    t5 = (t4 >> (sn >> op4 >> sn >> t4 >> s).repeat).named(:relate)
-    t6 = (t5 >> (sn >> op5 >> sn >> t5 >> s).repeat).named(:relate)
-    t7 = (t6 >> (sn >> op6 >> sn >> t6 >> s).repeat).named(:relate)
-    t8 = (t7 >> (sn >> op7 >> sn >> t7 >> s).repeat).named(:relate)
-    tw = (t8 >> (sn >> op8 >> sn >> t8 >> s).repeat).named(:relate)
+    t2 = (t1 >> (sn >> op1 >> sn >> t1).repeat).named(:relate)
+    t3 = (t2 >> (sn >> op2 >> sn >> t2).repeat).named(:relate)
+    t4 = (t3 >> (sn >> op3 >> sn >> t3).repeat).named(:relate)
+    t5 = (t4 >> (sn >> op4 >> sn >> t4).repeat).named(:relate)
+    t6 = (t5 >> (sn >> op5 >> sn >> t5).repeat).named(:relate)
+    t7 = (t6 >> (sn >> op6 >> sn >> t6).repeat).named(:relate)
+    t8 = (t7 >> (sn >> op7 >> sn >> t7).repeat).named(:relate)
+    tw = (t8 >> (sn >> op8 >> sn >> t8).repeat).named(:relate)
     te = (tw >> (opw >> s >> tw).repeat(1) >> s).named(:group_w) | tw
     t = (te >> (sn >> ope >> sn >> te >> s).repeat).named(:relate)
     
