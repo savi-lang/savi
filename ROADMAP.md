@@ -10,6 +10,7 @@
 - [x] - Non-looping flow control (`if`, `case`, etc)
 - [ ] - Boxed numeric values
 - [ ] - Actors and behaviours
+- [ ] - Finalizer functions
 - [ ] - Looping flow control (`while`, etc)
 - [ ] - Reference capabilities (`iso`, `trn`, `val`, `ref`, `box`, `tag`)
 - [ ] - Runtime type matching (`x <: Y`)
