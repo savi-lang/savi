@@ -193,7 +193,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     end
     
     def as_ref : Ref
-      Ref.new(Infer::MetaType.new(@program_type.ident.pos, [@program_type]))
+      Ref.new(Infer::MetaType.new([@program_type]))
     end
   end
   
