@@ -41,7 +41,7 @@ actor Main:
     | BelligerentFour
     )
     
-    thirty_three I32 = 33
+    thirty_three = I32[33]
     LibPonyRT.pony_exitcode(augend + thirty_three + 9)
   
   fun say_stuff:

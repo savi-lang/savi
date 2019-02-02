@@ -194,6 +194,8 @@ class Mare::Compiler::CodeGen
     @i32_ptr = @llvm.int32.pointer.as(LLVM::Type)
     @i32_0   = @llvm.int32.const_int(0).as(LLVM::Value)
     @i64     = @llvm.int64.as(LLVM::Type)
+    @f32     = @llvm.float.as(LLVM::Type)
+    @f64     = @llvm.double.as(LLVM::Type)
     @intptr  = @llvm.intptr(@target_machine.data_layout).as(LLVM::Type)
     
     @frames = [] of Frame
@@ -259,6 +261,8 @@ class Mare::Compiler::CodeGen
     when :i8, :u8 then @i8
     when :i32, :u32 then @i32
     when :i64, :u64 then @i64
+    when :f32 then @f32
+    when :f64 then @f64
     when :ptr then @ptr
     when :struct_ptr then
       @gtypes[program.reach[ref.single!].llvm_name].struct_ptr
@@ -768,6 +772,8 @@ class Mare::Compiler::CodeGen
         enum_value = ref.defn.metadata[:enum_value]?
         if enum_value
           llvm_type_of(expr).const_int(enum_value.as(Int32))
+        elsif ref.final_decl.defn.has_tag?(:numeric)
+          llvm_type_of(expr).const_int(0)
         else
           gtype_of(expr).singleton
         end
