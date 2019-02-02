@@ -18,6 +18,7 @@
 - [ ] - Partial functions and partial calls
 - [ ] - Generic types
 - [ ] - Array literals
+- [ ] - Tuple values
 - [ ] - FFI-compatible struct types
 
 ### New features (that were *NOT* in Pony)
