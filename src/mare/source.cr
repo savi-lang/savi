@@ -71,7 +71,7 @@ struct Mare::Source::Pos
     twiddle_width -= 1
     
     tail = ""
-    max_width = line_finish - line_start - col
+    max_width = [0, line_finish - line_start - col].max
     if twiddle_width > max_width
       twiddle_width = max_width
       tail = "···"
