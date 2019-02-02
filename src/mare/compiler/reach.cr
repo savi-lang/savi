@@ -99,9 +99,19 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
   end
   
   class Def
-    getter desc_id : Int32
+    getter! desc_id : Int32
     
-    def initialize(@program_type : Program::Type, @desc_id)
+    def initialize(@program_type : Program::Type, reach : Reach)
+      @desc_id =
+        if is_numeric?
+          reach.next_numeric_id
+        elsif is_abstract?
+          reach.next_trait_id
+        elsif is_tuple?
+          reach.next_tuple_id
+        else
+          reach.next_object_id
+        end
     end
     
     def llvm_name : String
@@ -158,6 +168,10 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       @program_type.has_tag?(:abstract)
     end
     
+    def is_tuple?
+      false
+    end
+    
     def is_numeric?
       @program_type.has_tag?(:numeric)
     end
@@ -189,7 +203,6 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     @refs = Hash(Infer::MetaType, Ref).new
     @defs = Hash(Program::Type, Def).new
     @seen_funcs = Set(Program::Function).new
-    @last_def_id = 0 # TODO: meaningful/deterministic descriptor ids?
   end
   
   def self.run(ctx)
@@ -247,7 +260,35 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     return if @defs.has_key?(program_type)
     
     # Now, save a Def instance for this program type.
-    @defs[program_type] = Def.new(program_type, @last_def_id += 1)
+    @defs[program_type] = Def.new(program_type, self)
+  end
+  
+  # Traits are numbered 0, 1, 2, 3, 4, ...
+  @trait_count = 0
+  def next_trait_id
+    @trait_count
+    .tap { @trait_count += 1 }
+  end
+  
+  # Objects are numbered 0, 3, 5, 7, 9, ...
+  @object_count = 0
+  def next_object_id
+    (@object_count * 2) + 1
+    .tap { @object_count += 1 }
+  end
+  
+  # Numerics are numbered 0, 4, 8, 12, 16, ...
+  @numeric_count = 0
+  def next_numeric_id
+    @numeric_count * 4
+    .tap { @numeric_count += 1 }
+  end
+  
+  # Tuples are numbered 2, 6, 10, 14, 18, ...
+  @tuple_count = 0
+  def next_tuple_id
+    (@tuple_count * 4) + 2
+    .tap { @tuple_count += 1 }
   end
   
   def [](meta_type : Infer::MetaType)
