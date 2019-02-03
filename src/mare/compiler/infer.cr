@@ -365,7 +365,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       
       infer = Infer.from(t, f)
       iface = infer.resolve(infer.ret_tid)
-      unless MetaType.new([t]) < iface
+      unless MetaType.new(t) < iface
         Error.at t.ident, "This type isn't a subtype of #{iface.show_type}"
       end
     end
@@ -398,7 +398,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     
     # Take note of the return type constraint if given.
     func.ret.try do |ret_t|
-      meta_type = MetaType.new([func.refer.decl_defn(ret_t.value)])
+      meta_type = MetaType.new(func.refer.decl_defn(ret_t.value))
       new_tid(ret_t, Fixed.new(ret_t.pos, meta_type))
       self[ret_tid].as(Local).set_explicit(ret_t.pos, meta_type)
     end
@@ -494,7 +494,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   
   def self_tid(pos_node) : TID
     return @self_tid unless @self_tid == 0
-    info = Fixed.new(pos_node.pos, MetaType.new([@self_type]))
+    info = Fixed.new(pos_node.pos, MetaType.new(@self_type))
     @self_tid = new_tid_detached(info)
   end
   
@@ -526,7 +526,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     when Refer::Decl, Refer::DeclAlias
       # If it's a const, treat it as a type reference.
       # TODO: handle instantiable type references as having a opaque singleton type.
-      new_tid(node, Fixed.new(node.pos, MetaType.new([ref.final_decl.defn])))
+      new_tid(node, Fixed.new(node.pos, MetaType.new(ref.final_decl.defn)))
     when Refer::Local
       # If it's a local, track the possibly new tid in our @local_tids map.
       local_tid = @local_tids[ref]?
@@ -656,7 +656,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       Error.at node.rhs, "expected this to have a fixed type at compile time" \
         unless self[node.rhs].is_a?(Fixed)
       
-      bool = MetaType.new([refer.decl_defn("Bool")])
+      bool = MetaType.new(refer.decl_defn("Bool"))
       new_tid(node, Fixed.new(node.pos, bool))
     else raise NotImplementedError.new(node.op.value)
     end
@@ -666,7 +666,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     body_tids = [] of TID
     node.list.each do |cond, body|
       # Each condition in a choice must evaluate to a type of Bool.
-      bool = MetaType.new([refer.decl_defn("Bool")])
+      bool = MetaType.new(refer.decl_defn("Bool"))
       self[cond].within_domain!(self, node.pos, bool)
       
       # Hold on to the body type for later in this function.

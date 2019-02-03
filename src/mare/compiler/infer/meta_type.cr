@@ -1,35 +1,142 @@
 class Mare::Compiler::Infer::MetaType
-  # TODO: represent in DNF or CNF form, to support not just union types but
-  # also intersections and exclusions in a formally reasonable way.
-  @union : Set(Program::Type)
+  ##
+  # A MetaType is represented internally in Disjunctive Normal Form (DNF),
+  # which is a standardized precedence order of logical formula that is
+  # conducive to formal subtype checking without too many edge cases.
+  #
+  # The precedence order for DNF is OR > AND > NOT, such that the lowest level
+  # term (a nominal type) can be optionally contained within a "NOT" term
+  # (which we call an anti-nominal type), which can be optionally within
+  # an "AND" term (a type intersection), which can be optionally within
+  # an "OR" term (a type union).
+  #
+  # If we ever get an operation that breaks this order of precedence, such as
+  # if we were asked to intersect two unions, or negate an intersection, we
+  # have to redistribute the terms and simplify to reach the DNF form.
+  # We ensure this is always done by representing the Inner types in this way.
+  
+  alias Inner = (Union | Intersection | AntiNominal | Nominal)
+  
+  class Nominal
+    getter defn : Program::Type
+    
+    def initialize(@defn)
+    end
+    
+    def hash : UInt64
+      defn.hash
+    end
+    
+    def ==(other)
+      other.is_a?(Nominal) && defn == other.defn
+    end
+  end
+  
+  class AntiNominal
+    getter defn : Program::Type
+    
+    def initialize(@defn)
+    end
+    
+    def hash : UInt64
+      self.class.hash ^ defn.hash
+    end
+    
+    def ==(other)
+      other.is_a?(AntiNominal) && defn == other.defn
+    end
+  end
+  
+  class Intersection
+    getter defns : Set(Program::Type)
+    getter anti_defns : Set(Program::Type)?
+    
+    def initialize(@defns, @anti_defns = nil)
+    end
+    
+    def hash : UInt64
+      hash = self.class.hash
+      defns.each { |defn| hash ^= defn.hash }
+      anti_defns.not_nil!.each { |defn| hash ^= (defn.hash * 31) } if anti_defns
+      hash
+    end
+    
+    def ==(other)
+      other.is_a?(Intersection) &&
+      defns == other.defns &&
+      anti_defns == other.anti_defns
+    end
+  end
+  
+  class Union
+    getter defns : Set(Program::Type)
+    getter anti_defns : Set(Program::Type)?
+    getter intersects : Set(Intersection)?
+    
+    def initialize(@defns, @anti_defns = nil, @intersects = nil)
+    end
+    
+    def hash : UInt64
+      hash = 0_u64
+      defns.each { |defn| hash ^= defn.hash }
+      anti_defns.not_nil!.each { |defn| hash ^= (defn.hash * 31) } if anti_defns
+      intersects.not_nil!.each { |defn| hash ^= (defn.hash * 63) } if intersects
+      hash
+    end
+    
+    def ==(other)
+      other.is_a?(Union) &&
+      defns == other.defns &&
+      anti_defns == other.anti_defns &&
+      intersects == other.intersects
+    end
+  end
+  
+  getter inner : Inner
+  
+  def initialize(nominal : Program::Type)
+    @inner = Nominal.new(nominal)
+  end
   
   def initialize(union : Enumerable(Program::Type))
     case union
-    when Set(Program::Type) then @union = union
-    else @union = union.to_set
+    when Set(Program::Type) then @inner = Union.new(union)
+    else @inner = Union.new(union.to_set)
     end
   end
   
   def self.new_union(types : Iterable(MetaType))
-    new(types.reduce(Set(Program::Type).new) { |all, o| all | o.defns })
+    new(types.reduce(Set(Program::Type).new) { |all, o| all | o.defns.to_set })
   end
   
   # TODO: remove this method:
-  def defns
-    @union
+  def defns : Enumerable(Program::Type)
+    inner = @inner
+    case inner
+    when Nominal
+      [inner.defn]
+    when Union
+      raise NotImplementedError.new(inner.inspect) \
+        if inner.anti_defns || inner.intersects
+      inner.defns
+    else raise NotImplementedError.new(inner.inspect)
+    end
   end
   
   def empty?
-    @union.empty?
+    return false if @inner.is_a?(Nominal)
+    defns.empty? # TODO: don't rely on defns
   end
   
   def singular?
-    @union.size == 1
+    return true if @inner.is_a?(Nominal)
+    defns.size == 1 # TODO: don't rely on defns
   end
   
   def single!
     raise "not singular: #{show_type}" unless singular?
-    @union.first
+    return @inner.as(Nominal).defn if @inner.is_a?(Nominal)
+    defns.first # TODO: don't rely on defns
   end
   
   def intersect(other : MetaType)
@@ -157,15 +264,15 @@ class Mare::Compiler::Infer::MetaType
   end
   
   def each_type_def : Iterator(Program::Type)
-    @union.each
+    defns.each # TODO: don't rely on defns, or get rid of this method
   end
   
   def ==(other)
-    @union == other.defns
+    @inner == other.inner
   end
   
   def hash
-    @union.hash
+    @inner.hash
   end
   
   def show
@@ -173,7 +280,8 @@ class Mare::Compiler::Infer::MetaType
   end
   
   def show_type
-    "(#{@union.map(&.ident).map(&.value).join(" | ")})"
+    return "(#{@inner.as(Nominal).defn.ident.value})" if @inner.is_a?(Nominal)
+    "(#{@inner.as(Union).defns.map(&.ident).map(&.value).join(" | ")})"
   end
   
   def within_constraints?(list : Iterable(MetaType))
