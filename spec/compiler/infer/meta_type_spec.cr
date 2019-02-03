@@ -73,19 +73,19 @@ describe Mare::Compiler::Infer::MetaType do
     (a1 | a2 | c1 | a3).inner.inspect.should eq "(A1 | A2 | C1 | A3)"
     
     # Union of concrete anti-nominals.
-    (-c1 | -c2 | -c3).inner.inspect.should eq "<unbounded>"
+    (-c1 | -c2 | -c3).inner.inspect.should eq "<unconstrained>"
     
     # Union of some abstract and some concrete anti-nominals.
-    (-a1 | -a2 | -c1 | -c2).inner.inspect.should eq "<unbounded>"
+    (-a1 | -a2 | -c1 | -c2).inner.inspect.should eq "<unconstrained>"
     
     # Union of some abstract and a single concrete anti-nominal.
     (-a1 | -a2 | -c1 | -a3).inner.inspect.should eq "(-A1 | -A2 | -C1 | -A3)"
     
     # Union of a nominal and its anti-nominal.
-    (a1 | -a1).inner.inspect.should eq "<unbounded>"
+    (a1 | -a1).inner.inspect.should eq "<unconstrained>"
     
     # Union of a nominal, other nominals, and its anti-nominal (later).
-    (a1 | a2 | a3 | -a1).inner.inspect.should eq "<unbounded>"
+    (a1 | a2 | a3 | -a1).inner.inspect.should eq "<unconstrained>"
     
     # Union of nominals, anti-nominals, and intersections.
     (c1 | c2 | -a1 | -a2 | (a3 & c3) | (a4 & c4)).inner.inspect \

@@ -20,12 +20,13 @@ class Mare::Compiler::Infer::MetaType
   struct AntiNominal;  end # A type negation - a logical "NOT".
   struct Nominal;      end # A named type, either abstract or concrete.
   class Unsatisfiable; end # It's impossible to find a type that fulfills this.
-  class Unbounded;     end # All types fulfill this - totally unconstrained.
+  class Unconstrained; end # All types fulfill this - totally unconstrained.
   
-  alias Inner =
-    (Union | Intersection | AntiNominal | Nominal | Unsatisfiable | Unbounded)
+  alias Inner = (
+    Union | Intersection | AntiNominal | Nominal |
+    Unsatisfiable | Unconstrained)
   
-  class Unbounded
+  class Unconstrained
     INSTANCE = new
     
     def self.instance
@@ -37,7 +38,7 @@ class Mare::Compiler::Infer::MetaType
     end
     
     def inspect(io : IO)
-      io << "<unbounded>"
+      io << "<unconstrained>"
     end
     
     def hash : UInt64
@@ -45,7 +46,7 @@ class Mare::Compiler::Infer::MetaType
     end
     
     def ==(other)
-      other.is_a?(Unbounded)
+      other.is_a?(Unconstrained)
     end
     
     def each_reachable_defn : Iterator(Program::Type)
@@ -53,18 +54,18 @@ class Mare::Compiler::Infer::MetaType
     end
     
     def negate : Inner
-      # The negation of an Unbounded is... well... I'm not sure yet.
+      # The negation of an Unconstrained is... well... I'm not sure yet.
       # Is it Unsatisfiable?
       raise NotImplementedError.new("negation of #{inspect}")
     end
     
     def intersect(other : Inner)
-      # The intersection of Unbounded and anything is the other thing.
+      # The intersection of Unconstrained and anything is the other thing.
       other
     end
     
     def unite(other : Inner)
-      # The union of Unbounded and anything is still Unbounded.
+      # The union of Unconstrained and anything is still Unconstrained.
       self
     end
   end
@@ -98,7 +99,7 @@ class Mare::Compiler::Infer::MetaType
     
     def negate : Inner
       # The negation of an Unsatisfiable is... well... I'm not sure yet.
-      # Is it Unbounded?
+      # Is it Unconstrained?
       raise NotImplementedError.new("negation of #{inspect}")
     end
     
@@ -143,7 +144,7 @@ class Mare::Compiler::Infer::MetaType
       AntiNominal.new(defn)
     end
     
-    def intersect(other : Unbounded)
+    def intersect(other : Unconstrained)
       self
     end
     
@@ -166,7 +167,7 @@ class Mare::Compiler::Infer::MetaType
       other.intersect(self) # delegate to the "higher" class via commutativity
     end
     
-    def unite(other : Unbounded)
+    def unite(other : Unconstrained)
       other
     end
     
@@ -218,7 +219,7 @@ class Mare::Compiler::Infer::MetaType
       Nominal.new(defn)
     end
     
-    def intersect(other : Unbounded)
+    def intersect(other : Unconstrained)
       self
     end
     
@@ -246,7 +247,7 @@ class Mare::Compiler::Infer::MetaType
       other.intersect(self) # delegate to the "higher" class via commutativity
     end
     
-    def unite(other : Unbounded)
+    def unite(other : Unconstrained)
       other
     end
     
@@ -255,8 +256,8 @@ class Mare::Compiler::Infer::MetaType
     end
     
     def unite(other : Nominal)
-      # Unbounded if the nominal and anti-nominal types are identical.
-      return Unbounded.instance if defn == other.defn
+      # Unconstrained if the nominal and anti-nominal types are identical.
+      return Unconstrained.instance if defn == other.defn
       
       # Otherwise, this is a new union of the two types.
       Union.new([other].to_set, [self].to_set)
@@ -266,8 +267,8 @@ class Mare::Compiler::Infer::MetaType
       # No change if the two anti-nominal types are identical.
       return self if defn == other.defn
       
-      # Unbounded if the two are concrete types that are not identical.
-      return Unbounded.instance if is_concrete? && other.is_concrete?
+      # Unconstrained if the two are concrete types that are not identical.
+      return Unconstrained.instance if is_concrete? && other.is_concrete?
       
       # Otherwise, this is a new union of the two types.
       Union.new(Set(Nominal).new, [self, other].to_set)
@@ -289,14 +290,14 @@ class Mare::Compiler::Infer::MetaType
     
     # This function works like .new, but it accounts for cases where there
     # aren't enough terms and anti-terms to build a real Intersection.
-    # Returns Unbounded if no terms or anti-terms are supplied.
+    # Returns Unconstrained if no terms or anti-terms are supplied.
     def self.build(
       terms : Set(Nominal),
       anti_terms : Set(AntiNominal)? = nil,
     ) : Inner
       if terms.size == 0
         case (anti_terms.try(&.size) || 0)
-        when 0 then return Unbounded.instance
+        when 0 then return Unconstrained.instance
         when 1 then return anti_terms.not_nil!.first
         end
       elsif (terms.size == 1) && ((anti_terms.try(&.size) || 0) == 0)
@@ -354,7 +355,7 @@ class Mare::Compiler::Infer::MetaType
       Union.new(new_terms, new_anti_terms)
     end
     
-    def intersect(other : Unbounded)
+    def intersect(other : Unconstrained)
       self
     end
     
@@ -416,7 +417,7 @@ class Mare::Compiler::Infer::MetaType
       other.intersect(self) # delegate to the "higher" class via commutativity
     end
     
-    def unite(other : Unbounded)
+    def unite(other : Unconstrained)
       other
     end
     
@@ -558,7 +559,7 @@ class Mare::Compiler::Infer::MetaType
       result.not_nil!
     end
     
-    def intersect(other : Unbounded)
+    def intersect(other : Unconstrained)
       self
     end
     
@@ -589,7 +590,7 @@ class Mare::Compiler::Infer::MetaType
       result
     end
     
-    def unite(other : Unbounded)
+    def unite(other : Unconstrained)
       other
     end
     
@@ -601,8 +602,8 @@ class Mare::Compiler::Infer::MetaType
       # No change if we've already united with this type.
       return self if terms.includes?(other)
       
-      # Unbounded if we have already have an anti-term for this type.
-      return Unbounded.instance \
+      # Unconstrained if we have already have an anti-term for this type.
+      return Unconstrained.instance \
         if anti_terms && anti_terms.not_nil!.includes?(AntiNominal.new(other.defn))
       
       # Otherwise, create a new union that adds this type.
@@ -613,11 +614,11 @@ class Mare::Compiler::Infer::MetaType
       # No change if we've already united with this anti-type.
       return self if anti_terms && anti_terms.not_nil!.includes?(other)
       
-      # Unbounded if we have already have a term for this anti-type.
-      return Unbounded.instance if terms.includes?(Nominal.new(other.defn))
+      # Unconstrained if we have already have a term for this anti-type.
+      return Unconstrained.instance if terms.includes?(Nominal.new(other.defn))
       
-      # Unbounded if there are two non-identical concrete anti-types.
-      return Unbounded.instance \
+      # Unconstrained if there are two non-identical concrete anti-types.
+      return Unconstrained.instance \
         if other.is_concrete? \
           && anti_terms && anti_terms.not_nil!.any?(&.is_concrete?)
       
@@ -647,19 +648,19 @@ class Mare::Compiler::Infer::MetaType
     
     def unite(other : Union)
       # Intersect each individual term of other into this running union.
-      # If the result becomes Unbounded, return so immediately.
+      # If the result becomes Unconstrained, return so immediately.
       result : Inner = self
       other.terms.each do |term|
         result = result.unite(term)
-        return result if result.is_a?(Unbounded)
+        return result if result.is_a?(Unconstrained)
       end
       other.anti_terms.not_nil!.each do |anti_term|
         result = result.unite(anti_term)
-        return result if result.is_a?(Unbounded)
+        return result if result.is_a?(Unconstrained)
       end if other.anti_terms
       other.intersects.not_nil!.each do |intersect|
         result = result.unite(intersect)
-        return result if result.is_a?(Unbounded)
+        return result if result.is_a?(Unconstrained)
       end if other.intersects
       
       result
