@@ -161,4 +161,40 @@ struct Mare::Compiler::Infer::MetaType::Intersection
   def unite(other : Union)
     other.unite(self) # delegate to the "higher" class via commutativity
   end
+  
+  def subtype_of?(other : Nominal) : Bool
+    raise NotImplementedError.new([self, :subtype_of?, other].inspect)
+  end
+  
+  def supertype_of?(other : Nominal) : Bool
+    # This intersection is a supertype of the given nominal if and only if
+    # all terms in the intersection are a supertype of that nominal.
+    result = terms.all?(&.supertype_of?(other))
+    result &&= anti_terms.not_nil!.all?(&.supertype_of?(other)) if anti_terms
+    result
+  end
+  
+  def subtype_of?(other : AntiNominal) : Bool
+    raise NotImplementedError.new([self, :subtype_of?, other].inspect)
+  end
+  
+  def supertype_of?(other : AntiNominal) : Bool
+    raise NotImplementedError.new([self, :supertype_of?, other].inspect)
+  end
+  
+  def subtype_of?(other : Intersection) : Bool
+    raise NotImplementedError.new([self, :subtype_of?, other].inspect)
+  end
+  
+  def supertype_of?(other : Intersection) : Bool
+    raise NotImplementedError.new([self, :supertype_of?, other].inspect)
+  end
+  
+  def subtype_of?(other : (Union | Unconstrained | Unsatisfiable)) : Bool
+    other.supertype_of?(self) # delegate to the other class via symmetry
+  end
+  
+  def supertype_of?(other : (Union | Unconstrained | Unsatisfiable)) : Bool
+    other.subtype_of?(self) # delegate to the other class via symmetry
+  end
 end

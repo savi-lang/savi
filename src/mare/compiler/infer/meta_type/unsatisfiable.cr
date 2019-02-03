@@ -40,4 +40,15 @@ class Mare::Compiler::Infer::MetaType::Unsatisfiable
     # The union of Unsatisfiable and anything is the other thing.
     other
   end
+  
+  def subtype_of?(other : Inner) : Bool
+    # Unsatisfiable is a subtype of nothing - it cannot exist at all.
+    # TODO: is this right? it seems so, but breaks symmetry with Unconstrained.
+    false
+  end
+  
+  def supertype_of?(other : Inner) : Bool
+    # Unsatisfiable is never a supertype - it is never satisfied.
+    false
+  end
 end

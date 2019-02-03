@@ -70,4 +70,23 @@ struct Mare::Compiler::Infer::MetaType::Nominal
   def unite(other : (AntiNominal | Intersection | Union))
     other.unite(self) # delegate to the "higher" class via commutativity
   end
+  
+  def subtype_of?(other : Nominal) : Bool
+    # A nominal is a subtype of another nominal if and only if
+    # the defn is a subtype of the other defn.
+    defn < other.defn
+  end
+  
+  def supertype_of?(other : Nominal) : Bool
+    # This operation is symmetrical with the above operation.
+    other.defn < defn
+  end
+  
+  def subtype_of?(other : (AntiNominal | Intersection | Union | Unconstrained | Unsatisfiable)) : Bool
+    other.supertype_of?(self) # delegate to the other class via symmetry
+  end
+  
+  def supertype_of?(other : (AntiNominal | Intersection | Union | Unconstrained | Unsatisfiable)) : Bool
+    other.subtype_of?(self) # delegate to the other class via symmetry
+  end
 end

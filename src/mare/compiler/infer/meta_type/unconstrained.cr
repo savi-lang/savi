@@ -40,4 +40,14 @@ class Mare::Compiler::Infer::MetaType::Unconstrained
     # The union of Unconstrained and anything is still Unconstrained.
     self
   end
+  
+  def subtype_of?(other : Inner) : Bool
+    # Unconstrained is a subtype of nothing - it makes no guarantees at all.
+    false
+  end
+  
+  def supertype_of?(other : Inner) : Bool
+    # Unconstrained is a supertype of everything.
+    true
+  end
 end

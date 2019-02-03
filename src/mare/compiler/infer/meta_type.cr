@@ -178,10 +178,7 @@ class Mare::Compiler::Infer::MetaType
   # Return true if this MetaType is a subtype of the other MetaType.
   def <(other); subtype_of?(other) end
   def subtype_of?(other : MetaType)
-    self.defns.all? do |defn|
-      other.defns.includes?(defn) ||
-      other.defns.any? { |d| defn.subtype_of?(d) }
-    end
+    inner.subtype_of?(other.inner)
   end
   
   def each_reachable_defn : Iterator(Program::Type)
