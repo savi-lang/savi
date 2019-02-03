@@ -852,16 +852,22 @@ class Mare::Compiler::CodeGen
     
     # Cast the receiver to right type and prepend it to our args list.
     rtype = gfunc.virtual_llvm_func.params.first.type
-    args.unshift(@builder.bit_cast(receiver, rtype, "#{rname}.CAST"))
+    args.unshift(gen_assign_cast(receiver, rtype))
     
     @builder.call(func, args)
+  end
+  
+  def gen_assign_cast(value : LLVM::Value, to_type : LLVM::Type)
+    @builder.bit_cast(value, to_type, "#{value.name}.CAST")
   end
   
   def gen_eq(relate)
     ref = func_frame.refer[relate.lhs]
     value = gen_expr(relate.rhs).as(LLVM::Value)
+    name = value.name
     
-    value = @builder.bit_cast(value, llvm_type_of(relate.lhs), value.name)
+    value = gen_assign_cast(value, llvm_type_of(relate.lhs))
+    value.name = name
     
     @di.set_loc(relate.op)
     if ref.is_a?(Refer::Local)
@@ -1061,7 +1067,7 @@ class Mare::Compiler::CodeGen
       # carry the value we just generated as one of the possible phi values.
       @builder.position_at_end(case_block)
       value = gen_expr(fore[1])
-      value = @builder.bit_cast(value, phi_type, "#{value.name}.CAST")
+      value = gen_assign_cast(value, phi_type)
       values << value
       blocks << case_block
       @builder.br(post_block)
@@ -1084,7 +1090,7 @@ class Mare::Compiler::CodeGen
     # that we used when we generated case blocks inside the loop above.
     @builder.position_at_end(case_block)
     value = gen_expr(expr.list.last[1])
-    value = @builder.bit_cast(value, phi_type, "#{value.name}.CAST")
+    value = gen_assign_cast(value, phi_type)
     values << value
     blocks << case_block
     @builder.br(post_block)
