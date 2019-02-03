@@ -35,14 +35,16 @@ class Mare::Compiler::Infer::MetaType
     @inner = Nominal.new(nominal)
   end
   
-  def initialize(union : Enumerable(Program::Type))
-    if union.size == 0
-      @inner = Unsatisfiable.instance
-    elsif union.size == 1
-      @inner = Nominal.new(union.first)
-    else
-      @inner = Union.new(union.map { |d| Nominal.new(d) }.to_set)
-    end
+  def self.new_union(types : Enumerable(Program::Type))
+    inner =
+      if types.size == 0
+        Unsatisfiable.instance
+      elsif types.size == 1
+        Nominal.new(types.first)
+      else
+        Union.new(types.map { |d| Nominal.new(d) }.to_set)
+      end
+    MetaType.new(inner)
   end
   
   def self.new_union(types : Iterable(MetaType))

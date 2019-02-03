@@ -31,9 +31,12 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   end
   
   class Literal < Info
+    @domain : MetaType
+    @domain_constraints : Array(MetaType)
+    
     def initialize(@pos, possible : Enumerable(Program::Type))
-      @domain = MetaType.new(possible)
-      @domain_constraints = [MetaType.new(possible)]
+      @domain = MetaType.new_union(possible)
+      @domain_constraints = [MetaType.new_union(possible)]
       @pos_list = [@pos] of Source::Pos
     end
     
@@ -612,7 +615,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     when "|"
       ref = refer[node]
       if ref.is_a?(Refer::DeclUnion)
-        meta_type = MetaType.new(ref.list.map(&.defn).to_set)
+        meta_type = MetaType.new_union(ref.list.map(&.defn))
         new_tid(node, Fixed.new(node.pos, meta_type))
       else
         raise NotImplementedError.new(node.to_a)
