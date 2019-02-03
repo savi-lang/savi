@@ -54,12 +54,12 @@ describe Mare::Compiler::Infer do
         "not a number at all"
          ^~~~~~~~~~~~~~~~~~~
     
-    - it must be a subtype of (CString):
+    - it must be a subtype of CString:
       from (example):3:
         "not a number at all"
          ^~~~~~~~~~~~~~~~~~~
     
-    - it must be a subtype of (I32):
+    - it must be a subtype of I32:
       from (example):2:
       fun number I32:
                  ^~~
@@ -83,12 +83,12 @@ describe Mare::Compiler::Infer do
         name CString = 42
                        ^~
 
-    - it must be a subtype of (Numeric):
+    - it must be a subtype of Numeric:
       from (example):3:
         name CString = 42
                        ^~
     
-    - it must be a subtype of (CString):
+    - it must be a subtype of CString:
       from (example):3:
         name CString = 42
              ^~~~~~~
@@ -111,12 +111,12 @@ describe Mare::Compiler::Infer do
       prop name CString: 42
                          ^~
     
-    - it must be a subtype of (Numeric):
+    - it must be a subtype of Numeric:
       from (example):2:
       prop name CString: 42
                          ^~
     
-    - it must be a subtype of (CString):
+    - it must be a subtype of CString:
       from (example):2:
       prop name CString: 42
                 ^~~~~~~
@@ -140,12 +140,12 @@ describe Mare::Compiler::Infer do
         name CString = ()
                        ^~
     
-    - it must be a subtype of (None):
+    - it must be a subtype of None:
       from (example):3:
         name CString = ()
                        ^~
     
-    - it must be a subtype of (CString):
+    - it must be a subtype of CString:
       from (example):3:
         name CString = ()
              ^~~~~~~
@@ -169,12 +169,12 @@ describe Mare::Compiler::Infer do
         if "not a boolean" 42
             ^~~~~~~~~~~~~
     
-    - it must be a subtype of (CString):
+    - it must be a subtype of CString:
       from (example):3:
         if "not a boolean" 42
             ^~~~~~~~~~~~~
     
-    - it must be a subtype of (Bool):
+    - it must be a subtype of Bool:
       from (example):3:
         if "not a boolean" 42
         ^~
@@ -300,7 +300,7 @@ describe Mare::Compiler::Infer do
         x (F64 | U64) = 42
                         ^~
     
-    - it must be a subtype of (Numeric):
+    - it must be a subtype of Numeric:
       from (example):3:
         x (F64 | U64) = 42
                         ^~
@@ -425,7 +425,7 @@ describe Mare::Compiler::Infer do
         i Interface = Concrete
                       ^~~~~~~~
     
-    - it must be a subtype of (Interface):
+    - it must be a subtype of Interface:
       from (example):9:
         i Interface = Concrete
           ^~~~~~~~~
@@ -453,7 +453,7 @@ describe Mare::Compiler::Infer do
         x I32 = True
                 ^~~~
     
-    - it must be a subtype of (I32):
+    - it must be a subtype of I32:
       from (example):3:
         x I32 = True
           ^~~

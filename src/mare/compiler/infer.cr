@@ -54,7 +54,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
     
     def within_domain!(infer : Infer, pos : Source::Pos, constraint : MetaType)
-      @domain = @domain.intersect(constraint)
+      @domain = @domain.intersect(constraint).simplify # TODO: maybe simplify just once at the end?
       @domain_constraints << constraint
       @pos_list << pos
       
@@ -208,7 +208,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       @downstreamed_pos ||=pos
       ds = @downstreamed
       if ds
-        @downstreamed = ds.intersect(constraint)
+        @downstreamed = ds.intersect(constraint).simplify # TODO: maybe simplify just once at the end?
       else
         @downstreamed = constraint
       end

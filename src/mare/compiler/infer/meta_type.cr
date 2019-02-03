@@ -15,6 +15,12 @@ class Mare::Compiler::Infer::MetaType
   # have to redistribute the terms and simplify to reach the DNF form.
   # We ensure this is always done by representing the Inner types in this way.
   
+  struct Union; end
+  struct Intersection; end
+  struct AntiNominal; end
+  struct Nominal; end
+  class Unsatisfiable; end
+  
   alias Inner = (Union | Intersection | AntiNominal | Nominal | Unsatisfiable)
   
   class Unsatisfiable
@@ -28,15 +34,36 @@ class Mare::Compiler::Infer::MetaType
       super
     end
     
+    def inspect(io : IO)
+      io << "<unsatisfiable>"
+    end
+    
+    def hash : UInt64
+      self.class.hash
+    end
+    
+    def ==(other)
+      other.is_a?(Unsatisfiable)
+    end
+    
     def each_reachable_defn : Iterator(Program::Type)
       ([] of Program::Type).each
     end
+    
+    # The intersection of Unsatisfiable and anything is still Unsatisfiable.
+    def intersect(other : Inner)
+      self
+    end
   end
   
-  class Nominal
+  struct Nominal
     getter defn : Program::Type
     
     def initialize(@defn)
+    end
+    
+    def inspect(io : IO)
+      io << defn.ident.value
     end
     
     def hash : UInt64
@@ -50,12 +77,40 @@ class Mare::Compiler::Infer::MetaType
     def each_reachable_defn : Iterator(Program::Type)
       [defn].each
     end
+    
+    def is_concrete?
+      defn.is_concrete?
+    end
+    
+    def intersect(other : Unsatisfiable)
+      other
+    end
+    
+    def intersect(other : Nominal)
+      # No change if the two nominal types are identical.
+      return self if defn == other.defn
+      
+      # Unsatisfiable if the two are concrete types that are not identical.
+      return Unsatisfiable.instance if is_concrete? && other.is_concrete?
+      
+      # Otherwise, this is a new intersection of the two types.
+      Intersection.new([self, other].to_set)
+    end
+    
+    def intersect(other : (AntiNominal | Intersection | Union))
+      other.intersect(self) # delegate to the "higher" class via commutativity
+    end
   end
   
-  class AntiNominal
+  struct AntiNominal
     getter defn : Program::Type
     
     def initialize(@defn)
+    end
+    
+    def inspect(io : IO)
+      io << "!"
+      io << defn.ident.value
     end
     
     def hash : UInt64
@@ -69,73 +124,296 @@ class Mare::Compiler::Infer::MetaType
     def each_reachable_defn : Iterator(Program::Type)
       [defn].each # TODO: is an anti-nominal actually reachable?
     end
+    
+    def intersect(other : Unsatisfiable)
+      other
+    end
+    
+    def intersect(other : Nominal)
+      # Unsatisfiable if the nominal and anti-nominal types are identical.
+      return Unsatisfiable.instance if defn == other.defn
+      
+      # Otherwise, this is a new intersection of the two types.
+      Intersection.new([other].to_set, [self].to_set)
+    end
+    
+    def intersect(other : AntiNominal)
+      # No change if the two anti-nominal types are identical.
+      return self if defn == other.defn
+      
+      # Otherwise, this is a new intersection of the two types.
+      Intersection.new(Set(Nominal).new, [self, other].to_set)
+    end
+    
+    def intersect(other : (Intersection | Union))
+      other.intersect(self) # delegate to the "higher" class via commutativity
+    end
   end
   
-  class Intersection
-    getter defns : Set(Program::Type)
-    getter anti_defns : Set(Program::Type)?
+  struct Intersection
+    getter terms : Set(Nominal)
+    getter anti_terms : Set(AntiNominal)?
     
-    def initialize(@defns, @anti_defns = nil)
+    def initialize(@terms, @anti_terms = nil)
+      raise "too few terms: #{terms.inspect}, #{@anti_terms.inspect}" \
+        if (@terms.size + (@anti_terms.try(&.size) || 0)) <= 1
+    end
+    
+    # This function works like .new, but it accounts for cases where there
+    # aren't enough terms and anti-terms to build a real Intersection.
+    def self.build(
+      terms : Set(Nominal),
+      anti_terms : Set(AntiNominal)? = nil,
+    ) : Inner
+      if terms.size == 0
+        case (anti_terms.try(&.size) || 0)
+        when 0 then return Unsatisfiable.instance # TODO: should this be an Unbounded result instead? are there other similar cases that need to be changed?
+        when 1 then return anti_terms.not_nil!.first
+        end
+      elsif (terms.size == 1) && ((anti_terms.try(&.size) || 0) == 0)
+        return terms.first
+      end
+      
+      anti_terms = nil if anti_terms && anti_terms.empty?
+      new(terms, anti_terms)
+    end
+    
+    def inspect(io : IO)
+      first = true
+      io << "("
+      
+      terms.each do |term|
+        io << " & " unless first; first = false
+        term.inspect(io)
+      end
+      
+      anti_terms.not_nil!.each do |anti_term|
+        io << " & " unless first; first = false
+        anti_term.inspect(io)
+      end if anti_terms
+      
+      io << ")"
     end
     
     def hash : UInt64
-      hash = self.class.hash
-      defns.each { |defn| hash ^= defn.hash }
-      anti_defns.not_nil!.each { |defn| hash ^= (defn.hash * 31) } if anti_defns
+      hash = terms.hash
+      hash ^= (anti_terms.not_nil!.hash * 31) if anti_terms
       hash
     end
     
     def ==(other)
       other.is_a?(Intersection) &&
-      defns == other.defns &&
-      anti_defns == other.anti_defns
+      terms == other.terms &&
+      anti_terms == other.anti_terms
     end
     
     def each_reachable_defn : Iterator(Program::Type)
-      iter = defns.each
+      iter = terms.each.map(&.defn)
       
-      return iter unless anti_defns
-      iter = iter.chain(anti_defns.not_nil!.each) # TODO: is an anti-nominal actually reachable?
+      return iter unless anti_terms
+      iter = iter.chain(anti_terms.not_nil!.each.map(&.defn)) # TODO: is an anti-nominal actually reachable?
+    end
+    
+    def intersect(other : Unsatisfiable)
+      other
+    end
+    
+    def intersect(other : Nominal)
+      # No change if we've already intersected with this type.
+      return self if terms.includes?(other)
+      
+      # Unsatisfiable if we have already have an anti-term for this type.
+      return Unsatisfiable.instance \
+        if anti_terms && anti_terms.not_nil!.includes?(other)
+      
+      # Unsatisfiable if there are two non-identical concrete types.
+      return Unsatisfiable.instance \
+        if other.is_concrete? && terms.any?(&.is_concrete?)
+      
+      # Otherwise, create a new intersection that adds this type.
+      Intersection.new(terms.dup.add(other), anti_terms)
+    end
+    
+    def intersect(other : AntiNominal)
+      # No change if we've already intersected with this anti-type.
+      return self if anti_terms && anti_terms.not_nil!.includes?(other)
+      
+      # Unsatisfiable if we have already have a term for this anti-type.
+      return Unsatisfiable.instance if terms.includes?(other)
+      
+      # Add this to existing anti-terms (if any) and create the intersection.
+      new_anti_terms =
+        if anti_terms
+          anti_terms.not_nil!.dup.add(other)
+        else
+          [other].to_set
+        end
+      Intersection.new(terms, new_anti_terms)
+    end
+    
+    def intersect(other : Intersection)
+      # Intersect each individual term of other into this running intersection.
+      # If the result becomes Unsatisfiable, return so immediately.
+      result = self
+      other.terms.each do |term|
+        result = result.intersect(term)
+        return result if result.is_a?(Unsatisfiable)
+      end
+      other.anti_terms.not_nil!.each do |term|
+        result = result.intersect(term)
+        return result if result.is_a?(Unsatisfiable)
+      end if other.anti_terms
+      
+      # Return the fully intersected result.
+      result
+    end
+    
+    def intersect(other : Union)
+      other.intersect(self) # delegate to the "higher" class via commutativity
     end
   end
   
-  class Union
-    getter defns : Set(Program::Type)
-    getter anti_defns : Set(Program::Type)?
+  struct Union
+    getter terms : Set(Nominal)
+    getter anti_terms : Set(AntiNominal)?
     getter intersects : Set(Intersection)?
     
-    def initialize(@defns, @anti_defns = nil, @intersects = nil)
+    def initialize(@terms, @anti_terms = nil, @intersects = nil)
+      raise "too few terms: #{inspect}" \
+        if (@terms.size +
+          (@anti_terms.try(&.size) || 0) +
+          (@intersects.try(&.size) || 0)
+        ) <= 1
+    end
+    
+    # This function works like .new, but it accounts for cases where there
+    # aren't enough terms, anti-terms, and intersections to build a real Union.
+    def self.build(
+      terms : Set(Nominal),
+      anti_terms : Set(AntiNominal)? = nil,
+      intersects : Set(Intersection)? = nil,
+    ) : Inner
+      if terms.size == 0
+        if (anti_terms.try(&.size) || 0) == 0
+          case (intersects.try(&.size) || 0)
+          when 0 then return Unsatisfiable.instance
+          when 1 then return intersects.not_nil!.first
+          end
+        elsif (intersects.try(&.size) || 0) == 0
+          if anti_terms.not_nil!.size == 1
+            return anti_terms.not_nil!.first
+          end
+        end
+      elsif (terms.size == 1) \
+        && ((anti_terms.try(&.size) || 0) == 0) \
+        && ((intersects.try(&.size) || 0) == 0)
+        return terms.first
+      end
+      
+      anti_terms = nil if anti_terms && anti_terms.empty?
+      intersects = nil if intersects && intersects.empty?
+      
+      new(terms, anti_terms, intersects)
+    end
+    
+    def inspect(io : IO)
+      first = true
+      io << "("
+      
+      terms.each do |term|
+        io << " | " unless first; first = false
+        term.inspect(io)
+      end
+      
+      anti_terms.not_nil!.each do |anti_term|
+        io << " | " unless first; first = false
+        anti_term.inspect(io)
+      end if anti_terms
+      
+      intersects.not_nil!.each do |intersect|
+        io << " | " unless first; first = false
+        intersect.inspect(io)
+      end if intersects
+      
+      io << ")"
     end
     
     def hash : UInt64
-      hash = 0_u64
-      defns.each { |defn| hash ^= defn.hash }
-      anti_defns.not_nil!.each { |defn| hash ^= (defn.hash * 31) } if anti_defns
-      intersects.not_nil!.each { |defn| hash ^= (defn.hash * 63) } if intersects
+      hash = terms.hash
+      hash ^= (anti_terms.not_nil!.hash * 31) if anti_terms
+      hash ^= (intersects.not_nil!.hash * 63) if intersects
       hash
     end
     
     def ==(other)
       other.is_a?(Union) &&
-      defns == other.defns &&
-      anti_defns == other.anti_defns &&
+      terms == other.terms &&
+      anti_terms == other.anti_terms &&
       intersects == other.intersects
     end
     
     def each_reachable_defn : Iterator(Program::Type)
-      iter = defns.each
+      iter = terms.each.map(&.defn)
       
-      return iter unless anti_defns
-      iter = iter.chain(anti_defns.not_nil!.each) # TODO: is an anti-nominal actually reachable?
+      return iter unless anti_terms
+      iter = iter.chain(anti_terms.not_nil!.each.map(&.defn)) # TODO: is an anti-nominal actually reachable?
       
       return iter unless intersects
       iter = iter.chain(
         intersects.not_nil!.map(&.each_reachable_defn).flat_map(&.to_a).each
       )
     end
+    
+    def intersect(other : Unsatisfiable)
+      other
+    end
+    
+    def intersect(other : (Nominal | AntiNominal | Intersection | Union))
+      # Intersect the other with each term that we contain in the union,
+      # discarding any results that come back as Unsatisfiable intersections.
+      results = [] of Inner
+      terms.each do |term|
+        result = other.intersect(term)
+        results << result unless result.is_a?(Unsatisfiable)
+      end
+      anti_terms.not_nil!.each do |anti_term|
+        result = other.intersect(anti_term)
+        results << result unless result.is_a?(Unsatisfiable)
+      end if anti_terms
+      intersects.not_nil!.each do |intersect|
+        result = other.intersect(intersect)
+        results << result unless result.is_a?(Unsatisfiable)
+      end if intersects
+      
+      # If there are zero viable options remaining, return Unsatisfiable.
+      # If there is only one viable option remaining, return it.
+      case results.size
+      when 0 then return Unsatisfiable.instance
+      when 1 then return results.first
+      end
+      
+      # Collect the results into typed sets to forward to Union.new.
+      new_terms = Set(Nominal).new
+      new_anti_terms = Set(AntiNominal).new
+      new_intersects = Set(Intersection).new
+      results.each do |result|
+        case result
+        when Nominal then new_terms.add(result)
+        when AntiNominal then new_anti_terms.add(result)
+        when Intersection then new_intersects.add(result)
+        else raise NotImplementedError.new(result)
+        end
+      end
+      
+      # Finally, return the intersected union.
+      Union.new(new_terms, new_anti_terms, new_intersects)
+    end
   end
   
   getter inner : Inner
+  
+  def initialize(@inner)
+  end
   
   def initialize(nominal : Program::Type)
     @inner = Nominal.new(nominal)
@@ -147,7 +425,7 @@ class Mare::Compiler::Infer::MetaType
     elsif union.size == 1
       @inner = Nominal.new(union.first)
     else
-      @inner = Union.new(union.to_set)
+      @inner = Union.new(union.map { |d| Nominal.new(d) }.to_set)
     end
   end
   
@@ -165,8 +443,8 @@ class Mare::Compiler::Infer::MetaType
       [inner.defn]
     when Union
       raise NotImplementedError.new(inner.inspect) \
-        if inner.anti_defns || inner.intersects
-      inner.defns
+        if inner.anti_terms || inner.intersects
+      inner.terms.map(&.defn)
     else raise NotImplementedError.new(inner.inspect)
     end
   end
@@ -185,24 +463,80 @@ class Mare::Compiler::Infer::MetaType
   end
   
   def intersect(other : MetaType)
-    # TODO: verify total correctness of this algorithm and its use.
-    new_union = Set(Program::Type).new
-    other.defns.each do |defn|
-      if self.defns.includes?(defn)
-        new_union.add(defn)
-      elsif self.defns.any? { |d| self.class.is_l_defn_sub_r_defn?(defn, d) }
-        new_union.add(defn)
+    MetaType.new(@inner.intersect(other.inner))
+  end
+  
+  def simplify
+    inner = @inner
+    
+    # Currently we only have the logic to simplify these cases:
+    return MetaType.new(simplify_union(inner)) if inner.is_a?(Union) && inner.intersects
+    return MetaType.new(simplify_intersection(inner)) if inner.is_a?(Intersection)
+    
+    self
+  end
+  
+  private def simplify_intersection(inner : Intersection)
+    removed_terms = Set(Nominal).new
+    new_terms = inner.terms.select do |l|
+      # Remove terms that are subtypes of an anti-term - they are excluded.
+      if inner.anti_terms && inner.anti_terms.not_nil!.any? do |r|
+        self.class.is_l_defn_sub_r_defn?(l.defn, r.defn)
       end
+        removed_terms.add(l)
+        next
+      end
+      
+      # Return Unsatisfiable if l is concrete and isn't a subtype of any other.
+      if l.is_concrete? && inner.terms.any? do |r|
+        !self.class.is_l_defn_sub_r_defn?(l.defn, r.defn)
+      end
+        return Unsatisfiable.instance
+      end
+      
+      # Remove terms that are supertypes of another term - they are redundant.
+      if inner.terms.any? do |r|
+        l != r &&
+        !removed_terms.includes?(r) &&
+        self.class.is_l_defn_sub_r_defn?(r.defn, l.defn)
+      end
+        removed_terms.add(l)
+        next
+      end
+      
+      true # keep this term
     end
-    self.defns.each do |defn|
-      if new_union.includes?(defn)
-        # skip this - it's already there
-      elsif other.defns.any? { |d| self.class.is_l_defn_sub_r_defn?(defn, d) }
-        new_union.add(defn)
+    
+    # If we didn't remove anything, there was no change.
+    return inner if removed_terms.empty?
+    
+    # Otherwise, return as a new intersection.
+    Intersection.build(new_terms.to_set, inner.anti_terms)
+  end
+  
+  private def simplify_union(inner : Union)
+    terms = Set(Nominal).new
+    anti_terms = Set(AntiNominal).new
+    intersects = Set(Intersection).new
+    
+    # Just copy the terms and anti-terms without working with them.
+    # TODO: are there any simplifications we can/should apply here?
+    terms.concat(inner.terms)
+    anti_terms.concat(inner.anti_terms.not_nil!) if inner.anti_terms
+    
+    # Simplify each intersection, collecting the results.
+    inner.intersects.not_nil!.each do |intersect|
+      result = simplify_intersection(intersect)
+      case result
+      when Unsatisfiable then # do nothing, it's no longer in the union
+      when Nominal then terms.add(result)
+      when AntiNominal then anti_terms.add(result)
+      when Intersection then intersects.add(result)
+      else raise NotImplementedError.new(result.inspect)
       end
     end
     
-    MetaType.new(new_union)
+    Union.build(terms.to_set, anti_terms.to_set, intersects.to_set)
   end
   
   # Return true if this MetaType is a subtype of the other MetaType.
@@ -325,8 +659,7 @@ class Mare::Compiler::Infer::MetaType
   end
   
   def show_type
-    return "(#{@inner.as(Nominal).defn.ident.value})" if @inner.is_a?(Nominal)
-    "(#{@inner.as(Union).defns.map(&.ident).map(&.value).join(" | ")})"
+    @inner.inspect
   end
   
   def within_constraints?(list : Iterable(MetaType))
@@ -334,7 +667,7 @@ class Mare::Compiler::Infer::MetaType
     unconstrained = true
     intersected = list.reduce self do |reduction, constraint|
       unconstrained = false
-      reduction.intersect(constraint)
+      reduction.intersect(constraint).simplify
     end
     unconstrained || !intersected.unsatisfiable?
   end
