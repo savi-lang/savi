@@ -105,6 +105,8 @@ class Mare::Program
       @subtyping ||= Mare::Compiler::Infer::SubtypingInfo.new(self)
     end
     
+    # Return true if this Type is a subtype of the other Type.
+    def <(other); subtype_of?(other) end
     def subtype_of?(other : Program::Type) : Bool
       subtyping.check(other)
     end
