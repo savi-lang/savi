@@ -827,7 +827,7 @@ class Mare::Compiler::CodeGen
       gen_virtual_call(receiver, args, lhs_type, gfunc)
     else
       args.unshift(receiver) if gfunc.needs_receiver?
-      @builder.call(gfunc.llvm_func, args)
+      gen_call(gfunc.llvm_func, args)
     end
   end
   
@@ -841,6 +841,9 @@ class Mare::Compiler::CodeGen
     rname = receiver.name
     fname = "#{rname}.#{gfunc.func.ident.value}"
     
+    # Prepend the receiver to the args list.
+    args.unshift(receiver)
+    
     # Load the type descriptor of the receiver so we can read its vtable,
     # then load the function pointer from the appropriate index of that vtable.
     desc = gen_get_desc(receiver)
@@ -850,11 +853,28 @@ class Mare::Compiler::CodeGen
     load = @builder.load(gep, "#{fname}.LOAD")
     func = @builder.bit_cast(load, gfunc.virtual_llvm_func.type, fname)
     
-    # Cast the receiver to right type and prepend it to our args list.
-    rtype = gfunc.virtual_llvm_func.params.first.type
-    args.unshift(gen_assign_cast(receiver, rtype))
+    gen_call(func, gfunc.virtual_llvm_func, args)
+  end
+  
+  def gen_call(func : LLVM::Function, args : Array(LLVM::Value))
+    # Cast the arguments to the right types.
+    cast_args = func.params.to_a.zip(args)
+      .map { |param, arg| gen_assign_cast(arg, param.type) }
     
-    @builder.call(func, args)
+    @builder.call(func, cast_args)
+  end
+  
+  def gen_call(
+    func : LLVM::Value,
+    func_proto : LLVM::Function,
+    args : Array(LLVM::Value),
+  )
+    # This version of gen_call uses a separate func_proto as the prototype,
+    # which we use to get the parameter types to cast the arguments to.
+    cast_args = func_proto.params.to_a.zip(args)
+      .map { |param, arg| gen_assign_cast(arg, param.type) }
+    
+    @builder.call(func, cast_args)
   end
   
   def gen_assign_cast(value : LLVM::Value, to_type : LLVM::Type)
