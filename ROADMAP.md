@@ -8,7 +8,7 @@
 - [x] - Interfaces
 - [x] - Virtual table calls on abstract types
 - [x] - Non-looping flow control (`if`, `case`, etc)
-- [ ] - Boxed numeric values
+- [x] - Boxed numeric values
 - [ ] - Actors and behaviours
 - [ ] - Finalizer functions
 - [ ] - Looping flow control (`while`, etc)

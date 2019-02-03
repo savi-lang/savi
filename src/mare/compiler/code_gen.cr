@@ -78,6 +78,17 @@ class Mare::Compiler::CodeGen
         end
       end
       
+      # If we're generating for a type that has no inherent descriptor,
+      # we are generating a struct_type for the boxed container that gets used
+      # when that value has to be passed as an abstract reference with a desc.
+      # In this case, there should be just a single field - the value itself.
+      if !type_def.has_desc?
+        raise "a value type with no descriptor can't have fields" \
+          unless @fields.empty?
+        
+        @fields << {"VALUE", @type_def.as_ref}
+      end
+      
       # Generate descriptor type and struct type.
       @desc_type = g.gen_desc_type(@type_def, @vtable_size)
       @struct_type = g.gen_struct_type(@type_def, @desc_type, @fields)
@@ -278,6 +289,8 @@ class Mare::Compiler::CodeGen
     when :i8 then @i8
     when :i32 then @i32
     when :i64 then @i64
+    when :f32 then @f32
+    when :f64 then @f64
     when :ptr then @ptr
     when :struct_ptr then
       @gtypes[program.reach[ref.single!].llvm_name].struct_ptr
@@ -788,9 +801,11 @@ class Mare::Compiler::CodeGen
     when AST::Identifier
       member = rhs.value
       args = [] of LLVM::Value
+      arg_exprs = [] of AST::Node
     when AST::Qualify
       member = rhs.term.as(AST::Identifier).value
       args = rhs.group.terms.map { |expr| gen_expr(expr).as(LLVM::Value) }
+      arg_exprs = rhs.group.terms.dup
     else raise NotImplementedError.new(rhs)
     end
     
@@ -812,6 +827,7 @@ class Mare::Compiler::CodeGen
         
         gen_within_foreign_frame lhs_gtype, gfunc do
           args << gen_expr(param.rhs)
+          arg_exprs << param.rhs
         end
       end
     end
@@ -820,29 +836,34 @@ class Mare::Compiler::CodeGen
     # We trust LLVM optimizations to eliminate dead code when it does nothing.
     receiver = gen_expr(relate.lhs)
     
+    # Determine if we need to use a virtual call here.
+    needs_virtual_call = lhs_type.is_abstract?
+    
+    # Prepend the receiver to the args list if necessary.
+    if needs_virtual_call || gfunc.needs_receiver?
+      args.unshift(receiver)
+      arg_exprs.unshift(relate.lhs)
+    end
+    
     # Call the LLVM function, or do a virtual call if necessary.
     @di.set_loc(relate.op)
-    needs_virtual_call = lhs_type.is_abstract?
     if needs_virtual_call
-      gen_virtual_call(receiver, args, lhs_type, gfunc)
+      gen_virtual_call(receiver, args, arg_exprs, lhs_type, gfunc)
     else
-      args.unshift(receiver) if gfunc.needs_receiver?
-      gen_call(gfunc.llvm_func, args)
+      gen_call(gfunc.llvm_func, args, arg_exprs)
     end
   end
   
   def gen_virtual_call(
     receiver : LLVM::Value,
     args : Array(LLVM::Value),
+    arg_exprs : Array(AST::Node),
     type_ref : Reach::Ref,
     gfunc : GenFunc,
   )
     receiver.name = type_ref.show_type if receiver.name.empty?
     rname = receiver.name
     fname = "#{rname}.#{gfunc.func.ident.value}"
-    
-    # Prepend the receiver to the args list.
-    args.unshift(receiver)
     
     # Load the type descriptor of the receiver so we can read its vtable,
     # then load the function pointer from the appropriate index of that vtable.
@@ -853,13 +874,17 @@ class Mare::Compiler::CodeGen
     load = @builder.load(gep, "#{fname}.LOAD")
     func = @builder.bit_cast(load, gfunc.virtual_llvm_func.type, fname)
     
-    gen_call(func, gfunc.virtual_llvm_func, args)
+    gen_call(func, gfunc.virtual_llvm_func, args, arg_exprs)
   end
   
-  def gen_call(func : LLVM::Function, args : Array(LLVM::Value))
+  def gen_call(
+    func : LLVM::Function,
+    args : Array(LLVM::Value),
+    arg_exprs : Array(AST::Node),
+  )
     # Cast the arguments to the right types.
-    cast_args = func.params.to_a.zip(args)
-      .map { |param, arg| gen_assign_cast(arg, param.type) }
+    cast_args = func.params.to_a.zip(args).zip(arg_exprs)
+      .map { |(param, arg), expr| gen_assign_cast(arg, param.type, expr) }
     
     @builder.call(func, cast_args)
   end
@@ -868,11 +893,12 @@ class Mare::Compiler::CodeGen
     func : LLVM::Value,
     func_proto : LLVM::Function,
     args : Array(LLVM::Value),
+    arg_exprs : Array(AST::Node),
   )
     # This version of gen_call uses a separate func_proto as the prototype,
     # which we use to get the parameter types to cast the arguments to.
-    cast_args = func_proto.params.to_a.zip(args)
-      .map { |param, arg| gen_assign_cast(arg, param.type) }
+    cast_args = func_proto.params.to_a.zip(args).zip(arg_exprs)
+      .map { |(param, arg), expr| gen_assign_cast(arg, param.type, expr) }
     
     @builder.call(func, cast_args)
   end
@@ -882,7 +908,7 @@ class Mare::Compiler::CodeGen
     value = gen_expr(relate.rhs).as(LLVM::Value)
     name = value.name
     
-    value = gen_assign_cast(value, llvm_type_of(relate.lhs))
+    value = gen_assign_cast(value, llvm_type_of(relate.lhs), relate.rhs)
     value.name = name
     
     @di.set_loc(relate.op)
@@ -916,8 +942,71 @@ class Mare::Compiler::CodeGen
       "#{lhs.name}<:#{rhs.name}"
   end
   
-  def gen_assign_cast(value : LLVM::Value, to_type : LLVM::Type)
-    @builder.bit_cast(value, to_type, "#{value.name}.CAST")
+  def gen_assign_cast(
+    value : LLVM::Value,
+    to_type : LLVM::Type,
+    from_expr : AST::Node,
+  )
+    from_type = value.type
+    return value if from_type == to_type
+    
+    case to_type.kind
+    when LLVM::Type::Kind::Integer,
+         LLVM::Type::Kind::Half,
+         LLVM::Type::Kind::Float,
+         LLVM::Type::Kind::Double
+      # This happens for example with Bool when llvm_use_type != llvm_mem_type,
+      # for cases where we are assigning to or from a field.
+      # TODO: Implement this and verify it is working as intended.
+      raise NotImplementedError.new("zero extension / truncation in cast") \
+        if from_type.kind == LLVM::Type::Kind::Integer \
+        && to_type.kind == LLVM::Type::Kind::Integer \
+        && to_type.int_width != from_type.int_width
+      
+      # This is just an assertion to make sure the type system protected us
+      # from trying to implicitly cast between different numeric types.
+      # We should only be going to/from a boxed pointer container.
+      raise "can't cast to/from different numeric types implicitly" \
+        if from_type.kind != LLVM::Type::Kind::Pointer
+      
+      # Unwrap the box and finish the assign cast from there.
+      # This brings us to the zero extension / truncation logic above.
+      value = gen_unboxed(value, from_expr)
+      gen_assign_cast(value, to_type, from_expr)
+    when LLVM::Type::Kind::Pointer
+      # If we're going from pointer to non-pointer, we're unboxing,
+      # so we have to do that first before the LLVM bit cast.
+      value = gen_boxed(value, from_expr) \
+        if value.type.kind != LLVM::Type::Kind::Pointer
+      
+      # Do the LLVM bitcast.
+      @builder.bit_cast(value, to_type, "#{value.name}.CAST")
+    else
+      raise NotImplementedError.new(to_type.kind)
+    end
+  end
+  
+  def gen_boxed(value, from_expr)
+    # Allocate a struct pointer to hold the type descriptor and value.
+    # This also writes the type descriptor into it appropriate position.
+    boxed = gen_alloc(gtype_of(from_expr), "#{value.name}.BOXED")
+    
+    # Write the value itself into the value field of the struct.
+    value_gep = @builder.struct_gep(boxed, 1, "#{value.name}.BOXED.VALUE")
+    @builder.store(value, value_gep)
+    
+    # Return the struct pointer
+    boxed
+  end
+  
+  def gen_unboxed(value, from_expr)
+    # First, cast the given object pointer to the correct boxed struct pointer.
+    struct_ptr = gtype_of(from_expr).struct_ptr
+    value = @builder.bit_cast(value, struct_ptr, "#{value.name}.BOXED")
+    
+    # Load the value itself into the value field of the boxed struct pointer.
+    value_gep = @builder.struct_gep(value, 1, "#{value.name}.VALUE")
+    @builder.load(value_gep, "@.#{value.name}.VALUE.LOAD")
   end
   
   def gen_expr(expr, const_only = false) : LLVM::Value
@@ -1087,7 +1176,7 @@ class Mare::Compiler::CodeGen
       # carry the value we just generated as one of the possible phi values.
       @builder.position_at_end(case_block)
       value = gen_expr(fore[1])
-      value = gen_assign_cast(value, phi_type)
+      value = gen_assign_cast(value, phi_type, fore[1])
       values << value
       blocks << case_block
       @builder.br(post_block)
@@ -1110,7 +1199,7 @@ class Mare::Compiler::CodeGen
     # that we used when we generated case blocks inside the loop above.
     @builder.position_at_end(case_block)
     value = gen_expr(expr.list.last[1])
-    value = gen_assign_cast(value, phi_type)
+    value = gen_assign_cast(value, phi_type, expr.list.last[1])
     values << value
     blocks << case_block
     @builder.br(post_block)
@@ -1276,9 +1365,6 @@ class Mare::Compiler::CodeGen
   end
   
   def gen_alloc(gtype, name = "@")
-    raise NotImplementedError.new(gtype.type_def) \
-      unless gtype.type_def.has_allocation?
-    
     size = gtype.type_def.abi_size
     size = 1 if size == 0
     args = [pony_ctx]
@@ -1320,8 +1406,6 @@ class Mare::Compiler::CodeGen
   end
   
   def gen_put_desc(value, gtype, name = "")
-    raise NotImplementedError.new(gtype) unless gtype.type_def.has_desc?
-    
     desc_p = @builder.struct_gep(value, 0, "#{name}.DESC")
     @builder.store(gtype.desc, desc_p)
     # TODO: tbaa? (from set_descriptor in libponyc/codegen/gencall.c)

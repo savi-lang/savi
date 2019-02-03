@@ -43,8 +43,9 @@ actor Main:
     | BelligerentFour
     )
     
-    thirty_three = I32[33]
-    LibPonyRT.pony_exitcode(augend + thirty_three + 9)
+    maybe_thirty_three (I32 | None) = I32[33]
+    if maybe_thirty_three <: I32 \
+      LibPonyRT.pony_exitcode(augend + maybe_thirty_three + 9)
   
   fun say_stuff (greeting Greeting):
     sentence = Sentence.new
