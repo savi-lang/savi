@@ -17,12 +17,6 @@ class Mare::Program
     @aliases.any? { |a| a.ident.value == alias_name && !f.has_tag?(:hygienic) }
   end
   
-  def find_func!(func_name)
-    @functions
-      .find { |f| f.ident.value == func_name && !f.has_tag?(:hygienic) }
-      .not_nil!
-  end
-  
   def find_type!(type_name)
     @types.find { |t| t.ident.value == type_name }.not_nil!
   end
