@@ -3,6 +3,7 @@ FROM alpine:3.9 as dev
 # Install build tools, Pony dependencies, LLVM libraries, and Crystal.
 RUN apk add --no-cache --update \
     alpine-sdk coreutils linux-headers clang-dev lld \
+    valgrind perl \
     libexecinfo-dev libressl-dev pcre2-dev \
     llvm5-dev llvm5-static \
     crystal shards

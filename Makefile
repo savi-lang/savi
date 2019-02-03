@@ -24,8 +24,14 @@ example: PHONY
 example-lldb: PHONY
 	docker exec -ti mare-dev make extra_args="$(extra_args)" example/main
 	echo && lldb -o run -- example/main
+example-mare-callgrind: PHONY
+	docker exec -ti mare-dev make extra_args="$(extra_args)" example-mare-callgrind.inner
 /tmp/bin/mare: main.cr $(shell find src -name '*.cr')
 	mkdir -p /tmp/bin
 	crystal build --debug --link-flags="-lponyrt" main.cr -o $@
 example/main: /tmp/bin/mare $(shell find example -name '*.mare')
 	echo && cd example && /tmp/bin/mare
+/tmp/callgrind.out: /tmp/bin/mare
+	echo && cd example && valgrind --tool=callgrind --callgrind-out-file=$@ $<
+example-mare-callgrind.inner: /tmp/callgrind.out PHONY
+	/usr/bin/callgrind_annotate $< | less
