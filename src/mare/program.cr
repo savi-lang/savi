@@ -55,7 +55,7 @@ class Mare::Program
     def initialize(@ident)
       @functions = [] of Function
       @tags = Set(Symbol).new
-      @metadata = Hash(Symbol, Int32 | Bool).new # TODO: should be UInt64?
+      @metadata = Hash(Symbol, UInt64 | Bool).new
     end
     
     def inspect(io : IO)

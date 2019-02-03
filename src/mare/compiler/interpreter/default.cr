@@ -88,7 +88,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
           unless bit_width_func.has_tag?(:constant)
         
         @type.metadata[:bit_width] = bit_width_func.body.not_nil!
-          .terms.last.as(AST::LiteralInteger).value.to_i32
+          .terms.last.as(AST::LiteralInteger).value
         
         # Capture is_floating_point constant value, or set a default if needed.
         # TODO: better generic mechanism for default consts

@@ -189,7 +189,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     end
     
     def bit_width
-      @program_type.metadata[:bit_width].as(Int32)
+      @program_type.metadata[:bit_width].as(UInt64).to_i32
     end
     
     def each_function
