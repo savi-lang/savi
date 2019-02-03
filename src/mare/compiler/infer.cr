@@ -25,7 +25,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     def within_domain!(infer : Infer, pos : Source::Pos, constraint : MetaType)
       return if @inner.within_constraints?([constraint])
       
-      Error.at self, "This type is outside of a constraint",
+      Error.at self,
+        "This type is outside of a constraint: #{@inner.show_type}",
         [{pos, constraint.show}]
     end
   end
@@ -98,7 +99,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     def within_domain!(infer : Infer, pos : Source::Pos, constraint : MetaType)
       if @explicit
         if !@explicit.not_nil!.within_constraints?([constraint])
-          Error.at self, "This type is outside of a constraint",
+          Error.at self,
+            "This type is outside of a constraint: #{@explicit.try(&.show_type)}",
             [{pos, constraint.show}]
         else
           return # explicit was okay, and we ignore upstream
@@ -149,7 +151,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     def within_domain!(infer : Infer, pos : Source::Pos, constraint : MetaType)
       if @explicit
         if !@explicit.not_nil!.within_constraints?([constraint])
-          Error.at self, "This type is outside of a constraint",
+          Error.at self,
+            "This type is outside of a constraint: #{@explicit.try(&.show_type)}",
             [{pos, constraint.show}]
         else
           return # explicit was okay, and we ignore upstream
@@ -204,7 +207,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     
     def within_domain!(infer : Infer, pos : Source::Pos, constraint : MetaType)
       if @explicit && !@explicit.not_nil!.within_constraints?([constraint])
-        Error.at self, "This type is outside of a constraint",
+        Error.at self,
+          "This type is outside of a constraint: #{@explicit.try(&.show_type)}",
           [{pos, constraint.show}]
       end
       

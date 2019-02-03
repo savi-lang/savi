@@ -236,25 +236,22 @@ struct Mare::Compiler::Infer::MetaType::Union
     result
   end
   
-  def subtype_of?(other : Nominal) : Bool
-    raise NotImplementedError.new([self, :subtype_of?, other].inspect)
+  def subtype_of?(other : (Nominal | AntiNominal)) : Bool
+    # This union is a subtype of the other if and only if
+    # all terms in the union are subtypes of that other.
+    result = terms.all?(&.subtype_of?(other))
+    result &&= anti_terms.not_nil!.all?(&.subtype_of?(other)) if anti_terms
+    result &&= intersects.not_nil!.all?(&.subtype_of?(other)) if intersects
+    result
   end
   
-  def supertype_of?(other : Nominal) : Bool
-    # This union is a supertype of the given nominal if and only if
-    # any term in the union qualifies as a supertype of that nominal.
+  def supertype_of?(other : (Nominal | AntiNominal)) : Bool
+    # This union is a supertype of the given other if and only if
+    # any term in the union qualifies as a supertype of that other.
     result = terms.any?(&.supertype_of?(other))
     result ||= anti_terms.not_nil!.any?(&.supertype_of?(other)) if anti_terms
     result ||= intersects.not_nil!.any?(&.supertype_of?(other)) if intersects
     result
-  end
-  
-  def subtype_of?(other : AntiNominal) : Bool
-    raise NotImplementedError.new([self, :subtype_of?, other].inspect)
-  end
-  
-  def supertype_of?(other : AntiNominal) : Bool
-    raise NotImplementedError.new([self, :supertype_of?, other].inspect)
   end
   
   def subtype_of?(other : Intersection) : Bool

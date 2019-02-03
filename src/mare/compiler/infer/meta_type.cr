@@ -54,15 +54,13 @@ class Mare::Compiler::Infer::MetaType
   end
   
   def self.new_intersection(types : Iterable(MetaType))
-    inner = Unbounded.instance
+    inner = Unconstrained.instance
     types.each { |mt| inner = inner.intersect(mt.inner) }
     MetaType.new(inner)
   end
   
   def within_constraints?(types : Iterable(MetaType))
-    inner = @inner
-    types.each { |mt| inner = inner.intersect(mt.inner) }
-    !MetaType.new(inner).simplify.unsatisfiable?
+    self < self.class.new_intersection(types)
   end
   
   def unsatisfiable?

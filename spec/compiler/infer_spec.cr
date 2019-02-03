@@ -304,6 +304,31 @@ describe Mare::Compiler::Infer do
     end
   end
   
+  it "complains when a less specific type than required is assigned" do
+    source = Mare::Source.new "(example)", <<-SOURCE
+    actor Main:
+      new:
+        x (U64 | None) = 42
+        y U64 = x
+    SOURCE
+    
+    expected = <<-MSG
+    This type is outside of a constraint: (U64 | None):
+    from (example):3:
+        x (U64 | None) = 42
+        ^
+    
+    - it must be a subtype of U64:
+      from (example):4:
+        y U64 = x
+          ^~~
+    MSG
+    
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :infer)
+    end
+  end
+  
   it "infers return type from param type or another return type" do
     source = Mare::Source.new "(example)", <<-SOURCE
     primitive Infer:
@@ -407,7 +432,7 @@ describe Mare::Compiler::Infer do
     SOURCE
     
     expected = <<-MSG
-    This type is outside of a constraint:
+    This type is outside of a constraint: Concrete:
     from (example):9:
         i Interface = Concrete
                       ^~~~~~~~
@@ -435,7 +460,7 @@ describe Mare::Compiler::Infer do
     SOURCE
     
     expected = <<-MSG
-    This type is outside of a constraint:
+    This type is outside of a constraint: Bool:
     from (example):3:
         x I32 = True
                 ^~~~
