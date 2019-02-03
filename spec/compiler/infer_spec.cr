@@ -198,11 +198,8 @@ describe Mare::Compiler::Infer do
     body = func.body.not_nil!
     assign = body.terms.first.as(Mare::AST::Relate)
     
-    func.infer.resolve(assign.lhs).defns.map(&.ident).map(&.value).should eq \
-      ["CString"]
-    
-    func.infer.resolve(assign.rhs).defns.map(&.ident).map(&.value).should eq \
-      ["CString"]
+    func.infer.resolve(assign.lhs).show_type.should eq "CString"
+    func.infer.resolve(assign.rhs).show_type.should eq "CString"
   end
   
   it "infers a prop's type based on the prop initializer" do
@@ -219,8 +216,7 @@ describe Mare::Compiler::Infer do
     body = func.body.not_nil!
     prop = body.terms.first
     
-    func.infer.resolve(prop).defns.map(&.ident).map(&.value).should eq \
-      ["CString"]
+    func.infer.resolve(prop).show_type.should eq "CString"
   end
   
   it "infers an integer literal based on an assignment" do
@@ -236,11 +232,8 @@ describe Mare::Compiler::Infer do
     body = func.body.not_nil!
     assign = body.terms.first.as(Mare::AST::Relate)
     
-    func.infer.resolve(assign.lhs).defns.map(&.ident).map(&.value).should eq \
-      ["U64", "None"]
-    
-    func.infer.resolve(assign.rhs).defns.map(&.ident).map(&.value).should eq \
-      ["U64"]
+    func.infer.resolve(assign.lhs).show_type.should eq "(U64 | None)"
+    func.infer.resolve(assign.rhs).show_type.should eq "U64"
   end
   
   it "infers an integer literal based on a prop type" do
@@ -257,7 +250,7 @@ describe Mare::Compiler::Infer do
     body = func.body.not_nil!
     prop = body.terms.first
     
-    func.infer.resolve(prop).defns.map(&.ident).map(&.value).should eq ["U64"]
+    func.infer.resolve(prop).show_type.should eq "U64"
   end
   
   it "infers an integer literal through an if statement" do
@@ -277,14 +270,9 @@ describe Mare::Compiler::Infer do
       .as(Mare::AST::Choice).list[0][1]
       .as(Mare::AST::LiteralInteger)
     
-    func.infer.resolve(assign.lhs).defns.map(&.ident).map(&.value).should eq \
-      ["U64", "CString", "None"]
-    
-    func.infer.resolve(assign.rhs).defns.map(&.ident).map(&.value).should eq \
-      ["U64", "None"]
-    
-    func.infer.resolve(literal).defns.map(&.ident).map(&.value).should eq \
-      ["U64"]
+    func.infer.resolve(assign.lhs).show_type.should eq "(U64 | CString | None)"
+    func.infer.resolve(assign.rhs).show_type.should eq "(U64 | None)"
+    func.infer.resolve(literal).show_type.should eq "U64"
   end
   
   it "complains when a literal couldn't be resolved to a single type" do
@@ -337,8 +325,7 @@ describe Mare::Compiler::Infer do
       func = ctx.program.find_func!(t_name, f_name)
       call = func.body.not_nil!.terms.first
       
-      func.infer.resolve(call).defns.map(&.ident).map(&.value).should eq \
-        ["I32"]
+      func.infer.resolve(call).show_type.should eq "I32"
     end
   end
   
@@ -363,7 +350,7 @@ describe Mare::Compiler::Infer do
       func = ctx.program.find_func!(t_name, f_name)
       expr = func.body.not_nil!.terms.first
       
-      func.infer.resolve(expr).defns.map(&.ident).map(&.value).should eq ["I32"]
+      func.infer.resolve(expr).show_type.should eq "I32"
     end
   end
   
@@ -479,10 +466,7 @@ describe Mare::Compiler::Infer do
     body = func.body.not_nil!
     assign = body.terms.first.as(Mare::AST::Relate)
     
-    func.infer.resolve(assign.lhs).defns.map(&.ident).map(&.value).should eq \
-      ["X"]
-    
-    func.infer.resolve(assign.rhs).defns.map(&.ident).map(&.value).should eq \
-      ["X"]
+    func.infer.resolve(assign.lhs).show_type.should eq "X"
+    func.infer.resolve(assign.rhs).show_type.should eq "X"
   end
 end
