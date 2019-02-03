@@ -258,9 +258,9 @@ class Mare::Compiler::CodeGen
   def llvm_type_of(ref : Reach::Ref)
     case ref.llvm_use_type
     when :i1 then @i1
-    when :i8, :u8 then @i8
-    when :i32, :u32 then @i32
-    when :i64, :u64 then @i64
+    when :i8 then @i8
+    when :i32 then @i32
+    when :i64 then @i64
     when :f32 then @f32
     when :f64 then @f64
     when :ptr then @ptr
@@ -275,9 +275,9 @@ class Mare::Compiler::CodeGen
   def llvm_mem_type_of(ref : Reach::Ref)
     case ref.llvm_mem_type
     when :i1 then @i8 # TODO: test that this works okay 
-    when :i8, :u8 then @i8
-    when :i32, :u32 then @i32
-    when :i64, :u64 then @i64
+    when :i8 then @i8
+    when :i32 then @i32
+    when :i64 then @i64
     when :ptr then @ptr
     when :struct_ptr then
       @gtypes[program.reach[ref.single!].llvm_name].struct_ptr
