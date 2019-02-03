@@ -74,7 +74,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         
         # Capture bit_width constant value, or set a default if needed.
         # TODO: better generic mechanism for default consts
-        if !@type.has_func?("bit_width")
+        if !@type.find_func?("bit_width")
           default = AST::Declare.new.from(@type.ident)
           default.head << AST::Identifier.new("const").from(@type.ident)
           default.head << AST::Identifier.new("bit_width").from(@type.ident)
@@ -92,7 +92,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         
         # Capture is_floating_point constant value, or set a default if needed.
         # TODO: better generic mechanism for default consts
-        if !@type.has_func?("is_floating_point")
+        if !@type.find_func?("is_floating_point")
           default = AST::Declare.new.from(@type.ident)
           default.head << AST::Identifier.new("const").from(@type.ident)
           default.head << AST::Identifier.new("is_floating_point").from(@type.ident)
@@ -112,7 +112,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         
         # Capture is_floating_point constant value, or set a default if needed.
         # TODO: better generic mechanism for default consts
-        if !@type.has_func?("is_signed")
+        if !@type.find_func?("is_signed")
           default = AST::Declare.new.from(@type.ident)
           default.head << AST::Identifier.new("const").from(@type.ident)
           default.head << AST::Identifier.new("is_signed").from(@type.ident)

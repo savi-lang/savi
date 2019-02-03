@@ -25,7 +25,7 @@ module Mare::Compiler::Copy
       next if f.body.nil?
       
       # We won't copy a function if the dest already has one with the same name.
-      next if dest.has_func?(f.ident.value)
+      next if dest.find_func?(f.ident.value)
       
       # Copy the function.
       dest.functions << f.dup

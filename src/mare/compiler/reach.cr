@@ -238,8 +238,8 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     # TODO: only do this if a function on an abstract type.
     # TODO: any other ways we can be more targeted with this?
     program.types.each do |t|
-      next unless t.has_func?(func.ident.value)
-      run(program, t.find_func!(func.ident.value))
+      other_func = t.find_func?(func.ident.value)
+      run(program, other_func) if other_func
     end
     
     # Now, reach all functions called by this function.
