@@ -30,7 +30,7 @@ actor Main:
   new:
     none = ()
     
-    maybe_greeting (Greeting | None) = None
+    maybe_greeting (Greeting | None) = Greeting
     if maybe_greeting <: Greeting \
       @say_stuff
     
