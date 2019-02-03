@@ -261,6 +261,48 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
   end
   
+  class TypeCondition < Info
+    getter bool : MetaType # TODO: avoid needing the caller to supply this
+    getter refine_tid : TID
+    getter refine_type : MetaType
+    
+    def initialize(@pos, @bool, @refine_tid, @refine_type)
+      raise "#{@bool.show_type} is not Bool" unless @bool.show_type == "Bool"
+    end
+    
+    def resolve!(infer : Infer)
+      @bool
+    end
+    
+    def within_domain!(infer : Infer, pos : Source::Pos, constraint : MetaType)
+      return if @bool.within_constraints?([constraint])
+      
+      Error.at self,
+        "This type is outside of a constraint: #{@bool.show_type}",
+        [{pos, constraint.show}]
+    end
+  end
+  
+  class Refinement < Info
+    getter refine_tid : TID
+    getter refine_type : MetaType
+    
+    def initialize(@pos, @refine_tid, @refine_type)
+    end
+    
+    def resolve!(infer : Infer)
+      infer[@refine_tid].resolve!(infer).intersect(@refine_type)
+    end
+    
+    def within_domain!(infer : Infer, pos : Source::Pos, constraint : MetaType)
+      return if resolve!(infer).within_constraints?([constraint])
+      
+      Error.at self,
+        "This type is outside of a constraint: #{@refine_type.show_type}",
+        [{pos, constraint.show}]
+    end
+  end
+  
   class FromCall < Info
     getter lhs : TID
     getter member : String
@@ -308,6 +350,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     # TODO: When we have branching, we'll need some form of divergence.
     @self_tid = 0_u64
     @local_tids = Hash(Refer::Local, TID).new
+    @local_tid_overrides = Hash(TID, TID).new
     @tids = Hash(TID, Info).new
     @last_tid = 0_u64
     @resolved = Hash(TID, MetaType).new
@@ -524,6 +567,17 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     to.tid = from.tid
   end
   
+  def lookup_local_tid(ref : Refer::Local)
+    tid = @local_tids[ref]?
+    return unless tid
+    while @local_tid_overrides[tid]?
+      old_tid = tid
+      tid = @local_tid_overrides[tid]
+      [old_tid, tid]
+    end
+    tid
+  end
+  
   # This visitor never replaces nodes, it just touches them and returns them.
   def visit(node)
     touch(node)
@@ -543,7 +597,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       new_tid(node, Fixed.new(node.pos, MetaType.new(ref.final_decl.defn)))
     when Refer::Local
       # If it's a local, track the possibly new tid in our @local_tids map.
-      local_tid = @local_tids[ref]?
+      local_tid = lookup_local_tid(ref)
       if local_tid
         transfer_tid(local_tid, node)
       else
@@ -665,23 +719,52 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       follow_call(call)
     when "<:"
       # TODO: check that it is a "non" cap - just being fixed isn't sufficient.
-      # For example, the type we produce for this node is Fixed,
-      # but it wouldn't be an appropriate right-hand term for this operator.
       Error.at node.rhs, "expected this to have a fixed type at compile time" \
         unless self[node.rhs].is_a?(Fixed)
       
       bool = MetaType.new(refer.decl_defn("Bool"))
-      new_tid(node, Fixed.new(node.pos, bool))
+      refine_tid = node.lhs.tid
+      refine_type = self[node.rhs].resolve!(self)
+      
+      new_tid(node, TypeCondition.new(node.pos, bool, refine_tid, refine_type))
     else raise NotImplementedError.new(node.op.value)
     end
+  end
+  
+  def visit_children?(node : AST::Choice)
+    false # don't visit children of Choices at the normal time - wait for touch.
   end
   
   def touch(node : AST::Choice)
     body_tids = [] of TID
     node.list.each do |cond, body|
+      # Visit the cond AST - we skipped it before with visit_children: false.
+      cond.accept(self)
+      
       # Each condition in a choice must evaluate to a type of Bool.
       bool = MetaType.new(refer.decl_defn("Bool"))
-      self[cond].within_domain!(self, node.pos, bool)
+      cond_info = self[cond]
+      cond_info.within_domain!(self, node.pos, bool)
+      
+      # If we have a type condition as the cond, that implies that it returned
+      # true if we are in the body; hence we can apply the type refinement.
+      # TODO: Do this in a less special-casey sort of way if possible.
+      # TODO: Do we need to override things besides locals? should we skip for non-locals?
+      if cond_info.is_a?(TypeCondition)
+        new_tid = new_tid_detached(Refinement.new(
+          cond_info.pos, cond_info.refine_tid, cond_info.refine_type
+        ))
+        @local_tid_overrides[cond_info.refine_tid] = new_tid
+      end
+      
+      # Visit the body AST - we skipped it before with visit_children: false.
+      # We needed to act on information from the cond analysis first.
+      body.accept(self)
+      
+      # Remove the override we put in place before, if any.
+      if cond_info.is_a?(TypeCondition)
+        @local_tid_overrides.delete(cond_info.refine_tid).not_nil!
+      end
       
       # Hold on to the body type for later in this function.
       body_tids << body.tid

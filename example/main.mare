@@ -32,7 +32,7 @@ actor Main:
     
     maybe_greeting (Greeting | None) = Greeting
     if maybe_greeting <: Greeting \
-      @say_stuff
+      @say_stuff(maybe_greeting)
     
     use_zero = False
     please_use_zero = True
@@ -46,11 +46,11 @@ actor Main:
     thirty_three = I32[33]
     LibPonyRT.pony_exitcode(augend + thirty_three + 9)
   
-  fun say_stuff:
+  fun say_stuff (greeting Greeting):
     sentence = Sentence.new
     LibC.puts(sentence.text)
-    sentence.text = Greeting.hello
+    sentence.text = greeting.hello
     LibC.puts(sentence.text)
-    sentence.text = Greeting.bye
+    sentence.text = greeting.bye
     LibC.puts(sentence.text)
     None // TODO: remove

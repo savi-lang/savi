@@ -877,10 +877,6 @@ class Mare::Compiler::CodeGen
     @builder.call(func, cast_args)
   end
   
-  def gen_assign_cast(value : LLVM::Value, to_type : LLVM::Type)
-    @builder.bit_cast(value, to_type, "#{value.name}.CAST")
-  end
-  
   def gen_eq(relate)
     ref = func_frame.refer[relate.lhs]
     value = gen_expr(relate.rhs).as(LLVM::Value)
@@ -918,6 +914,10 @@ class Mare::Compiler::CodeGen
     
     @builder.icmp LLVM::IntPredicate::EQ, lhs_desc, rhs_desc,
       "#{lhs.name}<:#{rhs.name}"
+  end
+  
+  def gen_assign_cast(value : LLVM::Value, to_type : LLVM::Type)
+    @builder.bit_cast(value, to_type, "#{value.name}.CAST")
   end
   
   def gen_expr(expr, const_only = false) : LLVM::Value
