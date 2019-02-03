@@ -15,13 +15,59 @@ class Mare::Compiler::Infer::MetaType
   # have to redistribute the terms and simplify to reach the DNF form.
   # We ensure this is always done by representing the Inner types in this way.
   
-  struct Union; end
-  struct Intersection; end
-  struct AntiNominal; end
-  struct Nominal; end
-  class Unsatisfiable; end
+  struct Union;        end # A type union - a logical "OR".
+  struct Intersection; end # A type intersection - a logical "AND".
+  struct AntiNominal;  end # A type negation - a logical "NOT".
+  struct Nominal;      end # A named type, either abstract or concrete.
+  class Unsatisfiable; end # It's impossible to find a type that fulfills this.
+  class Unbounded;     end # All types fulfill this - totally unconstrained.
   
-  alias Inner = (Union | Intersection | AntiNominal | Nominal | Unsatisfiable)
+  alias Inner =
+    (Union | Intersection | AntiNominal | Nominal | Unsatisfiable | Unbounded)
+  
+  class Unbounded
+    INSTANCE = new
+    
+    def self.instance
+      INSTANCE
+    end
+    
+    private def self.new
+      super
+    end
+    
+    def inspect(io : IO)
+      io << "<unbounded>"
+    end
+    
+    def hash : UInt64
+      self.class.hash
+    end
+    
+    def ==(other)
+      other.is_a?(Unbounded)
+    end
+    
+    def each_reachable_defn : Iterator(Program::Type)
+      ([] of Program::Type).each
+    end
+    
+    def negate : Inner
+      # The negation of an Unbounded is... well... I'm not sure yet.
+      # Is it Unsatisfiable?
+      raise NotImplementedError.new("negation of #{inspect}")
+    end
+    
+    def intersect(other : Inner)
+      # The intersection of Unbounded and anything is the other thing.
+      other
+    end
+    
+    def unite(other : Inner)
+      # The union of Unbounded and anything is still Unbounded.
+      self
+    end
+  end
   
   class Unsatisfiable
     INSTANCE = new
@@ -50,9 +96,20 @@ class Mare::Compiler::Infer::MetaType
       ([] of Program::Type).each
     end
     
-    # The intersection of Unsatisfiable and anything is still Unsatisfiable.
+    def negate : Inner
+      # The negation of an Unsatisfiable is... well... I'm not sure yet.
+      # Is it Unbounded?
+      raise NotImplementedError.new("negation of #{inspect}")
+    end
+    
     def intersect(other : Inner)
+      # The intersection of Unsatisfiable and anything is still Unsatisfiable.
       self
+    end
+    
+    def unite(other : Inner)
+      # The union of Unsatisfiable and anything is the other thing.
+      other
     end
   end
   
@@ -82,6 +139,14 @@ class Mare::Compiler::Infer::MetaType
       defn.is_concrete?
     end
     
+    def negate : Inner
+      AntiNominal.new(defn)
+    end
+    
+    def intersect(other : Unbounded)
+      self
+    end
+    
     def intersect(other : Unsatisfiable)
       other
     end
@@ -100,6 +165,26 @@ class Mare::Compiler::Infer::MetaType
     def intersect(other : (AntiNominal | Intersection | Union))
       other.intersect(self) # delegate to the "higher" class via commutativity
     end
+    
+    def unite(other : Unbounded)
+      other
+    end
+    
+    def unite(other : Unsatisfiable)
+      self
+    end
+    
+    def unite(other : Nominal)
+      # No change if the two nominal types are identical.
+      return self if defn == other.defn
+      
+      # Otherwise, this is a new union of the two types.
+      Union.new([self, other].to_set)
+    end
+    
+    def unite(other : (AntiNominal | Intersection | Union))
+      other.unite(self) # delegate to the "higher" class via commutativity
+    end
   end
   
   struct AntiNominal
@@ -109,7 +194,7 @@ class Mare::Compiler::Infer::MetaType
     end
     
     def inspect(io : IO)
-      io << "!"
+      io << "-"
       io << defn.ident.value
     end
     
@@ -123,6 +208,18 @@ class Mare::Compiler::Infer::MetaType
     
     def each_reachable_defn : Iterator(Program::Type)
       [defn].each # TODO: is an anti-nominal actually reachable?
+    end
+    
+    def is_concrete?
+      defn.is_concrete?
+    end
+    
+    def negate : Inner
+      Nominal.new(defn)
+    end
+    
+    def intersect(other : Unbounded)
+      self
     end
     
     def intersect(other : Unsatisfiable)
@@ -148,6 +245,37 @@ class Mare::Compiler::Infer::MetaType
     def intersect(other : (Intersection | Union))
       other.intersect(self) # delegate to the "higher" class via commutativity
     end
+    
+    def unite(other : Unbounded)
+      other
+    end
+    
+    def unite(other : Unsatisfiable)
+      self
+    end
+    
+    def unite(other : Nominal)
+      # Unbounded if the nominal and anti-nominal types are identical.
+      return Unbounded.instance if defn == other.defn
+      
+      # Otherwise, this is a new union of the two types.
+      Union.new([other].to_set, [self].to_set)
+    end
+    
+    def unite(other : AntiNominal)
+      # No change if the two anti-nominal types are identical.
+      return self if defn == other.defn
+      
+      # Unbounded if the two are concrete types that are not identical.
+      return Unbounded.instance if is_concrete? && other.is_concrete?
+      
+      # Otherwise, this is a new union of the two types.
+      Union.new(Set(Nominal).new, [self, other].to_set)
+    end
+    
+    def unite(other : (Intersection | Union))
+      other.unite(self) # delegate to the "higher" class via commutativity
+    end
   end
   
   struct Intersection
@@ -161,13 +289,14 @@ class Mare::Compiler::Infer::MetaType
     
     # This function works like .new, but it accounts for cases where there
     # aren't enough terms and anti-terms to build a real Intersection.
+    # Returns Unbounded if no terms or anti-terms are supplied.
     def self.build(
       terms : Set(Nominal),
       anti_terms : Set(AntiNominal)? = nil,
     ) : Inner
       if terms.size == 0
         case (anti_terms.try(&.size) || 0)
-        when 0 then return Unsatisfiable.instance # TODO: should this be an Unbounded result instead? are there other similar cases that need to be changed?
+        when 0 then return Unbounded.instance
         when 1 then return anti_terms.not_nil!.first
         end
       elsif (terms.size == 1) && ((anti_terms.try(&.size) || 0) == 0)
@@ -214,6 +343,21 @@ class Mare::Compiler::Infer::MetaType
       iter = iter.chain(anti_terms.not_nil!.each.map(&.defn)) # TODO: is an anti-nominal actually reachable?
     end
     
+    def negate : Inner
+      # De Morgan's Law:
+      # The negation of an intersection is the union of negations of its terms.
+      
+      new_terms = anti_terms.try(&.map(&.negate).to_set) || Set(Nominal).new
+      new_anti_terms = terms.map(&.negate).to_set
+      new_anti_terms = nil if new_anti_terms.empty?
+      
+      Union.new(new_terms, new_anti_terms)
+    end
+    
+    def intersect(other : Unbounded)
+      self
+    end
+    
     def intersect(other : Unsatisfiable)
       other
     end
@@ -224,7 +368,7 @@ class Mare::Compiler::Infer::MetaType
       
       # Unsatisfiable if we have already have an anti-term for this type.
       return Unsatisfiable.instance \
-        if anti_terms && anti_terms.not_nil!.includes?(other)
+        if anti_terms && anti_terms.not_nil!.includes?(AntiNominal.new(other.defn))
       
       # Unsatisfiable if there are two non-identical concrete types.
       return Unsatisfiable.instance \
@@ -239,7 +383,7 @@ class Mare::Compiler::Infer::MetaType
       return self if anti_terms && anti_terms.not_nil!.includes?(other)
       
       # Unsatisfiable if we have already have a term for this anti-type.
-      return Unsatisfiable.instance if terms.includes?(other)
+      return Unsatisfiable.instance if terms.includes?(Nominal.new(other.defn))
       
       # Add this to existing anti-terms (if any) and create the intersection.
       new_anti_terms =
@@ -271,6 +415,32 @@ class Mare::Compiler::Infer::MetaType
     def intersect(other : Union)
       other.intersect(self) # delegate to the "higher" class via commutativity
     end
+    
+    def unite(other : Unbounded)
+      other
+    end
+    
+    def unite(other : Unsatisfiable)
+      self
+    end
+    
+    def unite(other : Nominal)
+      Union.new([other].to_set, nil, [self].to_set)
+    end
+    
+    def unite(other : AntiNominal)
+      Union.new(Set(Nominal).new, [other].to_set, [self].to_set)
+    end
+    
+    def unite(other : Intersection)
+      return self if self == other
+      
+      Union.new(Set(Nominal).new, nil, [self, other].to_set)
+    end
+    
+    def unite(other : Union)
+      other.unite(self) # delegate to the "higher" class via commutativity
+    end
   end
   
   struct Union
@@ -288,6 +458,7 @@ class Mare::Compiler::Infer::MetaType
     
     # This function works like .new, but it accounts for cases where there
     # aren't enough terms, anti-terms, and intersections to build a real Union.
+    # Returns Unsatisfiable if no terms or anti-terms are supplied.
     def self.build(
       terms : Set(Nominal),
       anti_terms : Set(AntiNominal)? = nil,
@@ -364,6 +535,33 @@ class Mare::Compiler::Infer::MetaType
       )
     end
     
+    def negate : Inner
+      # De Morgan's Law:
+      # The negation of a union is the intersection of negations of its terms.
+      result = nil
+      terms.each do |term|
+        term = term.negate
+        result = result ? result.intersect(term) : term
+        return result if result.is_a?(Unsatisfiable)
+      end
+      anti_terms.not_nil!.each do |anti_term|
+        anti_term = anti_term.negate
+        result = result ? result.intersect(anti_term) : anti_term
+        return result if result.is_a?(Unsatisfiable)
+      end if anti_terms
+      intersects.not_nil!.each do |intersect|
+        intersect = intersect.negate
+        result = result ? result.intersect(intersect) : intersect
+        return result if result.is_a?(Unsatisfiable)
+      end if intersects
+      
+      result.not_nil!
+    end
+    
+    def intersect(other : Unbounded)
+      self
+    end
+    
     def intersect(other : Unsatisfiable)
       other
     end
@@ -385,28 +583,86 @@ class Mare::Compiler::Infer::MetaType
         results << result unless result.is_a?(Unsatisfiable)
       end if intersects
       
-      # If there are zero viable options remaining, return Unsatisfiable.
-      # If there is only one viable option remaining, return it.
-      case results.size
-      when 0 then return Unsatisfiable.instance
-      when 1 then return results.first
-      end
+      # Finally, unite all of the intersections together into their union.
+      result = Unsatisfiable.instance
+      results.each { |x| result = result.unite(x) }
+      result
+    end
+    
+    def unite(other : Unbounded)
+      other
+    end
+    
+    def unite(other : Unsatisfiable)
+      self
+    end
+    
+    def unite(other : Nominal)
+      # No change if we've already united with this type.
+      return self if terms.includes?(other)
       
-      # Collect the results into typed sets to forward to Union.new.
-      new_terms = Set(Nominal).new
-      new_anti_terms = Set(AntiNominal).new
-      new_intersects = Set(Intersection).new
-      results.each do |result|
-        case result
-        when Nominal then new_terms.add(result)
-        when AntiNominal then new_anti_terms.add(result)
-        when Intersection then new_intersects.add(result)
-        else raise NotImplementedError.new(result)
+      # Unbounded if we have already have an anti-term for this type.
+      return Unbounded.instance \
+        if anti_terms && anti_terms.not_nil!.includes?(AntiNominal.new(other.defn))
+      
+      # Otherwise, create a new union that adds this type.
+      Union.new(terms.dup.add(other), anti_terms, intersects)
+    end
+    
+    def unite(other : AntiNominal)
+      # No change if we've already united with this anti-type.
+      return self if anti_terms && anti_terms.not_nil!.includes?(other)
+      
+      # Unbounded if we have already have a term for this anti-type.
+      return Unbounded.instance if terms.includes?(Nominal.new(other.defn))
+      
+      # Unbounded if there are two non-identical concrete anti-types.
+      return Unbounded.instance \
+        if other.is_concrete? \
+          && anti_terms && anti_terms.not_nil!.any?(&.is_concrete?)
+      
+      # Add this to existing anti-terms (if any) and create the union.
+      new_anti_terms =
+        if anti_terms
+          anti_terms.not_nil!.dup.add(other)
+        else
+          [other].to_set
         end
-      end
+      Union.new(terms, new_anti_terms, intersects)
+    end
+    
+    def unite(other : Intersection)
+      # No change if we already have an equivalent intersection.
+      return self if intersects && intersects.not_nil!.includes?(other)
       
-      # Finally, return the intersected union.
-      Union.new(new_terms, new_anti_terms, new_intersects)
+      # Add this to existing anti-terms (if any) and create the union.
+      new_intersects =
+        if intersects
+          intersects.not_nil!.dup.add(other)
+        else
+          [other].to_set
+        end
+      Union.new(terms, anti_terms, new_intersects)
+    end
+    
+    def unite(other : Union)
+      # Intersect each individual term of other into this running union.
+      # If the result becomes Unbounded, return so immediately.
+      result : Inner = self
+      other.terms.each do |term|
+        result = result.unite(term)
+        return result if result.is_a?(Unbounded)
+      end
+      other.anti_terms.not_nil!.each do |anti_term|
+        result = result.unite(anti_term)
+        return result if result.is_a?(Unbounded)
+      end if other.anti_terms
+      other.intersects.not_nil!.each do |intersect|
+        result = result.unite(intersect)
+        return result if result.is_a?(Unbounded)
+      end if other.intersects
+      
+      result
     end
   end
   
@@ -462,8 +718,19 @@ class Mare::Compiler::Infer::MetaType
     @inner.as(Nominal).defn
   end
   
+  def -; negate end
+  def negate
+    MetaType.new(@inner.negate)
+  end
+  
+  def &(other : MetaType); intersect(other) end
   def intersect(other : MetaType)
     MetaType.new(@inner.intersect(other.inner))
+  end
+  
+  def |(other : MetaType); unite(other) end
+  def unite(other : MetaType)
+    MetaType.new(@inner.unite(other.inner))
   end
   
   def simplify
@@ -477,14 +744,14 @@ class Mare::Compiler::Infer::MetaType
   end
   
   private def simplify_intersection(inner : Intersection)
+    # TODO: complete the rest of the logic here (think about symmetry)
     removed_terms = Set(Nominal).new
     new_terms = inner.terms.select do |l|
-      # Remove terms that are subtypes of an anti-term - they are excluded.
+      # Return Unsatisfiable if any term is a subtype of an anti-term.
       if inner.anti_terms && inner.anti_terms.not_nil!.any? do |r|
         self.class.is_l_defn_sub_r_defn?(l.defn, r.defn)
       end
-        removed_terms.add(l)
-        next
+        return Unsatisfiable.instance
       end
       
       # Return Unsatisfiable if l is concrete and isn't a subtype of any other.
@@ -521,6 +788,7 @@ class Mare::Compiler::Infer::MetaType
     
     # Just copy the terms and anti-terms without working with them.
     # TODO: are there any simplifications we can/should apply here?
+    # TODO: consider some that are in symmetry with those for intersections.
     terms.concat(inner.terms)
     anti_terms.concat(inner.anti_terms.not_nil!) if inner.anti_terms
     
