@@ -4,7 +4,8 @@ module Mare::Parser::Builder
   def self.build(tokens, source)
     iter = Pegmatite::TokenIterator.new(tokens)
     main = iter.next
-    build_doc(main, iter, source)
+    state = State.new(source)
+    build_doc(main, iter, state)
   end
   
   private def self.assert_kind(token, kind)
@@ -12,17 +13,17 @@ module Mare::Parser::Builder
       unless token[0] == kind
   end
   
-  private def self.build_doc(main, iter, source)
+  private def self.build_doc(main, iter, state)
     assert_kind(main, :doc)
     doc = AST::Document.new
     decl : AST::Declare? = nil
     
     iter.while_next_is_child_of(main) do |child|
       if child[0] == :decl
-        decl = build_decl(child, iter, source)
+        decl = build_decl(child, iter, state)
         doc.list << decl
       else
-        term = build_term(child, iter, source)
+        term = build_term(child, iter, state)
         decl.as(AST::Declare).body.terms << term
       end
     end
@@ -30,52 +31,52 @@ module Mare::Parser::Builder
     doc
   end
   
-  private def self.build_decl(main, iter, source)
+  private def self.build_decl(main, iter, state)
     assert_kind(main, :decl)
-    decl = AST::Declare.new.with_pos(source, main)
+    decl = AST::Declare.new.with_pos(state.pos(main))
     
     iter.while_next_is_child_of(main) do |child|
-      decl.head << build_term(child, iter, source)
+      decl.head << build_term(child, iter, state)
     end
     
     decl
   end
   
-  private def self.build_term(main, iter, source)
+  private def self.build_term(main, iter, state)
     kind, start, finish = main
     case kind
     when :ident
-      value = source.content[start...finish]
-      AST::Identifier.new(value).with_pos(source, main)
+      value = state.slice(main)
+      AST::Identifier.new(value).with_pos(state.pos(main))
     when :string
-      value = source.content[start...finish]
-      AST::LiteralString.new(value).with_pos(source, main)
+      value = state.slice(main)
+      AST::LiteralString.new(value).with_pos(state.pos(main))
     when :integer
-      string = source.content[start...finish]
+      string = state.slice(main)
       value = begin string.to_u64 rescue string.to_i64.to_u64 end
-      AST::LiteralInteger.new(value).with_pos(source, main)
+      AST::LiteralInteger.new(value).with_pos(state.pos(main))
     when :float
-      value = source.content[start...finish].to_f
-      AST::LiteralFloat.new(value).with_pos(source, main)
+      value = state.slice(main).to_f
+      AST::LiteralFloat.new(value).with_pos(state.pos(main))
     when :op
-      value = source.content[start...finish]
-      AST::Operator.new(value).with_pos(source, main)
-    when :relate  then build_relate(main, iter, source)
-    when :group   then build_group(main, iter, source)
-    when :group_w then build_group_w(main, iter, source)
-    when :prefix  then build_prefix(main, iter, source)
-    when :qualify then build_qualify(main, iter, source)
+      value = state.slice(main)
+      AST::Operator.new(value).with_pos(state.pos(main))
+    when :relate  then build_relate(main, iter, state)
+    when :group   then build_group(main, iter, state)
+    when :group_w then build_group_w(main, iter, state)
+    when :prefix  then build_prefix(main, iter, state)
+    when :qualify then build_qualify(main, iter, state)
     else
       raise NotImplementedError.new(kind)
     end
   end
   
-  private def self.build_relate(main, iter, source)
+  private def self.build_relate(main, iter, state)
     assert_kind(main, :relate)
     terms = [] of AST::Term
     
     iter.while_next_is_child_of(main) do |child|
-      terms << build_term(child, iter, source)
+      terms << build_term(child, iter, state)
     end
     
     # Parsing operator precedeence without too much nested backtracking
@@ -86,18 +87,18 @@ module Mare::Parser::Builder
     # Build a left-leaning tree of Relate nodes, each with a left-hand-side,
     # a right-hand-side, and an operator betwixt the two of those terms.
     terms.each_slice(2).reduce(terms.shift) do |lhs, (op, rhs)|
-      AST::Relate.new(lhs, op.as(AST::Operator), rhs).with_pos(source, main)
+      AST::Relate.new(lhs, op.as(AST::Operator), rhs).with_pos(state.pos(main))
     end
   end
   
-  private def self.build_group(main, iter, source)
+  private def self.build_group(main, iter, state)
     assert_kind(main, :group)
-    style = source.content[main[1]..main[1]]
+    style = state.slice(main[1]..main[1])
     terms_lists = [[] of AST::Term]
     partitions = [main[1] + 1]
     
     iter.while_next_is_child_of(main) do |child|
-      term = build_term(child, iter, source)
+      term = build_term(child, iter, state)
       
       if term.is_a?(AST::Operator)
         raise "stray operator: #{term}" unless term.value == "|"
@@ -113,25 +114,25 @@ module Mare::Parser::Builder
     
     if terms_lists.size <= 1
       # This is a flat group with just one partition.
-      AST::Group.new(style, terms_lists.first).with_pos(source, main)
+      AST::Group.new(style, terms_lists.first).with_pos(state.pos(main))
     else
       # This is a partitioned group, built as a nested group.
       partitions << main[2] - 1
       positions = partitions.each_slice(2).to_a
       top_terms = terms_lists.zip(positions).map do |terms, pos|
         pos = {:group, pos[0], pos[1]}
-        AST::Group.new(style, terms).with_pos(source, pos).as(AST::Node)
+        AST::Group.new(style, terms).with_pos(state.pos(pos)).as(AST::Node)
       end
-      AST::Group.new("|", top_terms).with_pos(source, main)
+      AST::Group.new("|", top_terms).with_pos(state.pos(main))
     end
   end
   
-  private def self.build_group_w(main, iter, source)
+  private def self.build_group_w(main, iter, state)
     assert_kind(main, :group_w)
-    group = AST::Group.new(" ").with_pos(source, main)
+    group = AST::Group.new(" ").with_pos(state.pos(main))
     
     iter.while_next_is_child_of(main) do |child|
-      term = build_term(child, iter, source)
+      term = build_term(child, iter, state)
       
       raise "stray operator: #{term}" if term.is_a?(AST::Operator)
       
@@ -141,25 +142,25 @@ module Mare::Parser::Builder
     group
   end
   
-  private def self.build_prefix(main, iter, source)
+  private def self.build_prefix(main, iter, state)
     assert_kind(main, :prefix)
     
-    op = build_term(iter.next_as_child_of(main), iter, source)
+    op = build_term(iter.next_as_child_of(main), iter, state)
     op = op.as(AST::Operator)
     
-    term = build_term(iter.next_as_child_of(main), iter, source)
+    term = build_term(iter.next_as_child_of(main), iter, state)
     
-    AST::Prefix.new(op, term).with_pos(source, main)
+    AST::Prefix.new(op, term).with_pos(state.pos(main))
   end
   
-  private def self.build_qualify(main, iter, source)
+  private def self.build_qualify(main, iter, state)
     assert_kind(main, :qualify)
     
-    term = build_term(iter.next_as_child_of(main), iter, source)
+    term = build_term(iter.next_as_child_of(main), iter, state)
     
-    group = build_term(iter.next_as_child_of(main), iter, source)
+    group = build_term(iter.next_as_child_of(main), iter, state)
     group = group.as(AST::Group)
     
-    AST::Qualify.new(term, group).with_pos(source, main)
+    AST::Qualify.new(term, group).with_pos(state.pos(main))
   end
 end

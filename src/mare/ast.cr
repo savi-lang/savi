@@ -27,8 +27,8 @@ module Mare::AST
     property rid : UInt64 = 0
     @flags : UInt64 = 0
     
-    def with_pos(source : Source, token : Pegmatite::Token)
-      @pos = Source::Pos.new(source, token[1], token[2])
+    def with_pos(pos : Source::Pos)
+      @pos = pos
       self
     end
     

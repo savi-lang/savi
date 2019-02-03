@@ -9,58 +9,23 @@ end
 
 struct Mare::Source::Pos
   property source : Source
-  property start : Int32
-  property finish : Int32
+  property start : Int32       # the character offset of the start of this token
+  property finish : Int32      # the character offset of the end of this token
+  property row : Int32         # the zero-based vertical position in the text
+  property col : Int32         # the zero-based horizontal position in the text
+  property line_start : Int32  # the character offset of the start of this line
+  property line_finish : Int32 # the character offset of the end of this line
   
-  def initialize(@source, @start, @finish)
-    @info = {0, 0, 0, 0}
-    @missing_info = true
+  def initialize(
+    @source, @start, @finish, @line_start, @line_finish, @row, @col
+  )
   end
-  NONE = new(Source.none, 0, 0)
+  NONE = new(Source.none, 0, 0, 0, 0, 0, 0)
   def self.none; NONE end
   
   # Override inspect to avoid verbosely printing Source#content every time.
   def inspect(io)
     io << "`#{source.path.split("/").last}:#{start}-#{finish}`"
-  end
-  
-  def row; info[0] end
-  def col; info[1] end
-  def line_start; info[2] end
-  def line_finish; info[3] end
-  
-  # Look at the source content surrounding the position to calculate
-  # the following pieces of information, returned as a NamedTuple.
-  # - row: the zero-indexed vertical position in the text
-  # - col: the zero-indexed horizontal position in the text
-  # - line_start: the character offset of the start of this line
-  # - line_finish: the character offset of the end of this line
-  private def info
-    return @info unless @missing_info
-    
-    # TODO: convert start and finish from byte offset to char offset first,
-    # so that multi-byte characters are properly accounted for here.
-    content = source.content
-    
-    line_start = content.rindex("\n", start)
-    line_start = line_start ? line_start + 1 : 0
-    
-    line_finish = content.index("\n", start) || content.size
-    line_finish = line_finish ? line_finish - 1 : content.size
-    
-    col = start - line_start
-    
-    row = 0
-    cursor = start
-    while cursor && cursor > 0
-      cursor -= 1
-      cursor = content.rindex("\n", cursor.not_nil!)
-      break if cursor.nil?
-      row += 1
-    end
-    
-    @missing_info = false
-    @info = {row, col, line_start, line_finish}
   end
   
   def show
