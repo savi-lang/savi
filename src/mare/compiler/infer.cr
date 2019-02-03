@@ -38,7 +38,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
     
     def resolve!(infer : Infer)
-      if @domain.empty?
+      if @domain.unsatisfiable?
         Error.at self,
           "This value's type is unresolvable due to conflicting constraints",
           @pos_list.zip(@domain_constraints.map(&.show))
@@ -58,7 +58,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       @domain_constraints << constraint
       @pos_list << pos
       
-      return unless @domain.empty?
+      return unless @domain.unsatisfiable?
       
       Error.at self,
         "This value's type is unresolvable due to conflicting constraints",

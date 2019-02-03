@@ -15,7 +15,23 @@ class Mare::Compiler::Infer::MetaType
   # have to redistribute the terms and simplify to reach the DNF form.
   # We ensure this is always done by representing the Inner types in this way.
   
-  alias Inner = (Union | Intersection | AntiNominal | Nominal)
+  alias Inner = (Union | Intersection | AntiNominal | Nominal | Unsatisfiable)
+  
+  class Unsatisfiable
+    INSTANCE = new
+    
+    def self.instance
+      INSTANCE
+    end
+    
+    private def self.new
+      super
+    end
+    
+    def each_reachable_defn : Iterator(Program::Type)
+      ([] of Program::Type).each
+    end
+  end
   
   class Nominal
     getter defn : Program::Type
@@ -29,6 +45,10 @@ class Mare::Compiler::Infer::MetaType
     
     def ==(other)
       other.is_a?(Nominal) && defn == other.defn
+    end
+    
+    def each_reachable_defn : Iterator(Program::Type)
+      [defn].each
     end
   end
   
@@ -44,6 +64,10 @@ class Mare::Compiler::Infer::MetaType
     
     def ==(other)
       other.is_a?(AntiNominal) && defn == other.defn
+    end
+    
+    def each_reachable_defn : Iterator(Program::Type)
+      [defn].each # TODO: is an anti-nominal actually reachable?
     end
   end
   
@@ -65,6 +89,13 @@ class Mare::Compiler::Infer::MetaType
       other.is_a?(Intersection) &&
       defns == other.defns &&
       anti_defns == other.anti_defns
+    end
+    
+    def each_reachable_defn : Iterator(Program::Type)
+      iter = defns.each
+      
+      return iter unless anti_defns
+      iter = iter.chain(anti_defns.not_nil!.each) # TODO: is an anti-nominal actually reachable?
     end
   end
   
@@ -90,6 +121,18 @@ class Mare::Compiler::Infer::MetaType
       anti_defns == other.anti_defns &&
       intersects == other.intersects
     end
+    
+    def each_reachable_defn : Iterator(Program::Type)
+      iter = defns.each
+      
+      return iter unless anti_defns
+      iter = iter.chain(anti_defns.not_nil!.each) # TODO: is an anti-nominal actually reachable?
+      
+      return iter unless intersects
+      iter = iter.chain(
+        intersects.not_nil!.map(&.each_reachable_defn).flat_map(&.to_a).each
+      )
+    end
   end
   
   getter inner : Inner
@@ -99,9 +142,12 @@ class Mare::Compiler::Infer::MetaType
   end
   
   def initialize(union : Enumerable(Program::Type))
-    case union
-    when Set(Program::Type) then @inner = Union.new(union)
-    else @inner = Union.new(union.to_set)
+    if union.size == 0
+      @inner = Unsatisfiable.instance
+    elsif union.size == 1
+      @inner = Nominal.new(union.first)
+    else
+      @inner = Union.new(union.to_set)
     end
   end
   
@@ -113,6 +159,8 @@ class Mare::Compiler::Infer::MetaType
   def defns : Enumerable(Program::Type)
     inner = @inner
     case inner
+    when Unsatisfiable
+      [] of Program::Type
     when Nominal
       [inner.defn]
     when Union
@@ -123,20 +171,17 @@ class Mare::Compiler::Infer::MetaType
     end
   end
   
-  def empty?
-    return false if @inner.is_a?(Nominal)
-    defns.empty? # TODO: don't rely on defns
+  def unsatisfiable?
+    @inner.is_a?(Unsatisfiable)
   end
   
   def singular?
-    return true if @inner.is_a?(Nominal)
-    defns.size == 1 # TODO: don't rely on defns
+    @inner.is_a?(Nominal)
   end
   
   def single!
     raise "not singular: #{show_type}" unless singular?
-    return @inner.as(Nominal).defn if @inner.is_a?(Nominal)
-    defns.first # TODO: don't rely on defns
+    @inner.as(Nominal).defn
   end
   
   def intersect(other : MetaType)
@@ -263,8 +308,8 @@ class Mare::Compiler::Infer::MetaType
     true
   end
   
-  def each_type_def : Iterator(Program::Type)
-    defns.each # TODO: don't rely on defns, or get rid of this method
+  def each_reachable_defn : Iterator(Program::Type)
+    @inner.each_reachable_defn
   end
   
   def ==(other)
@@ -291,6 +336,6 @@ class Mare::Compiler::Infer::MetaType
       unconstrained = false
       reduction.intersect(constraint)
     end
-    unconstrained || !intersected.empty?
+    unconstrained || !intersected.unsatisfiable?
   end
 end
