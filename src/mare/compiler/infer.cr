@@ -336,6 +336,9 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   end
   
   def self.run(ctx)
+    # Before doing anything, mark the pass as ready on all types.
+    ctx.program.types.each(&.subtyping.infer_ready!)
+    
     # Start by running an instance of inference at the Main.new function,
     # and recurse into checking other functions that are reachable from there.
     t = ctx.program.find_type!("Main")

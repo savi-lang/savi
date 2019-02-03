@@ -71,6 +71,11 @@ class Mare::Program
         .any? { |f| f.ident.value == func_name && !f.has_tag?(:hygienic) }
     end
     
+    def find_func?(func_name)
+      @functions
+        .find { |f| f.ident.value == func_name && !f.has_tag?(:hygienic) }
+    end
+    
     def find_func!(func_name)
       @functions
         .find { |f| f.ident.value == func_name && !f.has_tag?(:hygienic) }
@@ -93,6 +98,15 @@ class Mare::Program
     
     def is_instantiable?
       has_tag?(:allocated) && is_concrete?
+    end
+    
+    @subtyping : Mare::Compiler::Infer::SubtypingInfo?
+    def subtyping
+      @subtyping ||= Mare::Compiler::Infer::SubtypingInfo.new(self)
+    end
+    
+    def subtype_of?(other : Program::Type) : Bool
+      subtyping.check(other)
     end
   end
   
