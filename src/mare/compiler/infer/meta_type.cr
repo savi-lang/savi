@@ -686,7 +686,9 @@ class Mare::Compiler::Infer::MetaType
   end
   
   def self.new_union(types : Iterable(MetaType))
-    new(types.reduce(Set(Program::Type).new) { |all, o| all | o.defns.to_set })
+    inner = Unsatisfiable.instance
+    types.each { |mt| inner = inner.unite(mt.inner) }
+    MetaType.new(inner)
   end
   
   # TODO: remove this method:
