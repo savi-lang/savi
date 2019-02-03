@@ -20,6 +20,11 @@ struct Mare::Compiler::Infer::MetaType::Nominal
     [defn].each
   end
   
+  def find_callable_func_defns(name : String)
+    func = defn.find_func?(name)
+    [{defn, func}] if func
+  end
+  
   def is_concrete?
     defn.is_concrete?
   end

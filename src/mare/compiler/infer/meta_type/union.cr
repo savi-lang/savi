@@ -90,6 +90,22 @@ struct Mare::Compiler::Infer::MetaType::Union
     )
   end
   
+  def find_callable_func_defns(name : String)
+    # Every term in the union must have an implementation of the call.
+    list = [] of Tuple(Program::Type, Program::Function)
+    terms.each do |term|
+      result = term.find_callable_func_defns(name)
+      return nil unless result
+      list.concat(result)
+    end
+    intersects.not_nil!.each do |intersect|
+      result = intersect.find_callable_func_defns(name)
+      return nil unless result
+      list.concat(result)
+    end if intersects
+    list
+  end
+  
   def negate : Inner
     # De Morgan's Law:
     # The negation of a union is the intersection of negations of its terms.

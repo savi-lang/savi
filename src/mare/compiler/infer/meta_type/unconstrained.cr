@@ -25,6 +25,10 @@ class Mare::Compiler::Infer::MetaType::Unconstrained
     ([] of Program::Type).each
   end
   
+  def find_callable_func_defns(name : String)
+    nil
+  end
+  
   def negate : Inner
     # The negation of an Unconstrained is... well... I'm not sure yet.
     # Is it Unsatisfiable?

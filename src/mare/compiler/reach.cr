@@ -6,6 +6,10 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     def initialize(@meta_type : Infer::MetaType)
     end
     
+    def show_type
+      @meta_type.show_type
+    end
+    
     def is_tuple?
       false # TODO
     end
@@ -38,8 +42,8 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       @meta_type.single!
     end
     
-    def each_defn # TODO: get rid of this - it's too leaky of an abstraction
-      @meta_type.defns.each
+    def any_callable_defn_for(name)
+      @meta_type.find_callable_func_defns(name).not_nil!.first.first
     end
     
     def tuple_count

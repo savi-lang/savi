@@ -25,6 +25,10 @@ class Mare::Compiler::Infer::MetaType::Unsatisfiable
     ([] of Program::Type).each
   end
   
+  def find_callable_func_defns(name : String)
+    nil
+  end
+  
   def negate : Inner
     # The negation of an Unsatisfiable is... well... I'm not sure yet.
     # Is it Unconstrained?

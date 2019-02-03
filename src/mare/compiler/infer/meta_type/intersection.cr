@@ -63,6 +63,16 @@ struct Mare::Compiler::Infer::MetaType::Intersection
     iter = iter.chain(anti_terms.not_nil!.each.map(&.defn)) # TODO: is an anti-nominal actually reachable?
   end
   
+  def find_callable_func_defns(name : String)
+    # We return for only those in the intersection that have this func.
+    list = [] of Tuple(Program::Type, Program::Function)
+    terms.each do |term|
+      result = term.find_callable_func_defns(name)
+      list.concat(result) if result
+    end
+    list.empty? ? nil : list
+  end
+  
   def negate : Inner
     # De Morgan's Law:
     # The negation of an intersection is the union of negations of its terms.

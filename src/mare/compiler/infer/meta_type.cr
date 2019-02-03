@@ -63,22 +63,6 @@ class Mare::Compiler::Infer::MetaType
     !MetaType.new(inner).simplify.unsatisfiable?
   end
   
-  # TODO: remove this method:
-  def defns : Enumerable(Program::Type)
-    inner = @inner
-    case inner
-    when Unsatisfiable
-      [] of Program::Type
-    when Nominal
-      [inner.defn]
-    when Union
-      raise NotImplementedError.new(inner.inspect) \
-        if inner.anti_terms || inner.intersects
-      inner.terms.map(&.defn)
-    else raise NotImplementedError.new(inner.inspect)
-    end
-  end
-  
   def unsatisfiable?
     @inner.is_a?(Unsatisfiable)
   end
@@ -183,6 +167,12 @@ class Mare::Compiler::Infer::MetaType
   
   def each_reachable_defn : Iterator(Program::Type)
     @inner.each_reachable_defn
+  end
+  
+  def find_callable_func_defns(
+    name : String,
+  ) : Array(Tuple(Program::Type, Program::Function))?
+    @inner.find_callable_func_defns(name)
   end
   
   def ==(other)

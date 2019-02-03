@@ -794,12 +794,12 @@ class Mare::Compiler::CodeGen
     else raise NotImplementedError.new(rhs)
     end
     
-    lhs_gtypes = gtypes_of(relate.lhs)
+    lhs_type = type_of(relate.lhs)
     
     # Even if there are multiple possible gtypes and thus gfuncs, we choose an
     # arbitrary one for the purposes of checking arg types against param types.
     # We make the assumption that signature differences have been prevented.
-    lhs_gtype = lhs_gtypes.first
+    lhs_gtype = @gtypes[program.reach[lhs_type.any_callable_defn_for(member)].llvm_name] # TODO: simplify this mess of an expression
     gfunc = lhs_gtype[member]
     
     # For any args we are missing, try to find and use a default param value.
@@ -822,9 +822,9 @@ class Mare::Compiler::CodeGen
     
     # Call the LLVM function, or do a virtual call if necessary.
     @di.set_loc(relate.op)
-    needs_virtual_call = lhs_gtypes.size > 1 || lhs_gtype.type_def.is_abstract?
+    needs_virtual_call = lhs_type.is_abstract?
     if needs_virtual_call
-      gen_virtual_call(receiver, args, lhs_gtypes, gfunc)
+      gen_virtual_call(receiver, args, lhs_type, gfunc)
     else
       args.unshift(receiver) if gfunc.needs_receiver?
       @builder.call(gfunc.llvm_func, args)
@@ -834,11 +834,10 @@ class Mare::Compiler::CodeGen
   def gen_virtual_call(
     receiver : LLVM::Value,
     args : Array(LLVM::Value),
-    gtypes : Array(GenType),
+    type_ref : Reach::Ref,
     gfunc : GenFunc,
   )
-    receiver.name = gtypes.map(&.type_def).map(&.llvm_name).join("|") \
-      if receiver.name.empty?
+    receiver.name = type_ref.show_type if receiver.name.empty?
     rname = receiver.name
     fname = "#{rname}.#{gfunc.func.ident.value}"
     

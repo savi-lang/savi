@@ -427,24 +427,28 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   end
   
   def follow_call(call : FromCall)
-    call_defns = self[call.lhs].resolve!(self).defns
+    resolved = self[call.lhs].resolve!(self)
+    call_defns = resolved.find_callable_func_defns(call.member)
     
-    raise NotImplementedError.new("no defns for #{call.inspect}") \
-      if call_defns.empty?
+    Error.at call, "can't call '#{call.member}' on #{resolved.show_type}" \
+      unless call_defns
+    raise "this array should be either nil or non-empty" if call_defns.empty?
     
     # For each receiver type definition that is possible, track down the infer
     # for the function that we're trying to call, evaluating the constraints
     # for each possibility such that all of them must hold true.
     rets = [] of MetaType
     poss = [] of Source::Pos
-    call_defns.each do |call_defn|
-      call_func = call_defn.find_func!(call.member)
-      
+    call_defns.each do |(call_defn, call_func)|
       # Keep track that we called this function.
       @called_funcs.add(call_func)
       
       # Get the Infer instance for call_func, possibly creating and running it.
+      # TODO: don't infer anything in the body of that func if type and params
+      # were explicitly specified in the function signature.
       infer = Infer.from(call_defn, call_func)
+      
+      # TODO: enforce reference capability of the receiver here.
       
       # Apply parameter constraints to each of the argument types.
       # TODO: handle case where number of args differs from number of params.

@@ -21,6 +21,10 @@ struct Mare::Compiler::Infer::MetaType::AntiNominal
     [defn].each # TODO: is an anti-nominal actually reachable?
   end
   
+  def find_callable_func_defns(name : String)
+    nil
+  end
+  
   def is_concrete?
     defn.is_concrete?
   end
