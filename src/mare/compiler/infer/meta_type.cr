@@ -692,6 +692,18 @@ class Mare::Compiler::Infer::MetaType
     MetaType.new(inner)
   end
   
+  def self.new_intersection(types : Iterable(MetaType))
+    inner = Unbounded.instance
+    types.each { |mt| inner = inner.intersect(mt.inner) }
+    MetaType.new(inner)
+  end
+  
+  def within_constraints?(types : Iterable(MetaType))
+    inner = @inner
+    types.each { |mt| inner = inner.intersect(mt.inner) }
+    !MetaType.new(inner).simplify.unsatisfiable?
+  end
+  
   # TODO: remove this method:
   def defns : Enumerable(Program::Type)
     inner = @inner
@@ -931,15 +943,5 @@ class Mare::Compiler::Infer::MetaType
   
   def show_type
     @inner.inspect
-  end
-  
-  def within_constraints?(list : Iterable(MetaType))
-    # TODO: verify total correctness of this algorithm and its use.
-    unconstrained = true
-    intersected = list.reduce self do |reduction, constraint|
-      unconstrained = false
-      reduction.intersect(constraint).simplify
-    end
-    unconstrained || !intersected.unsatisfiable?
   end
 end
