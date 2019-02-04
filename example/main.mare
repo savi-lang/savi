@@ -28,9 +28,12 @@ class Sentence:
 
 actor Main:
   new:
+    @do_stuff(Greeting)
+  
+  be do_stuff (greeting Greeting):
     none = ()
     
-    maybe_greeting (Greeting | None) = Greeting
+    maybe_greeting (Greeting | None) = greeting
     if maybe_greeting <: Greeting \
       @say_stuff(maybe_greeting)
     

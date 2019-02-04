@@ -121,6 +121,13 @@ class Mare::Compiler::CodeGen
       @desc = g.gen_desc(@type_def, @desc_type, gen_vtable(g))
     end
     
+    # Generate other global values.
+    def gen_globals(g : CodeGen)
+      return if @type_def.is_abstract?
+      
+      @singleton = g.gen_singleton(@type_def, @struct_type, @desc.not_nil!)
+    end
+    
     # Generate function implementations.
     def gen_func_impls(g : CodeGen)
       return if @type_def.is_abstract?
@@ -128,15 +135,9 @@ class Mare::Compiler::CodeGen
       g.gen_dispatch_impl(self) if @type_def.is_actor?
       
       @gfuncs.each_value do |gfunc|
+        g.gen_send_impl(self, gfunc) if gfunc.needs_send?
         g.gen_func_impl(self, gfunc)
       end
-    end
-    
-    # Generate other global values.
-    def gen_globals(g : CodeGen)
-      return if @type_def.is_abstract?
-      
-      @singleton = g.gen_singleton(@type_def, @struct_type, @desc.not_nil!)
     end
     
     def [](name)
@@ -164,6 +165,8 @@ class Mare::Compiler::CodeGen
     getter llvm_name : String
     property! llvm_func : LLVM::Function
     property! virtual_llvm_func : LLVM::Function
+    property! send_llvm_func : LLVM::Function
+    property! send_msg_llvm_type : LLVM::Type
     
     def initialize(type_def : Reach::Def, @func, @vtable_index)
       @needs_receiver = type_def.has_state? && !@func.has_tag?(:constant)
@@ -174,6 +177,10 @@ class Mare::Compiler::CodeGen
     
     def needs_receiver?
       @needs_receiver
+    end
+    
+    def needs_send?
+      @func.has_tag?(:async)
     end
     
     def is_initializer?
@@ -532,9 +539,12 @@ class Mare::Compiler::CodeGen
     
     # Get the LLVM types to use for the parameter types.
     param_types = [] of LLVM::Type
+    mparam_types = [] of LLVM::Type if gfunc.needs_send?
     gfunc.func.params.try do |params|
       params.terms.map do |param|
-        param_types << llvm_type_of(param, gfunc)
+        ref = type_of(param, gfunc)
+        param_types << llvm_type_of(ref)
+        mparam_types << llvm_mem_type_of(ref) if mparam_types
       end
     end
     
@@ -544,8 +554,8 @@ class Mare::Compiler::CodeGen
     # Store the function declaration.
     gfunc.llvm_func = @mod.functions.add(gfunc.llvm_name, param_types, ret_type)
     
-    # If we used a receiver parameter, we're done.
-    # Otherwise, we need to create a wrapper method for the vtable that
+    # If we didn't use a receiver parameter in the function signature,
+    # we need to create a wrapper method for the virtual table that
     # includes a receiver parameter, but throws it away without using it.
     gfunc.virtual_llvm_func =
       if gfunc.needs_receiver?
@@ -565,6 +575,22 @@ class Mare::Compiler::CodeGen
           gen_func_end
         end
       end
+    
+    # If this is an async function, we need to generate a wrapper that sends
+    # it as a message to be handled asynchronously by the dispatch function.
+    # This is also the function that should go in the virtual table.
+    if gfunc.needs_send?
+      send_name = "#{gfunc.llvm_name}.SEND"
+      msg_name = "#{gfunc.llvm_name}.SEND.MSG"
+      
+      # We'll fill in the implementation of this later, in gen_send_impl.
+      gfunc.virtual_llvm_func = gfunc.send_llvm_func =
+        @mod.functions.add(send_name, param_types, @gtypes["None"].struct_ptr)
+      
+      # We also need to create a message type to use in the send operation.
+      gfunc.send_msg_llvm_type =
+        @llvm.struct([@i32, @i32, @ptr] + mparam_types.not_nil!, msg_name)
+    end
   end
   
   def gen_func_impl(gtype, gfunc)
@@ -843,7 +869,7 @@ class Mare::Compiler::CodeGen
     end
     
     # Prepend the receiver to the args list if necessary.
-    if gfunc.needs_receiver? || needs_virtual_call
+    if gfunc.needs_receiver? || needs_virtual_call || gfunc.needs_send?
       args.unshift(receiver)
       arg_exprs.unshift(relate.lhs)
     end
@@ -852,6 +878,8 @@ class Mare::Compiler::CodeGen
     @di.set_loc(relate.op)
     if needs_virtual_call
       gen_virtual_call(receiver, args, arg_exprs, lhs_type, gfunc)
+    elsif gfunc.needs_send?
+      gen_call(gfunc.send_llvm_func, args, arg_exprs)
     else
       gen_call(gfunc.llvm_func, args, arg_exprs)
     end
@@ -948,7 +976,7 @@ class Mare::Compiler::CodeGen
   def gen_assign_cast(
     value : LLVM::Value,
     to_type : LLVM::Type,
-    from_expr : AST::Node,
+    from_expr : AST::Node?,
   )
     from_type = value.type
     return value if from_type == to_type
@@ -974,12 +1002,12 @@ class Mare::Compiler::CodeGen
       
       # Unwrap the box and finish the assign cast from there.
       # This brings us to the zero extension / truncation logic above.
-      value = gen_unboxed(value, from_expr)
+      value = gen_unboxed(value, from_expr.not_nil!)
       gen_assign_cast(value, to_type, from_expr)
     when LLVM::Type::Kind::Pointer
       # If we're going from pointer to non-pointer, we're unboxing,
       # so we have to do that first before the LLVM bit cast.
-      value = gen_boxed(value, from_expr) \
+      value = gen_boxed(value, from_expr.not_nil!) \
         if value.type.kind != LLVM::Type::Kind::Pointer
       
       # Do the LLVM bitcast.
@@ -1411,6 +1439,49 @@ class Mare::Compiler::CodeGen
     @builder.store(value, gep)
   end
   
+  def gen_send_impl(gtype, gfunc)
+    fn = gfunc.send_llvm_func
+    gen_func_start(fn)
+    
+    # Get the message type and virtual table index to use.
+    msg_type = gfunc.send_msg_llvm_type
+    vtable_index = gfunc.vtable_index
+    
+    # Allocate a message object of the specific size/type used by this function.
+    msg_size = @target_machine.data_layout.abi_size(msg_type)
+    pool_index = PonyRT.pool_index(msg_size)
+    msg_opaque = @builder.call(@mod.functions["pony_alloc_msg"],
+      [@i32.const_int(pool_index), @i32.const_int(vtable_index)], "msg_opaque")
+    msg = @builder.bit_cast(msg_opaque, msg_type.pointer, "msg")
+    
+    # Store all forwarding arguments in the message object.
+    msg_type.struct_element_types.each_with_index do |elem_type, i|
+      next if i < 3 # skip the first 3 boilerplate fields in the message
+      param = fn.params[i - 3 + 1] # skip 3 fields, skip 1 param (the receiver)
+      
+      # Cast the argument to the correct type and store it in the message.
+      cast_arg = gen_assign_cast(param, elem_type, nil)
+      arg_gep = @builder.struct_gep(msg, i)
+      @builder.store(cast_arg, arg_gep)
+    end
+    
+    # TODO: Trace the message.
+    
+    # Send the message.
+    @builder.call(@mod.functions["pony_sendv_single"], [
+      pony_ctx,
+      @builder.bit_cast(fn.params[0], @obj_ptr), # TODO: no fallback || here
+      msg_opaque,
+      msg_opaque,
+      @i1.const_int(1)
+    ])
+    
+    # Return None.
+    @builder.ret(gen_none)
+    
+    gen_func_end
+  end
+  
   def gen_dispatch_impl(gtype : GenType)
     # Get the reference to the dispatch function declared earlier.
     # We'll fill in the implementation of that function now.
@@ -1428,6 +1499,7 @@ class Mare::Compiler::CodeGen
     # (which was the third parameter to this function).
     msg_id_gep = @builder.struct_gep(fn.params[2], 1, "msg.id")
     msg_id = @builder.load(msg_id_gep)
+    receiver = @builder.bit_cast(fn.params[1], gtype.struct_ptr, "@")
     
     # Capture the current insert block so we can come back to it later,
     # after we jump around into each case block that we need to generate.
@@ -1447,11 +1519,23 @@ class Mare::Compiler::CodeGen
       cases[id] = block = gen_block("DISPATCH.#{func_name}")
       @builder.position_at_end(block)
       
-      # TODO: Destructure params from the message.
+      # Destructure args from the message.
+      msg_type = gfunc.send_msg_llvm_type
+      msg = @builder.bit_cast(fn.params[2], msg_type.pointer)
+      args =
+        msg_type.struct_element_types.each_with_index.map do |(elem_type, i)|
+          next if i < 3 # skip the first 3 boilerplate fields in the message
+          arg_gep = @builder.struct_gep(msg, i)
+          gen_assign_cast(@builder.load(arg_gep), elem_type, nil)
+        end.to_a.compact
+      
+      # Prepend the receiver as the first argument, not included in the message.
+      args.unshift(receiver)
+      
       # TODO: Trace the message.
       
       # Call the underlying function and return void.
-      @builder.call(gfunc.llvm_func, [receiver])
+      @builder.call(gfunc.llvm_func, args)
       @builder.ret
     end
     

@@ -50,7 +50,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
     
     # TODO: dedup these with the Witness mechanism.
     # TODO: be more specific (for example, `member` is only allowed for `enum`)
-    def keywords; ["prop", "fun", "new", "const", "member"] end
+    def keywords; ["prop", "fun", "be", "new", "const", "member"] end
     
     def finished(context)
       if @type.is_instantiable?
@@ -172,6 +172,25 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
       },
     ] of Hash(String, String | Bool))
     
+    @@declare_be = Witness.new([
+      {
+        "kind" => "keyword",
+        "name" => "be",
+      },
+      {
+        "kind" => "term",
+        "name" => "ident",
+        "type" => "ident|string",
+        "convert_string_to_ident" => true,
+      },
+      {
+        "kind" => "term",
+        "name" => "params",
+        "type" => "params",
+        "optional" => true,
+      },
+    ] of Hash(String, String | Bool))
+    
     @@declare_new = Witness.new([
       {
         "kind" => "keyword",
@@ -189,12 +208,6 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         "kind" => "term",
         "name" => "params",
         "type" => "params",
-        "optional" => true,
-      },
-      {
-        "kind" => "term",
-        "name" => "ret",
-        "type" => "type",
         "optional" => true,
       },
     ] of Hash(String, String | Bool))
@@ -260,6 +273,18 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
           data["ret"]?.as(AST::Identifier?),
           decl.body,
         )
+      when "be"
+        raise "only actors can have behaviours" \
+          unless @type.has_tag?(:actor)
+        
+        data = @@declare_be.run(decl)
+        
+        @type.functions << Program::Function.new(
+          data["ident"].as(AST::Identifier),
+          data["params"]?.as(AST::Group?),
+          AST::Identifier.new("None").from(data["ident"]),
+          decl.body,
+        ).tap(&.add_tag(:async))
       when "new"
         raise "stateless types can't have constructors" \
           unless @type.is_instantiable?
