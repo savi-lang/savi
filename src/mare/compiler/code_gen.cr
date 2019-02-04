@@ -1008,7 +1008,7 @@ class Mare::Compiler::CodeGen
     
     # Load the value itself into the value field of the boxed struct pointer.
     value_gep = @builder.struct_gep(value, 1, "#{value.name}.VALUE")
-    @builder.load(value_gep, "@.#{value.name}.VALUE.LOAD")
+    @builder.load(value_gep, "#{value.name}.VALUE.LOAD")
   end
   
   def gen_expr(expr, const_only = false) : LLVM::Value
