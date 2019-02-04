@@ -166,10 +166,7 @@ class Mare::Compiler::CodeGen
     property! virtual_llvm_func : LLVM::Function
     
     def initialize(type_def : Reach::Def, @func, @vtable_index)
-      @needs_receiver = \
-        type_def.has_state? &&
-        !@func.has_tag?(:constructor) &&
-        !@func.has_tag?(:constant)
+      @needs_receiver = type_def.has_state? && !@func.has_tag?(:constant)
       
       @llvm_name = "#{type_def.llvm_name}.#{@func.ident.value}"
       @llvm_name = "#{@llvm_name}.HYGIENIC" if func.has_tag?(:hygienic)
@@ -581,9 +578,7 @@ class Mare::Compiler::CodeGen
     
     # Set a receiver value (the value of the self in this function).
     func_frame.receiver_value =
-      if gfunc.func.has_tag?(:constructor)
-        gen_alloc(gtype)
-      elsif gfunc.needs_receiver?
+      if gfunc.needs_receiver?
         gfunc.llvm_func.params[0]
       elsif gtype.singleton?
         gtype.singleton
@@ -841,8 +836,14 @@ class Mare::Compiler::CodeGen
     # Determine if we need to use a virtual call here.
     needs_virtual_call = lhs_type.is_abstract?
     
+    # If this is a constructor, the receiver must be allocated first.
+    if gfunc.func.has_tag?(:constructor)
+      raise "can't do a virtual call on a constructor" if needs_virtual_call
+      receiver = gen_alloc(lhs_gtype, "#{lhs_gtype.type_def.llvm_name}.new")
+    end
+    
     # Prepend the receiver to the args list if necessary.
-    if needs_virtual_call || gfunc.needs_receiver?
+    if gfunc.needs_receiver? || needs_virtual_call
       args.unshift(receiver)
       arg_exprs.unshift(relate.lhs)
     end
@@ -1338,7 +1339,9 @@ class Mare::Compiler::CodeGen
     global
   end
   
-  def gen_alloc(gtype, name = "@")
+  def gen_alloc(gtype, name)
+    return gen_alloc_actor(gtype, name) if gtype.type_def.is_actor?
+    
     size = gtype.type_def.abi_size
     size = 1 if size == 0
     args = [pony_ctx]
@@ -1359,6 +1362,15 @@ class Mare::Compiler::CodeGen
     gen_put_desc(value, gtype, name)
     
     value
+  end
+  
+  def gen_alloc_actor(gtype, name)
+    allocated = @builder.call(@mod.functions["pony_create"], [
+      pony_ctx,
+      gen_get_desc(gtype),
+    ], "#{name}.MEM")
+    
+    @builder.bit_cast(allocated, gtype.struct_ptr, name)
   end
   
   def gen_get_desc(gtype_name : String)
@@ -1409,6 +1421,9 @@ class Mare::Compiler::CodeGen
     
     gen_func_start(fn)
     
+    # Get the receiver pointer from the second parameter (index 1).
+    receiver = @builder.bit_cast(fn.params[1], gtype.struct_ptr)
+    
     # Get the message id from the first field of the message object
     # (which was the third parameter to this function).
     msg_id_gep = @builder.struct_gep(fn.params[2], 1, "msg.id")
@@ -1436,7 +1451,7 @@ class Mare::Compiler::CodeGen
       # TODO: Trace the message.
       
       # Call the underlying function and return void.
-      @builder.call(gfunc.llvm_func)
+      @builder.call(gfunc.llvm_func, [receiver])
       @builder.ret
     end
     
