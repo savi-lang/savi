@@ -125,6 +125,8 @@ class Mare::Compiler::CodeGen
     def gen_func_impls(g : CodeGen)
       return if @type_def.is_abstract?
       
+      g.gen_dispatch_impl(self) if @type_def.is_actor?
+      
       @gfuncs.each_value do |gfunc|
         g.gen_func_impl(self, gfunc)
       end
@@ -1278,17 +1280,12 @@ class Mare::Compiler::CodeGen
     desc.global_constant = true
     desc
     
-    case type_def.llvm_name
-    when "Main"
-      dispatch_fn = @mod.functions.add("#{type_def.llvm_name}.DISPATCH", @dispatch_fn)
-      
-      traits = @pptr.null # TODO
-      fields = @pptr.null # TODO
-    else
-      dispatch_fn = @dispatch_fn_ptr.null # TODO
-      traits = @pptr.null # TODO
-      fields = @pptr.null # TODO
-    end
+    dispatch_fn =
+      if type_def.is_actor?
+        @mod.functions.add("#{type_def.llvm_name}.DISPATCH", @dispatch_fn)
+      else
+        @dispatch_fn_ptr.null
+      end
     
     desc.initializer = desc_type.const_struct [
       @i32.const_int(type_def.desc_id),      # 0: id
@@ -1305,33 +1302,10 @@ class Mare::Compiler::CodeGen
       dispatch_fn.to_value,                  # 11: dispatch fn
       @final_fn_ptr.null,                    # 12: final fn
       @i32.const_int(-1),                    # 13: event notify TODO
-      traits,                                # 14: TODO: traits
-      fields,                                # 15: TODO: fields
+      @pptr.null,                            # 14: TODO: traits
+      @pptr.null,                            # 15: TODO: fields
       @ptr.const_array(vtable),              # 16: vtable
     ]
-    
-    if dispatch_fn.is_a?(LLVM::Function)
-      dispatch_fn = dispatch_fn.not_nil!
-      
-      dispatch_fn.unnamed_addr = true
-      dispatch_fn.call_convention = LLVM::CallConvention::C
-      dispatch_fn.linkage = LLVM::Linkage::External
-      
-      gen_func_start(dispatch_fn)
-      
-      msg_id_gep = @builder.struct_gep(dispatch_fn.params[2], 1, "msg.id")
-      msg_id = @builder.load(msg_id_gep)
-      
-      # TODO: ... ^
-      
-      # TODO: arguments
-      # TODO: don't special-case this
-      @builder.call(@gtypes["Main"]["new"].llvm_func)
-      
-      @builder.ret
-      
-      gen_func_end
-    end
     
     desc
   end
@@ -1423,5 +1397,61 @@ class Mare::Compiler::CodeGen
     object = func_frame.receiver_value
     gep = @builder.struct_gep(object, gtype.field_index(name), "@.#{name}")
     @builder.store(value, gep)
+  end
+  
+  def gen_dispatch_impl(gtype : GenType)
+    # Get the reference to the dispatch function declared earlier.
+    # We'll fill in the implementation of that function now.
+    fn = @mod.functions["#{gtype.type_def.llvm_name}.DISPATCH"]
+    fn.unnamed_addr = true
+    fn.call_convention = LLVM::CallConvention::C
+    fn.linkage = LLVM::Linkage::External
+    
+    gen_func_start(fn)
+    
+    # Get the message id from the first field of the message object
+    # (which was the third parameter to this function).
+    msg_id_gep = @builder.struct_gep(fn.params[2], 1, "msg.id")
+    msg_id = @builder.load(msg_id_gep)
+    
+    # Capture the current insert block so we can come back to it later,
+    # after we jump around into each case block that we need to generate.
+    orig_block = @builder.insert_block
+    
+    # Generate the case block for each async function of this type,
+    # mapped by the message id that corresponds to that function.
+    cases = {} of LLVM::Value => LLVM::BasicBlock
+    gtype.gfuncs.each do |func_name, gfunc|
+      # Only look at functions with the async tag.
+      next unless gfunc.func.has_tag?(:async)
+      
+      # Use the vtable index of the function as the message id to look for.
+      id = @i32.const_int(gfunc.vtable_index)
+      
+      # Create the block to execute when the message id matches.
+      cases[id] = block = gen_block("DISPATCH.#{func_name}")
+      @builder.position_at_end(block)
+      
+      # TODO: Destructure params from the message.
+      # TODO: Trace the message.
+      
+      # Call the underlying function and return void.
+      @builder.call(gfunc.llvm_func)
+      @builder.ret
+    end
+    
+    # We rely on the typechecker to not let us call undefined async functions,
+    # so the "else" case of this switch block is to be considered unreachable.
+    unreachable_block = gen_block("unreachable_block")
+    @builder.position_at_end(unreachable_block)
+    # TODO: LLVM infinite loop protection workaround (see gentype.c:503)
+    @builder.unreachable
+    
+    # Finally, return to the original block that we came from and create the
+    # switch that maps onto all the case blocks that we just generated.
+    @builder.position_at_end(orig_block)
+    @builder.switch(msg_id, unreachable_block, cases)
+    
+    gen_func_end
   end
 end

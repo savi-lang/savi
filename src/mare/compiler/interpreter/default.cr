@@ -277,7 +277,10 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
           data["params"]?.as(AST::Group?),
           AST::Identifier.new("@").from(ident),
           body,
-        ).tap(&.add_tag(:constructor))
+        ).tap do |f|
+          f.add_tag(:constructor)
+          f.add_tag(:async) if @type.has_tag?(:actor)
+        end
       when "const"
         data = @@declare_const.run(decl)
         

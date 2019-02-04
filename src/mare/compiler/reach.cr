@@ -168,6 +168,10 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       @program_type.has_tag?(:actor)
     end
     
+    def is_actor?
+      @program_type.has_tag?(:actor)
+    end
+    
     def is_abstract?
       @program_type.has_tag?(:abstract)
     end
