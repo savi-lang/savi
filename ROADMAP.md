@@ -8,12 +8,12 @@
 - [x] - Interfaces
 - [x] - Virtual table calls on abstract types
 - [x] - Non-looping flow control (`if`, `case`, etc)
+- [x] - Runtime type matching (`x <: Y`)
 - [x] - Boxed numeric values
-- [ ] - Actors and behaviours
+- [x] - Actors and behaviours
 - [ ] - Finalizer functions
 - [ ] - Looping flow control (`while`, etc)
 - [ ] - Reference capabilities (`iso`, `trn`, `val`, `ref`, `box`, `tag`)
-- [ ] - Runtime type matching (`x <: Y`)
 - [ ] - For-loop iterator syntax sugar (`for x in y`)
 - [ ] - Partial functions and partial calls
 - [ ] - Generic types
