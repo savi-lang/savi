@@ -170,7 +170,8 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
     @@declare_fun = Witness.new([
       {
         "kind" => "keyword",
-        "name" => "fun",
+        "name" => "keyword",
+        "value" => "fun",
       },
       {
         "kind" => "term",
@@ -195,7 +196,8 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
     @@declare_be = Witness.new([
       {
         "kind" => "keyword",
-        "name" => "be",
+        "name" => "keyword",
+        "value" => "be",
       },
       {
         "kind" => "term",
@@ -214,7 +216,8 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
     @@declare_new = Witness.new([
       {
         "kind" => "keyword",
-        "name" => "new",
+        "name" => "keyword",
+        "value" => "new",
       },
       {
         "kind" => "term",
@@ -222,7 +225,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         "type" => "ident|string",
         "convert_string_to_ident" => true,
         "optional" => true,
-        "default_copy_term" => "new",
+        "default_copy_term" => "keyword",
       },
       {
         "kind" => "term",
@@ -235,7 +238,8 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
     @@declare_const = Witness.new([
       {
         "kind" => "keyword",
-        "name" => "const",
+        "name" => "keyword",
+        "value" => "const",
       },
       {
         "kind" => "term",
@@ -254,7 +258,8 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
     @@declare_prop = Witness.new([
       {
         "kind" => "keyword",
-        "name" => "prop",
+        "name" => "keyword",
+        "value" => "prop",
       },
       {
         "kind" => "term",
@@ -273,7 +278,8 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
     @@declare_is = Witness.new([
       {
         "kind" => "keyword",
-        "name" => "is",
+        "name" => "keyword",
+        "value" => "is",
       },
       {
         "kind" => "term",
@@ -285,7 +291,8 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
     @@declare_member = Witness.new([
       {
         "kind" => "keyword",
-        "name" => "member",
+        "name" => "keyword",
+        "value" => "member",
       },
       {
         "kind" => "term",
@@ -300,7 +307,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         data = @@declare_fun.run(decl)
         
         @type.functions << Program::Function.new(
-          AST::Identifier.new("box").from(decl.head.first.not_nil!),
+          AST::Identifier.new("box").from(data["keyword"]),
           data["ident"].as(AST::Identifier),
           data["params"]?.as(AST::Group?),
           data["ret"]?.as(AST::Identifier?),
@@ -313,7 +320,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         data = @@declare_be.run(decl)
         
         @type.functions << Program::Function.new(
-          AST::Identifier.new("ref").from(decl.head.first.not_nil!),
+          AST::Identifier.new("ref").from(data["keyword"]),
           data["ident"].as(AST::Identifier),
           data["params"]?.as(AST::Group?),
           AST::Identifier.new("None").from(data["ident"]),
@@ -332,7 +339,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         body.terms << AST::Identifier.new("@").from(ident)
         
         @type.functions << Program::Function.new(
-          AST::Identifier.new("ref").from(decl.head.first.not_nil!),
+          AST::Identifier.new("ref").from(data["keyword"]),
           ident,
           data["params"]?.as(AST::Group?),
           AST::Identifier.new("@").from(ident),
@@ -345,7 +352,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         data = @@declare_const.run(decl)
         
         @type.functions << Program::Function.new(
-          AST::Identifier.new("non").from(decl.head.first.not_nil!),
+          AST::Identifier.new("non").from(data["keyword"]),
           data["ident"].as(AST::Identifier),
           nil,
           data["ret"]?.as(AST::Identifier?),
@@ -359,7 +366,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         ident = data["ident"].as(AST::Identifier)
         ret = data["ret"]?.as(AST::Identifier?)
         
-        field_cap = AST::Identifier.new("tag").from(decl.head.first.not_nil!)
+        field_cap = AST::Identifier.new("tag").from(data["keyword"])
         field_params = AST::Group.new("(").from(ident)
         field_body = decl.body
         field_body = nil if decl.body.try { |group| group.terms.size == 0 }
@@ -368,13 +375,13 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         field_func.add_tag(:field)
         @type.functions << field_func
         
-        getter_cap = AST::Identifier.new("box").from(decl.head.first.not_nil!)
+        getter_cap = AST::Identifier.new("box").from(data["keyword"])
         getter_body = AST::Group.new(":").from(ident)
         getter_body.terms << AST::FieldRead.new(ident.value).from(ident)
         getter_func = Program::Function.new(getter_cap, ident, nil, ret, getter_body)
         @type.functions << getter_func
         
-        setter_cap = AST::Identifier.new("ref").from(decl.head.first.not_nil!)
+        setter_cap = AST::Identifier.new("ref").from(data["keyword"])
         setter_ident = AST::Identifier.new("#{ident.value}=").from(ident)
         setter_param = AST::Identifier.new("value").from(ident)
         if !ret.nil?
@@ -397,7 +404,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         data = @@declare_is.run(decl)
         
         @type.functions << Program::Function.new(
-          AST::Identifier.new("non").from(decl.head.first.not_nil!),
+          AST::Identifier.new("non").from(data["keyword"]),
           decl.head.first.as(AST::Identifier),
           nil,
           data["interface"].as(AST::Identifier),

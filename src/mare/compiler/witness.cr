@@ -72,8 +72,8 @@ class Mare::Witness
     case plan["kind"]
     when "keyword"
       # A keyword must be an identifier that exactly matches the given name.
-      Error.at term, "Expected keyword '#{plan["name"]}'" \
-        unless term.is_a?(AST::Identifier) && term.value == plan["name"]
+      Error.at term, "Expected keyword '#{plan["value"]}'" \
+        unless term.is_a?(AST::Identifier) && term.value == plan["value"]
     when "term"
       # If a type requirement is specified, check the type first.
       # We can check multiple types here if given (pipe-delimited).
