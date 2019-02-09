@@ -19,11 +19,12 @@ class Mare::Compiler::Infer::MetaType
   struct Intersection; end # A type intersection - a logical "AND".
   struct AntiNominal;  end # A type negation - a logical "NOT".
   struct Nominal;      end # A named type, either abstract or concrete.
+  struct Capability;   end # A reference capability.
   class Unsatisfiable; end # It's impossible to find a type that fulfills this.
   class Unconstrained; end # All types fulfill this - totally unconstrained.
   
   alias Inner = (
-    Union | Intersection | AntiNominal | Nominal |
+    Union | Intersection | AntiNominal | Nominal | Capability |
     Unsatisfiable | Unconstrained)
   
   getter inner : Inner
@@ -31,20 +32,13 @@ class Mare::Compiler::Infer::MetaType
   def initialize(@inner)
   end
   
-  def initialize(nominal : Program::Type)
-    @inner = Nominal.new(nominal)
+  def initialize(defn : Program::Type, cap : String? = nil)
+    cap ||= defn.cap.value
+    @inner = Nominal.new(defn).intersect(Capability.new(cap))
   end
   
-  def self.new_union(types : Enumerable(Program::Type))
-    inner =
-      if types.size == 0
-        Unsatisfiable.instance
-      elsif types.size == 1
-        Nominal.new(types.first)
-      else
-        Union.new(types.map { |d| Nominal.new(d) }.to_set)
-      end
-    MetaType.new(inner)
+  def self.new_nominal(defn : Program::Type)
+    MetaType.new(Nominal.new(defn))
   end
   
   def self.new_union(types : Iterable(MetaType))
@@ -59,6 +53,10 @@ class Mare::Compiler::Infer::MetaType
     MetaType.new(inner)
   end
   
+  def cap(name : String)
+    MetaType.new(@inner.intersect(Capability.new(name)))
+  end
+  
   def within_constraints?(types : Iterable(MetaType))
     self < self.class.new_intersection(types)
   end
@@ -68,12 +66,21 @@ class Mare::Compiler::Infer::MetaType
   end
   
   def singular?
-    @inner.is_a?(Nominal)
+    !!single?
+  end
+  
+  def single? : Nominal?
+    inner = @inner
+    case inner
+    when Nominal then inner
+    when Intersection then inner.terms.try(&.first?)
+    else nil
+    end
   end
   
   def single!
     raise "not singular: #{show_type}" unless singular?
-    @inner.as(Nominal).defn
+    single?.not_nil!.defn
   end
   
   def -; negate end
@@ -104,36 +111,37 @@ class Mare::Compiler::Infer::MetaType
   private def simplify_intersection(inner : Intersection)
     # TODO: complete the rest of the logic here (think about symmetry)
     removed_terms = Set(Nominal).new
-    new_terms = inner.terms.select do |l|
+    new_terms = inner.terms.try(&.select do |l|
       # Return Unsatisfiable if any term is a subtype of an anti-term.
       if inner.anti_terms.try(&.any? { |r| l.defn < r.defn })
         return Unsatisfiable.instance
       end
       
       # Return Unsatisfiable if l is concrete and isn't a subtype of all others.
-      if l.is_concrete? && !inner.terms.all? { |r| l.defn < r.defn }
+      if l.is_concrete? && inner.terms.try(&.any? { |r| !(l.defn < r.defn) })
         return Unsatisfiable.instance
       end
       
       # Remove terms that are supertypes of another term - they are redundant.
-      if inner.terms.any? do |r|
+      if inner.terms.try(&.any? do |r|
         l != r && !removed_terms.includes?(r) && r.defn < l.defn
-      end
+      end)
         removed_terms.add(l)
         next
       end
       
       true # keep this term
-    end
+    end)
     
     # If we didn't remove anything, there was no change.
     return inner if removed_terms.empty?
     
     # Otherwise, return as a new intersection.
-    Intersection.build(new_terms.to_set, inner.anti_terms)
+    Intersection.build(inner.cap, new_terms.try(&.to_set), inner.anti_terms)
   end
   
   private def simplify_union(inner : Union)
+    caps = Set(Capability).new
     terms = Set(Nominal).new
     anti_terms = Set(AntiNominal).new
     intersects = Set(Intersection).new
@@ -141,7 +149,8 @@ class Mare::Compiler::Infer::MetaType
     # Just copy the terms and anti-terms without working with them.
     # TODO: are there any simplifications we can/should apply here?
     # TODO: consider some that are in symmetry with those for intersections.
-    terms.concat(inner.terms)
+    caps.concat(inner.caps.not_nil!) if inner.caps
+    terms.concat(inner.terms.not_nil!) if inner.terms
     anti_terms.concat(inner.anti_terms.not_nil!) if inner.anti_terms
     
     # Simplify each intersection, collecting the results.
@@ -156,7 +165,7 @@ class Mare::Compiler::Infer::MetaType
       end
     end
     
-    Union.build(terms.to_set, anti_terms.to_set, intersects.to_set)
+    Union.build(caps.to_set, terms.to_set, anti_terms.to_set, intersects.to_set)
   end
   
   # Return true if this MetaType is a subtype of the other MetaType.

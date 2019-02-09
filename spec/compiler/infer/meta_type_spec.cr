@@ -1,35 +1,36 @@
 describe Mare::Compiler::Infer::MetaType do
   it "implements logical operators that keep the expression in DNF form" do
-    new_type = ->(s : String) {
+    new_type = ->(s : String, is_abstract : Bool) {
       ref = Mare::AST::Identifier.new("ref")
       t = Mare::Program::Type.new(ref, Mare::AST::Identifier.new(s))
-      m = Mare::Compiler::Infer::MetaType.new(t)
-      {t, m}
+      t.add_tag(:abstract) if is_abstract
+      m = Mare::Compiler::Infer::MetaType.new_nominal(t)
+      m
     }
     
-    tc1, c1 = new_type.call("C1")
-    tc2, c2 = new_type.call("C2")
-    tc3, c3 = new_type.call("C3")
-    tc4, c4 = new_type.call("C4")
-    ta1, a1 = new_type.call("A1").tap(&.first.add_tag(:abstract))
-    ta2, a2 = new_type.call("A2").tap(&.first.add_tag(:abstract))
-    ta3, a3 = new_type.call("A3").tap(&.first.add_tag(:abstract))
-    ta4, a4 = new_type.call("A4").tap(&.first.add_tag(:abstract))
+    c1 = new_type.call("C1", false)
+    c2 = new_type.call("C2", false)
+    c3 = new_type.call("C3", false)
+    c4 = new_type.call("C4", false)
+    a1 = new_type.call("A1", true)
+    a2 = new_type.call("A2", true)
+    a3 = new_type.call("A3", true)
+    a4 = new_type.call("A4", true)
     
     # Negation of a nominal.
-    (-a1).inner.inspect.should eq "-A1"
+    (-a1).inner.inspect.should eq "-A1'any"
     
     # Negation of an anti-nominal.
-    (-(-a1)).inner.inspect.should eq "A1"
+    (-(-a1)).inner.inspect.should eq "A1'any"
     
     # Intersection of nominals.
-    (a1 & a2 & a3).inner.inspect.should eq "(A1 & A2 & A3)"
+    (a1 & a2 & a3).inner.inspect.should eq "(A1'any & A2'any & A3'any)"
     
     # Intersection of identical nominals.
-    (a1 & a1 & a1).inner.inspect.should eq "A1"
+    (a1 & a1 & a1).inner.inspect.should eq "A1'any"
     
     # Intersection of mixed non-identical and identical nominals.
-    (a1 & a2 & a1).inner.inspect.should eq "(A1 & A2)"
+    (a1 & a2 & a1).inner.inspect.should eq "(A1'any & A2'any)"
     
     # Intersection of concrete nominals.
     (c1 & c2 & c3).inner.inspect.should eq "<unsatisfiable>"
@@ -38,16 +39,20 @@ describe Mare::Compiler::Infer::MetaType do
     (a1 & c1 & a2 & c2).inner.inspect.should eq "<unsatisfiable>"
     
     # Intersection of some abstract nominals and a single concrete nominal.
-    (a1 & a2 & c1 & a3).inner.inspect.should eq "(A1 & A2 & C1 & A3)"
+    (a1 & a2 & c1 & a3).inner.inspect.should eq \
+      "(A1'any & A2'any & C1'any & A3'any)"
     
     # Intersection of concrete anti-nominals.
-    (-c1 & -c2 & -c3).inner.inspect.should eq "(-C1 & -C2 & -C3)"
+    (-c1 & -c2 & -c3).inner.inspect.should eq \
+      "(-C1'any & -C2'any & -C3'any)"
     
     # Intersection of some abstract and some concrete anti-nominals.
-    (-a1 & -a2 & -c1 & -c2).inner.inspect.should eq "(-A1 & -A2 & -C1 & -C2)"
+    (-a1 & -a2 & -c1 & -c2).inner.inspect.should eq \
+      "(-A1'any & -A2'any & -C1'any & -C2'any)"
     
     # Intersection of some abstract and a single concrete anti-nominal.
-    (-a1 & -a2 & -c1 & -a3).inner.inspect.should eq "(-A1 & -A2 & -C1 & -A3)"
+    (-a1 & -a2 & -c1 & -a3).inner.inspect.should eq \
+      "(-A1'any & -A2'any & -C1'any & -A3'any)"
     
     # Intersection of a nominal and its anti-nominal.
     (a1 & -a1).inner.inspect.should eq "<unsatisfiable>"
@@ -56,22 +61,24 @@ describe Mare::Compiler::Infer::MetaType do
     (a1 & a2 & a3 & -a1).inner.inspect.should eq "<unsatisfiable>"
     
     # Union of nominals.
-    (a1 | a2 | a3).inner.inspect.should eq "(A1 | A2 | A3)"
+    (a1 | a2 | a3).inner.inspect.should eq "(A1'any | A2'any | A3'any)"
     
     # Union of identical nominals.
-    (a1 | a1 | a1).inner.inspect.should eq "A1"
+    (a1 | a1 | a1).inner.inspect.should eq "A1'any"
     
     # Union of mixed non-identical and identical nominals.
-    (a1 | a2 | a1).inner.inspect.should eq "(A1 | A2)"
+    (a1 | a2 | a1).inner.inspect.should eq "(A1'any | A2'any)"
     
     # Union of concrete nominals.
-    (c1 | c2 | c3).inner.inspect.should eq "(C1 | C2 | C3)"
+    (c1 | c2 | c3).inner.inspect.should eq "(C1'any | C2'any | C3'any)"
     
     # Union of some abstract and some concrete nominals.
-    (a1 | a2 | c1 | c2).inner.inspect.should eq "(A1 | A2 | C1 | C2)"
+    (a1 | a2 | c1 | c2).inner.inspect.should eq \
+      "(A1'any | A2'any | C1'any | C2'any)"
     
     # Union of some abstract and a single concrete nominal.
-    (a1 | a2 | c1 | a3).inner.inspect.should eq "(A1 | A2 | C1 | A3)"
+    (a1 | a2 | c1 | a3).inner.inspect.should eq \
+      "(A1'any | A2'any | C1'any | A3'any)"
     
     # Union of concrete anti-nominals.
     (-c1 | -c2 | -c3).inner.inspect.should eq "<unconstrained>"
@@ -80,7 +87,8 @@ describe Mare::Compiler::Infer::MetaType do
     (-a1 | -a2 | -c1 | -c2).inner.inspect.should eq "<unconstrained>"
     
     # Union of some abstract and a single concrete anti-nominal.
-    (-a1 | -a2 | -c1 | -a3).inner.inspect.should eq "(-A1 | -A2 | -C1 | -A3)"
+    (-a1 | -a2 | -c1 | -a3).inner.inspect.should eq \
+      "(-A1'any | -A2'any | -C1'any | -A3'any)"
     
     # Union of a nominal and its anti-nominal.
     (a1 | -a1).inner.inspect.should eq "<unconstrained>"
@@ -89,36 +97,43 @@ describe Mare::Compiler::Infer::MetaType do
     (a1 | a2 | a3 | -a1).inner.inspect.should eq "<unconstrained>"
     
     # Union of nominals, anti-nominals, and intersections.
-    (c1 | c2 | -a1 | -a2 | (a3 & c3) | (a4 & c4)).inner.inspect \
-      .should eq "(C1 | C2 | -A1 | -A2 | (A3 & C3) | (A4 & C4))"
+    (c1 | c2 | -a1 | -a2 | (a3 & c3) | (a4 & c4)).inner.inspect.should eq \
+      "(C1'any | C2'any | -A1'any | -A2'any |" \
+      " (A3'any & C3'any) | (A4'any & C4'any))"
     
     # Intersection of intersections.
-    ((a1 & a2) & (a3 & a4)).inner.inspect.should eq "(A1 & A2 & A3 & A4)"
+    ((a1 & a2) & (a3 & a4)).inner.inspect.should eq \
+      "(A1'any & A2'any & A3'any & A4'any)"
     
     # Union of unions.
-    ((c1 | -a1 | (a3 & c3)) | (c2 | -a2 | (a4 & c4))).inner.inspect \
-      .should eq "(C1 | C2 | -A1 | -A2 | (A3 & C3) | (A4 & C4))"
+    ((c1 | -a1 | (a3 & c3)) | (c2 | -a2 | (a4 & c4))).inner.inspect.should eq \
+      "(C1'any | C2'any | -A1'any | -A2'any |" \
+      " (A3'any & C3'any) | (A4'any & C4'any))"
     
     # Intersection of two simple unions.
-    ((a1 | a2) & (a3 | a4)).inner.inspect \
-      .should eq "((A1 & A3) | (A1 & A4) | (A2 & A3) | (A2 & A4))"
+    ((a1 | a2) & (a3 | a4)).inner.inspect.should eq \
+      "((A1'any & A3'any) | (A1'any & A4'any) |" \
+      " (A2'any & A3'any) | (A2'any & A4'any))"
     
     # Intersection of two complex unions.
-    ((c1 | -a1 | (a3 & c3)) & (c2 | -a2 | (a4 & c4))).inner.inspect \
-      .should eq "((C2 & -A1) | (-A1 & -A2) | (A4 & C4 & -A1) |"\
-                 " (C1 & -A2) | (A3 & C3 & -A2))"
+    ((c1 | -a1 | (a3 & c3)) & (c2 | -a2 | (a4 & c4))).inner.inspect.should eq \
+      "((C2'any & -A1'any) | (-A1'any & -A2'any) |" \
+      " (A4'any & C4'any & -A1'any) | (C1'any & -A2'any) |" \
+      " (A3'any & C3'any & -A2'any))"
     
     # Negation of an intersection.
-    (-(a1 & -a2 & a3 & -a4)).inner.inspect.should eq "(A2 | A4 | -A1 | -A3)"
+    (-(a1 & -a2 & a3 & -a4)).inner.inspect.should eq \
+      "(A2'any | A4'any | -A1'any | -A3'any)"
     
     # Negation of a union.
-    (-(a1 | -a2 | a3 | -a4)).inner.inspect.should eq "(A2 & A4 & -A1 & -A3)"
+    (-(a1 | -a2 | a3 | -a4)).inner.inspect.should eq \
+      "(A2'any & A4'any & -A1'any & -A3'any)"
     
     # Negation of a complex union.
-    (-(c1 | c2 | -a1 | -a2 | (a3 & c3) | (a4 & c4))).inner.inspect \
-      .should eq "((A1 & A2 & -C1 & -C2 & -A3 & -A4) |"\
-                 " (A1 & A2 & -C1 & -C2 & -A3 & -C4) |"\
-                 " (A1 & A2 & -C1 & -C2 & -C3 & -A4) |"\
-                 " (A1 & A2 & -C1 & -C2 & -C3 & -C4))"
+    (-(c1 | c2 | -a1 | -a2 | (a3 & c3) | (a4 & c4))).inner.inspect.should eq \
+      "((A1'any & A2'any & -C1'any & -C2'any & -A3'any & -A4'any) |"\
+      " (A1'any & A2'any & -C1'any & -C2'any & -A3'any & -C4'any) |"\
+      " (A1'any & A2'any & -C1'any & -C2'any & -C3'any & -A4'any) |"\
+      " (A1'any & A2'any & -C1'any & -C2'any & -C3'any & -C4'any))"
   end
 end

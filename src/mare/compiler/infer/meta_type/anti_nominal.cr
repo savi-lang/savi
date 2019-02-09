@@ -7,6 +7,7 @@ struct Mare::Compiler::Infer::MetaType::AntiNominal
   def inspect(io : IO)
     io << "-"
     io << defn.ident.value
+    io << "'any"
   end
   
   def hash : UInt64
@@ -41,12 +42,16 @@ struct Mare::Compiler::Infer::MetaType::AntiNominal
     other
   end
   
+  def intersect(other : Capability)
+    Intersection.new(other, nil, [self].to_set)
+  end
+  
   def intersect(other : Nominal)
     # Unsatisfiable if the nominal and anti-nominal types are identical.
     return Unsatisfiable.instance if defn == other.defn
     
     # Otherwise, this is a new intersection of the two types.
-    Intersection.new([other].to_set, [self].to_set)
+    Intersection.new(nil, [other].to_set, [self].to_set)
   end
   
   def intersect(other : AntiNominal)
@@ -54,7 +59,7 @@ struct Mare::Compiler::Infer::MetaType::AntiNominal
     return self if defn == other.defn
     
     # Otherwise, this is a new intersection of the two types.
-    Intersection.new(Set(Nominal).new, [self, other].to_set)
+    Intersection.new(nil, nil, [self, other].to_set)
   end
   
   def intersect(other : (Intersection | Union))
@@ -69,12 +74,16 @@ struct Mare::Compiler::Infer::MetaType::AntiNominal
     self
   end
   
+  def unite(other : Capability)
+    Union.new([other].to_set, nil, [self].to_set)
+  end
+  
   def unite(other : Nominal)
     # Unconstrained if the nominal and anti-nominal types are identical.
     return Unconstrained.instance if defn == other.defn
     
     # Otherwise, this is a new union of the two types.
-    Union.new([other].to_set, [self].to_set)
+    Union.new(nil, [other].to_set, [self].to_set)
   end
   
   def unite(other : AntiNominal)
@@ -85,11 +94,23 @@ struct Mare::Compiler::Infer::MetaType::AntiNominal
     return Unconstrained.instance if is_concrete? && other.is_concrete?
     
     # Otherwise, this is a new union of the two types.
-    Union.new(Set(Nominal).new, [self, other].to_set)
+    Union.new(nil, nil, [self, other].to_set)
   end
   
   def unite(other : (Intersection | Union))
     other.unite(self) # delegate to the "higher" class via commutativity
+  end
+  
+  def subtype_of?(other : Capability) : Bool
+    # An anti-nominal can never be a subtype of any capability -
+    # it excludes a single nominal, and says nothing about capabilities.
+    false
+  end
+  
+  def supertype_of?(other : Capability) : Bool
+    # An anti-nominal can never be a supertype of any capability -
+    # it excludes a single nominal, and says nothing about capabilities.
+    false
   end
   
   def subtype_of?(other : Nominal) : Bool

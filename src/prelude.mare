@@ -10,7 +10,7 @@ enum Bool:
   fun "!=" (other Bool) Bool: compiler intrinsic
 
 // Numerics
-interface Numeric:
+interface val Numeric:
   const bit_width U8:
   // TODO: arithmetic method interfaces with type parameters on Numeric[A] type
 
@@ -167,12 +167,12 @@ numeric F64:
 
 // ...
 
-primitive CString: // TODO: don't special-case in compiler as a char pointer
+class val CString: // TODO: don't special-case in compiler as a char pointer
 
-class String: // TODO: use for string literals in the compiler
+class val String: // TODO: use for string literals in the compiler
   prop _cpointer CString:
   prop _size U64: // TODO: cross-platform
   prop _alloc U64: // TODO: cross-platform
   new from_cpointer (@_cpointer, @_size, @_alloc):
 
-class Env:
+class val Env:

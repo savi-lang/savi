@@ -10,6 +10,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
   def compile(context, decl)
     keyword = decl.keyword
     
+    # Set a default default capability for this type.
     cap_value =
       case keyword
       when "actor"     then "tag"
@@ -22,6 +23,10 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
       else raise NotImplementedError.new(keyword)
       end
     cap = AST::Identifier.new(cap_value).from(decl.head.first.not_nil!)
+    
+    # Get the explicit default capability for this type.
+    cap = decl.head[1]?.as(AST::Identifier) \
+      if decl.head.size > 2 && cap_value == "ref"
     
     t = Type.new(
       keyword,

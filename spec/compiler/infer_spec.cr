@@ -135,13 +135,8 @@ describe Mare::Compiler::Infer do
     SOURCE
     
     expected = <<-MSG
-    This value's type is unresolvable due to conflicting constraints:
+    This type is outside of a constraint: None:
     from (example):3:
-        name CString = ()
-                       ^~
-    
-    - it must be a subtype of None:
-      from (example):3:
         name CString = ()
                        ^~
     
@@ -404,7 +399,7 @@ describe Mare::Compiler::Infer do
   
   it "allows an interface to be fulfilled with a covariant return type" do
     source = Mare::Source.new "(example)", <<-SOURCE
-    interface Interface:
+    interface non Interface:
       fun example Interface:
     
     primitive Concrete:
@@ -421,7 +416,7 @@ describe Mare::Compiler::Infer do
   
   it "complains when an interface has a covariant argument type" do
     source = Mare::Source.new "(example)", <<-SOURCE
-    interface Interface:
+    interface non Interface:
       fun example (arg Interface) None:
     
     primitive Concrete:

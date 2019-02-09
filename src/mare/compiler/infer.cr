@@ -36,8 +36,9 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     @domain_constraints : Array(MetaType)
     
     def initialize(@pos, possible : Enumerable(Program::Type))
+      possible = possible.map { |defn| MetaType.new(defn) }
       @domain = MetaType.new_union(possible)
-      @domain_constraints = [MetaType.new_union(possible)]
+      @domain_constraints = [MetaType.new_union(possible).cap("val")]
       @pos_list = [@pos] of Source::Pos
     end
     
@@ -423,7 +424,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       
       infer = Infer.from(t, f)
       iface = infer.resolve(infer.ret_tid)
-      unless MetaType.new(t) < iface
+      cap = "iso" # we use the ultimate subcap to simulate no cap comparison.
+      unless MetaType.new(t, cap) < iface
         Error.at t.ident, "This type isn't a subtype of #{iface.show_type}"
       end
     end
@@ -556,7 +558,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   
   def self_tid(pos_node) : TID
     return @self_tid unless @self_tid == 0
-    info = Fixed.new(pos_node.pos, MetaType.new(@self_type))
+    cap = @self_type.cap.value # TODO: use receiver capability of this function.
+    info = Fixed.new(pos_node.pos, MetaType.new(@self_type, cap))
     @self_tid = new_tid_detached(info)
   end
   
@@ -643,7 +646,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     case node.style
     when "(", ":"
       if node.terms.empty?
-        new_tid(node, Literal.new(node.pos, [refer.decl_defn("None")]))
+        none = MetaType.new(refer.decl_defn("None"))
+        new_tid(node, Fixed.new(node.pos, none))
       else
         # A non-empty group always has the tid of its final child.
         transfer_tid(node.terms.last, node)
@@ -672,7 +676,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     when "|"
       ref = refer[node]
       if ref.is_a?(Refer::DeclUnion)
-        meta_type = MetaType.new_union(ref.list.map(&.defn))
+        meta_types = ref.list.map { |ref| MetaType.new(ref.defn) }
+        meta_type = MetaType.new_union(meta_types)
         new_tid(node, Fixed.new(node.pos, meta_type))
       else
         raise NotImplementedError.new(node.to_a)
@@ -734,7 +739,6 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       bool = MetaType.new(refer.decl_defn("Bool"))
       refine_tid = node.lhs.tid
       refine_type = self[node.rhs].resolve!(self)
-      
       new_tid(node, TypeCondition.new(node.pos, bool, refine_tid, refine_type))
     else raise NotImplementedError.new(node.op.value)
     end

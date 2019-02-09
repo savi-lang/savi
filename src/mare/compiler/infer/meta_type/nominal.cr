@@ -6,6 +6,19 @@ struct Mare::Compiler::Infer::MetaType::Nominal
   
   def inspect(io : IO)
     io << defn.ident.value
+    io << "'any"
+  end
+  
+  def inspect_with_cap(io : IO, cap : Capability)
+    io << defn.ident.value
+    
+    # If the cap is the same as the default cap, we omit it for brevity.
+    # Otherwise, we'll print it here with the same syntax that the programmer
+    # can use to specify it explicitly.
+    if cap.name != defn.cap.value
+      io << "'"
+      io << cap.name
+    end
   end
   
   def hash : UInt64
@@ -41,6 +54,10 @@ struct Mare::Compiler::Infer::MetaType::Nominal
     other
   end
   
+  def intersect(other : Capability)
+    Intersection.new(other, [self].to_set)
+  end
+  
   def intersect(other : Nominal)
     # No change if the two nominal types are identical.
     return self if defn == other.defn
@@ -49,7 +66,7 @@ struct Mare::Compiler::Infer::MetaType::Nominal
     return Unsatisfiable.instance if is_concrete? && other.is_concrete?
     
     # Otherwise, this is a new intersection of the two types.
-    Intersection.new([self, other].to_set)
+    Intersection.new(nil, [self, other].to_set)
   end
   
   def intersect(other : (AntiNominal | Intersection | Union))
@@ -64,16 +81,32 @@ struct Mare::Compiler::Infer::MetaType::Nominal
     self
   end
   
+  def unite(other : Capability)
+    Union.new([other].to_set, [self].to_set)
+  end
+  
   def unite(other : Nominal)
     # No change if the two nominal types are identical.
     return self if defn == other.defn
     
     # Otherwise, this is a new union of the two types.
-    Union.new([self, other].to_set)
+    Union.new(nil, [self, other].to_set)
   end
   
   def unite(other : (AntiNominal | Intersection | Union))
     other.unite(self) # delegate to the "higher" class via commutativity
+  end
+  
+  def subtype_of?(other : Capability) : Bool
+    # A nominal can never be a subtype of any capability -
+    # it specifies a single nominal, and says nothing about capabilities.
+    false
+  end
+  
+  def supertype_of?(other : Capability) : Bool
+    # A nominal can never be a supertype of any capability -
+    # it specifies a single nominal, and says nothing about capabilities.
+    false
   end
   
   def subtype_of?(other : Nominal) : Bool
