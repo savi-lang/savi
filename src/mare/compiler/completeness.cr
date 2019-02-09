@@ -1,6 +1,4 @@
 class Mare::Compiler::Completeness < Mare::AST::Visitor
-  property! refer : Compiler::Refer
-  
   def self.run(ctx)
     ctx.program.types.each do |t|
       t.functions.each do |f|
