@@ -1,43 +1,58 @@
 module Mare::Compiler
-  # TODO: replace this with a sophisticated pass dependency/invalidation system
-  # that can construct a minimal pass list for the given target dynamically.
-  private def self.run_passes(ctx, target : Symbol)
+  def self.execute(ctx, target : Symbol)
     case target
-    when :copy then
-      ctx.run(Copy)
-    when :macros then
-      run_passes(ctx, :copy)
-      ctx.run(Macros)
-    when :sugar then
-      run_passes(ctx, :macros)
-      ctx.run(Sugar)
-    when :lambda then
-      run_passes(ctx, :sugar)
-      ctx.run(Lambda)
-    when :refer then
-      run_passes(ctx, :lambda)
-      ctx.run(Flagger)
-      ctx.run(Refer)
-    when :completeness then
-      run_passes(ctx, :refer)
-      ctx.run(Completeness)
-    when :infer
-      run_passes(ctx, :completeness)
-      ctx.run(Infer)
-    when :codegen then
-      run_passes(ctx, :infer)
-      ctx.run(Reach)
-      ctx.run(Paint)
-      ctx.run(CodeGen)
-    when :eval then
-      run_passes(ctx, :codegen)
-      ctx.run(Eval)
-    when :binary then
-      run_passes(ctx, :codegen)
-      ctx.run(Binary)
+    when :copy         then ctx.run(Copy)
+    when :macros       then ctx.run(Macros)
+    when :sugar        then ctx.run(Sugar)
+    when :lambda       then ctx.run(Lambda)
+    when :flagger      then ctx.run(Flagger)
+    when :refer        then ctx.run(Refer)
+    when :completeness then ctx.run(Completeness)
+    when :infer        then ctx.run(Infer)
+    when :reach        then ctx.run(Reach)
+    when :paint        then ctx.run(Paint)
+    when :codegen      then ctx.run(CodeGen)
+    when :eval         then ctx.run(Eval)
+    when :binary       then ctx.run(Binary)
     else raise NotImplementedError.new(target)
     end
-    
+  end
+  
+  # TODO: Add invalidation, such that passes like :lambda can invalidate
+  # passes like :flagger and :refer instead of marking a dependency.
+  def self.deps_of(target : Symbol) : Array(Symbol)
+    case target
+    when :copy then [] of Symbol
+    when :macros then [] of Symbol
+    when :sugar then [:macros]
+    when :lambda then [:macros, :sugar]
+    when :flagger then [:macros, :sugar, :lambda]
+    when :refer then [:macros, :sugar, :lambda]
+    when :completeness then [:macros, :sugar, :lambda]
+    when :infer then [:completeness, :refer, :flagger, :lambda, :copy]
+    when :reach then [:infer]
+    when :paint then [:reach]
+    when :codegen then [:paint, :reach, :infer, :completeness, :flagger]
+    when :eval then [:codegen]
+    when :binary then [:codegen]
+    else raise NotImplementedError.new([:deps_of, target].inspect)
+    end
+  end
+  
+  def self.all_deps_of(target : Symbol) : Set(Symbol)
+    deps_of(target).reduce(Set(Symbol).new) do |set, t|
+      set.add(t)
+      set.concat(all_deps_of(t))
+    end
+  end
+  
+  def self.satisfy(ctx, target : Symbol)
+    all_deps_of_target = all_deps_of(target)
+    all_deps = all_deps_of_target.map { |t| {t, all_deps_of(t)} }
+    all_deps << {target, all_deps_of_target}
+    all_deps.sort_by(&.last.size).map(&.first).each do |target|
+      execute(ctx, target)
+    end
     ctx
   end
   
@@ -62,7 +77,7 @@ module Mare::Compiler
     ctx = Context.new
     docs.each { |doc| ctx.compile(doc) }
     
-    run_passes(ctx, target)
+    satisfy(ctx, target)
   end
   
   def self.prelude_doc
