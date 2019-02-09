@@ -11,14 +11,6 @@ module Mare::Parser
     s = whitespace.repeat
     sn = (whitespace | (eol_comment.maybe >> char('\n'))).repeat
     
-    # Define what an identifier looks like.
-    ident_letter =
-      range('a', 'z') | range('A', 'Z') | range('0', '9') | char('_')
-    ident = (
-      (char('@') >> ident_letter.repeat) |
-      ident_letter.repeat(1)
-    ).named(:ident)
-    
     # Define what a number looks like (integer and float).
     digit19 = range('1', '9')
     digit = range('0', '9')
@@ -32,6 +24,15 @@ module Mare::Parser
     exp = (char('e') | char('E')) >> (char('+') | char('-')).maybe >> digits
     integer = int.named(:integer)
     float = (int >> ((frac >> exp.maybe) | exp)).named(:float)
+    
+    # Define what an identifier looks like.
+    ident_letter =
+      range('a', 'z') | range('A', 'Z') | range('0', '9') | char('_')
+    ident = (
+      (char('@') >> ident_letter.repeat) |
+      (char('^') >> digit19 >> digit.repeat) |
+      ident_letter.repeat(1)
+    ).named(:ident)
     
     # Define what a string looks like.
     hex = digit | range('a', 'f') | range('A', 'F')
