@@ -151,16 +151,29 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     resolved = self[call.lhs].resolve!(self)
     call_defns = resolved.find_callable_func_defns(call.member)
     
-    Error.at call, "can't call '#{call.member}' on #{resolved.show_type}" \
-      unless call_defns
-    raise "this array should be either nil or non-empty" if call_defns.empty?
+    # Raise an error if we don't have a callable function for every possibility.
+    call_defns << {resolved.inner, nil, nil} if call_defns.empty?
+    problems = call_defns.map do |(call_mti, call_defn, call_func)|
+      if call_defn.nil?
+        {call, "the type #{call_mti.inspect} has no referencable types in it"}
+      elsif call_func.nil?
+        {call_defn.ident,
+          "#{call_defn.ident.value} has no '#{call.member}' function"}
+      end
+    end.compact
+    Error.at call,
+      "The '#{call.member}' function can't be called on #{resolved.show_type}",
+        problems unless problems.empty?
     
     # For each receiver type definition that is possible, track down the infer
     # for the function that we're trying to call, evaluating the constraints
     # for each possibility such that all of them must hold true.
     rets = [] of MetaType
     poss = [] of Source::Pos
-    call_defns.each do |(call_defn, call_func)|
+    call_defns.each do |(call_mti, call_defn, call_func)|
+      call_defn = call_defn.not_nil!
+      call_func = call_func.not_nil!
+      
       # Keep track that we called this function.
       @called_funcs.add(call_func)
       
@@ -169,7 +182,12 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       # were explicitly specified in the function signature.
       infer = Infer.from(call_defn, call_func)
       
-      # TODO: enforce reference capability of the receiver here.
+      # Enforce the capability restriction of the receiver.
+      unless MetaType.new(call_mti) < infer.resolved_receiver
+        problems << {call_func.cap,
+          "the type #{call_mti.inspect} isn't a subtype of the " \
+          "required capability of '#{call_func.cap.value}'"} \
+      end
       
       # Apply parameter constraints to each of the argument types.
       # TODO: handle case where number of args differs from number of params.
@@ -185,6 +203,9 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       rets << inferred_ret.resolve!(infer)
       poss << inferred_ret.pos
     end
+    Error.at call,
+      "This function call doesn't meet subtyping requirements",
+        problems unless problems.empty?
     
     # Constrain the return value as the union of all observed return types.
     ret = rets.size == 1 ? rets.first : MetaType.new_union(rets)
@@ -228,6 +249,14 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     
     info = Fixed.new(pos_node.pos, MetaType.new(@self_type, cap))
     @self_tid = new_tid_detached(info)
+  end
+  
+  def resolved_receiver
+    if func.has_tag?(:constructor)
+      MetaType.new(@self_type, "non")
+    else
+      MetaType.new(@self_type, @func.cap.value)
+    end
   end
   
   def transfer_tid(from_tid : TID, to)

@@ -88,13 +88,33 @@ struct Mare::Compiler::Infer::MetaType::Intersection
   end
   
   def find_callable_func_defns(name : String)
-    # We return for only those in the intersection that have this func.
-    list = [] of Tuple(Program::Type, Program::Function)
+    list = [] of Tuple(Inner, Program::Type?, Program::Function?)
+    
+    # Collect a result for nominal in this intersection that has this func.
     terms.try(&.each do |term|
-      result = term.find_callable_func_defns(name)
-      list.concat(result) if result
+      term.find_callable_func_defns(name).try do |result|
+        result.each do |_, defn, func|
+          # Replace the inner term with an inner of this intersection.
+          # This will be used for subtype checking later, and we want to
+          # make sure that our cap will be taken into account, if any.
+          list << {self, defn, func}
+        end
+      end
     end)
-    list.empty? ? nil : list
+    
+    # If none of the nominals in this intersection had the func,
+    # we're in trouble; collect the list of types that failed our search.
+    if list.empty?
+      terms.try(&.each do |term|
+        list << {self, term.defn, nil}
+      end)
+    end
+    
+    # If for some reason we're still empty (like in the case of an
+    # intersection of anti-nominals), we have to return nil.
+    list << {self, nil, nil} if list.empty?
+    
+    list
   end
   
   def negate : Inner

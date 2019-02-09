@@ -42,8 +42,8 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       @meta_type.single!
     end
     
-    def any_callable_defn_for(name)
-      @meta_type.find_callable_func_defns(name).not_nil!.first.first
+    def any_callable_defn_for(name) : Program::Type
+      @meta_type.find_callable_func_defns(name).first[1].not_nil!
     end
     
     def tuple_count

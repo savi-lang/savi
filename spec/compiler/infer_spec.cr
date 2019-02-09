@@ -486,4 +486,70 @@ describe Mare::Compiler::Infer do
     func.infer.resolve(assign.lhs).show_type.should eq "X"
     func.infer.resolve(assign.rhs).show_type.should eq "X"
   end
+  
+  it "complains when calling on types without that function" do
+    source = Mare::Source.new "(example)", <<-SOURCE
+    interface A:
+      fun foo:
+    
+    primitive B:
+      fun bar:
+    
+    class C:
+      fun baz:
+    
+    actor Main:
+      new:
+        c (A | B | C) = C.new
+        c.baz
+    SOURCE
+    
+    expected = <<-MSG
+    The 'baz' function can't be called on (A | B | C):
+    from (example):13:
+        c.baz
+          ^~~
+    
+    - A has no 'baz' function:
+      from (example):1:
+    interface A:
+              ^
+    
+    - B has no 'baz' function:
+      from (example):4:
+    primitive B:
+              ^
+    MSG
+    
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :infer)
+    end
+  end
+  
+  it "complains when calling with an insufficient receiver capability" do
+    source = Mare::Source.new "(example)", <<-SOURCE
+    primitive Example:
+      fun ref mutate:
+    
+    actor Main:
+      new:
+        Example.mutate
+    SOURCE
+    
+    expected = <<-MSG
+    This function call doesn't meet subtyping requirements:
+    from (example):6:
+        Example.mutate
+                ^~~~~~
+    
+    - the type Example isn't a subtype of the required capability of 'ref':
+      from (example):2:
+      fun ref mutate:
+          ^~~
+    MSG
+    
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :infer)
+    end
+  end
 end

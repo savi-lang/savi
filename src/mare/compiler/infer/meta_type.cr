@@ -180,8 +180,10 @@ class Mare::Compiler::Infer::MetaType
   
   def find_callable_func_defns(
     name : String,
-  ) : Array(Tuple(Program::Type, Program::Function))?
-    @inner.find_callable_func_defns(name)
+  ) : Set(Tuple(Inner, Program::Type?, Program::Function?))
+    set = Set(Tuple(Inner, Program::Type?, Program::Function?)).new
+    @inner.find_callable_func_defns(name).try(&.each { |tuple| set.add(tuple) })
+    set
   end
   
   def ==(other)

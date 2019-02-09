@@ -92,6 +92,11 @@ module Mare::AST
       super.tap { |node| node.head = @head.map(&.dup); node.body = @body.dup }
     end
     
+    def with_pos(pos : Source::Pos)
+      @body.with_pos(pos)
+      super
+    end
+    
     def name; :declare end
     def to_a: Array(A)
       [name, head.map(&.to_a), body.to_a] of A
