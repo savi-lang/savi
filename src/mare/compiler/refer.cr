@@ -171,8 +171,8 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
     node.rid = new_rid(info)
   end
   
-  # For a Field, take note of it by name.
-  def touch(node : AST::Field)
+  # For a FieldRead or FieldWrite, take note of it by name.
+  def touch(node : AST::FieldRead | AST::FieldWrite)
     node.rid = new_rid(Field.new(node.pos, node.value))
   end
   

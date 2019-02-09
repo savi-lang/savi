@@ -332,7 +332,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         @type.functions << field_func
         
         getter_body = AST::Group.new(":").from(ident)
-        getter_body.terms << AST::Field.new(ident.value).from(ident)
+        getter_body.terms << AST::FieldRead.new(ident.value).from(ident)
         getter_func = Program::Function.new(ident, nil, ret, getter_body)
         @type.functions << getter_func
         
@@ -346,9 +346,8 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         end
         setter_params = AST::Group.new("(").from(ident)
         setter_params.terms << setter_param
-        setter_assign = AST::Relate.new(
-          AST::Field.new(ident.value).from(ident),
-          AST::Operator.new("=").from(ident),
+        setter_assign = AST::FieldWrite.new(
+          ident.value,
           AST::Identifier.new("value").from(ident),
         ).from(ident)
         setter_body = AST::Group.new(":").from(ident)

@@ -102,23 +102,16 @@ module Mare::AST
     end
   end
   
-  alias Term = Identifier | Field \
+  alias Term = Identifier \
     | LiteralString | LiteralInteger | LiteralFloat \
-    | Operator | Prefix | Relate | Group
+    | Operator | Prefix | Relate | Group \
+    | FieldRead | FieldWrite | Choice
   
   class Identifier < Node
     property value
     def initialize(@value : String)
     end
     def name; :ident end
-    def to_a: Array(A); [name, value] of A end
-  end
-  
-  class Field < Node
-    property value
-    def initialize(@value : String)
-    end
-    def name; :field end
     def to_a: Array(A); [name, value] of A end
   end
   
@@ -232,6 +225,33 @@ module Mare::AST
     def children_accept(visitor)
       @lhs = @lhs.accept(visitor)
       @op = @op.accept(visitor)
+      @rhs = @rhs.accept(visitor)
+    end
+  end
+  
+  class FieldRead < Node
+    property value
+    def initialize(@value : String)
+    end
+    def name; :field_r end
+    def to_a: Array(A); [name, value] of A end
+  end
+  
+  class FieldWrite < Node
+    property value
+    property rhs
+    def initialize(@value : String, @rhs : Term)
+    end
+    
+    def dup
+      super.tap do |node|
+        node.rhs = @rhs.dup
+      end
+    end
+    
+    def name; :field_w end
+    def to_a: Array(A); [name, value, rhs.to_a] of A end
+    def children_accept(visitor)
       @rhs = @rhs.accept(visitor)
     end
   end

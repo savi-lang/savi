@@ -618,12 +618,6 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
   end
   
-  def touch(node : AST::Field)
-    field = Field.new(node.pos)
-    new_tid(node, field)
-    follow_field(field, node.value)
-  end
-  
   def touch(node : AST::LiteralString)
     new_tid(node, Literal.new(node.pos, [refer.decl_defn("CString")]))
   end
@@ -682,15 +676,25 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
   end
   
+  def touch(node : AST::FieldRead)
+    field = Field.new(node.pos)
+    new_tid(node, field)
+    follow_field(field, node.value)
+  end
+  
+  def touch(node : AST::FieldWrite)
+    field = Field.new(node.pos)
+    new_tid(node, field)
+    follow_field(field, node.value)
+    field.assign(self, node.rhs.tid)
+  end
+  
   def touch(node : AST::Relate)
     case node.op.value
     when "=", "DEFAULTPARAM"
       lhs = self[node.lhs]
       case lhs
       when Local
-        lhs.assign(self, node.rhs.tid)
-        transfer_tid(node.lhs, node)
-      when Field
         lhs.assign(self, node.rhs.tid)
         transfer_tid(node.lhs, node)
       when Param

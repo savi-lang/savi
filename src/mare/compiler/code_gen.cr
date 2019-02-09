@@ -949,12 +949,20 @@ class Mare::Compiler::CodeGen
       
       value.name = ref.name
       func_frame.current_locals[ref] = value
-    elsif ref.is_a?(Refer::Field)
-      old_value = gen_field_load(ref.name)
-      gen_field_store(ref.name, value)
-      old_value
     else raise NotImplementedError.new(relate.inspect)
     end
+  end
+  
+  def gen_field_eq(node : AST::FieldWrite)
+    value = gen_expr(node.rhs).as(LLVM::Value)
+    name = value.name
+    
+    value = gen_assign_cast(value, llvm_type_of(node), node.rhs)
+    value.name = name
+    
+    @di.set_loc(node)
+    gen_field_store(node.value, value)
+    value
   end
   
   def gen_check_subtype(relate)
@@ -1075,8 +1083,10 @@ class Mare::Compiler::CodeGen
       else
         raise NotImplementedError.new(ref)
       end
-    when AST::Field
+    when AST::FieldRead
       gen_field_load(expr.value)
+    when AST::FieldWrite
+      gen_field_eq(expr)
     when AST::LiteralInteger
       gen_integer(expr)
     when AST::LiteralFloat
