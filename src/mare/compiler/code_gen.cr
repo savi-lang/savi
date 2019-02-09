@@ -537,6 +537,9 @@ class Mare::Compiler::CodeGen
     # Get the LLVM type to use for the return type.
     ret_type = llvm_type_of(gfunc.func.ident, gfunc)
     
+    # Constructors return void (the caller already has the receiver).
+    ret_type = @void if gfunc.func.has_tag?(:constructor)
+    
     # Get the LLVM types to use for the parameter types.
     param_types = [] of LLVM::Type
     mparam_types = [] of LLVM::Type if gfunc.needs_send?
@@ -634,7 +637,16 @@ class Mare::Compiler::CodeGen
       last_expr = expr
       last_value = gen_expr(expr, gfunc.func.has_tag?(:constant))
     end
-    @builder.ret(last_value.not_nil!)
+    
+    # For a constructor, return void (the caller already has the receiver).
+    if gfunc.func.has_tag?(:constructor)
+      last_value = nil
+    else
+      last_value.not_nil!
+    end
+    
+    # Return the return value (or void).
+    last_value ? @builder.ret(last_value) : @builder.ret
     
     gen_func_end
   end
@@ -876,13 +888,19 @@ class Mare::Compiler::CodeGen
     
     # Call the LLVM function, or do a virtual call if necessary.
     @di.set_loc(relate.op)
-    if needs_virtual_call
-      gen_virtual_call(receiver, args, arg_exprs, lhs_type, gfunc)
-    elsif gfunc.needs_send?
-      gen_call(gfunc.send_llvm_func, args, arg_exprs)
-    else
-      gen_call(gfunc.llvm_func, args, arg_exprs)
-    end
+    result =
+      if needs_virtual_call
+        gen_virtual_call(receiver, args, arg_exprs, lhs_type, gfunc)
+      elsif gfunc.needs_send?
+        gen_call(gfunc.send_llvm_func, args, arg_exprs)
+      else
+        gen_call(gfunc.llvm_func, args, arg_exprs)
+      end
+    
+    # If this is a constructor, the result is the receiver we already have.
+    result = receiver if gfunc.func.has_tag?(:constructor)
+    
+    result
   end
   
   def gen_virtual_call(

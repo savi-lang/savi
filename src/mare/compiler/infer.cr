@@ -474,7 +474,10 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     # Assign the function body value to the fake return value local.
     # This has the effect of constraining it to any given explicit type,
     # and also of allowing inference if there is no explicit type.
-    self[ret_tid].as(Local).assign(self, func_body.tid)
+    # We don't do this for constructors, since constructors implicitly return
+    # self no matter what the last term of the body of the function is.
+    self[ret_tid].as(Local).assign(self, func_body.tid) \
+      unless func.has_tag?(:constructor)
     
     # Assign the resolved types to a map for safekeeping.
     # This also has the effect of running some final checks on everything.

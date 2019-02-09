@@ -17,7 +17,6 @@ describe Mare::Compiler::Macros do
             [[:ident, "True"], [:ident, "None"]],
           ],
         ],
-        [:ident, "@"],
       ]
     end
     
@@ -110,7 +109,6 @@ describe Mare::Compiler::Macros do
             [[:ident, "True"], [:group, "(", [:integer, 7]]],
           ],
         ],
-        [:ident, "@"],
       ]
     end
     

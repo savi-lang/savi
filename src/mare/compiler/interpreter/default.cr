@@ -77,6 +77,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         if !@type.functions.any? { |f| f.has_tag?(:constructor) }
           default = AST::Declare.new.from(@type.ident)
           default.head << AST::Identifier.new("new").from(@type.ident)
+          default.body = AST::Group.new(":").from(@type.ident)
           compile(context, default)
         end
       end
@@ -333,17 +334,12 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         data = @@declare_new.run(decl)
         ident = data["ident"].as(AST::Identifier)
         
-        # A constructor always returns the self at the end of its body.
-        body = decl.body
-        body ||= AST::Group.new(":").from(ident)
-        body.terms << AST::Identifier.new("@").from(ident)
-        
         @type.functions << Program::Function.new(
           AST::Identifier.new("ref").from(data["keyword"]),
           ident,
           data["params"]?.as(AST::Group?),
           AST::Identifier.new("@").from(ident),
-          body,
+          decl.body,
         ).tap do |f|
           f.add_tag(:constructor)
           f.add_tag(:async) if @type.has_tag?(:actor)
