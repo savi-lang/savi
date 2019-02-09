@@ -65,11 +65,14 @@ class Mare::Compiler::Lambda < Mare::AST::Visitor
       end
     end
     
-    lambda_type = Program::Type.new(AST::Identifier.new(name).from(node))
+    lambda_type_cap = AST::Identifier.new("non").from(node) # TODO: change this for stateful functions
+    lambda_type_ident = AST::Identifier.new(name).from(node)
+    lambda_type = Program::Type.new(lambda_type_cap, lambda_type_ident)
     lambda_type.add_tag(:hygienic)
     @program.types << lambda_type
     
     lambda_type.functions << Program::Function.new(
+      AST::Identifier.new("non").from(node), # TODO: change this for stateful functions
       AST::Identifier.new("call").from(node),
       params,
       nil,

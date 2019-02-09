@@ -1,7 +1,8 @@
 describe Mare::Compiler::Infer::MetaType do
   it "implements logical operators that keep the expression in DNF form" do
     new_type = ->(s : String) {
-      t = Mare::Program::Type.new(Mare::AST::Identifier.new(s))
+      ref = Mare::AST::Identifier.new("ref")
+      t = Mare::Program::Type.new(ref, Mare::AST::Identifier.new(s))
       m = Mare::Compiler::Infer::MetaType.new(t)
       {t, m}
     }

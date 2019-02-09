@@ -44,6 +44,7 @@ class Mare::Program
   end
   
   class Type
+    property cap : AST::Identifier
     property ident : AST::Identifier
     
     getter metadata
@@ -58,7 +59,7 @@ class Mare::Program
       :numeric,
     ]
     
-    def initialize(@ident)
+    def initialize(@cap, @ident)
       @functions = [] of Function
       @tags = Set(Symbol).new
       @metadata = Hash(Symbol, UInt64 | Bool).new
@@ -110,6 +111,7 @@ class Mare::Program
   end
   
   class Function
+    property cap : AST::Identifier
     property ident : AST::Identifier
     property params : AST::Group?
     property ret : AST::Identifier?
@@ -129,12 +131,13 @@ class Mare::Program
       :is,
     ]
     
-    def initialize(@ident, @params, @ret, @body)
+    def initialize(@cap, @ident, @params, @ret, @body)
       @tags = Set(Symbol).new
     end
     
     def dup
       super.tap do |node|
+        node.cap = @cap.dup
         node.ident = @ident.dup
         node.params = @params.dup
         node.ret = @ret.dup

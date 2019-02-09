@@ -9,9 +9,23 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
   
   def compile(context, decl)
     keyword = decl.keyword
+    
+    cap_value =
+      case keyword
+      when "actor"     then "tag"
+      when "class"     then "ref"
+      when "interface" then "ref"
+      when "numeric"   then "val"
+      when "enum"      then "val"
+      when "primitive" then "non"
+      when "ffi"       then "non"
+      else raise NotImplementedError.new(keyword)
+      end
+    cap = AST::Identifier.new(cap_value).from(decl.head.first.not_nil!)
+    
     t = Type.new(
       keyword,
-      Program::Type.new(decl.head.last.as(AST::Identifier)),
+      Program::Type.new(cap, decl.head.last.as(AST::Identifier)),
       @program,
     )
     
@@ -65,9 +79,10 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
       # Numeric types need some basic metadata attached to know the native type.
       if @keyword == "numeric" || @keyword == "enum"
         # Add "is Numeric" to the type definition so to absorb the interface.
+        iface_cap = AST::Identifier.new("non").from(@type.ident)
         iface_is = AST::Identifier.new("is").from(@type.ident)
         iface_ret = AST::Identifier.new("Numeric").from(@type.ident)
-        iface_func = Program::Function.new(iface_is, nil, iface_ret, nil)
+        iface_func = Program::Function.new(iface_cap, iface_is, nil, iface_ret, nil)
         iface_func.add_tag(:hygienic)
         iface_func.add_tag(:is)
         @type.functions << iface_func
@@ -268,6 +283,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         data = @@declare_fun.run(decl)
         
         @type.functions << Program::Function.new(
+          AST::Identifier.new("box").from(decl.head.first.not_nil!),
           data["ident"].as(AST::Identifier),
           data["params"]?.as(AST::Group?),
           data["ret"]?.as(AST::Identifier?),
@@ -280,6 +296,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         data = @@declare_be.run(decl)
         
         @type.functions << Program::Function.new(
+          AST::Identifier.new("ref").from(decl.head.first.not_nil!),
           data["ident"].as(AST::Identifier),
           data["params"]?.as(AST::Group?),
           AST::Identifier.new("None").from(data["ident"]),
@@ -298,6 +315,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         body.terms << AST::Identifier.new("@").from(ident)
         
         @type.functions << Program::Function.new(
+          AST::Identifier.new("ref").from(decl.head.first.not_nil!),
           ident,
           data["params"]?.as(AST::Group?),
           AST::Identifier.new("@").from(ident),
@@ -310,6 +328,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         data = @@declare_const.run(decl)
         
         @type.functions << Program::Function.new(
+          AST::Identifier.new("non").from(decl.head.first.not_nil!),
           data["ident"].as(AST::Identifier),
           nil,
           data["ret"]?.as(AST::Identifier?),
@@ -323,19 +342,22 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         ident = data["ident"].as(AST::Identifier)
         ret = data["ret"]?.as(AST::Identifier?)
         
+        field_cap = AST::Identifier.new("tag").from(decl.head.first.not_nil!)
         field_params = AST::Group.new("(").from(ident)
         field_body = decl.body
         field_body = nil if decl.body.try { |group| group.terms.size == 0 }
-        field_func = Program::Function.new(ident.dup, field_params, ret.dup, field_body)
+        field_func = Program::Function.new(field_cap, ident.dup, field_params, ret.dup, field_body)
         field_func.add_tag(:hygienic)
         field_func.add_tag(:field)
         @type.functions << field_func
         
+        getter_cap = AST::Identifier.new("box").from(decl.head.first.not_nil!)
         getter_body = AST::Group.new(":").from(ident)
         getter_body.terms << AST::FieldRead.new(ident.value).from(ident)
-        getter_func = Program::Function.new(ident, nil, ret, getter_body)
+        getter_func = Program::Function.new(getter_cap, ident, nil, ret, getter_body)
         @type.functions << getter_func
         
+        setter_cap = AST::Identifier.new("ref").from(decl.head.first.not_nil!)
         setter_ident = AST::Identifier.new("#{ident.value}=").from(ident)
         setter_param = AST::Identifier.new("value").from(ident)
         if !ret.nil?
@@ -352,7 +374,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         ).from(ident)
         setter_body = AST::Group.new(":").from(ident)
         setter_body.terms << setter_assign
-        setter_func = Program::Function.new(setter_ident, setter_params, ret.dup, setter_body)
+        setter_func = Program::Function.new(setter_cap, setter_ident, setter_params, ret.dup, setter_body)
         @type.functions << setter_func
       when "member"
         raise "only enums can have members" unless @keyword == "enum"
