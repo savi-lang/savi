@@ -3,7 +3,10 @@ module Mare::Compiler
   # that can construct a minimal pass list for the given target dynamically.
   private def self.run_passes(ctx, target : Symbol)
     case target
+    when :copy then
+      ctx.run(Copy)
     when :macros then
+      run_passes(ctx, :copy)
       ctx.run(Macros)
     when :sugar then
       run_passes(ctx, :macros)
@@ -15,11 +18,8 @@ module Mare::Compiler
       run_passes(ctx, :lambda)
       ctx.run(Flagger)
       ctx.run(Refer)
-    when :copy then
-      run_passes(ctx, :refer)
-      ctx.run(Copy)
     when :completeness then
-      run_passes(ctx, :copy)
+      run_passes(ctx, :refer)
       ctx.run(Completeness)
     when :infer
       run_passes(ctx, :completeness)
