@@ -78,6 +78,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
           default = AST::Declare.new.from(@type.ident)
           default.head << AST::Identifier.new("new").from(@type.ident)
           default.body = AST::Group.new(":").from(@type.ident)
+          default.head << @type.cap.dup
           compile(context, default)
         end
       end
@@ -175,6 +176,12 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         "value" => "fun",
       },
       {
+        "kind" => "keyword",
+        "name" => "cap",
+        "value" => "iso|trn|val|ref|box|tag|non",
+        "optional" => true,
+      },
+      {
         "kind" => "term",
         "name" => "ident",
         "type" => "ident|string",
@@ -219,6 +226,12 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         "kind" => "keyword",
         "name" => "keyword",
         "value" => "new",
+      },
+      {
+        "kind" => "keyword",
+        "name" => "cap",
+        "value" => "iso|trn|val|ref|box|tag|non",
+        "optional" => true,
       },
       {
         "kind" => "term",
@@ -307,8 +320,17 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
       when "fun"
         data = @@declare_fun.run(decl)
         
+        data["cap"] ||=
+          begin
+            if @type.has_tag?(:allocated) ||  @type.has_tag?(:no_desc)
+              AST::Identifier.new("box").from(data["keyword"])
+            else
+              AST::Identifier.new("non").from(data["keyword"])
+            end
+          end
+        
         @type.functions << Program::Function.new(
-          AST::Identifier.new("box").from(data["keyword"]),
+          data["cap"].as(AST::Identifier),
           data["ident"].as(AST::Identifier),
           data["params"]?.as(AST::Group?),
           data["ret"]?.as(AST::Identifier?),
@@ -332,13 +354,14 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
           unless @type.is_instantiable?
         
         data = @@declare_new.run(decl)
-        ident = data["ident"].as(AST::Identifier)
+        
+        data["cap"] ||= AST::Identifier.new("ref").from(data["keyword"])
         
         @type.functions << Program::Function.new(
-          AST::Identifier.new("ref").from(data["keyword"]),
-          ident,
+          data["cap"].as(AST::Identifier),
+          data["ident"].as(AST::Identifier),
           data["params"]?.as(AST::Group?),
-          AST::Identifier.new("@").from(ident),
+          AST::Identifier.new("@").from(data["ident"]),
           decl.body,
         ).tap do |f|
           f.add_tag(:constructor)

@@ -343,11 +343,11 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
   end
   
-  property! refer : Compiler::Refer
+  getter func : Program::Function
   getter param_tids : Array(TID) = [] of TID
   getter! ret_tid : TID
   
-  def initialize(@self_type : Program::Type)
+  def initialize(@self_type : Program::Type, @func : Program::Function)
     # TODO: When we have branching, we'll need some form of divergence.
     @self_tid = 0_u64
     @local_tids = Hash(Refer::Local, TID).new
@@ -356,6 +356,9 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     @last_tid = 0_u64
     @resolved = Hash(TID, MetaType).new
     @called_funcs = Set(Program::Function).new
+    
+    raise "this func already has an infer: #{func.inspect}" if func.infer?
+    func.infer = self
   end
   
   def [](tid : TID)
@@ -366,6 +369,10 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   def [](node)
     raise "this has a tid of zero: #{node.inspect}" if node.tid == 0
     @tids[node.tid]
+  end
+  
+  def refer
+    func.refer
   end
   
   def resolve(tid : TID) : MetaType
@@ -397,7 +404,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     main = ctx.program.find_type?("Main")
     if main
       f = main.find_func?("new")
-      new(main).run(f) if f
+      new(main, f).run if f
     end
     
     # For each function in the program, run with a new instance,
@@ -415,7 +422,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   end
   
   def self.from(t : Program::Type, f : Program::Function)
-    f.infer? || new(t).tap(&.run(f))
+    f.infer? || new(t, f).tap(&.run)
   end
   
   def self.check_is_list(t : Program::Type)
@@ -431,11 +438,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
   end
   
-  def run(func)
-    raise "this func already has an infer: #{func.inspect}" if func.infer?
-    func.infer = self
-    @refer = func.refer
-    
+  def run
     # Complain if neither return type nor function body were specified.
     unless func.ret || func.body
       Error.at func.ident, \
@@ -561,7 +564,10 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   
   def self_tid(pos_node) : TID
     return @self_tid unless @self_tid == 0
-    cap = @self_type.cap.value # TODO: use receiver capability of this function.
+    
+    cap = @func.cap.value
+    cap = "ref" if func.has_tag?(:constructor) # TODO: use "tag" when self is incomplete in a constructor?
+    
     info = Fixed.new(pos_node.pos, MetaType.new(@self_type, cap))
     @self_tid = new_tid_detached(info)
   end
