@@ -13,10 +13,13 @@ class Mare::Program
     @aliases = [] of TypeAlias
   end
   
-  def find_type!(type_name)
+  def find_type?(type_name)
     @types
       .find { |t| t.ident.value == type_name && !t.has_tag?(:hygienic) }
-      .not_nil!
+  end
+  
+  def find_type!(type_name)
+    find_type?(type_name).not_nil!
   end
   
   def find_func!(type_name, func_name)

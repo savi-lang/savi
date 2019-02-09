@@ -391,8 +391,13 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     
     # Start by running an instance of inference at the Main.new function,
     # and recurse into checking other functions that are reachable from there.
-    t = ctx.program.find_type!("Main")
-    new(t).run(t.find_func!("new"))
+    # We do this so that errors for reachable functions are shown first.
+    # If there is no Main type, proceed to analyzing the whole program.
+    main = ctx.program.find_type?("Main")
+    if main
+      f = main.find_func?("new")
+      new(main).run(f) if f
+    end
     
     # For each function in the program, run with a new instance,
     # unless that function has already been reached with an infer instance.

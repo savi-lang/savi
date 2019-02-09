@@ -21,8 +21,11 @@ module Mare::Compiler
       run_passes(ctx, :lambda)
       ctx.run(Copy)
       ctx.run(Infer)
-    when :codegen then
+    when :completeness then
       run_passes(ctx, :infer)
+      ctx.run(Completeness)
+    when :codegen then
+      run_passes(ctx, :completeness)
       ctx.run(Reach)
       ctx.run(Paint)
       ctx.run(CodeGen)
