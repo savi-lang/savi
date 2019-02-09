@@ -408,11 +408,12 @@ describe Mare::Compiler::Infer do
       fun example Interface:
     
     primitive Concrete:
+      is Interface:
       fun example Concrete: Concrete
     
     actor Main:
       new:
-        i Interface = Concrete
+        Concrete
     SOURCE
     
     Mare::Compiler.compile([source], :infer)
@@ -424,23 +425,19 @@ describe Mare::Compiler::Infer do
       fun example (arg Interface) None:
     
     primitive Concrete:
+      is Interface:
       fun example (arg Concrete) None: None
     
     actor Main:
       new:
-        i Interface = Concrete
+        Concrete
     SOURCE
     
     expected = <<-MSG
-    This type is outside of a constraint: Concrete:
-    from (example):9:
-        i Interface = Concrete
-                      ^~~~~~~~
-    
-    - it must be a subtype of Interface:
-      from (example):9:
-        i Interface = Concrete
-          ^~~~~~~~~
+    This type isn't a subtype of Interface:
+    from (example):4:
+    primitive Concrete:
+              ^~~~~~~~
     MSG
     
     expect_raises Mare::Error, expected do

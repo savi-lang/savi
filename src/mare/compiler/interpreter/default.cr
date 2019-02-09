@@ -64,7 +64,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
     
     # TODO: dedup these with the Witness mechanism.
     # TODO: be more specific (for example, `member` is only allowed for `enum`)
-    def keywords; ["prop", "fun", "be", "new", "const", "member"] end
+    def keywords; ["is", "prop", "fun", "be", "new", "const", "member"] end
     
     def finished(context)
       if @type.is_instantiable?
@@ -265,6 +265,18 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
       },
     ] of Hash(String, String | Bool))
     
+    @@declare_is = Witness.new([
+      {
+        "kind" => "keyword",
+        "name" => "is",
+      },
+      {
+        "kind" => "term",
+        "name" => "interface",
+        "type" => "ident",
+      },
+    ] of Hash(String, String | Bool))
+    
     @@declare_member = Witness.new([
       {
         "kind" => "keyword",
@@ -376,6 +388,16 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         setter_body.terms << setter_assign
         setter_func = Program::Function.new(setter_cap, setter_ident, setter_params, ret.dup, setter_body)
         @type.functions << setter_func
+      when "is"
+        data = @@declare_is.run(decl)
+        
+        @type.functions << Program::Function.new(
+          AST::Identifier.new("non").from(decl.head.first.not_nil!),
+          decl.head.first.as(AST::Identifier),
+          nil,
+          data["interface"].as(AST::Identifier),
+          nil,
+        ).tap(&.add_tag(:hygienic)).tap(&.add_tag(:is))
       when "member"
         raise "only enums can have members" unless @keyword == "enum"
         
