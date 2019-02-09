@@ -8,17 +8,15 @@ module Mare::Compiler
     when :sugar then
       run_passes(ctx, :macros)
       ctx.run(Sugar)
-    when :refer then
+    when :lambda then
       run_passes(ctx, :sugar)
+      ctx.run(Lambda)
+    when :refer then
+      run_passes(ctx, :lambda)
       ctx.run(Flagger)
       ctx.run(Refer)
-    when :lambda then
-      run_passes(ctx, :refer)
-      ctx.run(Lambda)
-      ctx.run(Refer) # run refer pass again for any new or invalidated functions
-      # TODO: also run Flagger again?
     when :copy then
-      run_passes(ctx, :lambda)
+      run_passes(ctx, :refer)
       ctx.run(Copy)
     when :completeness then
       run_passes(ctx, :copy)

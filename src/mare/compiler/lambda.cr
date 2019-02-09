@@ -19,7 +19,6 @@ class Mare::Compiler::Lambda < Mare::AST::Visitor
   def run
     @func.params.try &.accept(self)
     @func.body.try &.accept(self)
-    @func.invalidate_refer! if @changed
   end
   
   private def next_lambda_name

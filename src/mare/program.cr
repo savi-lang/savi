@@ -133,11 +133,6 @@ class Mare::Program
       @tags = Set(Symbol).new
     end
     
-    def invalidate_refer!
-      raise "no refer present yet" unless @refer
-      @refer = nil
-    end
-    
     def dup
       super.tap do |node|
         node.ident = @ident.dup
