@@ -17,15 +17,17 @@ module Mare::Compiler
       ctx.run(Lambda)
       ctx.run(Refer) # run refer pass again for any new or invalidated functions
       # TODO: also run Flagger again?
-    when :infer then
+    when :copy then
       run_passes(ctx, :lambda)
       ctx.run(Copy)
-      ctx.run(Infer)
     when :completeness then
-      run_passes(ctx, :infer)
+      run_passes(ctx, :copy)
       ctx.run(Completeness)
-    when :codegen then
+    when :infer
       run_passes(ctx, :completeness)
+      ctx.run(Infer)
+    when :codegen then
+      run_passes(ctx, :infer)
       ctx.run(Reach)
       ctx.run(Paint)
       ctx.run(CodeGen)
