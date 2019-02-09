@@ -130,7 +130,7 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
   end
   
   def run(func)
-    raise "this func already has a refer: #{func.inspect}" if func.refer?
+    return if func.refer? # skip if we've already completed this analysis
     func.refer = self
     
     # Read parameter declarations, creating locals within that list.

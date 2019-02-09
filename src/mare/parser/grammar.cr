@@ -96,6 +96,7 @@ module Mare::Parser
       ptermsn >> sn >>
       pipesep.maybe >> sn
     parens.define(
+      (str("^(") >> sn >> ptermsp.maybe >> sn >> char(')')).named(:group) |
       (char('(') >> sn >> ptermsp.maybe >> sn >> char(')')).named(:group) |
       (char('[') >> sn >> ptermsp.maybe >> sn >> char(']')).named(:group)
     )

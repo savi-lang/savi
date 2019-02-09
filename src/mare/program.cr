@@ -14,7 +14,9 @@ class Mare::Program
   end
   
   def find_type!(type_name)
-    @types.find { |t| t.ident.value == type_name }.not_nil!
+    @types
+      .find { |t| t.ident.value == type_name && !t.has_tag?(:hygienic) }
+      .not_nil!
   end
   
   def find_func!(type_name, func_name)
@@ -48,6 +50,7 @@ class Mare::Program
       :abstract,
       :actor,
       :allocated,
+      :hygienic,
       :no_desc,
       :numeric,
     ]
@@ -125,6 +128,11 @@ class Mare::Program
     
     def initialize(@ident, @params, @ret, @body)
       @tags = Set(Symbol).new
+    end
+    
+    def invalidate_refer!
+      raise "no refer present yet" unless @refer
+      @refer = nil
     end
     
     def dup
