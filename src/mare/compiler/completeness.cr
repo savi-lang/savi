@@ -1,15 +1,16 @@
 module Mare::Compiler::Completeness
   def self.run(ctx)
     ctx.program.types.each do |t|
+      branch_cache = {} of Tuple(Set(String), Program::Function) => Branch
       t.functions.each do |f|
-        check_constructor(t, f) if f.has_tag?(:constructor)
+        check_constructor(t, f, branch_cache) if f.has_tag?(:constructor)
       end
     end
   end
   
-  def self.check_constructor(decl, func)
+  def self.check_constructor(decl, func, branch_cache)
     fields = decl.functions.select(&.has_tag?(:field))
-    branch = Branch.new(decl)
+    branch = Branch.new(decl, branch_cache)
     func.body.try(&.accept(branch))
     
     unseen =
@@ -25,8 +26,30 @@ module Mare::Compiler::Completeness
   
   class Branch < Mare::AST::Visitor
     getter decl : Program::Type
+    getter branch_cache : Hash(Tuple(Set(String), Program::Function), Branch)
     getter seen_fields : Set(String)
-    def initialize(@decl, @seen_fields = Set(String).new)
+    def initialize(@decl, @branch_cache, @seen_fields = Set(String).new)
+    end
+    
+    def sub_branch(node : AST::Node)
+      branch = Branch.new(decl, branch_cache, seen_fields.dup)
+      node.accept(branch)
+      branch
+    end
+    
+    def sub_branch(func : Program::Function)
+      # Use caching of function branches to prevent infinite recursion.
+      # We cache by both seen_fields and func so that we don't combine
+      # cached results for branch paths where the set of prior seen fields
+      # is different. This also lets us handle nicely some recursive patterns
+      # that can be proven to make progress in the set of seen fields.
+      cache_key = {seen_fields, func}
+      branch_cache.fetch cache_key do
+        branch_cache[cache_key] = branch =
+          Branch.new(decl, branch_cache, seen_fields.dup)
+        func.body.not_nil!.accept(branch)
+        branch
+      end
     end
     
     # This visitor never replaces nodes, it just touches them and returns them.
@@ -47,9 +70,9 @@ module Mare::Compiler::Completeness
       # and collect the fields that appeared in all child branches.
       # A field counts as initialized if it is initialized in all branches.
       seen_fields.concat(
-        node.list.flat_map do |cond, body|
-          Branch.new(decl, seen_fields.dup).tap { |branch| body.accept(branch) }
-        end.map(&.seen_fields).reduce { |accum, fields| accum & fields }
+        node.list
+          .map { |cond, body| sub_branch(body).seen_fields }
+          .reduce { |accum, fields| accum & fields }
       )
     end
     
@@ -73,7 +96,10 @@ module Mare::Compiler::Completeness
           else raise NotImplementedError.new(rhs.to_a)
           end
         
-        decl.find_func?(method_name).try(&.body).try(&.accept(self))
+        # Follow the method call in a new branch, and collect any field writes
+        # seen in that branch as if they had been seen in this branch.
+        branch = sub_branch(decl.find_func!(method_name))
+        seen_fields.concat(branch.seen_fields)
       end
     end
     

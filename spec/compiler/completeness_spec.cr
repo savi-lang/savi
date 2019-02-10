@@ -95,4 +95,38 @@ describe Mare::Compiler::Completeness do
     
     Mare::Compiler.compile([source], :completeness)
   end
+  
+  it "won't blow its stack on mutually recursive branching paths" do
+    source = Mare::Source.new "(example)", <<-SOURCE
+    class Data:
+      prop x U64:
+      new:
+        @tweedle_dee
+      
+      fun ref tweedle_dee None:
+        if True (@x = 2 | @tweedle_dum)
+        None
+      
+      fun ref tweedle_dum None:
+        if True (@x = 1 | @tweedle_dee)
+        None
+    SOURCE
+    
+    
+    expected = <<-MSG
+    This constructor doesn't initialize all of its fields:
+    from (example):3:
+      new:
+      ^~~
+    
+    - this field didn't get initialized:
+      from (example):2:
+      prop x U64:
+           ^
+    MSG
+    
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :completeness)
+    end
+  end
 end
