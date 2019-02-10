@@ -28,16 +28,21 @@ module Mare::Compiler::Completeness
     getter decl : Program::Type
     getter branch_cache : Hash(Tuple(Set(String), Program::Function), Branch)
     getter seen_fields : Set(String)
-    def initialize(@decl, @branch_cache, @seen_fields = Set(String).new)
+    getter call_crumbs : Array(Source::Pos)
+    def initialize(
+      @decl,
+      @branch_cache,
+      @seen_fields = Set(String).new,
+      @call_crumbs = Array(Source::Pos).new)
     end
     
     def sub_branch(node : AST::Node)
-      branch = Branch.new(decl, branch_cache, seen_fields.dup)
+      branch = Branch.new(decl, branch_cache, seen_fields.dup, call_crumbs.dup)
       node.accept(branch)
       branch
     end
     
-    def sub_branch(func : Program::Function)
+    def sub_branch(func : Program::Function, call_crumb : Source::Pos? = nil)
       # Use caching of function branches to prevent infinite recursion.
       # We cache by both seen_fields and func so that we don't combine
       # cached results for branch paths where the set of prior seen fields
@@ -46,7 +51,8 @@ module Mare::Compiler::Completeness
       cache_key = {seen_fields, func}
       branch_cache.fetch cache_key do
         branch_cache[cache_key] = branch =
-          Branch.new(decl, branch_cache, seen_fields.dup)
+          Branch.new(decl, branch_cache, seen_fields.dup, call_crumbs.dup)
+        branch.call_crumbs << call_crumb if call_crumb
         func.body.not_nil!.accept(branch)
         branch
       end
@@ -82,6 +88,11 @@ module Mare::Compiler::Completeness
     
     def touch(node : AST::FieldRead)
       # TODO: Raise an error if we haven't written to that field yet.
+      if !seen_fields.includes?(node.value)
+        Error.at node,
+          "This field may be read before it is initialized by a constructor",
+            call_crumbs.reverse.map { |pos| {pos, "traced from a call here"} }
+      end
     end
     
     def touch(node : AST::Relate)
@@ -98,7 +109,7 @@ module Mare::Compiler::Completeness
         
         # Follow the method call in a new branch, and collect any field writes
         # seen in that branch as if they had been seen in this branch.
-        branch = sub_branch(decl.find_func!(method_name))
+        branch = sub_branch(decl.find_func!(method_name), node.pos)
         seen_fields.concat(branch.seen_fields)
       end
     end

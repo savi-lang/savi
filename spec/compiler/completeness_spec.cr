@@ -129,4 +129,38 @@ describe Mare::Compiler::Completeness do
       Mare::Compiler.compile([source], :completeness)
     end
   end
+  
+  it "complains when a field is read before it has been initialized" do
+    source = Mare::Source.new "(example)", <<-SOURCE
+    class Data:
+      prop x U64:
+      prop y U64:
+      fun x_plus_one: @x + 1
+      new:
+        @y = @x_plus_one
+        @x = 2
+    SOURCE
+    
+    
+    expected = <<-MSG
+    This field may be read before it is initialized by a constructor:
+    from (example):2:
+      prop x U64:
+           ^
+    
+    - traced from a call here:
+      from (example):4:
+      fun x_plus_one: @x + 1
+                      ^~
+    
+    - traced from a call here:
+      from (example):6:
+        @y = @x_plus_one
+             ^~~~~~~~~~~
+    MSG
+    
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :completeness)
+    end
+  end
 end
