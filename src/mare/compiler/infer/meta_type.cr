@@ -1,4 +1,4 @@
-class Mare::Compiler::Infer::MetaType
+struct Mare::Compiler::Infer::MetaType
   ##
   # A MetaType is represented internally in Disjunctive Normal Form (DNF),
   # which is a standardized precedence order of logical formula that is
