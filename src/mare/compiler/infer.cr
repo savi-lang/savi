@@ -436,6 +436,14 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       new_tid(node, call)
       
       follow_call(call)
+    when "'"
+      rhs = node.rhs.as(AST::Identifier)
+      lhs_mt = self[node.lhs]
+      Error.at node.op, "A capability can't be specified for a value" \
+        unless lhs_mt.is_a?(Fixed) && node.value_not_needed?
+      
+      meta_type = lhs_mt.inner.override_cap(rhs.value)
+      new_tid(node, Fixed.new(node.pos, meta_type))
     when "<:"
       # TODO: check that it is a "non" cap - just being fixed isn't sufficient.
       Error.at node.rhs, "expected this to have a fixed type at compile time" \

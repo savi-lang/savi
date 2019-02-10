@@ -53,37 +53,45 @@ module Mare::Parser
     prefixed.define (prefixop >> atom).named(:prefix)
     
     # Define a qualified term to be immediately followed by a parens group.
-    qualify = (atom >> parens).named(:qualify)
-    suffixed = qualify
+    qualified = (atom >> parens).named(:qualify)
+    suffixed = qualified
+    
+    # Define what a capability looks like.
+    cap = (
+      str("iso") | str("trn") | str("val") |
+      str("ref") | str("box") | str("tag") | str("non")
+    ).named(:ident)
     
     # Define groups of operators, in order of precedence,
     # from most tightly binding to most loosely binding.
     # Operators in the same group have the same level of precedence.
-    op1 = (char('.')).named(:op)
-    op2 = (char('*') | char('/') | char('%')).named(:op)
-    op3 = (char('+') | char('-')).named(:op)
-    op4 = (str("..") | str("<>")).named(:op)
-    op5 = (str("<|>") | str("<~>") | str("<<<") | str(">>>") |
+    opcap = (char('\'')).named(:op)
+    op2 = (char('.')).named(:op)
+    op3 = (char('*') | char('/') | char('%')).named(:op)
+    op4 = (char('+') | char('-')).named(:op)
+    op5 = (str("..") | str("<>")).named(:op)
+    op6 = (str("<|>") | str("<~>") | str("<<<") | str(">>>") |
             str("<<~") | str("~>>") | str("<<") | str(">>") |
             str("<~") | str("~>")).named(:op)
-    op6 = ((str("<:") | str(">=") | str("<=") | char('<') | char('>')) >>
+    op7 = ((str("<:") | str(">=") | str("<=") | char('<') | char('>')) >>
             ~(char('>') | char('<'))).named(:op)
-    op7 = (str("===") | str("==") | str("!==") | str("!=") |
+    op8 = (str("===") | str("==") | str("!==") | str("!=") |
             str("=~")).named(:op)
-    op8 = (str("&&") | str("||")).named(:op)
+    op9 = (str("&&") | str("||")).named(:op)
     opw = (char(' ') | char('\t'))
     ope = char('=').named(:op)
     
     # Construct the nested possible relations for each group of operators.
     t1 = suffixed | atom
-    t2 = (t1 >> (sn >> op1 >> sn >> t1).repeat).named(:relate)
+    t2 = (t1 >> (opcap >> cap).repeat).named(:relate)
     t3 = (t2 >> (sn >> op2 >> sn >> t2).repeat).named(:relate)
     t4 = (t3 >> (sn >> op3 >> sn >> t3).repeat).named(:relate)
     t5 = (t4 >> (sn >> op4 >> sn >> t4).repeat).named(:relate)
     t6 = (t5 >> (sn >> op5 >> sn >> t5).repeat).named(:relate)
     t7 = (t6 >> (sn >> op6 >> sn >> t6).repeat).named(:relate)
     t8 = (t7 >> (sn >> op7 >> sn >> t7).repeat).named(:relate)
-    tw = (t8 >> (sn >> op8 >> sn >> t8).repeat).named(:relate)
+    t9 = (t8 >> (sn >> op8 >> sn >> t8).repeat).named(:relate)
+    tw = (t9 >> (sn >> op9 >> sn >> t9).repeat).named(:relate)
     te = (tw >> (opw >> s >> tw).repeat(1) >> s).named(:group_w) | tw
     t = (te >> (sn >> ope >> sn >> te >> s).repeat).named(:relate)
     

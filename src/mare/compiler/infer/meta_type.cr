@@ -57,6 +57,21 @@ class Mare::Compiler::Infer::MetaType
     MetaType.new(@inner.intersect(Capability.new(name)))
   end
   
+  def override_cap(name : String)
+    cap = Capability.new(name)
+    inner = @inner
+    MetaType.new(
+      case inner
+      when Nominal
+        inner.intersect(cap)
+      when Intersection
+        Intersection.new(cap, inner.terms, inner.anti_terms)
+      else
+        raise NotImplementedError.new(inner.inspect)
+      end
+    )
+  end
+  
   def within_constraints?(types : Iterable(MetaType))
     self < self.class.new_intersection(types)
   end

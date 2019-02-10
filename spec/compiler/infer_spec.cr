@@ -513,6 +513,33 @@ describe Mare::Compiler::Infer do
     end
   end
   
+  it "complains when assigning with an insufficient right-hand capability" do
+    source = Mare::Source.new "(example)", <<-SOURCE
+    class C:
+    
+    actor Main:
+      new:
+        c1 C'ref = C.new
+        c2 C'iso = c1
+    SOURCE
+    
+    expected = <<-MSG
+    This type is outside of a constraint: C:
+    from (example):5:
+        c1 C'ref = C.new
+        ^~
+    
+    - it must be a subtype of C'iso:
+      from (example):6:
+        c2 C'iso = c1
+           ^~~~~
+    MSG
+    
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :infer)
+    end
+  end
+  
   it "complains when calling on types without that function" do
     source = Mare::Source.new "(example)", <<-SOURCE
     interface A:
