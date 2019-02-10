@@ -65,19 +65,19 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       else
         defn = single!
         if defn.has_tag?(:numeric)
-          if defn.metadata[:is_floating_point]
-            case defn.metadata[:bit_width]
+          if defn.const_bool("is_floating_point")
+            case defn.const_u64("bit_width")
             when 32 then :f32
             when 64 then :f64
-            else raise NotImplementedError.new(defn.metadata)
+            else raise NotImplementedError.new(defn.inspect)
             end
           else
-            case defn.metadata[:bit_width]
+            case defn.const_u64("bit_width")
             when 1 then :i1
             when 8 then :i8
             when 32 then :i32
             when 64 then :i64
-            else raise NotImplementedError.new(defn.metadata)
+            else raise NotImplementedError.new(defn.inspect)
             end
           end
         else
@@ -185,15 +185,15 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     end
     
     def is_floating_point_numeric?
-      @program_type.metadata[:is_floating_point]? && is_numeric?
+      is_numeric? && @program_type.const_bool("is_floating_point")
     end
     
     def is_signed_numeric?
-      @program_type.metadata[:is_signed]? && is_numeric?
+      is_numeric? && @program_type.const_bool("is_signed")
     end
     
     def bit_width
-      @program_type.metadata[:bit_width].as(UInt64).to_i32
+      @program_type.const_u64("bit_width").to_i32
     end
     
     def each_function

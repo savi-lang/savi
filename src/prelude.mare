@@ -9,9 +9,9 @@ enum Bool:
 
 // Numerics
 interface val Numeric:
-  const bit_width U8:
-  const is_signed Bool:
-  const is_floating_point Bool:
+  const bit_width U8: 64
+  const is_signed Bool: False
+  const is_floating_point Bool: False
   // TODO: arithmetic method interfaces with type parameters on Numeric[A] type
 
 interface val NumericMethods: // TODO: don't use interface for this... `common`?

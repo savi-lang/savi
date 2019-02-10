@@ -106,6 +106,24 @@ class Mare::Program
       has_tag?(:allocated) && is_concrete?
     end
     
+    def const_u64(name) : UInt64
+      f = find_func!(name)
+      raise "#{ident.value}.#{name} not a constant" unless f.has_tag?(:constant)
+      
+      f.body.not_nil!.terms.last.as(AST::LiteralInteger).value
+    end
+    
+    def const_bool(name) : Bool
+      f = find_func!(name)
+      raise "#{ident.value}.#{name} not a constant" unless f.has_tag?(:constant)
+      
+      case f.body.not_nil!.terms.last.as(AST::Identifier).value
+      when "True" then true
+      when "False" then false
+      else raise NotImplementedError.new(f.body.not_nil!.to_a)
+      end
+    end
+    
     @subtyping : Mare::Compiler::Infer::SubtypingInfo?
     def subtyping
       @subtyping ||= Mare::Compiler::Infer::SubtypingInfo.new(self)
