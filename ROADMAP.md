@@ -26,7 +26,7 @@
 - [x] - Compile-time constant values
 - [x] - User-defined custom numeric types (`numeric MyNumber:`)
 - [x] - Enumerated custom numeric types (`enum MyEnum:`)
-- [ ] - Non-allocated class references with "static" stateless functions.
+- [x] - Non-allocated class references with "static" stateless functions.
 - [ ] - Typeclasses (`implement SomeInterface for SomeClass:`)
 - [ ] - Automatic specialization of functions to avoid virtual table calls.
 - [ ] - Sourcing/overriding constant values using compile-time options

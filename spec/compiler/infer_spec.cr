@@ -7,7 +7,7 @@ describe Mare::Compiler::Infer do
     SOURCE
     
     expected = <<-MSG
-    This identifer couldn't be resolved:
+    This type couldn't be resolved:
     from (example):3:
         x BogusType = 42
           ^~~~~~~~~
@@ -485,6 +485,32 @@ describe Mare::Compiler::Infer do
     
     func.infer.resolve(assign.lhs).show_type.should eq "X"
     func.infer.resolve(assign.rhs).show_type.should eq "X"
+  end
+  
+  it "requires allocation for non-non references of an allocated class" do
+    source = Mare::Source.new "(example)", <<-SOURCE
+    class X:
+    
+    actor Main:
+      new:
+        x X = X
+    SOURCE
+    
+    expected = <<-MSG
+    This type is outside of a constraint: X'non:
+    from (example):5:
+        x X = X
+              ^
+    
+    - it must be a subtype of X:
+      from (example):5:
+        x X = X
+          ^
+    MSG
+    
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :infer)
+    end
   end
   
   it "complains when calling on types without that function" do

@@ -1,6 +1,14 @@
 class Mare::Compiler::Flagger < Mare::AST::Visitor
   alias RID = UInt64
   
+  # This visitor marks the given node and all nodes within as value_not_needed.
+  class ValueNotNeededVisitor < Mare::AST::Visitor
+    def visit(node)
+      node.value_not_needed!
+      node
+    end
+  end
+  
   def self.run(ctx)
     ctx.program.types.each do |t|
       t.functions.each do |f|
@@ -31,6 +39,14 @@ class Mare::Compiler::Flagger < Mare::AST::Visitor
       # In a sequence-style group, only the value of the final term is needed.
       group.terms.each(&.value_not_needed!)
       group.terms.last.value_needed! unless group.terms.empty?
+    when " "
+      if group.terms.size == 2
+        # Treat this as an explicit type qualification, such as in the case
+        # of a local assignment with an explicit type. The value isn't used.
+        group.terms[1].accept(ValueNotNeededVisitor.new)
+      else
+        raise NotImplementedError.new(group.to_a.inspect)
+      end
     end
   end
   

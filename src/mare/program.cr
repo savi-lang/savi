@@ -41,6 +41,10 @@ class Mare::Program
     def inspect(io : IO)
       io << "#<#{self.class} #{@ident.value}: #{@target.value}>"
     end
+    
+    def is_value?
+      @metadata.has_key? :enum_value
+    end
   end
   
   class Type
@@ -88,6 +92,10 @@ class Mare::Program
     def has_tag?(tag : Symbol)
       raise NotImplementedError.new(tag) unless KNOWN_TAGS.includes?(tag)
       @tags.includes?(tag)
+    end
+    
+    def is_value?
+      false
     end
     
     def is_concrete?

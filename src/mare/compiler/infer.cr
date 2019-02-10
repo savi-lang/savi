@@ -127,18 +127,19 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     # Don't bother further typechecking functions that have no body
     # (such as FFI function declarations).
     func_body = func.body
-    return unless func_body
     
-    # Visit the function body, taking note of all observed constraints.
-    func_body.accept(self)
-    
-    # Assign the function body value to the fake return value local.
-    # This has the effect of constraining it to any given explicit type,
-    # and also of allowing inference if there is no explicit type.
-    # We don't do this for constructors, since constructors implicitly return
-    # self no matter what the last term of the body of the function is.
-    self[ret_tid].as(Local).assign(self, func_body.tid) \
-      unless func.has_tag?(:constructor)
+    if func_body
+      # Visit the function body, taking note of all observed constraints.
+      func_body.accept(self)
+      
+      # Assign the function body value to the fake return value local.
+      # This has the effect of constraining it to any given explicit type,
+      # and also of allowing inference if there is no explicit type.
+      # We don't do this for constructors, since constructors implicitly return
+      # self no matter what the last term of the body of the function is.
+      self[ret_tid].as(Local).assign(self, func_body.tid) \
+        unless func.has_tag?(:constructor)
+    end
     
     # Assign the resolved types to a map for safekeeping.
     # This also has the effect of running some final checks on everything.
@@ -296,9 +297,17 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     ref = refer[node]
     case ref
     when Refer::Decl, Refer::DeclAlias
-      # If it's a const, treat it as a type reference.
-      # TODO: handle instantiable type references as having a opaque singleton type.
-      new_tid(node, Fixed.new(node.pos, MetaType.new(ref.final_decl.defn)))
+      if node.value_needed? && !ref.defn.is_value?
+        # A type reference whose value is used and is not itself a value
+        # must be marked non, rather than having the default cap for that type.
+        # This is used when we pass a type around as if it were a value.
+        meta_type = MetaType.new(ref.final_decl.defn, "non")
+      else
+        # Otherwise, it's part of a type constraint, so we use the default cap.
+        meta_type = MetaType.new(ref.final_decl.defn)
+      end
+      
+      new_tid(node, Fixed.new(node.pos, meta_type))
     when Refer::Local
       # If it's a local, track the possibly new tid in our @local_tids map.
       local_tid = lookup_local_tid(ref)
