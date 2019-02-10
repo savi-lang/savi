@@ -189,7 +189,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     end
     
     def is_signed_numeric?
-      @program_type.metadata[:is_floating_point]? && is_numeric?
+      @program_type.metadata[:is_signed]? && is_numeric?
     end
     
     def bit_width

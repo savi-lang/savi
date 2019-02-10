@@ -152,15 +152,15 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
           compile(context, default)
         end
         
-        is_float_func = @type.find_func!("is_signed")
+        is_signed_func = @type.find_func!("is_signed")
         raise "numeric is_signed must be a const" \
-          unless is_float_func.has_tag?(:constant)
+          unless is_signed_func.has_tag?(:constant)
         
-        is_float = is_float_func.body.not_nil!.terms.last.as(AST::Identifier).value
+        is_signed = is_signed_func.body.not_nil!.terms.last.as(AST::Identifier).value
         raise "invalid numeric is_signed value" \
-          unless ["True", "False"].includes?(is_float)
+          unless ["True", "False"].includes?(is_signed)
         
-        @type.metadata[:is_signed] = is_float == "True"
+        @type.metadata[:is_signed] = is_signed == "True"
       end
       
       # An FFI type's functions should be tagged as "ffi" and body removed.

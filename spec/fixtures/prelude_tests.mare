@@ -62,6 +62,9 @@ actor Main:
     test["signed integer   >="].pass = I32[93] >= 93
     test["floating point   >="].pass = F32[93] >= 93
     
+    test["negative < positive"].pass = I32[-90] < 3
+    test["positive > negative"].pass = I32[3] > -90
+    
     ///
     // Numeric arithmetic
     
