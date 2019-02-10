@@ -112,7 +112,6 @@ describe Mare::Compiler::Completeness do
         None
     SOURCE
     
-    
     expected = <<-MSG
     This constructor doesn't initialize all of its fields:
     from (example):3:
@@ -140,7 +139,6 @@ describe Mare::Compiler::Completeness do
         @y = @x_plus_one
         @x = 2
     SOURCE
-    
     
     expected = <<-MSG
     This field may be read before it is initialized by a constructor:
