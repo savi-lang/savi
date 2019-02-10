@@ -99,13 +99,11 @@ class MicroTestInstance:
   fun "pass=" (pass Bool):
     if pass (
       Print.f("%s", ".")
-      None // TODO: shouldn't need this None
     |
       Print.line_break // TODO: fix processing of \n in string literals and use it
       Print.f("failure of '%s'!", @text)
       Print.line_break // TODO: fix processing of \n in string literals and use it
       LibPonyRT.pony_exitcode(1) // Mark the entire process as a failure.
-      None // TODO: shouldn't need this None
     )
 
 primitive Print:
