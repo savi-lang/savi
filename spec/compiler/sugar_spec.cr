@@ -117,4 +117,55 @@ describe Mare::Compiler::Sugar do
       ],
     ]
   end
+  
+  it "transforms short-circuiting logical operators into choices" do
+    source = Mare::Source.new "(example)", <<-SOURCE
+    class Example:
+      fun logical:
+        w && x || y && z
+    SOURCE
+    
+    ast = Mare::Parser.parse(source)
+    
+    ast.to_a.should eq [:doc,
+      [:declare, [[:ident, "class"], [:ident, "Example"]], [:group, ":"]],
+      [:declare, [[:ident, "fun"], [:ident, "logical"]], [:group, ":",
+        [:relate,
+          [:relate,
+            [:relate,
+              [:ident, "w"],
+              [:op, "&&"],
+              [:ident, "x"],
+            ],
+            [:op, "||"],
+            [:ident, "y"],
+          ],
+          [:op, "&&"],
+          [:ident, "z"],
+        ],
+      ]],
+    ]
+    
+    ctx = Mare::Compiler.compile([ast], :sugar)
+    
+    func = ctx.program.find_func!("Example", "logical")
+    func.body.not_nil!.to_a.should eq [:group, ":",
+      [:choice,
+        [
+          [:choice,
+            [
+              [:choice,
+                [[:ident, "w"], [:ident, "x"]],
+                [[:ident, "True"], [:ident, "False"]],
+              ],
+              [:ident, "True"],
+            ],
+            [[:ident, "True"], [:ident, "y"]],
+          ],
+          [:ident, "z"],
+        ],
+        [[:ident, "True"], [:ident, "False"]],
+      ],
+    ]
+  end
 end

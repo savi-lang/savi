@@ -54,6 +54,11 @@ class Mare::Compiler::Sugar < Mare::AST::Visitor
     f.body.try { |body| body.accept(self) }
   end
   
+  @last_choice_num = 0
+  private def next_choice_name
+    "choice.#{@last_choice_num += 1}"
+  end
+  
   def visit(node : AST::Identifier)
     if node.value == "@"
       node
@@ -92,7 +97,7 @@ class Mare::Compiler::Sugar < Mare::AST::Visitor
   
   def visit(node : AST::Relate)
     case node.op.value
-    when ".", "'", "&&", "||", " ", "<:", "DEFAULTPARAM"
+    when ".", "'", " ", "<:", "DEFAULTPARAM"
       node # skip these special-case operators
     when "="
       # If assigning to a ".[identifier]" relation, sugar as a "setter" method.
@@ -108,6 +113,23 @@ class Mare::Compiler::Sugar < Mare::AST::Visitor
       else
         node
       end
+    when "&&"
+      # Convert into a choice modeling a short-circuiting logical "AND".
+      # Create a choice that executes and returns the rhs expression
+      # if the lhs expression is True, and otherwise returns False.
+      AST::Choice.new([
+        {node.lhs, node.rhs},
+        {AST::Identifier.new("True").from(node.op),
+          AST::Identifier.new("False").from(node.op)},
+      ]).from(node.op)
+    when "||"
+      # Convert into a choice modeling a short-circuiting logical "OR".
+      # Create a choice that returns True if the lhs expression is True,
+      # and otherwise executes and returns the rhs expression.
+      AST::Choice.new([
+        {node.lhs, AST::Identifier.new("True").from(node.op)},
+        {AST::Identifier.new("True").from(node.op), node.rhs},
+      ]).from(node.op)
     else
       # Convert the operator relation into a single-argument method call.
       ident = AST::Identifier.new(node.op.value).from(node.op)
