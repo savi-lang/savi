@@ -429,10 +429,20 @@ describe Mare::Compiler::Infer do
     SOURCE
     
     expected = <<-MSG
-    This type isn't a subtype of Interface:
+    This type doesn't implement the interface Interface:
     from (example):4:
     primitive Concrete:
               ^~~~~~~~
+    
+    - this parameter type is Concrete:
+      from (example):6:
+      fun example (arg Concrete) None: None
+                   ^~~~~~~~~~~~
+    
+    - it is required to be a supertype of Interface:
+      from (example):2:
+      fun example (arg Interface) None:
+                   ^~~~~~~~~~~~~
     MSG
     
     expect_raises Mare::Error, expected do
@@ -455,10 +465,20 @@ describe Mare::Compiler::Infer do
     SOURCE
     
     expected = <<-MSG
-    This type isn't a subtype of Interface:
+    This type doesn't implement the interface Interface:
     from (example):4:
     primitive Concrete:
               ^~~~~~~~
+    
+    - a non-constant can't be a subtype of a constant:
+      from (example):6:
+      fun non color String: "red"
+              ^~~~~
+    
+    - the constant in the supertype is here:
+      from (example):2:
+      const color String:
+            ^~~~~
     MSG
     
     expect_raises Mare::Error, expected do

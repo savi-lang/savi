@@ -131,8 +131,8 @@ class Mare::Program
     
     # Return true if this Type is a subtype of the other Type.
     def <(other); subtype_of?(other) end
-    def subtype_of?(other : Program::Type) : Bool
-      subtyping.check(other)
+    def subtype_of?(other : Program::Type, errors = [] of Error::Info) : Bool
+      subtyping.check(other, errors)
     end
   end
   

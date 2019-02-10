@@ -1,9 +1,11 @@
 # This exception class is used to represent errors to be presented to the user,
 # with each error being associated to a particular SourcePos that caused it.
 class Mare::Error < Exception
+  alias Info = {Source::Pos, String}
+  
   getter pos : Source::Pos
   getter headline : String
-  getter info : Array({Source::Pos, String})
+  getter info : Array(Info)
   
   def initialize(@pos, @headline)
     @info = [] of {Source::Pos, String}

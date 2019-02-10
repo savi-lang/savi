@@ -92,10 +92,13 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       next unless f.has_tag?(:is)
       
       infer = Infer.from(t, f)
-      iface = infer.resolve(infer.ret_tid)
-      cap = "iso" # we use the ultimate subcap to simulate no cap comparison.
-      unless MetaType.new(t, cap) < iface
-        Error.at t.ident, "This type isn't a subtype of #{iface.show_type}"
+      iface = infer.resolve(infer.ret_tid).single!
+      
+      errors = [] of Error::Info
+      unless t.subtype_of?(iface, errors)
+        Error.at t.ident,
+          "This type doesn't implement the interface #{iface.ident.value}",
+            errors
       end
     end
   end
