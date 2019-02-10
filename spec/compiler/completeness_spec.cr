@@ -161,4 +161,74 @@ describe Mare::Compiler::Completeness do
       Mare::Compiler.compile([source], :completeness)
     end
   end
+  
+  it "complains when access to the self is shared while still incomplete" do
+    source = Mare::Source.new "(example)", <<-SOURCE
+    primitive Access:
+      fun data (d Data):
+        d.x
+    
+    class Data:
+      prop x U64:
+      prop y U64:
+      prop z U64:
+      new:
+        @x = 1
+        Access.data(@)
+        @y = 2
+        @z = 3
+    SOURCE
+    
+    expected = <<-MSG
+    This usage of `@` shares field access to the object from a constructor before all fields are initialized:
+    from (example):11:
+        Access.data(@)
+                    ^
+    
+    - if this constraint were specified as `tag` or lower it would not grant field access:
+      from (example):2:
+      fun data (d Data):
+                ^
+    
+    - this field didn't get initialized:
+      from (example):7:
+      prop y U64:
+           ^
+    
+    - this field didn't get initialized:
+      from (example):8:
+      prop z U64:
+           ^
+    MSG
+    
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :completeness)
+    end
+  end
+  
+  it "allows opaque sharing of the self while still incomplete" \
+     " and non-opaque sharing of the self after becoming complete" do
+    source = Mare::Source.new "(example)", <<-SOURCE
+    primitive Access:
+      fun data (d Data):
+        d.x
+    
+    primitive Touch:
+      fun data (d Data'tag):
+        d
+    
+    class Data:
+      prop x U64:
+      prop y U64:
+      prop z U64:
+      new:
+        @x = 1
+        Touch.data(@)
+        @y = 2
+        @z = 3
+        Access.data(@)
+    SOURCE
+    
+    Mare::Compiler.compile([source], :completeness)
+  end
 end

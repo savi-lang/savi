@@ -29,6 +29,29 @@ class Mare::Compiler::Infer
     end
   end
   
+  class Self < Info
+    property inner : MetaType
+    property domain_constraints : Array(Tuple(Source::Pos, MetaType))
+    
+    def initialize(@pos, @inner)
+      @domain_constraints = [] of Tuple(Source::Pos, MetaType)
+    end
+    
+    def resolve!(infer : Infer)
+      @inner
+    end
+    
+    def within_domain!(infer : Infer, pos : Source::Pos, constraint : MetaType)
+      @domain_constraints << {pos, constraint}
+      
+      return if @inner.within_constraints?([constraint])
+      
+      Error.at self,
+        "This type is outside of a constraint: #{@inner.show_type}",
+        [{pos, constraint.show}]
+    end
+  end
+  
   class Literal < Info
     @domain : MetaType
     @domain_constraints : Array(MetaType)

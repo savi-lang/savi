@@ -7,7 +7,6 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   
   def initialize(@self_type : Program::Type, @func : Program::Function)
     # TODO: When we have branching, we'll need some form of divergence.
-    @self_tid = 0_u64
     @local_tids = Hash(Refer::Local, TID).new
     @local_tid_overrides = Hash(TID, TID).new
     @tids = Hash(TID, Info).new
@@ -26,6 +25,11 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   
   def [](node)
     raise "this has a tid of zero: #{node.inspect}" if node.tid == 0
+    @tids[node.tid]
+  end
+  
+  def []?(node)
+    return nil if node.tid == 0
     @tids[node.tid]
   end
   
@@ -243,13 +247,10 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   end
   
   def self_tid(pos_node) : TID
-    return @self_tid unless @self_tid == 0
-    
     cap = @func.cap.value
-    cap = "ref" if func.has_tag?(:constructor) # TODO: use "tag" when self is incomplete in a constructor?
+    cap = "ref" if func.has_tag?(:constructor)
     
-    info = Fixed.new(pos_node.pos, MetaType.new(@self_type, cap))
-    @self_tid = new_tid_detached(info)
+    new_tid_detached(Self.new(pos_node.pos, MetaType.new(@self_type, cap)))
   end
   
   def resolved_receiver
