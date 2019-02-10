@@ -10,9 +10,15 @@ enum Bool:
 // Numerics
 interface val Numeric:
   const bit_width U8:
+  const is_signed Bool:
+  const is_floating_point Bool:
   // TODO: arithmetic method interfaces with type parameters on Numeric[A] type
 
 interface val NumericMethods: // TODO: don't use interface for this... `common`?
+  const bit_width U8:
+  const is_signed Bool:
+  const is_floating_point Bool:
+  
   fun non "[]" (value @) @: value
   
   fun val "==" (other @) Bool: compiler intrinsic
@@ -27,6 +33,10 @@ interface val NumericMethods: // TODO: don't use interface for this... `common`?
   fun val "*" (other @) @: compiler intrinsic
   fun val "/" (other @) @: compiler intrinsic
   fun val "%" (other @) @: compiler intrinsic
+  
+  fun val min (other @) @: if (@ < other) (@ | other)
+  fun val max (other @) @: if (@ > other) (@ | other)
+  fun val abs: if (@is_signed && @ < 0) (@[0] - @ | @)
 
 numeric U8:
   const bit_width U8: 8

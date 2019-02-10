@@ -72,7 +72,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
     def keywords; ["is", "prop", "fun", "be", "new", "const", "member"] end
     
     def finished(context)
-      if @type.is_instantiable?
+      if @type.has_tag?(:allocated) && !@type.has_tag?(:abstract)
         # Instantiable types with no constructor get a default empty one.
         if !@type.functions.any? { |f| f.has_tag?(:constructor) }
           default = AST::Declare.new.from(@type.ident)
