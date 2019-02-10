@@ -7,8 +7,8 @@ module Mare::Compiler
     when :lambda       then ctx.run(Lambda)
     when :flagger      then ctx.run(Flagger)
     when :refer        then ctx.run(Refer)
-    when :completeness then ctx.run(Completeness)
     when :infer        then ctx.run(Infer)
+    when :completeness then ctx.run(Completeness)
     when :reach        then ctx.run(Reach)
     when :paint        then ctx.run(Paint)
     when :codegen      then ctx.run(CodeGen)
@@ -28,8 +28,8 @@ module Mare::Compiler
     when :lambda then [:macros, :sugar]
     when :flagger then [:macros, :sugar, :lambda]
     when :refer then [:macros, :sugar, :lambda]
-    when :completeness then [:macros, :sugar, :lambda]
-    when :infer then [:completeness, :refer, :flagger, :lambda, :copy]
+    when :infer then [:refer, :flagger, :lambda, :copy]
+    when :completeness then [:macros, :sugar, :lambda, :copy, :infer]
     when :reach then [:infer]
     when :paint then [:reach]
     when :codegen then [:paint, :reach, :infer, :completeness, :flagger]
