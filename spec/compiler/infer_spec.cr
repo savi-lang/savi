@@ -440,6 +440,32 @@ describe Mare::Compiler::Infer do
     end
   end
   
+  it "complains when an interface const is implemented by a non-const" do
+    source = Mare::Source.new "(example)", <<-SOURCE
+    interface non Interface:
+      const color String:
+    
+    primitive Concrete:
+      is Interface:
+      fun non color String: "red"
+    
+    actor Main:
+      new:
+        Concrete
+    SOURCE
+    
+    expected = <<-MSG
+    This type isn't a subtype of Interface:
+    from (example):4:
+    primitive Concrete:
+              ^~~~~~~~
+    MSG
+    
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :infer)
+    end
+  end
+  
   it "complains about problems with unreachable functions too" do
     source = Mare::Source.new "(example)", <<-SOURCE
     primitive NeverCalled:
