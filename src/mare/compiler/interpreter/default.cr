@@ -92,7 +92,17 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         iface_func = Program::Function.new(iface_cap, iface_is, nil, iface_ret, nil)
         iface_func.add_tag(:hygienic)
         iface_func.add_tag(:is)
+        iface_func.add_tag(:copies)
         @type.functions << iface_func
+        
+        # Add "copies NumericMethods" to the type definition as well.
+        copy_cap = AST::Identifier.new("non").from(@type.ident)
+        copy_is = AST::Identifier.new("copies").from(@type.ident)
+        copy_ret = AST::Identifier.new("NumericMethods").from(@type.ident)
+        copy_func = Program::Function.new(copy_cap, copy_is, nil, copy_ret, nil)
+        copy_func.add_tag(:hygienic)
+        copy_func.add_tag(:copies)
+        @type.functions << copy_func
         
         # Capture bit_width constant value, or set a default if needed.
         # TODO: better generic mechanism for default consts
@@ -428,7 +438,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
           nil,
           data["interface"].as(AST::Identifier),
           nil,
-        ).tap(&.add_tag(:hygienic)).tap(&.add_tag(:is))
+        ).tap(&.add_tag(:hygienic)).tap(&.add_tag(:is)).tap(&.add_tag(:copies))
       when "member"
         raise "only enums can have members" unless @keyword == "enum"
         

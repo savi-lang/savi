@@ -133,6 +133,7 @@ class Mare::Program
       :compiler_intrinsic,
       :constant,
       :constructor,
+      :copies,
       :ffi,
       :field,
       :hygienic,

@@ -246,6 +246,10 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     tid
   end
   
+  def self_type_tid(pos_node) : TID
+    new_tid_detached(Fixed.new(pos_node.pos, MetaType.new(@self_type)))
+  end
+  
   def self_tid(pos_node) : TID
     cap = @func.cap.value
     cap = "ref" if func.has_tag?(:constructor)
@@ -319,8 +323,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         @local_tids[ref] = node.tid
       end
     when Refer::Self
-      # If it's the self, track the possibly new tid.
-      transfer_tid(self_tid(node), node)
+      info = node.value_needed? ? self_tid(node) : self_type_tid(node)
+      transfer_tid(info, node)
     when Refer::Unresolved
       # Leave the tid as zero if this identifer needs no value.
       return if node.value_not_needed?
@@ -367,11 +371,19 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         local = self[local_tid]
         case local
         when Local
-          info = self[node.terms[1]].as(Fixed)
-          local.set_explicit(info.pos, info.inner)
+          info = self[node.terms[1]]
+          case info
+          when Fixed then local.set_explicit(info.pos, info.inner)
+          when Self then local.set_explicit(info.pos, info.inner)
+          else raise NotImplementedError.new(info)
+          end
         when Param
-          info = self[node.terms[1]].as(Fixed)
-          local.set_explicit(info.pos, info.inner)
+          info = self[node.terms[1]]
+          case info
+          when Fixed then local.set_explicit(info.pos, info.inner)
+          when Self then local.set_explicit(info.pos, info.inner)
+          else raise NotImplementedError.new(info)
+          end
         else raise NotImplementedError.new(local)
         end
         
