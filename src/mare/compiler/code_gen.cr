@@ -1147,12 +1147,13 @@ class Mare::Compiler::CodeGen
   def gen_integer(expr : AST::LiteralInteger)
     type_ref = type_of(expr)
     case type_ref.llvm_use_type
+    when :i1 then @i1.const_int(expr.value.to_i8)
     when :i8 then @i8.const_int(expr.value.to_i8)
     when :i32 then @i32.const_int(expr.value.to_i32)
     when :i64 then @i64.const_int(expr.value.to_i64)
     when :f32 then @f32.const_float(expr.value.to_f32)
     when :f64 then @f64.const_double(expr.value.to_f64)
-    else raise "invalid numeric literal type: #{type_ref}"
+    else raise "invalid numeric literal type: #{type_ref.inspect}"
     end
   end
   
@@ -1161,7 +1162,7 @@ class Mare::Compiler::CodeGen
     case type_ref.llvm_use_type
     when :f32 then @f32.const_float(expr.value.to_f32)
     when :f64 then @f64.const_double(expr.value.to_f64)
-    else raise "invalid floating point literal type: #{type_ref}"
+    else raise "invalid floating point literal type: #{type_ref.inspect}"
     end
   end
   
