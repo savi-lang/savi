@@ -1,22 +1,36 @@
 # This exception class is used to represent errors to be presented to the user,
 # with each error being associated to a particular SourcePos that caused it.
 class Mare::Error < Exception
-  # alias Details = Array(Tuple(Source::Pos))
+  getter pos : Source::Pos
+  getter headline : String
+  getter info : Array({Source::Pos, String})
+  
+  def initialize(@pos, @headline)
+    @info = [] of {Source::Pos, String}
+  end
+  
+  def message
+    info.map { |info_pos, info_msg| "\n- #{info_msg}:\n  #{info_pos.show}" }
+      .unshift("#{headline}:\n#{pos.show}")
+      .join("\n")
+  end
   
   # Raise an error for the given source position, with the given message.
   def self.at(any, msg : String); at(any.pos, msg) end
   def self.at(pos : Source::Pos, msg : String)
-    raise new("#{msg}:\n#{pos.show}")
+    raise new(pos, msg)
   end
   
   # Raise an error for the given source position, with the given message,
   # along with extra details taken from the following array of tuples.
-  def self.at(any, msg : String, extra); at(any.pos, msg, extra) end
-  def self.at(pos : Source::Pos, msg : String, extra)
-    lines = extra.map do |any, m|
-      "\n- #{m}:\n  #{(any.is_a?(Source::Pos) ? any : any.pos).show}"
+  def self.at(any, msg : String, info); at(any.pos, msg, info) end
+  def self.at(pos : Source::Pos, msg : String, info)
+    new(pos, msg).tap do |err|
+      info.each do |info_any, info_msg|
+        info_pos = info_any.is_a?(Source::Pos) ? info_any : info_any.pos
+        err.info << {info_pos, info_msg}
+      end
+      raise err
     end
-    lines.unshift("#{msg}:\n#{pos.show}")
-    raise new(lines.join("\n"))
   end
 end
