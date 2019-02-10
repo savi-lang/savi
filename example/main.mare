@@ -23,7 +23,7 @@ interface Augend:
   fun "+" (other I32) I32:
 
 class Sentence:
-  prop text CString:
+  prop text String:
   new (@text = "[awkward silence]"):
 
 actor Main:
@@ -53,9 +53,9 @@ actor Main:
   fun say_stuff (greeting Greeting):
     sentence_source = ^(Sentence.new(^1))
     sentence = sentence_source.call("[pre greeting]")
-    LibC.puts(sentence.text)
+    LibC.puts(sentence.text.cpointer)
     sentence.text = greeting.hello
-    LibC.puts(sentence.text)
+    LibC.puts(sentence.text.cpointer)
     sentence.text = greeting.bye
-    LibC.puts(sentence.text)
+    LibC.puts(sentence.text.cpointer)
     None // TODO: remove

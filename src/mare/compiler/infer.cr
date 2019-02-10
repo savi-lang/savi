@@ -332,7 +332,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   end
   
   def touch(node : AST::LiteralString)
-    new_tid(node, Literal.new(node.pos, [refer.decl_defn("CString")]))
+    new_tid(node, Literal.new(node.pos, [refer.decl_defn("String")]))
   end
   
   # A literal integer could be any integer or floating-point machine type.

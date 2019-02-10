@@ -64,7 +64,7 @@ class Mare::Compiler::Completeness < Mare::AST::Visitor
         else raise NotImplementedError.new(rhs.to_a)
         end
       
-      decl.find_func!(method_name).body.try(&.accept(self))
+      decl.find_func?(method_name).try(&.body).try(&.accept(self))
     end
   end
   

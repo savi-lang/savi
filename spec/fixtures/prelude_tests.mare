@@ -1,7 +1,7 @@
 actor Main:
   new:
     test = MicroTest
-    LibC.puts("") // TODO: move to MicroTest constructor and finalizer
+    Print.line_break // TODO: move to MicroTest constructor and finalizer
     
     ///
     // Numeric facts
@@ -87,26 +87,33 @@ actor Main:
     test["signed integer   / overflow"].pass = I8[-128] / -1 == 0
     test["signed integer   % overflow"].pass = I8[-128] / -1 == 0
     
-    LibC.puts("") // TODO: move to MicroTest constructor and finalizer
+    Print.line_break // TODO: move to MicroTest constructor and finalizer
 
 primitive MicroTest:
-  fun "[]" (text CString) MicroTestInstance:
+  fun "[]" (text String) MicroTestInstance:
     MicroTestInstance.new(text)
 
 class MicroTestInstance:
-  prop text CString:
+  prop text String:
   new (@text):
   fun "pass=" (pass Bool):
     if pass (
-      LibC.printf("%s", ".")
+      Print.f("%s", ".")
       None // TODO: shouldn't need this None
     |
-      LibC.puts("") // TODO: fix processing of \n in string literals and use it
-      LibC.printf("failure of '%s'!", @text)
-      LibC.puts("") // TODO: fix processing of \n in string literals and use it
+      Print.line_break // TODO: fix processing of \n in string literals and use it
+      Print.f("failure of '%s'!", @text)
+      Print.line_break // TODO: fix processing of \n in string literals and use it
       LibPonyRT.pony_exitcode(1) // Mark the entire process as a failure.
       None // TODO: shouldn't need this None
     )
+
+primitive Print:
+  fun line_break:
+    LibC.puts("".cpointer)
+  
+  fun f (format String, text String):
+    LibC.printf(format.cpointer, text.cpointer)
 
 ffi LibC:
   fun puts (CString) I32:

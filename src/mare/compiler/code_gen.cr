@@ -217,6 +217,7 @@ class Mare::Compiler::CodeGen
     
     @frames = [] of Frame
     @string_globals = {} of String => LLVM::Value
+    @cstring_globals = {} of String => LLVM::Value
     @gtypes = {} of String => GenType
     
     # Pony runtime types.
@@ -383,7 +384,7 @@ class Mare::Compiler::CodeGen
     argv_0 = @builder.inbounds_gep(argv, @i32_0, @i32_0, "argv_0")
     argv_1 = @builder.inbounds_gep(argv, @i32_0, @i32.const_int(1), "argv_1")
     envp_0 = @builder.inbounds_gep(envp, @i32_0, @i32_0, "envp_0")
-    @builder.store(gen_string("marejit"), argv_0)
+    @builder.store(gen_cstring("marejit"), argv_0)
     @builder.store(@ptr.null, argv_1)
     @builder.store(@ptr.null, envp_0)
     
@@ -470,7 +471,7 @@ class Mare::Compiler::CodeGen
     # On failure, just write a failure message then continue to the post_block.
     @builder.position_at_end(start_fail_block)
     @builder.call(@mod.functions["puts"], [
-      gen_string("Error: couldn't start the runtime!")
+      gen_cstring("Error: couldn't start the runtime!")
     ])
     @builder.br(post_block)
     
@@ -1162,19 +1163,36 @@ class Mare::Compiler::CodeGen
     end
   end
   
-  def gen_string(expr_or_value)
-    @llvm.const_inbounds_gep(gen_string_global(expr_or_value), [@i32_0, @i32_0])
+  def gen_cstring(value : String) : LLVM::Value
+    @llvm.const_inbounds_gep(
+      @cstring_globals.fetch value do
+        const = @llvm.const_string(value)
+        global = @mod.globals.add(const.type, "")
+        global.linkage = LLVM::Linkage::External # TODO: Private linkage?
+        global.initializer = const
+        global.global_constant = true
+        global.unnamed_addr = true
+        
+        @cstring_globals[value] = global
+      end,
+      [@i32_0, @i32_0],
+    )
   end
   
-  def gen_string_global(expr : AST::LiteralString) : LLVM::Value
-    gen_string_global(expr.value)
-  end
-  
-  def gen_string_global(value : String) : LLVM::Value
+  def gen_string(expr : AST::LiteralString)
+    value = expr.value
+    
     @string_globals.fetch value do
-      const = @llvm.const_string(value)
+      string_gtype = @gtypes["String"]
+      const = string_gtype.struct_type.const_struct [
+        string_gtype.desc,
+        @i64.const_int(value.size),
+        @i64.const_int(value.size + 1),
+        gen_cstring(value),
+      ]
+      
       global = @mod.globals.add(const.type, "")
-      global.linkage = LLVM::Linkage::External
+      global.linkage = LLVM::Linkage::External # TODO: Private linkage?
       global.initializer = const
       global.global_constant = true
       global.unnamed_addr = true

@@ -54,7 +54,7 @@ describe Mare::Compiler::Infer do
         "not a number at all"
          ^~~~~~~~~~~~~~~~~~~
     
-    - it must be a subtype of CString:
+    - it must be a subtype of String:
       from (example):3:
         "not a number at all"
          ^~~~~~~~~~~~~~~~~~~
@@ -74,24 +74,24 @@ describe Mare::Compiler::Infer do
     source = Mare::Source.new "(example)", <<-SOURCE
     actor Main:
       new:
-        name CString = 42
+        name String = 42
     SOURCE
     
     expected = <<-MSG
     This value's type is unresolvable due to conflicting constraints:
     from (example):3:
-        name CString = 42
-                       ^~
+        name String = 42
+                      ^~
 
     - it must be a subtype of Numeric:
       from (example):3:
-        name CString = 42
-                       ^~
+        name String = 42
+                      ^~
     
-    - it must be a subtype of CString:
+    - it must be a subtype of String:
       from (example):3:
-        name CString = 42
-             ^~~~~~~
+        name String = 42
+             ^~~~~~
     MSG
     
     expect_raises Mare::Error, expected do
@@ -102,24 +102,24 @@ describe Mare::Compiler::Infer do
   it "complains when the prop type doesn't match the initializer value" do
     source = Mare::Source.new "(example)", <<-SOURCE
     actor Main:
-      prop name CString: 42
+      prop name String: 42
     SOURCE
     
     expected = <<-MSG
     This value's type is unresolvable due to conflicting constraints:
     from (example):2:
-      prop name CString: 42
-                         ^~
+      prop name String: 42
+                        ^~
     
     - it must be a subtype of Numeric:
       from (example):2:
-      prop name CString: 42
-                         ^~
+      prop name String: 42
+                        ^~
     
-    - it must be a subtype of CString:
+    - it must be a subtype of String:
       from (example):2:
-      prop name CString: 42
-                ^~~~~~~
+      prop name String: 42
+                ^~~~~~
     MSG
     
     expect_raises Mare::Error, expected do
@@ -131,19 +131,19 @@ describe Mare::Compiler::Infer do
     source = Mare::Source.new "(example)", <<-SOURCE
     actor Main:
       new:
-        name CString = ()
+        name String = ()
     SOURCE
     
     expected = <<-MSG
     This type is outside of a constraint: None:
     from (example):3:
-        name CString = ()
-                       ^~
+        name String = ()
+                      ^~
     
-    - it must be a subtype of CString:
+    - it must be a subtype of String:
       from (example):3:
-        name CString = ()
-             ^~~~~~~
+        name String = ()
+             ^~~~~~
     MSG
     
     expect_raises Mare::Error, expected do
@@ -164,7 +164,7 @@ describe Mare::Compiler::Infer do
         if "not a boolean" 42
             ^~~~~~~~~~~~~
     
-    - it must be a subtype of CString:
+    - it must be a subtype of String:
       from (example):3:
         if "not a boolean" 42
             ^~~~~~~~~~~~~
@@ -193,8 +193,8 @@ describe Mare::Compiler::Infer do
     body = func.body.not_nil!
     assign = body.terms.first.as(Mare::AST::Relate)
     
-    func.infer.resolve(assign.lhs).show_type.should eq "CString"
-    func.infer.resolve(assign.rhs).show_type.should eq "CString"
+    func.infer.resolve(assign.lhs).show_type.should eq "String"
+    func.infer.resolve(assign.rhs).show_type.should eq "String"
   end
   
   it "infers a prop's type based on the prop initializer" do
@@ -211,7 +211,7 @@ describe Mare::Compiler::Infer do
     body = func.body.not_nil!
     prop = body.terms.first
     
-    func.infer.resolve(prop).show_type.should eq "CString"
+    func.infer.resolve(prop).show_type.should eq "String"
   end
   
   it "infers an integer literal based on an assignment" do
@@ -252,7 +252,7 @@ describe Mare::Compiler::Infer do
     source = Mare::Source.new "(example)", <<-SOURCE
     actor Main:
       new:
-        x (U64 | CString | None) = if True 42
+        x (U64 | String | None) = if True 42
     SOURCE
     
     ctx = Mare::Compiler.compile([source], :infer)
@@ -265,7 +265,7 @@ describe Mare::Compiler::Infer do
       .as(Mare::AST::Choice).list[0][1]
       .as(Mare::AST::LiteralInteger)
     
-    func.infer.resolve(assign.lhs).show_type.should eq "(U64 | CString | None)"
+    func.infer.resolve(assign.lhs).show_type.should eq "(U64 | String | None)"
     func.infer.resolve(assign.rhs).show_type.should eq "(U64 | None)"
     func.infer.resolve(literal).show_type.should eq "U64"
   end
