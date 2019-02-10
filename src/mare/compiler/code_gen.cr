@@ -569,6 +569,8 @@ class Mare::Compiler::CodeGen
         param_types.unshift(gtype.struct_ptr)
         
         @mod.functions.add vtable_name, param_types, ret_type do |fn|
+          next if gtype.type_def.is_abstract?
+          
           gen_func_start(fn)
           
           forward_args =
