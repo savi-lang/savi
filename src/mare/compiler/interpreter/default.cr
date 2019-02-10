@@ -303,7 +303,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         ).tap(&.add_tag(:async))
       when "new"
         raise "stateless types can't have constructors" \
-          unless @type.is_instantiable?
+          unless @type.has_tag?(:allocated) || @type.has_tag?(:abstract)
         
         data = @@declare_new.run(decl)
         
@@ -331,7 +331,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         ).tap(&.add_tag(:constant))
       when "prop"
         raise "stateless types can't have properties" \
-          unless @type.is_instantiable?
+          unless @type.has_tag?(:allocated) || @type.has_tag?(:abstract)
         
         data = @@declare_prop.run(decl)
         ident = data["ident"].as(AST::Identifier)

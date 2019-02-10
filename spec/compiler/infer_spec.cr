@@ -397,95 +397,6 @@ describe Mare::Compiler::Infer do
     end
   end
   
-  it "allows an interface to be fulfilled with a covariant return type" do
-    source = Mare::Source.new "(example)", <<-SOURCE
-    interface non Interface:
-      fun example Interface:
-    
-    primitive Concrete:
-      is Interface:
-      fun example Concrete: Concrete
-    
-    actor Main:
-      new:
-        Concrete
-    SOURCE
-    
-    Mare::Compiler.compile([source], :infer)
-  end
-  
-  it "complains when an interface has a covariant argument type" do
-    source = Mare::Source.new "(example)", <<-SOURCE
-    interface non Interface:
-      fun example (arg Interface) None:
-    
-    primitive Concrete:
-      is Interface:
-      fun example (arg Concrete) None: None
-    
-    actor Main:
-      new:
-        Concrete
-    SOURCE
-    
-    expected = <<-MSG
-    This type doesn't implement the interface Interface:
-    from (example):4:
-    primitive Concrete:
-              ^~~~~~~~
-    
-    - this parameter type is Concrete:
-      from (example):6:
-      fun example (arg Concrete) None: None
-                   ^~~~~~~~~~~~
-    
-    - it is required to be a supertype of Interface:
-      from (example):2:
-      fun example (arg Interface) None:
-                   ^~~~~~~~~~~~~
-    MSG
-    
-    expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :infer)
-    end
-  end
-  
-  it "complains when an interface const is implemented by a non-const" do
-    source = Mare::Source.new "(example)", <<-SOURCE
-    interface non Interface:
-      const color String:
-    
-    primitive Concrete:
-      is Interface:
-      fun non color String: "red"
-    
-    actor Main:
-      new:
-        Concrete
-    SOURCE
-    
-    expected = <<-MSG
-    This type doesn't implement the interface Interface:
-    from (example):4:
-    primitive Concrete:
-              ^~~~~~~~
-    
-    - a non-constant can't be a subtype of a constant:
-      from (example):6:
-      fun non color String: "red"
-              ^~~~~
-    
-    - the constant in the supertype is here:
-      from (example):2:
-      const color String:
-            ^~~~~
-    MSG
-    
-    expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :infer)
-    end
-  end
-  
   it "complains about problems with unreachable functions too" do
     source = Mare::Source.new "(example)", <<-SOURCE
     primitive NeverCalled:
@@ -645,6 +556,268 @@ describe Mare::Compiler::Infer do
       from (example):2:
       fun ref mutate:
           ^~~
+    MSG
+    
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :infer)
+    end
+  end
+  
+  it "requires a sub-func to be present in the subtype" do
+    source = Mare::Source.new "(example)", <<-SOURCE
+    interface Interface:
+      fun example1 U64:
+      fun example2 U64:
+      fun example3 U64:
+    
+    class Concrete:
+      is Interface:
+      fun example2 U64: 0
+    
+    actor Main:
+      new:
+        Concrete
+    SOURCE
+    
+    expected = <<-MSG
+    This type doesn't implement the interface Interface:
+    from (example):6:
+    class Concrete:
+          ^~~~~~~~
+    
+    - this function isn't present in the subtype:
+      from (example):2:
+      fun example1 U64:
+          ^~~~~~~~
+    
+    - this function isn't present in the subtype:
+      from (example):4:
+      fun example3 U64:
+          ^~~~~~~~
+    MSG
+    
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :infer)
+    end
+  end
+  
+  it "requires a sub-func to have the same constructor or constant tags" do
+    source = Mare::Source.new "(example)", <<-SOURCE
+    interface Interface:
+      new constructor1:
+      new constructor2:
+      new constructor3:
+      const constant1 U64:
+      const constant2 U64:
+      const constant3 U64:
+      fun function1 U64:
+      fun function2 U64:
+      fun function3 U64:
+    
+    class Concrete:
+      is Interface:
+      new constructor1:
+      const constructor2 U64: 0
+      fun constructor3 U64: 0
+      new constant1:
+      const constant2 U64: 0
+      fun constant3 U64: 0
+      new function1:
+      const function2 U64: 0
+      fun function3 U64: 0
+    
+    actor Main:
+      new:
+        Concrete
+    SOURCE
+    
+    expected = <<-MSG
+    This type doesn't implement the interface Interface:
+    from (example):12:
+    class Concrete:
+          ^~~~~~~~
+    
+    - a non-constructor can't be a subtype of a constructor:
+      from (example):15:
+      const constructor2 U64: 0
+            ^~~~~~~~~~~~
+    
+    - the constructor in the supertype is here:
+      from (example):3:
+      new constructor2:
+          ^~~~~~~~~~~~
+    
+    - a non-constructor can't be a subtype of a constructor:
+      from (example):16:
+      fun constructor3 U64: 0
+          ^~~~~~~~~~~~
+    
+    - the constructor in the supertype is here:
+      from (example):4:
+      new constructor3:
+          ^~~~~~~~~~~~
+    
+    - a constructor can't be a subtype of a non-constructor:
+      from (example):17:
+      new constant1:
+          ^~~~~~~~~
+    
+    - the non-constructor in the supertype is here:
+      from (example):5:
+      const constant1 U64:
+            ^~~~~~~~~
+    
+    - a non-constant can't be a subtype of a constant:
+      from (example):19:
+      fun constant3 U64: 0
+          ^~~~~~~~~
+    
+    - the constant in the supertype is here:
+      from (example):7:
+      const constant3 U64:
+            ^~~~~~~~~
+    
+    - a constructor can't be a subtype of a non-constructor:
+      from (example):20:
+      new function1:
+          ^~~~~~~~~
+    
+    - the non-constructor in the supertype is here:
+      from (example):8:
+      fun function1 U64:
+          ^~~~~~~~~
+    
+    - a constant can't be a subtype of a non-constant:
+      from (example):21:
+      const function2 U64: 0
+            ^~~~~~~~~
+    
+    - the non-constant in the supertype is here:
+      from (example):9:
+      fun function2 U64:
+          ^~~~~~~~~
+    MSG
+    
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :infer)
+    end
+  end
+  
+  it "requires a sub-func to have the same number of params" do
+    source = Mare::Source.new "(example)", <<-SOURCE
+    interface non Interface:
+      fun example1 (a U64, b U64, c U64) None:
+      fun example2 (a U64, b U64, c U64) None:
+      fun example3 (a U64, b U64, c U64) None:
+    
+    primitive Concrete:
+      is Interface:
+      fun example1 None:
+      fun example2 (a U64, b U64) None:
+      fun example3 (a U64, b U64, c U64, d U64) None:
+    
+    actor Main:
+      new:
+        Concrete
+    SOURCE
+    
+    expected = <<-MSG
+    This type doesn't implement the interface Interface:
+    from (example):6:
+    primitive Concrete:
+              ^~~~~~~~
+    
+    - this function has too few parameters:
+      from (example):8:
+      fun example1 None:
+          ^~~~~~~~
+    
+    - the supertype has 3 parameters:
+      from (example):2:
+      fun example1 (a U64, b U64, c U64) None:
+                   ^~~~~~~~~~~~~~~~~~~~~
+    
+    - this function has too few parameters:
+      from (example):9:
+      fun example2 (a U64, b U64) None:
+                   ^~~~~~~~~~~~~~
+    
+    - the supertype has 3 parameters:
+      from (example):3:
+      fun example2 (a U64, b U64, c U64) None:
+                   ^~~~~~~~~~~~~~~~~~~~~
+    
+    - this function has too many parameters:
+      from (example):10:
+      fun example3 (a U64, b U64, c U64, d U64) None:
+                   ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    
+    - the supertype has 3 parameters:
+      from (example):4:
+      fun example3 (a U64, b U64, c U64) None:
+                   ^~~~~~~~~~~~~~~~~~~~~
+    MSG
+    
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :infer)
+    end
+  end
+  
+  it "requires a sub-func to have covariant return and contravariant params" do
+    source = Mare::Source.new "(example)", <<-SOURCE
+    interface non Interface:
+      fun example1 Numeric:
+      fun example2 U64:
+      fun example3 (a U64, b U64, c U64) None:
+      fun example4 (a Numeric, b Numeric, c Numeric) None:
+    
+    primitive Concrete:
+      is Interface:
+      fun example1 U64: 0
+      fun example2 Numeric: U64[0]
+      fun example3 (a Numeric, b U64, c Numeric) None:
+      fun example4 (a U64, b Numeric, c U64) None:
+    
+    actor Main:
+      new:
+        Concrete
+    SOURCE
+    
+    expected = <<-MSG
+    This type doesn't implement the interface Interface:
+    from (example):7:
+    primitive Concrete:
+              ^~~~~~~~
+    
+    - this function's return type is Numeric:
+      from (example):10:
+      fun example2 Numeric: U64[0]
+                   ^~~~~~~
+    
+    - it is required to be a subtype of U64:
+      from (example):3:
+      fun example2 U64:
+                   ^~~
+    
+    - this parameter type is U64:
+      from (example):12:
+      fun example4 (a U64, b Numeric, c U64) None:
+                    ^~~~~
+    
+    - it is required to be a supertype of Numeric:
+      from (example):5:
+      fun example4 (a Numeric, b Numeric, c Numeric) None:
+                    ^~~~~~~~~
+    
+    - this parameter type is U64:
+      from (example):12:
+      fun example4 (a U64, b Numeric, c U64) None:
+                                      ^~~~~
+    
+    - it is required to be a supertype of Numeric:
+      from (example):5:
+      fun example4 (a Numeric, b Numeric, c Numeric) None:
+                                          ^~~~~~~~~
     MSG
     
     expect_raises Mare::Error, expected do

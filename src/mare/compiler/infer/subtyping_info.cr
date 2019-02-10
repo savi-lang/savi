@@ -136,11 +136,13 @@ class Mare::Compiler::Infer::SubtypingInfo
     # Must have the same number of parameters.
     if this_func.param_count != that_func.param_count
       if this_func.param_count < that_func.param_count
-        errors << {this_func.ident.pos, "this function has too few parameters"}
+        errors << {(this_func.params || this_func.ident).pos,
+          "this function has too few parameters"}
       else
-        errors << {this_func.ident.pos, "this function has too many parameters"}
+        errors << {(this_func.params || this_func.ident).pos,
+          "this function has too many parameters"}
       end
-      errors << {that_func.ident.pos,
+      errors << {(that_func.params || that_func.ident).pos,
         "the supertype has #{that_func.param_count} parameters"}
       return false
     end
