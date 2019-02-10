@@ -97,7 +97,6 @@ module Mare::Compiler::Completeness
     end
     
     def touch(node : AST::FieldRead)
-      # TODO: Raise an error if we haven't written to that field yet.
       if !seen_fields.includes?(node.value)
         Error.at node,
           "This field may be read before it is initialized by a constructor",
