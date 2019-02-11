@@ -1,7 +1,7 @@
 require "pegmatite"
 
 module Mare::AST
-  alias A = Symbol | String | UInt64 | Float64 | Array(A)
+  alias A = Symbol | String | UInt64 | Int64 | Float64 | Array(A)
   
   class Visitor
     def visit_any?(node : Node)
@@ -134,7 +134,7 @@ module Mare::AST
   
   class LiteralInteger < Node
     property value
-    def initialize(@value : UInt64)
+    def initialize(@value : UInt64 | Int64)
     end
     def name; :integer end
     def to_a: Array(A); [name, value] of A end

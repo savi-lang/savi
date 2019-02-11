@@ -837,9 +837,20 @@ class Mare::Compiler::CodeGen
           # Get the final result, which may be zero from one of the pre-checks.
           @builder.phi(llvm_type, blocks, values, "phidiv")
         end
+      when "bit_and"
+        raise "bit_and float" if gtype.type_def.is_floating_point_numeric?
+        @builder.and(params[0], params[1])
+      when "bit_or"
+        raise "bit_or float" if gtype.type_def.is_floating_point_numeric?
+        @builder.or(params[0], params[1])
+      when "bit_xor"
+        raise "bit_xor float" if gtype.type_def.is_floating_point_numeric?
+        @builder.xor(params[0], params[1])
       when "invert"
+        raise "invert float" if gtype.type_def.is_floating_point_numeric?
         @builder.not(params[0])
       when "reverse_bits"
+        raise "reverse_bits float" if gtype.type_def.is_floating_point_numeric?
         op_func =
           case gtype.type_def.bit_width
           when 1
@@ -858,6 +869,7 @@ class Mare::Compiler::CodeGen
           end
         @builder.call(op_func, [params[0]])
       when "swap_bytes"
+        raise "swap_bytes float" if gtype.type_def.is_floating_point_numeric?
         case gtype.type_def.bit_width
         when 1, 8
           params[0]
@@ -874,6 +886,7 @@ class Mare::Compiler::CodeGen
         else raise NotImplementedError.new(gtype.type_def.bit_width)
         end
       when "leading_zeros"
+        raise "leading_zeros float" if gtype.type_def.is_floating_point_numeric?
         op_func =
           case gtype.type_def.bit_width
           when 1
@@ -893,6 +906,7 @@ class Mare::Compiler::CodeGen
         gen_numeric_conv gtype, @gtypes["U8"],
           @builder.call(op_func, [params[0], @i1_false])
       when "trailing_zeros"
+        raise "trailing_zeros float" if gtype.type_def.is_floating_point_numeric?
         op_func =
           case gtype.type_def.bit_width
           when 1
@@ -912,6 +926,7 @@ class Mare::Compiler::CodeGen
         gen_numeric_conv gtype, @gtypes["U8"],
           @builder.call(op_func, [params[0], @i1_false])
       when "count_ones"
+        raise "count_ones float" if gtype.type_def.is_floating_point_numeric?
         op_func =
           case gtype.type_def.bit_width
           when 1
@@ -930,6 +945,20 @@ class Mare::Compiler::CodeGen
           end
         gen_numeric_conv gtype, @gtypes["U8"], \
           @builder.call(op_func, [params[0]])
+      when "bits"
+        raise "bits integer" unless gtype.type_def.is_floating_point_numeric?
+        case gtype.type_def.bit_width
+        when 32 then @builder.bit_cast(params[0], @i32)
+        when 64 then @builder.bit_cast(params[0], @i64)
+        else raise NotImplementedError.new(gtype.type_def.bit_width)
+        end
+      when "from_bits"
+        raise "from_bits integer" unless gtype.type_def.is_floating_point_numeric?
+        case gtype.type_def.bit_width
+        when 32 then @builder.bit_cast(params[1], @f32)
+        when 64 then @builder.bit_cast(params[1], @f64)
+        else raise NotImplementedError.new(gtype.type_def.bit_width)
+        end
       else
         raise NotImplementedError.new(gfunc.func.ident.inspect)
       end
@@ -1407,7 +1436,7 @@ class Mare::Compiler::CodeGen
     # If the value is F64 NaN, return F32 NaN.
     test_overflow = gen_numeric_conv_float_handle_nan(
       value, @i64, 0x7FF0000000000000, 0x000FFFFFFFFFFFFF)
-    @builder.ret(@llvm.const_bit_cast(@i32.const_int(0x7F800001), @f32))
+    @builder.ret(@llvm.const_bit_cast(@i32.const_int(0x7FC00000), @f32))
     
     overflow = gen_block("overflow")
     test_underflow = gen_block("test_underflow")

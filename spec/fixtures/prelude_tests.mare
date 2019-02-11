@@ -65,8 +65,32 @@ actor Main:
     test["F64 to u32"].pass = F64[31].u32 == 31
     test["F32 to i32"].pass = F32[31].i32 == 31
     test["F64 to i32"].pass = F64[31].i32 == 31
+    test["F32 to f64"].pass = F32[31].f64 == 31
+    test["F64 to f32"].pass = F64[31].f32 == 31
     
-    // TODO: Test edge cases converting to and/or from floating-point numerics.
+    test["F32 to u8 nan       "].pass = F32.nan.u8          == 0
+    test["F32 to u8 infinity  "].pass = F32.infinity.u8     == 255
+    test["F32 to u8 -infinity "].pass = F32.neg_infinity.u8 == 0
+    test["F32 to u8 overflow  "].pass = F32[256].u8         == 255
+    test["F32 to u8 underflow "].pass = F32[-1].u8          == 0
+    test["F64 to u8 nan       "].pass = F64.nan.u8          == 0
+    test["F64 to u8 infinity  "].pass = F64.infinity.u8     == 255
+    test["F64 to u8 -infinity "].pass = F64.neg_infinity.u8 == 0
+    test["F64 to u8 overflow  "].pass = F64[256].u8         == 255
+    test["F64 to u8 underflow "].pass = F64[-1].u8          == 0
+    test["F32 to i8 nan       "].pass = F32.nan.i8          == 0
+    test["F32 to i8 infinity  "].pass = F32.infinity.i8     == 127
+    test["F32 to i8 -infinity "].pass = F32.neg_infinity.i8 == -128
+    test["F32 to i8 overflow  "].pass = F32[128].i8         == 127
+    test["F32 to i8 underflow "].pass = F32[-129].i8        == -128
+    test["F64 to i8 nan       "].pass = F64.nan.i8          == 0
+    test["F64 to i8 infinity  "].pass = F64.infinity.i8     == 127
+    test["F64 to i8 -infinity "].pass = F64.neg_infinity.i8 == -128
+    test["F64 to i8 overflow  "].pass = F64[128].i8         == 127
+    test["F64 to i8 underflow "].pass = F64[-129].i8        == -128
+    test["F64 to f32 nan      "].pass = F64.nan.f32.is_nan
+    test["F64 to f32 overflow "].pass = F64.max_value.f32   == F32.infinity
+    test["F64 to f32 underflow"].pass = F64.min_value.f32   == F32.neg_infinity
     
     ///
     // Numeric comparisons
@@ -144,6 +168,58 @@ actor Main:
     test["integer trailing_zeros"].pass = U8[18].trailing_zeros == 1
     test["integer count_ones    "].pass = U8[18].count_ones     == 2
     test["integer count_zeros   "].pass = U8[18].count_zeros    == 6
+    
+    ///
+    // Floating point bit representation and special values
+    
+    test["F32 bits"].pass = F32[9.3].bits == 0x4114_CCCD
+    test["F64 bits"].pass = F64[9.3].bits == 0x4022_9999_9999_999A
+    test["F32 from_bits"].pass = F32.from_bits(0x4114_CCCD)           == 9.3
+    test["F64 from_bits"].pass = F64.from_bits(0x4022_9999_9999_999A) == 9.3
+    test["F32 nan bits"].pass = F32.nan.bits == 0x7FC0_0000
+    test["F64 nan bits"].pass = F64.nan.bits == 0x7FF8_0000_0000_0000
+    test["F32 nan is_nan"].pass = F32.nan.is_nan
+    test["F64 nan is_nan"].pass = F64.nan.is_nan
+    test["F32 0 is_nan"].pass = F32[0].is_nan.is_false
+    test["F64 0 is_nan"].pass = F64[0].is_nan.is_false
+    test["F32 0/0 is_nan"].pass = (F32[0] / 0).is_nan
+    test["F64 0/0 is_nan"].pass = (F64[0] / 0).is_nan
+    test["F32 infinity bits"].pass = F32.infinity.bits == 0x7F80_0000
+    test["F64 infinity bits"].pass = F64.infinity.bits == 0x7FF0_0000_0000_0000
+    test["F32 neg_infinity bits"].pass = F32.neg_infinity.bits == 0xFF80_0000
+    test["F64 neg_infinity bits"].pass = F64.neg_infinity.bits == 0xFFF0_0000_0000_0000
+    test["F32 infinity == 1/0"].pass = F32.infinity == F32[1] / 0
+    test["F64 infinity == 1/0"].pass = F64.infinity == F64[1] / 0
+    test["F32 neg_infinity == -1/0"].pass = F32.neg_infinity == F32[-1] / 0
+    test["F64 neg_infinity == -1/0"].pass = F64.neg_infinity == F64[-1] / 0
+    test["F32 infinity is_nan"].pass = F32.infinity.is_nan.is_false
+    test["F64 infinity is_nan"].pass = F64.infinity.is_nan.is_false
+    test["F32 neg_infinity is_nan"].pass = F32.neg_infinity.is_nan.is_false
+    test["F64 neg_infinity is_nan"].pass = F64.neg_infinity.is_nan.is_false
+    test["F32 max_value is_nan"].pass = F32.max_value.is_nan.is_false
+    test["F64 max_value is_nan"].pass = F64.max_value.is_nan.is_false
+    test["F32 min_value is_nan"].pass = F32.min_value.is_nan.is_false
+    test["F64 min_value is_nan"].pass = F64.min_value.is_nan.is_false
+    test["F32 nan is_infinite"].pass = F32.nan.is_infinite.is_false
+    test["F64 nan is_infinite"].pass = F64.nan.is_infinite.is_false
+    test["F32 infinity is_infinite"].pass = F32.infinity.is_infinite
+    test["F64 infinity is_infinite"].pass = F64.infinity.is_infinite
+    test["F32 neg_infinity is_infinite"].pass = F32.neg_infinity.is_infinite
+    test["F64 neg_infinity is_infinite"].pass = F64.neg_infinity.is_infinite
+    test["F32 max_value is_infinite"].pass = F32.max_value.is_infinite.is_false
+    test["F64 max_value is_infinite"].pass = F64.max_value.is_infinite.is_false
+    test["F32 min_value is_infinite"].pass = F32.min_value.is_infinite.is_false
+    test["F64 min_value is_infinite"].pass = F64.min_value.is_infinite.is_false
+    test["F32 nan is_finite"].pass = F32.nan.is_finite.is_false
+    test["F64 nan is_finite"].pass = F64.nan.is_finite.is_false
+    test["F32 infinity is_finite"].pass = F32.infinity.is_finite.is_false
+    test["F64 infinity is_finite"].pass = F64.infinity.is_finite.is_false
+    test["F32 neg_infinity is_finite"].pass = F32.neg_infinity.is_finite.is_false
+    test["F64 neg_infinity is_finite"].pass = F64.neg_infinity.is_finite.is_false
+    test["F32 max_value is_finite"].pass = F32.max_value.is_finite
+    test["F64 max_value is_finite"].pass = F64.max_value.is_finite
+    test["F32 min_value is_finite"].pass = F32.min_value.is_finite
+    test["F64 min_value is_finite"].pass = F64.min_value.is_finite
     
     Print.line_break // TODO: move to MicroTest constructor and finalizer
 

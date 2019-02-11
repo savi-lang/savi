@@ -58,7 +58,7 @@ module Mare::Parser::Builder
           string.to_u64(underscore: true)
         rescue
           begin
-            string.to_i64(underscore: true).to_u64
+            string.to_i64(underscore: true).to_i64
           rescue
             string.to_u64(underscore: true, prefix: true)
           end

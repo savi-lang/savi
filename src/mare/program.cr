@@ -110,7 +110,7 @@ class Mare::Program
       f = find_func!(name)
       raise "#{ident.value}.#{name} not a constant" unless f.has_tag?(:constant)
       
-      f.body.not_nil!.terms.last.as(AST::LiteralInteger).value
+      f.body.not_nil!.terms.last.as(AST::LiteralInteger).value.to_u64
     end
     
     def const_bool(name) : Bool
@@ -122,6 +122,14 @@ class Mare::Program
       when "False" then false
       else raise NotImplementedError.new(f.body.not_nil!.to_a)
       end
+    end
+    
+    def const_u64_eq?(name, value : UInt64) : Bool
+      f = find_func?(name)
+      return false unless f && f.has_tag?(:constant)
+      
+      term = f.body.try(&.terms[-1]?)
+      term.is_a?(AST::LiteralInteger) && term.value == value
     end
     
     def const_bool_true?(name) : Bool

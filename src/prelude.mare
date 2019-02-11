@@ -53,6 +53,9 @@ interface val NumericMethods: // TODO: don't use interface for this... `common`?
 interface val IntegerMethods: // TODO: don't use interface for this... `common`?
   const bit_width U8: // TODO: dedup with NumericMethods
   
+  fun val bit_and (other @) @: compiler intrinsic
+  fun val bit_or (other @) @: compiler intrinsic
+  fun val bit_xor (other @) @: compiler intrinsic
   fun val invert @: compiler intrinsic
   fun val reverse_bits @: compiler intrinsic
   fun val swap_bytes @: compiler intrinsic
@@ -60,6 +63,54 @@ interface val IntegerMethods: // TODO: don't use interface for this... `common`?
   fun val trailing_zeros U8: compiler intrinsic
   fun val count_ones U8: compiler intrinsic
   fun val count_zeros U8: @invert.count_ones
+
+interface val Float32Methods:
+  fun non from_bits (bits U32) @: compiler intrinsic
+  fun val bits U32: compiler intrinsic
+  
+  fun non nan:          @from_bits(0x7FC0_0000)
+  fun non infinity:     @from_bits(0x7F80_0000)
+  fun non neg_infinity: @from_bits(0xFF80_0000)
+  fun non max_value:    @from_bits(0x7F7F_FFFF)
+  fun non min_value:    @from_bits(0xFF7F_FFFF)
+  
+  // Return true if the number is NaN.
+  fun val is_nan:
+    @bits.bit_and(0x7F80_0000) == 0x7F80_0000 && // exponent
+    @bits.bit_and(0x007F_FFFF) != 0              // mantissa
+  
+  // Return true if the number is positive or negative infinity.
+  fun val is_infinite:
+    @bits.bit_and(0x7F80_0000) == 0x7F80_0000 && // exponent
+    @bits.bit_and(0x007F_FFFF) == 0              // mantissa
+  
+  // Return true if the number is neither NaN nor positive or negative infinity.
+  fun val is_finite:
+    @bits.bit_and(0x7F80_0000) != 0x7F80_0000 // exponent
+
+interface val Float64Methods:
+  fun non from_bits (bits U64) @: compiler intrinsic
+  fun val bits U64: compiler intrinsic
+  
+  fun non nan:          @from_bits(0x7FF8_0000_0000_0000)
+  fun non infinity:     @from_bits(0x7FF0_0000_0000_0000)
+  fun non neg_infinity: @from_bits(0xFFF0_0000_0000_0000)
+  fun non max_value:    @from_bits(0x7FEF_FFFF_FFFF_FFFF)
+  fun non min_value:    @from_bits(0xFFEF_FFFF_FFFF_FFFF)
+  
+  // Return true if the number is NaN.
+  fun val is_nan:
+    @bits.bit_and(0x7FF0_0000_0000_0000) == 0x7FF0_0000_0000_0000 && // exponent
+    @bits.bit_and(0x000F_FFFF_FFFF_FFFF) != 0                        // mantissa
+  
+  // Return true if the number is positive or negative infinity.
+  fun val is_infinite:
+    @bits.bit_and(0x7FF0_0000_0000_0000) == 0x7FF0_0000_0000_0000 && // exponent
+    @bits.bit_and(0x000F_FFFF_FFFF_FFFF) == 0                        // mantissa
+  
+  // Return true if the number is neither NaN nor positive or negative infinity.
+  fun val is_finite:
+    @bits.bit_and(0x7FF0_0000_0000_0000) != 0x7FF0_0000_0000_0000 // exponent
 
 numeric U8:
   const bit_width U8: 8

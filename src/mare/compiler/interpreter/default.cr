@@ -104,16 +104,22 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         copy_func.add_tag(:copies)
         @type.functions << copy_func
         
-        # Add "copies IntegerMethods" if not a floating point numeric type.
-        unless @type.const_bool_true?("is_floating_point")
-          int_cap = AST::Identifier.new("non").from(@type.ident)
-          int_is = AST::Identifier.new("copies").from(@type.ident)
-          int_ret = AST::Identifier.new("IntegerMethods").from(@type.ident)
-          int_func = Program::Function.new(int_cap, int_is, nil, int_ret, nil)
-          int_func.add_tag(:hygienic)
-          int_func.add_tag(:copies)
-          @type.functions << int_func
-        end
+        # Also copy IntegerMethods, Float32Methods, or Float64Methods.
+        spec_name =
+          if !@type.const_bool_true?("is_floating_point")
+            "IntegerMethods"
+          elsif @type.const_u64_eq?("bit_width", 32)
+            "Float32Methods"
+          else
+            "Float64Methods"
+          end
+        spec_cap = AST::Identifier.new("non").from(@type.ident)
+        spec_is = AST::Identifier.new("copies").from(@type.ident)
+        spec_ret = AST::Identifier.new(spec_name).from(@type.ident)
+        spec_func = Program::Function.new(spec_cap, spec_is, nil, spec_ret, nil)
+        spec_func.add_tag(:hygienic)
+        spec_func.add_tag(:copies)
+        @type.functions << spec_func
       end
       
       # An FFI type's functions should be tagged as "ffi" and body removed.
