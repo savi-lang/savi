@@ -272,7 +272,7 @@ class Mare::Compiler::CodeGen
   end
   
   def llvm_type_of(gtype : GenType)
-    llvm_type_of(gtype.type_def.as_ref)
+    llvm_type_of(gtype.type_def.as_ref) # TODO: this is backwards - defs should have a llvm_use_type of their own, with refs delegating to that implementation when there is a singular meta_type
   end
   
   def llvm_type_of(ref : Reach::Ref)
@@ -699,6 +699,14 @@ class Mare::Compiler::CodeGen
     
     @builder.ret \
       case gfunc.func.ident.value
+      when "u8" then gen_numeric_conv(gtype, @gtypes["U8"], params[0])
+      when "u32" then gen_numeric_conv(gtype, @gtypes["U32"], params[0])
+      when "u64" then gen_numeric_conv(gtype, @gtypes["U64"], params[0])
+      when "i8" then gen_numeric_conv(gtype, @gtypes["I8"], params[0])
+      when "i32" then gen_numeric_conv(gtype, @gtypes["I32"], params[0])
+      when "i64" then gen_numeric_conv(gtype, @gtypes["I64"], params[0])
+      when "f32" then gen_numeric_conv(gtype, @gtypes["F32"], params[0])
+      when "f64" then gen_numeric_conv(gtype, @gtypes["F64"], params[0])
       when "==" then
         if gtype.type_def.is_floating_point_numeric?
           @builder.fcmp(LLVM::RealPredicate::OEQ, params[0], params[1])
@@ -1281,20 +1289,22 @@ class Mare::Compiler::CodeGen
       if from_width < to_width
         @builder.fpext(value, to_llvm_type)
       elsif from_width > to_width
-        raise NotImplementedError.new("F64 to F32")
+        raise "unexpected from_width: #{from_width}" unless from_width == 64
+        raise "unexpected to_width: #{to_width}" unless to_width == 32
+        gen_numeric_conv_f64_to_f32(value)
       else
         value
       end
     elsif from_float && to_signed
       case from_width
-      when 32 then raise NotImplementedError.new("F32 to signed integer")
-      when 64 then raise NotImplementedError.new("F64 to signed integer")
+      when 32 then gen_numeric_conv_f32_to_sint(value, to_llvm_type)
+      when 64 then gen_numeric_conv_f64_to_sint(value, to_llvm_type)
       else raise NotImplementedError.new(from_width)
       end
     elsif from_float
       case from_width
-      when 32 then raise NotImplementedError.new("F32 to unsigned integer")
-      when 64 then raise NotImplementedError.new("F64 to unsigned integer")
+      when 32 then gen_numeric_conv_f32_to_uint(value, to_llvm_type)
+      when 64 then gen_numeric_conv_f64_to_uint(value, to_llvm_type)
       else raise NotImplementedError.new(from_width)
       end
     elsif from_signed && to_float
@@ -1312,6 +1322,173 @@ class Mare::Compiler::CodeGen
     else
       value
     end
+  end
+  
+  def gen_numeric_conv_float_handle_nan(
+    value : LLVM::Value,
+    int_type : LLVM::Type,
+    exp : UInt64,
+    mantissa : UInt64,
+  )
+    nan = gen_block("nan")
+    non_nan = gen_block("non_nan")
+    
+    exp_mask = int_type.const_int(exp)
+    mant_mask = int_type.const_int(mantissa)
+    
+    bits = @builder.bit_cast(value, int_type, "bits")
+    exp_res = @builder.and(bits, exp_mask, "exp_res")
+    mant_res = @builder.and(bits, mant_mask, "mant_res")
+    
+    exp_res = @builder.icmp(
+      LLVM::IntPredicate::EQ, exp_res, exp_mask, "exp_res")
+    mant_res = @builder.icmp(
+      LLVM::IntPredicate::NE, mant_res, int_type.const_int(0), "mant_res")
+    
+    is_nan = @builder.and(exp_res, mant_res, "is_nan")
+    @builder.cond(is_nan, nan, non_nan)
+    @builder.position_at_end(nan)
+    
+    return non_nan
+  end
+  
+  def gen_numeric_conv_float_handle_overflow_saturate(
+    value : LLVM::Value,
+    from_type : LLVM::Type,
+    to_type : LLVM::Type,
+    to_min : LLVM::Value,
+    to_max : LLVM::Value,
+    is_signed : Bool,
+  )
+    overflow = gen_block("overflow")
+    test_underflow = gen_block("test_underflow")
+    underflow = gen_block("underflow")
+    normal = gen_block("normal")
+    
+    # Check if the floating-point value overflows the maximum integer value.
+    to_fmax =
+      if is_signed
+        @builder.si2fp(to_max, from_type)
+      else
+        @builder.ui2fp(to_max, from_type)
+      end
+    is_overflow = @builder.fcmp(LLVM::RealPredicate::OGT, value, to_fmax)
+    @builder.cond(is_overflow, overflow, test_underflow)
+    
+    # If it does overflow, return the maximum integer value.
+    @builder.position_at_end(overflow)
+    @builder.ret(to_max)
+    
+    # Check if the floating-point value underflows the minimum integer value.
+    @builder.position_at_end(test_underflow)
+    to_fmin =
+      if is_signed
+        @builder.si2fp(to_min, from_type)
+      else
+        @builder.ui2fp(to_min, from_type)
+      end
+    is_underflow = @builder.fcmp(LLVM::RealPredicate::OLT, value, to_fmin)
+    @builder.cond(is_underflow, underflow, normal)
+    
+    # If it does underflow, return the minimum integer value.
+    @builder.position_at_end(underflow)
+    @builder.ret(to_min)
+    
+    # Otherwise, proceed with the conversion as normal.
+    @builder.position_at_end(normal)
+    if is_signed
+      @builder.fp2si(value, to_type)
+    else
+      @builder.fp2ui(value, to_type)
+    end
+  end
+  
+  def gen_numeric_conv_f64_to_f32(value : LLVM::Value)
+    # If the value is F64 NaN, return F32 NaN.
+    test_overflow = gen_numeric_conv_float_handle_nan(
+      value, @i64, 0x7FF0000000000000, 0x000FFFFFFFFFFFFF)
+    @builder.ret(@llvm.const_bit_cast(@i32.const_int(0x7F800001), @f32))
+    
+    overflow = gen_block("overflow")
+    test_underflow = gen_block("test_underflow")
+    underflow = gen_block("underflow")
+    normal = gen_block("normal")
+    
+    # Check if the F64 value overflows the maximum F32 value.
+    @builder.position_at_end(test_overflow)
+    f32_max = @llvm.const_bit_cast(@i32.const_int(0x7F7FFFFF), @f32)
+    f32_max = @builder.fpext(f32_max, @f64, "f32_max")
+    is_overflow = @builder.fcmp(LLVM::RealPredicate::OGT, value, f32_max)
+    @builder.cond(is_overflow, overflow, test_underflow)
+    
+    # If it does overflow, return positive infinity.
+    @builder.position_at_end(overflow)
+    @builder.ret(@llvm.const_bit_cast(@i32.const_int(0x7F800000), @f32))
+    
+    # Check if the F64 value underflows the minimum F32 value.
+    @builder.position_at_end(test_underflow)
+    f32_min = @llvm.const_bit_cast(@i32.const_int(0xFF7FFFFF), @f32)
+    f32_min = @builder.fpext(f32_min, @f64, "f32_min")
+    is_underflow = @builder.fcmp(LLVM::RealPredicate::OLT, value, f32_min)
+    @builder.cond(is_underflow, underflow, normal)
+    
+    # If it does underflow, return negative infinity.
+    @builder.position_at_end(underflow)
+    @builder.ret(@llvm.const_bit_cast(@i32.const_int(0xFF800000), @f32))
+    
+    # Otherwise, proceed with the floating-point truncation as normal.
+    @builder.position_at_end(normal)
+    @builder.fptrunc(value, @f32)
+  end
+  
+  def gen_numeric_conv_f32_to_sint(value : LLVM::Value, to_type : LLVM::Type)
+    test_overflow = gen_numeric_conv_float_handle_nan(
+      value, @i32, 0x7F800000, 0x007FFFFF)
+    @builder.ret(to_type.const_int(0))
+    
+    @builder.position_at_end(test_overflow)
+    to_min = @builder.not(to_type.const_int(0), "to_min.pre")
+    to_max = @builder.lshr(to_min, to_type.const_int(1), "to_max")
+    to_min = @builder.xor(to_max, to_min, "to_min")
+    gen_numeric_conv_float_handle_overflow_saturate(
+      value, @f32, to_type, to_min, to_max, true)
+  end
+  
+  def gen_numeric_conv_f64_to_sint(value : LLVM::Value, to_type : LLVM::Type)
+    test_overflow = gen_numeric_conv_float_handle_nan(
+      value, @i64, 0x7FF0000000000000, 0x000FFFFFFFFFFFFF)
+    @builder.ret(to_type.const_int(0))
+    
+    @builder.position_at_end(test_overflow)
+    to_min = @builder.not(to_type.const_int(0), "to_min.pre")
+    to_max = @builder.lshr(to_min, to_type.const_int(1), "to_max")
+    to_min = @builder.xor(to_max, to_min, "to_min")
+    gen_numeric_conv_float_handle_overflow_saturate(
+      value, @f64, to_type, to_min, to_max, true)
+  end
+  
+  def gen_numeric_conv_f32_to_uint(value : LLVM::Value, to_type : LLVM::Type)
+    test_overflow = gen_numeric_conv_float_handle_nan(
+      value, @i32, 0x7F800000, 0x007FFFFF)
+    @builder.ret(to_type.const_int(0))
+    
+    @builder.position_at_end(test_overflow)
+    to_min = to_type.const_int(0)
+    to_max = @builder.not(to_min, "to_max")
+    gen_numeric_conv_float_handle_overflow_saturate(
+      value, @f32, to_type, to_min, to_max, false)
+  end
+  
+  def gen_numeric_conv_f64_to_uint(value : LLVM::Value, to_type : LLVM::Type)
+    test_overflow = gen_numeric_conv_float_handle_nan(
+      value, @i64, 0x7FF0000000000000, 0x000FFFFFFFFFFFFF)
+    @builder.ret(to_type.const_int(0))
+    
+    @builder.position_at_end(test_overflow)
+    to_min = to_type.const_int(0)
+    to_max = @builder.not(to_min, "to_max")
+    gen_numeric_conv_float_handle_overflow_saturate(
+      value, @f64, to_type, to_min, to_max, false)
   end
   
   def gen_cstring(value : String) : LLVM::Value

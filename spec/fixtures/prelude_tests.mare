@@ -51,6 +51,24 @@ actor Main:
     test["False not     "].pass = False.not      == True
     
     ///
+    // Numeric conversions
+    
+    test["U32 to u8 "].pass = U32[31].u8  == 31
+    test["U32 to u32"].pass = U32[31].u32 == 31
+    test["U32 to u64"].pass = U32[31].u64 == 31
+    test["U32 to i8 "].pass = U32[31].i8  == 31
+    test["U32 to i32"].pass = U32[31].i32 == 31
+    test["U32 to i64"].pass = U32[31].i64 == 31
+    test["U32 to f32"].pass = U32[31].f32 == 31
+    test["U32 to f64"].pass = U32[31].f64 == 31
+    test["F32 to u32"].pass = F32[31].u32 == 31
+    test["F64 to u32"].pass = F64[31].u32 == 31
+    test["F32 to i32"].pass = F32[31].i32 == 31
+    test["F64 to i32"].pass = F64[31].i32 == 31
+    
+    // TODO: Test edge cases converting to and/or from floating-point numerics.
+    
+    ///
     // Numeric comparisons
     
     test["unsigned integer =="].pass = U32[31] == 31

@@ -16,6 +16,15 @@ interface val Numeric:
   const is_signed Bool: False
   const is_floating_point Bool: False
   // TODO: arithmetic method interfaces with type parameters on Numeric[A] type
+  
+  fun val u8 U8: compiler intrinsic
+  fun val u32 U32: compiler intrinsic
+  fun val u64 U64: compiler intrinsic
+  fun val i8 I8: compiler intrinsic
+  fun val i32 I32: compiler intrinsic
+  fun val i64 I64: compiler intrinsic
+  fun val f32 F32: compiler intrinsic
+  fun val f64 F64: compiler intrinsic
 
 interface val NumericMethods: // TODO: don't use interface for this... `common`?
   const bit_width U8:
