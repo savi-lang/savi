@@ -53,7 +53,16 @@ module Mare::Parser::Builder
       AST::LiteralString.new(value).with_pos(state.pos(main))
     when :integer
       string = state.slice(main)
-      value = begin string.to_u64 rescue string.to_i64.to_u64 end
+      value =
+        begin
+          string.to_u64(underscore: true)
+        rescue
+          begin
+            string.to_i64(underscore: true).to_u64
+          rescue
+            string.to_u64(underscore: true, prefix: true)
+          end
+        end
       AST::LiteralInteger.new(value).with_pos(state.pos(main))
     when :float
       value = state.slice(main).to_f

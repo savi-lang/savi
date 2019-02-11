@@ -14,8 +14,12 @@ module Mare::Parser
     # Define what a number looks like (integer and float).
     digit19 = range('1', '9')
     digit = range('0', '9')
-    digits = digit.repeat(1)
+    digithex = digit | range('a', 'f') | range('A', 'F')
+    digitbin = range('0', '1')
+    digits = digit.repeat(1) | char('_')
     int =
+      (str("0x") >> (digithex | char('_')).repeat(1)) |
+      (str("0b") >> (digitbin | char('_')).repeat(1)) |
       (char('-') >> digit19 >> digits) |
       (char('-') >> digit) |
       (digit19 >> digits) |
@@ -35,11 +39,10 @@ module Mare::Parser
     ).named(:ident)
     
     # Define what a string looks like.
-    hex = digit | range('a', 'f') | range('A', 'F')
     string_char =
       str("\\\"") | str("\\\\") | str("\\|") |
       str("\\b") | str("\\f") | str("\\n") | str("\\r") | str("\\t") |
-      (str("\\u") >> hex >> hex >> hex >> hex) |
+      (str("\\u") >> digithex >> digithex >> digithex >> digithex) |
       (~char('"') >> ~char('\\') >> range(' ', 0x10FFFF_u32))
     string = char('"') >> string_char.repeat.named(:string) >> char('"')
     

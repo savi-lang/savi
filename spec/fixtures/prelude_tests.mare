@@ -33,9 +33,9 @@ actor Main:
     test["F32 is_floating_point"].pass = F32.is_floating_point == True
     test["F64 is_floating_point"].pass = F64.is_floating_point == True
     
-    test["U8  bounds"].pass = U8[-1] == 255
-    test["U32 bounds"].pass = U32[-1] == 4294967295
-    test["U64 bounds"].pass = U64[-1] == 18446744073709551615
+    test["U8  bounds"].pass = U8[-1] == 0xFF
+    test["U32 bounds"].pass = U32[-1] == 0xFFFF_FFFF
+    test["U64 bounds"].pass = U64[-1] == 0xFFFF_FFFF_FFFF_FFFF
     test["I8  bounds"].pass = I8[-128] == 128
     test["I32 bounds"].pass = I32[-2147483648] == 2147483648
     test["I64 bounds"].pass = I64[-9223372036854775808] == 9223372036854775808
@@ -135,8 +135,9 @@ actor Main:
     ///
     // Integer bit manipulation
     
-    test["integer invert        "].pass = U8[18].invert         == 237
-    test["integer reverse_bits  "].pass = U8[18].reverse_bits   == 72
+    test["integer (bits)        "].pass = U8[18]                == 0b00010010
+    test["integer invert        "].pass = U8[18].invert         == 0b11101101
+    test["integer reverse_bits  "].pass = U8[18].reverse_bits   == 0b01001000
     test["integer swap_bytes U8 "].pass = U8[18].swap_bytes     == 18
     test["integer swap_bytes U32"].pass = U32[66052].swap_bytes == 67240192
     test["integer leading_zeros "].pass = U8[18].leading_zeros  == 3
