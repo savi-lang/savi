@@ -41,6 +41,16 @@ actor Main:
     test["I64 bounds"].pass = I64[-9223372036854775808] == 9223372036854775808
     
     ///
+    // Bool convenience aliases
+    
+    test["True  is_true "].pass = True.is_true   == True
+    test["False is_true "].pass = False.is_true  == False
+    test["True  is_false"].pass = True.is_false  == False
+    test["False is_false"].pass = False.is_false == True
+    test["True  not     "].pass = True.not       == False
+    test["False not     "].pass = False.not      == True
+    
+    ///
     // Numeric comparisons
     
     test["unsigned integer =="].pass = U32[31] == 31
@@ -103,6 +113,18 @@ actor Main:
     test["signed integer   abs negative"].pass = I32[-93].abs == 93
     test["floating point   abs positive"].pass = F32[9.3].abs == 9.3
     test["floating point   abs negative"].pass = F32[-9.3].abs == 9.3
+    
+    ///
+    // Integer bit manipulation
+    
+    test["integer invert        "].pass = U8[18].invert         == 237
+    test["integer reverse_bits  "].pass = U8[18].reverse_bits   == 72
+    test["integer swap_bytes U8 "].pass = U8[18].swap_bytes     == 18
+    test["integer swap_bytes U32"].pass = U32[66052].swap_bytes == 67240192
+    test["integer leading_zeros "].pass = U8[18].leading_zeros  == 3
+    test["integer trailing_zeros"].pass = U8[18].trailing_zeros == 1
+    test["integer count_ones    "].pass = U8[18].count_ones     == 2
+    test["integer count_zeros   "].pass = U8[18].count_zeros    == 6
     
     Print.line_break // TODO: move to MicroTest constructor and finalizer
 

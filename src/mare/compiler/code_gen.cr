@@ -202,18 +202,20 @@ class Mare::Compiler::CodeGen
     
     @default_linkage = LLVM::Linkage::External
     
-    @void    = @llvm.void.as(LLVM::Type)
-    @ptr     = @llvm.int8.pointer.as(LLVM::Type)
-    @pptr    = @llvm.int8.pointer.pointer.as(LLVM::Type)
-    @i1      = @llvm.int1.as(LLVM::Type)
-    @i8      = @llvm.int8.as(LLVM::Type)
-    @i32     = @llvm.int32.as(LLVM::Type)
-    @i32_ptr = @llvm.int32.pointer.as(LLVM::Type)
-    @i32_0   = @llvm.int32.const_int(0).as(LLVM::Value)
-    @i64     = @llvm.int64.as(LLVM::Type)
-    @f32     = @llvm.float.as(LLVM::Type)
-    @f64     = @llvm.double.as(LLVM::Type)
-    @intptr  = @llvm.intptr(@target_machine.data_layout).as(LLVM::Type)
+    @void     = @llvm.void.as(LLVM::Type)
+    @ptr      = @llvm.int8.pointer.as(LLVM::Type)
+    @pptr     = @llvm.int8.pointer.pointer.as(LLVM::Type)
+    @i1       = @llvm.int1.as(LLVM::Type)
+    @i1_false = @llvm.int1.const_int(0).as(LLVM::Value)
+    @i1_true  = @llvm.int1.const_int(1).as(LLVM::Value)
+    @i8       = @llvm.int8.as(LLVM::Type)
+    @i32      = @llvm.int32.as(LLVM::Type)
+    @i32_ptr  = @llvm.int32.pointer.as(LLVM::Type)
+    @i32_0    = @llvm.int32.const_int(0).as(LLVM::Value)
+    @i64      = @llvm.int64.as(LLVM::Type)
+    @f32      = @llvm.float.as(LLVM::Type)
+    @f64      = @llvm.double.as(LLVM::Type)
+    @intptr   = @llvm.intptr(@target_machine.data_layout).as(LLVM::Type)
     
     @frames = [] of Frame
     @string_globals = {} of String => LLVM::Value
@@ -827,6 +829,99 @@ class Mare::Compiler::CodeGen
           # Get the final result, which may be zero from one of the pre-checks.
           @builder.phi(llvm_type, blocks, values, "phidiv")
         end
+      when "invert"
+        @builder.not(params[0])
+      when "reverse_bits"
+        op_func =
+          case gtype.type_def.bit_width
+          when 1
+            @mod.functions["llvm.bitreverse.i1"]? ||
+              @mod.functions.add("llvm.bitreverse.i1", [@i1], @i1)
+          when 8
+            @mod.functions["llvm.bitreverse.i8"]? ||
+              @mod.functions.add("llvm.bitreverse.i8", [@i8], @i8)
+          when 32
+            @mod.functions["llvm.bitreverse.i32"]? ||
+              @mod.functions.add("llvm.bitreverse.i32", [@i32], @i32)
+          when 64
+            @mod.functions["llvm.bitreverse.i64"]? ||
+              @mod.functions.add("llvm.bitreverse.i64", [@i64], @i64)
+          else raise NotImplementedError.new(gtype.type_def.bit_width)
+          end
+        @builder.call(op_func, [params[0]])
+      when "swap_bytes"
+        case gtype.type_def.bit_width
+        when 1, 8
+          params[0]
+        when 32
+          op_func =
+            @mod.functions["llvm.bswap.i32"]? ||
+              @mod.functions.add("llvm.bswap.i32", [@i32], @i32)
+          @builder.call(op_func, [params[0]])
+        when 64
+          op_func =
+            @mod.functions["llvm.bswap.i64"]? ||
+              @mod.functions.add("llvm.bswap.i64", [@i64], @i64)
+          @builder.call(op_func, [params[0]])
+        else raise NotImplementedError.new(gtype.type_def.bit_width)
+        end
+      when "leading_zeros"
+        op_func =
+          case gtype.type_def.bit_width
+          when 1
+            @mod.functions["llvm.ctlz.i1"]? ||
+              @mod.functions.add("llvm.ctlz.i1", [@i1, @i1], @i1)
+          when 8
+            @mod.functions["llvm.ctlz.i8"]? ||
+              @mod.functions.add("llvm.ctlz.i8", [@i8, @i1], @i8)
+          when 32
+            @mod.functions["llvm.ctlz.i32"]? ||
+              @mod.functions.add("llvm.ctlz.i32", [@i32, @i1], @i32)
+          when 64
+            @mod.functions["llvm.ctlz.i64"]? ||
+              @mod.functions.add("llvm.ctlz.i64", [@i64, @i1], @i64)
+          else raise NotImplementedError.new(gtype.type_def.bit_width)
+          end
+        gen_numeric_conv gtype, @gtypes["U8"],
+          @builder.call(op_func, [params[0], @i1_false])
+      when "trailing_zeros"
+        op_func =
+          case gtype.type_def.bit_width
+          when 1
+            @mod.functions["llvm.cttz.i1"]? ||
+              @mod.functions.add("llvm.cttz.i1", [@i1, @i1], @i1)
+          when 8
+            @mod.functions["llvm.cttz.i8"]? ||
+              @mod.functions.add("llvm.cttz.i8", [@i8, @i1], @i8)
+          when 32
+            @mod.functions["llvm.cttz.i32"]? ||
+              @mod.functions.add("llvm.cttz.i32", [@i32, @i1], @i32)
+          when 64
+            @mod.functions["llvm.cttz.i64"]? ||
+              @mod.functions.add("llvm.cttz.i64", [@i64, @i1], @i64)
+          else raise NotImplementedError.new(gtype.type_def.bit_width)
+          end
+        gen_numeric_conv gtype, @gtypes["U8"],
+          @builder.call(op_func, [params[0], @i1_false])
+      when "count_ones"
+        op_func =
+          case gtype.type_def.bit_width
+          when 1
+            @mod.functions["llvm.ctpop.i1"]? ||
+              @mod.functions.add("llvm.ctpop.i1", [@i1], @i1)
+          when 8
+            @mod.functions["llvm.ctpop.i8"]? ||
+              @mod.functions.add("llvm.ctpop.i8", [@i8], @i8)
+          when 32
+            @mod.functions["llvm.ctpop.i32"]? ||
+              @mod.functions.add("llvm.ctpop.i32", [@i32], @i32)
+          when 64
+            @mod.functions["llvm.ctpop.i64"]? ||
+              @mod.functions.add("llvm.ctpop.i64", [@i64], @i64)
+          else raise NotImplementedError.new(gtype.type_def.bit_width)
+          end
+        gen_numeric_conv gtype, @gtypes["U8"], \
+          @builder.call(op_func, [params[0]])
       else
         raise NotImplementedError.new(gfunc.func.ident.inspect)
       end
@@ -1165,6 +1260,57 @@ class Mare::Compiler::CodeGen
     when :f32 then @f32.const_float(expr.value.to_f32)
     when :f64 then @f64.const_double(expr.value.to_f64)
     else raise "invalid floating point literal type: #{type_ref.inspect}"
+    end
+  end
+  
+  def gen_numeric_conv(
+    from_gtype : GenType,
+    to_gtype : GenType,
+    value : LLVM::Value,
+  )
+    from_signed = from_gtype.type_def.is_signed_numeric?
+    to_signed = to_gtype.type_def.is_signed_numeric?
+    from_float = from_gtype.type_def.is_floating_point_numeric?
+    to_float = to_gtype.type_def.is_floating_point_numeric?
+    from_width = from_gtype.type_def.bit_width
+    to_width = to_gtype.type_def.bit_width
+    
+    to_llvm_type = llvm_type_of(to_gtype)
+    
+    if from_float && to_float
+      if from_width < to_width
+        @builder.fpext(value, to_llvm_type)
+      elsif from_width > to_width
+        raise NotImplementedError.new("F64 to F32")
+      else
+        value
+      end
+    elsif from_float && to_signed
+      case from_width
+      when 32 then raise NotImplementedError.new("F32 to signed integer")
+      when 64 then raise NotImplementedError.new("F64 to signed integer")
+      else raise NotImplementedError.new(from_width)
+      end
+    elsif from_float
+      case from_width
+      when 32 then raise NotImplementedError.new("F32 to unsigned integer")
+      when 64 then raise NotImplementedError.new("F64 to unsigned integer")
+      else raise NotImplementedError.new(from_width)
+      end
+    elsif from_signed && to_float
+      @builder.si2fp(value, to_llvm_type)
+    elsif to_float
+      @builder.ui2fp(value, to_llvm_type)
+    elsif from_width > to_width
+      @builder.trunc(value, to_llvm_type)
+    elsif from_width < to_width
+      if from_signed
+        @builder.sext(value, to_llvm_type)
+      else
+        @builder.zext(value, to_llvm_type)
+      end
+    else
+      value
     end
   end
   

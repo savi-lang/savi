@@ -103,6 +103,17 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         copy_func.add_tag(:hygienic)
         copy_func.add_tag(:copies)
         @type.functions << copy_func
+        
+        # Add "copies IntegerMethods" if not a floating point numeric type.
+        unless @type.const_bool_true?("is_floating_point")
+          int_cap = AST::Identifier.new("non").from(@type.ident)
+          int_is = AST::Identifier.new("copies").from(@type.ident)
+          int_ret = AST::Identifier.new("IntegerMethods").from(@type.ident)
+          int_func = Program::Function.new(int_cap, int_is, nil, int_ret, nil)
+          int_func.add_tag(:hygienic)
+          int_func.add_tag(:copies)
+          @type.functions << int_func
+        end
       end
       
       # An FFI type's functions should be tagged as "ffi" and body removed.

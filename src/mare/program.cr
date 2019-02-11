@@ -124,6 +124,14 @@ class Mare::Program
       end
     end
     
+    def const_bool_true?(name) : Bool
+      f = find_func?(name)
+      return false unless f && f.has_tag?(:constant)
+      
+      term = f.body.try(&.terms[-1]?)
+      term.is_a?(AST::Identifier) && term.value == "True"
+    end
+    
     @subtyping : Mare::Compiler::Infer::SubtypingInfo?
     def subtyping
       @subtyping ||= Mare::Compiler::Infer::SubtypingInfo.new(self)

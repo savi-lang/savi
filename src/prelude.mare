@@ -6,6 +6,9 @@ enum Bool:
   const bit_width U8: 1
   member False: 0
   member True: 1
+  fun val is_true: @
+  fun val is_false: @invert
+  fun val not: @invert
 
 // Numerics
 interface val Numeric:
@@ -37,6 +40,17 @@ interface val NumericMethods: // TODO: don't use interface for this... `common`?
   fun val min (other @) @: if (@ < other) (@ | other)
   fun val max (other @) @: if (@ > other) (@ | other)
   fun val abs: if (@is_signed && @ < 0) (@[0] - @ | @)
+
+interface val IntegerMethods: // TODO: don't use interface for this... `common`?
+  const bit_width U8: // TODO: dedup with NumericMethods
+  
+  fun val invert @: compiler intrinsic
+  fun val reverse_bits @: compiler intrinsic
+  fun val swap_bytes @: compiler intrinsic
+  fun val leading_zeros U8: compiler intrinsic
+  fun val trailing_zeros U8: compiler intrinsic
+  fun val count_ones U8: compiler intrinsic
+  fun val count_zeros U8: @invert.count_ones
 
 numeric U8:
   const bit_width U8: 8
