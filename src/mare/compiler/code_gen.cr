@@ -601,7 +601,7 @@ class Mare::Compiler::CodeGen
   
   def gen_func_impl(gtype, gfunc)
     return gen_intrinsic(gtype, gfunc) if gfunc.func.has_tag?(:compiler_intrinsic)
-    return gen_ffi_body(gtype, gfunc) if gfunc.func.has_tag?(:ffi)
+    return gen_ffi_impl(gtype, gfunc) if gfunc.func.has_tag?(:ffi)
     
     # Fields with no initializer body can be skipped.
     return if gfunc.func.has_tag?(:field) && gfunc.func.body.nil?
@@ -660,17 +660,19 @@ class Mare::Compiler::CodeGen
     end
     ret = ffi_type_for(gfunc.func.ret.not_nil!)
     
+    ffi_link_name = gfunc.func.metadata[:ffi_link_name].as(String)
+    
     # Prevent double-declaring for common FFI functions already known to us.
-    llvm_ffi_func = @mod.functions[gfunc.func.ident.value]?
+    llvm_ffi_func = @mod.functions[ffi_link_name]?
     if llvm_ffi_func
       # TODO: verify that parameter types and return type are compatible
-      return @mod.functions[gfunc.func.ident.value]
+      return @mod.functions[ffi_link_name]
     end
     
-    @mod.functions.add(gfunc.func.ident.value, params, ret)
+    @mod.functions.add(ffi_link_name, params, ret)
   end
   
-  def gen_ffi_body(gtype, gfunc)
+  def gen_ffi_impl(gtype, gfunc)
     llvm_ffi_func = gen_ffi_decl(gfunc)
     
     gen_func_start(gfunc.llvm_func, gtype, gfunc)

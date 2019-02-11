@@ -146,6 +146,8 @@ class Mare::Program
     property! refer : Compiler::Refer
     property! infer : Compiler::Infer
     
+    getter metadata : Hash(Symbol, String)
+    
     KNOWN_TAGS = [
       :async,
       :compiler_intrinsic,
@@ -160,6 +162,7 @@ class Mare::Program
     
     def initialize(@cap, @ident, @params, @ret, @body)
       @tags = Set(Symbol).new
+      @metadata = Hash(Symbol, String).new
     end
     
     def dup

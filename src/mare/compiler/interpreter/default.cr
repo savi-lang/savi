@@ -109,6 +109,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
       if @keyword == "ffi"
         @type.functions.each do |f|
           f.add_tag(:ffi)
+          f.metadata[:ffi_link_name] = f.ident.value
           f.body = nil
         end
       end
