@@ -763,6 +763,86 @@ describe Mare::Compiler::Infer do
     end
   end
   
+  it "requires a sub-constructor to have a covariant receiver capability" do
+    source = Mare::Source.new "(example)", <<-SOURCE
+    interface Interface:
+      new ref example1:
+      new ref example2:
+      new ref example3:
+    
+    class Concrete:
+      is Interface:
+      new box example1:
+      new ref example2:
+      new iso example3:
+    
+    actor Main:
+      new:
+        Concrete
+    SOURCE
+    
+    expected = <<-MSG
+    This type doesn't implement the interface Interface:
+    from (example):6:
+    class Concrete:
+          ^~~~~~~~
+    
+    - this constructor's receiver capability is box:
+      from (example):8:
+      new box example1:
+          ^~~
+    
+    - it is required to be a subtype of ref:
+      from (example):2:
+      new ref example1:
+          ^~~
+    MSG
+    
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :infer)
+    end
+  end
+  
+  it "requires a sub-func to have a contravariant receiver capability" do
+    source = Mare::Source.new "(example)", <<-SOURCE
+    interface Interface:
+      fun ref example1 U64:
+      fun ref example2 U64:
+      fun ref example3 U64:
+    
+    class Concrete:
+      is Interface:
+      fun box example1 U64: 0
+      fun ref example2 U64: 0
+      fun iso example3 U64: 0
+    
+    actor Main:
+      new:
+        Concrete
+    SOURCE
+    
+    expected = <<-MSG
+    This type doesn't implement the interface Interface:
+    from (example):6:
+    class Concrete:
+          ^~~~~~~~
+    
+    - this function's receiver capability is iso:
+      from (example):10:
+      fun iso example3 U64: 0
+          ^~~
+    
+    - it is required to be a supertype of ref:
+      from (example):4:
+      fun ref example3 U64:
+          ^~~
+    MSG
+    
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :infer)
+    end
+  end
+  
   it "requires a sub-func to have covariant return and contravariant params" do
     source = Mare::Source.new "(example)", <<-SOURCE
     interface non Interface:

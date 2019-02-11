@@ -147,9 +147,26 @@ class Mare::Compiler::Infer::SubtypingInfo
       return false
     end
     
-    # TODO: Check receiver rcap (see ponyc subtype.c:240)
-    # Covariant receiver rcap for constructors.
-    # Contravariant receiver rcap for functions and behaviours.
+    # Check the receiver capability.
+    this_cap = MetaType::Capability.new(this_func.cap.value)
+    that_cap = MetaType::Capability.new(that_func.cap.value)
+    if this_func.has_tag?(:constructor)
+      # Covariant receiver rcap for constructors.
+      unless this_cap.subtype_of?(that_cap)
+        errors << {this_func.cap.pos,
+          "this constructor's receiver capability is #{this_cap.inspect}"}
+        errors << {that_func.cap.pos,
+          "it is required to be a subtype of #{that_cap.inspect}"}
+      end
+    else
+      # Contravariant receiver rcap for normal functions.
+      unless that_cap.subtype_of?(this_cap)
+        errors << {this_func.cap.pos,
+          "this function's receiver capability is #{this_cap.inspect}"}
+        errors << {that_func.cap.pos,
+          "it is required to be a supertype of #{that_cap.inspect}"}
+      end
+    end
     
     # Covariant return type.
     this_ret = this_infer.resolve(this_infer.ret_tid)
