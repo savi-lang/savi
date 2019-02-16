@@ -1,6 +1,4 @@
-class Mare::Compiler::Flagger < Mare::AST::Visitor
-  alias RID = UInt64
-  
+class Mare::Compiler::Classify < Mare::AST::Visitor
   # This visitor marks the given node and all nodes within as value_not_needed.
   class ValueNotNeededVisitor < Mare::AST::Visitor
     def visit(node)

@@ -5,7 +5,7 @@ module Mare::Compiler
     when :macros       then ctx.run(Macros)
     when :sugar        then ctx.run(Sugar)
     when :lambda       then ctx.run(Lambda)
-    when :flagger      then ctx.run(Flagger)
+    when :classify     then ctx.run(Classify)
     when :refer        then ctx.run(Refer)
     when :infer        then ctx.run(Infer)
     when :completeness then ctx.run(Completeness)
@@ -19,20 +19,20 @@ module Mare::Compiler
   end
   
   # TODO: Add invalidation, such that passes like :lambda can invalidate
-  # passes like :flagger and :refer instead of marking a dependency.
+  # passes like :classify and :refer instead of marking a dependency.
   def self.deps_of(target : Symbol) : Array(Symbol)
     case target
     when :copy then [] of Symbol
     when :macros then [] of Symbol
     when :sugar then [:macros]
-    when :lambda then [:macros, :sugar]
-    when :flagger then [:macros, :sugar, :lambda]
-    when :refer then [:macros, :sugar, :lambda]
-    when :infer then [:refer, :flagger, :lambda, :copy]
-    when :completeness then [:macros, :sugar, :lambda, :copy, :infer]
+    when :lambda then [:sugar, :macros]
+    when :classify then [:lambda, :sugar, :macros]
+    when :refer then [:classify, :macros, :sugar, :lambda]
+    when :infer then [:classify, :refer, :lambda, :copy]
+    when :completeness then [:infer, :lambda, :sugar, :macros, :copy]
     when :reach then [:infer]
     when :paint then [:reach]
-    when :codegen then [:paint, :reach, :infer, :completeness, :flagger]
+    when :codegen then [:paint, :reach, :infer, :completeness, :classify]
     when :eval then [:codegen]
     when :binary then [:codegen]
     else raise NotImplementedError.new([:deps_of, target].inspect)
