@@ -25,7 +25,7 @@ module Mare::AST
     getter! pos
     property tid : UInt64 = 0
     property rid : UInt64 = 0
-    @flags : UInt64 = 0
+    property flags : UInt64 = 0
     
     def with_pos(pos : Source::Pos)
       @pos = pos
@@ -49,13 +49,6 @@ module Mare::AST
     
     def children_accept(visitor)
     end
-    
-    FLAG_VALUE_NOT_NEEDED = 0x1_u64
-    
-    def value_not_needed?; (@flags & FLAG_VALUE_NOT_NEEDED) != 0 end
-    def value_needed?;     (@flags & FLAG_VALUE_NOT_NEEDED) == 0 end
-    def value_not_needed!; @flags |= FLAG_VALUE_NOT_NEEDED end
-    def value_needed!;     @flags &= ~FLAG_VALUE_NOT_NEEDED end
   end
   
   class Document < Node

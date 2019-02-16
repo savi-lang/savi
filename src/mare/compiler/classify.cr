@@ -1,8 +1,15 @@
 class Mare::Compiler::Classify < Mare::AST::Visitor
+  FLAG_VALUE_NOT_NEEDED = 0x1_u64
+  
+  def self.value_not_needed?(node); (node.flags & FLAG_VALUE_NOT_NEEDED) != 0 end
+  def self.value_needed?(node);     (node.flags & FLAG_VALUE_NOT_NEEDED) == 0 end
+  def self.value_not_needed!(node); node.flags |= FLAG_VALUE_NOT_NEEDED end
+  def self.value_needed!(node);     node.flags &= ~FLAG_VALUE_NOT_NEEDED end
+  
   # This visitor marks the given node and all nodes within as value_not_needed.
   class ValueNotNeededVisitor < Mare::AST::Visitor
     def visit(node)
-      node.value_not_needed!
+      Classify.value_not_needed!(node)
       node
     end
   end
@@ -30,15 +37,15 @@ class Mare::Compiler::Classify < Mare::AST::Visitor
   
   # An Operator can never have a value, so its value should never be needed.
   def touch(op : AST::Operator)
-    op.value_not_needed!
+    Classify.value_not_needed!(op)
   end
   
   def touch(group : AST::Group)
     case group.style
     when "(", ":"
       # In a sequence-style group, only the value of the final term is needed.
-      group.terms.each(&.value_not_needed!)
-      group.terms.last.value_needed! unless group.terms.empty?
+      group.terms.each { |t| Classify.value_not_needed!(t) }
+      Classify.value_needed!(group.terms.last) unless group.terms.empty?
     when " "
       if group.terms.size == 2
         # Treat this as an explicit type qualification, such as in the case
@@ -52,7 +59,7 @@ class Mare::Compiler::Classify < Mare::AST::Visitor
   
   # However, in a Qualify, a value is needed in all terms of its Group.
   def touch(qualify : AST::Qualify)
-    qualify.group.terms.each(&.value_needed!)
+    qualify.group.terms.each { |t| Classify.value_needed!(t) }
   end
   
   def touch(relate : AST::Relate)
@@ -61,8 +68,8 @@ class Mare::Compiler::Classify < Mare::AST::Visitor
       # In a member access Relate, a value is not needed for the right side.
       # A value is only needed for the left side and the overall access node.
       rhs = relate.rhs
-      rhs.value_not_needed!
-      rhs.term.value_not_needed! if rhs.is_a?(AST::Qualify)
+      Classify.value_not_needed!(rhs)
+      Classify.value_not_needed!(rhs.term) if rhs.is_a?(AST::Qualify)
     end
   end
   
