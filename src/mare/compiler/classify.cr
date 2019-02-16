@@ -14,13 +14,12 @@ class Mare::Compiler::Classify < Mare::AST::Visitor
   def self.param?(node); (node.flags & FLAG_PARAM) != 0 end
   def self.param!(node); node.flags |= FLAG_PARAM end
   
-  # This visitor marks the given node tree as value_not_needed and type_expr.
+  # This visitor marks the given node tree as being a type_expr.
   class TypeExprVisitor < Mare::AST::Visitor
     INSTANCE = new
     def self.instance; INSTANCE end
     
     def visit(node)
-      Classify.value_not_needed!(node)
       Classify.type_expr!(node)
       node
     end

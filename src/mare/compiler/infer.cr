@@ -127,7 +127,6 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     # Take note of the return type constraint if given.
     func.ret.try do |ret_t|
       ret_t.accept(self)
-      require_nonzero(ret_t)
       meta_type = resolve(ret_t)
       self[ret_tid].as(Local).set_explicit(ret_t.pos, meta_type)
     end
@@ -292,9 +291,20 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     tid
   end
   
+  # Don't visit the children of a type expression root node
+  def visit_children?(node)
+    !Classify.type_expr?(node)
+  end
+  
   # This visitor never replaces nodes, it just touches them and returns them.
   def visit(node)
-    touch(node)
+    if Classify.type_expr?(node)
+      # For type expressions, don't do the usual touch - instead,
+      # construct the MetaType and assign it to the new tid.
+      new_tid(node, Fixed.new(node.pos, type_expr(node)))
+    else
+      touch(node)
+    end
     
     raise "didn't assign a tid to: #{node.inspect}" \
       if node.tid == 0 && Classify.value_needed?(node)
@@ -302,11 +312,53 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     node
   end
   
+  # An identifier type expression must refer to a type.
+  def type_expr(node : AST::Identifier)
+    ref = refer[node]
+    case ref
+    when Refer::Decl, Refer::DeclAlias
+      MetaType.new(ref.final_decl.defn)
+    when Refer::Self
+      MetaType.new(@self_type)
+    when Refer::Unresolved
+      Error.at node, "This type couldn't be resolved"
+    else
+      raise NotImplementedError.new(ref.inspect)
+    end
+  end
+  
+  # An relate type expression must be an explicit capability qualifier.
+  def type_expr(node : AST::Relate)
+    if node.op.value == "'"
+      cap = node.rhs.as(AST::Identifier).value
+      type_expr(node.lhs).override_cap(cap)
+    else
+      raise NotImplementedError.new(node.to_a.inspect)
+    end
+  end
+  
+  # A "|" group must be a union of type expressions, and a "(" group is
+  # considered to be just be a single parenthesized type expression (for now).
+  def type_expr(node : AST::Group)
+    if node.style == "|"
+      MetaType.new_union(node.terms.map { |t| type_expr(t) })
+    elsif node.style == "(" && node.terms.size == 1
+      type_expr(node.terms.first)
+    else
+      raise NotImplementedError.new(node.to_a.inspect)
+    end
+  end
+  
+  # All other AST nodes are unsupported as type expressions.
+  def type_expr(node : AST::Node)
+    raise NotImplementedError.new(node.to_a)
+  end
+  
   def touch(node : AST::Identifier)
     ref = refer[node]
     case ref
     when Refer::Decl, Refer::DeclAlias
-      if !Classify.type_expr?(node) && !ref.defn.is_value?
+      if !ref.defn.is_value?
         # A type reference whose value is used and is not itself a value
         # must be marked non, rather than having the default cap for that type.
         # This is used when we pass a type around as if it were a value.
@@ -327,8 +379,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         @local_tids[ref] = node.tid
       end
     when Refer::Self
-      info = Classify.type_expr?(node) ? self_type_tid(node) : self_tid(node)
-      transfer_tid(info, node)
+      transfer_tid(self_tid(node), node)
     when Refer::Unresolved
       # Leave the tid as zero if this identifer needs no value.
       return if Classify.value_not_needed?(node)
@@ -370,7 +421,6 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       ref = refer[node.terms[0]]
       if ref.is_a?(Refer::Local) && ref.defn_rid == node.terms[0].rid
         local_tid = @local_tids[ref]
-        require_nonzero(node.terms[1])
         
         local = self[local_tid]
         case local
@@ -453,14 +503,6 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       new_tid(node, call)
       
       follow_call(call)
-    when "'"
-      rhs = node.rhs.as(AST::Identifier)
-      lhs_mt = self[node.lhs]
-      Error.at node.op, "A capability can't be specified for a value" \
-        unless Classify.type_expr?(node)
-      
-      meta_type = lhs_mt.as(Fixed).inner.override_cap(rhs.value)
-      new_tid(node, Fixed.new(node.pos, meta_type))
     when "<:"
       # TODO: check that it is a "non" cap - just being fixed isn't sufficient.
       Error.at node.rhs, "expected this to have a fixed type at compile time" \
@@ -531,10 +573,5 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     else
       raise NotImplementedError.new([node, ref].inspect)
     end
-  end
-  
-  def require_nonzero(node : AST::Node)
-    return if node.tid != 0
-    Error.at node, "This type couldn't be resolved"
   end
 end
