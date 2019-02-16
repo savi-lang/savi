@@ -80,10 +80,16 @@ module Mare::Compiler
     satisfy(ctx, target)
   end
   
+  @@prelude_doc : AST::Document?
   def self.prelude_doc
-    path = File.join(__DIR__, "../prelude.mare")
-    content = File.read(path)
-    source = Source.new(path, content)
-    Parser.parse(source)
+    # TODO: detect when the file has changed and invalidate the cache
+    @@prelude_doc ||=
+      begin
+        path = File.join(__DIR__, "../prelude.mare")
+        content = File.read(path)
+        source = Source.new(path, content)
+        Parser.parse(source)
+      end
+    @@prelude_doc.not_nil!.dup
   end
 end
