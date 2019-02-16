@@ -11,12 +11,14 @@
 - [x] - Runtime type matching (`x <: Y`)
 - [x] - Boxed numeric values
 - [x] - Actors and behaviours
+- [x] - Rcaps (`iso`, `trn`, `val`, `ref`, `box`, `tag`)
+- [ ] - Rcap ephemerality (alias rcaps, ephemeral rcaps, `consume`)
+- [ ] - Rcap viewpoint adaptation
+- [ ] - Generic types and generic rcaps
 - [ ] - Finalizer functions
 - [ ] - Looping flow control (`while`, etc)
-- [ ] - Reference capabilities (`iso`, `trn`, `val`, `ref`, `box`, `tag`)
 - [ ] - For-loop iterator syntax sugar (`for x in y`)
 - [ ] - Partial functions and partial calls
-- [ ] - Generic types
 - [ ] - Array literals
 - [ ] - Tuple values
 - [ ] - FFI-compatible struct types
