@@ -78,7 +78,6 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
     (Unresolved | Self | Local | Field | Decl | DeclUnion | DeclAlias)
   
   def initialize(@self_decl : Decl, @decls : Hash(String, Decl | DeclAlias))
-    @create_params = false
     @last_rid = 0_u64
     @last_param = 0
     @rids = {} of RID => Info
@@ -133,28 +132,17 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
     return if func.refer? # skip if we've already completed this analysis
     func.refer = self
     
-    # Read parameter declarations, creating locals within that list.
-    with_create_params { func.params.try { |params| params.accept(self) } }
-    
-    # Read the return type, if any.
+    func.params.try(&.accept(self))
     func.ret.try(&.accept(self))
-    
-    # Now read the function body, if any.
     func.body.try(&.accept(self))
-  end
-  
-  # Yield with @create_params set to true, then after running the given block
-  # set the @create_params field back to its original value.
-  private def with_create_params(&block)
-    orig = @create_params
-    @create_params = true
-    yield
-    @create_params = orig
   end
   
   # This visitor never replaces nodes, it just touches them and returns them.
   def visit(node)
     touch(node)
+    
+    create_param_local(node) if Classify.param?(node)
+    
     node
   end
   
@@ -188,9 +176,7 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
   end
   
   def touch(node : AST::Group)
-    if node.style == "(" && @create_params
-      node.terms.each { |child| create_param_local(child) }
-    elsif node.style == "|"
+    if node.style == "|"
       # TODO: nice error here if this doesn't match the expected form.
       decls = node.terms.map do |child|
         self[child.as(AST::Group).terms.last].as(Decl)

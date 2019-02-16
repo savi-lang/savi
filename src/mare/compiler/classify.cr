@@ -1,15 +1,27 @@
 class Mare::Compiler::Classify < Mare::AST::Visitor
   FLAG_VALUE_NOT_NEEDED = 0x1_u64
+  FLAG_TYPE_EXPR        = 0x2_u64
+  FLAG_PARAM            = 0x4_u64
   
   def self.value_not_needed?(node); (node.flags & FLAG_VALUE_NOT_NEEDED) != 0 end
   def self.value_needed?(node);     (node.flags & FLAG_VALUE_NOT_NEEDED) == 0 end
   def self.value_not_needed!(node); node.flags |= FLAG_VALUE_NOT_NEEDED end
   def self.value_needed!(node);     node.flags &= ~FLAG_VALUE_NOT_NEEDED end
   
-  # This visitor marks the given node and all nodes within as value_not_needed.
-  class ValueNotNeededVisitor < Mare::AST::Visitor
+  def self.type_expr?(node); (node.flags & FLAG_TYPE_EXPR) != 0 end
+  def self.type_expr!(node); node.flags |= FLAG_TYPE_EXPR end
+  
+  def self.param?(node); (node.flags & FLAG_PARAM) != 0 end
+  def self.param!(node); node.flags |= FLAG_PARAM end
+  
+  # This visitor marks the given node tree as value_not_needed and type_expr.
+  class TypeExprVisitor < Mare::AST::Visitor
+    INSTANCE = new
+    def self.instance; INSTANCE end
+    
     def visit(node)
       Classify.value_not_needed!(node)
+      Classify.type_expr!(node)
       node
     end
   end
@@ -24,8 +36,9 @@ class Mare::Compiler::Classify < Mare::AST::Visitor
   
   def run(func)
     func.params.try(&.accept(self))
+    func.params.try(&.terms.each { |param| Classify.param!(param) })
     func.ret.try(&.accept(self))
-    func.ret.try(&.accept(ValueNotNeededVisitor.new))
+    func.ret.try(&.accept(TypeExprVisitor.instance))
     func.body.try(&.accept(self))
   end
   
@@ -50,7 +63,7 @@ class Mare::Compiler::Classify < Mare::AST::Visitor
       if group.terms.size == 2
         # Treat this as an explicit type qualification, such as in the case
         # of a local assignment with an explicit type. The value isn't used.
-        group.terms[1].accept(ValueNotNeededVisitor.new)
+        group.terms[1].accept(TypeExprVisitor.instance)
       else
         raise NotImplementedError.new(group.to_a.inspect)
       end

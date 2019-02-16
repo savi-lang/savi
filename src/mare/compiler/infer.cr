@@ -306,7 +306,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     ref = refer[node]
     case ref
     when Refer::Decl, Refer::DeclAlias
-      if Classify.value_needed?(node) && !ref.defn.is_value?
+      if !Classify.type_expr?(node) && !ref.defn.is_value?
         # A type reference whose value is used and is not itself a value
         # must be marked non, rather than having the default cap for that type.
         # This is used when we pass a type around as if it were a value.
@@ -327,7 +327,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         @local_tids[ref] = node.tid
       end
     when Refer::Self
-      info = Classify.value_needed?(node) ? self_tid(node) : self_type_tid(node)
+      info = Classify.type_expr?(node) ? self_type_tid(node) : self_tid(node)
       transfer_tid(info, node)
     when Refer::Unresolved
       # Leave the tid as zero if this identifer needs no value.
@@ -457,9 +457,9 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       rhs = node.rhs.as(AST::Identifier)
       lhs_mt = self[node.lhs]
       Error.at node.op, "A capability can't be specified for a value" \
-        unless lhs_mt.is_a?(Fixed) && Classify.value_not_needed?(node)
+        unless Classify.type_expr?(node)
       
-      meta_type = lhs_mt.inner.override_cap(rhs.value)
+      meta_type = lhs_mt.as(Fixed).inner.override_cap(rhs.value)
       new_tid(node, Fixed.new(node.pos, meta_type))
     when "<:"
       # TODO: check that it is a "non" cap - just being fixed isn't sufficient.
