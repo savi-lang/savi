@@ -18,6 +18,26 @@ describe Mare::Compiler::Infer do
     end
   end
   
+  it "complains when the return type identifier couldn't be resolved" do
+    source = Mare::Source.new "(example)", <<-SOURCE
+    actor Main:
+      fun x BogusType: 42
+      new:
+        @x
+    SOURCE
+    
+    expected = <<-MSG
+    This type couldn't be resolved:
+    from (example):2:
+      fun x BogusType: 42
+            ^~~~~~~~~
+    MSG
+    
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :infer)
+    end
+  end
+  
   it "complains when the local identifier couldn't be resolved" do
     source = Mare::Source.new "(example)", <<-SOURCE
     actor Main:

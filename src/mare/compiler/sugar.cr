@@ -18,8 +18,9 @@ class Mare::Compiler::Sugar < Mare::AST::Visitor
       end
     end
     
-    # Sugar the parameter signature.
-    f.params.try { |params| params.accept(self) }
+    # Sugar the parameter signature and return type.
+    f.params.try(&.accept(self))
+    f.ret.try(&.accept(self))
     
     # If any parameters contain assignables, make assignments in the body.
     if f.body && f.params

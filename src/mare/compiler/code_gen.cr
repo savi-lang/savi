@@ -91,7 +91,12 @@ class Mare::Compiler::CodeGen
       
       # Generate descriptor type and struct type.
       @desc_type = g.gen_desc_type(@type_def, @vtable_size)
-      @struct_type = g.gen_struct_type(@type_def, @desc_type, @fields)
+      @struct_type = g.llvm.struct_create_named(@type_def.llvm_name).as(LLVM::Type)
+    end
+    
+    # Generate struct type bodies.
+    def gen_struct_type(g : CodeGen)
+      g.gen_struct_type(@struct_type, @type_def, @desc_type, @fields)
     end
     
     # Generate function declarations.
@@ -223,9 +228,9 @@ class Mare::Compiler::CodeGen
     @gtypes = {} of String => GenType
     
     # Pony runtime types.
-    @desc = @llvm.opaque_struct("_.DESC").as(LLVM::Type)
+    @desc = @llvm.struct_create_named("_.DESC").as(LLVM::Type)
     @desc_ptr = @desc.pointer.as(LLVM::Type)
-    @obj = @llvm.opaque_struct("_.OBJECT").as(LLVM::Type)
+    @obj = @llvm.struct_create_named("_.OBJECT").as(LLVM::Type)
     @obj_ptr = @obj.pointer.as(LLVM::Type)
     @actor_pad = @i8.array(PonyRT::ACTOR_PAD_SIZE).as(LLVM::Type)
     @msg = @llvm.struct([@i32, @i32], "_.MESSAGE").as(LLVM::Type)
@@ -338,6 +343,9 @@ class Mare::Compiler::CodeGen
     ctx.program.reach.each_type_def.each do |type_def|
       @gtypes[type_def.llvm_name] = GenType.new(self, type_def)
     end
+    
+    # Generate all struct types.
+    @gtypes.each_value(&.gen_struct_type(self))
     
     # Generate all function declarations.
     @gtypes.each_value(&.gen_func_decls(self))
@@ -1742,14 +1750,14 @@ class Mare::Compiler::CodeGen
     desc
   end
   
-  def gen_struct_type(type_def, desc_type, fields)
+  def gen_struct_type(struct_type, type_def, desc_type, fields)
     elements = [] of LLVM::Type
     elements << desc_type.pointer # even types with no desc have a global desc
     elements << @actor_pad if type_def.has_actor_pad?
     
     fields.each { |name, t| elements << llvm_mem_type_of(t) }
     
-    @llvm.struct(elements, type_def.llvm_name)
+    struct_type.struct_set_body(elements)
   end
   
   def gen_singleton(type_def, struct_type, desc)

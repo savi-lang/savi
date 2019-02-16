@@ -17,8 +17,9 @@ class Mare::Compiler::Lambda < Mare::AST::Visitor
   end
   
   def run
-    @func.params.try &.accept(self)
-    @func.body.try &.accept(self)
+    @func.params.try(&.accept(self))
+    @func.ret.try(&.accept(self))
+    @func.body.try(&.accept(self))
   end
   
   private def next_lambda_name

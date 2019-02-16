@@ -136,8 +136,11 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
     # Read parameter declarations, creating locals within that list.
     with_create_params { func.params.try { |params| params.accept(self) } }
     
-    # Now read the function body.
-    func.body.try { |body| body.accept(self) }
+    # Read the return type, if any.
+    func.ret.try(&.accept(self))
+    
+    # Now read the function body, if any.
+    func.body.try(&.accept(self))
   end
   
   # Yield with @create_params set to true, then after running the given block

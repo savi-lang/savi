@@ -126,8 +126,9 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     
     # Take note of the return type constraint if given.
     func.ret.try do |ret_t|
-      meta_type = MetaType.new(func.refer.decl_defn(ret_t.value))
-      new_tid(ret_t, Fixed.new(ret_t.pos, meta_type))
+      ret_t.accept(self)
+      require_nonzero(ret_t)
+      meta_type = resolve(ret_t)
       self[ret_tid].as(Local).set_explicit(ret_t.pos, meta_type)
     end
     

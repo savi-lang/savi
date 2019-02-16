@@ -18,8 +18,10 @@ class Mare::Compiler::Flagger < Mare::AST::Visitor
   end
   
   def run(func)
-    func.params.try { |params| params.accept(self) }
-    func.body.try { |body| body.accept(self) }
+    func.params.try(&.accept(self))
+    func.ret.try(&.accept(self))
+    func.ret.try(&.accept(ValueNotNeededVisitor.new))
+    func.body.try(&.accept(self))
   end
   
   # This visitor never replaces nodes, it just touches them and returns them.

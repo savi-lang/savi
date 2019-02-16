@@ -3,7 +3,7 @@ class LLVM::Context
     Type.new LibLLVM.intptr_type_in_context(self, target_data)
   end
 
-  def opaque_struct(name : String) : Type
+  def struct_create_named(name : String) : Type
     Type.new LibLLVM.struct_create_named(self, name)
   end
   
