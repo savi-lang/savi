@@ -50,14 +50,6 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
     end
   end
   
-  class DeclUnion
-    getter pos : Source::Pos
-    getter list : Array(Decl)
-    
-    def initialize(@pos, @list)
-    end
-  end
-  
   class DeclAlias
     getter decl : Decl | DeclAlias
     getter defn : Program::TypeAlias
@@ -75,7 +67,7 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
   end
   
   alias Info =
-    (Unresolved | Self | Local | Field | Decl | DeclUnion | DeclAlias)
+    (Unresolved | Self | Local | Field | Decl | DeclAlias)
   
   def initialize(@self_decl : Decl, @decls : Hash(String, Decl | DeclAlias))
     @last_rid = 0_u64
@@ -172,16 +164,6 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
     if node.op.value == "="
       create_local(node.lhs) \
         if node.lhs.rid == 0 || self[node.lhs] == Unresolved::INSTANCE
-    end
-  end
-  
-  def touch(node : AST::Group)
-    if node.style == "|"
-      # TODO: nice error here if this doesn't match the expected form.
-      decls = node.terms.map do |child|
-        self[child.as(AST::Group).terms.last].as(Decl)
-      end
-      node.rid = new_rid(DeclUnion.new(node.pos, decls))
     end
   end
   

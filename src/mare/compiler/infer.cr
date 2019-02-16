@@ -445,15 +445,6 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       else
         raise NotImplementedError.new(node.to_a)
       end
-    when "|"
-      ref = refer[node]
-      if ref.is_a?(Refer::DeclUnion)
-        meta_types = ref.list.map { |ref| MetaType.new(ref.defn) }
-        meta_type = MetaType.new_union(meta_types)
-        new_tid(node, Fixed.new(node.pos, meta_type))
-      else
-        raise NotImplementedError.new(node.to_a)
-      end
     else raise NotImplementedError.new(node.style)
     end
   end
