@@ -169,7 +169,7 @@ class Mare::Compiler::CodeGen
     property! send_msg_llvm_type : LLVM::Type
     
     def initialize(type_def : Reach::Def, @func, @vtable_index)
-      @needs_receiver = type_def.has_state? && !@func.has_tag?(:constant)
+      @needs_receiver = type_def.has_state? && !(@func.cap.value == "non")
       
       @llvm_name = "#{type_def.llvm_name}.#{@func.ident.value}"
       @llvm_name = "#{@llvm_name}.HYGIENIC" if func.has_tag?(:hygienic)
@@ -955,8 +955,8 @@ class Mare::Compiler::CodeGen
       when "from_bits"
         raise "from_bits integer" unless gtype.type_def.is_floating_point_numeric?
         case gtype.type_def.bit_width
-        when 32 then @builder.bit_cast(params[1], @f32)
-        when 64 then @builder.bit_cast(params[1], @f64)
+        when 32 then @builder.bit_cast(params[0], @f32)
+        when 64 then @builder.bit_cast(params[0], @f64)
         else raise NotImplementedError.new(gtype.type_def.bit_width)
         end
       else
