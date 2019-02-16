@@ -22,14 +22,10 @@ module Mare::AST
   end
   
   abstract class Node
+    getter! pos
     property tid : UInt64 = 0
     property rid : UInt64 = 0
     @flags : UInt64 = 0
-    
-    def pos
-      raise "this AST node doesn't have a position: #{to_a.inspect}" unless @pos
-      @pos.not_nil!
-    end
     
     def with_pos(pos : Source::Pos)
       @pos = pos
