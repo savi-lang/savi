@@ -145,13 +145,14 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     if func_body
       # Visit the function body, taking note of all observed constraints.
       func_body.accept(self)
+      func_body_pos = func_body.terms.last.pos rescue func_body.pos
       
       # Assign the function body value to the fake return value local.
       # This has the effect of constraining it to any given explicit type,
       # and also of allowing inference if there is no explicit type.
       # We don't do this for constructors, since constructors implicitly return
       # self no matter what the last term of the body of the function is.
-      self[ret_tid].as(Local).assign(self, func_body.tid) \
+      self[ret_tid].as(Local).assign(self, func_body.tid, func_body_pos) \
         unless func.has_tag?(:constructor)
     end
     
@@ -208,8 +209,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       # TODO: handle case where number of args differs from number of params.
       # TODO: enforce that all call_defns have the same param count.
       unless call.args.empty?
-        call.args.zip(infer.param_tids).each do |arg_tid, param_tid|
-          infer[param_tid].as(Param).verify_arg(infer, self, arg_tid)
+        call.args.zip(infer.param_tids).zip(call.args_pos).each do |(arg_tid, param_tid), arg_pos|
+          infer[param_tid].as(Param).verify_arg(infer, self, arg_tid, arg_pos)
         end
       end
       
@@ -471,7 +472,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     field = Field.new(node.pos)
     new_tid(node, field)
     follow_field(field, node.value)
-    field.assign(self, node.rhs.tid)
+    field.assign(self, node.rhs.tid, node.rhs.pos)
   end
   
   def touch(node : AST::Relate)
@@ -480,10 +481,10 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       lhs = self[node.lhs]
       case lhs
       when Local
-        lhs.assign(self, node.rhs.tid)
+        lhs.assign(self, node.rhs.tid, node.rhs.pos)
         transfer_tid(node.lhs, node)
       when Param
-        lhs.assign(self, node.rhs.tid)
+        lhs.assign(self, node.rhs.tid, node.rhs.pos)
         transfer_tid(node.lhs, node)
       else
         raise NotImplementedError.new(node.lhs)
@@ -496,13 +497,15 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       when AST::Identifier
         member = rhs
         args = [] of TID
+        args_pos = [] of Source::Pos
       when AST::Qualify
         member = rhs.term.as(AST::Identifier)
         args = rhs.group.terms.map(&.tid)
+        args_pos = rhs.group.terms.map(&.pos)
       else raise NotImplementedError.new(rhs)
       end
       
-      call = FromCall.new(member.pos, lhs.tid, member.value, args)
+      call = FromCall.new(member.pos, lhs.tid, member.value, args, args_pos)
       new_tid(node, call)
       
       follow_call(call)
@@ -538,7 +541,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       # Each condition in a choice must evaluate to a type of Bool.
       bool = MetaType.new(refer.decl_defn("Bool"))
       cond_info = self[cond]
-      cond_info.within_domain!(self, node.pos, bool, true)
+      cond_info.within_domain!(self, node.pos, node.pos, bool, true)
       
       # If we have a type condition as the cond, that implies that it returned
       # true if we are in the body; hence we can apply the type refinement.

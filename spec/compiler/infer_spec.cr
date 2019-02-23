@@ -155,8 +155,13 @@ describe Mare::Compiler::Infer do
     SOURCE
     
     expected = <<-MSG
-    This type is outside of a constraint: None:
+    This expression doesn't meet the type constraints imposed on it:
     from (example):3:
+        name String = ()
+                      ^~
+    
+    - the expression has a type of None:
+      from (example):3:
         name String = ()
                       ^~
     
@@ -328,8 +333,13 @@ describe Mare::Compiler::Infer do
     SOURCE
     
     expected = <<-MSG
-    This type is outside of a constraint: (U64 | None):
-    from (example):3:
+    This expression doesn't meet the type constraints imposed on it:
+    from (example):4:
+        y U64 = x
+                ^
+    
+    - the expression has a type of (U64 | None):
+      from (example):3:
         x (U64 | None) = 42
         ^
     
@@ -429,8 +439,13 @@ describe Mare::Compiler::Infer do
     SOURCE
     
     expected = <<-MSG
-    This type is outside of a constraint: Bool:
+    This expression doesn't meet the type constraints imposed on it:
     from (example):3:
+        x I32 = True
+                ^~~~
+    
+    - the expression has a type of Bool:
+      from (example):3:
         x I32 = True
                 ^~~~
     
@@ -474,8 +489,13 @@ describe Mare::Compiler::Infer do
     SOURCE
     
     expected = <<-MSG
-    This type is outside of a constraint: X'non:
+    This expression doesn't meet the type constraints imposed on it:
     from (example):5:
+        x X = X
+              ^
+    
+    - the expression has a type of X'non:
+      from (example):5:
         x X = X
               ^
     
@@ -501,8 +521,13 @@ describe Mare::Compiler::Infer do
     SOURCE
     
     expected = <<-MSG
-    This type is outside of a constraint: C:
-    from (example):5:
+    This expression doesn't meet the type constraints imposed on it:
+    from (example):6:
+        c2 C'iso = c1
+                   ^~
+    
+    - the expression has a type of C:
+      from (example):5:
         c1 ref = C.new
         ^~
     
@@ -598,8 +623,13 @@ describe Mare::Compiler::Infer do
     SOURCE
     
     expected = <<-MSG
-    This type (when aliased) is outside of a constraint: X'tag:
-    from (example):9:
+    This expression doesn't meet the type constraints imposed on it:
+    from (example):10:
+        x2b iso = x2a
+                  ^~~
+    
+    - the expression (when aliased) has a type of X'tag:
+      from (example):9:
         x2a iso = X.new
         ^~~
     
@@ -636,8 +666,13 @@ describe Mare::Compiler::Infer do
     SOURCE
     
     expected = <<-MSG
-    This type (when aliased) is outside of a constraint: X'tag:
-    from (example):11:
+    This expression doesn't meet the type constraints imposed on it:
+    from (example):12:
+        @example(x2)
+                 ^~
+    
+    - the expression (when aliased) has a type of X'tag:
+      from (example):11:
         x2 iso = X.new
         ^~
     
