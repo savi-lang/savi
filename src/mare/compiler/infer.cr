@@ -328,7 +328,12 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     when Refer::Self
       MetaType.new(@self_type)
     when Refer::Unresolved
-      Error.at node, "This type couldn't be resolved"
+      case node.value
+      when "iso", "trn", "val", "ref", "box", "tag", "non"
+        MetaType.new(MetaType::Capability.new(node.value))
+      else
+        Error.at node, "This type couldn't be resolved"
+      end
     else
       raise NotImplementedError.new(ref.inspect)
     end

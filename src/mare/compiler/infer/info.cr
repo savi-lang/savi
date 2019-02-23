@@ -131,13 +131,15 @@ class Mare::Compiler::Infer
     end
     
     def resolve!(infer : Infer)
-      return @explicit.not_nil! if @explicit
+      explicit = @explicit
+      return explicit.not_nil! if explicit && !explicit.cap_only?
       
-      if @upstream != 0
-        infer[@upstream].resolve!(infer)
-      else
-        Error.at self, "This needs an explicit type; it could not be inferred"
-      end
+      Error.at self, "This needs an explicit type; it could not be inferred" \
+        if @upstream == 0
+      
+      upstream = infer[@upstream].resolve!(infer)
+      upstream = upstream.intersect(explicit).override_cap(explicit) if explicit
+      upstream
     end
     
     def set_explicit(explicit_pos : Source::Pos, explicit : MetaType)
@@ -151,11 +153,14 @@ class Mare::Compiler::Infer
     def within_domain!(infer : Infer, pos : Source::Pos, constraint : MetaType, aliased : Bool)
       if @explicit
         explicit = @explicit.not_nil!
-        meta_type_within_domain!(explicit, infer, pos, constraint, aliased)
-        return # if we have an explicit type, ignore the upstream
+        if explicit.cap_only?
+          meta_type_within_domain!(resolve!(infer), infer, pos, constraint, aliased)
+        else
+          meta_type_within_domain!(explicit, infer, pos, constraint, aliased)
+        end
+      else
+        infer[@upstream].within_domain!(infer, pos, constraint, aliased)
       end
-      
-      infer[@upstream].within_domain!(infer, pos, constraint, aliased)
     end
     
     def assign(infer : Infer, tid : TID)
@@ -180,13 +185,15 @@ class Mare::Compiler::Infer
     end
     
     def resolve!(infer : Infer)
-      return @explicit.not_nil! if @explicit
+      explicit = @explicit
+      return explicit.not_nil! if explicit && !explicit.cap_only?
       
-      if @upstream != 0
-        infer[@upstream].resolve!(infer)
-      else
-        Error.at self, "This needs an explicit type; it could not be inferred"
-      end
+      Error.at self, "This needs an explicit type; it could not be inferred" \
+        if @upstream == 0
+      
+      upstream = infer[@upstream].resolve!(infer)
+      upstream.intersect(explicit) if explicit
+      upstream
     end
     
     def set_explicit(explicit_pos : Source::Pos, explicit : MetaType)
@@ -200,11 +207,14 @@ class Mare::Compiler::Infer
     def within_domain!(infer : Infer, pos : Source::Pos, constraint : MetaType, aliased : Bool)
       if @explicit
         explicit = @explicit.not_nil!
-        meta_type_within_domain!(explicit, infer, pos, constraint, aliased)
-        return # if we have an explicit type, ignore the upstream
+        if explicit.cap_only?
+          meta_type_within_domain!(resolve!(infer), infer, pos, constraint, aliased)
+        else
+          meta_type_within_domain!(explicit, infer, pos, constraint, aliased)
+        end
+      else
+        infer[@upstream].within_domain!(infer, pos, constraint, aliased)
       end
-      
-      infer[@upstream].within_domain!(infer, pos, constraint, aliased)
     end
     
     def assign(infer : Infer, tid : TID)

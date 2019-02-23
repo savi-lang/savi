@@ -496,14 +496,14 @@ describe Mare::Compiler::Infer do
     
     actor Main:
       new:
-        c1 C'ref = C.new
+        c1 ref = C.new
         c2 C'iso = c1
     SOURCE
     
     expected = <<-MSG
     This type is outside of a constraint: C:
     from (example):5:
-        c1 C'ref = C.new
+        c1 ref = C.new
         ^~
     
     - it must be a subtype of C'iso:
@@ -590,23 +590,23 @@ describe Mare::Compiler::Infer do
     
     actor Main:
       new:
-        x1a X'iso = X.new
-        x1b X'iso = --x1a // okay
+        x1a iso = X.new
+        x1b iso = --x1a // okay
         
-        x2a X'iso = X.new
-        x2b X'iso = x2a
+        x2a iso = X.new
+        x2b iso = x2a
     SOURCE
     
     expected = <<-MSG
     This type (when aliased) is outside of a constraint: X'tag:
     from (example):9:
-        x2a X'iso = X.new
+        x2a iso = X.new
         ^~~
     
-    - it must be a subtype of X'iso:
+    - it must be a subtype of iso:
       from (example):10:
-        x2b X'iso = x2a
-            ^~~~~
+        x2b iso = x2a
+            ^~~
     
     - this would be allowed if this reference didn't get aliased
     - did you forget to consume the reference?
@@ -626,10 +626,10 @@ describe Mare::Compiler::Infer do
       new:
         @example(X.new) // okay
         
-        x1 X'iso = X.new
+        x1 iso = X.new
         @example(--x1)
         
-        x2 X'iso = X.new
+        x2 iso = X.new
         @example(x2)
       
       fun example (x X'iso):
@@ -638,7 +638,7 @@ describe Mare::Compiler::Infer do
     expected = <<-MSG
     This type (when aliased) is outside of a constraint: X'tag:
     from (example):11:
-        x2 X'iso = X.new
+        x2 iso = X.new
         ^~
     
     - it must be a subtype of X'iso:

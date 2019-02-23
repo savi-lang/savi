@@ -58,7 +58,14 @@ struct Mare::Compiler::Infer::MetaType
   end
   
   def override_cap(name : String)
-    cap = Capability.new(name)
+    override_cap(Capability.new(name))
+  end
+  
+  def override_cap(meta_type : MetaType)
+    override_cap(meta_type.inner.as(Capability))
+  end
+  
+  def override_cap(cap : Capability)
     inner = @inner
     MetaType.new(
       case inner
@@ -78,6 +85,10 @@ struct Mare::Compiler::Infer::MetaType
   
   def alias
     MetaType.new(inner.alias)
+  end
+  
+  def cap_only?
+    @inner.is_a?(Capability)
   end
   
   def within_constraints?(types : Iterable(MetaType))

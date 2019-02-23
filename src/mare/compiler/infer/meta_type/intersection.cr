@@ -250,7 +250,10 @@ struct Mare::Compiler::Infer::MetaType::Intersection
   end
   
   def subtype_of?(other : Capability) : Bool
-    raise NotImplementedError.new([self, :subtype_of?, other].inspect)
+    # This intersection is a subtype of the given capability if and only if
+    # it has a capability as part of the intersection, and that capability
+    # is a subtype of the given capability.
+    cap.try(&.subtype_of?(other)) || false
   end
   
   def supertype_of?(other : Capability) : Bool
