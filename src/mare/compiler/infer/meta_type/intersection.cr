@@ -241,6 +241,14 @@ struct Mare::Compiler::Infer::MetaType::Intersection
     other.unite(self) # delegate to the "higher" class via commutativity
   end
   
+  def ephemeralize
+    Intersection.new(cap.try(&.ephemeralize), terms, anti_terms)
+  end
+  
+  def alias
+    Intersection.new(cap.try(&.alias), terms, anti_terms)
+  end
+  
   def subtype_of?(other : Capability) : Bool
     raise NotImplementedError.new([self, :subtype_of?, other].inspect)
   end

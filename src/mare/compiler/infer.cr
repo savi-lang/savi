@@ -125,10 +125,17 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     @ret_tid = func.ident.tid
     
     # Take note of the return type constraint if given.
-    func.ret.try do |ret_t|
-      ret_t.accept(self)
-      meta_type = resolve(ret_t)
-      self[ret_tid].as(Local).set_explicit(ret_t.pos, meta_type)
+    # For constructors, this is the self type and listed receiver cap.
+    if func.has_tag?(:constructor)
+      meta_type = MetaType.new(@self_type, func.cap.not_nil!.value)
+      meta_type = meta_type.ephemeralize # a constructor returns the ephemeral
+      self[ret_tid].as(Local).set_explicit(func.cap.not_nil!.pos, meta_type)
+    else
+      func.ret.try do |ret_t|
+        ret_t.accept(self)
+        meta_type = resolve(ret_t)
+        self[ret_tid].as(Local).set_explicit(ret_t.pos, meta_type)
+      end
     end
     
     # Don't bother further typechecking functions that have no body
@@ -507,6 +514,12 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
   end
   
+  def touch(node : AST::Prefix)
+    raise NotImplementedError.new(node.op.value) unless node.op.value == "--"
+    
+    new_tid(node, Consume.new(node.pos, node.term.tid))
+  end
+  
   def visit_children?(node : AST::Choice)
     false # don't visit children of Choices at the normal time - wait for touch.
   end
@@ -520,7 +533,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       # Each condition in a choice must evaluate to a type of Bool.
       bool = MetaType.new(refer.decl_defn("Bool"))
       cond_info = self[cond]
-      cond_info.within_domain!(self, node.pos, bool)
+      cond_info.within_domain!(self, node.pos, bool, true)
       
       # If we have a type condition as the cond, that implies that it returned
       # true if we are in the body; hence we can apply the type refinement.

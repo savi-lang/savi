@@ -12,7 +12,7 @@
 - [x] - Boxed numeric values
 - [x] - Actors and behaviours
 - [x] - Rcaps (`iso`, `trn`, `val`, `ref`, `box`, `tag`)
-- [ ] - Rcap ephemerality (alias rcaps, ephemeral rcaps, `consume`)
+- [x] - Rcap ephemerality (alias rcaps, ephemeral rcaps, `consume`)
 - [ ] - Rcap viewpoint adaptation
 - [ ] - Generic types and generic rcaps
 - [ ] - Finalizer functions

@@ -45,6 +45,14 @@ class Mare::Compiler::Infer::MetaType::Unconstrained
     self
   end
   
+  def ephemeralize
+    self # no effect
+  end
+  
+  def alias
+    self # no effect
+  end
+  
   def subtype_of?(other : Inner) : Bool
     # Unconstrained is a subtype of nothing - it makes no guarantees at all.
     false

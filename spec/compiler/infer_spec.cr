@@ -583,6 +583,78 @@ describe Mare::Compiler::Infer do
     end
   end
   
+  it "complains when violating uniqueness into a local" do
+    source = Mare::Source.new "(example)", <<-SOURCE
+    class X:
+      new iso new:
+    
+    actor Main:
+      new:
+        x1a X'iso = X.new
+        x1b X'iso = --x1a // okay
+        
+        x2a X'iso = X.new
+        x2b X'iso = x2a
+    SOURCE
+    
+    expected = <<-MSG
+    This type (when aliased) is outside of a constraint: X'tag:
+    from (example):9:
+        x2a X'iso = X.new
+        ^~~
+    
+    - it must be a subtype of X'iso:
+      from (example):10:
+        x2b X'iso = x2a
+            ^~~~~
+    
+    - this would be allowed if this reference didn't get aliased
+    - did you forget to consume the reference?
+    MSG
+    
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :infer)
+    end
+  end
+  
+  it "complains when violating uniqueness into an argument" do
+    source = Mare::Source.new "(example)", <<-SOURCE
+    class X:
+      new iso new:
+    
+    actor Main:
+      new:
+        @example(X.new) // okay
+        
+        x1 X'iso = X.new
+        @example(--x1)
+        
+        x2 X'iso = X.new
+        @example(x2)
+      
+      fun example (x X'iso):
+    SOURCE
+    
+    expected = <<-MSG
+    This type (when aliased) is outside of a constraint: X'tag:
+    from (example):11:
+        x2 X'iso = X.new
+        ^~
+    
+    - it must be a subtype of X'iso:
+      from (example):14:
+      fun example (x X'iso):
+                   ^
+    
+    - this would be allowed if this reference didn't get aliased
+    - did you forget to consume the reference?
+    MSG
+    
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :infer)
+    end
+  end
+  
   it "requires a sub-func to be present in the subtype" do
     source = Mare::Source.new "(example)", <<-SOURCE
     interface Interface:

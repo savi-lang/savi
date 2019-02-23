@@ -52,7 +52,7 @@ module Mare::Parser
     atom = prefixed | parens | string | float | integer | ident
     
     # Define a prefixed term to be preceded by a prefix operator.
-    prefixop = char('~').named(:op)
+    prefixop = (char('~') | str("--")).named(:op)
     prefixed.define (prefixop >> atom).named(:prefix)
     
     # Define a qualified term to be immediately followed by a parens group.

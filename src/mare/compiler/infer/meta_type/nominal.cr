@@ -97,6 +97,14 @@ struct Mare::Compiler::Infer::MetaType::Nominal
     other.unite(self) # delegate to the "higher" class via commutativity
   end
   
+  def ephemeralize
+    self # no effect
+  end
+  
+  def alias
+    self # no effect
+  end
+  
   def subtype_of?(other : Capability) : Bool
     # A nominal can never be a subtype of any capability -
     # it specifies a single nominal, and says nothing about capabilities.

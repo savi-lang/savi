@@ -45,6 +45,14 @@ class Mare::Compiler::Infer::MetaType::Unsatisfiable
     other
   end
   
+  def ephemeralize
+    self # no effect
+  end
+  
+  def alias
+    self # no effect
+  end
+  
   def subtype_of?(other : Inner) : Bool
     # Unsatisfiable is a subtype of nothing - it cannot exist at all.
     # TODO: is this right? it seems so, but breaks symmetry with Unconstrained.

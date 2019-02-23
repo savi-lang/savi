@@ -289,6 +289,24 @@ struct Mare::Compiler::Infer::MetaType::Union
     result
   end
   
+  def ephemeralize
+    Union.new(
+      (caps.not_nil!.map(&.ephemeralize).to_set if caps),
+      terms,
+      anti_terms,
+      (intersects.not_nil!.map(&.ephemeralize).to_set if intersects),
+    )
+  end
+  
+  def alias
+    Union.new(
+      (caps.not_nil!.map(&.alias).to_set if caps),
+      terms,
+      anti_terms,
+      (intersects.not_nil!.map(&.alias).to_set if intersects),
+    )
+  end
+  
   def subtype_of?(other : Capability) : Bool
     raise NotImplementedError.new([self, :subtype_of?, other].inspect)
   end

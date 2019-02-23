@@ -12,9 +12,15 @@ class Mare::Error < Exception
   end
   
   def message
-    info.map { |info_pos, info_msg| "\n- #{info_msg}:\n  #{info_pos.show}" }
-      .unshift("#{headline}:\n#{pos.show}")
-      .join("\n")
+    strings = ["#{headline}:\n#{pos.show}\n"]
+    info.each do |info_pos, info_msg|
+      if info_pos == Source::Pos.none
+        strings << "- #{info_msg}"
+      else
+        strings << "- #{info_msg}:\n  #{info_pos.show}\n"
+      end
+    end
+    strings.join("\n").strip
   end
   
   # Raise an error for the given source position, with the given message.

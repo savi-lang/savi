@@ -7,7 +7,42 @@ class Mare::Compiler::Infer
       infer : Infer,
       pos : Source::Pos,
       constraint : MetaType,
+      aliased : Bool,
     )
+    
+    def meta_type_within_domain!(
+      meta_type : MetaType,
+      infer : Infer,
+      pos : Source::Pos,
+      constraint : MetaType,
+      aliased : Bool,
+    )
+      orig_meta_type = meta_type
+      if aliased
+        meta_type = meta_type.alias
+        alias_distinct = meta_type != orig_meta_type
+      end
+      
+      return if meta_type.within_constraints?([constraint])
+      
+      because_of_alias = alias_distinct &&
+        orig_meta_type.not_nil!.within_constraints?([constraint])
+      
+      extra = [{pos, constraint.show}]
+      extra.concat [
+        {Source::Pos.none,
+          "this would be allowed if this reference didn't get aliased"},
+        {Source::Pos.none,
+          "did you forget to consume the reference?"},
+      ] if because_of_alias
+      
+      # TODO: Put the type in parentheses in the early part of the sentence
+      # instead of at the end, where it might be confused as actually being
+      # representative of the constraint that wasn't met.
+      Error.at self,
+        "This type#{" (when aliased)" if alias_distinct} is outside of"\
+        " a constraint: #{meta_type.show_type}", extra
+    end
   end
   
   class Fixed < Info
@@ -20,12 +55,8 @@ class Mare::Compiler::Infer
       @inner
     end
     
-    def within_domain!(infer : Infer, pos : Source::Pos, constraint : MetaType)
-      return if @inner.within_constraints?([constraint])
-      
-      Error.at self,
-        "This type is outside of a constraint: #{@inner.show_type}",
-        [{pos, constraint.show}]
+    def within_domain!(infer : Infer, pos : Source::Pos, constraint : MetaType, aliased : Bool)
+      meta_type_within_domain!(@inner, infer, pos, constraint, aliased)
     end
   end
   
@@ -41,14 +72,10 @@ class Mare::Compiler::Infer
       @inner
     end
     
-    def within_domain!(infer : Infer, pos : Source::Pos, constraint : MetaType)
+    def within_domain!(infer : Infer, pos : Source::Pos, constraint : MetaType, aliased : Bool)
       @domain_constraints << {pos, constraint}
       
-      return if @inner.within_constraints?([constraint])
-      
-      Error.at self,
-        "This type is outside of a constraint: #{@inner.show_type}",
-        [{pos, constraint.show}]
+      meta_type_within_domain!(@inner, infer, pos, constraint, aliased)
     end
   end
   
@@ -79,7 +106,10 @@ class Mare::Compiler::Infer
       @domain
     end
     
-    def within_domain!(infer : Infer, pos : Source::Pos, constraint : MetaType)
+    def within_domain!(infer : Infer, pos : Source::Pos, constraint : MetaType, aliased : Bool)
+      raise "Literal alias distinction not implemented: #{@domain.inspect}" \
+        if aliased && (@domain.alias != @domain)
+      
       @domain = @domain.intersect(constraint).simplify # TODO: maybe simplify just once at the end?
       @domain_constraints << constraint
       @pos_list << pos
@@ -118,25 +148,22 @@ class Mare::Compiler::Infer
       @explicit_pos = explicit_pos
     end
     
-    def within_domain!(infer : Infer, pos : Source::Pos, constraint : MetaType)
+    def within_domain!(infer : Infer, pos : Source::Pos, constraint : MetaType, aliased : Bool)
       if @explicit
-        if !@explicit.not_nil!.within_constraints?([constraint])
-          Error.at self,
-            "This type is outside of a constraint: #{@explicit.try(&.show_type)}",
-            [{pos, constraint.show}]
-        else
-          return # explicit was okay, and we ignore upstream
-        end
+        explicit = @explicit.not_nil!
+        meta_type_within_domain!(explicit, infer, pos, constraint, aliased)
+        return # if we have an explicit type, ignore the upstream
       end
       
-      infer[@upstream].within_domain!(infer, pos, constraint)
+      infer[@upstream].within_domain!(infer, pos, constraint, aliased)
     end
     
     def assign(infer : Infer, tid : TID)
       infer[tid].within_domain!(
         infer,
         @explicit_pos.not_nil!,
-        @explicit.not_nil!
+        @explicit.not_nil!,
+        true,
       ) if @explicit
       
       raise "already assigned an upstream" if @upstream != 0
@@ -170,25 +197,22 @@ class Mare::Compiler::Infer
       @explicit_pos = explicit_pos
     end
     
-    def within_domain!(infer : Infer, pos : Source::Pos, constraint : MetaType)
+    def within_domain!(infer : Infer, pos : Source::Pos, constraint : MetaType, aliased : Bool)
       if @explicit
-        if !@explicit.not_nil!.within_constraints?([constraint])
-          Error.at self,
-            "This type is outside of a constraint: #{@explicit.try(&.show_type)}",
-            [{pos, constraint.show}]
-        else
-          return # explicit was okay, and we ignore upstream
-        end
+        explicit = @explicit.not_nil!
+        meta_type_within_domain!(explicit, infer, pos, constraint, aliased)
+        return # if we have an explicit type, ignore the upstream
       end
       
-      infer[@upstream].within_domain!(infer, pos, constraint)
+      infer[@upstream].within_domain!(infer, pos, constraint, aliased)
     end
     
     def assign(infer : Infer, tid : TID)
       infer[tid].within_domain!(
         infer,
         @explicit_pos.not_nil!,
-        @explicit.not_nil!
+        @explicit.not_nil!,
+        true
       ) if @explicit
       
       raise "already assigned an upstream" if @upstream != 0
@@ -227,14 +251,14 @@ class Mare::Compiler::Infer
       @explicit_pos = explicit_pos
     end
     
-    def within_domain!(infer : Infer, pos : Source::Pos, constraint : MetaType)
-      if @explicit && !@explicit.not_nil!.within_constraints?([constraint])
-        Error.at self,
-          "This type is outside of a constraint: #{@explicit.try(&.show_type)}",
-          [{pos, constraint.show}]
+    def within_domain!(infer : Infer, pos : Source::Pos, constraint : MetaType, aliased : Bool)
+      if @explicit
+        explicit = @explicit.not_nil!
+        meta_type_within_domain!(explicit, infer, pos, constraint, aliased)
+        return # if we have an explicit type, ignore the upstream
       end
       
-      @downstreamed_pos ||=pos
+      @downstreamed_pos ||= pos
       ds = @downstreamed
       if ds
         @downstreamed = ds.intersect(constraint).simplify # TODO: maybe simplify just once at the end?
@@ -242,25 +266,28 @@ class Mare::Compiler::Infer
         @downstreamed = constraint
       end
       
-      infer[@upstream].within_domain!(infer, pos, constraint) if @upstream != 0
+      infer[@upstream].within_domain!(infer, pos, constraint, aliased) \
+        if @upstream != 0
     end
     
     def verify_arg(infer : Infer, arg_infer : Infer, arg_tid : TID)
       arg = arg_infer[arg_tid]
-      arg.within_domain!(arg_infer, @pos, resolve!(infer))
+      arg.within_domain!(arg_infer, @pos, resolve!(infer), true)
     end
     
     def assign(infer : Infer, tid : TID)
       infer[tid].within_domain!(
         infer,
         @explicit_pos.not_nil!,
-        @explicit.not_nil!
+        @explicit.not_nil!,
+        true,
       ) if @explicit
       
       infer[tid].within_domain!(
         infer,
         @downstreamed_pos.not_nil!,
-        @downstreamed.not_nil!
+        @downstreamed.not_nil!,
+        true,
       ) if @downstreamed
       
       raise "already assigned an upstream" if @upstream != 0
@@ -278,8 +305,8 @@ class Mare::Compiler::Infer
       MetaType.new_union(clauses.map { |tid| infer[tid].resolve!(infer) })
     end
     
-    def within_domain!(infer : Infer, pos : Source::Pos, constraint : MetaType)
-      clauses.each { |tid| infer[tid].within_domain!(infer, pos, constraint) }
+    def within_domain!(infer : Infer, pos : Source::Pos, constraint : MetaType, aliased : Bool)
+      clauses.each { |tid| infer[tid].within_domain!(infer, pos, constraint, aliased) }
     end
   end
   
@@ -296,12 +323,8 @@ class Mare::Compiler::Infer
       @bool
     end
     
-    def within_domain!(infer : Infer, pos : Source::Pos, constraint : MetaType)
-      return if @bool.within_constraints?([constraint])
-      
-      Error.at self,
-        "This type is outside of a constraint: #{@bool.show_type}",
-        [{pos, constraint.show}]
+    def within_domain!(infer : Infer, pos : Source::Pos, constraint : MetaType, aliased : Bool)
+      meta_type_within_domain!(@bool, infer, pos, constraint, aliased)
     end
   end
   
@@ -316,12 +339,23 @@ class Mare::Compiler::Infer
       infer[@refine_tid].resolve!(infer).intersect(@refine_type)
     end
     
-    def within_domain!(infer : Infer, pos : Source::Pos, constraint : MetaType)
-      return if resolve!(infer).within_constraints?([constraint])
-      
-      Error.at self,
-        "This type is outside of a constraint: #{@refine_type.show_type}",
-        [{pos, constraint.show}]
+    def within_domain!(infer : Infer, pos : Source::Pos, constraint : MetaType, aliased : Bool)
+      meta_type_within_domain!(resolve!(infer), infer, pos, constraint, aliased)
+    end
+  end
+  
+  class Consume < Info
+    getter local_tid : TID
+    
+    def initialize(@pos, @local_tid)
+    end
+    
+    def resolve!(infer : Infer)
+      infer[@local_tid].resolve!(infer).ephemeralize
+    end
+    
+    def within_domain!(infer : Infer, pos : Source::Pos, constraint : MetaType, aliased : Bool)
+      meta_type_within_domain!(resolve!(infer), infer, pos, constraint, aliased)
     end
   end
   
@@ -342,7 +376,9 @@ class Mare::Compiler::Infer
       @ret.not_nil!
     end
     
-    def within_domain!(infer : Infer, pos : Source::Pos, constraint : MetaType)
+    def within_domain!(infer : Infer, pos : Source::Pos, constraint : MetaType, aliased : Bool)
+      raise NotImplementedError.new("within_domain! with aliased = false") \
+        unless aliased
       @domain_constraints << constraint
       @pos_list << pos
       verify_constraints! if @ret
@@ -356,6 +392,7 @@ class Mare::Compiler::Infer
     
     private def verify_constraints!
       ret = @ret.not_nil!
+      ret = ret.alias
       return if ret.within_constraints?(@domain_constraints)
       
       Error.at self, "This return value is outside of its constraints",

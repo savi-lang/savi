@@ -72,6 +72,14 @@ struct Mare::Compiler::Infer::MetaType
     )
   end
   
+  def ephemeralize
+    MetaType.new(inner.ephemeralize)
+  end
+  
+  def alias
+    MetaType.new(inner.alias)
+  end
+  
   def within_constraints?(types : Iterable(MetaType))
     self < self.class.new_intersection(types)
   end

@@ -4,13 +4,15 @@ struct Mare::Compiler::Infer::MetaType::Capability
   def initialize(@name)
   end
   
-  ISO = new("iso"); def self.iso; ISO end
-  TRN = new("trn"); def self.trn; TRN end
-  REF = new("ref"); def self.ref; REF end
-  VAL = new("val"); def self.val; VAL end
-  BOX = new("box"); def self.box; BOX end
-  TAG = new("tag"); def self.tag; TAG end
-  NON = new("non"); def self.non; NON end
+  ISO_EPH = new("iso+"); def self.iso_eph; ISO_EPH end
+  ISO     = new("iso");  def self.iso;     ISO     end
+  TRN_EPH = new("trn+"); def self.trn_eph; TRN_EPH end
+  TRN     = new("trn");  def self.trn;     TRN     end
+  REF     = new("ref");  def self.ref;     REF     end
+  VAL     = new("val");  def self.val;     VAL     end
+  BOX     = new("box");  def self.box;     BOX     end
+  TAG     = new("tag");  def self.tag;     TAG     end
+  NON     = new("non");  def self.non;     NON     end
   
   def inspect(io : IO)
     io << name
@@ -86,23 +88,35 @@ struct Mare::Compiler::Infer::MetaType::Capability
   
   def subtype_of?(other : Capability) : Bool
     ##
-    # Reference capability subtyping can be visualized using this chart,
+    # Reference capability subtyping can be visualized using this graph,
     # wherein leftward caps are subtypes of caps that appear to their right,
-    # with ISO being a subtype of all, and NON being a supertype of all.
-    #              / REF \
-    # ISO <: TRN <:       <: BOX <: TAG <: NON
-    #              \ VAL /
+    # with ISO+ being a subtype of all, and NON being a supertype of all.
+    #
+    # Non-ephemeral ISO and TRN are supertypes of their ephemeral counterparts,
+    # and they are the direct subtypes of TAG and BOX, respectively.
+    #
+    # See George Steed's paper, "A Principled Design of Capabilities in Pony":
+    # > https://www.imperial.ac.uk/media/imperial-college/faculty-of-engineering/computing/public/GeorgeSteed.pdf
+    #
+    #                / REF \
+    # ISO+ <: TRN+ <:       <: BOX <: TAG <: NON
+    #  ^       ^     \ VAL /    |      |
+    #  |       |                |      |
+    #  |      TRN  <: ----------/      |
+    # ISO  <: -------------------------/
     
     # A capability always counts as a subtype of itself.
     return true if self == other
     
-    # Otherwise, try to implement the rest of truth table in a readable way.
+    # Otherwise, check the truth table corresponding to the subtyping graph.
     case self
-    when ISO # TODO: Take capability ephemerality into account.
+    when ISO_EPH
       true
-    when TRN # TODO: Take capability ephemerality into account.
-      other != ISO
-    when REF, VAL
+    when TRN_EPH
+      other != ISO_EPH && other != ISO
+    when ISO
+      TAG == other
+    when TRN, REF, VAL
       BOX == other || TAG == other || NON == other
     when BOX
       TAG == other || NON == other
@@ -111,7 +125,7 @@ struct Mare::Compiler::Infer::MetaType::Capability
     when NON
       false
     else
-      raise NotImplementedError.new("#{self} < #{other}")
+      raise NotImplementedError.new("#{self} <: #{other}")
     end
   end
   
@@ -125,5 +139,30 @@ struct Mare::Compiler::Infer::MetaType::Capability
   
   def supertype_of?(other : (Nominal | AntiNominal | Intersection | Union | Unconstrained | Unsatisfiable)) : Bool
     other.subtype_of?(self) # delegate to the other class via symmetry
+  end
+  
+  def ephemeralize
+    # ISO and TRN are the only capabilities which distinguish ephemerality,
+    # because they are the only ones that care about reference uniqueness.
+    case self
+    when ISO then ISO_EPH
+    when TRN then TRN_EPH
+    else self
+    end
+  end
+  
+  def alias
+    case self
+    # The alias of an ISO+ or TRN+ is the non-ephemeral counterpart of it.
+    when ISO_EPH then ISO
+    when TRN_EPH then TRN
+    # The alias of an ISO or TRN is the degradation of it that can only do
+    # the things not explicitly denied by the uniqueness constraints of them.
+    # That is, the alias of ISO (read+write unique) cannot read nor write (TAG),
+    # and the alias of TRN (write unique) can only read and not write (BOX).
+    when ISO then TAG
+    when TRN then BOX
+    else self
+    end
   end
 end
