@@ -165,4 +165,130 @@ struct Mare::Compiler::Infer::MetaType::Capability
     else self
     end
   end
+  
+  def viewed_from(origin : Capability) : Capability
+    ##
+    # Non-extracting viewpoint adaptation table, with columns representing the
+    # capability of the field, and rows representing the origin capability:
+    #        ISO  TRN  REF  VAL  BOX  TAG  NON
+    #      ------------------------------------
+    # ISO+ | ISO+ ISO+ ISO+ VAL  VAL  TAG  NON
+    # ISO  | ISO  ISO  ISO  VAL  TAG  TAG  NON
+    # TRN+ | ISO+ TRN+ TRN+ VAL  VAL  TAG  NON
+    # TRN  | ISO  TRN  TRN  VAL  BOX  TAG  NON
+    # REF  | ISO  TRN  REF  VAL  BOX  TAG  NON
+    # VAL  | VAL  VAL  VAL  VAL  VAL  TAG  NON
+    # BOX  | TAG  BOX  BOX  VAL  BOX  TAG  NON
+    # TAG  | NON  NON  NON  NON  NON  NON  NON
+    # NON  | NON  NON  NON  NON  NON  NON  NON
+    #
+    # See George Steed's paper, "A Principled Design of Capabilities in Pony":
+    # > https://www.imperial.ac.uk/media/imperial-college/faculty-of-engineering/computing/public/GeorgeSteed.pdf
+    
+    case origin
+    when TAG, NON then return NON
+    end
+    
+    case self
+    when TAG, NON then return self
+    end
+    
+    case origin
+    when ISO_EPH
+      case self
+      when ISO, TRN, REF then ISO_EPH
+      when VAL, BOX      then VAL
+      else raise NotImplementedError.new(self.inspect)
+      end
+    when ISO
+      case self
+      when ISO, TRN, REF then ISO
+      when VAL           then VAL
+      when BOX           then TAG
+      else raise NotImplementedError.new(self.inspect)
+      end
+    when TRN_EPH
+      case self
+      when ISO      then ISO_EPH
+      when TRN, REF then TRN_EPH
+      when VAL, BOX then VAL
+      else raise NotImplementedError.new(self.inspect)
+      end
+    when TRN
+      case self
+      when ISO      then ISO
+      when TRN, REF then TRN
+      when BOX      then BOX
+      when VAL      then VAL
+      else raise NotImplementedError.new(self.inspect)
+      end
+    when REF then self
+    when VAL then VAL
+    when BOX
+      case self
+      when VAL           then VAL
+      when TRN, REF, BOX then BOX
+      when ISO           then TAG
+      else raise NotImplementedError.new(self.inspect)
+      end
+    else raise NotImplementedError.new(origin.inspect)
+    end
+  end
+  
+  def extracted_from(origin : Capability) : Capability
+    ##
+    # Extracting viewpoint adaptation table, with columns representing the
+    # capability of the field, and rows representing the origin capability:
+    #        ISO  TRN  REF  VAL  BOX  TAG  NON
+    #      ------------------------------------
+    # ISO+ | ISO+ ISO+ ISO+ VAL  VAL  TAG  NON
+    # ISO  | ISO+ VAL  TAG  VAL  TAG  TAG  NON
+    # TRN+ | ISO+ TRN+ TRN+ VAL  VAL  TAG  NON
+    # TRN  | ISO+ VAL  BOX  VAL  BOX  TAG  NON
+    # REF  | ISO+ TRN+ REF  VAL  BOX  TAG  NON
+    #
+    # See George Steed's paper, "A Principled Design of Capabilities in Pony":
+    # > https://www.imperial.ac.uk/media/imperial-college/faculty-of-engineering/computing/public/GeorgeSteed.pdf
+    
+    case origin
+    when VAL, BOX, TAG, NON then
+      raise "can't extract from non-writable cap #{origin}"
+    end
+    
+    case self
+    when TAG, NON then return self
+    end
+    
+    case origin
+    when ISO_EPH
+      case self
+      when ISO, TRN, REF then ISO_EPH
+      when VAL, BOX      then VAL
+      else raise NotImplementedError.new(self.inspect)
+      end
+    when ISO
+      case self
+      when ISO      then ISO_EPH
+      when TRN, VAL then VAL
+      when REF, BOX then TAG
+      else raise NotImplementedError.new(self.inspect)
+      end
+    when TRN_EPH
+      case self
+      when ISO      then ISO_EPH
+      when TRN, REF then TRN_EPH
+      when VAL, BOX then VAL
+      else raise NotImplementedError.new(self.inspect)
+      end
+    when TRN
+      case self
+      when ISO      then ISO_EPH
+      when TRN, VAL then VAL
+      when REF, BOX then BOX
+      else raise NotImplementedError.new(self.inspect)
+      end
+    when REF then self.ephemeralize
+    else raise NotImplementedError.new(origin.inspect)
+    end
+  end
 end
