@@ -188,7 +188,7 @@ describe Mare::Compiler::Completeness do
     - if this constraint were specified as `tag` or lower it would not grant field access:
       from (example):2:
       fun data (d Data):
-                ^
+                  ^~~~
     
     - this field didn't get initialized:
       from (example):7:

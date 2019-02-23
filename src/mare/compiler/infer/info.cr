@@ -131,7 +131,6 @@ class Mare::Compiler::Infer
   
   class Local < Info # TODO: dedup implementation with Field
     @explicit : MetaType?
-    @explicit_pos : Source::Pos?
     @upstream : TID = 0
     
     def initialize(@pos)
@@ -154,7 +153,7 @@ class Mare::Compiler::Infer
       raise "shouldn't have an upstream yet" if @upstream != 0
       
       @explicit = explicit
-      @explicit_pos = explicit_pos
+      @pos = explicit_pos
     end
     
     def within_domain!(infer : Infer, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliased : Bool)
@@ -174,7 +173,7 @@ class Mare::Compiler::Infer
       infer[rhs_tid].within_domain!(
         infer,
         rhs_pos,
-        @explicit_pos.not_nil!,
+        @pos,
         @explicit.not_nil!,
         true,
       ) if @explicit
@@ -186,7 +185,6 @@ class Mare::Compiler::Infer
   
   class Field < Info # TODO: dedup implementation with Local
     @explicit : MetaType?
-    @explicit_pos : Source::Pos?
     @upstream : TID = 0
     
     def initialize(@pos)
@@ -209,7 +207,7 @@ class Mare::Compiler::Infer
       raise "shouldn't have an upstream yet" if @upstream != 0
       
       @explicit = explicit
-      @explicit_pos = explicit_pos
+      @pos = explicit_pos
     end
     
     def within_domain!(infer : Infer, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliased : Bool)
@@ -229,7 +227,7 @@ class Mare::Compiler::Infer
       infer[rhs_tid].within_domain!(
         infer,
         rhs_pos,
-        @explicit_pos.not_nil!,
+        @pos,
         @explicit.not_nil!,
         true
       ) if @explicit
@@ -241,7 +239,6 @@ class Mare::Compiler::Infer
   
   class Param < Info
     @explicit : MetaType?
-    @explicit_pos : Source::Pos?
     @downstreamed : MetaType?
     @downstreamed_pos : Source::Pos?
     @upstream : TID = 0
@@ -267,7 +264,7 @@ class Mare::Compiler::Infer
       raise "already have an upstream" if @upstream != 0
       
       @explicit = explicit
-      @explicit_pos = explicit_pos
+      @pos = explicit_pos
     end
     
     def within_domain!(infer : Infer, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliased : Bool)
@@ -298,7 +295,7 @@ class Mare::Compiler::Infer
       infer[rhs_tid].within_domain!(
         infer,
         rhs_pos,
-        @explicit_pos.not_nil!,
+        @pos,
         @explicit.not_nil!,
         true,
       ) if @explicit

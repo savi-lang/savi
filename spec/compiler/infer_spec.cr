@@ -341,7 +341,7 @@ describe Mare::Compiler::Infer do
     - the expression has a type of (U64 | None):
       from (example):3:
         x (U64 | None) = 42
-        ^
+          ^~~~~~~~~~~~
     
     - it must be a subtype of U64:
       from (example):4:
@@ -529,7 +529,7 @@ describe Mare::Compiler::Infer do
     - the expression has a type of C:
       from (example):5:
         c1 ref = C.new
-        ^~
+           ^~~
     
     - it must be a subtype of C'iso:
       from (example):6:
@@ -631,7 +631,7 @@ describe Mare::Compiler::Infer do
     - the expression (when aliased) has a type of X'tag:
       from (example):9:
         x2a iso = X.new
-        ^~~
+            ^~~
     
     - it must be a subtype of iso:
       from (example):10:
@@ -674,12 +674,12 @@ describe Mare::Compiler::Infer do
     - the expression (when aliased) has a type of X'tag:
       from (example):11:
         x2 iso = X.new
-        ^~
+           ^~~
     
     - it must be a subtype of X'iso:
       from (example):14:
       fun example (x X'iso):
-                   ^
+                     ^~~~~
     
     - this would be allowed if this reference didn't get aliased
     - did you forget to consume the reference?
