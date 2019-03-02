@@ -245,6 +245,10 @@ struct Mare::Compiler::Infer::MetaType::Intersection
     Intersection.new(cap.try(&.ephemeralize), terms, anti_terms)
   end
   
+  def strip_ephemeral
+    Intersection.new(cap.try(&.strip_ephemeral), terms, anti_terms)
+  end
+  
   def alias
     Intersection.new(cap.try(&.alias), terms, anti_terms)
   end

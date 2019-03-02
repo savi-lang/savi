@@ -83,6 +83,10 @@ struct Mare::Compiler::Infer::MetaType
     MetaType.new(inner.ephemeralize)
   end
   
+  def strip_ephemeral
+    MetaType.new(inner.strip_ephemeral)
+  end
+  
   def alias
     MetaType.new(inner.alias)
   end

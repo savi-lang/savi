@@ -611,21 +611,21 @@ describe Mare::Compiler::Infer do
   it "complains when violating uniqueness into a local" do
     source = Mare::Source.new "(example)", <<-SOURCE
     class X:
-      new iso new:
+      new iso:
     
     actor Main:
       new:
         x1a iso = X.new
-        x1b iso = --x1a // okay
+        x1b val = --x1a // okay
         
         x2a iso = X.new
-        x2b iso = x2a
+        x2b val = x2a // not okay
     SOURCE
     
     expected = <<-MSG
     This expression doesn't meet the type constraints imposed on it:
     from (example):10:
-        x2b iso = x2a
+        x2b val = x2a // not okay
                   ^~~
     
     - the expression (when aliased) has a type of X'tag:
@@ -633,9 +633,9 @@ describe Mare::Compiler::Infer do
         x2a iso = X.new
             ^~~
     
-    - it must be a subtype of iso:
+    - it must be a subtype of val:
       from (example):10:
-        x2b iso = x2a
+        x2b val = x2a // not okay
             ^~~
     
     - this would be allowed if this reference didn't get aliased
@@ -650,25 +650,25 @@ describe Mare::Compiler::Infer do
   it "complains when violating uniqueness into an argument" do
     source = Mare::Source.new "(example)", <<-SOURCE
     class X:
-      new iso new:
+      new iso:
     
     actor Main:
       new:
         @example(X.new) // okay
         
         x1 iso = X.new
-        @example(--x1)
+        @example(--x1) // okay
         
         x2 iso = X.new
-        @example(x2)
+        @example(x2) // not okay
       
-      fun example (x X'iso):
+      fun example (x X'val):
     SOURCE
     
     expected = <<-MSG
     This expression doesn't meet the type constraints imposed on it:
     from (example):12:
-        @example(x2)
+        @example(x2) // not okay
                  ^~
     
     - the expression (when aliased) has a type of X'tag:
@@ -676,10 +676,47 @@ describe Mare::Compiler::Infer do
         x2 iso = X.new
            ^~~
     
-    - it must be a subtype of X'iso:
+    - it must be a subtype of X'val:
       from (example):14:
-      fun example (x X'iso):
+      fun example (x X'val):
                      ^~~~~
+    
+    - this would be allowed if this reference didn't get aliased
+    - did you forget to consume the reference?
+    MSG
+    
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :infer)
+    end
+  end
+  
+  it "strips the ephemeral modifier from the capability of an inferred local" do
+    source = Mare::Source.new "(example)", <<-SOURCE
+    class X:
+      new iso:
+    
+    actor Main:
+      new:
+        x = X.new // inferred as X'iso+, stripped to X'iso
+        x2 iso = x // not okay, but would work if not for the above stripping
+        x3 iso = x // not okay, but would work if not for the above stripping
+    SOURCE
+    
+    expected = <<-MSG
+    This expression doesn't meet the type constraints imposed on it:
+    from (example):7:
+        x2 iso = x // not okay, but would work if not for the above stripping
+                 ^
+    
+    - the expression (when aliased) has a type of X'tag:
+      from (example):6:
+        x = X.new // inferred as X'iso+, stripped to X'iso
+              ^~~
+    
+    - it must be a subtype of iso:
+      from (example):7:
+        x2 iso = x // not okay, but would work if not for the above stripping
+           ^~~
     
     - this would be allowed if this reference didn't get aliased
     - did you forget to consume the reference?

@@ -105,6 +105,10 @@ struct Mare::Compiler::Infer::MetaType::AntiNominal
     self # no effect
   end
   
+  def strip_ephemeral
+    self # no effect
+  end
+  
   def alias
     self # no effect
   end

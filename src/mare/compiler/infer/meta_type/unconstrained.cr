@@ -49,6 +49,10 @@ class Mare::Compiler::Infer::MetaType::Unconstrained
     self # no effect
   end
   
+  def strip_ephemeral
+    self # no effect
+  end
+  
   def alias
     self # no effect
   end

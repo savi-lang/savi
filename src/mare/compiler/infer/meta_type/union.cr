@@ -298,6 +298,15 @@ struct Mare::Compiler::Infer::MetaType::Union
     )
   end
   
+  def strip_ephemeral
+    Union.new(
+      (caps.not_nil!.map(&.strip_ephemeral).to_set if caps),
+      terms,
+      anti_terms,
+      (intersects.not_nil!.map(&.strip_ephemeral).to_set if intersects),
+    )
+  end
+  
   def alias
     Union.new(
       (caps.not_nil!.map(&.alias).to_set if caps),

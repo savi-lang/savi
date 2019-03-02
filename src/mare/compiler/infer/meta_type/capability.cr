@@ -151,6 +151,16 @@ struct Mare::Compiler::Infer::MetaType::Capability
     end
   end
   
+  def strip_ephemeral
+    # ISO and TRN are the only capabilities which distinguish ephemerality,
+    # because they are the only ones that care about reference uniqueness.
+    case self
+    when ISO_EPH then ISO
+    when TRN_EPH then TRN
+    else self
+    end
+  end
+  
   def alias
     case self
     # The alias of an ISO+ or TRN+ is the non-ephemeral counterpart of it.
