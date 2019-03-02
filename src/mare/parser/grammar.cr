@@ -68,10 +68,10 @@ module Mare::Parser
     # Define groups of operators, in order of precedence,
     # from most tightly binding to most loosely binding.
     # Operators in the same group have the same level of precedence.
-    opcap = (char('\'')).named(:op)
+    opcap = (char('\'') | str("->") | str("+>")).named(:op)
     op2 = (char('.')).named(:op)
     op3 = (char('*') | char('/') | char('%')).named(:op)
-    op4 = (char('+') | char('-')).named(:op)
+    op4 = ((char('+') | char('-')) >> ~char('>')).named(:op)
     op5 = (str("..") | str("<>")).named(:op)
     op6 = (str("<|>") | str("<~>") | str("<<<") | str(">>>") |
             str("<<~") | str("~>>") | str("<<") | str(">>") |

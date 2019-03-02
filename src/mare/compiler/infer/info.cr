@@ -185,8 +185,30 @@ class Mare::Compiler::Infer
   class Field < Info # TODO: dedup implementation with Local
     @explicit : MetaType?
     @upstream : TID = 0
+    getter origin : MetaType
     
-    def initialize(@pos)
+    def initialize(@pos, @origin)
+    end
+    
+    def read
+      Read.new(self)
+    end
+    
+    class Read < Info
+      def initialize(@field : Field)
+      end
+      
+      def pos
+        @field.pos
+      end
+      
+      def resolve!(infer : Infer)
+        @field.resolve!(infer).viewed_from(@field.origin)
+      end
+      
+      def within_domain!(infer : Infer, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliased : Bool)
+        meta_type_within_domain!(resolve!(infer), use_pos, constraint_pos, constraint, aliased)
+      end
     end
     
     def resolve!(infer : Infer)

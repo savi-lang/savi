@@ -109,6 +109,14 @@ struct Mare::Compiler::Infer::MetaType::Nominal
     self # no effect
   end
   
+  def viewed_from(origin)
+    raise NotImplementedError.new("#{origin.inspect}->#{self.inspect}")
+  end
+  
+  def extracted_from(origin)
+    raise NotImplementedError.new("#{origin.inspect}+>#{self.inspect}")
+  end
+  
   def subtype_of?(other : Capability) : Bool
     # A nominal can never be a subtype of any capability -
     # it specifies a single nominal, and says nothing about capabilities.

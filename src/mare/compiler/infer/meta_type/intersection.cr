@@ -253,6 +253,20 @@ struct Mare::Compiler::Infer::MetaType::Intersection
     Intersection.new(cap.try(&.alias), terms, anti_terms)
   end
   
+  def viewed_from(origin)
+    raise NotImplementedError.new("#{origin.inspect}->(nil cap)") unless cap
+    
+    Intersection.new(Capability::NON, terms, anti_terms)
+      .intersect(cap.not_nil!.viewed_from(origin))
+  end
+  
+  def extracted_from(origin)
+    raise NotImplementedError.new("#{origin.inspect}+>(nil cap)") unless cap
+    
+    Intersection.new(Capability::NON, terms, anti_terms)
+      .intersect(cap.not_nil!.extracted_from(origin))
+  end
+  
   def subtype_of?(other : Capability) : Bool
     # This intersection is a subtype of the given capability if and only if
     # it has a capability as part of the intersection, and that capability

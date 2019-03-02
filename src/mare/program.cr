@@ -156,7 +156,7 @@ class Mare::Program
     property cap : AST::Identifier
     property ident : AST::Identifier
     property params : AST::Group?
-    property ret : AST::Identifier?
+    property ret : AST::Term?
     property body : AST::Group?
     
     property! refer : Compiler::Refer

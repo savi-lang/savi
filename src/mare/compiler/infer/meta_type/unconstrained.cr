@@ -57,6 +57,14 @@ class Mare::Compiler::Infer::MetaType::Unconstrained
     self # no effect
   end
   
+  def viewed_from(origin)
+    raise NotImplementedError.new("#{origin.inspect}->#{self.inspect}")
+  end
+  
+  def extracted_from(origin)
+    raise NotImplementedError.new("#{origin.inspect}+>#{self.inspect}")
+  end
+  
   def subtype_of?(other : Inner) : Bool
     # Unconstrained is a subtype of nothing - it makes no guarantees at all.
     false

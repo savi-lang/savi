@@ -8,7 +8,7 @@ module Mare::Compiler::Copy
         # Find the type associated with the "return value" of the "function"
         # and copy the functions from it that we need.
         # TODO: present a nice error by checking with `has_type?` first.
-        source = ctx.program.find_type!(f.ret.not_nil!.value)
+        source = ctx.program.find_type!(f.ret.as(AST::Identifier).value)
         copy_from(source, dest)
       end
     end

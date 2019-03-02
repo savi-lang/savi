@@ -176,6 +176,23 @@ struct Mare::Compiler::Infer::MetaType::Capability
     end
   end
   
+  # def to_generic
+  #   case self
+  #   when ISO_EPH, TRN_EPH
+  #     raise NotImplementedError.new("generic cap of an ephemeral cap")
+  #   when ISO, TRN, REF, VAL
+  #     self
+  #   when BOX
+  #     Union.new([BOX, REF, VAL, TRN].to_set)
+  #   when TAG
+  #     Union.new([TAG, BOX, REF, VAL, ISO, TRN].to_set)
+  #   when NON
+  #     Union.new([NON, TAG, BOX, REF, VAL, ISO, TRN].to_set)
+  #   else
+  #     raise NotImplementedError.new("generic cap of #{self}")
+  #   end
+  # end
+  
   def viewed_from(origin : Capability) : Capability
     ##
     # Non-extracting viewpoint adaptation table, with columns representing the
@@ -245,6 +262,16 @@ struct Mare::Compiler::Infer::MetaType::Capability
     end
   end
   
+  def viewed_from(origin : Union)
+    raise NotImplementedError.new(origin.inspect) \
+      if origin.terms || origin.anti_terms || origin.intersects
+    
+    new_caps =
+      origin.caps.not_nil!.map { |origin_cap| viewed_from(origin_cap) }
+    
+    Union.build(new_caps.to_set)
+  end
+  
   def extracted_from(origin : Capability) : Capability
     ##
     # Extracting viewpoint adaptation table, with columns representing the
@@ -300,5 +327,15 @@ struct Mare::Compiler::Infer::MetaType::Capability
     when REF then self.ephemeralize
     else raise NotImplementedError.new(origin.inspect)
     end
+  end
+  
+  def extracted_from(origin : Union)
+    raise NotImplementedError.new(origin.inspect) \
+      if origin.terms || origin.anti_terms || origin.intersects
+    
+    new_caps =
+      origin.caps.not_nil!.map { |origin_cap| extracted_from(origin_cap) }
+    
+    Union.build(new_caps.to_set)
   end
 end

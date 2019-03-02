@@ -316,6 +316,34 @@ struct Mare::Compiler::Infer::MetaType::Union
     )
   end
   
+  def viewed_from(origin)
+    raise NotImplementedError.new("#{origin.inspect}->#{self.inspect}") \
+      if terms || anti_terms
+    
+    result = Unsatisfiable::INSTANCE
+    caps.not_nil!.each do |cap|
+      result.unite(cap.viewed_from(origin))
+    end if caps
+    intersects.not_nil!.each do |intersect|
+      result.unite(intersect.viewed_from(origin))
+    end if intersects
+    result
+  end
+  
+  def extracted_from(origin)
+    raise NotImplementedError.new("#{origin.inspect}+>#{self.inspect}") \
+      if terms || anti_terms
+    
+    result = Unsatisfiable::INSTANCE
+    caps.not_nil!.each do |cap|
+      result.unite(cap.extracted_from(origin))
+    end if caps
+    intersects.not_nil!.each do |intersect|
+      result.unite(intersect.extracted_from(origin))
+    end if intersects
+    result
+  end
+  
   def subtype_of?(other : Capability) : Bool
     raise NotImplementedError.new([self, :subtype_of?, other].inspect)
   end

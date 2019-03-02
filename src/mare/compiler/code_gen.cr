@@ -536,6 +536,7 @@ class Mare::Compiler::CodeGen
   end
   
   def ffi_type_for(ident)
+    ident = ident.as(AST::Identifier)
     case ident.value
     when "I32"     then @i32
     when "CString" then @ptr

@@ -113,6 +113,14 @@ struct Mare::Compiler::Infer::MetaType::AntiNominal
     self # no effect
   end
   
+  def viewed_from(origin)
+    raise NotImplementedError.new("#{origin.inspect}->#{self.inspect}")
+  end
+  
+  def extracted_from(origin)
+    raise NotImplementedError.new("#{origin.inspect}+>#{self.inspect}")
+  end
+  
   def subtype_of?(other : Capability) : Bool
     # An anti-nominal can never be a subtype of any capability -
     # it excludes a single nominal, and says nothing about capabilities.

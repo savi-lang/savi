@@ -57,6 +57,14 @@ class Mare::Compiler::Infer::MetaType::Unsatisfiable
     self # no effect
   end
   
+  def viewed_from(origin)
+    raise NotImplementedError.new("#{origin.inspect}->#{self.inspect}")
+  end
+  
+  def extracted_from(origin)
+    raise NotImplementedError.new("#{origin.inspect}+>#{self.inspect}")
+  end
+  
   def subtype_of?(other : Inner) : Bool
     # Unsatisfiable is a subtype of nothing - it cannot exist at all.
     # TODO: is this right? it seems so, but breaks symmetry with Unconstrained.

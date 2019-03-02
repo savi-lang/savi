@@ -262,10 +262,15 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   end
   
   def self_tid(pos_node) : TID
-    cap = @func.cap.value
-    cap = "ref" if func.has_tag?(:constructor)
-    
-    new_tid_detached(Self.new(pos_node.pos, MetaType.new(@self_type, cap)))
+    new_tid_detached(Self.new(pos_node.pos, resolved_self))
+  end
+  
+  def resolved_self
+    if func.has_tag?(:constructor)
+      MetaType.new(@self_type, "ref")
+    else
+      MetaType.new(@self_type, @func.cap.value)
+    end
   end
   
   def resolved_receiver
@@ -345,6 +350,12 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     if node.op.value == "'"
       cap = node.rhs.as(AST::Identifier).value
       type_expr(node.lhs).override_cap(cap)
+    elsif node.op.value == "->"
+      # TODO: right-associativity for viewpoint adaptation
+      type_expr(node.rhs).viewed_from(type_expr(node.lhs))
+    elsif node.op.value == "+>"
+      # TODO: right-associativity for viewpoint adaptation
+      type_expr(node.rhs).extracted_from(type_expr(node.lhs))
     else
       raise NotImplementedError.new(node.to_a.inspect)
     end
@@ -463,13 +474,13 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   end
   
   def touch(node : AST::FieldRead)
-    field = Field.new(node.pos)
-    new_tid(node, field)
+    field = Field.new(node.pos, resolved_self)
+    new_tid(node, field.read)
     follow_field(field, node.value)
   end
   
   def touch(node : AST::FieldWrite)
-    field = Field.new(node.pos)
+    field = Field.new(node.pos, resolved_self)
     new_tid(node, field)
     follow_field(field, node.value)
     field.assign(self, node.rhs.tid, node.rhs.pos)

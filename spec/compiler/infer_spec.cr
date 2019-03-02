@@ -727,6 +727,73 @@ describe Mare::Compiler::Infer do
     end
   end
   
+  it "reflects viewpoint adaptation in the return type of a prop getter" do
+    source = Mare::Source.new "(example)", <<-SOURCE
+    class Inner:
+    
+    class Outer:
+      prop inner: Inner.new
+    
+    actor Main:
+      new:
+        outer Outer'box = Outer.new
+        
+        inner_box Inner'box = outer.inner // okay
+        inner_ref Inner     = outer.inner // not okay
+    SOURCE
+    
+    expected = <<-MSG
+    This return value is outside of its constraints:
+    from (example):11:
+        inner_ref Inner     = outer.inner // not okay
+                                    ^~~~~
+    
+    - it must be a subtype of Inner:
+      from (example):11:
+        inner_ref Inner     = outer.inner // not okay
+                  ^~~~~
+    
+    - but it had a return type of Inner'box:
+      from (example):4:
+      prop inner: Inner.new
+           ^~~~~
+    MSG
+    
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :infer)
+    end
+  end
+  
+  it "treats box functions as being implicitly specialized on receiver cap" do
+    source = Mare::Source.new "(example)", <<-SOURCE
+    class Inner:
+    
+    class Outer:
+      prop inner: Inner.new
+      new ref new_ref: // TODO: use `new iso` instead
+      new iso new_val: // TODO: use `new iso` instead
+    
+    actor Main:
+      new:
+        outer_ref Outer'ref = Outer.new_ref
+        inner_ref Inner'ref = outer_ref.inner
+        
+        outer_val Outer'val = Outer.new_val
+        inner_val Inner'val = outer_val.inner
+    SOURCE
+    
+    pending "box functions implicitly specialized on receiver cap"
+    # Mare::Compiler.compile([source], :infer)
+  end
+  
+  it "enforces safe-to-write rules on prop setters" do
+    pending "safe-to-write rules on prop setters"
+  end
+  
+  it "infers prop setters to return the alias of the assigned value" do
+    pending "prop setters return the alias of the assigned value"
+  end
+  
   it "requires a sub-func to be present in the subtype" do
     source = Mare::Source.new "(example)", <<-SOURCE
     interface Interface:

@@ -91,6 +91,30 @@ struct Mare::Compiler::Infer::MetaType
     MetaType.new(inner.alias)
   end
   
+  def viewed_from(origin : MetaType)
+    origin_inner = origin.inner
+    case origin_inner
+    when Capability
+      MetaType.new(inner.viewed_from(origin_inner))
+    when Intersection
+      MetaType.new(inner.viewed_from(origin_inner.cap.not_nil!)) # TODO: convert to_generic
+    else
+      raise NotImplementedError.new("#{origin_inner.inspect}->#{inner.inspect}")
+    end
+  end
+  
+  def extracted_from(origin : MetaType)
+    origin_inner = origin.inner
+    case origin_inner
+    when Capability
+      MetaType.new(inner.extracted_from(origin_inner))
+    when Intersection
+      MetaType.new(inner.extracted_from(origin_inner.cap.not_nil!)) # TODO: convert to_generic
+    else
+      raise NotImplementedError.new("#{origin_inner.inspect}+>#{inner.inspect}")
+    end
+  end
+  
   def cap_only?
     @inner.is_a?(Capability)
   end

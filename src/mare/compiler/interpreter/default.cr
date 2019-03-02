@@ -365,9 +365,13 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         @type.functions << field_func
         
         getter_cap = AST::Identifier.new("box").from(data["keyword"])
+        if ret
+          getter_ret_op = AST::Operator.new("->").from(ret)
+          getter_ret = AST::Relate.new(getter_cap.dup, getter_ret_op, ret).from(ret)
+        end
         getter_body = AST::Group.new(":").from(ident)
         getter_body.terms << AST::FieldRead.new(ident.value).from(ident)
-        getter_func = Program::Function.new(getter_cap, ident, nil, ret, getter_body)
+        getter_func = Program::Function.new(getter_cap, ident, nil, getter_ret, getter_body)
         @type.functions << getter_func
         
         setter_cap = AST::Identifier.new("ref").from(data["keyword"])
@@ -387,7 +391,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         ).from(ident)
         setter_body = AST::Group.new(":").from(ident)
         setter_body.terms << setter_assign
-        setter_func = Program::Function.new(setter_cap, setter_ident, setter_params, ret.dup, setter_body)
+        setter_func = Program::Function.new(setter_cap, setter_ident, setter_params, nil, setter_body)
         @type.functions << setter_func
       when "is"
         data = @@declare_is.run(decl)
