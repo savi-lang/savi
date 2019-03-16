@@ -429,7 +429,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       end
     when " "
       ref = refer[node.terms[0]]
-      if ref.is_a?(Refer::Local) && ref.defn_rid == node.terms[0]
+      if ref.is_a?(Refer::Local) && ref.defn == node.terms[0]
         local_tid = @local_tids[ref]
         
         local = self[local_tid]

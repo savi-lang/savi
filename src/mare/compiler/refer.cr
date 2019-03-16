@@ -1,6 +1,4 @@
 class Mare::Compiler::Refer
-  alias RID = AST::Node
-  
   class Unresolved
     INSTANCE = new
     
@@ -28,10 +26,10 @@ class Mare::Compiler::Refer
   class Local
     getter pos : Source::Pos
     getter name : String
-    getter defn_rid : RID
+    getter defn : AST::Node
     getter param_idx : Int32?
     
-    def initialize(@pos, @name, @defn_rid, @param_idx = nil)
+    def initialize(@pos, @name, @defn, @param_idx = nil)
     end
   end
   
@@ -103,24 +101,19 @@ class Mare::Compiler::Refer
   property param_count = 0
   
   def initialize(@self_decl : Decl, @decls : Hash(String, Decl | DeclAlias))
-    @rids = {} of RID => Info
-  end
-  
-  def new_rid(rid : RID, info : Info)
-    @rids[rid] = info
-    rid
+    @infos = {} of AST::Node => Info
   end
   
   def [](node)
-    @rids[node]
+    @infos[node]
   end
   
   def []?(node)
-    @rids[node]?
+    @infos[node]?
   end
   
   def []=(node, info)
-    @rids[node] = info
+    @infos[node] = info
   end
   
   def decl(name)
@@ -237,7 +230,7 @@ class Mare::Compiler::Refer
           }
       end
       
-      @refer.new_rid(node, info)
+      @refer[node] = info
     end
     
     def touch(node : AST::Prefix)
@@ -252,7 +245,7 @@ class Mare::Compiler::Refer
     
     # For a FieldRead or FieldWrite, take note of it by name.
     def touch(node : AST::FieldRead | AST::FieldWrite)
-      @refer.new_rid(node, Field.new(node.pos, node.value))
+      @refer[node] = Field.new(node.pos, node.value)
     end
     
     # For a Relate, pay attention to any relations that are relevant to us.
@@ -346,7 +339,7 @@ class Mare::Compiler::Refer
       else
         # Treat this as a parameter with only a type and no identifier.
         # Do nothing other than increment the parameter count, because
-        # we don't want to overwrite the Decl info for this node's rid.
+        # we don't want to overwrite the Decl info for this node.
         # We don't need to create a Local anyway, because there's no way to
         # fetch the value of this parameter later (because it has no identifier).
         @refer.param_count += 1
