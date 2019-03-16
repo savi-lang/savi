@@ -1,35 +1,25 @@
 class Mare::Compiler::Refer
   class Unresolved
     INSTANCE = new
-    
-    def pos
-      Source::Pos.none
-    end
   end
   
   class Self
     INSTANCE = new
-    
-    def pos
-      Source::Pos.none
-    end
   end
   
   class Field
-    getter pos : Source::Pos
     getter name : String
     
-    def initialize(@pos, @name)
+    def initialize(@name)
     end
   end
   
   class Local
-    getter pos : Source::Pos
     getter name : String
     getter defn : AST::Node
     getter param_idx : Int32?
     
-    def initialize(@pos, @name, @defn, @param_idx = nil)
+    def initialize(@name, @defn, @param_idx = nil)
     end
   end
   
@@ -58,20 +48,12 @@ class Mare::Compiler::Refer
       
       instance
     end
-    
-    def pos
-      list.first.pos
-    end
   end
   
   class Decl
     getter defn : Program::Type
     
     def initialize(@defn)
-    end
-    
-    def pos
-      @defn.ident.pos
     end
     
     def final_decl : Decl
@@ -84,10 +66,6 @@ class Mare::Compiler::Refer
     getter defn : Program::TypeAlias
     
     def initialize(@defn, @decl)
-    end
-    
-    def pos
-      @defn.ident.pos
     end
     
     def final_decl : Decl
@@ -205,7 +183,7 @@ class Mare::Compiler::Refer
       # Raise an error if trying to use an "incomplete" union of locals.
       if info.is_a?(LocalUnion) && info.incomplete
         extra = info.list.map do |local|
-          {local.pos, "it was assigned here"}
+          {local.as(Local).defn.pos, "it was assigned here"}
         end
         extra << {Source::Pos.none,
           "but there were other possible branches where it wasn't assigned"}
@@ -245,7 +223,7 @@ class Mare::Compiler::Refer
     
     # For a FieldRead or FieldWrite, take note of it by name.
     def touch(node : AST::FieldRead | AST::FieldWrite)
-      @refer[node] = Field.new(node.pos, node.value)
+      @refer[node] = Field.new(node.value)
     end
     
     # For a Relate, pay attention to any relations that are relevant to us.
@@ -307,14 +285,15 @@ class Mare::Compiler::Refer
     def create_local(node : AST::Identifier)
       # This will be a new local, so if the identifier already matched an
       # existing local, it would shadow that, which we don't currently allow.
-      if @refer[node].is_a?(Local)
+      info = @refer[node]
+      if info.is_a?(Local)
         Error.at node, "This variable shadows an existing variable", [
-          {@refer[node], "the first definition was here"},
+          {info.defn, "the first definition was here"},
         ]
       end
       
       # Create the local entry, so later references to this name will see it.
-      local = Local.new(node.pos, node.value, node)
+      local = Local.new(node.value, node)
       @locals[node.value] = local unless node.value == "_"
       @refer[node] = local
     end
@@ -333,7 +312,7 @@ class Mare::Compiler::Refer
         # Treat this as a parameter with only an identifier and no type.
         ident = node
         
-        local = Local.new(node.pos, ident.value, ident, @refer.param_count += 1)
+        local = Local.new(ident.value, ident, @refer.param_count += 1)
         @locals[ident.value] = local unless ident.value == "_"
         @refer[ident] = local
       else
@@ -361,7 +340,7 @@ class Mare::Compiler::Refer
       
       ident = node.terms[0].as(AST::Identifier)
       
-      local = Local.new(node.pos, ident.value, ident, @refer.param_count += 1)
+      local = Local.new(ident.value, ident, @refer.param_count += 1)
       @locals[ident.value] = local unless ident.value == "_"
       @refer[ident] = local
       
