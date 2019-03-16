@@ -1,5 +1,5 @@
 class Mare::Compiler::Refer
-  alias RID = UInt64
+  alias RID = AST::Node
   
   class Unresolved
     INSTANCE = new
@@ -103,23 +103,24 @@ class Mare::Compiler::Refer
   property param_count = 0
   
   def initialize(@self_decl : Decl, @decls : Hash(String, Decl | DeclAlias))
-    @last_rid = 0_u64
     @rids = {} of RID => Info
   end
   
-  def new_rid(info : Info)
-    rid = (@last_rid += 1)
-    raise "refer id overflow" if rid == 0
+  def new_rid(rid : RID, info : Info)
     @rids[rid] = info
     rid
   end
   
   def [](node)
-    @rids[node.rid]
+    @rids[node]
+  end
+  
+  def []?(node)
+    @rids[node]?
   end
   
   def []=(node, info)
-    @rids[node.rid] = info
+    @rids[node] = info
   end
   
   def decl(name)
@@ -236,7 +237,7 @@ class Mare::Compiler::Refer
           }
       end
       
-      node.rid = @refer.new_rid(info)
+      @refer.new_rid(node, info)
     end
     
     def touch(node : AST::Prefix)
@@ -251,14 +252,14 @@ class Mare::Compiler::Refer
     
     # For a FieldRead or FieldWrite, take note of it by name.
     def touch(node : AST::FieldRead | AST::FieldWrite)
-      node.rid = @refer.new_rid(Field.new(node.pos, node.value))
+      @refer.new_rid(node, Field.new(node.pos, node.value))
     end
     
     # For a Relate, pay attention to any relations that are relevant to us.
     def touch(node : AST::Relate)
       if node.op.value == "="
-        create_local(node.lhs) \
-          if node.lhs.rid == 0 || @refer[node.lhs] == Unresolved::INSTANCE
+        info = @refer[node.lhs]?
+        create_local(node.lhs) if info.nil? || info == Unresolved::INSTANCE
       end
     end
     
@@ -320,7 +321,7 @@ class Mare::Compiler::Refer
       end
       
       # Create the local entry, so later references to this name will see it.
-      local = Local.new(node.pos, node.value, node.rid)
+      local = Local.new(node.pos, node.value, node)
       @locals[node.value] = local unless node.value == "_"
       @refer[node] = local
     end
@@ -330,7 +331,7 @@ class Mare::Compiler::Refer
         unless node.is_a?(AST::Group) && node.style == " " && node.terms.size == 2
       
       create_local(node.terms[0])
-      node.rid = node.terms[0].rid
+      @refer[node] = @refer[node.terms[0]]
     end
     
     def create_param_local(node : AST::Identifier)
@@ -339,7 +340,7 @@ class Mare::Compiler::Refer
         # Treat this as a parameter with only an identifier and no type.
         ident = node
         
-        local = Local.new(node.pos, ident.value, ident.rid, @refer.param_count += 1)
+        local = Local.new(node.pos, ident.value, ident, @refer.param_count += 1)
         @locals[ident.value] = local unless ident.value == "_"
         @refer[ident] = local
       else
@@ -358,7 +359,7 @@ class Mare::Compiler::Refer
       
       create_param_local(node.lhs)
       
-      node.rid = node.lhs.rid
+      @refer[node] = @refer[node.lhs]
     end
     
     def create_param_local(node : AST::Node)
@@ -367,11 +368,11 @@ class Mare::Compiler::Refer
       
       ident = node.terms[0].as(AST::Identifier)
       
-      local = Local.new(node.pos, ident.value, ident.rid, @refer.param_count += 1)
+      local = Local.new(node.pos, ident.value, ident, @refer.param_count += 1)
       @locals[ident.value] = local unless ident.value == "_"
       @refer[ident] = local
       
-      node.rid = ident.rid
+      @refer[node] = @refer[ident]
     end
   end
 end

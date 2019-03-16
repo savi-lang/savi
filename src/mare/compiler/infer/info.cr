@@ -130,7 +130,7 @@ class Mare::Compiler::Infer
   
   class Local < Info # TODO: dedup implementation with Field
     @explicit : MetaType?
-    @upstream : TID = 0
+    @upstream : TID?
     
     def initialize(@pos)
     end
@@ -140,16 +140,16 @@ class Mare::Compiler::Infer
       return explicit.not_nil! if explicit && !explicit.cap_only?
       
       Error.at self, "This needs an explicit type; it could not be inferred" \
-        if @upstream == 0
+        if @upstream.nil?
       
-      upstream = infer[@upstream].resolve!(infer)
+      upstream = infer[@upstream.not_nil!].resolve!(infer)
       upstream = upstream.intersect(explicit).override_cap(explicit) if explicit
       upstream.strip_ephemeral
     end
     
     def set_explicit(explicit_pos : Source::Pos, explicit : MetaType)
       raise "already set_explicit" if @explicit
-      raise "shouldn't have an upstream yet" if @upstream != 0
+      raise "shouldn't have an upstream yet" if @upstream
       
       @explicit = explicit
       @pos = explicit_pos
@@ -164,7 +164,7 @@ class Mare::Compiler::Infer
           meta_type_within_domain!(explicit, use_pos, constraint_pos, constraint, true)
         end
       else
-        infer[@upstream].within_domain!(infer, use_pos, constraint_pos, constraint, true)
+        infer[@upstream.not_nil!].within_domain!(infer, use_pos, constraint_pos, constraint, true)
       end
     end
     
@@ -177,14 +177,14 @@ class Mare::Compiler::Infer
         false,
       ) if @explicit
       
-      raise "already assigned an upstream" if @upstream != 0
+      raise "already assigned an upstream" if @upstream
       @upstream = rhs_tid
     end
   end
   
   class Field < Info # TODO: dedup implementation with Local
     @explicit : MetaType?
-    @upstream : TID = 0
+    @upstream : TID?
     getter origin : MetaType
     
     def initialize(@pos, @origin)
@@ -216,16 +216,16 @@ class Mare::Compiler::Infer
       return explicit.not_nil! if explicit && !explicit.cap_only?
       
       Error.at self, "This needs an explicit type; it could not be inferred" \
-        if @upstream == 0
+        if @upstream.nil?
       
-      upstream = infer[@upstream].resolve!(infer)
+      upstream = infer[@upstream.not_nil!].resolve!(infer)
       upstream.intersect(explicit) if explicit
       upstream.strip_ephemeral
     end
     
     def set_explicit(explicit_pos : Source::Pos, explicit : MetaType)
       raise "already set_explicit" if @explicit
-      raise "shouldn't have an upstream yet" if @upstream != 0
+      raise "shouldn't have an upstream yet" if @upstream
       
       @explicit = explicit
       @pos = explicit_pos
@@ -240,7 +240,7 @@ class Mare::Compiler::Infer
           meta_type_within_domain!(explicit, use_pos, constraint_pos, constraint, true)
         end
       else
-        infer[@upstream].within_domain!(infer, use_pos, constraint_pos, constraint, true)
+        infer[@upstream.not_nil!].within_domain!(infer, use_pos, constraint_pos, constraint, true)
       end
     end
     
@@ -253,7 +253,7 @@ class Mare::Compiler::Infer
         false
       ) if @explicit
       
-      raise "already assigned an upstream" if @upstream != 0
+      raise "already assigned an upstream" if @upstream
       @upstream = rhs_tid
     end
   end
@@ -262,7 +262,7 @@ class Mare::Compiler::Infer
     @explicit : MetaType?
     @downstreamed : MetaType?
     @downstreamed_pos : Source::Pos?
-    @upstream : TID = 0
+    @upstream : TID?
     
     def initialize(@pos)
     end
@@ -272,7 +272,7 @@ class Mare::Compiler::Infer
     
     def resolve!(infer : Infer) : MetaType
       return @explicit.not_nil! unless @explicit.nil?
-      return infer[@upstream].resolve!(infer).strip_ephemeral unless @upstream == 0
+      return infer[@upstream.not_nil!].resolve!(infer).strip_ephemeral unless @upstream.nil?
       return @downstreamed.not_nil!.strip_ephemeral unless @downstreamed.nil?
       
       Error.at self,
@@ -282,7 +282,7 @@ class Mare::Compiler::Infer
     def set_explicit(explicit_pos : Source::Pos, explicit : MetaType)
       raise "already set_explicit" if @explicit
       raise "already have downstreams" if @downstreamed
-      raise "already have an upstream" if @upstream != 0
+      raise "already have an upstream" if @upstream
       
       @explicit = explicit
       @pos = explicit_pos
@@ -303,8 +303,8 @@ class Mare::Compiler::Infer
         @downstreamed = constraint
       end
       
-      infer[@upstream].within_domain!(infer, use_pos, constraint_pos, constraint, true) \
-        if @upstream != 0
+      infer[@upstream.not_nil!].within_domain!(infer, use_pos, constraint_pos, constraint, true) \
+        if @upstream
     end
     
     def verify_arg(infer : Infer, arg_infer : Infer, arg_tid : TID, arg_pos : Source::Pos)
@@ -329,7 +329,7 @@ class Mare::Compiler::Infer
         false,
       ) if @downstreamed
       
-      raise "already assigned an upstream" if @upstream != 0
+      raise "already assigned an upstream" if @upstream
       @upstream = rhs_tid
     end
   end

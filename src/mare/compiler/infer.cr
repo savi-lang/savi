@@ -1,5 +1,5 @@
 class Mare::Compiler::Infer < Mare::AST::Visitor
-  alias TID = UInt64
+  alias TID = AST::Node
   
   getter func : Program::Function
   getter param_tids : Array(TID) = [] of TID
@@ -10,7 +10,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     @local_tids = Hash(Refer::Local, TID).new
     @local_tid_overrides = Hash(TID, TID).new
     @tids = Hash(TID, Info).new
-    @last_tid = 0_u64
+    @redirect_tids = Hash(TID, TID).new
     @resolved = Hash(TID, MetaType).new
     @called_funcs = Set(Program::Function).new
     
@@ -19,32 +19,19 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   end
   
   def [](tid : TID)
-    raise "tid of zero" if tid == 0
-    @tids[tid]
+    @tids[follow_redirects(tid)]
   end
   
-  def [](node)
-    raise "this has a tid of zero: #{node.inspect}" if node.tid == 0
-    @tids[node.tid]
-  end
-  
-  def []?(node)
-    return nil if node.tid == 0
-    @tids[node.tid]
+  def []?(tid : TID)
+    @tids[follow_redirects(tid)]?
   end
   
   def refer
     func.refer
   end
   
-  def resolve(tid : TID) : MetaType
-    raise "tid of zero" if tid == 0
-    @resolved[tid] ||= @tids[tid].resolve!(self)
-  end
-  
   def resolve(node) : MetaType
-    raise "this has a tid of zero: #{node.inspect}" if node.tid == 0
-    @resolved[node.tid] ||= @tids[node.tid].resolve!(self)
+    @resolved[node] ||= self[node].resolve!(self)
   end
   
   def each_meta_type
@@ -116,13 +103,13 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       params.accept(self)
       params.terms.each do |param|
         finish_param(param, self[param]) unless self[param].is_a?(Param)
-        @param_tids << param.tid
+        @param_tids << param
       end
     end
     
     # Create a fake local variable that represents the return value.
     new_tid(func.ident, Local.new(func.ident.pos))
-    @ret_tid = func.ident.tid
+    @ret_tid = func.ident
     
     # Take note of the return type constraint if given.
     # For constructors, this is the self type and listed receiver cap.
@@ -152,7 +139,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       # and also of allowing inference if there is no explicit type.
       # We don't do this for constructors, since constructors implicitly return
       # self no matter what the last term of the body of the function is.
-      self[ret_tid].as(Local).assign(self, func_body.tid, func_body_pos) \
+      self[ret_tid].as(Local).assign(self, func_body, func_body_pos) \
         unless func.has_tag?(:constructor)
     end
     
@@ -246,13 +233,12 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   end
   
   def new_tid(node, info)
-    raise "this already has a tid: #{node.inspect}" if node.tid != 0
-    node.tid = new_tid_detached(info)
+    @tids[node] = info
+    node
   end
   
-  def new_tid_detached(info) : TID
-    tid = @last_tid += 1
-    raise "type id overflow" if tid == 0
+  def new_tid_detached(info)
+    tid = AST::Identifier.new("(detached)")
     @tids[tid] = info
     tid
   end
@@ -281,26 +267,26 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
   end
   
-  def transfer_tid(from_tid : TID, to)
-    raise "this already has a tid: #{to.inspect}" if to.tid != 0
-    raise "this tid to transfer was zero" if from_tid == 0
-    to.tid = from_tid
+  def redirect_tid(from : TID, to : TID)
+    @redirect_tids[from] = to
   end
   
-  def transfer_tid(from, to)
-    raise "this already has a tid: #{to.inspect}" if to.tid != 0
-    raise "this doesn't have a tid to transfer: #{from.inspect}" if from.tid == 0
-    to.tid = from.tid
+  def follow_redirects(tid : TID) : TID
+    while @redirect_tids[tid]?
+      tid = @redirect_tids[tid]
+    end
+    
+    tid
   end
   
   def lookup_local_tid(ref : Refer::Local)
     tid = @local_tids[ref]?
     return unless tid
+    
     while @local_tid_overrides[tid]?
-      old_tid = tid
       tid = @local_tid_overrides[tid]
-      [old_tid, tid]
     end
+    
     tid
   end
   
@@ -319,8 +305,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       touch(node)
     end
     
-    raise "didn't assign a tid to: #{node.inspect}" \
-      if node.tid == 0 && Classify.value_needed?(node)
+    raise "didn't assign info to: #{node.inspect}" \
+      if Classify.value_needed?(node) && self[node]? == nil
     
     node
   end
@@ -397,13 +383,13 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       # If it's a local, track the possibly new tid in our @local_tids map.
       local_tid = lookup_local_tid(ref)
       if local_tid
-        transfer_tid(local_tid, node)
+        redirect_tid(node, local_tid)
       else
         new_tid(node, ref.param_idx ? Param.new(node.pos) : Local.new(node.pos))
-        @local_tids[ref] = node.tid
+        @local_tids[ref] = node
       end
     when Refer::Self
-      transfer_tid(self_tid(node), node)
+      redirect_tid(node, self_tid(node))
     when Refer::Unresolved
       # Leave the tid as zero if this identifer needs no value.
       return if Classify.value_not_needed?(node)
@@ -439,11 +425,11 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         new_tid(node, Fixed.new(node.pos, none))
       else
         # A non-empty group always has the tid of its final child.
-        transfer_tid(node.terms.last, node)
+        redirect_tid(node, node.terms.last)
       end
     when " "
       ref = refer[node.terms[0]]
-      if ref.is_a?(Refer::Local) && ref.defn_rid == node.terms[0].rid
+      if ref.is_a?(Refer::Local) && ref.defn_rid == node.terms[0]
         local_tid = @local_tids[ref]
         
         local = self[local_tid]
@@ -465,7 +451,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         else raise NotImplementedError.new(local)
         end
         
-        transfer_tid(local_tid, node)
+        redirect_tid(node, local_tid)
       else
         raise NotImplementedError.new(node.to_a)
       end
@@ -483,7 +469,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     field = Field.new(node.pos, resolved_self)
     new_tid(node, field)
     follow_field(field, node.value)
-    field.assign(self, node.rhs.tid, node.rhs.pos)
+    field.assign(self, node.rhs, node.rhs.pos)
   end
   
   def touch(node : AST::Relate)
@@ -492,11 +478,11 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       lhs = self[node.lhs]
       case lhs
       when Local
-        lhs.assign(self, node.rhs.tid, node.rhs.pos)
-        transfer_tid(node.lhs, node)
+        lhs.assign(self, node.rhs, node.rhs.pos)
+        redirect_tid(node, node.lhs)
       when Param
-        lhs.assign(self, node.rhs.tid, node.rhs.pos)
-        transfer_tid(node.lhs, node)
+        lhs.assign(self, node.rhs, node.rhs.pos)
+        redirect_tid(node, node.lhs)
       else
         raise NotImplementedError.new(node.lhs)
       end
@@ -511,12 +497,12 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         args_pos = [] of Source::Pos
       when AST::Qualify
         member = rhs.term.as(AST::Identifier)
-        args = rhs.group.terms.map(&.tid)
+        args = rhs.group.terms.map(&.itself)
         args_pos = rhs.group.terms.map(&.pos)
       else raise NotImplementedError.new(rhs)
       end
       
-      call = FromCall.new(member.pos, lhs.tid, member.value, args, args_pos)
+      call = FromCall.new(member.pos, lhs, member.value, args, args_pos)
       new_tid(node, call)
       
       follow_call(call)
@@ -526,7 +512,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         unless self[node.rhs].is_a?(Fixed)
       
       bool = MetaType.new(refer.decl_defn("Bool"))
-      refine_tid = node.lhs.tid
+      refine_tid = follow_redirects(node.lhs)
       refine_type = self[node.rhs].resolve!(self)
       new_tid(node, TypeCondition.new(node.pos, bool, refine_tid, refine_type))
     else raise NotImplementedError.new(node.op.value)
@@ -536,7 +522,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   def touch(node : AST::Prefix)
     raise NotImplementedError.new(node.op.value) unless node.op.value == "--"
     
-    new_tid(node, Consume.new(node.pos, node.term.tid))
+    new_tid(node, Consume.new(node.pos, node.term))
   end
   
   def visit_children?(node : AST::Choice)
@@ -575,7 +561,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       end
       
       # Hold on to the body type for later in this function.
-      body_tids << body.tid
+      body_tids << body
     end
     
     # TODO: also track cond types in branch, for analyzing exhausted choices.
@@ -591,8 +577,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     when Fixed
       param = Param.new(node.pos)
       param.set_explicit(ref.pos, ref.inner)
-      node.tid = 0 # clear to make room for new info
-      new_tid(node, param)
+      new_tid(node, param) # assign new info
     else
       raise NotImplementedError.new([node, ref].inspect)
     end
