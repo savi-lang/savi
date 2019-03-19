@@ -6,7 +6,6 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   getter! ret_tid : TID
   
   def initialize(@self_type : Program::Type, @func : Program::Function)
-    # TODO: When we have branching, we'll need some form of divergence.
     @local_tids = Hash(Refer::Local, TID).new
     @local_tid_overrides = Hash(TID, TID).new
     @tids = Hash(TID, Info).new
