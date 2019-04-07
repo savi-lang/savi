@@ -764,7 +764,7 @@ describe Mare::Compiler::Infer do
     end
   end
   
-  it "treats box functions as being implicitly specialized on receiver cap" do
+  pending "treats box functions as being implicitly specialized on receiver cap" do
     source = Mare::Source.new "(example)", <<-SOURCE
     class Inner:
     
@@ -782,17 +782,12 @@ describe Mare::Compiler::Infer do
         inner_val Inner'val = outer_val.inner
     SOURCE
     
-    pending "box functions implicitly specialized on receiver cap"
     # Mare::Compiler.compile([source], :infer)
   end
   
-  it "enforces safe-to-write rules on prop setters" do
-    pending "safe-to-write rules on prop setters"
-  end
+  pending "enforces safe-to-write rules on prop setters"
   
-  it "infers prop setters to return the alias of the assigned value" do
-    pending "prop setters return the alias of the assigned value"
-  end
+  pending "infers prop setters to return the alias of the assigned value"
   
   it "requires a sub-func to be present in the subtype" do
     source = Mare::Source.new "(example)", <<-SOURCE
