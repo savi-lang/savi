@@ -267,6 +267,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   end
   
   def redirect_tid(from : TID, to : TID)
+    return if from == to # TODO: raise an error?
+    
     @redirect_tids[from] = to
   end
   

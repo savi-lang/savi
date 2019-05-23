@@ -90,6 +90,6 @@ module Mare::Compiler
         source = Source.new(path, content)
         Parser.parse(source)
       end
-    @@prelude_doc.not_nil!.dup
+    @@prelude_doc.not_nil!
   end
 end

@@ -181,19 +181,16 @@ class Mare::Program
       @metadata = Hash(Symbol, String).new
     end
     
+    def dup_init
+      @tags = @tags.dup
+      @metadata = @metadata.dup
+      
+      raise "can't copy a refer property" if @refer
+      raise "can't copy a infer property" if @infer
+    end
+    
     def dup
-      super.tap do |node|
-        node.cap = @cap.dup
-        node.ident = @ident.dup
-        node.params = @params.dup
-        node.ret = @ret.dup
-        node.body = @body.dup
-        
-        @tags.each { |t| node.add_tag(t) }
-        
-        raise "can't copy a refer property" if @refer
-        raise "can't copy a infer property" if @infer
-      end
+      super.tap(&.dup_init)
     end
     
     def add_tag(tag : Symbol)
