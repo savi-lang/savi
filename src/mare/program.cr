@@ -141,14 +141,14 @@ class Mare::Program
     end
     
     @subtyping : Mare::Compiler::Infer::SubtypingInfo?
-    def subtyping
-      @subtyping ||= Mare::Compiler::Infer::SubtypingInfo.new(self)
+    def subtyping_init(ctx : Compiler::Context)
+      @subtyping = Mare::Compiler::Infer::SubtypingInfo.new(ctx, self)
     end
     
     # Return true if this Type is a subtype of the other Type.
     def <(other); subtype_of?(other) end
     def subtype_of?(other : Program::Type, errors = [] of Error::Info) : Bool
-      subtyping.check(other, errors)
+      @subtyping.not_nil!.check(other, errors)
     end
   end
   
@@ -160,7 +160,6 @@ class Mare::Program
     property body : AST::Group?
     
     property! refer : Compiler::Refer
-    property! infer : Compiler::Infer
     
     getter metadata : Hash(Symbol, String)
     
@@ -186,7 +185,6 @@ class Mare::Program
       @metadata = @metadata.dup
       
       raise "can't copy a refer property" if @refer
-      raise "can't copy a infer property" if @infer
     end
     
     def dup

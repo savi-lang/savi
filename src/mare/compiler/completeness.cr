@@ -3,14 +3,14 @@ module Mare::Compiler::Completeness
     ctx.program.types.each do |t|
       branch_cache = {} of Tuple(Set(String), Program::Function) => Branch
       t.functions.each do |f|
-        check_constructor(t, f, branch_cache) if f.has_tag?(:constructor)
+        check_constructor(ctx, t, f, branch_cache) if f.has_tag?(:constructor)
       end
     end
   end
   
-  def self.check_constructor(decl, func, branch_cache)
+  def self.check_constructor(ctx, decl, func, branch_cache)
     fields = decl.functions.select(&.has_tag?(:field))
-    branch = Branch.new(decl, func, branch_cache, fields)
+    branch = Branch.new(ctx, decl, func, branch_cache, fields)
     func.body.try(&.accept(branch))
     
     unseen = branch.show_unseen_fields
@@ -21,6 +21,7 @@ module Mare::Compiler::Completeness
   end
   
   class Branch < Mare::AST::Visitor
+    getter ctx : Context
     getter decl : Program::Type
     getter func : Program::Function
     getter branch_cache : Hash(Tuple(Set(String), Program::Function), Branch)
@@ -28,6 +29,7 @@ module Mare::Compiler::Completeness
     getter seen_fields : Set(String)
     getter call_crumbs : Array(Source::Pos)
     def initialize(
+      @ctx,
       @decl,
       @func,
       @branch_cache,
@@ -38,7 +40,7 @@ module Mare::Compiler::Completeness
     
     def sub_branch(node : AST::Node)
       branch =
-        Branch.new(decl, func, branch_cache, all_fields,
+        Branch.new(ctx, decl, func, branch_cache, all_fields,
           seen_fields.dup, call_crumbs.dup)
       node.accept(branch)
       branch
@@ -53,7 +55,7 @@ module Mare::Compiler::Completeness
       cache_key = {seen_fields, next_func}
       branch_cache.fetch cache_key do
         branch_cache[cache_key] = branch =
-          Branch.new(decl, next_func, branch_cache, all_fields,
+          Branch.new(ctx, decl, next_func, branch_cache, all_fields,
             seen_fields.dup, call_crumbs.dup)
         branch.call_crumbs << call_crumb
         next_func.body.not_nil!.accept(branch)
@@ -106,7 +108,7 @@ module Mare::Compiler::Completeness
     
     def touch(node : AST::Identifier)
       # Ignore this identifier if it is not of the self.
-      info = func.infer[node]?
+      info = ctx.infers[func][node]?
       return unless info.is_a?(Infer::Self)
       
       # We only care about further analysis if not all fields are initialized.

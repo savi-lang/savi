@@ -1,18 +1,82 @@
+class Mare::Compiler::Infers < Mare::AST::Visitor
+  def initialize
+    @map = {} of Program::Function => Infer
+  end
+  
+  def run(ctx)
+    # Before doing anything, instantiate SubtypingInfo on all types.
+    ctx.program.types.each(&.subtyping_init(ctx))
+    
+    # Start by running an instance of inference at the Main.new function,
+    # and recurse into checking other functions that are reachable from there.
+    # We do this so that errors for reachable functions are shown first.
+    # If there is no Main type, proceed to analyzing the whole program.
+    main = ctx.program.find_type?("Main")
+    if main
+      f = main.find_func?("new")
+      infer_from(ctx, main, f) if f
+    end
+    
+    # For each function in the program, run with a new instance,
+    # unless that function has already been reached with an infer instance.
+    # We probably reached most of them already by starting from Main.new,
+    # so this second pass just takes care of typechecking unreachable functions.
+    ctx.program.types.each do |t|
+      t.functions.each do |f|
+        infer_from(ctx, t, f)
+      end
+    end
+    ctx.program.types.each do |t|
+      check_is_list(ctx, t)
+    end
+  end
+  
+  def [](f : Program::Function)
+    @map[f]
+  end
+  
+  def []?(f : Program::Function)
+    @map[f]?
+  end
+  
+  def infer_from(ctx : Context, t : Program::Type, f : Program::Function)
+    self[f]? || (
+      Infer.new(ctx, t, f)
+      .tap { |infer| @map[f] = infer }
+      .tap(&.run)
+    )
+  end
+  
+  def check_is_list(ctx : Context, t : Program::Type)
+    t.functions.each do |f|
+      next unless f.has_tag?(:is)
+      
+      infer = infer_from(ctx, t, f)
+      iface = infer.resolve(infer.ret).single!
+      
+      errors = [] of Error::Info
+      unless t.subtype_of?(iface, errors)
+        Error.at t.ident,
+          "This type doesn't implement the interface #{iface.ident.value}",
+            errors
+      end
+    end
+  end
+end
+
 class Mare::Compiler::Infer < Mare::AST::Visitor
+  getter ctx : Context
   getter func : Program::Function
   getter params : Array(AST::Node) = [] of AST::Node
   getter! ret : AST::Node
   
-  def initialize(@self_type : Program::Type, @func : Program::Function)
+  def initialize(@ctx : Context, @self_type : Program::Type, @func : Program::Function)
     @local_idents = Hash(Refer::Local, AST::Node).new
     @local_ident_overrides = Hash(AST::Node, AST::Node).new
     @info_table = Hash(AST::Node, Info).new
     @redirects = Hash(AST::Node, AST::Node).new
     @resolved = Hash(AST::Node, MetaType).new
     @called_funcs = Set(Program::Function).new
-    
-    raise "this func already has an infer: #{func.inspect}" if func.infer?
-    func.infer = self
   end
   
   def [](node : AST::Node)
@@ -41,54 +105,6 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   
   def each_called_func
     @called_funcs.each
-  end
-  
-  def self.run(ctx)
-    # Before doing anything, mark the pass as ready on all types.
-    ctx.program.types.each(&.subtyping.infer_ready!)
-    
-    # Start by running an instance of inference at the Main.new function,
-    # and recurse into checking other functions that are reachable from there.
-    # We do this so that errors for reachable functions are shown first.
-    # If there is no Main type, proceed to analyzing the whole program.
-    main = ctx.program.find_type?("Main")
-    if main
-      f = main.find_func?("new")
-      new(main, f).run if f
-    end
-    
-    # For each function in the program, run with a new instance,
-    # unless that function has already been reached with an infer instance.
-    # We probably reached most of them already by starting from Main.new,
-    # so this second pass just takes care of typechecking unreachable functions.
-    ctx.program.types.each do |t|
-      t.functions.each do |f|
-        Infer.from(t, f)
-      end
-    end
-    ctx.program.types.each do |t|
-      check_is_list(t)
-    end
-  end
-  
-  def self.from(t : Program::Type, f : Program::Function)
-    f.infer? || new(t, f).tap(&.run)
-  end
-  
-  def self.check_is_list(t : Program::Type)
-    t.functions.each do |f|
-      next unless f.has_tag?(:is)
-      
-      infer = Infer.from(t, f)
-      iface = infer.resolve(infer.ret).single!
-      
-      errors = [] of Error::Info
-      unless t.subtype_of?(iface, errors)
-        Error.at t.ident,
-          "This type doesn't implement the interface #{iface.ident.value}",
-            errors
-      end
-    end
   end
   
   def run
@@ -184,7 +200,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       # Get the Infer instance for call_func, possibly creating and running it.
       # TODO: don't infer anything in the body of that func if type and params
       # were explicitly specified in the function signature.
-      infer = Infer.from(call_defn, call_func)
+      infer = ctx.infers.infer_from(ctx, call_defn, call_func)
       
       # Enforce the capability restriction of the receiver.
       unless MetaType.new(call_mti) < infer.resolved_receiver
@@ -226,7 +242,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     @called_funcs.add(field_func)
     
     # Get the Infer instance for field_func, possibly creating and running it.
-    infer = Infer.from(@self_type, field_func)
+    infer = ctx.infers.infer_from(ctx, @self_type, field_func)
     
     # Apply constraints to the return type.
     ret = infer[infer.ret]

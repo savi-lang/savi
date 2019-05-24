@@ -1,9 +1,11 @@
 class Mare::Compiler::Context
   getter program
+  getter infers
   
   def initialize
     @program = Program.new
     @stack = [Interpreter::Default.new(@program)] of Interpreter
+    @infers = Infers.new
   end
   
   def compile(doc : AST::Document)

@@ -1,14 +1,10 @@
 class Mare::Compiler::Infer::SubtypingInfo
-  def initialize(@this : Program::Type)
+  def initialize(@ctx : Compiler::Context, @this : Program::Type)
     @asserted = Set(Program::Type).new # TODO: use this instead of `is` metadata
     @confirmed = Set(Program::Type).new
     @disproved = Hash(Program::Type, Array(Error::Info)).new
     @temp_assumptions = Set(Program::Type).new
   end
-  
-  @infer_ready = false
-  def infer_ready?; @infer_ready end
-  def infer_ready!; @infer_ready = true end
   
   private def this
     @this
@@ -70,9 +66,6 @@ class Mare::Compiler::Infer::SubtypingInfo
   end
   
   private def full_check(that : Program::Type, errors : Array(Error::Info))
-    # We can't do anything involving Infer until we've been told it's ready.
-    raise "the Infer pass hasn't started yet" unless infer_ready?
-    
     # A type only matches an interface if all functions match that interface.
     that.functions.each do |that_func|
       # Hygienic functions are not considered to be real functions for the
@@ -98,8 +91,8 @@ class Mare::Compiler::Infer::SubtypingInfo
     raise "found hygienic function" if this_func.has_tag?(:hygienic)
     
     # Get the Infer instance for both this and that function, to compare them.
-    this_infer = Infer.from(this, this_func)
-    that_infer = Infer.from(that, that_func)
+    this_infer = @ctx.infers.infer_from(@ctx, this, this_func)
+    that_infer = @ctx.infers.infer_from(@ctx, that, that_func)
     
     # A constructor can only match another constructor.
     case {this_func.has_tag?(:constructor), that_func.has_tag?(:constructor)}

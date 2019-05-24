@@ -64,7 +64,7 @@ class Mare::Compiler::CodeGen
       @vtable_size = 0
       @type_def.each_function.each do |f|
         if f.has_tag?(:field)
-          field_type = g.program.reach[f.infer.resolve(f.ident)]
+          field_type = g.program.reach[g.ctx.infers[f].resolve(f.ident)]
           @fields << {f.ident.value, field_type}
         else
           next unless g.program.reach.reached_func?(f)
@@ -193,7 +193,8 @@ class Mare::Compiler::CodeGen
     end
   end
   
-  getter! program : Program
+  getter! ctx : Context
+  getter! program : Program # TODO: Remove in favor of ctx.program
   
   def initialize
     LLVM.init_x86
@@ -268,7 +269,7 @@ class Mare::Compiler::CodeGen
   
   def type_of(expr : AST::Node, in_gfunc : GenFunc? = nil)
     in_gfunc ||= func_frame.gfunc.not_nil!
-    inferred = in_gfunc.func.infer.resolve(expr)
+    inferred = ctx.infers[in_gfunc.func].resolve(expr)
     program.reach[inferred]
   end
   
@@ -336,6 +337,7 @@ class Mare::Compiler::CodeGen
   end
   
   def run(ctx : Context)
+    @ctx = ctx
     @program = ctx.program
     ctx.program.code_gen = self
     
