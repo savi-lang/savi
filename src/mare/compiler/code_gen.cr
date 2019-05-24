@@ -64,12 +64,12 @@ class Mare::Compiler::CodeGen
       @vtable_size = 0
       @type_def.each_function.each do |f|
         if f.has_tag?(:field)
-          field_type = g.program.reach[g.ctx.infers[f].resolve(f.ident)]
+          field_type = g.ctx.reach[g.ctx.infers[f].resolve(f.ident)]
           @fields << {f.ident.value, field_type}
         else
-          next unless g.program.reach.reached_func?(f)
+          next unless g.ctx.reach.reached_func?(f)
           
-          vtable_index = g.program.paint[f]
+          vtable_index = g.ctx.paint[f]
           @vtable_size = (vtable_index + 1) if @vtable_size <= vtable_index
           
           key = f.ident.value
@@ -194,7 +194,6 @@ class Mare::Compiler::CodeGen
   end
   
   getter! ctx : Context
-  getter! program : Program # TODO: Remove in favor of ctx.program
   
   def initialize
     LLVM.init_x86
@@ -270,7 +269,7 @@ class Mare::Compiler::CodeGen
   def type_of(expr : AST::Node, in_gfunc : GenFunc? = nil)
     in_gfunc ||= func_frame.gfunc.not_nil!
     inferred = ctx.infers[in_gfunc.func].resolve(expr)
-    program.reach[inferred]
+    ctx.reach[inferred]
   end
   
   def llvm_type_of(expr : AST::Node, in_gfunc : GenFunc? = nil)
@@ -291,7 +290,7 @@ class Mare::Compiler::CodeGen
     when :f64 then @f64
     when :ptr then @ptr
     when :struct_ptr then
-      @gtypes[program.reach[ref.single!].llvm_name].struct_ptr
+      @gtypes[ctx.reach[ref.single!].llvm_name].struct_ptr
     when :object_ptr then
       @obj_ptr
     else raise NotImplementedError.new(ref.llvm_use_type)
@@ -308,7 +307,7 @@ class Mare::Compiler::CodeGen
     when :f64 then @f64
     when :ptr then @ptr
     when :struct_ptr then
-      @gtypes[program.reach[ref.single!].llvm_name].struct_ptr
+      @gtypes[ctx.reach[ref.single!].llvm_name].struct_ptr
     when :object_ptr then
       @obj_ptr
     else raise NotImplementedError.new(ref.llvm_mem_type)
@@ -316,13 +315,13 @@ class Mare::Compiler::CodeGen
   end
   
   def gtype_of(expr : AST::Node, in_gfunc : GenFunc? = nil)
-    llvm_name = program.reach[type_of(expr, in_gfunc).single!].llvm_name
+    llvm_name = ctx.reach[type_of(expr, in_gfunc).single!].llvm_name
     @gtypes[llvm_name]
   end
   
   def gtypes_of(expr : AST::Node, in_gfunc : GenFunc? = nil)
     type_of(expr, in_gfunc).each_defn.map do |defn|
-      llvm_name = program.reach[defn].llvm_name
+      llvm_name = ctx.reach[defn].llvm_name
       @gtypes[llvm_name]
     end.to_a
   end
@@ -332,17 +331,11 @@ class Mare::Compiler::CodeGen
     func_frame.pony_ctx = @builder.call(@mod.functions["pony_ctx"], "PONY_CTX")
   end
   
-  def self.run(ctx)
-    new.run(ctx)
-  end
-  
   def run(ctx : Context)
     @ctx = ctx
-    @program = ctx.program
-    ctx.program.code_gen = self
     
     # Generate all type descriptors and function declarations.
-    ctx.program.reach.each_type_def.each do |type_def|
+    ctx.reach.each_type_def.each do |type_def|
       @gtypes[type_def.llvm_name] = GenType.new(self, type_def)
     end
     
@@ -997,7 +990,7 @@ class Mare::Compiler::CodeGen
     # Even if there are multiple possible gtypes and thus gfuncs, we choose an
     # arbitrary one for the purposes of checking arg types against param types.
     # We make the assumption that signature differences have been prevented.
-    lhs_gtype = @gtypes[program.reach[lhs_type.any_callable_defn_for(member)].llvm_name] # TODO: simplify this mess of an expression
+    lhs_gtype = @gtypes[ctx.reach[lhs_type.any_callable_defn_for(member)].llvm_name] # TODO: simplify this mess of an expression
     gfunc = lhs_gtype[member]
     
     # For any args we are missing, try to find and use a default param value.
@@ -1138,7 +1131,7 @@ class Mare::Compiler::CodeGen
     
     # TODO: support abstract gtypes
     raise NotImplementedError.new(rhs_type) unless rhs_type.is_concrete?
-    rhs_gtype = @gtypes[program.reach[rhs_type.single!].llvm_name]
+    rhs_gtype = @gtypes[ctx.reach[rhs_type.single!].llvm_name]
     
     lhs_desc = gen_get_desc(lhs)
     rhs_desc = gen_get_desc(rhs_gtype)

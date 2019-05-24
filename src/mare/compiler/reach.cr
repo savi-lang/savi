@@ -213,22 +213,20 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     @seen_funcs = Set(Program::Function).new
   end
   
-  def self.run(ctx)
-    instance = ctx.program.reach = new
-    
+  def run(ctx)
     # First, reach the "Main" and "Env" types.
     # TODO: can this special-casing of "Env" be removed?
     ["Main", "Env"].each do |name|
       t = ctx.program.find_type!(name)
-      instance.handle_type_def(t)
+      handle_type_def(t)
     end
     
     # Now, reach into the program starting from Env.new and Main.new.
-    instance.run(ctx, ctx.program.find_func!("Env", "new"))
-    instance.run(ctx, ctx.program.find_func!("Main", "new"))
+    handle_func(ctx, ctx.program.find_func!("Env", "new"))
+    handle_func(ctx, ctx.program.find_func!("Main", "new"))
   end
   
-  def run(ctx, func)
+  def handle_func(ctx, func)
     # Skip this function if we've already seen it.
     return if @seen_funcs.includes?(func)
     @seen_funcs.add(func)
@@ -243,12 +241,12 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     # TODO: any other ways we can be more targeted with this?
     ctx.program.types.each do |t|
       other_func = t.find_func?(func.ident.value)
-      run(ctx, other_func) if other_func
+      handle_func(ctx, other_func) if other_func
     end
     
     # Now, reach all functions called by this function.
     ctx.infers[func].each_called_func.each do |called_func|
-      run(ctx, called_func)
+      handle_func(ctx, called_func)
     end
   end
   

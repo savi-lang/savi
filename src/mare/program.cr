@@ -3,11 +3,6 @@ class Mare::Program
   getter types
   getter aliases
   
-  property! reach : Compiler::Reach
-  property! paint : Compiler::Paint
-  property! code_gen : Compiler::CodeGen
-  property! eval : Compiler::Eval
-  
   def initialize
     @types = [] of Type
     @aliases = [] of TypeAlias

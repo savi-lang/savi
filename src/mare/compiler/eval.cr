@@ -3,15 +3,9 @@ require "llvm"
 class Mare::Compiler::Eval
   getter! exitcode : Int32
   
-  def self.run(ctx)
-    new.run(ctx)
-  end
-  
   def run(ctx)
-    ctx.program.eval = self
-    
-    mod = ctx.program.code_gen.mod
-    llvm = ctx.program.code_gen.llvm
+    mod = ctx.code_gen.mod
+    llvm = ctx.code_gen.llvm
     
     # TODO: Should this pass be responsible for generating the wrapper function?
     jit_func = mod.functions["__mare_jit"]

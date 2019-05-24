@@ -1,9 +1,4 @@
 class Mare::Compiler::Paint
-  def self.run(ctx)
-    instance = ctx.program.paint = new
-    instance.run(ctx.program)
-  end
-  
   alias Color = Int32
   
   def initialize
@@ -13,12 +8,12 @@ class Mare::Compiler::Paint
     @next_color = 0
   end
   
-  def run(program)
+  def run(ctx)
     # Collect a mapping of the types that implement each function name.
-    program.types.each do |t|
+    ctx.program.types.each do |t|
       t.functions.each do |f|
         next if f.has_tag?(:hygienic)
-        next unless program.reach.reached_func?(f)
+        next unless ctx.reach.reached_func?(f)
         
         observe_func(t, f)
       end

@@ -11,9 +11,9 @@ class Mare::Compiler::Binary
   end
   
   def run(ctx)
-    llvm = ctx.program.code_gen.llvm
-    machine = ctx.program.code_gen.target_machine
-    mod = ctx.program.code_gen.mod
+    llvm = ctx.code_gen.llvm
+    machine = ctx.code_gen.target_machine
+    mod = ctx.code_gen.mod
     
     ponyrt_bc = LLVM::MemoryBuffer.from_file(PONYRT_BC_PATH)
     ponyrt = llvm.parse_bitcode(ponyrt_bc).as(LLVM::Module)

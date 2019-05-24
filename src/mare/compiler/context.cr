@@ -2,12 +2,21 @@ class Mare::Compiler::Context
   getter program
   getter infers
   getter refers
+  getter reach
+  getter paint
+  getter code_gen
+  getter eval
   
   def initialize
     @program = Program.new
     @stack = [Interpreter::Default.new(@program)] of Interpreter
+    
     @infers = Infers.new
     @refers = Refers.new
+    @reach = Reach.new
+    @paint = Paint.new
+    @code_gen = CodeGen.new
+    @eval = Eval.new
   end
   
   def compile(doc : AST::Document)
