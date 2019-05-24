@@ -143,7 +143,7 @@ struct Mare::Compiler::Infer::MetaType::AntiNominal
   def supertype_of?(other : Nominal) : Bool
     # An anti-nominal is a supertype of the given nominal if and only if
     # the other nominal's defn is not a subtype of this nominal's defn.
-    !(other.defn < defn)
+    !(other.defn.subtype_of?(defn))
   end
   
   def subtype_of?(other : AntiNominal) : Bool
@@ -151,12 +151,12 @@ struct Mare::Compiler::Infer::MetaType::AntiNominal
     # all cases excluded by the other anti-nominal are also excluded by it.
     # For this anti-nominal to be as or more exclusive than the other,
     # its defn must be as or more inclusive than the other (a supertype).
-    other.defn < defn
+    other.defn.subtype_of?(defn)
   end
   
   def supertype_of?(other : AntiNominal) : Bool
     # This operation is symmetrical with the above operation.
-    defn < other.defn
+    defn.subtype_of?(other.defn)
   end
   
   def subtype_of?(other : (Intersection | Union | Unconstrained | Unsatisfiable)) : Bool

@@ -132,12 +132,12 @@ struct Mare::Compiler::Infer::MetaType::Nominal
   def subtype_of?(other : Nominal) : Bool
     # A nominal is a subtype of another nominal if and only if
     # the defn is a subtype of the other defn.
-    defn < other.defn
+    defn.subtype_of?(other.defn)
   end
   
   def supertype_of?(other : Nominal) : Bool
     # This operation is symmetrical with the above operation.
-    other.defn < defn
+    other.defn.subtype_of?(defn)
   end
   
   def subtype_of?(other : (AntiNominal | Intersection | Union | Unconstrained | Unsatisfiable)) : Bool

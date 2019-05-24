@@ -175,18 +175,18 @@ struct Mare::Compiler::Infer::MetaType
     removed_terms = Set(Nominal).new
     new_terms = inner.terms.try(&.select do |l|
       # Return Unsatisfiable if any term is a subtype of an anti-term.
-      if inner.anti_terms.try(&.any? { |r| l.defn < r.defn })
+      if inner.anti_terms.try(&.any? { |r| l.defn.subtype_of?(r.defn) })
         return Unsatisfiable.instance
       end
       
       # Return Unsatisfiable if l is concrete and isn't a subtype of all others.
-      if l.is_concrete? && inner.terms.try(&.any? { |r| !(l.defn < r.defn) })
+      if l.is_concrete? && inner.terms.try(&.any? { |r| !(l.defn.subtype_of?(r.defn)) })
         return Unsatisfiable.instance
       end
       
       # Remove terms that are supertypes of another term - they are redundant.
       if inner.terms.try(&.any? do |r|
-        l != r && !removed_terms.includes?(r) && r.defn < l.defn
+        l != r && !removed_terms.includes?(r) && r.defn.subtype_of?(l.defn)
       end)
         removed_terms.add(l)
         next
