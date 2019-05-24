@@ -1,11 +1,13 @@
 class Mare::Compiler::Context
   getter program
   getter infers
+  getter refers
   
   def initialize
     @program = Program.new
     @stack = [Interpreter::Default.new(@program)] of Interpreter
     @infers = Infers.new
+    @refers = Refers.new
   end
   
   def compile(doc : AST::Document)

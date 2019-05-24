@@ -13,6 +13,7 @@ describe Mare::Compiler::Refer do
     ctx = Mare::Compiler.compile([source], :refer)
     
     func = ctx.program.find_func!("Main", "new")
+    refer = ctx.refers[func]
     x = func
       .body.not_nil!
       .terms.first.as(Mare::AST::Group)
@@ -20,7 +21,7 @@ describe Mare::Compiler::Refer do
       .list.last.last.as(Mare::AST::Group)
       .terms.first
     
-    func.refer[x].class.should eq Mare::Compiler::Refer::Unresolved
+    refer[x].class.should eq Mare::Compiler::Refer::Unresolved
   end
   
   it "resolves a local declared in all prior branches" do
@@ -42,6 +43,7 @@ describe Mare::Compiler::Refer do
     ctx = Mare::Compiler.compile([source], :refer)
     
     func = ctx.program.find_func!("Main", "new")
+    refer = ctx.refers[func]
     choice_outer = func
       .body.not_nil!
       .terms.first.as(Mare::AST::Group)
@@ -71,10 +73,10 @@ describe Mare::Compiler::Refer do
       .body.not_nil!
       .terms.last.as(Mare::AST::Identifier)
     
-    func.refer[x].as(Mare::Compiler::Refer::LocalUnion).list.should eq [
-      func.refer[x1].as(Mare::Compiler::Refer::Local),
-      func.refer[x2].as(Mare::Compiler::Refer::Local),
-      func.refer[x3].as(Mare::Compiler::Refer::Local),
+    refer[x].as(Mare::Compiler::Refer::LocalUnion).list.should eq [
+      refer[x1].as(Mare::Compiler::Refer::Local),
+      refer[x2].as(Mare::Compiler::Refer::Local),
+      refer[x3].as(Mare::Compiler::Refer::Local),
     ]
   end
   

@@ -6,7 +6,7 @@ module Mare::Compiler
     when :sugar        then ctx.run(Sugar)
     when :lambda       then ctx.run(Lambda)
     when :classify     then ctx.run(Classify)
-    when :refer        then ctx.run(Refer)
+    when :refer        then ctx.run(ctx.refers)
     when :infer        then ctx.run(ctx.infers)
     when :completeness then ctx.run(Completeness)
     when :reach        then ctx.run(Reach)

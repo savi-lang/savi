@@ -32,8 +32,6 @@ class Mare::Program
     
     getter metadata
     
-    property! refer : Compiler::Refer
-    
     def initialize(@ident, @target)
       @metadata = Hash(Symbol, Int32 | Bool).new # TODO: should be UInt64?
     end
@@ -159,8 +157,6 @@ class Mare::Program
     property ret : AST::Term?
     property body : AST::Group?
     
-    property! refer : Compiler::Refer
-    
     getter metadata : Hash(Symbol, String)
     
     KNOWN_TAGS = [
@@ -183,8 +179,6 @@ class Mare::Program
     def dup_init
       @tags = @tags.dup
       @metadata = @metadata.dup
-      
-      raise "can't copy a refer property" if @refer
     end
     
     def dup

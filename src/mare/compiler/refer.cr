@@ -1,3 +1,42 @@
+class Mare::Compiler::Refers < Mare::AST::Visitor
+  def initialize
+    @map = {} of Program::Function => Refer
+  end
+  
+  def run(ctx)
+    # Gather all the types in the program as Decls.
+    decls = {} of String => (Refer::Decl | Refer::DeclAlias)
+    ctx.program.types.each_with_index do |t, index|
+      name = t.ident.value
+      decls[name] = Refer::Decl.new(t)
+    end
+    
+    # Gather type aliases in a similar way, dereferencing as we go.
+    ctx.program.aliases.each_with_index do |a, index|
+      name = a.ident.value
+      decls[name] = Refer::DeclAlias.new(a, decls[a.target.value])
+    end
+    
+    # For each function in the program, run with a new instance.
+    ctx.program.types.each do |t|
+      t_decl = Refer::Decl.new(t)
+      t.functions.each do |f|
+        Refer.new(t_decl, decls)
+        .tap { |refer| @map[f] = refer }
+        .tap(&.run(f))
+      end
+    end
+  end
+  
+  def [](f : Program::Function)
+    @map[f]
+  end
+  
+  def []?(f : Program::Function)
+    @map[f]?
+  end
+end
+
 class Mare::Compiler::Refer
   class Unresolved
     INSTANCE = new
@@ -109,33 +148,7 @@ class Mare::Compiler::Refer
     @decls[name].final_decl.defn
   end
   
-  def self.run(ctx)
-    # Gather all the types in the program as Decls.
-    decls = {} of String => (Decl | DeclAlias)
-    ctx.program.types.each_with_index do |t, index|
-      name = t.ident.value
-      decls[name] = Decl.new(t)
-    end
-    
-    # Gather type aliases in a similar way, dereferencing as we go.
-    ctx.program.aliases.each_with_index do |a, index|
-      name = a.ident.value
-      decls[name] = DeclAlias.new(a, decls[a.target.value])
-    end
-    
-    # For each function in the program, run with a new instance.
-    ctx.program.types.each do |t|
-      t_decl = Decl.new(t)
-      t.functions.each do |f|
-        new(t_decl, decls).run(f)
-      end
-    end
-  end
-  
   def run(func)
-    return if func.refer? # skip if we've already completed this analysis
-    func.refer = self
-    
     root = Branch.new(self)
     
     func.params.try(&.accept(root))

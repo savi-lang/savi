@@ -92,7 +92,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   end
   
   def refer
-    func.refer
+    ctx.refers[func]
   end
   
   def resolve(node) : MetaType
