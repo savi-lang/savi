@@ -130,7 +130,7 @@ class Mare::Compiler::Infer
   
   class Local < Info # TODO: dedup implementation with Field
     @explicit : MetaType?
-    @upstream : TID?
+    @upstream : AST::Node?
     
     def initialize(@pos)
     end
@@ -168,8 +168,8 @@ class Mare::Compiler::Infer
       end
     end
     
-    def assign(infer : Infer, rhs_tid : TID, rhs_pos : Source::Pos)
-      infer[rhs_tid].within_domain!(
+    def assign(infer : Infer, rhs : AST::Node, rhs_pos : Source::Pos)
+      infer[rhs].within_domain!(
         infer,
         rhs_pos,
         @pos,
@@ -178,13 +178,13 @@ class Mare::Compiler::Infer
       ) if @explicit
       
       raise "already assigned an upstream" if @upstream
-      @upstream = rhs_tid
+      @upstream = rhs
     end
   end
   
   class Field < Info # TODO: dedup implementation with Local
     @explicit : MetaType?
-    @upstream : TID?
+    @upstream : AST::Node?
     getter origin : MetaType
     
     def initialize(@pos, @origin)
@@ -244,8 +244,8 @@ class Mare::Compiler::Infer
       end
     end
     
-    def assign(infer : Infer, rhs_tid : TID, rhs_pos : Source::Pos)
-      infer[rhs_tid].within_domain!(
+    def assign(infer : Infer, rhs : AST::Node, rhs_pos : Source::Pos)
+      infer[rhs].within_domain!(
         infer,
         rhs_pos,
         @pos,
@@ -254,7 +254,7 @@ class Mare::Compiler::Infer
       ) if @explicit
       
       raise "already assigned an upstream" if @upstream
-      @upstream = rhs_tid
+      @upstream = rhs
     end
   end
   
@@ -262,7 +262,7 @@ class Mare::Compiler::Infer
     @explicit : MetaType?
     @downstreamed : MetaType?
     @downstreamed_pos : Source::Pos?
-    @upstream : TID?
+    @upstream : AST::Node?
     
     def initialize(@pos)
     end
@@ -307,13 +307,13 @@ class Mare::Compiler::Infer
         if @upstream
     end
     
-    def verify_arg(infer : Infer, arg_infer : Infer, arg_tid : TID, arg_pos : Source::Pos)
-      arg = arg_infer[arg_tid]
+    def verify_arg(infer : Infer, arg_infer : Infer, arg : AST::Node, arg_pos : Source::Pos)
+      arg = arg_infer[arg]
       arg.within_domain!(arg_infer, arg_pos, @pos, resolve!(infer), false)
     end
     
-    def assign(infer : Infer, rhs_tid : TID, rhs_pos : Source::Pos)
-      infer[rhs_tid].within_domain!(
+    def assign(infer : Infer, rhs : AST::Node, rhs_pos : Source::Pos)
+      infer[rhs].within_domain!(
         infer,
         rhs_pos,
         @pos,
@@ -321,7 +321,7 @@ class Mare::Compiler::Infer
         false,
       ) if @explicit
       
-      infer[rhs_tid].within_domain!(
+      infer[rhs].within_domain!(
         infer,
         rhs_pos,
         @downstreamed_pos.not_nil!,
@@ -330,31 +330,31 @@ class Mare::Compiler::Infer
       ) if @downstreamed
       
       raise "already assigned an upstream" if @upstream
-      @upstream = rhs_tid
+      @upstream = rhs
     end
   end
   
   class Choice < Info
-    getter clauses : Array(TID)
+    getter clauses : Array(AST::Node)
     
     def initialize(@pos, @clauses)
     end
     
     def resolve!(infer : Infer)
-      MetaType.new_union(clauses.map { |tid| infer[tid].resolve!(infer) })
+      MetaType.new_union(clauses.map { |node| infer[node].resolve!(infer) })
     end
     
     def within_domain!(infer : Infer, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliased : Bool)
-      clauses.each { |tid| infer[tid].within_domain!(infer, use_pos, constraint_pos, constraint, aliased) }
+      clauses.each { |node| infer[node].within_domain!(infer, use_pos, constraint_pos, constraint, aliased) }
     end
   end
   
   class TypeCondition < Info
     getter bool : MetaType # TODO: avoid needing the caller to supply this
-    getter refine_tid : TID
+    getter refine : AST::Node
     getter refine_type : MetaType
     
-    def initialize(@pos, @bool, @refine_tid, @refine_type)
+    def initialize(@pos, @bool, @refine, @refine_type)
       raise "#{@bool.show_type} is not Bool" unless @bool.show_type == "Bool"
     end
     
@@ -368,14 +368,14 @@ class Mare::Compiler::Infer
   end
   
   class Refinement < Info
-    getter refine_tid : TID
+    getter refine : AST::Node
     getter refine_type : MetaType
     
-    def initialize(@pos, @refine_tid, @refine_type)
+    def initialize(@pos, @refine, @refine_type)
     end
     
     def resolve!(infer : Infer)
-      infer[@refine_tid].resolve!(infer).intersect(@refine_type)
+      infer[@refine].resolve!(infer).intersect(@refine_type)
     end
     
     def within_domain!(infer : Infer, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliased : Bool)
@@ -384,13 +384,13 @@ class Mare::Compiler::Infer
   end
   
   class Consume < Info
-    getter local_tid : TID
+    getter local : AST::Node
     
-    def initialize(@pos, @local_tid)
+    def initialize(@pos, @local)
     end
     
     def resolve!(infer : Infer)
-      infer[@local_tid].resolve!(infer).ephemeralize
+      infer[@local].resolve!(infer).ephemeralize
     end
     
     def within_domain!(infer : Infer, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliased : Bool)
@@ -399,10 +399,10 @@ class Mare::Compiler::Infer
   end
   
   class FromCall < Info
-    getter lhs : TID
+    getter lhs : AST::Node
     getter member : String
     getter args_pos : Array(Source::Pos)
-    getter args : Array(TID)
+    getter args : Array(AST::Node)
     @ret : MetaType?
     @ret_pos : Source::Pos?
     @aliased : Bool?

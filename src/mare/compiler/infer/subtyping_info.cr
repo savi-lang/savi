@@ -169,8 +169,8 @@ class Mare::Compiler::Infer::SubtypingInfo
     end
     
     # Covariant return type.
-    this_ret = this_infer.resolve(this_infer.ret_tid)
-    that_ret = that_infer.resolve(that_infer.ret_tid)
+    this_ret = this_infer.resolve(this_infer.ret)
+    that_ret = that_infer.resolve(that_infer.ret)
     unless this_ret < that_ret
       errors << {(this_func.ret || this_func.ident).pos,
         "this function's return type is #{this_ret.show_type}"}
