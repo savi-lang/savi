@@ -119,8 +119,8 @@ struct Mare::Compiler::Infer::MetaType
     @inner.is_a?(Capability)
   end
   
-  def within_constraints?(types : Iterable(MetaType))
-    self < self.class.new_intersection(types)
+  def within_constraints?(infer : Infer, types : Iterable(MetaType))
+    infer.is_subtype?(self, self.class.new_intersection(types))
   end
   
   def unsatisfiable?
@@ -160,33 +160,33 @@ struct Mare::Compiler::Infer::MetaType
     MetaType.new(@inner.unite(other.inner))
   end
   
-  def simplify
+  def simplify(infer : Infer)
     inner = @inner
     
     # Currently we only have the logic to simplify these cases:
-    return MetaType.new(simplify_union(inner)) if inner.is_a?(Union) && inner.intersects
-    return MetaType.new(simplify_intersection(inner)) if inner.is_a?(Intersection)
+    return MetaType.new(simplify_union(infer, inner)) if inner.is_a?(Union) && inner.intersects
+    return MetaType.new(simplify_intersection(infer, inner)) if inner.is_a?(Intersection)
     
     self
   end
   
-  private def simplify_intersection(inner : Intersection)
+  private def simplify_intersection(infer : Infer, inner : Intersection)
     # TODO: complete the rest of the logic here (think about symmetry)
     removed_terms = Set(Nominal).new
     new_terms = inner.terms.try(&.select do |l|
       # Return Unsatisfiable if any term is a subtype of an anti-term.
-      if inner.anti_terms.try(&.any? { |r| l.defn.subtype_of?(r.defn) })
+      if inner.anti_terms.try(&.any? { |r| infer.is_subtype?(l.defn, r.defn) })
         return Unsatisfiable.instance
       end
       
       # Return Unsatisfiable if l is concrete and isn't a subtype of all others.
-      if l.is_concrete? && inner.terms.try(&.any? { |r| !(l.defn.subtype_of?(r.defn)) })
+      if l.is_concrete? && inner.terms.try(&.any? { |r| !infer.is_subtype?(l.defn, r.defn) })
         return Unsatisfiable.instance
       end
       
       # Remove terms that are supertypes of another term - they are redundant.
       if inner.terms.try(&.any? do |r|
-        l != r && !removed_terms.includes?(r) && r.defn.subtype_of?(l.defn)
+        l != r && !removed_terms.includes?(r) && infer.is_subtype?(r.defn, l.defn)
       end)
         removed_terms.add(l)
         next
@@ -202,7 +202,7 @@ struct Mare::Compiler::Infer::MetaType
     Intersection.build(inner.cap, new_terms.try(&.to_set), inner.anti_terms)
   end
   
-  private def simplify_union(inner : Union)
+  private def simplify_union(infer : Infer, inner : Union)
     caps = Set(Capability).new
     terms = Set(Nominal).new
     anti_terms = Set(AntiNominal).new
@@ -217,7 +217,7 @@ struct Mare::Compiler::Infer::MetaType
     
     # Simplify each intersection, collecting the results.
     inner.intersects.not_nil!.each do |intersect|
-      result = simplify_intersection(intersect)
+      result = simplify_intersection(infer, intersect)
       case result
       when Unsatisfiable then # do nothing, it's no longer in the union
       when Nominal then terms.add(result)
@@ -231,9 +231,8 @@ struct Mare::Compiler::Infer::MetaType
   end
   
   # Return true if this MetaType is a subtype of the other MetaType.
-  def <(other); subtype_of?(other) end
-  def subtype_of?(other : MetaType)
-    inner.subtype_of?(other.inner)
+  def subtype_of?(infer : Infer, other : MetaType)
+    inner.subtype_of?(infer, other.inner)
   end
   
   def each_reachable_defn : Iterator(Program::Type)

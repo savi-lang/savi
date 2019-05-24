@@ -86,6 +86,7 @@ struct Mare::Compiler::Infer::MetaType::Capability
     other.unite(self) # delegate to the "higher" class via commutativity
   end
   
+  def subtype_of?(infer : Infer, other : Capability); subtype_of?(other) end
   def subtype_of?(other : Capability) : Bool
     ##
     # Reference capability subtyping can be visualized using this graph,
@@ -129,16 +130,17 @@ struct Mare::Compiler::Infer::MetaType::Capability
     end
   end
   
+  def supertype_of?(infer : Infer, other : Capability); supertype_of?(other) end
   def supertype_of?(other : Capability) : Bool
     other.subtype_of?(self) # delegate to the above function via symmetry
   end
   
-  def subtype_of?(other : (Nominal | AntiNominal | Intersection | Union | Unconstrained | Unsatisfiable)) : Bool
-    other.supertype_of?(self) # delegate to the other class via symmetry
+  def subtype_of?(infer : Infer, other : (Nominal | AntiNominal | Intersection | Union | Unconstrained | Unsatisfiable)) : Bool
+    other.supertype_of?(infer, self) # delegate to the other class via symmetry
   end
   
-  def supertype_of?(other : (Nominal | AntiNominal | Intersection | Union | Unconstrained | Unsatisfiable)) : Bool
-    other.subtype_of?(self) # delegate to the other class via symmetry
+  def supertype_of?(infer : Infer, other : (Nominal | AntiNominal | Intersection | Union | Unconstrained | Unsatisfiable)) : Bool
+    other.subtype_of?(infer, self) # delegate to the other class via symmetry
   end
   
   def ephemeralize

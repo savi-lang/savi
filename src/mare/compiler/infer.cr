@@ -1,11 +1,14 @@
 class Mare::Compiler::Infers < Mare::AST::Visitor
   def initialize
     @map = {} of Program::Function => Infer
+    @subtyping_info = {} of Program::Type => Infer::SubtypingInfo
   end
   
   def run(ctx)
     # Before doing anything, instantiate SubtypingInfo on all types.
-    ctx.program.types.each(&.subtyping_init(ctx))
+    ctx.program.types.each do |t|
+      @subtyping_info[t] = Infer::SubtypingInfo.new(ctx, t)
+    end
     
     # Start by running an instance of inference at the Main.new function,
     # and recurse into checking other functions that are reachable from there.
@@ -39,6 +42,10 @@ class Mare::Compiler::Infers < Mare::AST::Visitor
     @map[f]?
   end
   
+  def subtyping_info_for(t : Program::Type)
+    @subtyping_info[t]
+  end
+  
   def infer_from(ctx : Context, t : Program::Type, f : Program::Function)
     self[f]? || (
       Infer.new(ctx, t, f)
@@ -55,7 +62,7 @@ class Mare::Compiler::Infers < Mare::AST::Visitor
       iface = infer.resolve(infer.ret).single!
       
       errors = [] of Error::Info
-      unless t.subtype_of?(iface, errors)
+      unless infer.is_subtype?(t, iface, errors)
         Error.at t.ident,
           "This type doesn't implement the interface #{iface.ident.value}",
             errors
@@ -93,6 +100,18 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   
   def refer
     ctx.refers[func]
+  end
+  
+  def is_subtype?(
+    l : Program::Type,
+    r : Program::Type,
+    errors = [] of Error::Info,
+  ) : Bool
+    ctx.infers.subtyping_info_for(l).check(r, errors)
+  end
+  
+  def is_subtype?(l : MetaType, r : MetaType) : Bool
+    l.subtype_of?(self, r)
   end
   
   def resolve(node) : MetaType
@@ -203,7 +222,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       infer = ctx.infers.infer_from(ctx, call_defn, call_func)
       
       # Enforce the capability restriction of the receiver.
-      unless MetaType.new(call_mti) < infer.resolved_receiver
+      unless is_subtype?(MetaType.new(call_mti), infer.resolved_receiver)
         problems << {call_func.cap,
           "the type #{call_mti.inspect} isn't a subtype of the " \
           "required capability of '#{call_func.cap.value}'"} \
@@ -230,7 +249,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     # Constrain the return value as the union of all observed return types.
     ret = rets.size == 1 ? rets.first : MetaType.new_union(rets)
     pos = poss.size == 1 ? poss.first : call.pos
-    call.set_return(pos, ret)
+    call.set_return(self, pos, ret)
   end
   
   def follow_field(field : Field, name : String)

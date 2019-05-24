@@ -267,18 +267,18 @@ struct Mare::Compiler::Infer::MetaType::Intersection
       .intersect(cap.not_nil!.extracted_from(origin))
   end
   
-  def subtype_of?(other : Capability) : Bool
+  def subtype_of?(infer : Infer, other : Capability) : Bool
     # This intersection is a subtype of the given capability if and only if
     # it has a capability as part of the intersection, and that capability
     # is a subtype of the given capability.
-    cap.try(&.subtype_of?(other)) || false
+    cap.try(&.subtype_of?(infer, other)) || false
   end
   
-  def supertype_of?(other : Capability) : Bool
+  def supertype_of?(infer : Infer, other : Capability) : Bool
     raise NotImplementedError.new([self, :supertype_of?, other].inspect)
   end
   
-  def subtype_of?(other : Nominal) : Bool
+  def subtype_of?(infer : Infer, other : Nominal) : Bool
     # Note that no matter if we have a capability restriction or not,
     # it doesn't factor into us considering whether we're a subtype of
     # the given nominal or not - a nominal says nothing about capabilities.
@@ -286,12 +286,12 @@ struct Mare::Compiler::Infer::MetaType::Intersection
     # This intersection is a subtype of the given nominal if and only if
     # all terms in the intersection are a supertype of that nominal.
     result = true
-    result &&= terms.not_nil!.all?(&.subtype_of?(other)) if terms
-    result &&= anti_terms.not_nil!.all?(&.subtype_of?(other)) if anti_terms
+    result &&= terms.not_nil!.all?(&.subtype_of?(infer, other)) if terms
+    result &&= anti_terms.not_nil!.all?(&.subtype_of?(infer, other)) if anti_terms
     result
   end
   
-  def supertype_of?(other : Nominal) : Bool
+  def supertype_of?(infer : Infer, other : Nominal) : Bool
     # If we have a capability restriction, we can't possibly be a supertype of
     # other, because a nominal says nothing about capabilities.
     return false if cap
@@ -299,24 +299,24 @@ struct Mare::Compiler::Infer::MetaType::Intersection
     # This intersection is a supertype of the given nominal if and only if
     # all terms in the intersection are a supertype of that nominal.
     result = true
-    result &&= terms.not_nil!.all?(&.supertype_of?(other)) if terms
-    result &&= anti_terms.not_nil!.all?(&.supertype_of?(other)) if anti_terms
+    result &&= terms.not_nil!.all?(&.supertype_of?(infer, other)) if terms
+    result &&= anti_terms.not_nil!.all?(&.supertype_of?(infer, other)) if anti_terms
     result
   end
   
-  def subtype_of?(other : AntiNominal) : Bool
+  def subtype_of?(infer : Infer, other : AntiNominal) : Bool
     raise NotImplementedError.new([self, :subtype_of?, other].inspect)
   end
   
-  def supertype_of?(other : AntiNominal) : Bool
+  def supertype_of?(infer : Infer, other : AntiNominal) : Bool
     raise NotImplementedError.new([self, :supertype_of?, other].inspect)
   end
   
-  def subtype_of?(other : Intersection) : Bool
+  def subtype_of?(infer : Infer, other : Intersection) : Bool
     # Firstly, our cap must be a subtype of the other cap (if present).
     return false if other.cap && (
       !cap ||
-      !cap.not_nil!.subtype_of?(other.cap.not_nil!)
+      !cap.not_nil!.subtype_of?(infer, other.cap.not_nil!)
     )
     
     # Next, we'll look at each term we have.
@@ -327,7 +327,7 @@ struct Mare::Compiler::Infer::MetaType::Intersection
       # get inlined into a single composite interface so that they can be
       # properly compared while taking it all simultaneously into account.
       return false \
-        if other.terms && !other.terms.not_nil!.all?(&.supertype_of?(term))
+        if other.terms && !other.terms.not_nil!.all?(&.supertype_of?(infer, term))
       
       raise NotImplementedError.new("intersection subtyping with anti terms") \
         if other.anti_terms
@@ -342,15 +342,15 @@ struct Mare::Compiler::Infer::MetaType::Intersection
     true
   end
   
-  def supertype_of?(other : Intersection) : Bool
-    other.subtype_of?(self) # delegate to the above function via symmetry.
+  def supertype_of?(infer : Infer, other : Intersection) : Bool
+    other.subtype_of?(infer, self) # delegate to the above function via symmetry.
   end
   
-  def subtype_of?(other : (Union | Unconstrained | Unsatisfiable)) : Bool
-    other.supertype_of?(self) # delegate to the other class via symmetry
+  def subtype_of?(infer : Infer, other : (Union | Unconstrained | Unsatisfiable)) : Bool
+    other.supertype_of?(infer, self) # delegate to the other class via symmetry
   end
   
-  def supertype_of?(other : (Union | Unconstrained | Unsatisfiable)) : Bool
-    other.subtype_of?(self) # delegate to the other class via symmetry
+  def supertype_of?(infer : Infer, other : (Union | Unconstrained | Unsatisfiable)) : Bool
+    other.subtype_of?(infer, self) # delegate to the other class via symmetry
   end
 end

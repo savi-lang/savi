@@ -108,7 +108,8 @@ module Mare::Compiler::Completeness
     
     def touch(node : AST::Identifier)
       # Ignore this identifier if it is not of the self.
-      info = ctx.infers[func][node]?
+      infer = ctx.infers[func]
+      info = infer[node]?
       return unless info.is_a?(Infer::Self)
       
       # We only care about further analysis if not all fields are initialized.
@@ -123,7 +124,7 @@ module Mare::Compiler::Completeness
       # Infer pass that tracked all of those constraints.
       info.domain_constraints.each do |pos, constraint|
         # If tag will meet the constraint, then this use of the self is okay.
-        next if tag_self < constraint
+        next if infer.is_subtype?(tag_self, constraint)
         
         # Otherwise, we must raise an error.
         Error.at node,

@@ -132,16 +132,6 @@ class Mare::Program
       term = f.body.try(&.terms[-1]?)
       term.is_a?(AST::Identifier) && term.value == "True"
     end
-    
-    @subtyping : Mare::Compiler::Infer::SubtypingInfo?
-    def subtyping_init(ctx : Compiler::Context)
-      @subtyping = Mare::Compiler::Infer::SubtypingInfo.new(ctx, self)
-    end
-    
-    # Return true if this Type is a subtype of the other Type.
-    def subtype_of?(other : Program::Type, errors = [] of Error::Info) : Bool
-      @subtyping.not_nil!.check(other, errors)
-    end
   end
   
   class Function

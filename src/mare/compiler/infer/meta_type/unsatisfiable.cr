@@ -65,13 +65,13 @@ class Mare::Compiler::Infer::MetaType::Unsatisfiable
     raise NotImplementedError.new("#{origin.inspect}+>#{self.inspect}")
   end
   
-  def subtype_of?(other : Inner) : Bool
+  def subtype_of?(infer : Infer, other : Inner) : Bool
     # Unsatisfiable is a subtype of nothing - it cannot exist at all.
     # TODO: is this right? it seems so, but breaks symmetry with Unconstrained.
     false
   end
   
-  def supertype_of?(other : Inner) : Bool
+  def supertype_of?(infer : Infer, other : Inner) : Bool
     # Unsatisfiable is never a supertype - it is never satisfied.
     false
   end

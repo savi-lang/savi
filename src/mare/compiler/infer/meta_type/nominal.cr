@@ -117,34 +117,34 @@ struct Mare::Compiler::Infer::MetaType::Nominal
     raise NotImplementedError.new("#{origin.inspect}+>#{self.inspect}")
   end
   
-  def subtype_of?(other : Capability) : Bool
+  def subtype_of?(infer : Infer, other : Capability) : Bool
     # A nominal can never be a subtype of any capability -
     # it specifies a single nominal, and says nothing about capabilities.
     false
   end
   
-  def supertype_of?(other : Capability) : Bool
+  def supertype_of?(infer : Infer, other : Capability) : Bool
     # A nominal can never be a supertype of any capability -
     # it specifies a single nominal, and says nothing about capabilities.
     false
   end
   
-  def subtype_of?(other : Nominal) : Bool
+  def subtype_of?(infer : Infer, other : Nominal) : Bool
     # A nominal is a subtype of another nominal if and only if
     # the defn is a subtype of the other defn.
-    defn.subtype_of?(other.defn)
+    infer.is_subtype?(defn, other.defn)
   end
   
-  def supertype_of?(other : Nominal) : Bool
+  def supertype_of?(infer : Infer, other : Nominal) : Bool
     # This operation is symmetrical with the above operation.
-    other.defn.subtype_of?(defn)
+    infer.is_subtype?(other.defn, defn)
   end
   
-  def subtype_of?(other : (AntiNominal | Intersection | Union | Unconstrained | Unsatisfiable)) : Bool
-    other.supertype_of?(self) # delegate to the other class via symmetry
+  def subtype_of?(infer : Infer, other : (AntiNominal | Intersection | Union | Unconstrained | Unsatisfiable)) : Bool
+    other.supertype_of?(infer, self) # delegate to the other class via symmetry
   end
   
-  def supertype_of?(other : (AntiNominal | Intersection | Union | Unconstrained | Unsatisfiable)) : Bool
-    other.subtype_of?(self) # delegate to the other class via symmetry
+  def supertype_of?(infer : Infer, other : (AntiNominal | Intersection | Union | Unconstrained | Unsatisfiable)) : Bool
+    other.subtype_of?(infer, self) # delegate to the other class via symmetry
   end
 end

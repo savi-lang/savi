@@ -1,5 +1,5 @@
 class Mare::Compiler::Infer::SubtypingInfo
-  def initialize(@ctx : Compiler::Context, @this : Program::Type)
+  def initialize(@ctx : Context, @this : Program::Type)
     @asserted = Set(Program::Type).new # TODO: use this instead of `is` metadata
     @confirmed = Set(Program::Type).new
     @disproved = Hash(Program::Type, Array(Error::Info)).new
@@ -164,7 +164,7 @@ class Mare::Compiler::Infer::SubtypingInfo
     # Covariant return type.
     this_ret = this_infer.resolve(this_infer.ret)
     that_ret = that_infer.resolve(that_infer.ret)
-    unless this_ret < that_ret
+    unless this_infer.is_subtype?(this_ret, that_ret)
       errors << {(this_func.ret || this_func.ident).pos,
         "this function's return type is #{this_ret.show_type}"}
       errors << {(that_func.ret || that_func.ident).pos,
@@ -177,7 +177,7 @@ class Mare::Compiler::Infer::SubtypingInfo
         l_params.terms.zip(r_params.terms).each do |(l_param, r_param)|
           l_param_mt = this_infer.resolve(l_param)
           r_param_mt = that_infer.resolve(r_param)
-          unless r_param_mt < l_param_mt
+          unless this_infer.is_subtype?(r_param_mt, l_param_mt)
             errors << {l_param.pos,
               "this parameter type is #{l_param_mt.show_type}"}
             errors << {r_param.pos,
