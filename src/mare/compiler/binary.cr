@@ -35,7 +35,7 @@ class Mare::Compiler::Binary
     
     res =  Process.run("/usr/bin/env", link_args, output: STDOUT, error: STDERR)
     raise "linker failed" unless res.exit_status == 0
-  # ensure
-  #   File.delete(obj_filename) if obj_filename
+  ensure
+    File.delete(obj_filename) if obj_filename
   end
 end
