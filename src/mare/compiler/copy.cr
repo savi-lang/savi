@@ -2,13 +2,16 @@ module Mare::Compiler::Copy
   def self.run(ctx)
     ctx.program.types.each do |dest|
       dest.functions.each do |f|
-        # Only look at "functions" that are actually "is" annotations.
+        # Only look at functions that have the "copies" tag.
+        # Often these "functions" are actually "is" annotations.
         next unless f.has_tag?(:copies)
         
         # Find the type associated with the "return value" of the "function"
         # and copy the functions from it that we need.
-        # TODO: present a nice error by checking with `has_type?` first.
-        source = ctx.program.find_type!(f.ret.as(AST::Identifier).value)
+        ret = f.ret.as(AST::Identifier)
+        source = ctx.program.find_type?(ret.value)
+        Error.at ret, "This type couldn't be resolved" unless source
+        
         copy_from(source, dest)
       end
     end
