@@ -1,7 +1,13 @@
+##
+# The purpose of the Reach pass is to [TODO: justify and clean up this pass].
+#
+# This pass does not mutate the Program topology.
+# This pass does not mutate the AST.
+# This pass does not raise any compilation errors.
+# This pass keeps state at the program level.
+# This pass produces output state at the type/meta-type level.
+#
 class Mare::Compiler::Reach < Mare::AST::Visitor
-  class Error < Exception
-  end
-  
   class Ref
     def initialize(@meta_type : Infer::MetaType)
     end

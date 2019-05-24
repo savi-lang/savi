@@ -1,3 +1,16 @@
+##
+# The purpose of the Completeness pass is to prove that constructors initialize
+# all fields in the type that it constructs, such that no other code may ever
+# interact with a readable reference to an uninitialized/NULL field.
+# This validation work also includes typechecking of "self" references shared
+# during a constructor before the type is "complete" (all fields initialized).
+#
+# This pass does not mutate the Program topology.
+# This pass does not mutate the AST.
+# This pass may raise a compilation error.
+# This pass keeps temporay state (on the stack) at the per-type level.
+# This pass produces no output state.
+#
 module Mare::Compiler::Completeness
   def self.run(ctx)
     ctx.program.types.each do |t|

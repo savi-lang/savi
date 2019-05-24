@@ -1,3 +1,13 @@
+##
+# The purpose of the Lambda pass is to replace inline lambda forms with calls
+# to new anonymous/hygienic types that represent the lambda as an external type.
+#
+# This pass mutates the Program topology.
+# This pass mutates ASTs.
+# This pass may raise a compilation error.
+# This pass keeps temporary state at the per-function level.
+# This pass produces no output state.
+#
 class Mare::Compiler::Lambda < Mare::AST::Visitor
   def self.run(ctx)
     ctx.program.types.each do |t|

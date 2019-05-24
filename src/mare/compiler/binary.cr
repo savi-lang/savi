@@ -1,9 +1,18 @@
 require "file"
 require "llvm"
 
+##
+# The purpose of the Binary pass is to produce a binary executable of the
+# program, using LLVM and clang tooling and writing the result to disk.
+#
+# This pass does not mutate the Program topology.
+# This pass does not mutate the AST.
+# This pass does not raise any compilation errors.
+# This pass keeps temporary state (on the stack) at the program level.
+# This pass produces no output state (aside from the side effect below).
+# !! This pass has the side-effect of writing files to disk.
+#
 class Mare::Compiler::Binary
-  getter! exitcode : Int32
-  
   PONYRT_BC_PATH = "/usr/local/lib/libponyrt.bc"
   
   def self.run(ctx)

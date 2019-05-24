@@ -1,3 +1,15 @@
+##
+# The purpose of the Copy pass is to copy a set of functions from one type to
+# another, such that any functions missing in the destination type will be
+# copied from the source type. In the most common case, this is caused by
+# an "is" annotation on a type denoting an inheritance relationship.
+#
+# This pass mutates the Program topology.
+# This pass reads ASTs (Function heads only) but does not mutate any ASTs.
+# This pass may raise a compilation error.
+# This pass keeps temporary state (on the stack) at the per-type level.
+# This pass produces no output state.
+#
 module Mare::Compiler::Copy
   def self.run(ctx)
     ctx.program.types.each do |dest|

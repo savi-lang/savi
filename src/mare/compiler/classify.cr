@@ -1,3 +1,14 @@
+##
+# The purpose of the Classify pass is to do some further semantic parsing of
+# AST forms to add additional context about what those forms mean, in the form
+# of flag bits being set on the state of the AST nodes themselves.
+#
+# This pass does not mutate the Program topology.
+# This pass sets flags on AST nodes but does not otherwise mutate ASTs.
+# This pass does not raise any compilation errors.
+# This pass keeps temporary state (on the stack) at the per-function level.
+# This pass produces no output state.
+#
 class Mare::Compiler::Classify < Mare::AST::Visitor
   FLAG_VALUE_NOT_NEEDED = 0x1_u64
   FLAG_TYPE_EXPR        = 0x2_u64

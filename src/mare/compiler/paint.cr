@@ -1,3 +1,19 @@
+##
+# The purpose of the Paint pass is to pick a "color" for each function in the
+# program, such that functions which have the same name are guaranteed to have
+# the same color but no two functions in a single type have the same color.
+# The color id is then used to generate virtual-table call indexes, such that
+# calling a function on a trait (with a specific color) will result in the
+# function of the same name on the underlying concrete type being called
+# (because it has the same color). In the future, this pass may need to become
+# more sophisticated, perhaps to deal with multiple-dispatch forms.
+#
+# This pass does not mutate the Program topology.
+# This pass does not mutate the AST.
+# This pass does not raise any compilation errors.
+# This pass keeps state at the program level.
+# This pass produces output state at the per-function level.
+#
 class Mare::Compiler::Paint
   alias Color = Int32
   

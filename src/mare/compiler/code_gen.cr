@@ -4,6 +4,16 @@ require "../ext/llvm" # TODO: get these merged into crystal standard library
 require "compiler/crystal/config" # TODO: remove
 require "./code_gen/*"
 
+##
+# The purpose of the CodeGen pass is to generate LLVM code (IR) which can
+# be used along with LLVM tooling to create an executable program.
+#
+# This pass does not mutate the Program topology.
+# This pass does not mutate the AST.
+# This pass does not raise any compilation errors.
+# This pass keeps state at the program level.
+# This pass produces output state at the program level.
+#
 class Mare::Compiler::CodeGen
   getter llvm : LLVM::Context
   getter target : LLVM::Target

@@ -1,3 +1,15 @@
+##
+# The purpose of the Sugar pass is to expand universal shorthand forms,
+# by filling in default ASTs where they are omitted, or transforming
+# syntax sugar forms into their corresponding standard/canonical form,
+# so that later passes can deal in less diverse, more predictable forms.
+#
+# This pass does not mutate the Program topology.
+# This pass heavily mutates ASTs.
+# This pass does not raise any compilation errors.
+# This pass keeps temporary state (on the stack) at the per-function level.
+# This pass produces no output state.
+#
 class Mare::Compiler::Sugar < Mare::AST::Visitor
   def self.run(ctx)
     sugar = new
@@ -53,11 +65,6 @@ class Mare::Compiler::Sugar < Mare::AST::Visitor
     
     # Sugar the body.
     f.body.try { |body| body.accept(self) }
-  end
-  
-  @last_choice_num = 0
-  private def next_choice_name
-    "choice.#{@last_choice_num += 1}"
   end
   
   def visit(node : AST::Identifier)

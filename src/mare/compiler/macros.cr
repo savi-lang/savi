@@ -1,3 +1,16 @@
+##
+# The purpose of the Macros pass is to parse and expand semantic forms that
+# may be more context-sensitive/dynamic than those parsed in the parser itself.
+# Eventually we wish to allow the user code to register this macro logic in the
+# earlier passes of evaluation in the compiler, to make them fully dynamic.
+# This is not possible yet, as all macros are hard-coded here in the compiler.
+#
+# This pass does not mutate the Program topology, but may add Function tags.
+# This pass heavily mutates ASTs.
+# This pass may raise a compilation error.
+# This pass keeps temporary state (on the stack) at the per-function level.
+# This pass produces no output state.
+#
 class Mare::Compiler::Macros < Mare::AST::Visitor
   # TODO: This class should interpret macro declarations by the user and treat
   # those the same as macro declarations in the prelude, with both getting

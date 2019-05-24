@@ -1,3 +1,17 @@
+##
+# The purpose of the Refer pass is to resolve identifiers, either as local
+# variables or type declarations/aliases. The resolutions of the identifiers
+# are kept as output state available to future passes wishing to retrieve
+# information as to what a given identifier refers. Additionally, this pass
+# tracks and validates some invariants related to references, and raises
+# compilation errors if those forms are invalid.
+#
+# This pass does not mutate the Program topology.
+# This pass does not mutate the AST.
+# This pass may raise a compilation error.
+# This pass keeps state at the per-function level.
+# This pass produces output state at the per-function level.
+#
 class Mare::Compiler::Refers < Mare::AST::Visitor
   def initialize
     @map = {} of Program::Function => Refer
