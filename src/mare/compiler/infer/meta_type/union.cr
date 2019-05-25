@@ -327,10 +327,10 @@ struct Mare::Compiler::Infer::MetaType::Union
     
     result = Unsatisfiable::INSTANCE
     caps.not_nil!.each do |cap|
-      result.unite(cap.viewed_from(origin))
+      result = result.unite(cap.viewed_from(origin))
     end if caps
     intersects.not_nil!.each do |intersect|
-      result.unite(intersect.viewed_from(origin))
+      result = result.unite(intersect.viewed_from(origin))
     end if intersects
     result
   end
@@ -341,10 +341,10 @@ struct Mare::Compiler::Infer::MetaType::Union
     
     result = Unsatisfiable::INSTANCE
     caps.not_nil!.each do |cap|
-      result.unite(cap.extracted_from(origin))
+      result = result.unite(cap.extracted_from(origin))
     end if caps
     intersects.not_nil!.each do |intersect|
-      result.unite(intersect.extracted_from(origin))
+      result = result.unite(intersect.extracted_from(origin))
     end if intersects
     result
   end
@@ -380,11 +380,18 @@ struct Mare::Compiler::Infer::MetaType::Union
   end
   
   def subtype_of?(infer : Infer, other : Union) : Bool
-    raise NotImplementedError.new([self, :subtype_of?, other].inspect)
+    # This union is a subtype of the given other union if and only if
+    # all terms in the union are subtypes of that other.
+    result = true
+    result &&= caps.not_nil!.all?(&.subtype_of?(infer, other)) if caps
+    result &&= terms.not_nil!.all?(&.subtype_of?(infer, other)) if terms
+    result &&= anti_terms.not_nil!.all?(&.subtype_of?(infer, other)) if anti_terms
+    result &&= intersects.not_nil!.all?(&.subtype_of?(infer, other)) if intersects
+    result
   end
   
   def supertype_of?(infer : Infer, other : Union) : Bool
-    raise NotImplementedError.new([self, :supertype_of?, other].inspect)
+    other.subtype_of?(infer, self) # delegate to the other function via symmetry
   end
   
   def subtype_of?(infer : Infer, other : (Unconstrained | Unsatisfiable)) : Bool

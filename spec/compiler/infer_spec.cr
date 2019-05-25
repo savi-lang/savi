@@ -262,19 +262,20 @@ describe Mare::Compiler::Infer do
   it "infers an integer literal based on a prop type" do
     source = Mare::Source.new "(example)", <<-SOURCE
     actor Main:
-      prop x U64: 42 // TODO: test with (U64 | None) when it works
+      prop x (U64 | None): 42
       new:
         @x
     SOURCE
     
     ctx = Mare::Compiler.compile([source], :infer)
     
-    func = ctx.program.find_func!("Main", "new")
-    infer = ctx.infers.single_infer_for(func)
+    main = ctx.program.find_type!("Main")
+    func = main.functions.find(&.has_tag?(:field)).not_nil!
+    infer = ctx.infers.infers_for(func.not_nil!).first
     body = func.body.not_nil!
-    prop = body.terms.first
+    field = body.terms.first
     
-    infer.resolve(prop).show_type.should eq "U64"
+    infer.resolve(field).show_type.should eq "U64"
   end
   
   it "infers an integer literal through an if statement" do

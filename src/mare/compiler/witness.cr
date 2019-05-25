@@ -127,6 +127,12 @@ class Mare::Witness
         ["'", "->", "+>"].includes?(term.op.value) &&
         check_type(term.lhs, t) &&
         check_type(term.rhs, t)
+      when AST::Group
+        (
+          (term.style == "(" && term.terms.size == 1) ||
+          (term.style == "|")
+        ) &&
+        term.terms.all? { |term2| check_type(term2, t) }
       else false
       end
     when "params"
