@@ -282,17 +282,18 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       # Keep track that we called this function.
       @called_funcs.add({call_defn, call_func})
       
-      # Get the Infer instance for call_func, possibly creating and running it.
-      # TODO: don't infer anything in the body of that func if type and params
-      # were explicitly specified in the function signature.
-      infer = ctx.infers.infer_from(ctx, call_defn, call_func, call_mt.cap_only)
-      
       # Enforce the capability restriction of the receiver.
-      unless is_subtype?(call_mt, infer.resolved_receiver)
+      if !is_subtype?(call_mt.cap_only, MetaType.cap(call_func.cap.value)) \
+      && !call_func.has_tag?(:constructor)
         problems << {call_func.cap,
           "the type #{call_mti.inspect} isn't a subtype of the " \
           "required capability of '#{call_func.cap.value}'"} \
       end
+      
+      # Get the Infer instance for call_func, possibly creating and running it.
+      # TODO: don't infer anything in the body of that func if type and params
+      # were explicitly specified in the function signature.
+      infer = ctx.infers.infer_from(ctx, call_defn, call_func, call_mt.cap_only)
       
       # Apply parameter constraints to each of the argument types.
       # TODO: handle case where number of args differs from number of params.
@@ -344,14 +345,6 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   
   def resolved_self
     MetaType.new(@self_type, resolved_self_cap_value)
-  end
-  
-  def resolved_receiver
-    if func.has_tag?(:constructor)
-      MetaType.new(@self_type, "non")
-    else
-      MetaType.new(@self_type, func.cap.value)
-    end
   end
   
   def redirect(from : AST::Node, to : AST::Node)
