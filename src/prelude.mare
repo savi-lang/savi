@@ -145,12 +145,13 @@ numeric F64:
 
 // ...
 
-class CString: // TODO: don't special-case in compiler as a char pointer
+class tag CString: // TODO: don't special-case in compiler as a char pointer
 
 class val String: // TODO: use for string literals in the compiler
   prop _size U64: // TODO: cross-platform
   prop _alloc U64: // TODO: cross-platform
-  prop cpointer CString: // TODO: keep private as CString'ref
-  new from_cpointer (@cpointer, @_size, @_alloc):
+  prop _cpointer CString'ref:
+  new from_cpointer (@_cpointer, @_size, @_alloc):
+  fun cpointer CString: @_cpointer
 
 class val Env:

@@ -353,7 +353,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         
         data = @@declare_prop.run(decl)
         ident = data["ident"].as(AST::Identifier)
-        ret = data["ret"]?.as(AST::Identifier?)
+        ret = data["ret"]?.as(AST::Term?)
         
         field_cap = AST::Identifier.new("tag").from(data["keyword"])
         field_params = AST::Group.new("(").from(ident)
