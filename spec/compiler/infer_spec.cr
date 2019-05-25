@@ -778,15 +778,14 @@ describe Mare::Compiler::Infer do
     
     class Outer:
       prop inner: Inner.new
-      new ref new_ref: // TODO: use `new iso` instead
-      new iso new_val: // TODO: use `new iso` instead
+      new iso:
     
     actor Main:
       new:
-        outer_ref Outer'ref = Outer.new_ref
+        outer_ref Outer'ref = Outer.new
         inner_ref Inner'ref = outer_ref.inner
         
-        outer_val Outer'val = Outer.new_val
+        outer_val Outer'val = Outer.new
         inner_val Inner'val = outer_val.inner
     SOURCE
     
