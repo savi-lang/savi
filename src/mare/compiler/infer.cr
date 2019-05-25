@@ -101,7 +101,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     @info_table = Hash(AST::Node, Info).new
     @redirects = Hash(AST::Node, AST::Node).new
     @resolved = Hash(AST::Node, MetaType).new
-    @called_funcs = Set(Program::Function).new
+    @called_funcs = Set({Program::Type, Program::Function}).new
   end
   
   def [](node : AST::Node)
@@ -136,8 +136,9 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     @resolved[node] ||= self[node].resolve!(self)
   end
   
-  def each_meta_type
-    @resolved.each_value
+  def each_meta_type(&block)
+    yield resolved_self
+    @resolved.each_value { |mt| yield mt }
   end
   
   def each_called_func
@@ -233,7 +234,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       call_func = call_func.not_nil!
       
       # Keep track that we called this function.
-      @called_funcs.add(call_func)
+      @called_funcs.add({call_defn, call_func})
       
       # Get the Infer instance for call_func, possibly creating and running it.
       # TODO: don't infer anything in the body of that func if type and params
@@ -277,7 +278,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end.not_nil!
     
     # Keep track that we touched this "function".
-    @called_funcs.add(field_func)
+    @called_funcs.add({@self_type, field_func})
     
     # Get the Infer instance for field_func, possibly creating and running it.
     infer = ctx.infers.infer_from(ctx, @self_type, field_func, resolved_self_cap)

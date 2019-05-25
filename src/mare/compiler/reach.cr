@@ -220,56 +220,63 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
   end
   
   def run(ctx)
-    # First, reach the "Main" and "Env" types.
-    # TODO: can this special-casing of "Env" be removed?
-    ["Main", "Env"].each do |name|
-      t = ctx.program.find_type!(name)
-      handle_type_def(t)
-    end
-    
-    # Now, reach into the program starting from Env.new and Main.new.
-    handle_func(ctx, ctx.program.find_func!("Env", "new"))
-    handle_func(ctx, ctx.program.find_func!("Main", "new"))
+    # Reach functions called starting from the entrypoint of the program.
+    env = ctx.program.find_type!("Env")
+    handle_func(ctx, env, env.find_func!("new"))
+    main = ctx.program.find_type!("Main")
+    handle_func(ctx, main, main.find_func!("new"))
   end
   
-  def handle_func(ctx, func)
+  def handle_func(ctx, defn, func)
     # Skip this function if we've already seen it.
     return if @seen_funcs.includes?(func)
     @seen_funcs.add(func)
     
-    # First, reach each type reference in the function body.
-    ctx.infers[func].each_meta_type.each do |meta_type|
-      handle_type_ref(meta_type)
+    # Get the infer instance associated with this function.
+    infer = ctx.infers[func]
+    
+    # Reach all type references seen by this function.
+    infer.each_meta_type do |meta_type|
+      handle_type_ref(ctx, meta_type)
     end
     
-    # Now, reach all functions in the program that have the same name.
-    # TODO: only do this if a function on an abstract type.
-    # TODO: any other ways we can be more targeted with this?
-    ctx.program.types.each do |t|
-      other_func = t.find_func?(func.ident.value)
-      handle_func(ctx, other_func) if other_func
+    # Reach all functions called by this function.
+    infer.each_called_func.each do |called_defn, called_func|
+      handle_func(ctx, called_defn, called_func)
     end
     
-    # Now, reach all functions called by this function.
-    ctx.infers[func].each_called_func.each do |called_func|
-      handle_func(ctx, called_func)
+    # Reach all functions that have the same name as this function and
+    # belong to a type that is a subtype of this one.
+    # TODO: can we avoid doing this for unreachable types? It seems nontrivial.
+    ctx.program.types.each do |other_defn|
+      next if defn == other_defn
+      other_func = other_defn.find_func?(func.ident.value)
+      
+      handle_func(ctx, other_defn, other_func) \
+        if other_func && infer.is_subtype?(other_defn, defn)
     end
   end
   
-  def handle_type_ref(meta_type : Infer::MetaType)
+  def handle_type_ref(ctx, meta_type : Infer::MetaType)
     # Skip this type ref if we've already seen it.
     return if @refs.has_key?(meta_type)
     
     # First, reach any type definitions referenced by this type reference.
-    meta_type.each_reachable_defn.each { |t| handle_type_def(t) }
+    meta_type.each_reachable_defn.each { |t| handle_type_def(ctx, t) }
     
     # Now, save a Ref instance for this meta type.
     @refs[meta_type] = Ref.new(meta_type)
   end
   
-  def handle_type_def(program_type : Program::Type)
+  def handle_type_def(ctx, program_type : Program::Type)
     # Skip this type def if we've already seen it.
     return if @defs.has_key?(program_type)
+    
+    # Reach all fields, regardless of if they were actually used.
+    # This is important for consistency of memory layout purposes.
+    program_type.functions.each do |f|
+      handle_func(ctx, program_type, f) if f.has_tag?(:field)
+    end
     
     # Now, save a Def instance for this program type.
     @defs[program_type] = Def.new(program_type, self)
