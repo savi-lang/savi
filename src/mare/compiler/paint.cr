@@ -31,7 +31,9 @@ class Mare::Compiler::Paint
         next if f.has_tag?(:hygienic)
         next unless ctx.reach.reached_func?(f)
         
-        observe_func(t, f)
+        ctx.infers.infers_for(f).each do |infer|
+          observe_func(t, infer.reified)
+        end
       end
     end
     
@@ -42,9 +44,9 @@ class Mare::Compiler::Paint
   
   # Public: return the color id for the given function,
   # assuming that this pass has already been run on the program.
-  def [](f); color_of(f) end
-  def color_of(f : Program::Function) : Color
-    @color_by_func_name[name_of(f)]
+  def [](rf); color_of(rf) end
+  def color_of(rf : Infer::ReifiedFunction) : Color
+    @color_by_func_name[rf.name]
   end
   
   # Return the next color id to assign when we need a previously unused color.
@@ -54,15 +56,10 @@ class Mare::Compiler::Paint
     color
   end
   
-  # Return the deterministic name to use for the given function.
-  # It need not be globally unique - just unique within its owning type.
-  private def name_of(f)
-    f.ident.value # TODO: use a mangled name?
-  end
-  
   # Take notice of the given function, under the given type.
-  private def observe_func(t, f)
-    set = @types_by_func_name[name_of(f)] ||= Set(Program::Type).new
+  private def observe_func(t, rf)
+    name = rf.name
+    set = @types_by_func_name[name] ||= Set(Program::Type).new
     set.add(t)
   end
   

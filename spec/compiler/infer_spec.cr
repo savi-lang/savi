@@ -215,7 +215,7 @@ describe Mare::Compiler::Infer do
     ctx = Mare::Compiler.compile([source], :infer)
     
     func = ctx.program.find_func!("Main", "new")
-    infer = ctx.infers[func]
+    infer = ctx.infers.single_infer_for(func)
     body = func.body.not_nil!
     assign = body.terms.first.as(Mare::AST::Relate)
     
@@ -234,7 +234,7 @@ describe Mare::Compiler::Infer do
     ctx = Mare::Compiler.compile([source], :infer)
     
     func = ctx.program.find_func!("Main", "new")
-    infer = ctx.infers[func]
+    infer = ctx.infers.single_infer_for(func)
     body = func.body.not_nil!
     prop = body.terms.first
     
@@ -251,7 +251,7 @@ describe Mare::Compiler::Infer do
     ctx = Mare::Compiler.compile([source], :infer)
     
     func = ctx.program.find_func!("Main", "new")
-    infer = ctx.infers[func]
+    infer = ctx.infers.single_infer_for(func)
     body = func.body.not_nil!
     assign = body.terms.first.as(Mare::AST::Relate)
     
@@ -270,7 +270,7 @@ describe Mare::Compiler::Infer do
     ctx = Mare::Compiler.compile([source], :infer)
     
     func = ctx.program.find_func!("Main", "new")
-    infer = ctx.infers[func]
+    infer = ctx.infers.single_infer_for(func)
     body = func.body.not_nil!
     prop = body.terms.first
     
@@ -287,7 +287,7 @@ describe Mare::Compiler::Infer do
     ctx = Mare::Compiler.compile([source], :infer)
     
     func = ctx.program.find_func!("Main", "new")
-    infer = ctx.infers[func]
+    infer = ctx.infers.single_infer_for(func)
     body = func.body.not_nil!
     assign = body.terms.first.as(Mare::AST::Relate)
     literal = assign.rhs
@@ -378,7 +378,7 @@ describe Mare::Compiler::Infer do
       {"Main", "new"},
     ].each do |t_name, f_name|
       func = ctx.program.find_func!(t_name, f_name)
-      infer = ctx.infers[func]
+      infer = ctx.infers.single_infer_for(func)
       call = func.body.not_nil!.terms.first
       
       infer.resolve(call).show_type.should eq "I32"
@@ -404,7 +404,7 @@ describe Mare::Compiler::Infer do
       {"Infer", "from_return_type"},
     ].each do |t_name, f_name|
       func = ctx.program.find_func!(t_name, f_name)
-      infer = ctx.infers[func]
+      infer = ctx.infers.single_infer_for(func)
       expr = func.body.not_nil!.terms.first
       
       infer.resolve(expr).show_type.should eq "I32"
@@ -479,7 +479,7 @@ describe Mare::Compiler::Infer do
     ctx = Mare::Compiler.compile([source], :infer)
     
     func = ctx.program.find_func!("Main", "new")
-    infer = ctx.infers[func]
+    infer = ctx.infers.single_infer_for(func)
     body = func.body.not_nil!
     assign = body.terms.first.as(Mare::AST::Relate)
     

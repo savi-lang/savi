@@ -78,12 +78,14 @@ class Mare::Compiler::CodeGen
         next if f.has_tag?(:field)
         next unless g.ctx.reach.reached_func?(f)
         
-        vtable_index = g.ctx.paint[f]
-        @vtable_size = (vtable_index + 1) if @vtable_size <= vtable_index
+        g.ctx.infers.infers_for(f).each do |infer|
+          vtable_index = g.ctx.paint[infer.reified]
+          @vtable_size = (vtable_index + 1) if @vtable_size <= vtable_index
         
-        key = f.ident.value
-        key += Random::Secure.hex if f.has_tag?(:hygienic)
-        @gfuncs[key] = GenFunc.new(@type_def, f, vtable_index)
+          key = f.ident.value
+          key += Random::Secure.hex if f.has_tag?(:hygienic)
+          @gfuncs[key] = GenFunc.new(@type_def, infer, vtable_index)
+        end
       end
       
       # If we're generating for a type that has no inherent descriptor,
@@ -173,7 +175,7 @@ class Mare::Compiler::CodeGen
   end
   
   class GenFunc
-    getter func : Program::Function
+    getter infer : Infer
     getter vtable_index : Int32
     getter llvm_name : String
     property! llvm_func : LLVM::Function
@@ -181,11 +183,15 @@ class Mare::Compiler::CodeGen
     property! send_llvm_func : LLVM::Function
     property! send_msg_llvm_type : LLVM::Type
     
-    def initialize(type_def : Reach::Def, @func, @vtable_index)
-      @needs_receiver = type_def.has_state? && !(@func.cap.value == "non")
+    def initialize(type_def : Reach::Def, @infer, @vtable_index)
+      @needs_receiver = type_def.has_state? && !(func.cap.value == "non")
       
-      @llvm_name = "#{type_def.llvm_name}.#{@func.ident.value}"
+      @llvm_name = "#{type_def.llvm_name}#{infer.reified.name}"
       @llvm_name = "#{@llvm_name}.HYGIENIC" if func.has_tag?(:hygienic)
+    end
+    
+    def func
+      infer.func
     end
     
     def needs_receiver?
@@ -193,7 +199,7 @@ class Mare::Compiler::CodeGen
     end
     
     def needs_send?
-      @func.has_tag?(:async)
+      func.has_tag?(:async)
     end
     
     def is_initializer?
@@ -276,8 +282,7 @@ class Mare::Compiler::CodeGen
   
   def type_of(expr : AST::Node, in_gfunc : GenFunc? = nil)
     in_gfunc ||= func_frame.gfunc.not_nil!
-    inferred = ctx.infers[in_gfunc.func].resolve(expr)
-    ctx.reach[inferred]
+    ctx.reach[in_gfunc.infer.resolve(expr)]
   end
   
   def llvm_type_of(expr : AST::Node, in_gfunc : GenFunc? = nil)

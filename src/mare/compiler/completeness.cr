@@ -121,32 +121,33 @@ module Mare::Compiler::Completeness
     
     def touch(node : AST::Identifier)
       # Ignore this identifier if it is not of the self.
-      infer = ctx.infers[func]
-      info = infer[node]?
-      return unless info.is_a?(Infer::Self)
-      
-      # We only care about further analysis if not all fields are initialized.
-      return unless seen_fields.size < all_fields.size
-      
-      # This represents the self type as opaque, with no field access.
-      # We'll use this to guarantee that no usage of the current self object
-      # will require  any access to the fields of the object.
-      tag_self = Infer::MetaType.new(@decl, "tag")
-      
-      # Walk through each constraint imposed on the self in the earlier
-      # Infer pass that tracked all of those constraints.
-      info.domain_constraints.each do |pos, constraint|
-        # If tag will meet the constraint, then this use of the self is okay.
-        next if infer.is_subtype?(tag_self, constraint)
+      ctx.infers.infers_for(func).each do |infer|
+        info = infer[node]?
+        next unless info.is_a?(Infer::Self)
         
-        # Otherwise, we must raise an error.
-        Error.at node,
-          "This usage of `@` shares field access to the object" \
-          " from a constructor before all fields are initialized", [
-            {pos,
-              "if this constraint were specified as `tag` or lower" \
-              " it would not grant field access"}
-          ] + show_unseen_fields
+        # We only care about further analysis if not all fields are initialized.
+        next unless seen_fields.size < all_fields.size
+        
+        # This represents the self type as opaque, with no field access.
+        # We'll use this to guarantee that no usage of the current self object
+        # will require  any access to the fields of the object.
+        tag_self = Infer::MetaType.new(@decl, "tag")
+        
+        # Walk through each constraint imposed on the self in the earlier
+        # Infer pass that tracked all of those constraints.
+        info.domain_constraints.each do |pos, constraint|
+          # If tag will meet the constraint, then this use of the self is okay.
+          next if infer.is_subtype?(tag_self, constraint)
+          
+          # Otherwise, we must raise an error.
+          Error.at node,
+            "This usage of `@` shares field access to the object" \
+            " from a constructor before all fields are initialized", [
+              {pos,
+                "if this constraint were specified as `tag` or lower" \
+                " it would not grant field access"}
+            ] + show_unseen_fields
+        end
       end
     end
     

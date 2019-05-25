@@ -233,41 +233,44 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     return if @seen_funcs.includes?(func)
     @seen_funcs.add(func)
     
-    # Get the infer instance associated with this function.
-    infer = ctx.infers[func]
-    
-    # Reach all type references seen by this function.
-    infer.each_meta_type do |meta_type|
-      handle_type_ref(ctx, meta_type)
-    end
-    
-    # Reach all functions called by this function.
-    infer.each_called_func.each do |called_defn, called_func|
-      handle_func(ctx, called_defn, called_func)
-    end
-    
-    # Reach all functions that have the same name as this function and
-    # belong to a type that is a subtype of this one.
-    # TODO: can we avoid doing this for unreachable types? It seems nontrivial.
-    ctx.program.types.each do |other_defn|
-      next if defn == other_defn
-      other_func = other_defn.find_func?(func.ident.value)
+    # Get each infer instance associated with this function.
+    ctx.infers.infers_for(func).each do |infer|
+      # Reach all type references seen by this function.
+      infer.each_meta_type do |meta_type|
+        handle_type_ref(ctx, meta_type)
+      end
       
-      handle_func(ctx, other_defn, other_func) \
-        if other_func && infer.is_subtype?(other_defn, defn)
+      # Reach all functions called by this function.
+      infer.each_called_func.each do |called_defn, called_func|
+        handle_func(ctx, called_defn, called_func)
+      end
+      
+      # Reach all functions that have the same name as this function and
+      # belong to a type that is a subtype of this one.
+      # TODO: can we avoid doing this for unreachable types? It seems nontrivial.
+      ctx.program.types.each do |other_defn|
+        next if defn == other_defn
+        other_func = other_defn.find_func?(func.ident.value)
+        
+        handle_func(ctx, other_defn, other_func) \
+          if other_func && infer.is_subtype?(other_defn, defn)
+      end
     end
   end
   
   def handle_field(ctx, defn, func) : {String, Ref}
     # Reach the metatype of the field.
-    ref = ctx.infers[func].resolve(func.ident)
-    handle_type_ref(ctx, ref)
+    ref = nil
+    ctx.infers.infers_for(func).each do |infer|
+      ref = infer.resolve(func.ident)
+      handle_type_ref(ctx, ref)
+    end
     
     # Handle the field as if it were a function.
     handle_func(ctx, defn, func)
     
     # Return the Ref instance for this meta type.
-    {func.ident.value, @refs[ref]}
+    {func.ident.value, @refs[ref.not_nil!]}
   end
   
   def handle_type_ref(ctx, meta_type : Infer::MetaType)

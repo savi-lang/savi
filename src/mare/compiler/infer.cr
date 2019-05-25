@@ -13,7 +13,8 @@
 #
 class Mare::Compiler::Infers < Mare::AST::Visitor
   def initialize
-    @map = {} of Program::Function => Infer
+    @map = {} of Infer::ReifiedFunction => Infer
+    @mmap = {} of Program::Function => Array(Infer::ReifiedFunction)
     @subtyping_info = {} of Program::Type => Infer::SubtypingInfo
   end
   
@@ -47,16 +48,39 @@ class Mare::Compiler::Infers < Mare::AST::Visitor
     end
   end
   
-  def [](f : Program::Function)
-    @map[f]
+  def [](rf : Infer::ReifiedFunction)
+    @map[rf]
   end
   
-  def []?(f : Program::Function)
-    @map[f]?
+  def []?(rf : Infer::ReifiedFunction)
+    @map[rf]?
   end
   
   def subtyping_info_for(t : Program::Type)
     @subtyping_info[t]
+  end
+  
+  private def add_infer(rf, infer)
+    @map[rf] = infer
+    (@mmap[rf.func] ||= [] of Infer::ReifiedFunction) << rf
+  end
+  
+  def reifieds_for(f : Program::Function)
+    @mmap[f]
+  end
+  
+  def infers_for(f : Program::Function)
+    @mmap[f].map { |rf| @map[rf] }
+  end
+  
+  def single_infer_for(f : Program::Function)
+    list = @mmap[f]
+    unless list.size == 1
+      list.each { |e| p e.receiver }
+    end
+    raise "actually, there are #{list.size} infers for #{f.inspect}" \
+      unless list.size == 1
+    @map[list.first]
   end
   
   def infer_from(
@@ -65,9 +89,10 @@ class Mare::Compiler::Infers < Mare::AST::Visitor
     f : Program::Function,
     cap : Infer::MetaType,
   )
-    self[f]? || (
-      Infer.new(ctx, t, f)
-      .tap { |infer| @map[f] = infer }
+    rf = Infer::ReifiedFunction.new(f, Infer::MetaType.new_nominal(t).intersect(cap))
+    self[rf]? || (
+      Infer.new(ctx, t, rf)
+      .tap { |infer| add_infer(rf, infer) }
       .tap(&.run)
     )
   end
@@ -90,12 +115,29 @@ class Mare::Compiler::Infers < Mare::AST::Visitor
 end
 
 class Mare::Compiler::Infer < Mare::AST::Visitor
+  struct ReifiedFunction
+    getter func : Program::Function
+    getter receiver : MetaType
+    
+    def initialize(@func, @receiver)
+    end
+    
+    # This name is used in selector painting, so be sure that it meets the
+    # following criteria:
+    # - unique within a given type
+    # - identical for equivalent/compatible reified functions in different types
+    def name
+      cap = receiver.cap_only.inner.as(Infer::MetaType::Capability).name
+      "'#{cap}.#{func.ident.value}"
+    end
+  end
+  
   getter ctx : Context
-  getter func : Program::Function
+  getter reified : ReifiedFunction
   getter params : Array(AST::Node) = [] of AST::Node
   getter! ret : AST::Node
   
-  def initialize(@ctx : Context, @self_type : Program::Type, @func : Program::Function)
+  def initialize(@ctx : Context, @self_type : Program::Type, @reified)
     @local_idents = Hash(Refer::Local, AST::Node).new
     @local_ident_overrides = Hash(AST::Node, AST::Node).new
     @info_table = Hash(AST::Node, Info).new
@@ -114,6 +156,10 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   
   def []=(node : AST::Node, info : Info)
     @info_table[node] = info
+  end
+  
+  def func
+    reified.func
   end
   
   def refer
@@ -304,7 +350,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     if func.has_tag?(:constructor)
       MetaType.new(@self_type, "non")
     else
-      MetaType.new(@self_type, @func.cap.value)
+      MetaType.new(@self_type, func.cap.value)
     end
   end
   
