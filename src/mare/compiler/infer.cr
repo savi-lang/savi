@@ -75,9 +75,6 @@ class Mare::Compiler::Infers < Mare::AST::Visitor
   
   def single_infer_for(f : Program::Function)
     list = @mmap[f]
-    unless list.size == 1
-      list.each { |e| p e.receiver }
-    end
     raise "actually, there are #{list.size} infers for #{f.inspect}" \
       unless list.size == 1
     @map[list.first]
