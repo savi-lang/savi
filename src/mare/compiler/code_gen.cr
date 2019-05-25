@@ -68,24 +68,22 @@ class Mare::Compiler::CodeGen
     
     def initialize(g : CodeGen, @type_def)
       @gfuncs = Hash(String, GenFunc).new
-      @fields = Array(Tuple(String, Reach::Ref)).new
       
-      # Take down info on all functions and fields.
+      # Take down info on all fields.
+      @fields = @type_def.fields
+      
+      # Take down info on all functions.
       @vtable_size = 0
       @type_def.each_function.each do |f|
-        if f.has_tag?(:field)
-          field_type = g.ctx.reach[g.ctx.infers[f].resolve(f.ident)]
-          @fields << {f.ident.value, field_type}
-        else
-          next unless g.ctx.reach.reached_func?(f)
-          
-          vtable_index = g.ctx.paint[f]
-          @vtable_size = (vtable_index + 1) if @vtable_size <= vtable_index
-          
-          key = f.ident.value
-          key += Random::Secure.hex if f.has_tag?(:hygienic)
-          @gfuncs[key] = GenFunc.new(@type_def, f, vtable_index)
-        end
+        next if f.has_tag?(:field)
+        next unless g.ctx.reach.reached_func?(f)
+        
+        vtable_index = g.ctx.paint[f]
+        @vtable_size = (vtable_index + 1) if @vtable_size <= vtable_index
+        
+        key = f.ident.value
+        key += Random::Secure.hex if f.has_tag?(:hygienic)
+        @gfuncs[key] = GenFunc.new(@type_def, f, vtable_index)
       end
       
       # If we're generating for a type that has no inherent descriptor,

@@ -110,8 +110,9 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
   
   class Def
     getter! desc_id : Int32
+    getter fields : Array({String, Ref})
     
-    def initialize(@program_type : Program::Type, reach : Reach)
+    def initialize(@program_type : Program::Type, reach : Reach, @fields)
       @desc_id =
         if is_numeric?
           reach.next_numeric_id
@@ -257,6 +258,18 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     end
   end
   
+  def handle_field(ctx, defn, func) : {String, Ref}
+    # Reach the metatype of the field.
+    ref = ctx.infers[func].resolve(func.ident)
+    handle_type_ref(ctx, ref)
+    
+    # Handle the field as if it were a function.
+    handle_func(ctx, defn, func)
+    
+    # Return the Ref instance for this meta type.
+    {func.ident.value, @refs[ref]}
+  end
+  
   def handle_type_ref(ctx, meta_type : Infer::MetaType)
     # Skip this type ref if we've already seen it.
     return if @refs.has_key?(meta_type)
@@ -274,12 +287,12 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     
     # Reach all fields, regardless of if they were actually used.
     # This is important for consistency of memory layout purposes.
-    program_type.functions.each do |f|
-      handle_func(ctx, program_type, f) if f.has_tag?(:field)
+    fields = program_type.functions.select(&.has_tag?(:field)).map do |f|
+      handle_field(ctx, program_type, f)
     end
     
     # Now, save a Def instance for this program type.
-    @defs[program_type] = Def.new(program_type, self)
+    @defs[program_type] = Def.new(program_type, self, fields)
   end
   
   # Traits are numbered 0, 1, 2, 3, 4, ...
