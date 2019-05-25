@@ -884,14 +884,14 @@ describe Mare::Compiler::Infer do
     actor Main:
       new:
         outer_iso Outer'iso = Outer.new
-        inner_2 = (outer_iso.inner = Inner.new) // TODO: remove parens
+        inner_2 = outer_iso.inner = Inner.new
     SOURCE
     
     expected = <<-MSG
     This function call won't work unless the receiver is ephemeral; it must either be consumed or be allowed to be auto-recovered. Auto-recovery didn't work for these reasons:
     from (example):11:
-        inner_2 = (outer_iso.inner = Inner.new) // TODO: remove parens
-                             ^~~~~
+        inner_2 = outer_iso.inner = Inner.new
+                            ^~~~~
     
     - the return type Inner isn't sendable and the return value is used (the return type wouldn't matter if the calling side entirely ignored the return value:
       from (example):5:

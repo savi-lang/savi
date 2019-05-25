@@ -96,7 +96,7 @@ module Mare::Parser
     t9 = (t8 >> (sn >> op8 >> sn >> t8).repeat).named(:relate)
     tw = (t9 >> (sn >> op9 >> sn >> t9).repeat).named(:relate)
     te = (tw >> (opw >> s >> tw).repeat(1) >> s).named(:group_w) | tw
-    t = (te >> (sn >> ope >> sn >> te >> s).repeat).named(:relate)
+    t = (te >> (sn >> ope >> sn >> te >> s).repeat).named(:relate_r)
     
     # Define groups that are pipe-partitioned lists of comma-separated terms.
     pipesep = char('|').named(:op)
