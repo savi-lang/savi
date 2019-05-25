@@ -772,7 +772,7 @@ describe Mare::Compiler::Infer do
     end
   end
   
-  pending "treats box functions as being implicitly specialized on receiver cap" do
+  it "treats box functions as being implicitly specialized on receiver cap" do
     source = Mare::Source.new "(example)", <<-SOURCE
     class Inner:
     
@@ -790,7 +790,7 @@ describe Mare::Compiler::Infer do
         inner_val Inner'val = outer_val.inner
     SOURCE
     
-    # Mare::Compiler.compile([source], :infer)
+    Mare::Compiler.compile([source], :infer)
   end
   
   pending "enforces safe-to-write rules on prop setters"

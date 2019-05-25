@@ -127,8 +127,11 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     # - unique within a given type
     # - identical for equivalent/compatible reified functions in different types
     def name
-      cap = receiver.cap_only.inner.as(Infer::MetaType::Capability).name
-      "'#{cap}.#{func.ident.value}"
+      "'#{receiver_cap_value}.#{func.ident.value}"
+    end
+    
+    def receiver_cap_value
+      receiver.cap_only.inner.as(Infer::MetaType::Capability).name
     end
   end
   
@@ -335,7 +338,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   end
   
   def resolved_self_cap_value
-    func.has_tag?(:constructor) ? "ref" : func.cap.value
+    func.has_tag?(:constructor) ? "ref" : reified.receiver_cap_value
   end
   
   def resolved_self_cap
