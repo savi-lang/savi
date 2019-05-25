@@ -160,6 +160,19 @@ class Mare::Program
       @metadata = Hash(Symbol, String).new
     end
     
+    def inspect(io : IO)
+      io << "#<"
+      @tags.to_a.inspect(io)
+      @metadata.inspect(io)
+      io << " fun"
+      io << " " << @cap.value
+      io << " " << @ident.value
+      @params ? (io << " "; @params.not_nil!.to_a.inspect(io)) : (io << " []")
+      @ret    ? (io << " "; @ret.not_nil!.to_a.inspect(io))    : (io << " _")
+      @body   ? (io << ": "; @body.not_nil!.to_a.inspect(io))  : (io << " _")
+      io << ">"
+    end
+    
     def dup_init
       @tags = @tags.dup
       @metadata = @metadata.dup
