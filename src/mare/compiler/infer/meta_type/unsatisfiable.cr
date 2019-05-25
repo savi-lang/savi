@@ -57,6 +57,12 @@ class Mare::Compiler::Infer::MetaType::Unsatisfiable
     self # no effect
   end
   
+  def is_sendable?
+    # Unsatisfiable is never sendable - it cannot exist at all.
+    # TODO: is this right? it seems so, but breaks symmetry with Unconstrained.
+    false
+  end
+  
   def viewed_from(origin)
     raise NotImplementedError.new("#{origin.inspect}->#{self.inspect}")
   end

@@ -109,6 +109,12 @@ struct Mare::Compiler::Infer::MetaType::Nominal
     self # no effect
   end
   
+  def is_sendable?
+    # An nominal is never itself sendable -
+    # it specifies a single nominal, and says nothing about capabilities.
+    false
+  end
+  
   def viewed_from(origin)
     raise NotImplementedError.new("#{origin.inspect}->#{self.inspect}")
   end

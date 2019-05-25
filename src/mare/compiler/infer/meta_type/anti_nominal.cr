@@ -113,6 +113,12 @@ struct Mare::Compiler::Infer::MetaType::AntiNominal
     self # no effect
   end
   
+  def is_sendable?
+    # An anti-nominal is never itself sendable -
+    # it excludes a single nominal, and says nothing about capabilities.
+    false
+  end
+  
   def viewed_from(origin)
     raise NotImplementedError.new("#{origin.inspect}->#{self.inspect}")
   end

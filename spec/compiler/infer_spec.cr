@@ -792,9 +792,79 @@ describe Mare::Compiler::Infer do
     Mare::Compiler.compile([source], :infer)
   end
   
-  pending "enforces safe-to-write rules on prop setters"
+  it "allows safe auto-recovery of a property setter call" do
+    source = Mare::Source.new "(example)", <<-SOURCE
+    class Inner:
+      new iso:
+    
+    class Outer:
+      prop inner Inner: Inner.new
+      new iso:
+    
+    actor Main:
+      new:
+        outer_iso Outer'iso = Outer.new
+        inner_iso Inner'iso = Inner.new
+        inner_ref Inner'ref = Inner.new
+        
+        outer_iso.inner = --inner_iso
+        outer_iso.inner = inner_ref
+    SOURCE
+    
+    expected = <<-MSG
+    This function call won't work unless the receiver is ephemeral; it must either be consumed or be allowed to be auto-recovered. Auto-recovery didn't work for these reasons:
+    from (example):15:
+        outer_iso.inner = inner_ref
+                  ^~~~~
+    
+    - the argument (when aliased) has a type of Inner, which isn't sendable:
+      from (example):15:
+        outer_iso.inner = inner_ref
+                          ^~~~~~~~~
+    MSG
+    
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :infer)
+    end
+  end
+  
+  it "complains on auto-recovery of a property setter whose return is used" do
+    source = Mare::Source.new "(example)", <<-SOURCE
+    class Inner:
+      new iso:
+    
+    class Outer:
+      prop inner Inner: Inner.new
+      new iso:
+    
+    actor Main:
+      new:
+        outer_iso Outer'iso = Outer.new
+        inner_2 = (outer_iso.inner = Inner.new) // TODO: remove parens
+    SOURCE
+    
+    expected = <<-MSG
+    This function call won't work unless the receiver is ephemeral; it must either be consumed or be allowed to be auto-recovered. Auto-recovery didn't work for these reasons:
+    from (example):11:
+        inner_2 = (outer_iso.inner = Inner.new) // TODO: remove parens
+                             ^~~~~
+    
+    - the return type Inner isn't sendable and the return value is used (the return type wouldn't matter if the calling side entirely ignored the return value:
+      from (example):5:
+      prop inner Inner: Inner.new
+           ^~~~~
+    MSG
+    
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :infer)
+    end
+  end
   
   pending "infers prop setters to return the alias of the assigned value"
+  
+  pending "requires parameters of 'recovered' constructors to be sendable"
+  
+  pending "requires parameters of actor behaviours to be sendable"
   
   it "requires a sub-func to be present in the subtype" do
     source = Mare::Source.new "(example)", <<-SOURCE

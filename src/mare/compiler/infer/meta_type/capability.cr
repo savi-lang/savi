@@ -178,6 +178,19 @@ struct Mare::Compiler::Infer::MetaType::Capability
     end
   end
   
+  def is_sendable?
+    case self
+    when ISO_EPH, TRN_EPH
+      raise NotImplementedError.new("is_sendable? of an ephemeral cap")
+    when ISO, VAL, TAG, NON
+      true
+    when TRN, REF, BOX
+      false
+    else
+      raise NotImplementedError.new("is_sendable? of #{self}")
+    end
+  end
+  
   # def to_generic
   #   case self
   #   when ISO_EPH, TRN_EPH

@@ -106,6 +106,10 @@ struct Mare::Compiler::Infer::MetaType
     MetaType.new(inner.alias)
   end
   
+  def is_sendable? : Bool
+    inner.is_sendable?
+  end
+  
   def viewed_from(origin : MetaType)
     origin_inner = origin.inner
     case origin_inner

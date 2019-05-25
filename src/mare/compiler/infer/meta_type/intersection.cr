@@ -253,6 +253,10 @@ struct Mare::Compiler::Infer::MetaType::Intersection
     Intersection.new(cap.try(&.alias), terms, anti_terms)
   end
   
+  def is_sendable?
+    cap.try(&.is_sendable?) || false
+  end
+  
   def viewed_from(origin)
     raise NotImplementedError.new("#{origin.inspect}->(nil cap)") unless cap
     

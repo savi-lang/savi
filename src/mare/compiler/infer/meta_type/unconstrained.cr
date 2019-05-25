@@ -57,6 +57,11 @@ class Mare::Compiler::Infer::MetaType::Unconstrained
     self # no effect
   end
   
+  def is_sendable?
+    # Unconstrained is never sendable - it makes no guarantees at all.
+    false
+  end
+  
   def viewed_from(origin)
     raise NotImplementedError.new("#{origin.inspect}->#{self.inspect}")
   end

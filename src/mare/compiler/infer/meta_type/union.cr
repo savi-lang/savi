@@ -316,6 +316,11 @@ struct Mare::Compiler::Infer::MetaType::Union
     )
   end
   
+  def is_sendable?
+    return caps.not_nil!.all?(&.is_sendable?) if caps
+    false
+  end
+  
   def viewed_from(origin)
     raise NotImplementedError.new("#{origin.inspect}->#{self.inspect}") \
       if terms || anti_terms

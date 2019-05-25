@@ -13,6 +13,7 @@
 - [x] - Actors and behaviours
 - [x] - Rcaps (`iso`, `trn`, `val`, `ref`, `box`, `tag`)
 - [x] - Rcap ephemerality (alias rcaps, ephemeral rcaps, `consume`)
+- [x] - Automatic receiver recovery for ephemeral receivers
 - [ ] - Rcap viewpoint adaptation
 - [ ] - Generic types and generic rcaps
 - [ ] - Finalizer functions

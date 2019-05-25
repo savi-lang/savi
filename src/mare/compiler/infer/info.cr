@@ -404,11 +404,12 @@ class Mare::Compiler::Infer
     getter member : String
     getter args_pos : Array(Source::Pos)
     getter args : Array(AST::Node)
+    getter ret_value_used : Bool
     @ret : MetaType?
     @ret_pos : Source::Pos?
     @aliased : Bool?
     
-    def initialize(@pos, @lhs, @member, @args, @args_pos)
+    def initialize(@pos, @lhs, @member, @args, @args_pos, @ret_value_used)
       @domain_constraints = [] of MetaType
       @pos_list = [] of Source::Pos
     end

@@ -276,24 +276,32 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     poss = [] of Source::Pos
     call_defns.each do |(call_mti, call_defn, call_func)|
       call_mt = MetaType.new(call_mti)
+      call_mt_cap = call_mt.cap_only
       call_defn = call_defn.not_nil!
       call_func = call_func.not_nil!
+      autorecover_needed = false
       
       # Keep track that we called this function.
       @called_funcs.add({call_defn, call_func})
       
       # Enforce the capability restriction of the receiver.
-      if !is_subtype?(call_mt.cap_only, MetaType.cap(call_func.cap.value)) \
-      && !call_func.has_tag?(:constructor)
+      if is_subtype?(call_mt_cap, MetaType.cap(call_func.cap.value))
+        # The capability restriction is met; carry on.
+      elsif call_func.has_tag?(:constructor)
+        # Constructor calls ignore cap of the original receiver; carry on.
+      elsif is_subtype?(call_mt_cap.ephemeralize, MetaType.cap(call_func.cap.value))
+        call_mt_cap = call_mt_cap.ephemeralize
+        autorecover_needed = true
+      else
         problems << {call_func.cap,
           "the type #{call_mti.inspect} isn't a subtype of the " \
-          "required capability of '#{call_func.cap.value}'"} \
+          "required capability of '#{call_func.cap.value}'"}
       end
       
       # Get the Infer instance for call_func, possibly creating and running it.
       # TODO: don't infer anything in the body of that func if type and params
       # were explicitly specified in the function signature.
-      infer = ctx.infers.infer_from(ctx, call_defn, call_func, call_mt.cap_only)
+      infer = ctx.infers.infer_from(ctx, call_defn, call_func, call_mt_cap)
       
       # Apply parameter constraints to each of the argument types.
       # TODO: handle case where number of args differs from number of params.
@@ -305,9 +313,40 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       end
       
       # Resolve and take note of the return type.
-      inferred_ret = infer[infer.ret]
-      rets << inferred_ret.resolve!(infer)
-      poss << inferred_ret.pos
+      inferred_ret_info = infer[infer.ret]
+      inferred_ret = inferred_ret_info.resolve!(infer)
+      rets << inferred_ret
+      poss << inferred_ret_info.pos
+      
+      # If autorecover of the receiver cap was needed to make this call work,
+      # we now have to confirm that arguments and return value are all sendable.
+      if autorecover_needed
+        recover_problems = [] of {Source::Pos, String}
+        
+        unless inferred_ret.is_sendable? || !call.ret_value_used
+          recover_problems << {infer.ret.pos,
+            "the return type #{inferred_ret.show_type} isn't sendable " \
+            "and the return value is used (the return type wouldn't matter " \
+            "if the calling side entirely ignored the return value"}
+        end
+        
+        # TODO: It should be safe to pass in a TRN if the receiver is TRN,
+        # so is_sendable? isn't quite liberal enough to allow all valid cases.
+        call.args.each do |arg|
+          inferred_arg = self[arg].resolve!(self)
+          unless inferred_arg.alias.is_sendable?
+            recover_problems << {arg.pos,
+              "the argument (when aliased) has a type of " \
+              "#{inferred_arg.alias.show_type}, which isn't sendable"}
+          end
+        end
+        
+        Error.at call,
+          "This function call won't work unless the receiver is ephemeral; " \
+          "it must either be consumed or be allowed to be auto-recovered. "\
+          "Auto-recovery didn't work for these reasons",
+            recover_problems unless recover_problems.empty?
+      end
     end
     Error.at call,
       "This function call doesn't meet subtyping requirements",
@@ -584,7 +623,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       else raise NotImplementedError.new(rhs)
       end
       
-      call = FromCall.new(member.pos, lhs, member.value, args, args_pos)
+      used = Classify.value_needed?(node)
+      call = FromCall.new(member.pos, lhs, member.value, args, args_pos, used)
       self[node] = call
       
       follow_call(call)
