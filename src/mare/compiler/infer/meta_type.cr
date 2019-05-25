@@ -53,8 +53,23 @@ struct Mare::Compiler::Infer::MetaType
     MetaType.new(inner)
   end
   
+  def self.cap(name : String)
+    MetaType.new(Capability.new(name))
+  end
+  
   def cap(name : String)
     MetaType.new(@inner.intersect(Capability.new(name)))
+  end
+  
+  def cap_only
+    inner = @inner
+    MetaType.new(
+      case inner
+      when Capability; inner
+      when Union; caps = inner.caps; caps && caps.size == 1 && caps.first
+      when Intersection; inner.cap
+      end.as(Capability)
+    )
   end
   
   def override_cap(name : String)

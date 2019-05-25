@@ -91,8 +91,8 @@ class Mare::Compiler::Infer::SubtypingInfo
     raise "found hygienic function" if this_func.has_tag?(:hygienic)
     
     # Get the Infer instance for both this and that function, to compare them.
-    this_infer = @ctx.infers.infer_from(@ctx, this, this_func)
-    that_infer = @ctx.infers.infer_from(@ctx, that, that_func)
+    this_infer = @ctx.infers.infer_from(@ctx, this, this_func, MetaType.cap(this_func.cap.value))
+    that_infer = @ctx.infers.infer_from(@ctx, that, that_func, MetaType.cap(that_func.cap.value))
     
     # A constructor can only match another constructor.
     case {this_func.has_tag?(:constructor), that_func.has_tag?(:constructor)}

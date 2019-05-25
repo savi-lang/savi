@@ -30,7 +30,7 @@ class Mare::Compiler::Infers < Mare::AST::Visitor
     main = ctx.program.find_type?("Main")
     if main
       f = main.find_func?("new")
-      infer_from(ctx, main, f) if f
+      infer_from(ctx, main, f, Infer::MetaType.cap(f.cap.value)) if f
     end
     
     # For each function in the program, run with a new instance,
@@ -39,7 +39,7 @@ class Mare::Compiler::Infers < Mare::AST::Visitor
     # so this second pass just takes care of typechecking unreachable functions.
     ctx.program.types.each do |t|
       t.functions.each do |f|
-        infer_from(ctx, t, f)
+        infer_from(ctx, t, f, Infer::MetaType.cap(f.cap.value))
       end
     end
     ctx.program.types.each do |t|
@@ -59,7 +59,12 @@ class Mare::Compiler::Infers < Mare::AST::Visitor
     @subtyping_info[t]
   end
   
-  def infer_from(ctx : Context, t : Program::Type, f : Program::Function)
+  def infer_from(
+    ctx : Context,
+    t : Program::Type,
+    f : Program::Function,
+    cap : Infer::MetaType,
+  )
     self[f]? || (
       Infer.new(ctx, t, f)
       .tap { |infer| @map[f] = infer }
@@ -71,7 +76,7 @@ class Mare::Compiler::Infers < Mare::AST::Visitor
     t.functions.each do |f|
       next unless f.has_tag?(:is)
       
-      infer = infer_from(ctx, t, f)
+      infer = infer_from(ctx, t, f, Infer::MetaType.cap(f.cap.value))
       iface = infer.resolve(infer.ret).single!
       
       errors = [] of Error::Info
@@ -223,6 +228,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     rets = [] of MetaType
     poss = [] of Source::Pos
     call_defns.each do |(call_mti, call_defn, call_func)|
+      call_mt = MetaType.new(call_mti)
       call_defn = call_defn.not_nil!
       call_func = call_func.not_nil!
       
@@ -232,10 +238,10 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       # Get the Infer instance for call_func, possibly creating and running it.
       # TODO: don't infer anything in the body of that func if type and params
       # were explicitly specified in the function signature.
-      infer = ctx.infers.infer_from(ctx, call_defn, call_func)
+      infer = ctx.infers.infer_from(ctx, call_defn, call_func, call_mt.cap_only)
       
       # Enforce the capability restriction of the receiver.
-      unless is_subtype?(MetaType.new(call_mti), infer.resolved_receiver)
+      unless is_subtype?(call_mt, infer.resolved_receiver)
         problems << {call_func.cap,
           "the type #{call_mti.inspect} isn't a subtype of the " \
           "required capability of '#{call_func.cap.value}'"} \
@@ -274,19 +280,23 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     @called_funcs.add(field_func)
     
     # Get the Infer instance for field_func, possibly creating and running it.
-    infer = ctx.infers.infer_from(ctx, @self_type, field_func)
+    infer = ctx.infers.infer_from(ctx, @self_type, field_func, resolved_self_cap)
     
     # Apply constraints to the return type.
     ret = infer[infer.ret]
     field.set_explicit(ret.pos, ret.resolve!(infer))
   end
   
+  def resolved_self_cap_value
+    func.has_tag?(:constructor) ? "ref" : func.cap.value
+  end
+  
+  def resolved_self_cap
+    MetaType.cap(resolved_self_cap_value)
+  end
+  
   def resolved_self
-    if func.has_tag?(:constructor)
-      MetaType.new(@self_type, "ref")
-    else
-      MetaType.new(@self_type, @func.cap.value)
-    end
+    MetaType.new(@self_type, resolved_self_cap_value)
   end
   
   def resolved_receiver
