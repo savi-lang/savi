@@ -147,7 +147,7 @@ numeric F64:
 
 class tag CString: // TODO: don't special-case in compiler as a char pointer
 
-class val String: // TODO: use for string literals in the compiler
+class val String:
   prop _size U64: // TODO: cross-platform
   prop _alloc U64: // TODO: cross-platform
   prop _cpointer CString'ref:
