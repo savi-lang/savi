@@ -71,7 +71,7 @@ describe Mare::Compiler::Refer do
     
     x = func
       .body.not_nil!
-      .terms.last.as(Mare::AST::Identifier)
+      .terms[-2].as(Mare::AST::Identifier)
     
     refer[x].as(Mare::Compiler::Refer::LocalUnion).list.should eq [
       refer[x1].as(Mare::Compiler::Refer::Local),

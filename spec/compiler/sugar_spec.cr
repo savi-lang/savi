@@ -118,6 +118,31 @@ describe Mare::Compiler::Sugar do
     ]
   end
   
+  it "adds a '@' statement to the end of a constructor body" do
+    source = Mare::Source.new "(example)", <<-SOURCE
+    class Example:
+      new:
+        x = 1
+    SOURCE
+    
+    ast = Mare::Parser.parse(source)
+    
+    ast.to_a.should eq [:doc,
+      [:declare, [[:ident, "class"], [:ident, "Example"]], [:group, ":"]],
+      [:declare, [[:ident, "new"]], [:group, ":",
+        [:relate, [:ident, "x"], [:op, "="], [:integer, 1_u64]]
+      ]]
+    ]
+    
+    ctx = Mare::Compiler.compile([ast], :sugar)
+    
+    func = ctx.program.find_func!("Example", "new")
+    func.body.not_nil!.to_a.should eq [:group, ":",
+      [:relate, [:ident, "x"], [:op, "="], [:integer, 1_u64]],
+      [:ident, "@"],
+    ]
+  end
+  
   it "transforms short-circuiting logical operators into choices" do
     source = Mare::Source.new "(example)", <<-SOURCE
     class Example:
