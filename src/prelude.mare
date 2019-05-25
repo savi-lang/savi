@@ -31,7 +31,7 @@ interface val NumericMethods: // TODO: don't use interface for this... `common`?
   const is_signed Bool:
   const is_floating_point Bool:
   
-  fun non "[]" (value @) @: value
+  fun non "[]" (value @'val) @'val: value
   
   fun val "==" (other @) Bool: compiler intrinsic
   fun val "!=" (other @) Bool: compiler intrinsic
@@ -65,7 +65,7 @@ interface val IntegerMethods: // TODO: don't use interface for this... `common`?
   fun val count_zeros U8: @invert.count_ones
 
 interface val Float32Methods:
-  fun non from_bits (bits U32) @: compiler intrinsic
+  fun non from_bits (bits U32) @'val: compiler intrinsic
   fun val bits U32: compiler intrinsic
   
   fun non nan:          @from_bits(0x7FC0_0000)
@@ -89,7 +89,7 @@ interface val Float32Methods:
     @bits.bit_and(0x7F80_0000) != 0x7F80_0000 // exponent
 
 interface val Float64Methods:
-  fun non from_bits (bits U64) @: compiler intrinsic
+  fun non from_bits (bits U64) @'val: compiler intrinsic
   fun val bits U64: compiler intrinsic
   
   fun non nan:          @from_bits(0x7FF8_0000_0000_0000)

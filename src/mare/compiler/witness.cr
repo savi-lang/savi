@@ -121,8 +121,14 @@ class Mare::Witness
     when "ident" then term.is_a?(AST::Identifier)
     when "string" then term.is_a?(AST::LiteralString)
     when "type"
-      # TODO: allow more forms here, but maybe disallow lowercase identifiers?
-      term.is_a?(AST::Identifier)
+      case term
+      when AST::Identifier then true # TODO: maybe disallow lowercase?
+      when AST::Relate
+        ["'", "->", "+>"].includes?(term.op.value) &&
+        check_type(term.lhs, t) &&
+        check_type(term.rhs, t)
+      else false
+      end
     when "params"
       # TODO: more specific requirements here
       term.is_a?(AST::Group)

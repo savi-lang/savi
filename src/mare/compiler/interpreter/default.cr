@@ -292,7 +292,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         
         data["cap"] ||=
           begin
-            if @type.has_tag?(:allocated) ||  @type.has_tag?(:no_desc)
+            if @type.has_tag?(:allocated) || @type.has_tag?(:no_desc)
               AST::Identifier.new("box").from(data["keyword"])
             else
               AST::Identifier.new("non").from(data["keyword"])
@@ -303,7 +303,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
           data["cap"].as(AST::Identifier),
           data["ident"].as(AST::Identifier),
           data["params"]?.as(AST::Group?),
-          data["ret"]?.as(AST::Identifier?),
+          data["ret"]?.as(AST::Term?),
           decl.body,
         )
       when "be"
@@ -366,8 +366,9 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         
         getter_cap = AST::Identifier.new("box").from(data["keyword"])
         if ret
-          getter_ret_op = AST::Operator.new("->").from(ret)
-          getter_ret = AST::Relate.new(getter_cap.dup, getter_ret_op, ret).from(ret)
+          getter_ret_origin = AST::Identifier.new("@").from(getter_cap)
+          getter_ret_op = AST::Operator.new("->").from(getter_cap)
+          getter_ret = AST::Relate.new(getter_ret_origin, getter_ret_op, ret).from(ret)
         end
         getter_body = AST::Group.new(":").from(ident)
         getter_body.terms << AST::FieldRead.new(ident.value).from(ident)

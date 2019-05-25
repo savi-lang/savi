@@ -744,27 +744,71 @@ describe Mare::Compiler::Infer do
     
     actor Main:
       new:
-        outer Outer'box = Outer.new
+        outer_box Outer'box = Outer.new
+        outer_ref Outer'ref = Outer.new
         
-        inner_box Inner'box = outer.inner // okay
-        inner_ref Inner     = outer.inner // not okay
+        inner_box1 Inner'box = outer_ref.inner // okay
+        inner_ref1 Inner'ref = outer_ref.inner // okay
+        inner_box2 Inner'box = outer_box.inner // okay
+        inner_ref2 Inner'ref = outer_box.inner // not okay
     SOURCE
     
     expected = <<-MSG
     This return value is outside of its constraints:
-    from (example):11:
-        inner_ref Inner     = outer.inner // not okay
-                                    ^~~~~
+    from (example):14:
+        inner_ref2 Inner'ref = outer_box.inner // not okay
+                                         ^~~~~
     
     - it must be a subtype of Inner:
-      from (example):11:
-        inner_ref Inner     = outer.inner // not okay
-                  ^~~~~
+      from (example):14:
+        inner_ref2 Inner'ref = outer_box.inner // not okay
+                   ^~~~~~~~~
     
     - but it had a return type of Inner'box:
       from (example):4:
       prop inner: Inner.new
            ^~~~~
+    MSG
+    
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :infer)
+    end
+  end
+  
+  it "respects explicit viewpoint adaptation notation in the return type" do
+    source = Mare::Source.new "(example)", <<-SOURCE
+    class Inner:
+    
+    class Outer:
+      prop inner: Inner.new
+      fun get_inner @->Inner: @inner
+    
+    actor Main:
+      new:
+        outer_box Outer'box = Outer.new
+        outer_ref Outer'ref = Outer.new
+        
+        inner_box1 Inner'box = outer_ref.get_inner // okay
+        inner_ref1 Inner'ref = outer_ref.get_inner // okay
+        inner_box2 Inner'box = outer_box.get_inner // okay
+        inner_ref2 Inner'ref = outer_box.get_inner // not okay
+    SOURCE
+    
+    expected = <<-MSG
+    This return value is outside of its constraints:
+    from (example):15:
+        inner_ref2 Inner'ref = outer_box.get_inner // not okay
+                                         ^~~~~~~~~
+    
+    - it must be a subtype of Inner:
+      from (example):15:
+        inner_ref2 Inner'ref = outer_box.get_inner // not okay
+                   ^~~~~~~~~
+    
+    - but it had a return type of Inner'box:
+      from (example):5:
+      fun get_inner @->Inner: @inner
+                    ^~~~~~~~
     MSG
     
     expect_raises Mare::Error, expected do

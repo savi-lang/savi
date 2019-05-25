@@ -439,7 +439,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     when Refer::Decl, Refer::DeclAlias
       MetaType.new(ref.final_decl.defn)
     when Refer::Self
-      MetaType.new(@self_type)
+      reified.receiver
     when Refer::Unresolved
       case node.value
       when "iso", "trn", "val", "ref", "box", "tag", "non"

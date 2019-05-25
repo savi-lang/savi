@@ -68,8 +68,8 @@ module Mare::Parser
     # Define groups of operators, in order of precedence,
     # from most tightly binding to most loosely binding.
     # Operators in the same group have the same level of precedence.
-    opcap = (char('\'') | str("->") | str("+>")).named(:op)
-    op2 = (char('.')).named(:op)
+    opcap = (char('\'')).named(:op)
+    op2 = (char('.') | str("->") | str("+>")).named(:op)
     op3 = (char('*') | char('/') | char('%')).named(:op)
     op4 = ((char('+') | char('-')) >> ~char('>')).named(:op)
     op5 = (str("..") | str("<>")).named(:op)
@@ -114,7 +114,7 @@ module Mare::Parser
     )
     
     # Define what a declaration head of terms looks like.
-    dterm = atom
+    dterm = t3
     dterms = dterm >> (s >> dterm).repeat >> s
     decl = (dterms >> s >> char(':') >> s).named(:decl)
     
