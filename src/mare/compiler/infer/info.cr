@@ -8,7 +8,7 @@ class Mare::Compiler::Infer
       use_pos : Source::Pos,
       constraint_pos : Source::Pos,
       constraint : MetaType,
-      aliased : Bool,
+      aliases : Int32,
     )
     
     def meta_type_within_domain!(
@@ -17,12 +17,14 @@ class Mare::Compiler::Infer
       use_pos : Source::Pos,
       constraint_pos : Source::Pos,
       constraint : MetaType,
-      aliased : Bool,
+      aliases : Int32,
     )
       orig_meta_type = meta_type
-      if aliased
+      if aliases > 0
         meta_type = meta_type.strip_ephemeral.alias
         alias_distinct = meta_type != orig_meta_type
+      else
+        meta_type = meta_type.ephemeralize
       end
       
       return if meta_type.within_constraints?(infer, [constraint])
@@ -62,8 +64,8 @@ class Mare::Compiler::Infer
       @inner
     end
     
-    def within_domain!(infer : Infer, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliased : Bool)
-      meta_type_within_domain!(infer, @inner, use_pos, constraint_pos, constraint, aliased)
+    def within_domain!(infer : Infer, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
+      meta_type_within_domain!(infer, @inner, use_pos, constraint_pos, constraint, aliases)
     end
   end
   
@@ -79,10 +81,10 @@ class Mare::Compiler::Infer
       @inner
     end
     
-    def within_domain!(infer : Infer, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliased : Bool)
+    def within_domain!(infer : Infer, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
       @domain_constraints << {constraint_pos, constraint}
       
-      meta_type_within_domain!(infer, @inner, use_pos, constraint_pos, constraint, aliased)
+      meta_type_within_domain!(infer, @inner, use_pos, constraint_pos, constraint, aliases)
     end
   end
   
@@ -113,9 +115,9 @@ class Mare::Compiler::Infer
       @domain
     end
     
-    def within_domain!(infer : Infer, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliased : Bool)
+    def within_domain!(infer : Infer, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
       raise "Literal alias distinction not implemented: #{@domain.inspect}" \
-        if aliased && (@domain.alias != @domain)
+        if (aliases > 0) && (@domain.alias != @domain)
       
       @domain = @domain.intersect(constraint).simplify(infer) # TODO: maybe simplify just once at the end?
       @domain_constraints << constraint
@@ -156,16 +158,16 @@ class Mare::Compiler::Infer
       @pos = explicit_pos
     end
     
-    def within_domain!(infer : Infer, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliased : Bool)
+    def within_domain!(infer : Infer, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
       if @explicit
         explicit = @explicit.not_nil!
         if explicit.cap_only?
-          meta_type_within_domain!(infer, resolve!(infer), use_pos, constraint_pos, constraint, true)
+          meta_type_within_domain!(infer, resolve!(infer), use_pos, constraint_pos, constraint, aliases + 1)
         else
-          meta_type_within_domain!(infer, explicit, use_pos, constraint_pos, constraint, true)
+          meta_type_within_domain!(infer, explicit, use_pos, constraint_pos, constraint, aliases + 1)
         end
       else
-        infer[@upstream.not_nil!].within_domain!(infer, use_pos, constraint_pos, constraint, true)
+        infer[@upstream.not_nil!].within_domain!(infer, use_pos, constraint_pos, constraint, aliases + 1)
       end
     end
     
@@ -175,7 +177,7 @@ class Mare::Compiler::Infer
         rhs_pos,
         @pos,
         @explicit.not_nil!,
-        false,
+        0,
       ) if @explicit
       
       raise "already assigned an upstream" if @upstream
@@ -204,11 +206,11 @@ class Mare::Compiler::Infer
       end
       
       def resolve!(infer : Infer)
-        @field.resolve!(infer).viewed_from(@field.origin)
+        @field.resolve!(infer).viewed_from(@field.origin).alias
       end
       
-      def within_domain!(infer : Infer, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliased : Bool)
-        meta_type_within_domain!(infer, resolve!(infer), use_pos, constraint_pos, constraint, aliased)
+      def within_domain!(infer : Infer, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
+        meta_type_within_domain!(infer, resolve!(infer), use_pos, constraint_pos, constraint, aliases + 1)
       end
     end
     
@@ -232,16 +234,16 @@ class Mare::Compiler::Infer
       @pos = explicit_pos
     end
     
-    def within_domain!(infer : Infer, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliased : Bool)
+    def within_domain!(infer : Infer, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
       if @explicit
         explicit = @explicit.not_nil!
         if explicit.cap_only?
-          meta_type_within_domain!(infer, resolve!(infer), use_pos, constraint_pos, constraint, true)
+          meta_type_within_domain!(infer, resolve!(infer), use_pos, constraint_pos, constraint, aliases + 1)
         else
-          meta_type_within_domain!(infer, explicit, use_pos, constraint_pos, constraint, true)
+          meta_type_within_domain!(infer, explicit, use_pos, constraint_pos, constraint, aliases + 1)
         end
       else
-        infer[@upstream.not_nil!].within_domain!(infer, use_pos, constraint_pos, constraint, true)
+        infer[@upstream.not_nil!].within_domain!(infer, use_pos, constraint_pos, constraint, aliases + 1)
       end
     end
     
@@ -251,7 +253,7 @@ class Mare::Compiler::Infer
         rhs_pos,
         @pos,
         @explicit.not_nil!,
-        false
+        0
       ) if @explicit
       
       raise "already assigned an upstream" if @upstream
@@ -261,6 +263,7 @@ class Mare::Compiler::Infer
   
   class Param < Info
     @explicit : MetaType?
+    getter explicit
     @downstreamed : MetaType?
     @downstreamed_pos : Source::Pos?
     @upstream : AST::Node?
@@ -289,10 +292,10 @@ class Mare::Compiler::Infer
       @pos = explicit_pos
     end
     
-    def within_domain!(infer : Infer, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliased : Bool)
+    def within_domain!(infer : Infer, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
       if @explicit
         explicit = @explicit.not_nil!
-        meta_type_within_domain!(infer, explicit, use_pos, constraint_pos, constraint, true)
+        meta_type_within_domain!(infer, explicit, use_pos, constraint_pos, constraint, aliases + 1)
         return # if we have an explicit type, ignore the upstream
       end
       
@@ -304,13 +307,13 @@ class Mare::Compiler::Infer
         @downstreamed = constraint
       end
       
-      infer[@upstream.not_nil!].within_domain!(infer, use_pos, constraint_pos, constraint, true) \
+      infer[@upstream.not_nil!].within_domain!(infer, use_pos, constraint_pos, constraint, aliases + 1) \
         if @upstream
     end
     
     def verify_arg(infer : Infer, arg_infer : Infer, arg : AST::Node, arg_pos : Source::Pos)
       arg = arg_infer[arg]
-      arg.within_domain!(arg_infer, arg_pos, @pos, resolve!(infer), false)
+      arg.within_domain!(arg_infer, arg_pos, @pos, resolve!(infer), 0)
     end
     
     def assign(infer : Infer, rhs : AST::Node, rhs_pos : Source::Pos)
@@ -319,7 +322,7 @@ class Mare::Compiler::Infer
         rhs_pos,
         @pos,
         @explicit.not_nil!,
-        false,
+        0,
       ) if @explicit
       
       infer[rhs].within_domain!(
@@ -327,7 +330,7 @@ class Mare::Compiler::Infer
         rhs_pos,
         @downstreamed_pos.not_nil!,
         @downstreamed.not_nil!,
-        false,
+        0,
       ) if @downstreamed
       
       raise "already assigned an upstream" if @upstream
@@ -345,8 +348,8 @@ class Mare::Compiler::Infer
       MetaType.new_union(clauses.map { |node| infer[node].resolve!(infer) })
     end
     
-    def within_domain!(infer : Infer, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliased : Bool)
-      clauses.each { |node| infer[node].within_domain!(infer, use_pos, constraint_pos, constraint, aliased) }
+    def within_domain!(infer : Infer, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
+      clauses.each { |node| infer[node].within_domain!(infer, use_pos, constraint_pos, constraint, aliases) }
     end
   end
   
@@ -363,8 +366,8 @@ class Mare::Compiler::Infer
       @bool
     end
     
-    def within_domain!(infer : Infer, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliased : Bool)
-      meta_type_within_domain!(infer, @bool, use_pos, constraint_pos, constraint, aliased)
+    def within_domain!(infer : Infer, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
+      meta_type_within_domain!(infer, @bool, use_pos, constraint_pos, constraint, aliases)
     end
   end
   
@@ -379,8 +382,8 @@ class Mare::Compiler::Infer
       infer[@refine].resolve!(infer).intersect(@refine_type)
     end
     
-    def within_domain!(infer : Infer, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliased : Bool)
-      meta_type_within_domain!(infer, resolve!(infer), use_pos, constraint_pos, constraint, aliased)
+    def within_domain!(infer : Infer, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
+      meta_type_within_domain!(infer, resolve!(infer), use_pos, constraint_pos, constraint, aliases)
     end
   end
   
@@ -394,8 +397,8 @@ class Mare::Compiler::Infer
       infer[@local].resolve!(infer).ephemeralize
     end
     
-    def within_domain!(infer : Infer, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliased : Bool)
-      meta_type_within_domain!(infer, resolve!(infer), use_pos, constraint_pos, constraint, false)
+    def within_domain!(infer : Infer, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
+      infer[@local].within_domain!(infer, use_pos, constraint_pos, constraint, aliases - 1)
     end
   end
   
@@ -407,7 +410,7 @@ class Mare::Compiler::Infer
     getter ret_value_used : Bool
     @ret : MetaType?
     @ret_pos : Source::Pos?
-    @aliased : Bool?
+    @aliases : Int32?
     
     def initialize(@pos, @lhs, @member, @args, @args_pos, @ret_value_used)
       @domain_constraints = [] of MetaType
@@ -419,12 +422,12 @@ class Mare::Compiler::Infer
       @ret.not_nil!
     end
     
-    def within_domain!(infer : Infer, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliased : Bool)
-      if @aliased.nil?
-        @aliased = aliased
+    def within_domain!(infer : Infer, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
+      if @aliases.nil?
+        @aliases = aliases
       else
-        raise NotImplementedError.new("conflicting @aliased values") \
-          if @aliased != aliased
+        raise NotImplementedError.new("conflicting @aliases values") \
+          if @aliases != aliases
       end
       
       @domain_constraints << constraint
@@ -444,9 +447,9 @@ class Mare::Compiler::Infer
       domain = MetaType.new(MetaType::Unconstrained.instance)
       domain = @domain_constraints.reduce(domain) { |d, c| d.intersect(c) }
       
-      meta_type_within_domain!(infer, @ret.not_nil!, use_pos, @pos_list.first, domain, @aliased.not_nil!)
+      meta_type_within_domain!(infer, @ret.not_nil!, use_pos, @pos_list.first, domain, @aliases.not_nil!)
     rescue ex
-      raise ex if @aliased
+      raise ex if @aliases
       
       Error.at self, "This return value is outside of its constraints",
         @pos_list.zip(@domain_constraints.map(&.show)).push(

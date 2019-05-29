@@ -366,9 +366,15 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         
         getter_cap = AST::Identifier.new("box").from(data["keyword"])
         if ret
-          getter_ret_origin = AST::Identifier.new("@").from(getter_cap)
-          getter_ret_op = AST::Operator.new("->").from(getter_cap)
-          getter_ret = AST::Relate.new(getter_ret_origin, getter_ret_op, ret).from(ret)
+          getter_ret = AST::Relate.new(
+            AST::Relate.new(
+              AST::Identifier.new("@").from(getter_cap),
+              AST::Operator.new("->").from(getter_cap),
+              ret
+            ).from(ret),
+            AST::Operator.new("'").from(getter_cap),
+            AST::Identifier.new("alias").from(getter_cap),
+          ).from(ret)
         end
         getter_body = AST::Group.new(":").from(ident)
         getter_body.terms << AST::FieldRead.new(ident.value).from(ident)
@@ -386,13 +392,18 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         end
         setter_params = AST::Group.new("(").from(ident)
         setter_params.terms << setter_param
+        setter_ret = getter_ret
         setter_assign = AST::FieldWrite.new(
           ident.value,
-          AST::Identifier.new("value").from(ident),
+          AST::Prefix.new(
+            AST::Operator.new("--").from(ident),
+            AST::Identifier.new("value").from(ident),
+          ).from(ident)
         ).from(ident)
         setter_body = AST::Group.new(":").from(ident)
         setter_body.terms << setter_assign
-        setter_func = Program::Function.new(setter_cap, setter_ident, setter_params, nil, setter_body)
+        setter_body.terms << AST::FieldRead.new(ident.value).from(ident)
+        setter_func = Program::Function.new(setter_cap, setter_ident, setter_params, setter_ret, setter_body)
         @type.functions << setter_func
       when "is"
         data = @@declare_is.run(decl)

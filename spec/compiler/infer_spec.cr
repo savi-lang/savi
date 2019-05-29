@@ -628,23 +628,28 @@ describe Mare::Compiler::Infer do
         x1b val = --x1a // okay
         
         x2a iso = X.new
-        x2b val = x2a // not okay
+        x2b iso = --x2a // okay
+        x2c iso = --x2b // okay
+        x2d val = --x2c // okay
+        
+        x3a iso = X.new
+        x3b val = x3a // not okay
     SOURCE
     
     expected = <<-MSG
     This expression doesn't meet the type constraints imposed on it:
-    from (example):10:
-        x2b val = x2a // not okay
+    from (example):15:
+        x3b val = x3a // not okay
                   ^~~
     
     - the expression (when aliased) has a type of X'tag:
-      from (example):9:
-        x2a iso = X.new
+      from (example):14:
+        x3a iso = X.new
             ^~~
     
     - it must be a subtype of val:
-      from (example):10:
-        x2b val = x2a // not okay
+      from (example):15:
+        x3b val = x3a // not okay
             ^~~
     
     - this would be allowed if this reference didn't get aliased
@@ -755,8 +760,13 @@ describe Mare::Compiler::Infer do
     SOURCE
     
     expected = <<-MSG
-    This return value is outside of its constraints:
+    This expression doesn't meet the type constraints imposed on it:
     from (example):14:
+        inner_ref2 Inner'ref = outer_box.inner // not okay
+                               ^~~~~~~~~~~~~~~
+    
+    - the expression has a type of Inner'box:
+      from (example):14:
         inner_ref2 Inner'ref = outer_box.inner // not okay
                                          ^~~~~
     
@@ -764,11 +774,6 @@ describe Mare::Compiler::Infer do
       from (example):14:
         inner_ref2 Inner'ref = outer_box.inner // not okay
                    ^~~~~~~~~
-    
-    - but it had a return type of Inner'box:
-      from (example):4:
-      prop inner: Inner.new
-           ^~~~~
     MSG
     
     expect_raises Mare::Error, expected do
@@ -796,8 +801,13 @@ describe Mare::Compiler::Infer do
     SOURCE
     
     expected = <<-MSG
-    This return value is outside of its constraints:
+    This expression doesn't meet the type constraints imposed on it:
     from (example):15:
+        inner_ref2 Inner'ref = outer_box.get_inner // not okay
+                               ^~~~~~~~~~~~~~~~~~~
+    
+    - the expression has a type of Inner'box:
+      from (example):15:
         inner_ref2 Inner'ref = outer_box.get_inner // not okay
                                          ^~~~~~~~~
     
@@ -805,11 +815,6 @@ describe Mare::Compiler::Infer do
       from (example):15:
         inner_ref2 Inner'ref = outer_box.get_inner // not okay
                    ^~~~~~~~~
-    
-    - but it had a return type of Inner'box:
-      from (example):5:
-      fun get_inner @->Inner: @inner
-                    ^~~~~~~~
     MSG
     
     expect_raises Mare::Error, expected do
@@ -884,17 +889,17 @@ describe Mare::Compiler::Infer do
     
     actor Main:
       new:
-        outer_iso Outer'iso = Outer.new
-        inner_2 = outer_iso.inner = Inner.new
+        outer_trn Outer'trn = Outer.new
+        inner_2 = outer_trn.inner = Inner.new
     SOURCE
     
     expected = <<-MSG
     This function call won't work unless the receiver is ephemeral; it must either be consumed or be allowed to be auto-recovered. Auto-recovery didn't work for these reasons:
     from (example):11:
-        inner_2 = outer_iso.inner = Inner.new
+        inner_2 = outer_trn.inner = Inner.new
                             ^~~~~
     
-    - the return type Inner isn't sendable and the return value is used (the return type wouldn't matter if the calling side entirely ignored the return value:
+    - the return type Inner'box isn't sendable and the return value is used (the return type wouldn't matter if the calling side entirely ignored the return value:
       from (example):5:
       prop inner Inner: Inner.new
            ^~~~~
@@ -905,7 +910,43 @@ describe Mare::Compiler::Infer do
     end
   end
   
-  pending "infers prop setters to return the alias of the assigned value"
+  it "infers prop setters to return the alias of the assigned value" do
+    source = Mare::Source.new "(example)", <<-SOURCE
+    class Inner:
+      new trn:
+    
+    class Outer:
+      prop inner Inner'trn: Inner.new
+    
+    actor Main:
+      new:
+        outer = Outer.new
+        inner_box Inner'box = outer.inner = Inner.new // okay
+        inner_trn Inner'trn = outer.inner = Inner.new // not okay
+    SOURCE
+    
+    # TODO: Fix position reporting that isn't quite right here:
+    expected = <<-MSG
+    This expression doesn't meet the type constraints imposed on it:
+    from (example):11:
+        inner_trn Inner'trn = outer.inner = Inner.new // not okay
+        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    
+    - the expression has a type of Inner'box:
+      from (example):11:
+        inner_trn Inner'trn = outer.inner = Inner.new // not okay
+                                    ^~~~~
+    
+    - it must be a subtype of Inner'trn:
+      from (example):11:
+        inner_trn Inner'trn = outer.inner = Inner.new // not okay
+                  ^~~~~~~~~
+    MSG
+    
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :infer)
+    end
+  end
   
   pending "requires parameters of 'recovered' constructors to be sendable"
   

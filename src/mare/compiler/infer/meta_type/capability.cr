@@ -58,7 +58,7 @@ struct Mare::Compiler::Infer::MetaType::Capability
     # If we reach this point, it's because we're dealing with `ref` and `val`.
     # Assert that this is the case, just for sanity's sake, then we will
     # return the `trn` capability, since it is the nearest subtype of both.
-    raise "expected `ref` and `val`" \
+    raise "expected `ref` and `val`, but was `#{self}` and `#{other}`" \
       unless (REF == self && VAL == other) || (VAL == self && REF == other)
     TRN
   end
@@ -116,7 +116,7 @@ struct Mare::Compiler::Infer::MetaType::Capability
     when TRN_EPH
       other != ISO_EPH && other != ISO
     when ISO
-      TAG == other
+      TAG == other || NON == other
     when TRN, REF, VAL
       BOX == other || TAG == other || NON == other
     when BOX

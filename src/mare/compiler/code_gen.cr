@@ -1282,6 +1282,9 @@ class Mare::Compiler::CodeGen
     when AST::Choice
       raise "#{expr.inspect} isn't a constant value" if const_only
       gen_choice(expr)
+    when AST::Prefix
+      raise NotImplementedError.new(expr.inspect) unless expr.op.value == "--"
+      gen_expr(expr.term, const_only)
     else
       raise NotImplementedError.new(expr.inspect)
     end

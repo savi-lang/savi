@@ -86,7 +86,8 @@ class Mare::Compiler::Infers < Mare::AST::Visitor
     f : Program::Function,
     cap : Infer::MetaType,
   )
-    rf = Infer::ReifiedFunction.new(f, Infer::MetaType.new_nominal(t).intersect(cap))
+    mt = Infer::MetaType.new_nominal(t).intersect(cap.strip_ephemeral)
+    rf = Infer::ReifiedFunction.new(f, mt)
     self[rf]? || (
       Infer.new(ctx, t, rf)
       .tap { |infer| add_infer(rf, infer) }
@@ -456,12 +457,14 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   def type_expr(node : AST::Relate)
     if node.op.value == "'"
       cap = node.rhs.as(AST::Identifier).value
-      type_expr(node.lhs).override_cap(cap)
+      if cap == "alias"
+        type_expr(node.lhs).alias
+      else
+        type_expr(node.lhs).override_cap(cap)
+      end
     elsif node.op.value == "->"
-      # TODO: right-associativity for viewpoint adaptation
       type_expr(node.rhs).viewed_from(type_expr(node.lhs))
     elsif node.op.value == "+>"
-      # TODO: right-associativity for viewpoint adaptation
       type_expr(node.rhs).extracted_from(type_expr(node.lhs))
     else
       raise NotImplementedError.new(node.to_a.inspect)
@@ -660,7 +663,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       # Each condition in a choice must evaluate to a type of Bool.
       bool = MetaType.new(refer.decl_defn("Bool"))
       cond_info = self[cond]
-      cond_info.within_domain!(self, node.pos, node.pos, bool, true)
+      cond_info.within_domain!(self, node.pos, node.pos, bool, 1)
       
       # If we have a type condition as the cond, that implies that it returned
       # true if we are in the body; hence we can apply the type refinement.

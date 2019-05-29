@@ -64,6 +64,7 @@ module Mare::Parser
       str("iso") | str("trn") | str("val") |
       str("ref") | str("box") | str("tag") | str("non")
     ).named(:ident)
+    capmod = str("alias").named(:ident)
     
     # Define groups of operators, in order of precedence,
     # from most tightly binding to most loosely binding.
@@ -86,7 +87,7 @@ module Mare::Parser
     
     # Construct the nested possible relations for each group of operators.
     t1 = suffixed | atom
-    t2 = (t1 >> (opcap >> cap).repeat).named(:relate)
+    t2 = (t1 >> (opcap >> (cap | capmod)).repeat).named(:relate)
     t3 = (t2 >> (sn >> op2 >> sn >> t2).repeat).named(:relate)
     t4 = (t3 >> (sn >> op3 >> sn >> t3).repeat).named(:relate)
     t5 = (t4 >> (sn >> op4 >> sn >> t4).repeat).named(:relate)
