@@ -7,34 +7,56 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
   
   def keywords; %w{actor class interface numeric enum primitive ffi} end
   
+  @@declare_type = Witness.new([
+    {
+      "kind" => "keyword",
+      "name" => "keyword",
+      "value" => "actor|class|interface|numeric|enum|primitive|ffi",
+    },
+    {
+      "kind" => "keyword",
+      "name" => "cap",
+      "value" => "iso|trn|val|ref|box|tag|non",
+      "optional" => true,
+    },
+    {
+      "kind" => "term",
+      "name" => "ident",
+      "type" => "ident|string",
+      "convert_string_to_ident" => true,
+    },
+  ] of Hash(String, String | Bool))
+  
   def compile(context, decl)
-    keyword = decl.keyword
+    data = @@declare_type.run(decl)
+    keyword = data["keyword"].as(AST::Identifier)
     
-    # Set a default default capability for this type.
-    cap_value =
-      case keyword
-      when "actor"     then "tag"
-      when "class"     then "ref"
-      when "interface" then "ref"
-      when "numeric"   then "val"
-      when "enum"      then "val"
-      when "primitive" then "non"
-      when "ffi"       then "non"
-      else raise NotImplementedError.new(keyword)
-      end
-    cap = AST::Identifier.new(cap_value).from(decl.head.first.not_nil!)
-    
-    # Get the explicit default capability for this type.
-    cap = decl.head[1]?.as(AST::Identifier) \
-      if decl.head.size > 2 && cap_value == "ref"
+    # Set a default default capability for this type if not given explicitly.
+    data["cap"] ||= (
+      cap_value =
+        case keyword.value
+        when "actor"     then "tag"
+        when "class"     then "ref"
+        when "interface" then "ref"
+        when "numeric"   then "val"
+        when "enum"      then "val"
+        when "primitive" then "non"
+        when "ffi"       then "non"
+        else raise NotImplementedError.new(keyword)
+        end
+      AST::Identifier.new(cap_value).from(keyword)
+    )
     
     t = Type.new(
-      keyword,
-      Program::Type.new(cap, decl.head.last.as(AST::Identifier)),
+      keyword.value,
+      Program::Type.new(
+        data["cap"].as(AST::Identifier),
+        data["ident"].as(AST::Identifier),
+      ),
       @program,
     )
     
-    case keyword
+    case keyword.value
     when "actor"
       t.type.add_tag(:actor)
       t.type.add_tag(:allocated)
