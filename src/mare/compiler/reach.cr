@@ -49,7 +49,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     end
     
     def any_callable_defn_for(name) : Program::Type
-      @meta_type.find_callable_func_defns(name).first[1].not_nil!
+      @meta_type.any_callable_func_defn_type(name).not_nil!
     end
     
     def tuple_count

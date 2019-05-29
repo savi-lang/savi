@@ -254,7 +254,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   
   def follow_call(call : FromCall)
     resolved = self[call.lhs].resolve!(self)
-    call_defns = resolved.find_callable_func_defns(call.member)
+    call_defns = resolved.find_callable_func_defns(self, call.member)
     
     # Raise an error if we don't have a callable function for every possibility.
     call_defns << {resolved.inner, nil, nil} if call_defns.empty?

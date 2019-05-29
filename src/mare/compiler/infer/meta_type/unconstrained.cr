@@ -25,7 +25,11 @@ class Mare::Compiler::Infer::MetaType::Unconstrained
     ([] of Program::Type).each
   end
   
-  def find_callable_func_defns(name : String)
+  def find_callable_func_defns(infer : Infer, name : String)
+    nil
+  end
+  
+  def any_callable_func_defn_type(name : String) : Program::Type?
     nil
   end
   

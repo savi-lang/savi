@@ -87,12 +87,12 @@ struct Mare::Compiler::Infer::MetaType::Intersection
     iter
   end
   
-  def find_callable_func_defns(name : String)
+  def find_callable_func_defns(infer : Infer, name : String)
     list = [] of Tuple(Inner, Program::Type?, Program::Function?)
     
     # Collect a result for nominal in this intersection that has this func.
     terms.try(&.each do |term|
-      term.find_callable_func_defns(name).try do |result|
+      term.find_callable_func_defns(infer, name).try do |result|
         result.each do |_, defn, func|
           # Replace the inner term with an inner of this intersection.
           # This will be used for subtype checking later, and we want to
@@ -115,6 +115,17 @@ struct Mare::Compiler::Infer::MetaType::Intersection
     list << {self, nil, nil} if list.empty?
     
     list
+  end
+  
+  def any_callable_func_defn_type(name : String) : Program::Type?
+    # Return the first nominal in this intersection that has this func.
+    terms.try(&.each do |term|
+      term.any_callable_func_defn_type(name).try do |result|
+        return result
+      end
+    end)
+    
+    nil
   end
   
   def negate : Inner

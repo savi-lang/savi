@@ -259,11 +259,18 @@ struct Mare::Compiler::Infer::MetaType
   end
   
   def find_callable_func_defns(
+    infer : Infer,
     name : String,
   ) : Set(Tuple(Inner, Program::Type?, Program::Function?))
     set = Set(Tuple(Inner, Program::Type?, Program::Function?)).new
-    @inner.find_callable_func_defns(name).try(&.each { |tuple| set.add(tuple) })
+    @inner.find_callable_func_defns(infer, name).try(&.each { |tuple|
+      set.add(tuple)
+    })
     set
+  end
+  
+  def any_callable_func_defn_type(name : String) : Program::Type?
+    @inner.any_callable_func_defn_type(name)
   end
   
   def ==(other)

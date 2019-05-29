@@ -33,9 +33,14 @@ struct Mare::Compiler::Infer::MetaType::Nominal
     [defn].each
   end
   
-  def find_callable_func_defns(name : String)
+  def find_callable_func_defns(infer : Infer, name : String)
     func = defn.find_func?(name)
     [{self, defn, func}] if func
+  end
+  
+  def any_callable_func_defn_type(name : String) : Program::Type?
+    func = defn.find_func?(name)
+    defn if func
   end
   
   def is_concrete?

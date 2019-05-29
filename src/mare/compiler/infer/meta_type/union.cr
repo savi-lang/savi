@@ -102,13 +102,13 @@ struct Mare::Compiler::Infer::MetaType::Union
     iter
   end
   
-  def find_callable_func_defns(name : String)
+  def find_callable_func_defns(infer : Infer, name : String)
     list = [] of Tuple(Inner, Program::Type?, Program::Function?)
     
     # Every nominal in the union must have an implementation of the call.
     # If it doesn't, we will collect it here as a failure to find it.
     terms.not_nil!.each do |term|
-      result = term.find_callable_func_defns(name)
+      result = term.find_callable_func_defns(infer, name)
       result ||= [{term, term.defn, nil}]
       list.concat(result)
     end if terms
@@ -116,11 +116,27 @@ struct Mare::Compiler::Infer::MetaType::Union
     # Every intersection must have one or more implementations of the call.
     # Otherwise, it will return some error infomration in its list for us.
     intersects.not_nil!.each do |intersect|
-      result = intersect.find_callable_func_defns(name).not_nil!
+      result = intersect.find_callable_func_defns(infer, name).not_nil!
       list.concat(result)
     end if intersects
     
     list
+  end
+  
+  def any_callable_func_defn_type(name : String) : Program::Type?
+    # Return the first nominal or intersection in this union that has this func.
+    terms.try(&.each do |term|
+      term.any_callable_func_defn_type(name).try do |result|
+        return result
+      end
+    end)
+    intersects.try(&.each do |intersect|
+      intersect.any_callable_func_defn_type(name).try do |result|
+        return result
+      end
+    end)
+    
+    nil
   end
   
   def negate : Inner
