@@ -4,7 +4,9 @@ describe Mare::Compiler::Infer::MetaType do
       ref = Mare::AST::Identifier.new("ref")
       t = Mare::Program::Type.new(ref, Mare::AST::Identifier.new(s))
       t.add_tag(:abstract) if is_abstract
-      m = Mare::Compiler::Infer::MetaType.new_nominal(t)
+      m = Mare::Compiler::Infer::MetaType.new_nominal(
+        Mare::Compiler::Infer::ReifiedType.new(t)
+      )
       m
     }
     

@@ -15,13 +15,15 @@ class Mare::Compiler::Infers < Mare::AST::Visitor
   def initialize
     @map = {} of Infer::ReifiedFunction => Infer
     @mmap = {} of Program::Function => Array(Infer::ReifiedFunction)
-    @subtyping_info = {} of Program::Type => Infer::SubtypingInfo
+    @subtyping_info = {} of Infer::ReifiedType => Infer::SubtypingInfo
+    @rtset = Set(Infer::ReifiedType).new
   end
   
   def run(ctx)
     # Before doing anything, instantiate SubtypingInfo on all types.
+    # TODO: Can this be removed?
     ctx.program.types.each do |t|
-      @subtyping_info[t] = Infer::SubtypingInfo.new(ctx, t)
+      rt = reified_type(ctx, t)
     end
     
     # Start by running an instance of inference at the Main.new function,
@@ -31,7 +33,8 @@ class Mare::Compiler::Infers < Mare::AST::Visitor
     main = ctx.program.find_type?("Main")
     if main
       f = main.find_func?("new")
-      infer_from(ctx, main, f, Infer::MetaType.cap(f.cap.value)) if f
+      main_rt = reified_type(ctx, main)
+      infer_from(ctx, main_rt, f, Infer::MetaType.cap(f.cap.value)) if f
     end
     
     # For each function in the program, run with a new instance,
@@ -40,11 +43,13 @@ class Mare::Compiler::Infers < Mare::AST::Visitor
     # so this second pass just takes care of typechecking unreachable functions.
     ctx.program.types.each do |t|
       t.functions.each do |f|
-        infer_from(ctx, t, f, Infer::MetaType.cap(f.cap.value))
+        rt = reified_type(ctx, t)
+        infer_from(ctx, rt, f, Infer::MetaType.cap(f.cap.value))
       end
     end
     ctx.program.types.each do |t|
-      check_is_list(ctx, t)
+      rt = reified_type(ctx, t)
+      check_is_list(ctx, rt)
     end
   end
   
@@ -56,8 +61,8 @@ class Mare::Compiler::Infers < Mare::AST::Visitor
     @map[rf]?
   end
   
-  def subtyping_info_for(t : Program::Type)
-    @subtyping_info[t]
+  def subtyping_info_for(rt : Infer::ReifiedType)
+    @subtyping_info[rt]
   end
   
   private def add_infer(rf, infer)
@@ -82,30 +87,49 @@ class Mare::Compiler::Infers < Mare::AST::Visitor
   
   def infer_from(
     ctx : Context,
-    t : Program::Type,
+    rt : Infer::ReifiedType,
     f : Program::Function,
     cap : Infer::MetaType,
   )
-    mt = Infer::MetaType.new_nominal(t).intersect(cap.strip_ephemeral)
-    rf = Infer::ReifiedFunction.new(f, mt)
+    mt = Infer::MetaType.new_nominal(rt).intersect(cap.strip_ephemeral)
+    rf = Infer::ReifiedFunction.new(rt, f, mt)
     self[rf]? || (
-      Infer.new(ctx, t, rf)
+      Infer.new(ctx, rt, rf)
       .tap { |infer| add_infer(rf, infer) }
       .tap(&.run)
     )
   end
   
-  def check_is_list(ctx : Context, t : Program::Type)
-    t.functions.each do |f|
+  def reified_type(
+    ctx : Context,
+    t : Program::Type,
+    type_args : Array(Infer::MetaType) = [] of Infer::MetaType,
+    # TODO:
+  )
+    rt = Infer::ReifiedType.new(t, type_args)
+    return rt if @rtset.includes?(rt)
+    
+    @rtset.add(rt) # TODO: possible to remove in favor of subtyping_info.keys?
+    @subtyping_info[rt] = Infer::SubtypingInfo.new(ctx, rt)
+    
+    rt
+  end
+  
+  def completely_reified_types
+    @rtset.select(&.is_complete?).to_a
+  end
+  
+  def check_is_list(ctx : Context, rt : Infer::ReifiedType)
+    rt.defn.functions.each do |f|
       next unless f.has_tag?(:is)
       
-      infer = infer_from(ctx, t, f, Infer::MetaType.cap(f.cap.value))
+      infer = infer_from(ctx, rt, f, Infer::MetaType.cap(f.cap.value))
       iface = infer.resolve(infer.ret).single!
       
       errors = [] of Error::Info
-      unless infer.is_subtype?(t, iface, errors)
-        Error.at t.ident,
-          "This type doesn't implement the interface #{iface.ident.value}",
+      unless infer.is_subtype?(rt, iface, errors)
+        Error.at rt.defn.ident,
+          "This type doesn't implement the interface #{iface.defn.ident.value}",
             errors
       end
     end
@@ -113,11 +137,45 @@ class Mare::Compiler::Infers < Mare::AST::Visitor
 end
 
 class Mare::Compiler::Infer < Mare::AST::Visitor
+  struct ReifiedType
+    getter defn : Program::Type
+    getter args : Array(MetaType)
+    
+    def initialize(@defn, @args = [] of MetaType)
+    end
+    
+    def show_type
+      String.build { |io| show_type(io) }
+    end
+    
+    def show_type(io : IO)
+      io << defn.ident.value
+      
+      unless args.empty?
+        io << "("
+        args.each_with_index do |mt, index|
+          io << ", " unless index == 0
+          mt.inner.inspect(io)
+        end
+        io << ")"
+      end
+    end
+    
+    def inspect(io : IO)
+      show_type(io)
+    end
+    
+    def is_complete?
+      args.size == (defn.params.try(&.terms.size) || 0)
+    end
+  end
+  
   struct ReifiedFunction
+    getter type : ReifiedType
     getter func : Program::Function
     getter receiver : MetaType
     
-    def initialize(@func, @receiver)
+    def initialize(@type, @func, @receiver)
     end
     
     # This name is used in selector painting, so be sure that it meets the
@@ -138,13 +196,13 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   getter params : Array(AST::Node) = [] of AST::Node
   getter! ret : AST::Node
   
-  def initialize(@ctx : Context, @self_type : Program::Type, @reified)
+  def initialize(@ctx : Context, @self_type : ReifiedType, @reified)
     @local_idents = Hash(Refer::Local, AST::Node).new
     @local_ident_overrides = Hash(AST::Node, AST::Node).new
     @info_table = Hash(AST::Node, Info).new
     @redirects = Hash(AST::Node, AST::Node).new
     @resolved = Hash(AST::Node, MetaType).new
-    @called_funcs = Set({Program::Type, Program::Function}).new
+    @called_funcs = Set({ReifiedType, Program::Function}).new
   end
   
   def [](node : AST::Node)
@@ -168,11 +226,36 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   end
   
   def is_subtype?(
-    l : Program::Type,
-    r : Program::Type,
+    l : Infer::ReifiedType,
+    r : Infer::ReifiedType,
     errors = [] of Error::Info,
   ) : Bool
     ctx.infers.subtyping_info_for(l).check(r, errors)
+  end
+  
+  def is_subtype?(
+    l : Refer::DeclParam,
+    r : Infer::ReifiedType,
+    errors = [] of Error::Info,
+  ) : Bool
+    raise NotImplementedError.new("type param <: type")
+  end
+  
+  def is_subtype?(
+    l : Infer::ReifiedType,
+    r : Refer::DeclParam,
+    errors = [] of Error::Info,
+  ) : Bool
+    raise NotImplementedError.new("type <: type param")
+  end
+  
+  def is_subtype?(
+    l : Refer::DeclParam,
+    r : Refer::DeclParam,
+    errors = [] of Error::Info,
+  ) : Bool
+    return true if l == r
+    raise NotImplementedError.new("type param <: type param")
   end
   
   def is_subtype?(l : MetaType, r : MetaType) : Bool
@@ -262,8 +345,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       if call_defn.nil?
         {call, "the type #{call_mti.inspect} has no referencable types in it"}
       elsif call_func.nil?
-        {call_defn.ident,
-          "#{call_defn.ident.value} has no '#{call.member}' function"}
+        {call_defn.defn.ident,
+          "#{call_defn.defn.ident.value} has no '#{call.member}' function"}
       end
     end.compact
     Error.at call,
@@ -360,7 +443,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   end
   
   def follow_field(field : Field, name : String)
-    field_func = @self_type.functions.find do |f|
+    field_func = @self_type.defn.functions.find do |f|
       f.ident.value == name && f.has_tag?(:field)
     end.not_nil!
     
@@ -385,6 +468,10 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   
   def resolved_self
     MetaType.new(@self_type, resolved_self_cap_value)
+  end
+  
+  def reified_type(*args)
+    ctx.infers.reified_type(ctx, *args)
   end
   
   def redirect(from : AST::Node, to : AST::Node)
@@ -412,6 +499,14 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     node
   end
   
+  def lookup_type_param(ref : Refer::DeclParam)
+    raise NotImplementedError.new(ref) unless ref.parent == @self_type.defn
+    
+    # Lookup the type parameter on self type and return the corresponding arg,
+    # Or just return in an unresolved form if no arg was found.
+    @self_type.args[ref.index]? || MetaType.new_type_param(ref)
+  end
+  
   # Don't visit the children of a type expression root node
   def visit_children?(node)
     !Classify.type_expr?(node)
@@ -437,10 +532,12 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   def type_expr(node : AST::Identifier)
     ref = refer[node]
     case ref
-    when Refer::Decl, Refer::DeclAlias
-      MetaType.new(ref.final_decl.defn)
     when Refer::Self
       reified.receiver
+    when Refer::Decl, Refer::DeclAlias
+      MetaType.new(reified_type(ref.final_decl.defn))
+    when Refer::DeclParam
+      lookup_type_param(ref)
     when Refer::Unresolved
       case node.value
       when "iso", "trn", "val", "ref", "box", "tag", "non"
@@ -492,16 +589,20 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     ref = refer[node]
     case ref
     when Refer::Decl, Refer::DeclAlias
+      rt = reified_type(ref.final_decl.defn)
       if !ref.defn.is_value?
         # A type reference whose value is used and is not itself a value
         # must be marked non, rather than having the default cap for that type.
         # This is used when we pass a type around as if it were a value.
-        meta_type = MetaType.new(ref.final_decl.defn, "non")
+        meta_type = MetaType.new(rt, "non")
       else
         # Otherwise, it's part of a type constraint, so we use the default cap.
-        meta_type = MetaType.new(ref.final_decl.defn)
+        meta_type = MetaType.new(rt)
       end
       
+      self[node] = Fixed.new(node.pos, meta_type)
+    when Refer::DeclParam
+      meta_type = lookup_type_param(ref).override_cap("non")
       self[node] = Fixed.new(node.pos, meta_type)
     when Refer::Local
       # If it's a local, track the possibly new node in our @local_idents map.
@@ -526,26 +627,30 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   end
   
   def touch(node : AST::LiteralString)
-    self[node] = Literal.new(node.pos, [refer.decl_defn("String")])
+    defns = [refer.decl_defn("String")]
+    mts = defns.map { |defn| MetaType.new(reified_type(defn)) }
+    self[node] = Literal.new(node.pos, mts)
   end
   
   # A literal integer could be any integer or floating-point machine type.
   def touch(node : AST::LiteralInteger)
-    self[node] = Literal.new(node.pos, [refer.decl_defn("Numeric")])
+    defns = [refer.decl_defn("Numeric")]
+    mts = defns.map { |defn| MetaType.new(reified_type(defn)) }
+    self[node] = Literal.new(node.pos, mts)
   end
   
   # A literal float could be any floating-point machine type.
   def touch(node : AST::LiteralFloat)
-    self[node] = Literal.new(node.pos, [
-      refer.decl_defn("F32"), refer.decl_defn("F64"),
-    ])
+    defns = [refer.decl_defn("F32"), refer.decl_defn("F64")]
+    mts = defns.map { |defn| MetaType.new(reified_type(defn)) }
+    self[node] = Literal.new(node.pos, mts)
   end
   
   def touch(node : AST::Group)
     case node.style
     when "(", ":"
       if node.terms.empty?
-        none = MetaType.new(refer.decl_defn("None"))
+        none = MetaType.new(reified_type(refer.decl_defn("None")))
         self[node] = Fixed.new(node.pos, none)
       else
         # A non-empty group always has the node of its final child.
@@ -636,12 +741,36 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       Error.at node.rhs, "expected this to have a fixed type at compile time" \
         unless self[node.rhs].is_a?(Fixed)
       
-      bool = MetaType.new(refer.decl_defn("Bool"))
+      bool = MetaType.new(reified_type(refer.decl_defn("Bool")))
       refine = follow_redirects(node.lhs)
       refine_type = self[node.rhs].resolve!(self)
       self[node] = TypeCondition.new(node.pos, bool, refine, refine_type)
     else raise NotImplementedError.new(node.op.value)
     end
+  end
+  
+  def touch(node : AST::Qualify)
+    raise NotImplementedError.new(node.group.style) \
+      unless node.group.style == "("
+    
+    term_info = self[node.term]?
+    
+    # Ignore qualifications that are not type references. For example, this
+    # ignores function call arguments, for which no further work is needed.
+    # We only care about working with type arguments and type parameters now.
+    return unless \
+      term_info.is_a?(Fixed) &&
+      term_info.inner.cap_only_name == "non"
+    
+    # TODO: Check number of arguments against number of params.
+    # TODO: Check arguments against type parameter constraints.
+    args = node.group.terms.map { |t| type_expr(t) }
+    rt = term_info.inner.single!
+    
+    # TODO: Nice error for this case:
+    raise NotImplementedError.new("incremental type args") unless rt.args.empty?
+    
+    self[node] = Fixed.new(node.pos, MetaType.new(reified_type(rt.defn, args)))
   end
   
   def touch(node : AST::Prefix)
@@ -661,7 +790,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       cond.accept(self)
       
       # Each condition in a choice must evaluate to a type of Bool.
-      bool = MetaType.new(refer.decl_defn("Bool"))
+      bool = MetaType.new(reified_type(refer.decl_defn("Bool")))
       cond_info = self[cond]
       cond_info.within_domain!(self, node.pos, node.pos, bool, 1)
       

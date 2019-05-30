@@ -131,7 +131,7 @@ module Mare::Compiler::Completeness
         # This represents the self type as opaque, with no field access.
         # We'll use this to guarantee that no usage of the current self object
         # will require  any access to the fields of the object.
-        tag_self = Infer::MetaType.new(@decl, "tag")
+        tag_self = Infer::MetaType.new(infer.reified_type(@decl), "tag")
         
         # Walk through each constraint imposed on the self in the earlier
         # Infer pass that tracked all of those constraints.

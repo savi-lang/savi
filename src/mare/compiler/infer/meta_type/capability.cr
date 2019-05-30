@@ -26,15 +26,15 @@ struct Mare::Compiler::Infer::MetaType::Capability
     other.is_a?(Capability) && name == other.name
   end
   
-  def each_reachable_defn : Iterator(Program::Type)
-    ([] of Program::Type).each
+  def each_reachable_defn : Iterator(Infer::ReifiedType)
+    ([] of Infer::ReifiedType).each
   end
   
   def find_callable_func_defns(infer : Infer, name : String)
     nil
   end
   
-  def any_callable_func_defn_type(name : String) : Program::Type?
+  def any_callable_func_defn_type(name : String) : Infer::ReifiedType?
     nil
   end
   

@@ -1,12 +1,14 @@
 struct Mare::Compiler::Infer::MetaType::AntiNominal
-  getter defn : Program::Type
+  getter defn : Infer::ReifiedType
   
-  def initialize(@defn)
+  def initialize(defn)
+    raise NotImplementedError.new(defn) unless defn.is_a?(Infer::ReifiedType)
+    @defn = defn
   end
   
   def inspect(io : IO)
     io << "-"
-    io << defn.ident.value
+    io << defn.defn.ident.value
     io << "'any"
   end
   
@@ -18,7 +20,7 @@ struct Mare::Compiler::Infer::MetaType::AntiNominal
     other.is_a?(AntiNominal) && defn == other.defn
   end
   
-  def each_reachable_defn : Iterator(Program::Type)
+  def each_reachable_defn : Iterator(Infer::ReifiedType)
     [defn].each # TODO: is an anti-nominal actually reachable?
   end
   
@@ -26,12 +28,12 @@ struct Mare::Compiler::Infer::MetaType::AntiNominal
     nil
   end
   
-  def any_callable_func_defn_type(name : String) : Program::Type?
+  def any_callable_func_defn_type(name : String) : Infer::ReifiedType?
     nil
   end
   
   def is_concrete?
-    defn.is_concrete?
+    defn.defn.is_concrete?
   end
   
   def negate : Inner

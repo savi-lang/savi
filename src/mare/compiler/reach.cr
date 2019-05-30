@@ -29,7 +29,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     end
     
     def is_abstract?
-      is_intersect? || is_union? || !@meta_type.single!.is_concrete?
+      is_intersect? || is_union? || !@meta_type.single!.defn.is_concrete?
     end
     
     def is_concrete?
@@ -48,7 +48,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       @meta_type.single!
     end
     
-    def any_callable_defn_for(name) : Program::Type
+    def any_callable_defn_for(name) : Infer::ReifiedType
       @meta_type.any_callable_func_defn_type(name).not_nil!
     end
     
@@ -58,7 +58,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     
     def is_none!
       # TODO: better reach the one true None instead of a namespaced impostor?
-      raise "#{self} is not None" unless single!.ident.value == "None"
+      raise "#{self} is not None" unless single!.defn.ident.value == "None"
     end
     
     @llvm_use_type : Symbol?
@@ -69,7 +69,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       elsif !singular?
         :object_ptr
       else
-        defn = single!
+        defn = single!.defn
         if defn.has_tag?(:numeric)
           if defn.const_bool("is_floating_point")
             case defn.const_u64("bit_width")
@@ -112,7 +112,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     getter! desc_id : Int32
     getter fields : Array({String, Ref})
     
-    def initialize(@program_type : Program::Type, reach : Reach, @fields)
+    def initialize(@reified : Infer::ReifiedType, reach : Reach, @fields)
       @desc_id =
         if is_numeric?
           reach.next_numeric_id
@@ -125,19 +125,27 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
         end
     end
     
+    def inner
+      @reified
+    end
+    
+    def program_type
+      @reified.defn
+    end
+    
     def llvm_name : String
       # TODO: guarantee global uniqueness
-      @program_type.ident.value
+      @reified.show_type
     end
     
     def abi_size : Int32
       # TODO: move final number calculation to CodeGen side (LLVMABISizeOfType)
       # TODO: cross-platform
-      if @program_type.has_tag?(:no_desc)
+      if @reified.defn.has_tag?(:no_desc)
         16 # we use the boxed size here
-      elsif !@program_type.has_tag?(:allocated)
+      elsif !@reified.defn.has_tag?(:allocated)
         8 # the size of just a descriptor pointer
-      elsif @program_type.has_tag?(:actor)
+      elsif @reified.defn.has_tag?(:actor)
         256 # TODO: handle fields
       else
         64 # TODO: handle fields
@@ -153,34 +161,34 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       
       # TODO: move final number calculation to CodeGen side (LLVMOffsetOfElement)
       offset = 0
-      offset += 8 unless @program_type.has_tag?(:no_desc)
-      offset += 8 if @program_type.has_tag?(:actor)
+      offset += 8 unless @reified.defn.has_tag?(:no_desc)
+      offset += 8 if @reified.defn.has_tag?(:actor)
       offset
     end
     
     def has_desc?
-      !@program_type.has_tag?(:no_desc)
+      !@reified.defn.has_tag?(:no_desc)
     end
     
     def has_allocation?
-      @program_type.has_tag?(:allocated)
+      @reified.defn.has_tag?(:allocated)
     end
     
     def has_state?
-      @program_type.has_tag?(:allocated) ||
-      @program_type.has_tag?(:numeric)
+      @reified.defn.has_tag?(:allocated) ||
+      @reified.defn.has_tag?(:numeric)
     end
     
     def has_actor_pad?
-      @program_type.has_tag?(:actor)
+      @reified.defn.has_tag?(:actor)
     end
     
     def is_actor?
-      @program_type.has_tag?(:actor)
+      @reified.defn.has_tag?(:actor)
     end
     
     def is_abstract?
-      @program_type.has_tag?(:abstract)
+      @reified.defn.has_tag?(:abstract)
     end
     
     def is_tuple?
@@ -188,27 +196,27 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     end
     
     def is_numeric?
-      @program_type.has_tag?(:numeric)
+      @reified.defn.has_tag?(:numeric)
     end
     
     def is_floating_point_numeric?
-      is_numeric? && @program_type.const_bool("is_floating_point")
+      is_numeric? && @reified.defn.const_bool("is_floating_point")
     end
     
     def is_signed_numeric?
-      is_numeric? && @program_type.const_bool("is_signed")
+      is_numeric? && @reified.defn.const_bool("is_signed")
     end
     
     def bit_width
-      @program_type.const_u64("bit_width").to_i32
+      @reified.defn.const_u64("bit_width").to_i32
     end
     
     def each_function
-      @program_type.functions.each
+      @reified.defn.functions.each
     end
     
     def as_ref : Ref
-      Ref.new(Infer::MetaType.new(@program_type))
+      Ref.new(Infer::MetaType.new(@reified))
     end
   end
   
@@ -216,19 +224,19 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
   
   def initialize
     @refs = Hash(Infer::MetaType, Ref).new
-    @defs = Hash(Program::Type, Def).new
+    @defs = Hash(Infer::ReifiedType, Def).new
     @seen_funcs = Set(Program::Function).new
   end
   
   def run(ctx)
     # Reach functions called starting from the entrypoint of the program.
     env = ctx.program.find_type!("Env")
-    handle_func(ctx, env, env.find_func!("new"))
+    handle_func(ctx, ctx.infers.reified_type(ctx, env), env.find_func!("new"))
     main = ctx.program.find_type!("Main")
-    handle_func(ctx, main, main.find_func!("new"))
+    handle_func(ctx, ctx.infers.reified_type(ctx, main), main.find_func!("new"))
   end
   
-  def handle_func(ctx, defn, func)
+  def handle_func(ctx, rt, func)
     # Skip this function if we've already seen it.
     return if @seen_funcs.includes?(func)
     @seen_funcs.add(func)
@@ -241,24 +249,24 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       end
       
       # Reach all functions called by this function.
-      infer.each_called_func.each do |called_defn, called_func|
-        handle_func(ctx, called_defn, called_func)
+      infer.each_called_func.each do |called_rt, called_func|
+        handle_func(ctx, called_rt, called_func)
       end
       
       # Reach all functions that have the same name as this function and
       # belong to a type that is a subtype of this one.
       # TODO: can we avoid doing this for unreachable types? It seems nontrivial.
-      ctx.program.types.each do |other_defn|
-        next if defn == other_defn
-        other_func = other_defn.find_func?(func.ident.value)
+      ctx.infers.completely_reified_types.each do |other_rt|
+        next if rt == other_rt
+        other_func = other_rt.defn.find_func?(func.ident.value)
         
-        handle_func(ctx, other_defn, other_func) \
-          if other_func && infer.is_subtype?(other_defn, defn)
+        handle_func(ctx, other_rt, other_func) \
+          if other_func && infer.is_subtype?(other_rt, rt)
       end
     end
   end
   
-  def handle_field(ctx, defn, func) : {String, Ref}
+  def handle_field(ctx, rt, func) : {String, Ref}
     # Reach the metatype of the field.
     ref = nil
     ctx.infers.infers_for(func).each do |infer|
@@ -267,7 +275,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     end
     
     # Handle the field as if it were a function.
-    handle_func(ctx, defn, func)
+    handle_func(ctx, rt, func)
     
     # Return the Ref instance for this meta type.
     {func.ident.value, @refs[ref.not_nil!]}
@@ -284,18 +292,21 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     @refs[meta_type] = Ref.new(meta_type)
   end
   
-  def handle_type_def(ctx, program_type : Program::Type)
+  def handle_type_def(ctx, rt : Infer::ReifiedType)
     # Skip this type def if we've already seen it.
-    return if @defs.has_key?(program_type)
+    return if @defs.has_key?(rt)
+    
+    # Skip this type def if it's not completely reified.
+    return unless rt.is_complete?
     
     # Reach all fields, regardless of if they were actually used.
     # This is important for consistency of memory layout purposes.
-    fields = program_type.functions.select(&.has_tag?(:field)).map do |f|
-      handle_field(ctx, program_type, f)
+    fields = rt.defn.functions.select(&.has_tag?(:field)).map do |f|
+      handle_field(ctx, rt, f)
     end
     
     # Now, save a Def instance for this program type.
-    @defs[program_type] = Def.new(program_type, self, fields)
+    @defs[rt] = Def.new(rt, self, fields)
   end
   
   # Traits are numbered 0, 1, 2, 3, 4, ...
@@ -330,8 +341,8 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     @refs[meta_type]
   end
   
-  def [](program_type : Program::Type)
-    @defs[program_type]
+  def [](rt : Infer::ReifiedType)
+    @defs[rt]
   end
   
   def reached_func?(program_func : Program::Function)

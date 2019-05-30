@@ -25,6 +25,12 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
       "type" => "ident|string",
       "convert_string_to_ident" => true,
     },
+    {
+      "kind" => "term",
+      "name" => "params",
+      "type" => "params",
+      "optional" => true,
+    },
   ] of Hash(String, String | Bool))
   
   def compile(context, decl)
@@ -52,6 +58,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
       Program::Type.new(
         data["cap"].as(AST::Identifier),
         data["ident"].as(AST::Identifier),
+        data["params"]?.as(AST::Group?),
       ),
       @program,
     )

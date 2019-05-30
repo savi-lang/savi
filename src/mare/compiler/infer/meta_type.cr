@@ -32,12 +32,16 @@ struct Mare::Compiler::Infer::MetaType
   def initialize(@inner)
   end
   
-  def initialize(defn : Program::Type, cap : String? = nil)
-    cap ||= defn.cap.value
+  def initialize(defn : Infer::ReifiedType, cap : String? = nil)
+    cap ||= defn.defn.cap.value
     @inner = Nominal.new(defn).intersect(Capability.new(cap))
   end
   
-  def self.new_nominal(defn : Program::Type)
+  def self.new_nominal(defn : Infer::ReifiedType)
+    MetaType.new(Nominal.new(defn))
+  end
+  
+  def self.new_type_param(defn : Refer::DeclParam)
     MetaType.new(Nominal.new(defn))
   end
   
@@ -70,6 +74,15 @@ struct Mare::Compiler::Infer::MetaType
       when Intersection; inner.cap
       end.as(Capability)
     )
+  end
+  
+  def cap_only_name
+    inner = @inner
+    case inner
+    when Capability; inner
+    when Union; caps = inner.caps; caps && caps.size == 1 && caps.first
+    when Intersection; inner.cap
+    end.as(Capability).name
   end
   
   def override_cap(name : String)
@@ -161,7 +174,7 @@ struct Mare::Compiler::Infer::MetaType
   
   def single!
     raise "not singular: #{show_type}" unless singular?
-    single?.not_nil!.defn
+    single?.not_nil!.defn.as(Infer::ReifiedType)
   end
   
   def -; negate end
@@ -254,22 +267,22 @@ struct Mare::Compiler::Infer::MetaType
     inner.subtype_of?(infer, other.inner)
   end
   
-  def each_reachable_defn : Iterator(Program::Type)
+  def each_reachable_defn : Iterator(Infer::ReifiedType)
     @inner.each_reachable_defn
   end
   
   def find_callable_func_defns(
     infer : Infer,
     name : String,
-  ) : Set(Tuple(Inner, Program::Type?, Program::Function?))
-    set = Set(Tuple(Inner, Program::Type?, Program::Function?)).new
+  ) : Set(Tuple(Inner, Infer::ReifiedType?, Program::Function?))
+    set = Set(Tuple(Inner, Infer::ReifiedType?, Program::Function?)).new
     @inner.find_callable_func_defns(infer, name).try(&.each { |tuple|
       set.add(tuple)
     })
     set
   end
   
-  def any_callable_func_defn_type(name : String) : Program::Type?
+  def any_callable_func_defn_type(name : String) : Infer::ReifiedType?
     @inner.any_callable_func_defn_type(name)
   end
   

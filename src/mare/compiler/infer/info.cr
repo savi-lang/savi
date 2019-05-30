@@ -92,9 +92,8 @@ class Mare::Compiler::Infer
     @domain : MetaType
     @domain_constraints : Array(MetaType)
     
-    def initialize(@pos, possible : Enumerable(Program::Type))
-      possible = possible.map { |defn| MetaType.new(defn) }
-      @domain = MetaType.new_union(possible)
+    def initialize(@pos, possible : Array(MetaType))
+      @domain = MetaType.new_union(possible) # TODO: why doesn't this line also have .cap("val")?
       @domain_constraints = [MetaType.new_union(possible).cap("val")]
       @pos_list = [@pos] of Source::Pos
     end

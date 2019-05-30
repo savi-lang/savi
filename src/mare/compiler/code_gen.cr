@@ -79,6 +79,8 @@ class Mare::Compiler::CodeGen
         next unless g.ctx.reach.reached_func?(f)
         
         g.ctx.infers.infers_for(f).each do |infer|
+          next unless infer.reified.type == type_def.inner
+          
           vtable_index = g.ctx.paint[infer.reified]
           @vtable_size = (vtable_index + 1) if @vtable_size <= vtable_index
         
@@ -1249,6 +1251,23 @@ class Mare::Compiler::CodeGen
         else
           gtype_of(expr).singleton
         end
+      elsif ref.is_a?(Refer::DeclParam)
+        # TODO: unify with above clause
+        defn = gtype_of(expr).type_def.program_type
+        enum_value = defn.metadata[:enum_value]?
+        if enum_value
+          llvm_type_of(expr).const_int(enum_value.as(UInt64).to_i32)
+        elsif defn.has_tag?(:numeric)
+          llvm_type = llvm_type_of(expr)
+          case llvm_type.kind
+          when LLVM::Type::Kind::Integer then llvm_type.const_int(0)
+          when LLVM::Type::Kind::Float then llvm_type.const_float(0)
+          when LLVM::Type::Kind::Double then llvm_type.const_double(0)
+          else raise NotImplementedError.new(llvm_type)
+          end
+        else
+          gtype_of(expr).singleton
+        end
       elsif ref.is_a?(Refer::Self)
         raise "#{ref.inspect} isn't a constant value" if const_only
         func_frame.receiver_value
@@ -1285,6 +1304,8 @@ class Mare::Compiler::CodeGen
     when AST::Prefix
       raise NotImplementedError.new(expr.inspect) unless expr.op.value == "--"
       gen_expr(expr.term, const_only)
+    when AST::Qualify
+      gtype_of(expr).singleton
     else
       raise NotImplementedError.new(expr.inspect)
     end

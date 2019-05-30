@@ -91,10 +91,10 @@ struct Mare::Compiler::Infer::MetaType::Union
     intersects == other.intersects
   end
   
-  def each_reachable_defn : Iterator(Program::Type)
-    iter = ([] of Program::Type).each
-    iter = iter.chain(terms.not_nil!.each.map(&.defn)) if terms
-    iter = iter.chain(anti_terms.not_nil!.each.map(&.defn)) if anti_terms # TODO: is an anti-nominal actually reachable?
+  def each_reachable_defn : Iterator(Infer::ReifiedType)
+    iter = ([] of Infer::ReifiedType).each
+    iter = iter.chain(terms.not_nil!.each.map(&.defn).select(&.is_a?(Infer::ReifiedType)).map(&.as(Infer::ReifiedType))) if terms
+    iter = iter.chain(anti_terms.not_nil!.each.map(&.defn).select(&.is_a?(Infer::ReifiedType)).map(&.as(Infer::ReifiedType))) if anti_terms # TODO: is an anti-nominal actually reachable?
     iter = iter.chain(
       intersects.not_nil!.map(&.each_reachable_defn).flat_map(&.to_a).each
     ) if intersects
@@ -103,13 +103,14 @@ struct Mare::Compiler::Infer::MetaType::Union
   end
   
   def find_callable_func_defns(infer : Infer, name : String)
-    list = [] of Tuple(Inner, Program::Type?, Program::Function?)
+    list = [] of Tuple(Inner, Infer::ReifiedType?, Program::Function?)
     
     # Every nominal in the union must have an implementation of the call.
     # If it doesn't, we will collect it here as a failure to find it.
     terms.not_nil!.each do |term|
+      defn = term.defn
       result = term.find_callable_func_defns(infer, name)
-      result ||= [{term, term.defn, nil}]
+      result ||= [{term, (defn if defn.is_a?(Infer::ReifiedType)), nil}]
       list.concat(result)
     end if terms
     
@@ -123,7 +124,7 @@ struct Mare::Compiler::Infer::MetaType::Union
     list
   end
   
-  def any_callable_func_defn_type(name : String) : Program::Type?
+  def any_callable_func_defn_type(name : String) : Infer::ReifiedType?
     # Return the first nominal or intersection in this union that has this func.
     terms.try(&.each do |term|
       term.any_callable_func_defn_type(name).try do |result|

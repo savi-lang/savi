@@ -43,6 +43,7 @@ class Mare::Program
   class Type
     property cap : AST::Identifier
     property ident : AST::Identifier
+    property params : AST::Group?
     
     getter metadata
     getter functions
@@ -56,7 +57,7 @@ class Mare::Program
       :numeric,
     ]
     
-    def initialize(@cap, @ident)
+    def initialize(@cap, @ident, @params = nil)
       @functions = [] of Function
       @tags = Set(Symbol).new
       @metadata = Hash(Symbol, UInt64 | Bool).new

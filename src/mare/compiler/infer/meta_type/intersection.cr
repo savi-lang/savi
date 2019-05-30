@@ -79,16 +79,16 @@ struct Mare::Compiler::Infer::MetaType::Intersection
     anti_terms == other.anti_terms
   end
   
-  def each_reachable_defn : Iterator(Program::Type)
-    iter = ([] of Program::Type).each
-    iter = iter.chain(terms.not_nil!.each.map(&.defn)) if terms
-    iter = iter.chain(anti_terms.not_nil!.each.map(&.defn)) if anti_terms # TODO: is an anti-nominal actually reachable?
+  def each_reachable_defn : Iterator(Infer::ReifiedType)
+    iter = ([] of Infer::ReifiedType).each
+    iter = iter.chain(terms.not_nil!.each.map(&.defn).select(&.is_a?(Infer::ReifiedType)).map(&.as(Infer::ReifiedType))) if terms
+    iter = iter.chain(anti_terms.not_nil!.each.map(&.defn).select(&.is_a?(Infer::ReifiedType)).map(&.as(Infer::ReifiedType))) if anti_terms # TODO: is an anti-nominal actually reachable?
     
     iter
   end
   
   def find_callable_func_defns(infer : Infer, name : String)
-    list = [] of Tuple(Inner, Program::Type?, Program::Function?)
+    list = [] of Tuple(Inner, Infer::ReifiedType?, Program::Function?)
     
     # Collect a result for nominal in this intersection that has this func.
     terms.try(&.each do |term|
@@ -106,7 +106,8 @@ struct Mare::Compiler::Infer::MetaType::Intersection
     # we're in trouble; collect the list of types that failed our search.
     if list.empty?
       terms.try(&.each do |term|
-        list << {self, term.defn, nil}
+        defn = term.defn
+        list << {self, (defn if defn.is_a?(Infer::ReifiedType)), nil}
       end)
     end
     
@@ -117,7 +118,7 @@ struct Mare::Compiler::Infer::MetaType::Intersection
     list
   end
   
-  def any_callable_func_defn_type(name : String) : Program::Type?
+  def any_callable_func_defn_type(name : String) : Infer::ReifiedType?
     # Return the first nominal in this intersection that has this func.
     terms.try(&.each do |term|
       term.any_callable_func_defn_type(name).try do |result|

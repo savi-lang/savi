@@ -1,9 +1,9 @@
 class Mare::Compiler::Infer::SubtypingInfo
-  def initialize(@ctx : Context, @this : Program::Type)
-    @asserted = Set(Program::Type).new # TODO: use this instead of `is` metadata
-    @confirmed = Set(Program::Type).new
-    @disproved = Hash(Program::Type, Array(Error::Info)).new
-    @temp_assumptions = Set(Program::Type).new
+  def initialize(@ctx : Context, @this : Infer::ReifiedType)
+    @asserted = Set(Infer::ReifiedType).new # TODO: use this instead of `is` metadata
+    @confirmed = Set(Infer::ReifiedType).new
+    @disproved = Hash(Infer::ReifiedType, Array(Error::Info)).new
+    @temp_assumptions = Set(Infer::ReifiedType).new
   end
   
   private def this
@@ -11,7 +11,7 @@ class Mare::Compiler::Infer::SubtypingInfo
   end
   
   # Return true if this type satisfies the requirements of the that type.
-  def check(that : Program::Type, errors : Array(Error::Info))
+  def check(that : Infer::ReifiedType, errors : Array(Error::Info))
     # TODO: for each return false, carry info about why it was false?
     # Maybe we only want to go to the trouble of collecting this info
     # when it is requested by the caller, so as not to slow the base case.
@@ -24,8 +24,8 @@ class Mare::Compiler::Infer::SubtypingInfo
     # Note that by the time we've reached this line, we've already
     # determined that the two types are not identical, so we're only
     # concerned with structural subtyping from here on.
-    if that.is_concrete?
-      errors << {that.ident.pos,
+    if that.defn.is_concrete?
+      errors << {that.defn.ident.pos,
         "a concrete type can't be a subtype of another concrete type"}
       return false
     end
@@ -65,9 +65,9 @@ class Mare::Compiler::Infer::SubtypingInfo
     is_subtype
   end
   
-  private def full_check(that : Program::Type, errors : Array(Error::Info))
+  private def full_check(that : Infer::ReifiedType, errors : Array(Error::Info))
     # A type only matches an interface if all functions match that interface.
-    that.functions.each do |that_func|
+    that.defn.functions.each do |that_func|
       # Hygienic functions are not considered to be real functions for the
       # sake of structural subtyping, so they don't have to be fulfilled.
       next if that_func.has_tag?(:hygienic)
@@ -79,8 +79,11 @@ class Mare::Compiler::Infer::SubtypingInfo
   end
   
   private def check_func(that, that_func, errors)
+    raise NotImplementedError.new("function subtyping with type arguments") unless this.args.empty?
+    raise NotImplementedError.new("function subtyping with type arguments") unless that.args.empty?
+    
     # The structural comparison fails if a required method is missing.
-    this_func = this.find_func?(that_func.ident.value)
+    this_func = this.defn.find_func?(that_func.ident.value)
     unless this_func
       errors << {that_func.ident.pos,
         "this function isn't present in the subtype"}

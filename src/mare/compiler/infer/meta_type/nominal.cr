@@ -1,23 +1,35 @@
 struct Mare::Compiler::Infer::MetaType::Nominal
-  getter defn : Program::Type
+  getter defn : Infer::ReifiedType | Refer::DeclParam
   
   def initialize(@defn)
   end
   
   def inspect(io : IO)
-    io << defn.ident.value
+    inspect_without_cap(io)
+    
     io << "'any"
   end
   
   def inspect_with_cap(io : IO, cap : Capability)
-    io << defn.ident.value
+    inspect_without_cap(io)
     
     # If the cap is the same as the default cap, we omit it for brevity.
     # Otherwise, we'll print it here with the same syntax that the programmer
     # can use to specify it explicitly.
-    if cap.name != defn.cap.value
+    defn = defn()
+    unless defn.is_a?(Infer::ReifiedType) && cap.name == defn.defn.cap.value
       io << "'"
       io << cap.name
+    end
+  end
+  
+  def inspect_without_cap(io : IO)
+    defn = defn()
+    case defn
+    when Infer::ReifiedType
+      defn.show_type(io)
+    when Refer::DeclParam
+      io << defn.ident.value
     end
   end
   
@@ -29,22 +41,34 @@ struct Mare::Compiler::Infer::MetaType::Nominal
     other.is_a?(Nominal) && defn == other.defn
   end
   
-  def each_reachable_defn : Iterator(Program::Type)
-    [defn].each
+  def each_reachable_defn : Iterator(Infer::ReifiedType)
+    defn = defn()
+    defn.is_a?(Infer::ReifiedType) ? [defn].each : ([] of Infer::ReifiedType).each
   end
   
   def find_callable_func_defns(infer : Infer, name : String)
-    func = defn.find_func?(name)
-    [{self, defn, func}] if func
+    defn = defn()
+    case defn
+    when Infer::ReifiedType
+      func = defn.defn.find_func?(name)
+      [{self, defn, func}] if func
+    when Refer::DeclParam
+      raise NotImplementedError.new("TODO in this commit")
+    else raise NotImplementedError.new(defn)
+    end
   end
   
-  def any_callable_func_defn_type(name : String) : Program::Type?
-    func = defn.find_func?(name)
-    defn if func
+  def any_callable_func_defn_type(name : String) : Infer::ReifiedType?
+    defn = defn()
+    if defn.is_a?(Infer::ReifiedType)
+      func = defn.defn.find_func?(name)
+      defn if func
+    end
   end
   
   def is_concrete?
-    defn.is_concrete?
+    defn = defn()
+    defn.is_a?(Infer::ReifiedType) && defn.defn.is_concrete?
   end
   
   def negate : Inner

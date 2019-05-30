@@ -19,7 +19,7 @@ class Mare::Compiler::Refers < Mare::AST::Visitor
   
   def run(ctx)
     # Gather all the types in the program as Decls.
-    decls = {} of String => (Refer::Decl | Refer::DeclAlias)
+    decls = {} of String => (Refer::Decl | Refer::DeclAlias | Refer::DeclParam)
     ctx.program.types.each_with_index do |t, index|
       name = t.ident.value
       decls[name] = Refer::Decl.new(t)
@@ -28,14 +28,45 @@ class Mare::Compiler::Refers < Mare::AST::Visitor
     # Gather type aliases in a similar way, dereferencing as we go.
     ctx.program.aliases.each_with_index do |a, index|
       name = a.ident.value
-      decls[name] = Refer::DeclAlias.new(a, decls[a.target.value])
+      target = decls[a.target.value].as(Refer::Decl | Refer::DeclAlias)
+      decls[name] = Refer::DeclAlias.new(a, target)
     end
     
-    # For each function in the program, run with a new instance.
+    # For each type in the program, delve into type parameters and functions.
     ctx.program.types.each do |t|
       t_decl = Refer::Decl.new(t)
+      use_decls = decls
+      
+      # If the type has type parameters, add those to the decls map.
+      if t.params
+        use_decls = decls.dup
+        
+        t.params.not_nil!.terms.each_with_index do |param, index|
+          decl_param =
+            case param
+            when AST::Identifier
+              Refer::DeclParam.new(t, index, param, nil)
+            when AST::Group
+              raise NotImplementedError.new(param) \
+                unless param.terms.size == 2 && param.style == " "
+              
+              Refer::DeclParam.new(
+                t,
+                index,
+                param.terms.first.as(AST::Identifier),
+                param.terms.last.as(AST::Term),
+              )
+            else
+              raise NotImplementedError.new(param)
+            end
+          
+          use_decls[decl_param.ident.value] = decl_param
+        end
+      end
+      
+      # For each function in the program, run with a new instance.
       t.functions.each do |f|
-        Refer.new(t_decl, decls)
+        Refer.new(t_decl, use_decls)
         .tap { |refer| @map[f] = refer }
         .tap(&.run(f))
       end
@@ -126,12 +157,27 @@ class Mare::Compiler::Refer
     end
   end
   
-  alias Info =
-    (Unresolved | Self | Local | LocalUnion | Field | Decl | DeclAlias)
+  class DeclParam
+    getter parent : Program::Type
+    getter index : Int32
+    getter ident : AST::Identifier
+    getter constraint : AST::Term?
+    
+    def initialize(@parent, @index, @ident, @constraint)
+    end
+  end
+  
+  alias Info = (
+    Self | Local | LocalUnion | Field |
+    Decl | DeclAlias | DeclParam |
+    Unresolved)
   
   property param_count = 0
   
-  def initialize(@self_decl : Decl, @decls : Hash(String, Decl | DeclAlias))
+  def initialize(
+    @self_decl : Decl,
+    @decls : Hash(String, Decl | DeclAlias | DeclParam),
+  )
     @infos = {} of AST::Node => Info
   end
   
@@ -159,7 +205,11 @@ class Mare::Compiler::Refer
   
   def decl_defn(name) : Program::Type
     return @self_decl.final_decl.defn if name == "@"
-    @decls[name].final_decl.defn
+    decl = @decls[name]
+    case decl
+    when Decl, DeclAlias then decl.final_decl.defn
+    else raise NotImplementedError.new(decl)
+    end
   end
   
   def run(func)
