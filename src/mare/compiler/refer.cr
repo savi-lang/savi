@@ -312,6 +312,17 @@ class Mare::Compiler::Refer
       end
     end
     
+    # For a Group, pay attention to any styles that are relevant to us.
+    def touch(node : AST::Group)
+      # If we have a whitespace-delimited group where the first term has info,
+      # apply that info to the whole group.
+      # For example, this applies to type parameters with constraints.
+      if node.style == " "
+        info = @refer[node.terms.first]?
+        @refer[node] = info if info
+      end
+    end
+    
     # We don't visit anything under a choice with this visitor;
     # we instead spawn new visitor instances in the touch method below.
     def visit_children?(node : AST::Choice)
