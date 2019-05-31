@@ -19,12 +19,10 @@ module Mare::Parser::Builder
     decl : AST::Declare? = nil
     
     iter.while_next_is_child_of(main) do |child|
-      if child[0] == :decl
-        decl = build_decl(child, iter, state)
-        doc.list << decl
-      else
-        term = build_term(child, iter, state)
-        decl.as(AST::Declare).body.terms << term
+      term = build_term(child, iter, state)
+      case term
+      when AST::Declare then doc.list << (decl = term)
+      else decl.as(AST::Declare).body.terms << term
       end
     end
     
@@ -45,6 +43,8 @@ module Mare::Parser::Builder
   private def self.build_term(main, iter, state)
     kind, start, finish = main
     case kind
+    when :decl
+      build_decl(main, iter, state)
     when :ident
       value = state.slice(main)
       AST::Identifier.new(value).with_pos(state.pos(main))

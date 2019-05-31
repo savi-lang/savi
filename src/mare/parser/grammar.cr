@@ -9,7 +9,8 @@ module Mare::Parser
     whitespace =
       char(' ') | char('\t') | char('\r') | str("\\\n") | str("\\\r\n")
     s = whitespace.repeat
-    sn = (whitespace | (eol_comment.maybe >> char('\n'))).repeat
+    newline = s >> eol_comment.maybe >> (char('\n') | s.then_eof)
+    sn = (whitespace | newline).repeat
     
     # Define what a number looks like (integer and float).
     digit19 = range('1', '9')
@@ -47,9 +48,10 @@ module Mare::Parser
     string = char('"') >> string_char.repeat.named(:string) >> char('"')
     
     # Define an atom to be a single term with no binary operators.
-    parens = declare
-    prefixed = declare
-    atom = prefixed | parens | string | float | integer | ident
+    parens = declare()
+    prefixed = declare()
+    decl = declare()
+    atom = prefixed | parens | decl | string | float | integer | ident
     
     # Define a prefixed term to be preceded by a prefix operator.
     prefixop = (char('~') | str("--")).named(:op)
@@ -70,7 +72,8 @@ module Mare::Parser
     # from most tightly binding to most loosely binding.
     # Operators in the same group have the same level of precedence.
     opcap = (char('\'')).named(:op)
-    op2 = (char('.') | str("->") | str("+>")).named(:op)
+    op1 = (str("->") | str("+>")).named(:op)
+    op2 = char('.').named(:op)
     op3 = (char('*') | char('/') | char('%')).named(:op)
     op4 = ((char('+') | char('-')) >> ~char('>')).named(:op)
     op5 = (str("..") | str("<>")).named(:op)
@@ -86,8 +89,9 @@ module Mare::Parser
     ope = char('=').named(:op)
     
     # Construct the nested possible relations for each group of operators.
-    t1 = suffixed | atom
-    t2 = (t1 >> (opcap >> (cap | capmod)).repeat).named(:relate)
+    t0 = suffixed | atom
+    t1 = (t0 >> (opcap >> (cap | capmod)).repeat).named(:relate)
+    t2 = (t1 >> (op1 >> t1).repeat).named(:relate)
     t3 = (t2 >> (sn >> op2 >> sn >> t2).repeat).named(:relate)
     t4 = (t3 >> (sn >> op3 >> sn >> t3).repeat).named(:relate)
     t5 = (t4 >> (sn >> op4 >> sn >> t4).repeat).named(:relate)
@@ -96,17 +100,19 @@ module Mare::Parser
     t8 = (t7 >> (sn >> op7 >> sn >> t7).repeat).named(:relate)
     t9 = (t8 >> (sn >> op8 >> sn >> t8).repeat).named(:relate)
     tw = (t9 >> (sn >> op9 >> sn >> t9).repeat).named(:relate)
-    te = (tw >> (opw >> s >> tw).repeat(1) >> s).named(:group_w) | tw
+    te = (~decl >> tw >> (opw >> s >> ~decl >> tw).repeat(1) >> s).named(:group_w) | tw
     t = (te >> (sn >> ope >> sn >> te >> s).repeat).named(:relate_r)
     
-    # Define groups that are pipe-partitioned lists of comma-separated terms.
+    # Define what a comma/newline-separated sequence of terms looks like.
+    termsl = t >> s >> (char(',') >> sn >> t >> s).repeat
+    terms = (termsl >> sn).repeat
+    
+    # Define groups that are pipe-partitioned sequences of terms.
     pipesep = char('|').named(:op)
-    ptermsl = t >> s >> (char(',') >> sn >> t >> s).repeat
-    ptermsn = (ptermsl >> sn).repeat
     ptermsp =
       pipesep.maybe >> sn >>
-      (ptermsn >> sn >> pipesep >> sn).repeat >>
-      ptermsn >> sn >>
+      (terms >> sn >> pipesep >> sn).repeat >>
+      terms >> sn >>
       pipesep.maybe >> sn
     parens.define(
       (str("^(") >> sn >> ptermsp.maybe >> sn >> char(')')).named(:group) |
@@ -114,24 +120,15 @@ module Mare::Parser
       (char('[') >> sn >> ptermsp.maybe >> sn >> char(']')).named(:group)
     )
     
-    # Define what a declaration head of terms looks like.
-    terms = t >> s >> (char(',') >> sn >> t >> s).repeat
-    dterm = t3
-    decl =
-      (char(':') >> ident >> (s >> dterm).repeat >> s).named(:decl) >>
-      (char(':') >> s >> terms.maybe).maybe >>
-      s
-    
-    # Define what a line looks like.
-    line_item = decl | terms
-    line =
-      s >>
-      (s >> ~eol_comment >> line_item).repeat >>
-      (s >> eol_comment.maybe) >>
-      s
+    # Define what a declaration looks like.
+    declterm = t3
+    decl.define(
+      (char(':') >> ident >> (s >> declterm).repeat >> s).named(:decl) >>
+      (char(':') | ~~newline)
+    )
     
     # Define a total document to be a sequence of lines.
-    doc = ((line >> char('\n')).repeat >> line >> sn).named(:doc)
+    doc = sn >> terms.named(:doc)
     
     # A valid parse is a single document followed by the end of the file.
     doc.then_eof
