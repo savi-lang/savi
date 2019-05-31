@@ -1,0 +1,15 @@
+version: 2
+jobs:
+  build:
+    machine: true
+    steps:
+      - checkout
+      - run:
+          name: Build and run the development environment container.
+          command: make ready
+      - run:
+          name: Run the test suite.
+          command: make test
+      - run:
+          name: Build and run an example program.
+          command: make example
