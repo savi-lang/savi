@@ -20,12 +20,6 @@ class Mare::Compiler::Infers < Mare::AST::Visitor
   end
   
   def run(ctx)
-    # Before doing anything, instantiate SubtypingInfo on all types.
-    # TODO: Can this be removed?
-    ctx.program.types.each do |t|
-      rt = reified_type(ctx, t)
-    end
-    
     # Start by running an instance of inference at the Main.new function,
     # and recurse into checking other functions that are reachable from there.
     # We do this so that errors for reachable functions are shown first.
@@ -104,7 +98,6 @@ class Mare::Compiler::Infers < Mare::AST::Visitor
     ctx : Context,
     t : Program::Type,
     type_args : Array(Infer::MetaType) = [] of Infer::MetaType,
-    # TODO:
   )
     rt = Infer::ReifiedType.new(t, type_args)
     return rt if @rtset.includes?(rt)
@@ -749,9 +742,9 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       
       follow_call(call)
     when "<:"
-      # TODO: check that it is a "non" cap - just being fixed isn't sufficient.
+      rhs_info = self[node.rhs]
       Error.at node.rhs, "expected this to have a fixed type at compile time" \
-        unless self[node.rhs].is_a?(Fixed)
+        unless rhs_info.is_a?(Fixed) && rhs_info.inner.cap_only_name == "non"
       
       bool = MetaType.new(reified_type(refer.decl_defn("Bool")))
       refine = follow_redirects(node.lhs)
