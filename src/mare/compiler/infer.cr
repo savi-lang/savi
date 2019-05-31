@@ -238,6 +238,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     r : Infer::ReifiedType,
     errors = [] of Error::Info,
   ) : Bool
+    # TODO: Implement this.
     raise NotImplementedError.new("type param <: type")
   end
   
@@ -246,6 +247,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     r : Refer::DeclParam,
     errors = [] of Error::Info,
   ) : Bool
+    # TODO: Implement this.
     raise NotImplementedError.new("type <: type param")
   end
   
@@ -255,6 +257,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     errors = [] of Error::Info,
   ) : Bool
     return true if l == r
+    # TODO: Implement this.
     raise NotImplementedError.new("type param <: type param")
   end
   

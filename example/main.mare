@@ -23,7 +23,11 @@
   :fun "+" (other I32) I32
 
 :primitive Generic (A non)
-  :fun get A'non: A
+  :fun get A'non: A // TODO: remove 'non suffix
+
+:class Container (A val)
+  :prop value A'val // TODO: remove 'val suffix
+  :new (@value)
 
 :class Sentence
   :prop text String
@@ -53,8 +57,9 @@
       LibPonyRT.pony_exitcode(augend + maybe_thirty_three + 9)
   
   :fun say_stuff (greeting Greeting)
+    pre_greeting = Container(String).new("[pre greeting]")
     sentence_source = ^(Sentence.new(^1))
-    sentence = sentence_source.call("[pre greeting]")
+    sentence = sentence_source.call(pre_greeting.value)
     LibC.puts(sentence.text.cpointer)
     sentence.text = greeting.hello
     LibC.puts(sentence.text.cpointer)

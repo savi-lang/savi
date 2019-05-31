@@ -270,9 +270,11 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     # Reach the metatype of the field.
     ref = nil
     ctx.infers.infers_for(func).each do |infer|
+      next unless rt == infer.reified.type
       ref = infer.resolve(func.ident)
       handle_type_ref(ctx, ref)
     end
+    ref.not_nil!
     
     # Handle the field as if it were a function.
     handle_func(ctx, rt, func)
