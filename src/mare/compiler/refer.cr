@@ -215,6 +215,7 @@ class Mare::Compiler::Refer
   def run(func)
     root = Branch.new(self)
     
+    @self_decl.defn.params.try(&.accept(root))
     func.params.try(&.accept(root))
     func.ret.try(&.accept(root))
     func.body.try(&.accept(root))

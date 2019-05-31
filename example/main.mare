@@ -23,10 +23,10 @@
   :fun "+" (other I32) I32
 
 :primitive Generic (A non)
-  :fun get A'non: A // TODO: remove 'non suffix
+  :fun get A: A
 
 :class Container (A val)
-  :prop value A'val // TODO: remove 'val suffix
+  :prop value A
   :new (@value)
 
 :class Sentence

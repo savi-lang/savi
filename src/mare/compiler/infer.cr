@@ -505,9 +505,18 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   def lookup_type_param(ref : Refer::DeclParam)
     raise NotImplementedError.new(ref) unless ref.parent == @self_type.defn
     
-    # Lookup the type parameter on self type and return the corresponding arg,
-    # Or just return in an unresolved form if no arg was found.
-    @self_type.args[ref.index]? || MetaType.new_type_param(ref)
+    # Lookup the type parameter on self type and return the arg if present
+    arg = @self_type.args[ref.index]?
+    return arg if arg
+    
+    # TODO: For unconstrained types, reify with each possible cap in turn.
+    raise NotImplementedError.new("type param without constraint") \
+      unless ref.constraint
+    
+    # Return the type parameter intersected with its constraint.
+    # TODO: When constraint has multiple caps, reify with each possible cap.
+    type_expr(ref.constraint.not_nil!)
+    .intersect(MetaType.new_type_param(ref))
   end
   
   # Don't visit the children of a type expression root node
@@ -532,7 +541,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   end
   
   # An identifier type expression must refer to a type.
-  def type_expr(node : AST::Identifier)
+  def type_expr(node : AST::Identifier) : MetaType
     ref = refer[node]
     case ref
     when Refer::Self
@@ -554,7 +563,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   end
   
   # An relate type expression must be an explicit capability qualifier.
-  def type_expr(node : AST::Relate)
+  def type_expr(node : AST::Relate) : MetaType
     if node.op.value == "'"
       cap = node.rhs.as(AST::Identifier).value
       if cap == "alias"
@@ -573,9 +582,9 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   
   # A "|" group must be a union of type expressions, and a "(" group is
   # considered to be just be a single parenthesized type expression (for now).
-  def type_expr(node : AST::Group)
+  def type_expr(node : AST::Group) : MetaType
     if node.style == "|"
-      MetaType.new_union(node.terms.map { |t| type_expr(t) })
+      MetaType.new_union(node.terms.map { |t| type_expr(t).as(MetaType) }) # TODO: is it possible to remove this superfluous "as"?
     elsif node.style == "(" && node.terms.size == 1
       type_expr(node.terms.first)
     else
@@ -584,7 +593,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   end
   
   # All other AST nodes are unsupported as type expressions.
-  def type_expr(node : AST::Node)
+  def type_expr(node : AST::Node) : MetaType
     raise NotImplementedError.new(node.to_a)
   end
   
