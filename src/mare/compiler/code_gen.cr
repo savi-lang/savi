@@ -52,7 +52,7 @@ class Mare::Compiler::CodeGen
     end
     
     def refer
-      @g.ctx.refers[@gfunc.as(GenFunc).func]
+      @g.ctx.refer[@gfunc.as(GenFunc).func]
     end
   end
   

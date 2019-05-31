@@ -1,7 +1,7 @@
 class Mare::Compiler::Context
   getter program
   getter infers
-  getter refers
+  getter refer
   getter reach
   getter paint
   getter code_gen
@@ -12,7 +12,7 @@ class Mare::Compiler::Context
     @stack = [Interpreter::Default.new(@program)] of Interpreter
     
     @infers = Infers.new
-    @refers = Refers.new
+    @refer = Refer.new
     @reach = Reach.new
     @paint = Paint.new
     @code_gen = CodeGen.new
