@@ -88,7 +88,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     mt = MetaType.new_nominal(rt).intersect(cap.strip_ephemeral)
     rf = ReifiedFunction.new(rt, f, mt)
     self[rf]? || (
-      ForFunc.new(ctx, rt, rf)
+      ForFunc.new(ctx, rf)
       .tap { |infer| add_infer(rf, infer) }
       .tap(&.run)
     )
@@ -187,7 +187,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     getter reified : ReifiedFunction
     getter! ret : AST::Node
     
-    def initialize(@ctx : Context, @self_type : ReifiedType, @reified)
+    def initialize(@ctx, @reified)
       @local_idents = Hash(Refer::Local, AST::Node).new
       @local_ident_overrides = Hash(AST::Node, AST::Node).new
       @info_table = Hash(AST::Node, Info).new
@@ -296,7 +296,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       # Take note of the return type constraint if given.
       # For constructors, this is the self type and listed receiver cap.
       if func.has_tag?(:constructor)
-        meta_type = MetaType.new(@self_type, func.cap.not_nil!.value)
+        meta_type = MetaType.new(reified.type, func.cap.not_nil!.value)
         meta_type = meta_type.ephemeralize # a constructor returns the ephemeral
         self[ret].as(Local).set_explicit(func.cap.not_nil!.pos, meta_type)
       else
@@ -454,15 +454,15 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
     
     def follow_field(field : Field, name : String)
-      field_func = @self_type.defn.functions.find do |f|
+      field_func = reified.type.defn.functions.find do |f|
         f.ident.value == name && f.has_tag?(:field)
       end.not_nil!
       
       # Keep track that we touched this "function".
-      @called_funcs.add({@self_type, field_func})
+      @called_funcs.add({reified.type, field_func})
       
       # Get the ForFunc instance for field_func, possibly creating and running it.
-      infer = ctx.infer.infer_from(ctx, @self_type, field_func, resolved_self_cap)
+      infer = ctx.infer.infer_from(ctx, reified.type, field_func, resolved_self_cap)
       
       # Apply constraints to the return type.
       ret = infer[infer.ret]
@@ -478,7 +478,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
     
     def resolved_self
-      MetaType.new(@self_type, resolved_self_cap_value)
+      MetaType.new(reified.type, resolved_self_cap_value)
     end
     
     def reified_type(*args)
@@ -511,10 +511,10 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
     
     def lookup_type_param(ref : Refer::DeclParam)
-      raise NotImplementedError.new(ref) unless ref.parent == @self_type.defn
+      raise NotImplementedError.new(ref) unless ref.parent == reified.type.defn
       
       # Lookup the type parameter on self type and return the arg if present
-      arg = @self_type.args[ref.index]?
+      arg = reified.type.args[ref.index]?
       return arg if arg
       
       # TODO: For unconstrained types, reify with each possible cap in turn.
