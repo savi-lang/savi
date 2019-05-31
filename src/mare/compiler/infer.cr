@@ -364,6 +364,13 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       # Keep track that we called this function.
       @called_funcs.add({call_defn, call_func})
       
+      # For box functions only, we reify with the actual cap on the caller side.
+      # For all other functions, we just use the cap from the func definition.
+      reify_cap =
+        call_func.cap.value == "box" \
+        ? call_mt_cap \
+        : MetaType.cap(call_func.cap.value)
+      
       # Enforce the capability restriction of the receiver.
       if is_subtype?(call_mt_cap, MetaType.cap(call_func.cap.value))
         # The capability restriction is met; carry on.
@@ -371,6 +378,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         # Constructor calls ignore cap of the original receiver; carry on.
       elsif is_subtype?(call_mt_cap.ephemeralize, MetaType.cap(call_func.cap.value))
         call_mt_cap = call_mt_cap.ephemeralize
+        reify_cap = MetaType.cap(call_func.cap.value)
         autorecover_needed = true
       else
         problems << {call_func.cap,
@@ -381,7 +389,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       # Get the Infer instance for call_func, possibly creating and running it.
       # TODO: don't infer anything in the body of that func if type and params
       # were explicitly specified in the function signature.
-      infer = ctx.infers.infer_from(ctx, call_defn, call_func, call_mt_cap)
+      infer = ctx.infers.infer_from(ctx, call_defn, call_func, reify_cap)
       
       # Apply parameter constraints to each of the argument types.
       # TODO: handle case where number of args differs from number of params.
@@ -402,6 +410,12 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       # we now have to confirm that arguments and return value are all sendable.
       if autorecover_needed
         recover_problems = [] of {Source::Pos, String}
+        
+        unless call_func.cap.value == "ref" || call_func.cap.value == "box"
+          recover_problems << {call_func.cap.pos,
+            "the function's receiver capability is `#{call_func.cap.value}` " \
+            "but only a `ref` or `box` receiver can be auto-recovered"}
+        end
         
         unless inferred_ret.is_sendable? || !call.ret_value_used
           recover_problems << {infer.ret.pos,

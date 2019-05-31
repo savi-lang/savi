@@ -899,10 +899,43 @@ describe Mare::Compiler::Infer do
         inner_2 = outer_trn.inner = Inner.new
                             ^~~~~
     
-    - the return type Inner'box isn't sendable and the return value is used (the return type wouldn't matter if the calling side entirely ignored the return value:
+    - the return type Inner isn't sendable and the return value is used (the return type wouldn't matter if the calling side entirely ignored the return value:
       from (example):5:
       :prop inner Inner: Inner.new
             ^~~~~
+    MSG
+    
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :infer)
+    end
+  end
+  
+  it "complains on auto-recovery for a val method receiver" do
+    source = Mare::Source.new "(example)", <<-SOURCE
+    :class Inner
+      :new iso
+    
+    :class Outer
+      :prop inner Inner: Inner.new
+      :fun val immutable Inner'val: @inner
+      :new iso
+    
+    :actor Main
+      :new
+        outer Outer'iso = Outer.new
+        inner Inner'val = outer.immutable
+    SOURCE
+    
+    expected = <<-MSG
+    This function call won't work unless the receiver is ephemeral; it must either be consumed or be allowed to be auto-recovered. Auto-recovery didn't work for these reasons:
+    from (example):12:
+        inner Inner'val = outer.immutable
+                                ^~~~~~~~~
+    
+    - the function's receiver capability is `val` but only a `ref` or `box` receiver can be auto-recovered:
+      from (example):6:
+      :fun val immutable Inner'val: @inner
+           ^~~
     MSG
     
     expect_raises Mare::Error, expected do
