@@ -185,7 +185,6 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   class ForFunc < Mare::AST::Visitor
     getter ctx : Context
     getter reified : ReifiedFunction
-    getter! ret : AST::Node
     
     def initialize(@ctx, @reified)
       @local_idents = Hash(Refer::Local, AST::Node).new
@@ -214,6 +213,11 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     
     def params
       reified.func.params.try(&.terms) || ([] of AST::Node)
+    end
+    
+    def ret
+      # The ident is used as a fake local variable that represents the return.
+      reified.func.ident
     end
     
     def refer
@@ -290,8 +294,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       end
       
       # Create a fake local variable that represents the return value.
-      self[func.ident] = Local.new(func.ident.pos)
-      @ret = func.ident
+      # See also the #ret method.
+      self[ret] = Local.new(ret.pos)
       
       # Take note of the return type constraint if given.
       # For constructors, this is the self type and listed receiver cap.
