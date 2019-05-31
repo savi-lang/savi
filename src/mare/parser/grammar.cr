@@ -115,13 +115,15 @@ module Mare::Parser
     )
     
     # Define what a declaration head of terms looks like.
+    terms = t >> s >> (char(',') >> sn >> t >> s).repeat
     dterm = t3
-    dterms = dterm >> (s >> dterm).repeat >> s
-    decl = (dterms >> s >> char(':') >> s).named(:decl)
+    decl =
+      (char(':') >> ident >> (s >> dterm).repeat >> s).named(:decl) >>
+      (char(':') >> s >> terms.maybe).maybe >>
+      s
     
     # Define what a line looks like.
-    terms = t >> s >> (char(',') >> sn >> t >> s).repeat
-    line_item = (decl >> terms.maybe) | terms
+    line_item = decl | terms
     line =
       s >>
       (s >> ~eol_comment >> line_item).repeat >>

@@ -1,15 +1,15 @@
-describe Mare::Compiler::Infer do
+describe Mare::Compiler::Copy do
   it "complains when a source type couldn't be resolved" do
     source = Mare::Source.new "(example)", <<-SOURCE
-    actor Main:
-      is Bogus:
+    :actor Main
+      :is Bogus
     SOURCE
     
     expected = <<-MSG
     This type couldn't be resolved:
     from (example):2:
-      is Bogus:
-         ^~~~~
+      :is Bogus
+          ^~~~~
     MSG
     
     expect_raises Mare::Error, expected do

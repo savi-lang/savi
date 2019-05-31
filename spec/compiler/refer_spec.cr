@@ -1,8 +1,8 @@
 describe Mare::Compiler::Refer do
   it "fails to resolve a local when it was declared in another branch" do
     source = Mare::Source.new "(example)", <<-SOURCE
-    actor Main:
-      new:
+    :actor Main
+      :new
         if True (
           x = "example"
         |
@@ -26,8 +26,8 @@ describe Mare::Compiler::Refer do
   
   it "resolves a local declared in all prior branches" do
     source = Mare::Source.new "(example)", <<-SOURCE
-    actor Main:
-      new:
+    :actor Main
+      :new
         if True (
           if True (
             x = "one"
@@ -82,8 +82,8 @@ describe Mare::Compiler::Refer do
   
   it "complains when referencing a local declared in only some branches" do
     source = Mare::Source.new "(example)", <<-SOURCE
-    actor Main:
-      new:
+    :actor Main
+      :new
         if True (
           if True (
             // missing x
@@ -122,8 +122,8 @@ describe Mare::Compiler::Refer do
   
   it "complains when an already-consumed local is referenced" do
     source = Mare::Source.new "(example)", <<-SOURCE
-    actor Main:
-      new:
+    :actor Main
+      :new
         x = "example"
         --x
         x
@@ -148,8 +148,8 @@ describe Mare::Compiler::Refer do
   
   it "complains when an possibly-consumed local is referenced" do
     source = Mare::Source.new "(example)", <<-SOURCE
-    actor Main:
-      new:
+    :actor Main
+      :new
         x = "example"
         if True (--x)
         x
@@ -174,8 +174,8 @@ describe Mare::Compiler::Refer do
   
   it "complains when a possibly-consumed local from branches is referenced" do
     source = Mare::Source.new "(example)", <<-SOURCE
-    actor Main:
-      new:
+    :actor Main
+      :new
         if True (
           if True (
             x = "one" // no consume

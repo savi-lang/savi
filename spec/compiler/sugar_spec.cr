@@ -1,8 +1,8 @@
 describe Mare::Compiler::Sugar do
   it "transforms a property assignment into a method call" do
     source = Mare::Source.new "(example)", <<-SOURCE
-    class Example:
-      fun prop_assign:
+    :class Example
+      :fun prop_assign
         x.y = z
     SOURCE
     
@@ -33,8 +33,8 @@ describe Mare::Compiler::Sugar do
   
   it "transforms an operator into a method call" do
     source = Mare::Source.new "(example)", <<-SOURCE
-    class Example:
-      fun plus:
+    :class Example
+      :fun plus
         x + y
     SOURCE
     
@@ -61,8 +61,8 @@ describe Mare::Compiler::Sugar do
   
   it "transforms a square brace qualification into a method call" do
     source = Mare::Source.new "(example)", <<-SOURCE
-    class Example:
-      fun square:
+    :class Example
+      :fun square
         x[y]
     SOURCE
     
@@ -89,8 +89,8 @@ describe Mare::Compiler::Sugar do
   
   it "transforms an @-prefixed identifier into a method call of @" do
     source = Mare::Source.new "(example)", <<-SOURCE
-    class Example:
-      fun selfish:
+    :class Example
+      :fun selfish
         @x
         @x(y)
     SOURCE
@@ -120,8 +120,8 @@ describe Mare::Compiler::Sugar do
   
   it "adds a '@' statement to the end of a constructor body" do
     source = Mare::Source.new "(example)", <<-SOURCE
-    class Example:
-      new:
+    :class Example
+      :new
         x = 1
     SOURCE
     
@@ -145,8 +145,8 @@ describe Mare::Compiler::Sugar do
   
   it "transforms short-circuiting logical operators into choices" do
     source = Mare::Source.new "(example)", <<-SOURCE
-    class Example:
-      fun logical:
+    :class Example
+      :fun logical
         w && x || y && z
     SOURCE
     

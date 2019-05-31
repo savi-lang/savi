@@ -1,11 +1,11 @@
-class Example:
-  prop name String: "World"
+:class Example
+  :prop name String: "World"
   
-  fun greeting String:
+  :fun greeting String
     "Hello, " + @name + "!"
   
-  fun degreesF (c F64) F64:
+  :fun degreesF (c F64) F64
     c * 9 / 5 + 32.0
   
-  fun caller:
+  :fun caller
     @degreesF(10.add(2).sub(1))

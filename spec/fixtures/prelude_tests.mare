@@ -1,5 +1,5 @@
-actor Main:
-  new:
+:actor Main
+  :new
     test = MicroTest
     Print.line_break // TODO: move to MicroTest constructor and finalizer
     
@@ -223,14 +223,14 @@ actor Main:
     
     Print.line_break // TODO: move to MicroTest constructor and finalizer
 
-primitive MicroTest:
-  fun "[]" (text String) MicroTestInstance:
+:primitive MicroTest
+  :fun "[]" (text String) MicroTestInstance
     MicroTestInstance.new(text)
 
-class MicroTestInstance:
-  prop text String:
-  new (@text):
-  fun "pass=" (pass Bool):
+:class MicroTestInstance
+  :prop text String
+  :new (@text)
+  :fun "pass=" (pass Bool)
     if pass (
       Print.f("%s", ".")
     |
@@ -240,16 +240,16 @@ class MicroTestInstance:
       LibPonyRT.pony_exitcode(1) // Mark the entire process as a failure.
     )
 
-primitive Print:
-  fun line_break:
+:primitive Print
+  :fun line_break
     LibC.puts("".cpointer)
   
-  fun f (format String, text String):
+  :fun f (format String, text String)
     LibC.printf(format.cpointer, text.cpointer)
 
-ffi LibC:
-  fun puts (CString) I32:
-  fun printf (CString, CString) I32:
+:ffi LibC
+  :fun puts (CString) I32
+  :fun printf (CString, CString) I32
 
-ffi LibPonyRT:
-  fun pony_exitcode (I32) None:
+:ffi LibPonyRT
+  :fun pony_exitcode (I32) None

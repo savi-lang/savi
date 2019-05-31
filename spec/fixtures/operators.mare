@@ -1,5 +1,5 @@
-describe operators:
-  demo all: // in order of precedence, from "weakest" to "strongest"
+:describe operators
+  :demo all // in order of precedence, from "weakest" to "strongest"
     y = x x
     && x || x
     === x == x !== x != x =~ x
@@ -9,8 +9,8 @@ describe operators:
     + x - x
     * x / x.y
   
-  demo mixed:
+  :demo mixed
     a != b && c > d / x + e / y || i..j > k << l
   
-  demo prefix:
+  :demo prefix
     ~x

@@ -1,39 +1,38 @@
-ffi LibC:
-  fun puts (CString) I32:
+:ffi LibC
+  :fun puts (CString) I32
 
-ffi LibPonyRT:
-  fun pony_exitcode (I32) None:
+:ffi LibPonyRT
+  :fun pony_exitcode (I32) None
 
-primitive Greeting:
-  const hello: "Hello, World!"
-  const bye: "Goodbye, World!"
+:primitive Greeting
+  :const hello: "Hello, World!"
+  :const bye: "Goodbye, World!"
 
-primitive Zero:
-  fun "+" (other I32) I32:
+:primitive Zero
+  :fun "+" (other I32) I32
     other
 
-primitive BelligerentFour:
-  fun "+" (other I32) I32:
+:primitive BelligerentFour
+  :fun "+" (other I32) I32
     4 // (belligerently ignores the summand)
 
-primitive InfiniteZeros:
-  fun "[]" (index I64): Zero
+:primitive InfiniteZeros
+  :fun "[]" (index I64): Zero
 
-interface Augend:
-  fun "+" (other I32) I32:
+:interface Augend
+  :fun "+" (other I32) I32
 
-primitive Generic (A non):
-  fun get A'non: A
+:primitive Generic (A non)
+  :fun get A'non: A
 
-class Sentence:
-  prop text String:
-  new (@text = "[awkward silence]"):
+:class Sentence
+  :prop text String
+  :new (@text = "[awkward silence]")
 
-actor Main:
-  new:
-    @do_stuff(Greeting)
+:actor Main
+  :new: @do_stuff(Greeting)
   
-  be do_stuff (greeting Greeting):
+  :be do_stuff (greeting Greeting)
     none = ()
     
     maybe_greeting (Greeting | None) = Generic(Greeting).get
@@ -53,7 +52,7 @@ actor Main:
     if maybe_thirty_three <: I32 \
       LibPonyRT.pony_exitcode(augend + maybe_thirty_three + 9)
   
-  fun say_stuff (greeting Greeting):
+  :fun say_stuff (greeting Greeting)
     sentence_source = ^(Sentence.new(^1))
     sentence = sentence_source.call("[pre greeting]")
     LibC.puts(sentence.text.cpointer)

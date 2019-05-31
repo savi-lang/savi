@@ -1,17 +1,17 @@
 describe Mare::Compiler::Reach do
   it "reaches compatible functions when reaching an interface function" do
     source = Mare::Source.new "(example)", <<-SOURCE
-    interface Interface:
-      fun foo U64:
+    :interface Interface
+      :fun foo U64
     
-    class Class:
-      fun foo U64: 0
+    :class Class
+      :fun foo U64: 0
     
-    class Other:
-      fun foo F64: 0 // the return type in the function signature doesn't match
+    :class Other
+      :fun foo F64: 0 // the return type in the function signature doesn't match
     
-    actor Main:
-      new:
+    :actor Main
+      :new
         o = Other.new
         i Interface = Class.new
         i.foo

@@ -1,8 +1,8 @@
 describe Mare::Compiler::Infer do
   it "complains when the type identifier couldn't be resolved" do
     source = Mare::Source.new "(example)", <<-SOURCE
-    actor Main:
-      new:
+    :actor Main
+      :new
         x BogusType = 42
     SOURCE
     
@@ -20,17 +20,17 @@ describe Mare::Compiler::Infer do
   
   it "complains when the return type identifier couldn't be resolved" do
     source = Mare::Source.new "(example)", <<-SOURCE
-    actor Main:
-      fun x BogusType: 42
-      new:
+    :actor Main
+      :fun x BogusType: 42
+      :new
         @x
     SOURCE
     
     expected = <<-MSG
     This type couldn't be resolved:
     from (example):2:
-      fun x BogusType: 42
-            ^~~~~~~~~
+      :fun x BogusType: 42
+             ^~~~~~~~~
     MSG
     
     expect_raises Mare::Error, expected do
@@ -40,8 +40,8 @@ describe Mare::Compiler::Infer do
   
   it "complains when the local identifier couldn't be resolved" do
     source = Mare::Source.new "(example)", <<-SOURCE
-    actor Main:
-      new:
+    :actor Main
+      :new
         x = y
     SOURCE
     
@@ -59,12 +59,12 @@ describe Mare::Compiler::Infer do
   
   it "complains when the function body doesn't match the return type" do
     source = Mare::Source.new "(example)", <<-SOURCE
-    primitive Example:
-      fun number I32:
+    :primitive Example
+      :fun number I32
         "not a number at all"
     
-    actor Main:
-      new:
+    :actor Main
+      :new
         Example.number
     SOURCE
     
@@ -81,8 +81,8 @@ describe Mare::Compiler::Infer do
     
     - it must be a subtype of I32:
       from (example):2:
-      fun number I32:
-                 ^~~
+      :fun number I32
+                  ^~~
     MSG
     
     expect_raises Mare::Error, expected do
@@ -92,8 +92,8 @@ describe Mare::Compiler::Infer do
   
   it "complains when the assignment type doesn't match the right-hand-side" do
     source = Mare::Source.new "(example)", <<-SOURCE
-    actor Main:
-      new:
+    :actor Main
+      :new
         name String = 42
     SOURCE
     
@@ -121,25 +121,25 @@ describe Mare::Compiler::Infer do
   
   it "complains when the prop type doesn't match the initializer value" do
     source = Mare::Source.new "(example)", <<-SOURCE
-    actor Main:
-      prop name String: 42
+    :actor Main
+      :prop name String: 42
     SOURCE
     
     expected = <<-MSG
     This value's type is unresolvable due to conflicting constraints:
     from (example):2:
-      prop name String: 42
-                        ^~
+      :prop name String: 42
+                         ^~
     
     - it must be a subtype of Numeric:
       from (example):2:
-      prop name String: 42
-                        ^~
+      :prop name String: 42
+                         ^~
     
     - it must be a subtype of String:
       from (example):2:
-      prop name String: 42
-                ^~~~~~
+      :prop name String: 42
+                 ^~~~~~
     MSG
     
     expect_raises Mare::Error, expected do
@@ -149,8 +149,8 @@ describe Mare::Compiler::Infer do
   
   it "treats an empty sequence as producing None" do
     source = Mare::Source.new "(example)", <<-SOURCE
-    actor Main:
-      new:
+    :actor Main
+      :new
         name String = ()
     SOURCE
     
@@ -178,8 +178,8 @@ describe Mare::Compiler::Infer do
   
   it "complains when a choice condition type isn't boolean" do
     source = Mare::Source.new "(example)", <<-SOURCE
-    actor Main:
-      new:
+    :actor Main
+      :new
         if "not a boolean" 42
     SOURCE
     
@@ -207,8 +207,8 @@ describe Mare::Compiler::Infer do
   
   it "infers a local's type based on assignment" do
     source = Mare::Source.new "(example)", <<-SOURCE
-    actor Main:
-      new:
+    :actor Main
+      :new
         x = "Hello, World!"
     SOURCE
     
@@ -225,9 +225,9 @@ describe Mare::Compiler::Infer do
   
   it "infers a prop's type based on the prop initializer" do
     source = Mare::Source.new "(example)", <<-SOURCE
-    actor Main:
-      prop x: "Hello, World!"
-      new:
+    :actor Main
+      :prop x: "Hello, World!"
+      :new
         @x
     SOURCE
     
@@ -243,8 +243,8 @@ describe Mare::Compiler::Infer do
   
   it "infers an integer literal based on an assignment" do
     source = Mare::Source.new "(example)", <<-SOURCE
-    actor Main:
-      new:
+    :actor Main
+      :new
         x (U64 | None) = 42
     SOURCE
     
@@ -261,9 +261,9 @@ describe Mare::Compiler::Infer do
   
   it "infers an integer literal based on a prop type" do
     source = Mare::Source.new "(example)", <<-SOURCE
-    actor Main:
-      prop x (U64 | None): 42
-      new:
+    :actor Main
+      :prop x (U64 | None): 42
+      :new
         @x
     SOURCE
     
@@ -280,8 +280,8 @@ describe Mare::Compiler::Infer do
   
   it "infers an integer literal through an if statement" do
     source = Mare::Source.new "(example)", <<-SOURCE
-    actor Main:
-      new:
+    :actor Main
+      :new
         x (U64 | String | None) = if True 42
     SOURCE
     
@@ -303,8 +303,8 @@ describe Mare::Compiler::Infer do
   
   it "complains when a literal couldn't be resolved to a single type" do
     source = Mare::Source.new "(example)", <<-SOURCE
-    actor Main:
-      new:
+    :actor Main
+      :new
         x (F64 | U64) = 42
     SOURCE
     
@@ -332,8 +332,8 @@ describe Mare::Compiler::Infer do
   
   it "complains when a less specific type than required is assigned" do
     source = Mare::Source.new "(example)", <<-SOURCE
-    actor Main:
-      new:
+    :actor Main
+      :new
         x (U64 | None) = 42
         y U64 = x
     SOURCE
@@ -362,12 +362,12 @@ describe Mare::Compiler::Infer do
   
   it "infers return type from param type or another return type" do
     source = Mare::Source.new "(example)", <<-SOURCE
-    primitive Infer:
-      fun from_param (n I32): n
-      fun from_call_return (n I32): Infer.from_param(n)
+    :primitive Infer
+      :fun from_param (n I32): n
+      :fun from_call_return (n I32): Infer.from_param(n)
     
-    actor Main:
-      new:
+    :actor Main
+      :new
         Infer.from_call_return(42)
     SOURCE
     
@@ -388,12 +388,12 @@ describe Mare::Compiler::Infer do
   
   it "infers param type from local assignment or from the return type" do
     source = Mare::Source.new "(example)", <<-SOURCE
-    primitive Infer:
-      fun from_assign (n): m I32 = n
-      fun from_return_type (n) I32: n
+    :primitive Infer
+      :fun from_assign (n): m I32 = n
+      :fun from_return_type (n) I32: n
     
-    actor Main:
-      new:
+    :actor Main
+      :new
         Infer.from_assign(42)
         Infer.from_return_type(42)
     SOURCE
@@ -414,20 +414,20 @@ describe Mare::Compiler::Infer do
   
   it "complains when unable to infer mutually recursive return types" do
     source = Mare::Source.new "(example)", <<-SOURCE
-    primitive Tweedle:
-      fun dee (n I32): Tweedle.dum(n)
-      fun dum (n I32): Tweedle.dee(n)
+    :primitive Tweedle
+      :fun dee (n I32): Tweedle.dum(n)
+      :fun dum (n I32): Tweedle.dee(n)
     
-    actor Main:
-      new:
+    :actor Main
+      :new
         Tweedle.dum(42)
     SOURCE
     
     expected = <<-MSG
     This needs an explicit type; it could not be inferred:
     from (example):3:
-      fun dum (n I32): Tweedle.dee(n)
-          ^~~
+      :fun dum (n I32): Tweedle.dee(n)
+           ^~~
     MSG
     
     expect_raises Mare::Error, expected do
@@ -437,12 +437,12 @@ describe Mare::Compiler::Infer do
   
   it "complains about problems with unreachable functions too" do
     source = Mare::Source.new "(example)", <<-SOURCE
-    primitive NeverCalled:
-      fun call:
+    :primitive NeverCalled
+      :fun call
         x I32 = True
     
-    actor Main:
-      new:
+    :actor Main
+      :new
         None
     SOURCE
     
@@ -470,10 +470,10 @@ describe Mare::Compiler::Infer do
   
   it "infers assignment from an allocated class" do
     source = Mare::Source.new "(example)", <<-SOURCE
-    class X:
+    :class X
     
-    actor Main:
-      new:
+    :actor Main
+      :new
         x = X.new
     SOURCE
     
@@ -490,10 +490,10 @@ describe Mare::Compiler::Infer do
   
   it "requires allocation for non-non references of an allocated class" do
     source = Mare::Source.new "(example)", <<-SOURCE
-    class X:
+    :class X
     
-    actor Main:
-      new:
+    :actor Main
+      :new
         x X = X
     SOURCE
     
@@ -521,10 +521,10 @@ describe Mare::Compiler::Infer do
   
   it "complains when assigning with an insufficient right-hand capability" do
     source = Mare::Source.new "(example)", <<-SOURCE
-    class C:
+    :class C
     
-    actor Main:
-      new:
+    :actor Main
+      :new
         c1 ref = C.new
         c2 C'iso = c1
     SOURCE
@@ -553,17 +553,17 @@ describe Mare::Compiler::Infer do
   
   it "complains when calling on types without that function" do
     source = Mare::Source.new "(example)", <<-SOURCE
-    interface A:
-      fun foo:
+    :interface A
+      :fun foo
     
-    primitive B:
-      fun bar:
+    :primitive B
+      :fun bar
     
-    class C:
-      fun baz:
+    :class C
+      :fun baz
     
-    actor Main:
-      new:
+    :actor Main
+      :new
         c (A | B | C) = C.new
         c.baz
     SOURCE
@@ -576,13 +576,13 @@ describe Mare::Compiler::Infer do
     
     - A has no 'baz' function:
       from (example):1:
-    interface A:
-              ^
+    :interface A
+               ^
     
     - B has no 'baz' function:
       from (example):4:
-    primitive B:
-              ^
+    :primitive B
+               ^
     MSG
     
     expect_raises Mare::Error, expected do
@@ -592,11 +592,11 @@ describe Mare::Compiler::Infer do
   
   it "complains when calling with an insufficient receiver capability" do
     source = Mare::Source.new "(example)", <<-SOURCE
-    primitive Example:
-      fun ref mutate:
+    :primitive Example
+      :fun ref mutate
     
-    actor Main:
-      new:
+    :actor Main
+      :new
         Example.mutate
     SOURCE
     
@@ -608,8 +608,8 @@ describe Mare::Compiler::Infer do
     
     - the type Example isn't a subtype of the required capability of 'ref':
       from (example):2:
-      fun ref mutate:
-          ^~~
+      :fun ref mutate
+           ^~~
     MSG
     
     expect_raises Mare::Error, expected do
@@ -619,11 +619,11 @@ describe Mare::Compiler::Infer do
   
   it "complains when violating uniqueness into a local" do
     source = Mare::Source.new "(example)", <<-SOURCE
-    class X:
-      new iso:
+    :class X
+      :new iso
     
-    actor Main:
-      new:
+    :actor Main
+      :new
         x1a iso = X.new
         x1b val = --x1a // okay
         
@@ -663,11 +663,11 @@ describe Mare::Compiler::Infer do
   
   it "complains when violating uniqueness into an argument" do
     source = Mare::Source.new "(example)", <<-SOURCE
-    class X:
-      new iso:
+    :class X
+      :new iso
     
-    actor Main:
-      new:
+    :actor Main
+      :new
         @example(X.new) // okay
         
         x1 iso = X.new
@@ -676,7 +676,7 @@ describe Mare::Compiler::Infer do
         x2 iso = X.new
         @example(x2) // not okay
       
-      fun example (x X'val):
+      :fun example (x X'val)
     SOURCE
     
     expected = <<-MSG
@@ -692,8 +692,8 @@ describe Mare::Compiler::Infer do
     
     - it must be a subtype of X'val:
       from (example):14:
-      fun example (x X'val):
-                     ^~~~~
+      :fun example (x X'val)
+                      ^~~~~
     
     - this would be allowed if this reference didn't get aliased
     - did you forget to consume the reference?
@@ -706,11 +706,11 @@ describe Mare::Compiler::Infer do
   
   it "strips the ephemeral modifier from the capability of an inferred local" do
     source = Mare::Source.new "(example)", <<-SOURCE
-    class X:
-      new iso:
+    :class X
+      :new iso
     
-    actor Main:
-      new:
+    :actor Main
+      :new
         x = X.new // inferred as X'iso+, stripped to X'iso
         x2 iso = x // not okay, but would work if not for the above stripping
         x3 iso = x // not okay, but would work if not for the above stripping
@@ -743,13 +743,13 @@ describe Mare::Compiler::Infer do
   
   it "reflects viewpoint adaptation in the return type of a prop getter" do
     source = Mare::Source.new "(example)", <<-SOURCE
-    class Inner:
+    :class Inner
     
-    class Outer:
-      prop inner: Inner.new
+    :class Outer
+      :prop inner: Inner.new
     
-    actor Main:
-      new:
+    :actor Main
+      :new
         outer_box Outer'box = Outer.new
         outer_ref Outer'ref = Outer.new
         
@@ -783,14 +783,14 @@ describe Mare::Compiler::Infer do
   
   it "respects explicit viewpoint adaptation notation in the return type" do
     source = Mare::Source.new "(example)", <<-SOURCE
-    class Inner:
+    :class Inner
     
-    class Outer:
-      prop inner: Inner.new
-      fun get_inner @->Inner: @inner
+    :class Outer
+      :prop inner: Inner.new
+      :fun get_inner @->Inner: @inner
     
-    actor Main:
-      new:
+    :actor Main
+      :new
         outer_box Outer'box = Outer.new
         outer_ref Outer'ref = Outer.new
         
@@ -824,14 +824,14 @@ describe Mare::Compiler::Infer do
   
   it "treats box functions as being implicitly specialized on receiver cap" do
     source = Mare::Source.new "(example)", <<-SOURCE
-    class Inner:
+    :class Inner
     
-    class Outer:
-      prop inner: Inner.new
-      new iso:
+    :class Outer
+      :prop inner: Inner.new
+      :new iso
     
-    actor Main:
-      new:
+    :actor Main
+      :new
         outer_ref Outer'ref = Outer.new
         inner_ref Inner'ref = outer_ref.inner
         
@@ -844,15 +844,15 @@ describe Mare::Compiler::Infer do
   
   it "allows safe auto-recovery of a property setter call" do
     source = Mare::Source.new "(example)", <<-SOURCE
-    class Inner:
-      new iso:
+    :class Inner
+      :new iso
     
-    class Outer:
-      prop inner Inner: Inner.new
-      new iso:
+    :class Outer
+      :prop inner Inner: Inner.new
+      :new iso
     
-    actor Main:
-      new:
+    :actor Main
+      :new
         outer_iso Outer'iso = Outer.new
         inner_iso Inner'iso = Inner.new
         inner_ref Inner'ref = Inner.new
@@ -880,15 +880,15 @@ describe Mare::Compiler::Infer do
   
   it "complains on auto-recovery of a property setter whose return is used" do
     source = Mare::Source.new "(example)", <<-SOURCE
-    class Inner:
-      new iso:
+    :class Inner
+      :new iso
     
-    class Outer:
-      prop inner Inner: Inner.new
-      new iso:
+    :class Outer
+      :prop inner Inner: Inner.new
+      :new iso
     
-    actor Main:
-      new:
+    :actor Main
+      :new
         outer_trn Outer'trn = Outer.new
         inner_2 = outer_trn.inner = Inner.new
     SOURCE
@@ -901,8 +901,8 @@ describe Mare::Compiler::Infer do
     
     - the return type Inner'box isn't sendable and the return value is used (the return type wouldn't matter if the calling side entirely ignored the return value:
       from (example):5:
-      prop inner Inner: Inner.new
-           ^~~~~
+      :prop inner Inner: Inner.new
+            ^~~~~
     MSG
     
     expect_raises Mare::Error, expected do
@@ -912,14 +912,14 @@ describe Mare::Compiler::Infer do
   
   it "infers prop setters to return the alias of the assigned value" do
     source = Mare::Source.new "(example)", <<-SOURCE
-    class Inner:
-      new trn:
+    :class Inner
+      :new trn:
     
-    class Outer:
-      prop inner Inner'trn: Inner.new
+    :class Outer
+      :prop inner Inner'trn: Inner.new
     
-    actor Main:
-      new:
+    :actor Main
+      :new
         outer = Outer.new
         inner_box Inner'box = outer.inner = Inner.new // okay
         inner_trn Inner'trn = outer.inner = Inner.new // not okay
@@ -954,35 +954,35 @@ describe Mare::Compiler::Infer do
   
   it "requires a sub-func to be present in the subtype" do
     source = Mare::Source.new "(example)", <<-SOURCE
-    interface Interface:
-      fun example1 U64:
-      fun example2 U64:
-      fun example3 U64:
+    :interface Interface
+      :fun example1 U64
+      :fun example2 U64
+      :fun example3 U64
     
-    class Concrete:
-      is Interface:
-      fun example2 U64: 0
+    :class Concrete
+      :is Interface
+      :fun example2 U64: 0
     
-    actor Main:
-      new:
+    :actor Main
+      :new
         Concrete
     SOURCE
     
     expected = <<-MSG
     This type doesn't implement the interface Interface:
     from (example):6:
-    class Concrete:
-          ^~~~~~~~
+    :class Concrete
+           ^~~~~~~~
     
     - this function isn't present in the subtype:
       from (example):2:
-      fun example1 U64:
-          ^~~~~~~~
+      :fun example1 U64
+           ^~~~~~~~
     
     - this function isn't present in the subtype:
       from (example):4:
-      fun example3 U64:
-          ^~~~~~~~
+      :fun example3 U64
+           ^~~~~~~~
     MSG
     
     expect_raises Mare::Error, expected do
@@ -992,99 +992,99 @@ describe Mare::Compiler::Infer do
   
   it "requires a sub-func to have the same constructor or constant tags" do
     source = Mare::Source.new "(example)", <<-SOURCE
-    interface Interface:
-      new constructor1:
-      new constructor2:
-      new constructor3:
-      const constant1 U64:
-      const constant2 U64:
-      const constant3 U64:
-      fun function1 U64:
-      fun function2 U64:
-      fun function3 U64:
+    :interface Interface
+      :new constructor1
+      :new constructor2
+      :new constructor3
+      :const constant1 U64
+      :const constant2 U64
+      :const constant3 U64
+      :fun function1 U64
+      :fun function2 U64
+      :fun function3 U64
     
-    class Concrete:
-      is Interface:
-      new constructor1:
-      const constructor2 U64: 0
-      fun constructor3 U64: 0
-      new constant1:
-      const constant2 U64: 0
-      fun constant3 U64: 0
-      new function1:
-      const function2 U64: 0
-      fun function3 U64: 0
+    :class Concrete
+      :is Interface
+      :new constructor1
+      :const constructor2 U64: 0
+      :fun constructor3 U64: 0
+      :new constant1
+      :const constant2 U64: 0
+      :fun constant3 U64: 0
+      :new function1
+      :const function2 U64: 0
+      :fun function3 U64: 0
     
-    actor Main:
-      new:
+    :actor Main
+      :new
         Concrete
     SOURCE
     
     expected = <<-MSG
     This type doesn't implement the interface Interface:
     from (example):12:
-    class Concrete:
-          ^~~~~~~~
+    :class Concrete
+           ^~~~~~~~
     
     - a non-constructor can't be a subtype of a constructor:
       from (example):15:
-      const constructor2 U64: 0
-            ^~~~~~~~~~~~
+      :const constructor2 U64: 0
+             ^~~~~~~~~~~~
     
     - the constructor in the supertype is here:
       from (example):3:
-      new constructor2:
-          ^~~~~~~~~~~~
+      :new constructor2
+           ^~~~~~~~~~~~
     
     - a non-constructor can't be a subtype of a constructor:
       from (example):16:
-      fun constructor3 U64: 0
-          ^~~~~~~~~~~~
+      :fun constructor3 U64: 0
+           ^~~~~~~~~~~~
     
     - the constructor in the supertype is here:
       from (example):4:
-      new constructor3:
-          ^~~~~~~~~~~~
+      :new constructor3
+           ^~~~~~~~~~~~
     
     - a constructor can't be a subtype of a non-constructor:
       from (example):17:
-      new constant1:
-          ^~~~~~~~~
+      :new constant1
+           ^~~~~~~~~
     
     - the non-constructor in the supertype is here:
       from (example):5:
-      const constant1 U64:
-            ^~~~~~~~~
+      :const constant1 U64
+             ^~~~~~~~~
     
     - a non-constant can't be a subtype of a constant:
       from (example):19:
-      fun constant3 U64: 0
-          ^~~~~~~~~
+      :fun constant3 U64: 0
+           ^~~~~~~~~
     
     - the constant in the supertype is here:
       from (example):7:
-      const constant3 U64:
-            ^~~~~~~~~
+      :const constant3 U64
+             ^~~~~~~~~
     
     - a constructor can't be a subtype of a non-constructor:
       from (example):20:
-      new function1:
-          ^~~~~~~~~
+      :new function1
+           ^~~~~~~~~
     
     - the non-constructor in the supertype is here:
       from (example):8:
-      fun function1 U64:
-          ^~~~~~~~~
+      :fun function1 U64
+           ^~~~~~~~~
     
     - a constant can't be a subtype of a non-constant:
       from (example):21:
-      const function2 U64: 0
-            ^~~~~~~~~
+      :const function2 U64: 0
+             ^~~~~~~~~
     
     - the non-constant in the supertype is here:
       from (example):9:
-      fun function2 U64:
-          ^~~~~~~~~
+      :fun function2 U64
+           ^~~~~~~~~
     MSG
     
     expect_raises Mare::Error, expected do
@@ -1094,57 +1094,57 @@ describe Mare::Compiler::Infer do
   
   it "requires a sub-func to have the same number of params" do
     source = Mare::Source.new "(example)", <<-SOURCE
-    interface non Interface:
-      fun example1 (a U64, b U64, c U64) None:
-      fun example2 (a U64, b U64, c U64) None:
-      fun example3 (a U64, b U64, c U64) None:
+    :interface non Interface
+      :fun example1 (a U64, b U64, c U64) None
+      :fun example2 (a U64, b U64, c U64) None
+      :fun example3 (a U64, b U64, c U64) None
     
-    primitive Concrete:
-      is Interface:
-      fun example1 None:
-      fun example2 (a U64, b U64) None:
-      fun example3 (a U64, b U64, c U64, d U64) None:
+    :primitive Concrete
+      :is Interface
+      :fun example1 None
+      :fun example2 (a U64, b U64) None
+      :fun example3 (a U64, b U64, c U64, d U64) None
     
-    actor Main:
-      new:
+    :actor Main
+      :new
         Concrete
     SOURCE
     
     expected = <<-MSG
     This type doesn't implement the interface Interface:
     from (example):6:
-    primitive Concrete:
-              ^~~~~~~~
+    :primitive Concrete
+               ^~~~~~~~
     
     - this function has too few parameters:
       from (example):8:
-      fun example1 None:
-          ^~~~~~~~
+      :fun example1 None
+           ^~~~~~~~
     
     - the supertype has 3 parameters:
       from (example):2:
-      fun example1 (a U64, b U64, c U64) None:
-                   ^~~~~~~~~~~~~~~~~~~~~
+      :fun example1 (a U64, b U64, c U64) None
+                    ^~~~~~~~~~~~~~~~~~~~~
     
     - this function has too few parameters:
       from (example):9:
-      fun example2 (a U64, b U64) None:
-                   ^~~~~~~~~~~~~~
+      :fun example2 (a U64, b U64) None
+                    ^~~~~~~~~~~~~~
     
     - the supertype has 3 parameters:
       from (example):3:
-      fun example2 (a U64, b U64, c U64) None:
-                   ^~~~~~~~~~~~~~~~~~~~~
+      :fun example2 (a U64, b U64, c U64) None
+                    ^~~~~~~~~~~~~~~~~~~~~
     
     - this function has too many parameters:
       from (example):10:
-      fun example3 (a U64, b U64, c U64, d U64) None:
-                   ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      :fun example3 (a U64, b U64, c U64, d U64) None
+                    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
     
     - the supertype has 3 parameters:
       from (example):4:
-      fun example3 (a U64, b U64, c U64) None:
-                   ^~~~~~~~~~~~~~~~~~~~~
+      :fun example3 (a U64, b U64, c U64) None
+                    ^~~~~~~~~~~~~~~~~~~~~
     MSG
     
     expect_raises Mare::Error, expected do
@@ -1154,37 +1154,37 @@ describe Mare::Compiler::Infer do
   
   it "requires a sub-constructor to have a covariant receiver capability" do
     source = Mare::Source.new "(example)", <<-SOURCE
-    interface Interface:
-      new ref example1:
-      new ref example2:
-      new ref example3:
+    :interface Interface
+      :new ref example1
+      :new ref example2
+      :new ref example3
     
-    class Concrete:
-      is Interface:
-      new box example1:
-      new ref example2:
-      new iso example3:
+    :class Concrete
+      :is Interface
+      :new box example1
+      :new ref example2
+      :new iso example3
     
-    actor Main:
-      new:
+    :actor Main
+      :new
         Concrete
     SOURCE
     
     expected = <<-MSG
     This type doesn't implement the interface Interface:
     from (example):6:
-    class Concrete:
-          ^~~~~~~~
+    :class Concrete
+           ^~~~~~~~
     
     - this constructor's receiver capability is box:
       from (example):8:
-      new box example1:
-          ^~~
+      :new box example1
+           ^~~
     
     - it is required to be a subtype of ref:
       from (example):2:
-      new ref example1:
-          ^~~
+      :new ref example1
+           ^~~
     MSG
     
     expect_raises Mare::Error, expected do
@@ -1194,37 +1194,37 @@ describe Mare::Compiler::Infer do
   
   it "requires a sub-func to have a contravariant receiver capability" do
     source = Mare::Source.new "(example)", <<-SOURCE
-    interface Interface:
-      fun ref example1 U64:
-      fun ref example2 U64:
-      fun ref example3 U64:
+    :interface Interface
+      :fun ref example1 U64
+      :fun ref example2 U64
+      :fun ref example3 U64
     
-    class Concrete:
-      is Interface:
-      fun box example1 U64: 0
-      fun ref example2 U64: 0
-      fun iso example3 U64: 0
+    :class Concrete
+      :is Interface
+      :fun box example1 U64: 0
+      :fun ref example2 U64: 0
+      :fun iso example3 U64: 0
     
-    actor Main:
-      new:
+    :actor Main
+      :new
         Concrete
     SOURCE
     
     expected = <<-MSG
     This type doesn't implement the interface Interface:
     from (example):6:
-    class Concrete:
-          ^~~~~~~~
+    :class Concrete
+           ^~~~~~~~
     
     - this function's receiver capability is iso:
       from (example):10:
-      fun iso example3 U64: 0
-          ^~~
+      :fun iso example3 U64: 0
+           ^~~
     
     - it is required to be a supertype of ref:
       from (example):4:
-      fun ref example3 U64:
-          ^~~
+      :fun ref example3 U64
+           ^~~
     MSG
     
     expect_raises Mare::Error, expected do
@@ -1234,59 +1234,59 @@ describe Mare::Compiler::Infer do
   
   it "requires a sub-func to have covariant return and contravariant params" do
     source = Mare::Source.new "(example)", <<-SOURCE
-    interface non Interface:
-      fun example1 Numeric:
-      fun example2 U64:
-      fun example3 (a U64, b U64, c U64) None:
-      fun example4 (a Numeric, b Numeric, c Numeric) None:
+    :interface non Interface
+      :fun example1 Numeric
+      :fun example2 U64
+      :fun example3 (a U64, b U64, c U64) None
+      :fun example4 (a Numeric, b Numeric, c Numeric) None
     
-    primitive Concrete:
-      is Interface:
-      fun example1 U64: 0
-      fun example2 Numeric: U64[0]
-      fun example3 (a Numeric, b U64, c Numeric) None:
-      fun example4 (a U64, b Numeric, c U64) None:
+    :primitive Concrete
+      :is Interface
+      :fun example1 U64: 0
+      :fun example2 Numeric: U64[0]
+      :fun example3 (a Numeric, b U64, c Numeric) None:
+      :fun example4 (a U64, b Numeric, c U64) None:
     
-    actor Main:
-      new:
+    :actor Main
+      :new
         Concrete
     SOURCE
     
     expected = <<-MSG
     This type doesn't implement the interface Interface:
     from (example):7:
-    primitive Concrete:
-              ^~~~~~~~
+    :primitive Concrete
+               ^~~~~~~~
     
     - this function's return type is Numeric:
       from (example):10:
-      fun example2 Numeric: U64[0]
-                   ^~~~~~~
+      :fun example2 Numeric: U64[0]
+                    ^~~~~~~
     
     - it is required to be a subtype of U64:
       from (example):3:
-      fun example2 U64:
-                   ^~~
+      :fun example2 U64
+                    ^~~
     
     - this parameter type is U64:
       from (example):12:
-      fun example4 (a U64, b Numeric, c U64) None:
-                    ^~~~~
+      :fun example4 (a U64, b Numeric, c U64) None:
+                     ^~~~~
     
     - it is required to be a supertype of Numeric:
       from (example):5:
-      fun example4 (a Numeric, b Numeric, c Numeric) None:
-                    ^~~~~~~~~
+      :fun example4 (a Numeric, b Numeric, c Numeric) None
+                     ^~~~~~~~~
     
     - this parameter type is U64:
       from (example):12:
-      fun example4 (a U64, b Numeric, c U64) None:
-                                      ^~~~~
+      :fun example4 (a U64, b Numeric, c U64) None:
+                                       ^~~~~
     
     - it is required to be a supertype of Numeric:
       from (example):5:
-      fun example4 (a Numeric, b Numeric, c Numeric) None:
-                                          ^~~~~~~~~
+      :fun example4 (a Numeric, b Numeric, c Numeric) None
+                                           ^~~~~~~~~
     MSG
     
     expect_raises Mare::Error, expected do

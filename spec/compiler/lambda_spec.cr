@@ -1,8 +1,8 @@
-describe Mare::Compiler::Sugar do
+describe Mare::Compiler::Lambda do
   it "handles thunks (lambdas with no parameters)" do
     source = Mare::Source.new "(example)", <<-SOURCE
-    class Example:
-      fun thunk:
+    :class Example
+      :fun thunk
         apple = ^(Fruit.new("apple").flavor)
     SOURCE
     
@@ -34,8 +34,8 @@ describe Mare::Compiler::Sugar do
   
   it "handles lambdas with parameters" do
     source = Mare::Source.new "(example)", <<-SOURCE
-    class Example:
-      fun lambdas:
+    :class Example
+      :fun lambdas
         apple = ^(Fruit.new(^1, ^2).flavor)
     SOURCE
     
@@ -70,8 +70,8 @@ describe Mare::Compiler::Sugar do
   
   it "raises an error if a lambda parameter reference is outside a lambda" do
     source = Mare::Source.new "(example)", <<-SOURCE
-    class Example:
-      fun no_lambda:
+    :class Example
+      :fun no_lambda
         apple = ^1
     SOURCE
     
