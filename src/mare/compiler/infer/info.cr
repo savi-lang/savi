@@ -2,9 +2,9 @@ class Mare::Compiler::Infer
   abstract class Info
     property pos : Source::Pos = Source::Pos.none
     
-    abstract def resolve!(infer : Infer) : MetaType
+    abstract def resolve!(infer : ForFunc) : MetaType
     abstract def within_domain!(
-      infer : Infer,
+      infer : ForFunc,
       use_pos : Source::Pos,
       constraint_pos : Source::Pos,
       constraint : MetaType,
@@ -12,7 +12,7 @@ class Mare::Compiler::Infer
     )
     
     def meta_type_within_domain!(
-      infer : Infer,
+      infer : ForFunc,
       meta_type : MetaType,
       use_pos : Source::Pos,
       constraint_pos : Source::Pos,
@@ -60,11 +60,11 @@ class Mare::Compiler::Infer
     def initialize(@pos, @inner)
     end
     
-    def resolve!(infer : Infer)
+    def resolve!(infer : ForFunc)
       @inner
     end
     
-    def within_domain!(infer : Infer, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
+    def within_domain!(infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
       meta_type_within_domain!(infer, @inner, use_pos, constraint_pos, constraint, aliases)
     end
   end
@@ -77,11 +77,11 @@ class Mare::Compiler::Infer
       @domain_constraints = [] of Tuple(Source::Pos, MetaType)
     end
     
-    def resolve!(infer : Infer)
+    def resolve!(infer : ForFunc)
       @inner
     end
     
-    def within_domain!(infer : Infer, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
+    def within_domain!(infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
       @domain_constraints << {constraint_pos, constraint}
       
       meta_type_within_domain!(infer, @inner, use_pos, constraint_pos, constraint, aliases)
@@ -98,7 +98,7 @@ class Mare::Compiler::Infer
       @pos_list = [@pos] of Source::Pos
     end
     
-    def resolve!(infer : Infer)
+    def resolve!(infer : ForFunc)
       if @domain.unsatisfiable?
         Error.at self,
           "This value's type is unresolvable due to conflicting constraints",
@@ -114,7 +114,7 @@ class Mare::Compiler::Infer
       @domain
     end
     
-    def within_domain!(infer : Infer, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
+    def within_domain!(infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
       raise "Literal alias distinction not implemented: #{@domain.inspect}" \
         if (aliases > 0) && (@domain.alias != @domain)
       
@@ -137,7 +137,7 @@ class Mare::Compiler::Infer
     def initialize(@pos)
     end
     
-    def resolve!(infer : Infer)
+    def resolve!(infer : ForFunc)
       explicit = @explicit
       return explicit.not_nil! if explicit && !explicit.cap_only?
       
@@ -157,7 +157,7 @@ class Mare::Compiler::Infer
       @pos = explicit_pos
     end
     
-    def within_domain!(infer : Infer, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
+    def within_domain!(infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
       if @explicit
         explicit = @explicit.not_nil!
         if explicit.cap_only?
@@ -170,7 +170,7 @@ class Mare::Compiler::Infer
       end
     end
     
-    def assign(infer : Infer, rhs : AST::Node, rhs_pos : Source::Pos)
+    def assign(infer : ForFunc, rhs : AST::Node, rhs_pos : Source::Pos)
       infer[rhs].within_domain!(
         infer,
         rhs_pos,
@@ -204,16 +204,16 @@ class Mare::Compiler::Infer
         @field.pos
       end
       
-      def resolve!(infer : Infer)
+      def resolve!(infer : ForFunc)
         @field.resolve!(infer).viewed_from(@field.origin).alias
       end
       
-      def within_domain!(infer : Infer, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
+      def within_domain!(infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
         meta_type_within_domain!(infer, resolve!(infer), use_pos, constraint_pos, constraint, aliases + 1)
       end
     end
     
-    def resolve!(infer : Infer)
+    def resolve!(infer : ForFunc)
       explicit = @explicit
       return explicit.not_nil! if explicit && !explicit.cap_only?
       
@@ -233,7 +233,7 @@ class Mare::Compiler::Infer
       @pos = explicit_pos
     end
     
-    def within_domain!(infer : Infer, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
+    def within_domain!(infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
       if @explicit
         explicit = @explicit.not_nil!
         if explicit.cap_only?
@@ -246,7 +246,7 @@ class Mare::Compiler::Infer
       end
     end
     
-    def assign(infer : Infer, rhs : AST::Node, rhs_pos : Source::Pos)
+    def assign(infer : ForFunc, rhs : AST::Node, rhs_pos : Source::Pos)
       infer[rhs].within_domain!(
         infer,
         rhs_pos,
@@ -273,7 +273,7 @@ class Mare::Compiler::Infer
     private def already_resolved! : MetaType
     end
     
-    def resolve!(infer : Infer) : MetaType
+    def resolve!(infer : ForFunc) : MetaType
       return @explicit.not_nil! unless @explicit.nil?
       return infer[@upstream.not_nil!].resolve!(infer).strip_ephemeral unless @upstream.nil?
       return @downstreamed.not_nil!.strip_ephemeral unless @downstreamed.nil?
@@ -291,7 +291,7 @@ class Mare::Compiler::Infer
       @pos = explicit_pos
     end
     
-    def within_domain!(infer : Infer, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
+    def within_domain!(infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
       if @explicit
         explicit = @explicit.not_nil!
         meta_type_within_domain!(infer, explicit, use_pos, constraint_pos, constraint, aliases + 1)
@@ -310,12 +310,12 @@ class Mare::Compiler::Infer
         if @upstream
     end
     
-    def verify_arg(infer : Infer, arg_infer : Infer, arg : AST::Node, arg_pos : Source::Pos)
+    def verify_arg(infer : ForFunc, arg_infer : ForFunc, arg : AST::Node, arg_pos : Source::Pos)
       arg = arg_infer[arg]
       arg.within_domain!(arg_infer, arg_pos, @pos, resolve!(infer), 0)
     end
     
-    def assign(infer : Infer, rhs : AST::Node, rhs_pos : Source::Pos)
+    def assign(infer : ForFunc, rhs : AST::Node, rhs_pos : Source::Pos)
       infer[rhs].within_domain!(
         infer,
         rhs_pos,
@@ -343,11 +343,11 @@ class Mare::Compiler::Infer
     def initialize(@pos, @clauses)
     end
     
-    def resolve!(infer : Infer)
+    def resolve!(infer : ForFunc)
       MetaType.new_union(clauses.map { |node| infer[node].resolve!(infer) })
     end
     
-    def within_domain!(infer : Infer, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
+    def within_domain!(infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
       clauses.each { |node| infer[node].within_domain!(infer, use_pos, constraint_pos, constraint, aliases) }
     end
   end
@@ -361,11 +361,11 @@ class Mare::Compiler::Infer
       raise "#{@bool.show_type} is not Bool" unless @bool.show_type == "Bool"
     end
     
-    def resolve!(infer : Infer)
+    def resolve!(infer : ForFunc)
       @bool
     end
     
-    def within_domain!(infer : Infer, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
+    def within_domain!(infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
       meta_type_within_domain!(infer, @bool, use_pos, constraint_pos, constraint, aliases)
     end
   end
@@ -377,11 +377,11 @@ class Mare::Compiler::Infer
     def initialize(@pos, @refine, @refine_type)
     end
     
-    def resolve!(infer : Infer)
+    def resolve!(infer : ForFunc)
       infer[@refine].resolve!(infer).intersect(@refine_type)
     end
     
-    def within_domain!(infer : Infer, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
+    def within_domain!(infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
       meta_type_within_domain!(infer, resolve!(infer), use_pos, constraint_pos, constraint, aliases)
     end
   end
@@ -392,11 +392,11 @@ class Mare::Compiler::Infer
     def initialize(@pos, @local)
     end
     
-    def resolve!(infer : Infer)
+    def resolve!(infer : ForFunc)
       infer[@local].resolve!(infer).ephemeralize
     end
     
-    def within_domain!(infer : Infer, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
+    def within_domain!(infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
       infer[@local].within_domain!(infer, use_pos, constraint_pos, constraint, aliases - 1)
     end
   end
@@ -416,12 +416,12 @@ class Mare::Compiler::Infer
       @pos_list = [] of Source::Pos
     end
     
-    def resolve!(infer : Infer)
+    def resolve!(infer : ForFunc)
       raise "unresolved ret for #{self.inspect}" unless @ret
       @ret.not_nil!
     end
     
-    def within_domain!(infer : Infer, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
+    def within_domain!(infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
       if @aliases.nil?
         @aliases = aliases
       else
@@ -434,7 +434,7 @@ class Mare::Compiler::Infer
       verify_constraints!(infer, use_pos) if @ret
     end
     
-    def set_return(infer : Infer, ret_pos : Source::Pos, ret : MetaType)
+    def set_return(infer : ForFunc, ret_pos : Source::Pos, ret : MetaType)
       @ret_pos = ret_pos
       @ret = ret.ephemeralize
       verify_constraints!(infer, ret_pos)

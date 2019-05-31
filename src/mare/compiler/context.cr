@@ -1,6 +1,6 @@
 class Mare::Compiler::Context
   getter program
-  getter infers
+  getter infer
   getter refer
   getter reach
   getter paint
@@ -11,7 +11,7 @@ class Mare::Compiler::Context
     @program = Program.new
     @stack = [Interpreter::Default.new(@program)] of Interpreter
     
-    @infers = Infers.new
+    @infer = Infer.new
     @refer = Refer.new
     @reach = Reach.new
     @paint = Paint.new

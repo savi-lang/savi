@@ -31,7 +31,7 @@ class Mare::Compiler::Paint
         next if f.has_tag?(:hygienic)
         next unless ctx.reach.reached_func?(f)
         
-        ctx.infers.infers_for(f).each do |infer|
+        ctx.infer.infers_for(f).each do |infer|
           observe_func(t, infer.reified)
         end
       end

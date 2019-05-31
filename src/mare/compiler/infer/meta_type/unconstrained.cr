@@ -25,7 +25,7 @@ class Mare::Compiler::Infer::MetaType::Unconstrained
     ([] of Infer::ReifiedType).each
   end
   
-  def find_callable_func_defns(infer : Infer, name : String)
+  def find_callable_func_defns(infer : ForFunc, name : String)
     nil
   end
   
@@ -74,12 +74,12 @@ class Mare::Compiler::Infer::MetaType::Unconstrained
     raise NotImplementedError.new("#{origin.inspect}+>#{self.inspect}")
   end
   
-  def subtype_of?(infer : Infer, other : Inner) : Bool
+  def subtype_of?(infer : ForFunc, other : Inner) : Bool
     # Unconstrained is a subtype of nothing - it makes no guarantees at all.
     false
   end
   
-  def supertype_of?(infer : Infer, other : Inner) : Bool
+  def supertype_of?(infer : ForFunc, other : Inner) : Bool
     # Unconstrained is a supertype of everything.
     true
   end

@@ -32,7 +32,7 @@ struct Mare::Compiler::Infer::MetaType::Capability
     ([] of Infer::ReifiedType).each
   end
   
-  def find_callable_func_defns(infer : Infer, name : String)
+  def find_callable_func_defns(infer : ForFunc, name : String)
     nil
   end
   
@@ -92,7 +92,7 @@ struct Mare::Compiler::Infer::MetaType::Capability
     other.unite(self) # delegate to the "higher" class via commutativity
   end
   
-  def subtype_of?(infer : Infer, other : Capability); subtype_of?(other) end
+  def subtype_of?(infer : ForFunc, other : Capability); subtype_of?(other) end
   def subtype_of?(other : Capability) : Bool
     ##
     # Reference capability subtyping can be visualized using this graph,
@@ -136,16 +136,16 @@ struct Mare::Compiler::Infer::MetaType::Capability
     end
   end
   
-  def supertype_of?(infer : Infer, other : Capability); supertype_of?(other) end
+  def supertype_of?(infer : ForFunc, other : Capability); supertype_of?(other) end
   def supertype_of?(other : Capability) : Bool
     other.subtype_of?(self) # delegate to the above function via symmetry
   end
   
-  def subtype_of?(infer : Infer, other : (Nominal | AntiNominal | Intersection | Union | Unconstrained | Unsatisfiable)) : Bool
+  def subtype_of?(infer : ForFunc, other : (Nominal | AntiNominal | Intersection | Union | Unconstrained | Unsatisfiable)) : Bool
     other.supertype_of?(infer, self) # delegate to the other class via symmetry
   end
   
-  def supertype_of?(infer : Infer, other : (Nominal | AntiNominal | Intersection | Union | Unconstrained | Unsatisfiable)) : Bool
+  def supertype_of?(infer : ForFunc, other : (Nominal | AntiNominal | Intersection | Union | Unconstrained | Unsatisfiable)) : Bool
     other.subtype_of?(infer, self) # delegate to the other class via symmetry
   end
   

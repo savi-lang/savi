@@ -24,7 +24,7 @@ struct Mare::Compiler::Infer::MetaType::AntiNominal
     [defn].each # TODO: is an anti-nominal actually reachable?
   end
   
-  def find_callable_func_defns(infer : Infer, name : String)
+  def find_callable_func_defns(infer : ForFunc, name : String)
     nil
   end
   
@@ -133,32 +133,32 @@ struct Mare::Compiler::Infer::MetaType::AntiNominal
     raise NotImplementedError.new("#{origin.inspect}+>#{self.inspect}")
   end
   
-  def subtype_of?(infer : Infer, other : Capability) : Bool
+  def subtype_of?(infer : ForFunc, other : Capability) : Bool
     # An anti-nominal can never be a subtype of any capability -
     # it excludes a single nominal, and says nothing about capabilities.
     false
   end
   
-  def supertype_of?(infer : Infer, other : Capability) : Bool
+  def supertype_of?(infer : ForFunc, other : Capability) : Bool
     # An anti-nominal can never be a supertype of any capability -
     # it excludes a single nominal, and says nothing about capabilities.
     false
   end
   
-  def subtype_of?(infer : Infer, other : Nominal) : Bool
+  def subtype_of?(infer : ForFunc, other : Nominal) : Bool
     # An anti-nominal can never be a subtype of any nominal -
     # it excludes a single nominal, and includes every other possible nominal,
     # so it cannot possibly be as or more specific than a single nominal.
     false
   end
   
-  def supertype_of?(infer : Infer, other : Nominal) : Bool
+  def supertype_of?(infer : ForFunc, other : Nominal) : Bool
     # An anti-nominal is a supertype of the given nominal if and only if
     # the other nominal's defn is not a subtype of this nominal's defn.
     !infer.is_subtype?(other.defn, defn)
   end
   
-  def subtype_of?(infer : Infer, other : AntiNominal) : Bool
+  def subtype_of?(infer : ForFunc, other : AntiNominal) : Bool
     # An anti-nominal is a subtype of another anti-nominal if and only if
     # all cases excluded by the other anti-nominal are also excluded by it.
     # For this anti-nominal to be as or more exclusive than the other,
@@ -166,16 +166,16 @@ struct Mare::Compiler::Infer::MetaType::AntiNominal
     infer.is_subtype?(other.defn, defn)
   end
   
-  def supertype_of?(infer : Infer, other : AntiNominal) : Bool
+  def supertype_of?(infer : ForFunc, other : AntiNominal) : Bool
     # This operation is symmetrical with the above operation.
     infer.is_subtype?(defn, other.defn)
   end
   
-  def subtype_of?(infer : Infer, other : (Intersection | Union | Unconstrained | Unsatisfiable)) : Bool
+  def subtype_of?(infer : ForFunc, other : (Intersection | Union | Unconstrained | Unsatisfiable)) : Bool
     other.supertype_of?(infer, self) # delegate to the other class via symmetry
   end
   
-  def supertype_of?(infer : Infer, other : (Intersection | Union | Unconstrained | Unsatisfiable)) : Bool
+  def supertype_of?(infer : ForFunc, other : (Intersection | Union | Unconstrained | Unsatisfiable)) : Bool
     other.subtype_of?(infer, self) # delegate to the other class via symmetry
   end
 end

@@ -151,7 +151,7 @@ struct Mare::Compiler::Infer::MetaType
     @inner.is_a?(Capability)
   end
   
-  def within_constraints?(infer : Infer, types : Iterable(MetaType))
+  def within_constraints?(infer : ForFunc, types : Iterable(MetaType))
     infer.is_subtype?(self, self.class.new_intersection(types))
   end
   
@@ -192,7 +192,7 @@ struct Mare::Compiler::Infer::MetaType
     MetaType.new(@inner.unite(other.inner))
   end
   
-  def simplify(infer : Infer)
+  def simplify(infer : ForFunc)
     inner = @inner
     
     # Currently we only have the logic to simplify these cases:
@@ -202,7 +202,7 @@ struct Mare::Compiler::Infer::MetaType
     self
   end
   
-  private def simplify_intersection(infer : Infer, inner : Intersection)
+  private def simplify_intersection(infer : ForFunc, inner : Intersection)
     # TODO: complete the rest of the logic here (think about symmetry)
     removed_terms = Set(Nominal).new
     new_terms = inner.terms.try(&.select do |l|
@@ -234,7 +234,7 @@ struct Mare::Compiler::Infer::MetaType
     Intersection.build(inner.cap, new_terms.try(&.to_set), inner.anti_terms)
   end
   
-  private def simplify_union(infer : Infer, inner : Union)
+  private def simplify_union(infer : ForFunc, inner : Union)
     caps = Set(Capability).new
     terms = Set(Nominal).new
     anti_terms = Set(AntiNominal).new
@@ -263,7 +263,7 @@ struct Mare::Compiler::Infer::MetaType
   end
   
   # Return true if this MetaType is a subtype of the other MetaType.
-  def subtype_of?(infer : Infer, other : MetaType)
+  def subtype_of?(infer : ForFunc, other : MetaType)
     inner.subtype_of?(infer, other.inner)
   end
   
@@ -272,7 +272,7 @@ struct Mare::Compiler::Infer::MetaType
   end
   
   def find_callable_func_defns(
-    infer : Infer,
+    infer : ForFunc,
     name : String,
   ) : Set(Tuple(Inner, Infer::ReifiedType?, Program::Function?))
     set = Set(Tuple(Inner, Infer::ReifiedType?, Program::Function?)).new

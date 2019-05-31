@@ -121,7 +121,7 @@ module Mare::Compiler::Completeness
     
     def touch(node : AST::Identifier)
       # Ignore this identifier if it is not of the self.
-      ctx.infers.infers_for(func).each do |infer|
+      ctx.infer.infers_for(func).each do |infer|
         info = infer[node]?
         next unless info.is_a?(Infer::Self)
         

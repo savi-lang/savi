@@ -220,7 +220,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     end
   end
   
-  property! infer : Infer
+  property! infer : Infer::ForFunc
   
   def initialize
     @refs = Hash(Infer::MetaType, Ref).new
@@ -231,9 +231,9 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
   def run(ctx)
     # Reach functions called starting from the entrypoint of the program.
     env = ctx.program.find_type!("Env")
-    handle_func(ctx, ctx.infers.reified_type(ctx, env), env.find_func!("new"))
+    handle_func(ctx, ctx.infer.reified_type(ctx, env), env.find_func!("new"))
     main = ctx.program.find_type!("Main")
-    handle_func(ctx, ctx.infers.reified_type(ctx, main), main.find_func!("new"))
+    handle_func(ctx, ctx.infer.reified_type(ctx, main), main.find_func!("new"))
   end
   
   def handle_func(ctx, rt, func)
@@ -242,7 +242,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     @seen_funcs.add(func)
     
     # Get each infer instance associated with this function.
-    ctx.infers.infers_for(func).each do |infer|
+    ctx.infer.infers_for(func).each do |infer|
       # Reach all type references seen by this function.
       infer.each_meta_type do |meta_type|
         handle_type_ref(ctx, meta_type)
@@ -256,7 +256,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       # Reach all functions that have the same name as this function and
       # belong to a type that is a subtype of this one.
       # TODO: can we avoid doing this for unreachable types? It seems nontrivial.
-      ctx.infers.completely_reified_types.each do |other_rt|
+      ctx.infer.completely_reified_types.each do |other_rt|
         next if rt == other_rt
         other_func = other_rt.defn.find_func?(func.ident.value)
         
@@ -269,7 +269,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
   def handle_field(ctx, rt, func) : {String, Ref}
     # Reach the metatype of the field.
     ref = nil
-    ctx.infers.infers_for(func).each do |infer|
+    ctx.infer.infers_for(func).each do |infer|
       next unless rt == infer.reified.type
       ref = infer.resolve(func.ident)
       handle_type_ref(ctx, ref)

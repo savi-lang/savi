@@ -78,7 +78,7 @@ class Mare::Compiler::CodeGen
         next if f.has_tag?(:field)
         next unless g.ctx.reach.reached_func?(f)
         
-        g.ctx.infers.infers_for(f).each do |infer|
+        g.ctx.infer.infers_for(f).each do |infer|
           next unless infer.reified.type == type_def.inner
           
           vtable_index = g.ctx.paint[infer.reified]
@@ -177,7 +177,7 @@ class Mare::Compiler::CodeGen
   end
   
   class GenFunc
-    getter infer : Infer
+    getter infer : Infer::ForFunc
     getter vtable_index : Int32
     getter llvm_name : String
     property! llvm_func : LLVM::Function

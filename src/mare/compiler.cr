@@ -7,7 +7,7 @@ module Mare::Compiler
     when :lambda       then ctx.run(Lambda)
     when :classify     then ctx.run(Classify)
     when :refer        then ctx.run(ctx.refer)
-    when :infer        then ctx.run(ctx.infers)
+    when :infer        then ctx.run(ctx.infer)
     when :completeness then ctx.run(Completeness)
     when :reach        then ctx.run(ctx.reach)
     when :paint        then ctx.run(ctx.paint)
