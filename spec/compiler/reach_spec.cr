@@ -19,9 +19,9 @@ describe Mare::Compiler::Reach do
     
     ctx = Mare::Compiler.compile([source], :reach)
     
-    i_foo = ctx.program.find_func!("Interface", "foo")
-    c_foo = ctx.program.find_func!("Class", "foo")
-    o_foo = ctx.program.find_func!("Other", "foo")
+    i_foo = ctx.infer.for_func_simple(ctx, "Interface", "foo").reified
+    c_foo = ctx.infer.for_func_simple(ctx, "Class", "foo").reified
+    o_foo = ctx.infer.for_func_simple(ctx, "Other", "foo").reified
     
     ctx.reach.reached_func?(i_foo).should eq true
     ctx.reach.reached_func?(c_foo).should eq true

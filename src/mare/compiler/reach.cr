@@ -215,8 +215,10 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       @reified.defn.const_u64("bit_width").to_i32
     end
     
-    def each_function
-      @reified.defn.functions.each
+    def each_function(ctx)
+      ctx.infer[@reified]
+      .all_for_funcs.map(&.reified)
+      .select { |rf| ctx.reach.reached_func?(rf) }
     end
     
     def as_ref : Ref
@@ -224,29 +226,31 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     end
   end
   
-  property! infer : Infer::ForFunc
+  getter seen_funcs
   
   def initialize
     @refs = Hash(Infer::MetaType, Ref).new
     @defs = Hash(Infer::ReifiedType, Def).new
-    @seen_funcs = Set(Program::Function).new
+    @seen_funcs = Set(Infer::ReifiedFunction).new
   end
   
   def run(ctx)
     # Reach functions called starting from the entrypoint of the program.
     env = ctx.program.find_type!("Env")
-    handle_func(ctx, ctx.infer.reified_type(ctx, env), env.find_func!("new"))
+    handle_func(ctx, ctx.infer.for_type(ctx, env), env.find_func!("new"))
     main = ctx.program.find_type!("Main")
-    handle_func(ctx, ctx.infer.reified_type(ctx, main), main.find_func!("new"))
+    handle_func(ctx, ctx.infer.for_type(ctx, main), main.find_func!("new"))
   end
   
-  def handle_func(ctx, rt, func)
-    # Skip this function if we've already seen it.
-    return if @seen_funcs.includes?(func)
-    @seen_funcs.add(func)
-    
+  def handle_func(ctx, infer_type : Infer::ForType, func)
     # Get each infer instance associated with this function.
-    ctx.infer.infers_for(func).each do |infer|
+    infer_type.all_for_funcs.each do |infer|
+      next unless infer.reified.func == func
+      
+      # Skip this function if we've already seen it.
+      next if @seen_funcs.includes?(infer.reified)
+      @seen_funcs.add(infer.reified)
+    
       # Reach all type references seen by this function.
       infer.each_meta_type do |meta_type|
         handle_type_ref(ctx, meta_type)
@@ -254,34 +258,35 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       
       # Reach all functions called by this function.
       infer.each_called_func.each do |called_rt, called_func|
-        handle_func(ctx, called_rt, called_func)
+        handle_func(ctx, ctx.infer[called_rt], called_func)
       end
       
       # Reach all functions that have the same name as this function and
       # belong to a type that is a subtype of this one.
-      # TODO: can we avoid doing this for unreachable types? It seems nontrivial.
-      ctx.infer.completely_reified_types.each do |other_rt|
-        next if rt == other_rt
+      ctx.infer.for_completely_reified_types.each do |other_infer_type|
+        other_rt = other_infer_type.reified
+        next if infer_type.reified == other_rt
         other_func = other_rt.defn.find_func?(func.ident.value)
         
-        handle_func(ctx, other_rt, other_func) \
-          if other_func && infer.is_subtype?(other_rt, rt)
+        handle_func(ctx, ctx.infer[other_rt], other_func) \
+          if other_func && infer.is_subtype?(other_rt, infer_type.reified)
       end
     end
   end
   
-  def handle_field(ctx, rt, func) : {String, Ref}
+  def handle_field(ctx, rt : Infer::ReifiedType, func) : {String, Ref}
     # Reach the metatype of the field.
     ref = nil
-    ctx.infer.infers_for(func).each do |infer|
-      next unless rt == infer.reified.type
+    ctx.infer[rt].all_for_funcs.each do |infer|
+      next unless infer.reified.func == func
+      # TODO: should we choose a specific reification instead of just taking the final one?
       ref = infer.resolve(func.ident)
       handle_type_ref(ctx, ref)
     end
     ref.not_nil!
     
     # Handle the field as if it were a function.
-    handle_func(ctx, rt, func)
+    handle_func(ctx, ctx.infer[rt], func)
     
     # Return the Ref instance for this meta type.
     {func.ident.value, @refs[ref.not_nil!]}
@@ -351,8 +356,8 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     @defs[rt]
   end
   
-  def reached_func?(program_func : Program::Function)
-    @seen_funcs.includes?(program_func)
+  def reached_func?(rf : Infer::ReifiedFunction)
+    @seen_funcs.includes?(rf)
   end
   
   def each_type_def

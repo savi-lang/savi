@@ -214,9 +214,8 @@ describe Mare::Compiler::Infer do
     
     ctx = Mare::Compiler.compile([source], :infer)
     
-    func = ctx.program.find_func!("Main", "new")
-    infer = ctx.infer.single_infer_for(func)
-    body = func.body.not_nil!
+    infer = ctx.infer.for_func_simple(ctx, "Main", "new")
+    body = infer.reified.func.body.not_nil!
     assign = body.terms.first.as(Mare::AST::Relate)
     
     infer.resolve(assign.lhs).show_type.should eq "String"
@@ -233,9 +232,8 @@ describe Mare::Compiler::Infer do
     
     ctx = Mare::Compiler.compile([source], :infer)
     
-    func = ctx.program.find_func!("Main", "new")
-    infer = ctx.infer.single_infer_for(func)
-    body = func.body.not_nil!
+    infer = ctx.infer.for_func_simple(ctx, "Main", "new")
+    body = infer.reified.func.body.not_nil!
     prop = body.terms.first
     
     infer.resolve(prop).show_type.should eq "String"
@@ -250,9 +248,8 @@ describe Mare::Compiler::Infer do
     
     ctx = Mare::Compiler.compile([source], :infer)
     
-    func = ctx.program.find_func!("Main", "new")
-    infer = ctx.infer.single_infer_for(func)
-    body = func.body.not_nil!
+    infer = ctx.infer.for_func_simple(ctx, "Main", "new")
+    body = infer.reified.func.body.not_nil!
     assign = body.terms.first.as(Mare::AST::Relate)
     
     infer.resolve(assign.lhs).show_type.should eq "(U64 | None)"
@@ -269,10 +266,10 @@ describe Mare::Compiler::Infer do
     
     ctx = Mare::Compiler.compile([source], :infer)
     
-    main = ctx.program.find_type!("Main")
-    func = main.functions.find(&.has_tag?(:field)).not_nil!
-    infer = ctx.infer.infers_for(func.not_nil!).first
-    body = func.body.not_nil!
+    main_infer = ctx.infer.for_type(ctx, ctx.program.find_type!("Main"))
+    func = main_infer.reified.defn.functions.find(&.has_tag?(:field)).not_nil!
+    infer = ctx.infer.for_func(ctx, main_infer.reified, func, func.cap.value)
+    body = infer.reified.func.body.not_nil!
     field = body.terms.first
     
     infer.resolve(field).show_type.should eq "U64"
@@ -287,9 +284,8 @@ describe Mare::Compiler::Infer do
     
     ctx = Mare::Compiler.compile([source], :infer)
     
-    func = ctx.program.find_func!("Main", "new")
-    infer = ctx.infer.single_infer_for(func)
-    body = func.body.not_nil!
+    infer = ctx.infer.for_func_simple(ctx, "Main", "new")
+    body = infer.reified.func.body.not_nil!
     assign = body.terms.first.as(Mare::AST::Relate)
     literal = assign.rhs
       .as(Mare::AST::Group).terms.last
@@ -378,9 +374,8 @@ describe Mare::Compiler::Infer do
       {"Infer", "from_call_return"},
       {"Main", "new"},
     ].each do |t_name, f_name|
-      func = ctx.program.find_func!(t_name, f_name)
-      infer = ctx.infer.single_infer_for(func)
-      call = func.body.not_nil!.terms.first
+      infer = ctx.infer.for_func_simple(ctx, t_name, f_name)
+      call = infer.reified.func.body.not_nil!.terms.first
       
       infer.resolve(call).show_type.should eq "I32"
     end
@@ -404,9 +399,8 @@ describe Mare::Compiler::Infer do
       {"Infer", "from_assign"},
       {"Infer", "from_return_type"},
     ].each do |t_name, f_name|
-      func = ctx.program.find_func!(t_name, f_name)
-      infer = ctx.infer.single_infer_for(func)
-      expr = func.body.not_nil!.terms.first
+      infer = ctx.infer.for_func_simple(ctx, t_name, f_name)
+      expr = infer.reified.func.body.not_nil!.terms.first
       
       infer.resolve(expr).show_type.should eq "I32"
     end
@@ -479,9 +473,8 @@ describe Mare::Compiler::Infer do
     
     ctx = Mare::Compiler.compile([source], :infer)
     
-    func = ctx.program.find_func!("Main", "new")
-    infer = ctx.infer.single_infer_for(func)
-    body = func.body.not_nil!
+    infer = ctx.infer.for_func_simple(ctx, "Main", "new")
+    body = infer.reified.func.body.not_nil!
     assign = body.terms.first.as(Mare::AST::Relate)
     
     infer.resolve(assign.lhs).show_type.should eq "X"

@@ -13,37 +13,37 @@
 #
 module Mare::Compiler::Completeness
   def self.run(ctx)
-    ctx.program.types.each do |t|
-      branch_cache = {} of Tuple(Set(String), Program::Function) => Branch
-      t.functions.each do |f|
-        check_constructor(ctx, t, f, branch_cache) if f.has_tag?(:constructor)
+    ctx.infer.for_non_argumented_types.each do |infer_type|
+      branch_cache = {} of Tuple(Set(String), Infer::ReifiedFunction) => Branch
+      infer_type.all_for_funcs.each do |infer_func|
+        check_constructor(ctx, infer_type.reified, infer_func.reified, branch_cache) if infer_func.reified.func.has_tag?(:constructor)
       end
     end
   end
   
-  def self.check_constructor(ctx, decl, func, branch_cache)
-    fields = decl.functions.select(&.has_tag?(:field))
-    branch = Branch.new(ctx, decl, func, branch_cache, fields)
-    func.body.try(&.accept(branch))
+  def self.check_constructor(ctx, rt, rf, branch_cache)
+    fields = rt.defn.functions.select(&.has_tag?(:field))
+    branch = Branch.new(ctx, rt, rf, branch_cache, fields)
+    rf.func.body.try(&.accept(branch))
     
     unseen = branch.show_unseen_fields
     
-    Error.at func.ident,
+    Error.at rf.func.ident,
       "This constructor doesn't initialize all of its fields", unseen \
         unless unseen.empty?
   end
   
   class Branch < Mare::AST::Visitor
     getter ctx : Context
-    getter decl : Program::Type
-    getter func : Program::Function
-    getter branch_cache : Hash(Tuple(Set(String), Program::Function), Branch)
+    getter type : Infer::ReifiedType
+    getter func : Infer::ReifiedFunction
+    getter branch_cache : Hash(Tuple(Set(String), Infer::ReifiedFunction), Branch)
     getter all_fields : Array(Program::Function)
     getter seen_fields : Set(String)
     getter call_crumbs : Array(Source::Pos)
     def initialize(
       @ctx,
-      @decl,
+      @type,
       @func,
       @branch_cache,
       @all_fields,
@@ -53,13 +53,13 @@ module Mare::Compiler::Completeness
     
     def sub_branch(node : AST::Node)
       branch =
-        Branch.new(ctx, decl, func, branch_cache, all_fields,
+        Branch.new(ctx, type, func, branch_cache, all_fields,
           seen_fields.dup, call_crumbs.dup)
       node.accept(branch)
       branch
     end
     
-    def sub_branch(next_func : Program::Function, call_crumb : Source::Pos)
+    def sub_branch(next_func : Infer::ReifiedFunction, call_crumb : Source::Pos)
       # Use caching of function branches to prevent infinite recursion.
       # We cache by both seen_fields and func so that we don't combine
       # cached results for branch paths where the set of prior seen fields
@@ -68,10 +68,10 @@ module Mare::Compiler::Completeness
       cache_key = {seen_fields, next_func}
       branch_cache.fetch cache_key do
         branch_cache[cache_key] = branch =
-          Branch.new(ctx, decl, next_func, branch_cache, all_fields,
+          Branch.new(ctx, type, next_func, branch_cache, all_fields,
             seen_fields.dup, call_crumbs.dup)
         branch.call_crumbs << call_crumb
-        next_func.body.not_nil!.accept(branch)
+        next_func.func.body.not_nil!.accept(branch)
         branch
       end
     end
@@ -120,34 +120,34 @@ module Mare::Compiler::Completeness
     end
     
     def touch(node : AST::Identifier)
+      infer = ctx.infer[func]
+      
       # Ignore this identifier if it is not of the self.
-      ctx.infer.infers_for(func).each do |infer|
-        info = infer[node]?
-        next unless info.is_a?(Infer::Self)
+      info = infer[node]?
+      return unless info.is_a?(Infer::Self)
+      
+      # We only care about further analysis if not all fields are initialized.
+      return unless seen_fields.size < all_fields.size
+      
+      # This represents the self type as opaque, with no field access.
+      # We'll use this to guarantee that no usage of the current self object
+      # will require  any access to the fields of the object.
+      tag_self = Infer::MetaType.new(type, "tag")
+      
+      # Walk through each constraint imposed on the self in the earlier
+      # Infer pass that tracked all of those constraints.
+      info.domain_constraints.each do |pos, constraint|
+        # If tag will meet the constraint, then this use of the self is okay.
+        return if infer.is_subtype?(tag_self, constraint)
         
-        # We only care about further analysis if not all fields are initialized.
-        next unless seen_fields.size < all_fields.size
-        
-        # This represents the self type as opaque, with no field access.
-        # We'll use this to guarantee that no usage of the current self object
-        # will require  any access to the fields of the object.
-        tag_self = Infer::MetaType.new(infer.reified_type(@decl), "tag")
-        
-        # Walk through each constraint imposed on the self in the earlier
-        # Infer pass that tracked all of those constraints.
-        info.domain_constraints.each do |pos, constraint|
-          # If tag will meet the constraint, then this use of the self is okay.
-          next if infer.is_subtype?(tag_self, constraint)
-          
-          # Otherwise, we must raise an error.
-          Error.at node,
-            "This usage of `@` shares field access to the object" \
-            " from a constructor before all fields are initialized", [
-              {pos,
-                "if this constraint were specified as `tag` or lower" \
-                " it would not grant field access"}
-            ] + show_unseen_fields
-        end
+        # Otherwise, we must raise an error.
+        Error.at node,
+          "This usage of `@` shares field access to the object" \
+          " from a constructor before all fields are initialized", [
+            {pos,
+              "if this constraint were specified as `tag` or lower" \
+              " it would not grant field access"}
+          ] + show_unseen_fields
       end
     end
     
@@ -175,7 +175,9 @@ module Mare::Compiler::Completeness
         
         # Follow the method call in a new branch, and collect any field writes
         # seen in that branch as if they had been seen in this branch.
-        branch = sub_branch(decl.find_func!(func_name), node.pos)
+        next_f = type.defn.find_func!(func_name)
+        next_func = ctx.infer.for_func(ctx, type, next_f, next_f.cap.value).reified # TODO: reify with which cap?
+        branch = sub_branch(next_func, node.pos)
         seen_fields.concat(branch.seen_fields)
       end
     end

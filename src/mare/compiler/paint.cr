@@ -26,14 +26,12 @@ class Mare::Compiler::Paint
   
   def run(ctx)
     # Collect a mapping of the types that implement each function name.
-    ctx.program.types.each do |t|
-      t.functions.each do |f|
-        next if f.has_tag?(:hygienic)
-        next unless ctx.reach.reached_func?(f)
+    ctx.reach.each_type_def.each do |td|
+      td.each_function(ctx).each do |rf|
+        next unless ctx.reach.reached_func?(rf) # TODO: switch to each_reachable_function?
+        next if rf.func.has_tag?(:hygienic)
         
-        ctx.infer.infers_for(f).each do |infer|
-          observe_func(t, infer.reified)
-        end
+        observe_func(td.program_type, rf)
       end
     end
     

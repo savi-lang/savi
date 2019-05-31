@@ -14,7 +14,6 @@
 class Mare::Compiler::Infer < Mare::AST::Visitor
   def initialize
     @map = {} of ReifiedFunction => ForFunc
-    @mmap = {} of Program::Function => Array(ReifiedFunction)
     @types = {} of ReifiedType => ForType
   end
   
@@ -26,8 +25,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     main = ctx.program.find_type?("Main")
     if main
       f = main.find_func?("new")
-      main_rt = reified_type(ctx, main)
-      for_func(ctx, main_rt, f, f.cap.value).run if f
+      for_func(ctx, for_type(ctx, main).reified, f, f.cap.value).run if f
     end
     
     # For each function in the program, run with a new instance,
@@ -35,15 +33,15 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     # We probably reached most of them already by starting from Main.new,
     # so this second pass just takes care of typechecking unreachable functions.
     ctx.program.types.each do |t|
-      t.functions.each do |f|
-        rt = reified_type(ctx, t)
-        for_func(ctx, rt, f, f.cap.value).run
+      infer = for_type(ctx, t)
+      infer.reified.defn.functions.each do |f|
+        for_func(ctx, infer.reified, f, f.cap.value).run
       end
     end
-    ctx.program.types.each do |t|
-      rt = reified_type(ctx, t)
-      check_is_list(ctx, rt)
-    end
+    
+    # Check the "is" list for all types, to confirm that they implement the
+    # interfaces that they claim to have implemented in their declaration.
+    for_non_argumented_types.each(&.check_is_list)
   end
   
   def [](rf : ReifiedFunction)
@@ -54,26 +52,19 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     @map[rf]?
   end
   
-  def for_type(rt : ReifiedType)
+  def [](rt : ReifiedType)
     @types[rt]
   end
   
-  # TODO: Figure out how to remove this function
-  def reifieds_for(f : Program::Function)
-    @mmap[f]
+  def []?(rt : ReifiedType)
+    @types[rt]?
   end
   
-  # TODO: Figure out how to remove this function
-  def infers_for(f : Program::Function)
-    @mmap[f].map { |rf| @map[rf] }
-  end
-  
-  # TODO: Figure out how to remove this function
-  def single_infer_for(f : Program::Function)
-    list = @mmap[f]
-    raise "actually, there are #{list.size} infers for #{f.inspect}" \
-      unless list.size == 1
-    @map[list.first]
+  # This method is intended to be used in testing only.
+  def for_func_simple(ctx : Context, t_name : String, f_name : String) : ForFunc
+    t = ctx.program.find_type!(t_name)
+    f = t.find_func!(f_name)
+    for_func(ctx, for_type(ctx, t).reified, f, f.cap.value)
   end
   
   def for_func(
@@ -85,39 +76,31 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     mt = MetaType.new(rt, cap).strip_ephemeral
     rf = ReifiedFunction.new(rt, f, mt)
     @map[rf] ||= (
-      (@mmap[rf.func] ||= [] of ReifiedFunction) << rf
-      ForFunc.new(ctx, for_type(rt), rf)
+      ForFunc.new(ctx, for_type(ctx, rt.defn), rf)
+      .tap { |ff| self[rt].all_for_funcs.add(ff) }
     )
   end
   
-  def reified_type(
+  def for_type(
     ctx : Context,
     t : Program::Type,
     type_args : Array(MetaType) = [] of MetaType,
   )
     rt = ReifiedType.new(t, type_args)
     @types[rt] ||= ForType.new(ctx, rt)
-    rt
   end
   
-  def completely_reified_types
-    @types.keys.select(&.is_complete?).to_a
+  def for_completely_reified_types
+    @types.each_value.select(&.reified.is_complete?).to_a
   end
   
-  def check_is_list(ctx : Context, rt : ReifiedType)
-    rt.defn.functions.each do |f|
-      next unless f.has_tag?(:is)
-      
-      infer = for_func(ctx, rt, f, f.cap.value)
-      iface = infer.resolve(infer.ret).single!
-      
-      errors = [] of Error::Info
-      unless infer.is_subtype?(rt, iface, errors)
-        Error.at rt.defn.ident,
-          "This type doesn't implement the interface #{iface.defn.ident.value}",
-            errors
-      end
-    end
+  def for_non_argumented_types
+    # Skip fully-reified generic types - we will only check generics types
+    # that have been only partially reified and non-generic types.
+    @types
+    .each_value
+    .select { |ft| !(ft.reified.has_params? && ft.reified.is_complete?) }
+    .to_a
   end
   
   struct ReifiedType
@@ -146,6 +129,10 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     
     def inspect(io : IO)
       show_type(io)
+    end
+    
+    def has_params?
+      0 != (defn.params.try(&.terms.size) || 0)
     end
     
     def is_complete?
@@ -177,10 +164,28 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   class ForType
     getter ctx : Context
     getter reified : ReifiedType
+    getter all_for_funcs
     getter subtyping
     
     def initialize(@ctx, @reified)
+      @all_for_funcs = Set(ForFunc).new
       @subtyping = SubtypingInfo.new(@ctx, @reified)
+    end
+    
+    def check_is_list
+      reified.defn.functions.each do |f|
+        next unless f.has_tag?(:is)
+        
+        infer = ctx.infer.for_func(ctx, reified, f, f.cap.value)
+        iface = infer.resolve(infer.ret).single!
+        
+        errors = [] of Error::Info
+        unless infer.is_subtype?(reified, iface, errors)
+          Error.at reified.defn.ident,
+            "This type doesn't implement the interface #{iface.defn.ident.value}",
+              errors
+        end
+      end
     end
   end
   
@@ -233,7 +238,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       r : ReifiedType,
       errors = [] of Error::Info,
     ) : Bool
-      ctx.infer.for_type(l).subtyping.check(r, errors)
+      ctx.infer[l].subtyping.check(r, errors)
     end
     
     def is_subtype?(
@@ -493,7 +498,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
     
     def reified_type(*args)
-      ctx.infer.reified_type(ctx, *args)
+      ctx.infer.for_type(ctx, *args).reified
     end
     
     def redirect(from : AST::Node, to : AST::Node)
