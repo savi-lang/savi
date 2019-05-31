@@ -185,7 +185,6 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   class ForFunc < Mare::AST::Visitor
     getter ctx : Context
     getter reified : ReifiedFunction
-    getter params : Array(AST::Node) = [] of AST::Node
     getter! ret : AST::Node
     
     def initialize(@ctx : Context, @self_type : ReifiedType, @reified)
@@ -211,6 +210,10 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     
     def func
       reified.func
+    end
+    
+    def params
+      reified.func.params.try(&.terms) || ([] of AST::Node)
     end
     
     def refer
@@ -283,7 +286,6 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         params.accept(self)
         params.terms.each do |param|
           finish_param(param, self[param]) unless self[param].is_a?(Param)
-          @params << param
         end
       end
       
