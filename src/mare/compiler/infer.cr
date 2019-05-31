@@ -8,15 +8,14 @@
 # This pass does not mutate the Program topology.
 # This pass does not mutate the AST.
 # This pass may raise a compilation error.
-# This pass keeps state at the per-function level.
-# This pass produces output state at the per-function level.
+# This pass keeps state at the per-type and per-function level.
+# This pass produces output state at the per-type and per-function level.
 #
 class Mare::Compiler::Infer < Mare::AST::Visitor
   def initialize
     @map = {} of ReifiedFunction => ForFunc
     @mmap = {} of Program::Function => Array(ReifiedFunction)
-    @subtyping_info = {} of ReifiedType => SubtypingInfo
-    @rtset = Set(ReifiedType).new
+    @types = {} of ReifiedType => ForType
   end
   
   def run(ctx)
@@ -28,7 +27,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     if main
       f = main.find_func?("new")
       main_rt = reified_type(ctx, main)
-      infer_from(ctx, main_rt, f, MetaType.cap(f.cap.value)) if f
+      for_func(ctx, main_rt, f, f.cap.value).run if f
     end
     
     # For each function in the program, run with a new instance,
@@ -38,7 +37,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     ctx.program.types.each do |t|
       t.functions.each do |f|
         rt = reified_type(ctx, t)
-        infer_from(ctx, rt, f, MetaType.cap(f.cap.value))
+        for_func(ctx, rt, f, f.cap.value).run
       end
     end
     ctx.program.types.each do |t|
@@ -55,23 +54,21 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     @map[rf]?
   end
   
-  def subtyping_info_for(rt : ReifiedType)
-    @subtyping_info[rt]
+  def for_type(rt : ReifiedType)
+    @types[rt]
   end
   
-  private def add_infer(rf, infer)
-    @map[rf] = infer
-    (@mmap[rf.func] ||= [] of ReifiedFunction) << rf
-  end
-  
+  # TODO: Figure out how to remove this function
   def reifieds_for(f : Program::Function)
     @mmap[f]
   end
   
+  # TODO: Figure out how to remove this function
   def infers_for(f : Program::Function)
     @mmap[f].map { |rf| @map[rf] }
   end
   
+  # TODO: Figure out how to remove this function
   def single_infer_for(f : Program::Function)
     list = @mmap[f]
     raise "actually, there are #{list.size} infers for #{f.inspect}" \
@@ -79,18 +76,17 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     @map[list.first]
   end
   
-  def infer_from(
+  def for_func(
     ctx : Context,
     rt : ReifiedType,
     f : Program::Function,
-    cap : MetaType,
+    cap : String,
   )
-    mt = MetaType.new_nominal(rt).intersect(cap.strip_ephemeral)
+    mt = MetaType.new(rt, cap).strip_ephemeral
     rf = ReifiedFunction.new(rt, f, mt)
-    self[rf]? || (
-      ForFunc.new(ctx, rf)
-      .tap { |infer| add_infer(rf, infer) }
-      .tap(&.run)
+    @map[rf] ||= (
+      (@mmap[rf.func] ||= [] of ReifiedFunction) << rf
+      ForFunc.new(ctx, for_type(rt), rf)
     )
   end
   
@@ -100,23 +96,19 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     type_args : Array(MetaType) = [] of MetaType,
   )
     rt = ReifiedType.new(t, type_args)
-    return rt if @rtset.includes?(rt)
-    
-    @rtset.add(rt) # TODO: possible to remove in favor of subtyping_info.keys?
-    @subtyping_info[rt] = SubtypingInfo.new(ctx, rt)
-    
+    @types[rt] ||= ForType.new(ctx, rt)
     rt
   end
   
   def completely_reified_types
-    @rtset.select(&.is_complete?).to_a
+    @types.keys.select(&.is_complete?).to_a
   end
   
   def check_is_list(ctx : Context, rt : ReifiedType)
     rt.defn.functions.each do |f|
       next unless f.has_tag?(:is)
       
-      infer = infer_from(ctx, rt, f, MetaType.cap(f.cap.value))
+      infer = for_func(ctx, rt, f, f.cap.value)
       iface = infer.resolve(infer.ret).single!
       
       errors = [] of Error::Info
@@ -182,17 +174,29 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
   end
   
-  class ForFunc < Mare::AST::Visitor
+  class ForType
     getter ctx : Context
-    getter reified : ReifiedFunction
+    getter reified : ReifiedType
+    getter subtyping
     
     def initialize(@ctx, @reified)
+      @subtyping = SubtypingInfo.new(@ctx, @reified)
+    end
+  end
+  
+  class ForFunc < Mare::AST::Visitor
+    getter ctx : Context
+    getter for_type : ForType
+    getter reified : ReifiedFunction
+    
+    def initialize(@ctx, @for_type, @reified)
       @local_idents = Hash(Refer::Local, AST::Node).new
       @local_ident_overrides = Hash(AST::Node, AST::Node).new
       @info_table = Hash(AST::Node, Info).new
       @redirects = Hash(AST::Node, AST::Node).new
       @resolved = Hash(AST::Node, MetaType).new
       @called_funcs = Set({ReifiedType, Program::Function}).new
+      @already_ran = false
     end
     
     def [](node : AST::Node)
@@ -229,7 +233,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       r : ReifiedType,
       errors = [] of Error::Info,
     ) : Bool
-      ctx.infer.subtyping_info_for(l).check(r, errors)
+      ctx.infer.for_type(l).subtyping.check(r, errors)
     end
     
     def is_subtype?(
@@ -278,6 +282,9 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
     
     def run
+      return if @already_ran
+      @already_ran = true
+      
       # Complain if neither return type nor function body were specified.
       unless func.ret || func.body
         Error.at func.ident, \
@@ -334,6 +341,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       @info_table.each do |node, info|
         @resolved[node] ||= info.resolve!(self)
       end
+      
+      nil
     end
     
     def follow_call(call : FromCall)
@@ -361,7 +370,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       poss = [] of Source::Pos
       call_defns.each do |(call_mti, call_defn, call_func)|
         call_mt = MetaType.new(call_mti)
-        call_mt_cap = call_mt.cap_only
+        call_mt_cap = call_mt.cap_only.cap_value
         call_defn = call_defn.not_nil!
         call_func = call_func.not_nil!
         autorecover_needed = false
@@ -369,32 +378,34 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         # Keep track that we called this function.
         @called_funcs.add({call_defn, call_func})
         
-        # For box functions only, we reify with the actual cap on the caller side.
-        # For all other functions, we just use the cap from the func definition.
-        reify_cap =
-          call_func.cap.value == "box" \
-          ? call_mt_cap \
-          : MetaType.cap(call_func.cap.value)
-        
         # Enforce the capability restriction of the receiver.
-        if is_subtype?(call_mt_cap, MetaType.cap(call_func.cap.value))
-          # The capability restriction is met; carry on.
+        if is_subtype?(MetaType.cap(call_mt_cap), MetaType.cap(call_func.cap.value))
+          # For box functions only, we reify with the actual cap on the caller side.
+          # For all other functions, we just use the cap from the func definition.
+          reify_cap = call_func.cap.value == "box" ? call_mt_cap : call_func.cap.value
         elsif call_func.has_tag?(:constructor)
-          # Constructor calls ignore cap of the original receiver; carry on.
-        elsif is_subtype?(call_mt_cap.ephemeralize, MetaType.cap(call_func.cap.value))
-          call_mt_cap = call_mt_cap.ephemeralize
-          reify_cap = MetaType.cap(call_func.cap.value)
+          # Constructor calls ignore cap of the original receiver.
+          reify_cap = call_func.cap.value
+        elsif is_subtype?(MetaType.cap(call_mt_cap).ephemeralize, MetaType.cap(call_func.cap.value))
+          # We failed, but we may be able to use auto-recovery.
+          # Take note of this and we'll finish the auto-recovery checks later.
           autorecover_needed = true
+          # For auto-recovered calls, always use the cap of the func definition.
+          reify_cap = call_func.cap.value
         else
+          # We failed entirely; note the problem and carry on.
           problems << {call_func.cap,
             "the type #{call_mti.inspect} isn't a subtype of the " \
             "required capability of '#{call_func.cap.value}'"}
+          # We already failed subtyping for the receiver cap, but pretend
+          # for now that we didn't for the sake of further checks.
+          reify_cap = call_func.cap.value
         end
         
         # Get the ForFunc instance for call_func, possibly creating and running it.
         # TODO: don't infer anything in the body of that func if type and params
         # were explicitly specified in the function signature.
-        infer = ctx.infer.infer_from(ctx, call_defn, call_func, reify_cap)
+        infer = ctx.infer.for_func(ctx, call_defn, call_func, reify_cap).tap(&.run)
         
         # Apply parameter constraints to each of the argument types.
         # TODO: handle case where number of args differs from number of params.
@@ -466,7 +477,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       @called_funcs.add({reified.type, field_func})
       
       # Get the ForFunc instance for field_func, possibly creating and running it.
-      infer = ctx.infer.infer_from(ctx, reified.type, field_func, resolved_self_cap)
+      infer = ctx.infer.for_func(ctx, reified.type, field_func, resolved_self_cap_value).tap(&.run)
       
       # Apply constraints to the return type.
       ret = infer[infer.ret]
@@ -475,10 +486,6 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     
     def resolved_self_cap_value
       func.has_tag?(:constructor) ? "ref" : reified.receiver_cap_value
-    end
-    
-    def resolved_self_cap
-      MetaType.cap(resolved_self_cap_value)
     end
     
     def resolved_self

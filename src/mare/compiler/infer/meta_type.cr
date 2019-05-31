@@ -301,4 +301,8 @@ struct Mare::Compiler::Infer::MetaType
   def show_type
     @inner.inspect
   end
+  
+  def cap_value
+    @inner.as(Capability).name
+  end
 end
