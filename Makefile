@@ -20,7 +20,7 @@ test.inner: PHONY /tmp/bin/spec
 # Compile and run the mare binary in the `example` subdirectory.
 example: PHONY
 	docker exec -ti mare-dev make extra_args="$(extra_args)" example/main
-	echo && docker exec -ti mare-dev example/main
+	echo && docker exec -ti mare-dev example/main || true
 example-lldb: PHONY
 	docker exec -ti mare-dev make extra_args="$(extra_args)" example/main
 	echo && lldb -o run -- example/main # TODO: run this within docker when alpine supports lldb package outside of edge
