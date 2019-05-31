@@ -2,6 +2,8 @@
 
 <a href="https://openclipart.org/detail/191499/horse"><img alt="The ungui-angui-pede, a mascot for Mare" src="https://openclipart.org/download/191499/1393759624.svg" width="100px" /></a>
 
+[![CircleCI](https://circleci.com/gh/jemc/mare.svg?style=svg)](https://circleci.com/gh/jemc/mare)
+
 Mare is a reimagining of the [Pony](https://www.ponylang.io/) language.
 
 The goal is to create a language with all the desirable features of Pony, while simultaneously being more approachable to newcomers and more extensible for power users.
