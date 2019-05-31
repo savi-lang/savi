@@ -83,8 +83,9 @@ struct Mare::Compiler::Infer::MetaType::Capability
   def unite(other : Capability)
     return self if self == other
     
-    # TODO: Implement the rest of this method:
-    raise NotImplementedError.new("#{self} | #{other}")
+    # We explicitly do not wish to combine capabilities here like we do in
+    # the intersect method, even if they are overlapping.
+    Union.new([self, other].to_set)
   end
   
   def unite(other : (Nominal | AntiNominal | Intersection | Union))

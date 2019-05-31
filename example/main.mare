@@ -25,7 +25,7 @@
 :primitive Generic (A non)
   :fun get A: A
 
-:class Container (A val)
+:class Container (A (val|ref))
   :prop value A
   :new (@value)
 
@@ -58,7 +58,7 @@
   
   :fun say_stuff (greeting Greeting)
     pre_greeting = Container(String).new("[pre greeting]")
-    sentence_source = ^(Sentence.new(^1))
+    sentence_source = ^(Container(Sentence).new(Sentence.new(^1)).value)
     sentence = sentence_source.call(pre_greeting.value)
     LibC.puts(sentence.text.cpointer)
     sentence.text = greeting.hello
