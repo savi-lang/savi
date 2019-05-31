@@ -14,6 +14,8 @@ struct Mare::Compiler::Infer::MetaType::Capability
   TAG     = new("tag");  def self.tag;     TAG     end
   NON     = new("non");  def self.non;     NON     end
   
+  ALL_NON_EPH = [ISO, TRN, REF, VAL, BOX, TAG, NON]
+  
   def inspect(io : IO)
     io << name
   end
@@ -51,20 +53,19 @@ struct Mare::Compiler::Infer::MetaType::Capability
   end
   
   def intersect(other : Capability)
+    raise "unsupported intersect: #{self} & #{other}" \
+      unless ALL_NON_EPH.includes?(self) && ALL_NON_EPH.includes?(other)
+    
+    # If the two are equivalent, return the cap.
     return self if self == other
     
     # If one cap is a subtype of the other cap, return the subtype because
-    # it is the most specific type of the two. Note that if they are
-    # equivalent, it doesn't matter which we return here, but we'll return it.
+    # it is the most specific type of the two.
     return self if self.subtype_of?(other)
     return other if other.subtype_of?(self)
     
-    # If we reach this point, it's because we're dealing with `ref` and `val`.
-    # Assert that this is the case, just for sanity's sake, then we will
-    # return the `trn` capability, since it is the nearest subtype of both.
-    raise "expected `ref` and `val`, but was `#{self}` and `#{other}`" \
-      unless (REF == self && VAL == other) || (VAL == self && REF == other)
-    TRN
+    # If the two are unrelated by subtyping, this intersection is unsatisfiable.
+    Unsatisfiable.instance
   end
   
   def intersect(other : (Nominal | AntiNominal | Intersection | Union))

@@ -1,8 +1,20 @@
 describe Mare::Compiler::Infer::MetaType do
+  # For convenience, alias each capability here by name.
+  iso     = Mare::Compiler::Infer::MetaType::Capability::ISO
+  iso_eph = Mare::Compiler::Infer::MetaType::Capability::ISO_EPH
+  trn     = Mare::Compiler::Infer::MetaType::Capability::TRN
+  trn_eph = Mare::Compiler::Infer::MetaType::Capability::TRN_EPH
+  ref     = Mare::Compiler::Infer::MetaType::Capability::REF
+  val     = Mare::Compiler::Infer::MetaType::Capability::VAL
+  box     = Mare::Compiler::Infer::MetaType::Capability::BOX
+  tag     = Mare::Compiler::Infer::MetaType::Capability::TAG
+  non     = Mare::Compiler::Infer::MetaType::Capability::NON
+  no      = Mare::Compiler::Infer::MetaType::Unsatisfiable::INSTANCE
+  
   it "implements logical operators that keep the expression in DNF form" do
     new_type = ->(s : String, is_abstract : Bool) {
-      ref = Mare::AST::Identifier.new("ref")
-      t = Mare::Program::Type.new(ref, Mare::AST::Identifier.new(s))
+      ref_ident = Mare::AST::Identifier.new("ref")
+      t = Mare::Program::Type.new(ref_ident, Mare::AST::Identifier.new(s))
       t.add_tag(:abstract) if is_abstract
       m = Mare::Compiler::Infer::MetaType.new_nominal(
         Mare::Compiler::Infer::ReifiedType.new(t)
@@ -140,16 +152,6 @@ describe Mare::Compiler::Infer::MetaType do
   end
   
   it "implements the correct table for non-extracting viewpoint adaptation" do
-    iso     = Mare::Compiler::Infer::MetaType::Capability::ISO
-    iso_eph = Mare::Compiler::Infer::MetaType::Capability::ISO_EPH
-    trn     = Mare::Compiler::Infer::MetaType::Capability::TRN
-    trn_eph = Mare::Compiler::Infer::MetaType::Capability::TRN_EPH
-    ref     = Mare::Compiler::Infer::MetaType::Capability::REF
-    val     = Mare::Compiler::Infer::MetaType::Capability::VAL
-    box     = Mare::Compiler::Infer::MetaType::Capability::BOX
-    tag     = Mare::Compiler::Infer::MetaType::Capability::TAG
-    non     = Mare::Compiler::Infer::MetaType::Capability::NON
-    
     # See George Steed's paper, "A Principled Design of Capabilities in Pony":
     # > https://www.imperial.ac.uk/media/imperial-college/faculty-of-engineering/computing/public/GeorgeSteed.pdf
     
@@ -175,16 +177,6 @@ describe Mare::Compiler::Infer::MetaType do
   end
   
   it "implements the correct table for extracting viewpoint adaptation" do
-    iso     = Mare::Compiler::Infer::MetaType::Capability::ISO
-    iso_eph = Mare::Compiler::Infer::MetaType::Capability::ISO_EPH
-    trn     = Mare::Compiler::Infer::MetaType::Capability::TRN
-    trn_eph = Mare::Compiler::Infer::MetaType::Capability::TRN_EPH
-    ref     = Mare::Compiler::Infer::MetaType::Capability::REF
-    val     = Mare::Compiler::Infer::MetaType::Capability::VAL
-    box     = Mare::Compiler::Infer::MetaType::Capability::BOX
-    tag     = Mare::Compiler::Infer::MetaType::Capability::TAG
-    non     = Mare::Compiler::Infer::MetaType::Capability::NON
-    
     # See George Steed's paper, "A Principled Design of Capabilities in Pony":
     # > https://www.imperial.ac.uk/media/imperial-college/faculty-of-engineering/computing/public/GeorgeSteed.pdf
     
@@ -201,6 +193,26 @@ describe Mare::Compiler::Infer::MetaType do
       columns.zip(results).each do |column, result|
         actual = column.extracted_from(origin)
         {origin, column, actual}.should eq({origin, column, result})
+      end
+    end
+  end
+  
+  it "correctly intersects capabilities" do
+    columns = {iso, trn, ref, val, box, tag, non}
+    rows = {
+      iso =>  {iso, no,  no,  no,  no,  iso, iso},
+      trn =>  {no,  trn, no,  no,  trn, trn, trn},
+      ref =>  {no,  no,  ref, no,  ref, ref, ref},
+      val =>  {no,  no,  no,  val, val, val, val},
+      box =>  {no,  trn, ref, val, box, box, box},
+      tag =>  {iso, trn, ref, val, box, tag, tag},
+      non =>  {iso, trn, ref, val, box, tag, non},
+    }
+    
+    rows.each do |left, results|
+      columns.zip(results).each do |right, result|
+        actual = left.intersect(right)
+        {left, right, actual}.should eq({left, right, result})
       end
     end
   end

@@ -144,9 +144,9 @@ class Mare::Compiler::Infer
       Error.at self, "This needs an explicit type; it could not be inferred" \
         if @upstream.nil?
       
-      upstream = infer[@upstream.not_nil!].resolve!(infer)
+      upstream = infer[@upstream.not_nil!].resolve!(infer).strip_ephemeral
       upstream = upstream.intersect(explicit).override_cap(explicit) if explicit
-      upstream.strip_ephemeral
+      upstream
     end
     
     def set_explicit(explicit_pos : Source::Pos, explicit : MetaType)
