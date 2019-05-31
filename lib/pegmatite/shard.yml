@@ -1,0 +1,9 @@
+name: pegmatite
+version: 0.1.0
+
+authors:
+  - Joe Eli McIlvain <joe.eli.mac@gmail.com>
+
+crystal: 0.26.1
+
+license: MPLv2
