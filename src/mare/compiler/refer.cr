@@ -14,7 +14,7 @@
 #
 class Mare::Compiler::Refer < Mare::AST::Visitor
   def initialize
-    @map = {} of Program::Function => ForFunc
+    @map = {} of Program::Type => ForType
   end
   
   def run(ctx)
@@ -35,23 +35,43 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
     # For each type in the program, delve into type parameters and functions.
     ctx.program.types.each do |t|
       t_decl = Decl.new(t)
-      use_decls = decls
+      @map[t] = ForType.new(t_decl, decls).tap(&.run)
+    end
+  end
+  
+  def [](t : Program::Type) : ForType
+    @map[t]
+  end
+  
+  def []?(t : Program::Type) : ForType
+    @map[t]?
+  end
+  
+  class ForType
+    getter decl
+    getter decls
+    
+    def initialize(
+      @decl : Decl,
+      @decls : Hash(String, Decl | DeclAlias | DeclParam),
+    )
+      @map = {} of Program::Function => ForFunc
       
       # If the type has type parameters, add those to the decls map.
-      if t.params
-        use_decls = decls.dup
+      if decl.defn.params
+        @decls = @decls.dup
         
-        t.params.not_nil!.terms.each_with_index do |param, index|
+        decl.defn.params.not_nil!.terms.each_with_index do |param, index|
           decl_param =
             case param
             when AST::Identifier
-              DeclParam.new(t, index, param, nil)
+              DeclParam.new(decl.defn, index, param, nil)
             when AST::Group
               raise NotImplementedError.new(param) \
                 unless param.terms.size == 2 && param.style == " "
               
               DeclParam.new(
-                t,
+                decl.defn,
                 index,
                 param.terms.first.as(AST::Identifier),
                 param.terms.last.as(AST::Term),
@@ -60,34 +80,33 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
               raise NotImplementedError.new(param)
             end
           
-          use_decls[decl_param.ident.value] = decl_param
+          @decls[decl_param.ident.value] = decl_param
         end
       end
-      
-      # For each function in the program, run with a new instance.
-      t.functions.each do |f|
-        ForFunc.new(t_decl, use_decls)
+    end
+    
+    def [](f : Program::Function) : ForFunc
+      @map[f]
+    end
+    
+    def []?(f : Program::Function) : ForFunc
+      @map[f]?
+    end
+    
+    def run
+      # For each function in the program, run with a new ForFunc instance.
+      @decl.defn.functions.each do |f|
+        ForFunc.new(self)
         .tap { |refer| @map[f] = refer }
         .tap(&.run(f))
       end
     end
   end
   
-  def [](f : Program::Function)
-    @map[f]
-  end
-  
-  def []?(f : Program::Function)
-    @map[f]?
-  end
-  
   class ForFunc
     property param_count = 0
     
-    def initialize(
-      @self_decl : Decl,
-      @decls : Hash(String, Decl | DeclAlias | DeclParam),
-    )
+    def initialize(@for_type : ForType)
       @infos = {} of AST::Node => Info
     end
     
@@ -104,18 +123,18 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
     end
     
     def decl(name)
-      return @self_decl if name == "@"
-      @decls[name]
+      return @for_type.decl if name == "@"
+      @for_type.decls[name]
     end
     
     def decl?(name)
-      return @self_decl if name == "@"
-      @decls[name]?
+      return @for_type.decl if name == "@"
+      @for_type.decls[name]?
     end
     
     def decl_defn(name) : Program::Type
-      return @self_decl.final_decl.defn if name == "@"
-      decl = @decls[name]
+      return @for_type.decl.final_decl.defn if name == "@"
+      decl = @for_type.decls[name]
       case decl
       when Decl, DeclAlias then decl.final_decl.defn
       else raise NotImplementedError.new(decl)
@@ -125,7 +144,7 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
     def run(func)
       root = Branch.new(self)
       
-      @self_decl.defn.params.try(&.accept(root))
+      @for_type.decl.defn.params.try(&.accept(root))
       func.params.try(&.accept(root))
       func.ret.try(&.accept(root))
       func.body.try(&.accept(root))

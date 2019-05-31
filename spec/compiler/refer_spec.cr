@@ -12,8 +12,9 @@ describe Mare::Compiler::Refer do
     
     ctx = Mare::Compiler.compile([source], :refer)
     
-    func = ctx.program.find_func!("Main", "new")
-    refer = ctx.refer[func]
+    main = ctx.program.find_type!("Main")
+    func = main.find_func!("new")
+    refer = ctx.refer[main][func]
     x = func
       .body.not_nil!
       .terms.first.as(Mare::AST::Group)
@@ -42,8 +43,9 @@ describe Mare::Compiler::Refer do
     
     ctx = Mare::Compiler.compile([source], :refer)
     
-    func = ctx.program.find_func!("Main", "new")
-    refer = ctx.refer[func]
+    main = ctx.program.find_type!("Main")
+    func = main.find_func!("new")
+    refer = ctx.refer[main][func]
     choice_outer = func
       .body.not_nil!
       .terms.first.as(Mare::AST::Group)

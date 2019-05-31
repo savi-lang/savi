@@ -214,7 +214,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
     
     def refer
-      ctx.refer[func]
+      ctx.refer[reified.type.defn][reified.func]
     end
     
     def is_subtype?(

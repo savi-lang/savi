@@ -129,6 +129,10 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       @reified
     end
     
+    def refer(ctx)
+      ctx.refer[@reified.defn]
+    end
+    
     def program_type
       @reified.defn
     end
