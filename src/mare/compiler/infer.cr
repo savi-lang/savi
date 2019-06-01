@@ -32,10 +32,13 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     # unless that function has already been reached with an infer instance.
     # We probably reached most of them already by starting from Main.new,
     # so this second pass just takes care of typechecking unreachable functions.
+    # This is also where we take care of typechecking for unused partial
+    # reifications of all generic type parameters.
     ctx.program.types.each do |t|
-      infer = for_type(ctx, t)
-      infer.reified.defn.functions.each do |f|
-        for_func(ctx, infer.reified, f, f.cap.value).run
+      for_type_each_partial_reification(ctx, t).each do |infer_type|
+        infer_type.reified.defn.functions.each do |f|
+          for_func(ctx, infer_type.reified, f, f.cap.value).run
+        end
       end
     end
     
@@ -60,6 +63,15 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     @types[rt]?
   end
   
+  def for_type_each_partial_reification(ctx, t : Program::Type)
+    no_args = for_type(ctx, t)
+    return [no_args] if 0 == (t.params.try(&.terms.size) || 0)
+    
+    # TODO: Implement this logic
+    
+    [no_args]
+  end
+  
   # This method is intended to be used in testing only.
   def for_func_simple(ctx : Context, t_name : String, f_name : String) : ForFunc
     t = ctx.program.find_type!(t_name)
@@ -76,7 +88,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     mt = MetaType.new(rt, cap).strip_ephemeral
     rf = ReifiedFunction.new(rt, f, mt)
     @map[rf] ||= (
-      ForFunc.new(ctx, for_type(ctx, rt.defn), rf)
+      ForFunc.new(ctx, self[rt], rf)
       .tap { |ff| self[rt].all_for_funcs.add(ff) }
     )
   end
@@ -186,6 +198,84 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
               errors
         end
       end
+    end
+    
+    def reified_type(*args)
+      ctx.infer.for_type(ctx, *args).reified
+    end
+    
+    def lookup_type_param(ref : Refer::DeclParam, refer, receiver = nil)
+      raise NotImplementedError.new(ref) unless ref.parent == reified.defn
+      
+      # Lookup the type parameter on self type and return the arg if present
+      arg = reified.args[ref.index]?
+      return arg if arg
+      
+      # TODO: For unconstrained types, reify with each possible cap in turn.
+      raise NotImplementedError.new("type param without constraint") \
+        unless ref.constraint
+      
+      # Return the type parameter intersected with its constraint.
+      # TODO: When constraint has multiple caps, reify with each possible cap.
+      type_expr(ref.constraint.not_nil!, refer, receiver)
+      .intersect(MetaType.new_type_param(ref))
+    end
+    
+    # An identifier type expression must refer to a type.
+    def type_expr(node : AST::Identifier, refer, receiver = nil) : MetaType
+      ref = refer[node]
+      case ref
+      when Refer::Self
+        receiver || MetaType.new(reified)
+      when Refer::Decl, Refer::DeclAlias
+        MetaType.new(reified_type(ref.final_decl.defn))
+      when Refer::DeclParam
+        lookup_type_param(ref, refer, receiver)
+      when Refer::Unresolved
+        case node.value
+        when "iso", "trn", "val", "ref", "box", "tag", "non"
+          MetaType.new(MetaType::Capability.new(node.value))
+        else
+          Error.at node, "This type couldn't be resolved"
+        end
+      else
+        raise NotImplementedError.new(ref.inspect)
+      end
+    end
+    
+    # An relate type expression must be an explicit capability qualifier.
+    def type_expr(node : AST::Relate, refer, receiver = nil) : MetaType
+      if node.op.value == "'"
+        cap = node.rhs.as(AST::Identifier).value
+        if cap == "alias"
+          type_expr(node.lhs, refer, receiver).alias
+        else
+          type_expr(node.lhs, refer, receiver).override_cap(cap)
+        end
+      elsif node.op.value == "->"
+        type_expr(node.rhs, refer, receiver).viewed_from(type_expr(node.lhs, refer, receiver))
+      elsif node.op.value == "+>"
+        type_expr(node.rhs, refer, receiver).extracted_from(type_expr(node.lhs, refer, receiver))
+      else
+        raise NotImplementedError.new(node.to_a.inspect)
+      end
+    end
+    
+    # A "|" group must be a union of type expressions, and a "(" group is
+    # considered to be just be a single parenthesized type expression (for now).
+    def type_expr(node : AST::Group, refer, receiver = nil) : MetaType
+      if node.style == "|"
+        MetaType.new_union(node.terms.map { |t| type_expr(t, refer, receiver).as(MetaType) }) # TODO: is it possible to remove this superfluous "as"?
+      elsif node.style == "(" && node.terms.size == 1
+        type_expr(node.terms.first, refer, receiver)
+      else
+        raise NotImplementedError.new(node.to_a.inspect)
+      end
+    end
+    
+    # All other AST nodes are unsupported as type expressions.
+    def type_expr(node : AST::Node, refer, receiver = nil) : MetaType
+      raise NotImplementedError.new(node.to_a)
     end
   end
   
@@ -498,7 +588,15 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
     
     def reified_type(*args)
-      ctx.infer.for_type(ctx, *args).reified
+      @for_type.reified_type(*args)
+    end
+    
+    def lookup_type_param(ref)
+      @for_type.lookup_type_param(ref, refer, reified.receiver)
+    end
+    
+    def type_expr(node)
+      @for_type.type_expr(node, refer, reified.receiver)
     end
     
     def redirect(from : AST::Node, to : AST::Node)
@@ -526,23 +624,6 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       node
     end
     
-    def lookup_type_param(ref : Refer::DeclParam)
-      raise NotImplementedError.new(ref) unless ref.parent == reified.type.defn
-      
-      # Lookup the type parameter on self type and return the arg if present
-      arg = reified.type.args[ref.index]?
-      return arg if arg
-      
-      # TODO: For unconstrained types, reify with each possible cap in turn.
-      raise NotImplementedError.new("type param without constraint") \
-        unless ref.constraint
-      
-      # Return the type parameter intersected with its constraint.
-      # TODO: When constraint has multiple caps, reify with each possible cap.
-      type_expr(ref.constraint.not_nil!)
-      .intersect(MetaType.new_type_param(ref))
-    end
-    
     # Don't visit the children of a type expression root node
     def visit_children?(node)
       !Classify.type_expr?(node)
@@ -562,63 +643,6 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         if Classify.value_needed?(node) && self[node]? == nil
       
       node
-    end
-    
-    # An identifier type expression must refer to a type.
-    def type_expr(node : AST::Identifier) : MetaType
-      ref = refer[node]
-      case ref
-      when Refer::Self
-        reified.receiver
-      when Refer::Decl, Refer::DeclAlias
-        MetaType.new(reified_type(ref.final_decl.defn))
-      when Refer::DeclParam
-        lookup_type_param(ref)
-      when Refer::Unresolved
-        case node.value
-        when "iso", "trn", "val", "ref", "box", "tag", "non"
-          MetaType.new(MetaType::Capability.new(node.value))
-        else
-          Error.at node, "This type couldn't be resolved"
-        end
-      else
-        raise NotImplementedError.new(ref.inspect)
-      end
-    end
-    
-    # An relate type expression must be an explicit capability qualifier.
-    def type_expr(node : AST::Relate) : MetaType
-      if node.op.value == "'"
-        cap = node.rhs.as(AST::Identifier).value
-        if cap == "alias"
-          type_expr(node.lhs).alias
-        else
-          type_expr(node.lhs).override_cap(cap)
-        end
-      elsif node.op.value == "->"
-        type_expr(node.rhs).viewed_from(type_expr(node.lhs))
-      elsif node.op.value == "+>"
-        type_expr(node.rhs).extracted_from(type_expr(node.lhs))
-      else
-        raise NotImplementedError.new(node.to_a.inspect)
-      end
-    end
-    
-    # A "|" group must be a union of type expressions, and a "(" group is
-    # considered to be just be a single parenthesized type expression (for now).
-    def type_expr(node : AST::Group) : MetaType
-      if node.style == "|"
-        MetaType.new_union(node.terms.map { |t| type_expr(t).as(MetaType) }) # TODO: is it possible to remove this superfluous "as"?
-      elsif node.style == "(" && node.terms.size == 1
-        type_expr(node.terms.first)
-      else
-        raise NotImplementedError.new(node.to_a.inspect)
-      end
-    end
-    
-    # All other AST nodes are unsupported as type expressions.
-    def type_expr(node : AST::Node) : MetaType
-      raise NotImplementedError.new(node.to_a)
     end
     
     def touch(node : AST::Identifier)
