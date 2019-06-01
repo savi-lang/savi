@@ -138,6 +138,11 @@ struct Mare::Compiler::Infer::MetaType::Nominal
     self # no effect
   end
   
+  def partial_reifications
+    # Intersect with every possible non-ephemeral cap.
+    Capability::ALL_NON_EPH.map(&.intersect(self)).to_set
+  end
+  
   def is_sendable?
     # An nominal is never itself sendable -
     # it specifies a single nominal, and says nothing about capabilities.

@@ -333,6 +333,13 @@ struct Mare::Compiler::Infer::MetaType::Union
     )
   end
   
+  def partial_reifications
+    # Intersect with every possible non-ephemeral cap.
+    Capability::ALL_NON_EPH.map(&.intersect(self))
+    .reject(&.is_a?(Unsatisfiable))
+    .to_set
+  end
+  
   def is_sendable?
     return caps.not_nil!.all?(&.is_sendable?) if caps
     false

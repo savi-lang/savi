@@ -119,6 +119,10 @@ struct Mare::Compiler::Infer::MetaType
     MetaType.new(inner.alias)
   end
   
+  def partial_reifications
+    inner.partial_reifications.map { |i| MetaType.new(i) }
+  end
+  
   def is_sendable? : Bool
     inner.is_sendable?
   end

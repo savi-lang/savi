@@ -184,6 +184,10 @@ struct Mare::Compiler::Infer::MetaType::Capability
     end
   end
   
+  def partial_reifications
+    [self]
+  end
+  
   def is_sendable?
     case self
     when ISO_EPH, TRN_EPH

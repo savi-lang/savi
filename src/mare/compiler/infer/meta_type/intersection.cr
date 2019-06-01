@@ -265,6 +265,15 @@ struct Mare::Compiler::Infer::MetaType::Intersection
     Intersection.new(cap.try(&.alias), terms, anti_terms)
   end
   
+  def partial_reifications
+    # If this intersection already has a capability, it can't be divided into
+    # any further capability possibilities, so just return it now.
+    return [self] if cap
+    
+    # Otherwise, we need to intersect with every possible non-ephemeral cap.
+    Capability::ALL_NON_EPH.map(&.intersect(self)).to_set
+  end
+  
   def is_sendable?
     cap.try(&.is_sendable?) || false
   end

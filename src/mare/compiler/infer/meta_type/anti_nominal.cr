@@ -119,6 +119,11 @@ struct Mare::Compiler::Infer::MetaType::AntiNominal
     self # no effect
   end
   
+  def partial_reifications
+    # Intersect with every possible non-ephemeral cap.
+    Capability::ALL_NON_EPH.map(&.intersect(self)).to_set
+  end
+  
   def is_sendable?
     # An anti-nominal is never itself sendable -
     # it excludes a single nominal, and says nothing about capabilities.
