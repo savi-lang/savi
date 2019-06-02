@@ -20,14 +20,6 @@ struct Mare::Compiler::Infer::MetaType::Capability
     io << name
   end
   
-  def hash : UInt64
-    name.hash
-  end
-  
-  def ==(other)
-    other.is_a?(Capability) && name == other.name
-  end
-  
   def each_reachable_defn : Iterator(Infer::ReifiedType)
     ([] of Infer::ReifiedType).each
   end

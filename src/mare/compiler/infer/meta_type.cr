@@ -290,14 +290,6 @@ struct Mare::Compiler::Infer::MetaType
     @inner.any_callable_func_defn_type(name)
   end
   
-  def ==(other)
-    @inner == other.inner
-  end
-  
-  def hash
-    @inner.hash
-  end
-  
   def show
     "it must be a subtype of #{show_type}"
   end

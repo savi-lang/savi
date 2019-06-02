@@ -12,14 +12,6 @@ struct Mare::Compiler::Infer::MetaType::AntiNominal
     io << "'any"
   end
   
-  def hash : UInt64
-    self.class.hash ^ defn.hash
-  end
-  
-  def ==(other)
-    other.is_a?(AntiNominal) && defn == other.defn
-  end
-  
   def each_reachable_defn : Iterator(Infer::ReifiedType)
     [defn].each # TODO: is an anti-nominal actually reachable?
   end

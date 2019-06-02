@@ -13,14 +13,6 @@ class Mare::Compiler::Infer::MetaType::Unconstrained
     io << "<unconstrained>"
   end
   
-  def hash : UInt64
-    self.class.hash
-  end
-  
-  def ==(other)
-    other.is_a?(Unconstrained)
-  end
-  
   def each_reachable_defn : Iterator(Infer::ReifiedType)
     ([] of Infer::ReifiedType).each
   end

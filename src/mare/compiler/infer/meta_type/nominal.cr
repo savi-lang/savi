@@ -33,14 +33,6 @@ struct Mare::Compiler::Infer::MetaType::Nominal
     end
   end
   
-  def hash : UInt64
-    defn.hash
-  end
-  
-  def ==(other)
-    other.is_a?(Nominal) && defn == other.defn
-  end
-  
   def each_reachable_defn : Iterator(Infer::ReifiedType)
     defn = defn()
     defn.is_a?(Infer::ReifiedType) ? [defn].each : ([] of Infer::ReifiedType).each

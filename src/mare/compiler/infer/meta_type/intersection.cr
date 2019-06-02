@@ -65,20 +65,6 @@ struct Mare::Compiler::Infer::MetaType::Intersection
     io << ")"
   end
   
-  def hash : UInt64
-    hash = cap.hash
-    hash ^= (terms.not_nil!.hash * 31) if terms
-    hash ^= (anti_terms.not_nil!.hash * 63) if anti_terms
-    hash
-  end
-  
-  def ==(other)
-    other.is_a?(Intersection) &&
-    cap == other.cap &&
-    terms == other.terms &&
-    anti_terms == other.anti_terms
-  end
-  
   def each_reachable_defn : Iterator(Infer::ReifiedType)
     iter = ([] of Infer::ReifiedType).each
     iter = iter.chain(terms.not_nil!.each.map(&.defn).select(&.is_a?(Infer::ReifiedType)).map(&.as(Infer::ReifiedType))) if terms

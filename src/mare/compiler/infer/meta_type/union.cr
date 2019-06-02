@@ -74,23 +74,6 @@ struct Mare::Compiler::Infer::MetaType::Union
     io << ")"
   end
   
-  def hash : UInt64
-    hash = self.class.hash
-    hash ^= caps.not_nil!.hash if caps
-    hash ^= (terms.not_nil!.hash * 15) if terms
-    hash ^= (anti_terms.not_nil!.hash * 31) if anti_terms
-    hash ^= (intersects.not_nil!.hash * 63) if intersects
-    hash
-  end
-  
-  def ==(other)
-    other.is_a?(Union) &&
-    caps == other.caps &&
-    terms == other.terms &&
-    anti_terms == other.anti_terms &&
-    intersects == other.intersects
-  end
-  
   def each_reachable_defn : Iterator(Infer::ReifiedType)
     iter = ([] of Infer::ReifiedType).each
     iter = iter.chain(terms.not_nil!.each.map(&.defn).select(&.is_a?(Infer::ReifiedType)).map(&.as(Infer::ReifiedType))) if terms

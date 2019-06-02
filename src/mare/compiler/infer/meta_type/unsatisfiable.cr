@@ -13,14 +13,6 @@ class Mare::Compiler::Infer::MetaType::Unsatisfiable
     io << "<unsatisfiable>"
   end
   
-  def hash : UInt64
-    self.class.hash
-  end
-  
-  def ==(other)
-    other.is_a?(Unsatisfiable)
-  end
-  
   def each_reachable_defn : Iterator(Infer::ReifiedType)
     ([] of Infer::ReifiedType).each
   end
