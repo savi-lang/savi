@@ -1320,4 +1320,78 @@ describe Mare::Compiler::Infer do
       Mare::Compiler.compile([source], :infer)
     end
   end
+  
+  it "complains when too many type arguments are provided" do
+    source = Mare::Source.new "(example)", <<-SOURCE
+    :class Generic (P1, P2)
+    
+    :actor Main
+      :new
+        Generic(String, String, String, String)
+    SOURCE
+    
+    expected = <<-MSG
+    This type qualification has too many type arguments:
+    from (example):5:
+        Generic(String, String, String, String)
+        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    
+    - 2 type arguments were expected:
+      from (example):1:
+    :class Generic (P1, P2)
+                   ^~~~~~~~
+    
+    - this is an excessive type argument:
+      from (example):5:
+        Generic(String, String, String, String)
+                                ^~~~~~
+    
+    - this is an excessive type argument:
+      from (example):5:
+        Generic(String, String, String, String)
+                                        ^~~~~~
+    MSG
+    
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :infer)
+    end
+  end
+  
+  it "complains when too few type arguments are provided" do
+    source = Mare::Source.new "(example)", <<-SOURCE
+    :class Generic (P1, P2, P3)
+    
+    :actor Main
+      :new
+        Generic(String)
+    SOURCE
+    
+    expected = <<-MSG
+    This type qualification has too few type arguments:
+    from (example):5:
+        Generic(String)
+        ^~~~~~~~~~~~~~~
+    
+    - 3 type arguments were expected:
+      from (example):1:
+    :class Generic (P1, P2, P3)
+                   ^~~~~~~~~~~~
+    
+    - this additional type parameter needs an argument:
+      from (example):1:
+    :class Generic (P1, P2, P3)
+                        ^~
+    
+    - this additional type parameter needs an argument:
+      from (example):1:
+    :class Generic (P1, P2, P3)
+                            ^~
+    MSG
+    
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :infer)
+    end
+  end
+  
+  pending "complains when no type arguments are provided and some are expected"
 end

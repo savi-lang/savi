@@ -176,12 +176,16 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       show_type(io)
     end
     
+    def params_count
+      (defn.params.try(&.terms.size) || 0)
+    end
+    
     def has_params?
-      0 != (defn.params.try(&.terms.size) || 0)
+      0 != params_count
     end
     
     def is_complete?
-      args.size == (defn.params.try(&.terms.size) || 0)
+      args.size == params_count
     end
   end
   
@@ -858,13 +862,31 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         term_info.is_a?(Fixed) &&
         term_info.inner.cap_only.inner == MetaType::Capability::NON
       
-      # TODO: Check number of arguments against number of params.
-      # TODO: Check arguments against type parameter constraints (note that we need a new satisfies_type_bound? method rather than using is_subtype?).
+      # Get the MetaType of each arg and the current ReifiedType of the term.
       args = node.group.terms.map { |t| type_expr(t) }
       rt = term_info.inner.single!
       
-      # TODO: Nice error for this case:
-      raise NotImplementedError.new("incremental type args") unless rt.args.empty?
+      # Check number of arguments against number of params.
+      if node.group.terms.size > rt.params_count
+        params_pos = (rt.defn.params || rt.defn.ident).pos
+        Error.at node, "This type qualification has too many type arguments", [
+          {params_pos, "#{rt.params_count} type arguments were expected"},
+        ].concat(node.group.terms[rt.params_count..-1].map { |arg|
+          {arg.pos, "this is an excessive type argument"}
+        })
+      elsif node.group.terms.size < rt.params_count
+        params = rt.defn.params.not_nil!
+        Error.at node, "This type qualification has too few type arguments", [
+          {params.pos, "#{rt.params_count} type arguments were expected"},
+        ].concat(params.terms[node.group.terms.size..-1].map { |param|
+          {param.pos, "this additional type parameter needs an argument"}
+        })
+      end
+      
+      # TODO: Check arguments against type parameter constraints (note that we need a new satisfies_type_bound? method rather than using is_subtype?).
+      
+      # Sanity check - the reified type shouldn't have any args yet.
+      raise "already has type args: #{rt.inspect}" unless rt.args.empty?
       
       self[node] = Fixed.new(node.pos, MetaType.new(reified_type(rt.defn, args)))
     end
