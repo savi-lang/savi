@@ -663,6 +663,27 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       node
     end
     
+    def error_if_type_args_missing(node : AST::Node, mt : MetaType)
+      # Skip cases where the metatype has no single ReifiedType.
+      return unless mt.singular?
+      
+      error_if_type_args_missing(node, mt.single!)
+    end
+    
+    def error_if_type_args_missing(node : AST::Node, rt : ReifiedType)
+      # If this node is further qualified, we expect type args to come later.
+      return if Classify.further_qualified?(node)
+      
+      # If this node has no params, no type args are needed.
+      params = rt.defn.params
+      return if params.nil? || params.terms.size == 0
+      
+      # Otherwise, raise an error - the type needs to be qualified.
+      Error.at node, "This type needs to be qualified with type arguments", [
+        {params, "these type parameters are expecting arguments"}
+      ]
+    end
+    
     # Don't visit the children of a type expression root node
     def visit_children?(node)
       !Classify.type_expr?(node)
@@ -699,9 +720,13 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
           meta_type = MetaType.new(rt)
         end
         
+        error_if_type_args_missing(node, rt)
+        
         self[node] = Fixed.new(node.pos, meta_type)
       when Refer::DeclParam
         meta_type = lookup_type_param(ref).override_cap("non")
+        error_if_type_args_missing(node, meta_type)
+        
         self[node] = Fixed.new(node.pos, meta_type)
       when Refer::Local
         # If it's a local, track the possibly new node in our @local_idents map.

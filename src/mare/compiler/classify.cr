@@ -10,9 +10,10 @@
 # This pass produces no output state.
 #
 class Mare::Compiler::Classify < Mare::AST::Visitor
-  FLAG_VALUE_NOT_NEEDED = 0x1_u64
-  FLAG_TYPE_EXPR        = 0x2_u64
-  FLAG_PARAM            = 0x4_u64
+  FLAG_VALUE_NOT_NEEDED  = 0x1_u64
+  FLAG_TYPE_EXPR         = 0x2_u64
+  FLAG_PARAM             = 0x4_u64
+  FLAG_FURTHER_QUALIFIED = 0x8_u64
   
   def self.value_not_needed?(node); (node.flags & FLAG_VALUE_NOT_NEEDED) != 0 end
   def self.value_needed?(node);     (node.flags & FLAG_VALUE_NOT_NEEDED) == 0 end
@@ -24,6 +25,9 @@ class Mare::Compiler::Classify < Mare::AST::Visitor
   
   def self.param?(node); (node.flags & FLAG_PARAM) != 0 end
   def self.param!(node); node.flags |= FLAG_PARAM end
+  
+  def self.further_qualified?(node); (node.flags & FLAG_FURTHER_QUALIFIED) != 0 end
+  def self.further_qualified!(node); node.flags |= FLAG_FURTHER_QUALIFIED end
   
   # This visitor marks the given node tree as being a type_expr.
   class TypeExprVisitor < Mare::AST::Visitor
@@ -80,9 +84,13 @@ class Mare::Compiler::Classify < Mare::AST::Visitor
     end
   end
   
-  # However, in a Qualify, a value is needed in all terms of its Group.
   def touch(qualify : AST::Qualify)
+    # In a Qualify, a value is needed in all terms of its Group,
+    # despite having been marked as unneeded when handling the Group.
     qualify.group.terms.each { |t| Classify.value_needed!(t) }
+    
+    # Also, in a Qualifiy, we mark the term as being in such a qualify.
+    Classify.further_qualified!(qualify.term)
   end
   
   def touch(relate : AST::Relate)

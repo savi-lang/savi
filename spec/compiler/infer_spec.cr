@@ -1393,5 +1393,29 @@ describe Mare::Compiler::Infer do
     end
   end
   
-  pending "complains when no type arguments are provided and some are expected"
+  it "complains when no type arguments are provided and some are expected" do
+    source = Mare::Source.new "(example)", <<-SOURCE
+    :class Generic (P1, P2)
+    
+    :actor Main
+      :new
+        Generic
+    SOURCE
+    
+    expected = <<-MSG
+    This type needs to be qualified with type arguments:
+    from (example):5:
+        Generic
+        ^~~~~~~
+    
+    - these type parameters are expecting arguments:
+      from (example):1:
+    :class Generic (P1, P2)
+                   ^~~~~~~~
+    MSG
+    
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :infer)
+    end
+  end
 end
