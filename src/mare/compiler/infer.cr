@@ -67,9 +67,42 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     no_args = for_type(ctx, t)
     return [no_args] if 0 == (t.params.try(&.terms.size) || 0)
     
-    # TODO: Implement this logic
+    params_partial_reifications =
+      t.params.not_nil!.terms.map do |param|
+        constraint_node = ctx.refer[t][param].as(Refer::DeclParam).constraint
+        constraint_mt =
+          if constraint_node
+            # Get the MetaType of the constraint.
+            no_args.type_expr(constraint_node, ctx.refer[t])
+          else
+            # Use `any` as the MetaType of the constraint.
+            MetaType.new(MetaType::Capability::ANY)
+          end
+        # Return the list of MetaTypes that partially reify the constraint;
+        # that is, a list that constitutes every possible cap substitution.
+        constraint_mt.partial_reifications
+      end
     
-    [no_args]
+    recursive_expand_mts(params_partial_reifications).map do |params|
+      for_type(ctx, t, params)
+    end
+  end
+  
+  private def recursive_expand_mts(list : Array(Array(MetaType)))
+    recursive_expand_mts(list[0], list[1..-1])
+  end
+  
+  private def recursive_expand_mts(
+    head : Array(MetaType),
+    tail_list : Array(Array(MetaType)),
+  )
+    head.flat_map do |head_mt|
+      if tail_list.empty?
+        [[head_mt]]
+      else
+        recursive_expand_mts(tail_list).map(&.unshift(head_mt))
+      end
+    end
   end
   
   # This method is intended to be used in testing only.
@@ -235,6 +268,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         case node.value
         when "iso", "trn", "val", "ref", "box", "tag", "non"
           MetaType.new(MetaType::Capability.new(node.value))
+        when "any", "alias", "send", "share", "read"
+          MetaType.new(MetaType::Capability.new_generic(node.value))
         else
           Error.at node, "This type couldn't be resolved"
         end
@@ -824,7 +859,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         term_info.inner.cap_only.inner == MetaType::Capability::NON
       
       # TODO: Check number of arguments against number of params.
-      # TODO: Check arguments against type parameter constraints.
+      # TODO: Check arguments against type parameter constraints (note that we need a new satisfies_type_bound? method rather than using is_subtype?).
       args = node.group.terms.map { |t| type_expr(t) }
       rt = term_info.inner.single!
       

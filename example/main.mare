@@ -25,7 +25,7 @@
 :primitive Generic (A non)
   :fun get A: A
 
-:class Container (A (val|ref))
+:class Container (A read)
   :prop value A
   :new (@value)
 

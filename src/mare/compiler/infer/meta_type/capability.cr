@@ -23,6 +23,17 @@ struct Mare::Compiler::Infer::MetaType::Capability
   SHARE = new([VAL, TAG, NON].to_set)                     # are sendable & alias as themselves
   READ  = new([REF, VAL, BOX].to_set)                     # are readable & alias as themselves
   
+  def self.new_generic(name)
+    case name
+    when "any"   then ANY
+    when "alias" then ALIAS
+    when "send"  then SEND
+    when "share" then SHARE
+    when "read"  then READ
+    else raise NotImplementedError.new(name)
+    end
+  end
+  
   def inspect(io : IO)
     io << value
   end
@@ -193,10 +204,13 @@ struct Mare::Compiler::Infer::MetaType::Capability
     end
   end
   
-  def partial_reifications
-    raise "TODO: #{self}" unless ALL_SINGLE.includes?(self)
-    
-    [self]
+  def partial_reifications : Set(Capability)
+    value = value()
+    case value
+    when String then [self].to_set
+    when Set(Capability) then value
+    else raise NotImplementedError.new("partial_reifications of #{self}")
+    end
   end
   
   def is_sendable?
@@ -211,23 +225,6 @@ struct Mare::Compiler::Infer::MetaType::Capability
       raise NotImplementedError.new("is_sendable? of #{self}")
     end
   end
-  
-  # def to_generic
-  #   case self
-  #   when ISO_EPH, TRN_EPH
-  #     raise NotImplementedError.new("generic cap of an ephemeral cap")
-  #   when ISO, TRN, REF, VAL
-  #     self
-  #   when BOX
-  #     Union.new([BOX, REF, VAL, TRN].to_set)
-  #   when TAG
-  #     Union.new([TAG, BOX, REF, VAL, ISO, TRN].to_set)
-  #   when NON
-  #     Union.new([NON, TAG, BOX, REF, VAL, ISO, TRN].to_set)
-  #   else
-  #     raise NotImplementedError.new("generic cap of #{self}")
-  #   end
-  # end
   
   def viewed_from(origin : Capability) : Capability
     raise "unsupported viewed_from: #{origin}->#{self}" \

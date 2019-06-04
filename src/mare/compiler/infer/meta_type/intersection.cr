@@ -286,6 +286,10 @@ struct Mare::Compiler::Infer::MetaType::Intersection
   end
   
   def supertype_of?(infer : ForFunc, other : Capability) : Bool
+    # If we have terms or anti-terms, we can't possibly be a supertype of other,
+    # because a capability can never be a subtype of a nominal or anti-nominal.
+    return false if terms || anti_terms
+    
     raise NotImplementedError.new([self, :supertype_of?, other].inspect)
   end
   

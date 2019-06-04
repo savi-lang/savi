@@ -88,6 +88,8 @@ struct Mare::Compiler::Infer::MetaType
     inner = @inner
     MetaType.new(
       case inner
+      when Capability
+        cap
       when Nominal
         inner.intersect(cap)
       when Intersection
