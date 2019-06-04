@@ -241,6 +241,18 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       ctx.infer.for_type(ctx, *args).reified
     end
     
+    def get_param_bound(index : Int32)
+      refer = ctx.refer[reified.defn]
+      param_node = reified.defn.params.not_nil!.terms[index]
+      param_bound_node = refer[param_node].as(Refer::DeclParam).constraint
+      
+      if param_bound_node
+        type_expr(param_bound_node.not_nil!, refer, nil)
+      else
+        raise NotImplementedError.new("no param_bound_node")
+      end
+    end
+    
     def lookup_type_param(ref : Refer::DeclParam, refer, receiver = nil)
       raise NotImplementedError.new(ref) unless ref.parent == reified.defn
       
@@ -887,11 +899,11 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         term_info.is_a?(Fixed) &&
         term_info.inner.cap_only.inner == MetaType::Capability::NON
       
-      # Get the MetaType of each arg and the current ReifiedType of the term.
+      # Get the MetaType of each type arg and the target ReifiedType.
       args = node.group.terms.map { |t| type_expr(t) }
       rt = term_info.inner.single!
       
-      # Check number of arguments against number of params.
+      # Check number of type args against number of type params.
       if node.group.terms.size > rt.params_count
         params_pos = (rt.defn.params || rt.defn.ident).pos
         Error.at node, "This type qualification has too many type arguments", [
@@ -908,7 +920,17 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         })
       end
       
-      # TODO: Check arguments against type parameter constraints (note that we need a new satisfies_type_bound? method rather than using is_subtype?).
+      # Check each type arg against the bound of the corresponding type param.
+      node.group.terms.zip(args).each_with_index do |(arg_node, arg), index|
+        param_bound = ctx.infer[rt].get_param_bound(index)
+        unless arg.satisfies_bound?(self, param_bound)
+          bound_pos =
+            rt.defn.params.not_nil!.terms[index].as(AST::Group).terms.last.pos
+          Error.at arg_node,
+            "This type argument won't satisfy the type parameter bound",
+            [{bound_pos, "the type parameter bound is here"}]
+        end
+      end
       
       # Sanity check - the reified type shouldn't have any args yet.
       raise "already has type args: #{rt.inspect}" unless rt.args.empty?

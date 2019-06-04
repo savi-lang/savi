@@ -264,6 +264,12 @@ struct Mare::Compiler::Infer::MetaType
     inner.subtype_of?(infer, other.inner)
   end
   
+  # Return true if this MetaType is a satisfies the other MetaType
+  # as a type parameter bound/constraint.
+  def satisfies_bound?(infer : ForFunc, other : MetaType)
+    inner.satisfies_bound?(infer, other.inner)
+  end
+  
   def each_reachable_defn : Iterator(Infer::ReifiedType)
     @inner.each_reachable_defn
   end

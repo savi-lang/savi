@@ -1418,4 +1418,31 @@ describe Mare::Compiler::Infer do
       Mare::Compiler.compile([source], :infer)
     end
   end
+  
+  it "complains when a type argument doesn't satisfy the bound" do
+    source = Mare::Source.new "(example)", <<-SOURCE
+    :class Class
+    :class Generic (P1 send)
+    
+    :actor Main
+      :new
+        Generic(Class)
+    SOURCE
+    
+    expected = <<-MSG
+    This type argument won't satisfy the type parameter bound:
+    from (example):6:
+        Generic(Class)
+                ^~~~~
+    
+    - the type parameter bound is here:
+      from (example):2:
+    :class Generic (P1 send)
+                       ^~~~
+    MSG
+    
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :infer)
+    end
+  end
 end

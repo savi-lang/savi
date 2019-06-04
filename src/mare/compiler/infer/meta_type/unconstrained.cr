@@ -80,4 +80,8 @@ class Mare::Compiler::Infer::MetaType::Unconstrained
     # Unconstrained is a supertype of everything.
     true
   end
+  
+  def satisfies_bound?(infer : ForFunc, bound) : Bool
+    raise NotImplementedError.new("#{self} satisfies_bound? #{bound}")
+  end
 end

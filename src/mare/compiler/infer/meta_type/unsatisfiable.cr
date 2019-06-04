@@ -81,4 +81,8 @@ class Mare::Compiler::Infer::MetaType::Unsatisfiable
     # Unsatisfiable is never a supertype - it is never satisfied.
     false
   end
+  
+  def satisfies_bound?(infer : ForFunc, bound) : Bool
+    raise NotImplementedError.new("#{self} satisfies_bound? #{bound}")
+  end
 end

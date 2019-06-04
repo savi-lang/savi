@@ -163,6 +163,19 @@ struct Mare::Compiler::Infer::MetaType::Capability
     other.subtype_of?(infer, self) # delegate to the other class via symmetry
   end
   
+  def satisfies_bound?(infer : ForFunc, bound : Capability) : Bool
+    return true if value.is_a?(String) && self == bound
+    
+    bound_value = bound.value
+    return true if bound_value.is_a?(Set(Capability)) && bound_value.includes?(self)
+    
+    false
+  end
+  
+  def satisfies_bound?(infer : ForFunc, bound : (Nominal | AntiNominal | Intersection | Union | Unconstrained | Unsatisfiable)) : Bool
+    raise NotImplementedError.new("#{self} satisfies_bound? #{bound}")
+  end
+  
   def ephemeralize
     raise "unsupported cap: #{self}" unless ALL_SINGLE.includes?(self)
     
