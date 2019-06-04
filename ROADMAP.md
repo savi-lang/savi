@@ -14,14 +14,14 @@
 - [x] - Rcaps (`iso`, `trn`, `val`, `ref`, `box`, `tag`)
 - [x] - Rcap ephemerality (alias rcaps, ephemeral rcaps, `consume`)
 - [x] - Automatic receiver recovery for ephemeral receivers
-- [ ] - Rcap viewpoint adaptation
-- [ ] - Generic types and generic rcaps
-- [ ] - Finalizer functions
+- [x] - Rcap viewpoint adaptation
+- [x] - Generic types and generic rcaps
+- [ ] - Array literals
 - [ ] - Looping flow control (`while`, etc)
 - [ ] - For-loop iterator syntax sugar (`for x in y`)
 - [ ] - Partial functions and partial calls
-- [ ] - Array literals
 - [ ] - Tuple values
+- [ ] - Finalizer functions
 - [ ] - FFI-compatible struct types
 
 ### New features (that were *NOT* in Pony)
