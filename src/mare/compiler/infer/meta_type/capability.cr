@@ -4,15 +4,15 @@ struct Mare::Compiler::Infer::MetaType::Capability
   def initialize(@name)
   end
   
-  ISO_EPH = new("iso+"); def self.iso_eph; ISO_EPH end
-  ISO     = new("iso");  def self.iso;     ISO     end
-  TRN_EPH = new("trn+"); def self.trn_eph; TRN_EPH end
-  TRN     = new("trn");  def self.trn;     TRN     end
-  REF     = new("ref");  def self.ref;     REF     end
-  VAL     = new("val");  def self.val;     VAL     end
-  BOX     = new("box");  def self.box;     BOX     end
-  TAG     = new("tag");  def self.tag;     TAG     end
-  NON     = new("non");  def self.non;     NON     end
+  ISO_EPH = new("iso+")
+  ISO     = new("iso")
+  TRN_EPH = new("trn+")
+  TRN     = new("trn")
+  REF     = new("ref")
+  VAL     = new("val")
+  BOX     = new("box")
+  TAG     = new("tag")
+  NON     = new("non")
   
   ALL_NON_EPH = [ISO, TRN, REF, VAL, BOX, TAG, NON]
   
