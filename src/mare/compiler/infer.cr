@@ -25,7 +25,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     main = ctx.program.find_type?("Main")
     if main
       f = main.find_func?("new")
-      for_func(ctx, for_type(ctx, main).reified, f, f.cap.value).run if f
+      for_func(ctx, for_type(ctx, main).reified, f, MetaType.cap(f.cap.value)).run if f
     end
     
     # For each function in the program, run with a new instance,
@@ -37,7 +37,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     ctx.program.types.each do |t|
       for_type_each_partial_reification(ctx, t).each do |infer_type|
         infer_type.reified.defn.functions.each do |f|
-          for_func(ctx, infer_type.reified, f, f.cap.value).run
+          for_func(ctx, infer_type.reified, f, MetaType.cap(f.cap.value)).run
         end
       end
     end
@@ -76,16 +76,16 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   def for_func_simple(ctx : Context, t_name : String, f_name : String) : ForFunc
     t = ctx.program.find_type!(t_name)
     f = t.find_func!(f_name)
-    for_func(ctx, for_type(ctx, t).reified, f, f.cap.value)
+    for_func(ctx, for_type(ctx, t).reified, f, MetaType.cap(f.cap.value))
   end
   
   def for_func(
     ctx : Context,
     rt : ReifiedType,
     f : Program::Function,
-    cap : String,
+    cap : MetaType,
   )
-    mt = MetaType.new(rt, cap).strip_ephemeral
+    mt = MetaType.new(rt).override_cap(cap).strip_ephemeral
     rf = ReifiedFunction.new(rt, f, mt)
     @map[rf] ||= (
       ForFunc.new(ctx, self[rt], rf)
@@ -165,11 +165,11 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     # - unique within a given type
     # - identical for equivalent/compatible reified functions in different types
     def name
-      "'#{receiver_cap_value}.#{func.ident.value}"
+      "'#{receiver_cap.inspect}.#{func.ident.value}"
     end
     
-    def receiver_cap_value
-      receiver.cap_only.inner.as(MetaType::Capability).name
+    def receiver_cap
+      receiver.cap_only
     end
   end
   
@@ -188,7 +188,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       reified.defn.functions.each do |f|
         next unless f.has_tag?(:is)
         
-        infer = ctx.infer.for_func(ctx, reified, f, f.cap.value)
+        infer = ctx.infer.for_func(ctx, reified, f, MetaType.cap(f.cap.value))
         iface = infer.resolve(infer.ret).single!
         
         errors = [] of Error::Info
@@ -465,7 +465,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       poss = [] of Source::Pos
       call_defns.each do |(call_mti, call_defn, call_func)|
         call_mt = MetaType.new(call_mti)
-        call_mt_cap = call_mt.cap_only.cap_value
+        call_mt_cap = call_mt.cap_only
         call_defn = call_defn.not_nil!
         call_func = call_func.not_nil!
         autorecover_needed = false
@@ -474,19 +474,19 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         @called_funcs.add({call_defn, call_func})
         
         # Enforce the capability restriction of the receiver.
-        if is_subtype?(MetaType.cap(call_mt_cap), MetaType.cap(call_func.cap.value))
+        if is_subtype?(call_mt_cap, MetaType.cap(call_func.cap.value))
           # For box functions only, we reify with the actual cap on the caller side.
           # For all other functions, we just use the cap from the func definition.
-          reify_cap = call_func.cap.value == "box" ? call_mt_cap : call_func.cap.value
+          reify_cap = call_func.cap.value == "box" ? call_mt_cap : MetaType.cap(call_func.cap.value)
         elsif call_func.has_tag?(:constructor)
           # Constructor calls ignore cap of the original receiver.
-          reify_cap = call_func.cap.value
-        elsif is_subtype?(MetaType.cap(call_mt_cap).ephemeralize, MetaType.cap(call_func.cap.value))
+          reify_cap = MetaType.cap(call_func.cap.value)
+        elsif is_subtype?(call_mt_cap.ephemeralize, MetaType.cap(call_func.cap.value))
           # We failed, but we may be able to use auto-recovery.
           # Take note of this and we'll finish the auto-recovery checks later.
           autorecover_needed = true
           # For auto-recovered calls, always use the cap of the func definition.
-          reify_cap = call_func.cap.value
+          reify_cap = MetaType.cap(call_func.cap.value)
         else
           # We failed entirely; note the problem and carry on.
           problems << {call_func.cap,
@@ -494,7 +494,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
             "required capability of '#{call_func.cap.value}'"}
           # We already failed subtyping for the receiver cap, but pretend
           # for now that we didn't for the sake of further checks.
-          reify_cap = call_func.cap.value
+          reify_cap = MetaType.cap(call_func.cap.value)
         end
         
         # Get the ForFunc instance for call_func, possibly creating and running it.
@@ -572,19 +572,19 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       @called_funcs.add({reified.type, field_func})
       
       # Get the ForFunc instance for field_func, possibly creating and running it.
-      infer = ctx.infer.for_func(ctx, reified.type, field_func, resolved_self_cap_value).tap(&.run)
+      infer = ctx.infer.for_func(ctx, reified.type, field_func, resolved_self_cap).tap(&.run)
       
       # Apply constraints to the return type.
       ret = infer[infer.ret]
       field.set_explicit(ret.pos, ret.resolve!(infer))
     end
     
-    def resolved_self_cap_value
-      func.has_tag?(:constructor) ? "ref" : reified.receiver_cap_value
+    def resolved_self_cap : MetaType
+      func.has_tag?(:constructor) ? MetaType.cap("ref") : reified.receiver_cap
     end
     
     def resolved_self
-      MetaType.new(reified.type, resolved_self_cap_value)
+      MetaType.new(reified.type).override_cap(resolved_self_cap)
     end
     
     def reified_type(*args)
@@ -799,7 +799,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       when "<:"
         rhs_info = self[node.rhs]
         Error.at node.rhs, "expected this to have a fixed type at compile time" \
-          unless rhs_info.is_a?(Fixed) && rhs_info.inner.cap_only_name == "non"
+          unless rhs_info.is_a?(Fixed) \
+            && rhs_info.inner.cap_only.inner == MetaType::Capability::NON
         
         bool = MetaType.new(reified_type(refer.decl_defn("Bool")))
         refine = follow_redirects(node.lhs)
@@ -820,7 +821,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       # We only care about working with type arguments and type parameters now.
       return unless \
         term_info.is_a?(Fixed) &&
-        term_info.inner.cap_only_name == "non"
+        term_info.inner.cap_only.inner == MetaType::Capability::NON
       
       # TODO: Check number of arguments against number of params.
       # TODO: Check arguments against type parameter constraints.

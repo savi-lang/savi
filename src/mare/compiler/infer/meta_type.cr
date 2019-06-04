@@ -76,15 +76,6 @@ struct Mare::Compiler::Infer::MetaType
     )
   end
   
-  def cap_only_name
-    inner = @inner
-    case inner
-    when Capability; inner
-    when Union; caps = inner.caps; caps && caps.size == 1 && caps.first
-    when Intersection; inner.cap
-    end.as(Capability).name
-  end
-  
   def override_cap(name : String)
     override_cap(Capability.new(name))
   end
@@ -299,6 +290,6 @@ struct Mare::Compiler::Infer::MetaType
   end
   
   def cap_value
-    @inner.as(Capability).name
+    @inner.as(Capability).value
   end
 end

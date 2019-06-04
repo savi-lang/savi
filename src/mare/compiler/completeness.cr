@@ -176,7 +176,8 @@ module Mare::Compiler::Completeness
         # Follow the method call in a new branch, and collect any field writes
         # seen in that branch as if they had been seen in this branch.
         next_f = type.defn.find_func!(func_name)
-        next_func = ctx.infer.for_func(ctx, type, next_f, next_f.cap.value).reified # TODO: reify with which cap?
+        next_cap = Infer::MetaType.cap(next_f.cap.value) # TODO: reify with which cap?
+        next_func = ctx.infer.for_func(ctx, type, next_f, next_cap).reified
         branch = sub_branch(next_func, node.pos)
         seen_fields.concat(branch.seen_fields)
       end

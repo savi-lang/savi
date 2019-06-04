@@ -268,7 +268,8 @@ describe Mare::Compiler::Infer do
     
     main_infer = ctx.infer.for_type(ctx, ctx.program.find_type!("Main"))
     func = main_infer.reified.defn.functions.find(&.has_tag?(:field)).not_nil!
-    infer = ctx.infer.for_func(ctx, main_infer.reified, func, func.cap.value)
+    func_cap = Mare::Compiler::Infer::MetaType.cap(func.cap.value)
+    infer = ctx.infer.for_func(ctx, main_infer.reified, func, func_cap)
     body = infer.reified.func.body.not_nil!
     field = body.terms.first
     

@@ -1,7 +1,7 @@
 struct Mare::Compiler::Infer::MetaType::Capability
-  getter name : String
+  getter value : (String | Set(Capability))
   
-  def initialize(@name)
+  def initialize(@value)
   end
   
   ISO_EPH = new("iso+")
@@ -15,9 +15,16 @@ struct Mare::Compiler::Infer::MetaType::Capability
   NON     = new("non")
   
   ALL_NON_EPH = [ISO, TRN, REF, VAL, BOX, TAG, NON]
+  ALL_SINGLE = [ISO_EPH, TRN_EPH] + ALL_NON_EPH
+  
+  ANY   = new([ISO, TRN, REF, VAL, BOX, TAG, NON].to_set) # all (non-ephemeral) caps
+  ALIAS = new([REF, VAL, BOX, TAG, NON].to_set)           # alias as themselves
+  SEND  = new([ISO, VAL, TAG, NON].to_set)                # are sendable
+  SHARE = new([VAL, TAG, NON].to_set)                     # are sendable & alias as themselves
+  READ  = new([REF, VAL, BOX].to_set)                     # are readable & alias as themselves
   
   def inspect(io : IO)
-    io << name
+    io << value
   end
   
   def each_reachable_defn : Iterator(Infer::ReifiedType)
@@ -75,8 +82,12 @@ struct Mare::Compiler::Infer::MetaType::Capability
   def unite(other : Capability)
     return self if self == other
     
-    # We explicitly do not wish to combine capabilities here like we do in
-    # the intersect method, even if they are overlapping.
+    # If one cap is a subtype of the other cap, return the supertype because
+    # it is the most specific type of the two.
+    return other if self.subtype_of?(other)
+    return self if other.subtype_of?(self)
+    
+    # If the two are unrelated by subtyping, return as a union.
     Union.new([self, other].to_set)
   end
   
@@ -142,6 +153,8 @@ struct Mare::Compiler::Infer::MetaType::Capability
   end
   
   def ephemeralize
+    raise "unsupported cap: #{self}" unless ALL_SINGLE.includes?(self)
+    
     # ISO and TRN are the only capabilities which distinguish ephemerality,
     # because they are the only ones that care about reference uniqueness.
     case self
@@ -152,6 +165,8 @@ struct Mare::Compiler::Infer::MetaType::Capability
   end
   
   def strip_ephemeral
+    raise "unsupported cap: #{self}" unless ALL_SINGLE.includes?(self)
+    
     # ISO and TRN are the only capabilities which distinguish ephemerality,
     # because they are the only ones that care about reference uniqueness.
     case self
@@ -162,6 +177,8 @@ struct Mare::Compiler::Infer::MetaType::Capability
   end
   
   def alias
+    raise "unsupported cap: #{self}" unless ALL_SINGLE.includes?(self)
+    
     case self
     # The alias of an ISO+ or TRN+ is the non-ephemeral counterpart of it.
     when ISO_EPH then ISO
@@ -177,6 +194,8 @@ struct Mare::Compiler::Infer::MetaType::Capability
   end
   
   def partial_reifications
+    raise "TODO: #{self}" unless ALL_SINGLE.includes?(self)
+    
     [self]
   end
   
@@ -211,6 +230,9 @@ struct Mare::Compiler::Infer::MetaType::Capability
   # end
   
   def viewed_from(origin : Capability) : Capability
+    raise "unsupported viewed_from: #{origin}->#{self}" \
+      unless ALL_NON_EPH.includes?(self) && ALL_SINGLE.includes?(origin)
+    
     ##
     # Non-extracting viewpoint adaptation table, with columns representing the
     # capability of the field, and rows representing the origin capability:
@@ -290,6 +312,9 @@ struct Mare::Compiler::Infer::MetaType::Capability
   end
   
   def extracted_from(origin : Capability) : Capability
+    raise "unsupported extracted_from: #{origin}+>#{self}" \
+      unless ALL_NON_EPH.includes?(self) && ALL_SINGLE.includes?(origin)
+    
     ##
     # Extracting viewpoint adaptation table, with columns representing the
     # capability of the field, and rows representing the origin capability:
