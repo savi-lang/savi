@@ -114,6 +114,11 @@ class Mare::Compiler::CodeGen
         LLVM::Attribute::NoUnwind, LLVM::Attribute::NoReturn,
       ]},
       
+      # Internal Pony runtime functions that we will unscrupulously leverage.
+      {"ponyint_next_pow2", [@isize], @isize, [
+        LLVM::Attribute::NoUnwind, LLVM::Attribute::ReadNone,
+      ]},
+      
       # TODO: ponyint_personality_v0
       
       # Miscellaneous non-pony functions we depend on.

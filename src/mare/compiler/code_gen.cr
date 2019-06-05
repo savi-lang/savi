@@ -231,6 +231,7 @@ class Mare::Compiler::CodeGen
     @i32_ptr  = @llvm.int32.pointer.as(LLVM::Type)
     @i32_0    = @llvm.int32.const_int(0).as(LLVM::Value)
     @i64      = @llvm.int64.as(LLVM::Type)
+    @isize    = @llvm.int64.as(LLVM::Type) # TODO: cross-platform
     @f32      = @llvm.float.as(LLVM::Type)
     @f64      = @llvm.double.as(LLVM::Type)
     @intptr   = @llvm.intptr(@target_machine.data_layout).as(LLVM::Type)
@@ -973,6 +974,26 @@ class Mare::Compiler::CodeGen
         case gtype.type_def.bit_width
         when 32 then @builder.bit_cast(params[0], @f32)
         when 64 then @builder.bit_cast(params[0], @f64)
+        else raise NotImplementedError.new(gtype.type_def.bit_width)
+        end
+      when "next_pow2"
+        raise "next_pow2 float" if gtype.type_def.is_floating_point_numeric?
+        
+        arg =
+          case gtype.type_def.bit_width
+          when 1 then @builder.zext(params[0], @isize)
+          when 8 then @builder.zext(params[0], @isize)
+          when 32 then @builder.zext(params[0], @isize) # TODO: cross-platform
+          when 64 then @builder.zext(params[0], @isize) # TODO: cross-platform
+          else raise NotImplementedError.new(gtype.type_def.bit_width)
+          end
+        res = @builder.call(@mod.functions["ponyint_next_pow2"], [arg])
+        
+        case gtype.type_def.bit_width
+        when 1 then @builder.trunc(res, @i1)
+        when 8 then @builder.trunc(res, @i8)
+        when 32 then @builder.trunc(res, @i32) # TODO: cross-platform
+        when 64 then @builder.trunc(res, @i64) # TODO: cross-platform
         else raise NotImplementedError.new(gtype.type_def.bit_width)
         end
       else

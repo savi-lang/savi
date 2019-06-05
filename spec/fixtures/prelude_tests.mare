@@ -168,6 +168,12 @@
     test["integer trailing_zeros"].pass = U8[18].trailing_zeros == 1
     test["integer count_ones    "].pass = U8[18].count_ones     == 2
     test["integer count_zeros   "].pass = U8[18].count_zeros    == 6
+    test["integer 0.next_pow2   "].pass = U8[0].next_pow2       == 1
+    test["integer 2.next_pow2   "].pass = U8[2].next_pow2       == 2
+    test["integer 17.next_pow2  "].pass = U8[17].next_pow2      == 32
+    test["integer 127.next_pow2 "].pass = U8[127].next_pow2     == 128
+    test["integer 128.next_pow2 "].pass = U8[128].next_pow2     == 128
+    test["integer 129.next_pow2 "].pass = U8[129].next_pow2     == 0
     
     ///
     // Floating point bit representation and special values

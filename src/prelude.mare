@@ -63,6 +63,7 @@
   :fun val trailing_zeros U8: compiler intrinsic
   :fun val count_ones U8: compiler intrinsic
   :fun val count_zeros U8: @invert.count_ones
+  :fun val next_pow2 @: compiler intrinsic
 
 :trait val Float32Methods
   :fun non from_bits (bits U32) @'val: compiler intrinsic
