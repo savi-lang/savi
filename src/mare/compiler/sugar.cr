@@ -127,6 +127,18 @@ class Mare::Compiler::Sugar < Mare::AST::Visitor
         args = AST::Group.new("(", [node.rhs]).from(node.rhs)
         rhs = AST::Qualify.new(ident, args).from(node)
         AST::Relate.new(lhs.lhs, lhs.op, rhs).from(node)
+      # If assigning to a ".[]" relation, sugar as an "element setter" method.
+      elsif lhs.is_a?(AST::Relate) \
+      && lhs.op.value == "." \
+      && lhs.rhs.is_a?(AST::Qualify) \
+      && lhs.rhs.as(AST::Qualify).term.is_a?(AST::Identifier) \
+      && lhs.rhs.as(AST::Qualify).term.as(AST::Identifier).value == "[]"
+        inner = lhs.rhs.as(AST::Qualify)
+        ident = AST::Identifier.new("[]=").from(inner.term)
+        args = inner.group
+        args.terms << node.rhs
+        rhs = AST::Qualify.new(ident, args).from(node)
+        AST::Relate.new(lhs.lhs, lhs.op, rhs).from(node)
       else
         node
       end

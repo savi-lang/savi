@@ -233,6 +233,8 @@
     array_push = Array(U64).new << 9 << 3
     test["Array << <<, [0]"].pass = array_push[0] == 9
     test["Array << <<, [1]"].pass = array_push[1] == 3
+    array_push[1] = 33
+    test["Array [1]=, [1]"].pass = array_push[1] == 33
     
     Print.line_break // TODO: move to MicroTest constructor and finalizer
 
