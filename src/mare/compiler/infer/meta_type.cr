@@ -266,7 +266,7 @@ struct Mare::Compiler::Infer::MetaType
   
   # Return true if this MetaType is a satisfies the other MetaType
   # as a type parameter bound/constraint.
-  def satisfies_bound?(infer : ForFunc, other : MetaType)
+  def satisfies_bound?(infer : (ForFunc | ForType), other : MetaType)
     inner.satisfies_bound?(infer, other.inner)
   end
   

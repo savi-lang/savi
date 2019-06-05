@@ -82,7 +82,7 @@ class Mare::Compiler::Infer::MetaType::Unsatisfiable
     false
   end
   
-  def satisfies_bound?(infer : ForFunc, bound) : Bool
+  def satisfies_bound?(infer : (ForFunc | ForType), bound) : Bool
     raise NotImplementedError.new("#{self} satisfies_bound? #{bound}")
   end
 end

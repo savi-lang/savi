@@ -270,6 +270,48 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       .intersect(MetaType.new_type_param(ref))
     end
     
+    def validate_type_args(
+      infer : ForFunc?,
+      node : AST::Qualify,
+      target : MetaType,
+      args : Array(MetaType),
+    )
+      rt = target.single!
+      infer ||= self
+      
+      # Check number of type args against number of type params.
+      if node.group.terms.size > rt.params_count
+        params_pos = (rt.defn.params || rt.defn.ident).pos
+        Error.at node, "This type qualification has too many type arguments", [
+          {params_pos, "#{rt.params_count} type arguments were expected"},
+        ].concat(node.group.terms[rt.params_count..-1].map { |arg|
+          {arg.pos, "this is an excessive type argument"}
+        })
+      elsif node.group.terms.size < rt.params_count
+        params = rt.defn.params.not_nil!
+        Error.at node, "This type qualification has too few type arguments", [
+          {params.pos, "#{rt.params_count} type arguments were expected"},
+        ].concat(params.terms[node.group.terms.size..-1].map { |param|
+          {param.pos, "this additional type parameter needs an argument"}
+        })
+      end
+      
+      # Check each type arg against the bound of the corresponding type param.
+      node.group.terms.zip(args).each_with_index do |(arg_node, arg), index|
+        param_bound = ctx.infer[rt].get_param_bound(index)
+        unless arg.satisfies_bound?(infer, param_bound)
+          bound_pos =
+            rt.defn.params.not_nil!.terms[index].as(AST::Group).terms.last.pos
+          Error.at arg_node,
+            "This type argument won't satisfy the type parameter bound",
+            [{bound_pos, "the type parameter bound is here"}]
+        end
+      end
+      
+      # Sanity check - the reified type shouldn't have any args yet.
+      raise "already has type args: #{rt.inspect}" unless rt.args.empty?
+    end
+    
     # An identifier type expression must refer to a type.
     def type_expr(node : AST::Identifier, refer, receiver = nil) : MetaType
       ref = refer[node]
@@ -899,42 +941,10 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         term_info.is_a?(Fixed) &&
         term_info.inner.cap_only.inner == MetaType::Capability::NON
       
-      # Get the MetaType of each type arg and the target ReifiedType.
       args = node.group.terms.map { |t| type_expr(t) }
+      for_type.validate_type_args(self, node, term_info.inner, args)
+      
       rt = term_info.inner.single!
-      
-      # Check number of type args against number of type params.
-      if node.group.terms.size > rt.params_count
-        params_pos = (rt.defn.params || rt.defn.ident).pos
-        Error.at node, "This type qualification has too many type arguments", [
-          {params_pos, "#{rt.params_count} type arguments were expected"},
-        ].concat(node.group.terms[rt.params_count..-1].map { |arg|
-          {arg.pos, "this is an excessive type argument"}
-        })
-      elsif node.group.terms.size < rt.params_count
-        params = rt.defn.params.not_nil!
-        Error.at node, "This type qualification has too few type arguments", [
-          {params.pos, "#{rt.params_count} type arguments were expected"},
-        ].concat(params.terms[node.group.terms.size..-1].map { |param|
-          {param.pos, "this additional type parameter needs an argument"}
-        })
-      end
-      
-      # Check each type arg against the bound of the corresponding type param.
-      node.group.terms.zip(args).each_with_index do |(arg_node, arg), index|
-        param_bound = ctx.infer[rt].get_param_bound(index)
-        unless arg.satisfies_bound?(self, param_bound)
-          bound_pos =
-            rt.defn.params.not_nil!.terms[index].as(AST::Group).terms.last.pos
-          Error.at arg_node,
-            "This type argument won't satisfy the type parameter bound",
-            [{bound_pos, "the type parameter bound is here"}]
-        end
-      end
-      
-      # Sanity check - the reified type shouldn't have any args yet.
-      raise "already has type args: #{rt.inspect}" unless rt.args.empty?
-      
       self[node] = Fixed.new(node.pos, MetaType.new(reified_type(rt.defn, args)))
     end
     

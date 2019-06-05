@@ -176,7 +176,7 @@ struct Mare::Compiler::Infer::MetaType::AntiNominal
     other.subtype_of?(infer, self) # delegate to the other class via symmetry
   end
   
-  def satisfies_bound?(infer : ForFunc, bound) : Bool
+  def satisfies_bound?(infer : (ForFunc | ForType), bound) : Bool
     raise NotImplementedError.new("#{self} satisfies_bound? #{bound}")
   end
 end

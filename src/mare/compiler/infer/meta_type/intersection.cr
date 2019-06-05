@@ -369,14 +369,14 @@ struct Mare::Compiler::Infer::MetaType::Intersection
     other.subtype_of?(infer, self) # delegate to the other class via symmetry
   end
   
-  def satisfies_bound?(infer : ForFunc, bound : Capability) : Bool
+  def satisfies_bound?(infer : (ForFunc | ForType), bound : Capability) : Bool
     # This intersection satisfies the given capability bound if and only if
     # it has a capability as part of the intersection, and that capability
     # is satisfies the given capability bound.
     cap.try(&.satisfies_bound?(infer, bound)) || false
   end
   
-  def satisfies_bound?(infer : ForFunc, bound : (Nominal | AntiNominal | Intersection | Union | Unconstrained | Unsatisfiable)) : Bool
+  def satisfies_bound?(infer : (ForFunc | ForType), bound : (Nominal | AntiNominal | Intersection | Union | Unconstrained | Unsatisfiable)) : Bool
     raise NotImplementedError.new("#{self} satisfies_bound? #{bound}")
   end
 end
