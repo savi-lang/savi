@@ -547,7 +547,7 @@ class Mare::Compiler::CodeGen
     ident = ident.as(AST::Identifier)
     case ident.value
     when "I32"     then @i32
-    when "CString" then @ptr
+    when "CPointer" then @ptr
     when "None"    then @void
     else raise NotImplementedError.new(ident.value)
     end

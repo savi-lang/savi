@@ -89,7 +89,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
         else
           # TODO: don't special-case this in the compiler?
           case defn.ident.value
-          when "CString" then :ptr
+          when "CPointer" then :ptr
           else
             :struct_ptr
           end
@@ -201,7 +201,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     
     def is_cpointer?
       # TODO: less hacky here
-      @reified.defn.ident.value == "CString"
+      @reified.defn.ident.value == "CPointer"
     end
     
     def is_numeric?
