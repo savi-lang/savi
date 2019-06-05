@@ -402,7 +402,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
               ret
             ).from(ret),
             AST::Operator.new("'").from(getter_cap),
-            AST::Identifier.new("alias").from(getter_cap),
+            AST::Identifier.new("aliased").from(getter_cap),
           ).from(ret)
         end
         getter_body = AST::Group.new(":").from(ident)

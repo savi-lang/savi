@@ -298,7 +298,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     def type_expr(node : AST::Relate, refer, receiver = nil) : MetaType
       if node.op.value == "'"
         cap = node.rhs.as(AST::Identifier).value
-        if cap == "alias"
+        if cap == "aliased"
           type_expr(node.lhs, refer, receiver).alias
         else
           type_expr(node.lhs, refer, receiver).override_cap(cap)
