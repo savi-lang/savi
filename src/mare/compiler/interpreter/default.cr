@@ -5,13 +5,13 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
   def finished(context)
   end
   
-  def keywords; %w{actor class interface numeric enum primitive ffi} end
+  def keywords; %w{actor class trait numeric enum primitive ffi} end
   
   @@declare_type = Witness.new([
     {
       "kind" => "keyword",
       "name" => "keyword",
-      "value" => "actor|class|interface|numeric|enum|primitive|ffi",
+      "value" => "actor|class|trait|numeric|enum|primitive|ffi",
     },
     {
       "kind" => "keyword",
@@ -43,7 +43,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         case keyword.value
         when "actor"     then "tag"
         when "class"     then "ref"
-        when "interface" then "ref"
+        when "trait"     then "ref"
         when "numeric"   then "val"
         when "enum"      then "val"
         when "primitive" then "non"
@@ -69,7 +69,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
       t.type.add_tag(:allocated)
     when "class"
       t.type.add_tag(:allocated)
-    when "interface"
+    when "trait"
       t.type.add_tag(:abstract)
       t.type.add_tag(:allocated)
     when "numeric"
@@ -114,15 +114,15 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
       
       # Numeric types need some basic metadata attached to know the native type.
       if @keyword == "numeric" || @keyword == "enum"
-        # Add "is Numeric" to the type definition so to absorb the interface.
-        iface_cap = AST::Identifier.new("non").from(@type.ident)
-        iface_is = AST::Identifier.new("is").from(@type.ident)
-        iface_ret = AST::Identifier.new("Numeric").from(@type.ident)
-        iface_func = Program::Function.new(iface_cap, iface_is, nil, iface_ret, nil)
-        iface_func.add_tag(:hygienic)
-        iface_func.add_tag(:is)
-        iface_func.add_tag(:copies)
-        @type.functions << iface_func
+        # Add "is Numeric" to the type definition so to absorb the trait.
+        trait_cap = AST::Identifier.new("non").from(@type.ident)
+        trait_is = AST::Identifier.new("is").from(@type.ident)
+        trait_ret = AST::Identifier.new("Numeric").from(@type.ident)
+        trait_func = Program::Function.new(trait_cap, trait_is, nil, trait_ret, nil)
+        trait_func.add_tag(:hygienic)
+        trait_func.add_tag(:is)
+        trait_func.add_tag(:copies)
+        @type.functions << trait_func
         
         # Add "copies NumericMethods" to the type definition as well.
         copy_cap = AST::Identifier.new("non").from(@type.ident)
@@ -160,8 +160,8 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         end
       end
       
-      # An interface's functions should have their body removed.
-      if @keyword == "interface"
+      # A trait's functions should have their body removed.
+      if @keyword == "trait"
         @type.functions.each do |f|
           f.body = nil if f.body.try(&.terms).try(&.empty?)
         end
@@ -296,7 +296,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
       },
       {
         "kind" => "term",
-        "name" => "interface",
+        "name" => "trait",
         "type" => "ident",
       },
     ] of Hash(String, String | Bool))
@@ -441,7 +441,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
           AST::Identifier.new("non").from(data["keyword"]),
           decl.head.first.as(AST::Identifier),
           nil,
-          data["interface"].as(AST::Identifier),
+          data["trait"].as(AST::Identifier),
           nil,
         ).tap(&.add_tag(:hygienic)).tap(&.add_tag(:is)).tap(&.add_tag(:copies))
       when "member"

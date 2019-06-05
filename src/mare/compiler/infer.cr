@@ -43,7 +43,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
     
     # Check the "is" list for all types, to confirm that they implement the
-    # interfaces that they claim to have implemented in their declaration.
+    # traits that they claim to have implemented in their declaration.
     for_non_argumented_types.each(&.check_is_list)
   end
   
@@ -226,12 +226,12 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         next unless f.has_tag?(:is)
         
         infer = ctx.infer.for_func(ctx, reified, f, MetaType.cap(f.cap.value))
-        iface = infer.resolve(infer.ret).single!
+        trait = infer.resolve(infer.ret).single!
         
         errors = [] of Error::Info
-        unless infer.is_subtype?(reified, iface, errors)
+        unless infer.is_subtype?(reified, trait, errors)
           Error.at reified.defn.ident,
-            "This type doesn't implement the interface #{iface.defn.ident.value}",
+            "This type doesn't implement the trait #{trait.defn.ident.value}",
               errors
         end
       end

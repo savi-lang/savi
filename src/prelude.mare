@@ -11,11 +11,11 @@
   :fun val not: @invert
 
 // Numerics
-:interface val Numeric
+:trait val Numeric
   :const bit_width U8: 64
   :const is_signed Bool: False
   :const is_floating_point Bool: False
-  // TODO: arithmetic method interfaces with type parameters on Numeric[A] type
+  // TODO: arithmetic method traits with type parameters on Numeric[A] type
   
   :fun val u8 U8: compiler intrinsic
   :fun val u32 U32: compiler intrinsic
@@ -26,7 +26,7 @@
   :fun val f32 F32: compiler intrinsic
   :fun val f64 F64: compiler intrinsic
 
-:interface val NumericMethods // TODO: don't use :interface for this... `common`?
+:trait val NumericMethods // TODO: don't use :trait for this... `common`?
   :const bit_width U8
   :const is_signed Bool
   :const is_floating_point Bool
@@ -50,7 +50,7 @@
   :fun val max (other @) @: if (@ > other) (@ | other)
   :fun val abs: if (@is_signed && @ < 0) (@[0] - @ | @)
 
-:interface val IntegerMethods // TODO: don't use :interface for this... `common`?
+:trait val IntegerMethods // TODO: don't use :trait for this... `common`?
   :const bit_width U8 // TODO: dedup with NumericMethods
   
   :fun val bit_and (other @) @: compiler intrinsic
@@ -64,7 +64,7 @@
   :fun val count_ones U8: compiler intrinsic
   :fun val count_zeros U8: @invert.count_ones
 
-:interface val Float32Methods
+:trait val Float32Methods
   :fun non from_bits (bits U32) @'val: compiler intrinsic
   :fun val bits U32: compiler intrinsic
   
@@ -88,7 +88,7 @@
   :fun val is_finite
     @bits.bit_and(0x7F80_0000) != 0x7F80_0000 // exponent
 
-:interface val Float64Methods
+:trait val Float64Methods
   :fun non from_bits (bits U64) @'val: compiler intrinsic
   :fun val bits U64: compiler intrinsic
   

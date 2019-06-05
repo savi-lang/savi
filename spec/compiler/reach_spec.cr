@@ -1,7 +1,7 @@
 describe Mare::Compiler::Reach do
-  it "reaches compatible functions when reaching an interface function" do
+  it "reaches compatible functions when reaching a trait function" do
     source = Mare::Source.new "(example)", <<-SOURCE
-    :interface Interface
+    :trait Trait
       :fun foo U64
     
     :class Class
@@ -13,13 +13,13 @@ describe Mare::Compiler::Reach do
     :actor Main
       :new
         o = Other.new
-        i Interface = Class.new
+        i Trait = Class.new
         i.foo
     SOURCE
     
     ctx = Mare::Compiler.compile([source], :reach)
     
-    i_foo = ctx.infer.for_func_simple(ctx, "Interface", "foo").reified
+    i_foo = ctx.infer.for_func_simple(ctx, "Trait", "foo").reified
     c_foo = ctx.infer.for_func_simple(ctx, "Class", "foo").reified
     o_foo = ctx.infer.for_func_simple(ctx, "Other", "foo").reified
     

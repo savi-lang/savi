@@ -19,7 +19,7 @@
 :primitive InfiniteZeros
   :fun "[]" (index I64): Zero
 
-:interface Augend
+:trait Augend
   :fun "+" (other I32) I32
 
 :primitive Generic (A non)

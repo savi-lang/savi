@@ -5,7 +5,7 @@
 - [x] - Numeric machine word types
 - [x] - Stateful, allocated classes with constructors and methods
 - [x] - Properties (fields hidden behind getters/setters)
-- [x] - Interfaces
+- [x] - Traits (for structural subtyping and/or code reuse)
 - [x] - Virtual table calls on abstract types
 - [x] - Non-looping flow control (`if`, `case`, etc)
 - [x] - Runtime type matching (`x <: Y`)
@@ -30,7 +30,7 @@
 - [x] - User-defined custom numeric types (`numeric MyNumber:`)
 - [x] - Enumerated custom numeric types (`enum MyEnum:`)
 - [x] - Non-allocated class references with "static" stateless functions.
-- [ ] - Typeclasses (`implement SomeInterface for SomeClass:`)
+- [ ] - Typeclasses (`implement SomeTrait for SomeClass:`)
 - [ ] - Automatic specialization of functions to avoid virtual table calls.
 - [ ] - Sourcing/overriding constant values using compile-time options
 - [ ] - Builtin/automatic support for Pony's "Access Pattern"

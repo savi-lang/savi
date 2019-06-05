@@ -66,7 +66,7 @@ class Mare::Compiler::Infer::SubtypingInfo
   end
   
   private def full_check(that : Infer::ReifiedType, errors : Array(Error::Info))
-    # A type only matches an interface if all functions match that interface.
+    # A type only matches a trait if all functions match that trait.
     that.defn.functions.each do |that_func|
       # Hygienic functions are not considered to be real functions for the
       # sake of structural subtyping, so they don't have to be fulfilled.

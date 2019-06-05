@@ -338,8 +338,8 @@ struct Mare::Compiler::Infer::MetaType::Intersection
     terms.try(&.each do |term|
       # The term must be a subtype of all terms in the other.
       # TODO: we may have to do something more subtle here when dealing with
-      # subtyping of intersections of interfaces, where multiple interfaces
-      # get inlined into a single composite interface so that they can be
+      # subtyping of intersections of traits, where multiple traits
+      # get inlined into a single composite trait so that they can be
       # properly compared while taking it all simultaneously into account.
       return false \
         if other.terms && !other.terms.not_nil!.all?(&.supertype_of?(infer, term))

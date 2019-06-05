@@ -547,7 +547,7 @@ describe Mare::Compiler::Infer do
   
   it "complains when calling on types without that function" do
     source = Mare::Source.new "(example)", <<-SOURCE
-    :interface A
+    :trait A
       :fun foo
     
     :primitive B
@@ -570,8 +570,8 @@ describe Mare::Compiler::Infer do
     
     - A has no 'baz' function:
       from (example):1:
-    :interface A
-               ^
+    :trait A
+           ^
     
     - B has no 'baz' function:
       from (example):4:
@@ -981,13 +981,13 @@ describe Mare::Compiler::Infer do
   
   it "requires a sub-func to be present in the subtype" do
     source = Mare::Source.new "(example)", <<-SOURCE
-    :interface Interface
+    :trait Trait
       :fun example1 U64
       :fun example2 U64
       :fun example3 U64
     
     :class Concrete
-      :is Interface
+      :is Trait
       :fun example2 U64: 0
     
     :actor Main
@@ -996,7 +996,7 @@ describe Mare::Compiler::Infer do
     SOURCE
     
     expected = <<-MSG
-    This type doesn't implement the interface Interface:
+    This type doesn't implement the trait Trait:
     from (example):6:
     :class Concrete
            ^~~~~~~~
@@ -1019,7 +1019,7 @@ describe Mare::Compiler::Infer do
   
   it "requires a sub-func to have the same constructor or constant tags" do
     source = Mare::Source.new "(example)", <<-SOURCE
-    :interface Interface
+    :trait Trait
       :new constructor1
       :new constructor2
       :new constructor3
@@ -1031,7 +1031,7 @@ describe Mare::Compiler::Infer do
       :fun function3 U64
     
     :class Concrete
-      :is Interface
+      :is Trait
       :new constructor1
       :const constructor2 U64: 0
       :fun constructor3 U64: 0
@@ -1048,7 +1048,7 @@ describe Mare::Compiler::Infer do
     SOURCE
     
     expected = <<-MSG
-    This type doesn't implement the interface Interface:
+    This type doesn't implement the trait Trait:
     from (example):12:
     :class Concrete
            ^~~~~~~~
@@ -1121,13 +1121,13 @@ describe Mare::Compiler::Infer do
   
   it "requires a sub-func to have the same number of params" do
     source = Mare::Source.new "(example)", <<-SOURCE
-    :interface non Interface
+    :trait non Trait
       :fun example1 (a U64, b U64, c U64) None
       :fun example2 (a U64, b U64, c U64) None
       :fun example3 (a U64, b U64, c U64) None
     
     :primitive Concrete
-      :is Interface
+      :is Trait
       :fun example1 None
       :fun example2 (a U64, b U64) None
       :fun example3 (a U64, b U64, c U64, d U64) None
@@ -1138,7 +1138,7 @@ describe Mare::Compiler::Infer do
     SOURCE
     
     expected = <<-MSG
-    This type doesn't implement the interface Interface:
+    This type doesn't implement the trait Trait:
     from (example):6:
     :primitive Concrete
                ^~~~~~~~
@@ -1181,13 +1181,13 @@ describe Mare::Compiler::Infer do
   
   it "requires a sub-constructor to have a covariant receiver capability" do
     source = Mare::Source.new "(example)", <<-SOURCE
-    :interface Interface
+    :trait Trait
       :new ref example1
       :new ref example2
       :new ref example3
     
     :class Concrete
-      :is Interface
+      :is Trait
       :new box example1
       :new ref example2
       :new iso example3
@@ -1198,7 +1198,7 @@ describe Mare::Compiler::Infer do
     SOURCE
     
     expected = <<-MSG
-    This type doesn't implement the interface Interface:
+    This type doesn't implement the trait Trait:
     from (example):6:
     :class Concrete
            ^~~~~~~~
@@ -1221,13 +1221,13 @@ describe Mare::Compiler::Infer do
   
   it "requires a sub-func to have a contravariant receiver capability" do
     source = Mare::Source.new "(example)", <<-SOURCE
-    :interface Interface
+    :trait Trait
       :fun ref example1 U64
       :fun ref example2 U64
       :fun ref example3 U64
     
     :class Concrete
-      :is Interface
+      :is Trait
       :fun box example1 U64: 0
       :fun ref example2 U64: 0
       :fun iso example3 U64: 0
@@ -1238,7 +1238,7 @@ describe Mare::Compiler::Infer do
     SOURCE
     
     expected = <<-MSG
-    This type doesn't implement the interface Interface:
+    This type doesn't implement the trait Trait:
     from (example):6:
     :class Concrete
            ^~~~~~~~
@@ -1261,14 +1261,14 @@ describe Mare::Compiler::Infer do
   
   it "requires a sub-func to have covariant return and contravariant params" do
     source = Mare::Source.new "(example)", <<-SOURCE
-    :interface non Interface
+    :trait non Trait
       :fun example1 Numeric
       :fun example2 U64
       :fun example3 (a U64, b U64, c U64) None
       :fun example4 (a Numeric, b Numeric, c Numeric) None
     
     :primitive Concrete
-      :is Interface
+      :is Trait
       :fun example1 U64: 0
       :fun example2 Numeric: U64[0]
       :fun example3 (a Numeric, b U64, c Numeric) None:
@@ -1280,7 +1280,7 @@ describe Mare::Compiler::Infer do
     SOURCE
     
     expected = <<-MSG
-    This type doesn't implement the interface Interface:
+    This type doesn't implement the trait Trait:
     from (example):7:
     :primitive Concrete
                ^~~~~~~~
