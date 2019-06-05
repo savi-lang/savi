@@ -151,7 +151,8 @@
   :fun non _alloc (space U64) @'ref: compiler intrinsic
   :fun ref _realloc (space U64) @: compiler intrinsic
   :fun box _get_at (index U64) A: compiler intrinsic
-  :fun ref _swap_at (index U64, value A) A: compiler intrinsic
+  :fun ref _assign_at (index U64, value A) A: compiler intrinsic
+  :fun ref _displace_at (index U64, value A) A: compiler intrinsic
 
 :class val String
   :prop _size U64 // TODO: cross-platform
@@ -194,7 +195,7 @@
   
   :fun ref "<<" (value)
     @reserve(@_size + 1)
-    @_ptr._swap_at(@_size, value)
+    @_ptr._assign_at(@_size, value)
     @_size = @_size + 1
     @
 

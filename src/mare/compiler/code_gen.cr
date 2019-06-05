@@ -745,7 +745,13 @@ class Mare::Compiler::CodeGen
         elem_ptr = @builder.bit_cast(params[0], elem_llvm_type.pointer)
         gep = @builder.inbounds_gep(elem_ptr, params[1])
         @builder.load(gep)
-      when "_swap_at"
+      when "_assign_at"
+        elem_ptr = @builder.bit_cast(params[0], elem_llvm_type.pointer)
+        gep = @builder.inbounds_gep(elem_ptr, params[1])
+        new_value = params[2]
+        @builder.store(new_value, gep)
+        new_value
+      when "_displace_at"
         elem_ptr = @builder.bit_cast(params[0], elem_llvm_type.pointer)
         gep = @builder.inbounds_gep(elem_ptr, params[1])
         new_value = params[2]
