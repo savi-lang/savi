@@ -199,6 +199,11 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       false
     end
     
+    def is_cpointer?
+      # TODO: less hacky here
+      @reified.defn.ident.value == "CString"
+    end
+    
     def is_numeric?
       @reified.defn.has_tag?(:numeric)
     end

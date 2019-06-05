@@ -707,7 +707,35 @@ class Mare::Compiler::CodeGen
     gen_func_end
   end
   
+  def gen_intrinsic_cpointer(gtype, gfunc)
+    gen_func_start(gfunc.llvm_func)
+    params = gfunc.llvm_func.params
+    
+    @builder.ret \
+      case gfunc.func.ident.value
+      when "null"
+        @ptr.null
+      when "_alloc"
+        # TODO: cross-platform; use LLVMABISizeOfType
+        elem_size_value = 8 # TODO: get from type args
+        
+        gfunc.llvm_func.add_attribute(LLVM::Attribute::NoAlias, LLVM::AttributeIndex::ReturnIndex)
+        gfunc.llvm_func.add_attribute(LLVM::Attribute::DereferenceableOrNull, LLVM::AttributeIndex::ReturnIndex, elem_size_value)
+        gfunc.llvm_func.add_attribute(LLVM::Attribute::Alignment, LLVM::AttributeIndex::ReturnIndex, PonyRT::HEAP_MIN)
+        
+        elem_size = @isize.const_int(elem_size_value)
+        total_size = @builder.mul(params[0], elem_size)
+        @builder.call(@mod.functions["pony_alloc"], [pony_ctx, elem_size])
+      else
+        raise NotImplementedError.new(gfunc.func.ident.value)
+      end
+    
+    gen_func_end
+  end
+  
   def gen_intrinsic(gtype, gfunc)
+    return gen_intrinsic_cpointer(gtype, gfunc) if gtype.type_def.is_cpointer?
+    
     raise NotImplementedError.new(gtype.type_def) \
       unless gtype.type_def.is_numeric?
     

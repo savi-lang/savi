@@ -1,7 +1,7 @@
 class Mare::Compiler::CodeGen
   def gen_runtime_decls
     # Declare Pony runtime functions (and a few other functions we need).
-    align_width = 8_u64 # TODO: account for 32-bit platforms properly here
+    align_width = 8_u64 # TODO: cross-platform
     [
       {"pony_ctx", [] of LLVM::Type, @ptr, [
         LLVM::Attribute::NoUnwind, LLVM::Attribute::ReadNone,

@@ -249,7 +249,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       if param_bound_node
         type_expr(param_bound_node.not_nil!, refer, nil)
       else
-        raise NotImplementedError.new("no param_bound_node")
+        MetaType.new(MetaType::Capability::ANY)
       end
     end
     
