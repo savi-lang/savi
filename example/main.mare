@@ -39,9 +39,6 @@
   :be do_stuff (greeting Greeting)
     none = ()
     
-    array_zero = Array(U8).new
-    array_ten = Array(U8).new(10)
-    
     maybe_greeting (Greeting | None) = Generic(Greeting).get
     if maybe_greeting <: Greeting \
       @say_stuff(maybe_greeting)

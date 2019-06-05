@@ -148,7 +148,10 @@
 
 :class tag CString // TODO: don't special-case in compiler as a char pointer
   :fun non null CString'ref: compiler intrinsic
-  :fun non _alloc (size U64) CString'ref: compiler intrinsic
+  :fun non _alloc (space U64) CString'ref: compiler intrinsic
+  :fun ref _realloc (space U64) CString'ref: compiler intrinsic
+  :fun box _get_at (index U64) U8: compiler intrinsic
+  :fun ref _swap_at (index U64, value U8) U8: compiler intrinsic
 
 :class val String
   :prop _size U64 // TODO: cross-platform
@@ -162,14 +165,37 @@
   :prop _alloc U64 // TODO: cross-platform
   :prop _ptr CString'ref
   
-  :new (@_alloc = 0)
+  :fun ref _ptr_set_null
+    @_alloc = 0
+    @_ptr = CString.null
+  
+  :fun ref _ptr_allocate (space U64)
+    @_alloc = space.next_pow2.max(space).max(8)
+    @_ptr = CString._alloc(@_alloc)
+  
+  :fun ref _ptr_reallocate (space U64)
+    @_alloc = space.next_pow2.max(space).max(8)
+    @_ptr = @_ptr._realloc(@_alloc)
+  
+  :new (space U64 = 0)
     @_size = 0
     
-    if (@_alloc > 0) (
-      @_alloc = @_alloc.next_pow2.max(@_alloc).max(8)
-      @_ptr = CString._alloc(@_alloc)
+    if (space > 0) (
+      @_ptr_allocate(space)
     |
-      @_ptr = CString.null
+      @_ptr_set_null
     )
+  
+  :fun ref reserve (space U64)
+    if (@_alloc < space) \
+      @_ptr_reallocate(space)
+  
+  :fun "[]" (index): @_ptr._get_at(index)
+  
+  :fun ref "<<" (value)
+    @reserve(@_size + 1)
+    @_ptr._swap_at(@_size, value)
+    @_size = @_size + 1
+    @
 
 :class val Env
