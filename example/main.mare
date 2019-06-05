@@ -1,5 +1,5 @@
 :ffi LibC
-  :fun puts (CPointer) I32
+  :fun puts (CPointer(U8)) I32
 
 :ffi LibPonyRT
   :fun pony_exitcode (I32) None

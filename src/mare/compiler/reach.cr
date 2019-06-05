@@ -204,6 +204,11 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       @reified.defn.ident.value == "CPointer"
     end
     
+    def cpointer_type_arg
+      raise "not a cpointer" unless is_cpointer?
+      Ref.new(@reified.args.first)
+    end
+    
     def is_numeric?
       @reified.defn.has_tag?(:numeric)
     end

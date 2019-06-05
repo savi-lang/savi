@@ -366,6 +366,18 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       end
     end
     
+    # A "(" qualify is used to add type arguments to a type.
+    def type_expr(node : AST::Qualify, refer, receiver = nil) : MetaType
+      raise NotImplementedError.new(node.to_a) unless node.group.style == "("
+      
+      target = type_expr(node.term, refer, receiver)
+      args = node.group.terms.map { |t| type_expr(t, refer, receiver).as(MetaType) } # TODO: is it possible to remove this superfluous "as"?
+      
+      validate_type_args(nil, node, target, args)
+      
+      MetaType.new(reified_type(target.single!.defn, args))
+    end
+    
     # All other AST nodes are unsupported as type expressions.
     def type_expr(node : AST::Node, refer, receiver = nil) : MetaType
       raise NotImplementedError.new(node.to_a)
@@ -944,8 +956,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       args = node.group.terms.map { |t| type_expr(t) }
       for_type.validate_type_args(self, node, term_info.inner, args)
       
-      rt = term_info.inner.single!
-      self[node] = Fixed.new(node.pos, MetaType.new(reified_type(rt.defn, args)))
+      rt = reified_type(term_info.inner.single!.defn, args)
+      self[node] = Fixed.new(node.pos, MetaType.new(rt))
     end
     
     def touch(node : AST::Prefix)

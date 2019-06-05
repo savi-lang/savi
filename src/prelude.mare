@@ -146,32 +146,32 @@
 
 // ...
 
-:class tag CPointer // TODO: don't special-case in compiler as a faux-class
+:class tag CPointer (A) // TODO: don't special-case in compiler as a faux-class
   :fun non null @'ref: compiler intrinsic
   :fun non _alloc (space U64) @'ref: compiler intrinsic
   :fun ref _realloc (space U64) @: compiler intrinsic
-  :fun box _get_at (index U64) U8: compiler intrinsic
-  :fun ref _swap_at (index U64, value U8) U8: compiler intrinsic
+  :fun box _get_at (index U64) A: compiler intrinsic
+  :fun ref _swap_at (index U64, value A) A: compiler intrinsic
 
 :class val String
   :prop _size U64 // TODO: cross-platform
   :prop _alloc U64 // TODO: cross-platform
-  :prop _ptr CPointer'ref
+  :prop _ptr CPointer(U8)'ref
   :new from_cpointer (@_ptr, @_size, @_alloc)
-  :fun cpointer CPointer: @_ptr
+  :fun cpointer CPointer(U8): @_ptr
 
 :class ref Array (A)
   :prop _size U64 // TODO: cross-platform
   :prop _alloc U64 // TODO: cross-platform
-  :prop _ptr CPointer'ref
+  :prop _ptr CPointer(A)'ref
   
   :fun ref _ptr_set_null
     @_alloc = 0
-    @_ptr = CPointer.null
+    @_ptr = CPointer(A).null
   
   :fun ref _ptr_allocate (space U64)
     @_alloc = space.next_pow2.max(space).max(8)
-    @_ptr = CPointer._alloc(@_alloc)
+    @_ptr = CPointer(A)._alloc(@_alloc)
   
   :fun ref _ptr_reallocate (space U64)
     @_alloc = space.next_pow2.max(space).max(8)

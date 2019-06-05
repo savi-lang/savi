@@ -379,11 +379,20 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
     
     def create_param_local(node : AST::Relate)
       raise NotImplementedError.new(node.to_a) \
-        unless node.is_a?(AST::Relate) && node.op.value == "DEFAULTPARAM"
+        unless node.op.value == "DEFAULTPARAM"
       
       create_param_local(node.lhs)
       
       @refer[node] = @refer[node.lhs]
+    end
+    
+    def create_param_local(node : AST::Qualify)
+      raise NotImplementedError.new(node.to_a) \
+        unless node.term.is_a?(AST::Identifier) && node.group.style == "("
+      
+      create_param_local(node.term)
+      
+      @refer[node] = @refer[node.term]
     end
     
     def create_param_local(node : AST::Node)

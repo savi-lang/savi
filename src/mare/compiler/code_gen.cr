@@ -543,13 +543,20 @@ class Mare::Compiler::CodeGen
     frame.func.basic_blocks.append(name)
   end
   
-  def ffi_type_for(ident)
-    ident = ident.as(AST::Identifier)
-    case ident.value
-    when "I32"     then @i32
-    when "CPointer" then @ptr
-    when "None"    then @void
-    else raise NotImplementedError.new(ident.value)
+  def ffi_type_for(node)
+    case node
+    when AST::Identifier
+      case node.value
+      when "I32"  then @i32
+      when "None" then @void
+      else raise NotImplementedError.new(node.value)
+      end
+    when AST::Qualify
+      term = node.term
+      raise NotImplementedError.new(node.to_a) \
+        unless term.is_a?(AST::Identifier) && term.value == "CPointer"
+      @ptr
+    else raise NotImplementedError.new(node.to_a)
     end
   end
   
@@ -675,7 +682,7 @@ class Mare::Compiler::CodeGen
   
   def gen_ffi_decl(gfunc)
     params = gfunc.func.params.not_nil!.terms.map do |param|
-      ffi_type_for(param.as(AST::Identifier))
+      ffi_type_for(param)
     end
     ret = ffi_type_for(gfunc.func.ret.not_nil!)
     
@@ -711,9 +718,8 @@ class Mare::Compiler::CodeGen
     gen_func_start(gfunc.llvm_func)
     params = gfunc.llvm_func.params
     
-    # TODO: cross-platform; use LLVMABISizeOfType
-    elem_size_value = 8 # TODO: get from type args
-    elem_llvm_type = @i8
+    elem_llvm_type = llvm_mem_type_of(gtype.type_def.cpointer_type_arg)
+    elem_size_value = @target_machine.data_layout.abi_size(elem_llvm_type)
     
     @builder.ret \
       case gfunc.func.ident.value

@@ -123,6 +123,10 @@ class Mare::Witness
     when "type"
       case term
       when AST::Identifier then true # TODO: maybe disallow lowercase?
+      when AST::Qualify
+        check_type(term.term, t) &&
+        term.group.style == "(" &&
+        term.group.terms.all? { |term2| check_type(term2, t) }
       when AST::Relate
         ["'", "->", "+>"].includes?(term.op.value) &&
         check_type(term.lhs, t) &&
