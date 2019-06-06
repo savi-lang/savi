@@ -69,20 +69,20 @@ describe Mare::Compiler::Infer do
     SOURCE
     
     expected = <<-MSG
-    This value's type is unresolvable due to conflicting constraints:
+    The type of this expression doesn't meet the constraints imposed on it:
     from (example):3:
         "not a number at all"
          ^~~~~~~~~~~~~~~~~~~
     
-    - it must be a subtype of String:
-      from (example):3:
-        "not a number at all"
-         ^~~~~~~~~~~~~~~~~~~
-    
-    - it must be a subtype of I32:
+    - it is required here to be a subtype of I32:
       from (example):2:
       :fun number I32
                   ^~~
+    
+    - but the type of the literal value was String:
+      from (example):3:
+        "not a number at all"
+         ^~~~~~~~~~~~~~~~~~~
     MSG
     
     expect_raises Mare::Error, expected do
@@ -98,20 +98,20 @@ describe Mare::Compiler::Infer do
     SOURCE
     
     expected = <<-MSG
-    This value's type is unresolvable due to conflicting constraints:
+    The type of this expression doesn't meet the constraints imposed on it:
     from (example):3:
         name String = 42
                       ^~
-
-    - it must be a subtype of Numeric:
-      from (example):3:
-        name String = 42
-                      ^~
     
-    - it must be a subtype of String:
+    - it is required here to be a subtype of String:
       from (example):3:
         name String = 42
              ^~~~~~
+    
+    - but the type of the literal value was Numeric:
+      from (example):3:
+        name String = 42
+                      ^~
     MSG
     
     expect_raises Mare::Error, expected do
@@ -126,20 +126,20 @@ describe Mare::Compiler::Infer do
     SOURCE
     
     expected = <<-MSG
-    This value's type is unresolvable due to conflicting constraints:
+    The type of this expression doesn't meet the constraints imposed on it:
     from (example):2:
       :prop name String: 42
                          ^~
     
-    - it must be a subtype of Numeric:
-      from (example):2:
-      :prop name String: 42
-                         ^~
-    
-    - it must be a subtype of String:
+    - it is required here to be a subtype of String:
       from (example):2:
       :prop name String: 42
                  ^~~~~~
+    
+    - but the type of the literal value was Numeric:
+      from (example):2:
+      :prop name String: 42
+                         ^~
     MSG
     
     expect_raises Mare::Error, expected do
@@ -155,20 +155,20 @@ describe Mare::Compiler::Infer do
     SOURCE
     
     expected = <<-MSG
-    This expression doesn't meet the type constraints imposed on it:
+    The type of this expression doesn't meet the constraints imposed on it:
     from (example):3:
         name String = ()
                       ^~
     
-    - the expression has a type of None:
-      from (example):3:
-        name String = ()
-                      ^~
-    
-    - it must be a subtype of String:
+    - it is required here to be a subtype of String:
       from (example):3:
         name String = ()
              ^~~~~~
+    
+    - but the type of the expression was None:
+      from (example):3:
+        name String = ()
+                      ^~
     MSG
     
     expect_raises Mare::Error, expected do
@@ -184,20 +184,20 @@ describe Mare::Compiler::Infer do
     SOURCE
     
     expected = <<-MSG
-    This value's type is unresolvable due to conflicting constraints:
+    The type of this expression doesn't meet the constraints imposed on it:
     from (example):3:
         if "not a boolean" 42
-            ^~~~~~~~~~~~~
+        ^~
     
-    - it must be a subtype of String:
-      from (example):3:
-        if "not a boolean" 42
-            ^~~~~~~~~~~~~
-    
-    - it must be a subtype of Bool:
+    - it is required here to be a subtype of Bool:
       from (example):3:
         if "not a boolean" 42
         ^~
+    
+    - but the type of the literal value was String:
+      from (example):3:
+        if "not a boolean" 42
+            ^~~~~~~~~~~~~
     MSG
     
     expect_raises Mare::Error, expected do
@@ -306,20 +306,20 @@ describe Mare::Compiler::Infer do
     SOURCE
     
     expected = <<-MSG
-    This value couldn't be inferred as a single concrete type:
+    This literal value couldn't be inferred as a single concrete type:
     from (example):3:
         x (F64 | U64) = 42
                         ^~
     
-    - it must be a subtype of Numeric:
-      from (example):3:
-        x (F64 | U64) = 42
-                        ^~
-    
-    - it must be a subtype of (F64 | U64):
+    - it is required here to be a subtype of (F64 | U64):
       from (example):3:
         x (F64 | U64) = 42
           ^~~~~~~~~~~
+    
+    - and the literal itself has an intrinsic type of (F64 | U64):
+      from (example):3:
+        x (F64 | U64) = 42
+                        ^~
     MSG
     
     expect_raises Mare::Error, expected do
@@ -336,20 +336,20 @@ describe Mare::Compiler::Infer do
     SOURCE
     
     expected = <<-MSG
-    This expression doesn't meet the type constraints imposed on it:
+    The type of this expression doesn't meet the constraints imposed on it:
     from (example):4:
         y U64 = x
                 ^
     
-    - the expression has a type of (U64 | None):
-      from (example):3:
-        x (U64 | None) = 42
-          ^~~~~~~~~~~~
-    
-    - it must be a subtype of U64:
+    - it is required here to be a subtype of U64:
       from (example):4:
         y U64 = x
           ^~~
+    
+    - but the type of the local variable was (U64 | None):
+      from (example):3:
+        x (U64 | None) = 42
+          ^~~~~~~~~~~~
     MSG
     
     expect_raises Mare::Error, expected do
@@ -442,20 +442,20 @@ describe Mare::Compiler::Infer do
     SOURCE
     
     expected = <<-MSG
-    This expression doesn't meet the type constraints imposed on it:
+    The type of this expression doesn't meet the constraints imposed on it:
     from (example):3:
         x I32 = True
                 ^~~~
     
-    - the expression has a type of Bool:
-      from (example):3:
-        x I32 = True
-                ^~~~
-    
-    - it must be a subtype of I32:
+    - it is required here to be a subtype of I32:
       from (example):3:
         x I32 = True
           ^~~
+    
+    - but the type of the expression was Bool:
+      from (example):3:
+        x I32 = True
+                ^~~~
     MSG
     
     expect_raises Mare::Error, expected do
@@ -492,20 +492,20 @@ describe Mare::Compiler::Infer do
     SOURCE
     
     expected = <<-MSG
-    This expression doesn't meet the type constraints imposed on it:
+    The type of this expression doesn't meet the constraints imposed on it:
     from (example):5:
         x X = X
               ^
     
-    - the expression has a type of X'non:
-      from (example):5:
-        x X = X
-              ^
-    
-    - it must be a subtype of X:
+    - it is required here to be a subtype of X:
       from (example):5:
         x X = X
           ^
+    
+    - but the type of the expression was X'non:
+      from (example):5:
+        x X = X
+              ^
     MSG
     
     expect_raises Mare::Error, expected do
@@ -524,20 +524,20 @@ describe Mare::Compiler::Infer do
     SOURCE
     
     expected = <<-MSG
-    This expression doesn't meet the type constraints imposed on it:
+    The type of this expression doesn't meet the constraints imposed on it:
     from (example):6:
         c2 C'iso = c1
                    ^~
     
-    - the expression has a type of C:
-      from (example):5:
-        c1 ref = C.new
-           ^~~
-    
-    - it must be a subtype of C'iso:
+    - it is required here to be a subtype of C'iso:
       from (example):6:
         c2 C'iso = c1
            ^~~~~
+    
+    - but the type of the local variable was C:
+      from (example):5:
+        c1 ref = C.new
+           ^~~
     MSG
     
     expect_raises Mare::Error, expected do
@@ -631,19 +631,19 @@ describe Mare::Compiler::Infer do
     SOURCE
     
     expected = <<-MSG
-    This expression doesn't meet the type constraints imposed on it:
+    The type of this expression doesn't meet the constraints imposed on it:
     from (example):15:
         x3b val = x3a // not okay
                   ^~~
     
-    - the expression (when aliased) has a type of X'tag:
-      from (example):14:
-        x3a iso = X.new
-            ^~~
-    
-    - it must be a subtype of val:
+    - it is required here to be a subtype of val:
       from (example):15:
         x3b val = x3a // not okay
+            ^~~
+    
+    - but the type of the local variable (when aliased) was X'tag:
+      from (example):14:
+        x3a iso = X.new
             ^~~
     
     - this would be allowed if this reference didn't get aliased
@@ -674,20 +674,20 @@ describe Mare::Compiler::Infer do
     SOURCE
     
     expected = <<-MSG
-    This expression doesn't meet the type constraints imposed on it:
+    The type of this expression doesn't meet the constraints imposed on it:
     from (example):12:
         @example(x2) // not okay
                  ^~
     
-    - the expression (when aliased) has a type of X'tag:
-      from (example):11:
-        x2 iso = X.new
-           ^~~
-    
-    - it must be a subtype of X'val:
+    - it is required here to be a subtype of X'val:
       from (example):14:
       :fun example (x X'val)
                       ^~~~~
+    
+    - but the type of the local variable (when aliased) was X'tag:
+      from (example):11:
+        x2 iso = X.new
+           ^~~
     
     - this would be allowed if this reference didn't get aliased
     - did you forget to consume the reference?
@@ -711,20 +711,25 @@ describe Mare::Compiler::Infer do
     SOURCE
     
     expected = <<-MSG
-    This expression doesn't meet the type constraints imposed on it:
+    The type of this expression doesn't meet the constraints imposed on it:
     from (example):7:
         x2 iso = x // not okay, but would work if not for the above stripping
                  ^
     
-    - the expression (when aliased) has a type of X'tag:
-      from (example):6:
-        x = X.new // inferred as X'iso+, stripped to X'iso
-              ^~~
-    
-    - it must be a subtype of iso:
+    - it is required here to be a subtype of iso:
       from (example):7:
         x2 iso = x // not okay, but would work if not for the above stripping
            ^~~
+    
+    - it is required here to be a subtype of iso:
+      from (example):8:
+        x3 iso = x // not okay, but would work if not for the above stripping
+           ^~~
+    
+    - but the type of the return value (when aliased) was X'tag:
+      from (example):6:
+        x = X.new // inferred as X'iso+, stripped to X'iso
+              ^~~
     
     - this would be allowed if this reference didn't get aliased
     - did you forget to consume the reference?
@@ -791,20 +796,20 @@ describe Mare::Compiler::Infer do
     SOURCE
     
     expected = <<-MSG
-    This expression doesn't meet the type constraints imposed on it:
+    The type of this expression doesn't meet the constraints imposed on it:
     from (example):15:
         array_4 Array(X'val) = [x4] // not okay
                                ^~~~
     
-    - the expression (when aliased) has a type of X'tag:
-      from (example):14:
-        x4 iso = X.new
-           ^~~
-    
-    - it must be a subtype of X'val:
+    - it is required here to be a subtype of X'val:
       from (example):15:
         array_4 Array(X'val) = [x4] // not okay
                 ^~~~~~~~~~~~
+    
+    - but the type of the local variable (when aliased) was X'tag:
+      from (example):14:
+        x4 iso = X.new
+           ^~~
     
     - this would be allowed if this reference didn't get aliased
     - did you forget to consume the reference?
@@ -829,20 +834,20 @@ describe Mare::Compiler::Infer do
     
     # TODO: This error message will change when we have array literal recovery.
     expected = <<-MSG
-    This array's type is unresolvable due to conflicting constraints:
+    The type of this expression doesn't meet the constraints imposed on it:
     from (example):8:
         array_val val = [x_ref] // not okay
                         ^~~~~~~
     
-    - the inferred type of the array literal is Array(X):
-      from (example):8:
-        array_val val = [x_ref] // not okay
-                        ^~~~~~~
-    
-    - it must be a subtype of val:
+    - it is required here to be a subtype of val:
       from (example):8:
         array_val val = [x_ref] // not okay
                   ^~~
+    
+    - but the type of the array literal was Array(X):
+      from (example):8:
+        array_val val = [x_ref] // not okay
+                        ^~~~~~~
     MSG
     
     expect_raises Mare::Error, expected do
@@ -869,20 +874,20 @@ describe Mare::Compiler::Infer do
     SOURCE
     
     expected = <<-MSG
-    This expression doesn't meet the type constraints imposed on it:
+    The type of this expression doesn't meet the constraints imposed on it:
     from (example):14:
         inner_ref2 Inner'ref = outer_box.inner // not okay
                                ^~~~~~~~~~~~~~~
     
-    - the expression has a type of Inner'box:
-      from (example):14:
-        inner_ref2 Inner'ref = outer_box.inner // not okay
-                                         ^~~~~
-    
-    - it must be a subtype of Inner:
+    - it is required here to be a subtype of Inner:
       from (example):14:
         inner_ref2 Inner'ref = outer_box.inner // not okay
                    ^~~~~~~~~
+    
+    - but the type of the return value was Inner'box:
+      from (example):14:
+        inner_ref2 Inner'ref = outer_box.inner // not okay
+                                         ^~~~~
     MSG
     
     expect_raises Mare::Error, expected do
@@ -910,20 +915,20 @@ describe Mare::Compiler::Infer do
     SOURCE
     
     expected = <<-MSG
-    This expression doesn't meet the type constraints imposed on it:
+    The type of this expression doesn't meet the constraints imposed on it:
     from (example):15:
         inner_ref2 Inner'ref = outer_box.get_inner // not okay
                                ^~~~~~~~~~~~~~~~~~~
     
-    - the expression has a type of Inner'box:
-      from (example):15:
-        inner_ref2 Inner'ref = outer_box.get_inner // not okay
-                                         ^~~~~~~~~
-    
-    - it must be a subtype of Inner:
+    - it is required here to be a subtype of Inner:
       from (example):15:
         inner_ref2 Inner'ref = outer_box.get_inner // not okay
                    ^~~~~~~~~
+    
+    - but the type of the return value was Inner'box:
+      from (example):15:
+        inner_ref2 Inner'ref = outer_box.get_inner // not okay
+                                         ^~~~~~~~~
     MSG
     
     expect_raises Mare::Error, expected do
@@ -1069,20 +1074,20 @@ describe Mare::Compiler::Infer do
     
     # TODO: Fix position reporting that isn't quite right here:
     expected = <<-MSG
-    This expression doesn't meet the type constraints imposed on it:
+    The type of this expression doesn't meet the constraints imposed on it:
     from (example):11:
         inner_trn Inner'trn = outer.inner = Inner.new // not okay
         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     
-    - the expression has a type of Inner'box:
-      from (example):11:
-        inner_trn Inner'trn = outer.inner = Inner.new // not okay
-                                    ^~~~~
-    
-    - it must be a subtype of Inner'trn:
+    - it is required here to be a subtype of Inner'trn:
       from (example):11:
         inner_trn Inner'trn = outer.inner = Inner.new // not okay
                   ^~~~~~~~~
+    
+    - but the type of the return value was Inner'box:
+      from (example):11:
+        inner_trn Inner'trn = outer.inner = Inner.new // not okay
+                                    ^~~~~
     MSG
     
     expect_raises Mare::Error, expected do

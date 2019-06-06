@@ -289,10 +289,6 @@ struct Mare::Compiler::Infer::MetaType
     @inner.any_callable_func_defn_type(name)
   end
   
-  def show
-    "it must be a subtype of #{show_type}"
-  end
-  
   def show_type
     @inner.inspect
   end

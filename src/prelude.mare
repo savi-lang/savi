@@ -48,7 +48,7 @@
   
   :fun val min (other @) @: if (@ < other) (@ | other)
   :fun val max (other @) @: if (@ > other) (@ | other)
-  :fun val abs: if (@is_signed && @ < 0) (@[0] - @ | @)
+  // TODO: :fun val abs: if (@is_signed && @ < 0) (@[0] - @ | @)
 
 :trait val IntegerMethods // TODO: don't use :trait for this... `common`?
   :const bit_width U8 // TODO: dedup with NumericMethods
@@ -197,11 +197,11 @@
   
   :fun ref "[]=" (index, value)
     // TODO: bounds checking, partial function
-    @_ptr._assign_at(index, value)
+    @_ptr._assign_at(index, --value)
   
   :fun ref "<<" (value)
     @reserve(@_size + 1)
-    @_ptr._assign_at(@_size, value)
+    @_ptr._assign_at(@_size, --value)
     @_size = @_size + 1
     @
 
