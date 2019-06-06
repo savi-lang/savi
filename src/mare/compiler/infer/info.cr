@@ -508,7 +508,7 @@ class Mare::Compiler::Infer
           use_pos,
           constraint_pos,
           elem_constraint,
-          1,
+          0,
         )
       end
     end

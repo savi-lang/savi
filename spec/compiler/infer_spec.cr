@@ -769,6 +769,50 @@ describe Mare::Compiler::Infer do
     infer.resolve(assign.rhs).show_type.should eq "Array(U64)"
   end
   
+  it "complains when violating uniqueness into an array literal" do
+    source = Mare::Source.new "(example)", <<-SOURCE
+    :class X
+      :new iso
+    
+    :actor Main
+      :new
+        array_1 Array(X'val) = [X.new] // okay
+        
+        x2 iso = X.new
+        array_2 Array(X'val) = [--x2] // okay
+        
+        x3 iso = X.new
+        array_3 Array(X'tag) = [x3] // okay
+        
+        x4 iso = X.new
+        array_4 Array(X'val) = [x4] // not okay
+    SOURCE
+    
+    expected = <<-MSG
+    This expression doesn't meet the type constraints imposed on it:
+    from (example):15:
+        array_4 Array(X'val) = [x4] // not okay
+                               ^~~~
+    
+    - the expression (when aliased) has a type of X'tag:
+      from (example):14:
+        x4 iso = X.new
+           ^~~
+    
+    - it must be a subtype of X'val:
+      from (example):15:
+        array_4 Array(X'val) = [x4] // not okay
+                ^~~~~~~~~~~~
+    
+    - this would be allowed if this reference didn't get aliased
+    - did you forget to consume the reference?
+    MSG
+    
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :infer)
+    end
+  end
+  
   it "reflects viewpoint adaptation in the return type of a prop getter" do
     source = Mare::Source.new "(example)", <<-SOURCE
     :class Inner
