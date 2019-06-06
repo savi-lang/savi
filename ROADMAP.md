@@ -16,7 +16,7 @@
 - [x] - Automatic receiver recovery for ephemeral receivers
 - [x] - Rcap viewpoint adaptation
 - [x] - Generic types and generic rcaps
-- [ ] - Array literals
+- [x] - Array literals
 - [ ] - Looping flow control (`while`, etc)
 - [ ] - For-loop iterator syntax sugar (`for x in y`)
 - [ ] - Partial functions and partial calls
