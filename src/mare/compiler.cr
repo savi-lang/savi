@@ -26,8 +26,8 @@ module Mare::Compiler
     when :macros then [] of Symbol
     when :sugar then [:macros]
     when :lambda then [:sugar, :macros]
-    when :classify then [:lambda, :sugar, :macros]
-    when :refer then [:classify, :macros, :sugar, :lambda]
+    when :refer then [:lambda, :sugar, :macros]
+    when :classify then [:refer, :lambda, :sugar, :macros]
     when :infer then [:classify, :refer, :lambda, :copy]
     when :completeness then [:infer, :lambda, :sugar, :macros, :copy]
     when :reach then [:infer]
