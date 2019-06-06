@@ -789,14 +789,14 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       case ref
       when Refer::Decl, Refer::DeclAlias
         rt = reified_type(ref.final_decl.defn)
-        if !ref.defn.is_value?
+        if ref.defn.is_value?
+          # We trust the cap of the value type (for example, False, True, etc).
+          meta_type = MetaType.new(rt)
+        else
           # A type reference whose value is used and is not itself a value
           # must be marked non, rather than having the default cap for that type.
           # This is used when we pass a type around as if it were a value.
           meta_type = MetaType.new(rt, "non")
-        else
-          # Otherwise, it's part of a type constraint, so we use the default cap.
-          meta_type = MetaType.new(rt)
         end
         
         error_if_type_args_missing(node, rt)
