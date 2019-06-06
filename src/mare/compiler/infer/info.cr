@@ -470,21 +470,47 @@ class Mare::Compiler::Infer
     property explicit : MetaType?
     
     def initialize(@pos, @terms)
+      @domain_constraints = [] of Tuple(Source::Pos, Source::Pos, MetaType, Int32)
+      @elem_antecedents = Set(MetaType).new
     end
     
     def resolve!(infer : ForFunc)
-      mt =
-        if @explicit
-          @explicit.not_nil!
-        else
-          # Determine the MetaType to use for the element type argument.
-          elem_mts = terms.map { |term| infer[term].resolve!(infer) }.uniq
-          elem_mt = MetaType.new_union(elem_mts).simplify(infer)
-          
-          # Construct the ReifiedType to use for the array literal.
-          rt = infer.reified_type(infer.refer.decl_defn("Array"), [elem_mt])
-          MetaType.new(rt)
-        end
+      array_defn = infer.refer.decl_defn("Array")
+      
+      # Determine the lowest common denominator MetaType of all elements.
+      elem_mts = terms.map { |term| infer[term].resolve!(infer) }.uniq
+      elem_mt = MetaType.new_union(elem_mts).simplify(infer)
+      
+      # Look for exactly one antecedent type that matches the inferred type.
+      # Essentially, this is the correlating "outside" inference with "inside".
+      # If such a type is found, it replaces our inferred element type.
+      # If no such type is found, stick with what we inferred for now.
+      possible_antes = [] of MetaType
+      possible_element_antecedents(infer).each do |ante|
+        possible_antes << ante if elem_mt.subtype_of?(infer, ante)
+      end
+      if possible_antes.size > 1
+        # TODO: nice error for the below:
+        raise "too many possible antecedents"
+      elsif possible_antes.size == 1
+        elem_mt = possible_antes.first
+      else
+        # Leave elem_mt alone and let it ride.
+      end
+      
+      mt = MetaType.new(
+        infer.reified_type(infer.refer.decl_defn("Array"), [elem_mt])
+      )
+      
+      # The final MetaType must meet all constraints that have been imposed.
+      # This could fail based on the capability of the array, or based on
+      # a failure to match the inferred element type to an antecedent.
+      if total_domain_constraint.intersect(mt).unsatisfiable?
+        Error.at self,
+          "This array's type is unresolvable due to conflicting constraints", [
+            {pos, "the inferred type of the array literal is #{mt.show_type}"}
+          ] + @domain_constraints.map { |c| {c[1], c[2].show} }
+      end
       
       # Reach the functions we will use during CodeGen.
       ctx = infer.ctx
@@ -499,35 +525,38 @@ class Mare::Compiler::Infer
     end
     
     def within_domain!(infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
-      raise NotImplementedError.new("ArrayLiteral within_domain! #{constraint}") \
-        unless constraint.singular?
+      @domain_constraints << {use_pos, constraint_pos, constraint, aliases}
       
-      rt = constraint.single!
-      
-      raise NotImplementedError.new("#{rt}") unless \
-        rt.defn == infer.refer.decl_defn("Array") && \
-        rt.args.size == 1
-      
-      # For now, we only support array literals with a cap of "ref".
-      # Raise an error if that is a dealbreaker for this constraint.
-      as_ref = constraint.override_cap("ref")
-      meta_type_within_domain!(infer, as_ref, use_pos, constraint_pos, constraint, aliases)
-      
-      raise "already has an explicit Array type" \
-        if @explicit && @explicit != constraint
-      @explicit = constraint
-      
-      elem_constraint = rt.args.first
+      antecedents = possible_element_antecedents(infer)
+      return if antecedents.empty?
       
       terms.each do |term|
         infer[term].within_domain!(
           infer,
           use_pos,
           constraint_pos,
-          elem_constraint,
+          MetaType.new_union(antecedents),
           0,
         )
       end
+    end
+    
+    private def total_domain_constraint
+      MetaType.new_intersection(@domain_constraints.map(&.[2]))
+    end
+    
+    private def possible_element_antecedents(infer) : Array(MetaType)
+      results = [] of MetaType
+      
+      total_domain_constraint.each_reachable_defn.to_a.each do |rt|
+        # TODO: Support more element antecedent detection patterns.
+        if rt.defn == infer.refer.decl_defn("Array") \
+        && rt.args.size == 1
+          results << rt.args.first
+        end
+      end
+      
+      results
     end
   end
 end

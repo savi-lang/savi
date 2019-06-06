@@ -822,26 +822,27 @@ describe Mare::Compiler::Infer do
     :actor Main
       :new
         x_ref X'ref = X.new
-        array_ref Array(X)'ref = [x_ref] // okay
-        array_box Array(X)'box = [x_ref] // okay
-        array_val Array(X)'val = [x_ref] // not okay
+        array_ref ref = [x_ref] // okay
+        array_box box = [x_ref] // okay
+        array_val val = [x_ref] // not okay
     SOURCE
     
+    # TODO: This error message will change when we have array literal recovery.
     expected = <<-MSG
-    This expression doesn't meet the type constraints imposed on it:
+    This array's type is unresolvable due to conflicting constraints:
     from (example):8:
-        array_val Array(X)'val = [x_ref] // not okay
-                                 ^~~~~~~
+        array_val val = [x_ref] // not okay
+                        ^~~~~~~
     
-    - the expression has a type of Array(X):
+    - the inferred type of the array literal is Array(X):
       from (example):8:
-        array_val Array(X)'val = [x_ref] // not okay
-                                 ^~~~~~~
+        array_val val = [x_ref] // not okay
+                        ^~~~~~~
     
-    - it must be a subtype of Array(X)'val:
+    - it must be a subtype of val:
       from (example):8:
-        array_val Array(X)'val = [x_ref] // not okay
-                  ^~~~~~~~~~~~
+        array_val val = [x_ref] // not okay
+                  ^~~
     MSG
     
     expect_raises Mare::Error, expected do
