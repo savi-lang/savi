@@ -1374,6 +1374,7 @@ class Mare::Compiler::CodeGen
       raise "#{expr.inspect} isn't a constant value" if const_only
       case expr.style
       when "(", ":" then gen_sequence(expr)
+      when "["      then gen_array(expr)
       else raise NotImplementedError.new(expr.inspect)
       end
     when AST::Choice
@@ -1691,6 +1692,21 @@ class Mare::Compiler::CodeGen
     final.not_nil!
     
     # TODO: Pop the scope frame?
+  end
+  
+  def gen_array(expr : AST::Group)
+    gtype = gtype_of(expr)
+    
+    receiver = gen_alloc(gtype, "#{gtype.type_def.llvm_name}.new")
+    size_arg = @i64.const_int(expr.terms.size)
+    @builder.call(gtype.gfuncs["new"].llvm_func, [receiver, size_arg])
+    
+    expr.terms.each do |term|
+      value = gen_expr(term)
+      @builder.call(gtype.gfuncs["<<"].llvm_func, [receiver, value])
+    end
+    
+    receiver
   end
   
   # TODO: Use infer resolution for static True/False finding where possible.

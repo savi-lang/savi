@@ -28,6 +28,15 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       for_func(ctx, for_type(ctx, main).reified, f, MetaType.cap(f.cap.value)).run if f
     end
     
+    # # TODO: Maybe this needed for cases when we reach types without reaching their fields?
+    # # For each fully reified type in the program,
+    # # make sure we have reached all of its fields.
+    # @types.each_key.select(&.is_complete?).each do |rt|
+    #   rt.defn.functions.select(&.has_tag?(:field)).each do |f|
+    #     for_func(ctx, rt, f, MetaType.cap(f.cap.value)).run
+    #   end
+    # end
+    
     # For each function in the program, run with a new instance,
     # unless that function has already been reached with an infer instance.
     # We probably reached most of them already by starting from Main.new,
@@ -202,7 +211,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     # - unique within a given type
     # - identical for equivalent/compatible reified functions in different types
     def name
-      "'#{receiver_cap.inspect}.#{func.ident.value}"
+      "'#{receiver_cap.inner.inspect}.#{func.ident.value}"
     end
     
     def receiver_cap
@@ -479,6 +488,10 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     
     def each_called_func
       @called_funcs.each
+    end
+    
+    def extra_called_func!(rt, f)
+      @called_funcs.add({rt, f})
     end
     
     def run
@@ -846,6 +859,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
           # A non-empty group always has the node of its final child.
           redirect(node, node.terms.last)
         end
+      when "["
+        self[node] = ArrayLiteral.new(node.pos, node.terms)
       when " "
         ref = refer[node.terms[0]]
         if ref.is_a?(Refer::Local) && ref.defn == node.terms[0]
