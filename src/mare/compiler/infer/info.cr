@@ -467,27 +467,35 @@ class Mare::Compiler::Infer
   
   class ArrayLiteral < Info
     getter terms : Array(AST::Node)
+    property explicit : MetaType?
     
     def initialize(@pos, @terms)
     end
     
     def resolve!(infer : ForFunc)
-      # Determine the MetaType to use for the element type argument.
-      elem_mts = terms.map { |term| infer[term].resolve!(infer) }.uniq
-      elem_mt = MetaType.new_union(elem_mts).simplify(infer)
-      
-      # Construct the ReifiedType to use for the array literal.
-      rt = infer.reified_type(infer.refer.decl_defn("Array"), [elem_mt])
+      mt =
+        if @explicit
+          @explicit.not_nil!
+        else
+          # Determine the MetaType to use for the element type argument.
+          elem_mts = terms.map { |term| infer[term].resolve!(infer) }.uniq
+          elem_mt = MetaType.new_union(elem_mts).simplify(infer)
+          
+          # Construct the ReifiedType to use for the array literal.
+          rt = infer.reified_type(infer.refer.decl_defn("Array"), [elem_mt])
+          MetaType.new(rt)
+        end
       
       # Reach the functions we will use during CodeGen.
       ctx = infer.ctx
+      rt = mt.single!
       ["new", "<<"].each do |f_name|
         f = rt.defn.find_func!(f_name)
         ctx.infer.for_func(ctx, rt, f, MetaType.cap(f.cap.value)).run
         infer.extra_called_func!(rt, f)
       end
       
-      MetaType.new(rt)
+      mt
     end
     
     def within_domain!(infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
@@ -499,6 +507,10 @@ class Mare::Compiler::Infer
       raise NotImplementedError.new("#{rt}") unless \
         rt.defn == infer.refer.decl_defn("Array") && \
         rt.args.size == 1
+      
+      raise "already has an explicit Array type" \
+        if @explicit && @explicit != constraint
+      @explicit = constraint
       
       elem_constraint = rt.args.first
       

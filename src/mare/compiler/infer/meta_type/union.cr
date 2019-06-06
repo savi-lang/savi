@@ -410,6 +410,13 @@ struct Mare::Compiler::Infer::MetaType::Union
   end
   
   def satisfies_bound?(infer : (ForFunc | ForType), bound) : Bool
-    raise NotImplementedError.new("#{self} satisfies_bound? #{bound}")
+    # This union satisfies the given bound if and only if
+    # all terms in the union satisfy the bound.
+    result = true
+    result &&= caps.not_nil!.all?(&.satisfies_bound?(infer, bound)) if caps
+    result &&= terms.not_nil!.all?(&.satisfies_bound?(infer, bound)) if terms
+    result &&= anti_terms.not_nil!.all?(&.satisfies_bound?(infer, bound)) if anti_terms
+    result &&= intersects.not_nil!.all?(&.satisfies_bound?(infer, bound)) if intersects
+    result
   end
 end

@@ -39,16 +39,27 @@ class Mare::Compiler::Classify < Mare::AST::Visitor
   def self.run(ctx)
     ctx.program.types.each do |t|
       t.functions.each do |f|
-        new.run(f)
+        new(ctx, t, f).run
       end
     end
   end
   
-  def run(func)
+  getter ctx : Context
+  getter type : Program::Type
+  getter func : Program::Function
+  
+  def initialize(@ctx, @type, @func)
+  end
+  
+  def run
     func.params.try(&.accept(self))
     func.ret.try(&.accept(self))
     func.ret.try(&.accept(TypeExprVisitor.instance))
     func.body.try(&.accept(self))
+  end
+  
+  def refer
+    ctx.refer[type][func]
   end
   
   # This visitor never replaces nodes, it just touches them and returns them.
@@ -80,12 +91,26 @@ class Mare::Compiler::Classify < Mare::AST::Visitor
   end
   
   def touch(qualify : AST::Qualify)
-    # In a Qualify, a value is needed in all terms of its Group,
-    # despite having been marked as unneeded when handling the Group.
-    qualify.group.terms.each { |t| Classify.value_needed!(t) }
-    
-    # Also, in a Qualifiy, we mark the term as being in such a qualify.
+    # In a Qualify, we mark the term as being in such a qualify.
     Classify.further_qualified!(qualify.term)
+    
+    case refer[qualify.term]
+    when Refer::Unresolved
+      # We assume this qualify to be a function call with arguments.
+      # All of the arguments will have their value used, despite any earlier
+      # work we did of marking them all as unused due to being in a Group.
+      qualify.group.terms.each { |t| Classify.value_needed!(t) }
+    when Refer::Decl, Refer::DeclAlias, Refer::DeclParam
+      # We assume this qualify to be type with type arguments.
+      # None of the arguments will have their value used,
+      # and they are all type expressions.
+      qualify.group.terms.each do |t|
+        Classify.value_not_needed!(t)
+        Classify.type_expr!(t)
+      end
+    else
+      raise NotImplementedError.new(refer[qualify.term])
+    end
   end
   
   def touch(relate : AST::Relate)

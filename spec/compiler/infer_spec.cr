@@ -756,7 +756,7 @@ describe Mare::Compiler::Infer do
     source = Mare::Source.new "(example)", <<-SOURCE
     :actor Main
       :new
-        x Array(U64) = [1, 2, 3]
+        x Array((U64 | None)) = [1, 2, 3] // TODO: allow syntax: Array(U64 | None)?
     SOURCE
     
     ctx = Mare::Compiler.compile([source], :infer)
@@ -764,9 +764,11 @@ describe Mare::Compiler::Infer do
     infer = ctx.infer.for_func_simple(ctx, "Main", "new")
     body = infer.reified.func.body.not_nil!
     assign = body.terms.first.as(Mare::AST::Relate)
+    elem_0 = assign.rhs.as(Mare::AST::Group).terms.first
     
-    infer.resolve(assign.lhs).show_type.should eq "Array(U64)"
-    infer.resolve(assign.rhs).show_type.should eq "Array(U64)"
+    infer.resolve(assign.lhs).show_type.should eq "Array((U64 | None))"
+    infer.resolve(assign.rhs).show_type.should eq "Array((U64 | None))"
+    infer.resolve(elem_0).show_type.should eq "U64"
   end
   
   it "complains when violating uniqueness into an array literal" do
