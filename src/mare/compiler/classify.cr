@@ -12,8 +12,7 @@
 class Mare::Compiler::Classify < Mare::AST::Visitor
   FLAG_VALUE_NOT_NEEDED  = 0x1_u64
   FLAG_TYPE_EXPR         = 0x2_u64
-  FLAG_PARAM             = 0x4_u64
-  FLAG_FURTHER_QUALIFIED = 0x8_u64
+  FLAG_FURTHER_QUALIFIED = 0x4_u64
   
   def self.value_not_needed?(node); (node.flags & FLAG_VALUE_NOT_NEEDED) != 0 end
   def self.value_needed?(node);     (node.flags & FLAG_VALUE_NOT_NEEDED) == 0 end
@@ -22,9 +21,6 @@ class Mare::Compiler::Classify < Mare::AST::Visitor
   
   def self.type_expr?(node); (node.flags & FLAG_TYPE_EXPR) != 0 end
   def self.type_expr!(node); node.flags |= FLAG_TYPE_EXPR end
-  
-  def self.param?(node); (node.flags & FLAG_PARAM) != 0 end
-  def self.param!(node); node.flags |= FLAG_PARAM end
   
   def self.further_qualified?(node); (node.flags & FLAG_FURTHER_QUALIFIED) != 0 end
   def self.further_qualified!(node); node.flags |= FLAG_FURTHER_QUALIFIED end
@@ -50,7 +46,6 @@ class Mare::Compiler::Classify < Mare::AST::Visitor
   
   def run(func)
     func.params.try(&.accept(self))
-    func.params.try(&.terms.each { |param| Classify.param!(param) })
     func.ret.try(&.accept(self))
     func.ret.try(&.accept(TypeExprVisitor.instance))
     func.body.try(&.accept(self))

@@ -175,6 +175,7 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
       
       @for_type.self_decl.defn.params.try(&.accept(root))
       func.params.try(&.accept(root))
+      func.params.try(&.terms.each { |param| root.create_param_local(param) })
       func.ret.try(&.accept(root))
       func.body.try(&.accept(root))
     end
@@ -198,9 +199,6 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
     # This visitor never replaces nodes, it just touches them and returns them.
     def visit(node)
       touch(node)
-      
-      create_param_local(node) if Classify.param?(node)
-      
       node
     end
     
