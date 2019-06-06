@@ -508,6 +508,11 @@ class Mare::Compiler::Infer
         rt.defn == infer.refer.decl_defn("Array") && \
         rt.args.size == 1
       
+      # For now, we only support array literals with a cap of "ref".
+      # Raise an error if that is a dealbreaker for this constraint.
+      as_ref = constraint.override_cap("ref")
+      meta_type_within_domain!(infer, as_ref, use_pos, constraint_pos, constraint, aliases)
+      
       raise "already has an explicit Array type" \
         if @explicit && @explicit != constraint
       @explicit = constraint

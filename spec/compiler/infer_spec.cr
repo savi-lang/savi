@@ -815,6 +815,40 @@ describe Mare::Compiler::Infer do
     end
   end
   
+  it "complains when trying to implicitly recover an array literal" do
+    source = Mare::Source.new "(example)", <<-SOURCE
+    :class X
+    
+    :actor Main
+      :new
+        x_ref X'ref = X.new
+        array_ref Array(X)'ref = [x_ref] // okay
+        array_box Array(X)'box = [x_ref] // okay
+        array_val Array(X)'val = [x_ref] // not okay
+    SOURCE
+    
+    expected = <<-MSG
+    This expression doesn't meet the type constraints imposed on it:
+    from (example):8:
+        array_val Array(X)'val = [x_ref] // not okay
+                                 ^~~~~~~
+    
+    - the expression has a type of Array(X):
+      from (example):8:
+        array_val Array(X)'val = [x_ref] // not okay
+                                 ^~~~~~~
+    
+    - it must be a subtype of Array(X)'val:
+      from (example):8:
+        array_val Array(X)'val = [x_ref] // not okay
+                  ^~~~~~~~~~~~
+    MSG
+    
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :infer)
+    end
+  end
+  
   it "reflects viewpoint adaptation in the return type of a prop getter" do
     source = Mare::Source.new "(example)", <<-SOURCE
     :class Inner
