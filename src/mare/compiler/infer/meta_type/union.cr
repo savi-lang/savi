@@ -76,8 +76,10 @@ struct Mare::Compiler::Infer::MetaType::Union
   
   def each_reachable_defn : Iterator(Infer::ReifiedType)
     iter = ([] of Infer::ReifiedType).each
-    iter = iter.chain(terms.not_nil!.each.map(&.defn).select(&.is_a?(Infer::ReifiedType)).map(&.as(Infer::ReifiedType))) if terms
-    iter = iter.chain(anti_terms.not_nil!.each.map(&.defn).select(&.is_a?(Infer::ReifiedType)).map(&.as(Infer::ReifiedType))) if anti_terms # TODO: is an anti-nominal actually reachable?
+    
+    iter = iter.chain(
+      terms.not_nil!.map(&.each_reachable_defn).flat_map(&.to_a).each
+    ) if terms
     iter = iter.chain(
       intersects.not_nil!.map(&.each_reachable_defn).flat_map(&.to_a).each
     ) if intersects

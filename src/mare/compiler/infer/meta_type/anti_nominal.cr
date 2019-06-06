@@ -13,7 +13,7 @@ struct Mare::Compiler::Infer::MetaType::AntiNominal
   end
   
   def each_reachable_defn : Iterator(Infer::ReifiedType)
-    [defn].each # TODO: is an anti-nominal actually reachable?
+    ([] of Infer::ReifiedType).each
   end
   
   def find_callable_func_defns(infer : ForFunc, name : String)
