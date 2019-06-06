@@ -752,6 +752,23 @@ describe Mare::Compiler::Infer do
     infer.resolve(assign.rhs).show_type.should eq "Array(String)"
   end
   
+  it "infers the element types of an array literal from an assignment" do
+    source = Mare::Source.new "(example)", <<-SOURCE
+    :actor Main
+      :new
+        x Array(U64) = [1, 2, 3]
+    SOURCE
+    
+    ctx = Mare::Compiler.compile([source], :infer)
+    
+    infer = ctx.infer.for_func_simple(ctx, "Main", "new")
+    body = infer.reified.func.body.not_nil!
+    assign = body.terms.first.as(Mare::AST::Relate)
+    
+    infer.resolve(assign.lhs).show_type.should eq "Array(U64)"
+    infer.resolve(assign.rhs).show_type.should eq "Array(U64)"
+  end
+  
   it "reflects viewpoint adaptation in the return type of a prop getter" do
     source = Mare::Source.new "(example)", <<-SOURCE
     :class Inner

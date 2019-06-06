@@ -491,7 +491,26 @@ class Mare::Compiler::Infer
     end
     
     def within_domain!(infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
-      raise NotImplementedError.new("#{self.inspect} within_domain! #{constraint.inspect}")
+      raise NotImplementedError.new("ArrayLiteral within_domain! #{constraint}") \
+        unless constraint.singular?
+      
+      rt = constraint.single!
+      
+      raise NotImplementedError.new("#{rt}") unless \
+        rt.defn == infer.refer.decl_defn("Array") && \
+        rt.args.size == 1
+      
+      elem_constraint = rt.args.first
+      
+      terms.each do |term|
+        infer[term].within_domain!(
+          infer,
+          use_pos,
+          constraint_pos,
+          elem_constraint,
+          1,
+        )
+      end
     end
   end
 end
