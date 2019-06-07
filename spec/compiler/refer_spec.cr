@@ -302,4 +302,119 @@ describe Mare::Compiler::Refer do
       Mare::Compiler.compile([source], :refer)
     end
   end
+  
+  it "complains when consuming a local in a loop cond" do
+    source = Mare::Source.new "(example)", <<-SOURCE
+    :actor Main
+      :new
+        x = "example"
+        while --x (True)
+    SOURCE
+    
+    expected = <<-MSG
+    This variable can't be used here; it might already be consumed:
+    from (example):4:
+        while --x (True)
+                ^
+    
+    - it was consumed here:
+      from (example):4:
+        while --x (True)
+              ^~~
+    MSG
+    
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :refer)
+    end
+  end
+  
+  it "complains when consuming a local in a loop body" do
+    source = Mare::Source.new "(example)", <<-SOURCE
+    :actor Main
+      :new
+        x = "example"
+        while True (--x)
+    SOURCE
+    
+    expected = <<-MSG
+    This variable can't be used here; it might already be consumed:
+    from (example):4:
+        while True (--x)
+                      ^
+    
+    - it was consumed here:
+      from (example):4:
+        while True (--x)
+                    ^~~
+    MSG
+    
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :refer)
+    end
+  end
+  
+  it "complains when using a local possibly consumed in a loop else body" do
+    source = Mare::Source.new "(example)", <<-SOURCE
+    :actor Main
+      :new
+        x = "example"
+        while True (None | --x)
+        x
+    SOURCE
+    
+    expected = <<-MSG
+    This variable can't be used here; it might already be consumed:
+    from (example):5:
+        x
+        ^
+    
+    - it was consumed here:
+      from (example):4:
+        while True (None | --x)
+                           ^~~
+    MSG
+    
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :refer)
+    end
+  end
+  
+  it "allows referencing a local in the body of a loop consumed in the else" do
+    source = Mare::Source.new "(example)", <<-SOURCE
+    :actor Main
+      :new
+        x = "example"
+        while True (x | --x)
+    SOURCE
+    
+    Mare::Compiler.compile([source], :refer)
+  end
+  
+  it "complains when a loop cond uses a local consumed before the loop" do
+    source = Mare::Source.new "(example)", <<-SOURCE
+    :actor Main
+      :new
+        @show(1)
+      
+      :fun show (u U64)
+        --u
+        while u == 1 ("one" | "other")
+    SOURCE
+    
+    expected = <<-MSG
+    This variable can't be used here; it might already be consumed:
+    from (example):7:
+        while u == 1 ("one" | "other")
+              ^
+    
+    - it was consumed here:
+      from (example):6:
+        --u
+        ^~~
+    MSG
+    
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :refer)
+    end
+  end
 end

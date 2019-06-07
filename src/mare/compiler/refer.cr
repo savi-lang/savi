@@ -330,6 +330,52 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
       end
     end
     
+    # We don't visit anything under a choice with this visitor;
+    # we instead spawn new visitor instances in the touch method below.
+    def visit_children?(node : AST::Loop)
+      false
+    end
+    
+    # For a Loop, do a branching analysis of the clauses contained within it.
+    def touch(node : AST::Loop)
+      # Prepare to collect the list of new locals exposed in each branch.
+      branch_locals = {} of String => Array(Local | LocalUnion)
+      body_consumes = {} of (Local | LocalUnion) => Source::Pos
+      
+      # Visit the loop cond twice (nested) to simulate repeated execution.
+      cond_branch = sub_branch
+      node.cond.accept(cond_branch)
+      cond_branch_2 = cond_branch.sub_branch
+      node.cond.accept(cond_branch_2)
+      
+      # Absorb any consumes from the cond branch into this parent branch.
+      # This makes them visible both in the parent and in future sub branches.
+      @consumes.merge!(cond_branch.consumes)
+      
+      # Now, visit the else body, if any.
+      node.else_body.try do |else_body|
+        else_branch = sub_branch
+        else_body.accept(else_branch)
+        
+        # Collect any consumes from the else body branch.
+        body_consumes.merge!(else_branch.consumes)
+      end
+      
+      # Now, visit the main body twice (nested) to simulate repeated execution.
+      body_branch = sub_branch
+      node.body.accept(body_branch)
+      body_branch_2 = body_branch.sub_branch
+      node.body.accept(body_branch_2)
+      
+      # Collect any consumes from the body branch.
+      body_consumes.merge!(body_branch.consumes)
+      
+      # Absorb any consumes from the body branches into this parent branch.
+      @consumes.merge!(body_consumes)
+      
+      # TODO: Is it possible/safe to collect locals from the body branches?
+    end
+    
     def touch(node : AST::Node)
       # On all other nodes, do nothing.
     end

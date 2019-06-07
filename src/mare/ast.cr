@@ -93,7 +93,7 @@ module Mare::AST
   alias Term = Identifier \
     | LiteralString | LiteralInteger | LiteralFloat \
     | Operator | Prefix | Relate | Group \
-    | FieldRead | FieldWrite | Choice
+    | FieldRead | FieldWrite | Choice | Loop
   
   class Identifier < Node
     property value
@@ -231,6 +231,29 @@ module Mare::AST
     end
     def children_accept(visitor)
       @list.map! { |cond, body| {cond.accept(visitor), body.accept(visitor)} }
+    end
+  end
+  
+  class Loop < Node
+    property cond : Term
+    property body : Term
+    property else_body : Term?
+    
+    def initialize(@cond, @body, @else_body = nil)
+    end
+    
+    def name; :loop end
+    def to_a: Array(A)
+      res = [name] of A
+      res << cond.to_a
+      res << body.to_a
+      res << else_body.not_nil!.to_a if else_body
+      res
+    end
+    def children_accept(visitor)
+      cond.accept(visitor)
+      body.accept(visitor)
+      else_body.try(&.accept(visitor))
     end
   end
 end

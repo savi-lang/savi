@@ -62,6 +62,14 @@ class Mare::Compiler::Macros < Mare::AST::Visitor
         "  including an optional else clause partitioned by `|`",
       ])
       visit_if(node)
+    elsif Util.match_ident?(node, 0, "while")
+      Util.require_terms(node, [
+        nil,
+        "the condition to be satisfied",
+        "the body to be conditionally executed in a loop,\n" \
+        "  including an optional else clause partitioned by `|`",
+      ])
+      visit_while(node)
     elsif Util.match_ident?(node, 0, "case")
       Util.require_terms(node, [
         nil,
@@ -102,6 +110,27 @@ class Mare::Compiler::Macros < Mare::AST::Visitor
     
     group = AST::Group.new("(").from(node)
     group.terms << AST::Choice.new(clauses).from(orig)
+    group
+  end
+  
+  def visit_while(node : AST::Group)
+    orig = node.terms[0]
+    cond = node.terms[1]
+    body = node.terms[2]
+    else_body = nil
+    
+    if body.is_a?(AST::Group) && body.style == "|"
+      Util.require_terms(body, [
+        "the body to be executed on loop when the condition is true",
+        "the body to be executed otherwise (the \"else\" case)",
+      ], true)
+      
+      else_body = body.terms[1]
+      body      = body.terms[0]
+    end
+    
+    group = AST::Group.new("(").from(node)
+    group.terms << AST::Loop.new(cond, body, else_body).from(orig)
     group
   end
   
