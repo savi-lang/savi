@@ -204,7 +204,7 @@ class Mare::Compiler::Infer
   
   class Local < DynamicInfo # TODO: dedup implementation with Field and Param
     @explicit : MetaType?
-    @upstream : AST::Node?
+    @upstreams = [] of AST::Node
     
     def initialize(@pos)
     end
@@ -218,20 +218,33 @@ class Mare::Compiler::Infer
       return explicit.not_nil! if explicit && !explicit.cap_only?
       
       Error.at self, "This needs an explicit type; it could not be inferred" \
-        unless explicit || @upstream
+        unless explicit || !@upstreams.empty?
       
-      if @upstream
-        upstream = infer[@upstream.not_nil!].resolve!(infer).strip_ephemeral
-        upstream = upstream.intersect(explicit) if explicit
-        upstream
-      else
-        explicit.not_nil!
+      # TODO: refactor to use the explicit type only whenever it is present,
+      # instead of intersecting it with the upstream.
+      meta_type =
+        if @upstreams.empty?
+          explicit.not_nil!
+        else
+          upstream = infer[@upstreams.first].resolve!(infer).strip_ephemeral
+          upstream = upstream.intersect(explicit) if explicit
+          upstream
+        end
+      
+      # TODO: Verify all upstreams instead of just beyond 1, after the above TODO is completed.
+      if @upstreams.size > 1
+        @upstreams[1..-1].each do |other_upstream|
+          # TODO: use a custom Error.at for this instead
+          infer[other_upstream].within_domain!(infer, pos, pos, meta_type, 1) # TODO: should we really use 1 here?
+        end
       end
+      
+      meta_type
     end
     
     def set_explicit(explicit_pos : Source::Pos, explicit : MetaType)
       raise "already set_explicit" if @explicit
-      raise "shouldn't have an upstream yet" if @upstream
+      raise "shouldn't have an upstream yet" if !@upstreams.empty?
       
       @explicit = explicit
       @pos = explicit_pos
@@ -240,7 +253,9 @@ class Mare::Compiler::Infer
     def after_within_domain!(infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
       return if @explicit
       
-      infer[@upstream.not_nil!].within_domain!(infer, use_pos, constraint_pos, constraint, aliases)
+      @upstreams.each do |upstream|
+        infer[upstream].within_domain!(infer, use_pos, constraint_pos, constraint, aliases)
+      end
     end
     
     def assign(infer : ForFunc, rhs : AST::Node, rhs_pos : Source::Pos)
@@ -252,8 +267,7 @@ class Mare::Compiler::Infer
         0,
       ) if @explicit
       
-      raise "already assigned an upstream" if @upstream
-      @upstream = rhs
+      @upstreams << rhs
     end
   end
   

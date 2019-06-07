@@ -1207,15 +1207,15 @@ class Mare::Compiler::CodeGen
     
     @di.set_loc(relate.op)
     if ref.is_a?(Refer::Local)
-      raise "local already declared: #{ref.inspect}" \
-        if func_frame.current_locals[ref]?
-      
-      alloca = @builder.alloca(lhs_type, ref.name)
+      alloca = (
+        func_frame.current_locals[ref] ||= @builder.alloca(lhs_type, ref.name)
+      )
       @builder.store(cast_value, alloca)
-      
-      func_frame.current_locals[ref] = alloca
-    else raise NotImplementedError.new(relate.inspect)
+    else
+      raise NotImplementedError.new(relate.inspect)
     end
+    
+    cast_value
   end
   
   def gen_field_eq(node : AST::FieldWrite)

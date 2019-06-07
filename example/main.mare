@@ -52,9 +52,13 @@
     | BelligerentFour
     )
     
+    exitcode = 0
     maybe_thirty_three (I32 | None) = I32[33]
-    if maybe_thirty_three <: I32 \
-      LibPonyRT.pony_exitcode(augend + maybe_thirty_three + 9)
+    if maybe_thirty_three <: I32 (
+      exitcode = augend + maybe_thirty_three + 9
+    )
+    
+    LibPonyRT.pony_exitcode(exitcode)
   
   :fun say_stuff (greeting Greeting)
     pre_greeting = Container(String).new("[pre greeting]")
