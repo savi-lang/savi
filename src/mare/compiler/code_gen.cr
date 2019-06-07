@@ -1200,17 +1200,20 @@ class Mare::Compiler::CodeGen
     ref = func_frame.refer[relate.lhs]
     value = gen_expr(relate.rhs).as(LLVM::Value)
     name = value.name
+    lhs_type = llvm_type_of(relate.lhs)
     
-    value = gen_assign_cast(value, llvm_type_of(relate.lhs), relate.rhs)
-    value.name = name
+    cast_value = gen_assign_cast(value, lhs_type, relate.rhs)
+    cast_value.name = value.name
     
     @di.set_loc(relate.op)
     if ref.is_a?(Refer::Local)
       raise "local already declared: #{ref.inspect}" \
         if func_frame.current_locals[ref]?
       
-      value.name = ref.name
-      func_frame.current_locals[ref] = value
+      alloca = @builder.alloca(lhs_type, ref.name)
+      @builder.store(cast_value, alloca)
+      
+      func_frame.current_locals[ref] = alloca
     else raise NotImplementedError.new(relate.inspect)
     end
   end
@@ -1323,7 +1326,8 @@ class Mare::Compiler::CodeGen
         frame.func.params[param_idx]
       elsif ref.is_a?(Refer::Local)
         raise "#{ref.inspect} isn't a constant value" if const_only
-        func_frame.current_locals[ref]
+        alloca = func_frame.current_locals[ref]
+        @builder.load(alloca, ref.name)
       elsif ref.is_a?(Refer::Decl) || ref.is_a?(Refer::DeclAlias)
         enum_value = ref.defn.metadata[:enum_value]?
         if enum_value
