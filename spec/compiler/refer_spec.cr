@@ -174,37 +174,128 @@ describe Mare::Compiler::Refer do
     end
   end
   
-  it "complains when a possibly-consumed local from branches is referenced" do
+  it "complains when referencing a possibly-consumed local from a choice" do
     source = Mare::Source.new "(example)", <<-SOURCE
     :actor Main
       :new
-        if True (
-          if True (
-            x = "one" // no consume
-          |
-            x = "two", --x
+        @show(1)
+      
+      :fun show (u U64)
+        if u <= 3 (
+          case (
+          | u == 1 | x = "one" // no consume
+          | u == 2 | x = "two",   --x
+          | u == 2 | x = "three", --x
+          |          x = "four",  --x
           )
         |
-          x = "three", --x
+          x = "four", --x
         )
         x
     SOURCE
     
     expected = <<-MSG
     This variable can't be used here; it might already be consumed:
-    from (example):12:
+    from (example):16:
         x
         ^
     
     - it was consumed here:
-      from (example):7:
-            x = "two", --x
-                       ^~~
+      from (example):9:
+          | u == 2 | x = "two",   --x
+                                  ^~~
     
     - it was consumed here:
       from (example):10:
-          x = "three", --x
-                       ^~~
+          | u == 2 | x = "three", --x
+                                  ^~~
+    
+    - it was consumed here:
+      from (example):11:
+          |          x = "four",  --x
+                                  ^~~
+    
+    - it was consumed here:
+      from (example):14:
+          x = "four", --x
+                      ^~~
+    MSG
+    
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :refer)
+    end
+  end
+  
+  it "allows referencing a local consumed in an earlier choice branch" do
+    source = Mare::Source.new "(example)", <<-SOURCE
+    :actor Main
+      :new
+        @show(1)
+      
+      :fun show (u U64)
+        case (
+        | u == 1 | --u, x = "one"
+        | u == 2 | --u, x = "two"
+        | u == 2 | --u, x = "three"
+        |          --u, x = "four"
+        )
+    SOURCE
+    
+    Mare::Compiler.compile([source], :refer)
+  end
+  
+  it "complains when a choice body uses a local consumed in an earlier cond" do
+    source = Mare::Source.new "(example)", <<-SOURCE
+    :actor Main
+      :new
+        @show(1)
+      
+      :fun show (u U64)
+        if --u == 1 (
+          "one"
+        |
+          u
+        )
+    SOURCE
+    
+    expected = <<-MSG
+    This variable can't be used here; it might already be consumed:
+    from (example):9:
+          u
+          ^
+    
+    - it was consumed here:
+      from (example):6:
+        if --u == 1 (
+           ^~~
+    MSG
+    
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :refer)
+    end
+  end
+  
+  it "complains when a choice cond uses a local consumed before the choice" do
+    source = Mare::Source.new "(example)", <<-SOURCE
+    :actor Main
+      :new
+        @show(1)
+      
+      :fun show (u U64)
+        --u
+        if u == 1 ("one" | "other")
+    SOURCE
+    
+    expected = <<-MSG
+    This variable can't be used here; it might already be consumed:
+    from (example):7:
+        if u == 1 ("one" | "other")
+           ^
+    
+    - it was consumed here:
+      from (example):6:
+        --u
+        ^~~
     MSG
     
     expect_raises Mare::Error, expected do

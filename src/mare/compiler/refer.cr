@@ -193,7 +193,7 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
     end
     
     def sub_branch(init_locals = @locals.dup)
-      ForBranch.new(@refer, init_locals)
+      ForBranch.new(@refer, init_locals, @consumes.dup)
     end
     
     # This visitor never replaces nodes, it just touches them and returns them.
@@ -290,6 +290,7 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
     def touch(node : AST::Choice)
       # Prepare to collect the list of new locals exposed in each branch.
       branch_locals = {} of String => Array(Local | LocalUnion)
+      body_consumes = {} of (Local | LocalUnion) => Source::Pos
       
       # Iterate over each clause, visiting both the cond and body of the clause.
       node.list.each do |cond, body|
@@ -298,14 +299,16 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
         cond.accept(cond_branch)
         
         # Absorb any consumes from the cond branch into this parent branch.
+        # This makes them visible both in the parent and in future sub branches.
         @consumes.merge!(cond_branch.consumes)
         
         # Visit the body next. Locals from the cond are available in the body.
+        # Consumes from any earlier cond are also visible in the body.
         body_branch = sub_branch(cond_branch.locals)
         body.accept(body_branch)
         
-        # Absorb any consumes from the body branch into this parent branch.
-        @consumes.merge!(body_branch.consumes)
+        # Collect any consumes from the body branch.
+        body_consumes.merge!(body_branch.consumes)
         
         # Collect the list of new locals exposed in the body branch.
         body_branch.locals.each do |name, local|
@@ -313,6 +316,9 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
           (branch_locals[name] ||= Array(Local | LocalUnion).new) << local
         end
       end
+      
+      # Absorb any consumes from the cond branches into this parent branch.
+      @consumes.merge!(body_consumes)
       
       # Expose the locals from the branches as LocalUnion instances.
       # Those locals that were exposed in only some of the branches are to be
