@@ -51,6 +51,13 @@
     test["False not     "].pass = False.not      == True
     
     ///
+    // Numeric convenience aliases
+    
+    test["U32 zero"].pass = U32.zero == 0
+    test["F32 zero"].pass = F32.zero == 0
+    test["F64 zero"].pass = F64.zero == 0
+    
+    ///
     // Numeric conversions
     
     test["U32 to u8 "].pass = U32[31].u8  == 31
@@ -149,12 +156,12 @@
     test["numeric min r"].pass = U32[90].min(3) == 3
     test["numeric max l"].pass = U32[90].max(3) == 90
     test["numeric max r"].pass = U32[3].max(90) == 90
-    // TODO: test["unsigned integer abs positive"].pass = U32[93].abs == 93
-    // TODO: test["unsigned integer abs overflow"].pass = U32[-93].abs == -93
-    // TODO: test["signed integer   abs positive"].pass = I32[93].abs == 93
-    // TODO: test["signed integer   abs negative"].pass = I32[-93].abs == 93
-    // TODO: test["floating point   abs positive"].pass = F32[9.3].abs == 9.3
-    // TODO: test["floating point   abs negative"].pass = F32[-9.3].abs == 9.3
+    test["unsigned integer abs positive"].pass = U32[93].abs == 93
+    test["unsigned integer abs overflow"].pass = U32[-93].abs == -93
+    test["signed integer   abs positive"].pass = I32[93].abs == 93
+    test["signed integer   abs negative"].pass = I32[-93].abs == 93
+    test["floating point   abs positive"].pass = F32[9.3].abs == 9.3
+    test["floating point   abs negative"].pass = F32[-9.3].abs == 9.3
     
     ///
     // Integer bit manipulation

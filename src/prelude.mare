@@ -32,6 +32,7 @@
   :const is_floating_point Bool
   
   :fun non "[]" (value @'val) @'val: value
+  :fun non zero @'val: compiler intrinsic
   
   :fun val "==" (other @) Bool: compiler intrinsic
   :fun val "!=" (other @) Bool: compiler intrinsic
@@ -48,7 +49,7 @@
   
   :fun val min (other @) @: if (@ < other) (@ | other)
   :fun val max (other @) @: if (@ > other) (@ | other)
-  // TODO: :fun val abs: if (@is_signed && @ < 0) (@[0] - @ | @)
+  :fun val abs: if (@is_signed && @ < @zero) (@zero - @ | @)
 
 :trait val IntegerMethods // TODO: don't use :trait for this... `common`?
   :const bit_width U8 // TODO: dedup with NumericMethods

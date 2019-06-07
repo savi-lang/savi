@@ -776,6 +776,16 @@ class Mare::Compiler::CodeGen
     
     @builder.ret \
       case gfunc.func.ident.value
+      when "zero"
+        if gtype.type_def.is_floating_point_numeric?
+          case gtype.type_def.bit_width
+          when 32 then llvm_type_of(gtype).const_float(0)
+          when 64 then llvm_type_of(gtype).const_double(0)
+          else raise NotImplementedError.new(gtype.type_def.bit_width)
+          end
+        else
+          llvm_type_of(gtype).const_int(0)
+        end
       when "u8" then gen_numeric_conv(gtype, @gtypes["U8"], params[0])
       when "u32" then gen_numeric_conv(gtype, @gtypes["U32"], params[0])
       when "u64" then gen_numeric_conv(gtype, @gtypes["U64"], params[0])
