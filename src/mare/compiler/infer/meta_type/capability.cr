@@ -64,7 +64,7 @@ struct Mare::Compiler::Infer::MetaType::Capability
   
   def intersect(other : Capability)
     raise "unsupported intersect: #{self} & #{other}" \
-      unless ALL_NON_EPH.includes?(self) && ALL_NON_EPH.includes?(other)
+      unless ALL_SINGLE.includes?(self) && ALL_SINGLE.includes?(other)
     
     # If the two are equivalent, return the cap.
     return self if self == other
@@ -215,6 +215,11 @@ struct Mare::Compiler::Infer::MetaType::Capability
     when TRN then BOX
     else self
     end
+  end
+  
+  def strip_cap
+    # Stripping a cap out of itself leaves the type totally unconstrained.
+    Unconstrained.instance
   end
   
   def partial_reifications : Set(Capability)

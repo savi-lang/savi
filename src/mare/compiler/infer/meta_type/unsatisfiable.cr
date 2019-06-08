@@ -53,6 +53,10 @@ class Mare::Compiler::Infer::MetaType::Unsatisfiable
     self # no effect
   end
   
+  def strip_cap
+    self # no effect
+  end
+  
   def partial_reifications
     Set(Inner).new # no partial reifications are possible
   end

@@ -253,6 +253,10 @@ struct Mare::Compiler::Infer::MetaType::Intersection
     Intersection.new(cap.try(&.alias), terms, anti_terms)
   end
   
+  def strip_cap
+    Intersection.build(nil, terms, anti_terms)
+  end
+  
   def partial_reifications
     # If this intersection already has a capability, it can't be divided into
     # any further capability possibilities, so just return it now.

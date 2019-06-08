@@ -112,6 +112,10 @@ struct Mare::Compiler::Infer::MetaType
     MetaType.new(inner.alias)
   end
   
+  def strip_cap
+    MetaType.new(inner.strip_cap)
+  end
+  
   def partial_reifications
     inner.partial_reifications.map { |i| MetaType.new(i) }
   end

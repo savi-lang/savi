@@ -318,6 +318,22 @@ struct Mare::Compiler::Infer::MetaType::Union
     )
   end
   
+  def strip_cap
+    result = Unsatisfiable::INSTANCE
+    
+    terms.not_nil!.each do |term|
+      result = result.unite(term)
+    end if terms
+    anti_terms.not_nil!.each do |anti_term|
+      result = result.unite(anti_term)
+    end if anti_terms
+    intersects.not_nil!.each do |intersect|
+      result = result.unite(intersect.strip_cap)
+    end if intersects
+    
+    result
+  end
+  
   def partial_reifications
     # Intersect with every possible non-ephemeral cap.
     Capability::ALL_NON_EPH.map(&.intersect(self))

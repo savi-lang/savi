@@ -111,6 +111,10 @@ struct Mare::Compiler::Infer::MetaType::AntiNominal
     self # no effect
   end
   
+  def strip_cap
+    self # no effect
+  end
+  
   def partial_reifications
     # Intersect with every possible non-ephemeral cap.
     Capability::ALL_NON_EPH.map(&.intersect(self)).to_set

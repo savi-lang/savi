@@ -357,6 +357,36 @@ describe Mare::Compiler::Infer do
     end
   end
   
+  it "complains when a different type is assigned on reassignment" do
+    source = Mare::Source.new "(example)", <<-SOURCE
+    :actor Main
+      :new
+        x = U64[0]
+        x = "a string"
+    SOURCE
+    
+    expected = <<-MSG
+    The type of this expression doesn't meet the constraints imposed on it:
+    from (example):4:
+        x = "a string"
+             ^~~~~~~~
+    
+    - it is required here to be a subtype of U64:
+      from (example):3:
+        x = U64[0]
+        ^
+    
+    - but the type of the literal value was String:
+      from (example):4:
+        x = "a string"
+             ^~~~~~~~
+    MSG
+    
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :infer)
+    end
+  end
+  
   it "infers return type from param type or another return type" do
     source = Mare::Source.new "(example)", <<-SOURCE
     :primitive Infer
@@ -645,6 +675,45 @@ describe Mare::Compiler::Infer do
       from (example):14:
         x3a iso = X.new
             ^~~
+    
+    - this would be allowed if this reference didn't get aliased
+    - did you forget to consume the reference?
+    MSG
+    
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :infer)
+    end
+  end
+  
+  it "complains when violating uniqueness into a reassigned local" do
+    source = Mare::Source.new "(example)", <<-SOURCE
+    :class X
+      :new iso
+    
+    :actor Main
+      :new
+        xb val = X.new // okay
+        xb     = X.new // okay
+        
+        xa iso = X.new
+        xb     = xa    // not okay
+    SOURCE
+    
+    expected = <<-MSG
+    The type of this expression doesn't meet the constraints imposed on it:
+    from (example):10:
+        xb     = xa    // not okay
+                 ^~
+    
+    - it is required here to be a subtype of X'val:
+      from (example):6:
+        xb val = X.new // okay
+           ^~~
+    
+    - but the type of the local variable (when aliased) was X'tag:
+      from (example):9:
+        xa iso = X.new
+           ^~~
     
     - this would be allowed if this reference didn't get aliased
     - did you forget to consume the reference?

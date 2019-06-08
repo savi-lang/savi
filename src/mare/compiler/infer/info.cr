@@ -61,7 +61,7 @@ class Mare::Compiler::Infer
     def describe_domain_constraints
       @domain_constraints.map do |c|
         {c[1], "it is required here to be a subtype of #{c[2].show_type}"}
-      end
+      end.to_h.to_a
     end
     
     def first_domain_constraint_pos
@@ -81,10 +81,16 @@ class Mare::Compiler::Infer
     # Must be implemented by the child class as an required hook.
     abstract def inner_resolve!(infer : ForFunc)
     
+    # May be implemented by the child class as an optional hook.
+    def after_resolve!(infer : ForFunc, meta_type : MetaType); end
+    
     # The final MetaType must meet all constraints that have been imposed.
     def resolve!(infer : ForFunc) : MetaType
       meta_type = inner_resolve!(infer)
-      return meta_type if domain_constraints.empty?
+      if domain_constraints.empty?
+        after_resolve!(infer, meta_type)
+        return meta_type
+      end
       
       use_pos = domain_constraints.first[0]
       aliases = domain_constraints.map(&.[3]).reduce(0) { |a1, a2| a1 + a2 }
@@ -126,6 +132,8 @@ class Mare::Compiler::Infer
             extra
       end
       
+      # meta_type = meta_type.strip_ephemeral
+      after_resolve!(infer, meta_type)
       meta_type
     end
     
@@ -204,7 +212,7 @@ class Mare::Compiler::Infer
   
   class Local < DynamicInfo # TODO: dedup implementation with Field and Param
     @explicit : MetaType?
-    @upstreams = [] of AST::Node
+    @upstreams = [] of Tuple(AST::Node, Source::Pos)
     
     def initialize(@pos)
     end
@@ -226,25 +234,32 @@ class Mare::Compiler::Infer
         if @upstreams.empty?
           explicit.not_nil!
         else
-          upstream = infer[@upstreams.first].resolve!(infer).strip_ephemeral
-          upstream = upstream.intersect(explicit) if explicit
-          upstream
+          upstream = infer[@upstreams.first[0]].resolve!(infer)
+          if explicit
+            raise "sanity check" unless explicit.cap_only?
+            upstream = upstream.strip_cap.intersect(explicit)
+          end
+          upstream.strip_ephemeral
         end
-      
-      # TODO: Verify all upstreams instead of just beyond 1, after the above TODO is completed.
-      if @upstreams.size > 1
-        @upstreams[1..-1].each do |other_upstream|
-          # TODO: use a custom Error.at for this instead
-          infer[other_upstream].within_domain!(infer, pos, pos, meta_type, 1) # TODO: should we really use 1 here?
-        end
-      end
       
       meta_type
     end
     
+    def after_resolve!(infer : ForFunc, meta_type : MetaType)
+      # TODO: Verify all upstreams instead of just beyond 1?
+      if @upstreams.size > 1
+        @upstreams[1..-1].each do |other_upstream, other_upstream_pos|
+          infer[other_upstream].within_domain!(infer, other_upstream_pos, pos, meta_type.strip_ephemeral, 0) # TODO: should we really use 0 here?
+          
+          other_mt = infer[other_upstream].resolve!(infer)
+          raise "sanity check" unless other_mt.subtype_of?(infer, meta_type)
+        end
+      end
+    end
+    
     def set_explicit(explicit_pos : Source::Pos, explicit : MetaType)
       raise "already set_explicit" if @explicit
-      raise "shouldn't have an upstream yet" if !@upstreams.empty?
+      raise "shouldn't have an upstream yet" unless @upstreams.empty?
       
       @explicit = explicit
       @pos = explicit_pos
@@ -253,7 +268,7 @@ class Mare::Compiler::Infer
     def after_within_domain!(infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
       return if @explicit
       
-      @upstreams.each do |upstream|
+      @upstreams.each do |upstream, upstream_pos|
         infer[upstream].within_domain!(infer, use_pos, constraint_pos, constraint, aliases)
       end
     end
@@ -267,7 +282,7 @@ class Mare::Compiler::Infer
         0,
       ) if @explicit
       
-      @upstreams << rhs
+      @upstreams << {rhs, rhs_pos}
     end
   end
   
