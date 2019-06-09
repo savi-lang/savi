@@ -55,6 +55,7 @@ class Mare::Compiler::Infer
   end
   
   abstract class DynamicInfo < Info
+    @already_resolved : MetaType?
     @domain_constraints = [] of Tuple(Source::Pos, Source::Pos, MetaType, Int32)
     getter domain_constraints
     
@@ -86,9 +87,12 @@ class Mare::Compiler::Infer
     
     # The final MetaType must meet all constraints that have been imposed.
     def resolve!(infer : ForFunc) : MetaType
+      return @already_resolved.not_nil! if @already_resolved
+      
       meta_type = inner_resolve!(infer)
       if domain_constraints.empty?
         after_resolve!(infer, meta_type)
+        @already_resolved = meta_type
         return meta_type
       end
       
@@ -132,8 +136,8 @@ class Mare::Compiler::Infer
             extra
       end
       
-      # meta_type = meta_type.strip_ephemeral
       after_resolve!(infer, meta_type)
+      @already_resolved = meta_type
       meta_type
     end
     
@@ -142,6 +146,17 @@ class Mare::Compiler::Infer
     end
     
     def within_domain!(infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
+      if @already_resolved
+        return meta_type_within_domain!(
+          infer,
+          @already_resolved.not_nil!,
+          use_pos,
+          constraint_pos,
+          constraint,
+          aliases,
+        )
+      end
+      
       @domain_constraints << {use_pos, constraint_pos, constraint, aliases + adds_alias}
       
       after_within_domain!(infer, use_pos, constraint_pos, constraint, aliases + adds_alias)
