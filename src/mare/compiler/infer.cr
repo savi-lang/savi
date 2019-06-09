@@ -515,19 +515,19 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       
       # Create a fake local variable that represents the return value.
       # See also the #ret method.
-      self[ret] = Local.new(ret.pos)
+      self[ret] = FuncBody.new(ret.pos)
       
       # Take note of the return type constraint if given.
       # For constructors, this is the self type and listed receiver cap.
       if func.has_tag?(:constructor)
         meta_type = MetaType.new(reified.type, func.cap.not_nil!.value)
         meta_type = meta_type.ephemeralize # a constructor returns the ephemeral
-        self[ret].as(Local).set_explicit(func.cap.not_nil!.pos, meta_type)
+        self[ret].as(FuncBody).set_explicit(func.cap.not_nil!.pos, meta_type)
       else
         func.ret.try do |ret_t|
           ret_t.accept(self)
           meta_type = resolve(ret_t)
-          self[ret].as(Local).set_explicit(ret_t.pos, meta_type)
+          self[ret].as(FuncBody).set_explicit(ret_t.pos, meta_type)
         end
       end
       
@@ -545,7 +545,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         # and also of allowing inference if there is no explicit type.
         # We don't do this for constructors, since constructors implicitly return
         # self no matter what the last term of the body of the function is.
-        self[ret].as(Local).assign(self, func_body, func_body_pos) \
+        self[ret].as(FuncBody).assign(self, func_body, func_body_pos) \
           unless func.has_tag?(:constructor)
       end
       
@@ -894,13 +894,13 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
     
     def touch(node : AST::FieldRead)
-      field = Field.new(node.pos, resolved_self)
-      self[node] = field.read
+      field = Field.new(node.pos)
+      self[node] = FieldRead.new(field, resolved_self)
       follow_field(field, node.value)
     end
     
     def touch(node : AST::FieldWrite)
-      field = Field.new(node.pos, resolved_self)
+      field = Field.new(node.pos)
       self[node] = field
       follow_field(field, node.value)
       field.assign(self, node.rhs, node.rhs.pos)

@@ -163,6 +163,88 @@ class Mare::Compiler::Infer
     end
   end
   
+  abstract class NamedInfo < DynamicInfo
+    @explicit : MetaType?
+    @upstreams = [] of Tuple(AST::Node, Source::Pos)
+    
+    def initialize(@pos)
+    end
+    
+    def adds_alias; 1 end
+    
+    def inner_resolve!(infer : ForFunc)
+      explicit = @explicit
+      
+      if explicit
+        if !explicit.cap_only?
+          # If we have an explicit type that is more than just a cap, return it.
+          return explicit
+        elsif !@upstreams.empty?
+          # If there are upstreams, use the explicit cap applied to the type
+          # of the first upstream expression, which becomes canonical.
+          return (
+            infer[@upstreams.first[0]].resolve!(infer)
+            .strip_cap.intersect(explicit).strip_ephemeral
+            .strip_ephemeral
+          )
+        else
+          # If we have no upstreams and an explicit cap, return it.
+          return explicit
+        end
+      elsif !@upstreams.empty?
+        # If we only have upstreams to go on, return the first upstream type.
+        return infer[@upstreams.first[0]].resolve!(infer).strip_ephemeral
+      elsif !domain_constraints.empty?
+        # If we only have domain constraints to, just do our best with those.
+        return total_domain_constraint.simplify(infer).strip_ephemeral
+      end
+      
+      # If we get here, we've failed and don't have enough info to continue.
+      Error.at self,
+        "This #{describe_kind} needs an explicit type; it could not be inferred"
+    end
+    
+    def after_resolve!(infer : ForFunc, meta_type : MetaType)
+      # TODO: Verify all upstreams instead of just beyond 1?
+      if @upstreams.size > 1
+        @upstreams[1..-1].each do |other_upstream, other_upstream_pos|
+          infer[other_upstream].within_domain!(infer, other_upstream_pos, pos, meta_type.strip_ephemeral, 0) # TODO: should we really use 0 here?
+          
+          other_mt = infer[other_upstream].resolve!(infer)
+          raise "sanity check" unless other_mt.subtype_of?(infer, meta_type)
+        end
+      end
+    end
+    
+    def set_explicit(explicit_pos : Source::Pos, explicit : MetaType)
+      raise "already set_explicit" if @explicit
+      raise "shouldn't have an upstream yet" unless @upstreams.empty?
+      
+      @explicit = explicit
+      @pos = explicit_pos
+    end
+    
+    def after_within_domain!(infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
+      return if @explicit
+      
+      @upstreams.each do |upstream, upstream_pos|
+        infer[upstream].within_domain!(infer, use_pos, constraint_pos, constraint, aliases)
+      end
+    end
+    
+    def assign(infer : ForFunc, rhs : AST::Node, rhs_pos : Source::Pos)
+      infer[rhs].within_domain!(
+        infer,
+        rhs_pos,
+        @pos,
+        @explicit.not_nil!,
+        0,
+      ) if @explicit
+      
+      @upstreams << {rhs, rhs_pos}
+    end
+  end
+  
   class Fixed < Info
     property inner : MetaType
     
@@ -225,222 +307,41 @@ class Mare::Compiler::Infer
     end
   end
   
-  class Local < DynamicInfo # TODO: dedup implementation with Field and Param
-    @explicit : MetaType?
-    @upstreams = [] of Tuple(AST::Node, Source::Pos)
-    
-    def initialize(@pos)
-    end
-    
+  class FuncBody < NamedInfo
+    def describe_kind; "function body" end
+  end
+  
+  class Local < NamedInfo
     def describe_kind; "local variable" end
-    
-    def adds_alias; 1 end
-    
-    def inner_resolve!(infer : ForFunc)
-      explicit = @explicit
-      return explicit.not_nil! if explicit && !explicit.cap_only?
-      
-      Error.at self, "This needs an explicit type; it could not be inferred" \
-        unless explicit || !@upstreams.empty?
-      
-      # TODO: refactor to use the explicit type only whenever it is present,
-      # instead of intersecting it with the upstream.
-      meta_type =
-        if @upstreams.empty?
-          explicit.not_nil!
-        else
-          upstream = infer[@upstreams.first[0]].resolve!(infer)
-          if explicit
-            raise "sanity check" unless explicit.cap_only?
-            upstream = upstream.strip_cap.intersect(explicit)
-          end
-          upstream.strip_ephemeral
-        end
-      
-      meta_type
-    end
-    
-    def after_resolve!(infer : ForFunc, meta_type : MetaType)
-      # TODO: Verify all upstreams instead of just beyond 1?
-      if @upstreams.size > 1
-        @upstreams[1..-1].each do |other_upstream, other_upstream_pos|
-          infer[other_upstream].within_domain!(infer, other_upstream_pos, pos, meta_type.strip_ephemeral, 0) # TODO: should we really use 0 here?
-          
-          other_mt = infer[other_upstream].resolve!(infer)
-          raise "sanity check" unless other_mt.subtype_of?(infer, meta_type)
-        end
-      end
-    end
-    
-    def set_explicit(explicit_pos : Source::Pos, explicit : MetaType)
-      raise "already set_explicit" if @explicit
-      raise "shouldn't have an upstream yet" unless @upstreams.empty?
-      
-      @explicit = explicit
-      @pos = explicit_pos
-    end
-    
-    def after_within_domain!(infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
-      return if @explicit
-      
-      @upstreams.each do |upstream, upstream_pos|
-        infer[upstream].within_domain!(infer, use_pos, constraint_pos, constraint, aliases)
-      end
-    end
-    
-    def assign(infer : ForFunc, rhs : AST::Node, rhs_pos : Source::Pos)
-      infer[rhs].within_domain!(
-        infer,
-        rhs_pos,
-        @pos,
-        @explicit.not_nil!,
-        0,
-      ) if @explicit
-      
-      @upstreams << {rhs, rhs_pos}
-    end
   end
   
-  class Field < DynamicInfo # TODO: dedup implementation with Local and Param
-    @explicit : MetaType?
-    @upstream : AST::Node?
-    getter origin : MetaType
-    
-    def initialize(@pos, @origin)
-    end
-    
-    def read
-      Read.new(self)
-    end
-    
-    class Read < Info
-      def initialize(@field : Field)
-      end
-      
-      def pos
-        @field.pos
-      end
-      
-      def resolve!(infer : ForFunc)
-        @field.resolve!(infer).viewed_from(@field.origin).alias
-      end
-      
-      def within_domain!(infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
-        meta_type_within_domain!(infer, resolve!(infer), use_pos, constraint_pos, constraint, aliases + 1)
-      end
-    end
-    
-    def describe_kind; "field reference" end
-    
-    def adds_alias; 1 end
-    
-    def inner_resolve!(infer : ForFunc)
-      explicit = @explicit
-      return explicit.not_nil! if explicit && !explicit.cap_only?
-      
-      Error.at self, "This needs an explicit type; it could not be inferred" \
-        unless explicit || @upstream
-      
-      if @upstream
-        upstream = infer[@upstream.not_nil!].resolve!(infer).strip_ephemeral
-        upstream.intersect(explicit) if explicit
-        upstream
-      else
-        explicit.not_nil!
-      end
-    end
-    
-    def set_explicit(explicit_pos : Source::Pos, explicit : MetaType)
-      raise "already set_explicit" if @explicit
-      raise "shouldn't have an upstream yet" if @upstream
-      
-      @explicit = explicit
-      @pos = explicit_pos
-    end
-    
-    def after_within_domain!(infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
-      return if @explicit
-      
-      infer[@upstream.not_nil!].within_domain!(infer, use_pos, constraint_pos, constraint, aliases)
-    end
-    
-    def assign(infer : ForFunc, rhs : AST::Node, rhs_pos : Source::Pos)
-      infer[rhs].within_domain!(
-        infer,
-        rhs_pos,
-        @pos,
-        @explicit.not_nil!,
-        0
-      ) if @explicit
-      
-      raise "already assigned an upstream" if @upstream
-      @upstream = rhs
-    end
-  end
-  
-  class Param < DynamicInfo # TODO: dedup implementation with Local and Field
-    @explicit : MetaType?
-    getter explicit
-    @downstreamed : MetaType?
-    @downstreamed_pos : Source::Pos?
-    @upstream : AST::Node?
-    
-    def initialize(@pos)
-    end
-    
+  class Param < NamedInfo
     def describe_kind; "parameter" end
-    
-    def adds_alias; 1 end
-    
-    def inner_resolve!(infer : ForFunc) : MetaType
-      return @explicit.not_nil! unless @explicit.nil?
-      return infer[@upstream.not_nil!].resolve!(infer).strip_ephemeral unless @upstream.nil?
-      return total_domain_constraint.simplify(infer).strip_ephemeral unless domain_constraints.empty?
-      
-      Error.at self,
-        "This parameter's type was not specified and couldn't be inferred"
-    end
-    
-    def set_explicit(explicit_pos : Source::Pos, explicit : MetaType)
-      raise "already set_explicit" if @explicit
-      raise "already have downstreams" if @downstreamed
-      raise "already have an upstream" if @upstream
-      
-      @explicit = explicit
-      @pos = explicit_pos
-    end
-    
-    def after_within_domain!(infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
-      return if @explicit
-      
-      infer[@upstream.not_nil!].within_domain!(infer, use_pos, constraint_pos, constraint, aliases) \
-        if @upstream
-    end
     
     def verify_arg(infer : ForFunc, arg_infer : ForFunc, arg : AST::Node, arg_pos : Source::Pos)
       arg = arg_infer[arg]
       arg.within_domain!(arg_infer, arg_pos, @pos, resolve!(infer), 0)
     end
+  end
+  
+  class Field < NamedInfo
+    def describe_kind; "field reference" end
+  end
+  
+  class FieldRead < Info
+    def initialize(@field : Field, @origin : MetaType)
+    end
     
-    def assign(infer : ForFunc, rhs : AST::Node, rhs_pos : Source::Pos)
-      infer[rhs].within_domain!(
-        infer,
-        rhs_pos,
-        @pos,
-        @explicit.not_nil!,
-        0,
-      ) if @explicit
-      
-      infer[rhs].within_domain!(
-        infer,
-        rhs_pos,
-        first_domain_constraint_pos,
-        total_domain_constraint.simplify(infer),
-        0,
-      ) if !domain_constraints.empty?
-      
-      raise "already assigned an upstream" if @upstream
-      @upstream = rhs
+    def pos
+      @field.pos
+    end
+    
+    def resolve!(infer : ForFunc)
+      @field.resolve!(infer).viewed_from(@origin).alias
+    end
+    
+    def within_domain!(infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
+      meta_type_within_domain!(infer, resolve!(infer), use_pos, constraint_pos, constraint, aliases + 1) # TODO: can this +1 be removed?
     end
   end
   

@@ -449,7 +449,7 @@ describe Mare::Compiler::Infer do
     SOURCE
     
     expected = <<-MSG
-    This needs an explicit type; it could not be inferred:
+    This function body needs an explicit type; it could not be inferred:
     from (example):3:
       :fun dum (n I32): Tweedle.dee(n)
            ^~~
