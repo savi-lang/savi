@@ -60,16 +60,22 @@ class Mare::Compiler::Infer
     getter domain_constraints
     
     def describe_domain_constraints
+      raise "already resolved" if @already_resolved
+      
       @domain_constraints.map do |c|
         {c[1], "it is required here to be a subtype of #{c[2].show_type}"}
       end.to_h.to_a
     end
     
     def first_domain_constraint_pos
+      raise "already resolved" if @already_resolved
+      
       @domain_constraints.first[1]
     end
     
     def total_domain_constraint
+      raise "already resolved" if @already_resolved
+      
       MetaType.new_intersection(@domain_constraints.map(&.[2]))
     end
     
@@ -85,16 +91,28 @@ class Mare::Compiler::Infer
     # May be implemented by the child class as an optional hook.
     def after_resolve!(infer : ForFunc, meta_type : MetaType); end
     
+    # This method is *not* intended to be overridden by the child class;
+    # please override the after_resolve! method instead.
+    private def finish_resolve!(infer : ForFunc, meta_type : MetaType)
+      # Run the optional hook in case the child class defined something here.
+      after_resolve!(infer, meta_type)
+      
+      # Save the result of the resolution.
+      @already_resolved = meta_type
+      
+      # Clear the domain constraint information to save memory;
+      # we won't need to use this information again.
+      @domain_constraints.clear
+      
+      meta_type
+    end
+    
     # The final MetaType must meet all constraints that have been imposed.
     def resolve!(infer : ForFunc) : MetaType
       return @already_resolved.not_nil! if @already_resolved
       
       meta_type = inner_resolve!(infer)
-      if domain_constraints.empty?
-        after_resolve!(infer, meta_type)
-        @already_resolved = meta_type
-        return meta_type
-      end
+      return finish_resolve!(infer, meta_type) if domain_constraints.empty?
       
       use_pos = domain_constraints.first[0]
       aliases = domain_constraints.map(&.[3]).reduce(0) { |a1, a2| a1 + a2 }
@@ -136,9 +154,7 @@ class Mare::Compiler::Infer
             extra
       end
       
-      after_resolve!(infer, meta_type)
-      @already_resolved = meta_type
-      meta_type
+      finish_resolve!(infer, meta_type)
     end
     
     # May be implemented by the child class as an optional hook.
@@ -147,7 +163,7 @@ class Mare::Compiler::Infer
     
     def within_domain!(infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
       if @already_resolved
-        return meta_type_within_domain!(
+        meta_type_within_domain!(
           infer,
           @already_resolved.not_nil!,
           use_pos,
@@ -155,11 +171,11 @@ class Mare::Compiler::Infer
           constraint,
           aliases,
         )
+      else
+        @domain_constraints << {use_pos, constraint_pos, constraint, aliases + adds_alias}
+        
+        after_within_domain!(infer, use_pos, constraint_pos, constraint, aliases + adds_alias)
       end
-      
-      @domain_constraints << {use_pos, constraint_pos, constraint, aliases + adds_alias}
-      
-      after_within_domain!(infer, use_pos, constraint_pos, constraint, aliases + adds_alias)
     end
   end
   
