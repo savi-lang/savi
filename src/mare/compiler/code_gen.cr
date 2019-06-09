@@ -1394,6 +1394,9 @@ class Mare::Compiler::CodeGen
     when AST::Choice
       raise "#{expr.inspect} isn't a constant value" if const_only
       gen_choice(expr)
+    when AST::Loop
+      raise "#{expr.inspect} isn't a constant value" if const_only
+      gen_loop(expr)
     when AST::Prefix
       raise NotImplementedError.new(expr.inspect) unless expr.op.value == "--"
       gen_expr(expr.term, const_only)
@@ -1791,6 +1794,48 @@ class Mare::Compiler::CodeGen
     # the cases above, using the LLVM mechanism called a "phi" instruction.
     @builder.position_at_end(post_block)
     @builder.phi(phi_type, blocks, values, "phichoice")
+  end
+  
+  def gen_loop(expr : AST::Loop)
+    # Get the LLVM type for the phi that joins the final value of each branch.
+    # Each such value will needed to be bitcast to the that type.
+    phi_type = llvm_type_of(expr)
+    
+    # Create all of the instruction blocks we'll need for this loop.
+    body_block = gen_block("body_loop")
+    else_block = gen_block("else_loop")
+    post_block = gen_block("after_loop")
+    
+    # Start by generating the code to test the condition value.
+    # If the cond is true, go to the body block; otherwise, the else block.
+    cond_value = gen_expr(expr.cond)
+    @builder.cond(cond_value, body_block, else_block)
+    
+    # In the body block, generate code to arrive at the body value,
+    # and also generate the condition value code again.
+    # If the cond is true, repeat the body block; otherwise, go to post block.
+    @builder.position_at_end(body_block)
+    body_value = gen_expr(expr.body)
+    body_value = gen_assign_cast(body_value, phi_type, expr.body)
+    cond_value = gen_expr(expr.cond)
+    @builder.cond(cond_value, body_block, post_block)
+    
+    # In the body block, generate code to arrive at the else value,
+    # Then skip straight to the post block.
+    @builder.position_at_end(else_block)
+    else_value = gen_expr(expr.else_body)
+    else_value = gen_assign_cast(else_value, phi_type, expr.body)
+    @builder.br(post_block)
+    
+    # Here at the post block, we receive the value that was returned by one of
+    # the bodies above, using the LLVM mechanism called a "phi" instruction.
+    @builder.position_at_end(post_block)
+    @builder.phi(
+      phi_type,
+      [body_block, else_block],
+      [body_value, else_value],
+      "philoop"
+    )
   end
   
   DESC_ID                        = 0

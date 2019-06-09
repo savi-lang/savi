@@ -237,9 +237,9 @@ module Mare::AST
   class Loop < Node
     property cond : Term
     property body : Term
-    property else_body : Term?
+    property else_body : Term
     
-    def initialize(@cond, @body, @else_body = nil)
+    def initialize(@cond, @body, @else_body)
     end
     
     def name; :loop end
@@ -247,13 +247,13 @@ module Mare::AST
       res = [name] of A
       res << cond.to_a
       res << body.to_a
-      res << else_body.not_nil!.to_a if else_body
+      res << else_body.to_a
       res
     end
     def children_accept(visitor)
       cond.accept(visitor)
       body.accept(visitor)
-      else_body.try(&.accept(visitor))
+      else_body.accept(visitor)
     end
   end
 end

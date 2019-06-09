@@ -17,7 +17,7 @@
 - [x] - Rcap viewpoint adaptation
 - [x] - Generic types and generic rcaps
 - [x] - Array literals
-- [ ] - Looping flow control (`while`, etc)
+- [x] - Looping flow control (`while`)
 - [ ] - For-loop iterator syntax sugar (`for x in y`)
 - [ ] - Partial functions and partial calls
 - [ ] - Tuple values

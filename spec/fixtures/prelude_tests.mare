@@ -242,10 +242,15 @@
     test["Array << <<, [1]"].pass = array_push[1] == 3
     array_push[1] = 33
     test["Array [1]=, [1]"].pass = array_push[1] == 33
-    array_literal = [U64[31], U64[62], U64[93]]
-    test["Array literal, [0]"].pass = array_literal[0] == 31
-    test["Array literal, [1]"].pass = array_literal[1] == 62
-    test["Array literal, [2]"].pass = array_literal[2] == 93
+    (
+      array_literal = [U8[0], U8[1], U8[2]]
+      i U64 = 0
+      while (i < 3) (
+        test["Array literal, [i]"].pass = array_literal[i] == i.u8
+        i = i + 1
+      )
+      test["Array literal size"].pass = array_literal.size == i
+    )
     
     Print.line_break // TODO: move to MicroTest constructor and finalizer
 

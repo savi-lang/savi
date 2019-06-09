@@ -1024,6 +1024,16 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       self[node] = Choice.new(node.pos, body_nodes)
     end
     
+    def touch(node : AST::Loop)
+      # The condition of the loop must evaluate to a type of Bool.
+      bool = MetaType.new(reified_type(refer.decl_defn("Bool")))
+      cond_info = self[node.cond]
+      cond_info.within_domain!(self, node.pos, node.pos, bool, 1)
+      
+      # TODO: Don't use Choice?
+      self[node] = Choice.new(node.pos, [node.body, node.else_body])
+    end
+    
     def touch(node : AST::Node)
       # Do nothing for other nodes.
     end

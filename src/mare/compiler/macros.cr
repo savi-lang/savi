@@ -129,6 +129,8 @@ class Mare::Compiler::Macros < Mare::AST::Visitor
       body      = body.terms[0]
     end
     
+    else_body ||= AST::Identifier.new("None").from(node)
+    
     group = AST::Group.new("(").from(node)
     group.terms << AST::Loop.new(cond, body, else_body).from(orig)
     group

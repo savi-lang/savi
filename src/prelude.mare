@@ -188,6 +188,8 @@
       @_ptr_set_null
     )
   
+  :fun size: @_size
+  
   :fun ref reserve (space U64)
     if (@_alloc < space) \
       @_ptr_reallocate(space)
