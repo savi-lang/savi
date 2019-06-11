@@ -56,17 +56,19 @@ module Mare::Compiler
     ctx
   end
   
-  def self.compile(dirname : String, target : Symbol = :eval)
+  def self.get_library_sources(dirname)
+    library = Source::Library.new(dirname)
     filenames = Dir.entries(dirname).select(&.ends_with?(".mare")).to_a
     
     raise "No '.mare' source files found in '#{dirname}'!" if filenames.empty?
     
-    library = Source::Library.new(dirname)
-    sources = filenames.map do |name|
+    filenames.map do |name|
       Source.new(name, File.read(File.join(dirname, name)), library)
     end
-    
-    compile(sources, target)
+  end
+  
+  def self.compile(dirname : String, target : Symbol = :eval)
+    compile(get_library_sources(dirname), target)
   end
   
   def self.compile(sources : Array(Source), target : Symbol = :eval)
@@ -76,7 +78,7 @@ module Mare::Compiler
   def self.compile(docs : Array(AST::Document), target : Symbol = :eval)
     raise "No source documents given!" if docs.empty?
     
-    docs.unshift(prelude_doc)
+    docs.concat(prelude_docs)
     
     ctx = Context.new
     docs.each { |doc| ctx.compile(doc) }
@@ -84,20 +86,14 @@ module Mare::Compiler
     satisfy(ctx, target)
   end
   
-  @@prelude_doc : AST::Document?
-  def self.prelude_doc
-    # TODO: detect when the file has changed and invalidate the cache
-    @@prelude_doc ||=
+  @@prelude_docs : Array(AST::Document)?
+  def self.prelude_docs
+    # TODO: detect when the files have changed and invalidate the cache
+    @@prelude_docs ||=
       begin
-        path = File.join(__DIR__, "../prelude.mare")
-        content = File.read(path)
-        source = Mare::Source.new(
-          File.basename(path),
-          content,
-          Mare::Source::Library.new(File.dirname(path)),
-        )
-        Parser.parse(source)
+        get_library_sources(File.join(__DIR__, "../prelude"))
+        .map { |s| Parser.parse(s) }
       end
-    @@prelude_doc.not_nil!
+    @@prelude_docs.not_nil!
   end
 end
