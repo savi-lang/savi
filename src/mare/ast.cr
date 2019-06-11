@@ -62,7 +62,7 @@ module Mare::AST
       res
     end
     def children_accept(visitor)
-      @list.map! { |decl| decl.accept(visitor) }
+      @list.map!(&.accept(visitor))
     end
   end
   
@@ -82,7 +82,7 @@ module Mare::AST
       [name, head.map(&.to_a), body.to_a] of A
     end
     def children_accept(visitor)
-      @head.map! { |term| term.accept(visitor) }
+      @head.map!(&.accept(visitor))
       @body = @body.accept(visitor)
     end
     
@@ -178,7 +178,7 @@ module Mare::AST
       res
     end
     def children_accept(visitor)
-      @terms.map! { |x| x.accept(visitor) }
+      @terms.map!(&.accept(visitor))
     end
   end
   
