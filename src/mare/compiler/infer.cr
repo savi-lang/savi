@@ -328,7 +328,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       when Refer::Self
         receiver || MetaType.new(reified)
       when Refer::Decl, Refer::DeclAlias
-        MetaType.new(reified_type(ref.final_decl.defn))
+        MetaType.new(reified_type(ref.defn))
       when Refer::DeclParam
         lookup_type_param(ref, refer, receiver)
       when Refer::Unresolved
@@ -788,8 +788,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       ref = refer[node]
       case ref
       when Refer::Decl, Refer::DeclAlias
-        rt = reified_type(ref.final_decl.defn)
-        if ref.defn.is_value?
+        rt = reified_type(ref.defn)
+        if ref.metadata[:enum_value]?
           # We trust the cap of the value type (for example, False, True, etc).
           meta_type = MetaType.new(rt)
         else

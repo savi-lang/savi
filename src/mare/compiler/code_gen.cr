@@ -1329,10 +1329,10 @@ class Mare::Compiler::CodeGen
         alloca = func_frame.current_locals[ref]
         @builder.load(alloca, ref.name)
       elsif ref.is_a?(Refer::Decl) || ref.is_a?(Refer::DeclAlias)
-        enum_value = ref.defn.metadata[:enum_value]?
+        enum_value = ref.metadata[:enum_value]?
         if enum_value
           llvm_type_of(expr).const_int(enum_value.as(Int32))
-        elsif ref.final_decl.defn.has_tag?(:numeric)
+        elsif ref.defn.has_tag?(:numeric)
           llvm_type = llvm_type_of(expr)
           case llvm_type.kind
           when LLVM::Type::Kind::Integer then llvm_type.const_int(0)

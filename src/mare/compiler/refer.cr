@@ -28,8 +28,8 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
     # Gather type aliases in a similar way, dereferencing as we go.
     ctx.program.aliases.each_with_index do |a, index|
       name = a.ident.value
-      target = decls[a.target.value].as(Decl | DeclAlias)
-      decls[name] = DeclAlias.new(a, target)
+      target = decls[a.target.value].as(Decl)
+      decls[name] = DeclAlias.new(a, target.defn)
     end
     
     # For each type in the program, delve into type parameters and functions.
@@ -118,10 +118,10 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
     end
     
     def decl_defn(name : String) : Program::Type
-      return @decl.final_decl.defn if name == "@"
+      return @decl.defn if name == "@"
       decl = @decls[name]
       case decl
-      when Decl, DeclAlias then decl.final_decl.defn
+      when Decl, DeclAlias then decl.defn
       else raise NotImplementedError.new(decl)
       end
     end

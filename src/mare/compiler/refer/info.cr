@@ -1,20 +1,20 @@
 class Mare::Compiler::Refer
-  class Unresolved
+  struct Unresolved
     INSTANCE = new
   end
   
-  class Self
+  struct Self
     INSTANCE = new
   end
   
-  class Field
+  struct Field
     getter name : String
     
     def initialize(@name)
     end
   end
   
-  class Local
+  struct Local
     getter name : String
     getter defn : AST::Node
     getter param_idx : Int32?
@@ -23,7 +23,7 @@ class Mare::Compiler::Refer
     end
   end
   
-  class LocalUnion
+  struct LocalUnion
     getter list : Array(Local)
     property incomplete : Bool = false
     
@@ -50,30 +50,30 @@ class Mare::Compiler::Refer
     end
   end
   
-  class Decl
+  struct Decl
     getter defn : Program::Type
     
     def initialize(@defn)
     end
     
-    def final_decl : Decl
-      self
+    def metadata
+      defn.metadata
     end
   end
   
-  class DeclAlias
-    getter decl : Decl | DeclAlias
-    getter defn : Program::TypeAlias
+  struct DeclAlias
+    getter defn_alias : Program::TypeAlias
+    getter defn : Program::Type
     
-    def initialize(@defn, @decl)
+    def initialize(@defn_alias, @defn)
     end
     
-    def final_decl : Decl
-      decl.final_decl
+    def metadata
+      defn.metadata.merge(defn_alias.metadata)
     end
   end
   
-  class DeclParam
+  struct DeclParam
     getter parent : Program::Type
     getter index : Int32
     getter ident : AST::Identifier
