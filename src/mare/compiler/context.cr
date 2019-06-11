@@ -1,5 +1,6 @@
 class Mare::Compiler::Context
   getter program
+  getter namespace
   getter infer
   getter refer
   getter reach
@@ -11,6 +12,7 @@ class Mare::Compiler::Context
     @program = Program.new
     @stack = [Interpreter::Default.new(@program)] of Interpreter
     
+    @namespace = Namespace.new
     @infer = Infer.new
     @refer = Refer.new
     @reach = Reach.new

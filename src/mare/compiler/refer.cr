@@ -17,6 +17,7 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
     @map = {} of Program::Type => ForType
   end
   
+  # TODO: refactor to leverage ctx.namespace
   def run(ctx)
     # Gather all the types in the program as Decls.
     decls = Hash(Source::Library, Hash(String, Decl | DeclAlias)).new

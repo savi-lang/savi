@@ -1,5 +1,4 @@
 class Mare::Program
-  # TODO: add Package delineation here
   getter types
   getter aliases
   getter imports
@@ -7,20 +6,7 @@ class Mare::Program
   def initialize
     @types = [] of Type
     @aliases = [] of TypeAlias
-    @imports = {} of Source => Array(Import)
-  end
-  
-  def find_type?(type_name)
-    @types
-      .find { |t| t.ident.value == type_name && !t.has_tag?(:hygienic) }
-  end
-  
-  def find_type!(type_name)
-    find_type?(type_name).not_nil!
-  end
-  
-  def find_func!(type_name, func_name)
-    find_type!(type_name).find_func!(func_name)
+    @imports = {} of Source => Array(Import) # TODO: flat array of Imports
   end
   
   def add_import(import)
@@ -30,7 +16,7 @@ class Mare::Program
   class Import
     property ident : (AST::Identifier | AST::LiteralString)
     property names : AST::Group?
-    property resolved : Source::Library? = nil
+    property! resolved : Source::Library
     
     def initialize(@ident, @names = nil)
     end

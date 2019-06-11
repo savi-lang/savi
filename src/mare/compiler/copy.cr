@@ -21,8 +21,9 @@ module Mare::Compiler::Copy
         # Find the type associated with the "return value" of the "function"
         # and copy the functions from it that we need.
         ret = f.ret.as(AST::Identifier)
-        source = ctx.program.find_type?(ret.value)
+        source = ctx.namespace[ret]?
         Error.at ret, "This type couldn't be resolved" unless source
+        source = source.as(Program::Type)
         
         copy_from(source, dest)
       end

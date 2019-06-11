@@ -2,6 +2,7 @@ module Mare::Compiler
   def self.execute(ctx, target : Symbol)
     case target
     when :import       then ctx.run(Import)
+    when :namespace    then ctx.run(ctx.namespace)
     when :copy         then ctx.run(Copy)
     when :macros       then ctx.run(Macros)
     when :sugar        then ctx.run(Sugar)
@@ -24,11 +25,12 @@ module Mare::Compiler
   def self.deps_of(target : Symbol) : Array(Symbol)
     case target
     when :import then [] of Symbol
-    when :copy then [:import]
-    when :macros then [:import]
+    when :namespace then [:import]
+    when :copy then [:namespace]
+    when :macros then [:namespace]
     when :sugar then [:macros]
     when :lambda then [:sugar, :macros]
-    when :refer then [:lambda, :sugar, :macros]
+    when :refer then [:lambda, :sugar, :macros, :namespace]
     when :classify then [:refer, :lambda, :sugar, :macros]
     when :infer then [:classify, :refer, :lambda, :copy]
     when :completeness then [:infer, :lambda, :sugar, :macros, :copy]
@@ -93,7 +95,7 @@ module Mare::Compiler
     # TODO: detect when the files have changed and invalidate the cache
     @@prelude_docs ||=
       begin
-        get_library_sources(File.join(__DIR__, "../prelude"))
+        get_library_sources(File.expand_path("../prelude", __DIR__))
         .map { |s| Parser.parse(s) }
       end
     @@prelude_docs.not_nil!
