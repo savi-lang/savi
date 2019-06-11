@@ -1,0 +1,6 @@
+:class val String
+  :prop _size U64 // TODO: cross-platform
+  :prop _alloc U64 // TODO: cross-platform
+  :prop _ptr CPointer(U8)'ref
+  :new from_cpointer (@_ptr, @_size, @_alloc)
+  :fun cpointer CPointer(U8): @_ptr

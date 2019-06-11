@@ -1,0 +1,45 @@
+:class ref Array (A)
+  :prop _size U64 // TODO: cross-platform
+  :prop _alloc U64 // TODO: cross-platform
+  :prop _ptr CPointer(A)'ref
+  
+  :fun ref _ptr_set_null
+    @_alloc = 0
+    @_ptr = CPointer(A).null
+  
+  :fun ref _ptr_allocate (space U64)
+    @_alloc = space.next_pow2.max(space).max(8)
+    @_ptr = CPointer(A)._alloc(@_alloc)
+  
+  :fun ref _ptr_reallocate (space U64)
+    @_alloc = space.next_pow2.max(space).max(8)
+    @_ptr = @_ptr._realloc(@_alloc)
+  
+  :new (space U64 = 0)
+    @_size = 0
+    
+    if (space > 0) (
+      @_ptr_allocate(space)
+    |
+      @_ptr_set_null
+    )
+  
+  :fun size: @_size
+  
+  :fun ref reserve (space U64)
+    if (@_alloc < space) \
+      @_ptr_reallocate(space)
+  
+  :fun "[]" (index)
+    // TODO: bounds checking, partial function
+    @_ptr._get_at(index)
+  
+  :fun ref "[]=" (index, value)
+    // TODO: bounds checking, partial function
+    @_ptr._assign_at(index, --value)
+  
+  :fun ref "<<" (value)
+    @reserve(@_size + 1)
+    @_ptr._assign_at(@_size, --value)
+    @_size = @_size + 1
+    @

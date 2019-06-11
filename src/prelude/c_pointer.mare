@@ -1,0 +1,7 @@
+:class tag CPointer (A) // TODO: don't special-case in compiler as a faux-class
+  :fun non null @'ref: compiler intrinsic
+  :fun non _alloc (space U64) @'ref: compiler intrinsic
+  :fun ref _realloc (space U64) @: compiler intrinsic
+  :fun box _get_at (index U64) A: compiler intrinsic
+  :fun ref _assign_at (index U64, value A) A: compiler intrinsic
+  :fun ref _displace_at (index U64, value A) A: compiler intrinsic
