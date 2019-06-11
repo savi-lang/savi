@@ -1,6 +1,7 @@
 module Mare::Compiler
   def self.execute(ctx, target : Symbol)
     case target
+    when :import       then ctx.run(Import)
     when :copy         then ctx.run(Copy)
     when :macros       then ctx.run(Macros)
     when :sugar        then ctx.run(Sugar)
@@ -22,8 +23,9 @@ module Mare::Compiler
   # passes like :classify and :refer instead of marking a dependency.
   def self.deps_of(target : Symbol) : Array(Symbol)
     case target
-    when :copy then [] of Symbol
-    when :macros then [] of Symbol
+    when :import then [] of Symbol
+    when :copy then [:import]
+    when :macros then [:import]
     when :sugar then [:macros]
     when :lambda then [:sugar, :macros]
     when :refer then [:lambda, :sugar, :macros]

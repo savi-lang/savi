@@ -1,0 +1,10 @@
+:primitive Print
+  :fun line_break
+    LibC.puts("".cpointer)
+  
+  :fun f (format String, text String)
+    LibC.printf(format.cpointer, text.cpointer)
+
+:ffi LibC
+  :fun puts (CPointer(U8)) I32
+  :fun printf (CPointer(U8), CPointer(U8)) I32

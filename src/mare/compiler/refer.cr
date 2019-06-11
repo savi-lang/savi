@@ -44,7 +44,7 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
     # For each type in the program, delve into type parameters and functions.
     ctx.program.types.each do |t|
       t_decl = Decl.new(t)
-      @map[t] = ForType.new(t_decl, decls).tap(&.run)
+      @map[t] = ForType.new(ctx, t_decl, decls).tap(&.run)
     end
   end
   
@@ -58,6 +58,7 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
   
   class ForType
     def initialize(
+      @ctx : Context,
       @decl : Decl,
       @decls : Hash(Source::Library, Hash(String, Decl | DeclAlias)),
     )
@@ -119,18 +120,29 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
       @decl.defn.ident.pos.source.library
     end
     
+    def self_imports
+      @ctx.program.imports[@decl.defn.ident.pos.source]?
+    end
+    
     def decl(name : String)
-      return @decl if name == "@"
-      @params[name]? ||
-      @decls[Compiler.prelude_library][name]? ||
-      @decls[self_library][name]
+      decl?(name).not_nil!
     end
     
     def decl?(name : String)
       return @decl if name == "@"
-      @params[name]? ||
-      @decls[Compiler.prelude_library][name]? ||
-      @decls[self_library][name]?
+      
+      immediate =
+        @params[name]? ||
+        @decls[Compiler.prelude_library][name]? ||
+        @decls[self_library][name]?
+      return immediate if immediate
+      
+      self_imports.try(&.each { |import|
+        found = @decls[import.resolved][name]?
+        return found if found
+      })
+      
+      nil
     end
     
     def decl_defn(name : String) : Program::Type

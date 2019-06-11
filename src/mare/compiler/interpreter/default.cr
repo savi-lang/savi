@@ -5,7 +5,26 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
   def finished(context)
   end
   
-  def keywords; %w{actor class trait numeric enum primitive ffi} end
+  def keywords; %w{import actor class trait numeric enum primitive ffi} end
+  
+  @@declare_import = Witness.new([
+    {
+      "kind" => "keyword",
+      "name" => "keyword",
+      "value" => "import",
+    },
+    {
+      "kind" => "term",
+      "name" => "ident",
+      "type" => "ident|string",
+    },
+    {
+      "kind" => "term",
+      "name" => "params",
+      "type" => "params",
+      "optional" => true,
+    },
+  ] of Hash(String, String | Bool))
   
   @@declare_type = Witness.new([
     {
@@ -34,6 +53,8 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
   ] of Hash(String, String | Bool))
   
   def compile(context, decl)
+    return compile_import(context, decl) if decl.keyword == "import"
+    
     data = @@declare_type.run(decl)
     keyword = data["keyword"].as(AST::Identifier)
     
@@ -86,6 +107,15 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
     
     @program.types << t.type
     context.push t
+  end
+  
+  def compile_import(context, decl)
+    data = @@declare_import.run(decl)
+    
+    @program.add_import Program::Import.new(
+      data["ident"].as(AST::Identifier | AST::LiteralString),
+      data["params"]?.as(AST::Group?),
+    )
   end
   
   class Type < Interpreter

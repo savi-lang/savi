@@ -1,0 +1,19 @@
+:primitive MicroTest
+  :fun "[]" (text String) MicroTestInstance
+    MicroTestInstance.new(text)
+
+:class MicroTestInstance
+  :prop text String
+  :new (@text)
+  :fun "pass=" (pass Bool)
+    if pass (
+      Print.f("%s", ".")
+    |
+      Print.line_break // TODO: fix processing of \n in string literals and use it
+      Print.f("failure of '%s'!", @text)
+      Print.line_break // TODO: fix processing of \n in string literals and use it
+      LibPonyRT.pony_exitcode(1) // Mark the entire process as a failure.
+    )
+
+:ffi LibPonyRT
+  :fun pony_exitcode (I32) None
