@@ -1328,7 +1328,7 @@ class Mare::Compiler::CodeGen
         raise "#{ref.inspect} isn't a constant value" if const_only
         alloca = func_frame.current_locals[ref]
         @builder.load(alloca, ref.name)
-      elsif ref.is_a?(Refer::Decl) || ref.is_a?(Refer::DeclAlias)
+      elsif ref.is_a?(Refer::Type) || ref.is_a?(Refer::TypeAlias)
         enum_value = ref.metadata[:enum_value]?
         if enum_value
           llvm_type_of(expr).const_int(enum_value.as(Int32))
@@ -1343,7 +1343,7 @@ class Mare::Compiler::CodeGen
         else
           gtype_of(expr).singleton
         end
-      elsif ref.is_a?(Refer::DeclParam)
+      elsif ref.is_a?(Refer::TypeParam)
         # TODO: unify with above clause
         defn = gtype_of(expr).type_def.program_type
         enum_value = defn.metadata[:enum_value]?

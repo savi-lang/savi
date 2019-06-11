@@ -100,7 +100,7 @@ class Mare::Compiler::Classify < Mare::AST::Visitor
       # All of the arguments will have their value used, despite any earlier
       # work we did of marking them all as unused due to being in a Group.
       qualify.group.terms.each { |t| Classify.value_needed!(t) }
-    when Refer::Decl, Refer::DeclAlias, Refer::DeclParam
+    when Refer::Type, Refer::TypeAlias, Refer::TypeParam
       # We assume this qualify to be type with type arguments.
       # None of the arguments will have their value used,
       # and they are all type expressions.

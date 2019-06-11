@@ -20,7 +20,7 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
   def run(ctx)
     # For each type in the program, delve into type parameters and functions.
     ctx.program.types.each do |t|
-      @map[t] = ForType.new(ctx, Decl.new(t)).tap(&.run)
+      @map[t] = ForType.new(ctx, Type.new(t)).tap(&.run)
     end
   end
   
@@ -33,24 +33,24 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
   end
   
   class ForType
-    def initialize(@ctx : Context, @self_decl : Decl)
+    def initialize(@ctx : Context, @self_type : Type)
       @map = {} of Program::Function => ForFunc
       @infos = {} of AST::Node => Info
-      @params = {} of String => DeclParam
+      @params = {} of String => TypeParam
       
       # If the type has type parameters, collect them into the params map.
-      if self_decl.defn.params
-        self_decl.defn.params.not_nil!.terms.each_with_index do |param, index|
-          decl_param =
+      if self_type.defn.params
+        self_type.defn.params.not_nil!.terms.each_with_index do |param, index|
+          type_param =
             case param
             when AST::Identifier
-              DeclParam.new(self_decl.defn, index, param, nil)
+              TypeParam.new(self_type.defn, index, param, nil)
             when AST::Group
               raise NotImplementedError.new(param) \
                 unless param.terms.size == 2 && param.style == " "
               
-              DeclParam.new(
-                self_decl.defn,
+              TypeParam.new(
+                self_type.defn,
                 index,
                 param.terms.first.as(AST::Identifier),
                 param.terms.last.as(AST::Term),
@@ -59,7 +59,7 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
               raise NotImplementedError.new(param)
             end
           
-          @params[decl_param.ident.value] = decl_param
+          @params[type_param.ident.value] = type_param
         end
       end
     end
@@ -84,45 +84,41 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
       @infos[node] = info
     end
     
-    def self_decl
-      @self_decl
+    def self_type
+      @self_type
     end
     
     def self_library
-      @self_decl.defn.ident.pos.source.library
+      @self_type.defn.ident.pos.source.library
     end
     
     def self_imports
-      @ctx.program.imports[@self_decl.defn.ident.pos.source]?
+      @ctx.program.imports[@self_type.defn.ident.pos.source]?
     end
     
-    def decl(node)
-      decl?(node).not_nil!
-    end
-    
-    def decl?(node : AST::Identifier)
+    def find_type?(node : AST::Identifier)
       found = @params[node.value]?
       return found if found
       
       found = @ctx.namespace[node]?
       case found
       when Program::Type
-        Decl.new(found)
+        Type.new(found)
       when Program::TypeAlias
         target = found
         while !target.is_a?(Program::Type)
           target = @ctx.namespace[target.target]
         end
-        DeclAlias.new(found, target)
+        TypeAlias.new(found, target)
       end
     end
     
     def run
       # For the type parameters in the type, run with a new ForBranch instance.
-      @self_decl.defn.params.try(&.accept(ForBranch.new(self)))
+      @self_type.defn.params.try(&.accept(ForBranch.new(self)))
       
       # For each function in the type, run with a new ForFunc instance.
-      @self_decl.defn.functions.each do |f|
+      @self_type.defn.functions.each do |f|
         ForFunc.new(self)
         .tap { |refer| @map[f] = refer }
         .tap(&.run(f))
@@ -149,18 +145,14 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
       @infos[node] = info
     end
     
-    def decl(node)
-      @for_type.decl(node)
-    end
-    
-    def decl?(node)
-      @for_type.decl?(node)
+    def find_type?(node)
+      @for_type.find_type?(node)
     end
     
     def run(func)
       root = ForBranch.new(self)
       
-      @for_type.self_decl.defn.params.try(&.accept(root))
+      @for_type.self_type.defn.params.try(&.accept(root))
       func.params.try(&.accept(root))
       func.params.try(&.terms.each { |param| root.create_param_local(param) })
       func.ret.try(&.accept(root))
@@ -189,7 +181,7 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
       node
     end
     
-    # For an Identifier, resolve it to any known local or decl if possible.
+    # For an Identifier, resolve it to any known local or type if possible.
     def touch(node : AST::Identifier)
       name = node.value
       
@@ -198,8 +190,8 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
         if name == "@"
           Self::INSTANCE
         else
-          # First, try to resolve as local, then as decl, else it's unresolved.
-          @locals[name]? || @refer.decl?(node) || Unresolved::INSTANCE
+          # First, try to resolve as local, then as type, else it's unresolved.
+          @locals[name]? || @refer.find_type?(node) || Unresolved::INSTANCE
         end
       
       # Raise an error if trying to use an "incomplete" union of locals.
@@ -407,7 +399,7 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
       else
         # Treat this as a parameter with only a type and no identifier.
         # Do nothing other than increment the parameter count, because
-        # we don't want to overwrite the Decl info for this node.
+        # we don't want to overwrite the Type info for this node.
         # We don't need to create a Local anyway, because there's no way to
         # fetch the value of this parameter later (because it has no identifier).
         refer.param_count += 1

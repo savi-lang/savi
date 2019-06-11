@@ -41,7 +41,7 @@ struct Mare::Compiler::Infer::MetaType
     MetaType.new(Nominal.new(defn))
   end
   
-  def self.new_type_param(defn : Refer::DeclParam)
+  def self.new_type_param(defn : Refer::TypeParam)
     MetaType.new(Nominal.new(defn))
   end
   

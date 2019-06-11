@@ -1,5 +1,5 @@
 struct Mare::Compiler::Infer::MetaType::Nominal
-  getter defn : Infer::ReifiedType | Refer::DeclParam
+  getter defn : Infer::ReifiedType | Refer::TypeParam
   
   def initialize(@defn)
   end
@@ -28,7 +28,7 @@ struct Mare::Compiler::Infer::MetaType::Nominal
     case defn
     when Infer::ReifiedType
       defn.show_type(io)
-    when Refer::DeclParam
+    when Refer::TypeParam
       io << defn.ident.value
     end
   end
@@ -44,7 +44,7 @@ struct Mare::Compiler::Infer::MetaType::Nominal
     when Infer::ReifiedType
       func = defn.defn.find_func?(name)
       [{self, defn, func}] if func
-    when Refer::DeclParam
+    when Refer::TypeParam
       raise NotImplementedError.new("TODO in this commit")
     else raise NotImplementedError.new(defn)
     end

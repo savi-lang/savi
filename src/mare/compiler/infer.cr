@@ -79,7 +79,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     
     params_partial_reifications =
       t.params.not_nil!.terms.map do |param|
-        constraint_node = ctx.refer[t][param].as(Refer::DeclParam).constraint
+        constraint_node = ctx.refer[t][param].as(Refer::TypeParam).constraint
         constraint_mt =
           if constraint_node
             # Get the MetaType of the constraint.
@@ -254,7 +254,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     def get_param_bound(index : Int32)
       refer = ctx.refer[reified.defn]
       param_node = reified.defn.params.not_nil!.terms[index]
-      param_bound_node = refer[param_node].as(Refer::DeclParam).constraint
+      param_bound_node = refer[param_node].as(Refer::TypeParam).constraint
       
       if param_bound_node
         type_expr(param_bound_node.not_nil!, refer, nil)
@@ -263,7 +263,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       end
     end
     
-    def lookup_type_param(ref : Refer::DeclParam, refer, receiver = nil)
+    def lookup_type_param(ref : Refer::TypeParam, refer, receiver = nil)
       raise NotImplementedError.new(ref) unless ref.parent == reified.defn
       
       # Lookup the type parameter on self type and return the arg if present
@@ -328,9 +328,9 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       case ref
       when Refer::Self
         receiver || MetaType.new(reified)
-      when Refer::Decl, Refer::DeclAlias
+      when Refer::Type, Refer::TypeAlias
         MetaType.new(reified_type(ref.defn))
-      when Refer::DeclParam
+      when Refer::TypeParam
         lookup_type_param(ref, refer, receiver)
       when Refer::Unresolved
         case node.value
@@ -447,7 +447,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
     
     def is_subtype?(
-      l : Refer::DeclParam,
+      l : Refer::TypeParam,
       r : ReifiedType,
       errors = [] of Error::Info,
     ) : Bool
@@ -457,7 +457,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     
     def is_subtype?(
       l : ReifiedType,
-      r : Refer::DeclParam,
+      r : Refer::TypeParam,
       errors = [] of Error::Info,
     ) : Bool
       # TODO: Implement this.
@@ -465,8 +465,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
     
     def is_subtype?(
-      l : Refer::DeclParam,
-      r : Refer::DeclParam,
+      l : Refer::TypeParam,
+      r : Refer::TypeParam,
       errors = [] of Error::Info,
     ) : Bool
       return true if l == r
@@ -792,7 +792,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     def touch(node : AST::Identifier)
       ref = refer[node]
       case ref
-      when Refer::Decl, Refer::DeclAlias
+      when Refer::Type, Refer::TypeAlias
         rt = reified_type(ref.defn)
         if ref.metadata[:enum_value]?
           # We trust the cap of the value type (for example, False, True, etc).
@@ -807,7 +807,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         error_if_type_args_missing(node, rt)
         
         self[node] = Fixed.new(node.pos, meta_type)
-      when Refer::DeclParam
+      when Refer::TypeParam
         meta_type = lookup_type_param(ref).override_cap("non")
         error_if_type_args_missing(node, meta_type)
         

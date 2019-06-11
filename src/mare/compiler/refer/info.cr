@@ -50,7 +50,7 @@ class Mare::Compiler::Refer
     end
   end
   
-  struct Decl
+  struct Type
     getter defn : Program::Type
     
     def initialize(@defn)
@@ -61,7 +61,7 @@ class Mare::Compiler::Refer
     end
   end
   
-  struct DeclAlias
+  struct TypeAlias
     getter defn_alias : Program::TypeAlias
     getter defn : Program::Type
     
@@ -73,7 +73,7 @@ class Mare::Compiler::Refer
     end
   end
   
-  struct DeclParam
+  struct TypeParam
     getter parent : Program::Type
     getter index : Int32
     getter ident : AST::Identifier
@@ -85,6 +85,6 @@ class Mare::Compiler::Refer
   
   alias Info = (
     Self | Local | LocalUnion | Field |
-    Decl | DeclAlias | DeclParam |
+    Type | TypeAlias | TypeParam |
     Unresolved)
 end
