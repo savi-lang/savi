@@ -1,4 +1,5 @@
 :primitive MicroTest
+  :fun print_line_break: Print.line_break
   :fun "[]" (text String) MicroTestInstance
     MicroTestInstance.new(text)
 
@@ -14,6 +15,17 @@
       Print.line_break // TODO: fix processing of \n in string literals and use it
       LibPonyRT.pony_exitcode(1) // Mark the entire process as a failure.
     )
+
+:primitive Print
+  :fun line_break
+    LibC.puts("".cpointer)
+  
+  :fun f (format String, text String)
+    LibC.printf(format.cpointer, text.cpointer)
+
+:ffi LibC
+  :fun puts (CPointer(U8)) I32
+  :fun printf (CPointer(U8), CPointer(U8)) I32
 
 :ffi LibPonyRT
   :fun pony_exitcode (I32) None

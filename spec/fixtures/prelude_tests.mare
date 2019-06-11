@@ -1,12 +1,9 @@
-:import "./micro_test" (
-  MicroTest
-  Print
-)
+:import "./micro_test" (MicroTest)
 
 :actor Main
   :new
     test = MicroTest
-    Print.line_break // TODO: move to MicroTest constructor and finalizer
+    test.print_line_break // TODO: move to MicroTest constructor and finalizer
     
     ///
     // Numeric facts
@@ -257,4 +254,4 @@
       test["Array literal size"].pass = array_literal.size == i
     )
     
-    Print.line_break // TODO: move to MicroTest constructor and finalizer
+    test.print_line_break // TODO: move to MicroTest constructor and finalizer
