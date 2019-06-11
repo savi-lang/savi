@@ -24,20 +24,19 @@ module Mare::Compiler::Import
   def self.remaining_imports(ctx, libraries)
     remaining = Array(Tuple(String, Program::Import)).new
     
-    ctx.program.imports.each do |source, imports|
-      imports.each do |import|
-        import_ident = import.ident
-        raise NotImplementedError.new(import.ident.to_a) \
-          unless import_ident.is_a?(AST::LiteralString)
-        
-        path = File.expand_path(import_ident.value, source.library.path)
-        
-        library = libraries[path]?
-        if library
-          import.resolved = library
-        else
-          remaining << {path, import}
-        end
+    ctx.program.imports.each do |import|
+      import_ident = import.ident
+      raise NotImplementedError.new(import.ident.to_a) \
+        unless import_ident.is_a?(AST::LiteralString)
+      
+      source = import_ident.pos.source
+      path = File.expand_path(import_ident.value, source.library.path)
+      
+      library = libraries[path]?
+      if library
+        import.resolved = library
+      else
+        remaining << {path, import}
       end
     end
     

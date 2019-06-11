@@ -461,7 +461,7 @@ class Mare::Compiler::Infer
     def describe_kind; "array literal" end
     
     def inner_resolve!(infer : ForFunc)
-      array_defn = infer.refer.decl_defn("Array")
+      array_defn = infer.prelude_type("Array")
       
       # Determine the lowest common denominator MetaType of all elements.
       elem_mts = terms.map { |term| infer[term].resolve!(infer) }.uniq
@@ -485,7 +485,7 @@ class Mare::Compiler::Infer
       end
       
       # Now that we have the element type to use, construct the result.
-      rt = infer.reified_type(infer.refer.decl_defn("Array"), [elem_mt])
+      rt = infer.reified_type(infer.prelude_type("Array"), [elem_mt])
       mt = MetaType.new(rt)
       
       # Reach the functions we will use during CodeGen.
@@ -519,7 +519,7 @@ class Mare::Compiler::Infer
       
       total_domain_constraint.each_reachable_defn.to_a.each do |rt|
         # TODO: Support more element antecedent detection patterns.
-        if rt.defn == infer.refer.decl_defn("Array") \
+        if rt.defn == infer.prelude_type("Array") \
         && rt.args.size == 1
           results << rt.args.first
         end

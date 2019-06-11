@@ -112,7 +112,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
   def compile_import(context, decl)
     data = @@declare_import.run(decl)
     
-    @program.add_import Program::Import.new(
+    @program.imports << Program::Import.new(
       data["ident"].as(AST::Identifier | AST::LiteralString),
       data["params"]?.as(AST::Group?),
     )

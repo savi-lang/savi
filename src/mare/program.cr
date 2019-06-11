@@ -6,11 +6,7 @@ class Mare::Program
   def initialize
     @types = [] of Type
     @aliases = [] of TypeAlias
-    @imports = {} of Source => Array(Import) # TODO: flat array of Imports
-  end
-  
-  def add_import(import)
-    (@imports[import.ident.pos.source] ||= [] of Import) << import
+    @imports = [] of Import
   end
   
   class Import

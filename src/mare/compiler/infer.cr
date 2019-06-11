@@ -706,6 +706,10 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       MetaType.new(reified.type).override_cap(resolved_self_cap)
     end
     
+    def prelude_type(name)
+      @ctx.namespace[name].as(Program::Type)
+    end
+    
     def reified_type(*args)
       @for_type.reified_type(*args)
     end
@@ -831,21 +835,21 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
     
     def touch(node : AST::LiteralString)
-      defns = [refer.decl_defn("String")]
+      defns = [prelude_type("String")]
       mts = defns.map { |defn| MetaType.new(reified_type(defn)) }
       self[node] = Literal.new(node.pos, mts)
     end
     
     # A literal integer could be any integer or floating-point machine type.
     def touch(node : AST::LiteralInteger)
-      defns = [refer.decl_defn("Numeric")]
+      defns = [prelude_type("Numeric")]
       mts = defns.map { |defn| MetaType.new(reified_type(defn)) }
       self[node] = Literal.new(node.pos, mts)
     end
     
     # A literal float could be any floating-point machine type.
     def touch(node : AST::LiteralFloat)
-      defns = [refer.decl_defn("F32"), refer.decl_defn("F64")]
+      defns = [prelude_type("F32"), prelude_type("F64")]
       mts = defns.map { |defn| MetaType.new(reified_type(defn)) }
       self[node] = Literal.new(node.pos, mts)
     end
@@ -854,7 +858,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       case node.style
       when "(", ":"
         if node.terms.empty?
-          none = MetaType.new(reified_type(refer.decl_defn("None")))
+          none = MetaType.new(reified_type(prelude_type("None")))
           self[node] = Fixed.new(node.pos, none)
         else
           # A non-empty group always has the node of its final child.
@@ -948,7 +952,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
           unless rhs_info.is_a?(Fixed) \
             && rhs_info.inner.cap_only.inner == MetaType::Capability::NON
         
-        bool = MetaType.new(reified_type(refer.decl_defn("Bool")))
+        bool = MetaType.new(reified_type(prelude_type("Bool")))
         refine = follow_redirects(node.lhs)
         refine_type = self[node.rhs].resolve!(self)
         self[node] = TypeCondition.new(node.pos, bool, refine, refine_type)
@@ -993,7 +997,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         cond.accept(self)
         
         # Each condition in a choice must evaluate to a type of Bool.
-        bool = MetaType.new(reified_type(refer.decl_defn("Bool")))
+        bool = MetaType.new(reified_type(prelude_type("Bool")))
         cond_info = self[cond]
         cond_info.within_domain!(self, node.pos, node.pos, bool, 1)
         
@@ -1027,7 +1031,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     
     def touch(node : AST::Loop)
       # The condition of the loop must evaluate to a type of Bool.
-      bool = MetaType.new(reified_type(refer.decl_defn("Bool")))
+      bool = MetaType.new(reified_type(prelude_type("Bool")))
       cond_info = self[node.cond]
       cond_info.within_domain!(self, node.pos, node.pos, bool, 1)
       

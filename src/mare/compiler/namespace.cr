@@ -37,11 +37,15 @@ class Mare::Compiler::Namespace
       source_types.merge!(@types_by_library[source.library])
     end
     
-    ctx.program.imports.each do |source, imports|
-      imports.each do |import|
-        add_imported_types_to_source(import)
-      end
+    ctx.program.imports.each do |import|
+      add_imported_types_to_source(import)
     end
+  end
+  
+  # TODO: Can this be less hacky? It feels wrong to alter this state later.
+  def add_lambda_type_later(new_type)
+    add_type_to_library(new_type)
+    add_type_to_source(new_type)
   end
   
   def [](x)
@@ -53,10 +57,14 @@ class Mare::Compiler::Namespace
     result.not_nil!
   end
   
+  # When given an Identifier, try to find the type starting from its source.
+  # This is the way to resolve a type identifier in context.
   def []?(ident : AST::Identifier) : (Program::Type | Program::TypeAlias)?
-    @types_by_source[ident.pos.source]?.try(&.[]?(ident.value))
+    @types_by_source[ident.pos.source][ident.value]?
   end
   
+  # When given a String name, try to find the type in the root or prelude.
+  # This is a way to resolve a basic type when you don't have context.
   def []?(name : String) : (Program::Type | Program::TypeAlias)?
     @types_by_library[@root_library.not_nil!]?.try(&.[]?(name)) ||
     @types_by_library[Compiler.prelude_library]?.try(&.[]?(name))
@@ -68,7 +76,7 @@ class Mare::Compiler::Namespace
     self[type_name].as(Program::Type).find_func!(func_name)
   end
   
-  def add_type_to_library(new_type)
+  private def add_type_to_library(new_type)
     library = new_type.ident.pos.source.library
     name = new_type.ident.value
     
@@ -86,7 +94,7 @@ class Mare::Compiler::Namespace
     types[name] = new_type
   end
   
-  def add_type_to_source(new_type)
+  private def add_type_to_source(new_type)
     source = new_type.ident.pos.source
     name = new_type.ident.value
     
@@ -98,7 +106,7 @@ class Mare::Compiler::Namespace
     types[name] = new_type
   end
   
-  def add_prelude_types_to_source(source, source_types)
+  private def add_prelude_types_to_source(source, source_types)
     # Skip adding prelude types to source files in the prelude library.
     return if source.library == Compiler.prelude_library
     
@@ -115,7 +123,7 @@ class Mare::Compiler::Namespace
     end
   end
   
-  def add_imported_types_to_source(import)
+  private def add_imported_types_to_source(import)
     source = import.ident.pos.source
     library = import.resolved
     importable_types = @types_by_library[library]

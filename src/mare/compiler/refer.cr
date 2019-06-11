@@ -17,35 +17,10 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
     @map = {} of Program::Type => ForType
   end
   
-  # TODO: refactor to leverage ctx.namespace
   def run(ctx)
-    # Gather all the types in the program as Decls.
-    decls = Hash(Source::Library, Hash(String, Decl | DeclAlias)).new
-    ctx.program.types.each_with_index do |t, index|
-      library = t.ident.pos.source.library
-      name = t.ident.value
-      library_decls = (
-        decls[library] ||= Hash(String, Decl | DeclAlias).new
-      )
-      library_decls[name] = Decl.new(t)
-    end
-    
-    # Gather type aliases in a similar way, dereferencing as we go.
-    ctx.program.aliases.each_with_index do |a, index|
-      library = a.ident.pos.source.library
-      name = a.ident.value
-      library_decls = (
-        decls[library] ||= Hash(String, Decl | DeclAlias).new
-      )
-      # TODO: allow aliasing to other libraries, allow aliasing to other aliases
-      target = library_decls[a.target.value].as(Decl)
-      library_decls[name] = DeclAlias.new(a, target.defn)
-    end
-    
     # For each type in the program, delve into type parameters and functions.
     ctx.program.types.each do |t|
-      t_decl = Decl.new(t)
-      @map[t] = ForType.new(ctx, t_decl, decls).tap(&.run)
+      @map[t] = ForType.new(ctx, Decl.new(t)).tap(&.run)
     end
   end
   
@@ -58,28 +33,24 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
   end
   
   class ForType
-    def initialize(
-      @ctx : Context,
-      @decl : Decl,
-      @decls : Hash(Source::Library, Hash(String, Decl | DeclAlias)),
-    )
+    def initialize(@ctx : Context, @self_decl : Decl)
       @map = {} of Program::Function => ForFunc
       @infos = {} of AST::Node => Info
       @params = {} of String => DeclParam
       
       # If the type has type parameters, collect them into the params map.
-      if decl.defn.params
-        decl.defn.params.not_nil!.terms.each_with_index do |param, index|
+      if self_decl.defn.params
+        self_decl.defn.params.not_nil!.terms.each_with_index do |param, index|
           decl_param =
             case param
             when AST::Identifier
-              DeclParam.new(decl.defn, index, param, nil)
+              DeclParam.new(self_decl.defn, index, param, nil)
             when AST::Group
               raise NotImplementedError.new(param) \
                 unless param.terms.size == 2 && param.style == " "
               
               DeclParam.new(
-                decl.defn,
+                self_decl.defn,
                 index,
                 param.terms.first.as(AST::Identifier),
                 param.terms.last.as(AST::Term),
@@ -114,52 +85,44 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
     end
     
     def self_decl
-      @decl
+      @self_decl
     end
     
     def self_library
-      @decl.defn.ident.pos.source.library
+      @self_decl.defn.ident.pos.source.library
     end
     
     def self_imports
-      @ctx.program.imports[@decl.defn.ident.pos.source]?
+      @ctx.program.imports[@self_decl.defn.ident.pos.source]?
     end
     
-    def decl(name : String)
-      decl?(name).not_nil!
+    def decl(node)
+      decl?(node).not_nil!
     end
     
-    def decl?(name : String)
-      return @decl if name == "@"
+    def decl?(node : AST::Identifier)
+      found = @params[node.value]?
+      return found if found
       
-      immediate =
-        @params[name]? ||
-        @decls[Compiler.prelude_library][name]? ||
-        @decls[self_library][name]?
-      return immediate if immediate
-      
-      self_imports.try(&.each { |import|
-        found = @decls[import.resolved][name]?
-        return found if found
-      })
-      
-      nil
-    end
-    
-    def decl_defn(name : String) : Program::Type
-      decl = decl(name)
-      case decl
-      when Decl, DeclAlias then decl.defn
-      else raise NotImplementedError.new(decl)
+      found = @ctx.namespace[node]?
+      case found
+      when Program::Type
+        Decl.new(found)
+      when Program::TypeAlias
+        target = found
+        while !target.is_a?(Program::Type)
+          target = @ctx.namespace[target.target]
+        end
+        DeclAlias.new(found, target)
       end
     end
     
     def run
       # For the type parameters in the type, run with a new ForBranch instance.
-      @decl.defn.params.try(&.accept(ForBranch.new(self)))
+      @self_decl.defn.params.try(&.accept(ForBranch.new(self)))
       
       # For each function in the type, run with a new ForFunc instance.
-      @decl.defn.functions.each do |f|
+      @self_decl.defn.functions.each do |f|
         ForFunc.new(self)
         .tap { |refer| @map[f] = refer }
         .tap(&.run(f))
@@ -186,16 +149,12 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
       @infos[node] = info
     end
     
-    def decl(name : String)
-      @for_type.decl(name)
+    def decl(node)
+      @for_type.decl(node)
     end
     
-    def decl?(name : String)
-      @for_type.decl?(name)
-    end
-    
-    def decl_defn(name : String) : Program::Type
-      @for_type.decl_defn(name)
+    def decl?(node)
+      @for_type.decl?(node)
     end
     
     def run(func)
@@ -239,8 +198,8 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
         if name == "@"
           Self::INSTANCE
         else
-          # First, try to resolve as local, then try decls, else it's unresolved.
-          @locals[name]? || @refer.decl?(name) || Unresolved::INSTANCE
+          # First, try to resolve as local, then as decl, else it's unresolved.
+          @locals[name]? || @refer.decl?(node) || Unresolved::INSTANCE
         end
       
       # Raise an error if trying to use an "incomplete" union of locals.
