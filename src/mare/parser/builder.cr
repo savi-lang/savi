@@ -5,7 +5,7 @@ module Mare::Parser::Builder
     iter = Pegmatite::TokenIterator.new(tokens)
     main = iter.next
     state = State.new(source)
-    build_doc(main, iter, state)
+    build_doc(main, iter, state).tap(&.source=(source))
   end
   
   private def self.assert_kind(token, kind)

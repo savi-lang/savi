@@ -19,17 +19,26 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
   
   def run(ctx)
     # Gather all the types in the program as Decls.
-    decls = {} of String => (Decl | DeclAlias | DeclParam)
+    decls = Hash(Source::Library, Hash(String, Decl | DeclAlias)).new
     ctx.program.types.each_with_index do |t, index|
+      library = t.ident.pos.source.library
       name = t.ident.value
-      decls[name] = Decl.new(t)
+      library_decls = (
+        decls[library] ||= Hash(String, Decl | DeclAlias).new
+      )
+      library_decls[name] = Decl.new(t)
     end
     
     # Gather type aliases in a similar way, dereferencing as we go.
     ctx.program.aliases.each_with_index do |a, index|
+      library = a.ident.pos.source.library
       name = a.ident.value
-      target = decls[a.target.value].as(Decl)
-      decls[name] = DeclAlias.new(a, target.defn)
+      library_decls = (
+        decls[library] ||= Hash(String, Decl | DeclAlias).new
+      )
+      # TODO: allow aliasing to other libraries, allow aliasing to other aliases
+      target = library_decls[a.target.value].as(Decl)
+      library_decls[name] = DeclAlias.new(a, target.defn)
     end
     
     # For each type in the program, delve into type parameters and functions.
@@ -50,15 +59,14 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
   class ForType
     def initialize(
       @decl : Decl,
-      @decls : Hash(String, Decl | DeclAlias | DeclParam),
+      @decls : Hash(Source::Library, Hash(String, Decl | DeclAlias)),
     )
       @map = {} of Program::Function => ForFunc
       @infos = {} of AST::Node => Info
+      @params = {} of String => DeclParam
       
-      # If the type has type parameters, add those to the decls map.
+      # If the type has type parameters, collect them into the params map.
       if decl.defn.params
-        @decls = @decls.dup
-        
         decl.defn.params.not_nil!.terms.each_with_index do |param, index|
           decl_param =
             case param
@@ -78,7 +86,7 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
               raise NotImplementedError.new(param)
             end
           
-          @decls[decl_param.ident.value] = decl_param
+          @params[decl_param.ident.value] = decl_param
         end
       end
     end
@@ -107,19 +115,26 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
       @decl
     end
     
+    def self_library
+      @decl.defn.ident.pos.source.library
+    end
+    
     def decl(name : String)
       return @decl if name == "@"
-      @decls[name]
+      @params[name]? ||
+      @decls[Compiler.prelude_library][name]? ||
+      @decls[self_library][name]
     end
     
     def decl?(name : String)
       return @decl if name == "@"
-      @decls[name]?
+      @params[name]? ||
+      @decls[Compiler.prelude_library][name]? ||
+      @decls[self_library][name]?
     end
     
     def decl_defn(name : String) : Program::Type
-      return @decl.defn if name == "@"
-      decl = @decls[name]
+      decl = decl(name)
       case decl
       when Decl, DeclAlias then decl.defn
       else raise NotImplementedError.new(decl)

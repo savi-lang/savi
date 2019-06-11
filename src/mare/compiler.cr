@@ -96,4 +96,8 @@ module Mare::Compiler
       end
     @@prelude_docs.not_nil!
   end
+  
+  def self.prelude_library
+    prelude_docs.first.source.library
+  end
 end

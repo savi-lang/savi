@@ -51,6 +51,7 @@ module Mare::AST
   
   class Document < Node
     property list
+    property! source : Source
     def initialize(@list = [] of Declare)
     end
     
