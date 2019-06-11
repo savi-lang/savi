@@ -1,6 +1,6 @@
 describe Mare::Compiler::Completeness do
   it "complains when not all fields get initialized in a constructor" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :class Data
       :prop w U64
       :prop x U64
@@ -33,7 +33,7 @@ describe Mare::Compiler::Completeness do
   end
   
   it "complains when a field is only conditionally initialized" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :class Data
       :prop x U64
       :new
@@ -72,7 +72,7 @@ describe Mare::Compiler::Completeness do
   end
   
   it "allows a field to be initialized in every case of a choice" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :class Data
       :prop x U64
       :new
@@ -97,7 +97,7 @@ describe Mare::Compiler::Completeness do
   end
   
   it "won't blow its stack on mutually recursive branching paths" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :class Data
       :prop x U64
       :new
@@ -130,7 +130,7 @@ describe Mare::Compiler::Completeness do
   end
   
   it "complains when a field is read before it has been initialized" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :class Data
       :prop x U64
       :prop y U64
@@ -163,7 +163,7 @@ describe Mare::Compiler::Completeness do
   end
   
   it "complains when access to the self is shared while still incomplete" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :primitive Access
       :fun data (d Data)
         d.x
@@ -208,7 +208,7 @@ describe Mare::Compiler::Completeness do
   
   it "allows opaque sharing of the self while still incomplete" \
      " and non-opaque sharing of the self after becoming complete" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :primitive Access
       :fun data (d Data)
         d.x

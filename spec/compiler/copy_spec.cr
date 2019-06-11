@@ -1,6 +1,6 @@
 describe Mare::Compiler::Copy do
   it "complains when a source type couldn't be resolved" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :actor Main
       :is Bogus
     SOURCE

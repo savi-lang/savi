@@ -1,6 +1,6 @@
 describe Mare::Compiler::Refer do
   it "fails to resolve a local when it was declared in another branch" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :actor Main
       :new
         if True (
@@ -26,7 +26,7 @@ describe Mare::Compiler::Refer do
   end
   
   it "resolves a local declared in all prior branches" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :actor Main
       :new
         if True (
@@ -83,7 +83,7 @@ describe Mare::Compiler::Refer do
   end
   
   it "complains when referencing a local declared in only some branches" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :actor Main
       :new
         if True (
@@ -123,7 +123,7 @@ describe Mare::Compiler::Refer do
   end
   
   it "complains when an already-consumed local is referenced" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :actor Main
       :new
         x = "example"
@@ -149,7 +149,7 @@ describe Mare::Compiler::Refer do
   end
   
   it "complains when an possibly-consumed local is referenced" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :actor Main
       :new
         x = "example"
@@ -175,7 +175,7 @@ describe Mare::Compiler::Refer do
   end
   
   it "complains when referencing a possibly-consumed local from a choice" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :actor Main
       :new
         @show(1)
@@ -227,7 +227,7 @@ describe Mare::Compiler::Refer do
   end
   
   it "allows referencing a local consumed in an earlier choice branch" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :actor Main
       :new
         @show(1)
@@ -245,7 +245,7 @@ describe Mare::Compiler::Refer do
   end
   
   it "complains when a choice body uses a local consumed in an earlier cond" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :actor Main
       :new
         @show(1)
@@ -276,7 +276,7 @@ describe Mare::Compiler::Refer do
   end
   
   it "complains when a choice cond uses a local consumed before the choice" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :actor Main
       :new
         @show(1)
@@ -304,7 +304,7 @@ describe Mare::Compiler::Refer do
   end
   
   it "complains when consuming a local in a loop cond" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :actor Main
       :new
         x = "example"
@@ -329,7 +329,7 @@ describe Mare::Compiler::Refer do
   end
   
   it "complains when consuming a local in a loop body" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :actor Main
       :new
         x = "example"
@@ -354,7 +354,7 @@ describe Mare::Compiler::Refer do
   end
   
   it "complains when using a local possibly consumed in a loop else body" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :actor Main
       :new
         x = "example"
@@ -380,7 +380,7 @@ describe Mare::Compiler::Refer do
   end
   
   it "allows referencing a local in the body of a loop consumed in the else" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :actor Main
       :new
         x = "example"
@@ -391,7 +391,7 @@ describe Mare::Compiler::Refer do
   end
   
   it "complains when a loop cond uses a local consumed before the loop" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :actor Main
       :new
         @show(1)

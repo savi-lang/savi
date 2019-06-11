@@ -1,6 +1,6 @@
 describe Mare::Compiler::Reach do
   it "reaches compatible functions when reaching a trait function" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :trait Trait
       :fun foo U64
     

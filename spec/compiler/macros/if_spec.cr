@@ -1,7 +1,7 @@
 describe Mare::Compiler::Macros do
   describe "if" do
     it "is transformed into a choice" do
-      source = Mare::Source.new "(example)", <<-SOURCE
+      source = Mare::Source.new_example <<-SOURCE
       :actor Main
         :new
           if True 42
@@ -21,7 +21,7 @@ describe Mare::Compiler::Macros do
     end
     
     it "complains if the number of terms is more than 2" do
-      source = Mare::Source.new "(example)", <<-SOURCE
+      source = Mare::Source.new_example <<-SOURCE
       :actor Main
         :new
           if True (
@@ -63,7 +63,7 @@ describe Mare::Compiler::Macros do
     end
     
     it "complains if the number of terms is less than 2" do
-      source = Mare::Source.new "(example)", <<-SOURCE
+      source = Mare::Source.new_example <<-SOURCE
       :actor Main
         :new
           if True
@@ -93,7 +93,7 @@ describe Mare::Compiler::Macros do
     end
     
     it "handles an optional else clause, delimited by |" do
-      source = Mare::Source.new "(example)", <<-SOURCE
+      source = Mare::Source.new_example <<-SOURCE
       :actor Main
         :new
           if True (42 | 7)
@@ -113,7 +113,7 @@ describe Mare::Compiler::Macros do
     end
     
     it "complains if the delimited body has more than 2 sections" do
-      source = Mare::Source.new "(example)", <<-SOURCE
+      source = Mare::Source.new_example <<-SOURCE
       :actor Main
         :new
           if True (42 | 7 | what | now)

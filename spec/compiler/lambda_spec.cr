@@ -1,6 +1,6 @@
 describe Mare::Compiler::Lambda do
   it "handles thunks (lambdas with no parameters)" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :class Example
       :fun thunk
         apple = ^(Fruit.new("apple").flavor)
@@ -33,7 +33,7 @@ describe Mare::Compiler::Lambda do
   end
   
   it "handles lambdas with parameters" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :class Example
       :fun lambdas
         apple = ^(Fruit.new(^1, ^2).flavor)
@@ -69,7 +69,7 @@ describe Mare::Compiler::Lambda do
   end
   
   it "raises an error if a lambda parameter reference is outside a lambda" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :class Example
       :fun no_lambda
         apple = ^1

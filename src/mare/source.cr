@@ -1,9 +1,30 @@
 class Mare::Source
-  property path : String
+  property filename : String
   property content : String
-  def initialize(@path, @content)
+  property library : Library
+  
+  def initialize(@filename, @content, @library)
   end
-  NONE = new("(none)", "")
+  
+  def path
+    File.join(@library.path, @filename)
+  end
+  
+  NONE = new("(none)", "", Library::NONE)
+  def self.none; NONE end
+  
+  def self.new_example(content)
+    new("(example)", content, Library.new(""))
+  end
+end
+
+class Mare::Source::Library
+  property path : String
+  
+  def initialize(@path)
+  end
+  
+  NONE = new("")
   def self.none; NONE end
 end
 
@@ -25,7 +46,7 @@ struct Mare::Source::Pos
   
   # Override inspect to avoid verbosely printing Source#content every time.
   def inspect(io)
-    io << "`#{source.path.split("/").last}:#{start}-#{finish}`"
+    io << "`#{source.filename}:#{start}-#{finish}`"
   end
   
   def show

@@ -1,6 +1,6 @@
 describe Mare::Compiler::Infer do
   it "complains when the type identifier couldn't be resolved" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :actor Main
       :new
         x BogusType = 42
@@ -19,7 +19,7 @@ describe Mare::Compiler::Infer do
   end
   
   it "complains when the return type identifier couldn't be resolved" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :actor Main
       :fun x BogusType: 42
       :new
@@ -39,7 +39,7 @@ describe Mare::Compiler::Infer do
   end
   
   it "complains when the local identifier couldn't be resolved" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :actor Main
       :new
         x = y
@@ -58,7 +58,7 @@ describe Mare::Compiler::Infer do
   end
   
   it "complains when the function body doesn't match the return type" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :primitive Example
       :fun number I32
         "not a number at all"
@@ -91,7 +91,7 @@ describe Mare::Compiler::Infer do
   end
   
   it "complains when the assignment type doesn't match the right-hand-side" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :actor Main
       :new
         name String = 42
@@ -120,7 +120,7 @@ describe Mare::Compiler::Infer do
   end
   
   it "complains when the prop type doesn't match the initializer value" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :actor Main
       :prop name String: 42
     SOURCE
@@ -148,7 +148,7 @@ describe Mare::Compiler::Infer do
   end
   
   it "treats an empty sequence as producing None" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :actor Main
       :new
         name String = ()
@@ -177,7 +177,7 @@ describe Mare::Compiler::Infer do
   end
   
   it "complains when a choice condition type isn't boolean" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :actor Main
       :new
         if "not a boolean" 42
@@ -206,7 +206,7 @@ describe Mare::Compiler::Infer do
   end
   
   it "infers a local's type based on assignment" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :actor Main
       :new
         x = "Hello, World!"
@@ -223,7 +223,7 @@ describe Mare::Compiler::Infer do
   end
   
   it "infers a prop's type based on the prop initializer" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :actor Main
       :prop x: "Hello, World!"
       :new
@@ -240,7 +240,7 @@ describe Mare::Compiler::Infer do
   end
   
   it "infers an integer literal based on an assignment" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :actor Main
       :new
         x (U64 | None) = 42
@@ -257,7 +257,7 @@ describe Mare::Compiler::Infer do
   end
   
   it "infers an integer literal based on a prop type" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :actor Main
       :prop x (U64 | None): 42
       :new
@@ -277,7 +277,7 @@ describe Mare::Compiler::Infer do
   end
   
   it "infers an integer literal through an if statement" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :actor Main
       :new
         x (U64 | String | None) = if True 42
@@ -299,7 +299,7 @@ describe Mare::Compiler::Infer do
   end
   
   it "complains when a literal couldn't be resolved to a single type" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :actor Main
       :new
         x (F64 | U64) = 42
@@ -328,7 +328,7 @@ describe Mare::Compiler::Infer do
   end
   
   it "complains when a less specific type than required is assigned" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :actor Main
       :new
         x (U64 | None) = 42
@@ -358,7 +358,7 @@ describe Mare::Compiler::Infer do
   end
   
   it "complains when a different type is assigned on reassignment" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :actor Main
       :new
         x = U64[0]
@@ -388,7 +388,7 @@ describe Mare::Compiler::Infer do
   end
   
   it "infers return type from param type or another return type" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :primitive Infer
       :fun from_param (n I32): n
       :fun from_call_return (n I32): Infer.from_param(n)
@@ -413,7 +413,7 @@ describe Mare::Compiler::Infer do
   end
   
   it "infers param type from local assignment or from the return type" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :primitive Infer
       :fun from_assign (n): m I32 = n
       :fun from_return_type (n) I32: n
@@ -438,7 +438,7 @@ describe Mare::Compiler::Infer do
   end
   
   it "complains when unable to infer mutually recursive return types" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :primitive Tweedle
       :fun dee (n I32): Tweedle.dum(n)
       :fun dum (n I32): Tweedle.dee(n)
@@ -461,7 +461,7 @@ describe Mare::Compiler::Infer do
   end
   
   it "complains about problems with unreachable functions too" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :primitive NeverCalled
       :fun call
         x I32 = True
@@ -494,7 +494,7 @@ describe Mare::Compiler::Infer do
   end
   
   it "infers assignment from an allocated class" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :class X
     
     :actor Main
@@ -513,7 +513,7 @@ describe Mare::Compiler::Infer do
   end
   
   it "requires allocation for non-non references of an allocated class" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :class X
     
     :actor Main
@@ -544,7 +544,7 @@ describe Mare::Compiler::Infer do
   end
   
   it "complains when assigning with an insufficient right-hand capability" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :class C
     
     :actor Main
@@ -576,7 +576,7 @@ describe Mare::Compiler::Infer do
   end
   
   it "complains when calling on types without that function" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :trait A
       :fun foo
     
@@ -615,7 +615,7 @@ describe Mare::Compiler::Infer do
   end
   
   it "complains when calling with an insufficient receiver capability" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :primitive Example
       :fun ref mutate
     
@@ -642,7 +642,7 @@ describe Mare::Compiler::Infer do
   end
   
   it "complains when violating uniqueness into a local" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :class X
       :new iso
     
@@ -686,7 +686,7 @@ describe Mare::Compiler::Infer do
   end
   
   it "complains when violating uniqueness into a reassigned local" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :class X
       :new iso
     
@@ -725,7 +725,7 @@ describe Mare::Compiler::Infer do
   end
   
   it "complains when violating uniqueness into an argument" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :class X
       :new iso
     
@@ -768,7 +768,7 @@ describe Mare::Compiler::Infer do
   end
   
   it "strips the ephemeral modifier from the capability of an inferred local" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :class X
       :new iso
     
@@ -810,7 +810,7 @@ describe Mare::Compiler::Infer do
   end
   
   it "infers the type of an array literal from its elements" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :actor Main
       :new
         x = ["one", "two", "three"]
@@ -827,7 +827,7 @@ describe Mare::Compiler::Infer do
   end
   
   it "infers the element types of an array literal from an assignment" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :actor Main
       :new
         x Array((U64 | None)) = [1, 2, 3] // TODO: allow syntax: Array(U64 | None)?
@@ -846,7 +846,7 @@ describe Mare::Compiler::Infer do
   end
   
   it "complains when violating uniqueness into an array literal" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :class X
       :new iso
     
@@ -890,7 +890,7 @@ describe Mare::Compiler::Infer do
   end
   
   it "complains when trying to implicitly recover an array literal" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :class X
     
     :actor Main
@@ -925,7 +925,7 @@ describe Mare::Compiler::Infer do
   end
   
   it "reflects viewpoint adaptation in the return type of a prop getter" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :class Inner
     
     :class Outer
@@ -965,7 +965,7 @@ describe Mare::Compiler::Infer do
   end
   
   it "respects explicit viewpoint adaptation notation in the return type" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :class Inner
     
     :class Outer
@@ -1006,7 +1006,7 @@ describe Mare::Compiler::Infer do
   end
   
   it "treats box functions as being implicitly specialized on receiver cap" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :class Inner
     
     :class Outer
@@ -1026,7 +1026,7 @@ describe Mare::Compiler::Infer do
   end
   
   it "allows safe auto-recovery of a property setter call" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :class Inner
       :new iso
     
@@ -1062,7 +1062,7 @@ describe Mare::Compiler::Infer do
   end
   
   it "complains on auto-recovery of a property setter whose return is used" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :class Inner
       :new iso
     
@@ -1094,7 +1094,7 @@ describe Mare::Compiler::Infer do
   end
   
   it "complains on auto-recovery for a val method receiver" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :class Inner
       :new iso
     
@@ -1127,7 +1127,7 @@ describe Mare::Compiler::Infer do
   end
   
   it "infers prop setters to return the alias of the assigned value" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :class Inner
       :new trn:
     
@@ -1169,7 +1169,7 @@ describe Mare::Compiler::Infer do
   pending "requires parameters of actor behaviours to be sendable"
   
   it "requires a sub-func to be present in the subtype" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :trait Trait
       :fun example1 U64
       :fun example2 U64
@@ -1207,7 +1207,7 @@ describe Mare::Compiler::Infer do
   end
   
   it "requires a sub-func to have the same constructor or constant tags" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :trait Trait
       :new constructor1
       :new constructor2
@@ -1309,7 +1309,7 @@ describe Mare::Compiler::Infer do
   end
   
   it "requires a sub-func to have the same number of params" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :trait non Trait
       :fun example1 (a U64, b U64, c U64) None
       :fun example2 (a U64, b U64, c U64) None
@@ -1369,7 +1369,7 @@ describe Mare::Compiler::Infer do
   end
   
   it "requires a sub-constructor to have a covariant receiver capability" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :trait Trait
       :new ref example1
       :new ref example2
@@ -1409,7 +1409,7 @@ describe Mare::Compiler::Infer do
   end
   
   it "requires a sub-func to have a contravariant receiver capability" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :trait Trait
       :fun ref example1 U64
       :fun ref example2 U64
@@ -1449,7 +1449,7 @@ describe Mare::Compiler::Infer do
   end
   
   it "requires a sub-func to have covariant return and contravariant params" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :trait non Trait
       :fun example1 Numeric
       :fun example2 U64
@@ -1511,7 +1511,7 @@ describe Mare::Compiler::Infer do
   end
   
   it "complains when too many type arguments are provided" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :class Generic (P1, P2)
     
     :actor Main
@@ -1547,7 +1547,7 @@ describe Mare::Compiler::Infer do
   end
   
   it "complains when too few type arguments are provided" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :class Generic (P1, P2, P3)
     
     :actor Main
@@ -1583,7 +1583,7 @@ describe Mare::Compiler::Infer do
   end
   
   it "complains when no type arguments are provided and some are expected" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :class Generic (P1, P2)
     
     :actor Main
@@ -1609,7 +1609,7 @@ describe Mare::Compiler::Infer do
   end
   
   it "complains when a type argument doesn't satisfy the bound" do
-    source = Mare::Source.new "(example)", <<-SOURCE
+    source = Mare::Source.new_example <<-SOURCE
     :class Class
     :class Generic (P1 send)
     

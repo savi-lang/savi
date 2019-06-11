@@ -1,7 +1,7 @@
 describe Mare::Compiler::Macros do
   describe "case" do
     it "is transformed into a choice" do
-      source = Mare::Source.new "(example)", <<-SOURCE
+      source = Mare::Source.new_example <<-SOURCE
       :actor Main
         :new
           case (
@@ -27,7 +27,7 @@ describe Mare::Compiler::Macros do
     end
     
     it "with an odd number of sections treats the last one as an else clause" do
-      source = Mare::Source.new "(example)", <<-SOURCE
+      source = Mare::Source.new_example <<-SOURCE
       :actor Main
         :new
           case (
@@ -54,7 +54,7 @@ describe Mare::Compiler::Macros do
     end
     
     it "can be written on one line, without the first pipe" do
-      source = Mare::Source.new "(example)", <<-SOURCE
+      source = Mare::Source.new_example <<-SOURCE
       :actor Main
         :new
           case (x == 1 | "one" | x == 2 | "two")
@@ -77,7 +77,7 @@ describe Mare::Compiler::Macros do
     end
     
     it "complains if the number of top-level terms is more than one" do
-      source = Mare::Source.new "(example)", <<-SOURCE
+      source = Mare::Source.new_example <<-SOURCE
       :actor Main
         :new
           case (x == 1) "one" (x == 2) "two"
@@ -116,7 +116,7 @@ describe Mare::Compiler::Macros do
     end
     
     it "complains if the term isn't a group" do
-      source = Mare::Source.new "(example)", <<-SOURCE
+      source = Mare::Source.new_example <<-SOURCE
       :actor Main
         :new
           case x == 1
@@ -138,7 +138,7 @@ describe Mare::Compiler::Macros do
     end
     
     it "complains if the term isn't a pipe-delimited group" do
-      source = Mare::Source.new "(example)", <<-SOURCE
+      source = Mare::Source.new_example <<-SOURCE
       :actor Main
         :new
           case (x == 1)

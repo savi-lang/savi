@@ -58,11 +58,15 @@ module Mare::Compiler
   
   def self.compile(dirname : String, target : Symbol = :eval)
     filenames = Dir.entries(dirname).select(&.ends_with?(".mare")).to_a
-    filenames.map! { |filename| File.join(dirname, filename) }
     
     raise "No '.mare' source files found in '#{dirname}'!" if filenames.empty?
     
-    compile(filenames.map { |name| Source.new(name, File.read(name)) }, target)
+    library = Source::Library.new(dirname)
+    sources = filenames.map do |name|
+      Source.new(name, File.read(File.join(dirname, name)), library)
+    end
+    
+    compile(sources, target)
   end
   
   def self.compile(sources : Array(Source), target : Symbol = :eval)
@@ -87,7 +91,11 @@ module Mare::Compiler
       begin
         path = File.join(__DIR__, "../prelude.mare")
         content = File.read(path)
-        source = Source.new(path, content)
+        source = Mare::Source.new(
+          File.basename(path),
+          content,
+          Mare::Source::Library.new(File.dirname(path)),
+        )
         Parser.parse(source)
       end
     @@prelude_doc.not_nil!
