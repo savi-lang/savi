@@ -11,4 +11,17 @@ class LLVM::Builder
 
     Value.new LibLLVM.build_frem(self, lhs, rhs, name)
   end
+
+  def extract_value(aggregate, index, name = "")
+    # check_value(aggregate)
+
+    Value.new LibLLVM.build_extract_value(self, aggregate, index, name)
+  end
+
+  def insert_value(aggregate, element, index, name = "")
+    # check_value(aggregate)
+    # check_value(element)
+
+    Value.new LibLLVM.build_insert_value(self, aggregate, element, index, name)
+  end
 end

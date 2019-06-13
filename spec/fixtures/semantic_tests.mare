@@ -1,5 +1,9 @@
 :import "./micro_test" (MicroTest)
 
+:primitive Err
+  :fun non now!: @inner!
+  :fun non inner!: error!
+
 :actor Main
   :new
     test = MicroTest
@@ -93,6 +97,10 @@
       |
         33
       )
+    )
+    
+    test["try call error; with error"].pass = U64[33] == (
+      try (Err.now!, 11 | 33)
     )
     
     test.print_line_break // TODO: move to MicroTest constructor and finalizer

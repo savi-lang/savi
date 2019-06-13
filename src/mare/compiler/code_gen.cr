@@ -193,6 +193,10 @@ class Mare::Compiler::CodeGen
       infer.func
     end
     
+    def can_error?
+      Jumps.any_error?(func.ident)
+    end
+    
     def needs_receiver?
       @needs_receiver
     end
@@ -569,6 +573,10 @@ class Mare::Compiler::CodeGen
     # Get the LLVM type to use for the return type.
     ret_type = llvm_type_of(gfunc.func.ident, gfunc)
     
+    if gfunc.can_error?
+      ret_type = llvm.struct([ret_type, @i1])
+    end
+    
     # Constructors return void (the caller already has the receiver).
     ret_type = @void if gfunc.func.has_tag?(:constructor)
     
@@ -672,15 +680,18 @@ class Mare::Compiler::CodeGen
       last_value = gen_expr(expr, gfunc.func.has_tag?(:constant))
     end
     
-    # For a constructor, return void (the caller already has the receiver).
-    if gfunc.func.has_tag?(:constructor)
-      last_value = nil
-    else
-      last_value.not_nil!
+    unless Jumps.away?(gfunc.func.body.not_nil!)
+      if gfunc.func.has_tag?(:constructor)
+        # For a constructor, return void (the caller already has the receiver).
+        @builder.ret
+      elsif gfunc.can_error?
+        # If this is an error-able function, use that calling convention.
+        gen_return_using_error_cc(last_value.not_nil!, false)
+      else
+        # Otherwise, return the error as normal.
+        @builder.ret(last_value.not_nil!)
+      end
     end
-    
-    # Return the return value (or void).
-    last_value ? @builder.ret(last_value) : @builder.ret
     
     gen_func_end
   end
@@ -1145,6 +1156,25 @@ class Mare::Compiler::CodeGen
       else
         gen_call(gfunc.llvm_func, args, arg_exprs)
       end
+    
+    # If this is an error-able function, check the error bit in the tuple.
+    if gfunc.can_error?
+      error_bit = @builder.extract_value(result, 1)
+      
+      error_block = gen_block("error_return")
+      after_block = gen_block("after_return")
+      
+      is_error = @builder.icmp(LLVM::IntPredicate::EQ, error_bit, @i1_true)
+      @builder.cond(is_error, error_block, after_block)
+      
+      @builder.position_at_end(error_block)
+      # TODO: Should we try to avoid destructuring and restructuring the
+      # tuple value here? Or does LLVM optimize it away so as to not matter?
+      gen_raise_error(@builder.extract_value(result, 0))
+      
+      @builder.position_at_end(after_block)
+      result = @builder.extract_value(result, 0)
+    end
     
     # If this is a constructor, the result is the receiver we already have.
     result = receiver if gfunc.func.has_tag?(:constructor)
@@ -1944,20 +1974,31 @@ class Mare::Compiler::CodeGen
   end
   
   def gen_raise_error(expr)
-    # TODO: other path is to return error tuple value from errorable function
-    raise NotImplementedError.new("empty try else stack") \
-      if @try_else_stack.empty?
-    
     # TODO: Allow an error value of something other than None.
     error_value = gen_none
     
-    # Store the state needed to catch the value in the try else block.
-    else_stack_tuple = @try_else_stack.last
-    else_stack_tuple[1] << @builder.insert_block
-    else_stack_tuple[2] << error_value
-    
-    # Jump to the try else block.
-    @builder.br(else_stack_tuple[0])
+    # If we have no local try to catch the value, then we return it
+    # using the error-able calling convention function style,
+    # making (and checking) the assumption that we are in such a function.
+    if @try_else_stack.empty?
+      raise "malformed try else stack" unless func_frame.gfunc.not_nil!.can_error?
+      gen_return_using_error_cc(error_value, true)
+    else
+      # Store the state needed to catch the value in the try else block.
+      else_stack_tuple = @try_else_stack.last
+      else_stack_tuple[1] << @builder.insert_block
+      else_stack_tuple[2] << error_value
+      
+      # Jump to the try else block.
+      @builder.br(else_stack_tuple[0])
+    end
+  end
+  
+  def gen_return_using_error_cc(value, is_error : Bool)
+    tuple = func_frame.gfunc.not_nil!.llvm_func.return_type.undef
+    tuple = @builder.insert_value(tuple, value, 0)
+    tuple = @builder.insert_value(tuple, is_error ? @i1_true : @i1_false, 1)
+    @builder.ret(tuple)
   end
   
   DESC_ID                        = 0

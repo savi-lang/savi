@@ -1,5 +1,24 @@
 describe Mare::Compiler::Completeness do
-  it "complains when a function name needs an exclamation" do
+  it "complains when a constructor has an error-able body" do
+    source = Mare::Source.new_example <<-SOURCE
+    :actor Main
+      :new
+        error!
+    SOURCE
+    
+    expected = <<-MSG
+    This constructor may raise an error, but that is not allowed:
+    from (example):2:
+      :new
+       ^~~
+    MSG
+    
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :verify)
+    end
+  end
+  
+  it "complains when a no-exclamation function has an error-able body" do
     source = Mare::Source.new_example <<-SOURCE
     :actor Main
       :new

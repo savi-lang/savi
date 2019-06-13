@@ -21,13 +21,19 @@ module Mare::Compiler::Verify
   def self.check_function(ctx, rt, rf)
     func = rf.func
     
-    if func.body.try { |body| Jumps.any_error?(body) } \
-    && !Jumps.any_error?(func.ident)
-      Error.at func.ident,
-        "This function name needs an exclamation point "\
-        "because it may raise an error", [
-          {func.ident, "it should be named '#{func.ident.value}!' instead"}
-        ]
+    if func.body.try { |body| Jumps.any_error?(body) }
+      if func.has_tag?(:constructor)
+        Error.at func.ident,
+          "This constructor may raise an error, but that is not allowed"
+      end
+      
+      if !Jumps.any_error?(func.ident)
+        Error.at func.ident,
+          "This function name needs an exclamation point "\
+          "because it may raise an error", [
+            {func.ident, "it should be named '#{func.ident.value}!' instead"}
+          ]
+      end
     end
   end
 end

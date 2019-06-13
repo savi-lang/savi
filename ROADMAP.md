@@ -18,7 +18,7 @@
 - [x] - Generic types and generic rcaps
 - [x] - Array literals
 - [x] - Looping flow control (`while`)
-- [ ] - Partial functions and partial calls
+- [x] - Partial functions and partial calls
 - [ ] - For-loop iterator syntax sugar (`for x in y`)
 - [ ] - Tuple values
 - [ ] - Finalizer functions
