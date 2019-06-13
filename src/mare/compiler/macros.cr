@@ -76,6 +76,13 @@ class Mare::Compiler::Macros < Mare::AST::Visitor
         "the group of cases to check, partitioned by `|`",
       ])
       visit_case(node)
+    elsif Util.match_ident?(node, 0, "try")
+      Util.require_terms(node, [
+        nil,
+        "the body to be attempted, followed by an optional\n" \
+        "  else clause to execute if the body errors (partitioned by `|`)",
+      ])
+      visit_try(node)
     else
       node
     end
@@ -174,6 +181,28 @@ class Mare::Compiler::Macros < Mare::AST::Visitor
     
     group = AST::Group.new("(").from(node)
     group.terms << AST::Choice.new(clauses).from(orig)
+    group
+  end
+  
+  def visit_try(node : AST::Group)
+    orig = node.terms[0]
+    body = node.terms[1]
+    else_body = nil
+    
+    if body.is_a?(AST::Group) && body.style == "|"
+      Util.require_terms(body, [
+        "the body to attempt to execute fully",
+        "the body to be executed if the previous errored (the \"else\" case)",
+      ], true)
+      
+      else_body = body.terms[1]
+      body      = body.terms[0]
+    end
+    
+    else_body ||= AST::Identifier.new("None").from(node)
+    
+    group = AST::Group.new("(").from(node)
+    group.terms << AST::Try.new(body, else_body).from(orig)
     group
   end
 end

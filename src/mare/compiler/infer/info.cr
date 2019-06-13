@@ -361,6 +361,38 @@ class Mare::Compiler::Infer
     end
   end
   
+  class RaiseError < Info
+    def initialize(@pos)
+    end
+    
+    def resolve!(infer : ForFunc)
+      MetaType.new(MetaType::Unsatisfiable.instance)
+    end
+    
+    def within_domain!(infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
+      raise "halt"
+    end
+  end
+  
+  class Try < Info
+    def initialize(@pos, @body : AST::Node, @else_body : AST::Node)
+    end
+    
+    def resolve!(infer : ForFunc)
+      # TODO: error uncertainty in body
+      raise NotImplementedError.new(@body) unless infer[@body].is_a?(RaiseError)
+      
+      infer[@else_body].resolve!(infer)
+    end
+    
+    def within_domain!(infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
+      # TODO: error uncertainty in body
+      raise NotImplementedError.new(@body) unless infer[@body].is_a?(RaiseError)
+      
+      infer[@else_body].within_domain!(infer, use_pos, constraint_pos, constraint, aliases)
+    end
+  end
+  
   class Choice < Info
     getter clauses : Array(AST::Node)
     

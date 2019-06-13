@@ -824,11 +824,16 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       when Refer::Self
         self[node] = Self.new(node.pos, resolved_self)
       when Refer::Unresolved
-        # Leave the node as zero if this identifer needs no value.
-        return if Classify.value_not_needed?(node)
-        
-        # Otherwise, raise an error to the user:
-        Error.at node, "This identifer couldn't be resolved"
+        case node.value
+        when "error!"
+          self[node] = RaiseError.new(node.pos)
+        else
+          # Leave the node as zero if this identifer needs no value.
+          return if Classify.value_not_needed?(node)
+          
+          # Otherwise, raise an error to the user:
+          Error.at node, "This identifer couldn't be resolved"
+        end
       else
         raise NotImplementedError.new(ref)
       end
@@ -1037,6 +1042,10 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       
       # TODO: Don't use Choice?
       self[node] = Choice.new(node.pos, [node.body, node.else_body])
+    end
+    
+    def touch(node : AST::Try)
+      self[node] = Try.new(node.pos, node.body, node.else_body)
     end
     
     def touch(node : AST::Node)

@@ -34,9 +34,11 @@ module Mare::Parser
     ident_letter =
       range('a', 'z') | range('A', 'Z') | range('0', '9') | char('_')
     ident = (
-      (char('@') >> ident_letter.repeat) |
-      (char('^') >> digit19 >> digit.repeat) |
-      ident_letter.repeat(1)
+      (
+        (char('@') >> ident_letter.repeat) |
+        (char('^') >> digit19 >> digit.repeat) |
+        ident_letter.repeat(1)
+      ) >> char('!').maybe
     ).named(:ident)
     
     # Define what a string looks like.

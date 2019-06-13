@@ -240,6 +240,9 @@ class Mare::Compiler::CodeGen
     @string_globals = {} of String => LLVM::Value
     @cstring_globals = {} of String => LLVM::Value
     @gtypes = {} of String => GenType
+    @try_else_stack = Array(Tuple(
+      LLVM::BasicBlock, Array(LLVM::BasicBlock), Array(LLVM::Value)
+    )).new
     
     # Pony runtime types.
     @desc = @llvm.struct_create_named("_.DESC").as(LLVM::Type)
@@ -527,6 +530,8 @@ class Mare::Compiler::CodeGen
   
   def gen_func_end
     @di.func_end if @di.in_func?
+    
+    raise "invalid try else stack" unless @try_else_stack.empty?
     
     @frames.pop
   end
@@ -1363,6 +1368,8 @@ class Mare::Compiler::CodeGen
       elsif ref.is_a?(Refer::Self)
         raise "#{ref.inspect} isn't a constant value" if const_only
         func_frame.receiver_value
+      elsif ref.is_a?(Refer::Unresolved) && expr.value == "error!"
+        gen_raise_error(expr)
       else
         raise NotImplementedError.new(ref)
       end
@@ -1397,6 +1404,9 @@ class Mare::Compiler::CodeGen
     when AST::Loop
       raise "#{expr.inspect} isn't a constant value" if const_only
       gen_loop(expr)
+    when AST::Try
+      raise "#{expr.inspect} isn't a constant value" if const_only
+      gen_try(expr)
     when AST::Prefix
       raise NotImplementedError.new(expr.inspect) unless expr.op.value == "--"
       gen_expr(expr.term, const_only)
@@ -1836,6 +1846,81 @@ class Mare::Compiler::CodeGen
       [body_value, else_value],
       "philoop"
     )
+  end
+  
+  def gen_try(expr : AST::Try)
+    # Get the LLVM type for the phi that joins the final value of each branch.
+    # Each such value will needed to be bitcast to the that type.
+    phi_type = llvm_type_of(expr)
+    
+    # Prepare to capture state for the final phi
+    phi_blocks = [] of LLVM::BasicBlock
+    phi_values = [] of LLVM::Value
+    
+    # Create all of the instruction blocks we'll need for this try.
+    body_block = gen_block("body_try")
+    else_block = gen_block("else_try")
+    post_block = gen_block("after_try")
+    @try_else_stack << {else_block, [] of LLVM::BasicBlock, [] of LLVM::Value}
+    
+    # Go straight to the body block from whatever block we are in now.
+    @builder.br(body_block)
+    
+    # Generate the body and get the resulting value, assuming no throw happened.
+    # Then continue to the post block.
+    @builder.position_at_end(body_block)
+    body_value = gen_expr(expr.body)
+    # # TODO: Support bodies that sometimes don't error:
+    # @builder.br(post_block)
+    # phi_blocks << body_block
+    # phi_values << body_value
+    
+    # Now start generating the else clause (reached when a throw happened).
+    @builder.position_at_end(else_block)
+    
+    # TODO: Allow an error_phi_type of something other than None.
+    error_phi_type = llvm_type_of(@gtypes["None"])
+    
+    # Catch the thrown error value, by getting the blocks and values from the
+    # try_else_stack and using the LLVM mechanism called a "phi" instruction.
+    else_stack_tuple = @try_else_stack.pop
+    raise "invalid try else stack" unless else_stack_tuple[0] == else_block
+    error_value = @builder.phi(
+      error_phi_type,
+      else_stack_tuple[1],
+      else_stack_tuple[2],
+      "phi_else_try",
+    )
+    
+    # TODO: allow the else block to reference the error value as a local.
+    
+    # Generate the body code of the else clause, then proceed to the post block.
+    else_value = gen_expr(expr.else_body)
+    @builder.br(post_block)
+    phi_blocks << else_block
+    phi_values << else_value
+    
+    # Here at the post block, we receive the value that was returned by one of
+    # the bodies above, using the LLVM mechanism called a "phi" instruction.
+    @builder.position_at_end(post_block)
+    @builder.phi(phi_type, phi_blocks, phi_values, "phi_try")
+  end
+  
+  def gen_raise_error(expr)
+    # TODO: other path is to return error tuple value from errorable function
+    raise NotImplementedError.new("empty try else stack") \
+      if @try_else_stack.empty?
+    
+    # TODO: Allow an error value of something other than None.
+    error_value = gen_none
+    
+    # Store the state needed to catch the value in the try else block.
+    else_stack_tuple = @try_else_stack.last
+    else_stack_tuple[1] << @builder.insert_block
+    else_stack_tuple[2] << error_value
+    
+    # Jump to the try else block.
+    @builder.br(else_stack_tuple[0])
   end
   
   DESC_ID                        = 0

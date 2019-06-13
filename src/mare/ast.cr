@@ -94,7 +94,7 @@ module Mare::AST
   alias Term = Identifier \
     | LiteralString | LiteralInteger | LiteralFloat \
     | Operator | Prefix | Relate | Group \
-    | FieldRead | FieldWrite | Choice | Loop
+    | FieldRead | FieldWrite | Choice | Loop | Try
   
   class Identifier < Node
     property value
@@ -253,6 +253,26 @@ module Mare::AST
     end
     def children_accept(visitor)
       cond.accept(visitor)
+      body.accept(visitor)
+      else_body.accept(visitor)
+    end
+  end
+  
+  class Try < Node
+    property body : Term
+    property else_body : Term
+    
+    def initialize(@body, @else_body)
+    end
+    
+    def name; :try end
+    def to_a: Array(A)
+      res = [name] of A
+      res << body.to_a
+      res << else_body.to_a
+      res
+    end
+    def children_accept(visitor)
       body.accept(visitor)
       else_body.accept(visitor)
     end

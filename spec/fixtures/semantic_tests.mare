@@ -1,0 +1,12 @@
+:import "./micro_test" (MicroTest)
+
+:actor Main
+  :new
+    test = MicroTest
+    test.print_line_break // TODO: move to MicroTest constructor and finalizer
+    
+    test["try error else"].pass = U64[33] == (
+      try (error! | 33)
+    )
+    
+    test.print_line_break // TODO: move to MicroTest constructor and finalizer
