@@ -1368,7 +1368,7 @@ class Mare::Compiler::CodeGen
       elsif ref.is_a?(Refer::Self)
         raise "#{ref.inspect} isn't a constant value" if const_only
         func_frame.receiver_value
-      elsif ref.is_a?(Refer::Unresolved) && expr.value == "error!"
+      elsif ref.is_a?(Refer::RaiseError)
         gen_raise_error(expr)
       else
         raise NotImplementedError.new(ref)

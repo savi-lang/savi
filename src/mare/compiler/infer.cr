@@ -823,17 +823,14 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         end
       when Refer::Self
         self[node] = Self.new(node.pos, resolved_self)
+      when Refer::RaiseError
+        self[node] = RaiseError.new(node.pos)
       when Refer::Unresolved
-        case node.value
-        when "error!"
-          self[node] = RaiseError.new(node.pos)
-        else
-          # Leave the node as zero if this identifer needs no value.
-          return if Classify.value_not_needed?(node)
-          
-          # Otherwise, raise an error to the user:
-          Error.at node, "This identifer couldn't be resolved"
-        end
+        # Leave the node as unresolved if this identifer needs no value.
+        return if Classify.value_not_needed?(node)
+        
+        # Otherwise, raise an error to the user:
+        Error.at node, "This identifer couldn't be resolved"
       else
         raise NotImplementedError.new(ref)
       end

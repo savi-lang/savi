@@ -7,6 +7,10 @@ class Mare::Compiler::Refer
     INSTANCE = new
   end
   
+  struct RaiseError
+    INSTANCE = new
+  end
+  
   struct Field
     getter name : String
     
@@ -86,5 +90,5 @@ class Mare::Compiler::Refer
   alias Info = (
     Self | Local | LocalUnion | Field |
     Type | TypeAlias | TypeParam |
-    Unresolved)
+    RaiseError | Unresolved)
 end
