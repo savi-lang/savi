@@ -1758,8 +1758,8 @@ class Mare::Compiler::CodeGen
     cond_value = gen_expr(expr.list.first[0])
     
     # Generate the interacting code for each consecutive pair of cases.
-    values = [] of LLVM::Value
-    blocks = [] of LLVM::BasicBlock
+    phi_blocks = [] of LLVM::BasicBlock
+    phi_values = [] of LLVM::Value
     expr.list.each_cons(2).to_a.each_with_index do |(fore, aft), i|
       # The case block is the body to execute if the cond_value is true.
       # Otherwise we will jump to the next block, with its next cond_value.
@@ -1772,10 +1772,12 @@ class Mare::Compiler::CodeGen
       # carry the value we just generated as one of the possible phi values.
       @builder.position_at_end(case_block)
       value = gen_expr(fore[1])
-      value = gen_assign_cast(value, phi_type, fore[1])
-      values << value
-      blocks << case_block
-      @builder.br(post_block)
+      unless Jumps.away?(fore[1])
+        value = gen_assign_cast(value, phi_type, fore[1])
+        phi_blocks << @builder.insert_block
+        phi_values << value
+        @builder.br(post_block)
+      end
       
       # Generate code for the next block, which is the condition to be
       # checked for truthiness in the next iteration of this loop
@@ -1795,21 +1797,27 @@ class Mare::Compiler::CodeGen
     # that we used when we generated case blocks inside the loop above.
     @builder.position_at_end(case_block)
     value = gen_expr(expr.list.last[1])
-    value = gen_assign_cast(value, phi_type, expr.list.last[1])
-    values << value
-    blocks << case_block
-    @builder.br(post_block)
+    unless Jumps.away?(expr.list.last[1])
+      value = gen_assign_cast(value, phi_type, expr.list.last[1])
+      phi_blocks << @builder.insert_block
+      phi_values << value
+      @builder.br(post_block)
+    end
     
     # Here at the post block, we receive the value that was returned by one of
     # the cases above, using the LLVM mechanism called a "phi" instruction.
     @builder.position_at_end(post_block)
-    @builder.phi(phi_type, blocks, values, "phichoice")
+    @builder.phi(phi_type, phi_blocks, phi_values, "phi_choice")
   end
   
   def gen_loop(expr : AST::Loop)
     # Get the LLVM type for the phi that joins the final value of each branch.
     # Each such value will needed to be bitcast to the that type.
     phi_type = llvm_type_of(expr)
+    
+    # Prepare to capture state for the final phi.
+    phi_blocks = [] of LLVM::BasicBlock
+    phi_values = [] of LLVM::Value
     
     # Create all of the instruction blocks we'll need for this loop.
     body_block = gen_block("body_loop")
@@ -1826,26 +1834,29 @@ class Mare::Compiler::CodeGen
     # If the cond is true, repeat the body block; otherwise, go to post block.
     @builder.position_at_end(body_block)
     body_value = gen_expr(expr.body)
-    body_value = gen_assign_cast(body_value, phi_type, expr.body)
-    cond_value = gen_expr(expr.cond)
-    @builder.cond(cond_value, body_block, post_block)
+    unless Jumps.away?(expr.body)
+      body_value = gen_assign_cast(body_value, phi_type, expr.body)
+      cond_value = gen_expr(expr.cond)
+      phi_blocks << @builder.insert_block
+      phi_values << body_value
+      @builder.cond(cond_value, body_block, post_block)
+    end
     
     # In the body block, generate code to arrive at the else value,
     # Then skip straight to the post block.
     @builder.position_at_end(else_block)
     else_value = gen_expr(expr.else_body)
-    else_value = gen_assign_cast(else_value, phi_type, expr.body)
-    @builder.br(post_block)
+    unless Jumps.away?(expr.else_body)
+      else_value = gen_assign_cast(else_value, phi_type, expr.body)
+      phi_blocks << @builder.insert_block
+      phi_values << else_value
+      @builder.br(post_block)
+    end
     
     # Here at the post block, we receive the value that was returned by one of
     # the bodies above, using the LLVM mechanism called a "phi" instruction.
     @builder.position_at_end(post_block)
-    @builder.phi(
-      phi_type,
-      [body_block, else_block],
-      [body_value, else_value],
-      "philoop"
-    )
+    @builder.phi(phi_type, phi_blocks, phi_values, "phi_loop")
   end
   
   def gen_try(expr : AST::Try)
@@ -1853,7 +1864,7 @@ class Mare::Compiler::CodeGen
     # Each such value will needed to be bitcast to the that type.
     phi_type = llvm_type_of(expr)
     
-    # Prepare to capture state for the final phi
+    # Prepare to capture state for the final phi.
     phi_blocks = [] of LLVM::BasicBlock
     phi_values = [] of LLVM::Value
     
@@ -1870,10 +1881,11 @@ class Mare::Compiler::CodeGen
     # Then continue to the post block.
     @builder.position_at_end(body_block)
     body_value = gen_expr(expr.body)
-    # # TODO: Support bodies that sometimes don't error:
-    # @builder.br(post_block)
-    # phi_blocks << body_block
-    # phi_values << body_value
+    unless Jumps.away?(expr.body)
+      phi_blocks << @builder.insert_block
+      phi_values << body_value
+      @builder.br(post_block)
+    end
     
     # Now start generating the else clause (reached when a throw happened).
     @builder.position_at_end(else_block)
@@ -1896,9 +1908,9 @@ class Mare::Compiler::CodeGen
     
     # Generate the body code of the else clause, then proceed to the post block.
     else_value = gen_expr(expr.else_body)
-    @builder.br(post_block)
-    phi_blocks << else_block
+    phi_blocks << @builder.insert_block
     phi_values << else_value
+    @builder.br(post_block)
     
     # Here at the post block, we receive the value that was returned by one of
     # the bodies above, using the LLVM mechanism called a "phi" instruction.

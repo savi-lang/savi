@@ -231,4 +231,6 @@ describe Mare::Compiler::Completeness do
     
     Mare::Compiler.compile([source], :completeness)
   end
+  
+  pending "accounts for jumping away in its completeness detection"
 end

@@ -370,7 +370,7 @@ class Mare::Compiler::Infer
     end
     
     def within_domain!(infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
-      raise "halt"
+      raise "can't constrain RaiseError to a domain"
     end
   end
   
@@ -379,15 +379,15 @@ class Mare::Compiler::Infer
     end
     
     def resolve!(infer : ForFunc)
-      # TODO: error uncertainty in body
-      raise NotImplementedError.new(@body) unless infer[@body].is_a?(RaiseError)
-      
-      infer[@else_body].resolve!(infer)
+      MetaType.new_union([
+        infer[@body].resolve!(infer),
+        infer[@else_body].resolve!(infer),
+      ])
     end
     
     def within_domain!(infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
-      # TODO: error uncertainty in body
-      raise NotImplementedError.new(@body) unless infer[@body].is_a?(RaiseError)
+      infer[@body].within_domain!(infer, use_pos, constraint_pos, constraint, aliases) \
+        unless Jumps.away?(@body)
       
       infer[@else_body].within_domain!(infer, use_pos, constraint_pos, constraint, aliases)
     end
@@ -404,7 +404,11 @@ class Mare::Compiler::Infer
     end
     
     def within_domain!(infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
-      clauses.each { |node| infer[node].within_domain!(infer, use_pos, constraint_pos, constraint, aliases) }
+      clauses.each do |node|
+        next if Jumps.away?(node)
+        
+        infer[node].within_domain!(infer, use_pos, constraint_pos, constraint, aliases)
+      end
     end
   end
   

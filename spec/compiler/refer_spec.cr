@@ -417,4 +417,7 @@ describe Mare::Compiler::Refer do
       Mare::Compiler.compile([source], :refer)
     end
   end
+  
+  pending "complains when a local variable name ends with an exclamation"
+  pending "complains when a parameter name ends with an exclamation"
 end

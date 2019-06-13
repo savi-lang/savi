@@ -5,8 +5,74 @@
     test = MicroTest
     test.print_line_break // TODO: move to MicroTest constructor and finalizer
     
-    test["try error else"].pass = U64[33] == (
+    zero = U64[0]
+    
+    test["try error; with error"].pass = U64[33] == (
       try (error! | 33)
+    )
+    
+    test["try: if body error; without error"].pass = U64[33] == (
+      try (
+        if (zero > 1) (error! | 33)
+      |
+        11
+      )
+    )
+    
+    test["try: if body error; with error"].pass = U64[33] == (
+      try (
+        if (zero < 1) (error! | 11)
+      |
+        33
+      )
+    )
+    
+    test["try: if else body error; without error"].pass = U64[33] == (
+      try (
+        if (zero < 1) (33 | error!)
+      |
+        11
+      )
+    )
+    
+    test["try: if else body error; with error"].pass = U64[33] == (
+      try (
+        if (zero > 1) (11 | error!)
+      |
+        33
+      )
+    )
+    
+    test["try: while body error; without error"].pass = U64[33] == (
+      try (
+        while (zero > 1) (error! | 33)
+      |
+        11
+      )
+    )
+    
+    test["try: while body error; with error"].pass = U64[33] == (
+      try (
+        while (zero < 1) (error! | 11)
+      |
+        33
+      )
+    )
+    
+    test["try: while else body error; without error"].pass = U64[33] == (
+      try (
+        while (zero < 1) (zero = zero + 1, 33 | error!)
+      |
+        11
+      )
+    )
+    
+    test["try: while else body error; with error"].pass = U64[33] == (
+      try (
+        while (zero > 1) (11 | error!)
+      |
+        33
+      )
     )
     
     test.print_line_break // TODO: move to MicroTest constructor and finalizer

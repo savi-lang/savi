@@ -10,9 +10,10 @@
 # This pass produces no output state.
 #
 class Mare::Compiler::Classify < Mare::AST::Visitor
-  FLAG_VALUE_NOT_NEEDED  = 0x1_u64
-  FLAG_TYPE_EXPR         = 0x2_u64
-  FLAG_FURTHER_QUALIFIED = 0x4_u64
+  FLAG_VALUE_NOT_NEEDED  = 0x1_u64 # set here in the Classify pass
+  FLAG_TYPE_EXPR         = 0x2_u64 # set here in the Classify pass
+  FLAG_FURTHER_QUALIFIED = 0x4_u64 # set here in the Classify pass
+  FLAG_ERROR_JUMP        = 0x8_u64 # set in the Jumps pass
   
   def self.value_not_needed?(node); (node.flags & FLAG_VALUE_NOT_NEEDED) != 0 end
   def self.value_needed?(node);     (node.flags & FLAG_VALUE_NOT_NEEDED) == 0 end
@@ -24,6 +25,9 @@ class Mare::Compiler::Classify < Mare::AST::Visitor
   
   def self.further_qualified?(node); (node.flags & FLAG_FURTHER_QUALIFIED) != 0 end
   def self.further_qualified!(node); node.flags |= FLAG_FURTHER_QUALIFIED end
+  
+  def self.error_jump?(node); (node.flags & FLAG_ERROR_JUMP) != 0 end
+  def self.error_jump!(node); node.flags |= FLAG_ERROR_JUMP end
   
   # This visitor marks the given node tree as being a type_expr.
   class TypeExprVisitor < Mare::AST::Visitor

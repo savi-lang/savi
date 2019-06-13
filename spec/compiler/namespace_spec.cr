@@ -46,4 +46,5 @@ describe Mare::Compiler::Namespace do
   
   pending "complains when a bulk-imported type conflicts with another"
   pending "complains when an explicitly imported type conflicts with another"
+  pending "complains when a type name ends with an exclamation"
 end

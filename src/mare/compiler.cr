@@ -7,8 +7,9 @@ module Mare::Compiler
     when :macros       then ctx.run(Macros)
     when :sugar        then ctx.run(Sugar)
     when :lambda       then ctx.run(Lambda)
-    when :classify     then ctx.run(Classify)
     when :refer        then ctx.run(ctx.refer)
+    when :classify     then ctx.run(Classify)
+    when :jumps        then ctx.run(Jumps)
     when :infer        then ctx.run(ctx.infer)
     when :completeness then ctx.run(Completeness)
     when :reach        then ctx.run(ctx.reach)
@@ -32,11 +33,12 @@ module Mare::Compiler
     when :lambda then [:sugar, :macros]
     when :refer then [:lambda, :sugar, :macros, :namespace]
     when :classify then [:refer, :lambda, :sugar, :macros]
-    when :infer then [:classify, :refer, :lambda, :copy]
-    when :completeness then [:infer, :lambda, :sugar, :macros, :copy]
+    when :jumps then [:classify]
+    when :infer then [:jumps, :classify, :refer, :lambda, :copy]
+    when :completeness then [:jumps, :infer, :lambda, :sugar, :macros, :copy]
     when :reach then [:infer]
     when :paint then [:reach]
-    when :codegen then [:paint, :reach, :infer, :completeness, :classify]
+    when :codegen then [:paint, :reach, :infer, :completeness, :jumps, :classify]
     when :eval then [:codegen]
     when :binary then [:codegen]
     else raise NotImplementedError.new([:deps_of, target].inspect)
