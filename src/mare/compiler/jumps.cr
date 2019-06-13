@@ -12,33 +12,32 @@
 #
 class Mare::Compiler::Jumps < Mare::AST::Visitor
   def self.away?(node)
-    Classify.error_jump?(node)
+    Classify.always_error?(node)
     # TODO: early returns also jump away
   end
+  
+  def self.always_error?(node); Classify.always_error?(node) end
+  def self.maybe_error?(node);  Classify.maybe_error?(node)  end
+  def self.any_error?(node);    Classify.any_error?(node)    end
   
   def self.run(ctx)
     ctx.program.types.each do |t|
       t.functions.each do |f|
-        new(ctx, t, f).run
+        new(f).run
       end
     end
   end
   
-  getter ctx : Context
-  getter type : Program::Type
   getter func : Program::Function
   
-  def initialize(@ctx, @type, @func)
+  def initialize(@func)
   end
   
   def run
+    func.ident.try(&.accept(self))
     func.params.try(&.accept(self))
     func.ret.try(&.accept(self))
     func.body.try(&.accept(self))
-  end
-  
-  def refer
-    ctx.refer[type][func]
   end
   
   # We don't deal with type expressions at all.
@@ -53,59 +52,100 @@ class Mare::Compiler::Jumps < Mare::AST::Visitor
   end
   
   def touch(node : AST::Identifier)
-    # An identifier is an error jump if it ends in an exclamation point.
-    Classify.error_jump!(node) if node.value[-1] == '!'
+    if node.value == "error!"
+      # An identifier is an always error if it is the special case of "error!".
+      Classify.always_error!(node)
+    elsif node.value[-1] == '!'
+      # Otherwise, it is a maybe error if it ends in an exclamation point.
+      Classify.maybe_error!(node)
+    end
   end
   
   def touch(node : AST::Group)
-    # A group is an error jump if any term in it is.
-    Classify.error_jump!(node) \
-      if node.terms.any? { |t| Classify.error_jump?(t) }
+    if node.terms.any? { |t| Classify.always_error?(t) }
+      # A group is an always error if any term in it is.
+      Classify.always_error!(node)
+    elsif node.terms.any? { |t| Classify.maybe_error?(t) }
+      # Otherwise, it is a maybe error if any term in it is.
+      Classify.maybe_error!(node)
+    end
   end
   
   def touch(node : AST::Prefix)
-    # A prefixed term is an error jump if its term is.
-    Classify.error_jump!(node) \
-      if Classify.error_jump?(node.term)
+    if Classify.always_error?(node.term)
+      # A prefixed term is an always error if its term is.
+      Classify.always_error!(node)
+    elsif Classify.maybe_error?(node.term)
+      # Otherwise, it is a maybe error if its term is.
+      Classify.maybe_error!(node)
+    end
   end
   
   def touch(node : AST::Qualify)
-    # A qualify is an error jump if either its term or group is.
-    Classify.error_jump!(node) \
-      if Classify.error_jump?(node.term) || Classify.error_jump?(node.group)
+    if Classify.always_error?(node.term) || Classify.always_error?(node.group)
+      # A qualify is an always error if either its term or group is.
+      Classify.always_error!(node)
+    elsif Classify.maybe_error?(node.term) || Classify.maybe_error?(node.group)
+      # Otherwise, it is a maybe error if either its term or group is.
+      Classify.maybe_error!(node)
+    end
   end
   
   def touch(node : AST::Relate)
-    # A relation is an error jump if either its left or right side is.
-    Classify.error_jump!(node) \
-      if Classify.error_jump?(node.lhs) || Classify.error_jump?(node.rhs)
+    if Classify.always_error?(node.lhs) || Classify.always_error?(node.rhs)
+      # A relation is an always error if either its left or right side is.
+      Classify.always_error!(node)
+    elsif Classify.maybe_error?(node.lhs) || Classify.maybe_error?(node.rhs)
+      # Otherwise, it is a maybe error if either its left or right side is.
+      Classify.maybe_error!(node)
+    end
   end
   
   def touch(node : AST::Choice)
-    # A choice is an error jump only if all possible paths
-    # through conds and bodies force us into an error jump.
+    # A choice is an always error only if all possible paths
+    # through conds and bodies force us into an always error.
     some_possible_happy_path =
       node.list.size.times.each do |index|
-        break false if Classify.error_jump?(node.list[index][0])
-        break true unless Classify.error_jump?(node.list[index][1])
+        break false if Classify.always_error?(node.list[index][0])
+        break true unless Classify.always_error?(node.list[index][1])
       end
     
-    Classify.error_jump!(node) unless some_possible_happy_path
+    # A choice is a maybe error if any cond or body in it is a maybe error.
+    some_possible_error_path =
+      node.list.any? do |cond, body|
+        Classify.any_error?(cond) || Classify.any_error?(body)
+      end
+    
+    if !some_possible_happy_path
+      Classify.always_error!(node)
+    elsif some_possible_error_path
+      Classify.maybe_error!(node)
+    end
   end
   
   def touch(node : AST::Loop)
-    # A loop is an error jump if the cond is an error jump,
-    # or if both the body and else body are error jumps.
-    if Classify.error_jump?(node.cond) \
-    || (Classify.error_jump?(node.body) && Classify.error_jump?(node.else_body))
-      Classify.error_jump!(node)
+    if Classify.always_error?(node.cond) || (
+      Classify.always_error?(node.body) && Classify.always_error?(node.else_body)
+    )
+      # A loop is an always error if the cond is an always error,
+      # or if both the body and else body are always errors.
+      Classify.always_error!(node)
+    elsif Classify.maybe_error?(node.cond) \
+    || Classify.any_error?(node.body) \
+    || Classify.any_error?(node.else_body)
+      # A loop is a maybe error if the cond is a maybe error,
+      # or if either the body or else body are always errors or maybe errors.
+      Classify.maybe_error!(node)
     end
   end
   
   def touch(node : AST::Try)
-    # A try is an error jump if both the body and else body are error jumps.
-    if Classify.error_jump?(node.body) && Classify.error_jump?(node.else_body)
-      Classify.error_jump!(node)
+    if Classify.always_error?(node.body) && Classify.always_error?(node.else_body)
+      # A try is an always error if both the body and else are always errors.
+      Classify.always_error!(node)
+    elsif Classify.any_error?(node.else_body)
+      # A try is a maybe error if the else body has some chance to error.
+      Classify.maybe_error!(node)
     end
   end
   
