@@ -11,7 +11,11 @@
       try (error! | 33)
     )
     
-    test["try: if body error; without error"].pass = U64[33] == (
+    test["try: try error else error; with error"].pass = U64[33] == (
+      try (try (error! | error!) | 33)
+    )
+    
+    test["try: if error; without error"].pass = U64[33] == (
       try (
         if (zero > 1) (error! | 33)
       |
@@ -19,7 +23,7 @@
       )
     )
     
-    test["try: if body error; with error"].pass = U64[33] == (
+    test["try: if error; with error"].pass = U64[33] == (
       try (
         if (zero < 1) (error! | 11)
       |
@@ -27,7 +31,7 @@
       )
     )
     
-    test["try: if else body error; without error"].pass = U64[33] == (
+    test["try: if else error; without error"].pass = U64[33] == (
       try (
         if (zero < 1) (33 | error!)
       |
@@ -35,7 +39,7 @@
       )
     )
     
-    test["try: if else body error; with error"].pass = U64[33] == (
+    test["try: if else error; with error"].pass = U64[33] == (
       try (
         if (zero > 1) (11 | error!)
       |
@@ -43,7 +47,15 @@
       )
     )
     
-    test["try: while body error; without error"].pass = U64[33] == (
+    test["try: if error else error; with error"].pass = U64[33] == (
+      try (
+        if (zero < 1) (error! | error!)
+      |
+        33
+      )
+    )
+    
+    test["try: while error; without error"].pass = U64[33] == (
       try (
         while (zero > 1) (error! | 33)
       |
@@ -51,7 +63,7 @@
       )
     )
     
-    test["try: while body error; with error"].pass = U64[33] == (
+    test["try: while error; with error"].pass = U64[33] == (
       try (
         while (zero < 1) (error! | 11)
       |
@@ -59,7 +71,7 @@
       )
     )
     
-    test["try: while else body error; without error"].pass = U64[33] == (
+    test["try: while else error; without error"].pass = U64[33] == (
       try (
         while (zero < 1) (zero = zero + 1, 33 | error!)
       |
@@ -67,9 +79,17 @@
       )
     )
     
-    test["try: while else body error; with error"].pass = U64[33] == (
+    test["try: while else error; with error"].pass = U64[33] == (
       try (
         while (zero > 1) (11 | error!)
+      |
+        33
+      )
+    )
+    
+    test["try: while error else error; with error"].pass = U64[33] == (
+      try (
+        while (zero < 1) (error! | error!)
       |
         33
       )

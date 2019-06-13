@@ -1804,6 +1804,13 @@ class Mare::Compiler::CodeGen
       @builder.br(post_block)
     end
     
+    # We can't have a phi with no predecessors, so we don't generate it, and
+    # return a None value; it won't be used, but this method can't return nil.
+    if phi_blocks.empty? && phi_values.empty?
+      post_block.delete
+      return gen_none
+    end
+    
     # Here at the post block, we receive the value that was returned by one of
     # the cases above, using the LLVM mechanism called a "phi" instruction.
     @builder.position_at_end(post_block)
@@ -1847,10 +1854,17 @@ class Mare::Compiler::CodeGen
     @builder.position_at_end(else_block)
     else_value = gen_expr(expr.else_body)
     unless Jumps.away?(expr.else_body)
-      else_value = gen_assign_cast(else_value, phi_type, expr.body)
+      else_value = gen_assign_cast(else_value, phi_type, expr.else_body)
       phi_blocks << @builder.insert_block
       phi_values << else_value
       @builder.br(post_block)
+    end
+    
+    # We can't have a phi with no predecessors, so we don't generate it, and
+    # return a None value; it won't be used, but this method can't return nil.
+    if phi_blocks.empty? && phi_values.empty?
+      post_block.delete
+      return gen_none
     end
     
     # Here at the post block, we receive the value that was returned by one of
@@ -1882,6 +1896,7 @@ class Mare::Compiler::CodeGen
     @builder.position_at_end(body_block)
     body_value = gen_expr(expr.body)
     unless Jumps.away?(expr.body)
+      body_value = gen_assign_cast(body_value, phi_type, expr.body)
       phi_blocks << @builder.insert_block
       phi_values << body_value
       @builder.br(post_block)
@@ -1908,9 +1923,19 @@ class Mare::Compiler::CodeGen
     
     # Generate the body code of the else clause, then proceed to the post block.
     else_value = gen_expr(expr.else_body)
-    phi_blocks << @builder.insert_block
-    phi_values << else_value
-    @builder.br(post_block)
+    unless Jumps.away?(expr.else_body)
+      else_value = gen_assign_cast(else_value, phi_type, expr.else_body)
+      phi_blocks << @builder.insert_block
+      phi_values << else_value
+      @builder.br(post_block)
+    end
+    
+    # We can't have a phi with no predecessors, so we don't generate it, and
+    # return a None value; it won't be used, but this method can't return nil.
+    if phi_blocks.empty? && phi_values.empty?
+      post_block.delete
+      return gen_none
+    end
     
     # Here at the post block, we receive the value that was returned by one of
     # the bodies above, using the LLVM mechanism called a "phi" instruction.
