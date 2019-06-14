@@ -44,7 +44,10 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
           type_param =
             case param
             when AST::Identifier
-              TypeParam.new(self_type.defn, index, param, nil)
+              any = AST::Identifier.new("any").from(param)
+              self[any] = Unresolved::INSTANCE
+              
+              TypeParam.new(self_type.defn, index, param, any)
             when AST::Group
               raise NotImplementedError.new(param) \
                 unless param.terms.size == 2 && param.style == " "

@@ -68,7 +68,7 @@ module Mare::Parser
       str("iso") | str("trn") | str("val") |
       str("ref") | str("box") | str("tag") | str("non")
     ).named(:ident)
-    capmod = str("alias").named(:ident)
+    capmod = str("aliased").named(:ident)
     
     # Define groups of operators, in order of precedence,
     # from most tightly binding to most loosely binding.

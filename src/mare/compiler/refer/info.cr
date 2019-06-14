@@ -81,9 +81,9 @@ class Mare::Compiler::Refer
     getter parent : Program::Type
     getter index : Int32
     getter ident : AST::Identifier
-    getter constraint : AST::Term?
+    getter bound : AST::Term
     
-    def initialize(@parent, @index, @ident, @constraint)
+    def initialize(@parent, @index, @ident, @bound)
     end
   end
   

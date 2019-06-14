@@ -81,18 +81,13 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     
     params_partial_reifications =
       t.params.not_nil!.terms.map do |param|
-        constraint_node = ctx.refer[t][param].as(Refer::TypeParam).constraint
-        constraint_mt =
-          if constraint_node
-            # Get the MetaType of the constraint.
-            no_args.type_expr(constraint_node, ctx.refer[t])
-          else
-            # Use `any` as the MetaType of the constraint.
-            MetaType.new(MetaType::Capability::ANY)
-          end
-        # Return the list of MetaTypes that partially reify the constraint;
+        # Get the MetaType of the bound.
+        bound_node = ctx.refer[t][param].as(Refer::TypeParam).bound
+        bound_mt = no_args.type_expr(bound_node, ctx.refer[t])
+        
+        # Return the list of MetaTypes that partially reify the bound;
         # that is, a list that constitutes every possible cap substitution.
-        constraint_mt.partial_reifications
+        bound_mt.partial_reifications
       end
     
     recursive_expand_mts(params_partial_reifications).map do |params|
@@ -256,13 +251,9 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     def get_param_bound(index : Int32)
       refer = ctx.refer[reified.defn]
       param_node = reified.defn.params.not_nil!.terms[index]
-      param_bound_node = refer[param_node].as(Refer::TypeParam).constraint
+      param_bound_node = refer[param_node].as(Refer::TypeParam).bound
       
-      if param_bound_node
-        type_expr(param_bound_node.not_nil!, refer, nil)
-      else
-        MetaType.new(MetaType::Capability::ANY)
-      end
+      type_expr(param_bound_node.not_nil!, refer, nil)
     end
     
     def lookup_type_param(ref : Refer::TypeParam, refer, receiver = nil)
@@ -272,13 +263,9 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       arg = reified.args[ref.index]?
       return arg if arg
       
-      # TODO: For unconstrained types, reify with each possible cap in turn.
-      raise NotImplementedError.new("type param without constraint") \
-        unless ref.constraint
-      
-      # Return the type parameter intersected with its constraint.
-      # TODO: When constraint has multiple caps, reify with each possible cap.
-      type_expr(ref.constraint.not_nil!, refer, receiver)
+      # Return the type parameter intersected with its bound.
+      # TODO: When bound has multiple caps, reify with each possible cap.
+      type_expr(ref.bound, refer, receiver)
       .intersect(MetaType.new_type_param(ref))
     end
     

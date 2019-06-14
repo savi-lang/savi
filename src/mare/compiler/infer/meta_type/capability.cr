@@ -166,8 +166,15 @@ struct Mare::Compiler::Infer::MetaType::Capability
   def satisfies_bound?(infer : (ForFunc | ForType), bound : Capability) : Bool
     return true if value.is_a?(String) && self == bound
     
+    value = value()
     bound_value = bound.value
-    return true if bound_value.is_a?(Set(Capability)) && bound_value.includes?(self)
+    if bound_value.is_a?(Set(Capability))
+      return true if bound_value.includes?(self)
+      
+      if value.is_a?(Set(Capability))
+        return true if value.all? { |c| bound_value.includes?(c) }
+      end
+    end
     
     false
   end
