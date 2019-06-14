@@ -1,3 +1,5 @@
+require "levenshtein"
+
 ##
 # The purpose of the ForFunc pass is to resolve types. The resolutions of types
 # are kept as output state available to future passes wishing to retrieve
@@ -565,14 +567,38 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       
       # Raise an error if we don't have a callable function for every possibility.
       call_defns << {resolved.inner, nil, nil} if call_defns.empty?
-      problems = call_defns.map do |(call_mti, call_defn, call_func)|
+      problems = [] of {Source::Pos, String}
+      call_defns.each do |(call_mti, call_defn, call_func)|
         if call_defn.nil?
-          {call, "the type #{call_mti.inspect} has no referencable types in it"}
+          problems << {call.pos,
+            "the type #{call_mti.inspect} has no referencable types in it"}
         elsif call_func.nil?
-          {call_defn.defn.ident,
+          problems << {call_defn.defn.ident.pos,
             "#{call_defn.defn.ident.value} has no '#{call.member}' function"}
+          
+          found_similar = false
+          if call.member.ends_with?("!")
+            call_defn.defn.find_func?(call.member[0...-1]).try do |similar|
+              found_similar = true
+              problems << {similar.ident.pos,
+                "maybe you meant to call '#{similar.ident.value}' (without '!')"}
+            end
+          else
+            call_defn.defn.find_func?("#{call.member}!").try do |similar|
+              found_similar = true
+              problems << {similar.ident.pos,
+                "maybe you meant to call '#{similar.ident.value}' (with a '!')"}
+            end
+          end
+          
+          unless found_similar
+            similar = find_similar_function(call_defn.defn, call.member)
+            problems << {similar.ident.pos,
+              "maybe you meant to call the '#{similar.ident.value}' function"} \
+                if similar
+          end
         end
-      end.compact
+      end
       Error.at call,
         "The '#{call.member}' function can't be called on #{resolved.show_type}",
           problems unless problems.empty?
@@ -608,7 +634,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
           reify_cap = MetaType.cap(call_func.cap.value)
         else
           # We failed entirely; note the problem and carry on.
-          problems << {call_func.cap,
+          problems << {call_func.cap.pos,
             "the type #{call_mti.inspect} isn't a subtype of the " \
             "required capability of '#{call_func.cap.value}'"}
           # We already failed subtyping for the receiver cap, but pretend
@@ -1058,6 +1084,14 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       else
         raise NotImplementedError.new([node, ref].inspect)
       end
+    end
+    
+    def find_similar_function(defn : Program::Type, name : String)
+      finder = Levenshtein::Finder.new(name)
+      defn.functions.each do |f|
+        finder.test(f.ident.value) unless f.has_tag?(:hygienic)
+      end
+      finder.best_match.try { |other_name| defn.find_func?(other_name) }
     end
   end
 end

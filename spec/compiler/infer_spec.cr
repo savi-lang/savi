@@ -615,6 +615,104 @@ describe Mare::Compiler::Infer do
     end
   end
   
+  it "suggests a similarly named function when found" do
+    source = Mare::Source.new_example <<-SOURCE
+    :primitive Example
+      :fun hey
+      :fun hell
+      :fun hello_world
+    
+    :actor Main
+      :new
+        Example.hello
+    SOURCE
+    
+    expected = <<-MSG
+    The 'hello' function can't be called on Example:
+    from (example):8:
+        Example.hello
+                ^~~~~
+    
+    - Example has no 'hello' function:
+      from (example):1:
+    :primitive Example
+               ^~~~~~~
+    
+    - maybe you meant to call the 'hell' function:
+      from (example):3:
+      :fun hell
+           ^~~~
+    MSG
+    
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :infer)
+    end
+  end
+  
+  it "suggests a similarly named function (without '!') when found" do
+    source = Mare::Source.new_example <<-SOURCE
+    :primitive Example
+      :fun hello
+    
+    :actor Main
+      :new
+        Example.hello!
+    SOURCE
+    
+    expected = <<-MSG
+    The 'hello!' function can't be called on Example:
+    from (example):6:
+        Example.hello!
+                ^~~~~~
+    
+    - Example has no 'hello!' function:
+      from (example):1:
+    :primitive Example
+               ^~~~~~~
+    
+    - maybe you meant to call 'hello' (without '!'):
+      from (example):2:
+      :fun hello
+           ^~~~~
+    MSG
+    
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :infer)
+    end
+  end
+  
+  it "suggests a similarly named function (with '!') when found" do
+    source = Mare::Source.new_example <<-SOURCE
+    :primitive Example
+      :fun hello!
+    
+    :actor Main
+      :new
+        Example.hello
+    SOURCE
+    
+    expected = <<-MSG
+    The 'hello' function can't be called on Example:
+    from (example):6:
+        Example.hello
+                ^~~~~
+    
+    - Example has no 'hello' function:
+      from (example):1:
+    :primitive Example
+               ^~~~~~~
+    
+    - maybe you meant to call 'hello!' (with a '!'):
+      from (example):2:
+      :fun hello!
+           ^~~~~~
+    MSG
+    
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :infer)
+    end
+  end
+  
   it "complains when calling with an insufficient receiver capability" do
     source = Mare::Source.new_example <<-SOURCE
     :primitive Example
