@@ -119,7 +119,7 @@ module Mare::Parser
     parens.define(
       (str("^(") >> sn >> ptermsp.maybe >> sn >> char(')')).named(:group) |
       (char('(') >> sn >> ptermsp.maybe >> sn >> char(')')).named(:group) |
-      (char('[') >> sn >> ptermsp.maybe >> sn >> char(']')).named(:group)
+      (char('[') >> sn >> ptermsp.maybe >> sn >> char(']') >> char('!').maybe).named(:group)
     )
     
     # Define what a declaration looks like.

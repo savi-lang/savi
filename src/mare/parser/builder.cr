@@ -124,6 +124,12 @@ module Mare::Parser::Builder
   private def self.build_group(main, iter, state)
     assert_kind(main, :group)
     style = state.slice(main[1]..main[1])
+    
+    # This handles the case of an group ending with an exclamation
+    # by adding that character to its "style" string.
+    last_char = state.slice((main[2] - 1)..(main[2] - 1))
+    style += "!" if last_char == "!"
+    
     terms_lists = [[] of AST::Term]
     partitions = [main[1] + 1]
     

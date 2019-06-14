@@ -30,12 +30,12 @@
     if (@_alloc < space) \
       @_ptr_reallocate(space)
   
-  :fun "[]" (index)
-    // TODO: bounds checking, partial function
+  :fun "[]!" (index)
+    if (@size <= index) error!
     @_ptr._get_at(index)
   
-  :fun ref "[]=" (index, value)
-    // TODO: bounds checking, partial function
+  :fun ref "[]=!" (index, value)
+    if (@size <= index) error!
     @_ptr._assign_at(index, --value)
   
   :fun ref "<<" (value)

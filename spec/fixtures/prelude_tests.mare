@@ -239,19 +239,27 @@
     ///
     // Array methods
     
-    array_push = Array(U64).new << 9 << 3
-    test["Array << <<, [0]"].pass = array_push[0] == 9
-    test["Array << <<, [1]"].pass = array_push[1] == 3
-    array_push[1] = 33
-    test["Array [1]=, [1]"].pass = array_push[1] == 33
-    (
-      array_literal = [U8[0], U8[1], U8[2]]
-      i U64 = 0
-      while (i < 3) (
-        test["Array literal, [i]"].pass = array_literal[i] == i.u8
-        i = i + 1
+    try (
+      array_push = Array(U64).new << 9 << 3
+      test["Array << <<, [0]"].pass = array_push[0]! == 9
+      test["Array << <<, [1]"].pass = array_push[1]! == 3
+      array_push[1]! = 33
+      test["Array [1]=, [1]"].pass = array_push[1]! == 33
+      (
+        array_literal = [U8[0], U8[1], U8[2]]
+        i U64 = 0
+        while (i < 3) (
+          test["Array literal, [i]"].pass = array_literal[i]! == i.u8
+          i = i + 1
+        )
+        test["Array literal size"].pass = array_literal.size == i
+        test["Array literal out of bound read error"].pass =
+          try (array_literal[3]!, False | True)
+        test["Array literal out of bound write error"].pass =
+          try (array_literal[3]! = 3, False | True)
       )
-      test["Array literal size"].pass = array_literal.size == i
+    |
+      test["Array methods test block had an out-of-bounds error"].pass = False
     )
     
     test.print_line_break // TODO: move to MicroTest constructor and finalizer

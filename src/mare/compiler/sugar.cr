@@ -98,6 +98,13 @@ class Mare::Compiler::Sugar < Mare::AST::Visitor
       dot = AST::Operator.new(".").from(node.group)
       rhs = node
       return AST::Relate.new(lhs, dot, rhs).from(node)
+    elsif node.group.style == "[!"
+      lhs = node.term
+      node.term = AST::Identifier.new("[]!").from(node.group)
+      args = node.group.tap { |n| n.style = "(" }
+      dot = AST::Operator.new(".").from(node.group)
+      rhs = node
+      return AST::Relate.new(lhs, dot, rhs).from(node)
     end
     
     # If a dot relation is within a qualify (which doesn't happen in the parser,
@@ -135,6 +142,18 @@ class Mare::Compiler::Sugar < Mare::AST::Visitor
       && lhs.rhs.as(AST::Qualify).term.as(AST::Identifier).value == "[]"
         inner = lhs.rhs.as(AST::Qualify)
         ident = AST::Identifier.new("[]=").from(inner.term)
+        args = inner.group
+        args.terms << node.rhs
+        rhs = AST::Qualify.new(ident, args).from(node)
+        AST::Relate.new(lhs.lhs, lhs.op, rhs).from(node)
+      # If assigning to a ".[]!" relation, sugar as an "element setter" method.
+      elsif lhs.is_a?(AST::Relate) \
+      && lhs.op.value == "." \
+      && lhs.rhs.is_a?(AST::Qualify) \
+      && lhs.rhs.as(AST::Qualify).term.is_a?(AST::Identifier) \
+      && lhs.rhs.as(AST::Qualify).term.as(AST::Identifier).value == "[]!"
+        inner = lhs.rhs.as(AST::Qualify)
+        ident = AST::Identifier.new("[]=!").from(inner.term)
         args = inner.group
         args.terms << node.rhs
         rhs = AST::Qualify.new(ident, args).from(node)
