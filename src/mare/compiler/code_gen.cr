@@ -347,8 +347,30 @@ class Mare::Compiler::CodeGen
   end
   
   def pony_ctx
+    # Return the stored value if we have it cached for this function already.
     return func_frame.pony_ctx if func_frame.pony_ctx?
+    
+    # We need to take note of the current block first, then move to the
+    # entry block for inserting the call to the pony_ctx function.
+    # We have to do this because otherwise we might accidentally create this
+    # result value in a block and reuse it from another block that does not
+    # follow the first block, resulting in invalid IR ("does not dominate").
+    # All blocks follow the entry block (it dominates all other blocks),
+    # so this is a surefire safe place to do it.
+    orig_block = @builder.insert_block
+    if func_frame.func.entry_block.instructions.empty?
+      @builder.position_at_end(func_frame.func.entry_block)
+    else
+      @builder.position_before(func_frame.func.entry_block.instructions.first)
+    end
+    
+    # Call the pony_ctx function and save the value to refer to it later.
     func_frame.pony_ctx = @builder.call(@mod.functions["pony_ctx"], "PONY_CTX")
+    
+    # Return to the original block that we were at before this function.
+    @builder.position_at_end(orig_block)
+    
+    func_frame.pony_ctx
   end
   
   def run(ctx : Context)

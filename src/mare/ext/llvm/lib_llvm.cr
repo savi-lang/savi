@@ -1,4 +1,6 @@
 lib LibLLVM
+  fun get_entry_basic_block = LLVMGetEntryBasicBlock(function : ValueRef) : BasicBlockRef
+  fun position_builder_before = LLVMPositionBuilderBefore(builder : BuilderRef, instruction : ValueRef)
   fun intptr_type_in_context = LLVMIntPtrTypeInContext(ContextRef, TargetDataRef) : TypeRef
   fun build_struct_gep = LLVMBuildStructGEP(builder : BuilderRef, pointer : ValueRef, index : UInt32, name : UInt8*) : ValueRef
   fun build_frem = LLVMBuildFRem(builder : BuilderRef, lhs : ValueRef, rhs : ValueRef, name : UInt8*) : ValueRef

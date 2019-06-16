@@ -1,4 +1,8 @@
 class LLVM::Builder
+  def position_before(instruction)
+    LibLLVM.position_builder_before(self, instruction)
+  end
+
   def struct_gep(value, index, name = "")
     # check_value(value)
 
