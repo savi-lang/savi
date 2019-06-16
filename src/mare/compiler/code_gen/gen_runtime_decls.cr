@@ -118,6 +118,11 @@ class Mare::Compiler::CodeGen
       {"ponyint_next_pow2", [@isize], @isize, [
         LLVM::Attribute::NoUnwind, LLVM::Attribute::ReadNone,
       ]},
+      {"ponyint_hash_block", [@ptr, @isize], @isize, [
+        LLVM::Attribute::NoRecurse, LLVM::Attribute::NoUnwind,
+        LLVM::Attribute::ReadOnly, LLVM::Attribute::UWTable,
+        {1, LLVM::Attribute::ReadOnly},
+      ]},
       
       # TODO: ponyint_personality_v0
       

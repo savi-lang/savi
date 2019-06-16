@@ -4,3 +4,6 @@
   :prop _ptr CPointer(U8)'ref
   :new from_cpointer (@_ptr, @_size, @_alloc)
   :fun cpointer CPointer(U8): @_ptr
+  :fun hash: @_ptr._hash(@_size)
+  :fun "==" (other String'box)
+    (@_size == other._size) && (@_ptr._compare(other._ptr, @_size) == 0)

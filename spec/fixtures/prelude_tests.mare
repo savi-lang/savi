@@ -237,6 +237,13 @@
     test["F64 min_value is_finite"].pass = F64.min_value.is_finite
     
     ///
+    // String methods
+    
+    test["String == String"].pass = ("string" == "string")
+    test["String == other not"].pass = ("string" == "other").not
+    test["String hash"].pass = ("string".hash == 0x4CF51F4A5B5CF110)
+    
+    ///
     // Array methods
     
     try (

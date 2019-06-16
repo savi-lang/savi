@@ -796,6 +796,16 @@ class Mare::Compiler::CodeGen
         old_value = @builder.load(gep)
         @builder.store(new_value, gep)
         old_value
+      when "_compare"
+        @builder.call(
+          @mod.functions["memcmp"],
+          [params[0], params[1], params[2]],
+        )
+      when "_hash"
+        @builder.call(
+          @mod.functions["ponyint_hash_block"],
+          [params[0], params[1]],
+        )
       else
         raise NotImplementedError.new(gfunc.func.ident.value)
       end
