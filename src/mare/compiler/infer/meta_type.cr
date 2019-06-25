@@ -120,6 +120,10 @@ struct Mare::Compiler::Infer::MetaType
     inner.partial_reifications.map { |i| MetaType.new(i) }
   end
   
+  def type_params : Set(Refer::TypeParam)
+    inner.type_params
+  end
+  
   def is_sendable? : Bool
     inner.is_sendable?
   end

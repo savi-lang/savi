@@ -341,6 +341,22 @@ struct Mare::Compiler::Infer::MetaType::Union
     .to_set
   end
   
+  def type_params
+    result = Set(Refer::TypeParam).new
+    
+    terms.not_nil!.each do |term|
+      result.concat(term.type_params)
+    end if terms
+    anti_terms.not_nil!.each do |anti_term|
+      result.concat(anti_term.type_params)
+    end if anti_terms
+    intersects.not_nil!.each do |intersect|
+      result.concat(intersect.type_params)
+    end if intersects
+    
+    result
+  end
+  
   def is_sendable?
     return caps.not_nil!.all?(&.is_sendable?) if caps
     false

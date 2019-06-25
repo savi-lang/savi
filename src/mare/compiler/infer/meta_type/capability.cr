@@ -238,6 +238,10 @@ struct Mare::Compiler::Infer::MetaType::Capability
     end
   end
   
+  def type_params
+    Set(Refer::TypeParam).new # no type params are ever referenced by a cap
+  end
+  
   def is_sendable?
     case self
     when ISO_EPH, TRN_EPH

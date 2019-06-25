@@ -62,6 +62,10 @@ class Mare::Compiler::Infer::MetaType::Unconstrained
     Capability::ALL_NON_EPH.to_set
   end
   
+  def type_params
+    Set(Refer::TypeParam).new # no type params are present
+  end
+  
   def is_sendable?
     # Unconstrained is never sendable - it makes no guarantees at all.
     false

@@ -61,6 +61,10 @@ class Mare::Compiler::Infer::MetaType::Unsatisfiable
     Set(Inner).new # no partial reifications are possible
   end
   
+  def type_params
+    Set(Refer::TypeParam).new # no type params are present
+  end
+  
   def is_sendable?
     # Unsatisfiable is never sendable - it cannot exist at all.
     # TODO: is this right? it seems so, but breaks symmetry with Unconstrained.
