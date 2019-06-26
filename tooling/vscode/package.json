@@ -1,0 +1,25 @@
+{
+    "name": "mare",
+    "displayName": "Mare Language",
+    "description": "Support for the Mare programming language.",
+    "version": "0.0.1",
+    "engines": {
+        "vscode": "^1.35.0"
+    },
+    "categories": [
+        "Programming Languages"
+    ],
+    "contributes": {
+        "languages": [{
+            "id": "mare",
+            "aliases": ["Mare", "mare"],
+            "extensions": [".mare"],
+            "configuration": "./language-configuration.json"
+        }],
+        "grammars": [{
+            "language": "mare",
+            "scopeName": "source.mare",
+            "path": "./syntaxes/Mare.tmLanguage"
+        }]
+    }
+}

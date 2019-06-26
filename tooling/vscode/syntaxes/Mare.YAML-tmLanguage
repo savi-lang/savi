@@ -1,0 +1,135 @@
+# [PackageDev] target_format: plist, ext: tmLanguage
+name: Mare
+scopeName: source.mare
+fileTypes: [mare]
+uuid: 6d792077-696c-6465-7374-20647265616d
+patterns:
+
+- comment: Line Comment
+  name: comment.line.mare
+  begin: (\s*//)
+  end: ($)
+
+- comment: Double-Quote String
+  name: string.quoted.double.mare
+  begin: (")
+  end: (")
+  patterns:
+  - name: constant.character.escape.mare
+    match: \\.
+
+- comment: Class (or other type)
+  name: meta.class.mare
+  match: (?:::)?([A-Z][_a-zA-Z0-9]*)
+  captures:
+    '1': {name: support.class.mare}
+
+- comment: Declare
+  name: meta.declare.mare
+  begin: ^\s*(:)(\w+)
+  end: (:)|\n
+  beginCaptures:
+    '1': {name: keyword.declare.mare}
+    '2': {name: keyword.declare.mare}
+  endCaptures:
+    '1': {name: keyword.declare.mare}
+  patterns:
+  - include: $self
+  - name: entity.other.attribute-name.mare
+    match: (\w+)
+
+- comment: Error-Raising Calls/Names
+  name: markup.deleted.mare
+  match: (\w+\!)
+
+- comment: Numeric Values
+  name: constant.numeric.mare
+  match: \b\d([\d_]*(\.[\d_]+)?)\b
+
+- comment: Hex Numeric Values
+  name: constant.numeric.mare
+  match: \b0x([\h_]+)\b
+
+- comment: Binary Numeric Values
+  name: constant.numeric.mare
+  match: \b0b([01_]+)\b
+
+- comment: Function Call (with braces)
+  name: entity.name.function.mare
+  match: (\w+(?:\?|\!)?)(?=\()
+
+- comment: Function Call (with receiver)
+  name: support.function.mare
+  match: (?<=\.)(\w+(?:\?|\!)?)
+
+- comment: Function Call (with self receiver)
+  name: support.function.mare
+  match: (?<=@)(\w+(?:\?|\!)?)
+
+- comment: Parenthesis
+  name: meta.parens.mare
+  begin: (\()
+  end: (\))
+  beginCaptures: {'1': {name: punctuation.section.paren.mare}}
+  endCaptures:   {'1': {name: punctuation.section.paren.mare}}
+  patterns:
+  - include: $self
+
+- comment: Brace
+  name: meta.braces.mare
+  begin: (\{)
+  end: (\})
+  beginCaptures: {'1': {name: punctuation.section.brace.mare}}
+  endCaptures:   {'1': {name: punctuation.section.brace.mare}}
+  patterns:
+  - include: $self
+
+- comment: Bracket
+  name: meta.brackets.mare
+  begin: (\[)
+  end: (\])(\!)?
+  beginCaptures: {'1': {name: punctuation.section.bracket.mare}}
+  endCaptures:   {'1': {name: punctuation.section.bracket.mare}, '2': {name: markup.deleted.mare}}
+  patterns:
+  - include: $self
+
+- comment: Bracket
+  name: meta.brackets.mare
+  begin: (\[)
+  end: (\])
+  beginCaptures: {'1': {name: punctuation.section.bracket.mare}}
+  endCaptures:   {'1': {name: punctuation.section.bracket.mare}}
+  patterns:
+  - include: $self
+
+- comment: Expression Separators
+  name: punctuation.separator.mare
+  match: (\,|\;|\:)
+
+- comment: Other "Punctuation"
+  name: punctuation.receiver.mare
+  match: (@)
+
+- comment: Piping Operators
+  name: keyword.operator.pipe.mare
+  match: (\|\>)
+
+- comment: Branching Operators
+  name: keyword.operator.compound.mare
+  match: (\&\&|\|\||\?\?|\&\?|\|\?|\.\?)
+
+- comment: Comparison Operators
+  name: keyword.operator.comparison.mare
+  match: (\<\=\>|\=\~|\=\=|\<\=|\>\=|\<|\>)
+
+- comment: Arithmetic Operators
+  name: keyword.operator.arithmetic.mare
+  match: (\+|\-|\/|\*|\%)
+
+- comment: Assignment Operators
+  name: keyword.operator.assignment.mare
+  match: (\=)
+
+- comment: Other Operators
+  name: keyword.operator.other.mare
+  match: (\!|\<\<|\<|\&|\|)
