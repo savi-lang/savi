@@ -84,11 +84,8 @@ RUN shards install && make /tmp/bin/mare
 FROM alpine:3.9 as release
 
 # Install runtime dependencies of the compiler.
-# TODO: Collapse these into a single statement:
-RUN apk add --no-cache --update llvm5-libs
-RUN apk add --no-cache --update gc libevent pcre
-RUN apk add --no-cache --update clang
-RUN apk add --no-cache --update lld
+RUN apk add --no-cache --update \
+  llvm5-libs gc pcre gcc clang lld libgcc libevent musl-dev libexecinfo-dev
 
 RUN mkdir /opt/code
 WORKDIR /opt/code
