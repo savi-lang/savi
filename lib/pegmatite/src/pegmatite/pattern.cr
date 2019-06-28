@@ -33,7 +33,7 @@ abstract class Pegmatite::Pattern
       offset, pattern = fail
       description = pattern.description
       
-      line_start = (source.rindex("\n", offset) || -1) + 1
+      line_start = (source.rindex("\n", [offset - 1, 0].max) || -1) + 1
       line_finish = (source.index("\n", offset) || source.size)
       
       line = source[line_start...line_finish]

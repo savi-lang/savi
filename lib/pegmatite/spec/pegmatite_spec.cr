@@ -83,4 +83,53 @@ describe Pegmatite do
       Pegmatite.tokenize(Fixtures::JSONGrammar, source)
     end
   end
+  
+  it "correctly raises a parse error pointing to a newline" do
+    source = <<-JSON
+    {
+      "hello": 93.
+    }
+    JSON
+    
+    expected = <<-ERROR
+    unexpected token at byte offset 16:
+      "hello": 93.
+                  ^
+    ERROR
+    
+    expect_raises Pegmatite::Pattern::MatchError, expected do
+      Pegmatite.tokenize(Fixtures::JSONGrammar, source)
+    end
+  end
+  
+  it "correctly raises a parse error pointing to the end of the source" do
+    source = <<-JSON
+    {
+      "hello": 93.
+    JSON
+    
+    expected = <<-ERROR
+    unexpected token at byte offset 16:
+      "hello": 93.
+                  ^
+    ERROR
+    
+    expect_raises Pegmatite::Pattern::MatchError, expected do
+      Pegmatite.tokenize(Fixtures::JSONGrammar, source)
+    end
+  end
+  
+  it "correctly raises a parse error pointing to the beginning of the source" do
+    source = ""
+    
+    expected = <<-ERROR
+    unexpected token at byte offset 0:
+    
+    ^
+    ERROR
+    
+    expect_raises Pegmatite::Pattern::MatchError, expected do
+      Pegmatite.tokenize(Fixtures::JSONGrammar, source)
+    end
+  end
 end

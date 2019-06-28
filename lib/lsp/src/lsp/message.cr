@@ -136,6 +136,7 @@ module LSP::Message
     Cancel |
     Initialized |
     Exit |
+    DidChangeConfiguration |
     DidOpen |
     DidChange |
     WillSave |
@@ -445,7 +446,17 @@ module LSP::Message
   
   # A notification sent from the client to the server to signal the change of
   # configuration settings.
-  # TODO: struct DidChangeConfiguration
+  struct DidChangeConfiguration
+    Message.def_notification("workspace/didChangeConfiguration")
+    
+    struct Params
+      JSON.mapping({
+        settings: { type: JSON::Any },
+      })
+      def initialize(@settings = JSON::Any.new({} of String => JSON::Any))
+      end
+    end
+  end
   
   # The workspace/configuration request is sent from the server to the client
   # to fetch configuration settings from the client. The request can fetch n

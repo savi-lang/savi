@@ -451,6 +451,25 @@ describe LSP::Message do
       msg.result.as(LSP::Data::MessageActionItem).title.should eq "Hello!"
     end
     
+    it "parses didChangeConfiguration" do
+      msg = LSP::Message.from_json <<-EOF
+      {
+        "jsonrpc": "2.0",
+        "method": "workspace/didChangeConfiguration",
+        "params": {
+          "settings": {
+            "my-language": {
+              "foo": "bar"
+            }
+          }
+        }
+      }
+      EOF
+      
+      msg = msg.as LSP::Message::DidChangeConfiguration
+      msg.params.settings.should eq({"my-language" => {"foo" => "bar"}})
+    end
+    
     it "parses DidOpen" do
       msg = LSP::Message.from_json <<-EOF
       {
