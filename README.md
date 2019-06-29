@@ -2,7 +2,7 @@
 
 <a href="https://openclipart.org/detail/191499/horse"><img alt="The ungui-angui-pede, a mascot for Mare" src="./assets/mascot.svg" width="100px" /></a>
 
-[![CircleCI](https://circleci.com/gh/jemc/mare.svg?style=shield)](https://circleci.com/gh/jemc/mare) [![Docker](https://img.shields.io/docker/automated/jemc/mare.svg)](https://hub.docker.com/r/jemc/mare)
+[![CircleCI](https://circleci.com/gh/jemc/mare.svg?style=shield)](https://circleci.com/gh/jemc/mare) [![Docker](https://img.shields.io/docker/cloud/automated/jemc/mare.svg)](https://hub.docker.com/r/jemc/mare)
 
 Mare is a reimagining of the [Pony](https://www.ponylang.io/) language.
 
