@@ -22,19 +22,6 @@ class Mare::Server
     at_exit do
       @stderr.puts("... the LSP Server is closed.")
     end
-    
-    # When our process gets orphaned to PID 1, give up and exit.
-    # This would only happen if our parent dies without asking us to exit.
-    spawn do
-      loop do
-        if Process.ppid == 1
-          @stderr.puts("... the LSP Server has been orphaned.")
-          Process.exit(1)
-        else
-          sleep 30.seconds
-        end
-      end
-    end
   end
   
   # When told to initialize, respond with info about our capabilities.

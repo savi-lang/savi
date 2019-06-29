@@ -4,22 +4,70 @@
     "description": "Support for the Mare programming language.",
     "version": "0.0.1",
     "engines": {
-        "vscode": "^1.35.0"
+        "vscode": "^1.30.0"
     },
     "categories": [
         "Programming Languages"
     ],
+    "dependencies": {
+        "vscode-languageclient": "^4.3.0"
+    },
+    "devDependencies": {
+        "@types/node": "~10.1.0",
+        "@types/vscode": "^1.35.0",
+        "typescript": "^3.0.0",
+        "vsce": "^1.58.0",
+        "vscode": "^1.1.35"
+    },
+    "main": "./out/extension.js",
+    "scripts": {
+        "vscode:prepublish": "npm run check:version && npm run lint && npm run compile",
+        "compile": "tsc -p ./",
+        "watch": "tsc -watch -p ./"
+    },
+    "activationEvents": [
+        "onLanguage:mare"
+    ],
     "contributes": {
-        "languages": [{
-            "id": "mare",
-            "aliases": ["Mare", "mare"],
-            "extensions": [".mare"],
-            "configuration": "./language-configuration.json"
-        }],
-        "grammars": [{
-            "language": "mare",
-            "scopeName": "source.mare",
-            "path": "./syntaxes/Mare.tmLanguage"
-        }]
+        "languages": [
+            {
+                "id": "mare",
+                "aliases": [
+                    "Mare",
+                    "mare"
+                ],
+                "extensions": [
+                    ".mare"
+                ],
+                "configuration": "./language-configuration.json"
+            }
+        ],
+        "grammars": [
+            {
+                "language": "mare",
+                "scopeName": "source.mare",
+                "path": "./syntaxes/Mare.tmLanguage"
+            }
+        ],
+        "commands": [
+            {
+                "command": "mare.restart",
+                "title": "Restart the Mare Language Server",
+                "description": "Restart the Mare Language Server process",
+                "category": "Mare"
+            },
+            {
+                "command": "mare.update",
+                "title": "Update the Mare Language Server",
+                "description": "Pull the latest Mare compiler image",
+                "category": "Mare"
+            }
+        ],
+        "problemMatchers": [],
+        "configuration": {
+            "type": "object",
+            "title": "Mare configuration",
+            "properties": {}
+        }
     }
 }

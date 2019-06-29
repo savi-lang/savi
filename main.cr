@@ -1,5 +1,8 @@
 require "./src/mare"
 
-# TODO: Use CLI arguments to determine what to do (compile / serve / etc).
-# Mare::Server.new.run
-Mare::Compiler.compile(Dir.current, :binary)
+# TODO: Use more sophisticated CLI parsing.
+if ARGV == ["ls"]
+  Mare::Server.new.run
+else
+  Mare::Compiler.compile(Dir.current, :binary)
+end
