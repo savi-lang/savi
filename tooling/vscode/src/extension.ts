@@ -37,7 +37,7 @@ function didOpenTextDocument(
   
   // Ignore workspace folders we're already tracking.
   if (clients.has(folder.uri)) return
-
+  
   // Add a client for the new workspace folder.
   const client = new MareClient(folder)
   clients.set(folder.uri, client)
@@ -56,7 +56,7 @@ function didChangeWorkspaceFolders(
       client.start(ctx)
     }
   }
-
+  
   // Clean up clients for workspace folders that were closed.
   for (const folder of e.removed) {
     const ws = clients.get(folder.uri)
@@ -71,11 +71,11 @@ class MareClient {
   private disposables: Disposable[] = []
   private client: LanguageClient | null = null
   private readonly folder: WorkspaceFolder
-
+  
   constructor(folder: WorkspaceFolder) {
     this.folder = folder
   }
-
+  
   private get clientOptions(): LanguageClientOptions {
     return {
       documentSelector: [
@@ -91,7 +91,7 @@ class MareClient {
       workspaceFolder: this.folder,
     }
   }
-
+  
   public async start(ctx: ExtensionContext) {
     this.client = new LanguageClient(
       'mare-client',
@@ -99,7 +99,7 @@ class MareClient {
       async () => { return this.spawnServer() },
       this.clientOptions,
     )
-
+    
     this.disposables.push(
       commands.registerCommand('mare.update',
         async () => {
@@ -109,7 +109,7 @@ class MareClient {
         }
       )
     )
-
+    
     this.disposables.push(
       commands.registerCommand('mare.restart',
         async () => {
@@ -118,21 +118,21 @@ class MareClient {
         }
       )
     )
-
+    
     this.disposables.push(this.client.start())
     await this.client.onReady()
   }
-
+  
   public async stop() {
     if (this.client) await this.client.stop()
-
+      
     this.disposables.forEach(d => d.dispose())
   }
-
+  
   private async spawnServer(): Promise<child_process.ChildProcess> {
     const cwd = this.folder.uri.fsPath
     const env = { ...process.env }
-
+    
     let serverProcess = child_process.spawn(
       'docker', [
         'run', '-i',
@@ -149,14 +149,14 @@ class MareClient {
         `Failed to spawn Mare Language Server: \`${err.message}\``
       )
     })
-
+    
     return serverProcess
   }
-
+  
   private async updateImage() {
     const cwd = this.folder.uri.fsPath
     const env = { ...process.env }
-
+    
     let updateProcess = child_process.spawn(
       'docker', ['pull', 'jemc/mare'],
       { env, cwd }
@@ -167,13 +167,13 @@ class MareClient {
       'Pulling latest image for the Mare Language Server'
     )
     channel.show()
-
+    
     updateProcess.on('error', (err: { code?: string; message: string }) => {
       window.showWarningMessage(
         `Failed to update Mare Language Server: \`${err.message}\``
       )
     })
-
+    
     updateProcess.on('exit', (code) => {
       if(code == 0) {
         window.showInformationMessage(
@@ -184,11 +184,11 @@ class MareClient {
         window.showWarningMessage('Failed to update Mare Language Server')
       }
     })
-
+    
     updateProcess.stdout.on('data', (chunk) => {
       channel.append(chunk.toString())
     })
-
+    
     return updateProcess
   }
 }
