@@ -8,6 +8,8 @@ class Mare::Server
     @stderr : IO = STDERR)
     @wire = LSP::Wire.new(@stdin, @stdout)
     @open_files = {} of URI => String
+    
+    @use_snippet_completions = false
   end
   
   def run
@@ -26,6 +28,11 @@ class Mare::Server
   
   # When told to initialize, respond with info about our capabilities.
   def handle(msg : LSP::Message::Initialize)
+    @use_snippet_completions =
+      msg.params.capabilities
+        .text_document.completion
+        .completion_item.snippet_support
+    
     @wire.respond msg do |msg|
       msg.result.capabilities.text_document_sync.open_close = true
       msg.result.capabilities.text_document_sync.change =
@@ -101,13 +108,27 @@ class Mare::Server
           line_text = text.split("\n")[pos.line]
           if line_text =~ /\A\s*:\s*\z/
             msg.result.items =
-              ["class ", "prop ", "fun "].map do |label|
+              ["class", "prop", "fun"].map do |label|
                 LSP::Data::CompletionItem.new.try do |item|
                   item.label = label
                   item.kind = LSP::Data::CompletionItemKind::Method
                   item.detail = "declare a #{label}"
                   item.documentation = LSP::Data::MarkupContent.new "markdown",
                     "# TODO: Completion\n`#{pos.to_json}`\n```ruby\n#{text}\n```\n"
+                  item._insert_text = 
+                  
+                  if @use_snippet_completions
+                    item.insert_text_format = LSP::Data::InsertTextFormat::Snippet
+                    new_text = "#{label}${1| , ref , val , iso , box , trn , tag , non |}${2:Name}\n  $0"
+                  else
+                    new_text = "#{label} "
+                  end
+                  
+                  item.text_edit = LSP::Data::TextEdit.new(
+                    LSP::Data::Range.new(pos, pos),
+                    new_text,
+                  )
+                  
                   item
                 end
               end
