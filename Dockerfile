@@ -74,8 +74,15 @@ COPY --from=dev /usr/lib/crystal/core/llvm/ext/llvm_ext.o \
 
 RUN mkdir /opt/mare
 WORKDIR /opt/mare
-COPY . /opt/mare
-RUN shards install && make /tmp/bin/mare
+COPY \
+    shard.yml \
+    shard.lock \
+    Makefile \
+    main.cr \
+    /opt/mare/
+RUN shards install
+COPY src /opt/mare/src
+RUN make /tmp/bin/mare
 
 ##
 # Release stage: outputs a minimal alpine image with a working Mare compiler

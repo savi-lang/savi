@@ -35,3 +35,8 @@ example/main: /tmp/bin/mare $(shell find example -name '*.mare')
 	echo && cd example && valgrind --tool=callgrind --callgrind-out-file=$@ $<
 example-mare-callgrind.inner: /tmp/callgrind.out PHONY
 	/usr/bin/callgrind_annotate $< | less
+
+# Compile the language server image and vscode extension.
+vscode: PHONY
+	docker build . --tag jemc/mare
+	cd tooling/vscode && npm run-script compile || npm install

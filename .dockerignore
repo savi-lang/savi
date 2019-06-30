@@ -1,2 +1,9 @@
 .hg
 .git
+*.jemc
+/run.sh
+/assets
+/example
+/lib
+/spec
+/tooling
