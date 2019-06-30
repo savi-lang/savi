@@ -67,7 +67,19 @@
         "configuration": {
             "type": "object",
             "title": "Mare configuration",
-            "properties": {}
+            "properties": {
+                "mare-client.trace.server": {
+                    "type": "string",
+                    "enum": [
+                        "off",
+                        "messages",
+                        "verbose"
+                    ],
+                    "default": "off",
+                    "description": "Trace the communication between VS Code and the Mare Language Server, for debugging purposes.",
+                    "scope": "window"
+                }
+            }
         }
     }
 }
