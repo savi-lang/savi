@@ -115,7 +115,6 @@ class Mare::Server
                   item.detail = "declare a #{label}"
                   item.documentation = LSP::Data::MarkupContent.new "markdown",
                     "# TODO: Completion\n`#{pos.to_json}`\n```ruby\n#{text}\n```\n"
-                  item._insert_text = 
                   
                   if @use_snippet_completions
                     item.insert_text_format = LSP::Data::InsertTextFormat::Snippet
