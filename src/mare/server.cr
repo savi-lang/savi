@@ -32,7 +32,7 @@ class Mare::Server
         LSP::Data::TextDocumentSyncKind::Full
       msg.result.capabilities.hover_provider = true
       msg.result.capabilities.completion_provider =
-        LSP::Data::ServerCapabilities::CompletionOptions.new
+        LSP::Data::ServerCapabilities::CompletionOptions.new(false, [":"])
       msg
     end
   end
@@ -88,21 +88,32 @@ class Mare::Server
   end
   
   # TODO: Proper completion support.
-  def handle(msg : LSP::Message::Completion)
-    pos = msg.params.position
-    text = @open_files[msg.params.text_document.uri] rescue ""
-    @wire.respond msg do |msg|
-      msg.result.items =
-        ["class ", "prop ", "fun "].map do |label|
-          LSP::Data::CompletionItem.new.try do |item|
-            item.label = label
-            item.kind = LSP::Data::CompletionItemKind::Method
-            item.detail = "declare a #{label}"
-            item.documentation = LSP::Data::MarkupContent.new "markdown",
-              "# TODO: Completion\n`#{pos.to_json}`\n```ruby\n#{text}\n```\n"
-            item
+  def handle(req : LSP::Message::Completion)
+    pos = req.params.position
+    text = @open_files[req.params.text_document.uri]? || ""
+    
+    @wire.respond req do |msg|
+      case req.params.context.try(&.trigger_kind)
+      when LSP::Data::CompletionTriggerKind::TriggerCharacter
+        case req.params.context.not_nil!.trigger_character
+        when ":"
+          # Proceed with a ":"-based completion if the line is otherwise empty.
+          line_text = text.split("\n")[pos.line]
+          if line_text =~ /\A\s*:\s*\z/
+            msg.result.items =
+              ["class ", "prop ", "fun "].map do |label|
+                LSP::Data::CompletionItem.new.try do |item|
+                  item.label = label
+                  item.kind = LSP::Data::CompletionItemKind::Method
+                  item.detail = "declare a #{label}"
+                  item.documentation = LSP::Data::MarkupContent.new "markdown",
+                    "# TODO: Completion\n`#{pos.to_json}`\n```ruby\n#{text}\n```\n"
+                  item
+                end
+              end
           end
         end
+      end
       msg
     end
   end
