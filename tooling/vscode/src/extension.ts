@@ -139,7 +139,7 @@ class MareClient {
         '-v', `${cwd}:/opt/code`,
         '--entrypoint', '/bin/mare',
         'jemc/mare',
-        'ls',
+        'server',
       ],
       { env, cwd }
     )
