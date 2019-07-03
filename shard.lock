@@ -2,7 +2,7 @@ version: 1.0
 shards:
   lsp:
     github: jemc/crystal-lsp
-    commit: 1ebbe1155df7857354fc2b9fb02f65506723dec2
+    commit: 188c8d374da003d00f4333067229623550e7454d
 
   pegmatite:
     github: jemc/crystal-pegmatite

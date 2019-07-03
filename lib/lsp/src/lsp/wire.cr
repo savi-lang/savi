@@ -45,4 +45,10 @@ class LSP::Wire
     LSP::Codec.write_message(@out, msg, @outstanding)
     msg
   end
+  
+  def error_respond(req : M): M::ErrorResponse forall M
+    msg : M::ErrorResponse = yield req.new_error_response
+    LSP::Codec.write_message(@out, msg, @outstanding)
+    msg
+  end
 end

@@ -3,7 +3,7 @@ require "json"
 module LSP::Data
   struct ResponseError(D)
     JSON.mapping({
-      code:    Code | Int32,
+      code:    Code,
       message: String,
       data:    D?,
     })

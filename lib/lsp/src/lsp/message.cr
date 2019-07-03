@@ -59,6 +59,18 @@ module LSP::Message
       res.request = self
       res
     end
+    
+    def error_response_from_json(input)
+      res = ErrorResponse.from_json(input)
+      res.request = self
+      res
+    end
+    
+    def new_error_response
+      res = ErrorResponse.new(@id, Data::ResponseError(ErrorData).new)
+      res.request = self
+      res
+    end
   end
   
   macro def_response(request_class)
@@ -97,10 +109,12 @@ module LSP::Message
     parser = JSON::PullParser.new(input)
     method : String? = nil
     id : (Int64 | String)? = nil
+    is_error = false
     parser.read_object do |key|
       case key
       when "method"; method = parser.read_string
       when "id";     id     = parser.read?(Int64) || parser.read_string
+      when "error";  is_error = true; parser.skip
       else           parser.skip
       end
     end
@@ -110,9 +124,17 @@ module LSP::Message
       when nil
         req = outstanding.delete(id)
         if req
-          req.response_from_json(input)
+          if is_error
+            req.error_response_from_json(input)
+          else
+            req.response_from_json(input)
+          end
         else
-          GenericResponse.from_json(input)
+          if is_error
+            GenericErrorResponse.from_json(input)
+          else
+            GenericResponse.from_json(input)
+          end
         end
       {% for t in AnyMethod.union_types %}
         when {{ t }}.method; {{ t }}.from_json(input)
@@ -123,8 +145,10 @@ module LSP::Message
   end
   
   alias Any = AnyIn | AnyOut
-  alias AnyIn = AnyInNotification | AnyInRequest | AnyInResponse
-  alias AnyOut = AnyOutNotification | AnyOutRequest | AnyOutResponse
+  alias AnyIn = \
+    AnyInNotification | AnyInRequest | AnyInResponse | AnyInErrorResponse
+  alias AnyOut = \
+    AnyOutNotification | AnyOutRequest | AnyOutResponse | AnyOutErrorResponse
   
   alias AnyMethod = AnyInMethod | AnyOutMethod
   alias AnyInMethod = AnyInNotification | AnyInRequest
@@ -155,6 +179,10 @@ module LSP::Message
     GenericResponse |
     ShowMessageRequest::Response
   
+  alias AnyInErrorResponse =
+    GenericErrorResponse |
+    ShowMessageRequest::ErrorResponse
+  
   alias AnyOutNotification =
     Cancel |
     ShowMessage |
@@ -169,6 +197,15 @@ module LSP::Message
     Hover::Response |
     SignatureHelp::Response
   
+  alias AnyOutErrorResponse =
+    GenericErrorResponse |
+    Initialize::ErrorResponse |
+    Shutdown::ErrorResponse |
+    Completion::ErrorResponse |
+    CompletionItemResolve::ErrorResponse |
+    Hover::ErrorResponse |
+    SignatureHelp::ErrorResponse
+  
   alias AnyOutRequest =
     ShowMessageRequest
   
@@ -176,6 +213,12 @@ module LSP::Message
     Message.def_response(Nil)
     
     alias Result = JSON::Any
+  end
+  
+  struct GenericErrorResponse
+    Message.def_error_response(Nil)
+    
+    alias ErrorData = JSON::Any
   end
   
   # The base protocol offers support for request cancellation.
