@@ -103,15 +103,12 @@ describe Pegmatite do
   end
   
   it "correctly raises a parse error pointing to the end of the source" do
-    source = <<-JSON
-    {
-      "hello": 93.
-    JSON
+    source = "{\"hello\": 93."
     
     expected = <<-ERROR
-    unexpected token at byte offset 16:
-      "hello": 93.
-                  ^
+    unexpected token at byte offset 13:
+    {"hello": 93.
+                 ^
     ERROR
     
     expect_raises Pegmatite::Pattern::MatchError, expected do
@@ -126,6 +123,20 @@ describe Pegmatite do
     unexpected token at byte offset 0:
     
     ^
+    ERROR
+    
+    expect_raises Pegmatite::Pattern::MatchError, expected do
+      Pegmatite.tokenize(Fixtures::JSONGrammar, source)
+    end
+  end
+  
+  it "correctly raises a parse error for an unterminated string literal" do
+    source = "{\"hello\": \"uh oh"
+    
+    expected = <<-ERROR
+    unexpected token at byte offset 16:
+    {"hello": "uh oh
+                    ^
     ERROR
     
     expect_raises Pegmatite::Pattern::MatchError, expected do

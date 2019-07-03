@@ -3,6 +3,7 @@ module Pegmatite
   #
   # Parsing will fail if the child pattern parsing succeeds.
   # Otherwise, the pattern succeeds, consuming zero bytes.
+  # However, reaching the end of the file will always fail.
   #
   # Composing two Pattern::Not instances inside one another is a valid strategy
   # for positive lookahead. (TODO: test for this example)
@@ -15,6 +16,8 @@ module Pegmatite
     end
     
     def match(source, offset, state) : MatchResult
+      return {0, self} if offset >= source.size
+      
       length, result = @child.match(source, offset, state)
       case result
       when MatchOK

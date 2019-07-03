@@ -17,6 +17,8 @@ module Pegmatite
       else
         {0, self}
       end
+    rescue IndexError
+      {0, self}
     end
   end
 end
