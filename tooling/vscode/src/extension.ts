@@ -138,7 +138,6 @@ class MareClient {
         'run', '-i', '--rm',
         '-v', `${cwd}:/opt/code`,
         '-e', `SOURCE_DIRECTORY_MAPPING=${cwd}:/opt/code`,
-        '--entrypoint', '/bin/mare',
         'jemc/mare',
         'server',
       ],
