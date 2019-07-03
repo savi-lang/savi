@@ -1,7 +1,17 @@
 require "llvm"
 
 ##
-# TODO: Document this pass.
+# The purpose of the ServeHover pass is to serve up information about a given
+# hover position in the source code, represented as a Source::Pos.
+# When the [] method is called with a Source::Pos, it returns an Array(String)
+# of messages describing the entity at that position, as well as an output
+# Source::Pos value that points to the entirety of that entity's source.
+#
+# This pass does not mutate the Program topology.
+# This pass does not mutate the AST.
+# This pass does not raise any compilation errors.
+# This pass keeps no state other than holding onto the Context.
+# This pass produces no output state.
 #
 class Mare::Compiler::ServeHover
   getter! ctx : Context
@@ -13,7 +23,7 @@ class Mare::Compiler::ServeHover
     @ctx = ctx
   end
   
-  def find(pos : Source::Pos, within : AST::Node)
+  private def find(pos : Source::Pos, within : AST::Node)
     # TODO: Use the visitor pattern instead?
     case within
     when AST::Prefix
