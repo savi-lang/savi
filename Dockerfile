@@ -74,13 +74,8 @@ COPY --from=dev /usr/lib/crystal/core/llvm/ext/llvm_ext.o \
 
 RUN mkdir /opt/mare
 WORKDIR /opt/mare
-COPY \
-    shard.yml \
-    shard.lock \
-    Makefile \
-    main.cr \
-    /opt/mare/
-RUN shards install
+COPY Makefile main.cr /opt/mare/
+COPY lib /opt/mare/lib
 COPY src /opt/mare/src
 RUN make /tmp/bin/mare
 
