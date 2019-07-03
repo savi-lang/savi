@@ -49,6 +49,11 @@ class Mare::Server
     # TODO: Start server resources.
   end
   
+  # When told that we're free to be initialized, do so.
+  def handle(msg : LSP::Message::DidChangeConfiguration)
+    @stderr.puts(msg)
+  end
+  
   # When asked to shut down, respond in the affirmative immediately.
   def handle(msg : LSP::Message::Shutdown)
     # TODO: Stop server resources.
@@ -82,7 +87,6 @@ class Mare::Server
     # Ignore.
   end
   
-  # TODO: Proper hover support.
   def handle(msg : LSP::Message::Hover)
     pos = msg.params.position
     text = @open_files[msg.params.text_document.uri]? || ""
@@ -91,12 +95,20 @@ class Mare::Server
       if msg.params.text_document.uri.scheme != "file"
     
     filename = msg.params.text_document.uri.path.not_nil!
-    # TODO: Don't hard-code this.
-    if filename.starts_with?("/home/jemc/1/code/hg/mare/src/prelude")
-      filename = filename.sub("/home/jemc/1/code/hg/mare/src/prelude",
-        "/opt/mare/src/prelude")
-    elsif filename.starts_with?("/home/jemc/1/code/hg/mare/tmp")
-      filename = filename.sub("/home/jemc/1/code/hg/mare/tmp", "/opt/code")
+    
+    # If we're running in a docker container, or in some other remote
+    # environment, the host's source path may not match ours, and we
+    # can apply the needed transformation as specified in this ENV var.
+    ENV["SOURCE_DIRECTORY_MAPPING"]?.try do |mapping|
+      mapping.split(":").each_slice 2 do |pair|
+        next unless pair.size == 2
+        host_path = pair[0]
+        dest_path = pair[1]
+        
+        if filename.starts_with?(host_path)
+          filename = filename.sub(host_path, dest_path)
+        end
+      end
     end
     
     dirname = File.dirname(filename)

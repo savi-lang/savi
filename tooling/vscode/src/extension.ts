@@ -135,8 +135,9 @@ class MareClient {
     
     let serverProcess = child_process.spawn(
       'docker', [
-        'run', '-i',
+        'run', '-i', '--rm',
         '-v', `${cwd}:/opt/code`,
+        '-e', `SOURCE_DIRECTORY_MAPPING=${cwd}:/opt/code`,
         '--entrypoint', '/bin/mare',
         'jemc/mare',
         'server',
