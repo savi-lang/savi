@@ -247,7 +247,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
   def run(ctx)
     # Reach functions called starting from the entrypoint of the program.
     env = ctx.namespace["Env"].as(Program::Type)
-    handle_func(ctx, ctx.infer.for_type(ctx, env), env.find_func!("new"))
+    handle_func(ctx, ctx.infer.for_type(ctx, env), env.find_func!("_create"))
     main = ctx.namespace["Main"].as(Program::Type)
     handle_func(ctx, ctx.infer.for_type(ctx, main), main.find_func!("new"))
   end

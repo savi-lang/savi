@@ -511,6 +511,13 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         params.accept(self)
         params.terms.each do |param|
           finish_param(param, self[param]) unless self[param].is_a?(Param)
+          
+          # TODO: special-case this somewhere else?
+          if reified.type.defn.ident.value == "Main" \
+          && reified.func.ident.value == "new"
+            env = MetaType.new(reified_type(prelude_type("Env")))
+            self[param].as(Param).set_explicit(reified.func.ident.pos, env)
+          end
         end
       end
       

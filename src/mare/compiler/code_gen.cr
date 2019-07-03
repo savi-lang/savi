@@ -464,8 +464,9 @@ class Mare::Compiler::CodeGen
       [pony_ctx, gen_get_desc("Main")], "main_actor")
     @builder.call(@mod.functions["pony_become"], [pony_ctx, main_actor])
     
-    # Create the Env from argc, argv, and envp.
+    # TODO: Create the Env from argc, argv, and envp.
     env = gen_alloc(@gtypes["Env"], "env")
+    @builder.call(@gtypes["Env"]["_create"].llvm_func, [env])
     # TODO: @builder.call(env__create_fn,
     #   [argc, @builder.bit_cast(argv, @ptr), @builder.bitcast(envp, @ptr)])
     
@@ -579,6 +580,7 @@ class Mare::Compiler::CodeGen
     when AST::Identifier
       case node.value
       when "I32"  then @i32
+      when "U64"  then @i64
       when "None" then @void
       else raise NotImplementedError.new(node.value)
       end

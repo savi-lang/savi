@@ -1,6 +1,3 @@
-:ffi LibC
-  :fun puts (CPointer(U8)) I32
-
 :ffi LibPonyRT
   :fun pony_exitcode (I32) None
 
@@ -34,14 +31,14 @@
   :new (@text = "[awkward silence]")
 
 :actor Main
-  :new: @do_stuff(Greeting)
+  :new (env): @do_stuff(env)
   
-  :be do_stuff (greeting Greeting)
+  :be do_stuff (env Env)
     none = ()
     
     maybe_greeting (Greeting | None) = Generic(Greeting).get
     if maybe_greeting <: Greeting \
-      @say_stuff(maybe_greeting)
+      @say_stuff(env, maybe_greeting)
     
     use_zero = False
     please_use_zero = True
@@ -60,13 +57,12 @@
     
     LibPonyRT.pony_exitcode(exitcode)
   
-  :fun say_stuff (greeting Greeting)
+  :fun say_stuff (env Env, greeting Greeting)
     pre_greeting = Container(String).new("[pre greeting]")
     sentence_source = ^(Container(Sentence).new(Sentence.new(^1)).value)
     sentence = sentence_source.call(pre_greeting.value)
-    LibC.puts(sentence.text.cpointer)
+    env.out.print(sentence.text)
     sentence.text = greeting.hello
-    LibC.puts(sentence.text.cpointer)
+    env.out.print(sentence.text)
     sentence.text = greeting.bye
-    LibC.puts(sentence.text.cpointer)
-    None // TODO: remove
+    env.out.print(sentence.text)
