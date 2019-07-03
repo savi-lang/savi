@@ -7,6 +7,7 @@ class Mare::Compiler::Context
   getter paint
   getter code_gen
   getter eval
+  getter serve_hover
   
   def initialize
     @program = Program.new
@@ -19,6 +20,7 @@ class Mare::Compiler::Context
     @paint = Paint.new
     @code_gen = CodeGen.new
     @eval = Eval.new
+    @serve_hover = ServeHover.new
   end
   
   def compile(doc : AST::Document)

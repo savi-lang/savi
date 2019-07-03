@@ -22,7 +22,14 @@ module Mare::Parser::Builder
       term = build_term(child, iter, state)
       case term
       when AST::Declare then doc.list << (decl = term)
-      else decl.as(AST::Declare).body.terms << term
+      else
+        decl = decl.as(AST::Declare)
+        decl.body.terms << term
+        if term.pos.finish > decl.body.pos.finish
+          new_pos = decl.body.pos
+          new_pos.finish = term.pos.finish
+          decl.body.with_pos(new_pos)
+        end
       end
     end
     
@@ -34,7 +41,8 @@ module Mare::Parser::Builder
     decl = AST::Declare.new.with_pos(state.pos(main))
     
     iter.while_next_is_child_of(main) do |child|
-      decl.head << build_term(child, iter, state)
+      term = build_term(child, iter, state)
+      decl.head << term
     end
     
     decl

@@ -18,6 +18,7 @@ module Mare::Compiler
     when :codegen      then ctx.run(ctx.code_gen)
     when :eval         then ctx.run(ctx.eval)
     when :binary       then ctx.run(Binary)
+    when :serve_hover  then ctx.run(ctx.serve_hover)
     else raise NotImplementedError.new(target)
     end
   end
@@ -43,6 +44,7 @@ module Mare::Compiler
     when :codegen then [:paint, :verify, :reach, :completeness, :infer, :jumps]
     when :eval then [:codegen]
     when :binary then [:codegen]
+    when :serve_hover then [:refer, :infer]
     else raise NotImplementedError.new([:deps_of, target].inspect)
     end
   end

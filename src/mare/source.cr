@@ -37,12 +37,39 @@ struct Mare::Source::Pos
   property line_start : Int32  # the character offset of the start of this line
   property line_finish : Int32 # the character offset of the end of this line
   
+  def self.point(source : Source, row : Int32, col : Int32)
+    current_row = 0
+    line_start = 0
+    
+    while current_row < row
+      current_row += 1
+      line_start =
+        source.content.index("\n", line_start).try(&.+(1)) \
+        || source.content.size
+    end
+    
+    line_finish = source.content.index("\n") || source.content.size
+    start = line_start + col
+    
+    new(source, start, start, line_start, line_finish, row, col)
+  end
+  
   def initialize(
     @source, @start, @finish, @line_start, @line_finish, @row, @col
   )
   end
   NONE = new(Source.none, 0, 0, 0, 0, 0, 0)
   def self.none; NONE end
+  
+  def contains?(other : Source::Pos)
+    source == other.source &&
+    start <= other.start &&
+    finish >= other.finish
+  end
+  
+  def size
+    finish - start
+  end
   
   # Override inspect to avoid verbosely printing Source#content every time.
   def inspect(io)

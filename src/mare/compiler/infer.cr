@@ -112,10 +112,13 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
   end
   
-  # This method is intended to be used in testing only.
-  def for_func_simple(ctx : Context, t_name : String, f_name : String) : ForFunc
+  def for_func_simple(ctx : Context, t_name : String, f_name : String)
     t = ctx.namespace[t_name].as(Program::Type)
     f = t.find_func!(f_name)
+    for_func_simple(ctx, t, f)
+  end
+  
+  def for_func_simple(ctx : Context, t : Program::Type, f : Program::Function)
     for_func(ctx, for_type(ctx, t).reified, f, MetaType.cap(f.cap.value))
   end
   
@@ -124,7 +127,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     rt : ReifiedType,
     f : Program::Function,
     cap : MetaType,
-  )
+  ) : ForFunc
     mt = MetaType.new(rt).override_cap(cap).strip_ephemeral
     rf = ReifiedFunction.new(rt, f, mt)
     @map[rf] ||= (

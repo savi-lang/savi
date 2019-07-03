@@ -85,11 +85,39 @@ class Mare::Server
   # TODO: Proper hover support.
   def handle(msg : LSP::Message::Hover)
     pos = msg.params.position
-    text = @open_files[msg.params.text_document.uri] rescue ""
+    text = @open_files[msg.params.text_document.uri]? || ""
+    
+    raise NotImplementedError.new("not a file") \
+      if msg.params.text_document.uri.scheme != "file"
+    
+    filename = msg.params.text_document.uri.path.not_nil!
+    # TODO: Don't hard-code this.
+    if filename.starts_with?("/home/jemc/1/code/hg/mare/src/prelude")
+      filename = filename.sub("/home/jemc/1/code/hg/mare/src/prelude",
+        "/opt/mare/src/prelude")
+    elsif filename.starts_with?("/home/jemc/1/code/hg/mare/tmp")
+      filename = filename.sub("/home/jemc/1/code/hg/mare/tmp", "/opt/code")
+    end
+    
+    dirname = File.dirname(filename)
+    sources = Compiler.get_library_sources(dirname)
+    
+    source = sources.find { |s| s.path == filename }.not_nil!
+    source_pos = Source::Pos.point(source, pos.line.to_i32, pos.character.to_i32)
+    
+    # TODO: Don't compile from scratch on each hover call.
+    info, info_pos =
+      Compiler.compile(sources, :serve_hover).serve_hover[source_pos]
+    
+    info << "(no hover information)" if info.empty?
+    
     @wire.respond msg do |msg|
-      msg.result.contents.kind = "markdown"
-      msg.result.contents.value =
-        "# TODO: Hover\n`#{pos.to_json}`\n```ruby\n#{text}\n```\n"
+      msg.result.contents.kind = "plaintext"
+      msg.result.contents.value = info.join("\n\n")
+      msg.result.range = LSP::Data::Range.new(
+        LSP::Data::Position.new(info_pos.row.to_i64, info_pos.col.to_i64),
+        LSP::Data::Position.new(info_pos.row.to_i64, info_pos.col.to_i64 + info_pos.size), # TODO: account for spilling over into a new row
+      )
       msg
     end
   end
