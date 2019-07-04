@@ -1,4 +1,4 @@
-:import "./micro_test" (MicroTest)
+:import "../micro_test" (MicroTest)
 
 :primitive Err
   :fun non now!: @inner!

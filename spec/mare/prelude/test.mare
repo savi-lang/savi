@@ -1,4 +1,4 @@
-:import "./micro_test" (MicroTest)
+:import "../micro_test" (MicroTest)
 
 :actor Main
   :new
