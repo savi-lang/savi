@@ -17,7 +17,7 @@ module Pegmatite
       c, length = Pattern::UnicodeAny.utf32_at(source, offset)
       
       # Fail if a valid UTF-32 character couldn't be parsed.
-      return {0, self} if c == 0xFFFD_32
+      return {0, self} if c == 0xFFFD_u32
       
       # Fail if the character wasn't in the expected range.
       return {0, self} if (c < @min) || (c > @max)
