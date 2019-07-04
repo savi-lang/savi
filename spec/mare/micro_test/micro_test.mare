@@ -1,11 +1,14 @@
-:primitive MicroTest
+:class MicroTest
+  :prop env Env
+  :new (@env)
   :fun print_line_break: Print.line_break
   :fun "[]" (text String) MicroTestInstance
-    MicroTestInstance.new(text)
+    MicroTestInstance.new(@env, text)
 
 :class MicroTestInstance
+  :prop env Env
   :prop text String
-  :new (@text)
+  :new (@env, @text)
   :fun "pass=" (pass Bool)
     if pass (
       Print.f("%s", ".")
@@ -13,7 +16,7 @@
       Print.line_break // TODO: fix processing of \n in string literals and use it
       Print.f("failure of '%s'!", @text)
       Print.line_break // TODO: fix processing of \n in string literals and use it
-      LibPonyRT.pony_exitcode(1) // Mark the entire process as a failure.
+      @env.exit_code = 1 // Mark the entire process as a failure.
     )
 
 :primitive Print
@@ -26,6 +29,3 @@
 :ffi LibC
   :fun puts (CPointer(U8)) I32
   :fun printf (CPointer(U8), CPointer(U8)) I32
-
-:ffi LibPonyRT
-  :fun pony_exitcode (I32) None

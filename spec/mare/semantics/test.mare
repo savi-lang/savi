@@ -5,8 +5,8 @@
   :fun non inner!: error!
 
 :actor Main
-  :new
-    test = MicroTest
+  :new (env)
+    test = MicroTest.new(env)
     test.print_line_break // TODO: move to MicroTest constructor and finalizer
     
     zero = U64[0]

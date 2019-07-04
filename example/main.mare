@@ -1,6 +1,3 @@
-:ffi LibPonyRT
-  :fun pony_exitcode (I32) None
-
 :primitive Greeting
   :const hello: "Hello, World!"
   :const bye: "Goodbye, World!"
@@ -49,13 +46,13 @@
     | BelligerentFour
     )
     
-    exitcode = 0
+    exit_code = 0
     maybe_thirty_three (I32 | None) = I32[33]
     if maybe_thirty_three <: I32 (
-      exitcode = augend + maybe_thirty_three + 9
+      exit_code = augend + maybe_thirty_three + 9
     )
     
-    LibPonyRT.pony_exitcode(exitcode)
+    env.exit_code = exit_code
   
   :fun say_stuff (env Env, greeting Greeting)
     pre_greeting = Container(String).new("[pre greeting]")
