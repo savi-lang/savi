@@ -48,6 +48,10 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       @meta_type.single!
     end
     
+    def single_def!(ctx)
+      ctx.reach[@meta_type.single!]
+    end
+    
     def any_callable_defn_for(name) : Infer::ReifiedType
       @meta_type.any_callable_func_defn_type(name).not_nil!
     end
@@ -104,6 +108,151 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
         :i8
       else
         llvm_use_type
+      end
+    end
+    
+    def union_children : Array(Ref)
+      # TODO: Return the list of refs in this, assuming it is a union.
+      raise NotImplementedError.new(self)
+    end
+    
+    def trace_kind
+      if is_union?
+        union_children.reduce(:none) do |kind, child|
+          case child.trace_kind
+          when :none then :none
+          when :dynamic, :tuple then :dynamic
+          when :machine_word
+            case kind
+            when :val_known, :val_unknown, :machine_word
+              :val_unknown
+            when :mut_known, :mut_unknown
+              :mut_unknown
+            when :tag_known, :tag_unknown
+              :tag_unknown
+            when :non_known, :non_unknown
+              :non_unknown
+            when :dynamic, :tuple
+              :dynamic
+            else raise NotImplementedError.new(kind)
+            end
+          when :mut_known, :mut_unknown
+            case kind
+            when :mut_known, :mut_unknown, :machine_word
+              :mut_unknown
+            when :val_known, :val_unknown,
+                 :tag_known, :tag_unknown,
+                 :non_known, :non_unknown,
+                 :dynamic, :tuple
+              :dynamic
+            else raise NotImplementedError.new(kind)
+            end
+          when :val_known, :val_unknown
+            case kind
+            when :val_known, :val_unknown, :machine_word
+              :val_unknown
+            when :mut_known, :mut_unknown,
+                 :tag_known, :tag_unknown,
+                 :non_known, :non_unknown,
+                 :dynamic, :tuple
+              :dynamic
+            else raise NotImplementedError.new(kind)
+            end
+          when :tag_known, :tag_unknown
+            case kind
+            when :tag_known, :tag_unknown, :machine_word
+              :tag_unknown
+            when :mut_known, :mut_unknown,
+                 :val_known, :val_unknown,
+                 :non_known, :non_unknown,
+                 :dynamic, :tuple
+              :dynamic
+            else raise NotImplementedError.new(kind)
+            end
+          when :non_known, :non_unknown
+            case kind
+            when :non_known, :non_unknown, :machine_word
+              :non_unknown
+            when :mut_known, :mut_unknown,
+                 :val_known, :val_unknown,
+                 :tag_known, :tag_unknown,
+                 :dynamic, :tuple
+              :dynamic
+            else raise NotImplementedError.new(kind)
+            end
+          else raise NotImplementedError.new(kind)
+          end
+        end
+      elsif is_intersect?
+        raise NotImplementedError.new(self)
+      elsif is_tuple?
+        raise NotImplementedError.new(self)
+      elsif singular?
+        if !single!.defn.is_concrete?
+          case @meta_type.cap_only.inner
+          when Infer::MetaType::Capability::NON then :non_unknown
+          when Infer::MetaType::Capability::TAG then :tag_unknown
+          when Infer::MetaType::Capability::VAL then :val_unknown
+          when Infer::MetaType::Capability::ISO then :mut_unknown
+          else raise NotImplementedError.new(single!)
+          end
+        elsif single!.defn.has_tag?(:numeric)
+          :machine_word
+        elsif single!.defn.has_tag?(:actor)
+          :tag_known
+        else
+          case @meta_type.cap_only.inner
+          when Infer::MetaType::Capability::NON then :non_known
+          when Infer::MetaType::Capability::TAG then :tag_known
+          when Infer::MetaType::Capability::VAL then :val_known
+          when Infer::MetaType::Capability::ISO then :mut_known
+          else raise NotImplementedError.new(single!)
+          end
+        end
+      else
+        raise NotImplementedError.new(self)
+      end
+    end
+    
+    def trace_kind_with_dst_cap(dst_kind : Symbol)
+      raise "halt; verify the logic here before using it, especially with non"
+      src_kind = trace_kind()
+      case src_kind
+      when :none, :machine_word, :dynamic, :tag_known, :tag_unknown
+        src_kind
+      when :tuple
+        dst_kind == :tuple ? :tuple : :dynamic
+      when :val_known
+        case dst_kind
+        when :dynamic then :static
+        when :tag_known, :tag_unknown then :tag_known
+        when :non_known, :non_unknown then :non_known
+        else :val_known
+        end
+      when :val_unknown
+        case dst_kind
+        when :dynamic then singular? ? :static : :dynamic
+        when :tag_unknown then :tag_unknown
+        when :non_unknown then :non_unknown
+        else :val_unknown
+        end
+      when :mut_known
+        case dst_kind
+        when :dynamic then :static
+        when :val_known, :val_unknown then :val_known
+        when :tag_known, :tag_unknown then :tag_known
+        when :non_known, :non_unknown then :non_known
+        else :mut_known
+        end
+      when :mut_unknown
+        case dst_kind
+        when :dynamic then singular? ? :static : :dynamic
+        when :val_unknown then :val_unknown
+        when :tag_unknown then :tag_unknown
+        when :non_unknown then :non_unknown
+        else :mut_unknown
+        end
+      else raise NotImplementedError.new(src_kind)
       end
     end
   end

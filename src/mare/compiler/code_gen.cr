@@ -2233,6 +2233,60 @@ class Mare::Compiler::CodeGen
     @builder.store(value, gep)
   end
   
+  def gen_trace_unknown(dst, ponyrt_trace_kind)
+    @builder.call(@mod.functions["pony_traceunknown"], [
+      pony_ctx,
+      @builder.bit_cast(dst, @obj_ptr, "#{dst.name}.CAST"),
+      @i32.const_int(ponyrt_trace_kind),
+    ])
+  end
+  
+  def gen_trace_known(dst, src_type, ponyrt_trace_kind)
+    src_gtype = @gtypes[ctx.reach[src_type.single!].llvm_name]
+    
+    @builder.call(@mod.functions["pony_traceknown"], [
+      pony_ctx,
+      @builder.bit_cast(dst, @obj_ptr, "#{dst.name}.CAST"),
+      @builder.bit_cast(src_gtype.desc, @desc_ptr, "#{dst.name}.DESC"),
+      @i32.const_int(ponyrt_trace_kind),
+    ])
+  end
+  
+  def gen_trace(src : LLVM::Value, dst : LLVM::Value, src_type, dst_type)
+    if src_type == dst_type
+      trace_kind = src_type.trace_kind
+    else
+      # TODO: When is this true and not true? Do we have the right equivalency test?
+      # As of the time of this writing, this is unreachable because
+      # we always specify the same src_type and dst_type in the caller.
+      raise "halt; verify the circumstances of how we arrived here"
+      trace_kind = src_type.trace_kind_with_dst_cap(dst_type.trace_kind)
+    end
+    
+    case trace_kind
+    when :mut_known
+      gen_trace_known(dst, src_type, PonyRT::TRACE_MUTABLE)
+    when :val_known, :non_known
+      gen_trace_known(dst, src_type, PonyRT::TRACE_IMMUTABLE)
+    when :tag_known
+      gen_trace_known(dst, src_type, PonyRT::TRACE_OPAQUE)
+    when :mut_unknown
+      gen_trace_unknown(dst, PonyRT::TRACE_MUTABLE)
+    when :val_unknown, :non_unknown
+      gen_trace_unknown(dst, PonyRT::TRACE_IMMUTABLE)
+    when :tag_unknown
+      gen_trace_unknown(dst, PonyRT::TRACE_OPAQUE)
+    when :static
+      raise NotImplementedError.new("static") # TODO
+    when :dynamic
+      raise NotImplementedError.new("dynamic") # TODO
+    when :tuple
+      raise NotImplementedError.new("tuple") # TODO
+    else
+      raise NotImplementedError.new(trace_kind)
+    end
+  end
+  
   def gen_send_impl(gtype, gfunc)
     fn = gfunc.send_llvm_func
     gen_func_start(fn)
@@ -2248,18 +2302,39 @@ class Mare::Compiler::CodeGen
       [@i32.const_int(pool_index), @i32.const_int(vtable_index)], "msg_opaque")
     msg = @builder.bit_cast(msg_opaque, msg_type.pointer, "msg")
     
+    src_types = [] of Reach::Ref
+    dst_types = [] of Reach::Ref
+    src_values = [] of LLVM::Value
+    dst_values = [] of LLVM::Value
+    
     # Store all forwarding arguments in the message object.
     msg_type.struct_element_types.each_with_index do |elem_type, i|
       next if i < 3 # skip the first 3 boilerplate fields in the message
       param = fn.params[i - 3 + 1] # skip 3 fields, skip 1 param (the receiver)
       
+      arg = gfunc.func.params.not_nil!.terms[i - 3] # skip 3 fields
+      dst_types << type_of(arg, gfunc)
+      src_types << dst_types.last # TODO: are these ever different?
+      
       # Cast the argument to the correct type and store it in the message.
       cast_arg = gen_assign_cast(param, elem_type, nil)
       arg_gep = @builder.struct_gep(msg, i)
       @builder.store(cast_arg, arg_gep)
+      
+      src_values << param
+      dst_values << cast_arg
     end
     
-    # TODO: Trace the message.
+    needs_trace = true # TODO: determine if a trace is actually needed (gentrace_needed in Pony)
+    if needs_trace
+      @builder.call(@mod.functions["pony_gc_send"], [pony_ctx])
+      
+      src_values.each_with_index do |src_value, i|
+        gen_trace(src_value, dst_values[i], src_types[i], dst_types[i])
+      end
+      
+      @builder.call(@mod.functions["pony_send_done"], [pony_ctx])
+    end
     
     # Send the message.
     @builder.call(@mod.functions["pony_sendv_single"], [
@@ -2313,20 +2388,43 @@ class Mare::Compiler::CodeGen
       cases[id] = block = gen_block("DISPATCH.#{func_name}")
       @builder.position_at_end(block)
       
+      src_types = [] of Reach::Ref
+      dst_types = [] of Reach::Ref
+      src_values = [] of LLVM::Value
+      dst_values = [] of LLVM::Value
+      
       # Destructure args from the message.
       msg_type = gfunc.send_msg_llvm_type
       msg = @builder.bit_cast(fn.params[2], msg_type.pointer)
       args =
         msg_type.struct_element_types.each_with_index.map do |(elem_type, i)|
           next if i < 3 # skip the first 3 boilerplate fields in the message
+          
+          arg = gfunc.func.params.not_nil!.terms[i - 3] # skip 3 fields
+          dst_types << type_of(arg, gfunc)
+          src_types << dst_types.last # TODO: are these ever different?
+          
           arg_gep = @builder.struct_gep(msg, i)
-          gen_assign_cast(@builder.load(arg_gep), elem_type, nil)
+          src_value = @builder.load(arg_gep)
+          src_values << src_value
+          
+          gen_assign_cast(src_value, elem_type, nil)
         end.to_a.compact
+      dst_values = args
       
       # Prepend the receiver as the first argument, not included in the message.
       args.unshift(receiver)
       
-      # TODO: Trace the message.
+      needs_trace = true # TODO: determine if a trace is actually needed (gentrace_needed in Pony)
+      if needs_trace
+        @builder.call(@mod.functions["pony_gc_recv"], [pony_ctx])
+        
+        src_values.each_with_index do |src_value, i|
+          gen_trace(src_value, dst_values[i], src_types[i], dst_types[i])
+        end
+        
+        @builder.call(@mod.functions["pony_recv_done"], [pony_ctx])
+      end
       
       # Call the underlying function and return void.
       @builder.call(gfunc.llvm_func, args)
