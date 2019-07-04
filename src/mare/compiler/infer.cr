@@ -620,18 +620,24 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         call_func = call_func.not_nil!
         autorecover_needed = false
         
+        # The required capability is the receiver capability of the function,
+        # unless it is an asynchronous function, in which case it is tag.
+        required_cap = call_func.cap.value
+        required_cap = "tag" \
+          if call_func.has_tag?(:async) && !call_func.has_tag?(:constructor)
+        
         # Keep track that we called this function.
         @called_funcs.add({call_defn, call_func})
         
         # Enforce the capability restriction of the receiver.
-        if is_subtype?(call_mt_cap, MetaType.cap(call_func.cap.value))
+        if is_subtype?(call_mt_cap, MetaType.cap(required_cap))
           # For box functions only, we reify with the actual cap on the caller side.
           # For all other functions, we just use the cap from the func definition.
-          reify_cap = call_func.cap.value == "box" ? call_mt_cap : MetaType.cap(call_func.cap.value)
+          reify_cap = required_cap == "box" ? call_mt_cap : MetaType.cap(call_func.cap.value)
         elsif call_func.has_tag?(:constructor)
           # Constructor calls ignore cap of the original receiver.
           reify_cap = MetaType.cap(call_func.cap.value)
-        elsif is_subtype?(call_mt_cap.ephemeralize, MetaType.cap(call_func.cap.value))
+        elsif is_subtype?(call_mt_cap.ephemeralize, MetaType.cap(required_cap))
           # We failed, but we may be able to use auto-recovery.
           # Take note of this and we'll finish the auto-recovery checks later.
           autorecover_needed = true
@@ -641,7 +647,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
           # We failed entirely; note the problem and carry on.
           problems << {call_func.cap.pos,
             "the type #{call_mti.inspect} isn't a subtype of the " \
-            "required capability of '#{call_func.cap.value}'"}
+            "required capability of '#{required_cap}'"}
           # We already failed subtyping for the receiver cap, but pretend
           # for now that we didn't for the sake of further checks.
           reify_cap = MetaType.cap(call_func.cap.value)
@@ -672,9 +678,9 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         if autorecover_needed
           recover_problems = [] of {Source::Pos, String}
           
-          unless call_func.cap.value == "ref" || call_func.cap.value == "box"
+          unless required_cap == "ref" || required_cap == "box"
             recover_problems << {call_func.cap.pos,
-              "the function's receiver capability is `#{call_func.cap.value}` " \
+              "the function's receiver capability is `#{required_cap}` " \
               "but only a `ref` or `box` receiver can be auto-recovered"}
           end
           
