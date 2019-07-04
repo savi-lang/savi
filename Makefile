@@ -13,9 +13,15 @@ test: PHONY
 	docker exec -ti mare-dev make extra_args="$(extra_args)" test.inner
 /tmp/bin/spec: $(shell find src -name '*.cr') $(shell find spec -name '*.cr')
 	mkdir -p /tmp/bin
-	crystal build --debug --link-flags="-lponyrt" spec/spec_helper.cr -o $@
+	crystal build --debug spec/spec_helper.cr -o $@
 test.inner: PHONY /tmp/bin/spec
 	echo && /tmp/bin/spec $(extra_args)
+
+# Evaluate a Hello World example.
+example-eval: PHONY
+	docker exec -ti mare-dev make extra_args="$(extra_args)" example-eval.inner
+example-eval.inner: PHONY /tmp/bin/mare
+	echo && /tmp/bin/mare eval 'env.out.print("Hello, World!")'
 
 # Compile and run the mare binary in the `example` subdirectory.
 example: PHONY
@@ -28,7 +34,8 @@ example-mare-callgrind: PHONY
 	docker exec -ti mare-dev make extra_args="$(extra_args)" example-mare-callgrind.inner
 /tmp/bin/mare: main.cr $(shell find src -name '*.cr')
 	mkdir -p /tmp/bin
-	crystal build --debug --link-flags="-lponyrt" main.cr -o $@
+	crystal build --debug main.cr -o $@
+	ldd /tmp/bin/mare | grep libponyrt # prove that libponyrt was actually linked
 example/main: /tmp/bin/mare $(shell find example -name '*.mare')
 	echo && cd example && /tmp/bin/mare
 /tmp/callgrind.out: /tmp/bin/mare

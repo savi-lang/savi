@@ -13,7 +13,7 @@ require "llvm"
 # !! This pass has the side-effect of writing files to disk.
 #
 class Mare::Compiler::Binary
-  PONYRT_BC_PATH = "/usr/local/lib/libponyrt.bc"
+  PONYRT_BC_PATH = "/usr/lib/libponyrt.bc"
   
   def self.run(ctx)
     new.run(ctx)

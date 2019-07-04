@@ -77,6 +77,14 @@ module Mare::Compiler
     end
   end
   
+  def self.eval(string : String) : Int32
+    content = ":actor Main\n:new (env)\n#{string}"
+    library = Mare::Source::Library.new("(eval)")
+    source = Mare::Source.new("(eval)", content, library)
+    
+    Mare::Compiler.compile([source], :eval).eval.exitcode
+  end
+  
   def self.compile(dirname : String, target : Symbol = :eval)
     compile(get_library_sources(dirname), target)
   end

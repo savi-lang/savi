@@ -12,6 +12,30 @@ It's an early work in progress, but it can already compile and run basic program
 
 Check out the [feature roadmap](./ROADMAP.md) and [goals summary](./GOALS.md) for more information on where this project is headed.
 
+## Try It!
+
+There are a few ways you can try out Mare. All of them assume you have a working `docker` installation, so take a moment to take care of that first.
+
+First, just to prove the basics, you can use the `eval` subcommand of the docker image to compile a program:
+
+```sh
+docker run --rm jemc/mare eval 'env.out.print("Hello, World!")'
+# Prints "Hello, World!"
+```
+
+Beyond that, you can also use the docker image to compile a source code directory by mounting the directory into the container, like so:
+
+```sh
+# Compile the program.
+docker run --rm -v ${PATH_TO_YOUR_CODE}:/opt/code jemc/mare
+# Run the program.
+${PATH_TO_YOUR_CODE}/main
+```
+
+If you're a VS Code user, you may be interested to install our [language extension for that editor](./tooling/vscode), which includes both syntax highlighting and some Intellisense features via using the docker image as an LSP server.
+
+Finally, if you want to contribute to Mare, read on through the next section to learn about some of the basic development commands.
+
 ## Developing
 
 To work on this project, you'll need `docker` and `make`. You may also want to have `lldb` for debugging.

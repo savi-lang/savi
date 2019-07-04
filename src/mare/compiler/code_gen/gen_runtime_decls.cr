@@ -1,3 +1,16 @@
+# This lib is necessary in order for us to link libponyrt with the mare binary,
+# which is necessary in order for us to make `mare eval {{CODE}}` work right.
+# If this dummy is not here, even if we include `--link-args=-lponyrt`
+# in the crystal invocation, some part of the toolchain won't believe that
+# we truly need to link the library and just leave it out of the `ldd` list.
+# If the library is left out, we won't be able to access the Pony runtime
+# functions from within out JIT-compiled `mare eval` execution.
+@[Link("ponyrt")]
+lib LibPonyRTDummy
+  fun pony_ctx() : Void*
+end
+LibPonyRTDummy.pony_ctx()
+
 class Mare::Compiler::CodeGen
   def gen_runtime_decls
     # Declare Pony runtime functions (and a few other functions we need).

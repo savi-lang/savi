@@ -37,8 +37,8 @@ RUN git clone -b ${PONYC_VERSION} --depth 1 ${PONYC_GIT_URL} /tmp/ponyc && \
     make default_pic=true runtime-bitcode=yes verbose=yes libponyrt && \
     clang -shared -fpic -pthread -ldl -latomic -lexecinfo -o libponyrt.so build/release/lib/native/libponyrt.bc && \
     sudo mv libponyrt.so /usr/lib/ && \
-    sudo cp build/release/lib/native/libponyrt.bc /usr/local/lib/ && \
-    sudo cp build/release/lib/native/libponyrt.a /usr/local/lib/ && \
+    sudo cp build/release/lib/native/libponyrt.bc /usr/lib/ && \
+    sudo cp build/release/lib/native/libponyrt.a /usr/lib/ && \
     rm -rf /tmp/ponyc
 
 # TODO: Use multi-stage build here to carry over only the files we need.
@@ -66,9 +66,9 @@ RUN apk add --no-cache --update \
 # TODO: Don't bother with every possible libponyrt distribution format.
 COPY --from=dev /usr/lib/libponyrt.so \
                 /usr/lib/
-COPY --from=dev /usr/local/lib/libponyrt.a \
-                /usr/local/lib/libponyrt.bc \
-                /usr/local/lib/
+COPY --from=dev /usr/lib/libponyrt.a \
+                /usr/lib/libponyrt.bc \
+                /usr/lib/
 COPY --from=dev /usr/lib/crystal/core/llvm/ext/llvm_ext.o \
                 /usr/lib/crystal/core/llvm/ext/
 
@@ -95,9 +95,9 @@ WORKDIR /opt/code
 # TODO: Don't bother with every possible libponyrt distribution format.
 COPY --from=dev /usr/lib/libponyrt.so \
                 /usr/lib/
-COPY --from=dev /usr/local/lib/libponyrt.a \
-                /usr/local/lib/libponyrt.bc \
-                /usr/local/lib/
+COPY --from=dev /usr/lib/libponyrt.a \
+                /usr/lib/libponyrt.bc \
+                /usr/lib/
 
 COPY src/prelude /opt/mare/src/prelude
 COPY --from=build /tmp/bin/mare /bin/mare
