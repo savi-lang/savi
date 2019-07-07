@@ -7,9 +7,9 @@
 # functions from within out JIT-compiled `mare eval` execution.
 @[Link("ponyrt")]
 lib LibPonyRTDummy
-  fun pony_ctx() : Void*
+  fun pony_get_exitcode() : Int32*
 end
-LibPonyRTDummy.pony_ctx()
+LibPonyRTDummy.pony_get_exitcode()
 
 class Mare::Compiler::CodeGen
   def gen_runtime_decls
