@@ -31,11 +31,11 @@ ENV PONYC_VERSION 0.29.0
 ENV PONYC_GIT_URL https://github.com/ponylang/ponyc
 RUN git clone -b ${PONYC_VERSION} --depth 1 ${PONYC_GIT_URL} /tmp/ponyc && \
     cd /tmp/ponyc && \
-    make default_pic=true runtime-bitcode=yes verbose=yes libponyrt && \
-    clang -shared -fpic -pthread -ldl -latomic -lexecinfo -o libponyrt.so build/release/lib/native/libponyrt.bc && \
+    make default_pic=true runtime-bitcode=yes verbose=yes config=debug libponyrt && \
+    clang -shared -fpic -pthread -ldl -latomic -lexecinfo -o libponyrt.so build/debug/lib/native/libponyrt.bc && \
     sudo mv libponyrt.so /usr/lib/ && \
-    sudo cp build/release/lib/native/libponyrt.bc /usr/lib/ && \
-    sudo cp build/release/lib/native/libponyrt.a /usr/lib/ && \
+    sudo cp build/debug/lib/native/libponyrt.bc /usr/lib/ && \
+    sudo cp build/debug/lib/native/libponyrt.a /usr/lib/ && \
     rm -rf /tmp/ponyc
 
 # TODO: Use multi-stage build here to carry over only the files we need.
