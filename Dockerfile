@@ -27,13 +27,10 @@ RUN sh -c 'clang++ -v -c \
   /usr/lib/crystal/core/llvm/ext/llvm_ext.cc `llvm-config --cxxflags`'
 
 # Install Pony runtime (as shared library, static library, and bitcode).
-# TODO: Remove MinSizeRel find-and-replace hacks when ponyc is fixed.
-ENV PONYC_VERSION 0.26.0
+ENV PONYC_VERSION 0.29.0
 ENV PONYC_GIT_URL https://github.com/ponylang/ponyc
 RUN git clone -b ${PONYC_VERSION} --depth 1 ${PONYC_GIT_URL} /tmp/ponyc && \
     cd /tmp/ponyc && \
-    sed -i 's/RelWithDebInfo/MinSizeRel/g' Makefile && \
-    sed -i 's/RelWithDebInfo/MinSizeRel/g' src/common/llvm_config_begin.h && \
     make default_pic=true runtime-bitcode=yes verbose=yes libponyrt && \
     clang -shared -fpic -pthread -ldl -latomic -lexecinfo -o libponyrt.so build/release/lib/native/libponyrt.bc && \
     sudo mv libponyrt.so /usr/lib/ && \
