@@ -116,6 +116,13 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       raise NotImplementedError.new(self)
     end
     
+    def trace_needed?(dst_type = self)
+      trace_kind = trace_kind()
+      return false if trace_kind == :machine_word && dst_type.trace_kind == :machine_word
+      raise NotImplementedError.new(trace_kind) if trace_kind == :tuple
+      true
+    end
+    
     def trace_kind
       if is_union?
         union_children.reduce(:none) do |kind, child|
@@ -193,7 +200,10 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
           when Infer::MetaType::Capability::NON then :non_unknown
           when Infer::MetaType::Capability::TAG then :tag_unknown
           when Infer::MetaType::Capability::VAL then :val_unknown
-          when Infer::MetaType::Capability::ISO then :mut_unknown
+          when Infer::MetaType::Capability::ISO,
+               Infer::MetaType::Capability::TRN,
+               Infer::MetaType::Capability::REF,
+               Infer::MetaType::Capability::BOX then :mut_unknown
           else raise NotImplementedError.new(single!)
           end
         elsif single!.defn.has_tag?(:numeric)
@@ -205,7 +215,10 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
           when Infer::MetaType::Capability::NON then :non_known
           when Infer::MetaType::Capability::TAG then :tag_known
           when Infer::MetaType::Capability::VAL then :val_known
-          when Infer::MetaType::Capability::ISO then :mut_known
+          when Infer::MetaType::Capability::ISO,
+               Infer::MetaType::Capability::TRN,
+               Infer::MetaType::Capability::REF,
+               Infer::MetaType::Capability::BOX then :mut_known
           else raise NotImplementedError.new(single!)
           end
         end
@@ -289,34 +302,6 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     def llvm_name : String
       # TODO: guarantee global uniqueness
       @reified.show_type
-    end
-    
-    def abi_size : Int32
-      # TODO: move final number calculation to CodeGen side (LLVMABISizeOfType)
-      # TODO: cross-platform
-      if @reified.defn.has_tag?(:no_desc)
-        16 # we use the boxed size here
-      elsif !@reified.defn.has_tag?(:allocated)
-        8 # the size of just a descriptor pointer
-      elsif @reified.defn.has_tag?(:actor)
-        256 # TODO: handle fields
-      else
-        64 # TODO: handle fields
-      end
-    end
-    
-    def field_count
-      0 # TODO
-    end
-    
-    def field_offset : Int32
-      return 0 if field_count == 0
-      
-      # TODO: move final number calculation to CodeGen side (LLVMOffsetOfElement)
-      offset = 0
-      offset += 8 unless @reified.defn.has_tag?(:no_desc)
-      offset += 8 if @reified.defn.has_tag?(:actor)
-      offset
     end
     
     def has_desc?

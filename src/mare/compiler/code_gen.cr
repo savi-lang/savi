@@ -132,7 +132,7 @@ class Mare::Compiler::CodeGen
     def gen_desc(g : CodeGen)
       return if @type_def.is_abstract?
       
-      @desc = g.gen_desc(@type_def, @desc_type, gen_vtable(g))
+      @desc = g.gen_desc(self, gen_vtable(g))
     end
     
     # Generate other global values.
@@ -147,6 +147,7 @@ class Mare::Compiler::CodeGen
       return if @type_def.is_abstract?
       
       g.gen_dispatch_impl(self) if @type_def.is_actor?
+      g.gen_trace_impl(self)
       
       @gfuncs.each_value do |gfunc|
         g.gen_send_impl(self, gfunc) if gfunc.needs_send?
@@ -460,49 +461,18 @@ class Mare::Compiler::CodeGen
     func_frame.pony_ctx = pony_ctx
     
     # Create the main actor and become it.
-    main_actor = @builder.call(@mod.functions["pony_create"],
-      [pony_ctx, gen_get_desc("Main")], "main_actor")
-    @builder.call(@mod.functions["pony_become"], [pony_ctx, main_actor])
+    main_actor = gen_alloc_actor(@gtypes["Main"], "main", true)
     
     # TODO: Create the Env from argc, argv, and envp.
     env = gen_alloc(@gtypes["Env"], "env")
     @builder.call(@gtypes["Env"]["_create"].llvm_func, [env])
-    # TODO: @builder.call(env__create_fn,
+    # TODO: @builder.call(@gtypes["Env"]["_create"].llvm_func,
     #   [argc, @builder.bit_cast(argv, @ptr), @builder.bitcast(envp, @ptr)])
     
     # TODO: Run primitive initialisers using the main actor's heap.
     
-    # Create a one-off message type and allocate a message.
-    msg_type = @llvm.struct([@i32, @i32, @ptr, env.type])
-    vtable_index = @gtypes["Main"]["new"].vtable_index
-    msg_size = @target_machine.data_layout.abi_size(msg_type)
-    pool_index = PonyRT.pool_index(msg_size)
-    msg_opaque = @builder.call(@mod.functions["pony_alloc_msg"],
-      [@i32.const_int(pool_index), @i32.const_int(vtable_index)], "msg_opaque")
-    msg = @builder.bit_cast(msg_opaque, msg_type.pointer, "msg")
-    
-    # Put the env into the message.
-    msg_env_p = @builder.struct_gep(msg, 3, "msg_env_p")
-    @builder.store(env, msg_env_p)
-    
-    # Trace the message.
-    @builder.call(@mod.functions["pony_gc_send"], [func_frame.pony_ctx])
-    @builder.call(@mod.functions["pony_traceknown"], [
-      func_frame.pony_ctx,
-      @builder.bit_cast(env, @obj_ptr, "env_as_obj"),
-      @llvm.const_bit_cast(@gtypes["Env"].desc, @desc_ptr),
-      @i32.const_int(PonyRT::TRACE_IMMUTABLE),
-    ])
-    @builder.call(@mod.functions["pony_send_done"], [func_frame.pony_ctx])
-    
-    # Send the message.
-    @builder.call(@mod.functions["pony_sendv_single"], [
-      func_frame.pony_ctx,
-      main_actor,
-      msg_opaque,
-      msg_opaque,
-      @i1.const_int(1)
-    ])
+    # Send the env in a message to the main actor's constructor
+    @builder.call(@gtypes["Main"]["new"].send_llvm_func, [main_actor, env])
     
     # Start the runtime.
     start_success = @builder.call(@mod.functions["pony_start"], [
@@ -2079,11 +2049,24 @@ class Mare::Compiler::CodeGen
     ], "#{type_def.llvm_name}.DESC"
   end
   
-  def gen_desc(type_def, desc_type, vtable)
-    desc = @mod.globals.add(desc_type, "#{type_def.llvm_name}.DESC")
+  def gen_desc(gtype, vtable)
+    type_def = gtype.type_def
+    
+    desc = @mod.globals.add(gtype.desc_type, "#{type_def.llvm_name}.DESC")
     desc.linkage = LLVM::Linkage::LinkerPrivate
     desc.global_constant = true
     desc
+    
+    abi_size = @target_machine.data_layout.abi_size(gtype.struct_type)
+    field_offset =
+      if gtype.fields.empty?
+        0
+      else
+        @target_machine.data_layout.offset_of_element(
+          gtype.struct_type,
+          gtype.field_index(gtype.fields[0][0]),
+        )
+      end
     
     dispatch_fn =
       if type_def.is_actor?
@@ -2092,14 +2075,21 @@ class Mare::Compiler::CodeGen
         @dispatch_fn_ptr.null
       end
     
-    desc.initializer = desc_type.const_struct [
+    trace_fn =
+      if type_def.has_allocation? && gtype.fields.any?(&.last.trace_needed?)
+        @mod.functions.add("#{type_def.llvm_name}.TRACE", @trace_fn)
+      else
+        @trace_fn_ptr.null
+      end
+    
+    desc.initializer = gtype.desc_type.const_struct [
       @i32.const_int(type_def.desc_id),      # 0: id
-      @i32.const_int(type_def.abi_size),     # 1: size
+      @i32.const_int(abi_size),              # 1: size
       @i32_0,                                # 2: TODO: field_count (tuples only)
-      @i32.const_int(type_def.field_offset), # 3: field_offset
+      @i32.const_int(field_offset),          # 3: field_offset
       @obj_ptr.null,                         # 4: instance
-      @trace_fn_ptr.null,                    # 5: trace fn TODO: @#{llvm_name}.TRACE
-      @trace_fn_ptr.null,                    # 6: serialise trace fn TODO: @#{llvm_name}.TRACE
+      trace_fn.to_value,                     # 5: trace fn
+      @trace_fn_ptr.null,                    # 6: serialise trace fn TODO: @#{llvm_name}.SERIALISETRACE
       @serialise_fn_ptr.null,                # 7: serialise fn TODO: @#{llvm_name}.SERIALISE
       @deserialise_fn_ptr.null,              # 8: deserialise fn TODO: @#{llvm_name}.DESERIALISE
       @custom_serialise_space_fn_ptr.null,   # 9: custom serialise space fn
@@ -2146,7 +2136,7 @@ class Mare::Compiler::CodeGen
   def gen_alloc(gtype, name)
     return gen_alloc_actor(gtype, name) if gtype.type_def.is_actor?
     
-    size = gtype.type_def.abi_size
+    size = @target_machine.data_layout.abi_size(gtype.struct_type)
     size = 1 if size == 0
     args = [pony_ctx]
     
@@ -2168,11 +2158,16 @@ class Mare::Compiler::CodeGen
     value
   end
   
-  def gen_alloc_actor(gtype, name)
+  def gen_alloc_actor(gtype, name, become_now = false)
     allocated = @builder.call(@mod.functions["pony_create"], [
       pony_ctx,
       gen_get_desc(gtype),
-    ], "#{name}.MEM")
+    ], "#{name}.OPAQUE")
+    
+    if become_now
+      @builder.call(@mod.functions["pony_become"], [
+        func_frame.pony_ctx, allocated])
+    end
     
     @builder.bit_cast(allocated, gtype.struct_ptr, name)
   end
@@ -2201,24 +2196,23 @@ class Mare::Compiler::CodeGen
     # TODO: tbaa? (from set_descriptor in libponyc/codegen/gencall.c)
   end
   
-  def gen_field_load(name)
-    gtype = func_frame.gtype.not_nil!
+  def gen_field_gep(name, gtype = func_frame.gtype.not_nil!)
     object = func_frame.receiver_value
-    gep = @builder.struct_gep(object, gtype.field_index(name), "@.#{name}")
-    @builder.load(gep, "@.#{name}.LOAD")
+    @builder.struct_gep(object, gtype.field_index(name), "@.#{name}.GEP")
+  end
+  
+  def gen_field_load(name, gtype = func_frame.gtype.not_nil!)
+    @builder.load(gen_field_gep(name, gtype), "@.#{name}")
   end
   
   def gen_field_store(name, value)
-    gtype = func_frame.gtype.not_nil!
-    object = func_frame.receiver_value
-    gep = @builder.struct_gep(object, gtype.field_index(name), "@.#{name}")
-    @builder.store(value, gep)
+    @builder.store(value, gen_field_gep(name))
   end
   
   def gen_trace_unknown(dst, ponyrt_trace_kind)
     @builder.call(@mod.functions["pony_traceunknown"], [
       pony_ctx,
-      @builder.bit_cast(dst, @obj_ptr, "#{dst.name}.CAST"),
+      @builder.bit_cast(dst, @obj_ptr, "#{dst.name}.OPAQUE"),
       @i32.const_int(ponyrt_trace_kind),
     ])
   end
@@ -2228,7 +2222,7 @@ class Mare::Compiler::CodeGen
     
     @builder.call(@mod.functions["pony_traceknown"], [
       pony_ctx,
-      @builder.bit_cast(dst, @obj_ptr, "#{dst.name}.CAST"),
+      @builder.bit_cast(dst, @obj_ptr, "#{dst.name}.OPAQUE"),
       @builder.bit_cast(src_gtype.desc, @desc_ptr, "#{dst.name}.DESC"),
       @i32.const_int(ponyrt_trace_kind),
     ])
@@ -2246,6 +2240,13 @@ class Mare::Compiler::CodeGen
     end
     
     case trace_kind
+    when :machine_word
+      if dst_type.trace_kind == :machine_word
+        # Do nothing - no need to trace this value since it isn't boxed.
+      else
+        # The value is indeed boxed and has a type descriptor; trace it.
+        gen_trace_known(dst, src_type, PonyRT::TRACE_IMMUTABLE)
+      end
     when :mut_known
       gen_trace_known(dst, src_type, PonyRT::TRACE_MUTABLE)
     when :val_known, :non_known
@@ -2281,33 +2282,36 @@ class Mare::Compiler::CodeGen
     msg_size = @target_machine.data_layout.abi_size(msg_type)
     pool_index = PonyRT.pool_index(msg_size)
     msg_opaque = @builder.call(@mod.functions["pony_alloc_msg"],
-      [@i32.const_int(pool_index), @i32.const_int(vtable_index)], "msg_opaque")
+      [@i32.const_int(pool_index), @i32.const_int(vtable_index)], "msg.OPAQUE")
     msg = @builder.bit_cast(msg_opaque, msg_type.pointer, "msg")
     
     src_types = [] of Reach::Ref
     dst_types = [] of Reach::Ref
     src_values = [] of LLVM::Value
     dst_values = [] of LLVM::Value
+    needs_trace = false
     
     # Store all forwarding arguments in the message object.
     msg_type.struct_element_types.each_with_index do |elem_type, i|
       next if i < 3 # skip the first 3 boilerplate fields in the message
       param = fn.params[i - 3 + 1] # skip 3 fields, skip 1 param (the receiver)
+      param.name = "param.#{i - 2}"
       
       arg = gfunc.func.params.not_nil!.terms[i - 3] # skip 3 fields
       dst_types << type_of(arg, gfunc)
       src_types << dst_types.last # TODO: are these ever different?
       
+      needs_trace ||= src_types.last.trace_needed?(dst_types.last)
+      
       # Cast the argument to the correct type and store it in the message.
       cast_arg = gen_assign_cast(param, elem_type, nil)
-      arg_gep = @builder.struct_gep(msg, i)
+      arg_gep = @builder.struct_gep(msg, i, "msg.#{i - 2}.GEP")
       @builder.store(cast_arg, arg_gep)
       
       src_values << param
       dst_values << cast_arg
     end
     
-    needs_trace = true # TODO: determine if a trace is actually needed (gentrace_needed in Pony)
     if needs_trace
       @builder.call(@mod.functions["pony_gc_send"], [pony_ctx])
       
@@ -2321,7 +2325,7 @@ class Mare::Compiler::CodeGen
     # Send the message.
     @builder.call(@mod.functions["pony_sendv_single"], [
       pony_ctx,
-      @builder.bit_cast(fn.params[0], @obj_ptr), # TODO: no fallback || here
+      @builder.bit_cast(fn.params[0], @obj_ptr, "@.OPAQUE"),
       msg_opaque,
       msg_opaque,
       @i1.const_int(1)
@@ -2330,6 +2334,35 @@ class Mare::Compiler::CodeGen
     # Return None.
     @builder.ret(gen_none)
     
+    gen_func_end
+  end
+  
+  def gen_trace_impl(gtype : GenType)
+    # Get the reference to the trace function declared earlier.
+    # We'll fill in the implementation of that function now.
+    fn = @mod.functions["#{gtype.type_def.llvm_name}.TRACE"]?
+    return unless fn
+    
+    fn.unnamed_addr = true
+    fn.call_convention = LLVM::CallConvention::C
+    fn.linkage = LLVM::Linkage::External
+    
+    gen_func_start(fn)
+    
+    fn.params[0].name = "PONY_CTX"
+    fn.params[1].name = "@.OPAQUE"
+    func_frame.pony_ctx = fn.params[0]
+    func_frame.receiver_value =
+      @builder.bit_cast(fn.params[1], gtype.struct_ptr, "@")
+    
+    gtype.fields.each do |field_name, field_type|
+      next unless field_type.trace_needed?
+      
+      field = gen_field_load(field_name, gtype)
+      gen_trace(field, field, field_type, field_type)
+    end
+    
+    @builder.ret
     gen_func_end
   end
   
@@ -2343,14 +2376,19 @@ class Mare::Compiler::CodeGen
     
     gen_func_start(fn)
     
-    # Get the receiver pointer from the second parameter (index 1).
-    receiver = @builder.bit_cast(fn.params[1], gtype.struct_ptr)
+    fn.params[0].name = "PONY_CTX"
+    fn.params[1].name = "@.OPAQUE"
+    fn.params[2].name = "msg"
+    
+    func_frame.pony_ctx = fn.params[0]
+    receiver_opaque = fn.params[1]
+    func_frame.receiver_value = receiver =
+      @builder.bit_cast(receiver_opaque, gtype.struct_ptr, "@")
     
     # Get the message id from the first field of the message object
     # (which was the third parameter to this function).
-    msg_id_gep = @builder.struct_gep(fn.params[2], 1, "msg.id")
-    msg_id = @builder.load(msg_id_gep)
-    receiver = @builder.bit_cast(fn.params[1], gtype.struct_ptr, "@")
+    msg_id_gep = @builder.struct_gep(fn.params[2], 1, "msg.id.GEP")
+    msg_id = @builder.load(msg_id_gep, "msg.id")
     
     # Capture the current insert block so we can come back to it later,
     # after we jump around into each case block that we need to generate.
@@ -2374,30 +2412,30 @@ class Mare::Compiler::CodeGen
       dst_types = [] of Reach::Ref
       src_values = [] of LLVM::Value
       dst_values = [] of LLVM::Value
+      needs_trace = false
       
       # Destructure args from the message.
       msg_type = gfunc.send_msg_llvm_type
-      msg = @builder.bit_cast(fn.params[2], msg_type.pointer)
-      args =
-        msg_type.struct_element_types.each_with_index.map do |(elem_type, i)|
-          next if i < 3 # skip the first 3 boilerplate fields in the message
-          
-          arg = gfunc.func.params.not_nil!.terms[i - 3] # skip 3 fields
-          dst_types << type_of(arg, gfunc)
-          src_types << dst_types.last # TODO: are these ever different?
-          
-          arg_gep = @builder.struct_gep(msg, i)
-          src_value = @builder.load(arg_gep)
-          src_values << src_value
-          
-          gen_assign_cast(src_value, elem_type, nil)
-        end.to_a.compact
-      dst_values = args
+      msg = @builder.bit_cast(fn.params[2], msg_type.pointer, "msg.#{func_name}")
+      msg_type.struct_element_types.each_with_index do |elem_type, i|
+        next if i < 3 # skip the first 3 boilerplate fields in the message
+        
+        arg = gfunc.func.params.not_nil!.terms[i - 3] # skip 3 fields
+        dst_types << type_of(arg, gfunc)
+        src_types << dst_types.last # TODO: are these ever different?
+        needs_trace ||= src_types.last.trace_needed?(dst_types.last)
+        
+        arg_gep = @builder.struct_gep(msg, i, "msg.#{func_name}.#{i - 2}.GEP")
+        src_value = @builder.load(arg_gep, "msg.#{func_name}.#{i - 2}")
+        src_values << src_value
+        
+        dst_value = gen_assign_cast(src_value, elem_type, nil)
+        dst_values << dst_value
+      end
       
       # Prepend the receiver as the first argument, not included in the message.
-      args.unshift(receiver)
+      args = [receiver] + dst_values
       
-      needs_trace = true # TODO: determine if a trace is actually needed (gentrace_needed in Pony)
       if needs_trace
         @builder.call(@mod.functions["pony_gc_recv"], [pony_ctx])
         
