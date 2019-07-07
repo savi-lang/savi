@@ -575,24 +575,6 @@ class Mare::Compiler::CodeGen
     frame.func.basic_blocks.append(name)
   end
   
-  def ffi_type_for(node)
-    case node
-    when AST::Identifier
-      case node.value
-      when "I32"  then @i32
-      when "U64"  then @i64
-      when "None" then @void
-      else raise NotImplementedError.new(node.value)
-      end
-    when AST::Qualify
-      term = node.term
-      raise NotImplementedError.new(node.to_a) \
-        unless term.is_a?(AST::Identifier) && term.value == "CPointer"
-      @ptr
-    else raise NotImplementedError.new(node.to_a)
-    end
-  end
-  
   def gen_func_decl(gtype, gfunc)
     # Get the LLVM type to use for the return type.
     ret_type = llvm_type_of(gfunc.func.ident, gfunc)
@@ -722,9 +704,9 @@ class Mare::Compiler::CodeGen
   
   def gen_ffi_decl(gfunc)
     params = gfunc.func.params.not_nil!.terms.map do |param|
-      ffi_type_for(param)
+      llvm_type_of(param, gfunc)
     end
-    ret = ffi_type_for(gfunc.func.ret.not_nil!)
+    ret = llvm_type_of(gfunc.func.ret.not_nil!, gfunc)
     
     ffi_link_name = gfunc.func.metadata[:ffi_link_name].as(String)
     
