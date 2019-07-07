@@ -64,7 +64,12 @@ class Mare::Compiler::Classify < Mare::AST::Visitor
   end
   
   def run
-    func.params.try(&.accept(self))
+    if func.has_tag?(:ffi)
+      func.params.try(&.terms.each(&.accept(TypeExprVisitor.instance)))
+    else
+      func.params.try(&.accept(self))
+    end
+    
     func.ret.try(&.accept(self))
     func.ret.try(&.accept(TypeExprVisitor.instance))
     func.body.try(&.accept(self))
