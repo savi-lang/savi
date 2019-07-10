@@ -111,6 +111,8 @@ class Mare::Compiler::Namespace
     return if source.library == Compiler.prelude_library
     
     @types_by_library[Compiler.prelude_library].each do |name, new_type|
+      next if new_type.has_tag?(:private)
+      
       already_type = source_types[name]?
       if already_type
         Error.at already_type.ident.pos,
@@ -138,10 +140,15 @@ class Mare::Compiler::Namespace
         Error.at ident, "This type doesn't exist within the imported library" \
           unless new_type
         
+        Error.at ident, "This type is private and cannot be imported" \
+          if new_type.has_tag?(:private)
+        
         imported_types << {ident.pos, new_type}
       end
     else
       importable_types.values.each do |new_type|
+        next if new_type.has_tag?(:private)
+        
         imported_types << {import.ident.pos, new_type}
       end
     end

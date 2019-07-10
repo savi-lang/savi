@@ -102,7 +102,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
     when "primitive"
       # no type-level tags
     when "ffi"
-      # no type-level tags
+      t.type.add_tag(:private)
     end
     
     @program.types << t.type

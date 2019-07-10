@@ -31,6 +31,14 @@ class Mare::Program
     def inspect(io : IO)
       io << "#<#{self.class} #{@ident.value}: #{@target.value}>"
     end
+    
+    def add_tag(tag : Symbol)
+      raise NotImplementedError.new(self)
+    end
+    
+    def has_tag?(tag : Symbol)
+      false # not implemented
+    end
   end
   
   class Type
@@ -48,6 +56,7 @@ class Mare::Program
       :hygienic,
       :no_desc,
       :numeric,
+      :private,
     ]
     
     def initialize(@cap, @ident, @params = nil)

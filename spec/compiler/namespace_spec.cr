@@ -44,7 +44,21 @@ describe Mare::Compiler::Namespace do
     end
   end
   
+  # TODO: Figure out how to test these in our test suite - they need a library.
   pending "complains when a bulk-imported type conflicts with another"
   pending "complains when an explicitly imported type conflicts with another"
+  pending "complains when an explicitly imported type conflicts with another"
   pending "complains when a type name ends with an exclamation"
+  
+  it "won't have conflicts with a private type in the prelude library" do
+    source = Mare::Source.new_example <<-SOURCE
+    :ffi LibPonyc // defined in the prelude, but private, so no conflict here
+    SOURCE
+    
+    Mare::Compiler.compile([source], :namespace)
+  end
+  
+  # TODO: Figure out how to test these in our test suite - they need a library.
+  pending "won't have conflicts with a private type in an imported library"
+  pending "complains when trying to explicitly import a private type"
 end
