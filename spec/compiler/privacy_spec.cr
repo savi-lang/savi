@@ -6,6 +6,8 @@ describe Mare::Compiler::Privacy do
         Env._create
     SOURCE
     
+    p 
+    
     expected = <<-MSG
     This function call breaks privacy boundaries:
     from (example):3:
@@ -13,7 +15,7 @@ describe Mare::Compiler::Privacy do
             ^~~~~~~
     
     - this is a private function from another library:
-      from /opt/code/src/prelude/env.mare:4:
+      from #{Mare::Compiler.prelude_library.path}/env.mare:4:
       :new val _create
                ^~~~~~~
     MSG
