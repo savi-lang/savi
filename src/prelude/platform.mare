@@ -1,0 +1,3 @@
+:primitive Platform
+  :const ilp32 Bool: compiler intrinsic
+  :const ilp64 Bool: compiler intrinsic

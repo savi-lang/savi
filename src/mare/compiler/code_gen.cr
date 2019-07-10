@@ -768,8 +768,26 @@ class Mare::Compiler::CodeGen
     gen_func_end
   end
   
+  def gen_intrinsic_platform(gtype, gfunc)
+    gen_func_start(gfunc.llvm_func)
+    params = gfunc.llvm_func.params
+    
+    @builder.ret \
+      case gfunc.func.ident.value
+      when "ilp32"
+        gen_bool(@target_machine.data_layout.abi_size(@intptr) == 4)
+      when "ilp64"
+        gen_bool(@target_machine.data_layout.abi_size(@intptr) == 8)
+      else
+        raise NotImplementedError.new(gfunc.func.ident.value)
+      end
+    
+    gen_func_end
+  end
+  
   def gen_intrinsic(gtype, gfunc)
     return gen_intrinsic_cpointer(gtype, gfunc) if gtype.type_def.is_cpointer?
+    return gen_intrinsic_platform(gtype, gfunc) if gtype.type_def.is_platform?
     
     raise NotImplementedError.new(gtype.type_def) \
       unless gtype.type_def.is_numeric?

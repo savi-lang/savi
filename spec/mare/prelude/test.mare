@@ -6,6 +6,11 @@
     test.print_line_break // TODO: move to MicroTest constructor and finalizer
     
     ///
+    // Platform facts
+    
+    test["Platform ilp32 ilp64"].pass = Platform.ilp32 != Platform.ilp64
+    
+    ///
     // Numeric facts
     
     test["U8  bit_width"].pass = U8 .bit_width == 8
