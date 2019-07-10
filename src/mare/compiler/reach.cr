@@ -75,7 +75,9 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       else
         defn = single!.defn
         if defn.has_tag?(:numeric)
-          if defn.const_bool("is_floating_point")
+          if defn.ident.value == "USize" || defn.ident.value == "ISize"
+            :isize
+          elsif defn.const_bool("is_floating_point")
             case defn.const_u64("bit_width")
             when 32 then :f32
             when 64 then :f64
@@ -358,10 +360,6 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     
     def is_signed_numeric?
       is_numeric? && @reified.defn.const_bool("is_signed")
-    end
-    
-    def bit_width
-      @reified.defn.const_u64("bit_width").to_i32
     end
     
     def each_function(ctx)

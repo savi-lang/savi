@@ -237,10 +237,9 @@ class Mare::Compiler::CodeGen
     @i32_ptr  = @llvm.int32.pointer.as(LLVM::Type)
     @i32_0    = @llvm.int32.const_int(0).as(LLVM::Value)
     @i64      = @llvm.int64.as(LLVM::Type)
-    @isize    = @llvm.int64.as(LLVM::Type) # TODO: cross-platform
+    @isize    = @llvm.intptr(@target_machine.data_layout).as(LLVM::Type)
     @f32      = @llvm.float.as(LLVM::Type)
     @f64      = @llvm.double.as(LLVM::Type)
-    @intptr   = @llvm.intptr(@target_machine.data_layout).as(LLVM::Type)
     
     @frames = [] of Frame
     @string_globals = {} of String => LLVM::Value
@@ -311,6 +310,7 @@ class Mare::Compiler::CodeGen
     when :f32 then @f32
     when :f64 then @f64
     when :ptr then @ptr
+    when :isize then @isize
     when :struct_ptr then
       @gtypes[ctx.reach[ref.single!].llvm_name].struct_ptr
     when :object_ptr then
@@ -328,6 +328,7 @@ class Mare::Compiler::CodeGen
     when :f32 then @f32
     when :f64 then @f64
     when :ptr then @ptr
+    when :isize then @isize
     when :struct_ptr then
       @gtypes[ctx.reach[ref.single!].llvm_name].struct_ptr
     when :object_ptr then
@@ -775,9 +776,9 @@ class Mare::Compiler::CodeGen
     @builder.ret \
       case gfunc.func.ident.value
       when "ilp32"
-        gen_bool(@target_machine.data_layout.abi_size(@intptr) == 4)
+        gen_bool(@target_machine.data_layout.abi_size(@isize) == 4)
       when "ilp64"
-        gen_bool(@target_machine.data_layout.abi_size(@intptr) == 8)
+        gen_bool(@target_machine.data_layout.abi_size(@isize) == 8)
       else
         raise NotImplementedError.new(gfunc.func.ident.value)
       end
@@ -797,12 +798,16 @@ class Mare::Compiler::CodeGen
     
     @builder.ret \
       case gfunc.func.ident.value
+      when "bit_width"
+        @i8.const_int(
+          @target_machine.data_layout.abi_size(llvm_type_of(gtype)) * 8
+        )
       when "zero"
         if gtype.type_def.is_floating_point_numeric?
-          case gtype.type_def.bit_width
+          case bit_width_of(gtype)
           when 32 then llvm_type_of(gtype).const_float(0)
           when 64 then llvm_type_of(gtype).const_double(0)
-          else raise NotImplementedError.new(gtype.type_def.bit_width)
+          else raise NotImplementedError.new(bit_width_of(gtype))
           end
         else
           llvm_type_of(gtype).const_int(0)
@@ -810,9 +815,11 @@ class Mare::Compiler::CodeGen
       when "u8" then gen_numeric_conv(gtype, @gtypes["U8"], params[0])
       when "u32" then gen_numeric_conv(gtype, @gtypes["U32"], params[0])
       when "u64" then gen_numeric_conv(gtype, @gtypes["U64"], params[0])
+      when "usize" then gen_numeric_conv(gtype, @gtypes["USize"], params[0])
       when "i8" then gen_numeric_conv(gtype, @gtypes["I8"], params[0])
       when "i32" then gen_numeric_conv(gtype, @gtypes["I32"], params[0])
       when "i64" then gen_numeric_conv(gtype, @gtypes["I64"], params[0])
+      when "isize" then gen_numeric_conv(gtype, @gtypes["ISize"], params[0])
       when "f32" then gen_numeric_conv(gtype, @gtypes["F32"], params[0])
       when "f64" then gen_numeric_conv(gtype, @gtypes["F64"], params[0])
       when "==" then
@@ -914,7 +921,7 @@ class Mare::Compiler::CodeGen
             denom_good = @builder.icmp LLVM::IntPredicate::NE, params[1], bad,
               "#{params[1].name}.nonoverflow"
             
-            bits = llvm_type.const_int(gtype.type_def.bit_width - 1)
+            bits = llvm_type.const_int(bit_width_of(gtype) - 1)
             bad = @builder.shl(bad, bits)
             numer_good = @builder.icmp LLVM::IntPredicate::NE, params[0], bad,
               "#{params[0].name}.nonoverflow"
@@ -960,7 +967,7 @@ class Mare::Compiler::CodeGen
       when "reverse_bits"
         raise "reverse_bits float" if gtype.type_def.is_floating_point_numeric?
         op_func =
-          case gtype.type_def.bit_width
+          case bit_width_of(gtype)
           when 1
             @mod.functions["llvm.bitreverse.i1"]? ||
               @mod.functions.add("llvm.bitreverse.i1", [@i1], @i1)
@@ -973,12 +980,12 @@ class Mare::Compiler::CodeGen
           when 64
             @mod.functions["llvm.bitreverse.i64"]? ||
               @mod.functions.add("llvm.bitreverse.i64", [@i64], @i64)
-          else raise NotImplementedError.new(gtype.type_def.bit_width)
+          else raise NotImplementedError.new(bit_width_of(gtype))
           end
         @builder.call(op_func, [params[0]])
       when "swap_bytes"
         raise "swap_bytes float" if gtype.type_def.is_floating_point_numeric?
-        case gtype.type_def.bit_width
+        case bit_width_of(gtype)
         when 1, 8
           params[0]
         when 32
@@ -991,12 +998,12 @@ class Mare::Compiler::CodeGen
             @mod.functions["llvm.bswap.i64"]? ||
               @mod.functions.add("llvm.bswap.i64", [@i64], @i64)
           @builder.call(op_func, [params[0]])
-        else raise NotImplementedError.new(gtype.type_def.bit_width)
+        else raise NotImplementedError.new(bit_width_of(gtype))
         end
       when "leading_zeros"
         raise "leading_zeros float" if gtype.type_def.is_floating_point_numeric?
         op_func =
-          case gtype.type_def.bit_width
+          case bit_width_of(gtype)
           when 1
             @mod.functions["llvm.ctlz.i1"]? ||
               @mod.functions.add("llvm.ctlz.i1", [@i1, @i1], @i1)
@@ -1009,14 +1016,14 @@ class Mare::Compiler::CodeGen
           when 64
             @mod.functions["llvm.ctlz.i64"]? ||
               @mod.functions.add("llvm.ctlz.i64", [@i64, @i1], @i64)
-          else raise NotImplementedError.new(gtype.type_def.bit_width)
+          else raise NotImplementedError.new(bit_width_of(gtype))
           end
         gen_numeric_conv gtype, @gtypes["U8"],
           @builder.call(op_func, [params[0], @i1_false])
       when "trailing_zeros"
         raise "trailing_zeros float" if gtype.type_def.is_floating_point_numeric?
         op_func =
-          case gtype.type_def.bit_width
+          case bit_width_of(gtype)
           when 1
             @mod.functions["llvm.cttz.i1"]? ||
               @mod.functions.add("llvm.cttz.i1", [@i1, @i1], @i1)
@@ -1029,14 +1036,14 @@ class Mare::Compiler::CodeGen
           when 64
             @mod.functions["llvm.cttz.i64"]? ||
               @mod.functions.add("llvm.cttz.i64", [@i64, @i1], @i64)
-          else raise NotImplementedError.new(gtype.type_def.bit_width)
+          else raise NotImplementedError.new(bit_width_of(gtype))
           end
         gen_numeric_conv gtype, @gtypes["U8"],
           @builder.call(op_func, [params[0], @i1_false])
       when "count_ones"
         raise "count_ones float" if gtype.type_def.is_floating_point_numeric?
         op_func =
-          case gtype.type_def.bit_width
+          case bit_width_of(gtype)
           when 1
             @mod.functions["llvm.ctpop.i1"]? ||
               @mod.functions.add("llvm.ctpop.i1", [@i1], @i1)
@@ -1049,43 +1056,39 @@ class Mare::Compiler::CodeGen
           when 64
             @mod.functions["llvm.ctpop.i64"]? ||
               @mod.functions.add("llvm.ctpop.i64", [@i64], @i64)
-          else raise NotImplementedError.new(gtype.type_def.bit_width)
+          else raise NotImplementedError.new(bit_width_of(gtype))
           end
         gen_numeric_conv gtype, @gtypes["U8"], \
           @builder.call(op_func, [params[0]])
       when "bits"
         raise "bits integer" unless gtype.type_def.is_floating_point_numeric?
-        case gtype.type_def.bit_width
+        case bit_width_of(gtype)
         when 32 then @builder.bit_cast(params[0], @i32)
         when 64 then @builder.bit_cast(params[0], @i64)
-        else raise NotImplementedError.new(gtype.type_def.bit_width)
+        else raise NotImplementedError.new(bit_width_of(gtype))
         end
       when "from_bits"
         raise "from_bits integer" unless gtype.type_def.is_floating_point_numeric?
-        case gtype.type_def.bit_width
+        case bit_width_of(gtype)
         when 32 then @builder.bit_cast(params[0], @f32)
         when 64 then @builder.bit_cast(params[0], @f64)
-        else raise NotImplementedError.new(gtype.type_def.bit_width)
+        else raise NotImplementedError.new(bit_width_of(gtype))
         end
       when "next_pow2"
         raise "next_pow2 float" if gtype.type_def.is_floating_point_numeric?
         
         arg =
-          case gtype.type_def.bit_width
-          when 1 then @builder.zext(params[0], @isize)
-          when 8 then @builder.zext(params[0], @isize)
-          when 32 then @builder.zext(params[0], @isize) # TODO: cross-platform
-          when 64 then @builder.zext(params[0], @isize) # TODO: cross-platform
-          else raise NotImplementedError.new(gtype.type_def.bit_width)
+          if bit_width_of(gtype) > bit_width_of(@isize)
+            @builder.trunc(params[0], @isize)
+          else
+            @builder.zext(params[0], @isize)
           end
         res = @builder.call(@mod.functions["ponyint_next_pow2"], [arg])
         
-        case gtype.type_def.bit_width
-        when 1 then @builder.trunc(res, @i1)
-        when 8 then @builder.trunc(res, @i8)
-        when 32 then @builder.trunc(res, @i32) # TODO: cross-platform
-        when 64 then @builder.trunc(res, @i64) # TODO: cross-platform
-        else raise NotImplementedError.new(gtype.type_def.bit_width)
+        if bit_width_of(gtype) < bit_width_of(@isize)
+          @builder.trunc(res, llvm_type_of(gtype))
+        else
+          @builder.zext(res, llvm_type_of(gtype))
         end
       else
         raise NotImplementedError.new(gfunc.func.ident.inspect)
@@ -1469,6 +1472,11 @@ class Mare::Compiler::CodeGen
     when :i64 then @i64.const_int(expr.value.to_i64)
     when :f32 then @f32.const_float(expr.value.to_f32)
     when :f64 then @f64.const_double(expr.value.to_f64)
+    when :isize then @isize.const_int(
+      (@target_machine.data_layout.abi_size(@isize) == 8) \
+      ? expr.value.to_i64
+      : expr.value.to_i32
+    )
     else raise "invalid numeric literal type: #{type_ref.inspect}"
     end
   end
@@ -1482,6 +1490,14 @@ class Mare::Compiler::CodeGen
     end
   end
   
+  def bit_width_of(gtype : GenType)
+    bit_width_of(llvm_type_of(gtype))
+  end
+  
+  def bit_width_of(llvm_type : LLVM::Type)
+    @target_machine.data_layout.abi_size(llvm_type) * 8
+  end
+  
   def gen_numeric_conv(
     from_gtype : GenType,
     to_gtype : GenType,
@@ -1491,8 +1507,8 @@ class Mare::Compiler::CodeGen
     to_signed = to_gtype.type_def.is_signed_numeric?
     from_float = from_gtype.type_def.is_floating_point_numeric?
     to_float = to_gtype.type_def.is_floating_point_numeric?
-    from_width = from_gtype.type_def.bit_width
-    to_width = to_gtype.type_def.bit_width
+    from_width = bit_width_of(from_gtype)
+    to_width = bit_width_of(to_gtype)
     
     to_llvm_type = llvm_type_of(to_gtype)
     
@@ -2193,7 +2209,7 @@ class Mare::Compiler::CodeGen
         # TODO: handle case where final_fn is present (pony_alloc_small_final)
         @builder.call(@mod.functions["pony_alloc_small"], args, "#{name}.MEM")
       else
-        args << @intptr.const_int(size)
+        args << @isize.const_int(size)
         # TODO: handle case where final_fn is present (pony_alloc_large_final)
         @builder.call(@mod.functions["pony_alloc_large"], args, "#{name}.MEM")
       end

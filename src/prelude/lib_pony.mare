@@ -1,5 +1,5 @@
 :ffi LibPony
   :fun pony_os_stdout () CPointer(None)'ref
   :fun pony_os_stderr () CPointer(None)'ref
-  :fun pony_os_std_print (CPointer(None)'ref, CPointer(U8), U64) None // TODO: USize instead of U64
+  :fun pony_os_std_print (CPointer(None)'ref, CPointer(U8), USize) None
   :fun pony_exitcode (I32) None

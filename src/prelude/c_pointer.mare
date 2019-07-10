@@ -1,9 +1,9 @@
 :class tag CPointer (A) // TODO: don't special-case in compiler as a faux-class
   :fun non null @'ref: compiler intrinsic
-  :fun non _alloc (space U64) @'ref: compiler intrinsic // TODO: arg should be USize
-  :fun ref _realloc (space U64) @: compiler intrinsic // TODO: arg should be USize
-  :fun box _get_at (index U64) A: compiler intrinsic // TODO: arg should be USize
-  :fun ref _assign_at (index U64, value A) A: compiler intrinsic // TODO: arg should be USize
-  :fun ref _displace_at (index U64, value A) A: compiler intrinsic // TODO: arg should be USize
-  :fun box _compare (other @'box, size U64) I32: compiler intrinsic // TODO: arg should be USize, shouldn't need 'box in arg type?
-  :fun box _hash (size U64) U64: compiler intrinsic // TODO: arg and result should be USize
+  :fun non _alloc (space USize) @'ref: compiler intrinsic
+  :fun ref _realloc (space USize) @: compiler intrinsic
+  :fun box _get_at (index USize) A: compiler intrinsic
+  :fun ref _assign_at (index USize, value A) A: compiler intrinsic
+  :fun ref _displace_at (index USize, value A) A: compiler intrinsic
+  :fun box _compare (other @'box, size USize) I32: compiler intrinsic // TODO: shouldn't need 'box in arg type?
+  :fun box _hash (size USize) USize: compiler intrinsic

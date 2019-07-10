@@ -1,21 +1,21 @@
 :class ref Array (A)
-  :prop _size U64 // TODO: cross-platform
-  :prop _alloc U64 // TODO: cross-platform
+  :prop _size USize
+  :prop _alloc USize
   :prop _ptr CPointer(A)'ref
   
   :fun ref _ptr_set_null
     @_alloc = 0
     @_ptr = CPointer(A).null
   
-  :fun ref _ptr_allocate (space U64)
+  :fun ref _ptr_allocate (space USize)
     @_alloc = space.next_pow2.max(space).max(8)
     @_ptr = CPointer(A)._alloc(@_alloc)
   
-  :fun ref _ptr_reallocate (space U64)
+  :fun ref _ptr_reallocate (space USize)
     @_alloc = space.next_pow2.max(space).max(8)
     @_ptr = @_ptr._realloc(@_alloc)
   
-  :new (space U64 = 0)
+  :new (space USize = 0)
     @_size = 0
     
     if (space > 0) (
@@ -26,7 +26,7 @@
   
   :fun size: @_size
   
-  :fun ref reserve (space U64)
+  :fun ref reserve (space USize)
     if (@_alloc < space) \
       @_ptr_reallocate(space)
   

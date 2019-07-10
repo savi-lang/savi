@@ -34,7 +34,7 @@ class Mare::Compiler::CodeGen
       {"pony_sendv_single", [@ptr, @obj_ptr, @msg_ptr, @msg_ptr, @i1], @void, [
         LLVM::Attribute::NoUnwind, LLVM::Attribute::InaccessibleMemOrArgMemOnly,
       ]},
-      {"pony_alloc", [@ptr, @intptr], @ptr, [
+      {"pony_alloc", [@ptr, @isize], @ptr, [
         LLVM::Attribute::NoUnwind, LLVM::Attribute::InaccessibleMemOrArgMemOnly,
         {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::NoAlias},
         {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::DereferenceableOrNull, PonyRT::HEAP_MIN},
@@ -46,19 +46,19 @@ class Mare::Compiler::CodeGen
         {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::Dereferenceable, PonyRT::HEAP_MIN},
         {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::Alignment, align_width},
       ]},
-      {"pony_alloc_large", [@ptr, @intptr], @ptr, [
+      {"pony_alloc_large", [@ptr, @isize], @ptr, [
         LLVM::Attribute::NoUnwind, LLVM::Attribute::InaccessibleMemOrArgMemOnly,
         {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::NoAlias},
         {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::Dereferenceable, PonyRT::HEAP_MAX << 1},
         {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::Alignment, align_width},
       ]},
-      {"pony_realloc", [@ptr, @ptr, @intptr], @ptr, [
+      {"pony_realloc", [@ptr, @ptr, @isize], @ptr, [
         LLVM::Attribute::NoUnwind, LLVM::Attribute::InaccessibleMemOrArgMemOnly,
         {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::NoAlias},
         {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::DereferenceableOrNull, PonyRT::HEAP_MIN},
         {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::Alignment, align_width},
       ]},
-      {"pony_alloc_final", [@ptr, @intptr], @ptr, [
+      {"pony_alloc_final", [@ptr, @isize], @ptr, [
         LLVM::Attribute::NoUnwind, LLVM::Attribute::InaccessibleMemOrArgMemOnly,
         {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::NoAlias},
         {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::DereferenceableOrNull, PonyRT::HEAP_MIN},
@@ -70,7 +70,7 @@ class Mare::Compiler::CodeGen
         {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::Dereferenceable, PonyRT::HEAP_MIN},
         {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::Alignment, align_width},
       ]},
-      {"pony_alloc_large_final", [@ptr, @intptr], @ptr, [
+      {"pony_alloc_large_final", [@ptr, @isize], @ptr, [
         LLVM::Attribute::NoUnwind, LLVM::Attribute::InaccessibleMemOrArgMemOnly,
         {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::NoAlias},
         {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::Dereferenceable, PonyRT::HEAP_MAX << 1},
@@ -141,7 +141,7 @@ class Mare::Compiler::CodeGen
       
       # Miscellaneous non-pony functions we depend on.
       {"puts", [@ptr], @i32, [] of LLVM::Attribute},
-      {"memcmp", [@ptr, @ptr, @intptr], @i32, [
+      {"memcmp", [@ptr, @ptr, @isize], @i32, [
         LLVM::Attribute::NoUnwind, LLVM::Attribute::ReadOnly,
         {1, LLVM::Attribute::ReadOnly},
         {2, LLVM::Attribute::ReadOnly},

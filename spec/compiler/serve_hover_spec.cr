@@ -33,7 +33,7 @@ describe Mare::Compiler::ServeHover do
     pos.size.should eq "example.hash".bytesize
     messages.should eq [
       "This is a function call on an inferred receiver type of String.",
-      "It has an inferred return type of U64."
+      "It has an inferred return type of USize."
     ]
   end
 end

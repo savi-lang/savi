@@ -7,9 +7,11 @@
   :fun val u8 U8: compiler intrinsic
   :fun val u32 U32: compiler intrinsic
   :fun val u64 U64: compiler intrinsic
+  :fun val usize USize: compiler intrinsic
   :fun val i8 I8: compiler intrinsic
   :fun val i32 I32: compiler intrinsic
   :fun val i64 I64: compiler intrinsic
+  :fun val isize ISize: compiler intrinsic
   :fun val f32 F32: compiler intrinsic
   :fun val f64 F64: compiler intrinsic
 
@@ -110,12 +112,19 @@
 :numeric U64
   :const bit_width U8: 64
 
+:numeric USize
+  :const bit_width U8: compiler intrinsic
+
 :numeric I8
   :const bit_width U8: 8
   :const is_signed: True
 
 :numeric I32
   :const bit_width U8: 32
+  :const is_signed: True
+
+:numeric ISize
+  :const bit_width U8: compiler intrinsic
   :const is_signed: True
 
 :numeric I64

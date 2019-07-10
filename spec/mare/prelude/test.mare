@@ -22,23 +22,35 @@
     test["F32 bit_width"].pass = F32.bit_width == 32
     test["F64 bit_width"].pass = F64.bit_width == 64
     
-    test["U8  is_signed"].pass = U8 .is_signed == False
-    test["U32 is_signed"].pass = U32.is_signed == False
-    test["U64 is_signed"].pass = U64.is_signed == False
-    test["I8  is_signed"].pass = I8 .is_signed == True
-    test["I32 is_signed"].pass = I32.is_signed == True
-    test["I64 is_signed"].pass = I64.is_signed == True
-    test["F32 is_signed"].pass = F32.is_signed == True
-    test["F64 is_signed"].pass = F64.is_signed == True
+    if Platform.ilp64 (
+      test["USize bit_width"].pass = USize.bit_width == 64
+      test["ISize bit_width"].pass = ISize.bit_width == 64
+    |
+      test["USize bit_width"].pass = USize.bit_width == 32
+      test["ISize bit_width"].pass = ISize.bit_width == 32
+    )
     
-    test["U8  is_floating_point"].pass = U8 .is_floating_point == False
-    test["U32 is_floating_point"].pass = U32.is_floating_point == False
-    test["U64 is_floating_point"].pass = U64.is_floating_point == False
-    test["I8  is_floating_point"].pass = I8 .is_floating_point == False
-    test["I32 is_floating_point"].pass = I32.is_floating_point == False
-    test["I64 is_floating_point"].pass = I64.is_floating_point == False
-    test["F32 is_floating_point"].pass = F32.is_floating_point == True
-    test["F64 is_floating_point"].pass = F64.is_floating_point == True
+    test["U8    is_signed"].pass = U8   .is_signed == False
+    test["U32   is_signed"].pass = U32  .is_signed == False
+    test["U64   is_signed"].pass = U64  .is_signed == False
+    test["USize is_signed"].pass = USize.is_signed == False
+    test["I8    is_signed"].pass = I8   .is_signed == True
+    test["I32   is_signed"].pass = I32  .is_signed == True
+    test["I64   is_signed"].pass = I64  .is_signed == True
+    test["ISize is_signed"].pass = ISize.is_signed == True
+    test["F32   is_signed"].pass = F32  .is_signed == True
+    test["F64   is_signed"].pass = F64  .is_signed == True
+    
+    test["U8    is_floating_point"].pass = U8   .is_floating_point == False
+    test["U32   is_floating_point"].pass = U32  .is_floating_point == False
+    test["U64   is_floating_point"].pass = U64  .is_floating_point == False
+    test["USize is_floating_point"].pass = USize.is_floating_point == False
+    test["I8    is_floating_point"].pass = I8   .is_floating_point == False
+    test["I32   is_floating_point"].pass = I32  .is_floating_point == False
+    test["I64   is_floating_point"].pass = I64  .is_floating_point == False
+    test["ISize is_floating_point"].pass = ISize.is_floating_point == False
+    test["F32   is_floating_point"].pass = F32  .is_floating_point == True
+    test["F64   is_floating_point"].pass = F64  .is_floating_point == True
     
     test["U8  bounds"].pass = U8[-1] == 0xFF
     test["U32 bounds"].pass = U32[-1] == 0xFFFF_FFFF
@@ -46,6 +58,15 @@
     test["I8  bounds"].pass = I8[-128] == 128
     test["I32 bounds"].pass = I32[-2147483648] == 2147483648
     test["I64 bounds"].pass = I64[-9223372036854775808] == 9223372036854775808
+    
+    if Platform.ilp64 (
+      test["USize bounds"].pass = USize[-1] == 0xFFFF_FFFF_FFFF_FFFF
+      test["ISize bounds"].pass =
+        ISize[-9223372036854775808] == 9223372036854775808
+    |
+      test["USize bounds"].pass = USize[-1] == 0xFFFF_FFFF
+      test["ISize bounds"].pass = ISize[-2147483648] == 2147483648
+    )
     
     ///
     // Bool convenience aliases
@@ -67,20 +88,22 @@
     ///
     // Numeric conversions
     
-    test["U32 to u8 "].pass = U32[31].u8  == 31
-    test["U32 to u32"].pass = U32[31].u32 == 31
-    test["U32 to u64"].pass = U32[31].u64 == 31
-    test["U32 to i8 "].pass = U32[31].i8  == 31
-    test["U32 to i32"].pass = U32[31].i32 == 31
-    test["U32 to i64"].pass = U32[31].i64 == 31
-    test["U32 to f32"].pass = U32[31].f32 == 31
-    test["U32 to f64"].pass = U32[31].f64 == 31
-    test["F32 to u32"].pass = F32[31].u32 == 31
-    test["F64 to u32"].pass = F64[31].u32 == 31
-    test["F32 to i32"].pass = F32[31].i32 == 31
-    test["F64 to i32"].pass = F64[31].i32 == 31
-    test["F32 to f64"].pass = F32[31].f64 == 31
-    test["F64 to f32"].pass = F64[31].f32 == 31
+    test["U32 to u8   "].pass = U32[31].u8    == 31
+    test["U32 to u32  "].pass = U32[31].u32   == 31
+    test["U32 to u64  "].pass = U32[31].u64   == 31
+    test["U32 to usize"].pass = U32[31].usize == 31
+    test["U32 to i8   "].pass = U32[31].i8    == 31
+    test["U32 to i32  "].pass = U32[31].i32   == 31
+    test["U32 to i64  "].pass = U32[31].i64   == 31
+    test["U32 to isize"].pass = U32[31].isize == 31
+    test["U32 to f32  "].pass = U32[31].f32   == 31
+    test["U32 to f64  "].pass = U32[31].f64   == 31
+    test["F32 to u32  "].pass = F32[31].u32   == 31
+    test["F64 to u32  "].pass = F64[31].u32   == 31
+    test["F32 to i32  "].pass = F32[31].i32   == 31
+    test["F64 to i32  "].pass = F64[31].i32   == 31
+    test["F32 to f64  "].pass = F32[31].f64   == 31
+    test["F64 to f32  "].pass = F64[31].f32   == 31
     
     test["F32 to u8 nan       "].pass = F32.nan.u8          == 0
     test["F32 to u8 infinity  "].pass = F32.infinity.u8     == 255
@@ -259,7 +282,7 @@
       test["Array [1]=, [1]"].pass = array_push[1]! == 33
       (
         array_literal = [U8[0], U8[1], U8[2]]
-        i U64 = 0
+        i USize = 0
         while (i < 3) (
           test["Array literal, [i]"].pass = array_literal[i]! == i.u8
           i = i + 1
