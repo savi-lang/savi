@@ -52,7 +52,7 @@ describe Mare::Compiler::Namespace do
   
   it "won't have conflicts with a private type in the prelude library" do
     source = Mare::Source.new_example <<-SOURCE
-    :ffi LibPonyc // defined in the prelude, but private, so no conflict here
+    :ffi LibPony // defined in the prelude, but private, so no conflict here
     SOURCE
     
     Mare::Compiler.compile([source], :namespace)
