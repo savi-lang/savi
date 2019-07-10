@@ -8,7 +8,7 @@
     ///
     // Platform facts
     
-    test["Platform ilp32 ilp64"].pass = Platform.ilp32 != Platform.ilp64
+    test["Platform ilp32 lp64"].pass = Platform.ilp32 != Platform.lp64
     
     ///
     // Numeric facts
@@ -22,7 +22,7 @@
     test["F32 bit_width"].pass = F32.bit_width == 32
     test["F64 bit_width"].pass = F64.bit_width == 64
     
-    if Platform.ilp64 (
+    if Platform.lp64 (
       test["USize bit_width"].pass = USize.bit_width == 64
       test["ISize bit_width"].pass = ISize.bit_width == 64
     |
@@ -59,7 +59,7 @@
     test["I32 bounds"].pass = I32[-2147483648] == 2147483648
     test["I64 bounds"].pass = I64[-9223372036854775808] == 9223372036854775808
     
-    if Platform.ilp64 (
+    if Platform.lp64 (
       test["USize bounds"].pass = USize[-1] == 0xFFFF_FFFF_FFFF_FFFF
       test["ISize bounds"].pass =
         ISize[-9223372036854775808] == 9223372036854775808

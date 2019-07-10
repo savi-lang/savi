@@ -777,7 +777,7 @@ class Mare::Compiler::CodeGen
       case gfunc.func.ident.value
       when "ilp32"
         gen_bool(@target_machine.data_layout.abi_size(@isize) == 4)
-      when "ilp64"
+      when "lp64"
         gen_bool(@target_machine.data_layout.abi_size(@isize) == 8)
       else
         raise NotImplementedError.new(gfunc.func.ident.value)
