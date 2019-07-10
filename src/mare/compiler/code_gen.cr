@@ -104,7 +104,7 @@ class Mare::Compiler::CodeGen
     
     # Generate struct type bodies.
     def gen_struct_type(g : CodeGen)
-      g.gen_struct_type(@struct_type, @type_def, @desc_type, @fields)
+      g.gen_struct_type(self)
     end
     
     # Generate function declarations.
@@ -127,18 +127,20 @@ class Mare::Compiler::CodeGen
       vtable
     end
     
-    # Generate descriptor global instance.
+    # Generate the type descriptor value for this type.
+    # We skip this for abstract types (traits).
     def gen_desc(g : CodeGen)
       return if @type_def.is_abstract?
       
       @desc = g.gen_desc(self, gen_vtable(g))
     end
     
-    # Generate other global values.
-    def gen_globals(g : CodeGen)
+    # Generate the global singleton value for this type.
+    # We skip this for abstract types (traits).
+    def gen_singleton(g : CodeGen)
       return if @type_def.is_abstract?
       
-      @singleton = g.gen_singleton(@type_def, @struct_type, @desc.not_nil!)
+      @singleton = g.gen_singleton(self)
     end
     
     # Generate function implementations.
@@ -391,7 +393,7 @@ class Mare::Compiler::CodeGen
     @gtypes.each_value(&.gen_desc(self))
     
     # Generate all global values associated with this type.
-    @gtypes.each_value(&.gen_globals(self))
+    @gtypes.each_value(&.gen_singleton(self))
     
     # Generate all function implementations.
     @gtypes.each_value(&.gen_func_impls(self))
@@ -2004,6 +2006,10 @@ class Mare::Compiler::CodeGen
   DESC_FIELDS                    = 15
   DESC_VTABLE                    = 16
   
+  # This defines the generic LLVM struct type for what a type descriptor holds.
+  # The type descriptor for each type uses a more specific version of this.
+  # The order and sizes here must exactly match what is expected by the runtime,
+  # and they should correlate to the constants above.
   def gen_desc_basetype
     @desc.struct_set_body [
       @i32,                           # 0: id
@@ -2026,6 +2032,9 @@ class Mare::Compiler::CodeGen
     ]
   end
   
+  # This defines a more specific struct type than the above function,
+  # tailored to the specific type definition and its virtual table size.
+  # The actual type descriptor value for the type is an instance of this.
   def gen_desc_type(type_def : Reach::Def, vtable_size : Int32) : LLVM::Type
     @llvm.struct [
       @i32,                           # 0: id
@@ -2048,6 +2057,10 @@ class Mare::Compiler::CodeGen
     ], "#{type_def.llvm_name}.DESC"
   end
   
+  # This defines a global constant for the type descriptor of a type,
+  # which is held as the first value in an object, used for identifying its
+  # type at runtime, as well as a host of other functions related to dealing
+  # with objects in the runtime, such as allocating them and tracing them.
   def gen_desc(gtype, vtable)
     type_def = gtype.type_def
     
@@ -2104,18 +2117,32 @@ class Mare::Compiler::CodeGen
     desc
   end
   
-  def gen_struct_type(struct_type, type_def, desc_type, fields)
+  # This defines the LLVM struct type for objects of this type.
+  def gen_struct_type(gtype)
     elements = [] of LLVM::Type
-    elements << desc_type.pointer # even types with no desc have a global desc
-    elements << @actor_pad if type_def.has_actor_pad?
     
-    fields.each { |name, t| elements << llvm_mem_type_of(t) }
+    # All struct types start with the type descriptor (abbreviated "desc").
+    # Even types with no desc have a singleton with a desc.
+    # The values without a desc do not use this struct_type at all anyway.
+    elements << gtype.desc_type.pointer
     
-    struct_type.struct_set_body(elements)
+    # Actor types have an actor pad, which holds runtime internals containing
+    # things like the message queue used to deliver runtime messages.
+    elements << @actor_pad if gtype.type_def.has_actor_pad?
+    
+    # Each field of the type is an additional element in the struct type.
+    gtype.fields.each { |name, t| elements << llvm_mem_type_of(t) }
+    
+    # The struct was previously opaque with no body. We now fill it in here.
+    gtype.struct_type.struct_set_body(elements)
   end
   
-  def gen_singleton(type_def, struct_type, desc)
-    global = @mod.globals.add(struct_type, type_def.llvm_name)
+  # This defines the global singleton stateless value associated with this type.
+  # This value is invoked whenever you reference the type with as a `non`,
+  # acting as a runtime representation of a type itself rather than an instance.
+  # For primitives, this is the only value you'll ever see.
+  def gen_singleton(gtype)
+    global = @mod.globals.add(gtype.struct_type, gtype.type_def.llvm_name)
     global.linkage = LLVM::Linkage::LinkerPrivate
     global.global_constant = true
     
@@ -2123,15 +2150,17 @@ class Mare::Compiler::CodeGen
     # but we need to populate the fields with something - we use zeros.
     # We are relying on the reference capabilities part of the type system
     # to prevent such singletons from ever having their fields dereferenced.
-    elements = struct_type.struct_element_types[1..-1].map(&.null)
+    elements = gtype.struct_type.struct_element_types[1..-1].map(&.null)
     
     # The first element is always the type descriptor.
-    elements.unshift(desc)
+    elements.unshift(gtype.desc)
     
-    global.initializer = struct_type.const_struct(elements)
+    global.initializer = gtype.struct_type.const_struct(elements)
     global
   end
   
+  # This generates the code that allocates an object of the given type.
+  # This is the first step before actually calling the constructor of it.
   def gen_alloc(gtype, name)
     return gen_alloc_actor(gtype, name) if gtype.type_def.is_actor?
     
@@ -2157,6 +2186,8 @@ class Mare::Compiler::CodeGen
     value
   end
   
+  # This generates the special kind of allocation needed by actors,
+  # invoked by the above function when the type being allocated is an actor.
   def gen_alloc_actor(gtype, name, become_now = false)
     allocated = @builder.call(@mod.functions["pony_create"], [
       pony_ctx,
@@ -2171,26 +2202,26 @@ class Mare::Compiler::CodeGen
     @builder.bit_cast(allocated, gtype.struct_ptr, name)
   end
   
-  def gen_get_desc(gtype_name : String)
-    gen_get_desc(@gtypes[gtype_name])
-  end
-  
+  # Get the global constant value for the type descriptor of the given type.
   def gen_get_desc(gtype : GenType)
     @llvm.const_bit_cast(gtype.desc, @desc_ptr)
   end
   
+  # Dereference the type descriptor header of the given LLVM value,
+  # loading the type descriptor of the object at runtime.
+  # Prefer the above function instead when the type is statically known.
   def gen_get_desc(value : LLVM::Value)
     value_type = value.type
     raise "not a struct pointer: #{value}" \
       unless value_type.kind == LLVM::Type::Kind::Pointer \
         && value_type.element_type.kind == LLVM::Type::Kind::Struct
     
-    desc_gep = @builder.struct_gep(value, 0, "#{value.name}.DESC")
-    @builder.load(desc_gep, "#{value.name}.DESC.LOAD")
+    desc_gep = @builder.struct_gep(value, 0, "#{value.name}.DESC.GEP")
+    @builder.load(desc_gep, "#{value.name}.DESC")
   end
   
   def gen_put_desc(value, gtype, name = "")
-    desc_p = @builder.struct_gep(value, 0, "#{name}.DESC")
+    desc_p = @builder.struct_gep(value, 0, "#{name}.DESC.GEP")
     @builder.store(gtype.desc, desc_p)
     # TODO: tbaa? (from set_descriptor in libponyc/codegen/gencall.c)
   end
