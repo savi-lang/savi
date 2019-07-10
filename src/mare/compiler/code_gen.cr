@@ -1,7 +1,6 @@
 require "llvm"
 require "random"
 require "../ext/llvm" # TODO: get these merged into crystal standard library
-require "compiler/crystal/config" # TODO: remove
 require "./code_gen/*"
 
 ##
@@ -215,7 +214,7 @@ class Mare::Compiler::CodeGen
   
   def initialize
     LLVM.init_x86
-    @target_triple = Crystal::Config.default_target_triple
+    @target_triple = LLVM.default_target_triple
     @target = LLVM::Target.from_triple(@target_triple)
     @target_machine = @target.create_target_machine(@target_triple).as(LLVM::TargetMachine)
     @llvm = LLVM::Context.new
