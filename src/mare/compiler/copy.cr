@@ -18,6 +18,9 @@ module Mare::Compiler::Copy
         # Often these "functions" are actually "is" annotations.
         next unless f.has_tag?(:copies)
         
+        # TODO: Allow copying from traits with type parameters (AST::Qualify)
+        next unless f.ret.is_a?(AST::Identifier)
+        
         # Find the type associated with the "return value" of the "function"
         # and copy the functions from it that we need.
         ret = f.ret.as(AST::Identifier)

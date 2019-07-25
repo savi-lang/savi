@@ -66,7 +66,8 @@ module Mare::Parser
     # Define what a capability looks like.
     cap = (
       str("iso") | str("trn") | str("val") |
-      str("ref") | str("box") | str("tag") | str("non")
+      str("ref") | str("box") | str("tag") | str("non") |
+      str("any") | str("alias") | str("send") | str("share") | str("read")
     ).named(:ident)
     capmod = str("aliased").named(:ident)
     
@@ -92,7 +93,7 @@ module Mare::Parser
     
     # Construct the nested possible relations for each group of operators.
     t0 = suffixed | atom
-    t1 = (t0 >> (opcap >> (cap | capmod)).repeat).named(:relate)
+    t1 = (t0 >> (opcap >> (capmod | cap)).repeat).named(:relate)
     t2 = (t1 >> (op1 >> t1).repeat).named(:relate)
     t3 = (t2 >> (sn >> op2 >> sn >> t2).repeat).named(:relate)
     t4 = (t3 >> (sn >> op3 >> sn >> t3).repeat).named(:relate)

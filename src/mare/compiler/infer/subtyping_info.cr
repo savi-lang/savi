@@ -79,9 +79,6 @@ class Mare::Compiler::Infer::SubtypingInfo
   end
   
   private def check_func(that, that_func, errors)
-    raise NotImplementedError.new("function subtyping with type arguments") unless this.args.empty?
-    raise NotImplementedError.new("function subtyping with type arguments") unless that.args.empty?
-    
     # The structural comparison fails if a required method is missing.
     this_func = this.defn.find_func?(that_func.ident.value)
     unless this_func

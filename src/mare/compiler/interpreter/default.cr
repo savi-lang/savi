@@ -327,7 +327,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
       {
         "kind" => "term",
         "name" => "trait",
-        "type" => "ident",
+        "type" => "type",
       },
     ] of Hash(String, String | Bool))
     
@@ -471,7 +471,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
           AST::Identifier.new("non").from(data["keyword"]),
           decl.head.first.as(AST::Identifier),
           nil,
-          data["trait"].as(AST::Identifier),
+          data["trait"].as(AST::Term),
           nil,
         ).tap(&.add_tag(:hygienic)).tap(&.add_tag(:is)).tap(&.add_tag(:copies))
       when "member"
