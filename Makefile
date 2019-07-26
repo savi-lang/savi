@@ -13,9 +13,15 @@ test: PHONY
 	docker exec -ti mare-dev make extra_args="$(extra_args)" test.inner
 /tmp/bin/spec: $(shell find src -name '*.cr') $(shell find spec -name '*.cr')
 	mkdir -p /tmp/bin
-	crystal build --debug spec/spec_helper.cr -o $@
+	crystal build --debug spec/all.cr -o $@
 test.inner: PHONY /tmp/bin/spec
 	echo && /tmp/bin/spec $(extra_args)
+
+# Run a narrow target within the test suite.
+test.narrow: PHONY
+	docker exec -ti mare-dev make target="$(target)" test.narrow.inner
+test.narrow.inner: PHONY
+	crystal spec spec/spec_helper.cr "$(target)"
 
 # Evaluate a Hello World example.
 example-eval: PHONY
