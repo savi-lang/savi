@@ -17,6 +17,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   def initialize
     @map = {} of ReifiedFunction => ForFunc
     @types = {} of ReifiedType => ForType
+    @validated_type_args_already = Set(ReifiedType).new
   end
   
   def run(ctx)
@@ -57,6 +58,9 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     # Check the assertion list for all types, to confirm that they are subtypes
     # of what was claimed earlier, which we took on faith and now verify.
     for_non_argumented_types.each(&.subtyping.check_assertions)
+    
+    # Clean up temporary state.
+    @validated_type_args_already.clear
   end
   
   def [](rf : ReifiedFunction)
@@ -172,6 +176,47 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     .to_a
   end
   
+  def validate_type_args(
+    ctx : Context,
+    infer : (ForFunc | ForType),
+    node : AST::Qualify,
+    rt : ReifiedType,
+  )
+    raise "inconsistent arguments" if node.group.terms.size != rt.args.size
+    
+    return if @validated_type_args_already.includes?(rt)
+    @validated_type_args_already.add(rt)
+    
+    # Check number of type args against number of type params.
+    if rt.args.size > rt.params_count
+      params_pos = (rt.defn.params || rt.defn.ident).pos
+      Error.at node, "This type qualification has too many type arguments", [
+        {params_pos, "#{rt.params_count} type arguments were expected"},
+      ].concat(node.group.terms[rt.params_count..-1].map { |arg|
+        {arg.pos, "this is an excessive type argument"}
+      })
+    elsif rt.args.size < rt.params_count
+      params = rt.defn.params.not_nil!
+      Error.at node, "This type qualification has too few type arguments", [
+        {params.pos, "#{rt.params_count} type arguments were expected"},
+      ].concat(params.terms[rt.args.size..-1].map { |param|
+        {param.pos, "this additional type parameter needs an argument"}
+      })
+    end
+    
+    # Check each type arg against the bound of the corresponding type param.
+    node.group.terms.zip(rt.args).each_with_index do |(arg_node, arg), index|
+      param_bound = ctx.infer[rt].get_param_bound(index)
+      unless arg.satisfies_bound?(infer, param_bound)
+        bound_pos =
+          rt.defn.params.not_nil!.terms[index].as(AST::Group).terms.last.pos
+        Error.at arg_node,
+          "This type argument won't satisfy the type parameter bound",
+          [{bound_pos, "the type parameter bound is here"}]
+      end
+    end
+  end
+  
   struct ReifiedType
     getter defn : Program::Type
     getter args : Array(MetaType)
@@ -281,42 +326,10 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
     
     def validate_type_args(
-      infer : ForFunc?,
       node : AST::Qualify,
       rt : ReifiedType,
     )
-      raise "inconsistent arguments" if node.group.terms.size != rt.args.size
-      
-      infer ||= self
-      
-      # Check number of type args against number of type params.
-      if rt.args.size > rt.params_count
-        params_pos = (rt.defn.params || rt.defn.ident).pos
-        Error.at node, "This type qualification has too many type arguments", [
-          {params_pos, "#{rt.params_count} type arguments were expected"},
-        ].concat(node.group.terms[rt.params_count..-1].map { |arg|
-          {arg.pos, "this is an excessive type argument"}
-        })
-      elsif rt.args.size < rt.params_count
-        params = rt.defn.params.not_nil!
-        Error.at node, "This type qualification has too few type arguments", [
-          {params.pos, "#{rt.params_count} type arguments were expected"},
-        ].concat(params.terms[rt.args.size..-1].map { |param|
-          {param.pos, "this additional type parameter needs an argument"}
-        })
-      end
-      
-      # Check each type arg against the bound of the corresponding type param.
-      node.group.terms.zip(rt.args).each_with_index do |(arg_node, arg), index|
-        param_bound = ctx.infer[rt].get_param_bound(index)
-        unless arg.satisfies_bound?(infer, param_bound)
-          bound_pos =
-            rt.defn.params.not_nil!.terms[index].as(AST::Group).terms.last.pos
-          Error.at arg_node,
-            "This type argument won't satisfy the type parameter bound",
-            [{bound_pos, "the type parameter bound is here"}]
-        end
-      end
+      ctx.infer.validate_type_args(ctx, self, node, rt)
     end
     
     # An identifier type expression must refer to a type.
@@ -380,7 +393,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       target = type_expr(node.term, refer, receiver)
       args = node.group.terms.map { |t| type_expr(t, refer, receiver).as(MetaType) } # TODO: is it possible to remove this superfluous "as"?
       rt = reified_type(target.single!, args)
-      validate_type_args(nil, node, rt)
+      ctx.infer.validate_type_args(ctx, self, node, rt)
       
       MetaType.new(rt)
     end
@@ -1011,7 +1024,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       
       args = node.group.terms.map { |t| type_expr(t) }
       rt = reified_type(term_info.inner.single!, args)
-      for_type.validate_type_args(self, node, rt)
+      ctx.infer.validate_type_args(ctx, self, node, rt)
       
       self[node] = Fixed.new(node.pos, MetaType.new(rt))
     end
