@@ -54,9 +54,9 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       end
     end
     
-    # Check the "is" list for all types, to confirm that they implement the
-    # traits that they claim to have implemented in their declaration.
-    for_non_argumented_types.each(&.check_is_list)
+    # Check the assertion list for all types, to confirm that they are subtypes
+    # of what was claimed earlier, which we took on faith and now verify.
+    for_non_argumented_types.each(&.subtyping.check_assertions)
   end
   
   def [](rf : ReifiedFunction)
@@ -151,9 +151,9 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     ctx : Context,
     t : Program::Type,
     type_args : Array(MetaType) = [] of MetaType,
-  )
+  ) : ForType
     rt = ReifiedType.new(t, type_args)
-    @types[rt] ||= ForType.new(ctx, rt)
+    @types[rt] ||= ForType.new(ctx, rt).tap(&.initialize_assertions(ctx))
   end
   
   def for_completely_reified_types
@@ -242,19 +242,13 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       @subtyping = SubtypingInfo.new(@ctx, @reified)
     end
     
-    def check_is_list
-      reified.defn.functions.each do |f|
+    def initialize_assertions(ctx)
+      @reified.defn.functions.each do |f|
         next unless f.has_tag?(:is)
         
-        infer = ctx.infer.for_func(ctx, reified, f, MetaType.cap(f.cap.value))
-        trait = infer.resolve(infer.ret).single!
+        trait = type_expr(f.ret.not_nil!, ctx.refer[reified.defn][f]).single!
         
-        errors = [] of Error::Info
-        unless infer.is_subtype?(reified, trait, errors)
-          Error.at reified.defn.ident,
-            "This type doesn't implement the trait #{trait.defn.ident.value}",
-              errors
-        end
+        subtyping.assert(trait)
       end
     end
     
