@@ -1,9 +1,9 @@
 class Mare::Compiler::Infer::SubtypingInfo
-  def initialize(@ctx : Context, @this : Infer::ReifiedType)
-    @asserted = Set(Infer::ReifiedType).new # TODO: use this instead of `is` metadata
-    @confirmed = Set(Infer::ReifiedType).new
-    @disproved = Hash(Infer::ReifiedType, Array(Error::Info)).new
-    @temp_assumptions = Set(Infer::ReifiedType).new
+  def initialize(@ctx : Context, @this : ReifiedType)
+    @asserted = Set(ReifiedType).new # TODO: use this instead of `is` metadata
+    @confirmed = Set(ReifiedType).new
+    @disproved = Hash(ReifiedType, Array(Error::Info)).new
+    @temp_assumptions = Set(ReifiedType).new
   end
   
   private def this
@@ -11,7 +11,7 @@ class Mare::Compiler::Infer::SubtypingInfo
   end
   
   # Return true if this type satisfies the requirements of the that type.
-  def check(that : Infer::ReifiedType, errors : Array(Error::Info))
+  def check(that : ReifiedType, errors : Array(Error::Info))
     # TODO: for each return false, carry info about why it was false?
     # Maybe we only want to go to the trouble of collecting this info
     # when it is requested by the caller, so as not to slow the base case.
@@ -65,7 +65,7 @@ class Mare::Compiler::Infer::SubtypingInfo
     is_subtype
   end
   
-  private def full_check(that : Infer::ReifiedType, errors : Array(Error::Info))
+  private def full_check(that : ReifiedType, errors : Array(Error::Info))
     # A type only matches a trait if all functions match that trait.
     that.defn.functions.each do |that_func|
       # Hygienic functions are not considered to be real functions for the
