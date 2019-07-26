@@ -153,7 +153,10 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     type_args : Array(MetaType) = [] of MetaType,
   ) : ForType
     rt = ReifiedType.new(t, type_args)
-    @types[rt] ||= ForType.new(ctx, rt).tap(&.initialize_assertions(ctx))
+    @types[rt]? || (
+      ft = @types[rt] = ForType.new(ctx, rt)
+      ft.tap(&.initialize_assertions(ctx))
+    )
   end
   
   def for_completely_reified_types
