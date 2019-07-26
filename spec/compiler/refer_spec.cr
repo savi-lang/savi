@@ -420,4 +420,5 @@ describe Mare::Compiler::Refer do
   
   pending "complains when a local variable name ends with an exclamation"
   pending "complains when a parameter name ends with an exclamation"
+  pending "allows re-assigning a consumed variable, under certain conditions"
 end
