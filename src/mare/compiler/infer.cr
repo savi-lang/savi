@@ -248,7 +248,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         
         trait = type_expr(f.ret.not_nil!, ctx.refer[reified.defn][f]).single!
         
-        subtyping.assert(trait)
+        subtyping.assert(trait, f.ident.pos)
       end
     end
     

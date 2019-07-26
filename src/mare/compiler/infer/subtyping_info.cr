@@ -1,6 +1,6 @@
 class Mare::Compiler::Infer::SubtypingInfo
   def initialize(@ctx : Context, @this : ReifiedType)
-    @asserted = Set(ReifiedType).new
+    @asserted = Hash(ReifiedType, Source::Pos).new
     @confirmed = Set(ReifiedType).new
     @disproved = Hash(ReifiedType, Array(Error::Info)).new
     @temp_assumptions = Set(ReifiedType).new
@@ -10,21 +10,21 @@ class Mare::Compiler::Infer::SubtypingInfo
     @this
   end
   
-  def assert(that : ReifiedType)
-    @asserted.add(that)
+  def assert(that : ReifiedType, pos : Source::Pos)
+    @asserted[that] = pos
   end
   
   # Raise an Error if any asserted supertype is not actually a supertype.
   def check_assertions
     errors = [] of Error::Info
     
-    @asserted.each do |that|
+    @asserted.each do |that, pos|
       if check(that, errors)
         raise "inconsistent logic" if errors.size > 0
       else
-        Error.at this.defn.ident,
-          "This type doesn't implement the trait #{that.defn.ident.value}",
-            errors
+        Error.at pos,
+          "#{this} isn't a subtype of #{that}, as it is required to be here",
+          errors
       end
     end
   end

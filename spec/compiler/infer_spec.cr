@@ -1284,10 +1284,10 @@ describe Mare::Compiler::Infer do
     SOURCE
     
     expected = <<-MSG
-    This type doesn't implement the trait Trait:
-    from (example):6:
-    :class Concrete
-           ^~~~~~~~
+    Concrete isn't a subtype of Trait, as it is required to be here:
+    from (example):7:
+      :is Trait
+       ^~
     
     - this function isn't present in the subtype:
       from (example):2:
@@ -1336,10 +1336,10 @@ describe Mare::Compiler::Infer do
     SOURCE
     
     expected = <<-MSG
-    This type doesn't implement the trait Trait:
-    from (example):12:
-    :class Concrete
-           ^~~~~~~~
+    Concrete isn't a subtype of Trait, as it is required to be here:
+    from (example):13:
+      :is Trait
+       ^~
     
     - a non-constructor can't be a subtype of a constructor:
       from (example):15:
@@ -1426,10 +1426,10 @@ describe Mare::Compiler::Infer do
     SOURCE
     
     expected = <<-MSG
-    This type doesn't implement the trait Trait:
-    from (example):6:
-    :primitive Concrete
-               ^~~~~~~~
+    Concrete isn't a subtype of Trait, as it is required to be here:
+    from (example):7:
+      :is Trait
+       ^~
     
     - this function has too few parameters:
       from (example):8:
@@ -1486,10 +1486,10 @@ describe Mare::Compiler::Infer do
     SOURCE
     
     expected = <<-MSG
-    This type doesn't implement the trait Trait:
-    from (example):6:
-    :class Concrete
-           ^~~~~~~~
+    Concrete isn't a subtype of Trait, as it is required to be here:
+    from (example):7:
+      :is Trait
+       ^~
     
     - this constructor's receiver capability is box:
       from (example):8:
@@ -1526,10 +1526,10 @@ describe Mare::Compiler::Infer do
     SOURCE
     
     expected = <<-MSG
-    This type doesn't implement the trait Trait:
-    from (example):6:
-    :class Concrete
-           ^~~~~~~~
+    Concrete isn't a subtype of Trait, as it is required to be here:
+    from (example):7:
+      :is Trait
+       ^~
     
     - this function's receiver capability is iso:
       from (example):10:
@@ -1568,10 +1568,10 @@ describe Mare::Compiler::Infer do
     SOURCE
     
     expected = <<-MSG
-    This type doesn't implement the trait Trait:
-    from (example):7:
-    :primitive Concrete
-               ^~~~~~~~
+    Concrete isn't a subtype of Trait, as it is required to be here:
+    from (example):8:
+      :is Trait
+       ^~
     
     - this function's return type is Numeric:
       from (example):10:
