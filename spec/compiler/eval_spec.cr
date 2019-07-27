@@ -17,6 +17,15 @@ describe Mare::Compiler::Eval do
     no_test_failures.should eq true
   end
   
+  it "evaluates a collections package" do
+    source_dir = File.join(__DIR__, "../mare/collections")
+    
+    no_test_failures =
+      Mare::Compiler.compile(source_dir, :eval).eval.exitcode == 0
+    
+    no_test_failures.should eq true
+  end
+  
   it "evaluates an example" do
     source_dir = File.join(__DIR__, "../../example")
     

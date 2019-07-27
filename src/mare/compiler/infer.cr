@@ -176,6 +176,46 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     .to_a
   end
   
+  def is_subtype?(
+    ctx : Context,
+    l : ReifiedType,
+    r : ReifiedType,
+    errors = [] of Error::Info,
+  ) : Bool
+    ctx.infer[l].subtyping.check(r, errors)
+  end
+  
+  def is_subtype?(
+    ctx : Context,
+    l : Refer::TypeParam,
+    r : ReifiedType,
+    errors = [] of Error::Info,
+  ) : Bool
+    # TODO: Implement this.
+    raise NotImplementedError.new("type param <: type")
+  end
+  
+  def is_subtype?(
+    ctx : Context,
+    l : ReifiedType,
+    r : Refer::TypeParam,
+    errors = [] of Error::Info,
+  ) : Bool
+    # TODO: Implement this.
+    raise NotImplementedError.new("type <: type param")
+  end
+  
+  def is_subtype?(
+    ctx : Context,
+    l : Refer::TypeParam,
+    r : Refer::TypeParam,
+    errors = [] of Error::Info,
+  ) : Bool
+    return true if l == r
+    # TODO: Implement this.
+    raise NotImplementedError.new("type param <: type param")
+  end
+  
   def validate_type_args(
     ctx : Context,
     infer : (ForFunc | ForType),
@@ -206,6 +246,9 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     
     # Check each type arg against the bound of the corresponding type param.
     node.group.terms.zip(rt.args).each_with_index do |(arg_node, arg), index|
+      # Skip checking type arguments that contain type parameters.
+      next unless arg.type_params.empty?
+      
       param_bound = ctx.infer[rt].get_param_bound(index)
       unless arg.satisfies_bound?(infer, param_bound)
         bound_pos =
@@ -304,6 +347,14 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       ctx.infer.for_type(ctx, *args).reified
     end
     
+    def is_subtype?(l, r, errors = [] of Error::Info)
+      ctx.infer.is_subtype?(ctx, l, r, errors)
+    end
+    
+    def is_subtype?(l : MetaType, r : MetaType) : Bool
+      l.subtype_of?(self, r)
+    end
+    
     def get_param_bound(index : Int32)
       refer = ctx.refer[reified.defn]
       param_node = reified.defn.params.not_nil!.terms[index]
@@ -312,6 +363,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       type_expr(param_bound_node.not_nil!, refer, nil)
     end
     
+    @lookup_type_param_reentrant = Set(Refer::TypeParam).new
     def lookup_type_param(ref : Refer::TypeParam, refer, receiver = nil)
       raise NotImplementedError.new(ref) unless ref.parent == reified.defn
       
@@ -319,10 +371,19 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       arg = reified.args[ref.index]?
       return arg if arg
       
+      # If we have a temporary reentrant entry for this ref,
+      # skip intersecting the bound with the type param.
+      # Otherwise, continue, and add such an entry to prevent recursion.
+      return MetaType.new_type_param(ref) if @lookup_type_param_reentrant.includes?(ref)
+      @lookup_type_param_reentrant.add(ref)
+      
       # Return the type parameter intersected with its bound.
       # TODO: When bound has multiple caps, reify with each possible cap.
       type_expr(ref.bound, refer, receiver)
       .intersect(MetaType.new_type_param(ref))
+      
+      # Remove the temporary reentrant entry without affecting the return value.
+      .tap { @lookup_type_param_reentrant.delete(ref) }
     end
     
     def validate_type_args(
@@ -359,10 +420,12 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     # An relate type expression must be an explicit capability qualifier.
     def type_expr(node : AST::Relate, refer, receiver = nil) : MetaType
       if node.op.value == "'"
-        cap = node.rhs.as(AST::Identifier).value
-        if cap == "aliased"
+        cap_ident = node.rhs.as(AST::Identifier)
+        case cap_ident.value
+        when "aliased"
           type_expr(node.lhs, refer, receiver).alias
         else
+          cap = type_expr(cap_ident, refer, receiver)
           type_expr(node.lhs, refer, receiver).override_cap(cap)
         end
       elsif node.op.value == "->"
@@ -448,40 +511,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       ctx.refer[reified.type.defn][reified.func]
     end
     
-    def is_subtype?(
-      l : ReifiedType,
-      r : ReifiedType,
-      errors = [] of Error::Info,
-    ) : Bool
-      ctx.infer[l].subtyping.check(r, errors)
-    end
-    
-    def is_subtype?(
-      l : Refer::TypeParam,
-      r : ReifiedType,
-      errors = [] of Error::Info,
-    ) : Bool
-      # TODO: Implement this.
-      raise NotImplementedError.new("type param <: type")
-    end
-    
-    def is_subtype?(
-      l : ReifiedType,
-      r : Refer::TypeParam,
-      errors = [] of Error::Info,
-    ) : Bool
-      # TODO: Implement this.
-      raise NotImplementedError.new("type <: type param")
-    end
-    
-    def is_subtype?(
-      l : Refer::TypeParam,
-      r : Refer::TypeParam,
-      errors = [] of Error::Info,
-    ) : Bool
-      return true if l == r
-      # TODO: Implement this.
-      raise NotImplementedError.new("type param <: type param")
+    def is_subtype?(l, r, errors = [] of Error::Info)
+      ctx.infer.is_subtype?(ctx, l, r, errors)
     end
     
     def is_subtype?(l : MetaType, r : MetaType) : Bool
@@ -885,21 +916,21 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     
     def touch(node : AST::LiteralString)
       defns = [prelude_type("String")]
-      mts = defns.map { |defn| MetaType.new(reified_type(defn)) }
+      mts = defns.map { |defn| MetaType.new(reified_type(defn)).as(MetaType) } # TODO: is it possible to remove this superfluous "as"?
       self[node] = Literal.new(node.pos, mts)
     end
     
     # A literal integer could be any integer or floating-point machine type.
     def touch(node : AST::LiteralInteger)
       defns = [prelude_type("Numeric")]
-      mts = defns.map { |defn| MetaType.new(reified_type(defn)) }
+      mts = defns.map { |defn| MetaType.new(reified_type(defn)).as(MetaType) } # TODO: is it possible to remove this superfluous "as"?
       self[node] = Literal.new(node.pos, mts)
     end
     
     # A literal float could be any floating-point machine type.
     def touch(node : AST::LiteralFloat)
       defns = [prelude_type("F32"), prelude_type("F64")]
-      mts = defns.map { |defn| MetaType.new(reified_type(defn)) }
+      mts = defns.map { |defn| MetaType.new(reified_type(defn)).as(MetaType) } # TODO: is it possible to remove this superfluous "as"?
       self[node] = Literal.new(node.pos, mts)
     end
     

@@ -1,0 +1,22 @@
+:actor Main
+  :new (env)
+    env.out.print("TODO: Implement and test the Map type")
+
+:class val Foo
+  :is Hashable(Foo)
+  :fun hash USize: 0
+  :fun "==" (that Foo'box) Bool: False
+
+:trait Hashable (A Hashable(A)'read)
+  :fun hash USize
+  :fun "==" (that A'box) Bool // TODO: move to Equatable trait
+
+// :trait non HashFunction (A)
+//   :fun hash (x box->(A'aliased)) USize
+//   :fun equal (x box->(A'aliased), y box->(A'aliased)) Bool
+
+// :primitive HashEq (Q Hashable(Q)'read)
+//   :fun hash (x box->(Q'aliased)) USize: x.hash
+//   :fun equal (x box->(Q'aliased), y box->(Q'aliased)) Bool: x == y
+
+// :class val Map (K, V, H HashFunction(K))

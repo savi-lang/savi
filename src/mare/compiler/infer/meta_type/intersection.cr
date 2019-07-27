@@ -258,17 +258,33 @@ struct Mare::Compiler::Infer::MetaType::Intersection
   end
   
   def partial_reifications
+    result = Set(MetaType::Inner).new
+    
     cap = cap()
+    if cap
+      cap_value = cap.value
+      case cap_value
+      when String
+        # If this intersection already has a single capability, it can't be
+        # split into any further capability possibilities, so just return it.
+        result.add(self)
+      when Set(Capability)
+        # If this intersection already has a set of capabilities,
+        # intersect with each capability in the set.
+        cap_value.each do |new_cap|
+          result.add(Intersection.build(new_cap, terms, anti_terms))
+        end
+      else
+        raise NotImplementedError.new(cap)
+      end
+    else
+      # Otherwise, we need to intersect with every possible non-ephemeral cap.
+      Capability::ALL_NON_EPH.each do |new_cap|
+        Intersection.build(new_cap, terms, anti_terms)
+      end
+    end
     
-    # If this intersection already has a single capability, it can't be divided
-    # into any further capability possibilities, so just return it now.
-    return [self] if cap && cap.value.is_a?(String)
-    
-    # Otherwise, we need to intersect with every possible non-ephemeral cap.
-    Capability::ALL_NON_EPH
-      .map(&.intersect(self))
-      .reject(&.is_a?(Unsatisfiable))
-      .to_set
+    result
   end
   
   def type_params
@@ -396,11 +412,43 @@ struct Mare::Compiler::Infer::MetaType::Intersection
   def satisfies_bound?(infer : (ForFunc | ForType), bound : Capability) : Bool
     # This intersection satisfies the given capability bound if and only if
     # it has a capability as part of the intersection, and that capability
-    # is satisfies the given capability bound.
+    # satisfies the given capability bound.
     cap.try(&.satisfies_bound?(infer, bound)) || false
   end
   
-  def satisfies_bound?(infer : (ForFunc | ForType), bound : (Nominal | AntiNominal | Intersection | Union | Unconstrained | Unsatisfiable)) : Bool
+  def satisfies_bound?(infer : (ForFunc | ForType), bound : Nominal) : Bool
+    # This intersection satisfies the given capability bound if and only if
+    # it has at least one term that satisfies the given nominal bound.
+    terms.try do |terms|
+      terms.each do |term|
+        return true if term.satisfies_bound?(infer, bound)
+      end
+    end
+    false
+  end
+  
+  def satisfies_bound?(infer : (ForFunc | ForType), bound : Intersection) : Bool
+    # If the bound has a cap, then we must have a cap that satisfies it.
+    bound.cap.try do |bound_cap|
+      return false unless cap.try(&.satisfies_bound?(infer, bound_cap))
+    end
+    
+    # If the bound has terms, then we must satisfy each term.
+    bound.terms.try do |bound_terms|
+      bound_terms.each do |bound_term|
+        return false unless self.satisfies_bound?(infer, bound_term)
+      end
+    end
+    
+    # If the bound has anti-terms, then we don't know how to handle that yet.
+    raise NotImplementedError.new("#{self} satisfies_bound? #{bound}") \
+      if bound.anti_terms
+    
+    # If we get to this point, we've satisfied the bound.
+    true
+  end
+  
+  def satisfies_bound?(infer : (ForFunc | ForType), bound : (AntiNominal | Union | Unconstrained | Unsatisfiable)) : Bool
     raise NotImplementedError.new("#{self} satisfies_bound? #{bound}")
   end
 end

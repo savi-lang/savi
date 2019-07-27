@@ -193,7 +193,11 @@ struct Mare::Compiler::Infer::MetaType::Nominal
     other.subtype_of?(infer, self) # delegate to the other class via symmetry
   end
   
-  def satisfies_bound?(infer : (ForFunc | ForType), bound) : Bool
+  def satisfies_bound?(infer : (ForFunc | ForType), bound : Nominal) : Bool
+    infer.is_subtype?(defn, bound.defn)
+  end
+  
+  def satisfies_bound?(infer : (ForFunc | ForType), bound : (Capability | AntiNominal | Intersection | Union | Unconstrained | Unsatisfiable)) : Bool
     raise NotImplementedError.new("#{self} satisfies_bound? #{bound}")
   end
 end
