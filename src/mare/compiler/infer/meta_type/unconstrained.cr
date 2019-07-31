@@ -66,6 +66,10 @@ class Mare::Compiler::Infer::MetaType::Unconstrained
     Set(Refer::TypeParam).new # no type params are present
   end
   
+  def substitute_type_params(substitutions : Hash(Refer::TypeParam, MetaType))
+    self # no type params are present to be substituted
+  end
+  
   def is_sendable?
     # Unconstrained is never sendable - it makes no guarantees at all.
     false

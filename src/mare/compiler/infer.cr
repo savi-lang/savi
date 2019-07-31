@@ -86,33 +86,35 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     params_partial_reifications =
       t.params.not_nil!.terms.map do |param|
         # Get the MetaType of the bound.
-        bound_node = ctx.refer[t][param].as(Refer::TypeParam).bound
+        param_ref = ctx.refer[t][param].as(Refer::TypeParam)
+        bound_node = param_ref.bound
         bound_mt = no_args.type_expr(bound_node, ctx.refer[t])
+        
+        # TODO: Refactor the partial_reifications to return cap only already.
+        caps = bound_mt.partial_reifications.map(&.cap_only)
         
         # Return the list of MetaTypes that partially reify the bound;
         # that is, a list that constitutes every possible cap substitution.
-        bound_mt.partial_reifications
+        {param_ref, bound_mt, caps}
       end
     
-    recursive_expand_mts(params_partial_reifications).map do |params|
-      for_type(ctx, t, params)
-    end
-  end
-  
-  private def recursive_expand_mts(list : Array(Array(MetaType)))
-    recursive_expand_mts(list[0], list[1..-1])
-  end
-  
-  private def recursive_expand_mts(
-    head : Array(MetaType),
-    tail_list : Array(Array(MetaType)),
-  )
-    head.flat_map do |head_mt|
-      if tail_list.empty?
-        [[head_mt]]
-      else
-        recursive_expand_mts(tail_list).map(&.unshift(head_mt))
+    substitution_sets = [[] of {Refer::TypeParam, MetaType, MetaType}]
+    params_partial_reifications.each do |param_ref, bound_mt, caps|
+      substitution_sets = substitution_sets.flat_map do |pairs|
+        caps.map { |cap| pairs + [{param_ref, bound_mt, cap}] }
       end
+    end
+    
+    substitution_sets.map do |substitutions|
+      # TODO: Simplify/refactor in relation to code above
+      substitutions_map = {} of Refer::TypeParam => MetaType
+      substitutions.each do |param_ref, bound, cap_mt|
+        substitutions_map[param_ref] = MetaType.new_type_param(param_ref).intersect(cap_mt)
+      end
+      
+      args = substitutions_map.map(&.last.substitute_type_params(substitutions_map))
+      
+      for_type(ctx, t, args)
     end
   end
   

@@ -129,6 +129,10 @@ struct Mare::Compiler::Infer::MetaType::AntiNominal
     end
   end
   
+  def substitute_type_params(substitutions : Hash(Refer::TypeParam, MetaType))
+    raise NotImplementedError.new("#{self} substitute_type_params")
+  end
+  
   def is_sendable?
     # An anti-nominal is never itself sendable -
     # it excludes a single nominal, and says nothing about capabilities.

@@ -141,10 +141,29 @@ struct Mare::Compiler::Infer::MetaType::Nominal
   
   def type_params
     defn = defn()
-    if defn.is_a?(Refer::TypeParam)
+    case defn
+    when Refer::TypeParam
       [defn].to_set
+    when ReifiedType
+      defn.args.flat_map(&.type_params.as(Set(Refer::TypeParam)).to_a).to_set
     else
-      Set(Refer::TypeParam).new
+      raise NotImplementedError.new(defn)
+    end
+  end
+  
+  def substitute_type_params(substitutions : Hash(Refer::TypeParam, MetaType))
+    defn = defn()
+    case defn
+    when Refer::TypeParam
+      substitutions[defn]?.try(&.inner) || self
+    when Infer::ReifiedType
+      args = defn.args.map do |arg|
+        arg.substitute_type_params(substitutions).as(MetaType)
+      end
+      
+      Nominal.new(ReifiedType.new(defn.defn, args))
+    else
+      raise NotImplementedError.new(defn)
     end
   end
   

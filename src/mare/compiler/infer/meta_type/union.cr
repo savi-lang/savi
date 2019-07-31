@@ -357,6 +357,28 @@ struct Mare::Compiler::Infer::MetaType::Union
     result
   end
   
+  def substitute_type_params(substitutions : Hash(Refer::TypeParam, MetaType))
+    result = Unsatisfiable.instance
+    
+    caps.try(&.each { |cap|
+      result = result.unite(cap.substitute_type_params(substitutions))
+    })
+    
+    terms.try(&.each { |term|
+      result = result.unite(term.substitute_type_params(substitutions))
+    })
+    
+    anti_terms.try(&.each { |anti_term|
+      result = result.unite(anti_term.substitute_type_params(substitutions))
+    })
+    
+    intersects.try(&.each { |intersect|
+      result = result.unite(intersect.substitute_type_params(substitutions))
+    })
+    
+    result
+  end
+  
   def is_sendable?
     return caps.not_nil!.all?(&.is_sendable?) if caps
     false

@@ -124,6 +124,10 @@ struct Mare::Compiler::Infer::MetaType
     inner.type_params
   end
   
+  def substitute_type_params(substitutions : Hash(Refer::TypeParam, MetaType))
+    MetaType.new(inner.substitute_type_params(substitutions))
+  end
+  
   def is_sendable? : Bool
     inner.is_sendable?
   end
@@ -170,11 +174,13 @@ struct Mare::Compiler::Infer::MetaType
   
   def single? : Nominal?
     inner = @inner
-    case inner
-    when Nominal then inner
-    when Intersection then inner.terms.try(&.first?)
-    else nil
-    end
+    nominal =
+      case inner
+      when Nominal then inner
+      when Intersection then inner.terms.try(&.first?)
+      else nil
+      end
+    nominal if nominal && nominal.defn.is_a?(Infer::ReifiedType)
   end
   
   def single!

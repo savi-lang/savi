@@ -4,6 +4,14 @@ struct Mare::Compiler::Infer::MetaType::Capability
   def initialize(@value)
   end
   
+  def self.build(caps : Array(Capability))
+    case caps.size
+    when 0 then Unsatisfiable.instance
+    when 1 then caps.first
+    else new(caps.to_set)
+    end
+  end
+  
   ISO_EPH = new("iso+")
   ISO     = new("iso")
   TRN_EPH = new("trn+")
@@ -63,8 +71,21 @@ struct Mare::Compiler::Infer::MetaType::Capability
   end
   
   def intersect(other : Capability)
-    raise "unsupported intersect: #{self} & #{other}" \
-      unless ALL_SINGLE.includes?(self) && ALL_SINGLE.includes?(other)
+    if !ALL_SINGLE.includes?(other)
+      if !ALL_SINGLE.includes?(self)
+        raise "unsupported intersect: #{self} & #{other}"
+      else
+        return other.intersect(self)
+      end
+    elsif !ALL_SINGLE.includes?(self)
+      value = value().as(Set(Capability))
+      new_value =
+        value.map(&.intersect(other).as(Capability | Unsatisfiable))
+          .select(&.is_a?(Capability))
+          .map(&.as(Capability))
+      return Capability.build(new_value)
+    end
+    # If we get to this point, we are dealing with two single caps.
     
     # If the two are equivalent, return the cap.
     return self if self == other
@@ -240,6 +261,10 @@ struct Mare::Compiler::Infer::MetaType::Capability
   
   def type_params
     Set(Refer::TypeParam).new # no type params are ever referenced by a cap
+  end
+  
+  def substitute_type_params(substitutions : Hash(Refer::TypeParam, MetaType))
+    self # no type params are present to be substituted
   end
   
   def is_sendable?

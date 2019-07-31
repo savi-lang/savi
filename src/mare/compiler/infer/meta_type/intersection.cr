@@ -300,6 +300,20 @@ struct Mare::Compiler::Infer::MetaType::Intersection
     result
   end
   
+  def substitute_type_params(substitutions : Hash(Refer::TypeParam, MetaType))
+    result = cap || Unconstrained.instance
+    
+    terms.try(&.each { |term|
+      result = result.intersect(term.substitute_type_params(substitutions))
+    })
+    
+    anti_terms.try(&.each { |anti_term|
+      result = result.intersect(anti_term.substitute_type_params(substitutions))
+    })
+    
+    result
+  end
+  
   def is_sendable?
     cap.try(&.is_sendable?) || false
   end
