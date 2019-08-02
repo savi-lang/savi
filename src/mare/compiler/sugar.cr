@@ -57,9 +57,16 @@ class Mare::Compiler::Sugar < Mare::AST::Visitor
           end
           
           # Add the assignment statement to the top of the function body.
-          op = AST::Operator.new("=").from(param)
-          assign = AST::Relate.new(param, op, param_ident.dup).from(param)
-          f.body.not_nil!.terms.insert(param_assign_count, assign)
+          f.body.not_nil!.terms.insert(param_assign_count,
+            AST::Relate.new(
+              param,
+              AST::Operator.new("=").from(param),
+              AST::Prefix.new(
+                AST::Operator.new("--").from(param),
+                param_ident.dup,
+              ).from(param)
+            ).from(param)
+          )
           param_assign_count += 1
         end
       end

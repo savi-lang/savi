@@ -201,12 +201,16 @@ describe Mare::Compiler::Sugar do
       [:relate,
         [:ident, "@"],
         [:op, "."],
-        [:qualify, [:ident, "x="], [:group, "(", [:ident, "ASSIGNPARAM.1"]]]
+        [:qualify, [:ident, "x="], [:group, "(",
+          [:prefix, [:op, "--"], [:ident, "ASSIGNPARAM.1"]],
+        ]]
       ],
       [:relate,
         [:relate, [:ident, "@"], [:op, "."], [:ident, "y"]],
         [:op, "."],
-        [:qualify, [:ident, "z="], [:group, "(", [:ident, "ASSIGNPARAM.2"]]]
+        [:qualify, [:ident, "z="], [:group, "(",
+          [:prefix, [:op, "--"], [:ident, "ASSIGNPARAM.2"]],
+        ]]
       ],
       [:relate,
         [:relate, [:ident, "@"], [:op, "."], [:ident, "y"]],
