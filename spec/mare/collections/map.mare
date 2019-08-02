@@ -1,11 +1,7 @@
 :actor Main
   :new (env)
-    map = Map(Foo, Foo, HashEq(Foo)).new
+    map = Map(String, String, HashEq(String)).new
     env.out.print("TODO: Implement and test the Map type")
-
-:class val Foo
-  :fun hash USize: 0
-  :fun "==" (that Foo'box) Bool: False
 
 :trait Hashable (A Hashable(A)'read)
   :fun hash USize
