@@ -883,7 +883,9 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       
       # If this node has no params, no type args are needed.
       params = rt.defn.params
-      return if params.nil? || params.terms.size == 0
+      return if params.nil?
+      return if params.terms.size == 0
+      return if params.terms.size == rt.args.size
       
       # Otherwise, raise an error - the type needs to be qualified.
       Error.at node, "This type needs to be qualified with type arguments", [
