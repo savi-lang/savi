@@ -199,14 +199,14 @@ describe Mare::Compiler::Sugar do
     func = ctx.namespace.find_func!("Example", "param_assigns")
     func.body.not_nil!.to_a.should eq [:group, ":",
       [:relate,
-        [:relate, [:ident, "@"], [:op, "."], [:ident, "y"]],
-        [:op, "."],
-        [:qualify, [:ident, "z="], [:group, "(", [:ident, "ASSIGNPARAM.1"]]]
-      ],
-      [:relate,
         [:ident, "@"],
         [:op, "."],
         [:qualify, [:ident, "x="], [:group, "(", [:ident, "ASSIGNPARAM.0"]]]
+      ],
+      [:relate,
+        [:relate, [:ident, "@"], [:op, "."], [:ident, "y"]],
+        [:op, "."],
+        [:qualify, [:ident, "z="], [:group, "(", [:ident, "ASSIGNPARAM.1"]]]
       ],
       [:relate,
         [:relate, [:ident, "@"], [:op, "."], [:ident, "y"]],

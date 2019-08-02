@@ -36,6 +36,7 @@ class Mare::Compiler::Sugar < Mare::AST::Visitor
     
     # If any parameters contain assignables, make assignments in the body.
     if f.body && f.params
+      param_assign_count = 0
       f.params.not_nil!.terms.each_with_index do |param, index|
         # Dig through a default parameter value relation first if present.
         if param.is_a?(AST::Relate) && param.op.value == "DEFAULTPARAM"
@@ -58,7 +59,8 @@ class Mare::Compiler::Sugar < Mare::AST::Visitor
           # Add the assignment statement to the top of the function body.
           op = AST::Operator.new("=").from(param)
           assign = AST::Relate.new(param, op, param_ident.dup).from(param)
-          f.body.not_nil!.terms.unshift(assign)
+          f.body.not_nil!.terms.insert(param_assign_count, assign)
+          param_assign_count += 1
         end
       end
     end
