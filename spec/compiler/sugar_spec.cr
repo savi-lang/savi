@@ -59,6 +59,42 @@ describe Mare::Compiler::Sugar do
     ]
   end
   
+  it "transforms an operator into a method call (in a loop condition)" do
+    source = Mare::Source.new_example <<-SOURCE
+    :class Example
+      :fun countdown
+        while x > 0 (y)
+    SOURCE
+    
+    ast = Mare::Parser.parse(source)
+    
+    ast.to_a.should eq [:doc,
+      [:declare, [[:ident, "class"], [:ident, "Example"]], [:group, ":"]],
+      [:declare, [[:ident, "fun"], [:ident, "countdown"]], [:group, ":",
+        [:group, " ",
+          [:ident, "while"],
+          [:relate, [:ident, "x"], [:op, ">"], [:integer, 0_u64]],
+          [:group, "(", [:ident, "y"]],
+        ],
+      ]],
+    ]
+    
+    ctx = Mare::Compiler.compile([ast], :sugar)
+    
+    func = ctx.namespace.find_func!("Example", "countdown")
+    func.body.not_nil!.to_a.should eq [:group, ":",
+      [:group, "(", [:loop,
+        [:relate,
+          [:ident, "x"],
+          [:op, "."],
+          [:qualify, [:ident, ">"], [:group, "(", [:integer, 0_u64]]],
+        ],
+        [:group, "(", [:ident, "y"]],
+        [:ident, "None"],
+      ]],
+    ]
+  end
+  
   it "transforms a square brace qualification into a method call" do
     source = Mare::Source.new_example <<-SOURCE
     :class Example

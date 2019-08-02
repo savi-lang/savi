@@ -252,9 +252,9 @@ module Mare::AST
       res
     end
     def children_accept(visitor)
-      cond.accept(visitor)
-      body.accept(visitor)
-      else_body.accept(visitor)
+      @cond = cond.accept(visitor)
+      @body = body.accept(visitor)
+      @else_body = else_body.accept(visitor)
     end
   end
   
@@ -273,8 +273,8 @@ module Mare::AST
       res
     end
     def children_accept(visitor)
-      body.accept(visitor)
-      else_body.accept(visitor)
+      @body = body.accept(visitor)
+      @else_body = else_body.accept(visitor)
     end
   end
 end
