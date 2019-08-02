@@ -45,7 +45,7 @@ struct Mare::Compiler::Infer::MetaType::Nominal
       func = defn.defn.find_func?(name)
       [{self, defn, func}] if func
     when Refer::TypeParam
-      infer.lookup_type_param_bound(defn, infer.refer)
+      infer.lookup_type_param_bound(defn)
         .find_callable_func_defns(infer, name)
     else
       raise NotImplementedError.new(defn)

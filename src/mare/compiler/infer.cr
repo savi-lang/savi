@@ -337,7 +337,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     ) : Bool
       is_subtype?(
         MetaType.new_nominal(l),
-        lookup_type_param_bound(r, refer).strip_cap,
+        lookup_type_param_bound(r).strip_cap,
         # TODO: forward errors array
       )
     end
@@ -386,10 +386,10 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       .tap { @lookup_type_param_reentrant.delete(ref) }
     end
     
-    def lookup_type_param_bound(ref : Refer::TypeParam, refer, receiver = nil)
+    def lookup_type_param_bound(ref : Refer::TypeParam)
       raise NotImplementedError.new(ref) unless ref.parent == reified.defn
       
-      type_expr(ref.bound, refer, receiver)
+      type_expr(ref.bound, refer, nil)
     end
     
     def validate_type_args(
@@ -541,7 +541,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     ) : Bool
       is_subtype?(
         MetaType.new_nominal(l),
-        lookup_type_param_bound(r, refer).strip_cap,
+        lookup_type_param_bound(r).strip_cap,
         # TODO: forward errors array
       )
     end
@@ -837,8 +837,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       @for_type.lookup_type_param(ref, refer, receiver)
     end
     
-    def lookup_type_param_bound(ref, refer = refer(), receiver = reified.receiver)
-      @for_type.lookup_type_param_bound(ref, refer, receiver)
+    def lookup_type_param_bound(ref)
+      @for_type.lookup_type_param_bound(ref)
     end
     
     def type_expr(node)
