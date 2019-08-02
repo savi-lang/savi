@@ -46,7 +46,7 @@ class Mare::Compiler::Sugar < Mare::AST::Visitor
         
         # If the param is a dot relation, treat it as an assignable.
         if param.is_a?(AST::Relate) && param.op.value == "."
-          new_name = "ASSIGNPARAM.#{index}"
+          new_name = "ASSIGNPARAM.#{index + 1}"
           
           # Replace the parameter with our new name as the identifier.
           param_ident = AST::Identifier.new(new_name).from(param)
