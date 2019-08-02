@@ -175,6 +175,47 @@ describe Mare::Compiler::Sugar do
     ]
   end
   
+  it "transforms non-identifier parameters into assignment expressions" do
+    source = Mare::Source.new_example <<-SOURCE
+    :class Example
+      :fun param_assigns (@x, @y.z)
+        @y.after
+    SOURCE
+    
+    ast = Mare::Parser.parse(source)
+    
+    ast.to_a.should eq [:doc,
+      [:declare, [[:ident, "class"], [:ident, "Example"]], [:group, ":"]],
+      [:declare, [[:ident, "fun"], [:ident, "param_assigns"], [:group, "(",
+        [:ident, "@x"],
+        [:relate, [:ident, "@y"], [:op, "."], [:ident, "z"]]],
+      ], [:group, ":",
+        [:relate, [:ident, "@y"], [:op, "."], [:ident, "after"]],
+      ]],
+    ]
+    
+    ctx = Mare::Compiler.compile([ast], :sugar)
+    
+    func = ctx.namespace.find_func!("Example", "param_assigns")
+    func.body.not_nil!.to_a.should eq [:group, ":",
+      [:relate,
+        [:relate, [:ident, "@"], [:op, "."], [:ident, "y"]],
+        [:op, "."],
+        [:qualify, [:ident, "z="], [:group, "(", [:ident, "ASSIGNPARAM.1"]]]
+      ],
+      [:relate,
+        [:ident, "@"],
+        [:op, "."],
+        [:qualify, [:ident, "x="], [:group, "(", [:ident, "ASSIGNPARAM.0"]]]
+      ],
+      [:relate,
+        [:relate, [:ident, "@"], [:op, "."], [:ident, "y"]],
+        [:op, "."],
+        [:ident, "after"]
+      ],
+    ]
+  end
+  
   it "transforms short-circuiting logical operators into choices" do
     source = Mare::Source.new_example <<-SOURCE
     :class Example
