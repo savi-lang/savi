@@ -45,8 +45,10 @@ struct Mare::Compiler::Infer::MetaType::Nominal
       func = defn.defn.find_func?(name)
       [{self, defn, func}] if func
     when Refer::TypeParam
-      raise NotImplementedError.new("TODO in this commit")
-    else raise NotImplementedError.new(defn)
+      infer.lookup_type_param_bound(defn, infer.refer)
+        .find_callable_func_defns(infer, name)
+    else
+      raise NotImplementedError.new(defn)
     end
   end
   
@@ -181,34 +183,34 @@ struct Mare::Compiler::Infer::MetaType::Nominal
     raise NotImplementedError.new("#{origin.inspect}+>#{self.inspect}")
   end
   
-  def subtype_of?(infer : ForFunc, other : Capability) : Bool
+  def subtype_of?(infer : (ForFunc | ForType), other : Capability) : Bool
     # A nominal can never be a subtype of any capability -
     # it specifies a single nominal, and says nothing about capabilities.
     false
   end
   
-  def supertype_of?(infer : ForFunc, other : Capability) : Bool
+  def supertype_of?(infer : (ForFunc | ForType), other : Capability) : Bool
     # A nominal can never be a supertype of any capability -
     # it specifies a single nominal, and says nothing about capabilities.
     false
   end
   
-  def subtype_of?(infer : ForFunc, other : Nominal) : Bool
+  def subtype_of?(infer : (ForFunc | ForType), other : Nominal) : Bool
     # A nominal is a subtype of another nominal if and only if
     # the defn is a subtype of the other defn.
     infer.is_subtype?(defn, other.defn)
   end
   
-  def supertype_of?(infer : ForFunc, other : Nominal) : Bool
+  def supertype_of?(infer : (ForFunc | ForType), other : Nominal) : Bool
     # This operation is symmetrical with the above operation.
     infer.is_subtype?(other.defn, defn)
   end
   
-  def subtype_of?(infer : ForFunc, other : (AntiNominal | Intersection | Union | Unconstrained | Unsatisfiable)) : Bool
+  def subtype_of?(infer : (ForFunc | ForType), other : (AntiNominal | Intersection | Union | Unconstrained | Unsatisfiable)) : Bool
     other.supertype_of?(infer, self) # delegate to the other class via symmetry
   end
   
-  def supertype_of?(infer : ForFunc, other : (AntiNominal | Intersection | Union | Unconstrained | Unsatisfiable)) : Bool
+  def supertype_of?(infer : (ForFunc | ForType), other : (AntiNominal | Intersection | Union | Unconstrained | Unsatisfiable)) : Bool
     other.subtype_of?(infer, self) # delegate to the other class via symmetry
   end
   

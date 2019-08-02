@@ -412,15 +412,15 @@ struct Mare::Compiler::Infer::MetaType::Union
     result
   end
   
-  def subtype_of?(infer : ForFunc, other : Capability) : Bool
+  def subtype_of?(infer : (ForFunc | ForType), other : Capability) : Bool
     raise NotImplementedError.new([self, :subtype_of?, other].inspect)
   end
   
-  def supertype_of?(infer : ForFunc, other : Capability) : Bool
+  def supertype_of?(infer : (ForFunc | ForType), other : Capability) : Bool
     raise NotImplementedError.new([self, :supertype_of?, other].inspect)
   end
   
-  def subtype_of?(infer : ForFunc, other : (Nominal | AntiNominal | Intersection)) : Bool
+  def subtype_of?(infer : (ForFunc | ForType), other : (Nominal | AntiNominal | Intersection)) : Bool
     # This union is a subtype of the other if and only if
     # all terms in the union are subtypes of that other.
     result = true
@@ -431,7 +431,7 @@ struct Mare::Compiler::Infer::MetaType::Union
     result
   end
   
-  def supertype_of?(infer : ForFunc, other : (Nominal | AntiNominal | Intersection)) : Bool
+  def supertype_of?(infer : (ForFunc | ForType), other : (Nominal | AntiNominal | Intersection)) : Bool
     # This union is a supertype of the given other if and only if
     # any term in the union qualifies as a supertype of that other.
     result = false
@@ -442,7 +442,7 @@ struct Mare::Compiler::Infer::MetaType::Union
     result
   end
   
-  def subtype_of?(infer : ForFunc, other : Union) : Bool
+  def subtype_of?(infer : (ForFunc | ForType), other : Union) : Bool
     # This union is a subtype of the given other union if and only if
     # all terms in the union are subtypes of that other.
     result = true
@@ -453,15 +453,15 @@ struct Mare::Compiler::Infer::MetaType::Union
     result
   end
   
-  def supertype_of?(infer : ForFunc, other : Union) : Bool
+  def supertype_of?(infer : (ForFunc | ForType), other : Union) : Bool
     other.subtype_of?(infer, self) # delegate to the other function via symmetry
   end
   
-  def subtype_of?(infer : ForFunc, other : (Unconstrained | Unsatisfiable)) : Bool
+  def subtype_of?(infer : (ForFunc | ForType), other : (Unconstrained | Unsatisfiable)) : Bool
     other.supertype_of?(infer, self) # delegate to the other class via symmetry
   end
   
-  def supertype_of?(infer : ForFunc, other : (Unconstrained | Unsatisfiable)) : Bool
+  def supertype_of?(infer : (ForFunc | ForType), other : (Unconstrained | Unsatisfiable)) : Bool
     other.subtype_of?(infer, self) # delegate to the other class via symmetry
   end
   

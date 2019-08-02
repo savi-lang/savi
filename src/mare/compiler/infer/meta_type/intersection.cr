@@ -332,14 +332,14 @@ struct Mare::Compiler::Infer::MetaType::Intersection
       .intersect(cap.not_nil!.extracted_from(origin))
   end
   
-  def subtype_of?(infer : ForFunc, other : Capability) : Bool
+  def subtype_of?(infer : (ForFunc | ForType), other : Capability) : Bool
     # This intersection is a subtype of the given capability if and only if
     # it has a capability as part of the intersection, and that capability
     # is a subtype of the given capability.
     cap.try(&.subtype_of?(infer, other)) || false
   end
   
-  def supertype_of?(infer : ForFunc, other : Capability) : Bool
+  def supertype_of?(infer : (ForFunc | ForType), other : Capability) : Bool
     # If we have terms or anti-terms, we can't possibly be a supertype of other,
     # because a capability can never be a subtype of a nominal or anti-nominal.
     return false if terms || anti_terms
@@ -347,7 +347,7 @@ struct Mare::Compiler::Infer::MetaType::Intersection
     raise NotImplementedError.new([self, :supertype_of?, other].inspect)
   end
   
-  def subtype_of?(infer : ForFunc, other : Nominal) : Bool
+  def subtype_of?(infer : (ForFunc | ForType), other : Nominal) : Bool
     # Note that no matter if we have a capability restriction or not,
     # it doesn't factor into us considering whether we're a subtype of
     # the given nominal or not - a nominal says nothing about capabilities.
@@ -360,7 +360,7 @@ struct Mare::Compiler::Infer::MetaType::Intersection
     result
   end
   
-  def supertype_of?(infer : ForFunc, other : Nominal) : Bool
+  def supertype_of?(infer : (ForFunc | ForType), other : Nominal) : Bool
     # If we have a capability restriction, we can't possibly be a supertype of
     # other, because a nominal says nothing about capabilities.
     return false if cap
@@ -373,15 +373,15 @@ struct Mare::Compiler::Infer::MetaType::Intersection
     result
   end
   
-  def subtype_of?(infer : ForFunc, other : AntiNominal) : Bool
+  def subtype_of?(infer : (ForFunc | ForType), other : AntiNominal) : Bool
     raise NotImplementedError.new([self, :subtype_of?, other].inspect)
   end
   
-  def supertype_of?(infer : ForFunc, other : AntiNominal) : Bool
+  def supertype_of?(infer : (ForFunc | ForType), other : AntiNominal) : Bool
     raise NotImplementedError.new([self, :supertype_of?, other].inspect)
   end
   
-  def subtype_of?(infer : ForFunc, other : Intersection) : Bool
+  def subtype_of?(infer : (ForFunc | ForType), other : Intersection) : Bool
     # Firstly, our cap must be a subtype of the other cap (if present).
     return false if other.cap && (
       !cap ||
@@ -411,15 +411,15 @@ struct Mare::Compiler::Infer::MetaType::Intersection
     true
   end
   
-  def supertype_of?(infer : ForFunc, other : Intersection) : Bool
+  def supertype_of?(infer : (ForFunc | ForType), other : Intersection) : Bool
     other.subtype_of?(infer, self) # delegate to the above function via symmetry.
   end
   
-  def subtype_of?(infer : ForFunc, other : (Union | Unconstrained | Unsatisfiable)) : Bool
+  def subtype_of?(infer : (ForFunc | ForType), other : (Union | Unconstrained | Unsatisfiable)) : Bool
     other.supertype_of?(infer, self) # delegate to the other class via symmetry
   end
   
-  def supertype_of?(infer : ForFunc, other : (Union | Unconstrained | Unsatisfiable)) : Bool
+  def supertype_of?(infer : (ForFunc | ForType), other : (Union | Unconstrained | Unsatisfiable)) : Bool
     other.subtype_of?(infer, self) # delegate to the other class via symmetry
   end
   

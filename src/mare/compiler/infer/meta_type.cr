@@ -274,7 +274,7 @@ struct Mare::Compiler::Infer::MetaType
   end
   
   # Return true if this MetaType is a subtype of the other MetaType.
-  def subtype_of?(infer : ForFunc, other : MetaType)
+  def subtype_of?(infer : (ForFunc | ForType), other : MetaType)
     inner.subtype_of?(infer, other.inner)
   end
   

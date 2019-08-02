@@ -178,46 +178,6 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     .to_a
   end
   
-  def is_subtype?(
-    ctx : Context,
-    l : ReifiedType,
-    r : ReifiedType,
-    errors = [] of Error::Info,
-  ) : Bool
-    ctx.infer[l].subtyping.check(r, errors)
-  end
-  
-  def is_subtype?(
-    ctx : Context,
-    l : Refer::TypeParam,
-    r : ReifiedType,
-    errors = [] of Error::Info,
-  ) : Bool
-    # TODO: Implement this.
-    raise NotImplementedError.new("type param <: type")
-  end
-  
-  def is_subtype?(
-    ctx : Context,
-    l : ReifiedType,
-    r : Refer::TypeParam,
-    errors = [] of Error::Info,
-  ) : Bool
-    # TODO: Implement this.
-    raise NotImplementedError.new("type <: type param")
-  end
-  
-  def is_subtype?(
-    ctx : Context,
-    l : Refer::TypeParam,
-    r : Refer::TypeParam,
-    errors = [] of Error::Info,
-  ) : Bool
-    return true if l == r
-    # TODO: Implement this.
-    raise NotImplementedError.new("type param <: type param")
-  end
-  
   def validate_type_args(
     ctx : Context,
     infer : (ForFunc | ForType),
@@ -251,7 +211,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       # Skip checking type arguments that contain type parameters.
       next unless arg.type_params.empty?
       
-      param_bound = ctx.infer[rt].get_param_bound(index)
+      param_bound = ctx.infer[rt].get_type_param_bound(index)
       unless arg.satisfies_bound?(infer, param_bound)
         bound_pos =
           rt.defn.params.not_nil!.terms[index].as(AST::Group).terms.last.pos
@@ -349,15 +309,54 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       ctx.infer.for_type(ctx, *args).reified
     end
     
-    def is_subtype?(l, r, errors = [] of Error::Info)
-      ctx.infer.is_subtype?(ctx, l, r, errors)
+    def refer
+      ctx.refer[reified.defn]
+    end
+    
+    def is_subtype?(
+      l : ReifiedType,
+      r : ReifiedType,
+      errors = [] of Error::Info,
+    ) : Bool
+      ctx.infer[l].subtyping.check(r, errors)
+    end
+    
+    def is_subtype?(
+      l : Refer::TypeParam,
+      r : ReifiedType,
+      errors = [] of Error::Info,
+    ) : Bool
+      # TODO: Implement this.
+      raise NotImplementedError.new("type param <: type")
+    end
+    
+    def is_subtype?(
+      l : ReifiedType,
+      r : Refer::TypeParam,
+      errors = [] of Error::Info,
+    ) : Bool
+      is_subtype?(
+        MetaType.new_nominal(l),
+        lookup_type_param_bound(r, refer).strip_cap,
+        # TODO: forward errors array
+      )
+    end
+    
+    def is_subtype?(
+      l : Refer::TypeParam,
+      r : Refer::TypeParam,
+      errors = [] of Error::Info,
+    ) : Bool
+      return true if l == r
+      # TODO: Implement this.
+      raise NotImplementedError.new("type param <: type param")
     end
     
     def is_subtype?(l : MetaType, r : MetaType) : Bool
       l.subtype_of?(self, r)
     end
     
-    def get_param_bound(index : Int32)
+    def get_type_param_bound(index : Int32)
       refer = ctx.refer[reified.defn]
       param_node = reified.defn.params.not_nil!.terms[index]
       param_bound_node = refer[param_node].as(Refer::TypeParam).bound
@@ -380,12 +379,17 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       @lookup_type_param_reentrant.add(ref)
       
       # Return the type parameter intersected with its bound.
-      # TODO: When bound has multiple caps, reify with each possible cap.
       type_expr(ref.bound, refer, receiver)
       .intersect(MetaType.new_type_param(ref))
       
       # Remove the temporary reentrant entry without affecting the return value.
       .tap { @lookup_type_param_reentrant.delete(ref) }
+    end
+    
+    def lookup_type_param_bound(ref : Refer::TypeParam, refer, receiver = nil)
+      raise NotImplementedError.new(ref) unless ref.parent == reified.defn
+      
+      type_expr(ref.bound, refer, receiver)
     end
     
     def validate_type_args(
@@ -513,8 +517,43 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       ctx.refer[reified.type.defn][reified.func]
     end
     
-    def is_subtype?(l, r, errors = [] of Error::Info)
-      ctx.infer.is_subtype?(ctx, l, r, errors)
+    def is_subtype?(
+      l : ReifiedType,
+      r : ReifiedType,
+      errors = [] of Error::Info,
+    ) : Bool
+      ctx.infer[l].subtyping.check(r, errors)
+    end
+    
+    def is_subtype?(
+      l : Refer::TypeParam,
+      r : ReifiedType,
+      errors = [] of Error::Info,
+    ) : Bool
+      # TODO: Implement this.
+      raise NotImplementedError.new("type param <: type")
+    end
+    
+    def is_subtype?(
+      l : ReifiedType,
+      r : Refer::TypeParam,
+      errors = [] of Error::Info,
+    ) : Bool
+      is_subtype?(
+        MetaType.new_nominal(l),
+        lookup_type_param_bound(r, refer).strip_cap,
+        # TODO: forward errors array
+      )
+    end
+    
+    def is_subtype?(
+      l : Refer::TypeParam,
+      r : Refer::TypeParam,
+      errors = [] of Error::Info,
+    ) : Bool
+      return true if l == r
+      # TODO: Implement this.
+      raise NotImplementedError.new("type param <: type param")
     end
     
     def is_subtype?(l : MetaType, r : MetaType) : Bool
@@ -794,8 +833,12 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       @for_type.reified_type(*args)
     end
     
-    def lookup_type_param(ref)
-      @for_type.lookup_type_param(ref, refer, reified.receiver)
+    def lookup_type_param(ref, refer = refer(), receiver = reified.receiver)
+      @for_type.lookup_type_param(ref, refer, receiver)
+    end
+    
+    def lookup_type_param_bound(ref, refer = refer(), receiver = reified.receiver)
+      @for_type.lookup_type_param_bound(ref, refer, receiver)
     end
     
     def type_expr(node)

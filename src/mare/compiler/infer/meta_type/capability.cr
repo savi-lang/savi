@@ -4,11 +4,11 @@ struct Mare::Compiler::Infer::MetaType::Capability
   def initialize(@value)
   end
   
-  def self.build(caps : Array(Capability))
+  def self.build(caps : Set(Capability))
     case caps.size
     when 0 then Unsatisfiable.instance
     when 1 then caps.first
-    else new(caps.to_set)
+    else new(caps)
     end
   end
   
@@ -83,6 +83,7 @@ struct Mare::Compiler::Infer::MetaType::Capability
         value.map(&.intersect(other).as(Capability | Unsatisfiable))
           .select(&.is_a?(Capability))
           .map(&.as(Capability))
+          .to_set
       return Capability.build(new_value)
     end
     # If we get to this point, we are dealing with two single caps.
@@ -127,7 +128,7 @@ struct Mare::Compiler::Infer::MetaType::Capability
     other.unite(self) # delegate to the "higher" class via commutativity
   end
   
-  def subtype_of?(infer : ForFunc, other : Capability); subtype_of?(other) end
+  def subtype_of?(infer : (ForFunc | ForType), other : Capability); subtype_of?(other) end
   def subtype_of?(other : Capability) : Bool
     ##
     # Reference capability subtyping can be visualized using this graph,
@@ -171,16 +172,16 @@ struct Mare::Compiler::Infer::MetaType::Capability
     end
   end
   
-  def supertype_of?(infer : ForFunc, other : Capability); supertype_of?(other) end
+  def supertype_of?(infer : (ForFunc | ForType), other : Capability); supertype_of?(other) end
   def supertype_of?(other : Capability) : Bool
     other.subtype_of?(self) # delegate to the above function via symmetry
   end
   
-  def subtype_of?(infer : ForFunc, other : (Nominal | AntiNominal | Intersection | Union | Unconstrained | Unsatisfiable)) : Bool
+  def subtype_of?(infer : (ForFunc | ForType), other : (Nominal | AntiNominal | Intersection | Union | Unconstrained | Unsatisfiable)) : Bool
     other.supertype_of?(infer, self) # delegate to the other class via symmetry
   end
   
-  def supertype_of?(infer : ForFunc, other : (Nominal | AntiNominal | Intersection | Union | Unconstrained | Unsatisfiable)) : Bool
+  def supertype_of?(infer : (ForFunc | ForType), other : (Nominal | AntiNominal | Intersection | Union | Unconstrained | Unsatisfiable)) : Bool
     other.subtype_of?(infer, self) # delegate to the other class via symmetry
   end
   
