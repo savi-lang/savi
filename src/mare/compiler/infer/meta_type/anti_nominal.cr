@@ -1,8 +1,8 @@
 struct Mare::Compiler::Infer::MetaType::AntiNominal
-  getter defn : Infer::ReifiedType
+  getter defn : ReifiedType
   
   def initialize(defn)
-    raise NotImplementedError.new(defn) unless defn.is_a?(Infer::ReifiedType)
+    raise NotImplementedError.new(defn) unless defn.is_a?(ReifiedType)
     @defn = defn
   end
   
@@ -12,15 +12,15 @@ struct Mare::Compiler::Infer::MetaType::AntiNominal
     io << "'any"
   end
   
-  def each_reachable_defn : Iterator(Infer::ReifiedType)
-    ([] of Infer::ReifiedType).each
+  def each_reachable_defn : Iterator(ReifiedType)
+    ([] of ReifiedType).each
   end
   
   def find_callable_func_defns(infer : ForFunc, name : String)
     nil
   end
   
-  def any_callable_func_defn_type(name : String) : Infer::ReifiedType?
+  def any_callable_func_defn_type(name : String) : ReifiedType?
     nil
   end
   

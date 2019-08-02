@@ -32,12 +32,12 @@ struct Mare::Compiler::Infer::MetaType
   def initialize(@inner)
   end
   
-  def initialize(defn : Infer::ReifiedType, cap : String? = nil)
+  def initialize(defn : ReifiedType, cap : String? = nil)
     cap ||= defn.defn.cap.value
     @inner = Nominal.new(defn).intersect(Capability.new(cap))
   end
   
-  def self.new_nominal(defn : Infer::ReifiedType)
+  def self.new_nominal(defn : ReifiedType)
     MetaType.new(Nominal.new(defn))
   end
   
@@ -180,12 +180,12 @@ struct Mare::Compiler::Infer::MetaType
       when Intersection then inner.terms.try(&.first?)
       else nil
       end
-    nominal if nominal && nominal.defn.is_a?(Infer::ReifiedType)
+    nominal if nominal && nominal.defn.is_a?(ReifiedType)
   end
   
   def single!
     raise "not singular: #{show_type}" unless singular?
-    single?.not_nil!.defn.as(Infer::ReifiedType)
+    single?.not_nil!.defn.as(ReifiedType)
   end
   
   def -; negate end
@@ -284,22 +284,22 @@ struct Mare::Compiler::Infer::MetaType
     inner.satisfies_bound?(infer, other.inner)
   end
   
-  def each_reachable_defn : Iterator(Infer::ReifiedType)
+  def each_reachable_defn : Iterator(ReifiedType)
     @inner.each_reachable_defn
   end
   
   def find_callable_func_defns(
     infer : ForFunc,
     name : String,
-  ) : Set(Tuple(Inner, Infer::ReifiedType?, Program::Function?))
-    set = Set(Tuple(Inner, Infer::ReifiedType?, Program::Function?)).new
+  ) : Set(Tuple(Inner, ReifiedType?, Program::Function?))
+    set = Set(Tuple(Inner, ReifiedType?, Program::Function?)).new
     @inner.find_callable_func_defns(infer, name).try(&.each { |tuple|
       set.add(tuple)
     })
     set
   end
   
-  def any_callable_func_defn_type(name : String) : Infer::ReifiedType?
+  def any_callable_func_defn_type(name : String) : ReifiedType?
     @inner.any_callable_func_defn_type(name)
   end
   

@@ -65,8 +65,8 @@ struct Mare::Compiler::Infer::MetaType::Intersection
     io << ")"
   end
   
-  def each_reachable_defn : Iterator(Infer::ReifiedType)
-    iter = ([] of Infer::ReifiedType).each
+  def each_reachable_defn : Iterator(ReifiedType)
+    iter = ([] of ReifiedType).each
     
     iter = iter.chain(
       terms.not_nil!.map(&.each_reachable_defn).flat_map(&.to_a).each
@@ -76,7 +76,7 @@ struct Mare::Compiler::Infer::MetaType::Intersection
   end
   
   def find_callable_func_defns(infer : ForFunc, name : String)
-    list = [] of Tuple(Inner, Infer::ReifiedType?, Program::Function?)
+    list = [] of Tuple(Inner, ReifiedType?, Program::Function?)
     
     # Collect a result for nominal in this intersection that has this func.
     terms.try(&.each do |term|
@@ -95,7 +95,7 @@ struct Mare::Compiler::Infer::MetaType::Intersection
     if list.empty?
       terms.try(&.each do |term|
         defn = term.defn
-        list << {self, (defn if defn.is_a?(Infer::ReifiedType)), nil}
+        list << {self, (defn if defn.is_a?(ReifiedType)), nil}
       end)
     end
     
@@ -106,7 +106,7 @@ struct Mare::Compiler::Infer::MetaType::Intersection
     list
   end
   
-  def any_callable_func_defn_type(name : String) : Infer::ReifiedType?
+  def any_callable_func_defn_type(name : String) : ReifiedType?
     # Return the first nominal in this intersection that has this func.
     terms.try(&.each do |term|
       term.any_callable_func_defn_type(name).try do |result|

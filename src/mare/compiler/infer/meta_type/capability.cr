@@ -46,15 +46,15 @@ struct Mare::Compiler::Infer::MetaType::Capability
     io << value
   end
   
-  def each_reachable_defn : Iterator(Infer::ReifiedType)
-    ([] of Infer::ReifiedType).each
+  def each_reachable_defn : Iterator(ReifiedType)
+    ([] of ReifiedType).each
   end
   
   def find_callable_func_defns(infer : ForFunc, name : String)
     nil
   end
   
-  def any_callable_func_defn_type(name : String) : Infer::ReifiedType?
+  def any_callable_func_defn_type(name : String) : ReifiedType?
     nil
   end
   
