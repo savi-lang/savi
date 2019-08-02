@@ -944,6 +944,44 @@ describe Mare::Compiler::Infer do
     infer.resolve(elem_0).show_type.should eq "U64"
   end
   
+  it "infers an empty array literal from its antecedent" do
+    source = Mare::Source.new_example <<-SOURCE
+    :actor Main
+      :new
+        x Array(U64) = []
+        x << 99
+    SOURCE
+    
+    ctx = Mare::Compiler.compile([source], :infer)
+    
+    infer = ctx.infer.for_func_simple(ctx, "Main", "new")
+    body = infer.reified.func.body.not_nil!
+    assign = body.terms.first.as(Mare::AST::Relate)
+    
+    infer.resolve(assign.lhs).show_type.should eq "Array(U64)"
+    infer.resolve(assign.rhs).show_type.should eq "Array(U64)"
+  end
+  
+  it "complains when an empty array literal has no antecedent" do
+    source = Mare::Source.new_example <<-SOURCE
+    :actor Main
+      :new
+        x = []
+        x << 99
+    SOURCE
+    
+    expected = <<-MSG
+    The type of this empty array literal could not be inferred (it needs an explicit type):
+    from (example):3:
+        x = []
+            ^~
+    MSG
+    
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :infer)
+    end
+  end
+  
   it "complains when violating uniqueness into an array literal" do
     source = Mare::Source.new_example <<-SOURCE
     :class X

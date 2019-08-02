@@ -509,7 +509,9 @@ class Mare::Compiler::Infer
       # If no such type is found, stick with what we inferred for now.
       possible_antes = [] of MetaType
       possible_element_antecedents(infer).each do |ante|
-        possible_antes << ante if elem_mt.subtype_of?(infer, ante)
+        if elem_mts.empty? || elem_mt.subtype_of?(infer, ante)
+          possible_antes << ante
+        end
       end
       if possible_antes.size > 1
         # TODO: nice error for the below:
@@ -518,6 +520,12 @@ class Mare::Compiler::Infer
         elem_mt = possible_antes.first
       else
         # Leave elem_mt alone and let it ride.
+      end
+      
+      if elem_mt.unsatisfiable?
+        Error.at pos,
+          "The type of this empty array literal could not be inferred " \
+          "(it needs an explicit type)"
       end
       
       # Now that we have the element type to use, construct the result.
