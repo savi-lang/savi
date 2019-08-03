@@ -77,17 +77,18 @@ module Mare::Parser
     opcap = (char('\'')).named(:op)
     op1 = (str("->") | str("+>")).named(:op)
     op2 = char('.').named(:op)
-    op3 = (char('*') | char('/') | char('%')).named(:op)
-    op4 = ((char('+') | char('-')) >> ~char('>')).named(:op)
-    op5 = (str("..") | str("<>")).named(:op)
-    op6 = (str("<|>") | str("<~>") | str("<<<") | str(">>>") |
+    op3 = (char(' ') | char('\t'))
+    op4 = (char('*') | char('/') | char('%')).named(:op)
+    op5 = ((char('+') | char('-')) >> ~char('>')).named(:op)
+    op6 = (str("..") | str("<>")).named(:op)
+    op7 = (str("<|>") | str("<~>") | str("<<<") | str(">>>") |
             str("<<~") | str("~>>") | str("<<") | str(">>") |
             str("<~") | str("~>")).named(:op)
-    op7 = ((str("<:") | str(">=") | str("<=") | char('<') | char('>')) >>
+    op8 = ((str("<:") | str(">=") | str("<=") | char('<') | char('>')) >>
             ~(char('>') | char('<'))).named(:op)
-    op8 = (str("===") | str("==") | str("!==") | str("!=") |
+    op9 = (str("===") | str("==") | str("!==") | str("!=") |
             str("=~")).named(:op)
-    op9 = (str("&&") | str("||")).named(:op)
+    op10 = (str("&&") | str("||")).named(:op)
     opw = (char(' ') | char('\t'))
     ope = char('=').named(:op)
     
@@ -96,14 +97,14 @@ module Mare::Parser
     t1 = (t0 >> (opcap >> (capmod | cap)).repeat).named(:relate)
     t2 = (t1 >> (op1 >> t1).repeat).named(:relate)
     t3 = (t2 >> (sn >> op2 >> sn >> t2).repeat).named(:relate)
-    t4 = (t3 >> (sn >> op3 >> sn >> t3).repeat).named(:relate)
+    t4 = (~decl >> t3 >> (op3 >> s >> ~decl >> t3).repeat(1) >> s).named(:group_w) | t3
     t5 = (t4 >> (sn >> op4 >> sn >> t4).repeat).named(:relate)
     t6 = (t5 >> (sn >> op5 >> sn >> t5).repeat).named(:relate)
     t7 = (t6 >> (sn >> op6 >> sn >> t6).repeat).named(:relate)
     t8 = (t7 >> (sn >> op7 >> sn >> t7).repeat).named(:relate)
     t9 = (t8 >> (sn >> op8 >> sn >> t8).repeat).named(:relate)
-    tw = (t9 >> (sn >> op9 >> sn >> t9).repeat).named(:relate)
-    te = (~decl >> tw >> (opw >> s >> ~decl >> tw).repeat(1) >> s).named(:group_w) | tw
+    t10 = (t9 >> (sn >> op9 >> sn >> t9).repeat).named(:relate)
+    te = (t10 >> (sn >> op10 >> sn >> t10).repeat).named(:relate)
     t = (te >> (sn >> ope >> sn >> te >> s).repeat).named(:relate_r)
     
     # Define what a comma/newline-separated sequence of terms looks like.

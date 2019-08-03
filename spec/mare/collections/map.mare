@@ -39,14 +39,14 @@
     
     space = ((prealloc * 4) / 3).max(8).next_pow2
     @_array = Array((KV(K, V) | _MapEmpty | _MapDeleted)).new(space)
-    while space > 0 ( // TODO: space.times ...
+    while (space > 0) ( // TODO: space.times ...
       @_array << _MapEmpty
     space = space - 1)
     // TODO:refactor the above to use  @_init_array(((prealloc * 4) / 3).max(8).next_pow2)
   
   :fun ref _init_array (space USize)
     @_array = Array((KV(K, V) | _MapEmpty | _MapDeleted)).new(space)
-    while space > 0 ( // TODO: space.times ...
+    while (space > 0) ( // TODO: space.times ...
       @_array << _MapEmpty
     space = space - 1)
   
@@ -55,16 +55,16 @@
     old = @_array
     
     @_array = Array((KV(K, V) | _MapEmpty | _MapDeleted)).new(space)
-    while space > 0 ( // TODO: space.times ...
+    while (space > 0) ( // TODO: space.times ...
       @_array << _MapEmpty
     space = space - 1)
     // TODO: refactor the above to use @_init_array(space)
     
     try (
       i USize = 0
-      while i < old.size ( // TODO: old.size.times ...
+      while (i < old.size) ( // TODO: old.size.times ...
         entry = old[i]!
-        if entry <: KV(K, V) (
+        if (entry <: KV(K, V)) (
           @_array[@_search(entry.key)]! = entry
         )
       i = i + 1)
@@ -81,8 +81,8 @@
         @_array[index]! = KV(K, V).new(--key, --value)
         @_size = @_size + 1
         
-        if entry <: _MapEmpty (
-          if (@_size * 4) > (@_array.size * 3) (
+        if (entry <: _MapEmpty) (
+          if (@_size * 4 > @_array.size * 3) (
             @_resize(@_array.size * 2)
           )
         )
@@ -91,7 +91,7 @@
   
   :fun get! (key K)
     entry = @_array[@_search(key)]!
-    if entry <: KV(K, V) (entry.value | error!) // TODO: .as!(KV(K, V)).value
+    if (entry <: KV(K, V)) (entry.value | error!) // TODO: .as!(KV(K, V)).value
   
   :fun _search (key)
     hash = H.hash(key).usize()
@@ -105,7 +105,7 @@
     
     try (
       i USize = 0
-      while i < @_array.size ( // TODO: @_array.size.times ...
+      while (i < @_array.size) ( // TODO: @_array.size.times ...
         entry = @_array[idx]!
         
         case (
@@ -116,7 +116,7 @@
             error! // TODO: use early return instead of error!
           )
         | entry <: _MapEmpty |
-          if idx_del > mask (
+          if (idx_del > mask) (
             result_idx = idx
           |
             result_idx = idx_del
@@ -124,7 +124,7 @@
           found = False
           error!
         | entry <: _MapDeleted |
-          if idx_del > mask (
+          if (idx_del > mask) (
             idx_del = idx
           )
         )

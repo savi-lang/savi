@@ -129,7 +129,7 @@ describe Mare::Compiler::Macros do
         with an optional else body section at the end:
       from (example):3:
           case x == 1
-               ^~~~~~
+               ^
       MSG
       
       expect_raises Mare::Error, expected do

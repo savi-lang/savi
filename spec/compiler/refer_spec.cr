@@ -181,7 +181,7 @@ describe Mare::Compiler::Refer do
         @show(1)
       
       :fun show (u U64)
-        if u <= 3 (
+        if (u <= 3) (
           case (
           | u == 1 | x = "one" // no consume
           | u == 2 | x = "two",   --x
@@ -251,7 +251,7 @@ describe Mare::Compiler::Refer do
         @show(1)
       
       :fun show (u U64)
-        if --u == 1 (
+        if (--u == 1) (
           "one"
         |
           u
@@ -266,8 +266,8 @@ describe Mare::Compiler::Refer do
     
     - it was consumed here:
       from (example):6:
-        if --u == 1 (
-           ^~~
+        if (--u == 1) (
+            ^~~
     MSG
     
     expect_raises Mare::Error, expected do
@@ -283,14 +283,14 @@ describe Mare::Compiler::Refer do
       
       :fun show (u U64)
         --u
-        if u == 1 ("one" | "other")
+        if (u == 1) ("one" | "other")
     SOURCE
     
     expected = <<-MSG
     This variable can't be used here; it might already be consumed:
     from (example):7:
-        if u == 1 ("one" | "other")
-           ^
+        if (u == 1) ("one" | "other")
+            ^
     
     - it was consumed here:
       from (example):6:
@@ -398,14 +398,14 @@ describe Mare::Compiler::Refer do
       
       :fun show (u U64)
         --u
-        while u == 1 ("one" | "other")
+        while (u == 1) ("one" | "other")
     SOURCE
     
     expected = <<-MSG
     This variable can't be used here; it might already be consumed:
     from (example):7:
-        while u == 1 ("one" | "other")
-              ^
+        while (u == 1) ("one" | "other")
+               ^
     
     - it was consumed here:
       from (example):6:

@@ -34,8 +34,9 @@
     none = ()
     
     maybe_greeting (Greeting | None) = Generic(Greeting).get
-    if maybe_greeting <: Greeting \
+    if (maybe_greeting <: Greeting) (
       @say_stuff(env, maybe_greeting)
+    )
     
     use_zero = False
     please_use_zero = True
@@ -48,7 +49,7 @@
     
     exit_code = 0
     maybe_thirty_three (I32 | None) = I32[33]
-    if maybe_thirty_three <: I32 (
+    if (maybe_thirty_three <: I32) (
       exit_code = augend + maybe_thirty_three + 9
     )
     

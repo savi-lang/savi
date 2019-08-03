@@ -63,7 +63,9 @@ describe Mare::Compiler::Sugar do
     source = Mare::Source.new_example <<-SOURCE
     :class Example
       :fun countdown
-        while x > 0 (y)
+        while (x > 0) (
+          y
+        )
     SOURCE
     
     ast = Mare::Parser.parse(source)
@@ -73,7 +75,9 @@ describe Mare::Compiler::Sugar do
       [:declare, [[:ident, "fun"], [:ident, "countdown"]], [:group, ":",
         [:group, " ",
           [:ident, "while"],
-          [:relate, [:ident, "x"], [:op, ">"], [:integer, 0_u64]],
+          [:group, "(",
+            [:relate, [:ident, "x"], [:op, ">"], [:integer, 0_u64]]
+          ],
           [:group, "(", [:ident, "y"]],
         ],
       ]],
@@ -84,14 +88,14 @@ describe Mare::Compiler::Sugar do
     func = ctx.namespace.find_func!("Example", "countdown")
     func.body.not_nil!.to_a.should eq [:group, ":",
       [:group, "(", [:loop,
-        [:relate,
+        [:group, "(", [:relate,
           [:ident, "x"],
           [:op, "."],
-          [:qualify, [:ident, ">"], [:group, "(", [:integer, 0_u64]]],
-        ],
+          [:qualify, [:ident, ">"], [:group, "(", [:integer, 0_u64]]]
+        ]],
         [:group, "(", [:ident, "y"]],
-        [:ident, "None"],
-      ]],
+        [:ident, "None"]
+      ]]
     ]
   end
   
