@@ -760,7 +760,7 @@ describe Mare::Compiler::Infer do
     SOURCE
     
     expected = <<-MSG
-    The type of this expression doesn't meet the constraints imposed on it:
+    This aliasing violates uniqueness (did you forget to consume the variable?):
     from (example):15:
         x3b val = x3a // not okay
                   ^~~
@@ -774,9 +774,6 @@ describe Mare::Compiler::Infer do
       from (example):14:
         x3a iso = X.new
             ^~~
-    
-    - this would be allowed if this reference didn't get aliased
-    - did you forget to consume the reference?
     MSG
     
     expect_raises Mare::Error, expected do
@@ -799,7 +796,7 @@ describe Mare::Compiler::Infer do
     SOURCE
     
     expected = <<-MSG
-    The type of this expression doesn't meet the constraints imposed on it:
+    This aliasing violates uniqueness (did you forget to consume the variable?):
     from (example):10:
         xb     = xa    // not okay
                  ^~
@@ -813,14 +810,28 @@ describe Mare::Compiler::Infer do
       from (example):9:
         xa iso = X.new
            ^~~
-    
-    - this would be allowed if this reference didn't get aliased
-    - did you forget to consume the reference?
     MSG
     
     expect_raises Mare::Error, expected do
       Mare::Compiler.compile([source], :infer)
     end
+  end
+  
+  it "allows extra aliases that don't violate uniqueness" do
+    source = Mare::Source.new_example <<-SOURCE
+    :class X
+      :new iso
+    
+    :actor Main
+      :new
+        orig = X.new
+        
+        xa tag = orig   // okay
+        xb tag = orig   // okay
+        xc iso = --orig // okay
+    SOURCE
+    
+    Mare::Compiler.compile([source], :infer)
   end
   
   it "complains when violating uniqueness into an argument" do
@@ -842,7 +853,7 @@ describe Mare::Compiler::Infer do
     SOURCE
     
     expected = <<-MSG
-    The type of this expression doesn't meet the constraints imposed on it:
+    This aliasing violates uniqueness (did you forget to consume the variable?):
     from (example):12:
         @example(x2) // not okay
                  ^~
@@ -856,9 +867,6 @@ describe Mare::Compiler::Infer do
       from (example):11:
         x2 iso = X.new
            ^~~
-    
-    - this would be allowed if this reference didn't get aliased
-    - did you forget to consume the reference?
     MSG
     
     expect_raises Mare::Error, expected do
@@ -879,7 +887,7 @@ describe Mare::Compiler::Infer do
     SOURCE
     
     expected = <<-MSG
-    The type of this expression doesn't meet the constraints imposed on it:
+    This aliasing violates uniqueness (did you forget to consume the variable?):
     from (example):7:
         x2 iso = x // not okay, but would work if not for the above stripping
                  ^
@@ -898,9 +906,6 @@ describe Mare::Compiler::Infer do
       from (example):6:
         x = X.new // inferred as X'iso+, stripped to X'iso
               ^~~
-    
-    - this would be allowed if this reference didn't get aliased
-    - did you forget to consume the reference?
     MSG
     
     expect_raises Mare::Error, expected do
@@ -1002,7 +1007,7 @@ describe Mare::Compiler::Infer do
     SOURCE
     
     expected = <<-MSG
-    The type of this expression doesn't meet the constraints imposed on it:
+    This aliasing violates uniqueness (did you forget to consume the variable?):
     from (example):15:
         array_4 Array(X'val) = [x4] // not okay
                                ^~~~
@@ -1016,9 +1021,6 @@ describe Mare::Compiler::Infer do
       from (example):14:
         x4 iso = X.new
            ^~~
-    
-    - this would be allowed if this reference didn't get aliased
-    - did you forget to consume the reference?
     MSG
     
     expect_raises Mare::Error, expected do

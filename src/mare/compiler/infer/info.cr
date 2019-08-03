@@ -115,43 +115,49 @@ class Mare::Compiler::Infer
       return finish_resolve!(infer, meta_type) if domain_constraints.empty?
       
       use_pos = domain_constraints.first[0]
-      aliases = domain_constraints.map(&.[3]).reduce(0) { |a1, a2| a1 + a2 }
-      
-      orig_meta_type = meta_type
-      if aliases > 0
-        meta_type = meta_type.strip_ephemeral.alias
-        alias_distinct = meta_type != orig_meta_type
-      else
-        meta_type = meta_type.ephemeralize
-      end
       
       # TODO: print a different error message when the domain constraints are
       # internally conflicting, even before adding this meta_type into the mix.
       
       total_domain_constraint = total_domain_constraint().simplify(infer)
       
-      if !meta_type.within_constraints?(infer, [total_domain_constraint])
-        because_of_alias = alias_distinct &&
-          orig_meta_type.ephemeralize.not_nil!.within_constraints?(infer, [total_domain_constraint])
-        
+      meta_type_ephemeral = meta_type.ephemeralize
+      
+      if !meta_type_ephemeral.within_constraints?(infer, [total_domain_constraint])
         extra = describe_domain_constraints
         extra << {pos,
-          "but the type of the #{describe_kind}" \
-          "#{" (when aliased)" if alias_distinct} was #{meta_type.show_type}"
-        }
-        
-        if because_of_alias
-          extra.concat [
-            {Source::Pos.none,
-              "this would be allowed if this reference didn't get aliased"},
-            {Source::Pos.none,
-              "did you forget to consume the reference?"},
-          ]
-        end
+          "but the type of the #{describe_kind} was #{meta_type.show_type}"}
         
         Error.at use_pos, "The type of this expression " \
           "doesn't meet the constraints imposed on it",
             extra
+      end
+      
+      # If aliasing makes a difference, we need to evaluate each constraint
+      # that has nonzero aliases with an aliased version of the meta_type.
+      if meta_type != meta_type.strip_ephemeral.alias
+        meta_type_alias = meta_type.strip_ephemeral.alias
+        
+        # TODO: Do we need to do anything here to weed out union types with
+        # differing capabilities of compatible terms? Is it possible that
+        # the type that fulfills the total_domain_constraint is not compatible
+        # with the ephemerality requirement, while some other union member is?
+        
+        domain_constraints.each do |use_pos, _, constraint, aliases|
+          if aliases > 0
+            if !meta_type_alias.within_constraints?(infer, [constraint])
+              extra = describe_domain_constraints
+              extra << {pos,
+                "but the type of the #{describe_kind} " \
+                "(when aliased) was #{meta_type_alias.show_type}"
+              }
+              
+              Error.at use_pos, "This aliasing violates uniqueness " \
+                "(did you forget to consume the variable?)",
+                extra
+            end
+          end
+        end
       end
       
       finish_resolve!(infer, meta_type)
