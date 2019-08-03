@@ -657,6 +657,7 @@ class Mare::Compiler::CodeGen
       last_expr = expr
       last_value = gen_expr(expr, gfunc.func.has_tag?(:constant))
     end
+    last_value ||= gen_none
     
     unless Jumps.away?(gfunc.func.body.not_nil!)
       if gfunc.func.has_tag?(:constructor)
@@ -664,10 +665,10 @@ class Mare::Compiler::CodeGen
         @builder.ret
       elsif gfunc.can_error?
         # If this is an error-able function, use that calling convention.
-        gen_return_using_error_cc(last_value.not_nil!, false)
+        gen_return_using_error_cc(last_value, false)
       else
         # Otherwise, return the error as normal.
-        @builder.ret(last_value.not_nil!)
+        @builder.ret(last_value)
       end
     end
     

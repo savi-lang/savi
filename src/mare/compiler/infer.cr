@@ -1104,7 +1104,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       rt = reified_type(term_info.inner.single!, args)
       ctx.infer.validate_type_args(ctx, self, node, rt)
       
-      self[node] = Fixed.new(node.pos, MetaType.new(rt))
+      self[node] = Fixed.new(node.pos, MetaType.new(rt, "non"))
     end
     
     def touch(node : AST::Prefix)

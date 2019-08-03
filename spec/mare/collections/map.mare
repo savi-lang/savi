@@ -1,9 +1,12 @@
 :actor Main
   :new (env)
-    map = Map(String, String, HashEq(String)).new(
+    map = Map(String, String, HashEq(String)).new
+    map.put(
       "example"
       "TODO: Implement and test the Map type"
     )
+    
+    KV(String, String).new("foo", "bar") // TODO: the reach pass fails if nobody reaches any functions in KV
     
     env.out.print(try (map.get!("example") | "failure"))
 
@@ -19,10 +22,116 @@
   :fun hash (x box->(Q'aliased)) USize: x.hash
   :fun equal (x box->(Q'aliased), y box->(Q'aliased)) Bool: x == y
 
-:class val Map (K, V, H HashFunction(K))
+:class KV (K, V) // TODO: use a tuple literal instead
   :prop key K
   :prop value V
   :new (@key, @value)
+
+:primitive _MapEmpty
+:primitive _MapDeleted
+
+:class Map (K, V, H HashFunction(K))
+  :prop _size USize
+  :prop _array Array((KV(K, V) | _MapEmpty | _MapDeleted))
+  
+  :new (prealloc USize = 6)
+    @_size = 0 // TODO: move to prop declaration
+    
+    space = ((prealloc * 4) / 3).max(8).next_pow2
+    @_array = Array((KV(K, V) | _MapEmpty | _MapDeleted)).new(space)
+    while space > 0 ( // TODO: space.times ...
+      @_array << _MapEmpty
+    space = space - 1)
+    // TODO:refactor the above to use  @_init_array(((prealloc * 4) / 3).max(8).next_pow2)
+  
+  :fun ref _init_array (space USize)
+    @_array = Array((KV(K, V) | _MapEmpty | _MapDeleted)).new(space)
+    while space > 0 ( // TODO: space.times ...
+      @_array << _MapEmpty
+    space = space - 1)
+  
+  :fun ref _resize (space USize)
+    space = space.max(@_size) // only grow the array - never shrink it
+    old = @_array
+    
+    @_array = Array((KV(K, V) | _MapEmpty | _MapDeleted)).new(space)
+    while space > 0 ( // TODO: space.times ...
+      @_array << _MapEmpty
+    space = space - 1)
+    // TODO: refactor the above to use @_init_array(space)
+    
+    try (
+      i USize = 0
+      while i < old.size ( // TODO: old.size.times ...
+        entry = old[i]!
+        if entry <: KV(K, V) (
+          @_array[@_search(entry.key)]! = entry
+        )
+      i = i + 1)
+    )
+  
+  :fun ref put (key K, value V)
+    try (
+      index = @_search(key)
+      entry = @_array[index]!
+      
+      case (
+      | entry <: KV(K, V) | entry.value = --value
+      |
+        @_array[index]! = KV(K, V).new(--key, --value)
+        @_size = @_size + 1
+        
+        if entry <: _MapEmpty (
+          if (@_size * 4) > (@_array.size * 3) (
+            @_resize(@_array.size * 2)
+          )
+        )
+      )
+    )
   
   :fun get! (key K)
-    if H.equal(@key, key) (@value | error!)
+    entry = @_array[@_search(key)]!
+    if entry <: KV(K, V) (entry.value | error!) // TODO: .as!(KV(K, V)).value
+  
+  :fun _search (key)
+    hash = H.hash(key).usize()
+    
+    idx_del = @_array.size
+    mask = idx_del - 1
+    idx = hash.bit_and(mask)
+    
+    result_idx = idx_del
+    found = False
+    
+    try (
+      i USize = 0
+      while i < @_array.size ( // TODO: @_array.size.times ...
+        entry = @_array[idx]!
+        
+        case (
+        | entry <: KV(K, V) |
+          if H.equal(key, entry.key) (
+            result_idx = idx
+            found = True
+            error! // TODO: use early return instead of error!
+          )
+        | entry <: _MapEmpty |
+          if idx_del > mask (
+            result_idx = idx
+          |
+            result_idx = idx_del
+          )
+          found = False
+          error!
+        | entry <: _MapDeleted |
+          if idx_del > mask (
+            idx_del = idx
+          )
+        )
+        
+        idx = (hash + ((i + (i * i)) / 2)).bit_and(mask)
+        i = i + 1
+      )
+    )
+    
+    result_idx // TODO: also return `found`
