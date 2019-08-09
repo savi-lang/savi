@@ -421,7 +421,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     end
   end
   
-  def handle_field(ctx, rt : Infer::ReifiedType, func) : {String, Ref}
+  def handle_field(ctx, rt : Infer::ReifiedType, func) : {String, Ref}?
     # Reach the metatype of the field.
     ref = nil
     ctx.infer[rt].all_for_funcs.each do |infer|
@@ -430,7 +430,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       ref = infer.resolve(func.ident)
       handle_type_ref(ctx, ref)
     end
-    ref.not_nil!
+    return unless ref
     
     # Handle the field as if it were a function.
     handle_func(ctx, ctx.infer[rt], func)
@@ -461,7 +461,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     # This is important for consistency of memory layout purposes.
     fields = rt.defn.functions.select(&.has_tag?(:field)).map do |f|
       handle_field(ctx, rt, f)
-    end
+    end.compact
     
     # Now, save a Def instance for this program type.
     @defs[rt] = Def.new(rt, self, fields)
