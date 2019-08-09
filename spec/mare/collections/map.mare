@@ -31,12 +31,10 @@
 :primitive _MapDeleted
 
 :class Map (K, V, H HashFunction(K))
-  :prop _size USize
+  :prop _size USize: 0
   :prop _array Array((KV(K, V) | _MapEmpty | _MapDeleted))
   
   :new (prealloc USize = 6)
-    @_size = 0 // TODO: move to prop declaration
-    
     space = ((prealloc * 4) / 3).max(8).next_pow2
     @_array = Array((KV(K, V) | _MapEmpty | _MapDeleted)).new(space)
     while (space > 0) ( // TODO: space.times ...

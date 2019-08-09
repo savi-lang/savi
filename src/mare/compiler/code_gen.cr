@@ -75,11 +75,13 @@ class Mare::Compiler::CodeGen
       @vtable_size = 0
       @type_def.each_function(g.ctx).each do |rf|
         next unless g.ctx.reach.reached_func?(rf) # TODO: switch to each_reachable_function?
-        next if rf.func.has_tag?(:field)
         
-        infer        = g.ctx.infer[rf]
-        vtable_index = g.ctx.paint[rf]
-        @vtable_size = (vtable_index + 1) if @vtable_size <= vtable_index
+        infer = g.ctx.infer[rf]
+        
+        unless rf.func.has_tag?(:hygienic)
+          vtable_index = g.ctx.paint[rf]
+          @vtable_size = (vtable_index + 1) if @vtable_size <= vtable_index
+        end
         
         key = rf.func.ident.value
         key += Random::Secure.hex if rf.func.has_tag?(:hygienic)
@@ -121,6 +123,8 @@ class Mare::Compiler::CodeGen
       ptr = g.llvm.int8.pointer
       vtable = Array(LLVM::Value).new(@vtable_size, ptr.null)
       @gfuncs.each_value do |gfunc|
+        next unless gfunc.vtable_index?
+        
         vtable[gfunc.vtable_index] =
           g.llvm.const_bit_cast(gfunc.virtual_llvm_func.to_value, ptr)
       end
@@ -177,7 +181,7 @@ class Mare::Compiler::CodeGen
   
   class GenFunc
     getter infer : Infer::ForFunc
-    getter vtable_index : Int32
+    getter! vtable_index : Int32
     getter llvm_name : String
     property! llvm_func : LLVM::Function
     property! virtual_llvm_func : LLVM::Function
