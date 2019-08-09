@@ -11,7 +11,7 @@ ready: PHONY Dockerfile
 # Run the test suite.
 test: PHONY
 	docker exec -ti mare-dev make extra_args="$(extra_args)" test.inner
-/tmp/bin/spec: $(shell find src -name '*.cr') $(shell find spec -name '*.cr')
+/tmp/bin/spec: $(shell find lib -name '*.cr') $(shell find src -name '*.cr') $(shell find spec -name '*.cr')
 	mkdir -p /tmp/bin
 	crystal build --debug spec/all.cr -o $@
 test.inner: PHONY /tmp/bin/spec
@@ -38,7 +38,7 @@ example-lldb: PHONY
 	echo && lldb -o run -- example/main # TODO: run this within docker when alpine supports lldb package outside of edge
 example-mare-callgrind: PHONY
 	docker exec -ti mare-dev make extra_args="$(extra_args)" example-mare-callgrind.inner
-/tmp/bin/mare: main.cr $(shell find src -name '*.cr')
+/tmp/bin/mare: main.cr $(shell find lib -name '*.cr') $(shell find src -name '*.cr')
 	mkdir -p /tmp/bin
 	crystal build --debug main.cr -o $@
 	ldd /tmp/bin/mare | grep libponyrt # prove that libponyrt was actually linked
