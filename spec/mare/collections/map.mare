@@ -1,14 +1,11 @@
 :actor Main
   :new (env)
     map = Map(String, String, HashEq(String)).new
-    map.put(
-      "example"
-      "TODO: Implement and test the Map type"
-    )
+    map["example"] = "TODO: Implement and test the Map type"
     
     KV(String, String).new("foo", "bar") // TODO: the reach pass fails if nobody reaches any functions in KV
     
-    env.out.print(try (map.get!("example") | "failure"))
+    env.out.print(try (map["example"]! | "failure"))
 
 :trait Hashable (A Hashable(A)'read)
   :fun hash USize
@@ -59,7 +56,7 @@
       i = i + 1)
     )
   
-  :fun ref put (key K, value V)
+  :fun ref "[]=" (key K, value V)
     try (
       index = @_search(key)
       entry = @_array[index]!
@@ -78,7 +75,7 @@
       )
     )
   
-  :fun get! (key K)
+  :fun "[]!" (key K)
     entry = @_array[@_search(key)]!
     if (entry <: KV(K, V)) (entry.value | error!) // TODO: .as!(KV(K, V)).value
   
