@@ -66,6 +66,19 @@ describe Pegmatite do
     } of String => JSON::Any)
   end
   
+  it "traces the parsing process" do
+    source = <<-JSON
+    ["hello"]
+    JSON
+    
+    io = IO::Memory.new
+    tokens = Pegmatite.tokenize(Fixtures::JSONGrammar, source, 0, io)
+    
+    io.to_s
+      .ends_with?("0 ~~~ then_eof - {9, [{:array, 0, 9}, {:string, 2, 7}]}\n")
+      .should eq true
+  end
+  
   it "raises useful parse errors" do
     source = <<-JSON
     {

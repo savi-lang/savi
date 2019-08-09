@@ -5,14 +5,35 @@ module Pegmatite
   
   # Return the array of tokens resulting from executing the given pattern
   # grammar over the given source string, starting from the given offset.
+  # If an IO is passed, print traces of all parsing activity.
   # Raises a Pattern::MatchError if parsing fails.
   def self.tokenize(
     pattern : Pattern,
     source : String,
     offset = 0,
+    io : IO? = nil,
   ) : Array(Token)
     state = Pattern::MatchState.new
+    state.trace = true if io
     length, result = pattern.match(source, offset, state)
+    
+    # If an IO is passed, print traces of all parsing activity.
+    if io
+      state.traces.each do |trace|
+        case trace
+        when {Pattern, Int32}
+          io.puts "#{trace[1]} ?? #{trace[0].inspect}"
+        when {Pattern, Int32, Pattern::MatchResult}
+          result = trace.as({Pattern, Int32, Pattern::MatchResult})[2]
+          case result[1]
+          when Pattern::MatchOK
+            io.puts "#{trace[1]} ~~~ #{trace[0].dsl_name} - #{result.inspect}"
+          else
+            io.puts "#{trace[1]}     #{trace[0].dsl_name} - FAIL"
+          end
+        end
+      end
+    end
     
     case result
     when Pattern

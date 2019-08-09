@@ -9,11 +9,20 @@ module Pegmatite
     def initialize(@child : Pattern)
     end
     
+    def inspect(io)
+      @child.inspect(io)
+      io << ".then_eof"
+    end
+    
+    def dsl_name
+      "then_eof"
+    end
+    
     def description
       "#{@child.description} followed by end-of-file"
     end
     
-    def match(source, offset, state) : MatchResult
+    def _match(source, offset, state) : MatchResult
       length, result = @child.match(source, offset, state)
       return {length, result} if !result.is_a?(MatchOK)
       

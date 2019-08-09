@@ -11,14 +11,23 @@ abstract class Pegmatite::Pattern
   # the latter indicating that the indicated pattern failed to match.
   alias MatchResult = {Int32, MatchOK | Pattern}
   
+  # When we want to trace a call, we store the pattern, offset, and result
+  # for later inspection (skipping the result for the pre-trace).
+  alias MatchTrace = {Pattern, Int32} | {Pattern, Int32, MatchResult}
+  
   # MatchState is a class that carries some state through a match method.
   # It's not meant to be used as part of any public API.
   class MatchState
     property tokenize : Bool
+    property trace : Bool
+    property traces : Array(MatchTrace)
+    property memos
     getter highest_fail : {Int32, Pattern}
     
-    def initialize(@tokenize = true)
+    def initialize(@tokenize = true, @trace = false)
       @highest_fail = {-1, UnicodeAny::INSTANCE}
+      @traces = [] of MatchTrace
+      @memos = {} of {Pattern, Int32} => MatchResult
     end
     
     def observe_fail(offset, pattern)
@@ -44,6 +53,19 @@ abstract class Pegmatite::Pattern
       super("unexpected token at byte offset #{offset}:\n#{line}\n#{cursor}")
     end
   end
+  
+  def match(source, offset, state) : MatchResult
+    if state.trace
+      state.traces << {self, offset}
+      result = _match(source, offset, state)
+      state.traces << {self, offset, result}
+      result
+    else
+      _match(source, offset, state)
+    end
+  end
+  
+  abstract def _match(source, offset, state) : MatchResult
 end
 
 require "./pattern/*"

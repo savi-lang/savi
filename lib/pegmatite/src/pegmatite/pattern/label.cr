@@ -16,11 +16,19 @@ module Pegmatite
     def initialize(@child : Pattern, @label : Symbol, @tokenize = true)
     end
     
+    def inspect(io)
+      @label.inspect(io)
+    end
+    
+    def dsl_name
+      @label.inspect
+    end
+    
     def description
       @label.inspect
     end
     
-    def match(source, offset, state) : MatchResult
+    def _match(source, offset, state) : MatchResult
       length, result = @child.match(source, offset, state)
       
       # If requested, this label will be added as a token to the token stream,
@@ -35,7 +43,10 @@ module Pegmatite
         when Token
           result = [new_token, result]
         when Array(Token)
-          result = [new_token].concat(result)
+          orig_result = result
+          result = Array(Token).new(orig_result.size + 1)
+          result.push(new_token)
+          result.concat(orig_result)
         end
       end
       

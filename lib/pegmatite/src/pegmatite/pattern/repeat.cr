@@ -11,11 +11,22 @@ module Pegmatite
     def initialize(@child : Pattern, @min = 0)
     end
     
+    def inspect(io)
+      @child.inspect(io)
+      io << ".repeat("
+      @min.inspect(io)
+      io << ")"
+    end
+    
+    def dsl_name
+      "repeat"
+    end
+    
     def description
       "#{@min} or more occurrences of #{@child.description}"
     end
     
-    def match(source, offset, state) : MatchResult
+    def _match(source, offset, state) : MatchResult
       total_length = 0
       tokens : Array(Token)? = nil
       
@@ -54,7 +65,7 @@ module Pegmatite
             if tokens.is_a?(Array(Token))
               tokens.concat result
             else
-              tokens = result
+              tokens = result.dup
             end
           end
         end

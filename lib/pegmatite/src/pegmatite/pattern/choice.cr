@@ -10,6 +10,19 @@ module Pegmatite
     # Override this DSL operator to accrue into the existing choice.
     def |(other); Pattern::Choice.new(@children.dup.push(other)) end
     
+    def inspect(io)
+      io << "("
+      @children.each_with_index do |child, index|
+        io << " | " if index != 0
+        child.inspect(io)
+      end
+      io << ")"
+    end
+    
+    def dsl_name
+      "(|)"
+    end
+    
     def description
       case @children.size
       when 0 then "(empty choice!)"
@@ -20,7 +33,21 @@ module Pegmatite
       end
     end
     
+    # Explicitly memoize Choice patterns, which happens to have a significant
+    # speedup on otherwise troublesome grammars with a lot of backtracking.
+    # We don't do this for other patterns.
     def match(source, offset, state) : MatchResult
+      memo = state.memos[{self, offset}]?
+      return memo if memo
+      
+      result = _match(source, offset, state)
+      
+      state.memos[{self, offset}] = result
+      
+      result
+    end
+    
+    def _match(source, offset, state) : MatchResult
       fail_length, fail_result = {0, self}
       
       # Try each child pattern in order, looking for the first successful match.

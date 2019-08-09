@@ -9,6 +9,14 @@ module Pegmatite
   class Pattern::Forward < Pattern
     @child : Pattern?
     
+    def inspect(io)
+      io << "forward"
+    end
+    
+    def dsl_name
+      "forward"
+    end
+    
     def initialize
       @child = nil
     end
@@ -22,7 +30,7 @@ module Pegmatite
       @child.as(Pattern).description
     end
     
-    def match(source, offset, state) : MatchResult
+    def _match(source, offset, state) : MatchResult
       @child.as(Pattern).match(source, offset, state)
     end
   end

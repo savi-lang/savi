@@ -9,11 +9,23 @@ module Pegmatite
     def initialize(@min : UInt32, @max : UInt32)
     end
     
+    def inspect(io)
+      io << "range("
+      @min.chr.inspect(io)
+      io << ", "
+      @max.chr.inspect(io)
+      io << ")"
+    end
+    
+    def dsl_name
+      "range"
+    end
+    
     def description
       "#{@min.chr.inspect}..#{@max.chr.inspect}"
     end
     
-    def match(source, offset, state) : MatchResult
+    def _match(source, offset, state) : MatchResult
       c, length = Pattern::UnicodeAny.utf32_at(source, offset)
       
       # Fail if a valid UTF-32 character couldn't be parsed.

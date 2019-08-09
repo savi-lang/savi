@@ -10,6 +10,19 @@ module Pegmatite
     # Override this DSL operator to accrue into the existing sequence.
     def >>(other); Pattern::Sequence.new(@children.dup.push(other)) end
     
+    def inspect(io)
+      io << "("
+      @children.each_with_index do |child, index|
+        io << " >> " if index != 0
+        child.inspect(io)
+      end
+      io << ")"
+    end
+    
+    def dsl_name
+      "(>>)"
+    end
+    
     def description
       case @children.size
       when 0 then "(empty sequence!)"
@@ -20,7 +33,7 @@ module Pegmatite
       end
     end
     
-    def match(source, offset, state) : MatchResult
+    def _match(source, offset, state) : MatchResult
       total_length = 0
       tokens : Array(Token)? = nil
       
@@ -49,7 +62,7 @@ module Pegmatite
             if tokens.is_a?(Array(Token))
               tokens.concat result
             else
-              tokens = result
+              tokens = result.dup
             end
           end
         end
