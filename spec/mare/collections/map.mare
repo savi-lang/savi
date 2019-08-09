@@ -35,12 +35,7 @@
   :prop _array Array((KV(K, V) | _MapEmpty | _MapDeleted))
   
   :new (prealloc USize = 6)
-    space = ((prealloc * 4) / 3).max(8).next_pow2
-    @_array = Array((KV(K, V) | _MapEmpty | _MapDeleted)).new(space)
-    while (space > 0) ( // TODO: space.times ...
-      @_array << _MapEmpty
-    space = space - 1)
-    // TODO:refactor the above to use  @_init_array(((prealloc * 4) / 3).max(8).next_pow2)
+    @_init_array(((prealloc * 4) / 3).max(8).next_pow2)
   
   :fun ref _init_array (space USize)
     @_array = Array((KV(K, V) | _MapEmpty | _MapDeleted)).new(space)
@@ -52,11 +47,7 @@
     space = space.max(@_size) // only grow the array - never shrink it
     old = @_array
     
-    @_array = Array((KV(K, V) | _MapEmpty | _MapDeleted)).new(space)
-    while (space > 0) ( // TODO: space.times ...
-      @_array << _MapEmpty
-    space = space - 1)
-    // TODO: refactor the above to use @_init_array(space)
+    @_init_array(space)
     
     try (
       i USize = 0

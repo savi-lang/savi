@@ -529,6 +529,19 @@ class Mare::Compiler::CodeGen
     
     # Create an entry block and start building from there.
     @builder.position_at_end(gen_block("entry"))
+    
+    # Declare an alloca for each parameter.
+    if gfunc && !gfunc.func.has_tag?(:ffi)
+      gfunc.func.params.try(&.terms.each do |param|
+        ref = func_frame.refer[param].as(Refer::Local)
+        param_idx = ref.param_idx.not_nil!
+        param_idx -= 1 unless func_frame.gfunc.not_nil!.needs_receiver?
+        value = frame.func.params[param_idx]
+        alloca = @builder.alloca(value.type, ref.name)
+        func_frame.current_locals[ref] = alloca
+        @builder.store(value, alloca)
+      end)
+    end
   end
   
   def gen_func_end
@@ -1367,12 +1380,7 @@ class Mare::Compiler::CodeGen
     case expr
     when AST::Identifier
       ref = func_frame.refer[expr]
-      if ref.is_a?(Refer::Local) && ref.param_idx
-        raise "#{ref.inspect} isn't a constant value" if const_only
-        param_idx = ref.param_idx.not_nil!
-        param_idx -= 1 unless func_frame.gfunc.not_nil!.needs_receiver?
-        frame.func.params[param_idx]
-      elsif ref.is_a?(Refer::Local)
+      if ref.is_a?(Refer::Local)
         raise "#{ref.inspect} isn't a constant value" if const_only
         alloca = func_frame.current_locals[ref]
         @builder.load(alloca, ref.name)
