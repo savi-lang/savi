@@ -1300,8 +1300,8 @@ class Mare::Compiler::CodeGen
     raise NotImplementedError.new(rhs_type) unless rhs_type.is_concrete?
     rhs_gtype = @gtypes[ctx.reach[rhs_type.single!].llvm_name]
     
-    lhs_desc = gen_get_desc(lhs)
-    rhs_desc = gen_get_desc(rhs_gtype)
+    lhs_desc = gen_get_desc_opaque(lhs)
+    rhs_desc = gen_get_desc_opaque(rhs_gtype)
     
     @builder.icmp LLVM::IntPredicate::EQ, lhs_desc, rhs_desc,
       "#{lhs.name}<:#{rhs.name}"
@@ -2238,7 +2238,7 @@ class Mare::Compiler::CodeGen
   def gen_alloc_actor(gtype, name, become_now = false)
     allocated = @builder.call(@mod.functions["pony_create"], [
       pony_ctx,
-      gen_get_desc(gtype),
+      gen_get_desc_opaque(gtype),
     ], "#{name}.OPAQUE")
     
     if become_now
@@ -2250,8 +2250,14 @@ class Mare::Compiler::CodeGen
   end
   
   # Get the global constant value for the type descriptor of the given type.
-  def gen_get_desc(gtype : GenType)
+  def gen_get_desc_opaque(gtype : GenType)
     @llvm.const_bit_cast(gtype.desc, @desc_ptr)
+  end
+  
+  # Get the global constant value for the type descriptor of the given type.
+  def gen_get_desc_opaque(value : LLVM::Value)
+    desc = gen_get_desc(value)
+    @builder.bit_cast(desc, @desc_ptr, "#{value.name}.OPAQUE")
   end
   
   # Dereference the type descriptor header of the given LLVM value,
