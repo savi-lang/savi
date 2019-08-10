@@ -1,0 +1,8 @@
+:import ".."
+
+:actor Main
+  :new (env)
+    map = Map(String, String, HashEq(String)).new
+    map["example"] = "TODO: Implement and test the Map type"
+    
+    env.out.print(try (map["example"]! | "failure"))

@@ -1,31 +1,10 @@
-:actor Main
-  :new (env)
-    map = Map(String, String, HashEq(String)).new
-    map["example"] = "TODO: Implement and test the Map type"
-    
-    KV(String, String).new("foo", "bar") // TODO: the reach pass fails if nobody reaches any functions in KV
-    
-    env.out.print(try (map["example"]! | "failure"))
-
-:trait Hashable (A Hashable(A)'read)
-  :fun hash USize
-  :fun "==" (that A'box) Bool // TODO: move to Equatable trait
-
-:trait non HashFunction (A)
-  :fun non hash (x box->(A'aliased)) USize
-  :fun non equal (x box->(A'aliased), y box->(A'aliased)) Bool
-
-:primitive HashEq (Q Hashable(Q)'read)
-  :fun hash (x box->(Q'aliased)) USize: x.hash
-  :fun equal (x box->(Q'aliased), y box->(Q'aliased)) Bool: x == y
+:primitive _MapEmpty
+:primitive _MapDeleted
 
 :class KV (K, V) // TODO: use a tuple literal instead
   :prop key K
   :prop value V
   :new (@key, @value)
-
-:primitive _MapEmpty
-:primitive _MapDeleted
 
 :class Map (K, V, H HashFunction(K))
   :prop _size USize: 0

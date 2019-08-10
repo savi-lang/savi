@@ -1,0 +1,11 @@
+:trait Hashable (A Hashable(A)'read)
+  :fun hash USize
+  :fun "==" (that A'box) Bool // TODO: move to Equatable trait
+
+:trait non HashFunction (A)
+  :fun non hash (x box->(A'aliased)) USize
+  :fun non equal (x box->(A'aliased), y box->(A'aliased)) Bool
+
+:primitive HashEq (Q Hashable(Q)'read)
+  :fun hash (x box->(Q'aliased)) USize: x.hash
+  :fun equal (x box->(Q'aliased), y box->(Q'aliased)) Bool: x == y
