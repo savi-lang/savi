@@ -35,6 +35,20 @@
       i = i + 1)
     )
   
+  :: Return the value assigned to the given key, if present.
+  :: Raises an error if the key is not present.
+  ::
+  :: $ map = Map(String, U64).new
+  :: $ map["example"]!
+  :: > error! // this key hasn't been assigned a value yet
+  :: $ map["example"] = 99, map["example"]!
+  :: > 99
+  :: $ map.delete("example"), map["example"]!
+  :: > error! // this key no longer has an assigned value
+  
+  :fun "[]!" (key K)
+    @_array[@_search(key)]!.as!(KV(K, V)).value
+  
   :: Assign the given value to the given key in the map.
   :: The previous value will be overwritten and discarded if present.
   ::
@@ -54,7 +68,7 @@
       | entry <: KV(K, V) | entry.value = --value
       |
         @_array[index]! = KV(K, V).new(--key, --value)
-        @_size = @_size + 1
+        @_size = @_size + 1 // TODO: @_size += 1
         
         if (entry <: _MapEmpty) (
           if (@_size * 4 > @_array.size * 3) (
@@ -65,19 +79,21 @@
     )
     value_alias
   
-  :: Return the value assigned to the given key, if present.
-  :: Raises an error if the key is not present.
+  :: Discard the value assigned to the given key.
   ::
   :: $ map = Map(String, U64).new
-  :: $ map["example"]!
-  :: > error! // this key hasn't been assigned a value yet
   :: $ map["example"] = 99, map["example"]!
   :: > 99
   :: $ map.delete("example"), map["example"]!
   :: > error! // this key no longer has an assigned value
+  :: $ map.delete("example") // deleting it again has no effect
   
-  :fun "[]!" (key K)
-    @_array[@_search(key)]!.as!(KV(K, V)).value
+  :fun ref delete (key K)
+    try (
+      @_array[@_search(key)]! = _MapDeleted
+      @_size = @_size - 1 // TODO: @_size -= 1
+    )
+    None
   
   :fun _search (key)
     hash = H.hash(key).usize()

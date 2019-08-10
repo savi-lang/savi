@@ -15,5 +15,7 @@
     test["Map []! found key   "].pass = try (map["example"]! | U64[0]) == 99
     test["Map []= again       "].pass = (map["example"] = 88) == 88
     test["Map []! found again "].pass = try (map["example"]! | U64[0]) == 88
+    test["Map delete          "].pass = map.delete("example") <: None
+    test["Map []! gone again  "].pass = try map["example"]! <: None
     
     test.print_line_break // TODO: move to MicroTest constructor and finalizer
