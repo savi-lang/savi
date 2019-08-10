@@ -44,4 +44,28 @@ describe Mare::Compiler::Completeness do
       Mare::Compiler.compile([source], :verify)
     end
   end
+  
+  it "complains when a try body has no possible errors to catch" do
+    source = Mare::Source.new_example <<-SOURCE
+    :actor Main
+      :new
+        try (U64[33] * 3)
+    SOURCE
+    
+    expected = <<-MSG
+    This try block is unnecessary:
+    from (example):3:
+        try (U64[33] * 3)
+        ^~~
+    
+    - the body has no possible error cases to catch:
+      from (example):3:
+        try (U64[33] * 3)
+            ^~~~~~~~~~~~~
+    MSG
+    
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :verify)
+    end
+  end
 end
