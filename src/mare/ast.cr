@@ -290,4 +290,21 @@ module Mare::AST
       @else_body = else_body.accept(visitor)
     end
   end
+  
+  class Yield < Node
+    property term : Term
+    
+    def initialize(@term)
+    end
+    
+    def name; :yield end
+    def to_a: Array(A)
+      res = [name] of A
+      res << term.to_a
+      res
+    end
+    def children_accept(visitor)
+      @term = term.accept(visitor)
+    end
+  end
 end

@@ -83,6 +83,12 @@ class Mare::Compiler::Macros < Mare::AST::Visitor
         "  else clause to execute if the body errors (partitioned by `|`)",
       ])
       visit_try(node)
+    elsif Util.match_ident?(node, 0, "yield")
+      Util.require_terms(node, [
+        nil,
+        "the value to be yielded out to the calling function",
+      ])
+      visit_yield(node)
     else
       node
     end
@@ -203,6 +209,15 @@ class Mare::Compiler::Macros < Mare::AST::Visitor
     
     group = AST::Group.new("(").from(node)
     group.terms << AST::Try.new(body, else_body).from(orig)
+    group
+  end
+  
+  def visit_yield(node : AST::Group)
+    orig = node.terms[0]
+    term = node.terms[1]
+    
+    group = AST::Group.new("(").from(node)
+    group.terms << AST::Yield.new(term).from(orig)
     group
   end
 end
