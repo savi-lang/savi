@@ -45,6 +45,7 @@
   :: > 33
   
   :fun ref "[]=" (key K, value V)
+    value_alias = value
     try (
       index = @_search(key)
       entry = @_array[index]!
@@ -62,6 +63,7 @@
         )
       )
     )
+    value_alias
   
   :: Return the value assigned to the given key, if present.
   :: Raises an error if the key is not present.

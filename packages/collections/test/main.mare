@@ -1,8 +1,19 @@
 :import ".."
+:import "../../../spec/mare/micro_test"
 
 :actor Main
   :new (env)
-    map = Map(String, String, HashEq(String)).new
-    map["example"] = "TODO: Implement and test the Map type"
+    test = MicroTest.new(env)
+    test.print_line_break // TODO: move to MicroTest constructor and finalizer
     
-    env.out.print(try (map["example"]! | "failure"))
+    ///
+    // Map methods
+    
+    map = Map(String, U64, HashEq(String)).new // TODO: implicit default for HashFunction type argument
+    test["Map []! missing key "].pass = try (map["example"]!, False | True)
+    test["Map []= return value"].pass = (map["example"] = 99) == 99
+    test["Map []! found key   "].pass = try (map["example"]! | U64[0]) == 99
+    test["Map []= again       "].pass = (map["example"] = 88) == 88
+    test["Map []! found again "].pass = try (map["example"]! | U64[0]) == 88
+    
+    test.print_line_break // TODO: move to MicroTest constructor and finalizer
