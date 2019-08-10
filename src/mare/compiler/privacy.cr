@@ -40,12 +40,7 @@ class Mare::Compiler::Privacy < Mare::AST::Visitor
     # Get the identifier of the function call, if there is one.
     # TODO: some earlier pass should have made this easier for us,
     # so that we could be agnostic as to whether the call had arguments or not.
-    rhs = node.rhs
-    call_ident : AST::Identifier? = rhs.is_a?(AST::Identifier) ? rhs : (
-      if rhs.is_a?(AST::Qualify) && (term = rhs.term).is_a?(AST::Identifier)
-        term
-      end
-    )
+    call_ident, call_args, yield_params, yield_block = AST::Extract.call(node)
     
     # Only handle private calls (beginning with an underscore).
     return unless call_ident && call_ident.value.starts_with?("_")

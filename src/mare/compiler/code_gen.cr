@@ -1116,19 +1116,11 @@ class Mare::Compiler::CodeGen
   end
   
   def gen_dot(relate)
-    rhs = relate.rhs
+    call_ident, call_args, yield_params, yield_block = AST::Extract.call(relate)
     
-    case rhs
-    when AST::Identifier
-      member = rhs.value
-      args = [] of LLVM::Value
-      arg_exprs = [] of AST::Node
-    when AST::Qualify
-      member = rhs.term.as(AST::Identifier).value
-      args = rhs.group.terms.map { |expr| gen_expr(expr).as(LLVM::Value) }
-      arg_exprs = rhs.group.terms.dup
-    else raise NotImplementedError.new(rhs)
-    end
+    member = call_ident.value
+    arg_exprs = call_args.try(&.terms.dup) || [] of AST::Node
+    args = arg_exprs.map { |x| gen_expr(x).as(LLVM::Value) }
     
     lhs_type = type_of(relate.lhs)
     

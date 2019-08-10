@@ -133,11 +133,21 @@ class Mare::Compiler::Classify < Mare::AST::Visitor
   def touch(relate : AST::Relate)
     case relate.op.value
     when "."
-      # In a member access Relate, a value is not needed for the right side.
+      # In a function call Relate, a value is not needed for the right side.
       # A value is only needed for the left side and the overall access node.
-      rhs = relate.rhs
-      Classify.value_not_needed!(rhs)
-      Classify.value_not_needed!(rhs.term) if rhs.is_a?(AST::Qualify)
+      relate_rhs = relate.rhs
+      Classify.value_not_needed!(relate_rhs)
+      
+      # We also need to mark the pieces of the right-hand-side as appropriate.
+      if relate_rhs.is_a?(AST::Relate)
+        Classify.value_not_needed!(relate_rhs.lhs)
+        Classify.value_not_needed!(relate_rhs.rhs)
+      end
+      ident, args, yield_params, yield_block = AST::Extract.call(relate)
+      Classify.value_not_needed!(ident)
+      Classify.value_not_needed!(args) if args
+      Classify.value_not_needed!(yield_params) if yield_params
+      Classify.value_needed!(yield_block) if yield_block
     end
   end
   

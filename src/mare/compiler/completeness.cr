@@ -158,20 +158,13 @@ module Mare::Compiler::Completeness
       # We only care about further analysis if not all fields are initialized.
       return unless seen_fields.size < all_fields.size
       
-      lhs = node.lhs
-      rhs = node.rhs
-      
       # If the left side is definitely the self, we allow access even when
       # not all fields are initialized - we will follow the call and continue
       # our branching analysis of field initialization in that other function.
+      lhs = node.lhs
       if lhs.is_a?(AST::Identifier) && lhs.value == "@"
         # Extract the function name from the right side.
-        func_name =
-          case rhs
-          when AST::Identifier then rhs.value
-          when AST::Qualify then rhs.term.as(AST::Identifier).value
-          else raise NotImplementedError.new(rhs.to_a)
-          end
+        func_name = AST::Extract.call(node)[0].value
         
         # Follow the method call in a new branch, and collect any field writes
         # seen in that branch as if they had been seen in this branch.

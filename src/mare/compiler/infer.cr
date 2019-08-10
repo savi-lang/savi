@@ -983,6 +983,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     
     def touch(node : AST::Group)
       case node.style
+      when "|"
+        # Do nothing here - we'll handle it in one of the parent nodes.
       when "(", ":"
         if node.terms.empty?
           none = MetaType.new(reified_type(prelude_type("None")))
@@ -1040,6 +1042,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     
     def touch(node : AST::Relate)
       case node.op.value
+      when "->"
+        # Do nothing here - we'll handle it in one of the parent nodes.
       when "=", "DEFAULTPARAM"
         lhs = self[node.lhs]
         case lhs
@@ -1053,23 +1057,17 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
           raise NotImplementedError.new(node.lhs)
         end
       when "."
-        lhs = node.lhs
-        rhs = node.rhs
-        
-        case rhs
-        when AST::Identifier
-          member = rhs
-          args = [] of AST::Node
-          args_pos = [] of Source::Pos
-        when AST::Qualify
-          member = rhs.term.as(AST::Identifier)
-          args = rhs.group.terms.map(&.itself)
-          args_pos = rhs.group.terms.map(&.pos)
-        else raise NotImplementedError.new(rhs)
-        end
+        call_ident, call_args, yield_params, yield_block = AST::Extract.call(node)
         
         used = Classify.value_needed?(node)
-        call = FromCall.new(member.pos, lhs, member.value, args, args_pos, used)
+        call = FromCall.new(
+          call_ident.pos,
+          node.lhs,
+          call_ident.value,
+          (call_args ? call_args.terms.map(&.itself) : [] of AST::Node),
+          (call_args ? call_args.terms.map(&.pos) : [] of Source::Pos),
+          used,
+        )
         self[node] = call
         
         follow_call(call)

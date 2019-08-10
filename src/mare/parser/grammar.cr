@@ -97,7 +97,7 @@ module Mare::Parser
     # Construct the nested possible relations for each group of operators.
     t0 = suffixed | atom
     t1 = (t0 >> (opcap >> (capmod | cap)).repeat).named(:relate)
-    t2 = (t1 >> (op1 >> t1).repeat).named(:relate)
+    t2 = (t1 >> (s >> op1 >> s >> t1).repeat).named(:relate)
     t3 = (t2 >> (sn >> op2 >> sn >> t2).repeat).named(:relate)
     t4 = (~decl >> t3 >> (op3 >> s >> ~decl >> t3).repeat(1) >> s).named(:group_w) | t3
     t5 = (t4 >> (sn >> op4 >> sn >> t4).repeat).named(:relate)

@@ -247,11 +247,24 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
       @refer[node] = Field.new(node.value)
     end
     
+    # We conditionally visit the children of a `.` relation with this visitor;
+    # See the logic in the touch method below.
+    def visit_children?(node : AST::Relate)
+      !(node.op.value == ".")
+    end
+    
     # For a Relate, pay attention to any relations that are relevant to us.
     def touch(node : AST::Relate)
-      if node.op.value == "="
+      case node.op.value
+      when "="
         info = @refer[node.lhs]?
         create_local(node.lhs) if info.nil? || info == Unresolved::INSTANCE
+      when "."
+        node.lhs.accept(self)
+        ident, args, yield_params, yield_block = AST::Extract.call(node)
+        ident.accept(self)
+        args.try(&.accept(self))
+        touch_yield_loop(yield_params, yield_block)
       end
     end
     
@@ -360,6 +373,23 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
       @consumes.merge!(body_consumes)
       
       # TODO: Is it possible/safe to collect locals from the body branches?
+    end
+    
+    def touch_yield_loop(params : AST::Group?, block : AST::Group?)
+      return unless params || block
+      
+      # Visit params and block twice (nested) to simulate repeated execution
+      sub_branch = sub_branch()
+      params.try(&.accept(sub_branch))
+      params.try(&.terms.each { |param| sub_branch.create_param_local(param) })
+      block.try(&.accept(sub_branch))
+      sub_branch2 = sub_branch.sub_branch()
+      params.try(&.accept(sub_branch2))
+      params.try(&.terms.each { |param| sub_branch2.create_param_local(param) })
+      block.try(&.accept(sub_branch2))
+      
+      # Absorb any consumes from the block branch into this parent branch.
+      @consumes.merge!(sub_branch.consumes)
     end
     
     def touch(node : AST::Node)

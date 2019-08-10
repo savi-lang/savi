@@ -211,17 +211,7 @@ class Mare::Compiler::Sugar < Mare::AST::Visitor
   # TODO: Can this be done as a "universal method" rather than sugar?
   def visit_dot(node : AST::Relate)
     rhs = node.rhs
-    call_ident, call_args =
-      case rhs
-      when AST::Identifier then {rhs, nil}
-      when AST::Qualify then
-        if rhs.term.is_a?(AST::Identifier)
-          {rhs.term.as(AST::Identifier), rhs.group.terms}
-        else
-          {nil, nil}
-        end
-      else {nil, nil}
-      end
+    call_ident, call_args, yield_params, yield_block = AST::Extract.call(node)
     
     return node unless call_ident
     
@@ -229,10 +219,10 @@ class Mare::Compiler::Sugar < Mare::AST::Visitor
     when "as!"
       Error.at call_ident,
         "This call requires exactly one argument (the type to check)" \
-          unless call_args && call_args.size == 1
+          unless call_args && call_args.terms.size == 1
       
       local_name = next_local_name
-      type_arg = call_args.first
+      type_arg = call_args.terms.first
       
       group = AST::Group.new("(").from(node)
       group.terms << AST::Relate.new(

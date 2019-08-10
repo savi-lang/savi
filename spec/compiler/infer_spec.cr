@@ -1773,4 +1773,22 @@ describe Mare::Compiler::Infer do
       Mare::Compiler.compile([source], :infer)
     end
   end
+  
+  it "yields values to the caller" do
+    source = Mare::Source.new_example <<-SOURCE
+    :actor Main
+      :fun count_to (count U64) None
+        :yields U64 None
+        i U64 = 0
+        while (i < count) (
+          i = i + 1
+          yield i
+        )
+      :new
+        sum U64 = 0
+        @.count_to(5) -> (i| sum = sum + i) // TODO: @count_to without dot
+    SOURCE
+    
+    Mare::Compiler.compile([source], :infer)
+  end
 end
