@@ -10,12 +10,16 @@
     // Map methods
     
     map = Map(String, U64, HashEq(String)).new // TODO: implicit default for HashFunction type argument
+    test["Map size empty      "].pass = map.size == 0
     test["Map []! missing key "].pass = try (map["example"]!, False | True)
     test["Map []= return value"].pass = (map["example"] = 99) == 99
+    test["Map size == 1       "].pass = map.size == 1
     test["Map []! found key   "].pass = try (map["example"]! | U64[0]) == 99
     test["Map []= again       "].pass = (map["example"] = 88) == 88
+    test["Map size == 1 still "].pass = map.size == 1
     test["Map []! found again "].pass = try (map["example"]! | U64[0]) == 88
     test["Map delete          "].pass = map.delete("example") <: None
     test["Map []! gone again  "].pass = try map["example"]! <: None
+    test["Map size == 0 again "].pass = map.size == 0
     
     test.print_line_break // TODO: move to MicroTest constructor and finalizer

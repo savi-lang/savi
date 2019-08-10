@@ -10,6 +10,8 @@
   :prop _size USize: 0
   :prop _array Array((KV(K, V) | _MapEmpty | _MapDeleted))
   
+  :fun size: @_size
+  
   :new (prealloc USize = 6)
     @_init_array(((prealloc * 4) / 3).max(8).next_pow2)
   
@@ -34,6 +36,7 @@
         )
       i = i + 1)
     )
+  
   
   :: Return the value assigned to the given key, if present.
   :: Raises an error if the key is not present.
