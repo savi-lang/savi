@@ -27,6 +27,28 @@ A declaration "head" is any such line beginning with a colon-prefixed identifier
   :fun greeting: "Hello, World!"
 ```
 
+### Comments
+
+Like Pony, Mare has comments using the `//` syntax to mark the beginning of a comment, causing the parser to ignore all of the rest of the characters on that line.
+
+Additionally, Mare has "documentation comments", which instead use the `::` syntax to mark the beginning of such a comment, causing the parser to treat the rest of the characters on that line as a documentation string. This replaces the idiom of using triple-double-quote strings (`"""`) in Pony to add documentation to a type or a function.
+
+Unlike in Pony, the documentation comments for a type of function appear *above* the type or function declaration, rather than as the first expression below or "inside" of the declaration.
+
+```mare
+:: This comment is stored as documentation for the Example type.
+:primitive Example
+  :: This comment is stored as documentation for the greeting function.
+  :: Note that documentation comments can span multiple lines this way,
+  :: and by convention they often include code examples like this:
+  ::
+  :: $ Example.greeting
+  :: > "Hello, World!"
+  
+  :fun greeting
+    "Hello, World!" // this is a line comment, discarded by the parser
+```
+
 ### Local Variables
 
 Creating a local variable is simply an assignment:

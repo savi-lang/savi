@@ -1,6 +1,7 @@
 :class Example
   :prop name String: "World"
   
+  :: Return a friendly greeting string for this instance.
   :fun greeting String
     "Hello, " + @name + "!"
   

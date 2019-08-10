@@ -17,13 +17,21 @@ module Mare::Parser::Builder
     assert_kind(main, :doc)
     doc = AST::Document.new
     decl : AST::Declare? = nil
+    doc_strings = [] of AST::DocString
     
     iter.while_next_is_child_of(main) do |child|
       term = build_term(child, iter, state)
       case term
       when AST::Declare then doc.list << (decl = term)
+      when AST::DocString then doc_strings << term
       else
         decl = decl.as(AST::Declare)
+        
+        unless doc_strings.empty?
+          decl.doc_strings = doc_strings
+          doc_strings = [] of AST::DocString
+        end
+        
         decl.body.terms << term
         if term.pos.finish > decl.body.pos.finish
           new_pos = decl.body.pos
@@ -53,6 +61,9 @@ module Mare::Parser::Builder
     case kind
     when :decl
       build_decl(main, iter, state)
+    when :doc_string
+      value = state.slice(main)
+      AST::DocString.new(value).with_pos(state.pos(main))
     when :ident
       value = state.slice(main)
       AST::Identifier.new(value).with_pos(state.pos(main))

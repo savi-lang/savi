@@ -12,7 +12,7 @@ describe Mare::Parser do
         [[:ident, "prop"], [:ident, "name"], [:ident, "String"]],
         [:group, ":", [:string, "World"]]
       ],
-      [:declare,
+      [:declare, ["Return a friendly greeting string for this instance."],
         [[:ident, "fun"], [:ident, "greeting"], [:ident, "String"]],
         [:group, ":", [:relate,
           [:relate,

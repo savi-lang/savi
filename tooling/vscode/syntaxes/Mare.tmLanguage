@@ -12,13 +12,23 @@
 	<array>
 		<dict>
 			<key>begin</key>
-			<string>(\s*//)</string>
+			<string>\s*(//)</string>
 			<key>comment</key>
 			<string>Line Comment</string>
 			<key>end</key>
 			<string>($)</string>
 			<key>name</key>
 			<string>comment.line.mare</string>
+		</dict>
+		<dict>
+			<key>begin</key>
+			<string>\s*(::)</string>
+			<key>comment</key>
+			<string>Doc Comment</string>
+			<key>end</key>
+			<string>($)</string>
+			<key>name</key>
+			<string>comment.doc.mare</string>
 		</dict>
 		<dict>
 			<key>begin</key>

@@ -30,6 +30,8 @@
 - [x] - User-defined custom numeric types (`numeric MyNumber:`)
 - [x] - Enumerated custom numeric types (`enum MyEnum:`)
 - [x] - Non-allocated class references with "static" stateless functions.
+- [ ] - Doctests
+- [ ] - Command Line REPL
 - [ ] - Typed errors and debug-mode error state with no release-mode overhead.
 - [ ] - Typeclasses (`implement SomeTrait for SomeClass:`)
 - [ ] - Automatic specialization of functions to avoid virtual table calls.

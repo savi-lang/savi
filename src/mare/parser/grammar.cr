@@ -3,7 +3,9 @@ require "pegmatite"
 module Mare::Parser
   Grammar = Pegmatite::DSL.define do
     # Define what an end-of-line comment looks like.
-    eol_comment = str("//") >> (~char('\n') >> any).repeat
+    eol_comment =
+      (str("//") >> (~char('\n') >> any).repeat) |
+      (str("::") >> char(' ').maybe >> (~char('\n') >> any).repeat.named(:doc_string))
     
     # Define what whitespace looks like.
     whitespace =

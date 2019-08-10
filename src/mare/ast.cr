@@ -67,6 +67,7 @@ module Mare::AST
   end
   
   class Declare < Node
+    property doc_strings : Array(DocString)?
     property head
     property body
     def initialize(@head = [] of Term, @body = Group.new(":"))
@@ -79,7 +80,11 @@ module Mare::AST
     
     def name; :declare end
     def to_a: Array(A)
-      [name, head.map(&.to_a), body.to_a] of A
+      res = [name] of A
+      res << doc_strings.not_nil!.map(&.value) if doc_strings
+      res << head.map(&.to_a)
+      res << body.to_a
+      res
     end
     def children_accept(visitor)
       @head.map!(&.accept(visitor))
@@ -91,10 +96,18 @@ module Mare::AST
     end
   end
   
-  alias Term = Identifier \
+  alias Term = DocString | Identifier \
     | LiteralString | LiteralInteger | LiteralFloat \
     | Operator | Prefix | Relate | Group \
     | FieldRead | FieldWrite | Choice | Loop | Try
+  
+  class DocString < Node
+    property value
+    def initialize(@value : String)
+    end
+    def name; :doc_string end
+    def to_a: Array(A); [name, value] of A end
+  end
   
   class Identifier < Node
     property value

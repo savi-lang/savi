@@ -7,7 +7,12 @@ patterns:
 
 - comment: Line Comment
   name: comment.line.mare
-  begin: (\s*//)
+  begin: \s*(//)
+  end: ($)
+
+- comment: Doc Comment
+  name: comment.doc.mare
+  begin: \s*(::)
   end: ($)
 
 - comment: Double-Quote String
