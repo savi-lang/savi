@@ -8,7 +8,7 @@
 # This pass does not mutate the Program topology, but may add Function tags.
 # This pass heavily mutates ASTs.
 # This pass may raise a compilation error.
-# This pass keeps temporary state (on the stack) at the per-function level.
+# This pass keeps temporary state at the per-function level.
 # This pass produces no output state.
 #
 class Mare::Compiler::Macros < Mare::AST::Visitor
@@ -17,19 +17,23 @@ class Mare::Compiler::Macros < Mare::AST::Visitor
   # executed here dynamically instead of declared here statically.
   
   def self.run(ctx)
-    macros = new
     ctx.program.types.each do |t|
       t.functions.each do |f|
-        macros.maybe_compiler_intrinsic(f)
+        macros = new(f)
         
-        # TODO also run in parameter signature?
-        f.body.try { |body| body.accept(macros) }
+        macros.maybe_compiler_intrinsic
+        
+        f.params.try(&.terms.each(&.accept(macros)))
+        f.body.try(&.accept(macros))
       end
     end
   end
   
-  def maybe_compiler_intrinsic(f)
-    body = f.body
+  def initialize(@func : Program::Function)
+  end
+  
+  def maybe_compiler_intrinsic
+    body = @func.body
     return unless \
       body.is_a?(AST::Group) &&
       body.style == ":" &&
@@ -45,8 +49,8 @@ class Mare::Compiler::Macros < Mare::AST::Visitor
     
     # Having confirmed that the function body contains only the phrase
     # 'compiler intrinsic' as a macro-like form, we can tag it and delete it.
-    f.body = nil
-    f.add_tag(:compiler_intrinsic)
+    @func.body = nil
+    @func.add_tag(:compiler_intrinsic)
   end
   
   def visit(node : AST::Group)
@@ -215,6 +219,8 @@ class Mare::Compiler::Macros < Mare::AST::Visitor
   def visit_yield(node : AST::Group)
     orig = node.terms[0]
     term = node.terms[1]
+    
+    @func.add_tag(:yields)
     
     group = AST::Group.new("(").from(node)
     group.terms << AST::Yield.new(term).from(orig)
