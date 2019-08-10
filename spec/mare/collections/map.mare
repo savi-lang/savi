@@ -96,8 +96,7 @@
   :: > error! // this key no longer has an assigned value
   
   :fun "[]!" (key K)
-    entry = @_array[@_search(key)]!
-    if (entry <: KV(K, V)) (entry.value | error!) // TODO: .as!(KV(K, V)).value
+    @_array[@_search(key)]!.as!(KV(K, V)).value
   
   :fun _search (key)
     hash = H.hash(key).usize()

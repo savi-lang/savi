@@ -7,17 +7,25 @@
 # This pass does not mutate the Program topology.
 # This pass heavily mutates ASTs.
 # This pass does not raise any compilation errors.
-# This pass keeps temporary state (on the stack) at the per-function level.
+# This pass keeps temporary state at the per-function level.
 # This pass produces no output state.
 #
 class Mare::Compiler::Sugar < Mare::AST::Visitor
   def self.run(ctx)
-    sugar = new
     ctx.program.types.each do |t|
       t.functions.each do |f|
+        sugar = new
         sugar.run(f)
       end
     end
+  end
+  
+  def initialize
+    @last_hygienic_local = 0
+  end
+  
+  private def next_local_name
+    "hygienic_local.#{@last_hygienic_local += 1}"
   end
   
   def run(f)
@@ -130,8 +138,10 @@ class Mare::Compiler::Sugar < Mare::AST::Visitor
   
   def visit(node : AST::Relate)
     case node.op.value
-    when ".", "'", "->", "+>", " ", "<:", "DEFAULTPARAM"
+    when "'", "->", "+>", " ", "<:", "DEFAULTPARAM"
       node # skip these special-case operators
+    when "."
+      visit_dot(node)
     when "="
       # If assigning to a ".[identifier]" relation, sugar as a "setter" method.
       lhs = node.lhs
@@ -194,6 +204,60 @@ class Mare::Compiler::Sugar < Mare::AST::Visitor
       args = AST::Group.new("(", [node.rhs]).from(node.rhs)
       rhs = AST::Qualify.new(ident, args).from(node)
       AST::Relate.new(node.lhs, dot, rhs).from(node)
+    end
+  end
+  
+  # Handle pseudo-method sugar like `as!` calls.
+  # TODO: Can this be done as a "universal method" rather than sugar?
+  def visit_dot(node : AST::Relate)
+    rhs = node.rhs
+    call_ident, call_args =
+      case rhs
+      when AST::Identifier then {rhs, nil}
+      when AST::Qualify then
+        if rhs.term.is_a?(AST::Identifier)
+          {rhs.term.as(AST::Identifier), rhs.group.terms}
+        else
+          {nil, nil}
+        end
+      else {nil, nil}
+      end
+    
+    return node unless call_ident
+    
+    case call_ident.value
+    when "as!"
+      Error.at call_ident,
+        "This call requires exactly one argument (the type to check)" \
+          unless call_args && call_args.size == 1
+      
+      local_name = next_local_name
+      type_arg = call_args.first
+      
+      group = AST::Group.new("(").from(node)
+      group.terms << AST::Relate.new(
+        AST::Identifier.new(local_name).from(node.lhs),
+        AST::Operator.new("=").from(node.lhs),
+        node.lhs,
+      ).from(node.lhs)
+      group.terms << AST::Choice.new([
+        {
+          AST::Relate.new(
+            AST::Identifier.new(local_name).from(node.lhs),
+            AST::Operator.new("<:").from(call_ident),
+            type_arg,
+          ).from(call_ident),
+          AST::Identifier.new(local_name).from(node.lhs),
+        },
+        {
+          AST::Identifier.new("True").from(call_ident),
+          AST::Identifier.new("error!").from(call_ident),
+        },
+      ] of {AST::Term, AST::Term}).from(node.op)
+      
+      group
+    else
+      node # all other calls are passed through unchanged
     end
   end
 end

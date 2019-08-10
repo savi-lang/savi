@@ -310,4 +310,54 @@ describe Mare::Compiler::Sugar do
       ],
     ]
   end
+  
+  # TODO: Can this be done as a "universal method" rather than sugar?
+  it "transforms an `as!` call into a subtype check in a choice" do
+    source = Mare::Source.new_example <<-SOURCE
+    :class Example
+      :fun type_cast
+        x.y.as!(Y).z
+    SOURCE
+    
+    ast = Mare::Parser.parse(source)
+    
+    ast.to_a.should eq [:doc,
+      [:declare, [[:ident, "class"], [:ident, "Example"]], [:group, ":"]],
+      [:declare, [[:ident, "fun"], [:ident, "type_cast"]], [:group, ":",
+        [:relate,
+          [:relate,
+            [:relate, [:ident, "x"], [:op, "."], [:ident, "y"]],
+            [:op, "."],
+            [:qualify, [:ident, "as!"], [:group, "(", [:ident, "Y"]]],
+          ],
+          [:op, "."],
+          [:ident, "z"],
+        ]
+      ]]
+    ]
+    
+    ctx = Mare::Compiler.compile([ast], :sugar)
+    
+    func = ctx.namespace.find_func!("Example", "type_cast")
+    func.body.not_nil!.to_a.should eq [:group, ":",
+      [:relate,
+        [:group, "(",
+          [:relate,
+            [:ident, "hygienic_local.1"],
+            [:op, "="],
+            [:relate, [:ident, "x"], [:op, "."], [:ident, "y"]]
+          ],
+          [:choice, [
+            [:relate,
+              [:ident, "hygienic_local.1"], [:op, "<:"], [:ident, "Y"]],
+              [:ident, "hygienic_local.1"]
+            ],
+            [[:ident, "True"], [:ident, "error!"]]
+          ]
+        ],
+        [:op, "."],
+        [:ident, "z"]
+      ]
+    ]
+  end
 end
