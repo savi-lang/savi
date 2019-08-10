@@ -139,6 +139,8 @@ class Mare::Program
     property params : AST::Group?
     property ret : AST::Term?
     property body : AST::Group?
+    property yield_out : AST::Term?
+    property yield_in : AST::Term?
     
     getter metadata : Hash(Symbol, String)
     

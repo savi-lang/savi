@@ -345,6 +345,8 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
     ] of Hash(String, String | Bool))
     
     def compile(context, decl)
+      func = nil
+      
       case decl.keyword
       when "fun"
         data = @@declare_fun.run(decl)
@@ -358,7 +360,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
             end
           end
         
-        @type.functions << Program::Function.new(
+        func = Program::Function.new(
           data["cap"].as(AST::Identifier),
           data["ident"].as(AST::Identifier),
           data["params"]?.as(AST::Group?),
@@ -371,7 +373,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         
         data = @@declare_be.run(decl)
         
-        @type.functions << Program::Function.new(
+        func = Program::Function.new(
           AST::Identifier.new("ref").from(data["keyword"]),
           data["ident"].as(AST::Identifier),
           data["params"]?.as(AST::Group?),
@@ -386,7 +388,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         
         data["cap"] ||= AST::Identifier.new("ref").from(data["keyword"])
         
-        @type.functions << Program::Function.new(
+        func = Program::Function.new(
           data["cap"].as(AST::Identifier),
           data["ident"].as(AST::Identifier),
           data["params"]?.as(AST::Group?),
@@ -399,7 +401,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
       when "const"
         data = @@declare_const.run(decl)
         
-        @type.functions << Program::Function.new(
+        func = Program::Function.new(
           AST::Identifier.new("non").from(data["keyword"]),
           data["ident"].as(AST::Identifier),
           nil,
@@ -421,7 +423,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         field_func = Program::Function.new(field_cap, ident.dup, field_params, ret.dup, field_body)
         field_func.add_tag(:hygienic)
         field_func.add_tag(:field)
-        @type.functions << field_func
+        func = field_func
         
         getter_cap = AST::Identifier.new("box").from(data["keyword"])
         if ret
@@ -467,7 +469,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
       when "is"
         data = @@declare_is.run(decl)
         
-        @type.functions << Program::Function.new(
+        func = Program::Function.new(
           AST::Identifier.new("non").from(data["keyword"]),
           decl.head.first.as(AST::Identifier),
           nil,
@@ -492,6 +494,57 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
           body.terms[0].as(AST::LiteralInteger).value.to_i32
         
         @program.aliases << type_alias
+      end
+      
+      if func
+        @type.functions << func
+        context.push Function.new(decl.keyword, func, @type, @program)
+      end
+    end
+  end
+  
+  class Function < Interpreter
+    property keyword : String # TODO: read-only as getter
+    getter func : Program::Function
+    getter type : Program::Type
+    getter program : Program
+    
+    def initialize(@keyword, @func, @type, @program)
+    end
+    
+    # TODO: dedup these with the Witness mechanism.
+    def keywords; ["yields"] end
+    
+    def finished(context)
+    end
+    
+    @@declare_yields = Witness.new([
+      {
+        "kind" => "keyword",
+        "name" => "keyword",
+        "value" => "yields",
+      },
+      {
+        "kind" => "term",
+        "name" => "out",
+        "type" => "type",
+        "optional" => true,
+      },
+      {
+        "kind" => "term",
+        "name" => "in",
+        "type" => "type",
+        "optional" => true,
+      },
+    ] of Hash(String, String | Bool))
+    
+    def compile(context, decl)
+      case decl.keyword
+      when "yields"
+        data = @@declare_yields.run(decl)
+        
+        @func.yield_out = data["out"]?.as(AST::Term?)
+        @func.yield_in  = data["in"]?.as(AST::Term?)
       end
     end
   end

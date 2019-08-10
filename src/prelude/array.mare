@@ -43,3 +43,14 @@
     @_ptr._assign_at(@_size, --value)
     @_size = @_size + 1
     @
+  
+  :fun each
+    :yields A'aliased
+    i USize = 0
+    try (
+      while (i < size) (
+        yield @[i]!
+        i = i + 1
+      )
+    )
+    None
