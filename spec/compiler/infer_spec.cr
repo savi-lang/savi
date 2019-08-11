@@ -1786,7 +1786,7 @@ describe Mare::Compiler::Infer do
         )
       :new
         sum U64 = 0
-        @.count_to(5) -> (i| sum = sum + i) // TODO: @count_to without dot
+        @count_to(5) -> (i| sum = sum + i)
     SOURCE
     
     Mare::Compiler.compile([source], :infer)
@@ -1797,19 +1797,19 @@ describe Mare::Compiler::Infer do
     :actor Main
       :fun will_not_yield: None
       :new
-        @.will_not_yield -> (i| i) // TODO: @will_not_yield without dot
+        @will_not_yield -> (i| i)
     SOURCE
     
     expected = <<-MSG
     This function call doesn't meet subtyping requirements:
     from (example):4:
-        @.will_not_yield -> (i| i) // TODO: @will_not_yield without dot
-          ^~~~~~~~~~~~~~
+        @will_not_yield -> (i| i)
+        ^~~~~~~~~~~~~~~
     
     - it has a yield block but the called function does not have any yields:
       from (example):4:
-        @.will_not_yield -> (i| i) // TODO: @will_not_yield without dot
-                               ^~
+        @will_not_yield -> (i| i)
+                              ^~
     MSG
     
     expect_raises Mare::Error, expected do
@@ -1850,19 +1850,19 @@ describe Mare::Compiler::Infer do
         yield U64[99]
       :new
         sum U32 = 0
-        @.yield_99 -> (i| j U32 = i) // TODO: @yield_99 without dot
+        @yield_99 -> (i| j U32 = i)
     SOURCE
     
     expected = <<-MSG
     The type of this expression doesn't meet the constraints imposed on it:
     from (example):6:
-        @.yield_99 -> (i| j U32 = i) // TODO: @yield_99 without dot
-                                  ^
+        @yield_99 -> (i| j U32 = i)
+                                 ^
     
     - it is required here to be a subtype of U32:
       from (example):6:
-        @.yield_99 -> (i| j U32 = i) // TODO: @yield_99 without dot
-                            ^~~
+        @yield_99 -> (i| j U32 = i)
+                           ^~~
     
     - but the type of the local variable was U64:
       from (example):3:

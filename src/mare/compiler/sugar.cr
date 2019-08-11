@@ -138,10 +138,21 @@ class Mare::Compiler::Sugar < Mare::AST::Visitor
   
   def visit(node : AST::Relate)
     case node.op.value
-    when "'", "->", "+>", " ", "<:", "DEFAULTPARAM"
+    when "'", "+>", " ", "<:", "DEFAULTPARAM"
       node # skip these special-case operators
     when "."
       visit_dot(node)
+    when "->"
+      # If a dot relation is within this (which doesn't happen in the parser,
+      # but may happen artifically such as the `@identifier` sugar above),
+      # then always move the qualify into the right-hand-side of the dot.
+      new_top = nil
+      while (dot = node.lhs).is_a?(AST::Relate) && dot.op.value == "."
+        node.lhs = dot.rhs
+        dot.rhs = node
+        new_top ||= dot
+      end
+      new_top || node
     when "="
       # If assigning to a ".[identifier]" relation, sugar as a "setter" method.
       lhs = node.lhs
