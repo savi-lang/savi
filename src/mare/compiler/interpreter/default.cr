@@ -541,6 +541,17 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
     def compile(context, decl)
       case decl.keyword
       when "yields"
+        # If this yields declaration has code attached, append to the function.
+        # TODO: Provide a way to declare in the interpreter that the yields
+        # declaration takes no imperative code and is declarative only.
+        if @func.body
+          @func.body.not_nil!.terms.concat(decl.body.terms)
+          decl.body.terms.clear
+        else
+          @func.body = AST::Group.new(decl.body.style, decl.body.terms.dup).from(decl.body)
+          decl.body.terms.clear
+        end
+        
         data = @@declare_yields.run(decl)
         
         @func.yield_out = data["out"]?.as(AST::Term?)

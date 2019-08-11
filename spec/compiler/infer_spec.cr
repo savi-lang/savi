@@ -1778,12 +1778,12 @@ describe Mare::Compiler::Infer do
     source = Mare::Source.new_example <<-SOURCE
     :actor Main
       :fun count_to (count U64) None
+        :yields U64 None
         i U64 = 0
         while (i < count) (
           i = i + 1
           yield i
         )
-        :yields U64 None // TODO: move to just below the function head
       :new
         sum U64 = 0
         @.count_to(5) -> (i| sum = sum + i) // TODO: @count_to without dot
