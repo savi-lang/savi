@@ -47,10 +47,8 @@
   :fun each
     :yields A'aliased
     i USize = 0
-    try (
-      while (i < size) (
-        yield @[i]!
-        i = i + 1
-      )
+    while (i < @_size) (
+      yield @_ptr._get_at(index)
+      i = i + 1
     )
     None
