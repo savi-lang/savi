@@ -44,11 +44,11 @@
     @_size = @_size + 1
     @
   
-  :fun each
-    :yields A'aliased
-    i USize = 0
-    while (i < @_size) (
-      yield @_ptr._get_at(index)
-      i = i + 1
-    )
-    None
+  // :fun each
+  //   :yields A'aliased
+  //   i USize = 0
+  //   while (i < @_size) (
+  //     yield @_ptr._get_at(index)
+  //     i = i + 1
+  //   )
+  //   None
