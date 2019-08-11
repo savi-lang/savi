@@ -199,8 +199,18 @@ class Mare::Compiler::CodeGen
       infer.func
     end
     
-    def can_error?
-      Jumps.any_error?(func.ident)
+    def calling_convention : Symbol
+      if func.has_tag?(:constructor)
+        :constructor_cc
+      elsif infer.ctx.egress.yields[func]?
+        raise NotImplementedError.new("yield and error not supported yet") \
+          if Jumps.any_error?(func.ident)
+        :yield_cc
+      elsif Jumps.any_error?(func.ident)
+        :error_cc
+      else
+        :simple_cc
+      end
     end
     
     def needs_receiver?
@@ -565,15 +575,19 @@ class Mare::Compiler::CodeGen
   end
   
   def gen_func_decl(gtype, gfunc)
-    # Get the LLVM type to use for the return type.
-    ret_type = llvm_type_of(gfunc.func.ident, gfunc)
-    
-    if gfunc.can_error?
-      ret_type = llvm.struct([ret_type, @i1])
-    end
-    
-    # Constructors return void (the caller already has the receiver).
-    ret_type = @void if gfunc.func.has_tag?(:constructor)
+    # Determine the LLVM type to return, based on the calling convention.
+    simple_ret_type = llvm_type_of(gfunc.func.ident, gfunc)
+    ret_type =
+      case gfunc.calling_convention
+      when :constructor_cc
+        @void
+      when :simple_cc
+        simple_ret_type
+      when :error_cc
+        llvm.struct([simple_ret_type, @i1])
+      else
+        raise NotImplementedError.new(gfunc.calling_convention)
+      end
     
     # Get the LLVM types to use for the parameter types.
     param_types = [] of LLVM::Type
@@ -677,15 +691,15 @@ class Mare::Compiler::CodeGen
     last_value ||= gen_none
     
     unless Jumps.away?(gfunc.func.body.not_nil!)
-      if gfunc.func.has_tag?(:constructor)
-        # For a constructor, return void (the caller already has the receiver).
+      case gfunc.calling_convention
+      when :constructor_cc
         @builder.ret
-      elsif gfunc.can_error?
-        # If this is an error-able function, use that calling convention.
+      when :simple_cc
+        @builder.ret(last_value)
+      when :error_cc
         gen_return_using_error_cc(last_value, false)
       else
-        # Otherwise, return the error as normal.
-        @builder.ret(last_value)
+        raise NotImplementedError.new(gfunc.calling_convention)
       end
     end
     
@@ -1175,8 +1189,14 @@ class Mare::Compiler::CodeGen
         gen_call(gfunc.llvm_func, args, arg_exprs)
       end
     
-    # If this is an error-able function, check the error bit in the tuple.
-    if gfunc.can_error?
+    case gfunc.calling_convention
+    when :simple_cc
+      # Do nothing - we already have the result value we need.
+    when :constructor_cc
+      # The result is the receiver we sent over as an argument.
+      result = receiver if gfunc.func.has_tag?(:constructor)
+    when :error_cc
+      # If this is an error-able function, check the error bit in the tuple.
       error_bit = @builder.extract_value(result, 1)
       
       error_block = gen_block("error_return")
@@ -1193,9 +1213,6 @@ class Mare::Compiler::CodeGen
       @builder.position_at_end(after_block)
       result = @builder.extract_value(result, 0)
     end
-    
-    # If this is a constructor, the result is the receiver we already have.
-    result = receiver if gfunc.func.has_tag?(:constructor)
     
     result
   end
@@ -2007,7 +2024,9 @@ class Mare::Compiler::CodeGen
     # using the error-able calling convention function style,
     # making (and checking) the assumption that we are in such a function.
     if @try_else_stack.empty?
-      raise "malformed try else stack" unless func_frame.gfunc.not_nil!.can_error?
+      calling_convention = func_frame.gfunc.not_nil!.calling_convention
+      raise "unsupported empty try else stack for #{calling_convention}" \
+        unless calling_convention == :error_cc
       gen_return_using_error_cc(error_value, true)
     else
       # Store the state needed to catch the value in the try else block.
