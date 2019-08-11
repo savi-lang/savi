@@ -621,12 +621,14 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         end
       end
       
-      func.yield_out.try do |yield_out|
-        yield_out.accept(self)
-        
+      if ctx.egress.yields[func]?
         # Create a fake local variable that represents the yield out type.
         @yield_out_info = Local.new((func.yield_out || func.ident).pos)
-        @yield_out_info.not_nil!.set_explicit(yield_out.pos, resolve(yield_out))
+        
+        func.yield_out.try do |yield_out|
+          yield_out.accept(self)
+          @yield_out_info.not_nil!.set_explicit(yield_out.pos, resolve(yield_out))
+        end
       end
       
       # Don't bother further typechecking functions that have no body
@@ -1232,7 +1234,6 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
     
     def touch(node : AST::Yield)
-      @yield_out_info ||= Local.new((func.yield_out || func.ident).pos)
       @yield_out_info.not_nil!.assign(self, node.term, node.term.pos)
       
       none = MetaType.new(reified_type(prelude_type("None")))
