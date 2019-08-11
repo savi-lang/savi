@@ -477,7 +477,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     getter ctx : Context
     getter for_type : ForType
     getter reified : ReifiedFunction
-    getter! yield_out_info : Local
+    getter yield_out_info : Local?
     
     def initialize(@ctx, @for_type, @reified)
       @local_idents = Hash(Refer::Local, AST::Node).new
@@ -621,13 +621,12 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         end
       end
       
-      if func.has_tag?(:yields)
+      func.yield_out.try do |yield_out|
+        yield_out.accept(self)
+        
         # Create a fake local variable that represents the yield out type.
         @yield_out_info = Local.new((func.yield_out || func.ident).pos)
-        func.yield_out.try do |yield_out|
-          yield_out.accept(self)
-          yield_out_info.set_explicit(yield_out.pos, resolve(yield_out))
-        end
+        @yield_out_info.not_nil!.set_explicit(yield_out.pos, resolve(yield_out))
       end
       
       # Don't bother further typechecking functions that have no body
@@ -750,17 +749,17 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       end
     end
     
-    def follow_call_check_yield_block(call_func, infer, yield_params, yield_block, problems)
-      if !call_func.has_tag?(:yields)
+    def follow_call_check_yield_block(infer, yield_params, yield_block, problems)
+      if !infer.yield_out_info
         if yield_block
           problems << {yield_block.pos, "it has a yield block " \
             "but the called function does not have any yields"}
         end
       elsif !yield_block
-        problems << {infer.yield_out_info.first_viable_constraint_pos,
+        problems << {infer.yield_out_info.not_nil!.first_viable_constraint_pos,
           "it has no yield block but the called function does yield"}
       else
-        # TODO: Verify type of yield_block matches the call_func.yield_in.
+        # TODO: Verify type of yield_block matches the infer.yield_in_info.
         
         if yield_params
           raise NotImplementedError.new("multiple yield params") \
@@ -768,7 +767,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
           yield_param = yield_params.terms.first
           
           # TODO: Use .assign instead of .set_explicit after figuring out how to have an AST node for it
-          yield_out = infer.yield_out_info
+          yield_out = infer.yield_out_info.not_nil!
           self[yield_param].as(Local).set_explicit(
             yield_out.first_viable_constraint_pos,
             yield_out.resolve!(infer),
@@ -839,7 +838,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         infer = ctx.infer.for_func(ctx, call_defn, call_func, reify_cap).tap(&.run)
         
         follow_call_check_args(call, infer)
-        follow_call_check_yield_block(call_func, infer, yield_params, yield_block, problems)
+        follow_call_check_yield_block(infer, yield_params, yield_block, problems)
         
         # Resolve and take note of the return type.
         inferred_ret_info = infer[infer.ret]
@@ -1233,7 +1232,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
     
     def touch(node : AST::Yield)
-      yield_out_info.assign(self, node.term, node.term.pos)
+      @yield_out_info ||= Local.new((func.yield_out || func.ident).pos)
+      @yield_out_info.not_nil!.assign(self, node.term, node.term.pos)
       
       none = MetaType.new(reified_type(prelude_type("None")))
       self[node] = FromYield.new(node.pos, none)

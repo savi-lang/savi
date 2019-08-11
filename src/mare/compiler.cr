@@ -98,6 +98,8 @@ module Mare::Compiler
   def self.compile(docs : Array(AST::Document), target : Symbol = :eval)
     raise "No source documents given!" if docs.empty?
     
+    # TODO: sharing prelude_docs breaks when compiler passes are not idempotent.
+    # @@prelude_docs = nil
     docs.concat(prelude_docs)
     
     ctx = Context.new
