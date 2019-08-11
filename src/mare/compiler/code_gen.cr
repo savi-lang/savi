@@ -200,17 +200,14 @@ class Mare::Compiler::CodeGen
     end
     
     def calling_convention : Symbol
-      if func.has_tag?(:constructor)
-        :constructor_cc
-      elsif infer.ctx.inventory.yields[func]?
-        raise NotImplementedError.new("yield and error not supported yet") \
-          if Jumps.any_error?(func.ident)
-        :yield_cc
-      elsif Jumps.any_error?(func.ident)
-        :error_cc
-      else
-        :simple_cc
-      end
+      list = [] of Symbol
+      list << :constructor_cc if func.has_tag?(:constructor)
+      list << :error_cc if Jumps.any_error?(func.ident)
+      list << :yield_cc if infer.ctx.inventory.yields[func]?
+      
+      return :simple_cc if list.empty?
+      return list.first if list.size == 1
+      raise NotImplementedError.new(list)
     end
     
     def needs_receiver?
