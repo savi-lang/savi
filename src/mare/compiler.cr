@@ -10,7 +10,7 @@ module Mare::Compiler
     when :refer        then ctx.run(ctx.refer)
     when :classify     then ctx.run(Classify)
     when :jumps        then ctx.run(Jumps)
-    when :egress       then ctx.run(ctx.egress)
+    when :inventory    then ctx.run(ctx.inventory)
     when :infer        then ctx.run(ctx.infer)
     when :privacy      then ctx.run(Privacy)
     when :completeness then ctx.run(Completeness)
@@ -38,14 +38,14 @@ module Mare::Compiler
     when :refer then [:lambda, :sugar, :macros, :namespace]
     when :classify then [:refer, :lambda, :sugar, :macros]
     when :jumps then [:classify]
-    when :egress then [:classify]
-    when :infer then [:egress, :jumps, :classify, :refer, :lambda, :copy]
+    when :inventory then [:classify]
+    when :infer then [:inventory, :jumps, :classify, :refer, :lambda, :copy]
     when :privacy then [:infer]
     when :completeness then [:jumps, :infer, :lambda, :sugar, :macros, :copy]
     when :reach then [:infer]
     when :verify then [:reach]
     when :paint then [:reach]
-    when :codegen then [:paint, :verify, :reach, :completeness, :privacy, :infer, :egress, :jumps]
+    when :codegen then [:paint, :verify, :reach, :completeness, :privacy, :infer, :inventory, :jumps]
     when :eval then [:codegen]
     when :binary then [:codegen]
     when :serve_hover then [:refer, :infer]

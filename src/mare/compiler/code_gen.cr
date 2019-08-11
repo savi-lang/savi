@@ -202,7 +202,7 @@ class Mare::Compiler::CodeGen
     def calling_convention : Symbol
       if func.has_tag?(:constructor)
         :constructor_cc
-      elsif infer.ctx.egress.yields[func]?
+      elsif infer.ctx.inventory.yields[func]?
         raise NotImplementedError.new("yield and error not supported yet") \
           if Jumps.any_error?(func.ident)
         :yield_cc

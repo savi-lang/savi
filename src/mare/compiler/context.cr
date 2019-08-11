@@ -1,7 +1,7 @@
 class Mare::Compiler::Context
   getter program
   getter namespace
-  getter egress
+  getter inventory
   getter infer
   getter refer
   getter reach
@@ -15,7 +15,7 @@ class Mare::Compiler::Context
     @stack = [Interpreter::Default.new(@program)] of Interpreter
     
     @namespace = Namespace.new
-    @egress = Egress.new
+    @inventory = Inventory.new
     @infer = Infer.new
     @refer = Refer.new
     @reach = Reach.new

@@ -621,7 +621,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         end
       end
       
-      if ctx.egress.yields[func]?
+      if ctx.inventory.yields[func]?
         # Create a fake local variable that represents the yield out type.
         @yield_out_info = Local.new((func.yield_out || func.ident).pos)
         
