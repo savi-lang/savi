@@ -194,6 +194,12 @@ class Mare::Compiler::Infer
     
     def adds_alias; 1 end
     
+    def first_viable_constraint_pos : Source::Pos
+      @domain_constraints[0]?.try(&.[0]) ||
+      @upstreams[0]?.try(&.[1]) ||
+      @pos
+    end
+    
     def inner_resolve!(infer : ForFunc)
       explicit = @explicit
       
@@ -489,6 +495,18 @@ class Mare::Compiler::Infer
     def set_return(infer : ForFunc, ret_pos : Source::Pos, ret : MetaType)
       @ret_pos = ret_pos
       @ret = ret.ephemeralize
+    end
+  end
+  
+  class FromYield < DynamicInfo
+    def initialize(@pos, @static_type : MetaType)
+    end
+    
+    def describe_kind; "yield result" end
+    
+    def inner_resolve!(infer : ForFunc)
+      # TODO: Implement this.
+      @static_type
     end
   end
   

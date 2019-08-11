@@ -73,6 +73,8 @@ class Mare::Compiler::Classify < Mare::AST::Visitor
     func.ret.try(&.accept(self))
     func.ret.try(&.accept(TypeExprVisitor.instance))
     func.body.try(&.accept(self))
+    func.yield_out.try(&.accept(TypeExprVisitor.instance))
+    func.yield_in.try(&.accept(TypeExprVisitor.instance))
   end
   
   def refer

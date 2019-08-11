@@ -1778,12 +1778,12 @@ describe Mare::Compiler::Infer do
     source = Mare::Source.new_example <<-SOURCE
     :actor Main
       :fun count_to (count U64) None
-        :yields U64 None
         i U64 = 0
         while (i < count) (
           i = i + 1
           yield i
         )
+        :yields U64 None // TODO: move to just below the function head
       :new
         sum U64 = 0
         @.count_to(5) -> (i| sum = sum + i) // TODO: @count_to without dot
@@ -1791,4 +1791,89 @@ describe Mare::Compiler::Infer do
     
     Mare::Compiler.compile([source], :infer)
   end
+  
+  it "complains when a yield block is present on a non-yielding call" do
+    source = Mare::Source.new_example <<-SOURCE
+    :actor Main
+      :fun will_not_yield: None
+      :new
+        @.will_not_yield -> (i| i) // TODO: @will_not_yield without dot
+    SOURCE
+    
+    expected = <<-MSG
+    This function call doesn't meet subtyping requirements:
+    from (example):4:
+        @.will_not_yield -> (i| i) // TODO: @will_not_yield without dot
+          ^~~~~~~~~~~~~~
+    
+    - it has a yield block but the called function does not have any yields:
+      from (example):4:
+        @.will_not_yield -> (i| i) // TODO: @will_not_yield without dot
+                               ^~
+    MSG
+    
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :infer)
+    end
+  end
+  
+  it "complains when a yield block is not present on a yielding call" do
+    source = Mare::Source.new_example <<-SOURCE
+    :actor Main
+      :fun yield_99
+        yield U64[99]
+      :new
+        @yield_99
+    SOURCE
+    
+    expected = <<-MSG
+    This function call doesn't meet subtyping requirements:
+    from (example):5:
+        @yield_99
+        ^~~~~~~~~
+    
+    - it has no yield block but the called function does yield:
+      from (example):3:
+        yield U64[99]
+              ^~~~~~~
+    MSG
+    
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :infer)
+    end
+  end
+  
+  it "complains when the yield param type doesn't match a constraint" do
+    source = Mare::Source.new_example <<-SOURCE
+    :actor Main
+      :fun yield_99
+        yield U64[99]
+      :new
+        sum U32 = 0
+        @.yield_99 -> (i| j U32 = i) // TODO: @yield_99 without dot
+    SOURCE
+    
+    expected = <<-MSG
+    The type of this expression doesn't meet the constraints imposed on it:
+    from (example):6:
+        @.yield_99 -> (i| j U32 = i) // TODO: @yield_99 without dot
+                                  ^
+    
+    - it is required here to be a subtype of U32:
+      from (example):6:
+        @.yield_99 -> (i| j U32 = i) // TODO: @yield_99 without dot
+                            ^~~
+    
+    - but the type of the local variable was U64:
+      from (example):3:
+        yield U64[99]
+              ^~~~~~~
+    MSG
+    
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :infer)
+    end
+  end
+  
+  pending "complains when the yield block result doesn't match the expected type"
 end

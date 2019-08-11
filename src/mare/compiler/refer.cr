@@ -161,6 +161,8 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
         unless func.has_tag?(:ffi)
       func.ret.try(&.accept(root))
       func.body.try(&.accept(root))
+      func.yield_out.try(&.accept(root))
+      func.yield_in.try(&.accept(root))
     end
   end
   
@@ -381,11 +383,10 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
       # Visit params and block twice (nested) to simulate repeated execution
       sub_branch = sub_branch()
       params.try(&.accept(sub_branch))
-      params.try(&.terms.each { |param| sub_branch.create_param_local(param) })
+      params.try(&.terms.each { |param| sub_branch.create_local(param) })
       block.try(&.accept(sub_branch))
       sub_branch2 = sub_branch.sub_branch()
       params.try(&.accept(sub_branch2))
-      params.try(&.terms.each { |param| sub_branch2.create_param_local(param) })
       block.try(&.accept(sub_branch2))
       
       # Absorb any consumes from the block branch into this parent branch.

@@ -477,6 +477,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     getter ctx : Context
     getter for_type : ForType
     getter reified : ReifiedFunction
+    getter! yield_out_info : Local
     
     def initialize(@ctx, @for_type, @reified)
       @local_idents = Hash(Refer::Local, AST::Node).new
@@ -616,8 +617,16 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       else
         func.ret.try do |ret_t|
           ret_t.accept(self)
-          meta_type = resolve(ret_t)
-          self[ret].as(FuncBody).set_explicit(ret_t.pos, meta_type)
+          self[ret].as(FuncBody).set_explicit(ret_t.pos, resolve(ret_t))
+        end
+      end
+      
+      if func.has_tag?(:yields)
+        # Create a fake local variable that represents the yield out type.
+        @yield_out_info = Local.new((func.yield_out || func.ident).pos)
+        func.yield_out.try do |yield_out|
+          yield_out.accept(self)
+          yield_out_info.set_explicit(yield_out.pos, resolve(yield_out))
         end
       end
       
@@ -741,6 +750,33 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       end
     end
     
+    def follow_call_check_yield_block(call_func, infer, yield_params, yield_block, problems)
+      if !call_func.has_tag?(:yields)
+        if yield_block
+          problems << {yield_block.pos, "it has a yield block " \
+            "but the called function does not have any yields"}
+        end
+      elsif !yield_block
+        problems << {infer.yield_out_info.first_viable_constraint_pos,
+          "it has no yield block but the called function does yield"}
+      else
+        # TODO: Verify type of yield_block matches the call_func.yield_in.
+        
+        if yield_params
+          raise NotImplementedError.new("multiple yield params") \
+            unless yield_params.terms.size == 1
+          yield_param = yield_params.terms.first
+          
+          # TODO: Use .assign instead of .set_explicit after figuring out how to have an AST node for it
+          yield_out = infer.yield_out_info
+          self[yield_param].as(Local).set_explicit(
+            yield_out.first_viable_constraint_pos,
+            yield_out.resolve!(infer),
+          )
+        end
+      end
+    end
+    
     def follow_call_check_autorecover_cap(call, required_cap, call_func, infer, inferred_ret)
       # If autorecover of the receiver cap was needed to make this call work,
       # we now have to confirm that arguments and return value are all sendable.
@@ -777,7 +813,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
           problems unless problems.empty?
     end
     
-    def follow_call(call : FromCall)
+    def follow_call(call : FromCall, yield_params, yield_block)
       call_defns = follow_call_get_call_defns(call)
       
       # For each receiver type definition that is possible, track down the infer
@@ -803,6 +839,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         infer = ctx.infer.for_func(ctx, call_defn, call_func, reify_cap).tap(&.run)
         
         follow_call_check_args(call, infer)
+        follow_call_check_yield_block(call_func, infer, yield_params, yield_block, problems)
         
         # Resolve and take note of the return type.
         inferred_ret_info = infer[infer.ret]
@@ -1093,7 +1130,11 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         )
         self[node] = call
         
-        follow_call(call)
+        follow_call(
+          call,
+          yield_params,
+          yield_block,
+        )
       when "<:"
         rhs_info = self[node.rhs]
         Error.at node.rhs, "expected this to have a fixed type at compile time" \
@@ -1189,6 +1230,13 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     
     def touch(node : AST::Try)
       self[node] = Try.new(node.pos, node.body, node.else_body)
+    end
+    
+    def touch(node : AST::Yield)
+      yield_out_info.assign(self, node.term, node.term.pos)
+      
+      none = MetaType.new(reified_type(prelude_type("None")))
+      self[node] = FromYield.new(node.pos, none)
     end
     
     def touch(node : AST::Node)
