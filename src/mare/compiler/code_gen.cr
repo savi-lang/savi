@@ -2037,9 +2037,11 @@ class Mare::Compiler::CodeGen
       @builder.position_at_end(case_block)
       value = gen_expr(fore[1])
       unless Jumps.away?(fore[1])
-        value = gen_assign_cast(value, phi_type, fore[1])
-        phi_blocks << @builder.insert_block
-        phi_values << value
+        if Classify.value_needed?(expr)
+          value = gen_assign_cast(value, phi_type, fore[1])
+          phi_blocks << @builder.insert_block
+          phi_values << value
+        end
         @builder.br(post_block)
       end
       
@@ -2062,15 +2064,16 @@ class Mare::Compiler::CodeGen
     @builder.position_at_end(case_block)
     value = gen_expr(expr.list.last[1])
     unless Jumps.away?(expr.list.last[1])
-      value = gen_assign_cast(value, phi_type, expr.list.last[1])
-      phi_blocks << @builder.insert_block
-      phi_values << value
+      if Classify.value_needed?(expr)
+        value = gen_assign_cast(value, phi_type, expr.list.last[1])
+        phi_blocks << @builder.insert_block
+        phi_values << value
+      end
       @builder.br(post_block)
     end
     
-    # We can't have a phi with no predecessors, so we don't generate it, and
-    # return a None value; it won't be used, but this method can't return nil.
-    if phi_blocks.empty? && phi_values.empty?
+    # When we jump away, we can't generate the post block.
+    if Jumps.away?(expr)
       post_block.delete
       return gen_none
     end
@@ -2078,7 +2081,11 @@ class Mare::Compiler::CodeGen
     # Here at the post block, we receive the value that was returned by one of
     # the cases above, using the LLVM mechanism called a "phi" instruction.
     @builder.position_at_end(post_block)
-    @builder.phi(phi_type, phi_blocks, phi_values, "phi_choice")
+    if Classify.value_needed?(expr)
+      @builder.phi(phi_type, phi_blocks, phi_values, "phi_choice")
+    else
+      gen_none
+    end
   end
   
   def gen_loop(expr : AST::Loop)
@@ -2106,10 +2113,13 @@ class Mare::Compiler::CodeGen
     @builder.position_at_end(body_block)
     body_value = gen_expr(expr.body)
     unless Jumps.away?(expr.body)
-      body_value = gen_assign_cast(body_value, phi_type, expr.body)
       cond_value = gen_expr(expr.cond)
-      phi_blocks << @builder.insert_block
-      phi_values << body_value
+      
+      if Classify.value_needed?(expr)
+        body_value = gen_assign_cast(body_value, phi_type, expr.body)
+        phi_blocks << @builder.insert_block
+        phi_values << body_value
+      end
       @builder.cond(cond_value, body_block, post_block)
     end
     
@@ -2118,15 +2128,16 @@ class Mare::Compiler::CodeGen
     @builder.position_at_end(else_block)
     else_value = gen_expr(expr.else_body)
     unless Jumps.away?(expr.else_body)
-      else_value = gen_assign_cast(else_value, phi_type, expr.else_body)
-      phi_blocks << @builder.insert_block
-      phi_values << else_value
+      if Classify.value_needed?(expr)
+        else_value = gen_assign_cast(else_value, phi_type, expr.else_body)
+        phi_blocks << @builder.insert_block
+        phi_values << else_value
+      end
       @builder.br(post_block)
     end
     
-    # We can't have a phi with no predecessors, so we don't generate it, and
-    # return a None value; it won't be used, but this method can't return nil.
-    if phi_blocks.empty? && phi_values.empty?
+    # When we jump away, we can't generate the post block.
+    if Jumps.away?(expr)
       post_block.delete
       return gen_none
     end
@@ -2134,7 +2145,11 @@ class Mare::Compiler::CodeGen
     # Here at the post block, we receive the value that was returned by one of
     # the bodies above, using the LLVM mechanism called a "phi" instruction.
     @builder.position_at_end(post_block)
-    @builder.phi(phi_type, phi_blocks, phi_values, "phi_loop")
+    if Classify.value_needed?(expr)
+      @builder.phi(phi_type, phi_blocks, phi_values, "phi_loop")
+    else
+      gen_none
+    end
   end
   
   def gen_try(expr : AST::Try)

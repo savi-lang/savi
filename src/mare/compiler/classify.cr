@@ -37,6 +37,20 @@ class Mare::Compiler::Classify < Mare::AST::Visitor
     (node.flags & (FLAG_ALWAYS_ERROR | FLAG_MAYBE_ERROR)) != 0
   end
   
+  def self.recursive_value_not_needed!(node)
+    value_not_needed!(node)
+    
+    case node
+    when AST::Group
+      node.terms[-1]?.try { |child| recursive_value_not_needed!(child) }
+    when AST::Choice
+      node.list.each { |cond, body| recursive_value_not_needed!(body) }
+    when AST::Loop
+      recursive_value_not_needed!(node.body)
+      recursive_value_not_needed!(node.else_body)
+    end
+  end
+  
   # This visitor marks the given node tree as being a type_expr.
   class TypeExprVisitor < Mare::AST::Visitor
     INSTANCE = new
@@ -96,7 +110,7 @@ class Mare::Compiler::Classify < Mare::AST::Visitor
     case group.style
     when "(", ":"
       # In a sequence-style group, only the value of the final term is needed.
-      group.terms.each { |t| Classify.value_not_needed!(t) }
+      group.terms[0...-1].each { |t| Classify.recursive_value_not_needed!(t) }
       Classify.value_needed!(group.terms.last) unless group.terms.empty?
     when " "
       if group.terms.size == 2
