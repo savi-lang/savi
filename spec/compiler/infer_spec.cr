@@ -1876,4 +1876,5 @@ describe Mare::Compiler::Infer do
   end
   
   pending "complains when the yield block result doesn't match the expected type"
+  pending "enforces yield properties as part of trait subtyping"
 end

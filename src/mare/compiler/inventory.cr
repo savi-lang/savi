@@ -25,6 +25,7 @@ class Mare::Compiler::Inventory < Mare::AST::Visitor
       @current_type = t
       t.functions.each do |f|
         @current_func = f
+        f.params.try(&.accept(self))
         f.body.try(&.accept(self))
       end
     end
@@ -40,7 +41,8 @@ class Mare::Compiler::Inventory < Mare::AST::Visitor
     when AST::Identifier
       if (ref = current_ctx.refer[current_type][current_func][node]; ref)
         if ref.is_a?(Refer::Local)
-          (locals[current_func] ||= ([] of Refer::Local)) << ref
+          list = (locals[current_func] ||= ([] of Refer::Local))
+          list << ref unless list.includes?(ref)
         end
       end
     end

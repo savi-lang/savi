@@ -25,8 +25,14 @@ class Mare::Compiler::CodeGen
     getter gtype : GenType?
     getter gfunc : GenFunc?
     
+    # TODO: Rename func as llvm_func and remove this alias
+    def llvm_func
+      func
+    end
+    
     setter pony_ctx : LLVM::Value?
     property! receiver_value : LLVM::Value?
+    property! continuation_value : LLVM::Value
     
     getter current_locals
     
@@ -156,7 +162,13 @@ class Mare::Compiler::CodeGen
       
       @gfuncs.each_value do |gfunc|
         g.gen_send_impl(self, gfunc) if gfunc.needs_send?
-        g.gen_func_impl(self, gfunc)
+        g.gen_func_impl(self, gfunc, gfunc.llvm_func)
+        
+        # A function that his continuation must be generated additional times;
+        # once for each yield, each having a different entry path.
+        gfunc.continuation_llvm_funcs?.try(&.each { |cont_llvm_func|
+          g.gen_func_impl(self, gfunc, cont_llvm_func)
+        })
       end
     end
     
@@ -187,6 +199,10 @@ class Mare::Compiler::CodeGen
     property! virtual_llvm_func : LLVM::Function
     property! send_llvm_func : LLVM::Function
     property! send_msg_llvm_type : LLVM::Type
+    property! continuation_type : LLVM::Type
+    property! continuation_llvm_func_ptr : LLVM::Type
+    property! continuation_llvm_funcs : Array(LLVM::Function)
+    property! after_yield_blocks : Array(LLVM::BasicBlock)
     
     def initialize(type_def : Reach::Def, @infer, @vtable_index)
       @needs_receiver = type_def.has_state? && !(func.cap.value == "non")
@@ -304,12 +320,16 @@ class Mare::Compiler::CodeGen
     ctx.reach[in_gfunc.infer.resolve(expr)]
   end
   
+  def llvm_type_of(gtype : GenType)
+    llvm_type_of(gtype.type_def.as_ref) # TODO: this is backwards - defs should have a llvm_use_type of their own, with refs delegating to that implementation when there is a singular meta_type
+  end
+  
   def llvm_type_of(expr : AST::Node, in_gfunc : GenFunc? = nil)
     llvm_type_of(type_of(expr, in_gfunc))
   end
   
-  def llvm_type_of(gtype : GenType)
-    llvm_type_of(gtype.type_def.as_ref) # TODO: this is backwards - defs should have a llvm_use_type of their own, with refs delegating to that implementation when there is a singular meta_type
+  def llvm_mem_type_of(expr : AST::Node, in_gfunc : GenFunc? = nil)
+    llvm_mem_type_of(type_of(expr, in_gfunc))
   end
   
   def llvm_type_of(ref : Reach::Ref)
@@ -537,16 +557,68 @@ class Mare::Compiler::CodeGen
     # Create an entry block and start building from there.
     @builder.position_at_end(gen_block("entry"))
     
-    # Declare an alloca for each parameter.
+    # We have some extra work to do here if this is a yielding function.
+    if gfunc && gfunc.calling_convention == :yield_cc
+      # We need to pre-declare the code blocks that follow each yield statement.
+      gfunc.after_yield_blocks = [] of LLVM::BasicBlock
+      ctx.inventory.yields[gfunc.func].size.times do |index|
+        gfunc.after_yield_blocks << gen_block("after_yield_#{index + 1}")
+      end
+      
+      # For the continuation functions, we will jump directly to the block
+      # that follows the yield statement that last ran in the previous call.
+      # We will get a non-nil yield_index here if this is a continuation call.
+      yield_index = gfunc.continuation_llvm_funcs.index(llvm_func)
+      if yield_index.nil?
+        # If this isn't a continuation function, we have to allocate the object
+        # that will hold the continuation data, since it starts right here.
+        # TODO: Can we allocate with malloc instead so we can use explicit free?
+        # TODO: Can we avoid allocation entirely by not passing as a pointer?
+        # Doing so would reduce overhead of yielding calls, at the expense of
+        # making the code generation for virtual calls a bit more complicated,
+        # since we would still need a pointer for those cases (because each
+        # implementation of a yielding call may have different state sizes).
+        func_frame.continuation_value = gen_alloc(gfunc.continuation_type, "CONT")
+      else
+        # Grab the continuation value from the appropriate parameter.
+        cont_param_index = 1
+        cont_param_index -= 1 unless gfunc.needs_receiver?
+        cont = frame.func.params[cont_param_index]
+        func_frame.continuation_value = cont
+        # TODO: gather "yield in" parameter here as well
+        
+        # We need to eagerly generate the local geps here in the entry block,
+        # since if we generate them lazily, they may not dominate all uses
+        # in the LLVM dominator tree analysis (which checks declare-before-use).
+        ctx.inventory.locals[gfunc.func].each_with_index do |ref, ref_index|
+          ref_type = cont.type.element_type.struct_element_types[ref_index + 1]
+          func_frame.current_locals[ref] = gen_local_gep(ref, ref_type)
+        end
+        
+        # We are jumping to the after-yield block here, which means that all
+        # code that is about to be generated will be in an unused code block.
+        # So we set up a block called "unused_entry" to hold that code, then
+        # return from this function early to avoid generating the code below
+        # that will fetch parameters into local geps.
+        @builder.br(gfunc.after_yield_blocks[yield_index])
+        unused_entry_block = gen_block("unused_entry")
+        @builder.position_at_end(unused_entry_block)
+        return
+      end
+      
+      # TODO: when this is a continued call, get from the param instead of allocating
+    end
+    
+    # Store each parameter in an alloca (or the continuation, if present)
     if gfunc && !gfunc.func.has_tag?(:ffi)
       gfunc.func.params.try(&.terms.each do |param|
         ref = func_frame.refer[param].as(Refer::Local)
         param_idx = ref.param_idx.not_nil!
-        param_idx -= 1 unless func_frame.gfunc.not_nil!.needs_receiver?
+        param_idx -= 1 unless gfunc.needs_receiver?
         value = frame.func.params[param_idx]
-        alloca = @builder.alloca(value.type, ref.name)
-        func_frame.current_locals[ref] = alloca
-        @builder.store(value, alloca)
+        gep = gen_local_gep(ref, value.type)
+        func_frame.current_locals[ref] = gep
+        @builder.store(value, gep)
       end)
     end
   end
@@ -572,6 +644,18 @@ class Mare::Compiler::CodeGen
   end
   
   def gen_func_decl(gtype, gfunc)
+    # If this is a yielding function, we must first declare the type that will
+    # be used to hold continuation data for the subsequent continuing calls.
+    if gfunc.calling_convention == :yield_cc
+      cont_name = "#{gfunc.llvm_name}.CONTINUATION"
+      cont_elem_types = [] of LLVM::Type
+      cont_elem_types << @ptr # the function pointer for the next call
+      cont_elem_types.concat \
+        ctx.inventory.locals[gfunc.func].map { |ref| llvm_mem_type_of(ref.defn, gfunc) }
+      
+      gfunc.continuation_type = @llvm.struct(cont_elem_types, cont_name)
+    end
+    
     # Determine the LLVM type to return, based on the calling convention.
     simple_ret_type = llvm_type_of(gfunc.func.ident, gfunc)
     ret_type =
@@ -582,6 +666,8 @@ class Mare::Compiler::CodeGen
         simple_ret_type
       when :error_cc
         llvm.struct([simple_ret_type, @i1])
+      when :yield_cc
+        llvm.struct([@obj_ptr, gfunc.continuation_type.pointer])
       else
         raise NotImplementedError.new(gfunc.calling_convention)
       end
@@ -642,21 +728,43 @@ class Mare::Compiler::CodeGen
       gfunc.send_msg_llvm_type =
         @llvm.struct([@i32, @i32, @ptr] + mparam_types.not_nil!, msg_name)
     end
+    
+    # If this is a yielding function, we need to generate the alternate
+    # versions of it, each with their own different entrypoint block
+    # that will take the control flow to continuing where that yield was.
+    if gfunc.calling_convention == :yield_cc
+      # TODO: Include "yield in" value returned from the caller's yield block
+      continue_param_types = [gfunc.continuation_type.pointer] # TODO: pass by value instead of by pointer
+      continue_param_types.unshift(llvm_type_of(gtype)) if gfunc.needs_receiver?
+      
+      # Before declaring the continue functions themselves, we also declare
+      # the generic function pointer type that covers all of them.
+      # This is needed so that the functions can be called via function pointer.
+      gfunc.continuation_llvm_func_ptr =
+        LLVM::Type.function(continue_param_types, ret_type).pointer
+      
+      # Now declare the continue functions, all with that same signature.
+      gfunc.continuation_llvm_funcs =
+        ctx.inventory.yields[gfunc.func].each_index.map do |index|
+          continue_name = "#{gfunc.llvm_name}.CONTINUE.#{index + 1}"
+          @mod.functions.add(continue_name, continue_param_types, ret_type)
+        end.to_a
+    end
   end
   
-  def gen_func_impl(gtype, gfunc)
-    return gen_intrinsic(gtype, gfunc) if gfunc.func.has_tag?(:compiler_intrinsic)
-    return gen_ffi_impl(gtype, gfunc) if gfunc.func.has_tag?(:ffi)
+  def gen_func_impl(gtype, gfunc, llvm_func)
+    return gen_intrinsic(gtype, gfunc, llvm_func) if gfunc.func.has_tag?(:compiler_intrinsic)
+    return gen_ffi_impl(gtype, gfunc, llvm_func) if gfunc.func.has_tag?(:ffi)
     
     # Fields with no initializer body can be skipped.
     return if gfunc.func.has_tag?(:field) && gfunc.func.body.nil?
     
-    gen_func_start(gfunc.llvm_func, gtype, gfunc)
+    gen_func_start(llvm_func, gtype, gfunc)
     
     # Set a receiver value (the value of the self in this function).
     func_frame.receiver_value =
       if gfunc.needs_receiver?
-        gfunc.llvm_func.params[0]
+        llvm_func.params[0]
       elsif gtype.singleton?
         gtype.singleton
       end
@@ -695,6 +803,8 @@ class Mare::Compiler::CodeGen
         @builder.ret(last_value)
       when :error_cc
         gen_return_using_error_cc(last_value, false)
+      when :yield_cc
+        gen_return_using_yield_cc(last_value)
       else
         raise NotImplementedError.new(gfunc.calling_convention)
       end
@@ -721,13 +831,13 @@ class Mare::Compiler::CodeGen
     @mod.functions.add(ffi_link_name, params, ret)
   end
   
-  def gen_ffi_impl(gtype, gfunc)
+  def gen_ffi_impl(gtype, gfunc, llvm_func)
     llvm_ffi_func = gen_ffi_decl(gfunc)
     
-    gen_func_start(gfunc.llvm_func, gtype, gfunc)
+    gen_func_start(llvm_func, gtype, gfunc)
     
-    param_count = gfunc.llvm_func.params.size
-    args = param_count.times.map { |i| gfunc.llvm_func.params[i] }.to_a
+    param_count = llvm_func.params.size
+    args = param_count.times.map { |i| llvm_func.params[i] }.to_a
     
     value = @builder.call llvm_ffi_func, args
     value = gen_none if llvm_ffi_func.return_type == @void
@@ -737,9 +847,9 @@ class Mare::Compiler::CodeGen
     gen_func_end
   end
   
-  def gen_intrinsic_cpointer(gtype, gfunc)
-    gen_func_start(gfunc.llvm_func)
-    params = gfunc.llvm_func.params
+  def gen_intrinsic_cpointer(gtype, gfunc, llvm_func)
+    gen_func_start(llvm_func)
+    params = llvm_func.params
     
     elem_llvm_type = llvm_mem_type_of(gtype.type_def.cpointer_type_arg)
     elem_size_value = @target_machine.data_layout.abi_size(elem_llvm_type)
@@ -749,17 +859,17 @@ class Mare::Compiler::CodeGen
       when "null"
         @ptr.null
       when "_alloc"
-        gfunc.llvm_func.add_attribute(LLVM::Attribute::NoAlias, LLVM::AttributeIndex::ReturnIndex)
-        gfunc.llvm_func.add_attribute(LLVM::Attribute::DereferenceableOrNull, LLVM::AttributeIndex::ReturnIndex, elem_size_value)
-        gfunc.llvm_func.add_attribute(LLVM::Attribute::Alignment, LLVM::AttributeIndex::ReturnIndex, PonyRT::HEAP_MIN)
+        llvm_func.add_attribute(LLVM::Attribute::NoAlias, LLVM::AttributeIndex::ReturnIndex)
+        llvm_func.add_attribute(LLVM::Attribute::DereferenceableOrNull, LLVM::AttributeIndex::ReturnIndex, elem_size_value)
+        llvm_func.add_attribute(LLVM::Attribute::Alignment, LLVM::AttributeIndex::ReturnIndex, PonyRT::HEAP_MIN)
         
         elem_size = @isize.const_int(elem_size_value)
         total_size = @builder.mul(params[0], elem_size)
         @builder.call(@mod.functions["pony_alloc"], [pony_ctx, elem_size])
       when "_realloc"
-        gfunc.llvm_func.add_attribute(LLVM::Attribute::NoAlias, LLVM::AttributeIndex::ReturnIndex)
-        gfunc.llvm_func.add_attribute(LLVM::Attribute::DereferenceableOrNull, LLVM::AttributeIndex::ReturnIndex, elem_size_value)
-        gfunc.llvm_func.add_attribute(LLVM::Attribute::Alignment, LLVM::AttributeIndex::ReturnIndex, PonyRT::HEAP_MIN)
+        llvm_func.add_attribute(LLVM::Attribute::NoAlias, LLVM::AttributeIndex::ReturnIndex)
+        llvm_func.add_attribute(LLVM::Attribute::DereferenceableOrNull, LLVM::AttributeIndex::ReturnIndex, elem_size_value)
+        llvm_func.add_attribute(LLVM::Attribute::Alignment, LLVM::AttributeIndex::ReturnIndex, PonyRT::HEAP_MIN)
         
         elem_size = @isize.const_int(elem_size_value)
         total_size = @builder.mul(params[1], elem_size)
@@ -798,9 +908,9 @@ class Mare::Compiler::CodeGen
     gen_func_end
   end
   
-  def gen_intrinsic_platform(gtype, gfunc)
-    gen_func_start(gfunc.llvm_func)
-    params = gfunc.llvm_func.params
+  def gen_intrinsic_platform(gtype, gfunc, llvm_func)
+    gen_func_start(llvm_func)
+    params = llvm_func.params
     
     @builder.ret \
       case gfunc.func.ident.value
@@ -815,15 +925,15 @@ class Mare::Compiler::CodeGen
     gen_func_end
   end
   
-  def gen_intrinsic(gtype, gfunc)
-    return gen_intrinsic_cpointer(gtype, gfunc) if gtype.type_def.is_cpointer?
-    return gen_intrinsic_platform(gtype, gfunc) if gtype.type_def.is_platform?
+  def gen_intrinsic(gtype, gfunc, llvm_func)
+    return gen_intrinsic_cpointer(gtype, gfunc, llvm_func) if gtype.type_def.is_cpointer?
+    return gen_intrinsic_platform(gtype, gfunc, llvm_func) if gtype.type_def.is_platform?
     
     raise NotImplementedError.new(gtype.type_def) \
       unless gtype.type_def.is_numeric?
     
-    gen_func_start(gfunc.llvm_func)
-    params = gfunc.llvm_func.params
+    gen_func_start(llvm_func)
+    params = llvm_func.params
     
     @builder.ret \
       case gfunc.func.ident.value
@@ -1127,10 +1237,10 @@ class Mare::Compiler::CodeGen
   end
   
   def gen_dot(relate)
-    call_ident, call_args, yield_params, yield_block = AST::Extract.call(relate)
+    member_ast, args_ast, yield_params_ast, yield_block_ast = AST::Extract.call(relate)
     
-    member = call_ident.value
-    arg_exprs = call_args.try(&.terms.dup) || [] of AST::Node
+    member = member_ast.value
+    arg_exprs = args_ast.try(&.terms.dup) || [] of AST::Node
     args = arg_exprs.map { |x| gen_expr(x).as(LLVM::Value) }
     
     lhs_type = type_of(relate.lhs)
@@ -1209,6 +1319,88 @@ class Mare::Compiler::CodeGen
       
       @builder.position_at_end(after_block)
       result = @builder.extract_value(result, 0)
+    when :yield_cc
+      raise NotImplementedError.new "continuation type for virtual call" \
+        if needs_virtual_call
+      
+      # Since a yield block is kind of like a loop, we need an alloca to cover
+      # the "variables" that change between each iteration - the elements of
+      # the tuple that was returned as the result of the call above.
+      yield_out_alloca = @builder.alloca(result.type.struct_element_types[0], "YIELD.OUT")
+      cont_alloca = @builder.alloca(result.type.struct_element_types[1], "CONT")
+      
+      # Extract the elements of the result of the call above into the allocas.
+      yield_out = @builder.extract_value(result, 0)
+      cont = @builder.extract_value(result, 1)
+      @builder.store(yield_out, yield_out_alloca)
+      @builder.store(cont, cont_alloca)
+      
+      # Declare some code blocks in which we'll generate this pseudo-loop.
+      maybe_block = gen_block("maybe_yield_block")
+      yield_block = gen_block("yield_block")
+      after_block = gen_block("after_call")
+      
+      # We start at the "maybe block" right after the first call above.
+      # We'll also return here after subsequent continue calls below.
+      # The "maybe block" makes the determination of whether or not to jump to
+      # the yield block, based on the function pointer in the continuation.
+      # If the function pointer is NULL, then that means there is no more
+      # continuing to be done, and therefore the yield block shouldn't be run.
+      # If the function pointer is non-NULL, we go to the yield block.
+      @builder.br(maybe_block)
+      @builder.position_at_end(maybe_block)
+      next_func_gep = @builder.struct_gep(cont, 0, "CONT.NEXT.GEP")
+      next_func = @builder.load(next_func_gep, "CONT.NEXT")
+      is_finished = @builder.icmp(LLVM::IntPredicate::EQ, next_func, @ptr.null)
+      @builder.cond(is_finished, after_block, yield_block)
+      
+      # Move our cursor to the yield block to start generating code there.
+      @builder.position_at_end(yield_block)
+      
+      # If the yield block uses yield params, we treat them as locals,
+      # which means they need a gep to be able to load them later.
+      # We get the value from the earlier stored yield_out_alloca.
+      if yield_params_ast
+        raise NotImplementedError.new(yield_params_ast.to_a) \
+          unless yield_params_ast.terms.size == 1
+        yield_param_ast = yield_params_ast.terms.first
+        yield_param_ref = func_frame.refer[yield_param_ast]
+        yield_param_ref = yield_param_ref.as(Refer::Local)
+        yield_param_gep = func_frame.current_locals[yield_param_ref] ||=
+          gen_local_gep(yield_param_ref, llvm_type_of(yield_param_ast))
+        
+        yield_out = @builder.load(yield_out_alloca)
+        yield_out = @builder.bit_cast(yield_out, llvm_type_of(yield_param_ast))
+        @builder.store(yield_out, yield_param_gep)
+      end
+      
+      # Now we generate the actual code for the yield block.
+      yield_in_value = gen_expr(yield_block_ast.not_nil!)
+      
+      # After the yield block, we call the continue function pointer,
+      # which we extracted from continuation data earlier in the "maybe block".
+      # We pass the receiver, continuation data, and yield_in_value back as
+      # the arguments to the continue call, as the function signature expects.
+      next_func_cast = @builder.bit_cast(next_func, gfunc.continuation_llvm_func_ptr)
+      again_args = [cont] # TODO: include the yield_in_value too
+      again_args.unshift(receiver) if gfunc.needs_receiver?
+      again_result = @builder.call(next_func_cast, again_args)
+      
+      # Finally, extract and store the result of the continue call, so that the
+      # "maybe block" we are about to return to has access to the new values.
+      again_yield_out = @builder.extract_value(again_result, 0)
+      again_cont = @builder.extract_value(again_result, 1)
+      @builder.store(again_yield_out, yield_out_alloca)
+      @builder.store(again_cont, cont_alloca)
+      
+      # Return to the "maybe block", to determine if we need to iterate again.
+      @builder.br(maybe_block)
+      
+      # Finally, finish with the "real" result of the call.
+      @builder.position_at_end(after_block)
+      result = gen_none # TODO: cast the real result value of the call instead
+    else
+      raise NotImplementedError.new(gfunc.calling_convention)
     end
     
     result
@@ -1274,10 +1466,9 @@ class Mare::Compiler::CodeGen
     
     @di.set_loc(relate.op)
     if ref.is_a?(Refer::Local)
-      alloca = (
-        func_frame.current_locals[ref] ||= @builder.alloca(lhs_type, ref.name)
-      )
-      @builder.store(cast_value, alloca)
+      gep = func_frame.current_locals[ref] ||= gen_local_gep(ref, lhs_type)
+      
+      @builder.store(cast_value, gep)
     else
       raise NotImplementedError.new(relate.inspect)
     end
@@ -1464,6 +1655,9 @@ class Mare::Compiler::CodeGen
     when AST::Try
       raise "#{expr.inspect} isn't a constant value" if const_only
       gen_try(expr)
+    when AST::Yield
+      raise "#{expr.inspect} isn't a constant value" if const_only
+      gen_yield(expr)
     when AST::Prefix
       raise NotImplementedError.new(expr.inspect) unless expr.op.value == "--"
       gen_expr(expr.term, const_only)
@@ -2037,9 +2231,60 @@ class Mare::Compiler::CodeGen
   end
   
   def gen_return_using_error_cc(value, is_error : Bool)
-    tuple = func_frame.gfunc.not_nil!.llvm_func.return_type.undef
+    tuple = func_frame.llvm_func.return_type.undef
     tuple = @builder.insert_value(tuple, value, 0)
     tuple = @builder.insert_value(tuple, is_error ? @i1_true : @i1_false, 1)
+    @builder.ret(tuple)
+  end
+  
+  def gen_yield(expr : AST::Yield)
+    gfunc = func_frame.gfunc.not_nil!
+    
+    # First, we must know which yield this is in the function -
+    # each yield expression has a uniquely associated index.
+    yield_index = ctx.inventory.yields[gfunc.func].index(expr).not_nil!
+    
+    # Generate code for the value of the yield, and capture the value.
+    yield_value = gen_expr(expr.term)
+    
+    # Determine the continue function to use, based on the index of this yield.
+    next_func = gfunc.continuation_llvm_funcs[yield_index]
+    next_func = @llvm.const_bit_cast(next_func.to_value, @ptr)
+    
+    # Generate the return statement, which terminates this basic block and
+    # returns the tuple of the yield value and continuation data to the caller.
+    gen_return_using_yield_cc(yield_value, next_func)
+    
+    # Now start generating the code that comes after the yield expression.
+    # Note that this code block will be dead code (with "no predecessors")
+    # in all but one of the continue functions that we generate - the one
+    # continue function we grabbed above (which jumps to this block on entry).
+    after_block = gfunc.after_yield_blocks[yield_index]
+    @builder.position_at_end(after_block)
+    
+    gen_none # TODO: the "yield in" value returned from the caller
+  end
+  
+  def gen_return_using_yield_cc(value, next_func : LLVM::Value? = nil)
+    # Grab the two values we will return in our return tuple.
+    value = @builder.bit_cast(value, @obj_ptr, "#{value.name}.OPAQUE")
+    cont = func_frame.continuation_value
+    
+    # Assign the next continuation function to the function pointer.
+    # If nil, then we assign a NULL pointer, signifying the final return value,
+    # telling the caller not to continue the yield block iteration any more.
+    next_func_gep = @builder.struct_gep(cont, 0, "CONT.NEXT.GEP")
+    if next_func
+      @builder.store(next_func, next_func_gep)
+    else
+      # Assign NULL to the continuation's function pointer, signifying the end.
+      @builder.store(@ptr.null, next_func_gep)
+    end
+    
+    # Return the tuple: {value, continuation_value}
+    tuple = func_frame.llvm_func.return_type.undef
+    tuple = @builder.insert_value(tuple, value, 0)
+    tuple = @builder.insert_value(tuple, cont, 1)
     @builder.ret(tuple)
   end
   
@@ -2216,10 +2461,18 @@ class Mare::Compiler::CodeGen
   
   # This generates the code that allocates an object of the given type.
   # This is the first step before actually calling the constructor of it.
-  def gen_alloc(gtype, name)
+  def gen_alloc(gtype : GenType, name : String)
     return gen_alloc_actor(gtype, name) if gtype.type_def.is_actor?
     
-    size = @target_machine.data_layout.abi_size(gtype.struct_type)
+    value = gen_alloc(gtype.struct_type, name)
+    gen_put_desc(value, gtype, name)
+    value
+  end
+  
+  # This generates the code that allocates an object of any given LLVM type.
+  # It is used by the other implementation of this function defined above.
+  def gen_alloc(llvm_type : LLVM::Type, name : String)
+    size = @target_machine.data_layout.abi_size(llvm_type)
     size = 1 if size == 0
     args = [pony_ctx]
     
@@ -2235,10 +2488,7 @@ class Mare::Compiler::CodeGen
         @builder.call(@mod.functions["pony_alloc_large"], args, "#{name}.MEM")
       end
     
-    value = @builder.bit_cast(value, gtype.struct_ptr, name)
-    gen_put_desc(value, gtype, name)
-    
-    value
+    @builder.bit_cast(value, llvm_type.pointer, name)
   end
   
   # This generates the special kind of allocation needed by actors,
@@ -2285,6 +2535,22 @@ class Mare::Compiler::CodeGen
     desc_p = @builder.struct_gep(value, 0, "#{name}.DESC.GEP")
     @builder.store(gtype.desc, desc_p)
     # TODO: tbaa? (from set_descriptor in libponyc/codegen/gencall.c)
+  end
+  
+  def gen_local_gep(ref, llvm_type)
+    gfunc = func_frame.gfunc.not_nil!
+    
+    # If this is a yielding function, we store locals in the continuation data.
+    # Otherwise, we store each in its own alloca, which we create here.
+    if gfunc.calling_convention == :yield_cc
+      cont = func_frame.continuation_value
+      index = ctx.inventory.locals[gfunc.func].index(ref).not_nil! + 1
+      gep = @builder.struct_gep(cont, index, "CONT.#{ref.name}.GEP")
+      # TODO: bitcast to llvm_type?
+      @builder.bit_cast(gep, llvm_type.pointer)
+    else
+      @builder.alloca(llvm_type, ref.name)
+    end
   end
   
   def gen_field_gep(name, gtype = func_frame.gtype.not_nil!)

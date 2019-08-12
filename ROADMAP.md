@@ -19,7 +19,7 @@
 - [x] - Array literals
 - [x] - Looping flow control (`while`)
 - [x] - Partial functions and partial calls
-- [ ] - For-loop iterator syntax sugar (`for x in y`)
+- [x] - ~For-loop iterator syntax sugar (`for x in y`)~ (replaced by the new feature known as yielding functions)
 - [ ] - Tuple values
 - [ ] - Finalizer functions
 - [ ] - FFI-compatible struct types
@@ -30,6 +30,7 @@
 - [x] - User-defined custom numeric types (`numeric MyNumber:`)
 - [x] - Enumerated custom numeric types (`enum MyEnum:`)
 - [x] - Non-allocated class references with "static" stateless functions.
+- [ ] - Yielding functions as a cleaner alternative to Iterators, for-loops, and immediately-used lambdas
 - [ ] - Doctests
 - [ ] - Command Line REPL
 - [ ] - Typed errors and debug-mode error state with no release-mode overhead.
