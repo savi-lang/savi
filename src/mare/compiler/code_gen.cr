@@ -202,6 +202,8 @@ class Mare::Compiler::CodeGen
     property! continuation_type : LLVM::Type
     property! continuation_llvm_func_ptr : LLVM::Type
     property! continuation_llvm_funcs : Array(LLVM::Function)
+    property! yield_cc_yield_return_type : LLVM::Type
+    property! yield_cc_final_return_type : LLVM::Type
     property! after_yield_blocks : Array(LLVM::BasicBlock)
     
     def initialize(type_def : Reach::Def, @infer, @vtable_index)
@@ -667,7 +669,16 @@ class Mare::Compiler::CodeGen
       when :error_cc
         llvm.struct([simple_ret_type, @i1])
       when :yield_cc
-        llvm.struct([gfunc.continuation_type.pointer, @obj_ptr])
+        cont_ptr = gfunc.continuation_type.pointer
+        gfunc.yield_cc_yield_return_type = llvm.struct([cont_ptr, @obj_ptr])
+        gfunc.yield_cc_final_return_type = llvm.struct([cont_ptr, @obj_ptr])
+        
+        # TODO: make an opaque struct the same size as the larger of the two.
+        # @i8.vector [
+        #   @target_machine.data_layout.abi_size(gfunc.yield_cc_yield_return_type),
+        #   @target_machine.data_layout.abi_size(gfunc.yield_cc_final_return_type),
+        # ].max
+        gfunc.yield_cc_yield_return_type
       else
         raise NotImplementedError.new(gfunc.calling_convention)
       end
@@ -804,7 +815,7 @@ class Mare::Compiler::CodeGen
       when :error_cc
         gen_return_using_error_cc(last_value, false)
       when :yield_cc
-        gen_return_using_yield_cc(nil, last_value)
+        gen_final_return_using_yield_cc(last_value)
       else
         raise NotImplementedError.new(gfunc.calling_convention)
       end
@@ -2268,10 +2279,8 @@ class Mare::Compiler::CodeGen
     # each yield expression has a uniquely associated index.
     yield_index = ctx.inventory.yields[gfunc.func].index(expr).not_nil!
     
-    # Generate code for the value of the yield, and capture the value.
-    raise NotImplementedError.new("multiple yield args") \
-      if expr.terms.size > 1
-    yield_value = gen_expr(expr.terms.first)
+    # Generate code for the values of the yield, and capture the values.
+    yield_values = expr.terms.map { |term| gen_expr(term).as(LLVM::Value) }
     
     # Determine the continue function to use, based on the index of this yield.
     next_func = gfunc.continuation_llvm_funcs[yield_index]
@@ -2279,7 +2288,7 @@ class Mare::Compiler::CodeGen
     
     # Generate the return statement, which terminates this basic block and
     # returns the tuple of the yield value and continuation data to the caller.
-    gen_return_using_yield_cc(next_func, yield_value)
+    gen_yield_return_using_yield_cc(next_func, yield_values)
     
     # Now start generating the code that comes after the yield expression.
     # Note that this code block will be dead code (with "no predecessors")
@@ -2291,9 +2300,16 @@ class Mare::Compiler::CodeGen
     gen_none # TODO: the "yield in" value returned from the caller
   end
   
-  def gen_return_using_yield_cc(next_func : LLVM::Value?, value)
-    # Grab the two values we will return in our return tuple.
-    value = @builder.bit_cast(value, @obj_ptr, "#{value.name}.OPAQUE")
+  def gen_yield_return_using_yield_cc(next_func : LLVM::Value?, values)
+    # Cast the given values to the appropriate type.
+    return_type = func_frame.gfunc.not_nil!.yield_cc_yield_return_type
+    cast_values =
+      values.map_with_index do |value, index|
+        llvm_type = return_type.struct_element_types[index + 1]
+        gen_assign_cast(value, llvm_type, nil)
+      end
+    
+    # Grab the continuation value from local memory.
     cont = func_frame.continuation_value
     
     # Assign the next continuation function to the function pointer.
@@ -2307,11 +2323,34 @@ class Mare::Compiler::CodeGen
       @builder.store(@ptr.null, next_func_gep)
     end
     
-    # Return the tuple: {continuation_value, value}
-    tuple = func_frame.llvm_func.return_type.undef
+    # Return the tuple: {continuation_value, *values}
+    tuple = return_type.undef
     tuple = @builder.insert_value(tuple, cont, 0)
-    tuple = @builder.insert_value(tuple, value, 1)
-    @builder.ret(tuple)
+    cast_values.each_with_index do |cast_value, index|
+      tuple = @builder.insert_value(tuple, cast_value, index + 1)
+    end
+    @builder.ret(@builder.bit_cast(tuple, func_frame.llvm_func.return_type))
+  end
+  
+  def gen_final_return_using_yield_cc(value)
+    # Cast the given value to the appropriate type.
+    return_type = func_frame.gfunc.not_nil!.yield_cc_final_return_type
+    llvm_type = return_type.struct_element_types[1]
+    cast_value = gen_assign_cast(value, llvm_type, nil)
+    
+    # Grab the continuation value from local memory.
+    cont = func_frame.continuation_value
+    
+    # Assign NULL to the continuation's function pointer, signifying the end,
+    # telling the caller not to continue the yield block iteration any more.
+    next_func_gep = @builder.struct_gep(cont, 0, "CONT.NEXT.GEP")
+    @builder.store(@ptr.null, next_func_gep)
+    
+    # Return the tuple: {continuation_value, value}
+    tuple = return_type.undef
+    tuple = @builder.insert_value(tuple, cont, 0)
+    tuple = @builder.insert_value(tuple, cast_value, 1)
+    @builder.ret(@builder.bit_cast(tuple, func_frame.llvm_func.return_type))
   end
   
   DESC_ID                        = 0
