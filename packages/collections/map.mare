@@ -23,20 +23,16 @@
   
   :fun ref _resize (space USize)
     space = space.max(@_size) // only grow the array - never shrink it
-    old = @_array
+    old_array = @_array
     
+    // TODO: would we get any perf benefit from resizing the array instead?
     @_init_array(space)
     
-    try (
-      i USize = 0
-      while (i < old.size) ( // TODO: old.size.times ...
-        entry = old[i]!
-        if (entry <: KV(K, V)) (
-          @_array[@_search(entry.key)]! = entry
-        )
-      i = i + 1)
+    old_array.each -> (entry |
+      if (entry <: KV(K, V)) (
+        try (@_array[@_search(entry.key)]! = entry)
+      )
     )
-  
   
   :: Return the value assigned to the given key, if present.
   :: Raises an error if the key is not present.

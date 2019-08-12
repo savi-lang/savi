@@ -954,9 +954,17 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       ]
     end
     
-    # Don't visit the children of a type expression root node
     def visit_children?(node)
-      !Classify.type_expr?(node)
+      # Don't visit the children of a type expression root node.
+      return false if Classify.type_expr?(node)
+      
+      # Don't visit children of a dot relation eagerly - wait for touch.
+      return false if node.is_a?(AST::Relate) && node.op.value == "."
+      
+      # Don't visit children of Choices eagerly - wait for touch.
+      return false if node.is_a?(AST::Choice)
+      
+      true
     end
     
     # This visitor never replaces nodes, it just touches them and returns them.
@@ -1120,22 +1128,33 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       when "."
         call_ident, call_args, yield_params, yield_block = AST::Extract.call(node)
         
-        used = Classify.value_needed?(node)
         call = FromCall.new(
           call_ident.pos,
           node.lhs,
           call_ident.value,
           (call_args ? call_args.terms.map(&.itself) : [] of AST::Node),
           (call_args ? call_args.terms.map(&.pos) : [] of Source::Pos),
-          used,
+          Classify.value_needed?(node),
         )
         self[node] = call
         
+        # Visit lhs, args, and yield params before resolving the call.
+        # Note that we skipped it before with visit_children: false.
+        node.lhs.try(&.accept(self))
+        call_args.try(&.accept(self))
+        yield_params.try(&.accept(self))
+        
+        # Resolve and validate the call.
         follow_call(
           call,
           yield_params,
           yield_block,
         )
+        
+        # Visit yield block after resolving the call.
+        # They depend on information from the call resolution above.
+        # Note that we skipped it before with visit_children: false.
+        yield_block.try(&.accept(self))
       when "<:"
         rhs_info = self[node.rhs]
         Error.at node.rhs, "expected this to have a fixed type at compile time" \
@@ -1174,10 +1193,6 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       raise NotImplementedError.new(node.op.value) unless node.op.value == "--"
       
       self[node] = Consume.new(node.pos, node.term)
-    end
-    
-    def visit_children?(node : AST::Choice)
-      false # don't visit children of Choices at the normal time - wait for touch.
     end
     
     def touch(node : AST::Choice)
