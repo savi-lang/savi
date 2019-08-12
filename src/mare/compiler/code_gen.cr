@@ -1335,23 +1335,13 @@ class Mare::Compiler::CodeGen
         if needs_virtual_call
       
       # Since a yield block is kind of like a loop, we need an alloca to cover
-      # the "variables" that change between each iteration - the elements of
-      # the tuple that was returned as the result of the call above.
-      cont_alloca = @builder.alloca(result.type.struct_element_types[0], "CONT")
-      yield_out_allocas =
-        result.type.struct_element_types[1..-1].map_with_index do |llvm_type, index|
-          @builder.alloca(llvm_type, "YIELD.OUT.#{index + 1}")
-        end
+      # the "variable" that changes each iteration - the last call result.
+      result_alloca = @builder.alloca(result.type, "RESULT.YIELDED.OPAQUE.ALLOCA")
+      @builder.store(result, result_alloca)
       
-      # Extract the elements of the result of the call above into the allocas.
-      cont = @builder.extract_value(result, 0)
-      @builder.store(cont, cont_alloca)
-      yield_outs =
-        yield_out_allocas.map_with_index do |alloca, index|
-          yield_out = @builder.extract_value(result, index + 1)
-          @builder.store(yield_out, alloca)
-          yield_out
-        end
+      # We declare the alloca itself, as well as bit casted aliases.
+      yield_result_alloca = @builder.bit_cast(result_alloca,
+        gfunc.yield_cc_yield_return_type.pointer, "RESULT.YIELDED.ALLOCA")
       
       # Declare some code blocks in which we'll generate this pseudo-loop.
       maybe_block = gen_block("maybe_yield_block")
@@ -1367,9 +1357,16 @@ class Mare::Compiler::CodeGen
       # If the function pointer is non-NULL, we go to the yield block.
       @builder.br(maybe_block)
       @builder.position_at_end(maybe_block)
+      yield_result = @builder.load(yield_result_alloca, "RESULT.YIELDED")
+      cont = @builder.extract_value(yield_result, 0, "CONT")
       next_func_gep = @builder.struct_gep(cont, 0, "CONT.NEXT.GEP")
+      next_func_gep = @builder.bit_cast(next_func_gep,
+        gfunc.continuation_llvm_func_ptr.pointer, "CONT.NEXT.GEP") # TODO: remove this bit_cast by using a more specific type in the continuation_type struct
       next_func = @builder.load(next_func_gep, "CONT.NEXT")
-      is_finished = @builder.icmp(LLVM::IntPredicate::EQ, next_func, @ptr.null)
+      is_finished = @builder.icmp(LLVM::IntPredicate::EQ,
+        next_func,
+        gfunc.continuation_llvm_func_ptr.null
+      )
       @builder.cond(is_finished, after_block, yield_block)
       
       # Move our cursor to the yield block to start generating code there.
@@ -1385,7 +1382,7 @@ class Mare::Compiler::CodeGen
           yield_param_gep = func_frame.current_locals[yield_param_ref] ||=
             gen_local_gep(yield_param_ref, llvm_type_of(yield_param_ast))
           
-          yield_out = @builder.load(yield_out_allocas[index])
+          yield_out = @builder.extract_value(yield_result, index + 1, yield_param_ref.name)
           yield_out = @builder.bit_cast(yield_out, llvm_type_of(yield_param_ast))
           @builder.store(yield_out, yield_param_gep)
         end
@@ -1398,20 +1395,10 @@ class Mare::Compiler::CodeGen
       # which we extracted from continuation data earlier in the "maybe block".
       # We pass the receiver, continuation data, and yield_in_value back as
       # the arguments to the continue call, as the function signature expects.
-      next_func_cast = @builder.bit_cast(next_func, gfunc.continuation_llvm_func_ptr)
       again_args = [cont] # TODO: include the yield_in_value too
       again_args.unshift(receiver) if gfunc.needs_receiver?
-      again_result = @builder.call(next_func_cast, again_args)
-      
-      # Finally, extract and store the result of the continue call, so that the
-      # "maybe block" we are about to return to has access to the new values.
-      again_cont = @builder.extract_value(again_result, 0)
-      @builder.store(cont, cont_alloca)
-      yield_out_allocas.each_with_index do |alloca, index|
-        again_yield_out = @builder.extract_value(again_result, index + 1)
-        @builder.store(again_yield_out, alloca)
-        again_yield_out
-      end
+      again_result = @builder.call(next_func, again_args)
+      @builder.store(again_result, result_alloca)
       
       # Return to the "maybe block", to determine if we need to iterate again.
       @builder.br(maybe_block)
