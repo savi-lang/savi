@@ -667,7 +667,7 @@ class Mare::Compiler::CodeGen
       when :error_cc
         llvm.struct([simple_ret_type, @i1])
       when :yield_cc
-        llvm.struct([@obj_ptr, gfunc.continuation_type.pointer])
+        llvm.struct([gfunc.continuation_type.pointer, @obj_ptr])
       else
         raise NotImplementedError.new(gfunc.calling_convention)
       end
@@ -804,7 +804,7 @@ class Mare::Compiler::CodeGen
       when :error_cc
         gen_return_using_error_cc(last_value, false)
       when :yield_cc
-        gen_return_using_yield_cc(last_value)
+        gen_return_using_yield_cc(nil, last_value)
       else
         raise NotImplementedError.new(gfunc.calling_convention)
       end
@@ -1326,14 +1326,14 @@ class Mare::Compiler::CodeGen
       # Since a yield block is kind of like a loop, we need an alloca to cover
       # the "variables" that change between each iteration - the elements of
       # the tuple that was returned as the result of the call above.
-      yield_out_alloca = @builder.alloca(result.type.struct_element_types[0], "YIELD.OUT")
-      cont_alloca = @builder.alloca(result.type.struct_element_types[1], "CONT")
+      cont_alloca = @builder.alloca(result.type.struct_element_types[0], "CONT")
+      yield_out_alloca = @builder.alloca(result.type.struct_element_types[1], "YIELD.OUT")
       
       # Extract the elements of the result of the call above into the allocas.
-      yield_out = @builder.extract_value(result, 0)
-      cont = @builder.extract_value(result, 1)
-      @builder.store(yield_out, yield_out_alloca)
+      cont = @builder.extract_value(result, 0)
+      yield_out = @builder.extract_value(result, 1)
       @builder.store(cont, cont_alloca)
+      @builder.store(yield_out, yield_out_alloca)
       
       # Declare some code blocks in which we'll generate this pseudo-loop.
       maybe_block = gen_block("maybe_yield_block")
@@ -1388,10 +1388,10 @@ class Mare::Compiler::CodeGen
       
       # Finally, extract and store the result of the continue call, so that the
       # "maybe block" we are about to return to has access to the new values.
-      again_yield_out = @builder.extract_value(again_result, 0)
-      again_cont = @builder.extract_value(again_result, 1)
-      @builder.store(again_yield_out, yield_out_alloca)
+      again_cont = @builder.extract_value(again_result, 0)
+      again_yield_out = @builder.extract_value(again_result, 1)
       @builder.store(again_cont, cont_alloca)
+      @builder.store(again_yield_out, yield_out_alloca)
       
       # Return to the "maybe block", to determine if we need to iterate again.
       @builder.br(maybe_block)
@@ -2270,7 +2270,7 @@ class Mare::Compiler::CodeGen
     
     # Generate the return statement, which terminates this basic block and
     # returns the tuple of the yield value and continuation data to the caller.
-    gen_return_using_yield_cc(yield_value, next_func)
+    gen_return_using_yield_cc(next_func, yield_value)
     
     # Now start generating the code that comes after the yield expression.
     # Note that this code block will be dead code (with "no predecessors")
@@ -2282,7 +2282,7 @@ class Mare::Compiler::CodeGen
     gen_none # TODO: the "yield in" value returned from the caller
   end
   
-  def gen_return_using_yield_cc(value, next_func : LLVM::Value? = nil)
+  def gen_return_using_yield_cc(next_func : LLVM::Value?, value)
     # Grab the two values we will return in our return tuple.
     value = @builder.bit_cast(value, @obj_ptr, "#{value.name}.OPAQUE")
     cont = func_frame.continuation_value
@@ -2298,10 +2298,10 @@ class Mare::Compiler::CodeGen
       @builder.store(@ptr.null, next_func_gep)
     end
     
-    # Return the tuple: {value, continuation_value}
+    # Return the tuple: {continuation_value, value}
     tuple = func_frame.llvm_func.return_type.undef
-    tuple = @builder.insert_value(tuple, value, 0)
-    tuple = @builder.insert_value(tuple, cont, 1)
+    tuple = @builder.insert_value(tuple, cont, 0)
+    tuple = @builder.insert_value(tuple, value, 1)
     @builder.ret(tuple)
   end
   
