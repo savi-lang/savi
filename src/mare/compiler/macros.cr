@@ -221,7 +221,7 @@ class Mare::Compiler::Macros < Mare::AST::Visitor
     term = node.terms[1]
     
     group = AST::Group.new("(").from(node)
-    group.terms << AST::Yield.new(term).from(orig)
+    group.terms << AST::Yield.new([term]).from(orig)
     group
   end
 end

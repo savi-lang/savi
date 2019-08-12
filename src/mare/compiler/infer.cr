@@ -1249,7 +1249,10 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
     
     def touch(node : AST::Yield)
-      @yield_out_info.not_nil!.assign(self, node.term, node.term.pos)
+      raise NotImplementedError.new("multiple yield args") \
+        if node.terms.size > 1
+      term = node.terms.first
+      @yield_out_info.not_nil!.assign(self, term, term.pos)
       
       none = MetaType.new(reified_type(prelude_type("None")))
       self[node] = FromYield.new(node.pos, none)

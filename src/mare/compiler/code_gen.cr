@@ -2260,7 +2260,9 @@ class Mare::Compiler::CodeGen
     yield_index = ctx.inventory.yields[gfunc.func].index(expr).not_nil!
     
     # Generate code for the value of the yield, and capture the value.
-    yield_value = gen_expr(expr.term)
+    raise NotImplementedError.new("multiple yield args") \
+      if expr.terms.size > 1
+    yield_value = gen_expr(expr.terms.first)
     
     # Determine the continue function to use, based on the index of this yield.
     next_func = gfunc.continuation_llvm_funcs[yield_index]

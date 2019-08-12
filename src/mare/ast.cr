@@ -292,19 +292,19 @@ module Mare::AST
   end
   
   class Yield < Node
-    property term : Term
+    property terms : Array(Term)
     
-    def initialize(@term)
+    def initialize(@terms)
     end
     
     def name; :yield end
     def to_a: Array(A)
       res = [name] of A
-      res << term.to_a
+      res.concat(terms.map(&.to_a))
       res
     end
     def children_accept(visitor)
-      @term = term.accept(visitor)
+      @terms = terms.map(&.accept(visitor).as(Term))
     end
   end
 end
