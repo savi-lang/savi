@@ -1327,13 +1327,20 @@ class Mare::Compiler::CodeGen
       # the "variables" that change between each iteration - the elements of
       # the tuple that was returned as the result of the call above.
       cont_alloca = @builder.alloca(result.type.struct_element_types[0], "CONT")
-      yield_out_alloca = @builder.alloca(result.type.struct_element_types[1], "YIELD.OUT")
+      yield_out_allocas =
+        result.type.struct_element_types[1..-1].map_with_index do |llvm_type, index|
+          @builder.alloca(llvm_type, "YIELD.OUT.#{index + 1}")
+        end
       
       # Extract the elements of the result of the call above into the allocas.
       cont = @builder.extract_value(result, 0)
-      yield_out = @builder.extract_value(result, 1)
       @builder.store(cont, cont_alloca)
-      @builder.store(yield_out, yield_out_alloca)
+      yield_outs =
+        yield_out_allocas.map_with_index do |alloca, index|
+          yield_out = @builder.extract_value(result, index + 1)
+          @builder.store(yield_out, alloca)
+          yield_out
+        end
       
       # Declare some code blocks in which we'll generate this pseudo-loop.
       maybe_block = gen_block("maybe_yield_block")
@@ -1359,19 +1366,18 @@ class Mare::Compiler::CodeGen
       
       # If the yield block uses yield params, we treat them as locals,
       # which means they need a gep to be able to load them later.
-      # We get the value from the earlier stored yield_out_alloca.
+      # We get the values from the earlier stored yield_out_allocas.
       if yield_params_ast
-        raise NotImplementedError.new(yield_params_ast.to_a) \
-          unless yield_params_ast.terms.size == 1
-        yield_param_ast = yield_params_ast.terms.first
-        yield_param_ref = func_frame.refer[yield_param_ast]
-        yield_param_ref = yield_param_ref.as(Refer::Local)
-        yield_param_gep = func_frame.current_locals[yield_param_ref] ||=
-          gen_local_gep(yield_param_ref, llvm_type_of(yield_param_ast))
-        
-        yield_out = @builder.load(yield_out_alloca)
-        yield_out = @builder.bit_cast(yield_out, llvm_type_of(yield_param_ast))
-        @builder.store(yield_out, yield_param_gep)
+        yield_params_ast.terms.each_with_index do |yield_param_ast, index|
+          yield_param_ref = func_frame.refer[yield_param_ast]
+          yield_param_ref = yield_param_ref.as(Refer::Local)
+          yield_param_gep = func_frame.current_locals[yield_param_ref] ||=
+            gen_local_gep(yield_param_ref, llvm_type_of(yield_param_ast))
+          
+          yield_out = @builder.load(yield_out_allocas[index])
+          yield_out = @builder.bit_cast(yield_out, llvm_type_of(yield_param_ast))
+          @builder.store(yield_out, yield_param_gep)
+        end
       end
       
       # Now we generate the actual code for the yield block.
@@ -1389,9 +1395,12 @@ class Mare::Compiler::CodeGen
       # Finally, extract and store the result of the continue call, so that the
       # "maybe block" we are about to return to has access to the new values.
       again_cont = @builder.extract_value(again_result, 0)
-      again_yield_out = @builder.extract_value(again_result, 1)
-      @builder.store(again_cont, cont_alloca)
-      @builder.store(again_yield_out, yield_out_alloca)
+      @builder.store(cont, cont_alloca)
+      yield_out_allocas.each_with_index do |alloca, index|
+        again_yield_out = @builder.extract_value(again_result, index + 1)
+        @builder.store(again_yield_out, alloca)
+        again_yield_out
+      end
       
       # Return to the "maybe block", to determine if we need to iterate again.
       @builder.br(maybe_block)
