@@ -665,15 +665,42 @@ class Mare::Compiler::CodeGen
         llvm.struct([simple_ret_type, @i1])
       when :yield_cc
         cont_ptr = gfunc.continuation_type.pointer
-        gfunc.yield_cc_yield_return_type = llvm.struct([cont_ptr, @obj_ptr])
-        gfunc.yield_cc_final_return_type = llvm.struct([cont_ptr, @obj_ptr])
         
-        # TODO: make an opaque struct the same size as the larger of the two.
-        # @i8.vector [
-        #   @target_machine.data_layout.abi_size(gfunc.yield_cc_yield_return_type),
-        #   @target_machine.data_layout.abi_size(gfunc.yield_cc_final_return_type),
-        # ].max
-        gfunc.yield_cc_yield_return_type
+        # Gather the LLVM::Types to use for the yield out values.
+        yield_out_types = [llvm_type_of(ctx.reach[gfunc.infer.yield_out_resolved])]
+        
+        # Define two different return types - one for the yield returns
+        # and one for the final return when all yielding is done.
+        # The former contains the "yield out" values and the latter has the
+        # actual return value declared or inferred for this function.
+        y_t = gfunc.yield_cc_yield_return_type = llvm.struct([cont_ptr] + yield_out_types)
+        f_t = gfunc.yield_cc_final_return_type = llvm.struct([cont_ptr, simple_ret_type])
+        
+        # Determine the byte size of the larger type of the two.
+        max_size = [
+          @target_machine.data_layout.abi_size(y_t),
+          @target_machine.data_layout.abi_size(f_t),
+        ].max
+        
+        # Pad the yield return type with extra bytes as needed.
+        if 0 < (diff = max_size - @target_machine.data_layout.abi_size(y_t))
+          y_t = gfunc.yield_cc_yield_return_type = \
+            llvm.struct(y_t.struct_element_types + [@i8.vector(diff)])
+        end
+        
+        # Pad the final return type with extra bytes as needed.
+        if 0 < (diff = max_size - @target_machine.data_layout.abi_size(f_t))
+          f_t = gfunc.yield_cc_final_return_type = \
+            llvm.struct(f_t.struct_element_types + [@i8.vector(diff)])
+        end
+        
+        # The generic return type of the two is a struct containing just the
+        # continuation data, with the remaining size filled by padding bytes.
+        if 0 < (diff = max_size - @target_machine.data_layout.abi_size(cont_ptr))
+          llvm.struct([cont_ptr, @i8.vector(diff)])
+        else
+          llvm.struct([cont_ptr])
+        end
       else
         raise NotImplementedError.new(gfunc.calling_convention)
       end
@@ -2320,7 +2347,8 @@ class Mare::Compiler::CodeGen
     cast_values.each_with_index do |cast_value, index|
       tuple = @builder.insert_value(tuple, cast_value, index + 1)
     end
-    @builder.ret(@builder.bit_cast(tuple, func_frame.llvm_func.return_type))
+    tuple.name = "YIELD.RETURN"
+    @builder.ret(gen_struct_bit_cast(tuple, func_frame.llvm_func.return_type))
   end
   
   def gen_final_return_using_yield_cc(value)
@@ -2343,7 +2371,23 @@ class Mare::Compiler::CodeGen
     tuple = return_type.undef
     tuple = @builder.insert_value(tuple, cont, 0)
     tuple = @builder.insert_value(tuple, cast_value, 1)
-    @builder.ret(@builder.bit_cast(tuple, func_frame.llvm_func.return_type))
+    tuple.name = "FINAL.RETURN"
+    @builder.ret(gen_struct_bit_cast(tuple, func_frame.llvm_func.return_type))
+  end
+  
+  def gen_struct_bit_cast(value : LLVM::Value, to_type : LLVM::Type)
+    # LLVM doesn't allow directly casting to/from structs, so we cheat a bit
+    # with an alloca in between the two as a pointer that we can cast.
+    alloca = @builder.alloca(value.type, "#{value.name}.PTR")
+    @builder.store(value, alloca)
+    @builder.load(
+      @builder.bit_cast(
+        alloca,
+        to_type.pointer,
+        "#{value.name}.CAST.PTR",
+      ),
+      "#{value.name}.CAST",
+    )
   end
   
   DESC_ID                        = 0

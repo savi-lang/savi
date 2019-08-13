@@ -931,6 +931,10 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       node
     end
     
+    def yield_out_resolved
+      yield_out_info.not_nil!.resolve!(self)
+    end
+    
     def error_if_type_args_missing(node : AST::Node, mt : MetaType)
       # Skip cases where the metatype has no single ReifiedType.
       return unless mt.singular?
