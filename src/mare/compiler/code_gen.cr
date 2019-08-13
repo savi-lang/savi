@@ -649,13 +649,8 @@ class Mare::Compiler::CodeGen
     # If this is a yielding function, we must first declare the type that will
     # be used to hold continuation data for the subsequent continuing calls.
     if gfunc.calling_convention == :yield_cc
-      cont_name = "#{gfunc.llvm_name}.CONTINUATION"
-      cont_elem_types = [] of LLVM::Type
-      cont_elem_types << @ptr # the function pointer for the next call
-      cont_elem_types.concat \
-        ctx.inventory.locals[gfunc.func].map { |ref| llvm_mem_type_of(ref.defn, gfunc) }
-      
-      gfunc.continuation_type = @llvm.struct(cont_elem_types, cont_name)
+      gfunc.continuation_type =
+        @llvm.struct_create_named("#{gfunc.llvm_name}.CONTINUATION")
     end
     
     # Determine the LLVM type to return, based on the calling convention.
@@ -760,6 +755,14 @@ class Mare::Compiler::CodeGen
           continue_name = "#{gfunc.llvm_name}.CONTINUE.#{index + 1}"
           @mod.functions.add(continue_name, continue_param_types, ret_type)
         end.to_a
+      
+      # Finish defining the members of the continuation type struct.
+      cont_elem_types = [] of LLVM::Type
+      cont_elem_types << gfunc.continuation_llvm_func_ptr
+      cont_elem_types.concat \
+        ctx.inventory.locals[gfunc.func].map { |ref| llvm_mem_type_of(ref.defn, gfunc) }
+      
+      gfunc.continuation_type.struct_set_body(cont_elem_types)
     end
   end
   
@@ -1360,8 +1363,6 @@ class Mare::Compiler::CodeGen
       yield_result = @builder.load(yield_result_alloca, "RESULT.YIELDED")
       cont = @builder.extract_value(yield_result, 0, "CONT")
       next_func_gep = @builder.struct_gep(cont, 0, "CONT.NEXT.GEP")
-      next_func_gep = @builder.bit_cast(next_func_gep,
-        gfunc.continuation_llvm_func_ptr.pointer, "CONT.NEXT.GEP") # TODO: remove this bit_cast by using a more specific type in the continuation_type struct
       next_func = @builder.load(next_func_gep, "CONT.NEXT")
       is_finished = @builder.icmp(LLVM::IntPredicate::EQ,
         next_func,
@@ -2288,8 +2289,10 @@ class Mare::Compiler::CodeGen
   end
   
   def gen_yield_return_using_yield_cc(next_func : LLVM::Value?, values)
+    gfunc = func_frame.gfunc.not_nil!
+    
     # Cast the given values to the appropriate type.
-    return_type = func_frame.gfunc.not_nil!.yield_cc_yield_return_type
+    return_type = gfunc.yield_cc_yield_return_type
     cast_values =
       values.map_with_index do |value, index|
         llvm_type = return_type.struct_element_types[index + 1]
@@ -2304,10 +2307,11 @@ class Mare::Compiler::CodeGen
     # telling the caller not to continue the yield block iteration any more.
     next_func_gep = @builder.struct_gep(cont, 0, "CONT.NEXT.GEP")
     if next_func
+      next_func = @builder.bit_cast(next_func, gfunc.continuation_llvm_func_ptr, "#{next_func.name}.GENERIC")
       @builder.store(next_func, next_func_gep)
     else
       # Assign NULL to the continuation's function pointer, signifying the end.
-      @builder.store(@ptr.null, next_func_gep)
+      @builder.store(gfunc.continuation_llvm_func_ptr.null, next_func_gep)
     end
     
     # Return the tuple: {continuation_value, *values}
@@ -2320,6 +2324,8 @@ class Mare::Compiler::CodeGen
   end
   
   def gen_final_return_using_yield_cc(value)
+    gfunc = func_frame.gfunc.not_nil!
+    
     # Cast the given value to the appropriate type.
     return_type = func_frame.gfunc.not_nil!.yield_cc_final_return_type
     llvm_type = return_type.struct_element_types[1]
@@ -2331,7 +2337,7 @@ class Mare::Compiler::CodeGen
     # Assign NULL to the continuation's function pointer, signifying the end,
     # telling the caller not to continue the yield block iteration any more.
     next_func_gep = @builder.struct_gep(cont, 0, "CONT.NEXT.GEP")
-    @builder.store(@ptr.null, next_func_gep)
+    @builder.store(gfunc.continuation_llvm_func_ptr.null, next_func_gep)
     
     # Return the tuple: {continuation_value, value}
     tuple = return_type.undef
