@@ -304,6 +304,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     def llvm_name : String
       # TODO: guarantee global uniqueness
       @reified.show_type
+      .gsub("(", "[").gsub(")", "]") # LLDB doesn't handle parens very well...
     end
     
     def has_desc?
