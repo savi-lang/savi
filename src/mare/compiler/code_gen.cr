@@ -667,7 +667,9 @@ class Mare::Compiler::CodeGen
         cont_ptr = gfunc.continuation_type.pointer
         
         # Gather the LLVM::Types to use for the yield out values.
-        yield_out_types = [llvm_type_of(ctx.reach[gfunc.infer.yield_out_resolved])]
+        yield_out_types = gfunc.infer.yield_out_resolved.map do |resolved|
+          llvm_type_of(ctx.reach[resolved])
+        end
         
         # Define two different return types - one for the yield returns
         # and one for the final return when all yielding is done.

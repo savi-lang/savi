@@ -477,7 +477,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     getter ctx : Context
     getter for_type : ForType
     getter reified : ReifiedFunction
-    getter yield_out_info : Local?
+    getter yield_out_infos : Array(Local)
     
     def initialize(@ctx, @for_type, @reified)
       @local_idents = Hash(Refer::Local, AST::Node).new
@@ -487,6 +487,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       @resolved = Hash(AST::Node, MetaType).new
       @called_funcs = Set({ReifiedType, Program::Function}).new
       @already_ran = false
+      @yield_out_infos = [] of Local
     end
     
     def [](node : AST::Node)
@@ -622,12 +623,17 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       end
       
       if ctx.inventory.yields[func]?
-        # Create a fake local variable that represents the yield out type.
-        @yield_out_info = Local.new((func.yield_out || func.ident).pos)
+        ctx.inventory.yields[func].map(&.terms.size).max.times do
+          # Create a fake local variable that represents the yield out type.
+          @yield_out_infos << Local.new((func.yield_out || func.ident).pos)
+        end
         
         func.yield_out.try do |yield_out|
+          raise NotImplementedError.new("explicit types for multi-yield") \
+            if yield_out.is_a?(AST::Group) && yield_out.style == "("
+          
           yield_out.accept(self)
-          @yield_out_info.not_nil!.set_explicit(yield_out.pos, resolve(yield_out))
+          @yield_out_infos.first.set_explicit(yield_out.pos, resolve(yield_out))
         end
       end
       
@@ -752,28 +758,29 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
     
     def follow_call_check_yield_block(infer, yield_params, yield_block, problems)
-      if !infer.yield_out_info
+      if infer.yield_out_infos.empty?
         if yield_block
           problems << {yield_block.pos, "it has a yield block " \
             "but the called function does not have any yields"}
         end
       elsif !yield_block
-        problems << {infer.yield_out_info.not_nil!.first_viable_constraint_pos,
+        problems << {infer.yield_out_infos.first.first_viable_constraint_pos,
           "it has no yield block but the called function does yield"}
       else
         # TODO: Verify type of yield_block matches the infer.yield_in_info.
         
         if yield_params
-          raise NotImplementedError.new("multiple yield params") \
-            unless yield_params.terms.size == 1
-          yield_param = yield_params.terms.first
+          raise "TODO: Nice error message for this" \
+            if infer.yield_out_infos.size != yield_params.terms.size
           
-          # TODO: Use .assign instead of .set_explicit after figuring out how to have an AST node for it
-          yield_out = infer.yield_out_info.not_nil!
-          self[yield_param].as(Local).set_explicit(
-            yield_out.first_viable_constraint_pos,
-            yield_out.resolve!(infer),
-          )
+          infer.yield_out_infos.zip(yield_params.terms)
+          .each do |yield_out, yield_param|
+            # TODO: Use .assign instead of .set_explicit after figuring out how to have an AST node for it
+            self[yield_param].as(Local).set_explicit(
+              yield_out.first_viable_constraint_pos,
+              yield_out.resolve!(infer),
+            )
+          end
         end
       end
     end
@@ -932,7 +939,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
     
     def yield_out_resolved
-      yield_out_info.not_nil!.resolve!(self)
+      yield_out_infos.map(&.resolve!(self))
     end
     
     def error_if_type_args_missing(node : AST::Node, mt : MetaType)
@@ -1253,10 +1260,12 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
     
     def touch(node : AST::Yield)
-      raise NotImplementedError.new("multiple yield args") \
-        if node.terms.size > 1
-      term = node.terms.first
-      @yield_out_info.not_nil!.assign(self, term, term.pos)
+      raise "TODO: Nice error message for this" \
+        if yield_out_infos.size != node.terms.size
+      
+      yield_out_infos.zip(node.terms).each do |info, term|
+        info.assign(self, term, term.pos)
+      end
       
       none = MetaType.new(reified_type(prelude_type("None")))
       self[node] = FromYield.new(node.pos, none)

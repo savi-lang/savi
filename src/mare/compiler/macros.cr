@@ -220,8 +220,15 @@ class Mare::Compiler::Macros < Mare::AST::Visitor
     orig = node.terms[0]
     term = node.terms[1]
     
+    terms =
+      if term.is_a?(AST::Group) && term.style == "("
+        term.terms
+      else
+        [term]
+      end
+    
     group = AST::Group.new("(").from(node)
-    group.terms << AST::Yield.new([term]).from(orig)
+    group.terms << AST::Yield.new(terms).from(orig)
     group
   end
 end
