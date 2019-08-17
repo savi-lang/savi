@@ -61,6 +61,21 @@ class Mare::Compiler::CodeGen
       @builder.set_current_debug_location(0, 0, nil)
     end
     
+    def declare_local(ref : Refer::Local, storage : LLVM::Value)
+      pos = ref.defn.pos
+      name = ref.name
+      file = di_file(pos.source)
+      
+      # TODO: build a real type description here.
+      # This is just a stub that pretends the variable is just an int.
+      int = @di.create_basic_type("int", 32, 32, LLVM::DwarfTypeEncoding::Signed)
+      
+      info = @di.create_auto_variable(@di_func.not_nil!, name, file, pos.row + 1, int, 0)
+      expr = @di.create_expression(nil, 0)
+      
+      @di.insert_declare_at_end(storage, info, expr, @builder.current_debug_location, @builder.insert_block)
+    end
+    
     private def metadata(args)
       values = args.map do |value|
         case value

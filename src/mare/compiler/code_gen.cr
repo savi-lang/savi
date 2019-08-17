@@ -2655,6 +2655,7 @@ class Mare::Compiler::CodeGen
     else
       @builder.alloca(llvm_type, ref.name)
     end
+    .tap { |gep| @di.declare_local(ref, gep) }
   end
   
   def gen_field_gep(name, gtype = func_frame.gtype.not_nil!)
