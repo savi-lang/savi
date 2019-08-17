@@ -29,15 +29,15 @@ class Mare::Compiler::CodeGen
       ]))
     end
     
-    def func_start(gfunc : GenFunc)
+    def func_start(gfunc : GenFunc, llvm_func : LLVM::Function)
       pos = gfunc.func.ident.pos
-      name = gfunc.llvm_name
+      name = llvm_func.name
       file = di_file(pos.source)
       
       @di_func =
         @di.create_function(file, name, name, file, pos.row + 1,
           di_func_type(gfunc, file), true, true, pos.row + 1,
-          LLVM::DIFlags::Zero, false, gfunc.llvm_func)
+          LLVM::DIFlags::Zero, false, llvm_func)
       
       set_loc(pos)
     end

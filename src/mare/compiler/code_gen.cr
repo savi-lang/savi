@@ -554,7 +554,7 @@ class Mare::Compiler::CodeGen
     @frames << Frame.new(self, llvm_func, gtype, gfunc)
     
     # Add debug info for this function
-    @di.func_start(gfunc) if gfunc
+    @di.func_start(gfunc, llvm_func) if gfunc
     
     # Create an entry block and start building from there.
     @builder.position_at_end(gen_block("entry"))
