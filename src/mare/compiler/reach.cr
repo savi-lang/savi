@@ -65,6 +65,18 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       raise "#{self} is not None" unless single!.defn.ident.value == "None"
     end
     
+    def is_numeric?
+      singular? && single!.defn.has_tag?(:numeric)
+    end
+    
+    def is_floating_point_numeric?
+      is_numeric? && single!.defn.const_bool("is_floating_point")
+    end
+    
+    def is_signed_numeric?
+      is_numeric? && single!.defn.const_bool("is_signed")
+    end
+    
     @llvm_use_type : Symbol?
     def llvm_use_type : Symbol
       (@llvm_use_type ||= \

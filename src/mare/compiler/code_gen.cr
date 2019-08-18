@@ -251,7 +251,7 @@ class Mare::Compiler::CodeGen
     @llvm = LLVM::Context.new
     @mod = @llvm.new_module("main")
     @builder = @llvm.new_builder
-    @di = DebugInfo.new(@llvm, @mod, @builder)
+    @di = DebugInfo.new(@llvm, @mod, @builder, @target_machine.data_layout)
     
     @default_linkage = LLVM::Linkage::External
     
@@ -342,7 +342,7 @@ class Mare::Compiler::CodeGen
     when :i64 then @i64
     when :f32 then @f32
     when :f64 then @f64
-    when :ptr then @ptr
+    when :ptr then llvm_type_of(ref.single_def!(ctx).cpointer_type_arg).pointer
     when :isize then @isize
     when :struct_ptr then
       @gtypes[ctx.reach[ref.single!].llvm_name].struct_ptr
@@ -360,7 +360,7 @@ class Mare::Compiler::CodeGen
     when :i64 then @i64
     when :f32 then @f32
     when :f64 then @f64
-    when :ptr then @ptr
+    when :ptr then llvm_type_of(ref.single_def!(ctx).cpointer_type_arg).pointer
     when :isize then @isize
     when :struct_ptr then
       @gtypes[ctx.reach[ref.single!].llvm_name].struct_ptr
@@ -411,6 +411,7 @@ class Mare::Compiler::CodeGen
   
   def run(ctx : Context)
     @ctx = ctx
+    @di.ctx = ctx
     
     # Generate all type descriptors and function declarations.
     ctx.reach.each_type_def.each do |type_def|
@@ -894,42 +895,49 @@ class Mare::Compiler::CodeGen
     gen_func_start(llvm_func)
     params = llvm_func.params
     
+    llvm_type = llvm_type_of(gtype)
     elem_llvm_type = llvm_mem_type_of(gtype.type_def.cpointer_type_arg)
     elem_size_value = @target_machine.data_layout.abi_size(elem_llvm_type)
     
     @builder.ret \
       case gfunc.func.ident.value
       when "null"
-        @ptr.null
+        llvm_type.null
       when "_alloc"
         llvm_func.add_attribute(LLVM::Attribute::NoAlias, LLVM::AttributeIndex::ReturnIndex)
         llvm_func.add_attribute(LLVM::Attribute::DereferenceableOrNull, LLVM::AttributeIndex::ReturnIndex, elem_size_value)
         llvm_func.add_attribute(LLVM::Attribute::Alignment, LLVM::AttributeIndex::ReturnIndex, PonyRT::HEAP_MIN)
         
-        elem_size = @isize.const_int(elem_size_value)
-        total_size = @builder.mul(params[0], elem_size)
-        @builder.call(@mod.functions["pony_alloc"], [pony_ctx, elem_size])
+        @builder.bit_cast(
+          @builder.call(@mod.functions["pony_alloc"], [
+            pony_ctx,
+            @builder.mul(params[0], @isize.const_int(elem_size_value)),
+          ]),
+          llvm_type,
+        )
       when "_realloc"
         llvm_func.add_attribute(LLVM::Attribute::NoAlias, LLVM::AttributeIndex::ReturnIndex)
         llvm_func.add_attribute(LLVM::Attribute::DereferenceableOrNull, LLVM::AttributeIndex::ReturnIndex, elem_size_value)
         llvm_func.add_attribute(LLVM::Attribute::Alignment, LLVM::AttributeIndex::ReturnIndex, PonyRT::HEAP_MIN)
         
-        elem_size = @isize.const_int(elem_size_value)
-        total_size = @builder.mul(params[1], elem_size)
-        @builder.call(@mod.functions["pony_realloc"], [pony_ctx, params[0], elem_size])
+        @builder.bit_cast(
+          @builder.call(@mod.functions["pony_realloc"], [
+            pony_ctx,
+            @builder.bit_cast(params[0], @ptr),
+            @builder.mul(params[1], @isize.const_int(elem_size_value)),
+          ]),
+          llvm_type,
+        )
       when "_get_at"
-        elem_ptr = @builder.bit_cast(params[0], elem_llvm_type.pointer)
-        gep = @builder.inbounds_gep(elem_ptr, params[1])
+        gep = @builder.inbounds_gep(params[0], params[1])
         @builder.load(gep)
       when "_assign_at"
-        elem_ptr = @builder.bit_cast(params[0], elem_llvm_type.pointer)
-        gep = @builder.inbounds_gep(elem_ptr, params[1])
+        gep = @builder.inbounds_gep(params[0], params[1])
         new_value = params[2]
         @builder.store(new_value, gep)
         new_value
       when "_displace_at"
-        elem_ptr = @builder.bit_cast(params[0], elem_llvm_type.pointer)
-        gep = @builder.inbounds_gep(elem_ptr, params[1])
+        gep = @builder.inbounds_gep(params[0], params[1])
         new_value = params[2]
         old_value = @builder.load(gep)
         @builder.store(new_value, gep)
@@ -2655,7 +2663,7 @@ class Mare::Compiler::CodeGen
     else
       @builder.alloca(llvm_type, ref.name)
     end
-    .tap { |gep| @di.declare_local(ref, gep) }
+    .tap { |gep| @di.declare_local(ref, type_of(ref.defn), gep) }
   end
   
   def gen_field_gep(name, gtype = func_frame.gtype.not_nil!)
