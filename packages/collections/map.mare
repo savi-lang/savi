@@ -33,6 +33,7 @@
         try (@_array[@_search(entry.key)]! = entry)
       )
     )
+    @
   
   :: Return the value assigned to the given key, if present.
   :: Raises an error if the key is not present.
