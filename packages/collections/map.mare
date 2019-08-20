@@ -106,8 +106,7 @@
     found = False
     
     try (
-      i USize = 0
-      while (i < @_array.size) ( // TODO: @_array.size.times ...
+      @_array.each_with_index -> (entry, i |
         entry = @_array[idx]!
         
         case (
@@ -132,7 +131,6 @@
         )
         
         idx = (hash + ((i + (i * i)) / 2)).bit_and(mask)
-        i = i + 1
       )
     )
     
