@@ -317,6 +317,10 @@ class Mare::Compiler::CodeGen
     @frames.reverse_each.find { |f| f.func? }.not_nil!
   end
   
+  def abi_size_of(llvm_type : LLVM::Type)
+    @target_machine.data_layout.abi_size(llvm_type)
+  end
+  
   def type_of(expr : AST::Node, in_gfunc : GenFunc? = nil)
     in_gfunc ||= func_frame.gfunc.not_nil!
     ctx.reach[in_gfunc.infer.resolve(expr)]
@@ -680,30 +684,33 @@ class Mare::Compiler::CodeGen
         f_t = gfunc.yield_cc_final_return_type = llvm.struct([cont_ptr, simple_ret_type])
         
         # Determine the byte size of the larger type of the two.
-        max_size = [
-          @target_machine.data_layout.abi_size(y_t),
-          @target_machine.data_layout.abi_size(f_t),
-        ].max
+        max_size = [abi_size_of(y_t), abi_size_of(f_t)].max
         
         # Pad the yield return type with extra bytes as needed.
-        if 0 < (diff = max_size - @target_machine.data_layout.abi_size(y_t))
+        while abi_size_of(y_t) < max_size
           y_t = gfunc.yield_cc_yield_return_type = \
-            llvm.struct(y_t.struct_element_types + [@i8.vector(diff)])
+            llvm.struct(y_t.struct_element_types + [@isize])
         end
         
         # Pad the final return type with extra bytes as needed.
-        if 0 < (diff = max_size - @target_machine.data_layout.abi_size(f_t))
+        while abi_size_of(f_t) < max_size
           f_t = gfunc.yield_cc_final_return_type = \
-            llvm.struct(f_t.struct_element_types + [@i8.vector(diff)])
+            llvm.struct(f_t.struct_element_types + [@isize])
         end
         
         # The generic return type of the two is a struct containing just the
         # continuation data, with the remaining size filled by padding bytes.
-        if 0 < (diff = max_size - @target_machine.data_layout.abi_size(cont_ptr))
-          llvm.struct([cont_ptr, @i8.vector(diff)])
-        else
-          llvm.struct([cont_ptr])
+        opaque_t = llvm.struct([cont_ptr])
+        while abi_size_of(opaque_t) < max_size
+          opaque_t = llvm.struct(opaque_t.struct_element_types + [@isize])
         end
+        
+        # As a sanity check, confirm that the resulting sizes are the same.
+        raise "Failed to balance yield return struct sizes" unless \
+          (abi_size_of(opaque_t) == abi_size_of(y_t)) && \
+          (abi_size_of(opaque_t) == abi_size_of(f_t))
+        
+        opaque_t
       else
         raise NotImplementedError.new(gfunc.calling_convention)
       end
@@ -897,7 +904,7 @@ class Mare::Compiler::CodeGen
     
     llvm_type = llvm_type_of(gtype)
     elem_llvm_type = llvm_mem_type_of(gtype.type_def.cpointer_type_arg)
-    elem_size_value = @target_machine.data_layout.abi_size(elem_llvm_type)
+    elem_size_value = abi_size_of(elem_llvm_type)
     
     @builder.ret \
       case gfunc.func.ident.value
@@ -966,9 +973,9 @@ class Mare::Compiler::CodeGen
     @builder.ret \
       case gfunc.func.ident.value
       when "ilp32"
-        gen_bool(@target_machine.data_layout.abi_size(@isize) == 4)
+        gen_bool(abi_size_of(@isize) == 4)
       when "lp64"
-        gen_bool(@target_machine.data_layout.abi_size(@isize) == 8)
+        gen_bool(abi_size_of(@isize) == 8)
       else
         raise NotImplementedError.new(gfunc.func.ident.value)
       end
@@ -990,7 +997,7 @@ class Mare::Compiler::CodeGen
       case gfunc.func.ident.value
       when "bit_width"
         @i8.const_int(
-          @target_machine.data_layout.abi_size(llvm_type_of(gtype)) * 8
+          abi_size_of(llvm_type_of(gtype)) * 8
         )
       when "zero"
         if gtype.type_def.is_floating_point_numeric?
@@ -1731,7 +1738,7 @@ class Mare::Compiler::CodeGen
     when :f32 then @f32.const_float(expr.value.to_f32)
     when :f64 then @f64.const_double(expr.value.to_f64)
     when :isize then @isize.const_int(
-      (@target_machine.data_layout.abi_size(@isize) == 8) \
+      (abi_size_of(@isize) == 8) \
       ? expr.value.to_i64
       : expr.value.to_i32
     )
@@ -1753,7 +1760,7 @@ class Mare::Compiler::CodeGen
   end
   
   def bit_width_of(llvm_type : LLVM::Type)
-    @target_machine.data_layout.abi_size(llvm_type) * 8
+    abi_size_of(llvm_type) * 8
   end
   
   def gen_numeric_conv(
@@ -2481,7 +2488,7 @@ class Mare::Compiler::CodeGen
     desc.global_constant = true
     desc
     
-    abi_size = @target_machine.data_layout.abi_size(gtype.struct_type)
+    abi_size = abi_size_of(gtype.struct_type)
     field_offset =
       if gtype.fields.empty?
         0
@@ -2584,7 +2591,7 @@ class Mare::Compiler::CodeGen
   # This generates the code that allocates an object of any given LLVM type.
   # It is used by the other implementation of this function defined above.
   def gen_alloc(llvm_type : LLVM::Type, name : String)
-    size = @target_machine.data_layout.abi_size(llvm_type)
+    size = abi_size_of(llvm_type)
     size = 1 if size == 0
     args = [pony_ctx]
     
@@ -2749,7 +2756,7 @@ class Mare::Compiler::CodeGen
     vtable_index = gfunc.vtable_index
     
     # Allocate a message object of the specific size/type used by this function.
-    msg_size = @target_machine.data_layout.abi_size(msg_type)
+    msg_size = abi_size_of(msg_type)
     pool_index = PonyRT.pool_index(msg_size)
     msg_opaque = @builder.call(@mod.functions["pony_alloc_msg"],
       [@i32.const_int(pool_index), @i32.const_int(vtable_index)], "msg.OPAQUE")

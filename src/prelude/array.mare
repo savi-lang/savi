@@ -51,3 +51,11 @@
       index = index + 1 // TODO: index += 1
     )
     None
+  
+  :fun each_with_index
+    index USize = 0
+    while (index < @_size) (
+      yield (@_ptr._get_at(index), index)
+      index = index + 1 // TODO: index += 1
+    )
+    None
