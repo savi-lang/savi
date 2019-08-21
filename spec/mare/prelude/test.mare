@@ -306,14 +306,13 @@
       array_ewi = ["foo", "bar", "baz"]
       array_ewi_0 Array(String) = []
       array_ewi_1 Array(USize) = []
-      array_ewi_2 Array(String) = []
       array_ewi.each_with_index -> (string, index |
         array_ewi_0 << string
         array_ewi_1 << index
       )
-      test["Array each_with_index, [2][0] "].pass = array_ewi_0[0]! == "foo"
-      test["Array each_with_index, [2][1] "].pass = array_ewi_0[1]! == "bar"
-      test["Array each_with_index, [2][2] "].pass = array_ewi_0[2]! == "baz"
+      test["Array each_with_index, [0][0] "].pass = array_ewi_0[0]! == "foo"
+      test["Array each_with_index, [0][1] "].pass = array_ewi_0[1]! == "bar"
+      test["Array each_with_index, [0][2] "].pass = array_ewi_0[2]! == "baz"
       test["Array each_with_index, [1][0] "].pass = array_ewi_1[0]! == 0
       test["Array each_with_index, [1][1] "].pass = array_ewi_1[1]! == 1
       test["Array each_with_index, [1][2] "].pass = array_ewi_1[2]! == 2

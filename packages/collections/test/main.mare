@@ -22,4 +22,26 @@
     test["Map []! gone again  "].pass = try map["example"]! <: None
     test["Map size == 0 again "].pass = map.size == 0
     
+    // TODO: Make the following not segfault:
+    // map_each = Map(String, U64, HashEq(String)).new // TODO: implicit default for HashFunction type argument
+    // map_each["foo"] = 11
+    // map_each["bar"] = 22
+    // map_each["baz"] = 33
+    // map_each_0 Array(String) = []
+    // map_each_1 Array(U64) = []
+    // map_each.each -> (key, value |
+    //   map_each_0 << key
+    //   map_each_1 << value
+    // )
+    // try (
+    //   test["Map each, [0][0] "].pass = map_each_0[0]! == "foo"
+    //   test["Map each, [0][1] "].pass = map_each_0[1]! == "bar"
+    //   test["Map each, [0][2] "].pass = map_each_0[2]! == "baz"
+    //   test["Map each, [1][0] "].pass = map_each_1[0]! == 11
+    //   test["Map each, [1][1] "].pass = map_each_1[1]! == 22
+    //   test["Map each, [1][2] "].pass = map_each_1[2]! == 33
+    // |
+    //   test["Map methods test block had an out-of-bounds error"].pass = False
+    // )
+    
     test.print_line_break // TODO: move to MicroTest constructor and finalizer

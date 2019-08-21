@@ -95,6 +95,33 @@
     )
     None
   
+  :: Yield each key and value in the map.
+  :fun each
+    @_array.each -> (entry |
+      if (entry <: KV(K, V)) (
+        yield (entry.key, entry.value)
+      )
+    )
+    @
+  
+  :: Yield each key in the map.
+  :fun each_key
+    @_array.each -> (entry |
+      if (entry <: KV(K, V)) (
+        yield entry.key
+      )
+    )
+    @
+  
+  :: Yield each value in the map.
+  :fun each_value
+    @_array.each -> (entry |
+      if (entry <: KV(K, V)) (
+        yield entry.value
+      )
+    )
+    @
+  
   :fun _search (key)
     hash = H.hash(key).usize()
     
