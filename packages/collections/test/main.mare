@@ -7,6 +7,18 @@
     test.print_line_break // TODO: move to MicroTest constructor and finalizer
     
     ///
+    // Count functions
+    
+    count = USize[0]
+    count_sum = USize[0]
+    Count.to(5) -> (i |
+      count = count + 1
+      count_sum = count_sum + i
+    )
+    test["Count to 5 count"].pass = count == 5
+    test["Count to 5 sum"].pass = count_sum == 10
+    
+    ///
     // Map methods
     
     map = Map(String, U64, HashEq(String)).new // TODO: implicit default for HashFunction type argument
