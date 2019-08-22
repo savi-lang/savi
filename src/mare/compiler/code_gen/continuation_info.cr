@@ -12,14 +12,27 @@ class Mare::Compiler::CodeGen
     
     @struct_element_types : Array(LLVM::Type)?
     def struct_element_types
-      (@struct_element_types ||= (
+      (@struct_element_types ||= begin
         list = [] of LLVM::Type
+        
+        # The first element is always the pointer to the next function to call.
         list << gfunc.continuation_llvm_func_ptr
+        
+        # Then comes the receiver if this function needs a receiver value.
         list << g.llvm_type_of(gtype) if gfunc.needs_receiver?
-        list.concat \
-          ctx.inventory.locals(gfunc.func).map { |ref| g.llvm_mem_type_of(ref.defn, gfunc) }
+        
+        # Then come the local variables.
+        ctx.inventory.locals(gfunc.func).each do |ref|
+          list << g.llvm_mem_type_of(ref.defn, gfunc)
+        end
+        
+        # Then come the yielding call results (for yields nested in yields).
+        ctx.inventory.yielding_calls(gfunc.func).each do |relate|
+          list << g.resolve_call(relate, gfunc).last.llvm_func.return_type
+        end
+        
         list
-      )).not_nil!
+      end).not_nil!
     end
     
     def struct_gep_for_next_func(cont : LLVM::Value)
@@ -37,6 +50,22 @@ class Mare::Compiler::CodeGen
       index += ctx.inventory.locals(gfunc.func).index(ref).not_nil!
       
       builder.struct_gep(cont, index, "CONT.#{ref.name}.GEP")
+    end
+    
+    def struct_gep_for_yielded_result(cont : LLVM::Value, relate : AST::Relate)
+      index = 1
+      index += 1 if gfunc.needs_receiver?
+      index += ctx.inventory.locals(gfunc.func).size
+      index += ctx.inventory.yielding_calls(gfunc.func).index(relate).not_nil!
+      
+      member, _, _, _ = AST::Extract.call(relate)
+      
+      builder.struct_gep(cont, index, "CONT.#{member.value}.RESULT.YIELDED.OPAQUE.GEP")
+    end
+    
+    @struct_gep_for_yielded_result_by_frame = {} of {Frame, AST::Relate} => LLVM::Value
+    def struct_gep_for_yielded_result(frame : Frame, relate : AST::Relate)
+      @struct_gep_for_yielded_result_by_frame[{frame, relate}]
     end
     
     def get_next_func(cont : LLVM::Value)
@@ -81,6 +110,12 @@ class Mare::Compiler::CodeGen
       if gfunc.needs_receiver?
         builder.store(frame.llvm_func.params[0], struct_gep_for_receiver(cont))
       end
+      
+      # Eagerly create struct geps for all yielding call results in this func.
+      ctx.inventory.yielding_calls(gfunc.func).each do |relate|
+        @struct_gep_for_yielded_result_by_frame[{frame, relate}] =
+          struct_gep_for_yielded_result(cont, relate)
+      end
     end
     
     def continue_cont(frame : Frame)
@@ -105,6 +140,12 @@ class Mare::Compiler::CodeGen
         ref_index = ref_index + 1 if gfunc.needs_receiver? # skip the receiver
         ref_type = struct_element_types[ref_index]
         frame.current_locals[ref] = g.gen_local_gep(ref, ref_type)
+      end
+      
+      # Eagerly create struct geps for all yielding call results in this func.
+      ctx.inventory.yielding_calls(gfunc.func).each do |relate|
+        @struct_gep_for_yielded_result_by_frame[{frame, relate}] =
+          struct_gep_for_yielded_result(cont, relate)
       end
     end
   end

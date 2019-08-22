@@ -1244,6 +1244,20 @@ class Mare::Compiler::CodeGen
     gen_func_end
   end
   
+  def resolve_call(relate : AST::Relate, in_gfunc : GenFunc? = nil)
+    member_ast, args_ast, yield_params_ast, yield_block_ast = AST::Extract.call(relate)
+    lhs_type = type_of(relate.lhs, in_gfunc)
+    member = member_ast.value
+    
+    # Even if there are multiple possible gtypes and thus gfuncs, we choose an
+    # arbitrary one for the purposes of checking arg types against param types.
+    # We make the assumption that signature differences have been prevented.
+    lhs_gtype = @gtypes[ctx.reach[lhs_type.any_callable_defn_for(member)].llvm_name] # TODO: simplify this mess of an expression
+    gfunc = lhs_gtype[member]
+    
+    {lhs_gtype, gfunc}
+  end
+  
   def gen_dot(relate)
     member_ast, args_ast, yield_params_ast, yield_block_ast = AST::Extract.call(relate)
     
@@ -1252,12 +1266,7 @@ class Mare::Compiler::CodeGen
     args = arg_exprs.map { |x| gen_expr(x).as(LLVM::Value) }
     
     lhs_type = type_of(relate.lhs)
-    
-    # Even if there are multiple possible gtypes and thus gfuncs, we choose an
-    # arbitrary one for the purposes of checking arg types against param types.
-    # We make the assumption that signature differences have been prevented.
-    lhs_gtype = @gtypes[ctx.reach[lhs_type.any_callable_defn_for(member)].llvm_name] # TODO: simplify this mess of an expression
-    gfunc = lhs_gtype[member]
+    lhs_gtype, gfunc = resolve_call(relate)
     
     # For any args we are missing, try to find and use a default param value.
     gfunc.func.params.try do |params|
@@ -1333,7 +1342,13 @@ class Mare::Compiler::CodeGen
       
       # Since a yield block is kind of like a loop, we need an alloca to cover
       # the "variable" that changes each iteration - the last call result.
-      result_alloca = gen_alloca(result.type, "RESULT.YIELDED.OPAQUE.ALLOCA")
+      result_alloca =
+        if func_frame.gfunc.not_nil!.calling_convention == :yield_cc
+          func_frame.gfunc.not_nil!.continuation_info
+            .struct_gep_for_yielded_result(func_frame, relate)
+        else
+          gen_alloca(result.type, "RESULT.YIELDED.OPAQUE.ALLOCA")
+        end
       @builder.store(result, result_alloca)
       
       # We declare the alloca itself, as well as bit casted aliases.
