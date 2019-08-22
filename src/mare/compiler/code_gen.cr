@@ -1418,7 +1418,13 @@ class Mare::Compiler::CodeGen
       
       # Finally, finish with the "real" result of the call.
       @builder.position_at_end(after_block)
-      result = gen_none # TODO: cast the real result value of the call instead
+      final_result_alloca = @builder.bit_cast(result_alloca,
+        gfunc.yield_cc_final_return_type.pointer, "RESULT.ALLOCA")
+      final_result_return = @builder.load(
+        @builder.struct_gep(final_result_alloca, 1, "RESULT.RETURN.GEP"),
+        "RESULT.RETURN",
+      )
+      result = final_result_return
     else
       raise NotImplementedError.new(gfunc.calling_convention)
     end

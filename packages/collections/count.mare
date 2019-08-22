@@ -7,4 +7,4 @@
       yield i
       i = i + 1
     )
-    None
+    limit

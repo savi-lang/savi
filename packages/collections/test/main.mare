@@ -11,10 +11,11 @@
     
     count = USize[0]
     count_sum = USize[0]
-    Count.to(5) -> (i |
+    count_return = Count.to(5) -> (i |
       count = count + 1
       count_sum = count_sum + i
     )
+    test["Count to 5 return"].pass = count_return == 5
     test["Count to 5 count"].pass = count == 5
     test["Count to 5 sum"].pass = count_sum == 10
     
