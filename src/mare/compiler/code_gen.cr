@@ -18,7 +18,7 @@ class Mare::Compiler::CodeGen
   getter target : LLVM::Target
   getter target_machine : LLVM::TargetMachine
   getter mod : LLVM::Module
-  @builder : LLVM::Builder
+  getter builder : LLVM::Builder
   
   class Frame
     getter func : LLVM::Function?
@@ -199,6 +199,7 @@ class Mare::Compiler::CodeGen
     property! virtual_llvm_func : LLVM::Function
     property! send_llvm_func : LLVM::Function
     property! send_msg_llvm_type : LLVM::Type
+    property! continuation_info : ContinuationInfo
     property! continuation_type : LLVM::Type
     property! continuation_llvm_func_ptr : LLVM::Type
     property! continuation_llvm_funcs : Array(LLVM::Function)
@@ -576,7 +577,7 @@ class Mare::Compiler::CodeGen
         if gfunc.needs_receiver?
           @builder.store(
             frame.func.params[0],
-            @builder.struct_gep(cont, 1, "CONT.@.GEP"),
+            gfunc.continuation_info.struct_gep_for_receiver(cont),
           )
         end
       else
@@ -588,7 +589,7 @@ class Mare::Compiler::CodeGen
         # Get the receiver value from the continuation, if applicable.
         func_frame.receiver_value =
           if gfunc.needs_receiver?
-            @builder.load(@builder.struct_gep(cont, 1, "CONT.@.GEP"), "@")
+            @builder.load(gfunc.continuation_info.struct_gep_for_receiver(cont), "@")
           elsif gtype && gtype.singleton?
             gtype.singleton
           end
@@ -596,11 +597,8 @@ class Mare::Compiler::CodeGen
         # We need to eagerly generate the local geps here in the entry block,
         # since if we generate them lazily, they may not dominate all uses
         # in the LLVM dominator tree analysis (which checks declare-before-use).
-        ctx.inventory.locals[gfunc.func].each_with_index do |ref, ref_index|
-          ref_index = ref_index + 1 # skip the first element - the next func
-          ref_index = ref_index + 1 if gfunc.needs_receiver? # skip the receiver
-          ref_type = cont.type.element_type.struct_element_types[ref_index]
-          func_frame.current_locals[ref] = gen_local_gep(ref, ref_type)
+        gfunc.continuation_info.gen_local_geps do |ref, gep|
+          func_frame.current_locals[ref] = gep
         end
         
         # We are jumping to the after-yield block here, which means that all
@@ -652,6 +650,8 @@ class Mare::Compiler::CodeGen
   end
   
   def gen_func_decl(gtype, gfunc)
+    gfunc.continuation_info = ContinuationInfo.new(self, gtype, gfunc)
+    
     # If this is a yielding function, we must first declare the type that will
     # be used to hold continuation data for the subsequent continuing calls.
     if gfunc.calling_convention == :yield_cc
@@ -793,14 +793,7 @@ class Mare::Compiler::CodeGen
           @mod.functions.add(continue_name, continue_param_types, ret_type)
         end.to_a
       
-      # Finish defining the members of the continuation type struct.
-      cont_elem_types = [] of LLVM::Type
-      cont_elem_types << gfunc.continuation_llvm_func_ptr
-      cont_elem_types << llvm_type_of(gtype) if gfunc.needs_receiver?
-      cont_elem_types.concat \
-        ctx.inventory.locals[gfunc.func].map { |ref| llvm_mem_type_of(ref.defn, gfunc) }
-      
-      gfunc.continuation_type.struct_set_body(cont_elem_types)
+      gfunc.continuation_type.struct_set_body(gfunc.continuation_info.struct_element_types)
     end
   end
   
@@ -1409,12 +1402,7 @@ class Mare::Compiler::CodeGen
         gfunc.yield_cc_yield_return_type.pointer, "RESULT.YIELDED.ALLOCA")
       yield_result = @builder.load(yield_result_alloca, "RESULT.YIELDED")
       cont = @builder.extract_value(yield_result, 0, "CONT")
-      next_func_gep = @builder.struct_gep(cont, 0, "CONT.NEXT.GEP")
-      next_func = @builder.load(next_func_gep, "CONT.NEXT")
-      is_finished = @builder.icmp(LLVM::IntPredicate::EQ,
-        next_func,
-        gfunc.continuation_llvm_func_ptr.null
-      )
+      is_finished = gfunc.continuation_info.check_next_func_is_null(cont)
       @builder.cond(is_finished, after_block, yield_block)
       
       # Move our cursor to the yield block to start generating code there.
@@ -1451,8 +1439,7 @@ class Mare::Compiler::CodeGen
         gfunc.yield_cc_yield_return_type.pointer, "RESULT.YIELDED.ALLOCA")
       yield_result = @builder.load(yield_result_alloca, "RESULT.YIELDED")
       cont = @builder.extract_value(yield_result, 0, "CONT")
-      next_func_gep = @builder.struct_gep(cont, 0, "CONT.NEXT.GEP")
-      next_func = @builder.load(next_func_gep, "CONT.NEXT")
+      next_func = gfunc.continuation_info.get_next_func(cont)
       again_args = [cont] # TODO: include the yield_in_value too
       @di.set_loc(relate.op)
       again_result = @builder.call(next_func, again_args)
@@ -2347,7 +2334,7 @@ class Mare::Compiler::CodeGen
     gen_none # TODO: the "yield in" value returned from the caller
   end
   
-  def gen_yield_return_using_yield_cc(next_func : LLVM::Value?, values)
+  def gen_yield_return_using_yield_cc(next_func : LLVM::Value, values)
     gfunc = func_frame.gfunc.not_nil!
     
     # Cast the given values to the appropriate type.
@@ -2358,20 +2345,9 @@ class Mare::Compiler::CodeGen
         gen_assign_cast(value, llvm_type, nil)
       end
     
-    # Grab the continuation value from local memory.
+    # Grab the continuation value from local memory and set the next func.
     cont = func_frame.continuation_value
-    
-    # Assign the next continuation function to the function pointer.
-    # If nil, then we assign a NULL pointer, signifying the final return value,
-    # telling the caller not to continue the yield block iteration any more.
-    next_func_gep = @builder.struct_gep(cont, 0, "CONT.NEXT.GEP")
-    if next_func
-      next_func = @builder.bit_cast(next_func, gfunc.continuation_llvm_func_ptr, "#{next_func.name}.GENERIC")
-      @builder.store(next_func, next_func_gep)
-    else
-      # Assign NULL to the continuation's function pointer, signifying the end.
-      @builder.store(gfunc.continuation_llvm_func_ptr.null, next_func_gep)
-    end
+    gfunc.continuation_info.set_next_func(cont, next_func)
     
     # Return the tuple: {continuation_value, *values}
     tuple = return_type.undef
@@ -2391,13 +2367,9 @@ class Mare::Compiler::CodeGen
     llvm_type = return_type.struct_element_types[1]
     cast_value = gen_assign_cast(value, llvm_type, nil)
     
-    # Grab the continuation value from local memory.
+    # Grab the continuation value from local memory and clear the next func.
     cont = func_frame.continuation_value
-    
-    # Assign NULL to the continuation's function pointer, signifying the end,
-    # telling the caller not to continue the yield block iteration any more.
-    next_func_gep = @builder.struct_gep(cont, 0, "CONT.NEXT.GEP")
-    @builder.store(gfunc.continuation_llvm_func_ptr.null, next_func_gep)
+    gfunc.continuation_info.set_next_func(cont, nil)
     
     # Return the tuple: {continuation_value, value}
     tuple = return_type.undef
@@ -2711,10 +2683,7 @@ class Mare::Compiler::CodeGen
     # Otherwise, we store each in its own alloca, which we create here.
     if gfunc.calling_convention == :yield_cc
       cont = func_frame.continuation_value
-      index = ctx.inventory.locals[gfunc.func].index(ref).not_nil!
-      index = index + 1 # skip the first element - the next func
-      index = index + 1 if gfunc.needs_receiver? # skip the receiver
-      gep = @builder.struct_gep(cont, index, "CONT.#{ref.name}.GEP")
+      gep = gfunc.continuation_info.struct_gep_for_local(cont, ref)
       # TODO: bitcast to llvm_type?
       @builder.bit_cast(gep, llvm_type.pointer)
     else
