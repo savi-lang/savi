@@ -41,9 +41,6 @@ class Mare::Compiler::CodeGen
       builder.struct_gep(cont, struct_index_of_local(ref), "CONT.#{ref.name}.GEP")
     end
     
-    def gen_local_geps
-    end
-    
     def get_next_func(cont : LLVM::Value)
       next_func_gep = builder.struct_gep(cont, 0, "CONT.NEXT.GEP")
       builder.load(next_func_gep, "CONT.NEXT")
