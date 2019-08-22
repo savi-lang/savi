@@ -26,6 +26,8 @@
   
   :fun size: @_size
   
+  :fun ref clear: @_size = 0, @
+  
   :fun ref reserve (space USize)
     if (@_alloc < space) \
       @_ptr_reallocate(space)

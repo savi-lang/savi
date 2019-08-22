@@ -35,6 +35,12 @@
     )
     @
   
+  :: Remove all keys and values from the map.
+  :fun ref clear
+    @_size = 0
+    @_init_array(8) // the default prealloc of 6 corresponds to an array of 8
+    @
+  
   :: Return the value assigned to the given key, if present.
   :: Raises an error if the key is not present.
   ::

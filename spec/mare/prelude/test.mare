@@ -288,11 +288,13 @@
           test["Array literal, [i]"].pass = array_literal[i]! == i.u8
           i = i + 1
         )
-        test["Array literal size"].pass = array_literal.size == i
+        test["Array literal size"].pass = array_literal.size == 3
         test["Array literal out of bound read error"].pass =
           try (array_literal[3]!, False | True)
         test["Array literal out of bound write error"].pass =
           try (array_literal[3]! = 3, False | True)
+        array_literal.clear
+        test["Array literal size after clear"].pass = array_literal.size == 0
       )
       
       array_each_1 = ["foo", "bar", "baz"]
