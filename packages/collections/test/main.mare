@@ -23,13 +23,26 @@
     test["Map size == 0 again "].pass = map.size == 0
     
     map_each = Map(String, U64, HashEq(String)).new // TODO: implicit default for HashFunction type argument
-    map_each_copy = Map(String, U64, HashEq(String)).new // TODO: implicit default for HashFunction type argument
     map_each["foo"] = 11
     map_each["bar"] = 22
     map_each["baz"] = 33
+    
+    map_each_copy = Map(String, U64, HashEq(String)).new // TODO: implicit default for HashFunction type argument
     map_each.each -> (key, value | map_each_copy[key] = value)
+    test["Map each, size "].pass = map_each_copy.size == 3
     test["Map each, [foo]"].pass = try (map_each_copy["foo"]! | U64[0]) == 11
     test["Map each, [bar]"].pass = try (map_each_copy["bar"]! | U64[0]) == 22
     test["Map each, [baz]"].pass = try (map_each_copy["baz"]! | U64[0]) == 33
+    
+    map_each_copy = Map(String, U64, HashEq(String)).new // TODO: implicit default for HashFunction type argument
+    map_each.each_key -> (key | try (map_each_copy[key] = map_each[key]!))
+    test["Map each_key, size "].pass = map_each_copy.size == 3
+    test["Map each_key, [foo]"].pass = try (map_each_copy["foo"]! | U64[0]) == 11
+    test["Map each_key, [bar]"].pass = try (map_each_copy["bar"]! | U64[0]) == 22
+    test["Map each_key, [baz]"].pass = try (map_each_copy["baz"]! | U64[0]) == 33
+    
+    map_each_total_value = U64[0]
+    map_each.each_value -> (value | map_each_total_value = map_each_total_value + value) // TODO: +=
+    test["Map each_value, total"].pass = map_each_total_value == 66
     
     test.print_line_break // TODO: move to MicroTest constructor and finalizer
