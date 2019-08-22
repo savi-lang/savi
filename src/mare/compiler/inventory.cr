@@ -8,9 +8,6 @@
 # This pass produces output state at the per-function level.
 #
 class Mare::Compiler::Inventory < Mare::AST::Visitor
-  getter locals
-  getter yields
-  getter yielding_calls
   getter! current_ctx : Context?
   getter! current_type : Program::Type?
   getter! current_func : Program::Function?
@@ -19,6 +16,18 @@ class Mare::Compiler::Inventory < Mare::AST::Visitor
     @locals = {} of Program::Function => Array(Refer::Local)
     @yields = {} of Program::Function => Array(AST::Yield)
     @yielding_calls = {} of Program::Function => Array(AST::Relate)
+  end
+  
+  def locals(func)
+    @locals[func]? || [] of Refer::Local
+  end
+  
+  def yields(func)
+    @yields[func]? || [] of AST::Yield
+  end
+  
+  def yielding_calls(func)
+    @yielding_calls[func]? || [] of AST::Relate
   end
   
   def run(ctx)
@@ -41,17 +50,17 @@ class Mare::Compiler::Inventory < Mare::AST::Visitor
     when AST::Identifier
       if (ref = current_ctx.refer[current_type][current_func][node]; ref)
         if ref.is_a?(Refer::Local)
-          list = (locals[current_func] ||= ([] of Refer::Local))
+          list = (@locals[current_func] ||= ([] of Refer::Local))
           list << ref unless list.includes?(ref)
         end
       end
     when AST::Yield
-      (yields[current_func] ||= ([] of AST::Yield)) << node
+      (@yields[current_func] ||= ([] of AST::Yield)) << node
     when AST::Relate
       if node.op.value == "."
         ident, args, yield_params, yield_block = AST::Extract.call(node)
         if yield_params || yield_block
-          (yielding_calls[current_func] ||= ([] of AST::Relate)) << node
+          (@yielding_calls[current_func] ||= ([] of AST::Relate)) << node
         end
       end
     end

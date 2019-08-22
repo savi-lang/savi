@@ -622,8 +622,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         end
       end
       
-      if ctx.inventory.yields[func]?
-        ctx.inventory.yields[func].map(&.terms.size).max.times do
+      if ctx.inventory.yields(func).size > 0
+        ctx.inventory.yields(func).map(&.terms.size).max.times do
           # Create a fake local variable that represents the yield out type.
           @yield_out_infos << Local.new((func.yield_out || func.ident).pos)
         end

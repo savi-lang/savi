@@ -17,7 +17,7 @@ class Mare::Compiler::CodeGen
         list << gfunc.continuation_llvm_func_ptr
         list << g.llvm_type_of(gtype) if gfunc.needs_receiver?
         list.concat \
-          ctx.inventory.locals[gfunc.func].map { |ref| g.llvm_mem_type_of(ref.defn, gfunc) }
+          ctx.inventory.locals(gfunc.func).map { |ref| g.llvm_mem_type_of(ref.defn, gfunc) }
         list
       )).not_nil!
     end
@@ -34,7 +34,7 @@ class Mare::Compiler::CodeGen
     def struct_gep_for_local(cont : LLVM::Value, ref : Refer::Local)
       index = 1
       index += 1 if gfunc.needs_receiver?
-      index += ctx.inventory.locals[gfunc.func].index(ref).not_nil!
+      index += ctx.inventory.locals(gfunc.func).index(ref).not_nil!
       
       builder.struct_gep(cont, index, "CONT.#{ref.name}.GEP")
     end
@@ -100,7 +100,7 @@ class Mare::Compiler::CodeGen
       # We need to eagerly generate the local geps here in the entry block,
       # since if we generate them lazily, they may not dominate all uses
       # in the LLVM dominator tree analysis (which checks declare-before-use).
-      ctx.inventory.locals[gfunc.func].each_with_index do |ref, ref_index|
+      ctx.inventory.locals(gfunc.func).each_with_index do |ref, ref_index|
         ref_index = ref_index + 1 # skip the first element - the next func
         ref_index = ref_index + 1 if gfunc.needs_receiver? # skip the receiver
         ref_type = struct_element_types[ref_index]
