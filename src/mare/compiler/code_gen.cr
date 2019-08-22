@@ -21,14 +21,9 @@ class Mare::Compiler::CodeGen
   getter builder : LLVM::Builder
   
   class Frame
-    getter func : LLVM::Function?
+    getter! llvm_func : LLVM::Function?
     getter gtype : GenType?
     getter gfunc : GenFunc?
-    
-    # TODO: Rename func as llvm_func and remove this alias
-    def llvm_func
-      func
-    end
     
     setter pony_ctx : LLVM::Value?
     property! receiver_value : LLVM::Value?
@@ -36,16 +31,8 @@ class Mare::Compiler::CodeGen
     
     getter current_locals
     
-    def initialize(@g : CodeGen, @func = nil, @gtype = nil, @gfunc = nil)
+    def initialize(@g : CodeGen, @llvm_func = nil, @gtype = nil, @gfunc = nil)
       @current_locals = {} of Refer::Local => LLVM::Value
-    end
-    
-    def func?
-      @func.is_a?(LLVM::Function)
-    end
-    
-    def func
-      @func.as(LLVM::Function)
     end
     
     def pony_ctx?
@@ -315,7 +302,7 @@ class Mare::Compiler::CodeGen
   end
   
   def func_frame
-    @frames.reverse_each.find { |f| f.func? }.not_nil!
+    @frames.reverse_each.find { |f| f.llvm_func? }.not_nil!
   end
   
   def abi_size_of(llvm_type : LLVM::Type)
@@ -576,14 +563,14 @@ class Mare::Compiler::CodeGen
         # is there and that it has no need to change over that lifetime.
         if gfunc.needs_receiver?
           @builder.store(
-            frame.func.params[0],
+            frame.llvm_func.params[0],
             gfunc.continuation_info.struct_gep_for_receiver(cont),
           )
         end
       else
         # Grab the continuation value from the first and only parameter.
-        raise "weird parameter signature" if frame.func.params.size > 1
-        cont = func_frame.continuation_value = frame.func.params[0]
+        raise "weird parameter signature" if frame.llvm_func.params.size > 1
+        cont = func_frame.continuation_value = frame.llvm_func.params[0]
         # TODO: gather "yield in" parameter here as well
         
         # Get the receiver value from the continuation, if applicable.
@@ -621,7 +608,7 @@ class Mare::Compiler::CodeGen
         ref = func_frame.refer[param].as(Refer::Local)
         param_idx = ref.param_idx.not_nil!
         param_idx -= 1 unless gfunc.needs_receiver?
-        value = frame.func.params[param_idx]
+        value = frame.llvm_func.params[param_idx]
         gep = gen_local_gep(ref, value.type)
         func_frame.current_locals[ref] = gep
         @builder.store(value, gep)
@@ -646,7 +633,7 @@ class Mare::Compiler::CodeGen
   end
   
   def gen_block(name)
-    frame.func.basic_blocks.append(name)
+    frame.llvm_func.basic_blocks.append(name)
   end
   
   def gen_func_decl(gtype, gfunc)
@@ -2410,7 +2397,7 @@ class Mare::Compiler::CodeGen
     # All blocks follow the entry block (it dominates all other blocks),
     # so this is a surefire safe place to do whatever it is we need to declare.
     orig_block = @builder.insert_block
-    entry_block = func_frame.func.entry_block
+    entry_block = func_frame.llvm_func.entry_block
     if entry_block.instructions.empty?
       @builder.position_at_end(entry_block)
     else
