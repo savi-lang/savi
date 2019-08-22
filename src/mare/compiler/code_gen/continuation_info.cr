@@ -22,32 +22,30 @@ class Mare::Compiler::CodeGen
       )).not_nil!
     end
     
-    def struct_index_of_receiver
-      raise "no receiver for this gfunc" unless gfunc.needs_receiver?
-      1
-    end
-    
-    def struct_index_of_local(ref : Refer::Local)
-      index = 1
-      index += 1 if gfunc.needs_receiver?
-      index += ctx.inventory.locals[gfunc.func].index(ref).not_nil!
+    def struct_gep_for_next_func(cont : LLVM::Value)
+      next_func_gep = builder.struct_gep(cont, 0, "CONT.NEXT.GEP")
     end
     
     def struct_gep_for_receiver(cont : LLVM::Value)
-      builder.struct_gep(cont, struct_index_of_receiver, "CONT.@.GEP")
+      raise "no receiver for this gfunc" unless gfunc.needs_receiver?
+      builder.struct_gep(cont, 1, "CONT.@.GEP")
     end
     
     def struct_gep_for_local(cont : LLVM::Value, ref : Refer::Local)
-      builder.struct_gep(cont, struct_index_of_local(ref), "CONT.#{ref.name}.GEP")
+      index = 1
+      index += 1 if gfunc.needs_receiver?
+      index += ctx.inventory.locals[gfunc.func].index(ref).not_nil!
+      
+      builder.struct_gep(cont, index, "CONT.#{ref.name}.GEP")
     end
     
     def get_next_func(cont : LLVM::Value)
-      next_func_gep = builder.struct_gep(cont, 0, "CONT.NEXT.GEP")
+      next_func_gep = struct_gep_for_next_func(cont)
       builder.load(next_func_gep, "CONT.NEXT")
     end
     
     def set_next_func(cont : LLVM::Value, next_func : LLVM::Value?)
-      next_func_gep = builder.struct_gep(cont, 0, "CONT.NEXT.GEP")
+      next_func_gep = struct_gep_for_next_func(cont)
       
       # Assign the next continuation function to the function pointer.
       # If nil, then we assign a NULL pointer, signifying the final return value,
