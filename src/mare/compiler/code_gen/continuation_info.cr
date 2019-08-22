@@ -42,12 +42,6 @@ class Mare::Compiler::CodeGen
     end
     
     def gen_local_geps
-      ctx.inventory.locals[gfunc.func].each_with_index do |ref, ref_index|
-        ref_index = ref_index + 1 # skip the first element - the next func
-        ref_index = ref_index + 1 if gfunc.needs_receiver? # skip the receiver
-        ref_type = struct_element_types[ref_index]
-        yield ref, g.gen_local_gep(ref, ref_type)
-      end
     end
     
     def get_next_func(cont : LLVM::Value)
@@ -73,6 +67,50 @@ class Mare::Compiler::CodeGen
     def check_next_func_is_null(cont : LLVM::Value)
       null = gfunc.continuation_llvm_func_ptr.null
       builder.icmp(LLVM::IntPredicate::EQ, get_next_func(cont), null)
+    end
+    
+    def initial_cont(frame : Frame)
+      # TODO: Can we allocate with malloc instead so we can use explicit free?
+      # TODO: Can we avoid allocation entirely by not passing as a pointer?
+      # Doing so would reduce overhead of yielding calls, at the expense of
+      # making the code generation for virtual calls a bit more complicated,
+      # since we would still need a pointer for those cases (because each
+      # implementation of a yielding call may have different state sizes).
+      cont = g.gen_alloc(gfunc.continuation_type, "CONT")
+      
+      frame.continuation_value = cont
+      
+      # If the function has a receiver, store it in the continuation now.
+      # For the rest of the life of the continuation value, we'll assume it
+      # is there and that it has no need to change over that lifetime.
+      if gfunc.needs_receiver?
+        builder.store(frame.llvm_func.params[0], struct_gep_for_receiver(cont))
+      end
+    end
+    
+    def continue_cont(frame : Frame)
+      # Grab the continuation value from the first and only parameter.
+      raise "weird parameter signature" if frame.llvm_func.params.size > 1
+      cont = frame.continuation_value = frame.llvm_func.params[0]
+      # TODO: gather "yield in" parameter here as well
+      
+      # Get the receiver value from the continuation, if applicable.
+      frame.receiver_value =
+        if gfunc.needs_receiver?
+          builder.load(struct_gep_for_receiver(cont), "@")
+        elsif gtype && gtype.singleton?
+          gtype.singleton
+        end
+      
+      # We need to eagerly generate the local geps here in the entry block,
+      # since if we generate them lazily, they may not dominate all uses
+      # in the LLVM dominator tree analysis (which checks declare-before-use).
+      ctx.inventory.locals[gfunc.func].each_with_index do |ref, ref_index|
+        ref_index = ref_index + 1 # skip the first element - the next func
+        ref_index = ref_index + 1 if gfunc.needs_receiver? # skip the receiver
+        ref_type = struct_element_types[ref_index]
+        frame.current_locals[ref] = g.gen_local_gep(ref, ref_type)
+      end
     end
   end
 end

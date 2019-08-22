@@ -548,45 +548,13 @@ class Mare::Compiler::CodeGen
       # We will get a non-nil yield_index here if this is a continuation call.
       yield_index = gfunc.continuation_llvm_funcs.index(llvm_func)
       if yield_index.nil?
-        # If this isn't a continuation function, we have to allocate the object
+        # If this isn't a continuation function, we have to create the object
         # that will hold the continuation data, since it starts right here.
-        # TODO: Can we allocate with malloc instead so we can use explicit free?
-        # TODO: Can we avoid allocation entirely by not passing as a pointer?
-        # Doing so would reduce overhead of yielding calls, at the expense of
-        # making the code generation for virtual calls a bit more complicated,
-        # since we would still need a pointer for those cases (because each
-        # implementation of a yielding call may have different state sizes).
-        cont = func_frame.continuation_value = gen_alloc(gfunc.continuation_type, "CONT")
-        
-        # If the function has a receiver, store it in the continuation now.
-        # For the rest of the life of the continuation value, we'll assume it
-        # is there and that it has no need to change over that lifetime.
-        if gfunc.needs_receiver?
-          @builder.store(
-            frame.llvm_func.params[0],
-            gfunc.continuation_info.struct_gep_for_receiver(cont),
-          )
-        end
+        gfunc.continuation_info.initial_cont(func_frame)
       else
-        # Grab the continuation value from the first and only parameter.
-        raise "weird parameter signature" if frame.llvm_func.params.size > 1
-        cont = func_frame.continuation_value = frame.llvm_func.params[0]
-        # TODO: gather "yield in" parameter here as well
-        
-        # Get the receiver value from the continuation, if applicable.
-        func_frame.receiver_value =
-          if gfunc.needs_receiver?
-            @builder.load(gfunc.continuation_info.struct_gep_for_receiver(cont), "@")
-          elsif gtype && gtype.singleton?
-            gtype.singleton
-          end
-        
-        # We need to eagerly generate the local geps here in the entry block,
-        # since if we generate them lazily, they may not dominate all uses
-        # in the LLVM dominator tree analysis (which checks declare-before-use).
-        gfunc.continuation_info.gen_local_geps do |ref, gep|
-          func_frame.current_locals[ref] = gep
-        end
+        # If this *is* a continuation function, we need to grab the object
+        # holding the continuation data and extract receiver, locals, etc.
+        gfunc.continuation_info.continue_cont(func_frame)
         
         # We are jumping to the after-yield block here, which means that all
         # code that is about to be generated will be in an unused code block.
@@ -598,8 +566,6 @@ class Mare::Compiler::CodeGen
         @builder.position_at_end(unused_entry_block)
         return
       end
-      
-      # TODO: when this is a continued call, get from the param instead of allocating
     end
     
     # Store each parameter in an alloca (or the continuation, if present)
