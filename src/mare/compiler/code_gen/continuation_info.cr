@@ -120,9 +120,9 @@ class Mare::Compiler::CodeGen
     
     def continue_cont(frame : Frame)
       # Grab the continuation value from the first and only parameter.
-      raise "weird parameter signature" if frame.llvm_func.params.size > 1
+      raise "weird parameter signature" if frame.llvm_func.params.size != 2
       cont = frame.continuation_value = frame.llvm_func.params[0]
-      # TODO: gather "yield in" parameter here as well
+      # The "yield in" value is the second parameter, which we don't need here.
       
       # Get the receiver value from the continuation, if applicable.
       frame.receiver_value =

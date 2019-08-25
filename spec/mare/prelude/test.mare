@@ -318,6 +318,14 @@
       test["Array each_with_index, [1][0] "].pass = array_ewi_1[0]! == 0
       test["Array each_with_index, [1][1] "].pass = array_ewi_1[1]! == 1
       test["Array each_with_index, [1][2] "].pass = array_ewi_1[2]! == 2
+      
+      array_select Array(U8) = [11, 22, 33, 44, 36, 27, 18]
+      array_selected = array_select.select -> (num | num < 30)
+      test["Array select, size"].pass = array_selected.size == 4
+      test["Array select, [0] "].pass = array_selected[0]! == 11
+      test["Array select, [1] "].pass = array_selected[1]! == 22
+      test["Array select, [2] "].pass = array_selected[2]! == 27
+      test["Array select, [3] "].pass = array_selected[3]! == 18
     |
       test["Array methods test block had an out-of-bounds error"].pass = False
     )

@@ -1778,7 +1778,7 @@ describe Mare::Compiler::Infer do
     source = Mare::Source.new_example <<-SOURCE
     :actor Main
       :fun count_to (count U64) None
-        :yields U64 None
+        :yields U64 for None
         i U64 = 0
         while (i < count) (
           i = i + 1

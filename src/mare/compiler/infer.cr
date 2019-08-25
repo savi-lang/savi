@@ -478,6 +478,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     getter for_type : ForType
     getter reified : ReifiedFunction
     getter yield_out_infos : Array(Local)
+    getter! yield_in_info : FromYield
     
     def initialize(@ctx, @for_type, @reified)
       @local_idents = Hash(Refer::Local, AST::Node).new
@@ -623,17 +624,27 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       end
       
       if ctx.inventory.yields(func).size > 0
+        # Create a fake local variable that represents the yield-related types.
         ctx.inventory.yields(func).map(&.terms.size).max.times do
-          # Create a fake local variable that represents the yield out type.
-          @yield_out_infos << Local.new((func.yield_out || func.ident).pos)
+          yield_out_infos << Local.new((func.yield_out || func.ident).pos)
         end
+        @yield_in_info = FromYield.new((func.yield_in || func.ident).pos)
         
         func.yield_out.try do |yield_out|
           raise NotImplementedError.new("explicit types for multi-yield") \
             if yield_out.is_a?(AST::Group) && yield_out.style == "("
           
           yield_out.accept(self)
-          @yield_out_infos.first.set_explicit(yield_out.pos, resolve(yield_out))
+          yield_out_infos.first.set_explicit(yield_out.pos, resolve(yield_out))
+        end
+        
+        yield_in = func.yield_in
+        if yield_in
+          yield_in.accept(self)
+          yield_in_info.set_explicit(yield_in.pos, resolve(yield_in))
+        else
+          none = MetaType.new(reified_type(prelude_type("None")))
+          yield_in_info.set_explicit(yield_in_info.pos, none)
         end
       end
       
@@ -767,8 +778,12 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         problems << {infer.yield_out_infos.first.first_viable_constraint_pos,
           "it has no yield block but the called function does yield"}
       else
-        # TODO: Verify type of yield_block matches the infer.yield_in_info.
+        # Visit yield params to register them in our state.
+        # We have to do this before the lines below where we access that state.
+        # Note that we skipped it before with visit_children: false.
+        yield_params.try(&.accept(self))
         
+        # Based on the resolved function, assign the proper yield param types.
         if yield_params
           raise "TODO: Nice error message for this" \
             if infer.yield_out_infos.size != yield_params.terms.size
@@ -781,6 +796,25 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
               yield_out.resolve!(infer),
             )
           end
+        end
+        
+        # Now visit the yield block to register them in our state.
+        # We must do this after the lines above where the params were handled.
+        # Note that we skipped it before with visit_children: false.
+        yield_block.try(&.accept(self))
+        
+        # Finally, check that the type of the result of the yield block,
+        # but don't bother if it has a type requirement of None.
+        yield_in_resolved = infer.yield_in_resolved
+        none = MetaType.new(reified_type(prelude_type("None")))
+        if yield_in_resolved != none
+          self[yield_block].within_domain!(
+            self,
+            yield_block.pos,
+            infer.yield_in_info.pos,
+            infer.yield_in_info.resolve!(infer),
+            0,
+          )
         end
       end
     end
@@ -823,6 +857,16 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     
     def follow_call(call : FromCall, yield_params, yield_block)
       call_defns = follow_call_get_call_defns(call)
+      
+      # TODO: Because we visit yield_params and yield_block as part of the later
+      # follow_call_check_yield_block for each of the call_defns, we'll have
+      # problems with multiple call defns because we'll end up with potentially
+      # conflicting information gathered each time. Somehow, we need to be able
+      # to iterate over it multiple times and type-assign them separately,
+      # so that specialized code can be generated for each different receiver
+      # that may have different types. This is totally nontrivial...
+      raise NotImplementedError.new("yield_block with multiple call_defns") \
+        if yield_block && call_defns.size > 1
       
       # For each receiver type definition that is possible, track down the infer
       # for the function that we're trying to call, evaluating the constraints
@@ -940,6 +984,10 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     
     def yield_out_resolved
       yield_out_infos.map(&.resolve!(self))
+    end
+    
+    def yield_in_resolved
+      yield_in_info.not_nil!.resolve!(self)
     end
     
     def error_if_type_args_missing(node : AST::Node, mt : MetaType)
@@ -1153,19 +1201,14 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         # Note that we skipped it before with visit_children: false.
         node.lhs.try(&.accept(self))
         call_args.try(&.accept(self))
-        yield_params.try(&.accept(self))
         
         # Resolve and validate the call.
+        # We will visit the yield_params and yield_block from inside this call.
         follow_call(
           call,
           yield_params,
           yield_block,
         )
-        
-        # Visit yield block after resolving the call.
-        # They depend on information from the call resolution above.
-        # Note that we skipped it before with visit_children: false.
-        yield_block.try(&.accept(self))
       when "<:"
         rhs_info = self[node.rhs]
         Error.at node.rhs, "expected this to have a fixed type at compile time" \
@@ -1267,8 +1310,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         info.assign(self, term, term.pos)
       end
       
-      none = MetaType.new(reified_type(prelude_type("None")))
-      self[node] = FromYield.new(node.pos, none)
+      self[node] = yield_in_info
     end
     
     def touch(node : AST::Node)

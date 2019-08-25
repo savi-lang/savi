@@ -77,6 +77,12 @@ class Mare::Witness
       Error.at term, "Expected keyword '#{plan["value"]}'" \
         unless term.is_a?(AST::Identifier) && values.includes?(term.value)
     when "term"
+      if plan["exclude_keyword"]? \
+      && term.is_a?(AST::Identifier) && term.value == plan["exclude_keyword"]
+        Error.at term,
+          "Expected not to see keyword '#{plan["exclude_keyword"]}'"
+      end
+      
       # If a type requirement is specified, check the type first.
       # We can check multiple types here if given (pipe-delimited).
       if plan["type"]?

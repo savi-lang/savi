@@ -730,8 +730,10 @@ class Mare::Compiler::CodeGen
     # versions of it, each with their own different entrypoint block
     # that will take the control flow to continuing where that yield was.
     if gfunc.calling_convention == :yield_cc
-      # TODO: Include "yield in" value returned from the caller's yield block
-      continue_param_types = [gfunc.continuation_type.pointer] # TODO: pass by value instead of by pointer
+      continue_param_types = [
+        gfunc.continuation_type.pointer, # TODO: pass by value instead of by pointer
+        llvm_type_of(ctx.reach[gfunc.infer.yield_in_resolved]),
+      ]
       
       # Before declaring the continue functions themselves, we also declare
       # the generic function pointer type that covers all of them.
@@ -1397,6 +1399,13 @@ class Mare::Compiler::CodeGen
       # Now we generate the actual code for the yield block.
       yield_in_value = gen_expr(yield_block_ast.not_nil!)
       
+      # If None is the yield in value type expected, just generate None,
+      # allowing us to ignore the actual result value of the yield block.
+      yield_in_type = gfunc.continuation_llvm_func_ptr.element_type.params_types[1]
+      if yield_in_type == @gtypes["None"].struct_type.pointer
+        yield_in_value = gen_none
+      end
+      
       # After the yield block, we call the continue function pointer,
       # which we extracted from continuation data earlier in the "maybe block",
       # but must now extract again here, since we can't be sure that the other
@@ -1408,7 +1417,7 @@ class Mare::Compiler::CodeGen
       yield_result = @builder.load(yield_result_alloca, "RESULT.YIELDED")
       cont = @builder.extract_value(yield_result, 0, "CONT")
       next_func = gfunc.continuation_info.get_next_func(cont)
-      again_args = [cont] # TODO: include the yield_in_value too
+      again_args = [cont, yield_in_value]
       @di.set_loc(relate.op)
       again_result = @builder.call(next_func, again_args)
       @builder.store(again_result, result_alloca)
@@ -2305,7 +2314,16 @@ class Mare::Compiler::CodeGen
     after_block = gfunc.after_yield_blocks[yield_index]
     @builder.position_at_end(after_block)
     
-    gen_none # TODO: the "yield in" value returned from the caller
+    # Finally, use the "yield in" value returned from the caller.
+    # However, if we're not actually in a continuation function, then this
+    # "yield in" value won't be present in the parameters and we need to
+    # create an undefined value of the right type to fake it; but fear not,
+    # that junk value won't be used because that code won't ever be reached.
+    if gfunc.continuation_llvm_funcs.includes?(func_frame.llvm_func)
+      func_frame.llvm_func.params[1]
+    else
+      gfunc.continuation_llvm_func_ptr.element_type.params_types[1].undef
+    end
   end
   
   def gen_yield_return_using_yield_cc(next_func : LLVM::Value, values)

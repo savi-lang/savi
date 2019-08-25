@@ -529,6 +529,13 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         "name" => "out",
         "type" => "type",
         "optional" => true,
+        "exclude_keyword" => "for",
+      },
+      {
+        "kind" => "keyword",
+        "name" => "keyword",
+        "value" => "for",
+        "optional" => true, # TODO: don't accept more terms if the `for` is not here
       },
       {
         "kind" => "term",

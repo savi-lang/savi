@@ -498,16 +498,8 @@ class Mare::Compiler::Infer
     end
   end
   
-  class FromYield < DynamicInfo
-    def initialize(@pos, @static_type : MetaType)
-    end
-    
-    def describe_kind; "yield result" end
-    
-    def inner_resolve!(infer : ForFunc)
-      # TODO: Implement this.
-      @static_type
-    end
+  class FromYield < NamedInfo
+    def describe_kind; "yield block result" end
   end
   
   class ArrayLiteral < DynamicInfo
