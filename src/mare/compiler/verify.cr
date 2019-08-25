@@ -29,18 +29,26 @@ class Mare::Compiler::Verify < Mare::AST::Visitor
   def check_function(ctx, rt, rf)
     func = rf.func
     
-    if func.body.try { |body| Jumps.any_error?(body) }
+    func_body = func.body
+    if func_body && Jumps.any_error?(func_body)
       if func.has_tag?(:constructor)
+        finder = ErrorFinderVisitor.new(func_body)
+        func_body.accept(finder)
+        
         Error.at func.ident,
-          "This constructor may raise an error, but that is not allowed"
+          "This constructor may raise an error, but that is not allowed",
+          finder.found.map { |pos| {pos, "an error may be raised here"} }
       end
       
       if !Jumps.any_error?(func.ident)
+        finder = ErrorFinderVisitor.new(func_body)
+        func_body.accept(finder)
+        
         Error.at func.ident,
           "This function name needs an exclamation point "\
           "because it may raise an error", [
             {func.ident, "it should be named '#{func.ident.value}!' instead"}
-          ]
+          ] + finder.found.map { |pos| {pos, "an error may be raised here"} }
       end
     end
   end
@@ -63,5 +71,35 @@ class Mare::Compiler::Verify < Mare::AST::Visitor
   
   def touch(node : AST::Node)
     # Do nothing for all other AST::Nodes.
+  end
+  
+  # This visitor finds the most specific source positions that may raise errors.
+  class ErrorFinderVisitor < Mare::AST::Visitor
+    getter found
+    
+    def initialize(node : AST::Node)
+      @found = [] of Source::Pos
+      @deepest = node
+    end
+    
+    # Only visit nodes that may raise an error.
+    def visit_any?(node)
+      Jumps.any_error?(node)
+    end
+    
+    # Before visiting a node's children, mark this node as the deepest.
+    # If any children can also raise errors, they will be the new deepest ones,
+    # removing this node from the possibility of being considered deepest.
+    def visit_pre(node)
+      @deepest = node
+    end
+    
+    # Save this source position if it is the deepest node in this branch of
+    # the tree that we visited, recognizing that we skipped no-error branches.
+    def visit(node)
+      @found << node.pos if @deepest == node
+      
+      node
+    end
   end
 end

@@ -11,6 +11,11 @@ describe Mare::Compiler::Completeness do
     from (example):2:
       :new
        ^~~
+    
+    - an error may be raised here:
+      from (example):3:
+        error!
+        ^~~~~~
     MSG
     
     expect_raises Mare::Error, expected do
@@ -38,6 +43,11 @@ describe Mare::Compiler::Completeness do
       from (example):5:
       :fun risky (x U64)
            ^~~~~
+    
+    - an error may be raised here:
+      from (example):6:
+        if (x == 0) (error!)
+                     ^~~~~~
     MSG
     
     expect_raises Mare::Error, expected do
