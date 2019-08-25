@@ -1212,8 +1212,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       when "<:"
         rhs_info = self[node.rhs]
         Error.at node.rhs, "expected this to have a fixed type at compile time" \
-          unless rhs_info.is_a?(Fixed) \
-            && rhs_info.inner.cap_only.inner == MetaType::Capability::NON
+          unless rhs_info.is_a?(Fixed)
         
         bool = MetaType.new(reified_type(prelude_type("Bool")))
         refine = follow_redirects(node.lhs)

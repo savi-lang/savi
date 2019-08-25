@@ -148,6 +148,8 @@ class Mare::Compiler::Classify < Mare::AST::Visitor
   
   def touch(relate : AST::Relate)
     case relate.op.value
+    when "<:"
+      relate.rhs.accept(TypeExprVisitor.instance)
     when "."
       # In a function call Relate, a value is not needed for the right side.
       # A value is only needed for the left side and the overall access node.
