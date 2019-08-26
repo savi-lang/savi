@@ -62,6 +62,25 @@ struct Mare::Compiler::Infer::MetaType::Capability
     raise NotImplementedError.new("negate capability")
   end
   
+  def set_intersect(other : Capability)
+    v1 = value()
+    v2 = other.value
+    
+    if v1.is_a?(Set(Capability))
+      if v2.is_a?(Set(Capability))
+        Capability.new(v1 & v2)
+      else
+        v1.includes?(v2.as(String)) ? other : Unsatisfiable.instance
+      end
+    else
+      if v2.is_a?(Set(Capability))
+        v2.includes?(v1.as(String)) ? self : Unsatisfiable.instance
+      else
+        v1.as(String) == v2.as(String) ? self : Unsatisfiable.instance
+      end
+    end
+  end
+  
   def intersect(other : Unconstrained)
     self
   end

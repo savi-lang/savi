@@ -46,6 +46,24 @@
     @_size = @_size + 1
     @
   
+  :fun "!=" (other): (@ == other).not // TODO: move this to the Equatable trait?
+  :fun "==" (other Array(A)'box)
+    // TODO: optimize for cases when the elements can be pointer-compared by
+    // value/identity instead of structural equality (e.g. Array(U8))
+    equal_so_far = (@size == other.size)
+    index USize = 0
+    while (equal_so_far && index < @_size) (
+      value_a = @_ptr._get_at(index)
+      value_b = other._ptr._get_at(index)
+      if (A <: Equatable(A)'read) (
+        equal_so_far = (value_a == value_b)
+      |
+        equal_so_far = False // TODO: compare by identity
+      )
+      index = index + 1
+    )
+    equal_so_far
+  
   :fun each
     index USize = 0
     while (index < @_size) (

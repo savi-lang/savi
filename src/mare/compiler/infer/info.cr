@@ -54,6 +54,25 @@ class Mare::Compiler::Infer
     end
   end
   
+  class Unreachable < Info
+    INSTANCE = new
+    def self.instance; INSTANCE end
+    
+    def resolve!(infer : ForFunc) : MetaType
+      MetaType.new(MetaType::Unsatisfiable.instance)
+    end
+    
+    def within_domain!(
+      infer : ForFunc,
+      use_pos : Source::Pos,
+      constraint_pos : Source::Pos,
+      constraint : MetaType,
+      aliases : Int32,
+    )
+      # Do nothing; we're already unsatisfiable...
+    end
+  end
+  
   abstract class DynamicInfo < Info
     @already_resolved : MetaType?
     @domain_constraints = [] of Tuple(Source::Pos, Source::Pos, MetaType, Int32)
@@ -421,6 +440,24 @@ class Mare::Compiler::Infer
         
         infer[node].within_domain!(infer, use_pos, constraint_pos, constraint, aliases)
       end
+    end
+  end
+  
+  class TypeParamCondition < Info
+    getter bool : MetaType # TODO: avoid needing the caller to supply this
+    getter refine : Refer::TypeParam
+    getter refine_type : MetaType
+    
+    def initialize(@pos, @bool, @refine, @refine_type)
+      raise "#{@bool.show_type} is not Bool" unless @bool.show_type == "Bool"
+    end
+    
+    def resolve!(infer : ForFunc)
+      @bool
+    end
+    
+    def within_domain!(infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
+      meta_type_within_domain!(infer, @bool, use_pos, constraint_pos, constraint, aliases)
     end
   end
   

@@ -1524,19 +1524,30 @@ class Mare::Compiler::CodeGen
   end
   
   def gen_check_subtype(relate)
-    lhs = gen_expr(relate.lhs)
-    rhs = gen_expr(relate.rhs) # TODO: should this be removed?
-    rhs_type = type_of(relate.rhs)
+    infer = func_frame.gfunc.not_nil!.infer
     
-    # TODO: support abstract gtypes
-    raise NotImplementedError.new(rhs_type) unless rhs_type.is_concrete?
-    rhs_gtype = @gtypes[ctx.reach[rhs_type.single!].llvm_name]
-    
-    lhs_desc = gen_get_desc_opaque(lhs)
-    rhs_desc = gen_get_desc_opaque(rhs_gtype)
-    
-    @builder.icmp LLVM::IntPredicate::EQ, lhs_desc, rhs_desc,
-      "#{lhs.name}<:#{rhs.name}"
+    if infer[relate.lhs].is_a?(Infer::Fixed)
+      # If the left-hand side is a fixed compile-time type (and knowing that
+      # the right-hand side always is), we can return a compile-time true/false.
+      lhs_meta_type = infer.resolve(relate.lhs)
+      rhs_meta_type = infer.resolve(relate.rhs)
+      
+      gen_bool(lhs_meta_type.satisfies_bound?(infer, rhs_meta_type))
+    else
+      # Otherwise, we generate code that checks the type descriptor of the
+      # left-hand side against the compile-time type of the right-hand side.
+      lhs = gen_expr(relate.lhs)
+      rhs_type = type_of(relate.rhs)
+      
+      # TODO: support abstract gtypes
+      raise NotImplementedError.new(rhs_type) unless rhs_type.is_concrete?
+      rhs_gtype = @gtypes[ctx.reach[rhs_type.single!].llvm_name]
+      
+      lhs_desc = gen_get_desc_opaque(lhs)
+      rhs_desc = gen_get_desc_opaque(rhs_gtype)
+      
+      @builder.icmp LLVM::IntPredicate::EQ, lhs_desc, rhs_desc, "#{lhs.name}<:"
+    end
   end
   
   def gen_assign_cast(

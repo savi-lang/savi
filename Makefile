@@ -42,7 +42,7 @@ example-mare-callgrind: PHONY
 	mkdir -p /tmp/bin
 	crystal build --debug main.cr -o $@
 	ldd /tmp/bin/mare | grep libponyrt # prove that libponyrt was actually linked
-example/main: /tmp/bin/mare $(shell find example -name '*.mare')
+example/main: /tmp/bin/mare $(shell find . -name '*.mare')
 	echo && cd example && /tmp/bin/mare
 /tmp/callgrind.out: /tmp/bin/mare
 	echo && cd example && valgrind --tool=callgrind --callgrind-out-file=$@ $<

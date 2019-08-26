@@ -294,6 +294,13 @@
     array_literal.clear
     test["Array literal size after clear"].pass = array_literal.size == 0
     
+    test["Array == empty"].pass = Array(String).new == Array(String).new
+    test["Array == same"].pass = ["foo", "bar", "baz"] == ["foo", "bar", "baz"]
+    test["Array != shorter"].pass = ["foo", "bar", "baz"] != ["foo", "bar"]
+    test["Array != longer"].pass = ["foo", "bar"] != ["foo", "bar", "baz"]
+    test["Array != order"].pass = ["foo", "bar", "baz"] != ["baz", "bar", "foo"]
+    test["Array != different"].pass = ["foo", "bar"] != ["food", "bar"]
+    
     array_each_1 = ["foo", "bar", "baz"]
     array_each_2 Array(String) = []
     array_each_1.each -> (string | array_each_2 << string)

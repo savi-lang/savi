@@ -293,6 +293,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     def initialize(@ctx, @reified)
       @all_for_funcs = Set(ForFunc).new
       @subtyping = SubtypingInfo.new(@ctx, @reified)
+      @type_param_refinements = {} of Refer::TypeParam => Array(MetaType)
     end
     
     def initialize_assertions(ctx)
@@ -379,17 +380,43 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       @lookup_type_param_reentrant.add(ref)
       
       # Return the type parameter intersected with its bound.
-      type_expr(ref.bound, refer, receiver)
-      .intersect(MetaType.new_type_param(ref))
+      bound = type_expr(ref.bound, refer, receiver)
+      bound = bound.intersect(MetaType.new_type_param(ref))
       
       # Remove the temporary reentrant entry without affecting the return value.
-      .tap { @lookup_type_param_reentrant.delete(ref) }
+      @lookup_type_param_reentrant.delete(ref)
+      
+      bound
     end
     
     def lookup_type_param_bound(ref : Refer::TypeParam)
       raise NotImplementedError.new(ref) unless ref.parent == reified.defn
       
-      type_expr(ref.bound, refer, nil)
+      # Get the MetaType of the declared bound for this type parameter.
+      bound : MetaType = type_expr(ref.bound, refer, nil)
+      
+      # If we have temporary refinements for this type param, apply them now.
+      @type_param_refinements[ref]?.try(&.each { |refine_type|
+        # TODO: make this less of a special case, somehow:
+        bound = bound.strip_cap.intersect(refine_type.strip_cap).intersect(
+          MetaType.new(
+            bound.cap_only.inner.as(MetaType::Capability).set_intersect(
+              refine_type.cap_only.inner.as(MetaType::Capability)
+            )
+          )
+        )
+      })
+      
+      bound
+    end
+    
+    def push_type_param_refinement(ref, refine_type)
+      (@type_param_refinements[ref] ||= [] of MetaType) << refine_type
+    end
+    
+    def pop_type_param_refinement(ref)
+      list = @type_param_refinements[ref]
+      list.empty? ? @type_param_refinements.delete(ref) : list.pop
     end
     
     def validate_type_args(
@@ -533,8 +560,11 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       r : ReifiedType,
       errors = [] of Error::Info,
     ) : Bool
-      # TODO: Implement this.
-      raise NotImplementedError.new("type param <: type")
+      is_subtype?(
+        lookup_type_param_bound(l).strip_cap,
+        MetaType.new_nominal(r),
+        # TODO: forward errors array
+      )
     end
     
     def is_subtype?(
@@ -1214,10 +1244,48 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         Error.at node.rhs, "expected this to have a fixed type at compile time" \
           unless rhs_info.is_a?(Fixed)
         
-        bool = MetaType.new(reified_type(prelude_type("Bool")))
-        refine = follow_redirects(node.lhs)
-        refine_type = self[node.rhs].resolve!(self)
-        self[node] = TypeCondition.new(node.pos, bool, refine, refine_type)
+        lhs_info = self[node.lhs]
+        # If the left-hand side is the name of a local variable...
+        if lhs_info.is_a?(Local)
+          # Set up a local type refinement condition, which can be used within
+          # a choice body to inform the type system about the type relationship.
+          bool = MetaType.new(reified_type(prelude_type("Bool")))
+          refine = follow_redirects(node.lhs)
+          refine_type = self[node.rhs].resolve!(self)
+          self[node] = TypeCondition.new(node.pos, bool, refine, refine_type)
+        
+        # If the left-hand side is the name of a type parameter...
+        elsif lhs_info.is_a?(Fixed) \
+        && lhs_info.inner.cap_only.inner == MetaType::Capability::NON \
+        && (lhs_nominal = lhs_info.inner.strip_cap.inner).is_a?(MetaType::Nominal) \
+        && (lhs_type_param = lhs_nominal.defn).is_a?(Refer::TypeParam)
+          # Strip the "non" from the fixed type, as if it were a type expr.
+          self[node.lhs] = Fixed.new(node.lhs.pos, type_expr(node.lhs))
+          
+          # Set up a type param refinement condition, which can be used within
+          # a choice body to inform the type system about the type relationship.
+          bool = MetaType.new(reified_type(prelude_type("Bool")))
+          refine = lhs_type_param
+          refine_type = self[node.rhs].resolve!(self)
+          self[node] = TypeParamCondition.new(node.pos, bool, refine, refine_type)
+        
+        # If the left-hand side is the name of any other fixed type...
+        elsif lhs_info.is_a?(Fixed) \
+        && lhs_info.inner.cap_only.inner == MetaType::Capability::NON \
+        && (lhs_nominal = lhs_info.inner.strip_cap.inner).is_a?(MetaType::Nominal)
+          # Strip the "non" from the fixed type, as if it were a type expr.
+          self[node.lhs] = Fixed.new(node.lhs.pos, type_expr(node.lhs))
+          
+          # Just know that the result of this expression is a boolean.
+          bool = MetaType.new(reified_type(prelude_type("Bool")))
+          self[node] = Fixed.new(node.pos, bool)
+        
+        # For all other possible left-hand sides...
+        else
+          # Just know that the result of this expression is a boolean.
+          bool = MetaType.new(reified_type(prelude_type("Bool")))
+          self[node] = Fixed.new(node.pos, bool)
+        end
       else raise NotImplementedError.new(node.op.value)
       end
     end
@@ -1268,15 +1336,33 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
           self[refine] = Refinement.new(
             cond_info.pos, cond_info.refine, cond_info.refine_type
           )
+        elsif cond_info.is_a?(TypeParamCondition)
+          for_type.push_type_param_refinement(
+            cond_info.refine,
+            cond_info.refine_type,
+          )
+          
+          # When the type param is currently partially or fully reified with
+          # a type that is incompatible with the refinement, we skip the body.
+          current_type_param = lookup_type_param(cond_info.refine)
+          if !current_type_param.satisfies_bound?(self, cond_info.refine_type)
+            skip_body = true
+          end
         end
         
-        # Visit the body AST - we skipped it before with visit_children: false.
-        # We needed to act on information from the cond analysis first.
-        body.accept(self)
+        if skip_body
+          self[body] = Unreachable.instance
+        else
+          # Visit the body AST - we skipped it before with visit_children: false.
+          # We needed to act on information from the cond analysis first.
+          body.accept(self)
+        end
         
         # Remove the override we put in place before, if any.
         if cond_info.is_a?(TypeCondition)
           @local_ident_overrides.delete(cond_info.refine).not_nil!
+        elsif cond_info.is_a?(TypeParamCondition)
+          for_type.pop_type_param_refinement(cond_info.refine)
         end
         
         # Hold on to the body type for later in this function.
