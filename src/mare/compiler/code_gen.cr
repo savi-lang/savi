@@ -2672,14 +2672,16 @@ class Mare::Compiler::CodeGen
     gfunc = func_frame.gfunc.not_nil!
     
     # If this is a yielding function, we store locals in the continuation data.
-    # Otherwise, we store each in its own alloca, which we create here.
+    # Otherwise, we store each in its own alloca, which we create at the entry.
     if gfunc.calling_convention == :yield_cc
       cont = func_frame.continuation_value
       gep = gfunc.continuation_info.struct_gep_for_local(cont, ref)
       # TODO: bitcast to llvm_type?
       @builder.bit_cast(gep, llvm_type.pointer)
     else
-      @builder.alloca(llvm_type, ref.name)
+      gen_at_entry do
+        @builder.alloca(llvm_type, ref.name)
+      end
     end
     .tap { |gep| @di.declare_local(ref, type_of(ref.defn), gep) }
   end
