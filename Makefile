@@ -29,6 +29,12 @@ example-eval: PHONY
 example-eval.inner: PHONY /tmp/bin/mare
 	echo && /tmp/bin/mare eval 'env.out.print("Hello, World!")'
 
+# Run the files in the given directory.
+example-run: PHONY
+	docker exec -ti mare-dev make dir="$(dir)" example-run.inner
+example-run.inner: PHONY /tmp/bin/mare
+	echo && cd "$(dir)" && /tmp/bin/mare run
+
 # Compile and run the mare binary in the `example` subdirectory.
 example: PHONY
 	docker exec -ti mare-dev make extra_args="$(extra_args)" example/main
