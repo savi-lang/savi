@@ -271,8 +271,8 @@
     test["String == other not"].pass = ("string" == "other").not
     test["String hash"].pass = ("string".hash == 0x4CF51F4A5B5CF110)
     
-    string_split = "foo.bar.baz".split(46) // TODO: '.' as the argument
-    test["String each_split"].pass = string_split == ["foo", "bar", "baz"]
+    test["String split"].pass = \
+      "foo.bar.baz".split('.') == ["foo", "bar", "baz"]
     
     ///
     // Array methods

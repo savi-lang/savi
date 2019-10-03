@@ -1125,6 +1125,13 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       self[node] = Literal.new(node.pos, mts)
     end
     
+    # A literal character could be any integer or floating-point machine type.
+    def touch(node : AST::LiteralCharacter)
+      defns = [prelude_type("Numeric")]
+      mts = defns.map { |defn| MetaType.new(reified_type(defn)).as(MetaType) } # TODO: is it possible to remove this superfluous "as"?
+      self[node] = Literal.new(node.pos, mts)
+    end
+    
     # A literal integer could be any integer or floating-point machine type.
     def touch(node : AST::LiteralInteger)
       defns = [prelude_type("Numeric")]

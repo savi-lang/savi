@@ -70,6 +70,16 @@ module Mare::Parser::Builder
     when :string
       value = state.slice(main)
       AST::LiteralString.new(value).with_pos(state.pos(main))
+    when :char
+      string = state.slice(main)
+      reader = Char::Reader.new(string)
+      value = reader.current_char
+      if (reader.next_char; reader.has_next?)
+        Error.at state.pos(main),
+          "This character literal has more than one character in it"
+      end
+      
+      AST::LiteralCharacter.new(value.ord.to_i64).with_pos(state.pos(main))
     when :integer
       string = state.slice(main)
       value =

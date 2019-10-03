@@ -51,11 +51,20 @@ module Mare::Parser
       (~char('"') >> ~char('\\') >> range(' ', 0x10FFFF_u32))
     string = char('"') >> string_char.repeat.named(:string) >> char('"')
     
+    # Define what a character string looks like.
+    character_char =
+      str("\\'") | str("\\\\") | str("\\|") |
+      str("\\b") | str("\\f") | str("\\n") | str("\\r") | str("\\t") |
+      (str("\\u") >> digithex >> digithex >> digithex >> digithex) |
+      (~char('\'') >> ~char('\\') >> range(' ', 0x10FFFF_u32))
+    character = char('\'') >> character_char.repeat.named(:char) >> char('\'')
+    
     # Define an atom to be a single term with no binary operators.
     parens = declare()
     prefixed = declare()
     decl = declare()
-    atom = prefixed | parens | decl | string | float | integer | ident
+    atom = \
+      prefixed | parens | decl | string | character | float | integer | ident
     
     # Define a prefixed term to be preceded by a prefix operator.
     prefixop = (char('~') | str("--")).named(:op)

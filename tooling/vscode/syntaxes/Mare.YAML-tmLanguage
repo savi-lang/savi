@@ -23,6 +23,14 @@ patterns:
   - name: constant.character.escape.mare
     match: \\.
 
+- comment: Single-Quote String
+  name: string.quoted.single.mare
+  begin: (')
+  end: (')
+  patterns:
+  - name: constant.character.escape.mare
+    match: \\.
+
 - comment: Class (or other type)
   name: meta.class.mare
   match: (?:::)?([A-Z][_a-zA-Z0-9]*)

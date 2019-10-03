@@ -171,4 +171,23 @@ describe Mare::Parser do
       [:group, ":", [:prefix, [:op, "~"], [:ident, "x"]]]]]
     AST
   end
+
+  it "complains when a character literal has too many characters in it" do
+    source = Mare::Source.new_example <<-SOURCE
+    :actor Main
+      :new
+        x U64 = '..'
+    SOURCE
+    
+    expected = <<-MSG
+    This character literal has more than one character in it:
+    from (example):3:
+        x U64 = '..'
+                 ^~
+    MSG
+    
+    expect_raises Mare::Error, expected do
+      Mare::Parser.parse(source)
+    end
+  end
 end

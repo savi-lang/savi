@@ -97,7 +97,7 @@ module Mare::AST
   end
   
   alias Term = DocString | Identifier \
-    | LiteralString | LiteralInteger | LiteralFloat \
+    | LiteralString | LiteralCharacter | LiteralInteger | LiteralFloat \
     | Operator | Prefix | Relate | Group \
     | FieldRead | FieldWrite | Choice | Loop | Try
   
@@ -122,6 +122,14 @@ module Mare::AST
     def initialize(@value : String)
     end
     def name; :string end
+    def to_a: Array(A); [name, value] of A end
+  end
+  
+  class LiteralCharacter < Node
+    property value
+    def initialize(@value : UInt64 | Int64)
+    end
+    def name; :char end
     def to_a: Array(A); [name, value] of A end
   end
   

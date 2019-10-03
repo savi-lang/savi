@@ -1679,12 +1679,14 @@ class Mare::Compiler::CodeGen
       gen_field_load(expr.value)
     when AST::FieldWrite
       gen_field_eq(expr)
+    when AST::LiteralString
+      gen_string(expr)
+    when AST::LiteralCharacter
+      gen_integer(expr)
     when AST::LiteralInteger
       gen_integer(expr)
     when AST::LiteralFloat
       gen_float(expr)
-    when AST::LiteralString
-      gen_string(expr)
     when AST::Relate
       raise "#{expr.inspect} isn't a constant value" if const_only
       case expr.op.as(AST::Operator).value
@@ -1730,7 +1732,7 @@ class Mare::Compiler::CodeGen
     @i1.const_int(bool ? 1 : 0)
   end
   
-  def gen_integer(expr : AST::LiteralInteger)
+  def gen_integer(expr : (AST::LiteralInteger | AST::LiteralCharacter))
     type_ref = type_of(expr)
     case type_ref.llvm_use_type
     when :i1 then @i1.const_int(expr.value.to_i8)
