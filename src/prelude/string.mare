@@ -3,8 +3,39 @@
   :prop _alloc USize
   :prop _ptr CPointer(U8)'ref
   :new from_cpointer (@_ptr, @_size, @_alloc)
+  :new val val_from_cpointer (@_ptr, @_size, @_alloc) // TODO: remove this and use recover instead?
   :fun cpointer CPointer(U8): @_ptr
   :fun hash: @_ptr._hash(@_size)
   :fun size: @_size
   :fun "==" (other String'box)
     (@_size == other._size) && (@_ptr._compare(other._ptr, @_size) == 0)
+  
+  :fun val split (split_byte U8) // TODO: a byte shouldn't be the only thing we can split by...
+    result Array(String) = []
+    @each_split(split_byte) -> (s | result << s)
+    result
+  
+  :fun val each_split (split_byte U8) // TODO: a byte shouldn't be the only thing we can split by...
+    :yields String
+    finish USize = 0
+    start = finish
+    while (finish < @_size) (
+      byte = @_ptr._get_at(finish)
+      if (byte == split_byte) (
+        yield @val_from_cpointer(
+          @_ptr._offset(start)
+          (finish - start)
+          @_alloc - start
+        )
+        finish = finish + 1
+        start = finish
+      |
+        finish = finish + 1
+      )
+    )
+    yield @val_from_cpointer(
+      @_ptr._offset(start)
+      (finish - start)
+      @_alloc - start
+    )
+    @

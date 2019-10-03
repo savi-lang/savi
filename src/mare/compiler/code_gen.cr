@@ -887,6 +887,14 @@ class Mare::Compiler::CodeGen
           ]),
           llvm_type,
         )
+      when "_offset"
+        @builder.bit_cast(
+          @builder.inbounds_gep(
+            @builder.bit_cast(params[0], elem_llvm_type.pointer),
+            params[1]
+          ),
+          params[0].type
+        )
       when "_get_at"
         gep = @builder.inbounds_gep(params[0], params[1])
         @builder.load(gep)
