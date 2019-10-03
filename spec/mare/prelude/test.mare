@@ -301,34 +301,21 @@
     test["Array != order"].pass = ["foo", "bar", "baz"] != ["baz", "bar", "foo"]
     test["Array != different"].pass = ["foo", "bar"] != ["food", "bar"]
     
-    array_each_1 = ["foo", "bar", "baz"]
-    array_each_2 Array(String) = []
-    array_each_1.each -> (string | array_each_2 << string)
-    test["Array each, size"].pass = array_each_2.size == 3
-    test["Array each, [0] "].pass = try (array_each_2[0]! == "foo" | False)
-    test["Array each, [1] "].pass = try (array_each_2[1]! == "bar" | False)
-    test["Array each, [2] "].pass = try (array_each_2[2]! == "baz" | False)
+    array_each Array(String) = []
+    ["foo", "bar", "baz"].each -> (string | array_each << string)
+    test["Array each"].pass = array_each == ["foo", "bar", "baz"]
     
-    array_ewi = ["foo", "bar", "baz"]
-    array_ewi_0 Array(String) = []
-    array_ewi_1 Array(USize) = []
-    array_ewi.each_with_index -> (string, index |
-      array_ewi_0 << string
-      array_ewi_1 << index
+    array_ewi_a Array(String) = []
+    array_ewi_b Array(USize) = []
+    ["foo", "bar", "baz"].each_with_index -> (string, index |
+      array_ewi_a << string
+      array_ewi_b << index
     )
-    test["Array each_with_index, [0][0]"].pass = try (array_ewi_0[0]! == "foo" | False)
-    test["Array each_with_index, [0][1]"].pass = try (array_ewi_0[1]! == "bar" | False)
-    test["Array each_with_index, [0][2]"].pass = try (array_ewi_0[2]! == "baz" | False)
-    test["Array each_with_index, [1][0]"].pass = try (array_ewi_1[0]! == 0 | False)
-    test["Array each_with_index, [1][1]"].pass = try (array_ewi_1[1]! == 1 | False)
-    test["Array each_with_index, [1][2]"].pass = try (array_ewi_1[2]! == 2 | False)
+    test["Array each_with_index, a"].pass = array_ewi_a == ["foo", "bar", "baz"]
+    test["Array each_with_index, b"].pass = array_ewi_b == [0, 1, 2]
     
     array_select Array(U8) = [11, 22, 33, 44, 36, 27, 18]
     array_selected = array_select.select -> (num | num < 30)
-    test["Array select, size"].pass = array_selected.size == 4
-    test["Array select, [0] "].pass = try (array_selected[0]! == 11 | False)
-    test["Array select, [1] "].pass = try (array_selected[1]! == 22 | False)
-    test["Array select, [2] "].pass = try (array_selected[2]! == 27 | False)
-    test["Array select, [3] "].pass = try (array_selected[3]! == 18 | False)
+    test["Array select"].pass = array_selected == [11, 22, 27, 18]
     
     test.print_line_break // TODO: move to MicroTest constructor and finalizer
