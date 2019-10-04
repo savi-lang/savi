@@ -31,6 +31,14 @@
 			<string>comment.doc.mare</string>
 		</dict>
 		<dict>
+			<key>comment</key>
+			<string>Capability Operator</string>
+			<key>match</key>
+			<string>\'(?=iso|trn|val|ref|box|tag|non|any|alias|send|share|read|aliased)</string>
+			<key>name</key>
+			<string>keyword.operator.capability.mare</string>
+		</dict>
+		<dict>
 			<key>begin</key>
 			<string>(")</string>
 			<key>comment</key>
