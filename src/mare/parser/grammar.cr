@@ -45,16 +45,18 @@ module Mare::Parser
     
     # Define what a string looks like.
     string_char =
-      str("\\\"") | str("\\\\") | str("\\|") |
+      str("\\\"") | str("\\\\") |
       str("\\b") | str("\\f") | str("\\n") | str("\\r") | str("\\t") |
+      str("\b")  | str("\f")  | str("\n")  | str("\r")  | str("\t") |
       (str("\\u") >> digithex >> digithex >> digithex >> digithex) |
       (~char('"') >> ~char('\\') >> range(' ', 0x10FFFF_u32))
     string = char('"') >> string_char.repeat.named(:string) >> char('"')
     
     # Define what a character string looks like.
     character_char =
-      str("\\'") | str("\\\\") | str("\\|") |
+      str("\\'") | str("\\\\") |
       str("\\b") | str("\\f") | str("\\n") | str("\\r") | str("\\t") |
+      str("\b")  | str("\f")  | str("\n")  | str("\r")  | str("\t") |
       (str("\\u") >> digithex >> digithex >> digithex >> digithex) |
       (~char('\'') >> ~char('\\') >> range(' ', 0x10FFFF_u32))
     character = char('\'') >> character_char.repeat.named(:char) >> char('\'')

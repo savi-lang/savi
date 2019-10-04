@@ -1,7 +1,11 @@
+:ffi LibC
+  :fun printf (CPointer(U8), CPointer(U8)) I32
+
 :class MicroTest
   :prop env Env
   :new (@env)
-  :fun print_line_break: Print.line_break
+  :fun non _printf (f String, t String): LibC.printf(f.cpointer, t.cpointer)
+  :fun non print_line_break: @_printf("%s", "\n")
   :fun "[]" (text String) MicroTestInstance
     MicroTestInstance.new(@env, text)
 
@@ -11,21 +15,8 @@
   :new (@env, @text)
   :fun "pass=" (pass Bool)
     if pass (
-      Print.f("%s", ".")
+      MicroTest._printf("%s", ".")
     |
-      Print.line_break // TODO: fix processing of \n in string literals and use it
-      Print.f("failure of '%s'!", @text)
-      Print.line_break // TODO: fix processing of \n in string literals and use it
+      MicroTest._printf("\nfailure of '%s'!\n", @text)
       @env.exit_code = 1 // Mark the entire process as a failure.
     )
-
-:primitive Print
-  :fun line_break
-    LibC.puts("".cpointer)
-  
-  :fun f (format String, text String)
-    LibC.printf(format.cpointer, text.cpointer)
-
-:ffi LibC
-  :fun puts (CPointer(U8)) I32
-  :fun printf (CPointer(U8), CPointer(U8)) I32

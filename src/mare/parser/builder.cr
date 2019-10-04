@@ -68,10 +68,10 @@ module Mare::Parser::Builder
       value = state.slice(main)
       AST::Identifier.new(value).with_pos(state.pos(main))
     when :string
-      value = state.slice(main)
+      value = state.slice_with_escapes(main)
       AST::LiteralString.new(value).with_pos(state.pos(main))
     when :char
-      string = state.slice(main)
+      string = state.slice_with_escapes(main)
       reader = Char::Reader.new(string)
       value = reader.current_char
       if (reader.next_char; reader.has_next?)
