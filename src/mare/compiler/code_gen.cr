@@ -258,6 +258,10 @@ class Mare::Compiler::CodeGen
     @f32      = @llvm.float.as(LLVM::Type)
     @f64      = @llvm.double.as(LLVM::Type)
     
+    bitwidth = @isize.int_width
+    @memcpy = mod.functions.add("llvm.memcpy.p0i8.p0i8.i#{bitwidth}",
+      [@ptr, @ptr, @isize, @i32, @i1], @void).as(LLVM::Function)
+    
     @frames = [] of Frame
     @string_globals = {} of String => LLVM::Value
     @cstring_globals = {} of String => LLVM::Value
@@ -887,6 +891,8 @@ class Mare::Compiler::CodeGen
           ]),
           llvm_type,
         )
+      when "_unsafe"
+        params[0]
       when "_offset"
         @builder.bit_cast(
           @builder.inbounds_gep(
@@ -909,6 +915,18 @@ class Mare::Compiler::CodeGen
         old_value = @builder.load(gep)
         @builder.store(new_value, gep)
         old_value
+      when "_copy_to"
+        @builder.call(@memcpy, [
+          params[1],
+          params[0],
+          @builder.mul(
+            params[2],
+            @isize.const_int(elem_size_value),
+          ),
+          @i32.const_int(1),
+          @i1.const_int(0),
+        ])
+        gen_none
       when "_compare"
         @builder.call(
           @mod.functions["memcmp"],

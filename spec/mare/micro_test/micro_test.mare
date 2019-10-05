@@ -4,7 +4,7 @@
 :class MicroTest
   :prop env Env
   :new (@env)
-  :fun non _printf (f String, t String): LibC.printf(f.cpointer, t.cpointer)
+  :fun non _printf (f String, t String): LibC.printf(f.cstring, t.cstring)
   :fun non print_line_break: @_printf("%s", "\n")
   :fun "[]" (text String) MicroTestInstance
     MicroTestInstance.new(@env, text)

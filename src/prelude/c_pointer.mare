@@ -2,9 +2,11 @@
   :fun non null @'ref: compiler intrinsic
   :fun non _alloc (space USize) @'ref: compiler intrinsic
   :fun ref _realloc (space USize) @: compiler intrinsic
+  :fun tag _unsafe @'ref: compiler intrinsic
   :fun box _offset (offset USize) @'ref: compiler intrinsic
   :fun box _get_at (index USize) A'aliased: compiler intrinsic
   :fun ref _assign_at (index USize, value A) A'aliased: compiler intrinsic
   :fun ref _displace_at (index USize, value A) A: compiler intrinsic
+  :fun box _copy_to (other @'ref, count USize) None: compiler intrinsic
   :fun box _compare (other @'box, size USize) I32: compiler intrinsic // TODO: shouldn't need 'box in arg type?
   :fun box _hash (size USize) USize: compiler intrinsic

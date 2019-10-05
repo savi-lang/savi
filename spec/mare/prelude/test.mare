@@ -271,7 +271,12 @@
     test["String == other not"].pass = ("string" == "other").not
     test["String hash"].pass = ("string".hash == 0x4CF51F4A5B5CF110)
     
-    test["String split"].pass = \
+    test["String push_byte"].pass =
+      String.new.push_byte('o').push_byte('k') == "ok"
+    
+    test["String <<"].pass = (String.new << "foo" << "bar") == "foobar"
+    
+    test["String split"].pass =
       "foo.bar.baz".split('.') == ["foo", "bar", "baz"]
     
     ///
