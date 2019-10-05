@@ -292,6 +292,11 @@
     test["String split"].pass =
       "foo.bar.baz".split('.') == ["foo", "bar", "baz"]
     
+    test["String parse_i64  36"].pass = try ("36".parse_i64!  == 36  | False)
+    test["String parse_i64 +36"].pass = try ("+36".parse_i64! == 36  | False)
+    test["String parse_i64 -36"].pass = try ("-36".parse_i64! == -36 | False)
+    test["String parse_i64 36bad"].pass = try ("36bad".parse_i64!, False | True)
+    
     ///
     // Array methods
     

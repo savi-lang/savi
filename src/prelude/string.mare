@@ -119,3 +119,16 @@
       @_alloc - start
     )
     @
+  
+  :fun parse_i64! // TODO: Use something like Crystal's Char::Reader instead?
+    output I64 = 0
+    possible_negation I64 = 1
+    @each_byte_with_index -> (byte, index |
+      case (
+      | byte == '+' && index == 0 | // do nothing
+      | byte == '-' && index == 0 | possible_negation = -1
+      | byte >= '0' && byte <= '9' | output = output * 10 + (byte - '0').i64
+      | error!
+      )
+    )
+    output * possible_negation
