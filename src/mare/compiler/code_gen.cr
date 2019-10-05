@@ -350,7 +350,7 @@ class Mare::Compiler::CodeGen
   
   def llvm_mem_type_of(ref : Reach::Ref)
     case ref.llvm_mem_type
-    when :i1 then @i8 # TODO: test that this works okay 
+    when :i1 then @i1
     when :i8 then @i8
     when :i32 then @i32
     when :i64 then @i64
@@ -1777,6 +1777,31 @@ class Mare::Compiler::CodeGen
     end
   end
   
+  def gen_as_cond(value : LLVM::Value)
+    case value.type
+    when @i1 then value
+    when @obj_ptr
+      # When an object pointer, assume that it is a boxed Bool object,
+      # meaning that we need to unbox it as such here. This will fail
+      # in a silent and ugly way if the type system doesn't properly
+      # ensure that the value we hold here is truly a Bool.
+      @builder.load(
+        @builder.struct_gep(
+          @builder.bit_cast(
+            value,
+            @gtypes["Bool"].struct_ptr,
+            "#{value.name}.BOXED",
+          ),
+          1,
+          "#{value.name}.VALUE",
+        ),
+        "#{value.name}.VALUE.LOAD",
+      )
+    else
+      raise NotImplementedError.new(value.type)
+    end
+  end
+  
   def bit_width_of(gtype : GenType)
     bit_width_of(llvm_type_of(gtype))
   end
@@ -2093,7 +2118,7 @@ class Mare::Compiler::CodeGen
     post_block = gen_block("after#{j}of#{j}_choice")
     
     # Generate code for the first condition - we always start by running this.
-    cond_value = gen_expr(expr.list.first[0])
+    cond_value = gen_as_cond(gen_expr(expr.list.first[0]))
     
     # Generate the interacting code for each consecutive pair of cases.
     phi_blocks = [] of LLVM::BasicBlock
@@ -2178,7 +2203,7 @@ class Mare::Compiler::CodeGen
     
     # Start by generating the code to test the condition value.
     # If the cond is true, go to the body block; otherwise, the else block.
-    cond_value = gen_expr(expr.cond)
+    cond_value = gen_as_cond(gen_expr(expr.cond))
     @builder.cond(cond_value, body_block, else_block)
     
     # In the body block, generate code to arrive at the body value,

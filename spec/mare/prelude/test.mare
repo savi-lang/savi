@@ -361,6 +361,9 @@
     ///
     // Inspect methods
     
+    test["Inspect True "].pass = Inspect[True]  == "True"
+    test["Inspect False"].pass = Inspect[False] == "False"
+    
     test["Inspect U8   "].pass = Inspect[U8[36]]    == "36"
     test["Inspect U32  "].pass = Inspect[U32[36]]   == "36"
     test["Inspect U64  "].pass = Inspect[U64[36]]   == "36"

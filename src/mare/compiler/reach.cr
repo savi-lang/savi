@@ -117,12 +117,13 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     end
     
     def llvm_mem_type : Symbol
-      if llvm_use_type == :i1
-        # TODO: use :i32 on Darwin PPC32? (see ponyc's gentype.c:283)
-        :i8
-      else
+      # # TODO: should we be using a different memory type for i1 like ponyc?
+      # if llvm_use_type == :i1
+      #   # TODO: use :i32 on Darwin PPC32? (see ponyc's gentype.c:283)
+      #   :i8
+      # else
         llvm_use_type
-      end
+      # end
     end
     
     def union_children : Array(Ref)

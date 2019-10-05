@@ -15,6 +15,8 @@
   
   :fun into (input box, output String'ref) None // TODO: use something like Crystal IO instead of String?
     case (
+    | input <: Bool |
+      output << if input ("True" | "False")
     | input <: U8    | @into(input.u64, output) // TODO: unify into one integer clause?
     | input <: U32   | @into(input.u64, output) // TODO: unify into one integer clause?
     | input <: USize | @into(input.u64, output) // TODO: unify into one integer clause?
