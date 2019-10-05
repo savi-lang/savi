@@ -1649,6 +1649,32 @@ describe Mare::Compiler::Infer do
     end
   end
   
+  it "allows assigning from a variable with its refined type" do
+    source = Mare::Source.new_example <<-SOURCE
+    :actor Main
+      :new
+        x val = "example"
+        if (x <: String) (
+          y String = x
+        )
+    SOURCE
+    
+    Mare::Compiler.compile([source], :infer)
+  end
+  
+  it "allows assigning from a parameter with its refined type" do
+    source = Mare::Source.new_example <<-SOURCE
+    :actor Main
+      :new: @refine("example")
+      :fun refine (x val)
+        if (x <: String) (
+          y String = x
+        )
+    SOURCE
+    
+    Mare::Compiler.compile([source], :infer)
+  end
+  
   it "complains when too many type arguments are provided" do
     source = Mare::Source.new_example <<-SOURCE
     :class Generic (P1, P2)

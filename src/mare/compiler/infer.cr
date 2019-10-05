@@ -1253,7 +1253,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         
         lhs_info = self[node.lhs]
         # If the left-hand side is the name of a local variable...
-        if lhs_info.is_a?(Local)
+        if lhs_info.is_a?(Local) || lhs_info.is_a?(Param)
           # Set up a local type refinement condition, which can be used within
           # a choice body to inform the type system about the type relationship.
           bool = MetaType.new(reified_type(prelude_type("Bool")))
