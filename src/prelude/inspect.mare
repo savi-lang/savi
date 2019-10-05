@@ -1,0 +1,37 @@
+:ffi LibC
+  :fun puts (CPointer(U8)) I32
+
+// TODO: Move this out of prelude maybe? Does that make sense?
+// TODO: Make this into a trait with "implement for"/typeclass style polymorphism
+:primitive Inspect
+  :fun "[]" (input box) String'box // TODO: return String'val using recover
+    output = String.new
+    @into(input, output)
+    output
+  
+  :fun out (input box)
+    LibC.puts(@[input].cstring)
+  
+  :fun into (input box, output String'ref) None // TODO: use something like Crystal IO instead of String?
+    case (
+    | input <: U8    | @into(input.u64, output) // TODO: unify into one integer clause?
+    | input <: U32   | @into(input.u64, output) // TODO: unify into one integer clause?
+    | input <: USize | @into(input.u64, output) // TODO: unify into one integer clause?
+    | input <: U64   |                          // TODO: unify into one integer clause?
+      number = input
+      digits Array(U8) = []
+      while (number > 0) (
+        digits << (number % 10).u8 + '0'
+        number = number / 10
+      )
+      digits.reverse_each -> (digit | output.push_byte(digit))
+    | input <: I8    | @into(input.i64, output) // TODO: unify into one integer clause?
+    | input <: I32   | @into(input.i64, output) // TODO: unify into one integer clause?
+    | input <: ISize | @into(input.i64, output) // TODO: unify into one integer clause?
+    | input <: I64   |                          // TODO: unify into one integer clause?
+      positive = if (input >= 0) (input | output.push_byte('-'), input.abs)
+      @into(positive.u64, output)
+    |
+      output << "<uninspectable>"
+    )
+    None

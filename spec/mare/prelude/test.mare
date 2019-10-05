@@ -340,4 +340,24 @@
     array_selected = array_select.select -> (num | num < 30)
     test["Array select"].pass = array_selected == [11, 22, 27, 18]
     
+    ///
+    // Inspect methods
+    
+    test["Inspect U8   "].pass = Inspect[U8[99]]    == "99"
+    test["Inspect U32  "].pass = Inspect[U32[99]]   == "99"
+    test["Inspect U64  "].pass = Inspect[U64[99]]   == "99"
+    test["Inspect USize"].pass = Inspect[USize[99]] == "99"
+    
+    test["Inspect I8   "].pass = Inspect[I8[99]]    == "99"
+    test["Inspect I32  "].pass = Inspect[I32[99]]   == "99"
+    test["Inspect I64  "].pass = Inspect[I64[99]]   == "99"
+    test["Inspect ISize"].pass = Inspect[ISize[99]] == "99"
+    
+    test["Inspect -I8   "].pass = Inspect[I8[-99]]    == "-99"
+    test["Inspect -I32  "].pass = Inspect[I32[-99]]   == "-99"
+    test["Inspect -I64  "].pass = Inspect[I64[-99]]   == "-99"
+    test["Inspect -ISize"].pass = Inspect[ISize[-99]] == "-99"
+    
+    ///
+    
     test.print_line_break // TODO: move to MicroTest constructor and finalizer
