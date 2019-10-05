@@ -1,4 +1,5 @@
-:ffi LibC
+// TODO: Get rid of this hack:
+:ffi InspectLibC
   :fun puts (CPointer(U8)) I32
 
 // TODO: Move this out of prelude maybe? Does that make sense?
@@ -10,7 +11,7 @@
     output
   
   :fun out (input box)
-    LibC.puts(@[input].cstring)
+    InspectLibC.puts(@[input].cstring)
   
   :fun into (input box, output String'ref) None // TODO: use something like Crystal IO instead of String?
     case (
