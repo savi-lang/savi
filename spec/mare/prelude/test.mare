@@ -361,20 +361,20 @@
     ///
     // Inspect methods
     
-    test["Inspect U8   "].pass = Inspect[U8[99]]    == "99"
-    test["Inspect U32  "].pass = Inspect[U32[99]]   == "99"
-    test["Inspect U64  "].pass = Inspect[U64[99]]   == "99"
-    test["Inspect USize"].pass = Inspect[USize[99]] == "99"
+    test["Inspect U8   "].pass = Inspect[U8[36]]    == "36"
+    test["Inspect U32  "].pass = Inspect[U32[36]]   == "36"
+    test["Inspect U64  "].pass = Inspect[U64[36]]   == "36"
+    test["Inspect USize"].pass = Inspect[USize[36]] == "36"
     
-    test["Inspect I8   "].pass = Inspect[I8[99]]    == "99"
-    test["Inspect I32  "].pass = Inspect[I32[99]]   == "99"
-    test["Inspect I64  "].pass = Inspect[I64[99]]   == "99"
-    test["Inspect ISize"].pass = Inspect[ISize[99]] == "99"
+    test["Inspect I8   "].pass = Inspect[I8[36]]    == "36"
+    test["Inspect I32  "].pass = Inspect[I32[36]]   == "36"
+    test["Inspect I64  "].pass = Inspect[I64[36]]   == "36"
+    test["Inspect ISize"].pass = Inspect[ISize[36]] == "36"
     
-    test["Inspect -I8   "].pass = Inspect[I8[-99]]    == "-99"
-    test["Inspect -I32  "].pass = Inspect[I32[-99]]   == "-99"
-    test["Inspect -I64  "].pass = Inspect[I64[-99]]   == "-99"
-    test["Inspect -ISize"].pass = Inspect[ISize[-99]] == "-99"
+    test["Inspect -I8   "].pass = Inspect[I8[-36]]    == "-36"
+    test["Inspect -I32  "].pass = Inspect[I32[-36]]   == "-36"
+    test["Inspect -I64  "].pass = Inspect[I64[-36]]   == "-36"
+    test["Inspect -ISize"].pass = Inspect[ISize[-36]] == "-36"
     
     ///
     
