@@ -317,6 +317,20 @@
     test["Array each_with_index, a"].pass = array_ewi_a == ["foo", "bar", "baz"]
     test["Array each_with_index, b"].pass = array_ewi_b == [0, 1, 2]
     
+    array_reach Array(String) = []
+    ["foo", "bar", "baz"].reverse_each -> (string | array_reach << string)
+    test["Array reverse_each"].pass = array_reach == ["baz", "bar", "foo"]
+    
+    array_rewi_a Array(String) = []
+    array_rewi_b Array(USize) = []
+    ["foo", "bar", "baz"].reverse_each_with_index -> (string, index |
+      array_rewi_a << string
+      array_rewi_b << index
+    )
+    test["Array reverse_each_with_index, b"].pass = array_rewi_b == [2, 1, 0]
+    test["Array reverse_each_with_index, a"].pass =
+      array_rewi_a == ["baz", "bar", "foo"]
+    
     array_select Array(U8) = [11, 22, 33, 44, 36, 27, 18]
     array_selected = array_select.select -> (num | num < 30)
     test["Array select"].pass = array_selected == [11, 22, 27, 18]

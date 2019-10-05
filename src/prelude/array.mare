@@ -80,6 +80,22 @@
     )
     @
   
+  :fun reverse_each
+    index USize = @_size
+    while (index > 0) (
+      index = index - 1 // TODO: index -= 1
+      yield @_ptr._get_at(index)
+    )
+    @
+  
+  :fun reverse_each_with_index
+    index USize = @_size
+    while (index > 0) (
+      index = index - 1 // TODO: index -= 1
+      yield (@_ptr._get_at(index), index)
+    )
+    @
+  
   :fun select
     :yields for Bool
     new_array = Array(A'aliased).new // TODO: allow the caller to specify space
