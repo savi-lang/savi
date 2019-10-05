@@ -274,6 +274,19 @@
     test["String push_byte"].pass =
       String.new.push_byte('o').push_byte('k') == "ok"
     
+    string_each_byte Array(U8) = []
+    "foo".each_byte -> (byte | string_each_byte << byte)
+    test["String each_byte"].pass = string_each_byte == ['f', 'o', 'o']
+    
+    string_ebwi_a Array(U8) = []
+    string_ebwi_b Array(USize) = []
+    "yo".each_byte_with_index -> (byte, index |
+      string_ebwi_a << byte
+      string_ebwi_b << index
+    )
+    test["String each_byte_with_index, a"].pass = string_ebwi_a == ['y', 'o']
+    test["String each_byte_with_index, b"].pass = string_ebwi_b == [0, 1]
+    
     test["String <<"].pass = (String.new << "foo" << "bar") == "foobar"
     
     test["String split"].pass =

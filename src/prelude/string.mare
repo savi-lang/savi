@@ -63,6 +63,22 @@
     @_size = @_size + 1 // TODO: use += operator
     @
   
+  :fun each_byte
+    index USize = 0
+    while (index < @_size) (
+      yield @_ptr._get_at(index)
+      index = index + 1
+    )
+    @
+  
+  :fun each_byte_with_index
+    index USize = 0
+    while (index < @_size) (
+      yield (@_ptr._get_at(index), index)
+      index = index + 1
+    )
+    @
+  
   :fun ref "<<" (other String'box)
     new_size = @_size + other._size
     @reserve(new_size)
