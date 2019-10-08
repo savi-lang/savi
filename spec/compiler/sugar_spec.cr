@@ -31,6 +31,60 @@ describe Mare::Compiler::Sugar do
     ]
   end
   
+  it "transforms property arithmetic-assignments into method calls" do
+    source = Mare::Source.new_example <<-SOURCE
+    :class Example
+      :fun prop_assign
+        x.y += z
+        x.y -= z
+    SOURCE
+    
+    ast = Mare::Parser.parse(source)
+    
+    ast.to_a.should eq [:doc,
+      [:declare, [[:ident, "class"], [:ident, "Example"]], [:group, ":"]],
+      [:declare, [[:ident, "fun"], [:ident, "prop_assign"]], [:group, ":",
+        [:relate,
+          [:relate, [:ident, "x"], [:op, "."], [:ident, "y"]],
+          [:op, "+="],
+          [:ident, "z"],
+        ],
+        [:relate,
+          [:relate, [:ident, "x"], [:op, "."], [:ident, "y"]],
+          [:op, "-="], [:ident, "z"],
+        ],
+      ]],
+    ]
+    
+    ctx = Mare::Compiler.compile([ast], :sugar)
+    
+    func = ctx.namespace.find_func!("Example", "prop_assign")
+    func.body.not_nil!.to_a.should eq [:group, ":",
+      [:relate,
+        [:ident, "x"],
+        [:op, "."],
+        [:qualify, [:ident, "y="], [:group, "(",
+          [:relate,
+            [:relate, [:ident, "x"], [:op, "."], [:ident, "y"]],
+            [:op, "."],
+            [:qualify, [:ident, "+"], [:group, "(", [:ident, "z"]]]
+          ],
+        ]],
+      ],
+      [:relate,
+        [:ident, "x"],
+        [:op, "."],
+        [:qualify, [:ident, "y="], [:group, "(",
+          [:relate,
+            [:relate, [:ident, "x"], [:op, "."], [:ident, "y"]],
+            [:op, "."],
+            [:qualify, [:ident, "-"], [:group, "(", [:ident, "z"]]]
+          ],
+        ]],
+      ],
+    ]
+  end
+  
   it "transforms an operator into a method call" do
     source = Mare::Source.new_example <<-SOURCE
     :class Example

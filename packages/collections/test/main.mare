@@ -66,7 +66,7 @@
     test["Map each_key, [baz]"].pass = try (map_each_copy["baz"]! | U64[0]) == 33
     
     map_each_total_value = U64[0]
-    map_each.each_value -> (value | map_each_total_value = map_each_total_value + value) // TODO: +=
+    map_each.each_value -> (value | map_each_total_value += value)
     test["Map each_value, total"].pass = map_each_total_value == 66
     
     test.print_line_break // TODO: move to MicroTest constructor and finalizer

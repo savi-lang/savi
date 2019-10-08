@@ -3,7 +3,7 @@
     total I64 = 0
     @input.each_split('\n') -> (line |
       try (
-        total = total + line.parse_i64! // TODO: use += operator
+        total += line.parse_i64!
       |
         env.err.print("warning: couldn't parse the following line:")
         env.err.print(line)

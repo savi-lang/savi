@@ -68,7 +68,7 @@
     index USize = 0
     while (index < @_size) (
       yield @_ptr._get_at(index)
-      index = index + 1 // TODO: index += 1
+      index += 1
     )
     @
   
@@ -76,14 +76,14 @@
     index USize = 0
     while (index < @_size) (
       yield (@_ptr._get_at(index), index)
-      index = index + 1 // TODO: index += 1
+      index += 1
     )
     @
   
   :fun reverse_each
     index USize = @_size
     while (index > 0) (
-      index = index - 1 // TODO: index -= 1
+      index -= 1
       yield @_ptr._get_at(index)
     )
     @
@@ -91,7 +91,7 @@
   :fun reverse_each_with_index
     index USize = @_size
     while (index > 0) (
-      index = index - 1 // TODO: index -= 1
+      index -= 1
       yield (@_ptr._get_at(index), index)
     )
     @
@@ -105,6 +105,6 @@
       if (yield element) (
         new_array << element
       )
-      index = index + 1 // TODO: index += 1
+      index += 1
     )
     new_array

@@ -103,7 +103,7 @@ module Mare::Parser
             str("=~")).named(:op)
     op10 = (str("&&") | str("||")).named(:op)
     opw = (char(' ') | char('\t'))
-    ope = char('=').named(:op)
+    ope = (str("+=") | str("-=") | char('=')).named(:op)
     
     # Construct the nested possible relations for each group of operators.
     t0 = suffixed | atom

@@ -60,7 +60,7 @@
   :fun ref push_byte (byte U8)
     @reserve(@_size + 1)
     @_ptr._assign_at(@_size, byte)
-    @_size = @_size + 1 // TODO: use += operator
+    @_size += 1
     @
   
   :fun each_byte

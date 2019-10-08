@@ -17,7 +17,7 @@
       freqs = Map(I64, None, HashEq(I64)).new // TODO: use Set instead of Map
       while True (
         changes.each -> (change |
-          current_freq = current_freq + change // TODO: use the += operator
+          current_freq += change
           if freqs.has_key(current_freq) (error!)
           freqs[current_freq] = None
         )

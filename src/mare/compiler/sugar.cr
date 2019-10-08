@@ -153,6 +153,27 @@ class Mare::Compiler::Sugar < Mare::AST::Visitor
         new_top ||= dot
       end
       new_top || node
+    when "+=", "-="
+      op =
+        case node.op.value
+        when "+=" then "+"
+        when "-=" then "-"
+        else raise NotImplementedError.new(node.op.value)
+        end
+      
+      visit(
+        AST::Relate.new(
+          node.lhs,
+          AST::Operator.new("=").from(node.op),
+          visit(
+            AST::Relate.new(
+              node.lhs.dup,
+              AST::Operator.new(op).from(node.op),
+              node.rhs,
+            ).from(node)
+          )
+        ).from(node)
+      )
     when "="
       # If assigning to a ".[identifier]" relation, sugar as a "setter" method.
       lhs = node.lhs

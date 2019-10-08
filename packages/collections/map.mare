@@ -76,7 +76,7 @@
       | entry <: KV(K, V) | entry.value = --value
       |
         @_array[index]! = KV(K, V).new(--key, --value)
-        @_size = @_size + 1 // TODO: @_size += 1
+        @_size += 1
         
         if (entry <: _MapEmpty) (
           if (@_size * 4 > @_array.size * 3) (
@@ -99,7 +99,7 @@
   :fun ref delete (key K)
     try (
       @_array[@_search(key)]! = _MapDeleted
-      @_size = @_size - 1 // TODO: @_size -= 1
+      @_size -= 1
     )
     None
   
