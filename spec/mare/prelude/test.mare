@@ -213,6 +213,12 @@
     test["integer 129.next_pow2 "].pass = U8[129].next_pow2     == 0
     
     ///
+    // Integer hashing
+    
+    test["U64 hash  "].pass = U64[24].hash   == 11168194413345819337 // TODO: fix this test for 32-bit platforms
+    test["U64 hash64"].pass = U64[24].hash64 == 11168194413345819337
+    
+    ///
     // Floating point bit representation and special values
     
     test["F32 bits"].pass = F32[9.3].bits == 0x4114_CCCD

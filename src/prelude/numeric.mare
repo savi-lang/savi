@@ -4,16 +4,16 @@
   :const is_floating_point Bool: False
   // TODO: arithmetic method traits with type parameters on Numeric[A] type
   
-  :fun val u8 U8: compiler intrinsic
-  :fun val u32 U32: compiler intrinsic
-  :fun val u64 U64: compiler intrinsic
-  :fun val usize USize: compiler intrinsic
-  :fun val i8 I8: compiler intrinsic
-  :fun val i32 I32: compiler intrinsic
-  :fun val i64 I64: compiler intrinsic
-  :fun val isize ISize: compiler intrinsic
-  :fun val f32 F32: compiler intrinsic
-  :fun val f64 F64: compiler intrinsic
+  :fun u8 U8: compiler intrinsic
+  :fun u32 U32: compiler intrinsic
+  :fun u64 U64: compiler intrinsic
+  :fun usize USize: compiler intrinsic
+  :fun i8 I8: compiler intrinsic
+  :fun i32 I32: compiler intrinsic
+  :fun i64 I64: compiler intrinsic
+  :fun isize ISize: compiler intrinsic
+  :fun f32 F32: compiler intrinsic
+  :fun f64 F64: compiler intrinsic
 
 :trait val NumericMethods // TODO: don't use :trait for this... `common`?
   :const bit_width U8
@@ -41,11 +41,16 @@
   :fun val abs: if (@is_signed && @ < @zero) (@zero - @ | @)
 
 :trait val IntegerMethods // TODO: don't use :trait for this... `common`?
-  :const bit_width U8 // TODO: dedup with NumericMethods
+  :const bit_width U8 // TODO: dedup with Numeric
+  :const is_signed Bool // TODO: dedup with Numeric
+  :fun u64 U64: compiler intrinsic // TODO: dedup with Numeric
+  :fun usize USize: compiler intrinsic // TODO: dedup with Numeric
   
   :fun val bit_and (other @) @: compiler intrinsic
   :fun val bit_or (other @) @: compiler intrinsic
   :fun val bit_xor (other @) @: compiler intrinsic
+  :fun val bit_shl (bits U8) @: compiler intrinsic
+  :fun val bit_shr (bits U8) @: compiler intrinsic
   :fun val invert @: compiler intrinsic
   :fun val reverse_bits @: compiler intrinsic
   :fun val swap_bytes @: compiler intrinsic
@@ -54,6 +59,31 @@
   :fun val count_ones U8: compiler intrinsic
   :fun val count_zeros U8: @invert.count_ones
   :fun val next_pow2 @: compiler intrinsic
+  
+  :fun hash USize
+    if (USize.bit_width == 32) (
+      x = @usize
+      x = x.invert + x.bit_shl(15)
+      x = x.bit_xor(x.bit_shr(12))
+      x = x + x.bit_shl(2)
+      x = x.bit_xor(x.bit_shr(4))
+      x = (x + x.bit_shl(3)) + x.bit_shl(11)
+      x = x.bit_xor(x.bit_shr(16))
+      x
+    |
+      @hash64.usize
+    )
+  
+  :fun hash64 U64
+    x = @u64
+    x = x.invert + x.bit_shl(21)
+    x = x.bit_xor(x.bit_shr(24))
+    x = (x + x.bit_shl(3)) + x.bit_shl(8)
+    x = x.bit_xor(x.bit_shr(14))
+    x = (x + x.bit_shl(2)) + x.bit_shl(4)
+    x = x.bit_xor(x.bit_shr(28))
+    x = x + x.bit_shl(31)
+    x
 
 :trait val Float32Methods
   :fun non from_bits (bits U32) @'val: compiler intrinsic

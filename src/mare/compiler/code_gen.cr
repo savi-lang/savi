@@ -1136,6 +1136,30 @@ class Mare::Compiler::CodeGen
       when "bit_xor"
         raise "bit_xor float" if gtype.type_def.is_floating_point_numeric?
         @builder.xor(params[0], params[1])
+      when "bit_shl"
+        raise "bit_shl float" if gtype.type_def.is_floating_point_numeric?
+        bits = @builder.zext(params[1], llvm_type_of(gtype))
+        clamp = llvm_type_of(gtype).const_int(bit_width_of(gtype) - 1)
+        bits = @builder.select(
+          @builder.icmp(LLVM::IntPredicate::ULE, bits, clamp),
+          bits,
+          clamp,
+        )
+        @builder.shl(params[0], bits)
+      when "bit_shr"
+        raise "bit_shr float" if gtype.type_def.is_floating_point_numeric?
+        bits = @builder.zext(params[1], llvm_type_of(gtype))
+        clamp = llvm_type_of(gtype).const_int(bit_width_of(gtype) - 1)
+        bits = @builder.select(
+          @builder.icmp(LLVM::IntPredicate::ULE, bits, clamp),
+          bits,
+          clamp,
+        )
+        if gtype.type_def.is_signed_numeric?
+          @builder.ashr(params[0], bits)
+        else
+          @builder.lshr(params[0], bits)
+        end
       when "invert"
         raise "invert float" if gtype.type_def.is_floating_point_numeric?
         @builder.not(params[0])
