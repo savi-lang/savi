@@ -110,14 +110,8 @@ describe Mare::Parser do
                [:relate,
                 [:relate,
                  [:relate,
-                  [:relate,
-                   [:relate,
-                    [:relate, [:ident, "x"], [:op, "<|>"], [:ident, "x"]],
-                    [:op, "<~>"],
-                    [:ident, "x"]],
-                   [:op, "<<<"],
-                   [:ident, "x"]],
-                  [:op, ">>>"],
+                  [:relate, [:ident, "x"], [:op, "<|>"], [:ident, "x"]],
+                  [:op, "<~>"],
                   [:ident, "x"]],
                  [:op, "<<~"],
                  [:ident, "x"]],
@@ -189,5 +183,38 @@ describe Mare::Parser do
     expect_raises Mare::Error, expected do
       Mare::Parser.parse(source)
     end
+  end
+
+  it "handles nifty heredoc string literals" do
+    source = Mare::Source.new_example <<-SOURCE
+    :actor Main
+      :new
+        <<<FOO>>>
+        <<<FOO<<<BAR>>>BAZ>>>
+        <<<
+          FOO
+          BAR
+          BAZ
+        >>>
+        <<<
+          FOO
+          <<<
+            BAR
+          >>>
+          BAZ
+        >>>
+    SOURCE
+    
+    ast = Mare::Parser.parse(source)
+    
+    ast.to_a.should eq [:doc,
+      [:declare, [[:ident, "actor"], [:ident, "Main"]], [:group, ":"]],
+      [:declare, [[:ident, "new"]], [:group, ":",
+        [:string, "FOO"],
+        [:string, "FOO<<<BAR>>>BAZ"],
+        [:string, "FOO\nBAR\nBAZ"],
+        [:string, "FOO\n<<<\n  BAR\n>>>\nBAZ"],
+      ]],
+    ]
   end
 end

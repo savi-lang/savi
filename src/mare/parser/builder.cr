@@ -80,6 +80,12 @@ module Mare::Parser::Builder
       end
       
       AST::LiteralCharacter.new(value.ord.to_i64).with_pos(state.pos(main))
+    when :heredoc
+      value = state.slice(main)
+      if (leading_space = value[/(?<=\A\n)[ \t]+/]?; leading_space)
+        value = value.gsub("\n#{leading_space}", "\n").strip
+      end
+      AST::LiteralString.new(value).with_pos(state.pos(main))
     when :integer
       string = state.slice(main)
       value =

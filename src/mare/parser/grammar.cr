@@ -61,12 +61,19 @@ module Mare::Parser
       (~char('\'') >> ~char('\\') >> range(' ', 0x10FFFF_u32))
     character = char('\'') >> character_char.repeat.named(:char) >> char('\'')
     
+    # Define what a heredoc string looks like.
+    heredoc_content = declare()
+    heredoc = str("<<<") >> heredoc_content.named(:heredoc) >> str(">>>")
+    heredoc_no_token = str("<<<") >> heredoc_content >> str(">>>")
+    heredoc_content.define \
+      (heredoc_no_token | (~str(">>>") >> any)).repeat
+    
     # Define an atom to be a single term with no binary operators.
     parens = declare()
     prefixed = declare()
     decl = declare()
-    atom = \
-      prefixed | parens | decl | string | character | float | integer | ident
+    anystring = string | character | heredoc
+    atom = prefixed | parens | decl | anystring | float | integer | ident
     
     # Define a prefixed term to be preceded by a prefix operator.
     prefixop = (char('~') | str("--")).named(:op)
@@ -94,9 +101,8 @@ module Mare::Parser
     op4 = (char('*') | char('/') | char('%')).named(:op)
     op5 = ((char('+') | char('-')) >> ~char('>')).named(:op)
     op6 = (str("..") | str("<>")).named(:op)
-    op7 = (str("<|>") | str("<~>") | str("<<<") | str(">>>") |
-            str("<<~") | str("~>>") | str("<<") | str(">>") |
-            str("<~") | str("~>")).named(:op)
+    op7 = (str("<|>") | str("<~>") | str("<<~") | str("~>>") |
+            str("<<") | str(">>") | str("<~") | str("~>")).named(:op)
     op8 = ((str("<:") | str(">=") | str("<=") | char('<') | char('>')) >>
             ~(char('>') | char('<'))).named(:op)
     op9 = (str("===") | str("==") | str("!==") | str("!=") |
