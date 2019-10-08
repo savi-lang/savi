@@ -1,4 +1,4 @@
-:import "../../../../../packages/collections" (Map, HashEq) // TODO: std library implicit path
+:import "collections" (Map, HashEq)
 
 :actor Main
   :new (env)

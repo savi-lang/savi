@@ -30,7 +30,10 @@ module Mare::Compiler::Import
         unless import_ident.is_a?(AST::LiteralString)
       
       source = import_ident.pos.source
-      path = File.expand_path(import_ident.value, source.library.path)
+      path = Compiler.resolve_library_dirname(
+        import_ident.value,
+        source.library.path
+      )
       
       library = libraries[path]?
       if library

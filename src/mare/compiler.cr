@@ -70,11 +70,27 @@ module Mare::Compiler
     ctx
   end
   
+  STANDARD_LIBRARY_DIRNAME = File.expand_path("../../packages", __DIR__)
+  def self.resolve_library_dirname(libname, from_dirname = nil)
+    standard_dirname = File.expand_path(libname, STANDARD_LIBRARY_DIRNAME)
+    relative_dirname = File.expand_path(libname, from_dirname) if from_dirname
+    
+    if relative_dirname && Dir.exists?(relative_dirname)
+      relative_dirname
+    elsif Dir.exists?(standard_dirname)
+      standard_dirname
+    else
+      raise "Couldn't find a library directory named #{libname.inspect}" \
+        "#{" (relative to #{from_dirname.inspect})" if from_dirname}"
+    end
+  end
+  
   def self.get_library_sources(dirname)
     library = Source::Library.new(dirname)
     filenames = Dir.entries(dirname).select(&.ends_with?(".mare")).to_a
     
-    raise "No '.mare' source files found in '#{dirname}'!" if filenames.empty?
+    raise "No '.mare' source files found in #{dirname.inspect}!" \
+      if filenames.empty?
     
     filenames.map do |name|
       Source.new(name, File.read(File.join(dirname, name)), library)
