@@ -156,9 +156,10 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
       root = ForBranch.new(self)
       
       @for_type.self_type.defn.params.try(&.accept(root))
-      func.params.try(&.accept(root))
-      func.params.try(&.terms.each { |param| root.create_param_local(param) }) \
-        unless func.has_tag?(:ffi)
+      func.params.try(&.terms.each { |param|
+        param.accept(root)
+        root.create_param_local(param) unless func.has_tag?(:ffi)
+      })
       func.ret.try(&.accept(root))
       func.body.try(&.accept(root))
       func.yield_out.try(&.accept(root))
@@ -235,13 +236,17 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
     end
     
     def touch(node : AST::Prefix)
-      raise NotImplementedError.new(node.op.value) unless node.op.value == "--"
-      
-      info = @refer[node.term]
-      Error.at node, "Only a local variable can be consumed" \
-        unless info.is_a?(Local | LocalUnion)
-      
-      @consumes[info] = node.pos
+      case node.op.value
+      when "SOURCECODEPOSOFARG" then nil # ignore this prefix type
+      when "--"
+        info = @refer[node.term]
+        Error.at node, "Only a local variable can be consumed" \
+          unless info.is_a?(Local | LocalUnion)
+        
+        @consumes[info] = node.pos
+      else
+        raise NotImplementedError.new(node.op.value)
+      end
     end
     
     # For a FieldRead or FieldWrite, take note of it by name.

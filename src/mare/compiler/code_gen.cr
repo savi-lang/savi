@@ -263,8 +263,9 @@ class Mare::Compiler::CodeGen
       [@ptr, @ptr, @isize, @i32, @i1], @void).as(LLVM::Function)
     
     @frames = [] of Frame
-    @string_globals = {} of String => LLVM::Value
     @cstring_globals = {} of String => LLVM::Value
+    @string_globals = {} of String => LLVM::Value
+    @source_code_pos_globals = {} of Source::Pos => LLVM::Value
     @gtypes = {} of String => GenType
     @try_else_stack = Array(Tuple(
       LLVM::BasicBlock, Array(LLVM::BasicBlock), Array(LLVM::Value)
@@ -597,9 +598,11 @@ class Mare::Compiler::CodeGen
   def gen_within_foreign_frame(gtype : GenType, gfunc : GenFunc)
     @frames << Frame.new(self, gfunc.llvm_func, gtype, gfunc)
     
-    yield
+    result = yield
     
     @frames.pop
+    
+    result
   end
   
   def gen_block(name)
@@ -1330,9 +1333,27 @@ class Mare::Compiler::CodeGen
         raise "missing arg #{args.size + 1} with no default param" \
           unless param_default
         
-        gen_within_foreign_frame lhs_gtype, gfunc do
-          args << gen_expr(param_default)
-          arg_exprs << param_default
+        # Somewhat hacky unwrapping to aid the SOURCECODEPOSOFARG check below.
+        param_default = param_default.terms.first \
+          if param_default.is_a?(AST::Group) && param_default.terms.size == 1
+        
+        arg_exprs << param_default
+        
+        if param_default.is_a?(AST::Prefix) \
+        && param_default.op.value == "SOURCECODEPOSOFARG"
+          # If this is supposed to be a literal representing the source code of
+          # an argument, we first must find the index of the argument specified.
+          foreign_refer = gen_within_foreign_frame(lhs_gtype, gfunc) { func_frame.refer }
+          find_ref = foreign_refer[param_default.term]
+          found_index = \
+            params.terms.index { |o| foreign_refer[AST::Extract.param(o)[0]] == find_ref }
+          
+          # Now, generate a value representing the source code pos of that arg.
+          args << gen_source_code_pos(arg_exprs[found_index.not_nil!].pos)
+        else
+          gen_within_foreign_frame lhs_gtype, gfunc do
+            args << gen_expr(param_default)
+          end
         end
       end
     end
@@ -1724,7 +1745,7 @@ class Mare::Compiler::CodeGen
     when AST::FieldWrite
       gen_field_eq(expr)
     when AST::LiteralString
-      gen_string(expr)
+      gen_string(expr.value)
     when AST::LiteralCharacter
       gen_integer(expr)
     when AST::LiteralInteger
@@ -2072,15 +2093,13 @@ class Mare::Compiler::CodeGen
     )
   end
   
-  def gen_string(expr : AST::LiteralString)
-    value = expr.value
-    
+  def gen_string(value : String)
     @string_globals.fetch value do
       string_gtype = @gtypes["String"]
       const = string_gtype.struct_type.const_struct [
         string_gtype.desc,
-        @i64.const_int(value.size),
-        @i64.const_int(value.size + 1),
+        @isize.const_int(value.size),
+        @isize.const_int(value.size + 1),
         gen_cstring(value),
       ]
       
@@ -2091,6 +2110,27 @@ class Mare::Compiler::CodeGen
       global.unnamed_addr = true
       
       @string_globals[value] = global
+    end
+  end
+  
+  def gen_source_code_pos(pos : Source::Pos)
+    @source_code_pos_globals.fetch pos do
+      pos_gtype = @gtypes["SourceCodePos"]
+      const = pos_gtype.struct_type.const_struct [
+        pos_gtype.desc,
+        gen_string(pos.content),
+        gen_string(pos.source.filename),
+        @isize.const_int(pos.row),
+        @isize.const_int(pos.col),
+      ]
+      
+      global = @mod.globals.add(const.type, "")
+      global.linkage = LLVM::Linkage::External # TODO: Private linkage?
+      global.initializer = const
+      global.global_constant = true
+      global.unnamed_addr = true
+      
+      @source_code_pos_globals[pos] = global
     end
   end
   

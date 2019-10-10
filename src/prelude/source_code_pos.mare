@@ -1,0 +1,6 @@
+:class val SourceCodePos
+  // TODO: include more properties from the original Mare::Source::Pos?
+  :prop string String: ""
+  :prop filename String: ""
+  :prop row USize: 0
+  :prop col USize: 0

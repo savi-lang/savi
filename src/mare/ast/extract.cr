@@ -50,7 +50,8 @@ module Mare::AST::Extract
     && node.style == " " \
     && node.terms.size == 2
       {node.terms[0].as(AST::Identifier), node.terms[1], nil}
-    elsif node.is_a?(AST::Relate) && node.op.value == "DEFAULTPARAM"
+    elsif node.is_a?(AST::Relate) \
+    && (node.op.value == "DEFAULTPARAM" || node.op.value == "=")
       recurse = param(node.lhs)
       {recurse[0], recurse[1], node.rhs}
     else

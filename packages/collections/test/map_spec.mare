@@ -5,13 +5,18 @@
 :class MapSpec
   // TODO: inherit from Spec
   :prop env Env
-  :prop no_failures Bool: True
+  :prop failures Array(SourceCodePos): []
   :new (@env)
 
+  :fun no_failures: @failures.size == 0 // TODO: remove
+
   // TODO: inherit from Spec
-  :fun ref "assert=" (success Bool) // TODO: also collect and store argument source position/string
+  :fun ref "assert=" (
+    success Bool
+    pos SourceCodePos = source_code_pos_of_arg success
+  )
     if success.not (
-      @no_failures = False
+      @failures << pos
     )
     success
   

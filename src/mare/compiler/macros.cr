@@ -93,6 +93,12 @@ class Mare::Compiler::Macros < Mare::AST::Visitor
         "the value to be yielded out to the calling function",
       ])
       visit_yield(node)
+    elsif Util.match_ident?(node, 0, "source_code_pos_of_arg")
+      Util.require_terms(node, [
+        nil,
+        "the parameter whose argument source code should be captured",
+      ])
+      visit_source_code_pos_of_arg(node)
     else
       node
     end
@@ -229,6 +235,34 @@ class Mare::Compiler::Macros < Mare::AST::Visitor
     
     group = AST::Group.new("(").from(node)
     group.terms << AST::Yield.new(terms).from(orig)
+    group
+  end
+  
+  def visit_source_code_pos_of_arg(node : AST::Group)
+    orig = node.terms[0]
+    term = node.terms[1]
+    
+    Error.at term,
+      "Expected this term to be an identifier" \
+        unless term.is_a?(AST::Identifier)
+    
+    Error.at term,
+      "Expected this term to be the identifier of a parameter",
+        [{@func.params.not_nil!.pos,
+          "it is supposed to refer to one of the parameters listed here"}] \
+            unless AST::Extract.params(@func.params).map(&.first)
+              .find { |param| param.value == term.value }
+    
+    Error.at node,
+      "Expected this macro to be used as the default argument of a parameter",
+        [{@func.params.not_nil!.pos,
+          "it is supposed to be assigned to a parameter here"}] \
+            unless AST::Extract.params(@func.params).map(&.last).includes?(node)
+    
+    op = AST::Operator.new("SOURCECODEPOSOFARG").from(orig)
+    
+    group = AST::Group.new("(").from(node)
+    group.terms << AST::Prefix.new(op, term).from(node)
     group
   end
 end

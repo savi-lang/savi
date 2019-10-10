@@ -76,9 +76,11 @@ struct Mare::Source::Pos
     io << "`#{source.filename}:#{start}-#{finish}`"
   end
   
+  def content
+    source.content[start...finish]
+  end
+  
   def show
-    content = source.content
-    
     twiddle_width = finish - start
     twiddle_width = 1 if twiddle_width == 0
     twiddle_width -= 1
@@ -92,7 +94,7 @@ struct Mare::Source::Pos
     
     [
       "from #{source.path}:#{row + 1}:",
-      content[line_start..line_finish],
+      source.content[line_start..line_finish],
       (" " * col) + "^" + ("~" * twiddle_width) + tail,
     ].join("\n")
   end

@@ -1318,9 +1318,16 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
     
     def touch(node : AST::Prefix)
-      raise NotImplementedError.new(node.op.value) unless node.op.value == "--"
-      
-      self[node] = Consume.new(node.pos, node.term)
+      case node.op.value
+      when "SOURCECODEPOSOFARG" then
+        defns = [prelude_type("SourceCodePos")]
+        mts = defns.map { |defn| MetaType.new(reified_type(defn)).as(MetaType) } # TODO: is it possible to remove this superfluous "as"?
+        self[node] = Literal.new(node.pos, mts)
+      when "--"
+        self[node] = Consume.new(node.pos, node.term)
+      else
+        raise NotImplementedError.new(node.op.value)
+      end
     end
     
     def touch(node : AST::Choice)

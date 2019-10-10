@@ -24,7 +24,7 @@
     
     map_spec = MapSpec.new(env)
     map_spec.run_all
-    test["MapSpec"].pass = map_spec.no_failures
+    map_spec.failures.each -> (pos | test[pos.string].pass = False)
     
     map = Map(String, U64, HashEq(String)).new // TODO: implicit default for HashFunction type argument
     test["Map size empty      "].pass = map.size == 0
