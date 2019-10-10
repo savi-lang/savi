@@ -1,8 +1,9 @@
 ##
-# The purpose of the Copy pass is to copy a set of functions from one type to
-# another, such that any functions missing in the destination type will be
+# The purpose of the Populate pass is to copy a set of functions from one type
+# to another, such that any functions missing in the destination type will be
 # copied from the source type. In the most common case, this is caused by
 # an "is" annotation on a type denoting an inheritance relationship.
+# The Populate pass also creates missing methods, like the default constructor.
 #
 # This pass mutates the Program topology.
 # This pass reads ASTs (Function heads only) but does not mutate any ASTs.
@@ -10,9 +11,10 @@
 # This pass keeps temporary state (on the stack) at the per-type level.
 # This pass produces no output state.
 #
-module Mare::Compiler::Copy
+module Mare::Compiler::Populate
   def self.run(ctx)
     ctx.program.types.each do |dest|
+      # Copy functions into the type from other sources.
       dest.functions.each do |f|
         # Only look at functions that have the "copies" tag.
         # Often these "functions" are actually "is" annotations.
@@ -29,6 +31,25 @@ module Mare::Compiler::Copy
         source = source.as(Program::Type)
         
         copy_from(source, dest)
+      end
+      
+      # If the type doesn't have a constructor and needs one, then add one.
+      if dest.has_tag?(:allocated) && !dest.has_tag?(:abstract) \
+      && !dest.functions.any? { |f| f.has_tag?(:constructor) }
+        func = Program::Function.new(
+          AST::Identifier.new("ref").from(dest.ident),
+          AST::Identifier.new("new").from(dest.ident),
+          nil,
+          nil,
+          AST::Group.new(":").tap { |body|
+            body.terms << AST::Identifier.new("@").from(dest.ident)
+          },
+        ).tap do |f|
+          f.add_tag(:constructor)
+          f.add_tag(:async) if dest.has_tag?(:actor)
+        end
+        
+        dest.functions << func
       end
     end
   end

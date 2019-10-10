@@ -1,4 +1,4 @@
-describe Mare::Compiler::Copy do
+describe Mare::Compiler::Populate do
   it "complains when a source type couldn't be resolved" do
     source = Mare::Source.new_example <<-SOURCE
     :actor Main
@@ -13,7 +13,7 @@ describe Mare::Compiler::Copy do
     MSG
     
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :copy)
+      Mare::Compiler.compile([source], :populate)
     end
   end
 end

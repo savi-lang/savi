@@ -131,17 +131,6 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
     def keywords; ["is", "prop", "fun", "be", "new", "const", "member"] end
     
     def finished(context)
-      if @type.has_tag?(:allocated) && !@type.has_tag?(:abstract)
-        # Instantiable types with no constructor get a default empty one.
-        if !@type.functions.any? { |f| f.has_tag?(:constructor) }
-          default = AST::Declare.new.from(@type.ident)
-          default.head << AST::Identifier.new("new").from(@type.ident)
-          default.body = AST::Group.new(":").from(@type.ident)
-          default.head << @type.cap.dup
-          compile(context, default)
-        end
-      end
-      
       # Numeric types need some basic metadata attached to know the native type.
       if @keyword == "numeric" || @keyword == "enum"
         # Add "is Numeric" to the type definition so to absorb the trait.

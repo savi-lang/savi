@@ -3,9 +3,9 @@ module Mare::Compiler
     case target
     when :import       then ctx.run(Import)
     when :namespace    then ctx.run(ctx.namespace)
-    when :copy         then ctx.run(Copy)
     when :macros       then ctx.run(Macros)
     when :sugar        then ctx.run(Sugar)
+    when :populate     then ctx.run(Populate)
     when :lambda       then ctx.run(Lambda)
     when :refer        then ctx.run(ctx.refer)
     when :classify     then ctx.run(Classify)
@@ -31,17 +31,17 @@ module Mare::Compiler
     case target
     when :import then [] of Symbol
     when :namespace then [:import]
-    when :copy then [:namespace]
     when :macros then [:namespace]
     when :sugar then [:macros]
+    when :populate then [:sugar, :macros]
     when :lambda then [:sugar, :macros]
     when :refer then [:lambda, :sugar, :macros, :namespace]
     when :classify then [:refer, :lambda, :sugar, :macros]
     when :jumps then [:classify]
     when :inventory then [:classify]
-    when :infer then [:inventory, :jumps, :classify, :refer, :lambda, :copy]
+    when :infer then [:inventory, :jumps, :classify, :refer, :lambda, :populate]
     when :privacy then [:infer]
-    when :completeness then [:jumps, :infer, :lambda, :sugar, :macros, :copy]
+    when :completeness then [:jumps, :infer, :lambda, :sugar, :macros, :populate]
     when :reach then [:infer]
     when :verify then [:reach]
     when :paint then [:reach]

@@ -1,7 +1,7 @@
 :trait Spec
   :prop env Env
   :prop failures Array(SourceCodePos): []
-  // TODO: :new (@env)
+  :new (@env)
   
   :fun no_failures: @failures.size == 0 // TODO: remove
   

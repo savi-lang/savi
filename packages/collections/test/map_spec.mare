@@ -5,8 +5,6 @@
 :class MapSpec
   :is Spec
   
-  :new (@env) // TODO: inherit from Spec
-  
   // TODO: automate this list so it need not be explicit
   :fun ref run_all
     @stores_and_removes_values_at_a_given_key
