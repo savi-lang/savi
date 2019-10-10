@@ -1325,12 +1325,14 @@ class Mare::Compiler::CodeGen
       while args.size < params.terms.size
         param = params.terms[args.size]
         
+        param_default = AST::Extract.param(param)[2]
+        
         raise "missing arg #{args.size + 1} with no default param" \
-          unless param.is_a?(AST::Relate) && param.op.value == "DEFAULTPARAM"
+          unless param_default
         
         gen_within_foreign_frame lhs_gtype, gfunc do
-          args << gen_expr(param.rhs)
-          arg_exprs << param.rhs
+          args << gen_expr(param_default)
+          arg_exprs << param_default
         end
       end
     end

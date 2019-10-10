@@ -39,4 +39,28 @@ module Mare::AST::Extract
       raise NotImplementedError.new(rhs.to_a)
     end
   end
+  
+  def self.param(node : AST::Term) : {
+    AST::Identifier, # identifier
+    AST::Term?,      # explicit type
+    AST::Term?}      # default parameter
+    if node.is_a?(AST::Identifier)
+      {node, nil, nil}
+    elsif node.is_a?(AST::Group) \
+    && node.style == " " \
+    && node.terms.size == 2
+      {node.terms[0].as(AST::Identifier), node.terms[1], nil}
+    elsif node.is_a?(AST::Relate) && node.op.value == "DEFAULTPARAM"
+      recurse = param(node.lhs)
+      {recurse[0], recurse[1], node.rhs}
+    else
+      raise NotImplementedError.new(node.to_a)
+    end
+  end
+  
+  def self.params(node : AST::Group?)
+    return [] of {AST::Identifier, AST::Term?, AST::Term?} unless node
+    
+    node.terms.map { |child| param(child) }
+  end
 end
