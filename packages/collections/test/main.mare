@@ -22,6 +22,10 @@
     ///
     // Map methods
     
+    map_spec = MapSpec.new(env)
+    map_spec.run_all
+    test["MapSpec"].pass = map_spec.no_failures
+    
     map = Map(String, U64, HashEq(String)).new // TODO: implicit default for HashFunction type argument
     test["Map size empty      "].pass = map.size == 0
     test["Map []! missing key "].pass = try (map["example"]!, False | True)

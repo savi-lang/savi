@@ -1,0 +1,89 @@
+// TODO: :import "spec"
+:import ".." (Map, HashEq)
+
+// TODO: :attach Spec to Map
+:class MapSpec
+  // TODO: inherit from Spec
+  :prop env Env
+  :prop no_failures Bool: True
+  :new (@env)
+
+  // TODO: inherit from Spec
+  :fun ref "assert=" (success Bool) // TODO: also collect and store argument source position/string
+    if success.not (
+      @no_failures = False
+    )
+    success
+  
+  // TODO: automate this list so it need not be explicit
+  :fun ref run_all
+    @stores_and_removes_values_at_a_given_key
+    @can_be_cleared_removing_all_keys_and_values
+    @yields_each_key_and_value
+    @yields_each_key_and_each_value_separately
+  
+  // TODO: :it "stores and removes values at a given key"
+  :fun ref stores_and_removes_values_at_a_given_key
+    map = Map(String, U64, HashEq(String)).new // TODO: implicit default for HashFunction type argument
+    @assert = map.size == 0
+    @assert = try (map["example"]!, False | True)
+    @assert = map.has_key("example").not
+    @assert = (map["example"] = 99) == 99
+    @assert = map.size == 1
+    @assert = try (map["example"]! | U64[0]) == 99
+    @assert = map.has_key("example")
+    @assert = (map["example"] = 88) == 88
+    @assert = map.size == 1
+    @assert = try (map["example"]! | U64[0]) == 88
+    @assert = map.has_key("example")
+    @assert = map.delete("example") <: None
+    @assert = try map["example"]! <: None
+    @assert = map.has_key("example").not
+    @assert = map.size == 0
+  
+  // TODO: :it "can be cleared, removing all keys and values"
+  :fun ref can_be_cleared_removing_all_keys_and_values
+    // TODO: Move creation of this map to a user-defined utility function
+    map = Map(String, U64, HashEq(String)).new // TODO: implicit default for HashFunction type argument
+    map["foo"] = 11
+    map["bar"] = 22
+    map["baz"] = 33
+    
+    @assert = map.size == 3, map.clear
+    @assert = map.size == 0
+  
+  // TODO: :it "yields each key and value"
+  :fun ref yields_each_key_and_value
+    // TODO: Move creation of this map to a user-defined utility function
+    map = Map(String, U64, HashEq(String)).new // TODO: implicit default for HashFunction type argument
+    map["foo"] = 11
+    map["bar"] = 22
+    map["baz"] = 33
+    
+    copy = Map(String, U64, HashEq(String)).new // TODO: implicit default for HashFunction type argument
+    map.each -> (key, value | copy[key] = value)
+    
+    @assert = copy.size == 3
+    @assert = try (copy["foo"]! | U64[0]) == 11
+    @assert = try (copy["bar"]! | U64[0]) == 22
+    @assert = try (copy["baz"]! | U64[0]) == 33
+  
+  // TODO: :it "yields each key and each value (separately)"
+  :fun ref yields_each_key_and_each_value_separately
+    // TODO: Move creation of this map to a user-defined utility function
+    map = Map(String, U64, HashEq(String)).new // TODO: implicit default for HashFunction type argument
+    map["foo"] = 11
+    map["bar"] = 22
+    map["baz"] = 33
+    
+    copy = Map(String, U64, HashEq(String)).new // TODO: implicit default for HashFunction type argument
+    map.each_key -> (key | try (copy[key] = map[key]!))
+    
+    @assert = copy.size == 3
+    @assert = try (copy["foo"]! | U64[0]) == 11
+    @assert = try (copy["bar"]! | U64[0]) == 22
+    @assert = try (copy["baz"]! | U64[0]) == 33
+    
+    total_value = U64[0]
+    map.each_value -> (value | total_value += value)
+    @assert = total_value == 66
