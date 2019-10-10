@@ -37,15 +37,16 @@ module Mare::Compiler::Copy
   # if the destination doesn't already have an implementation for it.
   def self.copy_from(source : Program::Type, dest : Program::Type)
     source.functions.each do |f|
-      # We ignore hygienic functions entirely.
-      next if f.has_tag?(:hygienic)
-      
-      # We don't copy functions that have no implementation.
-      next if f.body.nil? && !f.has_tag?(:compiler_intrinsic)
-      
-      # We won't copy a function if the dest already has one with the same name.
-      # TODO: raise an error if the existing function was copied from another.
-      next if dest.find_func?(f.ident.value)
+      if !f.has_tag?(:field) # always copy fields; skip these checks if a field
+        # We ignore hygienic functions entirely.
+        next if f.has_tag?(:hygienic)
+        
+        # We don't copy functions that have no implementation.
+        next if f.body.nil? && !f.has_tag?(:compiler_intrinsic)
+        
+        # We won't copy a function if the dest already has one of the same name.
+        next if dest.find_func?(f.ident.value)
+      end
       
       # Copy the function.
       dest.functions << f.dup

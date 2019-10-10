@@ -1,24 +1,11 @@
-// TODO: :import "spec"
+:import "spec"
 :import ".." (Map, HashEq)
 
 // TODO: :attach Spec to Map
 :class MapSpec
-  // TODO: inherit from Spec
-  :prop env Env
-  :prop failures Array(SourceCodePos): []
-  :new (@env)
-
-  :fun no_failures: @failures.size == 0 // TODO: remove
-
-  // TODO: inherit from Spec
-  :fun ref "assert=" (
-    success Bool
-    pos SourceCodePos = source_code_pos_of_arg success
-  )
-    if success.not (
-      @failures << pos
-    )
-    success
+  :is Spec
+  
+  :new (@env) // TODO: inherit from Spec
   
   // TODO: automate this list so it need not be explicit
   :fun ref run_all
