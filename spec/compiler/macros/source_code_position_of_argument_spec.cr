@@ -35,19 +35,19 @@ describe Mare::Compiler::Macros do
       
       expected = <<-MSG
       This macro has too many terms:
-      from (example):2:
-        :new (foo String, bar SourceCodePosition = source_code_position_of_argument foo bar)
-                                                   ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      from (example):4:
+          bar SourceCodePosition = source_code_position_of_argument foo bar
+                                   ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       
       - this term is the parameter whose argument source code should be captured:
-        from (example):2:
-        :new (foo String, bar SourceCodePosition = source_code_position_of_argument foo bar)
-                                                                                    ^~~
+        from (example):4:
+          bar SourceCodePosition = source_code_position_of_argument foo bar
+                                                                    ^~~
       
       - this is an excessive term:
-        from (example):2:
-        :new (foo String, bar SourceCodePosition = source_code_position_of_argument foo bar)
-                                                                                        ^~~
+        from (example):4:
+          bar SourceCodePosition = source_code_position_of_argument foo bar
+                                                                        ^~~
       MSG
       
       expect_raises Mare::Error, expected do
