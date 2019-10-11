@@ -1,3 +1,6 @@
 :class val ReflectionOfType (A)
   // TODO: include more properties
-  :prop features Array(String): []
+  :prop features Array(ReflectionFeatureOfType(A)): []
+
+:class val ReflectionFeatureOfType (A)
+  :prop name String: ""

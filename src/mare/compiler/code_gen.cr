@@ -368,9 +368,12 @@ class Mare::Compiler::CodeGen
     end
   end
   
+  def gtype_of(reach_ref : Reach::Ref)
+    @gtypes[ctx.reach[reach_ref.single!].llvm_name]
+  end
+  
   def gtype_of(expr : AST::Node, in_gfunc : GenFunc? = nil)
-    llvm_name = ctx.reach[type_of(expr, in_gfunc).single!].llvm_name
-    @gtypes[llvm_name]
+    gtype_of(type_of(expr, in_gfunc))
   end
   
   def gtypes_of(expr : AST::Node, in_gfunc : GenFunc? = nil)
@@ -1783,7 +1786,7 @@ class Mare::Compiler::CodeGen
     when AST::Prefix
       case expr.op.value
       when "REFLECTIONOFTYPE"
-        gen_reflection_of_type(expr.term)
+        gen_reflection_of_type(expr, expr.term)
       when "--"
         gen_expr(expr.term, const_only)
       else
@@ -2137,19 +2140,32 @@ class Mare::Compiler::CodeGen
     end
   end
   
-  def gen_reflection_of_type(expr)
-    gtype = gtype_of(expr)
+  def gen_reflection_of_type(expr, term_expr)
+    reflect_gtype = gtype_of(expr)
+    gtype = gtype_of(term_expr)
     
     @reflection_of_type_globals.fetch gtype do
+      features_gtype = gtype_of(
+        reflect_gtype.fields.find(&.first.==("features")).not_nil!.last
+      )
+      feature_gtype = gtype_of(
+        features_gtype.fields.find(&.first.==("_ptr")).not_nil!.last
+          .single_def!(ctx).cpointer_type_arg
+      )
+      
       features =
         gtype.gfuncs.values
           .reject(&.func.has_tag?(:hygienic))
-          .map { |gfunc| gen_string(gfunc.func.ident.value) }
+          .map do |gfunc|
+            gen_global_const feature_gtype, [
+              gen_string(gfunc.func.ident.value)
+            ]
+          end
       
       features_global = gen_global_for_const(
         features.first.type.const_array(features)
       )
-      features_array_global = gen_global_const @gtypes["Array[String]"], [
+      features_array_global = gen_global_const features_gtype, [
         @isize.const_int(features.size),
         @isize.const_int(features.size),
         @llvm.const_inbounds_gep(features_global, [@i32_0, @i32_0])
