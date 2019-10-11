@@ -12,7 +12,7 @@ describe Mare::Compiler::Macros do
       func = ctx.namespace.find_func!("Main", "new")
       func.body.not_nil!.to_a.should eq [:group, ":",
         [:group, "(",
-          [:prefix, [:op, "REFLECTIONOFTYPE"], [:ident, "@"]],
+          [:prefix, [:op, "reflection_of_type"], [:ident, "@"]],
         ],
       ]
     end

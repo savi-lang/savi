@@ -93,12 +93,12 @@ class Mare::Compiler::Macros < Mare::AST::Visitor
         "the value to be yielded out to the calling function",
       ])
       visit_yield(node)
-    elsif Util.match_ident?(node, 0, "source_code_pos_of_arg")
+    elsif Util.match_ident?(node, 0, "source_code_position_of_argument")
       Util.require_terms(node, [
         nil,
         "the parameter whose argument source code should be captured",
       ])
-      visit_source_code_pos_of_arg(node)
+      visit_source_code_position_of_argument(node)
     elsif Util.match_ident?(node, 0, "reflection_of_type")
       Util.require_terms(node, [
         nil,
@@ -244,7 +244,7 @@ class Mare::Compiler::Macros < Mare::AST::Visitor
     group
   end
   
-  def visit_source_code_pos_of_arg(node : AST::Group)
+  def visit_source_code_position_of_argument(node : AST::Group)
     orig = node.terms[0]
     term = node.terms[1]
     
@@ -265,7 +265,7 @@ class Mare::Compiler::Macros < Mare::AST::Visitor
           "it is supposed to be assigned to a parameter here"}] \
             unless AST::Extract.params(@func.params).map(&.last).includes?(node)
     
-    op = AST::Operator.new("SOURCECODEPOSOFARG").from(orig)
+    op = AST::Operator.new("source_code_position_of_argument").from(orig)
     
     group = AST::Group.new("(").from(node)
     group.terms << AST::Prefix.new(op, term).from(node)
@@ -276,7 +276,7 @@ class Mare::Compiler::Macros < Mare::AST::Visitor
     orig = node.terms[0]
     term = node.terms[1]
     
-    op = AST::Operator.new("REFLECTIONOFTYPE").from(orig)
+    op = AST::Operator.new("reflection_of_type").from(orig)
     
     group = AST::Group.new("(").from(node)
     group.terms << AST::Prefix.new(op, term).from(node)

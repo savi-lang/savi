@@ -237,7 +237,7 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
     
     def touch(node : AST::Prefix)
       case node.op.value
-      when "SOURCECODEPOSOFARG", "REFLECTIONOFTYPE"
+      when "source_code_position_of_argument", "reflection_of_type"
         nil # ignore this prefix type
       when "--"
         info = @refer[node.term]

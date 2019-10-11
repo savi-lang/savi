@@ -103,13 +103,13 @@
       try (Err.now!, 11 | 33)
     )
     
-    test["source_code_pos_of_arg string"].pass =
-      @source_code_pos_of_arg_string(zero == 0) == "zero == 0"
+    test["source_code_position_of_argument string"].pass =
+      @source_code_position_of_argument_string(zero == 0) == "zero == 0"
     
     test.print_line_break // TODO: move to MicroTest constructor and finalizer
   
-  :fun non source_code_pos_of_arg_string (
+  :fun non source_code_position_of_argument_string (
     arg Bool
-    pos SourceCodePos = source_code_pos_of_arg arg
+    pos SourceCodePosition = source_code_position_of_argument arg
   )
     pos.string

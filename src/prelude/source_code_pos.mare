@@ -1,4 +1,4 @@
-:class val SourceCodePos
+:class val SourceCodePosition
   // TODO: include more properties from the original Mare::Source::Pos?
   :prop string String: ""
   :prop filename String: ""

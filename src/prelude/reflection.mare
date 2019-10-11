@@ -5,3 +5,7 @@
 :class val ReflectionFeatureOfType (A)
   :prop name String: ""
   :prop tags Array(String): []
+  :prop mutator (ReflectionMutatorOfType(A) | None): None
+
+:trait non ReflectionMutatorOfType (A)
+  :fun non call (a A) None

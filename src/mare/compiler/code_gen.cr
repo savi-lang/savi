@@ -1337,14 +1337,14 @@ class Mare::Compiler::CodeGen
         raise "missing arg #{args.size + 1} with no default param" \
           unless param_default
         
-        # Somewhat hacky unwrapping to aid the SOURCECODEPOSOFARG check below.
+        # Somewhat hacky unwrapping to aid the source_code_position_of_argument check below.
         param_default = param_default.terms.first \
           if param_default.is_a?(AST::Group) && param_default.terms.size == 1
         
         arg_exprs << param_default
         
         if param_default.is_a?(AST::Prefix) \
-        && param_default.op.value == "SOURCECODEPOSOFARG"
+        && param_default.op.value == "source_code_position_of_argument"
           # If this is supposed to be a literal representing the source code of
           # an argument, we first must find the index of the argument specified.
           foreign_refer = gen_within_foreign_frame(lhs_gtype, gfunc) { func_frame.refer }
@@ -1785,7 +1785,7 @@ class Mare::Compiler::CodeGen
       gen_yield(expr)
     when AST::Prefix
       case expr.op.value
-      when "REFLECTIONOFTYPE"
+      when "reflection_of_type"
         gen_reflection_of_type(expr, expr.term)
       when "--"
         gen_expr(expr.term, const_only)
@@ -2152,7 +2152,7 @@ class Mare::Compiler::CodeGen
   
   def gen_source_code_pos(pos : Source::Pos)
     @source_code_pos_globals.fetch pos do
-      global = gen_global_const(@gtypes["SourceCodePos"], {
+      global = gen_global_const(@gtypes["SourceCodePosition"], {
         "string"   => gen_string(pos.content),
         "filename" => gen_string(pos.source.filename),
         "row"      => @isize.const_int(pos.row),
