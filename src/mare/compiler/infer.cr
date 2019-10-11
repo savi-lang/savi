@@ -1322,6 +1322,9 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       when "SOURCECODEPOSOFARG" then
         rt = reified_type(prelude_type("SourceCodePos"))
         self[node] = Fixed.new(node.pos, MetaType.new(rt))
+      when "REFLECTIONOFTYPE" then
+        rt = reified_type(prelude_type("ReflectionOfType"), [resolve(node.term)])
+        self[node] = Fixed.new(node.pos, MetaType.new(rt))
       when "--"
         self[node] = Consume.new(node.pos, node.term)
       else

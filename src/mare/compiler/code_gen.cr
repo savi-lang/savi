@@ -266,6 +266,7 @@ class Mare::Compiler::CodeGen
     @cstring_globals = {} of String => LLVM::Value
     @string_globals = {} of String => LLVM::Value
     @source_code_pos_globals = {} of Source::Pos => LLVM::Value
+    @reflection_of_type_globals = {} of GenType => LLVM::Value
     @gtypes = {} of String => GenType
     @try_else_stack = Array(Tuple(
       LLVM::BasicBlock, Array(LLVM::BasicBlock), Array(LLVM::Value)
@@ -1780,8 +1781,14 @@ class Mare::Compiler::CodeGen
       raise "#{expr.inspect} isn't a constant value" if const_only
       gen_yield(expr)
     when AST::Prefix
-      raise NotImplementedError.new(expr.inspect) unless expr.op.value == "--"
-      gen_expr(expr.term, const_only)
+      case expr.op.value
+      when "REFLECTIONOFTYPE"
+        gen_reflection_of_type(expr.term)
+      when "--"
+        gen_expr(expr.term, const_only)
+      else
+        raise NotImplementedError.new(expr.inspect)
+      end
     when AST::Qualify
       gtype_of(expr).singleton
     else
@@ -2077,15 +2084,27 @@ class Mare::Compiler::CodeGen
       value, @f64, to_type, to_min, to_max, false)
   end
   
+  def gen_global_for_const(const : LLVM::Value) : LLVM::Value
+    global = @mod.globals.add(const.type, "")
+    global.linkage = LLVM::Linkage::External # TODO: Private linkage?
+    global.initializer = const
+    global.global_constant = true
+    global.unnamed_addr = true
+    global
+  end
+  
+  def gen_const_for_gtype(gtype : GenType, fields : Array(LLVM::Value))
+    gtype.struct_type.const_struct([gtype.desc] + fields)
+  end
+  
+  def gen_global_const(gtype : GenType, fields : Array(LLVM::Value))
+    gen_global_for_const(gen_const_for_gtype(gtype, fields))
+  end
+  
   def gen_cstring(value : String) : LLVM::Value
     @llvm.const_inbounds_gep(
       @cstring_globals.fetch value do
-        const = @llvm.const_string(value)
-        global = @mod.globals.add(const.type, "")
-        global.linkage = LLVM::Linkage::External # TODO: Private linkage?
-        global.initializer = const
-        global.global_constant = true
-        global.unnamed_addr = true
+        global = gen_global_for_const(@llvm.const_string(value))
         
         @cstring_globals[value] = global
       end,
@@ -2095,19 +2114,11 @@ class Mare::Compiler::CodeGen
   
   def gen_string(value : String)
     @string_globals.fetch value do
-      string_gtype = @gtypes["String"]
-      const = string_gtype.struct_type.const_struct [
-        string_gtype.desc,
+      global = gen_global_const @gtypes["String"], [
         @isize.const_int(value.size),
         @isize.const_int(value.size + 1),
         gen_cstring(value),
       ]
-      
-      global = @mod.globals.add(const.type, "")
-      global.linkage = LLVM::Linkage::External # TODO: Private linkage?
-      global.initializer = const
-      global.global_constant = true
-      global.unnamed_addr = true
       
       @string_globals[value] = global
     end
@@ -2115,22 +2126,40 @@ class Mare::Compiler::CodeGen
   
   def gen_source_code_pos(pos : Source::Pos)
     @source_code_pos_globals.fetch pos do
-      pos_gtype = @gtypes["SourceCodePos"]
-      const = pos_gtype.struct_type.const_struct [
-        pos_gtype.desc,
+      global = gen_global_const @gtypes["SourceCodePos"], [
         gen_string(pos.content),
         gen_string(pos.source.filename),
         @isize.const_int(pos.row),
         @isize.const_int(pos.col),
       ]
       
-      global = @mod.globals.add(const.type, "")
-      global.linkage = LLVM::Linkage::External # TODO: Private linkage?
-      global.initializer = const
-      global.global_constant = true
-      global.unnamed_addr = true
-      
       @source_code_pos_globals[pos] = global
+    end
+  end
+  
+  def gen_reflection_of_type(expr)
+    gtype = gtype_of(expr)
+    
+    @reflection_of_type_globals.fetch gtype do
+      features =
+        gtype.gfuncs.values
+          .reject(&.func.has_tag?(:hygienic))
+          .map { |gfunc| gen_string(gfunc.func.ident.value) }
+      
+      features_global = gen_global_for_const(
+        features.first.type.const_array(features)
+      )
+      features_array_global = gen_global_const @gtypes["Array[String]"], [
+        @isize.const_int(features.size),
+        @isize.const_int(features.size),
+        @llvm.const_inbounds_gep(features_global, [@i32_0, @i32_0])
+      ]
+      
+      global = gen_global_const gtype, [
+        features_array_global
+      ]
+      
+      @reflection_of_type_globals[gtype] = global
     end
   end
   

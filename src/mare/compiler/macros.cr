@@ -99,6 +99,12 @@ class Mare::Compiler::Macros < Mare::AST::Visitor
         "the parameter whose argument source code should be captured",
       ])
       visit_source_code_pos_of_arg(node)
+    elsif Util.match_ident?(node, 0, "reflection_of_type")
+      Util.require_terms(node, [
+        nil,
+        "the reference whose compile-time type is to be reflected",
+      ])
+      visit_reflection_of_type(node)
     else
       node
     end
@@ -260,6 +266,17 @@ class Mare::Compiler::Macros < Mare::AST::Visitor
             unless AST::Extract.params(@func.params).map(&.last).includes?(node)
     
     op = AST::Operator.new("SOURCECODEPOSOFARG").from(orig)
+    
+    group = AST::Group.new("(").from(node)
+    group.terms << AST::Prefix.new(op, term).from(node)
+    group
+  end
+  
+  def visit_reflection_of_type(node : AST::Group)
+    orig = node.terms[0]
+    term = node.terms[1]
+    
+    op = AST::Operator.new("REFLECTIONOFTYPE").from(orig)
     
     group = AST::Group.new("(").from(node)
     group.terms << AST::Prefix.new(op, term).from(node)

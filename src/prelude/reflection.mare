@@ -1,0 +1,3 @@
+:class val ReflectionOfType (A)
+  // TODO: include more properties
+  :prop features Array(String): []

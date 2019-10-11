@@ -237,7 +237,8 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
     
     def touch(node : AST::Prefix)
       case node.op.value
-      when "SOURCECODEPOSOFARG" then nil # ignore this prefix type
+      when "SOURCECODEPOSOFARG", "REFLECTIONOFTYPE"
+        nil # ignore this prefix type
       when "--"
         info = @refer[node.term]
         Error.at node, "Only a local variable can be consumed" \
