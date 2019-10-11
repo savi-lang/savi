@@ -2096,12 +2096,16 @@ class Mare::Compiler::CodeGen
     global
   end
   
-  def gen_const_for_gtype(gtype : GenType, fields : Array(LLVM::Value))
-    gtype.struct_type.const_struct([gtype.desc] + fields)
+  def gen_const_for_gtype(gtype : GenType, values : Hash(String, LLVM::Value))
+    field_values = gtype.fields.map(&.first).map { |name| values[name] }
+    raise "wrong number of values in #{values.inspect}" \
+      if field_values.size != values.size
+    
+    gtype.struct_type.const_struct([gtype.desc] + field_values)
   end
   
-  def gen_global_const(gtype : GenType, fields : Array(LLVM::Value))
-    gen_global_for_const(gen_const_for_gtype(gtype, fields))
+  def gen_global_const(*args)
+    gen_global_for_const(gen_const_for_gtype(*args))
   end
   
   def gen_cstring(value : String) : LLVM::Value
@@ -2117,11 +2121,11 @@ class Mare::Compiler::CodeGen
   
   def gen_string(value : String)
     @string_globals.fetch value do
-      global = gen_global_const @gtypes["String"], [
-        @isize.const_int(value.size),
-        @isize.const_int(value.size + 1),
-        gen_cstring(value),
-      ]
+      global = gen_global_const(@gtypes["String"], {
+        "_size"  => @isize.const_int(value.size),
+        "_alloc" => @isize.const_int(value.size + 1),
+        "_ptr"   => gen_cstring(value),
+      })
       
       @string_globals[value] = global
     end
@@ -2129,12 +2133,12 @@ class Mare::Compiler::CodeGen
   
   def gen_source_code_pos(pos : Source::Pos)
     @source_code_pos_globals.fetch pos do
-      global = gen_global_const @gtypes["SourceCodePos"], [
-        gen_string(pos.content),
-        gen_string(pos.source.filename),
-        @isize.const_int(pos.row),
-        @isize.const_int(pos.col),
-      ]
+      global = gen_global_const(@gtypes["SourceCodePos"], {
+        "string"   => gen_string(pos.content),
+        "filename" => gen_string(pos.source.filename),
+        "row"      => @isize.const_int(pos.row),
+        "col"      => @isize.const_int(pos.col),
+      })
       
       @source_code_pos_globals[pos] = global
     end
@@ -2157,23 +2161,23 @@ class Mare::Compiler::CodeGen
         gtype.gfuncs.values
           .reject(&.func.has_tag?(:hygienic))
           .map do |gfunc|
-            gen_global_const feature_gtype, [
-              gen_string(gfunc.func.ident.value)
-            ]
+            gen_global_const(feature_gtype, {
+              "name" => gen_string(gfunc.func.ident.value),
+            })
           end
       
       features_global = gen_global_for_const(
         features.first.type.const_array(features)
       )
-      features_array_global = gen_global_const features_gtype, [
-        @isize.const_int(features.size),
-        @isize.const_int(features.size),
-        @llvm.const_inbounds_gep(features_global, [@i32_0, @i32_0])
-      ]
+      features_array_global = gen_global_const(features_gtype, {
+        "_size"  => @isize.const_int(features.size),
+        "_alloc" => @isize.const_int(features.size),
+        "_ptr"   => @llvm.const_inbounds_gep(features_global, [@i32_0, @i32_0])
+      })
       
-      global = gen_global_const gtype, [
-        features_array_global
-      ]
+      global = gen_global_const(reflect_gtype, {
+        "features" => features_array_global,
+      })
       
       @reflection_of_type_globals[gtype] = global
     end
