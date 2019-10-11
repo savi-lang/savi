@@ -1320,9 +1320,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     def touch(node : AST::Prefix)
       case node.op.value
       when "SOURCECODEPOSOFARG" then
-        defns = [prelude_type("SourceCodePos")]
-        mts = defns.map { |defn| MetaType.new(reified_type(defn)).as(MetaType) } # TODO: is it possible to remove this superfluous "as"?
-        self[node] = Literal.new(node.pos, mts)
+        rt = reified_type(prelude_type("SourceCodePos"))
+        self[node] = Fixed.new(node.pos, MetaType.new(rt))
       when "--"
         self[node] = Consume.new(node.pos, node.term)
       else
