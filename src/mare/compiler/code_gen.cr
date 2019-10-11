@@ -2131,15 +2131,23 @@ class Mare::Compiler::CodeGen
     end
   end
   
-  def gen_array(array_gtype : GenType, values) : LLVM::Value
-    values_type = values.first.type # assume all values have the same LLVM::Type
-    values_global = gen_global_for_const(values_type.const_array(values))
-    
-    gen_global_const(array_gtype, {
-      "_size"  => @isize.const_int(values.size),
-      "_alloc" => @isize.const_int(values.size),
-      "_ptr"   => @llvm.const_inbounds_gep(values_global, [@i32_0, @i32_0])
-    })
+  def gen_array(array_gtype, values : Array(LLVM::Value)) : LLVM::Value
+    if values.size > 0
+      values_type = values.first.type # assume all values have the same LLVM::Type
+      values_global = gen_global_for_const(values_type.const_array(values))
+      
+      gen_global_const(array_gtype, {
+        "_size"  => @isize.const_int(values.size),
+        "_alloc" => @isize.const_int(values.size),
+        "_ptr"   => @llvm.const_inbounds_gep(values_global, [@i32_0, @i32_0])
+      })
+    else
+      gen_global_const(array_gtype, {
+        "_size"  => @isize.const_int(0),
+        "_alloc" => @isize.const_int(0),
+        "_ptr"   => @ptr.null
+      })
+    end
   end
   
   def gen_source_code_pos(pos : Source::Pos)
@@ -2172,8 +2180,11 @@ class Mare::Compiler::CodeGen
         gtype.gfuncs.values
           .reject(&.func.has_tag?(:hygienic))
           .map do |gfunc|
+            tags = gfunc.func.tags.map { |tag| gen_string(tag.to_s) }
+            
             gen_global_const(feature_gtype, {
               "name" => gen_string(gfunc.func.ident.value),
+              "tags" => gen_array(@gtypes["Array[String]"], tags),
             })
           end
       

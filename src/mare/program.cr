@@ -90,6 +90,10 @@ class Mare::Program
       @tags.includes?(tag)
     end
     
+    def tags
+      @tags.to_a.sort
+    end
+    
     def is_concrete?
       !has_tag?(:abstract)
     end
@@ -191,6 +195,10 @@ class Mare::Program
     def has_tag?(tag : Symbol)
       raise NotImplementedError.new(tag) unless KNOWN_TAGS.includes?(tag)
       @tags.includes?(tag)
+    end
+    
+    def tags
+      @tags.to_a.sort
     end
     
     def param_count

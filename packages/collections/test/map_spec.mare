@@ -9,6 +9,10 @@
   :fun ref run_all
     (reflection_of_type @).features.each -> (feature |
       @env.out.print(feature.name)
+      feature.tags.each -> (tag |
+        @env.out.print(tag)
+      )
+      @env.out.print("")
     )
     @stores_and_removes_values_at_a_given_key
     @can_be_cleared_removing_all_keys_and_values

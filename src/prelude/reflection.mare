@@ -4,3 +4,4 @@
 
 :class val ReflectionFeatureOfType (A)
   :prop name String: ""
+  :prop tags Array(String): []
