@@ -1768,7 +1768,7 @@ class Mare::Compiler::CodeGen
       raise "#{expr.inspect} isn't a constant value" if const_only
       case expr.style
       when "(", ":" then gen_sequence(expr)
-      when "["      then gen_array(expr)
+      when "["      then gen_dynamic_array(expr)
       else raise NotImplementedError.new(expr.inspect)
       end
     when AST::Choice
@@ -2131,6 +2131,17 @@ class Mare::Compiler::CodeGen
     end
   end
   
+  def gen_array(array_gtype : GenType, values) : LLVM::Value
+    values_type = values.first.type # assume all values have the same LLVM::Type
+    values_global = gen_global_for_const(values_type.const_array(values))
+    
+    gen_global_const(array_gtype, {
+      "_size"  => @isize.const_int(values.size),
+      "_alloc" => @isize.const_int(values.size),
+      "_ptr"   => @llvm.const_inbounds_gep(values_global, [@i32_0, @i32_0])
+    })
+  end
+  
   def gen_source_code_pos(pos : Source::Pos)
     @source_code_pos_globals.fetch pos do
       global = gen_global_const(@gtypes["SourceCodePos"], {
@@ -2166,17 +2177,8 @@ class Mare::Compiler::CodeGen
             })
           end
       
-      features_global = gen_global_for_const(
-        features.first.type.const_array(features)
-      )
-      features_array_global = gen_global_const(features_gtype, {
-        "_size"  => @isize.const_int(features.size),
-        "_alloc" => @isize.const_int(features.size),
-        "_ptr"   => @llvm.const_inbounds_gep(features_global, [@i32_0, @i32_0])
-      })
-      
       global = gen_global_const(reflect_gtype, {
-        "features" => features_array_global,
+        "features" => gen_array(features_gtype, features),
       })
       
       @reflection_of_type_globals[gtype] = global
@@ -2199,7 +2201,7 @@ class Mare::Compiler::CodeGen
     # TODO: Pop the scope frame?
   end
   
-  def gen_array(expr : AST::Group)
+  def gen_dynamic_array(expr : AST::Group)
     gtype = gtype_of(expr)
     
     receiver = gen_alloc(gtype, "#{gtype.type_def.llvm_name}.new")
