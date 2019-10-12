@@ -2098,8 +2098,6 @@ class Mare::Compiler::CodeGen
   
   def gen_const_for_gtype(gtype : GenType, values : Hash(String, LLVM::Value))
     field_values = gtype.fields.map(&.first).map { |name| values[name] }
-    raise "wrong number of values in #{values.inspect}" \
-      if field_values.size != values.size
     
     gtype.struct_type.const_struct([gtype.desc] + field_values)
   end
