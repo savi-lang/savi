@@ -23,6 +23,10 @@
   :prop value A
   :new (@value)
 
+:class ContainerMaybe (A read)
+  :prop value (A | None)
+  :new (@value)
+
 :class Sentence
   :prop text String
   :new (@text = "[awkward silence]")
@@ -48,9 +52,16 @@
     )
     
     exit_code = 0
-    maybe_thirty_three (I32 | None) = I32[33]
-    if (maybe_thirty_three <: I32) (
-      exit_code = augend + maybe_thirty_three + 9
+    
+    maybe = ContainerMaybe(Bool).new(True)
+    value = maybe.value
+    if (value <: Bool) (
+      if value (
+        maybe_thirty_three (I32 | None) = I32[33]
+        if (maybe_thirty_three <: I32) (
+          exit_code = augend + maybe_thirty_three + 9
+        )
+      )
     )
     
     env.exit_code = exit_code

@@ -127,8 +127,14 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     end
     
     def union_children : Array(Ref)
-      # TODO: Return the list of refs in this, assuming it is a union.
-      raise NotImplementedError.new(self)
+      # Return the list of refs in this union, assuming it is a union.
+      # TODO: Make this logic more robust/comprehensive, and move to MetaType.
+      u = @meta_type.inner.as(Infer::MetaType::Union)
+      raise NotImplementedError.new(u) if u.caps || u.terms || u.anti_terms
+      
+      u.intersects.not_nil!.map do |intersect|
+        Ref.new(Infer::MetaType.new(intersect))
+      end
     end
     
     def trace_needed?(dst_type = self)
@@ -141,11 +147,11 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     def trace_kind
       if is_union?
         union_children.reduce(:none) do |kind, child|
-          case child.trace_kind
-          when :none then :none
+          case kind
+          when :none then child.trace_kind
           when :dynamic, :tuple then :dynamic
           when :machine_word
-            case kind
+            case child.trace_kind
             when :val_known, :val_unknown, :machine_word
               :val_unknown
             when :mut_known, :mut_unknown
@@ -156,10 +162,10 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
               :non_unknown
             when :dynamic, :tuple
               :dynamic
-            else raise NotImplementedError.new(kind)
+            else raise NotImplementedError.new(child.trace_kind)
             end
           when :mut_known, :mut_unknown
-            case kind
+            case child.trace_kind
             when :mut_known, :mut_unknown, :machine_word
               :mut_unknown
             when :val_known, :val_unknown,
@@ -167,10 +173,10 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
                  :non_known, :non_unknown,
                  :dynamic, :tuple
               :dynamic
-            else raise NotImplementedError.new(kind)
+            else raise NotImplementedError.new(child.trace_kind)
             end
           when :val_known, :val_unknown
-            case kind
+            case child.trace_kind
             when :val_known, :val_unknown, :machine_word
               :val_unknown
             when :mut_known, :mut_unknown,
@@ -178,10 +184,10 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
                  :non_known, :non_unknown,
                  :dynamic, :tuple
               :dynamic
-            else raise NotImplementedError.new(kind)
+            else raise NotImplementedError.new(child.trace_kind)
             end
           when :tag_known, :tag_unknown
-            case kind
+            case child.trace_kind
             when :tag_known, :tag_unknown, :machine_word
               :tag_unknown
             when :mut_known, :mut_unknown,
@@ -189,10 +195,10 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
                  :non_known, :non_unknown,
                  :dynamic, :tuple
               :dynamic
-            else raise NotImplementedError.new(kind)
+            else raise NotImplementedError.new(child.trace_kind)
             end
           when :non_known, :non_unknown
-            case kind
+            case child.trace_kind
             when :non_known, :non_unknown, :machine_word
               :non_unknown
             when :mut_known, :mut_unknown,
@@ -200,7 +206,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
                  :tag_known, :tag_unknown,
                  :dynamic, :tuple
               :dynamic
-            else raise NotImplementedError.new(kind)
+            else raise NotImplementedError.new(child.trace_kind)
             end
           else raise NotImplementedError.new(kind)
           end
