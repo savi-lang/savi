@@ -5,7 +5,7 @@ PHONY:
 ready: PHONY Dockerfile
 	docker build --target dev --tag mare-dev .
 	docker rm -f mare-dev || echo "the mare-dev container wasn't running"
-	docker run --name mare-dev -v $(shell pwd):/opt/code -d --rm mare-dev tail -f /dev/null
+	docker run --name mare-dev -v $(shell pwd):/opt/code -d --rm --memory 4g mare-dev tail -f /dev/null
 	@echo "the mare-dev container is ready!"
 
 # Run the test suite.
