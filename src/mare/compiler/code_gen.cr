@@ -258,8 +258,8 @@ class Mare::Compiler::CodeGen
     @f32      = @llvm.float.as(LLVM::Type)
     @f64      = @llvm.double.as(LLVM::Type)
     
-    bitwidth = @isize.int_width
-    @memcpy = mod.functions.add("llvm.memcpy.p0i8.p0i8.i#{bitwidth}",
+    @bitwidth = @isize.int_width.to_u.as(UInt32)
+    @memcpy = mod.functions.add("llvm.memcpy.p0i8.p0i8.i#{@bitwidth}",
       [@ptr, @ptr, @isize, @i32, @i1], @void).as(LLVM::Function)
     
     @frames = [] of Frame
@@ -808,6 +808,14 @@ class Mare::Compiler::CodeGen
       last_value = gen_expr(expr, gfunc.func.has_tag?(:constant))
     end
     last_value ||= gen_none
+    
+    # For field initializers, make sure the LLVM type of the return value
+    # matches the LLVM return type declared in the function head.
+    # TODO: Why only field initializers? Why not all functions?
+    if gfunc.func.has_tag?(:field)
+      return_type = gfunc.llvm_func.return_type
+      last_value = gen_assign_cast(last_value, return_type, last_expr)
+    end
     
     unless Jumps.away?(gfunc.func.body.not_nil!)
       case gfunc.calling_convention
@@ -1617,13 +1625,43 @@ class Mare::Compiler::CodeGen
       rhs_type = type_of(relate.rhs)
       
       # TODO: support abstract gtypes
-      raise NotImplementedError.new(rhs_type) unless rhs_type.is_concrete?
-      rhs_gtype = @gtypes[ctx.reach[rhs_type.single!].llvm_name]
-      
-      lhs_desc = gen_get_desc_opaque(lhs)
-      rhs_desc = gen_get_desc_opaque(rhs_gtype)
-      
-      @builder.icmp LLVM::IntPredicate::EQ, lhs_desc, rhs_desc, "#{lhs.name}<:"
+      if rhs_type.is_concrete?
+        rhs_gtype = @gtypes[ctx.reach[rhs_type.single!].llvm_name]
+        
+        lhs_desc = gen_get_desc_opaque(lhs)
+        rhs_desc = gen_get_desc_opaque(rhs_gtype)
+        
+        @builder.icmp LLVM::IntPredicate::EQ, lhs_desc, rhs_desc, "#{lhs.name}<:"
+      else
+        type_def = rhs_type.single_def!(ctx)
+        rhs_name = type_def.llvm_name
+        trait_id = @isize.const_int(type_def.desc_id)
+        
+        # Based on the trait id, determine the values to use for bitmap testing.
+        shift = @llvm.const_lshr(
+          trait_id,
+          @isize.const_int(Math.log2(@bitwidth).to_i),
+        )
+        mask = @llvm.const_shl(
+          @isize.const_int(1),
+          @llvm.const_and(trait_id, @isize.const_int(@bitwidth - 1)),
+        )
+        
+        # Load the trait bitmap of the concrete type descriptor of the lhs.
+        desc = gen_get_desc(lhs)
+        traits_gep = @builder.struct_gep(desc, DESC_TRAITS, "#{lhs.name}.DESC.TRAITS.GEP")
+        traits = @builder.load(traits_gep, "#{lhs.name}.DESC.TRAITS")
+        bits_gep = @builder.inbounds_gep(traits, @i32_0, shift, "#{lhs.name}.DESC.TRAITS.GEP.#{rhs_name}")
+        bits = @builder.load(bits_gep, "#{lhs.name}.DESC.TRAITS.#{rhs_name}")
+        
+        # If the bit for this trait is present, then it's a runtime type match.
+        @builder.icmp(
+          LLVM::IntPredicate::NE,
+          @builder.and(bits, mask, "#{lhs.name}<:#{rhs_name}.BITS"),
+          @isize.const_int(0),
+          "#{lhs.name}<:#{rhs_name}"
+        )
+      end
     end
   end
   
@@ -2179,10 +2217,12 @@ class Mare::Compiler::CodeGen
           .reject(&.func.has_tag?(:hygienic))
           .map do |gfunc|
             tags = gfunc.func.tags.map { |tag| gen_string(tag.to_s) }
+            mutator = gen_none
             
             gen_global_const(feature_gtype, {
               "name" => gen_string(gfunc.func.ident.value),
               "tags" => gen_array(@gtypes["Array[String]"], tags),
+              "mutator" => mutator,
             })
           end
       
@@ -2647,8 +2687,8 @@ class Mare::Compiler::CodeGen
       @dispatch_fn_ptr,               # 11: dispatch fn
       @final_fn_ptr,                  # 12: final fn
       @i32,                           # 13: event notify
-      @pptr,                          # 14: TODO: traits
-      @pptr,                          # 15: TODO: fields
+      @isize.array(0).pointer,        # 14: traits bitmap
+      @pptr,                          # 15: TODO: fields descriptors
       @ptr.array(0),                  # 16: vtable
     ]
   end
@@ -2658,23 +2698,23 @@ class Mare::Compiler::CodeGen
   # The actual type descriptor value for the type is an instance of this.
   def gen_desc_type(type_def : Reach::Def, vtable_size : Int32) : LLVM::Type
     @llvm.struct [
-      @i32,                           # 0: id
-      @i32,                           # 1: size
-      @i32,                           # 2: field_count
-      @i32,                           # 3: field_offset
-      @obj_ptr,                       # 4: instance
-      @trace_fn_ptr,                  # 5: trace fn
-      @trace_fn_ptr,                  # 6: serialise trace fn
-      @serialise_fn_ptr,              # 7: serialise fn
-      @deserialise_fn_ptr,            # 8: deserialise fn
-      @custom_serialise_space_fn_ptr, # 9: custom serialise space fn
-      @custom_deserialise_fn_ptr,     # 10: custom deserialise fn
-      @dispatch_fn_ptr,               # 11: dispatch fn
-      @final_fn_ptr,                  # 12: final fn
-      @i32,                           # 13: event notify
-      @pptr,                          # 14: TODO: traits
-      @pptr,                          # 15: TODO: fields
-      @ptr.array(vtable_size),        # 16: vtable
+      @i32,                                    # 0: id
+      @i32,                                    # 1: size
+      @i32,                                    # 2: field_count
+      @i32,                                    # 3: field_offset
+      @obj_ptr,                                # 4: instance
+      @trace_fn_ptr,                           # 5: trace fn
+      @trace_fn_ptr,                           # 6: serialise trace fn
+      @serialise_fn_ptr,                       # 7: serialise fn
+      @deserialise_fn_ptr,                     # 8: deserialise fn
+      @custom_serialise_space_fn_ptr,          # 9: custom serialise space fn
+      @custom_deserialise_fn_ptr,              # 10: custom deserialise fn
+      @dispatch_fn_ptr,                        # 11: dispatch fn
+      @final_fn_ptr,                           # 12: final fn
+      @i32,                                    # 13: event notify
+      @isize.array(trait_bitmap_size).pointer, # 14: traits bitmap
+      @pptr,                                   # 15: TODO: fields descriptors
+      @ptr.array(vtable_size),                 # 16: vtable
     ], "#{type_def.llvm_name}.DESC"
   end
   
@@ -2715,6 +2755,27 @@ class Mare::Compiler::CodeGen
         @trace_fn_ptr.null
       end
     
+    # Generate a bitmap of one or more integers in which each bit represents
+    # a trait in the program, with types that implement that trait having
+    # the corresponding bit set in their version of the bitmap.
+    # This is used for runtime type matching against abstract types (traits).
+    traits_bitmap = trait_bitmap_size.times.map { 0 }.to_a
+    infer = ctx.infer[gtype.type_def.reified]
+    ctx.reach.each_type_def.each do |other_def|
+      if infer.is_subtype?(gtype.type_def.reified, other_def.reified)
+        next if gtype.type_def == other_def
+        raise "can't be subtype of a concrete" unless other_def.is_abstract?
+        
+        index = other_def.desc_id >> Math.log2(@bitwidth).to_i
+        raise "bad index or trait_bitmap_size" unless index < trait_bitmap_size
+        
+        bit = other_def.desc_id & (@bitwidth - 1)
+        traits_bitmap[index] |= (1 << bit)
+      end
+    end
+    traits_bitmap_global = gen_global_for_const \
+      @isize.const_array(traits_bitmap.map { |bits| @isize.const_int(bits) })
+    
     desc.initializer = gtype.desc_type.const_struct [
       @i32.const_int(type_def.desc_id),      # 0: id
       @i32.const_int(abi_size),              # 1: size
@@ -2730,7 +2791,7 @@ class Mare::Compiler::CodeGen
       dispatch_fn.to_value,                  # 11: dispatch fn
       @final_fn_ptr.null,                    # 12: final fn
       @i32.const_int(-1),                    # 13: event notify TODO
-      @pptr.null,                            # 14: TODO: traits
+      traits_bitmap_global,                  # 14: traits bitmap
       @pptr.null,                            # 15: TODO: fields
       @ptr.const_array(vtable),              # 16: vtable
     ]
@@ -2887,6 +2948,17 @@ class Mare::Compiler::CodeGen
   
   def gen_field_store(name, value)
     @builder.store(value, gen_field_gep(name))
+  end
+  
+  # Calculate the number of @bitwidth-sized integers  (i.e. @isize)
+  # would be needed to hold a single bit for each trait in the trait_count.
+  # For example, if there are 64 traits, the trait_bitmap_size is 2,
+  # but if there is a 65th trait, the trait_bitmap_size increases to 3,
+  # because another integer will be added to hold that many bits.
+  def trait_bitmap_size
+    trait_count = @ctx.not_nil!.reach.trait_count
+    ((trait_count + (@bitwidth - 1)) & ~(@bitwidth - 1)) \
+      >> Math.log2(@bitwidth).to_i
   end
   
   def gen_trace_unknown(dst, ponyrt_trace_kind)

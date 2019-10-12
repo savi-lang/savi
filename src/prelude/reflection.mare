@@ -6,6 +6,15 @@
   :prop name String: ""
   :prop tags Array(String): []
   :prop mutator (ReflectionMutatorOfType(A) | None): None
+  
+  :fun maybe_call_mutator (a A) Bool
+    mutator = @mutator // TODO: somehow avoid typecheck-aiding temporary variable
+    if (mutator <: ReflectionMutatorOfType(A)) (
+      mutator.call(--a)
+      True
+    |
+      False
+    )
 
 :trait non ReflectionMutatorOfType (A)
   :fun non call (a A) None

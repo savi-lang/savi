@@ -12,6 +12,9 @@
       feature.tags.each -> (tag |
         @env.out.print(tag)
       )
+      if feature.maybe_call_mutator(@) (
+        @env.out.print("called it!")
+      )
       @env.out.print("")
     )
     @stores_and_removes_values_at_a_given_key

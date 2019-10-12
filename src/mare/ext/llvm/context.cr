@@ -15,6 +15,15 @@ class LLVM::Context
     Value.new LibLLVM.const_bit_cast(value, to_type)
   end
   
+  {% for name in %w(shl and lshr) %}
+    def const_{{name.id}}(lhs, rhs)
+      # check_value(lhs)
+      # check_value(rhs)
+
+      Value.new LibLLVM.const_{{name.id}}(lhs, rhs)
+    end
+  {% end %}
+  
   # (derived from existing parse_ir method)
   def parse_bitcode(buf : MemoryBuffer)
     ret = LibLLVM.parse_bitcode_in_context(self, buf, out mod, out msg)

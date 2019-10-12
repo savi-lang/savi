@@ -294,13 +294,15 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
   class Def
     getter! desc_id : Int32
     getter fields : Array({String, Ref})
+    getter reified
     
-    def initialize(@reified : Infer::ReifiedType, reach : Reach, @fields)
+    def initialize(ctx, @reified : Infer::ReifiedType, reach : Reach, @fields)
+      @desc_id = 0
       @desc_id =
         if is_numeric?
           reach.next_numeric_id
         elsif is_abstract?
-          reach.next_trait_id
+          reach.next_trait_id(ctx, self)
         elsif is_tuple?
           reach.next_tuple_id
         else
@@ -394,6 +396,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
   end
   
   getter seen_funcs
+  getter trait_count
   
   def initialize
     @refs = Hash(Infer::MetaType, Ref).new
@@ -484,17 +487,27 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     end.compact
     
     # Now, save a Def instance for this program type.
-    @defs[rt] = Def.new(rt, self, fields)
+    @defs[rt] = Def.new(ctx, rt, self, fields)
   end
   
   # Traits are numbered 0, 1, 2, 3, 4, ...
+  # These ids are used differently from the others, so overlap isn't a worry.
   @trait_count = 0
-  def next_trait_id
+  def next_trait_id(ctx, new_def : Def)
+    # Don't assign a new trait id if it is identical to another existing trait
+    infer = ctx.infer[new_def.reified]
+    identical_def = @defs.values.find do |other_def|
+      infer.is_subtype?(other_def.reified, new_def.reified) \
+      && infer.is_subtype?(new_def.reified, other_def.reified)
+    end
+    return identical_def.desc_id if identical_def
+    
     @trait_count
     .tap { @trait_count += 1 }
   end
   
-  # Objects are numbered 0, 3, 5, 7, 9, ...
+  # Objects are numbered 1, 3, 5, 7, 9, ...
+  # An object_id will never overlap with a numeric_id or tuple_id.
   @object_count = 0
   def next_object_id
     (@object_count * 2) + 1
@@ -502,6 +515,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
   end
   
   # Numerics are numbered 0, 4, 8, 12, 16, ...
+  # A numeric_id will never overlap with an object_id or tuple_id.
   @numeric_count = 0
   def next_numeric_id
     @numeric_count * 4
@@ -509,6 +523,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
   end
   
   # Tuples are numbered 2, 6, 10, 14, 18, ...
+  # A tuple_id will never overlap with an object_id or numeric_id.
   @tuple_count = 0
   def next_tuple_id
     (@tuple_count * 4) + 2

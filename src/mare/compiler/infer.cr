@@ -259,7 +259,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
     
     def is_complete?
-      args.size == params_count
+      args.size == params_count && args.all?(&.type_params.empty?)
     end
   end
   
