@@ -2,7 +2,20 @@ require "./spec_helper"
 
 describe Mare::Parser do
   it "parses an example" do
-    source = fixture "example.mare"
+    source = Mare::Source.new_example <<-SOURCE
+    :class Example
+      :prop name String: "World"
+      
+      :: Return a friendly greeting string for this instance.
+      :fun greeting String
+        "Hello, " + @name + "!"
+      
+      :fun degreesF (c F64) F64
+        c * 9 / 5 + 32.0
+      
+      :fun caller
+        @degreesF(10.add(2).sub(1))
+    SOURCE
     
     ast = Mare::Parser.parse(source)
     
@@ -63,7 +76,24 @@ describe Mare::Parser do
   end
   
   it "parses operators" do
-    source = fixture "operators.mare"
+    source = Mare::Source.new_example <<-SOURCE
+    :describe operators
+      :demo all // in order of precedence, from "weakest" to "strongest"
+        y = x
+        && x || x
+        === x == x !== x != x =~ x
+        >= x <= x < x > x
+        <|> x <~> x <<~ x ~>> x << x >> x <~ x ~> x
+        .. x <> x
+        + x - x
+        * x / x x.y
+      
+      :demo mixed
+        a != b && c > d / x + e / y || i..j > k << l
+      
+      :demo prefix
+        ~x
+    SOURCE
     
     ast = Mare::Parser.parse(source)
     
