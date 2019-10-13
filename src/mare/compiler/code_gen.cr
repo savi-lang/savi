@@ -67,8 +67,6 @@ class Mare::Compiler::CodeGen
       # Take down info on all functions.
       @vtable_size = 0
       @type_def.each_function(g.ctx).each do |rf|
-        next unless g.ctx.reach.reached_func?(rf) # TODO: switch to each_reachable_function?
-        
         infer = g.ctx.infer[rf]
         
         unless rf.func.has_tag?(:hygienic)

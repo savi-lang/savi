@@ -17,10 +17,6 @@
       )
       @env.out.print("")
     )
-    @stores_and_removes_values_at_a_given_key
-    @can_be_cleared_removing_all_keys_and_values
-    @yields_each_key_and_value
-    @yields_each_key_and_each_value_separately
     @
   
   // TODO: :it "stores and removes values at a given key"

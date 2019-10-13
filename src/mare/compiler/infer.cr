@@ -1323,7 +1323,17 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         rt = reified_type(prelude_type("SourceCodePosition"))
         self[node] = Fixed.new(node.pos, MetaType.new(rt))
       when "reflection_of_type" then
-        rt = reified_type(prelude_type("ReflectionOfType"), [resolve(node.term)])
+        reflect_mt = resolve(node.term)
+        reflect_rt = reflect_mt.single!
+        
+        # Reach all functions that might possibly be reflected.
+        reflect_rt.defn.functions.each do |f|
+          next if f.has_tag?(:hygienic) || f.body.nil?
+          ctx.infer.for_func(ctx, reflect_rt, f, MetaType.cap(f.cap.value)).tap(&.run)
+          extra_called_func!(reflect_rt, f)
+        end
+        
+        rt = reified_type(prelude_type("ReflectionOfType"), [reflect_mt])
         self[node] = Fixed.new(node.pos, MetaType.new(rt))
       when "--"
         self[node] = Consume.new(node.pos, node.term)
