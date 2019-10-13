@@ -591,8 +591,8 @@ class Mare::Compiler::CodeGen
     end
   end
   
-  def gen_func_end
-    @di.func_end if @di.in_func?
+  def gen_func_end(gfunc = nil)
+    @di.func_end if gfunc
     
     raise "invalid try else stack" unless @try_else_stack.empty?
     
@@ -832,7 +832,7 @@ class Mare::Compiler::CodeGen
       end
     end
     
-    gen_func_end
+    gen_func_end(gfunc)
   end
   
   def gen_ffi_decl(gfunc)
@@ -866,7 +866,7 @@ class Mare::Compiler::CodeGen
     
     @builder.ret(value)
     
-    gen_func_end
+    gen_func_end(gfunc)
   end
   
   def gen_intrinsic_cpointer(gtype, gfunc, llvm_func)
@@ -2211,13 +2211,32 @@ class Mare::Compiler::CodeGen
         features_gtype.fields.find(&.first.==("_ptr")).not_nil!.last
           .single_def!(ctx).cpointer_type_arg
       )
+      mutator_gtype = gtype_of(
+        feature_gtype.fields.find(&.first.==("mutator")).not_nil!.last
+          .union_children.find(&.show_type.!=("None")).not_nil!
+      )
       
       features =
         gtype.gfuncs.values
           .reject(&.func.has_tag?(:hygienic))
           .map do |gfunc|
             tags = gfunc.func.tags.map { |tag| gen_string(tag.to_s) }
-            mutator = gen_none
+            
+            # A mutator must meet the following qualifications:
+            # a ref function that takes no arguments and returns None.
+            # Any other function can't be safely called this way, so we
+            # leave its mutator field as None so that it can't be called.
+            # In the future, we may make it possible to call other functions
+            # that are not mutators, but that becomes a tough type system
+            # problem to solve, not the least of which is type variable varargs.
+            mutator =
+              if gfunc.func.cap.value == "ref" \
+              && (gfunc.func.params.try(&.terms.size) || 0) == 0 \
+              && gfunc.llvm_func.return_type == @gtypes["None"].struct_type.pointer
+                gen_reflection_mutator_of_type(mutator_gtype, gtype, gfunc)
+              else
+                gen_none
+              end
             
             gen_global_const(feature_gtype, {
               "name" => gen_string(gfunc.func.ident.value),
@@ -2232,6 +2251,72 @@ class Mare::Compiler::CodeGen
       
       @reflection_of_type_globals[gtype] = global
     end
+  end
+  
+  def gen_reflection_mutator_of_type(mutator_gtype, gtype, gfunc)
+    mutator_call_gfunc = mutator_gtype.gfuncs["call"]
+    
+    # This code is shamelessly copied from gen_desc, with a few modifications,
+    # because we already know that we are just targeting exactly one gtype
+    # (the mutator_gtype which this object is tailor-made to fit).
+    traits_bitmap = trait_bitmap_size.times.map { 0 }.to_a
+    mutator_gtype.type_def.tap do |other_def|
+      raise "can't be subtype of a concrete" unless other_def.is_abstract?
+      
+      index = other_def.desc_id >> Math.log2(@bitwidth).to_i
+      raise "bad index or trait_bitmap_size" unless index < trait_bitmap_size
+      
+      bit = other_def.desc_id & (@bitwidth - 1)
+      traits_bitmap[index] |= (1 << bit)
+    end
+    traits_bitmap_global = gen_global_for_const \
+      @isize.const_array(traits_bitmap.map { |bits| @isize.const_int(bits) })
+    
+    # Create an intermediary function that strips the mutator_gtype receiver
+    # from the arguments forwarded to the gfunc we actually want to call.
+    orig_block = @builder.insert_block
+    via_llvm_func =
+      @mod.functions.add(
+        "#{gfunc.llvm_name}.VIA.#{mutator_gtype.type_def.llvm_name}",
+        mutator_call_gfunc.virtual_llvm_func.function_type.params_types,
+        mutator_call_gfunc.virtual_llvm_func.function_type.return_type,
+      ) do |fn|
+        gen_func_start(fn)
+        @builder.ret @builder.call(gfunc.llvm_func, [fn.params[1]])
+        gen_func_end
+      end
+    
+    # Go back to the original block that we were at before making this function.
+    @builder.position_at_end(orig_block)
+    
+    # Create a vtable that places our via function in the proper index.
+    vtable = mutator_gtype.gen_vtable(self)
+    vtable[mutator_call_gfunc.vtable_index] =
+      @llvm.const_bit_cast(via_llvm_func.to_value, @ptr)
+    
+    # Generate a type descriptor, so this can masquerade as a real primitive.
+    desc = gen_global_for_const(mutator_gtype.desc_type.const_struct [
+      @i32.const_int(0xFFFF_FFFF),         # 0: id
+      @i32.const_int(abi_size_of(@ptr)),   # 1: size
+      @i32_0,                              # 2: field_count (tuples only)
+      @i32_0,                              # 3: field_offset
+      @obj_ptr.null,                       # 4: instance
+      @trace_fn_ptr.null,                  # 5: trace fn
+      @trace_fn_ptr.null,                  # 6: serialise trace fn
+      @serialise_fn_ptr.null,              # 7: serialise fn
+      @deserialise_fn_ptr.null,            # 8: deserialise fn
+      @custom_serialise_space_fn_ptr.null, # 9: custom serialise space fn
+      @custom_deserialise_fn_ptr.null,     # 10: custom deserialise fn
+      @dispatch_fn_ptr.null,               # 11: dispatch fn
+      @final_fn_ptr.null,                  # 12: final fn
+      @i32.const_int(-1),                  # 13: event notify
+      traits_bitmap_global,                # 14: traits bitmap
+      @pptr.null,                          # 15: field descriptors
+      @ptr.const_array(vtable),            # 16: vtable
+    ])
+    
+    # Finally, create the singleton "instance" for this fake primitve.
+    gen_global_for_const(@obj.const_struct([desc]))
   end
   
   def gen_sequence(expr : AST::Group)

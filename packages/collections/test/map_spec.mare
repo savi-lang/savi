@@ -21,9 +21,10 @@
     @can_be_cleared_removing_all_keys_and_values
     @yields_each_key_and_value
     @yields_each_key_and_each_value_separately
+    @
   
   // TODO: :it "stores and removes values at a given key"
-  :fun ref stores_and_removes_values_at_a_given_key
+  :fun ref stores_and_removes_values_at_a_given_key None
     map = Map(String, U64, HashEq(String)).new // TODO: implicit default for HashFunction type argument
     @assert = map.size == 0
     @assert = try (map["example"]!, False | True)
@@ -40,9 +41,10 @@
     @assert = try map["example"]! <: None
     @assert = map.has_key("example").not
     @assert = map.size == 0
+    None // TODO: shouldn't need this explicit None here
   
   // TODO: :it "can be cleared, removing all keys and values"
-  :fun ref can_be_cleared_removing_all_keys_and_values
+  :fun ref can_be_cleared_removing_all_keys_and_values None
     // TODO: Move creation of this map to a user-defined utility function
     map = Map(String, U64, HashEq(String)).new // TODO: implicit default for HashFunction type argument
     map["foo"] = 11
@@ -51,9 +53,10 @@
     
     @assert = map.size == 3, map.clear
     @assert = map.size == 0
+    None // TODO: shouldn't need this explicit None here
   
   // TODO: :it "yields each key and value"
-  :fun ref yields_each_key_and_value
+  :fun ref yields_each_key_and_value None
     // TODO: Move creation of this map to a user-defined utility function
     map = Map(String, U64, HashEq(String)).new // TODO: implicit default for HashFunction type argument
     map["foo"] = 11
@@ -67,9 +70,10 @@
     @assert = try (copy["foo"]! | U64[0]) == 11
     @assert = try (copy["bar"]! | U64[0]) == 22
     @assert = try (copy["baz"]! | U64[0]) == 33
+    None // TODO: shouldn't need this explicit None here
   
   // TODO: :it "yields each key and each value (separately)"
-  :fun ref yields_each_key_and_each_value_separately
+  :fun ref yields_each_key_and_each_value_separately None
     // TODO: Move creation of this map to a user-defined utility function
     map = Map(String, U64, HashEq(String)).new // TODO: implicit default for HashFunction type argument
     map["foo"] = 11
@@ -87,3 +91,4 @@
     total_value = U64[0]
     map.each_value -> (value | total_value += value)
     @assert = total_value == 66
+    None // TODO: shouldn't need this explicit None here
