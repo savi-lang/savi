@@ -8,19 +8,16 @@
   // TODO: automate this list so it need not be explicit
   :fun ref run_all
     (reflection_of_type @).features.each -> (feature |
-      @env.out.print(feature.name)
-      feature.tags.each -> (tag |
-        @env.out.print(tag)
+      is_a_test_case = False
+      feature.tags.each -> (tag | if (tag == "it") (is_a_test_case = True))
+      if is_a_test_case (
+        @env.out.print(feature.name)
+        feature.maybe_call_mutator(@)
       )
-      if feature.maybe_call_mutator(@) (
-        @env.out.print("called it!")
-      )
-      @env.out.print("")
     )
     @
   
-  // TODO: :it "stores and removes values at a given key"
-  :fun ref stores_and_removes_values_at_a_given_key None
+  :it "stores and removes values at a given key"
     map = Map(String, U64, HashEq(String)).new // TODO: implicit default for HashFunction type argument
     @assert = map.size == 0
     @assert = try (map["example"]!, False | True)
@@ -39,8 +36,7 @@
     @assert = map.size == 0
     None // TODO: shouldn't need this explicit None here
   
-  // TODO: :it "can be cleared, removing all keys and values"
-  :fun ref can_be_cleared_removing_all_keys_and_values None
+  :it "can be cleared, removing all keys and values"
     // TODO: Move creation of this map to a user-defined utility function
     map = Map(String, U64, HashEq(String)).new // TODO: implicit default for HashFunction type argument
     map["foo"] = 11
@@ -51,8 +47,7 @@
     @assert = map.size == 0
     None // TODO: shouldn't need this explicit None here
   
-  // TODO: :it "yields each key and value"
-  :fun ref yields_each_key_and_value None
+  :it "yields each key and value"
     // TODO: Move creation of this map to a user-defined utility function
     map = Map(String, U64, HashEq(String)).new // TODO: implicit default for HashFunction type argument
     map["foo"] = 11
@@ -68,8 +63,7 @@
     @assert = try (copy["baz"]! | U64[0]) == 33
     None // TODO: shouldn't need this explicit None here
   
-  // TODO: :it "yields each key and each value (separately)"
-  :fun ref yields_each_key_and_each_value_separately None
+  :it "yields each key and each value (separately)"
     // TODO: Move creation of this map to a user-defined utility function
     map = Map(String, U64, HashEq(String)).new // TODO: implicit default for HashFunction type argument
     map["foo"] = 11

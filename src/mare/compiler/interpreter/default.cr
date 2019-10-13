@@ -128,7 +128,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
     
     # TODO: dedup these with the Witness mechanism.
     # TODO: be more specific (for example, `member` is only allowed for `enum`)
-    def keywords; ["is", "prop", "fun", "be", "new", "const", "member"] end
+    def keywords; ["is", "prop", "fun", "be", "new", "const", "member", "it"] end
     
     def finished(context)
       # Numeric types need some basic metadata attached to know the native type.
@@ -186,6 +186,21 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         end
       end
     end
+    
+    # TODO: This witness should be declared by the spec package.
+    @@declare_it = Witness.new([
+      {
+        "kind" => "keyword",
+        "name" => "keyword",
+        "value" => "it",
+      },
+      {
+        "kind" => "term",
+        "name" => "name",
+        "type" => "string",
+        "convert_string_to_ident" => true,
+      },
+    ] of Hash(String, String | Bool))
     
     @@declare_fun = Witness.new([
       {
@@ -337,6 +352,16 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
       func = nil
       
       case decl.keyword
+      when "it"
+        data = @@declare_it.run(decl)
+        
+        func = Program::Function.new(
+          AST::Identifier.new("ref").from(data["keyword"]),
+          data["name"].as(AST::Identifier),
+          nil,
+          AST::Identifier.new("None").from(data["keyword"]),
+          decl.body,
+        ).tap(&.add_tag(:it))
       when "fun"
         data = @@declare_fun.run(decl)
         

@@ -158,6 +158,7 @@ class Mare::Program
       :field,
       :hygienic,
       :is,
+      :it,
     ]
     
     def initialize(@cap, @ident, @params, @ret, @body)
