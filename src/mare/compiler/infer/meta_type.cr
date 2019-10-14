@@ -70,8 +70,15 @@ struct Mare::Compiler::Infer::MetaType
     MetaType.new(
       case inner
       when Capability; inner
-      when Union; caps = inner.caps; caps && caps.size == 1 && caps.first
       when Intersection; inner.cap
+      when Union
+        caps = Set(Capability).new
+        inner.caps.try(&.each { |cap| caps << cap })
+        inner.intersects.try(&.each { |intersect|
+          cap = intersect.cap
+          caps << cap if cap
+        })
+        caps.size == 1 && caps.first
       end.as(Capability)
     )
   end
@@ -98,6 +105,23 @@ struct Mare::Compiler::Infer::MetaType
         Unsatisfiable.instance
       when Unconstrained
         cap
+      when Union
+        result = Unsatisfiable.instance
+        inner.caps.try(&.each {
+          result = result.unite(cap)
+        })
+        inner.terms.try(&.each { |term|
+          result = result.unite(term.intersect(cap))
+        })
+        inner.anti_terms.try(&.each { |anti_term|
+          result = result.unite(anti_term.intersect(cap))
+        })
+        inner.intersects.try(&.each { |intersect|
+          result = result.unite(
+            Intersection.new(cap, intersect.terms, intersect.anti_terms)
+          )
+        })
+        result
       else
         raise NotImplementedError.new(inner.inspect)
       end

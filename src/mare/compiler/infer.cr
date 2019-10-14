@@ -1285,8 +1285,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         
         # If the left-hand side is the name of any other fixed type...
         elsif lhs_info.is_a?(Fixed) \
-        && lhs_info.inner.cap_only.inner == MetaType::Capability::NON \
-        && (lhs_nominal = lhs_info.inner.strip_cap.inner).is_a?(MetaType::Nominal)
+        && lhs_info.inner.cap_only.inner == MetaType::Capability::NON
           # Strip the "non" from the fixed types, as if each were a type expr.
           lhs_mt = type_expr(node.lhs)
           rhs_mt = type_expr(node.rhs)
