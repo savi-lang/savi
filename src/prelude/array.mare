@@ -64,6 +64,20 @@
     )
     equal_so_far
   
+  :fun includes (expected A)
+    is_found = False
+    index USize = 0
+    while (is_found.not && index < @_size) (
+      actual = @_ptr._get_at(index)
+      if (A <: Equatable(A)'read) (
+        is_found = (actual == expected)
+      |
+        is_found = (actual is expected)
+      )
+      index += 1
+    )
+    is_found
+  
   :fun each
     index USize = 0
     while (index < @_size) (

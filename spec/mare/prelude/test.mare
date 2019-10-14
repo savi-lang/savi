@@ -333,6 +333,9 @@
     test["Array != order"].pass = ["foo", "bar", "baz"] != ["baz", "bar", "foo"]
     test["Array != different"].pass = ["foo", "bar"] != ["food", "bar"]
     
+    test["Array includes, True"].pass = ["foo", "bar", "baz"].includes("foo")
+    test["Array includes, False"].pass = ["foo", "bar", "baz"].includes("f").not
+    
     array_each Array(String) = []
     ["foo", "bar", "baz"].each -> (string | array_each << string)
     test["Array each"].pass = array_each == ["foo", "bar", "baz"]
