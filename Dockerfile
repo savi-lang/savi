@@ -97,6 +97,7 @@ COPY --from=dev /usr/lib/libponyrt.a \
                 /usr/lib/
 
 COPY src/prelude /opt/mare/src/prelude
+COPY packages    /opt/mare/packages
 COPY --from=build /tmp/bin/mare /bin/mare
 
 ENTRYPOINT ["/bin/mare"]
