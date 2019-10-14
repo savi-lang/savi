@@ -1246,6 +1246,10 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
           yield_params,
           yield_block,
         )
+      when "is"
+        # Just know that the result of this expression is a boolean.
+        bool = MetaType.new(reified_type(prelude_type("Bool")))
+        self[node] = Fixed.new(node.pos, bool)
       when "<:"
         rhs_info = self[node.rhs]
         Error.at node.rhs, "expected this to have a fixed type at compile time" \

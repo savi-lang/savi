@@ -105,6 +105,13 @@ class Mare::Compiler::Macros < Mare::AST::Visitor
         "the reference whose compile-time type is to be reflected",
       ])
       visit_reflection_of_type(node)
+    elsif Util.match_ident?(node, 1, "is")
+      Util.require_terms(node, [
+        "one of the two operands whose identity is to be compared",
+        nil,
+        "the other of the two operands whose identity is to be compared",
+      ])
+      visit_is(node)
     else
       node
     end
@@ -280,6 +287,18 @@ class Mare::Compiler::Macros < Mare::AST::Visitor
     
     group = AST::Group.new("(").from(node)
     group.terms << AST::Prefix.new(op, term).from(node)
+    group
+  end
+  
+  def visit_is(node : AST::Group)
+    lhs = node.terms[0]
+    orig = node.terms[1]
+    rhs = node.terms[2]
+    
+    op = AST::Operator.new("is").from(orig)
+    
+    group = AST::Group.new("(").from(node)
+    group.terms << AST::Relate.new(lhs, op,rhs).from(node)
     group
   end
 end

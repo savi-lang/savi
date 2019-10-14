@@ -1606,7 +1606,45 @@ class Mare::Compiler::CodeGen
     value
   end
   
-  def gen_check_subtype(relate)
+  def gen_check_identity_is(relate : AST::Relate)
+    lhs_type = type_of(relate.lhs)
+    rhs_type = type_of(relate.rhs)
+    lhs = gen_expr(relate.lhs)
+    rhs = gen_expr(relate.rhs)
+    
+    if lhs.type.kind == LLVM::Type::Kind::Integer \
+    && lhs.type.kind == LLVM::Type::Kind::Integer
+      if lhs.type == rhs.type
+        # Integers of the same type are compared by integer comparison.
+        @builder.icmp(
+          LLVM::IntPredicate::EQ,
+          lhs,
+          rhs,
+          "#{lhs.name}.is.#{rhs.name}",
+        )
+      else
+        # Integers of different types never have the same identity.
+        gen_bool(false)
+      end
+    elsif lhs_type == rhs_type \
+    && lhs.type.kind == LLVM::Type::Kind::Pointer \
+    && lhs.type.kind == LLVM::Type::Kind::Pointer \
+    && lhs.type == llvm_type_of(lhs_type) \
+    && rhs.type == llvm_type_of(rhs_type)
+      # Objects (not boxed machine words) of the same type are compared by
+      # integer comparison of the pointer to the object.
+      @builder.icmp(
+        LLVM::IntPredicate::EQ,
+        @builder.bit_cast(lhs, @obj_ptr, "#{lhs.name}.CAST"),
+        @builder.bit_cast(rhs, @obj_ptr, "#{rhs.name}.CAST"),
+        "#{lhs.name}.is.#{rhs.name}",
+      )
+    else
+      raise NotImplementedError.new("this comparison:\n#{relate.pos.show}")
+    end
+  end
+  
+  def gen_check_subtype(relate : AST::Relate)
     infer = func_frame.gfunc.not_nil!.infer
     
     if infer[relate.lhs].is_a?(Infer::Fixed)
@@ -1797,6 +1835,7 @@ class Mare::Compiler::CodeGen
       case expr.op.as(AST::Operator).value
       when "." then gen_dot(expr)
       when "=" then gen_eq(expr)
+      when "is" then gen_check_identity_is(expr)
       when "<:" then gen_check_subtype(expr)
       else raise NotImplementedError.new(expr.inspect)
       end

@@ -139,7 +139,7 @@ class Mare::Compiler::Sugar < Mare::AST::Visitor
   
   def visit(node : AST::Relate)
     case node.op.value
-    when "'", "+>", " ", "<:", "DEFAULTPARAM"
+    when "'", "+>", " ", "<:", "is", "DEFAULTPARAM"
       node # skip these special-case operators
     when "."
       visit_dot(node)

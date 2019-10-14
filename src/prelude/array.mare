@@ -58,7 +58,7 @@
       if (A <: Equatable(A)'read) (
         equal_so_far = (value_a == value_b)
       |
-        equal_so_far = False // TODO: compare by identity
+        equal_so_far = (value_a is value_b)
       )
       index = index + 1
     )
