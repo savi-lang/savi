@@ -479,6 +479,38 @@ class Mare::Compiler::Infer
     end
   end
   
+  class TrueCondition < Info # TODO: dedup with FalseCondition?
+    getter bool : MetaType # TODO: avoid needing the caller to supply this
+    
+    def initialize(@pos, @bool)
+      raise "#{@bool.show_type} is not Bool" unless @bool.show_type == "Bool"
+    end
+    
+    def resolve!(infer : ForFunc)
+      @bool
+    end
+    
+    def within_domain!(infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
+      meta_type_within_domain!(infer, @bool, use_pos, constraint_pos, constraint, aliases)
+    end
+  end
+  
+  class FalseCondition < Info # TODO: dedup with TrueCondition?
+    getter bool : MetaType # TODO: avoid needing the caller to supply this
+    
+    def initialize(@pos, @bool)
+      raise "#{@bool.show_type} is not Bool" unless @bool.show_type == "Bool"
+    end
+    
+    def resolve!(infer : ForFunc)
+      @bool
+    end
+    
+    def within_domain!(infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
+      meta_type_within_domain!(infer, @bool, use_pos, constraint_pos, constraint, aliases)
+    end
+  end
+  
   class Refinement < Info
     getter refine : AST::Node
     getter refine_type : MetaType

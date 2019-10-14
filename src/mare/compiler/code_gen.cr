@@ -2418,18 +2418,24 @@ class Mare::Compiler::CodeGen
       next_block = case_and_cond_blocks.shift
       @builder.cond(cond_value, case_block, next_block)
       
-      # Generate code for the case block that we execute, finishing by
-      # jumping to the post block using the `br` instruction, where we will
-      # carry the value we just generated as one of the possible phi values.
       @builder.position_at_end(case_block)
-      value = gen_expr(fore[1])
-      unless Jumps.away?(fore[1])
-        if Classify.value_needed?(expr)
-          value = gen_assign_cast(value, phi_type, fore[1])
-          phi_blocks << @builder.insert_block
-          phi_values << value
+      if func_frame.gfunc.not_nil!.infer[fore[1]].is_a?(Infer::Unreachable)
+        # We skip generating code for the case block if it is unreachable,
+        # meaning that the cond was deemed at compile time to never be true.
+        @builder.unreachable
+      else
+        # Generate code for the case block that we execute, finishing by
+        # jumping to the post block using the `br` instruction, where we will
+        # carry the value we just generated as one of the possible phi values.
+        value = gen_expr(fore[1])
+        unless Jumps.away?(fore[1])
+          if Classify.value_needed?(expr)
+            value = gen_assign_cast(value, phi_type, fore[1])
+            phi_blocks << @builder.insert_block
+            phi_values << value
+          end
+          @builder.br(post_block)
         end
-        @builder.br(post_block)
       end
       
       # Generate code for the next block, which is the condition to be
@@ -2446,17 +2452,23 @@ class Mare::Compiler::CodeGen
     case_block = case_and_cond_blocks.shift
     @builder.br(case_block)
     
-    # Generate code for the final case block using exactly the same strategy
-    # that we used when we generated case blocks inside the loop above.
     @builder.position_at_end(case_block)
-    value = gen_expr(expr.list.last[1])
-    unless Jumps.away?(expr.list.last[1])
-      if Classify.value_needed?(expr)
-        value = gen_assign_cast(value, phi_type, expr.list.last[1])
-        phi_blocks << @builder.insert_block
-        phi_values << value
+    if func_frame.gfunc.not_nil!.infer[expr.list.last[1]].is_a?(Infer::Unreachable)
+      # We skip generating code for the case block if it is unreachable,
+      # meaning that the cond was deemed at compile time to never be true.
+      @builder.unreachable
+    else
+      # Generate code for the final case block using exactly the same strategy
+      # that we used when we generated case blocks inside the loop above.
+      value = gen_expr(expr.list.last[1])
+      unless Jumps.away?(expr.list.last[1])
+        if Classify.value_needed?(expr)
+          value = gen_assign_cast(value, phi_type, expr.list.last[1])
+          phi_blocks << @builder.insert_block
+          phi_values << value
+        end
+        @builder.br(post_block)
       end
-      @builder.br(post_block)
     end
     
     # When we jump away, we can't generate the post block.

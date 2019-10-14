@@ -94,6 +94,10 @@ struct Mare::Compiler::Infer::MetaType
         inner.intersect(cap)
       when Intersection
         Intersection.new(cap, inner.terms, inner.anti_terms)
+      when Unsatisfiable
+        Unsatisfiable.instance
+      when Unconstrained
+        cap
       else
         raise NotImplementedError.new(inner.inspect)
       end

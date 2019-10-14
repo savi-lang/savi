@@ -489,9 +489,12 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       target = type_expr(node.term, refer, receiver)
       args = node.group.terms.map { |t| type_expr(t, refer, receiver).as(MetaType) } # TODO: is it possible to remove this superfluous "as"?
       rt = reified_type(target.single!, args)
-      ctx.infer.validate_type_args(ctx, self, node, rt)
-      
-      MetaType.new(rt)
+      begin
+        ctx.infer.validate_type_args(ctx, self, node, rt)
+        MetaType.new(rt)
+      rescue Mare::Error
+        MetaType.new(MetaType::Unsatisfiable.instance)
+      end
     end
     
     # All other AST nodes are unsupported as type expressions.
@@ -1284,12 +1287,19 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         elsif lhs_info.is_a?(Fixed) \
         && lhs_info.inner.cap_only.inner == MetaType::Capability::NON \
         && (lhs_nominal = lhs_info.inner.strip_cap.inner).is_a?(MetaType::Nominal)
-          # Strip the "non" from the fixed type, as if it were a type expr.
-          self[node.lhs] = Fixed.new(node.lhs.pos, type_expr(node.lhs))
+          # Strip the "non" from the fixed types, as if each were a type expr.
+          lhs_mt = type_expr(node.lhs)
+          rhs_mt = type_expr(node.rhs)
+          self[node.lhs] = Fixed.new(node.lhs.pos, lhs_mt)
+          self[node.rhs] = Fixed.new(node.rhs.pos, rhs_mt)
           
-          # Just know that the result of this expression is a boolean.
+          # We can know statically at compile time whether it's true or false.
           bool = MetaType.new(reified_type(prelude_type("Bool")))
-          self[node] = Fixed.new(node.pos, bool)
+          if lhs_mt.satisfies_bound?(self, rhs_mt)
+            self[node] = TrueCondition.new(node.pos, bool)
+          else
+            self[node] = FalseCondition.new(node.pos, bool)
+          end
         
         # For all other possible left-hand sides...
         else
@@ -1347,6 +1357,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
     
     def touch(node : AST::Choice)
+      skip_later_bodies = false
       body_nodes = [] of AST::Node
       node.list.each do |cond, body|
         # Visit the cond AST - we skipped it before with visit_children: false.
@@ -1378,6 +1389,12 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
           if !current_type_param.satisfies_bound?(self, cond_info.refine_type)
             skip_body = true
           end
+        elsif cond_info.is_a?(FalseCondition)
+          skip_body = true
+        elsif cond_info.is_a?(TrueCondition)
+          skip_later_bodies = true
+        elsif skip_later_bodies
+          skip_body = true
         end
         
         if skip_body

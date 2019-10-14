@@ -1,5 +1,7 @@
 :import "../micro_test" (MicroTest)
 
+:class OpaqueObject
+
 :actor Main
   :new (env)
     test = MicroTest.new(env)
@@ -335,6 +337,11 @@
     
     test["Array includes, True"].pass = ["foo", "bar", "baz"].includes("foo")
     test["Array includes, False"].pass = ["foo", "bar", "baz"].includes("f").not
+    
+    opaque_1 = OpaqueObject.new
+    opaque_2 = OpaqueObject.new
+    test["Array includes (Opaque), True"].pass = [opaque_1].includes(opaque_1)
+    test["Array includes (Opaque), False"].pass = [opaque_1].includes(opaque_2).not
     
     array_each Array(String) = []
     ["foo", "bar", "baz"].each -> (string | array_each << string)
