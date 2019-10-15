@@ -1,4 +1,42 @@
 describe Mare::Compiler::Sugar do
+  it "inserts a None return value where it was left out" do
+    source = Mare::Source.new_example <<-SOURCE
+    :actor Example
+      :fun return_none None
+        "this isn't the return value"
+      
+      :be behave
+        "this isn't the return value"
+    SOURCE
+    
+    ast = Mare::Parser.parse(source)
+    
+    ast.to_a.should eq [:doc,
+      [:declare, [[:ident, "actor"], [:ident, "Example"]], [:group, ":"]],
+      [:declare,
+        [[:ident, "fun"], [:ident, "return_none"], [:ident, "None"]],
+        [:group, ":", [:string, "this isn't the return value"]],
+      ],
+      [:declare, [[:ident, "be"], [:ident, "behave"]], [:group, ":",
+        [:string, "this isn't the return value"],
+      ]]
+    ]
+    
+    ctx = Mare::Compiler.compile([ast], :sugar)
+    
+    func = ctx.namespace.find_func!("Example", "return_none")
+    func.body.not_nil!.to_a.should eq [:group, ":",
+      [:string, "this isn't the return value"],
+      [:ident, "None"],
+    ]
+    
+    func = ctx.namespace.find_func!("Example", "behave")
+    func.body.not_nil!.to_a.should eq [:group, ":",
+      [:string, "this isn't the return value"],
+      [:ident, "None"],
+    ]
+  end
+  
   it "transforms a property assignment into a method call" do
     source = Mare::Source.new_example <<-SOURCE
     :class Example

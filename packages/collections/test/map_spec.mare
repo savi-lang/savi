@@ -22,7 +22,6 @@
     @assert = try map["example"]! <: None
     @assert = map.has_key("example").not
     @assert = map.size == 0
-    None // TODO: shouldn't need this explicit None here
   
   :it "can be cleared, removing all keys and values"
     // TODO: Move creation of this map to a user-defined utility function
@@ -33,7 +32,6 @@
     
     @assert = map.size == 3, map.clear
     @assert = map.size == 0
-    None // TODO: shouldn't need this explicit None here
   
   :it "yields each key and value"
     // TODO: Move creation of this map to a user-defined utility function
@@ -49,7 +47,6 @@
     @assert = try (copy["foo"]! | U64[0]) == 11
     @assert = try (copy["bar"]! | U64[0]) == 22
     @assert = try (copy["baz"]! | U64[0]) == 33
-    None // TODO: shouldn't need this explicit None here
   
   :it "yields each key and each value (separately)"
     // TODO: Move creation of this map to a user-defined utility function
@@ -69,4 +66,3 @@
     total_value = U64[0]
     map.each_value -> (value | total_value += value)
     @assert = total_value == 66
-    None // TODO: shouldn't need this explicit None here
