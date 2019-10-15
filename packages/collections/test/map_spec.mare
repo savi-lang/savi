@@ -5,16 +5,6 @@
 :class MapSpec
   :is Spec
   
-  // TODO: automate this list so it need not be explicit
-  :fun ref run_all
-    (reflection_of_type @).features.each -> (feature |
-      if feature.tags.includes("it") (
-        @env.out.print(feature.name)
-        feature.maybe_call_mutator(@)
-      )
-    )
-    @
-  
   :it "stores and removes values at a given key"
     map = Map(String, U64, HashEq(String)).new // TODO: implicit default for HashFunction type argument
     @assert = map.size == 0

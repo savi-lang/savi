@@ -1337,7 +1337,17 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         self[node] = Fixed.new(node.pos, MetaType.new(rt))
       when "reflection_of_type" then
         reflect_mt = resolve(node.term)
-        reflect_rt = reflect_mt.single!
+        reflect_rt =
+          if reflect_mt.type_params.empty?
+            reflect_mt.single!
+          else
+            # If trying to reflect a type with unreified type params in it,
+            # we just shrug and reflect the type None instead, since it doesn't
+            # seem like there is anything more meaningful we could do here.
+            # This happens when typechecking on not-yet-reified functions,
+            # so it isn't really avoidable. But it shouldn't reach CodeGen.
+            reified_type(prelude_type("None"))
+          end
         
         # Reach all functions that might possibly be reflected.
         reflect_rt.defn.functions.each do |f|
