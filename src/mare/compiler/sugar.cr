@@ -92,10 +92,6 @@ class Mare::Compiler::Sugar < Mare::AST::Visitor
     
     # If this is a behaviour or function that returns None,
     # sugar a final "None" reference at the end.
-    #
-    # This isn't required by the CodeGen pass, but it improves intermediate
-    # analysis such as the Classify.value_needed? flag, since the final
-    # expression in a constructor body isn't really used - "@" is returned.
     if (f.has_tag?(:async) && !f.has_tag?(:constructor)) \
     || ((ret = f.ret; ret.is_a?(AST::Identifier)) && ret.value == "None")
       f.body.try do |body|
