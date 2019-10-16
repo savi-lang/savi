@@ -15,13 +15,63 @@
     )
     letters.has_any -> (letter, count | count == target_count)
   
-  :fun a (env Env, input String)
+  :fun a (input String)
+    // Find the number of lines that have a byte repeated exactly twice,
+    // and the number of lines that have a byte repeated exactly thrice,
+    // and multiply these two counts together to get the checksum.
     count_duo = count_trio = I64[0]
     input.each_split('\n') -> (line |
       if @has_duo(line)  (count_duo  += 1)
       if @has_trio(line) (count_trio += 1)
     )
     count_duo * count_trio
+  
+  :fun b (input String)
+    found_l = ""
+    found_r = ""
+    diff USize = -1
+    // In a loop, compare each line in the list to each line in the list,
+    // exiting early from the loop when we find two that differ by exactly
+    // one byte being different in the same position of the two strings.
+    try (
+      input.each_split('\n') -> (line_l |
+        input.each_split('\n') -> (line_r |
+          diff = -1
+          // Scan through the bytes in the lines, breaking early if more than
+          // two different byte indexes between the two strings are found.
+          try (
+            line_l.each_byte_with_index -> (byte_l, index |
+              if (byte_l != line_r[index]!) (
+                if (diff != -1) (
+                  // We already found a difference, but this is another one,
+                  // so we know this isn't the pair we wanted. Error out.
+                  diff = -1
+                  error!
+                |
+                  // This is the first difference we've found! Take note.
+                  diff = index
+                )
+              )
+            )
+          )
+          // If diff is not -1 here, it means that we found a line pair with
+          // exactly one difference, which means we can exit early from the
+          // outer two loops with an "error" - we fulfilled the mission.
+          if (diff != -1) (
+            found_l = line_l
+            found_r = line_r
+            error! // TODO: use double-break? or early return?
+          )
+        )
+      )
+    )
+    // Now that we found our matching pair, create a new string that contains
+    // only the bytes that are the same between the two strings found.
+    result = String.new
+    found_l.each_byte_with_index -> (byte, index |
+      if (diff != index && diff != -1) result.push_byte(byte)
+    )
+    result
 
 :class Day2Spec
   :is Spec
@@ -45,10 +95,25 @@
       abcdee
       ababab
     >>>
-    @assert = Day2.a(@env, input) == 12
+    @assert = Day2.a(input) == 12
   
   :it "solves the A puzzle"
-    @assert = Day2.a(@env, @puzzle_input) == 8296
+    @assert = Day2.a(@puzzle_input) == 8296
+  
+  :it "passes the B test case"
+    input = <<<
+      abcde
+      fghij
+      klmno
+      pqrst
+      fguij
+      axcye
+      wvxyz
+    >>>
+    @assert = Day2.b(input) == "fgij"
+  
+  :it "solves the B puzzle"
+    @assert = Day2.b(@puzzle_input) == "pazvmqbftrbeosiecxlghkwud"
   
   :const puzzle_input
     <<<
