@@ -1,29 +1,6 @@
 :import "spec"
-:import ".."
-:import "../../../spec/mare/micro_test"
 
 :actor Main
   :new (env)
-    test = MicroTest.new(env)
-    test.print_line_break // TODO: move to MicroTest constructor and finalizer
-    
-    ///
-    // Count functions
-    // TODO: port to a construct like MapSpec
-    
-    count = USize[0]
-    count_sum = USize[0]
-    count_return = Count.to(5) -> (i |
-      count = count + 1
-      count_sum = count_sum + i
-    )
-    test["Count to 5 return"].pass = count_return == 5
-    test["Count to 5 count"].pass = count == 5
-    test["Count to 5 sum"].pass = count_sum == 10
-    
-    ///
-    // Map methods
-    
+    Specs(CountSpec).run(env)
     Specs(MapSpec).run(env)
-    
-    test.print_line_break // TODO: move to MicroTest constructor and finalizer

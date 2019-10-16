@@ -1,7 +1,6 @@
 :import "spec"
 :import ".." (Map, HashEq)
 
-// TODO: :attach Spec to Map
 :class MapSpec
   :is Spec
   
