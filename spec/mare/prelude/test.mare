@@ -279,6 +279,9 @@
     test["String == other not"].pass = ("string" == "other").not
     test["String hash"].pass = ("string".hash == 0x4CF51F4A5B5CF110)
     
+    test["String []! found"].pass = try ("example"[3]! == 'm' | False)
+    test["String []! missing"].pass = try ("example"[7]!, False | True)
+    
     test["String push_byte"].pass =
       String.new.push_byte('o').push_byte('k') == "ok"
     

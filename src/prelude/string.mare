@@ -57,6 +57,10 @@
       @_ptr = @_ptr._realloc(@_alloc)
     )
   
+  :fun "[]!" (index USize)
+    if (@size <= index) error!
+    @_ptr._get_at(index)
+  
   :fun ref push_byte (byte U8)
     @reserve(@_size + 1)
     @_ptr._assign_at(@_size, byte)
