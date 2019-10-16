@@ -130,6 +130,22 @@
     )
     @
   
+  :: Return True after finding a key/value pair for which the yield block
+  :: returns True, defaulting to False if no such key/value pair is found.
+  
+  :fun has_any
+    :yields for Bool
+    found = False
+    try (
+      @_array.each -> (entry |
+        if (entry <: KV(K, V)) (
+          found = yield (entry.key, entry.value)
+          if found error! // TODO: use break instead
+        )
+      )
+    )
+    found
+  
   :fun _search (key)
     hash = H.hash(key).usize()
     
