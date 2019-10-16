@@ -118,19 +118,17 @@ class Mare::Compiler::Sugar < Mare::AST::Visitor
   
   def visit(node : AST::Qualify)
     # Transform square-brace qualifications into method calls
-    if node.group.style == "["
+    square_bracket =
+      case node.group.style
+      when "[" then "[]"
+      when "[!" then "[]!"
+      end
+    if square_bracket
       lhs = node.term
-      node.term = AST::Identifier.new("[]").from(node.group)
+      node.term = AST::Identifier.new(square_bracket).from(node.group)
       args = node.group.tap { |n| n.style = "(" }
       dot = AST::Operator.new(".").from(node.group)
-      rhs = node
-      return AST::Relate.new(lhs, dot, rhs).from(node)
-    elsif node.group.style == "[!"
-      lhs = node.term
-      node.term = AST::Identifier.new("[]!").from(node.group)
-      args = node.group.tap { |n| n.style = "(" }
-      dot = AST::Operator.new(".").from(node.group)
-      rhs = node
+      rhs = visit(node)
       return AST::Relate.new(lhs, dot, rhs).from(node)
     end
     
@@ -252,7 +250,19 @@ class Mare::Compiler::Sugar < Mare::AST::Visitor
   # Handle pseudo-method sugar like `as!` calls.
   # TODO: Can this be done as a "universal method" rather than sugar?
   def visit_dot(node : AST::Relate)
+    # If the right side of a dot relation is a dot relation between two
+    # qualifications, rebalance the node tree to the proper shape.
+    # This happens in certain chained call/qualification patterns.
     rhs = node.rhs
+    if rhs.is_a?(AST::Relate) && rhs.op.value == "." \
+    && rhs.lhs.is_a?(AST::Qualify) && rhs.rhs.is_a?(AST::Qualify)
+      rhs_lhs = rhs.lhs
+      rhs.lhs = node
+      node.rhs = rhs_lhs
+      node = rhs
+      rhs = rhs_lhs
+    end
+    
     call_ident, call_args, yield_params, yield_block = AST::Extract.call(node)
     
     return node unless call_ident

@@ -229,9 +229,13 @@ module Mare::Parser::Builder
     
     term = build_term(iter.next_as_child_of(main), iter, state)
     
-    group = build_term(iter.next_as_child_of(main), iter, state)
-    group = group.as(AST::Group)
+    iter.while_next_is_child_of(main) do |child|
+      group = build_group(child, iter, state)
+      group = group.as(AST::Group)
+      
+      term = AST::Qualify.new(term, group).with_pos(state.pos(main))
+    end
     
-    AST::Qualify.new(term, group).with_pos(state.pos(main))
+    term
   end
 end

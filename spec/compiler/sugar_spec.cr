@@ -219,6 +219,96 @@ describe Mare::Compiler::Sugar do
     ]
   end
   
+  it "transforms a chained qualifications into chained method calls" do
+    source = Mare::Source.new_example <<-SOURCE
+    :class Example
+      :fun chained
+        x.call(y).call(z)
+        x[y][z]
+        x.call(y)[y].call(z)[z]
+    SOURCE
+    
+    ast = Mare::Parser.parse(source)
+    
+    ast.to_a.should eq [:doc,
+      [:declare, [[:ident, "class"], [:ident, "Example"]], [:group, ":"]],
+      [:declare, [[:ident, "fun"], [:ident, "chained"]], [:group, ":",
+        [:relate,
+          [:relate,
+            [:ident, "x"],
+            [:op, "."],
+            [:qualify, [:ident, "call"], [:group, "(", [:ident, "y"]]],
+          ],
+          [:op, "."],
+          [:qualify, [:ident, "call"], [:group, "(", [:ident, "z"]]],
+        ],
+        [:qualify,
+          [:qualify,
+            [:ident, "x"],
+            [:group, "[", [:ident, "y"]],
+          ],
+          [:group, "[", [:ident, "z"]],
+        ],
+        [:relate,
+          [:relate,
+            [:ident, "x"],
+            [:op, "."],
+            [:qualify,
+              [:qualify, [:ident, "call"], [:group, "(", [:ident, "y"]]],
+              [:group, "[", [:ident, "y"]],
+            ]
+          ],
+          [:op, "."],
+          [:qualify,
+            [:qualify, [:ident, "call"], [:group, "(", [:ident, "z"]]],
+            [:group, "[", [:ident, "z"]],
+          ],
+        ],
+      ]],
+    ]
+    
+    ctx = Mare::Compiler.compile([ast], :sugar)
+    
+    func = ctx.namespace.find_func!("Example", "chained")
+    func.body.not_nil!.to_a.should eq [:group, ":",
+      [:relate,
+        [:relate,
+          [:ident, "x"],
+          [:op, "."],
+          [:qualify, [:ident, "call"], [:group, "(", [:ident, "y"]]],
+        ],
+        [:op, "."],
+        [:qualify, [:ident, "call"], [:group, "(", [:ident, "z"]]],
+      ],
+      [:relate,
+        [:relate,
+          [:ident, "x"],
+          [:op, "."],
+          [:qualify, [:ident, "[]"], [:group, "(", [:ident, "y"]]],
+        ],
+        [:op, "."],
+        [:qualify, [:ident, "[]"], [:group, "(", [:ident, "z"]]],
+      ],
+      [:relate,
+        [:relate,
+          [:relate,
+            [:relate,
+              [:ident, "x"],
+              [:op, "."],
+              [:qualify, [:ident, "call"], [:group, "(", [:ident, "y"]]],
+            ],
+            [:op, "."],
+            [:qualify, [:ident, "[]"], [:group, "(", [:ident, "y"]]],
+          ],
+          [:op, "."],
+          [:qualify, [:ident, "call"], [:group, "(", [:ident, "z"]]],
+        ],
+        [:op, "."],
+        [:qualify, [:ident, "[]"], [:group, "(", [:ident, "z"]]],
+      ],
+    ]
+  end
+  
   it "transforms a square brace qualified assignment into a method call" do
     source = Mare::Source.new_example <<-SOURCE
     :class Example

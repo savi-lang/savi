@@ -80,7 +80,7 @@ module Mare::Parser
     prefixed.define (prefixop >> atom).named(:prefix)
     
     # Define a qualified term to be immediately followed by a parens group.
-    qualified = (atom >> parens).named(:qualify)
+    qualified = (atom >> parens.repeat(1)).named(:qualify)
     suffixed = qualified
     
     # Define what a capability looks like.
