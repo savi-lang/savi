@@ -1,7 +1,10 @@
-:actor Main
-  :new (env)
+:import "spec"
+:import "collections"
+
+:primitive Day1
+  :fun a (env Env, input String)
     total I64 = 0
-    @input.each_split('\n') -> (line |
+    input.each_split('\n') -> (line |
       try (
         total += line.parse_i64!
       |
@@ -9,11 +12,56 @@
         env.err.print(line)
       )
     )
-    
-    Inspect.out(total)        // TODO: env.out.print(Inspect[total])
-    Inspect.out(total == 508) // TODO: env.out.print(Inspect[total == 508])
+    total
   
-  :const input
+  :fun b (env Env, input String)
+    changes Array(I64) = []
+    input.each_split('\n') -> (line |
+      try (
+        changes << line.parse_i64!
+      |
+        env.err.print("warning: couldn't parse the following line:")
+        env.err.print(line)
+      )
+    )
+    
+    current_freq I64 = 0
+    try (
+      freqs = Map(I64, None, HashEq(I64)).new // TODO: use Set instead of Map
+      while True (
+        changes.each -> (change |
+          freqs[current_freq] = None
+          current_freq += change
+          if freqs.has_key(current_freq) (error!)
+        )
+      )
+    )
+    current_freq
+
+:class Day1Spec
+  :is Spec
+  :const describes: "Day1"
+  
+  :it "passes the A test cases"
+    @assert = Day1.a(@env, "+1\n-2\n+3\n+1") == 3
+    @assert = Day1.a(@env, "+1\n+1\n+1")     == 3
+    @assert = Day1.a(@env, "+1\n+1\n-2")     == 0
+    @assert = Day1.a(@env, "-1\n-2\n-3")     == -6
+  
+  :it "solves the A puzzle"
+    @assert = Day1.a(@env, @puzzle_input) == 508
+  
+  :it "passes the B test cases"
+    @assert = Day1.b(@env, "+1\n-2\n+3\n+1\n+1\n-2") == 2
+    @assert = Day1.b(@env, "+1\n-1")                 == 0
+    @assert = Day1.b(@env, "+3\n+3\n+4\n-2\n-4")     == 10
+    @assert = Day1.b(@env, "-6\n+3\n+8\n+5\n-6")     == 5
+    @assert = Day1.b(@env, "+7\n+7\n-2\n-7\n-4")     == 14
+  
+  :it "solves the B puzzle"
+    @assert = Day1.b(@env, @puzzle_input) == 549
+  
+  :const puzzle_input
     <<<
       +12
       -13
