@@ -395,6 +395,9 @@
     test["Inspect -I64  "].pass = Inspect[I64[-36]]   == "-36"
     test["Inspect -ISize"].pass = Inspect[ISize[-36]] == "-36"
     
+    test["Inspect String    "].pass = Inspect["example"] == "\"example\""
+    test["Inspect String'ref"].pass = Inspect[String.new] == "\"\""
+    
     ///
     
     test.print_line_break // TODO: move to MicroTest constructor and finalizer
