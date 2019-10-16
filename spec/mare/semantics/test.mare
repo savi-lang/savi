@@ -103,6 +103,13 @@
       try (Err.now!, 11 | 33)
     )
     
+    test["reflection_of_type.string String"].pass =
+      (reflection_of_type "example").string == "String"
+    test["reflection_of_type.string String'ref"].pass =
+      (reflection_of_type String.new).string == "String'ref"
+    test["reflection_of_type.string Array(U8)"].pass =
+      (reflection_of_type Array(U8).new).string == "Array(U8)"
+    
     test["source_code_position_of_argument string"].pass =
       @source_code_position_of_argument_string(zero == 0) == "zero == 0"
     

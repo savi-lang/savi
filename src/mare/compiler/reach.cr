@@ -8,7 +8,7 @@
 # This pass produces output state at the type/meta-type level.
 #
 class Mare::Compiler::Reach < Mare::AST::Visitor
-  class Ref
+  struct Ref
     def initialize(@meta_type : Infer::MetaType)
     end
     
@@ -77,9 +77,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       is_numeric? && single!.defn.const_bool("is_signed")
     end
     
-    @llvm_use_type : Symbol?
     def llvm_use_type : Symbol
-      (@llvm_use_type ||= \
       if is_tuple?
         :tuple
       elsif !singular?
@@ -113,7 +111,6 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
           end
         end
       end
-      ).not_nil!
     end
     
     def llvm_mem_type : Symbol

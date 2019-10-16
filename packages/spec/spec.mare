@@ -1,6 +1,8 @@
 :primitive Specs (A Spec)
   :fun non run (spec A)
-    (reflection_of_type A).features.each -> (feature |
+    type = (reflection_of_type spec)
+    spec.env.out.print(type.string)
+    type.features.each -> (feature |
       if feature.tags.includes("it") (
         spec.env.out.print(feature.name)
         feature.maybe_call_mutator(spec)

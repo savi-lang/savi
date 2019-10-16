@@ -1,5 +1,16 @@
 :class val ReflectionOfType (A)
-  // TODO: include more properties
+  :: The string used in compiler messages to represent the type with capability.
+  :: If the capability is the same as the default for that type, it will be
+  :: omitted for brevity. Type arguments will also be included if present.
+  ::
+  :: $ (reflection_of_type "example").string
+  :: > "String"
+  :: $ (reflection_of_type String.new).string
+  :: > "String'ref"
+  :: $ (reflection_of_type Array(U8).new).string
+  :: > "Array(U8)"
+  :prop string String: ""
+  
   :prop features Array(ReflectionFeatureOfType(A)): []
 
 :class val ReflectionFeatureOfType (A)

@@ -161,6 +161,14 @@ class Mare::Compiler::CodeGen
       @gfuncs[name]
     end
     
+    def field(name)
+      @fields.find(&.first.==(name)).not_nil!.last
+    end
+    
+    def field?(name)
+      @fields.find(&.first.==(name)).try(&.last)
+    end
+    
     def struct_ptr
       @struct_type.pointer
     end
@@ -2238,55 +2246,63 @@ class Mare::Compiler::CodeGen
   
   def gen_reflection_of_type(expr, term_expr)
     reflect_gtype = gtype_of(expr)
-    gtype = gtype_of(term_expr)
     
-    @reflection_of_type_globals.fetch gtype do
-      features_gtype = gtype_of(
-        reflect_gtype.fields.find(&.first.==("features")).not_nil!.last
-      )
-      feature_gtype = gtype_of(
-        features_gtype.fields.find(&.first.==("_ptr")).not_nil!.last
-          .single_def!(ctx).cpointer_type_arg
-      )
-      mutator_gtype = gtype_of(
-        feature_gtype.fields.find(&.first.==("mutator")).not_nil!.last
-          .union_children.find(&.show_type.!=("None")).not_nil!
-      )
+    @reflection_of_type_globals.fetch reflect_gtype do
+      reach_ref = type_of(term_expr)
       
-      features =
-        gtype.gfuncs.values
-          .reject(&.func.has_tag?(:hygienic))
-          .map do |gfunc|
-            tags = gfunc.func.tags.map { |tag| gen_string(tag.to_s) }
-            
-            # A mutator must meet the following qualifications:
-            # a ref function that takes no arguments and returns None.
-            # Any other function can't be safely called this way, so we
-            # leave its mutator field as None so that it can't be called.
-            # In the future, we may make it possible to call other functions
-            # that are not mutators, but that becomes a tough type system
-            # problem to solve, not the least of which is type variable varargs.
-            mutator =
-              if gfunc.func.cap.value == "ref" \
-              && (gfunc.func.params.try(&.terms.size) || 0) == 0 \
-              && gfunc.llvm_func.return_type == @gtypes["None"].struct_type.pointer
-                gen_reflection_mutator_of_type(mutator_gtype, gtype, gfunc)
-              else
-                gen_none
-              end
-            
-            gen_global_const(feature_gtype, {
-              "name" => gen_string(gfunc.func.ident.value),
-              "tags" => gen_array(@gtypes["Array[String]"], tags),
-              "mutator" => mutator,
-            })
-          end
+      props = {} of String => LLVM::Value
+      props["string"] = gen_string(reach_ref.show_type)
       
-      global = gen_global_const(reflect_gtype, {
-        "features" => gen_array(features_gtype, features),
-      })
+      if reflect_gtype.field?("features")
+        features_gtype = gtype_of(reflect_gtype.field("features"))
+        feature_gtype = gtype_of(
+          features_gtype.field("_ptr")
+            .single_def!(ctx).cpointer_type_arg
+        )
+        mutator_gtype = gtype_of(
+          feature_gtype.field("mutator")
+            .union_children.find(&.show_type.!=("None")).not_nil!
+        )
+        
+        raise NotImplementedError.new(reach_ref.show_type) \
+          unless reach_ref.singular?
+        gtype = gtype_of(reach_ref)
+        
+        features =
+          gtype.gfuncs.values
+            .reject(&.func.has_tag?(:hygienic))
+            .map do |gfunc|
+              tags = gfunc.func.tags.map { |tag| gen_string(tag.to_s) }
+              
+              # A mutator must meet the following qualifications:
+              # a ref function that takes no arguments and returns None.
+              # Any other function can't be safely called this way, so we
+              # leave its mutator field as None so that it can't be called.
+              # In the future, we may make it possible to call other functions
+              # that are not mutators, but that becomes a tough type system
+              # problem to solve, not the least of which is type variable varargs.
+              mutator =
+                if gfunc.func.cap.value == "ref" \
+                && (gfunc.func.params.try(&.terms.size) || 0) == 0 \
+                && gfunc.llvm_func.return_type == @gtypes["None"].struct_type.pointer
+                  gen_reflection_mutator_of_type(mutator_gtype, gtype, gfunc)
+                else
+                  gen_none
+                end
+              
+              gen_global_const(feature_gtype, {
+                "name" => gen_string(gfunc.func.ident.value),
+                "tags" => gen_array(@gtypes["Array[String]"], tags),
+                "mutator" => mutator,
+              })
+            end
+        
+        props["features"] = gen_array(features_gtype, features)
+      end
       
-      @reflection_of_type_globals[gtype] = global
+      global = gen_global_const(reflect_gtype, props)
+      
+      @reflection_of_type_globals[reflect_gtype] = global
     end
   end
   
