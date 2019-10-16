@@ -3,6 +3,7 @@
 
 :class MapSpec
   :is Spec
+  :const describes: "Map"
   
   :it "stores and removes values at a given key"
     map = Map(String, U64, HashEq(String)).new // TODO: implicit default for HashFunction type argument

@@ -3,6 +3,7 @@
 
 :class CountSpec
   :is Spec
+  :const describes: "Count"
   
   :it "counts upward, starting with 0, excluding the given number itself"
     count = USize[0]

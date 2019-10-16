@@ -3,6 +3,11 @@
   :prop failures Array(SourceCodePosition): []
   :new (@env)
   
+  :: When implementing the Spec trait, include a definition for this constant
+  :: indicating what entity the tests are describing the specification for.
+  
+  :const describes String
+  
   :fun ref "assert=" (
     success Bool
     pos SourceCodePosition = source_code_position_of_argument success
@@ -42,7 +47,7 @@
         |
           @_fail(env)
           env.err.write("\nFAIL: ")
-          env.err.write(type.string)
+          env.err.write(spec.describes)
           env.err.write(" ")
           env.err.print(feature.name)
           spec.failures.each -> (fail |
