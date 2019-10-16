@@ -32,7 +32,7 @@
         changes.each -> (change |
           freqs[current_freq] = None
           current_freq += change
-          if freqs.has_key(current_freq) (error!)
+          if freqs.has_key(current_freq) error! // TODO: use break instead
         )
       )
     )

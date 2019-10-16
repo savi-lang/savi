@@ -1,0 +1,305 @@
+:import "spec"
+:import "collections"
+
+:primitive Day2
+  :fun has_duo  (line): @has_target_count(line, 2)
+  :fun has_trio (line): @has_target_count(line, 3)
+  :fun has_target_count (line String, target_count I64)
+    letters = Map(U8, I64, HashEq(U8)).new
+    line.each_byte -> (letter |
+      try ( // TODO: use an upsert method instead?
+        letters[letter] = letters[letter]! + 1
+      |
+        letters[letter] = 1
+      )
+    )
+    letters.has_any -> (letter, count | count == target_count)
+  
+  :fun a (env Env, input String)
+    count_duo = count_trio = I64[0]
+    input.each_split('\n') -> (line |
+      if @has_duo(line)  (count_duo  += 1)
+      if @has_trio(line) (count_trio += 1)
+    )
+    count_duo * count_trio
+
+:class Day2Spec
+  :is Spec
+  :const describes: "Day2"
+  
+  :it "passes the A test cases"
+    @assert = Day2.has_duo("abcdef").not, @assert = Day2.has_trio("abcdef").not
+    @assert = Day2.has_duo("bababc"),     @assert = Day2.has_trio("bababc")
+    @assert = Day2.has_duo("abbcde"),     @assert = Day2.has_trio("abbcde").not
+    @assert = Day2.has_duo("abcccd").not, @assert = Day2.has_trio("abcccd")
+    @assert = Day2.has_duo("aabcdd"),     @assert = Day2.has_trio("aabcdd").not
+    @assert = Day2.has_duo("abcdee"),     @assert = Day2.has_trio("abcdee").not
+    @assert = Day2.has_duo("ababab").not, @assert = Day2.has_trio("ababab")
+    
+    input = <<<
+      abcdef
+      bababc
+      abbcde
+      abcccd
+      aabcdd
+      abcdee
+      ababab
+    >>>
+    @assert = Day2.a(@env, input) == 12
+  
+  :it "solves the A puzzle"
+    @assert = Day2.a(@env, @puzzle_input) == 8296
+  
+  :const puzzle_input
+    <<<
+      bazvmqthjtrnlosiecxyghkwud
+      pazvmqbijirzlosiecxyghkwud
+      pazvtqbmjtrnlosiecxyghkwzd
+      pazvmqbfjtrjlosnlcxyghkwud
+      pazvkqbfjtrtlosiecjyghkwud
+      paztmqbfjtrnbosiecxyglkwud
+      pazvmqbfjtunlosievxmghkwud
+      pazvmqbfjtmngosiecyyghkwud
+      jazvmqbfjtrnlosiecxygikpud
+      pazvqqbfctrnlosimcxyghkwud
+      pazvmqbfjtrnwogiecxyihkwud
+      pazvmqbfjtrqlojiecxeghkwud
+      payvmqbfjtrzlosiecxyghkwuk
+      pkzvmqnfjtrnlosieciyghkwud
+      pazvmqqfjtrnldsiecxyghkwui
+      pazvmqbfttrqlosiecxywhkwud
+      gazvmybfjthnlosiecxyghkwud
+      pazvmqbfjtrnlasiecxygptwud
+      pktvmqbfjtrnwosiecxyghkwud
+      pazvmqwfjtrnlosiecxgghkkud
+      pazvmzkbjtrnlosiecxyghkwud
+      pazvmqbfjtrnloslecxyghuwui
+      pezvmqbfjtrnlesieyxyghkwud
+      cazvmqbfjrrnlosiecxyghkmud
+      pazvmqrfjjrnlosiecxyghkwnd
+      pazvmqbgjtrnlosiecxyphtwud
+      pazvmqbvmtrnlosiecxyghkpud
+      pazdmqbfjtrnlosiecxyuhkpud
+      pazvmqbflnrnloshecxyghkwud
+      pazvvqbfjprilosiecxyghkwud
+      pazvwqbfjtrllosiecxyghknud
+      pazvmqbfjtrnloniecxdghkaud
+      pazvmqbfjtrnlvsuecxynhkwud
+      ptzvmqwfjtrnlosieccyghkwud
+      pkzvmqbjjtrnlosiecryghkwud
+      pazvmqqfjtrexosiecxyghkwud
+      pazgmqbfjtrneoyiecxyghkwud
+      paznmqbfjtrnlosiecxydhkwzd
+      pazvmqbfjtrnaosiwcxsghkwud
+      pazomqbfjxrnlosiewxyghkwud
+      pazsmqbfjprnlosiecxrghkwud
+      pazvmqbfqtrnoosiecxygmkwud
+      aazvmqbfjtrnlosiacxyghjwud
+      pazviqbfjtrnlobiecxygrkwud
+      qazwmqbfjhrnlosiecxyghkwud
+      pazvmqbfftrnlosiqcxygfkwud
+      patvmqbfjtonlosircxyghkwud
+      pazvmqbfjtrnlomaecxyghkpud
+      paztmqbfjtrulossecxyghkwud
+      pazvmqbijtrnlobiecxyghkwkd
+      pazvsqbfjtrnlospecxyghkqud
+      pbzmmqbfjtrnlosiecxyghkwhd
+      pezvkqbfjtenlosiecxyghkwud
+      razvmqbfjkrnlosiecxeghkwud
+      pazcmqbfjtrnloriecxyghkgud
+      pazvmqbfftfnlosiecvyghkwud
+      pazvmqpujtrnlosiepxyghkwud
+      patvgqbfjtrnloslecxyghkwud
+      pazvmqbfltrnlosibcxyghswud
+      pazvmebfjtrnlosaecxyehkwud
+      pazdmqbejtrnlosiecxyghrwud
+      pazvmcbfntrplosiecxyghkwud
+      pszvmqbfjtrnlosivcfyghkwud
+      puzvmqbfjtrnloeiecxyxhkwud
+      pazvmqbfjtrivooiecxyghkwud
+      pazvyqbfjtrngosiwcxyghkwud
+      pauvmqbfjtrnlosimexyghkwud
+      pazvmqbfjtrnwoshecxeghkwud
+      dazvmqbfjtrnloshecxygxkwud
+      pazvmqbfjtrtdosiecxyghvwud
+      pazxmqbfjtrnlosieceyghjwud
+      pazvmqbfjtrnlosihexjghkwud
+      pazvmqbfjsrnlosiecxughiwud
+      phzvcqbfjtrqlosiecxyghkwud
+      pazvmibfjtrnlosjecxxghkwud
+      pazvmqbfjtrbeosiecxlghkwud
+      pazvmqyfjttolosiecxyghkwud
+      fawvmqbfjtrnlosiecxyghkwhd
+      pazvmqbfjprnxosiecxyghkbud
+      macvmqbfjtrnlosiesxyghkwud
+      pazsmqbfjtrflouiecxyghkwud
+      pacvmqbfjtrnltsiecxyghcwud
+      pazvmqbfjtymlosiecxygykwud
+      pazvmqbfjtrclosiecxygukwmd
+      pazvmqbfjtrnlobiecxphhkwud
+      mazvmqbhitrnlosiecxyghkwud
+      pazvmqdtjtrnlrsiecxyghkwud
+      pazvmqbfjgrnllsieczyghkwud
+      pazvmqbfjtrilosiecxxgikwud
+      pazvmqbjjtrnlosreceyghkwud
+      paxvmmbfjtrilosiecxyghkwud
+      pazqmwbfjtrnlowiecxyghkwud
+      pazvmqbfjfrnqosiecxyghkwui
+      pazvmqbfjtrrgosiecxyghswud
+      pazvmqnfjtrnlosiecsyghkwmd
+      paiemqbmjtrnlosiecxyghkwud
+      pazvmqbfdtqnlosiecxyjhkwud
+      pazvmxbfjthndosiecxyghkwud
+      pqzvmqbfjtrnlosiecxbghkzud
+      pagrmqbfjtrnlosiecxygskwud
+      pazamqtfjtrnsosiecxyghkwud
+      pazvmqbfjtrnldshecxyzhkwud
+      pazvmnbfjtrllosieclyghkwud
+      snzvmqbfjnrnlosiecxyghkwud
+      pazvsqbfjdrnlosiecxyghswud
+      pazvmqnfjfrnlosiecsyghkwud
+      pazvmqbfjtrnlosiecxjghowum
+      pazvmqbfjtjnlosieczygfkwud
+      pazvmqbsjtrnloziecxyghkeud
+      pazvxqbgjtrnlooiecxyghkwud
+      pazvmqbfjtrnlooiecxmyhkwud
+      pazvmqbyftrnlosgecxyghkwud
+      pazvmqbfjtrnlosiwcxyqhksud
+      pazvmqkyjtrnlokiecxyghkwud
+      pazfmqbfjtrnlosijcxyohkwud
+      pazvmqbfjtrnlociecxygikcud
+      fazvmqbfjtrnlosiecxyjhkuud
+      pazvmqbojtknlohiecxyghkwud
+      pazvmqbfjtgnlosbecxyghkwux
+      pazvmqbfjtrnlocieckoghkwud
+      pazvdqbfjtrlltsiecxyghkwud
+      pazvmqbfjtsnlfsiecxyglkwud
+      przvpqbfjtrnyosiecxyghkwud
+      pazvmbrfjtrnlosiecxmghkwud
+      dazvmqbfttrnlostecxyghkwud
+      pazvmqbfttdnlosiecxygwkwud
+      pazvmqbvitrnlosieexyghkwud
+      pazvmqbfjhrnlosjecxyvhkwud
+      pazvmqbfstrnlosiecxyggkwpd
+      bazvmqbfjtrnlmsiecxyohkwud
+      patmmqbfjtrnlosizcxyghkwud
+      pazvmqbfwtrglosieqxyghkwud
+      pazvmqbfjtrnlosiecxdhhkwmd
+      pazvmqbfjdrnlosnexxyghkwud
+      oazrrqbfjtrnlosiecxyghkwud
+      pazvmqbfjcrnlosiecxygakwjd
+      pazvmqbfjtrnlosifcxfghkwyd
+      pazvmnbfjtrnlosiecxyahzwud
+      pazvmqbfgtrnlojiecxyghkgud
+      pazvmqbfjtrnlaliecxyghkwuy
+      pazvmqbfjtrnlfsiecrtghkwud
+      pazvmqbkjtrnloswecxdghkwud
+      pazvtqbfjtdnlosiecxyghkwuu
+      pozvmqbfrtrnlosiesxyghkwud
+      payvmqbfjornlossecxyghkwud
+      pazvuqbfjtrnlosiscxyghkpud
+      pgzcmqbfjtrnlotiecxyghkwud
+      pazvvqbfjtrnlobieyxyghkwud
+      pazycqbfjtrnlosiecxyzhkwud
+      pizvdqbfjtrnlosiecxbghkwud
+      pazvmqbfjtrnloqiecxmgtkwud
+      gazvmqbfjtrnlusiecxpghkwud
+      pazvmqdfjtralosiecxyghkwmd
+      pazvmqbfjtmnlosiecxywhawud
+      pazvlqbfjtrnlosqecxyghqwud
+      pazvmqbfjtrnlhsneixyghkwud
+      kazvmqbfjtrqlosimcxyghkwud
+      pazvmwbfjtrclosiecxyghkuud
+      pazvmqjfjtrnlosieckyghpwud
+      pezvmqbgjtrnloseecxyghkwud
+      pazvqqbfjtfnlosvecxyghkwud
+      oazvmqbfjtunlosiecxyghkwad
+      pazvmqbfjtrncoswecxyghfwud
+      pazvyqbfjtrnlosqecxygtkwud
+      pazvmqbfjtrvlzsiecxygwkwud
+      pazvmqbfjjrnlosiekxylhkwud
+      madvmqbfjtrnlosircxyghkwud
+      pazvmybfjtrnlisiecxyghkwbd
+      pazvmqbjjixnlosiecxyghkwud
+      pazvmqefjtrnloqiecxyghhwud
+      pazveqbfjtrnlosiecgygzkwud
+      pazvmqbfjtrxlosiecxmgwkwud
+      uazvmqufjtrnlosiecxyghkwuo
+      pasymqbfjtrnlosiecxyghowud
+      pazvmqbfjtlnlpsiecxyghswud
+      pnzvmqbfjprnloszecxyghkwud
+      pafjmqcfjtrnlosiecxyghkwud
+      pazvmqxfbtrnloqiecxyghkwud
+      pazvmzbfjtrnposiccxyghkwud
+      pazvmqbfjotulosiecxyghkwud
+      pazvmqbfotrnlosgecxykhkwud
+      przvmqbfjtrnlosiecxyqhkwcd
+      pazvmqbfjtsnlogiecxyyhkwud
+      pazvmqbfrtrnlzsiecxyghkwug
+      pazvmqbfjtrnlosiecxzgukwuo
+      pqzvmqbqjtrnlosdecxyghkwud
+      pazvmqbfjtqqlosiecxughkwud
+      pazvmqbfjtrnlosiedhyphkwud
+      pazsmqbcutrnlosiecxyghkwud
+      pazvmqbgrtrnlosiecxyghpwud
+      pazemqbfjtznlosiecxyghkvud
+      pazvkqbfjtrilosiecxyghkwod
+      pfzvmqbfjtrnlopiecxygjkwud
+      pazvmqvfjtreloniecxyghkwud
+      pazvmqbfjernljsiecxgghkwud
+      pazvmqikjtrnlosiecxyghqwud
+      pazvmqbfjtrnpesoecxyghkwud
+      fazvmqbfjtrnlosihchyghkwud
+      pazvmqbfjtgnloanecxyghkwud
+      pazvmqsfjqrnlosiecxychkwud
+      parvmqbfjtrnlosiecxygfuwud
+      przvmqbfjtrhlosihcxyghkwud
+      pazvmqbcjtrnlosimcxgghkwud
+      pazvmqbfjtrnlosceciyjhkwud
+      pazvkqbfjtrylosivcxyghkwud
+      pazvmqbfjtrnlgsieoxyghdwud
+      pazvmqnfstrnlowiecxyghkwud
+      pazvmqbfdtrnlosieumyghkwud
+      pazvmqbfjtrnlosyecxfghkwul
+      pazvmqbfjtrclosivcxyghkcud
+      pazjmqbfjtrnlosiecxygokwkd
+      hazvmqbfjtrflosiecxzghkwud
+      wazvmqbfjtrnlomiecxyphkwud
+      yazvmqbfjirnkosiecxyghkwud
+      pczvmqbfjtrnlohiecxyghkwpd
+      pazvmqbfotrbeosiecxlghkwud
+      pazvmqbfjtrplosiecxynhzwud
+      paxvbqbwjtrnlosiecxyghkwud
+      pazvmqvfjtrnlosiecbyghqwud
+      pazjmqbfjtrnlosiecxoghkwed
+      pazvmqbfjtreljsitcxyghkwud
+      mazamqbfjtrnlosiecxoghkwud
+      pazvmqbfjjrnposiscxyghkwud
+      pbrvmqbfjtrnloliecxyghkwud
+      pazvmqbfjtrnlosiecxgghkyyd
+      pmzvmqbfntrnlosiecxyghkwuw
+      pazvzqbfjtrnlosienxyghzwud
+      pazvmqifjtvnlosrecxyghkwud
+      tazvmqbhjtjnlosiecxyghkwud
+      pazvmqbfjtlnxosiecxyghkwuo
+      pazvmqbfjennlosiecxyghkwxd
+      pahvmqbfjhrnlosiecxythkwud
+      pazvmlkfjtrnlxsiecxyghkwud
+      pfzvmqbojtrnlosieciyghkwud
+      pazvbqbfjtrollsiecxyghkwud
+      eazvmqbfjtrnlosiecayghkoud
+      pazvmqbfjtjnlvsiecxyghkwsd
+      pazvoqbojtrnlosiecfyghkwud
+      pazvmqbfjtuslosiecxyghksud
+      pazvmqbfjnrnlosiedxyghkwup
+      pazvmqbjjtrnlosieaxyghdwud
+      pazccqbfjtrhlosiecxyghkwud
+      pbzvmqkfjtrnlosievxyghkwud
+      pazvmqrljtrnlosiscxyghkwud
+      pazvmqbfjfoqlosiecxyghkwud
+      pazcmqbfjtrnlosiecxyihkwuf
+      pszvmqbfjtrnnosiacxyghkwud
+      aazvmqbfjtrnlosieyxyghkwld
+      pazvrqbfntrnlosiycxyghkwud
+      pkzvoqbfjtrnlosiecxyghxwud
+    >>>

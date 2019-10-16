@@ -3,3 +3,4 @@
 :actor Main
   :new (env)
     Specs(Day1Spec).run(env)
+    Specs(Day2Spec).run(env)
