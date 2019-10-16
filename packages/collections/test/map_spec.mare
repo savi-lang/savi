@@ -5,8 +5,10 @@
   :is Spec
   :const describes: "Map"
   
+  :fun new_map: Map(String, U64, HashEq(String)).new // TODO: implicit default for HashFunction type argument
+  
   :it "stores and removes values at a given key"
-    map = Map(String, U64, HashEq(String)).new // TODO: implicit default for HashFunction type argument
+    map = @new_map
     @assert = map.size == 0
     @assert = try (map["example"]!, False | True)
     @assert = map.has_key("example").not
@@ -24,8 +26,7 @@
     @assert = map.size == 0
   
   :it "can be cleared, removing all keys and values"
-    // TODO: Move creation of this map to a user-defined utility function
-    map = Map(String, U64, HashEq(String)).new // TODO: implicit default for HashFunction type argument
+    map = @new_map
     map["foo"] = 11
     map["bar"] = 22
     map["baz"] = 33
@@ -34,13 +35,12 @@
     @assert = map.size == 0
   
   :it "yields each key and value"
-    // TODO: Move creation of this map to a user-defined utility function
-    map = Map(String, U64, HashEq(String)).new // TODO: implicit default for HashFunction type argument
+    map = @new_map
     map["foo"] = 11
     map["bar"] = 22
     map["baz"] = 33
     
-    copy = Map(String, U64, HashEq(String)).new // TODO: implicit default for HashFunction type argument
+    copy = @new_map
     map.each -> (key, value | copy[key] = value)
     
     @assert = copy.size == 3
@@ -49,13 +49,12 @@
     @assert = try (copy["baz"]! | U64[0]) == 33
   
   :it "yields each key and each value (separately)"
-    // TODO: Move creation of this map to a user-defined utility function
-    map = Map(String, U64, HashEq(String)).new // TODO: implicit default for HashFunction type argument
+    map = @new_map
     map["foo"] = 11
     map["bar"] = 22
     map["baz"] = 33
     
-    copy = Map(String, U64, HashEq(String)).new // TODO: implicit default for HashFunction type argument
+    copy = @new_map
     map.each_key -> (key | try (copy[key] = map[key]!))
     
     @assert = copy.size == 3
