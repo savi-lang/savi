@@ -2,4 +2,5 @@
   :fun pony_os_stdout () CPointer(None)'ref
   :fun pony_os_stderr () CPointer(None)'ref
   :fun pony_os_std_print (CPointer(None)'ref, CPointer(U8), USize) None
+  :fun pony_os_std_write (CPointer(None)'ref, CPointer(U8), USize) None
   :fun pony_exitcode (I32) None

@@ -23,10 +23,7 @@
     
     ///
     // Map methods
-    // TODO: simplify the invocation of MapSpec, make independent of MicroTest
     
-    map_spec = MapSpec.new(env)
-    Specs(MapSpec).run(map_spec)
-    map_spec.failures.each -> (pos | test[pos.string].pass = False)
+    Specs(MapSpec).run(env)
     
     test.print_line_break // TODO: move to MicroTest constructor and finalizer

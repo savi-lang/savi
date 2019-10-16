@@ -1,21 +1,35 @@
 :primitive Specs (A Spec)
-  :fun non run (spec A)
+  :fun non run (env Env)
+    spec = A.new(env)
     type = (reflection_of_type spec)
-    spec.env.out.print(type.string)
+    
+    called = False // TODO: this line shouldn't be needed
     type.features.each -> (feature |
       if feature.tags.includes("it") (
-        spec.env.out.print(feature.name)
-        feature.maybe_call_mutator(spec)
+        called = feature.maybe_call_mutator(spec)
+        
+        if (spec.failures.size == 0) (
+          if called env.out.write(".")
+        |
+          env.exit_code = 1 // Mark the entire process as a failure.
+          env.out.write("\nFAIL: ")
+          env.out.write(type.string)
+          env.out.write(" ")
+          env.out.print(feature.name)
+          spec.failures.each -> (fail |
+            env.out.write("  - "), env.out.print(fail.string)
+          )
+          spec.failures.clear
+        )
       )
     )
+    
     spec
 
 :trait Spec
   :prop env Env
   :prop failures Array(SourceCodePosition): []
   :new (@env)
-  
-  :fun no_failures: @failures.size == 0 // TODO: remove
   
   :fun ref "assert=" (
     success Bool
