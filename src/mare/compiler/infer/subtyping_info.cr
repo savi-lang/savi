@@ -76,6 +76,15 @@ class Mare::Compiler::Infer::SubtypingInfo
     if is_subtype
       @confirmed.add(that)
     else
+      # If we happened to just invalidate an assertion, we need to raise that
+      # error here instead of continuing to return true or false -
+      # this makes sure that we show the most relevant error to the user.
+      if (assert_pos = @asserted[that]?)
+        Error.at assert_pos,
+          "#{this} isn't a subtype of #{that}, as it is required to be here",
+          errors
+      end
+      
       raise "no errors logged" if errors.empty?
       @disproved[that] = errors
     end
