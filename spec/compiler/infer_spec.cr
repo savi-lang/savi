@@ -1679,6 +1679,37 @@ describe Mare::Compiler::Infer do
     end
   end
   
+  it "prefers to show error about assertions even in a self-referential case" do
+    source = Mare::Source.new_example <<-SOURCE
+    :trait Trait (A Trait(A)'read)
+      :fun similar (other A'box) Bool
+      :fun dissimilar (other A'box) Bool: @.similar(other).not
+    
+    :class Concrete
+      :is Trait(Concrete)
+    
+    :actor Main
+      :new
+        Concrete
+    SOURCE
+    
+    expected = <<-MSG
+    Concrete isn't a subtype of Trait(Concrete), as it is required to be here:
+    from (example):6:
+      :is Trait(Concrete)
+       ^~
+    
+    - this function isn't present in the subtype:
+      from (example):2:
+      :fun similar (other A'box) Bool
+           ^~~~~~~
+    MSG
+    
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :infer)
+    end
+  end
+  
   it "allows assigning from a variable with its refined type" do
     source = Mare::Source.new_example <<-SOURCE
     :actor Main

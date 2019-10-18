@@ -489,12 +489,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       target = type_expr(node.term, refer, receiver)
       args = node.group.terms.map { |t| type_expr(t, refer, receiver).as(MetaType) } # TODO: is it possible to remove this superfluous "as"?
       rt = reified_type(target.single!, args)
-      begin
-        ctx.infer.validate_type_args(ctx, self, node, rt)
-        MetaType.new(rt)
-      rescue Mare::Error
-        MetaType.new(MetaType::Unsatisfiable.instance)
-      end
+      MetaType.new(rt)
     end
     
     # All other AST nodes are unsupported as type expressions.
