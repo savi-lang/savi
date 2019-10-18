@@ -61,6 +61,31 @@
     if (@size <= index) error!
     @_ptr._get_at(index)
   
+  :fun _offset_to_index (offset ISize) USize
+    if (offset < 0) (offset.usize + @size | offset.usize)
+  
+  :: Return a shared portion of this string, covering `from` until `to`,
+  :: with negative values in `from` and `to` representing indexes counting
+  :: backward from the end of the string.
+  ::
+  :: Both the original and the new string are immutable, as they share memory.
+  :: The operation does not allocate a new string pointer nor copy elements.
+  
+  :fun val trim (from ISize = 0, to ISize = 0x7FFF_FFFF_FFFF_FFFF) // TODO: ISize.max_value
+    start = @_offset_to_index(from)
+    finish = @_offset_to_index(to).min(@size)
+    
+    if (start < @_size && start < finish) (
+      size = finish - start
+      @val_from_cpointer(
+        @_ptr._offset(start)
+        size
+        size
+      )
+    |
+      @val_from_cpointer(@_ptr.null, 0, 0)
+    )
+  
   :fun ref push_byte (byte U8)
     @reserve(@_size + 1)
     @_ptr._assign_at(@_size, byte)

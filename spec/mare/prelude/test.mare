@@ -282,6 +282,13 @@
     test["String []! found"].pass = try ("example"[3]! == 'm' | False)
     test["String []! missing"].pass = try ("example"[7]!, False | True)
     
+    test["String trim  2    "].pass = "example".trim(2)      == "ample"
+    test["String trim  3, -2"].pass = "example".trim(3,  -2) == "mp"
+    test["String trim  7    "].pass = "example".trim(7)      == ""
+    test["String trim  5,  4"].pass = "example".trim(5,   4) == ""
+    test["String trim -5, -2"].pass = "example".trim(-5, -2) == "amp"
+    test["String trim -5,  5"].pass = "example".trim(-5,  5) == "amp"
+    
     test["String push_byte"].pass =
       String.new.push_byte('o').push_byte('k') == "ok"
     
