@@ -6,8 +6,6 @@ describe Mare::Compiler::Privacy do
         Env._create
     SOURCE
     
-    p 
-    
     expected = <<-MSG
     This function call breaks privacy boundaries:
     from (example):3:
@@ -26,4 +24,23 @@ describe Mare::Compiler::Privacy do
   end
   
   pending "won't allow an interface in the local library to circumvent"
+  
+  it "won't try (and fail) to check privacy of unreachable choice branches" do
+    source = Mare::Source.new_example <<-SOURCE
+    :trait Trait
+      :fun trait None
+    
+    :class Generic (A)
+      :prop _value A
+      :new (@_value)
+      :fun ref value_trait
+        if (A <: Trait) (@._value.trait)
+    
+    :actor Main
+      :new
+        Generic(String).new("example").value_trait
+    SOURCE
+    
+    Mare::Compiler.compile([source], :privacy)
+  end
 end

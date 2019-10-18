@@ -33,6 +33,13 @@ class Mare::Compiler::Privacy < Mare::AST::Visitor
     node
   end
   
+  def visit_children?(node : AST::Group)
+    # Don't visit children of groups marked by the type checker as unreachable.
+    # This keeps us from trying to deal with branches of Choices that have
+    # not been typechecked and thus have no call resolution for private calls.
+    !infer[node]?.is_a?(Infer::Unreachable)
+  end
+  
   def touch(node : AST::Relate)
     # Only handle function calls (dot relations).
     return unless node.op.value == "."
