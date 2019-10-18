@@ -1,0 +1,54 @@
+:import "spec"
+
+:class StringSpec
+  :is Spec
+  :const describes: "String"
+  
+  :it "compares bytewise equality with another string"
+    @assert = ("string" == "string")
+    @assert = ("string" == "other").not
+  
+  :it "hashes the bytes of the string"
+    @assert = ("string".hash == 0x4CF51F4A5B5CF110)
+  
+  :it "returns the byte at the given byte offset"
+    @assert = try ("example"[3]! == 'm' | False)
+    @assert = try ("example"[7]!, False | True)
+  
+  :it "trims bytes off the start and end of the string"
+    @assert = "example".trim(2)      == "ample"
+    @assert = "example".trim(3,  -2) == "mp"
+    @assert = "example".trim(7)      == ""
+    @assert = "example".trim(5,   4) == ""
+    @assert = "example".trim(-5, -2) == "amp"
+    @assert = "example".trim(-5,  5) == "amp"
+  
+  :it "pushes a new byte onto the end of the string"
+    @assert = String.new.push_byte('o').push_byte('k') == "ok"
+  
+  :it "yields each byte in the string"
+    string Array(U8) = []
+    "foo".each_byte -> (byte | string << byte)
+    @assert = string == ['f', 'o', 'o']
+    
+  :it "yields each byte in the string, along with the index"
+    string_a Array(U8) = []
+    string_b Array(USize) = []
+    "yo".each_byte_with_index -> (byte, index |
+      string_a << byte
+      string_b << index
+    )
+    @assert = string_a == ['y', 'o']
+    @assert = string_b == [0, 1]
+  
+  :it "copies bytes from the given string onto the end of the string"
+    @assert = (String.new << "foo" << "bar") == "foobar"
+  
+  :it "splits the string at every occurrence of the given byte value"
+    @assert = "foo.bar.baz".split('.') == ["foo", "bar", "baz"]
+  
+  :it "parses an integer from the string decimal representation"
+    @assert = try ("36".parse_i64!  == 36  | False)
+    @assert = try ("+36".parse_i64! == 36  | False)
+    @assert = try ("-36".parse_i64! == -36 | False)
+    @assert = try ("36bad".parse_i64!, False | True)

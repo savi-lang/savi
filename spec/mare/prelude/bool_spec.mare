@@ -1,0 +1,13 @@
+:import "spec"
+
+:class BoolSpec
+  :is Spec
+  :const describes: "Bool"
+  
+  :it "has some trivial convenience methods for readability's sake"
+    @assert = True.is_true   == True
+    @assert = False.is_true  == False
+    @assert = True.is_false  == False
+    @assert = False.is_false == True
+    @assert = True.not       == False
+    @assert = False.not      == True
