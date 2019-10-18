@@ -1,6 +1,7 @@
 :trait Spec
   :prop env Env
   :prop failures Array(SourceCodePosition): []
+  :prop assert_count USize: 0
   :new (@env)
   
   :: When implementing the Spec trait, include a definition for this constant
@@ -13,6 +14,7 @@
     pos SourceCodePosition = source_code_position_of_argument success
   )
     if success.not (@failures << pos)
+    @assert_count += 1
     success
 
 :primitive Specs (A Spec)
@@ -42,7 +44,8 @@
           env.err.print("FAILED TO CALL A SPEC FEATURE?")
         
         | spec.failures.size == 0 |
-          env.err.write(".")
+          env.err.write("." * spec.assert_count)
+          env.err.write(" ")
         
         |
           @_fail(env)
@@ -63,7 +66,7 @@
       env.err.print("FAIL: No spec features found in ")
       env.err.write(type.string)
     |
-      env.err.write(" ")
+      env.err.write(", ")
     )
     
     spec
