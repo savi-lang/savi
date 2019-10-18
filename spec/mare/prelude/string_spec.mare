@@ -30,7 +30,7 @@
     string Array(U8) = []
     "foo".each_byte -> (byte | string << byte)
     @assert = string == ['f', 'o', 'o']
-    
+  
   :it "yields each byte in the string, along with the index"
     string_a Array(U8) = []
     string_b Array(USize) = []
@@ -43,6 +43,11 @@
   
   :it "copies bytes from the given string onto the end of the string"
     @assert = (String.new << "foo" << "bar") == "foobar"
+  
+  :it "creates a multiplicit copy of the string"
+    @assert = ("Hey" * 3) == "HeyHeyHey"
+    @assert = ("Hey" * 1) == "Hey"
+    @assert = ("Hey" * 0) == ""
   
   :it "splits the string at every occurrence of the given byte value"
     @assert = "foo.bar.baz".split('.') == ["foo", "bar", "baz"]

@@ -119,6 +119,22 @@
     @_size = new_size
     @
   
+  :: Return a new string consisting of the original string copied `n` times.
+  :fun "*" (times USize)
+    if (times > 0) (
+      ptr = @_ptr._alloc(@size * times)
+      size = 0
+      
+      while (times > 0) (times -= 1
+        @_ptr._copy_to(ptr._offset(size), @size)
+        size += @size
+      )
+      
+      @val_from_cpointer(ptr, size, size)
+    |
+      @val_from_cpointer(@_ptr.null, 0, 0)
+    )
+  
   :fun val split (split_byte U8) // TODO: a byte shouldn't be the only thing we can split by...
     result Array(String) = []
     @each_split(split_byte) -> (s | result << s)
