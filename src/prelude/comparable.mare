@@ -1,0 +1,6 @@
+:trait Comparable (A Comparable(A)'read)
+  :fun "==" (other A'box) Bool // TODO: use :is Equatable(A) instead
+  :fun "<" (other A'box) Bool
+  :fun "<=" (other A'box) Bool: (@ == other) || (@ < other)
+  :fun ">=" (other A'box) Bool: (@ < other).not
+  :fun ">" (other A'box) Bool: (@ <= other).not

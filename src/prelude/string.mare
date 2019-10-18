@@ -1,4 +1,6 @@
 :class val String
+  :is Comparable(String'box)
+  
   :prop _size USize
   :prop _alloc USize // TODO: rename as `_space`
   :prop _ptr CPointer(U8)'ref
@@ -164,6 +166,45 @@
       @_alloc - start
     )
     @
+  
+  :fun "<" (other String'box)
+    min_size = @size.min(other.size)
+    index USize = 0
+    result = False
+    try (
+      while (index < min_size) (
+        a = @_ptr._get_at(index)
+        b = other._ptr._get_at(index)
+        case (
+        | a < b | result = True,  error! // TODO: use break or early return instead of error
+        | a > b | result = False, error! // TODO: use break or early return instead of error
+        )
+        index = index + 1
+      )
+      result = @size < other.size
+    )
+    result
+  
+  :fun "<=" (other String'box)
+    min_size = @size.min(other.size)
+    index USize = 0
+    result = False
+    try (
+      while (index < min_size) (
+        a = @_ptr._get_at(index)
+        b = other._ptr._get_at(index)
+        case (
+        | a < b | result = True,  error! // TODO: use break or early return instead of error
+        | a > b | result = False, error! // TODO: use break or early return instead of error
+        )
+        index = index + 1
+      )
+      result = @size <= other.size
+    )
+    result
+  
+  :fun ">=" (other String'box) Bool: (@ < other).not // TODO: inherit from Comparable(String) instead of implementing here
+  :fun ">" (other String'box) Bool: (@ <= other).not // TODO: inherit from Comparable(String) instead of implementing here
   
   :fun parse_i64! // TODO: Use something like Crystal's Char::Reader instead?
     output I64 = 0

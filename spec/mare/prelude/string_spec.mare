@@ -52,6 +52,32 @@
   :it "splits the string at every occurrence of the given byte value"
     @assert = "foo.bar.baz".split('.') == ["foo", "bar", "baz"]
   
+  :it "lexically compares the string with another string of the same length"
+    @assert = "examplE" < "example"
+    @assert = "example" > "examplE"
+    @assert = ("example" < "examplE").not
+    @assert = ("examplE" > "example").not
+    @assert = "examplE" <= "example"
+    @assert = "example" >= "examplE"
+    @assert = ("example" <= "examplE").not
+    @assert = ("examplE" >= "example").not
+    
+  :it "lexically compares the string with an identical string"
+    @assert = ("example" < "example").not
+    @assert = ("example" > "example").not
+    @assert = "example" <= "example"
+    @assert = "example" >= "example"
+    
+  :it "lexically compares with a nearly identical string of different length"
+    @assert = "example" < "example!"
+    @assert = "example!" > "example"
+    @assert = ("example!" < "example").not
+    @assert = ("example" > "example!").not
+    @assert = "example" <= "example!"
+    @assert = "example!" >= "example"
+    @assert = ("example!" <= "example").not
+    @assert = ("example" >= "example!").not
+  
   :it "parses an integer from the string decimal representation"
     @assert = try ("36".parse_i64!  == 36  | False)
     @assert = try ("+36".parse_i64! == 36  | False)
