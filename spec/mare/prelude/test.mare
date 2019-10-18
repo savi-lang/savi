@@ -398,6 +398,8 @@
     test["Inspect -I64  "].pass = Inspect[I64[-36]]   == "-36"
     test["Inspect -ISize"].pass = Inspect[ISize[-36]] == "-36"
     
+    test["Inspect 0"].pass = Inspect[U8[0]] == "0"
+    
     test["Inspect String    "].pass = Inspect["example"] == "\"example\""
     test["Inspect String'ref"].pass = Inspect[String.new] == "\"\""
     
