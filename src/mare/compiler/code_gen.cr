@@ -925,6 +925,9 @@ class Mare::Compiler::CodeGen
       when "_get_at"
         gep = @builder.inbounds_gep(params[0], params[1])
         @builder.load(gep)
+      when "_get_at_no_alias"
+        gep = @builder.inbounds_gep(params[0], params[1])
+        @builder.load(gep)
       when "_assign_at"
         gep = @builder.inbounds_gep(params[0], params[1])
         new_value = params[2]
@@ -938,8 +941,8 @@ class Mare::Compiler::CodeGen
         old_value
       when "_copy_to"
         @builder.call(@memcpy, [
-          params[1],
-          params[0],
+          @builder.bit_cast(params[1], @ptr),
+          @builder.bit_cast(params[0], @ptr),
           @builder.mul(
             params[2],
             @isize.const_int(elem_size_value),
@@ -1348,8 +1351,8 @@ class Mare::Compiler::CodeGen
         
         param_default = AST::Extract.param(param)[2]
         
-        raise "missing arg #{args.size + 1} with no default param" \
-          unless param_default
+        raise "missing arg #{args.size + 1} with no default param:"\
+          "\n#{relate.pos.show}" unless param_default
         
         # Somewhat hacky unwrapping to aid the source_code_position_of_argument check below.
         param_default = param_default.terms.first \

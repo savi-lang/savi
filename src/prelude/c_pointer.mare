@@ -5,6 +5,7 @@
   :fun tag _unsafe @'ref: compiler intrinsic
   :fun box _offset (offset USize) @'ref: compiler intrinsic
   :fun box _get_at (index USize) A'aliased: compiler intrinsic
+  :fun ref _get_at_no_alias (index USize) A: compiler intrinsic
   :fun ref _assign_at (index USize, value A) A'aliased: compiler intrinsic
   :fun ref _displace_at (index USize, value A) A: compiler intrinsic
   :fun box _copy_to (other @'ref, count USize) None: compiler intrinsic

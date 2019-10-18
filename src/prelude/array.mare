@@ -32,6 +32,19 @@
     if (@_alloc < space) \
       @_ptr_reallocate(space)
   
+  :: Create a clone of this array, containing references to the same elements
+  :: that are held by this array. This is only safe if the references are
+  :: aliasable as themselves (with non-unique reference capabilities), so
+  :: if the element type isn't aliasable, the cloned array will be empty.
+  
+  :fun clone
+    array = @new(@size)
+    if (A <: alias) (
+      @_ptr._copy_to(array._ptr, @size)
+      array._size = @size
+    )
+    array
+  
   :fun "[]!" (index)
     if (@size <= index) error!
     @_ptr._get_at(index)
@@ -122,3 +135,90 @@
       index += 1
     )
     new_array
+  
+  :: Return a copy of the array that has its elements sorted by value.
+  :: If the element type is not aliasable, or not Comparable, it will be empty.
+  
+  :fun sort: @clone.sort_in_place
+  
+  :: Mutate the array to sort its elements by value.
+  :: If the element type is not Comparable, there is no way to sort the values,
+  :: so the array will be emptied of all elements, in order to make the
+  :: issue as obvious as possible while not penalizing proper usage.
+  
+  :fun ref sort_in_place
+    if @_sort_in_place(0, @size.isize - 1) (@ | @.clear)
+  
+  :fun ref _sort_in_place (lo_pivot ISize, hi_pivot ISize) Bool // TODO: should be actually private
+    if (A <: Comparable(A)'read) (
+      if (lo_pivot < hi_pivot) (
+        // Choose the outermost elements as pivots, ensuring that the higher
+        // of the two is on the right, swapping to make it so if needed.
+        lo_pivot_value = @_ptr._get_at(lo_pivot.usize)
+        hi_pivot_value = @_ptr._get_at(hi_pivot.usize)
+        if (lo_pivot_value > hi_pivot_value) (
+          @_ptr._assign_at(lo_pivot.usize, hi_pivot_value)
+          @_ptr._assign_at(hi_pivot.usize, lo_pivot_value)
+          lo_pivot_value = @_ptr._get_at(lo_pivot.usize)
+          hi_pivot_value = @_ptr._get_at(hi_pivot.usize)
+        )
+        
+        // Create our three moving cursors inside the pivot range:
+        // `lo` moves upward starting from the bottom of the range
+        // `hi` moves downward starting from the top of the range
+        // `scan` moves upward between the two
+        lo = lo_pivot + 1, hi = hi_pivot - 1
+        scan = lo
+        
+        // Scan the range, swapping as necessary.
+        while (scan <= hi) (scan_value = @_ptr._get_at(scan.usize)
+          case (
+          // When we scan a value less than our pivot, swap the value downward.
+          | scan_value < lo_pivot_value |
+            @_swap(scan.usize, lo.usize) // TODO: these swap operations can be optimized by leveraging earlier pointer reads, though it will be more verbose
+            lo += 1
+          
+          // When we scan a value greater than our pivot, swap the value upward.
+          | scan_value >= hi_pivot_value |
+            // First move `hi` cursor until it's greater than the `hi_pivot`.
+            while (@_ptr._get_at(hi.usize) > hi_pivot_value && scan < hi) (
+              hi -= 1
+            )
+            
+            // Swap the scanned value upward.
+            @_swap(scan.usize, hi.usize) // TODO: these swap operations can be optimized by leveraging earlier pointer reads, though it will be more verbose
+            hi -= 1
+            
+            // Possibly swap the just-swapped value downward if it needs to be.
+            // Note that `scan_value` here is the previous `hi` value.
+            scan_value = @_ptr._get_at(scan.usize)
+            if (scan_value < lo_pivot_value) (
+              @_swap(scan.usize, lo.usize) // TODO: these swap operations can be optimized by leveraging earlier pointer reads, though it will be more verbose
+              lo += 1
+            )
+          )
+        scan += 1)
+        
+        // Re-expand to the true range now that we've finished scanning.
+        lo -= 1
+        hi += 1
+        
+        // Swap the pivots to their final positions.
+        @_swap(lo_pivot.usize, lo.usize) // TODO: these swap operations can be optimized by leveraging earlier pointer reads, though it will be more verbose
+        @_swap(hi_pivot.usize, hi.usize) // TODO: these swap operations can be optimized by leveraging earlier pointer reads, though it will be more verbose
+        
+        // Recursively sort the three sub-ranges left inside this range.
+        @_sort_in_place(lo_pivot, lo - 1)
+        @_sort_in_place(lo + 1, hi - 1)
+        @_sort_in_place(hi + 1, hi_pivot)
+      )
+      True
+    |
+      False // return false if the elements are not Comparable
+    )
+  
+  :fun ref _swap (a USize, b USize)
+    a_elem = @_ptr._get_at_no_alias(a)
+    b_elem = @_ptr._get_at_no_alias(b)
+    @_ptr._assign_at(a, --b_elem)
+    @_ptr._assign_at(b, --a_elem)
