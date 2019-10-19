@@ -66,8 +66,9 @@ class Mare::Compiler::CodeGen
       
       # Take down info on all functions.
       @vtable_size = 0
-      @type_def.each_function(g.ctx).each do |rf|
-        infer = g.ctx.infer[rf]
+      @type_def.each_function(g.ctx).each do |reach_func|
+        rf = reach_func.reified
+        infer = reach_func.infer
         
         unless rf.func.has_tag?(:hygienic)
           vtable_index = g.ctx.paint[rf]

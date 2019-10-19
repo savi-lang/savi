@@ -384,11 +384,22 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     def each_function(ctx)
       ctx.infer[@reified]
       .all_for_funcs.map(&.reified)
-      .select { |rf| ctx.reach.reached_func?(rf) }
+      .flat_map { |rf| ctx.reach.reached_funcs_for(rf).to_a }
     end
     
     def as_ref : Ref
       Ref.new(Infer::MetaType.new(@reified))
+    end
+  end
+  
+  struct Func
+    getter infer : Infer::ForFunc
+    
+    def reified
+      infer.reified
+    end
+    
+    def initialize(@infer)
     end
   end
   
@@ -398,7 +409,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
   def initialize
     @refs = Hash(Infer::MetaType, Ref).new
     @defs = Hash(Infer::ReifiedType, Def).new
-    @seen_funcs = Set(Infer::ReifiedFunction).new
+    @seen_funcs = Hash(Infer::ReifiedFunction, Set(Func)).new
   end
   
   def run(ctx)
@@ -415,8 +426,10 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       next unless infer.reified.func == func
       
       # Skip this function if we've already seen it.
-      next if @seen_funcs.includes?(infer.reified)
-      @seen_funcs.add(infer.reified)
+      next if @seen_funcs.has_key?(infer.reified)
+      funcs = Set(Func).new
+      funcs.add(Func.new(infer))
+      @seen_funcs[infer.reified] = funcs
     
       # Reach all type references seen by this function.
       infer.each_meta_type do |meta_type|
@@ -536,7 +549,11 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
   end
   
   def reached_func?(rf : Infer::ReifiedFunction)
-    @seen_funcs.includes?(rf)
+    @seen_funcs.has_key?(rf)
+  end
+  
+  def reached_funcs_for(rf : Infer::ReifiedFunction)
+    @seen_funcs[rf]? || Set(Func).new
   end
   
   def each_type_def
