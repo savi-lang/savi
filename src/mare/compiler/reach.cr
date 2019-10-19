@@ -288,7 +288,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     end
   end
   
-  class Def
+  struct Def
     getter! desc_id : Int32
     getter fields : Array({String, Ref})
     getter reified
