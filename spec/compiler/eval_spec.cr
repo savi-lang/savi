@@ -26,6 +26,15 @@ describe Mare::Compiler::Eval do
     no_test_failures.should eq true
   end
   
+  it "evaluates the time package's tests" do
+    source_dir = File.join(__DIR__, "../../packages/time/test")
+    
+    no_test_failures =
+      Mare::Compiler.compile(source_dir, :eval).eval.exitcode == 0
+    
+    no_test_failures.should eq true
+  end
+  
   it "evaluates an example" do
     source_dir = File.join(__DIR__, "../../example")
     
