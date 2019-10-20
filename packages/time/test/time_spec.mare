@@ -24,6 +24,36 @@
       (Time.utc(2036, 10, 7, 20, 36, 10, 777) + Time.hours(7))
       == Time.utc(2036, 10, 8, 3, 36, 10, 777)
   
+  :it "can be compared to other times"
+    now = Time.utc(2036, 10, 7, 20, 36, 10, 777)
+    soon = now + Time.nanoseconds(13)
+    later = now + Time.hours(12)
+    @assert = now < later
+    @assert = now <= later
+    @assert = (now == later).not
+    @assert = (now >= later).not
+    @assert = (now > later).not
+    @assert = (later < now).not
+    @assert = (later <= now).not
+    @assert = (later == now).not
+    @assert = later >= now
+    @assert = later > now
+    @assert = (now < now).not
+    @assert = now <= now
+    @assert = now == now
+    @assert = now >= now
+    @assert = (now > now).not
+    @assert = now < soon
+    @assert = now <= soon
+    @assert = (now == soon).not
+    @assert = (now >= soon).not
+    @assert = (now > soon).not
+    @assert = (soon < now).not
+    @assert = (soon <= now).not
+    @assert = (soon == now).not
+    @assert = soon >= now
+    @assert = soon > now
+  
   :it "can be inspected"
     // TODO: Properly pad numbers with zeroes for a constant string width.
     @assert =

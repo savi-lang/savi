@@ -6,6 +6,8 @@
 :: with an additional 32-bit integer to specify nanoseconds within the second.
 
 :class val Time
+  :is Comparable(Time)
+  
   :const _seconds_per_day U64: 86400
   :const _seconds_per_hour U64: 3600
   :const _seconds_per_minute U64: 60
@@ -39,6 +41,15 @@
       + @_seconds_per_minute * minute.u64
       + second.u64
   
+  :: Represent a duration of the given number of nanoseconds.
+  :new nanoseconds (n):
+    @total_seconds = 0
+    while (@_nanoseconds_per_second < n) (
+      n -= @_nanoseconds_per_second
+      @total_seconds += 1
+    )
+    @nanosecond = n
+  
   :: Represent a duration of the given number of seconds.
   :new seconds (n): @total_seconds = n
   
@@ -55,6 +66,20 @@
   :fun "==" (other Time'box)
     @total_seconds == other.total_seconds
     && @nanosecond == other.nanosecond
+  
+  :: Return True if the given time is less than (earlier than) this one.
+  :fun "<" (other Time'box)
+    @total_seconds < other.total_seconds
+    || (@total_seconds == other.total_seconds && @nanosecond < other.nanosecond)
+  
+  :: Return True if the given time is greater than (later than) this one.
+  :fun ">" (other Time'box)
+    @total_seconds > other.total_seconds
+    || (@total_seconds == other.total_seconds && @nanosecond > other.nanosecond)
+  
+  // TODO: Inherit these from Comparable instead:
+  :fun ">=" (other): (@ < other).not
+  :fun "<=" (other): (@ > other).not
   
   :: Subtract the given time (elapsed since `0001-01-01 00:00:00.0` UTC)
   :: from this time and return the result.
