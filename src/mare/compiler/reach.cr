@@ -392,14 +392,35 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     end
   end
   
+  struct Signature
+    getter name : String
+    getter args : Array(Ref)
+    getter ret : Ref
+    def initialize(@name, @args, @ret)
+    end
+    
+    def is_subtype?(ctx, other : Signature)
+      return false unless name == other.name
+      return false unless args.size == other.args.size
+      return false unless args.zip(other.args).all? do |arg, other_arg|
+        ctx.infer[other_arg.reified].subtyping.check(arg.reified)
+      end
+      return false unless \
+        ctx.infer[other.ret.reified].subtyping.check(ret.reified)
+      true
+    end
+  end
+  
   struct Func
-    getter infer : Infer::ForFunc
+    getter reach_def : Def
+    getter infer : Infer::ForFunc # TODO: can/should this be removed or is it good to remain here?
+    getter signature : Signature
     
     def reified
       infer.reified
     end
     
-    def initialize(@infer)
+    def initialize(@reach_def, @infer, @signature)
     end
   end
   
@@ -427,14 +448,17 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       
       # Skip this function if we've already seen it.
       next if @seen_funcs.has_key?(infer.reified)
-      funcs = Set(Func).new
-      funcs.add(Func.new(infer))
-      @seen_funcs[infer.reified] = funcs
+      reach_funcs = Set(Func).new
+      @seen_funcs[infer.reified] = reach_funcs
     
       # Reach all type references seen by this function.
       infer.each_meta_type do |meta_type|
         handle_type_ref(ctx, meta_type)
       end
+      
+      # Add this function with its signature.
+      reach_def = ctx.reach[infer_type.reified]
+      reach_funcs.add(Func.new(reach_def, infer, signature_for(ctx, infer)))
       
       # Reach all functions called by this function.
       infer.each_called_func.each do |called_rt, called_func|
@@ -452,6 +476,20 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
           if other_func && infer.is_subtype?(other_rt, infer_type.reified)
       end
     end
+  end
+  
+  def signature_for(ctx, infer : Infer::ForFunc) : Signature
+    infer.reified.func.params.try(&.terms.map { |arg| })
+    
+    args = [] of Ref
+    infer.reified.func.params.try do |param_exprs|
+      param_exprs.terms.map do |param_expr|
+        args << ctx.reach[infer.resolve(param_expr)]
+      end
+    end
+    ret = ctx.reach[infer.resolve(infer.ret)]
+    
+    Signature.new(infer.reified.name, args, ret)
   end
   
   def handle_field(ctx, rt : Infer::ReifiedType, func) : {String, Ref}?

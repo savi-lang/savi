@@ -71,7 +71,7 @@ class Mare::Compiler::CodeGen
         infer = reach_func.infer
         
         unless rf.func.has_tag?(:hygienic)
-          vtable_index = g.ctx.paint[rf]
+          vtable_index = g.ctx.paint[reach_func]
           @vtable_size = (vtable_index + 1) if @vtable_size <= vtable_index
         end
         

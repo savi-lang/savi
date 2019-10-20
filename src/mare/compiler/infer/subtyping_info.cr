@@ -30,7 +30,7 @@ class Mare::Compiler::Infer::SubtypingInfo
   end
   
   # Return true if this type satisfies the requirements of the that type.
-  def check(that : ReifiedType, errors : Array(Error::Info))
+  def check(that : ReifiedType, errors : Array(Error::Info) = [] of Error::Info)
     # TODO: for each return false, carry info about why it was false?
     # Maybe we only want to go to the trouble of collecting this info
     # when it is requested by the caller, so as not to slow the base case.

@@ -18,20 +18,41 @@ class Mare::Compiler::Paint
   alias Color = Int32
   
   def initialize
-    @types_by_func_name = Hash(String, Set(Program::Type)).new
-    @types_by_color = Hash(Color, Set(Program::Type)).new
-    @color_by_func_name = Hash(String, Color).new
-    @next_color = 0
+    @concrete_defs     = Hash(Reach::Def, Array(Reach::Def)).new
+    @abstract_defs     = Hash(Reach::Def, Array(Reach::Def)).new
+    @defs_by_signature = Hash(Reach::Signature, Set(Reach::Def)).new
+    @defs_by_color     = Hash(Color, Set(Reach::Def)).new
+    @next_color        = 0
+    
+    @results = Hash(Reach::Def, Hash(Reach::Signature, Color)).new
   end
   
   def run(ctx)
+    # Collect all type defs based on whether they are concrete or abstract.
+    ctx.reach.each_type_def.each do |reach_def|
+      if reach_def.is_abstract?
+        @abstract_defs[reach_def] = [] of Reach::Def
+      else
+        @concrete_defs[reach_def] = [] of Reach::Def
+      end
+    end
+    
+    # Now figure out which concrete types fulfill which abstract ones.
+    @abstract_defs.each do |abstract_def, concretes_of_abstract|
+      @concrete_defs.each do |concrete_def, abstracts_of_concrete|
+        if ctx.infer[concrete_def.reified].subtyping.check(abstract_def.reified)
+          concretes_of_abstract << concrete_def
+          abstracts_of_concrete << abstract_def
+        end
+      end
+    end
+    
     # Collect a mapping of the types that implement each function name.
-    ctx.reach.each_type_def.each do |td|
-      td.each_function(ctx).each do |reach_func|
-        rf = reach_func.reified
-        next if rf.func.has_tag?(:hygienic)
+    ctx.reach.each_type_def.each do |reach_def|
+      reach_def.each_function(ctx).each do |reach_func|
+        next if reach_func.reified.func.has_tag?(:hygienic)
         
-        observe_func(td.program_type, rf)
+        observe_func(reach_def, reach_func)
       end
     end
     
@@ -43,8 +64,8 @@ class Mare::Compiler::Paint
   # Public: return the color id for the given function,
   # assuming that this pass has already been run on the program.
   def [](rf); color_of(rf) end
-  def color_of(rf : Infer::ReifiedFunction) : Color
-    @color_by_func_name[rf.name]
+  def color_of(reach_func : Reach::Func) : Color
+    @results[reach_func.reach_def][reach_func.signature]
   end
   
   # Return the next color id to assign when we need a previously unused color.
@@ -55,41 +76,45 @@ class Mare::Compiler::Paint
   end
   
   # Take notice of the given function, under the given type.
-  private def observe_func(t, rf)
-    name = rf.name
-    set = @types_by_func_name[name] ||= Set(Program::Type).new
-    set.add(t)
+  private def observe_func(reach_def : Reach::Def, reach_func : Reach::Func)
+    sig = reach_func.signature
+    set = @defs_by_signature[sig] ||= Set(Reach::Def).new
+    set.add(reach_def)
   end
   
-  # For all the function names we know about, assign "color" ids
+  # For all the function signatures we know about, assign "color" ids
   # such that no type will have multiple functions of the same color,
   # and as few as possible (well... as is practical) color ids are used.
-  # TODO: take into account other discriminators besides function names?
   private def assign_colors
-    @types_by_func_name.each do |name, name_types|
-      # Try to find an existing color that is unused in all of these name_types.
-      result =
-        @types_by_color.to_a.find { |_, c_types| (name_types & c_types).empty? }
+    @defs_by_signature.each do |signature, sig_defs|
+      # Try to find an existing color that is unused in all of these sig_defs.
+      pair =
+        @defs_by_color.to_a.find { |_, c_types| (sig_defs & c_types).empty? }
       
       # Otherwise, generate a new color id and start to populate it.
-      result ||= (
+      pair ||= (
         color = next_color
-        color_types = Set(Program::Type).new
-        @types_by_color[color] = color_types
-        {color, color_types}
+        color_defs = Set(Reach::Def).new
+        @defs_by_color[color] = color_defs
+        {color, color_defs}
       )
       
-      # Insert these name_types into the color_types set for this color,
-      # and insert this name/color pair into our result map.
-      color, color_types = result
-      color_types.concat(name_types)
-      @color_by_func_name[name] = color
+      # Insert these sig_defs into the color_defs set for this color,
+      # and insert this name/color pair for each def into our result map.
+      color, color_defs = pair
+      color_defs.concat(sig_defs)
+      sig_defs.each do |sig_def|
+        colors_by_sig = @results[sig_def] ||= Hash(Reach::Signature, Color).new
+        colors_by_sig[signature] = color
+      end
     end
   end
   
   # Delete unnecessary information from our memory (everything but the results).
   private def cleanup
-    @types_by_func_name.clear
-    @types_by_color.clear
+    @concrete_defs.clear
+    @abstract_defs.clear
+    @defs_by_signature.clear
+    @defs_by_color.clear
   end
 end
