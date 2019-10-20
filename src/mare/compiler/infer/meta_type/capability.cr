@@ -43,7 +43,17 @@ struct Mare::Compiler::Infer::MetaType::Capability
   end
   
   def inspect(io : IO)
-    io << value
+    value = value()
+    if value.is_a?(Set(Capability))
+      io << '{'
+      value.each_with_index do |cap, index|
+        io << ", " unless index == 0
+        cap.inspect(io)
+      end
+      io << '}'
+    else
+      io << value
+    end
   end
   
   def each_reachable_defn : Iterator(ReifiedType)

@@ -216,8 +216,10 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         bound_pos =
           rt.defn.params.not_nil!.terms[index].as(AST::Group).terms.last.pos
         Error.at arg_node,
-          "This type argument won't satisfy the type parameter bound",
-          [{bound_pos, "the type parameter bound is here"}]
+          "This type argument won't satisfy the type parameter bound", [
+            {bound_pos, "the type parameter bound is #{param_bound.show_type}"},
+            {arg_node.pos, "the type argument is #{arg.show_type}"},
+          ]
       end
     end
   end

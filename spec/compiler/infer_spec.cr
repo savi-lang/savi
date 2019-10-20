@@ -1850,10 +1850,15 @@ describe Mare::Compiler::Infer do
         Generic(Class)
                 ^~~~~
     
-    - the type parameter bound is here:
+    - the type parameter bound is {iso, val, tag, non}:
       from (example):2:
     :class Generic (P1 send)
                        ^~~~
+    
+    - the type argument is Class:
+      from (example):6:
+        Generic(Class)
+                ^~~~~
     MSG
     
     expect_raises Mare::Error, expected do
