@@ -18,6 +18,21 @@
   :fun "==" (other String'box)
     (@_size == other._size) && (@_ptr._compare(other._ptr, @_size) == 0)
   
+  :fun includes (other): try (@offset_of!(other), True | False)
+  
+  :fun offset_of! (other String'box, start_offset USize = 0)
+    found Bool = False
+    offset = start_offset
+    other_first = other[0]! // cache here and error out if the other is empty
+    while (found.not && offset < @_size) (
+      if (@_ptr._get_at(offset) == other_first) (
+        found = (@_ptr._offset(offset)._compare(other._ptr, other._size) == 0)
+      )
+      offset = offset + 1
+    )
+    if found.not error!
+    offset - 1
+  
   :: Returns true if the string is null-terminated and safe to pass to an FFI
   :: function that doesn't accept a size argument, expecting a null-terminator.
   ::

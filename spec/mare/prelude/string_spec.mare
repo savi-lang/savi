@@ -8,6 +8,16 @@
     @assert = ("string" == "string")
     @assert = ("string" == "other").not
   
+  :it "finds the index of another substring within it"
+    @assert = try ("bar food foo".offset_of!("foo") == 4 | False)
+    @assert = try ("bar food foo".offset_of!("bard"), False | True)
+    @assert = try ("bar food foo".offset_of!("nope"), False | True)
+    @assert = try ("bar food foo".offset_of!(""),     False | True)
+    @assert = "bar food foo".includes("foo")
+    @assert = "bar food foo".includes("bard").not
+    @assert = "bar food foo".includes("nope").not
+    @assert = "bar food foo".includes("").not
+  
   :it "hashes the bytes of the string"
     @assert = ("string".hash == 0x4CF51F4A5B5CF110)
   
