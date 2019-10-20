@@ -151,7 +151,7 @@ module Mare::Parser
     )
     
     # Define a total document to be a sequence of lines.
-    doc = sn >> terms.named(:doc)
+    doc = (sn >> terms).named(:doc)
     
     # A valid parse is a single document followed by the end of the file.
     doc.then_eof

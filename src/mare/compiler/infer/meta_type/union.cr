@@ -412,15 +412,7 @@ struct Mare::Compiler::Infer::MetaType::Union
     result
   end
   
-  def subtype_of?(infer : (ForFunc | ForType), other : Capability) : Bool
-    raise NotImplementedError.new([self, :subtype_of?, other].inspect)
-  end
-  
-  def supertype_of?(infer : (ForFunc | ForType), other : Capability) : Bool
-    raise NotImplementedError.new([self, :supertype_of?, other].inspect)
-  end
-  
-  def subtype_of?(infer : (ForFunc | ForType), other : (Nominal | AntiNominal | Intersection)) : Bool
+  def subtype_of?(infer : (ForFunc | ForType), other : (Capability | Nominal | AntiNominal | Intersection)) : Bool
     # This union is a subtype of the other if and only if
     # all terms in the union are subtypes of that other.
     result = true
@@ -431,7 +423,7 @@ struct Mare::Compiler::Infer::MetaType::Union
     result
   end
   
-  def supertype_of?(infer : (ForFunc | ForType), other : (Nominal | AntiNominal | Intersection)) : Bool
+  def supertype_of?(infer : (ForFunc | ForType), other : (Capability | Nominal | AntiNominal | Intersection)) : Bool
     # This union is a supertype of the given other if and only if
     # any term in the union qualifies as a supertype of that other.
     result = false
