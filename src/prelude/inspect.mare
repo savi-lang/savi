@@ -2,6 +2,11 @@
 :ffi InspectLibC
   :fun puts (CPointer(U8)) I32
 
+:trait box _InspectEach
+  // TODO: use each instead of size and []!
+  :fun size USize
+  :fun "[]!" (index USize) box // TODO: allow any box
+
 // TODO: Move this out of prelude maybe? Does that make sense?
 // TODO: Make this into a trait with "implement for"/typeclass style polymorphism
 :primitive Inspect
@@ -39,6 +44,15 @@
       output.push_byte('"')
       output << input // TODO: show some characters as escaped.
       output.push_byte('"')
+    | input <: _InspectEach |
+      output.push_byte('[')
+      index USize = 0
+      while (index < input.size) (
+        if (index > 0) (output.push_byte(','), output.push_byte(' '))
+        try (@into(input[index]!, output))
+        index += 1
+      )
+      output.push_byte(']')
     | // TODO: support inspection of more types
       output << "<uninspectable>"
     )

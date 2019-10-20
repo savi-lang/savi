@@ -18,35 +18,14 @@ class Mare::Compiler::Paint
   alias Color = Int32
   
   def initialize
-    @concrete_defs     = Hash(Reach::Def, Array(Reach::Def)).new
-    @abstract_defs     = Hash(Reach::Def, Array(Reach::Def)).new
-    @defs_by_signature = Hash(Reach::Signature, Set(Reach::Def)).new
-    @defs_by_color     = Hash(Color, Set(Reach::Def)).new
-    @next_color        = 0
+    @defs_by_sig_compat = Hash(String, Set(Reach::Def)).new
+    @defs_by_color      = Hash(Color, Set(Reach::Def)).new
+    @next_color         = 0
     
-    @results = Hash(Reach::Def, Hash(Reach::Signature, Color)).new
+    @results = Hash(Reach::Def, Hash(String, Color)).new
   end
   
   def run(ctx)
-    # Collect all type defs based on whether they are concrete or abstract.
-    ctx.reach.each_type_def.each do |reach_def|
-      if reach_def.is_abstract?
-        @abstract_defs[reach_def] = [] of Reach::Def
-      else
-        @concrete_defs[reach_def] = [] of Reach::Def
-      end
-    end
-    
-    # Now figure out which concrete types fulfill which abstract ones.
-    @abstract_defs.each do |abstract_def, concretes_of_abstract|
-      @concrete_defs.each do |concrete_def, abstracts_of_concrete|
-        if ctx.infer[concrete_def.reified].subtyping.check(abstract_def.reified)
-          concretes_of_abstract << concrete_def
-          abstracts_of_concrete << abstract_def
-        end
-      end
-    end
-    
     # Collect a mapping of the types that implement each function name.
     ctx.reach.each_type_def.each do |reach_def|
       reach_def.each_function(ctx).each do |reach_func|
@@ -65,7 +44,7 @@ class Mare::Compiler::Paint
   # assuming that this pass has already been run on the program.
   def [](rf); color_of(rf) end
   def color_of(reach_func : Reach::Func) : Color
-    @results[reach_func.reach_def][reach_func.signature]
+    @results[reach_func.reach_def][reach_func.signature.codegen_compat_name]
   end
   
   # Return the next color id to assign when we need a previously unused color.
@@ -78,7 +57,7 @@ class Mare::Compiler::Paint
   # Take notice of the given function, under the given type.
   private def observe_func(reach_def : Reach::Def, reach_func : Reach::Func)
     sig = reach_func.signature
-    set = @defs_by_signature[sig] ||= Set(Reach::Def).new
+    set = @defs_by_sig_compat[sig.codegen_compat_name] ||= Set(Reach::Def).new
     set.add(reach_def)
   end
   
@@ -86,7 +65,7 @@ class Mare::Compiler::Paint
   # such that no type will have multiple functions of the same color,
   # and as few as possible (well... as is practical) color ids are used.
   private def assign_colors
-    @defs_by_signature.each do |signature, sig_defs|
+    @defs_by_sig_compat.each do |sig_compat, sig_defs|
       # Try to find an existing color that is unused in all of these sig_defs.
       pair =
         @defs_by_color.to_a.find { |_, c_types| (sig_defs & c_types).empty? }
@@ -104,17 +83,15 @@ class Mare::Compiler::Paint
       color, color_defs = pair
       color_defs.concat(sig_defs)
       sig_defs.each do |sig_def|
-        colors_by_sig = @results[sig_def] ||= Hash(Reach::Signature, Color).new
-        colors_by_sig[signature] = color
+        colors_by_sig = @results[sig_def] ||= Hash(String, Color).new
+        colors_by_sig[sig_compat] = color
       end
     end
   end
   
   # Delete unnecessary information from our memory (everything but the results).
   private def cleanup
-    @concrete_defs.clear
-    @abstract_defs.clear
-    @defs_by_signature.clear
+    @defs_by_sig_compat.clear
     @defs_by_color.clear
   end
 end

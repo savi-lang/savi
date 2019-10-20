@@ -77,7 +77,8 @@ class Mare::Compiler::CodeGen
         
         key = rf.func.ident.value
         key += Random::Secure.hex if rf.func.has_tag?(:hygienic)
-        @gfuncs[key] = GenFunc.new(@type_def, infer, vtable_index)
+        key += Random::Secure.hex if @gfuncs.has_key?(key)
+        @gfuncs[key] = GenFunc.new(reach_func, vtable_index)
       end
       
       # If we're generating for a type that has no inherent descriptor,
@@ -186,7 +187,7 @@ class Mare::Compiler::CodeGen
   end
   
   class GenFunc
-    getter infer : Infer::ForFunc
+    getter reach_func : Reach::Func
     getter! vtable_index : Int32
     getter llvm_name : String
     property! llvm_func : LLVM::Function
@@ -201,11 +202,19 @@ class Mare::Compiler::CodeGen
     property! yield_cc_final_return_type : LLVM::Type
     property! after_yield_blocks : Array(LLVM::BasicBlock)
     
-    def initialize(type_def : Reach::Def, @infer, @vtable_index)
+    def initialize(@reach_func, @vtable_index)
       @needs_receiver = type_def.has_state? && !(func.cap.value == "non")
       
       @llvm_name = "#{type_def.llvm_name}#{infer.reified.name}"
       @llvm_name = "#{@llvm_name}.HYGIENIC" if func.has_tag?(:hygienic)
+    end
+    
+    def type_def
+      @reach_func.reach_def
+    end
+    
+    def infer
+      @reach_func.infer
     end
     
     def func
@@ -631,7 +640,7 @@ class Mare::Compiler::CodeGen
     end
     
     # Determine the LLVM type to return, based on the calling convention.
-    simple_ret_type = llvm_type_of(gfunc.func.ident, gfunc)
+    simple_ret_type = llvm_type_of(gfunc.reach_func.signature.ret)
     ret_type =
       case gfunc.calling_convention
       when :constructor_cc
@@ -690,12 +699,9 @@ class Mare::Compiler::CodeGen
     # Get the LLVM types to use for the parameter types.
     param_types = [] of LLVM::Type
     mparam_types = [] of LLVM::Type if gfunc.needs_send?
-    gfunc.func.params.try do |params|
-      params.terms.map do |param|
-        ref = type_of(param, gfunc)
-        param_types << llvm_type_of(ref)
-        mparam_types << llvm_mem_type_of(ref) if mparam_types
-      end
+    gfunc.reach_func.signature.params.map do |param|
+      param_types << llvm_type_of(param)
+      mparam_types << llvm_mem_type_of(param) if mparam_types
     end
     
     # Add implicit receiver parameter if needed.
@@ -831,7 +837,7 @@ class Mare::Compiler::CodeGen
       when :simple_cc
         @builder.ret(last_value)
       when :error_cc
-        gen_return_using_error_cc(last_value, false)
+        gen_return_using_error_cc(last_value, last_expr, false)
       when :yield_cc
         gen_final_return_using_yield_cc(last_value)
       else
@@ -2652,7 +2658,7 @@ class Mare::Compiler::CodeGen
       calling_convention = func_frame.gfunc.not_nil!.calling_convention
       raise "unsupported empty try else stack for #{calling_convention}" \
         unless calling_convention == :error_cc
-      gen_return_using_error_cc(error_value, true)
+      gen_return_using_error_cc(error_value, nil, true)
     else
       # Store the state needed to catch the value in the try else block.
       else_stack_tuple = @try_else_stack.last
@@ -2664,7 +2670,10 @@ class Mare::Compiler::CodeGen
     end
   end
   
-  def gen_return_using_error_cc(value, is_error : Bool)
+  def gen_return_using_error_cc(value, value_expr, is_error : Bool)
+    value_type = func_frame.llvm_func.return_type.struct_element_types[0]
+    value = gen_assign_cast(value, value_type, value_expr) unless is_error
+    
     tuple = func_frame.llvm_func.return_type.undef
     tuple = @builder.insert_value(tuple, value, 0)
     tuple = @builder.insert_value(tuple, is_error ? @i1_true : @i1_false, 1)

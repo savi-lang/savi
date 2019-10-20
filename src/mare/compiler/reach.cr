@@ -9,11 +9,17 @@
 #
 class Mare::Compiler::Reach < Mare::AST::Visitor
   struct Ref
+    protected getter meta_type
+    
     def initialize(@meta_type : Infer::MetaType)
     end
     
     def show_type
       @meta_type.show_type
+    end
+    
+    def is_subtype?(infer, other : Ref)
+      @meta_type.subtype_of?(infer, other.meta_type)
     end
     
     def is_tuple?
@@ -75,6 +81,10 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     
     def is_signed_numeric?
       is_numeric? && single!.defn.const_bool("is_signed")
+    end
+    
+    def is_not_pointer?
+      !([:object_ptr, :struct_ptr].includes?(llvm_use_type))
     end
     
     def llvm_use_type : Symbol
@@ -384,7 +394,13 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     def each_function(ctx)
       ctx.infer[@reified]
       .all_for_funcs.map(&.reified)
-      .flat_map { |rf| ctx.reach.reached_funcs_for(rf).to_a }
+      .flat_map { |rf| ctx.reach.reached_funcs_for(rf) }
+    end
+    
+    def each_function_not_flat(ctx)
+      ctx.infer[@reified]
+      .all_for_funcs.map(&.reified)
+      .map { |rf| ctx.reach.reached_funcs_for(rf) }
     end
     
     def as_ref : Ref
@@ -394,20 +410,28 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
   
   struct Signature
     getter name : String
-    getter args : Array(Ref)
+    getter params : Array(Ref)
     getter ret : Ref
-    def initialize(@name, @args, @ret)
+    def initialize(@name, @params, @ret)
     end
     
-    def is_subtype?(ctx, other : Signature)
+    def is_subtype?(infer, other : Signature)
       return false unless name == other.name
-      return false unless args.size == other.args.size
-      return false unless args.zip(other.args).all? do |arg, other_arg|
-        ctx.infer[other_arg.reified].subtyping.check(arg.reified)
+      return false unless params.size == other.params.size
+      return false unless params.zip(other.params).all? do |param, other_param|
+        infer.is_subtype?(other_param.meta_type, param.meta_type)
       end
       return false unless \
-        ctx.infer[other.ret.reified].subtyping.check(ret.reified)
+        infer.is_subtype?(ret.meta_type, other.ret.meta_type)
       true
+    end
+    
+    def codegen_compat
+      {name, params.map(&.is_not_pointer?) + [ret.is_not_pointer?]}
+    end
+    
+    def codegen_compat_name
+      codegen_compat.inspect # TODO: be less silly and lazy here?
     end
   end
   
@@ -430,7 +454,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
   def initialize
     @refs = Hash(Infer::MetaType, Ref).new
     @defs = Hash(Infer::ReifiedType, Def).new
-    @seen_funcs = Hash(Infer::ReifiedFunction, Set(Func)).new
+    @seen_funcs = Hash(Infer::ReifiedFunction, Array(Func)).new
   end
   
   def run(ctx)
@@ -439,6 +463,9 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     handle_func(ctx, ctx.infer.for_type(ctx, env), env.find_func!("_create"))
     main = ctx.namespace["Main"].as(Program::Type)
     handle_func(ctx, ctx.infer.for_type(ctx, main), main.find_func!("new"))
+    
+    # Run our "sympathetic resonance" mini-pass.
+    sympathetic_resonance(ctx)
   end
   
   def handle_func(ctx, infer_type : Infer::ForType, func)
@@ -448,7 +475,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       
       # Skip this function if we've already seen it.
       next if @seen_funcs.has_key?(infer.reified)
-      reach_funcs = Set(Func).new
+      reach_funcs = Array(Func).new
       @seen_funcs[infer.reified] = reach_funcs
     
       # Reach all type references seen by this function.
@@ -458,7 +485,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       
       # Add this function with its signature.
       reach_def = ctx.reach[infer_type.reified]
-      reach_funcs.add(Func.new(reach_def, infer, signature_for(ctx, infer)))
+      reach_funcs << Func.new(reach_def, infer, signature_for(ctx, infer))
       
       # Reach all functions called by this function.
       infer.each_called_func.each do |called_rt, called_func|
@@ -479,17 +506,15 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
   end
   
   def signature_for(ctx, infer : Infer::ForFunc) : Signature
-    infer.reified.func.params.try(&.terms.map { |arg| })
-    
-    args = [] of Ref
+    params = [] of Ref
     infer.reified.func.params.try do |param_exprs|
       param_exprs.terms.map do |param_expr|
-        args << ctx.reach[infer.resolve(param_expr)]
+        params << ctx.reach[infer.resolve(param_expr)]
       end
     end
     ret = ctx.reach[infer.resolve(infer.ret)]
     
-    Signature.new(infer.reified.name, args, ret)
+    Signature.new(infer.reified.name, params, ret)
   end
   
   def handle_field(ctx, rt : Infer::ReifiedType, func) : {String, Ref}?
@@ -536,6 +561,67 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     
     # Now, save a Def instance for this program type.
     @defs[rt] = Def.new(ctx, rt, self, fields)
+  end
+  
+  def sympathetic_resonance(ctx)
+    # For each reachable abstract type def in the program,
+    # collect the type defs that are subtypes of it.
+    abstract_defs = Hash(Reach::Def, Array(Reach::Def)).new
+    each_type_def.select(&.is_abstract?).each do |abstract_def|
+      abstract_defs[abstract_def] = subtype_defs = [] of Reach::Def
+      each_type_def.each do |other_def|
+        if other_def != abstract_def \
+        && ctx.infer[other_def.reified].subtyping.check(abstract_def.reified)
+          subtype_defs << other_def
+        end
+      end
+    end
+    
+    # For each method in each abstract type, sympathetically resonate into
+    # the corresponding methods in each concrete type that is a subtype of it.
+    abstract_defs.each do |abstract_def, subtype_defs|
+      subtype_defs.each do |subtype_def|
+        ctx.infer[abstract_def.reified].all_for_funcs.each do |abstract_infer|
+          abstract_seen = @seen_funcs[abstract_infer.reified]?
+          next unless abstract_seen && !abstract_seen.empty?
+          
+          ctx.infer[subtype_def.reified].all_for_funcs.each do |subtype_infer|
+            subtype_seen = @seen_funcs[subtype_infer.reified]?
+            next unless subtype_seen && !subtype_seen.empty?
+            
+            # Skip to the next subtype function if this isn't the right one
+            # corresponding to the current function on the abstract type.
+            next unless (abstract_seen.any? do |abstract_func|
+              subtype_seen.any? do |subtype_func|
+                subtype_func.signature.is_subtype?(
+                  abstract_infer,
+                  abstract_func.signature,
+                )
+              end
+            end)
+            
+            # For each signature known to this abstract type for this function,
+            # sympathetically resonate that signature into the subtype.
+            abstract_seen.each do |abstract_func|
+              # Skip if the subtype already has a version with this signature,
+              # or at least one that is codegen-compatible.
+              next if (subtype_seen.any? do |subtype_func|
+                abstract_func.signature.codegen_compat == \
+                  subtype_func.signature.codegen_compat
+              end)
+              
+              # Create a new function manifestation in the subtype with this
+              # signature, so that it is codegen-compatible with the abstract.
+              subtype_seen << Func.new(
+                subtype_seen.first.reach_def,
+                subtype_seen.first.infer,
+                abstract_func.signature,
+              )
+            end
+          end
+        end
+      end
+    end
   end
   
   # Traits are numbered 0, 1, 2, 3, 4, ...
@@ -591,7 +677,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
   end
   
   def reached_funcs_for(rf : Infer::ReifiedFunction)
-    @seen_funcs[rf]? || Set(Func).new
+    @seen_funcs[rf]? || Array(Func).new
   end
   
   def each_type_def

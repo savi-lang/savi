@@ -32,3 +32,7 @@
   :it "inspects strings"
     @assert = Inspect["example"] == "\"example\""
     @assert = Inspect[String.new] == "\"\""
+  
+  :it "inspects arrays"
+    @assert = Inspect[["foo", "bar", "baz"]] == "[\"foo\", \"bar\", \"baz\"]"
+    @assert = Inspect[[U8[10], U8[5], U8[6], U8[5]]] == "[10, 5, 6, 5]"
