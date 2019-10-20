@@ -122,6 +122,23 @@ describe Mare::Compiler::Refer do
     end
   end
   
+  it "allows the use of branch-scoped variables to assign to outer ones" do
+    source = Mare::Source.new_example <<-SOURCE
+    :actor Main
+      :new
+        outer = ""
+        array = ["foo", "bar", "baz"]
+        array.each -> (string|
+          if (string == "foo") (
+            thing = string
+            outer = thing
+          )
+        )
+    SOURCE
+    
+    Mare::Compiler.compile([source], :refer)
+  end
+  
   it "complains when an already-consumed local is referenced" do
     source = Mare::Source.new_example <<-SOURCE
     :actor Main

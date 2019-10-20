@@ -32,7 +32,6 @@
     type = (reflection_of_type spec)
     
     feature_count USize = 0
-    called = False // TODO: this line shouldn't be needed
     type.features.each -> (feature |
       if feature.tags.includes("it") (
         feature_count += 1

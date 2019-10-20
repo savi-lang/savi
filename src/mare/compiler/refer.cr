@@ -371,7 +371,7 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
       # Now, visit the main body twice (nested) to simulate repeated execution.
       body_branch = sub_branch
       node.body.accept(body_branch)
-      body_branch_2 = body_branch.sub_branch
+      body_branch_2 = body_branch.sub_branch(@locals.dup)
       node.body.accept(body_branch_2)
       
       # Collect any consumes from the body branch.
@@ -391,8 +391,9 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
       params.try(&.accept(sub_branch))
       params.try(&.terms.each { |param| sub_branch.create_local(param) })
       block.try(&.accept(sub_branch))
-      sub_branch2 = sub_branch.sub_branch()
+      sub_branch2 = sub_branch.sub_branch(@locals.dup)
       params.try(&.accept(sub_branch2))
+      params.try(&.terms.each { |param| sub_branch2.create_local(param) })
       block.try(&.accept(sub_branch2))
       
       # Absorb any consumes from the block branch into this parent branch.
