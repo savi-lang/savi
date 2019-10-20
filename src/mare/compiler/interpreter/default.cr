@@ -400,7 +400,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         
         data = @@declare_new.run(decl)
         
-        data["cap"] ||= AST::Identifier.new("ref").from(data["keyword"])
+        data["cap"] ||= @type.cap.dup
         
         func = Program::Function.new(
           data["cap"].as(AST::Identifier),

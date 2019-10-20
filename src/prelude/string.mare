@@ -4,13 +4,13 @@
   :prop _size USize
   :prop _alloc USize // TODO: rename as `_space`
   :prop _ptr CPointer(U8)'ref
-  :new from_cpointer (@_ptr, @_size, @_alloc)
+  :new ref from_cpointer (@_ptr, @_size, @_alloc)
   :new val val_from_cpointer (@_ptr, @_size, @_alloc) // TODO: remove this and use recover instead?
   :fun cpointer CPointer(U8): @_ptr
   :fun hash: @_ptr._hash(@_size)
   :fun size: @_size
   
-  :new (space USize = 0)
+  :new ref (space USize = 0)
     @_size = 0
     @_alloc = space.max(8)
     @_ptr = CPointer(U8)._alloc(@_alloc)
