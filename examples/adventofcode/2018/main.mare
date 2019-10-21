@@ -5,3 +5,4 @@
     Specs(Day1Spec).run(env)
     Specs(Day2Spec).run(env)
     Specs(Day3Spec).run(env)
+    Specs(Day4Spec).run(env)
