@@ -165,7 +165,7 @@
     
     month U8 = 0
     days_in_month U64 = 0
-    while (total_days > days_in_month) (
+    while (total_days >= days_in_month) (
       total_days -= days_in_month
       month += 1
       days_in_month = @_days_in_month(month, year).u64

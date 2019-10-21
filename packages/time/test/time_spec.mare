@@ -16,6 +16,12 @@
     @assert = time.nanosecond    == 777
     @assert = time.total_seconds == 64242621370
   
+  :it "correctly describes the month and day on the first day of a month"
+    time = Time.utc(2036, 11, 1)
+    @assert = time.year  == 2036
+    @assert = time.month == 11
+    @assert = time.day   == 1
+  
   :it "can add or subtract other time durations"
     @assert =
       (Time.utc(2036, 10, 7, 20, 36, 10, 777) - Time.days(3))
