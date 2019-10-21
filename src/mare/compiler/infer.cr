@@ -367,7 +367,6 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       type_expr(param_bound_node.not_nil!, refer, nil)
     end
     
-    @lookup_type_param_reentrant = Set(Refer::TypeParam).new
     def lookup_type_param(ref : Refer::TypeParam, refer, receiver = nil)
       raise NotImplementedError.new(ref) unless ref.parent == reified.defn
       
@@ -375,20 +374,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       arg = reified.args[ref.index]?
       return arg if arg
       
-      # If we have a temporary reentrant entry for this ref,
-      # skip intersecting the bound with the type param.
-      # Otherwise, continue, and add such an entry to prevent recursion.
-      return MetaType.new_type_param(ref) if @lookup_type_param_reentrant.includes?(ref)
-      @lookup_type_param_reentrant.add(ref)
-      
-      # Return the type parameter intersected with its bound.
-      bound = type_expr(ref.bound, refer, receiver)
-      bound = bound.intersect(MetaType.new_type_param(ref))
-      
-      # Remove the temporary reentrant entry without affecting the return value.
-      @lookup_type_param_reentrant.delete(ref)
-      
-      bound
+      # Otherwise, return it as an unreified type parameter nominal.
+      MetaType.new_type_param(ref)
     end
     
     def lookup_type_param_bound(ref : Refer::TypeParam)
