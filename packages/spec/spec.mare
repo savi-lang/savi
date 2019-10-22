@@ -18,6 +18,15 @@
     success
 
 :primitive Specs (A Spec)
+  :fun non run (env Env): SpecRunner(A).new(env)
+
+:actor SpecRunner (A Spec)
+  :prop spec A
+  :fun env: @spec.env
+  :new (env)
+    @spec = A.new(env)
+    @run
+  
   :fun non _fail (env Env)
     env.exit_code = 1 // Mark the entire process as a failure.
   
@@ -27,45 +36,42 @@
   :: A summary of successes and failures will be printed to `env.out`.
   :: If there are one or more failures, `env.exit_code` will be set accordingly.
   
-  :fun non run (env Env)
-    spec = A.new(env)
-    type = (reflection_of_type spec)
+  :fun ref run
+    type = (reflection_of_type @spec)
     
     feature_count USize = 0
     type.features.each -> (feature |
       if feature.tags.includes("it") (
         feature_count += 1
-        called = feature.maybe_call_mutator(spec)
+        called = feature.maybe_call_mutator(@spec)
         
         case (
         | called.not |
-          @_fail(env)
-          env.err.print("FAILED TO CALL A SPEC FEATURE?")
+          @_fail(@env)
+          @env.err.print("FAILED TO CALL A SPEC FEATURE?")
         
-        | spec.failures.size == 0 |
-          env.err.write("." * spec.assert_count)
-          env.err.write(" ")
+        | @spec.failures.size == 0 |
+          @env.err.write("." * @spec.assert_count)
+          @env.err.write(" ")
         
         |
-          @_fail(env)
-          env.err.write("\nFAIL: ")
-          env.err.write(spec.describes)
-          env.err.write(" ")
-          env.err.print(feature.name)
-          spec.failures.each -> (fail |
-            env.err.write("  X "), env.err.print(fail.string)
+          @_fail(@env)
+          @env.err.write("\nFAIL: ")
+          @env.err.write(@spec.describes)
+          @env.err.write(" ")
+          @env.err.print(feature.name)
+          @spec.failures.each -> (fail |
+            @env.err.write("  X "), @env.err.print(fail.string)
           )
-          spec.failures.clear
+          @spec.failures.clear
         )
       )
     )
     
     if (feature_count == 0) (
-      @_fail(env)
-      env.err.print("FAIL: No spec features found in ")
-      env.err.write(type.string)
+      @_fail(@env)
+      @env.err.print("FAIL: No spec features found in ")
+      @env.err.write(type.string)
     |
-      env.err.write(", ")
+      @env.err.write(", ")
     )
-    
-    spec

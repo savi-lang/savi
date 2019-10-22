@@ -146,21 +146,23 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     ctx : Context,
     rt : ReifiedType,
     type_args : Array(MetaType) = [] of MetaType,
+    precursor : (ForType | ForFunc)? = nil
   )
     # Sanity check - the reified type shouldn't have any args yet.
     raise "already has type args: #{rt.inspect}" unless rt.args.empty?
     
-    for_type(ctx, rt.defn, type_args)
+    for_type(ctx, rt.defn, type_args, precursor)
   end
   
   def for_type(
     ctx : Context,
     t : Program::Type,
     type_args : Array(MetaType) = [] of MetaType,
+    precursor : (ForType | ForFunc)? = nil
   ) : ForType
     rt = ReifiedType.new(t, type_args)
     @types[rt]? || (
-      ft = @types[rt] = ForType.new(ctx, rt)
+      ft = @types[rt] = ForType.new(ctx, rt, precursor)
       ft.tap(&.initialize_assertions(ctx))
     )
   end
@@ -289,10 +291,11 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   class ForType
     getter ctx : Context
     getter reified : ReifiedType
+    getter precursor : (ForType | ForFunc)?
     getter all_for_funcs
     getter subtyping
     
-    def initialize(@ctx, @reified)
+    def initialize(@ctx, @reified, @precursor = nil)
       @all_for_funcs = Set(ForFunc).new
       @subtyping = SubtypingInfo.new(@ctx, @reified)
       @type_param_refinements = {} of Refer::TypeParam => Array(MetaType)
@@ -368,7 +371,10 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
     
     def lookup_type_param(ref : Refer::TypeParam, refer, receiver = nil)
-      raise NotImplementedError.new(ref) unless ref.parent == reified.defn
+      if ref.parent != reified.defn
+        raise NotImplementedError.new(ref) unless @precursor
+        return @precursor.not_nil!.lookup_type_param(ref, refer, receiver)
+      end
       
       # Lookup the type parameter on self type and return the arg if present
       arg = reified.args[ref.index]?
@@ -379,7 +385,10 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
     
     def lookup_type_param_bound(ref : Refer::TypeParam)
-      raise NotImplementedError.new(ref) unless ref.parent == reified.defn
+      if ref.parent != reified.defn
+        raise NotImplementedError.new(ref) unless @precursor
+        return @precursor.not_nil!.lookup_type_param_bound(ref)
+      end
       
       # Get the MetaType of the declared bound for this type parameter.
       bound : MetaType = type_expr(ref.bound, refer, nil)
@@ -477,7 +486,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       
       target = type_expr(node.term, refer, receiver)
       args = node.group.terms.map { |t| type_expr(t, refer, receiver).as(MetaType) } # TODO: is it possible to remove this superfluous "as"?
-      rt = reified_type(target.single!, args)
+      rt = reified_type(target.single!, args, self)
       MetaType.new(rt)
     end
     
@@ -1308,7 +1317,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         term_info.inner.cap_only.inner == MetaType::Capability::NON
       
       args = node.group.terms.map { |t| type_expr(t) }
-      rt = reified_type(term_info.inner.single!, args)
+      rt = reified_type(term_info.inner.single!, args, self)
       ctx.infer.validate_type_args(ctx, self, node, rt)
       
       self[node] = Fixed.new(node.pos, MetaType.new(rt, "non"))
