@@ -34,11 +34,4 @@ describe Mare::Compiler::Eval do
     
     no_test_failures.should eq true
   end
-  
-  it "evaluates an example" do
-    source_dir = File.join(__DIR__, "../../example")
-    
-    Mare::Compiler.compile(source_dir, :eval) \
-      .eval.exitcode.should eq 42
-  end
 end
