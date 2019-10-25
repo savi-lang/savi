@@ -56,4 +56,31 @@ describe Mare::Compiler::ServeHover do
       "It has an inferred return type of U64.",
     ]
   end
+  
+  it "describes an expression nested inside several layers of flow control" do
+    source = Mare::Source.new_example <<-SOURCE
+    :actor Main
+      :fun example U64: 0
+      :new
+        x U64 = 0
+        while (x < 100) (
+          if (x == 36) (
+            example = x
+            example
+          )
+          x += 1
+        )
+    SOURCE
+    
+    ctx = Mare::Compiler.compile([source], :serve_hover)
+    
+    messages, pos = ctx.serve_hover[Mare::Source::Pos.point(source, 7, 9)]
+    pos.row.should eq 7
+    pos.col.should eq 8
+    pos.size.should eq "example".bytesize
+    messages.should eq [
+      "This is a local variable.",
+      "It has an inferred type of U64.",
+    ]
+  end
 end

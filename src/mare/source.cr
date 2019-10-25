@@ -79,6 +79,7 @@ struct Mare::Source::Pos
     new_start = @start + trim_left
     new_finish = @finish - trim_right
     
+    # TODO: dedup with similar logic in span
     new_row = @row
     new_line_start = @line_start
     content[0...trim_left].each_char.each_with_index do |char, index|
@@ -94,6 +95,40 @@ struct Mare::Source::Pos
       new_line_start, new_line_finish,
       new_row, new_col,
     )
+  end
+  
+  def span(others : Enumerable(Source::Pos))
+    new_start = @start
+    new_finish = @finish
+    others.each do |other|
+      raise ArgumentError.new "can't span positions from different sources" \
+        unless other.source == source
+      
+      new_start = other.start if other.start < @start
+      new_finish = other.finish if other.finish > @finish
+    end
+    
+    if new_start == @start
+      # This is an optimized path for the common case of start not changing.
+      self.class.new(source, @start, new_finish, @line_start, @line_finish, @row, @col)
+    else
+      # TODO: dedup with similar logic in subset
+      new_row = @row
+      new_line_start = @line_start
+      source.content[0...new_start].each_char.each_with_index do |char, index|
+        next unless char == '\n'
+        new_row += 1
+        new_line_start = @line_start + index
+      end
+      new_line_finish = source.content.index("\n", new_line_start) || source.content.size
+      new_col = new_start - new_line_start
+      
+      self.class.new(
+        source, new_start, new_finish,
+        new_line_start, new_line_finish,
+        new_row, new_col,
+      )
+    end
   end
   
   # Override inspect to avoid verbosely printing Source#content every time.

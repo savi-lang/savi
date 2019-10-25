@@ -35,6 +35,10 @@ module Mare::AST
       self
     end
     
+    def span_pos
+      pos
+    end
+    
     def accept(visitor)
       node = self
       if visitor.visit_any?(node)
@@ -163,6 +167,10 @@ module Mare::AST
     def initialize(@op : Operator, @term : Term)
     end
     
+    def span_pos
+      pos.span([op.span_pos, term.span_pos])
+    end
+    
     def name; :prefix end
     def to_a; [name, op.to_a, term.to_a] of A end
     def children_accept(visitor)
@@ -177,6 +185,10 @@ module Mare::AST
     def initialize(@term : Term, @group : Group)
     end
     
+    def span_pos
+      pos.span([term.span_pos, group.span_pos])
+    end
+    
     def name; :qualify end
     def to_a; [name, term.to_a, group.to_a] of A end
     def children_accept(visitor)
@@ -189,6 +201,10 @@ module Mare::AST
     property style
     property terms
     def initialize(@style : String, @terms = [] of Term)
+    end
+    
+    def span_pos
+      pos.span(terms.map(&.span_pos))
     end
     
     def name; :group end
@@ -208,6 +224,10 @@ module Mare::AST
     property op
     property rhs
     def initialize(@lhs : Term, @op : Operator, @rhs : Term)
+    end
+    
+    def span_pos
+      pos.span([lhs.span_pos, op.span_pos, rhs.span_pos])
     end
     
     def name; :relate end
@@ -245,6 +265,10 @@ module Mare::AST
     def initialize(@list : Array({Term, Term}))
     end
     
+    def span_pos
+      pos.span(list.map { |cond, body| cond.span_pos.span([body.span_pos]) })
+    end
+    
     def name; :choice end
     def to_a: Array(A)
       res = [name] of A
@@ -262,6 +286,10 @@ module Mare::AST
     property else_body : Term
     
     def initialize(@cond, @body, @else_body)
+    end
+    
+    def span_pos
+      pos.span([cond.span_pos, body.span_pos, else_body.span_pos])
     end
     
     def name; :loop end
@@ -286,6 +314,10 @@ module Mare::AST
     def initialize(@body, @else_body)
     end
     
+    def span_pos
+      pos.span([body.span_pos, else_body.span_pos])
+    end
+    
     def name; :try end
     def to_a: Array(A)
       res = [name] of A
@@ -303,6 +335,10 @@ module Mare::AST
     property terms : Array(Term)
     
     def initialize(@terms)
+    end
+    
+    def span_pos
+      pos.span(terms.map(&.span_pos))
     end
     
     def name; :yield end

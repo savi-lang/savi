@@ -28,36 +28,36 @@ class Mare::Compiler::ServeHover
     case within
     when AST::Prefix
       [within.op, within.term].each do |term|
-        return [within] + find(pos, term) if term.pos.contains?(pos)
+        return [within] + find(pos, term) if term.span_pos.contains?(pos)
       end
     when AST::Qualify
       [within.term, within.group].each do |term|
-        return [within] + find(pos, term) if term.pos.contains?(pos)
+        return [within] + find(pos, term) if term.span_pos.contains?(pos)
       end
     when AST::Group
       within.terms.each do |term|
-        return [within] + find(pos, term) if term.pos.contains?(pos)
+        return [within] + find(pos, term) if term.span_pos.contains?(pos)
       end
     when AST::Relate
       [within.lhs, within.op, within.rhs].each do |term|
-        return [within] + find(pos, term) if term.pos.contains?(pos)
+        return [within] + find(pos, term) if term.span_pos.contains?(pos)
       end
     when AST::FieldWrite
       [within.rhs].each do |term|
-        return [within] + find(pos, term) if term.pos.contains?(pos)
+        return [within] + find(pos, term) if term.span_pos.contains?(pos)
       end
     when AST::Choice
       within.list.each do |cond, body|
-        return [within] + find(pos, cond) if cond.pos.contains?(pos)
-        return [within] + find(pos, body) if body.pos.contains?(pos)
+        return [within] + find(pos, cond) if cond.span_pos.contains?(pos)
+        return [within] + find(pos, body) if body.span_pos.contains?(pos)
       end
     when AST::Loop
       [within.cond, within.body, within.else_body].each do |term|
-        return [within] + find(pos, term) if term.pos.contains?(pos)
+        return [within] + find(pos, term) if term.span_pos.contains?(pos)
       end
     when AST::Try
       [within.body, within.else_body].each do |term|
-        return [within] + find(pos, term) if term.pos.contains?(pos)
+        return [within] + find(pos, term) if term.span_pos.contains?(pos)
       end
     end
     [within]
