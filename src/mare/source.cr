@@ -48,7 +48,7 @@ struct Mare::Source::Pos
         || source.content.size
     end
     
-    line_finish = source.content.index("\n") || source.content.size
+    line_finish = source.content.index("\n", line_start) || source.content.size
     start = line_start + col
     
     new(source, start, start, line_start, line_finish, row, col)
@@ -69,6 +69,31 @@ struct Mare::Source::Pos
   
   def size
     finish - start
+  end
+  
+  def subset(trim_left, trim_right)
+    raise ArgumentError.new \
+      "can't trim this much (#{trim_left}, #{trim_right}) of this:\n#{show}" \
+      if (trim_left + trim_right) > size
+    
+    new_start = @start + trim_left
+    new_finish = @finish - trim_right
+    
+    new_row = @row
+    new_line_start = @line_start
+    content[0...trim_left].each_char.each_with_index do |char, index|
+      next unless char == '\n'
+      new_row += 1
+      new_line_start = @line_start + index
+    end
+    new_line_finish = source.content.index("\n", new_line_start) || source.content.size
+    new_col = new_start - new_line_start
+    
+    self.class.new(
+      source, new_start, new_finish,
+      new_line_start, new_line_finish,
+      new_row, new_col,
+    )
   end
   
   # Override inspect to avoid verbosely printing Source#content every time.

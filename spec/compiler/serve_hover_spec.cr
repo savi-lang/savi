@@ -36,4 +36,24 @@ describe Mare::Compiler::ServeHover do
       "It has an inferred return type of USize."
     ]
   end
+  
+  it "describes a self-call" do
+    source = Mare::Source.new_example <<-SOURCE
+    :actor Main
+      :fun example U64: 0
+      :new
+        @example
+    SOURCE
+    
+    ctx = Mare::Compiler.compile([source], :serve_hover)
+    
+    messages, pos = ctx.serve_hover[Mare::Source::Pos.point(source, 3, 6)]
+    pos.row.should eq 3
+    pos.col.should eq 4
+    pos.size.should eq "@example".bytesize
+    messages.should eq [
+      "This is a function call on an inferred receiver type of Main'ref.",
+      "It has an inferred return type of U64.",
+    ]
+  end
 end

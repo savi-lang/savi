@@ -107,9 +107,11 @@ class Mare::Compiler::Sugar < Mare::AST::Visitor
     if node.value == "@"
       node
     elsif node.value.char_at(0) == '@'
-      lhs = AST::Identifier.new("@").from(node)
-      dot = AST::Operator.new(".").from(node)
-      rhs = AST::Identifier.new(node.value[1..-1]).from(node)
+      lhs_pos = node.pos.subset(0, node.pos.size - 1)
+      rhs_pos = node.pos.subset(1, 0)
+      lhs = AST::Identifier.new("@").with_pos(lhs_pos)
+      dot = AST::Operator.new(".").with_pos(lhs_pos)
+      rhs = AST::Identifier.new(node.value[1..-1]).with_pos(rhs_pos)
       AST::Relate.new(lhs, dot, rhs).from(node)
     else
       node

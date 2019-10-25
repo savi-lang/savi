@@ -1896,7 +1896,7 @@ describe Mare::Compiler::Infer do
     This function call doesn't meet subtyping requirements:
     from (example):4:
         @will_not_yield -> (i| i)
-        ^~~~~~~~~~~~~~~
+         ^~~~~~~~~~~~~~
     
     - it has a yield block but the called function does not have any yields:
       from (example):4:
@@ -1922,7 +1922,7 @@ describe Mare::Compiler::Infer do
     This function call doesn't meet subtyping requirements:
     from (example):5:
         @yield_99
-        ^~~~~~~~~
+         ^~~~~~~~
     
     - it has no yield block but the called function does yield:
       from (example):3:
