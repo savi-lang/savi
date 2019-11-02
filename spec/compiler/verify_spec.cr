@@ -78,4 +78,81 @@ describe Mare::Compiler::Completeness do
       Mare::Compiler.compile([source], :verify)
     end
   end
+  
+  it "complains when an async function declares or tries to yield" do
+    source = Mare::Source.new_example <<-SOURCE
+    :actor Main
+      :new
+      :be try_to_yield
+        :yields Bool
+        yield True
+        yield False
+    SOURCE
+    
+    expected = <<-MSG
+    An asynchronous function cannot yield values:
+    from (example):3:
+      :be try_to_yield
+          ^~~~~~~~~~~~
+    
+    - it declares a yield here:
+      from (example):4:
+        :yields Bool
+                ^~~~
+    
+    - it yields here:
+      from (example):5:
+        yield True
+        ^~~~~
+    
+    - it yields here:
+      from (example):6:
+        yield False
+        ^~~~~
+    MSG
+    
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :verify)
+    end
+  end
+  
+  it "complains when a constructor declares or tries to yield" do
+    source = Mare::Source.new_example <<-SOURCE
+    :class Example
+      :new try_to_yield
+        :yields Bool
+        yield True
+        yield False
+    
+    :actor Main
+      :new
+        Example.try_to_yield -> (bool | bool)
+    SOURCE
+    
+    expected = <<-MSG
+    A constructor cannot yield values:
+    from (example):2:
+      :new try_to_yield
+           ^~~~~~~~~~~~
+    
+    - it declares a yield here:
+      from (example):3:
+        :yields Bool
+                ^~~~
+    
+    - it yields here:
+      from (example):4:
+        yield True
+        ^~~~~
+    
+    - it yields here:
+      from (example):5:
+        yield False
+        ^~~~~
+    MSG
+    
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :verify)
+    end
+  end
 end

@@ -28,8 +28,8 @@ class Mare::Compiler::Verify < Mare::AST::Visitor
   
   def check_function(ctx, rt, rf)
     func = rf.func
-    
     func_body = func.body
+    
     if func_body && Jumps.any_error?(func_body)
       if func.has_tag?(:constructor)
         finder = ErrorFinderVisitor.new(func_body)
@@ -50,6 +50,26 @@ class Mare::Compiler::Verify < Mare::AST::Visitor
             {func.ident, "it should be named '#{func.ident.value}!' instead"}
           ] + finder.found.map { |pos| {pos, "an error may be raised here"} }
       end
+    end
+    
+    # Require that async functions and constructors do not yield values.
+    no_yields =
+      if func.has_tag?(:async)
+        "An asynchronous function"
+      elsif func.has_tag?(:constructor)
+        "A constructor"
+      end
+    if no_yields
+      errs = [] of {Source::Pos, String}
+      if func.yield_in || func.yield_out
+        node = (func.yield_in || func.yield_out).not_nil!
+        errs << {node.pos, "it declares a yield here"}
+      end
+      ctx.inventory.yields(func).each do |node|
+        errs << {node.pos, "it yields here"}
+      end
+      Error.at func.ident, "#{no_yields} cannot yield values", errs \
+        unless errs.empty?
     end
   end
   
