@@ -240,6 +240,13 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         "name" => "keyword",
         "value" => "be",
       },
+      { # This cap isn't actually allowed for a behaviour declaration;
+        # it is only accepted here so that we can give a nicer error later.
+        "kind" => "keyword",
+        "name" => "cap",
+        "value" => "iso|trn|val|ref|box|tag|non",
+        "optional" => true,
+      },
       {
         "kind" => "term",
         "name" => "ident",
@@ -386,6 +393,10 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
           unless @type.has_tag?(:actor) || @type.has_tag?(:abstract)
         
         data = @@declare_be.run(decl)
+        
+        cap = data["cap"]?
+        Error.at cap, "A behaviour can't have an explicit receiver capability" \
+          if cap
         
         func = Program::Function.new(
           AST::Identifier.new("ref").from(data["keyword"]),
