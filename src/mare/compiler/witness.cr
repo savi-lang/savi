@@ -88,8 +88,17 @@ class Mare::Witness
       if plan["type"]?
         types = plan["type"].as(String).split("|")
         
-        Error.at term, "Expected a term of type: #{show_or(types)}" \
-          unless types.any? { |t| check_type(term, t) }
+        unless types.any? { |t| check_type(term, t) }
+          extra = [] of {Source::Pos, String}
+          
+          if term.is_a?(AST::Qualify) \
+          && types.any? { |t| check_type(term.term, t) }
+            extra << {term.group.pos, "you probably need to add a space " \
+              "to separate it from this next term"}
+          end
+          
+          Error.at term, "Expected a term of type: #{show_or(types)}", extra
+        end
       end
       
       # Convert LiteralString to Identifier if requested.
