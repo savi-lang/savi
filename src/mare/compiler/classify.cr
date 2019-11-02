@@ -11,15 +11,22 @@
 #
 class Mare::Compiler::Classify < Mare::AST::Visitor
   FLAG_VALUE_NOT_NEEDED  = 0x01_u64 # set here in the Classify pass
-  FLAG_TYPE_EXPR         = 0x02_u64 # set here in the Classify pass
-  FLAG_FURTHER_QUALIFIED = 0x04_u64 # set here in the Classify pass
-  FLAG_ALWAYS_ERROR      = 0x08_u64 # set in the Jumps pass
-  FLAG_MAYBE_ERROR       = 0x10_u64 # set in the Jumps pass
+  FLAG_NO_VALUE          = 0x02_u64 # set here in the Classify pass
+  FLAG_TYPE_EXPR         = 0x04_u64 # set here in the Classify pass
+  FLAG_FURTHER_QUALIFIED = 0x08_u64 # set here in the Classify pass
+  FLAG_ALWAYS_ERROR      = 0x10_u64 # set in the Jumps pass
+  FLAG_MAYBE_ERROR       = 0x20_u64 # set in the Jumps pass
   
   def self.value_not_needed?(node); (node.flags & FLAG_VALUE_NOT_NEEDED) != 0 end
   def self.value_needed?(node);     (node.flags & FLAG_VALUE_NOT_NEEDED) == 0 end
   def self.value_not_needed!(node); node.flags |= FLAG_VALUE_NOT_NEEDED end
   def self.value_needed!(node);     node.flags &= ~FLAG_VALUE_NOT_NEEDED end
+  
+  def self.no_value?(node); (node.flags & FLAG_NO_VALUE) != 0 end
+  def self.no_value!(node)
+    node.flags |= FLAG_NO_VALUE
+    value_not_needed!(node)
+  end
   
   def self.type_expr?(node); (node.flags & FLAG_TYPE_EXPR) != 0 end
   def self.type_expr!(node); node.flags |= FLAG_TYPE_EXPR end
@@ -103,7 +110,7 @@ class Mare::Compiler::Classify < Mare::AST::Visitor
   
   # An Operator can never have a value, so its value should never be needed.
   def touch(op : AST::Operator)
-    Classify.value_not_needed!(op)
+    Classify.no_value!(op)
   end
   
   def touch(group : AST::Group)
@@ -154,17 +161,17 @@ class Mare::Compiler::Classify < Mare::AST::Visitor
       # In a function call Relate, a value is not needed for the right side.
       # A value is only needed for the left side and the overall access node.
       relate_rhs = relate.rhs
-      Classify.value_not_needed!(relate_rhs)
+      Classify.no_value!(relate_rhs)
       
       # We also need to mark the pieces of the right-hand-side as appropriate.
       if relate_rhs.is_a?(AST::Relate)
-        Classify.value_not_needed!(relate_rhs.lhs)
-        Classify.value_not_needed!(relate_rhs.rhs)
+        Classify.no_value!(relate_rhs.lhs)
+        Classify.no_value!(relate_rhs.rhs)
       end
       ident, args, yield_params, yield_block = AST::Extract.call(relate)
-      Classify.value_not_needed!(ident)
-      Classify.value_not_needed!(args) if args
-      Classify.value_not_needed!(yield_params) if yield_params
+      Classify.no_value!(ident)
+      Classify.no_value!(args) if args
+      Classify.no_value!(yield_params) if yield_params
       Classify.value_needed!(yield_block) if yield_block
     end
   end

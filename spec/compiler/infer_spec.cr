@@ -57,6 +57,25 @@ describe Mare::Compiler::Infer do
     end
   end
   
+  it "complains when a local identifier wasn't declared, even when unused" do
+    source = Mare::Source.new_example <<-SOURCE
+    :actor Main
+      :new
+        bogus
+    SOURCE
+    
+    expected = <<-MSG
+    This identifer couldn't be resolved:
+    from (example):3:
+        bogus
+        ^~~~~
+    MSG
+    
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :infer)
+    end
+  end
+  
   it "complains when the function body doesn't match the return type" do
     source = Mare::Source.new_example <<-SOURCE
     :primitive Example

@@ -1136,8 +1136,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       when Refer::RaiseError
         self[node] = RaiseError.new(node.pos)
       when Refer::Unresolved
-        # Leave the node as unresolved if this identifer needs no value.
-        return if Classify.value_not_needed?(node)
+        # Leave the node as unresolved if this identifer is not a value.
+        return if Classify.no_value?(node)
         
         # Otherwise, raise an error to the user:
         Error.at node, "This identifer couldn't be resolved"

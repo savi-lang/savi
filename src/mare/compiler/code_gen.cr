@@ -1897,7 +1897,7 @@ class Mare::Compiler::CodeGen
       elsif ref.is_a?(Refer::RaiseError)
         gen_raise_error(expr)
       else
-        raise NotImplementedError.new(ref)
+        raise NotImplementedError.new("#{ref}\n#{expr.pos.show}")
       end
     when AST::FieldRead
       gen_field_load(expr.value)
