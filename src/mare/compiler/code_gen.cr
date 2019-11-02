@@ -1641,7 +1641,7 @@ class Mare::Compiler::CodeGen
     rhs = gen_expr(relate.rhs)
     
     if lhs.type.kind == LLVM::Type::Kind::Integer \
-    && lhs.type.kind == LLVM::Type::Kind::Integer
+    && rhs.type.kind == LLVM::Type::Kind::Integer
       if lhs.type == rhs.type
         # Integers of the same type are compared by integer comparison.
         @builder.icmp(
@@ -1656,7 +1656,7 @@ class Mare::Compiler::CodeGen
       end
     elsif lhs_type == rhs_type \
     && lhs.type.kind == LLVM::Type::Kind::Pointer \
-    && lhs.type.kind == LLVM::Type::Kind::Pointer \
+    && rhs.type.kind == LLVM::Type::Kind::Pointer \
     && lhs.type == llvm_type_of(lhs_type) \
     && rhs.type == llvm_type_of(rhs_type)
       # Objects (not boxed machine words) of the same type are compared by
@@ -1669,6 +1669,59 @@ class Mare::Compiler::CodeGen
       )
     else
       raise NotImplementedError.new("this comparison:\n#{relate.pos.show}")
+    end
+  end
+  
+  def gen_identity_digest_of(term_expr)
+    term_type = type_of(term_expr)
+    value = gen_expr(term_expr)
+    name = "identity_digest_of.#{value.name}"
+    
+    case value.type.kind
+    when LLVM::Type::Kind::Float
+      @builder.zext(@builder.bit_cast(value, @i32), @isize, name)
+    when LLVM::Type::Kind::Double
+      gen_identity_digest_of_i64(@builder.bit_cast(value, @i64), name)
+    when LLVM::Type::Kind::Integer
+      case value.type.int_width
+      when @bitwidth
+        value
+      when 64
+        gen_identity_digest_of_i64(value, name)
+      else
+        @builder.zext(value, @isize, name)
+      end
+    when LLVM::Type::Kind::Pointer
+      if llvm_type_of(term_type).kind == LLVM::Type::Kind::Pointer
+        @builder.ptr_to_int(value, @isize, name)
+      else
+        # When the value is a pointer, but the type is not, the value is boxed.
+        # Therefore, we must unwrap the boxed value and get its digest.
+        # TODO: Implement this.
+        raise NotImplementedError.new("unboxing digest:\n#{term_expr.pos.show}")
+      end
+    else
+      raise NotImplementedError.new("this digest:\n#{term_expr.pos.show}")
+    end
+  end
+  
+  def gen_identity_digest_of_i64(value : LLVM::Value, name : String)
+    raise "not i64" unless value.type == @i64
+    
+    case @bitwidth
+    when 64
+      value.name = name
+      value
+    when 32
+      # On 32-bit platforms, the digest of an i64 only has 32 bits,
+      # so we need to XOR the high and low halves together into one i32.
+      @builder.xor(
+        @builder.trunc(@builder.lshr(value, @i64.const_int(32)), @i32),
+        @builder.trunc(value, @i32),
+        name
+      )
+    else
+      raise NotImplementedError.new(@bitwidth)
     end
   end
   
@@ -1890,6 +1943,8 @@ class Mare::Compiler::CodeGen
       case expr.op.value
       when "reflection_of_type"
         gen_reflection_of_type(expr, expr.term)
+      when "identity_digest_of"
+        gen_identity_digest_of(expr.term)
       when "--"
         gen_expr(expr.term, const_only)
       else

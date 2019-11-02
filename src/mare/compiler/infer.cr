@@ -1325,10 +1325,10 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     
     def touch(node : AST::Prefix)
       case node.op.value
-      when "source_code_position_of_argument" then
+      when "source_code_position_of_argument"
         rt = reified_type(prelude_type("SourceCodePosition"))
         self[node] = Fixed.new(node.pos, MetaType.new(rt))
-      when "reflection_of_type" then
+      when "reflection_of_type"
         reflect_mt = resolve(node.term)
         reflect_rt =
           if reflect_mt.type_params.empty?
@@ -1351,6 +1351,9 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         
         rt = reified_type(prelude_type("ReflectionOfType"), [reflect_mt])
         self[node] = Fixed.new(node.pos, MetaType.new(rt))
+      when "identity_digest_of"
+        usize = MetaType.new(reified_type(prelude_type("USize")))
+        self[node] = Fixed.new(node.pos, usize)
       when "--"
         self[node] = Consume.new(node.pos, node.term)
       else

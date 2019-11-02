@@ -28,4 +28,8 @@ class LLVM::Builder
 
     Value.new LibLLVM.build_insert_value(self, aggregate, element, index, name)
   end
+
+  def ptr_to_int(value, to_type, name = "")
+    Value.new LibLLVM.build_ptr2int(self, value, to_type, name)
+  end
 end

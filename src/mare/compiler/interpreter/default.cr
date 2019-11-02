@@ -383,7 +383,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         )
       when "be"
         raise "only actors can have behaviours" \
-          unless @type.has_tag?(:actor)
+          unless @type.has_tag?(:actor) || @type.has_tag?(:abstract)
         
         data = @@declare_be.run(decl)
         

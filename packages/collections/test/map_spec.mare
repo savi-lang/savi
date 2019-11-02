@@ -1,11 +1,14 @@
 :import "spec"
-:import ".." (Map, HashEq)
+:import ".." (Map, HashEq, HashId)
+
+:actor MapSpecActor
 
 :class MapSpec
   :is Spec
   :const describes: "Map"
   
   :fun new_map: Map(String, U64, HashEq(String)).new // TODO: implicit default for HashFunction type argument
+  :fun new_actor_map: Map(MapSpecActor, U64, HashId(MapSpecActor)).new
   
   :it "stores and removes values at a given key"
     map = @new_map
@@ -24,6 +27,18 @@
     @assert = try map["example"]! <: None
     @assert = map.has_key("example").not
     @assert = map.size == 0
+  
+  :it "stores values at actor keys by identity"
+    foo = MapSpecActor.new
+    bar = MapSpecActor.new
+    baz = MapSpecActor.new
+    map = @new_actor_map
+    map[foo] = 11
+    map[bar] = 22
+    map[baz] = 33
+    @assert = try (map[foo]! == 11 | False)
+    @assert = try (map[bar]! == 22 | False)
+    @assert = try (map[baz]! == 33 | False)
   
   :it "can be cleared, removing all keys and values"
     map = @new_map
