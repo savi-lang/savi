@@ -692,6 +692,37 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
           unless func.has_tag?(:constructor)
       end
       
+      # Parameters must be sendable when the function is asynchronous,
+      # or when it is a constructor with elevated capability.
+      require_sendable =
+        if func.has_tag?(:async)
+          "An asynchronous function"
+        elsif func.has_tag?(:constructor) \
+        && !self[ret].resolve!(self).subtype_of?(self, MetaType.cap("ref"))
+          "A constructor with elevated capability"
+        end
+      if require_sendable
+        func.params.try do |params|
+          
+          errs = [] of {Source::Pos, String}
+          params.terms.each do |param|
+            param_mt = self[param].resolve!(self)
+            
+            unless param_mt.is_sendable?
+              # TODO: Remove this hacky special case.
+              next if param_mt.show_type.starts_with? "CPointer"
+              
+              errs << {param.pos,
+                "this parameter type (#{param_mt.show_type}) is not sendable"}
+            end
+          end
+          
+          Error.at func.cap.pos,
+            "#{require_sendable} must only have sendable parameters", errs \
+              unless errs.empty?
+        end
+      end
+      
       # Assign the resolved types to a map for safekeeping.
       # This also has the effect of running some final checks on everything.
       @info_table.each do |node, info|

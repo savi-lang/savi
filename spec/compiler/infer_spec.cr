@@ -1303,9 +1303,71 @@ describe Mare::Compiler::Infer do
     end
   end
   
-  pending "requires parameters of 'recovered' constructors to be sendable"
+  it "complains if some params of an elevated constructor are not sendable" do
+    source = Mare::Source.new_example <<-SOURCE
+    :class Example
+      :new val (a String'ref, b String'val, c String'box)
+        None
+    
+    :actor Main
+      :new
+        Example.new(String.new, "", "")
+    SOURCE
+    
+    expected = <<-MSG
+    A constructor with elevated capability must only have sendable parameters:
+    from (example):2:
+      :new val (a String'ref, b String'val, c String'box)
+           ^~~
+    
+    - this parameter type (String'ref) is not sendable:
+      from (example):2:
+      :new val (a String'ref, b String'val, c String'box)
+                ^~~~~~~~~~~~
+    
+    - this parameter type (String'box) is not sendable:
+      from (example):2:
+      :new val (a String'ref, b String'val, c String'box)
+                                            ^~~~~~~~~~~~
+    MSG
+    
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :infer)
+    end
+  end
   
-  pending "requires parameters of actor behaviours to be sendable"
+  it "complains if some params of an asynchronous function are not sendable" do
+    source = Mare::Source.new_example <<-SOURCE
+    :actor Example
+      :be call (a String'ref, b String'val, c String'box)
+        None
+    
+    :actor Main
+      :new
+        Example.new.call(String.new, "", "")
+    SOURCE
+    
+    expected = <<-MSG
+    An asynchronous function must only have sendable parameters:
+    from (example):2:
+      :be call (a String'ref, b String'val, c String'box)
+       ^~
+    
+    - this parameter type (String'ref) is not sendable:
+      from (example):2:
+      :be call (a String'ref, b String'val, c String'box)
+                ^~~~~~~~~~~~
+    
+    - this parameter type (String'box) is not sendable:
+      from (example):2:
+      :be call (a String'ref, b String'val, c String'box)
+                                            ^~~~~~~~~~~~
+    MSG
+    
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :infer)
+    end
+  end
   
   it "requires a sub-func to be present in the subtype" do
     source = Mare::Source.new_example <<-SOURCE
