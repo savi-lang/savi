@@ -46,6 +46,12 @@ class Mare::Compiler::CodeGen
     def refer
       @gtype.not_nil!.type_def.refer(@g.ctx)[@gfunc.as(GenFunc).func]
     end
+    
+    @entry_block : LLVM::BasicBlock?
+    def entry_block
+      @entry_block ||= llvm_func.basic_blocks.append("entry")
+      @entry_block.not_nil!
+    end
   end
   
   class GenType
@@ -327,6 +333,10 @@ class Mare::Compiler::CodeGen
     @frames.reverse_each.find { |f| f.llvm_func? }.not_nil!
   end
   
+  def gen_frame
+    @frames.each.find { |f| f.llvm_func? }.not_nil!
+  end
+  
   def abi_size_of(llvm_type : LLVM::Type)
     @target_machine.data_layout.abi_size(llvm_type)
   end
@@ -557,8 +567,8 @@ class Mare::Compiler::CodeGen
     # Add debug info for this function
     @di.func_start(gfunc, llvm_func) if gfunc
     
-    # Create an entry block and start building from there.
-    @builder.position_at_end(gen_block("entry"))
+    # Start building from the entry block.
+    @builder.position_at_end(func_frame.entry_block)
     
     # We have some extra work to do here if this is a yielding function.
     if gfunc && gfunc.calling_convention == :yield_cc
@@ -2648,6 +2658,8 @@ class Mare::Compiler::CodeGen
   end
   
   def gen_raise_error(expr)
+    raise "inconsistent frames" if @frames.size > 1
+    
     # TODO: Allow an error value of something other than None.
     error_value = gen_none
     
@@ -2671,6 +2683,8 @@ class Mare::Compiler::CodeGen
   end
   
   def gen_return_using_error_cc(value, value_expr, is_error : Bool)
+    raise "inconsistent frames" if @frames.size > 1
+    
     value_type = func_frame.llvm_func.return_type.struct_element_types[0]
     value = gen_assign_cast(value, value_type, value_expr) unless is_error
     
@@ -2681,6 +2695,8 @@ class Mare::Compiler::CodeGen
   end
   
   def gen_yield(expr : AST::Yield)
+    raise "inconsistent frames" if @frames.size > 1
+    
     @di.set_loc(expr)
     
     gfunc = func_frame.gfunc.not_nil!
@@ -2720,6 +2736,8 @@ class Mare::Compiler::CodeGen
   end
   
   def gen_yield_return_using_yield_cc(next_func : LLVM::Value, values)
+    raise "inconsistent frames" if @frames.size > 1
+    
     gfunc = func_frame.gfunc.not_nil!
     
     # Cast the given values to the appropriate type.
@@ -2745,6 +2763,8 @@ class Mare::Compiler::CodeGen
   end
   
   def gen_final_return_using_yield_cc(value)
+    raise "inconsistent frames" if @frames.size > 1
+    
     gfunc = func_frame.gfunc.not_nil!
     
     # Cast the given value to the appropriate type.
@@ -2795,7 +2815,8 @@ class Mare::Compiler::CodeGen
     # All blocks follow the entry block (it dominates all other blocks),
     # so this is a surefire safe place to do whatever it is we need to declare.
     orig_block = @builder.insert_block
-    entry_block = func_frame.llvm_func.entry_block
+    entry_block = gen_frame.entry_block
+    
     if entry_block.instructions.empty?
       @builder.position_at_end(entry_block)
     else
@@ -3046,7 +3067,7 @@ class Mare::Compiler::CodeGen
     
     if become_now
       @builder.call(@mod.functions["pony_become"], [
-        func_frame.pony_ctx, allocated])
+        gen_frame.pony_ctx, allocated])
     end
     
     @builder.bit_cast(allocated, gtype.struct_ptr, name)
@@ -3101,6 +3122,7 @@ class Mare::Compiler::CodeGen
   end
   
   def gen_field_gep(name, gtype = func_frame.gtype.not_nil!)
+    raise "inconsistent frames" if @frames.size > 1
     object = func_frame.receiver_value
     @builder.struct_gep(object, gtype.field_index(name), "@.#{name}.GEP")
   end
@@ -3253,6 +3275,8 @@ class Mare::Compiler::CodeGen
   end
   
   def gen_trace_impl(gtype : GenType)
+    raise "inconsistent frames" if @frames.size > 1
+    
     # Get the reference to the trace function declared earlier.
     # We'll fill in the implementation of that function now.
     fn = @mod.functions["#{gtype.type_def.llvm_name}.TRACE"]?
@@ -3282,6 +3306,8 @@ class Mare::Compiler::CodeGen
   end
   
   def gen_dispatch_impl(gtype : GenType)
+    raise "inconsistent frames" if @frames.size > 1
+    
     # Get the reference to the dispatch function declared earlier.
     # We'll fill in the implementation of that function now.
     fn = @mod.functions["#{gtype.type_def.llvm_name}.DISPATCH"]
