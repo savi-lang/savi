@@ -4,9 +4,19 @@ require "./src/mare"
 if ARGV == ["server"]
   Mare::Server.new.run
 elsif ARGV[0]? == "eval"
-  exit Mare::Compiler.eval(ARGV[1])
+  begin
+    exit Mare::Compiler.eval(ARGV[1])
+  rescue e : Mare::Error
+    STDERR.puts "Compilation Error:\n\n#{e.message}\n\n"
+    exit 1
+  end
 elsif ARGV[0]? == "run"
-  exit Mare::Compiler.compile(Dir.current, :eval).eval.exitcode
+  begin
+    exit Mare::Compiler.compile(Dir.current, :eval).eval.exitcode
+  rescue e : Mare::Error
+    STDERR.puts "Compilation Error:\n\n#{e.message}\n\n"
+    exit 1
+  end
 else
   Mare::Compiler.compile(Dir.current, :binary)
 end
