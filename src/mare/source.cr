@@ -87,7 +87,7 @@ struct Mare::Source::Pos
       new_row += 1
       new_line_start = @line_start + index
     end
-    new_line_finish = source.content.index("\n", new_line_start) || source.content.size
+    new_line_finish = (source.content.index("\n", new_line_start) || source.content.size) - 1
     new_col = new_start - new_line_start
     
     self.class.new(
@@ -120,7 +120,7 @@ struct Mare::Source::Pos
         new_row += 1
         new_line_start = @line_start + index
       end
-      new_line_finish = source.content.index("\n", new_line_start) || source.content.size
+      new_line_finish = (source.content.index("\n", new_line_start) || source.content.size) - 1
       new_col = new_start - new_line_start
       
       self.class.new(

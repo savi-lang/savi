@@ -759,6 +759,40 @@ describe Mare::Compiler::Infer do
     end
   end
   
+  it "complains with an extra hint when using insufficient capability of @" do
+    source = Mare::Source.new_example <<-SOURCE
+    :class Example
+      :fun ref mutate
+      :fun readonly
+        @mutate
+    
+    :actor Main
+      :new
+        Example.new.readonly
+    SOURCE
+    
+    expected = <<-MSG
+    This function call doesn't meet subtyping requirements:
+    from (example):4:
+        @mutate
+         ^~~~~~
+    
+    - the type Example'box isn't a subtype of the required capability of 'ref':
+      from (example):2:
+      :fun ref mutate
+           ^~~
+    
+    - this would be possible if the calling function were declared as `:fun ref`:
+      from (example):3:
+      :fun readonly
+       ^~~
+    MSG
+    
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :infer)
+    end
+  end
+  
   it "complains when violating uniqueness into a local" do
     source = Mare::Source.new_example <<-SOURCE
     :class X

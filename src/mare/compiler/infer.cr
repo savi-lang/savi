@@ -777,7 +777,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       call_defns
     end
     
-    def follow_call_check_receiver_cap(call_mt, call_func, problems)
+    def follow_call_check_receiver_cap(call, call_mt, call_func, problems)
       call_mt_cap = call_mt.cap_only
       autorecover_needed = false
       
@@ -806,6 +806,14 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         problems << {call_func.cap.pos,
           "the type #{call_mt.inner.inspect} isn't a subtype of the " \
           "required capability of '#{required_cap}'"}
+        
+        # If the receiver of the call is the self (the receiver of the caller),
+        # then we can give an extra hint about changing its capability to match.
+        if self[call.lhs].is_a?(Self)
+          problems << {func.cap.pos, "this would be possible if the " \
+            "calling function were declared as `:fun #{required_cap}`"}
+        end
+        
         # We already failed subtyping for the receiver cap, but pretend
         # for now that we didn't for the sake of further checks.
         reify_cap = MetaType.cap(call_func.cap.value)
@@ -940,7 +948,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         @called_funcs.add({call_defn, call_func})
         
         required_cap, reify_cap, autorecover_needed =
-          follow_call_check_receiver_cap(call_mt, call_func, problems)
+          follow_call_check_receiver_cap(call, call_mt, call_func, problems)
         
         # Get the ForFunc instance for call_func, possibly creating and running it.
         # TODO: don't infer anything in the body of that func if type and params
