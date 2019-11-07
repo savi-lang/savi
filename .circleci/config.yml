@@ -8,8 +8,8 @@ jobs:
           name: Build and run the development environment container.
           command: make ready
       - run:
-          name: Run the test suite.
-          command: make test
+          name: Run the CI suite.
+          command: make ci
       - run:
-          name: Build and run an example program.
-          command: make example
+          name: Build and run some example programs.
+          command: |

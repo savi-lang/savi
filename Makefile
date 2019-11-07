@@ -8,6 +8,11 @@ ready: PHONY Dockerfile
 	docker run --name mare-dev -v $(shell pwd):/opt/code -d --rm --memory 4g mare-dev tail -f /dev/null
 	@echo "the mare-dev container is ready!"
 
+# Run the full CI suite.
+ci: PHONY
+	make test
+	make example-run dir="/opt/code/examples/adventofcode/2018"
+
 # Run the test suite.
 test: PHONY
 	docker exec -ti mare-dev make extra_args="$(extra_args)" test.inner
