@@ -35,6 +35,18 @@
     @assert = array.size == 0
     @assert = try (array[0]!, False | True)
   
+  :it "can reserve undefined space for numeric elements"
+    array Array(U8) = [3, 6, 12]
+    @assert = array.reserve_undefined(10) is array
+    @assert = array.size  == 10
+    @assert = array.space == 16
+  
+  :it "won't reserve undefined space for a non-numeric element type"
+    array = ["foo", "bar", "baz"]
+    @assert = array.reserve_undefined(10) is array
+    @assert = array.size  == 3
+    @assert = array.space == 16
+  
   :it "compares equality for the elements in the array"
     @assert = Array(String).new == Array(String).new
     @assert = ["foo", "bar", "baz"] == ["foo", "bar", "baz"]
