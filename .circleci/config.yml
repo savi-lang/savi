@@ -10,6 +10,3 @@ jobs:
       - run:
           name: Run the CI suite.
           command: make ci
-      - run:
-          name: Build and run some example programs.
-          command: |
