@@ -24,10 +24,23 @@ module Mare::Compiler::Completeness
   def self.check_constructor(ctx, rt, rf, branch_cache)
     fields = rt.defn.functions.select(&.has_tag?(:field))
     branch = Branch.new(ctx, rt, rf, branch_cache, fields)
+    
+    # First, visit the field initializers (for those fields that have them) as
+    # sub branches to simulate them being run at the start of the constructor.
+    fields.each do |f|
+      next unless f.body
+      branch.sub_branch(
+        ctx.infer.for_func(ctx, rt, f, Infer::MetaType.cap("ref")).reified,
+        f.ident.pos,
+      )
+      branch.seen_fields.add(f.ident.value)
+    end
+    
+    # Now visit the actual constructor body.
     rf.func.body.try(&.accept(branch))
     
+    # Any fields that were not seen in the branching analysis are errors.
     unseen = branch.show_unseen_fields
-    
     Error.at rf.func.ident,
       "This constructor doesn't initialize all of its fields", unseen \
         unless unseen.empty?

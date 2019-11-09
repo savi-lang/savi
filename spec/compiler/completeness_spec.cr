@@ -162,6 +162,54 @@ describe Mare::Compiler::Completeness do
     end
   end
   
+  it "allows a field to be read if it has an initializer" do
+    source = Mare::Source.new_example <<-SOURCE
+    :class Data
+      :prop x Array(U8): []
+      :new: @init_x
+      :fun ref init_x
+        @x << 1
+        @x << 2
+        @x << 3
+    SOURCE
+    
+    Mare::Compiler.compile([source], :completeness)
+  end
+  
+  it "complains if a field initializer tries to read an uninitialized field" do
+    source = Mare::Source.new_example <<-SOURCE
+    :class Data
+      :prop space USize
+      :prop x: Array(U8).new(@space)
+      :new: @init_x
+      :fun ref init_x
+        @x << 1
+        @x << 2
+        @x << 3
+    SOURCE
+    
+    expected = <<-MSG
+    This field may be read before it is initialized by a constructor:
+    from (example):2:
+      :prop space USize
+            ^~~~~
+    
+    - traced from a call here:
+      from (example):3:
+      :prop x: Array(U8).new(@space)
+                             ^~~~~~
+    
+    - traced from a call here:
+      from (example):3:
+      :prop x: Array(U8).new(@space)
+            ^
+    MSG
+    
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :completeness)
+    end
+  end
+  
   it "complains when access to the self is shared while still incomplete" do
     source = Mare::Source.new_example <<-SOURCE
     :primitive Access
