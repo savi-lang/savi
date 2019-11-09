@@ -720,28 +720,61 @@ class Mare::Compiler::CodeGen
     # Store the function declaration.
     gfunc.llvm_func = @mod.functions.add(gfunc.llvm_name, param_types, ret_type)
     
-    # If we didn't use a receiver parameter in the function signature,
-    # we need to create a wrapper method for the virtual table that
-    # includes a receiver parameter, but throws it away without using it.
+    # Choose the strategy for the function that goes in the virtual table.
+    # The virtual table is used for calling functions indirectly, and always
+    # has an object-style receiver as the first parameter, for consistency.
+    # However, some functions expect no receiver or expect a raw machine value,
+    # so we may need a wrapper function that handles this case.
     gfunc.virtual_llvm_func =
-      if gfunc.needs_receiver?
-        gfunc.llvm_func
-      else
+      if !gfunc.needs_receiver?
+        # If we didn't use a receiver parameter in the function signature,
+        # we need to create a wrapper method for the virtual table that
+        # includes a receiver parameter, but throws it away without using it.
         vtable_name = "#{gfunc.llvm_name}.VIRTUAL"
-        param_types.unshift(gtype.struct_ptr)
+        vparam_types = param_types.dup
+        vparam_types.unshift(gtype.struct_ptr)
         
-        @mod.functions.add vtable_name, param_types, ret_type do |fn|
+        @mod.functions.add vtable_name, vparam_types, ret_type do |fn|
           next if gtype.type_def.is_abstract?
           
           gen_func_start(fn)
           
           forward_args =
-            (param_types.size - 1).times.map { |i| fn.params[i + 1] }.to_a
+            (vparam_types.size - 1).times.map { |i| fn.params[i + 1] }.to_a
           
           @builder.ret @builder.call(gfunc.llvm_func, forward_args)
           
           gen_func_end
         end
+      elsif param_types.first != gtype.struct_ptr
+        # If the receiver parameter type doesn't match the struct pointer,
+        # we assume it is a boxed machine value, so we need a wrapper function
+        # that will unwrap the raw machine value to use as the receiver.
+        elem_types = gtype.struct_type.struct_element_types
+        raise "expected the receiver type to be a raw machine value" \
+          unless elem_types.size == 2 && elem_types[1] == param_types.first
+        
+        vtable_name = "#{gfunc.llvm_name}.VIRTUAL"
+        vparam_types = param_types.dup
+        vparam_types.shift
+        vparam_types.unshift(gtype.struct_ptr)
+        
+        @mod.functions.add vtable_name, vparam_types, ret_type do |fn|
+          next if gtype.type_def.is_abstract?
+          
+          gen_func_start(fn)
+          
+          forward_args =
+            (vparam_types.size - 1).times.map { |i| fn.params[i + 1] }.to_a
+          forward_args.unshift(gen_unboxed(fn.params[0], gtype))
+          
+          @builder.ret @builder.call(gfunc.llvm_func, forward_args)
+          
+          gen_func_end
+        end
+      else
+        # Otherwise the function needs no wrapper; it can be naked in the table.
+        gfunc.llvm_func
       end
     
     # If this is an async function, we need to generate a wrapper that sends
@@ -1811,12 +1844,12 @@ class Mare::Compiler::CodeGen
       
       # Unwrap the box and finish the assign cast from there.
       # This brings us to the zero extension / truncation logic above.
-      value = gen_unboxed(value, from_expr.not_nil!)
+      value = gen_unboxed(value, gtype_of(from_expr.not_nil!))
       gen_assign_cast(value, to_type, from_expr)
     when LLVM::Type::Kind::Pointer
       # If we're going from pointer to non-pointer, we're unboxing,
       # so we have to do that first before the LLVM bit cast.
-      value = gen_boxed(value, from_expr.not_nil!) \
+      value = gen_boxed(value, gtype_of(from_expr.not_nil!)) \
         if value.type.kind != LLVM::Type::Kind::Pointer
       
       # Do the LLVM bitcast.
@@ -1826,10 +1859,10 @@ class Mare::Compiler::CodeGen
     end
   end
   
-  def gen_boxed(value, from_expr)
+  def gen_boxed(value, from_gtype)
     # Allocate a struct pointer to hold the type descriptor and value.
     # This also writes the type descriptor into it appropriate position.
-    boxed = gen_alloc(gtype_of(from_expr), "#{value.name}.BOXED")
+    boxed = gen_alloc(from_gtype, "#{value.name}.BOXED")
     
     # Write the value itself into the value field of the struct.
     value_gep = @builder.struct_gep(boxed, 1, "#{value.name}.BOXED.VALUE")
@@ -1839,9 +1872,9 @@ class Mare::Compiler::CodeGen
     boxed
   end
   
-  def gen_unboxed(value, from_expr)
+  def gen_unboxed(value, from_gtype)
     # First, cast the given object pointer to the correct boxed struct pointer.
-    struct_ptr = gtype_of(from_expr).struct_ptr
+    struct_ptr = from_gtype.struct_ptr
     value = @builder.bit_cast(value, struct_ptr, "#{value.name}.BOXED")
     
     # Load the value itself into the value field of the boxed struct pointer.
@@ -2988,7 +3021,7 @@ class Mare::Compiler::CodeGen
       end
     
     trace_fn =
-      if type_def.has_allocation? && gtype.fields.any?(&.last.trace_needed?)
+      if type_def.has_desc? && gtype.fields.any?(&.last.trace_needed?)
         @mod.functions.add("#{type_def.llvm_name}.TRACE", @trace_fn)
       else
         @trace_fn_ptr.null

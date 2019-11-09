@@ -90,6 +90,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
       t.type.add_tag(:allocated)
     when "class"
       t.type.add_tag(:allocated)
+      t.type.add_tag(:no_desc) if t.type.ident.value == "CPointer" # TODO: less hacky and special-cased for this
     when "trait"
       t.type.add_tag(:abstract)
       t.type.add_tag(:allocated)
@@ -122,8 +123,10 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
     property keyword : String # TODO: read-only as getter
     getter type : Program::Type
     getter program : Program
+    getter members
     
     def initialize(@keyword, @type, @program)
+      @members = [] of Program::TypeAlias
     end
     
     # TODO: dedup these with the Witness mechanism.
@@ -168,6 +171,44 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         spec_func.add_tag(:hygienic)
         spec_func.add_tag(:copies)
         @type.functions << spec_func
+      end
+      
+      # An enum type gets a method for printing the name of the member
+      if @keyword == "enum"
+        # Each member gets a clause in the choice.
+        member_name_choices = [] of {AST::Term, AST::Term}
+        @members.each do |member|
+          member_name_choices << {
+            # Test if this value is equal to this member.
+            AST::Relate.new(
+              AST::Identifier.new("@").from(member.ident),
+              AST::Operator.new("==").from(member.ident),
+              AST::Identifier.new(member.ident.value).from(member.ident),
+            ).from(@type.ident),
+            # If true, then the value is the string literal for that member.
+            AST::LiteralString.new(member.ident.value).from(member.ident),
+          }
+        end
+        # Otherwise, the member name is returned as an empty string. Sad.
+        member_name_choices << {
+          AST::Identifier.new("True").from(@type.ident),
+          AST::LiteralString.new("").from(@type.ident),
+        }
+        
+        # Create a function body containing that choice as its only expression.
+        member_name_body = AST::Group.new(":").from(@type.ident)
+        member_name_body.terms <<
+          AST::Choice.new(member_name_choices).from(@type.ident)
+        
+        # Finally, create a function with that body.
+        member_name_func = Program::Function.new(
+          AST::Identifier.new("box").from(@type.ident),
+          AST::Identifier.new("member_name").from(@type.ident),
+          nil,
+          AST::Identifier.new("String").from(@type.ident),
+          member_name_body,
+        )
+        @type.functions << member_name_func
       end
       
       # An FFI type's functions should be tagged as "ffi" and body removed.
@@ -518,6 +559,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         type_alias.metadata[:enum_value] =
           body.terms[0].as(AST::LiteralInteger).value.to_i32
         
+        @members << type_alias
         @program.aliases << type_alias
       end
       

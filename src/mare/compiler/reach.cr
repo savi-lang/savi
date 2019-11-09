@@ -339,10 +339,6 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       !@reified.defn.has_tag?(:no_desc)
     end
     
-    def has_allocation?
-      @reified.defn.has_tag?(:allocated)
-    end
-    
     def has_state?
       @reified.defn.has_tag?(:allocated) ||
       @reified.defn.has_tag?(:numeric)

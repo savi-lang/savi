@@ -7,6 +7,9 @@
   :fun size USize
   :fun "[]!" (index USize) box // TODO: allow any box
 
+:trait box _InspectEnum
+  :fun member_name String
+
 :trait box _InspectCustom
   :fun inspect_into (output String'ref) None
 
@@ -24,8 +27,7 @@
   :fun into (output String'ref, input box) None // TODO: use something like Crystal IO instead of String?
     case (
     | input <: _InspectCustom | input.inspect_into(output)
-    | input <: Bool |
-      output << if input ("True" | "False")
+    | input <: _InspectEnum | output << input.member_name
     | input <: U8    | @into(output, input.u64) // TODO: unify into one integer clause?
     | input <: U32   | @into(output, input.u64) // TODO: unify into one integer clause?
     | input <: USize | @into(output, input.u64) // TODO: unify into one integer clause?
