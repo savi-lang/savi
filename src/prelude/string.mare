@@ -100,7 +100,7 @@
         size
       )
     |
-      @val_from_cpointer(@_ptr.null, 0, 0)
+      @val_from_cpointer(@_ptr._null, 0, 0)
     )
   
   :fun ref push_byte (byte U8)
@@ -149,7 +149,7 @@
       
       @val_from_cpointer(ptr, size, size)
     |
-      @val_from_cpointer(@_ptr.null, 0, 0)
+      @val_from_cpointer(@_ptr._null, 0, 0)
     )
   
   :fun val split (split_byte U8) // TODO: a byte shouldn't be the only thing we can split by...

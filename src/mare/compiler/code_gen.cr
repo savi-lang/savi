@@ -935,7 +935,7 @@ class Mare::Compiler::CodeGen
     
     @builder.ret \
       case gfunc.func.ident.value
-      when "null"
+      when "null", "_null"
         llvm_type.null
       when "_alloc"
         llvm_func.add_attribute(LLVM::Attribute::NoAlias, LLVM::AttributeIndex::ReturnIndex)

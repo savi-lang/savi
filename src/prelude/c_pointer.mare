@@ -1,5 +1,6 @@
 :class tag CPointer (A) // TODO: don't special-case in compiler as a faux-class
-  :fun non null @'ref: compiler intrinsic
+  :fun non null @'tag: compiler intrinsic
+  :fun non _null @'ref: compiler intrinsic
   :fun non _alloc (space USize) @'ref: compiler intrinsic
   :fun ref _realloc (space USize) @: compiler intrinsic
   :fun tag _unsafe @'ref: compiler intrinsic

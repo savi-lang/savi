@@ -5,7 +5,7 @@
   
   :fun ref _ptr_set_null
     @_alloc = 0
-    @_ptr = CPointer(A).null
+    @_ptr = CPointer(A)._null
   
   :fun ref _ptr_allocate (space USize)
     @_alloc = space.next_pow2.max(space).max(8)
