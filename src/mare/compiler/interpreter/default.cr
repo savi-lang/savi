@@ -173,7 +173,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         @type.functions << spec_func
       end
       
-      # An enum type gets a method for printing the name of the member
+      # An enum type gets a method for printing the name of the member.
       if @keyword == "enum"
         # Each member gets a clause in the choice.
         member_name_choices = [] of {AST::Term, AST::Term}
@@ -209,6 +209,53 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
           member_name_body,
         )
         @type.functions << member_name_func
+      end
+      
+      # An enum type gets a method for converting from U64.
+      if @keyword == "enum"
+        # Each member gets a clause in the choice.
+        from_u64_choices = [] of {AST::Term, AST::Term}
+        @members.each do |member|
+          from_u64_choices << {
+            # Test if this value is equal to this member.
+            AST::Relate.new(
+              AST::Relate.new(
+                AST::Identifier.new(member.ident.value).from(member.ident),
+                AST::Operator.new(".").from(member.ident),
+                AST::Identifier.new("u64").from(member.ident),
+              ).from(@type.ident),
+              AST::Operator.new("==").from(member.ident),
+              AST::Identifier.new("value").from(member.ident),
+            ).from(@type.ident),
+            # If true, then the member is returned.
+            AST::Identifier.new(member.ident.value).from(member.ident),
+          }
+        end
+        # Otherwise, an error is raised. Sad.
+        from_u64_choices << {
+          AST::Identifier.new("True").from(@type.ident),
+          AST::Identifier.new("error!").from(@type.ident),
+        }
+        
+        # Create function parameters for the value parameter.
+        from_u64_params = AST::Group.new("(").from(@type.ident)
+        from_u64_params.terms <<
+          AST::Identifier.new("value").from(@type.ident)
+        
+        # Create a function body containing that choice as its only expression.
+        from_u64_body = AST::Group.new(":").from(@type.ident)
+        from_u64_body.terms <<
+          AST::Choice.new(from_u64_choices).from(@type.ident)
+        
+        # Finally, create a function with that body.
+        from_u64_func = Program::Function.new(
+          AST::Identifier.new("non").from(@type.ident),
+          AST::Identifier.new("from_u64!").from(@type.ident),
+          from_u64_params,
+          AST::Identifier.new(@type.ident.value).from(@type.ident),
+          from_u64_body,
+        )
+        @type.functions << from_u64_func
       end
       
       # An FFI type's functions should be tagged as "ffi" and body removed.
