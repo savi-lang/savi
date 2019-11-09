@@ -32,4 +32,8 @@ class LLVM::Builder
   def ptr_to_int(value, to_type, name = "")
     Value.new LibLLVM.build_ptr2int(self, value, to_type, name)
   end
+
+  def int_to_ptr(value, to_type, name = "")
+    Value.new LibLLVM.build_int2ptr(self, value, to_type, name)
+  end
 end

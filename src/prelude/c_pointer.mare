@@ -12,3 +12,5 @@
   :fun box _copy_to (other @'ref, count USize) None: compiler intrinsic
   :fun box _compare (other @'box, size USize) I32: compiler intrinsic // TODO: shouldn't need 'box in arg type?
   :fun box _hash (size USize) USize: compiler intrinsic
+  :fun tag usize USize: compiler intrinsic
+  :fun non from_usize (number USize) @'tag: compiler intrinsic

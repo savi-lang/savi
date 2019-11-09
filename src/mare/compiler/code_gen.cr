@@ -1011,6 +1011,10 @@ class Mare::Compiler::CodeGen
           @mod.functions["ponyint_hash_block"],
           [params[0], params[1]],
         )
+      when "usize"
+        @builder.ptr_to_int(params[0], @isize)
+      when "from_usize"
+        @builder.int_to_ptr(params[0], @ptr)
       else
         raise NotImplementedError.new(gfunc.func.ident.value)
       end

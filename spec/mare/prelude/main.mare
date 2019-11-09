@@ -4,6 +4,7 @@
   :new (env)
     Specs(ArraySpec).run(env)
     Specs(BoolSpec).run(env)
+    Specs(CPointerSpec).run(env)
     Specs(InspectSpec).run(env)
     Specs(NumericSpec).run(env)
     Specs(PlatformSpec).run(env)
