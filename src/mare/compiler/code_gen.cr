@@ -1823,7 +1823,6 @@ class Mare::Compiler::CodeGen
       lhs = gen_expr(relate.lhs)
       rhs_type = type_of(relate.rhs)
       
-      # TODO: support abstract gtypes
       if rhs_type.is_concrete?
         rhs_gtype = @gtypes[ctx.reach[rhs_type.single!].llvm_name]
         
