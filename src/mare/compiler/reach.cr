@@ -296,6 +296,42 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       else raise NotImplementedError.new(src_kind)
       end
     end
+    
+    def trace_mutability_of_nominal(infer, dst_type : Ref)
+      src_cap = @meta_type.cap_only.inner
+      case src_cap
+      when Infer::MetaType::Capability::NON then return :non
+      when Infer::MetaType::Capability::TRN,
+           Infer::MetaType::Capability::REF,
+           Infer::MetaType::Capability::BOX then return :mutable
+      end
+      
+      if src_cap == Infer::MetaType::Capability::ISO
+        if dst_type.meta_type.safe_to_match_as?(infer, @meta_type)
+          return :mutable
+        else
+          src_cap = Infer::MetaType::Capability::VAL
+        end
+      end
+      
+      if src_cap == Infer::MetaType::Capability::VAL
+        if dst_type.meta_type.safe_to_match_as?(infer, @meta_type)
+          return :immutable
+        else
+          src_cap = Infer::MetaType::Capability::TAG
+        end
+      end
+      
+      if src_cap == Infer::MetaType::Capability::TAG
+        if dst_type.meta_type.safe_to_match_as?(infer, @meta_type)
+          return :opaque
+        else
+          return nil
+        end
+      end
+      
+      raise NotImplementedError.new(src_cap)
+    end
   end
   
   struct Def
@@ -337,6 +373,10 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     
     def has_desc?
       !@reified.defn.has_tag?(:no_desc)
+    end
+    
+    def has_allocation?
+      @reified.defn.has_tag?(:allocated)
     end
     
     def has_state?
@@ -399,8 +439,8 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       .map { |rf| ctx.reach.reached_funcs_for(rf) }
     end
     
-    def as_ref : Ref
-      Ref.new(Infer::MetaType.new(@reified))
+    def as_ref(cap = nil) : Ref
+      Ref.new(Infer::MetaType.new(@reified, cap))
     end
   end
   

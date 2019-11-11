@@ -8,8 +8,11 @@
   :fun ref received (conn TCPConnection'ref, data String, call_count USize) Bool // TODO: ByteSeq instead of String
   :fun ref closed (conn TCPConnection'ref): None
 
+:actor TCPListener
+  :be _conn_closed
+
 :actor TCPConnection
-  // TODO: :prop listen (TCPListener | None): None
+  :prop listen (TCPListener | None): TCPListener.new // TODO: None
   :prop notify TCPConnectionNotify
   :prop connect_error OSError: OSErrorNone
   
@@ -321,7 +324,7 @@
       
       @notify.closed(@)
       
-      // TODO: try (@listen.as!(TCPListener)._conn_closed)
+      try @listen.as!(TCPListener)._conn_closed
     )
   
   :fun ref _windows_queue_read // TODO (for windows only)

@@ -1820,46 +1820,47 @@ class Mare::Compiler::CodeGen
     else
       # Otherwise, we generate code that checks the type descriptor of the
       # left-hand side against the compile-time type of the right-hand side.
-      lhs = gen_expr(relate.lhs)
-      rhs_type = type_of(relate.rhs)
+      gen_check_subtype_at_runtime(gen_expr(relate.lhs), type_of(relate.rhs))
+    end
+  end
+  
+  def gen_check_subtype_at_runtime(lhs : LLVM::Value, rhs_type : Reach::Ref)
+    if rhs_type.is_concrete?
+      rhs_gtype = @gtypes[ctx.reach[rhs_type.single!].llvm_name]
       
-      if rhs_type.is_concrete?
-        rhs_gtype = @gtypes[ctx.reach[rhs_type.single!].llvm_name]
-        
-        lhs_desc = gen_get_desc_opaque(lhs)
-        rhs_desc = gen_get_desc_opaque(rhs_gtype)
-        
-        @builder.icmp LLVM::IntPredicate::EQ, lhs_desc, rhs_desc, "#{lhs.name}<:"
-      else
-        type_def = rhs_type.single_def!(ctx)
-        rhs_name = type_def.llvm_name
-        trait_id = @isize.const_int(type_def.desc_id)
-        
-        # Based on the trait id, determine the values to use for bitmap testing.
-        shift = @llvm.const_lshr(
-          trait_id,
-          @isize.const_int(Math.log2(@bitwidth).to_i),
-        )
-        mask = @llvm.const_shl(
-          @isize.const_int(1),
-          @llvm.const_and(trait_id, @isize.const_int(@bitwidth - 1)),
-        )
-        
-        # Load the trait bitmap of the concrete type descriptor of the lhs.
-        desc = gen_get_desc(lhs)
-        traits_gep = @builder.struct_gep(desc, DESC_TRAITS, "#{lhs.name}.DESC.TRAITS.GEP")
-        traits = @builder.load(traits_gep, "#{lhs.name}.DESC.TRAITS")
-        bits_gep = @builder.inbounds_gep(traits, @i32_0, shift, "#{lhs.name}.DESC.TRAITS.GEP.#{rhs_name}")
-        bits = @builder.load(bits_gep, "#{lhs.name}.DESC.TRAITS.#{rhs_name}")
-        
-        # If the bit for this trait is present, then it's a runtime type match.
-        @builder.icmp(
-          LLVM::IntPredicate::NE,
-          @builder.and(bits, mask, "#{lhs.name}<:#{rhs_name}.BITS"),
-          @isize.const_int(0),
-          "#{lhs.name}<:#{rhs_name}"
-        )
-      end
+      lhs_desc = gen_get_desc_opaque(lhs)
+      rhs_desc = gen_get_desc_opaque(rhs_gtype)
+      
+      @builder.icmp LLVM::IntPredicate::EQ, lhs_desc, rhs_desc, "#{lhs.name}<:"
+    else
+      type_def = rhs_type.single_def!(ctx)
+      rhs_name = type_def.llvm_name
+      trait_id = @isize.const_int(type_def.desc_id)
+      
+      # Based on the trait id, determine the values to use for bitmap testing.
+      shift = @llvm.const_lshr(
+        trait_id,
+        @isize.const_int(Math.log2(@bitwidth).to_i),
+      )
+      mask = @llvm.const_shl(
+        @isize.const_int(1),
+        @llvm.const_and(trait_id, @isize.const_int(@bitwidth - 1)),
+      )
+      
+      # Load the trait bitmap of the concrete type descriptor of the lhs.
+      desc = gen_get_desc(lhs)
+      traits_gep = @builder.struct_gep(desc, DESC_TRAITS, "#{lhs.name}.DESC.TRAITS.GEP")
+      traits = @builder.load(traits_gep, "#{lhs.name}.DESC.TRAITS")
+      bits_gep = @builder.inbounds_gep(traits, @i32_0, shift, "#{lhs.name}.DESC.TRAITS.GEP.#{rhs_name}")
+      bits = @builder.load(bits_gep, "#{lhs.name}.DESC.TRAITS.#{rhs_name}")
+      
+      # If the bit for this trait is present, then it's a runtime type match.
+      @builder.icmp(
+        LLVM::IntPredicate::NE,
+        @builder.and(bits, mask, "#{lhs.name}<:#{rhs_name}.BITS"),
+        @isize.const_int(0),
+        "#{lhs.name}<:#{rhs_name}"
+      )
     end
   end
   
@@ -3312,6 +3313,58 @@ class Mare::Compiler::CodeGen
     ])
   end
   
+  def gen_trace_dynamic(dst, src_type, dst_type, after_block)
+    if src_type.is_union?
+      src_type.union_children.each do |child_type|
+        gen_trace_dynamic(dst, child_type, dst_type, after_block)
+      end
+      gen_trace_unknown(dst, PonyRT::TRACE_OPAQUE)
+    elsif src_type.singular?
+      src_type_def = src_type.single_def!(ctx)
+      
+      # We can't trace it if it doesn't have a descriptor,
+      # and we shouldn't trace it if it isn't runtime-allocated.
+      return unless src_type_def.has_desc? && src_type_def.has_allocation?
+      
+      # Generate code to check if this value is a subtype of this at runtime.
+      is_subtype = gen_check_subtype_at_runtime(dst, src_type)
+      true_block = gen_block("trace.is_subtype_of.#{src_type.show_type}")
+      false_block = gen_block("trace.not_subtype_of.#{src_type.show_type}")
+      @builder.cond(is_subtype, true_block, false_block)
+      
+      # In the block in which the value was proved to indeed be a subtype,
+      # Determine the mutability kind to use, then construct a newly refined
+      # destination type to trace for, recursing/delegating back to gen_trace.
+      @builder.position_at_end(true_block)
+      mutability = src_type.trace_mutability_of_nominal(
+        ctx.infer[src_type_def.reified],
+        dst_type,
+      )
+      refined_dst_type =
+        case mutability
+        when :mutable   then src_type_def.as_ref("iso")
+        when :immutable then src_type_def.as_ref("val")
+        when :opaque    then src_type_def.as_ref("tag")
+        when :non       then src_type_def.as_ref("non")
+        else
+          raise NotImplementedError.new([src_type, dst_type])
+        end
+      gen_trace(dst, dst, src_type, refined_dst_type)
+      
+      # If we've traced as mutable or immutable, we're done with this element;
+      # otherwise, we continue tracing as if the match had been false.
+      case mutability
+      when :mutable, :immutable then @builder.br(after_block)
+      else                           @builder.br(false_block)
+      end
+      
+      # Carry on to the next elements, continuing from the false block.
+      @builder.position_at_end(false_block)
+    else
+      raise NotImplementedError.new(src_type)
+    end
+  end
+  
   def gen_trace(src : LLVM::Value, dst : LLVM::Value, src_type, dst_type)
     if src_type == dst_type
       trace_kind = src_type.trace_kind
@@ -3346,7 +3399,10 @@ class Mare::Compiler::CodeGen
     when :static
       raise NotImplementedError.new("static") # TODO
     when :dynamic
-      raise NotImplementedError.new("dynamic") # TODO
+      after_block = gen_block("after_dynamic_trace")
+      gen_trace_dynamic(dst, src_type, dst_type, after_block)
+      @builder.br(after_block)
+      @builder.position_at_end(after_block)
     when :tuple
       raise NotImplementedError.new("tuple") # TODO
     else
