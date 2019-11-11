@@ -175,6 +175,10 @@ struct Mare::Compiler::Infer::MetaType::Nominal
     false
   end
   
+  def safe_to_match_as?(infer : (ForFunc | ForType), other) : Bool?
+    supertype_of?(infer, other) ? true : nil
+  end
+  
   def viewed_from(origin)
     raise NotImplementedError.new("#{origin.inspect}->#{self.inspect}")
   end

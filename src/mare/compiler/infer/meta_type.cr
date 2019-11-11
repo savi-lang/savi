@@ -160,6 +160,13 @@ struct Mare::Compiler::Infer::MetaType
     inner.is_sendable?
   end
   
+  # Returns true if it is safe to refine the type of self to other at runtime.
+  # Returns false if doing so would violate capabilities.
+  # Returns nil if doing so would be impossible even if we ignored capabilities.
+  def safe_to_match_as?(infer : (ForFunc | ForType), other : MetaType) : Bool?
+    inner.safe_to_match_as?(infer, other.inner)
+  end
+  
   def viewed_from(origin : MetaType)
     origin_inner = origin.inner
     case origin_inner

@@ -139,6 +139,10 @@ struct Mare::Compiler::Infer::MetaType::AntiNominal
     false
   end
   
+  def safe_to_match_as?(infer : (ForFunc | ForType), other) : Bool?
+    raise NotImplementedError.new("#{self.inspect} safe_to_match_as?")
+  end
+  
   def viewed_from(origin)
     raise NotImplementedError.new("#{origin.inspect}->#{self.inspect}")
   end

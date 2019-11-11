@@ -310,6 +310,10 @@ struct Mare::Compiler::Infer::MetaType::Capability
     end
   end
   
+  def safe_to_match_as?(infer : (ForFunc | ForType), other) : Bool?
+    supertype_of?(infer, other) ? true : false
+  end
+  
   def viewed_from(origin : Capability) : Capability
     raise "unsupported viewed_from: #{origin}->#{self}" \
       unless ALL_NON_EPH.includes?(self) && ALL_SINGLE.includes?(origin)

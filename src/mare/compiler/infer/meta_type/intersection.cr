@@ -318,6 +318,19 @@ struct Mare::Compiler::Infer::MetaType::Intersection
     cap.try(&.is_sendable?) || false
   end
   
+  def safe_to_match_as?(infer : (ForFunc | ForType), other) : Bool?
+    terms.try(&.each { |term|
+      return nil unless term.supertype_of?(infer, other)
+    })
+    anti_terms.try(&.each { |anti_term|
+      return nil unless anti_term.supertype_of?(infer, other)
+    })
+    cap.try { |cap|
+      return false unless cap.supertype_of?(infer, other)
+    }
+    true
+  end
+  
   def viewed_from(origin)
     raise NotImplementedError.new("#{origin.inspect}->(nil cap)") unless cap
     

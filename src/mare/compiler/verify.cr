@@ -6,27 +6,41 @@
 # This pass does not mutate the Program topology.
 # This pass does not mutate the AST.
 # This pass may raise a compilation error.
-# This pass keeps temporay state (on the stack) at the per-type level.
+# This pass keeps temporay state at the per-function level.
 # This pass produces no output state.
 #
 class Mare::Compiler::Verify < Mare::AST::Visitor
   def self.run(ctx)
-    verify = new
     ctx.infer.for_non_argumented_types.each do |infer_type|
       infer_type.all_for_funcs.each do |infer_func|
-        verify.run(ctx, infer_type.reified, infer_func.reified)
+        new(ctx, infer_type, infer_func).run
       end
     end
   end
   
-  def run(ctx, rt, rf)
-    check_function(ctx, rt, rf)
+  getter ctx : Context
+  getter infer_type : Infer::ForType
+  getter infer_func : Infer::ForFunc
+  
+  def initialize(@ctx, @infer_type, @infer_func)
+  end
+  
+  def rt
+    infer_type.reified
+  end
+  
+  def rf
+    infer_func.reified
+  end
+  
+  def run
+    check_function
     
     rf.func.params.try(&.terms.each(&.accept(self)))
     rf.func.body.try(&.accept(self))
   end
   
-  def check_function(ctx, rt, rf)
+  def check_function
     func = rf.func
     func_body = func.body
     
@@ -86,6 +100,27 @@ class Mare::Compiler::Verify < Mare::AST::Visitor
       Error.at node, "This try block is unnecessary", [
         {node.body, "the body has no possible error cases to catch"}
       ]
+    end
+  end
+  
+  def touch(node : AST::Relate)
+    case node.op.value
+    when "<:"
+      # Skip this verification if this just a compile-time type check.
+      return if infer_func[node.lhs].is_a?(Infer::Fixed)
+      
+      # Verify that it is safe to perform this runtime type check.
+      lhs_mt = infer_func.resolve(node.lhs)
+      rhs_mt = infer_func.resolve(node.rhs)
+      case lhs_mt.safe_to_match_as?(infer_func, rhs_mt)
+      when false
+        Error.at node,
+          "This type check would require runtime knowledge of capabilities", [
+            {node.rhs.pos, "the target type is #{rhs_mt.show_type}"},
+            {node.lhs.pos, "but the origin type #{lhs_mt.show_type} has " \
+              "possibilities with the same type but different capability"}
+          ]
+      end
     end
   end
   

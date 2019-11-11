@@ -19,6 +19,15 @@ struct Mare::Compiler::Infer::MetaType::Union
     raise "empty intersects" if intersects && intersects.try(&.empty?)
   end
   
+  def all_terms
+    all_terms = [] of Inner
+    caps.try(&.each { |cap| all_terms << cap })
+    terms.try(&.each { |term| all_terms << term })
+    anti_terms.try(&.each { |anti_term| all_terms << anti_term })
+    intersects.try(&.each { |intersect| all_terms << intersect })
+    all_terms
+  end
+  
   # This function works like .new, but it accounts for cases where there
   # aren't enough terms, anti-terms, and intersections to build a real Union.
   # Returns Unsatisfiable if no terms or anti-terms are supplied.
@@ -382,6 +391,17 @@ struct Mare::Compiler::Infer::MetaType::Union
   def is_sendable?
     return caps.not_nil!.all?(&.is_sendable?) if caps
     false
+  end
+  
+  def safe_to_match_as?(infer : (ForFunc | ForType), other) : Bool?
+    all_terms.each do |term|
+      case term.safe_to_match_as?(infer, other)
+      when true  then return true
+      when false then return false
+      when nil   then next
+      end
+    end
+    nil
   end
   
   def viewed_from(origin)
