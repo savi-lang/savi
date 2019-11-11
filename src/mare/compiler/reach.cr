@@ -459,6 +459,8 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     handle_func(ctx, ctx.infer.for_type(ctx, env), env.find_func!("_create"))
     main = ctx.namespace["Main"].as(Program::Type)
     handle_func(ctx, ctx.infer.for_type(ctx, main), main.find_func!("new"))
+    n = ctx.namespace["AsioEventNotify"].as(Program::Type)
+    handle_func(ctx, ctx.infer.for_type(ctx, n), n.find_func!("_event_notify"))
     
     # Run our "sympathetic resonance" mini-pass.
     sympathetic_resonance(ctx)
@@ -499,6 +501,8 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
           if other_func && infer.is_subtype?(other_rt, infer_type.reified)
       end
     end
+    
+    handle_type_def(ctx, infer_type.reified)
   end
   
   def signature_for(ctx, infer : Infer::ForFunc) : Signature
@@ -549,14 +553,19 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     # Skip this type def if it's not completely reified.
     return unless rt.is_complete?
     
+    # Now, save a Def instance for this program type.
+    # We do this sooner rather than later because we may recurse here.
+    fields = [] of {String, Ref}
+    @defs[rt] = Def.new(ctx, rt, self, fields)
+    
+    # Now, if the type has any type arguments, reach those as well.
+    rt.args.each { |arg| handle_type_ref(ctx, arg) }
+    
     # Reach all fields, regardless of if they were actually used.
     # This is important for consistency of memory layout purposes.
-    fields = rt.defn.functions.select(&.has_tag?(:field)).map do |f|
+    fields.concat(rt.defn.functions.select(&.has_tag?(:field)).map do |f|
       handle_field(ctx, rt, f)
-    end.compact
-    
-    # Now, save a Def instance for this program type.
-    @defs[rt] = Def.new(ctx, rt, self, fields)
+    end.compact)
   end
   
   def sympathetic_resonance(ctx)

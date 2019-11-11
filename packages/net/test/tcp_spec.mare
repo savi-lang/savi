@@ -1,0 +1,39 @@
+:import "spec"
+:import ".." (TCPConnection, TCPConnectionNotify)
+
+:class iso TCPSpecNotify
+  :is TCPConnectionNotify
+  :prop env Env
+  :new (@env)
+  
+  :fun ref connecting (conn TCPConnection'ref, count U32)
+    @env.err.print("Connecting")
+  
+  :fun ref connected (conn TCPConnection'ref)
+    @env.err.print("Connected")
+    conn.write("Hello, World!")
+  
+  :fun ref connect_failed (conn TCPConnection'ref)
+    @env.err.print("Failed to connect:")
+    @env.err.print(conn.connect_error.name)
+  
+  :fun ref closed (conn TCPConnection'ref)
+    @env.err.print("Closed")
+  
+  :fun ref sent (conn TCPConnection'ref, data String)
+    @env.err.print("Sent:")
+    @env.err.print(data)
+    data
+  
+  :fun ref received (conn TCPConnection'ref, data String, call_count USize)
+    @env.err.print("Received:")
+    @env.err.print(data)
+    conn.dispose
+    True
+
+:class TCPSpec
+  :is Spec
+  :const describes: "TCP"
+  
+  :it "can connect"
+    conn = TCPConnection.new(TCPSpecNotify.new(@env), "localhost", "8080")

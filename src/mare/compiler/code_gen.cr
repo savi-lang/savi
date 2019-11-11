@@ -108,6 +108,15 @@ class Mare::Compiler::CodeGen
       g.gen_struct_type(self)
     end
     
+    # Generate function declaration return types.
+    def gen_func_decl_ret_types(g : CodeGen)
+      # Generate associated function declarations, some of which
+      # may be referenced in the descriptor global instance below.
+      @gfuncs.each_value do |gfunc|
+        g.gen_func_decl_ret_type(self, gfunc)
+      end
+    end
+    
     # Generate function declarations.
     def gen_func_decls(g : CodeGen)
       # Generate associated function declarations, some of which
@@ -197,6 +206,7 @@ class Mare::Compiler::CodeGen
     getter! vtable_index : Int32
     getter llvm_name : String
     property! llvm_func : LLVM::Function
+    property! llvm_func_ret_type : LLVM::Type
     property! virtual_llvm_func : LLVM::Function
     property! send_llvm_func : LLVM::Function
     property! send_msg_llvm_type : LLVM::Type
@@ -279,6 +289,11 @@ class Mare::Compiler::CodeGen
     @isize    = @llvm.intptr(@target_machine.data_layout).as(LLVM::Type)
     @f32      = @llvm.float.as(LLVM::Type)
     @f64      = @llvm.double.as(LLVM::Type)
+    
+    @pony_error_landing_pad_type =
+      @llvm.struct([@ptr, @i32], "_.PONY_ERROR_LANDING_PAD_TYPE").as(LLVM::Type)
+    @pony_error_personality_fn = @mod.functions.add("ponyint_personality_v0",
+      [] of LLVM::Type, @i32).as(LLVM::Function)
     
     @bitwidth = @isize.int_width.to_u.as(UInt32)
     @memcpy = mod.functions.add("llvm.memcpy.p0i8.p0i8.i#{@bitwidth}",
@@ -430,6 +445,9 @@ class Mare::Compiler::CodeGen
     
     # Generate all struct types.
     @gtypes.each_value(&.gen_struct_type(self))
+    
+    # Generate all function declaration return types.
+    @gtypes.each_value(&.gen_func_decl_ret_types(self))
     
     # Generate all function declarations.
     @gtypes.each_value(&.gen_func_decls(self))
@@ -639,7 +657,7 @@ class Mare::Compiler::CodeGen
     frame.llvm_func.basic_blocks.append(name)
   end
   
-  def gen_func_decl(gtype, gfunc)
+  def gen_func_decl_ret_type(gtype, gfunc)
     gfunc.continuation_info = ContinuationInfo.new(self, gtype, gfunc)
     
     # If this is a yielding function, we must first declare the type that will
@@ -651,7 +669,7 @@ class Mare::Compiler::CodeGen
     
     # Determine the LLVM type to return, based on the calling convention.
     simple_ret_type = llvm_type_of(gfunc.reach_func.signature.ret)
-    ret_type =
+    gfunc.llvm_func_ret_type =
       case gfunc.calling_convention
       when :constructor_cc
         @void
@@ -705,6 +723,10 @@ class Mare::Compiler::CodeGen
       else
         raise NotImplementedError.new(gfunc.calling_convention)
       end
+  end
+  
+  def gen_func_decl(gtype, gfunc)
+    ret_type = gfunc.llvm_func_ret_type
     
     # Get the LLVM types to use for the parameter types.
     param_types = [] of LLVM::Type
@@ -917,10 +939,33 @@ class Mare::Compiler::CodeGen
     param_count = llvm_func.params.size
     args = param_count.times.map { |i| llvm_func.params[i] }.to_a
     
-    value = @builder.call llvm_ffi_func, args
-    value = gen_none if llvm_ffi_func.return_type == @void
-    
-    @builder.ret(value)
+    case gfunc.calling_convention
+    when :simple_cc
+      value = @builder.call llvm_ffi_func, args
+      value = gen_none if llvm_ffi_func.return_type == @void
+      @builder.ret(value)
+    when :error_cc
+      then_block = gen_block("invoke_then")
+      else_block = gen_block("invoke_else")
+      value = @builder.invoke llvm_ffi_func, args, then_block, else_block
+      value = gen_none if llvm_ffi_func.return_type == @void
+      
+      # In the else block, make a landing pad to catch the pony-style error,
+      # then return an error using our error calling convention.
+      @builder.position_at_end(else_block)
+      @builder.landing_pad(
+        @pony_error_landing_pad_type,
+        @pony_error_personality_fn,
+        [] of LLVM::Value,
+      )
+      gen_return_using_error_cc(gen_none, nil, true)
+      
+      # In the then block, return the value using our error calling convention.
+      @builder.position_at_end(then_block)
+      gen_return_using_error_cc(value, nil, false)
+    else
+      raise NotImplementedError.new(gfunc.calling_convention)
+    end
     
     gen_func_end(gfunc)
   end
@@ -1932,7 +1977,7 @@ class Mare::Compiler::CodeGen
         raise "#{ref.inspect} isn't a constant value" if const_only
         func_frame.receiver_value
       elsif ref.is_a?(Refer::RaiseError)
-        gen_raise_error(expr)
+        gen_raise_error
       else
         raise NotImplementedError.new("#{ref}\n#{expr.pos.show}")
       end
@@ -2749,7 +2794,7 @@ class Mare::Compiler::CodeGen
     @builder.phi(phi_type, phi_blocks, phi_values, "phi_try")
   end
   
-  def gen_raise_error(expr)
+  def gen_raise_error(error_value = gen_none)
     raise "inconsistent frames" if @frames.size > 1
     
     # TODO: Allow an error value of something other than None.
@@ -3035,6 +3080,7 @@ class Mare::Compiler::CodeGen
     # a trait in the program, with types that implement that trait having
     # the corresponding bit set in their version of the bitmap.
     # This is used for runtime type matching against abstract types (traits).
+    is_asio_event_notify = false
     traits_bitmap = trait_bitmap_size.times.map { 0 }.to_a
     infer = ctx.infer[gtype.type_def.reified]
     ctx.reach.each_type_def.each do |other_def|
@@ -3047,10 +3093,20 @@ class Mare::Compiler::CodeGen
         
         bit = other_def.desc_id & (@bitwidth - 1)
         traits_bitmap[index] |= (1 << bit)
+        
+        # Take special note if this type is a subtype of AsioEventNotify.
+        is_asio_event_notify = true if other_def.llvm_name == "AsioEventNotify"
       end
     end
     traits_bitmap_global = gen_global_for_const \
       @isize.const_array(traits_bitmap.map { |bits| @isize.const_int(bits) })
+    
+    # If this type is an AsioEventNotify, then take note of the vtable index
+    # of the _event_notify behaviour that the ASIO runtime will send to.
+    # Otherwise, an index of -1 indicates that the runtime should *not* send.
+    event_notify_vtable_index = @i32.const_int(
+      is_asio_event_notify ? gtype["_event_notify"].vtable_index : -1
+    )
     
     desc.initializer = gtype.desc_type.const_struct [
       @i32.const_int(type_def.desc_id),      # 0: id
@@ -3066,7 +3122,7 @@ class Mare::Compiler::CodeGen
       @custom_deserialise_fn_ptr.null,       # 10: custom deserialise fn
       dispatch_fn.to_value,                  # 11: dispatch fn
       @final_fn_ptr.null,                    # 12: final fn
-      @i32.const_int(-1),                    # 13: event notify TODO
+      event_notify_vtable_index,             # 13: event notify TODO
       traits_bitmap_global,                  # 14: traits bitmap
       @pptr.null,                            # 15: TODO: fields
       @ptr.const_array(vtable),              # 16: vtable

@@ -28,7 +28,7 @@ class Mare::Compiler::CodeGen
         
         # Then come the yielding call results (for yields nested in yields).
         ctx.inventory.yielding_calls(gfunc.func).each do |relate|
-          list << g.resolve_call(relate, gfunc).last.llvm_func.return_type
+          list << g.resolve_call(relate, gfunc).last.llvm_func_ret_type
         end
         
         list

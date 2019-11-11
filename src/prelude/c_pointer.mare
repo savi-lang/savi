@@ -14,3 +14,4 @@
   :fun box _hash (size USize) USize: compiler intrinsic
   :fun tag usize USize: compiler intrinsic
   :fun non from_usize (number USize) @'tag: compiler intrinsic
+  :new _this_pseudo_class_has_no_constructor // TODO: shouldn't need this hack?

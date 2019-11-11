@@ -24,10 +24,50 @@
       @_ptr_set_null
     )
   
+  :new iso new_iso (space USize = 0) // TODO: use recover instead of this hack
+    @_size = 0
+    
+    if (space > 0) (
+      @_ptr_allocate(space)
+    |
+      @_ptr_set_null
+    )
+  
   :fun size: @_size
   :fun space: @_alloc
+  :fun cpointer (offset = 0) tag: @_ptr._offset(offset)
   
   :fun ref clear: @_size = 0, @
+  
+  :fun ref truncate (size): @_size = @_size.min(size)
+  
+  :fun ref trim_in_place (from USize, to USize = -1)
+    to = to.min(@_size)
+    from = from.min(to)
+    size = to - from
+    
+    if (to == @_size) (
+      // If our new final address lines up with the current final address,
+      // then we can keep any extra bytes allocated beyond the current size.
+      // We'll only trim off the left side.
+      @_alloc -= from
+    |
+      // Otherwise, we can't keep the extra allocated bytes, and therefore
+      // the new allocation size is the same as the new occupied size
+      @_alloc = size
+    )
+    
+    @_size = size
+    
+    if (@_alloc == 0) (
+      // If the new allocation space is zero, use a null pointer to avoid issue.
+      @_ptr = CPointer(A)._null
+    |
+      // Otherwise, use a pointer offset from the original one to trim the left.
+      @_ptr = @_ptr._offset(from)
+    )
+    
+    @
   
   :: Reserve enough total space for the given number of elements.
   :: The size (number of actual elements present in the array) does not change.
@@ -52,13 +92,17 @@
   :: aliasable as themselves (with non-unique reference capabilities), so
   :: if the element type isn't aliasable, the cloned array will be empty.
   
-  :fun clone
-    array = @new(@size)
+  :fun clone iso
+    array = @new_iso(@size)
     if (A <: alias) (
-      @_ptr._copy_to(array._ptr, @size)
+      _ptr_tag tag = @_ptr // TODO: this indirection shouldn't be needed
+      array._clone_from(_ptr_tag, @size)
       array._size = @size
     )
-    array
+    --array // TODO: auto-consume at end of the function?
+  
+  :fun ref _clone_from (other_ptr CPointer(A), size USize)
+    other_ptr._unsafe._copy_to(@_ptr, size)
   
   :fun "[]!" (index)
     if (@size <= index) error!

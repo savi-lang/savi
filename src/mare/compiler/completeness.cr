@@ -141,6 +141,7 @@ module Mare::Compiler::Completeness
       
       # We only care about further analysis if not all fields are initialized.
       return unless seen_fields.size < all_fields.size
+      return if (unseen_fields = show_unseen_fields; unseen_fields).empty?
       
       # This represents the self type as opaque, with no field access.
       # We'll use this to guarantee that no usage of the current self object
@@ -160,7 +161,7 @@ module Mare::Compiler::Completeness
             {pos,
               "if this constraint were specified as `tag` or lower" \
               " it would not grant field access"}
-          ] + show_unseen_fields
+          ] + unseen_fields
       end
     end
     

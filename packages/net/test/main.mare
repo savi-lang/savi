@@ -1,0 +1,5 @@
+:import "spec"
+
+:actor Main
+  :new (env)
+    Specs(TCPSpec).run(env)

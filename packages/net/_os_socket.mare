@@ -1,0 +1,66 @@
+:import "os/error"
+
+:ffi LibPonyOs
+  :fun pony_os_sockopt_level (I32) I32
+  :fun pony_os_sockopt_option (I32) I32
+  :fun pony_os_connect_tcp (AsioEventNotify, CPointer(U8), CPointer(U8), CPointer(U8), U32) U32
+  :fun pony_os_socket_close (U32) None
+  :fun pony_os_socket_shutdown (U32) None
+  :fun pony_os_writev (CPointer(AsioEvent), CPointer(CPointer(U8)), USize) USize
+  :fun pony_os_recv! (CPointer(AsioEvent), CPointer(U8), USize) USize
+  :fun pony_os_errno () OSError // TODO: shouldn't require empty param parens here
+  :fun getsockopt (U32, I32, I32, CPointer(U8), CPointer(USize)) I32
+
+:primitive _OSSocket
+  :fun level_socket  I32: LibPonyOs.pony_os_sockopt_level(4138)
+  :fun option_error  I32: LibPonyOs.pony_os_sockopt_option(827)
+  :fun option_rcvbuf I32: LibPonyOs.pony_os_sockopt_option(884)
+  :fun option_sndbuf I32: LibPonyOs.pony_os_sockopt_option(903)
+  
+  :fun connect_tcp (owner, host String, service String, from String, asio_flags)
+    LibPonyOs.pony_os_connect_tcp(
+      owner, host.cstring, service.cstring, from.cstring, asio_flags)
+  
+  :fun close (fd U32)
+    LibPonyOs.pony_os_socket_close(fd)
+  
+  :fun shutdown (fd U32)
+    LibPonyOs.pony_os_socket_shutdown(fd)
+  
+  :fun writev (event CPointer(AsioEvent), buffers Array(CPointer(U8)), count USize)
+    LibPonyOs.pony_os_writev(event, buffers.cpointer, count)
+  
+  :fun recv! (event CPointer(AsioEvent), buffer Array(U8), offset USize = 0)
+    LibPonyOs.pony_os_recv!(event, buffer.cpointer(offset), buffer.size - offset)
+  
+  :fun check_os_error (fd U32) OSError
+    option_max_size USize = 4
+    option_size = [option_max_size] // TODO: use ffi_address_of instead?
+    option = Array(U8).new(option_max_size).reserve_undefined(option_max_size)
+    result = LibPonyOs.getsockopt(
+      fd, @level_socket, @option_error, option.cpointer, option_size.cpointer
+    )
+    
+    if (result != 0) (
+      // Nonzero result indicates that the getsockopt call itself failed.
+      // So we fetch errno, which holds the OSError for the failed call.
+      LibPonyOs.pony_os_errno
+    |
+      // Use the option_size value from the getsockopt call to trim the size
+      // of the option result, as demanded by the getsockopt convention.
+      option.truncate(try (option_size[0]! | 0))
+      
+      // Convert the 4-byte array to the equivalent 32-bit OSError value.
+      // TODO: Array.read_u32 optimization from Pony
+      // TODO: cross-platform (little-endian vs big-endian) (not necessary if the above optimization is pursued)
+      try (
+        OSError.from_u64!(
+          (option[3]!.u64.bit_shl(24)) +
+          (option[2]!.u64.bit_shl(16)) +
+          (option[1]!.u64.bit_shl(8)) +
+          option[0]!.u64
+        )
+      |
+        EINVAL
+      )
+    )

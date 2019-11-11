@@ -262,7 +262,9 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
       if @keyword == "ffi"
         @type.functions.each do |f|
           f.add_tag(:ffi)
-          f.metadata[:ffi_link_name] = f.ident.value
+          ffi_link_name = f.ident.value
+          ffi_link_name = ffi_link_name[0...-1] if ffi_link_name.ends_with?("!")
+          f.metadata[:ffi_link_name] = ffi_link_name
           f.body = nil
         end
       end

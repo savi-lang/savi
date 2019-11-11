@@ -790,8 +790,19 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       # Enforce the capability restriction of the receiver.
       if is_subtype?(call_mt_cap, MetaType.cap(required_cap))
         # For box functions only, we reify with the actual cap on the caller side.
+        # Or rather, we use "ref", "box", or "val", depending on the caller cap.
         # For all other functions, we just use the cap from the func definition.
-        reify_cap = required_cap == "box" ? call_mt_cap : MetaType.cap(call_func.cap.value)
+        reify_cap = MetaType.cap(
+          if required_cap == "box"
+            case call_mt_cap.inner.as(MetaType::Capability).value
+            when "iso", "trn", "ref" then "ref"
+            when "val" then "val"
+            else "box"
+            end
+          else
+            call_func.cap.value
+          end
+        )
       elsif call_func.has_tag?(:constructor)
         # Constructor calls ignore cap of the original receiver.
         reify_cap = MetaType.cap(call_func.cap.value)

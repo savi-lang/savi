@@ -27,22 +27,4 @@ describe Mare::Compiler::Reach do
     ctx.reach.reached_func?(c_foo).should eq true
     ctx.reach.reached_func?(o_foo).should eq false
   end
-  
-  it "skips over fields when they are never reached" do
-    source = Mare::Source.new_example <<-SOURCE
-    :class KV (K, V)
-      :prop k K
-      :prop v V
-      :new (@k, @v)
-    
-    :actor Main
-      :new (env)
-        KV(String, U8) // type is reached, but no functions are ever called
-    SOURCE
-    
-    ctx = Mare::Compiler.compile([source], :reach)
-    
-    kv = ctx.reach.each_type_def.find(&.program_type.ident.value).not_nil!
-    kv.fields.size.should eq 0
-  end
 end
