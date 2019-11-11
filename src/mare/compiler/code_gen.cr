@@ -1056,6 +1056,10 @@ class Mare::Compiler::CodeGen
           @mod.functions["ponyint_hash_block"],
           [params[0], params[1]],
         )
+      when "is_null"
+        @builder.is_null(params[0])
+      when "is_not_null"
+        @builder.is_not_null(params[0])
       when "usize"
         @builder.ptr_to_int(params[0], @isize)
       when "from_usize"

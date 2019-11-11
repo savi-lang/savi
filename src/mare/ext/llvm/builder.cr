@@ -36,4 +36,12 @@ class LLVM::Builder
   def int_to_ptr(value, to_type, name = "")
     Value.new LibLLVM.build_int2ptr(self, value, to_type, name)
   end
+
+  def is_null(value, name = "")
+    Value.new LibLLVM.build_is_null(self, value, name)
+  end
+
+  def is_not_null(value, name = "")
+    Value.new LibLLVM.build_is_not_null(self, value, name)
+  end
 end

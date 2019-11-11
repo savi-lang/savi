@@ -16,4 +16,6 @@ lib LibLLVM
   fun const_lshr = LLVMConstLShr(lhs : ValueRef, rhs : ValueRef) : ValueRef
   fun const_and = LLVMConstAnd(lhs : ValueRef, rhs : ValueRef) : ValueRef
   fun const_shl = LLVMConstShl(lhs : ValueRef, rhs : ValueRef) : ValueRef
+  fun build_is_null = LLVMBuildIsNull(builder : BuilderRef, value : ValueRef, name : UInt8*) : ValueRef
+  fun build_is_not_null = LLVMBuildIsNotNull(builder : BuilderRef, value : ValueRef, name : UInt8*) : ValueRef
 end
