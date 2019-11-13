@@ -9,8 +9,8 @@
     @assert = ("string" == "other").not
   
   :it "clones itself into a new string"
-    array Array(U8) = "example"
-    @assert = array.clone == "example"
+    string String = "example"
+    @assert = string.clone == "example"
   
   :it "finds the index of another substring within it"
     @assert = try ("bar food foo".offset_of!("foo") == 4 | False)
