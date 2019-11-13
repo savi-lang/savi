@@ -22,6 +22,8 @@
   :prop _closed Bool: False
   :prop _paused Bool: False
   
+  :fun local_address: NetAddress._for_fd(@_fd)
+  
   :new (
     // TODO: TCPListenerAuth, rather than ambient authority.
     notify TCPListenerNotify'iso

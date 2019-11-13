@@ -13,7 +13,11 @@
   
   :fun ref listening (listen TCPListener'ref)
     // TODO: get port dynamically instead of hard-coding it.
-    TCPConnection.new(TCPSpecNotify.new(@env), "localhost", "12345")
+    TCPConnection.new(
+      TCPSpecNotify.new(@env)
+      "localhost"
+      Inspect[listen.local_address.port].clone // TODO: shouldn't need clone
+    )
     @env.err.print("[Listener] Listening")
   
   :fun ref not_listening (listen TCPListener'ref) None
@@ -98,4 +102,4 @@
   :const describes: "TCP"
   
   :it "can listen, connect, send, respond, disconnect, and stop listening"
-    TCPListener.new(TCPSpecListenerNotify.new(@env), "", "12345")
+    TCPListener.new(TCPSpecListenerNotify.new(@env))

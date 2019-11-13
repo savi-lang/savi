@@ -1,18 +1,5 @@
 :import "os/error"
 
-:ffi LibPonyOs
-  :fun pony_os_sockopt_level (I32) I32
-  :fun pony_os_sockopt_option (I32) I32
-  :fun pony_os_connect_tcp (AsioEventNotify, CPointer(U8), CPointer(U8), CPointer(U8), U32) U32
-  :fun pony_os_listen_tcp (AsioEventNotify, CPointer(U8), CPointer(U8)) CPointer(AsioEvent)
-  :fun pony_os_accept (CPointer(AsioEvent)) U32
-  :fun pony_os_socket_close (U32) None
-  :fun pony_os_socket_shutdown (U32) None
-  :fun pony_os_writev (CPointer(AsioEvent), CPointer(CPointer(U8)), USize) USize
-  :fun pony_os_recv! (CPointer(AsioEvent), CPointer(U8), USize) USize
-  :fun pony_os_errno () OSError // TODO: shouldn't require empty param parens here
-  :fun getsockopt (U32, I32, I32, CPointer(U8), CPointer(USize)) I32
-
 :primitive _OSSocket
   :fun level_socket  I32: LibPonyOs.pony_os_sockopt_level(4138)
   :fun option_error  I32: LibPonyOs.pony_os_sockopt_option(827)
@@ -46,7 +33,7 @@
     option_max_size USize = 4
     option_size = [option_max_size] // TODO: use ffi_address_of instead?
     option = Array(U8).new(option_max_size).reserve_undefined(option_max_size)
-    result = LibPonyOs.getsockopt(
+    result = LibC.getsockopt(
       fd, @level_socket, @option_error, option.cpointer, option_size.cpointer
     )
     
