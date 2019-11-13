@@ -5,10 +5,12 @@
   // TODO: arithmetic method traits with type parameters on Numeric[A] type
   
   :fun u8 U8: compiler intrinsic
+  :fun u16 U16: compiler intrinsic
   :fun u32 U32: compiler intrinsic
   :fun u64 U64: compiler intrinsic
   :fun usize USize: compiler intrinsic
   :fun i8 I8: compiler intrinsic
+  :fun i16 I16: compiler intrinsic
   :fun i32 I32: compiler intrinsic
   :fun i64 I64: compiler intrinsic
   :fun isize ISize: compiler intrinsic
@@ -136,6 +138,9 @@
 :numeric U8
   :const bit_width U8: 8
 
+:numeric U16
+  :const bit_width U8: 16
+
 :numeric U32
   :const bit_width U8: 32
 
@@ -149,16 +154,20 @@
   :const bit_width U8: 8
   :const is_signed: True
 
+:numeric I16
+  :const bit_width U8: 16
+  :const is_signed: True
+
 :numeric I32
   :const bit_width U8: 32
   :const is_signed: True
 
-:numeric ISize
-  :const bit_width U8: compiler intrinsic
-  :const is_signed: True
-
 :numeric I64
   :const bit_width U8: 64
+  :const is_signed: True
+
+:numeric ISize
+  :const bit_width U8: compiler intrinsic
   :const is_signed: True
 
 :numeric F32

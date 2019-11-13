@@ -29,6 +29,7 @@
     | input <: _InspectCustom | input.inspect_into(output)
     | input <: _InspectEnum | output << input.member_name
     | input <: U8    | @into(output, input.u64) // TODO: unify into one integer clause?
+    | input <: U16   | @into(output, input.u64) // TODO: unify into one integer clause?
     | input <: U32   | @into(output, input.u64) // TODO: unify into one integer clause?
     | input <: USize | @into(output, input.u64) // TODO: unify into one integer clause?
     | input <: U64   |                          // TODO: unify into one integer clause?
@@ -41,6 +42,7 @@
       digits.reverse_each -> (digit | output.push_byte(digit))
       if (digits.size == 0) (output.push_byte('0'))
     | input <: I8    | @into(output, input.i64) // TODO: unify into one integer clause?
+    | input <: I16   | @into(output, input.i64) // TODO: unify into one integer clause?
     | input <: I32   | @into(output, input.i64) // TODO: unify into one integer clause?
     | input <: ISize | @into(output, input.i64) // TODO: unify into one integer clause?
     | input <: I64   |                          // TODO: unify into one integer clause?

@@ -6,9 +6,11 @@
   
   :it "returns a fixed bit width for most numeric types"
     @assert = U8 .bit_width == 8
+    @assert = U16.bit_width == 16
     @assert = U32.bit_width == 32
     @assert = U64.bit_width == 64
     @assert = I8 .bit_width == 8
+    @assert = I16.bit_width == 16
     @assert = I32.bit_width == 32
     @assert = I64.bit_width == 64
     @assert = F32.bit_width == 32
@@ -25,10 +27,12 @@
   
   :it "indicates whether the given numeric is signed or unsigned"
     @assert = U8   .is_signed == False
+    @assert = U16  .is_signed == False
     @assert = U32  .is_signed == False
     @assert = U64  .is_signed == False
     @assert = USize.is_signed == False
     @assert = I8   .is_signed == True
+    @assert = I16  .is_signed == True
     @assert = I32  .is_signed == True
     @assert = I64  .is_signed == True
     @assert = ISize.is_signed == True
@@ -37,10 +41,12 @@
   
   :it "indicates whether the given numeric is a floating point or an integer"
     @assert = U8   .is_floating_point == False
+    @assert = U16  .is_floating_point == False
     @assert = U32  .is_floating_point == False
     @assert = U64  .is_floating_point == False
     @assert = USize.is_floating_point == False
     @assert = I8   .is_floating_point == False
+    @assert = I16  .is_floating_point == False
     @assert = I32  .is_floating_point == False
     @assert = I64  .is_floating_point == False
     @assert = ISize.is_floating_point == False
@@ -49,9 +55,11 @@
   
   :it "exhibits wraparound behaviour for underflowing numeric literals"
     @assert = U8[-1]                    == 0xFF
+    @assert = U16[-1]                   == 0xFFFF
     @assert = U32[-1]                   == 0xFFFF_FFFF
     @assert = U64[-1]                   == 0xFFFF_FFFF_FFFF_FFFF
     @assert = I8[-128]                  == 128
+    @assert = I16[-32768]               == 32768
     @assert = I32[-2147483648]          == 2147483648
     @assert = I64[-9223372036854775808] == 9223372036854775808
     
@@ -65,10 +73,12 @@
   
   :it "has a convenience alias for the number zero"
     @assert = U8   .zero == 0
+    @assert = U16  .zero == 0
     @assert = U32  .zero == 0
     @assert = U64  .zero == 0
     @assert = USize.zero == 0
     @assert = I8   .zero == 0
+    @assert = I16  .zero == 0
     @assert = I32  .zero == 0
     @assert = I64  .zero == 0
     @assert = ISize.zero == 0
@@ -77,10 +87,12 @@
   
   :it "converts between different integer types"
     @assert = U32[36].u8    == 36
+    @assert = U32[36].u16   == 36
     @assert = U32[36].u32   == 36
     @assert = U32[36].u64   == 36
     @assert = U32[36].usize == 36
     @assert = U32[36].i8    == 36
+    @assert = U32[36].i16   == 36
     @assert = U32[36].i32   == 36
     @assert = U32[36].i64   == 36
     @assert = U32[36].isize == 36

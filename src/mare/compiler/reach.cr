@@ -107,6 +107,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
             case defn.const_u64("bit_width")
             when 1 then :i1
             when 8 then :i8
+            when 16 then :i16
             when 32 then :i32
             when 64 then :i64
             else raise NotImplementedError.new(defn.inspect)

@@ -282,6 +282,7 @@ class Mare::Compiler::CodeGen
     @i1_false = @llvm.int1.const_int(0).as(LLVM::Value)
     @i1_true  = @llvm.int1.const_int(1).as(LLVM::Value)
     @i8       = @llvm.int8.as(LLVM::Type)
+    @i16      = @llvm.int16.as(LLVM::Type)
     @i32      = @llvm.int32.as(LLVM::Type)
     @i32_ptr  = @llvm.int32.pointer.as(LLVM::Type)
     @i32_0    = @llvm.int32.const_int(0).as(LLVM::Value)
@@ -377,6 +378,7 @@ class Mare::Compiler::CodeGen
     case ref.llvm_use_type
     when :i1 then @i1
     when :i8 then @i8
+    when :i16 then @i16
     when :i32 then @i32
     when :i64 then @i64
     when :f32 then @f32
@@ -395,6 +397,7 @@ class Mare::Compiler::CodeGen
     case ref.llvm_mem_type
     when :i1 then @i1
     when :i8 then @i8
+    when :i16 then @i16
     when :i32 then @i32
     when :i64 then @i64
     when :f32 then @f32
@@ -1115,10 +1118,12 @@ class Mare::Compiler::CodeGen
           llvm_type_of(gtype).const_int(0)
         end
       when "u8" then gen_numeric_conv(gtype, @gtypes["U8"], params[0])
+      when "u16" then gen_numeric_conv(gtype, @gtypes["U16"], params[0])
       when "u32" then gen_numeric_conv(gtype, @gtypes["U32"], params[0])
       when "u64" then gen_numeric_conv(gtype, @gtypes["U64"], params[0])
       when "usize" then gen_numeric_conv(gtype, @gtypes["USize"], params[0])
       when "i8" then gen_numeric_conv(gtype, @gtypes["I8"], params[0])
+      when "i16" then gen_numeric_conv(gtype, @gtypes["I16"], params[0])
       when "i32" then gen_numeric_conv(gtype, @gtypes["I32"], params[0])
       when "i64" then gen_numeric_conv(gtype, @gtypes["I64"], params[0])
       when "isize" then gen_numeric_conv(gtype, @gtypes["ISize"], params[0])
@@ -1300,6 +1305,9 @@ class Mare::Compiler::CodeGen
           when 8
             @mod.functions["llvm.bitreverse.i8"]? ||
               @mod.functions.add("llvm.bitreverse.i8", [@i8], @i8)
+          when 16
+            @mod.functions["llvm.bitreverse.i16"]? ||
+              @mod.functions.add("llvm.bitreverse.i16", [@i16], @i16)
           when 32
             @mod.functions["llvm.bitreverse.i32"]? ||
               @mod.functions.add("llvm.bitreverse.i32", [@i32], @i32)
@@ -1339,6 +1347,9 @@ class Mare::Compiler::CodeGen
           when 32
             @mod.functions["llvm.ctlz.i32"]? ||
               @mod.functions.add("llvm.ctlz.i32", [@i32, @i1], @i32)
+          when 16
+            @mod.functions["llvm.ctlz.i16"]? ||
+              @mod.functions.add("llvm.ctlz.i16", [@i16, @i1], @i16)
           when 64
             @mod.functions["llvm.ctlz.i64"]? ||
               @mod.functions.add("llvm.ctlz.i64", [@i64, @i1], @i64)
@@ -1356,6 +1367,9 @@ class Mare::Compiler::CodeGen
           when 8
             @mod.functions["llvm.cttz.i8"]? ||
               @mod.functions.add("llvm.cttz.i8", [@i8, @i1], @i8)
+          when 16
+            @mod.functions["llvm.cttz.i16"]? ||
+              @mod.functions.add("llvm.cttz.i16", [@i16, @i1], @i16)
           when 32
             @mod.functions["llvm.cttz.i32"]? ||
               @mod.functions.add("llvm.cttz.i32", [@i32, @i1], @i32)
@@ -1376,6 +1390,9 @@ class Mare::Compiler::CodeGen
           when 8
             @mod.functions["llvm.ctpop.i8"]? ||
               @mod.functions.add("llvm.ctpop.i8", [@i8], @i8)
+          when 16
+            @mod.functions["llvm.ctpop.i16"]? ||
+              @mod.functions.add("llvm.ctpop.i16", [@i16], @i16)
           when 32
             @mod.functions["llvm.ctpop.i32"]? ||
               @mod.functions.add("llvm.ctpop.i32", [@i32], @i32)
@@ -2065,6 +2082,7 @@ class Mare::Compiler::CodeGen
     case type_ref.llvm_use_type
     when :i1 then @i1.const_int(expr.value.to_i8)
     when :i8 then @i8.const_int(expr.value.to_i8)
+    when :i16 then @i16.const_int(expr.value.to_i16)
     when :i32 then @i32.const_int(expr.value.to_i32)
     when :i64 then @i64.const_int(expr.value.to_i64)
     when :f32 then @f32.const_float(expr.value.to_f32)
