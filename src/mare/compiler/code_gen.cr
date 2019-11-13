@@ -1900,10 +1900,19 @@ class Mare::Compiler::CodeGen
       value = gen_unboxed(value, gtype_of(from_expr.not_nil!))
       gen_assign_cast(value, to_type, from_expr)
     when LLVM::Type::Kind::Pointer
-      # If we're going from pointer to non-pointer, we're unboxing,
-      # so we have to do that first before the LLVM bit cast.
-      value = gen_boxed(value, gtype_of(from_expr.not_nil!)) \
-        if value.type.kind != LLVM::Type::Kind::Pointer
+      from_expr_type = type_of(from_expr.not_nil!)
+      if value.type.kind != LLVM::Type::Kind::Pointer
+        # If we're going from non-pointer to pointer, we're boxing.
+        value = gen_boxed(value, gtype_of(from_expr_type))
+      elsif from_expr_type.singular? && from_expr_type.single_def!(ctx).is_cpointer?
+        if value.type != @obj_ptr && to_type == @obj_ptr
+          # If going from non-object cpointer to object pointer, we're boxing.
+          value = gen_boxed(value, gtype_of(from_expr_type))
+        elsif value.type == @obj_ptr && to_type != @obj_ptr
+          # If going from object pointer to non-object cpointer, we're unboxing.
+          value = gen_unboxed(value, gtype_of(from_expr_type))
+        end
+      end
       
       # Do the LLVM bitcast.
       @builder.bit_cast(value, to_type, "#{value.name}.CAST")

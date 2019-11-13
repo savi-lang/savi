@@ -55,14 +55,14 @@
   :: Call the cpointer method instead when you don't need a null terminator
   :: (that is, when the FFI function you are calling has a size argument).
   
-  :fun cstring
+  :fun cstring CPointer(U8)
     if @is_null_terminated (
-      @_ptr
+      ret tag = @_ptr // TODO: remove this type hint - it shouldn't be needed
     |
       ptr = @_ptr._alloc(@_size + 1)
       @_ptr._copy_to(ptr._unsafe, @_size)
       ptr._assign_at(@_size, 0)
-      ptr
+      ret tag = ptr // TODO: remove this type hint - it shouldn't be needed
     )
   
   :: Ensure enough capacity is allocated for the given space, in bytes.
