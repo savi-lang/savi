@@ -40,6 +40,12 @@ example-run: PHONY
 example-run.inner: PHONY /tmp/bin/mare
 	echo && cd "$(dir)" && /tmp/bin/mare run
 
+# Compile the files in the given directory.
+example-compile: PHONY
+	docker exec -ti mare-dev make dir="$(dir)" example-compile.inner
+example-compile.inner: PHONY /tmp/bin/mare
+	echo && cd "$(dir)" && /tmp/bin/mare
+
 # Compile and run the mare binary in the `example` subdirectory.
 example: PHONY
 	docker exec -ti mare-dev make extra_args="$(extra_args)" example/main
