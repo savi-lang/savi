@@ -27,10 +27,12 @@ RUN sh -c 'clang++ -v -c \
   /usr/lib/crystal/core/llvm/ext/llvm_ext.cc `llvm-config --cxxflags`'
 
 # Install Pony runtime (as shared library, static library, and bitcode).
-ENV PONYC_VERSION 0.29.0
+ENV PONYC_VERSION 0.33.0
 ENV PONYC_GIT_URL https://github.com/ponylang/ponyc
 RUN git clone -b ${PONYC_VERSION} --depth 1 ${PONYC_GIT_URL} /tmp/ponyc && \
     cd /tmp/ponyc && \
+    sed -i 's/void Main_/\/\/ void Main_/g' src/libponyrt/sched/start.c && \
+    sed -i 's/  Main_/  \/\/ Main_/g' src/libponyrt/sched/start.c && \
     make default_pic=true runtime-bitcode=yes verbose=yes config=debug libponyrt && \
     clang -shared -fpic -pthread -ldl -latomic -lexecinfo -o libponyrt.so build/debug/lib/native/libponyrt.bc && \
     sudo mv libponyrt.so /usr/lib/ && \
