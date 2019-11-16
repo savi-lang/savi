@@ -21,7 +21,7 @@
   :prop _yield_after_reading USize
   :prop _yield_after_writing USize
   
-  :prop _fd U32
+  :prop _fd U32: -1
   :prop _event CPointer(AsioEvent): CPointer(AsioEvent).null
   :prop _expect USize: 0
   
@@ -50,7 +50,6 @@
     @_yield_after_reading = 16384
     @_yield_after_writing = 16384
   )
-    @_fd = -1 // TODO: Move default value to prop declaration
     @notify = --notify // TODO: is it possible to use param assign sugar for this?
     @_read_buffer = Array(U8).new(@_read_buffer_size)
     @_read_buffer.reserve_undefined(@_read_buffer_size)

@@ -73,7 +73,7 @@ module Mare::Parser
     prefixed = declare()
     decl = declare()
     anystring = string | character | heredoc
-    atom = prefixed | parens | decl | anystring | float | integer | ident
+    atom = prefixed | parens | anystring | float | integer | ident
     
     # Define a prefixed term to be preceded by a prefix operator.
     prefixop = (char('~') | str("--")).named(:op)
@@ -116,7 +116,7 @@ module Mare::Parser
     t1 = (t0 >> (opcap >> (capmod | cap)).repeat).named(:relate)
     t2 = (t1 >> (s >> op1 >> s >> t1).repeat).named(:relate)
     t3 = (t2 >> (sn >> op2 >> sn >> t2).repeat).named(:relate)
-    t4 = (~decl >> t3 >> (op3 >> s >> ~decl >> t3).repeat(1) >> s).named(:group_w) | t3
+    t4 = (t3 >> (op3 >> s >> t3).repeat(1) >> s).named(:group_w) | t3
     t5 = (t4 >> (sn >> op4 >> sn >> t4).repeat).named(:relate)
     t6 = (t5 >> (sn >> op5 >> sn >> t5).repeat).named(:relate)
     t7 = (t6 >> (sn >> op6 >> sn >> t6).repeat).named(:relate)
@@ -127,7 +127,8 @@ module Mare::Parser
     t = (te >> (sn >> ope >> sn >> te >> s).repeat).named(:relate_r)
     
     # Define what a comma/newline-separated sequence of terms looks like.
-    termsl = t >> s >> (char(',') >> sn >> t >> s).repeat
+    term = decl | t
+    termsl = term >> s >> (char(',') >> sn >> term >> s).repeat
     terms = (termsl >> sn).repeat
     
     # Define groups that are pipe-partitioned sequences of terms.

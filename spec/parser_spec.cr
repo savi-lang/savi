@@ -195,7 +195,7 @@ describe Mare::Parser do
       [:group, ":", [:prefix, [:op, "~"], [:ident, "x"]]]]]
     AST
   end
-
+  
   it "complains when a character literal has too many characters in it" do
     source = Mare::Source.new_example <<-SOURCE
     :actor Main
@@ -214,7 +214,7 @@ describe Mare::Parser do
       Mare::Parser.parse(source)
     end
   end
-
+  
   it "handles nifty heredoc string literals" do
     source = Mare::Source.new_example <<-SOURCE
     :actor Main
@@ -246,5 +246,27 @@ describe Mare::Parser do
         [:string, "FOO\n<<<\n  BAR\n>>>\nBAZ"],
       ]],
     ]
+  end
+  
+  it "correctly parses a negative integer literal in a single-line decl" do
+    source = Mare::Source.new_example <<-SOURCE
+    :primitive Example
+      :const x U64: 1
+      :const y U64: -1
+    SOURCE
+    
+    ast = Mare::Parser.parse(source)
+    
+    # Can't use array literals here because Crystal is too slow to compile them.
+    ast.to_a.pretty_inspect(74).should eq <<-AST
+    [:doc,
+     [:declare, [[:ident, "primitive"], [:ident, "Example"]], [:group, ":"]],
+     [:declare,
+      [[:ident, "const"], [:ident, "x"], [:ident, "U64"]],
+      [:group, ":", [:integer, 1_u64]]],
+     [:declare,
+      [[:ident, "const"], [:ident, "y"], [:ident, "U64"]],
+      [:group, ":", [:integer, -1_i64]]]]
+    AST
   end
 end
