@@ -158,7 +158,7 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
       @for_type.self_type.defn.params.try(&.accept(root))
       func.params.try(&.terms.each { |param|
         param.accept(root)
-        root.create_param_local(param) unless func.has_tag?(:ffi)
+        root.create_param_local(param)
       })
       func.ret.try(&.accept(root))
       func.body.try(&.accept(root))

@@ -1,6 +1,6 @@
 // TODO: Get rid of this hack:
 :ffi InspectLibC
-  :fun puts (CPointer(U8)) I32
+  :fun puts (string CPointer(U8)) I32
 
 :trait box _InspectEach
   // TODO: use each instead of size and []!

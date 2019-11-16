@@ -50,12 +50,15 @@
     event
 
 :ffi LibPonyAsioEvent
-  :fun pony_asio_event_create (AsioEventNotify, U32, U32, U64, Bool) CPointer(AsioEvent)
-  :fun pony_asio_event_fd (CPointer(AsioEvent)) U32
-  :fun pony_asio_event_unsubscribe (CPointer(AsioEvent)) None
-  :fun pony_asio_event_resubscribe_read (CPointer(AsioEvent)) None
-  :fun pony_asio_event_resubscribe_write (CPointer(AsioEvent)) None
-  :fun pony_asio_event_destroy (CPointer(AsioEvent)) None
-  :fun pony_asio_event_get_disposable (CPointer(AsioEvent)) Bool
-  :fun pony_asio_event_set_writeable (CPointer(AsioEvent), Bool) None
-  :fun pony_asio_event_set_readable (CPointer(AsioEvent), Bool) None
+  :fun pony_asio_event_create (
+    owner AsioEventNotify,
+    fd U32, flags U32, nsec U64, noisy Bool
+  ) CPointer(AsioEvent)
+  :fun pony_asio_event_fd (event CPointer(AsioEvent)) U32
+  :fun pony_asio_event_unsubscribe (event CPointer(AsioEvent)) None
+  :fun pony_asio_event_resubscribe_read (event CPointer(AsioEvent)) None
+  :fun pony_asio_event_resubscribe_write (event CPointer(AsioEvent)) None
+  :fun pony_asio_event_destroy (event CPointer(AsioEvent)) None
+  :fun pony_asio_event_get_disposable (event CPointer(AsioEvent)) Bool
+  :fun pony_asio_event_set_writeable (event CPointer(AsioEvent), bool Bool) None
+  :fun pony_asio_event_set_readable (event CPointer(AsioEvent), bool Bool) None
