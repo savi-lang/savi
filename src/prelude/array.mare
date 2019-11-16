@@ -201,13 +201,13 @@
     index USize = 0
     while (index < @_size) (
       element = @_ptr._get_at(index)
-      if ((yield element).is_false) (
+      if (yield element).is_false (
         new_array << element
       )
       index += 1
     )
     new_array
-
+  
   :: Return a copy of the array that has its elements sorted by value.
   :: If the element type is not aliasable, or not Comparable, it will be empty.
   
