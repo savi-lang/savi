@@ -3493,8 +3493,14 @@ class Mare::Compiler::CodeGen
       @builder.call(@mod.functions["pony_send_done"], [pony_ctx])
     end
     
+    # If this is a constructor, we know that we are the only message producer
+    # for this actor at this point, so we can optimize by using sendv_single.
+    # Otherwise, we need to use the normal multi-producer-safe function.
+    sendv_name =
+      gfunc.func.has_tag?(:constructor) ? "pony_sendv_single" : "pony_sendv"
+    
     # Send the message.
-    @builder.call(@mod.functions["pony_sendv_single"], [
+    @builder.call(@mod.functions[sendv_name], [
       pony_ctx,
       @builder.bit_cast(fn.params[0], @obj_ptr, "@.OPAQUE"),
       msg_opaque,
