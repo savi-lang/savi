@@ -17,18 +17,24 @@
     @assert_count += 1
     success
 
-:primitive Specs (A Spec)
-  :fun non run (env Env): SpecRunner(A).new(env)
+:primitive Specs
+  :fun non run (runners Array(SpecRunnerAny))
+    runners.each -> (runner | runner.run)
+
+:trait tag SpecRunnerAny
+  :be run
 
 :actor SpecRunner (A Spec)
-  :prop spec A
-  :fun env: @spec.env
-  :new (env)
-    @spec = A.new(env)
+  :is SpecRunnerAny
+  :prop env Env
+  :new (@env)
     @run
   
-  :fun non _fail (env Env)
+  :fun non _fail (env Env) // TODO: move to Specs
     env.exit_code = 1 // Mark the entire process as a failure.
+  
+  // TODO: avoid this indirection
+  :fun ref new_spec A: A.new(@env)
   
   :: Run all spec features for the Spec type indicated by the type argument,
   :: using the given Env to construct an instance of that Spec type.
@@ -36,35 +42,15 @@
   :: A summary of successes and failures will be printed to `env.out`.
   :: If there are one or more failures, `env.exit_code` will be set accordingly.
   
-  :fun ref run
-    type = (reflection_of_type @spec)
+  :be run
+    type ReflectionOfType(A) = (reflection_of_type @new_spec)
     
     feature_count USize = 0
     type.features.each -> (feature |
+      feature2 ReflectionFeatureOfType(A) = feature
       if feature.tags.includes("it") (
         feature_count += 1
-        called = feature.maybe_call_mutator(@spec)
-        
-        case (
-        | called.not |
-          @_fail(@env)
-          @env.err.print("FAILED TO CALL A SPEC FEATURE?")
-        
-        | @spec.failures.size == 0 |
-          @env.err.write("." * @spec.assert_count)
-          @env.err.write(" ")
-        
-        |
-          @_fail(@env)
-          @env.err.write("\nFAIL: ")
-          @env.err.write(@spec.describes)
-          @env.err.write(" ")
-          @env.err.print(feature.name)
-          @spec.failures.each -> (fail |
-            @env.err.write("  X "), @env.err.print(fail.string)
-          )
-          @spec.failures.clear
-        )
+        SpecExampleRunner(A).new(@env, feature2)
       )
     )
     
@@ -72,6 +58,35 @@
       @_fail(@env)
       @env.err.print("FAIL: No spec features found in ")
       @env.err.write(type.string)
+    )
+
+:actor SpecExampleRunner (A Spec)
+  :prop example ReflectionFeatureOfType(A)
+  
+  :fun non _fail (env Env) // TODO: move to Specs
+    env.exit_code = 1 // Mark the entire process as a failure.
+  
+  :new (env, @example)
+    spec = A.new(env)
+    called = @example.maybe_call_mutator(spec)
+    
+    case (
+    | called.not |
+      @_fail(env)
+      env.err.print("FAILED TO CALL A SPEC FEATURE?")
+    
+    | spec.failures.size == 0 |
+      env.err.write("." * spec.assert_count)
+      env.err.write(" ")
+    
     |
-      @env.err.write(", ")
+      @_fail(env)
+      env.err.write("\nFAIL: ")
+      env.err.write(spec.describes)
+      env.err.write(" ")
+      env.err.print(@example.name)
+      spec.failures.each -> (fail |
+        env.err.write("  X "), env.err.print(fail.string)
+      )
+      spec.failures.clear
     )

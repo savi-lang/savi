@@ -2,4 +2,6 @@
 
 :actor Main
   :new (env)
-    Specs(TimeSpec).run(env)
+    Specs.run([
+      SpecRunner(TimeSpec).new(env)
+    ])

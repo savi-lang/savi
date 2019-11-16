@@ -2,4 +2,6 @@
 
 :actor Main
   :new (env)
-    Specs(TCPSpec).run(env)
+    Specs.run([
+      SpecRunner(TCPSpec).new(env)
+    ])

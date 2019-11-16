@@ -2,5 +2,7 @@
 
 :actor Main
   :new (env)
-    Specs(CountSpec).run(env)
-    Specs(MapSpec).run(env)
+    Specs.run([
+      SpecRunner(CountSpec).new(env)
+      SpecRunner(MapSpec).new(env)
+    ])

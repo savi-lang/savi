@@ -2583,8 +2583,10 @@ class Mare::Compiler::CodeGen
     size_arg = @i64.const_int(expr.terms.size)
     @builder.call(gtype.gfuncs["new"].llvm_func, [receiver, size_arg])
     
+    arg_type = gtype.gfuncs["<<"].llvm_func.type.element_type.params_types[1]
+    
     expr.terms.each do |term|
-      value = gen_expr(term)
+      value = gen_assign_cast(gen_expr(term), arg_type, term)
       @builder.call(gtype.gfuncs["<<"].llvm_func, [receiver, value])
     end
     
