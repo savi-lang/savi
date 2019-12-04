@@ -111,6 +111,7 @@ module Mare::Parser::Builder
     when :group_w  then build_group_w(main, iter, state)
     when :prefix   then build_prefix(main, iter, state)
     when :qualify  then build_qualify(main, iter, state)
+    when :compound then build_compound(main, iter, state)
     else
       raise NotImplementedError.new(kind)
     end
@@ -234,6 +235,27 @@ module Mare::Parser::Builder
       group = group.as(AST::Group)
       
       term = AST::Qualify.new(term, group).with_pos(state.pos(main))
+    end
+    
+    term
+  end
+  
+  private def self.build_compound(main, iter, state)
+    assert_kind(main, :compound)
+    
+    term = build_term(iter.next_as_child_of(main), iter, state)
+    
+    iter.while_next_is_child_of(main) do |child|
+      op = build_term(child, iter, state)
+      case op
+      when AST::Operator
+        rhs = build_term(iter.next_as_child_of(main), iter, state)
+        term = AST::Relate.new(term, op, rhs).with_pos(state.pos(main))
+      when AST::Group
+        term = AST::Qualify.new(term, op).with_pos(state.pos(main))
+      else
+        raise NotImplementedError.new(child)
+      end
     end
     
     term

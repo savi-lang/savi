@@ -16,6 +16,10 @@ class Mare::Compiler::Sugar < Mare::AST::Visitor
       t.functions.each do |f|
         sugar = new
         sugar.run(f)
+        
+        # Run pseudo-call transformation as a separate followup mini-pass,
+        # because some of the sugar transformations need to already be done.
+        PseudoCalls.run(f, sugar)
       end
     end
   end
@@ -24,7 +28,7 @@ class Mare::Compiler::Sugar < Mare::AST::Visitor
     @last_hygienic_local = 0
   end
   
-  private def next_local_name
+  def next_local_name
     "hygienic_local.#{@last_hygienic_local += 1}"
   end
   
@@ -134,9 +138,8 @@ class Mare::Compiler::Sugar < Mare::AST::Visitor
       return AST::Relate.new(lhs, dot, rhs).from(node)
     end
     
-    # If a dot relation is within a qualify (which doesn't happen in the parser,
-    # but may happen artifically such as the `@identifier` sugar above),
-    # then always move the qualify into the right-hand-side of the dot.
+    # If a dot relation is within a qualify, move the qualify into the
+    # right-hand-side of the dot (this cleans up the work of the parser).
     new_top = nil
     while (dot = node.term).is_a?(AST::Relate) && dot.op.value == "."
       node.term = dot.rhs
@@ -148,10 +151,8 @@ class Mare::Compiler::Sugar < Mare::AST::Visitor
   
   def visit(node : AST::Relate)
     case node.op.value
-    when "'", "+>", " ", "<:", "is", "DEFAULTPARAM"
+    when ".", "'", "+>", " ", "<:", "is", "DEFAULTPARAM"
       node # skip these special-case operators
-    when "."
-      visit_dot(node)
     when "->"
       # If a dot relation is within this (which doesn't happen in the parser,
       # but may happen artifically such as the `@identifier` sugar above),
@@ -251,57 +252,58 @@ class Mare::Compiler::Sugar < Mare::AST::Visitor
   
   # Handle pseudo-method sugar like `as!` calls.
   # TODO: Can this be done as a "universal method" rather than sugar?
-  def visit_dot(node : AST::Relate)
-    # If the right side of a dot relation is a dot relation between two
-    # qualifications, rebalance the node tree to the proper shape.
-    # This happens in certain chained call/qualification patterns.
-    rhs = node.rhs
-    if rhs.is_a?(AST::Relate) && rhs.op.value == "." \
-    && rhs.lhs.is_a?(AST::Qualify) && rhs.rhs.is_a?(AST::Qualify)
-      rhs_lhs = rhs.lhs
-      rhs.lhs = node
-      node.rhs = rhs_lhs
-      node = rhs
-      rhs = rhs_lhs
+  class PseudoCalls < Mare::AST::Visitor
+    def self.run(f : Program::Function, sugar : Sugar)
+      ps = new(sugar)
+      f.params.try(&.accept(ps))
+      f.body.try(&.accept(ps))
     end
     
-    call_ident, call_args, yield_params, yield_block = AST::Extract.call(node)
+    getter sugar : Sugar
+    def initialize(@sugar)
+    end
     
-    return node unless call_ident
-    
-    case call_ident.value
-    when "as!"
-      Error.at call_ident,
-        "This call requires exactly one argument (the type to check)" \
-          unless call_args && call_args.terms.size == 1
+    def visit(node : AST::Node)
+      return node unless node.is_a?(AST::Relate) && node.op.value == "."
       
-      local_name = next_local_name
-      type_arg = call_args.terms.first
+      call_ident, call_args, yield_params, yield_block = AST::Extract.call(node)
       
-      group = AST::Group.new("(").from(node)
-      group.terms << AST::Relate.new(
-        AST::Identifier.new(local_name).from(node.lhs),
-        AST::Operator.new("=").from(node.lhs),
-        node.lhs,
-      ).from(node.lhs)
-      group.terms << AST::Choice.new([
-        {
-          AST::Relate.new(
-            AST::Identifier.new(local_name).from(node.lhs),
-            AST::Operator.new("<:").from(call_ident),
-            type_arg,
-          ).from(call_ident),
+      return node unless call_ident
+      
+      case call_ident.value
+      when "as!"
+        Error.at call_ident,
+          "This call requires exactly one argument (the type to check)" \
+            unless call_args && call_args.terms.size == 1
+        
+        local_name = sugar.next_local_name
+        type_arg = call_args.terms.first
+        
+        group = AST::Group.new("(").from(node)
+        group.terms << AST::Relate.new(
           AST::Identifier.new(local_name).from(node.lhs),
-        },
-        {
-          AST::Identifier.new("True").from(call_ident),
-          AST::Identifier.new("error!").from(call_ident),
-        },
-      ] of {AST::Term, AST::Term}).from(node.op)
-      
-      group
-    else
-      node # all other calls are passed through unchanged
+          AST::Operator.new("=").from(node.lhs),
+          node.lhs,
+        ).from(node.lhs)
+        group.terms << AST::Choice.new([
+          {
+            AST::Relate.new(
+              AST::Identifier.new(local_name).from(node.lhs),
+              AST::Operator.new("<:").from(call_ident),
+              type_arg,
+            ).from(call_ident),
+            AST::Identifier.new(local_name).from(node.lhs),
+          },
+          {
+            AST::Identifier.new("True").from(call_ident),
+            AST::Identifier.new("error!").from(call_ident),
+          },
+        ] of {AST::Term, AST::Term}).from(node.op)
+        
+        group
+      else
+        node # all other calls are passed through unchanged
+      end
     end
   end
 end

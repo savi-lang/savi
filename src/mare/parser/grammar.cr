@@ -79,10 +79,6 @@ module Mare::Parser
     prefixop = (char('~') | str("--")).named(:op)
     prefixed.define (prefixop >> atom).named(:prefix)
     
-    # Define a qualified term to be immediately followed by a parens group.
-    qualified = (atom >> parens.repeat(1)).named(:qualify)
-    suffixed = qualified
-    
     # Define what a capability looks like.
     cap = (
       str("iso") | str("trn") | str("val") |
@@ -91,12 +87,20 @@ module Mare::Parser
     ).named(:ident)
     capmod = str("aliased").named(:ident)
     
+    # Define a compound to be a closely bound chain of atoms.
+    opcap = char('\'').named(:op)
+    opdot = char('.').named(:op)
+    oparrow = (str("->") | str("+>")).named(:op)
+    compound = (atom >> (
+      (opcap >> (capmod | cap)) | \
+      (s >> oparrow >> s >> atom) | \
+      (sn >> opdot >> sn >> atom) | \
+      parens
+    ).repeat).named(:compound)
+    
     # Define groups of operators, in order of precedence,
     # from most tightly binding to most loosely binding.
     # Operators in the same group have the same level of precedence.
-    opcap = (char('\'')).named(:op)
-    op1 = (str("->") | str("+>")).named(:op)
-    op2 = char('.').named(:op)
     op3 = (char(' ') | char('\t'))
     op4 = (char('*') | char('/') | char('%')).named(:op)
     op5 = ((char('+') | char('-')) >> ~char('>')).named(:op)
@@ -112,10 +116,7 @@ module Mare::Parser
     ope = (str("+=") | str("-=") | char('=')).named(:op)
     
     # Construct the nested possible relations for each group of operators.
-    t0 = suffixed | atom
-    t1 = (t0 >> (opcap >> (capmod | cap)).repeat).named(:relate)
-    t2 = (t1 >> (s >> op1 >> s >> t1).repeat).named(:relate)
-    t3 = (t2 >> (sn >> op2 >> sn >> t2).repeat).named(:relate)
+    t3 = compound
     t4 = (t3 >> (op3 >> s >> t3).repeat(1) >> s).named(:group_w) | t3
     t5 = (t4 >> (sn >> op4 >> sn >> t4).repeat).named(:relate)
     t6 = (t5 >> (sn >> op5 >> sn >> t5).repeat).named(:relate)
