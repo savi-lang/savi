@@ -101,30 +101,24 @@ module Mare::Parser
     # Define groups of operators, in order of precedence,
     # from most tightly binding to most loosely binding.
     # Operators in the same group have the same level of precedence.
-    op3 = (char(' ') | char('\t'))
-    op4 = (char('*') | char('/') | char('%')).named(:op)
-    op5 = ((char('+') | char('-')) >> ~char('>')).named(:op)
-    op6 = (str("..") | str("<>")).named(:op)
-    op7 = (str("<|>") | str("<~>") | str("<<~") | str("~>>") |
-            str("<<") | str(">>") | str("<~") | str("~>")).named(:op)
-    op8 = ((str("<:") | str(">=") | str("<=") | char('<') | char('>')) >>
-            ~(char('>') | char('<'))).named(:op)
-    op9 = (str("===") | str("==") | str("!==") | str("!=") |
-            str("=~")).named(:op)
-    op10 = (str("&&") | str("||")).named(:op)
     opw = (char(' ') | char('\t'))
+    op1 = (char('*') | char('/') | char('%')).named(:op)
+    op2 = (char('+') | char('-')).named(:op)
+    op3 = (str("<|>") | str("<~>") | str("<<~") | str("~>>") |
+            str("<<") | str(">>") | str("<~") | str("~>") |
+            str("<:") | str(">=") | str("<=") | char('<') | char('>') |
+            str("===") | str("==") | str("!==") | str("!=") |
+            str("=~")).named(:op)
+    op4 = (str("&&") | str("||")).named(:op)
     ope = (str("+=") | str("-=") | char('=')).named(:op)
     
     # Construct the nested possible relations for each group of operators.
-    t3 = compound
-    t4 = (t3 >> (op3 >> s >> t3).repeat(1) >> s).named(:group_w) | t3
-    t5 = (t4 >> (sn >> op4 >> sn >> t4).repeat).named(:relate)
-    t6 = (t5 >> (sn >> op5 >> sn >> t5).repeat).named(:relate)
-    t7 = (t6 >> (sn >> op6 >> sn >> t6).repeat).named(:relate)
-    t8 = (t7 >> (sn >> op7 >> sn >> t7).repeat).named(:relate)
-    t9 = (t8 >> (sn >> op8 >> sn >> t8).repeat).named(:relate)
-    t10 = (t9 >> (sn >> op9 >> sn >> t9).repeat).named(:relate)
-    te = (t10 >> (sn >> op10 >> sn >> t10).repeat).named(:relate)
+    tw = compound
+    t1 = (tw >> (opw >> s >> tw).repeat(1) >> s).named(:group_w) | tw
+    t2 = (t1 >> (sn >> op1 >> sn >> t1).repeat).named(:relate)
+    t3 = (t2 >> (sn >> op2 >> sn >> t2).repeat).named(:relate)
+    t4 = (t3 >> (sn >> op3 >> sn >> t3).repeat).named(:relate)
+    te = (t4 >> (sn >> op4 >> sn >> t4).repeat).named(:relate)
     t = (te >> (sn >> ope >> sn >> te >> s).repeat).named(:relate_r)
     
     # Define what a comma/newline-separated sequence of terms looks like.
@@ -146,9 +140,8 @@ module Mare::Parser
     )
     
     # Define what a declaration looks like.
-    declterm = t3
     decl.define(
-      (char(':') >> ident >> (s >> declterm).repeat >> s).named(:decl) >>
+      (char(':') >> ident >> (s >> compound).repeat >> s).named(:decl) >>
       (char(':') | ~~newline)
     )
     
