@@ -257,10 +257,11 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     end
     
     def trace_kind_with_dst_cap(dst_kind : Symbol)
-      raise "halt; verify the logic here before using it, especially with non"
       src_kind = trace_kind()
       case src_kind
-      when :none, :machine_word, :dynamic, :tag_known, :tag_unknown
+      when :none, :machine_word, :dynamic,
+           :tag_known, :tag_unknown,
+           :non_known, :non_unknown
         src_kind
       when :tuple
         dst_kind == :tuple ? :tuple : :dynamic
@@ -406,6 +407,11 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       @reified.defn.ident.value == "CPointer"
     end
     
+    def is_array?
+      # TODO: less hacky here
+      @reified.defn.ident.value == "Array"
+    end
+    
     def is_platform?
       # TODO: less hacky here
       @reified.defn.ident.value == "Platform"
@@ -413,6 +419,11 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     
     def cpointer_type_arg
       raise "not a cpointer" unless is_cpointer?
+      Ref.new(@reified.args.first)
+    end
+    
+    def array_type_arg
+      raise "not an array" unless is_array?
       Ref.new(@reified.args.first)
     end
     

@@ -3402,10 +3402,6 @@ class Mare::Compiler::CodeGen
     if src_type == dst_type
       trace_kind = src_type.trace_kind
     else
-      # TODO: When is this true and not true? Do we have the right equivalency test?
-      # As of the time of this writing, this is unreachable because
-      # we always specify the same src_type and dst_type in the caller.
-      raise "halt; verify the circumstances of how we arrived here"
       trace_kind = src_type.trace_kind_with_dst_cap(dst_type.trace_kind)
     end
     
@@ -3536,15 +3532,80 @@ class Mare::Compiler::CodeGen
     func_frame.receiver_value =
       @builder.bit_cast(fn.params[1], gtype.struct_ptr, "@")
     
-    gtype.fields.each do |field_name, field_type|
-      next unless field_type.trace_needed?
-      
-      field = gen_field_load(field_name, gtype)
-      gen_trace(field, field, field_type, field_type)
+    if gtype.type_def.is_array?
+      # We have a special-case implementation for Array (unfortunately).
+      # This is the only case when we will trace "into" a CPointer.
+      gen_trace_impl_for_array(gtype, fn)
+    else
+      # For all other types, we simply trace all fields (that need tracing).
+      gtype.fields.each do |field_name, field_type|
+        next unless field_type.trace_needed?
+        
+        field = gen_field_load(field_name, gtype)
+        gen_trace(field, field, field_type, field_type)
+      end
     end
     
     @builder.ret
     gen_func_end
+  end
+  
+  def gen_trace_impl_for_array(gtype : GenType, fn)
+    elem_type_ref = gtype.type_def.array_type_arg
+    array_size    = gen_field_load("_size", gtype)
+    array_ptr     = gen_field_load("_ptr", gtype)
+    
+    # First, trace the base pointer itself.
+    @builder.call(@mod.functions["pony_trace"], [
+      pony_ctx,
+      @builder.bit_cast(array_ptr, @ptr),
+    ])
+    
+    # Now, we need to trace each of the array elements, one by one.
+    # We do this by generating a crude loop over the array indexes.
+    
+    # Create a reassignable local variable-like alloca to hold the loop index.
+    # TODO: Consider avoiding this how ponyc does, with a lazily-filled phi.
+    index_alloca = @builder.alloca(@isize, "ARRAY.TRACE.LOOP.INDEX.ALLOCA")
+    @builder.store(@isize.const_int(0), index_alloca)
+    
+    # Create some code blocks to use for the loop.
+    cond_block = gen_block("ARRAY.TRACE.LOOP.COND")
+    body_block = gen_block("ARRAY.TRACE.LOOP.BODY")
+    post_block = gen_block("ARRAY.TRACE.LOOP.POST")
+    
+    # Start by jumping into the cond block.
+    @builder.br(cond_block)
+    
+    # In the cond block, compare the index variable to the array size,
+    # jumping to the body block if still within bounds; else, the post block.
+    @builder.position_at_end(cond_block)
+    index = @builder.load(index_alloca, "ARRAY.TRACE.LOOP.INDEX")
+    continue = @builder.icmp(LLVM::IntPredicate::ULT, index, array_size)
+    @builder.cond(continue, body_block, post_block)
+    
+    # In the body block, get the element for this index and trace it.
+    @builder.position_at_end(body_block)
+    elem =
+      @builder.load(
+        @builder.inbounds_gep(
+          array_ptr,
+          @builder.load(index_alloca, "ARRAY.TRACE.LOOP.INDEX"),
+          "ARRAY.TRACE.LOOP.ELEM.GEP",
+        ),
+        "ARRAY.TRACE.LOOP.ELEM",
+      )
+    gen_trace(elem, elem, elem_type_ref, elem_type_ref)
+    
+    # Then increment the index and continue to the next iteration of the loop.
+    @builder.store(
+      @builder.add(index, @isize.const_int(1)),
+      index_alloca,
+    )
+    @builder.br(cond_block)
+    
+    # Once done, move the builder to the post block for whatever code follows.
+    @builder.position_at_end(post_block)
   end
   
   def gen_dispatch_impl(gtype : GenType)
