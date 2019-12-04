@@ -833,7 +833,25 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       {required_cap, reify_cap, autorecover_needed}
     end
     
-    def follow_call_check_args(call, infer)
+    def follow_call_check_args(call, call_func, infer, problems)
+      # First, check the number of arguments.
+      max = infer.params.size
+      min = infer.params.count { |param| !AST::Extract.param(param)[2] }
+      func_pos = call_func.ident.pos
+      if call.args.size > max
+        args = max == 1 ? "argument" : "arguments"
+        params_pos = call_func.params.try(&.pos) || call_func.ident.pos
+        problems << {call.pos, "the call site has too many arguments"}
+        problems << {params_pos, "the function allows at most #{max} #{args}"}
+        return
+      elsif call.args.size < min
+        args = min == 1 ? "argument" : "arguments"
+        params_pos = call_func.params.try(&.pos) || call_func.ident.pos
+        problems << {call.pos, "the call site has too few arguments"}
+        problems << {params_pos, "the function requires at least #{min} #{args}"}
+        return
+      end
+      
       # Apply parameter constraints to each of the argument types.
       # TODO: handle case where number of args differs from number of params.
       # TODO: enforce that all call_defns have the same param count.
@@ -966,7 +984,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         # were explicitly specified in the function signature.
         infer = ctx.infer.for_func(ctx, call_defn, call_func, reify_cap).tap(&.run)
         
-        follow_call_check_args(call, infer)
+        follow_call_check_args(call, call_func, infer, problems)
         follow_call_check_yield_block(infer, yield_params, yield_block, problems)
         
         # Resolve and take note of the return type.

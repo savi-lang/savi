@@ -793,6 +793,72 @@ describe Mare::Compiler::Infer do
     end
   end
   
+  it "complains when calling on a function with too many arguments" do
+    source = Mare::Source.new_example <<-SOURCE
+    :actor Main
+      :fun example (a U8, b U8, c U8, d U8 = 4, e U8 = 5)
+      :new
+        @example(1, 2, 3)
+        @example(1, 2, 3, 4)
+        @example(1, 2, 3, 4, 5)
+        @example(1, 2, 3, 4, 5, 6)
+    SOURCE
+    
+    expected = <<-MSG
+    This function call doesn't meet subtyping requirements:
+    from (example):7:
+        @example(1, 2, 3, 4, 5, 6)
+         ^~~~~~~
+    
+    - the call site has too many arguments:
+      from (example):7:
+        @example(1, 2, 3, 4, 5, 6)
+         ^~~~~~~
+    
+    - the function allows at most 5 arguments:
+      from (example):2:
+      :fun example (a U8, b U8, c U8, d U8 = 4, e U8 = 5)
+                   ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    MSG
+    
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :infer)
+    end
+  end
+  
+  it "complains when calling on a function with too few arguments" do
+    source = Mare::Source.new_example <<-SOURCE
+    :actor Main
+      :fun example (a U8, b U8, c U8, d U8 = 4, e U8 = 5)
+      :new
+        @example(1, 2, 3, 4, 5)
+        @example(1, 2, 3, 4)
+        @example(1, 2, 3)
+        @example(1, 2)
+    SOURCE
+    
+    expected = <<-MSG
+    This function call doesn't meet subtyping requirements:
+    from (example):7:
+        @example(1, 2)
+         ^~~~~~~
+    
+    - the call site has too few arguments:
+      from (example):7:
+        @example(1, 2)
+         ^~~~~~~
+    
+    - the function requires at least 3 arguments:
+      from (example):2:
+      :fun example (a U8, b U8, c U8, d U8 = 4, e U8 = 5)
+                   ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    MSG
+    
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :infer)
+    end
+  end
+  
   it "complains when violating uniqueness into a local" do
     source = Mare::Source.new_example <<-SOURCE
     :class X
