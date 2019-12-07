@@ -108,6 +108,23 @@
     @assert =
       array_a == ["baz", "bar", "foo"]
   
+  :it "yields each element in the array, stopping early if the criteria is met"
+    array Array(String) = []
+    early_stop = ["foo", "bar", "baz"].each_until -> (string |
+      array << string
+      string == "bar"
+    )
+    @assert = early_stop == True
+    @assert = array == ["foo", "bar"]
+    
+    array.clear
+    early_stop = ["foo", "bar", "baz"].each_until -> (string |
+      array << string
+      string == "bard"
+    )
+    @assert = early_stop == False
+    @assert = array == ["foo", "bar", "baz"]
+  
   :it "selects those elements in the array that meet the criteria"
     array Array(U8) = [11, 22, 33, 44, 36, 27, 18]
     selected = array.select -> (num | num < 30)

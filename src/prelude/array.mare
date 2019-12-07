@@ -182,6 +182,16 @@
     )
     @
   
+  :fun each_until
+    :yields for Bool
+    index USize = 0
+    early_stop = False
+    while (index < @_size && early_stop.not) (
+      early_stop = yield @_ptr._get_at(index)
+      index += 1
+    )
+    early_stop
+  
   :fun select
     :yields for Bool
     new_array = Array(A'aliased).new // TODO: allow the caller to specify space
