@@ -130,6 +130,42 @@
     )
     @
   
+  :: Yield each key and value in the map, stopping iteration if the yield block
+  :: returns True. Returns True if iteration was stopped early; else, False.
+  :fun each_until
+    :yields for Bool
+    @_array.each_until -> (entry |
+      if (entry <: KV(K, V)) (
+        yield (entry.key, entry.value)
+      |
+        False
+      )
+    )
+  
+  :: Yield each key in the map, stopping iteration if the yield block
+  :: returns True. Returns True if iteration was stopped early; else, False.
+  :fun each_key_until
+    :yields for Bool
+    @_array.each_until -> (entry |
+      if (entry <: KV(K, V)) (
+        yield entry.key
+      |
+        False
+      )
+    )
+  
+  :: Yield each value in the map, stopping iteration if the yield block
+  :: returns True. Returns True if iteration was stopped early; else, False.
+  :fun each_value_until
+    :yields for Bool
+    @_array.each_until -> (entry |
+      if (entry <: KV(K, V)) (
+        yield entry.value
+      |
+        False
+      )
+    )
+  
   :: Return True after finding a key/value pair for which the yield block
   :: returns True, defaulting to False if no such key/value pair is found.
   
