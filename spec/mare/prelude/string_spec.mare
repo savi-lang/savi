@@ -8,6 +8,22 @@
     @assert = ("string" == "string")
     @assert = ("string" == "other").not
   
+  :it "checks if it starts with a substring equal to the other string"
+    @assert = "foo".starts_with("foo")
+    @assert = "foo".starts_with("food").not
+    @assert = "food".starts_with("foo")
+    @assert = "barfood".starts_with("foo").not
+    @assert = "barfood".starts_with("barf")
+    @assert = "barfood".starts_with("")
+  
+  :it "checks if it ends with a substring equal to the other string"
+    @assert = "food".ends_with("foo").not
+    @assert = "foo".ends_with("foo")
+    @assert = "foo".ends_with("food").not
+    @assert = "snafoo".ends_with("foo")
+    @assert = "snafoozled".ends_with("foo").not
+    @assert = "snafoozled".ends_with("")
+  
   :it "clones itself into a new string"
     string String = "example"
     @assert = string.clone == "example"

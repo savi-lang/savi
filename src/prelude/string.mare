@@ -28,6 +28,18 @@
   :fun "==" (other String'box)
     (@_size == other._size) && (@_ptr._compare(other._ptr, @_size) == 0)
   
+  :: Returns True if this String starts with a substring equal to the other.
+  :: Otherwise, returns False.
+  :fun starts_with (other String'box)
+    (@_size >= other.size) && (@_ptr._compare(other._ptr, other.size) == 0)
+  
+  :: Returns True if this String ends with a substring equal to the other.
+  :: Otherwise, returns False.
+  :fun ends_with (other String'box)
+    (@_size >= other.size) && (
+      @_ptr._offset(@_size - other.size)._compare(other._ptr, other.size) == 0
+    )
+  
   :fun clone iso
     copy = @new_iso(@size)
     _ptr_tag tag = @_ptr // TODO: this indirection shouldn't be needed
