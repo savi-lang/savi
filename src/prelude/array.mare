@@ -156,7 +156,7 @@
       yield @_ptr._get_at(index)
       index += 1
     )
-    @
+    None
   
   :fun each_with_index
     index USize = 0
@@ -164,7 +164,7 @@
       yield (@_ptr._get_at(index), index)
       index += 1
     )
-    @
+    None
   
   :fun reverse_each
     index USize = @_size
@@ -172,7 +172,7 @@
       index -= 1
       yield @_ptr._get_at(index)
     )
-    @
+    None
   
   :fun reverse_each_with_index
     index USize = @_size
@@ -180,7 +180,7 @@
       index -= 1
       yield (@_ptr._get_at(index), index)
     )
-    @
+    None
   
   :fun each_until
     :yields for Bool
