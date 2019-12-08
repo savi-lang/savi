@@ -168,19 +168,15 @@
   
   :: Return True after finding a key/value pair for which the yield block
   :: returns True, defaulting to False if no such key/value pair is found.
-  
-  :fun has_any
+  :fun has_any // TODO: define as simple alias of each_until?
     :yields for Bool
-    found = False
-    try (
-      @_array.each -> (entry |
-        if (entry <: KV(K, V)) (
-          found = yield (entry.key, entry.value)
-          if found error! // TODO: use break instead
-        )
-      )
-    )
-    found
+    @each_until -> (k, v | yield (k, v))
+  
+  :: Return False after finding a key/value pair for which the yield block
+  :: returns False, defaulting to True if no such key/value pair is found.
+  :fun has_all
+    :yields for Bool
+    @each_until -> (k, v | (yield (k, v)).not).not
   
   :fun _search (key)
     hash = H.hash(key).usize()
