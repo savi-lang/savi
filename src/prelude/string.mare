@@ -40,6 +40,9 @@
       @_ptr._offset(@_size - other.size)._compare(other._ptr, other.size) == 0
     )
   
+  :fun is_empty:     @size == 0
+  :fun is_not_empty: @size != 0
+  
   :fun clone iso
     copy = @new_iso(@size)
     _ptr_tag tag = @_ptr // TODO: this indirection shouldn't be needed

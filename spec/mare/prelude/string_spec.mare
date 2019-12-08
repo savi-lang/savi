@@ -24,6 +24,16 @@
     @assert = "snafoozled".ends_with("foo").not
     @assert = "snafoozled".ends_with("")
   
+  :it "checks if it is an empty string or not"
+    @assert = "".is_empty
+    @assert = "".is_not_empty.not
+    @assert = "example".is_empty.not
+    @assert = "example".is_not_empty
+    @assert = String.new.is_empty
+    @assert = String.new.is_not_empty.not
+    @assert = (String.new << "example").is_empty.not
+    @assert = (String.new << "example").is_not_empty
+  
   :it "clones itself into a new string"
     string String = "example"
     @assert = string.clone == "example"
