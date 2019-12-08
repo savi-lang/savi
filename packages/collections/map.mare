@@ -110,7 +110,7 @@
         yield (entry.key, entry.value)
       )
     )
-    @
+    None
   
   :: Yield each key in the map.
   :fun each_key
@@ -119,7 +119,7 @@
         yield entry.key
       )
     )
-    @
+    None
   
   :: Yield each value in the map.
   :fun each_value
@@ -128,7 +128,7 @@
         yield entry.value
       )
     )
-    @
+    None
   
   :: Yield each key and value in the map, stopping iteration if the yield block
   :: returns True. Returns True if iteration was stopped early; else, False.
