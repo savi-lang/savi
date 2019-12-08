@@ -103,6 +103,48 @@
     )
     None
   
+  :: Given a key, find the internal index associated with the hash of that key.
+  :fun _search (key)
+    hash = H.hash(key).usize()
+    
+    idx_del = @_array.size
+    mask = idx_del - 1
+    idx = hash.bit_and(mask)
+    
+    result_idx = idx_del
+    found = False
+    
+    try (
+      @_array.each_with_index -> (entry, i |
+        entry = @_array[idx]!
+        
+        case (
+        | entry <: KV(K, V) |
+          if H.equal(key, entry.key) (
+            result_idx = idx
+            found = True
+            error! // TODO: use early return instead of error!
+          )
+        | entry <: _MapEmpty |
+          if (idx_del > mask) (
+            result_idx = idx
+          |
+            result_idx = idx_del
+          )
+          found = False
+          error!
+        | entry <: _MapDeleted |
+          if (idx_del > mask) (
+            idx_del = idx
+          )
+        )
+        
+        idx = (hash + ((i + (i * i)) / 2)).bit_and(mask)
+      )
+    )
+    
+    result_idx // TODO: also return `found`
+  
   :: Yield each key and value in the map.
   :fun each
     @_array.each -> (entry |
@@ -177,44 +219,3 @@
   :fun has_all
     :yields for Bool
     @each_until -> (k, v | (yield (k, v)).not).not
-  
-  :fun _search (key)
-    hash = H.hash(key).usize()
-    
-    idx_del = @_array.size
-    mask = idx_del - 1
-    idx = hash.bit_and(mask)
-    
-    result_idx = idx_del
-    found = False
-    
-    try (
-      @_array.each_with_index -> (entry, i |
-        entry = @_array[idx]!
-        
-        case (
-        | entry <: KV(K, V) |
-          if H.equal(key, entry.key) (
-            result_idx = idx
-            found = True
-            error! // TODO: use early return instead of error!
-          )
-        | entry <: _MapEmpty |
-          if (idx_del > mask) (
-            result_idx = idx
-          |
-            result_idx = idx_del
-          )
-          found = False
-          error!
-        | entry <: _MapDeleted |
-          if (idx_del > mask) (
-            idx_del = idx
-          )
-        )
-        
-        idx = (hash + ((i + (i * i)) / 2)).bit_and(mask)
-      )
-    )
-    
-    result_idx // TODO: also return `found`
