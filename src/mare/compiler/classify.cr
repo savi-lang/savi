@@ -130,11 +130,6 @@ class Mare::Compiler::Classify < Mare::AST::Visitor
     Classify.further_qualified!(qualify.term)
     
     case refer[qualify.term]
-    when Refer::Unresolved
-      # We assume this qualify to be a function call with arguments.
-      # All of the arguments will have their value used, despite any earlier
-      # work we did of marking them all as unused due to being in a Group.
-      qualify.group.terms.each { |t| Classify.value_needed!(t) }
     when Refer::Type, Refer::TypeAlias, Refer::TypeParam
       # We assume this qualify to be type with type arguments.
       # None of the arguments will have their value used,
@@ -144,7 +139,10 @@ class Mare::Compiler::Classify < Mare::AST::Visitor
         Classify.type_expr!(t)
       end
     else
-      raise NotImplementedError.new(refer[qualify.term])
+      # We assume this qualify to be a function call with arguments.
+      # All of the arguments will have their value used, despite any earlier
+      # work we did of marking them all as unused due to being in a Group.
+      qualify.group.terms.each { |t| Classify.value_needed!(t) }
     end
   end
   

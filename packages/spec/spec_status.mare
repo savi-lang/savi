@@ -1,0 +1,22 @@
+:import "collections" (Map, HashEq)
+
+:class SpecStatus
+  :prop examples: Map(String, SpecExampleStatus, HashEq(String)).new // TODO: implicit HashEq by default
+  :prop expected_examples USize: 0
+  :prop name String
+  :prop ended Bool: False
+  :prop reported Bool: False
+  :new (@name)
+
+:class SpecExampleStatus
+  :prop events: Array(SpecEventAssert).new
+  :prop events_reported USize: 0
+  :prop name String
+  :prop ended Bool: False
+  :prop reported Bool: False
+  :new (@name)
+
+:class val SpecEventAssert
+  :prop success Bool
+  :prop pos SourceCodePosition
+  :new (@success, @pos)

@@ -2,12 +2,12 @@
 
 :actor Main
   :new (env)
-    Specs.run([
-      SpecRunner(ArraySpec).new(env)
-      SpecRunner(BoolSpec).new(env)
-      SpecRunner(CPointerSpec).new(env)
-      SpecRunner(InspectSpec).new(env)
-      SpecRunner(NumericSpec).new(env)
-      SpecRunner(PlatformSpec).new(env)
-      SpecRunner(StringSpec).new(env)
+    Specs.run(env, [
+      SpecRun(ArraySpec).new(env)
+      SpecRun(BoolSpec).new(env)
+      SpecRun(CPointerSpec).new(env)
+      SpecRun(InspectSpec).new(env)
+      SpecRun(NumericSpec).new(env)
+      SpecRun(PlatformSpec).new(env)
+      SpecRun(StringSpec).new(env)
     ])

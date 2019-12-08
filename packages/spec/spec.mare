@@ -1,92 +1,32 @@
 :trait Spec
-  :prop env Env
-  :prop failures Array(SourceCodePosition): []
-  :prop assert_count USize: 0
-  :new (@env)
+  :prop test TestHelper
+  :fun env: @test.env
+  :new (@test)
   
   :: When implementing the Spec trait, include a definition for this constant
   :: indicating what entity the tests are describing the specification for.
-  
   :const describes String
   
   :fun ref "assert=" (
     success Bool
     pos SourceCodePosition = source_code_position_of_argument success
   )
-    if success.not (@failures << pos)
-    @assert_count += 1
-    success
+    @test.assert(success, pos)
 
-:primitive Specs
-  :fun non run (runners Array(SpecRunnerAny))
-    runners.each -> (runner | runner.run)
-
-:trait tag SpecRunnerAny
-  :be run
-
-:actor SpecRunner (A Spec)
-  :is SpecRunnerAny
+:class val TestHelper
   :prop env Env
-  :new (@env)
-    @run
+  :prop specs Specs
+  :prop spec String
+  :prop example String
+  :new (@env, @specs, @spec, @example)
   
-  :fun non _fail (env Env) // TODO: move to Specs
-    env.exit_code = 1 // Mark the entire process as a failure.
+  :fun assert (success, pos) // TODO: avoid needing this alias
+    @specs.assert(@spec, @example, success, pos)
+    success
   
-  // TODO: avoid this indirection
-  :fun ref new_spec A: A.new(@env)
-  
-  :: Run all spec features for the Spec type indicated by the type argument,
-  :: using the given Env to construct an instance of that Spec type.
-  ::
-  :: A summary of successes and failures will be printed to `env.out`.
-  :: If there are one or more failures, `env.exit_code` will be set accordingly.
-  
-  :be run
-    type ReflectionOfType(A) = (reflection_of_type @new_spec)
-    
-    feature_count USize = 0
-    type.features.each -> (feature |
-      feature2 ReflectionFeatureOfType(A) = feature
-      if feature.tags.includes("it") (
-        feature_count += 1
-        SpecExampleRunner(A).new(@env, feature2)
-      )
-    )
-    
-    if (feature_count == 0) (
-      @_fail(@env)
-      @env.err.print("FAIL: No spec features found in ")
-      @env.err.write(type.string)
-    )
-
-:actor SpecExampleRunner (A Spec)
-  :prop example ReflectionFeatureOfType(A)
-  
-  :fun non _fail (env Env) // TODO: move to Specs
-    env.exit_code = 1 // Mark the entire process as a failure.
-  
-  :new (env, @example)
-    spec = A.new(env)
-    called = @example.maybe_call_mutator(spec)
-    
-    case (
-    | called.not |
-      @_fail(env)
-      env.err.print("FAILED TO CALL A SPEC FEATURE?")
-    
-    | spec.failures.size == 0 |
-      env.err.write("." * spec.assert_count)
-      env.err.write(" ")
-    
-    |
-      @_fail(env)
-      env.err.write("\nFAIL: ")
-      env.err.write(spec.describes)
-      env.err.write(" ")
-      env.err.print(@example.name)
-      spec.failures.each -> (fail |
-        env.err.write("  X "), env.err.print(fail.string)
-      )
-      spec.failures.clear
-    )
+  :fun "assert=" (
+    success Bool
+    pos SourceCodePosition = source_code_position_of_argument success
+  )
+    @specs.assert(@spec, @example, success, pos)
+    success

@@ -2,10 +2,10 @@
 
 :actor Main
   :new (env)
-    Specs.run([
-      SpecRunner(Day1Spec).new(env)
-      SpecRunner(Day2Spec).new(env)
-      SpecRunner(Day3Spec).new(env)
-      SpecRunner(Day4Spec).new(env)
-      SpecRunner(Day5Spec).new(env)
+    Specs.run(env, [
+      SpecRun(Day1Spec).new(env)
+      SpecRun(Day2Spec).new(env)
+      SpecRun(Day3Spec).new(env)
+      SpecRun(Day4Spec).new(env)
+      SpecRun(Day5Spec).new(env)
     ])
