@@ -1757,11 +1757,11 @@ class Mare::Compiler::CodeGen
         # Integers of different types never have the same identity.
         gen_bool(false)
       end
-    elsif lhs_type == rhs_type \
+    elsif (
+      lhs_type == rhs_type || lhs.type == @obj_ptr || rhs.type == @obj_ptr
+    ) \
     && lhs.type.kind == LLVM::Type::Kind::Pointer \
-    && rhs.type.kind == LLVM::Type::Kind::Pointer \
-    && lhs.type == llvm_type_of(lhs_type) \
-    && rhs.type == llvm_type_of(rhs_type)
+    && rhs.type.kind == LLVM::Type::Kind::Pointer
       # Objects (not boxed machine words) of the same type are compared by
       # integer comparison of the pointer to the object.
       @builder.icmp(
