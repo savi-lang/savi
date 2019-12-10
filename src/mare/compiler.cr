@@ -5,6 +5,7 @@ module Mare::Compiler
     when :namespace    then ctx.run(ctx.namespace)
     when :macros       then ctx.run(Macros)
     when :sugar        then ctx.run(Sugar)
+    when :refer_type   then ctx.run(ctx.refer_type)
     when :populate     then ctx.run(Populate)
     when :lambda       then ctx.run(Lambda)
     when :refer        then ctx.run(ctx.refer)
@@ -33,9 +34,10 @@ module Mare::Compiler
     when :namespace then [:import]
     when :macros then [:namespace]
     when :sugar then [:macros]
-    when :populate then [:sugar, :macros]
+    when :refer_type then [:sugar, :macros, :namespace]
+    when :populate then [:sugar, :macros, :refer_type]
     when :lambda then [:sugar, :macros]
-    when :refer then [:lambda, :sugar, :macros, :namespace]
+    when :refer then [:lambda, :populate, :sugar, :macros, :refer_type, :namespace]
     when :classify then [:refer, :lambda, :sugar, :macros]
     when :jumps then [:classify]
     when :inventory then [:classify]

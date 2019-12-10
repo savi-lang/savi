@@ -1,6 +1,7 @@
 class Mare::Compiler::Context
   getter program
   getter namespace
+  getter refer_type
   getter inventory
   getter infer
   getter refer
@@ -15,6 +16,7 @@ class Mare::Compiler::Context
     @stack = [Interpreter::Default.new(@program)] of Interpreter
     
     @namespace = Namespace.new
+    @refer_type = ReferType.new
     @inventory = Inventory.new
     @infer = Infer.new
     @refer = Refer.new

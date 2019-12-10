@@ -1,6 +1,8 @@
 ##
 # The purpose of the Refer pass is to resolve identifiers, either as local
-# variables or type declarations/aliases. The resolutions of the identifiers
+# variables or type declarations/aliases. The resolution of types is deferred
+# to the earlier ReferType pass, on which this pass depends.
+# Just like the earlier ReferType pass, the resolutions of the identifiers
 # are kept as output state available to future passes wishing to retrieve
 # information as to what a given identifier refers. Additionally, this pass
 # tracks and validates some invariants related to references, and raises
@@ -20,7 +22,7 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
   def run(ctx)
     # For each type in the program, delve into type parameters and functions.
     ctx.program.types.each do |t|
-      @map[t] = ForType.new(ctx, Type.new(t)).tap(&.run)
+      @map[t] = ForType.new(ctx, t).tap(&.run)
     end
   end
   
@@ -33,38 +35,12 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
   end
   
   class ForType
-    def initialize(@ctx : Context, @self_type : Type)
+    getter self_type : Type
+    
+    def initialize(@ctx : Context, t)
+      @self_type = @ctx.refer_type[t.ident].as(Type)
       @map = {} of Program::Function => ForFunc
       @infos = {} of AST::Node => Info
-      @params = {} of String => TypeParam
-      
-      # If the type has type parameters, collect them into the params map.
-      if self_type.defn.params
-        self_type.defn.params.not_nil!.terms.each_with_index do |param, index|
-          type_param =
-            case param
-            when AST::Identifier
-              any = AST::Identifier.new("any").from(param)
-              self[any] = Unresolved::INSTANCE
-              
-              TypeParam.new(self_type.defn, index, param, any)
-            when AST::Group
-              raise NotImplementedError.new(param) \
-                unless param.terms.size == 2 && param.style == " "
-              
-              TypeParam.new(
-                self_type.defn,
-                index,
-                param.terms.first.as(AST::Identifier),
-                param.terms.last.as(AST::Term),
-              )
-            else
-              raise NotImplementedError.new(param)
-            end
-          
-          @params[type_param.ident.value] = type_param
-        end
-      end
     end
     
     def [](f : Program::Function) : ForFunc
@@ -91,29 +67,8 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
       @self_type
     end
     
-    def self_library
-      @self_type.defn.ident.pos.source.library
-    end
-    
-    def self_imports
-      @ctx.program.imports[@self_type.defn.ident.pos.source]?
-    end
-    
     def find_type?(node : AST::Identifier)
-      found = @params[node.value]?
-      return found if found
-      
-      found = @ctx.namespace[node]?
-      case found
-      when Program::Type
-        Type.new(found)
-      when Program::TypeAlias
-        target = found
-        while !target.is_a?(Program::Type)
-          target = @ctx.namespace[target.target]
-        end
-        TypeAlias.new(found, target)
-      end
+      @ctx.refer_type[node]?
     end
     
     def run
@@ -155,7 +110,6 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
     def run(func)
       root = ForBranch.new(self)
       
-      @for_type.self_type.defn.params.try(&.accept(root))
       func.params.try(&.terms.each { |param|
         param.accept(root)
         root.create_param_local(param)

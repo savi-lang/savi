@@ -426,7 +426,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     
     # An identifier type expression must refer to a type.
     def type_expr(node : AST::Identifier, refer, receiver = nil) : MetaType
-      ref = refer[node]
+      ref = refer[node]?
       case ref
       when Refer::Self
         receiver || MetaType.new(reified)
@@ -434,7 +434,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         MetaType.new(reified_type(ref.defn))
       when Refer::TypeParam
         lookup_type_param(ref, refer, receiver)
-      when Refer::Unresolved
+      when Refer::Unresolved, nil
         case node.value
         when "iso", "trn", "val", "ref", "box", "tag", "non"
           MetaType.new(MetaType::Capability.new(node.value))
