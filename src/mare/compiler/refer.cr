@@ -1,5 +1,5 @@
 ##
-# The purpose of the ForFunc pass is to resolve identifiers, either as local
+# The purpose of the Refer pass is to resolve identifiers, either as local
 # variables or type declarations/aliases. The resolutions of the identifiers
 # are kept as output state available to future passes wishing to retrieve
 # information as to what a given identifier refers. Additionally, this pass
