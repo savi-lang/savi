@@ -4,6 +4,10 @@ module Mare::AST
   alias A = Symbol | String | UInt64 | Int64 | Float64 | Array(A)
   
   class Visitor
+    def dup_nodes?
+      false
+    end
+    
     def visit_any?(node : Node)
       true
     end
@@ -41,6 +45,7 @@ module Mare::AST
     
     def accept(visitor)
       node = self
+      node = node.dup if visitor.dup_nodes?
       if visitor.visit_any?(node)
         node = visitor.visit_pre(node)
         children_accept(visitor) if visitor.visit_children?(node)

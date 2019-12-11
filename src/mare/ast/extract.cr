@@ -64,4 +64,26 @@ module Mare::AST::Extract
     
     node.terms.map { |child| param(child) }
   end
+  
+  def self.type_param(node : AST::Term) : {
+    AST::Identifier, # identifier
+    AST::Term?}      # bound
+    case node
+    when AST::Identifier
+      {node, nil}
+    when AST::Group
+      raise NotImplementedError.new(node) \
+        unless node.terms.size == 2 && node.style == " "
+      
+      {node.terms.first.as(AST::Identifier), node.terms.last.as(AST::Term)}
+    else
+      raise NotImplementedError.new(node)
+    end
+  end
+  
+  def self.type_params(node : AST::Group?)
+    return [] of {AST::Identifier, AST::Term?} unless node
+    
+    node.terms.map { |child| type_param(child) }
+  end
 end

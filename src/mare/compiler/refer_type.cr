@@ -43,27 +43,13 @@ class Mare::Compiler::ReferType < Mare::AST::Visitor
     # If the type has type parameters, collect them into the params map.
     t.params.try do |type_params|
       type_params.terms.each_with_index do |param, index|
-        type_param =
-          case param
-          when AST::Identifier
-            any = AST::Identifier.new("any").from(param)
-            
-            Refer::TypeParam.new(t, index, param, any)
-          when AST::Group
-            raise NotImplementedError.new(param) \
-              unless param.terms.size == 2 && param.style == " "
-            
-            Refer::TypeParam.new(
-              t,
-              index,
-              param.terms.first.as(AST::Identifier),
-              param.terms.last.as(AST::Term),
-            )
-          else
-            raise NotImplementedError.new(param)
-          end
-        
-        @params[type_param.ident.value] = type_param
+        param_ident, param_bound = AST::Extract.type_param(param)
+        @params[param_ident.value] = Refer::TypeParam.new(
+          t,
+          index,
+          param_ident,
+          param_bound || AST::Identifier.new("any").from(param),
+        )
       end
     end
     
