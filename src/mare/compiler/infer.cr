@@ -52,12 +52,12 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         infer_type.reified.defn.functions.each do |f|
           for_func(ctx, infer_type.reified, f, MetaType.cap(f.cap.value)).run
         end
+        
+        # Check the assertion list for the type, to confirm that it is a subtype
+        # of any it claimed earlier, which we took on faith and now verify.
+        infer_type.subtyping.check_assertions
       end
     end
-    
-    # Check the assertion list for all types, to confirm that they are subtypes
-    # of what was claimed earlier, which we took on faith and now verify.
-    for_non_argumented_types.each(&.subtyping.check_assertions)
     
     # Clean up temporary state.
     @validated_type_args_already.clear
@@ -649,19 +649,34 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         end
       end
       
+      # TODO: Find a way to unify/simplify some logic from this big block below.
       if ctx.inventory.yields(func).size > 0
         # Create a fake local variable that represents the yield-related types.
-        ctx.inventory.yields(func).map(&.terms.size).max.times do
+        yield_out_arg_count = [
+          ctx.inventory.yields(func).map(&.terms.size).max,
+          func.yield_out.try do |yield_out|
+            yield_out.is_a?(AST::Group) && yield_out.style == "(" \
+            ? yield_out.terms.size : 0
+          end || 0
+        ].max
+        yield_out_arg_count.times do
           yield_out_infos << Local.new((func.yield_out || func.ident).pos)
         end
         @yield_in_info = FromYield.new((func.yield_in || func.ident).pos)
         
         func.yield_out.try do |yield_out|
-          raise NotImplementedError.new("explicit types for multi-yield") \
-            if yield_out.is_a?(AST::Group) && yield_out.style == "("
-          
-          yield_out.accept(self)
-          yield_out_infos.first.set_explicit(yield_out.pos, resolve(yield_out))
+          if yield_out.is_a?(AST::Group) && yield_out.style == "(" \
+          && yield_out.terms.size > 1
+            # We have a function signature for multiple yield out arg types.
+            yield_out.terms.each_with_index do |yield_out_arg, index|
+              yield_out_arg.accept(self)
+              yield_out_infos[index].set_explicit(yield_out_arg.pos, resolve(yield_out_arg))
+            end
+          else
+            # We have a function signature for just one yield out arg type.
+            yield_out.accept(self)
+            yield_out_infos.first.set_explicit(yield_out.pos, resolve(yield_out))
+          end
         end
         
         yield_in = func.yield_in
@@ -671,6 +686,28 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         else
           none = MetaType.new(reified_type(prelude_type("None")))
           yield_in_info.set_explicit(yield_in_info.pos, none)
+        end
+      else
+        func.yield_out.try do |yield_out|
+          if yield_out.is_a?(AST::Group) && yield_out.style == "(" \
+          && yield_out.terms.size > 1
+            yield_out.terms.each do |yield_out_arg|
+              yield_out_arg.accept(self)
+              local = Local.new(yield_out_arg.pos)
+              local.set_explicit(yield_out_arg.pos, resolve(yield_out_arg))
+              yield_out_infos << local
+            end
+          else
+            yield_out.accept(self)
+            yield_out_infos << Local.new(yield_out.pos)
+            yield_out_infos.first.set_explicit(yield_out.pos, resolve(yield_out))
+          end
+        end
+        
+        func.yield_in.try do |yield_in|
+          yield_in.accept(self)
+          @yield_in_info = FromYield.new(yield_in.pos)
+          yield_in_info.set_explicit(yield_in.pos, resolve(yield_in))
         end
       end
       

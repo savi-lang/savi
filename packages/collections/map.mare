@@ -7,6 +7,7 @@
   :new (@key, @value)
 
 :class Map (K, V, H HashFunction(K))
+  :is MapReadable(K, V)
   :prop _size USize: 0
   :prop _array Array((_KV(K, V) | _MapEmpty | _MapDeleted))
   
@@ -154,24 +155,6 @@
     )
     None
   
-  :: Yield each key in the map.
-  :fun each_key
-    @_array.each -> (entry |
-      if (entry <: _KV(K, V)) (
-        yield entry.key
-      )
-    )
-    None
-  
-  :: Yield each value in the map.
-  :fun each_value
-    @_array.each -> (entry |
-      if (entry <: _KV(K, V)) (
-        yield entry.value
-      )
-    )
-    None
-  
   :: Yield each key and value in the map, stopping iteration if the yield block
   :: returns True. Returns True if iteration was stopped early; else, False.
   :fun each_until
@@ -183,39 +166,3 @@
         False
       )
     )
-  
-  :: Yield each key in the map, stopping iteration if the yield block
-  :: returns True. Returns True if iteration was stopped early; else, False.
-  :fun each_key_until
-    :yields for Bool
-    @_array.each_until -> (entry |
-      if (entry <: _KV(K, V)) (
-        yield entry.key
-      |
-        False
-      )
-    )
-  
-  :: Yield each value in the map, stopping iteration if the yield block
-  :: returns True. Returns True if iteration was stopped early; else, False.
-  :fun each_value_until
-    :yields for Bool
-    @_array.each_until -> (entry |
-      if (entry <: _KV(K, V)) (
-        yield entry.value
-      |
-        False
-      )
-    )
-  
-  :: Return True after finding a key/value pair for which the yield block
-  :: returns True, defaulting to False if no such key/value pair is found.
-  :fun has_any // TODO: define as simple alias of each_until?
-    :yields for Bool
-    @each_until -> (k, v | yield (k, v))
-  
-  :: Return False after finding a key/value pair for which the yield block
-  :: returns False, defaulting to True if no such key/value pair is found.
-  :fun has_all
-    :yields for Bool
-    @each_until -> (k, v | (yield (k, v)).not).not

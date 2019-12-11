@@ -18,6 +18,8 @@
 :: hash map is also part of a doubly-linked circular list, with the "head" of
 :: the circular list being the most recently inserted entry in the hash map.
 :class OrderedMap (K, V, H HashFunction(K))
+  :is MapReadable(K, V)
+  
   :prop _size USize: 0
   :prop _array Array((_KVBA(K, V) | _MapEmpty | _MapDeleted))
   :prop _head (_KVBA(K, V) | None): None
@@ -207,7 +209,7 @@
     try ( // this should only fail when the map is empty, thus yielding nothing
       head = @_head.as!(_KVBA(K, V))
       entry = head.after!
-      while (entry is head).not (
+      while (entry is head).not ( // TODO: "isnt" as sugar for "is...not"
         yield (entry.key, entry.value)
         entry = entry.after!
       )
@@ -215,28 +217,18 @@
     )
     None
   
-  :: Yield each key in the map.
-  :fun each_key
+  :: Yield each key and value in the map, in the order in they were inserted,
+  :: with the oldest key/value pairs appearing first, ending with the newest.
+  :fun each_until
+    :yields for Bool
+    early_stop = False
     try ( // this should only fail when the map is empty, thus yielding nothing
       head = @_head.as!(_KVBA(K, V))
       entry = head.after!
-      while (entry is head).not (
-        yield entry.key
+      while (entry is head || early_stop).not ( // TODO: "isnt" as sugar for "is...not"
+        yield (entry.key, entry.value)
         entry = entry.after!
       )
-      yield entry.key // yield once more for the head
+      yield (entry.key, entry.value) // yield once more for the head
     )
-    None
-  
-  :: Yield each value in the map.
-  :fun each_value
-    try ( // this should only fail when the map is empty, thus yielding nothing
-      head = @_head.as!(_KVBA(K, V))
-      entry = head.after!
-      while (entry is head).not (
-        yield entry.value
-        entry = entry.after!
-      )
-      yield entry.value // yield once more for the head
-    )
-    None
+    early_stop

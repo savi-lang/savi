@@ -643,7 +643,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
       {
         "kind" => "term",
         "name" => "out",
-        "type" => "type",
+        "type" => "type|params",
         "optional" => true,
         "exclude_keyword" => "for",
       },
