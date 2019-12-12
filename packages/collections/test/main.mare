@@ -6,4 +6,5 @@
       SpecRun(CountSpec).new(env)
       SpecRun(MapSpec).new(env)
       SpecRun(OrderedMapSpec).new(env)
+      SpecRun(MapReadableSpec).new(env)
     ])

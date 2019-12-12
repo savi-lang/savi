@@ -49,20 +49,3 @@
     
     @assert = keys == ["bar", "baz", "foo"]
     @assert = values == [22, 55, 66]
-  
-  :it "yields each key and each value (in insertion order, separately)"
-    map = @new_map
-    map["foo"] = 11
-    map["bar"] = 22
-    map["baz"] = 33
-    map["foo"] = 44
-    map["baz"] = 55
-    map["foo"] = 66
-    
-    keys Array(String) = []
-    values Array(U64) = []
-    map.each_key -> (key | keys << key)
-    map.each_value -> (value | values << value)
-    
-    @assert = keys == ["bar", "baz", "foo"]
-    @assert = values == [22, 55, 66]

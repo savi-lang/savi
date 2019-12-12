@@ -907,7 +907,7 @@ class Mare::Compiler::CodeGen
       when :error_cc
         gen_return_using_error_cc(last_value, last_expr, false)
       when :yield_cc
-        gen_final_return_using_yield_cc(last_value)
+        gen_final_return_using_yield_cc(last_value, last_expr)
       else
         raise NotImplementedError.new(gfunc.calling_convention)
       end
@@ -1553,9 +1553,6 @@ class Mare::Compiler::CodeGen
       @builder.position_at_end(after_block)
       result = @builder.extract_value(result, 0)
     when :yield_cc
-      raise NotImplementedError.new "continuation type for virtual call" \
-        if needs_virtual_call
-      
       # Since a yield block is kind of like a loop, we need an alloca to cover
       # the "variable" that changes each iteration - the last call result.
       result_alloca =
@@ -2932,7 +2929,7 @@ class Mare::Compiler::CodeGen
     @builder.ret(gen_struct_bit_cast(tuple, func_frame.llvm_func.return_type))
   end
   
-  def gen_final_return_using_yield_cc(value)
+  def gen_final_return_using_yield_cc(value, from_expr : AST::Node? = nil)
     raise "inconsistent frames" if @frames.size > 1
     
     gfunc = func_frame.gfunc.not_nil!
@@ -2940,7 +2937,7 @@ class Mare::Compiler::CodeGen
     # Cast the given value to the appropriate type.
     return_type = func_frame.gfunc.not_nil!.yield_cc_final_return_type
     llvm_type = return_type.struct_element_types[1]
-    cast_value = gen_assign_cast(value, llvm_type, nil)
+    cast_value = gen_assign_cast(value, llvm_type, from_expr)
     
     # Grab the continuation value from local memory and clear the next func.
     cont = func_frame.continuation_value
