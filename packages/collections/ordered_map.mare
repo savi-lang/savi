@@ -226,9 +226,11 @@
       head = @_head.as!(_KVBA(K, V))
       entry = head.after!
       while (entry is head || early_stop).not ( // TODO: "isnt" as sugar for "is...not"
-        yield (entry.key, entry.value)
+        early_stop = yield (entry.key, entry.value)
         entry = entry.after!
       )
-      yield (entry.key, entry.value) // yield once more for the head
+      if early_stop.not (
+        early_stop = yield (entry.key, entry.value) // yield once more for the head
+      )
     )
     early_stop
