@@ -1,10 +1,10 @@
-:import "collections" (Map, HashEq)
+:import "collections" (OrderedMap, HashEq)
 
 :actor Specs
   :prop env Env
   :prop reporter SpecReporter
   :prop spec_count USize
-  :prop statuses: Map(String, SpecStatus, HashEq(String)).new // TODO: implicit HashEq by default
+  :prop statuses: OrderedMap(String, SpecStatus, HashEq(String)).new // TODO: implicit HashEq by default
   
   :new (@env, @spec_count)
     @reporter = SpecReporterLinear.new(@env, @statuses, SpecReporterFull.new(@env))

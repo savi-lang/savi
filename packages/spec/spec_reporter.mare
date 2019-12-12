@@ -1,4 +1,4 @@
-:import "collections" (Map, HashEq)
+:import "collections" (OrderedMap, HashEq)
 
 :trait SpecReporter
   :fun ref spec_began (spec String): None
@@ -56,7 +56,7 @@
 
 :class SpecReporterLinear
   :prop env Env
-  :prop statuses: Map(String, SpecStatus, HashEq(String)).new // TODO: implicit HashEq by default
+  :prop statuses: OrderedMap(String, SpecStatus, HashEq(String)).new // TODO: implicit HashEq by default
   :prop inner SpecReporter
   :prop current_spec: ""
   :prop current_example: ""

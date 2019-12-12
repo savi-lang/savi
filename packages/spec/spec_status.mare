@@ -1,7 +1,7 @@
-:import "collections" (Map, HashEq)
+:import "collections" (OrderedMap, HashEq)
 
 :class SpecStatus
-  :prop examples: Map(String, SpecExampleStatus, HashEq(String)).new // TODO: implicit HashEq by default
+  :prop examples: OrderedMap(String, SpecExampleStatus, HashEq(String)).new // TODO: implicit HashEq by default
   :prop expected_examples USize: 0
   :prop name String
   :prop ended Bool: False
