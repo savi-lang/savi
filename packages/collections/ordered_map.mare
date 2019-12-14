@@ -121,7 +121,7 @@
         entry.value = --value
 
         // If this entry is not already the head, we will make it the new head.
-        if (entry is @_head).not (
+        if (entry isnt @_head) (
           @_remove_entry_from_place(entry)
           @_place_entry_as_head(entry)
         )
@@ -209,7 +209,7 @@
     try ( // this should only fail when the map is empty, thus yielding nothing
       head = @_head.as!(_KVBA(K, V))
       entry = head.after!
-      while (entry is head).not ( // TODO: "isnt" as sugar for "is...not"
+      while (entry isnt head) (
         yield (entry.key, entry.value)
         entry = entry.after!
       )
@@ -225,7 +225,7 @@
     try ( // this should only fail when the map is empty, thus yielding nothing
       head = @_head.as!(_KVBA(K, V))
       entry = head.after!
-      while (entry is head || early_stop).not ( // TODO: "isnt" as sugar for "is...not"
+      while (entry isnt head && early_stop.not) (
         early_stop = yield (entry.key, entry.value)
         entry = entry.after!
       )

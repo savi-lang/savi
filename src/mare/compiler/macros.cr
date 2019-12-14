@@ -118,6 +118,13 @@ class Mare::Compiler::Macros < Mare::AST::Visitor
         "the other of the two operands whose identity is to be compared",
       ])
       visit_is(node)
+    elsif Util.match_ident?(node, 1, "isnt")
+      Util.require_terms(node, [
+        "one of the two operands whose identity is to be compared",
+        nil,
+        "the other of the two operands whose identity is to be compared",
+      ])
+      visit_isnt(node)
     else
       node
     end
@@ -315,7 +322,23 @@ class Mare::Compiler::Macros < Mare::AST::Visitor
     op = AST::Operator.new("is").from(orig)
 
     group = AST::Group.new("(").from(node)
-    group.terms << AST::Relate.new(lhs, op,rhs).from(node)
+    group.terms << AST::Relate.new(lhs, op, rhs).from(node)
+    group
+  end
+
+  def visit_isnt(node : AST::Group)
+    lhs = node.terms[0]
+    orig = node.terms[1]
+    rhs = node.terms[2]
+
+    op = AST::Operator.new("is").from(orig)
+
+    group = AST::Group.new("(").from(node)
+    group.terms << AST::Relate.new(
+      AST::Relate.new(lhs, op, rhs).from(node),
+      AST::Operator.new(".").from(node),
+      AST::Identifier.new("not").from(node),
+    ).from(node)
     group
   end
 end
