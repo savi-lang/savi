@@ -6,7 +6,7 @@ module LSP::Data
   enum InsertTextFormat
     # The primary text to be inserted is treated as a plain string.
     PlainText = 1
-    
+
     # The primary text to be inserted is treated as a snippet.
     #
     # A snippet can define tab stops and placeholders with `$1`, `$2`

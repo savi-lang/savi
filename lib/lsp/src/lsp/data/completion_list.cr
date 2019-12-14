@@ -8,7 +8,7 @@ module LSP::Data
       # This list it not complete. Further typing should result in recomputing
       # this list.
       is_incomplete: {type: Bool, key: "isIncomplete"},
-      
+
       # The completion items.
       items: Array(CompletionItem),
     })

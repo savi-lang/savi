@@ -10,10 +10,10 @@ module LSP::Data
     JSON.mapping({
       # Title of the command, like `save`.
       title: String,
-      
+
       # The identifier of the actual command handler.
       command: String,
-      
+
       # Arguments that the command handler should be invoked with.
       arguments: {type: Array(JSON::Any), default: [] of JSON::Any},
     })

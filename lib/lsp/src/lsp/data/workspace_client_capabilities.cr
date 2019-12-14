@@ -49,7 +49,7 @@ module LSP::Data
       # Since 3.6.0
       configuration: {type: Bool, default: false},
     })
-    
+
     def initialize
       @apply_edit = false
       @workspace_edit = WorkspaceEdit.new
@@ -60,7 +60,7 @@ module LSP::Data
       @workspace_folders = false
       @configuration = false
     end
-    
+
     struct WorkspaceEdit
       JSON.mapping({
         # The client supports versioned document changes in `WorkspaceEdit`s
@@ -88,7 +88,7 @@ module LSP::Data
         @failure_handling = "abort"
       end
     end
-    
+
     struct WorkspaceSymbol
       JSON.mapping({
         # Symbol request supports dynamic registration.

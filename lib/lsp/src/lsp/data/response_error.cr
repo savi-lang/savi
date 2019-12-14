@@ -7,7 +7,7 @@ module LSP::Data
       message: String,
       data:    D?,
     })
-    
+
     enum Code
       # Defined by JSON RPC.
       ParseError           = -32700
@@ -23,7 +23,7 @@ module LSP::Data
       # Defined by the protocol.
       RequestCancelled = -32800
     end
-    
+
     def initialize(
       @data    = nil,
       @message = "(no error message specified)",

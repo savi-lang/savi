@@ -10,15 +10,15 @@ module LSP::Message
       params:  Params,
       {% end %}
     })
-    
+
     def initialize({% if has_params %} @params = Params.new {% end %})
       @method = {{method}}
       @jsonrpc = "2.0"
     end
-    
+
     def self.method; {{method}} end
   end
-  
+
   macro def_request(method, has_params = true)
     JSON.mapping({
       method:  {type: String, converter: JSONUtil::SpecificString.new({{method}})},
@@ -28,83 +28,83 @@ module LSP::Message
       params:  Params,
       {% end %}
     })
-    
+
     def initialize(@id{% if has_params %}, @params = Params.new {% end %})
       @method = {{method}}
       @jsonrpc = "2.0"
     end
-    
+
     alias SelfType = self
-    
+
     struct Response
       Message.def_response(SelfType)
     end
-    
+
     struct ErrorResponse
       Message.def_error_response(SelfType)
     end
-    
+
     def self.method; {{method}} end
-    
+
     def self.empty_result; Result.new end
-    
+
     def response_from_json(input)
       res = Response.from_json(input)
       res.request = self
       res
     end
-    
+
     def new_response
       res = Response.new(@id)
       res.request = self
       res
     end
-    
+
     def error_response_from_json(input)
       res = ErrorResponse.from_json(input)
       res.request = self
       res
     end
-    
+
     def new_error_response
       res = ErrorResponse.new(@id, Data::ResponseError(ErrorData).new)
       res.request = self
       res
     end
   end
-  
+
   macro def_response(request_class)
     property request : {{request_class}}?
-    
+
     JSON.mapping({
       jsonrpc: {type: String, converter: JSONUtil::SpecificString.new("2.0")},
       id:      Int64 | String | Nil,
       result:  {type: Result, emit_null: true},
     })
-    
+
     def initialize(@id, @result : Result = {{request_class}}.empty_result)
       @jsonrpc = "2.0"
     end
-    
+
     def self.method; nil end
   end
-  
+
   macro def_error_response(request_class)
     property request : {{request_class}}?
-    
+
     JSON.mapping({
       jsonrpc: {type: String, converter: JSONUtil::SpecificString.new("2.0")},
       id:      Int64 | String | Nil,
       error:   Data::ResponseError(ErrorData)?,
     })
-    
+
     def initialize(@id, @error : Data::ResponseError(ErrorData))
       @jsonrpc = "2.0"
     end
-    
+
     def self.method; nil end
   end
-  
+
   def self.from_json(input, outstanding = {} of (String | Int64) => AnyRequest)
     parser = JSON::PullParser.new(input)
     method : String? = nil
@@ -118,7 +118,7 @@ module LSP::Message
       else           parser.skip
       end
     end
-    
+
     {% if true %}
       case method
       when nil
@@ -143,19 +143,19 @@ module LSP::Message
       end.as(Any)
     {% end %}
   end
-  
+
   alias Any = AnyIn | AnyOut
   alias AnyIn = \
     AnyInNotification | AnyInRequest | AnyInResponse | AnyInErrorResponse
   alias AnyOut = \
     AnyOutNotification | AnyOutRequest | AnyOutResponse | AnyOutErrorResponse
-  
+
   alias AnyMethod = AnyInMethod | AnyOutMethod
   alias AnyInMethod = AnyInNotification | AnyInRequest
   alias AnyOutMethod = AnyOutNotification | AnyOutRequest
-  
+
   alias AnyRequest = AnyInRequest | AnyOutRequest
-  
+
   alias AnyInNotification =
     Cancel |
     Initialized |
@@ -166,7 +166,7 @@ module LSP::Message
     WillSave |
     DidSave |
     DidClose
-  
+
   alias AnyInRequest =
     Initialize |
     Shutdown |
@@ -174,20 +174,20 @@ module LSP::Message
     CompletionItemResolve |
     Hover |
     SignatureHelp
-  
+
   alias AnyInResponse =
     GenericResponse |
     ShowMessageRequest::Response
-  
+
   alias AnyInErrorResponse =
     GenericErrorResponse |
     ShowMessageRequest::ErrorResponse
-  
+
   alias AnyOutNotification =
     Cancel |
     ShowMessage |
     PublishDiagnostics
-  
+
   alias AnyOutResponse =
     GenericResponse |
     Initialize::Response |
@@ -196,7 +196,7 @@ module LSP::Message
     CompletionItemResolve::Response |
     Hover::Response |
     SignatureHelp::Response
-  
+
   alias AnyOutErrorResponse =
     GenericErrorResponse |
     Initialize::ErrorResponse |
@@ -205,22 +205,22 @@ module LSP::Message
     CompletionItemResolve::ErrorResponse |
     Hover::ErrorResponse |
     SignatureHelp::ErrorResponse
-  
+
   alias AnyOutRequest =
     ShowMessageRequest
-  
+
   struct GenericResponse
     Message.def_response(Nil)
-    
+
     alias Result = JSON::Any
   end
-  
+
   struct GenericErrorResponse
     Message.def_error_response(Nil)
-    
+
     alias ErrorData = JSON::Any
   end
-  
+
   # The base protocol offers support for request cancellation.
   #
   # A request that got canceled still needs to return from the server and send
@@ -239,13 +239,13 @@ module LSP::Message
   # ignore them if they are unknown.
   struct Cancel
     Message.def_notification("$/cancelRequest")
-    
+
     struct Params
       JSON.mapping({id: Int64 | String})
       def initialize(@id = 0_i64); end
     end
   end
-  
+
   # The initialize request is sent as the first request from the client to the
   # server. If the server receives a request or notification before the
   # initialize request it should act as follows:
@@ -266,20 +266,20 @@ module LSP::Message
   # The initialize request may only be sent once.
   struct Initialize
     Message.def_request("initialize")
-    
+
     struct Params
       JSON.mapping({
         # The process Id of the parent process that started
         # the server. Is null if the process has not been started by another process.
         # If the parent process is not alive then the server should exit (see exit notification) its process.
         process_id: {type: Int64?, key: "processId", emit_null: true},
-        
+
         # The rootPath of the workspace. Is null
         # if no folder is open.
         #
         # @deprecated in favour of rootUri.
         _root_path: {type: String?, key: "rootPath"},
-        
+
         # The rootUri of the workspace. Is null if no
         # folder is open. If both `rootPath` and `rootUri` are set
         # `rootUri` wins.
@@ -289,19 +289,19 @@ module LSP::Message
           emit_null: true,
           converter: JSONUtil::URIStringOrNil,
         },
-        
+
         # User provided initialization options.
         options: {
           type: JSON::Any?,
           key: "initializationOptions",
         },
-        
+
         # The capabilities provided by the client (editor or tool)
         capabilities: Data::ClientCapabilities,
-        
+
         # The initial trace setting. If omitted trace is disabled ('off').
         trace: {type: String, default: "off"},
-        
+
         # The workspace folders configured in the client when the server starts.
         # This property is only available if the client supports workspace folders.
         # It can be `null` if the client supports workspace folders but none are
@@ -321,11 +321,11 @@ module LSP::Message
         @capabilities = Data::ClientCapabilities.new,
         @trace = "off",
         @workspace_folders = [] of Data::WorkspaceFolder)
-        
+
         @_root_path = nil
       end
     end
-    
+
     struct Result
       JSON.mapping({
         capabilities: Data::ServerCapabilities,
@@ -333,7 +333,7 @@ module LSP::Message
       def initialize(@capabilities = Data::ServerCapabilities.new)
       end
     end
-    
+
     struct ErrorData
       JSON.mapping({
         # Indicates whether the client execute the following retry logic:
@@ -346,7 +346,7 @@ module LSP::Message
       end
     end
   end
-  
+
   # The initialized notification is sent from the client to the server after
   # the client received the result of the initialize request but before the
   # client is sending any other request or notification to the server.
@@ -355,31 +355,31 @@ module LSP::Message
   struct Initialized
     Message.def_notification("initialized", false)
   end
-  
+
   # The shutdown request is sent from the client to the server.
   # It asks the server to shut down, but to not exit (otherwise the response
   # might not be delivered correctly to the client). There is a separate exit
   # notification that asks the server to exit.
   struct Shutdown
     Message.def_request("shutdown", false)
-    
+
     alias Result = Nil
     alias ErrorData = Nil
     def self.empty_result; nil end
   end
-  
+
   # A notification to ask the server to exit its process.
   # The server should exit with success code 0 if the shutdown request has
   # been received before; otherwise with error code 1.
   struct Exit
     Message.def_notification("exit", false)
   end
-  
+
   # The show message notification is sent from a server to a client to ask
   # the client to display a particular message in the user interface.
   struct ShowMessage
     Message.def_notification("window/showMessage")
-    
+
     struct Params
       JSON.mapping({
         type: Data::MessageType,
@@ -389,14 +389,14 @@ module LSP::Message
       end
     end
   end
-  
+
   # The show message request is sent from a server to a client to ask
   # the client to display a particular message in the user interface.
   # In addition to the show message notification the request allows
   # to pass actions and to wait for an answer from the client.
   struct ShowMessageRequest
     Message.def_request("window/showMessageRequest")
-    
+
     struct Params
       JSON.mapping({
         type: Data::MessageType,
@@ -412,17 +412,17 @@ module LSP::Message
         @actions = [] of LSP::Data::MessageActionItem)
       end
     end
-    
+
     alias Result = LSP::Data::MessageActionItem?
     alias ErrorData = Nil
     def self.empty_result; nil end
   end
-  
+
   # The log message notification is sent from the server to the client to ask
   # the client to log a particular message.
   struct LogMessage
     Message.def_notification("window/logMessage")
-    
+
     struct Params
       JSON.mapping({
         type: Data::MessageType,
@@ -432,15 +432,15 @@ module LSP::Message
       end
     end
   end
-  
+
   # The telemetry notification is sent from the server to the client to ask
   # the client to log a telemetry event.
   struct Telemetry
     Message.def_notification("telemetry/event")
-    
+
     alias Params = JSON::Any
   end
-  
+
   # The client/registerCapability request is sent from the server to the client
   # to register for a new capability on the client side. Not all clients need
   # to support dynamic capability registration. A client opts in via the
@@ -448,11 +448,11 @@ module LSP::Message
   # A client can even provide dynamic registration for capability A but
   # not for capability B (see TextDocumentClientCapabilities as an example).
   # TODO: struct RegisterCapability
-  
+
   # The client/unregisterCapability request is sent from the server to the
   # client to unregister a previously registered capability.
   # TODO: struct UnregisterCapability
-  
+
   # Many tools support more than one root folder per workspace. Examples for
   # this are VS Code’s multi-root support, Atom’s project folder support or
   # Sublime’s project support. If a client workspace consists of multiple roots
@@ -468,7 +468,7 @@ module LSP::Message
   # in the response if only a single file is open in the tool. Returns an
   # empty array if a workspace is open but no folders are configured.
   # TODO: struct WorkspaceFolders
-  
+
   # The workspace/didChangeWorkspaceFolders notification is sent from the
   # client to the server to inform the server about workspace folder
   # configuration changes. The notification is sent by default if both
@@ -486,12 +486,12 @@ module LSP::Message
   #       method: "workspace/didChangeWorkspaceFolders"
   #     }
   # TODO: struct DidChangeWorkspaceFolders
-  
+
   # A notification sent from the client to the server to signal the change of
   # configuration settings.
   struct DidChangeConfiguration
     Message.def_notification("workspace/didChangeConfiguration")
-    
+
     struct Params
       JSON.mapping({
         settings: { type: JSON::Any },
@@ -500,7 +500,7 @@ module LSP::Message
       end
     end
   end
-  
+
   # The workspace/configuration request is sent from the server to the client
   # to fetch configuration settings from the client. The request can fetch n
   # configuration settings in one roundtrip. The order of the returned
@@ -520,7 +520,7 @@ module LSP::Message
   # resource URI. If the client can’t provide a configuration setting for a
   # given scope then null need to be present in the returned array.
   # TODO: struct Configuration
-  
+
   # The watched files notification is sent from the client to the server when
   # the client detects changes to files watched by the language client.
   # It is recommended that servers register for these file events using the
@@ -556,7 +556,7 @@ module LSP::Message
   # The workspace/applyEdit request is sent from the server to the client to
   # modify resource on the client side.
   # TODO: struct ApplyEdit
-  
+
   # The document open notification is sent from the client to the server to
   # signal newly opened text documents. The document’s truth is now managed
   # by the client and the server must not try to read the document’s truth
@@ -578,7 +578,7 @@ module LSP::Message
   # new language id as well.
   struct DidOpen
     Message.def_notification("textDocument/didOpen")
-    
+
     struct Params
       JSON.mapping({
         # The document that was opened.
@@ -588,13 +588,13 @@ module LSP::Message
       end
     end
   end
-  
+
   # The document change notification is sent from the client to the server to
   # signal changes to a text document. In 2.0 the shape of the params has
   # changed to include proper version numbers and language ids.
   struct DidChange
     Message.def_notification("textDocument/didChange")
-    
+
     struct Params
       JSON.mapping({
         # The document that did change. The version number points
@@ -604,7 +604,7 @@ module LSP::Message
           type: Data::TextDocumentVersionedIdentifier,
           key: "textDocument"
         },
-        
+
         # The actual content changes. The content changes describe single state
         # changes to the document. So if there are two content changes
         # c1 and c2 for a document in state S then c1 move the document
@@ -620,12 +620,12 @@ module LSP::Message
       end
     end
   end
-  
+
   # The document will save notification is sent from the client to the server
   # before the document is actually saved.
   struct WillSave
     Message.def_notification("textDocument/willSave")
-    
+
     struct Params
       JSON.mapping({
         # The document that will be saved.
@@ -633,7 +633,7 @@ module LSP::Message
           type: Data::TextDocumentIdentifier,
           key: "textDocument"
         },
-        
+
         # Represents the reason why the document will be saved.
         reason: Data::TextDocumentSaveReason,
       })
@@ -643,7 +643,7 @@ module LSP::Message
       end
     end
   end
-  
+
   # The document will save request is sent from the client to the server before
   # the document is actually saved. The request can return an array of
   # TextEdits which will be applied to the text document before it is saved.
@@ -652,12 +652,12 @@ module LSP::Message
   # took too long or if a server constantly fails on this request.
   # This is done to keep the save fast and reliable.
   # TODO: struct WillSaveWaitUntil
-  
+
   # The document save notification is sent from the client to the server when
   # the document was saved in the client.
   struct DidSave
     Message.def_notification("textDocument/didSave")
-    
+
     struct Params
       JSON.mapping({
         # The document that was saved.
@@ -665,7 +665,7 @@ module LSP::Message
           type: Data::TextDocumentIdentifier,
           key: "textDocument"
         },
-        
+
         # Optional the content when saved. Depends on the includeText value
         # when the save notification was requested.
         text: String?,
@@ -676,7 +676,7 @@ module LSP::Message
       end
     end
   end
-  
+
   # The document close notification is sent from the client to the server when
   # the document got closed in the client. The document’s truth now exists
   # where the document’s uri points to (e.g. if the document’s uri is a file
@@ -689,7 +689,7 @@ module LSP::Message
   # a text document is open or closed.
   struct DidClose
     Message.def_notification("textDocument/didClose")
-    
+
     struct Params
       JSON.mapping({
         # The document that was closed.
@@ -702,7 +702,7 @@ module LSP::Message
       end
     end
   end
-  
+
   # Diagnostics notification are sent from the server to the client to signal
   # results of validation runs.
   #
@@ -723,12 +723,12 @@ module LSP::Message
   # merging that happens on the client side.
   struct PublishDiagnostics
     Message.def_notification("textDocument/publishDiagnostics")
-    
+
     struct Params
       JSON.mapping({
         # The URI for which diagnostic information is reported.
         uri: {type: URI, converter: JSONUtil::URIString},
-        
+
         # An array of diagnostic information items.
         diagnostics: Array(Data::Diagnostic),
       })
@@ -736,7 +736,7 @@ module LSP::Message
       end
     end
   end
-  
+
   # The Completion request is sent from the client to the server to compute
   # completion items at a given cursor position. Completion items are
   # presented in the IntelliSense user interface. If computing full completion
@@ -755,7 +755,7 @@ module LSP::Message
   # request and must not be changed during resolve.
   struct Completion
     Message.def_request("textDocument/completion")
-    
+
     struct Params
       JSON.mapping({
         # The text document.
@@ -763,10 +763,10 @@ module LSP::Message
           type: Data::TextDocumentIdentifier,
           key: "textDocument",
         },
-        
+
         # The position inside the text document.
         position: Data::Position,
-        
+
         # The completion context. This is only available if the client
         # specifies to send this using
         # `ClientCapabilities.textDocument.completion.contextSupport === true`
@@ -778,26 +778,26 @@ module LSP::Message
         @context = nil)
       end
     end
-    
+
     alias Result = Data::CompletionList
     alias ErrorData = Nil
   end
-  
+
   # The request is sent from the client to the server to resolve additional
   # information for a given completion item.
   struct CompletionItemResolve
     Message.def_request("completionItem/resolve")
-    
+
     alias Params = Data::CompletionItem
     alias Result = Data::CompletionItem
     alias ErrorData = Nil
   end
-  
+
   # The hover request is sent from the client to the server to request hover
   # information at a given text document position.
   struct Hover
     Message.def_request("textDocument/hover")
-    
+
     struct Params
       JSON.mapping({
         # The text document.
@@ -805,7 +805,7 @@ module LSP::Message
           type: Data::TextDocumentIdentifier,
           key: "textDocument",
         },
-        
+
         # The position inside the text document.
         position: Data::Position,
       })
@@ -814,13 +814,13 @@ module LSP::Message
         @position = Data::Position.new)
       end
     end
-    
+
     # TODO: allow null result when nothing to show
     struct Result
       JSON.mapping({
         # The hover's content
         contents: Data::MarkupContent,
-        
+
         # An optional range is a range inside a text document that is used
         # to visualize a hover, e.g. by changing the background color.
         range: Data::Range?,
@@ -830,23 +830,23 @@ module LSP::Message
         @range = nil)
       end
     end
-    
+
     alias ErrorData = Nil
   end
-  
+
   # The signature help request is sent from the client to the server to request
   # signature information at a given cursor position.
   struct SignatureHelp
     Message.def_request("textDocument/signatureHelp")
-    
+
     alias Params = Hover::Params
-    
+
     # TODO: allow null result when nothing to show
     struct Result
       JSON.mapping({
         # One or more signatures.
         signatures: Array(Data::SignatureInformation),
-        
+
         # The active signature. If omitted or the value lies outside the
         # range of `signatures` the value defaults to zero or is ignored if
         # `signatures.length === 0`. Whenever possible implementors should
@@ -855,7 +855,7 @@ module LSP::Message
         # In future version of the protocol this property might become
         # mandatory to better express this.
         active_signature: {type: Int64, default: 0_i64, key: "activeSignature"},
-        
+
         # The active parameter of the active signature. If omitted or the value
         # lies outside the range of `signatures[activeSignature].parameters`
         # defaults to 0 if the active signature has parameters. If
@@ -871,30 +871,30 @@ module LSP::Message
         @active_parameter = 0_i64)
       end
     end
-    
+
     alias ErrorData = Nil
   end
-  
+
   # The goto definition request is sent from the client to the server to
   # resolve the definition location of a symbol at a given text document
   # position.
   # TODO: struct Definition
-  
+
   # The goto type definition request is sent from the client to the server to
   # resolve the type definition location of a symbol at a given text document
   # position.
   # TODO: struct TypeDefinition
-  
+
   # The goto implementation request is sent from the client to the server to
   # resolve the implementation location of a symbol at a given text document
   # position.
   # TODO: struct Implementation
-  
+
   # The references request is sent from the client to the server to resolve
   # project-wide references for the symbol denoted by the given text document
   # position.
   # TODO: struct References
-  
+
   # The document highlight request is sent from the client to the server to
   # resolve a document highlights for a given text document position.
   # For programming languages this usually highlights all references to the
@@ -905,13 +905,13 @@ module LSP::Message
   # Symbol matches usually have a DocumentHighlightKind of Read or Write
   # whereas fuzzy or textual matches use Text as the kind.
   # TODO: struct DocumentHighlight
-  
+
   # The document symbol request is sent from the client to the server to
   # return a flat list of all symbols found in a given text document.
   # Neither the symbol’s location range nor the symbol’s container name should
   # be used to infer a hierarchy.
   # TODO: struct DocumentSymbol
-  
+
   # The code action request is sent from the client to the server to compute
   # commands for a given text document and range. These commands are typically
   # code fixes to either fix problems or to beautify/refactor code.
@@ -939,23 +939,23 @@ module LSP::Message
   # action kinds via the corresponding client capability
   # textDocument.codeAction.codeActionLiteralSupport.
   # TODO: struct CodeAction
-  
+
   # The code lens request is sent from the client to the server to compute
   # code lenses for a given text document.
   # TODO: struct CodeLens
-  
+
   # The code lens resolve request is sent from the client to the server to
   # resolve the command for a given code lens item.
   # TODO: struct CodeLensResolve
-  
+
   # The document links request is sent from the client to the server to request
   # the location of links in a document.
   # TODO: struct DocumentLink
-  
+
   # The document link resolve request is sent from the client to the server to
   # resolve the target of a given document link.
   # TODO: struct DocumentLinkResolve
-  
+
   # The document color request is sent from the client to the server to list
   # all color references found in a given text document. Along with the range,
   # a color value in RGB is returned.
@@ -965,34 +965,34 @@ module LSP::Message
   # * Color boxes showing the actual color next to the reference
   # * Show a color picker when a color reference is edited
   # TODO: struct DocumentColor
-  
+
   # The color presentation request is sent from the client to the server to
   # obtain a list of presentations for a color value at a given location.
   # Clients can use the result to:
   # * modify a color reference.
   # * show in a color picker and let users pick one of the presentations
   # TODO: struct ColorPresentation
-  
+
   # The document formatting request is sent from the client to the server to
   # format a whole document.
   # TODO: struct Formatting
-  
+
   # The document range formatting request is sent from the client to the server
   # to format a given range in a document.
   # TODO: struct RangeFormatting
-  
+
   # The document on type formatting request is sent from the client to the
   # server to format parts of the document during typing.
   # TODO: struct OnTypeFormatting
-  
+
   # The rename request is sent from the client to the server to perform a
   # workspace-wide rename of a symbol.
   # TODO: struct Rename
-  
+
   # The prepare rename request is sent from the client to the server to setup
   # and test the validity of a rename operation at a given location.
   # TODO: struct PrepareRename
-  
+
   # The folding range request is sent from the client to the server to return
   # all folding ranges found in a given text document.
   # TODO: struct FoldingRange

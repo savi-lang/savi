@@ -7,7 +7,7 @@ module LSP::Data
     JSON.mapping({
       # How the completion was triggered.
       trigger_kind: {type: CompletionTriggerKind, key: "triggerKind"},
-      
+
       # The trigger character (a single character) that has trigger code
       # complete. Is undefined if
       # `triggerKind !== CompletionTriggerKind.TriggerCharacter`

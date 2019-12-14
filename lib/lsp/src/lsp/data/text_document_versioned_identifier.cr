@@ -5,7 +5,7 @@ module LSP::Data
     JSON.mapping({
       # The text document's URI.
       uri: {type: URI, converter: JSONUtil::URIString},
-      
+
       # The version number of this document (it will increase after each
       # change, including undo/redo).
       version: Int64,

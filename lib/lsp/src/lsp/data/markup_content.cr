@@ -27,7 +27,7 @@ module LSP::Data
     JSON.mapping({
       # The type of the Markup.
       kind: String,
-      
+
       # The content itself.
       value: String,
     })

@@ -12,7 +12,7 @@ module LSP::Codec
     io.print(body)
     io.print("\n")
   end
-  
+
   # Read a message using the LSP wire format, including headers.
   # Silently swallows malformed lines/messages that get in the way.
   # Raises IO::EOFError when the IO is out of data to be read.
@@ -26,7 +26,7 @@ module LSP::Codec
       while (header = io.read_line)
         split = header.as(String).split(": ", 2)
         break if split.size < 2
-        
+
         key, value = split
         case key
         when "Content-Length"
@@ -36,7 +36,7 @@ module LSP::Codec
         else break
         end
       end
-      
+
       # Read the specified number of bytes, as JSON, into an LSP::Message.
       if length.is_a? Int32
         body = IO::Sized.new(io, length).gets_to_end

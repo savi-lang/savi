@@ -28,7 +28,7 @@ module LSP::Data
     Event         = 24
     Operator      = 25
     TypeParameter = 26
-    
+
     def self.default
       [
         File, Module, Namespace, Package, Class, Method, Property, Field,

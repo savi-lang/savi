@@ -12,11 +12,11 @@ describe LSP::Message do
         }
       }
       EOF
-      
+
       msg = msg.as LSP::Message::Cancel
       msg.params.id.should eq "example"
     end
-    
+
     it "parses Initialize (minimal)" do
       msg = LSP::Message.from_json <<-EOF
       {
@@ -30,13 +30,13 @@ describe LSP::Message do
         }
       }
       EOF
-      
+
       msg = msg.as LSP::Message::Initialize
       msg.params.process_id.should eq 99
       msg.params._root_path.should eq nil
       msg.params.root_uri.should eq nil
       msg.params.options.should eq nil
-      
+
       msg.params.capabilities.workspace.apply_edit.should eq false
       msg.params.capabilities.workspace.workspace_edit
         .document_changes.should eq false
@@ -56,7 +56,7 @@ describe LSP::Message do
         .dynamic_registration.should eq false
       msg.params.capabilities.workspace.workspace_folders.should eq false
       msg.params.capabilities.workspace.configuration.should eq false
-      
+
       msg.params.capabilities.text_document.synchronization
         .dynamic_registration.should eq false
       msg.params.capabilities.text_document.synchronization
@@ -134,12 +134,12 @@ describe LSP::Message do
         .range_limit.should eq 0
       msg.params.capabilities.text_document.folding_range
         .line_folding_only.should eq false
-      
+
       msg.params.trace.should eq "off"
-      
+
       msg.params.workspace_folders.should eq [] of LSP::Data::WorkspaceFolder
     end
-    
+
     it "parses Initialize (maximal)" do
       msg = LSP::Message.from_json <<-EOF
       {
@@ -278,15 +278,15 @@ describe LSP::Message do
         }
       }
       EOF
-      
+
       msg = msg.as LSP::Message::Initialize
-      
+
       msg.params.process_id.should eq 99
       msg.params._root_path.should eq "/tmp/deprecated"
       msg.params.root_uri.as(URI).scheme.should eq "file"
       msg.params.root_uri.as(URI).path.should eq "/tmp/example"
       msg.params.options.should eq({"foo" => "bar"})
-      
+
       msg.params.capabilities.workspace.apply_edit.should eq true
       msg.params.capabilities.workspace.workspace_edit
         .document_changes.should eq true
@@ -306,7 +306,7 @@ describe LSP::Message do
         .dynamic_registration.should eq true
       msg.params.capabilities.workspace.workspace_folders.should eq true
       msg.params.capabilities.workspace.configuration.should eq true
-      
+
       msg.params.capabilities.text_document.synchronization
         .dynamic_registration.should eq true
       msg.params.capabilities.text_document.synchronization
@@ -384,9 +384,9 @@ describe LSP::Message do
         .range_limit.should eq 500
       msg.params.capabilities.text_document.folding_range
         .line_folding_only.should eq true
-      
+
       msg.params.trace.should eq "verbose"
-      
+
       msg.params.workspace_folders.size.should eq 2
       msg.params.workspace_folders[0].uri.scheme.should eq "file"
       msg.params.workspace_folders[0].uri.path.should eq "/tmp/example/foo"
@@ -395,7 +395,7 @@ describe LSP::Message do
       msg.params.workspace_folders[1].uri.path.should eq "/tmp/example/bar"
       msg.params.workspace_folders[1].name.should eq "bar"
     end
-    
+
     it "parses Initialized" do
       msg = LSP::Message.from_json <<-EOF
       {
@@ -404,10 +404,10 @@ describe LSP::Message do
         "params": {}
       }
       EOF
-      
+
       msg = msg.as LSP::Message::Initialized
     end
-    
+
     it "parses Shutdown" do
       msg = LSP::Message.from_json <<-EOF
       {
@@ -416,10 +416,10 @@ describe LSP::Message do
         "method": "shutdown"
       }
       EOF
-      
+
       msg = msg.as LSP::Message::Shutdown
     end
-    
+
     it "parses Exit" do
       msg = LSP::Message.from_json <<-EOF
       {
@@ -427,15 +427,15 @@ describe LSP::Message do
         "method": "exit"
       }
       EOF
-      
+
       msg = msg.as LSP::Message::Exit
     end
-    
+
     it "parses ShowMessageRequest::Response" do
       req = LSP::Message::ShowMessageRequest.new("example")
       reqs = {} of (String | Int64) => LSP::Message::AnyRequest
       reqs["example"] = req
-      
+
       msg = LSP::Message.from_json <<-EOF, reqs
       {
         "jsonrpc": "2.0",
@@ -445,12 +445,12 @@ describe LSP::Message do
         }
       }
       EOF
-      
+
       msg = msg.as LSP::Message::ShowMessageRequest::Response
       msg.request.should eq req
       msg.result.as(LSP::Data::MessageActionItem).title.should eq "Hello!"
     end
-    
+
     it "parses didChangeConfiguration" do
       msg = LSP::Message.from_json <<-EOF
       {
@@ -465,11 +465,11 @@ describe LSP::Message do
         }
       }
       EOF
-      
+
       msg = msg.as LSP::Message::DidChangeConfiguration
       msg.params.settings.should eq({"my-language" => {"foo" => "bar"}})
     end
-    
+
     it "parses DidOpen" do
       msg = LSP::Message.from_json <<-EOF
       {
@@ -485,7 +485,7 @@ describe LSP::Message do
         }
       }
       EOF
-      
+
       msg = msg.as LSP::Message::DidOpen
       msg.params.text_document.uri.scheme.should eq "file"
       msg.params.text_document.uri.path.should eq "/tmp/example/foo"
@@ -493,7 +493,7 @@ describe LSP::Message do
       msg.params.text_document.version.should eq 42
       msg.params.text_document.text.should eq "class Foo; end"
     end
-    
+
     it "parses DidChange (full document)" do
       msg = LSP::Message.from_json <<-EOF
       {
@@ -512,14 +512,14 @@ describe LSP::Message do
         }
       }
       EOF
-      
+
       msg = msg.as LSP::Message::DidChange
       msg.params.text_document.uri.scheme.should eq "file"
       msg.params.text_document.uri.path.should eq "/tmp/example/foo"
       msg.params.text_document.version.should eq 42
       msg.params.content_changes[0].text.should eq "class Foo; end"
     end
-    
+
     it "parses DidChange (ranged)" do
       msg = LSP::Message.from_json <<-EOF
       {
@@ -543,7 +543,7 @@ describe LSP::Message do
         }
       }
       EOF
-      
+
       msg = msg.as LSP::Message::DidChange
       msg.params.text_document.uri.scheme.should eq "file"
       msg.params.text_document.uri.path.should eq "/tmp/example/foo"
@@ -556,7 +556,7 @@ describe LSP::Message do
       msg.params.content_changes[0].range_length.should eq 3
       msg.params.content_changes[0].text.should eq "foo"
     end
-    
+
     it "parses WillSave" do
       msg = LSP::Message.from_json <<-EOF
       {
@@ -570,13 +570,13 @@ describe LSP::Message do
         }
       }
       EOF
-      
+
       msg = msg.as LSP::Message::WillSave
       msg.params.text_document.uri.scheme.should eq "file"
       msg.params.text_document.uri.path.should eq "/tmp/example/foo"
       msg.params.reason.should eq LSP::Data::TextDocumentSaveReason::AfterDelay
     end
-    
+
     it "parses DidSave" do
       msg = LSP::Message.from_json <<-EOF
       {
@@ -590,13 +590,13 @@ describe LSP::Message do
         }
       }
       EOF
-      
+
       msg = msg.as LSP::Message::DidSave
       msg.params.text_document.uri.scheme.should eq "file"
       msg.params.text_document.uri.path.should eq "/tmp/example/foo"
       msg.params.text.should eq "class Foo; end"
     end
-    
+
     it "parses DidClose" do
       msg = LSP::Message.from_json <<-EOF
       {
@@ -609,12 +609,12 @@ describe LSP::Message do
         }
       }
       EOF
-      
+
       msg = msg.as LSP::Message::DidClose
       msg.params.text_document.uri.scheme.should eq "file"
       msg.params.text_document.uri.path.should eq "/tmp/example/foo"
     end
-    
+
     it "parses Completion" do
       msg = LSP::Message.from_json <<-EOF
       {
@@ -636,7 +636,7 @@ describe LSP::Message do
         }
       }
       EOF
-      
+
       msg = msg.as LSP::Message::Completion
       msg.id.should eq "example"
       msg.params.text_document.uri.scheme.should eq "file"
@@ -649,7 +649,7 @@ describe LSP::Message do
         context.trigger_character.should eq "."
       end
     end
-    
+
     it "parses CompletionItemResolve" do
       msg = LSP::Message.from_json <<-EOF
       {
@@ -714,7 +714,7 @@ describe LSP::Message do
         }
       }
       EOF
-      
+
       msg = msg.as LSP::Message::CompletionItemResolve
       msg.id.should eq "example"
       msg.params.label.should eq "open"
@@ -753,7 +753,7 @@ describe LSP::Message do
       end
       msg.params.data.should eq JSON::Any.new({"foo" => JSON::Any.new("bar")})
     end
-    
+
     it "parses Hover" do
       msg = LSP::Message.from_json <<-EOF
       {
@@ -771,7 +771,7 @@ describe LSP::Message do
         }
       }
       EOF
-      
+
       msg = msg.as LSP::Message::Hover
       msg.id.should eq "example"
       msg.params.text_document.uri.scheme.should eq "file"
@@ -779,7 +779,7 @@ describe LSP::Message do
       msg.params.position.line.should eq 4
       msg.params.position.character.should eq 2
     end
-    
+
     it "parses SignatureHelp" do
       msg = LSP::Message.from_json <<-EOF
       {
@@ -797,7 +797,7 @@ describe LSP::Message do
         }
       }
       EOF
-      
+
       msg = msg.as LSP::Message::SignatureHelp
       msg.id.should eq "example"
       msg.params.text_document.uri.scheme.should eq "file"
@@ -806,12 +806,12 @@ describe LSP::Message do
       msg.params.position.character.should eq 2
     end
   end
-  
+
   describe "Any.to_json" do
     it "builds Cancel" do
       msg = LSP::Message::Cancel.new
       msg.params.id = "example"
-      
+
       msg.to_pretty_json.should eq <<-EOF
       {
         "method": "$/cancelRequest",
@@ -822,11 +822,11 @@ describe LSP::Message do
       }
       EOF
     end
-    
+
     it "builds Initialize::Response (minimal)" do
       req = LSP::Message::Initialize.new "example"
       msg = req.new_response
-      
+
       msg.to_pretty_json.should eq <<-EOF
       {
         "jsonrpc": "2.0",
@@ -865,11 +865,11 @@ describe LSP::Message do
       }
       EOF
     end
-    
+
     it "builds Initialize::Response (maximal)" do
       req = LSP::Message::Initialize.new "example"
       msg = req.new_response
-      
+
       msg.result.capabilities.text_document_sync.open_close = true
       msg.result.capabilities.text_document_sync.change =
         LSP::Data::TextDocumentSyncKind::Incremental
@@ -877,78 +877,78 @@ describe LSP::Message do
       msg.result.capabilities.text_document_sync.will_save_wait_until = true
       msg.result.capabilities.text_document_sync.save =
         LSP::Data::ServerCapabilities::SaveOptions.new(true)
-      
+
       msg.result.capabilities.hover_provider = true
-      
+
       msg.result.capabilities.completion_provider =
         LSP::Data::ServerCapabilities::CompletionOptions.new(true, ["=", "."])
-      
+
       msg.result.capabilities.signature_help_provider =
         LSP::Data::ServerCapabilities::SignatureHelpOptions.new(["("])
-      
+
       msg.result.capabilities.definition_provider = true
-      
+
       msg.result.capabilities.type_definition_provider =
         LSP::Data::ServerCapabilities::StaticRegistrationOptions.new([
           LSP::Data::DocumentFilter.new("crystal", "file", "*.cr")
         ], "reg")
-      
+
       msg.result.capabilities.implementation_provider =
         LSP::Data::ServerCapabilities::StaticRegistrationOptions.new([
           LSP::Data::DocumentFilter.new("crystal", "file", "*.cr")
         ], "reg")
-      
+
       msg.result.capabilities.references_provider = true
-      
+
       msg.result.capabilities.document_highlight_provider = true
-      
+
       msg.result.capabilities.document_symbol_provider = true
-      
+
       msg.result.capabilities.workspace_symbol_provider = true
-      
+
       msg.result.capabilities.code_action_provider =
         LSP::Data::ServerCapabilities::CodeActionOptions.new([
           "quickfix",
           "refactor",
           "source",
         ])
-      
+
       msg.result.capabilities.code_lens_provider =
         LSP::Data::ServerCapabilities::CodeLensOptions.new(true)
-      
+
       msg.result.capabilities.document_formatting_provider = true
-      
+
       msg.result.capabilities.document_range_formatting_provider = true
-      
+
       msg.result.capabilities.document_on_type_formatting_provider =
         LSP::Data::ServerCapabilities::DocumentOnTypeFormattingOptions.new(
           "}",
           ")",
           ":",
         )
-      
+
       msg.result.capabilities.rename_provider =
         LSP::Data::ServerCapabilities::RenameOptions.new(true)
-      
+
       msg.result.capabilities.document_link_provider =
         LSP::Data::ServerCapabilities::DocumentLinkOptions.new(true)
-      
+
       msg.result.capabilities.color_provider =
         LSP::Data::ServerCapabilities::StaticRegistrationOptions.new([
           LSP::Data::DocumentFilter.new("crystal", "file", "*.cr")
         ], "reg")
-      
+
       msg.result.capabilities.folding_range_provider =
         LSP::Data::ServerCapabilities::StaticRegistrationOptions.new([
           LSP::Data::DocumentFilter.new("crystal", "file", "*.cr")
         ], "reg")
-      
+
       msg.result.capabilities.execute_command_provider =
         LSP::Data::ServerCapabilities::ExecuteCommandOptions.new(["x", "y"])
-      
+
       msg.result.capabilities.workspace.workspace_folders.supported = true
       msg.result.capabilities.workspace.workspace_folders.change_notifications = "reg"
-      
+
       msg.to_pretty_json.should eq <<-EOF
       {
         "jsonrpc": "2.0",
@@ -1065,11 +1065,11 @@ describe LSP::Message do
       }
       EOF
     end
-    
+
     it "builds Shutdown::Response" do
       req = LSP::Message::Shutdown.new "example"
       msg = req.new_response
-      
+
       msg.to_pretty_json.should eq <<-EOF
       {
         "jsonrpc": "2.0",
@@ -1078,12 +1078,12 @@ describe LSP::Message do
       }
       EOF
     end
-    
+
     it "builds ShowMessage" do
       msg = LSP::Message::ShowMessage.new
       msg.params.type = LSP::Data::MessageType::Info
       msg.params.message = "Hello, World!"
-      
+
       msg.to_pretty_json.should eq <<-EOF
       {
         "method": "window/showMessage",
@@ -1095,14 +1095,14 @@ describe LSP::Message do
       }
       EOF
     end
-    
+
     it "builds ShowMessageRequest" do
       msg = LSP::Message::ShowMessageRequest.new("example")
       msg.params.type = LSP::Data::MessageType::Info
       msg.params.message = "Hello, World!"
       msg.params.actions << LSP::Data::MessageActionItem.new("Hello!")
       msg.params.actions << LSP::Data::MessageActionItem.new("Goodbye!")
-      
+
       msg.to_pretty_json.should eq <<-EOF
       {
         "method": "window/showMessageRequest",
@@ -1123,12 +1123,12 @@ describe LSP::Message do
       }
       EOF
     end
-    
+
     it "builds LogMessage" do
       msg = LSP::Message::LogMessage.new
       msg.params.type = LSP::Data::MessageType::Info
       msg.params.message = "Hello, World!"
-      
+
       msg.to_pretty_json.should eq <<-EOF
       {
         "method": "window/logMessage",
@@ -1140,11 +1140,11 @@ describe LSP::Message do
       }
       EOF
     end
-    
+
     it "builds Telemetry" do
       msg = LSP::Message::Telemetry.new \
         JSON::Any.new({"foo" => JSON::Any.new("bar")})
-      
+
       msg.to_pretty_json.should eq <<-EOF
       {
         "method": "telemetry/event",
@@ -1155,7 +1155,7 @@ describe LSP::Message do
       }
       EOF
     end
-    
+
     it "builds PublishDiagnostics" do
       msg = LSP::Message::PublishDiagnostics.new
       msg.params.uri = URI.new("file", "/tmp/example/foo")
@@ -1180,7 +1180,7 @@ describe LSP::Message do
         end
         diag
       end
-      
+
       msg.to_pretty_json.should eq <<-EOF
       {
         "method": "textDocument/publishDiagnostics",
@@ -1227,7 +1227,7 @@ describe LSP::Message do
       }
       EOF
     end
-    
+
     it "builds Completion::Response" do
       req = LSP::Message::Completion.new "example"
       msg = req.new_response
@@ -1269,7 +1269,7 @@ describe LSP::Message do
         item.data = JSON::Any.new({"foo" => JSON::Any.new("bar")})
         item
       end
-      
+
       msg.to_pretty_json.should eq <<-EOF
       {
         "jsonrpc": "2.0",
@@ -1338,7 +1338,7 @@ describe LSP::Message do
       }
       EOF
     end
-    
+
     it "builds CompletionItemResolve::Response" do
       req = LSP::Message::CompletionItemResolve.new "example"
       msg = req.new_response
@@ -1379,7 +1379,7 @@ describe LSP::Message do
         item.data = JSON::Any.new({"foo" => JSON::Any.new("bar")})
         item
       end
-      
+
       msg.to_pretty_json.should eq <<-EOF
       {
         "jsonrpc": "2.0",
@@ -1443,7 +1443,7 @@ describe LSP::Message do
       }
       EOF
     end
-    
+
     it "builds Hover::Response" do
       req = LSP::Message::Hover.new "example"
       msg = req.new_response
@@ -1455,7 +1455,7 @@ describe LSP::Message do
         range.finish.character = 5
         range
       end
-      
+
       msg.to_pretty_json.should eq <<-EOF
       {
         "jsonrpc": "2.0",
@@ -1479,7 +1479,7 @@ describe LSP::Message do
       }
       EOF
     end
-    
+
     it "builds SignatureHelp::Response" do
       req = LSP::Message::SignatureHelp.new "example"
       msg = req.new_response
@@ -1500,7 +1500,7 @@ describe LSP::Message do
       end
       msg.result.active_signature = 0
       msg.result.active_parameter = 1
-      
+
       msg.to_pretty_json.should eq <<-EOF
       {
         "jsonrpc": "2.0",

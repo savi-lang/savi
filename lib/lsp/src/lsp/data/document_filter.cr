@@ -12,10 +12,10 @@ module LSP::Data
     JSON.mapping({
       # A language id, like `typescript`.
       language: String?,
-      
+
       # A Uri [scheme](#Uri.scheme), like `file` or `untitled`.
       scheme: String?,
-      
+
       # A glob pattern, like `*.{ts,js}`.
       pattern: String?,
     })
