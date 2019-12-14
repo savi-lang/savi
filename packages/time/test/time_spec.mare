@@ -4,7 +4,7 @@
 :class TimeSpec
   :is Spec
   :const describes: "Time"
-  
+
   :it "can describe a date and time"
     time = Time.utc(2036, 10, 7, 20, 36, 10, 777)
     @assert = time.year          == 2036
@@ -15,13 +15,13 @@
     @assert = time.second        == 10
     @assert = time.nanosecond    == 777
     @assert = time.total_seconds == 64242621370
-  
+
   :it "correctly describes the month and day on the first day of a month"
     time = Time.utc(2036, 11, 1)
     @assert = time.year  == 2036
     @assert = time.month == 11
     @assert = time.day   == 1
-  
+
   :it "can add or subtract other time durations"
     @assert =
       (Time.utc(2036, 10, 7, 20, 36, 10, 777) - Time.days(3))
@@ -29,7 +29,7 @@
     @assert =
       (Time.utc(2036, 10, 7, 20, 36, 10, 777) + Time.hours(7))
       == Time.utc(2036, 10, 8, 3, 36, 10, 777)
-  
+
   :it "can be compared to other times"
     now = Time.utc(2036, 10, 7, 20, 36, 10, 777)
     soon = now + Time.nanoseconds(13)
@@ -59,7 +59,7 @@
     @assert = (soon == now).not
     @assert = soon >= now
     @assert = soon > now
-  
+
   :it "can be inspected"
     // TODO: Properly pad numbers with zeroes for a constant string width.
     @assert =

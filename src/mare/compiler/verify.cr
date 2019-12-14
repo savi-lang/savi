@@ -17,47 +17,47 @@ class Mare::Compiler::Verify < Mare::AST::Visitor
       end
     end
   end
-  
+
   getter ctx : Context
   getter infer_type : Infer::ForType
   getter infer_func : Infer::ForFunc
-  
+
   def initialize(@ctx, @infer_type, @infer_func)
   end
-  
+
   def rt
     infer_type.reified
   end
-  
+
   def rf
     infer_func.reified
   end
-  
+
   def run
     check_function
-    
+
     rf.func.params.try(&.terms.each(&.accept(self)))
     rf.func.body.try(&.accept(self))
   end
-  
+
   def check_function
     func = rf.func
     func_body = func.body
-    
+
     if func_body && Jumps.any_error?(func_body)
       if func.has_tag?(:constructor)
         finder = ErrorFinderVisitor.new(func_body)
         func_body.accept(finder)
-        
+
         Error.at func.ident,
           "This constructor may raise an error, but that is not allowed",
           finder.found.map { |pos| {pos, "an error may be raised here"} }
       end
-      
+
       if !Jumps.any_error?(func.ident)
         finder = ErrorFinderVisitor.new(func_body)
         func_body.accept(finder)
-        
+
         Error.at func.ident,
           "This function name needs an exclamation point "\
           "because it may raise an error", [
@@ -65,7 +65,7 @@ class Mare::Compiler::Verify < Mare::AST::Visitor
           ] + finder.found.map { |pos| {pos, "an error may be raised here"} }
       end
     end
-    
+
     # Require that async functions and constructors do not yield values.
     no_yields =
       if func.has_tag?(:async)
@@ -86,14 +86,14 @@ class Mare::Compiler::Verify < Mare::AST::Visitor
         unless errs.empty?
     end
   end
-  
+
   # This visitor never replaces nodes, it just touches them and returns them.
   def visit(node)
     touch(node)
-    
+
     node
   end
-  
+
   # Verify that each try block has at least one possible error case.
   def touch(node : AST::Try)
     unless node.body.try { |body| Jumps.any_error?(body) }
@@ -102,13 +102,13 @@ class Mare::Compiler::Verify < Mare::AST::Visitor
       ]
     end
   end
-  
+
   def touch(node : AST::Relate)
     case node.op.value
     when "<:"
       # Skip this verification if this just a compile-time type check.
       return if infer_func[node.lhs].is_a?(Infer::Fixed)
-      
+
       # Verify that it is safe to perform this runtime type check.
       lhs_mt = infer_func.resolve(node.lhs)
       rhs_mt = infer_func.resolve(node.rhs)
@@ -123,37 +123,37 @@ class Mare::Compiler::Verify < Mare::AST::Visitor
       end
     end
   end
-  
+
   def touch(node : AST::Node)
     # Do nothing for all other AST::Nodes.
   end
-  
+
   # This visitor finds the most specific source positions that may raise errors.
   class ErrorFinderVisitor < Mare::AST::Visitor
     getter found
-    
+
     def initialize(node : AST::Node)
       @found = [] of Source::Pos
       @deepest = node
     end
-    
+
     # Only visit nodes that may raise an error.
     def visit_any?(node)
       Jumps.any_error?(node)
     end
-    
+
     # Before visiting a node's children, mark this node as the deepest.
     # If any children can also raise errors, they will be the new deepest ones,
     # removing this node from the possibility of being considered deepest.
     def visit_pre(node)
       @deepest = node
     end
-    
+
     # Save this source position if it is the deepest node in this branch of
     # the tree that we visited, recognizing that we skipped no-error branches.
     def visit(node)
       @found << node.pos if @deepest == node
-      
+
       node
     end
   end

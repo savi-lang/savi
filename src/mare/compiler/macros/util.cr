@@ -5,7 +5,7 @@ module Mare::Compiler::Macros::Util
     return false unless value.nil? || value == child.value
     true
   end
-  
+
   def self.require_terms(
     node : AST::Group,
     term_docs : Array(String?),
@@ -13,10 +13,10 @@ module Mare::Compiler::Macros::Util
   )
     thing = is_grouping ? "grouping" : "macro"
     part = is_grouping ? "section" : "term"
-    
+
     if node.terms.size > term_docs.size
       info = [] of Tuple(AST::Node, String)
-      
+
       index = -1
       while (index += 1) < node.terms.size
         if index < term_docs.size
@@ -27,13 +27,13 @@ module Mare::Compiler::Macros::Util
           info << {node.terms[index], "this is an excessive #{part}"}
         end
       end
-      
+
       Error.at node, "This #{thing} has too many #{part}s", info
     end
-    
+
     if node.terms.size < term_docs.size
       info = [] of Tuple(AST::Node, String)
-      
+
       index = -1
       while (index += 1) < term_docs.size
         if index < node.terms.size
@@ -44,7 +44,7 @@ module Mare::Compiler::Macros::Util
           info << {node, "expected a #{part}: #{term_docs[index]}"}
         end
       end
-      
+
       Error.at node, "This #{thing} has too few #{part}s", info
     end
   end

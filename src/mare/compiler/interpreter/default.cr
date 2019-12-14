@@ -1,12 +1,12 @@
 class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
   def initialize(@program : Program)
   end
-  
+
   def finished(context)
   end
-  
+
   def keywords; %w{import actor class trait numeric enum primitive ffi} end
-  
+
   @@declare_import = Witness.new([
     {
       "kind" => "keyword",
@@ -25,7 +25,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
       "optional" => true,
     },
   ] of Hash(String, String | Bool))
-  
+
   @@declare_type = Witness.new([
     {
       "kind" => "keyword",
@@ -51,13 +51,13 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
       "optional" => true,
     },
   ] of Hash(String, String | Bool))
-  
+
   def compile(context, decl)
     return compile_import(context, decl) if decl.keyword == "import"
-    
+
     data = @@declare_type.run(decl)
     keyword = data["keyword"].as(AST::Identifier)
-    
+
     # Set a default default capability for this type if not given explicitly.
     data["cap"] ||= (
       cap_value =
@@ -73,7 +73,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         end
       AST::Identifier.new(cap_value).from(keyword)
     )
-    
+
     t = Type.new(
       keyword.value,
       Program::Type.new(
@@ -83,7 +83,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
       ),
       @program,
     )
-    
+
     case keyword.value
     when "actor"
       t.type.add_tag(:actor)
@@ -105,34 +105,34 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
     when "ffi"
       t.type.add_tag(:private)
     end
-    
+
     @program.types << t.type
     context.push t
   end
-  
+
   def compile_import(context, decl)
     data = @@declare_import.run(decl)
-    
+
     @program.imports << Program::Import.new(
       data["ident"].as(AST::Identifier | AST::LiteralString),
       data["params"]?.as(AST::Group?),
     )
   end
-  
+
   class Type < Interpreter
     property keyword : String # TODO: read-only as getter
     getter type : Program::Type
     getter program : Program
     getter members
-    
+
     def initialize(@keyword, @type, @program)
       @members = [] of Program::TypeAlias
     end
-    
+
     # TODO: dedup these with the Witness mechanism.
     # TODO: be more specific (for example, `member` is only allowed for `enum`)
     def keywords; ["is", "prop", "fun", "be", "new", "const", "member", "it"] end
-    
+
     def finished(context)
       # Numeric types need some basic metadata attached to know the native type.
       if @keyword == "numeric" || @keyword == "enum"
@@ -145,7 +145,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         trait_func.add_tag(:is)
         trait_func.add_tag(:copies)
         @type.functions << trait_func
-        
+
         # Add "copies NumericMethods" to the type definition as well.
         copy_cap = AST::Identifier.new("non").from(@type.ident)
         copy_is = AST::Identifier.new("copies").from(@type.ident)
@@ -154,7 +154,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         copy_func.add_tag(:hygienic)
         copy_func.add_tag(:copies)
         @type.functions << copy_func
-        
+
         # Also copy IntegerMethods, Float32Methods, or Float64Methods.
         spec_name =
           if !@type.const_bool_true?("is_floating_point")
@@ -172,7 +172,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         spec_func.add_tag(:copies)
         @type.functions << spec_func
       end
-      
+
       # An enum type gets a method for printing the name of the member.
       if @keyword == "enum"
         # Each member gets a clause in the choice.
@@ -194,12 +194,12 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
           AST::Identifier.new("True").from(@type.ident),
           AST::LiteralString.new("").from(@type.ident),
         }
-        
+
         # Create a function body containing that choice as its only expression.
         member_name_body = AST::Group.new(":").from(@type.ident)
         member_name_body.terms <<
           AST::Choice.new(member_name_choices).from(@type.ident)
-        
+
         # Finally, create a function with that body.
         member_name_func = Program::Function.new(
           AST::Identifier.new("box").from(@type.ident),
@@ -210,7 +210,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         )
         @type.functions << member_name_func
       end
-      
+
       # An enum type gets a method for converting from U64.
       if @keyword == "enum"
         # Each member gets a clause in the choice.
@@ -236,17 +236,17 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
           AST::Identifier.new("True").from(@type.ident),
           AST::Identifier.new("error!").from(@type.ident),
         }
-        
+
         # Create function parameters for the value parameter.
         from_u64_params = AST::Group.new("(").from(@type.ident)
         from_u64_params.terms <<
           AST::Identifier.new("value").from(@type.ident)
-        
+
         # Create a function body containing that choice as its only expression.
         from_u64_body = AST::Group.new(":").from(@type.ident)
         from_u64_body.terms <<
           AST::Choice.new(from_u64_choices).from(@type.ident)
-        
+
         # Finally, create a function with that body.
         from_u64_func = Program::Function.new(
           AST::Identifier.new("non").from(@type.ident),
@@ -257,7 +257,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         )
         @type.functions << from_u64_func
       end
-      
+
       # An FFI type's functions should be tagged as "ffi" and body removed.
       if @keyword == "ffi"
         @type.functions.each do |f|
@@ -268,7 +268,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
           f.body = nil
         end
       end
-      
+
       # A trait's functions should have their body removed.
       if @keyword == "trait"
         @type.functions.each do |f|
@@ -276,7 +276,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         end
       end
     end
-    
+
     # TODO: This witness should be declared by the spec package.
     @@declare_it = Witness.new([
       {
@@ -291,7 +291,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         "convert_string_to_ident" => true,
       },
     ] of Hash(String, String | Bool))
-    
+
     @@declare_fun = Witness.new([
       {
         "kind" => "keyword",
@@ -323,7 +323,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         "optional" => true,
       },
     ] of Hash(String, String | Bool))
-    
+
     @@declare_be = Witness.new([
       {
         "kind" => "keyword",
@@ -350,7 +350,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         "optional" => true,
       },
     ] of Hash(String, String | Bool))
-    
+
     @@declare_new = Witness.new([
       {
         "kind" => "keyword",
@@ -378,7 +378,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         "optional" => true,
       },
     ] of Hash(String, String | Bool))
-    
+
     @@declare_const = Witness.new([
       {
         "kind" => "keyword",
@@ -398,7 +398,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         "optional" => true,
       },
     ] of Hash(String, String | Bool))
-    
+
     @@declare_prop = Witness.new([
       {
         "kind" => "keyword",
@@ -418,7 +418,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         "optional" => true,
       },
     ] of Hash(String, String | Bool))
-    
+
     @@declare_is = Witness.new([
       {
         "kind" => "keyword",
@@ -431,7 +431,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         "type" => "type",
       },
     ] of Hash(String, String | Bool))
-    
+
     @@declare_member = Witness.new([
       {
         "kind" => "keyword",
@@ -444,14 +444,14 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         "type" => "ident",
       },
     ] of Hash(String, String | Bool))
-    
+
     def compile(context, decl)
       func = nil
-      
+
       case decl.keyword
       when "it"
         data = @@declare_it.run(decl)
-        
+
         func = Program::Function.new(
           AST::Identifier.new("ref").from(data["keyword"]),
           data["name"].as(AST::Identifier),
@@ -461,7 +461,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         ).tap(&.add_tag(:it))
       when "fun"
         data = @@declare_fun.run(decl)
-        
+
         data["cap"] ||=
           begin
             if @type.has_tag?(:allocated) || @type.has_tag?(:no_desc)
@@ -470,7 +470,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
               AST::Identifier.new("non").from(data["keyword"])
             end
           end
-        
+
         func = Program::Function.new(
           data["cap"].as(AST::Identifier),
           data["ident"].as(AST::Identifier),
@@ -481,13 +481,13 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
       when "be"
         raise "only actors can have behaviours" \
           unless @type.has_tag?(:actor) || @type.has_tag?(:abstract)
-        
+
         data = @@declare_be.run(decl)
-        
+
         cap = data["cap"]?
         Error.at cap, "A behaviour can't have an explicit receiver capability" \
           if cap
-        
+
         func = Program::Function.new(
           AST::Identifier.new("ref").from(data["keyword"]),
           data["ident"].as(AST::Identifier),
@@ -498,11 +498,11 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
       when "new"
         raise "stateless types can't have constructors" \
           unless @type.has_tag?(:allocated) || @type.has_tag?(:abstract)
-        
+
         data = @@declare_new.run(decl)
-        
+
         data["cap"] ||= @type.cap.dup
-        
+
         func = Program::Function.new(
           data["cap"].as(AST::Identifier),
           data["ident"].as(AST::Identifier),
@@ -515,7 +515,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         end
       when "const"
         data = @@declare_const.run(decl)
-        
+
         func = Program::Function.new(
           AST::Identifier.new("non").from(data["keyword"]),
           data["ident"].as(AST::Identifier),
@@ -526,11 +526,11 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
       when "prop"
         raise "stateless types can't have properties" \
           unless @type.has_tag?(:allocated) || @type.has_tag?(:abstract)
-        
+
         data = @@declare_prop.run(decl)
         ident = data["ident"].as(AST::Identifier)
         ret = data["ret"]?.as(AST::Term?)
-        
+
         field_cap = AST::Identifier.new("ref").from(data["keyword"])
         field_params = AST::Group.new("(").from(ident)
         field_body = decl.body
@@ -539,7 +539,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         field_func.add_tag(:hygienic)
         field_func.add_tag(:field)
         func = field_func
-        
+
         getter_cap = AST::Identifier.new("box").from(data["keyword"])
         if ret
           getter_ret = AST::Relate.new(
@@ -556,7 +556,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         getter_body.terms << AST::FieldRead.new(ident.value).from(ident)
         getter_func = Program::Function.new(getter_cap, ident, nil, getter_ret, getter_body)
         @type.functions << getter_func
-        
+
         setter_cap = AST::Identifier.new("ref").from(data["keyword"])
         setter_ident = AST::Identifier.new("#{ident.value}=").from(ident)
         setter_param = AST::Identifier.new("value").from(ident)
@@ -583,7 +583,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         @type.functions << setter_func
       when "is"
         data = @@declare_is.run(decl)
-        
+
         func = Program::Function.new(
           AST::Identifier.new("non").from(data["keyword"]),
           decl.head.first.as(AST::Identifier),
@@ -593,47 +593,47 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         ).tap(&.add_tag(:hygienic)).tap(&.add_tag(:is)).tap(&.add_tag(:copies))
       when "member"
         raise "only enums can have members" unless @keyword == "enum"
-        
+
         data = @@declare_member.run(decl)
         ident = data["ident"].as(AST::Identifier)
         body = decl.body
-        
+
         raise "member value must be a single integer" \
           unless body.is_a?(AST::Group) \
             && body.terms.size == 1 \
             && body.terms[0].is_a?(AST::LiteralInteger)
         value = body.terms[0].as(AST::LiteralInteger)
-        
+
         type_alias = Program::TypeAlias.new(ident, @type.ident.dup)
         type_alias.metadata[:enum_value] =
           body.terms[0].as(AST::LiteralInteger).value.to_i32
-        
+
         @members << type_alias
         @program.aliases << type_alias
       end
-      
+
       if func
         @type.functions << func
         context.push Function.new(decl.keyword, func, @type, @program)
       end
     end
   end
-  
+
   class Function < Interpreter
     property keyword : String # TODO: read-only as getter
     getter func : Program::Function
     getter type : Program::Type
     getter program : Program
-    
+
     def initialize(@keyword, @func, @type, @program)
     end
-    
+
     # TODO: dedup these with the Witness mechanism.
     def keywords; ["yields"] end
-    
+
     def finished(context)
     end
-    
+
     @@declare_yields = Witness.new([
       {
         "kind" => "keyword",
@@ -660,7 +660,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         "optional" => true,
       },
     ] of Hash(String, String | Bool))
-    
+
     def compile(context, decl)
       case decl.keyword
       when "yields"
@@ -674,9 +674,9 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
           @func.body = AST::Group.new(decl.body.style, decl.body.terms.dup).from(decl.body)
           decl.body.terms.clear
         end
-        
+
         data = @@declare_yields.run(decl)
-        
+
         @func.yield_out = data["out"]?.as(AST::Term?)
         @func.yield_in  = data["in"]?.as(AST::Term?)
       end

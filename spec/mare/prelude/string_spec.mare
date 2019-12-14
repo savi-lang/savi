@@ -3,11 +3,11 @@
 :class StringSpec
   :is Spec
   :const describes: "String"
-  
+
   :it "compares bytewise equality with another string"
     @assert = ("string" == "string")
     @assert = ("string" == "other").not
-  
+
   :it "checks if it starts with a substring equal to the other string"
     @assert = "foo".starts_with("foo")
     @assert = "foo".starts_with("food").not
@@ -15,7 +15,7 @@
     @assert = "barfood".starts_with("foo").not
     @assert = "barfood".starts_with("barf")
     @assert = "barfood".starts_with("")
-  
+
   :it "checks if it ends with a substring equal to the other string"
     @assert = "food".ends_with("foo").not
     @assert = "foo".ends_with("foo")
@@ -23,7 +23,7 @@
     @assert = "snafoo".ends_with("foo")
     @assert = "snafoozled".ends_with("foo").not
     @assert = "snafoozled".ends_with("")
-  
+
   :it "checks if it is an empty string or not"
     @assert = "".is_empty
     @assert = "".is_not_empty.not
@@ -33,11 +33,11 @@
     @assert = String.new.is_not_empty.not
     @assert = (String.new << "example").is_empty.not
     @assert = (String.new << "example").is_not_empty
-  
+
   :it "clones itself into a new string"
     string String = "example"
     @assert = string.clone == "example"
-  
+
   :it "finds the index of another substring within it"
     @assert = try ("bar food foo".offset_of!("foo") == 4 | False)
     @assert = try ("bar food foo".offset_of!("bard"), False | True)
@@ -47,14 +47,14 @@
     @assert = "bar food foo".includes("bard").not
     @assert = "bar food foo".includes("nope").not
     @assert = "bar food foo".includes("").not
-  
+
   :it "hashes the bytes of the string"
     @assert = ("string".hash == 0x4CF51F4A5B5CF110)
-  
+
   :it "returns the byte at the given byte offset"
     @assert = try ("example"[3]! == 'm' | False)
     @assert = try ("example"[7]!, False | True)
-  
+
   :it "trims bytes off the start and end of the string"
     @assert = "example".trim(2)      == "ample"
     @assert = "example".trim(3,  -2) == "mp"
@@ -62,15 +62,15 @@
     @assert = "example".trim(5,   4) == ""
     @assert = "example".trim(-5, -2) == "amp"
     @assert = "example".trim(-5,  5) == "amp"
-  
+
   :it "pushes a new byte onto the end of the string"
     @assert = String.new.push_byte('o').push_byte('k') == "ok"
-  
+
   :it "yields each byte in the string"
     string Array(U8) = []
     "foo".each_byte -> (byte | string << byte)
     @assert = string == ['f', 'o', 'o']
-  
+
   :it "yields each byte in the string, along with the index"
     string_a Array(U8) = []
     string_b Array(USize) = []
@@ -80,18 +80,18 @@
     )
     @assert = string_a == ['y', 'o']
     @assert = string_b == [0, 1]
-  
+
   :it "copies bytes from the given string onto the end of the string"
     @assert = (String.new << "foo" << "bar") == "foobar"
-  
+
   :it "creates a multiplicit copy of the string"
     @assert = ("Hey" * 3) == "HeyHeyHey"
     @assert = ("Hey" * 1) == "Hey"
     @assert = ("Hey" * 0) == ""
-  
+
   :it "splits the string at every occurrence of the given byte value"
     @assert = "foo.bar.baz".split('.') == ["foo", "bar", "baz"]
-  
+
   :it "lexically compares the string with another string of the same length"
     @assert = "examplE" < "example"
     @assert = "example" > "examplE"
@@ -101,13 +101,13 @@
     @assert = "example" >= "examplE"
     @assert = ("example" <= "examplE").not
     @assert = ("examplE" >= "example").not
-    
+
   :it "lexically compares the string with an identical string"
     @assert = ("example" < "example").not
     @assert = ("example" > "example").not
     @assert = "example" <= "example"
     @assert = "example" >= "example"
-    
+
   :it "lexically compares with a nearly identical string of different length"
     @assert = "example" < "example!"
     @assert = "example!" > "example"
@@ -117,7 +117,7 @@
     @assert = "example!" >= "example"
     @assert = ("example!" <= "example").not
     @assert = ("example" >= "example!").not
-  
+
   :it "parses an integer from the string decimal representation"
     @assert = try ("36".parse_i64!  == 36  | False)
     @assert = try ("+36".parse_i64! == 36  | False)

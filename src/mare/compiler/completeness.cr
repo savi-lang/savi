@@ -20,11 +20,11 @@ module Mare::Compiler::Completeness
       end
     end
   end
-  
+
   def self.check_constructor(ctx, rt, rf, branch_cache)
     fields = rt.defn.functions.select(&.has_tag?(:field))
     branch = Branch.new(ctx, rt, rf, branch_cache, fields)
-    
+
     # First, visit the field initializers (for those fields that have them) as
     # sub branches to simulate them being run at the start of the constructor.
     fields.each do |f|
@@ -35,17 +35,17 @@ module Mare::Compiler::Completeness
       )
       branch.seen_fields.add(f.ident.value)
     end
-    
+
     # Now visit the actual constructor body.
     rf.func.body.try(&.accept(branch))
-    
+
     # Any fields that were not seen in the branching analysis are errors.
     unseen = branch.show_unseen_fields
     Error.at rf.func.ident,
       "This constructor doesn't initialize all of its fields", unseen \
         unless unseen.empty?
   end
-  
+
   class Branch < Mare::AST::Visitor
     getter ctx : Context
     getter type : Infer::ReifiedType
@@ -63,7 +63,7 @@ module Mare::Compiler::Completeness
       @seen_fields = Set(String).new,
       @call_crumbs = Array(Source::Pos).new)
     end
-    
+
     def sub_branch(node : AST::Node)
       branch =
         Branch.new(ctx, type, func, branch_cache, all_fields,
@@ -71,7 +71,7 @@ module Mare::Compiler::Completeness
       node.accept(branch)
       branch
     end
-    
+
     def sub_branch(next_func : Infer::ReifiedFunction, call_crumb : Source::Pos)
       # Use caching of function branches to prevent infinite recursion.
       # We cache by both seen_fields and func so that we don't combine
@@ -88,27 +88,27 @@ module Mare::Compiler::Completeness
         branch
       end
     end
-    
+
     def show_unseen_fields
       all_fields
         .select(&.body.nil?) # ignore fields with a default initializer value
         .reject { |f| seen_fields.includes?(f.ident.value) }
         .map { |f| {f.ident, "this field didn't get initialized"} }
     end
-    
+
     # This visitor never replaces nodes, it just touches them and returns them.
     def visit(node)
       touch(node)
-      
+
       node
     end
-    
+
     def visit_children?(node : AST::Choice)
       # We don't visit anything under a choice with this visitor;
       # we instead spawn a new visitor instance in the touch method below.
       false
     end
-    
+
     def touch(node : AST::Choice)
       # Visit the body of each clause with a new instance of this visitor,
       # and collect the fields that appeared in all child branches.
@@ -119,11 +119,11 @@ module Mare::Compiler::Completeness
           .reduce { |accum, fields| accum & fields }
       )
     end
-    
+
     def touch(node : AST::FieldWrite)
       seen_fields.add(node.value)
     end
-    
+
     def touch(node : AST::FieldRead)
       if !seen_fields.includes?(node.value)
         Error.at node,
@@ -131,29 +131,29 @@ module Mare::Compiler::Completeness
             call_crumbs.reverse.map { |pos| {pos, "traced from a call here"} }
       end
     end
-    
+
     def touch(node : AST::Identifier)
       infer = ctx.infer[func]
-      
+
       # Ignore this identifier if it is not of the self.
       info = infer[node]?
       return unless info.is_a?(Infer::Self)
-      
+
       # We only care about further analysis if not all fields are initialized.
       return unless seen_fields.size < all_fields.size
       return if (unseen_fields = show_unseen_fields; unseen_fields).empty?
-      
+
       # This represents the self type as opaque, with no field access.
       # We'll use this to guarantee that no usage of the current self object
       # will require  any access to the fields of the object.
       tag_self = Infer::MetaType.new(type, "tag")
-      
+
       # Walk through each constraint imposed on the self in the earlier
       # Infer pass that tracked all of those constraints.
       info.domain_constraints.each do |pos, constraint|
         # If tag will meet the constraint, then this use of the self is okay.
         return if infer.is_subtype?(tag_self, constraint)
-        
+
         # Otherwise, we must raise an error.
         Error.at node,
           "This usage of `@` shares field access to the object" \
@@ -164,14 +164,14 @@ module Mare::Compiler::Completeness
           ] + unseen_fields
       end
     end
-    
+
     def touch(node : AST::Relate)
       # We only care about looking at dot-relations (function calls).
       return unless node.op.value == "."
-      
+
       # We only care about further analysis if not all fields are initialized.
       return unless seen_fields.size < all_fields.size
-      
+
       # If the left side is definitely the self, we allow access even when
       # not all fields are initialized - we will follow the call and continue
       # our branching analysis of field initialization in that other function.
@@ -179,7 +179,7 @@ module Mare::Compiler::Completeness
       if lhs.is_a?(AST::Identifier) && lhs.value == "@"
         # Extract the function name from the right side.
         func_name = AST::Extract.call(node)[0].value
-        
+
         # Follow the method call in a new branch, and collect any field writes
         # seen in that branch as if they had been seen in this branch.
         next_f = type.defn.find_func!(func_name)
@@ -189,7 +189,7 @@ module Mare::Compiler::Completeness
         seen_fields.concat(branch.seen_fields)
       end
     end
-    
+
     def touch(node : AST::Node)
       # Do nothing for all other AST::Nodes.
     end

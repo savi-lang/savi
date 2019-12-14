@@ -16,51 +16,51 @@
 #
 class Mare::Compiler::Paint
   alias Color = Int32
-  
+
   def initialize
     @defs_by_sig_compat = Hash(String, Set(Reach::Def)).new
     @defs_by_color      = Hash(Color, Set(Reach::Def)).new
     @next_color         = 0
-    
+
     @results = Hash(Reach::Def, Hash(String, Color)).new
   end
-  
+
   def run(ctx)
     # Collect a mapping of the types that implement each function name.
     ctx.reach.each_type_def.each do |reach_def|
       reach_def.each_function(ctx).each do |reach_func|
         next if reach_func.reified.func.has_tag?(:hygienic)
-        
+
         observe_func(reach_def, reach_func)
       end
     end
-    
+
     # Assign colors to function names, then clean up all other memory.
     assign_colors
     cleanup
   end
-  
+
   # Public: return the color id for the given function,
   # assuming that this pass has already been run on the program.
   def [](rf); color_of(rf) end
   def color_of(reach_func : Reach::Func) : Color
     @results[reach_func.reach_def][reach_func.signature.codegen_compat_name]
   end
-  
+
   # Return the next color id to assign when we need a previously unused color.
   private def next_color
     color = @next_color
     @next_color += 1
     color
   end
-  
+
   # Take notice of the given function, under the given type.
   private def observe_func(reach_def : Reach::Def, reach_func : Reach::Func)
     sig = reach_func.signature
     set = @defs_by_sig_compat[sig.codegen_compat_name] ||= Set(Reach::Def).new
     set.add(reach_def)
   end
-  
+
   # For all the function signatures we know about, assign "color" ids
   # such that no type will have multiple functions of the same color,
   # and as few as possible (well... as is practical) color ids are used.
@@ -69,7 +69,7 @@ class Mare::Compiler::Paint
       # Try to find an existing color that is unused in all of these sig_defs.
       pair =
         @defs_by_color.to_a.find { |_, c_types| (sig_defs & c_types).empty? }
-      
+
       # Otherwise, generate a new color id and start to populate it.
       pair ||= (
         color = next_color
@@ -77,7 +77,7 @@ class Mare::Compiler::Paint
         @defs_by_color[color] = color_defs
         {color, color_defs}
       )
-      
+
       # Insert these sig_defs into the color_defs set for this color,
       # and insert this name/color pair for each def into our result map.
       color, color_defs = pair
@@ -88,7 +88,7 @@ class Mare::Compiler::Paint
       end
     end
   end
-  
+
   # Delete unnecessary information from our memory (everything but the results).
   private def cleanup
     @defs_by_sig_compat.clear

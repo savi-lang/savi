@@ -8,17 +8,17 @@
   :new (env)
     test = MicroTest.new(env)
     test.print_line_break // TODO: move to MicroTest constructor and finalizer
-    
+
     zero = U64[0]
-    
+
     test["try error; with error"].pass = U64[33] == (
       try (error! | 33)
     )
-    
+
     test["try: try error else error; with error"].pass = U64[33] == (
       try (try (error! | error!) | 33)
     )
-    
+
     test["try: if error; without error"].pass = U64[33] == (
       try (
         if (zero > 1) (error! | 33)
@@ -26,7 +26,7 @@
         11
       )
     )
-    
+
     test["try: if error; with error"].pass = U64[33] == (
       try (
         if (zero < 1) (error! | 11)
@@ -34,7 +34,7 @@
         33
       )
     )
-    
+
     test["try: if else error; without error"].pass = U64[33] == (
       try (
         if (zero < 1) (33 | error!)
@@ -42,7 +42,7 @@
         11
       )
     )
-    
+
     test["try: if else error; with error"].pass = U64[33] == (
       try (
         if (zero > 1) (11 | error!)
@@ -50,7 +50,7 @@
         33
       )
     )
-    
+
     test["try: if error else error; with error"].pass = U64[33] == (
       try (
         if (zero < 1) (error! | error!)
@@ -58,7 +58,7 @@
         33
       )
     )
-    
+
     test["try: while error; without error"].pass = U64[33] == (
       try (
         while (zero > 1) (error! | 33)
@@ -66,7 +66,7 @@
         11
       )
     )
-    
+
     test["try: while error; with error"].pass = U64[33] == (
       try (
         while (zero < 1) (error! | 11)
@@ -74,7 +74,7 @@
         33
       )
     )
-    
+
     test["try: while else error; without error"].pass = U64[33] == (
       try (
         while (zero < 1) (zero = zero + 1, 33 | error!)
@@ -82,7 +82,7 @@
         11
       )
     )
-    
+
     test["try: while else error; with error"].pass = U64[33] == (
       try (
         while (zero > 1) (11 | error!)
@@ -90,7 +90,7 @@
         33
       )
     )
-    
+
     test["try: while error else error; with error"].pass = U64[33] == (
       try (
         while (zero < 1) (error! | error!)
@@ -98,23 +98,23 @@
         33
       )
     )
-    
+
     test["try call error; with error"].pass = U64[33] == (
       try (Err.now!, 11 | 33)
     )
-    
+
     test["reflection_of_type.string String"].pass =
       (reflection_of_type "example").string == "String"
     test["reflection_of_type.string String'ref"].pass =
       (reflection_of_type String.new).string == "String'ref"
     test["reflection_of_type.string Array(U8)"].pass =
       (reflection_of_type Array(U8).new).string == "Array(U8)"
-    
+
     test["source_code_position_of_argument string"].pass =
       @source_code_position_of_argument_string(zero == 0) == "zero == 0"
-    
+
     test.print_line_break // TODO: move to MicroTest constructor and finalizer
-  
+
   :fun non source_code_position_of_argument_string (
     arg Bool
     pos SourceCodePosition = source_code_position_of_argument arg

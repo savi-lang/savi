@@ -25,7 +25,7 @@ module Mare::Compiler
     else raise NotImplementedError.new(target)
     end
   end
-  
+
   # TODO: Add invalidation, such that passes like :lambda can invalidate
   # passes like :classify and :refer instead of marking a dependency.
   def self.deps_of(target : Symbol) : Array(Symbol)
@@ -54,14 +54,14 @@ module Mare::Compiler
     else raise NotImplementedError.new([:deps_of, target].inspect)
     end
   end
-  
+
   def self.all_deps_of(target : Symbol) : Set(Symbol)
     deps_of(target).reduce(Set(Symbol).new) do |set, t|
       set.add(t)
       set.concat(all_deps_of(t))
     end
   end
-  
+
   def self.satisfy(ctx, target : Symbol)
     all_deps_of_target = all_deps_of(target)
     all_deps = all_deps_of_target.map { |t| {t, all_deps_of(t)} }
@@ -71,12 +71,12 @@ module Mare::Compiler
     end
     ctx
   end
-  
+
   STANDARD_LIBRARY_DIRNAME = File.expand_path("../../packages", __DIR__)
   def self.resolve_library_dirname(libname, from_dirname = nil)
     standard_dirname = File.expand_path(libname, STANDARD_LIBRARY_DIRNAME)
     relative_dirname = File.expand_path(libname, from_dirname) if from_dirname
-    
+
     if relative_dirname && Dir.exists?(relative_dirname)
       relative_dirname
     elsif Dir.exists?(standard_dirname)
@@ -86,48 +86,48 @@ module Mare::Compiler
         "#{" (relative to #{from_dirname.inspect})" if from_dirname}"
     end
   end
-  
+
   def self.get_library_sources(dirname)
     library = Source::Library.new(dirname)
     filenames = Dir.entries(dirname).select(&.ends_with?(".mare")).to_a
-    
+
     raise "No '.mare' source files found in #{dirname.inspect}!" \
       if filenames.empty?
-    
+
     filenames.map do |name|
       Source.new(name, File.read(File.join(dirname, name)), library)
     end
   end
-  
+
   def self.eval(string : String) : Int32
     content = ":actor Main\n:new (env)\n#{string}"
     library = Mare::Source::Library.new("(eval)")
     source = Mare::Source.new("(eval)", content, library)
-    
+
     Mare::Compiler.compile([source], :eval).eval.exitcode
   end
-  
+
   def self.compile(dirname : String, target : Symbol = :eval)
     compile(get_library_sources(dirname), target)
   end
-  
+
   def self.compile(sources : Array(Source), target : Symbol = :eval)
     compile(sources.map { |s| Parser.parse(s) }, target)
   end
-  
+
   def self.compile(docs : Array(AST::Document), target : Symbol = :eval)
     raise "No source documents given!" if docs.empty?
-    
+
     # TODO: sharing prelude_docs breaks when compiler passes are not idempotent.
     # @@prelude_docs = nil
     docs.concat(prelude_docs)
-    
+
     ctx = Context.new
     docs.each { |doc| ctx.compile(doc) }
-    
+
     satisfy(ctx, target)
   end
-  
+
   @@prelude_docs : Array(AST::Document)?
   def self.prelude_docs
     # TODO: detect when the files have changed and invalidate the cache
@@ -138,7 +138,7 @@ module Mare::Compiler
       end
     @@prelude_docs.not_nil!
   end
-  
+
   def self.prelude_library
     prelude_docs.first.source.library
   end

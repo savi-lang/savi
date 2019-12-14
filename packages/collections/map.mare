@@ -10,40 +10,40 @@
   :is MapReadable(K, V)
   :prop _size USize: 0
   :prop _array Array((_KV(K, V) | _MapEmpty | _MapDeleted))
-  
+
   :fun size: @_size
-  
+
   :new (prealloc USize = 6)
     @_init_array(((prealloc * 4) / 3).max(8).next_pow2)
-  
+
   :fun ref _init_array (space USize)
     @_array = Array((_KV(K, V) | _MapEmpty | _MapDeleted)).new(space)
     Count.to(space) -> (@_array << _MapEmpty)
-  
+
   :fun ref _resize (space USize)
     space = space.max(@_size) // only grow the array - never shrink it
     old_array = @_array
-    
+
     // TODO: would we get any perf benefit from resizing the array instead?
     @_init_array(space)
-    
+
     old_array.each -> (entry |
       if (entry <: _KV(K, V)) (
         try (@_array[@_search(entry.key)]! = entry)
       )
     )
     @
-  
+
   :: Remove all keys and values from the map.
   :fun ref clear
     @_size = 0
     @_init_array(8) // the default prealloc of 6 corresponds to an array of 8
     @
-  
+
   :: Return True if the given key is present.
   :fun has_key (key K)
     try (@[--key]!, True | False)
-  
+
   :: Return the value assigned to the given key, if present.
   :: Raises an error if the key is not present.
   ::
@@ -57,7 +57,7 @@
   ::
   :fun "[]!" (key K)
     @_array[@_search(key)]!.as!(_KV(K, V)).value
-  
+
   :: Assign the given value to the given key in the map.
   :: The previous value will be overwritten and discarded if present.
   ::
@@ -72,13 +72,13 @@
     try (
       index = @_search(key)
       entry = @_array[index]!
-      
+
       case (
       | entry <: _KV(K, V) | entry.value = --value
       |
         @_array[index]! = _KV(K, V).new(--key, --value)
         @_size += 1
-        
+
         if (entry <: _MapEmpty) (
           if (@_size * 4 > @_array.size * 3) (
             @_resize(@_array.size * 2)
@@ -87,7 +87,7 @@
       )
     )
     value_alias
-  
+
   :: Discard the value assigned to the given key.
   ::
   :: $ map = Map(String, U64).new
@@ -103,22 +103,22 @@
       @_size -= 1
     )
     None
-  
+
   :: Given a key, find the internal index associated with the hash of that key.
   :fun _search (key)
     hash = H.hash(key).usize()
-    
+
     idx_del = @_array.size
     mask = idx_del - 1
     idx = hash.bit_and(mask)
-    
+
     result_idx = idx_del
     found = False
-    
+
     try (
       @_array.each_with_index -> (entry, i |
         entry = @_array[idx]!
-        
+
         case (
         | entry <: _KV(K, V) |
           if H.equal(key, entry.key) (
@@ -139,13 +139,13 @@
             idx_del = idx
           )
         )
-        
+
         idx = (hash + ((i + (i * i)) / 2)).bit_and(mask)
       )
     )
-    
+
     result_idx // TODO: also return `found`
-  
+
   :: Yield each key and value in the map.
   :fun each
     @_array.each -> (entry |
@@ -154,7 +154,7 @@
       )
     )
     None
-  
+
   :: Yield each key and value in the map, stopping iteration if the yield block
   :: returns True. Returns True if iteration was stopped early; else, False.
   :fun each_until

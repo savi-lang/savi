@@ -5,19 +5,19 @@ class Mare::Compiler::Infer::SubtypingInfo
     @disproved = Hash(ReifiedType, Array(Error::Info)).new
     @temp_assumptions = Set(ReifiedType).new
   end
-  
+
   private def this
     @this
   end
-  
+
   def assert(that : ReifiedType, pos : Source::Pos)
     @asserted[that] = pos
   end
-  
+
   # Raise an Error if any asserted supertype is not actually a supertype.
   def check_assertions
     errors = [] of Error::Info
-    
+
     @asserted.each do |that, pos|
       if check(that, errors)
         raise "inconsistent logic" if errors.size > 0
@@ -28,16 +28,16 @@ class Mare::Compiler::Infer::SubtypingInfo
       end
     end
   end
-  
+
   # Return true if this type satisfies the requirements of the that type.
   def check(that : ReifiedType, errors : Array(Error::Info) = [] of Error::Info)
     # TODO: for each return false, carry info about why it was false?
     # Maybe we only want to go to the trouble of collecting this info
     # when it is requested by the caller, so as not to slow the base case.
-    
+
     # If these are literally the same type, we can trivially return true.
     return true if this == that
-    
+
     # We don't have subtyping of concrete types (i.e. class inheritance),
     # so we know this can't possibly be a subtype of that if that is concrete.
     # Note that by the time we've reached this line, we've already
@@ -48,14 +48,14 @@ class Mare::Compiler::Infer::SubtypingInfo
         "a concrete type can't be a subtype of another concrete type"}
       return false
     end
-    
+
     # If we've already done a full check on this type, don't do it again.
     return true if @confirmed.includes?(that)
     if @disproved.has_key?(that)
       errors.concat(@disproved[that])
       return false
     end
-    
+
     # If we have a temp assumption that this is a subtype of that, return true.
     # Otherwise, move forward with the check and add such an assumption.
     # This is done to prevent infinite recursion in the typechecking.
@@ -64,14 +64,14 @@ class Mare::Compiler::Infer::SubtypingInfo
     # in the middle of checking it somewhere further up the call stack.
     return true if @temp_assumptions.includes?(that)
     @temp_assumptions.add(that)
-    
+
     # Okay, we have to do a full check.
     is_subtype = full_check(that, errors)
-    
+
     # Remove our standing assumption about this being a subtype of that -
     # we have our answer and have no more need for this recursion guard.
     @temp_assumptions.delete(that)
-    
+
     # Save the result of the full check so we don't ever have to do it again.
     if is_subtype
       @confirmed.add(that)
@@ -84,28 +84,28 @@ class Mare::Compiler::Infer::SubtypingInfo
           "#{this} isn't a subtype of #{that}, as it is required to be here",
           errors
       end
-      
+
       raise "no errors logged" if errors.empty?
       @disproved[that] = errors
     end
-    
+
     # Finally, return the result.
     is_subtype
   end
-  
+
   private def full_check(that : ReifiedType, errors : Array(Error::Info))
     # A type only matches a trait if all functions match that trait.
     that.defn.functions.each do |that_func|
       # Hygienic functions are not considered to be real functions for the
       # sake of structural subtyping, so they don't have to be fulfilled.
       next if that_func.has_tag?(:hygienic)
-      
+
       check_func(that, that_func, errors)
     end
-    
+
     errors.empty?
   end
-  
+
   private def check_func(that, that_func, errors)
     # The structural comparison fails if a required method is missing.
     this_func = this.defn.find_func?(that_func.ident.value)
@@ -114,14 +114,14 @@ class Mare::Compiler::Infer::SubtypingInfo
         "this function isn't present in the subtype"}
       return false
     end
-    
+
     # Just asserting; we expect find_func? to prevent this.
     raise "found hygienic function" if this_func.has_tag?(:hygienic)
-    
+
     # Get the Infer instance for both this and that function, to compare them.
     this_infer = @ctx.infer.for_func(@ctx, this, this_func, MetaType.cap(this_func.cap.value)).tap(&.run)
     that_infer = @ctx.infer.for_func(@ctx, that, that_func, MetaType.cap(that_func.cap.value)).tap(&.run)
-    
+
     # A constructor can only match another constructor.
     case {this_func.has_tag?(:constructor), that_func.has_tag?(:constructor)}
     when {true, false}
@@ -137,7 +137,7 @@ class Mare::Compiler::Infer::SubtypingInfo
         "the constructor in the supertype is here"}
       return false
     end
-    
+
     # A constant can only match another constant.
     case {this_func.has_tag?(:constant), that_func.has_tag?(:constant)}
     when {true, false}
@@ -153,7 +153,7 @@ class Mare::Compiler::Infer::SubtypingInfo
         "the constant in the supertype is here"}
       return false
     end
-    
+
     # Must have the same number of parameters.
     if this_func.param_count != that_func.param_count
       if this_func.param_count < that_func.param_count
@@ -167,7 +167,7 @@ class Mare::Compiler::Infer::SubtypingInfo
         "the supertype has #{that_func.param_count} parameters"}
       return false
     end
-    
+
     # Check the receiver capability.
     this_cap = MetaType::Capability.new(this_func.cap.value)
     that_cap = MetaType::Capability.new(that_func.cap.value)
@@ -188,7 +188,7 @@ class Mare::Compiler::Infer::SubtypingInfo
           "it is required to be a supertype of #{that_cap.inspect}"}
       end
     end
-    
+
     # Covariant return type.
     this_ret = this_infer.resolve(this_infer.ret)
     that_ret = that_infer.resolve(that_infer.ret)
@@ -198,7 +198,7 @@ class Mare::Compiler::Infer::SubtypingInfo
       errors << {(that_func.ret || that_func.ident).pos,
         "it is required to be a subtype of #{that_ret.show_type}"}
     end
-    
+
     # Contravariant parameter types.
     this_func.params.try do |l_params|
       that_func.params.try do |r_params|
@@ -214,7 +214,7 @@ class Mare::Compiler::Infer::SubtypingInfo
         end
       end
     end
-    
+
     errors.empty?
   end
 end

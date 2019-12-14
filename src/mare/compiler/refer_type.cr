@@ -14,31 +14,31 @@
 #
 class Mare::Compiler::ReferType < Mare::AST::Visitor
   getter! ctx : Context
-  
+
   def initialize
     @infos = {} of AST::Identifier => Refer::Info
     @params = {} of String => Refer::TypeParam
   end
-  
+
   def [](t : AST::Identifier) : Refer::Info
     @infos[t]
   end
-  
+
   def []?(t : AST::Identifier) : Refer::Info?
     @infos[t]?
   end
-  
+
   def run(ctx)
     @ctx = ctx
-    
+
     # For each type in the program, delve into type parameters and functions.
     ctx.program.types.each do |t|
       run_for_type(t)
     end
-    
+
     @ctx = nil
   end
-  
+
   def run_for_type(t)
     # If the type has type parameters, collect them into the params map.
     t.params.try do |type_params|
@@ -52,20 +52,20 @@ class Mare::Compiler::ReferType < Mare::AST::Visitor
         )
       end
     end
-    
+
     # Run as a visitor on the ident itself and every type param.
     t.ident.accept(self)
     t.params.try(&.accept(self))
-    
+
     # Run for each function in the type.
     t.functions.each do |f|
       run_for_func(t, f)
     end
-    
+
     # Clear the type-specific state we accumulated earlier.
     @params.clear
   end
-  
+
   def run_for_func(t, f)
     f.params.try(&.accept(self))
     f.ret.try(&.accept(self))
@@ -73,11 +73,11 @@ class Mare::Compiler::ReferType < Mare::AST::Visitor
     f.yield_out.try(&.accept(self))
     f.yield_in.try(&.accept(self))
   end
-  
+
   def find_type?(node : AST::Identifier)
     found = @params[node.value]?
     return found if found
-    
+
     found = ctx.namespace[node]?
     case found
     when Program::Type
@@ -90,13 +90,13 @@ class Mare::Compiler::ReferType < Mare::AST::Visitor
       Refer::TypeAlias.new(found, target)
     end
   end
-  
+
   # This visitor never replaces nodes, it just touches them and returns them.
   def visit(node)
     touch(node) if node.is_a?(AST::Identifier)
     node
   end
-  
+
   # For an Identifier, resolve it to any known type if possible.
   # Otherwise, leave it missing from our infos map.
   def touch(node : AST::Identifier)

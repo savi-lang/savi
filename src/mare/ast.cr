@@ -2,47 +2,47 @@ require "pegmatite"
 
 module Mare::AST
   alias A = Symbol | String | UInt64 | Int64 | Float64 | Array(A)
-  
+
   class Visitor
     def dup_nodes?
       false
     end
-    
+
     def visit_any?(node : Node)
       true
     end
-    
+
     def visit_children?(node : Node)
       true
     end
-    
+
     def visit_pre(node : Node)
       node
     end
-    
+
     def visit(node : Node)
       node
     end
   end
-  
+
   abstract class Node
     getter! pos
     property flags : UInt64 = 0
-    
+
     def with_pos(pos : Source::Pos)
       @pos = pos
       self
     end
-    
+
     def from(other : Node)
       @pos = other.pos
       self
     end
-    
+
     def span_pos
       pos
     end
-    
+
     def accept(visitor)
       node = self
       node = node.dup if visitor.dup_nodes?
@@ -53,17 +53,17 @@ module Mare::AST
       end
       node
     end
-    
+
     def children_accept(visitor)
     end
   end
-  
+
   class Document < Node
     property list
     property! source : Source
     def initialize(@list = [] of Declare)
     end
-    
+
     def name; :doc end
     def to_a: Array(A)
       res = [name] of A
@@ -74,19 +74,19 @@ module Mare::AST
       @list.map!(&.accept(visitor))
     end
   end
-  
+
   class Declare < Node
     property doc_strings : Array(DocString)?
     property head
     property body
     def initialize(@head = [] of Term, @body = Group.new(":"))
     end
-    
+
     def with_pos(pos : Source::Pos)
       @body.with_pos(pos)
       super
     end
-    
+
     def name; :declare end
     def to_a: Array(A)
       res = [name] of A
@@ -99,17 +99,17 @@ module Mare::AST
       @head.map!(&.accept(visitor))
       @body = @body.accept(visitor)
     end
-    
+
     def keyword
       head.first.as(Identifier).value
     end
   end
-  
+
   alias Term = DocString | Identifier \
     | LiteralString | LiteralCharacter | LiteralInteger | LiteralFloat \
     | Operator | Prefix | Relate | Group \
     | FieldRead | FieldWrite | Choice | Loop | Try
-  
+
   class DocString < Node
     property value
     def initialize(@value : String)
@@ -117,7 +117,7 @@ module Mare::AST
     def name; :doc_string end
     def to_a: Array(A); [name, value] of A end
   end
-  
+
   class Identifier < Node
     property value
     def initialize(@value : String)
@@ -125,7 +125,7 @@ module Mare::AST
     def name; :ident end
     def to_a: Array(A); [name, value] of A end
   end
-  
+
   class LiteralString < Node
     property value
     def initialize(@value : String)
@@ -133,7 +133,7 @@ module Mare::AST
     def name; :string end
     def to_a: Array(A); [name, value] of A end
   end
-  
+
   class LiteralCharacter < Node
     property value
     def initialize(@value : UInt64 | Int64)
@@ -141,7 +141,7 @@ module Mare::AST
     def name; :char end
     def to_a: Array(A); [name, value] of A end
   end
-  
+
   class LiteralInteger < Node
     property value
     def initialize(@value : UInt64 | Int64)
@@ -149,7 +149,7 @@ module Mare::AST
     def name; :integer end
     def to_a: Array(A); [name, value] of A end
   end
-  
+
   class LiteralFloat < Node
     property value
     def initialize(@value : Float64)
@@ -157,7 +157,7 @@ module Mare::AST
     def name; :float end
     def to_a: Array(A); [name, value] of A end
   end
-  
+
   class Operator < Node
     property value
     def initialize(@value : String)
@@ -165,17 +165,17 @@ module Mare::AST
     def name; :op end
     def to_a: Array(A); [name, value] of A end
   end
-  
+
   class Prefix < Node
     property op
     property term
     def initialize(@op : Operator, @term : Term)
     end
-    
+
     def span_pos
       pos.span([op.span_pos, term.span_pos])
     end
-    
+
     def name; :prefix end
     def to_a; [name, op.to_a, term.to_a] of A end
     def children_accept(visitor)
@@ -183,17 +183,17 @@ module Mare::AST
       @term = @term.accept(visitor)
     end
   end
-  
+
   class Qualify < Node
     property term
     property group
     def initialize(@term : Term, @group : Group)
     end
-    
+
     def span_pos
       pos.span([term.span_pos, group.span_pos])
     end
-    
+
     def name; :qualify end
     def to_a; [name, term.to_a, group.to_a] of A end
     def children_accept(visitor)
@@ -201,17 +201,17 @@ module Mare::AST
       @group = @group.accept(visitor)
     end
   end
-  
+
   class Group < Node
     property style
     property terms
     def initialize(@style : String, @terms = [] of Term)
     end
-    
+
     def span_pos
       pos.span(terms.map(&.span_pos))
     end
-    
+
     def name; :group end
     def to_a: Array(A)
       res = [name] of A
@@ -223,18 +223,18 @@ module Mare::AST
       @terms.map!(&.accept(visitor))
     end
   end
-  
+
   class Relate < Node
     property lhs
     property op
     property rhs
     def initialize(@lhs : Term, @op : Operator, @rhs : Term)
     end
-    
+
     def span_pos
       pos.span([lhs.span_pos, op.span_pos, rhs.span_pos])
     end
-    
+
     def name; :relate end
     def to_a; [name, lhs.to_a, op.to_a, rhs.to_a] of A end
     def children_accept(visitor)
@@ -243,7 +243,7 @@ module Mare::AST
       @rhs = @rhs.accept(visitor)
     end
   end
-  
+
   class FieldRead < Node
     property value
     def initialize(@value : String)
@@ -251,29 +251,29 @@ module Mare::AST
     def name; :field_r end
     def to_a: Array(A); [name, value] of A end
   end
-  
+
   class FieldWrite < Node
     property value
     property rhs
     def initialize(@value : String, @rhs : Term)
     end
-    
+
     def name; :field_w end
     def to_a: Array(A); [name, value, rhs.to_a] of A end
     def children_accept(visitor)
       @rhs = @rhs.accept(visitor)
     end
   end
-  
+
   class Choice < Node
     property list
     def initialize(@list : Array({Term, Term}))
     end
-    
+
     def span_pos
       pos.span(list.map { |cond, body| cond.span_pos.span([body.span_pos]) })
     end
-    
+
     def name; :choice end
     def to_a: Array(A)
       res = [name] of A
@@ -284,19 +284,19 @@ module Mare::AST
       @list.map! { |cond, body| {cond.accept(visitor), body.accept(visitor)} }
     end
   end
-  
+
   class Loop < Node
     property cond : Term
     property body : Term
     property else_body : Term
-    
+
     def initialize(@cond, @body, @else_body)
     end
-    
+
     def span_pos
       pos.span([cond.span_pos, body.span_pos, else_body.span_pos])
     end
-    
+
     def name; :loop end
     def to_a: Array(A)
       res = [name] of A
@@ -311,18 +311,18 @@ module Mare::AST
       @else_body = else_body.accept(visitor)
     end
   end
-  
+
   class Try < Node
     property body : Term
     property else_body : Term
-    
+
     def initialize(@body, @else_body)
     end
-    
+
     def span_pos
       pos.span([body.span_pos, else_body.span_pos])
     end
-    
+
     def name; :try end
     def to_a: Array(A)
       res = [name] of A
@@ -335,17 +335,17 @@ module Mare::AST
       @else_body = else_body.accept(visitor)
     end
   end
-  
+
   class Yield < Node
     property terms : Array(Term)
-    
+
     def initialize(@terms)
     end
-    
+
     def span_pos
       pos.span(terms.map(&.span_pos))
     end
-    
+
     def name; :yield end
     def to_a: Array(A)
       res = [name] of A

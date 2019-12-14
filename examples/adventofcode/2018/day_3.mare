@@ -35,7 +35,7 @@
       )
     )
     claims
-  
+
   :fun claims_to_cloth (env Env, claims Array(Day3Claim))
     cloth Array(Array(U64)) = []
     claims.each -> (claim |
@@ -44,7 +44,7 @@
       cloth.each -> (row |
         while (row.size <= (claim.left + claim.width)) (row << 0)
       )
-      
+
       // Place the claims on the cloth.
       Count.to(claim.height) -> (i | i += claim.top
         Count.to(claim.width) -> (j | j += claim.left
@@ -58,11 +58,11 @@
       )
     )
     cloth
-  
+
   :fun a (env Env, input String)
     claims = @input_to_claims(env, input)
     cloth  = @claims_to_cloth(env, claims)
-    
+
     // Count the number of cells ("square inches") in the cloth that overlap.
     overlap_count USize = 0
     cloth.each -> (row |
@@ -71,11 +71,11 @@
       )
     )
     overlap_count
-  
+
   :fun b (env Env, input String)
     claims = @input_to_claims(env, input)
     cloth  = @claims_to_cloth(env, claims)
-    
+
     // Find the claims that don't overlap with any other claims in the cloth.
     found_ids Array(String) = []
     claims.each -> (claim |
@@ -90,7 +90,7 @@
         found_ids << claim.id
       )
     )
-    
+
     // We expect exactly one claim to meet the criteria.
     if (found_ids.size > 1) (
       env.err.print("warning: found multiple overlap-free claims")
@@ -100,7 +100,7 @@
 :class Day3Spec
   :is Spec
   :const describes: "Day3"
-  
+
   :it "rightly parses a claim string"
     @assert = try (
       claim = Day3Claim.parse!("#123 @ 3,2: 5x4")
@@ -113,7 +113,7 @@
     |
       False
     )
-  
+
   :it "passes the A test case"
     claims = input = <<<
       #1 @ 1,3: 4x4
@@ -121,10 +121,10 @@
       #3 @ 5,5: 2x2
     >>>
     @assert = Day3.a(@env, input) == 4
-  
+
   :it "solves the A puzzle"
     @assert = Day3.a(@env, @puzzle_input) == 118322
-  
+
   :it "passes the B test case"
     claims = input = <<<
       #1 @ 1,3: 4x4
@@ -132,10 +132,10 @@
       #3 @ 5,5: 2x2
     >>>
     @assert = Day3.b(@env, input) == "3"
-  
+
   :it "solves the B puzzle"
     @assert = Day3.b(@env, @puzzle_input) == "1178"
-  
+
   :const puzzle_input
     <<<
       #1 @ 53,238: 26x24

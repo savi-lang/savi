@@ -2,10 +2,10 @@ class Mare::Compiler::CodeGen
   class DebugInfo
     # TODO: pick a real DWARF language ID
     LANGUAGE_ID = 0x000c # pretend to be C
-    
+
     property! ctx : Context
     private getter! di_func : LibLLVMExt::Metadata
-    
+
     def initialize(
       @llvm : LLVM::Context,
       @mod : LLVM::Module,
@@ -13,61 +13,61 @@ class Mare::Compiler::CodeGen
       @target_data : LLVM::TargetData,
     )
       @di = LLVM::DIBuilder.new(@mod)
-      
+
       # TODO: real filename and dirname?
       filename = "(main)"
       dirname = ""
-      
+
       @di.create_compile_unit(LANGUAGE_ID, filename, dirname, "Mare", false, "", 0)
     end
-    
+
     def finish
       @di.end
-      
+
       @mod.add_named_metadata_operand("llvm.module.flags", metadata([
         LLVM::ModuleFlag::Warning.value,
         "Debug Info Version",
         LLVM::DEBUG_METADATA_VERSION
       ]))
     end
-    
+
     def func_start(gfunc : GenFunc, llvm_func : LLVM::Function)
       pos = gfunc.func.ident.pos
       name = llvm_func.name
       file = di_file(pos.source)
-      
+
       @di_func =
         @di.create_function(file, name, name, file, pos.row + 1,
           di_func_type(gfunc, file), true, true, pos.row + 1,
           LLVM::DIFlags::Zero, false, llvm_func)
-      
+
       set_loc(pos)
     end
-    
+
     def func_end
       clear_loc
-      
+
       @di_func = nil
     end
-    
+
     def in_func?
       !!@di_func
     end
-    
+
     def set_loc(node : AST::Node); set_loc(node.pos) end
     def set_loc(pos : Source::Pos)
       @builder.set_current_debug_location(pos.row + 1, pos.col + 1, di_func)
     end
-    
+
     def clear_loc
       @builder.set_current_debug_location(0, 0, nil)
     end
-    
+
     def declare_local(ref : Refer::Local, t : Reach::Ref, storage : LLVM::Value)
       pos = ref.defn.pos
       name = ref.name
       file = di_file(pos.source)
-      
+
       info = @di.create_auto_variable(
         @di_func.not_nil!,
         name,
@@ -77,10 +77,10 @@ class Mare::Compiler::CodeGen
         0,
       )
       expr = @di.create_expression(nil, 0)
-      
+
       @di.insert_declare_at_end(storage, info, expr, @builder.current_debug_location, @builder.insert_block)
     end
-    
+
     private def metadata(args)
       values = args.map do |value|
         case value
@@ -96,13 +96,13 @@ class Mare::Compiler::CodeGen
       end
       @llvm.md_node(values)
     end
-    
+
     private def di_file(source : Source)
       di_files = (@di_files ||= {} of String => LibLLVMExt::Metadata)
       di_files[source.path] ||=
         @di.create_file(File.basename(source.path), File.dirname(source.path))
     end
-    
+
     private def di_create_basic_type(
       t : Reach::Ref,
       llvm_type : LLVM::Type,
@@ -115,7 +115,7 @@ class Mare::Compiler::CodeGen
         dwarf_type,
       )
     end
-    
+
     private def di_create_struct_pointer_type(
       t : Reach::Ref,
       llvm_type : LLVM::Type,
@@ -124,13 +124,13 @@ class Mare::Compiler::CodeGen
       ident = t.single!.defn.ident
       name = ident.value
       pos = ident.pos
-      
+
       # Create a temporary stand-in for this debug type, which is used to
       # prevent unwanted recursion if it (directly or indirectly) contains
       # this same debug type within one of its fields, which we visit below.
       tmp_debug_type = @di.create_replaceable_composite_type(nil, name, nil, 1, @llvm)
       @di_types.not_nil![t] = tmp_debug_type
-      
+
       # Now go gather the debug type information for all user-visible fields.
       reach_def = t.single_def!(ctx)
       reach_fields = reach_def.fields.dup
@@ -140,7 +140,7 @@ class Mare::Compiler::CodeGen
         # like the type descriptor and the actor pad.
         next if index == 0
         next if index == 1 && reach_def.has_actor_pad?
-        
+
         field_name, field_reach_ref = reach_fields.shift
         element_debug_types <<
           @di.create_member_type(nil, field_name, nil, 1,
@@ -151,7 +151,7 @@ class Mare::Compiler::CodeGen
             di_type(field_reach_ref, elem_llvm_type)
           )
       end
-      
+
       # Create the debug type, as a struct pointer with those element types.
       debug_type = @di.create_pointer_type(
         @di.create_struct_type(
@@ -169,12 +169,12 @@ class Mare::Compiler::CodeGen
         @target_data.abi_alignment(llvm_type) * 8,
         name,
       )
-      
+
       # Finally, replace the temporary stand-in we created above and return.
       @di.replace_temporary(tmp_debug_type, debug_type)
       debug_type
     end
-    
+
     private def di_type(t : Reach::Ref, llvm_type : LLVM::Type)
       di_types = (@di_types ||= {} of Reach::Ref => LibLLVMExt::Metadata)
       di_types[t] ||=
@@ -203,7 +203,7 @@ class Mare::Compiler::CodeGen
           raise NotImplementedError.new(t)
         end
     end
-    
+
     # TODO: build a real type description here.
     private def di_func_type(gfunc : GenFunc, file : LibLLVMExt::Metadata)
       # This is just a stub that pretends there is just one int parameter.

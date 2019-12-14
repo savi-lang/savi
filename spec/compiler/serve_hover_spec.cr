@@ -6,9 +6,9 @@ describe Mare::Compiler::ServeHover do
         example = "Hello, World!"
         example.hash
     SOURCE
-    
+
     ctx = Mare::Compiler.compile([source], :serve_hover)
-    
+
     messages, pos = ctx.serve_hover[Mare::Source::Pos.point(source, 2, 5)]
     pos.row.should eq 2
     pos.col.should eq 4
@@ -17,7 +17,7 @@ describe Mare::Compiler::ServeHover do
       "This is a local variable.",
       "It has an inferred type of String.",
     ]
-    
+
     messages, pos = ctx.serve_hover[Mare::Source::Pos.point(source, 3, 5)]
     pos.row.should eq 3
     pos.col.should eq 4
@@ -26,7 +26,7 @@ describe Mare::Compiler::ServeHover do
       "This is a local variable.",
       "It has an inferred type of String.",
     ]
-    
+
     messages, pos = ctx.serve_hover[Mare::Source::Pos.point(source, 3, 13)]
     pos.row.should eq 3
     pos.col.should eq 4
@@ -36,7 +36,7 @@ describe Mare::Compiler::ServeHover do
       "It has an inferred return type of USize."
     ]
   end
-  
+
   it "describes a self-call" do
     source = Mare::Source.new_example <<-SOURCE
     :actor Main
@@ -44,9 +44,9 @@ describe Mare::Compiler::ServeHover do
       :new
         @example
     SOURCE
-    
+
     ctx = Mare::Compiler.compile([source], :serve_hover)
-    
+
     messages, pos = ctx.serve_hover[Mare::Source::Pos.point(source, 3, 6)]
     pos.row.should eq 3
     pos.col.should eq 4
@@ -56,7 +56,7 @@ describe Mare::Compiler::ServeHover do
       "It has an inferred return type of U64.",
     ]
   end
-  
+
   it "describes an expression nested inside several layers of flow control" do
     source = Mare::Source.new_example <<-SOURCE
     :actor Main
@@ -71,9 +71,9 @@ describe Mare::Compiler::ServeHover do
           x += 1
         )
     SOURCE
-    
+
     ctx = Mare::Compiler.compile([source], :serve_hover)
-    
+
     messages, pos = ctx.serve_hover[Mare::Source::Pos.point(source, 7, 9)]
     pos.row.should eq 7
     pos.col.should eq 8

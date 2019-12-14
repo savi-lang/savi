@@ -9,21 +9,21 @@
 :actor TCPListener
   :prop notify TCPListenerNotify
   :prop listen_error OSError: EINVAL
-  
+
   :prop _fd U32: -1
   :prop _event CPointer(AsioEvent): CPointer(AsioEvent).null
-  
+
   :prop _count USize: 0
   :prop _limit USize
   :prop _read_buffer_size USize
   :prop _yield_after_reading USize
   :prop _yield_after_writing USize
-  
+
   :prop _closed Bool: False
   :prop _paused Bool: False
-  
+
   :fun local_address: NetAddress._for_fd(@_fd)
-  
+
   :new (
     // TODO: TCPListenerAuth, rather than ambient authority.
     notify TCPListenerNotify'iso
@@ -42,7 +42,7 @@
     )
     @_fd = AsioEvent.fd(@_event)
     @_notify_listening
-  
+
   :fun ref _notify_listening
     if @_event.is_not_null (
       @notify.listening(@)
@@ -50,7 +50,7 @@
       @_closed = True
       @notify.not_listening(@)
     )
-  
+
   :: This is a special behaviour that hooks into the AsioEventNotify runtime,
   :: called whenever an event handle we're subscribed to receives an event.
   :be _event_notify (event CPointer(AsioEvent), flags U32, arg U32)
@@ -63,7 +63,7 @@
         @_event = CPointer(AsioEvent).null
       )
     )
-  
+
   :be _accept (ns U32 = 0)
     if Platform.windows (
       // TODO
@@ -82,7 +82,7 @@
         )
       )
     )
-  
+
   :fun ref _spawn (conn_fd U32)
     try (
       TCPConnection._accept(
@@ -97,25 +97,25 @@
     |
       _OSSocket.close(conn_fd)
     )
-  
+
   :be _conn_closed
     @_count -= 1
-    
+
     // If releasing this connection takes us below the limit,
     // unpause acceptance and try to accept more connections.
     if (@_paused && @_count < @_limit) (
       @_paused = False
       @_accept
     )
-  
+
   :be dispose: @close
   :fun ref close
     if (@_closed.not && @_event.is_not_null) (
       // When not on windows, unsubscribe immediately here instead of later.
       if Platform.windows.not AsioEvent.unsubscribe(@_event)
-      
+
       _OSSocket.close(@_fd)
       @_fd = -1
-      
+
       @notify.closed(@)
     )

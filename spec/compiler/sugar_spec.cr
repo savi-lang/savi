@@ -4,13 +4,13 @@ describe Mare::Compiler::Sugar do
     :actor Example
       :fun return_none None
         "this isn't the return value"
-      
+
       :be behave
         "this isn't the return value"
     SOURCE
-    
+
     ast = Mare::Parser.parse(source)
-    
+
     ast.to_a.should eq [:doc,
       [:declare, [[:ident, "actor"], [:ident, "Example"]], [:group, ":"]],
       [:declare,
@@ -21,31 +21,31 @@ describe Mare::Compiler::Sugar do
         [:string, "this isn't the return value"],
       ]]
     ]
-    
+
     ctx = Mare::Compiler.compile([ast], :sugar)
-    
+
     func = ctx.namespace.find_func!("Example", "return_none")
     func.body.not_nil!.to_a.should eq [:group, ":",
       [:string, "this isn't the return value"],
       [:ident, "None"],
     ]
-    
+
     func = ctx.namespace.find_func!("Example", "behave")
     func.body.not_nil!.to_a.should eq [:group, ":",
       [:string, "this isn't the return value"],
       [:ident, "None"],
     ]
   end
-  
+
   it "transforms a property assignment into a method call" do
     source = Mare::Source.new_example <<-SOURCE
     :class Example
       :fun prop_assign
         x.y = z
     SOURCE
-    
+
     ast = Mare::Parser.parse(source)
-    
+
     ast.to_a.should eq [:doc,
       [:declare, [[:ident, "class"], [:ident, "Example"]], [:group, ":"]],
       [:declare, [[:ident, "fun"], [:ident, "prop_assign"]], [:group, ":",
@@ -56,9 +56,9 @@ describe Mare::Compiler::Sugar do
         ],
       ]],
     ]
-    
+
     ctx = Mare::Compiler.compile([ast], :sugar)
-    
+
     func = ctx.namespace.find_func!("Example", "prop_assign")
     func.body.not_nil!.to_a.should eq [:group, ":",
       [:relate,
@@ -68,7 +68,7 @@ describe Mare::Compiler::Sugar do
       ],
     ]
   end
-  
+
   it "transforms property arithmetic-assignments into method calls" do
     source = Mare::Source.new_example <<-SOURCE
     :class Example
@@ -76,9 +76,9 @@ describe Mare::Compiler::Sugar do
         x.y += z
         x.y -= z
     SOURCE
-    
+
     ast = Mare::Parser.parse(source)
-    
+
     ast.to_a.should eq [:doc,
       [:declare, [[:ident, "class"], [:ident, "Example"]], [:group, ":"]],
       [:declare, [[:ident, "fun"], [:ident, "prop_assign"]], [:group, ":",
@@ -93,9 +93,9 @@ describe Mare::Compiler::Sugar do
         ],
       ]],
     ]
-    
+
     ctx = Mare::Compiler.compile([ast], :sugar)
-    
+
     func = ctx.namespace.find_func!("Example", "prop_assign")
     func.body.not_nil!.to_a.should eq [:group, ":",
       [:relate,
@@ -122,25 +122,25 @@ describe Mare::Compiler::Sugar do
       ],
     ]
   end
-  
+
   it "transforms an operator into a method call" do
     source = Mare::Source.new_example <<-SOURCE
     :class Example
       :fun plus
         x + y
     SOURCE
-    
+
     ast = Mare::Parser.parse(source)
-    
+
     ast.to_a.should eq [:doc,
       [:declare, [[:ident, "class"], [:ident, "Example"]], [:group, ":"]],
       [:declare, [[:ident, "fun"], [:ident, "plus"]], [:group, ":",
         [:relate, [:ident, "x"], [:op, "+"], [:ident, "y"]],
       ]],
     ]
-    
+
     ctx = Mare::Compiler.compile([ast], :sugar)
-    
+
     func = ctx.namespace.find_func!("Example", "plus")
     func.body.not_nil!.to_a.should eq [:group, ":",
       [:relate,
@@ -150,7 +150,7 @@ describe Mare::Compiler::Sugar do
       ],
     ]
   end
-  
+
   it "transforms an operator into a method call (in a loop condition)" do
     source = Mare::Source.new_example <<-SOURCE
     :class Example
@@ -159,9 +159,9 @@ describe Mare::Compiler::Sugar do
           y
         )
     SOURCE
-    
+
     ast = Mare::Parser.parse(source)
-    
+
     ast.to_a.should eq [:doc,
       [:declare, [[:ident, "class"], [:ident, "Example"]], [:group, ":"]],
       [:declare, [[:ident, "fun"], [:ident, "countdown"]], [:group, ":",
@@ -174,9 +174,9 @@ describe Mare::Compiler::Sugar do
         ],
       ]],
     ]
-    
+
     ctx = Mare::Compiler.compile([ast], :sugar)
-    
+
     func = ctx.namespace.find_func!("Example", "countdown")
     func.body.not_nil!.to_a.should eq [:group, ":",
       [:group, "(", [:loop,
@@ -190,25 +190,25 @@ describe Mare::Compiler::Sugar do
       ]]
     ]
   end
-  
+
   it "transforms a square brace qualification into a method call" do
     source = Mare::Source.new_example <<-SOURCE
     :class Example
       :fun square
         x[y]
     SOURCE
-    
+
     ast = Mare::Parser.parse(source)
-    
+
     ast.to_a.should eq [:doc,
       [:declare, [[:ident, "class"], [:ident, "Example"]], [:group, ":"]],
       [:declare, [[:ident, "fun"], [:ident, "square"]], [:group, ":",
         [:qualify, [:ident, "x"], [:group, "[", [:ident, "y"]]],
       ]],
     ]
-    
+
     ctx = Mare::Compiler.compile([ast], :sugar)
-    
+
     func = ctx.namespace.find_func!("Example", "square")
     func.body.not_nil!.to_a.should eq [:group, ":",
       [:relate,
@@ -218,7 +218,7 @@ describe Mare::Compiler::Sugar do
       ],
     ]
   end
-  
+
   it "transforms a chained qualifications into chained method calls" do
     source = Mare::Source.new_example <<-SOURCE
     :class Example
@@ -227,9 +227,9 @@ describe Mare::Compiler::Sugar do
         x[y][z]
         x.call(y)[y].call(z)[z]
     SOURCE
-    
+
     ast = Mare::Parser.parse(source)
-    
+
     ast.to_a.should eq [:doc,
       [:declare, [[:ident, "class"], [:ident, "Example"]], [:group, ":"]],
       [:declare, [[:ident, "fun"], [:ident, "chained"]], [:group, ":",
@@ -267,9 +267,9 @@ describe Mare::Compiler::Sugar do
         ],
       ]],
     ]
-    
+
     ctx = Mare::Compiler.compile([ast], :sugar)
-    
+
     func = ctx.namespace.find_func!("Example", "chained")
     func.body.not_nil!.to_a.should eq [:group, ":",
       [:relate,
@@ -309,16 +309,16 @@ describe Mare::Compiler::Sugar do
       ],
     ]
   end
-  
+
   it "transforms a square brace qualified assignment into a method call" do
     source = Mare::Source.new_example <<-SOURCE
     :class Example
       :fun square
         x[y] = z
     SOURCE
-    
+
     ast = Mare::Parser.parse(source)
-    
+
     ast.to_a.should eq [:doc,
       [:declare, [[:ident, "class"], [:ident, "Example"]], [:group, ":"]],
       [:declare, [[:ident, "fun"], [:ident, "square"]], [:group, ":",
@@ -329,9 +329,9 @@ describe Mare::Compiler::Sugar do
         ],
       ]],
     ]
-    
+
     ctx = Mare::Compiler.compile([ast], :sugar)
-    
+
     func = ctx.namespace.find_func!("Example", "square")
     func.body.not_nil!.to_a.should eq [:group, ":",
       [:relate,
@@ -341,7 +341,7 @@ describe Mare::Compiler::Sugar do
       ],
     ]
   end
-  
+
   it "transforms an @-prefixed identifier into a method call of @" do
     source = Mare::Source.new_example <<-SOURCE
     :class Example
@@ -349,9 +349,9 @@ describe Mare::Compiler::Sugar do
         @x
         @x(y)
     SOURCE
-    
+
     ast = Mare::Parser.parse(source)
-    
+
     ast.to_a.should eq [:doc,
       [:declare, [[:ident, "class"], [:ident, "Example"]], [:group, ":"]],
       [:declare, [[:ident, "fun"], [:ident, "selfish"]], [:group, ":",
@@ -359,9 +359,9 @@ describe Mare::Compiler::Sugar do
         [:qualify, [:ident, "@x"], [:group, "(", [:ident, "y"]]],
       ]],
     ]
-    
+
     ctx = Mare::Compiler.compile([ast], :sugar)
-    
+
     func = ctx.namespace.find_func!("Example", "selfish")
     func.body.not_nil!.to_a.should eq [:group, ":",
       [:relate, [:ident, "@"], [:op, "."], [:ident, "x"]],
@@ -372,41 +372,41 @@ describe Mare::Compiler::Sugar do
       ],
     ]
   end
-  
+
   it "adds a '@' statement to the end of a constructor body" do
     source = Mare::Source.new_example <<-SOURCE
     :class Example
       :new
         x = 1
     SOURCE
-    
+
     ast = Mare::Parser.parse(source)
-    
+
     ast.to_a.should eq [:doc,
       [:declare, [[:ident, "class"], [:ident, "Example"]], [:group, ":"]],
       [:declare, [[:ident, "new"]], [:group, ":",
         [:relate, [:ident, "x"], [:op, "="], [:integer, 1_u64]]
       ]]
     ]
-    
+
     ctx = Mare::Compiler.compile([ast], :sugar)
-    
+
     func = ctx.namespace.find_func!("Example", "new")
     func.body.not_nil!.to_a.should eq [:group, ":",
       [:relate, [:ident, "x"], [:op, "="], [:integer, 1_u64]],
       [:ident, "@"],
     ]
   end
-  
+
   it "transforms non-identifier parameters into assignment expressions" do
     source = Mare::Source.new_example <<-SOURCE
     :class Example
       :fun param_assigns (@x, @y.z)
         @y.after
     SOURCE
-    
+
     ast = Mare::Parser.parse(source)
-    
+
     ast.to_a.should eq [:doc,
       [:declare, [[:ident, "class"], [:ident, "Example"]], [:group, ":"]],
       [:declare, [[:ident, "fun"], [:ident, "param_assigns"], [:group, "(",
@@ -416,9 +416,9 @@ describe Mare::Compiler::Sugar do
         [:relate, [:ident, "@y"], [:op, "."], [:ident, "after"]],
       ]],
     ]
-    
+
     ctx = Mare::Compiler.compile([ast], :sugar)
-    
+
     func = ctx.namespace.find_func!("Example", "param_assigns")
     func.body.not_nil!.to_a.should eq [:group, ":",
       [:relate,
@@ -442,16 +442,16 @@ describe Mare::Compiler::Sugar do
       ],
     ]
   end
-  
+
   it "transforms short-circuiting logical operators into choices" do
     source = Mare::Source.new_example <<-SOURCE
     :class Example
       :fun logical
         w && x || y && z
     SOURCE
-    
+
     ast = Mare::Parser.parse(source)
-    
+
     ast.to_a.should eq [:doc,
       [:declare, [[:ident, "class"], [:ident, "Example"]], [:group, ":"]],
       [:declare, [[:ident, "fun"], [:ident, "logical"]], [:group, ":",
@@ -470,9 +470,9 @@ describe Mare::Compiler::Sugar do
         ],
       ]],
     ]
-    
+
     ctx = Mare::Compiler.compile([ast], :sugar)
-    
+
     func = ctx.namespace.find_func!("Example", "logical")
     func.body.not_nil!.to_a.should eq [:group, ":",
       [:choice,
@@ -493,7 +493,7 @@ describe Mare::Compiler::Sugar do
       ],
     ]
   end
-  
+
   # TODO: Can this be done as a "universal method" rather than sugar?
   it "transforms an `as!` call into a subtype check in a choice" do
     source = Mare::Source.new_example <<-SOURCE
@@ -501,9 +501,9 @@ describe Mare::Compiler::Sugar do
       :fun type_cast
         x.y.as!(Y).z
     SOURCE
-    
+
     ast = Mare::Parser.parse(source)
-    
+
     ast.to_a.should eq [:doc,
       [:declare, [[:ident, "class"], [:ident, "Example"]], [:group, ":"]],
       [:declare, [[:ident, "fun"], [:ident, "type_cast"]], [:group, ":",
@@ -521,9 +521,9 @@ describe Mare::Compiler::Sugar do
         ]
       ]]
     ]
-    
+
     ctx = Mare::Compiler.compile([ast], :sugar)
-    
+
     func = ctx.namespace.find_func!("Example", "type_cast")
     func.body.not_nil!.to_a.should eq [:group, ":",
       [:relate,

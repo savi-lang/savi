@@ -14,14 +14,14 @@
   :prop time Time
   :new (@guard, @event, @time)
   :new empty: @guard = "", @event = 0, @time = Time.seconds(0)
-  
+
   :fun _offset_time: @time + Time.hours(12)
   :fun minute_id I32: @time.minute.i32 + (@_offset_time.hour.i32 - 12) * 60
   :fun night_id U32: @_offset_time.day.u32 + @_offset_time.month.u32 * 100
-  
+
   :fun non parse! (line String)
     halves = line.split(']')
-    
+
     // Parse the event type from the message.
     message = halves[1]!.trim(1)
     event = case (
@@ -30,13 +30,13 @@
     | message.includes("wakes up")     | Day4EventAwake
     | error!
     )
-    
+
     // Parse the guard id from the message (on "begin" events).
     guard = ""
     if (event == Day4EventBegin) (
       guard = message.split('#')[1]!.split(' ')[0]!
     )
-    
+
     // Parse the timestamp of the message.
     // TODO: Something handy like Time.parse_format!
     timestamp      = halves[0]!.trim(1).split(' ')
@@ -49,7 +49,7 @@
       hour_minute[0]!.parse_i64!.u8
       hour_minute[1]!.parse_i64!.u8
     )
-    
+
     @new(guard, event, time)
 
 :primitive Day4
@@ -62,7 +62,7 @@
       try (
         entry = Day4Entry.parse!(line)
         entries << entry
-        
+
         // Only the first entry for each guard has the guard id, so we need
         // to retain it in memory and assign it when missing in the entry.
         if (entry.guard == "") (
@@ -75,7 +75,7 @@
         env.err.print(line)
       )
     )
-    
+
     // Take note of each minute in which each guard was asleep for which night.
     sleeps = Map(String, Map(I32, Array(U32), HashEq(I32)), HashEq(String)).new
     last_entry = try (entries[0]! | Day4Entry.empty)
@@ -84,11 +84,11 @@
         if (last_entry.event != Day4EventSleep) (
           env.err.print("warning: awoke without first sleeping!")
         )
-        
+
         times = try (sleeps[entry.guard]! |
           sleeps[entry.guard] = Map(I32, Array(U32), HashEq(I32)).new
         )
-        
+
         minute_id = last_entry.minute_id
         while (minute_id < entry.minute_id) (
           night_ids = try (times[minute_id]! | times[minute_id] = [])
@@ -98,25 +98,25 @@
       )
       last_entry = entry
     )
-    
+
     sleeps
-  
+
   :fun a (env Env, input String) I64
     sleeps = @sleeps_data_from(env, input)
-    
+
     // Find the guard who slept the most total minutes.
     sleepiest_guard = ""
     sleepiest_count USize = 0
     sleeps.each -> (guard, times |
       sleep_count USize = 0
       times.each -> (minute_id, night_ids | sleep_count += night_ids.size)
-      
+
       if (sleep_count > sleepiest_count) (
         sleepiest_guard = guard
         sleepiest_count = sleep_count
       )
     )
-    
+
     // Find the minute in which that guard most frequently slept.
     sleepiest_minute I32 = 0
     sleepiest_count = 0
@@ -130,7 +130,7 @@
     |
       env.err.print("warning: couldn't find a guard that we found earlier!")
     )
-    
+
     // Multiply the sleepiest guard id number with the sleepiest minute id.
     try (
       sleepiest_guard.parse_i64! * sleepiest_minute.i64
@@ -139,10 +139,10 @@
       env.err.print(sleepiest_guard)
       0
     )
-  
+
   :fun b (env Env, input String) I64
     sleeps = @sleeps_data_from(env, input)
-    
+
     // Find the guard who most often slept during a consistently same minute,
     // also collecting which minute that was.
     sleepiest_guard = ""
@@ -158,14 +158,14 @@
           this_sleepiest_minute = minute_id
         )
       )
-      
+
       if (this_sleepiest_count > sleepiest_count) (
         sleepiest_guard = guard
         sleepiest_count = this_sleepiest_count
         sleepiest_minute = this_sleepiest_minute
       )
     )
-    
+
     // Multiply the sleepiest guard id number with the sleepiest minute id.
     try (
       sleepiest_guard.parse_i64! * sleepiest_minute.i64
@@ -178,7 +178,7 @@
 :class Day4Spec
   :is Spec
   :const describes: "Day4"
-  
+
   :it "rightly parses journal entry strings"
     @assert = try (
       entry = Day4Entry.parse!("[1518-11-01 23:58] Guard #99 begins shift")
@@ -225,7 +225,7 @@
     |
       False
     )
-  
+
   :it "passes the A and B test cases"
     claims = input = <<<
       [1518-11-01 00:00] Guard #10 begins shift
@@ -248,13 +248,13 @@
     >>>
     @assert = Day4.a(@env, input) == 240
     @assert = Day4.b(@env, input) == 4455
-  
+
   :it "solves the A puzzle"
     @assert = Day4.a(@env, @puzzle_input) == 104764
-  
+
   :it "solves the B puzzle"
     @assert = Day4.b(@env, @puzzle_input) == 128617
-  
+
   :const puzzle_input
     <<<
       [1518-06-03 00:32] wakes up

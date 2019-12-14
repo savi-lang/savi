@@ -15,11 +15,11 @@ class Mare::Compiler::Jumps < Mare::AST::Visitor
     Classify.always_error?(node)
     # TODO: early returns also jump away
   end
-  
+
   def self.always_error?(node); Classify.always_error?(node) end
   def self.maybe_error?(node);  Classify.maybe_error?(node)  end
   def self.any_error?(node);    Classify.any_error?(node)    end
-  
+
   def self.run(ctx)
     ctx.program.types.each do |t|
       t.functions.each do |f|
@@ -27,30 +27,30 @@ class Mare::Compiler::Jumps < Mare::AST::Visitor
       end
     end
   end
-  
+
   getter func : Program::Function
-  
+
   def initialize(@func)
   end
-  
+
   def run
     func.ident.try(&.accept(self))
     func.params.try(&.accept(self))
     func.ret.try(&.accept(self))
     func.body.try(&.accept(self))
   end
-  
+
   # We don't deal with type expressions at all.
   def visit_children?(node)
     !Classify.type_expr?(node)
   end
-  
+
   # This visitor never replaces nodes, it just touches them and returns them.
   def visit(node)
     touch(node) unless Classify.type_expr?(node)
     node
   end
-  
+
   def touch(node : AST::Identifier)
     if node.value == "error!"
       # An identifier is an always error if it is the special case of "error!".
@@ -60,7 +60,7 @@ class Mare::Compiler::Jumps < Mare::AST::Visitor
       Classify.maybe_error!(node)
     end
   end
-  
+
   def touch(node : AST::Group)
     if node.terms.any? { |t| Classify.always_error?(t) }
       # A group is an always error if any term in it is.
@@ -70,7 +70,7 @@ class Mare::Compiler::Jumps < Mare::AST::Visitor
       Classify.maybe_error!(node)
     end
   end
-  
+
   def touch(node : AST::Prefix)
     if Classify.always_error?(node.term)
       # A prefixed term is an always error if its term is.
@@ -80,7 +80,7 @@ class Mare::Compiler::Jumps < Mare::AST::Visitor
       Classify.maybe_error!(node)
     end
   end
-  
+
   def touch(node : AST::Qualify)
     if Classify.always_error?(node.term) || Classify.always_error?(node.group)
       # A qualify is an always error if either its term or group is.
@@ -90,7 +90,7 @@ class Mare::Compiler::Jumps < Mare::AST::Visitor
       Classify.maybe_error!(node)
     end
   end
-  
+
   def touch(node : AST::Relate)
     if Classify.always_error?(node.lhs) || Classify.always_error?(node.rhs)
       # A relation is an always error if either its left or right side is.
@@ -100,7 +100,7 @@ class Mare::Compiler::Jumps < Mare::AST::Visitor
       Classify.maybe_error!(node)
     end
   end
-  
+
   def touch(node : AST::Choice)
     # A choice is an always error only if all possible paths
     # through conds and bodies force us into an always error.
@@ -109,20 +109,20 @@ class Mare::Compiler::Jumps < Mare::AST::Visitor
         break false if Classify.always_error?(node.list[index][0])
         break true unless Classify.always_error?(node.list[index][1])
       end
-    
+
     # A choice is a maybe error if any cond or body in it is a maybe error.
     some_possible_error_path =
       node.list.any? do |cond, body|
         Classify.any_error?(cond) || Classify.any_error?(body)
       end
-    
+
     if !some_possible_happy_path
       Classify.always_error!(node)
     elsif some_possible_error_path
       Classify.maybe_error!(node)
     end
   end
-  
+
   def touch(node : AST::Loop)
     if Classify.always_error?(node.cond) || (
       Classify.always_error?(node.body) && Classify.always_error?(node.else_body)
@@ -138,7 +138,7 @@ class Mare::Compiler::Jumps < Mare::AST::Visitor
       Classify.maybe_error!(node)
     end
   end
-  
+
   def touch(node : AST::Try)
     if Classify.always_error?(node.body) && Classify.always_error?(node.else_body)
       # A try is an always error if both the body and else are always errors.
@@ -148,7 +148,7 @@ class Mare::Compiler::Jumps < Mare::AST::Visitor
       Classify.maybe_error!(node)
     end
   end
-  
+
   def touch(node)
     # On all other nodes, do nothing.
   end

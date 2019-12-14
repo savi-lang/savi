@@ -3,7 +3,7 @@
 :class NumericSpec
   :is Spec
   :const describes: "Numeric"
-  
+
   :it "returns a fixed bit width for most numeric types"
     @assert = U8 .bit_width == 8
     @assert = U16.bit_width == 16
@@ -15,7 +15,7 @@
     @assert = I64.bit_width == 64
     @assert = F32.bit_width == 32
     @assert = F64.bit_width == 64
-  
+
   :it "returns a platform-dependent bit width for USize and ISize"
     if Platform.lp64 (
       @assert = USize.bit_width == 64
@@ -24,7 +24,7 @@
       @assert = USize.bit_width == 32
       @assert = ISize.bit_width == 32
     )
-  
+
   :it "indicates whether the given numeric is signed or unsigned"
     @assert = U8   .is_signed == False
     @assert = U16  .is_signed == False
@@ -38,7 +38,7 @@
     @assert = ISize.is_signed == True
     @assert = F32  .is_signed == True
     @assert = F64  .is_signed == True
-  
+
   :it "indicates whether the given numeric is a floating point or an integer"
     @assert = U8   .is_floating_point == False
     @assert = U16  .is_floating_point == False
@@ -52,7 +52,7 @@
     @assert = ISize.is_floating_point == False
     @assert = F32  .is_floating_point == True
     @assert = F64  .is_floating_point == True
-  
+
   :it "exhibits wraparound behaviour for underflowing numeric literals"
     @assert = U8[-1]                    == 0xFF
     @assert = U16[-1]                   == 0xFFFF
@@ -62,7 +62,7 @@
     @assert = I16[-32768]               == 32768
     @assert = I32[-2147483648]          == 2147483648
     @assert = I64[-9223372036854775808] == 9223372036854775808
-    
+
     if Platform.lp64 (
       @assert = USize[-1]                   == 0xFFFF_FFFF_FFFF_FFFF
       @assert = ISize[-9223372036854775808] == 9223372036854775808
@@ -70,7 +70,7 @@
       @assert = USize[-1]          == 0xFFFF_FFFF
       @assert = ISize[-2147483648] == 2147483648
     )
-  
+
   :it "has a convenience alias for the number zero"
     @assert = U8   .zero == 0
     @assert = U16  .zero == 0
@@ -84,7 +84,7 @@
     @assert = ISize.zero == 0
     @assert = F32  .zero == 0
     @assert = F64  .zero == 0
-  
+
   :it "converts between different integer types"
     @assert = U32[36].u8    == 36
     @assert = U32[36].u16   == 36
@@ -98,7 +98,7 @@
     @assert = U32[36].isize == 36
     @assert = U32[36].f32   == 36
     @assert = U32[36].f64   == 36
-  
+
   :it "converts from floating point to other numeric types"
     @assert = F32[36].u32 == 36
     @assert = F64[36].u32 == 36
@@ -106,7 +106,7 @@
     @assert = F64[36].i32 == 36
     @assert = F32[36].f64 == 36
     @assert = F64[36].f32 == 36
-  
+
   :it "handles edge cases for conversions from floating point"
     @assert = F32.nan.u8          == 0
     @assert = F32.infinity.u8     == 255
@@ -131,7 +131,7 @@
     @assert = F64.nan.f32.is_nan
     @assert = F64.max_value.f32   == F32.infinity
     @assert = F64.min_value.f32   == F32.neg_infinity
-  
+
   :it "compares numbers to one another"
     @assert = U32[12] == 12
     @assert = I32[12] == 12
@@ -153,7 +153,7 @@
     @assert = F32[36] >= 36
     @assert = I32[-30] < 6
     @assert = I32[6] > -30
-  
+
   :it "applies arithmetic operations"
     @assert = U32[6]  + 30  == 36
     @assert = I32[-6] + 30  == 24
@@ -176,13 +176,13 @@
     @assert = I32[36] % 0 == 0
     @assert = I8[-128] / -1 == 0
     @assert = I8[-128] / -1 == 0
-  
+
   :it "finds the minimum or maximum value between the two compared values"
     @assert = U32[6].min(30) == 6
     @assert = U32[30].min(6) == 6
     @assert = U32[30].max(6) == 30
     @assert = U32[6].max(30) == 30
-  
+
   :it "finds the absolute value"
     @assert = U32[36]  .abs == 36
     @assert = U32[-36] .abs == -36 // -36 is an underflow literal when unsigned
@@ -190,7 +190,7 @@
     @assert = I32[-36] .abs == 36
     @assert = F32[3.6] .abs == 3.6
     @assert = F32[-3.6].abs == 3.6
-  
+
   :it "implements bitwise analysis and manipulation for integers"
     @assert = U8[18]                == 0b00010010
     @assert = U8[18].invert         == 0b11101101
@@ -207,11 +207,11 @@
     @assert = U8[127].next_pow2     == 128
     @assert = U8[128].next_pow2     == 128
     @assert = U8[129].next_pow2     == 0
-  
+
   :it "hashes the value of the integer"
     @assert = U64[24].hash   == 11168194413345819337 // TODO: fix this test for 32-bit platforms
     @assert = U64[24].hash64 == 11168194413345819337
-  
+
   :it "implements bitwise analysis and special values for floating points"
     @assert = F32[3.6].bits == 0x4066_6666
     @assert = F64[3.6].bits == 0x400C_CCCC_CCCC_CCCD

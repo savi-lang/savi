@@ -2,50 +2,50 @@
   :prop _size USize
   :prop _alloc USize
   :prop _ptr CPointer(A)'ref
-  
+
   :fun ref _ptr_set_null
     @_alloc = 0
     @_ptr = CPointer(A)._null
-  
+
   :fun ref _ptr_allocate (space USize)
     @_alloc = space.next_pow2.max(space).max(8)
     @_ptr = CPointer(A)._alloc(@_alloc)
-  
+
   :fun ref _ptr_reallocate (space USize)
     @_alloc = space.next_pow2.max(space).max(8)
     @_ptr = @_ptr._realloc(@_alloc)
-  
+
   :new (space USize = 0)
     @_size = 0
-    
+
     if (space > 0) (
       @_ptr_allocate(space)
     |
       @_ptr_set_null
     )
-  
+
   :new iso new_iso (space USize = 0) // TODO: use recover instead of this hack
     @_size = 0
-    
+
     if (space > 0) (
       @_ptr_allocate(space)
     |
       @_ptr_set_null
     )
-  
+
   :fun size: @_size
   :fun space: @_alloc
   :fun cpointer (offset = 0) tag: @_ptr._offset(offset)
-  
+
   :fun ref clear: @_size = 0, @
-  
+
   :fun ref truncate (size): @_size = @_size.min(size)
-  
+
   :fun ref trim_in_place (from USize, to USize = -1)
     to = to.min(@_size)
     from = from.min(to)
     size = to - from
-    
+
     if (to == @_size) (
       // If our new final address lines up with the current final address,
       // then we can keep any extra bytes allocated beyond the current size.
@@ -56,9 +56,9 @@
       // the new allocation size is the same as the new occupied size
       @_alloc = size
     )
-    
+
     @_size = size
-    
+
     if (@_alloc == 0) (
       // If the new allocation space is zero, use a null pointer to avoid issue.
       @_ptr = CPointer(A)._null
@@ -66,32 +66,32 @@
       // Otherwise, use a pointer offset from the original one to trim the left.
       @_ptr = @_ptr._offset(from)
     )
-    
+
     @
-  
+
   :: Reserve enough total space for the given number of elements.
   :: The size (number of actual elements present in the array) does not change.
-  
+
   :fun ref reserve (space USize)
     if (@_alloc < space) \
       @_ptr_reallocate(space)
     @
-  
+
   :: Reserve enough total space for the given number of elements,
   :: and expand to that size, filling the added space with arbitrary memory.
   :: This expansion of size only happens for an array of Numeric type elements;
   :: if the type of the elements is not Numeric, this is the same as `reserve`.
-  
+
   :fun ref reserve_undefined (space USize)
     @reserve(space)
     if (A <: Numeric) (@_size = space)
     @
-  
+
   :: Create a clone of this array, containing references to the same elements
   :: that are held by this array. This is only safe if the references are
   :: aliasable as themselves (with non-unique reference capabilities), so
   :: if the element type isn't aliasable, the cloned array will be empty.
-  
+
   :fun clone iso
     array = @new_iso(@size)
     if (A <: alias) (
@@ -100,24 +100,24 @@
       array._size = @size
     )
     --array // TODO: auto-consume at end of the function?
-  
+
   :fun ref _clone_from (other_ptr CPointer(A), size USize)
     other_ptr._unsafe._copy_to(@_ptr, size)
-  
+
   :fun "[]!" (index)
     if (@size <= index) error!
     @_ptr._get_at(index)
-  
+
   :fun ref "[]=!" (index, value)
     if (@size <= index) error!
     @_ptr._assign_at(index, --value)
-  
+
   :fun ref "<<" (value)
     @reserve(@_size + 1)
     @_ptr._assign_at(@_size, --value)
     @_size = @_size + 1
     @
-  
+
   :fun "!=" (other): (@ == other).not // TODO: move this to the Equatable trait?
   :fun "==" (other Array(A)'box)
     // TODO: optimize for cases when the elements can be pointer-compared by
@@ -135,7 +135,7 @@
       index = index + 1
     )
     equal_so_far
-  
+
   :fun includes (expected A)
     is_found = False
     index USize = 0
@@ -149,7 +149,7 @@
       index += 1
     )
     is_found
-  
+
   :fun each
     index USize = 0
     while (index < @_size) (
@@ -157,7 +157,7 @@
       index += 1
     )
     None
-  
+
   :fun each_with_index
     index USize = 0
     while (index < @_size) (
@@ -165,7 +165,7 @@
       index += 1
     )
     None
-  
+
   :fun reverse_each
     index USize = @_size
     while (index > 0) (
@@ -173,7 +173,7 @@
       yield @_ptr._get_at(index)
     )
     None
-  
+
   :fun reverse_each_with_index
     index USize = @_size
     while (index > 0) (
@@ -181,7 +181,7 @@
       yield (@_ptr._get_at(index), index)
     )
     None
-  
+
   :fun each_until
     :yields for Bool
     index USize = 0
@@ -191,7 +191,7 @@
       index += 1
     )
     early_stop
-  
+
   :fun select
     :yields for Bool
     new_array = Array(A'aliased).new // TODO: allow the caller to specify space
@@ -204,7 +204,7 @@
       index += 1
     )
     new_array
-  
+
   :fun reject
     :yields for Bool
     new_array = Array(A'aliased).new
@@ -217,20 +217,20 @@
       index += 1
     )
     new_array
-  
+
   :: Return a copy of the array that has its elements sorted by value.
   :: If the element type is not aliasable, or not Comparable, it will be empty.
-  
+
   :fun sort: @clone.sort_in_place
-  
+
   :: Mutate the array to sort its elements by value.
   :: If the element type is not Comparable, there is no way to sort the values,
   :: so the array will be emptied of all elements, in order to make the
   :: issue as obvious as possible while not penalizing proper usage.
-  
+
   :fun ref sort_in_place
     if @_sort_in_place(0, @size.isize - 1) (@ | @.clear)
-  
+
   :fun ref _sort_in_place (lo_pivot ISize, hi_pivot ISize) Bool // TODO: should be actually private
     if (A <: Comparable(A)'read) (
       if (lo_pivot < hi_pivot) (
@@ -244,14 +244,14 @@
           lo_pivot_value = @_ptr._get_at(lo_pivot.usize)
           hi_pivot_value = @_ptr._get_at(hi_pivot.usize)
         )
-        
+
         // Create our three moving cursors inside the pivot range:
         // `lo` moves upward starting from the bottom of the range
         // `hi` moves downward starting from the top of the range
         // `scan` moves upward between the two
         lo = lo_pivot + 1, hi = hi_pivot - 1
         scan = lo
-        
+
         // Scan the range, swapping as necessary.
         while (scan <= hi) (scan_value = @_ptr._get_at(scan.usize)
           case (
@@ -259,18 +259,18 @@
           | scan_value < lo_pivot_value |
             @_swap(scan.usize, lo.usize) // TODO: these swap operations can be optimized by leveraging earlier pointer reads, though it will be more verbose
             lo += 1
-          
+
           // When we scan a value greater than our pivot, swap the value upward.
           | scan_value >= hi_pivot_value |
             // First move `hi` cursor until it's greater than the `hi_pivot`.
             while (@_ptr._get_at(hi.usize) > hi_pivot_value && scan < hi) (
               hi -= 1
             )
-            
+
             // Swap the scanned value upward.
             @_swap(scan.usize, hi.usize) // TODO: these swap operations can be optimized by leveraging earlier pointer reads, though it will be more verbose
             hi -= 1
-            
+
             // Possibly swap the just-swapped value downward if it needs to be.
             // Note that `scan_value` here is the previous `hi` value.
             scan_value = @_ptr._get_at(scan.usize)
@@ -280,15 +280,15 @@
             )
           )
         scan += 1)
-        
+
         // Re-expand to the true range now that we've finished scanning.
         lo -= 1
         hi += 1
-        
+
         // Swap the pivots to their final positions.
         @_swap(lo_pivot.usize, lo.usize) // TODO: these swap operations can be optimized by leveraging earlier pointer reads, though it will be more verbose
         @_swap(hi_pivot.usize, hi.usize) // TODO: these swap operations can be optimized by leveraging earlier pointer reads, though it will be more verbose
-        
+
         // Recursively sort the three sub-ranges left inside this range.
         @_sort_in_place(lo_pivot, lo - 1)
         @_sort_in_place(lo + 1, hi - 1)
@@ -298,7 +298,7 @@
     |
       False // return false if the elements are not Comparable
     )
-  
+
   :fun ref _swap (a USize, b USize)
     a_elem = @_ptr._get_at_no_alias(a)
     b_elem = @_ptr._get_at_no_alias(b)

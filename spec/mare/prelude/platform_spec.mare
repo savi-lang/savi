@@ -3,7 +3,7 @@
 :class PlatformSpec
   :is Spec
   :const describes: "Platform"
-  
+
   :it "returns True for exactly one of {ilp32, lp64, llp64}"
     @assert = U8[1] == U8[0] +
       (if Platform.ilp32 (1 | 0)) +

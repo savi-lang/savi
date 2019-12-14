@@ -15,14 +15,14 @@ require "llvm"
 #
 class Mare::Compiler::ServeHover
   getter! ctx : Context
-  
+
   def initialize
   end
-  
+
   def run(ctx)
     @ctx = ctx
   end
-  
+
   private def find(pos : Source::Pos, within : AST::Node)
     # TODO: Use the visitor pattern instead?
     case within
@@ -62,14 +62,14 @@ class Mare::Compiler::ServeHover
     end
     [within]
   end
-  
+
   def [](pos : Source::Pos)
     ctx.program.types.each do |t|
       next unless t.ident.pos.source == pos.source
-      
+
       t.functions.each do |f|
         next unless f.ident.pos.source == pos.source
-        
+
         f.body.try do |body|
           if body.pos.contains?(pos)
             find(pos, body).reverse_each do |node|
@@ -80,17 +80,17 @@ class Mare::Compiler::ServeHover
         end
       end
     end
-    
+
     {[] of String, pos}
   end
-  
+
   def [](t : Program::Type, f : Program::Function, node : AST::Node)
     messages = [] of String
-    
+
     refer = ctx.refer[t][f]
     infer = ctx.infer.for_func_simple(ctx, t, f)
     describe_type = "type"
-    
+
     ref = refer[node]?
     case ref
     when Refer::Self
@@ -114,7 +114,7 @@ class Mare::Compiler::ServeHover
     when nil
     else raise NotImplementedError.new(ref)
     end
-    
+
     if node.is_a?(AST::Relate) && node.op.value == "."
       begin
         messages << "This is a function call on an inferred receiver type of " \
@@ -124,13 +124,13 @@ class Mare::Compiler::ServeHover
       end
       describe_type = "return type"
     end
-    
+
     begin
       inf = infer.resolve(node)
       messages << "It has an inferred #{describe_type} of #{inf.show_type}."
     rescue
     end
-    
+
     {messages, node.pos}
   end
 end

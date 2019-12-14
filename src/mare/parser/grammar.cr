@@ -6,14 +6,14 @@ module Mare::Parser
     eol_comment =
       (str("//") >> (~char('\n') >> any).repeat) |
       (str("::") >> char(' ').maybe >> (~char('\n') >> any).repeat.named(:doc_string))
-    
+
     # Define what whitespace looks like.
     whitespace =
       char(' ') | char('\t') | char('\r') | str("\\\n") | str("\\\r\n")
     s = whitespace.repeat
     newline = s >> eol_comment.maybe >> (char('\n') | s.then_eof)
     sn = (whitespace | newline).repeat
-    
+
     # Define what a number looks like (integer and float).
     digit19 = range('1', '9')
     digit = range('0', '9')
@@ -31,7 +31,7 @@ module Mare::Parser
     exp = (char('e') | char('E')) >> (char('+') | char('-')).maybe >> digits
     integer = int.named(:integer)
     float = (int >> ((frac >> exp.maybe) | exp)).named(:float)
-    
+
     # Define what an identifier looks like.
     ident_letter =
       range('a', 'z') | range('A', 'Z') | range('0', '9') | char('_')
@@ -42,7 +42,7 @@ module Mare::Parser
         ident_letter.repeat(1)
       ) >> char('!').maybe
     ).named(:ident)
-    
+
     # Define what a string looks like.
     string_char =
       str("\\\"") | str("\\\\") |
@@ -51,7 +51,7 @@ module Mare::Parser
       (str("\\u") >> digithex >> digithex >> digithex >> digithex) |
       (~char('"') >> ~char('\\') >> range(' ', 0x10FFFF_u32))
     string = char('"') >> string_char.repeat.named(:string) >> char('"')
-    
+
     # Define what a character string looks like.
     character_char =
       str("\\'") | str("\\\\") |
@@ -60,25 +60,25 @@ module Mare::Parser
       (str("\\u") >> digithex >> digithex >> digithex >> digithex) |
       (~char('\'') >> ~char('\\') >> range(' ', 0x10FFFF_u32))
     character = char('\'') >> character_char.repeat.named(:char) >> char('\'')
-    
+
     # Define what a heredoc string looks like.
     heredoc_content = declare()
     heredoc = str("<<<") >> heredoc_content.named(:heredoc) >> str(">>>")
     heredoc_no_token = str("<<<") >> heredoc_content >> str(">>>")
     heredoc_content.define \
       (heredoc_no_token | (~str(">>>") >> any)).repeat
-    
+
     # Define an atom to be a single term with no binary operators.
     parens = declare()
     prefixed = declare()
     decl = declare()
     anystring = string | character | heredoc
     atom = prefixed | parens | anystring | float | integer | ident
-    
+
     # Define a prefixed term to be preceded by a prefix operator.
     prefixop = (char('~') | str("--")).named(:op)
     prefixed.define (prefixop >> atom).named(:prefix)
-    
+
     # Define what a capability looks like.
     cap = (
       str("iso") | str("trn") | str("val") |
@@ -86,7 +86,7 @@ module Mare::Parser
       str("any") | str("alias") | str("send") | str("share") | str("read")
     ).named(:ident)
     capmod = str("aliased").named(:ident)
-    
+
     # Define a compound to be a closely bound chain of atoms.
     opcap = char('\'').named(:op)
     opdot = char('.').named(:op)
@@ -97,7 +97,7 @@ module Mare::Parser
       (sn >> opdot >> sn >> atom) | \
       parens
     ).repeat).named(:compound)
-    
+
     # Define groups of operators, in order of precedence,
     # from most tightly binding to most loosely binding.
     # Operators in the same group have the same level of precedence.
@@ -111,7 +111,7 @@ module Mare::Parser
             str("=~")).named(:op)
     op4 = (str("&&") | str("||")).named(:op)
     ope = (str("+=") | str("-=") | char('=')).named(:op)
-    
+
     # Construct the nested possible relations for each group of operators.
     tw = compound
     t1 = (tw >> (opw >> s >> tw).repeat(1) >> s).named(:group_w) | tw
@@ -120,12 +120,12 @@ module Mare::Parser
     t4 = (t3 >> (sn >> op3 >> sn >> t3).repeat).named(:relate)
     te = (t4 >> (sn >> op4 >> sn >> t4).repeat).named(:relate)
     t = (te >> (sn >> ope >> sn >> te >> s).repeat).named(:relate_r)
-    
+
     # Define what a comma/newline-separated sequence of terms looks like.
     term = decl | t
     termsl = term >> s >> (char(',') >> sn >> term >> s).repeat
     terms = (termsl >> sn).repeat
-    
+
     # Define groups that are pipe-partitioned sequences of terms.
     pipesep = char('|').named(:op)
     ptermsp =
@@ -138,16 +138,16 @@ module Mare::Parser
       (char('(') >> sn >> ptermsp.maybe >> sn >> char(')')).named(:group) |
       (char('[') >> sn >> ptermsp.maybe >> sn >> char(']') >> char('!').maybe).named(:group)
     )
-    
+
     # Define what a declaration looks like.
     decl.define(
       (char(':') >> ident >> (s >> compound).repeat >> s).named(:decl) >>
       (char(':') | ~~newline)
     )
-    
+
     # Define a total document to be a sequence of lines.
     doc = (sn >> terms).named(:doc)
-    
+
     # A valid parse is a single document followed by the end of the file.
     doc.then_eof
   end

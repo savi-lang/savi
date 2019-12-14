@@ -4,14 +4,14 @@ describe Mare::Compiler::Populate do
     :actor Main
       :is Bogus
     SOURCE
-    
+
     expected = <<-MSG
     This type couldn't be resolved:
     from (example):2:
       :is Bogus
           ^~~~~
     MSG
-    
+
     expect_raises Mare::Error, expected do
       Mare::Compiler.compile([source], :populate)
     end

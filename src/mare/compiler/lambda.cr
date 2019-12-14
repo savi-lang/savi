@@ -16,7 +16,7 @@ class Mare::Compiler::Lambda < Mare::AST::Visitor
       end
     end
   end
-  
+
   @ctx : Context
   @type : Program::Type
   @func : Program::Function
@@ -25,48 +25,48 @@ class Mare::Compiler::Lambda < Mare::AST::Visitor
     @changed = false
     @observed_refs_stack = [] of Hash(Int32, AST::Identifier)
   end
-  
+
   def run
     @func.params.try(&.accept(self))
     @func.ret.try(&.accept(self))
     @func.body.try(&.accept(self))
   end
-  
+
   private def next_lambda_name
     "#{@type.ident.value}.#{@func.ident.value}.^#{@last_num += 1}"
   end
-  
+
   def visit_pre(node : AST::Group)
     return node unless node.style == "^"
-    
+
     @observed_refs_stack << Hash(Int32, AST::Identifier).new
-    
+
     node
   end
-  
+
   def visit(node : AST::Identifier)
     return node unless node.value.starts_with?("^")
-    
+
     Error.at node, "A lambda parameter can't be used outside of a lambda" \
       if @observed_refs_stack.empty?
-    
+
     # Strip the "^" from the start of the identifier
     node.value = node.value[1..-1]
-    
+
     # Save the identifier in the observed refs for this lambda, mapped by num.
     # If we see the same identifier more than once, don't overwrite.
     num = node.value.to_i32
     @observed_refs_stack.last[num] ||= node
-    
+
     node
   end
-  
+
   def visit(node : AST::Group)
     return node unless node.style == "^"
-    
+
     @changed = true
     name = next_lambda_name
-    
+
     refs = @observed_refs_stack.pop
     unless refs.empty?
       param_count = refs.keys.max
@@ -75,14 +75,14 @@ class Mare::Compiler::Lambda < Mare::AST::Visitor
         params.terms << (refs[i + 1] || AST::Identifier.new("_").from(node))
       end
     end
-    
+
     lambda_type_cap = AST::Identifier.new("non").from(node) # TODO: change this for stateful functions
     lambda_type_ident = AST::Identifier.new(name).from(node)
     lambda_type = Program::Type.new(lambda_type_cap, lambda_type_ident)
     lambda_type.add_tag(:hygienic)
     @ctx.program.types << lambda_type
     @ctx.namespace.add_lambda_type_later(lambda_type)
-    
+
     lambda_type.functions << Program::Function.new(
       AST::Identifier.new("non").from(node), # TODO: change this for stateful functions
       AST::Identifier.new("call").from(node),
@@ -90,7 +90,7 @@ class Mare::Compiler::Lambda < Mare::AST::Visitor
       nil,
       node.dup.tap(&.style=(":")),
     )
-    
+
     AST::Group.new("(").from(node).tap do |group|
       group.terms << AST::Identifier.new(name).from(node)
     end

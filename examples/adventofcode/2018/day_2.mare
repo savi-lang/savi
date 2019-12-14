@@ -14,7 +14,7 @@
       )
     )
     letters.has_any -> (letter, count | count == target_count)
-  
+
   :fun a (input String)
     // Find the number of lines that have a byte repeated exactly twice,
     // and the number of lines that have a byte repeated exactly thrice,
@@ -25,7 +25,7 @@
       if @has_trio(line) (count_trio += 1)
     )
     count_duo * count_trio
-  
+
   :fun b (input String)
     found_l = ""
     found_r = ""
@@ -76,7 +76,7 @@
 :class Day2Spec
   :is Spec
   :const describes: "Day2"
-  
+
   :it "passes the A test cases"
     @assert = Day2.has_duo("abcdef").not, @assert = Day2.has_trio("abcdef").not
     @assert = Day2.has_duo("bababc"),     @assert = Day2.has_trio("bababc")
@@ -85,7 +85,7 @@
     @assert = Day2.has_duo("aabcdd"),     @assert = Day2.has_trio("aabcdd").not
     @assert = Day2.has_duo("abcdee"),     @assert = Day2.has_trio("abcdee").not
     @assert = Day2.has_duo("ababab").not, @assert = Day2.has_trio("ababab")
-    
+
     input = <<<
       abcdef
       bababc
@@ -96,10 +96,10 @@
       ababab
     >>>
     @assert = Day2.a(input) == 12
-  
+
   :it "solves the A puzzle"
     @assert = Day2.a(@puzzle_input) == 8296
-  
+
   :it "passes the B test case"
     input = <<<
       abcde
@@ -111,10 +111,10 @@
       wvxyz
     >>>
     @assert = Day2.b(input) == "fgij"
-  
+
   :it "solves the B puzzle"
     @assert = Day2.b(@puzzle_input) == "pazvmqbftrbeosiecxlghkwud"
-  
+
   :const puzzle_input
     <<<
       bazvmqthjtrnlosiecxyghkwud

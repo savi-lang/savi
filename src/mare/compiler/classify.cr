@@ -16,37 +16,37 @@ class Mare::Compiler::Classify < Mare::AST::Visitor
   FLAG_FURTHER_QUALIFIED = 0x08_u64 # set here in the Classify pass
   FLAG_ALWAYS_ERROR      = 0x10_u64 # set in the Jumps pass
   FLAG_MAYBE_ERROR       = 0x20_u64 # set in the Jumps pass
-  
+
   def self.value_not_needed?(node); (node.flags & FLAG_VALUE_NOT_NEEDED) != 0 end
   def self.value_needed?(node);     (node.flags & FLAG_VALUE_NOT_NEEDED) == 0 end
   def self.value_not_needed!(node); node.flags |= FLAG_VALUE_NOT_NEEDED end
   def self.value_needed!(node);     node.flags &= ~FLAG_VALUE_NOT_NEEDED end
-  
+
   def self.no_value?(node); (node.flags & FLAG_NO_VALUE) != 0 end
   def self.no_value!(node)
     node.flags |= FLAG_NO_VALUE
     value_not_needed!(node)
   end
-  
+
   def self.type_expr?(node); (node.flags & FLAG_TYPE_EXPR) != 0 end
   def self.type_expr!(node); node.flags |= FLAG_TYPE_EXPR end
-  
+
   def self.further_qualified?(node); (node.flags & FLAG_FURTHER_QUALIFIED) != 0 end
   def self.further_qualified!(node); node.flags |= FLAG_FURTHER_QUALIFIED end
-  
+
   def self.always_error?(node); (node.flags & FLAG_ALWAYS_ERROR) != 0 end
   def self.always_error!(node); node.flags |= FLAG_ALWAYS_ERROR end
-  
+
   def self.maybe_error?(node); (node.flags & FLAG_MAYBE_ERROR) != 0 end
   def self.maybe_error!(node); node.flags |= FLAG_MAYBE_ERROR end
-  
+
   def self.any_error?(node)
     (node.flags & (FLAG_ALWAYS_ERROR | FLAG_MAYBE_ERROR)) != 0
   end
-  
+
   def self.recursive_value_not_needed!(node)
     value_not_needed!(node)
-    
+
     case node
     when AST::Group
       node.terms[-1]?.try { |child| recursive_value_not_needed!(child) }
@@ -57,18 +57,18 @@ class Mare::Compiler::Classify < Mare::AST::Visitor
       recursive_value_not_needed!(node.else_body)
     end
   end
-  
+
   # This visitor marks the given node tree as being a type_expr.
   class TypeExprVisitor < Mare::AST::Visitor
     INSTANCE = new
     def self.instance; INSTANCE end
-    
+
     def visit(node)
       Classify.type_expr!(node)
       node
     end
   end
-  
+
   def self.run(ctx)
     ctx.program.types.each do |t|
       t.functions.each do |f|
@@ -76,14 +76,14 @@ class Mare::Compiler::Classify < Mare::AST::Visitor
       end
     end
   end
-  
+
   getter ctx : Context
   getter type : Program::Type
   getter func : Program::Function
-  
+
   def initialize(@ctx, @type, @func)
   end
-  
+
   def run
     func.params.try(&.accept(self))
     func.ret.try(&.accept(self))
@@ -92,22 +92,22 @@ class Mare::Compiler::Classify < Mare::AST::Visitor
     func.yield_out.try(&.accept(TypeExprVisitor.instance))
     func.yield_in.try(&.accept(TypeExprVisitor.instance))
   end
-  
+
   def refer
     ctx.refer[type][func]
   end
-  
+
   # This visitor never replaces nodes, it just touches them and returns them.
   def visit(node)
     touch(node)
     node
   end
-  
+
   # An Operator can never have a value, so its value should never be needed.
   def touch(op : AST::Operator)
     Classify.no_value!(op)
   end
-  
+
   def touch(group : AST::Group)
     case group.style
     when "(", ":"
@@ -124,11 +124,11 @@ class Mare::Compiler::Classify < Mare::AST::Visitor
       end
     end
   end
-  
+
   def touch(qualify : AST::Qualify)
     # In a Qualify, we mark the term as being in such a qualify.
     Classify.further_qualified!(qualify.term)
-    
+
     case refer[qualify.term]
     when Refer::Type, Refer::TypeAlias, Refer::TypeParam
       # We assume this qualify to be type with type arguments.
@@ -145,7 +145,7 @@ class Mare::Compiler::Classify < Mare::AST::Visitor
       qualify.group.terms.each { |t| Classify.value_needed!(t) }
     end
   end
-  
+
   def touch(relate : AST::Relate)
     case relate.op.value
     when "<:"
@@ -155,7 +155,7 @@ class Mare::Compiler::Classify < Mare::AST::Visitor
       # A value is only needed for the left side and the overall access node.
       relate_rhs = relate.rhs
       Classify.no_value!(relate_rhs)
-      
+
       # We also need to mark the pieces of the right-hand-side as appropriate.
       if relate_rhs.is_a?(AST::Relate)
         Classify.no_value!(relate_rhs.lhs)
@@ -168,7 +168,7 @@ class Mare::Compiler::Classify < Mare::AST::Visitor
       Classify.value_needed!(yield_block) if yield_block
     end
   end
-  
+
   def touch(node : AST::Node)
     # On all other nodes, do nothing.
   end

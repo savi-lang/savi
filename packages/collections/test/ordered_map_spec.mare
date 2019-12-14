@@ -4,9 +4,9 @@
 :class OrderedMapSpec
   :is Spec
   :const describes: "OrderedMap"
-  
+
   :fun new_map: OrderedMap(String, U64, HashEq(String)).new // TODO: implicit default for HashFunction type argument
-  
+
   :it "stores and removes values at a given key"
     map = @new_map
     @assert = map.size == 0
@@ -24,16 +24,16 @@
     @assert = try map["example"]! <: None
     @assert = map.has_key("example").not
     @assert = map.size == 0
-  
+
   :it "can be cleared, removing all keys and values"
     map = @new_map
     map["foo"] = 11
     map["bar"] = 22
     map["baz"] = 33
-    
+
     @assert = map.size == 3, map.clear
     @assert = map.size == 0
-  
+
   :it "yields each key and value (in insertion order)"
     map = @new_map
     map["foo"] = 11
@@ -42,34 +42,34 @@
     map["foo"] = 44
     map["baz"] = 55
     map["foo"] = 66
-    
+
     keys Array(String) = []
     values Array(U64) = []
     map.each -> (key, value | keys << key, values << value)
-    
+
     @assert = keys == ["bar", "baz", "foo"]
     @assert = values == [22, 55, 66]
-  
+
   :it "yields each key and value until the criteria is met"
     map = @new_map
     map["foo"] = 11
     map["bar"] = 22
     map["baz"] = 33
-    
+
     count = USize[0]
     key = ""
     found_it = map.each_until -> (k, v | count += 1, key = k, v == 22)
     @assert = found_it
     @assert = count == 2
     @assert = key == "bar"
-    
+
     count = USize[0]
     key = ""
     found_it = map.each_until -> (k, v | count += 1, key = k, v == 33)
     @assert = found_it
     @assert = count == 3
     @assert = key == "baz"
-    
+
     count = USize[0]
     key = ""
     found_it = map.each_until -> (k, v | count += 1, key = k, v == 99)

@@ -3,11 +3,11 @@
 :class CPointerSpec
   :is Spec
   :const describes: "CPointer"
-  
+
   :it "converts to and from USize"
     @assert = CPointer(U8).null.usize == 0
     @assert = CPointer(U8).from_usize(36).usize == 36
-  
+
   :it "tests if it is a null pointer or not"
     @assert = CPointer(U8).null.is_null
     @assert = CPointer(U8).null.is_not_null.not

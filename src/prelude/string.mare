@@ -1,6 +1,6 @@
 :class val String
   :is Comparable(String'box)
-  
+
   :prop _size USize
   :prop _alloc USize // TODO: rename as `_space`
   :prop _ptr CPointer(U8)'ref
@@ -9,52 +9,52 @@
   :fun cpointer CPointer(U8): @_ptr
   :fun hash: @_ptr._hash(@_size)
   :fun size: @_size
-  
+
   :new ref (space USize = 0)
     @_size = 0
     @_alloc = space.max(8)
     @_ptr = CPointer(U8)._alloc(@_alloc)
-  
+
   :new iso new_iso (space USize = 0) // TODO: use `recover` with `new` instead
     @_size = 0
     @_alloc = space.max(8)
     @_ptr = CPointer(U8)._alloc(@_alloc)
-  
+
   :new val from_array (data Array(U8)'val)
     @_size = data.size
     @_alloc = data.space
     @_ptr = data.cpointer._unsafe
-  
+
   :fun "==" (other String'box)
     (@_size == other._size) && (@_ptr._compare(other._ptr, @_size) == 0)
-  
+
   :: Returns True if this String starts with a substring equal to the other.
   :: Otherwise, returns False.
   :fun starts_with (other String'box)
     (@_size >= other.size) && (@_ptr._compare(other._ptr, other.size) == 0)
-  
+
   :: Returns True if this String ends with a substring equal to the other.
   :: Otherwise, returns False.
   :fun ends_with (other String'box)
     (@_size >= other.size) && (
       @_ptr._offset(@_size - other.size)._compare(other._ptr, other.size) == 0
     )
-  
+
   :fun is_empty:     @size == 0
   :fun is_not_empty: @size != 0
-  
+
   :fun clone iso
     copy = @new_iso(@size)
     _ptr_tag tag = @_ptr // TODO: this indirection shouldn't be needed
     copy._clone_from(_ptr_tag, @size)
     copy._size = @size
     --copy // TODO: auto-consume at end of the function?
-  
+
   :fun ref _clone_from (other_ptr CPointer(U8), size USize)
     other_ptr._unsafe._copy_to(@_ptr, size)
-  
+
   :fun includes (other): try (@offset_of!(other), True | False)
-  
+
   :fun offset_of! (other String'box, start_offset USize = 0)
     found Bool = False
     offset = start_offset
@@ -67,7 +67,7 @@
     )
     if found.not error!
     offset - 1
-  
+
   :: Returns true if the string is null-terminated and safe to pass to an FFI
   :: function that doesn't accept a size argument, expecting a null-terminator.
   ::
@@ -76,15 +76,15 @@
   :: which may be present earlier in the content of the string.
   ::
   :: Use the cstring method to get a null-terminated version of the string.
-  
+
   :fun is_null_terminated: (@_alloc > @_size) && (@_ptr._get_at(@_size) == 0)
-  
+
   :: Returns a CPointer to a null-terminated version of this string,
   :: copying the string if necessary to get a null-terminated pointer.
   ::
   :: Call the cpointer method instead when you don't need a null terminator
   :: (that is, when the FFI function you are calling has a size argument).
-  
+
   :fun cstring CPointer(U8)
     if @is_null_terminated (
       ret tag = @_ptr // TODO: remove this type hint - it shouldn't be needed
@@ -94,10 +94,10 @@
       ptr._assign_at(@_size, 0)
       ret tag = ptr // TODO: remove this type hint - it shouldn't be needed
     )
-  
+
   :: Ensure enough capacity is allocated for the given space, in bytes.
   :: An additional byte will be reserved for a null terminator.
-  
+
   :fun ref reserve (space)
     if (@_alloc <= space) (
       max_space = USize[-1] // TODO: USize.max_value ?
@@ -108,25 +108,25 @@
       )
       @_ptr = @_ptr._realloc(@_alloc)
     )
-  
+
   :fun "[]!" (index USize)
     if (@size <= index) error!
     @_ptr._get_at(index)
-  
+
   :fun _offset_to_index (offset ISize) USize
     if (offset < 0) (offset.usize + @size | offset.usize)
-  
+
   :: Return a shared portion of this string, covering `from` until `to`,
   :: with negative values in `from` and `to` representing indexes counting
   :: backward from the end of the string.
   ::
   :: Both the original and the new string are immutable, as they share memory.
   :: The operation does not allocate a new string pointer nor copy elements.
-  
+
   :fun val trim (from ISize = 0, to ISize = 0x7FFF_FFFF_FFFF_FFFF) // TODO: ISize.max_value
     start = @_offset_to_index(from)
     finish = @_offset_to_index(to).min(@size)
-    
+
     if (start < @_size && start < finish) (
       size = finish - start
       @val_from_cpointer(
@@ -137,13 +137,13 @@
     |
       @val_from_cpointer(@_ptr._null, 0, 0)
     )
-  
+
   :fun ref push_byte (byte U8)
     @reserve(@_size + 1)
     @_ptr._assign_at(@_size, byte)
     @_size += 1
     @
-  
+
   :fun each_byte
     index USize = 0
     while (index < @_size) (
@@ -151,7 +151,7 @@
       index = index + 1
     )
     @
-  
+
   :fun each_byte_with_index
     index USize = 0
     while (index < @_size) (
@@ -159,7 +159,7 @@
       index = index + 1
     )
     @
-  
+
   :fun ref "<<" (other String'box)
     new_size = @_size + other._size
     @reserve(new_size)
@@ -170,28 +170,28 @@
     )
     @_size = new_size
     @
-  
+
   :: Return a new string consisting of the original string copied `n` times.
   :fun "*" (times USize)
     if (times > 0) (
       ptr = @_ptr._alloc(@size * times)
       size = 0
-      
+
       while (times > 0) (times -= 1
         @_ptr._copy_to(ptr._offset(size), @size)
         size += @size
       )
-      
+
       @val_from_cpointer(ptr, size, size)
     |
       @val_from_cpointer(@_ptr._null, 0, 0)
     )
-  
+
   :fun val split (split_byte U8) // TODO: a byte shouldn't be the only thing we can split by...
     result Array(String) = []
     @each_split(split_byte) -> (s | result << s)
     result
-  
+
   :fun val each_split (split_byte U8) // TODO: a byte shouldn't be the only thing we can split by...
     :yields String
     finish USize = 0
@@ -216,7 +216,7 @@
       @_alloc - start
     )
     @
-  
+
   :fun "<" (other String'box)
     min_size = @size.min(other.size)
     index USize = 0
@@ -234,7 +234,7 @@
       result = @size < other.size
     )
     result
-  
+
   :fun "<=" (other String'box)
     min_size = @size.min(other.size)
     index USize = 0
@@ -252,10 +252,10 @@
       result = @size <= other.size
     )
     result
-  
+
   :fun ">=" (other String'box) Bool: (@ < other).not // TODO: inherit from Comparable(String) instead of implementing here
   :fun ">" (other String'box) Bool: (@ <= other).not // TODO: inherit from Comparable(String) instead of implementing here
-  
+
   :fun parse_i64! // TODO: Use something like Crystal's Char::Reader instead?
     output I64 = 0
     possible_negation I64 = 1

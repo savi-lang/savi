@@ -20,10 +20,10 @@
     output = String.new
     @into(output, input)
     output
-  
+
   :fun out (input box)
     InspectLibC.puts(@[input].cstring)
-  
+
   :fun into (output String'ref, input box) None // TODO: use something like Crystal IO instead of String?
     case (
     | input <: _InspectCustom | input.inspect_into(output)

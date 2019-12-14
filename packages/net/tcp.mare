@@ -13,22 +13,22 @@
   :prop listen (TCPListener | None): None
   :prop notify TCPConnectionNotify
   :prop connect_error OSError: OSErrorNone
-  
+
   :prop _connect_count U32
   :prop _read_buffer Array(U8) // TODO: iso
   :prop _read_buffer_offset USize: 0
   :prop _read_buffer_size USize
   :prop _yield_after_reading USize
   :prop _yield_after_writing USize
-  
+
   :prop _fd U32: -1
   :prop _event CPointer(AsioEvent): CPointer(AsioEvent).null
   :prop _expect USize: 0
-  
+
   :prop _pending_sent USize: 0
   :prop _pending_writev_total USize: 0
   :prop _pending_writev Array(CPointer(U8)): []
-  
+
   :prop _connected     Bool: False
   :prop _readable      Bool: False
   :prop _reading       Bool: False
@@ -39,7 +39,7 @@
   :prop _shutdown_peer Bool: False
   :prop _in_sent       Bool: False
   :prop _muted         Bool: False
-  
+
   :new (
     // TODO: TCPConnectionAuth, rather than ambient authority.
     notify TCPConnectionNotify'iso
@@ -53,12 +53,12 @@
     @notify = --notify // TODO: is it possible to use param assign sugar for this?
     @_read_buffer = Array(U8).new(@_read_buffer_size)
     @_read_buffer.reserve_undefined(@_read_buffer_size)
-    
+
     asio_flags =
       if Platform.windows (AsioEvent.read_write | AsioEvent.read_write_oneshot)
     @_connect_count = _OSSocket.connect_tcp(@, host, service, from, asio_flags)
     @_notify_connecting
-  
+
   :new _accept (
     // TODO: TCPConnectionAuth, rather than ambient authority.
     listen TCPListener
@@ -72,22 +72,22 @@
     @_connect_count = 0
     @_connected = True
     @_writeable = True
-    
+
     @notify = --notify // TODO: is it possible to use param assign sugar for this?
     @_read_buffer = Array(U8).new(@_read_buffer_size)
     @_read_buffer.reserve_undefined(@_read_buffer_size)
-    
+
     asio_flags =
       if Platform.windows (AsioEvent.read_write | AsioEvent.read_write_oneshot)
     @_event = AsioEvent.create(@, @_fd, asio_flags, 0, True)
     @_notify_accepted // TODO: shouldn't need this indirection
-    
+
     @_readable = True
     @_windows_queue_read
     @_pending_reads
-  
+
   :fun ref _notify_accepted: @notify.accepted(@)
-  
+
   :fun ref _notify_connecting
     if (@_connect_count > 0) (
       // When nonzero, we know we're connecting, so we call the connecting hook.
@@ -99,7 +99,7 @@
       @notify.connect_failed(@)
       @hard_close
     )
-  
+
   :: Write a single sequence of bytes.
   :: WARNING: Data will be silently discarded if the socket isn't connected.
   :be write (data String)
@@ -108,7 +108,7 @@
       @write_final(@notify.sent(@, data))
       @_in_sent = False
     )
-  
+
   :: Write a single sequence of bytes without calling the sent hook.
   :: WARNING: Data will be silently discarded if the socket isn't connected.
   :fun ref write_final (data String)
@@ -127,7 +127,7 @@
         )
       )
     )
-  
+
   :: This is a special behaviour that hooks into the AsioEventNotify runtime,
   :: called whenever an event handle we're subscribed to receives an event.
   :be _event_notify (event CPointer(AsioEvent), flags U32, arg U32)
@@ -136,7 +136,7 @@
     |
       @_event_notify_initial(event, flags, arg)
     )
-  
+
   :: Handle incoming events for an event handle that we don't recognize.
   :fun ref _event_notify_initial (event CPointer(AsioEvent), flags U32, arg U32)
     if AsioEvent.is_writeable(flags).not (
@@ -146,7 +146,7 @@
       // A connection has completed.
       fd = AsioEvent.fd(event)
       @_connect_count -= 1
-      
+
       if (@_connected || @_closed) (
         // Someone may already be subscribed to this event.
         // This is a race condition, and we avoid issue by trying to close it.
@@ -162,7 +162,7 @@
           @_connected = True
           @_writeable = True
           @_readable = True
-          
+
           @notify.connected(@)
           @_windows_queue_read
           @_pending_reads
@@ -175,7 +175,7 @@
         )
       )
     )
-  
+
   :: Handle incoming events for the event handle that we already own.
   :fun ref _event_notify_continue (flags U32, arg U32)
     if AsioEvent.is_writeable(flags) (
@@ -193,14 +193,14 @@
     )
     if @_closed @_close
     None
-  
+
   :be _pending_reads_later: @_pending_reads
   :fun ref _pending_reads None: if Platform.windows.not @_pending_reads_inner // TODO: shouldn't need the explicit return type of None
   :fun ref _pending_reads_inner
     total_bytes_read USize = 0
     received_called USize = 0
     @_reading = True
-    
+
     // Read data from the socket as long as it is readable, or until one of
     // our several early return conditions is reached (throwing an error!)
     try (
@@ -209,20 +209,20 @@
           @_reading = False
           error! // TODO: early return instead of error?
         )
-        
+
         // Distribute data from the read buffer if we have some that is ready.
         while (@_read_buffer_offset >= @_expect && @_read_buffer_offset > 0) (
           // If the caller is expecting a specific number of bytes,
           // respect that and give them exactly that many bytes from the buffer.
           // Otherwise, we'll give them everything that we have received so far.
           chop_at = if (@_expect == 0) (@_read_buffer_offset | @_expect)
-          
+
           // Callback to the handler for the received hook, including telling
           // them the number of times we've called them from this loop so far.
           received_called += 1
           keep_reading =
             @notify.received(@, @_read_buffer_chop(chop_at), received_called)
-          
+
           // Stop reading if the handler asked us to stop by returning False.
           if keep_reading.not (
             @_pending_reads_later
@@ -230,7 +230,7 @@
             error! // TODO: early return instead of error?
           )
         )
-        
+
         // Stop reading if we've already read the maximum number of bytes
         // per call to this function. We have this limit in place to prevent
         // a socket with a lot of data from starving the other actors.
@@ -239,11 +239,11 @@
           @_reading = False
           error! // TODO: early return instead of error?
         )
-        
+
         // Prepare the buffer, then receive bytes into it from the socket.
         @_read_buffer_reserve
         bytes_read = @_read_buffer_recv!
-        
+
         // If we read zero bytes, we know that further reading would block,
         // so we'll set the event handle as non-readable and try again later.
         // This is safe because the asio thread isn't currently subscribed
@@ -254,19 +254,19 @@
           @_reading = False
           AsioEvent.resubscribe_read(@_event)
         )
-        
+
         // Move our read buffer offset forward, as well as our running total.
         @_read_buffer_offset += bytes_read
         total_bytes_read += bytes_read
       )
     )
-  
+
   :: Resize the read buffer if it is empty or smaller than the next payload.
   :fun ref _read_buffer_reserve
     if (@_read_buffer.size <= @_expect) (
       @_read_buffer.reserve_undefined(@_read_buffer_size)
     )
-  
+
   :: Receive bytes into the read buffer, starting at the appropriate offset.
   :: Raises an error and initiates a hard close if the socket was closed
   :: on the other side of the connection.
@@ -277,22 +277,22 @@
       @hard_close
       error!
     )
-  
+
   :: Remove the given number of bytes from the left side of the read buffer,
   :: returning the removed bytes, keeping the right side of the buffer in place.
   :fun ref _read_buffer_chop (size)
     // TODO: Use chop instead of clone, to avoid copying bytes.
     copy = @_read_buffer.clone
     copy.trim_in_place(0, size)
-    
+
     // Move our read buffer offset forward to the point at which we chopped,
     // so that future bytes will be read into the unused part of the buffer.
     @_read_buffer_offset -= size
-    
+
     // Return the buffer, as a String.
     // TODO: Probably use Array(U8) instead, as Pony does.
     String.from_array(--copy)
-  
+
   :: Attempt to close the connection gracefully, after all writes are sent.
   :: New writes arriving after this will be ignored and discarded.
   :: All data currently available to be read from the socket will be read.
@@ -302,16 +302,16 @@
   :fun ref close: if (@_muted.not || Platform.windows) (@_close | @hard_close)
   :fun ref _close
     @_closed = True
-    
+
     // Start shutting down the socket if it's ready for that step.
     if (@_shutdown.not && @_connect_count == 0 && @_pending_writev_total == 0) (
       @_shutdown = True
       if @_connected (_OSSocket.shutdown(@_fd) | @_shutdown_peer = True)
     )
-    
+
     // Finish with a hard close if the socket is ready for that step.
     if (@_connected && @_shutdown && @_shutdown_peer) @hard_close
-    
+
     // On windows, hard_close doesn't unsubscribe the socket, because we want
     // to wait for all outstanding IOCP operations to be completed or cancelled.
     // So, we finish up here in a later call to this function by unsubscribing,
@@ -322,7 +322,7 @@
     ) (
       AsioEvent.unsubscribe(@_event)
     )
-  
+
   :: When an error happens, this function is invoked for a non-graceful close.
   :: Unlike the close function, this one won't wait around to finish reading.
   :: This function is also used as the final step of a graceful shutdown.
@@ -332,11 +332,11 @@
       @_closed = True
       @_shutdown = True
       @_shutdown_peer = True
-      
+
       @_pending_writev_total = 0
       @_pending_writev.clear
       @_pending_sent = 0
-      
+
       if Platform.windows.not (
         AsioEvent.unsubscribe(@_event)
         @_readable = False
@@ -344,14 +344,14 @@
         AsioEvent.set_readable(@_event, False)
         AsioEvent.set_writeable(@_event, False)
       )
-      
+
       _OSSocket.close(@_fd)
       @_fd = -1
-      
+
       @notify.closed(@)
-      
+
       try @listen.as!(TCPListener)._conn_closed
     )
-  
+
   :fun ref _windows_queue_read // TODO (for windows only)
   :fun ref _windows_complete_reads (arg U32) // TODO (for windows only)

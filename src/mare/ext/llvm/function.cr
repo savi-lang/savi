@@ -2,7 +2,7 @@ struct LLVM::Function
   def entry_block
     BasicBlock.new LibLLVM.get_entry_basic_block self
   end
-  
+
   def add_attribute(
     attribute : Attribute,
     index = AttributeIndex::FunctionIndex,

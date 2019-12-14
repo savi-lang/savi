@@ -12,29 +12,29 @@
 module Mare::Compiler::Import
   def self.run(ctx)
     libraries = {} of String => Source::Library
-    
+
     while true
       remaining = remaining_imports(ctx, libraries)
       break if remaining.empty?
-      
+
       load_more_libraries(ctx, libraries, remaining)
     end
   end
-  
+
   def self.remaining_imports(ctx, libraries)
     remaining = Array(Tuple(String, Program::Import)).new
-    
+
     ctx.program.imports.each do |import|
       import_ident = import.ident
       raise NotImplementedError.new(import.ident.to_a) \
         unless import_ident.is_a?(AST::LiteralString)
-      
+
       source = import_ident.pos.source
       path = Compiler.resolve_library_dirname(
         import_ident.value,
         source.library.path
       )
-      
+
       library = libraries[path]?
       if library
         import.resolved = library
@@ -42,10 +42,10 @@ module Mare::Compiler::Import
         remaining << {path, import}
       end
     end
-    
+
     remaining
   end
-  
+
   def self.load_more_libraries(ctx, libraries, remaining)
     remaining.each do |path, import|
       library = libraries[path]?
@@ -57,7 +57,7 @@ module Mare::Compiler::Import
           .get_library_sources(path)
           .map { |s| Parser.parse(s) }
           .tap(&.each { |doc| ctx.compile(doc) })
-        
+
         libraries[path] = docs.first.source.library
       end
     end

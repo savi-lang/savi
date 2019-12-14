@@ -6,10 +6,10 @@
 :class MapSpec
   :is Spec
   :const describes: "Map"
-  
+
   :fun new_map: Map(String, U64, HashEq(String)).new // TODO: implicit default for HashFunction type argument
   :fun new_actor_map: Map(MapSpecActor, U64, HashId(MapSpecActor)).new
-  
+
   :it "stores and removes values at a given key"
     map = @new_map
     @assert = map.size == 0
@@ -27,7 +27,7 @@
     @assert = try map["example"]! <: None
     @assert = map.has_key("example").not
     @assert = map.size == 0
-  
+
   :it "stores values at actor keys by identity"
     foo = MapSpecActor.new
     bar = MapSpecActor.new
@@ -39,46 +39,46 @@
     @assert = try (map[foo]! == 11 | False)
     @assert = try (map[bar]! == 22 | False)
     @assert = try (map[baz]! == 33 | False)
-  
+
   :it "can be cleared, removing all keys and values"
     map = @new_map
     map["foo"] = 11
     map["bar"] = 22
     map["baz"] = 33
-    
+
     @assert = map.size == 3, map.clear
     @assert = map.size == 0
-  
+
   :it "yields each key and value"
     map = @new_map
     map["foo"] = 11
     map["bar"] = 22
     map["baz"] = 33
-    
+
     copy = @new_map
     map.each -> (key, value | copy[key] = value)
-    
+
     @assert = copy.size == 3
     @assert = try (copy["foo"]! | U64[0]) == 11
     @assert = try (copy["bar"]! | U64[0]) == 22
     @assert = try (copy["baz"]! | U64[0]) == 33
-  
+
   :it "yields each key and value until the criteria is met"
     map = @new_map
     map["foo"] = 11
     map["bar"] = 22
     map["baz"] = 33
-    
+
     this_key = ""
     found_it = map.each_until -> (key, value | this_key = key, value == 22)
     @assert = found_it
     @assert = this_key == "bar"
-    
+
     this_key = ""
     found_it = map.each_until -> (key, value | this_key = key, value == 33)
     @assert = found_it
     @assert = this_key == "baz"
-    
+
     this_key = ""
     found_it = map.each_until -> (key, value | this_key = key, value == 99)
     @assert = found_it.not

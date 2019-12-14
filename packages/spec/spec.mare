@@ -2,11 +2,11 @@
   :prop test TestHelper
   :fun env: @test.env
   :new (@test)
-  
+
   :: When implementing the Spec trait, include a definition for this constant
   :: indicating what entity the tests are describing the specification for.
   :const describes String
-  
+
   :fun ref "assert=" (
     success Bool
     pos SourceCodePosition = source_code_position_of_argument success
@@ -19,11 +19,11 @@
   :prop spec String
   :prop example String
   :new (@env, @specs, @spec, @example)
-  
+
   :fun assert (success, pos) // TODO: avoid needing this alias
     @specs.assert(@spec, @example, success, pos)
     success
-  
+
   :fun "assert=" (
     success Bool
     pos SourceCodePosition = source_code_position_of_argument success

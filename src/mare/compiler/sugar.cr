@@ -16,22 +16,22 @@ class Mare::Compiler::Sugar < Mare::AST::Visitor
       t.functions.each do |f|
         sugar = new
         sugar.run(f)
-        
+
         # Run pseudo-call transformation as a separate followup mini-pass,
         # because some of the sugar transformations need to already be done.
         PseudoCalls.run(f, sugar)
       end
     end
   end
-  
+
   def initialize
     @last_hygienic_local = 0
   end
-  
+
   def next_local_name
     "hygienic_local.#{@last_hygienic_local += 1}"
   end
-  
+
   def run(f)
     # If any parameters contain assignments, convert them to defaults.
     if f.body && f.params
@@ -41,11 +41,11 @@ class Mare::Compiler::Sugar < Mare::AST::Visitor
         end
       end
     end
-    
+
     # Sugar the parameter signature and return type.
     f.params.try(&.accept(self))
     f.ret.try(&.accept(self))
-    
+
     # If any parameters contain assignables, make assignments in the body.
     if f.params
       param_assign_count = 0
@@ -55,11 +55,11 @@ class Mare::Compiler::Sugar < Mare::AST::Visitor
           orig_param_with_default = param
           param = param.lhs
         end
-        
+
         # If the param is a dot relation, treat it as an assignable.
         if param.is_a?(AST::Relate) && param.op.value == "."
           new_name = "ASSIGNPARAM.#{index + 1}"
-          
+
           # Replace the parameter with our new name as the identifier.
           param_ident = AST::Identifier.new(new_name).from(param)
           if orig_param_with_default
@@ -67,7 +67,7 @@ class Mare::Compiler::Sugar < Mare::AST::Visitor
           else
             f.params.not_nil!.terms[index] = param_ident
           end
-          
+
           # Add the assignment statement to the top of the function body.
           f.body ||= AST::Group.new(":").from(f.params.not_nil!)
           f.body.not_nil!.terms.insert(param_assign_count,
@@ -84,7 +84,7 @@ class Mare::Compiler::Sugar < Mare::AST::Visitor
         end
       end
     end
-    
+
     # If this is a constructor, sugar a final "@" reference at the end.
     #
     # This isn't required by the CodeGen pass, but it improves intermediate
@@ -93,7 +93,7 @@ class Mare::Compiler::Sugar < Mare::AST::Visitor
     if f.has_tag?(:constructor)
       f.body.try { |body| body.terms << AST::Identifier.new("@").from(f.ident) }
     end
-    
+
     # If this is a behaviour or function that returns None,
     # sugar a final "None" reference at the end.
     if (f.has_tag?(:async) && !f.has_tag?(:constructor)) \
@@ -102,11 +102,11 @@ class Mare::Compiler::Sugar < Mare::AST::Visitor
         body.terms << AST::Identifier.new("None").from(ret || f.ident)
       end
     end
-    
+
     # Sugar the body.
     f.body.try { |body| body.accept(self) }
   end
-  
+
   def visit(node : AST::Identifier)
     if node.value == "@"
       node
@@ -121,7 +121,7 @@ class Mare::Compiler::Sugar < Mare::AST::Visitor
       node
     end
   end
-  
+
   def visit(node : AST::Qualify)
     # Transform square-brace qualifications into method calls
     square_bracket =
@@ -137,7 +137,7 @@ class Mare::Compiler::Sugar < Mare::AST::Visitor
       rhs = visit(node)
       return AST::Relate.new(lhs, dot, rhs).from(node)
     end
-    
+
     # If a dot relation is within a qualify, move the qualify into the
     # right-hand-side of the dot (this cleans up the work of the parser).
     new_top = nil
@@ -148,7 +148,7 @@ class Mare::Compiler::Sugar < Mare::AST::Visitor
     end
     new_top || node
   end
-  
+
   def visit(node : AST::Relate)
     case node.op.value
     when ".", "'", "+>", " ", "<:", "is", "DEFAULTPARAM"
@@ -171,7 +171,7 @@ class Mare::Compiler::Sugar < Mare::AST::Visitor
         when "-=" then "-"
         else raise NotImplementedError.new(node.op.value)
         end
-      
+
       visit(
         AST::Relate.new(
           node.lhs,
@@ -249,7 +249,7 @@ class Mare::Compiler::Sugar < Mare::AST::Visitor
       AST::Relate.new(node.lhs, dot, rhs).from(node)
     end
   end
-  
+
   # Handle pseudo-method sugar like `as!` calls.
   # TODO: Can this be done as a "universal method" rather than sugar?
   class PseudoCalls < Mare::AST::Visitor
@@ -258,27 +258,27 @@ class Mare::Compiler::Sugar < Mare::AST::Visitor
       f.params.try(&.accept(ps))
       f.body.try(&.accept(ps))
     end
-    
+
     getter sugar : Sugar
     def initialize(@sugar)
     end
-    
+
     def visit(node : AST::Node)
       return node unless node.is_a?(AST::Relate) && node.op.value == "."
-      
+
       call_ident, call_args, yield_params, yield_block = AST::Extract.call(node)
-      
+
       return node unless call_ident
-      
+
       case call_ident.value
       when "as!"
         Error.at call_ident,
           "This call requires exactly one argument (the type to check)" \
             unless call_args && call_args.terms.size == 1
-        
+
         local_name = sugar.next_local_name
         type_arg = call_args.terms.first
-        
+
         group = AST::Group.new("(").from(node)
         group.terms << AST::Relate.new(
           AST::Identifier.new(local_name).from(node.lhs),
@@ -299,7 +299,7 @@ class Mare::Compiler::Sugar < Mare::AST::Visitor
             AST::Identifier.new("error!").from(call_ident),
           },
         ] of {AST::Term, AST::Term}).from(node.op)
-        
+
         group
       else
         node # all other calls are passed through unchanged

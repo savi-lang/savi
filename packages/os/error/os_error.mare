@@ -1,12 +1,12 @@
 :enum OSError
   :const bit_width U8: 32
-  
+
   :fun name: @member_name
-  
+
   // TODO: cross-platform; see http://www.ioplex.com/~miallen/errcmp.html
-  
+
   :member OSErrorNone:       0 :: Success
-  
+
   :member EPERM:             1 :: Operation not permitted
   :member ENOENT:            2 :: No such file or directory
   :member ESRCH:             3 :: No such process
@@ -47,7 +47,7 @@
   :member ENOSYS:           38 :: Invalid system call number
   :member ENOTEMPTY:        39 :: Directory not empty
   :member ELOOP:            40 :: Too many symbolic links encountered
-  
+
   :member ENOMSG:           42 :: No message of desired type
   :member EIDRM:            43 :: Identifier removed
   :member ECHRNG:           44 :: Channel number out of range
@@ -64,7 +64,7 @@
   :member ENOANO:           55 :: No anode
   :member EBADRQC:          56 :: Invalid request code
   :member EBADSLT:          57 :: Invalid slot
-  
+
   :member EBFONT:           59 :: Bad font file format
   :member ENOSTR:           60 :: Device not a stream
   :member ENODATA:          61 :: No data available

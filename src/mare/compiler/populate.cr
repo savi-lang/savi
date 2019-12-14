@@ -19,7 +19,7 @@ module Mare::Compiler::Populate
         # Only look at functions that have the "copies" tag.
         # Often these "functions" are actually "is" annotations.
         next unless f.has_tag?(:copies)
-        
+
         # Find the type associated with the "return value" of the "function"
         # and copy the functions from it that we need.
         ret = f.ret
@@ -32,7 +32,7 @@ module Mare::Compiler::Populate
           source = ctx.refer_type[ret.term.as(AST::Identifier)]?
           Error.at ret, "This type couldn't be resolved" unless source
           source = source.as(Refer::Type) # TODO: handle cases of Refer::TypeAlias or Refer::TypeParam
-          
+
           # We need to build a replace map and a visitor that will use it to
           # find every identifier referencing the type parameter and replace it
           # with the AST from the corresponding qualify arg, transforming the
@@ -50,10 +50,10 @@ module Mare::Compiler::Populate
         else
           raise NotImplementedError.new(ret)
         end
-        
+
         copy_from(source.defn, dest, visitor)
       end
-      
+
       # If the type doesn't have a constructor and needs one, then add one.
       if dest.has_tag?(:allocated) && !dest.has_tag?(:abstract) \
       && !dest.functions.any? { |f| f.has_tag?(:constructor) }
@@ -69,12 +69,12 @@ module Mare::Compiler::Populate
           f.add_tag(:constructor)
           f.add_tag(:async) if dest.has_tag?(:actor)
         end
-        
+
         dest.functions << func
       end
     end
   end
-  
+
   # For each concrete function in the given source, copy it to the destination
   # if the destination doesn't already have an implementation for it.
   def self.copy_from(
@@ -86,14 +86,14 @@ module Mare::Compiler::Populate
       if !f.has_tag?(:field) # always copy fields; skip these checks if a field
         # We ignore hygienic functions entirely.
         next if f.has_tag?(:hygienic)
-        
+
         # We don't copy functions that have no implementation.
         next if f.body.nil? && !f.has_tag?(:compiler_intrinsic)
-        
+
         # We won't copy a function if the dest already has one of the same name.
         next if dest.find_func?(f.ident.value)
       end
-      
+
       # Copy the function.
       new_f = f.dup
       if visitor
@@ -106,7 +106,7 @@ module Mare::Compiler::Populate
       dest.functions << new_f
     end
   end
-  
+
   # This visitor, given a mapping of type params to AST nodes,
   # will replace every identifier that represents one of those type params
   # with the corresponding replacement AST node provided in the mapping.
@@ -116,12 +116,12 @@ module Mare::Compiler::Populate
       @replace_map : Hash(Refer::TypeParam, AST::Node)
     )
     end
-    
+
     # We need to duplicate the AST tree to avoid mutating the original.
     def dup_nodes?
       false
     end
-    
+
     def visit(node)
       if node.is_a?(AST::Identifier) \
       && (ref = @ctx.refer_type[node]?; ref.is_a?(Refer::TypeParam))

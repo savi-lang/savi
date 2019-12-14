@@ -6,9 +6,9 @@ describe Mare::Compiler::Macros do
         :new
           yield True
       SOURCE
-      
+
       ctx = Mare::Compiler.compile([source], :macros)
-      
+
       func = ctx.namespace.find_func!("Main", "new")
       func.body.not_nil!.to_a.should eq [:group, ":",
         [:group, "(",
@@ -16,36 +16,36 @@ describe Mare::Compiler::Macros do
         ],
       ]
     end
-    
+
     it "complains if the number of terms is more than 1" do
       source = Mare::Source.new_example <<-SOURCE
       :actor Main
         :new
           yield True what now
       SOURCE
-      
+
       expected = <<-MSG
       This macro has too many terms:
       from (example):3:
           yield True what now
           ^~~~~~~~~~~~~~~~~~~
-      
+
       - this term is the value to be yielded out to the calling function:
         from (example):3:
           yield True what now
                 ^~~~
-      
+
       - this is an excessive term:
         from (example):3:
           yield True what now
                      ^~~~
-      
+
       - this is an excessive term:
         from (example):3:
           yield True what now
                           ^~~
       MSG
-      
+
       expect_raises Mare::Error, expected do
         Mare::Compiler.compile([source], :macros)
       end

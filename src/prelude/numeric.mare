@@ -3,7 +3,7 @@
   :const is_signed Bool: False
   :const is_floating_point Bool: False
   // TODO: arithmetic method traits with type parameters on Numeric[A] type
-  
+
   :fun u8 U8: compiler intrinsic
   :fun u16 U16: compiler intrinsic
   :fun u32 U32: compiler intrinsic
@@ -21,23 +21,23 @@
   :const bit_width U8
   :const is_signed Bool
   :const is_floating_point Bool
-  
+
   :fun non "[]" (value @'val) @'val: value
   :fun non zero @'val: compiler intrinsic
-  
+
   :fun "==" (other @) Bool: compiler intrinsic
   :fun "!=" (other @) Bool: compiler intrinsic
   :fun "<" (other @) Bool: compiler intrinsic
   :fun "<=" (other @) Bool: compiler intrinsic
   :fun ">" (other @) Bool: compiler intrinsic
   :fun ">=" (other @) Bool: compiler intrinsic
-  
+
   :fun val "+" (other @) @: compiler intrinsic
   :fun val "-" (other @) @: compiler intrinsic
   :fun val "*" (other @) @: compiler intrinsic
   :fun val "/" (other @) @: compiler intrinsic
   :fun val "%" (other @) @: compiler intrinsic
-  
+
   :fun val min (other @) @: if (@ < other) (@ | other)
   :fun val max (other @) @: if (@ > other) (@ | other)
   :fun val abs: if (@is_signed && @ < @zero) (@zero - @ | @)
@@ -47,7 +47,7 @@
   :const is_signed Bool // TODO: dedup with Numeric
   :fun u64 U64: compiler intrinsic // TODO: dedup with Numeric
   :fun usize USize: compiler intrinsic // TODO: dedup with Numeric
-  
+
   :fun val bit_and (other @) @: compiler intrinsic
   :fun val bit_or (other @) @: compiler intrinsic
   :fun val bit_xor (other @) @: compiler intrinsic
@@ -61,7 +61,7 @@
   :fun val count_ones U8: compiler intrinsic
   :fun val count_zeros U8: @invert.count_ones
   :fun val next_pow2 @: compiler intrinsic
-  
+
   :fun hash USize
     if (USize.bit_width == 32) (
       x = @usize
@@ -75,7 +75,7 @@
     |
       @hash64.usize
     )
-  
+
   :fun hash64 U64
     x = @u64
     x = x.invert + x.bit_shl(21)
@@ -90,23 +90,23 @@
 :trait val Float32Methods
   :fun non from_bits (bits U32) @'val: compiler intrinsic
   :fun val bits U32: compiler intrinsic
-  
+
   :fun non nan:          @from_bits(0x7FC0_0000)
   :fun non infinity:     @from_bits(0x7F80_0000)
   :fun non neg_infinity: @from_bits(0xFF80_0000)
   :fun non max_value:    @from_bits(0x7F7F_FFFF)
   :fun non min_value:    @from_bits(0xFF7F_FFFF)
-  
+
   // Return true if the number is NaN.
   :fun val is_nan
     @bits.bit_and(0x7F80_0000) == 0x7F80_0000 && // exponent
     @bits.bit_and(0x007F_FFFF) != 0              // mantissa
-  
+
   // Return true if the number is positive or negative infinity.
   :fun val is_infinite
     @bits.bit_and(0x7F80_0000) == 0x7F80_0000 && // exponent
     @bits.bit_and(0x007F_FFFF) == 0              // mantissa
-  
+
   // Return true if the number is neither NaN nor positive or negative infinity.
   :fun val is_finite
     @bits.bit_and(0x7F80_0000) != 0x7F80_0000 // exponent
@@ -114,23 +114,23 @@
 :trait val Float64Methods
   :fun non from_bits (bits U64) @'val: compiler intrinsic
   :fun val bits U64: compiler intrinsic
-  
+
   :fun non nan:          @from_bits(0x7FF8_0000_0000_0000)
   :fun non infinity:     @from_bits(0x7FF0_0000_0000_0000)
   :fun non neg_infinity: @from_bits(0xFFF0_0000_0000_0000)
   :fun non max_value:    @from_bits(0x7FEF_FFFF_FFFF_FFFF)
   :fun non min_value:    @from_bits(0xFFEF_FFFF_FFFF_FFFF)
-  
+
   // Return true if the number is NaN.
   :fun val is_nan
     @bits.bit_and(0x7FF0_0000_0000_0000) == 0x7FF0_0000_0000_0000 && // exponent
     @bits.bit_and(0x000F_FFFF_FFFF_FFFF) != 0                        // mantissa
-  
+
   // Return true if the number is positive or negative infinity.
   :fun val is_infinite
     @bits.bit_and(0x7FF0_0000_0000_0000) == 0x7FF0_0000_0000_0000 && // exponent
     @bits.bit_and(0x000F_FFFF_FFFF_FFFF) == 0                        // mantissa
-  
+
   // Return true if the number is neither NaN nor positive or negative infinity.
   :fun val is_finite
     @bits.bit_and(0x7FF0_0000_0000_0000) != 0x7FF0_0000_0000_0000 // exponent

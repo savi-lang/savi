@@ -11,25 +11,25 @@ class Mare::Compiler::Inventory < Mare::AST::Visitor
   getter! current_ctx : Context?
   getter! current_type : Program::Type?
   getter! current_func : Program::Function?
-  
+
   def initialize
     @locals = {} of Program::Function => Array(Refer::Local)
     @yields = {} of Program::Function => Array(AST::Yield)
     @yielding_calls = {} of Program::Function => Array(AST::Relate)
   end
-  
+
   def locals(func)
     @locals[func]? || [] of Refer::Local
   end
-  
+
   def yields(func)
     @yields[func]? || [] of AST::Yield
   end
-  
+
   def yielding_calls(func)
     @yielding_calls[func]? || [] of AST::Relate
   end
-  
+
   def run(ctx)
     @current_ctx = ctx
     ctx.program.types.each do |t|
@@ -44,7 +44,7 @@ class Mare::Compiler::Inventory < Mare::AST::Visitor
     @current_type = nil
     @current_func = nil
   end
-  
+
   def visit(node)
     case node
     when AST::Identifier
@@ -64,7 +64,7 @@ class Mare::Compiler::Inventory < Mare::AST::Visitor
         end
       end
     end
-    
+
     node
   end
 end

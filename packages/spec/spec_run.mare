@@ -5,11 +5,11 @@
   :is SpecRunAny
   :prop env Env
   :new (@env)
-  
+
   // TODO: avoid this indirection
   :fun _new_spec (specs) A
     A.new(TestHelper.new(@env, specs, A.describes, ""))
-  
+
   :: Run all spec features for the Spec type indicated by the type argument,
   :: using the given Env to construct an instance of that Spec type.
   ::
@@ -20,25 +20,25 @@
     features = type.features.select -> (feature |
       feature.tags.includes("it")
     )
-    
+
     specs.spec_began(A.describes, features.size)
-    
+
     features.each -> (feature |
       SpecExampleRunner(A).new(@env, specs, feature)
     )
 
 :actor SpecExampleRunner (A Spec)
   :prop example ReflectionFeatureOfType(A)
-  
+
   :new (env, specs, @example)
     helper = TestHelper.new(env, specs, A.describes, @example.name)
     spec = A.new(helper)
-    
+
     specs.example_began(A.describes, @example.name)
-    
+
     called = @example.maybe_call_mutator(spec)
     if called.not (
       Specs._bug(env, "failed to call a spec feature")
     )
-    
+
     specs.example_close(A.describes, @example.name)

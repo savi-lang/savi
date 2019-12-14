@@ -105,12 +105,12 @@ class Mare::Compiler::CodeGen
       {"pony_recv_done", [@ptr], @void, [
         LLVM::Attribute::NoUnwind,
       ]},
-      
+
       # TODO: pony_serialise_reserve
       # TODO: pony_serialise_offset
       # TODO: pony_deserialise_offset
       # TODO: pony_deserialise_block
-      
+
       {"pony_init", [@i32, @pptr], @i32, [
         LLVM::Attribute::NoUnwind, LLVM::Attribute::InaccessibleMemOrArgMemOnly,
       ]},
@@ -126,7 +126,7 @@ class Mare::Compiler::CodeGen
       {"pony_error", [] of LLVM::Type, @void, [
         LLVM::Attribute::NoUnwind, LLVM::Attribute::NoReturn,
       ]},
-      
+
       # Internal Pony runtime functions that we will unscrupulously leverage.
       {"ponyint_next_pow2", [@isize], @isize, [
         LLVM::Attribute::NoUnwind, LLVM::Attribute::ReadNone,
@@ -136,9 +136,9 @@ class Mare::Compiler::CodeGen
         LLVM::Attribute::ReadOnly, LLVM::Attribute::UWTable,
         {1, LLVM::Attribute::ReadOnly},
       ]},
-      
+
       # TODO: ponyint_personality_v0
-      
+
       # Miscellaneous non-pony functions we depend on.
       {"puts", [@ptr], @i32, [] of LLVM::Attribute},
       {"memcmp", [@ptr, @ptr, @isize], @i32, [
