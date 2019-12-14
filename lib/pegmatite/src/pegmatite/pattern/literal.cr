@@ -7,21 +7,21 @@ module Pegmatite
     def initialize(@string : String)
       @size = @string.bytesize.as(Int32)
     end
-    
+
     def inspect(io)
       io << "str(\""
       @string.inspect(io)
       io << "\")"
     end
-    
+
     def dsl_name
       "str"
     end
-    
+
     def description
       @string.inspect
     end
-    
+
     def _match(source, offset, state) : MatchResult
       # We use some ugly patterns here for optimization - this is a hot path!
       return {0, self} if source.bytesize < (offset + @string.bytesize)
@@ -31,7 +31,7 @@ module Pegmatite
           if @string.unsafe_byte_at(i) != source.unsafe_byte_at(offset + i)
         i += 1
       end
-      
+
       {@string.bytesize, nil}
     end
   end

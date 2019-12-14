@@ -6,10 +6,10 @@ module Pegmatite
   class Pattern::Sequence < Pattern
     def initialize(@children = [] of Pattern)
     end
-    
+
     # Override this DSL operator to accrue into the existing sequence.
     def >>(other); Pattern::Sequence.new(@children.dup.push(other)) end
-    
+
     def inspect(io)
       io << "("
       @children.each_with_index do |child, index|
@@ -18,11 +18,11 @@ module Pegmatite
       end
       io << ")"
     end
-    
+
     def dsl_name
       "(>>)"
     end
-    
+
     def description
       case @children.size
       when 0 then "(empty sequence!)"
@@ -32,22 +32,22 @@ module Pegmatite
                   " then #{@children[-1].description}"
       end
     end
-    
+
     def _match(source, offset, state) : MatchResult
       total_length = 0
       tokens : Array(Token)? = nil
-      
+
       # Match each child pattern, capturing tokens and increasing total_length.
       @children.each do |child|
         length, result = child.match(source, offset + total_length, state)
         total_length += length
-        
+
         # Fail as soon as one child pattern fails.
         if !result.is_a?(MatchOK)
           state.observe_fail(offset + total_length, child)
           return {total_length, result}
         end
-        
+
         # Capture the result if it is a token or array of tokens,
         # accounting for the case where the current tokens list is nil.
         if state.tokenize
@@ -67,7 +67,7 @@ module Pegmatite
           end
         end
       end
-      
+
       {total_length, tokens}
     end
   end

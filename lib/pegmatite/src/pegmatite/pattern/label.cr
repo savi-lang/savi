@@ -15,28 +15,28 @@ module Pegmatite
   class Pattern::Label < Pattern
     def initialize(@child : Pattern, @label : Symbol, @tokenize = true)
     end
-    
+
     def inspect(io)
       @label.inspect(io)
     end
-    
+
     def dsl_name
       @label.inspect
     end
-    
+
     def description
       @label.inspect
     end
-    
+
     def _match(source, offset, state) : MatchResult
       length, result = @child.match(source, offset, state)
-      
+
       # If requested, this label will be added as a token to the token stream,
       # preceding any other tokens emitted by the child pattern.
       # This won't happen if the child pattern failed to parse.
       if state.tokenize && @tokenize
         new_token = {@label, offset, offset + length}
-        
+
         case result
         when Nil
           result = new_token
@@ -49,7 +49,7 @@ module Pegmatite
           result.concat(orig_result)
         end
       end
-      
+
       {length, result}
     end
   end

@@ -15,7 +15,7 @@ describe Pegmatite do
       }
     }
     JSON
-    
+
     tokens = Pegmatite.tokenize(Fixtures::JSONGrammar, source)
     tokens.should eq [
       {:object, 0, 182},
@@ -47,7 +47,7 @@ describe Pegmatite do
           {:string, 163, 171}, # "problems"
           {:array, 174, 176}, # []
     ]
-    
+
     result = Fixtures::JSONBuilder.build(tokens, source)
     result.should eq JSON::Any.new({
       "hello" => JSON::Any.new("world"),
@@ -65,93 +65,93 @@ describe Pegmatite do
       } of String => JSON::Any)
     } of String => JSON::Any)
   end
-  
+
   it "traces the parsing process" do
     source = <<-JSON
     ["hello"]
     JSON
-    
+
     io = IO::Memory.new
     tokens = Pegmatite.tokenize(Fixtures::JSONGrammar, source, 0, io)
-    
+
     io.to_s
       .ends_with?("0 ~~~ then_eof - {9, [{:array, 0, 9}, {:string, 2, 7}]}\n")
       .should eq true
   end
-  
+
   it "raises useful parse errors" do
     source = <<-JSON
     {
       "hello": !
     }
     JSON
-    
+
     expected = <<-ERROR
     unexpected token at byte offset 13:
       "hello": !
                ^
     ERROR
-    
+
     expect_raises Pegmatite::Pattern::MatchError, expected do
       Pegmatite.tokenize(Fixtures::JSONGrammar, source)
     end
   end
-  
+
   it "correctly raises a parse error pointing to a newline" do
     source = <<-JSON
     {
       "hello": 93.
     }
     JSON
-    
+
     expected = <<-ERROR
     unexpected token at byte offset 16:
       "hello": 93.
                   ^
     ERROR
-    
+
     expect_raises Pegmatite::Pattern::MatchError, expected do
       Pegmatite.tokenize(Fixtures::JSONGrammar, source)
     end
   end
-  
+
   it "correctly raises a parse error pointing to the end of the source" do
     source = "{\"hello\": 93."
-    
+
     expected = <<-ERROR
     unexpected token at byte offset 13:
     {"hello": 93.
                  ^
     ERROR
-    
+
     expect_raises Pegmatite::Pattern::MatchError, expected do
       Pegmatite.tokenize(Fixtures::JSONGrammar, source)
     end
   end
-  
+
   it "correctly raises a parse error pointing to the beginning of the source" do
     source = ""
-    
+
     expected = <<-ERROR
     unexpected token at byte offset 0:
-    
+
     ^
     ERROR
-    
+
     expect_raises Pegmatite::Pattern::MatchError, expected do
       Pegmatite.tokenize(Fixtures::JSONGrammar, source)
     end
   end
-  
+
   it "correctly raises a parse error for an unterminated string literal" do
     source = "{\"hello\": \"uh oh"
-    
+
     expected = <<-ERROR
     unexpected token at byte offset 16:
     {"hello": "uh oh
                     ^
     ERROR
-    
+
     expect_raises Pegmatite::Pattern::MatchError, expected do
       Pegmatite.tokenize(Fixtures::JSONGrammar, source)
     end

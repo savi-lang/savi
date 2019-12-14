@@ -8,27 +8,27 @@ module Pegmatite
     def initialize(@expected : UInt32)
       raise "0xFFFD isn't a valid expected character" if @expected == 0xFFFD_u32
     end
-    
+
     def inspect(io)
       io << "char("
       @expected.chr.inspect(io)
       io << ")"
     end
-    
+
     def dsl_name
       "char"
     end
-    
+
     def description
       @expected.chr.inspect
     end
-    
+
     def _match(source, offset, state) : MatchResult
       c, length = Pattern::UnicodeAny.utf32_at(source, offset)
-      
+
       # Fail if the character wasn't the expected value.
       return {0, self} if c != @expected
-      
+
       # Otherwise, pass.
       {length, nil}
     end

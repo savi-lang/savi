@@ -7,23 +7,23 @@ module Pegmatite
   class Pattern::Optional < Pattern
     def initialize(@child : Pattern)
     end
-    
+
     def inspect(io)
       @child.inspect(io)
       io << ".maybe"
     end
-    
+
     def dsl_name
       "maybe"
     end
-    
+
     def description
       "optional #{@child.description}"
     end
-    
+
     def _match(source, offset, state) : MatchResult
       length, result = @child.match(source, offset, state)
-      
+
       if result.is_a?(MatchOK)
         {length, result}
       else

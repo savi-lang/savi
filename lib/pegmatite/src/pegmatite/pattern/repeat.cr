@@ -10,31 +10,31 @@ module Pegmatite
   class Pattern::Repeat < Pattern
     def initialize(@child : Pattern, @min = 0)
     end
-    
+
     def inspect(io)
       @child.inspect(io)
       io << ".repeat("
       @min.inspect(io)
       io << ")"
     end
-    
+
     def dsl_name
       "repeat"
     end
-    
+
     def description
       "#{@min} or more occurrences of #{@child.description}"
     end
-    
+
     def _match(source, offset, state) : MatchResult
       total_length = 0
       tokens : Array(Token)? = nil
-      
+
       # Keep trying to match the child pattern until we can't anymore.
       count = 0
       loop do
         length, result = @child.match(source, offset + total_length, state)
-        
+
         # If the child pattern failed to match, either return early with the
         # failure or end the loop successfully, depending on whether we've
         # already met the specified minimum number of occurrences.
@@ -46,10 +46,10 @@ module Pegmatite
             break
           end
         end
-        
+
         # Add to our running total of consumed bytes.
         total_length += length
-        
+
         # Capture the result if it is a token or array of tokens,
         # accounting for the case where the current tokens list is nil.
         if state.tokenize
@@ -69,13 +69,13 @@ module Pegmatite
             end
           end
         end
-        
+
         # Increase the occurrence counter and consider breaking early if we are
         # parsing zero-length patterns and we've already met our minimum
         count += 1
         break if (count > @min) && (length == 0)
       end
-      
+
       {total_length, tokens}
     end
   end

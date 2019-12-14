@@ -6,8 +6,9 @@ class Pegmatite::DSL
   def self.define
     with new yield
   end
-  
+
   def declare; Pattern::Forward.new end
+  def dynamic_match(label); Pattern::DynamicMatch.new(label) end
   def str(text); Pattern::Literal.new(text) end
   def any; Pattern::UnicodeAny::INSTANCE end
   def char(c)
@@ -19,7 +20,7 @@ class Pegmatite::DSL
     max = max.ord if max.is_a?(Char)
     Pattern::UnicodeRange.new(min.to_u32, max.to_u32)
   end
-  
+
   # These Methods are defined to be included in all Pattern instances,
   # for ease of combining and composing new Patterns.
   module Methods
@@ -29,6 +30,8 @@ class Pegmatite::DSL
     def repeat(min = 0); Pattern::Repeat.new(self, min) end
     def maybe; Pattern::Optional.new(self) end
     def then_eof; Pattern::EOF.new(self) end
+    def dynamic_push(label); Pattern::DynamicPush.new(self, label) end
+    def dynamic_pop(label); Pattern::DynamicPop.new(self, label) end
     def named(label, tokenize = true)
       Pattern::Label.new(self, label, tokenize)
     end

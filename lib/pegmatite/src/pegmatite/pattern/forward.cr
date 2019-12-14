@@ -8,28 +8,28 @@ module Pegmatite
   # Returns the result of the child pattern's parsing.
   class Pattern::Forward < Pattern
     @child : Pattern?
-    
+
     def inspect(io)
       io << "forward"
     end
-    
+
     def dsl_name
       "forward"
     end
-    
+
     def initialize
       @child = nil
     end
-    
+
     def define(child)
       raise "already defined" unless @child.nil?
       @child = child
     end
-    
+
     def description
       @child.as(Pattern).description
     end
-    
+
     def _match(source, offset, state) : MatchResult
       @child.as(Pattern).match(source, offset, state)
     end

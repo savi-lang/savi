@@ -8,30 +8,30 @@ module Pegmatite
   class Pattern::EOF < Pattern
     def initialize(@child : Pattern)
     end
-    
+
     def inspect(io)
       @child.inspect(io)
       io << ".then_eof"
     end
-    
+
     def dsl_name
       "then_eof"
     end
-    
+
     def description
       "#{@child.description} followed by end-of-file"
     end
-    
+
     def _match(source, offset, state) : MatchResult
       length, result = @child.match(source, offset, state)
       return {length, result} if !result.is_a?(MatchOK)
-      
+
       # Fail if the end of the source hasn't been reached yet.
       if (offset + length) != source.bytesize
         state.observe_fail(offset + length + 1, @child)
         return {0, self}
       end
-      
+
       {length, result}
     end
   end
