@@ -10,42 +10,49 @@
 # This pass produces output state at the source and source library level.
 #
 class Mare::Compiler::Namespace
-  @root_library : Source::Library?
+  @root_library : Program::Library?
 
   def initialize
-    @types_by_library = Hash(Source::Library, Hash(String, Program::Type | Program::TypeAlias)).new
+    @types_by_library = Hash(Program::Library, Hash(String, Program::Type | Program::TypeAlias)).new
     @types_by_source = Hash(Source, Hash(String, Program::Type | Program::TypeAlias)).new
   end
 
   def run(ctx)
-    # TODO: map by Program::Library instead of Source::Library
-    @root_library = ctx.program.libraries.first.source_library
-
-    ctx.program.types.each do |t|
-      add_type_to_library(t)
-      add_type_to_source(t)
-    end
-    ctx.program.aliases.each do |t|
-      add_type_to_library(t)
-      add_type_to_source(t)
+    ctx.program.libraries.each do |library|
+      library.types.each do |t|
+        add_type_to_library(t, library)
+        add_type_to_source(t)
+      end
+      library.aliases.each do |t|
+        add_type_to_library(t, library)
+        add_type_to_source(t)
+      end
     end
 
     @types_by_source.each do |source, source_types|
       add_prelude_types_to_source(source, source_types)
     end
 
-    @types_by_source.each do |source, source_types|
-      source_types.merge!(@types_by_library[source.library])
+    ctx.program.libraries.each do |library|
+      @types_by_source.each do |source, source_types|
+        next unless source.library == library.source_library
+        source_types.merge!(@types_by_library[library])
+      end
     end
 
-    ctx.program.imports.each do |import|
-      add_imported_types_to_source(import)
+    ctx.program.libraries.each do |library|
+      library.imports.each do |import|
+        add_imported_types_to_source(import)
+      end
     end
+
+    # TODO: Try to remove the need for this:
+    @root_library = ctx.program.libraries.first
   end
 
   # TODO: Can this be less hacky? It feels wrong to alter this state later.
-  def add_lambda_type_later(new_type)
-    add_type_to_library(new_type)
+  def add_lambda_type_later(new_type, library)
+    add_type_to_library(new_type, library)
     add_type_to_source(new_type)
   end
 
@@ -77,8 +84,7 @@ class Mare::Compiler::Namespace
     self[type_name].as(Program::Type).find_func!(func_name)
   end
 
-  private def add_type_to_library(new_type)
-    library = new_type.ident.pos.source.library
+  private def add_type_to_library(new_type, library)
     name = new_type.ident.value
 
     types = @types_by_library[library] ||=
@@ -109,7 +115,7 @@ class Mare::Compiler::Namespace
 
   private def add_prelude_types_to_source(source, source_types)
     # Skip adding prelude types to source files in the prelude library.
-    return if source.library == Compiler.prelude_library
+    return if source.library == Compiler.prelude_library.source_library
 
     @types_by_library[Compiler.prelude_library].each do |name, new_type|
       next if new_type.has_tag?(:private)
@@ -128,7 +134,7 @@ class Mare::Compiler::Namespace
 
   private def add_imported_types_to_source(import)
     source = import.ident.pos.source
-    library = import.resolved.source_library
+    library = import.resolved
     importable_types = @types_by_library[library]
 
     # Determine the list of types to be imported.

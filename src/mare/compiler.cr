@@ -124,9 +124,7 @@ module Mare::Compiler
     library.source_library = docs.first.source.library
     docs.each { |doc| ctx.compile(library, doc) }
 
-    # TODO: try to cache the prelude's Program::Library itself?
-    prelude_library = Program::Library.new
-    prelude_library.source_library = prelude_docs.first.source.library
+    prelude_library.clear_lists # TODO: find a less hacky way to do this?
     prelude_docs.each { |doc| ctx.compile(prelude_library, doc) }
 
     satisfy(ctx, target)
@@ -134,7 +132,7 @@ module Mare::Compiler
 
   @@prelude_docs : Array(AST::Document)?
   def self.prelude_docs
-    # TODO: detect when the files have changed and invalidate the cache
+    # TODO: detect when the files have changed and invalidate the cache?
     @@prelude_docs ||=
       begin
         get_library_sources(File.expand_path("../prelude", __DIR__))
@@ -143,7 +141,15 @@ module Mare::Compiler
     @@prelude_docs.not_nil!
   end
 
+  @@prelude_library : Program::Library?
   def self.prelude_library
-    prelude_docs.first.source.library
+    # TODO: detect when the files have changed and invalidate the cache?
+    @@prelude_library ||=
+      begin
+        prelude_library = Program::Library.new
+        prelude_library.source_library = prelude_docs.first.source.library
+        prelude_library
+      end
+    @@prelude_library.not_nil!
   end
 end

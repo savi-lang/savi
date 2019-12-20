@@ -21,6 +21,13 @@ class Mare::Program
       @aliases = [] of TypeAlias
       @imports = [] of Import
     end
+
+    # TODO: Remove this and meet this need in a less hacky way.
+    def clear_lists
+      @types.clear
+      @aliases.clear
+      @imports.clear
+    end
   end
 
   class Import
