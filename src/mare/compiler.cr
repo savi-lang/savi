@@ -118,12 +118,16 @@ module Mare::Compiler
   def self.compile(docs : Array(AST::Document), target : Symbol = :eval)
     raise "No source documents given!" if docs.empty?
 
-    # TODO: sharing prelude_docs breaks when compiler passes are not idempotent.
-    # @@prelude_docs = nil
-    docs.concat(prelude_docs)
-
     ctx = Context.new
-    docs.each { |doc| ctx.compile(doc) }
+
+    library = Program::Library.new
+    library.source_library = docs.first.source.library
+    docs.each { |doc| ctx.compile(library, doc) }
+
+    # TODO: try to cache the prelude's Program::Library itself?
+    prelude_library = Program::Library.new
+    prelude_library.source_library = prelude_docs.first.source.library
+    prelude_docs.each { |doc| ctx.compile(prelude_library, doc) }
 
     satisfy(ctx, target)
   end

@@ -10,17 +10,20 @@
 #
 class Mare::Compiler::Lambda < Mare::AST::Visitor
   def self.run(ctx)
-    ctx.program.types.each do |t|
-      t.functions.each do |f|
-        new(ctx, t, f).run
+    ctx.program.libraries.each do |l|
+      l.types.each do |t|
+        t.functions.each do |f|
+          new(ctx, l, t, f).run
+        end
       end
     end
   end
 
   @ctx : Context
+  @lib : Program::Library
   @type : Program::Type
   @func : Program::Function
-  def initialize(@ctx, @type, @func)
+  def initialize(@ctx, @lib, @type, @func)
     @last_num = 0
     @changed = false
     @observed_refs_stack = [] of Hash(Int32, AST::Identifier)
@@ -80,7 +83,7 @@ class Mare::Compiler::Lambda < Mare::AST::Visitor
     lambda_type_ident = AST::Identifier.new(name).from(node)
     lambda_type = Program::Type.new(lambda_type_cap, lambda_type_ident)
     lambda_type.add_tag(:hygienic)
-    @ctx.program.types << lambda_type
+    @lib.types << lambda_type
     @ctx.namespace.add_lambda_type_later(lambda_type)
 
     lambda_type.functions << Program::Function.new(

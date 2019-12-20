@@ -18,7 +18,8 @@ class Mare::Compiler::Namespace
   end
 
   def run(ctx)
-    @root_library = ctx.program.types.first.ident.pos.source.library
+    # TODO: map by Program::Library instead of Source::Library
+    @root_library = ctx.program.libraries.first.source_library
 
     ctx.program.types.each do |t|
       add_type_to_library(t)
@@ -127,7 +128,7 @@ class Mare::Compiler::Namespace
 
   private def add_imported_types_to_source(import)
     source = import.ident.pos.source
-    library = import.resolved
+    library = import.resolved.source_library
     importable_types = @types_by_library[library]
 
     # Determine the list of types to be imported.

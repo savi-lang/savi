@@ -1,18 +1,32 @@
 class Mare::Program
-  getter types
-  getter aliases
-  getter imports
+  getter libraries
 
   def initialize
-    @types = [] of Type
-    @aliases = [] of TypeAlias
-    @imports = [] of Import
+    @libraries = [] of Library
+  end
+
+  # TODO: Remove these aliases and make passes work at the library level
+  def imports; libraries.flat_map(&.imports) end
+  def types;   libraries.flat_map(&.types)   end
+  def aliases; libraries.flat_map(&.aliases) end
+
+  class Library
+    getter types
+    getter aliases
+    getter imports
+    property! source_library : Source::Library
+
+    def initialize
+      @types = [] of Type
+      @aliases = [] of TypeAlias
+      @imports = [] of Import
+    end
   end
 
   class Import
     property ident : (AST::Identifier | AST::LiteralString)
     property names : AST::Group?
-    property! resolved : Source::Library
+    property! resolved : Library
 
     def initialize(@ident, @names = nil)
     end

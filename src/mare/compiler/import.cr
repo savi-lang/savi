@@ -11,7 +11,7 @@
 #
 module Mare::Compiler::Import
   def self.run(ctx)
-    libraries = {} of String => Source::Library
+    libraries = {} of String => Program::Library
 
     while true
       remaining = remaining_imports(ctx, libraries)
@@ -52,13 +52,17 @@ module Mare::Compiler::Import
       if library
         import.resolved = library
       else
+        library = Program::Library.new
+
         docs =
           Compiler
           .get_library_sources(path)
           .map { |s| Parser.parse(s) }
-          .tap(&.each { |doc| ctx.compile(doc) })
+          .tap(&.each { |doc| ctx.compile(library, doc) })
 
-        libraries[path] = docs.first.source.library
+        library.source_library = docs.first.source.library
+
+        libraries[path] = library
       end
     end
   end

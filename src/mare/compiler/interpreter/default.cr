@@ -1,5 +1,5 @@
 class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
-  def initialize(@program : Program)
+  def initialize(@library : Program::Library)
   end
 
   def finished(context)
@@ -81,7 +81,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         data["ident"].as(AST::Identifier),
         data["params"]?.as(AST::Group?),
       ),
-      @program,
+      @library,
     )
 
     case keyword.value
@@ -106,14 +106,14 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
       t.type.add_tag(:private)
     end
 
-    @program.types << t.type
+    @library.types << t.type
     context.push t
   end
 
   def compile_import(context, decl)
     data = @@declare_import.run(decl)
 
-    @program.imports << Program::Import.new(
+    @library.imports << Program::Import.new(
       data["ident"].as(AST::Identifier | AST::LiteralString),
       data["params"]?.as(AST::Group?),
     )
@@ -122,10 +122,10 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
   class Type < Interpreter
     property keyword : String # TODO: read-only as getter
     getter type : Program::Type
-    getter program : Program
+    getter library : Program::Library
     getter members
 
-    def initialize(@keyword, @type, @program)
+    def initialize(@keyword, @type, @library)
       @members = [] of Program::TypeAlias
     end
 
@@ -609,12 +609,12 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
           body.terms[0].as(AST::LiteralInteger).value.to_i32
 
         @members << type_alias
-        @program.aliases << type_alias
+        @library.aliases << type_alias
       end
 
       if func
         @type.functions << func
-        context.push Function.new(decl.keyword, func, @type, @program)
+        context.push Function.new(decl.keyword, func, @type, @library)
       end
     end
   end
@@ -623,9 +623,9 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
     property keyword : String # TODO: read-only as getter
     getter func : Program::Function
     getter type : Program::Type
-    getter program : Program
+    getter library : Program::Library
 
-    def initialize(@keyword, @func, @type, @program)
+    def initialize(@keyword, @func, @type, @library)
     end
 
     # TODO: dedup these with the Witness mechanism.

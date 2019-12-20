@@ -13,7 +13,7 @@ class Mare::Compiler::Context
 
   def initialize
     @program = Program.new
-    @stack = [Interpreter::Default.new(@program)] of Interpreter
+    @stack = [] of Interpreter
 
     @namespace = Namespace.new
     @refer_type = ReferType.new
@@ -27,12 +27,15 @@ class Mare::Compiler::Context
     @serve_hover = ServeHover.new
   end
 
-  def compile(doc : AST::Document)
-    doc.list.each { |decl| compile(decl) }
+  def compile(library : Program::Library, doc : AST::Document)
+    @program.libraries << library unless @program.libraries.includes?(library)
+    @stack.unshift(Interpreter::Default.new(library))
+    doc.list.each { |decl| compile_decl(decl) }
     @stack.reverse_each &.finished(self)
+    @stack.shift
   end
 
-  def compile(decl : AST::Declare)
+  def compile_decl(decl : AST::Declare)
     loop do
       raise "Unrecognized keyword: #{decl.keyword}" if @stack.size == 0
       break if @stack.last.keywords.includes?(decl.keyword)
