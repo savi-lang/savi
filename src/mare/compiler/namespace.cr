@@ -22,6 +22,7 @@ class Mare::Compiler::Namespace
   end
 
   def run(ctx)
+    # Take note of the library and source file in which each type occurs.
     ctx.program.libraries.each do |library|
       library.types.each do |t|
         add_type_to_library(t, library)
@@ -33,10 +34,12 @@ class Mare::Compiler::Namespace
       end
     end
 
+    # Every source file implicitly has access to all prelude types.
     @types_by_source.each do |source, source_types|
       add_prelude_types_to_source(source, source_types)
     end
 
+    # Every source file implicitly has access to all types in the same library.
     ctx.program.libraries.each do |library|
       @types_by_source.each do |source, source_types|
         next unless source.library == library.source_library
@@ -44,10 +47,9 @@ class Mare::Compiler::Namespace
       end
     end
 
-    ctx.program.libraries.each do |library|
-      library.imports.each do |import|
-        add_imported_types_to_source(import)
-      end
+    # Every source file has access to all explicitly imported types.
+    ctx.program.libraries.flat_map(&.imports).each do |import|
+      add_imported_types_to_source(import)
     end
   end
 
