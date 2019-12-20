@@ -19,9 +19,9 @@ describe Mare::Compiler::Reach do
 
     ctx = Mare::Compiler.compile([source], :reach)
 
-    i_foo = ctx.infer.for_func_simple(ctx, "Trait", "foo").reified
-    c_foo = ctx.infer.for_func_simple(ctx, "Class", "foo").reified
-    o_foo = ctx.infer.for_func_simple(ctx, "Other", "foo").reified
+    i_foo = ctx.infer.for_func_simple(ctx, source, "Trait", "foo").reified
+    c_foo = ctx.infer.for_func_simple(ctx, source, "Class", "foo").reified
+    o_foo = ctx.infer.for_func_simple(ctx, source, "Other", "foo").reified
 
     ctx.reach.reached_func?(i_foo).should eq true
     ctx.reach.reached_func?(c_foo).should eq true

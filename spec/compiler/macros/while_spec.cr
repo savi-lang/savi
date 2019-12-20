@@ -9,7 +9,7 @@ describe Mare::Compiler::Macros do
 
       ctx = Mare::Compiler.compile([source], :macros)
 
-      func = ctx.namespace.find_func!("Main", "new")
+      func = ctx.namespace.find_func!(source, "Main", "new")
       func.body.not_nil!.to_a.should eq [:group, ":",
         [:group, "(",
           [:loop, [:ident, "True"], [:integer, 42], [:ident, "None"]],
@@ -98,7 +98,7 @@ describe Mare::Compiler::Macros do
 
       ctx = Mare::Compiler.compile([source], :macros)
 
-      func = ctx.namespace.find_func!("Main", "new")
+      func = ctx.namespace.find_func!(source, "Main", "new")
       func.body.not_nil!.to_a.should eq [:group, ":",
         [:group, "(",
           [:loop,

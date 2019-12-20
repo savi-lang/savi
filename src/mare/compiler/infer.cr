@@ -25,7 +25,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     # and recurse into checking other functions that are reachable from there.
     # We do this so that errors for reachable functions are shown first.
     # If there is no Main type, proceed to analyzing the whole program.
-    main = ctx.namespace["Main"]?
+    main = ctx.namespace.main_type?(ctx)
     if main
       main = main.as(Program::Type)
       f = main.find_func?("new")
@@ -118,8 +118,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
   end
 
-  def for_func_simple(ctx : Context, t_name : String, f_name : String)
-    t = ctx.namespace[t_name].as(Program::Type)
+  def for_func_simple(ctx : Context, source : Source, t_name : String, f_name : String)
+    t = ctx.namespace.in_source(source, t_name).as(Program::Type)
     f = t.find_func!(f_name)
     for_func_simple(ctx, t, f)
   end

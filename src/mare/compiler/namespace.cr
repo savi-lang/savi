@@ -10,11 +10,15 @@
 # This pass produces output state at the source and source library level.
 #
 class Mare::Compiler::Namespace
-  @root_library : Program::Library?
-
   def initialize
     @types_by_library = Hash(Program::Library, Hash(String, Program::Type | Program::TypeAlias)).new
     @types_by_source = Hash(Source, Hash(String, Program::Type | Program::TypeAlias)).new
+  end
+
+  def main_type!(ctx); main_type?(ctx).not_nil! end
+  def main_type?(ctx): Program::Type?
+    root_library = ctx.program.libraries.first
+    @types_by_library[root_library]["Main"]?.as(Program::Type?)
   end
 
   def run(ctx)
@@ -45,9 +49,6 @@ class Mare::Compiler::Namespace
         add_imported_types_to_source(import)
       end
     end
-
-    # TODO: Try to remove the need for this:
-    @root_library = ctx.program.libraries.first
   end
 
   # TODO: Can this be less hacky? It feels wrong to alter this state later.
@@ -71,17 +72,22 @@ class Mare::Compiler::Namespace
     @types_by_source[ident.pos.source][ident.value]?
   end
 
-  # When given a String name, try to find the type in the root or prelude.
-  # This is a way to resolve a basic type when you don't have context.
+  # When given a String name, try to find the type in the prelude library.
+  # This is a way to resolve a builtin type by name without more context.
   def []?(name : String) : (Program::Type | Program::TypeAlias)?
-    @types_by_library[@root_library.not_nil!]?.try(&.[]?(name)) ||
     @types_by_library[Compiler.prelude_library]?.try(&.[]?(name))
+  end
+
+  # When given an String name and Source, try to find the named type.
+  # This is not very commonly what you want.
+  def in_source(source : Source, name : String)
+    @types_by_source[source][name]?
   end
 
   # TODO: Remove this method?
   # This is only for use in testing.
-  def find_func!(type_name, func_name)
-    self[type_name].as(Program::Type).find_func!(func_name)
+  def find_func!(source, type_name, func_name)
+    self.in_source(source, type_name).as(Program::Type).find_func!(func_name)
   end
 
   private def add_type_to_library(new_type, library)

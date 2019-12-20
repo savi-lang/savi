@@ -509,7 +509,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     # Reach functions called starting from the entrypoint of the program.
     env = ctx.namespace["Env"].as(Program::Type)
     handle_func(ctx, ctx.infer.for_type(ctx, env), env.find_func!("_create"))
-    main = ctx.namespace["Main"].as(Program::Type)
+    main = ctx.namespace.main_type!(ctx)
     handle_func(ctx, ctx.infer.for_type(ctx, main), main.find_func!("new"))
     n = ctx.namespace["AsioEventNotify"].as(Program::Type)
     handle_func(ctx, ctx.infer.for_type(ctx, n), n.find_func!("_event_notify"))

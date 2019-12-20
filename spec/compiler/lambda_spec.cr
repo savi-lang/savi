@@ -8,7 +8,7 @@ describe Mare::Compiler::Lambda do
 
     ctx = Mare::Compiler.compile([source], :lambda)
 
-    func = ctx.namespace.find_func!("Example", "thunk")
+    func = ctx.namespace.find_func!(source, "Example", "thunk")
     func.body.not_nil!.to_a.should eq [:group, ":",
       [:relate,
         [:ident, "apple"],
@@ -41,7 +41,7 @@ describe Mare::Compiler::Lambda do
 
     ctx = Mare::Compiler.compile([source], :lambda)
 
-    func = ctx.namespace.find_func!("Example", "lambdas")
+    func = ctx.namespace.find_func!(source, "Example", "lambdas")
     func.body.not_nil!.to_a.should eq [:group, ":",
       [:relate,
         [:ident, "apple"],
