@@ -118,8 +118,9 @@ module Mare::Compiler::Populate
     end
 
     # We need to duplicate the AST tree to avoid mutating the original.
-    def dup_nodes?
-      false
+    # But we need to avoid duping identifiers, since they have ReferType info...
+    def dup_node?(node)
+      !node.is_a?(AST::Identifier)
     end
 
     def visit(node)
