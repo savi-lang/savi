@@ -3,67 +3,69 @@
 # based on import directives found in the source files loaded so far.
 # We continue loading source libraries until all imports have been resolved.
 #
-# This pass mutates the Program topology by assigning the Import#library fields.
+# This pass mutates the Program topology by assigning the Import#resolved field.
 # This pass reads ASTs (Import heads only) but does not mutate any ASTs.
 # This pass may raise a compilation error.
-# This pass keeps temporary state (on the stack) at the program level.
+# This pass keeps no state (other than the Program topology itself).
 # This pass produces no output state.
 #
 module Mare::Compiler::Import
   def self.run(ctx)
-    libraries = {} of String => Program::Library
+    # Copy the current list of libraries as our initial list, so that we
+    # don't end up trying to iterate over a list that's being mutated.
+    initial_libraries_list = ctx.program.libraries.dup
 
-    while true
-      remaining = remaining_imports(ctx, libraries)
-      break if remaining.empty?
-
-      load_more_libraries(ctx, libraries, remaining)
+    # For each library in the program, run the Import pass on it.
+    # TODO: In the future, rely on the compiler to run at the library level.
+    initial_libraries_list.each do |library|
+      run_for_library(ctx, library)
     end
   end
 
-  def self.remaining_imports(ctx, libraries)
-    remaining = Array(Tuple(String, Program::Import)).new
+  def self.run_for_library(ctx, library)
+    # For each import statement found in the library, resolve it.
+    library.imports.each do |import|
+      # Skip imports that have already been resolved.
+      next if import.resolved?
 
-    ctx.program.imports.each do |import|
-      import_ident = import.ident
+      # Assert that the imported relative path is a string.
+      # TODO: remove this? why even allow a non-string here in the topology?
+      relative_path = import.ident
       raise NotImplementedError.new(import.ident.to_a) \
-        unless import_ident.is_a?(AST::LiteralString)
+        unless relative_path.is_a?(AST::LiteralString)
 
-      source = import_ident.pos.source
+      # Based on the source file that the import statement was declared in
+      # and the relative path mentioned in the import statement itself,
+      # get the absolute path for the library that is to be loaded.
+      source = relative_path.pos.source
       path = Compiler.resolve_library_dirname(
-        import_ident.value,
+        relative_path.value,
         source.library.path
       )
 
-      library = libraries[path]?
-      if library
-        import.resolved = library
-      else
-        remaining << {path, import}
-      end
-    end
+      # Finally, load the library, then recursively run this pass on it.
+      loaded_library = load_library(ctx, path)
+      import.resolved = loaded_library
 
-    remaining
+      # Recursively run this pass on the loaded library.
+      # TODO: In the future, rely on the compiler to run at the library level.
+      run_for_library(ctx, loaded_library)
+    end
   end
 
-  def self.load_more_libraries(ctx, libraries, remaining)
-    remaining.each do |path, import|
-      library = libraries[path]?
-      if library
-        import.resolved = library
-      else
-        library = Program::Library.new
+  def self.load_library(ctx, path) : Program::Library
+    # First, try to find an already loaded library that has this same path.
+    library = ctx.program.libraries.find(&.source_library.path.==(path))
+    return library if library
 
-        docs =
-          Compiler
-          .get_library_sources(path)
-          .map { |s| Parser.parse(s) }
-          .tap(&.each { |doc| ctx.compile(library, doc) })
-
-        library.source_library = docs.first.source.library
-
-        libraries[path] = library
-      end
-    end
+    # Otherwise, use the Compiler to load the library now.
+    library = Program::Library.new
+    docs =
+      Compiler
+        .get_library_sources(path)
+        .map { |s| Parser.parse(s) }
+        .tap(&.each { |doc| ctx.compile(library, doc) })
+    library.source_library = docs.first.source.library
+    library
   end
 end
