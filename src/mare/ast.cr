@@ -4,6 +4,25 @@ module Mare::AST
   alias A = Symbol | String | UInt64 | Int64 | Float64 | Array(A)
 
   class Visitor
+    def visit_any?(node : Node)
+      true
+    end
+
+    def visit_children?(node : Node)
+      true
+    end
+
+    def visit_pre(node : Node)
+      nil
+    end
+
+    def visit(node : Node)
+      nil
+    end
+  end
+
+  class MutatingVisitor
+    # TODO: Move this to a CopyingVisitor variant instead?
     def dup_node?(node : Node)
       false
     end
@@ -43,7 +62,16 @@ module Mare::AST
       pos
     end
 
-    def accept(visitor)
+    def accept(visitor : Visitor)
+      node = self
+      if visitor.visit_any?(node)
+        visitor.visit_pre(node)
+        children_accept(visitor) if visitor.visit_children?(node)
+        visitor.visit(node)
+      end
+      self
+    end
+    def accept(visitor : MutatingVisitor)
       node = self
       node = node.dup if visitor.dup_node?(node)
       if visitor.visit_any?(node)
@@ -54,7 +82,11 @@ module Mare::AST
       node
     end
 
-    def children_accept(visitor)
+    def children_accept(visitor : Visitor)
+      # An AST node must implement this if it has child nodes.
+    end
+    def children_accept(visitor : MutatingVisitor)
+      # An AST node must implement this if it has child nodes.
     end
   end
 
@@ -70,7 +102,10 @@ module Mare::AST
       list.each { |x| res << x.to_a }
       res
     end
-    def children_accept(visitor)
+    def children_accept(visitor : Visitor)
+      @list.each(&.accept(visitor))
+    end
+    def children_accept(visitor : MutatingVisitor)
       @list.map!(&.accept(visitor))
     end
   end
@@ -95,7 +130,11 @@ module Mare::AST
       res << body.to_a
       res
     end
-    def children_accept(visitor)
+    def children_accept(visitor : Visitor)
+      @head.each(&.accept(visitor))
+      @body.accept(visitor)
+    end
+    def children_accept(visitor : MutatingVisitor)
       @head.map!(&.accept(visitor))
       @body = @body.accept(visitor)
     end
@@ -178,7 +217,11 @@ module Mare::AST
 
     def name; :prefix end
     def to_a; [name, op.to_a, term.to_a] of A end
-    def children_accept(visitor)
+    def children_accept(visitor : Visitor)
+      @op.accept(visitor)
+      @term.accept(visitor)
+    end
+    def children_accept(visitor : MutatingVisitor)
       @op = @op.accept(visitor)
       @term = @term.accept(visitor)
     end
@@ -196,7 +239,11 @@ module Mare::AST
 
     def name; :qualify end
     def to_a; [name, term.to_a, group.to_a] of A end
-    def children_accept(visitor)
+    def children_accept(visitor : Visitor)
+      @term.accept(visitor)
+      @group.accept(visitor)
+    end
+    def children_accept(visitor : MutatingVisitor)
       @term = @term.accept(visitor)
       @group = @group.accept(visitor)
     end
@@ -219,7 +266,10 @@ module Mare::AST
       terms.each { |x| res << x.to_a }
       res
     end
-    def children_accept(visitor)
+    def children_accept(visitor : Visitor)
+      @terms.each(&.accept(visitor))
+    end
+    def children_accept(visitor : MutatingVisitor)
       @terms.map!(&.accept(visitor))
     end
   end
@@ -237,7 +287,12 @@ module Mare::AST
 
     def name; :relate end
     def to_a; [name, lhs.to_a, op.to_a, rhs.to_a] of A end
-    def children_accept(visitor)
+    def children_accept(visitor : Visitor)
+      @lhs.accept(visitor)
+      @op.accept(visitor)
+      @rhs.accept(visitor)
+    end
+    def children_accept(visitor : MutatingVisitor)
       @lhs = @lhs.accept(visitor)
       @op = @op.accept(visitor)
       @rhs = @rhs.accept(visitor)
@@ -260,7 +315,10 @@ module Mare::AST
 
     def name; :field_w end
     def to_a: Array(A); [name, value, rhs.to_a] of A end
-    def children_accept(visitor)
+    def children_accept(visitor : Visitor)
+      @rhs.accept(visitor)
+    end
+    def children_accept(visitor : MutatingVisitor)
       @rhs = @rhs.accept(visitor)
     end
   end
@@ -280,7 +338,10 @@ module Mare::AST
       list.each { |cond, body| res << [cond.to_a, body.to_a] }
       res
     end
-    def children_accept(visitor)
+    def children_accept(visitor : Visitor)
+      @list.each { |cond, body| cond.accept(visitor); body.accept(visitor) }
+    end
+    def children_accept(visitor : MutatingVisitor)
       @list.map! { |cond, body| {cond.accept(visitor), body.accept(visitor)} }
     end
   end
@@ -305,7 +366,12 @@ module Mare::AST
       res << else_body.to_a
       res
     end
-    def children_accept(visitor)
+    def children_accept(visitor : Visitor)
+      cond.accept(visitor)
+      body.accept(visitor)
+      else_body.accept(visitor)
+    end
+    def children_accept(visitor : MutatingVisitor)
       @cond = cond.accept(visitor)
       @body = body.accept(visitor)
       @else_body = else_body.accept(visitor)
@@ -330,7 +396,11 @@ module Mare::AST
       res << else_body.to_a
       res
     end
-    def children_accept(visitor)
+    def children_accept(visitor : Visitor)
+      body.accept(visitor)
+      else_body.accept(visitor)
+    end
+    def children_accept(visitor : MutatingVisitor)
       @body = body.accept(visitor)
       @else_body = else_body.accept(visitor)
     end
@@ -352,7 +422,10 @@ module Mare::AST
       res.concat(terms.map(&.to_a))
       res
     end
-    def children_accept(visitor)
+    def children_accept(visitor : Visitor)
+      terms.each(&.accept(visitor))
+    end
+    def children_accept(visitor : MutatingVisitor)
       @terms = terms.map(&.accept(visitor).as(Term))
     end
   end

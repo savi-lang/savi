@@ -8,7 +8,7 @@
 # This pass keeps temporary state at the per-function level.
 # This pass produces no output state.
 #
-class Mare::Compiler::Lambda < Mare::AST::Visitor
+class Mare::Compiler::Lambda < Mare::AST::MutatingVisitor
   def self.run(ctx)
     ctx.program.libraries.each do |l|
       l.types.each do |t|

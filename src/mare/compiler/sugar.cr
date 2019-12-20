@@ -10,7 +10,7 @@
 # This pass keeps temporary state at the per-function level.
 # This pass produces no output state.
 #
-class Mare::Compiler::Sugar < Mare::AST::Visitor
+class Mare::Compiler::Sugar < Mare::AST::MutatingVisitor
   def self.run(ctx)
     ctx.program.types.each do |t|
       t.functions.each do |f|
@@ -252,7 +252,7 @@ class Mare::Compiler::Sugar < Mare::AST::Visitor
 
   # Handle pseudo-method sugar like `as!` calls.
   # TODO: Can this be done as a "universal method" rather than sugar?
-  class PseudoCalls < Mare::AST::Visitor
+  class PseudoCalls < Mare::AST::MutatingVisitor
     def self.run(f : Program::Function, sugar : Sugar)
       ps = new(sugar)
       f.params.try(&.accept(ps))

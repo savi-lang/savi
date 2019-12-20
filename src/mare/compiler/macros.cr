@@ -11,7 +11,7 @@
 # This pass keeps temporary state at the per-function level.
 # This pass produces no output state.
 #
-class Mare::Compiler::Macros < Mare::AST::Visitor
+class Mare::Compiler::Macros < Mare::AST::MutatingVisitor
   # TODO: This class should interpret macro declarations by the user and treat
   # those the same as macro declarations in the prelude, with both getting
   # executed here dynamically instead of declared here statically.
