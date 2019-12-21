@@ -62,6 +62,14 @@ module Mare::AST
       pos
     end
 
+    @cached_structural_hash : UInt64?
+    def get_structural_hash
+      (@cached_structural_hash ||= structural_hash).not_nil!
+    end
+    def invalidate_structural_hash
+      @cached_structural_hash = nil
+    end
+
     def accept(visitor : Visitor)
       node = self
       if visitor.visit_any?(node)
@@ -73,12 +81,14 @@ module Mare::AST
     end
     def accept(visitor : MutatingVisitor)
       node = self
-      node = node.dup if visitor.dup_node?(node)
+      dup_node = visitor.dup_node?(node)
+      node = node.dup if dup_node
       if visitor.visit_any?(node)
         node = visitor.visit_pre(node)
         children_accept(visitor) if visitor.visit_children?(node)
         node = visitor.visit(node)
       end
+      invalidate_structural_hash unless dup_node
       node
     end
 
@@ -93,6 +103,7 @@ module Mare::AST
   class Document < Node
     property list
     property! source : Source
+    def_structural_hash @pos, @list
     def initialize(@list = [] of Declare)
     end
 
@@ -114,6 +125,7 @@ module Mare::AST
     property doc_strings : Array(DocString)?
     property head
     property body
+    def_structural_hash @pos, @doc_strings, @head, @body
     def initialize(@head = [] of Term, @body = Group.new(":"))
     end
 
@@ -151,6 +163,7 @@ module Mare::AST
 
   class DocString < Node
     property value
+    def_structural_hash @pos, @value
     def initialize(@value : String)
     end
     def name; :doc_string end
@@ -159,6 +172,7 @@ module Mare::AST
 
   class Identifier < Node
     property value
+    def_structural_hash @pos, @value
     def initialize(@value : String)
     end
     def name; :ident end
@@ -167,6 +181,7 @@ module Mare::AST
 
   class LiteralString < Node
     property value
+    def_structural_hash @pos, @value
     def initialize(@value : String)
     end
     def name; :string end
@@ -175,6 +190,7 @@ module Mare::AST
 
   class LiteralCharacter < Node
     property value
+    def_structural_hash @pos, @value
     def initialize(@value : UInt64 | Int64)
     end
     def name; :char end
@@ -183,6 +199,7 @@ module Mare::AST
 
   class LiteralInteger < Node
     property value
+    def_structural_hash @pos, @value
     def initialize(@value : UInt64 | Int64)
     end
     def name; :integer end
@@ -191,6 +208,7 @@ module Mare::AST
 
   class LiteralFloat < Node
     property value
+    def_structural_hash @pos, @value
     def initialize(@value : Float64)
     end
     def name; :float end
@@ -199,6 +217,7 @@ module Mare::AST
 
   class Operator < Node
     property value
+    def_structural_hash @pos, @value
     def initialize(@value : String)
     end
     def name; :op end
@@ -208,6 +227,7 @@ module Mare::AST
   class Prefix < Node
     property op
     property term
+    def_structural_hash @pos, @op, @term
     def initialize(@op : Operator, @term : Term)
     end
 
@@ -230,6 +250,7 @@ module Mare::AST
   class Qualify < Node
     property term
     property group
+    def_structural_hash @pos, @term, @group
     def initialize(@term : Term, @group : Group)
     end
 
@@ -252,6 +273,7 @@ module Mare::AST
   class Group < Node
     property style
     property terms
+    def_structural_hash @pos, @style, @terms
     def initialize(@style : String, @terms = [] of Term)
     end
 
@@ -278,6 +300,7 @@ module Mare::AST
     property lhs
     property op
     property rhs
+    def_structural_hash @pos, @lhs, @op, @rhs
     def initialize(@lhs : Term, @op : Operator, @rhs : Term)
     end
 
@@ -301,6 +324,7 @@ module Mare::AST
 
   class FieldRead < Node
     property value
+    def_structural_hash @pos, @value
     def initialize(@value : String)
     end
     def name; :field_r end
@@ -310,6 +334,7 @@ module Mare::AST
   class FieldWrite < Node
     property value
     property rhs
+    def_structural_hash @pos, @value, @rhs
     def initialize(@value : String, @rhs : Term)
     end
 
@@ -325,6 +350,7 @@ module Mare::AST
 
   class Choice < Node
     property list
+    def_structural_hash @pos, @list
     def initialize(@list : Array({Term, Term}))
     end
 
@@ -350,7 +376,7 @@ module Mare::AST
     property cond : Term
     property body : Term
     property else_body : Term
-
+    def_structural_hash @pos, @cond, @body, @else_body
     def initialize(@cond, @body, @else_body)
     end
 
@@ -381,7 +407,7 @@ module Mare::AST
   class Try < Node
     property body : Term
     property else_body : Term
-
+    def_structural_hash @pos, @body, @else_body
     def initialize(@body, @else_body)
     end
 
@@ -408,7 +434,7 @@ module Mare::AST
 
   class Yield < Node
     property terms : Array(Term)
-
+    def_structural_hash @pos, @terms
     def initialize(@terms)
     end
 

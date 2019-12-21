@@ -67,6 +67,12 @@ struct Mare::Source::Pos
     finish >= other.finish
   end
 
+  # The structual hash of Source::Pos is based only on source path and offset.
+  def structural_hash(hasher)
+    hasher = source.filename.hash(hasher)
+    hasher = start.hash(hasher)
+  end
+
   def size
     finish - start
   end

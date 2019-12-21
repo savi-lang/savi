@@ -1,3 +1,4 @@
+require "./mare/ext/**"
 require "./mare/**"
 
 module Mare
