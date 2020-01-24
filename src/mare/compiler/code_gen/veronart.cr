@@ -31,6 +31,8 @@ class Mare::Compiler::CodeGen::VeronaRT
     @alloc_ptr = @alloc.pointer.as(LLVM::Type)
     @desc = llvm.struct_create_named("_.RTDescriptor").as(LLVM::Type)
     @desc_ptr = @desc.pointer.as(LLVM::Type)
+    @obj_stack = llvm.struct_create_named("_.RTObjectStack").as(LLVM::Type)
+    @obj_stack_ptr = @obj_stack.pointer.as(LLVM::Type)
     @obj = llvm.struct_create_named("_.RTObject").as(LLVM::Type)
     @obj_ptr = @obj.pointer.as(LLVM::Type)
     @cown = llvm.struct_create_named("_.RTCown").as(LLVM::Type)
@@ -38,6 +40,12 @@ class Mare::Compiler::CodeGen::VeronaRT
     @cown_pad = @i8.array(COWN_PAD_SIZE).as(LLVM::Type)
     @main_inner_fn = LLVM::Type.function([@ptr], @void).as(LLVM::Type)
     @main_inner_fn_ptr = @main_inner_fn.pointer.as(LLVM::Type)
+    @trace_fn = LLVM::Type.function([@obj_ptr, @obj_stack_ptr], @void).as(LLVM::Type)
+    @trace_fn_ptr = @trace_fn.pointer.as(LLVM::Type)
+    @final_fn = LLVM::Type.function([@obj_ptr], @void).as(LLVM::Type)
+    @final_fn_ptr = @final_fn.pointer.as(LLVM::Type)
+    @notify_fn = LLVM::Type.function([@obj_ptr], @void).as(LLVM::Type)
+    @notify_fn_ptr = @notify_fn.pointer.as(LLVM::Type)
   end
 
   def gen_runtime_decls(g : CodeGen)
@@ -75,6 +83,82 @@ class Mare::Compiler::CodeGen::VeronaRT
 
   def gen_alloc_ctx_get(g : CodeGen)
     g.builder.call(g.mod.functions["RTAlloc_get"], "ALLOC_CTX")
+  end
+
+  DESC_ID                    = 0
+  DESC_TRACE_FN              = 1
+  DESC_TRACE_POSSIBLY_ISO_FN = 2
+  DESC_FINAL_FN              = 3
+  DESC_NOTIFY_FN             = 4
+
+  # This defines the generic LLVM struct type for what a type descriptor holds.
+  # The type descriptor for each type uses a more specific version of this.
+  # The order and sizes here must exactly match what is expected by the runtime,
+  # and they should correlate to the constants above.
+  def gen_desc_basetype
+    @desc.struct_set_body [
+      @isize,         # 0: size
+      @trace_fn_ptr,  # 1: trace fn
+      @trace_fn_ptr,  # 2: trace possibly iso fn
+      @final_fn_ptr,  # 3: final fn
+      @notify_fn_ptr, # 4: notified fn
+      # TODO: id, traits bitmap, vtable
+    ]
+  end
+
+  # This defines a more specific struct type than the above function,
+  # tailored to the specific type definition and its virtual table size.
+  # The actual type descriptor value for the type is an instance of this.
+  def gen_desc_type(g : CodeGen, type_def : Reach::Def, vtable_size : Int32) : LLVM::Type
+    g.llvm.struct [
+      @isize,         # 0: size
+      @trace_fn_ptr,  # 1: trace fn
+      @trace_fn_ptr,  # 2: trace possibly iso fn
+      @final_fn_ptr,  # 3: final fn
+      @notify_fn_ptr, # 4: notified fn
+      # TODO: id, traits bitmap, vtable
+    ], "#{type_def.llvm_name}.DESC"
+  end
+
+  # This defines a global constant for the type descriptor of a type,
+  # which is held as the first value in an object, used for identifying its
+  # type at runtime, as well as a host of other functions related to dealing
+  # with objects in the runtime, such as allocating them and tracing them.
+  def gen_desc(g : CodeGen, gtype : GenType, vtable)
+    type_def = gtype.type_def
+
+    desc = g.mod.globals.add(gtype.desc_type, "#{type_def.llvm_name}.DESC")
+    desc.linkage = LLVM::Linkage::LinkerPrivate
+    desc.global_constant = true
+    desc
+
+    abi_size = g.abi_size_of(gtype.struct_type)
+
+    trace_fn =
+      if type_def.has_desc? && gtype.fields.any?(&.last.trace_needed?)
+        g.mod.functions.add("#{type_def.llvm_name}.TRACE", @trace_fn)
+      else
+        @trace_fn_ptr.null
+      end
+
+    desc.initializer = gtype.desc_type.const_struct [
+      @isize.const_int(abi_size), # 0: size
+      trace_fn.to_value,          # 1: trace fn
+      @trace_fn_ptr.null,         # 2: trace possibly iso fn TODO: @#{llvm_name}.TRACEPOSSIBLYISO
+      @final_fn_ptr.null,         # 3: final fn TODO: @#{llvm_name}.FINAL
+      @notify_fn_ptr.null,        # 4: notified fn TODO: @#{llvm_name}.NOTIFY
+      # TODO: id, traits bitmap, vtable
+    ]
+
+    desc
+  end
+
+  def gen_vtable_gep_get(g, desc, name)
+    raise NotImplementedError.new("Verona runtime: gen_vtable_gep_get")
+  end
+
+  def gen_traits_gep_get(g, desc, name)
+    raise NotImplementedError.new("Verona runtime: gen_vtable_traits_get")
   end
 
   def gen_main(g : CodeGen)

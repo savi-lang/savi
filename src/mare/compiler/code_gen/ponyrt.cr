@@ -272,6 +272,175 @@ class Mare::Compiler::CodeGen::PonyRT
     g.builder.call(g.mod.functions["pony_ctx"], "ALLOC_CTX")
   end
 
+  DESC_ID                        = 0
+  DESC_SIZE                      = 1
+  DESC_FIELD_COUNT               = 2
+  DESC_FIELD_OFFSET              = 3
+  DESC_INSTANCE                  = 4
+  DESC_TRACE_FN                  = 5
+  DESC_SERIALISE_TRACE_FN        = 6
+  DESC_SERIALISE_FN              = 7
+  DESC_DESERIALISE_FN            = 8
+  DESC_CUSTOM_SERIALISE_SPACE_FN = 9
+  DESC_CUSTOM_DESERIALISE_FN     = 10
+  DESC_DISPATCH_FN               = 11
+  DESC_FINAL_FN                  = 12
+  DESC_EVENT_NOTIFY              = 13
+  DESC_TRAITS                    = 14
+  DESC_FIELDS                    = 15
+  DESC_VTABLE                    = 16
+
+  # This defines the generic LLVM struct type for what a type descriptor holds.
+  # The type descriptor for each type uses a more specific version of this.
+  # The order and sizes here must exactly match what is expected by the runtime,
+  # and they should correlate to the constants above.
+  def gen_desc_basetype
+    @desc.struct_set_body [
+      @i32,                           # 0: id
+      @i32,                           # 1: size
+      @i32,                           # 2: field_count
+      @i32,                           # 3: field_offset
+      @obj_ptr,                       # 4: instance
+      @trace_fn_ptr,                  # 5: trace fn
+      @trace_fn_ptr,                  # 6: serialise trace fn
+      @serialise_fn_ptr,              # 7: serialise fn
+      @deserialise_fn_ptr,            # 8: deserialise fn
+      @custom_serialise_space_fn_ptr, # 9: custom serialise space fn
+      @custom_deserialise_fn_ptr,     # 10: custom deserialise fn
+      @dispatch_fn_ptr,               # 11: dispatch fn
+      @final_fn_ptr,                  # 12: final fn
+      @i32,                           # 13: event notify
+      @isize.array(0).pointer,        # 14: traits bitmap
+      @pptr,                          # 15: TODO: fields descriptors
+      @ptr.array(0),                  # 16: vtable
+    ]
+  end
+
+  # This defines a more specific struct type than the above function,
+  # tailored to the specific type definition and its virtual table size.
+  # The actual type descriptor value for the type is an instance of this.
+  def gen_desc_type(g : CodeGen, type_def : Reach::Def, vtable_size : Int32) : LLVM::Type
+    g.llvm.struct [
+      @i32,                                      # 0: id
+      @i32,                                      # 1: size
+      @i32,                                      # 2: field_count
+      @i32,                                      # 3: field_offset
+      @obj_ptr,                                  # 4: instance
+      @trace_fn_ptr,                             # 5: trace fn
+      @trace_fn_ptr,                             # 6: serialise trace fn
+      @serialise_fn_ptr,                         # 7: serialise fn
+      @deserialise_fn_ptr,                       # 8: deserialise fn
+      @custom_serialise_space_fn_ptr,            # 9: custom serialise space fn
+      @custom_deserialise_fn_ptr,                # 10: custom deserialise fn
+      @dispatch_fn_ptr,                          # 11: dispatch fn
+      @final_fn_ptr,                             # 12: final fn
+      @i32,                                      # 13: event notify
+      @isize.array(g.trait_bitmap_size).pointer, # 14: traits bitmap
+      @pptr,                                     # 15: TODO: fields descriptors
+      @ptr.array(vtable_size),                   # 16: vtable
+    ], "#{type_def.llvm_name}.DESC"
+  end
+
+  # This defines a global constant for the type descriptor of a type,
+  # which is held as the first value in an object, used for identifying its
+  # type at runtime, as well as a host of other functions related to dealing
+  # with objects in the runtime, such as allocating them and tracing them.
+  def gen_desc(g : CodeGen, gtype : GenType, vtable)
+    type_def = gtype.type_def
+
+    desc = g.mod.globals.add(gtype.desc_type, "#{type_def.llvm_name}.DESC")
+    desc.linkage = LLVM::Linkage::LinkerPrivate
+    desc.global_constant = true
+    desc
+
+    abi_size = g.abi_size_of(gtype.struct_type)
+    field_offset =
+      if gtype.fields.empty?
+        0
+      else
+        g.target_machine.data_layout.offset_of_element(
+          gtype.struct_type,
+          gtype.field_index(gtype.fields[0][0]),
+        )
+      end
+
+    dispatch_fn =
+      if type_def.is_actor?
+        g.mod.functions.add("#{type_def.llvm_name}.DISPATCH", @dispatch_fn)
+      else
+        @dispatch_fn_ptr.null
+      end
+
+    trace_fn =
+      if type_def.has_desc? && gtype.fields.any?(&.last.trace_needed?)
+        g.mod.functions.add("#{type_def.llvm_name}.TRACE", @trace_fn)
+      else
+        @trace_fn_ptr.null
+      end
+
+    # Generate a bitmap of one or more integers in which each bit represents
+    # a trait in the program, with types that implement that trait having
+    # the corresponding bit set in their version of the bitmap.
+    # This is used for runtime type matching against abstract types (traits).
+    is_asio_event_notify = false
+    traits_bitmap = g.trait_bitmap_size.times.map { 0 }.to_a
+    infer = g.ctx.infer[gtype.type_def.reified]
+    g.ctx.reach.each_type_def.each do |other_def|
+      if infer.is_subtype?(gtype.type_def.reified, other_def.reified)
+        next if gtype.type_def == other_def
+        raise "can't be subtype of a concrete" unless other_def.is_abstract?
+
+        index = other_def.desc_id >> Math.log2(g.bitwidth).to_i
+        raise "bad index or trait_bitmap_size" unless index < g.trait_bitmap_size
+
+        bit = other_def.desc_id & (g.bitwidth - 1)
+        traits_bitmap[index] |= (1 << bit)
+
+        # Take special note if this type is a subtype of AsioEventNotify.
+        is_asio_event_notify = true if other_def.llvm_name == "AsioEventNotify"
+      end
+    end
+    traits_bitmap_global = g.gen_global_for_const \
+      @isize.const_array(traits_bitmap.map { |bits| @isize.const_int(bits) })
+
+    # If this type is an AsioEventNotify, then take note of the vtable index
+    # of the _event_notify behaviour that the ASIO runtime will send to.
+    # Otherwise, an index of -1 indicates that the runtime should *not* send.
+    event_notify_vtable_index = @i32.const_int(
+      is_asio_event_notify ? gtype["_event_notify"].vtable_index : -1
+    )
+
+    desc.initializer = gtype.desc_type.const_struct [
+      @i32.const_int(type_def.desc_id),      # 0: id
+      @i32.const_int(abi_size),              # 1: size
+      @i32_0,                                # 2: TODO: field_count (tuples only)
+      @i32.const_int(field_offset),          # 3: field_offset
+      @obj_ptr.null,                         # 4: instance
+      trace_fn.to_value,                     # 5: trace fn
+      @trace_fn_ptr.null,                    # 6: serialise trace fn TODO: @#{llvm_name}.SERIALISETRACE
+      @serialise_fn_ptr.null,                # 7: serialise fn TODO: @#{llvm_name}.SERIALISE
+      @deserialise_fn_ptr.null,              # 8: deserialise fn TODO: @#{llvm_name}.DESERIALISE
+      @custom_serialise_space_fn_ptr.null,   # 9: custom serialise space fn
+      @custom_deserialise_fn_ptr.null,       # 10: custom deserialise fn
+      dispatch_fn.to_value,                  # 11: dispatch fn
+      @final_fn_ptr.null,                    # 12: final fn
+      event_notify_vtable_index,             # 13: event notify TODO
+      traits_bitmap_global,                  # 14: traits bitmap
+      @pptr.null,                            # 15: TODO: fields
+      @ptr.const_array(vtable),              # 16: vtable
+    ]
+
+    desc
+  end
+
+  def gen_vtable_gep_get(g, desc, name)
+    g.builder.struct_gep(desc, DESC_VTABLE, name)
+  end
+
+  def gen_traits_gep_get(g, desc, name)
+    g.builder.struct_gep(desc, DESC_TRAITS, name)
+  end
+
   def gen_main(g : CodeGen)
     # Declare the main function.
     main = g.mod.functions.add("main", [@i32, @pptr, @pptr], @i32)
