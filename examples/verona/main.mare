@@ -1,0 +1,7 @@
+:ffi LibC
+  :fun printf (format CPointer(U8), arg1 CPointer(U8)) I32
+
+:actor Main
+  :new (env)
+    // TODO: Should be using cstring instead of cpointer
+    LibC.printf("%s".cpointer, "Hello, World!".cpointer)

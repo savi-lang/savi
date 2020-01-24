@@ -8,6 +8,7 @@ class Mare::Compiler::Context
   getter reach
   getter paint
   getter code_gen
+  getter code_gen_verona
   getter eval
   getter serve_hover
 
@@ -22,7 +23,8 @@ class Mare::Compiler::Context
     @refer = Refer.new
     @reach = Reach.new
     @paint = Paint.new
-    @code_gen = CodeGen.new
+    @code_gen = CodeGen.new(CodeGen::PonyRT)
+    @code_gen_verona = CodeGen.new(CodeGen::VeronaRT)
     @eval = Eval.new
     @serve_hover = ServeHover.new
   end

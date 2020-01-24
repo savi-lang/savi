@@ -1,27 +1,29 @@
 module Mare::Compiler
   def self.execute(ctx, target : Symbol)
     case target
-    when :import       then ctx.run(Import)
-    when :namespace    then ctx.run(ctx.namespace)
-    when :macros       then ctx.run(Macros)
-    when :sugar        then ctx.run(Sugar)
-    when :refer_type   then ctx.run(ctx.refer_type)
-    when :populate     then ctx.run(Populate)
-    when :lambda       then ctx.run(Lambda)
-    when :refer        then ctx.run(ctx.refer)
-    when :classify     then ctx.run(Classify)
-    when :jumps        then ctx.run(Jumps)
-    when :inventory    then ctx.run(ctx.inventory)
-    when :infer        then ctx.run(ctx.infer)
-    when :privacy      then ctx.run(Privacy)
-    when :completeness then ctx.run(Completeness)
-    when :reach        then ctx.run(ctx.reach)
-    when :verify       then ctx.run(Verify)
-    when :paint        then ctx.run(ctx.paint)
-    when :codegen      then ctx.run(ctx.code_gen)
-    when :eval         then ctx.run(ctx.eval)
-    when :binary       then ctx.run(Binary)
-    when :serve_hover  then ctx.run(ctx.serve_hover)
+    when :import         then ctx.run(Import)
+    when :namespace      then ctx.run(ctx.namespace)
+    when :macros         then ctx.run(Macros)
+    when :sugar          then ctx.run(Sugar)
+    when :refer_type     then ctx.run(ctx.refer_type)
+    when :populate       then ctx.run(Populate)
+    when :lambda         then ctx.run(Lambda)
+    when :refer          then ctx.run(ctx.refer)
+    when :classify       then ctx.run(Classify)
+    when :jumps          then ctx.run(Jumps)
+    when :inventory      then ctx.run(ctx.inventory)
+    when :infer          then ctx.run(ctx.infer)
+    when :privacy        then ctx.run(Privacy)
+    when :completeness   then ctx.run(Completeness)
+    when :reach          then ctx.run(ctx.reach)
+    when :verify         then ctx.run(Verify)
+    when :paint          then ctx.run(ctx.paint)
+    when :codegen        then ctx.run(ctx.code_gen)
+    when :codegen_verona then ctx.run(ctx.code_gen_verona)
+    when :eval           then ctx.run(ctx.eval)
+    when :binary         then ctx.run(Binary)
+    when :binary_verona  then ctx.run(BinaryVerona)
+    when :serve_hover    then ctx.run(ctx.serve_hover)
     else raise NotImplementedError.new(target)
     end
   end
@@ -48,8 +50,10 @@ module Mare::Compiler
     when :verify then [:reach]
     when :paint then [:reach]
     when :codegen then [:paint, :verify, :reach, :completeness, :privacy, :infer, :inventory, :jumps]
+    when :codegen_verona then [:paint, :verify, :reach, :completeness, :privacy, :infer, :inventory, :jumps]
     when :eval then [:codegen]
     when :binary then [:codegen]
+    when :binary_verona then [:codegen_verona]
     when :serve_hover then [:refer, :infer]
     else raise NotImplementedError.new([:deps_of, target].inspect)
     end

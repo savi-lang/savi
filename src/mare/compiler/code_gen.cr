@@ -25,7 +25,7 @@ class Mare::Compiler::CodeGen
     getter gtype : GenType?
     getter gfunc : GenFunc?
 
-    setter pony_ctx : LLVM::Value?
+    setter alloc_ctx : LLVM::Value?
     property! receiver_value : LLVM::Value?
     property! continuation_value : LLVM::Value
 
@@ -35,12 +35,12 @@ class Mare::Compiler::CodeGen
       @current_locals = {} of Refer::Local => LLVM::Value
     end
 
-    def pony_ctx?
-      @pony_ctx.is_a?(LLVM::Value)
+    def alloc_ctx?
+      @alloc_ctx.is_a?(LLVM::Value)
     end
 
-    def pony_ctx
-      @pony_ctx.as(LLVM::Value)
+    def alloc_ctx
+      @alloc_ctx.as(LLVM::Value)
     end
 
     def refer
@@ -263,7 +263,13 @@ class Mare::Compiler::CodeGen
 
   getter! ctx : Context
 
-  def initialize
+  getter llvm
+  getter mod
+  getter builder
+  getter di
+  getter gtypes
+
+  def initialize(runtime : PonyRT.class | VeronaRT.class = PonyRT)
     LLVM.init_x86
     @target_triple = LLVM.default_target_triple
     @target = LLVM::Target.from_triple(@target_triple)
@@ -272,6 +278,8 @@ class Mare::Compiler::CodeGen
     @mod = @llvm.new_module("main")
     @builder = @llvm.new_builder
     @di = DebugInfo.new(@llvm, @mod, @builder, @target_machine.data_layout)
+
+    @runtime = runtime.new(@llvm, @target_machine).as(PonyRT | VeronaRT)
 
     @default_linkage = LLVM::Linkage::External
 
@@ -311,9 +319,10 @@ class Mare::Compiler::CodeGen
     )).new
 
     # Pony runtime types.
-    @desc = @llvm.struct_create_named("_.DESC").as(LLVM::Type)
+    # TODO: Remove these, because they're already present in PonyRT
+    @desc = @runtime.desc.as(LLVM::Type)
     @desc_ptr = @desc.pointer.as(LLVM::Type)
-    @obj = @llvm.struct_create_named("_.OBJECT").as(LLVM::Type)
+    @obj = @runtime.obj.as(LLVM::Type)
     @obj_ptr = @obj.pointer.as(LLVM::Type)
     @actor_pad = @i8.array(PonyRT::ACTOR_PAD_SIZE).as(LLVM::Type)
     @msg = @llvm.struct([@i32, @i32], "_.MESSAGE").as(LLVM::Type)
@@ -337,8 +346,22 @@ class Mare::Compiler::CodeGen
     gen_desc_basetype
     @obj.struct_set_body([@desc_ptr])
 
-    # Pony runtime function declarations.
-    gen_runtime_decls
+    @runtime.gen_runtime_decls(self).each do |tuple|
+      func = @mod.functions.add(tuple[0], tuple[1], tuple[2])
+      tuple[3].each do |attr|
+        if attr.is_a?(Tuple((LLVM::AttributeIndex | Int32), LLVM::Attribute))
+          func.add_attribute(attr[1], attr[0])
+        elsif attr.is_a?(Tuple((LLVM::AttributeIndex | Int32), LLVM::Attribute, UInt64))
+          func.add_attribute(attr[1], attr[0], attr[2])
+        else
+          func.add_attribute(attr)
+        end
+      end
+    end
+  end
+
+  def frame_count
+    @frames.size
   end
 
   def frame
@@ -427,13 +450,13 @@ class Mare::Compiler::CodeGen
     end.to_a
   end
 
-  def pony_ctx
+  def alloc_ctx
     # Return the stored value if we have it cached for this function already.
-    return func_frame.pony_ctx if func_frame.pony_ctx?
+    return func_frame.alloc_ctx if func_frame.alloc_ctx?
 
     gen_at_entry do
-      # Call the pony_ctx function and save the value to refer to it later.
-      func_frame.pony_ctx = @builder.call(@mod.functions["pony_ctx"], "PONY_CTX")
+      # Call the alloc_ctx function and save the value to refer to it later.
+      func_frame.alloc_ctx = @runtime.gen_alloc_ctx_get(self)
     end
   end
 
@@ -465,7 +488,7 @@ class Mare::Compiler::CodeGen
     @gtypes.each_value(&.gen_func_impls(self))
 
     # Generate the internal main function.
-    gen_main
+    @runtime.gen_main(self)
 
     # Generate the wrapper main function for the JIT.
     gen_wrapper
@@ -506,80 +529,6 @@ class Mare::Compiler::CodeGen
     # Call the main function with the constructed arguments.
     res = @builder.call(@mod.functions["main"], [argc, argv_0, envp_0], "res")
     @builder.ret(res)
-  end
-
-  def gen_main
-    # Declare the main function.
-    main = @mod.functions.add("main", [@i32, @pptr, @pptr], @i32)
-    main.linkage = LLVM::Linkage::External
-
-    gen_func_start(main)
-
-    argc = main.params[0].tap &.name=("argc")
-    argv = main.params[1].tap &.name=("argv")
-    envp = main.params[2].tap &.name=("envp")
-
-    # Call pony_init, letting it optionally consume some of the CLI args,
-    # giving us a new value for argc and a mutated argv array.
-    argc = @builder.call(@mod.functions["pony_init"], [@i32.const_int(1), argv], "argc")
-
-    # Get the current pony_ctx and hold on to it.
-    pony_ctx = @builder.call(@mod.functions["pony_ctx"], "ctx")
-    func_frame.pony_ctx = pony_ctx
-
-    # Create the main actor and become it.
-    main_actor = gen_alloc_actor(@gtypes["Main"], "main", true)
-
-    # TODO: Create the Env from argc, argv, and envp.
-    env = gen_alloc(@gtypes["Env"], "env")
-    @builder.call(@gtypes["Env"]["_create"].llvm_func, [env])
-    # TODO: @builder.call(@gtypes["Env"]["_create"].llvm_func,
-    #   [argc, @builder.bit_cast(argv, @ptr), @builder.bitcast(envp, @ptr)])
-
-    # TODO: Run primitive initialisers using the main actor's heap.
-
-    # Send the env in a message to the main actor's constructor
-    @builder.call(@gtypes["Main"]["new"].send_llvm_func, [main_actor, env])
-
-    # Start the runtime.
-    start_success = @builder.call(@mod.functions["pony_start"], [
-      @i1.const_int(0),
-      @i32_ptr.null,
-      @ptr.null, # TODO: pony_language_features_init_t*
-    ], "start_success")
-
-    # Branch based on the value of `start_success`.
-    start_fail_block = gen_block("start_fail")
-    post_block = gen_block("post")
-    @builder.cond(start_success, post_block, start_fail_block)
-
-    # On failure, just write a failure message then continue to the post_block.
-    @builder.position_at_end(start_fail_block)
-    @builder.call(@mod.functions["puts"], [
-      gen_cstring("Error: couldn't start the runtime!")
-    ])
-    @builder.br(post_block)
-
-    # On success (or after running the failure block), do the following:
-    @builder.position_at_end(post_block)
-
-    # TODO: Run primitive finalizers.
-
-    # Become nothing (stop being the main actor).
-    @builder.call(@mod.functions["pony_become"], [
-      func_frame.pony_ctx,
-      @obj_ptr.null,
-    ])
-
-    # Get the program's chosen exit code (or 0 by default), but override
-    # it with -1 if we failed to start the runtime.
-    exitcode = @builder.call(@mod.functions["pony_get_exitcode"], "exitcode")
-    ret = @builder.select(start_success, exitcode, @i32.const_int(-1), "ret")
-    @builder.ret(ret)
-
-    gen_func_end
-
-    main
   end
 
   def gen_func_start(llvm_func, gtype : GenType? = nil, gfunc : GenFunc? = nil)
@@ -992,7 +941,7 @@ class Mare::Compiler::CodeGen
 
         @builder.bit_cast(
           @builder.call(@mod.functions["pony_alloc"], [
-            pony_ctx,
+            alloc_ctx,
             @builder.mul(params[0], @isize.const_int(elem_size_value)),
           ]),
           llvm_type,
@@ -1004,7 +953,7 @@ class Mare::Compiler::CodeGen
 
         @builder.bit_cast(
           @builder.call(@mod.functions["pony_realloc"], [
-            pony_ctx,
+            alloc_ctx,
             @builder.bit_cast(params[0], @ptr),
             @builder.mul(params[1], @isize.const_int(elem_size_value)),
           ]),
@@ -3218,7 +3167,7 @@ class Mare::Compiler::CodeGen
   def gen_alloc(llvm_type : LLVM::Type, name : String)
     size = abi_size_of(llvm_type)
     size = 1 if size == 0
-    args = [pony_ctx]
+    args = [alloc_ctx]
 
     value =
       if size <= PonyRT::HEAP_MAX
@@ -3237,18 +3186,8 @@ class Mare::Compiler::CodeGen
 
   # This generates the special kind of allocation needed by actors,
   # invoked by the above function when the type being allocated is an actor.
-  def gen_alloc_actor(gtype, name, become_now = false)
-    allocated = @builder.call(@mod.functions["pony_create"], [
-      pony_ctx,
-      gen_get_desc_opaque(gtype),
-    ], "#{name}.OPAQUE")
-
-    if become_now
-      @builder.call(@mod.functions["pony_become"], [
-        gen_frame.pony_ctx, allocated])
-    end
-
-    @builder.bit_cast(allocated, gtype.struct_ptr, name)
+  def gen_alloc_actor(gtype, name)
+    @runtime.gen_alloc_actor(self, gtype, name)
   end
 
   # Get the global constant value for the type descriptor of the given type.
@@ -3324,386 +3263,18 @@ class Mare::Compiler::CodeGen
       >> Math.log2(@bitwidth).to_i
   end
 
-  def gen_trace_unknown(dst, ponyrt_trace_kind)
-    @builder.call(@mod.functions["pony_traceunknown"], [
-      pony_ctx,
-      @builder.bit_cast(dst, @obj_ptr, "#{dst.name}.OPAQUE"),
-      @i32.const_int(ponyrt_trace_kind),
-    ])
-  end
-
-  def gen_trace_known(dst, src_type, ponyrt_trace_kind)
-    src_gtype = @gtypes[ctx.reach[src_type.single!].llvm_name]
-
-    @builder.call(@mod.functions["pony_traceknown"], [
-      pony_ctx,
-      @builder.bit_cast(dst, @obj_ptr, "#{dst.name}.OPAQUE"),
-      @builder.bit_cast(src_gtype.desc, @desc_ptr, "#{dst.name}.DESC"),
-      @i32.const_int(ponyrt_trace_kind),
-    ])
-  end
-
-  def gen_trace_dynamic(dst, src_type, dst_type, after_block)
-    if src_type.is_union?
-      src_type.union_children.each do |child_type|
-        gen_trace_dynamic(dst, child_type, dst_type, after_block)
-      end
-      gen_trace_unknown(dst, PonyRT::TRACE_OPAQUE)
-    elsif src_type.singular?
-      src_type_def = src_type.single_def!(ctx)
-
-      # We can't trace it if it doesn't have a descriptor,
-      # and we shouldn't trace it if it isn't runtime-allocated.
-      return unless src_type_def.has_desc? && src_type_def.has_allocation?
-
-      # Generate code to check if this value is a subtype of this at runtime.
-      is_subtype = gen_check_subtype_at_runtime(dst, src_type)
-      true_block = gen_block("trace.is_subtype_of.#{src_type.show_type}")
-      false_block = gen_block("trace.not_subtype_of.#{src_type.show_type}")
-      @builder.cond(is_subtype, true_block, false_block)
-
-      # In the block in which the value was proved to indeed be a subtype,
-      # Determine the mutability kind to use, then construct a newly refined
-      # destination type to trace for, recursing/delegating back to gen_trace.
-      @builder.position_at_end(true_block)
-      mutability = src_type.trace_mutability_of_nominal(
-        ctx.infer[src_type_def.reified],
-        dst_type,
-      )
-      refined_dst_type =
-        case mutability
-        when :mutable   then src_type_def.as_ref("iso")
-        when :immutable then src_type_def.as_ref("val")
-        when :opaque    then src_type_def.as_ref("tag")
-        when :non       then src_type_def.as_ref("non")
-        else
-          raise NotImplementedError.new([src_type, dst_type])
-        end
-      gen_trace(dst, dst, src_type, refined_dst_type)
-
-      # If we've traced as mutable or immutable, we're done with this element;
-      # otherwise, we continue tracing as if the match had been false.
-      case mutability
-      when :mutable, :immutable then @builder.br(after_block)
-      else                           @builder.br(false_block)
-      end
-
-      # Carry on to the next elements, continuing from the false block.
-      @builder.position_at_end(false_block)
-    else
-      raise NotImplementedError.new(src_type)
-    end
-  end
-
-  def gen_trace(src : LLVM::Value, dst : LLVM::Value, src_type, dst_type)
-    if src_type == dst_type
-      trace_kind = src_type.trace_kind
-    else
-      trace_kind = src_type.trace_kind_with_dst_cap(dst_type.trace_kind)
-    end
-
-    case trace_kind
-    when :machine_word
-      if dst_type.trace_kind == :machine_word
-        # Do nothing - no need to trace this value since it isn't boxed.
-      else
-        # The value is indeed boxed and has a type descriptor; trace it.
-        gen_trace_known(dst, src_type, PonyRT::TRACE_IMMUTABLE)
-      end
-    when :mut_known
-      gen_trace_known(dst, src_type, PonyRT::TRACE_MUTABLE)
-    when :val_known, :non_known
-      gen_trace_known(dst, src_type, PonyRT::TRACE_IMMUTABLE)
-    when :tag_known
-      gen_trace_known(dst, src_type, PonyRT::TRACE_OPAQUE)
-    when :mut_unknown
-      gen_trace_unknown(dst, PonyRT::TRACE_MUTABLE)
-    when :val_unknown, :non_unknown
-      gen_trace_unknown(dst, PonyRT::TRACE_IMMUTABLE)
-    when :tag_unknown
-      gen_trace_unknown(dst, PonyRT::TRACE_OPAQUE)
-    when :static
-      raise NotImplementedError.new("static") # TODO
-    when :dynamic
-      after_block = gen_block("after_dynamic_trace")
-      gen_trace_dynamic(dst, src_type, dst_type, after_block)
-      @builder.br(after_block)
-      @builder.position_at_end(after_block)
-    when :tuple
-      raise NotImplementedError.new("tuple") # TODO
-    else
-      raise NotImplementedError.new(trace_kind)
-    end
-  end
-
   def gen_send_impl(gtype, gfunc)
-    fn = gfunc.send_llvm_func
-    gen_func_start(fn)
-
-    # Get the message type and virtual table index to use.
-    msg_type = gfunc.send_msg_llvm_type
-    vtable_index = gfunc.vtable_index
-
-    # Allocate a message object of the specific size/type used by this function.
-    msg_size = abi_size_of(msg_type)
-    pool_index = PonyRT.pool_index(msg_size)
-    msg_opaque = @builder.call(@mod.functions["pony_alloc_msg"],
-      [@i32.const_int(pool_index), @i32.const_int(vtable_index)], "msg.OPAQUE")
-    msg = @builder.bit_cast(msg_opaque, msg_type.pointer, "msg")
-
-    src_types = [] of Reach::Ref
-    dst_types = [] of Reach::Ref
-    src_values = [] of LLVM::Value
-    dst_values = [] of LLVM::Value
-    needs_trace = false
-
-    # Store all forwarding arguments in the message object.
-    msg_type.struct_element_types.each_with_index do |elem_type, i|
-      next if i < 3 # skip the first 3 boilerplate fields in the message
-      param = fn.params[i - 3 + 1] # skip 3 fields, skip 1 param (the receiver)
-      param.name = "param.#{i - 2}"
-
-      arg = gfunc.func.params.not_nil!.terms[i - 3] # skip 3 fields
-      dst_types << type_of(arg, gfunc)
-      src_types << dst_types.last # TODO: are these ever different?
-
-      needs_trace ||= src_types.last.trace_needed?(dst_types.last)
-
-      # Cast the argument to the correct type and store it in the message.
-      cast_arg = gen_assign_cast(param, elem_type, nil)
-      arg_gep = @builder.struct_gep(msg, i, "msg.#{i - 2}.GEP")
-      @builder.store(cast_arg, arg_gep)
-
-      src_values << param
-      dst_values << cast_arg
-    end
-
-    if needs_trace
-      @builder.call(@mod.functions["pony_gc_send"], [pony_ctx])
-
-      src_values.each_with_index do |src_value, i|
-        gen_trace(src_value, dst_values[i], src_types[i], dst_types[i])
-      end
-
-      @builder.call(@mod.functions["pony_send_done"], [pony_ctx])
-    end
-
-    # If this is a constructor, we know that we are the only message producer
-    # for this actor at this point, so we can optimize by using sendv_single.
-    # Otherwise, we need to use the normal multi-producer-safe function.
-    sendv_name =
-      gfunc.func.has_tag?(:constructor) ? "pony_sendv_single" : "pony_sendv"
-
-    # Send the message.
-    @builder.call(@mod.functions[sendv_name], [
-      pony_ctx,
-      @builder.bit_cast(fn.params[0], @obj_ptr, "@.OPAQUE"),
-      msg_opaque,
-      msg_opaque,
-      @i1.const_int(1)
-    ])
-
-    # Return None.
-    @builder.ret(gen_none)
-
-    gen_func_end
+    # Sending a message needs a runtime-specific implementation.
+    @runtime.gen_send_impl(self, gtype, gfunc)
   end
 
   def gen_trace_impl(gtype : GenType)
-    raise "inconsistent frames" if @frames.size > 1
-
-    # Get the reference to the trace function declared earlier.
-    # We'll fill in the implementation of that function now.
-    fn = @mod.functions["#{gtype.type_def.llvm_name}.TRACE"]?
-    return unless fn
-
-    fn.unnamed_addr = true
-    fn.call_convention = LLVM::CallConvention::C
-    fn.linkage = LLVM::Linkage::External
-
-    gen_func_start(fn)
-
-    fn.params[0].name = "PONY_CTX"
-    fn.params[1].name = "@.OPAQUE"
-    func_frame.pony_ctx = fn.params[0]
-    func_frame.receiver_value =
-      @builder.bit_cast(fn.params[1], gtype.struct_ptr, "@")
-
-    if gtype.type_def.is_array?
-      # We have a special-case implementation for Array (unfortunately).
-      # This is the only case when we will trace "into" a CPointer.
-      gen_trace_impl_for_array(gtype, fn)
-    else
-      # For all other types, we simply trace all fields (that need tracing).
-      gtype.fields.each do |field_name, field_type|
-        next unless field_type.trace_needed?
-
-        field = gen_field_load(field_name, gtype)
-        gen_trace(field, field, field_type, field_type)
-      end
-    end
-
-    @builder.ret
-    gen_func_end
-  end
-
-  def gen_trace_impl_for_array(gtype : GenType, fn)
-    elem_type_ref = gtype.type_def.array_type_arg
-    array_size    = gen_field_load("_size", gtype)
-    array_ptr     = gen_field_load("_ptr", gtype)
-
-    # First, trace the base pointer itself.
-    @builder.call(@mod.functions["pony_trace"], [
-      pony_ctx,
-      @builder.bit_cast(array_ptr, @ptr),
-    ])
-
-    # Now, we need to trace each of the array elements, one by one.
-    # We do this by generating a crude loop over the array indexes.
-
-    # Create a reassignable local variable-like alloca to hold the loop index.
-    # TODO: Consider avoiding this how ponyc does, with a lazily-filled phi.
-    index_alloca = @builder.alloca(@isize, "ARRAY.TRACE.LOOP.INDEX.ALLOCA")
-    @builder.store(@isize.const_int(0), index_alloca)
-
-    # Create some code blocks to use for the loop.
-    cond_block = gen_block("ARRAY.TRACE.LOOP.COND")
-    body_block = gen_block("ARRAY.TRACE.LOOP.BODY")
-    post_block = gen_block("ARRAY.TRACE.LOOP.POST")
-
-    # Start by jumping into the cond block.
-    @builder.br(cond_block)
-
-    # In the cond block, compare the index variable to the array size,
-    # jumping to the body block if still within bounds; else, the post block.
-    @builder.position_at_end(cond_block)
-    index = @builder.load(index_alloca, "ARRAY.TRACE.LOOP.INDEX")
-    continue = @builder.icmp(LLVM::IntPredicate::ULT, index, array_size)
-    @builder.cond(continue, body_block, post_block)
-
-    # In the body block, get the element for this index and trace it.
-    @builder.position_at_end(body_block)
-    elem =
-      @builder.load(
-        @builder.inbounds_gep(
-          array_ptr,
-          @builder.load(index_alloca, "ARRAY.TRACE.LOOP.INDEX"),
-          "ARRAY.TRACE.LOOP.ELEM.GEP",
-        ),
-        "ARRAY.TRACE.LOOP.ELEM",
-      )
-    gen_trace(elem, elem, elem_type_ref, elem_type_ref)
-
-    # Then increment the index and continue to the next iteration of the loop.
-    @builder.store(
-      @builder.add(index, @isize.const_int(1)),
-      index_alloca,
-    )
-    @builder.br(cond_block)
-
-    # Once done, move the builder to the post block for whatever code follows.
-    @builder.position_at_end(post_block)
+    # Tracing a value needs a runtime-specific implementation.
+    @runtime.gen_trace_impl(self, gtype)
   end
 
   def gen_dispatch_impl(gtype : GenType)
-    raise "inconsistent frames" if @frames.size > 1
-
-    # Get the reference to the dispatch function declared earlier.
-    # We'll fill in the implementation of that function now.
-    fn = @mod.functions["#{gtype.type_def.llvm_name}.DISPATCH"]
-    fn.unnamed_addr = true
-    fn.call_convention = LLVM::CallConvention::C
-    fn.linkage = LLVM::Linkage::External
-
-    gen_func_start(fn)
-
-    fn.params[0].name = "PONY_CTX"
-    fn.params[1].name = "@.OPAQUE"
-    fn.params[2].name = "msg"
-
-    func_frame.pony_ctx = fn.params[0]
-    receiver_opaque = fn.params[1]
-    func_frame.receiver_value = receiver =
-      @builder.bit_cast(receiver_opaque, gtype.struct_ptr, "@")
-
-    # Get the message id from the first field of the message object
-    # (which was the third parameter to this function).
-    msg_id_gep = @builder.struct_gep(fn.params[2], 1, "msg.id.GEP")
-    msg_id = @builder.load(msg_id_gep, "msg.id")
-
-    # Capture the current insert block so we can come back to it later,
-    # after we jump around into each case block that we need to generate.
-    orig_block = @builder.insert_block
-
-    # Generate the case block for each async function of this type,
-    # mapped by the message id that corresponds to that function.
-    cases = {} of LLVM::Value => LLVM::BasicBlock
-    gtype.gfuncs.each do |func_name, gfunc|
-      # Only look at functions with the async tag.
-      next unless gfunc.func.has_tag?(:async)
-
-      # Use the vtable index of the function as the message id to look for.
-      id = @i32.const_int(gfunc.vtable_index)
-
-      # Create the block to execute when the message id matches.
-      cases[id] = block = gen_block("DISPATCH.#{func_name}")
-      @builder.position_at_end(block)
-
-      src_types = [] of Reach::Ref
-      dst_types = [] of Reach::Ref
-      src_values = [] of LLVM::Value
-      dst_values = [] of LLVM::Value
-      needs_trace = false
-
-      # Destructure args from the message.
-      msg_type = gfunc.send_msg_llvm_type
-      msg = @builder.bit_cast(fn.params[2], msg_type.pointer, "msg.#{func_name}")
-      msg_type.struct_element_types.each_with_index do |elem_type, i|
-        next if i < 3 # skip the first 3 boilerplate fields in the message
-
-        arg = gfunc.func.params.not_nil!.terms[i - 3] # skip 3 fields
-        dst_types << type_of(arg, gfunc)
-        src_types << dst_types.last # TODO: are these ever different?
-        needs_trace ||= src_types.last.trace_needed?(dst_types.last)
-
-        arg_gep = @builder.struct_gep(msg, i, "msg.#{func_name}.#{i - 2}.GEP")
-        src_value = @builder.load(arg_gep, "msg.#{func_name}.#{i - 2}")
-        src_values << src_value
-
-        dst_value = gen_assign_cast(src_value, elem_type, nil)
-        dst_values << dst_value
-      end
-
-      # Prepend the receiver as the first argument, not included in the message.
-      args = [receiver] + dst_values
-
-      if needs_trace
-        @builder.call(@mod.functions["pony_gc_recv"], [pony_ctx])
-
-        src_values.each_with_index do |src_value, i|
-          gen_trace(src_value, dst_values[i], src_types[i], dst_types[i])
-        end
-
-        @builder.call(@mod.functions["pony_recv_done"], [pony_ctx])
-      end
-
-      # Call the underlying function and return void.
-      @builder.call(gfunc.llvm_func, args)
-      @builder.ret
-    end
-
-    # We rely on the typechecker to not let us call undefined async functions,
-    # so the "else" case of this switch block is to be considered unreachable.
-    unreachable_block = gen_block("unreachable_block")
-    @builder.position_at_end(unreachable_block)
-    # TODO: LLVM infinite loop protection workaround (see gentype.c:503)
-    @builder.unreachable
-
-    # Finally, return to the original block that we came from and create the
-    # switch that maps onto all the case blocks that we just generated.
-    @builder.position_at_end(orig_block)
-    @builder.switch(msg_id, unreachable_block, cases)
-
-    gen_func_end
+    # Tracing a value needs a runtime-specific implementation.
+    @runtime.gen_dispatch_impl(self, gtype)
   end
 end
