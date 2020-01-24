@@ -40,6 +40,34 @@ RUN git clone -b ${PONYC_VERSION} --depth 1 ${PONYC_GIT_URL} /tmp/ponyc && \
     sudo cp build/debug/lib/native/libponyrt.a /usr/lib/ && \
     rm -rf /tmp/ponyc
 
+# Install Verona runtime (as shared library and static library).
+# We hack the CMakeLists to avoid building the compiler/interpreter/stdlib.
+RUN apk add --no-cache --update cmake ninja
+ENV VERONA_VERSION e0899b280f83c3deb19ea605f488827dc8f71d8d
+# TODO: Use upstream, official verona repository.
+ENV VERONA_GIT_URL https://github.com/jemc/verona
+RUN git init /tmp/verona && \
+    cd /tmp/verona && \
+    git remote add origin ${VERONA_GIT_URL} && \
+    git fetch --depth 1 origin ${VERONA_VERSION} && \
+    git checkout FETCH_HEAD && \
+    git submodule update --init --recursive
+# TODO: Combine the two RUN commands into one, after all is working.
+RUN cd /tmp/verona && \
+    mkdir ninja_build && \
+    cd ninja_build && \
+    sed -i 's/add_subdirectory.compiler.//g' ../src/CMakeLists.txt && \
+    sed -i 's/add_subdirectory.interpreter.//g' ../src/CMakeLists.txt && \
+    sed -i 's/add_subdirectory.stdlib.//g' ../src/CMakeLists.txt && \
+    cat ../src/CMakeLists.txt && \
+    cmake .. -GNinja -DCMAKE_BUILD_TYPE=Debug && \
+    ninja install && \
+    sudo cp dist/lib/libverona.so           /usr/lib/ && \
+    sudo cp dist/lib/libverona-sys.so       /usr/lib/ && \
+    sudo cp dist/lib/libverona-static.a     /usr/lib/ && \
+    sudo cp dist/lib/libverona-sys-static.a /usr/lib/ && \
+    rm -rf /tmp/verona
+
 # TODO: Use multi-stage build here to carry over only the files we need.
 
 # Create a basic working directory to use for code.
