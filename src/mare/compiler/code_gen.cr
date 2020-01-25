@@ -2314,9 +2314,14 @@ class Mare::Compiler::CodeGen
   end
 
   def gen_const_for_gtype(gtype : GenType, values : Hash(String, LLVM::Value))
+    pad_elements =
+      gtype.struct_type
+        .struct_element_types[1...(-1*gtype.fields.size)]
+        .map(&.null)
+
     field_values = gtype.fields.map(&.first).map { |name| values[name] }
 
-    gtype.struct_type.const_struct([gtype.desc] + field_values)
+    gtype.struct_type.const_struct([gtype.desc] + pad_elements + field_values)
   end
 
   def gen_global_const(*args)

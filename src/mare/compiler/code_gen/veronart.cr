@@ -35,6 +35,10 @@ class Mare::Compiler::CodeGen::VeronaRT
     @alloc_ptr = @alloc.pointer.as(LLVM::Type)
     @desc = llvm.struct_create_named("_.RTDescriptor").as(LLVM::Type)
     @desc_ptr = @desc.pointer.as(LLVM::Type)
+    @action_desc = llvm.struct_create_named("_.RTActionDescriptor").as(LLVM::Type)
+    @action_desc_ptr = @action_desc.pointer.as(LLVM::Type)
+    @action = llvm.struct_create_named("_.RTAction").as(LLVM::Type)
+    @action_ptr = @action.pointer.as(LLVM::Type)
     @obj_stack = llvm.struct_create_named("_.RTObjectStack").as(LLVM::Type)
     @obj_stack_ptr = @obj_stack.pointer.as(LLVM::Type)
     @obj = llvm.struct_create_named("_.RTObject").as(LLVM::Type)
@@ -42,14 +46,18 @@ class Mare::Compiler::CodeGen::VeronaRT
     @cown = llvm.struct_create_named("_.RTCown").as(LLVM::Type)
     @cown_ptr = @cown.pointer.as(LLVM::Type)
     @cown_pad = @i8.array(COWN_PAD_SIZE).as(LLVM::Type)
-    @main_inner_fn = LLVM::Type.function([@ptr], @void).as(LLVM::Type)
-    @main_inner_fn_ptr = @main_inner_fn.pointer.as(LLVM::Type)
     @trace_fn = LLVM::Type.function([@obj_ptr, @obj_stack_ptr], @void).as(LLVM::Type)
     @trace_fn_ptr = @trace_fn.pointer.as(LLVM::Type)
     @final_fn = LLVM::Type.function([@obj_ptr], @void).as(LLVM::Type)
     @final_fn_ptr = @final_fn.pointer.as(LLVM::Type)
     @notify_fn = LLVM::Type.function([@obj_ptr], @void).as(LLVM::Type)
     @notify_fn_ptr = @notify_fn.pointer.as(LLVM::Type)
+    @action_fn = LLVM::Type.function([@action_ptr], @void).as(LLVM::Type)
+    @action_fn_ptr = @action_fn.pointer.as(LLVM::Type)
+    @action_trace_fn = LLVM::Type.function([@action_ptr, @obj_stack_ptr], @void).as(LLVM::Type)
+    @action_trace_fn_ptr = @action_trace_fn.pointer.as(LLVM::Type)
+    @main_inner_fn = LLVM::Type.function([@ptr], @void).as(LLVM::Type)
+    @main_inner_fn_ptr = @main_inner_fn.pointer.as(LLVM::Type)
   end
 
   def gen_runtime_decls(g : CodeGen)
@@ -68,6 +76,15 @@ class Mare::Compiler::CodeGen::VeronaRT
         {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::Alignment, align_width},
       ]},
       {"RTCown_release", [@cown_ptr, @alloc_ptr], @void, [
+        LLVM::Attribute::NoUnwind, LLVM::Attribute::InaccessibleMemOrArgMemOnly,
+      ]},
+      {"RTAction_new", [@alloc_ptr, @action_desc_ptr], @action_ptr, [
+        LLVM::Attribute::NoUnwind, LLVM::Attribute::InaccessibleMemOrArgMemOnly,
+        {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::NoAlias},
+        {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::Dereferenceable, align_width},
+        {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::Alignment, align_width},
+      ]},
+      {"RTAction_schedule", [@action_ptr, @cown_ptr.pointer, @isize], @void, [
         LLVM::Attribute::NoUnwind, LLVM::Attribute::InaccessibleMemOrArgMemOnly,
       ]},
       {"RTSystematicTestHarness_run", [@i32, @pptr, @main_inner_fn_ptr, @ptr], @void,
@@ -112,6 +129,12 @@ class Mare::Compiler::CodeGen::VeronaRT
       @final_fn_ptr,  # 3: final fn
       @notify_fn_ptr, # 4: notified fn
       # TODO: id, traits bitmap, vtable
+    ]
+
+    @action_desc.struct_set_body [
+      @isize,               # 0: size
+      @action_fn_ptr,       # 1: action fn
+      @action_trace_fn_ptr, # 2: action trace fn
     ]
   end
 
@@ -233,14 +256,14 @@ class Mare::Compiler::CodeGen::VeronaRT
     g.func_frame.alloc_ctx = alloc_ctx
 
     # TODO: Create a singleton Env object to use here:
-    env_obj = @ptr.null
+    env_obj = g.gtypes["Env"].struct_ptr.null
 
     if USE_SYSTEMATIC_TESTING
       g.builder.call(g.mod.functions["RTSystematicTestHarness_run"], [
         argc,
         argv,
         g.mod.functions["main.INNER"].to_value,
-        env_obj,
+        g.builder.bit_cast(env_obj, @ptr),
       ])
     else
       raise NotImplementedError.new("verona runtime init without test harness") # TODO
@@ -253,16 +276,18 @@ class Mare::Compiler::CodeGen::VeronaRT
 
   def gen_main_inner(g : CodeGen)
     fn = g.mod.functions.add("main.INNER", [@ptr], @void)
-    arg = fn.params[0].tap &.name=("arg")
-
     g.gen_func_start(fn)
+
+    env = g.builder.bit_cast(
+      fn.params[0].tap &.name=("env.OPAQUE"),
+      g.gtypes["Env"].struct_ptr,
+      "env",
+    )
 
     # Create the main actor and become it.
     main_actor = g.gen_alloc_actor(g.gtypes["Main"], "main")
 
-    g.builder.call(g.mod.functions["puts"], [
-      g.gen_cstring("TODO: Send a message to the Main actor")
-    ])
+    g.builder.call(g.gtypes["Main"]["new"].send_llvm_func, [main_actor, env])
 
     g.builder.call(g.mod.functions["RTCown_release"], [
       g.builder.bit_cast(main_actor, @cown_ptr),
@@ -281,11 +306,78 @@ class Mare::Compiler::CodeGen::VeronaRT
     g.builder.bit_cast(allocated, gtype.struct_ptr, name)
   end
 
+  def gen_alloc_action(g : CodeGen, action_desc, action_type, name)
+    allocated = g.builder.call(g.mod.functions["RTAction_new"], [
+      g.alloc_ctx,
+      action_desc,
+    ], "#{name}.OPAQUE")
+    g.builder.bit_cast(allocated, action_type.pointer, name)
+  end
+
+  def gen_action_type(g : CodeGen, gtype : GenType, gfunc : GenFunc)
+    element_types = [@action_desc_ptr]
+
+    # TODO: add send parameter types
+
+    g.llvm.struct element_types
+  end
+
+  def gen_action_desc(g : CodeGen, gtype : GenType, gfunc : GenFunc, action_type)
+    abi_size = g.abi_size_of(action_type)
+    action_fn = gen_action_func(g, gtype, gfunc)
+
+    desc = g.mod.globals.add(@action_desc, "#{gfunc.llvm_name}.ACTIONDESC")
+    desc.linkage = LLVM::Linkage::LinkerPrivate
+    desc.global_constant = true
+
+    desc.initializer = @action_desc.const_struct [
+      @isize.const_int(abi_size), # 0: size
+      action_fn.to_value,         # 1: action fn
+      @action_trace_fn_ptr.null,  # 2: TODO: action trace fn
+    ]
+
+    desc
+  end
+
+  def gen_action_func(g : CodeGen, gtype : GenType, gfunc : GenFunc)
+    fn = g.mod.functions.add("#{gfunc.llvm_name}.ACTION", @action_fn)
+    g.gen_func_start(fn)
+
+    # TODO: Real args, destructured from the action instance
+    fake_args = gfunc.llvm_func.params.types.map(&.null)
+
+    g.builder.call(gfunc.llvm_func, fake_args)
+
+    g.builder.ret
+    g.gen_func_end
+    fn
+  end
+
   def gen_send_impl(g : CodeGen, gtype : GenType, gfunc : GenFunc)
+    action_type = gen_action_type(g, gtype, gfunc)
+    action_desc = gen_action_desc(g, gtype, gfunc, action_type)
+
     fn = gfunc.send_llvm_func
     g.gen_func_start(fn)
 
-    # TODO: Send the message to the actor.
+    # Create the action object to be scheduled.
+    action = gen_alloc_action(g, action_desc, action_type, "ACTION")
+
+    # Create the list of cowns to be acquired for the action.
+    # Since this is always a list of one, it can be modeled as an alloca
+    # whose "address" we take to be the argument for the cown list.
+    cown_alloca = g.builder.alloca(@cown_ptr, "COWN.ALLOCA")
+    g.builder.store(
+      g.builder.bit_cast(fn.params[0], @cown_ptr),
+      cown_alloca,
+    )
+
+    # Schedule the action to executed when the cown is available.
+    g.builder.call(g.mod.functions["RTAction_schedule"], [
+      g.builder.bit_cast(action, @action_ptr),
+      cown_alloca,
+      @isize.const_int(1),
+    ])
 
     g.builder.ret(g.gen_none)
     g.gen_func_end
