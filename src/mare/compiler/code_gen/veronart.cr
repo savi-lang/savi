@@ -63,8 +63,10 @@ class Mare::Compiler::CodeGen::VeronaRT
         {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::NoAlias},
         {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::Dereferenceable, align_width + COWN_PAD_SIZE},
         {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::Alignment, align_width},
-      ]
-      },
+      ]},
+      {"RTCown_release", [@cown_ptr, @alloc_ptr], @void, [
+        LLVM::Attribute::NoUnwind, LLVM::Attribute::InaccessibleMemOrArgMemOnly,
+      ]},
       {"RTSystematicTestHarness_run", [@i32, @pptr, @main_inner_fn_ptr, @ptr], @void,
         [] of LLVM::Attribute
       },
@@ -139,7 +141,7 @@ class Mare::Compiler::CodeGen::VeronaRT
     abi_size = g.abi_size_of(gtype.struct_type)
 
     trace_fn =
-      if type_def.has_desc? && gtype.fields.any?(&.last.trace_needed?)
+      if type_def.has_desc?
         g.mod.functions.add("#{type_def.llvm_name}.TRACE", @trace_fn)
       else
         @trace_fn_ptr.null
@@ -250,17 +252,21 @@ class Mare::Compiler::CodeGen::VeronaRT
       g.gen_cstring("TODO: Send a message to the Main actor")
     ])
 
+    g.builder.call(g.mod.functions["RTCown_release"], [
+      g.builder.bit_cast(main_actor, @cown_ptr),
+      g.alloc_ctx,
+    ])
+
     g.builder.ret
     g.gen_func_end
   end
 
   def gen_alloc_actor(g : CodeGen, gtype : GenType, name)
-    # allocated = g.builder.call(g.mod.functions["RTCown_new"], [
-    #   g.alloc_ctx,
-    #   g.gen_get_desc_opaque(gtype),
-    # ], "#{name}.OPAQUE")
-    # g.builder.bit_cast(allocated, gtype.struct_ptr, name)
-    @ptr.null
+    allocated = g.builder.call(g.mod.functions["RTCown_new"], [
+      g.alloc_ctx,
+      g.gen_get_desc_opaque(gtype),
+    ], "#{name}.OPAQUE")
+    g.builder.bit_cast(allocated, gtype.struct_ptr, name)
   end
 
   def gen_send_impl(g : CodeGen, gtype : GenType, gfunc : GenFunc)
@@ -287,7 +293,9 @@ class Mare::Compiler::CodeGen::VeronaRT
 
     g.gen_func_start(fn)
 
-    # TODO: Trace the value.
+    gtype.fields.each do |name, field_ref|
+      # TODO: Trace the fields that need tracing.
+    end
 
     g.builder.ret
     g.gen_func_end
