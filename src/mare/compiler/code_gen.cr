@@ -2482,6 +2482,8 @@ class Mare::Compiler::CodeGen
       @llvm.const_bit_cast(via_llvm_func.to_value, @ptr)
 
     # Generate a type descriptor, so this can masquerade as a real primitive.
+    raise NotImplementedError.new("gen_reflection_mutator_of_type in Verona") \
+      if @runtime.is_a?(VeronaRT)
     desc = gen_global_for_const(mutator_gtype.desc_type.const_struct [
       @i32.const_int(0xFFFF_FFFF),         # 0: id
       @i32.const_int(abi_size_of(@ptr)),   # 1: size
