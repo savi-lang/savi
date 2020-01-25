@@ -3049,8 +3049,7 @@ class Mare::Compiler::CodeGen
       unless value_type.kind == LLVM::Type::Kind::Pointer \
         && value_type.element_type.kind == LLVM::Type::Kind::Struct
 
-    desc_gep = @builder.struct_gep(value, 0, "#{value.name}.DESC.GEP")
-    @builder.load(desc_gep, "#{value.name}.DESC")
+    @runtime.gen_get_desc(self, value)
   end
 
   def gen_put_desc(value, gtype, name = "")

@@ -460,6 +460,11 @@ class Mare::Compiler::CodeGen::PonyRT
     gtype.struct_type.struct_set_body(elements)
   end
 
+  def gen_get_desc(g : CodeGen, value : LLVM::Value)
+    desc_gep = g.builder.struct_gep(value, 0, "#{value.name}.DESC.GEP")
+    g.builder.load(desc_gep, "#{value.name}.DESC")
+  end
+
   def gen_main(g : CodeGen)
     # Declare the main function.
     main = g.mod.functions.add("main", [@i32, @pptr, @pptr], @i32)

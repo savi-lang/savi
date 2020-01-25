@@ -58,6 +58,9 @@ class Mare::Compiler::CodeGen::VeronaRT
       {"RTAlloc_get", [] of LLVM::Type, @alloc_ptr, [
         LLVM::Attribute::NoUnwind, LLVM::Attribute::ReadNone,
       ]},
+      {"RTObject_get_descriptor", [@obj_ptr], @desc_ptr, [
+        LLVM::Attribute::NoUnwind, LLVM::Attribute::InaccessibleMemOrArgMemOnly, LLVM::Attribute::ReadOnly,
+      ]},
       {"RTCown_new", [@alloc_ptr, @desc_ptr], @cown_ptr, [
         LLVM::Attribute::NoUnwind, LLVM::Attribute::InaccessibleMemOrArgMemOnly,
         {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::NoAlias},
@@ -197,6 +200,15 @@ class Mare::Compiler::CodeGen::VeronaRT
 
     # The struct was previously opaque with no body. We now fill it in here.
     gtype.struct_type.struct_set_body(elements)
+  end
+
+  def gen_get_desc(g : CodeGen, value : LLVM::Value)
+    # Verona hacks the lower bits of the desc pointer, so we don't want to
+    # reach to it directly. Instead we call the runtime function to get it.
+    g.builder.call(
+      g.mod.functions["RTObject_get_descriptor"],
+      [g.builder.bit_cast(value, @obj_ptr)],
+    )
   end
 
   def gen_main(g : CodeGen)
