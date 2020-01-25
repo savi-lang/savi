@@ -289,11 +289,6 @@ class Mare::Compiler::CodeGen::VeronaRT
 
     g.builder.call(g.gtypes["Main"]["new"].send_llvm_func, [main_actor, env])
 
-    g.builder.call(g.mod.functions["RTCown_release"], [
-      g.builder.bit_cast(main_actor, @cown_ptr),
-      g.alloc_ctx,
-    ])
-
     g.builder.ret
     g.gen_func_end
   end
@@ -314,17 +309,15 @@ class Mare::Compiler::CodeGen::VeronaRT
     g.builder.bit_cast(allocated, action_type.pointer, name)
   end
 
-  def gen_action_type(g : CodeGen, gtype : GenType, gfunc : GenFunc)
+  def gen_action_type(g : CodeGen, gtype : GenType, gfunc : GenFunc, params_types)
     element_types = [@action_desc_ptr]
-
-    # TODO: add send parameter types
-
+    element_types.concat(params_types)
     g.llvm.struct element_types
   end
 
   def gen_action_desc(g : CodeGen, gtype : GenType, gfunc : GenFunc, action_type)
     abi_size = g.abi_size_of(action_type)
-    action_fn = gen_action_func(g, gtype, gfunc)
+    action_fn = gen_action_func(g, gtype, gfunc, action_type)
 
     desc = g.mod.globals.add(@action_desc, "#{gfunc.llvm_name}.ACTIONDESC")
     desc.linkage = LLVM::Linkage::LinkerPrivate
@@ -339,14 +332,22 @@ class Mare::Compiler::CodeGen::VeronaRT
     desc
   end
 
-  def gen_action_func(g : CodeGen, gtype : GenType, gfunc : GenFunc)
+  def gen_action_func(g : CodeGen, gtype : GenType, gfunc : GenFunc, action_type)
     fn = g.mod.functions.add("#{gfunc.llvm_name}.ACTION", @action_fn)
     g.gen_func_start(fn)
 
-    # TODO: Real args, destructured from the action instance
-    fake_args = gfunc.llvm_func.params.types.map(&.null)
+    # Destructure args from the message.
+    dst_values = [] of LLVM::Value
+    action = g.builder.bit_cast(fn.params[0], action_type.pointer, "ACTION")
+    gfunc.llvm_func.params.types.each_with_index do |param_type, i|
+      arg_gep = g.builder.struct_gep(action, i + 1, "ACTION.#{i + 1}.GEP")
+      src_value = g.builder.load(arg_gep, "ACTION.#{i + 1}")
 
-    g.builder.call(gfunc.llvm_func, fake_args)
+      dst_value = g.gen_assign_cast(src_value, param_type, nil)
+      dst_values << dst_value
+    end
+
+    g.builder.call(gfunc.llvm_func, dst_values)
 
     g.builder.ret
     g.gen_func_end
@@ -354,7 +355,7 @@ class Mare::Compiler::CodeGen::VeronaRT
   end
 
   def gen_send_impl(g : CodeGen, gtype : GenType, gfunc : GenFunc)
-    action_type = gen_action_type(g, gtype, gfunc)
+    action_type = gen_action_type(g, gtype, gfunc, gfunc.llvm_func.params.types)
     action_desc = gen_action_desc(g, gtype, gfunc, action_type)
 
     fn = gfunc.send_llvm_func
@@ -363,14 +364,18 @@ class Mare::Compiler::CodeGen::VeronaRT
     # Create the action object to be scheduled.
     action = gen_alloc_action(g, action_desc, action_type, "ACTION")
 
+    # Fill the action with the arguments we were passed.
+    fn.params.to_a.each_with_index do |param, i|
+      arg_gep = g.builder.struct_gep(action, i + 1, "ACTION.#{i + 1}.GEP")
+      g.builder.store(param, arg_gep)
+    end
+
     # Create the list of cowns to be acquired for the action.
     # Since this is always a list of one, it can be modeled as an alloca
     # whose "address" we take to be the argument for the cown list.
+    cown = g.builder.bit_cast(fn.params[0], @cown_ptr)
     cown_alloca = g.builder.alloca(@cown_ptr, "COWN.ALLOCA")
-    g.builder.store(
-      g.builder.bit_cast(fn.params[0], @cown_ptr),
-      cown_alloca,
-    )
+    g.builder.store(cown, cown_alloca)
 
     # Schedule the action to executed when the cown is available.
     g.builder.call(g.mod.functions["RTAction_schedule"], [
@@ -378,6 +383,10 @@ class Mare::Compiler::CodeGen::VeronaRT
       cown_alloca,
       @isize.const_int(1),
     ])
+
+    # Call release for this Cown.
+    # TODO: Should we only call release when the Cown falls out of scope?
+    g.builder.call(g.mod.functions["RTCown_release"], [cown, g.alloc_ctx])
 
     g.builder.ret(g.gen_none)
     g.gen_func_end

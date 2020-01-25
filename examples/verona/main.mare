@@ -1,7 +1,15 @@
 :ffi LibC
   :fun printf (format CPointer(U8), arg1 CPointer(U8)) I32
 
+:actor Greeter
+  :new (message1 String, message2 String)
+    // TODO: Should be using cstring instead of cpointer
+    LibC.printf("%s".cpointer, message1.cpointer)
+    LibC.printf("%s".cpointer, message2.cpointer)
+
 :actor Main
   :new (env)
-    // TODO: Should be using cstring instead of cpointer
-    LibC.printf("%s".cpointer, "Hello, World!".cpointer)
+    Greeter.new("What goes\n", "up\n")
+    Greeter.new("Must come\n", "down\n")
+    Greeter.new("Mare can\n", "now\n")
+    Greeter.new("Schedule a\n", "cown\n")
