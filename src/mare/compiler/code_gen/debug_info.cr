@@ -135,11 +135,11 @@ class Mare::Compiler::CodeGen
       reach_def = t.single_def!(ctx)
       reach_fields = reach_def.fields.dup
       element_debug_types = [] of LibLLVMExt::Metadata
-      llvm_struct_type.struct_element_types.each_with_index do |elem_llvm_type, index|
+      struct_element_types = llvm_struct_type.struct_element_types
+      struct_element_types.each_with_index do |elem_llvm_type, index|
         # We skip over fields the user shouldn't know about,
         # like the type descriptor and the actor pad.
-        next if index == 0
-        next if index == 1 && reach_def.has_actor_pad?
+        next if index < (struct_element_types.size - reach_def.fields.size)
 
         field_name, field_reach_ref = reach_fields.shift
         element_debug_types <<

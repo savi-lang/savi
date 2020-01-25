@@ -3,7 +3,11 @@ class Mare::Compiler::CodeGen::VeronaRT
   # TODO: Should this be configurable by a flag at runtime?
   USE_SYSTEMATIC_TESTING = true
 
-  COWN_PAD_SIZE = 8 * (USE_SYSTEMATIC_TESTING ? 12 : 8) # TODO: cross-platform - not only the outer 8, but also the inner 12 and 8 are platform-dependent...
+  # The size by which every Cown object is padded with runtime-internal data.
+  # We cheat the size smaller by point pointer here because we know the first
+  # pointer is the type descriptor, which we still try not to touch directly,
+  # except in cases where we are mimicking with non-runtime-allocated objects.
+  COWN_PAD_SIZE = 8 * ((USE_SYSTEMATIC_TESTING ? 12 : 8) - 1) # TODO: cross-platform - not only the outer 8, but also the inner 12 and 8 are platform-dependent...
 
   getter desc
   getter obj
@@ -159,6 +163,38 @@ class Mare::Compiler::CodeGen::VeronaRT
 
   def gen_traits_gep_get(g, desc, name)
     raise NotImplementedError.new("Verona runtime: gen_vtable_traits_get")
+  end
+
+  def gen_struct_type(g : CodeGen, gtype : GenType)
+    elements = [] of LLVM::Type
+
+    # All struct types start with the type descriptor (abbreviated "desc").
+    # Even types with no desc have a singleton with a desc.
+    # The values without a desc do not use this struct_type at all anyway.
+    elements << gtype.desc_type.pointer
+
+    # Different runtime objects have a different sized opaque pad at the start
+    # that holds all of the runtime-internal data that we shouldn't touch.
+    if gtype.type_def.is_actor?
+      # Actors are cowns, and thus have a cown pad.
+      elements << @cown_pad
+    elsif !gtype.type_def.has_allocation? || gtype.type_def.is_abstract?
+      # Objects that aren't runtime-allocated need no opaque pad at all,
+      # because they don't need to hold any runtime-internal data.
+      nil
+    elsif gtype.type_def.llvm_name == "Env" \
+      || gtype.type_def.llvm_name == "String" \
+      || gtype.type_def.llvm_name.starts_with?("CPointer[")
+      elements << @cown_pad
+    else
+      raise NotImplementedError.new("pad for #{gtype.type_def.llvm_name}")
+    end
+
+    # Each field of the type is an additional element in the struct type.
+    gtype.fields.each { |name, t| elements << g.llvm_mem_type_of(t) }
+
+    # The struct was previously opaque with no body. We now fill it in here.
+    gtype.struct_type.struct_set_body(elements)
   end
 
   def gen_main(g : CodeGen)

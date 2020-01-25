@@ -441,6 +441,25 @@ class Mare::Compiler::CodeGen::PonyRT
     g.builder.struct_gep(desc, DESC_TRAITS, name)
   end
 
+  def gen_struct_type(g : CodeGen, gtype : GenType)
+    elements = [] of LLVM::Type
+
+    # All struct types start with the type descriptor (abbreviated "desc").
+    # Even types with no desc have a singleton with a desc.
+    # The values without a desc do not use this struct_type at all anyway.
+    elements << gtype.desc_type.pointer
+
+    # Actor types have an actor pad, which holds runtime internals containing
+    # things like the message queue used to deliver runtime messages.
+    elements << @actor_pad if gtype.type_def.has_actor_pad?
+
+    # Each field of the type is an additional element in the struct type.
+    gtype.fields.each { |name, t| elements << g.llvm_mem_type_of(t) }
+
+    # The struct was previously opaque with no body. We now fill it in here.
+    gtype.struct_type.struct_set_body(elements)
+  end
+
   def gen_main(g : CodeGen)
     # Declare the main function.
     main = g.mod.functions.add("main", [@i32, @pptr, @pptr], @i32)

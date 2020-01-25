@@ -191,8 +191,7 @@ class Mare::Compiler::CodeGen
     end
 
     def field_index(name)
-      offset = 1 # TODO: not for C-like structs
-      offset += 1 if @type_def.has_actor_pad?
+      offset = struct_type.struct_element_types.size - @fields.size
       @fields.index { |n, _| n == name }.not_nil! + offset
     end
 
@@ -2967,22 +2966,7 @@ class Mare::Compiler::CodeGen
 
   # This defines the LLVM struct type for objects of this type.
   def gen_struct_type(gtype)
-    elements = [] of LLVM::Type
-
-    # All struct types start with the type descriptor (abbreviated "desc").
-    # Even types with no desc have a singleton with a desc.
-    # The values without a desc do not use this struct_type at all anyway.
-    elements << gtype.desc_type.pointer
-
-    # Actor types have an actor pad, which holds runtime internals containing
-    # things like the message queue used to deliver runtime messages.
-    elements << @actor_pad if gtype.type_def.has_actor_pad?
-
-    # Each field of the type is an additional element in the struct type.
-    gtype.fields.each { |name, t| elements << llvm_mem_type_of(t) }
-
-    # The struct was previously opaque with no body. We now fill it in here.
-    gtype.struct_type.struct_set_body(elements)
+    @runtime.gen_struct_type(self, gtype)
   end
 
   # This defines the global singleton stateless value associated with this type.
