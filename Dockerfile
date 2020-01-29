@@ -60,7 +60,7 @@ RUN cd /tmp/verona && \
     sed -i 's/add_subdirectory.interpreter.//g' ../src/CMakeLists.txt && \
     sed -i 's/add_subdirectory.stdlib.//g' ../src/CMakeLists.txt && \
     cat ../src/CMakeLists.txt && \
-    cmake .. -GNinja -DCMAKE_BUILD_TYPE=Debug -DUSE_ASAN=On && \
+    cmake .. -GNinja -DCMAKE_BUILD_TYPE=Debug && \
     ninja install && \
     sudo cp dist/lib/libverona.so           /usr/lib/ && \
     sudo cp dist/lib/libverona-sys.so       /usr/lib/ && \
