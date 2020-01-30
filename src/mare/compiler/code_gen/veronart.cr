@@ -128,6 +128,28 @@ class Mare::Compiler::CodeGen::VeronaRT
     g.builder.call(g.mod.functions["RTAlloc_get"], "ALLOC_CTX")
   end
 
+  @current_root_thread_local : LLVM::Value?
+  def gen_current_root_thread_local(g : CodeGen)
+    (@current_root_thread_local ||= begin
+      desc = g.mod.globals.add(@obj_ptr, "CURRENT.ROOT")
+      desc.linkage = LLVM::Linkage::LinkerPrivate
+      desc.thread_local = true
+      desc
+
+      desc.initializer = @obj_ptr.null
+
+      desc
+    end).not_nil!
+  end
+
+  def gen_current_root_get(g : CodeGen)
+    g.builder.load(gen_current_root_thread_local(g), "CURRENT.ROOT")
+  end
+
+  def gen_current_root_set(g : CodeGen, value : LLVM::Value)
+    g.builder.store(value, gen_current_root_thread_local(g))
+  end
+
   DESC_ID                    = 0
   DESC_TRACE_FN              = 1
   DESC_TRACE_POSSIBLY_ISO_FN = 2
@@ -404,6 +426,15 @@ class Mare::Compiler::CodeGen::VeronaRT
       dst_values << dst_value
     end
 
+    # Set the current root to be the root object stored in this actor.
+    gen_current_root_set(g,
+      g.builder.load(
+        g.builder.struct_gep(dst_values[0], 2, "@.ROOT.GEP"),
+        "@.ROOT",
+      )
+    )
+
+    # Finally, call the function itself, with the program logic inside it.
     g.builder.call(gfunc.llvm_func, dst_values)
 
     g.builder.ret
