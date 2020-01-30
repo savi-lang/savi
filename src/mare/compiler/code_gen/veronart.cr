@@ -7,6 +7,7 @@ class Mare::Compiler::CodeGen::VeronaRT
   # We cheat the size smaller by point pointer here because we know the first
   # pointer is the type descriptor, which we still try not to touch directly,
   # except in cases where we are mimicking with non-runtime-allocated objects.
+  OBJECT_PAD_SIZE = 8 * (3 - 1)                               # TODO: cross-platform - not only the outer 8, but also the inner 3 is platform-dependent...
   COWN_PAD_SIZE = 8 * ((USE_SYSTEMATIC_TESTING ? 12 : 8) - 1) # TODO: cross-platform - not only the outer 8, but also the inner 12 and 8 are platform-dependent...
 
   getter desc
@@ -43,6 +44,7 @@ class Mare::Compiler::CodeGen::VeronaRT
     @obj_stack_ptr = @obj_stack.pointer.as(LLVM::Type)
     @obj = llvm.struct_create_named("_.RTObject").as(LLVM::Type)
     @obj_ptr = @obj.pointer.as(LLVM::Type)
+    @obj_pad = @i8.array(OBJECT_PAD_SIZE).as(LLVM::Type)
     @cown = llvm.struct_create_named("_.RTCown").as(LLVM::Type)
     @cown_ptr = @cown.pointer.as(LLVM::Type)
     @cown_pad = @i8.array(COWN_PAD_SIZE).as(LLVM::Type)
@@ -216,12 +218,8 @@ class Mare::Compiler::CodeGen::VeronaRT
       # Objects that aren't runtime-allocated need no opaque pad at all,
       # because they don't need to hold any runtime-internal data.
       nil
-    elsif gtype.type_def.llvm_name == "Env" \
-      || gtype.type_def.llvm_name == "String" \
-      || gtype.type_def.llvm_name.starts_with?("CPointer[")
-      elements << @cown_pad
     else
-      raise NotImplementedError.new("pad for #{gtype.type_def.llvm_name}")
+      elements << @obj_pad
     end
 
     # Each field of the type is an additional element in the struct type.
