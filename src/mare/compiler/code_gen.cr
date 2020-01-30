@@ -726,7 +726,7 @@ class Mare::Compiler::CodeGen
         # that will unwrap the raw machine value to use as the receiver.
         elem_types = gtype.struct_type.struct_element_types
         raise "expected the receiver type to be a raw machine value" \
-          unless elem_types.size == 2 && elem_types[1] == param_types.first
+          unless elem_types.last == param_types.first
 
         vtable_name = "#{gfunc.llvm_name}.VIRTUAL"
         vparam_types = param_types.dup
@@ -938,27 +938,12 @@ class Mare::Compiler::CodeGen
         llvm_func.add_attribute(LLVM::Attribute::NoAlias, LLVM::AttributeIndex::ReturnIndex)
         llvm_func.add_attribute(LLVM::Attribute::DereferenceableOrNull, LLVM::AttributeIndex::ReturnIndex, elem_size_value)
         llvm_func.add_attribute(LLVM::Attribute::Alignment, LLVM::AttributeIndex::ReturnIndex, PonyRT::HEAP_MIN)
-
-        @builder.bit_cast(
-          @builder.call(@mod.functions["pony_alloc"], [
-            alloc_ctx,
-            @builder.mul(params[0], @isize.const_int(elem_size_value)),
-          ]),
-          llvm_type,
-        )
+        @runtime.gen_intrinsic_cpointer_alloc(self, params, llvm_type, elem_size_value)
       when "_realloc"
         llvm_func.add_attribute(LLVM::Attribute::NoAlias, LLVM::AttributeIndex::ReturnIndex)
         llvm_func.add_attribute(LLVM::Attribute::DereferenceableOrNull, LLVM::AttributeIndex::ReturnIndex, elem_size_value)
         llvm_func.add_attribute(LLVM::Attribute::Alignment, LLVM::AttributeIndex::ReturnIndex, PonyRT::HEAP_MIN)
-
-        @builder.bit_cast(
-          @builder.call(@mod.functions["pony_realloc"], [
-            alloc_ctx,
-            @builder.bit_cast(params[0], @ptr),
-            @builder.mul(params[1], @isize.const_int(elem_size_value)),
-          ]),
-          llvm_type,
-        )
+        @runtime.gen_intrinsic_cpointer_realloc(self, params, llvm_type, elem_size_value)
       when "_unsafe"
         params[0]
       when "_offset"
@@ -1890,7 +1875,8 @@ class Mare::Compiler::CodeGen
     boxed = gen_alloc(from_gtype, "#{value.name}.BOXED")
 
     # Write the value itself into the value field of the struct.
-    value_gep = @builder.struct_gep(boxed, 1, "#{value.name}.BOXED.VALUE")
+    index = from_gtype.struct_type.struct_element_types.size - 1
+    value_gep = @builder.struct_gep(boxed, index, "#{value.name}.BOXED.VALUE")
     @builder.store(value, value_gep)
 
     # Return the struct pointer
@@ -1903,7 +1889,8 @@ class Mare::Compiler::CodeGen
     value = @builder.bit_cast(value, struct_ptr, "#{value.name}.BOXED")
 
     # Load the value itself into the value field of the boxed struct pointer.
-    value_gep = @builder.struct_gep(value, 1, "#{value.name}.VALUE")
+    index = from_gtype.struct_type.struct_element_types.size - 1
+    value_gep = @builder.struct_gep(value, index, "#{value.name}.VALUE")
     @builder.load(value_gep, "#{value.name}.VALUE.LOAD")
   end
 

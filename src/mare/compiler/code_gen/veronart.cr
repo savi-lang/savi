@@ -66,6 +66,12 @@ class Mare::Compiler::CodeGen::VeronaRT
       {"RTAlloc_get", [] of LLVM::Type, @alloc_ptr, [
         LLVM::Attribute::NoUnwind, LLVM::Attribute::ReadNone,
       ]},
+      {"RTAlloc_alloc", [@alloc_ptr, @isize], @ptr, [
+        LLVM::Attribute::NoUnwind, LLVM::Attribute::InaccessibleMemOrArgMemOnly,
+        {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::NoAlias},
+        {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::Dereferenceable, align_width},
+        {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::Alignment, align_width},
+      ]},
       {"RTObject_get_descriptor", [@obj_ptr], @desc_ptr, [
         LLVM::Attribute::NoUnwind, LLVM::Attribute::InaccessibleMemOrArgMemOnly, LLVM::Attribute::ReadOnly,
       ]},
@@ -352,6 +358,22 @@ class Mare::Compiler::CodeGen::VeronaRT
     g.builder.ret
     g.gen_func_end
     fn
+  end
+
+  def gen_intrinsic_cpointer_alloc(g : CodeGen, params, llvm_type, elem_size_value)
+    g.builder.bit_cast(
+      g.builder.call(g.mod.functions["RTAlloc_alloc"], [
+        g.alloc_ctx,
+        g.builder.mul(params[0], @isize.const_int(elem_size_value)),
+      ]),
+      llvm_type,
+    )
+  end
+
+  def gen_intrinsic_cpointer_realloc(g : CodeGen, params, llvm_type, elem_size_value)
+    # Unfortunately, snmalloc currently doesn't have a clear choice for realloc.
+    # We should just implement our own wrapper for its alloc/free/etc.
+    raise NotImplementedError.new("gen_intrinsic_cpointer_realloc for Verona")
   end
 
   def gen_send_impl(g : CodeGen, gtype : GenType, gfunc : GenFunc)

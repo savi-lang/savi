@@ -3,9 +3,8 @@
 
 :actor Greeter
   :new (message1 String, message2 String)
-    // TODO: Should be using cstring instead of cpointer
-    LibC.printf("%s".cpointer, message1.cpointer)
-    LibC.printf("%s".cpointer, message2.cpointer)
+    LibC.printf("%s".cstring, message1.cstring)
+    LibC.printf("%s".cstring, message2.cstring)
 
 :actor Main
   :new (env)

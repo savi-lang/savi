@@ -555,6 +555,27 @@ class Mare::Compiler::CodeGen::PonyRT
     g.builder.bit_cast(allocated, gtype.struct_ptr, name)
   end
 
+  def gen_intrinsic_cpointer_alloc(g : CodeGen, params, llvm_type, elem_size_value)
+    g.builder.bit_cast(
+      g.builder.call(g.mod.functions["pony_alloc"], [
+        g.alloc_ctx,
+        g.builder.mul(params[0], @isize.const_int(elem_size_value)),
+      ]),
+      llvm_type,
+    )
+  end
+
+  def gen_intrinsic_cpointer_realloc(g : CodeGen, params, llvm_type, elem_size_value)
+    g.builder.bit_cast(
+      g.builder.call(g.mod.functions["pony_realloc"], [
+        g.alloc_ctx,
+        g.builder.bit_cast(params[0], @ptr),
+        g.builder.mul(params[1], @isize.const_int(elem_size_value)),
+      ]),
+      llvm_type,
+    )
+  end
+
   def gen_send_impl(g : CodeGen, gtype : GenType, gfunc : GenFunc)
     fn = gfunc.send_llvm_func
     g.gen_func_start(fn)
