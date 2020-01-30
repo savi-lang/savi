@@ -43,7 +43,7 @@ RUN git clone -b ${PONYC_VERSION} --depth 1 ${PONYC_GIT_URL} /tmp/ponyc && \
 # Install Verona runtime (as shared library and static library).
 # We hack the CMakeLists to avoid building the compiler/interpreter/stdlib.
 RUN apk add --no-cache --update cmake ninja
-ENV VERONA_VERSION 6e8a8a40f4ad4fac0e9302c9a21026c7aa07e2fa
+ENV VERONA_VERSION ce5b3535bc16235185c1f90c5946ec8f6f4851ae
 # TODO: Use upstream, official verona repository.
 ENV VERONA_GIT_URL https://github.com/jemc/verona
 RUN git init /tmp/verona && \
