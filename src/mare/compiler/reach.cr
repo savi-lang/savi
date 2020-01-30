@@ -145,6 +145,15 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       end
     end
 
+    def is_possibly_iso?
+      (
+        singular? &&
+        @meta_type.cap_only.inner == Infer::MetaType::Capability::ISO
+      ) || (
+        is_union? && union_children.any?(&.is_possibly_iso?)
+      )
+    end
+
     def trace_needed?(dst_type = self)
       trace_kind = trace_kind()
       return false if trace_kind == :machine_word && dst_type.trace_kind == :machine_word

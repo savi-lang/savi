@@ -74,6 +74,15 @@ class Mare::Compiler::CodeGen::VeronaRT
         {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::Dereferenceable, align_width},
         {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::Alignment, align_width},
       ]},
+      {"RTObjectStack_push", [@obj_stack_ptr, @obj_ptr], @void, [
+        LLVM::Attribute::NoUnwind, LLVM::Attribute::InaccessibleMemOrArgMemOnly,
+      ]},
+      {"RTObject_new_iso", [@alloc_ptr, @desc_ptr], @obj_ptr, [
+        LLVM::Attribute::NoUnwind, LLVM::Attribute::InaccessibleMemOrArgMemOnly,
+        {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::NoAlias},
+        {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::Dereferenceable, align_width + OBJECT_PAD_SIZE},
+        {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::Alignment, align_width},
+      ]},
       {"RTObject_get_descriptor", [@obj_ptr], @desc_ptr, [
         LLVM::Attribute::NoUnwind, LLVM::Attribute::InaccessibleMemOrArgMemOnly, LLVM::Attribute::ReadOnly,
       ]},
@@ -176,21 +185,51 @@ class Mare::Compiler::CodeGen::VeronaRT
 
     trace_fn =
       if type_def.has_desc?
-        g.mod.functions.add("#{type_def.llvm_name}.TRACE", @trace_fn)
+        g.mod.functions.add("#{type_def.llvm_name}.TRACE".gsub(/\W/, "_"), @trace_fn)
+      else
+        @trace_fn_ptr.null
+      end
+
+    trace_possibly_iso_fn =
+      if type_def.is_actor? \
+      || gtype.fields.any?(&.last.is_possibly_iso?)
+        g.mod.functions.add("#{type_def.llvm_name}.TRACEPOSSIBLYISO".gsub(/\W/, "_"), @trace_fn)
       else
         @trace_fn_ptr.null
       end
 
     desc.initializer = gtype.desc_type.const_struct [
-      @isize.const_int(abi_size), # 0: size
-      trace_fn.to_value,          # 1: trace fn
-      @trace_fn_ptr.null,         # 2: trace possibly iso fn TODO: @#{llvm_name}.TRACEPOSSIBLYISO
-      @final_fn_ptr.null,         # 3: final fn TODO: @#{llvm_name}.FINAL
-      @notify_fn_ptr.null,        # 4: notified fn TODO: @#{llvm_name}.NOTIFY
+      @isize.const_int(abi_size),     # 0: size
+      trace_fn.to_value,              # 1: trace fn
+      trace_possibly_iso_fn.to_value, # 2: trace possibly iso fn
+      @final_fn_ptr.null,             # 3: final fn TODO: @#{llvm_name}.FINAL
+      @notify_fn_ptr.null,            # 4: notified fn TODO: @#{llvm_name}.NOTIFY
       # TODO: id, traits bitmap, vtable
     ]
 
     desc
+  end
+
+  @desc_empty : LLVM::Value?
+  def gen_desc_empty(g : CodeGen)
+    (@desc_empty ||= begin
+      abi_size = g.abi_size_of(@desc_ptr) + g.abi_size_of(@obj_pad)
+
+      desc = g.mod.globals.add(@desc, "EMPTY.DESC")
+      desc.linkage = LLVM::Linkage::LinkerPrivate
+      desc.global_constant = true
+      desc
+
+      desc.initializer = @desc.const_struct [
+        @isize.const_int(abi_size), # 0: size
+        @trace_fn_ptr.null,         # 1: trace fn
+        @trace_fn_ptr.null,         # 2: trace possibly iso fn
+        @final_fn_ptr.null,         # 3: final fn
+        @notify_fn_ptr.null,        # 4: notified fn
+      ]
+
+      desc
+    end).not_nil!
   end
 
   def gen_vtable_gep_get(g, desc, name)
@@ -214,6 +253,8 @@ class Mare::Compiler::CodeGen::VeronaRT
     if gtype.type_def.is_actor?
       # Actors are cowns, and thus have a cown pad.
       elements << @cown_pad
+      # Actors need an iso root region, which is an empty object with region md.
+      elements << @obj_ptr
     elsif !gtype.type_def.has_allocation? || gtype.type_def.is_abstract?
       # Objects that aren't runtime-allocated need no opaque pad at all,
       # because they don't need to hold any runtime-internal data.
@@ -302,7 +343,19 @@ class Mare::Compiler::CodeGen::VeronaRT
       g.alloc_ctx,
       g.gen_get_desc_opaque(gtype),
     ], "#{name}.OPAQUE")
-    g.builder.bit_cast(allocated, gtype.struct_ptr, name)
+    actor = g.builder.bit_cast(allocated, gtype.struct_ptr, name)
+
+    # Every actor object needs an iso root allocated for region bookkeeping.
+    iso_root = g.builder.call(g.mod.functions["RTObject_new_iso"], [
+      g.alloc_ctx,
+      gen_desc_empty(g),
+    ], "#{name}.ROOT")
+    g.builder.store(
+      iso_root,
+      g.builder.struct_gep(actor, 2, "#{name}.ROOT.GEP")
+    )
+
+    actor
   end
 
   def gen_alloc_action(g : CodeGen, action_desc, action_type, name)
@@ -415,9 +468,14 @@ class Mare::Compiler::CodeGen::VeronaRT
   def gen_trace_impl(g : CodeGen, gtype : GenType)
     raise "inconsistent frames" if g.frame_count > 1
 
+    # Need to also generate the other trace fn for possibly iso
+    # TODO: this is kind of bad code organization here... probably these should
+    # all be built when invoked by Codegen as gen_desc_fn_impls or something.
+    gen_trace_possibly_iso_impl(g, gtype)
+
     # Get the reference to the trace function declared earlier.
     # We'll fill in the implementation of that function now.
-    fn = g.mod.functions["#{gtype.type_def.llvm_name}.TRACE"]?
+    fn = g.mod.functions["#{gtype.type_def.llvm_name}.TRACE".gsub(/\W/, "_")]?
     return unless fn
 
     fn.unnamed_addr = true
@@ -426,8 +484,61 @@ class Mare::Compiler::CodeGen::VeronaRT
 
     g.gen_func_start(fn)
 
+    receiver = g.builder.bit_cast(fn.params[0], gtype.struct_ptr, "@")
+    obj_stack = fn.params[1]
+
+    # For actors, it is necessary to trace the iso root.
+    if gtype.type_def.is_actor?
+      g.builder.call(g.mod.functions["RTObjectStack_push"], [
+        obj_stack,
+        g.builder.load(
+          g.builder.struct_gep(receiver, 2, "@.ROOT.GEP"),
+          "@.ROOT",
+        )
+      ])
+    end
+
     gtype.fields.each do |name, field_ref|
       # TODO: Trace the fields that need tracing.
+    end
+
+    g.builder.ret
+    g.gen_func_end
+  end
+
+  def gen_trace_possibly_iso_impl(g : CodeGen, gtype : GenType)
+    raise "inconsistent frames" if g.frame_count > 1
+
+    # Get the reference to the trace function declared earlier.
+    # We'll fill in the implementation of that function now.
+    fn = g.mod.functions["#{gtype.type_def.llvm_name}.TRACEPOSSIBLYISO".gsub(/\W/, "_")]?
+    return unless fn
+
+    fn.unnamed_addr = true
+    fn.call_convention = LLVM::CallConvention::C
+    fn.linkage = LLVM::Linkage::External
+
+    g.gen_func_start(fn)
+
+    receiver = g.builder.bit_cast(fn.params[0], gtype.struct_ptr, "@")
+    obj_stack = fn.params[1]
+
+    # For actors, it is necessary to trace the iso root.
+    if gtype.type_def.is_actor?
+      g.builder.call(g.mod.functions["RTObjectStack_push"], [
+        obj_stack,
+        g.builder.load(
+          g.builder.struct_gep(receiver, 2, "@.ROOT.GEP"),
+          "@.ROOT",
+        )
+      ])
+    end
+
+    gtype.fields.each do |name, field_ref|
+      next unless field_ref.is_possibly_iso?
+
+      # TODO: Trace here and also in gen_trace_impl.
+      raise NotImplementedError.new("trace possibly iso field in Verona")
     end
 
     g.builder.ret
