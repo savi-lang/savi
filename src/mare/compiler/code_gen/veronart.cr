@@ -465,14 +465,12 @@ class Mare::Compiler::CodeGen::VeronaRT
     g.gen_func_end
   end
 
-  def gen_trace_impl(g : CodeGen, gtype : GenType)
-    raise "inconsistent frames" if g.frame_count > 1
-
-    # Need to also generate the other trace fn for possibly iso
-    # TODO: this is kind of bad code organization here... probably these should
-    # all be built when invoked by Codegen as gen_desc_fn_impls or something.
+  def gen_desc_fn_impls(g : CodeGen, gtype : GenType)
+    gen_trace_impl(g, gtype)
     gen_trace_possibly_iso_impl(g, gtype)
+  end
 
+  def gen_trace_impl(g : CodeGen, gtype : GenType)
     # Get the reference to the trace function declared earlier.
     # We'll fill in the implementation of that function now.
     fn = g.mod.functions["#{gtype.type_def.llvm_name}.TRACE".gsub(/\W/, "_")]?
@@ -507,8 +505,6 @@ class Mare::Compiler::CodeGen::VeronaRT
   end
 
   def gen_trace_possibly_iso_impl(g : CodeGen, gtype : GenType)
-    raise "inconsistent frames" if g.frame_count > 1
-
     # Get the reference to the trace function declared earlier.
     # We'll fill in the implementation of that function now.
     fn = g.mod.functions["#{gtype.type_def.llvm_name}.TRACEPOSSIBLYISO".gsub(/\W/, "_")]?
@@ -541,17 +537,6 @@ class Mare::Compiler::CodeGen::VeronaRT
       raise NotImplementedError.new("trace possibly iso field in Verona")
     end
 
-    g.builder.ret
-    g.gen_func_end
-  end
-
-  def gen_dispatch_impl(g : CodeGen, gtype : GenType)
-    # TODO: Does Verona need a dispatch implementation at all? Doesn't seem so.
-
-    fn = g.mod.functions["#{gtype.type_def.llvm_name}.DISPATCH"]?
-    return unless fn
-
-    g.gen_func_start(fn)
     g.builder.ret
     g.gen_func_end
   end

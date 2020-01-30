@@ -649,6 +649,11 @@ class Mare::Compiler::CodeGen::PonyRT
     g.gen_func_end
   end
 
+  def gen_desc_fn_impls(g : CodeGen, gtype : GenType)
+    gen_dispatch_impl(g, gtype) if gtype.type_def.is_actor?
+    gen_trace_impl(g, gtype)
+  end
+
   def gen_trace_impl(g : CodeGen, gtype : GenType)
     raise "inconsistent frames" if g.frame_count > 1
 

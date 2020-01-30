@@ -159,8 +159,7 @@ class Mare::Compiler::CodeGen
     def gen_func_impls(g : CodeGen)
       return if @type_def.is_abstract?
 
-      g.gen_dispatch_impl(self) if @type_def.is_actor?
-      g.gen_trace_impl(self)
+      g.gen_desc_fn_impls(self)
 
       @gfuncs.each_value do |gfunc|
         g.gen_send_impl(self, gfunc) if gfunc.needs_send?
@@ -3100,13 +3099,7 @@ class Mare::Compiler::CodeGen
     @runtime.gen_send_impl(self, gtype, gfunc)
   end
 
-  def gen_trace_impl(gtype : GenType)
-    # Tracing a value needs a runtime-specific implementation.
-    @runtime.gen_trace_impl(self, gtype)
-  end
-
-  def gen_dispatch_impl(gtype : GenType)
-    # Tracing a value needs a runtime-specific implementation.
-    @runtime.gen_dispatch_impl(self, gtype)
+  def gen_desc_fn_impls(gtype : GenType)
+    @runtime.gen_desc_fn_impls(self, gtype)
   end
 end
