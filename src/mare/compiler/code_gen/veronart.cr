@@ -83,6 +83,12 @@ class Mare::Compiler::CodeGen::VeronaRT
         {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::Dereferenceable, align_width + OBJECT_PAD_SIZE},
         {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::Alignment, align_width},
       ]},
+      {"RTObject_new_mut", [@alloc_ptr, @desc_ptr, @obj_ptr], @obj_ptr, [
+        LLVM::Attribute::NoUnwind, LLVM::Attribute::InaccessibleMemOrArgMemOnly,
+        {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::NoAlias},
+        {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::Dereferenceable, align_width + OBJECT_PAD_SIZE},
+        {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::Alignment, align_width},
+      ]},
       {"RTObject_get_descriptor", [@obj_ptr], @desc_ptr, [
         LLVM::Attribute::NoUnwind, LLVM::Attribute::InaccessibleMemOrArgMemOnly, LLVM::Attribute::ReadOnly,
       ]},
@@ -352,7 +358,7 @@ class Mare::Compiler::CodeGen::VeronaRT
     )
 
     # Create the main actor and become it.
-    main_actor = g.gen_alloc_actor(g.gtypes["Main"], "main")
+    main_actor = gen_alloc_actor(g, g.gtypes["Main"], "main")
 
     g.builder.call(g.gtypes["Main"]["new"].send_llvm_func, [main_actor, env])
 
@@ -360,12 +366,48 @@ class Mare::Compiler::CodeGen::VeronaRT
     g.gen_func_end
   end
 
+  # This generates the code that allocates an object of the given type.
+  # This is the first step before actually calling the constructor of it.
+  def gen_alloc(g : CodeGen, gtype : GenType, from_expr : AST::Node, name : String)
+    allocated =
+      if gtype.type_def.is_actor?
+        gen_alloc_actor(g, gtype, name)
+      elsif g.type_of(from_expr).is_singular_iso?
+        raise NotImplementedError.new("Verona gen_alloc iso fails for now because we have no code to free the iso later")
+        gen_alloc_object_iso(g, gtype, name)
+      else
+        gen_alloc_object(g, gtype, name)
+      end
+
+    object = g.builder.bit_cast(allocated, gtype.struct_ptr, name)
+    object
+  end
+
+  def gen_alloc_struct(g : CodeGen, llvm_type : LLVM::Type, name)
+    raise NotImplementedError.new("gen_alloc for non-objects in Verona")
+  end
+
+  def gen_alloc_object(g : CodeGen, gtype : GenType, name)
+    g.builder.call(g.mod.functions["RTObject_new_mut"], [
+      g.alloc_ctx,
+      g.gen_get_desc_opaque(gtype),
+      gen_current_root_get(g),
+    ], "#{name}.OPAQUE")
+  end
+
+  def gen_alloc_object_iso(g : CodeGen, gtype : GenType, name)
+    g.builder.call(g.mod.functions["RTObject_new_iso"], [
+      g.alloc_ctx,
+      g.gen_get_desc_opaque(gtype),
+    ], "#{name}.OPAQUE")
+  end
+
   def gen_alloc_actor(g : CodeGen, gtype : GenType, name)
     allocated = g.builder.call(g.mod.functions["RTCown_new"], [
       g.alloc_ctx,
       g.gen_get_desc_opaque(gtype),
     ], "#{name}.OPAQUE")
-    actor = g.builder.bit_cast(allocated, gtype.struct_ptr, name)
+    actor = g.builder.bit_cast(allocated, gtype.struct_ptr, "#{name}.OPAQUE")
 
     # Every actor object needs an iso root allocated for region bookkeeping.
     iso_root = g.builder.call(g.mod.functions["RTObject_new_iso"], [

@@ -145,13 +145,17 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       end
     end
 
+    def is_singular_iso?
+      iso_caps = [
+        Infer::MetaType::Capability::ISO,
+        Infer::MetaType::Capability::ISO_EPH,
+      ]
+      singular? && iso_caps.includes?(@meta_type.cap_only.inner)
+    end
+
     def is_possibly_iso?
-      (
-        singular? &&
-        @meta_type.cap_only.inner == Infer::MetaType::Capability::ISO
-      ) || (
-        is_union? && union_children.any?(&.is_possibly_iso?)
-      )
+      is_singular_iso? \
+      || (is_union? && union_children.any?(&.is_possibly_iso?))
     end
 
     def trace_needed?(dst_type = self)

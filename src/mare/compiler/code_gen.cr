@@ -1442,7 +1442,7 @@ class Mare::Compiler::CodeGen
     # If this is a constructor, the receiver must be allocated first.
     if gfunc.func.has_tag?(:constructor)
       raise "can't do a virtual call on a constructor" if needs_virtual_call
-      receiver = gen_alloc(lhs_gtype, "#{lhs_gtype.type_def.llvm_name}.new")
+      receiver = gen_alloc(lhs_gtype, relate, "#{lhs_gtype.type_def.llvm_name}.new")
     end
 
     # Prepend the receiver to the args list if necessary.
@@ -1850,11 +1850,11 @@ class Mare::Compiler::CodeGen
       from_expr_type = type_of(from_expr.not_nil!)
       if value.type.kind != LLVM::Type::Kind::Pointer
         # If we're going from non-pointer to pointer, we're boxing.
-        value = gen_boxed(value, gtype_of(from_expr_type))
+        value = gen_boxed(value, gtype_of(from_expr_type), from_expr.not_nil!)
       elsif from_expr_type.singular? && from_expr_type.single_def!(ctx).is_cpointer?
         if value.type != @obj_ptr && to_type == @obj_ptr
           # If going from non-object cpointer to object pointer, we're boxing.
-          value = gen_boxed(value, gtype_of(from_expr_type))
+          value = gen_boxed(value, gtype_of(from_expr_type), from_expr.not_nil!)
         elsif value.type == @obj_ptr && to_type != @obj_ptr
           # If going from object pointer to non-object cpointer, we're unboxing.
           value = gen_unboxed(value, gtype_of(from_expr_type))
@@ -1868,10 +1868,10 @@ class Mare::Compiler::CodeGen
     end
   end
 
-  def gen_boxed(value, from_gtype)
+  def gen_boxed(value, from_gtype, from_expr)
     # Allocate a struct pointer to hold the type descriptor and value.
     # This also writes the type descriptor into it appropriate position.
-    boxed = gen_alloc(from_gtype, "#{value.name}.BOXED")
+    boxed = gen_alloc(from_gtype, from_expr, "#{value.name}.BOXED")
 
     # Write the value itself into the value field of the struct.
     index = from_gtype.struct_type.struct_element_types.size - 1
@@ -2518,7 +2518,7 @@ class Mare::Compiler::CodeGen
   def gen_dynamic_array(expr : AST::Group)
     gtype = gtype_of(expr)
 
-    receiver = gen_alloc(gtype, "#{gtype.type_def.llvm_name}.new")
+    receiver = gen_alloc(gtype, expr, "#{gtype.type_def.llvm_name}.new")
     size_arg = @i64.const_int(expr.terms.size)
     @builder.call(gtype.gfuncs["new"].llvm_func, [receiver, size_arg])
 
@@ -2986,40 +2986,14 @@ class Mare::Compiler::CodeGen
 
   # This generates the code that allocates an object of the given type.
   # This is the first step before actually calling the constructor of it.
-  def gen_alloc(gtype : GenType, name : String)
-    return gen_alloc_actor(gtype, name) if gtype.type_def.is_actor?
-
-    value = gen_alloc(gtype.struct_type, name)
-    gen_put_desc(value, gtype, name)
-    value
+  def gen_alloc(gtype : GenType, from_expr : AST::Node, name : String)
+    @runtime.gen_alloc(self, gtype, from_expr, name)
   end
 
-  # This generates the code that allocates an object of any given LLVM type.
-  # It is used by the other implementation of this function defined above.
-  def gen_alloc(llvm_type : LLVM::Type, name : String)
-    size = abi_size_of(llvm_type)
-    size = 1 if size == 0
-    args = [alloc_ctx]
-
-    value =
-      if size <= PonyRT::HEAP_MAX
-        index = PonyRT.heap_index(size).to_i32
-        args << @i32.const_int(index)
-        # TODO: handle case where final_fn is present (pony_alloc_small_final)
-        @builder.call(@mod.functions["pony_alloc_small"], args, "#{name}.MEM")
-      else
-        args << @isize.const_int(size)
-        # TODO: handle case where final_fn is present (pony_alloc_large_final)
-        @builder.call(@mod.functions["pony_alloc_large"], args, "#{name}.MEM")
-      end
-
-    @builder.bit_cast(value, llvm_type.pointer, name)
-  end
-
-  # This generates the special kind of allocation needed by actors,
-  # invoked by the above function when the type being allocated is an actor.
-  def gen_alloc_actor(gtype, name)
-    @runtime.gen_alloc_actor(self, gtype, name)
+  # This generates more generic code for allocating a given LLVM struct type,
+  # without the assumption of it being initialized as a proper runtime object.
+  def gen_alloc_struct(llvm_type : LLVM::Type, name : String)
+    @runtime.gen_alloc_struct(self, llvm_type, name)
   end
 
   # Get the global constant value for the type descriptor of the given type.

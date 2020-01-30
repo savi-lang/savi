@@ -100,7 +100,7 @@ class Mare::Compiler::CodeGen
       # making the code generation for virtual calls a bit more complicated,
       # since we would still need a pointer for those cases (because each
       # implementation of a yielding call may have different state sizes).
-      cont = g.gen_alloc(gfunc.continuation_type, "CONT")
+      cont = g.gen_alloc_struct(gfunc.continuation_type, "CONT")
 
       frame.continuation_value = cont
 

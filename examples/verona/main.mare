@@ -1,14 +1,21 @@
 :ffi LibC
   :fun printf (format CPointer(U8), arg1 CPointer(U8)) I32
 
+:class Greeting
+  :prop message1 String
+  :prop message2 String
+  :new ref (@message1, @message2)
+  :fun say
+    LibC.printf("%s\n".cstring, @message1.cstring)
+    LibC.printf("%s\n".cstring, @message2.cstring)
+
 :actor Greeter
   :new (message1 String, message2 String)
-    LibC.printf("%s".cstring, message1.cstring)
-    LibC.printf("%s".cstring, message2.cstring)
+    Greeting.new(message1, message2).say
 
 :actor Main
   :new (env)
-    Greeter.new("What goes\n", "up\n")
-    Greeter.new("Must come\n", "down\n")
-    Greeter.new("Mare can\n", "now\n")
-    Greeter.new("Schedule a\n", "cown\n")
+    Greeter.new("What goes", "up")
+    Greeter.new("Must come", "down")
+    Greeter.new("Mare can", "now")
+    Greeter.new("Schedule a", "cown")

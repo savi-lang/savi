@@ -488,7 +488,7 @@ class Mare::Compiler::CodeGen::PonyRT
     main_actor = gen_alloc_actor(g, g.gtypes["Main"], "main", true)
 
     # TODO: Create the Env from argc, argv, and envp.
-    env = g.gen_alloc(g.gtypes["Env"], "env")
+    env = gen_alloc(g, g.gtypes["Env"], nil, "env")
     g.builder.call(g.gtypes["Env"]["_create"].llvm_func, [env])
     # TODO: g.builder.call(g.gtypes["Env"]["_create"].llvm_func,
     #   [argc, g.builder.bit_cast(argv, @ptr), g.builder.bitcast(envp, @ptr)])
@@ -539,6 +539,44 @@ class Mare::Compiler::CodeGen::PonyRT
     main
   end
 
+  # This generates the code that allocates an object of the given type.
+  # This is the first step before actually calling the constructor of it.
+  def gen_alloc(g : CodeGen, gtype : GenType, _from_expr, name : String)
+    object =
+      if gtype.type_def.is_actor?
+        gen_alloc_actor(g, gtype, name)
+      else
+        gen_alloc_struct(g, gtype.struct_type, name)
+      end
+
+    g.gen_put_desc(object, gtype, name)
+    object
+  end
+
+  # This generates more generic code for allocating a given LLVM struct type,
+  # without the assumption of it being initialized as a proper runtime object.
+  def gen_alloc_struct(g : CodeGen, llvm_type : LLVM::Type, name)
+    size = g.abi_size_of(llvm_type)
+    size = 1 if size == 0
+    args = [g.alloc_ctx]
+
+    allocated =
+      if size <= PonyRT::HEAP_MAX
+        index = PonyRT.heap_index(size).to_i32
+        args << @i32.const_int(index)
+        # TODO: handle case where final_fn is present (pony_alloc_small_final)
+        g.builder.call(g.mod.functions["pony_alloc_small"], args, "#{name}.MEM")
+      else
+        args << @isize.const_int(size)
+        # TODO: handle case where final_fn is present (pony_alloc_large_final)
+        g.builder.call(g.mod.functions["pony_alloc_large"], args, "#{name}.MEM")
+      end
+
+    g.builder.bit_cast(allocated, llvm_type.pointer, name)
+  end
+
+  # This generates the special kind of allocation needed by actors,
+  # invoked by the above function when the type being allocated is an actor.
   def gen_alloc_actor(g : CodeGen, gtype : GenType, name, become_now = false)
     allocated = g.builder.call(g.mod.functions["pony_create"], [
       g.alloc_ctx,
