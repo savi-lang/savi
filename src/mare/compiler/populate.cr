@@ -62,7 +62,7 @@ module Mare::Compiler::Populate
           AST::Identifier.new("new").from(dest.ident),
           nil,
           nil,
-          AST::Group.new(":").tap { |body|
+          AST::Group.new(":").from(dest.ident).tap { |body|
             body.terms << AST::Identifier.new("@").from(dest.ident)
           },
         ).tap do |f|

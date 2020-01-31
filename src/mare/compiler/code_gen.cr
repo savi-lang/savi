@@ -830,13 +830,18 @@ class Mare::Compiler::CodeGen
     end
 
     # Now generate code for the expressions in the function body.
+    body = gfunc.func.body.not_nil!
     last_expr = nil
-    last_value = nil
-    gfunc.func.body.not_nil!.terms.each do |expr|
-      last_expr = expr
-      last_value = gen_expr(expr, gfunc.func.has_tag?(:constant))
-    end
-    last_value ||= gen_none
+    last_value =
+      if body.terms.empty?
+        gen_none
+      elsif gfunc.func.has_tag?(:constant)
+        last_expr = body.terms.last
+        gen_expr(body.terms.last)
+      else
+        last_expr = body.terms.last
+        gen_expr(body)
+      end
 
     # For field initializers, make sure the LLVM type of the return value
     # matches the LLVM return type declared in the function head.
