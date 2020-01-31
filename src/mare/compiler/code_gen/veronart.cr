@@ -95,6 +95,9 @@ class Mare::Compiler::CodeGen::VeronaRT
       {"RTObject_region_merge", [@alloc_ptr, @obj_ptr, @obj_ptr], @void, [
         LLVM::Attribute::NoUnwind, LLVM::Attribute::InaccessibleMemOrArgMemOnly,
       ]},
+      {"RTObject_region_freeze", [@alloc_ptr, @obj_ptr], @void, [
+        LLVM::Attribute::NoUnwind, LLVM::Attribute::InaccessibleMemOrArgMemOnly,
+      ]},
       {"RTCown_new", [@alloc_ptr, @desc_ptr], @cown_ptr, [
         LLVM::Attribute::NoUnwind, LLVM::Attribute::InaccessibleMemOrArgMemOnly,
         {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::NoAlias},
@@ -380,6 +383,12 @@ class Mare::Compiler::CodeGen::VeronaRT
       g.builder.call(g.mod.functions["RTObject_region_merge"], [
         g.alloc_ctx,
         gen_current_root_get(g),
+        g.builder.bit_cast(value, @obj_ptr, "#{value}.name.OPAQUE"),
+      ])
+      value
+    when Lifetime::IsoFreezeRegion
+      g.builder.call(g.mod.functions["RTObject_region_freeze"], [
+        g.alloc_ctx,
         g.builder.bit_cast(value, @obj_ptr, "#{value}.name.OPAQUE"),
       ])
       value

@@ -14,9 +14,13 @@
 #
 class Mare::Compiler::Lifetime
   alias Info = (
-    IsoMergeIntoCurrentRegion)
+    IsoMergeIntoCurrentRegion | IsoFreezeRegion)
 
   struct IsoMergeIntoCurrentRegion
+    INSTANCE = new
+  end
+
+  struct IsoFreezeRegion
     INSTANCE = new
   end
 
@@ -102,6 +106,10 @@ class Mare::Compiler::Lifetime
         # When an ephemeral iso is moved to a local mutable cap,
         # it needs to be merged into the current local mutable region.
         self[from_node] = IsoMergeIntoCurrentRegion::INSTANCE
+      when {"iso+", "val"}
+        # When an ephemeral iso is moved to an immutable cap,
+        # it needs to be frozen, rendering its whole region immutable.
+        self[from_node] = IsoFreezeRegion::INSTANCE
       else
         raise NotImplementedError.new("move #{from_cap} into #{into_cap}")
       end
