@@ -1896,6 +1896,7 @@ class Mare::Compiler::CodeGen
   def gen_expr(expr, const_only = false) : LLVM::Value
     @di.set_loc(expr)
 
+    value = \
     case expr
     when AST::Identifier
       ref = func_frame.refer[expr]
@@ -1999,6 +2000,8 @@ class Mare::Compiler::CodeGen
     else
       raise NotImplementedError.new(expr.inspect)
     end
+
+    @runtime.gen_expr_post(self, expr, value)
   end
 
   def gen_none

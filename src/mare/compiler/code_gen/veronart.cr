@@ -92,6 +92,9 @@ class Mare::Compiler::CodeGen::VeronaRT
       {"RTObject_get_descriptor", [@obj_ptr], @desc_ptr, [
         LLVM::Attribute::NoUnwind, LLVM::Attribute::InaccessibleMemOrArgMemOnly, LLVM::Attribute::ReadOnly,
       ]},
+      {"RTObject_region_merge", [@alloc_ptr, @obj_ptr, @obj_ptr], @void, [
+        LLVM::Attribute::NoUnwind, LLVM::Attribute::InaccessibleMemOrArgMemOnly,
+      ]},
       {"RTCown_new", [@alloc_ptr, @desc_ptr], @cown_ptr, [
         LLVM::Attribute::NoUnwind, LLVM::Attribute::InaccessibleMemOrArgMemOnly,
         {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::NoAlias},
@@ -357,13 +360,32 @@ class Mare::Compiler::CodeGen::VeronaRT
       "env",
     )
 
-    # Create the main actor and become it.
+    # Create the main actor.
     main_actor = gen_alloc_actor(g, g.gtypes["Main"], "main")
 
     g.builder.call(g.gtypes["Main"]["new"].send_llvm_func, [main_actor, env])
 
     g.builder.ret
     g.gen_func_end
+  end
+
+  # For every expression whose value is generated, hook into the value and
+  # maybe take an action based on the given lifetime info.
+  def gen_expr_post(g : CodeGen, expr : AST::Node, value : LLVM::Value)
+    info = g.ctx.lifetime[g.func_frame.gfunc.not_nil!.reach_func][expr]?
+    return value unless info
+
+    case info
+    when Lifetime::IsoMergeIntoCurrentRegion
+      g.builder.call(g.mod.functions["RTObject_region_merge"], [
+        g.alloc_ctx,
+        gen_current_root_get(g),
+        g.builder.bit_cast(value, @obj_ptr, "#{value}.name.OPAQUE"),
+      ])
+      value
+    else
+      raise NotImplementedError.new(info)
+    end
   end
 
   # This generates the code that allocates an object of the given type.
@@ -373,7 +395,6 @@ class Mare::Compiler::CodeGen::VeronaRT
       if gtype.type_def.is_actor?
         gen_alloc_actor(g, gtype, name)
       elsif g.type_of(from_expr).is_singular_iso?
-        raise NotImplementedError.new("Verona gen_alloc iso fails for now because we have no code to free the iso later")
         gen_alloc_object_iso(g, gtype, name)
       else
         gen_alloc_object(g, gtype, name)

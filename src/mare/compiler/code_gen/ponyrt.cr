@@ -539,6 +539,11 @@ class Mare::Compiler::CodeGen::PonyRT
     main
   end
 
+  # We don't hook into gen_expr post hook at all - simply return the value.
+  def gen_expr_post(g : CodeGen, expr : AST::Node, value : LLVM::Value)
+    value
+  end
+
   # This generates the code that allocates an object of the given type.
   # This is the first step before actually calling the constructor of it.
   def gen_alloc(g : CodeGen, gtype : GenType, _from_expr, name : String)

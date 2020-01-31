@@ -145,6 +145,10 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       end
     end
 
+    def cap_only
+      @meta_type.cap_only
+    end
+
     def is_singular_iso?
       iso_caps = [
         Infer::MetaType::Capability::ISO,

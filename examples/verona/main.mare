@@ -4,14 +4,15 @@
 :class Greeting
   :prop message1 String
   :prop message2 String
-  :new ref (@message1, @message2)
+  :new iso (@message1, @message2)
   :fun say
     LibC.printf("%s\n".cstring, @message1.cstring)
     LibC.printf("%s\n".cstring, @message2.cstring)
 
 :actor Greeter
   :new (message1 String, message2 String)
-    Greeting.new(message1, message2).say
+    greeting ref = Greeting.new(message1, message2)
+    greeting.say
 
 :actor Main
   :new (env)

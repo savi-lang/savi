@@ -19,6 +19,7 @@ module Mare::Compiler
     when :verify         then ctx.run(Verify)
     when :paint          then ctx.run(ctx.paint)
     when :codegen        then ctx.run(ctx.code_gen)
+    when :lifetime       then ctx.run(ctx.lifetime)
     when :codegen_verona then ctx.run(ctx.code_gen_verona)
     when :eval           then ctx.run(ctx.eval)
     when :binary         then ctx.run(Binary)
@@ -50,7 +51,8 @@ module Mare::Compiler
     when :verify then [:reach]
     when :paint then [:reach]
     when :codegen then [:paint, :verify, :reach, :completeness, :privacy, :infer, :inventory, :jumps]
-    when :codegen_verona then [:paint, :verify, :reach, :completeness, :privacy, :infer, :inventory, :jumps]
+    when :lifetime then [:reach, :infer]
+    when :codegen_verona then [:lifetime, :paint, :verify, :reach, :completeness, :privacy, :infer, :inventory, :jumps]
     when :eval then [:codegen]
     when :binary then [:codegen]
     when :binary_verona then [:codegen_verona]
