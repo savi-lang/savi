@@ -14,7 +14,8 @@
 #
 class Mare::Compiler::Lifetime
   alias Info = (
-    IsoMergeIntoCurrentRegion | IsoFreezeRegion)
+    IsoMergeIntoCurrentRegion | IsoFreezeRegion |
+    ValReleaseFromScope | ActorReleaseFromScope)
 
   struct IsoMergeIntoCurrentRegion
     INSTANCE = new
@@ -22,6 +23,20 @@ class Mare::Compiler::Lifetime
 
   struct IsoFreezeRegion
     INSTANCE = new
+  end
+
+  struct ValReleaseFromScope
+    getter local : Refer::Local
+
+    def initialize(@local)
+    end
+  end
+
+  struct ActorReleaseFromScope
+    getter local : Refer::Local
+
+    def initialize(@local)
+    end
   end
 
   def initialize
@@ -51,39 +66,112 @@ class Mare::Compiler::Lifetime
     @reach_def : Reach::Def
     @reach_func : Reach::Func
 
+    def refer
+      @ctx.refer[@reach_def.reified.defn][@reach_func.infer.reified.func]
+    end
+
     def initialize(@ctx, @reach_def, @reach_func)
-      @info_by_node = Hash(AST::Node, Info).new
+      @infos_by_node = Hash(AST::Node, Array(Info)).new
+      @scopes = [] of Refer::Scope
     end
 
     def []?(node)
-      @info_by_node[node]?
+      @infos_by_node[node]?
     end
 
-    private def []=(node, info)
-      @info_by_node[node] = info
+    private def insert(node, info)
+      (@infos_by_node[node] ||= ([] of Info)).not_nil! << info
     end
 
     # This visitor only touches nodes and does not mutate or replace them.
+    def visit_pre(node)
+      touch_pre(node)
+      node
+    end
     def visit(node)
       touch(node)
       node
     end
 
+    def touch_pre(node : AST::Node)
+      case node
+      when AST::Group
+        scope = refer.scope?(node)
+        touch_scope_pre(node, scope) if scope
+      end
+    end
     def touch(node : AST::Node)
       case node
+      when AST::Group
+        scope = refer.scope?(node)
+        touch_scope_post(node, scope) if scope
       when AST::Relate
         case node.op.value
         when "="
           touch_move(node.rhs, node.lhs)
-        # TODO: Handle more cases
+          # TODO: Handle more cases
         end
       # TODO: Handle more cases
       end
     end
 
+    def touch_scope_pre(node, scope)
+      @scopes << scope
+    end
+
+    def touch_scope_post(node, scope)
+      popped_scope = @scopes.pop
+      raise "scope stack inconsistency" unless popped_scope == scope
+
+      popped_scope.locals.each do |local_name, local|
+        # Take no action for variables that are also present in an outer scope.
+        next if @scopes.any?(&.locals.has_key?(local_name))
+
+        # Touch the local variable as it is falling out of scope and released.
+        case local
+        when Refer::Local
+          touch_local_release(node, local)
+        when Refer::LocalUnion
+          local.list.each do |inner_local|
+            touch_local_release(node, inner_local)
+          end
+        else
+          raise NotImplementedError.new(local)
+        end
+      end
+    end
+
+    def touch_local_release(node : AST::Node, local : Refer::Local)
+      local_ref = @reach_func.resolve(@ctx, local.defn)
+
+      # For now we only have supported this logic for singular types.
+      raise NotImplementedError.new(local_ref.show_type) unless local_ref.singular?
+      local_def = local_ref.single_def!(@ctx)
+
+      # We don't handle lifetime of non-allocated types or cpointers.
+      return if !local_def.has_allocation? || local_def.is_cpointer?
+
+      local_cap = local_ref.cap_only.cap_value
+      case local_cap
+      when "ref"
+        # We do nothing - ref objects are traced only from their iso root,
+        # so we need not pay attention to those references as they come and go.
+      when "val"
+        insert(node, ValReleaseFromScope.new(local))
+      when "tag"
+        Error.at local.defn, "Only actors are allowed to be tag on Verona" \
+          unless local_def.is_actor?
+
+        insert(node, ActorReleaseFromScope.new(local))
+      else
+        pp local_ref
+        raise NotImplementedError.new("local release #{local_cap}")
+      end
+    end
+
     def touch_move(from_node : AST::Node, into_node : AST::Node)
-      from_ref = @ctx.reach[@reach_func.infer.resolve(from_node)]
-      into_ref = @ctx.reach[@reach_func.infer.resolve(into_node)]
+      from_ref = @reach_func.resolve(@ctx, from_node)
+      into_ref = @reach_func.resolve(@ctx, into_node)
 
       # If the type isn't changing, we have nothing to check on here.
       return if from_ref == into_ref
@@ -105,11 +193,11 @@ class Mare::Compiler::Lifetime
       when {"iso+", "ref"}, {"iso+", "box"}
         # When an ephemeral iso is moved to a local mutable cap,
         # it needs to be merged into the current local mutable region.
-        self[from_node] = IsoMergeIntoCurrentRegion::INSTANCE
+        insert(from_node, IsoMergeIntoCurrentRegion::INSTANCE)
       when {"iso+", "val"}
         # When an ephemeral iso is moved to an immutable cap,
         # it needs to be frozen, rendering its whole region immutable.
-        self[from_node] = IsoFreezeRegion::INSTANCE
+        insert(from_node, IsoFreezeRegion::INSTANCE)
       else
         raise NotImplementedError.new("move #{from_cap} into #{into_cap}")
       end

@@ -511,6 +511,10 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
 
     def initialize(@reach_def, @infer, @signature)
     end
+
+    def resolve(ctx, node)
+      ctx.reach[infer.resolve(node)]
+    end
   end
 
   getter seen_funcs

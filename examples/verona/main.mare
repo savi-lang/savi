@@ -11,7 +11,7 @@
 
 :actor Greeter
   :new (message1 String, message2 String)
-    greeting ref = Greeting.new(message1, message2)
+    greeting val = Greeting.new(message1, message2)
     greeting.say
 
 :actor Main

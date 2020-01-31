@@ -98,6 +98,9 @@ class Mare::Compiler::CodeGen::VeronaRT
       {"RTObject_region_freeze", [@alloc_ptr, @obj_ptr], @void, [
         LLVM::Attribute::NoUnwind, LLVM::Attribute::InaccessibleMemOrArgMemOnly,
       ]},
+      {"RTImmutable_release", [@obj_ptr, @alloc_ptr], @void, [
+        LLVM::Attribute::NoUnwind, LLVM::Attribute::InaccessibleMemOrArgMemOnly,
+      ]},
       {"RTCown_new", [@alloc_ptr, @desc_ptr], @cown_ptr, [
         LLVM::Attribute::NoUnwind, LLVM::Attribute::InaccessibleMemOrArgMemOnly,
         {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::NoAlias},
@@ -375,26 +378,56 @@ class Mare::Compiler::CodeGen::VeronaRT
   # For every expression whose value is generated, hook into the value and
   # maybe take an action based on the given lifetime info.
   def gen_expr_post(g : CodeGen, expr : AST::Node, value : LLVM::Value)
-    info = g.ctx.lifetime[g.func_frame.gfunc.not_nil!.reach_func][expr]?
-    return value unless info
+    infos = g.ctx.lifetime[g.func_frame.gfunc.not_nil!.reach_func][expr]?
+    return value unless infos
 
-    case info
-    when Lifetime::IsoMergeIntoCurrentRegion
-      g.builder.call(g.mod.functions["RTObject_region_merge"], [
-        g.alloc_ctx,
-        gen_current_root_get(g),
-        g.builder.bit_cast(value, @obj_ptr, "#{value}.name.OPAQUE"),
-      ])
-      value
-    when Lifetime::IsoFreezeRegion
-      g.builder.call(g.mod.functions["RTObject_region_freeze"], [
-        g.alloc_ctx,
-        g.builder.bit_cast(value, @obj_ptr, "#{value}.name.OPAQUE"),
-      ])
-      value
-    else
-      raise NotImplementedError.new(info)
+    infos.each do |info|
+      case info
+      when Lifetime::IsoMergeIntoCurrentRegion
+        g.builder.call(g.mod.functions["RTObject_region_merge"], [
+          g.alloc_ctx,
+          gen_current_root_get(g),
+          g.builder.bit_cast(value, @obj_ptr, "#{value.name}.OPAQUE"),
+        ])
+      when Lifetime::IsoFreezeRegion
+        # TODO: find a way to have both compile-time and runtime String'val
+        raise NotImplementedError.new("runtime-alloc'd String'val in Verona") \
+          if value.type == g.gtypes["String"].struct_ptr
+
+        g.builder.call(g.mod.functions["RTObject_region_freeze"], [
+          g.alloc_ctx,
+          g.builder.bit_cast(value, @obj_ptr, "#{value.name}.OPAQUE"),
+        ])
+      when Lifetime::ValReleaseFromScope
+        # Don't release String'val - right now these are all compile-time
+        # constant values instead of being runtime allocated.
+        # TODO: find a way to have both compile-time and runtime String'val
+        no_release = g.gtype_of(info.local.defn) == g.gtypes["String"]
+        # TODO: stop hacking around and actually pass a real Env to Main
+        no_release ||= g.gtype_of(info.local.defn) == g.gtypes["Env"]
+
+        g.builder.call(g.mod.functions["RTImmutable_release"], [
+          g.builder.bit_cast(
+            g.builder.load(
+              g.func_frame.current_locals[info.local],
+              "#{info.local.name}",
+            ),
+            @obj_ptr,
+            "#{info.local.name}.OPAQUE",
+          ),
+          g.alloc_ctx,
+        ]) unless no_release
+      when Lifetime::ActorReleaseFromScope
+        g.builder.call(g.mod.functions["RTCown_release"], [
+          g.builder.bit_cast(value, @cown_ptr, "#{value.name}.OPAQUE"),
+          g.alloc_ctx,
+        ])
+      else
+        raise NotImplementedError.new(info)
+      end
     end
+
+    value
   end
 
   # This generates the code that allocates an object of the given type.

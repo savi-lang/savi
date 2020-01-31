@@ -91,4 +91,11 @@ class Mare::Compiler::Refer
     Self | Local | LocalUnion | Field |
     Type | TypeAlias | TypeParam |
     RaiseError | Unresolved)
+
+  struct Scope
+    getter locals : Hash(String, (Local | LocalUnion))
+
+    def initialize(@locals)
+    end
+  end
 end

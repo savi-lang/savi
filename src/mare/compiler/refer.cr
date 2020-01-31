@@ -41,6 +41,7 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
       @self_type = @ctx.refer_type[t.ident].as(Type)
       @map = {} of Program::Function => ForFunc
       @infos = {} of AST::Node => Info
+      @scopes = {} of AST::Group => Scope
     end
 
     def [](f : Program::Function) : ForFunc
@@ -61,6 +62,14 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
 
     def []=(node : AST::Node, info : Info)
       @infos[node] = info
+    end
+
+    def scope?(group)
+      @scopes[group]?
+    end
+
+    def set_scope(group, branch : ForBranch)
+      @scopes[group] ||= Scope.new(branch.locals)
     end
 
     def self_type
@@ -89,6 +98,7 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
 
     def initialize(@for_type : ForType)
       @infos = {} of AST::Node => Info
+      @scopes = {} of AST::Group => Scope
     end
 
     def [](node)
@@ -101,6 +111,14 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
 
     def []=(node, info)
       @infos[node] = info
+    end
+
+    def scope?(group)
+      @scopes[group]?
+    end
+
+    def set_scope(group, branch : ForBranch)
+      @scopes[group] ||= Scope.new(branch.locals)
     end
 
     def find_type?(node)
@@ -118,6 +136,10 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
       func.body.try(&.accept(root))
       func.yield_out.try(&.accept(root))
       func.yield_in.try(&.accept(root))
+
+      func.body.try { |body| set_scope(body, root) }
+
+      root
     end
   end
 
@@ -132,8 +154,11 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
     )
     end
 
-    def sub_branch(init_locals = @locals.dup)
-      ForBranch.new(@refer, init_locals, @consumes.dup)
+    def sub_branch(group : AST::Node?, init_locals = @locals.dup)
+      ForBranch.new(@refer, init_locals, @consumes.dup).tap do |branch|
+        @refer.set_scope(group, branch) if group.is_a?(AST::Group)
+        group.try(&.accept(branch))
+      end
     end
 
     # This visitor never replaces nodes, it just touches them and returns them.
@@ -257,8 +282,7 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
       # Iterate over each clause, visiting both the cond and body of the clause.
       node.list.each do |cond, body|
         # Visit the cond first.
-        cond_branch = sub_branch
-        cond.accept(cond_branch)
+        cond_branch = sub_branch(cond)
 
         # Absorb any consumes from the cond branch into this parent branch.
         # This makes them visible both in the parent and in future sub branches.
@@ -266,8 +290,7 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
 
         # Visit the body next. Locals from the cond are available in the body.
         # Consumes from any earlier cond are also visible in the body.
-        body_branch = sub_branch(cond_branch.locals)
-        body.accept(body_branch)
+        body_branch = sub_branch(body, cond_branch.locals.dup)
 
         # Collect any consumes from the body branch.
         body_consumes.merge!(body_branch.consumes)
@@ -305,10 +328,8 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
       body_consumes = {} of (Local | LocalUnion) => Source::Pos
 
       # Visit the loop cond twice (nested) to simulate repeated execution.
-      cond_branch = sub_branch
-      node.cond.accept(cond_branch)
-      cond_branch_2 = cond_branch.sub_branch
-      node.cond.accept(cond_branch_2)
+      cond_branch = sub_branch(node.cond)
+      cond_branch_2 = cond_branch.sub_branch(node.cond)
 
       # Absorb any consumes from the cond branch into this parent branch.
       # This makes them visible both in the parent and in future sub branches.
@@ -316,18 +337,15 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
 
       # Now, visit the else body, if any.
       node.else_body.try do |else_body|
-        else_branch = sub_branch
-        else_body.accept(else_branch)
+        else_branch = sub_branch(else_body)
 
         # Collect any consumes from the else body branch.
         body_consumes.merge!(else_branch.consumes)
       end
 
       # Now, visit the main body twice (nested) to simulate repeated execution.
-      body_branch = sub_branch
-      node.body.accept(body_branch)
-      body_branch_2 = body_branch.sub_branch(@locals.dup)
-      node.body.accept(body_branch_2)
+      body_branch = sub_branch(node.body)
+      body_branch_2 = body_branch.sub_branch(node.body, @locals.dup)
 
       # Collect any consumes from the body branch.
       body_consumes.merge!(body_branch.consumes)
@@ -342,14 +360,13 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
       return unless params || block
 
       # Visit params and block twice (nested) to simulate repeated execution
-      sub_branch = sub_branch()
-      params.try(&.accept(sub_branch))
+      sub_branch = sub_branch(params)
       params.try(&.terms.each { |param| sub_branch.create_local(param) })
       block.try(&.accept(sub_branch))
-      sub_branch2 = sub_branch.sub_branch(@locals.dup)
-      params.try(&.accept(sub_branch2))
+      sub_branch2 = sub_branch.sub_branch(params, @locals.dup)
       params.try(&.terms.each { |param| sub_branch2.create_local(param) })
       block.try(&.accept(sub_branch2))
+      @refer.set_scope(block, sub_branch) if block.is_a?(AST::Group)
 
       # Absorb any consumes from the block branch into this parent branch.
       @consumes.merge!(sub_branch.consumes)
