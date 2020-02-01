@@ -98,6 +98,9 @@ class Mare::Compiler::CodeGen::VeronaRT
       {"RTObject_region_freeze", [@alloc_ptr, @obj_ptr], @void, [
         LLVM::Attribute::NoUnwind, LLVM::Attribute::InaccessibleMemOrArgMemOnly,
       ]},
+      {"RTImmutable_acquire", [@obj_ptr], @void, [
+        LLVM::Attribute::NoUnwind, LLVM::Attribute::InaccessibleMemOrArgMemOnly,
+      ]},
       {"RTImmutable_release", [@obj_ptr, @alloc_ptr], @void, [
         LLVM::Attribute::NoUnwind, LLVM::Attribute::InaccessibleMemOrArgMemOnly,
       ]},
@@ -106,6 +109,9 @@ class Mare::Compiler::CodeGen::VeronaRT
         {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::NoAlias},
         {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::Dereferenceable, align_width + COWN_PAD_SIZE},
         {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::Alignment, align_width},
+      ]},
+      {"RTCown_acquire", [@cown_ptr], @void, [
+        LLVM::Attribute::NoUnwind, LLVM::Attribute::InaccessibleMemOrArgMemOnly,
       ]},
       {"RTCown_release", [@cown_ptr, @alloc_ptr], @void, [
         LLVM::Attribute::NoUnwind, LLVM::Attribute::InaccessibleMemOrArgMemOnly,
@@ -337,15 +343,16 @@ class Mare::Compiler::CodeGen::VeronaRT
     alloc_ctx = gen_alloc_ctx_get(g)
     g.func_frame.alloc_ctx = alloc_ctx
 
-    # TODO: Create a singleton Env object to use here:
-    env_obj = g.gtypes["Env"].struct_ptr.null
+    env = gen_alloc_object_iso(g, g.gtypes["Env"], "env")
+    # TODO: call the Env.new constructor?
+    gen_iso_freeze_region(g, env)
 
     if USE_SYSTEMATIC_TESTING
       g.builder.call(g.mod.functions["RTSystematicTestHarness_run"], [
         argc,
         argv,
         g.mod.functions["main.INNER"].to_value,
-        g.builder.bit_cast(env_obj, @ptr),
+        g.builder.bit_cast(env, @ptr),
       ])
     else
       raise NotImplementedError.new("verona runtime init without test harness") # TODO
@@ -360,16 +367,26 @@ class Mare::Compiler::CodeGen::VeronaRT
     fn = g.mod.functions.add("main.INNER", [@ptr], @void)
     g.gen_func_start(fn)
 
+    # We receive the Env object as an opaque void pointer. Cast it to Env here.
     env = g.builder.bit_cast(
       fn.params[0].tap &.name=("env.OPAQUE"),
       g.gtypes["Env"].struct_ptr,
       "env",
     )
 
-    # Create the main actor.
+    # Acquire the Env object an extra time, since Main.new fails to do this.
+    # TODO: Add lifetime analysis and codegen for acquiring stuff into scope.
+    gen_val_acquire_into_scope(g, env)
+
+    # Create the Main actor.
     main_actor = gen_alloc_actor(g, g.gtypes["Main"], "main")
 
+    # Call the Main actor's asynchronous constructor function, passing the Env.
     g.builder.call(g.gtypes["Main"]["new"].send_llvm_func, [main_actor, env])
+
+    # Release the Env object, now that the program is otherwise done.
+    # This is the counterpart to the implicit acquire at its original creation.
+    gen_val_release_from_scope(g, env)
 
     g.builder.ret
     g.gen_func_end
@@ -384,39 +401,25 @@ class Mare::Compiler::CodeGen::VeronaRT
     infos.each do |info|
       case info
       when Lifetime::IsoMergeIntoCurrentRegion
-        g.builder.call(g.mod.functions["RTObject_region_merge"], [
-          g.alloc_ctx,
-          gen_current_root_get(g),
-          g.builder.bit_cast(value, @obj_ptr, "#{value.name}.OPAQUE"),
-        ])
+        gen_iso_merge_into_current_region(g, value)
       when Lifetime::IsoFreezeRegion
         # TODO: find a way to have both compile-time and runtime String'val
         raise NotImplementedError.new("runtime-alloc'd String'val in Verona") \
           if value.type == g.gtypes["String"].struct_ptr
 
-        g.builder.call(g.mod.functions["RTObject_region_freeze"], [
-          g.alloc_ctx,
-          g.builder.bit_cast(value, @obj_ptr, "#{value.name}.OPAQUE"),
-        ])
+        gen_iso_freeze_region(g, value)
       when Lifetime::ValReleaseFromScope
         # Don't release String'val - right now these are all compile-time
         # constant values instead of being runtime allocated.
         # TODO: find a way to have both compile-time and runtime String'val
         no_release = g.gtype_of(info.local.defn) == g.gtypes["String"]
-        # TODO: stop hacking around and actually pass a real Env to Main
-        no_release ||= g.gtype_of(info.local.defn) == g.gtypes["Env"]
 
-        g.builder.call(g.mod.functions["RTImmutable_release"], [
-          g.builder.bit_cast(
-            g.builder.load(
-              g.func_frame.current_locals[info.local],
-              "#{info.local.name}",
-            ),
-            @obj_ptr,
-            "#{info.local.name}.OPAQUE",
-          ),
-          g.alloc_ctx,
-        ]) unless no_release
+        gen_val_release_from_scope(g,
+          g.builder.load(
+            g.func_frame.current_locals[info.local],
+            info.local.name,
+          )
+        ) unless no_release
       when Lifetime::ActorReleaseFromScope
         g.builder.call(g.mod.functions["RTCown_release"], [
           g.builder.bit_cast(value, @cown_ptr, "#{value.name}.OPAQUE"),
@@ -430,20 +433,63 @@ class Mare::Compiler::CodeGen::VeronaRT
     value
   end
 
+  def gen_iso_merge_into_current_region(g : CodeGen, value : LLVM::Value)
+    g.builder.call(g.mod.functions["RTObject_region_merge"], [
+      g.alloc_ctx,
+      gen_current_root_get(g),
+      g.builder.bit_cast(value, @obj_ptr, "#{value.name}.OPAQUE"),
+    ])
+    value
+  end
+
+  def gen_iso_freeze_region(g : CodeGen, value : LLVM::Value)
+    g.builder.call(g.mod.functions["RTObject_region_freeze"], [
+      g.alloc_ctx,
+      g.builder.bit_cast(value, @obj_ptr, "#{value.name}.OPAQUE"),
+    ])
+    value
+  end
+
+  def gen_val_acquire_into_scope(g : CodeGen, value : LLVM::Value)
+    g.builder.call(g.mod.functions["RTImmutable_acquire"], [
+      g.builder.bit_cast(value, @obj_ptr, "#{value.name}.OPAQUE"),
+    ])
+    value
+  end
+
+  def gen_val_release_from_scope(g : CodeGen, value : LLVM::Value)
+    g.builder.call(g.mod.functions["RTImmutable_release"], [
+      g.builder.bit_cast(value, @obj_ptr, "#{value.name}.OPAQUE"),
+      g.alloc_ctx,
+    ])
+    value
+  end
+
+  def gen_actor_acquire_into_scope(g : CodeGen, value : LLVM::Value)
+    g.builder.call(g.mod.functions["RTCown_acquire"], [
+      g.builder.bit_cast(value, @cown_ptr, "#{value.name}.OPAQUE"),
+    ])
+    value
+  end
+
+  def gen_actor_release_from_scope(g : CodeGen, value : LLVM::Value)
+    g.builder.call(g.mod.functions["RTCown_release"], [
+      g.builder.bit_cast(value, @cown_ptr, "#{value.name}.OPAQUE"),
+      g.alloc_ctx,
+    ])
+    value
+  end
+
   # This generates the code that allocates an object of the given type.
   # This is the first step before actually calling the constructor of it.
   def gen_alloc(g : CodeGen, gtype : GenType, from_expr : AST::Node, name : String)
-    allocated =
-      if gtype.type_def.is_actor?
-        gen_alloc_actor(g, gtype, name)
-      elsif g.type_of(from_expr).is_singular_iso?
-        gen_alloc_object_iso(g, gtype, name)
-      else
-        gen_alloc_object(g, gtype, name)
-      end
-
-    object = g.builder.bit_cast(allocated, gtype.struct_ptr, name)
-    object
+    if gtype.type_def.is_actor?
+      gen_alloc_actor(g, gtype, name)
+    elsif g.type_of(from_expr).is_singular_iso?
+      gen_alloc_object_iso(g, gtype, name)
+    else
+      gen_alloc_object(g, gtype, name)
+    end
   end
 
   def gen_alloc_struct(g : CodeGen, llvm_type : LLVM::Type, name)
@@ -451,18 +497,20 @@ class Mare::Compiler::CodeGen::VeronaRT
   end
 
   def gen_alloc_object(g : CodeGen, gtype : GenType, name)
-    g.builder.call(g.mod.functions["RTObject_new_mut"], [
+    allocated = g.builder.call(g.mod.functions["RTObject_new_mut"], [
       g.alloc_ctx,
       g.gen_get_desc_opaque(gtype),
       gen_current_root_get(g),
     ], "#{name}.OPAQUE")
+    g.builder.bit_cast(allocated, gtype.struct_ptr, name)
   end
 
   def gen_alloc_object_iso(g : CodeGen, gtype : GenType, name)
-    g.builder.call(g.mod.functions["RTObject_new_iso"], [
+    allocated = g.builder.call(g.mod.functions["RTObject_new_iso"], [
       g.alloc_ctx,
       g.gen_get_desc_opaque(gtype),
     ], "#{name}.OPAQUE")
+    g.builder.bit_cast(allocated, gtype.struct_ptr, name)
   end
 
   def gen_alloc_actor(g : CodeGen, gtype : GenType, name)
@@ -594,8 +642,8 @@ class Mare::Compiler::CodeGen::VeronaRT
     ])
 
     # Call release for this Cown.
-    # TODO: Should we only call release when the Cown falls out of scope?
-    g.builder.call(g.mod.functions["RTCown_release"], [cown, g.alloc_ctx])
+    # TODO: Handle this with appropriate lifetime tracking instead.
+    gen_actor_release_from_scope(g, cown)
 
     g.builder.ret(g.gen_none)
     g.gen_func_end
