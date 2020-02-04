@@ -15,7 +15,7 @@
 class Mare::Compiler::Lifetime
   alias Info = (
     IsoMergeIntoCurrentRegion | IsoFreezeRegion |
-    ValReleaseFromScope | ActorReleaseFromScope)
+    IsoFree | ValReleaseFromScope | ActorReleaseFromScope)
 
   struct IsoMergeIntoCurrentRegion
     INSTANCE = new
@@ -23,6 +23,13 @@ class Mare::Compiler::Lifetime
 
   struct IsoFreezeRegion
     INSTANCE = new
+  end
+
+  struct IsoFree
+    getter local : Refer::Local
+
+    def initialize(@local)
+    end
   end
 
   struct ValReleaseFromScope
@@ -109,6 +116,7 @@ class Mare::Compiler::Lifetime
         case node.op.value
         when "="
           touch_move(node.rhs, node.lhs)
+          touch_assign_local(node)
           # TODO: Handle more cases
         end
       # TODO: Handle more cases
@@ -164,8 +172,38 @@ class Mare::Compiler::Lifetime
 
         insert(node, ActorReleaseFromScope.new(local))
       else
-        pp local_ref
         raise NotImplementedError.new("local release #{local_cap}")
+      end
+    end
+
+    def touch_assign_local(node : AST::Relate)
+      node_lhs = node.lhs
+
+      # We only deal in this function with assignments whose lhs is a Local.
+      local = refer[node_lhs]
+      return unless local.is_a?(Refer::Local)
+
+      # For now we only have supported this logic for singular types.
+      type_ref = @reach_func.resolve(@ctx, local.defn)
+      raise NotImplementedError.new(type_ref.show_type) unless type_ref.singular?
+      type_def = type_ref.single_def!(@ctx)
+
+      # We don't handle lifetime of non-allocated types or cpointers.
+      return if !type_def.has_allocation? || type_def.is_cpointer?
+
+      # When rebinding a var and not using the old value, we free/release it.
+      if !Classify.value_needed?(node) && !local.is_defn_assign?(node)
+        type_cap = type_ref.cap_only.cap_value
+        case type_cap
+        when "iso"
+          insert(node.lhs, IsoFree.new(local))
+        when "val"
+          insert(node.lhs, ValReleaseFromScope.new(local))
+        when "tag"
+          insert(node.lhs, ActorReleaseFromScope.new(local))
+        else
+          raise NotImplementedError.new("assign overwriting #{type_cap}")
+        end
       end
     end
 

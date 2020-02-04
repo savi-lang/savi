@@ -25,6 +25,16 @@ class Mare::Compiler::Refer
 
     def initialize(@name, @defn, @param_idx = nil)
     end
+
+    def is_defn_assign?(node : AST::Relate)
+      node_lhs = node.lhs
+
+      node_lhs == self.defn || (
+        node_lhs.is_a?(AST::Group) &&
+        node_lhs.style == " " &&
+        node_lhs.terms.first == self.defn
+      )
+    end
   end
 
   struct LocalUnion

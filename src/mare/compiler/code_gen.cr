@@ -1648,6 +1648,8 @@ class Mare::Compiler::CodeGen
     cast_value = gen_assign_cast(value, lhs_type, relate.rhs)
     cast_value.name = value.name
 
+    @runtime.gen_expr_post(self, relate.lhs, cast_value)
+
     @di.set_loc(relate.op)
     if ref.is_a?(Refer::Local)
       gep = func_frame.current_locals[ref] ||= gen_local_gep(ref, lhs_type)
