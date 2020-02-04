@@ -408,6 +408,15 @@ class Mare::Compiler::CodeGen::VeronaRT
           if value.type == g.gtypes["String"].struct_ptr
 
         gen_iso_freeze_region(g, value)
+      when Lifetime::ValAcquireIntoScope
+        # Don't acquire String'val - right now these are all compile-time
+        # constant values instead of being runtime allocated.
+        # TODO: find a way to have both compile-time and runtime String'val
+        no_acquire = g.gtype_of(expr) == g.gtypes["String"]
+
+        gen_val_acquire_into_scope(g, value) unless no_acquire
+      when Lifetime::ActorAcquireIntoScope
+        gen_actor_acquire_into_scope(g, value)
       when Lifetime::ValReleaseFromScope
         # Don't release String'val - right now these are all compile-time
         # constant values instead of being runtime allocated.

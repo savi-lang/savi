@@ -15,6 +15,7 @@
 class Mare::Compiler::Lifetime
   alias Info = (
     IsoMergeIntoCurrentRegion | IsoFreezeRegion |
+    ValAcquireIntoScope | ActorAcquireIntoScope |
     IsoFree | ValReleaseFromScope | ActorReleaseFromScope)
 
   struct IsoMergeIntoCurrentRegion
@@ -22,6 +23,14 @@ class Mare::Compiler::Lifetime
   end
 
   struct IsoFreezeRegion
+    INSTANCE = new
+  end
+
+  struct ValAcquireIntoScope
+    INSTANCE = new
+  end
+
+  struct ActorAcquireIntoScope
     INSTANCE = new
   end
 
@@ -117,6 +126,8 @@ class Mare::Compiler::Lifetime
         when "="
           touch_move(node.rhs, node.lhs)
           touch_assign_local(node)
+        when "."
+          touch_call(node)
           # TODO: Handle more cases
         end
       # TODO: Handle more cases
@@ -204,6 +215,37 @@ class Mare::Compiler::Lifetime
         else
           raise NotImplementedError.new("assign overwriting #{type_cap}")
         end
+      end
+    end
+
+    def touch_call(node : AST::Relate)
+      _, args, _, _ = AST::Extract.call(node)
+      args.try(&.terms.each { |arg|
+        touch_call_arg(arg)
+      })
+    end
+
+    def touch_call_arg(node : AST::Node)
+      # TODO: Sometimes may need IsoMergeIntoCurrentRegion or IsoFreezeRegion
+      # or similar if passing an argument cap that doesn't match the param.
+
+      # For now we only have supported this logic for singular types.
+      arg_ref = @reach_func.resolve(@ctx, node)
+      raise NotImplementedError.new(arg_ref.show_type) unless arg_ref.singular?
+      arg_def = arg_ref.single_def!(@ctx)
+
+      # We don't handle lifetime of non-allocated types or cpointers.
+      return if !arg_def.has_allocation? || arg_def.is_cpointer?
+
+      # Passing a value as an argument causes an acquire for it.
+      arg_cap = arg_ref.cap_only.cap_value
+      case arg_cap
+      when "val"
+        insert(node, ValAcquireIntoScope::INSTANCE)
+      when "tag"
+        insert(node, ActorAcquireIntoScope::INSTANCE)
+      else
+        raise NotImplementedError.new("arg of #{arg_cap}")
       end
     end
 
