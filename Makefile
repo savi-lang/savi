@@ -10,7 +10,7 @@ ready: PHONY Dockerfile
 
 # Run the full CI suite.
 ci: PHONY
-	make test
+	make test extra_args="$(extra_args)"
 	make example-run dir="/opt/code/examples/adventofcode/2018"
 
 # Run the test suite.
