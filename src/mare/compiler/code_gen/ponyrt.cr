@@ -272,6 +272,38 @@ class Mare::Compiler::CodeGen::PonyRT
     g.builder.call(g.mod.functions["pony_ctx"], "ALLOC_CTX")
   end
 
+  def cast_kind_of(g : CodeGen, type_ref : Reach::Ref, pos : Source::Pos) : Symbol
+    if type_ref.singular? \
+    && (type_ref.is_numeric? || type_ref.single_def!(g.ctx).is_cpointer?)
+      :bare
+    else
+      :object
+    end
+  end
+
+  def gen_cast_value(
+    g : CodeGen,
+    value : LLVM::Value,
+    from_kind : Symbol,
+    to_kind : Symbol,
+    from_type : Reach::Ref,
+    to_type : Reach::Ref,
+    from_expr : AST::Node
+   ) : LLVM::Value
+    case {from_kind, to_kind}
+    when {:bare, :object}
+      # When going from a bare machine value to an object,
+      # we pack the value into a temporary object wrapper.
+      g.gen_boxed(value, g.gtype_of(from_type), from_expr)
+    when {:object, :bare}
+      # When going from an object to a bare machine value,
+      # we unpack the value from within its temporary object wrapper.
+      g.gen_unboxed(value, g.gtype_of(to_type))
+    else
+      raise NotImplementedError.new({from_kind, to_kind})
+    end
+  end
+
   DESC_ID                        = 0
   DESC_SIZE                      = 1
   DESC_FIELD_COUNT               = 2

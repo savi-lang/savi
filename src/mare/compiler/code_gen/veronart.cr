@@ -171,9 +171,7 @@ class Mare::Compiler::CodeGen::VeronaRT
     g.builder.store(value, gen_current_root_thread_local(g))
   end
 
-  def runtime_kind_of(g : CodeGen, node : AST::Node)
-    type_ref = g.type_of(node)
-
+  def cast_kind_of(g : CodeGen, type_ref : Reach::Ref, pos : Source::Pos) : Symbol
     # For now we only have supported this logic for singular types.
     raise NotImplementedError.new(type_ref.show_type) unless type_ref.singular?
     type_def = type_ref.single_def!(g.ctx)
@@ -183,16 +181,31 @@ class Mare::Compiler::CodeGen::VeronaRT
 
     case type_ref.cap_only.cap_value
     when "iso" then :iso
+    when "iso+" then :iso_eph
     when "ref" then :ref
+    when "box" then :box
     when "val" then :val
+    when "non" then :non
     when "tag"
-      Error.at node, "Only actors are allowed to be tag on Verona" \
+      Error.at pos, "Only actors are allowed to be tag on Verona" \
         unless type_def.is_actor?
 
       :actor
     else
-      raise NotImplementedError.new("VeronaRT#runtime_kind_of #{type_ref.show_type}")
+      raise NotImplementedError.new("VeronaRT#cast_kind_of #{type_ref.show_type}")
     end
+  end
+
+  def gen_cast_value(
+    g : CodeGen,
+    value : LLVM::Value,
+    from_kind : Symbol,
+    to_kind : Symbol,
+    from_type : Reach::Ref,
+    to_type : Reach::Ref,
+    from_expr : AST::Node
+  ) : LLVM::Value
+    value # TODO
   end
 
   DESC_ID                    = 0
@@ -433,7 +446,7 @@ class Mare::Compiler::CodeGen::VeronaRT
 
         gen_iso_freeze_region(g, value)
       when Lifetime::PassAsArgument
-        kind = runtime_kind_of(g, expr)
+        kind = cast_kind_of(g, g.type_of(expr), expr.pos)
         case kind
         when :bare
           # Do nothing - we don't track lifetime of bare values.
@@ -450,7 +463,7 @@ class Mare::Compiler::CodeGen::VeronaRT
           raise NotImplementedError.new("VeronaRT PassAsArgument #{kind}")
         end
       when Lifetime::ReleaseFromScope
-        kind = runtime_kind_of(g, info.local.defn)
+        kind = cast_kind_of(g, g.type_of(info.local.defn), info.local.defn.pos)
         case kind
         when :bare
           # Do nothing - we don't track lifetime of bare values.

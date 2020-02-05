@@ -1839,6 +1839,8 @@ class Mare::Compiler::CodeGen
     from_expr : AST::Node,
     from_frame : Frame? = nil,
   )
+    # TODO: Can we replace from_expr and from_frame with simply from_type?
+    # That would simplify the callers, if the runtime never needs the AST.
     from_type =
       if from_frame
         gen_within_foreign_frame(from_frame) { type_of(from_expr) }
@@ -1854,49 +1856,21 @@ class Mare::Compiler::CodeGen
       from_expr.pos.show \
         unless value.type == from_llvm_type
 
-    return value if from_llvm_type == to_llvm_type
-
-    case to_llvm_type.kind
-    when LLVM::Type::Kind::Integer,
-         LLVM::Type::Kind::Half,
-         LLVM::Type::Kind::Float,
-         LLVM::Type::Kind::Double
-      # This happens for example with Bool when llvm_use_type != llvm_mem_type,
-      # for cases where we are assigning to or from a field.
-      # TODO: Implement this and verify it is working as intended.
-      raise NotImplementedError.new("zero extension / truncation in cast") \
-        if from_llvm_type.kind == LLVM::Type::Kind::Integer \
-        && to_llvm_type.kind == LLVM::Type::Kind::Integer \
-        && to_llvm_type.int_width != from_llvm_type.int_width
-
-      # This is just an assertion to make sure the type system protected us
-      # from trying to implicitly cast between different numeric types.
-      # We should only be going to/from a boxed pointer container.
-      raise "can't cast to/from different numeric types implicitly" \
-        if from_llvm_type.kind != LLVM::Type::Kind::Pointer
-
-      # Unwrap the box.
-      value = gen_unboxed(value, gtype_of(to_type))
-    when LLVM::Type::Kind::Pointer
-      from_expr_type = type_of(from_expr)
-      if value.type.kind != LLVM::Type::Kind::Pointer
-        # If we're going from non-pointer to pointer, we're boxing.
-        value = gen_boxed(value, gtype_of(from_expr_type), from_expr)
-      elsif from_expr_type.singular? && from_expr_type.single_def!(ctx).is_cpointer?
-        if value.type != @obj_ptr && to_llvm_type == @obj_ptr
-          # If going from non-object cpointer to object pointer, we're boxing.
-          value = gen_boxed(value, gtype_of(from_expr_type), from_expr)
-        elsif value.type == @obj_ptr && to_llvm_type != @obj_ptr
-          # If going from object pointer to non-object cpointer, we're unboxing.
-          value = gen_unboxed(value, gtype_of(from_expr_type))
-        end
-      end
-
-      # Do the LLVM bitcast.
-      @builder.bit_cast(value, to_llvm_type, "#{value.name}.CAST")
-    else
-      raise NotImplementedError.new(to_llvm_type.kind)
+    # If the runtime-specific cast kind doesn't match,
+    # we need to take a runtime-specific action prior to bit casting.
+    from_kind = @runtime.cast_kind_of(self, from_type, from_expr.pos)
+    to_kind   = @runtime.cast_kind_of(self, to_type,   from_expr.pos)
+    if from_kind != to_kind
+      value = @runtime.gen_cast_value(self,
+        value, from_kind, to_kind, from_type, to_type, from_expr)
     end
+
+    # Finally, if the LLVM type doesn't yet match, proceed with a bit cast.
+    if value.type != to_llvm_type
+      value = @builder.bit_cast(value, to_llvm_type, "#{value.name}.CAST")
+    end
+
+    value
   end
 
   def gen_boxed(value, from_gtype, from_expr)
