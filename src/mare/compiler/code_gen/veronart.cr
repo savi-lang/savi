@@ -618,26 +618,23 @@ class Mare::Compiler::CodeGen::VeronaRT
     g.gen_func_start(fn)
 
     # Destructure args from the message.
-    dst_values = [] of LLVM::Value
+    args = [] of LLVM::Value
     action = g.builder.bit_cast(fn.params[0], action_type.pointer, "ACTION")
     gfunc.llvm_func.params.types.each_with_index do |param_type, i|
       arg_gep = g.builder.struct_gep(action, i + 1, "ACTION.#{i + 1}.GEP")
-      src_value = g.builder.load(arg_gep, "ACTION.#{i + 1}")
-
-      dst_value = g.gen_assign_llvm_cast(src_value, param_type, nil)
-      dst_values << dst_value
+      args << g.builder.load(arg_gep, "ACTION.#{i + 1}")
     end
 
     # Set the current root to be the root object stored in this actor.
     gen_current_root_set(g,
       g.builder.load(
-        g.builder.struct_gep(dst_values[0], 2, "@.ROOT.GEP"),
+        g.builder.struct_gep(args[0], 2, "@.ROOT.GEP"),
         "@.ROOT",
       )
     )
 
     # Finally, call the function itself, with the program logic inside it.
-    g.builder.call(gfunc.llvm_func, dst_values)
+    g.builder.call(gfunc.llvm_func, args)
 
     g.builder.ret
     g.gen_func_end
