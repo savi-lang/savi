@@ -595,7 +595,12 @@ class Mare::Compiler::CodeGen
   end
 
   def gen_within_foreign_frame(gtype : GenType, gfunc : GenFunc)
-    @frames << Frame.new(self, gfunc.llvm_func, gtype, gfunc)
+    frame = Frame.new(self, gfunc.llvm_func, gtype, gfunc)
+    gen_within_foreign_frame(frame) { yield }
+  end
+
+  def gen_within_foreign_frame(frame : Frame)
+    @frames << frame
 
     result = yield
 
@@ -1398,6 +1403,7 @@ class Mare::Compiler::CodeGen
     member = member_ast.value
     arg_exprs = args_ast.try(&.terms.dup) || [] of AST::Node
     args = arg_exprs.map { |x| gen_expr(x).as(LLVM::Value) }
+    arg_frames = arg_exprs.map { nil.as(Frame?) }
 
     lhs_type = type_of(relate.lhs)
     lhs_gtype, gfunc = resolve_call(relate)
@@ -1417,6 +1423,7 @@ class Mare::Compiler::CodeGen
           if param_default.is_a?(AST::Group) && param_default.terms.size == 1
 
         arg_exprs << param_default
+        arg_frames << gen_within_foreign_frame(lhs_gtype, gfunc) { func_frame }
 
         if param_default.is_a?(AST::Prefix) \
         && param_default.op.value == "source_code_position_of_argument"
@@ -1455,6 +1462,7 @@ class Mare::Compiler::CodeGen
     if gfunc.needs_receiver? || needs_virtual_call || gfunc.needs_send?
       args.unshift(receiver)
       arg_exprs.unshift(relate.lhs)
+      arg_frames.unshift(nil)
       use_receiver = true
     end
 
@@ -1462,11 +1470,11 @@ class Mare::Compiler::CodeGen
     @di.set_loc(relate.op)
     result =
       if needs_virtual_call
-        gen_virtual_call(receiver, args, arg_exprs, lhs_type, gfunc)
+        gen_virtual_call(receiver, args, arg_exprs, arg_frames, lhs_type, gfunc)
       elsif gfunc.needs_send?
-        gen_call(gfunc.reach_func.signature, gfunc.send_llvm_func, args, arg_exprs, use_receiver)
+        gen_call(gfunc.reach_func.signature, gfunc.send_llvm_func, args, arg_exprs, arg_frames, use_receiver)
       else
-        gen_call(gfunc.reach_func.signature, gfunc.llvm_func, args, arg_exprs, use_receiver)
+        gen_call(gfunc.reach_func.signature, gfunc.llvm_func, args, arg_exprs, arg_frames, use_receiver)
       end
 
     case gfunc.calling_convention
@@ -1596,6 +1604,7 @@ class Mare::Compiler::CodeGen
     receiver : LLVM::Value,
     args : Array(LLVM::Value),
     arg_exprs : Array(AST::Node),
+    arg_frames : Array(Frame?),
     type_ref : Reach::Ref,
     gfunc : GenFunc,
   )
@@ -1612,7 +1621,7 @@ class Mare::Compiler::CodeGen
     load = @builder.load(gep, "#{fname}.LOAD")
     func = @builder.bit_cast(load, gfunc.virtual_llvm_func.type, fname)
 
-    gen_call(gfunc.reach_func.signature, func, args, arg_exprs, true)
+    gen_call(gfunc.reach_func.signature, func, args, arg_exprs, arg_frames, true)
   end
 
   def gen_call(
@@ -1620,6 +1629,7 @@ class Mare::Compiler::CodeGen
     func : (LLVM::Function | LLVM::Value),
     args : Array(LLVM::Value),
     arg_exprs : Array(AST::Node),
+    arg_frames : Array(Frame?),
     use_receiver : Bool,
   )
     # Get the list of parameter types, prepending the receiver type if in use.
@@ -1627,8 +1637,14 @@ class Mare::Compiler::CodeGen
     param_types.unshift(signature.receiver) if use_receiver
 
     # Cast the arguments to the parameter types.
-    cast_args = param_types.to_a.zip(args).zip(arg_exprs)
-      .map { |(param_type, arg), expr| gen_assign_cast(arg, param_type, expr) }
+    cast_args = [] of LLVM::Value
+    param_types.to_a.each_with_index do |param_type, index|
+      arg = args[index]
+      arg_expr = arg_exprs[index]
+      arg_frame = arg_frames[index] if arg_frames
+
+      cast_args << gen_assign_cast(arg, param_type, arg_expr, arg_frame)
+    end
 
     @builder.call(func, cast_args)
   end
@@ -1821,9 +1837,23 @@ class Mare::Compiler::CodeGen
     value : LLVM::Value,
     to_type : Reach::Ref,
     from_expr : AST::Node,
+    from_frame : Frame? = nil,
   )
+    from_type =
+      if from_frame
+        gen_within_foreign_frame(from_frame) { type_of(from_expr) }
+      else
+        type_of(from_expr)
+      end
+    from_llvm_type = llvm_type_of(from_type)
     to_llvm_type = llvm_type_of(to_type)
-    from_llvm_type = value.type
+
+    # We assert that the origin llvm type derived from type analysis is the
+    # same as the actual type of the llvm value we are being asked to cast.
+    raise "value type #{value.type} doesn't match #{from_llvm_type}:\n" +
+      from_expr.pos.show \
+        unless value.type == from_llvm_type
+
     return value if from_llvm_type == to_llvm_type
 
     case to_llvm_type.kind
@@ -1845,10 +1875,8 @@ class Mare::Compiler::CodeGen
       raise "can't cast to/from different numeric types implicitly" \
         if from_llvm_type.kind != LLVM::Type::Kind::Pointer
 
-      # Unwrap the box and finish the assign cast from there.
-      # This brings us to the zero extension / truncation logic above.
+      # Unwrap the box.
       value = gen_unboxed(value, gtype_of(to_type))
-      gen_assign_cast(value, to_type, from_expr)
     when LLVM::Type::Kind::Pointer
       from_expr_type = type_of(from_expr)
       if value.type.kind != LLVM::Type::Kind::Pointer
