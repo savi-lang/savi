@@ -632,8 +632,8 @@ class Mare::Compiler::CodeGen
         cont_ptr = gfunc.continuation_type.pointer
 
         # Gather the LLVM::Types to use for the yield out values.
-        yield_out_types = gfunc.infer.yield_out_resolved.map do |resolved|
-          llvm_type_of(ctx.reach[resolved])
+        yield_out_types = gfunc.reach_func.signature.yield_out.map do |yield_out_ref|
+          llvm_type_of(yield_out_ref)
         end
 
         # Define two different return types - one for the yield returns
@@ -847,7 +847,7 @@ class Mare::Compiler::CodeGen
     # matches the LLVM return type declared in the function head.
     # TODO: Why only field initializers? Why not all functions?
     if gfunc.func.has_tag?(:field)
-      return_type = gfunc.llvm_func.return_type
+      return_type = gfunc.reach_func.signature.ret
       last_value = gen_assign_cast(last_value, return_type, last_expr)
     end
 
@@ -1620,7 +1620,7 @@ class Mare::Compiler::CodeGen
   )
     # Cast the arguments to the right types.
     cast_args = func.params.to_a.zip(args).zip(arg_exprs)
-      .map { |(param, arg), expr| gen_assign_cast(arg, param.type, expr) }
+      .map { |(param, arg), expr| gen_assign_llvm_cast(arg, param.type, expr) }
 
     @builder.call(func, cast_args)
   end
@@ -1634,7 +1634,7 @@ class Mare::Compiler::CodeGen
     # This version of gen_call uses a separate func_proto as the prototype,
     # which we use to get the parameter types to cast the arguments to.
     cast_args = func_proto.params.to_a.zip(args).zip(arg_exprs)
-      .map { |(param, arg), expr| gen_assign_cast(arg, param.type, expr) }
+      .map { |(param, arg), expr| gen_assign_llvm_cast(arg, param.type, expr) }
 
     @builder.call(func, cast_args)
   end
@@ -1643,7 +1643,8 @@ class Mare::Compiler::CodeGen
     ref = func_frame.refer[relate.lhs]
     value = gen_expr(relate.rhs).as(LLVM::Value)
     name = value.name
-    lhs_type = llvm_type_of(relate.lhs)
+    lhs_type = type_of(relate.lhs)
+    lhs_llvm_type = llvm_type_of(lhs_type)
 
     cast_value = gen_assign_cast(value, lhs_type, relate.rhs)
     cast_value.name = value.name
@@ -1652,7 +1653,7 @@ class Mare::Compiler::CodeGen
 
     @di.set_loc(relate.op)
     if ref.is_a?(Refer::Local)
-      gep = func_frame.current_locals[ref] ||= gen_local_gep(ref, lhs_type)
+      gep = func_frame.current_locals[ref] ||= gen_local_gep(ref, lhs_llvm_type)
 
       @builder.store(cast_value, gep)
     else
@@ -1666,7 +1667,7 @@ class Mare::Compiler::CodeGen
     value = gen_expr(node.rhs).as(LLVM::Value)
     name = value.name
 
-    value = gen_assign_cast(value, llvm_type_of(node), node.rhs)
+    value = gen_assign_cast(value, type_of(node), node.rhs)
     value.name = name
 
     @di.set_loc(node)
@@ -1824,13 +1825,21 @@ class Mare::Compiler::CodeGen
 
   def gen_assign_cast(
     value : LLVM::Value,
-    to_type : LLVM::Type,
+    to_type : Reach::Ref,
     from_expr : AST::Node?,
   )
-    from_type = value.type
-    return value if from_type == to_type
+    gen_assign_llvm_cast(value, llvm_type_of(to_type), from_expr)
+  end
 
-    case to_type.kind
+  def gen_assign_llvm_cast(
+    value : LLVM::Value,
+    to_llvm_type : LLVM::Type,
+    from_expr : AST::Node?,
+  )
+    from_llvm_type = value.type
+    return value if from_llvm_type == to_llvm_type
+
+    case to_llvm_type.kind
     when LLVM::Type::Kind::Integer,
          LLVM::Type::Kind::Half,
          LLVM::Type::Kind::Float,
@@ -1839,39 +1848,39 @@ class Mare::Compiler::CodeGen
       # for cases where we are assigning to or from a field.
       # TODO: Implement this and verify it is working as intended.
       raise NotImplementedError.new("zero extension / truncation in cast") \
-        if from_type.kind == LLVM::Type::Kind::Integer \
-        && to_type.kind == LLVM::Type::Kind::Integer \
-        && to_type.int_width != from_type.int_width
+        if from_llvm_type.kind == LLVM::Type::Kind::Integer \
+        && to_llvm_type.kind == LLVM::Type::Kind::Integer \
+        && to_llvm_type.int_width != from_llvm_type.int_width
 
       # This is just an assertion to make sure the type system protected us
       # from trying to implicitly cast between different numeric types.
       # We should only be going to/from a boxed pointer container.
       raise "can't cast to/from different numeric types implicitly" \
-        if from_type.kind != LLVM::Type::Kind::Pointer
+        if from_llvm_type.kind != LLVM::Type::Kind::Pointer
 
       # Unwrap the box and finish the assign cast from there.
       # This brings us to the zero extension / truncation logic above.
       value = gen_unboxed(value, gtype_of(from_expr.not_nil!))
-      gen_assign_cast(value, to_type, from_expr)
+      gen_assign_llvm_cast(value, to_llvm_type, from_expr)
     when LLVM::Type::Kind::Pointer
       from_expr_type = type_of(from_expr.not_nil!)
       if value.type.kind != LLVM::Type::Kind::Pointer
         # If we're going from non-pointer to pointer, we're boxing.
         value = gen_boxed(value, gtype_of(from_expr_type), from_expr.not_nil!)
       elsif from_expr_type.singular? && from_expr_type.single_def!(ctx).is_cpointer?
-        if value.type != @obj_ptr && to_type == @obj_ptr
+        if value.type != @obj_ptr && to_llvm_type == @obj_ptr
           # If going from non-object cpointer to object pointer, we're boxing.
           value = gen_boxed(value, gtype_of(from_expr_type), from_expr.not_nil!)
-        elsif value.type == @obj_ptr && to_type != @obj_ptr
+        elsif value.type == @obj_ptr && to_llvm_type != @obj_ptr
           # If going from object pointer to non-object cpointer, we're unboxing.
           value = gen_unboxed(value, gtype_of(from_expr_type))
         end
       end
 
       # Do the LLVM bitcast.
-      @builder.bit_cast(value, to_type, "#{value.name}.CAST")
+      @builder.bit_cast(value, to_llvm_type, "#{value.name}.CAST")
     else
-      raise NotImplementedError.new(to_type.kind)
+      raise NotImplementedError.new(to_llvm_type.kind)
     end
   end
 
@@ -2532,7 +2541,7 @@ class Mare::Compiler::CodeGen
     size_arg = @i64.const_int(expr.terms.size)
     @builder.call(gtype.gfuncs["new"].llvm_func, [receiver, size_arg])
 
-    arg_type = gtype.gfuncs["<<"].llvm_func.type.element_type.params_types[1]
+    arg_type = gtype.gfuncs["<<"].reach_func.signature.params.first
 
     expr.terms.each do |term|
       value = gen_assign_cast(gen_expr(term), arg_type, term)
@@ -2548,7 +2557,7 @@ class Mare::Compiler::CodeGen
 
     # Get the LLVM type for the phi that joins the final value of each branch.
     # Each such value will needed to be bitcast to the that type.
-    phi_type = llvm_type_of(expr)
+    phi_type = type_of(expr)
 
     # Create all of the instruction blocks we'll need for this choice.
     j = expr.list.size
@@ -2636,7 +2645,7 @@ class Mare::Compiler::CodeGen
     # the cases above, using the LLVM mechanism called a "phi" instruction.
     @builder.position_at_end(post_block)
     if Classify.value_needed?(expr)
-      @builder.phi(phi_type, phi_blocks, phi_values, "phi_choice")
+      @builder.phi(llvm_type_of(phi_type), phi_blocks, phi_values, "phi_choice")
     else
       gen_none
     end
@@ -2645,7 +2654,7 @@ class Mare::Compiler::CodeGen
   def gen_loop(expr : AST::Loop)
     # Get the LLVM type for the phi that joins the final value of each branch.
     # Each such value will needed to be bitcast to the that type.
-    phi_type = llvm_type_of(expr)
+    phi_type = type_of(expr)
 
     # Prepare to capture state for the final phi.
     phi_blocks = [] of LLVM::BasicBlock
@@ -2700,7 +2709,7 @@ class Mare::Compiler::CodeGen
     # the bodies above, using the LLVM mechanism called a "phi" instruction.
     @builder.position_at_end(post_block)
     if Classify.value_needed?(expr)
-      @builder.phi(phi_type, phi_blocks, phi_values, "phi_loop")
+      @builder.phi(llvm_type_of(phi_type), phi_blocks, phi_values, "phi_loop")
     else
       gen_none
     end
@@ -2709,7 +2718,7 @@ class Mare::Compiler::CodeGen
   def gen_try(expr : AST::Try)
     # Get the LLVM type for the phi that joins the final value of each branch.
     # Each such value will needed to be bitcast to the that type.
-    phi_type = llvm_type_of(expr)
+    phi_type = type_of(expr)
 
     # Prepare to capture state for the final phi.
     phi_blocks = [] of LLVM::BasicBlock
@@ -2738,15 +2747,15 @@ class Mare::Compiler::CodeGen
     # Now start generating the else clause (reached when a throw happened).
     @builder.position_at_end(else_block)
 
-    # TODO: Allow an error_phi_type of something other than None.
-    error_phi_type = llvm_type_of(@gtypes["None"])
+    # TODO: Allow an error_phi_llvm_type of something other than None.
+    error_phi_llvm_type = llvm_type_of(@gtypes["None"])
 
     # Catch the thrown error value, by getting the blocks and values from the
     # try_else_stack and using the LLVM mechanism called a "phi" instruction.
     else_stack_tuple = @try_else_stack.pop
     raise "invalid try else stack" unless else_stack_tuple[0] == else_block
     error_value = @builder.phi(
-      error_phi_type,
+      error_phi_llvm_type,
       else_stack_tuple[1],
       else_stack_tuple[2],
       "phi_else_try",
@@ -2773,7 +2782,7 @@ class Mare::Compiler::CodeGen
     # Here at the post block, we receive the value that was returned by one of
     # the bodies above, using the LLVM mechanism called a "phi" instruction.
     @builder.position_at_end(post_block)
-    @builder.phi(phi_type, phi_blocks, phi_values, "phi_try")
+    @builder.phi(llvm_type_of(phi_type), phi_blocks, phi_values, "phi_try")
   end
 
   def gen_raise_error(error_value = gen_none)
@@ -2804,7 +2813,7 @@ class Mare::Compiler::CodeGen
   def gen_return_using_error_cc(value, value_expr, is_error : Bool)
     raise "inconsistent frames" if @frames.size > 1
 
-    value_type = func_frame.llvm_func.return_type.struct_element_types[0]
+    value_type = func_frame.gfunc.not_nil!.reach_func.signature.ret
     value = gen_assign_cast(value, value_type, value_expr) unless is_error
 
     tuple = func_frame.llvm_func.return_type.undef
@@ -2863,8 +2872,8 @@ class Mare::Compiler::CodeGen
     return_type = gfunc.yield_cc_yield_return_type
     cast_values =
       values.map_with_index do |value, index|
-        llvm_type = return_type.struct_element_types[index + 1]
-        gen_assign_cast(value, llvm_type, nil)
+        cast_type = gfunc.reach_func.signature.yield_out[index]
+        gen_assign_cast(value, cast_type, nil)
       end
 
     # Grab the continuation value from local memory and set the next func.
@@ -2887,9 +2896,9 @@ class Mare::Compiler::CodeGen
     gfunc = func_frame.gfunc.not_nil!
 
     # Cast the given value to the appropriate type.
-    return_type = func_frame.gfunc.not_nil!.yield_cc_final_return_type
-    llvm_type = return_type.struct_element_types[1]
-    cast_value = gen_assign_cast(value, llvm_type, from_expr)
+    return_type = gfunc.yield_cc_final_return_type
+    cast_type = gfunc.reach_func.signature.ret
+    cast_value = gen_assign_cast(value, cast_type, from_expr)
 
     # Grab the continuation value from local memory and clear the next func.
     cont = func_frame.continuation_value

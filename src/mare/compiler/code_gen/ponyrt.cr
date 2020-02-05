@@ -653,7 +653,7 @@ class Mare::Compiler::CodeGen::PonyRT
       needs_trace ||= src_types.last.trace_needed?(dst_types.last)
 
       # Cast the argument to the correct type and store it in the message.
-      cast_arg = g.gen_assign_cast(param, elem_type, nil)
+      cast_arg = g.gen_assign_llvm_cast(param, elem_type, nil)
       arg_gep = g.builder.struct_gep(msg, i, "msg.#{i - 2}.GEP")
       g.builder.store(cast_arg, arg_gep)
 
@@ -858,7 +858,7 @@ class Mare::Compiler::CodeGen::PonyRT
         src_value = g.builder.load(arg_gep, "msg.#{func_name}.#{i - 2}")
         src_values << src_value
 
-        dst_value = g.gen_assign_cast(src_value, elem_type, nil)
+        dst_value = g.gen_assign_llvm_cast(src_value, elem_type, nil)
         dst_values << dst_value
       end
 

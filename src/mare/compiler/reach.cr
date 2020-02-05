@@ -477,7 +477,9 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     getter name : String
     getter params : Array(Ref)
     getter ret : Ref
-    def initialize(@name, @params, @ret)
+    getter yield_out : Array(Ref)
+    # TODO: Add yield_in as well
+    def initialize(@name, @params, @ret, @yield_out)
     end
 
     def is_subtype?(infer, other : Signature)
@@ -587,7 +589,11 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     end
     ret = ctx.reach[infer.resolve(infer.ret)]
 
-    Signature.new(infer.reified.name, params, ret)
+    yield_out = infer.yield_out_resolved.map do |resolved|
+      ctx.reach[resolved]
+    end
+
+    Signature.new(infer.reified.name, params, ret, yield_out)
   end
 
   def handle_field(ctx, rt : Infer::ReifiedType, func) : {String, Ref}?

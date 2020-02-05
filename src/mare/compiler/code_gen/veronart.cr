@@ -624,7 +624,7 @@ class Mare::Compiler::CodeGen::VeronaRT
       arg_gep = g.builder.struct_gep(action, i + 1, "ACTION.#{i + 1}.GEP")
       src_value = g.builder.load(arg_gep, "ACTION.#{i + 1}")
 
-      dst_value = g.gen_assign_cast(src_value, param_type, nil)
+      dst_value = g.gen_assign_llvm_cast(src_value, param_type, nil)
       dst_values << dst_value
     end
 
