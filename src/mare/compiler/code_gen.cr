@@ -848,7 +848,7 @@ class Mare::Compiler::CodeGen
     # TODO: Why only field initializers? Why not all functions?
     if gfunc.func.has_tag?(:field)
       return_type = gfunc.reach_func.signature.ret
-      last_value = gen_assign_cast(last_value, return_type, last_expr)
+      last_value = gen_assign_cast(last_value, return_type, last_expr) if last_expr
     end
 
     unless Jumps.away?(gfunc.func.body.not_nil!)
@@ -858,9 +858,9 @@ class Mare::Compiler::CodeGen
       when :simple_cc
         @builder.ret(last_value)
       when :error_cc
-        gen_return_using_error_cc(last_value, last_expr, false)
+        gen_return_using_error_cc(last_value, last_expr.not_nil!, false)
       when :yield_cc
-        gen_final_return_using_yield_cc(last_value, last_expr)
+        gen_final_return_using_yield_cc(last_value, last_expr.not_nil!)
       else
         raise NotImplementedError.new(gfunc.calling_convention)
       end
@@ -1488,7 +1488,7 @@ class Mare::Compiler::CodeGen
       @builder.position_at_end(error_block)
       # TODO: Should we try to avoid destructuring and restructuring the
       # tuple value here? Or does LLVM optimize it away so as to not matter?
-      gen_raise_error(@builder.extract_value(result, 0))
+      gen_raise_error(@builder.extract_value(result, 0), relate)
 
       @builder.position_at_end(after_block)
       result = @builder.extract_value(result, 0)
@@ -1820,7 +1820,7 @@ class Mare::Compiler::CodeGen
   def gen_assign_cast(
     value : LLVM::Value,
     to_type : Reach::Ref,
-    from_expr : AST::Node?,
+    from_expr : AST::Node,
   )
     gen_assign_llvm_cast(value, llvm_type_of(to_type), from_expr)
   end
@@ -1828,7 +1828,7 @@ class Mare::Compiler::CodeGen
   def gen_assign_llvm_cast(
     value : LLVM::Value,
     to_llvm_type : LLVM::Type,
-    from_expr : AST::Node?,
+    from_expr : AST::Node,
   )
     from_llvm_type = value.type
     return value if from_llvm_type == to_llvm_type
@@ -1854,17 +1854,17 @@ class Mare::Compiler::CodeGen
 
       # Unwrap the box and finish the assign cast from there.
       # This brings us to the zero extension / truncation logic above.
-      value = gen_unboxed(value, gtype_of(from_expr.not_nil!))
+      value = gen_unboxed(value, gtype_of(from_expr))
       gen_assign_llvm_cast(value, to_llvm_type, from_expr)
     when LLVM::Type::Kind::Pointer
-      from_expr_type = type_of(from_expr.not_nil!)
+      from_expr_type = type_of(from_expr)
       if value.type.kind != LLVM::Type::Kind::Pointer
         # If we're going from non-pointer to pointer, we're boxing.
-        value = gen_boxed(value, gtype_of(from_expr_type), from_expr.not_nil!)
+        value = gen_boxed(value, gtype_of(from_expr_type), from_expr)
       elsif from_expr_type.singular? && from_expr_type.single_def!(ctx).is_cpointer?
         if value.type != @obj_ptr && to_llvm_type == @obj_ptr
           # If going from non-object cpointer to object pointer, we're boxing.
-          value = gen_boxed(value, gtype_of(from_expr_type), from_expr.not_nil!)
+          value = gen_boxed(value, gtype_of(from_expr_type), from_expr)
         elsif value.type == @obj_ptr && to_llvm_type != @obj_ptr
           # If going from object pointer to non-object cpointer, we're unboxing.
           value = gen_unboxed(value, gtype_of(from_expr_type))
@@ -1950,7 +1950,8 @@ class Mare::Compiler::CodeGen
         raise "#{ref.inspect} isn't a constant value" if const_only
         func_frame.receiver_value
       elsif ref.is_a?(Refer::RaiseError)
-        gen_raise_error
+        # TODO: Allow an error value of something other than None.
+        gen_raise_error(gen_none, expr)
       else
         raise NotImplementedError.new("#{ref}\n#{expr.pos.show}")
       end
@@ -2779,7 +2780,7 @@ class Mare::Compiler::CodeGen
     @builder.phi(llvm_type_of(phi_type), phi_blocks, phi_values, "phi_try")
   end
 
-  def gen_raise_error(error_value = gen_none)
+  def gen_raise_error(error_value : LLVM::Value, from_expr : AST::Node)
     raise "inconsistent frames" if @frames.size > 1
 
     # TODO: Allow an error value of something other than None.
@@ -2792,7 +2793,7 @@ class Mare::Compiler::CodeGen
       calling_convention = func_frame.gfunc.not_nil!.calling_convention
       raise "unsupported empty try else stack for #{calling_convention}" \
         unless calling_convention == :error_cc
-      gen_return_using_error_cc(error_value, nil, true)
+      gen_return_using_error_cc(error_value, from_expr, true)
     else
       # Store the state needed to catch the value in the try else block.
       else_stack_tuple = @try_else_stack.last
@@ -2804,11 +2805,12 @@ class Mare::Compiler::CodeGen
     end
   end
 
-  def gen_return_using_error_cc(value, value_expr, is_error : Bool)
+  def gen_return_using_error_cc(value, value_expr : AST::Node?, is_error : Bool)
     raise "inconsistent frames" if @frames.size > 1
 
     value_type = func_frame.gfunc.not_nil!.reach_func.signature.ret
-    value = gen_assign_cast(value, value_type, value_expr) unless is_error
+    value = gen_assign_cast(value, value_type, value_expr) \
+      if value_expr && !is_error
 
     tuple = func_frame.llvm_func.return_type.undef
     tuple = @builder.insert_value(tuple, value, 0)
@@ -2836,7 +2838,7 @@ class Mare::Compiler::CodeGen
 
     # Generate the return statement, which terminates this basic block and
     # returns the tuple of the yield value and continuation data to the caller.
-    gen_yield_return_using_yield_cc(next_func, yield_values)
+    gen_yield_return_using_yield_cc(next_func, yield_values, expr.terms)
 
     # Now start generating the code that comes after the yield expression.
     # Note that this code block will be dead code (with "no predecessors")
@@ -2857,7 +2859,7 @@ class Mare::Compiler::CodeGen
     end
   end
 
-  def gen_yield_return_using_yield_cc(next_func : LLVM::Value, values)
+  def gen_yield_return_using_yield_cc(next_func : LLVM::Value, values, value_exprs)
     raise "inconsistent frames" if @frames.size > 1
 
     gfunc = func_frame.gfunc.not_nil!
@@ -2865,9 +2867,9 @@ class Mare::Compiler::CodeGen
     # Cast the given values to the appropriate type.
     return_type = gfunc.yield_cc_yield_return_type
     cast_values =
-      values.map_with_index do |value, index|
+      values.zip(value_exprs).map_with_index do |(value, value_expr), index|
         cast_type = gfunc.reach_func.signature.yield_out[index]
-        gen_assign_cast(value, cast_type, nil)
+        gen_assign_cast(value, cast_type, value_expr)
       end
 
     # Grab the continuation value from local memory and set the next func.
@@ -2884,7 +2886,7 @@ class Mare::Compiler::CodeGen
     @builder.ret(gen_struct_bit_cast(tuple, func_frame.llvm_func.return_type))
   end
 
-  def gen_final_return_using_yield_cc(value, from_expr : AST::Node? = nil)
+  def gen_final_return_using_yield_cc(value, from_expr : AST::Node)
     raise "inconsistent frames" if @frames.size > 1
 
     gfunc = func_frame.gfunc.not_nil!
