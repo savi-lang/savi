@@ -1637,7 +1637,7 @@ class Mare::Compiler::CodeGen
     ref = func_frame.refer[relate.lhs]
     value = gen_expr(relate.rhs).as(LLVM::Value)
     name = value.name
-    lhs_type = type_of(relate.lhs)
+    lhs_type = ref.is_a?(Refer::Local) ? type_of(ref.defn) : type_of(relate.lhs)
     lhs_llvm_type = llvm_type_of(lhs_type)
 
     cast_value = gen_assign_cast(value, lhs_type, relate.rhs)
@@ -1822,14 +1822,7 @@ class Mare::Compiler::CodeGen
     to_type : Reach::Ref,
     from_expr : AST::Node,
   )
-    gen_assign_llvm_cast(value, llvm_type_of(to_type), from_expr)
-  end
-
-  def gen_assign_llvm_cast(
-    value : LLVM::Value,
-    to_llvm_type : LLVM::Type,
-    from_expr : AST::Node,
-  )
+    to_llvm_type = llvm_type_of(to_type)
     from_llvm_type = value.type
     return value if from_llvm_type == to_llvm_type
 
@@ -1854,8 +1847,8 @@ class Mare::Compiler::CodeGen
 
       # Unwrap the box and finish the assign cast from there.
       # This brings us to the zero extension / truncation logic above.
-      value = gen_unboxed(value, gtype_of(from_expr))
-      gen_assign_llvm_cast(value, to_llvm_type, from_expr)
+      value = gen_unboxed(value, gtype_of(to_type))
+      gen_assign_cast(value, to_type, from_expr)
     when LLVM::Type::Kind::Pointer
       from_expr_type = type_of(from_expr)
       if value.type.kind != LLVM::Type::Kind::Pointer
@@ -1913,7 +1906,11 @@ class Mare::Compiler::CodeGen
       if ref.is_a?(Refer::Local)
         raise "#{ref.inspect} isn't a constant value" if const_only
         alloca = func_frame.current_locals[ref]
-        @builder.load(alloca, ref.name)
+        gen_assign_cast(
+          @builder.load(alloca, ref.name),
+          type_of(expr),
+          ref.defn,
+        )
       elsif ref.is_a?(Refer::Type) || ref.is_a?(Refer::TypeAlias)
         enum_value = ref.metadata[:enum_value]?
         if enum_value
