@@ -317,6 +317,8 @@ class Mare::Compiler::CodeGen
       LLVM::BasicBlock, Array(LLVM::BasicBlock), Array(LLVM::Value)
     )).new
 
+    @value_not_needed = @llvm.struct([@i1], "_.VALUE_NOT_NEEDED").as(LLVM::Type)
+
     # Pony runtime types.
     # TODO: Remove these, because they're already present in PonyRT
     @desc = @runtime.desc.as(LLVM::Type)
@@ -2011,7 +2013,19 @@ class Mare::Compiler::CodeGen
       raise NotImplementedError.new(expr.inspect)
     end
 
-    @runtime.gen_expr_post(self, expr, value)
+    value = @runtime.gen_expr_post(self, expr, value)
+
+    # As a way of asserting that value_not_needed analysis has no false
+    # "not needed" tags on expressions, if this expression is tagged as such,
+    # we return a fake value instead of the evaluation of the expression,
+    # expecting that later LLVM actions will fail loudly if this value is used.
+    return gen_value_not_needed unless Classify.value_needed?(expr)
+
+    value
+  end
+
+  def gen_value_not_needed
+    @value_not_needed.undef
   end
 
   def gen_none

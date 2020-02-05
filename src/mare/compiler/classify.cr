@@ -58,6 +58,20 @@ class Mare::Compiler::Classify < Mare::AST::Visitor
     end
   end
 
+  def self.recursive_value_needed!(node)
+    value_needed!(node)
+
+    case node
+    when AST::Group
+      node.terms[-1]?.try { |child| recursive_value_needed!(child) }
+    when AST::Choice
+      node.list.each { |cond, body| recursive_value_needed!(body) }
+    when AST::Loop
+      recursive_value_needed!(node.body)
+      recursive_value_needed!(node.else_body)
+    end
+  end
+
   # This visitor marks the given node tree as being a type_expr.
   class TypeExprVisitor < Mare::AST::Visitor
     INSTANCE = new
@@ -142,7 +156,7 @@ class Mare::Compiler::Classify < Mare::AST::Visitor
       # We assume this qualify to be a function call with arguments.
       # All of the arguments will have their value used, despite any earlier
       # work we did of marking them all as unused due to being in a Group.
-      qualify.group.terms.each { |t| Classify.value_needed!(t) }
+      qualify.group.terms.each { |t| Classify.recursive_value_needed!(t) }
     end
   end
 
