@@ -153,9 +153,6 @@ class Mare::Compiler::Lifetime
     end
 
     def touch_call_arg(node : AST::Node)
-      # TODO: Sometimes may need IsoMergeIntoCurrentRegion or IsoFreezeRegion
-      # or similar if passing an argument cap that doesn't match the param.
-
       insert(node, PassAsArgument::INSTANCE)
     end
   end
