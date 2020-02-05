@@ -171,6 +171,30 @@ class Mare::Compiler::CodeGen::VeronaRT
     g.builder.store(value, gen_current_root_thread_local(g))
   end
 
+  def runtime_kind_of(g : CodeGen, node : AST::Node)
+    type_ref = g.type_of(node)
+
+    # For now we only have supported this logic for singular types.
+    raise NotImplementedError.new(type_ref.show_type) unless type_ref.singular?
+    type_def = type_ref.single_def!(g.ctx)
+
+    # We don't handle lifetime of non-allocated types or cpointers.
+    return :bare if !type_def.has_allocation? || type_def.is_cpointer?
+
+    case type_ref.cap_only.cap_value
+    when "iso" then :iso
+    when "ref" then :ref
+    when "val" then :val
+    when "tag"
+      Error.at node, "Only actors are allowed to be tag on Verona" \
+        unless type_def.is_actor?
+
+      :actor
+    else
+      raise NotImplementedError.new("VeronaRT#runtime_kind_of #{type_ref.show_type}")
+    end
+  end
+
   DESC_ID                    = 0
   DESC_TRACE_FN              = 1
   DESC_TRACE_POSSIBLY_ISO_FN = 2
@@ -408,32 +432,48 @@ class Mare::Compiler::CodeGen::VeronaRT
           if value.type == g.gtypes["String"].struct_ptr
 
         gen_iso_freeze_region(g, value)
-      when Lifetime::ValAcquireIntoScope
-        # Don't acquire String'val - right now these are all compile-time
-        # constant values instead of being runtime allocated.
-        # TODO: find a way to have both compile-time and runtime String'val
-        no_acquire = g.gtype_of(expr) == g.gtypes["String"]
+      when Lifetime::PassAsArgument
+        kind = runtime_kind_of(g, expr)
+        case kind
+        when :bare
+          # Do nothing - we don't track lifetime of bare values.
+        when :val
+          # Don't acquire String'val - right now these are all compile-time
+          # constant values instead of being runtime allocated.
+          # TODO: find a way to have both compile-time and runtime String'val
+          no_acquire = g.gtype_of(expr) == g.gtypes["String"]
 
-        gen_val_acquire_into_scope(g, value) unless no_acquire
-      when Lifetime::ActorAcquireIntoScope
-        gen_actor_acquire_into_scope(g, value)
-      when Lifetime::ValReleaseFromScope
-        # Don't release String'val - right now these are all compile-time
-        # constant values instead of being runtime allocated.
-        # TODO: find a way to have both compile-time and runtime String'val
-        no_release = g.gtype_of(info.local.defn) == g.gtypes["String"]
+          gen_val_acquire_into_scope(g, value) unless no_acquire
+        when :actor
+          gen_actor_acquire_into_scope(g, value)
+        else
+          raise NotImplementedError.new("VeronaRT PassAsArgument #{kind}")
+        end
+      when Lifetime::ReleaseFromScope
+        kind = runtime_kind_of(g, info.local.defn)
+        case kind
+        when :bare
+          # Do nothing - we don't track lifetime of bare values.
+        when :ref
+          # We do nothing - ref objects are traced only from their iso root,
+          # so we need not pay attention to those references as they come and go.
+        when :val
+          # Don't release String'val - right now these are all compile-time
+          # constant values instead of being runtime allocated.
+          # TODO: find a way to have both compile-time and runtime String'val
+          no_release = g.gtype_of(info.local.defn) == g.gtypes["String"]
 
-        gen_val_release_from_scope(g,
-          g.builder.load(
-            g.func_frame.current_locals[info.local],
-            info.local.name,
-          )
-        ) unless no_release
-      when Lifetime::ActorReleaseFromScope
-        g.builder.call(g.mod.functions["RTCown_release"], [
-          g.builder.bit_cast(value, @cown_ptr, "#{value.name}.OPAQUE"),
-          g.alloc_ctx,
-        ])
+          gen_val_release_from_scope(g,
+            g.builder.load(
+              g.func_frame.current_locals[info.local],
+              info.local.name,
+            )
+          ) unless no_release
+        when :actor
+          gen_actor_release_from_scope(g, value)
+        else
+          raise NotImplementedError.new("VeronaRT ReleaseFromScope #{kind}")
+        end
       else
         raise NotImplementedError.new(info)
       end

@@ -15,8 +15,7 @@
 class Mare::Compiler::Lifetime
   alias Info = (
     IsoMergeIntoCurrentRegion | IsoFreezeRegion |
-    ValAcquireIntoScope | ActorAcquireIntoScope |
-    IsoFree | ValReleaseFromScope | ActorReleaseFromScope)
+    PassAsArgument | ReleaseFromScope)
 
   struct IsoMergeIntoCurrentRegion
     INSTANCE = new
@@ -26,29 +25,11 @@ class Mare::Compiler::Lifetime
     INSTANCE = new
   end
 
-  struct ValAcquireIntoScope
+  struct PassAsArgument
     INSTANCE = new
   end
 
-  struct ActorAcquireIntoScope
-    INSTANCE = new
-  end
-
-  struct IsoFree
-    getter local : Refer::Local
-
-    def initialize(@local)
-    end
-  end
-
-  struct ValReleaseFromScope
-    getter local : Refer::Local
-
-    def initialize(@local)
-    end
-  end
-
-  struct ActorReleaseFromScope
+  struct ReleaseFromScope
     getter local : Refer::Local
 
     def initialize(@local)
@@ -161,30 +142,7 @@ class Mare::Compiler::Lifetime
     end
 
     def touch_local_release(node : AST::Node, local : Refer::Local)
-      local_ref = @reach_func.resolve(@ctx, local.defn)
-
-      # For now we only have supported this logic for singular types.
-      raise NotImplementedError.new(local_ref.show_type) unless local_ref.singular?
-      local_def = local_ref.single_def!(@ctx)
-
-      # We don't handle lifetime of non-allocated types or cpointers.
-      return if !local_def.has_allocation? || local_def.is_cpointer?
-
-      local_cap = local_ref.cap_only.cap_value
-      case local_cap
-      when "ref"
-        # We do nothing - ref objects are traced only from their iso root,
-        # so we need not pay attention to those references as they come and go.
-      when "val"
-        insert(node, ValReleaseFromScope.new(local))
-      when "tag"
-        Error.at local.defn, "Only actors are allowed to be tag on Verona" \
-          unless local_def.is_actor?
-
-        insert(node, ActorReleaseFromScope.new(local))
-      else
-        raise NotImplementedError.new("local release #{local_cap}")
-      end
+      insert(node, ReleaseFromScope.new(local))
     end
 
     def touch_assign_local(node : AST::Relate)
@@ -194,59 +152,22 @@ class Mare::Compiler::Lifetime
       local = refer[node_lhs]
       return unless local.is_a?(Refer::Local)
 
-      # For now we only have supported this logic for singular types.
-      type_ref = @reach_func.resolve(@ctx, local.defn)
-      raise NotImplementedError.new(type_ref.show_type) unless type_ref.singular?
-      type_def = type_ref.single_def!(@ctx)
-
-      # We don't handle lifetime of non-allocated types or cpointers.
-      return if !type_def.has_allocation? || type_def.is_cpointer?
-
       # When rebinding a var and not using the old value, we free/release it.
       if !Classify.value_needed?(node) && !local.is_defn_assign?(node)
-        type_cap = type_ref.cap_only.cap_value
-        case type_cap
-        when "iso"
-          insert(node.lhs, IsoFree.new(local))
-        when "val"
-          insert(node.lhs, ValReleaseFromScope.new(local))
-        when "tag"
-          insert(node.lhs, ActorReleaseFromScope.new(local))
-        else
-          raise NotImplementedError.new("assign overwriting #{type_cap}")
-        end
+        insert(node.lhs, ReleaseFromScope.new(local))
       end
     end
 
     def touch_call(node : AST::Relate)
       _, args, _, _ = AST::Extract.call(node)
-      args.try(&.terms.each { |arg|
-        touch_call_arg(arg)
-      })
+      args.try(&.terms.each { |arg| touch_call_arg(arg) })
     end
 
     def touch_call_arg(node : AST::Node)
       # TODO: Sometimes may need IsoMergeIntoCurrentRegion or IsoFreezeRegion
       # or similar if passing an argument cap that doesn't match the param.
 
-      # For now we only have supported this logic for singular types.
-      arg_ref = @reach_func.resolve(@ctx, node)
-      raise NotImplementedError.new(arg_ref.show_type) unless arg_ref.singular?
-      arg_def = arg_ref.single_def!(@ctx)
-
-      # We don't handle lifetime of non-allocated types or cpointers.
-      return if !arg_def.has_allocation? || arg_def.is_cpointer?
-
-      # Passing a value as an argument causes an acquire for it.
-      arg_cap = arg_ref.cap_only.cap_value
-      case arg_cap
-      when "val"
-        insert(node, ValAcquireIntoScope::INSTANCE)
-      when "tag"
-        insert(node, ActorAcquireIntoScope::INSTANCE)
-      else
-        raise NotImplementedError.new("arg of #{arg_cap}")
-      end
+      insert(node, PassAsArgument::INSTANCE)
     end
 
     def touch_move(from_node : AST::Node, into_node : AST::Node)
