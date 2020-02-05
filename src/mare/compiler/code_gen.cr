@@ -1451,9 +1451,11 @@ class Mare::Compiler::CodeGen
     end
 
     # Prepend the receiver to the args list if necessary.
+    use_receiver = false
     if gfunc.needs_receiver? || needs_virtual_call || gfunc.needs_send?
       args.unshift(receiver)
       arg_exprs.unshift(relate.lhs)
+      use_receiver = true
     end
 
     # Call the LLVM function, or do a virtual call if necessary.
@@ -1462,9 +1464,9 @@ class Mare::Compiler::CodeGen
       if needs_virtual_call
         gen_virtual_call(receiver, args, arg_exprs, lhs_type, gfunc)
       elsif gfunc.needs_send?
-        gen_call(gfunc.send_llvm_func, args, arg_exprs)
+        gen_call(gfunc.reach_func.signature, gfunc.send_llvm_func, args, arg_exprs, use_receiver)
       else
-        gen_call(gfunc.llvm_func, args, arg_exprs)
+        gen_call(gfunc.reach_func.signature, gfunc.llvm_func, args, arg_exprs, use_receiver)
       end
 
     case gfunc.calling_convention
@@ -1610,31 +1612,23 @@ class Mare::Compiler::CodeGen
     load = @builder.load(gep, "#{fname}.LOAD")
     func = @builder.bit_cast(load, gfunc.virtual_llvm_func.type, fname)
 
-    gen_call(func, gfunc.virtual_llvm_func, args, arg_exprs)
+    gen_call(gfunc.reach_func.signature, func, args, arg_exprs, true)
   end
 
   def gen_call(
-    func : LLVM::Function,
+    signature : Reach::Signature,
+    func : (LLVM::Function | LLVM::Value),
     args : Array(LLVM::Value),
     arg_exprs : Array(AST::Node),
+    use_receiver : Bool,
   )
-    # Cast the arguments to the right types.
-    cast_args = func.params.to_a.zip(args).zip(arg_exprs)
-      .map { |(param, arg), expr| gen_assign_llvm_cast(arg, param.type, expr) }
+    # Get the list of parameter types, prepending the receiver type if in use.
+    param_types = signature.params.dup
+    param_types.unshift(signature.receiver) if use_receiver
 
-    @builder.call(func, cast_args)
-  end
-
-  def gen_call(
-    func : LLVM::Value,
-    func_proto : LLVM::Function,
-    args : Array(LLVM::Value),
-    arg_exprs : Array(AST::Node),
-  )
-    # This version of gen_call uses a separate func_proto as the prototype,
-    # which we use to get the parameter types to cast the arguments to.
-    cast_args = func_proto.params.to_a.zip(args).zip(arg_exprs)
-      .map { |(param, arg), expr| gen_assign_llvm_cast(arg, param.type, expr) }
+    # Cast the arguments to the parameter types.
+    cast_args = param_types.to_a.zip(args).zip(arg_exprs)
+      .map { |(param_type, arg), expr| gen_assign_cast(arg, param_type, expr) }
 
     @builder.call(func, cast_args)
   end

@@ -475,11 +475,12 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
 
   struct Signature
     getter name : String
+    getter receiver : Ref # TODO: add to is_subtype? logic
     getter params : Array(Ref)
     getter ret : Ref
-    getter yield_out : Array(Ref)
+    getter yield_out : Array(Ref) # TODO: add to is_subtype? logic
     # TODO: Add yield_in as well
-    def initialize(@name, @params, @ret, @yield_out)
+    def initialize(@name, @receiver, @params, @ret, @yield_out)
     end
 
     def is_subtype?(infer, other : Signature)
@@ -581,6 +582,8 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
   end
 
   def signature_for(ctx, infer : Infer::ForFunc) : Signature
+    receiver = ctx.reach[infer.reified.receiver]
+
     params = [] of Ref
     infer.reified.func.params.try do |param_exprs|
       param_exprs.terms.map do |param_expr|
@@ -593,7 +596,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       ctx.reach[resolved]
     end
 
-    Signature.new(infer.reified.name, params, ret, yield_out)
+    Signature.new(infer.reified.name, receiver, params, ret, yield_out)
   end
 
   def handle_field(ctx, rt : Infer::ReifiedType, func) : {String, Ref}?

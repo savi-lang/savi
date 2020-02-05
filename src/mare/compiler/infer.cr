@@ -594,6 +594,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
 
     def each_meta_type(&block)
+      yield reified.receiver
       yield resolved_self
       @resolved.each_value { |mt| yield mt }
     end
