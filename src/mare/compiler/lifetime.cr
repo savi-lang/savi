@@ -13,17 +13,7 @@
 # This pass produces output state at the per-function level.
 #
 class Mare::Compiler::Lifetime
-  alias Info = (
-    IsoMergeIntoCurrentRegion | IsoFreezeRegion |
-    PassAsArgument | ReleaseFromScope)
-
-  struct IsoMergeIntoCurrentRegion
-    INSTANCE = new
-  end
-
-  struct IsoFreezeRegion
-    INSTANCE = new
-  end
+  alias Info = (PassAsArgument | ReleaseFromScope)
 
   struct PassAsArgument
     INSTANCE = new
@@ -105,7 +95,6 @@ class Mare::Compiler::Lifetime
       when AST::Relate
         case node.op.value
         when "="
-          touch_move(node.rhs, node.lhs)
           touch_assign_local(node)
         when "."
           touch_call(node)
@@ -168,40 +157,6 @@ class Mare::Compiler::Lifetime
       # or similar if passing an argument cap that doesn't match the param.
 
       insert(node, PassAsArgument::INSTANCE)
-    end
-
-    def touch_move(from_node : AST::Node, into_node : AST::Node)
-      from_ref = @reach_func.resolve(@ctx, from_node)
-      into_ref = @reach_func.resolve(@ctx, into_node)
-
-      # If the type isn't changing, we have nothing to check on here.
-      return if from_ref == into_ref
-
-      # For now we only have supported this logic for singular types.
-      raise NotImplementedError.new(from_ref.show_type) unless from_ref.singular?
-      raise NotImplementedError.new(into_ref.show_type) unless into_ref.singular?
-      from_def = from_ref.single_def!(@ctx)
-      into_def = into_ref.single_def!(@ctx)
-
-      # We don't handle lifetime of non-allocated types or cpointers.
-      return if !from_def.has_allocation? || from_def.is_cpointer?
-
-      # Based on the from and into cap, we determine an appropriate strategy
-      # for handling the lifetime change (if any).
-      from_cap = from_ref.cap_only.cap_value
-      into_cap = into_ref.cap_only.cap_value
-      case {from_cap, into_cap}
-      when {"iso+", "ref"}, {"iso+", "box"}
-        # When an ephemeral iso is moved to a local mutable cap,
-        # it needs to be merged into the current local mutable region.
-        insert(from_node, IsoMergeIntoCurrentRegion::INSTANCE)
-      when {"iso+", "val"}
-        # When an ephemeral iso is moved to an immutable cap,
-        # it needs to be frozen, rendering its whole region immutable.
-        insert(from_node, IsoFreezeRegion::INSTANCE)
-      else
-        raise NotImplementedError.new("move #{from_cap} into #{into_cap}")
-      end
     end
   end
 end

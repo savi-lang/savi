@@ -171,43 +171,6 @@ class Mare::Compiler::CodeGen::VeronaRT
     g.builder.store(value, gen_current_root_thread_local(g))
   end
 
-  def cast_kind_of(g : CodeGen, type_ref : Reach::Ref, pos : Source::Pos) : Symbol
-    # For now we only have supported this logic for singular types.
-    raise NotImplementedError.new(type_ref.show_type) unless type_ref.singular?
-    type_def = type_ref.single_def!(g.ctx)
-
-    # We don't handle lifetime of non-allocated types or cpointers.
-    return :bare if !type_def.has_allocation? || type_def.is_cpointer?
-
-    case type_ref.cap_only.cap_value
-    when "iso" then :iso
-    when "iso+" then :iso_eph
-    when "ref" then :ref
-    when "box" then :box
-    when "val" then :val
-    when "non" then :non
-    when "tag"
-      Error.at pos, "Only actors are allowed to be tag on Verona" \
-        unless type_def.is_actor?
-
-      :actor
-    else
-      raise NotImplementedError.new("VeronaRT#cast_kind_of #{type_ref.show_type}")
-    end
-  end
-
-  def gen_cast_value(
-    g : CodeGen,
-    value : LLVM::Value,
-    from_kind : Symbol,
-    to_kind : Symbol,
-    from_type : Reach::Ref,
-    to_type : Reach::Ref,
-    from_expr : AST::Node
-  ) : LLVM::Value
-    value # TODO
-  end
-
   DESC_ID                    = 0
   DESC_TRACE_FN              = 1
   DESC_TRACE_POSSIBLY_ISO_FN = 2
@@ -429,6 +392,76 @@ class Mare::Compiler::CodeGen::VeronaRT
     g.gen_func_end
   end
 
+  # When an assignment cast may need to happen, classify the kind of type.
+  def cast_kind_of(g : CodeGen, type_ref : Reach::Ref, pos : Source::Pos) : Symbol
+    # For now we only have supported this logic for singular types.
+    raise NotImplementedError.new(type_ref.show_type) unless type_ref.singular?
+    type_def = type_ref.single_def!(g.ctx)
+
+    # We don't handle lifetime of non-allocated types or cpointers.
+    return :bare if !type_def.has_allocation? || type_def.is_cpointer?
+
+    case type_ref.cap_only.cap_value
+    when "iso" then :iso
+    when "iso+" then :iso_eph
+    when "ref" then :ref
+    when "box" then :box
+    when "val" then :val
+    when "non" then :non
+    when "tag"
+      Error.at pos, "Only actors are allowed to be tag on Verona" \
+        unless type_def.is_actor?
+
+      :actor
+    else
+      raise NotImplementedError.new("VeronaRT#cast_kind_of #{type_ref.show_type}")
+    end
+  end
+
+  # When an assignment cast needs to happen, take the runtime-appropriate
+  # action needed to convert from one type kind to a different type kind.
+  def gen_cast_value(
+    g : CodeGen,
+    value : LLVM::Value,
+    from_kind : Symbol,
+    to_kind : Symbol,
+    from_type : Reach::Ref,
+    to_type : Reach::Ref,
+    from_expr : AST::Node
+  ) : LLVM::Value
+    case {from_kind, to_kind}
+    when {:ref, :box}
+      # A mutable reference downgrades to read-only with no action needed.
+      value
+    when {:iso_eph, :iso}
+      # An iso ephemeral can be captured as an iso with no action needed.
+      value
+    when {:iso_eph, :ref}, {:iso_eph, :box}
+      # When an ephemeral iso is moved to a local mutable cap,
+      # it needs to be merged into the current local mutable region.
+      gen_iso_merge_into_current_region(g, value)
+    when {:iso_eph, :val}
+      # TODO: find a way to have both compile-time and runtime String'val
+      raise NotImplementedError.new("runtime-alloc'd String'val in Verona") \
+        if value.type == g.gtypes["String"].struct_ptr
+
+      # When an ephemeral iso is moved to an immutable cap,
+      # it needs to be frozen, rendering its whole region immutable.
+      gen_iso_freeze_region(g, value)
+    when {:non, _}
+      # Constructor call receiver casts hit this case, but we don't
+      # have to do anything here to account for it - simply return the value.
+      value # TODO: Can this hacky special case be avoided?
+    when {:box, :val}, {:box, :ref}
+      # In-method box receiver casts hit this case, due to specialization, but
+      # there's nothing to do to account for it - simply return the value.
+      value # TODO: Can this hacky special case be avoided?
+    else
+      raise NotImplementedError.new(
+        "#{{from_kind, to_kind}}:\n" + from_expr.pos.show)
+    end
+  end
+
   # For every expression whose value is generated, hook into the value and
   # maybe take an action based on the given lifetime info.
   def gen_expr_post(g : CodeGen, expr : AST::Node, value : LLVM::Value)
@@ -437,14 +470,6 @@ class Mare::Compiler::CodeGen::VeronaRT
 
     infos.each do |info|
       case info
-      when Lifetime::IsoMergeIntoCurrentRegion
-        gen_iso_merge_into_current_region(g, value)
-      when Lifetime::IsoFreezeRegion
-        # TODO: find a way to have both compile-time and runtime String'val
-        raise NotImplementedError.new("runtime-alloc'd String'val in Verona") \
-          if value.type == g.gtypes["String"].struct_ptr
-
-        gen_iso_freeze_region(g, value)
       when Lifetime::PassAsArgument
         kind = cast_kind_of(g, g.type_of(expr), expr.pos)
         case kind
