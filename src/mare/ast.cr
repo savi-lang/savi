@@ -156,6 +156,60 @@ module Mare::AST
     end
   end
 
+  class Function
+    property cap : AST::Identifier
+    property ident : AST::Identifier
+    property params : AST::Group?
+    property ret : AST::Term?
+    property body : AST::Group?
+    property yield_out : AST::Term?
+    property yield_in : AST::Term?
+    def_structural_hash @cap, @ident, @params, @ret, @body, @yield_out, @yield_in
+    def initialize(@cap, @ident, @params = nil, @ret = nil, @body = nil)
+    end
+
+    def span_pos
+      pos.span([
+        cap.span_pos,
+        ident.span_pos,
+        params.span_pos,
+        ret.span_pos,
+        body.span_pos,
+        yield_out.span_pos,
+        yield_in.span_pos,
+      ])
+    end
+
+    def name; :fun end
+    def to_a; [
+      cap.to_a,
+      ident.to_a,
+      params.try(&.to_a),
+      ret.try(&.to_a),
+      body.try(&.to_a),
+      yield_out.try(&.to_a),
+      yield_in.try(&.to_a),
+    ] of A end
+    def children_accept(visitor : Visitor)
+      @cap.accept(visitor)
+      @ident.accept(visitor)
+      @params.try(&.accept(visitor))
+      @ret.try(&.accept(visitor))
+      @body.try(&.accept(visitor))
+      @yield_out.try(&.accept(visitor))
+      @yield_in.try(&.accept(visitor))
+    end
+    def children_accept(visitor : MutatingVisitor)
+      @cap = @cap.accept(visitor)
+      @ident = @ident.accept(visitor)
+      @params = @params.try(&.accept(visitor))
+      @ret = @ret.try(&.accept(visitor))
+      @body = @body.try(&.accept(visitor))
+      @yield_out = @yield_out.try(&.accept(visitor))
+      @yield_in = @yield_in.try(&.accept(visitor))
+    end
+  end
+
   alias Term = DocString | Identifier \
     | LiteralString | LiteralCharacter | LiteralInteger | LiteralFloat \
     | Operator | Prefix | Relate | Group \

@@ -159,13 +159,21 @@ class Mare::Program
   end
 
   class Function
-    property cap : AST::Identifier
-    property ident : AST::Identifier
-    property params : AST::Group?
-    property ret : AST::Term?
-    property body : AST::Group?
-    property yield_out : AST::Term?
-    property yield_in : AST::Term?
+    property ast : AST::Function
+    def cap; ast.cap end
+    def cap=(x); ast.cap = x end
+    def ident; ast.ident end
+    def ident=(x); ast.ident = x end
+    def params; ast.params end
+    def params=(x); ast.params = x end
+    def ret; ast.ret end
+    def ret=(x); ast.ret = x end
+    def body; ast.body end
+    def body=(x); ast.body = x end
+    def yield_out; ast.yield_out end
+    def yield_out=(x); ast.yield_out = x end
+    def yield_in; ast.yield_in end
+    def yield_in=(x); ast.yield_in = x end
 
     getter metadata : Hash(Symbol, String)
 
@@ -182,7 +190,8 @@ class Mare::Program
       :it,
     ]
 
-    def initialize(@cap, @ident, @params, @ret, @body)
+    def initialize(*args)
+      @ast = AST::Function.new(*args)
       @tags = Set(Symbol).new
       @metadata = Hash(Symbol, String).new
     end
@@ -192,11 +201,11 @@ class Mare::Program
       @tags.to_a.inspect(io)
       @metadata.inspect(io)
       io << " fun"
-      io << " " << @cap.value
-      io << " " << @ident.value
-      @params ? (io << " "; @params.not_nil!.to_a.inspect(io)) : (io << " []")
-      @ret    ? (io << " "; @ret.not_nil!.to_a.inspect(io))    : (io << " _")
-      @body   ? (io << ": "; @body.not_nil!.to_a.inspect(io))  : (io << " _")
+      io << " " << cap.value
+      io << " " << ident.value
+      params ? (io << " "; params.not_nil!.to_a.inspect(io)) : (io << " []")
+      ret    ? (io << " "; ret.not_nil!.to_a.inspect(io))    : (io << " _")
+      body   ? (io << ": "; body.not_nil!.to_a.inspect(io))  : (io << " _")
       io << ">"
     end
 
