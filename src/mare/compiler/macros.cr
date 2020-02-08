@@ -16,8 +16,8 @@ class Mare::Compiler::Macros < Mare::AST::MutatingVisitor
   # those the same as macro declarations in the prelude, with both getting
   # executed here dynamically instead of declared here statically.
 
-  def self.run(ctx)
-    ctx.program.types.each do |t|
+  def self.run(ctx, library)
+    library.types.each do |t|
       t.functions.each do |f|
         macros = new(f)
 

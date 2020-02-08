@@ -30,9 +30,9 @@ class Mare::Compiler::Inventory < Mare::AST::Visitor
     @yielding_calls[func]? || [] of AST::Relate
   end
 
-  def run(ctx)
+  def run(ctx, library)
     @current_ctx = ctx
-    ctx.program.types.each do |t|
+    library.types.each do |t|
       @current_type = t
       t.functions.each do |f|
         @current_func = f

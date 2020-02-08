@@ -83,8 +83,8 @@ class Mare::Compiler::Classify < Mare::AST::Visitor
     end
   end
 
-  def self.run(ctx)
-    ctx.program.types.each do |t|
+  def self.run(ctx, library)
+    library.types.each do |t|
       t.functions.each do |f|
         new(ctx, t, f).run
       end

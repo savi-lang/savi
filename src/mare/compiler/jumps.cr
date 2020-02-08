@@ -20,8 +20,8 @@ class Mare::Compiler::Jumps < Mare::AST::Visitor
   def self.maybe_error?(node);  Classify.maybe_error?(node)  end
   def self.any_error?(node);    Classify.any_error?(node)    end
 
-  def self.run(ctx)
-    ctx.program.types.each do |t|
+  def self.run(ctx, library)
+    library.types.each do |t|
       t.functions.each do |f|
         new(f).run
       end

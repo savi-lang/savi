@@ -11,8 +11,8 @@
 # This pass produces no output state.
 #
 class Mare::Compiler::Sugar < Mare::AST::MutatingVisitor
-  def self.run(ctx)
-    ctx.program.types.each do |t|
+  def self.run(ctx, library)
+    library.types.each do |t|
       t.functions.each do |f|
         sugar = new
         sugar.run(f)

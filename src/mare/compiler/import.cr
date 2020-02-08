@@ -10,13 +10,13 @@
 # This pass produces no output state.
 #
 module Mare::Compiler::Import
+  # TODO: Refactor this method away, since compiler already runs at the library level.
   def self.run(ctx)
     # Copy the current list of libraries as our initial list, so that we
     # don't end up trying to iterate over a list that's being mutated.
     initial_libraries_list = ctx.program.libraries.dup
 
     # For each library in the program, run the Import pass on it.
-    # TODO: In the future, rely on the compiler to run at the library level.
     initial_libraries_list.each do |library|
       run_for_library(ctx, library)
     end

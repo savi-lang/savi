@@ -19,9 +19,9 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
     @map = {} of Program::Type => ForType
   end
 
-  def run(ctx)
-    # For each type in the program, delve into type parameters and functions.
-    ctx.program.types.each do |t|
+  def run(ctx, library)
+    # For each type in the library, delve into type parameters and functions.
+    library.types.each do |t|
       @map[t] = ForType.new(ctx, t).tap(&.run)
     end
   end

@@ -58,6 +58,14 @@ class Mare::Compiler::Context
   end
 
   def run(obj)
+    @program.libraries.each do |library|
+      obj.run(self, library)
+    end
+    finish
+    obj
+  end
+
+  def run_whole_program(obj)
     obj.run(self)
     finish
     obj

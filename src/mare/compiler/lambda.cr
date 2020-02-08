@@ -9,12 +9,10 @@
 # This pass produces no output state.
 #
 class Mare::Compiler::Lambda < Mare::AST::MutatingVisitor
-  def self.run(ctx)
-    ctx.program.libraries.each do |l|
-      l.types.each do |t|
-        t.functions.each do |f|
-          new(ctx, l, t, f).run
-        end
+  def self.run(ctx, library)
+    library.types.each do |t|
+      t.functions.each do |f|
+        new(ctx, library, t, f).run
       end
     end
   end

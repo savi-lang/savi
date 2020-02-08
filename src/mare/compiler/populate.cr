@@ -12,8 +12,8 @@
 # This pass produces no output state.
 #
 module Mare::Compiler::Populate
-  def self.run(ctx)
-    ctx.program.types.each do |dest|
+  def self.run(ctx, library)
+    library.types.each do |dest|
       # Copy functions into the type from other sources.
       dest.functions.each do |f|
         # Only look at functions that have the "copies" tag.

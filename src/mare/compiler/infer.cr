@@ -20,7 +20,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     @validated_type_args_already = Set(ReifiedType).new
   end
 
-  def run(ctx)
+  def run(ctx, library)
     # Start by running an instance of inference at the Main.new function,
     # and recurse into checking other functions that are reachable from there.
     # We do this so that errors for reachable functions are shown first.
@@ -41,13 +41,13 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     #   end
     # end
 
-    # For each function in the program, run with a new instance,
+    # For each function in the library, run with a new instance,
     # unless that function has already been reached with an infer instance.
     # We probably reached most of them already by starting from Main.new,
     # so this second pass just takes care of typechecking unreachable functions.
     # This is also where we take care of typechecking for unused partial
     # reifications of all generic type parameters.
-    ctx.program.types.each do |t|
+    library.types.each do |t|
       for_type_each_partial_reification(ctx, t).each do |infer_type|
         infer_type.reified.defn.functions.each do |f|
           for_func(ctx, infer_type.reified, f, MetaType.cap(f.cap.value)).run

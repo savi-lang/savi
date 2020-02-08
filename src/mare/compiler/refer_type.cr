@@ -28,11 +28,11 @@ class Mare::Compiler::ReferType < Mare::AST::Visitor
     @infos[t]?
   end
 
-  def run(ctx)
+  def run(ctx, library)
     @ctx = ctx
 
-    # For each type in the program, delve into type parameters and functions.
-    ctx.program.types.each do |t|
+    # For each type in the library, delve into type parameters and functions.
+    library.types.each do |t|
       run_for_type(t)
     end
 
