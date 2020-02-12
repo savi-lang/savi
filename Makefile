@@ -24,9 +24,9 @@ test.inner: PHONY /tmp/bin/spec
 
 # Run a narrow target within the test suite.
 test.narrow: PHONY
-	docker exec -ti mare-dev make target="$(target)" test.narrow.inner
+	docker exec -ti mare-dev make target="$(target)" extra_args="$(extra_args)" test.narrow.inner
 test.narrow.inner: PHONY
-	crystal spec spec/spec_helper.cr "$(target)"
+	crystal spec spec/spec_helper.cr "$(target)" $(extra_args)
 
 # Evaluate a Hello World example.
 example-eval: PHONY
