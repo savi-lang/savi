@@ -1,4 +1,4 @@
-class Mare::Source
+struct Mare::Source
   property filename : String
   property content : String
   property library : Library
@@ -18,7 +18,7 @@ class Mare::Source
   end
 end
 
-class Mare::Source::Library
+struct Mare::Source::Library
   property path : String
 
   def initialize(@path)
