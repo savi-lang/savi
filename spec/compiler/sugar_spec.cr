@@ -24,13 +24,13 @@ describe Mare::Compiler::Sugar do
 
     ctx = Mare::Compiler.compile([ast], :sugar)
 
-    func = ctx.namespace.find_func!(source, "Example", "return_none")
+    func = ctx.namespace.find_func!(ctx, source, "Example", "return_none")
     func.body.not_nil!.to_a.should eq [:group, ":",
       [:string, "this isn't the return value"],
       [:ident, "None"],
     ]
 
-    func = ctx.namespace.find_func!(source, "Example", "behave")
+    func = ctx.namespace.find_func!(ctx, source, "Example", "behave")
     func.body.not_nil!.to_a.should eq [:group, ":",
       [:string, "this isn't the return value"],
       [:ident, "None"],
@@ -59,7 +59,7 @@ describe Mare::Compiler::Sugar do
 
     ctx = Mare::Compiler.compile([ast], :sugar)
 
-    func = ctx.namespace.find_func!(source, "Example", "prop_assign")
+    func = ctx.namespace.find_func!(ctx, source, "Example", "prop_assign")
     func.body.not_nil!.to_a.should eq [:group, ":",
       [:relate,
         [:ident, "x"],
@@ -96,7 +96,7 @@ describe Mare::Compiler::Sugar do
 
     ctx = Mare::Compiler.compile([ast], :sugar)
 
-    func = ctx.namespace.find_func!(source, "Example", "prop_assign")
+    func = ctx.namespace.find_func!(ctx, source, "Example", "prop_assign")
     func.body.not_nil!.to_a.should eq [:group, ":",
       [:relate,
         [:ident, "x"],
@@ -141,7 +141,7 @@ describe Mare::Compiler::Sugar do
 
     ctx = Mare::Compiler.compile([ast], :sugar)
 
-    func = ctx.namespace.find_func!(source, "Example", "plus")
+    func = ctx.namespace.find_func!(ctx, source, "Example", "plus")
     func.body.not_nil!.to_a.should eq [:group, ":",
       [:relate,
         [:ident, "x"],
@@ -177,7 +177,7 @@ describe Mare::Compiler::Sugar do
 
     ctx = Mare::Compiler.compile([ast], :sugar)
 
-    func = ctx.namespace.find_func!(source, "Example", "countdown")
+    func = ctx.namespace.find_func!(ctx, source, "Example", "countdown")
     func.body.not_nil!.to_a.should eq [:group, ":",
       [:group, "(", [:loop,
         [:group, "(", [:relate,
@@ -209,7 +209,7 @@ describe Mare::Compiler::Sugar do
 
     ctx = Mare::Compiler.compile([ast], :sugar)
 
-    func = ctx.namespace.find_func!(source, "Example", "square")
+    func = ctx.namespace.find_func!(ctx, source, "Example", "square")
     func.body.not_nil!.to_a.should eq [:group, ":",
       [:relate,
         [:ident, "x"],
@@ -270,7 +270,7 @@ describe Mare::Compiler::Sugar do
 
     ctx = Mare::Compiler.compile([ast], :sugar)
 
-    func = ctx.namespace.find_func!(source, "Example", "chained")
+    func = ctx.namespace.find_func!(ctx, source, "Example", "chained")
     func.body.not_nil!.to_a.should eq [:group, ":",
       [:relate,
         [:relate,
@@ -332,7 +332,7 @@ describe Mare::Compiler::Sugar do
 
     ctx = Mare::Compiler.compile([ast], :sugar)
 
-    func = ctx.namespace.find_func!(source, "Example", "square")
+    func = ctx.namespace.find_func!(ctx, source, "Example", "square")
     func.body.not_nil!.to_a.should eq [:group, ":",
       [:relate,
         [:ident, "x"],
@@ -362,7 +362,7 @@ describe Mare::Compiler::Sugar do
 
     ctx = Mare::Compiler.compile([ast], :sugar)
 
-    func = ctx.namespace.find_func!(source, "Example", "selfish")
+    func = ctx.namespace.find_func!(ctx, source, "Example", "selfish")
     func.body.not_nil!.to_a.should eq [:group, ":",
       [:relate, [:ident, "@"], [:op, "."], [:ident, "x"]],
       [:relate,
@@ -391,7 +391,7 @@ describe Mare::Compiler::Sugar do
 
     ctx = Mare::Compiler.compile([ast], :sugar)
 
-    func = ctx.namespace.find_func!(source, "Example", "new")
+    func = ctx.namespace.find_func!(ctx, source, "Example", "new")
     func.body.not_nil!.to_a.should eq [:group, ":",
       [:relate, [:ident, "x"], [:op, "="], [:integer, 1_u64]],
       [:ident, "@"],
@@ -419,7 +419,7 @@ describe Mare::Compiler::Sugar do
 
     ctx = Mare::Compiler.compile([ast], :sugar)
 
-    func = ctx.namespace.find_func!(source, "Example", "param_assigns")
+    func = ctx.namespace.find_func!(ctx, source, "Example", "param_assigns")
     func.body.not_nil!.to_a.should eq [:group, ":",
       [:relate,
         [:ident, "@"],
@@ -473,7 +473,7 @@ describe Mare::Compiler::Sugar do
 
     ctx = Mare::Compiler.compile([ast], :sugar)
 
-    func = ctx.namespace.find_func!(source, "Example", "logical")
+    func = ctx.namespace.find_func!(ctx, source, "Example", "logical")
     func.body.not_nil!.to_a.should eq [:group, ":",
       [:choice,
         [
@@ -524,7 +524,7 @@ describe Mare::Compiler::Sugar do
 
     ctx = Mare::Compiler.compile([ast], :sugar)
 
-    func = ctx.namespace.find_func!(source, "Example", "type_cast")
+    func = ctx.namespace.find_func!(ctx, source, "Example", "type_cast")
     func.body.not_nil!.to_a.should eq [:group, ":",
       [:relate,
         [:group, "(",

@@ -28,6 +28,19 @@ class Mare::Program
       @aliases.clear
       @imports.clear
     end
+
+    def make_link
+      Link.new(source_library.path)
+    end
+
+    struct Link
+      getter path : String
+      def initialize(@path)
+      end
+      def resolve(ctx : Compiler::Context)
+        ctx.program.libraries.find(&.source_library.path.==(@path)).not_nil!
+      end
+    end
   end
 
   class Import
@@ -59,6 +72,23 @@ class Mare::Program
 
     def has_tag?(tag : Symbol)
       false # not implemented
+    end
+
+    def make_link(library : Library)
+      make_link(library.make_link)
+    end
+    def make_link(library : Library::Link)
+      Link.new(library, ident.value)
+    end
+
+    struct Link
+      getter library : Library::Link
+      getter name : String
+      def initialize(@library, @name)
+      end
+      def resolve(ctx : Compiler::Context)
+        @library.resolve(ctx).aliases.find(&.ident.value.==(@name)).not_nil!
+      end
     end
   end
 
@@ -155,6 +185,23 @@ class Mare::Program
 
       term = f.body.try(&.terms[-1]?)
       term.is_a?(AST::Identifier) && term.value == "True"
+    end
+
+    def make_link(library : Library)
+      make_link(library.make_link)
+    end
+    def make_link(library : Library::Link)
+      Link.new(library, ident.value)
+    end
+
+    struct Link
+      getter library : Library::Link
+      getter name : String
+      def initialize(@library, @name)
+      end
+      def resolve(ctx : Compiler::Context)
+        @library.resolve(ctx).types.find(&.ident.value.==(@name)).not_nil!
+      end
     end
   end
 

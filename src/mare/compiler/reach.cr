@@ -531,11 +531,11 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
 
   def run(ctx)
     # Reach functions called starting from the entrypoint of the program.
-    env = ctx.namespace["Env"].as(Program::Type)
+    env = ctx.namespace[ctx, "Env"].as(Program::Type)
     handle_func(ctx, ctx.infer.for_type(ctx, env), env.find_func!("_create"))
     main = ctx.namespace.main_type!(ctx)
     handle_func(ctx, ctx.infer.for_type(ctx, main), main.find_func!("new"))
-    n = ctx.namespace["AsioEventNotify"].as(Program::Type)
+    n = ctx.namespace[ctx, "AsioEventNotify"].as(Program::Type)
     handle_func(ctx, ctx.infer.for_type(ctx, n), n.find_func!("_event_notify"))
 
     # Run our "sympathetic resonance" mini-pass.

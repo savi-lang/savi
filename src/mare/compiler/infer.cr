@@ -119,7 +119,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   end
 
   def for_func_simple(ctx : Context, source : Source, t_name : String, f_name : String)
-    t = ctx.namespace.in_source(source, t_name).as(Program::Type)
+    t = ctx.namespace.in_source(ctx, source, t_name).as(Program::Type)
     f = t.find_func!(f_name)
     for_func_simple(ctx, t, f)
   end
@@ -1051,7 +1051,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
 
     def prelude_type(name)
-      @ctx.namespace[name].as(Program::Type)
+      @ctx.namespace[@ctx, name].as(Program::Type)
     end
 
     def reified_type(*args)

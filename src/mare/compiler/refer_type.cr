@@ -78,14 +78,14 @@ class Mare::Compiler::ReferType < Mare::AST::Visitor
     found = @params[node.value]?
     return found if found
 
-    found = ctx.namespace[node]?
+    found = ctx.namespace[ctx, node]?
     case found
     when Program::Type
       Refer::Type.new(found)
     when Program::TypeAlias
       target = found
       while !target.is_a?(Program::Type)
-        target = ctx.namespace[target.target]
+        target = ctx.namespace[ctx, target.target]
       end
       Refer::TypeAlias.new(found, target)
     end
