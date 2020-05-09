@@ -371,7 +371,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
 
     def lookup_type_param(ref : Refer::TypeParam, refer, receiver = nil)
-      if ref.parent != reified.defn
+      if ref.parent(ctx) != reified.defn
         raise NotImplementedError.new(ref) unless @precursor
         return @precursor.not_nil!.lookup_type_param(ref, refer, receiver)
       end
@@ -385,7 +385,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
 
     def lookup_type_param_bound(ref : Refer::TypeParam)
-      if ref.parent != reified.defn
+      if ref.parent(ctx) != reified.defn
         raise NotImplementedError.new(ref) unless @precursor
         return @precursor.not_nil!.lookup_type_param_bound(ref)
       end
@@ -431,7 +431,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       when Refer::Self
         receiver || MetaType.new(reified)
       when Refer::Type, Refer::TypeAlias
-        MetaType.new(reified_type(ref.defn))
+        MetaType.new(reified_type(ref.defn(ctx)))
       when Refer::TypeParam
         lookup_type_param(ref, refer, receiver)
       when Refer::Unresolved, nil
@@ -1159,8 +1159,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       ref = refer[node]
       case ref
       when Refer::Type, Refer::TypeAlias
-        rt = reified_type(ref.defn)
-        if ref.metadata[:enum_value]?
+        rt = reified_type(ref.defn(ctx))
+        if ref.metadata(ctx)[:enum_value]?
           # We trust the cap of the value type (for example, False, True, etc).
           meta_type = MetaType.new(rt)
         else

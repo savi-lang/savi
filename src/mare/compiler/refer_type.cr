@@ -33,19 +33,19 @@ class Mare::Compiler::ReferType < Mare::AST::Visitor
 
     # For each type in the library, delve into type parameters and functions.
     library.types.each do |t|
-      run_for_type(t)
+      run_for_type(t, library)
     end
 
     @ctx = nil
   end
 
-  def run_for_type(t)
+  def run_for_type(t, library)
     # If the type has type parameters, collect them into the params map.
     t.params.try do |type_params|
       type_params.terms.each_with_index do |param, index|
         param_ident, param_bound = AST::Extract.type_param(param)
         @params[param_ident.value] = Refer::TypeParam.new(
-          t,
+          t.make_link(library),
           index,
           param_ident,
           param_bound || AST::Identifier.new("any").from(param),
@@ -78,14 +78,14 @@ class Mare::Compiler::ReferType < Mare::AST::Visitor
     found = @params[node.value]?
     return found if found
 
-    found = ctx.namespace[ctx, node]?
+    found = ctx.namespace[node]?
     case found
-    when Program::Type
+    when Program::Type::Link
       Refer::Type.new(found)
-    when Program::TypeAlias
+    when Program::TypeAlias::Link
       target = found
-      while !target.is_a?(Program::Type)
-        target = ctx.namespace[ctx, target.target]
+      while !target.is_a?(Program::Type::Link)
+        target = ctx.namespace[target.resolve(ctx).target]
       end
       Refer::TypeAlias.new(found, target)
     end

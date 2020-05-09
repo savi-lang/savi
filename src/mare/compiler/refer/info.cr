@@ -65,35 +65,51 @@ class Mare::Compiler::Refer
   end
 
   struct Type
-    getter defn : Program::Type
+    getter link : Program::Type::Link
 
-    def initialize(@defn)
+    def initialize(@link)
     end
 
-    def metadata
-      defn.metadata
+    def defn(ctx)
+      link.resolve(ctx)
+    end
+
+    def metadata(ctx)
+      defn(ctx).metadata
     end
   end
 
   struct TypeAlias
-    getter defn_alias : Program::TypeAlias
-    getter defn : Program::Type
+    getter link_alias : Program::TypeAlias::Link
+    getter link : Program::Type::Link
 
-    def initialize(@defn_alias, @defn)
+    def initialize(@link_alias, @link)
     end
 
-    def metadata
-      defn.metadata.merge(defn_alias.metadata)
+    def defn_alias(ctx)
+      link_alias.resolve(ctx)
+    end
+
+    def defn(ctx)
+      link.resolve(ctx)
+    end
+
+    def metadata(ctx)
+      defn(ctx).metadata.merge(defn_alias(ctx).metadata)
     end
   end
 
   struct TypeParam
-    getter parent : Program::Type
+    getter parent_link : Program::Type::Link
     getter index : Int32
     getter ident : AST::Identifier
     getter bound : AST::Term
 
-    def initialize(@parent, @index, @ident, @bound)
+    def initialize(@parent_link, @index, @ident, @bound)
+    end
+
+    def parent(ctx)
+      parent_link.resolve(ctx)
     end
   end
 

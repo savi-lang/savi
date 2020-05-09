@@ -1916,10 +1916,10 @@ class Mare::Compiler::CodeGen
           ref.defn,
         )
       elsif ref.is_a?(Refer::Type) || ref.is_a?(Refer::TypeAlias)
-        enum_value = ref.metadata[:enum_value]?
+        enum_value = ref.metadata(ctx)[:enum_value]?
         if enum_value
           llvm_type_of(expr).const_int(enum_value.as(Int32))
-        elsif ref.defn.has_tag?(:numeric)
+        elsif ref.defn(ctx).has_tag?(:numeric)
           llvm_type = llvm_type_of(expr)
           case llvm_type.kind
           when LLVM::Type::Kind::Integer then llvm_type.const_int(0)

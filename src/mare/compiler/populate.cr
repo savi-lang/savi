@@ -28,6 +28,7 @@ module Mare::Compiler::Populate
           source = ctx.refer_type[ret]?
           Error.at ret, "This type couldn't be resolved" unless source
           source = source.as(Refer::Type) # TODO: handle cases of Refer::TypeAlias or Refer::TypeParam
+          source_defn = source.defn(ctx)
         when AST::Qualify
           source = ctx.refer_type[ret.term.as(AST::Identifier)]?
           Error.at ret, "This type couldn't be resolved" unless source
@@ -37,10 +38,11 @@ module Mare::Compiler::Populate
           # find every identifier referencing the type parameter and replace it
           # with the AST from the corresponding qualify arg, transforming the
           # copy we will make from the source function to the dest function.
-          source_defn_params_size = source.defn.params.try(&.terms.size) || 0
+          source_defn = source.defn(ctx)
+          source_defn_params_size = source_defn.params.try(&.terms.size) || 0
           replace_map = {} of Refer::TypeParam => AST::Node
           [source_defn_params_size, ret.group.terms.size].min.times do |index|
-            type_param_ast = source.defn.params.not_nil!.terms[index]
+            type_param_ast = source_defn.params.not_nil!.terms[index]
             replacement_ast = ret.group.terms[index]
             type_param_ident = AST::Extract.type_param(type_param_ast)[0]
             type_param_refer = ctx.refer_type[type_param_ident].as(Refer::TypeParam)
@@ -51,7 +53,7 @@ module Mare::Compiler::Populate
           raise NotImplementedError.new(ret)
         end
 
-        copy_from(source.defn, dest, visitor)
+        copy_from(source_defn, dest, visitor)
       end
 
       # If the type doesn't have a constructor and needs one, then add one.

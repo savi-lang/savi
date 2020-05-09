@@ -35,9 +35,10 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
   end
 
   class ForType
+    getter ctx : Context
     getter self_type : Type
 
-    def initialize(@ctx : Context, t)
+    def initialize(@ctx, t)
       @self_type = @ctx.refer_type[t.ident].as(Type)
       @map = {} of Program::Function => ForFunc
       @infos = {} of AST::Node => Info
@@ -81,11 +82,13 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
     end
 
     def run
+      self_type_defn = @self_type.defn(ctx)
+
       # For the type parameters in the type, run with a new ForBranch instance.
-      @self_type.defn.params.try(&.accept(ForBranch.new(self)))
+      self_type_defn.params.try(&.accept(ForBranch.new(self)))
 
       # For each function in the type, run with a new ForFunc instance.
-      @self_type.defn.functions.each do |f|
+      self_type_defn.functions.each do |f|
         ForFunc.new(self)
         .tap { |refer| @map[f] = refer }
         .tap(&.run(f))
