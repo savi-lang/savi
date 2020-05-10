@@ -8,7 +8,7 @@ struct Mare::Compiler::Infer::MetaType::AntiNominal
 
   def inspect(io : IO)
     io << "-"
-    io << defn.defn.ident.value
+    io << defn.link.name
     io << "'any"
   end
 
@@ -20,12 +20,12 @@ struct Mare::Compiler::Infer::MetaType::AntiNominal
     nil
   end
 
-  def any_callable_func_defn_type(name : String) : ReifiedType?
+  def any_callable_func_defn_type(ctx, name : String) : ReifiedType?
     nil
   end
 
   def is_concrete?
-    defn.defn.is_concrete?
+    defn.link.is_concrete?
   end
 
   def negate : Inner

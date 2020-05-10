@@ -274,7 +274,7 @@ class Mare::Compiler::CodeGen::PonyRT
 
   def cast_kind_of(g : CodeGen, type_ref : Reach::Ref, pos : Source::Pos) : Symbol
     if type_ref.singular? \
-    && (type_ref.is_numeric? || type_ref.single_def!(g.ctx).is_cpointer?)
+    && (type_ref.is_numeric?(g.ctx) || type_ref.single_def!(g.ctx).is_cpointer?(g.ctx))
       :bare
     else
       :object
@@ -397,14 +397,14 @@ class Mare::Compiler::CodeGen::PonyRT
       end
 
     dispatch_fn =
-      if type_def.is_actor?
+      if type_def.is_actor?(g.ctx)
         g.mod.functions.add("#{type_def.llvm_name}.DISPATCH", @dispatch_fn)
       else
         @dispatch_fn_ptr.null
       end
 
     trace_fn =
-      if type_def.has_desc? && gtype.fields.any?(&.last.trace_needed?)
+      if type_def.has_desc?(g.ctx) && gtype.fields.any?(&.last.trace_needed?(g.ctx))
         g.mod.functions.add("#{type_def.llvm_name}.TRACE", @trace_fn)
       else
         @trace_fn_ptr.null
@@ -420,7 +420,7 @@ class Mare::Compiler::CodeGen::PonyRT
     g.ctx.reach.each_type_def.each do |other_def|
       if infer.is_subtype?(gtype.type_def.reified, other_def.reified)
         next if gtype.type_def == other_def
-        raise "can't be subtype of a concrete" unless other_def.is_abstract?
+        raise "can't be subtype of a concrete" unless other_def.is_abstract?(g.ctx)
 
         index = other_def.desc_id >> Math.log2(g.bitwidth).to_i
         raise "bad index or trait_bitmap_size" unless index < g.trait_bitmap_size
@@ -483,7 +483,7 @@ class Mare::Compiler::CodeGen::PonyRT
 
     # Actor types have an actor pad, which holds runtime internals containing
     # things like the message queue used to deliver runtime messages.
-    elements << @actor_pad if gtype.type_def.has_actor_pad?
+    elements << @actor_pad if gtype.type_def.has_actor_pad?(g.ctx)
 
     # Each field of the type is an additional element in the struct type.
     gtype.fields.each { |name, t| elements << g.llvm_mem_type_of(t) }
@@ -580,7 +580,7 @@ class Mare::Compiler::CodeGen::PonyRT
   # This is the first step before actually calling the constructor of it.
   def gen_alloc(g : CodeGen, gtype : GenType, _from_expr, name : String)
     object =
-      if gtype.type_def.is_actor?
+      if gtype.type_def.is_actor?(g.ctx)
         gen_alloc_actor(g, gtype, name)
       else
         gen_alloc_struct(g, gtype.struct_type, name)
@@ -682,7 +682,7 @@ class Mare::Compiler::CodeGen::PonyRT
       dst_types << g.type_of(arg, gfunc)
       src_types << dst_types.last # TODO: are these ever different?
 
-      needs_trace ||= src_types.last.trace_needed?(dst_types.last)
+      needs_trace ||= src_types.last.trace_needed?(g.ctx, dst_types.last)
 
       # Store the parameter as an argument in the message.
       arg_gep = g.builder.struct_gep(msg, i, "msg.#{i - 2}.GEP")
@@ -725,7 +725,7 @@ class Mare::Compiler::CodeGen::PonyRT
   end
 
   def gen_desc_fn_impls(g : CodeGen, gtype : GenType)
-    gen_dispatch_impl(g, gtype) if gtype.type_def.is_actor?
+    gen_dispatch_impl(g, gtype) if gtype.type_def.is_actor?(g.ctx)
     gen_trace_impl(g, gtype)
   end
 
@@ -749,14 +749,14 @@ class Mare::Compiler::CodeGen::PonyRT
     g.func_frame.receiver_value =
       g.builder.bit_cast(fn.params[1], gtype.struct_ptr, "@")
 
-    if gtype.type_def.is_array?
+    if gtype.type_def.is_array?(g.ctx)
       # We have a special-case implementation for Array (unfortunately).
       # This is the only case when we will trace "into" a CPointer.
-      gen_trace_impl_for_array(g,gtype, fn)
+      gen_trace_impl_for_array(g, gtype, fn)
     else
       # For all other types, we simply trace all fields (that need tracing).
       gtype.fields.each do |field_name, field_type|
-        next unless field_type.trace_needed?
+        next unless field_type.trace_needed?(g.ctx)
 
         field = g.gen_field_load(field_name, gtype)
         gen_trace(g, field, field, field_type, field_type)
@@ -768,7 +768,7 @@ class Mare::Compiler::CodeGen::PonyRT
   end
 
   def gen_trace_impl_for_array(g : CodeGen, gtype : GenType, fn)
-    elem_type_ref = gtype.type_def.array_type_arg
+    elem_type_ref = gtype.type_def.array_type_arg(g.ctx)
     array_size    = g.gen_field_load("_size", gtype)
     array_ptr     = g.gen_field_load("_ptr", gtype)
 
@@ -884,7 +884,7 @@ class Mare::Compiler::CodeGen::PonyRT
         arg = gfunc.func.params.not_nil!.terms[i - 3] # skip 3 fields
         dst_types << g.type_of(arg, gfunc)
         src_types << dst_types.last # TODO: are these ever different?
-        needs_trace ||= src_types.last.trace_needed?(dst_types.last)
+        needs_trace ||= src_types.last.trace_needed?(g.ctx, dst_types.last)
 
         arg_gep = g.builder.struct_gep(msg, i, "msg.#{func_name}.#{i - 2}.GEP")
         src_value = g.builder.load(arg_gep, "msg.#{func_name}.#{i - 2}")
@@ -957,7 +957,7 @@ class Mare::Compiler::CodeGen::PonyRT
 
       # We can't trace it if it doesn't have a descriptor,
       # and we shouldn't trace it if it isn't runtime-allocated.
-      return unless src_type_def.has_desc? && src_type_def.has_allocation?
+      return unless src_type_def.has_desc?(g.ctx) && src_type_def.has_allocation?(g.ctx)
 
       # Generate code to check if this value is a subtype of this at runtime.
       is_subtype = g.gen_check_subtype_at_runtime(dst, src_type)
@@ -975,10 +975,10 @@ class Mare::Compiler::CodeGen::PonyRT
       )
       refined_dst_type =
         case mutability
-        when :mutable   then src_type_def.as_ref("iso")
-        when :immutable then src_type_def.as_ref("val")
-        when :opaque    then src_type_def.as_ref("tag")
-        when :non       then src_type_def.as_ref("non")
+        when :mutable   then src_type_def.as_ref(g.ctx, "iso")
+        when :immutable then src_type_def.as_ref(g.ctx, "val")
+        when :opaque    then src_type_def.as_ref(g.ctx, "tag")
+        when :non       then src_type_def.as_ref(g.ctx, "non")
         else
           raise NotImplementedError.new([src_type, dst_type])
         end
@@ -1000,14 +1000,14 @@ class Mare::Compiler::CodeGen::PonyRT
 
   def gen_trace(g : CodeGen, src : LLVM::Value, dst : LLVM::Value, src_type, dst_type)
     if src_type == dst_type
-      trace_kind = src_type.trace_kind
+      trace_kind = src_type.trace_kind(g.ctx)
     else
-      trace_kind = src_type.trace_kind_with_dst_cap(dst_type.trace_kind)
+      trace_kind = src_type.trace_kind_with_dst_cap(g.ctx, dst_type.trace_kind(g.ctx))
     end
 
     case trace_kind
     when :machine_word
-      if dst_type.trace_kind == :machine_word
+      if dst_type.trace_kind(g.ctx) == :machine_word
         # Do nothing - no need to trace this value since it isn't boxed.
       else
         # The value is indeed boxed and has a type descriptor; trace it.

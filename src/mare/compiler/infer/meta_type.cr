@@ -33,7 +33,7 @@ struct Mare::Compiler::Infer::MetaType
   end
 
   def initialize(defn : ReifiedType, cap : String? = nil)
-    cap ||= defn.defn.cap.value
+    cap ||= defn.link.cap
     @inner = Nominal.new(defn).intersect(Capability.new(cap))
   end
 
@@ -334,8 +334,8 @@ struct Mare::Compiler::Infer::MetaType
     set
   end
 
-  def any_callable_func_defn_type(name : String) : ReifiedType?
-    @inner.any_callable_func_defn_type(name)
+  def any_callable_func_defn_type(ctx, name : String) : ReifiedType?
+    @inner.any_callable_func_defn_type(ctx, name)
   end
 
   def show_type

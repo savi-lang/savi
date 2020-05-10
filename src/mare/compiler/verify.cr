@@ -11,7 +11,7 @@
 #
 class Mare::Compiler::Verify < Mare::AST::Visitor
   def self.run(ctx)
-    ctx.infer.for_non_argumented_types.each do |infer_type|
+    ctx.infer.for_non_argumented_types(ctx).each do |infer_type|
       infer_type.all_for_funcs.each do |infer_func|
         new(ctx, infer_type, infer_func).run
       end

@@ -77,7 +77,7 @@ class Mare::Compiler::CodeGen
         infer = reach_func.infer
 
         unless rf.func.has_tag?(:hygienic)
-          vtable_index = g.ctx.paint[reach_func]
+          vtable_index = g.ctx.paint[g.ctx, reach_func]
           @vtable_size = (vtable_index + 1) if @vtable_size <= vtable_index
         end
 
@@ -91,11 +91,11 @@ class Mare::Compiler::CodeGen
       # we are generating a struct_type for the boxed container that gets used
       # when that value has to be passed as an abstract reference with a desc.
       # In this case, there should be just a single field - the value itself.
-      if !type_def.has_desc?
+      if !type_def.has_desc?(g.ctx)
         raise "a value type with no descriptor can't have fields" \
           unless @fields.empty?
 
-        @fields << {"VALUE", @type_def.as_ref}
+        @fields << {"VALUE", @type_def.as_ref(g.ctx)}
       end
 
       # Generate descriptor type and struct type.
@@ -142,7 +142,7 @@ class Mare::Compiler::CodeGen
     # Generate the type descriptor value for this type.
     # We skip this for abstract types (traits).
     def gen_desc(g : CodeGen)
-      return if @type_def.is_abstract?
+      return if @type_def.is_abstract?(g.ctx)
 
       @desc = g.gen_desc(self, gen_vtable(g))
     end
@@ -150,14 +150,14 @@ class Mare::Compiler::CodeGen
     # Generate the global singleton value for this type.
     # We skip this for abstract types (traits).
     def gen_singleton(g : CodeGen)
-      return if @type_def.is_abstract?
+      return if @type_def.is_abstract?(g.ctx)
 
       @singleton = g.gen_singleton(self)
     end
 
     # Generate function implementations.
     def gen_func_impls(g : CodeGen)
-      return if @type_def.is_abstract?
+      return if @type_def.is_abstract?(g.ctx)
 
       g.gen_desc_fn_impls(self)
 
@@ -217,7 +217,7 @@ class Mare::Compiler::CodeGen
     property! after_yield_blocks : Array(LLVM::BasicBlock)
 
     def initialize(@reach_func, @vtable_index)
-      @needs_receiver = type_def.has_state? && !(func.cap.value == "non")
+      @needs_receiver = type_def.has_state?(infer.ctx) && !(func.cap.value == "non")
 
       @llvm_name = "#{type_def.llvm_name}#{infer.reified.name}"
       @llvm_name = "#{@llvm_name}.HYGIENIC" if func.has_tag?(:hygienic)
@@ -387,7 +387,7 @@ class Mare::Compiler::CodeGen
   end
 
   def llvm_type_of(gtype : GenType)
-    llvm_type_of(gtype.type_def.as_ref) # TODO: this is backwards - defs should have a llvm_use_type of their own, with refs delegating to that implementation when there is a singular meta_type
+    llvm_type_of(gtype.type_def.as_ref(ctx)) # TODO: this is backwards - defs should have a llvm_use_type of their own, with refs delegating to that implementation when there is a singular meta_type
   end
 
   def llvm_type_of(expr : AST::Node, in_gfunc : GenFunc? = nil)
@@ -399,7 +399,7 @@ class Mare::Compiler::CodeGen
   end
 
   def llvm_type_of(ref : Reach::Ref)
-    case ref.llvm_use_type
+    case ref.llvm_use_type(ctx)
     when :i1 then @i1
     when :i8 then @i8
     when :i16 then @i16
@@ -407,18 +407,18 @@ class Mare::Compiler::CodeGen
     when :i64 then @i64
     when :f32 then @f32
     when :f64 then @f64
-    when :ptr then llvm_type_of(ref.single_def!(ctx).cpointer_type_arg).pointer
+    when :ptr then llvm_type_of(ref.single_def!(ctx).cpointer_type_arg(ctx)).pointer
     when :isize then @isize
     when :struct_ptr then
       @gtypes[ctx.reach[ref.single!].llvm_name].struct_ptr
     when :object_ptr then
       @obj_ptr
-    else raise NotImplementedError.new(ref.llvm_use_type)
+    else raise NotImplementedError.new(ref.llvm_use_type(ctx))
     end
   end
 
   def llvm_mem_type_of(ref : Reach::Ref)
-    case ref.llvm_mem_type
+    case ref.llvm_mem_type(ctx)
     when :i1 then @i1
     when :i8 then @i8
     when :i16 then @i16
@@ -426,13 +426,13 @@ class Mare::Compiler::CodeGen
     when :i64 then @i64
     when :f32 then @f32
     when :f64 then @f64
-    when :ptr then llvm_type_of(ref.single_def!(ctx).cpointer_type_arg).pointer
+    when :ptr then llvm_type_of(ref.single_def!(ctx).cpointer_type_arg(ctx)).pointer
     when :isize then @isize
     when :struct_ptr then
       @gtypes[ctx.reach[ref.single!].llvm_name].struct_ptr
     when :object_ptr then
       @obj_ptr
-    else raise NotImplementedError.new(ref.llvm_mem_type)
+    else raise NotImplementedError.new(ref.llvm_mem_type(ctx))
     end
   end
 
@@ -715,7 +715,7 @@ class Mare::Compiler::CodeGen
         vparam_types.unshift(gtype.struct_ptr)
 
         @mod.functions.add vtable_name, vparam_types, ret_type do |fn|
-          next if gtype.type_def.is_abstract?
+          next if gtype.type_def.is_abstract?(ctx)
 
           gen_func_start(fn)
 
@@ -740,7 +740,7 @@ class Mare::Compiler::CodeGen
         vparam_types.unshift(gtype.struct_ptr)
 
         @mod.functions.add vtable_name, vparam_types, ret_type do |fn|
-          next if gtype.type_def.is_abstract?
+          next if gtype.type_def.is_abstract?(ctx)
 
           gen_func_start(fn)
 
@@ -938,7 +938,7 @@ class Mare::Compiler::CodeGen
     params = llvm_func.params
 
     llvm_type = llvm_type_of(gtype)
-    elem_llvm_type = llvm_mem_type_of(gtype.type_def.cpointer_type_arg)
+    elem_llvm_type = llvm_mem_type_of(gtype.type_def.cpointer_type_arg(ctx))
     elem_size_value = abi_size_of(elem_llvm_type)
 
     @builder.ret \
@@ -1037,11 +1037,11 @@ class Mare::Compiler::CodeGen
   end
 
   def gen_intrinsic(gtype, gfunc, llvm_func)
-    return gen_intrinsic_cpointer(gtype, gfunc, llvm_func) if gtype.type_def.is_cpointer?
-    return gen_intrinsic_platform(gtype, gfunc, llvm_func) if gtype.type_def.is_platform?
+    return gen_intrinsic_cpointer(gtype, gfunc, llvm_func) if gtype.type_def.is_cpointer?(ctx)
+    return gen_intrinsic_platform(gtype, gfunc, llvm_func) if gtype.type_def.is_platform?(ctx)
 
     raise NotImplementedError.new(gtype.type_def) \
-      unless gtype.type_def.is_numeric?
+      unless gtype.type_def.is_numeric?(ctx)
 
     gen_func_start(llvm_func)
     params = llvm_func.params
@@ -1053,7 +1053,7 @@ class Mare::Compiler::CodeGen
           abi_size_of(llvm_type_of(gtype)) * 8
         )
       when "zero"
-        if gtype.type_def.is_floating_point_numeric?
+        if gtype.type_def.is_floating_point_numeric?(ctx)
           case bit_width_of(gtype)
           when 32 then llvm_type_of(gtype).const_float(0)
           when 64 then llvm_type_of(gtype).const_double(0)
@@ -1075,69 +1075,69 @@ class Mare::Compiler::CodeGen
       when "f32" then gen_numeric_conv(gtype, @gtypes["F32"], params[0])
       when "f64" then gen_numeric_conv(gtype, @gtypes["F64"], params[0])
       when "==" then
-        if gtype.type_def.is_floating_point_numeric?
+        if gtype.type_def.is_floating_point_numeric?(ctx)
           @builder.fcmp(LLVM::RealPredicate::OEQ, params[0], params[1])
         else
           @builder.icmp(LLVM::IntPredicate::EQ, params[0], params[1])
         end
       when "!=" then
-        if gtype.type_def.is_floating_point_numeric?
+        if gtype.type_def.is_floating_point_numeric?(ctx)
           @builder.fcmp(LLVM::RealPredicate::ONE, params[0], params[1])
         else
           @builder.icmp(LLVM::IntPredicate::NE, params[0], params[1])
         end
       when "<" then
-        if gtype.type_def.is_floating_point_numeric?
+        if gtype.type_def.is_floating_point_numeric?(ctx)
           @builder.fcmp(LLVM::RealPredicate::OLT, params[0], params[1])
-        elsif gtype.type_def.is_signed_numeric?
+        elsif gtype.type_def.is_signed_numeric?(ctx)
           @builder.icmp(LLVM::IntPredicate::SLT, params[0], params[1])
         else
           @builder.icmp(LLVM::IntPredicate::ULT, params[0], params[1])
         end
       when "<=" then
-        if gtype.type_def.is_floating_point_numeric?
+        if gtype.type_def.is_floating_point_numeric?(ctx)
           @builder.fcmp(LLVM::RealPredicate::OLE, params[0], params[1])
-        elsif gtype.type_def.is_signed_numeric?
+        elsif gtype.type_def.is_signed_numeric?(ctx)
           @builder.icmp(LLVM::IntPredicate::SLE, params[0], params[1])
         else
           @builder.icmp(LLVM::IntPredicate::ULE, params[0], params[1])
         end
       when ">" then
-        if gtype.type_def.is_floating_point_numeric?
+        if gtype.type_def.is_floating_point_numeric?(ctx)
           @builder.fcmp(LLVM::RealPredicate::OGT, params[0], params[1])
-        elsif gtype.type_def.is_signed_numeric?
+        elsif gtype.type_def.is_signed_numeric?(ctx)
           @builder.icmp(LLVM::IntPredicate::SGT, params[0], params[1])
         else
           @builder.icmp(LLVM::IntPredicate::UGT, params[0], params[1])
         end
       when ">=" then
-        if gtype.type_def.is_floating_point_numeric?
+        if gtype.type_def.is_floating_point_numeric?(ctx)
           @builder.fcmp(LLVM::RealPredicate::OGE, params[0], params[1])
-        elsif gtype.type_def.is_signed_numeric?
+        elsif gtype.type_def.is_signed_numeric?(ctx)
           @builder.icmp(LLVM::IntPredicate::SGE, params[0], params[1])
         else
           @builder.icmp(LLVM::IntPredicate::UGE, params[0], params[1])
         end
       when "+" then
-        if gtype.type_def.is_floating_point_numeric?
+        if gtype.type_def.is_floating_point_numeric?(ctx)
           @builder.fadd(params[0], params[1])
         else
           @builder.add(params[0], params[1])
         end
       when "-" then
-        if gtype.type_def.is_floating_point_numeric?
+        if gtype.type_def.is_floating_point_numeric?(ctx)
           @builder.fsub(params[0], params[1])
         else
           @builder.sub(params[0], params[1])
         end
       when "*" then
-        if gtype.type_def.is_floating_point_numeric?
+        if gtype.type_def.is_floating_point_numeric?(ctx)
           @builder.fmul(params[0], params[1])
         else
           @builder.mul(params[0], params[1])
         end
       when "/", "%" then
-        if gtype.type_def.is_floating_point_numeric?
+        if gtype.type_def.is_floating_point_numeric?(ctx)
           if gfunc.func.ident.value == "/"
             @builder.fdiv(params[0], params[1])
           else
@@ -1151,7 +1151,7 @@ class Mare::Compiler::CodeGen
           zero = llvm_type.const_int(0)
           nonzero_block = gen_block(".div.nonzero")
           nonoverflow_block = gen_block(".div.nonoverflow") \
-            if gtype.type_def.is_signed_numeric?
+            if gtype.type_def.is_signed_numeric?(ctx)
           after_block = gen_block(".div.after")
 
           blocks = [] of LLVM::BasicBlock
@@ -1168,7 +1168,7 @@ class Mare::Compiler::CodeGen
           # If signed, return zero if this operation would overflow.
           # This happens for exactly one case in each signed integer type.
           # In `I8`, the overflow case is `-128 / -1`, which would be 128.
-          if gtype.type_def.is_signed_numeric?
+          if gtype.type_def.is_signed_numeric?(ctx)
             bad = @builder.not(zero)
             denom_good = @builder.icmp LLVM::IntPredicate::NE, params[1], bad,
               "#{params[1].name}.nonoverflow"
@@ -1188,7 +1188,7 @@ class Mare::Compiler::CodeGen
 
           # Otherwise, compute the result.
           result =
-            case {gtype.type_def.is_signed_numeric?, gfunc.func.ident.value}
+            case {gtype.type_def.is_signed_numeric?(ctx), gfunc.func.ident.value}
             when {true, "/"} then @builder.sdiv(params[0], params[1])
             when {true, "%"} then @builder.srem(params[0], params[1])
             when {false, "/"} then @builder.udiv(params[0], params[1])
@@ -1205,16 +1205,16 @@ class Mare::Compiler::CodeGen
           @builder.phi(llvm_type, blocks, values, "phidiv")
         end
       when "bit_and"
-        raise "bit_and float" if gtype.type_def.is_floating_point_numeric?
+        raise "bit_and float" if gtype.type_def.is_floating_point_numeric?(ctx)
         @builder.and(params[0], params[1])
       when "bit_or"
-        raise "bit_or float" if gtype.type_def.is_floating_point_numeric?
+        raise "bit_or float" if gtype.type_def.is_floating_point_numeric?(ctx)
         @builder.or(params[0], params[1])
       when "bit_xor"
-        raise "bit_xor float" if gtype.type_def.is_floating_point_numeric?
+        raise "bit_xor float" if gtype.type_def.is_floating_point_numeric?(ctx)
         @builder.xor(params[0], params[1])
       when "bit_shl"
-        raise "bit_shl float" if gtype.type_def.is_floating_point_numeric?
+        raise "bit_shl float" if gtype.type_def.is_floating_point_numeric?(ctx)
         bits = @builder.zext(params[1], llvm_type_of(gtype))
         clamp = llvm_type_of(gtype).const_int(bit_width_of(gtype) - 1)
         bits = @builder.select(
@@ -1224,7 +1224,7 @@ class Mare::Compiler::CodeGen
         )
         @builder.shl(params[0], bits)
       when "bit_shr"
-        raise "bit_shr float" if gtype.type_def.is_floating_point_numeric?
+        raise "bit_shr float" if gtype.type_def.is_floating_point_numeric?(ctx)
         bits = @builder.zext(params[1], llvm_type_of(gtype))
         clamp = llvm_type_of(gtype).const_int(bit_width_of(gtype) - 1)
         bits = @builder.select(
@@ -1232,16 +1232,16 @@ class Mare::Compiler::CodeGen
           bits,
           clamp,
         )
-        if gtype.type_def.is_signed_numeric?
+        if gtype.type_def.is_signed_numeric?(ctx)
           @builder.ashr(params[0], bits)
         else
           @builder.lshr(params[0], bits)
         end
       when "invert"
-        raise "invert float" if gtype.type_def.is_floating_point_numeric?
+        raise "invert float" if gtype.type_def.is_floating_point_numeric?(ctx)
         @builder.not(params[0])
       when "reverse_bits"
-        raise "reverse_bits float" if gtype.type_def.is_floating_point_numeric?
+        raise "reverse_bits float" if gtype.type_def.is_floating_point_numeric?(ctx)
         op_func =
           case bit_width_of(gtype)
           when 1
@@ -1263,7 +1263,7 @@ class Mare::Compiler::CodeGen
           end
         @builder.call(op_func, [params[0]])
       when "swap_bytes"
-        raise "swap_bytes float" if gtype.type_def.is_floating_point_numeric?
+        raise "swap_bytes float" if gtype.type_def.is_floating_point_numeric?(ctx)
         case bit_width_of(gtype)
         when 1, 8
           params[0]
@@ -1280,7 +1280,7 @@ class Mare::Compiler::CodeGen
         else raise NotImplementedError.new(bit_width_of(gtype))
         end
       when "leading_zeros"
-        raise "leading_zeros float" if gtype.type_def.is_floating_point_numeric?
+        raise "leading_zeros float" if gtype.type_def.is_floating_point_numeric?(ctx)
         op_func =
           case bit_width_of(gtype)
           when 1
@@ -1303,7 +1303,7 @@ class Mare::Compiler::CodeGen
         gen_numeric_conv gtype, @gtypes["U8"],
           @builder.call(op_func, [params[0], @i1_false])
       when "trailing_zeros"
-        raise "trailing_zeros float" if gtype.type_def.is_floating_point_numeric?
+        raise "trailing_zeros float" if gtype.type_def.is_floating_point_numeric?(ctx)
         op_func =
           case bit_width_of(gtype)
           when 1
@@ -1326,7 +1326,7 @@ class Mare::Compiler::CodeGen
         gen_numeric_conv gtype, @gtypes["U8"],
           @builder.call(op_func, [params[0], @i1_false])
       when "count_ones"
-        raise "count_ones float" if gtype.type_def.is_floating_point_numeric?
+        raise "count_ones float" if gtype.type_def.is_floating_point_numeric?(ctx)
         op_func =
           case bit_width_of(gtype)
           when 1
@@ -1349,21 +1349,21 @@ class Mare::Compiler::CodeGen
         gen_numeric_conv gtype, @gtypes["U8"], \
           @builder.call(op_func, [params[0]])
       when "bits"
-        raise "bits integer" unless gtype.type_def.is_floating_point_numeric?
+        raise "bits integer" unless gtype.type_def.is_floating_point_numeric?(ctx)
         case bit_width_of(gtype)
         when 32 then @builder.bit_cast(params[0], @i32)
         when 64 then @builder.bit_cast(params[0], @i64)
         else raise NotImplementedError.new(bit_width_of(gtype))
         end
       when "from_bits"
-        raise "from_bits integer" unless gtype.type_def.is_floating_point_numeric?
+        raise "from_bits integer" unless gtype.type_def.is_floating_point_numeric?(ctx)
         case bit_width_of(gtype)
         when 32 then @builder.bit_cast(params[0], @f32)
         when 64 then @builder.bit_cast(params[0], @f64)
         else raise NotImplementedError.new(bit_width_of(gtype))
         end
       when "next_pow2"
-        raise "next_pow2 float" if gtype.type_def.is_floating_point_numeric?
+        raise "next_pow2 float" if gtype.type_def.is_floating_point_numeric?(ctx)
 
         arg =
           if bit_width_of(gtype) > bit_width_of(@isize)
@@ -1393,7 +1393,7 @@ class Mare::Compiler::CodeGen
     # Even if there are multiple possible gtypes and thus gfuncs, we choose an
     # arbitrary one for the purposes of checking arg types against param types.
     # We make the assumption that signature differences have been prevented.
-    lhs_gtype = @gtypes[ctx.reach[lhs_type.any_callable_defn_for(member)].llvm_name] # TODO: simplify this mess of an expression
+    lhs_gtype = @gtypes[ctx.reach[lhs_type.any_callable_defn_for(ctx, member)].llvm_name] # TODO: simplify this mess of an expression
     gfunc = lhs_gtype[member]
 
     {lhs_gtype, gfunc}
@@ -1451,7 +1451,7 @@ class Mare::Compiler::CodeGen
     receiver = gen_expr(relate.lhs)
 
     # Determine if we need to use a virtual call here.
-    needs_virtual_call = lhs_type.is_abstract?
+    needs_virtual_call = lhs_type.is_abstract?(ctx)
 
     # If this is a constructor, the receiver must be allocated first.
     if gfunc.func.has_tag?(:constructor)
@@ -1796,7 +1796,7 @@ class Mare::Compiler::CodeGen
   end
 
   def gen_check_subtype_at_runtime(lhs : LLVM::Value, rhs_type : Reach::Ref)
-    if rhs_type.is_concrete?
+    if rhs_type.is_concrete?(ctx)
       rhs_gtype = @gtypes[ctx.reach[rhs_type.single!].llvm_name]
 
       lhs_desc = gen_get_desc_opaque(lhs)
@@ -1932,7 +1932,7 @@ class Mare::Compiler::CodeGen
         end
       elsif ref.is_a?(Refer::TypeParam)
         # TODO: unify with above clause
-        defn = gtype_of(expr).type_def.program_type
+        defn = gtype_of(expr).type_def.program_type.resolve(ctx)
         enum_value = defn.metadata[:enum_value]?
         if enum_value
           llvm_type_of(expr).const_int(enum_value.as(UInt64).to_i32)
@@ -2038,7 +2038,7 @@ class Mare::Compiler::CodeGen
 
   def gen_integer(expr : (AST::LiteralInteger | AST::LiteralCharacter))
     type_ref = type_of(expr)
-    case type_ref.llvm_use_type
+    case type_ref.llvm_use_type(ctx)
     when :i1 then @i1.const_int(expr.value.to_i8)
     when :i8 then @i8.const_int(expr.value.to_i8)
     when :i16 then @i16.const_int(expr.value.to_i16)
@@ -2057,7 +2057,7 @@ class Mare::Compiler::CodeGen
 
   def gen_float(expr : AST::LiteralFloat)
     type_ref = type_of(expr)
-    case type_ref.llvm_use_type
+    case type_ref.llvm_use_type(ctx)
     when :f32 then @f32.const_float(expr.value.to_f32)
     when :f64 then @f64.const_double(expr.value.to_f64)
     else raise "invalid floating point literal type: #{type_ref.inspect}"
@@ -2102,10 +2102,10 @@ class Mare::Compiler::CodeGen
     to_gtype : GenType,
     value : LLVM::Value,
   )
-    from_signed = from_gtype.type_def.is_signed_numeric?
-    to_signed = to_gtype.type_def.is_signed_numeric?
-    from_float = from_gtype.type_def.is_floating_point_numeric?
-    to_float = to_gtype.type_def.is_floating_point_numeric?
+    from_signed = from_gtype.type_def.is_signed_numeric?(ctx)
+    to_signed = to_gtype.type_def.is_signed_numeric?(ctx)
+    from_float = from_gtype.type_def.is_floating_point_numeric?(ctx)
+    to_float = to_gtype.type_def.is_floating_point_numeric?(ctx)
     from_width = bit_width_of(from_gtype)
     to_width = bit_width_of(to_gtype)
 
@@ -2409,7 +2409,7 @@ class Mare::Compiler::CodeGen
         features_gtype = gtype_of(reflect_gtype.field("features"))
         feature_gtype = gtype_of(
           features_gtype.field("_ptr")
-            .single_def!(ctx).cpointer_type_arg
+            .single_def!(ctx).cpointer_type_arg(ctx)
         )
         mutator_gtype = gtype_of(
           feature_gtype.field("mutator")
@@ -2466,7 +2466,7 @@ class Mare::Compiler::CodeGen
     # (the mutator_gtype which this object is tailor-made to fit).
     traits_bitmap = trait_bitmap_size.times.map { 0 }.to_a
     mutator_gtype.type_def.tap do |other_def|
-      raise "can't be subtype of a concrete" unless other_def.is_abstract?
+      raise "can't be subtype of a concrete" unless other_def.is_abstract?(ctx)
 
       index = other_def.desc_id >> Math.log2(@bitwidth).to_i
       raise "bad index or trait_bitmap_size" unless index < trait_bitmap_size

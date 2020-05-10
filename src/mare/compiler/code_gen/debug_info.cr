@@ -121,7 +121,7 @@ class Mare::Compiler::CodeGen
       llvm_type : LLVM::Type,
     )
       llvm_struct_type = llvm_type.element_type
-      ident = t.single!.defn.ident
+      ident = t.single!.defn(ctx).ident
       name = ident.value
       pos = ident.pos
 
@@ -178,25 +178,25 @@ class Mare::Compiler::CodeGen
     private def di_type(t : Reach::Ref, llvm_type : LLVM::Type)
       di_types = (@di_types ||= {} of Reach::Ref => LibLLVMExt::Metadata)
       di_types[t] ||=
-        if t.is_floating_point_numeric?
+        if t.is_floating_point_numeric?(ctx)
           di_create_basic_type(t, llvm_type, LLVM::DwarfTypeEncoding::Float)
-        elsif t.is_signed_numeric?
+        elsif t.is_signed_numeric?(ctx)
           di_create_basic_type(t, llvm_type, LLVM::DwarfTypeEncoding::Signed)
-        elsif t.is_numeric?
+        elsif t.is_numeric?(ctx)
           di_create_basic_type(t, llvm_type, LLVM::DwarfTypeEncoding::Unsigned)
-        elsif t.llvm_use_type == :ptr
+        elsif t.llvm_use_type(ctx) == :ptr
           @di.create_pointer_type(
             di_type(
-              t.single_def!(ctx).cpointer_type_arg,
+              t.single_def!(ctx).cpointer_type_arg(ctx),
               llvm_type.element_type,
             ),
             @target_data.abi_size(llvm_type) * 8,
             @target_data.abi_alignment(llvm_type) * 8,
             t.show_type,
           )
-        elsif t.llvm_use_type == :struct_ptr
+        elsif t.llvm_use_type(ctx) == :struct_ptr
           di_create_struct_pointer_type(t, llvm_type)
-        elsif t.llvm_use_type == :object_ptr
+        elsif t.llvm_use_type(ctx) == :object_ptr
           # TODO: Some more descriptive debug type?
           di_create_basic_type(t, llvm_type, LLVM::DwarfTypeEncoding::Address)
         else

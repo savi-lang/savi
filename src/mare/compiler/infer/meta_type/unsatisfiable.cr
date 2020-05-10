@@ -21,7 +21,7 @@ class Mare::Compiler::Infer::MetaType::Unsatisfiable
     nil
   end
 
-  def any_callable_func_defn_type(name : String) : Infer::ReifiedType?
+  def any_callable_func_defn_type(ctx, name : String) : Infer::ReifiedType?
     nil
   end
 

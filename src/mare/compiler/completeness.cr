@@ -13,7 +13,7 @@
 #
 module Mare::Compiler::Completeness
   def self.run(ctx)
-    ctx.infer.for_non_argumented_types.each do |infer_type|
+    ctx.infer.for_non_argumented_types(ctx).each do |infer_type|
       branch_cache = {} of Tuple(Set(String), Infer::ReifiedFunction) => Branch
       infer_type.all_for_funcs.each do |infer_func|
         check_constructor(ctx, infer_type.reified, infer_func.reified, branch_cache) if infer_func.reified.func.has_tag?(:constructor)
@@ -22,7 +22,7 @@ module Mare::Compiler::Completeness
   end
 
   def self.check_constructor(ctx, rt, rf, branch_cache)
-    fields = rt.defn.functions.select(&.has_tag?(:field))
+    fields = rt.defn(ctx).functions.select(&.has_tag?(:field))
     branch = Branch.new(ctx, rt, rf, branch_cache, fields)
 
     # First, visit the field initializers (for those fields that have them) as
@@ -182,7 +182,7 @@ module Mare::Compiler::Completeness
 
         # Follow the method call in a new branch, and collect any field writes
         # seen in that branch as if they had been seen in this branch.
-        next_f = type.defn.find_func!(func_name)
+        next_f = type.defn(ctx).find_func!(func_name)
         next_cap = Infer::MetaType.cap(next_f.cap.value) # TODO: reify with which cap?
         next_func = ctx.infer.for_func(ctx, type, next_f, next_cap).reified
         branch = sub_branch(next_func, node.pos)

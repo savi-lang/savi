@@ -17,7 +17,7 @@ struct Mare::Compiler::Infer::MetaType::Nominal
     # Otherwise, we'll print it here with the same syntax that the programmer
     # can use to specify it explicitly.
     defn = defn()
-    unless defn.is_a?(Infer::ReifiedType) && cap.value == defn.defn.cap.value
+    unless defn.is_a?(Infer::ReifiedType) && cap.value == defn.link.cap
       io << "'"
       cap.inspect(io)
     end
@@ -42,7 +42,7 @@ struct Mare::Compiler::Infer::MetaType::Nominal
     defn = defn()
     case defn
     when Infer::ReifiedType
-      func = defn.defn.find_func?(name)
+      func = defn.defn(infer.ctx).find_func?(name)
       [{self, defn, func}] if func
     when Refer::TypeParam
       infer.lookup_type_param_bound(defn)
@@ -52,17 +52,17 @@ struct Mare::Compiler::Infer::MetaType::Nominal
     end
   end
 
-  def any_callable_func_defn_type(name : String) : Infer::ReifiedType?
+  def any_callable_func_defn_type(ctx, name : String) : Infer::ReifiedType?
     defn = defn()
     if defn.is_a?(Infer::ReifiedType)
-      func = defn.defn.find_func?(name)
+      func = defn.defn(ctx).find_func?(name)
       defn if func
     end
   end
 
   def is_concrete?
     defn = defn()
-    defn.is_a?(Infer::ReifiedType) && defn.defn.is_concrete?
+    defn.is_a?(Infer::ReifiedType) && defn.link.is_concrete?
   end
 
   def negate : Inner
@@ -163,7 +163,7 @@ struct Mare::Compiler::Infer::MetaType::Nominal
         arg.substitute_type_params(substitutions).as(MetaType)
       end
 
-      Nominal.new(ReifiedType.new(defn.defn, args))
+      Nominal.new(ReifiedType.new(defn.link, args))
     else
       raise NotImplementedError.new(defn)
     end

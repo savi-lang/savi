@@ -227,14 +227,14 @@ class Mare::Compiler::CodeGen::VeronaRT
     abi_size = g.abi_size_of(gtype.struct_type)
 
     trace_fn =
-      if type_def.has_desc?
+      if type_def.has_desc?(g.ctx)
         g.mod.functions.add("#{type_def.llvm_name}.TRACE".gsub(/\W/, "_"), @trace_fn)
       else
         @trace_fn_ptr.null
       end
 
     trace_possibly_iso_fn =
-      if type_def.is_actor? \
+      if type_def.is_actor?(g.ctx) \
       || gtype.fields.any?(&.last.is_possibly_iso?)
         g.mod.functions.add("#{type_def.llvm_name}.TRACEPOSSIBLYISO".gsub(/\W/, "_"), @trace_fn)
       else
@@ -293,12 +293,12 @@ class Mare::Compiler::CodeGen::VeronaRT
 
     # Different runtime objects have a different sized opaque pad at the start
     # that holds all of the runtime-internal data that we shouldn't touch.
-    if gtype.type_def.is_actor?
+    if gtype.type_def.is_actor?(g.ctx)
       # Actors are cowns, and thus have a cown pad.
       elements << @cown_pad
       # Actors need an iso root region, which is an empty object with region md.
       elements << @obj_ptr
-    elsif !gtype.type_def.has_allocation? || gtype.type_def.is_abstract?
+    elsif !gtype.type_def.has_allocation?(g.ctx) || gtype.type_def.is_abstract?(g.ctx)
       # Objects that aren't runtime-allocated need no opaque pad at all,
       # because they don't need to hold any runtime-internal data.
       nil
@@ -399,7 +399,7 @@ class Mare::Compiler::CodeGen::VeronaRT
     type_def = type_ref.single_def!(g.ctx)
 
     # We don't handle lifetime of non-allocated types or cpointers.
-    return :bare if !type_def.has_allocation? || type_def.is_cpointer?
+    return :bare if !type_def.has_allocation?(g.ctx) || type_def.is_cpointer?(g.ctx)
 
     case type_ref.cap_only.cap_value
     when "iso" then :iso
@@ -410,7 +410,7 @@ class Mare::Compiler::CodeGen::VeronaRT
     when "non" then :non
     when "tag"
       Error.at pos, "Only actors are allowed to be tag on Verona" \
-        unless type_def.is_actor?
+        unless type_def.is_actor?(g.ctx)
 
       :actor
     else
@@ -570,7 +570,7 @@ class Mare::Compiler::CodeGen::VeronaRT
   # This generates the code that allocates an object of the given type.
   # This is the first step before actually calling the constructor of it.
   def gen_alloc(g : CodeGen, gtype : GenType, from_expr : AST::Node, name : String)
-    if gtype.type_def.is_actor?
+    if gtype.type_def.is_actor?(g.ctx)
       gen_alloc_actor(g, gtype, name)
     elsif g.type_of(from_expr).is_singular_iso?
       gen_alloc_object_iso(g, gtype, name)
@@ -754,7 +754,7 @@ class Mare::Compiler::CodeGen::VeronaRT
     obj_stack = fn.params[1]
 
     # For actors, it is necessary to trace the iso root.
-    if gtype.type_def.is_actor?
+    if gtype.type_def.is_actor?(g.ctx)
       g.builder.call(g.mod.functions["RTObjectStack_push"], [
         obj_stack,
         g.builder.load(
@@ -788,7 +788,7 @@ class Mare::Compiler::CodeGen::VeronaRT
     obj_stack = fn.params[1]
 
     # For actors, it is necessary to trace the iso root.
-    if gtype.type_def.is_actor?
+    if gtype.type_def.is_actor?(g.ctx)
       g.builder.call(g.mod.functions["RTObjectStack_push"], [
         obj_stack,
         g.builder.load(

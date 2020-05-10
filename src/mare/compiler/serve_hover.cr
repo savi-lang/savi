@@ -64,17 +64,19 @@ class Mare::Compiler::ServeHover
   end
 
   def [](pos : Source::Pos)
-    ctx.program.types.each do |t|
-      next unless t.ident.pos.source == pos.source
+    ctx.program.libraries.each do |library|
+      library.types.each do |t|
+        next unless t.ident.pos.source == pos.source
 
-      t.functions.each do |f|
-        next unless f.ident.pos.source == pos.source
+        t.functions.each do |f|
+          next unless f.ident.pos.source == pos.source
 
-        f.body.try do |body|
-          if body.pos.contains?(pos)
-            find(pos, body).reverse_each do |node|
-              messages, pos = self[t, f, node]
-              return {messages, pos} unless messages.empty?
+          f.body.try do |body|
+            if body.pos.contains?(pos)
+              find(pos, body).reverse_each do |node|
+                messages, pos = self[t.make_link(library), f, node]
+                return {messages, pos} unless messages.empty?
+              end
             end
           end
         end
@@ -84,11 +86,12 @@ class Mare::Compiler::ServeHover
     {[] of String, pos}
   end
 
-  def [](t : Program::Type, f : Program::Function, node : AST::Node)
+  def [](t_link : Program::Type::Link, f : Program::Function, node : AST::Node)
     messages = [] of String
 
+    t = t_link.resolve(ctx)
     refer = ctx.refer[t][f]
-    infer = ctx.infer.for_func_simple(ctx, t, f)
+    infer = ctx.infer.for_func_simple(ctx, t_link, f)
     describe_type = "type"
 
     ref = refer[node]?

@@ -34,12 +34,12 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       !@meta_type.singular? # TODO: distinguish from tuple and intersect
     end
 
-    def is_abstract?
-      is_intersect? || is_union? || !@meta_type.single!.defn.is_concrete?
+    def is_abstract?(ctx)
+      is_intersect? || is_union? || !@meta_type.single!.defn(ctx).is_concrete?
     end
 
-    def is_concrete?
-      !is_abstract?
+    def is_concrete?(ctx)
+      !is_abstract?(ctx)
     end
 
     def is_value?
@@ -58,8 +58,8 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       ctx.reach[@meta_type.single!]
     end
 
-    def any_callable_defn_for(name) : Infer::ReifiedType
-      @meta_type.any_callable_func_defn_type(name).not_nil!
+    def any_callable_defn_for(ctx, name) : Infer::ReifiedType
+      @meta_type.any_callable_func_defn_type(ctx, name).not_nil!
     end
 
     def tuple_count
@@ -68,32 +68,32 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
 
     def is_none!
       # TODO: better reach the one true None instead of a namespaced impostor?
-      raise "#{self} is not None" unless single!.defn.ident.value == "None"
+      raise "#{self} is not None" unless single!.link.name == "None"
     end
 
-    def is_numeric?
-      singular? && single!.defn.has_tag?(:numeric)
+    def is_numeric?(ctx)
+      singular? && single!.defn(ctx).has_tag?(:numeric)
     end
 
-    def is_floating_point_numeric?
-      is_numeric? && single!.defn.const_bool("is_floating_point")
+    def is_floating_point_numeric?(ctx)
+      is_numeric?(ctx) && single!.defn(ctx).const_bool("is_floating_point")
     end
 
-    def is_signed_numeric?
-      is_numeric? && single!.defn.const_bool("is_signed")
+    def is_signed_numeric?(ctx)
+      is_numeric?(ctx) && single!.defn(ctx).const_bool("is_signed")
     end
 
-    def is_not_pointer?
-      !([:object_ptr, :struct_ptr].includes?(llvm_use_type))
+    def is_not_pointer?(ctx)
+      !([:object_ptr, :struct_ptr].includes?(llvm_use_type(ctx)))
     end
 
-    def llvm_use_type : Symbol
+    def llvm_use_type(ctx) : Symbol
       if is_tuple?
         :tuple
       elsif !singular?
         :object_ptr
       else
-        defn = single!.defn
+        defn = single!.defn(ctx)
         if defn.has_tag?(:numeric)
           if defn.ident.value == "USize" || defn.ident.value == "ISize"
             :isize
@@ -124,13 +124,13 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       end
     end
 
-    def llvm_mem_type : Symbol
+    def llvm_mem_type(ctx) : Symbol
       # # TODO: should we be using a different memory type for i1 like ponyc?
-      # if llvm_use_type == :i1
+      # if llvm_use_type(ctx) == :i1
       #   # TODO: use :i32 on Darwin PPC32? (see ponyc's gentype.c:283)
       #   :i8
       # else
-        llvm_use_type
+        llvm_use_type(ctx)
       # end
     end
 
@@ -162,21 +162,22 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       || (is_union? && union_children.any?(&.is_possibly_iso?))
     end
 
-    def trace_needed?(dst_type = self)
-      trace_kind = trace_kind()
-      return false if trace_kind == :machine_word && dst_type.trace_kind == :machine_word
+    def trace_needed?(ctx, dst_type = self)
+      trace_kind = trace_kind(ctx)
+      return false if trace_kind == :machine_word && dst_type.trace_kind(ctx) == :machine_word
       raise NotImplementedError.new(trace_kind) if trace_kind == :tuple
       true
     end
 
-    def trace_kind
+    def trace_kind(ctx)
       if is_union?
         union_children.reduce(:none) do |kind, child|
+          child_trace_kind = child.trace_kind(ctx)
           case kind
-          when :none then child.trace_kind
+          when :none then child_trace_kind
           when :dynamic, :tuple then :dynamic
           when :machine_word
-            case child.trace_kind
+            case child_trace_kind
             when :val_known, :val_unknown, :machine_word
               :val_unknown
             when :mut_known, :mut_unknown
@@ -187,10 +188,10 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
               :non_unknown
             when :dynamic, :tuple
               :dynamic
-            else raise NotImplementedError.new(child.trace_kind)
+            else raise NotImplementedError.new(child_trace_kind)
             end
           when :mut_known, :mut_unknown
-            case child.trace_kind
+            case child_trace_kind
             when :mut_known, :mut_unknown, :machine_word
               :mut_unknown
             when :val_known, :val_unknown,
@@ -198,10 +199,10 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
                  :non_known, :non_unknown,
                  :dynamic, :tuple
               :dynamic
-            else raise NotImplementedError.new(child.trace_kind)
+            else raise NotImplementedError.new(child_trace_kind)
             end
           when :val_known, :val_unknown
-            case child.trace_kind
+            case child_trace_kind
             when :val_known, :val_unknown, :machine_word
               :val_unknown
             when :mut_known, :mut_unknown,
@@ -209,10 +210,10 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
                  :non_known, :non_unknown,
                  :dynamic, :tuple
               :dynamic
-            else raise NotImplementedError.new(child.trace_kind)
+            else raise NotImplementedError.new(child_trace_kind)
             end
           when :tag_known, :tag_unknown
-            case child.trace_kind
+            case child_trace_kind
             when :tag_known, :tag_unknown, :machine_word
               :tag_unknown
             when :mut_known, :mut_unknown,
@@ -220,10 +221,10 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
                  :non_known, :non_unknown,
                  :dynamic, :tuple
               :dynamic
-            else raise NotImplementedError.new(child.trace_kind)
+            else raise NotImplementedError.new(child_trace_kind)
             end
           when :non_known, :non_unknown
-            case child.trace_kind
+            case child_trace_kind
             when :non_known, :non_unknown, :machine_word
               :non_unknown
             when :mut_known, :mut_unknown,
@@ -231,7 +232,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
                  :tag_known, :tag_unknown,
                  :dynamic, :tuple
               :dynamic
-            else raise NotImplementedError.new(child.trace_kind)
+            else raise NotImplementedError.new(child_trace_kind)
             end
           else raise NotImplementedError.new(kind)
           end
@@ -241,7 +242,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       elsif is_tuple?
         raise NotImplementedError.new(self)
       elsif singular?
-        if !single!.defn.is_concrete?
+        if !single!.defn(ctx).is_concrete?
           case @meta_type.cap_only.inner
           when Infer::MetaType::Capability::NON then :non_unknown
           when Infer::MetaType::Capability::TAG then :tag_unknown
@@ -252,9 +253,9 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
                Infer::MetaType::Capability::BOX then :mut_unknown
           else raise NotImplementedError.new(single!)
           end
-        elsif single!.defn.has_tag?(:numeric)
+        elsif single!.defn(ctx).has_tag?(:numeric)
           :machine_word
-        elsif single!.defn.has_tag?(:actor)
+        elsif single!.defn(ctx).has_tag?(:actor)
           :tag_known
         else
           case @meta_type.cap_only.inner
@@ -273,8 +274,8 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       end
     end
 
-    def trace_kind_with_dst_cap(dst_kind : Symbol)
-      src_kind = trace_kind()
+    def trace_kind_with_dst_cap(ctx, dst_kind : Symbol)
+      src_kind = trace_kind(ctx)
       case src_kind
       when :none, :machine_word, :dynamic,
            :tag_known, :tag_unknown,
@@ -361,9 +362,9 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     def initialize(ctx, @reified : Infer::ReifiedType, reach : Reach, @fields)
       @desc_id = 0
       @desc_id =
-        if is_numeric?
+        if is_numeric?(ctx)
           reach.next_numeric_id
-        elsif is_abstract?
+        elsif is_abstract?(ctx)
           reach.next_trait_id(ctx, self)
         elsif is_tuple?
           reach.next_tuple_id
@@ -377,11 +378,11 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     end
 
     def refer(ctx)
-      ctx.refer[@reified.defn]
+      ctx.refer[@reified.defn(ctx)]
     end
 
     def program_type
-      @reified.defn
+      @reified.link
     end
 
     def llvm_name : String
@@ -390,70 +391,70 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       .gsub("(", "[").gsub(")", "]") # LLDB doesn't handle parens very well...
     end
 
-    def has_desc?
-      !@reified.defn.has_tag?(:no_desc)
+    def has_desc?(ctx)
+      !@reified.defn(ctx).has_tag?(:no_desc)
     end
 
-    def has_allocation?
-      @reified.defn.has_tag?(:allocated)
+    def has_allocation?(ctx)
+      @reified.defn(ctx).has_tag?(:allocated)
     end
 
-    def has_state?
-      @reified.defn.has_tag?(:allocated) ||
-      @reified.defn.has_tag?(:numeric)
+    def has_state?(ctx)
+      @reified.defn(ctx).has_tag?(:allocated) ||
+      @reified.defn(ctx).has_tag?(:numeric)
     end
 
-    def has_actor_pad?
-      @reified.defn.has_tag?(:actor)
+    def has_actor_pad?(ctx)
+      @reified.defn(ctx).has_tag?(:actor)
     end
 
-    def is_actor?
-      @reified.defn.has_tag?(:actor)
+    def is_actor?(ctx)
+      @reified.defn(ctx).has_tag?(:actor)
     end
 
-    def is_abstract?
-      @reified.defn.has_tag?(:abstract)
+    def is_abstract?(ctx)
+      @reified.defn(ctx).has_tag?(:abstract)
     end
 
     def is_tuple?
       false
     end
 
-    def is_cpointer?
+    def is_cpointer?(ctx)
       # TODO: less hacky here
-      @reified.defn.ident.value == "CPointer"
+      @reified.defn(ctx).ident.value == "CPointer"
     end
 
-    def is_array?
+    def is_array?(ctx)
       # TODO: less hacky here
-      @reified.defn.ident.value == "Array"
+      @reified.defn(ctx).ident.value == "Array"
     end
 
-    def is_platform?
+    def is_platform?(ctx)
       # TODO: less hacky here
-      @reified.defn.ident.value == "Platform"
+      @reified.defn(ctx).ident.value == "Platform"
     end
 
-    def cpointer_type_arg
-      raise "not a cpointer" unless is_cpointer?
+    def cpointer_type_arg(ctx)
+      raise "not a cpointer" unless is_cpointer?(ctx)
       Ref.new(@reified.args.first)
     end
 
-    def array_type_arg
-      raise "not an array" unless is_array?
+    def array_type_arg(ctx)
+      raise "not an array" unless is_array?(ctx)
       Ref.new(@reified.args.first)
     end
 
-    def is_numeric?
-      @reified.defn.has_tag?(:numeric)
+    def is_numeric?(ctx)
+      @reified.defn(ctx).has_tag?(:numeric)
     end
 
-    def is_floating_point_numeric?
-      is_numeric? && @reified.defn.const_bool("is_floating_point")
+    def is_floating_point_numeric?(ctx)
+      is_numeric?(ctx) && @reified.defn(ctx).const_bool("is_floating_point")
     end
 
-    def is_signed_numeric?
-      is_numeric? && @reified.defn.const_bool("is_signed")
+    def is_signed_numeric?(ctx)
+      is_numeric?(ctx) && @reified.defn(ctx).const_bool("is_signed")
     end
 
     def each_function(ctx)
@@ -468,7 +469,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       .map { |rf| ctx.reach.reached_funcs_for(rf) }
     end
 
-    def as_ref(cap = nil) : Ref
+    def as_ref(ctx, cap = nil) : Ref
       Ref.new(Infer::MetaType.new(@reified, cap))
     end
   end
@@ -494,12 +495,12 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       true
     end
 
-    def codegen_compat
-      {name, params.map(&.is_not_pointer?) + [ret.is_not_pointer?]}
+    def codegen_compat(ctx)
+      {name, params.map(&.is_not_pointer?(ctx)) + [ret.is_not_pointer?(ctx)]}
     end
 
-    def codegen_compat_name
-      codegen_compat.inspect # TODO: be less silly and lazy here?
+    def codegen_compat_name(ctx)
+      codegen_compat(ctx).inspect # TODO: be less silly and lazy here?
     end
   end
 
@@ -531,12 +532,12 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
 
   def run(ctx)
     # Reach functions called starting from the entrypoint of the program.
-    env = ctx.namespace[ctx, "Env"].as(Program::Type)
-    handle_func(ctx, ctx.infer.for_type(ctx, env), env.find_func!("_create"))
+    env = ctx.namespace["Env"].as(Program::Type::Link)
+    handle_func(ctx, ctx.infer.for_type(ctx, env), env.resolve(ctx).find_func!("_create"))
     main = ctx.namespace.main_type!(ctx)
-    handle_func(ctx, ctx.infer.for_type(ctx, main), main.find_func!("new"))
-    n = ctx.namespace[ctx, "AsioEventNotify"].as(Program::Type)
-    handle_func(ctx, ctx.infer.for_type(ctx, n), n.find_func!("_event_notify"))
+    handle_func(ctx, ctx.infer.for_type(ctx, main), main.resolve(ctx).find_func!("new"))
+    n = ctx.namespace["AsioEventNotify"].as(Program::Type::Link)
+    handle_func(ctx, ctx.infer.for_type(ctx, n), n.resolve(ctx).find_func!("_event_notify"))
 
     # Run our "sympathetic resonance" mini-pass.
     sympathetic_resonance(ctx)
@@ -568,10 +569,10 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
 
       # Reach all functions that have the same name as this function and
       # belong to a type that is a subtype of this one.
-      ctx.infer.for_completely_reified_types.each do |other_infer_type|
+      ctx.infer.for_completely_reified_types(ctx).each do |other_infer_type|
         other_rt = other_infer_type.reified
         next if infer_type.reified == other_rt
-        other_func = other_rt.defn.find_func?(func.ident.value)
+        other_func = other_rt.defn(ctx).find_func?(func.ident.value)
 
         handle_func(ctx, ctx.infer[other_rt], other_func) \
           if other_func && infer.is_subtype?(other_rt, infer_type.reified)
@@ -633,7 +634,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     return if @defs.has_key?(rt)
 
     # Skip this type def if it's not completely reified.
-    return unless rt.is_complete?
+    return unless rt.is_complete?(ctx)
 
     # Now, save a Def instance for this program type.
     # We do this sooner rather than later because we may recurse here.
@@ -645,7 +646,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
 
     # Reach all fields, regardless of if they were actually used.
     # This is important for consistency of memory layout purposes.
-    fields.concat(rt.defn.functions.select(&.has_tag?(:field)).map do |f|
+    fields.concat(rt.defn(ctx).functions.select(&.has_tag?(:field)).map do |f|
       handle_field(ctx, rt, f)
     end.compact)
   end
@@ -654,7 +655,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     # For each reachable abstract type def in the program,
     # collect the type defs that are subtypes of it.
     abstract_defs = Hash(Reach::Def, Array(Reach::Def)).new
-    each_type_def.select(&.is_abstract?).each do |abstract_def|
+    each_type_def.select(&.is_abstract?(ctx)).each do |abstract_def|
       abstract_defs[abstract_def] = subtype_defs = [] of Reach::Def
       each_type_def.each do |other_def|
         if other_def != abstract_def \
@@ -693,8 +694,8 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
               # Skip if the subtype already has a version with this signature,
               # or at least one that is codegen-compatible.
               next if (subtype_seen.any? do |subtype_func|
-                abstract_func.signature.codegen_compat == \
-                  subtype_func.signature.codegen_compat
+                abstract_func.signature.codegen_compat(ctx) == \
+                  subtype_func.signature.codegen_compat(ctx)
               end)
 
               # Create a new function manifestation in the subtype with this

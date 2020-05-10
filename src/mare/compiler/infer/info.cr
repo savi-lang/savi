@@ -92,7 +92,7 @@ class Mare::Compiler::Infer
       @domain_constraints.first[1]
     end
 
-    def total_domain_constraint
+    def total_domain_constraint(ctx)
       raise "already resolved" if @already_resolved
 
       MetaType.new_intersection(@domain_constraints.map(&.[2]))
@@ -138,7 +138,7 @@ class Mare::Compiler::Infer
       # TODO: print a different error message when the domain constraints are
       # internally conflicting, even before adding this meta_type into the mix.
 
-      total_domain_constraint = total_domain_constraint().simplify(infer)
+      total_domain_constraint = total_domain_constraint(infer.ctx).simplify(infer)
 
       meta_type_ephemeral = meta_type.ephemeralize
 
@@ -220,6 +220,7 @@ class Mare::Compiler::Infer
     end
 
     def inner_resolve!(infer : ForFunc)
+      ctx = infer.ctx
       explicit = @explicit
 
       if explicit
@@ -243,7 +244,7 @@ class Mare::Compiler::Infer
         return infer[@upstreams.first[0]].resolve!(infer).strip_ephemeral
       elsif !domain_constraints.empty?
         # If we only have domain constraints to, just do our best with those.
-        return total_domain_constraint.simplify(infer).strip_ephemeral
+        return total_domain_constraint(infer.ctx).simplify(infer).strip_ephemeral
       end
 
       # If we get here, we've failed and don't have enough info to continue.
@@ -329,15 +330,15 @@ class Mare::Compiler::Infer
   class Literal < DynamicInfo
     def describe_kind; "literal value" end
 
-    def initialize(@pos, possible : Array(MetaType))
-      @possible = MetaType.new_union(possible).cap("val").as(MetaType)
+    def initialize(@pos, @possible : MetaType)
     end
 
     def inner_resolve!(infer : ForFunc)
       # Literal values (such as numeric literals) sometimes have
       # an ambiguous type. Here, we  intersect with the domain constraints
       # to (hopefully) arrive at a single concrete type to return.
-      meta_type = total_domain_constraint.intersect(@possible).simplify(infer)
+      ctx = infer.ctx
+      meta_type = total_domain_constraint(ctx).intersect(@possible).simplify(infer)
 
       # If we don't satisfy the constraints, leave it to DynamicInfo.resolve!
       # to print a consistent error message instead of printing it here.
@@ -620,7 +621,7 @@ class Mare::Compiler::Infer
       # Reach the functions we will use during CodeGen.
       ctx = infer.ctx
       ["new", "<<"].each do |f_name|
-        f = rt.defn.find_func!(f_name)
+        f = rt.defn(ctx).find_func!(f_name)
         ctx.infer.for_func(ctx, rt, f, MetaType.cap(f.cap.value)).run
         infer.extra_called_func!(rt, f)
       end
@@ -646,9 +647,9 @@ class Mare::Compiler::Infer
     private def possible_element_antecedents(infer) : Array(MetaType)
       results = [] of MetaType
 
-      total_domain_constraint.each_reachable_defn.to_a.each do |rt|
+      total_domain_constraint(infer.ctx).each_reachable_defn.to_a.each do |rt|
         # TODO: Support more element antecedent detection patterns.
-        if rt.defn == infer.prelude_type("Array") \
+        if rt.link == infer.prelude_type("Array") \
         && rt.args.size == 1
           results << rt.args.first
         end

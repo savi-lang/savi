@@ -12,12 +12,16 @@ describe Mare::Compiler::Infer::MetaType do
   no      = Mare::Compiler::Infer::MetaType::Unsatisfiable::INSTANCE
 
   it "implements logical operators that keep the expression in DNF form" do
+    library = Mare::Program::Library.new
+    library.source_library = Mare::Source::Library.new("(example)")
+
     new_type = ->(s : String, is_abstract : Bool) {
       ref_ident = Mare::AST::Identifier.new("ref")
       t = Mare::Program::Type.new(ref_ident, Mare::AST::Identifier.new(s))
       t.add_tag(:abstract) if is_abstract
+      library.types << t
       m = Mare::Compiler::Infer::MetaType.new_nominal(
-        Mare::Compiler::Infer::ReifiedType.new(t)
+        Mare::Compiler::Infer::ReifiedType.new(t.make_link(library))
       )
       m
     }

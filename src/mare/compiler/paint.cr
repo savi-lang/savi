@@ -31,7 +31,7 @@ class Mare::Compiler::Paint
       reach_def.each_function(ctx).each do |reach_func|
         next if reach_func.reified.func.has_tag?(:hygienic)
 
-        observe_func(reach_def, reach_func)
+        observe_func(ctx, reach_def, reach_func)
       end
     end
 
@@ -42,9 +42,9 @@ class Mare::Compiler::Paint
 
   # Public: return the color id for the given function,
   # assuming that this pass has already been run on the program.
-  def [](rf); color_of(rf) end
-  def color_of(reach_func : Reach::Func) : Color
-    @results[reach_func.reach_def][reach_func.signature.codegen_compat_name]
+  def [](ctx, rf); color_of(ctx, rf) end
+  def color_of(ctx, reach_func : Reach::Func) : Color
+    @results[reach_func.reach_def][reach_func.signature.codegen_compat_name(ctx)]
   end
 
   # Return the next color id to assign when we need a previously unused color.
@@ -55,9 +55,9 @@ class Mare::Compiler::Paint
   end
 
   # Take notice of the given function, under the given type.
-  private def observe_func(reach_def : Reach::Def, reach_func : Reach::Func)
+  private def observe_func(ctx, reach_def : Reach::Def, reach_func : Reach::Func)
     sig = reach_func.signature
-    set = @defs_by_sig_compat[sig.codegen_compat_name] ||= Set(Reach::Def).new
+    set = @defs_by_sig_compat[sig.codegen_compat_name(ctx)] ||= Set(Reach::Def).new
     set.add(reach_def)
   end
 

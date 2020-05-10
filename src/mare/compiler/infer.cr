@@ -27,8 +27,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     # If there is no Main type, proceed to analyzing the whole program.
     main = ctx.namespace.main_type?(ctx)
     if main
-      main = main.as(Program::Type)
-      f = main.find_func?("new")
+      main = main.as(Program::Type::Link)
+      f = main.resolve(ctx).find_func?("new")
       for_func(ctx, for_type(ctx, main).reified, f, MetaType.cap(f.cap.value)).run if f
     end
 
@@ -48,8 +48,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     # This is also where we take care of typechecking for unused partial
     # reifications of all generic type parameters.
     library.types.each do |t|
-      for_type_each_partial_reification(ctx, t).each do |infer_type|
-        infer_type.reified.defn.functions.each do |f|
+      for_type_each_partial_reification(ctx, t, t.make_link(library)).each do |infer_type|
+        infer_type.reified.defn(ctx).functions.each do |f|
           for_func(ctx, infer_type.reified, f, MetaType.cap(f.cap.value)).run
         end
 
@@ -79,8 +79,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     @types[rt]?
   end
 
-  def for_type_each_partial_reification(ctx, t : Program::Type)
-    no_args = for_type(ctx, t)
+  def for_type_each_partial_reification(ctx, t, link : Program::Type::Link)
+    no_args = for_type(ctx, link)
     return [no_args] if 0 == (t.params.try(&.terms.size) || 0)
 
     params_partial_reifications =
@@ -114,18 +114,18 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
 
       args = substitutions_map.map(&.last.substitute_type_params(substitutions_map))
 
-      for_type(ctx, t, args)
+      for_type(ctx, link, args)
     end
   end
 
   def for_func_simple(ctx : Context, source : Source, t_name : String, f_name : String)
-    t = ctx.namespace.in_source(ctx, source, t_name).as(Program::Type)
-    f = t.find_func!(f_name)
-    for_func_simple(ctx, t, f)
+    t_link = ctx.namespace.in_source(source, t_name).as(Program::Type::Link)
+    f = t_link.resolve(ctx).find_func!(f_name)
+    for_func_simple(ctx, t_link, f)
   end
 
-  def for_func_simple(ctx : Context, t : Program::Type, f : Program::Function)
-    for_func(ctx, for_type(ctx, t).reified, f, MetaType.cap(f.cap.value))
+  def for_func_simple(ctx : Context, t_link : Program::Type::Link, f : Program::Function)
+    for_func(ctx, for_type(ctx, t_link).reified, f, MetaType.cap(f.cap.value))
   end
 
   def for_func(
@@ -151,32 +151,32 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     # Sanity check - the reified type shouldn't have any args yet.
     raise "already has type args: #{rt.inspect}" unless rt.args.empty?
 
-    for_type(ctx, rt.defn, type_args, precursor)
+    for_type(ctx, rt.link, type_args, precursor)
   end
 
   def for_type(
     ctx : Context,
-    t : Program::Type,
+    link : Program::Type::Link,
     type_args : Array(MetaType) = [] of MetaType,
     precursor : (ForType | ForFunc)? = nil
   ) : ForType
-    rt = ReifiedType.new(t, type_args)
+    rt = ReifiedType.new(link, type_args)
     @types[rt]? || (
       ft = @types[rt] = ForType.new(ctx, rt, precursor)
       ft.tap(&.initialize_assertions(ctx))
     )
   end
 
-  def for_completely_reified_types
-    @types.each_value.select(&.reified.is_complete?).to_a
+  def for_completely_reified_types(ctx)
+    @types.each_value.select(&.reified.is_complete?(ctx)).to_a
   end
 
-  def for_non_argumented_types
+  def for_non_argumented_types(ctx)
     # Skip fully-reified generic types - we will only check generics types
     # that have been only partially reified and non-generic types.
     @types
     .each_value
-    .select { |ft| !(ft.reified.has_params? && ft.reified.is_complete?) }
+    .select { |ft| !(ft.reified.has_params?(ctx) && ft.reified.is_complete?(ctx)) }
     .to_a
   end
 
@@ -186,23 +186,26 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     node : AST::Qualify,
     rt : ReifiedType,
   )
+    rt_defn = rt.defn(ctx)
+    rt_params_count = rt.params_count(ctx)
+
     raise "inconsistent arguments" if node.group.terms.size != rt.args.size
 
     return if @validated_type_args_already.includes?(rt)
     @validated_type_args_already.add(rt)
 
     # Check number of type args against number of type params.
-    if rt.args.size > rt.params_count
-      params_pos = (rt.defn.params || rt.defn.ident).pos
+    if rt.args.size > rt_params_count
+      params_pos = (rt_defn.params || rt_defn.ident).pos
       Error.at node, "This type qualification has too many type arguments", [
-        {params_pos, "#{rt.params_count} type arguments were expected"},
-      ].concat(node.group.terms[rt.params_count..-1].map { |arg|
+        {params_pos, "#{rt_params_count} type arguments were expected"},
+      ].concat(node.group.terms[rt_params_count..-1].map { |arg|
         {arg.pos, "this is an excessive type argument"}
       })
-    elsif rt.args.size < rt.params_count
-      params = rt.defn.params.not_nil!
+    elsif rt.args.size < rt_params_count
+      params = rt_defn.params.not_nil!
       Error.at node, "This type qualification has too few type arguments", [
-        {params.pos, "#{rt.params_count} type arguments were expected"},
+        {params.pos, "#{rt_params_count} type arguments were expected"},
       ].concat(params.terms[rt.args.size..-1].map { |param|
         {param.pos, "this additional type parameter needs an argument"}
       })
@@ -216,7 +219,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       param_bound = ctx.infer[rt].get_type_param_bound(index)
       unless arg.satisfies_bound?(infer, param_bound)
         bound_pos =
-          rt.defn.params.not_nil!.terms[index].as(AST::Group).terms.last.pos
+          rt_defn.params.not_nil!.terms[index].as(AST::Group).terms.last.pos
         Error.at arg_node,
           "This type argument won't satisfy the type parameter bound", [
             {bound_pos, "the type parameter bound is #{param_bound.show_type}"},
@@ -227,10 +230,14 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   end
 
   struct ReifiedType
-    getter defn : Program::Type
+    getter link : Program::Type::Link
     getter args : Array(MetaType)
 
-    def initialize(@defn, @args = [] of MetaType)
+    def initialize(@link, @args = [] of MetaType)
+    end
+
+    def defn(ctx)
+      link.resolve(ctx)
     end
 
     def show_type
@@ -238,7 +245,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
 
     def show_type(io : IO)
-      io << defn.ident.value
+      io << link.name
 
       unless args.empty?
         io << "("
@@ -254,16 +261,16 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       show_type(io)
     end
 
-    def params_count
-      (defn.params.try(&.terms.size) || 0)
+    def params_count(ctx)
+      (defn(ctx).params.try(&.terms.size) || 0)
     end
 
-    def has_params?
-      0 != params_count
+    def has_params?(ctx)
+      0 != params_count(ctx)
     end
 
-    def is_complete?
-      args.size == params_count && args.all?(&.type_params.empty?)
+    def is_complete?(ctx)
+      args.size == params_count(ctx) && args.all?(&.type_params.empty?)
     end
   end
 
@@ -302,10 +309,11 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
 
     def initialize_assertions(ctx)
-      @reified.defn.functions.each do |f|
+      reified_defn = reified.defn(ctx)
+      reified_defn.functions.each do |f|
         next unless f.has_tag?(:is)
 
-        trait = type_expr(f.ret.not_nil!, ctx.refer[reified.defn][f]).single!
+        trait = type_expr(f.ret.not_nil!, ctx.refer[reified_defn][f]).single!
 
         subtyping.assert(trait, f.ident.pos)
       end
@@ -316,7 +324,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
 
     def refer
-      ctx.refer[reified.defn]
+      ctx.refer[reified.defn(ctx)]
     end
 
     def is_subtype?(
@@ -363,15 +371,16 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
 
     def get_type_param_bound(index : Int32)
-      refer = ctx.refer[reified.defn]
-      param_node = reified.defn.params.not_nil!.terms[index]
+      reified_defn = reified.defn(ctx)
+      refer = ctx.refer[reified_defn]
+      param_node = reified_defn.params.not_nil!.terms[index]
       param_bound_node = refer[param_node].as(Refer::TypeParam).bound
 
       type_expr(param_bound_node.not_nil!, refer, nil)
     end
 
     def lookup_type_param(ref : Refer::TypeParam, refer, receiver = nil)
-      if ref.parent(ctx) != reified.defn
+      if ref.parent_link != reified.link
         raise NotImplementedError.new(ref) unless @precursor
         return @precursor.not_nil!.lookup_type_param(ref, refer, receiver)
       end
@@ -385,7 +394,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
 
     def lookup_type_param_bound(ref : Refer::TypeParam)
-      if ref.parent(ctx) != reified.defn
+      if ref.parent_link != reified.link
         raise NotImplementedError.new(ref) unless @precursor
         return @precursor.not_nil!.lookup_type_param_bound(ref)
       end
@@ -431,7 +440,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       when Refer::Self
         receiver || MetaType.new(reified)
       when Refer::Type, Refer::TypeAlias
-        MetaType.new(reified_type(ref.defn(ctx)))
+        MetaType.new(reified_type(ref.link))
       when Refer::TypeParam
         lookup_type_param(ref, refer, receiver)
       when Refer::Unresolved, nil
@@ -540,7 +549,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
 
     def refer
-      ctx.refer[reified.type.defn][reified.func]
+      ctx.refer[reified.type.defn(ctx)][reified.func]
     end
 
     def is_subtype?(
@@ -625,7 +634,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
           finish_param(param, self[param]) unless self[param].is_a?(Param)
 
           # TODO: special-case this somewhere else?
-          if reified.type.defn.ident.value == "Main" \
+          if reified.type.link.name == "Main" \
           && reified.func.ident.value == "new"
             env = MetaType.new(reified_type(prelude_type("Env")))
             self[param].as(Param).set_explicit(reified.func.ident.pos, env)
@@ -763,18 +772,20 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
           problems << {call.pos,
             "the type #{call_mti.inspect} has no referencable types in it"}
         elsif call_func.nil?
-          problems << {call_defn.defn.ident.pos,
-            "#{call_defn.defn.ident.value} has no '#{call.member}' function"}
+          call_defn_defn = call_defn.defn(ctx)
+
+          problems << {call_defn_defn.ident.pos,
+            "#{call_defn_defn.ident.value} has no '#{call.member}' function"}
 
           found_similar = false
           if call.member.ends_with?("!")
-            call_defn.defn.find_func?(call.member[0...-1]).try do |similar|
+            call_defn_defn.find_func?(call.member[0...-1]).try do |similar|
               found_similar = true
               problems << {similar.ident.pos,
                 "maybe you meant to call '#{similar.ident.value}' (without '!')"}
             end
           else
-            call_defn.defn.find_func?("#{call.member}!").try do |similar|
+            call_defn_defn.find_func?("#{call.member}!").try do |similar|
               found_similar = true
               problems << {similar.ident.pos,
                 "maybe you meant to call '#{similar.ident.value}' (with a '!')"}
@@ -782,7 +793,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
           end
 
           unless found_similar
-            similar = find_similar_function(call_defn.defn, call.member)
+            similar = find_similar_function(call_defn_defn, call.member)
             problems << {similar.ident.pos,
               "maybe you meant to call the '#{similar.ident.value}' function"} \
                 if similar
@@ -1027,7 +1038,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
 
     def follow_field(field : Field, name : String)
-      field_func = reified.type.defn.functions.find do |f|
+      field_func = reified.type.defn(ctx).functions.find do |f|
         f.ident.value == name && f.has_tag?(:field)
       end.not_nil!
 
@@ -1051,7 +1062,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
 
     def prelude_type(name)
-      @ctx.namespace[@ctx, name].as(Program::Type)
+      @ctx.namespace[name].as(Program::Type::Link)
     end
 
     def reified_type(*args)
@@ -1115,7 +1126,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       return if Classify.further_qualified?(node)
 
       # If this node has no params, no type args are needed.
-      params = rt.defn.params
+      params = rt.defn(ctx).params
       return if params.nil?
       return if params.terms.size == 0
       return if params.terms.size == rt.args.size
@@ -1159,7 +1170,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       ref = refer[node]
       case ref
       when Refer::Type, Refer::TypeAlias
-        rt = reified_type(ref.defn(ctx))
+        rt = reified_type(ref.link)
         if ref.metadata(ctx)[:enum_value]?
           # We trust the cap of the value type (for example, False, True, etc).
           meta_type = MetaType.new(rt)
@@ -1205,28 +1216,32 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     def touch(node : AST::LiteralString)
       defns = [prelude_type("String")]
       mts = defns.map { |defn| MetaType.new(reified_type(defn)).as(MetaType) } # TODO: is it possible to remove this superfluous "as"?
-      self[node] = Literal.new(node.pos, mts)
+      mt = MetaType.new_union(mts).cap("val")
+      self[node] = Literal.new(node.pos, mt)
     end
 
     # A literal character could be any integer or floating-point machine type.
     def touch(node : AST::LiteralCharacter)
       defns = [prelude_type("Numeric")]
       mts = defns.map { |defn| MetaType.new(reified_type(defn)).as(MetaType) } # TODO: is it possible to remove this superfluous "as"?
-      self[node] = Literal.new(node.pos, mts)
+      mt = MetaType.new_union(mts).cap("val")
+      self[node] = Literal.new(node.pos, mt)
     end
 
     # A literal integer could be any integer or floating-point machine type.
     def touch(node : AST::LiteralInteger)
       defns = [prelude_type("Numeric")]
       mts = defns.map { |defn| MetaType.new(reified_type(defn)).as(MetaType) } # TODO: is it possible to remove this superfluous "as"?
-      self[node] = Literal.new(node.pos, mts)
+      mt = MetaType.new_union(mts).cap("val")
+      self[node] = Literal.new(node.pos, mt)
     end
 
     # A literal float could be any floating-point machine type.
     def touch(node : AST::LiteralFloat)
       defns = [prelude_type("F32"), prelude_type("F64")]
       mts = defns.map { |defn| MetaType.new(reified_type(defn)).as(MetaType) } # TODO: is it possible to remove this superfluous "as"?
-      self[node] = Literal.new(node.pos, mts)
+      mt = MetaType.new_union(mts).cap("val")
+      self[node] = Literal.new(node.pos, mt)
     end
 
     def touch(node : AST::Group)
@@ -1430,7 +1445,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
           end
 
         # Reach all functions that might possibly be reflected.
-        reflect_rt.defn.functions.each do |f|
+        reflect_rt.defn(ctx).functions.each do |f|
           next if f.has_tag?(:hygienic) || f.body.nil?
           ctx.infer.for_func(ctx, reflect_rt, f, MetaType.cap(f.cap.value)).tap(&.run)
           extra_called_func!(reflect_rt, f)

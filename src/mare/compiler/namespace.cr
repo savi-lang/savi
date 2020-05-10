@@ -16,9 +16,9 @@ class Mare::Compiler::Namespace
   end
 
   def main_type!(ctx); main_type?(ctx).not_nil! end
-  def main_type?(ctx): Program::Type?
+  def main_type?(ctx): Program::Type::Link?
     root_library_link = ctx.program.libraries.first.make_link
-    @types_by_library[root_library_link]["Main"]?.as(Program::Type::Link?).try(&.resolve(ctx))
+    @types_by_library[root_library_link]["Main"]?.as(Program::Type::Link?)
   end
 
   def run(ctx)
@@ -88,14 +88,14 @@ class Mare::Compiler::Namespace
 
   # When given an String name and Source, try to find the named type.
   # This is not very commonly what you want.
-  def in_source(ctx : Context, source : Source, name : String)
-    @types_by_source[source][name]?.try(&.resolve(ctx))
+  def in_source(source : Source, name : String)
+    @types_by_source[source][name]?
   end
 
   # TODO: Remove this method?
   # This is only for use in testing.
   def find_func!(ctx, source, type_name, func_name)
-    self.in_source(ctx, source, type_name).as(Program::Type).find_func!(func_name)
+    self.in_source(source, type_name).as(Program::Type::Link).resolve(ctx).find_func!(func_name)
   end
 
   private def add_type_to_library(ctx, new_type, library)

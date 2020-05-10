@@ -118,15 +118,15 @@ struct Mare::Compiler::Infer::MetaType::Union
     list
   end
 
-  def any_callable_func_defn_type(name : String) : Infer::ReifiedType?
+  def any_callable_func_defn_type(ctx, name : String) : Infer::ReifiedType?
     # Return the first nominal or intersection in this union that has this func.
     terms.try(&.each do |term|
-      term.any_callable_func_defn_type(name).try do |result|
+      term.any_callable_func_defn_type(ctx, name).try do |result|
         return result
       end
     end)
     intersects.try(&.each do |intersect|
-      intersect.any_callable_func_defn_type(name).try do |result|
+      intersect.any_callable_func_defn_type(ctx, name).try do |result|
         return result
       end
     end)

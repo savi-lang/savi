@@ -1,5 +1,7 @@
 class Mare::Compiler::Infer::SubtypingInfo
-  def initialize(@ctx : Context, @this : ReifiedType)
+  getter ctx : Context
+
+  def initialize(@ctx, @this : ReifiedType)
     @asserted = Hash(ReifiedType, Source::Pos).new
     @confirmed = Set(ReifiedType).new
     @disproved = Hash(ReifiedType, Array(Error::Info)).new
@@ -43,8 +45,9 @@ class Mare::Compiler::Infer::SubtypingInfo
     # Note that by the time we've reached this line, we've already
     # determined that the two types are not identical, so we're only
     # concerned with structural subtyping from here on.
-    if that.defn.is_concrete?
-      errors << {that.defn.ident.pos,
+    that_defn = that.defn(ctx)
+    if that_defn.is_concrete?
+      errors << {that_defn.ident.pos,
         "a concrete type can't be a subtype of another concrete type"}
       return false
     end
@@ -95,7 +98,7 @@ class Mare::Compiler::Infer::SubtypingInfo
 
   private def full_check(that : ReifiedType, errors : Array(Error::Info))
     # A type only matches a trait if all functions match that trait.
-    that.defn.functions.each do |that_func|
+    that.defn(ctx).functions.each do |that_func|
       # Hygienic functions are not considered to be real functions for the
       # sake of structural subtyping, so they don't have to be fulfilled.
       next if that_func.has_tag?(:hygienic)
@@ -108,7 +111,7 @@ class Mare::Compiler::Infer::SubtypingInfo
 
   private def check_func(that, that_func, errors)
     # The structural comparison fails if a required method is missing.
-    this_func = this.defn.find_func?(that_func.ident.value)
+    this_func = this.defn(ctx).find_func?(that_func.ident.value)
     unless this_func
       errors << {that_func.ident.pos,
         "this function isn't present in the subtype"}

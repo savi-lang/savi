@@ -106,10 +106,10 @@ struct Mare::Compiler::Infer::MetaType::Intersection
     list
   end
 
-  def any_callable_func_defn_type(name : String) : ReifiedType?
+  def any_callable_func_defn_type(ctx, name : String) : ReifiedType?
     # Return the first nominal in this intersection that has this func.
     terms.try(&.each do |term|
-      term.any_callable_func_defn_type(name).try do |result|
+      term.any_callable_func_defn_type(ctx, name).try do |result|
         return result
       end
     end)

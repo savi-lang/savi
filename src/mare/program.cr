@@ -191,13 +191,17 @@ class Mare::Program
       make_link(library.make_link)
     end
     def make_link(library : Library::Link)
-      Link.new(library, ident.value)
+      Link.new(library, ident.value, cap.value, is_concrete?)
     end
 
     struct Link
       getter library : Library::Link
       getter name : String
-      def initialize(@library, @name)
+      getter cap : String # TODO: remove this? need to refactor MetaType.new and MetaType#inspect
+      getter concrete : Bool # TODO: remove this? need to refactor MetaType#is_concrete?
+      def is_concrete?; concrete; end
+      def is_abstract?; !concrete; end
+      def initialize(@library, @name, @cap, @concrete)
       end
       def resolve(ctx : Compiler::Context)
         @library.resolve(ctx).types.find(&.ident.value.==(@name)).not_nil!

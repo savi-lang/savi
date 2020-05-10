@@ -64,7 +64,7 @@ struct Mare::Compiler::Infer::MetaType::Capability
     nil
   end
 
-  def any_callable_func_defn_type(name : String) : ReifiedType?
+  def any_callable_func_defn_type(ctx, name : String) : ReifiedType?
     nil
   end
 

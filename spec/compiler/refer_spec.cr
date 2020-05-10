@@ -12,7 +12,7 @@ describe Mare::Compiler::Refer do
 
     ctx = Mare::Compiler.compile([source], :refer)
 
-    main = ctx.namespace.main_type!(ctx)
+    main = ctx.namespace.main_type!(ctx).resolve(ctx)
     func = main.find_func!("new")
     refer = ctx.refer[main][func]
     x = func
@@ -43,7 +43,7 @@ describe Mare::Compiler::Refer do
 
     ctx = Mare::Compiler.compile([source], :refer)
 
-    main = ctx.namespace.main_type!(ctx)
+    main = ctx.namespace.main_type!(ctx).resolve(ctx)
     func = main.find_func!("new")
     refer = ctx.refer[main][func]
     choice_outer = func
