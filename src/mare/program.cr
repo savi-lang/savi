@@ -11,7 +11,7 @@ class Mare::Program
   def aliases; libraries.flat_map(&.aliases) end
 
   class Library
-    getter types
+    getter types : Array(Type)
     getter aliases
     getter imports
     property! source_library : Source::Library
@@ -22,21 +22,23 @@ class Mare::Program
       @imports = [] of Import
     end
 
-    def dup_init
-      @types = @types.dup
+    def dup_init(new_types = nil)
+      @types = new_types || @types.dup
       @aliases = @aliases.dup
       @imports = @imports.dup
     end
 
-    def dup
-      super.tap(&.dup_init)
+    def dup(*args)
+      super().tap(&.dup_init(*args))
     end
 
-    # TODO: Remove this and meet this need in a less hacky way.
-    def clear_lists
-      @types.clear
-      @aliases.clear
-      @imports.clear
+    def types_map_cow(&block : Type -> Type)
+      new_types = types.map_cow(&block)
+      if new_types.same?(types)
+        self
+      else
+        dup(new_types)
+      end
     end
 
     def make_link
@@ -108,7 +110,7 @@ class Mare::Program
     property params : AST::Group?
 
     getter metadata
-    getter functions
+    getter functions : Array(Function)
 
     KNOWN_TAGS = [
       :abstract,
@@ -126,14 +128,23 @@ class Mare::Program
       @metadata = Hash(Symbol, UInt64 | Bool).new
     end
 
-    def dup_init
-      @functions = @functions.dup
+    def dup_init(new_functions = nil)
+      @functions = new_functions || @functions.dup
       @tags = @tags.dup
       @metadata = @metadata.dup
     end
 
-    def dup
-      super.tap(&.dup_init)
+    def dup(*args)
+      super().tap(&.dup_init(*args))
+    end
+
+    def functions_map_cow(&block : Function -> Function)
+      new_functions = functions.map_cow(&block)
+      if new_functions.same?(functions)
+        self
+      else
+        dup(new_functions)
+      end
     end
 
     def inspect(io : IO)

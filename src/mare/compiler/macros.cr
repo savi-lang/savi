@@ -37,19 +37,15 @@ class Mare::Compiler::Macros < Mare::AST::CopyOnMutateVisitor
   end
 
   def self.run(ctx, library)
-    library = library.dup
-    library.types.map! do |t|
-      t = t.dup
-      t.functions.map! do |f|
+    library.types_map_cow do |t|
+      t.functions_map_cow do |f|
         cached_or_run library, t, f do
           macros = new(f)
           macros.maybe_compiler_intrinsic
           macros.run
         end
       end
-      t
     end
-    library
   end
 
   getter func

@@ -32,10 +32,8 @@ class Mare::Compiler::Sugar < Mare::AST::CopyOnMutateVisitor
   end
 
   def self.run(ctx, library)
-    library = library.dup
-    library.types.map! do |t|
-      t = t.dup
-      t.functions.map! do |f|
+    library.types_map_cow do |t|
+      t.functions_map_cow do |f|
         cached_or_run library, t, f do
           sugar = new
           f = sugar.run(f)
@@ -45,9 +43,7 @@ class Mare::Compiler::Sugar < Mare::AST::CopyOnMutateVisitor
           PseudoCalls.run(f, sugar)
         end
       end
-      t
     end
-    library
   end
 
   def initialize
@@ -65,8 +61,7 @@ class Mare::Compiler::Sugar < Mare::AST::CopyOnMutateVisitor
 
     # If any parameters contain assignments, convert them to defaults.
     if body && params
-      # TODO: Use lazier dup patterns
-      params = params.dup
+      params = params.dup if params.same?(f.params)
       params.terms = params.terms.map do |param|
         next param unless param.is_a?(AST::Relate) && param.op.value == "="
 
@@ -85,7 +80,7 @@ class Mare::Compiler::Sugar < Mare::AST::CopyOnMutateVisitor
     # If any parameters contain assignables, make assignments in the body.
     if params
       param_assign_count = 0
-      params = params.dup
+      params = params.dup if params.same?(f.params)
       params.terms = params.terms.map_with_index do |param, index|
         # Dig through a default parameter value relation first if present.
         if param.is_a?(AST::Relate) && param.op.value == "DEFAULTPARAM"
@@ -110,9 +105,12 @@ class Mare::Compiler::Sugar < Mare::AST::CopyOnMutateVisitor
           end
 
           # Add the assignment statement to the top of the function body.
-          # TODO: Use lazier dup patterns
-          body = body.try(&.dup) || AST::Group.new(":").from(params)
-          body.terms = body.terms.dup
+          if body.nil?
+            body = AST::Group.new(":").from(params)
+          elsif body.same?(f.body)
+            body = body.dup
+            body.terms = body.terms.dup
+          end
           body.terms.insert(param_assign_count,
             AST::Relate.new(
               param,
@@ -136,9 +134,10 @@ class Mare::Compiler::Sugar < Mare::AST::CopyOnMutateVisitor
     # analysis such as the Classify.value_needed? flag, since the final
     # expression in a constructor body isn't really used - "@" is returned.
     if f.has_tag?(:constructor) && body
-      # TODO: Use lazier dup patterns
-      body = body.dup
-      body.terms = body.terms.dup
+      if body.same?(f.body)
+        body = body.dup
+        body.terms = body.terms.dup
+      end
       body.terms << AST::Identifier.new("@").from(f.ident)
     end
 
@@ -147,9 +146,10 @@ class Mare::Compiler::Sugar < Mare::AST::CopyOnMutateVisitor
     if (f.has_tag?(:async) && !f.has_tag?(:constructor)) \
     || (ret.is_a?(AST::Identifier) && ret.value == "None")
       if body
-        # TODO: Use lazier dup patterns
-        body = body.dup
-        body.terms = body.terms.dup
+        if body.same?(f.body)
+          body = body.dup
+          body.terms = body.terms.dup
+        end
         body.terms << AST::Identifier.new("None").from(ret || f.ident)
       end
     end
@@ -157,10 +157,12 @@ class Mare::Compiler::Sugar < Mare::AST::CopyOnMutateVisitor
     # Sugar the body.
     body = body.try { |body| body.accept(self) }
 
-    f = f.dup
-    f.params = params
-    f.ret = ret
-    f.body = body
+    unless params.same?(f.params) && ret.same?(f.ret) && body.same?(f.body)
+      f = f.dup
+      f.params = params
+      f.ret = ret
+      f.body = body
+    end
     f
   end
 

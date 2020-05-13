@@ -141,41 +141,14 @@ module Mare::AST
     end
     private def children_list_accept(list : T, visitor : CopyOnMutateVisitor) : {T, Bool} forall T
       changed = false
-      # Avoid allocating new_list if no children change;
-      # lazily allocate it after the first child has changed.
-      new_list = nil
-      list.each_with_index do |child, index|
-        if changed
-          new_list.not_nil! << child.accept(visitor)
-        else
-          new_child = child.accept(visitor)
-          if !new_child.same?(child)
-            changed = true
-            new_list = (list[0...index] << new_child)
-          end
-        end
-      end
-      {(new_list || list), changed}
+      new_list = list.map_cow(&.accept(visitor))
+      {new_list, !new_list.same?(list)}
     end
     private def children_tuple2_list_accept(list : T, visitor : CopyOnMutateVisitor) : {T, Bool} forall T
-      changed = false
-      # Avoid allocating new_list if no children change;
-      # lazily allocate it after the first child has changed.
-      new_list = nil
-      list.each_with_index do |(child1, child2), index|
-        if changed
-          new_list.not_nil! << {child1.accept(visitor), child2.accept(visitor)}
-        else
-          new_child1 = child1.accept(visitor)
-          new_child2 = child2.accept(visitor)
-          changed ||= !new_child1.same?(child1)
-          changed ||= !new_child2.same?(child2)
-          if changed
-            new_list = (list[0...index] << {new_child1, new_child2})
-          end
-        end
+      new_list = list.map_cow2 do |(child1, child2)|
+        {child1.accept(visitor), child2.accept(visitor)}
       end
-      {(new_list || list), changed}
+      {new_list, !new_list.same?(list)}
     end
   end
 
