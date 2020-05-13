@@ -4,7 +4,7 @@ module Mare::Compiler
     when :import         then ctx.run_whole_program(Import)
     when :namespace      then ctx.run_whole_program(ctx.namespace)
     when :macros         then ctx.run_copy_on_mutate(Macros)
-    when :sugar          then ctx.run(Sugar)
+    when :sugar          then ctx.run_copy_on_mutate(Sugar)
     when :refer_type     then ctx.run(ctx.refer_type)
     when :populate       then ctx.run(Populate)
     when :lambda         then ctx.run(Lambda)

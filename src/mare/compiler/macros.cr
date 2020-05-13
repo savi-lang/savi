@@ -16,6 +16,7 @@ class Mare::Compiler::Macros < Mare::AST::CopyOnMutateVisitor
   # those the same as macro declarations in the prelude, with both getting
   # executed here dynamically instead of declared here statically.
 
+  # TODO: Clean up, consolidate, and improve this caching mechanism.
   @@cache = {} of String => {UInt64, Program::Function}
   def self.cache_key(l, t, f)
     t.ident.value + "\0" + f.ident.value

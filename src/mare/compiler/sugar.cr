@@ -10,18 +10,44 @@
 # This pass keeps temporary state at the per-function level.
 # This pass produces no output state.
 #
-class Mare::Compiler::Sugar < Mare::AST::MutatingVisitor
-  def self.run(ctx, library)
-    library.types.each do |t|
-      t.functions.each do |f|
-        sugar = new
-        sugar.run(f)
+class Mare::Compiler::Sugar < Mare::AST::CopyOnMutateVisitor
+  # TODO: Clean up, consolidate, and improve this caching mechanism.
+  @@cache = {} of String => {UInt64, Program::Function}
+  def self.cache_key(l, t, f)
+    t.ident.value + "\0" + f.ident.value
+  end
+  def self.cached_or_run(l, t, f) : Program::Function
+    input_hash = f.hash
+    # input_hash = f.structural_hash
+    cache_key = cache_key(l, t, f)
+    cache_result = @@cache[cache_key]?
+    cached_hash, cached_func = cache_result if cache_result
+    return cached_func if cached_func && cached_hash == input_hash
 
-        # Run pseudo-call transformation as a separate followup mini-pass,
-        # because some of the sugar transformations need to already be done.
-        PseudoCalls.run(f, sugar)
-      end
+    yield
+
+    .tap do |result|
+      @@cache[cache_key] = {input_hash, result}
     end
+  end
+
+  def self.run(ctx, library)
+    library = library.dup
+    library.types.map! do |t|
+      t = t.dup
+      t.functions.map! do |f|
+        cached_or_run library, t, f do
+          sugar = new
+          f = sugar.run(f)
+
+          # Run pseudo-call transformation as a separate followup mini-pass,
+          # because some of the sugar transformations need to already be done.
+          PseudoCalls.run(f, sugar)
+        end
+      end
+      t
+    end
+    library
   end
 
   def initialize
@@ -33,23 +59,34 @@ class Mare::Compiler::Sugar < Mare::AST::MutatingVisitor
   end
 
   def run(f)
+    params = f.params
+    ret = f.ret
+    body = f.body
+
     # If any parameters contain assignments, convert them to defaults.
-    if f.body && f.params
-      f.params.not_nil!.terms.each do |param|
-        if param.is_a?(AST::Relate) && param.op.value == "="
-          param.op.value = "DEFAULTPARAM"
-        end
+    if body && params
+      # TODO: Use lazier dup patterns
+      params = params.dup
+      params.terms = params.terms.map do |param|
+        next param unless param.is_a?(AST::Relate) && param.op.value == "="
+
+        AST::Relate.new(
+          param.lhs,
+          AST::Operator.new("DEFAULTPARAM").from(param.op),
+          param.rhs,
+        ).from(param)
       end
     end
 
     # Sugar the parameter signature and return type.
-    f.params.try(&.accept(self))
-    f.ret.try(&.accept(self))
+    params = params.try(&.accept(self))
+    ret = ret.try(&.accept(self))
 
     # If any parameters contain assignables, make assignments in the body.
-    if f.params
+    if params
       param_assign_count = 0
-      f.params.not_nil!.terms.each_with_index do |param, index|
+      params = params.dup
+      params.terms = params.terms.map_with_index do |param, index|
         # Dig through a default parameter value relation first if present.
         if param.is_a?(AST::Relate) && param.op.value == "DEFAULTPARAM"
           orig_param_with_default = param
@@ -63,14 +100,20 @@ class Mare::Compiler::Sugar < Mare::AST::MutatingVisitor
           # Replace the parameter with our new name as the identifier.
           param_ident = AST::Identifier.new(new_name).from(param)
           if orig_param_with_default
-            orig_param_with_default.lhs = param_ident
+            orig_param_with_default = AST::Relate.new(
+              param_ident,
+              orig_param_with_default.op,
+              orig_param_with_default.rhs,
+            ).from(orig_param_with_default)
           else
-            f.params.not_nil!.terms[index] = param_ident
+            assign_param = param_ident
           end
 
           # Add the assignment statement to the top of the function body.
-          f.body ||= AST::Group.new(":").from(f.params.not_nil!)
-          f.body.not_nil!.terms.insert(param_assign_count,
+          # TODO: Use lazier dup patterns
+          body = body.try(&.dup) || AST::Group.new(":").from(params)
+          body.terms = body.terms.dup
+          body.terms.insert(param_assign_count,
             AST::Relate.new(
               param,
               AST::Operator.new("=").from(param),
@@ -82,6 +125,8 @@ class Mare::Compiler::Sugar < Mare::AST::MutatingVisitor
           )
           param_assign_count += 1
         end
+
+        orig_param_with_default || assign_param || param
       end
     end
 
@@ -90,21 +135,33 @@ class Mare::Compiler::Sugar < Mare::AST::MutatingVisitor
     # This isn't required by the CodeGen pass, but it improves intermediate
     # analysis such as the Classify.value_needed? flag, since the final
     # expression in a constructor body isn't really used - "@" is returned.
-    if f.has_tag?(:constructor)
-      f.body.try { |body| body.terms << AST::Identifier.new("@").from(f.ident) }
+    if f.has_tag?(:constructor) && body
+      # TODO: Use lazier dup patterns
+      body = body.dup
+      body.terms = body.terms.dup
+      body.terms << AST::Identifier.new("@").from(f.ident)
     end
 
     # If this is a behaviour or function that returns None,
     # sugar a final "None" reference at the end.
     if (f.has_tag?(:async) && !f.has_tag?(:constructor)) \
-    || ((ret = f.ret; ret.is_a?(AST::Identifier)) && ret.value == "None")
-      f.body.try do |body|
+    || (ret.is_a?(AST::Identifier) && ret.value == "None")
+      if body
+        # TODO: Use lazier dup patterns
+        body = body.dup
+        body.terms = body.terms.dup
         body.terms << AST::Identifier.new("None").from(ret || f.ident)
       end
     end
 
     # Sugar the body.
-    f.body.try { |body| body.accept(self) }
+    body = body.try { |body| body.accept(self) }
+
+    f = f.dup
+    f.params = params
+    f.ret = ret
+    f.body = body
+    f
   end
 
   def visit(node : AST::Identifier)
@@ -131,8 +188,10 @@ class Mare::Compiler::Sugar < Mare::AST::MutatingVisitor
       end
     if square_bracket
       lhs = node.term
-      node.term = AST::Identifier.new(square_bracket).from(node.group)
-      args = node.group.tap { |n| n.style = "(" }
+      node = AST::Qualify.new(
+        AST::Identifier.new(square_bracket).from(node.group),
+        AST::Group.new("(", node.group.terms.dup).from(node.group),
+      ).from(node)
       dot = AST::Operator.new(".").from(node.group)
       rhs = visit(node)
       return AST::Relate.new(lhs, dot, rhs).from(node)
@@ -210,7 +269,8 @@ class Mare::Compiler::Sugar < Mare::AST::MutatingVisitor
       && lhs.rhs.as(AST::Qualify).term.as(AST::Identifier).value == "[]"
         inner = lhs.rhs.as(AST::Qualify)
         ident = AST::Identifier.new("[]=").from(inner.term)
-        args = inner.group
+        args = inner.group.dup
+        args.terms = args.terms.dup
         args.terms << node.rhs
         rhs = AST::Qualify.new(ident, args).from(node)
         AST::Relate.new(lhs.lhs, lhs.op, rhs).from(node)
@@ -222,7 +282,8 @@ class Mare::Compiler::Sugar < Mare::AST::MutatingVisitor
       && lhs.rhs.as(AST::Qualify).term.as(AST::Identifier).value == "[]!"
         inner = lhs.rhs.as(AST::Qualify)
         ident = AST::Identifier.new("[]=!").from(inner.term)
-        args = inner.group
+        args = inner.group.dup
+        args.terms = args.terms.dup
         args.terms << node.rhs
         rhs = AST::Qualify.new(ident, args).from(node)
         AST::Relate.new(lhs.lhs, lhs.op, rhs).from(node)
@@ -258,11 +319,16 @@ class Mare::Compiler::Sugar < Mare::AST::MutatingVisitor
 
   # Handle pseudo-method sugar like `as!` calls.
   # TODO: Can this be done as a "universal method" rather than sugar?
-  class PseudoCalls < Mare::AST::MutatingVisitor
+  class PseudoCalls < Mare::AST::CopyOnMutateVisitor
     def self.run(f : Program::Function, sugar : Sugar)
       ps = new(sugar)
-      f.params.try(&.accept(ps))
-      f.body.try(&.accept(ps))
+      params = f.params.try(&.accept(ps))
+      body = f.body.try(&.accept(ps))
+
+      f = f.dup
+      f.params = params
+      f.body = body
+      f
     end
 
     getter sugar : Sugar

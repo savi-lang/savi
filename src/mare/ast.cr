@@ -313,8 +313,8 @@ module Mare::AST
       new_yield_in, yield_in_changed = child_single_accept(@yield_in.not_nil!, visitor) if @yield_in
       return self unless cap_changed || ident_changed || params_changed || ret_changed || body_changed || yield_out_changed || yield_in_changed
       dup.tap do |node|
-        node.cap = new_cap
-        node.ident = new_ident
+        node.cap = new_cap.as(AST::Identifier)
+        node.ident = new_ident.as(AST::Identifier)
         node.params = new_params
         node.ret = new_ret
         node.body = new_body
