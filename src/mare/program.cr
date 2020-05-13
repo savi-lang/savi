@@ -22,6 +22,16 @@ class Mare::Program
       @imports = [] of Import
     end
 
+    def dup_init
+      @types = @types.dup
+      @aliases = @aliases.dup
+      @imports = @imports.dup
+    end
+
+    def dup
+      super.tap(&.dup_init)
+    end
+
     # TODO: Remove this and meet this need in a less hacky way.
     def clear_lists
       @types.clear
@@ -114,6 +124,16 @@ class Mare::Program
       @functions = [] of Function
       @tags = Set(Symbol).new
       @metadata = Hash(Symbol, UInt64 | Bool).new
+    end
+
+    def dup_init
+      @functions = @functions.dup
+      @tags = @tags.dup
+      @metadata = @metadata.dup
+    end
+
+    def dup
+      super.tap(&.dup_init)
     end
 
     def inspect(io : IO)
@@ -241,6 +261,13 @@ class Mare::Program
       :it,
     ]
 
+    def structural_hash(hasher)
+      hasher = @ast.get_structural_hash.hash(hasher)
+      hasher = @tags.structural_hash(hasher)
+      hasher = @metadata.structural_hash(hasher)
+      hasher
+    end
+
     def initialize(*args)
       @ast = AST::Function.new(*args)
       @tags = Set(Symbol).new
@@ -258,6 +285,15 @@ class Mare::Program
       ret    ? (io << " "; ret.not_nil!.to_a.inspect(io))    : (io << " _")
       body   ? (io << ": "; body.not_nil!.to_a.inspect(io))  : (io << " _")
       io << ">"
+    end
+
+    def accept(visitor : AST::CopyOnMutateVisitor)
+      new_ast = @ast.accept(visitor)
+      return self if new_ast.same?(@ast)
+
+      dup.tap do |f|
+        f.ast = new_ast
+      end
     end
 
     def dup_init

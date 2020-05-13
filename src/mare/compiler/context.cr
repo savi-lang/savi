@@ -65,6 +65,14 @@ class Mare::Compiler::Context
     obj
   end
 
+  def run_copy_on_mutate(obj)
+    @program.libraries.map! do |library|
+      obj.run(self, library)
+    end
+    finish
+    obj
+  end
+
   def run_whole_program(obj)
     obj.run(self)
     finish

@@ -13,7 +13,7 @@ describe Mare::Compiler::Privacy do
             ^~~~~~~
 
     - this is a private function from another library:
-      from #{Mare::Compiler.prelude_library.source_library.path}/env.mare:4:
+      from #{Mare::Compiler.prelude_source_library.path}/env.mare:4:
       :new val _create
                ^~~~~~~
     MSG

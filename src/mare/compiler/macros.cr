@@ -11,25 +11,53 @@
 # This pass keeps temporary state at the per-function level.
 # This pass produces no output state.
 #
-class Mare::Compiler::Macros < Mare::AST::MutatingVisitor
+class Mare::Compiler::Macros < Mare::AST::CopyOnMutateVisitor
   # TODO: This class should interpret macro declarations by the user and treat
   # those the same as macro declarations in the prelude, with both getting
   # executed here dynamically instead of declared here statically.
 
-  def self.run(ctx, library)
-    library.types.each do |t|
-      t.functions.each do |f|
-        macros = new(f)
+  @@cache = {} of String => {UInt64, Program::Function}
+  def self.cache_key(l, t, f)
+    t.ident.value + "\0" + f.ident.value
+  end
+  def self.cached_or_run(l, t, f) : Program::Function
+    input_hash = f.hash
+    # input_hash = f.structural_hash
+    cache_key = cache_key(l, t, f)
+    cache_result = @@cache[cache_key]?
+    cached_hash, cached_func = cache_result if cache_result
+    return cached_func if cached_func && cached_hash == input_hash
 
-        macros.maybe_compiler_intrinsic
+    yield
 
-        f.params.try(&.terms.each(&.accept(macros)))
-        f.body.try(&.accept(macros))
-      end
+    .tap do |result|
+      @@cache[cache_key] = {input_hash, result}
     end
   end
 
+  def self.run(ctx, library)
+    library = library.dup
+    library.types.map! do |t|
+      t = t.dup
+      t.functions.map! do |f|
+        cached_or_run library, t, f do
+          macros = new(f)
+          macros.maybe_compiler_intrinsic
+          macros.run
+        end
+      end
+      t
+    end
+    library
+  end
+
+  getter func
   def initialize(@func : Program::Function)
+  end
+
+  def run
+    @func = @func.accept(self)
+    @func
   end
 
   def maybe_compiler_intrinsic
@@ -157,9 +185,9 @@ class Mare::Compiler::Macros < Mare::AST::MutatingVisitor
       }
     end
 
-    group = AST::Group.new("(").from(node)
-    group.terms << AST::Choice.new(clauses).from(orig)
-    group
+    AST::Group.new("(", [
+      AST::Choice.new(clauses).from(orig),
+    ] of AST::Term).from(node)
   end
 
   def visit_while(node : AST::Group)
@@ -180,9 +208,9 @@ class Mare::Compiler::Macros < Mare::AST::MutatingVisitor
 
     else_body ||= AST::Identifier.new("None").from(node)
 
-    group = AST::Group.new("(").from(node)
-    group.terms << AST::Loop.new(cond, body, else_body).from(orig)
-    group
+    AST::Group.new("(", [
+      AST::Loop.new(cond, body, else_body).from(orig),
+    ] of AST::Term).from(node)
   end
 
   def visit_case(node : AST::Group)
@@ -221,9 +249,9 @@ class Mare::Compiler::Macros < Mare::AST::MutatingVisitor
       sections.empty? ? AST::Identifier.new("None").from(orig) : sections.pop
     }
 
-    group = AST::Group.new("(").from(node)
-    group.terms << AST::Choice.new(clauses).from(orig)
-    group
+    AST::Group.new("(", [
+      AST::Choice.new(clauses).from(orig),
+    ] of AST::Term).from(node)
   end
 
   def visit_try(node : AST::Group)
@@ -243,9 +271,9 @@ class Mare::Compiler::Macros < Mare::AST::MutatingVisitor
 
     else_body ||= AST::Identifier.new("None").from(node)
 
-    group = AST::Group.new("(").from(node)
-    group.terms << AST::Try.new(body, else_body).from(orig)
-    group
+    AST::Group.new("(", [
+      AST::Try.new(body, else_body).from(orig),
+    ] of AST::Term).from(node)
   end
 
   def visit_yield(node : AST::Group)
@@ -259,9 +287,9 @@ class Mare::Compiler::Macros < Mare::AST::MutatingVisitor
         [term]
       end
 
-    group = AST::Group.new("(").from(node)
-    group.terms << AST::Yield.new(terms).from(orig)
-    group
+    AST::Group.new("(", [
+      AST::Yield.new(terms).from(orig),
+    ] of AST::Term).from(node)
   end
 
   def visit_source_code_position_of_argument(node : AST::Group)
@@ -287,9 +315,9 @@ class Mare::Compiler::Macros < Mare::AST::MutatingVisitor
 
     op = AST::Operator.new("source_code_position_of_argument").from(orig)
 
-    group = AST::Group.new("(").from(node)
-    group.terms << AST::Prefix.new(op, term).from(node)
-    group
+    AST::Group.new("(", [
+      AST::Prefix.new(op, term).from(node),
+    ] of AST::Term).from(node)
   end
 
   def visit_reflection_of_type(node : AST::Group)
@@ -298,9 +326,9 @@ class Mare::Compiler::Macros < Mare::AST::MutatingVisitor
 
     op = AST::Operator.new("reflection_of_type").from(orig)
 
-    group = AST::Group.new("(").from(node)
-    group.terms << AST::Prefix.new(op, term).from(node)
-    group
+    AST::Group.new("(", [
+      AST::Prefix.new(op, term).from(node),
+    ] of AST::Term).from(node)
   end
 
   def visit_identity_digest_of(node : AST::Group)
@@ -309,9 +337,9 @@ class Mare::Compiler::Macros < Mare::AST::MutatingVisitor
 
     op = AST::Operator.new("identity_digest_of").from(orig)
 
-    group = AST::Group.new("(").from(node)
-    group.terms << AST::Prefix.new(op, term).from(node)
-    group
+    AST::Group.new("(", [
+      AST::Prefix.new(op, term).from(node),
+    ] of AST::Term).from(node)
   end
 
   def visit_is(node : AST::Group)
@@ -321,9 +349,9 @@ class Mare::Compiler::Macros < Mare::AST::MutatingVisitor
 
     op = AST::Operator.new("is").from(orig)
 
-    group = AST::Group.new("(").from(node)
-    group.terms << AST::Relate.new(lhs, op, rhs).from(node)
-    group
+    AST::Group.new("(", [
+      AST::Relate.new(lhs, op, rhs).from(node),
+    ] of AST::Term).from(node)
   end
 
   def visit_isnt(node : AST::Group)
@@ -333,12 +361,12 @@ class Mare::Compiler::Macros < Mare::AST::MutatingVisitor
 
     op = AST::Operator.new("is").from(orig)
 
-    group = AST::Group.new("(").from(node)
-    group.terms << AST::Relate.new(
-      AST::Relate.new(lhs, op, rhs).from(node),
-      AST::Operator.new(".").from(node),
-      AST::Identifier.new("not").from(node),
-    ).from(node)
-    group
+    AST::Group.new("(", [
+      AST::Relate.new(
+        AST::Relate.new(lhs, op, rhs).from(node),
+        AST::Operator.new(".").from(node),
+        AST::Identifier.new("not").from(node),
+      ).from(node)
+    ] of AST::Term).from(node)
   end
 end

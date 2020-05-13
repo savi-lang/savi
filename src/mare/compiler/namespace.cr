@@ -80,7 +80,7 @@ class Mare::Compiler::Namespace
   # When given a String name, try to find the type in the prelude library.
   # This is a way to resolve a builtin type by name without more context.
   def []?(name : String) : (Program::Type::Link | Program::TypeAlias::Link)?
-    @types_by_library[Compiler.prelude_library.make_link]?.try(&.[]?(name))
+    @types_by_library[Compiler.prelude_library_link]?.try(&.[]?(name))
   end
   def []?(ctx, name : String) : (Program::Type | Program::TypeAlias)?
     self[name]?.try(&.resolve(ctx))
@@ -130,9 +130,9 @@ class Mare::Compiler::Namespace
 
   private def add_prelude_types_to_source(ctx, source, source_types)
     # Skip adding prelude types to source files in the prelude library.
-    return if source.library == Compiler.prelude_library.source_library
+    return if source.library == Compiler.prelude_source_library
 
-    @types_by_library[Compiler.prelude_library.make_link].each do |name, new_type_link|
+    @types_by_library[Compiler.prelude_library_link].each do |name, new_type_link|
       new_type = new_type_link.resolve(ctx)
       next if new_type.has_tag?(:private)
 

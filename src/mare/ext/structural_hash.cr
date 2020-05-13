@@ -27,6 +27,24 @@ class ::Array
   end
 end
 
+struct ::Set
+  def structural_hash; structural_hash(Crystal::Hasher.new).result end
+  def structural_hash(hasher)
+    # The hash value must be the same regardless of the order of the keys.
+    # This implementation is based on Hash#hash from Crystal's core:
+    #   https://github.com/crystal-lang/crystal/blob/5704b9e6ceb4f73831c91db463a6b3d0397964b6/src/hash.cr#L1767-L1778
+    result = hasher.result
+
+    each do |value|
+      hasher_copy = hasher
+      hasher_copy = value.structural_hash(hasher_copy)
+      result &+= hasher_copy.result
+    end
+
+    result.hash(hasher)
+  end
+end
+
 class ::Hash
   def structural_hash; structural_hash(Crystal::Hasher.new).result end
   def structural_hash(hasher)
@@ -65,6 +83,14 @@ struct ::Nil
 end
 
 class ::String
+  # For value types, the structural hash is the same as the normal hash.
+  def structural_hash; structural_hash(Crystal::Hasher.new).result end
+  def structural_hash(hasher)
+    hash(hasher)
+  end
+end
+
+struct ::Symbol
   # For value types, the structural hash is the same as the normal hash.
   def structural_hash; structural_hash(Crystal::Hasher.new).result end
   def structural_hash(hasher)

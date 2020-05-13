@@ -142,9 +142,12 @@ class Mare::Compiler::Sugar < Mare::AST::MutatingVisitor
     # right-hand-side of the dot (this cleans up the work of the parser).
     new_top = nil
     while (dot = node.term).is_a?(AST::Relate) && dot.op.value == "."
-      node.term = dot.rhs
-      dot.rhs = node
-      new_top ||= dot
+      node = AST::Qualify.new(dot.rhs, node.group).from(node)
+      new_top ||= AST::Relate.new(
+        dot.lhs,
+        dot.op,
+        node,
+      ).from(dot)
     end
     new_top || node
   end
@@ -159,9 +162,12 @@ class Mare::Compiler::Sugar < Mare::AST::MutatingVisitor
       # then always move the qualify into the right-hand-side of the dot.
       new_top = nil
       while (dot = node.lhs).is_a?(AST::Relate) && dot.op.value == "."
-        node.lhs = dot.rhs
-        dot.rhs = node
-        new_top ||= dot
+        node = AST::Relate.new(dot.rhs, node.op, node.rhs).from(node)
+        new_top ||= AST::Relate.new(
+          dot.lhs,
+          dot.op,
+          node,
+        ).from(dot)
       end
       new_top || node
     when "+=", "-="

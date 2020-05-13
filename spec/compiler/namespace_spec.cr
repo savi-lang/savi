@@ -34,7 +34,7 @@ describe Mare::Compiler::Namespace do
            ^~~~~~
 
     - the built-in type is defined here:
-      from #{Mare::Compiler.prelude_library.source_library.path}/string.mare:1:
+      from #{Mare::Compiler.prelude_source_library.path}/string.mare:1:
     :class val String
                ^~~~~~
     MSG

@@ -3,7 +3,7 @@ module Mare::Compiler
     case target
     when :import         then ctx.run_whole_program(Import)
     when :namespace      then ctx.run_whole_program(ctx.namespace)
-    when :macros         then ctx.run(Macros)
+    when :macros         then ctx.run_copy_on_mutate(Macros)
     when :sugar          then ctx.run(Sugar)
     when :refer_type     then ctx.run(ctx.refer_type)
     when :populate       then ctx.run(Populate)
@@ -130,7 +130,8 @@ module Mare::Compiler
     library.source_library = docs.first.source.library
     docs.each { |doc| ctx.compile(library, doc) }
 
-    prelude_library.clear_lists # TODO: find a less hacky way to do this?
+    prelude_library = Program::Library.new
+    prelude_library.source_library = prelude_source_library
     prelude_docs.each { |doc| ctx.compile(prelude_library, doc) }
 
     satisfy(ctx, target)
@@ -147,15 +148,11 @@ module Mare::Compiler
     @@prelude_docs.not_nil!
   end
 
-  @@prelude_library : Program::Library?
-  def self.prelude_library
-    # TODO: detect when the files have changed and invalidate the cache?
-    @@prelude_library ||=
-      begin
-        prelude_library = Program::Library.new
-        prelude_library.source_library = prelude_docs.first.source.library
-        prelude_library
-      end
-    @@prelude_library.not_nil!
+  def self.prelude_source_library
+    prelude_docs.first.source.library
+  end
+
+  def self.prelude_library_link
+    Program::Library::Link.new(prelude_source_library.path)
   end
 end
