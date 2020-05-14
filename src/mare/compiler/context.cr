@@ -53,7 +53,7 @@ class Mare::Compiler::Context
       @stack.unshift(Interpreter::Default.new(library))
       doc.list.each { |decl| compile_decl(decl) }
       @stack.reverse_each &.finished(self)
-      @stack.shift
+      @stack.clear
     end
 
     library

@@ -44,7 +44,7 @@ class Mare::Compiler::CodeGen
     end
 
     def refer
-      @gtype.not_nil!.type_def.refer(@g.ctx)[@gfunc.as(GenFunc).func]
+      @gtype.not_nil!.type_def.refer(@g.ctx)[@gfunc.as(GenFunc).link]
     end
 
     @entry_block : LLVM::BasicBlock?
@@ -76,14 +76,14 @@ class Mare::Compiler::CodeGen
         rf = reach_func.reified
         infer = reach_func.infer
 
-        unless rf.func.has_tag?(:hygienic)
+        unless rf.link.hygienic_id
           vtable_index = g.ctx.paint[g.ctx, reach_func]
           @vtable_size = (vtable_index + 1) if @vtable_size <= vtable_index
         end
 
-        key = rf.func.ident.value
-        key += Random::Secure.hex if rf.func.has_tag?(:hygienic)
-        key += Random::Secure.hex if @gfuncs.has_key?(key)
+        key = rf.link.name
+        key += ".#{rf.link.hygienic_id}" if rf.link.hygienic_id
+        key += ".#{Random::Secure.hex}" if @gfuncs.has_key?(key)
         @gfuncs[key] = GenFunc.new(reach_func, vtable_index)
       end
 
@@ -220,7 +220,7 @@ class Mare::Compiler::CodeGen
       @needs_receiver = type_def.has_state?(infer.ctx) && !(func.cap.value == "non")
 
       @llvm_name = "#{type_def.llvm_name}#{infer.reified.name}"
-      @llvm_name = "#{@llvm_name}.HYGIENIC" if func.has_tag?(:hygienic)
+      @llvm_name = "#{@llvm_name}.HYGIENIC" if link.hygienic_id
     end
 
     def type_def
@@ -231,6 +231,10 @@ class Mare::Compiler::CodeGen
       @reach_func.infer
     end
 
+    def link
+      infer.reified.link
+    end
+
     def func
       infer.func
     end
@@ -239,7 +243,7 @@ class Mare::Compiler::CodeGen
       list = [] of Symbol
       list << :constructor_cc if func.has_tag?(:constructor)
       list << :error_cc if Jumps.any_error?(func.ident)
-      list << :yield_cc if infer.ctx.inventory.yields(func).size > 0
+      list << :yield_cc if infer.ctx.inventory.yields(link).size > 0
 
       return :simple_cc if list.empty?
       return list.first if list.size == 1
@@ -545,7 +549,7 @@ class Mare::Compiler::CodeGen
     if gfunc && gfunc.calling_convention == :yield_cc
       # We need to pre-declare the code blocks that follow each yield statement.
       gfunc.after_yield_blocks = [] of LLVM::BasicBlock
-      ctx.inventory.yields(gfunc.func).size.times do |index|
+      ctx.inventory.yields(gfunc.link).size.times do |index|
         gfunc.after_yield_blocks << gen_block("after_yield_#{index + 1}")
       end
 
@@ -790,7 +794,7 @@ class Mare::Compiler::CodeGen
 
       # Now declare the continue functions, all with that same signature.
       gfunc.continuation_llvm_funcs =
-        ctx.inventory.yields(gfunc.func).each_index.map do |index|
+        ctx.inventory.yields(gfunc.link).each_index.map do |index|
           continue_name = "#{gfunc.llvm_name}.CONTINUE.#{index + 1}"
           @mod.functions.add(continue_name, continue_param_types, ret_type)
         end.to_a
@@ -2840,7 +2844,7 @@ class Mare::Compiler::CodeGen
 
     # First, we must know which yield this is in the function -
     # each yield expression has a uniquely associated index.
-    yield_index = ctx.inventory.yields(gfunc.func).index(expr).not_nil!
+    yield_index = ctx.inventory.yields(gfunc.link).index(expr).not_nil!
 
     # Generate code for the values of the yield, and capture the values.
     yield_values = expr.terms.map { |term| gen_expr(term).as(LLVM::Value) }

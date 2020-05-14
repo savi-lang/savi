@@ -333,5 +333,29 @@ class Mare::Program
     def param_count
       params.try { |group| group.terms.size } || 0
     end
+
+    def make_link(library_or_link, type : Type)
+      make_link(type.make_link(library_or_link))
+    end
+    def make_link(type : Type::Link)
+      hygienic_id = hash if has_tag?(:hygienic)
+      Link.new(type, ident.value, hygienic_id)
+    end
+
+    struct Link
+      getter type : Type::Link
+      getter name : String
+      getter hygienic_id : UInt64?
+      def initialize(@type, @name, @hygienic_id)
+      end
+      def resolve(ctx : Compiler::Context)
+        functions = @type.resolve(ctx).functions
+        if hygienic_id
+          functions.find { |f| f.ident.value == name && f.hash == hygienic_id }
+        else
+          functions.find { |f| f.ident.value == name && !f.has_tag?(:hygienic) }
+        end.not_nil!
+      end
+    end
   end
 end

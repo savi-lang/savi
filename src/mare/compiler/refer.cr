@@ -16,41 +16,42 @@
 #
 class Mare::Compiler::Refer < Mare::AST::Visitor
   def initialize
-    @map = {} of Program::Type => ForType
+    @map = {} of Program::Type::Link => ForType
   end
 
   def run(ctx, library)
     # For each type in the library, delve into type parameters and functions.
     library.types.each do |t|
-      @map[t] = ForType.new(ctx, t).tap(&.run)
+      t_link = t.make_link(library)
+      @map[t_link] = ForType.new(ctx, t.ident).tap(&.run)
     end
   end
 
-  def [](t : Program::Type) : ForType
-    @map[t]
+  def [](t_link : Program::Type::Link) : ForType
+    @map[t_link]
   end
 
-  def []?(t : Program::Type) : ForType
-    @map[t]?
+  def []?(t_link : Program::Type::Link) : ForType
+    @map[t_link]?
   end
 
   class ForType
     getter ctx : Context
     getter self_type : Type
 
-    def initialize(@ctx, t)
-      @self_type = @ctx.refer_type[t.ident].as(Type)
-      @map = {} of Program::Function => ForFunc
+    def initialize(@ctx, t_ident)
+      @self_type = @ctx.refer_type[t_ident].as(Type)
+      @map = {} of Program::Function::Link => ForFunc
       @infos = {} of AST::Node => Info
       @scopes = {} of AST::Group => Scope
     end
 
-    def [](f : Program::Function) : ForFunc
-      @map[f]
+    def [](f_link : Program::Function::Link) : ForFunc
+      @map[f_link]
     end
 
-    def []?(f : Program::Function) : ForFunc
-      @map[f]?
+    def []?(f_link : Program::Function::Link) : ForFunc
+      @map[f_link]?
     end
 
     def [](node : AST::Node) : Info
@@ -90,7 +91,7 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
       # For each function in the type, run with a new ForFunc instance.
       self_type_defn.functions.each do |f|
         ForFunc.new(self)
-        .tap { |refer| @map[f] = refer }
+        .tap { |refer| @map[f.make_link(@self_type.link)] = refer }
         .tap(&.run(f))
       end
     end

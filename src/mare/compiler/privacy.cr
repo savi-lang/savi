@@ -14,8 +14,9 @@ class Mare::Compiler::Privacy < Mare::AST::Visitor
     ctx.infer.for_non_argumented_types(ctx).each do |infer_type|
       infer_type.all_for_funcs.each do |infer_func|
         privacy = new(ctx, infer_func)
-        infer_func.reified.func.params.try(&.accept(privacy))
-        infer_func.reified.func.body.try(&.accept(privacy))
+        func = infer_func.reified.func(ctx)
+        func.params.try(&.accept(privacy))
+        func.body.try(&.accept(privacy))
       end
     end
   end

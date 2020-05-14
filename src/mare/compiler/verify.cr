@@ -34,14 +34,14 @@ class Mare::Compiler::Verify < Mare::AST::Visitor
   end
 
   def run
-    check_function
+    func = rf.func(ctx)
+    check_function(func)
 
-    rf.func.params.try(&.terms.each(&.accept(self)))
-    rf.func.body.try(&.accept(self))
+    func.params.try(&.terms.each(&.accept(self)))
+    func.body.try(&.accept(self))
   end
 
-  def check_function
-    func = rf.func
+  def check_function(func)
     func_body = func.body
 
     if func_body && Jumps.any_error?(func_body)
@@ -79,7 +79,7 @@ class Mare::Compiler::Verify < Mare::AST::Visitor
         node = (func.yield_in || func.yield_out).not_nil!
         errs << {node.pos, "it declares a yield here"}
       end
-      ctx.inventory.yields(func).each do |node|
+      ctx.inventory.yields(rf.link).each do |node|
         errs << {node.pos, "it yields here"}
       end
       Error.at func.ident, "#{no_yields} cannot yield values", errs \

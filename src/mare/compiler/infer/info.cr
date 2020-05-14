@@ -622,7 +622,8 @@ class Mare::Compiler::Infer
       ctx = infer.ctx
       ["new", "<<"].each do |f_name|
         f = rt.defn(ctx).find_func!(f_name)
-        ctx.infer.for_func(ctx, rt, f, MetaType.cap(f.cap.value)).run
+        f_link = f.make_link(rt.link)
+        ctx.infer.for_func(ctx, rt, f_link, MetaType.cap(f.cap.value)).run
         infer.extra_called_func!(rt, f)
       end
 

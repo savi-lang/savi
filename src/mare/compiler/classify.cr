@@ -85,8 +85,10 @@ class Mare::Compiler::Classify < Mare::AST::Visitor
 
   def self.run(ctx, library)
     library.types.each do |t|
+      t_link = t.make_link(library)
       t.functions.each do |f|
-        new(ctx, t, f).run
+        f_link = f.make_link(t_link)
+        new(ctx, t, f, t_link, f_link).run
       end
     end
   end
@@ -94,8 +96,10 @@ class Mare::Compiler::Classify < Mare::AST::Visitor
   getter ctx : Context
   getter type : Program::Type
   getter func : Program::Function
+  getter type_link : Program::Type::Link
+  getter func_link : Program::Function::Link
 
-  def initialize(@ctx, @type, @func)
+  def initialize(@ctx, @type, @func, @type_link, @func_link)
   end
 
   def run
@@ -108,7 +112,7 @@ class Mare::Compiler::Classify < Mare::AST::Visitor
   end
 
   def refer
-    ctx.refer[type][func]
+    ctx.refer[type_link][func_link]
   end
 
   # This visitor never replaces nodes, it just touches them and returns them.

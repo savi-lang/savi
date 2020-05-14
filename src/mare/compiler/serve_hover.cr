@@ -74,7 +74,9 @@ class Mare::Compiler::ServeHover
           f.body.try do |body|
             if body.pos.contains?(pos)
               find(pos, body).reverse_each do |node|
-                messages, pos = self[t.make_link(library), f, node]
+                t_link = t.make_link(library)
+                f_link = f.make_link(t_link)
+                messages, pos = self[t_link, f_link, node]
                 return {messages, pos} unless messages.empty?
               end
             end
@@ -86,12 +88,11 @@ class Mare::Compiler::ServeHover
     {[] of String, pos}
   end
 
-  def [](t_link : Program::Type::Link, f : Program::Function, node : AST::Node)
+  def [](t_link : Program::Type::Link, f_link : Program::Function::Link, node : AST::Node)
     messages = [] of String
 
-    t = t_link.resolve(ctx)
-    refer = ctx.refer[t][f]
-    infer = ctx.infer.for_func_simple(ctx, t_link, f)
+    refer = ctx.refer[t_link][f_link]
+    infer = ctx.infer.for_func_simple(ctx, t_link, f_link)
     describe_type = "type"
 
     ref = refer[node]?

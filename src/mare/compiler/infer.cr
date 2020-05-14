@@ -29,7 +29,10 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     if main
       main = main.as(Program::Type::Link)
       f = main.resolve(ctx).find_func?("new")
-      for_func(ctx, for_type(ctx, main).reified, f, MetaType.cap(f.cap.value)).run if f
+      if f
+        f_link = f.make_link(main)
+        for_func(ctx, for_type(ctx, main).reified, f_link, MetaType.cap(f.cap.value)).run
+      end
     end
 
     # # TODO: Maybe this needed for cases when we reach types without reaching their fields?
@@ -48,9 +51,11 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     # This is also where we take care of typechecking for unused partial
     # reifications of all generic type parameters.
     library.types.each do |t|
-      for_type_each_partial_reification(ctx, t, t.make_link(library)).each do |infer_type|
+      t_link = t.make_link(library)
+      for_type_each_partial_reification(ctx, t, t_link).each do |infer_type|
         infer_type.reified.defn(ctx).functions.each do |f|
-          for_func(ctx, infer_type.reified, f, MetaType.cap(f.cap.value)).run
+          f_link = f.make_link(t_link)
+          for_func(ctx, infer_type.reified, f_link, MetaType.cap(f.cap.value)).run
         end
 
         # Check the assertion list for the type, to confirm that it is a subtype
@@ -86,9 +91,9 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     params_partial_reifications =
       t.params.not_nil!.terms.map do |param|
         # Get the MetaType of the bound.
-        param_ref = ctx.refer[t][param].as(Refer::TypeParam)
+        param_ref = ctx.refer[link][param].as(Refer::TypeParam)
         bound_node = param_ref.bound
-        bound_mt = no_args.type_expr(bound_node, ctx.refer[t])
+        bound_mt = no_args.type_expr(bound_node, ctx.refer[link])
 
         # TODO: Refactor the partial_reifications to return cap only already.
         caps = bound_mt.partial_reifications.map(&.cap_only)
@@ -121,17 +126,19 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   def for_func_simple(ctx : Context, source : Source, t_name : String, f_name : String)
     t_link = ctx.namespace.in_source(source, t_name).as(Program::Type::Link)
     f = t_link.resolve(ctx).find_func!(f_name)
-    for_func_simple(ctx, t_link, f)
+    f_link = f.make_link(t_link)
+    for_func_simple(ctx, t_link, f_link)
   end
 
-  def for_func_simple(ctx : Context, t_link : Program::Type::Link, f : Program::Function)
-    for_func(ctx, for_type(ctx, t_link).reified, f, MetaType.cap(f.cap.value))
+  def for_func_simple(ctx : Context, t_link : Program::Type::Link, f_link : Program::Function::Link)
+    f = f_link.resolve(ctx)
+    for_func(ctx, for_type(ctx, t_link).reified, f_link, MetaType.cap(f.cap.value))
   end
 
   def for_func(
     ctx : Context,
     rt : ReifiedType,
-    f : Program::Function,
+    f : Program::Function::Link,
     cap : MetaType,
   ) : ForFunc
     mt = MetaType.new(rt).override_cap(cap).strip_ephemeral
@@ -276,10 +283,14 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
 
   struct ReifiedFunction
     getter type : ReifiedType
-    getter func : Program::Function
+    getter link : Program::Function::Link
     getter receiver : MetaType
 
-    def initialize(@type, @func, @receiver)
+    def initialize(@type, @link, @receiver)
+    end
+
+    def func(ctx)
+      link.resolve(ctx)
     end
 
     # This name is used in selector painting, so be sure that it meets the
@@ -287,7 +298,9 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     # - unique within a given type
     # - identical for equivalent/compatible reified functions in different types
     def name
-      "'#{receiver_cap.inner.inspect}.#{func.ident.value}"
+      name = "'#{receiver_cap.inner.inspect}.#{link.name}"
+      name += ".#{link.hygienic_id}" if link.hygienic_id
+      name
     end
 
     def receiver_cap
@@ -313,7 +326,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       reified_defn.functions.each do |f|
         next unless f.has_tag?(:is)
 
-        trait = type_expr(f.ret.not_nil!, ctx.refer[reified_defn][f]).single!
+        f_link = f.make_link(reified.link)
+        trait = type_expr(f.ret.not_nil!, ctx.refer[reified.link][f_link]).single!
 
         subtyping.assert(trait, f.ident.pos)
       end
@@ -324,7 +338,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
 
     def refer
-      ctx.refer[reified.defn(ctx)]
+      ctx.refer[reified.link]
     end
 
     def is_subtype?(
@@ -371,9 +385,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
 
     def get_type_param_bound(index : Int32)
-      reified_defn = reified.defn(ctx)
-      refer = ctx.refer[reified_defn]
-      param_node = reified_defn.params.not_nil!.terms[index]
+      refer = ctx.refer[reified.link]
+      param_node = reified.defn(ctx).params.not_nil!.terms[index]
       param_bound_node = refer[param_node].as(Refer::TypeParam).bound
 
       type_expr(param_bound_node.not_nil!, refer, nil)
@@ -536,20 +549,20 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
 
     def func
-      reified.func
+      reified.func(ctx)
     end
 
     def params
-      reified.func.params.try(&.terms) || ([] of AST::Node)
+      func.params.try(&.terms) || ([] of AST::Node)
     end
 
     def ret
       # The ident is used as a fake local variable that represents the return.
-      reified.func.ident
+      func.ident
     end
 
     def refer
-      ctx.refer[reified.type.defn(ctx)][reified.func]
+      ctx.refer[reified.type.link][reified.link]
     end
 
     def is_subtype?(
@@ -635,9 +648,9 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
 
           # TODO: special-case this somewhere else?
           if reified.type.link.name == "Main" \
-          && reified.func.ident.value == "new"
+          && reified.link.name == "new"
             env = MetaType.new(reified_type(prelude_type("Env")))
-            self[param].as(Param).set_explicit(reified.func.ident.pos, env)
+            self[param].as(Param).set_explicit(reified.func(ctx).ident.pos, env)
           end
         end
       end
@@ -663,7 +676,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       # number of arguments used in any yield statements here, as well as the
       # explicit yield_out part of the function signature if present.
       yield_out_arg_count = [
-        (ctx.inventory.yields(func).map(&.terms.size) + [0]).max,
+        (ctx.inventory.yields(reified.link).map(&.terms.size) + [0]).max,
         func.yield_out.try do |yield_out|
           yield_out.is_a?(AST::Group) && yield_out.style == "(" \
           ? yield_out.terms.size : 0
@@ -1002,6 +1015,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         call_mt = MetaType.new(call_mti)
         call_defn = call_defn.not_nil!
         call_func = call_func.not_nil!
+        call_func_link = call_func.make_link(call_defn.link)
 
         # Keep track that we called this function.
         @called_funcs.add({call_defn, call_func})
@@ -1012,7 +1026,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         # Get the ForFunc instance for call_func, possibly creating and running it.
         # TODO: don't infer anything in the body of that func if type and params
         # were explicitly specified in the function signature.
-        infer = ctx.infer.for_func(ctx, call_defn, call_func, reify_cap).tap(&.run)
+        infer = ctx.infer.for_func(ctx, call_defn, call_func_link, reify_cap).tap(&.run)
 
         follow_call_check_args(call, call_func, infer, problems)
         follow_call_check_yield_block(infer, yield_params, yield_block, problems)
@@ -1041,12 +1055,13 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       field_func = reified.type.defn(ctx).functions.find do |f|
         f.ident.value == name && f.has_tag?(:field)
       end.not_nil!
+      field_func_link = field_func.make_link(reified.type.link)
 
       # Keep track that we touched this "function".
       @called_funcs.add({reified.type, field_func})
 
       # Get the ForFunc instance for field_func, possibly creating and running it.
-      infer = ctx.infer.for_func(ctx, reified.type, field_func, resolved_self_cap).tap(&.run)
+      infer = ctx.infer.for_func(ctx, reified.type, field_func_link, resolved_self_cap).tap(&.run)
 
       # Apply constraints to the return type.
       ret = infer[infer.ret]
@@ -1447,7 +1462,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         # Reach all functions that might possibly be reflected.
         reflect_rt.defn(ctx).functions.each do |f|
           next if f.has_tag?(:hygienic) || f.body.nil?
-          ctx.infer.for_func(ctx, reflect_rt, f, MetaType.cap(f.cap.value)).tap(&.run)
+          f_link = f.make_link(reflect_rt.link)
+          ctx.infer.for_func(ctx, reflect_rt, f_link, MetaType.cap(f.cap.value)).tap(&.run)
           extra_called_func!(reflect_rt, f)
         end
 

@@ -378,7 +378,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     end
 
     def refer(ctx)
-      ctx.refer[@reified.defn(ctx)]
+      ctx.refer[@reified.link]
     end
 
     def program_type
@@ -546,7 +546,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
   def handle_func(ctx, infer_type : Infer::ForType, func)
     # Get each infer instance associated with this function.
     infer_type.all_for_funcs.each do |infer|
-      next unless infer.reified.func == func
+      next unless infer.reified.func(ctx) == func
 
       # Skip this function if we've already seen it.
       next if @seen_funcs.has_key?(infer.reified)
@@ -586,7 +586,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     receiver = ctx.reach[infer.reified.receiver]
 
     params = [] of Ref
-    infer.reified.func.params.try do |param_exprs|
+    infer.reified.func(ctx).params.try do |param_exprs|
       param_exprs.terms.map do |param_expr|
         params << ctx.reach[infer.resolve(param_expr)]
       end
@@ -604,7 +604,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     # Reach the metatype of the field.
     ref = nil
     ctx.infer[rt].all_for_funcs.each do |infer|
-      next unless infer.reified.func == func
+      next unless infer.reified.func(ctx) == func
       # TODO: should we choose a specific reification instead of just taking the final one?
       ref = infer.resolve(func.ident)
       handle_type_ref(ctx, ref)
