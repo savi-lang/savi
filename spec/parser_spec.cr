@@ -274,4 +274,16 @@ describe Mare::Parser do
       [:group, ":", [:integer, -1_i64]]]]
     AST
   end
+
+  it "returns the same AST when called again with the same source content" do
+    content = <<-SOURCE
+    :primitive Example
+      :const greeting String: "Hello, World!"
+    SOURCE
+
+    ast1 = Mare::Parser.parse(Mare::Source.new_example(content))
+    ast2 = Mare::Parser.parse(Mare::Source.new_example(content))
+
+    ast1.should be ast2
+  end
 end
