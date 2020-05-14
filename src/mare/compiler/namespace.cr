@@ -25,6 +25,7 @@ class Mare::Compiler::Namespace
     # Take note of the library and source file in which each type occurs.
     ctx.program.libraries.each do |library|
       library.types.each do |t|
+        check_conflicting_functions(ctx, t, t.make_link(library))
         add_type_to_library(ctx, t, library)
         add_type_to_source(t, library)
       end
@@ -55,6 +56,7 @@ class Mare::Compiler::Namespace
 
   # TODO: Can this be less hacky? It feels wrong to alter this state later.
   def add_lambda_type_later(ctx : Context, new_type : Program::Type, library : Program::Library)
+    check_conflicting_functions(ctx, new_type, new_type.make_link(library))
     add_type_to_library(ctx, new_type, library)
     add_type_to_source(new_type, library)
   end
@@ -96,6 +98,18 @@ class Mare::Compiler::Namespace
   # This is only for use in testing.
   def find_func!(ctx, source, type_name, func_name)
     self.in_source(source, type_name).as(Program::Type::Link).resolve(ctx).find_func!(func_name)
+  end
+
+  private def check_conflicting_functions(ctx, t, t_link : Program::Type::Link)
+    # Find any functions that would resolve to the same link - not allowed.
+    t.functions.group_by(&.make_link(t_link)).each do |f_link, fs|
+      next if fs.size <= 1
+
+      f_first = fs.shift
+      Error.at f_first.ident.pos,
+        "This name conflicts with others declared in the same type",
+        fs.map { |f| {f.ident.pos, "a conflicting declaration is here"} }
+    end
   end
 
   private def add_type_to_library(ctx, new_type, library)

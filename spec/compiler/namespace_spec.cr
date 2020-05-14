@@ -22,6 +22,36 @@ describe Mare::Compiler::Namespace do
     end
   end
 
+  it "complains when a function has the same name as another" do
+    source = Mare::Source.new_example <<-SOURCE
+    :class Example
+      :fun same_name: "This is a contentious function!"
+      :prop same_name: "This is a contentious property!"
+      :const same_name: "This is a contentious constant!"
+    SOURCE
+
+    expected = <<-MSG
+    This name conflicts with others declared in the same type:
+    from (example):2:
+      :fun same_name: "This is a contentious function!"
+           ^~~~~~~~~
+
+    - a conflicting declaration is here:
+      from (example):3:
+      :prop same_name: "This is a contentious property!"
+            ^~~~~~~~~
+
+    - a conflicting declaration is here:
+      from (example):4:
+      :const same_name: "This is a contentious constant!"
+             ^~~~~~~~~
+    MSG
+
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :namespace)
+    end
+  end
+
   it "complains when a type has the same name as another" do
     source = Mare::Source.new_example <<-SOURCE
     :class String
