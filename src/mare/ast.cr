@@ -21,29 +21,6 @@ module Mare::AST
     end
   end
 
-  class MutatingVisitor
-    # TODO: Move this to a CopyingVisitor variant instead?
-    def dup_node?(node : Node)
-      false
-    end
-
-    def visit_any?(node : Node)
-      true
-    end
-
-    def visit_children?(node : Node)
-      true
-    end
-
-    def visit_pre(node : Node)
-      node
-    end
-
-    def visit(node : Node)
-      node
-    end
-  end
-
   class CopyOnMutateVisitor
     def visit_any?(node : Node)
       true
@@ -97,18 +74,6 @@ module Mare::AST
       end
       self
     end
-    def accept(visitor : MutatingVisitor)
-      node = self
-      dup_node = visitor.dup_node?(node)
-      node = node.dup if dup_node
-      if visitor.visit_any?(node)
-        node = visitor.visit_pre(node)
-        children_accept(visitor) if visitor.visit_children?(node)
-        node = visitor.visit(node)
-      end
-      invalidate_structural_hash unless dup_node
-      node
-    end
     def accept(visitor : CopyOnMutateVisitor)
       node = self
       if visitor.visit_any?(node)
@@ -123,9 +88,6 @@ module Mare::AST
     end
 
     def children_accept(visitor : Visitor)
-      # An AST node must implement this if it has child nodes.
-    end
-    def children_accept(visitor : MutatingVisitor)
       # An AST node must implement this if it has child nodes.
     end
     def children_accept(visitor : CopyOnMutateVisitor)
@@ -168,9 +130,6 @@ module Mare::AST
     def children_accept(visitor : Visitor)
       @list.each(&.accept(visitor))
     end
-    def children_accept(visitor : MutatingVisitor)
-      @list.map!(&.accept(visitor))
-    end
     def children_accept(visitor : CopyOnMutateVisitor)
       new_list, list_changed = children_list_accept(@list, visitor)
       return self unless list_changed
@@ -204,10 +163,6 @@ module Mare::AST
     def children_accept(visitor : Visitor)
       @head.each(&.accept(visitor))
       @body.accept(visitor)
-    end
-    def children_accept(visitor : MutatingVisitor)
-      @head.map!(&.accept(visitor))
-      @body = @body.accept(visitor)
     end
     def children_accept(visitor : CopyOnMutateVisitor)
       new_head, head_changed = children_list_accept(@head, visitor)
@@ -266,15 +221,6 @@ module Mare::AST
       @body.try(&.accept(visitor))
       @yield_out.try(&.accept(visitor))
       @yield_in.try(&.accept(visitor))
-    end
-    def children_accept(visitor : MutatingVisitor)
-      @cap = @cap.accept(visitor).as(AST::Identifier)
-      @ident = @ident.accept(visitor).as(AST::Identifier)
-      @params = @params.try(&.accept(visitor))
-      @ret = @ret.try(&.accept(visitor))
-      @body = @body.try(&.accept(visitor))
-      @yield_out = @yield_out.try(&.accept(visitor))
-      @yield_in = @yield_in.try(&.accept(visitor))
     end
     def children_accept(visitor : CopyOnMutateVisitor)
       new_cap, cap_changed = child_single_accept(@cap, visitor)
@@ -382,10 +328,6 @@ module Mare::AST
       @op.accept(visitor)
       @term.accept(visitor)
     end
-    def children_accept(visitor : MutatingVisitor)
-      @op = @op.accept(visitor)
-      @term = @term.accept(visitor)
-    end
     def children_accept(visitor : CopyOnMutateVisitor)
       new_op, op_changed = child_single_accept(@op, visitor)
       new_term, term_changed = child_single_accept(@term, visitor)
@@ -413,10 +355,6 @@ module Mare::AST
     def children_accept(visitor : Visitor)
       @term.accept(visitor)
       @group.accept(visitor)
-    end
-    def children_accept(visitor : MutatingVisitor)
-      @term = @term.accept(visitor)
-      @group = @group.accept(visitor)
     end
     def children_accept(visitor : CopyOnMutateVisitor)
       new_term, term_changed = child_single_accept(@term, visitor)
@@ -450,9 +388,6 @@ module Mare::AST
     def children_accept(visitor : Visitor)
       @terms.each(&.accept(visitor))
     end
-    def children_accept(visitor : MutatingVisitor)
-      @terms.map!(&.accept(visitor))
-    end
     def children_accept(visitor : CopyOnMutateVisitor)
       new_terms, terms_changed = children_list_accept(@terms, visitor)
       return self unless terms_changed
@@ -480,11 +415,6 @@ module Mare::AST
       @lhs.accept(visitor)
       @op.accept(visitor)
       @rhs.accept(visitor)
-    end
-    def children_accept(visitor : MutatingVisitor)
-      @lhs = @lhs.accept(visitor)
-      @op = @op.accept(visitor)
-      @rhs = @rhs.accept(visitor)
     end
     def children_accept(visitor : CopyOnMutateVisitor)
       new_lhs, lhs_changed = child_single_accept(@lhs, visitor)
@@ -520,9 +450,6 @@ module Mare::AST
     def children_accept(visitor : Visitor)
       @rhs.accept(visitor)
     end
-    def children_accept(visitor : MutatingVisitor)
-      @rhs = @rhs.accept(visitor)
-    end
     def children_accept(visitor : CopyOnMutateVisitor)
       new_rhs, rhs_changed = child_single_accept(@rhs, visitor)
       return self unless rhs_changed
@@ -550,9 +477,6 @@ module Mare::AST
     end
     def children_accept(visitor : Visitor)
       @list.each { |cond, body| cond.accept(visitor); body.accept(visitor) }
-    end
-    def children_accept(visitor : MutatingVisitor)
-      @list.map! { |cond, body| {cond.accept(visitor), body.accept(visitor)} }
     end
     def children_accept(visitor : CopyOnMutateVisitor)
       new_list, list_changed = children_tuple2_list_accept(@list, visitor)
@@ -587,11 +511,6 @@ module Mare::AST
       cond.accept(visitor)
       body.accept(visitor)
       else_body.accept(visitor)
-    end
-    def children_accept(visitor : MutatingVisitor)
-      @cond = cond.accept(visitor)
-      @body = body.accept(visitor)
-      @else_body = else_body.accept(visitor)
     end
     def children_accept(visitor : CopyOnMutateVisitor)
       new_cond, cond_changed = child_single_accept(@cond, visitor)
@@ -628,10 +547,6 @@ module Mare::AST
       body.accept(visitor)
       else_body.accept(visitor)
     end
-    def children_accept(visitor : MutatingVisitor)
-      @body = body.accept(visitor)
-      @else_body = else_body.accept(visitor)
-    end
     def children_accept(visitor : CopyOnMutateVisitor)
       new_body, body_changed = child_single_accept(@body, visitor)
       new_else_body, else_body_changed = child_single_accept(@else_body, visitor)
@@ -661,9 +576,6 @@ module Mare::AST
     end
     def children_accept(visitor : Visitor)
       terms.each(&.accept(visitor))
-    end
-    def children_accept(visitor : MutatingVisitor)
-      @terms = terms.map(&.accept(visitor).as(Term))
     end
     def children_accept(visitor : CopyOnMutateVisitor)
       new_terms, terms_changed = children_list_accept(@terms, visitor)
