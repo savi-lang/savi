@@ -2,8 +2,9 @@ class Mare::Compiler::Infer
   abstract class Info
     property pos : Source::Pos = Source::Pos.none
 
-    abstract def resolve!(infer : ForFunc) : MetaType
+    abstract def resolve!(ctx : Context, infer : ForFunc) : MetaType
     abstract def within_domain!(
+      ctx : Context,
       infer : ForFunc,
       use_pos : Source::Pos,
       constraint_pos : Source::Pos,
@@ -58,11 +59,12 @@ class Mare::Compiler::Infer
     INSTANCE = new
     def self.instance; INSTANCE end
 
-    def resolve!(infer : ForFunc) : MetaType
+    def resolve!(ctx : Context, infer : ForFunc) : MetaType
       MetaType.new(MetaType::Unsatisfiable.instance)
     end
 
     def within_domain!(
+      ctx : Context,
       infer : ForFunc,
       use_pos : Source::Pos,
       constraint_pos : Source::Pos,
@@ -105,16 +107,16 @@ class Mare::Compiler::Infer
     def adds_alias; 0 end
 
     # Must be implemented by the child class as an required hook.
-    abstract def inner_resolve!(infer : ForFunc)
+    abstract def inner_resolve!(ctx : Context, infer : ForFunc)
 
     # May be implemented by the child class as an optional hook.
-    def after_resolve!(infer : ForFunc, meta_type : MetaType); end
+    def after_resolve!(ctx : Context, infer : ForFunc, meta_type : MetaType); end
 
     # This method is *not* intended to be overridden by the child class;
     # please override the after_resolve! method instead.
-    private def finish_resolve!(infer : ForFunc, meta_type : MetaType)
+    private def finish_resolve!(ctx : Context, infer : ForFunc, meta_type : MetaType)
       # Run the optional hook in case the child class defined something here.
-      after_resolve!(infer, meta_type)
+      after_resolve!(ctx, infer, meta_type)
 
       # Save the result of the resolution.
       @already_resolved = meta_type
@@ -127,18 +129,18 @@ class Mare::Compiler::Infer
     end
 
     # The final MetaType must meet all constraints that have been imposed.
-    def resolve!(infer : ForFunc) : MetaType
+    def resolve!(ctx : Context, infer : ForFunc) : MetaType
       return @already_resolved.not_nil! if @already_resolved
 
-      meta_type = inner_resolve!(infer)
-      return finish_resolve!(infer, meta_type) if domain_constraints.empty?
+      meta_type = inner_resolve!(ctx, infer)
+      return finish_resolve!(ctx, infer, meta_type) if domain_constraints.empty?
 
       use_pos = domain_constraints.first[0]
 
       # TODO: print a different error message when the domain constraints are
       # internally conflicting, even before adding this meta_type into the mix.
 
-      total_domain_constraint = total_domain_constraint(infer.ctx).simplify(infer)
+      total_domain_constraint = total_domain_constraint(ctx).simplify(infer)
 
       meta_type_ephemeral = meta_type.ephemeralize
 
@@ -179,14 +181,14 @@ class Mare::Compiler::Infer
         end
       end
 
-      finish_resolve!(infer, meta_type)
+      finish_resolve!(ctx, infer, meta_type)
     end
 
     # May be implemented by the child class as an optional hook.
-    def after_within_domain!(infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
+    def after_within_domain!(ctx : Context, infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
     end
 
-    def within_domain!(infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
+    def within_domain!(ctx : Context, infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
       if @already_resolved
         meta_type_within_domain!(
           infer,
@@ -199,7 +201,7 @@ class Mare::Compiler::Infer
       else
         @domain_constraints << {use_pos, constraint_pos, constraint, aliases + adds_alias}
 
-        after_within_domain!(infer, use_pos, constraint_pos, constraint, aliases + adds_alias)
+        after_within_domain!(ctx, infer, use_pos, constraint_pos, constraint, aliases + adds_alias)
       end
     end
   end
@@ -219,8 +221,7 @@ class Mare::Compiler::Infer
       @pos
     end
 
-    def inner_resolve!(infer : ForFunc)
-      ctx = infer.ctx
+    def inner_resolve!(ctx : Context, infer : ForFunc)
       explicit = @explicit
 
       if explicit
@@ -231,7 +232,7 @@ class Mare::Compiler::Infer
           # If there are upstreams, use the explicit cap applied to the type
           # of the first upstream expression, which becomes canonical.
           return (
-            infer[@upstreams.first[0]].resolve!(infer)
+            infer[@upstreams.first[0]].resolve!(ctx, infer)
             .strip_cap.intersect(explicit).strip_ephemeral
             .strip_ephemeral
           )
@@ -241,10 +242,10 @@ class Mare::Compiler::Infer
         end
       elsif !@upstreams.empty?
         # If we only have upstreams to go on, return the first upstream type.
-        return infer[@upstreams.first[0]].resolve!(infer).strip_ephemeral
+        return infer[@upstreams.first[0]].resolve!(ctx, infer).strip_ephemeral
       elsif !domain_constraints.empty?
         # If we only have domain constraints to, just do our best with those.
-        return total_domain_constraint(infer.ctx).simplify(infer).strip_ephemeral
+        return total_domain_constraint(ctx).simplify(infer).strip_ephemeral
       end
 
       # If we get here, we've failed and don't have enough info to continue.
@@ -252,13 +253,13 @@ class Mare::Compiler::Infer
         "This #{describe_kind} needs an explicit type; it could not be inferred"
     end
 
-    def after_resolve!(infer : ForFunc, meta_type : MetaType)
+    def after_resolve!(ctx : Context, infer : ForFunc, meta_type : MetaType)
       # TODO: Verify all upstreams instead of just beyond 1?
       if @upstreams.size > 1
         @upstreams[1..-1].each do |other_upstream, other_upstream_pos|
-          infer[other_upstream].within_domain!(infer, other_upstream_pos, pos, meta_type.strip_ephemeral, 0) # TODO: should we really use 0 here?
+          infer[other_upstream].within_domain!(ctx, infer, other_upstream_pos, pos, meta_type.strip_ephemeral, 0) # TODO: should we really use 0 here?
 
-          other_mt = infer[other_upstream].resolve!(infer)
+          other_mt = infer[other_upstream].resolve!(ctx, infer)
           raise "sanity check" unless other_mt.subtype_of?(infer, meta_type)
         end
       end
@@ -272,16 +273,17 @@ class Mare::Compiler::Infer
       @pos = explicit_pos
     end
 
-    def after_within_domain!(infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
+    def after_within_domain!(ctx : Context, infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
       return if @explicit
 
       @upstreams.each do |upstream, upstream_pos|
-        infer[upstream].within_domain!(infer, use_pos, constraint_pos, constraint, aliases)
+        infer[upstream].within_domain!(ctx, infer, use_pos, constraint_pos, constraint, aliases)
       end
     end
 
-    def assign(infer : ForFunc, rhs : AST::Node, rhs_pos : Source::Pos)
+    def assign(ctx : Context, infer : ForFunc, rhs : AST::Node, rhs_pos : Source::Pos)
       infer[rhs].within_domain!(
+        ctx,
         infer,
         rhs_pos,
         @pos,
@@ -299,11 +301,11 @@ class Mare::Compiler::Infer
     def initialize(@pos, @inner)
     end
 
-    def resolve!(infer : ForFunc)
+    def resolve!(ctx : Context, infer : ForFunc)
       @inner
     end
 
-    def within_domain!(infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
+    def within_domain!(ctx : Context, infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
       meta_type_within_domain!(infer, @inner, use_pos, constraint_pos, constraint, aliases)
     end
   end
@@ -316,11 +318,11 @@ class Mare::Compiler::Infer
       @domain_constraints = [] of Tuple(Source::Pos, MetaType)
     end
 
-    def resolve!(infer : ForFunc)
+    def resolve!(ctx : Context, infer : ForFunc)
       @inner
     end
 
-    def within_domain!(infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
+    def within_domain!(ctx : Context, infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
       @domain_constraints << {constraint_pos, constraint}
 
       meta_type_within_domain!(infer, @inner, use_pos, constraint_pos, constraint, aliases)
@@ -333,11 +335,10 @@ class Mare::Compiler::Infer
     def initialize(@pos, @possible : MetaType)
     end
 
-    def inner_resolve!(infer : ForFunc)
+    def inner_resolve!(ctx : Context, infer : ForFunc)
       # Literal values (such as numeric literals) sometimes have
       # an ambiguous type. Here, we  intersect with the domain constraints
       # to (hopefully) arrive at a single concrete type to return.
-      ctx = infer.ctx
       meta_type = total_domain_constraint(ctx).intersect(@possible).simplify(infer)
 
       # If we don't satisfy the constraints, leave it to DynamicInfo.resolve!
@@ -366,9 +367,9 @@ class Mare::Compiler::Infer
   class Param < NamedInfo
     def describe_kind; "parameter" end
 
-    def verify_arg(infer : ForFunc, arg_infer : ForFunc, arg : AST::Node, arg_pos : Source::Pos)
+    def verify_arg(ctx : Context, infer : ForFunc, arg_infer : ForFunc, arg : AST::Node, arg_pos : Source::Pos)
       arg = arg_infer[arg]
-      arg.within_domain!(arg_infer, arg_pos, @pos, resolve!(infer), 0)
+      arg.within_domain!(ctx, arg_infer, arg_pos, @pos, resolve!(ctx, infer), 0)
     end
   end
 
@@ -384,12 +385,12 @@ class Mare::Compiler::Infer
       @field.pos
     end
 
-    def resolve!(infer : ForFunc)
-      @field.resolve!(infer).viewed_from(@origin).alias
+    def resolve!(ctx : Context, infer : ForFunc)
+      @field.resolve!(ctx, infer).viewed_from(@origin).alias
     end
 
-    def within_domain!(infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
-      meta_type_within_domain!(infer, resolve!(infer), use_pos, constraint_pos, constraint, aliases + 1) # TODO: can this +1 be removed?
+    def within_domain!(ctx : Context, infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
+      meta_type_within_domain!(infer, resolve!(ctx, infer), use_pos, constraint_pos, constraint, aliases + 1) # TODO: can this +1 be removed?
     end
   end
 
@@ -397,11 +398,11 @@ class Mare::Compiler::Infer
     def initialize(@pos)
     end
 
-    def resolve!(infer : ForFunc)
+    def resolve!(ctx : Context, infer : ForFunc)
       MetaType.new(MetaType::Unsatisfiable.instance)
     end
 
-    def within_domain!(infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
+    def within_domain!(ctx : Context, infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
       raise "can't constrain RaiseError to a domain"
     end
   end
@@ -410,18 +411,18 @@ class Mare::Compiler::Infer
     def initialize(@pos, @body : AST::Node, @else_body : AST::Node)
     end
 
-    def resolve!(infer : ForFunc)
+    def resolve!(ctx : Context, infer : ForFunc)
       MetaType.new_union([
-        infer[@body].resolve!(infer),
-        infer[@else_body].resolve!(infer),
+        infer[@body].resolve!(ctx, infer),
+        infer[@else_body].resolve!(ctx, infer),
       ])
     end
 
-    def within_domain!(infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
-      infer[@body].within_domain!(infer, use_pos, constraint_pos, constraint, aliases) \
+    def within_domain!(ctx : Context, infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
+      infer[@body].within_domain!(ctx, infer, use_pos, constraint_pos, constraint, aliases) \
         unless Jumps.away?(@body)
 
-      infer[@else_body].within_domain!(infer, use_pos, constraint_pos, constraint, aliases)
+      infer[@else_body].within_domain!(ctx, infer, use_pos, constraint_pos, constraint, aliases)
     end
   end
 
@@ -431,15 +432,15 @@ class Mare::Compiler::Infer
     def initialize(@pos, @clauses)
     end
 
-    def resolve!(infer : ForFunc)
-      MetaType.new_union(clauses.map { |node| infer[node].resolve!(infer) })
+    def resolve!(ctx : Context, infer : ForFunc)
+      MetaType.new_union(clauses.map { |node| infer[node].resolve!(ctx, infer) })
     end
 
-    def within_domain!(infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
+    def within_domain!(ctx : Context, infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
       clauses.each do |node|
         next if Jumps.away?(node)
 
-        infer[node].within_domain!(infer, use_pos, constraint_pos, constraint, aliases)
+        infer[node].within_domain!(ctx, infer, use_pos, constraint_pos, constraint, aliases)
       end
     end
   end
@@ -453,11 +454,11 @@ class Mare::Compiler::Infer
       raise "#{@bool.show_type} is not Bool" unless @bool.show_type == "Bool"
     end
 
-    def resolve!(infer : ForFunc)
+    def resolve!(ctx : Context, infer : ForFunc)
       @bool
     end
 
-    def within_domain!(infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
+    def within_domain!(ctx : Context, infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
       meta_type_within_domain!(infer, @bool, use_pos, constraint_pos, constraint, aliases)
     end
   end
@@ -471,11 +472,11 @@ class Mare::Compiler::Infer
       raise "#{@bool.show_type} is not Bool" unless @bool.show_type == "Bool"
     end
 
-    def resolve!(infer : ForFunc)
+    def resolve!(ctx : Context, infer : ForFunc)
       @bool
     end
 
-    def within_domain!(infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
+    def within_domain!(ctx : Context, infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
       meta_type_within_domain!(infer, @bool, use_pos, constraint_pos, constraint, aliases)
     end
   end
@@ -487,11 +488,11 @@ class Mare::Compiler::Infer
       raise "#{@bool.show_type} is not Bool" unless @bool.show_type == "Bool"
     end
 
-    def resolve!(infer : ForFunc)
+    def resolve!(ctx : Context, infer : ForFunc)
       @bool
     end
 
-    def within_domain!(infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
+    def within_domain!(ctx : Context, infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
       meta_type_within_domain!(infer, @bool, use_pos, constraint_pos, constraint, aliases)
     end
   end
@@ -503,11 +504,11 @@ class Mare::Compiler::Infer
       raise "#{@bool.show_type} is not Bool" unless @bool.show_type == "Bool"
     end
 
-    def resolve!(infer : ForFunc)
+    def resolve!(ctx : Context, infer : ForFunc)
       @bool
     end
 
-    def within_domain!(infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
+    def within_domain!(ctx : Context, infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
       meta_type_within_domain!(infer, @bool, use_pos, constraint_pos, constraint, aliases)
     end
   end
@@ -519,12 +520,12 @@ class Mare::Compiler::Infer
     def initialize(@pos, @refine, @refine_type)
     end
 
-    def resolve!(infer : ForFunc)
-      infer[@refine].resolve!(infer).intersect(@refine_type)
+    def resolve!(ctx : Context, infer : ForFunc)
+      infer[@refine].resolve!(ctx, infer).intersect(@refine_type)
     end
 
-    def within_domain!(infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
-      meta_type_within_domain!(infer, resolve!(infer), use_pos, constraint_pos, constraint, aliases)
+    def within_domain!(ctx : Context, infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
+      meta_type_within_domain!(infer, resolve!(ctx, infer), use_pos, constraint_pos, constraint, aliases)
     end
   end
 
@@ -534,12 +535,12 @@ class Mare::Compiler::Infer
     def initialize(@pos, @local)
     end
 
-    def resolve!(infer : ForFunc)
-      infer[@local].resolve!(infer).ephemeralize
+    def resolve!(ctx : Context, infer : ForFunc)
+      infer[@local].resolve!(ctx, infer).ephemeralize
     end
 
-    def within_domain!(infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
-      infer[@local].within_domain!(infer, use_pos, constraint_pos, constraint, aliases - 1)
+    def within_domain!(ctx : Context, infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
+      infer[@local].within_domain!(ctx, infer, use_pos, constraint_pos, constraint, aliases - 1)
     end
   end
 
@@ -557,7 +558,7 @@ class Mare::Compiler::Infer
 
     def describe_kind; "return value" end
 
-    def inner_resolve!(infer : ForFunc)
+    def inner_resolve!(ctx : Context, infer : ForFunc)
       raise "unresolved ret for #{self.inspect}" unless @ret
       @ret.not_nil!
     end
@@ -582,11 +583,11 @@ class Mare::Compiler::Infer
 
     def describe_kind; "array literal" end
 
-    def inner_resolve!(infer : ForFunc)
+    def inner_resolve!(ctx : Context, infer : ForFunc)
       array_defn = infer.prelude_type("Array")
 
       # Determine the lowest common denominator MetaType of all elements.
-      elem_mts = terms.map { |term| infer[term].resolve!(infer) }.uniq
+      elem_mts = terms.map { |term| infer[term].resolve!(ctx, infer) }.uniq
       elem_mt = MetaType.new_union(elem_mts).simplify(infer)
 
       # Look for exactly one antecedent type that matches the inferred type.
@@ -594,7 +595,7 @@ class Mare::Compiler::Infer
       # If such a type is found, it replaces our inferred element type.
       # If no such type is found, stick with what we inferred for now.
       possible_antes = [] of MetaType
-      possible_element_antecedents(infer).each do |ante|
+      possible_element_antecedents(ctx, infer).each do |ante|
         if elem_mts.empty? || elem_mt.subtype_of?(infer, ante)
           possible_antes << ante
         end
@@ -619,7 +620,6 @@ class Mare::Compiler::Infer
       mt = MetaType.new(rt)
 
       # Reach the functions we will use during CodeGen.
-      ctx = infer.ctx
       ["new", "<<"].each do |f_name|
         f = rt.defn(ctx).find_func!(f_name)
         f_link = f.make_link(rt.link)
@@ -630,12 +630,13 @@ class Mare::Compiler::Infer
       mt
     end
 
-    def after_within_domain!(infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
-      antecedents = possible_element_antecedents(infer)
+    def after_within_domain!(ctx : Context, infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
+      antecedents = possible_element_antecedents(ctx, infer)
       return if antecedents.empty?
 
       terms.each do |term|
         infer[term].within_domain!(
+          ctx,
           infer,
           use_pos,
           constraint_pos,
@@ -645,10 +646,10 @@ class Mare::Compiler::Infer
       end
     end
 
-    private def possible_element_antecedents(infer) : Array(MetaType)
+    private def possible_element_antecedents(ctx, infer) : Array(MetaType)
       results = [] of MetaType
 
-      total_domain_constraint(infer.ctx).each_reachable_defn.to_a.each do |rt|
+      total_domain_constraint(ctx).each_reachable_defn.to_a.each do |rt|
         # TODO: Support more element antecedent detection patterns.
         if rt.link == infer.prelude_type("Array") \
         && rt.args.size == 1

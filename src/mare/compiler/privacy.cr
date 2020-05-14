@@ -21,7 +21,7 @@ class Mare::Compiler::Privacy < Mare::AST::Visitor
     end
   end
 
-  getter ctx : Context
+  private getter ctx : Context
   getter infer : Infer::ForFunc
 
   def initialize(@ctx, @infer)
@@ -62,7 +62,7 @@ class Mare::Compiler::Privacy < Mare::AST::Visitor
     problems = [] of {Source::Pos, String}
     infer
     .resolve(node.lhs)
-    .find_callable_func_defns(infer, call_ident.value)
+    .find_callable_func_defns(ctx, infer, call_ident.value)
     .each do |(_, _, call_func)|
       call_func_pos = call_func.not_nil!.ident.pos
       if call_library != call_func_pos.source.library

@@ -309,7 +309,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   end
 
   class ForType
-    getter ctx : Context
+    private getter ctx : Context
     getter reified : ReifiedType
     getter precursor : (ForType | ForFunc)?
     getter all_for_funcs
@@ -519,7 +519,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   end
 
   class ForFunc < Mare::AST::Visitor
-    getter ctx : Context
+    private getter ctx : Context
     getter for_type : ForType
     getter reified : ReifiedFunction
     getter yield_out_infos : Array(Local)
@@ -612,7 +612,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
 
     def resolve(node) : MetaType
-      @resolved[node] ||= self[node].resolve!(self)
+      @resolved[node] ||= self[node].resolve!(ctx, self)
     end
 
     def each_meta_type(&block)
@@ -729,7 +729,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         # and also of allowing inference if there is no explicit type.
         # We don't do this for constructors, since constructors implicitly return
         # self no matter what the last term of the body of the function is.
-        self[ret].as(FuncBody).assign(self, func_body, func_body_pos) \
+        self[ret].as(FuncBody).assign(ctx, self, func_body, func_body_pos) \
           unless func.has_tag?(:constructor)
       end
 
@@ -739,7 +739,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         if func.has_tag?(:async)
           "An asynchronous function"
         elsif func.has_tag?(:constructor) \
-        && !self[ret].resolve!(self).subtype_of?(self, MetaType.cap("ref"))
+        && !self[ret].resolve!(ctx, self).subtype_of?(self, MetaType.cap("ref"))
           "A constructor with elevated capability"
         end
       if require_sendable
@@ -747,7 +747,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
 
           errs = [] of {Source::Pos, String}
           params.terms.each do |param|
-            param_mt = self[param].resolve!(self)
+            param_mt = self[param].resolve!(ctx, self)
 
             unless param_mt.is_sendable?
               # TODO: Remove this hacky special case.
@@ -767,15 +767,15 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       # Assign the resolved types to a map for safekeeping.
       # This also has the effect of running some final checks on everything.
       @info_table.each do |node, info|
-        @resolved[node] ||= info.resolve!(self)
+        @resolved[node] ||= info.resolve!(ctx, self)
       end
 
       nil
     end
 
     def follow_call_get_call_defns(call : FromCall)
-      receiver = self[call.lhs].resolve!(self)
-      call_defns = receiver.find_callable_func_defns(self, call.member)
+      receiver = self[call.lhs].resolve!(ctx, self)
+      call_defns = receiver.find_callable_func_defns(ctx, self, call.member)
 
       # Raise an error if we don't have a callable function for every possibility.
       call_defns << {receiver.inner, nil, nil} if call_defns.empty?
@@ -900,7 +900,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       # TODO: enforce that all call_defns have the same param count.
       unless call.args.empty?
         call.args.zip(infer.params).zip(call.args_pos).each do |(arg, param), arg_pos|
-          infer[param].as(Param).verify_arg(infer, self, arg, arg_pos)
+          infer[param].as(Param).verify_arg(ctx, infer, self, arg, arg_pos)
         end
       end
     end
@@ -930,7 +930,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
             # TODO: Use .assign instead of .set_explicit after figuring out how to have an AST node for it
             self[yield_param].as(Local).set_explicit(
               yield_out.first_viable_constraint_pos,
-              yield_out.resolve!(infer),
+              yield_out.resolve!(ctx, infer),
             )
           end
         end
@@ -946,10 +946,11 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         none = MetaType.new(reified_type(prelude_type("None")))
         if yield_in_resolved != none
           self[yield_block].within_domain!(
+            ctx,
             self,
             yield_block.pos,
             infer.yield_in_info.pos,
-            infer.yield_in_info.resolve!(infer),
+            infer.yield_in_info.resolve!(ctx, infer),
             0,
           )
         end
@@ -977,7 +978,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       # TODO: It should be safe to pass in a TRN if the receiver is TRN,
       # so is_sendable? isn't quite liberal enough to allow all valid cases.
       call.args.each do |arg|
-        inferred_arg = self[arg].resolve!(self)
+        inferred_arg = self[arg].resolve!(ctx, self)
         unless inferred_arg.alias.is_sendable?
           problems << {arg.pos,
             "the argument (when aliased) has a type of " \
@@ -1033,7 +1034,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
 
         # Resolve and take note of the return type.
         inferred_ret_info = infer[infer.ret]
-        inferred_ret = inferred_ret_info.resolve!(infer)
+        inferred_ret = inferred_ret_info.resolve!(ctx, infer)
         rets << inferred_ret
         poss << inferred_ret_info.pos
 
@@ -1065,7 +1066,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
 
       # Apply constraints to the return type.
       ret = infer[infer.ret]
-      field.set_explicit(ret.pos, ret.resolve!(infer))
+      field.set_explicit(ret.pos, ret.resolve!(ctx, infer))
     end
 
     def resolved_self_cap : MetaType
@@ -1122,11 +1123,11 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
 
     def yield_out_resolved
-      yield_out_infos.map(&.resolve!(self))
+      yield_out_infos.map(&.resolve!(ctx, self))
     end
 
     def yield_in_resolved
-      yield_in_info.not_nil!.resolve!(self)
+      yield_in_info.not_nil!.resolve!(ctx, self)
     end
 
     def error_if_type_args_missing(node : AST::Node, mt : MetaType)
@@ -1315,7 +1316,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       field = Field.new(node.pos)
       self[node] = field
       follow_field(field, node.value)
-      field.assign(self, node.rhs, node.rhs.pos)
+      field.assign(ctx, self, node.rhs, node.rhs.pos)
     end
 
     def touch(node : AST::Relate)
@@ -1326,10 +1327,10 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         lhs = self[node.lhs]
         case lhs
         when Local
-          lhs.assign(self, node.rhs, node.rhs.pos)
+          lhs.assign(ctx, self, node.rhs, node.rhs.pos)
           redirect(node, node.lhs)
         when Param
-          lhs.assign(self, node.rhs, node.rhs.pos)
+          lhs.assign(ctx, self, node.rhs, node.rhs.pos)
           redirect(node, node.lhs)
         else
           raise NotImplementedError.new(node.lhs)
@@ -1375,7 +1376,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
           # a choice body to inform the type system about the type relationship.
           bool = MetaType.new(reified_type(prelude_type("Bool")))
           refine = follow_redirects(node.lhs)
-          refine_type = self[node.rhs].resolve!(self)
+          refine_type = self[node.rhs].resolve!(ctx, self)
           self[node] = TypeCondition.new(node.pos, bool, refine, refine_type)
 
         # If the left-hand side is the name of a type parameter...
@@ -1390,7 +1391,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
           # a choice body to inform the type system about the type relationship.
           bool = MetaType.new(reified_type(prelude_type("Bool")))
           refine = lhs_type_param
-          refine_type = self[node.rhs].resolve!(self)
+          refine_type = self[node.rhs].resolve!(ctx, self)
           self[node] = TypeParamCondition.new(node.pos, bool, refine, refine_type)
 
         # If the left-hand side is the name of any other fixed type...
@@ -1489,7 +1490,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         # Each condition in a choice must evaluate to a type of Bool.
         bool = MetaType.new(reified_type(prelude_type("Bool")))
         cond_info = self[cond]
-        cond_info.within_domain!(self, node.pos, node.pos, bool, 1)
+        cond_info.within_domain!(ctx, self, node.pos, node.pos, bool, 1)
 
         # If we have a type condition as the cond, that implies that it returned
         # true if we are in the body; hence we can apply the type refinement.
@@ -1547,7 +1548,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       # The condition of the loop must evaluate to a type of Bool.
       bool = MetaType.new(reified_type(prelude_type("Bool")))
       cond_info = self[node.cond]
-      cond_info.within_domain!(self, node.pos, node.pos, bool, 1)
+      cond_info.within_domain!(ctx, self, node.pos, node.pos, bool, 1)
 
       # TODO: Don't use Choice?
       self[node] = Choice.new(node.pos, [node.body, node.else_body])
@@ -1562,7 +1563,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         if yield_out_infos.size != node.terms.size
 
       yield_out_infos.zip(node.terms).each do |info, term|
-        info.assign(self, term, term.pos)
+        info.assign(ctx, self, term, term.pos)
       end
 
       self[node] = yield_in_info

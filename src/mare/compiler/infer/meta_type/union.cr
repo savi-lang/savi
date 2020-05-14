@@ -96,14 +96,14 @@ struct Mare::Compiler::Infer::MetaType::Union
     iter
   end
 
-  def find_callable_func_defns(infer : ForFunc, name : String)
+  def find_callable_func_defns(ctx, infer : ForFunc, name : String)
     list = [] of Tuple(Inner, Infer::ReifiedType?, Program::Function?)
 
     # Every nominal in the union must have an implementation of the call.
     # If it doesn't, we will collect it here as a failure to find it.
     terms.not_nil!.each do |term|
       defn = term.defn
-      result = term.find_callable_func_defns(infer, name)
+      result = term.find_callable_func_defns(ctx, infer, name)
       result ||= [{term, (defn if defn.is_a?(Infer::ReifiedType)), nil}]
       list.concat(result)
     end if terms
@@ -111,7 +111,7 @@ struct Mare::Compiler::Infer::MetaType::Union
     # Every intersection must have one or more implementations of the call.
     # Otherwise, it will return some error infomration in its list for us.
     intersects.not_nil!.each do |intersect|
-      result = intersect.find_callable_func_defns(infer, name).not_nil!
+      result = intersect.find_callable_func_defns(ctx, infer, name).not_nil!
       list.concat(result)
     end if intersects
 

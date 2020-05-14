@@ -60,7 +60,7 @@ struct Mare::Compiler::Infer::MetaType::Capability
     ([] of ReifiedType).each
   end
 
-  def find_callable_func_defns(infer : ForFunc, name : String)
+  def find_callable_func_defns(ctx, infer : ForFunc, name : String)
     nil
   end
 

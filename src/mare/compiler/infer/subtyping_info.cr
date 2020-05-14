@@ -1,5 +1,5 @@
 class Mare::Compiler::Infer::SubtypingInfo
-  getter ctx : Context
+  private getter ctx : Context
 
   def initialize(@ctx, @this : ReifiedType)
     @asserted = Hash(ReifiedType, Source::Pos).new

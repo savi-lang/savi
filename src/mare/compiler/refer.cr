@@ -36,7 +36,7 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
   end
 
   class ForType
-    getter ctx : Context
+    private getter ctx : Context
     getter self_type : Type
 
     def initialize(@ctx, t_ident)

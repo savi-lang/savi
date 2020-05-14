@@ -324,11 +324,12 @@ struct Mare::Compiler::Infer::MetaType
   end
 
   def find_callable_func_defns(
+    ctx : Context,
     infer : ForFunc,
     name : String,
   ) : Set(Tuple(Inner, ReifiedType?, Program::Function?))
     set = Set(Tuple(Inner, ReifiedType?, Program::Function?)).new
-    @inner.find_callable_func_defns(infer, name).try(&.each { |tuple|
+    @inner.find_callable_func_defns(ctx, infer, name).try(&.each { |tuple|
       set.add(tuple)
     })
     set

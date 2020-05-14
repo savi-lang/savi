@@ -51,7 +51,7 @@ module Mare::Compiler::Completeness
   end
 
   class Branch < Mare::AST::Visitor
-    getter ctx : Context
+    private getter ctx : Context
     getter type : Infer::ReifiedType
     getter func : Infer::ReifiedFunction
     getter branch_cache : Hash(Tuple(Set(String), Infer::ReifiedFunction), Branch)

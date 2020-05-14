@@ -18,7 +18,7 @@ class Mare::Compiler::Verify < Mare::AST::Visitor
     end
   end
 
-  getter ctx : Context
+  private getter ctx : Context
   getter infer_type : Infer::ForType
   getter infer_func : Infer::ForFunc
 

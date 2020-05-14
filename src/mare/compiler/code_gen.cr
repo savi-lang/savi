@@ -84,7 +84,7 @@ class Mare::Compiler::CodeGen
         key = rf.link.name
         key += ".#{rf.link.hygienic_id}" if rf.link.hygienic_id
         key += ".#{Random::Secure.hex}" if @gfuncs.has_key?(key)
-        @gfuncs[key] = GenFunc.new(reach_func, vtable_index)
+        @gfuncs[key] = GenFunc.new(g.ctx, reach_func, vtable_index)
       end
 
       # If we're generating for a type that has no inherent descriptor,
@@ -216,8 +216,8 @@ class Mare::Compiler::CodeGen
     property! yield_cc_final_return_type : LLVM::Type
     property! after_yield_blocks : Array(LLVM::BasicBlock)
 
-    def initialize(@reach_func, @vtable_index)
-      @needs_receiver = type_def.has_state?(infer.ctx) && !(func.cap.value == "non")
+    def initialize(ctx, @reach_func, @vtable_index)
+      @needs_receiver = type_def.has_state?(ctx) && !(func.cap.value == "non")
 
       @llvm_name = "#{type_def.llvm_name}#{infer.reified.name}"
       @llvm_name = "#{@llvm_name}.HYGIENIC" if link.hygienic_id
@@ -239,11 +239,11 @@ class Mare::Compiler::CodeGen
       infer.func
     end
 
-    def calling_convention : Symbol
+    def calling_convention(ctx) : Symbol
       list = [] of Symbol
       list << :constructor_cc if func.has_tag?(:constructor)
       list << :error_cc if Jumps.any_error?(func.ident)
-      list << :yield_cc if infer.ctx.inventory.yields(link).size > 0
+      list << :yield_cc if ctx.inventory.yields(link).size > 0
 
       return :simple_cc if list.empty?
       return list.first if list.size == 1
@@ -546,7 +546,7 @@ class Mare::Compiler::CodeGen
     @builder.position_at_end(func_frame.entry_block)
 
     # We have some extra work to do here if this is a yielding function.
-    if gfunc && gfunc.calling_convention == :yield_cc
+    if gfunc && gfunc.calling_convention(ctx) == :yield_cc
       # We need to pre-declare the code blocks that follow each yield statement.
       gfunc.after_yield_blocks = [] of LLVM::BasicBlock
       ctx.inventory.yields(gfunc.link).size.times do |index|
@@ -624,7 +624,7 @@ class Mare::Compiler::CodeGen
 
     # If this is a yielding function, we must first declare the type that will
     # be used to hold continuation data for the subsequent continuing calls.
-    if gfunc.calling_convention == :yield_cc
+    if gfunc.calling_convention(ctx) == :yield_cc
       gfunc.continuation_type =
         @llvm.struct_create_named("#{gfunc.llvm_name}.CONTINUATION")
     end
@@ -632,7 +632,7 @@ class Mare::Compiler::CodeGen
     # Determine the LLVM type to return, based on the calling convention.
     simple_ret_type = llvm_type_of(gfunc.reach_func.signature.ret)
     gfunc.llvm_func_ret_type =
-      case gfunc.calling_convention
+      case gfunc.calling_convention(ctx)
       when :constructor_cc
         @void
       when :simple_cc
@@ -683,7 +683,7 @@ class Mare::Compiler::CodeGen
 
         opaque_t
       else
-        raise NotImplementedError.new(gfunc.calling_convention)
+        raise NotImplementedError.new(gfunc.calling_convention(ctx))
       end
   end
 
@@ -780,7 +780,7 @@ class Mare::Compiler::CodeGen
     # If this is a yielding function, we need to generate the alternate
     # versions of it, each with their own different entrypoint block
     # that will take the control flow to continuing where that yield was.
-    if gfunc.calling_convention == :yield_cc
+    if gfunc.calling_convention(ctx) == :yield_cc
       continue_param_types = [
         gfunc.continuation_type.pointer, # TODO: pass by value instead of by pointer
         llvm_type_of(ctx.reach[gfunc.infer.yield_in_resolved]),
@@ -863,7 +863,7 @@ class Mare::Compiler::CodeGen
     end
 
     unless Jumps.away?(gfunc.func.body.not_nil!)
-      case gfunc.calling_convention
+      case gfunc.calling_convention(ctx)
       when :constructor_cc
         @builder.ret
       when :simple_cc
@@ -873,7 +873,7 @@ class Mare::Compiler::CodeGen
       when :yield_cc
         gen_final_return_using_yield_cc(last_value, last_expr.not_nil!)
       else
-        raise NotImplementedError.new(gfunc.calling_convention)
+        raise NotImplementedError.new(gfunc.calling_convention(ctx))
       end
     end
 
@@ -906,7 +906,7 @@ class Mare::Compiler::CodeGen
     param_count = llvm_func.params.size
     args = param_count.times.map { |i| llvm_func.params[i] }.to_a
 
-    case gfunc.calling_convention
+    case gfunc.calling_convention(ctx)
     when :simple_cc
       value = @builder.call llvm_ffi_func, args
       value = gen_none if llvm_ffi_func.return_type == @void
@@ -931,7 +931,7 @@ class Mare::Compiler::CodeGen
       @builder.position_at_end(then_block)
       gen_return_using_error_cc(value, nil, false)
     else
-      raise NotImplementedError.new(gfunc.calling_convention)
+      raise NotImplementedError.new(gfunc.calling_convention(ctx))
     end
 
     gen_func_end(gfunc)
@@ -1483,7 +1483,7 @@ class Mare::Compiler::CodeGen
         gen_call(gfunc.reach_func.signature, gfunc.llvm_func, args, arg_exprs, arg_frames, use_receiver)
       end
 
-    case gfunc.calling_convention
+    case gfunc.calling_convention(ctx)
     when :simple_cc
       # Do nothing - we already have the result value we need.
     when :constructor_cc
@@ -1510,7 +1510,7 @@ class Mare::Compiler::CodeGen
       # Since a yield block is kind of like a loop, we need an alloca to cover
       # the "variable" that changes each iteration - the last call result.
       result_alloca =
-        if func_frame.gfunc.not_nil!.calling_convention == :yield_cc
+        if func_frame.gfunc.not_nil!.calling_convention(ctx) == :yield_cc
           func_frame.gfunc.not_nil!.continuation_info
             .struct_gep_for_yielded_result(func_frame, relate)
         else
@@ -1600,7 +1600,7 @@ class Mare::Compiler::CodeGen
       )
       result = final_result_return
     else
-      raise NotImplementedError.new(gfunc.calling_convention)
+      raise NotImplementedError.new(gfunc.calling_convention(ctx))
     end
 
     result
@@ -2807,7 +2807,7 @@ class Mare::Compiler::CodeGen
     # using the error-able calling convention function style,
     # making (and checking) the assumption that we are in such a function.
     if @try_else_stack.empty?
-      calling_convention = func_frame.gfunc.not_nil!.calling_convention
+      calling_convention = func_frame.gfunc.not_nil!.calling_convention(ctx)
       raise "unsupported empty try else stack for #{calling_convention}" \
         unless calling_convention == :error_cc
       gen_return_using_error_cc(error_value, from_expr, true)
@@ -3062,7 +3062,7 @@ class Mare::Compiler::CodeGen
 
     # If this is a yielding function, we store locals in the continuation data.
     # Otherwise, we store each in its own alloca, which we create at the entry.
-    if gfunc.calling_convention == :yield_cc
+    if gfunc.calling_convention(ctx) == :yield_cc
       cont = func_frame.continuation_value
       gep = gfunc.continuation_info.struct_gep_for_local(cont, ref)
       # TODO: bitcast to llvm_type?

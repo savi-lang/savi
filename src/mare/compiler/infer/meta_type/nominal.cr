@@ -38,15 +38,15 @@ struct Mare::Compiler::Infer::MetaType::Nominal
     defn.is_a?(Infer::ReifiedType) ? [defn].each : ([] of Infer::ReifiedType).each
   end
 
-  def find_callable_func_defns(infer : ForFunc, name : String)
+  def find_callable_func_defns(ctx, infer : ForFunc, name : String)
     defn = defn()
     case defn
     when Infer::ReifiedType
-      func = defn.defn(infer.ctx).find_func?(name)
+      func = defn.defn(ctx).find_func?(name)
       [{self, defn, func}] if func
     when Refer::TypeParam
       infer.lookup_type_param_bound(defn)
-        .find_callable_func_defns(infer, name)
+        .find_callable_func_defns(ctx, infer, name)
     else
       raise NotImplementedError.new(defn)
     end

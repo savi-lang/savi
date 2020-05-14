@@ -17,7 +17,7 @@ class Mare::Compiler::Infer::MetaType::Unconstrained
     ([] of Infer::ReifiedType).each
   end
 
-  def find_callable_func_defns(infer : ForFunc, name : String)
+  def find_callable_func_defns(ctx, infer : ForFunc, name : String)
     nil
   end
 

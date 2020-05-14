@@ -93,7 +93,7 @@ class Mare::Compiler::Classify < Mare::AST::Visitor
     end
   end
 
-  getter ctx : Context
+  private getter ctx : Context
   getter type : Program::Type
   getter func : Program::Function
   getter type_link : Program::Type::Link
