@@ -59,13 +59,8 @@ module Mare::Compiler::Import
     return library if library
 
     # Otherwise, use the Compiler to load the library now.
-    library = Program::Library.new
-    docs =
-      Compiler
-        .get_library_sources(path)
-        .map { |s| Parser.parse(s) }
-        .tap(&.each { |doc| ctx.compile(library, doc) })
-    library.source_library = docs.first.source.library
-    library
+    library_sources = Compiler.get_library_sources(path)
+    library_docs = library_sources.map { |s| Parser.parse(s) }
+    ctx.compile_library(library_sources.first.library, library_docs)
   end
 end

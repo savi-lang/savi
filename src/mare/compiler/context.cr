@@ -31,12 +31,19 @@ class Mare::Compiler::Context
     @serve_hover = ServeHover.new
   end
 
-  def compile(library : Program::Library, doc : AST::Document)
-    @program.libraries << library unless @program.libraries.includes?(library)
-    @stack.unshift(Interpreter::Default.new(library))
-    doc.list.each { |decl| compile_decl(decl) }
-    @stack.reverse_each &.finished(self)
-    @stack.shift
+  def compile_library(source_library : Source::Library, docs : Array(AST::Document))
+    library = Program::Library.new
+    library.source_library = source_library
+
+    docs.each do |doc|
+      @stack.unshift(Interpreter::Default.new(library))
+      doc.list.each { |decl| compile_decl(decl) }
+      @stack.reverse_each &.finished(self)
+      @stack.shift
+    end
+
+    @program.libraries << library
+    library
   end
 
   def compile_decl(decl : AST::Declare)

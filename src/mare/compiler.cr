@@ -126,16 +126,11 @@ module Mare::Compiler
 
     ctx = Context.new
 
-    library = Program::Library.new
-    library.source_library = docs.first.source.library
-    docs.each { |doc| ctx.compile(library, doc) }
+    ctx.compile_library(docs.first.source.library, docs)
 
-    prelude_library_sources = get_library_sources(prelude_library_path)
-    prelude_library = Program::Library.new
-    prelude_library.source_library = prelude_library_sources.first.library
-    prelude_library_sources
-      .map { |s| Parser.parse(s) }
-      .each { |doc| ctx.compile(prelude_library, doc) }
+    prelude_sources = get_library_sources(prelude_library_path)
+    prelude_docs = prelude_sources.map { |s| Parser.parse(s) }
+    ctx.compile_library(prelude_sources.first.library, prelude_docs)
 
     satisfy(ctx, target)
   end
