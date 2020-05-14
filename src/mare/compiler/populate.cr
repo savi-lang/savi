@@ -13,9 +13,11 @@
 #
 module Mare::Compiler::Populate
   def self.run(ctx, library)
-    library.types.each do |dest|
+    library.types_map_cow do |dest|
+      orig_functions = dest.functions
+
       # Copy functions into the type from other sources.
-      dest.functions.each do |f|
+      orig_functions.each do |f|
         # Only look at functions that have the "copies" tag.
         # Often these "functions" are actually "is" annotations.
         next unless f.has_tag?(:copies)
@@ -53,7 +55,14 @@ module Mare::Compiler::Populate
           raise NotImplementedError.new(ret)
         end
 
-        copy_from(source_defn, dest, visitor)
+        new_functions = copy_from(source_defn, dest, visitor)
+        if new_functions.any?
+          if dest.functions.same?(orig_functions)
+            dest = dest.dup
+            raise "didn't dup functions!" if dest.functions.same?(orig_functions)
+          end
+          dest.functions.concat(new_functions)
+        end
       end
 
       # If the type doesn't have a constructor and needs one, then add one.
@@ -72,18 +81,27 @@ module Mare::Compiler::Populate
           f.add_tag(:async) if dest.has_tag?(:actor)
         end
 
+        if dest.functions.same?(orig_functions)
+          dest = dest.dup
+          raise "didn't dup functions!" if dest.functions.same?(orig_functions)
+        end
         dest.functions << func
       end
+
+      dest
     end
   end
 
   # For each concrete function in the given source, copy it to the destination
   # if the destination doesn't already have an implementation for it.
+  # Don't actually copy yet - just return the new functions to be copied in.
   def self.copy_from(
     source : Program::Type,
     dest : Program::Type,
     visitor : AST::Visitor?
   )
+    new_functions = [] of Program::Function
+
     source.functions.each do |f|
       if !f.has_tag?(:field) # always copy fields; skip these checks if a field
         # We ignore hygienic functions entirely.
@@ -105,8 +123,10 @@ module Mare::Compiler::Populate
         new_f.yield_out = f.yield_out.try(&.accept(visitor))
         new_f.yield_in = f.yield_in.try(&.accept(visitor))
       end
-      dest.functions << new_f
+      new_functions << new_f
     end
+
+    new_functions
   end
 
   # This visitor, given a mapping of type params to AST nodes,
