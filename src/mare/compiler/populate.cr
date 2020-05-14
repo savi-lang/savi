@@ -5,8 +5,8 @@
 # an "is" annotation on a type denoting an inheritance relationship.
 # The Populate pass also creates missing methods, like the default constructor.
 #
-# This pass mutates the Program topology.
-# This pass reads ASTs (Function heads only) but does not mutate any ASTs.
+# This pass uses copy-on-mutate patterns to "mutate" the Program topology.
+# This pass does not mutate ASTs, but copies whole functions to other types.
 # This pass may raise a compilation error.
 # This pass keeps temporary state (on the stack) at the per-type level.
 # This pass produces no output state.

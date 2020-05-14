@@ -5,8 +5,8 @@
 # earlier passes of evaluation in the compiler, to make them fully dynamic.
 # This is not possible yet, as all macros are hard-coded here in the compiler.
 #
-# This pass does not mutate the Program topology, but may add Function tags.
-# This pass heavily mutates ASTs.
+# This pass uses copy-on-mutate patterns to "mutate" the Program topology.
+# This pass uses copy-on-mutate patterns to "mutate" the AST.
 # This pass may raise a compilation error.
 # This pass keeps temporary state at the per-function level.
 # This pass produces no output state.
@@ -74,6 +74,7 @@ class Mare::Compiler::Macros < Mare::AST::CopyOnMutateVisitor
 
     # Having confirmed that the function body contains only the phrase
     # 'compiler intrinsic' as a macro-like form, we can tag it and delete it.
+    @func = @func.dup
     @func.body = nil
     @func.add_tag(:compiler_intrinsic)
   end

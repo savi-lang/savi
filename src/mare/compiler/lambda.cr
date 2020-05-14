@@ -2,8 +2,8 @@
 # The purpose of the Lambda pass is to replace inline lambda forms with calls
 # to new anonymous/hygienic types that represent the lambda as an external type.
 #
-# This pass mutates the Program topology.
-# This pass mutates ASTs.
+# This pass uses copy-on-mutate patterns to "mutate" the Program topology.
+# This pass uses copy-on-mutate patterns to "mutate" the AST.
 # This pass may raise a compilation error.
 # This pass keeps temporary state at the per-function level.
 # This pass produces no output state.

@@ -4,8 +4,8 @@
 # syntax sugar forms into their corresponding standard/canonical form,
 # so that later passes can deal in less diverse, more predictable forms.
 #
-# This pass does not mutate the Program topology.
-# This pass heavily mutates ASTs.
+# This pass uses copy-on-mutate patterns to "mutate" the Program topology.
+# This pass uses copy-on-mutate patterns to "mutate" the AST.
 # This pass does not raise any compilation errors.
 # This pass keeps temporary state at the per-function level.
 # This pass produces no output state.
