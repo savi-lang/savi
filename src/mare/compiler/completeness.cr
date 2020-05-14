@@ -41,7 +41,7 @@ module Mare::Compiler::Completeness
     end
 
     # Now visit the actual constructor body.
-    rf_func.body.try(&.accept(branch))
+    rf_func.body.try(&.accept(ctx, branch))
 
     # Any fields that were not seen in the branching analysis are errors.
     unseen = branch.show_unseen_fields
@@ -72,7 +72,7 @@ module Mare::Compiler::Completeness
       branch =
         Branch.new(ctx, type, func, branch_cache, all_fields,
           seen_fields.dup, call_crumbs.dup)
-      node.accept(branch)
+      node.accept(ctx, branch)
       branch
     end
 
@@ -88,7 +88,7 @@ module Mare::Compiler::Completeness
           Branch.new(ctx, type, next_func, branch_cache, all_fields,
             seen_fields.dup, call_crumbs.dup)
         branch.call_crumbs << call_crumb
-        next_func.func(ctx).body.not_nil!.accept(branch)
+        next_func.func(ctx).body.not_nil!.accept(ctx, branch)
         branch
       end
     end
@@ -101,13 +101,13 @@ module Mare::Compiler::Completeness
     end
 
     # This visitor never replaces nodes, it just touches them and returns them.
-    def visit(node)
+    def visit(ctx, node)
       touch(node)
 
       node
     end
 
-    def visit_children?(node : AST::Choice)
+    def visit_children?(ctx, node : AST::Choice)
       # We don't visit anything under a choice with this visitor;
       # we instead spawn a new visitor instance in the touch method below.
       false

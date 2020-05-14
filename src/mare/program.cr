@@ -297,8 +297,8 @@ class Mare::Program
       io << ">"
     end
 
-    def accept(visitor : AST::CopyOnMutateVisitor)
-      new_ast = @ast.accept(visitor)
+    def accept(ctx : Compiler::Context, visitor : AST::CopyOnMutateVisitor)
+      new_ast = @ast.accept(ctx, visitor)
       return self if new_ast.same?(@ast)
 
       dup.tap do |f|

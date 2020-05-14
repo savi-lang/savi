@@ -23,7 +23,8 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
     # For each type in the library, delve into type parameters and functions.
     library.types.each do |t|
       t_link = t.make_link(library)
-      @map[t_link] = ForType.new(ctx, t.ident).tap(&.run)
+      self_type = ctx.refer_type[t.ident].as(Type)
+      @map[t_link] = ForType.new(self_type).tap(&.run(ctx))
     end
   end
 
@@ -36,11 +37,9 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
   end
 
   class ForType
-    private getter ctx : Context
     getter self_type : Type
 
-    def initialize(@ctx, t_ident)
-      @self_type = @ctx.refer_type[t_ident].as(Type)
+    def initialize(@self_type)
       @map = {} of Program::Function::Link => ForFunc
       @infos = {} of AST::Node => Info
       @scopes = {} of AST::Group => Scope
@@ -78,21 +77,21 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
       @self_type
     end
 
-    def find_type?(node : AST::Identifier)
-      @ctx.refer_type[node]?
+    def find_type?(ctx, node : AST::Identifier)
+      ctx.refer_type[node]?
     end
 
-    def run
+    def run(ctx)
       self_type_defn = @self_type.defn(ctx)
 
       # For the type parameters in the type, run with a new ForBranch instance.
-      self_type_defn.params.try(&.accept(ForBranch.new(self)))
+      self_type_defn.params.try(&.accept(ctx, ForBranch.new(self)))
 
       # For each function in the type, run with a new ForFunc instance.
       self_type_defn.functions.each do |f|
         ForFunc.new(self)
         .tap { |refer| @map[f.make_link(@self_type.link)] = refer }
-        .tap(&.run(f))
+        .tap(&.run(ctx, f))
       end
     end
   end
@@ -125,21 +124,21 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
       @scopes[group] ||= Scope.new(branch.locals)
     end
 
-    def find_type?(node)
-      @for_type.find_type?(node)
+    def find_type?(ctx, node)
+      @for_type.find_type?(ctx, node)
     end
 
-    def run(func)
+    def run(ctx, func)
       root = ForBranch.new(self)
 
       func.params.try(&.terms.each { |param|
-        param.accept(root)
+        param.accept(ctx, root)
         root.create_param_local(param)
       })
-      func.ret.try(&.accept(root))
-      func.body.try(&.accept(root))
-      func.yield_out.try(&.accept(root))
-      func.yield_in.try(&.accept(root))
+      func.ret.try(&.accept(ctx, root))
+      func.body.try(&.accept(ctx, root))
+      func.yield_out.try(&.accept(ctx, root))
+      func.yield_in.try(&.accept(ctx, root))
 
       func.body.try { |body| set_scope(body, root) }
 
@@ -158,21 +157,21 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
     )
     end
 
-    def sub_branch(group : AST::Node?, init_locals = @locals.dup)
+    def sub_branch(ctx, group : AST::Node?, init_locals = @locals.dup)
       ForBranch.new(@refer, init_locals, @consumes.dup).tap do |branch|
         @refer.set_scope(group, branch) if group.is_a?(AST::Group)
-        group.try(&.accept(branch))
+        group.try(&.accept(ctx, branch))
       end
     end
 
     # This visitor never replaces nodes, it just touches them and returns them.
-    def visit(node)
-      touch(node)
+    def visit(ctx, node)
+      touch(ctx, node)
       node
     end
 
     # For an Identifier, resolve it to any known local or type if possible.
-    def touch(node : AST::Identifier)
+    def touch(ctx, node : AST::Identifier)
       name = node.value
 
       # If this is an @ symbol, it refers to the this/self object.
@@ -181,7 +180,7 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
           Self::INSTANCE
         else
           # First, try to resolve as local, then as type, else it's unresolved.
-          @locals[name]? || @refer.find_type?(node) || Unresolved::INSTANCE
+          @locals[name]? || @refer.find_type?(ctx, node) || Unresolved::INSTANCE
         end
 
       # If this is an "error!" identifier, it's not actually unresolved.
@@ -218,7 +217,7 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
       @refer[node] = info
     end
 
-    def touch(node : AST::Prefix)
+    def touch(ctx, node : AST::Prefix)
       case node.op.value
       when "source_code_position_of_argument", "reflection_of_type",
            "identity_digest_of"
@@ -235,33 +234,33 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
     end
 
     # For a FieldRead or FieldWrite, take note of it by name.
-    def touch(node : AST::FieldRead | AST::FieldWrite)
+    def touch(ctx, node : AST::FieldRead | AST::FieldWrite)
       @refer[node] = Field.new(node.value)
     end
 
     # We conditionally visit the children of a `.` relation with this visitor;
     # See the logic in the touch method below.
-    def visit_children?(node : AST::Relate)
+    def visit_children?(ctx, node : AST::Relate)
       !(node.op.value == ".")
     end
 
     # For a Relate, pay attention to any relations that are relevant to us.
-    def touch(node : AST::Relate)
+    def touch(ctx, node : AST::Relate)
       case node.op.value
       when "="
         info = @refer[node.lhs]?
         create_local(node.lhs) if info.nil? || info == Unresolved::INSTANCE
       when "."
-        node.lhs.accept(self)
+        node.lhs.accept(ctx, self)
         ident, args, yield_params, yield_block = AST::Extract.call(node)
-        ident.accept(self)
-        args.try(&.accept(self))
-        touch_yield_loop(yield_params, yield_block)
+        ident.accept(ctx, self)
+        args.try(&.accept(ctx, self))
+        touch_yield_loop(ctx, yield_params, yield_block)
       end
     end
 
     # For a Group, pay attention to any styles that are relevant to us.
-    def touch(node : AST::Group)
+    def touch(ctx, node : AST::Group)
       # If we have a whitespace-delimited group where the first term has info,
       # apply that info to the whole group.
       # For example, this applies to type parameters with constraints.
@@ -273,12 +272,12 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
 
     # We don't visit anything under a choice with this visitor;
     # we instead spawn new visitor instances in the touch method below.
-    def visit_children?(node : AST::Choice)
+    def visit_children?(ctx, node : AST::Choice)
       false
     end
 
     # For a Choice, do a branching analysis of the clauses contained within it.
-    def touch(node : AST::Choice)
+    def touch(ctx, node : AST::Choice)
       # Prepare to collect the list of new locals exposed in each branch.
       branch_locals = {} of String => Array(Local | LocalUnion)
       body_consumes = {} of (Local | LocalUnion) => Source::Pos
@@ -286,7 +285,7 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
       # Iterate over each clause, visiting both the cond and body of the clause.
       node.list.each do |cond, body|
         # Visit the cond first.
-        cond_branch = sub_branch(cond)
+        cond_branch = sub_branch(ctx, cond)
 
         # Absorb any consumes from the cond branch into this parent branch.
         # This makes them visible both in the parent and in future sub branches.
@@ -294,7 +293,7 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
 
         # Visit the body next. Locals from the cond are available in the body.
         # Consumes from any earlier cond are also visible in the body.
-        body_branch = sub_branch(body, cond_branch.locals.dup)
+        body_branch = sub_branch(ctx, body, cond_branch.locals.dup)
 
         # Collect any consumes from the body branch.
         body_consumes.merge!(body_branch.consumes)
@@ -321,19 +320,19 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
 
     # We don't visit anything under a choice with this visitor;
     # we instead spawn new visitor instances in the touch method below.
-    def visit_children?(node : AST::Loop)
+    def visit_children?(ctx, node : AST::Loop)
       false
     end
 
     # For a Loop, do a branching analysis of the clauses contained within it.
-    def touch(node : AST::Loop)
+    def touch(ctx, node : AST::Loop)
       # Prepare to collect the list of new locals exposed in each branch.
       branch_locals = {} of String => Array(Local | LocalUnion)
       body_consumes = {} of (Local | LocalUnion) => Source::Pos
 
       # Visit the loop cond twice (nested) to simulate repeated execution.
-      cond_branch = sub_branch(node.cond)
-      cond_branch_2 = cond_branch.sub_branch(node.cond)
+      cond_branch = sub_branch(ctx, node.cond)
+      cond_branch_2 = cond_branch.sub_branch(ctx, node.cond)
 
       # Absorb any consumes from the cond branch into this parent branch.
       # This makes them visible both in the parent and in future sub branches.
@@ -341,15 +340,15 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
 
       # Now, visit the else body, if any.
       node.else_body.try do |else_body|
-        else_branch = sub_branch(else_body)
+        else_branch = sub_branch(ctx, else_body)
 
         # Collect any consumes from the else body branch.
         body_consumes.merge!(else_branch.consumes)
       end
 
       # Now, visit the main body twice (nested) to simulate repeated execution.
-      body_branch = sub_branch(node.body)
-      body_branch_2 = body_branch.sub_branch(node.body, @locals.dup)
+      body_branch = sub_branch(ctx, node.body)
+      body_branch_2 = body_branch.sub_branch(ctx, node.body, @locals.dup)
 
       # Collect any consumes from the body branch.
       body_consumes.merge!(body_branch.consumes)
@@ -360,23 +359,23 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
       # TODO: Is it possible/safe to collect locals from the body branches?
     end
 
-    def touch_yield_loop(params : AST::Group?, block : AST::Group?)
+    def touch_yield_loop(ctx, params : AST::Group?, block : AST::Group?)
       return unless params || block
 
       # Visit params and block twice (nested) to simulate repeated execution
-      sub_branch = sub_branch(params)
+      sub_branch = sub_branch(ctx, params)
       params.try(&.terms.each { |param| sub_branch.create_local(param) })
-      block.try(&.accept(sub_branch))
-      sub_branch2 = sub_branch.sub_branch(params, @locals.dup)
+      block.try(&.accept(ctx, sub_branch))
+      sub_branch2 = sub_branch.sub_branch(ctx, params, @locals.dup)
       params.try(&.terms.each { |param| sub_branch2.create_local(param) })
-      block.try(&.accept(sub_branch2))
+      block.try(&.accept(ctx, sub_branch2))
       @refer.set_scope(block, sub_branch) if block.is_a?(AST::Group)
 
       # Absorb any consumes from the block branch into this parent branch.
       @consumes.merge!(sub_branch.consumes)
     end
 
-    def touch(node : AST::Node)
+    def touch(ctx, node : AST::Node)
       # On all other nodes, do nothing.
     end
 

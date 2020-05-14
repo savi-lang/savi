@@ -37,8 +37,8 @@ class Mare::Compiler::Verify < Mare::AST::Visitor
     func = rf.func(ctx)
     check_function(func)
 
-    func.params.try(&.terms.each(&.accept(self)))
-    func.body.try(&.accept(self))
+    func.params.try(&.terms.each(&.accept(ctx, self)))
+    func.body.try(&.accept(ctx, self))
   end
 
   def check_function(func)
@@ -47,7 +47,7 @@ class Mare::Compiler::Verify < Mare::AST::Visitor
     if func_body && Jumps.any_error?(func_body)
       if func.has_tag?(:constructor)
         finder = ErrorFinderVisitor.new(func_body)
-        func_body.accept(finder)
+        func_body.accept(ctx, finder)
 
         Error.at func.ident,
           "This constructor may raise an error, but that is not allowed",
@@ -56,7 +56,7 @@ class Mare::Compiler::Verify < Mare::AST::Visitor
 
       if !Jumps.any_error?(func.ident)
         finder = ErrorFinderVisitor.new(func_body)
-        func_body.accept(finder)
+        func_body.accept(ctx, finder)
 
         Error.at func.ident,
           "This function name needs an exclamation point "\
@@ -88,7 +88,7 @@ class Mare::Compiler::Verify < Mare::AST::Visitor
   end
 
   # This visitor never replaces nodes, it just touches them and returns them.
-  def visit(node)
+  def visit(ctx, node)
     touch(node)
 
     node
@@ -138,20 +138,20 @@ class Mare::Compiler::Verify < Mare::AST::Visitor
     end
 
     # Only visit nodes that may raise an error.
-    def visit_any?(node)
+    def visit_any?(ctx, node)
       Jumps.any_error?(node)
     end
 
     # Before visiting a node's children, mark this node as the deepest.
     # If any children can also raise errors, they will be the new deepest ones,
     # removing this node from the possibility of being considered deepest.
-    def visit_pre(node)
+    def visit_pre(ctx, node)
       @deepest = node
     end
 
     # Save this source position if it is the deepest node in this branch of
     # the tree that we visited, recognizing that we skipped no-error branches.
-    def visit(node)
+    def visit(ctx, node)
       @found << node.pos if @deepest == node
 
       node

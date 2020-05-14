@@ -77,7 +77,7 @@ class Mare::Compiler::Classify < Mare::AST::Visitor
     INSTANCE = new
     def self.instance; INSTANCE end
 
-    def visit(node)
+    def visit(ctx, node)
       Classify.type_expr!(node)
       node
     end
@@ -103,12 +103,12 @@ class Mare::Compiler::Classify < Mare::AST::Visitor
   end
 
   def run
-    func.params.try(&.accept(self))
-    func.ret.try(&.accept(self))
-    func.ret.try(&.accept(TypeExprVisitor.instance))
-    func.body.try(&.accept(self))
-    func.yield_out.try(&.accept(TypeExprVisitor.instance))
-    func.yield_in.try(&.accept(TypeExprVisitor.instance))
+    func.params.try(&.accept(ctx, self))
+    func.ret.try(&.accept(ctx, self))
+    func.ret.try(&.accept(ctx, TypeExprVisitor.instance))
+    func.body.try(&.accept(ctx, self))
+    func.yield_out.try(&.accept(ctx, TypeExprVisitor.instance))
+    func.yield_in.try(&.accept(ctx, TypeExprVisitor.instance))
   end
 
   def refer
@@ -116,7 +116,7 @@ class Mare::Compiler::Classify < Mare::AST::Visitor
   end
 
   # This visitor never replaces nodes, it just touches them and returns them.
-  def visit(node)
+  def visit(ctx, node)
     touch(node)
     node
   end
@@ -136,7 +136,7 @@ class Mare::Compiler::Classify < Mare::AST::Visitor
       if group.terms.size == 2
         # Treat this as an explicit type qualification, such as in the case
         # of a local assignment with an explicit type. The value isn't used.
-        group.terms[1].accept(TypeExprVisitor.instance)
+        group.terms[1].accept(ctx, TypeExprVisitor.instance)
       else
         raise NotImplementedError.new(group.to_a.inspect)
       end
@@ -167,7 +167,7 @@ class Mare::Compiler::Classify < Mare::AST::Visitor
   def touch(relate : AST::Relate)
     case relate.op.value
     when "<:"
-      relate.rhs.accept(TypeExprVisitor.instance)
+      relate.rhs.accept(ctx, TypeExprVisitor.instance)
     when "."
       # In a function call Relate, a value is not needed for the right side.
       # A value is only needed for the left side and the overall access node.

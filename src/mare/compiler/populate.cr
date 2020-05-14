@@ -55,7 +55,7 @@ module Mare::Compiler::Populate
           raise NotImplementedError.new(ret)
         end
 
-        new_functions = copy_from(source_defn, dest, visitor)
+        new_functions = copy_from(ctx, source_defn, dest, visitor)
         if new_functions.any?
           if dest.functions.same?(orig_functions)
             dest = dest.dup
@@ -96,6 +96,7 @@ module Mare::Compiler::Populate
   # if the destination doesn't already have an implementation for it.
   # Don't actually copy yet - just return the new functions to be copied in.
   def self.copy_from(
+    ctx : Context,
     source : Program::Type,
     dest : Program::Type,
     visitor : AST::Visitor?
@@ -117,11 +118,11 @@ module Mare::Compiler::Populate
       # Copy the function.
       new_f = f.dup
       if visitor
-        new_f.params = f.params.try(&.accept(visitor))
-        new_f.body = f.body.try(&.accept(visitor))
-        new_f.ret = f.ret.try(&.accept(visitor))
-        new_f.yield_out = f.yield_out.try(&.accept(visitor))
-        new_f.yield_in = f.yield_in.try(&.accept(visitor))
+        new_f.params = f.params.try(&.accept(ctx, visitor))
+        new_f.body = f.body.try(&.accept(ctx, visitor))
+        new_f.ret = f.ret.try(&.accept(ctx, visitor))
+        new_f.yield_out = f.yield_out.try(&.accept(ctx, visitor))
+        new_f.yield_in = f.yield_in.try(&.accept(ctx, visitor))
       end
       new_functions << new_f
     end
@@ -145,7 +146,7 @@ module Mare::Compiler::Populate
       !node.is_a?(AST::Identifier)
     end
 
-    def visit(node)
+    def visit(ctx, node)
       if node.is_a?(AST::Identifier) \
       && (ref = @ctx.refer_type[node]?; ref.is_a?(Refer::TypeParam))
         @replace_map[ref]? || node

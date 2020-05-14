@@ -38,7 +38,7 @@ class Mare::Compiler::Lambda < Mare::AST::CopyOnMutateVisitor
         t.functions_map_cow do |f|
           cached_or_run library, t, f do
             visitor = new(t, f)
-            f = visitor.run
+            f = visitor.run(ctx)
             new_types.concat(visitor.new_types)
             f
           end
@@ -69,12 +69,12 @@ class Mare::Compiler::Lambda < Mare::AST::CopyOnMutateVisitor
     @new_types = [] of Program::Type
   end
 
-  def run
+  def run(ctx)
     f = @func
 
-    params = f.params.try(&.accept(self))
-    ret = f.ret.try(&.accept(self))
-    body = f.body.try(&.accept(self))
+    params = f.params.try(&.accept(ctx, self))
+    ret = f.ret.try(&.accept(ctx, self))
+    body = f.body.try(&.accept(ctx, self))
 
     unless params.same?(f.params) && ret.same?(f.ret) && body.same?(f.body)
       f = f.dup
@@ -89,7 +89,7 @@ class Mare::Compiler::Lambda < Mare::AST::CopyOnMutateVisitor
     "#{@type.ident.value}.#{@func.ident.value}.^#{@last_num += 1}"
   end
 
-  def visit_pre(node : AST::Group)
+  def visit_pre(ctx, node : AST::Group)
     return node unless node.style == "^"
 
     @observed_refs_stack << Hash(Int32, AST::Identifier).new
@@ -97,7 +97,7 @@ class Mare::Compiler::Lambda < Mare::AST::CopyOnMutateVisitor
     node
   end
 
-  def visit(node : AST::Identifier)
+  def visit(ctx, node : AST::Identifier)
     return node unless node.value.starts_with?("^")
 
     Error.at node, "A lambda parameter can't be used outside of a lambda" \
@@ -114,7 +114,7 @@ class Mare::Compiler::Lambda < Mare::AST::CopyOnMutateVisitor
     node
   end
 
-  def visit(node : AST::Group)
+  def visit(ctx, node : AST::Group)
     return node unless node.style == "^"
 
     @changed = true

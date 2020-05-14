@@ -36,8 +36,8 @@ class Mare::Compiler::Inventory < Mare::AST::Visitor
       @current_type = t.make_link(library)
       t.functions.each do |f|
         @current_func = f.make_link(@current_type.not_nil!)
-        f.params.try(&.accept(self))
-        f.body.try(&.accept(self))
+        f.params.try(&.accept(ctx, self))
+        f.body.try(&.accept(ctx, self))
       end
     end
     @current_ctx = nil
@@ -45,7 +45,7 @@ class Mare::Compiler::Inventory < Mare::AST::Visitor
     @current_func = nil
   end
 
-  def visit(node)
+  def visit(ctx, node)
     case node
     when AST::Identifier
       if (ref = current_ctx.refer[current_type][current_func][node]; ref)

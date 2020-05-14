@@ -42,7 +42,7 @@ class Mare::Compiler::Macros < Mare::AST::CopyOnMutateVisitor
         cached_or_run library, t, f do
           macros = new(f)
           macros.maybe_compiler_intrinsic
-          macros.run
+          macros.run(ctx)
         end
       end
     end
@@ -52,8 +52,8 @@ class Mare::Compiler::Macros < Mare::AST::CopyOnMutateVisitor
   def initialize(@func : Program::Function)
   end
 
-  def run
-    @func = @func.accept(self)
+  def run(ctx)
+    @func = @func.accept(ctx, self)
     @func
   end
 
@@ -79,7 +79,7 @@ class Mare::Compiler::Macros < Mare::AST::CopyOnMutateVisitor
     @func.add_tag(:compiler_intrinsic)
   end
 
-  def visit(node : AST::Group)
+  def visit(ctx, node : AST::Group)
     # Handle only groups that are whitespace-delimited, as these are the only
     # groups that we may match and interpret as if they are macros.
     return node unless node.style == " "

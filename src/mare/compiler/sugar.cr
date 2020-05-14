@@ -36,11 +36,11 @@ class Mare::Compiler::Sugar < Mare::AST::CopyOnMutateVisitor
       t.functions_map_cow do |f|
         cached_or_run library, t, f do
           sugar = new
-          f = sugar.run(f)
+          f = sugar.run(ctx, f)
 
           # Run pseudo-call transformation as a separate followup mini-pass,
           # because some of the sugar transformations need to already be done.
-          PseudoCalls.run(f, sugar)
+          PseudoCalls.run(ctx, f, sugar)
         end
       end
     end
@@ -54,7 +54,7 @@ class Mare::Compiler::Sugar < Mare::AST::CopyOnMutateVisitor
     "hygienic_local.#{@last_hygienic_local += 1}"
   end
 
-  def run(f)
+  def run(ctx, f)
     params = f.params
     ret = f.ret
     body = f.body
@@ -74,8 +74,8 @@ class Mare::Compiler::Sugar < Mare::AST::CopyOnMutateVisitor
     end
 
     # Sugar the parameter signature and return type.
-    params = params.try(&.accept(self))
-    ret = ret.try(&.accept(self))
+    params = params.try(&.accept(ctx, self))
+    ret = ret.try(&.accept(ctx, self))
 
     # If any parameters contain assignables, make assignments in the body.
     if params
@@ -155,7 +155,7 @@ class Mare::Compiler::Sugar < Mare::AST::CopyOnMutateVisitor
     end
 
     # Sugar the body.
-    body = body.try { |body| body.accept(self) }
+    body = body.try { |body| body.accept(ctx, self) }
 
     unless params.same?(f.params) && ret.same?(f.ret) && body.same?(f.body)
       f = f.dup
@@ -166,7 +166,7 @@ class Mare::Compiler::Sugar < Mare::AST::CopyOnMutateVisitor
     f
   end
 
-  def visit(node : AST::Identifier)
+  def visit(ctx, node : AST::Identifier)
     if node.value == "@"
       node
     elsif node.value.char_at(0) == '@'
@@ -181,7 +181,7 @@ class Mare::Compiler::Sugar < Mare::AST::CopyOnMutateVisitor
     end
   end
 
-  def visit(node : AST::Qualify)
+  def visit(ctx, node : AST::Qualify)
     # Transform square-brace qualifications into method calls
     square_bracket =
       case node.group.style
@@ -195,7 +195,7 @@ class Mare::Compiler::Sugar < Mare::AST::CopyOnMutateVisitor
         AST::Group.new("(", node.group.terms.dup).from(node.group),
       ).from(node)
       dot = AST::Operator.new(".").from(node.group)
-      rhs = visit(node)
+      rhs = visit(ctx, node)
       return AST::Relate.new(lhs, dot, rhs).from(node)
     end
 
@@ -213,7 +213,7 @@ class Mare::Compiler::Sugar < Mare::AST::CopyOnMutateVisitor
     new_top || node
   end
 
-  def visit(node : AST::Relate)
+  def visit(ctx, node : AST::Relate)
     case node.op.value
     when ".", "'", "+>", " ", "<:", "is", "DEFAULTPARAM"
       node # skip these special-case operators
@@ -239,11 +239,11 @@ class Mare::Compiler::Sugar < Mare::AST::CopyOnMutateVisitor
         else raise NotImplementedError.new(node.op.value)
         end
 
-      visit(
+      visit(ctx,
         AST::Relate.new(
           node.lhs,
           AST::Operator.new("=").from(node.op),
-          visit(
+          visit(ctx,
             AST::Relate.new(
               node.lhs.dup,
               AST::Operator.new(op).from(node.op),
@@ -322,10 +322,10 @@ class Mare::Compiler::Sugar < Mare::AST::CopyOnMutateVisitor
   # Handle pseudo-method sugar like `as!` calls.
   # TODO: Can this be done as a "universal method" rather than sugar?
   class PseudoCalls < Mare::AST::CopyOnMutateVisitor
-    def self.run(f : Program::Function, sugar : Sugar)
+    def self.run(ctx : Context, f : Program::Function, sugar : Sugar)
       ps = new(sugar)
-      params = f.params.try(&.accept(ps))
-      body = f.body.try(&.accept(ps))
+      params = f.params.try(&.accept(ctx, ps))
+      body = f.body.try(&.accept(ctx, ps))
 
       f = f.dup
       f.params = params
@@ -337,7 +337,7 @@ class Mare::Compiler::Sugar < Mare::AST::CopyOnMutateVisitor
     def initialize(@sugar)
     end
 
-    def visit(node : AST::Node)
+    def visit(ctx, node : AST::Node)
       return node unless node.is_a?(AST::Relate) && node.op.value == "."
 
       call_ident, call_args, yield_params, yield_block = AST::Extract.call(node)

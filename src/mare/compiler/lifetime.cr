@@ -40,8 +40,8 @@ class Mare::Compiler::Lifetime
         for_func = ForFunc.new(ctx, reach_def, reach_func)
 
         func = reach_func.infer.reified.func(ctx)
-        func.params.try(&.accept(for_func))
-        func.body.try(&.accept(for_func))
+        func.params.try(&.accept(ctx, for_func))
+        func.body.try(&.accept(ctx, for_func))
 
         @info_by_func[reach_func] = for_func
       end
@@ -71,11 +71,11 @@ class Mare::Compiler::Lifetime
     end
 
     # This visitor only touches nodes and does not mutate or replace them.
-    def visit_pre(node)
+    def visit_pre(ctx, node)
       touch_pre(node)
       node
     end
-    def visit(node)
+    def visit(ctx, node)
       touch(node)
       node
     end

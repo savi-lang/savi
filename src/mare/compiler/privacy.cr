@@ -15,8 +15,8 @@ class Mare::Compiler::Privacy < Mare::AST::Visitor
       infer_type.all_for_funcs.each do |infer_func|
         privacy = new(ctx, infer_func)
         func = infer_func.reified.func(ctx)
-        func.params.try(&.accept(privacy))
-        func.body.try(&.accept(privacy))
+        func.params.try(&.accept(ctx, privacy))
+        func.body.try(&.accept(ctx, privacy))
       end
     end
   end
@@ -28,13 +28,13 @@ class Mare::Compiler::Privacy < Mare::AST::Visitor
   end
 
   # This visitor never replaces nodes, it just touches them and returns them.
-  def visit(node)
+  def visit(ctx, node)
     touch(node)
 
     node
   end
 
-  def visit_children?(node : AST::Group)
+  def visit_children?(ctx, node : AST::Group)
     # Don't visit children of groups marked by the type checker as unreachable.
     # This keeps us from trying to deal with branches of Choices that have
     # not been typechecked and thus have no call resolution for private calls.

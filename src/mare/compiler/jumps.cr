@@ -23,7 +23,7 @@ class Mare::Compiler::Jumps < Mare::AST::Visitor
   def self.run(ctx, library)
     library.types.each do |t|
       t.functions.each do |f|
-        new(f).run
+        new(f).run(ctx)
       end
     end
   end
@@ -33,20 +33,20 @@ class Mare::Compiler::Jumps < Mare::AST::Visitor
   def initialize(@func)
   end
 
-  def run
-    func.ident.try(&.accept(self))
-    func.params.try(&.accept(self))
-    func.ret.try(&.accept(self))
-    func.body.try(&.accept(self))
+  def run(ctx)
+    func.ident.try(&.accept(ctx, self))
+    func.params.try(&.accept(ctx, self))
+    func.ret.try(&.accept(ctx, self))
+    func.body.try(&.accept(ctx, self))
   end
 
   # We don't deal with type expressions at all.
-  def visit_children?(node)
+  def visit_children?(ctx, node)
     !Classify.type_expr?(node)
   end
 
   # This visitor never replaces nodes, it just touches them and returns them.
-  def visit(node)
+  def visit(ctx, node)
     touch(node) unless Classify.type_expr?(node)
     node
   end

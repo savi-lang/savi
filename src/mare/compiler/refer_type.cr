@@ -54,8 +54,8 @@ class Mare::Compiler::ReferType < Mare::AST::Visitor
     end
 
     # Run as a visitor on the ident itself and every type param.
-    t.ident.accept(self)
-    t.params.try(&.accept(self))
+    t.ident.accept(ctx, self)
+    t.params.try(&.accept(ctx, self))
 
     # Run for each function in the type.
     t.functions.each do |f|
@@ -67,11 +67,11 @@ class Mare::Compiler::ReferType < Mare::AST::Visitor
   end
 
   def run_for_func(t, f)
-    f.params.try(&.accept(self))
-    f.ret.try(&.accept(self))
-    f.body.try(&.accept(self))
-    f.yield_out.try(&.accept(self))
-    f.yield_in.try(&.accept(self))
+    f.params.try(&.accept(ctx, self))
+    f.ret.try(&.accept(ctx, self))
+    f.body.try(&.accept(ctx, self))
+    f.yield_out.try(&.accept(ctx, self))
+    f.yield_in.try(&.accept(ctx, self))
   end
 
   def find_type?(node : AST::Identifier)
@@ -92,7 +92,7 @@ class Mare::Compiler::ReferType < Mare::AST::Visitor
   end
 
   # This visitor never replaces nodes, it just touches them and returns them.
-  def visit(node)
+  def visit(ctx, node)
     touch(node) if node.is_a?(AST::Identifier)
     node
   end

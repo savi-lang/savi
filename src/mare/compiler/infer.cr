@@ -642,7 +642,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       # Visit the function parameters, noting any declared types there.
       # We may need to apply some parameter-specific finishing touches.
       func.params.try do |params|
-        params.accept(self)
+        params.accept(ctx, self)
         params.terms.each do |param|
           finish_param(param, self[param]) unless self[param].is_a?(Param)
 
@@ -667,7 +667,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         self[ret].as(FuncBody).set_explicit(func.cap.not_nil!.pos, meta_type)
       else
         func.ret.try do |ret_t|
-          ret_t.accept(self)
+          ret_t.accept(ctx, self)
           self[ret].as(FuncBody).set_explicit(ret_t.pos, resolve(ret_t))
         end
       end
@@ -695,12 +695,12 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         && yield_out.terms.size > 1
           # We have a function signature for multiple yield out arg types.
           yield_out.terms.each_with_index do |yield_out_arg, index|
-            yield_out_arg.accept(self)
+            yield_out_arg.accept(ctx, self)
             yield_out_infos[index].set_explicit(yield_out_arg.pos, resolve(yield_out_arg))
           end
         else
           # We have a function signature for just one yield out arg type.
-          yield_out.accept(self)
+          yield_out.accept(ctx, self)
           yield_out_infos.first.set_explicit(yield_out.pos, resolve(yield_out))
         end
       end
@@ -708,7 +708,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       # Constrain via the "yield in" part of the explicit signature if present.
       yield_in = func.yield_in
       if yield_in
-        yield_in.accept(self)
+        yield_in.accept(ctx, self)
         yield_in_info.set_explicit(yield_in.pos, resolve(yield_in))
       else
         none = MetaType.new(reified_type(prelude_type("None")))
@@ -721,7 +721,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
 
       if func_body
         # Visit the function body, taking note of all observed constraints.
-        func_body.accept(self)
+        func_body.accept(ctx, self)
         func_body_pos = func_body.terms.last.pos rescue func_body.pos
 
         # Assign the function body value to the fake return value local.
@@ -918,7 +918,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         # Visit yield params to register them in our state.
         # We have to do this before the lines below where we access that state.
         # Note that we skipped it before with visit_children: false.
-        yield_params.try(&.accept(self))
+        yield_params.try(&.accept(ctx, self))
 
         # Based on the resolved function, assign the proper yield param types.
         if yield_params
@@ -938,7 +938,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         # Now visit the yield block to register them in our state.
         # We must do this after the lines above where the params were handled.
         # Note that we skipped it before with visit_children: false.
-        yield_block.try(&.accept(self))
+        yield_block.try(&.accept(ctx, self))
 
         # Finally, check that the type of the result of the yield block,
         # but don't bother if it has a type requirement of None.
@@ -1153,7 +1153,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       ]
     end
 
-    def visit_children?(node)
+    def visit_children?(ctx, node)
       # Don't visit the children of a type expression root node.
       return false if Classify.type_expr?(node)
 
@@ -1167,7 +1167,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
 
     # This visitor never replaces nodes, it just touches them and returns them.
-    def visit(node)
+    def visit(ctx, node)
       if Classify.type_expr?(node)
         # For type expressions, don't do the usual touch - instead,
         # construct the MetaType and assign it to the new node.
@@ -1350,8 +1350,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
 
         # Visit lhs, args, and yield params before resolving the call.
         # Note that we skipped it before with visit_children: false.
-        node.lhs.try(&.accept(self))
-        call_args.try(&.accept(self))
+        node.lhs.try(&.accept(ctx, self))
+        call_args.try(&.accept(ctx, self))
 
         # Resolve and validate the call.
         # We will visit the yield_params and yield_block from inside this call.
@@ -1485,7 +1485,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       body_nodes = [] of AST::Node
       node.list.each do |cond, body|
         # Visit the cond AST - we skipped it before with visit_children: false.
-        cond.accept(self)
+        cond.accept(ctx, self)
 
         # Each condition in a choice must evaluate to a type of Bool.
         bool = MetaType.new(reified_type(prelude_type("Bool")))
@@ -1526,7 +1526,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         else
           # Visit the body AST - we skipped it before with visit_children: false.
           # We needed to act on information from the cond analysis first.
-          body.accept(self)
+          body.accept(ctx, self)
         end
 
         # Remove the override we put in place before, if any.
