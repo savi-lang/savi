@@ -8,29 +8,81 @@
 # This pass keeps temporary state at the per-function level.
 # This pass produces no output state.
 #
-class Mare::Compiler::Lambda < Mare::AST::MutatingVisitor
-  def self.run(ctx, library)
-    library.types.each do |t|
-      t.functions.each do |f|
-        new(ctx, library, t, f).run
-      end
+class Mare::Compiler::Lambda < Mare::AST::CopyOnMutateVisitor
+  # TODO: Clean up, consolidate, and improve this caching mechanism.
+  @@cache = {} of String => {UInt64, Program::Function}
+  def self.cache_key(l, t, f)
+    t.ident.value + "\0" + f.ident.value
+  end
+  def self.cached_or_run(l, t, f) : Program::Function
+    input_hash = f.hash
+    # input_hash = f.structural_hash
+    cache_key = cache_key(l, t, f)
+    cache_result = @@cache[cache_key]?
+    cached_hash, cached_func = cache_result if cache_result
+    return cached_func if cached_func && cached_hash == input_hash
+
+    yield
+
+    .tap do |result|
+      @@cache[cache_key] = {input_hash, result}
     end
   end
 
-  @ctx : Context
-  @lib : Program::Library
+  def self.run(ctx, library)
+    orig_library = library
+    new_types = [] of Program::Type
+
+    loop do
+      library = library.types_map_cow do |t|
+        t.functions_map_cow do |f|
+          cached_or_run library, t, f do
+            visitor = new(t, f)
+            f = visitor.run
+            new_types.concat(visitor.new_types)
+            f
+          end
+        end
+      end
+
+      break if new_types.empty?
+
+      library = library.dup if library.same?(orig_library)
+      new_types.each do |lambda_type|
+        library.types << lambda_type
+        ctx.namespace.add_lambda_type_later(ctx, lambda_type, library)
+      end
+
+      new_types.clear
+    end
+
+    library
+  end
+
+  getter new_types
   @type : Program::Type
   @func : Program::Function
-  def initialize(@ctx, @lib, @type, @func)
+  def initialize(@type, @func)
     @last_num = 0
     @changed = false
     @observed_refs_stack = [] of Hash(Int32, AST::Identifier)
+    @new_types = [] of Program::Type
   end
 
   def run
-    @func.params.try(&.accept(self))
-    @func.ret.try(&.accept(self))
-    @func.body.try(&.accept(self))
+    f = @func
+
+    params = f.params.try(&.accept(self))
+    ret = f.ret.try(&.accept(self))
+    body = f.body.try(&.accept(self))
+
+    unless params.same?(f.params) && ret.same?(f.ret) && body.same?(f.body)
+      f = f.dup
+      f.params = params
+      f.ret = ret
+      f.body = body
+    end
+    f
   end
 
   private def next_lambda_name
@@ -81,8 +133,7 @@ class Mare::Compiler::Lambda < Mare::AST::MutatingVisitor
     lambda_type_ident = AST::Identifier.new(name).from(node)
     lambda_type = Program::Type.new(lambda_type_cap, lambda_type_ident)
     lambda_type.add_tag(:hygienic)
-    @lib.types << lambda_type
-    @ctx.namespace.add_lambda_type_later(@ctx, lambda_type, @lib)
+    @new_types << lambda_type
 
     lambda_type.functions << Program::Function.new(
       AST::Identifier.new("non").from(node), # TODO: change this for stateful functions

@@ -7,7 +7,7 @@ module Mare::Compiler
     when :sugar          then ctx.run_copy_on_mutate(Sugar)
     when :refer_type     then ctx.run(ctx.refer_type)
     when :populate       then ctx.run(Populate)
-    when :lambda         then ctx.run(Lambda)
+    when :lambda         then ctx.run_copy_on_mutate(Lambda)
     when :refer          then ctx.run(ctx.refer)
     when :classify       then ctx.run(Classify)
     when :jumps          then ctx.run(Jumps)

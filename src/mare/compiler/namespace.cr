@@ -54,7 +54,7 @@ class Mare::Compiler::Namespace
   end
 
   # TODO: Can this be less hacky? It feels wrong to alter this state later.
-  def add_lambda_type_later(ctx, new_type, library)
+  def add_lambda_type_later(ctx : Context, new_type : Program::Type, library : Program::Library)
     add_type_to_library(ctx, new_type, library)
     add_type_to_source(new_type, library)
   end

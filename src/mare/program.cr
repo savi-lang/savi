@@ -308,6 +308,7 @@ class Mare::Program
     end
 
     def dup_init
+      @ast = @ast.dup
       @tags = @tags.dup
       @metadata = @metadata.dup
     end
