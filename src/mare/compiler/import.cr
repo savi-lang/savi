@@ -45,7 +45,7 @@ module Mare::Compiler::Import
 
       # Finally, load the library, then recursively run this pass on it.
       loaded_library = load_library(ctx, path)
-      import.resolved = loaded_library
+      import.resolved = loaded_library.make_link
 
       # Recursively run this pass on the loaded library.
       # TODO: In the future, rely on the compiler to run at the library level.

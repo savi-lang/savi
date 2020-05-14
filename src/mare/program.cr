@@ -58,7 +58,7 @@ class Mare::Program
   class Import
     property ident : (AST::Identifier | AST::LiteralString)
     property names : AST::Group?
-    property! resolved : Library
+    property! resolved : Library::Link
 
     def initialize(@ident, @names = nil)
     end
