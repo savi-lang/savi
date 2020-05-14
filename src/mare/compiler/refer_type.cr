@@ -13,8 +13,6 @@
 # This pass produces output state at the global level.
 #
 class Mare::Compiler::ReferType < Mare::AST::Visitor
-  getter! ctx : Context
-
   def initialize
     @infos = {} of AST::Identifier => Refer::Info
     @params = {} of String => Refer::TypeParam
@@ -29,17 +27,13 @@ class Mare::Compiler::ReferType < Mare::AST::Visitor
   end
 
   def run(ctx, library)
-    @ctx = ctx
-
     # For each type in the library, delve into type parameters and functions.
     library.types.each do |t|
-      run_for_type(t, library)
+      run_for_type(ctx, t, library)
     end
-
-    @ctx = nil
   end
 
-  def run_for_type(t, library)
+  def run_for_type(ctx, t, library)
     # If the type has type parameters, collect them into the params map.
     t.params.try do |type_params|
       type_params.terms.each_with_index do |param, index|
@@ -59,14 +53,14 @@ class Mare::Compiler::ReferType < Mare::AST::Visitor
 
     # Run for each function in the type.
     t.functions.each do |f|
-      run_for_func(t, f)
+      run_for_func(ctx, t, f)
     end
 
     # Clear the type-specific state we accumulated earlier.
     @params.clear
   end
 
-  def run_for_func(t, f)
+  def run_for_func(ctx, t, f)
     f.params.try(&.accept(ctx, self))
     f.ret.try(&.accept(ctx, self))
     f.body.try(&.accept(ctx, self))
@@ -74,7 +68,7 @@ class Mare::Compiler::ReferType < Mare::AST::Visitor
     f.yield_in.try(&.accept(ctx, self))
   end
 
-  def find_type?(node : AST::Identifier)
+  def find_type?(ctx, node : AST::Identifier)
     found = @params[node.value]?
     return found if found
 
@@ -93,14 +87,14 @@ class Mare::Compiler::ReferType < Mare::AST::Visitor
 
   # This visitor never replaces nodes, it just touches them and returns them.
   def visit(ctx, node)
-    touch(node) if node.is_a?(AST::Identifier)
+    touch(ctx, node) if node.is_a?(AST::Identifier)
     node
   end
 
   # For an Identifier, resolve it to any known type if possible.
   # Otherwise, leave it missing from our infos map.
-  def touch(node : AST::Identifier)
-    info = find_type?(node)
+  def touch(ctx, node : AST::Identifier)
+    info = find_type?(ctx, node)
     @infos[node] = info if info
   end
 end
