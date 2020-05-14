@@ -22,18 +22,21 @@ class Mare::Compiler::Jumps < Mare::AST::Visitor
 
   def self.run(ctx, library)
     library.types.each do |t|
+      t_link = t.make_link(library)
       t.functions.each do |f|
-        new(f).run(ctx)
+        f_link = f.make_link(t_link)
+        new(f_link).run(ctx)
       end
     end
   end
 
-  getter func : Program::Function
+  getter func_link : Program::Function::Link
 
-  def initialize(@func)
+  def initialize(@func_link)
   end
 
   def run(ctx)
+    func = func_link.resolve(ctx)
     func.ident.try(&.accept(ctx, self))
     func.params.try(&.accept(ctx, self))
     func.ret.try(&.accept(ctx, self))

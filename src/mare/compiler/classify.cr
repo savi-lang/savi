@@ -88,21 +88,18 @@ class Mare::Compiler::Classify < Mare::AST::Visitor
       t_link = t.make_link(library)
       t.functions.each do |f|
         f_link = f.make_link(t_link)
-        new(ctx, t, f, t_link, f_link).run
+        new(f_link).run(ctx)
       end
     end
   end
 
-  private getter ctx : Context
-  getter type : Program::Type
-  getter func : Program::Function
-  getter type_link : Program::Type::Link
   getter func_link : Program::Function::Link
 
-  def initialize(@ctx, @type, @func, @type_link, @func_link)
+  def initialize(@func_link)
   end
 
-  def run
+  def run(ctx)
+    func = func_link.resolve(ctx)
     func.params.try(&.accept(ctx, self))
     func.ret.try(&.accept(ctx, self))
     func.ret.try(&.accept(ctx, TypeExprVisitor.instance))
@@ -111,22 +108,22 @@ class Mare::Compiler::Classify < Mare::AST::Visitor
     func.yield_in.try(&.accept(ctx, TypeExprVisitor.instance))
   end
 
-  def refer
-    ctx.refer[type_link][func_link]
+  def refer(ctx)
+    ctx.refer[func_link.type][func_link]
   end
 
   # This visitor never replaces nodes, it just touches them and returns them.
   def visit(ctx, node)
-    touch(node)
+    touch(ctx, node)
     node
   end
 
   # An Operator can never have a value, so its value should never be needed.
-  def touch(op : AST::Operator)
+  def touch(ctx, op : AST::Operator)
     Classify.no_value!(op)
   end
 
-  def touch(group : AST::Group)
+  def touch(ctx, group : AST::Group)
     case group.style
     when "(", ":"
       # In a sequence-style group, only the value of the final term is needed.
@@ -143,11 +140,11 @@ class Mare::Compiler::Classify < Mare::AST::Visitor
     end
   end
 
-  def touch(qualify : AST::Qualify)
+  def touch(ctx, qualify : AST::Qualify)
     # In a Qualify, we mark the term as being in such a qualify.
     Classify.further_qualified!(qualify.term)
 
-    case refer[qualify.term]
+    case refer(ctx)[qualify.term]
     when Refer::Type, Refer::TypeAlias, Refer::TypeParam
       # We assume this qualify to be type with type arguments.
       # None of the arguments will have their value used,
@@ -164,7 +161,7 @@ class Mare::Compiler::Classify < Mare::AST::Visitor
     end
   end
 
-  def touch(relate : AST::Relate)
+  def touch(ctx, relate : AST::Relate)
     case relate.op.value
     when "<:"
       relate.rhs.accept(ctx, TypeExprVisitor.instance)
@@ -187,7 +184,7 @@ class Mare::Compiler::Classify < Mare::AST::Visitor
     end
   end
 
-  def touch(node : AST::Node)
+  def touch(ctx, node : AST::Node)
     # On all other nodes, do nothing.
   end
 end
