@@ -3,15 +3,23 @@
 # based on import directives found in the source files loaded so far.
 # We continue loading source libraries until all imports have been resolved.
 #
-# This pass mutates the Program topology by assigning the Import#resolved field.
-# This pass reads ASTs (Import heads only) but does not mutate any ASTs.
+# This pass does not mutate the Program topology directly, though it instructs Context to compile more libraries.
+# This pass does not mutate the AST.
 # This pass may raise a compilation error.
-# This pass keeps no state (other than the Program topology itself).
-# This pass produces no output state.
+# This pass keeps state at the program level.
+# This pass produces output state at the library import level.
 #
-module Mare::Compiler::Import
+class Mare::Compiler::Import
+  def initialize
+    @libraries_by_import = Hash(Program::Import, Program::Library::Link).new
+  end
+
+  def [](import : Program::Import) : Program::Library::Link
+    @libraries_by_import[import]
+  end
+
   # TODO: Refactor this method away, since compiler already runs at the library level.
-  def self.run(ctx)
+  def run(ctx)
     # Copy the current list of libraries as our initial list, so that we
     # don't end up trying to iterate over a list that's being mutated.
     initial_libraries_list = ctx.program.libraries.dup
@@ -22,11 +30,11 @@ module Mare::Compiler::Import
     end
   end
 
-  def self.run_for_library(ctx, library)
+  def run_for_library(ctx, library)
     # For each import statement found in the library, resolve it.
     library.imports.each do |import|
       # Skip imports that have already been resolved.
-      next if import.resolved?
+      next if @libraries_by_import.has_key?(import)
 
       # Assert that the imported relative path is a string.
       # TODO: remove this? why even allow a non-string here in the topology?
@@ -45,7 +53,7 @@ module Mare::Compiler::Import
 
       # Finally, load the library, then recursively run this pass on it.
       loaded_library = load_library(ctx, path)
-      import.resolved = loaded_library.make_link
+      @libraries_by_import[import] = loaded_library.make_link
 
       # Recursively run this pass on the loaded library.
       # TODO: In the future, rely on the compiler to run at the library level.
@@ -53,7 +61,7 @@ module Mare::Compiler::Import
     end
   end
 
-  def self.load_library(ctx, path) : Program::Library
+  def load_library(ctx, path) : Program::Library
     # First, try to find an already loaded library that has this same path.
     library = ctx.program.libraries.find(&.source_library.path.==(path))
     return library if library

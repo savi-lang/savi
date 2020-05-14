@@ -1,7 +1,7 @@
 module Mare::Compiler
   def self.execute(ctx, target : Symbol)
     case target
-    when :import         then ctx.run_whole_program(Import)
+    when :import         then ctx.run_whole_program(ctx.import)
     when :namespace      then ctx.run_whole_program(ctx.namespace)
     when :macros         then ctx.run_copy_on_mutate(Macros)
     when :sugar          then ctx.run_copy_on_mutate(Sugar)

@@ -150,7 +150,7 @@ class Mare::Compiler::Namespace
 
   private def add_imported_types_to_source(ctx, import)
     source = import.ident.pos.source
-    importable_types = @types_by_library[import.resolved]
+    importable_types = @types_by_library[ctx.import[import]]
 
     # Determine the list of types to be imported.
     imported_types = [] of Tuple(Source::Pos, Program::Type::Link | Program::TypeAlias::Link)
