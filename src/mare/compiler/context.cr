@@ -33,7 +33,19 @@ class Mare::Compiler::Context
     @serve_hover = ServeHover.new
   end
 
-  def compile_library(source_library : Source::Library, docs : Array(AST::Document))
+  def compile_library(*args)
+    library = compile_library_inner(*args)
+    @program.libraries << library
+    library
+  end
+
+  @@cache = {} of String => {Array(AST::Document), Program::Library}
+  def compile_library_inner(source_library : Source::Library, docs : Array(AST::Document))
+    if (cache_result = @@cache[source_library.path]?; cache_result)
+      cached_docs, cached_library = cache_result
+      return cached_library if cached_docs == docs
+    end
+
     library = Program::Library.new
     library.source_library = source_library
 
@@ -44,8 +56,11 @@ class Mare::Compiler::Context
       @stack.shift
     end
 
-    @program.libraries << library
     library
+
+    .tap do |result|
+      @@cache[source_library.path] = {docs, result}
+    end
   end
 
   def compile_decl(decl : AST::Declare)
