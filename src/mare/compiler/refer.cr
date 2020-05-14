@@ -73,10 +73,6 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
       @scopes[group] ||= Scope.new(branch.locals)
     end
 
-    def self_type
-      @self_type
-    end
-
     def find_type?(ctx, node : AST::Identifier)
       ctx.refer_type[node]?
     end
