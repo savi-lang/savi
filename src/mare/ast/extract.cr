@@ -86,4 +86,20 @@ module Mare::AST::Extract
 
     node.terms.map { |child| type_param(child) }
   end
+
+  def self.type_arg(node : AST::Term) : {
+    AST::Identifier,  # identifier
+    AST::Identifier?} # cap
+    # TODO: handle more cases?
+    case node
+    when AST::Identifier
+      {node, nil}
+    when AST::Relate
+      raise NotImplementedError.new(node) unless node.op.value == "'"
+
+      {node.lhs.as(AST::Identifier), node.rhs.as(AST::Identifier)}
+    else
+      raise NotImplementedError.new(node)
+    end
+  end
 end

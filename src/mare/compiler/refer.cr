@@ -23,8 +23,8 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
     # For each type in the library, delve into type parameters and functions.
     library.types.each do |t|
       t_link = t.make_link(library)
-      self_type = ctx.refer_type[t.ident].as(Type)
-      @map[t_link] = ForType.new(self_type).tap(&.run(ctx))
+      self_type = ctx.refer_type[t_link][t.ident].as(Type)
+      @map[t_link] = ForType.new(self_type, t_link).tap(&.run(ctx))
     end
   end
 
@@ -38,8 +38,9 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
 
   class ForType
     getter self_type : Type
+    getter t_link : Program::Type::Link
 
-    def initialize(@self_type)
+    def initialize(@self_type, @t_link)
       @map = {} of Program::Function::Link => ForFunc
       @infos = {} of AST::Node => Info
       @scopes = {} of AST::Group => Scope
@@ -74,7 +75,7 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
     end
 
     def find_type?(ctx, node : AST::Identifier)
-      ctx.refer_type[node]?
+      ctx.refer_type[t_link][node]?
     end
 
     def run(ctx)
@@ -85,17 +86,19 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
 
       # For each function in the type, run with a new ForFunc instance.
       self_type_defn.functions.each do |f|
-        ForFunc.new(self)
-        .tap { |refer| @map[f.make_link(@self_type.link)] = refer }
-        .tap(&.run(ctx, f))
+        f_link = f.make_link(t_link)
+        ForFunc.new(self, f_link)
+          .tap { |refer| @map[f.make_link(@self_type.link)] = refer }
+          .tap(&.run(ctx, f))
       end
     end
   end
 
   class ForFunc
     property param_count = 0
+    getter f_link : Program::Function::Link
 
-    def initialize(@for_type : ForType)
+    def initialize(@for_type : ForType, @f_link)
       @infos = {} of AST::Node => Info
       @scopes = {} of AST::Group => Scope
     end
@@ -120,8 +123,8 @@ class Mare::Compiler::Refer < Mare::AST::Visitor
       @scopes[group] ||= Scope.new(branch.locals)
     end
 
-    def find_type?(ctx, node)
-      @for_type.find_type?(ctx, node)
+    def find_type?(ctx, node : AST::Identifier)
+      ctx.refer_type[f_link][node]?
     end
 
     def run(ctx, func)

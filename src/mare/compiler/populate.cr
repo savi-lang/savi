@@ -15,6 +15,7 @@ module Mare::Compiler::Populate
   def self.run(ctx, library)
     library.types_map_cow do |dest|
       orig_functions = dest.functions
+      dest_link = dest.make_link(library)
 
       # Copy functions into the type from other sources.
       orig_functions.each do |f|
@@ -22,46 +23,69 @@ module Mare::Compiler::Populate
         # Often these "functions" are actually "is" annotations.
         next unless f.has_tag?(:copies)
 
+        dest_copies_link = f.make_link(dest_link)
+
         # Find the type associated with the "return value" of the "function"
         # and copy the functions from it that we need.
         ret = f.ret
         case ret
         when AST::Identifier
-          source = ctx.refer_type[ret]?
+          source = ctx.refer_type[dest_copies_link][ret]?
           Error.at ret, "This type couldn't be resolved" unless source
           source = source.as(Refer::Type) # TODO: handle cases of Refer::TypeAlias or Refer::TypeParam
           source_defn = source.defn(ctx)
         when AST::Qualify
-          source = ctx.refer_type[ret.term.as(AST::Identifier)]?
+          source = ctx.refer_type[dest_copies_link][ret.term.as(AST::Identifier)]?
           Error.at ret, "This type couldn't be resolved" unless source
           source = source.as(Refer::Type) # TODO: handle cases of Refer::TypeAlias or Refer::TypeParam
 
-          # We need to build a replace map and a visitor that will use it to
-          # find every identifier referencing the type parameter and replace it
-          # with the AST from the corresponding qualify arg, transforming the
-          # copy we will make from the source function to the dest function.
+          # We need to build an intercessor redirect mapping the refer_type
+          # analysis that will take place on the new functions that will be
+          # copied from the source type to the dest type. This is necessary
+          # because the source type may contain references to type parameters
+          # that were supplied by type arguments within the dest type's source.
+          # So we build a mapping that will replace instances of the type param.
+          new_refer_type_analysis = ReferTypeAnalysis.new(ctx.refer_type[source.link])
           source_defn = source.defn(ctx)
           source_defn_params_size = source_defn.params.try(&.terms.size) || 0
-          replace_map = {} of Refer::TypeParam => AST::Node
           [source_defn_params_size, ret.group.terms.size].min.times do |index|
+            # Get the Refer info of the type parameter identifier.
             type_param_ast = source_defn.params.not_nil!.terms[index]
-            replacement_ast = ret.group.terms[index]
             type_param_ident = AST::Extract.type_param(type_param_ast)[0]
-            type_param_refer = ctx.refer_type[type_param_ident].as(Refer::TypeParam)
-            replace_map[type_param_refer] = replacement_ast
+            type_param_ref = ctx.refer_type[source.link][type_param_ident]
+
+            # Get the Refer info of the type argument's type name identifier.
+            replacement_ast = ret.group.terms[index]
+            replacement_ident = AST::Extract.type_arg(replacement_ast)[0]
+            replacement_ref = ctx.refer_type[dest_copies_link][replacement_ident]
+
+            # Introduce the mapping for this redirect into the analysis struct
+            # that we will use as an intercessor.
+            new_refer_type_analysis.redirect(type_param_ref, replacement_ref)
           end
-          visitor = TypeParamReplacer.new(ctx, replace_map)
         else
           raise NotImplementedError.new(ret)
         end
 
-        new_functions = copy_from(ctx, source_defn, dest, visitor)
+        new_functions = copy_from(ctx, source_defn, dest)
         if new_functions.any?
           if dest.functions.same?(orig_functions)
             dest = dest.dup
             raise "didn't dup functions!" if dest.functions.same?(orig_functions)
           end
           dest.functions.concat(new_functions)
+        end
+
+        # Run the missing refer_type pass on the new functions on the dest type.
+        # Use the special intercessor redirect mapping we created earlier,
+        # in the case that type params were used; otherwise it will be nil.
+        new_functions.each do |f|
+          ctx.refer_type.run_for_func(
+            ctx,
+            f,
+            f.make_link(dest_link),
+            new_refer_type_analysis,
+          )
         end
       end
 
@@ -98,8 +122,7 @@ module Mare::Compiler::Populate
   def self.copy_from(
     ctx : Context,
     source : Program::Type,
-    dest : Program::Type,
-    visitor : AST::CopyOnMutateVisitor?
+    dest : Program::Type
   )
     new_functions = [] of Program::Function
 
@@ -115,38 +138,10 @@ module Mare::Compiler::Populate
         next if dest.find_func?(f.ident.value)
       end
 
-      # Copy the function.
-      new_f = f.dup
-      if visitor
-        new_f.params = f.params.try(&.accept(ctx, visitor))
-        new_f.body = f.body.try(&.accept(ctx, visitor))
-        new_f.ret = f.ret.try(&.accept(ctx, visitor))
-        new_f.yield_out = f.yield_out.try(&.accept(ctx, visitor))
-        new_f.yield_in = f.yield_in.try(&.accept(ctx, visitor))
-      end
-      new_functions << new_f
+      # Add the function to the list of those that we will add to the dest type.
+      new_functions << f
     end
 
     new_functions
-  end
-
-  # This visitor, given a mapping of type params to AST nodes,
-  # will replace every identifier that represents one of those type params
-  # with the corresponding replacement AST node provided in the mapping.
-  class TypeParamReplacer < AST::CopyOnMutateVisitor
-    def initialize(
-      @ctx : Context,
-      @replace_map : Hash(Refer::TypeParam, AST::Node)
-    )
-    end
-
-    def visit(ctx, node)
-      if node.is_a?(AST::Identifier) \
-      && (ref = @ctx.refer_type[node]?; ref.is_a?(Refer::TypeParam))
-        @replace_map[ref]? || node
-      else
-        node
-      end
-    end
   end
 end
