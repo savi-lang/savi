@@ -109,7 +109,7 @@ class Mare::Compiler::Classify < Mare::AST::Visitor
   end
 
   def refer(ctx)
-    ctx.refer[func_link.type][func_link]
+    ctx.refer[func_link]
   end
 
   # This visitor never replaces nodes, it just touches them and returns them.

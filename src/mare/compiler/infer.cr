@@ -327,7 +327,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         next unless f.has_tag?(:is)
 
         f_link = f.make_link(reified.link)
-        trait = type_expr(f.ret.not_nil!, ctx.refer[reified.link][f_link]).single!
+        trait = type_expr(f.ret.not_nil!, ctx.refer[f_link]).single!
 
         subtyping.assert(trait, f.ident.pos)
       end
@@ -562,7 +562,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
 
     def refer
-      ctx.refer[reified.type.link][reified.link]
+      ctx.refer[reified.link]
     end
 
     def is_subtype?(

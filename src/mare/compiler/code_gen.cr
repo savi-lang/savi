@@ -44,7 +44,7 @@ class Mare::Compiler::CodeGen
     end
 
     def refer
-      @gtype.not_nil!.type_def.refer(@g.ctx)[@gfunc.as(GenFunc).link]
+      @g.ctx.refer[@gfunc.as(GenFunc).link]
     end
 
     @entry_block : LLVM::BasicBlock?

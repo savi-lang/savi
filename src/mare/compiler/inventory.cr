@@ -48,7 +48,7 @@ class Mare::Compiler::Inventory < Mare::AST::Visitor
   def visit(ctx, node)
     case node
     when AST::Identifier
-      if (ref = current_ctx.refer[current_type][current_func][node]; ref)
+      if (ref = current_ctx.refer[current_func][node]; ref)
         if ref.is_a?(Refer::Local)
           list = (@locals[current_func] ||= ([] of Refer::Local))
           list << ref unless list.includes?(ref)

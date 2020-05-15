@@ -15,7 +15,7 @@ describe Mare::Compiler::Refer do
     main = ctx.namespace.main_type!(ctx)
     func = main.resolve(ctx).find_func!("new")
     func_link = func.make_link(main)
-    refer = ctx.refer[main][func_link]
+    refer = ctx.refer[func_link]
     x = func
       .body.not_nil!
       .terms.first.as(Mare::AST::Group)
@@ -47,7 +47,7 @@ describe Mare::Compiler::Refer do
     main = ctx.namespace.main_type!(ctx)
     func = main.resolve(ctx).find_func!("new")
     func_link = func.make_link(main)
-    refer = ctx.refer[main][func_link]
+    refer = ctx.refer[func_link]
     choice_outer = func
       .body.not_nil!
       .terms.first.as(Mare::AST::Group)

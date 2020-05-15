@@ -91,7 +91,7 @@ class Mare::Compiler::ServeHover
   def [](t_link : Program::Type::Link, f_link : Program::Function::Link, node : AST::Node)
     messages = [] of String
 
-    refer = ctx.refer[t_link][f_link]
+    refer = ctx.refer[f_link]
     infer = ctx.infer.for_func_simple(ctx, t_link, f_link)
     describe_type = "type"
 

@@ -54,7 +54,7 @@ class Mare::Compiler::Lifetime
     @reach_func : Reach::Func
 
     def refer
-      @ctx.refer[@reach_def.reified.link][@reach_func.infer.reified.link]
+      @ctx.refer[@reach_func.infer.reified.link]
     end
 
     def initialize(@ctx, @reach_def, @reach_func)
