@@ -14,118 +14,117 @@ require "./pass/analyze"
 # This pass keeps state at the per-type and per-function level.
 # This pass produces output state at the per-type and per-function level.
 #
-struct Mare::Compiler::ReferTypeAnalysis
-  @parent : StructRef(ReferTypeAnalysis)?
+module Mare::Compiler::ReferType
+  struct Analysis
+    @parent : StructRef(Analysis)?
 
-  def initialize(parent : ReferTypeAnalysis? = nil)
-    @parent = StructRef(ReferTypeAnalysis).new(parent) if parent
-    @infos = {} of AST::Identifier => Refer::Info
-    @params = {} of String => Refer::TypeParam
-    @redirects = {} of Refer::Info => Refer::Info
-  end
+    def initialize(parent : Analysis? = nil)
+      @parent = StructRef(Analysis).new(parent) if parent
+      @infos = {} of AST::Identifier => Refer::Info
+      @params = {} of String => Refer::TypeParam
+      @redirects = {} of Refer::Info => Refer::Info
+    end
 
-  def observe_ident(ident : AST::Identifier, info : Refer::Info)
-    @infos[ident] = redirect_for?(info) || info
-  end
+    def observe_ident(ident : AST::Identifier, info : Refer::Info)
+      @infos[ident] = redirect_for?(info) || info
+    end
 
-  def [](ident : AST::Identifier) : Refer::Info
-    @infos[ident]
-  end
+    def [](ident : AST::Identifier) : Refer::Info
+      @infos[ident]
+    end
 
-  def []?(ident : AST::Identifier) : Refer::Info?
-    @infos[ident]?
-  end
+    def []?(ident : AST::Identifier) : Refer::Info?
+      @infos[ident]?
+    end
 
-  def observe_type_param(param : Refer::TypeParam)
-    @params[param.ident.value] = param
-  end
+    def observe_type_param(param : Refer::TypeParam)
+      @params[param.ident.value] = param
+    end
 
-  def type_param_for?(name : String)
-    @params[name]? || @parent.try(&.type_param_for?(name))
-  end
+    def type_param_for?(name : String)
+      @params[name]? || @parent.try(&.type_param_for?(name))
+    end
 
-  def redirect(from : Refer::Info, to : Refer::Info)
-    raise "can't redirect from unresolved" if from.is_a?(Refer::Unresolved)
-    @redirects[from] = to
-  end
+    def redirect(from : Refer::Info, to : Refer::Info)
+      raise "can't redirect from unresolved" if from.is_a?(Refer::Unresolved)
+      @redirects[from] = to
+    end
 
-  def redirect_for?(from : Refer::Info) : Refer::Info?
-    @redirects[from]? || @parent.try(&.redirect_for?(from))
-  end
-end
-
-class Mare::Compiler::ReferTypeVisitor < Mare::AST::Visitor
-  getter analysis : ReferTypeAnalysis
-  def initialize(@analysis)
-  end
-
-  def find_type?(ctx, node : AST::Identifier)
-    found = @analysis.type_param_for?(node.value)
-    return found if found
-
-    found = ctx.namespace[node]?
-    case found
-    when Program::Type::Link
-      Refer::Type.new(found)
-    when Program::TypeAlias::Link
-      target = found
-      while !target.is_a?(Program::Type::Link)
-        target = ctx.namespace[target.resolve(ctx).target]
-      end
-      Refer::TypeAlias.new(found, target)
+    def redirect_for?(from : Refer::Info) : Refer::Info?
+      @redirects[from]? || @parent.try(&.redirect_for?(from))
     end
   end
 
-  # This visitor never replaces nodes, it just touches them and returns them.
-  def visit(ctx, node)
-    touch(ctx, node) if node.is_a?(AST::Identifier)
-    node
+  class Visitor < Mare::AST::Visitor
+    getter analysis : Analysis
+    def initialize(@analysis)
+    end
+
+    def find_type?(ctx, node : AST::Identifier)
+      found = @analysis.type_param_for?(node.value)
+      return found if found
+
+      found = ctx.namespace[node]?
+      case found
+      when Program::Type::Link
+        Refer::Type.new(found)
+      when Program::TypeAlias::Link
+        target = found
+        while !target.is_a?(Program::Type::Link)
+          target = ctx.namespace[target.resolve(ctx).target]
+        end
+        Refer::TypeAlias.new(found, target)
+      end
+    end
+
+    # This visitor never replaces nodes, it just touches them and returns them.
+    def visit(ctx, node)
+      touch(ctx, node) if node.is_a?(AST::Identifier)
+      node
+    end
+
+    # For an Identifier, resolve it to any known type if possible.
+    # Otherwise, leave it missing from our infos map.
+    def touch(ctx, node : AST::Identifier)
+      info = find_type?(ctx, node)
+      @analysis.observe_ident(node, info) if info
+    end
   end
 
-  # For an Identifier, resolve it to any known type if possible.
-  # Otherwise, leave it missing from our infos map.
-  def touch(ctx, node : AST::Identifier)
-    info = find_type?(ctx, node)
-    @analysis.observe_ident(node, info) if info
-  end
-end
+  class Pass < Compiler::Pass::Analyze(Analysis, Analysis)
+    def analyze_type(ctx, t, t_link)
+      t_analysis = Analysis.new
 
-class Mare::Compiler::ReferType < Mare::Compiler::Pass::Analyze(
-  Mare::Compiler::ReferTypeAnalysis,
-  Mare::Compiler::ReferTypeAnalysis,
-)
-  def analyze_type(ctx, t, t_link)
-    t_analysis = ReferTypeAnalysis.new
-
-    # If the type has type parameters, collect them into the params map.
-    t.params.try do |type_params|
-      type_params.terms.each_with_index do |param, index|
-        param_ident, param_bound = AST::Extract.type_param(param)
-        t_analysis.observe_type_param(
-          Refer::TypeParam.new(
-            t_link,
-            index,
-            param_ident,
-            param_bound || AST::Identifier.new("any").from(param),
+      # If the type has type parameters, collect them into the params map.
+      t.params.try do |type_params|
+        type_params.terms.each_with_index do |param, index|
+          param_ident, param_bound = AST::Extract.type_param(param)
+          t_analysis.observe_type_param(
+            Refer::TypeParam.new(
+              t_link,
+              index,
+              param_ident,
+              param_bound || AST::Identifier.new("any").from(param),
+            )
           )
-        )
+        end
       end
+
+      # Run as a visitor on the ident itself and every type param.
+      visitor = Visitor.new(t_analysis)
+      t.ident.accept(ctx, visitor)
+      t.params.try(&.accept(ctx, visitor))
+
+      visitor.analysis
     end
 
-    # Run as a visitor on the ident itself and every type param.
-    visitor = ReferTypeVisitor.new(t_analysis)
-    t.ident.accept(ctx, visitor)
-    t.params.try(&.accept(ctx, visitor))
+    def analyze_func(ctx, f, f_link, t_analysis)
+      f_analysis = Analysis.new(t_analysis)
+      visitor = Visitor.new(f_analysis)
 
-    visitor.analysis
-  end
+      f.ast.accept(ctx, visitor)
 
-  def analyze_func(ctx, f, f_link, t_analysis)
-    f_analysis = ReferTypeAnalysis.new(t_analysis)
-    visitor = ReferTypeVisitor.new(f_analysis)
-
-    f.ast.accept(ctx, visitor)
-
-    visitor.analysis
+      visitor.analysis
+    end
   end
 end

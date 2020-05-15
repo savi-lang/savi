@@ -45,7 +45,7 @@ module Mare::Compiler::Populate
           # because the source type may contain references to type parameters
           # that were supplied by type arguments within the dest type's source.
           # So we build a mapping that will replace instances of the type param.
-          new_refer_type_analysis = ReferTypeAnalysis.new(ctx.refer_type[source.link])
+          new_refer_type_analysis = ReferType::Analysis.new(ctx.refer_type[source.link])
           source_defn = source.defn(ctx)
           source_defn_params_size = source_defn.params.try(&.terms.size) || 0
           [source_defn_params_size, ret.group.terms.size].min.times do |index|

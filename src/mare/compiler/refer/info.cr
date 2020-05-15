@@ -1,4 +1,4 @@
-class Mare::Compiler::Refer
+module Mare::Compiler::Refer
   struct Unresolved
     INSTANCE = new
   end

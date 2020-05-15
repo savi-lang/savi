@@ -20,10 +20,10 @@ class Mare::Compiler::Context
 
     @import = Import.new
     @namespace = Namespace.new
-    @refer_type = ReferType.new
-    @inventory = Inventory.new
+    @refer_type = ReferType::Pass.new
+    @inventory = Inventory::Pass.new
     @infer = Infer.new
-    @refer = Refer.new
+    @refer = Refer::Pass.new
     @reach = Reach.new
     @paint = Paint.new
     @code_gen = CodeGen.new(CodeGen::PonyRT)
