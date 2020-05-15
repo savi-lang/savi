@@ -6,7 +6,7 @@ abstract class Mare::Compiler::Pass::Analyze(TypeAnalysis, FuncAnalysis)
 
   def [](t_link : Program::Type::Link); @for_type[t_link] end
   def []?(t_link : Program::Type::Link); @for_type[t_link]? end
-  def [](f_link : Program::Function::Link); @for_func[f_link]; rescue e; pp @for_func.keys; raise e end
+  def [](f_link : Program::Function::Link); @for_func[f_link] end
   def []?(f_link : Program::Function::Link); @for_func[f_link]? end
 
   def run(ctx : Context, library : Program::Library)
