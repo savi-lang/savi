@@ -99,7 +99,7 @@ module Mare::Compiler::Populate
     ctx : Context,
     source : Program::Type,
     dest : Program::Type,
-    visitor : AST::Visitor?
+    visitor : AST::CopyOnMutateVisitor?
   )
     new_functions = [] of Program::Function
 
@@ -133,17 +133,11 @@ module Mare::Compiler::Populate
   # This visitor, given a mapping of type params to AST nodes,
   # will replace every identifier that represents one of those type params
   # with the corresponding replacement AST node provided in the mapping.
-  class TypeParamReplacer < AST::Visitor
+  class TypeParamReplacer < AST::CopyOnMutateVisitor
     def initialize(
       @ctx : Context,
       @replace_map : Hash(Refer::TypeParam, AST::Node)
     )
-    end
-
-    # We need to duplicate the AST tree to avoid mutating the original.
-    # But we need to avoid duping identifiers, since they have ReferType info...
-    def dup_node?(node)
-      !node.is_a?(AST::Identifier)
     end
 
     def visit(ctx, node)

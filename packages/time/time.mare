@@ -77,10 +77,6 @@
     @total_seconds > other.total_seconds
     || (@total_seconds == other.total_seconds && @nanosecond > other.nanosecond)
 
-  // TODO: Inherit these from Comparable instead:
-  :fun ">=" (other): (@ < other).not
-  :fun "<=" (other): (@ > other).not
-
   :: Subtract the given time (elapsed since `0001-01-01 00:00:00.0` UTC)
   :: from this time and return the result.
   :fun "-" (other Time'box)

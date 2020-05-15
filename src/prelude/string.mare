@@ -253,9 +253,6 @@
     )
     result
 
-  :fun ">=" (other String'box) Bool: (@ < other).not // TODO: inherit from Comparable(String) instead of implementing here
-  :fun ">" (other String'box) Bool: (@ <= other).not // TODO: inherit from Comparable(String) instead of implementing here
-
   :fun parse_i64! // TODO: Use something like Crystal's Char::Reader instead?
     output I64 = 0
     possible_negation I64 = 1
