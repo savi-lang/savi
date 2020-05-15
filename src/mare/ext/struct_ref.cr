@@ -6,9 +6,7 @@
 class StructRef(T)
   getter value : T
 
-  macro method_missing(call)
-    value.{{ call.name }}({{ *call.args }})
-  end
+  forward_missing_to @value
 
   def initialize(@value)
   end
