@@ -676,7 +676,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       # number of arguments used in any yield statements here, as well as the
       # explicit yield_out part of the function signature if present.
       yield_out_arg_count = [
-        (ctx.inventory.yields(reified.link).map(&.terms.size) + [0]).max,
+        (ctx.inventory[reified.link].each_yield.map(&.terms.size).to_a + [0]).max,
         func.yield_out.try do |yield_out|
           yield_out.is_a?(AST::Group) && yield_out.style == "(" \
           ? yield_out.terms.size : 0

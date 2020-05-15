@@ -22,12 +22,12 @@ class Mare::Compiler::CodeGen
         list << g.llvm_type_of(gtype) if gfunc.needs_receiver?
 
         # Then come the local variables.
-        ctx.inventory.locals(gfunc.link).each do |ref|
+        ctx.inventory[gfunc.link].each_local.each do |ref|
           list << g.llvm_mem_type_of(ref.defn, gfunc)
         end
 
         # Then come the yielding call results (for yields nested in yields).
-        ctx.inventory.yielding_calls(gfunc.link).each do |relate|
+        ctx.inventory[gfunc.link].each_yielding_call.each do |relate|
           list << g.resolve_call(relate, gfunc).last.llvm_func_ret_type
         end
 
@@ -47,7 +47,7 @@ class Mare::Compiler::CodeGen
     def struct_gep_for_local(cont : LLVM::Value, ref : Refer::Local)
       index = 1
       index += 1 if gfunc.needs_receiver?
-      index += ctx.inventory.locals(gfunc.link).index(ref).not_nil!
+      index += ctx.inventory[gfunc.link].each_local.index(ref).not_nil!
 
       builder.struct_gep(cont, index, "CONT.#{ref.name}.GEP")
     end
@@ -55,8 +55,8 @@ class Mare::Compiler::CodeGen
     def struct_gep_for_yielded_result(cont : LLVM::Value, relate : AST::Relate)
       index = 1
       index += 1 if gfunc.needs_receiver?
-      index += ctx.inventory.locals(gfunc.link).size
-      index += ctx.inventory.yielding_calls(gfunc.link).index(relate).not_nil!
+      index += ctx.inventory[gfunc.link].local_count
+      index += ctx.inventory[gfunc.link].each_yielding_call.index(relate).not_nil!
 
       member, _, _, _ = AST::Extract.call(relate)
 
@@ -112,7 +112,7 @@ class Mare::Compiler::CodeGen
       end
 
       # Eagerly create struct geps for all yielding call results in this func.
-      ctx.inventory.yielding_calls(gfunc.link).each do |relate|
+      ctx.inventory[gfunc.link].each_yielding_call.each do |relate|
         @struct_gep_for_yielded_result_by_frame[{frame, relate}] =
           struct_gep_for_yielded_result(cont, relate)
       end
@@ -135,7 +135,7 @@ class Mare::Compiler::CodeGen
       # We need to eagerly generate the local geps here in the entry block,
       # since if we generate them lazily, they may not dominate all uses
       # in the LLVM dominator tree analysis (which checks declare-before-use).
-      ctx.inventory.locals(gfunc.link).each_with_index do |ref, ref_index|
+      ctx.inventory[gfunc.link].each_local.each_with_index do |ref, ref_index|
         ref_index = ref_index + 1 # skip the first element - the next func
         ref_index = ref_index + 1 if gfunc.needs_receiver? # skip the receiver
         ref_type = struct_element_types[ref_index]
@@ -143,7 +143,7 @@ class Mare::Compiler::CodeGen
       end
 
       # Eagerly create struct geps for all yielding call results in this func.
-      ctx.inventory.yielding_calls(gfunc.link).each do |relate|
+      ctx.inventory[gfunc.link].each_yielding_call.each do |relate|
         @struct_gep_for_yielded_result_by_frame[{frame, relate}] =
           struct_gep_for_yielded_result(cont, relate)
       end

@@ -1,3 +1,5 @@
+require "./pass/analyze"
+
 ##
 # The purpose of the Inventory pass is to take note of certain expressions.
 #
@@ -6,65 +8,72 @@
 # This pass does not raise any compilation errors.
 # This pass keeps temporary state at the per-function level.
 # This pass produces output state at the per-function level.
-#
-class Mare::Compiler::Inventory < Mare::AST::Visitor
-  getter! current_ctx : Context?
-  getter! current_type : Program::Type::Link?
-  getter! current_func : Program::Function::Link?
 
+struct Mare::Compiler::InventoryAnalysis
   def initialize
-    @locals = {} of Program::Function::Link => Array(Refer::Local)
-    @yields = {} of Program::Function::Link => Array(AST::Yield)
-    @yielding_calls = {} of Program::Function::Link => Array(AST::Relate)
+    @locals = [] of Refer::Local
+    @yields = [] of AST::Yield
+    @yielding_calls = [] of AST::Relate
   end
 
-  def locals(func : Program::Function::Link)
-    @locals[func]? || [] of Refer::Local
-  end
+  def observe_local(x); @locals << x; end
+  def observe_yield(x); @yields << x; end
+  def observe_yielding_call(x); @yielding_calls << x; end
 
-  def yields(func : Program::Function::Link)
-    @yields[func]? || [] of AST::Yield
-  end
+  def has_local?(x); @locals.includes?(x); end
 
-  def yielding_calls(func : Program::Function::Link)
-    @yielding_calls[func]? || [] of AST::Relate
-  end
+  def yield_count; @yields.size; end
+  def local_count; @locals.size; end
 
-  def run(ctx, library)
-    @current_ctx = ctx
-    library.types.each do |t|
-      @current_type = t.make_link(library)
-      t.functions.each do |f|
-        @current_func = f.make_link(@current_type.not_nil!)
-        f.params.try(&.accept(ctx, self))
-        f.body.try(&.accept(ctx, self))
-      end
-    end
-    @current_ctx = nil
-    @current_type = nil
-    @current_func = nil
+  def each_local; @locals.each end
+  def each_yield; @yields.each end
+  def each_yielding_call; @yielding_calls.each end
+end
+
+class Mare::Compiler::InventoryVisitor < Mare::AST::Visitor
+  getter analysis : InventoryAnalysis
+  getter refer : ReferAnalysis
+  def initialize(@analysis, @refer)
   end
 
   def visit(ctx, node)
     case node
     when AST::Identifier
-      if (ref = current_ctx.refer[current_func][node]; ref)
+      if (ref = @refer[node]; ref)
         if ref.is_a?(Refer::Local)
-          list = (@locals[current_func] ||= ([] of Refer::Local))
-          list << ref unless list.includes?(ref)
+          @analysis.observe_local(ref) unless @analysis.has_local?(ref)
         end
       end
     when AST::Yield
-      (@yields[current_func] ||= ([] of AST::Yield)) << node
+      @analysis.observe_yield(node)
     when AST::Relate
       if node.op.value == "."
         ident, args, yield_params, yield_block = AST::Extract.call(node)
         if yield_params || yield_block
-          (@yielding_calls[current_func] ||= ([] of AST::Relate)) << node
+          @analysis.observe_yielding_call(node)
         end
       end
     end
 
     node
+  end
+end
+
+class Mare::Compiler::Inventory < Mare::Compiler::Pass::Analyze(
+  Nil, # no analysis at the type level
+  Mare::Compiler::InventoryAnalysis,
+)
+  def analyze_type(ctx, t, t_link)
+    nil # no analysis at the type level
+  end
+
+  def analyze_func(ctx, f, f_link, t_analysis)
+    refer = ctx.refer[f_link]
+    visitor = InventoryVisitor.new(InventoryAnalysis.new, refer)
+
+    f.params.try(&.accept(ctx, visitor))
+    f.body.try(&.accept(ctx, visitor))
+
+    visitor.analysis
   end
 end

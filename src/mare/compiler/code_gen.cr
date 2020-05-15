@@ -243,7 +243,7 @@ class Mare::Compiler::CodeGen
       list = [] of Symbol
       list << :constructor_cc if func.has_tag?(:constructor)
       list << :error_cc if Jumps.any_error?(func.ident)
-      list << :yield_cc if ctx.inventory.yields(link).size > 0
+      list << :yield_cc if ctx.inventory[link].yield_count > 0
 
       return :simple_cc if list.empty?
       return list.first if list.size == 1
@@ -549,7 +549,7 @@ class Mare::Compiler::CodeGen
     if gfunc && gfunc.calling_convention(ctx) == :yield_cc
       # We need to pre-declare the code blocks that follow each yield statement.
       gfunc.after_yield_blocks = [] of LLVM::BasicBlock
-      ctx.inventory.yields(gfunc.link).size.times do |index|
+      ctx.inventory[gfunc.link].yield_count.times do |index|
         gfunc.after_yield_blocks << gen_block("after_yield_#{index + 1}")
       end
 
@@ -794,7 +794,7 @@ class Mare::Compiler::CodeGen
 
       # Now declare the continue functions, all with that same signature.
       gfunc.continuation_llvm_funcs =
-        ctx.inventory.yields(gfunc.link).each_index.map do |index|
+        ctx.inventory[gfunc.link].yield_count.times.map do |index|
           continue_name = "#{gfunc.llvm_name}.CONTINUE.#{index + 1}"
           @mod.functions.add(continue_name, continue_param_types, ret_type)
         end.to_a
@@ -2844,7 +2844,7 @@ class Mare::Compiler::CodeGen
 
     # First, we must know which yield this is in the function -
     # each yield expression has a uniquely associated index.
-    yield_index = ctx.inventory.yields(gfunc.link).index(expr).not_nil!
+    yield_index = ctx.inventory[gfunc.link].each_yield.index(expr).not_nil!
 
     # Generate code for the values of the yield, and capture the values.
     yield_values = expr.terms.map { |term| gen_expr(term).as(LLVM::Value) }

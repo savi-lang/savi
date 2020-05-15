@@ -79,7 +79,7 @@ class Mare::Compiler::Verify < Mare::AST::Visitor
         node = (func.yield_in || func.yield_out).not_nil!
         errs << {node.pos, "it declares a yield here"}
       end
-      ctx.inventory.yields(rf.link).each do |node|
+      ctx.inventory[rf.link].each_yield.each do |node|
         errs << {node.pos, "it yields here"}
       end
       Error.at func.ident, "#{no_yields} cannot yield values", errs \
