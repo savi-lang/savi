@@ -11,8 +11,8 @@ require "./pass/analyze"
 # This pass does not mutate the Program topology.
 # This pass does not mutate the AST.
 # This pass does not raise any compilation errors.
-# This pass keeps state at the global and per-type level.
-# This pass produces output state at the global level.
+# This pass keeps state at the per-type and per-function level.
+# This pass produces output state at the per-type and per-function level.
 #
 struct Mare::Compiler::ReferTypeAnalysis
   @parent : StructRef(ReferTypeAnalysis)?
