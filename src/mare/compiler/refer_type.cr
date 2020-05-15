@@ -14,8 +14,11 @@ require "./pass/analyze"
 # This pass keeps state at the global and per-type level.
 # This pass produces output state at the global level.
 #
-class Mare::Compiler::ReferTypeAnalysis
-  def initialize(@parent : ReferTypeAnalysis? = nil)
+struct Mare::Compiler::ReferTypeAnalysis
+  @parent : StructRef(ReferTypeAnalysis)?
+
+  def initialize(parent : ReferTypeAnalysis? = nil)
+    @parent = StructRef(ReferTypeAnalysis).new(parent) if parent
     @infos = {} of AST::Identifier => Refer::Info
     @params = {} of String => Refer::TypeParam
     @redirects = {} of Refer::Info => Refer::Info
