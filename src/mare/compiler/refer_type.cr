@@ -25,7 +25,7 @@ module Mare::Compiler::ReferType
       @redirects = {} of Refer::Info => Refer::Info
     end
 
-    def observe_ident(ident : AST::Identifier, info : Refer::Info)
+    protected def observe_ident(ident : AST::Identifier, info : Refer::Info)
       @infos[ident] = redirect_for?(info) || info
     end
 
@@ -37,7 +37,7 @@ module Mare::Compiler::ReferType
       @infos[ident]?
     end
 
-    def observe_type_param(param : Refer::TypeParam)
+    protected def observe_type_param(param : Refer::TypeParam)
       @params[param.ident.value] = param
     end
 
@@ -45,6 +45,7 @@ module Mare::Compiler::ReferType
       @params[name]? || @parent.try(&.type_param_for?(name))
     end
 
+    # TODO: Can this be protected?
     def redirect(from : Refer::Info, to : Refer::Info)
       raise "can't redirect from unresolved" if from.is_a?(Refer::Unresolved)
       @redirects[from] = to

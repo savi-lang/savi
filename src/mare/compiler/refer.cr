@@ -23,7 +23,7 @@ module Mare::Compiler::Refer
       @scopes = {} of AST::Group => Scope
     end
 
-    def []=(node : AST::Node, info : Info)
+    protected def []=(node : AST::Node, info : Info)
       @infos[node] = info
     end
 

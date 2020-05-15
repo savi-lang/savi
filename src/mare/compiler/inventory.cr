@@ -17,9 +17,9 @@ module Mare::Compiler::Inventory
       @yielding_calls = [] of AST::Relate
     end
 
-    def observe_local(x); @locals << x; end
-    def observe_yield(x); @yields << x; end
-    def observe_yielding_call(x); @yielding_calls << x; end
+    protected def observe_local(x); @locals << x; end
+    protected def observe_yield(x); @yields << x; end
+    protected def observe_yielding_call(x); @yielding_calls << x; end
 
     def has_local?(x); @locals.includes?(x); end
 
