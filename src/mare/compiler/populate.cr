@@ -92,7 +92,7 @@ module Mare::Compiler::Populate
       # If the type doesn't have a constructor and needs one, then add one.
       if dest.has_tag?(:allocated) && !dest.has_tag?(:abstract) \
       && !dest.functions.any? { |f| f.has_tag?(:constructor) }
-        func = Program::Function.new(
+        f = Program::Function.new(
           AST::Identifier.new("ref").from(dest.ident),
           AST::Identifier.new("new").from(dest.ident),
           nil,
@@ -109,7 +109,13 @@ module Mare::Compiler::Populate
           dest = dest.dup
           raise "didn't dup functions!" if dest.functions.same?(orig_functions)
         end
-        dest.functions << func
+        dest.functions << f
+
+        # Run the missing ReferType pass for this new function.
+        # TODO: Make the compiler automatically run missing passes that are
+        # required by a subsequent pass - this should be invoked automatically
+        # by the next pass that "needs" the analysis to be available.
+        ctx.refer_type.run_for_func(ctx, f, f.make_link(dest_link))
       end
 
       dest

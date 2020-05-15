@@ -50,23 +50,19 @@ module Mare::Compiler::Refer
     getter consumes
 
     def initialize(
-      @t_or_f_link : (Program::Type::Link | Program::Function::Link),
       @analysis : Analysis,
+      @refer_type : ReferType::Analysis,
       @locals = {} of String => (Local | LocalUnion),
       @consumes = {} of (Local | LocalUnion) => Source::Pos,)
       @param_count = 0
     end
 
     def sub_branch(ctx, group : AST::Node?, init_locals = @locals.dup)
-      Visitor.new(@t_or_f_link, @analysis, init_locals, @consumes.dup).tap do |branch|
+      Visitor.new(@analysis, @refer_type, init_locals, @consumes.dup).tap do |branch|
         @analysis.set_scope(group, branch) if group.is_a?(AST::Group)
         group.try(&.accept(ctx, branch))
         @analysis = branch.analysis
       end
-    end
-
-    def find_type?(ctx, node : AST::Identifier)
-      ctx.refer_type[@t_or_f_link][node]?
     end
 
     # This visitor never replaces nodes, it just touches them and returns them.
@@ -85,7 +81,7 @@ module Mare::Compiler::Refer
           Self::INSTANCE
         else
           # First, try to resolve as local, then as type, else it's unresolved.
-          @locals[name]? || find_type?(ctx, node) || Unresolved::INSTANCE
+          @locals[name]? || @refer_type[node]? || Unresolved::INSTANCE
         end
 
       # If this is an "error!" identifier, it's not actually unresolved.
@@ -309,10 +305,6 @@ module Mare::Compiler::Refer
     end
 
     def create_param_local(node : AST::Identifier)
-      # We don't support creating locals outside of a function.
-      raise NotImplementedError.new(@t_or_f_link) \
-        unless @t_or_f_link.is_a?(Program::Function::Link)
-
       case @analysis[node]
       when Unresolved
         # Treat this as a parameter with only an identifier and no type.
@@ -353,10 +345,6 @@ module Mare::Compiler::Refer
       raise NotImplementedError.new(node.to_a) \
         unless node.is_a?(AST::Group) && node.style == " " && node.terms.size == 2
 
-      # We don't support creating locals outside of a function.
-      raise NotImplementedError.new(@t_or_f_link) \
-        unless @t_or_f_link.is_a?(Program::Function::Link)
-
       ident = node.terms[0].as(AST::Identifier)
 
       local = Local.new(ident.value, ident, @param_count += 1)
@@ -369,7 +357,8 @@ module Mare::Compiler::Refer
 
   class Pass < Compiler::Pass::Analyze(Analysis, Analysis)
     def analyze_type(ctx, t, t_link)
-      visitor = Visitor.new(t_link, Analysis.new)
+      refer_type = ctx.refer_type[t_link]
+      visitor = Visitor.new(Analysis.new, refer_type)
 
       t.params.try(&.accept(ctx, visitor))
 
@@ -377,7 +366,8 @@ module Mare::Compiler::Refer
     end
 
     def analyze_func(ctx, f, f_link, t_analysis)
-      visitor = Visitor.new(f_link, Analysis.new)
+      refer_type = ctx.refer_type[f_link]
+      visitor = Visitor.new(Analysis.new, refer_type)
 
       f.params.try(&.terms.each { |param|
         param.accept(ctx, visitor)
