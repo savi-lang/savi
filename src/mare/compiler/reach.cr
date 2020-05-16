@@ -566,20 +566,10 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       # belong to a type that is a subtype of this one.
       # TODO: Can this be combined with the sympathetic_resonance mini-pass somehow?
       if rt.link.is_abstract?
-        ctx.infer.for_completely_reified_types(ctx).each do |other_infer_type|
-          other_rt = other_infer_type.reified
-          next if rt == other_rt
-          next unless ctx.infer[other_rt].is_subtype_of?(ctx, rt)
-
+        ctx.infer[rt].each_known_complete_subtype(ctx).to_a.uniq.each do |other_rt|
           other_func = other_rt.defn(ctx).find_func!(f_link.name)
           handle_func(ctx, other_rt, other_func.make_link(other_rt.link))
         end
-        # # TODO: Use this more efficient implementation, once it is tested to be
-        # # working for cases like Inspect -> _InspectEnum reaching Bool methods.
-        # ctx.infer[rt].each_known_complete_subtype(ctx).to_a.uniq.each do |other_rt|
-        #   other_func = other_rt.defn(ctx).find_func!(f_link.name)
-        #   handle_func(ctx, other_rt, other_func.make_link(other_rt.link))
-        # end
       end
     end
 
@@ -660,19 +650,11 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     abstract_defs = Hash(Reach::Def, Array(Reach::Def)).new
     each_type_def.select(&.is_abstract?(ctx)).each do |abstract_def|
       abstract_defs[abstract_def] = subtype_defs = [] of Reach::Def
-      each_type_def.each do |other_def|
-        if other_def != abstract_def \
-        && ctx.infer[other_def.reified].is_subtype_of?(ctx, abstract_def.reified)
-          subtype_defs << other_def
-        end
+      ctx.infer[abstract_def.reified]
+      .each_known_complete_subtype(ctx).to_a.uniq.each do |other_rt|
+        other_def = @defs[other_rt]?
+        subtype_defs << other_def if other_def
       end
-      # # TODO: Use this more efficient implementation, once it is tested to be
-      # # working for cases like Inspect -> _InspectEnum reaching Bool methods.
-      # ctx.infer[abstract_def.reified]
-      # .each_known_complete_subtype(ctx).to_a.uniq.each do |other_rt|
-      #   other_def = @defs[other_rt]?
-      #   subtype_defs << other_def if other_def
-      # end
     end
 
     # For each method in each abstract type, sympathetically resonate into

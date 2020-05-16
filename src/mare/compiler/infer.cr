@@ -422,11 +422,6 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     @types[rt]
   end
 
-  # TODO: Remove this function and refactor the things that call it.
-  def for_completely_reified_types(ctx)
-    @types.each_value.select(&.reified.is_complete?(ctx)).to_a
-  end
-
   def validate_type_args(
     ctx : Context,
     infer : (ForFunc | ForType),
