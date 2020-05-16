@@ -271,13 +271,6 @@ class Mare::Program
       :it,
     ]
 
-    def structural_hash(hasher)
-      hasher = @ast.get_structural_hash.hash(hasher)
-      hasher = @tags.structural_hash(hasher)
-      hasher = @metadata.structural_hash(hasher)
-      hasher
-    end
-
     def initialize(*args)
       @ast = AST::Function.new(*args)
       @tags = Set(Symbol).new

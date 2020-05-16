@@ -6,14 +6,6 @@ struct Mare::Source
   def initialize(@filename, @content, @library)
   end
 
-  # The structual hash is based only on source path, source content and offset.
-  def structural_hash(hasher)
-    hasher = filename.hash(hasher)
-    hasher = content.hash(hasher)
-    hasher = library.path.hash(hasher)
-    hasher
-  end
-
   def path
     File.join(@library.path, @filename)
   end
@@ -73,13 +65,6 @@ struct Mare::Source::Pos
     source == other.source &&
     start <= other.start &&
     finish >= other.finish
-  end
-
-  # The structual hash is based only on source and offset.
-  def structural_hash(hasher)
-    hasher = source.structural_hash(hasher)
-    hasher = start.hash(hasher)
-    hasher
   end
 
   def size

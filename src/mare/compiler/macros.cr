@@ -23,7 +23,6 @@ class Mare::Compiler::Macros < Mare::AST::CopyOnMutateVisitor
   end
   def self.cached_or_run(l, t, f) : Program::Function
     input_hash = f.hash
-    # input_hash = f.structural_hash
     cache_key = cache_key(l, t, f)
     cache_result = @@cache[cache_key]?
     cached_hash, cached_func = cache_result if cache_result
