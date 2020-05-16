@@ -44,6 +44,9 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         @partial_reifieds.each
       end
     end
+    def each_non_partial_reified
+      @reached_fully_reifieds.each.chain([no_args].each)
+    end
   end
 
   struct FuncAnalysis
@@ -161,7 +164,15 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     @types = {} of ReifiedType => ForType
   end
 
-  def run(ctx, library)
+  def run(ctx)
+    ctx.program.libraries.each do |library|
+      run_for_library(ctx, library)
+    end
+
+    reach_additional_subtype_relationships(ctx)
+  end
+
+  def run_for_library(ctx, library)
     # Always evaluate the Main type first, if it's part of this library.
     # TODO: This shouldn't be necessary, but it is right now for some reason...
     # In both execution orders, the ReifiedType and ReifiedFunction for Main
@@ -201,6 +212,65 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       # of any it claimed earlier, which we took on faith and now verify.
       @t_analyses[t_link].each_non_argumented_reified.each do |rt|
         self[rt].subtyping.check_assertions(ctx)
+      end
+    end
+  end
+
+  def reach_additional_subtype_relationships(ctx)
+    # Keep looping as long as the keep_going variable gets set to true in
+    # each iteration of the loop by at least one item in the subtype topology
+    # changing in one of the deeply nested loops.
+    keep_going = true
+    while keep_going
+      keep_going = false
+
+      # For each abstract type in the program that we have analyzed...
+      # (this should be all of the abstract types in the program)
+      @t_analyses.each do |t_link, t_analysis|
+        next unless t_link.is_abstract?
+
+        # For each "fully baked" reification of that type we have checked...
+        # (this should include all reifications reachable from any defined
+        # function, though not necessarily all reachable from Main.new)
+        # TODO: Should we be limiting to only paths reachable from Main.new?
+        t_analysis.each_non_partial_reified.each do |rt|
+          rt_analysis = self[rt]
+
+          # Store the array of all known complete subtypes that have been
+          # tested by any defined code in the program.
+          # TODO: Should we be limiting to only paths reachable from Main.new?
+          each_known_complete_subtype =
+            rt_analysis.each_known_complete_subtype(ctx).to_a
+
+          # For each abstract type in that subtypes list...
+          each_known_complete_subtype.each do |subtype_rt|
+            next unless subtype_rt.link.is_abstract?
+            subtype_rt_analysis = self[subtype_rt]
+
+            # For each other/distinct type in that subtypes list...
+            each_known_complete_subtype.each do |other_subtype_rt|
+              next if other_subtype_rt == subtype_rt
+
+              # Check if the first subtype is a supertype of the other subtype.
+              # For example, if Foo and Bar are both used as subtypes of Any
+              # in the program, we check here if Foo is a subtype of Bar,
+              # or in another iteration, if Bar is a subtype of Foo.
+              #
+              # This lets us be sure that later trait mapping for the runtime
+              # knows about the relationship of types which may be matched at
+              # runtime after having been "carried" as a common supertype.
+              #
+              # If our test here has changed the topology of known subtypes,
+              # then we need to keep going in our overall iteration, since
+              # we need to uncover other transitive relationships at deeper
+              # levels of transitivity until there is nothing left to uncover.
+              orig_size = subtype_rt_analysis.each_known_subtype.size
+              subtype_rt_analysis.is_supertype_of?(ctx, other_subtype_rt)
+              keep_going = true \
+                if orig_size != subtype_rt_analysis.each_known_subtype.size
+            end
+          end
+        end
       end
     end
   end
@@ -1401,18 +1471,19 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         bool = MetaType.new(reified_type(prelude_type("Bool")))
         @analysis[node] = Fixed.new(node.pos, bool)
       when "<:"
+        need_to_check_if_right_is_subtype_of_left = true
+        lhs_info = self[node.lhs]
         rhs_info = self[node.rhs]
         Error.at node.rhs, "expected this to have a fixed type at compile time" \
           unless rhs_info.is_a?(Fixed)
 
-        lhs_info = self[node.lhs]
         # If the left-hand side is the name of a local variable...
         if lhs_info.is_a?(Local) || lhs_info.is_a?(Param)
           # Set up a local type refinement condition, which can be used within
           # a choice body to inform the type system about the type relationship.
           bool = MetaType.new(reified_type(prelude_type("Bool")))
           refine = @analysis.follow_redirects(node.lhs)
-          refine_type = self[node.rhs].resolve!(ctx, self)
+          refine_type = rhs_info.resolve!(ctx, self)
           @analysis[node] = TypeCondition.new(node.pos, bool, refine, refine_type)
 
         # If the left-hand side is the name of a type parameter...
@@ -1420,6 +1491,10 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         && lhs_info.inner.cap_only.inner == MetaType::Capability::NON \
         && (lhs_nominal = lhs_info.inner.strip_cap.inner).is_a?(MetaType::Nominal) \
         && (lhs_type_param = lhs_nominal.defn).is_a?(Refer::TypeParam)
+          # For type parameter refinements we do not verify that the right side
+          # must be a subtype of the left side - it breaks partial reification.
+          need_to_check_if_right_is_subtype_of_left = false
+
           # Strip the "non" from the fixed type, as if it were a type expr.
           @analysis[node.lhs] = Fixed.new(node.lhs.pos, type_expr(node.lhs))
 
@@ -1427,12 +1502,16 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
           # a choice body to inform the type system about the type relationship.
           bool = MetaType.new(reified_type(prelude_type("Bool")))
           refine = lhs_type_param
-          refine_type = self[node.rhs].resolve!(ctx, self)
+          refine_type = rhs_info.resolve!(ctx, self)
           @analysis[node] = TypeParamCondition.new(node.pos, bool, refine, refine_type)
 
         # If the left-hand side is the name of any other fixed type...
         elsif lhs_info.is_a?(Fixed) \
         && lhs_info.inner.cap_only.inner == MetaType::Capability::NON
+          # For statically known type comparisons we cannot require that they
+          # have the possibility of being true - it breaks full reification.
+          need_to_check_if_right_is_subtype_of_left = false
+
           # Strip the "non" from the fixed types, as if each were a type expr.
           lhs_mt = type_expr(node.lhs)
           rhs_mt = type_expr(node.rhs)
@@ -1453,6 +1532,19 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
           bool = MetaType.new(reified_type(prelude_type("Bool")))
           @analysis[node] = Fixed.new(node.pos, bool)
         end
+
+        if need_to_check_if_right_is_subtype_of_left
+          # The right side must be a subtype of the left side.
+          rhs_mt = rhs_info.inner
+          lhs_mt = resolve(node.lhs)
+          if !rhs_mt.subtype_of?(ctx, lhs_mt)
+            Error.at node, "This type check will never match", [
+              {rhs_info.pos, "the match type is #{rhs_mt.show_type}"},
+              {lhs_info.pos, "which is not a subtype of #{lhs_mt.show_type}"},
+            ]
+          end
+        end
+
       else raise NotImplementedError.new(node.op.value)
       end
     end

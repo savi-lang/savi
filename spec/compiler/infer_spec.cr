@@ -1887,6 +1887,39 @@ describe Mare::Compiler::Infer do
     Mare::Compiler.compile([source], :infer)
   end
 
+  it "complains when the match type isn't a subtype of the original" do
+    source = Mare::Source.new_example <<-SOURCE
+    :trait non Exampleable
+      :fun non example String
+
+    :actor Main
+      :new: @refine("example")
+      :fun refine (x String)
+        if (x <: Exampleable) x.example
+    SOURCE
+
+    expected = <<-MSG
+    This type check will never match:
+    from (example):7:
+        if (x <: Exampleable) x.example
+            ^~~~~~~~~~~~~~~~
+
+    - the match type is Exampleable:
+      from (example):7:
+        if (x <: Exampleable) x.example
+                 ^~~~~~~~~~~
+
+    - which is not a subtype of String:
+      from (example):6:
+      :fun refine (x String)
+                     ^~~~~~
+    MSG
+
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :infer)
+    end
+  end
+
   it "complains when too many type arguments are provided" do
     source = Mare::Source.new_example <<-SOURCE
     :class Generic (P1, P2)
@@ -2116,6 +2149,40 @@ describe Mare::Compiler::Infer do
     expect_raises Mare::Error, expected do
       Mare::Compiler.compile([source], :infer)
     end
+  end
+
+  it "tests and conveys transitively reached subtypes to the reach pass" do
+    source = Mare::Source.new_example <<-SOURCE
+    :trait non Exampleable
+      :fun non example String
+
+    :primitive Example
+      :fun non example String: "Hello, World!"
+
+    :actor Main
+      :fun maybe_call_example (e Any'non)
+        if (e <: Exampleable) e.example
+      :new
+        @maybe_call_example(Example)
+    SOURCE
+
+    ctx = Mare::Compiler.compile([source], :infer)
+
+    any = ctx.namespace.in_source(source, "Any").as(Mare::Program::Type::Link)
+    trait = ctx.namespace.in_source(source, "Exampleable").as(Mare::Program::Type::Link)
+    sub = ctx.namespace.in_source(source, "Example").as(Mare::Program::Type::Link)
+
+    any_rt = ctx.infer[any].no_args
+    trait_rt = ctx.infer[trait].no_args
+    sub_rt = ctx.infer[sub].no_args
+
+    any_subtypes = ctx.infer[any_rt].each_known_complete_subtype(ctx).to_a
+    trait_subtypes = ctx.infer[trait_rt].each_known_complete_subtype(ctx).to_a
+    sub_subtypes = ctx.infer[sub_rt].each_known_complete_subtype(ctx).to_a
+
+    any_subtypes.should contain(sub_rt)
+    any_subtypes.should contain(trait_rt)
+    trait_subtypes.should contain(sub_rt)
   end
 
   pending "complains when the yield block result doesn't match the expected type"
