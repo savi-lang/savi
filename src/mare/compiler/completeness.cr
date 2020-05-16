@@ -36,14 +36,10 @@ module Mare::Compiler::Completeness
 
     # First, visit the field initializers (for those fields that have them) as
     # sub branches to simulate them being run at the start of the constructor.
-    fields.each do |f|
-      next unless f.body
-      f_link = f.make_link(rt.link)
-      branch.sub_branch(
-        ctx.infer.for_func(ctx, rt, f_link, Infer::MetaType.cap("ref")).reified,
-        f.ident.pos,
-      )
-      branch.seen_fields.add(f.ident.value)
+    fields.each do |next_f|
+      next unless next_f.body
+      branch.sub_branch(next_f.make_link(rt.link), "ref", next_f.ident.pos)
+      branch.seen_fields.add(next_f.ident.value)
     end
 
     # Now visit the actual constructor body.
@@ -82,19 +78,27 @@ module Mare::Compiler::Completeness
       branch
     end
 
-    def sub_branch(next_func : Infer::ReifiedFunction, call_crumb : Source::Pos)
+    def sub_branch(
+      next_f_link : Program::Function::Link,
+      next_f_cap : String,
+      call_crumb : Source::Pos,
+    )
+      next_rf = ctx.infer[next_f_link]
+        .each_reified_func(type)
+        .find(&.receiver.cap_only.cap_value.==(next_f_cap)).not_nil!
+
       # Use caching of function branches to prevent infinite recursion.
       # We cache by both seen_fields and func so that we don't combine
       # cached results for branch paths where the set of prior seen fields
       # is different. This also lets us handle nicely some recursive patterns
       # that can be proven to make progress in the set of seen fields.
-      cache_key = {seen_fields, next_func}
+      cache_key = {seen_fields, next_rf}
       branch_cache.fetch cache_key do
         branch_cache[cache_key] = branch =
-          Branch.new(ctx, type, next_func, branch_cache, all_fields,
+          Branch.new(ctx, type, next_rf, branch_cache, all_fields,
             seen_fields.dup, call_crumbs.dup)
         branch.call_crumbs << call_crumb
-        next_func.func(ctx).body.not_nil!.accept(ctx, branch)
+        next_rf.func(ctx).body.not_nil!.accept(ctx, branch)
         branch
       end
     end
@@ -193,10 +197,8 @@ module Mare::Compiler::Completeness
         # Follow the method call in a new branch, and collect any field writes
         # seen in that branch as if they had been seen in this branch.
         next_f = type.defn(ctx).find_func!(func_name)
-        next_f_link = next_f.make_link(type.link)
-        next_cap = Infer::MetaType.cap(next_f.cap.value) # TODO: reify with which cap?
-        next_func = ctx.infer.for_func(ctx, type, next_f_link, next_cap).reified
-        branch = sub_branch(next_func, node.pos)
+        next_f_cap = next_f.cap.value # TODO: reify with which cap?
+        branch = sub_branch(next_f.make_link(type.link), next_f_cap, node.pos)
         seen_fields.concat(branch.seen_fields)
       end
     end
