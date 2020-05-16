@@ -116,7 +116,7 @@ class Mare::Compiler::Verify < Mare::AST::Visitor
       # Verify that it is safe to perform this runtime type check.
       lhs_mt = infer_func.resolve(node.lhs)
       rhs_mt = infer_func.resolve(node.rhs)
-      case lhs_mt.safe_to_match_as?(infer_func, rhs_mt)
+      case lhs_mt.safe_to_match_as?(ctx, rhs_mt)
       when false
         Error.at node,
           "This type check would require runtime knowledge of capabilities", [

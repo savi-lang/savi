@@ -163,8 +163,8 @@ struct Mare::Compiler::Infer::MetaType
   # Returns true if it is safe to refine the type of self to other at runtime.
   # Returns false if doing so would violate capabilities.
   # Returns nil if doing so would be impossible even if we ignored capabilities.
-  def safe_to_match_as?(infer : (ForFunc | ForType), other : MetaType) : Bool?
-    inner.safe_to_match_as?(infer, other.inner)
+  def safe_to_match_as?(ctx : Context, other : MetaType) : Bool?
+    inner.safe_to_match_as?(ctx, other.inner)
   end
 
   def viewed_from(origin : MetaType)
@@ -195,8 +195,8 @@ struct Mare::Compiler::Infer::MetaType
     @inner.is_a?(Capability)
   end
 
-  def within_constraints?(infer : ForFunc, types : Iterable(MetaType))
-    infer.is_subtype?(self, self.class.new_intersection(types))
+  def within_constraints?(ctx : Context, types : Iterable(MetaType))
+    subtype_of?(ctx, self.class.new_intersection(types))
   end
 
   def unsatisfiable?
@@ -238,33 +238,33 @@ struct Mare::Compiler::Infer::MetaType
     MetaType.new(@inner.unite(other.inner))
   end
 
-  def simplify(infer : ForFunc)
+  def simplify(ctx : Context)
     inner = @inner
 
     # Currently we only have the logic to simplify these cases:
-    return MetaType.new(simplify_union(infer, inner)) if inner.is_a?(Union) && inner.intersects
-    return MetaType.new(simplify_intersection(infer, inner)) if inner.is_a?(Intersection)
+    return MetaType.new(simplify_union(ctx, inner)) if inner.is_a?(Union) && inner.intersects
+    return MetaType.new(simplify_intersection(ctx, inner)) if inner.is_a?(Intersection)
 
     self
   end
 
-  private def simplify_intersection(infer : ForFunc, inner : Intersection)
+  private def simplify_intersection(ctx : Context, inner : Intersection)
     # TODO: complete the rest of the logic here (think about symmetry)
     removed_terms = Set(Nominal).new
     new_terms = inner.terms.try(&.select do |l|
       # Return Unsatisfiable if any term is a subtype of an anti-term.
-      if inner.anti_terms.try(&.any? { |r| infer.is_subtype?(l.defn, r.defn) })
+      if inner.anti_terms.try(&.any? { |r| l.subtype_of?(ctx, r) })
         return Unsatisfiable.instance
       end
 
       # Return Unsatisfiable if l is concrete and isn't a subtype of all others.
-      if l.is_concrete? && inner.terms.try(&.any? { |r| !infer.is_subtype?(l.defn, r.defn) })
+      if l.is_concrete? && inner.terms.try(&.any? { |r| !l.subtype_of?(ctx, r) })
         return Unsatisfiable.instance
       end
 
       # Remove terms that are supertypes of another term - they are redundant.
       if inner.terms.try(&.any? do |r|
-        l != r && !removed_terms.includes?(r) && infer.is_subtype?(r.defn, l.defn)
+        l != r && !removed_terms.includes?(r) && r.subtype_of?(ctx, l)
       end)
         removed_terms.add(l)
         next
@@ -280,7 +280,7 @@ struct Mare::Compiler::Infer::MetaType
     Intersection.build(inner.cap, new_terms.try(&.to_set), inner.anti_terms)
   end
 
-  private def simplify_union(infer : ForFunc, inner : Union)
+  private def simplify_union(ctx : Context, inner : Union)
     caps = Set(Capability).new
     terms = Set(Nominal).new
     anti_terms = Set(AntiNominal).new
@@ -295,7 +295,7 @@ struct Mare::Compiler::Infer::MetaType
 
     # Simplify each intersection, collecting the results.
     inner.intersects.not_nil!.each do |intersect|
-      result = simplify_intersection(infer, intersect)
+      result = simplify_intersection(ctx, intersect)
       case result
       when Unsatisfiable then # do nothing, it's no longer in the union
       when Nominal then terms.add(result)
@@ -309,14 +309,14 @@ struct Mare::Compiler::Infer::MetaType
   end
 
   # Return true if this MetaType is a subtype of the other MetaType.
-  def subtype_of?(infer : (ForFunc | ForType), other : MetaType)
-    inner.subtype_of?(infer, other.inner)
+  def subtype_of?(ctx : Context, other : MetaType)
+    inner.subtype_of?(ctx, other.inner)
   end
 
   # Return true if this MetaType is a satisfies the other MetaType
   # as a type parameter bound/constraint.
-  def satisfies_bound?(infer : (ForFunc | ForType), other : MetaType)
-    inner.satisfies_bound?(infer, other.inner)
+  def satisfies_bound?(ctx : Context, other : MetaType)
+    inner.satisfies_bound?(ctx, other.inner)
   end
 
   def each_reachable_defn : Iterator(ReifiedType)

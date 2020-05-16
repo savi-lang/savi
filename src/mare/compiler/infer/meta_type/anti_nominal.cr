@@ -139,7 +139,7 @@ struct Mare::Compiler::Infer::MetaType::AntiNominal
     false
   end
 
-  def safe_to_match_as?(infer : (ForFunc | ForType), other) : Bool?
+  def safe_to_match_as?(ctx : Context, other) : Bool?
     raise NotImplementedError.new("#{self.inspect} safe_to_match_as?")
   end
 
@@ -151,53 +151,53 @@ struct Mare::Compiler::Infer::MetaType::AntiNominal
     raise NotImplementedError.new("#{origin.inspect}+>#{self.inspect}")
   end
 
-  def subtype_of?(infer : (ForFunc | ForType), other : Capability) : Bool
+  def subtype_of?(ctx : Context, other : Capability) : Bool
     # An anti-nominal can never be a subtype of any capability -
     # it excludes a single nominal, and says nothing about capabilities.
     false
   end
 
-  def supertype_of?(infer : (ForFunc | ForType), other : Capability) : Bool
+  def supertype_of?(ctx : Context, other : Capability) : Bool
     # An anti-nominal can never be a supertype of any capability -
     # it excludes a single nominal, and says nothing about capabilities.
     false
   end
 
-  def subtype_of?(infer : (ForFunc | ForType), other : Nominal) : Bool
+  def subtype_of?(ctx : Context, other : Nominal) : Bool
     # An anti-nominal can never be a subtype of any nominal -
     # it excludes a single nominal, and includes every other possible nominal,
     # so it cannot possibly be as or more specific than a single nominal.
     false
   end
 
-  def supertype_of?(infer : (ForFunc | ForType), other : Nominal) : Bool
+  def supertype_of?(ctx : Context, other : Nominal) : Bool
     # An anti-nominal is a supertype of the given nominal if and only if
-    # the other nominal's defn is not a subtype of this nominal's defn.
-    !infer.is_subtype?(other.defn, defn)
+    # the other nominal is not a subtype of this defn's nominal.
+    !other.subtype_of?(ctx, Nominal.new(defn))
   end
 
-  def subtype_of?(infer : (ForFunc | ForType), other : AntiNominal) : Bool
+  def subtype_of?(ctx : Context, other : AntiNominal) : Bool
     # An anti-nominal is a subtype of another anti-nominal if and only if
     # all cases excluded by the other anti-nominal are also excluded by it.
     # For this anti-nominal to be as or more exclusive than the other,
     # its defn must be as or more inclusive than the other (a supertype).
-    infer.is_subtype?(other.defn, defn)
+    Nominal.new(other.defn).subtype_of?(ctx, Nominal.new(defn))
   end
 
-  def supertype_of?(infer : (ForFunc | ForType), other : AntiNominal) : Bool
+  def supertype_of?(ctx : Context, other : AntiNominal) : Bool
     # This operation is symmetrical with the above operation.
-    infer.is_subtype?(defn, other.defn)
+    other.subtype_of?(ctx, self) # delegate to the above method via symmetry
   end
 
-  def subtype_of?(infer : (ForFunc | ForType), other : (Intersection | Union | Unconstrained | Unsatisfiable)) : Bool
-    other.supertype_of?(infer, self) # delegate to the other class via symmetry
+  def subtype_of?(ctx : Context, other : (Intersection | Union | Unconstrained | Unsatisfiable)) : Bool
+    other.supertype_of?(ctx, self) # delegate to the other class via symmetry
   end
 
-  def supertype_of?(infer : (ForFunc | ForType), other : (Intersection | Union | Unconstrained | Unsatisfiable)) : Bool
-    other.subtype_of?(infer, self) # delegate to the other class via symmetry
+  def supertype_of?(ctx : Context, other : (Intersection | Union | Unconstrained | Unsatisfiable)) : Bool
+    other.subtype_of?(ctx, self) # delegate to the other class via symmetry
   end
 
-  def satisfies_bound?(infer : (ForFunc | ForType), bound) : Bool
+  def satisfies_bound?(ctx : Context, bound) : Bool
     raise NotImplementedError.new("#{self} satisfies_bound? #{bound}")
   end
 end

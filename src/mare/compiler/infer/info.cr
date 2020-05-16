@@ -13,7 +13,7 @@ class Mare::Compiler::Infer
     )
 
     def meta_type_within_domain!(
-      infer : ForFunc,
+      ctx : Context,
       meta_type : MetaType,
       use_pos : Source::Pos,
       constraint_pos : Source::Pos,
@@ -28,10 +28,10 @@ class Mare::Compiler::Infer
         meta_type = meta_type.ephemeralize
       end
 
-      return if meta_type.within_constraints?(infer, [constraint])
+      return if meta_type.within_constraints?(ctx, [constraint])
 
       because_of_alias = alias_distinct &&
-        orig_meta_type.ephemeralize.not_nil!.within_constraints?(infer, [constraint])
+        orig_meta_type.ephemeralize.not_nil!.within_constraints?(ctx, [constraint])
 
       extra = [
         {constraint_pos,
@@ -140,11 +140,11 @@ class Mare::Compiler::Infer
       # TODO: print a different error message when the domain constraints are
       # internally conflicting, even before adding this meta_type into the mix.
 
-      total_domain_constraint = total_domain_constraint(ctx).simplify(infer)
+      total_domain_constraint = total_domain_constraint(ctx).simplify(ctx)
 
       meta_type_ephemeral = meta_type.ephemeralize
 
-      if !meta_type_ephemeral.within_constraints?(infer, [total_domain_constraint])
+      if !meta_type_ephemeral.within_constraints?(ctx, [total_domain_constraint])
         extra = describe_domain_constraints
         extra << {pos,
           "but the type of the #{describe_kind} was #{meta_type.show_type}"}
@@ -166,7 +166,7 @@ class Mare::Compiler::Infer
 
         domain_constraints.each do |use_pos, _, constraint, aliases|
           if aliases > 0
-            if !meta_type_alias.within_constraints?(infer, [constraint])
+            if !meta_type_alias.within_constraints?(ctx, [constraint])
               extra = describe_domain_constraints
               extra << {pos,
                 "but the type of the #{describe_kind} " \
@@ -191,7 +191,7 @@ class Mare::Compiler::Infer
     def within_domain!(ctx : Context, infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
       if @already_resolved
         meta_type_within_domain!(
-          infer,
+          ctx,
           @already_resolved.not_nil!,
           use_pos,
           constraint_pos,
@@ -245,7 +245,7 @@ class Mare::Compiler::Infer
         return infer[@upstreams.first[0]].resolve!(ctx, infer).strip_ephemeral
       elsif !domain_constraints.empty?
         # If we only have domain constraints to, just do our best with those.
-        return total_domain_constraint(ctx).simplify(infer).strip_ephemeral
+        return total_domain_constraint(ctx).simplify(ctx).strip_ephemeral
       end
 
       # If we get here, we've failed and don't have enough info to continue.
@@ -260,7 +260,7 @@ class Mare::Compiler::Infer
           infer[other_upstream].within_domain!(ctx, infer, other_upstream_pos, pos, meta_type.strip_ephemeral, 0) # TODO: should we really use 0 here?
 
           other_mt = infer[other_upstream].resolve!(ctx, infer)
-          raise "sanity check" unless other_mt.subtype_of?(infer, meta_type)
+          raise "sanity check" unless other_mt.subtype_of?(ctx, meta_type)
         end
       end
     end
@@ -306,7 +306,7 @@ class Mare::Compiler::Infer
     end
 
     def within_domain!(ctx : Context, infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
-      meta_type_within_domain!(infer, @inner, use_pos, constraint_pos, constraint, aliases)
+      meta_type_within_domain!(ctx, @inner, use_pos, constraint_pos, constraint, aliases)
     end
   end
 
@@ -325,7 +325,7 @@ class Mare::Compiler::Infer
     def within_domain!(ctx : Context, infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
       @domain_constraints << {constraint_pos, constraint}
 
-      meta_type_within_domain!(infer, @inner, use_pos, constraint_pos, constraint, aliases)
+      meta_type_within_domain!(ctx, @inner, use_pos, constraint_pos, constraint, aliases)
     end
   end
 
@@ -339,7 +339,7 @@ class Mare::Compiler::Infer
       # Literal values (such as numeric literals) sometimes have
       # an ambiguous type. Here, we  intersect with the domain constraints
       # to (hopefully) arrive at a single concrete type to return.
-      meta_type = total_domain_constraint(ctx).intersect(@possible).simplify(infer)
+      meta_type = total_domain_constraint(ctx).intersect(@possible).simplify(ctx)
 
       # If we don't satisfy the constraints, leave it to DynamicInfo.resolve!
       # to print a consistent error message instead of printing it here.
@@ -390,7 +390,7 @@ class Mare::Compiler::Infer
     end
 
     def within_domain!(ctx : Context, infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
-      meta_type_within_domain!(infer, resolve!(ctx, infer), use_pos, constraint_pos, constraint, aliases + 1) # TODO: can this +1 be removed?
+      meta_type_within_domain!(ctx, resolve!(ctx, infer), use_pos, constraint_pos, constraint, aliases + 1) # TODO: can this +1 be removed?
     end
   end
 
@@ -459,7 +459,7 @@ class Mare::Compiler::Infer
     end
 
     def within_domain!(ctx : Context, infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
-      meta_type_within_domain!(infer, @bool, use_pos, constraint_pos, constraint, aliases)
+      meta_type_within_domain!(ctx, @bool, use_pos, constraint_pos, constraint, aliases)
     end
   end
 
@@ -477,7 +477,7 @@ class Mare::Compiler::Infer
     end
 
     def within_domain!(ctx : Context, infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
-      meta_type_within_domain!(infer, @bool, use_pos, constraint_pos, constraint, aliases)
+      meta_type_within_domain!(ctx, @bool, use_pos, constraint_pos, constraint, aliases)
     end
   end
 
@@ -493,7 +493,7 @@ class Mare::Compiler::Infer
     end
 
     def within_domain!(ctx : Context, infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
-      meta_type_within_domain!(infer, @bool, use_pos, constraint_pos, constraint, aliases)
+      meta_type_within_domain!(ctx, @bool, use_pos, constraint_pos, constraint, aliases)
     end
   end
 
@@ -509,7 +509,7 @@ class Mare::Compiler::Infer
     end
 
     def within_domain!(ctx : Context, infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
-      meta_type_within_domain!(infer, @bool, use_pos, constraint_pos, constraint, aliases)
+      meta_type_within_domain!(ctx, @bool, use_pos, constraint_pos, constraint, aliases)
     end
   end
 
@@ -525,7 +525,7 @@ class Mare::Compiler::Infer
     end
 
     def within_domain!(ctx : Context, infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
-      meta_type_within_domain!(infer, resolve!(ctx, infer), use_pos, constraint_pos, constraint, aliases)
+      meta_type_within_domain!(ctx, resolve!(ctx, infer), use_pos, constraint_pos, constraint, aliases)
     end
   end
 
@@ -588,7 +588,7 @@ class Mare::Compiler::Infer
 
       # Determine the lowest common denominator MetaType of all elements.
       elem_mts = terms.map { |term| infer[term].resolve!(ctx, infer) }.uniq
-      elem_mt = MetaType.new_union(elem_mts).simplify(infer)
+      elem_mt = MetaType.new_union(elem_mts).simplify(ctx)
 
       # Look for exactly one antecedent type that matches the inferred type.
       # Essentially, this is the correlating "outside" inference with "inside".
@@ -596,7 +596,7 @@ class Mare::Compiler::Infer
       # If no such type is found, stick with what we inferred for now.
       possible_antes = [] of MetaType
       possible_element_antecedents(ctx, infer).each do |ante|
-        if elem_mts.empty? || elem_mt.subtype_of?(infer, ante)
+        if elem_mts.empty? || elem_mt.subtype_of?(ctx, ante)
           possible_antes << ante
         end
       end

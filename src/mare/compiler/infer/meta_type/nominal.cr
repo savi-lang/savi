@@ -175,8 +175,8 @@ struct Mare::Compiler::Infer::MetaType::Nominal
     false
   end
 
-  def safe_to_match_as?(infer : (ForFunc | ForType), other) : Bool?
-    supertype_of?(infer, other) ? true : nil
+  def safe_to_match_as?(ctx : Context, other) : Bool?
+    supertype_of?(ctx, other) ? true : nil
   end
 
   def viewed_from(origin)
@@ -187,42 +187,71 @@ struct Mare::Compiler::Infer::MetaType::Nominal
     raise NotImplementedError.new("#{origin.inspect}+>#{self.inspect}")
   end
 
-  def subtype_of?(infer : (ForFunc | ForType), other : Capability) : Bool
+  def subtype_of?(ctx : Context, other : Capability) : Bool
     # A nominal can never be a subtype of any capability -
     # it specifies a single nominal, and says nothing about capabilities.
     false
   end
 
-  def supertype_of?(infer : (ForFunc | ForType), other : Capability) : Bool
+  def supertype_of?(ctx : Context, other : Capability) : Bool
     # A nominal can never be a supertype of any capability -
     # it specifies a single nominal, and says nothing about capabilities.
     false
   end
 
-  def subtype_of?(infer : (ForFunc | ForType), other : Nominal) : Bool
-    # A nominal is a subtype of another nominal if and only if
-    # the defn is a subtype of the other defn.
-    infer.is_subtype?(defn, other.defn)
+  def subtype_of?(ctx : Context, other : Nominal) : Bool
+    defn = defn()
+    other_defn = other.defn()
+    errors = [] of Error::Info # TODO: accept this as an argument?
+
+    if defn.is_a?(ReifiedType)
+      if other_defn.is_a?(ReifiedType)
+        # When both sides are ReifiedTypes, delegate to the SubtypingInfo logic.
+        ctx.infer[defn].is_subtype_of?(ctx, other_defn, errors)
+      elsif other_defn.is_a?(Refer::TypeParam)
+        # When the other is a TypeParam, use its bound MetaType and run again.
+        l = MetaType.new_nominal(defn)
+        r = ctx.infer.for_type(ctx, other_defn.parent_link)
+              .lookup_type_param_bound(other_defn).strip_cap
+        l.subtype_of?(ctx, r)
+      else
+        raise NotImplementedError.new("type <: ?")
+      end
+    elsif defn.is_a?(Refer::TypeParam)
+      if other_defn.is_a?(ReifiedType)
+        # When this is a TypeParam, use its bound MetaType and run again.
+        l = ctx.infer.for_type(ctx, defn.parent_link)
+              .lookup_type_param_bound(defn).strip_cap
+        r = MetaType.new_nominal(other_defn)
+        l.subtype_of?(ctx, r)
+      elsif other_defn.is_a?(Refer::TypeParam)
+        return true if defn == other_defn
+        raise NotImplementedError.new("type param <: type param")
+      else
+        raise NotImplementedError.new("type param <: ?")
+      end
+    else
+      raise NotImplementedError.new("? <: anything")
+    end
   end
 
-  def supertype_of?(infer : (ForFunc | ForType), other : Nominal) : Bool
-    # This operation is symmetrical with the above operation.
-    infer.is_subtype?(other.defn, defn)
+  def supertype_of?(ctx : Context, other : Nominal) : Bool
+    other.subtype_of?(ctx, self) # delegate to the method above via symmetry
   end
 
-  def subtype_of?(infer : (ForFunc | ForType), other : (AntiNominal | Intersection | Union | Unconstrained | Unsatisfiable)) : Bool
-    other.supertype_of?(infer, self) # delegate to the other class via symmetry
+  def subtype_of?(ctx : Context, other : (AntiNominal | Intersection | Union | Unconstrained | Unsatisfiable)) : Bool
+    other.supertype_of?(ctx, self) # delegate to the other class via symmetry
   end
 
-  def supertype_of?(infer : (ForFunc | ForType), other : (AntiNominal | Intersection | Union | Unconstrained | Unsatisfiable)) : Bool
-    other.subtype_of?(infer, self) # delegate to the other class via symmetry
+  def supertype_of?(ctx : Context, other : (AntiNominal | Intersection | Union | Unconstrained | Unsatisfiable)) : Bool
+    other.subtype_of?(ctx, self) # delegate to the other class via symmetry
   end
 
-  def satisfies_bound?(infer : (ForFunc | ForType), bound : Nominal) : Bool
-    infer.is_subtype?(defn, bound.defn)
+  def satisfies_bound?(ctx : Context, bound : Nominal) : Bool
+    subtype_of?(ctx, bound)
   end
 
-  def satisfies_bound?(infer : (ForFunc | ForType), bound : (Capability | AntiNominal | Intersection | Union | Unconstrained | Unsatisfiable)) : Bool
+  def satisfies_bound?(ctx : Context, bound : (Capability | AntiNominal | Intersection | Union | Unconstrained | Unsatisfiable)) : Bool
     raise NotImplementedError.new("#{self} satisfies_bound? #{bound}")
   end
 end

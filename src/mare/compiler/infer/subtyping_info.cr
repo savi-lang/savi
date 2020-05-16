@@ -1,7 +1,5 @@
 class Mare::Compiler::Infer::SubtypingInfo
-  private getter ctx : Context
-
-  def initialize(@ctx, @this : ReifiedType)
+  def initialize(@this : ReifiedType)
     @asserted = Hash(ReifiedType, Source::Pos).new
     @confirmed = Set(ReifiedType).new
     @disproved = Hash(ReifiedType, Array(Error::Info)).new
@@ -17,11 +15,11 @@ class Mare::Compiler::Infer::SubtypingInfo
   end
 
   # Raise an Error if any asserted supertype is not actually a supertype.
-  def check_assertions
+  def check_assertions(ctx)
     errors = [] of Error::Info
 
     @asserted.each do |that, pos|
-      if check(that, errors)
+      if check(ctx, that, errors)
         raise "inconsistent logic" if errors.size > 0
       else
         Error.at pos,
@@ -32,7 +30,7 @@ class Mare::Compiler::Infer::SubtypingInfo
   end
 
   # Return true if this type satisfies the requirements of the that type.
-  def check(that : ReifiedType, errors : Array(Error::Info) = [] of Error::Info)
+  def check(ctx, that : ReifiedType, errors : Array(Error::Info) = [] of Error::Info)
     # TODO: for each return false, carry info about why it was false?
     # Maybe we only want to go to the trouble of collecting this info
     # when it is requested by the caller, so as not to slow the base case.
@@ -69,7 +67,7 @@ class Mare::Compiler::Infer::SubtypingInfo
     @temp_assumptions.add(that)
 
     # Okay, we have to do a full check.
-    is_subtype = full_check(that, errors)
+    is_subtype = full_check(ctx, that, errors)
 
     # Remove our standing assumption about this being a subtype of that -
     # we have our answer and have no more need for this recursion guard.
@@ -96,20 +94,20 @@ class Mare::Compiler::Infer::SubtypingInfo
     is_subtype
   end
 
-  private def full_check(that : ReifiedType, errors : Array(Error::Info))
+  private def full_check(ctx, that : ReifiedType, errors : Array(Error::Info))
     # A type only matches a trait if all functions match that trait.
     that.defn(ctx).functions.each do |that_func|
       # Hygienic functions are not considered to be real functions for the
       # sake of structural subtyping, so they don't have to be fulfilled.
       next if that_func.has_tag?(:hygienic)
 
-      check_func(that, that_func, errors)
+      check_func(ctx, that, that_func, errors)
     end
 
     errors.empty?
   end
 
-  private def check_func(that, that_func, errors)
+  private def check_func(ctx, that, that_func, errors)
     # The structural comparison fails if a required method is missing.
     this_func = this.defn(ctx).find_func?(that_func.ident.value)
     unless this_func
@@ -122,8 +120,8 @@ class Mare::Compiler::Infer::SubtypingInfo
     raise "found hygienic function" if this_func.has_tag?(:hygienic)
 
     # Get the Infer instance for both this and that function, to compare them.
-    this_infer = @ctx.infer.for_func(@ctx, this, this_func.make_link(this.link), MetaType.cap(this_func.cap.value)).tap(&.run)
-    that_infer = @ctx.infer.for_func(@ctx, that, that_func.make_link(that.link), MetaType.cap(that_func.cap.value)).tap(&.run)
+    this_infer = ctx.infer.for_func(ctx, this, this_func.make_link(this.link), MetaType.cap(this_func.cap.value)).tap(&.run)
+    that_infer = ctx.infer.for_func(ctx, that, that_func.make_link(that.link), MetaType.cap(that_func.cap.value)).tap(&.run)
 
     # A constructor can only match another constructor.
     case {this_func.has_tag?(:constructor), that_func.has_tag?(:constructor)}
@@ -195,7 +193,7 @@ class Mare::Compiler::Infer::SubtypingInfo
     # Covariant return type.
     this_ret = this_infer.resolve(this_infer.ret)
     that_ret = that_infer.resolve(that_infer.ret)
-    unless this_infer.is_subtype?(this_ret, that_ret)
+    unless this_ret.subtype_of?(ctx, that_ret)
       errors << {(this_func.ret || this_func.ident).pos,
         "this function's return type is #{this_ret.show_type}"}
       errors << {(that_func.ret || that_func.ident).pos,
@@ -208,7 +206,7 @@ class Mare::Compiler::Infer::SubtypingInfo
         l_params.terms.zip(r_params.terms).each do |(l_param, r_param)|
           l_param_mt = this_infer.resolve(l_param)
           r_param_mt = that_infer.resolve(r_param)
-          unless this_infer.is_subtype?(r_param_mt, l_param_mt)
+          unless r_param_mt.subtype_of?(ctx, l_param_mt)
             errors << {l_param.pos,
               "this parameter type is #{l_param_mt.show_type}"}
             errors << {r_param.pos,

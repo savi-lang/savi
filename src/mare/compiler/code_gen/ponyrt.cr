@@ -418,7 +418,7 @@ class Mare::Compiler::CodeGen::PonyRT
     traits_bitmap = g.trait_bitmap_size.times.map { 0 }.to_a
     infer = g.ctx.infer[gtype.type_def.reified]
     g.ctx.reach.each_type_def.each do |other_def|
-      if infer.is_subtype?(gtype.type_def.reified, other_def.reified)
+      if infer.is_subtype_of?(g.ctx, other_def.reified)
         next if gtype.type_def == other_def
         raise "can't be subtype of a concrete" unless other_def.is_abstract?(g.ctx)
 
@@ -969,10 +969,7 @@ class Mare::Compiler::CodeGen::PonyRT
       # Determine the mutability kind to use, then construct a newly refined
       # destination type to trace for, recursing/delegating back to gen_trace.
       g.builder.position_at_end(true_block)
-      mutability = src_type.trace_mutability_of_nominal(
-        g.ctx.infer[src_type_def.reified],
-        dst_type,
-      )
+      mutability = src_type.trace_mutability_of_nominal(g.ctx, dst_type)
       refined_dst_type =
         case mutability
         when :mutable   then src_type_def.as_ref(g.ctx, "iso")

@@ -75,7 +75,7 @@ class Mare::Compiler::Infer::MetaType::Unsatisfiable
     false
   end
 
-  def safe_to_match_as?(infer : (ForFunc | ForType), other) : Bool?
+  def safe_to_match_as?(ctx : Context, other) : Bool?
     raise NotImplementedError.new("#{self.inspect} safe_to_match_as?")
   end
 
@@ -87,18 +87,18 @@ class Mare::Compiler::Infer::MetaType::Unsatisfiable
     raise NotImplementedError.new("#{origin.inspect}+>#{self.inspect}")
   end
 
-  def subtype_of?(infer : (ForFunc | ForType), other : Inner) : Bool
+  def subtype_of?(ctx : Context, other : Inner) : Bool
     # Unsatisfiable is a subtype of nothing - it cannot exist at all.
     # TODO: is this right? it seems so, but breaks symmetry with Unconstrained.
     false
   end
 
-  def supertype_of?(infer : (ForFunc | ForType), other : Inner) : Bool
+  def supertype_of?(ctx : Context, other : Inner) : Bool
     # Unsatisfiable is never a supertype - it is never satisfied.
     false
   end
 
-  def satisfies_bound?(infer : (ForFunc | ForType), bound) : Bool
+  def satisfies_bound?(ctx : Context, bound) : Bool
     raise NotImplementedError.new("#{self} satisfies_bound? #{bound}")
   end
 end

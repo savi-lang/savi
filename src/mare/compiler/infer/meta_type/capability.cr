@@ -157,7 +157,7 @@ struct Mare::Compiler::Infer::MetaType::Capability
     other.unite(self) # delegate to the "higher" class via commutativity
   end
 
-  def subtype_of?(infer : (ForFunc | ForType), other : Capability); subtype_of?(other) end
+  def subtype_of?(ctx : Context, other : Capability); subtype_of?(other) end
   def subtype_of?(other : Capability) : Bool
     ##
     # Reference capability subtyping can be visualized using this graph,
@@ -201,20 +201,20 @@ struct Mare::Compiler::Infer::MetaType::Capability
     end
   end
 
-  def supertype_of?(infer : (ForFunc | ForType), other : Capability); supertype_of?(other) end
+  def supertype_of?(ctx : Context, other : Capability); supertype_of?(other) end
   def supertype_of?(other : Capability) : Bool
     other.subtype_of?(self) # delegate to the above function via symmetry
   end
 
-  def subtype_of?(infer : (ForFunc | ForType), other : (Nominal | AntiNominal | Intersection | Union | Unconstrained | Unsatisfiable)) : Bool
-    other.supertype_of?(infer, self) # delegate to the other class via symmetry
+  def subtype_of?(ctx : Context, other : (Nominal | AntiNominal | Intersection | Union | Unconstrained | Unsatisfiable)) : Bool
+    other.supertype_of?(ctx, self) # delegate to the other class via symmetry
   end
 
-  def supertype_of?(infer : (ForFunc | ForType), other : (Nominal | AntiNominal | Intersection | Union | Unconstrained | Unsatisfiable)) : Bool
-    other.subtype_of?(infer, self) # delegate to the other class via symmetry
+  def supertype_of?(ctx : Context, other : (Nominal | AntiNominal | Intersection | Union | Unconstrained | Unsatisfiable)) : Bool
+    other.subtype_of?(ctx, self) # delegate to the other class via symmetry
   end
 
-  def satisfies_bound?(infer : (ForFunc | ForType), bound : Capability) : Bool
+  def satisfies_bound?(ctx : Context, bound : Capability) : Bool
     return true if value.is_a?(String) && self == bound
 
     value = value()
@@ -230,7 +230,7 @@ struct Mare::Compiler::Infer::MetaType::Capability
     false
   end
 
-  def satisfies_bound?(infer : (ForFunc | ForType), bound : (Nominal | AntiNominal | Intersection | Union | Unconstrained | Unsatisfiable)) : Bool
+  def satisfies_bound?(ctx : Context, bound : (Nominal | AntiNominal | Intersection | Union | Unconstrained | Unsatisfiable)) : Bool
     raise NotImplementedError.new("#{self} satisfies_bound? #{bound}")
   end
 
@@ -310,8 +310,8 @@ struct Mare::Compiler::Infer::MetaType::Capability
     end
   end
 
-  def safe_to_match_as?(infer : (ForFunc | ForType), other) : Bool?
-    supertype_of?(infer, other) ? true : false
+  def safe_to_match_as?(ctx : Context, other) : Bool?
+    supertype_of?(ctx, other) ? true : false
   end
 
   def viewed_from(origin : Capability) : Capability

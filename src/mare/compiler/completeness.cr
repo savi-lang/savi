@@ -156,7 +156,7 @@ module Mare::Compiler::Completeness
       # Infer pass that tracked all of those constraints.
       info.domain_constraints.each do |pos, constraint|
         # If tag will meet the constraint, then this use of the self is okay.
-        return if infer.is_subtype?(tag_self, constraint)
+        return if tag_self.subtype_of?(ctx, constraint)
 
         # Otherwise, we must raise an error.
         Error.at node,

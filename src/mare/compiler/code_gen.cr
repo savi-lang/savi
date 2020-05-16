@@ -1799,7 +1799,7 @@ class Mare::Compiler::CodeGen
       lhs_meta_type = infer.resolve(relate.lhs)
       rhs_meta_type = infer.resolve(relate.rhs)
 
-      gen_bool(lhs_meta_type.satisfies_bound?(infer, rhs_meta_type))
+      gen_bool(lhs_meta_type.satisfies_bound?(ctx, rhs_meta_type))
     else
       # Otherwise, we generate code that checks the type descriptor of the
       # left-hand side against the compile-time type of the right-hand side.

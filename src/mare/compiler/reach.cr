@@ -317,7 +317,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       end
     end
 
-    def trace_mutability_of_nominal(infer, dst_type : Ref)
+    def trace_mutability_of_nominal(ctx, dst_type : Ref)
       src_cap = @meta_type.cap_only.inner
       case src_cap
       when Infer::MetaType::Capability::NON then return :non
@@ -327,7 +327,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       end
 
       if src_cap == Infer::MetaType::Capability::ISO
-        if dst_type.meta_type.safe_to_match_as?(infer, @meta_type)
+        if dst_type.meta_type.safe_to_match_as?(ctx, @meta_type)
           return :mutable
         else
           src_cap = Infer::MetaType::Capability::VAL
@@ -335,7 +335,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       end
 
       if src_cap == Infer::MetaType::Capability::VAL
-        if dst_type.meta_type.safe_to_match_as?(infer, @meta_type)
+        if dst_type.meta_type.safe_to_match_as?(ctx, @meta_type)
           return :immutable
         else
           src_cap = Infer::MetaType::Capability::TAG
@@ -343,7 +343,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       end
 
       if src_cap == Infer::MetaType::Capability::TAG
-        if dst_type.meta_type.safe_to_match_as?(infer, @meta_type)
+        if dst_type.meta_type.safe_to_match_as?(ctx, @meta_type)
           return :opaque
         else
           return nil
@@ -458,13 +458,13 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     end
 
     def each_function(ctx)
-      ctx.infer[@reified]
+      ctx.infer.for_type(@reified)
       .all_for_funcs.map(&.reified)
       .flat_map { |rf| ctx.reach.reached_funcs_for(rf) }
     end
 
     def each_function_not_flat(ctx)
-      ctx.infer[@reified]
+      ctx.infer.for_type(@reified)
       .all_for_funcs.map(&.reified)
       .map { |rf| ctx.reach.reached_funcs_for(rf) }
     end
@@ -476,22 +476,22 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
 
   struct Signature
     getter name : String
-    getter receiver : Ref # TODO: add to is_subtype? logic
+    getter receiver : Ref # TODO: add to subtype_of? logic
     getter params : Array(Ref)
     getter ret : Ref
-    getter yield_out : Array(Ref) # TODO: add to is_subtype? logic
+    getter yield_out : Array(Ref) # TODO: add to subtype_of? logic
     # TODO: Add yield_in as well
     def initialize(@name, @receiver, @params, @ret, @yield_out)
     end
 
-    def is_subtype?(infer, other : Signature)
+    def subtype_of?(ctx, other : Signature)
       return false unless name == other.name
       return false unless params.size == other.params.size
       return false unless params.zip(other.params).all? do |param, other_param|
-        infer.is_subtype?(other_param.meta_type, param.meta_type)
+        other_param.meta_type.subtype_of?(ctx, param.meta_type)
       end
       return false unless \
-        infer.is_subtype?(ret.meta_type, other.ret.meta_type)
+        ret.meta_type.subtype_of?(ctx, other.ret.meta_type)
       true
     end
 
@@ -564,7 +564,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
 
       # Reach all functions called by this function.
       infer.each_called_func.each do |called_rt, called_func|
-        handle_func(ctx, ctx.infer[called_rt], called_func)
+        handle_func(ctx, ctx.infer.for_type(called_rt), called_func)
       end
 
       # Reach all functions that have the same name as this function and
@@ -574,8 +574,8 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
         next if infer_type.reified == other_rt
         other_func = other_rt.defn(ctx).find_func?(func.ident.value)
 
-        handle_func(ctx, ctx.infer[other_rt], other_func) \
-          if other_func && infer.is_subtype?(other_rt, infer_type.reified)
+        handle_func(ctx, ctx.infer.for_type(other_rt), other_func) \
+          if other_func && ctx.infer[other_rt].is_subtype_of?(ctx, infer_type.reified)
       end
     end
 
@@ -603,7 +603,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
   def handle_field(ctx, rt : Infer::ReifiedType, func) : {String, Ref}?
     # Reach the metatype of the field.
     ref = nil
-    ctx.infer[rt].all_for_funcs.each do |infer|
+    ctx.infer.for_type(rt).all_for_funcs.each do |infer|
       next unless infer.reified.func(ctx) == func
       # TODO: should we choose a specific reification instead of just taking the final one?
       ref = infer.resolve(func.ident)
@@ -612,7 +612,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     return unless ref
 
     # Handle the field as if it were a function.
-    handle_func(ctx, ctx.infer[rt], func)
+    handle_func(ctx, ctx.infer.for_type(rt), func)
 
     # Return the Ref instance for this meta type.
     {func.ident.value, @refs[ref.not_nil!]}
@@ -659,7 +659,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       abstract_defs[abstract_def] = subtype_defs = [] of Reach::Def
       each_type_def.each do |other_def|
         if other_def != abstract_def \
-        && ctx.infer[other_def.reified].subtyping.check(abstract_def.reified)
+        && ctx.infer[other_def.reified].is_subtype_of?(ctx, abstract_def.reified)
           subtype_defs << other_def
         end
       end
@@ -669,11 +669,11 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     # the corresponding methods in each concrete type that is a subtype of it.
     abstract_defs.each do |abstract_def, subtype_defs|
       subtype_defs.each do |subtype_def|
-        ctx.infer[abstract_def.reified].all_for_funcs.each do |abstract_infer|
+        ctx.infer.for_type(abstract_def.reified).all_for_funcs.each do |abstract_infer|
           abstract_seen = @seen_funcs[abstract_infer.reified]?
           next unless abstract_seen && !abstract_seen.empty?
 
-          ctx.infer[subtype_def.reified].all_for_funcs.each do |subtype_infer|
+          ctx.infer.for_type(subtype_def.reified).all_for_funcs.each do |subtype_infer|
             subtype_seen = @seen_funcs[subtype_infer.reified]?
             next unless subtype_seen && !subtype_seen.empty?
 
@@ -681,10 +681,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
             # corresponding to the current function on the abstract type.
             next unless (abstract_seen.any? do |abstract_func|
               subtype_seen.any? do |subtype_func|
-                subtype_func.signature.is_subtype?(
-                  abstract_infer,
-                  abstract_func.signature,
-                )
+                subtype_func.signature.subtype_of?(ctx, abstract_func.signature)
               end
             end)
 
@@ -719,8 +716,8 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     # Don't assign a new trait id if it is identical to another existing trait
     infer = ctx.infer[new_def.reified]
     identical_def = @defs.values.find do |other_def|
-      infer.is_subtype?(other_def.reified, new_def.reified) \
-      && infer.is_subtype?(new_def.reified, other_def.reified)
+      ctx.infer[other_def.reified].is_subtype_of?(ctx, new_def.reified) \
+      && ctx.infer[new_def.reified].is_subtype_of?(ctx, other_def.reified)
     end
     return identical_def.desc_id if identical_def
 

@@ -393,9 +393,9 @@ struct Mare::Compiler::Infer::MetaType::Union
     false
   end
 
-  def safe_to_match_as?(infer : (ForFunc | ForType), other) : Bool?
+  def safe_to_match_as?(ctx : Context, other) : Bool?
     all_terms.each do |term|
-      case term.safe_to_match_as?(infer, other)
+      case term.safe_to_match_as?(ctx, other)
       when true  then return true
       when false then return false
       when nil   then next
@@ -432,59 +432,59 @@ struct Mare::Compiler::Infer::MetaType::Union
     result
   end
 
-  def subtype_of?(infer : (ForFunc | ForType), other : (Capability | Nominal | AntiNominal | Intersection)) : Bool
+  def subtype_of?(ctx : Context, other : (Capability | Nominal | AntiNominal | Intersection)) : Bool
     # This union is a subtype of the other if and only if
     # all terms in the union are subtypes of that other.
     result = true
-    result &&= caps.not_nil!.all?(&.subtype_of?(infer, other)) if caps
-    result &&= terms.not_nil!.all?(&.subtype_of?(infer, other)) if terms
-    result &&= anti_terms.not_nil!.all?(&.subtype_of?(infer, other)) if anti_terms
-    result &&= intersects.not_nil!.all?(&.subtype_of?(infer, other)) if intersects
+    result &&= caps.not_nil!.all?(&.subtype_of?(ctx, other)) if caps
+    result &&= terms.not_nil!.all?(&.subtype_of?(ctx, other)) if terms
+    result &&= anti_terms.not_nil!.all?(&.subtype_of?(ctx, other)) if anti_terms
+    result &&= intersects.not_nil!.all?(&.subtype_of?(ctx, other)) if intersects
     result
   end
 
-  def supertype_of?(infer : (ForFunc | ForType), other : (Capability | Nominal | AntiNominal | Intersection)) : Bool
+  def supertype_of?(ctx : Context, other : (Capability | Nominal | AntiNominal | Intersection)) : Bool
     # This union is a supertype of the given other if and only if
     # any term in the union qualifies as a supertype of that other.
     result = false
-    result ||= caps.not_nil!.any?(&.supertype_of?(infer, other)) if caps
-    result ||= terms.not_nil!.any?(&.supertype_of?(infer, other)) if terms
-    result ||= anti_terms.not_nil!.any?(&.supertype_of?(infer, other)) if anti_terms
-    result ||= intersects.not_nil!.any?(&.supertype_of?(infer, other)) if intersects
+    result ||= caps.not_nil!.any?(&.supertype_of?(ctx, other)) if caps
+    result ||= terms.not_nil!.any?(&.supertype_of?(ctx, other)) if terms
+    result ||= anti_terms.not_nil!.any?(&.supertype_of?(ctx, other)) if anti_terms
+    result ||= intersects.not_nil!.any?(&.supertype_of?(ctx, other)) if intersects
     result
   end
 
-  def subtype_of?(infer : (ForFunc | ForType), other : Union) : Bool
+  def subtype_of?(ctx : Context, other : Union) : Bool
     # This union is a subtype of the given other union if and only if
     # all terms in the union are subtypes of that other.
     result = true
-    result &&= caps.not_nil!.all?(&.subtype_of?(infer, other)) if caps
-    result &&= terms.not_nil!.all?(&.subtype_of?(infer, other)) if terms
-    result &&= anti_terms.not_nil!.all?(&.subtype_of?(infer, other)) if anti_terms
-    result &&= intersects.not_nil!.all?(&.subtype_of?(infer, other)) if intersects
+    result &&= caps.not_nil!.all?(&.subtype_of?(ctx, other)) if caps
+    result &&= terms.not_nil!.all?(&.subtype_of?(ctx, other)) if terms
+    result &&= anti_terms.not_nil!.all?(&.subtype_of?(ctx, other)) if anti_terms
+    result &&= intersects.not_nil!.all?(&.subtype_of?(ctx, other)) if intersects
     result
   end
 
-  def supertype_of?(infer : (ForFunc | ForType), other : Union) : Bool
-    other.subtype_of?(infer, self) # delegate to the other function via symmetry
+  def supertype_of?(ctx : Context, other : Union) : Bool
+    other.subtype_of?(ctx, self) # delegate to the other function via symmetry
   end
 
-  def subtype_of?(infer : (ForFunc | ForType), other : (Unconstrained | Unsatisfiable)) : Bool
-    other.supertype_of?(infer, self) # delegate to the other class via symmetry
+  def subtype_of?(ctx : Context, other : (Unconstrained | Unsatisfiable)) : Bool
+    other.supertype_of?(ctx, self) # delegate to the other class via symmetry
   end
 
-  def supertype_of?(infer : (ForFunc | ForType), other : (Unconstrained | Unsatisfiable)) : Bool
-    other.subtype_of?(infer, self) # delegate to the other class via symmetry
+  def supertype_of?(ctx : Context, other : (Unconstrained | Unsatisfiable)) : Bool
+    other.subtype_of?(ctx, self) # delegate to the other class via symmetry
   end
 
-  def satisfies_bound?(infer : (ForFunc | ForType), bound) : Bool
+  def satisfies_bound?(ctx : Context, bound) : Bool
     # This union satisfies the given bound if and only if
     # all terms in the union satisfy the bound.
     result = true
-    result &&= caps.not_nil!.all?(&.satisfies_bound?(infer, bound)) if caps
-    result &&= terms.not_nil!.all?(&.satisfies_bound?(infer, bound)) if terms
-    result &&= anti_terms.not_nil!.all?(&.satisfies_bound?(infer, bound)) if anti_terms
-    result &&= intersects.not_nil!.all?(&.satisfies_bound?(infer, bound)) if intersects
+    result &&= caps.not_nil!.all?(&.satisfies_bound?(ctx, bound)) if caps
+    result &&= terms.not_nil!.all?(&.satisfies_bound?(ctx, bound)) if terms
+    result &&= anti_terms.not_nil!.all?(&.satisfies_bound?(ctx, bound)) if anti_terms
+    result &&= intersects.not_nil!.all?(&.satisfies_bound?(ctx, bound)) if intersects
     result
   end
 end
