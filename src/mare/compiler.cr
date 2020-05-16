@@ -12,7 +12,7 @@ module Mare::Compiler
     when :classify       then ctx.run(ctx.classify)
     when :jumps          then ctx.run(ctx.jumps)
     when :inventory      then ctx.run(ctx.inventory)
-    when :infer          then ctx.run(ctx.infer)
+    when :infer          then ctx.run_whole_program(ctx.infer)
     when :privacy        then ctx.run_whole_program(Privacy)
     when :completeness   then ctx.run_whole_program(Completeness)
     when :reach          then ctx.run_whole_program(ctx.reach)

@@ -1,7 +1,7 @@
 require "levenshtein"
 
 ##
-# The purpose of the ForFunc pass is to resolve types. The resolutions of types
+# The purpose of the Infer pass is to resolve types. The resolutions of types
 # are kept as output state available to future passes wishing to retrieve
 # information as to what a given AST node's type is. Additionally, this pass
 # tracks and validates typechecking invariants, and raises compilation errors
@@ -20,7 +20,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     @validated_type_args_already = Set(ReifiedType).new
   end
 
-  def run(ctx, library)
+  def run(ctx)
     # Start by running an instance of inference at the Main.new function,
     # and recurse into checking other functions that are reachable from there.
     # We do this so that errors for reachable functions are shown first.
@@ -44,23 +44,25 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     #   end
     # end
 
-    # For each function in the library, run with a new instance,
+    # For each function in the program, run with a new instance,
     # unless that function has already been reached with an infer instance.
     # We probably reached most of them already by starting from Main.new,
     # so this second pass just takes care of typechecking unreachable functions.
     # This is also where we take care of typechecking for unused partial
     # reifications of all generic type parameters.
-    library.types.each do |t|
-      t_link = t.make_link(library)
-      for_type_each_partial_reification(ctx, t, t_link).each do |infer_type|
-        infer_type.reified.defn(ctx).functions.each do |f|
-          f_link = f.make_link(t_link)
-          for_func(ctx, infer_type.reified, f_link, MetaType.cap(f.cap.value)).run
-        end
+    ctx.program.libraries.each do |library|
+      library.types.each do |t|
+        t_link = t.make_link(library)
+        for_type_each_partial_reification(ctx, t, t_link).each do |infer_type|
+          infer_type.reified.defn(ctx).functions.each do |f|
+            f_link = f.make_link(t_link)
+            for_func(ctx, infer_type.reified, f_link, MetaType.cap(f.cap.value)).run
+          end
 
-        # Check the assertion list for the type, to confirm that it is a subtype
-        # of any it claimed earlier, which we took on faith and now verify.
-        infer_type.subtyping.check_assertions
+          # Check the assertion list for the type, to confirm that it is a subtype
+          # of any it claimed earlier, which we took on faith and now verify.
+          infer_type.subtyping.check_assertions
+        end
       end
     end
 
