@@ -57,6 +57,10 @@ class Mare::Compiler::Lifetime
       @ctx.refer[@reach_func.infer.reified.link]
     end
 
+    def classify
+      @ctx.classify[@reach_func.infer.reified.link]
+    end
+
     def initialize(@ctx, @reach_def, @reach_func)
       @infos_by_node = Hash(AST::Node, Array(Info)).new
       @scopes = [] of Refer::Scope
@@ -142,7 +146,7 @@ class Mare::Compiler::Lifetime
       return unless local.is_a?(Refer::Local)
 
       # When rebinding a var and not using the old value, we free/release it.
-      if !Classify.value_needed?(node) && !local.is_defn_assign?(node)
+      if !classify.value_needed?(node) && !local.is_defn_assign?(node)
         insert(node.lhs, ReleaseFromScope.new(local))
       end
     end

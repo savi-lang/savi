@@ -41,7 +41,6 @@ module Mare::AST
 
   abstract class Node
     getter! pos
-    property flags : UInt64 = 0
 
     def with_pos(pos : Source::Pos)
       @pos = pos

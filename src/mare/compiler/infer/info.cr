@@ -420,7 +420,7 @@ class Mare::Compiler::Infer
 
     def within_domain!(ctx : Context, infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
       infer[@body].within_domain!(ctx, infer, use_pos, constraint_pos, constraint, aliases) \
-        unless Jumps.away?(@body)
+        unless infer.jumps.away?(@body)
 
       infer[@else_body].within_domain!(ctx, infer, use_pos, constraint_pos, constraint, aliases)
     end
@@ -438,7 +438,7 @@ class Mare::Compiler::Infer
 
     def within_domain!(ctx : Context, infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
       clauses.each do |node|
-        next if Jumps.away?(node)
+        next if infer.jumps.away?(node)
 
         infer[node].within_domain!(ctx, infer, use_pos, constraint_pos, constraint, aliases)
       end

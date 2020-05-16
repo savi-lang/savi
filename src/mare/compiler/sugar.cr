@@ -131,7 +131,7 @@ class Mare::Compiler::Sugar < Mare::AST::CopyOnMutateVisitor
     # If this is a constructor, sugar a final "@" reference at the end.
     #
     # This isn't required by the CodeGen pass, but it improves intermediate
-    # analysis such as the Classify.value_needed? flag, since the final
+    # analysis such as the Classify value_needed? flag, since the final
     # expression in a constructor body isn't really used - "@" is returned.
     if f.has_tag?(:constructor) && body
       if body.same?(f.body)

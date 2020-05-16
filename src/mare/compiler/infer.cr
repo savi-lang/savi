@@ -565,6 +565,14 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       ctx.refer[reified.link]
     end
 
+    def classify
+      ctx.classify[reified.link]
+    end
+
+    def jumps
+      ctx.jumps[reified.link]
+    end
+
     def is_subtype?(
       l : ReifiedType,
       r : ReifiedType,
@@ -1139,7 +1147,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
 
     def error_if_type_args_missing(node : AST::Node, rt : ReifiedType)
       # If this node is further qualified, we expect type args to come later.
-      return if Classify.further_qualified?(node)
+      return if classify.further_qualified?(node)
 
       # If this node has no params, no type args are needed.
       params = rt.defn(ctx).params
@@ -1155,7 +1163,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
 
     def visit_children?(ctx, node)
       # Don't visit the children of a type expression root node.
-      return false if Classify.type_expr?(node)
+      return false if classify.type_expr?(node)
 
       # Don't visit children of a dot relation eagerly - wait for touch.
       return false if node.is_a?(AST::Relate) && node.op.value == "."
@@ -1168,7 +1176,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
 
     # This visitor never replaces nodes, it just touches them and returns them.
     def visit(ctx, node)
-      if Classify.type_expr?(node)
+      if classify.type_expr?(node)
         # For type expressions, don't do the usual touch - instead,
         # construct the MetaType and assign it to the new node.
         self[node] = Fixed.new(node.pos, type_expr(node))
@@ -1177,7 +1185,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       end
 
       raise "didn't assign info to: #{node.inspect}" \
-        if Classify.value_needed?(node) && self[node]? == nil
+        if classify.value_needed?(node) && self[node]? == nil
 
       node
     end
@@ -1220,7 +1228,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         self[node] = RaiseError.new(node.pos)
       when Refer::Unresolved
         # Leave the node as unresolved if this identifer is not a value.
-        return if Classify.no_value?(node)
+        return if classify.no_value?(node)
 
         # Otherwise, raise an error to the user:
         Error.at node, "This identifer couldn't be resolved"
@@ -1344,7 +1352,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
           call_ident.value,
           (call_args ? call_args.terms.map(&.itself) : [] of AST::Node),
           (call_args ? call_args.terms.map(&.pos) : [] of Source::Pos),
-          Classify.value_needed?(node),
+          classify.value_needed?(node),
         )
         self[node] = call
 

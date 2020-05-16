@@ -33,6 +33,10 @@ class Mare::Compiler::Verify < Mare::AST::Visitor
     infer_func.reified
   end
 
+  def jumps
+    ctx.jumps[rf.link]
+  end
+
   def run
     func = rf.func(ctx)
     check_function(func)
@@ -44,9 +48,9 @@ class Mare::Compiler::Verify < Mare::AST::Visitor
   def check_function(func)
     func_body = func.body
 
-    if func_body && Jumps.any_error?(func_body)
+    if func_body && jumps.any_error?(func_body)
       if func.has_tag?(:constructor)
-        finder = ErrorFinderVisitor.new(func_body)
+        finder = ErrorFinderVisitor.new(func_body, jumps)
         func_body.accept(ctx, finder)
 
         Error.at func.ident,
@@ -54,8 +58,8 @@ class Mare::Compiler::Verify < Mare::AST::Visitor
           finder.found.map { |pos| {pos, "an error may be raised here"} }
       end
 
-      if !Jumps.any_error?(func.ident)
-        finder = ErrorFinderVisitor.new(func_body)
+      if !jumps.any_error?(func.ident)
+        finder = ErrorFinderVisitor.new(func_body, jumps)
         func_body.accept(ctx, finder)
 
         Error.at func.ident,
@@ -96,7 +100,7 @@ class Mare::Compiler::Verify < Mare::AST::Visitor
 
   # Verify that each try block has at least one possible error case.
   def touch(node : AST::Try)
-    unless node.body.try { |body| Jumps.any_error?(body) }
+    unless node.body.try { |body| jumps.any_error?(body) }
       Error.at node, "This try block is unnecessary", [
         {node.body, "the body has no possible error cases to catch"}
       ]
@@ -131,15 +135,16 @@ class Mare::Compiler::Verify < Mare::AST::Visitor
   # This visitor finds the most specific source positions that may raise errors.
   class ErrorFinderVisitor < Mare::AST::Visitor
     getter found
+    getter jumps : Jumps::Analysis
 
-    def initialize(node : AST::Node)
+    def initialize(node : AST::Node, @jumps)
       @found = [] of Source::Pos
       @deepest = node
     end
 
     # Only visit nodes that may raise an error.
     def visit_any?(ctx, node)
-      Jumps.any_error?(node)
+      @jumps.any_error?(node)
     end
 
     # Before visiting a node's children, mark this node as the deepest.

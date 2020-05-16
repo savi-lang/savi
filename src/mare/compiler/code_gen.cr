@@ -47,6 +47,14 @@ class Mare::Compiler::CodeGen
       @g.ctx.refer[@gfunc.as(GenFunc).link]
     end
 
+    def classify
+      @g.ctx.classify[@gfunc.as(GenFunc).link]
+    end
+
+    def jumps
+      @g.ctx.jumps[@gfunc.as(GenFunc).link]
+    end
+
     @entry_block : LLVM::BasicBlock?
     def entry_block
       @entry_block ||= llvm_func.basic_blocks.append("entry")
@@ -242,7 +250,7 @@ class Mare::Compiler::CodeGen
     def calling_convention(ctx) : Symbol
       list = [] of Symbol
       list << :constructor_cc if func.has_tag?(:constructor)
-      list << :error_cc if Jumps.any_error?(func.ident)
+      list << :error_cc if infer.jumps.any_error?(func.ident)
       list << :yield_cc if ctx.inventory[link].yield_count > 0
 
       return :simple_cc if list.empty?
@@ -862,7 +870,7 @@ class Mare::Compiler::CodeGen
       last_value = gen_assign_cast(last_value, return_type, last_expr) if last_expr
     end
 
-    unless Jumps.away?(gfunc.func.body.not_nil!)
+    unless func_frame.jumps.away?(gfunc.func.body.not_nil!)
       case gfunc.calling_convention(ctx)
       when :constructor_cc
         @builder.ret
@@ -2023,7 +2031,7 @@ class Mare::Compiler::CodeGen
     # "not needed" tags on expressions, if this expression is tagged as such,
     # we return a fake value instead of the evaluation of the expression,
     # expecting that later LLVM actions will fail loudly if this value is used.
-    return gen_value_not_needed unless Classify.value_needed?(expr)
+    return gen_value_not_needed unless func_frame.classify.value_needed?(expr)
 
     value
   end
@@ -2604,8 +2612,8 @@ class Mare::Compiler::CodeGen
         # jumping to the post block using the `br` instruction, where we will
         # carry the value we just generated as one of the possible phi values.
         value = gen_expr(fore[1])
-        unless Jumps.away?(fore[1])
-          if Classify.value_needed?(expr)
+        unless func_frame.jumps.away?(fore[1])
+          if func_frame.classify.value_needed?(expr)
             value = gen_assign_cast(value, phi_type, fore[1])
             phi_blocks << @builder.insert_block
             phi_values << value
@@ -2637,8 +2645,8 @@ class Mare::Compiler::CodeGen
       # Generate code for the final case block using exactly the same strategy
       # that we used when we generated case blocks inside the loop above.
       value = gen_expr(expr.list.last[1])
-      unless Jumps.away?(expr.list.last[1])
-        if Classify.value_needed?(expr)
+      unless func_frame.jumps.away?(expr.list.last[1])
+        if func_frame.classify.value_needed?(expr)
           value = gen_assign_cast(value, phi_type, expr.list.last[1])
           phi_blocks << @builder.insert_block
           phi_values << value
@@ -2648,7 +2656,7 @@ class Mare::Compiler::CodeGen
     end
 
     # When we jump away, we can't generate the post block.
-    if Jumps.away?(expr)
+    if func_frame.jumps.away?(expr)
       post_block.delete
       return gen_none
     end
@@ -2656,7 +2664,7 @@ class Mare::Compiler::CodeGen
     # Here at the post block, we receive the value that was returned by one of
     # the cases above, using the LLVM mechanism called a "phi" instruction.
     @builder.position_at_end(post_block)
-    if Classify.value_needed?(expr)
+    if func_frame.classify.value_needed?(expr)
       @builder.phi(llvm_type_of(phi_type), phi_blocks, phi_values, "phi_choice")
     else
       gen_none
@@ -2687,10 +2695,10 @@ class Mare::Compiler::CodeGen
     # If the cond is true, repeat the body block; otherwise, go to post block.
     @builder.position_at_end(body_block)
     body_value = gen_expr(expr.body)
-    unless Jumps.away?(expr.body)
+    unless func_frame.jumps.away?(expr.body)
       cond_value = gen_expr(expr.cond)
 
-      if Classify.value_needed?(expr)
+      if func_frame.classify.value_needed?(expr)
         body_value = gen_assign_cast(body_value, phi_type, expr.body)
         phi_blocks << @builder.insert_block
         phi_values << body_value
@@ -2702,8 +2710,8 @@ class Mare::Compiler::CodeGen
     # Then skip straight to the post block.
     @builder.position_at_end(else_block)
     else_value = gen_expr(expr.else_body)
-    unless Jumps.away?(expr.else_body)
-      if Classify.value_needed?(expr)
+    unless func_frame.jumps.away?(expr.else_body)
+      if func_frame.classify.value_needed?(expr)
         else_value = gen_assign_cast(else_value, phi_type, expr.else_body)
         phi_blocks << @builder.insert_block
         phi_values << else_value
@@ -2712,7 +2720,7 @@ class Mare::Compiler::CodeGen
     end
 
     # When we jump away, we can't generate the post block.
-    if Jumps.away?(expr)
+    if func_frame.jumps.away?(expr)
       post_block.delete
       return gen_none
     end
@@ -2720,7 +2728,7 @@ class Mare::Compiler::CodeGen
     # Here at the post block, we receive the value that was returned by one of
     # the bodies above, using the LLVM mechanism called a "phi" instruction.
     @builder.position_at_end(post_block)
-    if Classify.value_needed?(expr)
+    if func_frame.classify.value_needed?(expr)
       @builder.phi(llvm_type_of(phi_type), phi_blocks, phi_values, "phi_loop")
     else
       gen_none
@@ -2749,7 +2757,7 @@ class Mare::Compiler::CodeGen
     # Then continue to the post block.
     @builder.position_at_end(body_block)
     body_value = gen_expr(expr.body)
-    unless Jumps.away?(expr.body)
+    unless func_frame.jumps.away?(expr.body)
       body_value = gen_assign_cast(body_value, phi_type, expr.body)
       phi_blocks << @builder.insert_block
       phi_values << body_value
@@ -2777,7 +2785,7 @@ class Mare::Compiler::CodeGen
 
     # Generate the body code of the else clause, then proceed to the post block.
     else_value = gen_expr(expr.else_body)
-    unless Jumps.away?(expr.else_body)
+    unless func_frame.jumps.away?(expr.else_body)
       else_value = gen_assign_cast(else_value, phi_type, expr.else_body)
       phi_blocks << @builder.insert_block
       phi_values << else_value

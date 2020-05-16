@@ -1,35 +1,40 @@
 class Mare::Compiler::Context
   getter program
   getter import
-  getter namespace
-  getter refer_type
-  getter inventory
-  getter infer
-  getter refer
-  getter reach
-  getter paint
+
+  getter classify
   getter code_gen
-  getter lifetime
   getter code_gen_verona
   getter eval
+  getter infer
+  getter inventory
+  getter jumps
+  getter lifetime
+  getter namespace
+  getter paint
+  getter reach
+  getter refer
+  getter refer_type
   getter serve_hover
 
   def initialize
     @program = Program.new
     @stack = [] of Interpreter
 
-    @import = Import.new
-    @namespace = Namespace.new
-    @refer_type = ReferType::Pass.new
-    @inventory = Inventory::Pass.new
-    @infer = Infer.new
-    @refer = Refer::Pass.new
-    @reach = Reach.new
-    @paint = Paint.new
+    @classify = Classify::Pass.new
     @code_gen = CodeGen.new(CodeGen::PonyRT)
-    @lifetime = Lifetime.new
     @code_gen_verona = CodeGen.new(CodeGen::VeronaRT)
     @eval = Eval.new
+    @import = Import.new
+    @infer = Infer.new
+    @inventory = Inventory::Pass.new
+    @jumps = Jumps::Pass.new
+    @lifetime = Lifetime.new
+    @namespace = Namespace.new
+    @paint = Paint.new
+    @reach = Reach.new
+    @refer = Refer::Pass.new
+    @refer_type = ReferType::Pass.new
     @serve_hover = ServeHover.new
   end
 
