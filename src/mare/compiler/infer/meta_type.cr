@@ -223,7 +223,13 @@ struct Mare::Compiler::Infer::MetaType
     nominal =
       case inner
       when Nominal then inner
-      when Intersection then inner.terms.try(&.first?)
+      when Intersection then
+        terms = inner.terms
+        if terms
+          terms.find { |t| defn = t.defn; defn.is_a?(ReifiedType) && defn.link.is_concrete? } \
+          || terms.find { |t| t.defn.is_a?(ReifiedType) } \
+          || terms.first
+        end
       else nil
       end
     nominal if nominal && nominal.defn.is_a?(ReifiedType)

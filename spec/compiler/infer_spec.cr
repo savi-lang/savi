@@ -2160,7 +2160,7 @@ describe Mare::Compiler::Infer do
       :fun non example String: "Hello, World!"
 
     :actor Main
-      :fun maybe_call_example (e Any'non)
+      :fun maybe_call_example (e non)
         if (e <: Exampleable) e.example
       :new
         @maybe_call_example(Example)
@@ -2175,6 +2175,11 @@ describe Mare::Compiler::Infer do
     any_rt = ctx.infer[any].no_args
     trait_rt = ctx.infer[trait].no_args
     sub_rt = ctx.infer[sub].no_args
+
+    mce_t, mce_f, mce_infer =
+      ctx.infer.test_simple!(ctx, source, "Main", "maybe_call_example")
+    e_param = mce_f.params.not_nil!.terms.first.not_nil!
+    mce_infer.resolve(e_param).single!.should eq any_rt
 
     any_subtypes = ctx.infer[any_rt].each_known_complete_subtype(ctx).to_a
     trait_subtypes = ctx.infer[trait_rt].each_known_complete_subtype(ctx).to_a

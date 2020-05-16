@@ -315,6 +315,18 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     @types[rt]?.try(&.analysis)
   end
 
+  # This is only for use in testing.
+  def test_simple!(ctx, source, t_name, f_name)
+    t_link = ctx.namespace.in_source(source, t_name).as(Program::Type::Link)
+    t = t_link.resolve(ctx)
+    f = t.find_func!(f_name)
+    f_link = f.make_link(t_link)
+    rt = self[t_link].no_args
+    rf = self[f_link].each_reified_func(rt).first
+    infer = self[rf]
+    {t, f, infer}
+  end
+
   def for_type_partial_reifications(ctx, t, t_link, no_args_rt, refer)
     return [] of ReifiedType if 0 == (t.params.try(&.terms.size) || 0)
 
@@ -895,14 +907,16 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
 
       # Assign the resolved types to a map for safekeeping.
       # This also has the effect of running some final checks on everything.
+      # TODO: Is it possible to remove the simplify calls here?
+      # Is it actually a significant performance impact or not?
       @analysis.each_info.each do |node, info|
-        @analysis.resolved[node] ||= info.resolve!(ctx, self)
+        @analysis.resolved[node] ||= info.resolve!(ctx, self).simplify(ctx)
       end
       if (info = @yield_in_info; info)
-        @analysis.yield_in_resolved = info.resolve!(ctx, self)
+        @analysis.yield_in_resolved = info.resolve!(ctx, self).simplify(ctx)
       end
       @analysis.yield_out_resolved = @yield_out_infos.map do |info|
-        info.resolve!(ctx, self)
+        info.resolve!(ctx, self).simplify(ctx)
       end
       @analysis.ret_resolved = @analysis.resolved[ret]
 

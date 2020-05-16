@@ -237,8 +237,10 @@ class Mare::Compiler::Infer
             .strip_ephemeral
           )
         else
-          # If we have no upstreams and an explicit cap, return it.
-          return explicit
+          # If we have no upstreams and an explicit cap, return
+          # the empty trait called `Any` intersected with that cap.
+          any = MetaType.new_nominal(infer.reified_type(infer.prelude_type("Any")))
+          return any.intersect(explicit)
         end
       elsif !@upstreams.empty?
         # If we only have upstreams to go on, return the first upstream type.

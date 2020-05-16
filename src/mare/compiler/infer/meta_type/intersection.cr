@@ -365,12 +365,30 @@ struct Mare::Compiler::Infer::MetaType::Intersection
     # it doesn't factor into us considering whether we're a subtype of
     # the given nominal or not - a nominal says nothing about capabilities.
 
-    # This intersection is a subtype of the given nominal if and only if
-    # all terms in the intersection are a supertype of that nominal.
-    result = true
-    result &&= terms.not_nil!.all?(&.subtype_of?(ctx, other)) if terms
-    result &&= anti_terms.not_nil!.all?(&.subtype_of?(ctx, other)) if anti_terms
-    result
+    # We don't handle anti-terms here yet. Error if they are present.
+    raise NotImplementedError.new("intersection subtyping with anti terms") \
+      if anti_terms
+
+    # If we get this far, we know the intersections has at least one term.
+    terms = terms().not_nil!
+
+    # This intersection is a subtype of the given nominal if any one term
+    # in the intersection is a subtype of that nominal.
+    # This is a sufficient condition, but not a necessary one;
+    # there are theoretically other ways to succeed if we fail this check.
+    return true if terms.any?(&.subtype_of?(ctx, other))
+
+    # If we only had one term, and it failed the above check, then we know we
+    # have failed overall; it's only possible to still succeed if we have
+    # multiple terms to work with here.
+    return false if terms.size == 1
+
+    # However we have not yet implemented this logic.
+    # TODO: we may have to do something subtle here when dealing with
+    # subtyping of intersections of traits, where multiple traits
+    # get inlined into a single composite trait so that they can be
+    # properly compared while taking it all simultaneously into account.
+    raise NotImplementedError.new("#{self} <: #{other}")
   end
 
   def supertype_of?(ctx : Context, other : Nominal) : Bool
@@ -378,12 +396,16 @@ struct Mare::Compiler::Infer::MetaType::Intersection
     # other, because a nominal says nothing about capabilities.
     return false if cap
 
+    # We don't handle anti-terms here yet. Error if they are present.
+    raise NotImplementedError.new("intersection supertyping with anti terms") \
+      if anti_terms
+
+    # If we get this far, we know the intersections has at least one term.
+    terms = terms().not_nil!
+
     # This intersection is a supertype of the given nominal if and only if
     # all terms in the intersection are a supertype of that nominal.
-    result = true
-    result &&= terms.not_nil!.all?(&.supertype_of?(ctx, other)) if terms
-    result &&= anti_terms.not_nil!.all?(&.supertype_of?(ctx, other)) if anti_terms
-    result
+    terms.all?(&.supertype_of?(ctx, other))
   end
 
   def subtype_of?(ctx : Context, other : AntiNominal) : Bool
@@ -401,24 +423,33 @@ struct Mare::Compiler::Infer::MetaType::Intersection
       !cap.not_nil!.subtype_of?(ctx, other.cap.not_nil!)
     )
 
-    # Next, we'll look at each term we have.
-    terms.try(&.each do |term|
-      # The term must be a subtype of all terms in the other.
-      # TODO: we may have to do something more subtle here when dealing with
-      # subtyping of intersections of traits, where multiple traits
-      # get inlined into a single composite trait so that they can be
-      # properly compared while taking it all simultaneously into account.
-      return false \
-        if other.terms && !other.terms.not_nil!.all?(&.supertype_of?(ctx, term))
+    # We don't handle anti-terms here yet. Error if they are present.
+    raise NotImplementedError.new("intersection subtyping with anti terms") \
+      if anti_terms || other.anti_terms
 
-      raise NotImplementedError.new("intersection subtyping with anti terms") \
-        if other.anti_terms
-    end)
+    # If we get this far, we know both intersections have at least one term.
+    terms = terms().not_nil!
+    other_terms = other.terms.not_nil!
 
-    # Next, we'll look at each anti-term we have.
-    anti_terms.try(&.each do |anti_term|
-      raise NotImplementedError.new("intersection subtyping with anti terms")
-    end)
+    # If we have at least one term that is a subtype of all terms of other,
+    # then we know the whole intersection is a subtype of the other.
+    # This is a sufficient condition, but not a necessary one;
+    # there are theoretically other ways to succeed if we fail this check.
+    return true if terms.any? do |term|
+      other_terms.all?(&.supertype_of?(ctx, term))
+    end
+
+    # If we only had one term, and it failed the above check, then we know we
+    # have failed overall; it's only possible to still succeed if we have
+    # multiple terms to work with here.
+    return false if terms.size == 1
+
+    # However we have not yet implemented this logic.
+    # TODO: we may have to do something subtle here when dealing with
+    # subtyping of intersections of traits, where multiple traits
+    # get inlined into a single composite trait so that they can be
+    # properly compared while taking it all simultaneously into account.
+    raise NotImplementedError.new("#{self} <: #{other}")
 
     # If we reach this point, we've passed all checks. Congratulations!
     true
