@@ -208,6 +208,7 @@ class Mare::Compiler::CodeGen
   end
 
   class GenFunc
+    getter func : Program::Function
     getter reach_func : Reach::Func
     getter! vtable_index : Int32
     getter llvm_name : String
@@ -225,9 +226,10 @@ class Mare::Compiler::CodeGen
     property! after_yield_blocks : Array(LLVM::BasicBlock)
 
     def initialize(ctx, @reach_func, @vtable_index)
+      @func = @reach_func.reified.link.resolve(ctx)
       @needs_receiver = type_def.has_state?(ctx) && !(func.cap.value == "non")
 
-      @llvm_name = "#{type_def.llvm_name}#{infer.reified.name}"
+      @llvm_name = "#{type_def.llvm_name}#{@reach_func.reified.name}"
       @llvm_name = "#{@llvm_name}.HYGIENIC" if link.hygienic_id
     end
 
@@ -240,17 +242,13 @@ class Mare::Compiler::CodeGen
     end
 
     def link
-      infer.reified.link
-    end
-
-    def func
-      infer.func
+      @reach_func.reified.link
     end
 
     def calling_convention(ctx) : Symbol
       list = [] of Symbol
       list << :constructor_cc if func.has_tag?(:constructor)
-      list << :error_cc if infer.jumps.any_error?(func.ident)
+      list << :error_cc if ctx.jumps[link].any_error?(func.ident)
       list << :yield_cc if ctx.inventory[link].yield_count > 0
 
       return :simple_cc if list.empty?

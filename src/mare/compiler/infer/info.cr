@@ -553,6 +553,10 @@ class Mare::Compiler::Infer
     @ret : MetaType?
     @ret_pos : Source::Pos? # TODO: remove?
 
+    # TODO: Can this property be removed, or can it be reduced to not expose
+    # the MetaType::Inner or the Program::Function (prefer Program::Function::Link)
+    property! call_defns : Set(Tuple(MetaType::Inner, ReifiedType?, Program::Function?))
+
     def initialize(@pos, @lhs, @member, @args, @args_pos, @ret_value_used)
     end
 
@@ -624,7 +628,7 @@ class Mare::Compiler::Infer
         f = rt.defn(ctx).find_func!(f_name)
         f_link = f.make_link(rt.link)
         ctx.infer.for_func(ctx, rt, f_link, MetaType.cap(f.cap.value)).run
-        infer.extra_called_func!(rt, f)
+        infer.extra_called_func!(rt, f_link)
       end
 
       mt

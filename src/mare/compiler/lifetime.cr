@@ -39,7 +39,7 @@ class Mare::Compiler::Lifetime
       reach_def.each_function(ctx).each do |reach_func|
         for_func = ForFunc.new(ctx, reach_def, reach_func)
 
-        func = reach_func.infer.reified.func(ctx)
+        func = reach_func.reified.func(ctx)
         func.params.try(&.accept(ctx, for_func))
         func.body.try(&.accept(ctx, for_func))
 
@@ -54,11 +54,11 @@ class Mare::Compiler::Lifetime
     @reach_func : Reach::Func
 
     def refer
-      @ctx.refer[@reach_func.infer.reified.link]
+      @ctx.refer[@reach_func.reified.link]
     end
 
     def classify
-      @ctx.classify[@reach_func.infer.reified.link]
+      @ctx.classify[@reach_func.reified.link]
     end
 
     def initialize(@ctx, @reach_def, @reach_func)

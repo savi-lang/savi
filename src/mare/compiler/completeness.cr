@@ -12,11 +12,17 @@
 # This pass produces no output state.
 #
 module Mare::Compiler::Completeness
-  def self.run(ctx)
-    ctx.infer.for_non_argumented_types(ctx).each do |infer_type|
-      branch_cache = {} of Tuple(Set(String), Infer::ReifiedFunction) => Branch
-      infer_type.all_for_funcs.each do |infer_func|
-        check_constructor(ctx, infer_type.reified, infer_func.reified, branch_cache)
+  def self.run(ctx, library)
+    library.types.each do |t|
+      t_link = t.make_link(library)
+      ctx.infer[t_link].each_non_argumented_reified.each do |rt|
+        branch_cache = {} of Tuple(Set(String), Infer::ReifiedFunction) => Branch
+        t.functions.each do |f|
+          f_link = f.make_link(t_link)
+          ctx.infer[f_link].each_reified_func(rt).each do |rf|
+            check_constructor(ctx, rt, rf, branch_cache)
+          end
+        end
       end
     end
   end

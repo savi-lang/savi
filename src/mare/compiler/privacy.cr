@@ -10,26 +10,31 @@
 # This pass produces no output state.
 #
 class Mare::Compiler::Privacy < Mare::AST::Visitor
-  def self.run(ctx)
-    ctx.infer.for_non_argumented_types(ctx).each do |infer_type|
-      infer_type.all_for_funcs.each do |infer_func|
-        privacy = new(ctx, infer_func)
-        func = infer_func.reified.func(ctx)
-        func.params.try(&.accept(ctx, privacy))
-        func.body.try(&.accept(ctx, privacy))
+  def self.run(ctx, library)
+    library.types.each do |t|
+      t_link = t.make_link(library)
+      ctx.infer[t_link].each_non_argumented_reified.each do |rt|
+        t.functions.each do |f|
+          f_link = f.make_link(t_link)
+          ctx.infer[f_link].each_reified_func(rt).each do |rf|
+            infer = ctx.infer[rf]
+
+            visitor = new(infer)
+
+            f.params.try(&.accept(ctx, visitor))
+            f.body.try(&.accept(ctx, visitor))
+          end
+        end
       end
     end
   end
 
-  private getter ctx : Context
-  getter infer : Infer::ForFunc
-
-  def initialize(@ctx, @infer)
+  def initialize(@infer : Infer::ReifiedFuncAnalysis)
   end
 
   # This visitor never replaces nodes, it just touches them and returns them.
   def visit(ctx, node)
-    touch(node)
+    touch(ctx, node)
 
     node
   end
@@ -38,10 +43,10 @@ class Mare::Compiler::Privacy < Mare::AST::Visitor
     # Don't visit children of groups marked by the type checker as unreachable.
     # This keeps us from trying to deal with branches of Choices that have
     # not been typechecked and thus have no call resolution for private calls.
-    !infer[node]?.is_a?(Infer::Unreachable)
+    !@infer[node]?.is_a?(Infer::Unreachable)
   end
 
-  def touch(node : AST::Relate)
+  def touch(ctx, node : AST::Relate)
     # Only handle function calls (dot relations).
     return unless node.op.value == "."
 
@@ -60,10 +65,7 @@ class Mare::Compiler::Privacy < Mare::AST::Visitor
     # collecting a list of problematic definitions for this call
     # (those whose library reference isn't the same as that of the call site).
     problems = [] of {Source::Pos, String}
-    infer
-    .resolve(node.lhs)
-    .find_callable_func_defns(ctx, infer, call_ident.value)
-    .each do |(_, _, call_func)|
+    @infer[node].as(Infer::FromCall).call_defns.each do |(_, _, call_func)|
       call_func_pos = call_func.not_nil!.ident.pos
       if call_library != call_func_pos.source.library
         problems << {call_func_pos,
@@ -77,7 +79,7 @@ class Mare::Compiler::Privacy < Mare::AST::Visitor
         unless problems.empty?
   end
 
-  def touch(node : AST::Node)
+  def touch(ctx, node : AST::Node)
     # Do nothing for all other AST::Nodes.
   end
 end

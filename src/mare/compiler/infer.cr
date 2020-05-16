@@ -15,11 +15,11 @@ require "levenshtein"
 #
 class Mare::Compiler::Infer < Mare::AST::Visitor
   struct TypeAnalysis
-    private getter base
+    getter no_args
     protected getter partial_reifieds
     protected getter reached_fully_reifieds # TODO: populate this during the pass
 
-    def initialize(@base : ReifiedType)
+    def initialize(@no_args : ReifiedType)
       @partial_reifieds = [] of ReifiedType
       @reached_fully_reifieds = [] of ReifiedType
     end
@@ -28,10 +28,23 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     def each_reached_fully_reified; @reached_fully_reifieds.each; end
     def each_non_argumented_reified
       if @partial_reifieds.empty?
-        [@base].each
+        [@no_args].each
       else
         @partial_reifieds.each
       end
+    end
+  end
+
+  struct FuncAnalysis
+    def initialize(@link : Program::Function::Link)
+      @reified_funcs = {} of ReifiedType => Set(ReifiedFunction)
+    end
+
+    def each_reified_func(rt : ReifiedType)
+      @reified_funcs[rt]?.try(&.each) || ([] of ReifiedFunction).each
+    end
+    protected def observe_reified_func(rf)
+      (@reified_funcs[rf.type] ||= Set(ReifiedFunction).new).add(rf)
     end
   end
 
@@ -48,17 +61,27 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   end
 
   struct ReifiedFuncAnalysis
-    def initialize
-      @infos = {} of AST::Node => Info
+    protected getter resolved
+    protected getter called_funcs
+    getter! ret_resolved : MetaType; protected setter ret_resolved
+    getter! yield_in_resolved : MetaType; protected setter yield_in_resolved
+    getter! yield_out_resolved : Array(MetaType); protected setter yield_out_resolved
+
+    def initialize(ctx : Context, @rf : ReifiedFunction)
+      f = @rf.link.resolve(ctx)
+
+      @is_constructor = f.has_tag?(:constructor).as(Bool)
       @redirects = {} of AST::Node => AST::Node
+      @infos = {} of AST::Node => Info
+      @resolved = {} of AST::Node => MetaType
+      @called_funcs = Set({ReifiedType, Program::Function::Link}).new
     end
 
-    def [](node : AST::Node); @infos[follow_redirects(node)]; end
-    def []?(node : AST::Node); @infos[follow_redirects(node)]?; end
-    protected def []=(node, info); @infos[follow_redirects(node)] = info; end
-    def each_info; @infos.each; end
+    def reified
+      @rf
+    end
 
-    def redirect(from : AST::Node, to : AST::Node)
+    protected def redirect(from : AST::Node, to : AST::Node)
       return if from == to # TODO: raise an error?
 
       @redirects[from] = to
@@ -71,10 +94,39 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
 
       node
     end
+
+    def [](node : AST::Node); @infos[follow_redirects(node)]; end
+    def []?(node : AST::Node); @infos[follow_redirects(node)]?; end
+    protected def []=(node, info); @infos[follow_redirects(node)] = info; end
+    def each_info; @infos.each; end
+
+    # TODO: rename as [] and rename [] to info_for or similar.
+    def resolve(node : AST::Node)
+      @resolved[follow_redirects(node)]
+    end
+
+    def resolved_self_cap : MetaType
+      @is_constructor ? MetaType.cap("ref") : @rf.receiver_cap
+    end
+
+    def resolved_self
+      MetaType.new(@rf.type).override_cap(resolved_self_cap)
+    end
+
+    def each_meta_type(&block)
+      yield @rf.receiver
+      yield resolved_self
+      @resolved.each_value { |mt| yield mt }
+    end
+
+    def each_called_func
+      @called_funcs.each
+    end
   end
 
   def initialize
     @t_analyses = {} of Program::Type::Link => TypeAnalysis
+    @f_analyses = {} of Program::Function::Link => FuncAnalysis
     @map = {} of ReifiedFunction => ForFunc
     @types = {} of ReifiedType => ForType
   end
@@ -136,6 +188,18 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     @t_analyses[t_link]?
   end
 
+  def [](f_link : Program::Function::Link)
+    @f_analyses[f_link]
+  end
+
+  def []?(f_link : Program::Function::Link)
+    @f_analyses[f_link]?
+  end
+
+  protected def get_or_create_analysis(f_link : Program::Function::Link)
+    @f_analyses[f_link] ||= FuncAnalysis.new(f_link)
+  end
+
   def [](rf : ReifiedFunction)
     @map[rf].analysis
   end
@@ -153,13 +217,13 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   end
 
   # TODO: make protected def
-  def for_type(rt : ReifiedType)
-    @types[rt]
+  def for_func(rf : ReifiedFunction)
+    @map[rf]
   end
 
   # TODO: make protected def
-  def for_type?(rt : ReifiedType)
-    @types[rt]?
+  def for_func?(rf : ReifiedFunction)
+    @map[rf]?
   end
 
   def for_type_partial_reifications(ctx, t, t_link, no_args_rt, refer)
@@ -170,7 +234,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         # Get the MetaType of the bound.
         param_ref = refer[param].as(Refer::TypeParam)
         bound_node = param_ref.bound
-        bound_mt = self.for_type(no_args_rt).type_expr(bound_node, refer)
+        bound_mt = self.for_type(ctx, no_args_rt).type_expr(bound_node, refer)
 
         # TODO: Refactor the partial_reifications to return cap only already.
         caps = bound_mt.partial_reifications.map(&.cap_only)
@@ -220,10 +284,9 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   ) : ForFunc
     mt = MetaType.new(rt).override_cap(cap).strip_ephemeral
     rf = ReifiedFunction.new(rt, f, mt)
-    for_type = self.for_type(rt)
     @map[rf] ||= (
-      ForFunc.new(ctx, ReifiedFuncAnalysis.new, for_type, rf)
-      .tap { |ff| for_type.all_for_funcs.add(ff) }
+      ForFunc.new(ctx, ReifiedFuncAnalysis.new(ctx, rf), @types[rt], rf)
+      .tap { get_or_create_analysis(f).observe_reified_func(rf) }
     )
   end
 
@@ -252,17 +315,9 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     )
   end
 
+  # TODO: Remove this function and refactor the things that call it.
   def for_completely_reified_types(ctx)
     @types.each_value.select(&.reified.is_complete?(ctx)).to_a
-  end
-
-  def for_non_argumented_types(ctx)
-    # Skip fully-reified generic types - we will only check generics types
-    # that have been only partially reified and non-generic types.
-    @types
-    .each_value
-    .select { |ft| !(ft.reified.has_params?(ctx) && ft.reified.is_complete?(ctx)) }
-    .to_a
   end
 
   def validate_type_args(
@@ -298,7 +353,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       # Skip checking type arguments that contain type parameters.
       next unless arg.type_params.empty?
 
-      param_bound = ctx.infer.for_type(rt).get_type_param_bound(index)
+      param_bound = @types[rt].get_type_param_bound(index)
       unless arg.satisfies_bound?(ctx, param_bound)
         bound_pos =
           rt_defn.params.not_nil!.terms[index].as(AST::Group).terms.last.pos
@@ -388,10 +443,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     getter analysis : ReifiedTypeAnalysis
     getter reified : ReifiedType
     getter precursor : (ForType | ForFunc)?
-    getter all_for_funcs
 
     def initialize(@ctx, @analysis, @reified, @precursor = nil)
-      @all_for_funcs = Set(ForFunc).new
       @type_param_refinements = {} of Refer::TypeParam => Array(MetaType)
     end
 
@@ -561,8 +614,6 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       @local_idents = Hash(Refer::Local, AST::Node).new
       @local_ident_overrides = Hash(AST::Node, AST::Node).new
       @redirects = Hash(AST::Node, AST::Node).new
-      @resolved = Hash(AST::Node, MetaType).new
-      @called_funcs = Set({ReifiedType, Program::Function}).new
       @already_ran = false
       @yield_out_infos = [] of Local
     end
@@ -601,21 +652,11 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
 
     def resolve(node) : MetaType
-      @resolved[node] ||= self[node].resolve!(ctx, self)
-    end
-
-    def each_meta_type(&block)
-      yield reified.receiver
-      yield resolved_self
-      @resolved.each_value { |mt| yield mt }
-    end
-
-    def each_called_func
-      @called_funcs.each
+      @analysis.resolved[node] ||= self[node].resolve!(ctx, self)
     end
 
     def extra_called_func!(rt, f)
-      @called_funcs.add({rt, f})
+      @analysis.called_funcs.add({rt, f})
     end
 
     def run
@@ -756,8 +797,15 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       # Assign the resolved types to a map for safekeeping.
       # This also has the effect of running some final checks on everything.
       @analysis.each_info.each do |node, info|
-        @resolved[node] ||= info.resolve!(ctx, self)
+        @analysis.resolved[node] ||= info.resolve!(ctx, self)
       end
+      if (info = @yield_in_info; info)
+        @analysis.yield_in_resolved = info.resolve!(ctx, self)
+      end
+      @analysis.yield_out_resolved = @yield_out_infos.map do |info|
+        info.resolve!(ctx, self)
+      end
+      @analysis.ret_resolved = @analysis.resolved[ret]
 
       nil
     end
@@ -765,6 +813,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     def follow_call_get_call_defns(call : FromCall)
       receiver = self[call.lhs].resolve!(ctx, self)
       call_defns = receiver.find_callable_func_defns(ctx, self, call.member)
+      call.call_defns = call_defns
 
       # Raise an error if we don't have a callable function for every possibility.
       call_defns << {receiver.inner, nil, nil} if call_defns.empty?
@@ -931,7 +980,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
 
         # Finally, check that the type of the result of the yield block,
         # but don't bother if it has a type requirement of None.
-        yield_in_resolved = infer.yield_in_resolved
+        yield_in_resolved = infer.analysis.yield_in_resolved
         none = MetaType.new(reified_type(prelude_type("None")))
         if yield_in_resolved != none
           self[yield_block].within_domain!(
@@ -1008,7 +1057,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         call_func_link = call_func.make_link(call_defn.link)
 
         # Keep track that we called this function.
-        @called_funcs.add({call_defn, call_func})
+        @analysis.called_funcs.add({call_defn, call_func_link})
 
         required_cap, reify_cap, autorecover_needed =
           follow_call_check_receiver_cap(call, call_mt, call_func, problems)
@@ -1048,22 +1097,14 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       field_func_link = field_func.make_link(reified.type.link)
 
       # Keep track that we touched this "function".
-      @called_funcs.add({reified.type, field_func})
+      @analysis.called_funcs.add({reified.type, field_func_link})
 
       # Get the ForFunc instance for field_func, possibly creating and running it.
-      infer = ctx.infer.for_func(ctx, reified.type, field_func_link, resolved_self_cap).tap(&.run)
+      infer = ctx.infer.for_func(ctx, reified.type, field_func_link, @analysis.resolved_self_cap).tap(&.run)
 
       # Apply constraints to the return type.
       ret = infer[infer.ret]
       field.set_explicit(ret.pos, ret.resolve!(ctx, infer))
-    end
-
-    def resolved_self_cap : MetaType
-      func.has_tag?(:constructor) ? MetaType.cap("ref") : reified.receiver_cap
-    end
-
-    def resolved_self
-      MetaType.new(reified.type).override_cap(resolved_self_cap)
     end
 
     def prelude_type(name)
@@ -1095,14 +1136,6 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       end
 
       node
-    end
-
-    def yield_out_resolved
-      yield_out_infos.map(&.resolve!(ctx, self))
-    end
-
-    def yield_in_resolved
-      yield_in_info.not_nil!.resolve!(ctx, self)
     end
 
     def error_if_type_args_missing(node : AST::Node, mt : MetaType)
@@ -1190,7 +1223,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
           @local_idents[ref] = node
         end
       when Refer::Self
-        @analysis[node] = Self.new(node.pos, resolved_self)
+        @analysis[node] = Self.new(node.pos, @analysis.resolved_self)
       when Refer::RaiseError
         @analysis[node] = RaiseError.new(node.pos)
       when Refer::Unresolved
@@ -1283,7 +1316,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
 
     def touch(node : AST::FieldRead)
       field = Field.new(node.pos)
-      @analysis[node] = FieldRead.new(field, resolved_self)
+      @analysis[node] = FieldRead.new(field, @analysis.resolved_self)
       follow_field(field, node.value)
     end
 
@@ -1440,7 +1473,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
           next if f.has_tag?(:hygienic) || f.body.nil?
           f_link = f.make_link(reflect_rt.link)
           ctx.infer.for_func(ctx, reflect_rt, f_link, MetaType.cap(f.cap.value)).tap(&.run)
-          extra_called_func!(reflect_rt, f)
+          extra_called_func!(reflect_rt, f_link)
         end
 
         rt = reified_type(prelude_type("ReflectionOfType"), [reflect_mt])

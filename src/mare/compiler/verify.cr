@@ -10,42 +10,36 @@
 # This pass produces no output state.
 #
 class Mare::Compiler::Verify < Mare::AST::Visitor
-  def self.run(ctx)
-    ctx.infer.for_non_argumented_types(ctx).each do |infer_type|
-      infer_type.all_for_funcs.each do |infer_func|
-        new(ctx, infer_type, infer_func).run
+  def self.run(ctx, library)
+    library.types.each do |t|
+      t_link = t.make_link(library)
+      ctx.infer[t_link].each_non_argumented_reified.each do |rt|
+        t.functions.each do |f|
+          f_link = f.make_link(t_link)
+          jumps = ctx.jumps[f_link]
+          inventory = ctx.inventory[f_link]
+
+          ctx.infer[f_link].each_reified_func(rt).each do |rf|
+            infer = ctx.infer[rf]
+
+            visitor = new(infer, jumps, inventory)
+            visitor.check_function(ctx, f)
+            f.params.try(&.terms.each(&.accept(ctx, visitor)))
+            f.body.try(&.accept(ctx, visitor))
+          end
+        end
       end
     end
   end
 
-  private getter ctx : Context
-  getter infer_type : Infer::ForType
-  getter infer_func : Infer::ForFunc
+  getter infer : Infer::ReifiedFuncAnalysis
+  getter jumps : Jumps::Analysis
+  getter inventory : Inventory::Analysis
 
-  def initialize(@ctx, @infer_type, @infer_func)
+  def initialize(@infer, @jumps, @inventory)
   end
 
-  def rt
-    infer_type.reified
-  end
-
-  def rf
-    infer_func.reified
-  end
-
-  def jumps
-    ctx.jumps[rf.link]
-  end
-
-  def run
-    func = rf.func(ctx)
-    check_function(func)
-
-    func.params.try(&.terms.each(&.accept(ctx, self)))
-    func.body.try(&.accept(ctx, self))
-  end
-
-  def check_function(func)
+  def check_function(ctx, func)
     func_body = func.body
 
     if func_body && jumps.any_error?(func_body)
@@ -83,7 +77,7 @@ class Mare::Compiler::Verify < Mare::AST::Visitor
         node = (func.yield_in || func.yield_out).not_nil!
         errs << {node.pos, "it declares a yield here"}
       end
-      ctx.inventory[rf.link].each_yield.each do |node|
+      inventory.each_yield.each do |node|
         errs << {node.pos, "it yields here"}
       end
       Error.at func.ident, "#{no_yields} cannot yield values", errs \
@@ -93,13 +87,13 @@ class Mare::Compiler::Verify < Mare::AST::Visitor
 
   # This visitor never replaces nodes, it just touches them and returns them.
   def visit(ctx, node)
-    touch(node)
+    touch(ctx, node)
 
     node
   end
 
   # Verify that each try block has at least one possible error case.
-  def touch(node : AST::Try)
+  def touch(ctx, node : AST::Try)
     unless node.body.try { |body| jumps.any_error?(body) }
       Error.at node, "This try block is unnecessary", [
         {node.body, "the body has no possible error cases to catch"}
@@ -107,15 +101,15 @@ class Mare::Compiler::Verify < Mare::AST::Visitor
     end
   end
 
-  def touch(node : AST::Relate)
+  def touch(ctx, node : AST::Relate)
     case node.op.value
     when "<:"
       # Skip this verification if this just a compile-time type check.
-      return if infer_func[node.lhs].is_a?(Infer::Fixed)
+      return if infer[node.lhs].is_a?(Infer::Fixed)
 
       # Verify that it is safe to perform this runtime type check.
-      lhs_mt = infer_func.resolve(node.lhs)
-      rhs_mt = infer_func.resolve(node.rhs)
+      lhs_mt = infer.resolve(node.lhs)
+      rhs_mt = infer.resolve(node.rhs)
       case lhs_mt.safe_to_match_as?(ctx, rhs_mt)
       when false
         Error.at node,
@@ -128,7 +122,7 @@ class Mare::Compiler::Verify < Mare::AST::Visitor
     end
   end
 
-  def touch(node : AST::Node)
+  def touch(ctx, node : AST::Node)
     # Do nothing for all other AST::Nodes.
   end
 
