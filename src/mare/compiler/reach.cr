@@ -558,7 +558,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       reach_funcs << Func.new(reach_def, infer, signature_for(ctx, infer))
 
       # Reach all functions called by this function.
-      infer.each_called_func.each do |called_rt, called_func_link|
+      infer.each_called_func.each do |pos, called_rt, called_func_link|
         handle_func(ctx, called_rt, called_func_link)
       end
 

@@ -74,7 +74,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       @redirects = {} of AST::Node => AST::Node
       @infos = {} of AST::Node => Info
       @resolved = {} of AST::Node => MetaType
-      @called_funcs = Set({ReifiedType, Program::Function::Link}).new
+      @called_funcs = Set({Source::Pos, ReifiedType, Program::Function::Link}).new
     end
 
     def reified
@@ -214,16 +214,6 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
 
   def []?(rt : ReifiedType)
     @types[rt]?.try(&.analysis)
-  end
-
-  # TODO: make protected def
-  def for_func(rf : ReifiedFunction)
-    @map[rf]
-  end
-
-  # TODO: make protected def
-  def for_func?(rf : ReifiedFunction)
-    @map[rf]?
   end
 
   def for_type_partial_reifications(ctx, t, t_link, no_args_rt, refer)
@@ -655,8 +645,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       @analysis.resolved[node] ||= self[node].resolve!(ctx, self)
     end
 
-    def extra_called_func!(rt, f)
-      @analysis.called_funcs.add({rt, f})
+    def extra_called_func!(pos, rt, f)
+      @analysis.called_funcs.add({pos, rt, f})
     end
 
     def run
@@ -813,7 +803,6 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     def follow_call_get_call_defns(call : FromCall)
       receiver = self[call.lhs].resolve!(ctx, self)
       call_defns = receiver.find_callable_func_defns(ctx, self, call.member)
-      call.call_defns = call_defns
 
       # Raise an error if we don't have a callable function for every possibility.
       call_defns << {receiver.inner, nil, nil} if call_defns.empty?
@@ -1057,7 +1046,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         call_func_link = call_func.make_link(call_defn.link)
 
         # Keep track that we called this function.
-        @analysis.called_funcs.add({call_defn, call_func_link})
+        @analysis.called_funcs.add({call.pos, call_defn, call_func_link})
 
         required_cap, reify_cap, autorecover_needed =
           follow_call_check_receiver_cap(call, call_mt, call_func, problems)
@@ -1097,7 +1086,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       field_func_link = field_func.make_link(reified.type.link)
 
       # Keep track that we touched this "function".
-      @analysis.called_funcs.add({reified.type, field_func_link})
+      @analysis.called_funcs.add({field.pos, reified.type, field_func_link})
 
       # Get the ForFunc instance for field_func, possibly creating and running it.
       infer = ctx.infer.for_func(ctx, reified.type, field_func_link, @analysis.resolved_self_cap).tap(&.run)
@@ -1473,7 +1462,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
           next if f.has_tag?(:hygienic) || f.body.nil?
           f_link = f.make_link(reflect_rt.link)
           ctx.infer.for_func(ctx, reflect_rt, f_link, MetaType.cap(f.cap.value)).tap(&.run)
-          extra_called_func!(reflect_rt, f_link)
+          extra_called_func!(node.pos, reflect_rt, f_link)
         end
 
         rt = reified_type(prelude_type("ReflectionOfType"), [reflect_mt])
