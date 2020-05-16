@@ -160,6 +160,17 @@ struct Mare::Compiler::Infer::MetaType
     inner.is_sendable?
   end
 
+  # A partial reify type param is a type param intersected with a capability.
+  def is_partial_reify_type_param? : Bool
+    inner = inner()
+    return false unless inner.is_a?(Intersection)
+    return false unless inner.cap
+    return false unless inner.anti_terms == nil
+    return false unless inner.terms.try(&.size) == 1
+    return false unless inner.terms.try(&.first.try(&.defn.is_a?(Refer::TypeParam)))
+    true
+  end
+
   # Returns true if it is safe to refine the type of self to other at runtime.
   # Returns false if doing so would violate capabilities.
   # Returns nil if doing so would be impossible even if we ignored capabilities.

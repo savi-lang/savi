@@ -7,6 +7,10 @@ class Mare::Compiler::Infer::SubtypingInfo
     @temp_assumptions = Set(ReifiedType).new
   end
 
+  def each_known_subtype
+    @confirmed.each.chain(@asserted.each_key)
+  end
+
   def assert(that : ReifiedType, pos : Source::Pos)
     @asserted[that] = pos
   end

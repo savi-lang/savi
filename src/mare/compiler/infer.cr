@@ -15,20 +15,31 @@ require "levenshtein"
 #
 class Mare::Compiler::Infer < Mare::AST::Visitor
   struct TypeAnalysis
-    getter no_args
     protected getter partial_reifieds
     protected getter reached_fully_reifieds # TODO: populate this during the pass
 
-    def initialize(@no_args : ReifiedType)
+    def initialize(@link : Program::Type::Link)
       @partial_reifieds = [] of ReifiedType
       @reached_fully_reifieds = [] of ReifiedType
+    end
+
+    def no_args
+      ReifiedType.new(@link)
+    end
+
+    protected def observe_reified_type(ctx, rt)
+      if rt.is_complete?(ctx)
+        @reached_fully_reifieds << rt
+      elsif rt.is_partial_reify?(ctx)
+        @partial_reifieds << rt
+      end
     end
 
     def each_partial_reified; @partial_reifieds.each; end
     def each_reached_fully_reified; @reached_fully_reifieds.each; end
     def each_non_argumented_reified
       if @partial_reifieds.empty?
-        [@no_args].each
+        [no_args].each
       else
         @partial_reifieds.each
       end
@@ -62,6 +73,20 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
 
     def is_supertype_of?(ctx : Context, other : ReifiedType, errors = [] of Error::Info)
       @subtyping.check(ctx, other, errors)
+    end
+
+    def each_known_subtype
+      @subtyping.each_known_subtype
+    end
+
+    def each_known_complete_subtype(ctx)
+      each_known_subtype.flat_map do |rt|
+        if rt.is_complete?(ctx)
+          rt
+        else
+          ctx.infer[rt.link].each_reached_fully_reified
+        end
+      end
     end
   end
 
@@ -163,14 +188,9 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       refer = ctx.refer[t_link]
 
       no_args_rt = for_type(ctx, t_link).reified
-      t_analysis = TypeAnalysis.new(no_args_rt)
-
       rts = for_type_partial_reifications(ctx, t, t_link, no_args_rt, refer)
-      t_analysis.partial_reifieds.concat(rts)
 
-      @t_analyses[t_link] = t_analysis
-
-      t_analysis.each_non_argumented_reified.each do |rt|
+      @t_analyses[t_link].each_non_argumented_reified.each do |rt|
         t.functions.each do |f|
           f_link = f.make_link(t_link)
           for_func(ctx, rt, f_link, MetaType.cap(f.cap.value)).run
@@ -179,7 +199,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
 
       # Check the assertion list for the type, to confirm that it is a subtype
       # of any it claimed earlier, which we took on faith and now verify.
-      t_analysis.each_non_argumented_reified.each do |rt|
+      @t_analyses[t_link].each_non_argumented_reified.each do |rt|
         self[rt].subtyping.check_assertions(ctx)
       end
     end
@@ -199,6 +219,10 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
 
   def []?(f_link : Program::Function::Link)
     @f_analyses[f_link]?
+  end
+
+  protected def get_or_create_analysis(t_link : Program::Type::Link)
+    @t_analyses[t_link] ||= TypeAnalysis.new(t_link)
   end
 
   protected def get_or_create_analysis(f_link : Program::Function::Link)
@@ -307,6 +331,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     @types[rt]? || (
       ft = @types[rt] = ForType.new(ctx, ReifiedTypeAnalysis.new(rt), rt, precursor)
       ft.tap(&.initialize_assertions(ctx))
+      .tap { |ft| get_or_create_analysis(link).observe_reified_type(ctx, rt) }
     )
   end
 
@@ -404,6 +429,10 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
 
     def has_params?(ctx)
       0 != params_count(ctx)
+    end
+
+    def is_partial_reify?(ctx)
+      args.size == params_count(ctx) && args.all?(&.is_partial_reify_type_param?)
     end
 
     def is_complete?(ctx)
