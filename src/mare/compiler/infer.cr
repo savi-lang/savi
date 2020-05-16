@@ -55,7 +55,12 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       @subtyping = SubtypingInfo.new(rt)
     end
 
+    # TODO: Remove this and refactor callers to use the more efficient/direct variant?
     def is_subtype_of?(ctx : Context, other : ReifiedType, errors = [] of Error::Info)
+      ctx.infer[other].is_supertype_of?(ctx, @rt, errors)
+    end
+
+    def is_supertype_of?(ctx : Context, other : ReifiedType, errors = [] of Error::Info)
       @subtyping.check(ctx, other, errors)
     end
   end
@@ -305,6 +310,11 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     )
   end
 
+  # TODO: Get rid of this
+  protected def for_type!(rt)
+    @types[rt]
+  end
+
   # TODO: Remove this function and refactor the things that call it.
   def for_completely_reified_types(ctx)
     @types.each_value.select(&.reified.is_complete?(ctx)).to_a
@@ -446,7 +456,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         f_link = f.make_link(reified.link)
         trait = type_expr(f.ret.not_nil!, ctx.refer[f_link]).single!
 
-        @analysis.subtyping.assert(trait, f.ident.pos)
+        ctx.infer.for_type!(trait).analysis.subtyping.assert(reified, f.ident.pos)
       end
     end
 

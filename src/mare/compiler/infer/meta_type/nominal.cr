@@ -207,7 +207,7 @@ struct Mare::Compiler::Infer::MetaType::Nominal
     if defn.is_a?(ReifiedType)
       if other_defn.is_a?(ReifiedType)
         # When both sides are ReifiedTypes, delegate to the SubtypingInfo logic.
-        ctx.infer[defn].is_subtype_of?(ctx, other_defn, errors)
+        ctx.infer[other_defn].is_supertype_of?(ctx, defn, errors)
       elsif other_defn.is_a?(Refer::TypeParam)
         # When the other is a TypeParam, use its bound MetaType and run again.
         l = MetaType.new_nominal(defn)
