@@ -317,7 +317,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
 
   # This is only for use in testing.
   def test_simple!(ctx, source, t_name, f_name)
-    t_link = ctx.namespace.in_source(source, t_name).as(Program::Type::Link)
+    t_link = ctx.namespace[source][t_name].as(Program::Type::Link)
     t = t_link.resolve(ctx)
     f = t.find_func!(f_name)
     f_link = f.make_link(t_link)
@@ -366,7 +366,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   end
 
   def for_func_simple(ctx : Context, source : Source, t_name : String, f_name : String)
-    t_link = ctx.namespace.in_source(source, t_name).as(Program::Type::Link)
+    t_link = ctx.namespace[source][t_name].as(Program::Type::Link)
     f = t_link.resolve(ctx).find_func!(f_name)
     f_link = f.make_link(t_link)
     for_func_simple(ctx, t_link, f_link)
@@ -1215,7 +1215,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
 
     def prelude_type(name)
-      @ctx.namespace[name].as(Program::Type::Link)
+      @ctx.namespace.prelude_type(name)
     end
 
     def reified_type(*args)

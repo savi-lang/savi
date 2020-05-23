@@ -1,8 +1,9 @@
 describe Mare::Compiler::Import do
-  it "returns the same AST when compiled again with the same source" do
+  it "returns the same data structures when compiled again with same sources" do
     source = Mare::Source.new_example <<-SOURCE
-    :primitive Example
-      :const greeting String: "Hello, World!"
+    :actor Main
+      :new (env)
+        env.out.print("Hello, World")
     SOURCE
 
     ctx1 = Mare::Compiler.compile([source], :import)

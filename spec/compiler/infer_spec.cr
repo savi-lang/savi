@@ -2168,9 +2168,9 @@ describe Mare::Compiler::Infer do
 
     ctx = Mare::Compiler.compile([source], :infer)
 
-    any = ctx.namespace.in_source(source, "Any").as(Mare::Program::Type::Link)
-    trait = ctx.namespace.in_source(source, "Exampleable").as(Mare::Program::Type::Link)
-    sub = ctx.namespace.in_source(source, "Example").as(Mare::Program::Type::Link)
+    any = ctx.namespace[source]["Any"].as(Mare::Program::Type::Link)
+    trait = ctx.namespace[source]["Exampleable"].as(Mare::Program::Type::Link)
+    sub = ctx.namespace[source]["Example"].as(Mare::Program::Type::Link)
 
     any_rt = ctx.infer[any].no_args
     trait_rt = ctx.infer[trait].no_args

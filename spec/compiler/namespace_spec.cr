@@ -1,4 +1,17 @@
 describe Mare::Compiler::Namespace do
+  it "returns the same output state when compiled again with same sources" do
+    source = Mare::Source.new_example <<-SOURCE
+    :actor Main
+      :new (env)
+        env.out.print("Hello, World")
+    SOURCE
+
+    ctx1 = Mare::Compiler.compile([source], :namespace)
+    ctx2 = Mare::Compiler.compile([source], :namespace)
+
+    ctx1.namespace[source].should eq ctx2.namespace[source]
+  end
+
   it "complains when a type has the same name as another" do
     source = Mare::Source.new_example <<-SOURCE
     :class Redundancy

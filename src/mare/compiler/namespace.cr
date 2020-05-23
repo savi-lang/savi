@@ -10,9 +10,20 @@
 # This pass produces output state at the source and source library level.
 #
 class Mare::Compiler::Namespace
+  struct SourceAnalysis
+    protected getter types
+
+    def initialize(@source : Source)
+      @types = {} of String => (Program::Type::Link | Program::TypeAlias::Link)
+    end
+
+    def [](name : String); @types[name]; end
+    def []?(name : String); @types[name]?; end
+  end
+
   def initialize
     @types_by_library = Hash(Program::Library::Link, Hash(String, Program::Type::Link | Program::TypeAlias::Link)).new
-    @types_by_source = Hash(Source, Hash(String, Program::Type::Link | Program::TypeAlias::Link)).new
+    @source_analyses = Hash(Source, SourceAnalysis).new
   end
 
   def main_type!(ctx); main_type?(ctx).not_nil! end
@@ -36,15 +47,15 @@ class Mare::Compiler::Namespace
     end
 
     # Every source file implicitly has access to all prelude types.
-    @types_by_source.each do |source, source_types|
-      add_prelude_types_to_source(ctx, source, source_types)
+    @source_analyses.each do |source, source_analysis|
+      add_prelude_types_to_source(ctx, source, source_analysis)
     end
 
     # Every source file implicitly has access to all types in the same library.
     ctx.program.libraries.each do |library|
-      @types_by_source.each do |source, source_types|
+      @source_analyses.each do |source, source_analysis|
         next unless source.library == library.source_library
-        source_types.merge!(@types_by_library[library.make_link])
+        source_analysis.types.merge!(@types_by_library[library.make_link])
       end
     end
 
@@ -61,43 +72,22 @@ class Mare::Compiler::Namespace
     add_type_to_source(new_type, library)
   end
 
-  def [](*args)
-    result = self[*args]?
-
-    raise "failed to find asserted type in namespace: #{args.last.inspect}" \
-      unless result
-
-    result.not_nil!
-  end
-
-  # When given an Identifier, try to find the type starting from its source.
-  # This is the way to resolve a type identifier in context.
-  def []?(ident : AST::Identifier) : (Program::Type::Link | Program::TypeAlias::Link)?
-    @types_by_source[ident.pos.source][ident.value]?
-  end
-  def []?(ctx, ident : AST::Identifier) : (Program::Type | Program::TypeAlias)?
-    self[ident]?.try(&.resolve(ctx))
+  # When given a Source, return the set of analysis for that source.
+  # TODO: Get rid of other forms of [] here in favor of this one.
+  def [](source : Source) : SourceAnalysis
+    @source_analyses[source]
   end
 
   # When given a String name, try to find the type in the prelude library.
   # This is a way to resolve a builtin type by name without more context.
-  def []?(name : String) : (Program::Type::Link | Program::TypeAlias::Link)?
-    @types_by_library[Compiler.prelude_library_link]?.try(&.[]?(name))
-  end
-  def []?(ctx, name : String) : (Program::Type | Program::TypeAlias)?
-    self[name]?.try(&.resolve(ctx))
-  end
-
-  # When given an String name and Source, try to find the named type.
-  # This is not very commonly what you want.
-  def in_source(source : Source, name : String)
-    @types_by_source[source][name]?
+  def prelude_type(name : String) : Program::Type::Link
+    @types_by_library[Compiler.prelude_library_link][name].as(Program::Type::Link)
   end
 
   # TODO: Remove this method?
   # This is only for use in testing.
   def find_func!(ctx, source, type_name, func_name)
-    self.in_source(source, type_name).as(Program::Type::Link).resolve(ctx).find_func!(func_name)
+    self[source][type_name].as(Program::Type::Link).resolve(ctx).find_func!(func_name)
   end
 
   private def check_conflicting_functions(ctx, t, t_link : Program::Type::Link)
@@ -134,15 +124,15 @@ class Mare::Compiler::Namespace
     source = new_type.ident.pos.source
     name = new_type.ident.value
 
-    types = @types_by_source[source] ||=
-      Hash(String, Program::Type::Link | Program::TypeAlias::Link).new
+    source_analysis = @source_analyses[source] ||= SourceAnalysis.new(source)
 
-    raise "should have been prevented by add_type_to_library" if types[name]?
+    raise "should have been prevented by add_type_to_library" \
+      if source_analysis.types[name]?
 
-    types[name] = new_type.make_link(library)
+    source_analysis.types[name] = new_type.make_link(library)
   end
 
-  private def add_prelude_types_to_source(ctx, source, source_types)
+  private def add_prelude_types_to_source(ctx, source, source_analysis)
     # Skip adding prelude types to source files in the prelude library.
     return if source.library.path == Compiler.prelude_library_path
 
@@ -150,7 +140,7 @@ class Mare::Compiler::Namespace
       new_type = new_type_link.resolve(ctx)
       next if new_type.has_tag?(:private)
 
-      already_type = source_types[name]?.try(&.resolve(ctx))
+      already_type = source_analysis.types[name]?.try(&.resolve(ctx))
       if already_type
         Error.at already_type.ident.pos,
           "This type's name conflicts with a mandatory built-in type", [
@@ -158,7 +148,7 @@ class Mare::Compiler::Namespace
           ]
       end
 
-      source_types[name] = new_type_link
+      source_analysis.types[name] = new_type_link
     end
   end
 
@@ -191,14 +181,13 @@ class Mare::Compiler::Namespace
       end
     end
 
-    types = @types_by_source[source] ||=
-      Hash(String, Program::Type::Link | Program::TypeAlias::Link).new
+    source_analysis = @source_analyses[source] ||= SourceAnalysis.new(source)
 
     # Import those types into the source, raising an error upon any conflict.
     imported_types.each do |import_pos, new_type_link|
       new_type = new_type_link.resolve(ctx)
 
-      already_type_link = types[new_type.ident.value]?
+      already_type_link = source_analysis.types[new_type.ident.value]?
       if already_type_link
         already_type = already_type_link.resolve(ctx)
         Error.at import_pos,
@@ -209,7 +198,7 @@ class Mare::Compiler::Namespace
           ]
       end
 
-      types[new_type.ident.value] = new_type_link
+      source_analysis.types[new_type.ident.value] = new_type_link
     end
   end
 end

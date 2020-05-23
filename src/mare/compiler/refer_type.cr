@@ -58,21 +58,22 @@ module Mare::Compiler::ReferType
 
   class Visitor < Mare::AST::Visitor
     getter analysis : Analysis
-    def initialize(@analysis)
+    getter namespace : Namespace::SourceAnalysis
+    def initialize(@analysis, @namespace)
     end
 
     def find_type?(ctx, node : AST::Identifier)
       found = @analysis.type_param_for?(node.value)
       return found if found
 
-      found = ctx.namespace[node]?
+      found = namespace[node.value]?
       case found
       when Program::Type::Link
         Refer::Type.new(found)
       when Program::TypeAlias::Link
         target = found
         while !target.is_a?(Program::Type::Link)
-          target = ctx.namespace[target.resolve(ctx).target]
+          target = namespace[target.resolve(ctx).target.value]
         end
         Refer::TypeAlias.new(found, target)
       end
@@ -112,7 +113,8 @@ module Mare::Compiler::ReferType
       end
 
       # Run as a visitor on the ident itself and every type param.
-      visitor = Visitor.new(t_analysis)
+      namespace = ctx.namespace[t.ident.pos.source]
+      visitor = Visitor.new(t_analysis, namespace)
       t.ident.accept(ctx, visitor)
       t.params.try(&.accept(ctx, visitor))
 
@@ -121,7 +123,8 @@ module Mare::Compiler::ReferType
 
     def analyze_func(ctx, f, f_link, t_analysis)
       f_analysis = Analysis.new(t_analysis)
-      visitor = Visitor.new(f_analysis)
+      namespace = ctx.namespace[f.ident.pos.source]
+      visitor = Visitor.new(f_analysis, namespace)
 
       f.ast.accept(ctx, visitor)
 
