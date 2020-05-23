@@ -236,6 +236,10 @@ class Mare::Program
       def resolve(ctx : Compiler::Context)
         @library.resolve(ctx).types.find(&.ident.value.==(@name)).not_nil!
       end
+      # This should be used only in testing.
+      def make_func_link_simple(name : String)
+        Function::Link.new(self, name, nil)
+      end
     end
   end
 
