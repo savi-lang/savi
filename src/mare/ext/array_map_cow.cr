@@ -15,7 +15,7 @@ class ::Array(T)
         new_list.not_nil! << yield item
       else
         new_item = yield item
-        if !new_item.same?(item)
+        if new_item != item
           changed = true
           new_list = (self[0...index] << new_item)
         end
@@ -37,7 +37,7 @@ class ::Array(T)
         new_list.not_nil! << yield ({item1, item2})
       else
         new_item1, new_item2 = yield ({item1, item2})
-        if !new_item1.same?(item1) || !new_item2.same?(item2)
+        if (new_item1 != item1) || (new_item2 != item2)
           changed = true
           new_list = (self[0...index] << {new_item1, new_item2})
         end

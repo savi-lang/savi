@@ -22,7 +22,7 @@ describe Mare::Compiler::Sugar do
       ]]
     ]
 
-    ctx = Mare::Compiler.compile([ast], :sugar)
+    ctx = Mare::Compiler.compile([source], :sugar)
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "return_none")
     func.body.not_nil!.to_a.should eq [:group, ":",
@@ -35,6 +35,10 @@ describe Mare::Compiler::Sugar do
       [:string, "this isn't the return value"],
       [:ident, "None"],
     ]
+
+    # Compiling again should yield an equivalent program tree:
+    ctx2 = Mare::Compiler.compile([source], :sugar)
+    ctx.program.libraries.should eq ctx2.program.libraries
   end
 
   it "transforms a property assignment into a method call" do
@@ -67,6 +71,10 @@ describe Mare::Compiler::Sugar do
         [:qualify, [:ident, "y="], [:group, "(", [:ident, "z"]]],
       ],
     ]
+
+    # Compiling again should yield an equivalent program tree:
+    ctx2 = Mare::Compiler.compile([source], :sugar)
+    ctx.program.libraries.should eq ctx2.program.libraries
   end
 
   it "transforms property arithmetic-assignments into method calls" do
@@ -121,6 +129,10 @@ describe Mare::Compiler::Sugar do
         ]],
       ],
     ]
+
+    # Compiling again should yield an equivalent program tree:
+    ctx2 = Mare::Compiler.compile([source], :sugar)
+    ctx.program.libraries.should eq ctx2.program.libraries
   end
 
   it "transforms an operator into a method call" do
@@ -149,6 +161,10 @@ describe Mare::Compiler::Sugar do
         [:qualify, [:ident, "+"], [:group, "(", [:ident, "y"]]]
       ],
     ]
+
+    # Compiling again should yield an equivalent program tree:
+    ctx2 = Mare::Compiler.compile([source], :sugar)
+    ctx.program.libraries.should eq ctx2.program.libraries
   end
 
   it "transforms an operator into a method call (in a loop condition)" do
@@ -189,6 +205,10 @@ describe Mare::Compiler::Sugar do
         [:ident, "None"]
       ]]
     ]
+
+    # Compiling again should yield an equivalent program tree:
+    ctx2 = Mare::Compiler.compile([source], :sugar)
+    ctx.program.libraries.should eq ctx2.program.libraries
   end
 
   it "transforms a square brace qualification into a method call" do
@@ -217,6 +237,10 @@ describe Mare::Compiler::Sugar do
         [:qualify, [:ident, "[]"], [:group, "(", [:ident, "y"]]]
       ],
     ]
+
+    # Compiling again should yield an equivalent program tree:
+    ctx2 = Mare::Compiler.compile([source], :sugar)
+    ctx.program.libraries.should eq ctx2.program.libraries
   end
 
   it "transforms a chained qualifications into chained method calls" do
@@ -308,6 +332,10 @@ describe Mare::Compiler::Sugar do
         [:qualify, [:ident, "[]"], [:group, "(", [:ident, "z"]]],
       ],
     ]
+
+    # Compiling again should yield an equivalent program tree:
+    ctx2 = Mare::Compiler.compile([source], :sugar)
+    ctx.program.libraries.should eq ctx2.program.libraries
   end
 
   it "transforms a square brace qualified assignment into a method call" do
@@ -340,6 +368,10 @@ describe Mare::Compiler::Sugar do
         [:qualify, [:ident, "[]="], [:group, "(", [:ident, "y"], [:ident, "z"]]]
       ],
     ]
+
+    # Compiling again should yield an equivalent program tree:
+    ctx2 = Mare::Compiler.compile([source], :sugar)
+    ctx.program.libraries.should eq ctx2.program.libraries
   end
 
   it "transforms an @-prefixed identifier into a method call of @" do
@@ -371,6 +403,10 @@ describe Mare::Compiler::Sugar do
         [:qualify, [:ident, "x"], [:group, "(", [:ident, "y"]]],
       ],
     ]
+
+    # Compiling again should yield an equivalent program tree:
+    ctx2 = Mare::Compiler.compile([source], :sugar)
+    ctx.program.libraries.should eq ctx2.program.libraries
   end
 
   it "adds a '@' statement to the end of a constructor body" do
@@ -396,6 +432,10 @@ describe Mare::Compiler::Sugar do
       [:relate, [:ident, "x"], [:op, "="], [:integer, 1_u64]],
       [:ident, "@"],
     ]
+
+    # Compiling again should yield an equivalent program tree:
+    ctx2 = Mare::Compiler.compile([source], :sugar)
+    ctx.program.libraries.should eq ctx2.program.libraries
   end
 
   it "transforms non-identifier parameters into assignment expressions" do
@@ -441,6 +481,10 @@ describe Mare::Compiler::Sugar do
         [:ident, "after"]
       ],
     ]
+
+    # Compiling again should yield an equivalent program tree:
+    ctx2 = Mare::Compiler.compile([source], :sugar)
+    ctx.program.libraries.should eq ctx2.program.libraries
   end
 
   it "transforms short-circuiting logical operators into choices" do
@@ -492,6 +536,10 @@ describe Mare::Compiler::Sugar do
         [[:ident, "True"], [:ident, "False"]],
       ],
     ]
+
+    # Compiling again should yield an equivalent program tree:
+    ctx2 = Mare::Compiler.compile([source], :sugar)
+    ctx.program.libraries.should eq ctx2.program.libraries
   end
 
   # TODO: Can this be done as a "universal method" rather than sugar?
@@ -545,5 +593,9 @@ describe Mare::Compiler::Sugar do
         [:ident, "z"]
       ]
     ]
+
+    # Compiling again should yield an equivalent program tree:
+    ctx2 = Mare::Compiler.compile([source], :sugar)
+    ctx.program.libraries.should eq ctx2.program.libraries
   end
 end

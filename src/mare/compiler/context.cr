@@ -51,8 +51,7 @@ class Mare::Compiler::Context
       return cached_library if cached_docs == docs
     end
 
-    library = Program::Library.new
-    library.source_library = source_library
+    library = Program::Library.new(source_library)
 
     docs.each do |doc|
       @stack.unshift(Interpreter::Default.new(library))

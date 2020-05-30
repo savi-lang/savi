@@ -14,9 +14,9 @@ class Mare::Program
     getter types : Array(Type)
     getter aliases
     getter imports
-    property! source_library : Source::Library
+    getter source_library : Source::Library
 
-    def initialize
+    def initialize(@source_library)
       @types = [] of Type
       @aliases = [] of TypeAlias
       @imports = [] of Import
@@ -30,6 +30,15 @@ class Mare::Program
 
     def dup(*args)
       super().tap(&.dup_init(*args))
+    end
+
+    def ==(other)
+      return false unless other.is_a?(Library)
+      return false unless @source_library == other.source_library
+      return false unless @types == other.types
+      return false unless @aliases == other.aliases
+      return false unless @imports == other.imports
+      true
     end
 
     def types_map_cow(&block : Type -> Type)
@@ -61,6 +70,13 @@ class Mare::Program
 
     def initialize(@ident, @names = nil)
     end
+
+    def ==(other)
+      return false unless other.is_a?(Import)
+      return false unless @ident == other.ident
+      return false unless @names == other.names
+      true
+    end
   end
 
   class TypeAlias
@@ -75,6 +91,13 @@ class Mare::Program
 
     def inspect(io : IO)
       io << "#<#{self.class} #{@ident.value}: #{@target.value}>"
+    end
+
+    def ==(other)
+      return false unless other.is_a?(TypeAlias)
+      return false unless @ident == other.ident
+      return false unless @target== other.target
+      true
     end
 
     def add_tag(tag : Symbol)
@@ -108,6 +131,7 @@ class Mare::Program
     property ident : AST::Identifier
     property params : AST::Group?
 
+    protected getter tags
     getter metadata
     getter functions : Array(Function)
 
@@ -135,6 +159,17 @@ class Mare::Program
 
     def dup(*args)
       super().tap(&.dup_init(*args))
+    end
+
+    def ==(other)
+      return false unless other.is_a?(Type)
+      return false unless @cap == other.cap
+      return false unless @ident == other.ident
+      return false unless @params == other.params
+      return false unless @functions == other.functions
+      return false unless @tags == other.tags
+      return false unless @metadata == other.metadata
+      true
     end
 
     def functions_map_cow(&block : Function -> Function)
@@ -171,7 +206,7 @@ class Mare::Program
       @tags.includes?(tag)
     end
 
-    def tags
+    def tags_sorted
       @tags.to_a.sort
     end
 
@@ -280,6 +315,8 @@ class Mare::Program
       @tags = Set(Symbol).new
       @metadata = Hash(Symbol, String).new
     end
+    protected getter tags
+    protected getter metadata
 
     def inspect(io : IO)
       io << "#<"
@@ -313,6 +350,14 @@ class Mare::Program
       super.tap(&.dup_init)
     end
 
+    def ==(other)
+      return false unless other.is_a?(Function)
+      return false unless @ast == other.ast
+      return false unless @tags == other.tags
+      return false unless @metadata == other.metadata
+      true
+    end
+
     def add_tag(tag : Symbol)
       raise NotImplementedError.new(tag) unless KNOWN_TAGS.includes?(tag)
       @tags.add(tag)
@@ -323,7 +368,7 @@ class Mare::Program
       @tags.includes?(tag)
     end
 
-    def tags
+    def tags_sorted
       @tags.to_a.sort
     end
 

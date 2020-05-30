@@ -12,21 +12,18 @@
 #
 class Mare::Compiler::Sugar < Mare::AST::CopyOnMutateVisitor
   # TODO: Clean up, consolidate, and improve this caching mechanism.
-  @@cache = {} of String => {UInt64, Program::Function}
-  def self.cache_key(l, t, f)
-    t.ident.value + "\0" + f.ident.value
-  end
+  @@cache = {} of Program::Function::Link => {UInt64, Program::Function}
   def self.cached_or_run(l, t, f) : Program::Function
+    f_link = f.make_link(t.make_link(l.make_link))
     input_hash = f.hash
-    cache_key = cache_key(l, t, f)
-    cache_result = @@cache[cache_key]?
+    cache_result = @@cache[f_link]?
     cached_hash, cached_func = cache_result if cache_result
     return cached_func if cached_func && cached_hash == input_hash
 
     yield
 
     .tap do |result|
-      @@cache[cache_key] = {input_hash, result}
+      @@cache[f_link] = {input_hash, result}
     end
   end
 

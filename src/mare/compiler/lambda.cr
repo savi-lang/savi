@@ -46,7 +46,7 @@ class Mare::Compiler::Lambda < Mare::AST::CopyOnMutateVisitor
 
       break if new_types.empty?
 
-      library = library.dup if library.same?(orig_library)
+      library = library.dup if library == orig_library
       new_types.each do |lambda_type|
         library.types << lambda_type
         ctx.namespace.add_lambda_type_later(ctx, lambda_type, library)

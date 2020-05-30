@@ -2434,7 +2434,7 @@ class Mare::Compiler::CodeGen
           gtype.gfuncs.values
             .reject(&.func.has_tag?(:hygienic))
             .map do |gfunc|
-              tags = gfunc.func.tags.map { |tag| gen_string(tag.to_s) }
+              tags = gfunc.func.tags_sorted.map { |tag| gen_string(tag.to_s) }
 
               # A mutator must meet the following qualifications:
               # a ref function that takes no arguments and returns None.
