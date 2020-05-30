@@ -41,7 +41,7 @@ struct Mare::Compiler::Infer::MetaType
     MetaType.new(Nominal.new(defn))
   end
 
-  def self.new_type_param(defn : Refer::TypeParam)
+  def self.new_type_param(defn : TypeParam)
     MetaType.new(Nominal.new(defn))
   end
 
@@ -148,7 +148,7 @@ struct Mare::Compiler::Infer::MetaType
     inner.partial_reifications.map { |i| MetaType.new(i) }
   end
 
-  def type_params : Set(Refer::TypeParam)
+  def type_params : Set(TypeParam)
     inner.type_params
   end
 
@@ -167,7 +167,7 @@ struct Mare::Compiler::Infer::MetaType
     return false unless inner.cap
     return false unless inner.anti_terms == nil
     return false unless inner.terms.try(&.size) == 1
-    return false unless inner.terms.try(&.first.try(&.defn.is_a?(Refer::TypeParam)))
+    return false unless inner.terms.try(&.first.try(&.defn.is_a?(TypeParam)))
     true
   end
 

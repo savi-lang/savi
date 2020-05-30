@@ -358,7 +358,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       # TODO: Simplify/refactor in relation to code above
       substitutions_map = {} of Refer::TypeParam => MetaType
       substitutions.each do |param_ref, bound, cap_mt|
-        substitutions_map[param_ref] = MetaType.new_type_param(param_ref).intersect(cap_mt)
+        substitutions_map[param_ref] = MetaType.new_type_param(TypeParam.new(param_ref)).intersect(cap_mt)
       end
 
       args = substitutions_map.map(&.last.substitute_type_params(substitutions_map))
@@ -468,6 +468,12 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
             {arg_node.pos, "the type argument is #{arg.show_type}"},
           ]
       end
+    end
+  end
+
+  struct TypeParam
+    getter ref : Refer::TypeParam
+    def initialize(@ref)
     end
   end
 
@@ -586,17 +592,15 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
 
     def lookup_type_param(ref : Refer::TypeParam, refer, receiver = nil)
-      if ref.parent_link != reified.link
-        raise NotImplementedError.new(ref) unless @precursor
-        return @precursor.not_nil!.lookup_type_param(ref, refer, receiver)
-      end
+      raise NotImplementedError.new(ref) unless @precursor \
+        if ref.parent_link != reified.link
 
       # Lookup the type parameter on self type and return the arg if present
       arg = reified.args[ref.index]?
       return arg if arg
 
       # Otherwise, return it as an unreified type parameter nominal.
-      MetaType.new_type_param(ref)
+      MetaType.new_type_param(TypeParam.new(ref))
     end
 
     def lookup_type_param_bound(ref : Refer::TypeParam)

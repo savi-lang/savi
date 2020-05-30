@@ -316,7 +316,7 @@ struct Mare::Compiler::Infer::MetaType::Capability
   end
 
   def type_params
-    Set(Refer::TypeParam).new # no type params are ever referenced by a cap
+    Set(TypeParam).new # no type params are ever referenced by a cap
   end
 
   def substitute_type_params(substitutions : Hash(Refer::TypeParam, MetaType))

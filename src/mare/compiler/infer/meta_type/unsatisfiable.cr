@@ -62,7 +62,7 @@ class Mare::Compiler::Infer::MetaType::Unsatisfiable
   end
 
   def type_params
-    Set(Refer::TypeParam).new # no type params are present
+    Set(TypeParam).new # no type params are present
   end
 
   def substitute_type_params(substitutions : Hash(Refer::TypeParam, MetaType))

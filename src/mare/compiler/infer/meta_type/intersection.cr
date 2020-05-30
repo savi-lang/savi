@@ -288,7 +288,7 @@ struct Mare::Compiler::Infer::MetaType::Intersection
   end
 
   def type_params
-    result = Set(Refer::TypeParam).new
+    result = Set(TypeParam).new
 
     terms.not_nil!.each do |term|
       result.concat(term.type_params)

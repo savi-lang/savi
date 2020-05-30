@@ -1,5 +1,5 @@
 struct Mare::Compiler::Infer::MetaType::Nominal
-  getter defn : Infer::ReifiedType | Refer::TypeParam
+  getter defn : Infer::ReifiedType | TypeParam
 
   def initialize(@defn)
   end
@@ -28,8 +28,8 @@ struct Mare::Compiler::Infer::MetaType::Nominal
     case defn
     when Infer::ReifiedType
       defn.show_type(io)
-    when Refer::TypeParam
-      io << defn.ident.value
+    when TypeParam
+      io << defn.ref.ident.value
     end
   end
 
@@ -44,8 +44,8 @@ struct Mare::Compiler::Infer::MetaType::Nominal
     when Infer::ReifiedType
       func = defn.defn(ctx).find_func?(name)
       [{self, defn, func}] if func
-    when Refer::TypeParam
-      infer.lookup_type_param_bound(defn)
+    when TypeParam
+      infer.lookup_type_param_bound(defn.ref)
         .find_callable_func_defns(ctx, infer, name)
     else
       raise NotImplementedError.new(defn)
@@ -144,10 +144,10 @@ struct Mare::Compiler::Infer::MetaType::Nominal
   def type_params
     defn = defn()
     case defn
-    when Refer::TypeParam
+    when TypeParam
       [defn].to_set
     when ReifiedType
-      defn.args.flat_map(&.type_params.as(Set(Refer::TypeParam)).to_a).to_set
+      defn.args.flat_map(&.type_params.as(Set(TypeParam)).to_a).to_set
     else
       raise NotImplementedError.new(defn)
     end
@@ -156,9 +156,9 @@ struct Mare::Compiler::Infer::MetaType::Nominal
   def substitute_type_params(substitutions : Hash(Refer::TypeParam, MetaType))
     defn = defn()
     case defn
-    when Refer::TypeParam
-      substitutions[defn]?.try(&.inner) || self
-    when Infer::ReifiedType
+    when TypeParam
+      substitutions[defn.ref]?.try(&.inner) || self
+    when ReifiedType
       args = defn.args.map do |arg|
         arg.substitute_type_params(substitutions).as(MetaType)
       end
@@ -208,23 +208,23 @@ struct Mare::Compiler::Infer::MetaType::Nominal
       if other_defn.is_a?(ReifiedType)
         # When both sides are ReifiedTypes, delegate to the SubtypingInfo logic.
         ctx.infer[other_defn].is_supertype_of?(ctx, defn, errors)
-      elsif other_defn.is_a?(Refer::TypeParam)
+      elsif other_defn.is_a?(TypeParam)
         # When the other is a TypeParam, use its bound MetaType and run again.
         l = MetaType.new_nominal(defn)
-        r = ctx.infer.for_type(ctx, other_defn.parent_link)
-              .lookup_type_param_bound(other_defn).strip_cap
+        r = ctx.infer.for_type(ctx, other_defn.ref.parent_link)
+              .lookup_type_param_bound(other_defn.ref).strip_cap
         l.subtype_of?(ctx, r)
       else
         raise NotImplementedError.new("type <: ?")
       end
-    elsif defn.is_a?(Refer::TypeParam)
+    elsif defn.is_a?(TypeParam)
       if other_defn.is_a?(ReifiedType)
         # When this is a TypeParam, use its bound MetaType and run again.
-        l = ctx.infer.for_type(ctx, defn.parent_link)
-              .lookup_type_param_bound(defn).strip_cap
+        l = ctx.infer.for_type(ctx, defn.ref.parent_link)
+              .lookup_type_param_bound(defn.ref).strip_cap
         r = MetaType.new_nominal(other_defn)
         l.subtype_of?(ctx, r)
-      elsif other_defn.is_a?(Refer::TypeParam)
+      elsif other_defn.is_a?(TypeParam)
         return true if defn == other_defn
         raise NotImplementedError.new("type param <: type param")
       else

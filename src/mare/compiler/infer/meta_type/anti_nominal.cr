@@ -122,10 +122,10 @@ struct Mare::Compiler::Infer::MetaType::AntiNominal
 
   def type_params
     defn = defn()
-    if defn.is_a?(Refer::TypeParam)
+    if defn.is_a?(TypeParam)
       [defn].to_set
     else
-      Set(Refer::TypeParam).new
+      Set(TypeParam).new
     end
   end
 
