@@ -204,7 +204,9 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       @t_analyses[t_link].each_non_argumented_reified.each do |rt|
         t.functions.each do |f|
           f_link = f.make_link(t_link)
-          for_func(ctx, rt, f_link, MetaType.cap(f.cap.value)).run
+          MetaType::Capability.new_maybe_generic(f.cap.value).each_cap.each do |f_cap|
+            for_func(ctx, rt, f_link, MetaType.new(f_cap)).run
+          end
         end
       end
 
@@ -383,7 +385,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     f : Program::Function::Link,
     cap : MetaType,
   ) : ForFunc
-    mt = MetaType.new(rt).override_cap(cap).strip_ephemeral
+    raise "halt" if cap.inner.as(MetaType::Capability).value == "mutableplus"
+    mt = MetaType.new(rt).override_cap(cap)
     rf = ReifiedFunction.new(rt, f, mt)
     @map[rf] ||= (
       ForFunc.new(ctx, ReifiedFuncAnalysis.new(ctx, rf), @types[rt], rf)
@@ -673,7 +676,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         end
       elsif node.op.value == "->"
         type_expr(node.rhs, refer, receiver).viewed_from(type_expr(node.lhs, refer, receiver))
-      elsif node.op.value == "+>"
+      elsif node.op.value == "->>"
         type_expr(node.rhs, refer, receiver).extracted_from(type_expr(node.lhs, refer, receiver))
       else
         raise NotImplementedError.new(node.to_a.inspect)
@@ -966,40 +969,52 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
 
     def follow_call_check_receiver_cap(call, call_mt, call_func, problems)
-      call_mt_cap = call_mt.cap_only
+      call_cap_mt = call_mt.cap_only
       autorecover_needed = false
+
+      call_func_cap = MetaType::Capability.new_maybe_generic(call_func.cap.value)
+      call_func_cap_mt = MetaType.new(call_func_cap)
 
       # The required capability is the receiver capability of the function,
       # unless it is an asynchronous function, in which case it is tag.
-      required_cap = call_func.cap.value
-      required_cap = "tag" \
+      required_cap = call_func_cap
+      required_cap = MetaType::Capability.new("tag") \
         if call_func.has_tag?(:async) && !call_func.has_tag?(:constructor)
 
+      receiver_okay =
+        if required_cap.value.is_a?(String)
+          call_cap_mt.subtype_of?(ctx, MetaType.new(required_cap))
+        else
+          call_cap_mt.satisfies_bound?(ctx, MetaType.new(required_cap))
+        end
+
       # Enforce the capability restriction of the receiver.
-      if call_mt_cap.subtype_of?(ctx, MetaType.cap(required_cap))
+      if receiver_okay
         # For box functions only, we reify with the actual cap on the caller side.
         # Or rather, we use "ref", "box", or "val", depending on the caller cap.
         # For all other functions, we just use the cap from the func definition.
-        reify_cap = MetaType.cap(
-          if required_cap == "box"
-            case call_mt_cap.inner.as(MetaType::Capability).value
-            when "iso", "trn", "ref" then "ref"
-            when "val" then "val"
-            else "box"
+        reify_cap =
+          if required_cap.value == "box"
+            case call_cap_mt.inner.as(MetaType::Capability).value
+            when "iso", "trn", "ref" then MetaType.cap("ref")
+            when "val" then MetaType.cap("val")
+            else MetaType.cap("box")
             end
+          # TODO: This shouldn't be a special case - any generic cap should be accepted.
+          elsif required_cap.value.is_a?(Set(MetaType::Capability))
+            call_cap_mt
           else
-            call_func.cap.value
+            call_func_cap_mt
           end
-        )
       elsif call_func.has_tag?(:constructor)
         # Constructor calls ignore cap of the original receiver.
-        reify_cap = MetaType.cap(call_func.cap.value)
-      elsif call_mt_cap.ephemeralize.subtype_of?(ctx, MetaType.cap(required_cap))
+        reify_cap = call_func_cap_mt
+      elsif call_cap_mt.ephemeralize.subtype_of?(ctx, MetaType.new(required_cap))
         # We failed, but we may be able to use auto-recovery.
         # Take note of this and we'll finish the auto-recovery checks later.
         autorecover_needed = true
         # For auto-recovered calls, always use the cap of the func definition.
-        reify_cap = MetaType.cap(call_func.cap.value)
+        reify_cap = call_func_cap_mt
       else
         # We failed entirely; note the problem and carry on.
         problems << {call_func.cap.pos,
@@ -1015,7 +1030,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
 
         # We already failed subtyping for the receiver cap, but pretend
         # for now that we didn't for the sake of further checks.
-        reify_cap = MetaType.cap(call_func.cap.value)
+        reify_cap = call_func_cap_mt
       end
 
       {required_cap, reify_cap, autorecover_needed}
@@ -1107,7 +1122,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       # we now have to confirm that arguments and return value are all sendable.
       problems = [] of {Source::Pos, String}
 
-      unless required_cap == "ref" || required_cap == "box"
+      unless required_cap.value == "ref" || required_cap.value == "box"
         problems << {call_func.cap.pos,
           "the function's receiver capability is `#{required_cap}` " \
           "but only a `ref` or `box` receiver can be auto-recovered"}
@@ -1434,6 +1449,13 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       field.assign(ctx, self, node.rhs, node.rhs.pos)
     end
 
+    def touch(node : AST::FieldReplace)
+      field = Field.new(node.pos)
+      @analysis[node] = FieldExtract.new(field, @analysis.resolved_self)
+      follow_field(field, node.value)
+      field.assign(ctx, self, node.rhs, node.rhs.pos)
+    end
+
     def touch(node : AST::Relate)
       case node.op.value
       when "->"
@@ -1601,7 +1623,9 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         reflect_rt.defn(ctx).functions.each do |f|
           next if f.has_tag?(:hygienic) || f.body.nil?
           f_link = f.make_link(reflect_rt.link)
-          ctx.infer.for_func(ctx, reflect_rt, f_link, MetaType.cap(f.cap.value)).tap(&.run)
+          MetaType::Capability.new_maybe_generic(f.cap.value).each_cap.each do |f_cap|
+            ctx.infer.for_func(ctx, reflect_rt, f_link, MetaType.new(f_cap)).tap(&.run)
+          end
           extra_called_func!(node.pos, reflect_rt, f_link)
         end
 

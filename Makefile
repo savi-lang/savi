@@ -11,7 +11,7 @@ ready: PHONY Dockerfile
 # Run the full CI suite.
 ci: PHONY
 	make test extra_args="$(extra_args)"
-	make example-run dir="/opt/code/examples/adventofcode/2018"
+	make example-run dir="examples/adventofcode/2018"
 
 # Run the test suite.
 test: PHONY
@@ -38,29 +38,25 @@ example-eval.inner: PHONY /tmp/bin/mare
 example-run: PHONY
 	docker exec -ti mare-dev make dir="$(dir)" example-run.inner
 example-run.inner: PHONY /tmp/bin/mare
-	echo && cd "$(dir)" && /tmp/bin/mare run
+	echo && cd "/opt/code/$(dir)" && /tmp/bin/mare run
 
 # Compile the files in the given directory.
 example-compile: PHONY
 	docker exec -ti mare-dev make dir="$(dir)" example-compile.inner
 example-compile.inner: PHONY /tmp/bin/mare
-	echo && cd "$(dir)" && /tmp/bin/mare
+	echo && cd "/opt/code/$(dir)" && /tmp/bin/mare
 
-# Compile and run the mare binary in the `example` subdirectory.
-example: PHONY
-	docker exec -ti mare-dev make extra_args="$(extra_args)" example/main
-	echo && docker exec -ti mare-dev example/main || true
-example-lldb: PHONY
-	docker exec -ti mare-dev make extra_args="$(extra_args)" example/main
-	echo && lldb -o run -- example/main # TODO: run this within docker when alpine supports lldb package outside of edge
+# Compile and run the mare binary in the given directory.
+example: example-compile
+	echo && docker exec -ti mare-dev "$(dir)/main" || true
+example-lldb: example-compile
+	echo && lldb -o run -- "$(dir)/main" # TODO: run this within docker when alpine supports lldb package outside of edge
 example-mare-callgrind: PHONY
 	docker exec -ti mare-dev make extra_args="$(extra_args)" example-mare-callgrind.inner
 /tmp/bin/mare: main.cr $(shell find lib -name '*.cr') $(shell find src -name '*.cr')
 	mkdir -p /tmp/bin
 	crystal build --debug main.cr -o $@
 	ldd /tmp/bin/mare | grep libponyrt # prove that libponyrt was actually linked
-example/main: /tmp/bin/mare $(shell find . -name '*.mare')
-	echo && cd example && /tmp/bin/mare
 /tmp/callgrind.out: /tmp/bin/mare
 	echo && cd example && valgrind --tool=callgrind --callgrind-out-file=$@ $<
 example-mare-callgrind.inner: /tmp/callgrind.out PHONY

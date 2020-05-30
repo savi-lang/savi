@@ -184,7 +184,7 @@ struct Mare::Compiler::Infer::MetaType::Nominal
   end
 
   def extracted_from(origin)
-    raise NotImplementedError.new("#{origin.inspect}+>#{self.inspect}")
+    raise NotImplementedError.new("#{origin.inspect}->>#{self.inspect}")
   end
 
   def subtype_of?(ctx : Context, other : Capability) : Bool

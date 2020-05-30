@@ -211,9 +211,9 @@ class Mare::Compiler::Sugar < Mare::AST::CopyOnMutateVisitor
 
   def visit(ctx, node : AST::Relate)
     case node.op.value
-    when ".", "'", "+>", " ", "<:", "is", "DEFAULTPARAM"
+    when ".", "'", " ", "<:", "is", "DEFAULTPARAM"
       node # skip these special-case operators
-    when "->"
+    when "->", "->>"
       # If a dot relation is within this (which doesn't happen in the parser,
       # but may happen artifically such as the `@identifier` sugar above),
       # then always move the qualify into the right-hand-side of the dot.
@@ -248,13 +248,13 @@ class Mare::Compiler::Sugar < Mare::AST::CopyOnMutateVisitor
           )
         ).from(node)
       )
-    when "="
-      # If assigning to a ".[identifier]" relation, sugar as a "setter" method.
+    when "=", "<<="
       lhs = node.lhs
+      # If assigning to a ".[identifier]" relation, sugar as a "setter" method.
       if lhs.is_a?(AST::Relate) \
       && lhs.op.value == "." \
       && lhs.rhs.is_a?(AST::Identifier)
-        name = "#{lhs.rhs.as(AST::Identifier).value}="
+        name = "#{lhs.rhs.as(AST::Identifier).value}#{node.op.value}"
         ident = AST::Identifier.new(name).from(lhs.rhs)
         args = AST::Group.new("(", [node.rhs]).from(node.rhs)
         rhs = AST::Qualify.new(ident, args).from(node)
@@ -266,7 +266,7 @@ class Mare::Compiler::Sugar < Mare::AST::CopyOnMutateVisitor
       && lhs.rhs.as(AST::Qualify).term.is_a?(AST::Identifier) \
       && lhs.rhs.as(AST::Qualify).term.as(AST::Identifier).value == "[]"
         inner = lhs.rhs.as(AST::Qualify)
-        ident = AST::Identifier.new("[]=").from(inner.term)
+        ident = AST::Identifier.new("[]#{node.op.value}").from(inner.term)
         args = inner.group.dup
         args.terms = args.terms.dup
         args.terms << node.rhs
@@ -279,7 +279,7 @@ class Mare::Compiler::Sugar < Mare::AST::CopyOnMutateVisitor
       && lhs.rhs.as(AST::Qualify).term.is_a?(AST::Identifier) \
       && lhs.rhs.as(AST::Qualify).term.as(AST::Identifier).value == "[]!"
         inner = lhs.rhs.as(AST::Qualify)
-        ident = AST::Identifier.new("[]=!").from(inner.term)
+        ident = AST::Identifier.new("[]#{node.op.value}!").from(inner.term)
         args = inner.group.dup
         args.terms = args.terms.dup
         args.terms << node.rhs

@@ -84,7 +84,7 @@ class Mare::Compiler::Infer::MetaType::Unsatisfiable
   end
 
   def extracted_from(origin)
-    raise NotImplementedError.new("#{origin.inspect}+>#{self.inspect}")
+    raise NotImplementedError.new("#{origin.inspect}->>#{self.inspect}")
   end
 
   def subtype_of?(ctx : Context, other : Inner) : Bool

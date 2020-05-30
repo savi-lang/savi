@@ -419,7 +419,7 @@ struct Mare::Compiler::Infer::MetaType::Union
   end
 
   def extracted_from(origin)
-    raise NotImplementedError.new("#{origin.inspect}+>#{self.inspect}") \
+    raise NotImplementedError.new("#{origin.inspect}->>#{self.inspect}") \
       if terms || anti_terms
 
     result = Unsatisfiable::INSTANCE

@@ -46,6 +46,10 @@ class Mare::Compiler::ServeHover
       [within.rhs].each do |term|
         return [within] + find(pos, term) if term.span_pos.contains?(pos)
       end
+    when AST::FieldReplace
+      [within.rhs].each do |term|
+        return [within] + find(pos, term) if term.span_pos.contains?(pos)
+      end
     when AST::Choice
       within.list.each do |cond, body|
         return [within] + find(pos, cond) if cond.span_pos.contains?(pos)

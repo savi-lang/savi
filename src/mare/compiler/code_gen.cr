@@ -1697,6 +1697,21 @@ class Mare::Compiler::CodeGen
     value
   end
 
+  def gen_field_replace(node : AST::FieldReplace)
+    old_value = gen_field_load(node.value)
+
+    value = gen_expr(node.rhs).as(LLVM::Value)
+    name = value.name
+
+    value = gen_assign_cast(value, type_of(node), node.rhs)
+    value.name = name
+
+    @di.set_loc(node)
+    gen_field_store(node.value, value)
+
+    old_value
+  end
+
   def gen_check_identity_is(relate : AST::Relate)
     lhs_type = type_of(relate.lhs)
     rhs_type = type_of(relate.rhs)
@@ -1970,6 +1985,8 @@ class Mare::Compiler::CodeGen
       gen_field_load(expr.value)
     when AST::FieldWrite
       gen_field_eq(expr)
+    when AST::FieldReplace
+      gen_field_replace(expr)
     when AST::LiteralString
       gen_string(expr.value)
     when AST::LiteralCharacter
@@ -2327,8 +2344,8 @@ class Mare::Compiler::CodeGen
       value, @f64, to_type, to_min, to_max, false)
   end
 
-  def gen_global_for_const(const : LLVM::Value) : LLVM::Value
-    global = @mod.globals.add(const.type, "")
+  def gen_global_for_const(const : LLVM::Value, name : String = "") : LLVM::Value
+    global = @mod.globals.add(const.type, name)
     global.linkage = LLVM::Linkage::External # TODO: Private linkage?
     global.initializer = const
     global.global_constant = true

@@ -396,6 +396,23 @@ class Mare::Compiler::Infer
     end
   end
 
+  class FieldExtract < Info
+    def initialize(@field : Field, @origin : MetaType)
+    end
+
+    def pos
+      @field.pos
+    end
+
+    def resolve!(ctx : Context, infer : ForFunc)
+      @field.resolve!(ctx, infer).extracted_from(@origin).ephemeralize
+    end
+
+    def within_domain!(ctx : Context, infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
+      meta_type_within_domain!(ctx, resolve!(ctx, infer), use_pos, constraint_pos, constraint, aliases - 1)
+    end
+  end
+
   class RaiseError < Info
     def initialize(@pos)
     end

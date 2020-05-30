@@ -134,8 +134,8 @@ module Mare::Compiler::Refer
       end
     end
 
-    # For a FieldRead or FieldWrite, take note of it by name.
-    def touch(ctx, node : AST::FieldRead | AST::FieldWrite)
+    # For a FieldRead, FieldWrite, or FieldReplace; take note of it by name.
+    def touch(ctx, node : AST::FieldRead | AST::FieldWrite | AST::FieldReplace)
       @analysis[node] = Field.new(node.value)
     end
 

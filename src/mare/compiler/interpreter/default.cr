@@ -581,6 +581,40 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         setter_body.terms << AST::FieldRead.new(ident.value).from(ident)
         setter_func = Program::Function.new(setter_cap, setter_ident, setter_params, setter_ret, setter_body)
         @type.functions << setter_func
+
+        replace_cap = AST::Identifier.new("mutableplus").from(data["keyword"])
+        replace_ident = AST::Identifier.new("#{ident.value}<<=").from(ident)
+        replace_param = AST::Identifier.new("value").from(ident)
+        if !ret.nil?
+          pair = AST::Group.new(" ").from(replace_param)
+          pair.terms << replace_param
+          pair.terms << ret.dup
+          replace_param = pair
+        end
+        replace_params = AST::Group.new("(").from(ident)
+        replace_params.terms << replace_param
+        if ret
+          replace_ret = AST::Relate.new(
+            AST::Relate.new(
+              AST::Identifier.new("@").from(replace_cap),
+              AST::Operator.new("->>").from(replace_cap),
+              ret
+            ).from(ret),
+            AST::Operator.new("'").from(replace_cap),
+            AST::Identifier.new("aliased").from(replace_cap),
+          ).from(ret)
+        end
+        replace_assign = AST::FieldReplace.new(
+          ident.value,
+          AST::Prefix.new(
+            AST::Operator.new("--").from(ident),
+            AST::Identifier.new("value").from(ident),
+          ).from(ident)
+        ).from(ident)
+        replace_body = AST::Group.new(":").from(ident)
+        replace_body.terms << replace_assign
+        replace_func = Program::Function.new(replace_cap, replace_ident, replace_params, replace_ret, replace_body)
+        @type.functions << replace_func
       when "is"
         data = @@declare_is.run(decl)
 

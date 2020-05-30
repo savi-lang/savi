@@ -198,7 +198,7 @@ struct Mare::Compiler::Infer::MetaType
     when Intersection
       MetaType.new(inner.extracted_from(origin_inner.cap.not_nil!)) # TODO: convert to_generic
     else
-      raise NotImplementedError.new("#{origin_inner.inspect}+>#{inner.inspect}")
+      raise NotImplementedError.new("#{origin_inner.inspect}->>#{inner.inspect}")
     end
   end
 

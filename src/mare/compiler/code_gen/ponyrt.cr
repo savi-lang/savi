@@ -433,7 +433,8 @@ class Mare::Compiler::CodeGen::PonyRT
       end
     end
     traits_bitmap_global = g.gen_global_for_const \
-      @isize.const_array(traits_bitmap.map { |bits| @isize.const_int(bits) })
+      @isize.const_array(traits_bitmap.map { |bits| @isize.const_int(bits) }),
+      "#{type_def.llvm_name}.DESC.TRAITS"
 
     # If this type is an AsioEventNotify, then take note of the vtable index
     # of the _event_notify behaviour that the ASIO runtime will send to.

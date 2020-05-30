@@ -4,6 +4,10 @@
   :fun non now!: @inner!
   :fun non inner!: error!
 
+:class Container (A)
+  :prop value A
+  :new (@value)
+
 :actor Main
   :new (env)
     test = MicroTest.new(env)
@@ -112,6 +116,10 @@
 
     test["source_code_position_of_argument string"].pass =
       @source_code_position_of_argument_string(zero == 0) == "zero == 0"
+
+    container_string = Container(String).new("original")
+    test["<<= result"].pass = (container_string.value <<= "new") == "original"
+    test["<<= effect"].pass = container_string.value == "new"
 
     test.print_line_break // TODO: move to MicroTest constructor and finalizer
 

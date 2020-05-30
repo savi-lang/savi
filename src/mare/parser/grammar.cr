@@ -83,14 +83,15 @@ module Mare::Parser
     cap = (
       str("iso") | str("trn") | str("val") |
       str("ref") | str("box") | str("tag") | str("non") |
-      str("any") | str("alias") | str("send") | str("share") | str("read")
+      str("any") | str("alias") | str("send") | str("share") |
+      str("read") | str("mutable") | str("mutableplus")
     ).named(:ident)
     capmod = str("aliased").named(:ident)
 
     # Define a compound to be a closely bound chain of atoms.
     opcap = char('\'').named(:op)
     opdot = char('.').named(:op)
-    oparrow = (str("->") | str("+>")).named(:op)
+    oparrow = (str("->") | str("->>")).named(:op)
     compound = (atom >> (
       (opcap >> (capmod | cap)) | \
       (s >> oparrow >> s >> atom) | \
@@ -110,7 +111,7 @@ module Mare::Parser
             str("===") | str("==") | str("!==") | str("!=") |
             str("=~")).named(:op)
     op4 = (str("&&") | str("||")).named(:op)
-    ope = (str("+=") | str("-=") | char('=')).named(:op)
+    ope = (str("+=") | str("-=") | str("<<=") | char('=')).named(:op)
 
     # Construct the nested possible relations for each group of operators.
     tw = compound

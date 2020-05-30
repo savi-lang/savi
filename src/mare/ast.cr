@@ -433,6 +433,26 @@ module Mare::AST
     end
   end
 
+  class FieldReplace < Node
+    property value
+    property rhs
+    def initialize(@value : String, @rhs : Term)
+    end
+
+    def name; :field_x end
+    def to_a: Array(A); [name, value, rhs.to_a] of A end
+    def children_accept(ctx : Compiler::Context, visitor : Visitor)
+      @rhs.accept(ctx, visitor)
+    end
+    def children_accept(ctx : Compiler::Context, visitor : CopyOnMutateVisitor)
+      new_rhs, rhs_changed = child_single_accept(ctx, @rhs, visitor)
+      return self unless rhs_changed
+      dup.tap do |node|
+        node.rhs = new_rhs
+      end
+    end
+  end
+
   class Choice < Node
     property list
     def initialize(@list : Array({Term, Term}))

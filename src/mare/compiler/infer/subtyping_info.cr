@@ -101,27 +101,47 @@ class Mare::Compiler::Infer::SubtypingInfo
       # sake of structural subtyping, so they don't have to be fulfilled.
       next if this_func.has_tag?(:hygienic)
 
-      check_func(ctx, that, this_func, errors)
+      that_func = that.defn(ctx).find_func?(this_func.ident.value)
+      if that_func
+        this_cap = MetaType::Capability.new_maybe_generic(this_func.cap.value)
+        that_cap = MetaType::Capability.new_maybe_generic(that_func.cap.value)
+
+        # For "simple" capabilities, just use them to check the function.
+        if this_cap.value.is_a?(String) && that_cap.value.is_a?(String)
+          check_func(ctx, that, this_func, that_func, this_cap, that_cap, errors)
+        else
+          # If either capability is a generic cap, they must be equivalent.
+          # TODO: May need to revisit this requirement later and loosen it?
+          if this_cap != that_cap
+            errors << {that_func.cap.pos,
+              "this function's receiver capability is #{that_cap.inspect}"}
+            errors << {this_func.cap.pos,
+              "it is required to be equivalent to #{this_cap.inspect}"}
+          else
+            # Now that we know they both use the same generic cap,
+            # we can compare each reification of that generic cap.
+            this_cap.each_cap.each do |cap|
+              check_func(ctx, that, this_func, that_func, cap, cap, errors)
+            end
+          end
+        end
+      else
+        # The structural comparison fails if a required method is missing.
+        errors << {this_func.ident.pos,
+          "this function isn't present in the subtype"}
+      end
     end
 
     errors.empty?
   end
 
-  private def check_func(ctx, that, this_func, errors)
-    # The structural comparison fails if a required method is missing.
-    that_func = that.defn(ctx).find_func?(this_func.ident.value)
-    unless that_func
-      errors << {this_func.ident.pos,
-        "this function isn't present in the subtype"}
-      return false
-    end
-
+  private def check_func(ctx, that, this_func, that_func, this_cap, that_cap, errors)
     # Just asserting; we expect find_func? to prevent this.
     raise "found hygienic function" if that_func.has_tag?(:hygienic)
 
     # Get the Infer instance for both this and that function, to compare them.
-    this_infer = ctx.infer.for_func(ctx, this, this_func.make_link(this.link), MetaType.cap(this_func.cap.value)).tap(&.run)
-    that_infer = ctx.infer.for_func(ctx, that, that_func.make_link(that.link), MetaType.cap(that_func.cap.value)).tap(&.run)
+    this_infer = ctx.infer.for_func(ctx, this, this_func.make_link(this.link), MetaType.new(this_cap)).tap(&.run)
+    that_infer = ctx.infer.for_func(ctx, that, that_func.make_link(that.link), MetaType.new(that_cap)).tap(&.run)
 
     # A constructor can only match another constructor.
     case {that_func.has_tag?(:constructor), this_func.has_tag?(:constructor)}
@@ -170,8 +190,6 @@ class Mare::Compiler::Infer::SubtypingInfo
     end
 
     # Check the receiver capability.
-    this_cap = MetaType::Capability.new(this_func.cap.value)
-    that_cap = MetaType::Capability.new(that_func.cap.value)
     if that_func.has_tag?(:constructor)
       # Covariant receiver rcap for constructors.
       unless that_cap.subtype_of?(this_cap)

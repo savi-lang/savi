@@ -25,20 +25,46 @@ struct Mare::Compiler::Infer::MetaType::Capability
   ALL_NON_EPH = [ISO, TRN, REF, VAL, BOX, TAG, NON]
   ALL_SINGLE = [ISO_EPH, TRN_EPH] + ALL_NON_EPH
 
-  ANY   = new([ISO, TRN, REF, VAL, BOX, TAG, NON].to_set) # all (non-ephemeral) caps
-  ALIAS = new([REF, VAL, BOX, TAG, NON].to_set)           # alias as themselves
-  SEND  = new([ISO, VAL, TAG, NON].to_set)                # are sendable
-  SHARE = new([VAL, TAG, NON].to_set)                     # are sendable & alias as themselves
-  READ  = new([REF, VAL, BOX].to_set)                     # are readable & alias as themselves
+  ANY          = new([ISO, TRN, REF, VAL, BOX, TAG, NON].to_set) # all (non-ephemeral) caps
+  ALIAS        = new([REF, VAL, BOX, TAG, NON].to_set)           # alias as themselves
+  SEND         = new([ISO, VAL, TAG, NON].to_set)                # are sendable
+  SHARE        = new([VAL, TAG, NON].to_set)                     # are sendable & alias as themselves
+  READ         = new([REF, VAL, BOX].to_set)                     # are readable & alias as themselves
+  MUTABLE      = new([ISO, TRN, REF].to_set)                     # are mutable
+  MUTABLE_PLUS = new([ISO_EPH, TRN_EPH, ISO, TRN, REF].to_set)   # are mutable, incl ephemeral
 
   def self.new_generic(name)
     case name
-    when "any"   then ANY
-    when "alias" then ALIAS
-    when "send"  then SEND
-    when "share" then SHARE
-    when "read"  then READ
+    when "any"         then ANY
+    when "alias"       then ALIAS
+    when "send"        then SEND
+    when "share"       then SHARE
+    when "read"        then READ
+    when "mutable"     then MUTABLE
+    when "mutableplus" then MUTABLE_PLUS # TODO: can this special case for <<= be removed somehow?
     else raise NotImplementedError.new(name)
+    end
+  end
+
+  def self.new_maybe_generic(name)
+    case name
+    when "any"         then ANY
+    when "alias"       then ALIAS
+    when "send"        then SEND
+    when "share"       then SHARE
+    when "read"        then READ
+    when "mutable"     then MUTABLE
+    when "mutableplus" then MUTABLE_PLUS # TODO: can this special case for <<= be removed somehow?
+    else new(name)
+    end
+  end
+
+  def each_cap
+    value = value()
+    if value.is_a?(Set(Capability))
+      value.each
+    else
+      [self].each
     end
   end
 
@@ -397,7 +423,7 @@ struct Mare::Compiler::Infer::MetaType::Capability
   end
 
   def extracted_from(origin : Capability) : Capability
-    raise "unsupported extracted_from: #{origin}+>#{self}" \
+    raise "unsupported extracted_from: #{origin}->>#{self}" \
       unless ALL_NON_EPH.includes?(self) && ALL_SINGLE.includes?(origin)
 
     ##

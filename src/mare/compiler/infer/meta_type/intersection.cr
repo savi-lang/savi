@@ -339,7 +339,7 @@ struct Mare::Compiler::Infer::MetaType::Intersection
   end
 
   def extracted_from(origin)
-    raise NotImplementedError.new("#{origin.inspect}+>(nil cap)") unless cap
+    raise NotImplementedError.new("#{origin.inspect}->>(nil cap)") unless cap
 
     Intersection.new(Capability::NON, terms, anti_terms)
       .intersect(cap.not_nil!.extracted_from(origin))
