@@ -152,7 +152,7 @@ struct Mare::Compiler::Infer::MetaType
     inner.type_params
   end
 
-  def substitute_type_params(substitutions : Hash(Refer::TypeParam, MetaType))
+  def substitute_type_params(substitutions : Hash(TypeParam, MetaType))
     MetaType.new(inner.substitute_type_params(substitutions))
   end
 

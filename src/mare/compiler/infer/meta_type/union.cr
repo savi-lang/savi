@@ -366,7 +366,7 @@ struct Mare::Compiler::Infer::MetaType::Union
     result
   end
 
-  def substitute_type_params(substitutions : Hash(Refer::TypeParam, MetaType))
+  def substitute_type_params(substitutions : Hash(TypeParam, MetaType))
     result = Unsatisfiable.instance
 
     caps.try(&.each { |cap|

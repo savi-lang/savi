@@ -29,7 +29,16 @@ struct Mare::Compiler::Infer::MetaType::Nominal
     when Infer::ReifiedType
       defn.show_type(io)
     when TypeParam
-      io << defn.ref.ident.value
+      parent_rt = defn.parent_rt
+      if parent_rt
+        io << "["
+        io << defn.ref.ident.value
+        io << " from "
+        io << defn.parent_rt.try(&.show_type)
+        io << "]"
+      else
+        io << defn.ref.ident.value
+      end
     end
   end
 
@@ -45,7 +54,7 @@ struct Mare::Compiler::Infer::MetaType::Nominal
       func = defn.defn(ctx).find_func?(name)
       [{self, defn, func}] if func
     when TypeParam
-      infer.lookup_type_param_bound(defn.ref)
+      infer.lookup_type_param_bound(defn)
         .find_callable_func_defns(ctx, infer, name)
     else
       raise NotImplementedError.new(defn)
@@ -153,11 +162,11 @@ struct Mare::Compiler::Infer::MetaType::Nominal
     end
   end
 
-  def substitute_type_params(substitutions : Hash(Refer::TypeParam, MetaType))
+  def substitute_type_params(substitutions : Hash(TypeParam, MetaType))
     defn = defn()
     case defn
     when TypeParam
-      substitutions[defn.ref]?.try(&.inner) || self
+      substitutions[defn]?.try(&.inner) || self
     when ReifiedType
       args = defn.args.map do |arg|
         arg.substitute_type_params(substitutions).as(MetaType)
@@ -212,7 +221,7 @@ struct Mare::Compiler::Infer::MetaType::Nominal
         # When the other is a TypeParam, use its bound MetaType and run again.
         l = MetaType.new_nominal(defn)
         r = ctx.infer.for_type(ctx, other_defn.ref.parent_link)
-              .lookup_type_param_bound(other_defn.ref).strip_cap
+              .lookup_type_param_bound(other_defn).strip_cap
         l.subtype_of?(ctx, r)
       else
         raise NotImplementedError.new("type <: ?")
@@ -221,11 +230,15 @@ struct Mare::Compiler::Infer::MetaType::Nominal
       if other_defn.is_a?(ReifiedType)
         # When this is a TypeParam, use its bound MetaType and run again.
         l = ctx.infer.for_type(ctx, defn.ref.parent_link)
-              .lookup_type_param_bound(defn.ref).strip_cap
+              .lookup_type_param_bound(defn).strip_cap
         r = MetaType.new_nominal(other_defn)
         l.subtype_of?(ctx, r)
       elsif other_defn.is_a?(TypeParam)
-        return true if defn == other_defn
+        if defn.ref == other_defn.ref
+          return true if defn.parent_rt == other_defn.parent_rt
+          return true if defn.parent_rt.nil?
+          return true if other_defn.parent_rt.nil?
+        end
         raise NotImplementedError.new("type param <: type param")
       else
         raise NotImplementedError.new("type param <: ?")

@@ -344,21 +344,21 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
 
         # Return the list of MetaTypes that partially reify the bound;
         # that is, a list that constitutes every possible cap substitution.
-        {param_ref, bound_mt, caps}
+        {TypeParam.new(param_ref), bound_mt, caps}
       end
 
-    substitution_sets = [[] of {Refer::TypeParam, MetaType, MetaType}]
-    params_partial_reifications.each do |param_ref, bound_mt, caps|
+    substitution_sets = [[] of {TypeParam, MetaType, MetaType}]
+    params_partial_reifications.each do |param, bound_mt, caps|
       substitution_sets = substitution_sets.flat_map do |pairs|
-        caps.map { |cap| pairs + [{param_ref, bound_mt, cap}] }
+        caps.map { |cap| pairs + [{param, bound_mt, cap}] }
       end
     end
 
     substitution_sets.map do |substitutions|
       # TODO: Simplify/refactor in relation to code above
-      substitutions_map = {} of Refer::TypeParam => MetaType
-      substitutions.each do |param_ref, bound, cap_mt|
-        substitutions_map[param_ref] = MetaType.new_type_param(TypeParam.new(param_ref)).intersect(cap_mt)
+      substitutions_map = {} of TypeParam => MetaType
+      substitutions.each do |param, bound, cap_mt|
+        substitutions_map[param] = MetaType.new_type_param(param).intersect(cap_mt)
       end
 
       args = substitutions_map.map(&.last.substitute_type_params(substitutions_map))
@@ -385,7 +385,6 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     f : Program::Function::Link,
     cap : MetaType,
   ) : ForFunc
-    raise "halt" if cap.inner.as(MetaType::Capability).value == "mutableplus"
     mt = MetaType.new(rt).override_cap(cap)
     rf = ReifiedFunction.new(rt, f, mt)
     @map[rf] ||= (
@@ -397,24 +396,22 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   def for_type(
     ctx : Context,
     rt : ReifiedType,
-    type_args : Array(MetaType) = [] of MetaType,
-    precursor : (ForType | ForFunc)? = nil
+    type_args : Array(MetaType) = [] of MetaType
   )
     # Sanity check - the reified type shouldn't have any args yet.
     raise "already has type args: #{rt.inspect}" unless rt.args.empty?
 
-    for_type(ctx, rt.link, type_args, precursor)
+    for_type(ctx, rt.link, type_args)
   end
 
   def for_type(
     ctx : Context,
     link : Program::Type::Link,
-    type_args : Array(MetaType) = [] of MetaType,
-    precursor : (ForType | ForFunc)? = nil
+    type_args : Array(MetaType) = [] of MetaType
   ) : ForType
     rt = ReifiedType.new(link, type_args)
     @types[rt]? || (
-      ft = @types[rt] = ForType.new(ctx, ReifiedTypeAnalysis.new(rt), rt, precursor)
+      ft = @types[rt] = ForType.new(ctx, ReifiedTypeAnalysis.new(rt), rt)
       ft.tap(&.initialize_assertions(ctx))
       .tap { |ft| get_or_create_analysis(link).observe_reified_type(ctx, rt) }
     )
@@ -473,7 +470,9 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
 
   struct TypeParam
     getter ref : Refer::TypeParam
-    def initialize(@ref)
+    getter parent_rt : StructRef(ReifiedType)?
+    def initialize(@ref, parent_rt : ReifiedType? = nil)
+      @parent_rt = StructRef(ReifiedType).new(parent_rt) if parent_rt
     end
   end
 
@@ -557,9 +556,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     private getter ctx : Context
     getter analysis : ReifiedTypeAnalysis
     getter reified : ReifiedType
-    getter precursor : (ForType | ForFunc)?
 
-    def initialize(@ctx, @analysis, @reified, @precursor = nil)
+    def initialize(@ctx, @analysis, @reified)
       @type_param_refinements = {} of Refer::TypeParam => Array(MetaType)
     end
 
@@ -592,8 +590,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
 
     def lookup_type_param(ref : Refer::TypeParam, refer, receiver = nil)
-      raise NotImplementedError.new(ref) unless @precursor \
-        if ref.parent_link != reified.link
+      raise NotImplementedError.new(ref) if ref.parent_link != reified.link
 
       # Lookup the type parameter on self type and return the arg if present
       arg = reified.args[ref.index]?
@@ -603,17 +600,25 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       MetaType.new_type_param(TypeParam.new(ref))
     end
 
-    def lookup_type_param_bound(ref : Refer::TypeParam)
-      if ref.parent_link != reified.link
-        raise NotImplementedError.new(ref) unless @precursor
-        return @precursor.not_nil!.lookup_type_param_bound(ref)
+    def lookup_type_param_bound(type_param : TypeParam)
+      parent_rt = type_param.parent_rt
+      if parent_rt && parent_rt != reified
+        return (
+          ctx.infer.for_type(ctx, parent_rt.link, parent_rt.args)
+            .lookup_type_param_bound(type_param)
+        )
+      end
+
+      if type_param.ref.parent_link != reified.link
+        raise NotImplementedError.new([reified, type_param].inspect) \
+          unless parent_rt
       end
 
       # Get the MetaType of the declared bound for this type parameter.
-      bound : MetaType = type_expr(ref.bound, refer, nil)
+      bound : MetaType = type_expr(type_param.ref.bound, refer, nil)
 
       # If we have temporary refinements for this type param, apply them now.
-      @type_param_refinements[ref]?.try(&.each { |refine_type|
+      @type_param_refinements[type_param.ref]?.try(&.each { |refine_type|
         # TODO: make this less of a special case, somehow:
         bound = bound.strip_cap.intersect(refine_type.strip_cap).intersect(
           MetaType.new(
@@ -704,14 +709,38 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       raise NotImplementedError.new(node.to_a) unless node.group.style == "("
 
       target = type_expr(node.term, refer, receiver)
-      args = node.group.terms.map { |t| type_expr(t, refer, receiver).as(MetaType) } # TODO: is it possible to remove this superfluous "as"?
-      rt = reified_type(target.single!, args, self)
+      args = node.group.terms.map do |t|
+        resolve_type_param_parent_links(type_expr(t, refer, receiver))
+      end
+      rt = reified_type(target.single!, args)
       MetaType.new(rt)
     end
 
     # All other AST nodes are unsupported as type expressions.
     def type_expr(node : AST::Node, refer, receiver = nil) : MetaType
       raise NotImplementedError.new(node.to_a)
+    end
+
+    # TODO: Can we do this more eagerly? Chicken and egg problem.
+    # Can every TypeParam contain the parent_rt from birth, so we can avoid
+    # the cost of scanning and substituting them here later?
+    # It's a chicken-and-egg problem because the parent_rt may contain
+    # references to type params in its type arguments, which means those
+    # references have to exist somehow before the parent_rt is settled,
+    # but then that changes the parent_rt which needs to be embedded in them.
+    def resolve_type_param_parent_links(mt : MetaType) : MetaType
+      substitutions = {} of TypeParam => MetaType
+      mt.type_params.each do |type_param|
+        next if type_param.parent_rt
+        next if type_param.ref.parent_link != reified.link
+
+        scoped_type_param = TypeParam.new(type_param.ref, reified)
+        substitutions[type_param] = MetaType.new_type_param(scoped_type_param)
+      end
+
+      mt = mt.substitute_type_params(substitutions) if substitutions.any?
+
+      mt
     end
   end
 
@@ -1245,8 +1274,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       @for_type.lookup_type_param(ref, refer, receiver)
     end
 
-    def lookup_type_param_bound(ref)
-      @for_type.lookup_type_param_bound(ref)
+    def lookup_type_param_bound(type_param)
+      @for_type.lookup_type_param_bound(type_param)
     end
 
     def type_expr(node)
@@ -1597,8 +1626,10 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         term_info.is_a?(Fixed) &&
         term_info.inner.cap_only.inner == MetaType::Capability::NON
 
-      args = node.group.terms.map { |t| type_expr(t) }
-      rt = reified_type(term_info.inner.single!, args, self)
+      args = node.group.terms.map do |t|
+        @for_type.resolve_type_param_parent_links(type_expr(t))
+      end
+      rt = reified_type(term_info.inner.single!, args)
       ctx.infer.validate_type_args(ctx, self, node, rt)
 
       @analysis[node] = Fixed.new(node.pos, MetaType.new(rt, "non"))
@@ -1610,7 +1641,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         rt = reified_type(prelude_type("SourceCodePosition"))
         @analysis[node] = Fixed.new(node.pos, MetaType.new(rt))
       when "reflection_of_type"
-        reflect_mt = resolve(node.term)
+        reflect_mt = @for_type.resolve_type_param_parent_links(resolve(node.term))
         reflect_rt =
           if reflect_mt.type_params.empty?
             reflect_mt.single!

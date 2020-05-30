@@ -66,7 +66,7 @@ class Mare::Compiler::Infer::MetaType::Unconstrained
     Set(TypeParam).new # no type params are present
   end
 
-  def substitute_type_params(substitutions : Hash(Refer::TypeParam, MetaType))
+  def substitute_type_params(substitutions : Hash(TypeParam, MetaType))
     self # no type params are present to be substituted
   end
 

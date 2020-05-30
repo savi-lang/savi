@@ -129,7 +129,7 @@ struct Mare::Compiler::Infer::MetaType::AntiNominal
     end
   end
 
-  def substitute_type_params(substitutions : Hash(Refer::TypeParam, MetaType))
+  def substitute_type_params(substitutions : Hash(TypeParam, MetaType))
     raise NotImplementedError.new("#{self} substitute_type_params")
   end
 

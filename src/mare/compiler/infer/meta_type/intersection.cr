@@ -300,7 +300,7 @@ struct Mare::Compiler::Infer::MetaType::Intersection
     result
   end
 
-  def substitute_type_params(substitutions : Hash(Refer::TypeParam, MetaType))
+  def substitute_type_params(substitutions : Hash(TypeParam, MetaType))
     result = cap || Unconstrained.instance
 
     terms.try(&.each { |term|
