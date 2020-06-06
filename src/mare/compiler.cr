@@ -95,13 +95,18 @@ module Mare::Compiler
 
   def self.get_library_sources(dirname)
     library = Source::Library.new(dirname)
-    filenames = Dir.entries(dirname).select(&.ends_with?(".mare")).to_a
 
-    raise "No '.mare' source files found in #{dirname.inspect}!" \
-      if filenames.empty?
+    Dir.entries(dirname).map do |name|
+      if name.ends_with?(".mare")
+        Source.new(name, File.read(File.join(dirname, name)), library, :mare)
+      elsif name.ends_with?(".pony")
+        Source.new(name, File.read(File.join(dirname, name)), library, :pony)
+      end
+    end.compact
 
-    filenames.map do |name|
-      Source.new(name, File.read(File.join(dirname, name)), library)
+    .tap do |sources|
+      raise "No '.mare' or '.pony' source files found in #{dirname.inspect}!" \
+        if sources.empty?
     end
   end
 

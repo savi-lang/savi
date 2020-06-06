@@ -205,6 +205,11 @@ class Mare::Compiler::CodeGen
     def each_gfunc
       @gfuncs.each_value
     end
+
+    # PONY special case - Pony calls the default constructor `create`...
+    def default_constructor
+      gfuncs["new"]? || gfuncs["create"]
+    end
   end
 
   class GenFunc
@@ -2574,7 +2579,7 @@ class Mare::Compiler::CodeGen
 
     receiver = gen_alloc(gtype, expr, "#{gtype.type_def.llvm_name}.new")
     size_arg = @i64.const_int(expr.terms.size)
-    @builder.call(gtype.gfuncs["new"].llvm_func, [receiver, size_arg])
+    @builder.call(gtype.default_constructor.llvm_func, [receiver, size_arg])
 
     arg_type = gtype.gfuncs["<<"].reach_func.signature.params.first
 

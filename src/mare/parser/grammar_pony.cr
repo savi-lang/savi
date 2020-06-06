@@ -140,15 +140,19 @@ module Mare::Parser
 
     colon_type = char(':') >> sn >> compound
 
-    method_decl_start = (
-      str("fun") | str("be") | str("new")
-    ).named(:ident)
+    method_decl_start = (str("fun") | str("be") | str("new")).named(:ident)
+    method_param = (ident >> sn >> colon_type).named(:group_w)
     method_params = (
-      (char('(') >> sn >> ptermsp.maybe >> sn >> char(')')).named(:group)
-    )
+      char('(') >> sn >>
+      (
+        method_param >> sn >>
+        (char(',') >> sn >> method_param >> sn).repeat
+      ).maybe >> sn >>
+      char(')')
+    ).named(:group)
     method_decl_head = (
       method_decl_start >> sn >> (cap >> sn).maybe >> ident >> sn >>
-      method_params >> sn >> colon_type >> sn
+      method_params >> sn >> (colon_type >> sn).maybe
     ).named(:decl)
     method_decl = method_decl_head >> (str("=>") >> sn >> termsl).maybe
 
@@ -158,7 +162,7 @@ module Mare::Parser
     field_decl_head = (
       field_decl_start >> sn >> ident >> sn >> colon_type >> sn
     ).named(:pony_prop_decl)
-    field_decl = field_decl_head >> (char('=') >> sn >> compound >> sn).maybe
+    field_decl = field_decl_head >> (char('=') >> sn >> t >> sn).maybe
 
     member_decl = field_decl | method_decl
 

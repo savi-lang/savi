@@ -529,7 +529,7 @@ class Mare::Compiler::CodeGen::PonyRT
     # TODO: Run primitive initialisers using the main actor's heap.
 
     # Send the env in a message to the main actor's constructor
-    g.builder.call(g.gtypes["Main"]["new"].send_llvm_func, [main_actor, env])
+    g.builder.call(g.gtypes["Main"].default_constructor.send_llvm_func, [main_actor, env])
 
     # Start the runtime.
     start_success = g.builder.call(g.mod.functions["pony_start"], [
