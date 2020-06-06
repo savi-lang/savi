@@ -172,8 +172,30 @@ class Mare::Compiler::Sugar < Mare::AST::CopyOnMutateVisitor
       dot = AST::Operator.new(".").with_pos(lhs_pos)
       rhs = AST::Identifier.new(node.value[1..-1]).with_pos(rhs_pos)
       AST::Relate.new(lhs, dot, rhs).from(node)
+    elsif node.pos.source.pony?
+      # PONY special case: uses the keyword `this` for the self value.
+      if node.value == "this"
+        AST::Identifier.new("@").from(node)
+      # PONY special case: uses the keyword `error` for the error statement.
+      elsif node.value == "error"
+        AST::Identifier.new("error!").from(node)
+      else
+        node
+      end
     else
       node
+    end
+  end
+
+  # PONY special case: many operators have different names in Pony.
+  def visit(ctx, node : AST::Operator)
+    return node unless node.pos.source.pony?
+
+    case node.value
+    when "consume" then AST::Operator.new("--").from(node)
+    when "and"     then AST::Operator.new("&&").from(node)
+    when "or"      then AST::Operator.new("||").from(node)
+    else node
     end
   end
 
@@ -185,6 +207,19 @@ class Mare::Compiler::Sugar < Mare::AST::CopyOnMutateVisitor
       when "[!" then "[]!"
       end
     if square_bracket
+      # PONY special case: square brackets are type params in Pony
+      if node.pos.source.pony?
+        term = node.term
+        if term.is_a?(AST::Identifier) && term.value.match(/\A[A-Z]/)
+          return AST::Qualify.new(
+            term,
+            AST::Group.new("(", node.group.terms.dup).from(node.group)
+          ).from(node)
+        else
+          raise NotImplementedError.new(node.to_a.inspect)
+        end
+      end
+
       lhs = node.term
       node = AST::Qualify.new(
         AST::Identifier.new(square_bracket).from(node.group),
@@ -206,6 +241,23 @@ class Mare::Compiler::Sugar < Mare::AST::CopyOnMutateVisitor
         node,
       ).from(dot)
     end
+
+    # PONY special case: non-square qualify exclamation gets moved to the ident.
+    if node.pos.source.pony? && node.group.style == "(!"
+      new_ident_value = "#{node.term.as(AST::Identifier).value}!"
+      new_ident = AST::Identifier.new(new_ident_value).from(node.term)
+      new_group = AST::Group.new("(", node.group.terms.dup).from(node.group)
+      if new_top
+        node.term = new_ident
+        node.group = new_group
+      else
+        node = AST::Qualify.new(
+          new_ident,
+          new_group,
+        ).from(node)
+      end
+    end
+
     new_top || node
   end
 
@@ -250,7 +302,7 @@ class Mare::Compiler::Sugar < Mare::AST::CopyOnMutateVisitor
       )
     when "=", "<<="
       lhs = node.lhs
-      # If assigning to a ".[identifier]" relation, sugar as a "setter" method.
+      # If assigning to a ".identifier" relation, sugar as a "setter" method.
       if lhs.is_a?(AST::Relate) \
       && lhs.op.value == "." \
       && lhs.rhs.is_a?(AST::Identifier)

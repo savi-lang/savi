@@ -9,8 +9,10 @@ module Mare::Parser
     whitespace =
       char(' ') | char('\t') | char('\r') | str("\\\n") | str("\\\r\n")
     s = whitespace.repeat
+    rs = whitespace.repeat(1)
     newline = s >> eol_comment.maybe >> (char('\n') | s.then_eof)
     sn = (whitespace | newline).repeat
+    rsn = (whitespace | newline).repeat(1)
 
     # Define what a number looks like (integer and float).
     digit19 = range('1', '9')
@@ -33,7 +35,7 @@ module Mare::Parser
     # Define what an identifier looks like.
     ident_letter =
       range('a', 'z') | range('A', 'Z') | range('0', '9') | char('_')
-    ident = ident_letter.repeat(1).named(:ident)
+    ident = (ident_letter.repeat(1) >> char('\'').repeat).named(:ident)
 
     # Define what a string looks like.
     string_char =
@@ -55,7 +57,7 @@ module Mare::Parser
 
     # Define what a triple-quote string looks like.
     string3_content = declare()
-    string3 = str("\"\"\"") >> string3_content.named(:string3) >> str("\"\"\"")
+    string3 = str("\"\"\"") >> string3_content.named(:string) >> str("\"\"\"")
     string3_no_token = str("<<<") >> string3_content >> str("\"\"\"")
     string3_content.define \
       (string3_no_token | (~str("\"\"\"") >> any)).repeat
@@ -63,12 +65,14 @@ module Mare::Parser
     # Define an atom to be a single term with no binary operators.
     parens = declare()
     prefixed = declare()
+    control = declare()
     decl = declare()
-    anystring = string | character
-    atom = prefixed | parens | anystring | float | integer | ident
+    anystring = string3 | string | character
+    atom = prefixed | control | parens | anystring | float | integer | ident
 
     # Define a prefixed term to be preceded by a prefix operator.
-    prefixop = (char('~') | str("--")).named(:op)
+    prefixoprs = (str("consume")).named(:op) >> rs
+    prefixop = (char('~') | str("--")).named(:op) | prefixoprs
     prefixed.define (prefixop >> atom).named(:prefix)
 
     # Define what a capability looks like.
@@ -81,7 +85,7 @@ module Mare::Parser
     capmod = str("aliased").named(:ident)
 
     # Define a compound to be a closely bound chain of atoms.
-    opcap = char('\'').named(:op)
+    opcap = s.named(:pony_opcap)
     opdot = char('.').named(:op)
     oparrow = (str("->") | str("->>")).named(:op)
     compound = (atom >> (
@@ -102,12 +106,11 @@ module Mare::Parser
             str("<:") | str(">=") | str("<=") | char('<') | char('>') |
             str("===") | str("==") | str("!==") | str("!=") |
             str("=~")).named(:op)
-    op4 = (str("&&") | str("||")).named(:op)
-    ope = (str("+=") | str("-=") | str("<<=") | char('=')).named(:op)
+    op4 = (str("and") | str("or")).named(:op) >> rsn
+    ope = char('=').named(:op)
 
     # Construct the nested possible relations for each group of operators.
-    tw = compound
-    t1 = (tw >> (opw >> s >> tw).repeat(1) >> s).named(:group_w) | tw
+    t1 = compound
     t2 = (t1 >> (sn >> op1 >> sn >> t1).repeat).named(:relate)
     t3 = (t2 >> (sn >> op2 >> sn >> t2).repeat).named(:relate)
     t4 = (t3 >> (sn >> op3 >> sn >> t3).repeat).named(:relate)
@@ -115,9 +118,10 @@ module Mare::Parser
     t = (te >> (sn >> ope >> sn >> te >> s).repeat).named(:relate_r)
 
     # Define what a semicolon/newline-separated sequence of terms looks like.
-    term = decl | t
-    termsl = term >> s >> (char(',') >> sn >> term >> s).repeat
-    terms = (termsl >> sn).repeat
+    term = declare()
+    termsl = term >> s >> ((char(';') | newline) >> sn >> term >> s).repeat
+    termscomma = term >> s >> (char(',') >> sn >> term >> s).repeat
+    terms = termsl
 
     # Define groups that are pipe-partitioned sequences of terms.
     pipesep = char('|').named(:op)
@@ -127,21 +131,43 @@ module Mare::Parser
       terms >> sn >>
       pipesep.maybe >> sn
     parens.define(
-      (str("^(") >> sn >> ptermsp.maybe >> sn >> char(')')).named(:group) |
+      (char('(') >> sn >> termscomma.maybe >> sn >> char(')') >> char('?').maybe).named(:group) |
       (char('(') >> sn >> ptermsp.maybe >> sn >> char(')')).named(:group) |
-      (char('[') >> sn >> ptermsp.maybe >> sn >> char(']') >> char('!').maybe).named(:group)
-    )
-
-    # Define what a declaration looks like.
-    decl.define(
-      (char(':') >> ident >> (s >> compound).repeat >> s).named(:decl) >>
-      (char(':') | ~~newline)
+      (char('[') >> sn >> ptermsp.maybe >> sn >> char(']')).named(:group)
     )
 
     colon_type = char(':') >> sn >> compound
 
+    control_block = terms.named(:pony_control_block)
+    control_var = (
+      (str("var") | str("let")) >> rsn >>
+      (ident >> sn >> colon_type.maybe).named(:group_w) >> sn >>
+      char('=').named(:op) >> sn >> term
+    ).named(:relate)
+    control_if = (
+      str("if") >> rsn >> control_block >> sn >>
+      str("then") >> rsn >> control_block >> sn >>
+      (
+        str("elseif") >> rsn >> control_block >> sn >>
+        str("then") >> rsn >> control_block >> sn
+      ).repeat >>
+      (str("else") >> rsn >> control_block >> sn).maybe >>
+      str("end")
+    ).named(:pony_control_if)
+    control_while = (
+      str("while") >> rsn >> control_block >> sn >>
+      str("do") >> rsn >> control_block >> sn >>
+      (str("else") >> rsn >> control_block >> sn).maybe >>
+      str("end")
+    ).named(:pony_control_while)
+    control.define control_var | control_if | control_while
+    control_mid_keywords = str("do") | str("then") | str("else") | str("end")
+
     method_decl_start = (str("fun") | str("be") | str("new")).named(:ident)
-    method_param = (ident >> sn >> colon_type).named(:group_w)
+    method_param = (
+      (ident >> sn >> colon_type).named(:group_w) >> sn >>
+      (char('=').named(:op) >> sn >> term >> sn).maybe
+    ).named(:relate)
     method_params = (
       char('(') >> sn >>
       (
@@ -152,9 +178,11 @@ module Mare::Parser
     ).named(:group)
     method_decl_head = (
       method_decl_start >> sn >> (cap >> sn).maybe >> ident >> sn >>
-      method_params >> sn >> (colon_type >> sn).maybe
-    ).named(:decl)
-    method_decl = method_decl_head >> (str("=>") >> sn >> termsl).maybe
+      method_params >> sn >>
+      (colon_type >> sn).maybe >>
+      (char('?').named(:ident) >> sn).maybe
+    ).named(:pony_method_decl)
+    method_decl = method_decl_head >> (str("=>") >> sn >> terms).maybe
 
     field_decl_start = (
       str("var") | str("let") | str("embed")
@@ -162,20 +190,28 @@ module Mare::Parser
     field_decl_head = (
       field_decl_start >> sn >> ident >> sn >> colon_type >> sn
     ).named(:pony_prop_decl)
-    field_decl = field_decl_head >> (char('=') >> sn >> t >> sn).maybe
-
-    member_decl = field_decl | method_decl
+    field_decl = field_decl_head >> (char('=') >> sn >> term >> sn).maybe
 
     type_decl_start = (
       str("primitive") | str("struct") | str("class") | str("actor") |
       str("interface") | str("trait") | str("type")
     ).named(:ident)
+    type_decl_head = (
+      (type_decl_start >> sn >> (cap >> sn).maybe >> ident >> sn).named(:decl)
+    )
     type_decl = (
-      (type_decl_start >> sn >> ident >> sn).named(:decl) >>
-      (member_decl >> sn).repeat
+      type_decl_head >> sn >>
+      (string3 >> sn).maybe >>
+      (field_decl >> sn).repeat >>
+      (method_decl >> sn).repeat
     )
 
     use_decl = str("TODO: use_decl")
+
+    reset_context_keyword = (
+      type_decl_start | method_decl_start | control_mid_keywords
+    )
+    term.define ~reset_context_keyword >> t
 
     # Define a total document to be use_decls followed by type_decls.
     doc = (sn >>

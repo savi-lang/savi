@@ -1077,6 +1077,47 @@ class Mare::Compiler::CodeGen
         else
           llvm_type_of(gtype).const_int(0)
         end
+      when "min_value"
+        if gtype.type_def.is_floating_point_numeric?(ctx)
+          raise NotImplementedError.new("float min_value compiler intrinsic")
+        else
+          if gtype.type_def.is_signed_numeric?(ctx)
+            case bit_width_of(gtype)
+            when 1 then llvm_type_of(gtype).const_int(1)
+            when 8 then llvm_type_of(gtype).const_int(0xFF)
+            when 16 then llvm_type_of(gtype).const_int(0xFFFF)
+            when 32 then llvm_type_of(gtype).const_int(0xFFFFFFFF)
+            when 64 then llvm_type_of(gtype).const_int(0xFFFFFFFFFFFFFFFF)
+            else raise NotImplementedError.new(bit_width_of(gtype))
+            end
+          else
+            llvm_type_of(gtype).const_int(0)
+          end
+        end
+      when "max_value"
+        if gtype.type_def.is_floating_point_numeric?(ctx)
+          raise NotImplementedError.new("float max_value compiler intrinsic")
+        else
+          if gtype.type_def.is_signed_numeric?(ctx)
+            case bit_width_of(gtype)
+            when 1 then llvm_type_of(gtype).const_int(0)
+            when 8 then llvm_type_of(gtype).const_int(0x7F)
+            when 16 then llvm_type_of(gtype).const_int(0x7FFF)
+            when 32 then llvm_type_of(gtype).const_int(0x7FFFFFFF)
+            when 64 then llvm_type_of(gtype).const_int(0x7FFFFFFFFFFFFFFF)
+            else raise NotImplementedError.new(bit_width_of(gtype))
+            end
+          else
+            case bit_width_of(gtype)
+            when 1 then llvm_type_of(gtype).const_int(1)
+            when 8 then llvm_type_of(gtype).const_int(0xFF)
+            when 16 then llvm_type_of(gtype).const_int(0xFFFF)
+            when 32 then llvm_type_of(gtype).const_int(0xFFFFFFFF)
+            when 64 then llvm_type_of(gtype).const_int(0xFFFFFFFFFFFFFFFF)
+            else raise NotImplementedError.new(bit_width_of(gtype))
+            end
+          end
+        end
       when "u8" then gen_numeric_conv(gtype, @gtypes["U8"], params[0])
       when "u16" then gen_numeric_conv(gtype, @gtypes["U16"], params[0])
       when "u32" then gen_numeric_conv(gtype, @gtypes["U32"], params[0])

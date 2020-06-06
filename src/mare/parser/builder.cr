@@ -56,7 +56,7 @@ module Mare::Parser::Builder
     decl
   end
 
-  # Special case for Pony - rewrite `let`, `var`, and `embed` as `prop`.
+  # PONY special case: rewrite `let`, `var`, and `embed` as `prop`.
   # TODO: Do something else and actually carry through the Pony distinction?
   private def self.build_pony_prop_decl(main, iter, state)
     assert_kind(main, :pony_prop_decl)
@@ -73,13 +73,30 @@ module Mare::Parser::Builder
     decl
   end
 
+  # PONY special case: rewrite `?` in a method decl as `!` instead,
+  # since that is the symbol we use for partial calls.
+  private def self.build_pony_method_decl(main, iter, state)
+    assert_kind(main, :pony_method_decl)
+    decl = AST::Declare.new.with_pos(state.pos(main))
+
+    iter.while_next_is_child_of(main) do |child|
+      term = build_term(child, iter, state)
+
+      if term.is_a?(AST::Identifier) && term.value == "?"
+        term = AST::Identifier.new("!").from(term)
+      end
+
+      decl.head << term
+    end
+
+    decl
+  end
+
   private def self.build_term(main, iter, state)
     kind, start, finish = main
     case kind
     when :decl
       build_decl(main, iter, state)
-    when :pony_prop_decl
-      build_pony_prop_decl(main, iter, state)
     when :doc_string
       value = state.slice(main)
       AST::DocString.new(value).with_pos(state.pos(main))
@@ -124,6 +141,10 @@ module Mare::Parser::Builder
     when :op
       value = state.slice(main)
       AST::Operator.new(value).with_pos(state.pos(main))
+    when :pony_opcap
+      # PONY special case: need to fake the Mare cap suffix operator.
+      value = state.slice(main)
+      AST::Operator.new("'").with_pos(state.pos(main))
     when :relate   then build_relate(main, iter, state)
     when :relate_r then build_relate_r(main, iter, state)
     when :group    then build_group(main, iter, state)
@@ -131,6 +152,11 @@ module Mare::Parser::Builder
     when :prefix   then build_prefix(main, iter, state)
     when :qualify  then build_qualify(main, iter, state)
     when :compound then build_compound(main, iter, state)
+    when :pony_prop_decl     then build_pony_prop_decl(main, iter, state)
+    when :pony_method_decl   then build_pony_method_decl(main, iter, state)
+    when :pony_control_block then build_pony_control_block(main, iter, state)
+    when :pony_control_if    then build_pony_control_if(main, iter, state)
+    when :pony_control_while then build_pony_control_while(main, iter, state)
     else
       raise NotImplementedError.new(kind)
     end
@@ -185,6 +211,9 @@ module Mare::Parser::Builder
     last_char = state.slice((main[2] - 1)..(main[2] - 1))
     style += "!" if last_char == "!"
 
+    # PONY special case: same as above, but syntax is a question mark instead.
+    style += "!" if last_char == "?"
+
     terms_lists = [[] of AST::Term]
     partitions = [main[1] + 1]
 
@@ -230,7 +259,71 @@ module Mare::Parser::Builder
       group.terms << term
     end
 
+    group.terms.size == 1 ? group.terms.first : group
+  end
+
+  private def self.build_pony_control_block(main, iter, state)
+    assert_kind(main, :pony_control_block)
+    group = AST::Group.new("(").with_pos(state.pos(main))
+
+    iter.while_next_is_child_of(main) do |child|
+      term = build_term(child, iter, state)
+
+      raise "stray operator: #{term}" if term.is_a?(AST::Operator)
+
+      group.terms << term
+    end
+
     group
+  end
+
+  private def self.build_pony_control_if(main, iter, state)
+    assert_kind(main, :pony_control_if)
+    pos = state.pos(main)
+    stack = [] of AST::Term
+    list = [] of {AST::Term, AST::Term}
+
+    iter.while_next_is_child_of(main) do |child|
+      term = build_term(child, iter, state)
+
+      raise "stray operator: #{term}" if term.is_a?(AST::Operator)
+
+      if stack.empty?
+        stack.push(term)
+      else
+        list.push({stack.shift(), term})
+      end
+    end
+
+    unless stack.empty?
+      list.push({AST::Identifier.new("True").with_pos(pos), stack.shift()})
+    end
+    raise "inconsistent logic" unless stack.empty?
+
+    AST::Choice.new(list).with_pos(pos)
+  end
+
+  private def self.build_pony_control_while(main, iter, state)
+    assert_kind(main, :pony_control_while)
+    pos = state.pos(main)
+    stack = [] of AST::Term
+
+    iter.while_next_is_child_of(main) do |child|
+      term = build_term(child, iter, state)
+
+      raise "stray operator: #{term}" if term.is_a?(AST::Operator)
+
+      stack.push(term)
+    end
+
+    raise "wrong number of terms: #{stack.to_a.inspect}" \
+      if stack.size < 2 || stack.size > 3
+
+    AST::Loop.new(
+      stack.shift(),
+      stack.shift(),
+      stack.last? || AST::Identifier.new("None").with_pos(pos),
+    ).with_pos(pos)
   end
 
   private def self.build_prefix(main, iter, state)
