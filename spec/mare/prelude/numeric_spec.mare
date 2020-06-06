@@ -85,6 +85,41 @@
     @assert = F32  .zero == 0
     @assert = F64  .zero == 0
 
+  :it "can report the max or minimum integer based on bit width and signedness"
+    @assert = Bool .max_value == True
+    @assert = U8   .max_value == 0xFF
+    @assert = U16  .max_value == 0xFFFF
+    @assert = U32  .max_value == 0xFFFF_FFFF
+    @assert = U64  .max_value == 0xFFFF_FFFF_FFFF_FFFF
+    @assert = I8   .max_value == 0x7F
+    @assert = I16  .max_value == 0x7FFF
+    @assert = I32  .max_value == 0x7FFF_FFFF
+    @assert = I64  .max_value == 0x7FFF_FFFF_FFFF_FFFF
+    if Platform.lp64 (
+      @assert = USize.max_value == 0xFFFF_FFFF_FFFF_FFFF
+      @assert = ISize.max_value == 0x7FFF_FFFF_FFFF_FFFF
+    |
+      @assert = USize.max_value == 0xFFFF_FFFF
+      @assert = ISize.max_value == 0x7FFF_FFFF
+    )
+
+    @assert = Bool .min_value == False
+    @assert = U8   .min_value == 0
+    @assert = U16  .min_value == 0
+    @assert = U32  .min_value == 0
+    @assert = U64  .min_value == 0
+    @assert = I8   .min_value == 0xFF
+    @assert = I16  .min_value == 0xFFFF
+    @assert = I32  .min_value == 0xFFFF_FFFF
+    @assert = I64  .min_value == 0xFFFF_FFFF_FFFF_FFFF
+    if Platform.lp64 (
+      @assert = USize.min_value == 0
+      @assert = ISize.min_value == 0xFFFF_FFFF_FFFF_FFFF
+    |
+      @assert = USize.min_value == 0
+      @assert = ISize.min_value == 0xFFFF_FFFF
+    )
+
   :it "converts between different integer types"
     @assert = U32[36].u8    == 36
     @assert = U32[36].u16   == 36
