@@ -1,10 +1,6 @@
 require "pegmatite"
 
 module Mare::Parser
-  def self.tokenize(source : Source)
-    Pegmatite.tokenize(Grammar, source.content)
-  end
-
   @@cache = {} of String => {Source, AST::Document}
   def self.parse(source : Source)
     if (cache_result = @@cache[source.path]?; cache_result)
@@ -12,7 +8,14 @@ module Mare::Parser
       return cached_ast if cached_source == source
     end
 
-    Builder.build(tokenize(source), source)
+    grammar =
+      case source.language
+      when :mare then Grammar
+      when :pony then GrammarPony
+      else raise NotImplementedError.new("#{source.language} language parsing")
+      end
+
+    Builder.build(Pegmatite.tokenize(grammar, source.content), source)
 
     .tap do |result|
       @@cache[source.path] = {source, result}

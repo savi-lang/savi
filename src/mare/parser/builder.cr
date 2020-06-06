@@ -56,11 +56,30 @@ module Mare::Parser::Builder
     decl
   end
 
+  # Special case for Pony - rewrite `let`, `var`, and `embed` as `prop`.
+  # TODO: Do something else and actually carry through the Pony distinction?
+  private def self.build_pony_prop_decl(main, iter, state)
+    assert_kind(main, :pony_prop_decl)
+    decl = AST::Declare.new.with_pos(state.pos(main))
+
+    iter.while_next_is_child_of(main) do |child|
+      term = build_term(child, iter, state)
+      decl.head << term
+    end
+
+    # This part is the special case for Pony - override the head's first ident.
+    decl.head.first.as(AST::Identifier).value = "prop"
+
+    decl
+  end
+
   private def self.build_term(main, iter, state)
     kind, start, finish = main
     case kind
     when :decl
       build_decl(main, iter, state)
+    when :pony_prop_decl
+      build_pony_prop_decl(main, iter, state)
     when :doc_string
       value = state.slice(main)
       AST::DocString.new(value).with_pos(state.pos(main))

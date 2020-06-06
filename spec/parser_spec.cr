@@ -12,67 +12,40 @@ describe Mare::Parser do
 
       :fun degreesF (c F64) F64
         c * 9 / 5 + 32.0
-
-      :fun caller
-        @degreesF(10.add(2).sub(1))
     SOURCE
 
     ast = Mare::Parser.parse(source)
 
-    ast.to_a.should eq [:doc,
-      [:declare, [[:ident, "class"], [:ident, "Example"]], [:group, ":"]],
-      [:declare,
-        [[:ident, "prop"], [:ident, "name"], [:ident, "String"]],
-        [:group, ":", [:string, "World"]]
-      ],
-      [:declare, ["Return a friendly greeting string for this instance."],
-        [[:ident, "fun"], [:ident, "greeting"], [:ident, "String"]],
-        [:group, ":", [:relate,
-          [:relate,
-            [:string, "Hello, "],
-            [:op, "+"],
-            [:ident, "@name"],
-          ],
-          [:op, "+"],
-          [:string, "!"],
-        ]]
-      ],
-      [:declare,
-        [
-          [:ident, "fun"],
-          [:ident, "degreesF"],
-          [:group, "(", [:group, " ", [:ident, "c"], [:ident, "F64"]]],
-          [:ident, "F64"]
-        ],
-        [:group, ":", [:relate,
-          [:relate,
-            [:relate, [:ident, "c"], [:op, "*"], [:integer, 9]],
-            [:op, "/"],
-            [:integer, 5],
-          ],
-          [:op, "+"], [:float, 32.0],
-        ]]
-      ],
-      [:declare,
-        [[:ident, "fun"], [:ident, "caller"]],
-        [:group, ":", [:qualify,
-          [:ident, "@degreesF"],
-          [:group, "(",
-            [:qualify,
-              [:relate,
-                [:qualify,
-                  [:relate, [:integer, 10_u64], [:op, "."], [:ident, "add"]],
-                  [:group, "(", [:integer, 2_u64]],
-                ],
-                [:op, "."],
-                [:ident, "sub"],
-              ],
-              [:group, "(", [:integer, 1_u64]],
-            ],
-          ],
-        ]]
-      ],
-    ]
+    ast.to_a.pretty_inspect(74).should eq <<-AST
+    [:doc,
+     [:declare, [[:ident, "class"], [:ident, "Example"]], [:group, ":"]],
+     [:declare,
+      [[:ident, "prop"], [:ident, "name"], [:ident, "String"]],
+      [:group, ":", [:string, "World"]]],
+     [:declare,
+      ["Return a friendly greeting string for this instance."],
+      [[:ident, "fun"], [:ident, "greeting"], [:ident, "String"]],
+      [:group,
+       ":",
+       [:relate,
+        [:relate, [:string, "Hello, "], [:op, "+"], [:ident, "@name"]],
+        [:op, "+"],
+        [:string, "!"]]]],
+     [:declare,
+      [[:ident, "fun"],
+       [:ident, "degreesF"],
+       [:group, "(", [:group, " ", [:ident, "c"], [:ident, "F64"]]],
+       [:ident, "F64"]],
+      [:group,
+       ":",
+       [:relate,
+        [:relate,
+         [:relate, [:ident, "c"], [:op, "*"], [:integer, 9_u64]],
+         [:op, "/"],
+         [:integer, 5_u64]],
+        [:op, "+"],
+        [:float, 32.0]]]]]
+    AST
   end
 
   it "parses operators" do
@@ -285,5 +258,57 @@ describe Mare::Parser do
     ast2 = Mare::Parser.parse(Mare::Source.new_example(content))
 
     ast1.should be ast2
+  end
+
+  it "parses a Pony example" do
+    source = Mare::Source.new_pony_example <<-SOURCE
+    class Example
+      let name: String = "World"
+
+      // Return a friendly greeting string for this instance.
+      fun greeting(): String =>
+        "Hello, " + this.name + "!"
+
+      fun degreesF(c F64): F64 =>
+        c * 9 / 5 + 32.0
+    SOURCE
+
+    ast = Mare::Parser.parse(source)
+
+    ast.to_a.pretty_inspect(74).should eq <<-AST
+    [:doc,
+     [:declare, [[:ident, "class"], [:ident, "Example"]], [:group, ":"]],
+     [:declare,
+      [[:ident, "prop"], [:ident, "name"], [:ident, "String"]],
+      [:group, ":", [:string, "World"]]],
+     [:declare,
+      [[:ident, "fun"],
+       [:ident, "greeting"],
+       [:group, "("],
+       [:ident, "String"]],
+      [:group,
+       ":",
+       [:relate,
+        [:relate,
+         [:string, "Hello, "],
+         [:op, "+"],
+         [:relate, [:ident, "this"], [:op, "."], [:ident, "name"]]],
+        [:op, "+"],
+        [:string, "!"]]]],
+     [:declare,
+      [[:ident, "fun"],
+       [:ident, "degreesF"],
+       [:group, "(", [:group, " ", [:ident, "c"], [:ident, "F64"]]],
+       [:ident, "F64"]],
+      [:group,
+       ":",
+       [:relate,
+        [:relate,
+         [:relate, [:ident, "c"], [:op, "*"], [:integer, 9_u64]],
+         [:op, "/"],
+         [:integer, 5_u64]],
+        [:op, "+"],
+        [:float, 32.0]]]]]
+    AST
   end
 end

@@ -2,8 +2,13 @@ struct Mare::Source
   property filename : String
   property content : String
   property library : Library
+  property language : Symbol
 
-  def initialize(@filename, @content, @library)
+  def initialize(@filename, @content, @library, @language = :mare)
+  end
+
+  def pony?
+    @language == :pony
   end
 
   def path
@@ -15,6 +20,10 @@ struct Mare::Source
 
   def self.new_example(content)
     new("(example)", content, Library.new(""))
+  end
+
+  def self.new_pony_example(content)
+    new("(example)", content, Library.new(""), :pony)
   end
 end
 
