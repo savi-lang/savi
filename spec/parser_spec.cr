@@ -269,7 +269,7 @@ describe Mare::Parser do
       fun greeting(): String =>
         "Hello, " + this.name + "!"
 
-      fun degreesF(c F64): F64 =>
+      fun degreesF(c: F64): F64 =>
         c * 9 / 5 + 32.0
     SOURCE
 
