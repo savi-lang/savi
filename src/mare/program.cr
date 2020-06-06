@@ -197,9 +197,10 @@ class Mare::Program
     end
 
     # PONY special case - Pony calls the default constructor `create`...
-    def find_default_constructor!
-      find_func?("new") || find_func!("create")
+    def find_default_constructor?
+      find_func?("new") || find_func?("create")
     end
+    def find_default_constructor!; find_default_constructor?.not_nil! end
 
     def add_tag(tag : Symbol)
       raise NotImplementedError.new(tag) unless KNOWN_TAGS.includes?(tag)

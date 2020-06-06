@@ -213,6 +213,10 @@ class Mare::Compiler::Infer
     def initialize(@pos)
     end
 
+    def explicit?
+      @explicit
+    end
+
     def adds_alias; 1 end
 
     def first_viable_constraint_pos : Source::Pos

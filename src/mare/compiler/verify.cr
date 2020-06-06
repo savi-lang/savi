@@ -11,6 +11,11 @@
 #
 class Mare::Compiler::Verify < Mare::AST::Visitor
   def self.run(ctx, library)
+    # If this is the "root" library, check that it has a Main actor,
+    # and that the Main actor meets all requirements we expect.
+    check_main_actor(ctx, library) \
+      if library.make_link == ctx.namespace.root_library_link(ctx)
+
     library.types.each do |t|
       t_link = t.make_link(library)
       ctx.infer[t_link].each_non_argumented_reified.each do |rt|
@@ -30,6 +35,70 @@ class Mare::Compiler::Verify < Mare::AST::Visitor
         end
       end
     end
+  end
+
+  def self.check_main_actor(ctx, library)
+    main_link = ctx.namespace.main_type?(ctx)
+    main = main_link.try(&.resolve(ctx))
+
+    Error.at Source::Pos.show_library_path(library.source_library),
+      "This directory is being compiled, but it has no Main actor defined" \
+        unless main
+    raise "inconsistent logic" unless main_link && main
+
+    Error.at main.ident,
+      "The Main type defined here must be defined as an actor" \
+        unless main.has_tag?(:actor)
+
+    Error.at main.params.not_nil!,
+      "The Main actor is not allowed to have type parameters" \
+        if main.params
+
+    new_f = main.find_default_constructor?
+    new_f_link = new_f.make_link(main_link.not_nil!) if new_f
+
+    unless new_f
+      Error.at main.ident,
+        "The Main actor defined here must have a constructor named `new`",
+          main.functions.select(&.has_tag?(:constructor)) \
+            .map { |f| {f.ident.pos, "this constructor is not named `new`"} }
+    end
+    raise "inconsistent logic" unless new_f_link && new_f
+
+    Error.at new_f.not_nil!.ident,
+      "The Main.new function defined here must be a constructor" \
+        unless new_f.not_nil!.has_tag?(:constructor)
+
+    env_link = ctx.namespace.prelude_type("Env")
+    env = env_link.resolve(ctx)
+
+    Error.at new_f.params || new_f.ident,
+      "The Main.new function has too few parameters", [
+        {env.ident.pos, "it should accept exactly one parameter of type Env"},
+      ] \
+        unless new_f.params.try(&.terms.size.>=(1))
+
+    Error.at new_f.params.not_nil!,
+      "The Main.new function has too many parameters", [
+        {env.ident.pos, "it should accept exactly one parameter of type Env"},
+      ] \
+        unless new_f.params.not_nil!.terms.size == 1
+
+    env_rt = ctx.infer[env_link].no_args
+    env_mt = Infer::MetaType.new(env_rt)
+    main_rt = ctx.infer[main_link].no_args
+    new_rf = ctx.infer[new_f_link].each_reified_func(main_rt).first.not_nil!
+    new_f_param = new_f.params.not_nil!.terms.first.not_nil!
+    infer = ctx.infer[new_rf]
+    new_f_param_mt = infer.resolve(new_f_param)
+
+    Error.at new_f_param,
+      "The parameter of Main.new has the wrong type", [
+        {env.ident.pos, "it should accept a parameter of type Env"},
+        {infer[new_f_param].pos,
+          "but the parameter type is #{new_f_param_mt.show_type}"},
+      ] \
+        unless new_f_param_mt == env_mt
   end
 
   getter infer : Infer::ReifiedFuncAnalysis

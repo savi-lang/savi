@@ -1,15 +1,187 @@
-describe Mare::Compiler::Completeness do
-  it "complains when a constructor has an error-able body" do
+describe Mare::Compiler::Verify do
+  it "complains if there is no Main actor" do
+    content = <<-SOURCE
+    :primitive Example
+    SOURCE
+
+    source = Mare::Source.new(
+      "example.mare",
+      content,
+      Mare::Source::Library.new("/path/to/fake/example/library"),
+    )
+
+    expected = <<-MSG
+    This directory is being compiled, but it has no Main actor defined:
+    from /path/to/fake/example/library/:1:
+    /path/to/fake/example/library
+    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    MSG
+
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :verify)
+    end
+  end
+
+  it "complains if the Main type is not an actor" do
+    source = Mare::Source.new_example <<-SOURCE
+    :class Main
+    SOURCE
+
+    expected = <<-MSG
+    The Main type defined here must be defined as an actor:
+    from (example):1:
+    :class Main
+           ^~~~
+    MSG
+
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :verify)
+    end
+  end
+
+  it "complains if the Main actor has type parameters" do
+    source = Mare::Source.new_example <<-SOURCE
+    :actor Main (A)
+    SOURCE
+
+    expected = <<-MSG
+    The Main actor is not allowed to have type parameters:
+    from (example):1:
+    :actor Main (A)
+                ^~~
+    MSG
+
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :verify)
+    end
+  end
+
+  it "complains if the Main actor has no `new` constructor" do
+    source = Mare::Source.new_example <<-SOURCE
+    :actor Main
+      :new wrong_name
+    SOURCE
+
+    expected = <<-MSG
+    The Main actor defined here must have a constructor named `new`:
+    from (example):1:
+    :actor Main
+           ^~~~
+
+    - this constructor is not named `new`:
+      from (example):2:
+      :new wrong_name
+           ^~~~~~~~~~
+    MSG
+
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :verify)
+    end
+  end
+
+  it "complains if the Main.new function is not a constructor" do
+    source = Mare::Source.new_example <<-SOURCE
+    :actor Main
+      :fun new
+    SOURCE
+
+    expected = <<-MSG
+    The Main.new function defined here must be a constructor:
+    from (example):2:
+      :fun new
+           ^~~
+    MSG
+
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :verify)
+    end
+  end
+
+  it "complains if the Main.new function has no parameters" do
     source = Mare::Source.new_example <<-SOURCE
     :actor Main
       :new
+    SOURCE
+
+    expected = <<-MSG
+    The Main.new function has too few parameters:
+    from (example):2:
+      :new
+       ^~~
+
+    - it should accept exactly one parameter of type Env:
+      from /opt/code/src/prelude/env.mare:1:
+    :class val Env
+               ^~~
+    MSG
+
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :verify)
+    end
+  end
+
+  it "complains if the Main.new function has too many parameters" do
+    source = Mare::Source.new_example <<-SOURCE
+    :actor Main
+      :new (env Env, bogus Env)
+    SOURCE
+
+    expected = <<-MSG
+    The Main.new function has too many parameters:
+    from (example):2:
+      :new (env Env, bogus Env)
+           ^~~~~~~~~~~~~~~~~~~~
+
+    - it should accept exactly one parameter of type Env:
+      from /opt/code/src/prelude/env.mare:1:
+    :class val Env
+               ^~~
+    MSG
+
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :verify)
+    end
+  end
+
+  it "complains if the Main.new function is of the wrong type" do
+    source = Mare::Source.new_example <<-SOURCE
+    :actor Main
+      :new (env String)
+    SOURCE
+
+    expected = <<-MSG
+    The parameter of Main.new has the wrong type:
+    from (example):2:
+      :new (env String)
+            ^~~~~~~~~~
+
+    - it should accept a parameter of type Env:
+      from /opt/code/src/prelude/env.mare:1:
+    :class val Env
+               ^~~
+
+    - but the parameter type is String:
+      from (example):2:
+      :new (env String)
+                ^~~~~~
+    MSG
+
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :verify)
+    end
+  end
+
+  it "complains when a constructor has an error-able body" do
+    source = Mare::Source.new_example <<-SOURCE
+    :actor Main
+      :new (env)
         error!
     SOURCE
 
     expected = <<-MSG
     This constructor may raise an error, but that is not allowed:
     from (example):2:
-      :new
+      :new (env)
        ^~~
 
     - an error may be raised here:
@@ -26,7 +198,7 @@ describe Mare::Compiler::Completeness do
   it "complains when a no-exclamation function has an error-able body" do
     source = Mare::Source.new_example <<-SOURCE
     :actor Main
-      :new
+      :new (env)
 
     :primitive Example
       :fun risky (x U64)
@@ -58,7 +230,7 @@ describe Mare::Compiler::Completeness do
   it "complains when a try body has no possible errors to catch" do
     source = Mare::Source.new_example <<-SOURCE
     :actor Main
-      :new
+      :new (env)
         try (U64[33] * 3)
     SOURCE
 
@@ -82,7 +254,7 @@ describe Mare::Compiler::Completeness do
   it "complains when an async function declares or tries to yield" do
     source = Mare::Source.new_example <<-SOURCE
     :actor Main
-      :new
+      :new (env)
       :be try_to_yield
         :yields Bool
         yield True
@@ -125,7 +297,7 @@ describe Mare::Compiler::Completeness do
         yield False
 
     :actor Main
-      :new
+      :new (env)
         Example.try_to_yield -> (bool | bool)
     SOURCE
 
@@ -159,7 +331,7 @@ describe Mare::Compiler::Completeness do
   it "complains when a check would require runtime knowledge of capabilties" do
     source = Mare::Source.new_example <<-SOURCE
     :actor Main
-      :new: @example("example")
+      :new (env): @example("example")
       :fun example (x (String'val | String'ref))
         if (x <: String'ref) (
           x << "..."

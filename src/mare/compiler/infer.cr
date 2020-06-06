@@ -822,7 +822,9 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
           if reified.type.link.name == "Main" \
           && reified.link.name == "new"
             env = MetaType.new(reified_type(prelude_type("Env")))
-            self[param].as(Param).set_explicit(reified.func(ctx).ident.pos, env)
+            param_info = self[param].as(Param)
+            param_info.set_explicit(reified.func(ctx).ident.pos, env) \
+              unless param_info.explicit?
           end
         end
       end

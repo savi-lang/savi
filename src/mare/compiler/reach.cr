@@ -527,10 +527,13 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
 
   def run(ctx)
     # Reach functions called starting from the entrypoint of the program.
+    main = ctx.namespace.main_type?(ctx)
+    if main
+      new_f = main.resolve(ctx).find_default_constructor?
+      handle_func(ctx, ctx.infer[main].no_args, new_f.make_link(main)) if new_f
+    end
     env = ctx.namespace.prelude_type("Env")
     handle_func(ctx, ctx.infer[env].no_args, env.resolve(ctx).find_func!("_create").make_link(env))
-    main = ctx.namespace.main_type!(ctx)
-    handle_func(ctx, ctx.infer[main].no_args, main.resolve(ctx).find_default_constructor!.make_link(main))
     n = ctx.namespace.prelude_type("AsioEventNotify")
     handle_func(ctx, ctx.infer[n].no_args, n.resolve(ctx).find_func!("_event_notify").make_link(n))
 

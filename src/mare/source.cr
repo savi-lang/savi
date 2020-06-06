@@ -63,6 +63,11 @@ struct Mare::Source::Pos
     new(source, start, start, line_start, line_finish, row, col)
   end
 
+  def self.show_library_path(library : Library)
+    source = Source.new("", library.path, library, :path)
+    new(source, 0, library.path.size, 0, library.path.size, 0, 0)
+  end
+
   def initialize(
     @source, @start, @finish, @line_start, @line_finish, @row, @col
   )
