@@ -1,4 +1,7 @@
-version: 2
+version: 2.1
+orbs:
+  vsce: uraway/vsce@0.0.3
+
 jobs:
   build:
     machine: true
@@ -10,3 +13,28 @@ jobs:
       - run:
           name: Run the CI suite.
           command: make ci
+
+workflows:
+  build:
+    jobs:
+      - build
+  tooling-vscode-publish:
+    jobs:
+      - vsce/publish:
+          filters: { branches: { only: master } }
+          package-path: tooling/vscode
+          push-git-tag: false
+          post-install-steps:
+            - save_cache:
+                key: 'v1-node-cache-{{ .Branch }}-{{ checksum "package-lock.json" }}'
+                paths:
+                  - node_modules
+          pre-install-steps:
+            - restore_cache:
+                keys:
+                  - >-
+                    v1-node-cache-{{ .Branch }}-{{ checksum "package-lock.json"
+                    }}
+                  - 'v1-node-cache-{{ .Branch }}'
+                  - v1-node-cache-
+          publish-token-variable: VSCODE_MARKETPLACE_TOKEN
