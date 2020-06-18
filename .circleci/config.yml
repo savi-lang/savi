@@ -37,7 +37,7 @@ jobs:
       - run:
           name: Publish
           working_directory: tooling/vscode
-          command: npx vsce publish -p $VSCODE_MARKETPLACE_TOKEN 2>&1 | tee /dev/stderr | grep -E 'DONE|Version number cannot be the same'
+          command: sh -c "npx vsce publish -p $VSCODE_MARKETPLACE_TOKEN 2>&1 | tee /dev/stderr | grep -E 'DONE|Version number cannot be the same'"
 
 executors:
   node:
