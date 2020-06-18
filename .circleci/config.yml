@@ -22,6 +22,7 @@ workflows:
     jobs:
       - vsce/publish:
           filters: { branches: { only: master } }
+          publish-token-variable: VSCODE_MARKETPLACE_TOKEN
           package-path: tooling/vscode
           push-git-tag: false
           post-install-steps:
@@ -37,4 +38,4 @@ workflows:
                     }}
                   - 'v1-node-cache-{{ .Branch }}'
                   - v1-node-cache-
-          publish-token-variable: VSCODE_MARKETPLACE_TOKEN
+
