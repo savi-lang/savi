@@ -27,14 +27,14 @@ workflows:
           push-git-tag: false
           post-install-steps:
             - save_cache:
-                key: 'v1-node-cache-{{ .Branch }}-{{ checksum "package-lock.json" }}'
+                key: 'v1-node-cache-{{ .Branch }}-{{ checksum "tooling/vscode/package-lock.json" }}'
                 paths:
                   - node_modules
           pre-install-steps:
             - restore_cache:
                 keys:
                   - >-
-                    v1-node-cache-{{ .Branch }}-{{ checksum "package-lock.json"
+                    v1-node-cache-{{ .Branch }}-{{ checksum "tooling/vscode/package-lock.json"
                     }}
                   - 'v1-node-cache-{{ .Branch }}'
                   - v1-node-cache-
