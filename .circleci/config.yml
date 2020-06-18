@@ -1,5 +1,9 @@
 version: 2.1
 
+workflows:
+  build: { jobs: [build] }
+  tooling-vscode-publish: { jobs: [tooling-vscode-publish] }
+
 jobs:
   build:
     machine: true
@@ -35,6 +39,23 @@ jobs:
           working_directory: tooling/vscode
           command: npx vsce publish -p $VSCODE_MARKETPLACE_TOKEN 2>&1 | tee /dev/stderr | grep -E 'DONE|Version number cannot be the same'
 
-workflows:
-  build: { jobs: [build] }
-  tooling-vscode-publish: { jobs: [tooling-vscode-publish] }
+executors:
+  node:
+    description: |
+      CircleCI Node Docker image
+    docker:
+    - image: circleci/node:<<parameters.tag>>
+    parameters:
+      resource-class:
+        default: small
+        enum:
+        - small
+        - medium
+        - medium+
+        - large
+        - xlarge
+        type: enum
+      tag:
+        default: latest
+        type: string
+    resource_class: <<parameters.resource-class>>
