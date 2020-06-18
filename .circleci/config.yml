@@ -1,6 +1,4 @@
 version: 2.1
-orbs:
-  vsce: uraway/vsce@0.0.3
 
 jobs:
   build:
@@ -14,27 +12,29 @@ jobs:
           name: Run the CI suite.
           command: make ci
 
-workflows:
-  build:
-    jobs:
-      - build
   tooling-vscode-publish:
-    jobs:
-      - vsce/publish:
-          filters: { branches: { only: master } }
-          publish-token-variable: VSCODE_MARKETPLACE_TOKEN
-          package-path: tooling/vscode
-          push-git-tag: false
-          post-install-steps:
-            - save_cache:
-                key: 'v1-node-cache-{{ .Branch }}-{{ checksum "tooling/vscode/package-lock.json" }}'
-                paths:
-                  - node_modules
-          pre-install-steps:
-            - restore_cache:
-                keys:
-                  - >-
-                    v1-node-cache-{{ .Branch }}-{{ checksum "tooling/vscode/package-lock.json"
-                    }}
-                  - 'v1-node-cache-{{ .Branch }}'
-                  - v1-node-cache-
+    executor: node
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - >-
+              v1-node-cache-{{ .Branch }}-{{ checksum "tooling/vscode/package-lock.json"
+              }}
+            - 'v1-node-cache-{{ .Branch }}'
+            - v1-node-cache-
+      - run:
+          working_directory: tooling/vscode
+          command: npm install
+      - save_cache:
+          key: 'v1-node-cache-{{ .Branch }}-{{ checksum "tooling/vscode/package-lock.json" }}'
+          paths:
+            - node_modules
+      - run:
+          name: Publish
+          working_directory: tooling/vscode
+          command: npx vsce publish -p $VSCODE_MARKETPLACE_TOKEN 2>&1 | tee /dev/stderr | grep -E 'DONE|Version number cannot be the same'
+
+workflows:
+  build: { jobs: [build] }
+  tooling-vscode-publish: { jobs: [tooling-vscode-publish] }
