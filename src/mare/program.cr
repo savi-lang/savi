@@ -202,6 +202,14 @@ class Mare::Program
     end
     def find_default_constructor!; find_default_constructor?.not_nil! end
 
+    def find_similar_function(name : String)
+      finder = Levenshtein::Finder.new(name)
+      functions.each do |f|
+        finder.test(f.ident.value) unless f.has_tag?(:hygienic)
+      end
+      finder.best_match.try { |other_name| find_func?(other_name) }
+    end
+
     def add_tag(tag : Symbol)
       raise NotImplementedError.new(tag) unless KNOWN_TAGS.includes?(tag)
       @tags.add(tag)

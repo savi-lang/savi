@@ -567,31 +567,6 @@ class Mare::Compiler::Infer
     end
   end
 
-  class FromCall < DynamicInfo
-    getter lhs : AST::Node
-    getter member : String
-    getter args_pos : Array(Source::Pos)
-    getter args : Array(AST::Node)
-    getter ret_value_used : Bool
-    @ret : MetaType?
-    @ret_pos : Source::Pos? # TODO: remove?
-
-    def initialize(@pos, @lhs, @member, @args, @args_pos, @ret_value_used)
-    end
-
-    def describe_kind; "return value" end
-
-    def inner_resolve!(ctx : Context, infer : ForFunc)
-      raise "unresolved ret for #{self.inspect}" unless @ret
-      @ret.not_nil!
-    end
-
-    def set_return(infer : ForFunc, ret_pos : Source::Pos, ret : MetaType)
-      @ret_pos = ret_pos
-      @ret = ret.ephemeralize
-    end
-  end
-
   class FromYield < NamedInfo
     def describe_kind; "yield block result" end
   end
@@ -681,6 +656,330 @@ class Mare::Compiler::Infer
       end
 
       results
+    end
+  end
+
+  class FromCall < DynamicInfo
+    getter lhs : AST::Node
+    getter member : String
+    getter args_pos : Array(Source::Pos)
+    getter args : Array(AST::Node)
+    getter ret_value_used : Bool
+    @ret : MetaType?
+    @ret_pos : Source::Pos? # TODO: remove?
+
+    def initialize(@pos, @lhs, @member, @args, @args_pos, @ret_value_used)
+    end
+
+    def describe_kind; "return value" end
+
+    def inner_resolve!(ctx : Context, infer : ForFunc)
+      raise "unresolved ret for #{self.inspect}" unless @ret
+      @ret.not_nil!
+    end
+
+    def set_return(infer : ForFunc, ret_pos : Source::Pos, ret : MetaType)
+      @ret_pos = ret_pos
+      @ret = ret.ephemeralize
+    end
+
+    def follow_call_get_call_defns(ctx : Context, infer : ForFunc)
+      call = self
+      receiver = infer[call.lhs].resolve!(ctx, infer)
+      call_defns = receiver.find_callable_func_defns(ctx, infer, call.member)
+
+      # Raise an error if we don't have a callable function for every possibility.
+      call_defns << {receiver.inner, nil, nil} if call_defns.empty?
+      problems = [] of {Source::Pos, String}
+      call_defns.each do |(call_mti, call_defn, call_func)|
+        if call_defn.nil?
+          problems << {call.pos,
+            "the type #{call_mti.inspect} has no referencable types in it"}
+        elsif call_func.nil?
+          call_defn_defn = call_defn.defn(ctx)
+
+          problems << {call_defn_defn.ident.pos,
+            "#{call_defn_defn.ident.value} has no '#{call.member}' function"}
+
+          found_similar = false
+          if call.member.ends_with?("!")
+            call_defn_defn.find_func?(call.member[0...-1]).try do |similar|
+              found_similar = true
+              problems << {similar.ident.pos,
+                "maybe you meant to call '#{similar.ident.value}' (without '!')"}
+            end
+          else
+            call_defn_defn.find_func?("#{call.member}!").try do |similar|
+              found_similar = true
+              problems << {similar.ident.pos,
+                "maybe you meant to call '#{similar.ident.value}' (with a '!')"}
+            end
+          end
+
+          unless found_similar
+            similar = call_defn_defn.find_similar_function(call.member)
+            problems << {similar.ident.pos,
+              "maybe you meant to call the '#{similar.ident.value}' function"} \
+                if similar
+          end
+        end
+      end
+      Error.at call,
+        "The '#{call.member}' function can't be called on #{receiver.show_type}",
+          problems unless problems.empty?
+
+      call_defns
+    end
+
+    def follow_call_check_receiver_cap(ctx : Context, infer : ForFunc, call_mt, call_func, problems)
+      call = self
+      call_cap_mt = call_mt.cap_only
+      autorecover_needed = false
+
+      call_func_cap = MetaType::Capability.new_maybe_generic(call_func.cap.value)
+      call_func_cap_mt = MetaType.new(call_func_cap)
+
+      # The required capability is the receiver capability of the function,
+      # unless it is an asynchronous function, in which case it is tag.
+      required_cap = call_func_cap
+      required_cap = MetaType::Capability.new("tag") \
+        if call_func.has_tag?(:async) && !call_func.has_tag?(:constructor)
+
+      receiver_okay =
+        if required_cap.value.is_a?(String)
+          call_cap_mt.subtype_of?(ctx, MetaType.new(required_cap))
+        else
+          call_cap_mt.satisfies_bound?(ctx, MetaType.new(required_cap))
+        end
+
+      # Enforce the capability restriction of the receiver.
+      if receiver_okay
+        # For box functions only, we reify with the actual cap on the caller side.
+        # Or rather, we use "ref", "box", or "val", depending on the caller cap.
+        # For all other functions, we just use the cap from the func definition.
+        reify_cap =
+          if required_cap.value == "box"
+            case call_cap_mt.inner.as(MetaType::Capability).value
+            when "iso", "trn", "ref" then MetaType.cap("ref")
+            when "val" then MetaType.cap("val")
+            else MetaType.cap("box")
+            end
+          # TODO: This shouldn't be a special case - any generic cap should be accepted.
+          elsif required_cap.value.is_a?(Set(MetaType::Capability))
+            call_cap_mt
+          else
+            call_func_cap_mt
+          end
+      elsif call_func.has_tag?(:constructor)
+        # Constructor calls ignore cap of the original receiver.
+        reify_cap = call_func_cap_mt
+      elsif call_cap_mt.ephemeralize.subtype_of?(ctx, MetaType.new(required_cap))
+        # We failed, but we may be able to use auto-recovery.
+        # Take note of this and we'll finish the auto-recovery checks later.
+        autorecover_needed = true
+        # For auto-recovered calls, always use the cap of the func definition.
+        reify_cap = call_func_cap_mt
+      else
+        # We failed entirely; note the problem and carry on.
+        problems << {call_func.cap.pos,
+          "the type #{call_mt.inner.inspect} isn't a subtype of the " \
+          "required capability of '#{required_cap}'"}
+
+        # If the receiver of the call is the self (the receiver of the caller),
+        # then we can give an extra hint about changing its capability to match.
+        if infer[call.lhs].is_a?(Self)
+          problems << {infer.func.cap.pos, "this would be possible if the " \
+            "calling function were declared as `:fun #{required_cap}`"}
+        end
+
+        # We already failed subtyping for the receiver cap, but pretend
+        # for now that we didn't for the sake of further checks.
+        reify_cap = call_func_cap_mt
+      end
+
+      {required_cap, reify_cap, autorecover_needed}
+    end
+
+    def follow_call_check_args(ctx : Context, infer : ForFunc, call_func, other_infer, problems)
+      call = self
+
+      # First, check the number of arguments.
+      max = other_infer.params.size
+      min = other_infer.params.count { |param| !AST::Extract.param(param)[2] }
+      func_pos = call_func.ident.pos
+      if call.args.size > max
+        args = max == 1 ? "argument" : "arguments"
+        params_pos = call_func.params.try(&.pos) || call_func.ident.pos
+        problems << {call.pos, "the call site has too many arguments"}
+        problems << {params_pos, "the function allows at most #{max} #{args}"}
+        return
+      elsif call.args.size < min
+        args = min == 1 ? "argument" : "arguments"
+        params_pos = call_func.params.try(&.pos) || call_func.ident.pos
+        problems << {call.pos, "the call site has too few arguments"}
+        problems << {params_pos, "the function requires at least #{min} #{args}"}
+        return
+      end
+
+      # Apply parameter constraints to each of the argument types.
+      # TODO: handle case where number of args differs from number of params.
+      # TODO: enforce that all call_defns have the same param count.
+      unless call.args.empty?
+        call.args.zip(other_infer.params).zip(call.args_pos).each do |(arg, param), arg_pos|
+          other_infer[param].as(Param).verify_arg(ctx, other_infer, infer, arg, arg_pos)
+        end
+      end
+    end
+
+    def follow_call_check_yield_block(ctx : Context, infer : ForFunc, other_infer, yield_params, yield_block, problems)
+      if other_infer.yield_out_infos.empty?
+        if yield_block
+          problems << {yield_block.pos, "it has a yield block " \
+            "but the called function does not have any yields"}
+        end
+      elsif !yield_block
+        problems << {other_infer.yield_out_infos.first.first_viable_constraint_pos,
+          "it has no yield block but the called function does yield"}
+      else
+        # Visit yield params to register them in our state.
+        # We have to do this before the lines below where we access that state.
+        # Note that we skipped it before with visit_children: false.
+        yield_params.try(&.accept(ctx, infer))
+
+        # Based on the resolved function, assign the proper yield param types.
+        if yield_params
+          raise "TODO: Nice error message for this" \
+            if other_infer.yield_out_infos.size != yield_params.terms.size
+
+          other_infer.yield_out_infos.zip(yield_params.terms)
+          .each do |yield_out, yield_param|
+            # TODO: Use .assign instead of .set_explicit after figuring out how to have an AST node for it
+            infer[yield_param].as(Local).set_explicit(
+              yield_out.first_viable_constraint_pos,
+              yield_out.resolve!(ctx, other_infer),
+            )
+          end
+        end
+
+        # Now visit the yield block to register them in our state.
+        # We must do this after the lines above where the params were handled.
+        # Note that we skipped it before with visit_children: false.
+        yield_block.try(&.accept(ctx, infer))
+
+        # Finally, check that the type of the result of the yield block,
+        # but don't bother if it has a type requirement of None.
+        yield_in_resolved = other_infer.analysis.yield_in_resolved
+        none = MetaType.new(infer.reified_type(infer.prelude_type("None")))
+        if yield_in_resolved != none
+          infer[yield_block].within_domain!(
+            ctx,
+            infer,
+            yield_block.pos,
+            other_infer.yield_in_info.pos,
+            other_infer.yield_in_info.resolve!(ctx, other_infer),
+            0,
+          )
+        end
+      end
+    end
+
+    def follow_call_check_autorecover_cap(ctx, infer, required_cap, call_func, other_infer, inferred_ret)
+      call = self
+
+      # If autorecover of the receiver cap was needed to make this call work,
+      # we now have to confirm that arguments and return value are all sendable.
+      problems = [] of {Source::Pos, String}
+
+      unless required_cap.value == "ref" || required_cap.value == "box"
+        problems << {call_func.cap.pos,
+          "the function's receiver capability is `#{required_cap}` " \
+          "but only a `ref` or `box` receiver can be auto-recovered"}
+      end
+
+      unless inferred_ret.is_sendable? || !call.ret_value_used
+        problems << {other_infer.ret.pos,
+          "the return type #{inferred_ret.show_type} isn't sendable " \
+          "and the return value is used (the return type wouldn't matter " \
+          "if the calling side entirely ignored the return value"}
+      end
+
+      # TODO: It should be safe to pass in a TRN if the receiver is TRN,
+      # so is_sendable? isn't quite liberal enough to allow all valid cases.
+      call.args.each do |arg|
+        inferred_arg = infer[arg].resolve!(ctx, infer)
+        unless inferred_arg.alias.is_sendable?
+          problems << {arg.pos,
+            "the argument (when aliased) has a type of " \
+            "#{inferred_arg.alias.show_type}, which isn't sendable"}
+        end
+      end
+
+      Error.at call,
+        "This function call won't work unless the receiver is ephemeral; " \
+        "it must either be consumed or be allowed to be auto-recovered. "\
+        "Auto-recovery didn't work for these reasons",
+          problems unless problems.empty?
+    end
+
+    def follow_call(ctx : Context, infer : ForFunc, yield_params, yield_block)
+      call = self
+      call_defns = follow_call_get_call_defns(ctx, infer)
+
+      # TODO: Because we visit yield_params and yield_block as part of the later
+      # follow_call_check_yield_block for each of the call_defns, we'll have
+      # problems with multiple call defns because we'll end up with potentially
+      # conflicting information gathered each time. Somehow, we need to be able
+      # to iterate over it multiple times and type-assign them separately,
+      # so that specialized code can be generated for each different receiver
+      # that may have different types. This is totally nontrivial...
+      raise NotImplementedError.new("yield_block with multiple call_defns") \
+        if yield_block && call_defns.size > 1
+
+      # For each receiver type definition that is possible, track down the infer
+      # for the function that we're trying to call, evaluating the constraints
+      # for each possibility such that all of them must hold true.
+      rets = [] of MetaType
+      poss = [] of Source::Pos
+      problems = [] of {Source::Pos, String}
+      call_defns.each do |(call_mti, call_defn, call_func)|
+        call_mt = MetaType.new(call_mti)
+        call_defn = call_defn.not_nil!
+        call_func = call_func.not_nil!
+        call_func_link = call_func.make_link(call_defn.link)
+
+        # Keep track that we called this function.
+        infer.analysis.called_funcs.add({call.pos, call_defn, call_func_link})
+
+        required_cap, reify_cap, autorecover_needed =
+          follow_call_check_receiver_cap(ctx, infer, call_mt, call_func, problems)
+
+        # Get the ForFunc instance for call_func, possibly creating and running it.
+        # TODO: don't infer anything in the body of that func if type and params
+        # were explicitly specified in the function signature.
+        other_infer = ctx.infer.for_func(ctx, call_defn, call_func_link, reify_cap).tap(&.run)
+
+        follow_call_check_args(ctx, infer, call_func, other_infer, problems)
+        follow_call_check_yield_block(ctx, infer, other_infer, yield_params, yield_block, problems)
+
+        # Resolve and take note of the return type.
+        inferred_ret_info = other_infer[other_infer.ret]
+        inferred_ret = inferred_ret_info.resolve!(ctx, other_infer)
+        rets << inferred_ret
+        poss << inferred_ret_info.pos
+
+        if autorecover_needed
+          follow_call_check_autorecover_cap(ctx, infer, required_cap, call_func, other_infer, inferred_ret)
+        end
+      end
+      Error.at call,
+        "This function call doesn't meet subtyping requirements",
+          problems unless problems.empty?
+
+      # Constrain the return value as the union of all observed return types.
+      ret = rets.size == 1 ? rets.first : MetaType.new_union(rets)
+      pos = poss.size == 1 ? poss.first : call.pos
+
+      call.set_return(infer, pos, ret)
     end
   end
 end
