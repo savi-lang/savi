@@ -664,11 +664,13 @@ class Mare::Compiler::Infer
     getter member : String
     getter args_pos : Array(Source::Pos)
     getter args : Array(AST::Node)
+    getter yield_params : AST::Group?
+    getter yield_block : AST::Group?
     getter ret_value_used : Bool
     @ret : MetaType?
     @ret_pos : Source::Pos? # TODO: remove?
 
-    def initialize(@pos, @lhs, @member, @args, @args_pos, @ret_value_used)
+    def initialize(@pos, @lhs, @member, @args, @args_pos, @yield_params, @yield_block, @ret_value_used)
     end
 
     def describe_kind; "return value" end
@@ -831,55 +833,15 @@ class Mare::Compiler::Infer
       end
     end
 
-    def follow_call_check_yield_block(ctx : Context, infer : ForFunc, other_infer, yield_params, yield_block, problems)
+    def follow_call_check_yield_block(other_infer, problems)
       if other_infer.yield_out_infos.empty?
         if yield_block
-          problems << {yield_block.pos, "it has a yield block " \
+          problems << {yield_block.not_nil!.pos, "it has a yield block " \
             "but the called function does not have any yields"}
         end
       elsif !yield_block
         problems << {other_infer.yield_out_infos.first.first_viable_constraint_pos,
           "it has no yield block but the called function does yield"}
-      else
-        # Visit yield params to register them in our state.
-        # We have to do this before the lines below where we access that state.
-        # Note that we skipped it before with visit_children: false.
-        yield_params.try(&.accept(ctx, infer))
-
-        # Based on the resolved function, assign the proper yield param types.
-        if yield_params
-          raise "TODO: Nice error message for this" \
-            if other_infer.yield_out_infos.size != yield_params.terms.size
-
-          other_infer.yield_out_infos.zip(yield_params.terms)
-          .each do |yield_out, yield_param|
-            # TODO: Use .assign instead of .set_explicit after figuring out how to have an AST node for it
-            infer[yield_param].as(Local).set_explicit(
-              yield_out.first_viable_constraint_pos,
-              yield_out.resolve!(ctx, other_infer),
-            )
-          end
-        end
-
-        # Now visit the yield block to register them in our state.
-        # We must do this after the lines above where the params were handled.
-        # Note that we skipped it before with visit_children: false.
-        yield_block.try(&.accept(ctx, infer))
-
-        # Finally, check that the type of the result of the yield block,
-        # but don't bother if it has a type requirement of None.
-        yield_in_resolved = other_infer.analysis.yield_in_resolved
-        none = MetaType.new(infer.reified_type(infer.prelude_type("None")))
-        if yield_in_resolved != none
-          infer[yield_block].within_domain!(
-            ctx,
-            infer,
-            yield_block.pos,
-            other_infer.yield_in_info.pos,
-            other_infer.yield_in_info.resolve!(ctx, other_infer),
-            0,
-          )
-        end
       end
     end
 
@@ -921,19 +883,9 @@ class Mare::Compiler::Infer
           problems unless problems.empty?
     end
 
-    def follow_call(ctx : Context, infer : ForFunc, yield_params, yield_block)
+    def follow_call(ctx : Context, infer : ForFunc)
       call = self
       call_defns = follow_call_get_call_defns(ctx, infer)
-
-      # TODO: Because we visit yield_params and yield_block as part of the later
-      # follow_call_check_yield_block for each of the call_defns, we'll have
-      # problems with multiple call defns because we'll end up with potentially
-      # conflicting information gathered each time. Somehow, we need to be able
-      # to iterate over it multiple times and type-assign them separately,
-      # so that specialized code can be generated for each different receiver
-      # that may have different types. This is totally nontrivial...
-      raise NotImplementedError.new("yield_block with multiple call_defns") \
-        if yield_block && call_defns.size > 1
 
       # For each receiver type definition that is possible, track down the infer
       # for the function that we're trying to call, evaluating the constraints
@@ -959,7 +911,7 @@ class Mare::Compiler::Infer
         other_infer = ctx.infer.for_func(ctx, call_defn, call_func_link, reify_cap).tap(&.run)
 
         follow_call_check_args(ctx, infer, call_func, other_infer, problems)
-        follow_call_check_yield_block(ctx, infer, other_infer, yield_params, yield_block, problems)
+        follow_call_check_yield_block(other_infer, problems)
 
         # Resolve and take note of the return type.
         inferred_ret_info = other_infer[other_infer.ret]
@@ -980,6 +932,70 @@ class Mare::Compiler::Infer
       pos = poss.size == 1 ? poss.first : call.pos
 
       call.set_return(infer, pos, ret)
+    end
+
+    def visit_and_verify_yield_block(ctx : Context, infer : ForFunc, yield_params, yield_block)
+      return unless yield_block
+
+      call_defns = follow_call_get_call_defns(ctx, infer)
+
+      # TODO: Because we visit yield_params and yield_block, we'll have
+      # problems with multiple call defns because we'll end up with potentially
+      # conflicting information gathered each time. Somehow, we need to be able
+      # to iterate over it multiple times and type-assign them separately,
+      # so that specialized code can be generated for each different receiver
+      # that may have different types. This is totally nontrivial...
+      raise NotImplementedError.new("yield_block with multiple call_defns") \
+        if yield_block && call_defns.size > 1
+
+      call_defns.each do |(call_mti, call_defn, call_func)|
+        call_mt = MetaType.new(call_mti)
+        call_defn = call_defn.not_nil!
+        call_func = call_func.not_nil!
+        call_func_link = call_func.make_link(call_defn.link)
+
+        problems = [] of {Source::Pos, String}
+        required_cap, reify_cap, autorecover_needed =
+          follow_call_check_receiver_cap(ctx, infer, call_mt, call_func, problems)
+        raise "this should have been prevented earlier" if problems.any?
+
+        other_infer = ctx.infer.for_func(ctx, call_defn, call_func_link, reify_cap).tap(&.run)
+
+        # Based on the resolved function, assign the proper yield param types.
+        if yield_params
+          raise "TODO: Nice error message for this" \
+            if other_infer.yield_out_infos.size != yield_params.terms.size
+
+          other_infer.yield_out_infos.zip(yield_params.terms)
+          .each do |yield_out, yield_param|
+            # TODO: Use .assign instead of .set_explicit after figuring out how to have an AST node for it
+            infer[yield_param].as(Local).set_explicit(
+              yield_out.first_viable_constraint_pos,
+              yield_out.resolve!(ctx, other_infer),
+            )
+          end
+        end
+
+        # Now visit the yield block to register them in our state.
+        # We must do this after the lines above where the params were handled.
+        # Note that we skipped it before with visit_children: false.
+        yield_block.try(&.accept(ctx, infer))
+
+        # Finally, check that the type of the result of the yield block,
+        # but don't bother if it has a type requirement of None.
+        yield_in_resolved = other_infer.analysis.yield_in_resolved
+        none = MetaType.new(infer.reified_type(infer.prelude_type("None")))
+        if yield_in_resolved != none
+          infer[yield_block].within_domain!(
+            ctx,
+            infer,
+            yield_block.pos,
+            other_infer.yield_in_info.pos,
+            other_infer.yield_in_info.resolve!(ctx, other_infer),
+            0,
+          )
+        end
+      end
     end
   end
 end

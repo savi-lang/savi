@@ -1225,6 +1225,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
           call_ident.value,
           (call_args ? call_args.terms.map(&.itself) : [] of AST::Node),
           (call_args ? call_args.terms.map(&.pos) : [] of Source::Pos),
+          yield_params,
+          yield_block,
           classify.value_needed?(node),
         )
         @analysis[node] = call
@@ -1235,8 +1237,16 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         call_args.try(&.accept(ctx, self))
 
         # Resolve and validate the call.
-        # We will visit the yield_params and yield_block from inside this call.
-        call.follow_call(ctx, self, yield_params, yield_block)
+        call.follow_call(ctx, self)
+
+        # Visit yield params to register them in our state.
+        # We have to do this before the lines below where we access that state.
+        # Note that we skipped it before with visit_children: false.
+        yield_params.try(&.accept(ctx, self))
+
+        # We will visit the yield_block from inside this call.
+        call.visit_and_verify_yield_block(ctx, self, yield_params, yield_block)
+
       when "is"
         # Just know that the result of this expression is a boolean.
         bool = MetaType.new(reified_type(prelude_type("Bool")))
