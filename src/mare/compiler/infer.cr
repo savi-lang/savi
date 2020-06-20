@@ -1461,8 +1461,11 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         branches << self[body] unless jumps.away?(body)
       end
 
-      # TODO: also track cond types in branch, for analyzing exhausted choices.
-      @analysis[node] = Choice.new(node.pos, branches)
+      # TODO: also track cond infos in Phi, for analyzing exhausted choices,
+      # as well as necessary/sufficient conditions for each branch to be in play
+      # letting us better specialize the codegen later by eliminating impossible
+      # branches in particular reifications of this type or function.
+      @analysis[node] = Phi.new(node.pos, branches)
     end
 
     def touch(node : AST::Loop)
@@ -1476,8 +1479,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         .reject { |node| jumps.away?(node) }
         .map { |node| self[node] }
 
-      # TODO: Don't use Choice?
-      @analysis[node] = Choice.new(node.pos, branches)
+      @analysis[node] = Phi.new(node.pos, branches)
     end
 
     def touch(node : AST::Try)
@@ -1486,8 +1488,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         .reject { |node| jumps.away?(node) }
         .map { |node| self[node] }
 
-      # TODO: Don't use Choice?
-      @analysis[node] = Choice.new(node.pos, branches)
+      @analysis[node] = Phi.new(node.pos, branches)
     end
 
     def touch(node : AST::Yield)
