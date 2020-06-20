@@ -728,10 +728,8 @@ class Mare::Compiler::Infer
 
   class ArrayLiteral < DynamicInfo
     getter terms : Array(AST::Node)
-    property explicit : MetaType?
 
     def initialize(@pos, @terms)
-      @elem_antecedents = Set(MetaType).new
     end
 
     def describe_kind; "array literal" end
