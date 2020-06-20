@@ -552,59 +552,27 @@ class Mare::Compiler::Infer
     end
   end
 
-  class Try < Info
-    def initialize(@pos, @body : AST::Node, @else_body : AST::Node)
-    end
-
-    def describe_kind; "try block" end
-
-    def resolve!(ctx : Context, infer : ForFunc)
-      MetaType.new_union([
-        infer[@body].resolve!(ctx, infer),
-        infer[@else_body].resolve!(ctx, infer),
-      ])
-    end
-
-    def add_downstream(ctx : Context, infer : ForFunc, use_pos : Source::Pos, info : Info, aliases : Int32)
-      infer[@body].add_downstream(ctx, infer, use_pos, info, aliases) \
-        unless infer.jumps.away?(@body)
-
-      infer[@else_body].add_downstream(ctx, infer, use_pos, info, aliases)
-    end
-
-    def within_domain!(ctx : Context, infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
-      infer[@body].within_domain!(ctx, infer, use_pos, constraint_pos, constraint, aliases) \
-        unless infer.jumps.away?(@body)
-
-      infer[@else_body].within_domain!(ctx, infer, use_pos, constraint_pos, constraint, aliases)
-    end
-  end
-
   class Choice < Info
-    getter clauses : Array(AST::Node)
+    getter branches : Array(Info)
 
-    def initialize(@pos, @clauses)
+    def initialize(@pos, @branches)
     end
 
     def describe_kind; "choice block" end
 
     def resolve!(ctx : Context, infer : ForFunc)
-      MetaType.new_union(clauses.map { |node| infer[node].resolve!(ctx, infer) })
+      MetaType.new_union(branches.map { |node| infer.resolve(ctx, node) })
     end
 
     def add_downstream(ctx : Context, infer : ForFunc, use_pos : Source::Pos, info : Info, aliases : Int32)
-      clauses.each do |node|
-        next if infer.jumps.away?(node)
-
-        infer[node].add_downstream(ctx, infer, use_pos, info, aliases)
+      branches.each do |node|
+        node.add_downstream(ctx, infer, use_pos, info, aliases)
       end
     end
 
     def within_domain!(ctx : Context, infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
-      clauses.each do |node|
-        next if infer.jumps.away?(node)
-
-        infer[node].within_domain!(ctx, infer, use_pos, constraint_pos, constraint, aliases)
+      branches.each do |node|
+        node.within_domain!(ctx, infer, use_pos, constraint_pos, constraint, aliases)
       end
     end
   end

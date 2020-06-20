@@ -1402,7 +1402,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
 
     def touch(node : AST::Choice)
       skip_later_bodies = false
-      body_nodes = [] of AST::Node
+      branches = [] of Info
       node.list.each do |cond, body|
         # Visit the cond AST - we skipped it before with visit_children: false.
         cond.accept(ctx, self)
@@ -1456,12 +1456,13 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
           for_type.pop_type_param_refinement(cond_info.refine)
         end
 
-        # Hold on to the body type for later in this function.
-        body_nodes << body
+        # Hold on to the body info for later in this function.
+        # Ignore branches that jump away without resulting in a value.
+        branches << self[body] unless jumps.away?(body)
       end
 
       # TODO: also track cond types in branch, for analyzing exhausted choices.
-      @analysis[node] = Choice.new(node.pos, body_nodes)
+      @analysis[node] = Choice.new(node.pos, branches)
     end
 
     def touch(node : AST::Loop)
@@ -1470,12 +1471,23 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       cond_info = self[node.cond]
       cond_info.add_downstream(ctx, self, node.pos, Fixed.new(node.pos, bool), 1)
 
+      # Ignore branches that jump away without resulting in a value.
+      branches = [node.body, node.else_body]
+        .reject { |node| jumps.away?(node) }
+        .map { |node| self[node] }
+
       # TODO: Don't use Choice?
-      @analysis[node] = Choice.new(node.pos, [node.body, node.else_body])
+      @analysis[node] = Choice.new(node.pos, branches)
     end
 
     def touch(node : AST::Try)
-      @analysis[node] = Try.new(node.pos, node.body, node.else_body)
+      # Ignore branches that jump away without resulting in a value.
+      branches = [node.body, node.else_body]
+        .reject { |node| jumps.away?(node) }
+        .map { |node| self[node] }
+
+      # TODO: Don't use Choice?
+      @analysis[node] = Choice.new(node.pos, branches)
     end
 
     def touch(node : AST::Yield)
