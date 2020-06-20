@@ -850,11 +850,6 @@ class Mare::Compiler::Infer
       @ret.not_nil!
     end
 
-    def set_return(infer : ForFunc, ret_pos : Source::Pos, ret : MetaType)
-      @ret_pos = ret_pos
-      @ret = ret.ephemeralize
-    end
-
     def follow_call_get_call_defns(ctx : Context, infer : ForFunc)
       call = self
       receiver = infer[call.lhs].resolve!(ctx, infer)
@@ -1101,7 +1096,8 @@ class Mare::Compiler::Infer
       ret = rets.size == 1 ? rets.first : MetaType.new_union(rets)
       pos = poss.size == 1 ? poss.first : call.pos
 
-      call.set_return(infer, pos, ret)
+      @ret_pos = pos
+      @ret = ret.ephemeralize
     end
 
     def visit_and_verify_yield_block(ctx : Context, infer : ForFunc, yield_params, yield_block)
