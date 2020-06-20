@@ -295,7 +295,7 @@ class Mare::Compiler::Infer
 
   abstract class NamedInfo < DynamicInfo
     @explicit : Fixed?
-    @upstreams = [] of Tuple(AST::Node, Source::Pos)
+    @upstreams = [] of Tuple(Info, Source::Pos)
 
     def initialize(@pos)
     end
@@ -326,7 +326,7 @@ class Mare::Compiler::Infer
           # If there are upstreams, use the explicit cap applied to the type
           # of the first upstream expression, which becomes canonical.
           return (
-            infer[@upstreams.first[0]].resolve!(ctx, infer)
+            @upstreams.first[0].resolve!(ctx, infer)
             .strip_cap.intersect(explicit_mt).strip_ephemeral
             .strip_ephemeral
           )
@@ -338,7 +338,7 @@ class Mare::Compiler::Infer
         end
       elsif !@upstreams.empty?
         # If we only have upstreams to go on, return the first upstream type.
-        return infer[@upstreams.first[0]].resolve!(ctx, infer).strip_ephemeral
+        return @upstreams.first[0].resolve!(ctx, infer).strip_ephemeral
       elsif !(downstreams_empty? && domain_constraints.empty?)
         # If we only have domain constraints to, just do our best with those.
         return \
@@ -357,9 +357,9 @@ class Mare::Compiler::Infer
       # TODO: Verify all upstreams instead of just beyond 1?
       if @upstreams.size > 1
         @upstreams[1..-1].each do |other_upstream, other_upstream_pos|
-          infer[other_upstream].within_domain!(ctx, infer, other_upstream_pos, pos, meta_type.strip_ephemeral, 0) # TODO: should we really use 0 here?
+          other_upstream.within_domain!(ctx, infer, other_upstream_pos, pos, meta_type.strip_ephemeral, 0) # TODO: should we really use 0 here?
 
-          other_mt = infer[other_upstream].resolve!(ctx, infer)
+          other_mt = other_upstream.resolve!(ctx, infer)
           raise "sanity check" unless other_mt.subtype_of?(ctx, meta_type)
         end
       end
@@ -377,20 +377,23 @@ class Mare::Compiler::Infer
       return if @explicit
 
       @upstreams.each do |upstream, upstream_pos|
-        infer[upstream].within_domain!(ctx, infer, use_pos, constraint_pos, constraint, aliases)
+        upstream.within_domain!(ctx, infer, use_pos, constraint_pos, constraint, aliases)
       end
     end
 
     def assign(ctx : Context, infer : ForFunc, rhs : AST::Node, rhs_pos : Source::Pos)
-      infer[rhs].add_downstream(
+      upstream = infer[rhs]
+      upstream_pos = rhs_pos
+
+      @upstreams << {upstream, upstream_pos}
+
+      upstream.add_downstream(
         ctx,
         infer,
         rhs_pos,
         @explicit.not_nil!,
         0,
       ) if @explicit
-
-      @upstreams << {rhs, rhs_pos}
     end
   end
 
