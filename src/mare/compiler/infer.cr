@@ -139,6 +139,9 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     def resolve(node : AST::Node)
       @resolved[follow_redirects(node)]
     end
+    def resolve(info : Info)
+      @resolved_infos[info]
+    end
 
     def resolved_self_cap : MetaType
       @is_constructor ? MetaType.cap("ref") : @rf.receiver_cap
@@ -829,7 +832,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
           && reified.link.name == "new"
             env = MetaType.new(reified_type(prelude_type("Env")))
             param_info = self[param].as(Param)
-            param_info.set_explicit(reified.func(ctx).ident.pos, env) \
+            param_info.set_explicit(ctx, self, reified.func(ctx).ident.pos, env) \
               unless param_info.explicit?
           end
         end
@@ -844,11 +847,11 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       if func.has_tag?(:constructor)
         meta_type = MetaType.new(reified.type, func.cap.not_nil!.value)
         meta_type = meta_type.ephemeralize # a constructor returns the ephemeral
-        self[ret].as(FuncBody).set_explicit(func.cap.not_nil!.pos, meta_type)
+        self[ret].as(FuncBody).set_explicit(ctx, self, func.cap.not_nil!.pos, meta_type)
       else
         func.ret.try do |ret_t|
           ret_t.accept(ctx, self)
-          self[ret].as(FuncBody).set_explicit(ret_t.pos, resolve(ret_t))
+          self[ret].as(FuncBody).set_explicit(ctx, self, ret_t.pos, resolve(ret_t))
         end
       end
 
@@ -876,12 +879,12 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
           # We have a function signature for multiple yield out arg types.
           yield_out.terms.each_with_index do |yield_out_arg, index|
             yield_out_arg.accept(ctx, self)
-            yield_out_infos[index].set_explicit(yield_out_arg.pos, resolve(yield_out_arg))
+            yield_out_infos[index].set_explicit(ctx, self, yield_out_arg.pos, resolve(yield_out_arg))
           end
         else
           # We have a function signature for just one yield out arg type.
           yield_out.accept(ctx, self)
-          yield_out_infos.first.set_explicit(yield_out.pos, resolve(yield_out))
+          yield_out_infos.first.set_explicit(ctx, self, yield_out.pos, resolve(yield_out))
         end
       end
 
@@ -889,10 +892,10 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       yield_in = func.yield_in
       if yield_in
         yield_in.accept(ctx, self)
-        yield_in_info.set_explicit(yield_in.pos, resolve(yield_in))
+        yield_in_info.set_explicit(ctx, self, yield_in.pos, resolve(yield_in))
       else
         none = MetaType.new(reified_type(prelude_type("None")))
-        yield_in_info.set_explicit(yield_in_info.pos, none)
+        yield_in_info.set_explicit(ctx, self, yield_in_info.pos, none)
       end
 
       # Don't bother further typechecking functions that have no body
@@ -976,7 +979,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
 
       # Apply constraints to the return type.
       ret = infer[infer.ret]
-      field.set_explicit(ret.pos, ret.resolve!(ctx, infer))
+      field.set_explicit(ctx, self, ret.pos, ret.resolve!(ctx, infer))
     end
 
     def prelude_type(ctx, name)
@@ -1173,15 +1176,15 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
           when Local
             info = self[node.terms[1]]
             case info
-            when Fixed then local.set_explicit(info.pos, info.inner)
-            when Self then local.set_explicit(info.pos, info.inner)
+            when Fixed then local.set_explicit(ctx, self, info.pos, info.inner)
+            when Self then local.set_explicit(ctx, self, info.pos, info.inner)
             else raise NotImplementedError.new(info)
             end
           when Param
             info = self[node.terms[1]]
             case info
-            when Fixed then local.set_explicit(info.pos, info.inner)
-            when Self then local.set_explicit(info.pos, info.inner)
+            when Fixed then local.set_explicit(ctx, self, info.pos, info.inner)
+            when Self then local.set_explicit(ctx, self, info.pos, info.inner)
             else raise NotImplementedError.new(info)
             end
           else raise NotImplementedError.new(local)
@@ -1197,7 +1200,9 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
 
     def touch(node : AST::FieldRead)
       field = Field.new(node.pos)
-      @analysis[node] = FieldRead.new(field, Fixed.new(field.pos, @analysis.resolved_self))
+      fixed = Fixed.new(field.pos, @analysis.resolved_self)
+      self.resolve(ctx, fixed)
+      @analysis[node] = FieldRead.new(field, fixed)
       follow_field(field, node.value)
     end
 
@@ -1210,7 +1215,9 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
 
     def touch(node : AST::FieldReplace)
       field = Field.new(node.pos)
-      @analysis[node] = FieldExtract.new(field, Fixed.new(field.pos, @analysis.resolved_self))
+      fixed = Fixed.new(field.pos, @analysis.resolved_self)
+      self.resolve(ctx, fixed)
+      @analysis[node] = FieldExtract.new(field, fixed)
       follow_field(field, node.value)
       field.assign(ctx, self, node.rhs, node.rhs.pos)
     end
@@ -1415,8 +1422,10 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
 
         # Each condition in a choice must evaluate to a type of Bool.
         bool = MetaType.new(reified_type(prelude_type("Bool")))
+        fixed_bool = Fixed.new(node.pos, bool)
+        self.resolve(ctx, fixed_bool)
         cond_info = self[cond]
-        cond_info.add_downstream(ctx, self, node.pos, Fixed.new(node.pos, bool), 1)
+        cond_info.add_downstream(ctx, self, node.pos, fixed_bool, 1)
 
         # If we have a type condition as the cond, that implies that it returned
         # true if we are in the body; hence we can apply the type refinement.
@@ -1477,8 +1486,10 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     def touch(node : AST::Loop)
       # The condition of the loop must evaluate to a type of Bool.
       bool = MetaType.new(reified_type(prelude_type("Bool")))
+      fixed_bool = Fixed.new(node.pos, bool)
+      self.resolve(ctx, fixed_bool)
       cond_info = self[node.cond]
-      cond_info.add_downstream(ctx, self, node.pos, Fixed.new(node.pos, bool), 1)
+      cond_info.add_downstream(ctx, self, node.pos, fixed_bool, 1)
 
       # Ignore branches that jump away without resulting in a value.
       branches = [node.body, node.else_body]
@@ -1516,7 +1527,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       case ref
       when Fixed
         param = Param.new(node.pos)
-        param.set_explicit(ref.pos, ref.inner)
+        param.set_explicit(ctx, self, ref.pos, ref.inner)
         @analysis[node] = param # assign new info
       else
         raise NotImplementedError.new([node, ref].inspect)

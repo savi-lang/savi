@@ -365,12 +365,21 @@ class Mare::Compiler::Infer
       end
     end
 
-    def set_explicit(explicit_pos : Source::Pos, explicit_mt : MetaType)
+    def set_explicit(ctx : Context, infer : ForFunc, explicit_pos : Source::Pos, explicit_mt : MetaType)
       raise "already set_explicit" if @explicit
       raise "shouldn't have an upstream yet" unless @upstreams.empty?
 
-      @explicit = Fixed.new(explicit_pos, explicit_mt.not_nil!)
+      @explicit = Fixed.new(explicit_pos, explicit_mt)
+      infer.resolve(ctx, @explicit.not_nil!)
       @pos = explicit_pos
+    end
+
+    def after_add_downstream(ctx : Context, infer : ForFunc, use_pos : Source::Pos, info : Info, aliases : Int32)
+      return if @explicit
+
+      @upstreams.each do |upstream, upstream_pos|
+        upstream.add_downstream(ctx, infer, use_pos, info, aliases)
+      end
     end
 
     def after_within_domain!(ctx : Context, infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
@@ -423,6 +432,10 @@ class Mare::Compiler::Infer
 
     def initialize(@pos, @inner)
       @domain_constraints = [] of Tuple(Source::Pos, MetaType)
+    end
+
+    def downstream_constraints(ctx : Context, analysis : ReifiedFuncAnalysis)
+      @downstreams.map { |_, info, _| {info.pos, analysis.resolve(info)} }
     end
 
     def resolve!(ctx : Context, infer : ForFunc)
@@ -480,8 +493,10 @@ class Mare::Compiler::Infer
     def describe_kind; "parameter" end
 
     def verify_arg(ctx : Context, infer : ForFunc, arg_infer : ForFunc, arg : AST::Node, arg_pos : Source::Pos)
-      arg = arg_infer[arg]
-      arg.within_domain!(ctx, arg_infer, arg_pos, @pos, infer.resolve(ctx, self), 0)
+      param_mt = infer.resolve(ctx, self)
+      param_info = Fixed.new(@pos, param_mt)
+      arg_infer.resolve(ctx, param_info)
+      arg_infer[arg].add_downstream(ctx, arg_infer, arg_pos, param_info, 0)
     end
   end
 
@@ -561,7 +576,7 @@ class Mare::Compiler::Infer
     def describe_kind; "choice block" end
 
     def resolve!(ctx : Context, infer : ForFunc)
-      MetaType.new_union(branches.map { |node| infer.resolve(ctx, node) })
+      MetaType.new_union(branches.map { |node| infer.resolve(ctx, node).as(MetaType) })
     end
 
     def add_downstream(ctx : Context, infer : ForFunc, use_pos : Source::Pos, info : Info, aliases : Int32)
@@ -1101,6 +1116,8 @@ class Mare::Compiler::Infer
           .each do |yield_out, yield_param|
             # TODO: Use .assign instead of .set_explicit after figuring out how to have an AST node for it
             infer[yield_param].as(Local).set_explicit(
+              ctx,
+              infer,
               yield_out.first_viable_constraint_pos,
               other_infer.resolve(ctx, yield_out),
             )

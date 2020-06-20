@@ -181,6 +181,19 @@ module Mare::Compiler::Completeness
               " it would not grant field access"}
           ] + unseen_fields
       end
+      info.downstream_constraints(ctx, infer).each do |pos, constraint|
+        # If tag will meet the constraint, then this use of the self is okay.
+        return if tag_self.subtype_of?(ctx, constraint)
+
+        # Otherwise, we must raise an error.
+        Error.at node,
+          "This usage of `@` shares field access to the object" \
+          " from a constructor before all fields are initialized", [
+            {pos,
+              "if this constraint were specified as `tag` or lower" \
+              " it would not grant field access"}
+          ] + unseen_fields
+      end
     end
 
     def touch(node : AST::Relate)
