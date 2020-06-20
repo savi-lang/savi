@@ -317,7 +317,7 @@ class Mare::Compiler::Infer
       explicit = @explicit
 
       if explicit
-        explicit_mt = explicit.resolve!(ctx, infer)
+        explicit_mt = infer.resolve(ctx, explicit)
 
         if !explicit_mt.cap_only?
           # If we have an explicit type that is more than just a cap, return it.
@@ -326,7 +326,7 @@ class Mare::Compiler::Infer
           # If there are upstreams, use the explicit cap applied to the type
           # of the first upstream expression, which becomes canonical.
           return (
-            @upstreams.first[0].resolve!(ctx, infer)
+            infer.resolve(ctx, @upstreams.first[0])
             .strip_cap.intersect(explicit_mt).strip_ephemeral
             .strip_ephemeral
           )
@@ -338,7 +338,7 @@ class Mare::Compiler::Infer
         end
       elsif !@upstreams.empty?
         # If we only have upstreams to go on, return the first upstream type.
-        return @upstreams.first[0].resolve!(ctx, infer).strip_ephemeral
+        return infer.resolve(ctx, @upstreams.first[0]).strip_ephemeral
       elsif !(downstreams_empty? && domain_constraints.empty?)
         # If we only have domain constraints to, just do our best with those.
         return \
@@ -359,7 +359,7 @@ class Mare::Compiler::Infer
         @upstreams[1..-1].each do |other_upstream, other_upstream_pos|
           other_upstream.within_domain!(ctx, infer, other_upstream_pos, pos, meta_type.strip_ephemeral, 0) # TODO: should we really use 0 here?
 
-          other_mt = other_upstream.resolve!(ctx, infer)
+          other_mt = infer.resolve(ctx, other_upstream)
           raise "sanity check" unless other_mt.subtype_of?(ctx, meta_type)
         end
       end
@@ -481,7 +481,7 @@ class Mare::Compiler::Infer
 
     def verify_arg(ctx : Context, infer : ForFunc, arg_infer : ForFunc, arg : AST::Node, arg_pos : Source::Pos)
       arg = arg_infer[arg]
-      arg.within_domain!(ctx, arg_infer, arg_pos, @pos, resolve!(ctx, infer), 0)
+      arg.within_domain!(ctx, arg_infer, arg_pos, @pos, infer.resolve(ctx, self), 0)
     end
   end
 
@@ -507,7 +507,7 @@ class Mare::Compiler::Infer
     end
 
     def within_domain!(ctx : Context, infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
-      meta_type_within_domain!(ctx, resolve!(ctx, infer), use_pos, constraint_pos, constraint, aliases + 1) # TODO: can this +1 be removed?
+      meta_type_within_domain!(ctx, infer.resolve(ctx, self), use_pos, constraint_pos, constraint, aliases + 1) # TODO: can this +1 be removed?
     end
   end
 
@@ -529,7 +529,7 @@ class Mare::Compiler::Infer
     end
 
     def within_domain!(ctx : Context, infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
-      meta_type_within_domain!(ctx, resolve!(ctx, infer), use_pos, constraint_pos, constraint, aliases - 1)
+      meta_type_within_domain!(ctx, infer.resolve(ctx, self), use_pos, constraint_pos, constraint, aliases - 1)
     end
   end
 
@@ -662,7 +662,7 @@ class Mare::Compiler::Infer
     end
 
     def within_domain!(ctx : Context, infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
-      meta_type_within_domain!(ctx, resolve!(ctx, infer), use_pos, constraint_pos, constraint, aliases)
+      meta_type_within_domain!(ctx, infer.resolve(ctx, self), use_pos, constraint_pos, constraint, aliases)
     end
   end
 
@@ -998,7 +998,7 @@ class Mare::Compiler::Infer
       # TODO: It should be safe to pass in a TRN if the receiver is TRN,
       # so is_sendable? isn't quite liberal enough to allow all valid cases.
       call.args.each do |arg|
-        inferred_arg = infer[arg].resolve!(ctx, infer)
+        inferred_arg = infer.resolve(ctx, infer[arg])
         unless inferred_arg.alias.is_sendable?
           problems << {arg.pos,
             "the argument (when aliased) has a type of " \
@@ -1045,7 +1045,7 @@ class Mare::Compiler::Infer
 
         # Resolve and take note of the return type.
         inferred_ret_info = other_infer[other_infer.ret]
-        inferred_ret = inferred_ret_info.resolve!(ctx, other_infer)
+        inferred_ret = other_infer.resolve(ctx, inferred_ret_info)
         rets << inferred_ret
         poss << inferred_ret_info.pos
 
@@ -1102,7 +1102,7 @@ class Mare::Compiler::Infer
             # TODO: Use .assign instead of .set_explicit after figuring out how to have an AST node for it
             infer[yield_param].as(Local).set_explicit(
               yield_out.first_viable_constraint_pos,
-              yield_out.resolve!(ctx, other_infer),
+              other_infer.resolve(ctx, yield_out),
             )
           end
         end
@@ -1122,7 +1122,7 @@ class Mare::Compiler::Infer
             infer,
             yield_block.pos,
             other_infer.yield_in_info.pos,
-            other_infer.yield_in_info.resolve!(ctx, other_infer),
+            other_infer.resolve(ctx, other_infer.yield_in_info),
             0,
           )
         end
