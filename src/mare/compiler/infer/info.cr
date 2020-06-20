@@ -1138,14 +1138,11 @@ class Mare::Compiler::Infer
         yield_in_resolved = other_infer.analysis.yield_in_resolved
         none = MetaType.new(infer.reified_type(infer.prelude_type("None")))
         if yield_in_resolved != none
-          infer[yield_block].within_domain!(
-            ctx,
-            infer,
-            yield_block.pos,
-            other_infer.yield_in_info.pos,
-            other_infer.resolve(ctx, other_infer.yield_in_info),
-            0,
-          )
+          yield_in_mt = other_infer.resolve(ctx, other_infer.yield_in_info)
+          yield_in_info = Fixed.new(other_infer.yield_in_info.pos, yield_in_mt)
+          other_infer.resolve(ctx, yield_in_info)
+
+          infer[yield_block].add_downstream(ctx, infer, yield_block.pos, yield_in_info, 0)
         end
       end
     end
