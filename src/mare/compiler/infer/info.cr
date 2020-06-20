@@ -490,7 +490,7 @@ class Mare::Compiler::Infer
   end
 
   class FieldRead < DownstreamableInfo
-    def initialize(@field : Field, @origin : MetaType)
+    def initialize(@field : Field, @origin : Fixed)
     end
 
     def describe_kind; "field read" end
@@ -500,7 +500,9 @@ class Mare::Compiler::Infer
     end
 
     def resolve!(ctx : Context, infer : ForFunc)
-      @field.resolve!(ctx, infer).viewed_from(@origin).alias
+      origin_mt = infer.resolve(ctx, @origin)
+      field_mt = infer.resolve(ctx, @field)
+      field_mt.viewed_from(origin_mt).alias
       .tap { |mt| within_downstream_constraints!(ctx, infer, mt) }
     end
 
@@ -510,7 +512,7 @@ class Mare::Compiler::Infer
   end
 
   class FieldExtract < DownstreamableInfo
-    def initialize(@field : Field, @origin : MetaType)
+    def initialize(@field : Field, @origin : Fixed)
     end
 
     def describe_kind; "field extraction" end
@@ -520,7 +522,9 @@ class Mare::Compiler::Infer
     end
 
     def resolve!(ctx : Context, infer : ForFunc)
-      @field.resolve!(ctx, infer).extracted_from(@origin).ephemeralize
+      origin_mt = infer.resolve(ctx, @origin)
+      field_mt = infer.resolve(ctx, @field)
+      field_mt.extracted_from(origin_mt).ephemeralize
       .tap { |mt| within_downstream_constraints!(ctx, infer, mt) }
     end
 

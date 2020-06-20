@@ -1188,7 +1188,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
 
     def touch(node : AST::FieldRead)
       field = Field.new(node.pos)
-      @analysis[node] = FieldRead.new(field, @analysis.resolved_self)
+      @analysis[node] = FieldRead.new(field, Fixed.new(field.pos, @analysis.resolved_self))
       follow_field(field, node.value)
     end
 
@@ -1201,7 +1201,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
 
     def touch(node : AST::FieldReplace)
       field = Field.new(node.pos)
-      @analysis[node] = FieldExtract.new(field, @analysis.resolved_self)
+      @analysis[node] = FieldExtract.new(field, Fixed.new(field.pos, @analysis.resolved_self))
       follow_field(field, node.value)
       field.assign(ctx, self, node.rhs, node.rhs.pos)
     end
