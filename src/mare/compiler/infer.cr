@@ -95,6 +95,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
 
   struct ReifiedFuncAnalysis
     protected getter resolved
+    protected getter resolved_infos
     protected getter called_funcs
     getter! ret_resolved : MetaType; protected setter ret_resolved
     getter! yield_in_resolved : MetaType; protected setter yield_in_resolved
@@ -107,6 +108,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       @redirects = {} of AST::Node => AST::Node
       @infos = {} of AST::Node => Info
       @resolved = {} of AST::Node => MetaType
+      @resolved_infos = {} of Info => MetaType
       @called_funcs = Set({Source::Pos, ReifiedType, Program::Function::Link}).new
     end
 
@@ -793,6 +795,10 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       ctx.jumps[reified.link]
     end
 
+    def resolve(ctx : Context, info : Info) : MetaType
+      @analysis.resolved_infos[info] ||= info.resolve!(ctx, self)
+    end
+    # TODO: remove this cheat and stop using the ctx field we hold, so to remove it later...
     def resolve(node) : MetaType
       @analysis.resolved[node] ||= self[node].resolve!(ctx, self)
     end
@@ -1237,6 +1243,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         call_args.try(&.accept(ctx, self))
 
         # Resolve and validate the call.
+        # TODO: move this into FromCall.inner_resolve and do not eagerly resolve here
         call.follow_call(ctx, self)
 
         # Visit yield params to register them in our state.
@@ -1403,7 +1410,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         # Each condition in a choice must evaluate to a type of Bool.
         bool = MetaType.new(reified_type(prelude_type("Bool")))
         cond_info = self[cond]
-        cond_info.within_domain!(ctx, self, node.pos, node.pos, bool, 1)
+        cond_info.add_downstream(ctx, self, node.pos, Fixed.new(node.pos, bool), 1)
 
         # If we have a type condition as the cond, that implies that it returned
         # true if we are in the body; hence we can apply the type refinement.
@@ -1461,7 +1468,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       # The condition of the loop must evaluate to a type of Bool.
       bool = MetaType.new(reified_type(prelude_type("Bool")))
       cond_info = self[node.cond]
-      cond_info.within_domain!(ctx, self, node.pos, node.pos, bool, 1)
+      cond_info.add_downstream(ctx, self, node.pos, Fixed.new(node.pos, bool), 1)
 
       # TODO: Don't use Choice?
       @analysis[node] = Choice.new(node.pos, [node.body, node.else_body])

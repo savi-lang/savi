@@ -3,6 +3,16 @@ class Mare::Compiler::Infer
     property pos : Source::Pos = Source::Pos.none
 
     abstract def resolve!(ctx : Context, infer : ForFunc) : MetaType
+
+    abstract def add_downstream(
+      ctx : Context,
+      infer : ForFunc,
+      use_pos : Source::Pos,
+      info : Info,
+      aliases : Int32,
+    )
+
+    # TODO: remove this maybe?
     abstract def within_domain!(
       ctx : Context,
       infer : ForFunc,
@@ -55,6 +65,71 @@ class Mare::Compiler::Infer
     end
   end
 
+  abstract class DownstreamableInfo < Info
+    # Must be implemented by the child class as an required hook.
+    abstract def describe_kind : String
+
+    # May be implemented by the child class as an optional hook.
+    def adds_alias; 0 end
+
+    # Values flow downstream as the program executes;
+    # the value flowing into a downstream must be a subtype of the downstream.
+    # Type information can be inferred in either direction, but certain
+    # Info node types are fixed, meaning that they act only as constraints
+    # on their upstreams, and are not influenced at all by upstream info nodes.
+    @downstreams = [] of Tuple(Source::Pos, Info, Int32)
+    def add_downstream(ctx : Context, infer : ForFunc, use_pos : Source::Pos, info : Info, aliases : Int32)
+      @downstreams << {use_pos, info, aliases + adds_alias}
+      after_add_downstream(ctx, infer, use_pos, info, aliases)
+    end
+    def downstreams_empty?
+      @downstreams.empty?
+    end
+    def downstream_use_pos
+      @downstreams.first[0]
+    end
+
+    # May be implemented by the child class as an optional hook.
+    def after_add_downstream(ctx : Context, infer : ForFunc, use_pos : Source::Pos, info : Info, aliases : Int32)
+    end
+
+    # When we need to take into consideration the downstreams' constraints
+    # in order to infer our type from them, we can use this to collect all
+    # those constraints into one intersection of them all.
+    def total_downstream_constraint(ctx : Context, infer : ForFunc)
+      MetaType.new_intersection(
+        @downstreams.map { |_, other_info, _|
+          infer.resolve(ctx, other_info).as(MetaType)
+        }
+      ).simplify(ctx) # TODO: is this simplify needed? when is it needed? can it be optimized?
+    end
+
+    # TODO: document
+    def describe_downstream_constraints(ctx : Context, infer : ForFunc)
+      @downstreams.map do |c|
+        mt = infer.resolve(ctx, c[1])
+        {c[1].pos, "it is required here to be a subtype of #{mt.show_type}"}
+      end.to_h.to_a
+    end
+
+    # TODO: document
+    def within_downstream_constraints!(ctx : Context, infer : ForFunc, meta_type : MetaType)
+      if !within_downstream_constraints?(ctx, infer, meta_type)
+        extra = describe_downstream_constraints(ctx, infer)
+        extra << {pos,
+          "but the type of the #{describe_kind} was #{meta_type.show_type}"}
+
+        Error.at downstream_use_pos, "The type of this expression " \
+          "doesn't meet the constraints imposed on it",
+            extra
+      end
+    end
+    def within_downstream_constraints?(ctx : Context, infer : ForFunc, meta_type : MetaType)
+      return true if @downstreams.empty?
+      meta_type.within_constraints?(ctx, [total_downstream_constraint(ctx, infer)])
+    end
+  end
+
   class Unreachable < Info
     INSTANCE = new
     def self.instance; INSTANCE end
@@ -63,26 +138,24 @@ class Mare::Compiler::Infer
       MetaType.new(MetaType::Unsatisfiable.instance)
     end
 
-    def within_domain!(
-      ctx : Context,
-      infer : ForFunc,
-      use_pos : Source::Pos,
-      constraint_pos : Source::Pos,
-      constraint : MetaType,
-      aliases : Int32,
-    )
+    def add_downstream(ctx : Context, infer : ForFunc, use_pos : Source::Pos, info : Info, aliases : Int32)
+      # Do nothing; we're already unsatisfiable...
+    end
+
+    def within_domain!(ctx : Context, infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
       # Do nothing; we're already unsatisfiable...
     end
   end
 
-  abstract class DynamicInfo < Info
+  abstract class DynamicInfo < DownstreamableInfo
     @already_resolved : MetaType?
     @domain_constraints = [] of Tuple(Source::Pos, Source::Pos, MetaType, Int32)
     getter domain_constraints
 
-    def describe_domain_constraints
+    def describe_domain_constraints(ctx, infer)
       raise "already resolved" if @already_resolved
 
+      describe_downstream_constraints(ctx, infer) +
       @domain_constraints.map do |c|
         {c[1], "it is required here to be a subtype of #{c[2].show_type}"}
       end.to_h.to_a
@@ -99,12 +172,6 @@ class Mare::Compiler::Infer
 
       MetaType.new_intersection(@domain_constraints.map(&.[2]))
     end
-
-    # Must be implemented by the child class as an required hook.
-    abstract def describe_kind : String
-
-    # May be implemented by the child class as an optional hook.
-    def adds_alias; 0 end
 
     # Must be implemented by the child class as an required hook.
     abstract def inner_resolve!(ctx : Context, infer : ForFunc)
@@ -133,19 +200,22 @@ class Mare::Compiler::Infer
       return @already_resolved.not_nil! if @already_resolved
 
       meta_type = inner_resolve!(ctx, infer)
-      return finish_resolve!(ctx, infer, meta_type) if domain_constraints.empty?
+      return finish_resolve!(ctx, infer, meta_type) if downstreams_empty? && domain_constraints.empty?
 
-      use_pos = domain_constraints.first[0]
+      use_pos = (domain_constraints[0]?.try(&.[0]) || downstream_use_pos)
 
       # TODO: print a different error message when the domain constraints are
       # internally conflicting, even before adding this meta_type into the mix.
 
-      total_domain_constraint = total_domain_constraint(ctx).simplify(ctx)
+      total_domain_constraint =
+        total_domain_constraint(ctx)
+          .intersect(total_downstream_constraint(ctx, infer))
+          .simplify(ctx)
 
       meta_type_ephemeral = meta_type.ephemeralize
 
       if !meta_type_ephemeral.within_constraints?(ctx, [total_domain_constraint])
-        extra = describe_domain_constraints
+        extra = describe_domain_constraints(ctx, infer)
         extra << {pos,
           "but the type of the #{describe_kind} was #{meta_type.show_type}"}
 
@@ -167,7 +237,23 @@ class Mare::Compiler::Infer
         domain_constraints.each do |use_pos, _, constraint, aliases|
           if aliases > 0
             if !meta_type_alias.within_constraints?(ctx, [constraint])
-              extra = describe_domain_constraints
+              extra = describe_domain_constraints(ctx, infer)
+              extra << {pos,
+                "but the type of the #{describe_kind} " \
+                "(when aliased) was #{meta_type_alias.show_type}"
+              }
+
+              Error.at use_pos, "This aliasing violates uniqueness " \
+                "(did you forget to consume the variable?)",
+                extra
+            end
+          end
+        end
+        @downstreams.each do |use_pos, other_info, aliases|
+          if aliases > 0
+            constraint = infer.resolve(ctx, other_info)
+            if !meta_type_alias.within_constraints?(ctx, [constraint])
+              extra = describe_domain_constraints(ctx, infer)
               extra << {pos,
                 "but the type of the #{describe_kind} " \
                 "(when aliased) was #{meta_type_alias.show_type}"
@@ -182,6 +268,7 @@ class Mare::Compiler::Infer
       end
 
       finish_resolve!(ctx, infer, meta_type)
+      # .tap { |mt| within_downstream_constraints!(ctx, infer, mt) }
     end
 
     # May be implemented by the child class as an optional hook.
@@ -220,6 +307,7 @@ class Mare::Compiler::Infer
     def adds_alias; 1 end
 
     def first_viable_constraint_pos : Source::Pos
+      (downstream_use_pos unless downstreams_empty?)
       @domain_constraints[0]?.try(&.[0]) ||
       @upstreams[0]?.try(&.[1]) ||
       @pos
@@ -249,9 +337,13 @@ class Mare::Compiler::Infer
       elsif !@upstreams.empty?
         # If we only have upstreams to go on, return the first upstream type.
         return infer[@upstreams.first[0]].resolve!(ctx, infer).strip_ephemeral
-      elsif !domain_constraints.empty?
+      elsif !(downstreams_empty? && domain_constraints.empty?)
         # If we only have domain constraints to, just do our best with those.
-        return total_domain_constraint(ctx).simplify(ctx).strip_ephemeral
+        return \
+          total_domain_constraint(ctx)
+            .intersect(total_downstream_constraint(ctx, infer))
+            .simplify(ctx)
+            .strip_ephemeral
       end
 
       # If we get here, we've failed and don't have enough info to continue.
@@ -288,12 +380,11 @@ class Mare::Compiler::Infer
     end
 
     def assign(ctx : Context, infer : ForFunc, rhs : AST::Node, rhs_pos : Source::Pos)
-      infer[rhs].within_domain!(
+      infer[rhs].add_downstream(
         ctx,
         infer,
         rhs_pos,
-        @pos,
-        @explicit.not_nil!,
+        Fixed.new(@pos, @explicit.not_nil!),
         0,
       ) if @explicit
 
@@ -301,14 +392,17 @@ class Mare::Compiler::Infer
     end
   end
 
-  class Fixed < Info
+  class Fixed < DownstreamableInfo
     property inner : MetaType
+
+    def describe_kind; "expression" end
 
     def initialize(@pos, @inner)
     end
 
     def resolve!(ctx : Context, infer : ForFunc)
       @inner
+      .tap { |mt| within_downstream_constraints!(ctx, infer, mt) }
     end
 
     def within_domain!(ctx : Context, infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
@@ -316,9 +410,11 @@ class Mare::Compiler::Infer
     end
   end
 
-  class Self < Info
+  class Self < DownstreamableInfo
     property inner : MetaType
     property domain_constraints : Array(Tuple(Source::Pos, MetaType))
+
+    def describe_kind; "receiver value" end
 
     def initialize(@pos, @inner)
       @domain_constraints = [] of Tuple(Source::Pos, MetaType)
@@ -326,6 +422,7 @@ class Mare::Compiler::Infer
 
     def resolve!(ctx : Context, infer : ForFunc)
       @inner
+      .tap { |mt| within_downstream_constraints!(ctx, infer, mt) }
     end
 
     def within_domain!(ctx : Context, infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
@@ -342,10 +439,14 @@ class Mare::Compiler::Infer
     end
 
     def inner_resolve!(ctx : Context, infer : ForFunc)
+      total_constraint =
+        total_domain_constraint(ctx)
+          .intersect(total_downstream_constraint(ctx, infer))
+
       # Literal values (such as numeric literals) sometimes have
       # an ambiguous type. Here, we  intersect with the domain constraints
       # to (hopefully) arrive at a single concrete type to return.
-      meta_type = total_domain_constraint(ctx).intersect(@possible).simplify(ctx)
+      meta_type = total_constraint.intersect(@possible).simplify(ctx)
 
       # If we don't satisfy the constraints, leave it to DynamicInfo.resolve!
       # to print a consistent error message instead of printing it here.
@@ -354,7 +455,7 @@ class Mare::Compiler::Infer
       if !meta_type.singular?
         Error.at self,
           "This literal value couldn't be inferred as a single concrete type",
-          describe_domain_constraints.push({pos,
+          describe_domain_constraints(ctx, infer).push({pos,
             "and the literal itself has an intrinsic type of #{meta_type.show_type}"})
       end
 
@@ -383,9 +484,11 @@ class Mare::Compiler::Infer
     def describe_kind; "field reference" end
   end
 
-  class FieldRead < Info
+  class FieldRead < DownstreamableInfo
     def initialize(@field : Field, @origin : MetaType)
     end
+
+    def describe_kind; "field read" end
 
     def pos
       @field.pos
@@ -393,6 +496,7 @@ class Mare::Compiler::Infer
 
     def resolve!(ctx : Context, infer : ForFunc)
       @field.resolve!(ctx, infer).viewed_from(@origin).alias
+      .tap { |mt| within_downstream_constraints!(ctx, infer, mt) }
     end
 
     def within_domain!(ctx : Context, infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
@@ -400,9 +504,11 @@ class Mare::Compiler::Infer
     end
   end
 
-  class FieldExtract < Info
+  class FieldExtract < DownstreamableInfo
     def initialize(@field : Field, @origin : MetaType)
     end
+
+    def describe_kind; "field extraction" end
 
     def pos
       @field.pos
@@ -410,6 +516,7 @@ class Mare::Compiler::Infer
 
     def resolve!(ctx : Context, infer : ForFunc)
       @field.resolve!(ctx, infer).extracted_from(@origin).ephemeralize
+      .tap { |mt| within_downstream_constraints!(ctx, infer, mt) }
     end
 
     def within_domain!(ctx : Context, infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
@@ -421,8 +528,14 @@ class Mare::Compiler::Infer
     def initialize(@pos)
     end
 
+    def describe_kind; "error expression" end
+
     def resolve!(ctx : Context, infer : ForFunc)
       MetaType.new(MetaType::Unsatisfiable.instance)
+    end
+
+    def add_downstream(ctx : Context, infer : ForFunc, use_pos : Source::Pos, info : Info, aliases : Int32)
+      raise "can't be downstream of a RaiseError"
     end
 
     def within_domain!(ctx : Context, infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
@@ -434,11 +547,20 @@ class Mare::Compiler::Infer
     def initialize(@pos, @body : AST::Node, @else_body : AST::Node)
     end
 
+    def describe_kind; "try block" end
+
     def resolve!(ctx : Context, infer : ForFunc)
       MetaType.new_union([
         infer[@body].resolve!(ctx, infer),
         infer[@else_body].resolve!(ctx, infer),
       ])
+    end
+
+    def add_downstream(ctx : Context, infer : ForFunc, use_pos : Source::Pos, info : Info, aliases : Int32)
+      infer[@body].add_downstream(ctx, infer, use_pos, info, aliases) \
+        unless infer.jumps.away?(@body)
+
+      infer[@else_body].add_downstream(ctx, infer, use_pos, info, aliases)
     end
 
     def within_domain!(ctx : Context, infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
@@ -455,8 +577,18 @@ class Mare::Compiler::Infer
     def initialize(@pos, @clauses)
     end
 
+    def describe_kind; "choice block" end
+
     def resolve!(ctx : Context, infer : ForFunc)
       MetaType.new_union(clauses.map { |node| infer[node].resolve!(ctx, infer) })
+    end
+
+    def add_downstream(ctx : Context, infer : ForFunc, use_pos : Source::Pos, info : Info, aliases : Int32)
+      clauses.each do |node|
+        next if infer.jumps.away?(node)
+
+        infer[node].add_downstream(ctx, infer, use_pos, info, aliases)
+      end
     end
 
     def within_domain!(ctx : Context, infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
@@ -468,28 +600,12 @@ class Mare::Compiler::Infer
     end
   end
 
-  class TypeParamCondition < Info
+  class TypeParamCondition < DownstreamableInfo
     getter bool : MetaType # TODO: avoid needing the caller to supply this
     getter refine : Refer::TypeParam
     getter refine_type : MetaType
 
-    def initialize(@pos, @bool, @refine, @refine_type)
-      raise "#{@bool.show_type} is not Bool" unless @bool.show_type == "Bool"
-    end
-
-    def resolve!(ctx : Context, infer : ForFunc)
-      @bool
-    end
-
-    def within_domain!(ctx : Context, infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
-      meta_type_within_domain!(ctx, @bool, use_pos, constraint_pos, constraint, aliases)
-    end
-  end
-
-  class TypeCondition < Info
-    getter bool : MetaType # TODO: avoid needing the caller to supply this
-    getter refine : AST::Node
-    getter refine_type : MetaType
+    def describe_kind; "type parameter condition" end
 
     def initialize(@pos, @bool, @refine, @refine_type)
       raise "#{@bool.show_type} is not Bool" unless @bool.show_type == "Bool"
@@ -497,6 +613,7 @@ class Mare::Compiler::Infer
 
     def resolve!(ctx : Context, infer : ForFunc)
       @bool
+      .tap { |mt| within_downstream_constraints!(ctx, infer, mt) }
     end
 
     def within_domain!(ctx : Context, infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
@@ -504,47 +621,77 @@ class Mare::Compiler::Infer
     end
   end
 
-  class TrueCondition < Info # TODO: dedup with FalseCondition?
+  class TypeCondition < DownstreamableInfo
     getter bool : MetaType # TODO: avoid needing the caller to supply this
-
-    def initialize(@pos, @bool)
-      raise "#{@bool.show_type} is not Bool" unless @bool.show_type == "Bool"
-    end
-
-    def resolve!(ctx : Context, infer : ForFunc)
-      @bool
-    end
-
-    def within_domain!(ctx : Context, infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
-      meta_type_within_domain!(ctx, @bool, use_pos, constraint_pos, constraint, aliases)
-    end
-  end
-
-  class FalseCondition < Info # TODO: dedup with TrueCondition?
-    getter bool : MetaType # TODO: avoid needing the caller to supply this
-
-    def initialize(@pos, @bool)
-      raise "#{@bool.show_type} is not Bool" unless @bool.show_type == "Bool"
-    end
-
-    def resolve!(ctx : Context, infer : ForFunc)
-      @bool
-    end
-
-    def within_domain!(ctx : Context, infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
-      meta_type_within_domain!(ctx, @bool, use_pos, constraint_pos, constraint, aliases)
-    end
-  end
-
-  class Refinement < Info
     getter refine : AST::Node
     getter refine_type : MetaType
+
+    def describe_kind; "type condition" end
+
+    def initialize(@pos, @bool, @refine, @refine_type)
+      raise "#{@bool.show_type} is not Bool" unless @bool.show_type == "Bool"
+    end
+
+    def resolve!(ctx : Context, infer : ForFunc)
+      @bool
+      .tap { |mt| within_downstream_constraints!(ctx, infer, mt) }
+    end
+
+    def within_domain!(ctx : Context, infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
+      meta_type_within_domain!(ctx, @bool, use_pos, constraint_pos, constraint, aliases)
+    end
+  end
+
+  class TrueCondition < DownstreamableInfo # TODO: dedup with FalseCondition?
+    getter bool : MetaType # TODO: avoid needing the caller to supply this
+
+    def describe_kind; "True value" end
+
+    def initialize(@pos, @bool)
+      raise "#{@bool.show_type} is not Bool" unless @bool.show_type == "Bool"
+    end
+
+    def resolve!(ctx : Context, infer : ForFunc)
+      @bool
+      .tap { |mt| within_downstream_constraints!(ctx, infer, mt) }
+    end
+
+    def within_domain!(ctx : Context, infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
+      meta_type_within_domain!(ctx, @bool, use_pos, constraint_pos, constraint, aliases)
+    end
+  end
+
+  class FalseCondition < DownstreamableInfo # TODO: dedup with TrueCondition?
+    getter bool : MetaType # TODO: avoid needing the caller to supply this
+
+    def describe_kind; "False value" end
+
+    def initialize(@pos, @bool)
+      raise "#{@bool.show_type} is not Bool" unless @bool.show_type == "Bool"
+    end
+
+    def resolve!(ctx : Context, infer : ForFunc)
+      @bool
+      .tap { |mt| within_downstream_constraints!(ctx, infer, mt) }
+    end
+
+    def within_domain!(ctx : Context, infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
+      meta_type_within_domain!(ctx, @bool, use_pos, constraint_pos, constraint, aliases)
+    end
+  end
+
+  class Refinement < DownstreamableInfo
+    getter refine : AST::Node
+    getter refine_type : MetaType
+
+    def describe_kind; "type refinement" end
 
     def initialize(@pos, @refine, @refine_type)
     end
 
     def resolve!(ctx : Context, infer : ForFunc)
       infer[@refine].resolve!(ctx, infer).intersect(@refine_type)
+      .tap { |mt| within_downstream_constraints!(ctx, infer, mt) }
     end
 
     def within_domain!(ctx : Context, infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
@@ -552,14 +699,20 @@ class Mare::Compiler::Infer
     end
   end
 
-  class Consume < Info
+  class Consume < DownstreamableInfo
     getter local : AST::Node
+
+    def describe_kind; "consumed reference" end
 
     def initialize(@pos, @local)
     end
 
     def resolve!(ctx : Context, infer : ForFunc)
       infer[@local].resolve!(ctx, infer).ephemeralize
+    end
+
+    def add_downstream(ctx : Context, infer : ForFunc, use_pos : Source::Pos, info : Info, aliases : Int32)
+      infer[@local].add_downstream(ctx, infer, use_pos, info, aliases - 1)
     end
 
     def within_domain!(ctx : Context, infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
@@ -628,6 +781,23 @@ class Mare::Compiler::Infer
       mt
     end
 
+    def after_add_downstream(ctx : Context, infer : ForFunc, use_pos : Source::Pos, info : Info, aliases : Int32)
+      antecedents = possible_element_antecedents(ctx, infer)
+      return if antecedents.empty?
+
+      terms.each do |term|
+        # TODO: switch to add_downstream?
+        infer[term].within_domain!(
+          ctx,
+          infer,
+          (domain_constraints[0]?.try(&.[0]) || downstream_use_pos),
+          (domain_constraints[0]?.try(&.[1]) || @downstreams.first[1].pos),
+          MetaType.new_union(antecedents),
+          0,
+        )
+      end
+    end
+
     def after_within_domain!(ctx : Context, infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
       antecedents = possible_element_antecedents(ctx, infer)
       return if antecedents.empty?
@@ -647,7 +817,7 @@ class Mare::Compiler::Infer
     private def possible_element_antecedents(ctx, infer) : Array(MetaType)
       results = [] of MetaType
 
-      total_domain_constraint(ctx).each_reachable_defn.to_a.each do |rt|
+      total_domain_constraint(ctx).intersect(total_downstream_constraint(ctx, infer)).each_reachable_defn.to_a.each do |rt|
         # TODO: Support more element antecedent detection patterns.
         if rt.link == infer.prelude_type("Array") \
         && rt.args.size == 1

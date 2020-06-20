@@ -921,6 +921,11 @@ describe Mare::Compiler::Infer do
         xb     = xa    // not okay
                  ^~
 
+    - it is required here to be a subtype of val:
+      from (example):6:
+        xb val = X.new // okay
+           ^~~
+
     - it is required here to be a subtype of X'val:
       from (example):6:
         xb val = X.new // okay
@@ -1022,10 +1027,10 @@ describe Mare::Compiler::Infer do
         x3 iso = x // not okay, but would work if not for the above stripping
            ^~~
 
-    - but the type of the return value (when aliased) was X'tag:
+    - but the type of the local variable (when aliased) was X'tag:
       from (example):6:
         x = X.new // inferred as X'iso+, stripped to X'iso
-              ^~~
+        ^
     MSG
 
     expect_raises Mare::Error, expected do
