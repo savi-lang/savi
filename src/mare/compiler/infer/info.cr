@@ -294,14 +294,14 @@ class Mare::Compiler::Infer
   end
 
   abstract class NamedInfo < DynamicInfo
-    @explicit : MetaType?
+    @explicit : Fixed?
     @upstreams = [] of Tuple(AST::Node, Source::Pos)
 
     def initialize(@pos)
     end
 
-    def explicit?
-      @explicit
+    def explicit? : Bool
+      !!@explicit
     end
 
     def adds_alias; 1 end
@@ -317,22 +317,24 @@ class Mare::Compiler::Infer
       explicit = @explicit
 
       if explicit
-        if !explicit.cap_only?
+        explicit_mt = explicit.resolve!(ctx, infer)
+
+        if !explicit_mt.cap_only?
           # If we have an explicit type that is more than just a cap, return it.
-          return explicit
+          return explicit_mt
         elsif !@upstreams.empty?
           # If there are upstreams, use the explicit cap applied to the type
           # of the first upstream expression, which becomes canonical.
           return (
             infer[@upstreams.first[0]].resolve!(ctx, infer)
-            .strip_cap.intersect(explicit).strip_ephemeral
+            .strip_cap.intersect(explicit_mt).strip_ephemeral
             .strip_ephemeral
           )
         else
           # If we have no upstreams and an explicit cap, return
           # the empty trait called `Any` intersected with that cap.
           any = MetaType.new_nominal(infer.reified_type(infer.prelude_type("Any")))
-          return any.intersect(explicit)
+          return any.intersect(explicit_mt)
         end
       elsif !@upstreams.empty?
         # If we only have upstreams to go on, return the first upstream type.
@@ -363,11 +365,11 @@ class Mare::Compiler::Infer
       end
     end
 
-    def set_explicit(explicit_pos : Source::Pos, explicit : MetaType)
+    def set_explicit(explicit_pos : Source::Pos, explicit_mt : MetaType)
       raise "already set_explicit" if @explicit
       raise "shouldn't have an upstream yet" unless @upstreams.empty?
 
-      @explicit = explicit
+      @explicit = Fixed.new(explicit_pos, explicit_mt.not_nil!)
       @pos = explicit_pos
     end
 
@@ -384,7 +386,7 @@ class Mare::Compiler::Infer
         ctx,
         infer,
         rhs_pos,
-        Fixed.new(@pos, @explicit.not_nil!),
+        @explicit.not_nil!,
         0,
       ) if @explicit
 
