@@ -552,7 +552,7 @@ class Mare::Compiler::Infer
     end
   end
 
-  class Choice < Info
+  class Phi < Info
     getter branches : Array(Info)
 
     def initialize(@pos, @branches)
@@ -578,88 +578,78 @@ class Mare::Compiler::Infer
   end
 
   class TypeParamCondition < DownstreamableInfo
-    getter bool : MetaType # TODO: avoid needing the caller to supply this
     getter refine : Refer::TypeParam
     getter refine_type : MetaType
 
     def describe_kind; "type parameter condition" end
 
-    def initialize(@pos, @bool, @refine, @refine_type)
-      raise "#{@bool.show_type} is not Bool" unless @bool.show_type == "Bool"
+    def initialize(@pos, @refine, @refine_type)
     end
 
     def resolve!(ctx : Context, infer : ForFunc)
-      @bool
+      infer.prelude_bool(ctx)
       .tap { |mt| within_downstream_constraints!(ctx, infer, mt) }
     end
 
     def within_domain!(ctx : Context, infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
-      meta_type_within_domain!(ctx, @bool, use_pos, constraint_pos, constraint, aliases)
+      meta_type_within_domain!(ctx, infer.prelude_bool(ctx), use_pos, constraint_pos, constraint, aliases)
     end
   end
 
   class TypeCondition < DownstreamableInfo
-    getter bool : MetaType # TODO: avoid needing the caller to supply this
     getter refine : AST::Node
-    getter refine_type : MetaType
+    getter refine_type : Info
 
     def describe_kind; "type condition" end
 
-    def initialize(@pos, @bool, @refine, @refine_type)
-      raise "#{@bool.show_type} is not Bool" unless @bool.show_type == "Bool"
+    def initialize(@pos, @refine, @refine_type)
     end
 
     def resolve!(ctx : Context, infer : ForFunc)
-      @bool
+      infer.prelude_bool(ctx)
       .tap { |mt| within_downstream_constraints!(ctx, infer, mt) }
     end
 
     def within_domain!(ctx : Context, infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
-      meta_type_within_domain!(ctx, @bool, use_pos, constraint_pos, constraint, aliases)
+      meta_type_within_domain!(ctx, infer.prelude_bool(ctx), use_pos, constraint_pos, constraint, aliases)
     end
   end
 
   class TrueCondition < DownstreamableInfo # TODO: dedup with FalseCondition?
-    getter bool : MetaType # TODO: avoid needing the caller to supply this
-
     def describe_kind; "True value" end
 
-    def initialize(@pos, @bool)
-      raise "#{@bool.show_type} is not Bool" unless @bool.show_type == "Bool"
+    def initialize(@pos)
     end
 
     def resolve!(ctx : Context, infer : ForFunc)
-      @bool
+      infer.prelude_bool(ctx)
       .tap { |mt| within_downstream_constraints!(ctx, infer, mt) }
     end
 
     def within_domain!(ctx : Context, infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
-      meta_type_within_domain!(ctx, @bool, use_pos, constraint_pos, constraint, aliases)
+      meta_type_within_domain!(ctx, infer.prelude_bool(ctx), use_pos, constraint_pos, constraint, aliases)
     end
   end
 
   class FalseCondition < DownstreamableInfo # TODO: dedup with TrueCondition?
-    getter bool : MetaType # TODO: avoid needing the caller to supply this
-
     def describe_kind; "False value" end
 
-    def initialize(@pos, @bool)
-      raise "#{@bool.show_type} is not Bool" unless @bool.show_type == "Bool"
+    def initialize(@pos)
     end
 
     def resolve!(ctx : Context, infer : ForFunc)
-      @bool
+      infer.prelude_bool(ctx)
       .tap { |mt| within_downstream_constraints!(ctx, infer, mt) }
     end
 
     def within_domain!(ctx : Context, infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
-      meta_type_within_domain!(ctx, @bool, use_pos, constraint_pos, constraint, aliases)
+      meta_type_within_domain!(ctx, infer.prelude_bool(ctx), use_pos, constraint_pos, constraint, aliases)
     end
   end
 
   class Refinement < DownstreamableInfo
-    getter refine : AST::Node
-    getter refine_type : MetaType
+    getter refine : Info
+    getter refine_type : Info
 
     def describe_kind; "type refinement" end
 
@@ -667,7 +657,7 @@ class Mare::Compiler::Infer
     end
 
     def resolve!(ctx : Context, infer : ForFunc)
-      infer[@refine].resolve!(ctx, infer).intersect(@refine_type)
+      infer.resolve(ctx, @refine).intersect(infer.resolve(ctx, @refine_type))
       .tap { |mt| within_downstream_constraints!(ctx, infer, mt) }
     end
 
@@ -677,7 +667,7 @@ class Mare::Compiler::Infer
   end
 
   class Consume < DownstreamableInfo
-    getter local : AST::Node
+    getter local : Info
 
     def describe_kind; "consumed reference" end
 
@@ -685,15 +675,15 @@ class Mare::Compiler::Infer
     end
 
     def resolve!(ctx : Context, infer : ForFunc)
-      infer[@local].resolve!(ctx, infer).ephemeralize
+      infer.resolve(ctx, @local).ephemeralize
     end
 
     def add_downstream(ctx : Context, infer : ForFunc, use_pos : Source::Pos, info : Info, aliases : Int32)
-      infer[@local].add_downstream(ctx, infer, use_pos, info, aliases - 1)
+      @local.add_downstream(ctx, infer, use_pos, info, aliases - 1)
     end
 
     def within_domain!(ctx : Context, infer : ForFunc, use_pos : Source::Pos, constraint_pos : Source::Pos, constraint : MetaType, aliases : Int32)
-      infer[@local].within_domain!(ctx, infer, use_pos, constraint_pos, constraint, aliases - 1)
+      @local.within_domain!(ctx, infer, use_pos, constraint_pos, constraint, aliases - 1)
     end
   end
 
@@ -702,7 +692,7 @@ class Mare::Compiler::Infer
   end
 
   class ArrayLiteral < DynamicInfo
-    getter terms : Array(AST::Node)
+    getter terms : Array(Info)
 
     def initialize(@pos, @terms)
     end
@@ -713,7 +703,7 @@ class Mare::Compiler::Infer
       array_defn = infer.prelude_type("Array")
 
       # Determine the lowest common denominator MetaType of all elements.
-      elem_mts = terms.map { |term| infer[term].resolve!(ctx, infer) }.uniq
+      elem_mts = terms.map { |term| infer.resolve(ctx, term).as(MetaType) }.uniq
       elem_mt = MetaType.new_union(elem_mts).simplify(ctx)
 
       # Look for exactly one antecedent type that matches the inferred type.
@@ -742,7 +732,7 @@ class Mare::Compiler::Infer
       end
 
       # Now that we have the element type to use, construct the result.
-      rt = infer.reified_type(infer.prelude_type("Array"), [elem_mt])
+      rt = infer.reified_type(infer.prelude_type(ctx, "Array"), [elem_mt])
       mt = MetaType.new(rt)
 
       # Reach the functions we will use during CodeGen.
@@ -762,7 +752,7 @@ class Mare::Compiler::Infer
 
       terms.each do |term|
         # TODO: switch to add_downstream?
-        infer[term].within_domain!(
+        term.within_domain!(
           ctx,
           infer,
           (domain_constraints[0]?.try(&.[0]) || downstream_use_pos),
@@ -778,7 +768,7 @@ class Mare::Compiler::Infer
       return if antecedents.empty?
 
       terms.each do |term|
-        infer[term].within_domain!(
+        term.within_domain!(
           ctx,
           infer,
           use_pos,
@@ -805,7 +795,7 @@ class Mare::Compiler::Infer
   end
 
   class FromCall < DynamicInfo
-    getter lhs : AST::Node
+    getter lhs : Info
     getter member : String
     getter args_pos : Array(Source::Pos)
     getter args : Array(AST::Node)
@@ -827,31 +817,31 @@ class Mare::Compiler::Infer
 
     def follow_call_get_call_defns(ctx : Context, infer : ForFunc)
       call = self
-      receiver = infer[call.lhs].resolve!(ctx, infer)
-      call_defns = receiver.find_callable_func_defns(ctx, infer, call.member)
+      receiver = infer.resolve(ctx, @lhs)
+      call_defns = receiver.find_callable_func_defns(ctx, infer, @member)
 
       # Raise an error if we don't have a callable function for every possibility.
       call_defns << {receiver.inner, nil, nil} if call_defns.empty?
       problems = [] of {Source::Pos, String}
       call_defns.each do |(call_mti, call_defn, call_func)|
         if call_defn.nil?
-          problems << {call.pos,
+          problems << {@pos,
             "the type #{call_mti.inspect} has no referencable types in it"}
         elsif call_func.nil?
           call_defn_defn = call_defn.defn(ctx)
 
           problems << {call_defn_defn.ident.pos,
-            "#{call_defn_defn.ident.value} has no '#{call.member}' function"}
+            "#{call_defn_defn.ident.value} has no '#{@member}' function"}
 
           found_similar = false
-          if call.member.ends_with?("!")
-            call_defn_defn.find_func?(call.member[0...-1]).try do |similar|
+          if @member.ends_with?("!")
+            call_defn_defn.find_func?(@member[0...-1]).try do |similar|
               found_similar = true
               problems << {similar.ident.pos,
                 "maybe you meant to call '#{similar.ident.value}' (without '!')"}
             end
           else
-            call_defn_defn.find_func?("#{call.member}!").try do |similar|
+            call_defn_defn.find_func?("#{@member}!").try do |similar|
               found_similar = true
               problems << {similar.ident.pos,
                 "maybe you meant to call '#{similar.ident.value}' (with a '!')"}
@@ -859,7 +849,7 @@ class Mare::Compiler::Infer
           end
 
           unless found_similar
-            similar = call_defn_defn.find_similar_function(call.member)
+            similar = call_defn_defn.find_similar_function(@member)
             problems << {similar.ident.pos,
               "maybe you meant to call the '#{similar.ident.value}' function"} \
                 if similar
@@ -867,7 +857,7 @@ class Mare::Compiler::Infer
         end
       end
       Error.at call,
-        "The '#{call.member}' function can't be called on #{receiver.show_type}",
+        "The '#{@member}' function can't be called on #{receiver.show_type}",
           problems unless problems.empty?
 
       call_defns
@@ -929,7 +919,7 @@ class Mare::Compiler::Infer
 
         # If the receiver of the call is the self (the receiver of the caller),
         # then we can give an extra hint about changing its capability to match.
-        if infer[call.lhs].is_a?(Self)
+        if @lhs.is_a?(Self)
           problems << {infer.func.cap.pos, "this would be possible if the " \
             "calling function were declared as `:fun #{required_cap}`"}
         end

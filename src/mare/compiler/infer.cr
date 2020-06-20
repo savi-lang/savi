@@ -979,12 +979,20 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       field.set_explicit(ret.pos, ret.resolve!(ctx, infer))
     end
 
+    def prelude_type(ctx, name)
+      @ctx.namespace.prelude_type(name)
+    end
+    # TODO: remove this alias of the above method that relies on interior @ctx.
     def prelude_type(name)
       @ctx.namespace.prelude_type(name)
     end
 
     def reified_type(*args)
       @for_type.reified_type(*args)
+    end
+
+    def prelude_bool(ctx)
+      (@prelude_bool ||= MetaType.new(reified_type(prelude_type(ctx, "Bool"))))
     end
 
     def lookup_type_param(ref, refer = refer(), receiver = reified.receiver)
@@ -1153,7 +1161,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
           @analysis.redirect(node, node.terms.last)
         end
       when "["
-        @analysis[node] = ArrayLiteral.new(node.pos, node.terms)
+        @analysis[node] =
+          ArrayLiteral.new(node.pos, node.terms.map { |term| self[term] })
       when " "
         ref = refer[node.terms[0]]
         if ref.is_a?(Refer::Local) && ref.defn == node.terms[0]
@@ -1225,9 +1234,14 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       when "."
         call_ident, call_args, yield_params, yield_block = AST::Extract.call(node)
 
+        # Visit lhs, args, and yield params before resolving the call.
+        # Note that we skipped it before with visit_children: false.
+        node.lhs.try(&.accept(ctx, self))
+        call_args.try(&.accept(ctx, self))
+
         call = FromCall.new(
           call_ident.pos,
-          node.lhs,
+          self[node.lhs],
           call_ident.value,
           (call_args ? call_args.terms.map(&.itself) : [] of AST::Node),
           (call_args ? call_args.terms.map(&.pos) : [] of Source::Pos),
@@ -1236,11 +1250,6 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
           classify.value_needed?(node),
         )
         @analysis[node] = call
-
-        # Visit lhs, args, and yield params before resolving the call.
-        # Note that we skipped it before with visit_children: false.
-        node.lhs.try(&.accept(ctx, self))
-        call_args.try(&.accept(ctx, self))
 
         # Resolve and validate the call.
         # TODO: move this into FromCall.inner_resolve and do not eagerly resolve here
@@ -1256,8 +1265,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
 
       when "is"
         # Just know that the result of this expression is a boolean.
-        bool = MetaType.new(reified_type(prelude_type("Bool")))
-        @analysis[node] = Fixed.new(node.pos, bool)
+        @analysis[node] = Fixed.new(node.pos, prelude_bool(ctx))
       when "<:"
         need_to_check_if_right_is_subtype_of_left = true
         lhs_info = self[node.lhs]
@@ -1269,10 +1277,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         if lhs_info.is_a?(Local) || lhs_info.is_a?(Param)
           # Set up a local type refinement condition, which can be used within
           # a choice body to inform the type system about the type relationship.
-          bool = MetaType.new(reified_type(prelude_type("Bool")))
           refine = @analysis.follow_redirects(node.lhs)
-          refine_type = rhs_info.resolve!(ctx, self)
-          @analysis[node] = TypeCondition.new(node.pos, bool, refine, refine_type)
+          @analysis[node] = TypeCondition.new(node.pos, refine, rhs_info)
 
         # If the left-hand side is the name of a type parameter...
         elsif lhs_info.is_a?(Fixed) \
@@ -1291,7 +1297,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
           bool = MetaType.new(reified_type(prelude_type("Bool")))
           refine = lhs_type_param
           refine_type = rhs_info.resolve!(ctx, self)
-          @analysis[node] = TypeParamCondition.new(node.pos, bool, refine, refine_type)
+          @analysis[node] = TypeParamCondition.new(node.pos, refine, refine_type)
 
         # If the left-hand side is the name of any other fixed type...
         elsif lhs_info.is_a?(Fixed) \
@@ -1309,9 +1315,9 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
           # We can know statically at compile time whether it's true or false.
           bool = MetaType.new(reified_type(prelude_type("Bool")))
           if lhs_mt.satisfies_bound?(ctx, rhs_mt)
-            @analysis[node] = TrueCondition.new(node.pos, bool)
+            @analysis[node] = TrueCondition.new(node.pos)
           else
-            @analysis[node] = FalseCondition.new(node.pos, bool)
+            @analysis[node] = FalseCondition.new(node.pos)
           end
 
         # For all other possible left-hand sides...
@@ -1394,7 +1400,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         usize = MetaType.new(reified_type(prelude_type("USize")))
         @analysis[node] = Fixed.new(node.pos, usize)
       when "--"
-        @analysis[node] = Consume.new(node.pos, node.term)
+        @analysis[node] = Consume.new(node.pos, self[node.term])
       else
         raise NotImplementedError.new(node.op.value)
       end
@@ -1419,7 +1425,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         if cond_info.is_a?(TypeCondition)
           @local_ident_overrides[cond_info.refine] = refine = cond_info.refine.dup
           @analysis[refine] = Refinement.new(
-            cond_info.pos, cond_info.refine, cond_info.refine_type
+            cond_info.pos, self[cond_info.refine], cond_info.refine_type
           )
         elsif cond_info.is_a?(TypeParamCondition)
           for_type.push_type_param_refinement(
