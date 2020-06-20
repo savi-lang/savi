@@ -765,14 +765,18 @@ class Mare::Compiler::Infer
       antecedents = possible_element_antecedents(ctx, infer)
       return if antecedents.empty?
 
+      fixed = Fixed.new(
+        (domain_constraints[0]?.try(&.[1]) || @downstreams.first[1].pos),
+        MetaType.new_union(antecedents),
+      )
+      infer.resolve(ctx, fixed)
+
       terms.each do |term|
-        # TODO: switch to add_downstream?
-        term.within_domain!(
+        term.add_downstream(
           ctx,
           infer,
           (domain_constraints[0]?.try(&.[0]) || downstream_use_pos),
-          (domain_constraints[0]?.try(&.[1]) || @downstreams.first[1].pos),
-          MetaType.new_union(antecedents),
+          fixed,
           0,
         )
       end
