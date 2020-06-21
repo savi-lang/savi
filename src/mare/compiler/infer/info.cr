@@ -356,8 +356,11 @@ class Mare::Compiler::Infer
     def after_resolve!(ctx : Context, infer : ForFunc, meta_type : MetaType)
       # TODO: Verify all upstreams instead of just beyond 1?
       if @upstreams.size > 1
+        fixed = Fixed.new(pos, meta_type.strip_ephemeral)
+        infer.resolve(ctx, fixed)
+
         @upstreams[1..-1].each do |other_upstream, other_upstream_pos|
-          other_upstream.within_domain!(ctx, infer, other_upstream_pos, pos, meta_type.strip_ephemeral, 0) # TODO: should we really use 0 here?
+          other_upstream.add_downstream(ctx, infer, other_upstream_pos, fixed, 0) # TODO: should we really use 0 here?
 
           other_mt = infer.resolve(ctx, other_upstream)
           raise "sanity check" unless other_mt.subtype_of?(ctx, meta_type)
