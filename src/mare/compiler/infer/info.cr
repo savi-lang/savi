@@ -626,7 +626,6 @@ class Mare::Compiler::Infer
     getter yield_block : AST::Group?
     getter ret_value_used : Bool
     @ret : MetaType?
-    @ret_pos : Source::Pos? # TODO: remove?
 
     def initialize(@pos, @lhs, @member, @args, @args_pos, @yield_params, @yield_block, @ret_value_used)
     end
@@ -882,9 +881,8 @@ class Mare::Compiler::Infer
 
       # Constrain the return value as the union of all observed return types.
       ret = rets.size == 1 ? rets.first : MetaType.new_union(rets)
-      pos = poss.size == 1 ? poss.first : call.pos
+      pos = poss.size == 1 ? poss.first : call.pos # TODO: remove this unused calculated value? or use it somehow for better error messages?
 
-      @ret_pos = pos
       @ret = ret.ephemeralize
     end
 
