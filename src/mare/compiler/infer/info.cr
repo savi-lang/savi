@@ -92,8 +92,6 @@ class Mare::Compiler::Infer
   end
 
   abstract class DynamicInfo < DownstreamableInfo
-    @already_resolved : MetaType?
-
     # Must be implemented by the child class as an required hook.
     abstract def inner_resolve!(ctx : Context, infer : ForFunc)
 
@@ -106,16 +104,11 @@ class Mare::Compiler::Infer
       # Run the optional hook in case the child class defined something here.
       after_resolve!(ctx, infer, meta_type)
 
-      # Save the result of the resolution.
-      @already_resolved = meta_type
-
       meta_type
     end
 
     # The final MetaType must meet all constraints that have been imposed.
     def resolve!(ctx : Context, infer : ForFunc) : MetaType
-      return @already_resolved.not_nil! if @already_resolved
-
       meta_type = inner_resolve!(ctx, infer)
       return finish_resolve!(ctx, infer, meta_type) if downstreams_empty?
 
@@ -280,6 +273,20 @@ class Mare::Compiler::Infer
     property inner : MetaType
 
     def describe_kind; "expression" end
+
+    def initialize(@pos, @inner)
+    end
+
+    def resolve!(ctx : Context, infer : ForFunc)
+      @inner
+      .tap { |mt| within_downstream_constraints!(ctx, infer, mt) }
+    end
+  end
+
+  class FixedType < DownstreamableInfo
+    property inner : MetaType
+
+    def describe_kind; "type expression" end
 
     def initialize(@pos, @inner)
     end

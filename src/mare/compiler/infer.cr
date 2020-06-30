@@ -803,7 +803,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
     # TODO: remove this cheat and stop using the ctx field we hold, so to remove it later...
     def resolve(node) : MetaType
-      @analysis.resolved[node] ||= self[node].resolve!(ctx, self)
+      @analysis.resolved[node] ||= resolve(ctx, self[node])
     end
 
     def extra_called_func!(pos, rt, f)
@@ -922,7 +922,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         if func.has_tag?(:async)
           "An asynchronous function"
         elsif func.has_tag?(:constructor) \
-        && !self[ret].resolve!(ctx, self).subtype_of?(ctx, MetaType.cap("ref"))
+        && !resolve(ctx, self[ret]).subtype_of?(ctx, MetaType.cap("ref"))
           "A constructor with elevated capability"
         end
       if require_sendable
@@ -930,7 +930,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
 
           errs = [] of {Source::Pos, String}
           params.terms.each do |param|
-            param_mt = self[param].resolve!(ctx, self)
+            param_mt = resolve(ctx, self[param])
 
             unless param_mt.is_sendable?
               # TODO: Remove this hacky special case.
@@ -952,13 +952,13 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       # TODO: Is it possible to remove the simplify calls here?
       # Is it actually a significant performance impact or not?
       @analysis.each_info.each do |node, info|
-        @analysis.resolved[node] ||= info.resolve!(ctx, self).simplify(ctx)
+        @analysis.resolved[node] ||= resolve(ctx, info).simplify(ctx)
       end
       if (info = @yield_in_info; info)
-        @analysis.yield_in_resolved = info.resolve!(ctx, self).simplify(ctx)
+        @analysis.yield_in_resolved = resolve(ctx, info).simplify(ctx)
       end
       @analysis.yield_out_resolved = @yield_out_infos.map do |info|
-        info.resolve!(ctx, self).simplify(ctx)
+        resolve(ctx, info).simplify(ctx)
       end
       @analysis.ret_resolved = @analysis.resolved[ret]
 
@@ -979,7 +979,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
 
       # Apply constraints to the return type.
       ret = infer[infer.ret]
-      field.set_explicit(ctx, self, ret.pos, ret.resolve!(ctx, infer))
+      field.set_explicit(ctx, self, ret.pos, infer.resolve(ctx, ret))
     end
 
     def prelude_type(ctx, name)
@@ -1303,7 +1303,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
           # a choice body to inform the type system about the type relationship.
           bool = MetaType.new(reified_type(prelude_type("Bool")))
           refine = lhs_type_param
-          refine_type = rhs_info.resolve!(ctx, self)
+          refine_type = resolve(ctx, rhs_info)
           @analysis[node] = TypeParamCondition.new(node.pos, refine, refine_type)
 
         # If the left-hand side is the name of any other fixed type...
