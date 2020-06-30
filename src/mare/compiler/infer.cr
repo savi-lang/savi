@@ -1029,18 +1029,22 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
 
     def error_if_type_args_missing(node : AST::Node, rt : ReifiedType)
+      # If this node is already a qualify, we take no issue with it.
+      return if node.is_a?(AST::Qualify)
+
+      # If this reified type already has arguments, we take no issue with it.
+      return if rt.args.size > 0
+
       # If this node is further qualified, we expect type args to come later.
       return if classify.further_qualified?(node)
 
       # If this node has no params, no type args are needed.
-      params = rt.defn(ctx).params
-      return if params.nil?
-      return if params.terms.size == 0
-      return if params.terms.size == rt.args.size
+      defn = rt.defn(ctx)
+      return if defn.param_count == 0
 
       # Otherwise, raise an error - the type needs to be qualified.
       Error.at node, "This type needs to be qualified with type arguments", [
-        {params, "these type parameters are expecting arguments"}
+        {defn.params.not_nil!, "these type parameters are expecting arguments"}
       ]
     end
 
@@ -1077,9 +1081,9 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       ref = refer[node]
       case ref
       when Refer::Type, Refer::TypeAlias
-        rt = reified_type(ref.link)
         if ref.metadata(ctx)[:enum_value]?
           # We trust the cap of the value type (for example, False, True, etc).
+          rt = reified_type(ref.link)
           meta_type = MetaType.new(rt)
           @analysis[node] = Fixed.new(node.pos, meta_type)
         else
@@ -1087,17 +1091,10 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
           # must be marked non, rather than having the default cap for that type.
           # This is used when we pass a type around as if it were a value,
           # where that value is a stateless singleton able to call `:fun non`s.
-          meta_type = MetaType.new(rt, "non")
-          @analysis[node] = FixedSingleton.new(node.pos, meta_type)
+          @analysis[node] = FixedSingleton.new(node.pos, node)
         end
-
-        error_if_type_args_missing(node, rt)
-
       when Refer::TypeParam
-        meta_type = lookup_type_param(ref).override_cap("non")
-        error_if_type_args_missing(node, meta_type)
-
-        @analysis[node] = FixedSingleton.new(node.pos, meta_type)
+        @analysis[node] = FixedSingleton.new(node.pos, node)
       when Refer::Local
         # If it's a local, track the possibly new node in our @local_idents map.
         local_ident = lookup_local_ident(ref)
@@ -1291,7 +1288,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
 
         # If the left-hand side is the name of a type parameter...
         elsif lhs_info.is_a?(FixedSingleton) \
-        && (lhs_nominal = lhs_info.inner.strip_cap.inner).is_a?(MetaType::Nominal) \
+        && (lhs_nominal = resolve(ctx, lhs_info).strip_cap.inner).is_a?(MetaType::Nominal) \
         && (lhs_type_param = lhs_nominal.defn).is_a?(Refer::TypeParam)
           # For type parameter refinements we do not verify that the right side
           # must be a subtype of the left side - it breaks partial reification.
@@ -1361,13 +1358,9 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       # We only care about working with type arguments and type parameters now.
       return unless term_info.is_a?(FixedSingleton)
 
-      args = node.group.terms.map do |t|
-        @for_type.resolve_type_param_parent_links(type_expr(t))
-      end
-      rt = reified_type(term_info.inner.single!, args)
-      ctx.infer.validate_type_args(ctx, self, node, rt)
+      @analysis[node] = info = FixedSingleton.new(node.pos, node)
 
-      @analysis[node] = FixedSingleton.new(node.pos, MetaType.new(rt, "non"))
+      ctx.infer.validate_type_args(ctx, self, node, resolve(ctx, info).single!)
     end
 
     def touch(node : AST::Prefix)

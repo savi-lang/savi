@@ -224,6 +224,10 @@ class Mare::Program
       @tags.to_a.sort
     end
 
+    def param_count
+      params.try { |group| group.terms.size } || 0
+    end
+
     def is_concrete?
       !has_tag?(:abstract)
     end

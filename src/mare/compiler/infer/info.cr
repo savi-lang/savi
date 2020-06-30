@@ -284,16 +284,17 @@ class Mare::Compiler::Infer
   end
 
   class FixedSingleton < DownstreamableInfo
-    property inner : MetaType
+    property node : AST::Node
 
     def describe_kind; "singleton value for this type" end
 
-    def initialize(@pos, @inner)
+    def initialize(@pos, @node)
     end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc)
-      @inner
+      infer.type_expr(@node).override_cap("non")
       .tap { |mt| within_downstream_constraints!(ctx, infer, mt) }
+      .tap { |mt| infer.error_if_type_args_missing(@node, mt) }
     end
   end
 
