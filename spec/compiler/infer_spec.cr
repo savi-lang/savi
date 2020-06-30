@@ -290,7 +290,7 @@ describe Mare::Compiler::Infer do
     func = main_infer.reified.defn(ctx).functions.find(&.has_tag?(:field)).not_nil!
     func_link = func.make_link(main)
     func_cap = Mare::Compiler::Infer::MetaType.cap(func.cap.value)
-    infer = ctx.infer.for_func(ctx, main_infer.reified, func_link, func_cap)
+    infer = ctx.infer.for_rf(ctx, main_infer.reified, func_link, func_cap)
     body = infer.reified.func(ctx).body.not_nil!
     field = body.terms.first
 

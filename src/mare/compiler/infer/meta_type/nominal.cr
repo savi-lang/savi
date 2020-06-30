@@ -47,7 +47,7 @@ struct Mare::Compiler::Infer::MetaType::Nominal
     defn.is_a?(Infer::ReifiedType) ? [defn].each : ([] of Infer::ReifiedType).each
   end
 
-  def find_callable_func_defns(ctx, infer : ForFunc, name : String)
+  def find_callable_func_defns(ctx, infer : ForReifiedFunc, name : String)
     defn = defn()
     case defn
     when Infer::ReifiedType

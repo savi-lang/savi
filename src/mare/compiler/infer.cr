@@ -165,7 +165,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   def initialize
     @t_analyses = {} of Program::Type::Link => TypeAnalysis
     @f_analyses = {} of Program::Function::Link => FuncAnalysis
-    @map = {} of ReifiedFunction => ForFunc
+    @map = {} of ReifiedFunction => ForReifiedFunc
     @types = {} of ReifiedType => ForType
   end
 
@@ -210,7 +210,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         t.functions.each do |f|
           f_link = f.make_link(t_link)
           MetaType::Capability.new_maybe_generic(f.cap.value).each_cap.each do |f_cap|
-            for_func(ctx, rt, f_link, MetaType.new(f_cap)).run
+            for_rf(ctx, rt, f_link, MetaType.new(f_cap)).run
           end
         end
       end
@@ -381,19 +381,19 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
 
   def for_func_simple(ctx : Context, t_link : Program::Type::Link, f_link : Program::Function::Link)
     f = f_link.resolve(ctx)
-    for_func(ctx, for_type(ctx, t_link).reified, f_link, MetaType.cap(f.cap.value))
+    for_rf(ctx, for_type(ctx, t_link).reified, f_link, MetaType.cap(f.cap.value))
   end
 
-  def for_func(
+  def for_rf(
     ctx : Context,
     rt : ReifiedType,
     f : Program::Function::Link,
     cap : MetaType,
-  ) : ForFunc
+  ) : ForReifiedFunc
     mt = MetaType.new(rt).override_cap(cap)
     rf = ReifiedFunction.new(rt, f, mt)
     @map[rf] ||= (
-      ForFunc.new(ctx, ReifiedFuncAnalysis.new(ctx, rf), @types[rt], rf)
+      ForReifiedFunc.new(ctx, ReifiedFuncAnalysis.new(ctx, rf), @types[rt], rf)
       .tap { get_or_create_analysis(f).observe_reified_func(rf) }
     )
   end
@@ -429,7 +429,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
 
   def validate_type_args(
     ctx : Context,
-    infer : (ForFunc | ForType),
+    infer : (ForReifiedFunc | ForType),
     node : AST::Qualify,
     rt : ReifiedType,
   )
@@ -749,7 +749,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
   end
 
-  class ForFunc < Mare::AST::Visitor
+  class ForReifiedFunc < Mare::AST::Visitor
     private getter ctx : Context
     getter analysis : ReifiedFuncAnalysis
     getter for_type : ForType
@@ -974,8 +974,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       # Keep track that we touched this "function".
       @analysis.called_funcs.add({field.pos, reified.type, field_func_link})
 
-      # Get the ForFunc instance for field_func, possibly creating and running it.
-      infer = ctx.infer.for_func(ctx, reified.type, field_func_link, @analysis.resolved_self_cap).tap(&.run)
+      # Get the ForReifiedFunc instance for field_func, possibly creating and running it.
+      infer = ctx.infer.for_rf(ctx, reified.type, field_func_link, @analysis.resolved_self_cap).tap(&.run)
 
       # Apply constraints to the return type.
       ret = infer[infer.ret]
@@ -1394,7 +1394,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
           next if f.has_tag?(:hygienic) || f.body.nil?
           f_link = f.make_link(reflect_rt.link)
           MetaType::Capability.new_maybe_generic(f.cap.value).each_cap.each do |f_cap|
-            ctx.infer.for_func(ctx, reflect_rt, f_link, MetaType.new(f_cap)).tap(&.run)
+            ctx.infer.for_rf(ctx, reflect_rt, f_link, MetaType.new(f_cap)).tap(&.run)
           end
           extra_called_func!(node.pos, reflect_rt, f_link)
         end

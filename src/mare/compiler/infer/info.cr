@@ -2,11 +2,11 @@ class Mare::Compiler::Infer
   abstract class Info
     property pos : Source::Pos = Source::Pos.none
 
-    abstract def resolve!(ctx : Context, infer : ForFunc) : MetaType
+    abstract def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
 
     abstract def add_downstream(
       ctx : Context,
-      infer : ForFunc,
+      infer : ForReifiedFunc,
       use_pos : Source::Pos,
       info : Info,
       aliases : Int32,
@@ -26,7 +26,7 @@ class Mare::Compiler::Infer
     # Info node types are fixed, meaning that they act only as constraints
     # on their upstreams, and are not influenced at all by upstream info nodes.
     @downstreams = [] of Tuple(Source::Pos, Info, Int32)
-    def add_downstream(ctx : Context, infer : ForFunc, use_pos : Source::Pos, info : Info, aliases : Int32)
+    def add_downstream(ctx : Context, infer : ForReifiedFunc, use_pos : Source::Pos, info : Info, aliases : Int32)
       @downstreams << {use_pos, info, aliases + adds_alias}
       after_add_downstream(ctx, infer, use_pos, info, aliases)
     end
@@ -38,13 +38,13 @@ class Mare::Compiler::Infer
     end
 
     # May be implemented by the child class as an optional hook.
-    def after_add_downstream(ctx : Context, infer : ForFunc, use_pos : Source::Pos, info : Info, aliases : Int32)
+    def after_add_downstream(ctx : Context, infer : ForReifiedFunc, use_pos : Source::Pos, info : Info, aliases : Int32)
     end
 
     # When we need to take into consideration the downstreams' constraints
     # in order to infer our type from them, we can use this to collect all
     # those constraints into one intersection of them all.
-    def total_downstream_constraint(ctx : Context, infer : ForFunc)
+    def total_downstream_constraint(ctx : Context, infer : ForReifiedFunc)
       MetaType.new_intersection(
         @downstreams.map { |_, other_info, _|
           infer.resolve(ctx, other_info).as(MetaType)
@@ -53,7 +53,7 @@ class Mare::Compiler::Infer
     end
 
     # TODO: document
-    def describe_downstream_constraints(ctx : Context, infer : ForFunc)
+    def describe_downstream_constraints(ctx : Context, infer : ForReifiedFunc)
       @downstreams.map do |c|
         mt = infer.resolve(ctx, c[1])
         {c[1].pos, "it is required here to be a subtype of #{mt.show_type}"}
@@ -61,7 +61,7 @@ class Mare::Compiler::Infer
     end
 
     # TODO: document
-    def within_downstream_constraints!(ctx : Context, infer : ForFunc, meta_type : MetaType)
+    def within_downstream_constraints!(ctx : Context, infer : ForReifiedFunc, meta_type : MetaType)
       if !within_downstream_constraints?(ctx, infer, meta_type)
         extra = describe_downstream_constraints(ctx, infer)
         extra << {pos,
@@ -72,7 +72,7 @@ class Mare::Compiler::Infer
             extra
       end
     end
-    def within_downstream_constraints?(ctx : Context, infer : ForFunc, meta_type : MetaType)
+    def within_downstream_constraints?(ctx : Context, infer : ForReifiedFunc, meta_type : MetaType)
       return true if @downstreams.empty?
       meta_type.within_constraints?(ctx, [total_downstream_constraint(ctx, infer)])
     end
@@ -82,25 +82,25 @@ class Mare::Compiler::Infer
     INSTANCE = new
     def self.instance; INSTANCE end
 
-    def resolve!(ctx : Context, infer : ForFunc) : MetaType
+    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
       MetaType.new(MetaType::Unsatisfiable.instance)
     end
 
-    def add_downstream(ctx : Context, infer : ForFunc, use_pos : Source::Pos, info : Info, aliases : Int32)
+    def add_downstream(ctx : Context, infer : ForReifiedFunc, use_pos : Source::Pos, info : Info, aliases : Int32)
       # Do nothing; we're already unsatisfiable...
     end
   end
 
   abstract class DynamicInfo < DownstreamableInfo
     # Must be implemented by the child class as an required hook.
-    abstract def inner_resolve!(ctx : Context, infer : ForFunc)
+    abstract def inner_resolve!(ctx : Context, infer : ForReifiedFunc)
 
     # May be implemented by the child class as an optional hook.
-    def after_resolve!(ctx : Context, infer : ForFunc, meta_type : MetaType); end
+    def after_resolve!(ctx : Context, infer : ForReifiedFunc, meta_type : MetaType); end
 
     # This method is *not* intended to be overridden by the child class;
     # please override the after_resolve! method instead.
-    private def finish_resolve!(ctx : Context, infer : ForFunc, meta_type : MetaType)
+    private def finish_resolve!(ctx : Context, infer : ForReifiedFunc, meta_type : MetaType)
       # Run the optional hook in case the child class defined something here.
       after_resolve!(ctx, infer, meta_type)
 
@@ -108,7 +108,7 @@ class Mare::Compiler::Infer
     end
 
     # The final MetaType must meet all constraints that have been imposed.
-    def resolve!(ctx : Context, infer : ForFunc) : MetaType
+    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
       meta_type = inner_resolve!(ctx, infer)
       return finish_resolve!(ctx, infer, meta_type) if downstreams_empty?
 
@@ -181,7 +181,7 @@ class Mare::Compiler::Infer
       @pos
     end
 
-    def inner_resolve!(ctx : Context, infer : ForFunc)
+    def inner_resolve!(ctx : Context, infer : ForReifiedFunc)
       explicit = @explicit
 
       if explicit
@@ -220,7 +220,7 @@ class Mare::Compiler::Infer
         "This #{describe_kind} needs an explicit type; it could not be inferred"
     end
 
-    def after_resolve!(ctx : Context, infer : ForFunc, meta_type : MetaType)
+    def after_resolve!(ctx : Context, infer : ForReifiedFunc, meta_type : MetaType)
       # TODO: Verify all upstreams instead of just beyond 1?
       if @upstreams.size > 1
         fixed = Fixed.new(pos, meta_type.strip_ephemeral)
@@ -235,7 +235,7 @@ class Mare::Compiler::Infer
       end
     end
 
-    def set_explicit(ctx : Context, infer : ForFunc, explicit_pos : Source::Pos, explicit_mt : MetaType)
+    def set_explicit(ctx : Context, infer : ForReifiedFunc, explicit_pos : Source::Pos, explicit_mt : MetaType)
       raise "already set_explicit" if @explicit
       raise "shouldn't have an upstream yet" unless @upstreams.empty?
 
@@ -244,7 +244,7 @@ class Mare::Compiler::Infer
       @pos = explicit_pos
     end
 
-    def after_add_downstream(ctx : Context, infer : ForFunc, use_pos : Source::Pos, info : Info, aliases : Int32)
+    def after_add_downstream(ctx : Context, infer : ForReifiedFunc, use_pos : Source::Pos, info : Info, aliases : Int32)
       return if @explicit
 
       @upstreams.each do |upstream, upstream_pos|
@@ -253,7 +253,7 @@ class Mare::Compiler::Infer
     end
 
 
-    def assign(ctx : Context, infer : ForFunc, rhs : AST::Node, rhs_pos : Source::Pos)
+    def assign(ctx : Context, infer : ForReifiedFunc, rhs : AST::Node, rhs_pos : Source::Pos)
       upstream = infer[rhs]
       upstream_pos = rhs_pos
 
@@ -277,7 +277,7 @@ class Mare::Compiler::Infer
     def initialize(@pos, @inner)
     end
 
-    def resolve!(ctx : Context, infer : ForFunc)
+    def resolve!(ctx : Context, infer : ForReifiedFunc)
       @inner
       .tap { |mt| within_downstream_constraints!(ctx, infer, mt) }
     end
@@ -291,7 +291,7 @@ class Mare::Compiler::Infer
     def initialize(@pos, @inner)
     end
 
-    def resolve!(ctx : Context, infer : ForFunc)
+    def resolve!(ctx : Context, infer : ForReifiedFunc)
       @inner
       .tap { |mt| within_downstream_constraints!(ctx, infer, mt) }
     end
@@ -309,7 +309,7 @@ class Mare::Compiler::Infer
       @downstreams.map { |_, info, _| {info.pos, analysis.resolve(info)} }
     end
 
-    def resolve!(ctx : Context, infer : ForFunc)
+    def resolve!(ctx : Context, infer : ForReifiedFunc)
       @inner
       .tap { |mt| within_downstream_constraints!(ctx, infer, mt) }
     end
@@ -321,7 +321,7 @@ class Mare::Compiler::Infer
     def initialize(@pos, @possible : MetaType)
     end
 
-    def inner_resolve!(ctx : Context, infer : ForFunc)
+    def inner_resolve!(ctx : Context, infer : ForReifiedFunc)
       total_constraint = total_downstream_constraint(ctx, infer)
 
       # Literal values (such as numeric literals) sometimes have
@@ -357,7 +357,7 @@ class Mare::Compiler::Infer
   class Param < NamedInfo
     def describe_kind; "parameter" end
 
-    def verify_arg(ctx : Context, infer : ForFunc, arg_infer : ForFunc, arg : AST::Node, arg_pos : Source::Pos)
+    def verify_arg(ctx : Context, infer : ForReifiedFunc, arg_infer : ForReifiedFunc, arg : AST::Node, arg_pos : Source::Pos)
       param_mt = infer.resolve(ctx, self)
       param_info = Fixed.new(@pos, param_mt)
       arg_infer.resolve(ctx, param_info)
@@ -379,7 +379,7 @@ class Mare::Compiler::Infer
       @field.pos
     end
 
-    def resolve!(ctx : Context, infer : ForFunc)
+    def resolve!(ctx : Context, infer : ForReifiedFunc)
       origin_mt = infer.resolve(ctx, @origin)
       field_mt = infer.resolve(ctx, @field)
       field_mt.viewed_from(origin_mt).alias
@@ -397,7 +397,7 @@ class Mare::Compiler::Infer
       @field.pos
     end
 
-    def resolve!(ctx : Context, infer : ForFunc)
+    def resolve!(ctx : Context, infer : ForReifiedFunc)
       origin_mt = infer.resolve(ctx, @origin)
       field_mt = infer.resolve(ctx, @field)
       field_mt.extracted_from(origin_mt).ephemeralize
@@ -411,11 +411,11 @@ class Mare::Compiler::Infer
 
     def describe_kind; "error expression" end
 
-    def resolve!(ctx : Context, infer : ForFunc)
+    def resolve!(ctx : Context, infer : ForReifiedFunc)
       MetaType.new(MetaType::Unsatisfiable.instance)
     end
 
-    def add_downstream(ctx : Context, infer : ForFunc, use_pos : Source::Pos, info : Info, aliases : Int32)
+    def add_downstream(ctx : Context, infer : ForReifiedFunc, use_pos : Source::Pos, info : Info, aliases : Int32)
       raise "can't be downstream of a RaiseError"
     end
   end
@@ -428,11 +428,11 @@ class Mare::Compiler::Infer
 
     def describe_kind; "choice block" end
 
-    def resolve!(ctx : Context, infer : ForFunc)
+    def resolve!(ctx : Context, infer : ForReifiedFunc)
       MetaType.new_union(branches.map { |node| infer.resolve(ctx, node).as(MetaType) })
     end
 
-    def add_downstream(ctx : Context, infer : ForFunc, use_pos : Source::Pos, info : Info, aliases : Int32)
+    def add_downstream(ctx : Context, infer : ForReifiedFunc, use_pos : Source::Pos, info : Info, aliases : Int32)
       branches.each do |node|
         node.add_downstream(ctx, infer, use_pos, info, aliases)
       end
@@ -448,7 +448,7 @@ class Mare::Compiler::Infer
     def initialize(@pos, @refine, @refine_type)
     end
 
-    def resolve!(ctx : Context, infer : ForFunc)
+    def resolve!(ctx : Context, infer : ForReifiedFunc)
       infer.prelude_bool(ctx)
       .tap { |mt| within_downstream_constraints!(ctx, infer, mt) }
     end
@@ -463,7 +463,7 @@ class Mare::Compiler::Infer
     def initialize(@pos, @refine, @refine_type)
     end
 
-    def resolve!(ctx : Context, infer : ForFunc)
+    def resolve!(ctx : Context, infer : ForReifiedFunc)
       infer.prelude_bool(ctx)
       .tap { |mt| within_downstream_constraints!(ctx, infer, mt) }
     end
@@ -475,7 +475,7 @@ class Mare::Compiler::Infer
     def initialize(@pos)
     end
 
-    def resolve!(ctx : Context, infer : ForFunc)
+    def resolve!(ctx : Context, infer : ForReifiedFunc)
       infer.prelude_bool(ctx)
       .tap { |mt| within_downstream_constraints!(ctx, infer, mt) }
     end
@@ -487,7 +487,7 @@ class Mare::Compiler::Infer
     def initialize(@pos)
     end
 
-    def resolve!(ctx : Context, infer : ForFunc)
+    def resolve!(ctx : Context, infer : ForReifiedFunc)
       infer.prelude_bool(ctx)
       .tap { |mt| within_downstream_constraints!(ctx, infer, mt) }
     end
@@ -502,7 +502,7 @@ class Mare::Compiler::Infer
     def initialize(@pos, @refine, @refine_type)
     end
 
-    def resolve!(ctx : Context, infer : ForFunc)
+    def resolve!(ctx : Context, infer : ForReifiedFunc)
       infer.resolve(ctx, @refine).intersect(infer.resolve(ctx, @refine_type))
       .tap { |mt| within_downstream_constraints!(ctx, infer, mt) }
     end
@@ -516,11 +516,11 @@ class Mare::Compiler::Infer
     def initialize(@pos, @local)
     end
 
-    def resolve!(ctx : Context, infer : ForFunc)
+    def resolve!(ctx : Context, infer : ForReifiedFunc)
       infer.resolve(ctx, @local).ephemeralize
     end
 
-    def add_downstream(ctx : Context, infer : ForFunc, use_pos : Source::Pos, info : Info, aliases : Int32)
+    def add_downstream(ctx : Context, infer : ForReifiedFunc, use_pos : Source::Pos, info : Info, aliases : Int32)
       @local.add_downstream(ctx, infer, use_pos, info, aliases - 1)
     end
   end
@@ -537,7 +537,7 @@ class Mare::Compiler::Infer
 
     def describe_kind; "array literal" end
 
-    def inner_resolve!(ctx : Context, infer : ForFunc)
+    def inner_resolve!(ctx : Context, infer : ForReifiedFunc)
       array_defn = infer.prelude_type("Array")
 
       # Determine the lowest common denominator MetaType of all elements.
@@ -577,14 +577,14 @@ class Mare::Compiler::Infer
       ["new", "<<"].each do |f_name|
         f = rt.defn(ctx).find_func!(f_name)
         f_link = f.make_link(rt.link)
-        ctx.infer.for_func(ctx, rt, f_link, MetaType.cap(f.cap.value)).run
+        ctx.infer.for_rf(ctx, rt, f_link, MetaType.cap(f.cap.value)).run
         infer.extra_called_func!(pos, rt, f_link)
       end
 
       mt
     end
 
-    def after_add_downstream(ctx : Context, infer : ForFunc, use_pos : Source::Pos, info : Info, aliases : Int32)
+    def after_add_downstream(ctx : Context, infer : ForReifiedFunc, use_pos : Source::Pos, info : Info, aliases : Int32)
       antecedents = possible_element_antecedents(ctx, infer)
       return if antecedents.empty?
 
@@ -633,12 +633,12 @@ class Mare::Compiler::Infer
 
     def describe_kind; "return value" end
 
-    def inner_resolve!(ctx : Context, infer : ForFunc)
+    def inner_resolve!(ctx : Context, infer : ForReifiedFunc)
       raise "unresolved ret for #{self.inspect}" unless @ret
       @ret.not_nil!
     end
 
-    def follow_call_get_call_defns(ctx : Context, infer : ForFunc)
+    def follow_call_get_call_defns(ctx : Context, infer : ForReifiedFunc)
       call = self
       receiver = infer.resolve(ctx, @lhs)
       call_defns = receiver.find_callable_func_defns(ctx, infer, @member)
@@ -686,7 +686,7 @@ class Mare::Compiler::Infer
       call_defns
     end
 
-    def follow_call_check_receiver_cap(ctx : Context, infer : ForFunc, call_mt, call_func, problems)
+    def follow_call_check_receiver_cap(ctx : Context, infer : ForReifiedFunc, call_mt, call_func, problems)
       call = self
       call_cap_mt = call_mt.cap_only
       autorecover_needed = false
@@ -755,7 +755,7 @@ class Mare::Compiler::Infer
       {required_cap, reify_cap, autorecover_needed}
     end
 
-    def follow_call_check_args(ctx : Context, infer : ForFunc, call_func, other_infer, problems)
+    def follow_call_check_args(ctx : Context, infer : ForReifiedFunc, call_func, other_infer, problems)
       call = self
 
       # First, check the number of arguments.
@@ -836,7 +836,7 @@ class Mare::Compiler::Infer
           problems unless problems.empty?
     end
 
-    def follow_call(ctx : Context, infer : ForFunc)
+    def follow_call(ctx : Context, infer : ForReifiedFunc)
       call = self
       call_defns = follow_call_get_call_defns(ctx, infer)
 
@@ -858,10 +858,10 @@ class Mare::Compiler::Infer
         required_cap, reify_cap, autorecover_needed =
           follow_call_check_receiver_cap(ctx, infer, call_mt, call_func, problems)
 
-        # Get the ForFunc instance for call_func, possibly creating and running it.
+        # Get the ForReifiedFunc instance for call_func, possibly creating and running it.
         # TODO: don't infer anything in the body of that func if type and params
         # were explicitly specified in the function signature.
-        other_infer = ctx.infer.for_func(ctx, call_defn, call_func_link, reify_cap).tap(&.run)
+        other_infer = ctx.infer.for_rf(ctx, call_defn, call_func_link, reify_cap).tap(&.run)
 
         follow_call_check_args(ctx, infer, call_func, other_infer, problems)
         follow_call_check_yield_block(other_infer, problems)
@@ -888,7 +888,7 @@ class Mare::Compiler::Infer
       @ret = ret.ephemeralize
     end
 
-    def visit_and_verify_yield_block(ctx : Context, infer : ForFunc, yield_params, yield_block)
+    def visit_and_verify_yield_block(ctx : Context, infer : ForReifiedFunc, yield_params, yield_block)
       return unless yield_block
 
       call_defns = follow_call_get_call_defns(ctx, infer)
@@ -913,7 +913,7 @@ class Mare::Compiler::Infer
           follow_call_check_receiver_cap(ctx, infer, call_mt, call_func, problems)
         raise "this should have been prevented earlier" if problems.any?
 
-        other_infer = ctx.infer.for_func(ctx, call_defn, call_func_link, reify_cap).tap(&.run)
+        other_infer = ctx.infer.for_rf(ctx, call_defn, call_func_link, reify_cap).tap(&.run)
 
         # Based on the resolved function, assign the proper yield param types.
         if yield_params

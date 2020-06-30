@@ -96,7 +96,7 @@ struct Mare::Compiler::Infer::MetaType::Union
     iter
   end
 
-  def find_callable_func_defns(ctx, infer : ForFunc, name : String)
+  def find_callable_func_defns(ctx, infer : ForReifiedFunc, name : String)
     list = [] of Tuple(Inner, Infer::ReifiedType?, Program::Function?)
 
     # Every nominal in the union must have an implementation of the call.
