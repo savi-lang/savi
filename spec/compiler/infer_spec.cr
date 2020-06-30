@@ -921,11 +921,6 @@ describe Mare::Compiler::Infer do
         xb     = xa    // not okay
                  ^~
 
-    - it is required here to be a subtype of val:
-      from (example):6:
-        xb val = X.new // okay
-           ^~~
-
     - it is required here to be a subtype of X'val:
       from (example):6:
         xb val = X.new // okay
