@@ -283,10 +283,10 @@ class Mare::Compiler::Infer
     end
   end
 
-  class FixedType < DownstreamableInfo
+  class FixedSingleton < DownstreamableInfo
     property inner : MetaType
 
-    def describe_kind; "type expression" end
+    def describe_kind; "singleton value for this type" end
 
     def initialize(@pos, @inner)
     end

@@ -1081,21 +1081,23 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         if ref.metadata(ctx)[:enum_value]?
           # We trust the cap of the value type (for example, False, True, etc).
           meta_type = MetaType.new(rt)
+          @analysis[node] = Fixed.new(node.pos, meta_type)
         else
           # A type reference whose value is used and is not itself a value
           # must be marked non, rather than having the default cap for that type.
-          # This is used when we pass a type around as if it were a value.
+          # This is used when we pass a type around as if it were a value,
+          # where that value is a stateless singleton able to call `:fun non`s.
           meta_type = MetaType.new(rt, "non")
+          @analysis[node] = FixedSingleton.new(node.pos, meta_type)
         end
 
         error_if_type_args_missing(node, rt)
 
-        @analysis[node] = Fixed.new(node.pos, meta_type)
       when Refer::TypeParam
         meta_type = lookup_type_param(ref).override_cap("non")
         error_if_type_args_missing(node, meta_type)
 
-        @analysis[node] = Fixed.new(node.pos, meta_type)
+        @analysis[node] = FixedSingleton.new(node.pos, meta_type)
       when Refer::Local
         # If it's a local, track the possibly new node in our @local_idents map.
         local_ident = lookup_local_ident(ref)
@@ -1288,8 +1290,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
           @analysis[node] = TypeCondition.new(node.pos, refine, rhs_info)
 
         # If the left-hand side is the name of a type parameter...
-        elsif lhs_info.is_a?(Fixed) \
-        && lhs_info.inner.cap_only.inner == MetaType::Capability::NON \
+        elsif lhs_info.is_a?(FixedSingleton) \
         && (lhs_nominal = lhs_info.inner.strip_cap.inner).is_a?(MetaType::Nominal) \
         && (lhs_type_param = lhs_nominal.defn).is_a?(Refer::TypeParam)
           # For type parameter refinements we do not verify that the right side
@@ -1307,8 +1308,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
           @analysis[node] = TypeParamCondition.new(node.pos, refine, refine_type)
 
         # If the left-hand side is the name of any other fixed type...
-        elsif lhs_info.is_a?(Fixed) \
-        && lhs_info.inner.cap_only.inner == MetaType::Capability::NON
+        elsif lhs_info.is_a?(FixedSingleton)
           # For statically known type comparisons we cannot require that they
           # have the possibility of being true - it breaks full reification.
           need_to_check_if_right_is_subtype_of_left = false
@@ -1359,9 +1359,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       # Ignore qualifications that are not type references. For example, this
       # ignores function call arguments, for which no further work is needed.
       # We only care about working with type arguments and type parameters now.
-      return unless \
-        term_info.is_a?(Fixed) &&
-        term_info.inner.cap_only.inner == MetaType::Capability::NON
+      return unless term_info.is_a?(FixedSingleton)
 
       args = node.group.terms.map do |t|
         @for_type.resolve_type_param_parent_links(type_expr(t))
@@ -1369,7 +1367,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       rt = reified_type(term_info.inner.single!, args)
       ctx.infer.validate_type_args(ctx, self, node, rt)
 
-      @analysis[node] = Fixed.new(node.pos, MetaType.new(rt, "non"))
+      @analysis[node] = FixedSingleton.new(node.pos, MetaType.new(rt, "non"))
     end
 
     def touch(node : AST::Prefix)

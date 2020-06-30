@@ -553,7 +553,7 @@ describe Mare::Compiler::Infer do
         x X = X
           ^
 
-    - but the type of the expression was X'non:
+    - but the type of the singleton value for this type was X'non:
       from (example):5:
         x X = X
               ^
