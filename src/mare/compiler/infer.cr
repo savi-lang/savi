@@ -1105,7 +1105,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
           @local_idents[ref] = node
         end
       when Refer::Self
-        @analysis[node] = Self.new(node.pos, @analysis.resolved_self)
+        @analysis[node] = Self.new(node.pos)
       when Refer::RaiseError
         @analysis[node] = RaiseError.new(node.pos)
       when Refer::Unresolved
@@ -1176,14 +1176,14 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
             info = self[node.terms[1]]
             case info
             when Fixed then local.set_explicit(ctx, self, info.pos, info.inner)
-            when Self then local.set_explicit(ctx, self, info.pos, info.inner)
+            when Self then local.set_explicit(ctx, self, info.pos, resolve(ctx, info)) # TODO: set_explicit should take an info rather than a MetaType.
             else raise NotImplementedError.new(info)
             end
           when Param
             info = self[node.terms[1]]
             case info
             when Fixed then local.set_explicit(ctx, self, info.pos, info.inner)
-            when Self then local.set_explicit(ctx, self, info.pos, info.inner)
+            when Self then local.set_explicit(ctx, self, info.pos, resolve(ctx, info)) # TODO: set_explicit should take an info rather than a MetaType.
             else raise NotImplementedError.new(info)
             end
           else raise NotImplementedError.new(local)
@@ -1199,7 +1199,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
 
     def touch(node : AST::FieldRead)
       field = Field.new(node.pos)
-      fixed = Fixed.new(field.pos, @analysis.resolved_self)
+      fixed = Self.new(field.pos)
       self.resolve(ctx, fixed)
       @analysis[node] = FieldRead.new(field, fixed)
       follow_field(field, node.value)
@@ -1214,7 +1214,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
 
     def touch(node : AST::FieldReplace)
       field = Field.new(node.pos)
-      fixed = Fixed.new(field.pos, @analysis.resolved_self)
+      fixed = Self.new(field.pos)
       self.resolve(ctx, fixed)
       @analysis[node] = FieldExtract.new(field, fixed)
       follow_field(field, node.value)

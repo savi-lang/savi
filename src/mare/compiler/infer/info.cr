@@ -299,11 +299,9 @@ class Mare::Compiler::Infer
   end
 
   class Self < DownstreamableInfo
-    property inner : MetaType
-
     def describe_kind; "receiver value" end
 
-    def initialize(@pos, @inner)
+    def initialize(@pos)
     end
 
     def downstream_constraints(ctx : Context, analysis : ReifiedFuncAnalysis)
@@ -311,7 +309,7 @@ class Mare::Compiler::Infer
     end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc)
-      @inner
+      infer.analysis.resolved_self
       .tap { |mt| within_downstream_constraints!(ctx, infer, mt) }
     end
   end
@@ -371,7 +369,7 @@ class Mare::Compiler::Infer
   end
 
   class FieldRead < DownstreamableInfo
-    def initialize(@field : Field, @origin : Fixed)
+    def initialize(@field : Field, @origin : Self)
     end
 
     def describe_kind; "field read" end
@@ -389,7 +387,7 @@ class Mare::Compiler::Infer
   end
 
   class FieldExtract < DownstreamableInfo
-    def initialize(@field : Field, @origin : Fixed)
+    def initialize(@field : Field, @origin : Self)
     end
 
     def describe_kind; "field extraction" end
