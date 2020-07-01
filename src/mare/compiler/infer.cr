@@ -916,7 +916,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         # and also of allowing inference if there is no explicit type.
         # We don't do this for constructors, since constructors implicitly return
         # self no matter what the last term of the body of the function is.
-        self[ret].as(FuncBody).assign(ctx, self, func_body, func_body_pos) \
+        self[ret].as(FuncBody).assign(ctx, self, @analysis[func_body], func_body_pos) \
           unless func.has_tag?(:constructor)
       end
 
@@ -1205,7 +1205,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       field = Field.new(node.pos)
       @analysis[node] = field
       follow_field(field, node.value)
-      field.assign(ctx, self, node.rhs, node.rhs.pos)
+      field.assign(ctx, self, @analysis[node.rhs], node.rhs.pos)
     end
 
     def touch(node : AST::FieldReplace)
@@ -1214,7 +1214,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       self.resolve(ctx, fixed)
       @analysis[node] = FieldExtract.new(field, fixed)
       follow_field(field, node.value)
-      field.assign(ctx, self, node.rhs, node.rhs.pos)
+      field.assign(ctx, self, @analysis[node.rhs], node.rhs.pos)
     end
 
     def touch(node : AST::Relate)
@@ -1225,10 +1225,10 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         lhs = self[node.lhs]
         case lhs
         when Local
-          lhs.assign(ctx, self, node.rhs, node.rhs.pos)
+          lhs.assign(ctx, self, @analysis[node.rhs], node.rhs.pos)
           @analysis.redirect(node, node.lhs)
         when Param
-          lhs.assign(ctx, self, node.rhs, node.rhs.pos)
+          lhs.assign(ctx, self, @analysis[node.rhs], node.rhs.pos)
           @analysis.redirect(node, node.lhs)
         else
           raise NotImplementedError.new(node.lhs)
@@ -1500,7 +1500,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         if yield_out_infos.size != node.terms.size
 
       yield_out_infos.zip(node.terms).each do |info, term|
-        info.assign(ctx, self, term, term.pos)
+        info.assign(ctx, self, @analysis[term], term.pos)
       end
 
       @analysis[node] = yield_in_info

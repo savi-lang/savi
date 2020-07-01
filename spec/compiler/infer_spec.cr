@@ -2221,7 +2221,7 @@ describe Mare::Compiler::Infer do
         @yield_99 -> (i| j U32 = i)
                            ^~~
 
-    - but the type of the local variable was U64:
+    - but the type of the expression was U64:
       from (example):3:
         yield U64[99]
               ^~~~~~~

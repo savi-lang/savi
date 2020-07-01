@@ -252,17 +252,13 @@ class Mare::Compiler::Infer
       end
     end
 
-
-    def assign(ctx : Context, infer : ForReifiedFunc, rhs : AST::Node, rhs_pos : Source::Pos)
-      upstream = infer[rhs]
-      upstream_pos = rhs_pos
-
+    def assign(ctx : Context, infer : ForReifiedFunc, upstream : Info, upstream_pos : Source::Pos)
       @upstreams << {upstream, upstream_pos}
 
       upstream.add_downstream(
         ctx,
         infer,
-        rhs_pos,
+        upstream_pos,
         @explicit.not_nil!,
         0,
       ) if @explicit
@@ -919,14 +915,14 @@ class Mare::Compiler::Infer
 
           other_infer.yield_out_infos.zip(yield_params.terms)
           .each do |yield_out, yield_param|
-            # TODO: Use .assign instead of .set_explicit after figuring out how to have an AST node for it
-            infer[yield_param].as(Local).set_explicit(
+            infer[yield_param].as(Local).assign(
               ctx,
               infer,
               Fixed.new(
                 yield_out.first_viable_constraint_pos,
                 other_infer.resolve(ctx, yield_out)
               ),
+              yield_out.first_viable_constraint_pos,
             )
           end
         end
