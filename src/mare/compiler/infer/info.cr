@@ -374,8 +374,42 @@ class Mare::Compiler::Infer
     end
   end
 
-  class Field < NamedInfo
+  class Field < DownstreamableInfo
+    def initialize(@pos, @name : String)
+    end
+
     def describe_kind; "field reference" end
+
+    def assign(ctx : Context, infer : ForReifiedFunc, upstream : Info, upstream_pos : Source::Pos)
+      upstream.add_downstream(
+        ctx,
+        infer,
+        upstream_pos,
+        self,
+        0,
+      )
+    end
+
+    def resolve!(ctx : Context, infer : ForReifiedFunc)
+      follow_field(ctx, infer)
+      .tap { |mt| within_downstream_constraints!(ctx, infer, mt) }
+    end
+
+    def follow_field(ctx : Context, infer : ForReifiedFunc) : MetaType
+      field_func = infer.reified.type.defn(ctx).functions.find do |f|
+        f.ident.value == @name && f.has_tag?(:field)
+      end.not_nil!
+      field_func_link = field_func.make_link(infer.reified.type.link)
+
+      # Keep track that we touched this "function".
+      infer.analysis.called_funcs.add({pos, infer.reified.type, field_func_link})
+
+      # Get the ForReifiedFunc instance for field_func, possibly creating and running it.
+      other_infer = ctx.infer.for_rf(ctx, infer.reified.type, field_func_link, infer.analysis.resolved_self_cap).tap(&.run)
+
+      # Get the return type.
+      other_infer.resolve(ctx, other_infer[other_infer.ret])
+    end
   end
 
   class FieldRead < DownstreamableInfo

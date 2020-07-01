@@ -965,23 +965,6 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       nil
     end
 
-    def follow_field(field : Field, name : String)
-      field_func = reified.type.defn(ctx).functions.find do |f|
-        f.ident.value == name && f.has_tag?(:field)
-      end.not_nil!
-      field_func_link = field_func.make_link(reified.type.link)
-
-      # Keep track that we touched this "function".
-      @analysis.called_funcs.add({field.pos, reified.type, field_func_link})
-
-      # Get the ForReifiedFunc instance for field_func, possibly creating and running it.
-      infer = ctx.infer.for_rf(ctx, reified.type, field_func_link, @analysis.resolved_self_cap).tap(&.run)
-
-      # Apply constraints to the return type.
-      ret = infer[infer.ret]
-      field.set_explicit(ctx, self, Fixed.new(ret.pos, infer.resolve(ctx, ret)))
-    end
-
     def prelude_type(ctx, name)
       @ctx.namespace.prelude_type(name)
     end
@@ -1182,26 +1165,19 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
 
     def touch(node : AST::FieldRead)
-      field = Field.new(node.pos)
-      fixed = Self.new(field.pos)
-      self.resolve(ctx, fixed)
-      @analysis[node] = FieldRead.new(field, fixed)
-      follow_field(field, node.value)
+      field = Field.new(node.pos, node.value) # TODO: consider caching this to reduce duplication?
+      @analysis[node] = FieldRead.new(field, Self.new(field.pos))
     end
 
     def touch(node : AST::FieldWrite)
-      field = Field.new(node.pos)
+      field = Field.new(node.pos, node.value) # TODO: consider caching this to reduce duplication?
       @analysis[node] = field
-      follow_field(field, node.value)
       field.assign(ctx, self, @analysis[node.rhs], node.rhs.pos)
     end
 
     def touch(node : AST::FieldReplace)
-      field = Field.new(node.pos)
-      fixed = Self.new(field.pos)
-      self.resolve(ctx, fixed)
-      @analysis[node] = FieldExtract.new(field, fixed)
-      follow_field(field, node.value)
+      field = Field.new(node.pos, node.value) # TODO: consider caching this to reduce duplication?
+      @analysis[node] = FieldExtract.new(field, Self.new(field.pos))
       field.assign(ctx, self, @analysis[node.rhs], node.rhs.pos)
     end
 
