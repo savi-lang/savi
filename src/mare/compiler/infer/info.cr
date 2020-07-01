@@ -292,6 +292,20 @@ class Mare::Compiler::Infer
     end
   end
 
+  class FixedTypeExpr < DownstreamableInfo
+    property node : AST::Node
+
+    def describe_kind; "type expression" end
+
+    def initialize(@pos, @node)
+    end
+
+    def resolve!(ctx : Context, infer : ForReifiedFunc)
+      infer.type_expr(@node)
+      .tap { |mt| within_downstream_constraints!(ctx, infer, mt) }
+    end
+  end
+
   class FixedSingleton < DownstreamableInfo
     property node : AST::Node
     property type_param_ref : Refer::TypeParam?

@@ -1045,7 +1045,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       if classify.type_expr?(node)
         # For type expressions, don't do the usual touch - instead,
         # construct the MetaType and assign it to the new node.
-        @analysis[node] = Fixed.new(node.pos, type_expr(node))
+        @analysis[node] = FixedTypeExpr.new(node.pos, node)
       else
         touch(node)
       end
@@ -1150,7 +1150,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
           when Local, Param
             info = self[node.terms[1]]
             case info
-            when Fixed, Self then local.set_explicit(ctx, self, info)
+            when FixedTypeExpr, Self then local.set_explicit(ctx, self, info)
             else raise NotImplementedError.new(info)
             end
           else raise NotImplementedError.new(local)
@@ -1237,7 +1237,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         lhs_info = self[node.lhs]
         rhs_info = self[node.rhs]
         Error.at node.rhs, "expected this to have a fixed type at compile time" \
-          unless rhs_info.is_a?(Fixed)
+          unless rhs_info.is_a?(FixedTypeExpr)
 
         # If the left-hand side is the name of a local variable...
         if lhs_info.is_a?(Local) || lhs_info.is_a?(Param)
@@ -1253,7 +1253,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
           need_to_check_if_right_is_subtype_of_left = false
 
           # Strip the "non" from the fixed type, as if it were a type expr.
-          @analysis[node.lhs] = Fixed.new(node.lhs.pos, type_expr(node.lhs))
+          @analysis[node.lhs] = FixedTypeExpr.new(node.lhs.pos, node.lhs)
 
           # Set up a type param refinement condition, which can be used within
           # a choice body to inform the type system about the type relationship.
@@ -1267,12 +1267,12 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
           need_to_check_if_right_is_subtype_of_left = false
 
           # Strip the "non" from the fixed types, as if each were a type expr.
-          lhs_mt = type_expr(node.lhs)
-          rhs_mt = type_expr(node.rhs)
-          @analysis[node.lhs] = Fixed.new(node.lhs.pos, lhs_mt)
-          @analysis[node.rhs] = Fixed.new(node.rhs.pos, rhs_mt)
+          @analysis[node.lhs] = FixedTypeExpr.new(node.lhs.pos, node.lhs)
+          @analysis[node.rhs] = FixedTypeExpr.new(node.rhs.pos, node.rhs)
 
           # We can know statically at compile time whether it's true or false.
+          lhs_mt = type_expr(node.lhs)
+          rhs_mt = type_expr(node.rhs)
           if lhs_mt.satisfies_bound?(ctx, rhs_mt)
             @analysis[node] = TrueCondition.new(node.pos)
           else
@@ -1287,8 +1287,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
 
         if need_to_check_if_right_is_subtype_of_left
           # The right side must be a subtype of the left side.
-          rhs_mt = rhs_info.inner
-          lhs_mt = resolve(node.lhs)
+          rhs_mt = resolve(ctx, rhs_info)
+          lhs_mt = resolve(ctx, lhs_info)
           if !rhs_mt.subtype_of?(ctx, lhs_mt)
             Error.at node, "This type check will never match", [
               {rhs_info.pos, "the match type is #{rhs_mt.show_type}"},
@@ -1468,7 +1468,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
 
     def finish_param(node : AST::Node, info : Info)
       case info
-      when Fixed
+      when FixedTypeExpr
         param = Param.new(node.pos)
         param.set_explicit(ctx, self, info)
         @analysis[node] = param # assign new info

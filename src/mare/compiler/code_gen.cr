@@ -1852,7 +1852,7 @@ class Mare::Compiler::CodeGen
   def gen_check_subtype(relate : AST::Relate)
     infer = func_frame.gfunc.not_nil!.infer
 
-    if infer[relate.lhs].is_a?(Infer::Fixed)
+    if infer[relate.lhs].is_a?(Infer::FixedTypeExpr)
       # If the left-hand side is a fixed compile-time type (and knowing that
       # the right-hand side always is), we can return a compile-time true/false.
       lhs_meta_type = infer.resolve(relate.lhs)

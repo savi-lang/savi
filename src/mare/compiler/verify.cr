@@ -174,7 +174,7 @@ class Mare::Compiler::Verify < Mare::AST::Visitor
     case node.op.value
     when "<:"
       # Skip this verification if this just a compile-time type check.
-      return if infer[node.lhs].is_a?(Infer::Fixed)
+      return if infer[node.lhs].is_a?(Infer::FixedTypeExpr)
 
       # Verify that it is safe to perform this runtime type check.
       lhs_mt = infer.resolve(node.lhs)
