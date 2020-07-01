@@ -279,7 +279,7 @@ class Mare::Compiler::Infer
   end
 
   class FixedPrelude < DownstreamableInfo
-    property name : String
+    getter name : String
 
     def describe_kind; "expression" end
 
@@ -293,7 +293,7 @@ class Mare::Compiler::Infer
   end
 
   class FixedTypeExpr < DownstreamableInfo
-    property node : AST::Node
+    getter node : AST::Node
 
     def describe_kind; "type expression" end
 
@@ -306,9 +306,23 @@ class Mare::Compiler::Infer
     end
   end
 
+  class FixedEnumValue < DownstreamableInfo
+    getter node : AST::Node
+
+    def describe_kind; "expression" end
+
+    def initialize(@pos, @node)
+    end
+
+    def resolve!(ctx : Context, infer : ForReifiedFunc)
+      infer.type_expr(@node)
+      .tap { |mt| within_downstream_constraints!(ctx, infer, mt) }
+    end
+  end
+
   class FixedSingleton < DownstreamableInfo
-    property node : AST::Node
-    property type_param_ref : Refer::TypeParam?
+    getter node : AST::Node
+    getter type_param_ref : Refer::TypeParam?
 
     def describe_kind; "singleton value for this type" end
 

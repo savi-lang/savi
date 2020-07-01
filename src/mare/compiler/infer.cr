@@ -1061,10 +1061,9 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       case ref
       when Refer::Type, Refer::TypeAlias
         if ref.metadata(ctx)[:enum_value]?
-          # We trust the cap of the value type (for example, False, True, etc).
-          rt = reified_type(ref.link)
-          meta_type = MetaType.new(rt)
-          @analysis[node] = Fixed.new(node.pos, meta_type)
+          # We allow it to be resolved as if it were a type expression,
+          # since this enum value literal will have the type of its referent.
+          @analysis[node] = FixedEnumValue.new(node.pos, node)
         else
           # A type reference whose value is used and is not itself a value
           # must be marked non, rather than having the default cap for that type.
