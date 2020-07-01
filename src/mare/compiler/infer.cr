@@ -830,10 +830,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
           # TODO: special-case this somewhere else?
           if reified.type.link.name == "Main" \
           && reified.link.name == "new"
-            env = Fixed.new(
-              reified.func(ctx).ident.pos,
-              MetaType.new(reified_type(prelude_type("Env"))),
-            )
+            env = FixedPrelude.new(reified.func(ctx).ident.pos, "Env")
             param_info = self[param].as(Param)
             param_info.set_explicit(ctx, self, env) unless param_info.explicit?
           end
@@ -897,8 +894,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         yield_in.accept(ctx, self)
         yield_in_info.set_explicit(ctx, self, @analysis[yield_in])
       else
-        none = MetaType.new(reified_type(prelude_type("None")))
-        fixed = Fixed.new(yield_in_info.pos, none)
+        fixed = FixedPrelude.new(yield_in_info.pos, "None")
         yield_in_info.set_explicit(ctx, self, fixed)
       end
 
@@ -996,10 +992,6 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
 
     def reified_type(*args)
       @for_type.reified_type(*args)
-    end
-
-    def prelude_bool(ctx)
-      (@prelude_bool ||= MetaType.new(reified_type(prelude_type(ctx, "Bool"))))
     end
 
     def lookup_type_param(ref, refer = refer(), receiver = reified.receiver)
@@ -1124,10 +1116,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
 
     def touch(node : AST::LiteralString)
-      defns = [prelude_type("String")]
-      mts = defns.map { |defn| MetaType.new(reified_type(defn)).as(MetaType) } # TODO: is it possible to remove this superfluous "as"?
-      mt = MetaType.new_union(mts).cap("val")
-      @analysis[node] = Literal.new(node.pos, mt)
+      @analysis[node] = FixedPrelude.new(node.pos, "String")
     end
 
     # A literal character could be any integer or floating-point machine type.
@@ -1160,8 +1149,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         # Do nothing here - we'll handle it in one of the parent nodes.
       when "(", ":"
         if node.terms.empty?
-          none = MetaType.new(reified_type(prelude_type("None")))
-          @analysis[node] = Fixed.new(node.pos, none)
+          @analysis[node] = FixedPrelude.new(node.pos, "None")
         else
           # A non-empty group always has the node of its final child.
           @analysis.redirect(node, node.terms.last)
@@ -1267,7 +1255,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
 
       when "is"
         # Just know that the result of this expression is a boolean.
-        @analysis[node] = Fixed.new(node.pos, prelude_bool(ctx))
+        @analysis[node] = FixedPrelude.new(node.pos, "Bool")
       when "<:"
         need_to_check_if_right_is_subtype_of_left = true
         lhs_info = self[node.lhs]
@@ -1293,7 +1281,6 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
 
           # Set up a type param refinement condition, which can be used within
           # a choice body to inform the type system about the type relationship.
-          bool = MetaType.new(reified_type(prelude_type("Bool")))
           refine = lhs_info.type_param_ref.not_nil!
           @analysis[node] = TypeParamCondition.new(node.pos, refine, rhs_info)
 
@@ -1310,7 +1297,6 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
           @analysis[node.rhs] = Fixed.new(node.rhs.pos, rhs_mt)
 
           # We can know statically at compile time whether it's true or false.
-          bool = MetaType.new(reified_type(prelude_type("Bool")))
           if lhs_mt.satisfies_bound?(ctx, rhs_mt)
             @analysis[node] = TrueCondition.new(node.pos)
           else
@@ -1320,8 +1306,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         # For all other possible left-hand sides...
         else
           # Just know that the result of this expression is a boolean.
-          bool = MetaType.new(reified_type(prelude_type("Bool")))
-          @analysis[node] = Fixed.new(node.pos, bool)
+          @analysis[node] = FixedPrelude.new(node.pos, "Bool")
         end
 
         if need_to_check_if_right_is_subtype_of_left
@@ -1359,8 +1344,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     def touch(node : AST::Prefix)
       case node.op.value
       when "source_code_position_of_argument"
-        rt = reified_type(prelude_type("SourceCodePosition"))
-        @analysis[node] = Fixed.new(node.pos, MetaType.new(rt))
+        @analysis[node] = FixedPrelude.new(node.pos, "SourceCodePosition")
       when "reflection_of_type"
         reflect_mt = @for_type.resolve_type_param_parent_links(resolve(node.term))
         reflect_rt =
@@ -1388,8 +1372,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         rt = reified_type(prelude_type("ReflectionOfType"), [reflect_mt])
         @analysis[node] = Fixed.new(node.pos, MetaType.new(rt))
       when "identity_digest_of"
-        usize = MetaType.new(reified_type(prelude_type("USize")))
-        @analysis[node] = Fixed.new(node.pos, usize)
+        @analysis[node] = FixedPrelude.new(node.pos, "USize")
       when "--"
         @analysis[node] = Consume.new(node.pos, self[node.term])
       else
@@ -1405,8 +1388,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         cond.accept(ctx, self)
 
         # Each condition in a choice must evaluate to a type of Bool.
-        bool = MetaType.new(reified_type(prelude_type("Bool")))
-        fixed_bool = Fixed.new(node.pos, bool)
+        fixed_bool = FixedPrelude.new(node.pos, "Bool")
         self.resolve(ctx, fixed_bool)
         cond_info = self[cond]
         cond_info.add_downstream(ctx, self, node.pos, fixed_bool, 1)
@@ -1471,9 +1453,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
 
     def touch(node : AST::Loop)
       # The condition of the loop must evaluate to a type of Bool.
-      bool = MetaType.new(reified_type(prelude_type("Bool")))
-      fixed_bool = Fixed.new(node.pos, bool)
-      self.resolve(ctx, fixed_bool)
+      fixed_bool = FixedPrelude.new(node.pos, "Bool")
+      self.resolve(ctx, fixed_bool) # TODO: can this be removed?
       cond_info = self[node.cond]
       cond_info.add_downstream(ctx, self, node.pos, fixed_bool, 1)
 

@@ -278,6 +278,20 @@ class Mare::Compiler::Infer
     end
   end
 
+  class FixedPrelude < DownstreamableInfo
+    property name : String
+
+    def describe_kind; "expression" end
+
+    def initialize(@pos, @name)
+    end
+
+    def resolve!(ctx : Context, infer : ForReifiedFunc)
+      MetaType.new(infer.reified_type(infer.prelude_type(@name)))
+      .tap { |mt| within_downstream_constraints!(ctx, infer, mt) }
+    end
+  end
+
   class FixedSingleton < DownstreamableInfo
     property node : AST::Node
     property type_param_ref : Refer::TypeParam?
@@ -436,15 +450,15 @@ class Mare::Compiler::Infer
 
   class TypeParamCondition < DownstreamableInfo
     getter refine : Refer::TypeParam
-    getter refine_info : Info
+    getter refine_type : Info
 
     def describe_kind; "type parameter condition" end
 
-    def initialize(@pos, @refine, @refine_info)
+    def initialize(@pos, @refine, @refine_type)
     end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc)
-      infer.prelude_bool(ctx)
+      MetaType.new(infer.reified_type(infer.prelude_type("Bool")))
       .tap { |mt| within_downstream_constraints!(ctx, infer, mt) }
     end
   end
@@ -459,7 +473,7 @@ class Mare::Compiler::Infer
     end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc)
-      infer.prelude_bool(ctx)
+      MetaType.new(infer.reified_type(infer.prelude_type("Bool")))
       .tap { |mt| within_downstream_constraints!(ctx, infer, mt) }
     end
   end
@@ -471,7 +485,7 @@ class Mare::Compiler::Infer
     end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc)
-      infer.prelude_bool(ctx)
+      MetaType.new(infer.reified_type(infer.prelude_type("Bool")))
       .tap { |mt| within_downstream_constraints!(ctx, infer, mt) }
     end
   end
@@ -483,7 +497,7 @@ class Mare::Compiler::Infer
     end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc)
-      infer.prelude_bool(ctx)
+      MetaType.new(infer.reified_type(infer.prelude_type("Bool")))
       .tap { |mt| within_downstream_constraints!(ctx, infer, mt) }
     end
   end

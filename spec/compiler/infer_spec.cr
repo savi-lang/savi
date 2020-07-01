@@ -98,7 +98,7 @@ describe Mare::Compiler::Infer do
       :fun number I32
                   ^~~
 
-    - but the type of the literal value was String:
+    - but the type of the expression was String:
       from (example):3:
         "not a number at all"
          ^~~~~~~~~~~~~~~~~~~
@@ -213,7 +213,7 @@ describe Mare::Compiler::Infer do
         if "not a boolean" 42
         ^~
 
-    - but the type of the literal value was String:
+    - but the type of the expression was String:
       from (example):3:
         if "not a boolean" 42
             ^~~~~~~~~~~~~
@@ -397,7 +397,7 @@ describe Mare::Compiler::Infer do
         x = U64[0]
         ^
 
-    - but the type of the literal value was String:
+    - but the type of the expression was String:
       from (example):4:
         x = "a string"
              ^~~~~~~~
