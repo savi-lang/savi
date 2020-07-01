@@ -1257,17 +1257,11 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
           need_to_check_if_right_is_subtype_of_left = false
 
           # Strip the "non" from the fixed types, as if each were a type expr.
-          @analysis[node.lhs] = FixedTypeExpr.new(node.lhs.pos, node.lhs)
-          @analysis[node.rhs] = FixedTypeExpr.new(node.rhs.pos, node.rhs)
+          @analysis[node.lhs] = lhs_info = FixedTypeExpr.new(node.lhs.pos, node.lhs)
+          @analysis[node.rhs] = rhs_info = FixedTypeExpr.new(node.rhs.pos, node.rhs)
 
           # We can know statically at compile time whether it's true or false.
-          lhs_mt = type_expr(node.lhs)
-          rhs_mt = type_expr(node.rhs)
-          if lhs_mt.satisfies_bound?(ctx, rhs_mt)
-            @analysis[node] = TrueCondition.new(node.pos)
-          else
-            @analysis[node] = FalseCondition.new(node.pos)
-          end
+          @analysis[node] = TypeConditionStatic.new(node.pos, lhs_info, rhs_info)
 
         # For all other possible left-hand sides...
         else
@@ -1356,10 +1350,15 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
           if !current_type_param.satisfies_bound?(ctx, refine_type)
             skip_body = true
           end
-        elsif cond_info.is_a?(FalseCondition)
-          skip_body = true
-        elsif cond_info.is_a?(TrueCondition)
-          skip_later_bodies = true
+        elsif cond_info.is_a?(TypeConditionStatic)
+          if cond_info.evaluate(ctx, self)
+            # A statically true condition prevents all later branch bodies
+            # from having a chance to be executed, since it happens first.
+            skip_later_bodies = true
+          else
+            # A statically false condition will not execute its branch body.
+            skip_body = true
+          end
         elsif skip_later_bodies
           skip_body = true
         end

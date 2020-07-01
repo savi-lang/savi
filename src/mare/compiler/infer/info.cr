@@ -605,22 +605,19 @@ class Mare::Compiler::Infer
     end
   end
 
-  class TrueCondition < DownstreamableInfo # TODO: dedup with FalseCondition?
-    def describe_kind; "True value" end
+  class TypeConditionStatic < DownstreamableInfo
+    getter lhs : Info
+    getter rhs : Info
 
-    def initialize(@pos)
+    def describe_kind; "static type condition" end
+
+    def initialize(@pos, @lhs, @rhs)
     end
 
-    def resolve!(ctx : Context, infer : ForReifiedFunc)
-      MetaType.new(infer.reified_type(infer.prelude_type("Bool")))
-      .tap { |mt| within_downstream_constraints!(ctx, infer, mt) }
-    end
-  end
-
-  class FalseCondition < DownstreamableInfo # TODO: dedup with TrueCondition?
-    def describe_kind; "False value" end
-
-    def initialize(@pos)
+    def evaluate(ctx : Context, infer : ForReifiedFunc) : Bool
+      lhs_mt = infer.resolve(ctx, lhs)
+      rhs_mt = infer.resolve(ctx, rhs)
+      lhs_mt.satisfies_bound?(ctx, rhs_mt)
     end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc)
