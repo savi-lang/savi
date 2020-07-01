@@ -158,7 +158,6 @@ class Mare::Compiler::Infer
       end
 
       finish_resolve!(ctx, infer, meta_type)
-      # .tap { |mt| within_downstream_constraints!(ctx, infer, mt) }
     end
   end
 
@@ -264,7 +263,7 @@ class Mare::Compiler::Infer
     end
   end
 
-  class Fixed < DownstreamableInfo
+  class Fixed < DynamicInfo
     property inner : MetaType
 
     def describe_kind; "expression" end
@@ -272,13 +271,12 @@ class Mare::Compiler::Infer
     def initialize(@pos, @inner)
     end
 
-    def resolve!(ctx : Context, infer : ForReifiedFunc)
+    def inner_resolve!(ctx : Context, infer : ForReifiedFunc)
       @inner
-      .tap { |mt| within_downstream_constraints!(ctx, infer, mt) }
     end
   end
 
-  class FixedPrelude < DownstreamableInfo
+  class FixedPrelude < DynamicInfo
     getter name : String
 
     def describe_kind; "expression" end
@@ -286,13 +284,12 @@ class Mare::Compiler::Infer
     def initialize(@pos, @name)
     end
 
-    def resolve!(ctx : Context, infer : ForReifiedFunc)
+    def inner_resolve!(ctx : Context, infer : ForReifiedFunc)
       MetaType.new(infer.reified_type(infer.prelude_type(@name)))
-      .tap { |mt| within_downstream_constraints!(ctx, infer, mt) }
     end
   end
 
-  class FixedTypeExpr < DownstreamableInfo
+  class FixedTypeExpr < DynamicInfo
     getter node : AST::Node
 
     def describe_kind; "type expression" end
@@ -300,13 +297,12 @@ class Mare::Compiler::Infer
     def initialize(@pos, @node)
     end
 
-    def resolve!(ctx : Context, infer : ForReifiedFunc)
+    def inner_resolve!(ctx : Context, infer : ForReifiedFunc)
       infer.type_expr(@node)
-      .tap { |mt| within_downstream_constraints!(ctx, infer, mt) }
     end
   end
 
-  class FixedEnumValue < DownstreamableInfo
+  class FixedEnumValue < DynamicInfo
     getter node : AST::Node
 
     def describe_kind; "expression" end
@@ -314,13 +310,12 @@ class Mare::Compiler::Infer
     def initialize(@pos, @node)
     end
 
-    def resolve!(ctx : Context, infer : ForReifiedFunc)
+    def inner_resolve!(ctx : Context, infer : ForReifiedFunc)
       infer.type_expr(@node)
-      .tap { |mt| within_downstream_constraints!(ctx, infer, mt) }
     end
   end
 
-  class FixedSingleton < DownstreamableInfo
+  class FixedSingleton < DynamicInfo
     getter node : AST::Node
     getter type_param_ref : Refer::TypeParam?
 
@@ -329,7 +324,7 @@ class Mare::Compiler::Infer
     def initialize(@pos, @node, @type_param_ref = nil)
     end
 
-    def resolve!(ctx : Context, infer : ForReifiedFunc)
+    def inner_resolve!(ctx : Context, infer : ForReifiedFunc)
       # If this node is further qualified, we don't want to both resolving it,
       # and doing so would trigger errors during type argument validation,
       # because the type arguments haven't been applied yet; they will be
@@ -339,12 +334,11 @@ class Mare::Compiler::Infer
         && infer.classify.further_qualified?(@node)
 
       infer.type_expr(@node).override_cap("non")
-      .tap { |mt| within_downstream_constraints!(ctx, infer, mt) }
       .tap { |mt| ctx.infer.validate_type_args(ctx, infer, @node, mt) }
     end
   end
 
-  class Self < DownstreamableInfo
+  class Self < DynamicInfo
     def describe_kind; "receiver value" end
 
     def initialize(@pos)
@@ -354,27 +348,25 @@ class Mare::Compiler::Infer
       @downstreams.map { |_, info, _| {info.pos, analysis.resolve(info)} }
     end
 
-    def resolve!(ctx : Context, infer : ForReifiedFunc)
+    def inner_resolve!(ctx : Context, infer : ForReifiedFunc)
       infer.analysis.resolved_self
-      .tap { |mt| within_downstream_constraints!(ctx, infer, mt) }
     end
   end
 
-  class FromConstructor < DownstreamableInfo
+  class FromConstructor < DynamicInfo
     def describe_kind; "constructed object" end
 
     def initialize(@pos, @cap : String)
     end
 
-    def resolve!(ctx : Context, infer : ForReifiedFunc)
+    def inner_resolve!(ctx : Context, infer : ForReifiedFunc)
       # A constructor returns the ephemeral of the self type with the given cap.
       # TODO: should the ephemeral be removed, given Mare's ephemeral semantics?
       MetaType.new(infer.reified.type, @cap).ephemeralize
-      .tap { |mt| within_downstream_constraints!(ctx, infer, mt) }
     end
   end
 
-  class ReflectionOfType < DownstreamableInfo
+  class ReflectionOfType < DynamicInfo
     getter reflect_type : Info
 
     def describe_kind; "type reflection" end
@@ -382,9 +374,8 @@ class Mare::Compiler::Infer
     def initialize(@pos, @reflect_type)
     end
 
-    def resolve!(ctx : Context, infer : ForReifiedFunc)
+    def inner_resolve!(ctx : Context, infer : ForReifiedFunc)
       follow_reflection(ctx, infer)
-      .tap { |mt| within_downstream_constraints!(ctx, infer, mt) }
     end
 
     def follow_reflection(ctx : Context, infer : ForReifiedFunc)
@@ -466,7 +457,7 @@ class Mare::Compiler::Infer
     end
   end
 
-  class Field < DownstreamableInfo
+  class Field < DynamicInfo
     def initialize(@pos, @name : String)
     end
 
@@ -482,9 +473,8 @@ class Mare::Compiler::Infer
       )
     end
 
-    def resolve!(ctx : Context, infer : ForReifiedFunc)
+    def inner_resolve!(ctx : Context, infer : ForReifiedFunc)
       follow_field(ctx, infer)
-      .tap { |mt| within_downstream_constraints!(ctx, infer, mt) }
     end
 
     def follow_field(ctx : Context, infer : ForReifiedFunc) : MetaType
@@ -504,7 +494,7 @@ class Mare::Compiler::Infer
     end
   end
 
-  class FieldRead < DownstreamableInfo
+  class FieldRead < DynamicInfo
     def initialize(@field : Field, @origin : Self)
     end
 
@@ -514,15 +504,14 @@ class Mare::Compiler::Infer
       @field.pos
     end
 
-    def resolve!(ctx : Context, infer : ForReifiedFunc)
+    def inner_resolve!(ctx : Context, infer : ForReifiedFunc)
       origin_mt = infer.resolve(ctx, @origin)
       field_mt = infer.resolve(ctx, @field)
       field_mt.viewed_from(origin_mt).alias
-      .tap { |mt| within_downstream_constraints!(ctx, infer, mt) }
     end
   end
 
-  class FieldExtract < DownstreamableInfo
+  class FieldExtract < DynamicInfo
     def initialize(@field : Field, @origin : Self)
     end
 
@@ -532,11 +521,10 @@ class Mare::Compiler::Infer
       @field.pos
     end
 
-    def resolve!(ctx : Context, infer : ForReifiedFunc)
+    def inner_resolve!(ctx : Context, infer : ForReifiedFunc)
       origin_mt = infer.resolve(ctx, @origin)
       field_mt = infer.resolve(ctx, @field)
       field_mt.extracted_from(origin_mt).ephemeralize
-      .tap { |mt| within_downstream_constraints!(ctx, infer, mt) }
     end
   end
 
@@ -574,7 +562,7 @@ class Mare::Compiler::Infer
     end
   end
 
-  class TypeParamCondition < DownstreamableInfo
+  class TypeParamCondition < DynamicInfo
     getter refine : Refer::TypeParam
     getter refine_type : Info
 
@@ -583,13 +571,12 @@ class Mare::Compiler::Infer
     def initialize(@pos, @refine, @refine_type)
     end
 
-    def resolve!(ctx : Context, infer : ForReifiedFunc)
+    def inner_resolve!(ctx : Context, infer : ForReifiedFunc)
       MetaType.new(infer.reified_type(infer.prelude_type("Bool")))
-      .tap { |mt| within_downstream_constraints!(ctx, infer, mt) }
     end
   end
 
-  class TypeCondition < DownstreamableInfo
+  class TypeCondition < DynamicInfo
     getter refine : AST::Node
     getter refine_type : Info
 
@@ -598,13 +585,12 @@ class Mare::Compiler::Infer
     def initialize(@pos, @refine, @refine_type)
     end
 
-    def resolve!(ctx : Context, infer : ForReifiedFunc)
+    def inner_resolve!(ctx : Context, infer : ForReifiedFunc)
       MetaType.new(infer.reified_type(infer.prelude_type("Bool")))
-      .tap { |mt| within_downstream_constraints!(ctx, infer, mt) }
     end
   end
 
-  class TypeConditionStatic < DownstreamableInfo
+  class TypeConditionStatic < DynamicInfo
     getter lhs : Info
     getter rhs : Info
 
@@ -619,13 +605,12 @@ class Mare::Compiler::Infer
       lhs_mt.satisfies_bound?(ctx, rhs_mt)
     end
 
-    def resolve!(ctx : Context, infer : ForReifiedFunc)
+    def inner_resolve!(ctx : Context, infer : ForReifiedFunc)
       MetaType.new(infer.reified_type(infer.prelude_type("Bool")))
-      .tap { |mt| within_downstream_constraints!(ctx, infer, mt) }
     end
   end
 
-  class Refinement < DownstreamableInfo
+  class Refinement < DynamicInfo
     getter refine : Info
     getter refine_type : Info
 
@@ -634,13 +619,12 @@ class Mare::Compiler::Infer
     def initialize(@pos, @refine, @refine_type)
     end
 
-    def resolve!(ctx : Context, infer : ForReifiedFunc)
+    def inner_resolve!(ctx : Context, infer : ForReifiedFunc)
       infer.resolve(ctx, @refine).intersect(infer.resolve(ctx, @refine_type))
-      .tap { |mt| within_downstream_constraints!(ctx, infer, mt) }
     end
   end
 
-  class Consume < DownstreamableInfo
+  class Consume < Info
     getter local : Info
 
     def describe_kind; "consumed reference" end
