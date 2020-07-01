@@ -1176,18 +1176,10 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
 
           local = self[local_ident]
           case local
-          when Local
+          when Local, Param
             info = self[node.terms[1]]
             case info
-            when Fixed then local.set_explicit(ctx, self, info)
-            when Self then local.set_explicit(ctx, self, info)
-            else raise NotImplementedError.new(info)
-            end
-          when Param
-            info = self[node.terms[1]]
-            case info
-            when Fixed then local.set_explicit(ctx, self, info)
-            when Self then local.set_explicit(ctx, self, info)
+            when Fixed, Self then local.set_explicit(ctx, self, info)
             else raise NotImplementedError.new(info)
             end
           else raise NotImplementedError.new(local)
