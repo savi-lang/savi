@@ -240,7 +240,6 @@ class Mare::Compiler::Infer
       raise "shouldn't have an upstream yet" unless @upstreams.empty?
 
       @explicit = explicit
-      infer.resolve(ctx, explicit.not_nil!) # TODO: can this be removed?
       @pos = explicit.pos
     end
 
