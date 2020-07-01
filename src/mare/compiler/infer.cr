@@ -844,10 +844,9 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       # Take note of the return type constraint if given.
       # For constructors, this is the self type and listed receiver cap.
       if func.has_tag?(:constructor)
-        meta_type = MetaType.new(reified.type, func.cap.not_nil!.value)
-        meta_type = meta_type.ephemeralize # a constructor returns the ephemeral
-        fixed = Fixed.new(func.cap.not_nil!.pos, meta_type)
-        self[ret].as(FuncBody).set_explicit(ctx, self, fixed)
+        self[ret].as(FuncBody).set_explicit(ctx, self,
+          FromConstructor.new(func.cap.not_nil!.pos, func.cap.not_nil!.value)
+        )
       else
         func.ret.try do |ret_t|
           ret_t.accept(ctx, self)

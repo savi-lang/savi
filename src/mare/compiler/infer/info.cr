@@ -352,6 +352,20 @@ class Mare::Compiler::Infer
     end
   end
 
+  class FromConstructor < DownstreamableInfo
+    def describe_kind; "constructed object" end
+
+    def initialize(@pos, @cap : String)
+    end
+
+    def resolve!(ctx : Context, infer : ForReifiedFunc)
+      # A constructor returns the ephemeral of the self type with the given cap.
+      # TODO: should the ephemeral be removed, given Mare's ephemeral semantics?
+      MetaType.new(infer.reified.type, @cap).ephemeralize
+      .tap { |mt| within_downstream_constraints!(ctx, infer, mt) }
+    end
+  end
+
   class ReflectionOfType < DownstreamableInfo
     getter reflect_type : Info
 
