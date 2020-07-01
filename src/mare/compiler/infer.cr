@@ -1323,7 +1323,6 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
 
         # Each condition in a choice must evaluate to a type of Bool.
         fixed_bool = FixedPrelude.new(node.pos, "Bool")
-        self.resolve(ctx, fixed_bool)
         cond_info = self[cond]
         cond_info.add_downstream(ctx, self, node.pos, fixed_bool, 1)
 
@@ -1393,7 +1392,6 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     def touch(node : AST::Loop)
       # The condition of the loop must evaluate to a type of Bool.
       fixed_bool = FixedPrelude.new(node.pos, "Bool")
-      self.resolve(ctx, fixed_bool) # TODO: can this be removed?
       cond_info = self[node.cond]
       cond_info.add_downstream(ctx, self, node.pos, fixed_bool, 1)
 
