@@ -330,9 +330,17 @@ class Mare::Compiler::Infer
     end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc)
+      # If this node is further qualified, we don't want to both resolving it,
+      # and doing so would trigger errors during type argument validation,
+      # because the type arguments haven't been applied yet; they will be
+      # applied in a different FixedSingleton that wraps this one in range.
+      # We don't have to resolve it because nothing will ever be its downstream.
+      return MetaType.unsatisfiable if @node.is_a?(AST::Identifier) \
+        && infer.classify.further_qualified?(@node)
+
       infer.type_expr(@node).override_cap("non")
       .tap { |mt| within_downstream_constraints!(ctx, infer, mt) }
-      .tap { |mt| infer.error_if_type_args_missing(@node, mt) }
+      .tap { |mt| ctx.infer.validate_type_args(ctx, infer, @node, mt) }
     end
   end
 

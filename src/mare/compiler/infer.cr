@@ -430,20 +430,46 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   def validate_type_args(
     ctx : Context,
     infer : (ForReifiedFunc | ForType),
-    node : AST::Qualify,
-    rt : ReifiedType,
+    node : AST::Node,
+    mt : MetaType,
   )
+    return unless mt.singular? # this skip partially reified type params
+    rt = mt.single!
     rt_defn = rt.defn(ctx)
     rt_params_count = rt.params_count(ctx)
+    arg_terms = node.is_a?(AST::Qualify) ? node.group.terms : [] of AST::Node
 
-    raise "inconsistent arguments" if node.group.terms.size != rt.args.size
+    if rt.args.empty?
+      if rt_params_count == 0
+        # If there are no type args or type params there's nothing to check.
+        return
+      else
+        # If there are type params but no type args we have a problem.
+        Error.at node, "This type needs to be qualified with type arguments", [
+          {rt_defn.params.not_nil!,
+            "these type parameters are expecting arguments"}
+        ]
+      end
+    end
+
+    # If this is an identifier referencing a different type, skip it;
+    # it will have been validated at its referent location, and trying
+    # to validate it here would break because we don't have the Qualify node.
+    return if node.is_a?(AST::Identifier) \
+      && !infer.classify.further_qualified?(node)
+
+    raise "inconsistent arguments" if arg_terms.size != rt.args.size
 
     # Check number of type args against number of type params.
-    if rt.args.size > rt_params_count
+    if rt.args.empty?
+      Error.at node, "This type needs to be qualified with type arguments", [
+        {rt_defn.params.not_nil!, "these type parameters are expecting arguments"}
+      ]
+    elsif rt.args.size > rt_params_count
       params_pos = (rt_defn.params || rt_defn.ident).pos
       Error.at node, "This type qualification has too many type arguments", [
         {params_pos, "#{rt_params_count} type arguments were expected"},
-      ].concat(node.group.terms[rt_params_count..-1].map { |arg|
+      ].concat(arg_terms[rt_params_count..-1].map { |arg|
         {arg.pos, "this is an excessive type argument"}
       })
     elsif rt.args.size < rt_params_count
@@ -456,7 +482,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
 
     # Check each type arg against the bound of the corresponding type param.
-    node.group.terms.zip(rt.args).each_with_index do |(arg_node, arg), index|
+    arg_terms.zip(rt.args).each_with_index do |(arg_node, arg), index|
       # Skip checking type arguments that contain type parameters.
       next unless arg.type_params.empty?
 
@@ -644,13 +670,6 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     def pop_type_param_refinement(ref)
       list = @type_param_refinements[ref]
       list.empty? ? @type_param_refinements.delete(ref) : list.pop
-    end
-
-    def validate_type_args(
-      node : AST::Qualify,
-      rt : ReifiedType,
-    )
-      ctx.infer.validate_type_args(ctx, self, node, rt)
     end
 
     # An identifier type expression must refer to a type.
@@ -999,33 +1018,6 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       node
     end
 
-    def error_if_type_args_missing(node : AST::Node, mt : MetaType)
-      # Skip cases where the metatype has no single ReifiedType.
-      return unless mt.singular?
-
-      error_if_type_args_missing(node, mt.single!)
-    end
-
-    def error_if_type_args_missing(node : AST::Node, rt : ReifiedType)
-      # If this node is already a qualify, we take no issue with it.
-      return if node.is_a?(AST::Qualify)
-
-      # If this reified type already has arguments, we take no issue with it.
-      return if rt.args.size > 0
-
-      # If this node is further qualified, we expect type args to come later.
-      return if classify.further_qualified?(node)
-
-      # If this node has no params, no type args are needed.
-      defn = rt.defn(ctx)
-      return if defn.param_count == 0
-
-      # Otherwise, raise an error - the type needs to be qualified.
-      Error.at node, "This type needs to be qualified with type arguments", [
-        {defn.params.not_nil!, "these type parameters are expecting arguments"}
-      ]
-    end
-
     def visit_children?(ctx, node)
       # Don't visit the children of a type expression root node.
       return false if classify.type_expr?(node)
@@ -1310,9 +1302,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       # We only care about working with type arguments and type parameters now.
       return unless term_info.is_a?(FixedSingleton)
 
-      @analysis[node] = info = FixedSingleton.new(node.pos, node, term_info.type_param_ref)
-
-      ctx.infer.validate_type_args(ctx, self, node, resolve(ctx, info).single!)
+      @analysis[node] = FixedSingleton.new(node.pos, node, term_info.type_param_ref)
     end
 
     def touch(node : AST::Prefix)
