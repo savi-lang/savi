@@ -1207,17 +1207,15 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         )
         @analysis[node] = call
 
+        # Visit yield params and yield block.
+        yield_params.try(&.accept(ctx, self))
+        call.pre_visit_yield_block(ctx, self, yield_params, yield_block)
+        yield_block.try(&.accept(ctx, self))
+
         # Resolve and validate the call.
         # TODO: move this into FromCall.inner_resolve and do not eagerly resolve here
         call.follow_call(ctx, self)
-
-        # Visit yield params to register them in our state.
-        # We have to do this before the lines below where we access that state.
-        # Note that we skipped it before with visit_children: false.
-        yield_params.try(&.accept(ctx, self))
-
-        # We will visit the yield_block from inside this call.
-        call.visit_and_verify_yield_block(ctx, self, yield_params, yield_block)
+        call.follow_call_verify_yield_block(ctx, self, yield_params, yield_block)
 
       when "is"
         # Just know that the result of this expression is a boolean.
