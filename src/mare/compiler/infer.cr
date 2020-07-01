@@ -830,10 +830,12 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
           # TODO: special-case this somewhere else?
           if reified.type.link.name == "Main" \
           && reified.link.name == "new"
-            env = MetaType.new(reified_type(prelude_type("Env")))
+            env = Fixed.new(
+              reified.func(ctx).ident.pos,
+              MetaType.new(reified_type(prelude_type("Env"))),
+            )
             param_info = self[param].as(Param)
-            param_info.set_explicit(ctx, self, reified.func(ctx).ident.pos, env) \
-              unless param_info.explicit?
+            param_info.set_explicit(ctx, self, env) unless param_info.explicit?
           end
         end
       end
@@ -847,11 +849,12 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       if func.has_tag?(:constructor)
         meta_type = MetaType.new(reified.type, func.cap.not_nil!.value)
         meta_type = meta_type.ephemeralize # a constructor returns the ephemeral
-        self[ret].as(FuncBody).set_explicit(ctx, self, func.cap.not_nil!.pos, meta_type)
+        fixed = Fixed.new(func.cap.not_nil!.pos, meta_type)
+        self[ret].as(FuncBody).set_explicit(ctx, self, fixed)
       else
         func.ret.try do |ret_t|
           ret_t.accept(ctx, self)
-          self[ret].as(FuncBody).set_explicit(ctx, self, ret_t.pos, resolve(ret_t))
+          self[ret].as(FuncBody).set_explicit(ctx, self, @analysis[ret_t])
         end
       end
 
@@ -879,12 +882,12 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
           # We have a function signature for multiple yield out arg types.
           yield_out.terms.each_with_index do |yield_out_arg, index|
             yield_out_arg.accept(ctx, self)
-            yield_out_infos[index].set_explicit(ctx, self, yield_out_arg.pos, resolve(yield_out_arg))
+            yield_out_infos[index].set_explicit(ctx, self, @analysis[yield_out_arg])
           end
         else
           # We have a function signature for just one yield out arg type.
           yield_out.accept(ctx, self)
-          yield_out_infos.first.set_explicit(ctx, self, yield_out.pos, resolve(yield_out))
+          yield_out_infos.first.set_explicit(ctx, self, @analysis[yield_out])
         end
       end
 
@@ -892,10 +895,11 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       yield_in = func.yield_in
       if yield_in
         yield_in.accept(ctx, self)
-        yield_in_info.set_explicit(ctx, self, yield_in.pos, resolve(yield_in))
+        yield_in_info.set_explicit(ctx, self, @analysis[yield_in])
       else
         none = MetaType.new(reified_type(prelude_type("None")))
-        yield_in_info.set_explicit(ctx, self, yield_in_info.pos, none)
+        fixed = Fixed.new(yield_in_info.pos, none)
+        yield_in_info.set_explicit(ctx, self, fixed)
       end
 
       # Don't bother further typechecking functions that have no body
@@ -979,7 +983,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
 
       # Apply constraints to the return type.
       ret = infer[infer.ret]
-      field.set_explicit(ctx, self, ret.pos, infer.resolve(ctx, ret))
+      field.set_explicit(ctx, self, Fixed.new(ret.pos, infer.resolve(ctx, ret)))
     end
 
     def prelude_type(ctx, name)
@@ -1175,15 +1179,15 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
           when Local
             info = self[node.terms[1]]
             case info
-            when Fixed then local.set_explicit(ctx, self, info.pos, info.inner)
-            when Self then local.set_explicit(ctx, self, info.pos, resolve(ctx, info)) # TODO: set_explicit should take an info rather than a MetaType.
+            when Fixed then local.set_explicit(ctx, self, info)
+            when Self then local.set_explicit(ctx, self, info)
             else raise NotImplementedError.new(info)
             end
           when Param
             info = self[node.terms[1]]
             case info
-            when Fixed then local.set_explicit(ctx, self, info.pos, info.inner)
-            when Self then local.set_explicit(ctx, self, info.pos, resolve(ctx, info)) # TODO: set_explicit should take an info rather than a MetaType.
+            when Fixed then local.set_explicit(ctx, self, info)
+            when Self then local.set_explicit(ctx, self, info)
             else raise NotImplementedError.new(info)
             end
           else raise NotImplementedError.new(local)
@@ -1514,14 +1518,14 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       # Do nothing for other nodes.
     end
 
-    def finish_param(node : AST::Node, ref : Info)
-      case ref
+    def finish_param(node : AST::Node, info : Info)
+      case info
       when Fixed
         param = Param.new(node.pos)
-        param.set_explicit(ctx, self, ref.pos, ref.inner)
+        param.set_explicit(ctx, self, info)
         @analysis[node] = param # assign new info
       else
-        raise NotImplementedError.new([node, ref].inspect)
+        raise NotImplementedError.new([node, info].inspect)
       end
     end
   end

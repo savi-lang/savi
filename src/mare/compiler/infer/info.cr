@@ -163,7 +163,7 @@ class Mare::Compiler::Infer
   end
 
   abstract class NamedInfo < DynamicInfo
-    @explicit : Fixed?
+    @explicit : Info?
     @upstreams = [] of Tuple(Info, Source::Pos)
 
     def initialize(@pos)
@@ -235,13 +235,13 @@ class Mare::Compiler::Infer
       end
     end
 
-    def set_explicit(ctx : Context, infer : ForReifiedFunc, explicit_pos : Source::Pos, explicit_mt : MetaType)
+    def set_explicit(ctx : Context, infer : ForReifiedFunc, explicit : Info)
       raise "already set_explicit" if @explicit
       raise "shouldn't have an upstream yet" unless @upstreams.empty?
 
-      @explicit = Fixed.new(explicit_pos, explicit_mt)
-      infer.resolve(ctx, @explicit.not_nil!)
-      @pos = explicit_pos
+      @explicit = explicit
+      infer.resolve(ctx, explicit.not_nil!) # TODO: can this be removed?
+      @pos = explicit.pos
     end
 
     def after_add_downstream(ctx : Context, infer : ForReifiedFunc, use_pos : Source::Pos, info : Info, aliases : Int32)
@@ -923,8 +923,10 @@ class Mare::Compiler::Infer
             infer[yield_param].as(Local).set_explicit(
               ctx,
               infer,
-              yield_out.first_viable_constraint_pos,
-              other_infer.resolve(ctx, yield_out),
+              Fixed.new(
+                yield_out.first_viable_constraint_pos,
+                other_infer.resolve(ctx, yield_out)
+              ),
             )
           end
         end
