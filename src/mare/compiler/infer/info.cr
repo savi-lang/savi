@@ -280,10 +280,11 @@ class Mare::Compiler::Infer
 
   class FixedSingleton < DownstreamableInfo
     property node : AST::Node
+    property type_param_ref : Refer::TypeParam?
 
     def describe_kind; "singleton value for this type" end
 
-    def initialize(@pos, @node)
+    def initialize(@pos, @node, @type_param_ref = nil)
     end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc)
@@ -435,11 +436,11 @@ class Mare::Compiler::Infer
 
   class TypeParamCondition < DownstreamableInfo
     getter refine : Refer::TypeParam
-    getter refine_type : MetaType
+    getter refine_info : Info
 
     def describe_kind; "type parameter condition" end
 
-    def initialize(@pos, @refine, @refine_type)
+    def initialize(@pos, @refine, @refine_info)
     end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc)

@@ -1098,7 +1098,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
           @analysis[node] = FixedSingleton.new(node.pos, node)
         end
       when Refer::TypeParam
-        @analysis[node] = FixedSingleton.new(node.pos, node)
+        @analysis[node] = FixedSingleton.new(node.pos, node, ref)
       when Refer::Local
         # If it's a local, track the possibly new node in our @local_idents map.
         local_ident = lookup_local_ident(ref)
@@ -1283,9 +1283,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
           @analysis[node] = TypeCondition.new(node.pos, refine, rhs_info)
 
         # If the left-hand side is the name of a type parameter...
-        elsif lhs_info.is_a?(FixedSingleton) \
-        && (lhs_nominal = resolve(ctx, lhs_info).strip_cap.inner).is_a?(MetaType::Nominal) \
-        && (lhs_type_param = lhs_nominal.defn).is_a?(Refer::TypeParam)
+        elsif lhs_info.is_a?(FixedSingleton) && lhs_info.type_param_ref
           # For type parameter refinements we do not verify that the right side
           # must be a subtype of the left side - it breaks partial reification.
           need_to_check_if_right_is_subtype_of_left = false
@@ -1296,9 +1294,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
           # Set up a type param refinement condition, which can be used within
           # a choice body to inform the type system about the type relationship.
           bool = MetaType.new(reified_type(prelude_type("Bool")))
-          refine = lhs_type_param
-          refine_type = resolve(ctx, rhs_info)
-          @analysis[node] = TypeParamCondition.new(node.pos, refine, refine_type)
+          refine = lhs_info.type_param_ref.not_nil!
+          @analysis[node] = TypeParamCondition.new(node.pos, refine, rhs_info)
 
         # If the left-hand side is the name of any other fixed type...
         elsif lhs_info.is_a?(FixedSingleton)
@@ -1354,7 +1351,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       # We only care about working with type arguments and type parameters now.
       return unless term_info.is_a?(FixedSingleton)
 
-      @analysis[node] = info = FixedSingleton.new(node.pos, node)
+      @analysis[node] = info = FixedSingleton.new(node.pos, node, term_info.type_param_ref)
 
       ctx.infer.validate_type_args(ctx, self, node, resolve(ctx, info).single!)
     end
@@ -1424,15 +1421,17 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
             cond_info.pos, self[cond_info.refine], cond_info.refine_type
           )
         elsif cond_info.is_a?(TypeParamCondition)
+          refine_type = resolve(ctx, cond_info.refine_type) # TODO: postpone to second half of infer pass
+
           for_type.push_type_param_refinement(
             cond_info.refine,
-            cond_info.refine_type,
+            refine_type,
           )
 
           # When the type param is currently partially or fully reified with
           # a type that is incompatible with the refinement, we skip the body.
           current_type_param = lookup_type_param(cond_info.refine)
-          if !current_type_param.satisfies_bound?(ctx, cond_info.refine_type)
+          if !current_type_param.satisfies_bound?(ctx, refine_type)
             skip_body = true
           end
         elsif cond_info.is_a?(FalseCondition)
