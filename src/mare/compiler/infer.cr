@@ -1322,31 +1322,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       when "source_code_position_of_argument"
         @analysis[node] = FixedPrelude.new(node.pos, "SourceCodePosition")
       when "reflection_of_type"
-        reflect_mt = @for_type.resolve_type_param_parent_links(resolve(node.term))
-        reflect_rt =
-          if reflect_mt.type_params.empty?
-            reflect_mt.single!
-          else
-            # If trying to reflect a type with unreified type params in it,
-            # we just shrug and reflect the type None instead, since it doesn't
-            # seem like there is anything more meaningful we could do here.
-            # This happens when typechecking on not-yet-reified functions,
-            # so it isn't really avoidable. But it shouldn't reach CodeGen.
-            reified_type(prelude_type("None"))
-          end
-
-        # Reach all functions that might possibly be reflected.
-        reflect_rt.defn(ctx).functions.each do |f|
-          next if f.has_tag?(:hygienic) || f.body.nil?
-          f_link = f.make_link(reflect_rt.link)
-          MetaType::Capability.new_maybe_generic(f.cap.value).each_cap.each do |f_cap|
-            ctx.infer.for_rf(ctx, reflect_rt, f_link, MetaType.new(f_cap)).tap(&.run)
-          end
-          extra_called_func!(node.pos, reflect_rt, f_link)
-        end
-
-        rt = reified_type(prelude_type("ReflectionOfType"), [reflect_mt])
-        @analysis[node] = Fixed.new(node.pos, MetaType.new(rt))
+        @analysis[node] = ReflectionOfType.new(node.pos, @analysis[node.term])
       when "identity_digest_of"
         @analysis[node] = FixedPrelude.new(node.pos, "USize")
       when "--"

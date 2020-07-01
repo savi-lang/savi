@@ -338,6 +338,49 @@ class Mare::Compiler::Infer
     end
   end
 
+  class ReflectionOfType < DownstreamableInfo
+    getter reflect_type : Info
+
+    def describe_kind; "type reflection" end
+
+    def initialize(@pos, @reflect_type)
+    end
+
+    def resolve!(ctx : Context, infer : ForReifiedFunc)
+      follow_reflection(ctx, infer)
+      .tap { |mt| within_downstream_constraints!(ctx, infer, mt) }
+    end
+
+    def follow_reflection(ctx : Context, infer : ForReifiedFunc)
+      # TODO: Can the resolve_type_param_parent_links call be removed? Or is it still necessary?
+      reflect_mt = infer.for_type.resolve_type_param_parent_links(infer.resolve(ctx, @reflect_type))
+      reflect_rt =
+        if reflect_mt.type_params.empty?
+          reflect_mt.single!
+        else
+          # If trying to reflect a type with unreified type params in it,
+          # we just shrug and reflect the type None instead, since it doesn't
+          # seem like there is anything more meaningful we could do here.
+          # This happens when typechecking on not-yet-reified functions,
+          # so it isn't really avoidable. But it shouldn't reach CodeGen.
+          infer.reified_type(infer.prelude_type("None"))
+        end
+
+      # Reach all functions that might possibly be reflected.
+      reflect_rt.defn(ctx).functions.each do |f|
+        next if f.has_tag?(:hygienic) || f.body.nil?
+        f_link = f.make_link(reflect_rt.link)
+        MetaType::Capability.new_maybe_generic(f.cap.value).each_cap.each do |f_cap|
+          ctx.infer.for_rf(ctx, reflect_rt, f_link, MetaType.new(f_cap)).tap(&.run)
+        end
+        infer.extra_called_func!(@pos, reflect_rt, f_link)
+      end
+
+      MetaType.new(infer.reified_type(infer.prelude_type("ReflectionOfType"), [reflect_mt]))
+    end
+
+  end
+
   class Literal < DynamicInfo
     def describe_kind; "literal value" end
 
