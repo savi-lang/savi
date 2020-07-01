@@ -388,7 +388,6 @@ class Mare::Compiler::Infer
     end
 
     def follow_reflection(ctx : Context, infer : ForReifiedFunc)
-      # TODO: Can the resolve_type_param_parent_links call be removed? Or is it still necessary?
       reflect_mt = infer.for_type.resolve_type_param_parent_links(infer.resolve(ctx, @reflect_type))
       reflect_rt =
         if reflect_mt.type_params.empty?
