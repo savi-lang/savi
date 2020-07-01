@@ -718,24 +718,16 @@ class Mare::Compiler::Infer
     end
 
     def after_add_downstream(ctx : Context, infer : ForReifiedFunc, use_pos : Source::Pos, info : Info, aliases : Int32)
-      antecedents = possible_element_antecedents(ctx, infer)
-      return if antecedents.empty?
+      # Only do this after the first downstream is added.
+      return unless @downstreams.size == 1
 
-      fixed = Fixed.new(@downstreams.first[1].pos, MetaType.new_union(antecedents))
-      infer.resolve(ctx, fixed)
-
-      terms.each do |term|
-        term.add_downstream(
-          ctx,
-          infer,
-          downstream_use_pos,
-          fixed,
-          0,
-        )
+      elem_downstream = ArrayLiteralElementAntecedent.new(@downstreams.first[1].pos, self)
+      @terms.each do |term|
+        term.add_downstream(ctx, infer, downstream_use_pos, elem_downstream, 0)
       end
     end
 
-    private def possible_element_antecedents(ctx, infer) : Array(MetaType)
+    def possible_element_antecedents(ctx, infer) : Array(MetaType)
       results = [] of MetaType
 
       total_downstream_constraint(ctx, infer).each_reachable_defn.to_a.each do |rt|
@@ -747,6 +739,20 @@ class Mare::Compiler::Infer
       end
 
       results
+    end
+  end
+
+  class ArrayLiteralElementAntecedent < DownstreamableInfo
+    getter array : ArrayLiteral
+
+    def initialize(@pos, @array)
+    end
+
+    def describe_kind; "array element" end
+
+    def resolve!(ctx : Context, infer : ForReifiedFunc)
+      antecedents = @array.possible_element_antecedents(ctx, infer)
+      antecedents.empty? ? MetaType.unconstrained : MetaType.new_union(antecedents)
     end
   end
 

@@ -61,6 +61,10 @@ struct Mare::Compiler::Infer::MetaType
     MetaType.new(Unsatisfiable.instance)
   end
 
+  def self.unconstrained
+    MetaType.new(Unconstrained.instance)
+  end
+
   def self.cap(name : String)
     MetaType.new(Capability.new(name))
   end
