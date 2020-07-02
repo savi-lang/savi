@@ -1207,15 +1207,34 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         )
         @analysis[node] = call
 
-        # Visit yield params and yield block.
+        # Each yield param needs a link back to the FromCall with a param index.
         yield_params.try(&.accept(ctx, self))
-        call.pre_visit_yield_block(ctx, self, yield_params, yield_block)
+        if yield_params
+          yield_params.terms.each_with_index do |yield_param, index|
+            @analysis[yield_param].as(Local).assign(
+              ctx,
+              self,
+              FromCallYieldOut.new(yield_param.pos, call, index),
+              yield_param.pos,
+            )
+          end
+        end
+
+        # The yield block result info needs a link back to the FromCall as well.
         yield_block.try(&.accept(ctx, self))
+        if yield_block
+          @analysis[yield_block].add_downstream(
+            ctx,
+            self,
+            yield_block.pos,
+            TowardCallYieldIn.new(yield_block.pos, call),
+            0
+          )
+        end
 
         # Resolve and validate the call.
         # TODO: move this into FromCall.inner_resolve and do not eagerly resolve here
         call.follow_call(ctx, self)
-        call.follow_call_verify_yield_block(ctx, self, yield_params, yield_block)
 
       when "is"
         # Just know that the result of this expression is a boolean.

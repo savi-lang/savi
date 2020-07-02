@@ -1007,52 +1007,6 @@ class Mare::Compiler::Infer
 
       @ret = ret.ephemeralize
     end
-
-    def pre_visit_yield_block(ctx : Context, infer : ForReifiedFunc, yield_params, yield_block)
-      # Each yield param needs to have a link back to this FromCall with a param index.
-      if yield_params
-        yield_params.terms.each_with_index do |yield_param, index|
-          infer[yield_param].as(Local).assign(
-            ctx,
-            infer,
-            FromCallYieldOut.new(yield_param.pos, self, index),
-            yield_param.pos,
-          )
-        end
-      end
-    end
-
-    def follow_call_verify_yield_block(ctx : Context, infer : ForReifiedFunc, yield_params, yield_block)
-      return unless yield_block
-
-      call_defns = follow_call_get_call_defns(ctx, infer)
-
-      call_defns.each do |(call_mti, call_defn, call_func)|
-        call_mt = MetaType.new(call_mti)
-        call_defn = call_defn.not_nil!
-        call_func = call_func.not_nil!
-        call_func_link = call_func.make_link(call_defn.link)
-
-        problems = [] of {Source::Pos, String}
-        required_cap, reify_cap, autorecover_needed =
-          follow_call_check_receiver_cap(ctx, infer, call_mt, call_func, problems)
-        raise "this should have been prevented earlier" if problems.any?
-
-        other_infer = ctx.infer.for_rf(ctx, call_defn, call_func_link, reify_cap).tap(&.run)
-
-        # Finally, check that the type of the result of the yield block,
-        # but don't bother if it has a type requirement of None.
-        yield_in_resolved = other_infer.analysis.yield_in_resolved
-        none = MetaType.new(infer.reified_type(infer.prelude_type("None")))
-        if yield_in_resolved != none
-          yield_in_mt = other_infer.resolve(ctx, other_infer.yield_in_info)
-          yield_in_info = Fixed.new(other_infer.yield_in_info.pos, yield_in_mt)
-          other_infer.resolve(ctx, yield_in_info)
-
-          infer[yield_block].add_downstream(ctx, infer, yield_block.pos, yield_in_info, 0)
-        end
-      end
-    end
   end
 
   class FromCallYieldOut < DynamicInfo
@@ -1096,6 +1050,50 @@ class Mare::Compiler::Infer
       @pos = yield_out.first_viable_constraint_pos
 
       other_infer.resolve(ctx, yield_out)
+    end
+  end
+
+  class TowardCallYieldIn < DynamicInfo
+    getter call : FromCall
+
+    def describe_kind; "expected for the yield result" end
+
+    def initialize(@pos, @call)
+    end
+
+    def inner_resolve!(ctx : Context, infer : ForReifiedFunc)
+      call_defns = call.follow_call_get_call_defns(ctx, infer)
+
+      # TODO: problems with multiple call defns because we'll end up with
+      # conflicting information gathered each time. Somehow, we need to be able
+      # to iterate over it multiple times and type-assign them separately,
+      # so that specialized code can be generated for each different receiver
+      # that may have different types. This is totally nontrivial...
+      raise NotImplementedError.new("yield_block with multiple call_defns") \
+        if call_defns.size > 1
+
+      call_mt = MetaType.new(call_defns.first[0])
+      call_defn = call_defns.first[1].not_nil!
+      call_func = call_defns.first[2].not_nil!
+      call_func_link = call_func.make_link(call_defn.link)
+
+      problems = [] of {Source::Pos, String}
+      required_cap, reify_cap, autorecover_needed =
+        call.follow_call_check_receiver_cap(ctx, infer, call_mt, call_func, problems)
+      raise "this should have been prevented earlier" if problems.any?
+
+      other_infer = ctx.infer.for_rf(ctx, call_defn, call_func_link, reify_cap).tap(&.run)
+
+      # Finally, check that the type of the result of the yield block,
+      # but don't bother if it has a type requirement of None.
+      yield_in_resolved = other_infer.analysis.yield_in_resolved
+      none = MetaType.new(infer.reified_type(infer.prelude_type("None")))
+      if yield_in_resolved != none
+        # @pos = other_infer.yield_in_info.first_viable_constraint_pos
+        other_infer.resolve(ctx, other_infer.yield_in_info)
+      else
+        MetaType.unconstrained
+      end
     end
   end
 end
