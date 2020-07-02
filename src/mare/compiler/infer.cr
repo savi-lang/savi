@@ -97,6 +97,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     protected getter resolved
     protected getter resolved_infos
     protected getter called_funcs
+    protected getter call_infers_for
     getter! ret_resolved : MetaType; protected setter ret_resolved
     getter! yield_in_resolved : MetaType; protected setter yield_in_resolved
     getter! yield_out_resolved : Array(MetaType); protected setter yield_out_resolved
@@ -110,6 +111,9 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       @resolved = {} of AST::Node => MetaType
       @resolved_infos = {} of Info => MetaType
       @called_funcs = Set({Source::Pos, ReifiedType, Program::Function::Link}).new
+
+      # TODO: can this be removed or made more clean without sacrificing performance?
+      @call_infers_for = {} of FromCall => Set(ForReifiedFunc)
     end
 
     def reified
@@ -382,6 +386,11 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   def for_func_simple(ctx : Context, t_link : Program::Type::Link, f_link : Program::Function::Link)
     f = f_link.resolve(ctx)
     for_rf(ctx, for_type(ctx, t_link).reified, f_link, MetaType.cap(f.cap.value))
+  end
+
+  # TODO: remove this cheap hacky alias somehow:
+  def for_rf_existing!(rf)
+    @map[rf]
   end
 
   def for_rf(
@@ -822,7 +831,12 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
 
     def resolve(ctx : Context, info : Info) : MetaType
-      @analysis.resolved_infos[info] ||= info.resolve!(ctx, self)
+      @analysis.resolved_infos[info]? || begin
+        mt = info.resolve!(ctx, self)
+        @analysis.resolved_infos[info] = mt
+        info.post_resolve!(ctx, self, mt)
+        mt
+      end
     end
     # TODO: remove this cheat and stop using the ctx field we hold, so to remove it later...
     def resolve(node) : MetaType
@@ -1211,6 +1225,16 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         )
         @analysis[node] = call
 
+        # Each arg needs a link back to the FromCall with an arg index.
+        # call_args.try(&.accept(ctx, self))
+        if call_args
+          call_args.terms.each_with_index do |call_arg, index|
+            new_info = TowardCallParam.new(call_arg.pos, call, index)
+            @analysis[call_arg].add_downstream(ctx, self, call_arg.pos, new_info, 0)
+            # call.resolvables.push(new_info)
+          end
+        end
+
         # Each yield param needs a link back to the FromCall with a param index.
         yield_params.try(&.accept(ctx, self))
         if yield_params
@@ -1221,6 +1245,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
               FromCallYieldOut.new(yield_param.pos, call, index),
               yield_param.pos,
             )
+            # TODO: push the new info onto call.resolvables?
           end
         end
 
@@ -1234,6 +1259,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
             TowardCallYieldIn.new(yield_block.pos, call),
             0
           )
+          # TODO: push the new info onto call.resolvables?
         end
 
         # TODO: is it possible to get rid of this eager resolve?

@@ -3,6 +3,8 @@ class Mare::Compiler::Infer
     property pos : Source::Pos = Source::Pos.none
 
     abstract def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
+    def post_resolve!(ctx : Context, infer : ForReifiedFunc, mt : MetaType)
+    end
 
     abstract def add_downstream(
       ctx : Context,
@@ -11,6 +13,20 @@ class Mare::Compiler::Infer
       info : Info,
       aliases : Int32,
     )
+
+    # In the rare case that an Info subclass needs to dynamically pretend to be
+    # multiple different downstream constraints, it can override this method.
+    # This is only used to report positions in more detail, and it is expected
+    # that the intersection of all MetaTypes here is the same as the resolve.
+    def as_multiple_downstream_constraints(ctx : Context, infer : ForReifiedFunc) : Array({Source::Pos, MetaType})?
+      nil
+    end
+
+    # TODO: remove this cheap hacky alias somehow:
+    def as_multiple_downstream_constraints(ctx : Context, analysis : ReifiedFuncAnalysis) : Array({Source::Pos, MetaType})?
+      infer = ctx.infer.for_rf_existing!(analysis.reified)
+      as_multiple_downstream_constraints(ctx, infer)
+    end
   end
 
   abstract class DownstreamableInfo < Info
@@ -57,9 +73,18 @@ class Mare::Compiler::Infer
 
     # TODO: document
     def describe_downstream_constraints(ctx : Context, infer : ForReifiedFunc)
-      @downstreams.map do |c|
-        mt = infer.resolve(ctx, c[1])
-        {c[1].pos, "it is required here to be a subtype of #{mt.show_type}"}
+      @downstreams.flat_map do |_, other_info, _|
+        multi = other_info.as_multiple_downstream_constraints(ctx, infer)
+        if multi
+          multi.map do |other_info_pos, mt|
+            {other_info_pos,
+              "it is required here to be a subtype of #{mt.show_type}"}
+          end
+        else
+          mt = infer.resolve(ctx, other_info)
+          [{other_info.pos,
+            "it is required here to be a subtype of #{mt.show_type}"}]
+        end
       end.to_h.to_a
     end
 
@@ -97,23 +122,19 @@ class Mare::Compiler::Infer
   abstract class DynamicInfo < DownstreamableInfo
     # Must be implemented by the child class as an required hook.
     abstract def inner_resolve!(ctx : Context, infer : ForReifiedFunc)
+    # TODO: Get rid of inner_resolve, as it's obsoleted by the addition of post_resolve
+    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
+      inner_resolve!(ctx, infer)
+    end
 
     # May be implemented by the child class as an optional hook.
     def after_resolve!(ctx : Context, infer : ForReifiedFunc, meta_type : MetaType); end
 
+    # The final MetaType must meet all constraints that have been imposed.
     # This method is *not* intended to be overridden by the child class;
     # please override the after_resolve! method instead.
-    private def finish_resolve!(ctx : Context, infer : ForReifiedFunc, meta_type : MetaType)
-      # Run the optional hook in case the child class defined something here.
-      after_resolve!(ctx, infer, meta_type)
-
-      meta_type
-    end
-
-    # The final MetaType must meet all constraints that have been imposed.
-    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
-      meta_type = inner_resolve!(ctx, infer)
-      return finish_resolve!(ctx, infer, meta_type) if downstreams_empty?
+    def post_resolve!(ctx : Context, infer : ForReifiedFunc, meta_type : MetaType)
+      return after_resolve!(ctx, infer, meta_type) if downstreams_empty?
 
       # TODO: print a different error message when the downstream constraints are
       # internally conflicting, even before adding this meta_type into the mix.
@@ -160,7 +181,7 @@ class Mare::Compiler::Infer
         end
       end
 
-      finish_resolve!(ctx, infer, meta_type)
+      after_resolve!(ctx, infer, meta_type)
     end
   end
 
@@ -348,7 +369,10 @@ class Mare::Compiler::Infer
     end
 
     def downstream_constraints(ctx : Context, analysis : ReifiedFuncAnalysis)
-      @downstreams.map { |_, info, _| {info.pos, analysis.resolve(info)} }
+      @downstreams.flat_map do |_, info, _|
+        info.as_multiple_downstream_constraints(ctx, analysis) \
+        || [{info.pos, analysis.resolve(info)}]
+      end
     end
 
     def inner_resolve!(ctx : Context, infer : ForReifiedFunc)
@@ -451,13 +475,6 @@ class Mare::Compiler::Infer
 
   class Param < NamedInfo
     def describe_kind; "parameter" end
-
-    def verify_arg(ctx : Context, infer : ForReifiedFunc, arg_infer : ForReifiedFunc, arg : AST::Node, arg_pos : Source::Pos)
-      param_mt = infer.resolve(ctx, self)
-      param_info = Fixed.new(@pos, param_mt)
-      arg_infer.resolve(ctx, param_info)
-      arg_infer[arg].add_downstream(ctx, arg_infer, arg_pos, param_info, 0)
-    end
   end
 
   class Field < DynamicInfo
@@ -745,7 +762,7 @@ class Mare::Compiler::Infer
   class FromCall < DynamicInfo
     getter lhs : Info
     getter member : String
-    getter args_pos : Array(Source::Pos)
+    getter args_pos : Array(Source::Pos) # TODO: remove; args as Nodes makes this obsolete.
     getter args : Array(AST::Node)
     getter yield_params : AST::Group?
     getter yield_block : AST::Group?
@@ -760,7 +777,7 @@ class Mare::Compiler::Infer
       follow_call(ctx, infer)
     end
 
-    def follow_call_get_call_defns(ctx : Context, infer : ForReifiedFunc)
+    def follow_call_get_call_defns(ctx : Context, infer : ForReifiedFunc) : Set({MetaType::Inner, ReifiedType?, Program::Function?})Set
       call = self
       receiver = infer.resolve(ctx, @lhs)
       call_defns = receiver.find_callable_func_defns(ctx, infer, @member)
@@ -880,7 +897,8 @@ class Mare::Compiler::Infer
     def follow_call_check_args(ctx : Context, infer : ForReifiedFunc, call_func, other_infer, problems)
       call = self
 
-      # First, check the number of arguments.
+      # Just check the number of arguments.
+      # We will check the types in another Info type (TowardCallParam)
       max = other_infer.params.size
       min = other_infer.params.count { |param| !AST::Extract.param(param)[2] }
       func_pos = call_func.ident.pos
@@ -896,15 +914,6 @@ class Mare::Compiler::Infer
         problems << {call.pos, "the call site has too few arguments"}
         problems << {params_pos, "the function requires at least #{min} #{args}"}
         return
-      end
-
-      # Apply parameter constraints to each of the argument types.
-      # TODO: handle case where number of args differs from number of params.
-      # TODO: enforce that all call_defns have the same param count.
-      unless call.args.empty?
-        call.args.zip(other_infer.params).zip(call.args_pos).each do |(arg, param), arg_pos|
-          other_infer[param].as(Param).verify_arg(ctx, other_infer, infer, arg, arg_pos)
-        end
       end
     end
 
@@ -962,6 +971,8 @@ class Mare::Compiler::Infer
       call = self
       call_defns = follow_call_get_call_defns(ctx, infer)
 
+      other_infers = infer.analysis.call_infers_for[self] ||= Set(ForReifiedFunc).new
+
       # For each receiver type definition that is possible, track down the infer
       # for the function that we're trying to call, evaluating the constraints
       # for each possibility such that all of them must hold true.
@@ -984,6 +995,7 @@ class Mare::Compiler::Infer
         # TODO: don't infer anything in the body of that func if type and params
         # were explicitly specified in the function signature.
         other_infer = ctx.infer.for_rf(ctx, call_defn, call_func_link, reify_cap).tap(&.run)
+        other_infers.add(other_infer)
 
         follow_call_check_args(ctx, infer, call_func, other_infer, problems)
         follow_call_check_yield_block(other_infer, problems)
@@ -1020,27 +1032,15 @@ class Mare::Compiler::Infer
     end
 
     def inner_resolve!(ctx : Context, infer : ForReifiedFunc)
-      call_defns = call.follow_call_get_call_defns(ctx, infer)
+      # We must first resolve the FromCall itself to collect the other_infers.
+      infer.resolve(ctx, @call)
+      other_infers = infer.analysis.call_infers_for[@call]
 
-      # TODO: problems with multiple call defns because we'll end up with
-      # conflicting information gathered each time. Somehow, we need to be able
-      # to iterate over it multiple times and type-assign them separately,
-      # so that specialized code can be generated for each different receiver
-      # that may have different types. This is totally nontrivial...
-      raise NotImplementedError.new("yield_block with multiple call_defns") \
-        if call_defns.size > 1
-
-      call_mt = MetaType.new(call_defns.first[0])
-      call_defn = call_defns.first[1].not_nil!
-      call_func = call_defns.first[2].not_nil!
-      call_func_link = call_func.make_link(call_defn.link)
-
-      problems = [] of {Source::Pos, String}
-      required_cap, reify_cap, autorecover_needed =
-        call.follow_call_check_receiver_cap(ctx, infer, call_mt, call_func, problems)
-      raise "this should have been prevented earlier" if problems.any?
-
-      other_infer = ctx.infer.for_rf(ctx, call_defn, call_func_link, reify_cap).tap(&.run)
+      # TODO: Figure out how to support this multiple call defns case somehow.
+      # It may be easier now that FromCall has been made more lazy?
+      raise NotImplementedError.new("yield_block with multiple other_infers") \
+        if other_infers.size > 1
+      other_infer = other_infers.first
 
       raise "TODO: Nice error message for this" \
         if other_infer.yield_out_infos.size <= @index
@@ -1063,30 +1063,18 @@ class Mare::Compiler::Infer
     end
 
     def inner_resolve!(ctx : Context, infer : ForReifiedFunc)
-      call_defns = call.follow_call_get_call_defns(ctx, infer)
+      # We must first resolve the FromCall itself to collect the other_infers.
+      infer.resolve(ctx, @call)
+      other_infers = infer.analysis.call_infers_for[@call]
 
-      # TODO: problems with multiple call defns because we'll end up with
-      # conflicting information gathered each time. Somehow, we need to be able
-      # to iterate over it multiple times and type-assign them separately,
-      # so that specialized code can be generated for each different receiver
-      # that may have different types. This is totally nontrivial...
-      raise NotImplementedError.new("yield_block with multiple call_defns") \
-        if call_defns.size > 1
+      # TODO: Figure out how to support this multiple call defns case somehow.
+      # It may be easier now that FromCall has been made more lazy?
+      raise NotImplementedError.new("yield_block with multiple other_infers") \
+        if other_infers.size > 1
+      other_infer = other_infers.first
 
-      call_mt = MetaType.new(call_defns.first[0])
-      call_defn = call_defns.first[1].not_nil!
-      call_func = call_defns.first[2].not_nil!
-      call_func_link = call_func.make_link(call_defn.link)
-
-      problems = [] of {Source::Pos, String}
-      required_cap, reify_cap, autorecover_needed =
-        call.follow_call_check_receiver_cap(ctx, infer, call_mt, call_func, problems)
-      raise "this should have been prevented earlier" if problems.any?
-
-      other_infer = ctx.infer.for_rf(ctx, call_defn, call_func_link, reify_cap).tap(&.run)
-
-      # Finally, check that the type of the result of the yield block,
-      # but don't bother if it has a type requirement of None.
+      # Check that the type of the yield block result matches what's expected,
+      # but don't bother if the type requirement of just None.
       yield_in_resolved = other_infer.analysis.yield_in_resolved
       none = MetaType.new(infer.reified_type(infer.prelude_type("None")))
       if yield_in_resolved != none
@@ -1095,6 +1083,48 @@ class Mare::Compiler::Infer
       else
         MetaType.unconstrained
       end
+    end
+  end
+
+  class TowardCallParam < DynamicInfo
+    getter call : FromCall
+    getter index : Int32
+
+    def describe_kind; "parameter for this argument" end
+
+    def initialize(@pos, @call, @index)
+    end
+
+    def as_multiple_downstream_constraints(ctx : Context, infer : ForReifiedFunc) : Array({Source::Pos, MetaType})?
+      # We must first resolve the FromCall itself to collect the other_infers.
+      infer.resolve(ctx, @call)
+
+      infer.analysis.call_infers_for[@call].map do |other_infer|
+        arg = call.args[@index]
+        arg_pos = call.args_pos[@index]
+        param = other_infer.params[@index]
+        param_info = other_infer.analysis[param].as(Param)
+        param_mt = other_infer.resolve(ctx, param_info)
+
+        {param_info.first_viable_constraint_pos, param_mt}
+      end
+    end
+
+    def inner_resolve!(ctx : Context, infer : ForReifiedFunc)
+      # We must first resolve the FromCall itself to collect the other_infers.
+      infer.resolve(ctx, @call)
+
+      MetaType.new_intersection(
+        infer.analysis.call_infers_for[@call].map do |other_infer|
+          arg = call.args[@index]
+          arg_pos = call.args_pos[@index]
+          param = other_infer.params[@index]
+          param_info = other_infer.analysis[param].as(Param)
+          param_mt = other_infer.resolve(ctx, param_info)
+
+          param_mt
+        end
+      )
     end
   end
 end
