@@ -29,6 +29,9 @@ class Mare::Compiler::Infer
     def add_downstream(ctx : Context, infer : ForReifiedFunc, use_pos : Source::Pos, info : Info, aliases : Int32)
       @downstreams << {use_pos, info, aliases + adds_alias}
       after_add_downstream(ctx, infer, use_pos, info, aliases)
+      if infer.already_resolved?(self)
+        within_downstream_constraints!(ctx, infer, infer.resolve(ctx, self))
+      end
     end
     def downstreams_empty?
       @downstreams.empty?
@@ -747,7 +750,6 @@ class Mare::Compiler::Infer
     getter yield_params : AST::Group?
     getter yield_block : AST::Group?
     getter ret_value_used : Bool
-    @ret : MetaType?
 
     def initialize(@pos, @lhs, @member, @args, @args_pos, @yield_params, @yield_block, @ret_value_used)
     end
@@ -755,8 +757,7 @@ class Mare::Compiler::Infer
     def describe_kind; "return value" end
 
     def inner_resolve!(ctx : Context, infer : ForReifiedFunc)
-      raise "unresolved ret for #{self.inspect}" unless @ret
-      @ret.not_nil!
+      follow_call(ctx, infer)
     end
 
     def follow_call_get_call_defns(ctx : Context, infer : ForReifiedFunc)
@@ -1005,7 +1006,7 @@ class Mare::Compiler::Infer
       ret = rets.size == 1 ? rets.first : MetaType.new_union(rets)
       pos = poss.size == 1 ? poss.first : call.pos # TODO: remove this unused calculated value? or use it somehow for better error messages?
 
-      @ret = ret.ephemeralize
+      ret.ephemeralize
     end
   end
 

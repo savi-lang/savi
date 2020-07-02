@@ -817,6 +817,10 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       ctx.jumps[reified.link]
     end
 
+    def already_resolved?(info : Info) : Bool
+      @analysis.resolved_infos.has_key?(info)
+    end
+
     def resolve(ctx : Context, info : Info) : MetaType
       @analysis.resolved_infos[info] ||= info.resolve!(ctx, self)
     end
@@ -1232,9 +1236,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
           )
         end
 
-        # Resolve and validate the call.
-        # TODO: move this into FromCall.inner_resolve and do not eagerly resolve here
-        call.follow_call(ctx, self)
+        # TODO: is it possible to get rid of this eager resolve?
+        resolve(ctx, call)
 
       when "is"
         # Just know that the result of this expression is a boolean.
