@@ -1,11 +1,8 @@
 version: 2.1
 
 workflows:
-  build:
-    jobs: [build]
-  tooling-vscode-publish:
-    jobs: [tooling-vscode-publish]
-    branches: { only: [master] }
+  build: { jobs: [build] }
+  tooling-vscode-publish: { jobs: [tooling-vscode-publish] }
 
 jobs:
   build:
@@ -20,6 +17,7 @@ jobs:
           command: make ci
 
   tooling-vscode-publish:
+    branches: { only: [master] }
     executor: node
     steps:
       - checkout
