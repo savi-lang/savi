@@ -19,7 +19,7 @@
     // Find the number of lines that have a byte repeated exactly twice,
     // and the number of lines that have a byte repeated exactly thrice,
     // and multiply these two counts together to get the checksum.
-    count_duo = count_trio = I64[0]
+    count_duo I64 = count_trio = I64[0] // TODO: type of count_duo should be inferred
     input.each_split('\n') -> (line |
       if @has_duo(line)  (count_duo  += 1)
       if @has_trio(line) (count_trio += 1)

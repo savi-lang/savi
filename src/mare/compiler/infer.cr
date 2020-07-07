@@ -790,6 +790,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       @local_ident_overrides = Hash(AST::Node, AST::Node).new
       @redirects = Hash(AST::Node, AST::Node).new
       @already_ran = false
+      @prevent_reentrance = {} of Info => Int32
       @yield_out_infos = [] of Local
     end
 
@@ -841,6 +842,20 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     # TODO: remove this cheat and stop using the ctx field we hold, so to remove it later...
     def resolve(node) : MetaType
       @analysis.resolved[node] ||= resolve(ctx, self[node])
+    end
+
+    # This variant has protection to prevent infinite recursion.
+    # It is mainly used by FromCall, since it interacts across reified funcs.
+    def resolve_with_reentrance_prevention(ctx : Context, info : Info) : MetaType
+      orig_count = @prevent_reentrance[info]?
+      if (orig_count || 0) > 2 # TODO: can we remove this counter and use a set instead of a map?
+        kind = info.is_a?(DownstreamableInfo) ? " #{info.describe_kind}" : ""
+        Error.at info.pos,
+          "This#{kind} needs an explicit type; it could not be inferred"
+      end
+      @prevent_reentrance[info] = (orig_count || 0) + 1
+      resolve(ctx, info)
+      .tap { orig_count ? (@prevent_reentrance[info] = orig_count) : @prevent_reentrance.delete(info) }
     end
 
     def extra_called_func!(pos, rt, f)
@@ -952,6 +967,21 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
           unless func.has_tag?(:constructor)
       end
 
+      # Assign the resolved types to a map for safekeeping.
+      # This also has the effect of running some final checks on everything.
+      # TODO: Is it possible to remove the simplify calls here?
+      # Is it actually a significant performance impact or not?
+      @analysis.each_info.each do |node, info|
+        @analysis.resolved[node] ||= resolve(ctx, info).simplify(ctx)
+      end
+      if (info = @yield_in_info; info)
+        @analysis.yield_in_resolved = resolve(ctx, info).simplify(ctx)
+      end
+      @analysis.yield_out_resolved = @yield_out_infos.map do |info|
+        resolve(ctx, info).simplify(ctx)
+      end
+      @analysis.ret_resolved = @analysis.resolved[ret]
+
       # Parameters must be sendable when the function is asynchronous,
       # or when it is a constructor with elevated capability.
       require_sendable =
@@ -982,21 +1012,6 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
               unless errs.empty?
         end
       end
-
-      # Assign the resolved types to a map for safekeeping.
-      # This also has the effect of running some final checks on everything.
-      # TODO: Is it possible to remove the simplify calls here?
-      # Is it actually a significant performance impact or not?
-      @analysis.each_info.each do |node, info|
-        @analysis.resolved[node] ||= resolve(ctx, info).simplify(ctx)
-      end
-      if (info = @yield_in_info; info)
-        @analysis.yield_in_resolved = resolve(ctx, info).simplify(ctx)
-      end
-      @analysis.yield_out_resolved = @yield_out_infos.map do |info|
-        resolve(ctx, info).simplify(ctx)
-      end
-      @analysis.ret_resolved = @analysis.resolved[ret]
 
       nil
     end
@@ -1231,7 +1246,6 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
           call_args.terms.each_with_index do |call_arg, index|
             new_info = TowardCallParam.new(call_arg.pos, call, index)
             @analysis[call_arg].add_downstream(ctx, self, call_arg.pos, new_info, 0)
-            # call.resolvables.push(new_info)
           end
         end
 
@@ -1245,7 +1259,6 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
               FromCallYieldOut.new(yield_param.pos, call, index),
               yield_param.pos,
             )
-            # TODO: push the new info onto call.resolvables?
           end
         end
 
@@ -1259,11 +1272,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
             TowardCallYieldIn.new(yield_block.pos, call),
             0
           )
-          # TODO: push the new info onto call.resolvables?
         end
-
-        # TODO: is it possible to get rid of this eager resolve?
-        resolve(ctx, call)
 
       when "is"
         # Just know that the result of this expression is a boolean.

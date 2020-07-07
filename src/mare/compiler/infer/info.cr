@@ -779,7 +779,7 @@ class Mare::Compiler::Infer
 
     def follow_call_get_call_defns(ctx : Context, infer : ForReifiedFunc) : Set({MetaType::Inner, ReifiedType?, Program::Function?})Set
       call = self
-      receiver = infer.resolve(ctx, @lhs)
+      receiver = infer.resolve_with_reentrance_prevention(ctx, @lhs)
       call_defns = receiver.find_callable_func_defns(ctx, infer, @member)
 
       # Raise an error if we don't have a callable function for every possibility.
@@ -972,7 +972,7 @@ class Mare::Compiler::Infer
       other_infers = infer.analysis.call_infers_for[self]?
       return other_infers if other_infers
 
-      other_infers = infer.analysis.call_infers_for[self] = Set({ForReifiedFunc, Bool}).new
+      other_infers = Set({ForReifiedFunc, Bool}).new
 
       call = self
       call_defns = follow_call_get_call_defns(ctx, infer)
@@ -1007,16 +1007,17 @@ class Mare::Compiler::Infer
         "This function call doesn't meet subtyping requirements",
           problems unless problems.empty?
 
-      other_infers
+      infer.analysis.call_infers_for[self] = other_infers
     end
 
     def follow_call(ctx : Context, infer : ForReifiedFunc)
       other_infers = follow_call_resolve_other_infers(ctx, infer)
+      raise "this call didn't have any call defns:\n#{pos.show}" if other_infers.empty?
 
       rets = [] of MetaType
-      follow_call_resolve_other_infers(ctx, infer).each do |other_infer, autorecover_needed|
+      other_infers.each do |other_infer, autorecover_needed|
         inferred_ret_info = other_infer[other_infer.ret]
-        inferred_ret = other_infer.resolve(ctx, inferred_ret_info)
+        inferred_ret = other_infer.resolve_with_reentrance_prevention(ctx, inferred_ret_info)
         rets << inferred_ret
 
         if autorecover_needed

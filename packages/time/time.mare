@@ -42,7 +42,7 @@
       + second.u64
 
   :: Represent a duration of the given number of nanoseconds.
-  :new nanoseconds (n):
+  :new nanoseconds (n U32):
     @total_seconds = 0
     while (@_nanoseconds_per_second < n) (
       n -= @_nanoseconds_per_second
