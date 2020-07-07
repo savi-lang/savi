@@ -170,7 +170,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     @t_analyses = {} of Program::Type::Link => TypeAnalysis
     @f_analyses = {} of Program::Function::Link => FuncAnalysis
     @map = {} of ReifiedFunction => ForReifiedFunc
-    @types = {} of ReifiedType => ForType
+    @types = {} of ReifiedType => ForReifiedType
   end
 
   def run(ctx)
@@ -207,7 +207,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       t_link = t.make_link(library)
       refer = ctx.refer[t_link]
 
-      no_args_rt = for_type(ctx, t_link).reified
+      no_args_rt = for_rt(ctx, t_link).reified
       rts = for_type_partial_reifications(ctx, t, t_link, no_args_rt, refer)
 
       @t_analyses[t_link].each_non_argumented_reified.each do |rt|
@@ -346,7 +346,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         # Get the MetaType of the bound.
         param_ref = refer[param].as(Refer::TypeParam)
         bound_node = param_ref.bound
-        bound_mt = self.for_type(ctx, no_args_rt).type_expr(bound_node, refer)
+        bound_mt = self.for_rt(ctx, no_args_rt).type_expr(bound_node, refer)
 
         # TODO: Refactor the partial_reifications to return cap only already.
         caps = bound_mt.partial_reifications.map(&.cap_only)
@@ -372,7 +372,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
 
       args = substitutions_map.map(&.last.substitute_type_params(substitutions_map))
 
-      for_type(ctx, t_link, args).reified
+      for_rt(ctx, t_link, args).reified
     end
   end
 
@@ -385,7 +385,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
 
   def for_func_simple(ctx : Context, t_link : Program::Type::Link, f_link : Program::Function::Link)
     f = f_link.resolve(ctx)
-    for_rf(ctx, for_type(ctx, t_link).reified, f_link, MetaType.cap(f.cap.value))
+    for_rf(ctx, for_rt(ctx, t_link).reified, f_link, MetaType.cap(f.cap.value))
   end
 
   # TODO: remove this cheap hacky alias somehow:
@@ -407,7 +407,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     )
   end
 
-  def for_type(
+  def for_rt(
     ctx : Context,
     rt : ReifiedType,
     type_args : Array(MetaType) = [] of MetaType
@@ -415,30 +415,30 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     # Sanity check - the reified type shouldn't have any args yet.
     raise "already has type args: #{rt.inspect}" unless rt.args.empty?
 
-    for_type(ctx, rt.link, type_args)
+    for_rt(ctx, rt.link, type_args)
   end
 
-  def for_type(
+  def for_rt(
     ctx : Context,
     link : Program::Type::Link,
     type_args : Array(MetaType) = [] of MetaType
-  ) : ForType
+  ) : ForReifiedType
     rt = ReifiedType.new(link, type_args)
     @types[rt]? || (
-      ft = @types[rt] = ForType.new(ctx, ReifiedTypeAnalysis.new(rt), rt)
+      ft = @types[rt] = ForReifiedType.new(ctx, ReifiedTypeAnalysis.new(rt), rt)
       ft.tap(&.initialize_assertions(ctx))
       .tap { |ft| get_or_create_analysis(link).observe_reified_type(ctx, rt) }
     )
   end
 
   # TODO: Get rid of this
-  protected def for_type!(rt)
+  protected def for_rt!(rt)
     @types[rt]
   end
 
   def validate_type_args(
     ctx : Context,
-    infer : (ForReifiedFunc | ForType),
+    infer : (ForReifiedFunc | ForReifiedType),
     node : AST::Node,
     mt : MetaType,
   )
@@ -592,7 +592,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
   end
 
-  class ForType
+  class ForReifiedType
     private getter ctx : Context
     getter analysis : ReifiedTypeAnalysis
     getter reified : ReifiedType
@@ -609,12 +609,12 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         f_link = f.make_link(reified.link)
         trait = type_expr(f.ret.not_nil!, ctx.refer[f_link]).single!
 
-        ctx.infer.for_type!(trait).analysis.subtyping.assert(reified, f.ident.pos)
+        ctx.infer.for_rt!(trait).analysis.subtyping.assert(reified, f.ident.pos)
       end
     end
 
     def reified_type(*args)
-      ctx.infer.for_type(ctx, *args).reified
+      ctx.infer.for_rt(ctx, *args).reified
     end
 
     def refer
@@ -644,7 +644,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       parent_rt = type_param.parent_rt
       if parent_rt && parent_rt != reified
         return (
-          ctx.infer.for_type(ctx, parent_rt.link, parent_rt.args)
+          ctx.infer.for_rt(ctx, parent_rt.link, parent_rt.args)
             .lookup_type_param_bound(type_param)
         )
       end
@@ -780,12 +780,12 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   class ForReifiedFunc < Mare::AST::Visitor
     private getter ctx : Context
     getter analysis : ReifiedFuncAnalysis
-    getter for_type : ForType
+    getter for_rt : ForReifiedType
     getter reified : ReifiedFunction
     getter yield_out_infos : Array(Local)
     getter! yield_in_info : FromYield
 
-    def initialize(@ctx, @analysis, @for_type, @reified)
+    def initialize(@ctx, @analysis, @for_rt, @reified)
       @local_idents = Hash(Refer::Local, AST::Node).new
       @local_ident_overrides = Hash(AST::Node, AST::Node).new
       @redirects = Hash(AST::Node, AST::Node).new
@@ -1025,19 +1025,19 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
 
     def reified_type(*args)
-      @for_type.reified_type(*args)
+      @for_rt.reified_type(*args)
     end
 
     def lookup_type_param(ref, refer = refer(), receiver = reified.receiver)
-      @for_type.lookup_type_param(ref, refer, receiver)
+      @for_rt.lookup_type_param(ref, refer, receiver)
     end
 
     def lookup_type_param_bound(type_param)
-      @for_type.lookup_type_param_bound(type_param)
+      @for_rt.lookup_type_param_bound(type_param)
     end
 
     def type_expr(node)
-      @for_type.type_expr(node, refer, reified.receiver)
+      @for_rt.type_expr(node, refer, reified.receiver)
     end
 
     def lookup_local_ident(ref : Refer::Local)
@@ -1382,7 +1382,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         elsif cond_info.is_a?(TypeParamCondition)
           refine_type = resolve(ctx, cond_info.refine_type) # TODO: postpone to second half of infer pass
 
-          for_type.push_type_param_refinement(
+          for_rt.push_type_param_refinement(
             cond_info.refine,
             refine_type,
           )
@@ -1418,7 +1418,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         if cond_info.is_a?(TypeCondition)
           @local_ident_overrides.delete(cond_info.refine).not_nil!
         elsif cond_info.is_a?(TypeParamCondition)
-          for_type.pop_type_param_refinement(cond_info.refine)
+          for_rt.pop_type_param_refinement(cond_info.refine)
         end
 
         # Hold on to the body info for later in this function.

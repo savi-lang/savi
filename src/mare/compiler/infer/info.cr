@@ -351,7 +351,7 @@ class Mare::Compiler::Infer
     end
 
     def follow_reflection(ctx : Context, infer : ForReifiedFunc)
-      reflect_mt = infer.for_type.resolve_type_param_parent_links(infer.resolve(ctx, @reflect_type))
+      reflect_mt = infer.for_rt.resolve_type_param_parent_links(infer.resolve(ctx, @reflect_type))
       reflect_rt =
         if reflect_mt.type_params.empty?
           reflect_mt.single!

@@ -286,7 +286,7 @@ describe Mare::Compiler::Infer do
     ctx = Mare::Compiler.compile([source], :infer)
 
     main = ctx.namespace.main_type!(ctx)
-    main_infer = ctx.infer.for_type(ctx, main)
+    main_infer = ctx.infer.for_rt(ctx, main)
     func = main_infer.reified.defn(ctx).functions.find(&.has_tag?(:field)).not_nil!
     func_link = func.make_link(main)
     func_cap = Mare::Compiler::Infer::MetaType.cap(func.cap.value)

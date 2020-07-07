@@ -220,7 +220,7 @@ struct Mare::Compiler::Infer::MetaType::Nominal
       elsif other_defn.is_a?(TypeParam)
         # When the other is a TypeParam, use its bound MetaType and run again.
         l = MetaType.new_nominal(defn)
-        r = ctx.infer.for_type(ctx, other_defn.ref.parent_link)
+        r = ctx.infer.for_rt(ctx, other_defn.ref.parent_link)
               .lookup_type_param_bound(other_defn).strip_cap
         l.subtype_of?(ctx, r)
       else
@@ -229,7 +229,7 @@ struct Mare::Compiler::Infer::MetaType::Nominal
     elsif defn.is_a?(TypeParam)
       if other_defn.is_a?(ReifiedType)
         # When this is a TypeParam, use its bound MetaType and run again.
-        l = ctx.infer.for_type(ctx, defn.ref.parent_link)
+        l = ctx.infer.for_rt(ctx, defn.ref.parent_link)
               .lookup_type_param_bound(defn).strip_cap
         r = MetaType.new_nominal(other_defn)
         l.subtype_of?(ctx, r)
