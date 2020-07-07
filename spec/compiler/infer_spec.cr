@@ -1450,7 +1450,7 @@ describe Mare::Compiler::Infer do
     SOURCE
 
     expected = <<-MSG
-    This function call won't work unless the receiver is ephemeral; it must either be consumed or be allowed to be auto-recovered. Auto-recovery didn't work for these reasons:
+    This function call doesn't meet subtyping requirements:
     from (example):12:
         inner Inner'val = outer.immutable
                                 ^~~~~~~~~

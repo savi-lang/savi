@@ -891,7 +891,14 @@ class Mare::Compiler::Infer
         reify_cap = call_func_cap_mt
       end
 
-      {required_cap, reify_cap, autorecover_needed}
+      if autorecover_needed \
+      && required_cap.value != "ref" && required_cap.value != "box"
+        problems << {call_func.cap.pos,
+          "the function's receiver capability is `#{required_cap}` " \
+          "but only a `ref` or `box` receiver can be auto-recovered"}
+      end
+
+      {reify_cap, autorecover_needed}
     end
 
     def follow_call_check_args(ctx : Context, infer : ForReifiedFunc, call_func, other_infer, problems)
@@ -929,18 +936,12 @@ class Mare::Compiler::Infer
       end
     end
 
-    def follow_call_check_autorecover_cap(ctx, infer, required_cap, call_func, other_infer, inferred_ret)
+    def follow_call_check_autorecover_cap(ctx, infer, other_infer, inferred_ret)
       call = self
 
       # If autorecover of the receiver cap was needed to make this call work,
       # we now have to confirm that arguments and return value are all sendable.
       problems = [] of {Source::Pos, String}
-
-      unless required_cap.value == "ref" || required_cap.value == "box"
-        problems << {call_func.cap.pos,
-          "the function's receiver capability is `#{required_cap}` " \
-          "but only a `ref` or `box` receiver can be auto-recovered"}
-      end
 
       unless inferred_ret.is_sendable? || !call.ret_value_used
         problems << {other_infer.ret.pos,
@@ -967,17 +968,18 @@ class Mare::Compiler::Infer
           problems unless problems.empty?
     end
 
-    def follow_call(ctx : Context, infer : ForReifiedFunc)
+    def follow_call_resolve_other_infers(ctx : Context, infer : ForReifiedFunc) : Set({ForReifiedFunc, Bool})
+      other_infers = infer.analysis.call_infers_for[self]?
+      return other_infers if other_infers
+
+      other_infers = infer.analysis.call_infers_for[self] = Set({ForReifiedFunc, Bool}).new
+
       call = self
       call_defns = follow_call_get_call_defns(ctx, infer)
-
-      other_infers = infer.analysis.call_infers_for[self] ||= Set(ForReifiedFunc).new
 
       # For each receiver type definition that is possible, track down the infer
       # for the function that we're trying to call, evaluating the constraints
       # for each possibility such that all of them must hold true.
-      rets = [] of MetaType
-      poss = [] of Source::Pos
       problems = [] of {Source::Pos, String}
       call_defns.each do |(call_mti, call_defn, call_func)|
         call_mt = MetaType.new(call_mti)
@@ -988,35 +990,42 @@ class Mare::Compiler::Infer
         # Keep track that we called this function.
         infer.analysis.called_funcs.add({call.pos, call_defn, call_func_link})
 
-        required_cap, reify_cap, autorecover_needed =
+        reify_cap, autorecover_needed =
           follow_call_check_receiver_cap(ctx, infer, call_mt, call_func, problems)
 
         # Get the ForReifiedFunc instance for call_func, possibly creating and running it.
         # TODO: don't infer anything in the body of that func if type and params
         # were explicitly specified in the function signature.
         other_infer = ctx.infer.for_rf(ctx, call_defn, call_func_link, reify_cap).tap(&.run)
-        other_infers.add(other_infer)
 
         follow_call_check_args(ctx, infer, call_func, other_infer, problems)
         follow_call_check_yield_block(other_infer, problems)
 
-        # Resolve and take note of the return type.
-        inferred_ret_info = other_infer[other_infer.ret]
-        inferred_ret = other_infer.resolve(ctx, inferred_ret_info)
-        rets << inferred_ret
-        poss << inferred_ret_info.pos
-
-        if autorecover_needed
-          follow_call_check_autorecover_cap(ctx, infer, required_cap, call_func, other_infer, inferred_ret)
-        end
+        other_infers.add({other_infer, autorecover_needed})
       end
       Error.at call,
         "This function call doesn't meet subtyping requirements",
           problems unless problems.empty?
 
+      other_infers
+    end
+
+    def follow_call(ctx : Context, infer : ForReifiedFunc)
+      other_infers = follow_call_resolve_other_infers(ctx, infer)
+
+      rets = [] of MetaType
+      follow_call_resolve_other_infers(ctx, infer).each do |other_infer, autorecover_needed|
+        inferred_ret_info = other_infer[other_infer.ret]
+        inferred_ret = other_infer.resolve(ctx, inferred_ret_info)
+        rets << inferred_ret
+
+        if autorecover_needed
+          follow_call_check_autorecover_cap(ctx, infer, other_infer, inferred_ret)
+        end
+      end
+
       # Constrain the return value as the union of all observed return types.
       ret = rets.size == 1 ? rets.first : MetaType.new_union(rets)
-      pos = poss.size == 1 ? poss.first : call.pos # TODO: remove this unused calculated value? or use it somehow for better error messages?
 
       ret.ephemeralize
     end
@@ -1040,7 +1049,7 @@ class Mare::Compiler::Infer
       # It may be easier now that FromCall has been made more lazy?
       raise NotImplementedError.new("yield_block with multiple other_infers") \
         if other_infers.size > 1
-      other_infer = other_infers.first
+      other_infer = other_infers.first.first
 
       raise "TODO: Nice error message for this" \
         if other_infer.yield_out_infos.size <= @index
@@ -1071,7 +1080,7 @@ class Mare::Compiler::Infer
       # It may be easier now that FromCall has been made more lazy?
       raise NotImplementedError.new("yield_block with multiple other_infers") \
         if other_infers.size > 1
-      other_infer = other_infers.first
+      other_infer = other_infers.first.first
 
       # Check that the type of the yield block result matches what's expected,
       # but don't bother if the type requirement of just None.
@@ -1096,26 +1105,24 @@ class Mare::Compiler::Infer
     end
 
     def as_multiple_downstream_constraints(ctx : Context, infer : ForReifiedFunc) : Array({Source::Pos, MetaType})?
-      # We must first resolve the FromCall itself to collect the other_infers.
-      infer.resolve(ctx, @call)
+      other_infers = @call.follow_call_resolve_other_infers(ctx, infer)
 
-      infer.analysis.call_infers_for[@call].map do |other_infer|
+      other_infers.map do |other_infer, _|
         arg = call.args[@index]
         arg_pos = call.args_pos[@index]
         param = other_infer.params[@index]
         param_info = other_infer.analysis[param].as(Param)
         param_mt = other_infer.resolve(ctx, param_info)
 
-        {param_info.first_viable_constraint_pos, param_mt}
+        {param_info.first_viable_constraint_pos, param_mt}.as({Source::Pos, MetaType})
       end
     end
 
     def inner_resolve!(ctx : Context, infer : ForReifiedFunc)
-      # We must first resolve the FromCall itself to collect the other_infers.
-      infer.resolve(ctx, @call)
+      other_infers = @call.follow_call_resolve_other_infers(ctx, infer)
 
       MetaType.new_intersection(
-        infer.analysis.call_infers_for[@call].map do |other_infer|
+        other_infers.map do |other_infer, _|
           arg = call.args[@index]
           arg_pos = call.args_pos[@index]
           param = other_infer.params[@index]

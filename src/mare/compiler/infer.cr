@@ -113,7 +113,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       @called_funcs = Set({Source::Pos, ReifiedType, Program::Function::Link}).new
 
       # TODO: can this be removed or made more clean without sacrificing performance?
-      @call_infers_for = {} of FromCall => Set(ForReifiedFunc)
+      @call_infers_for = {} of FromCall => Set({ForReifiedFunc, Bool})
     end
 
     def reified
