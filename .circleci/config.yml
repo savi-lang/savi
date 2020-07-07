@@ -1,8 +1,11 @@
 version: 2.1
 
 workflows:
-  build: { jobs: [build] }
-  tooling-vscode-publish: { jobs: [tooling-vscode-publish] }
+  build:
+    jobs: [build]
+  tooling-vscode-publish:
+    jobs: [tooling-vscode-publish]
+    branches: { only: [master] }
 
 jobs:
   build:
