@@ -585,7 +585,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     params = [] of Ref
     infer.reified.func(ctx).params.try do |param_exprs|
       param_exprs.terms.map do |param_expr|
-        params << ctx.reach[infer.resolve(param_expr)]
+        params << ctx.reach[infer.resolved(ctx, param_expr)]
       end
     end
     ret = ctx.reach[infer.ret_resolved]
@@ -602,7 +602,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     ref = nil
     ctx.infer[f_link].each_reified_func(rt).each do |rf|
       # TODO: should we choose a specific reification instead of just taking the final one?
-      ref = ctx.infer[rf].resolve(ident)
+      ref = ctx.infer[rf].resolved(ctx, ident)
       handle_type_ref(ctx, ref)
     end
     return unless ref

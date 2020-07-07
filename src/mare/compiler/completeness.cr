@@ -154,7 +154,7 @@ module Mare::Compiler::Completeness
       infer = ctx.infer[func]
 
       # Ignore this identifier if it is not of the self.
-      info = infer[node]?
+      info = ctx.infer[func.link][node]?
       return unless info.is_a?(Infer::Self)
 
       # We only care about further analysis if not all fields are initialized.

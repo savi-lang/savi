@@ -398,7 +398,7 @@ class Mare::Compiler::CodeGen
 
   def type_of(expr : AST::Node, in_gfunc : GenFunc? = nil)
     in_gfunc ||= func_frame.gfunc.not_nil!
-    ctx.reach[in_gfunc.infer.resolve(expr)]
+    ctx.reach[in_gfunc.infer.resolved(ctx, expr)]
   end
 
   def llvm_type_of(gtype : GenType)
@@ -1850,13 +1850,14 @@ class Mare::Compiler::CodeGen
   end
 
   def gen_check_subtype(relate : AST::Relate)
-    infer = func_frame.gfunc.not_nil!.infer
+    infer_f = ctx.infer[func_frame.gfunc.not_nil!.link]
 
-    if infer[relate.lhs].is_a?(Infer::FixedTypeExpr)
+    if infer_f[relate.lhs].is_a?(Infer::FixedTypeExpr)
       # If the left-hand side is a fixed compile-time type (and knowing that
       # the right-hand side always is), we can return a compile-time true/false.
-      lhs_meta_type = infer.resolve(relate.lhs)
-      rhs_meta_type = infer.resolve(relate.rhs)
+      infer = func_frame.gfunc.not_nil!.infer
+      lhs_meta_type = infer.resolved(ctx, relate.lhs)
+      rhs_meta_type = infer.resolved(ctx, relate.rhs)
 
       gen_bool(lhs_meta_type.satisfies_bound?(ctx, rhs_meta_type))
     else
@@ -2664,7 +2665,7 @@ class Mare::Compiler::CodeGen
       @builder.cond(cond_value, case_block, next_block)
 
       @builder.position_at_end(case_block)
-      if func_frame.gfunc.not_nil!.infer[fore[1]].is_a?(Infer::Unreachable)
+      if ctx.infer[func_frame.gfunc.not_nil!.link][fore[1]].is_a?(Infer::Unreachable)
         # We skip generating code for the case block if it is unreachable,
         # meaning that the cond was deemed at compile time to never be true.
         @builder.unreachable
@@ -2698,7 +2699,7 @@ class Mare::Compiler::CodeGen
     @builder.br(case_block)
 
     @builder.position_at_end(case_block)
-    if func_frame.gfunc.not_nil!.infer[expr.list.last[1]].is_a?(Infer::Unreachable)
+    if ctx.infer[func_frame.gfunc.not_nil!.link][expr.list.last[1]].is_a?(Infer::Unreachable)
       # We skip generating code for the case block if it is unreachable,
       # meaning that the cond was deemed at compile time to never be true.
       @builder.unreachable

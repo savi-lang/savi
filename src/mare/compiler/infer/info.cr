@@ -447,7 +447,7 @@ class Mare::Compiler::Infer
       other_infer = ctx.infer.for_rf(ctx, infer.reified.type, field_func_link, infer.analysis.resolved_self_cap).tap(&.run)
 
       # Get the return type.
-      other_infer.resolve(ctx, other_infer[other_infer.ret])
+      other_infer.resolve(ctx, other_infer.for_f[other_infer.ret])
     end
   end
 
@@ -862,13 +862,15 @@ class Mare::Compiler::Infer
     end
 
     def follow_call_check_yield_block(other_infer, problems)
-      if other_infer.yield_out_infos.empty?
+      yield_out_infos = other_infer.for_f.yield_out_infos
+
+      if yield_out_infos.empty?
         if yield_block
           problems << {yield_block.not_nil!.pos, "it has a yield block " \
             "but the called function does not have any yields"}
         end
       elsif !yield_block
-        problems << {other_infer.yield_out_infos.first.first_viable_constraint_pos,
+        problems << {yield_out_infos.first.first_viable_constraint_pos,
           "it has no yield block but the called function does yield"}
       end
     end
@@ -890,7 +892,7 @@ class Mare::Compiler::Infer
       # TODO: It should be safe to pass in a TRN if the receiver is TRN,
       # so is_sendable? isn't quite liberal enough to allow all valid cases.
       call.args.try(&.terms.each do |arg|
-        inferred_arg = infer.resolve(ctx, infer[arg])
+        inferred_arg = infer.resolve(ctx, infer.for_f[arg])
         unless inferred_arg.alias.is_sendable?
           problems << {arg.pos,
             "the argument (when aliased) has a type of " \
@@ -953,7 +955,7 @@ class Mare::Compiler::Infer
 
       rets = [] of MetaType
       other_infers.each do |other_infer, autorecover_needed|
-        inferred_ret_info = other_infer[other_infer.ret]
+        inferred_ret_info = other_infer.for_f[other_infer.ret]
         inferred_ret = other_infer.resolve_with_reentrance_prevention(ctx, inferred_ret_info)
         rets << inferred_ret
 
@@ -990,10 +992,10 @@ class Mare::Compiler::Infer
       other_infer = other_infers.first.first
 
       raise "TODO: Nice error message for this" \
-        if other_infer.yield_out_infos.size <= @index
+        if other_infer.for_f.yield_out_infos.size <= @index
 
       yield_param = call.yield_params.not_nil!.terms[@index]
-      yield_out = other_infer.yield_out_infos[@index]
+      yield_out = other_infer.for_f.yield_out_infos[@index]
 
       @pos = yield_out.first_viable_constraint_pos
 
@@ -1025,8 +1027,8 @@ class Mare::Compiler::Infer
       yield_in_resolved = other_infer.analysis.yield_in_resolved
       none = MetaType.new(infer.reified_type(infer.prelude_type("None")))
       if yield_in_resolved != none
-        # @pos = other_infer.yield_in_info.first_viable_constraint_pos
-        other_infer.resolve(ctx, other_infer.yield_in_info)
+        # @pos = other_infer.for_f.yield_in_info.first_viable_constraint_pos
+        other_infer.resolve(ctx, other_infer.for_f.yield_in_info)
       else
         MetaType.unconstrained
       end
@@ -1047,7 +1049,7 @@ class Mare::Compiler::Infer
 
       other_infers.map do |other_infer, _|
         param = other_infer.params[@index]
-        param_info = other_infer.analysis[param].as(Param)
+        param_info = other_infer.for_f[param].as(Param)
         param_mt = other_infer.resolve(ctx, param_info)
 
         {param_info.first_viable_constraint_pos, param_mt}.as({Source::Pos, MetaType})
@@ -1060,7 +1062,7 @@ class Mare::Compiler::Infer
       MetaType.new_intersection(
         other_infers.map do |other_infer, _|
           param = other_infer.params[@index]
-          other_infer.resolve(ctx, other_infer.analysis[param]).as(MetaType)
+          other_infer.resolve(ctx, other_infer.for_f[param]).as(MetaType)
         end
       )
     end

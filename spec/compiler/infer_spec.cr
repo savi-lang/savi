@@ -2260,7 +2260,7 @@ describe Mare::Compiler::Infer do
     mce_t, mce_f, mce_infer =
       ctx.infer.test_simple!(ctx, source, "Main", "maybe_call_example")
     e_param = mce_f.params.not_nil!.terms.first.not_nil!
-    mce_infer.resolve(e_param).single!.should eq any_rt
+    mce_infer.resolved(ctx, e_param).single!.should eq any_rt
 
     any_subtypes = ctx.infer[any_rt].each_known_complete_subtype(ctx).to_a
     trait_subtypes = ctx.infer[trait_rt].each_known_complete_subtype(ctx).to_a

@@ -89,8 +89,8 @@
     @assert = ("Hey" * 1) == "Hey"
     @assert = ("Hey" * 0) == ""
 
-  :it "splits the string at every occurrence of the given byte value"
-    @assert = "foo.bar.baz".split('.') == ["foo", "bar", "baz"]
+  // :it "splits the string at every occurrence of the given byte value"
+  //   @assert = "foo.bar.baz".split('.') == ["foo", "bar", "baz"]
 
   :it "lexically compares the string with another string of the same length"
     @assert = "examplE" < "example"

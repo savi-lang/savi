@@ -50,8 +50,12 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   end
 
   struct FuncAnalysis
+    getter link
+
     def initialize(@link : Program::Function::Link)
       @reified_funcs = {} of ReifiedType => Set(ReifiedFunction)
+      @redirects = {} of AST::Node => AST::Node
+      @infos = {} of AST::Node => Info
     end
 
     def each_reified_func(rt : ReifiedType)
@@ -60,6 +64,25 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     protected def observe_reified_func(rf)
       (@reified_funcs[rf.type] ||= Set(ReifiedFunction).new).add(rf)
     end
+
+    protected def redirect(from : AST::Node, to : AST::Node)
+      return if from == to # TODO: raise an error?
+
+      @redirects[from] = to
+    end
+
+    def follow_redirects(node : AST::Node) : AST::Node
+      while @redirects[node]?
+        node = @redirects[node]
+      end
+
+      node
+    end
+
+    def [](node : AST::Node); @infos[follow_redirects(node)]; end
+    def []?(node : AST::Node); @infos[follow_redirects(node)]?; end
+    protected def []=(node, info); @infos[follow_redirects(node)] = info; end
+    def each_info; @infos.each; end
   end
 
   struct ReifiedTypeAnalysis
@@ -106,8 +129,6 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       f = @rf.link.resolve(ctx)
 
       @is_constructor = f.has_tag?(:constructor).as(Bool)
-      @redirects = {} of AST::Node => AST::Node
-      @infos = {} of AST::Node => Info
       @resolved = {} of AST::Node => MetaType
       @resolved_infos = {} of Info => MetaType
       @called_funcs = Set({Source::Pos, ReifiedType, Program::Function::Link}).new
@@ -120,31 +141,14 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       @rf
     end
 
-    protected def redirect(from : AST::Node, to : AST::Node)
-      return if from == to # TODO: raise an error?
-
-      @redirects[from] = to
-    end
-
-    def follow_redirects(node : AST::Node) : AST::Node
-      while @redirects[node]?
-        node = @redirects[node]
-      end
-
-      node
-    end
-
-    def [](node : AST::Node); @infos[follow_redirects(node)]; end
-    def []?(node : AST::Node); @infos[follow_redirects(node)]?; end
-    protected def []=(node, info); @infos[follow_redirects(node)] = info; end
-    def each_info; @infos.each; end
-
-    # TODO: rename as [] and rename [] to info_for or similar.
-    def resolve(node : AST::Node)
-      @resolved[follow_redirects(node)]
-    end
+    # TODO: rename as [] and rename [] to info_for or similar?
     def resolve(info : Info)
       @resolved_infos[info]
+    end
+
+    # TODO: rename as [] and rename [] to info_for or similar?
+    def resolved(ctx, node : AST::Node)
+      @resolved_infos[ctx.infer[@rf.link][node]]
     end
 
     def resolved_self_cap : MetaType
@@ -168,7 +172,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
 
   def initialize
     @t_analyses = {} of Program::Type::Link => TypeAnalysis
-    @f_analyses = {} of Program::Function::Link => FuncAnalysis
+    @map_for_f = {} of Program::Function::Link => ForFunc
     @map = {} of ReifiedFunction => ForReifiedFunc
     @types = {} of ReifiedType => ForReifiedType
   end
@@ -295,19 +299,15 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   end
 
   def [](f_link : Program::Function::Link)
-    @f_analyses[f_link]
+    @map_for_f[f_link].analysis
   end
 
   def []?(f_link : Program::Function::Link)
-    @f_analyses[f_link]?
+    @map_for_f[f_link]?.try(&.analysis)
   end
 
-  protected def get_or_create_analysis(t_link : Program::Type::Link)
+  protected def get_or_create_t_analysis(t_link : Program::Type::Link)
     @t_analyses[t_link] ||= TypeAnalysis.new(t_link)
-  end
-
-  protected def get_or_create_analysis(f_link : Program::Function::Link)
-    @f_analyses[f_link] ||= FuncAnalysis.new(f_link)
   end
 
   def [](rf : ReifiedFunction)
@@ -393,6 +393,10 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     @map[rf]
   end
 
+  def for_f(ctx : Context, f : Program::Function::Link) : ForFunc
+    @map_for_f[f] ||= ForFunc.new(ctx, FuncAnalysis.new(f))
+  end
+
   def for_rf(
     ctx : Context,
     rt : ReifiedType,
@@ -402,8 +406,9 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     mt = MetaType.new(rt).override_cap(cap)
     rf = ReifiedFunction.new(rt, f, mt)
     @map[rf] ||= (
-      ForReifiedFunc.new(ctx, ReifiedFuncAnalysis.new(ctx, rf), @types[rt], rf)
-      .tap { get_or_create_analysis(f).observe_reified_func(rf) }
+      for_f = for_f(ctx, f).tap(&.run)
+      ForReifiedFunc.new(ctx, ReifiedFuncAnalysis.new(ctx, rf), @types[rt], for_f, rf)
+      .tap { for_f.analysis.observe_reified_func(rf) }
     )
   end
 
@@ -427,7 +432,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     @types[rt]? || (
       ft = @types[rt] = ForReifiedType.new(ctx, ReifiedTypeAnalysis.new(rt), rt)
       ft.tap(&.initialize_assertions(ctx))
-      .tap { |ft| get_or_create_analysis(link).observe_reified_type(ctx, rt) }
+      .tap { |ft| get_or_create_t_analysis(link).observe_reified_type(ctx, rt) }
     )
   end
 
@@ -777,20 +782,17 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
   end
 
-  class ForReifiedFunc < Mare::AST::Visitor
+  class ForFunc < Mare::AST::Visitor
     private getter ctx : Context
-    getter analysis : ReifiedFuncAnalysis
-    getter for_rt : ForReifiedType
-    getter reified : ReifiedFunction
+    getter analysis : FuncAnalysis
     getter yield_out_infos : Array(Local)
     getter! yield_in_info : FromYield
 
-    def initialize(@ctx, @analysis, @for_rt, @reified)
+    def initialize(@ctx, @analysis)
       @local_idents = Hash(Refer::Local, AST::Node).new
       @local_ident_overrides = Hash(AST::Node, AST::Node).new
       @redirects = Hash(AST::Node, AST::Node).new
       @already_ran = false
-      @prevent_reentrance = {} of Info => Int32
       @yield_out_infos = [] of Local
     end
 
@@ -802,8 +804,12 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       @analysis[node]?
     end
 
+    def link
+      @analysis.link
+    end
+
     def func
-      reified.func(ctx)
+      @analysis.link.resolve(ctx)
     end
 
     def params
@@ -816,50 +822,15 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
 
     def refer
-      ctx.refer[reified.link]
+      ctx.refer[link]
     end
 
     def classify
-      ctx.classify[reified.link]
+      ctx.classify[link]
     end
 
     def jumps
-      ctx.jumps[reified.link]
-    end
-
-    def already_resolved?(info : Info) : Bool
-      @analysis.resolved_infos.has_key?(info)
-    end
-
-    def resolve(ctx : Context, info : Info) : MetaType
-      @analysis.resolved_infos[info]? || begin
-        mt = info.resolve!(ctx, self)
-        @analysis.resolved_infos[info] = mt
-        info.post_resolve!(ctx, self, mt)
-        mt
-      end
-    end
-    # TODO: remove this cheat and stop using the ctx field we hold, so to remove it later...
-    def resolve(node) : MetaType
-      @analysis.resolved[node] ||= resolve(ctx, self[node])
-    end
-
-    # This variant has protection to prevent infinite recursion.
-    # It is mainly used by FromCall, since it interacts across reified funcs.
-    def resolve_with_reentrance_prevention(ctx : Context, info : Info) : MetaType
-      orig_count = @prevent_reentrance[info]?
-      if (orig_count || 0) > 2 # TODO: can we remove this counter and use a set instead of a map?
-        kind = info.is_a?(DynamicInfo) ? " #{info.describe_kind}" : ""
-        Error.at info.pos,
-          "This#{kind} needs an explicit type; it could not be inferred"
-      end
-      @prevent_reentrance[info] = (orig_count || 0) + 1
-      resolve(ctx, info)
-      .tap { orig_count ? (@prevent_reentrance[info] = orig_count) : @prevent_reentrance.delete(info) }
-    end
-
-    def extra_called_func!(pos, rt, f)
-      @analysis.called_funcs.add({pos, rt, f})
+      ctx.jumps[link]
     end
 
     def run
@@ -880,9 +851,9 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
           finish_param(param, self[param]) unless self[param].is_a?(Param)
 
           # TODO: special-case this somewhere else?
-          if reified.type.link.name == "Main" \
-          && reified.link.name == "new"
-            env = FixedPrelude.new(reified.func(ctx).ident.pos, "Env")
+          if link.type.name == "Main" \
+          && link.name == "new"
+            env = FixedPrelude.new(link.resolve(ctx).ident.pos, "Env")
             param_info = self[param].as(Param)
             param_info.set_explicit(env) unless param_info.explicit?
           end
@@ -910,7 +881,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       # number of arguments used in any yield statements here, as well as the
       # explicit yield_out part of the function signature if present.
       yield_out_arg_count = [
-        (ctx.inventory[reified.link].each_yield.map(&.terms.size).to_a + [0]).max,
+        (ctx.inventory[link].each_yield.map(&.terms.size).to_a + [0]).max,
         func.yield_out.try do |yield_out|
           yield_out.is_a?(AST::Group) && yield_out.style == "(" \
           ? yield_out.terms.size : 0
@@ -967,52 +938,6 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
           unless func.has_tag?(:constructor)
       end
 
-      # Assign the resolved types to a map for safekeeping.
-      # This also has the effect of running some final checks on everything.
-      # TODO: Is it possible to remove the simplify calls here?
-      # Is it actually a significant performance impact or not?
-      @analysis.each_info.each do |node, info|
-        @analysis.resolved[node] ||= resolve(ctx, info).simplify(ctx)
-      end
-      if (info = @yield_in_info; info)
-        @analysis.yield_in_resolved = resolve(ctx, info).simplify(ctx)
-      end
-      @analysis.yield_out_resolved = @yield_out_infos.map do |info|
-        resolve(ctx, info).simplify(ctx)
-      end
-      @analysis.ret_resolved = @analysis.resolved[ret]
-
-      # Parameters must be sendable when the function is asynchronous,
-      # or when it is a constructor with elevated capability.
-      require_sendable =
-        if func.has_tag?(:async)
-          "An asynchronous function"
-        elsif func.has_tag?(:constructor) \
-        && !resolve(ctx, self[ret]).subtype_of?(ctx, MetaType.cap("ref"))
-          "A constructor with elevated capability"
-        end
-      if require_sendable
-        func.params.try do |params|
-
-          errs = [] of {Source::Pos, String}
-          params.terms.each do |param|
-            param_mt = resolve(ctx, self[param])
-
-            unless param_mt.is_sendable?
-              # TODO: Remove this hacky special case.
-              next if param_mt.show_type.starts_with? "CPointer"
-
-              errs << {param.pos,
-                "this parameter type (#{param_mt.show_type}) is not sendable"}
-            end
-          end
-
-          Error.at func.cap.pos,
-            "#{require_sendable} must only have sendable parameters", errs \
-              unless errs.empty?
-        end
-      end
-
       nil
     end
 
@@ -1025,19 +950,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
 
     def reified_type(*args)
-      @for_rt.reified_type(*args)
-    end
-
-    def lookup_type_param(ref, refer = refer(), receiver = reified.receiver)
-      @for_rt.lookup_type_param(ref, refer, receiver)
-    end
-
-    def lookup_type_param_bound(type_param)
-      @for_rt.lookup_type_param_bound(type_param)
-    end
-
-    def type_expr(node)
-      @for_rt.type_expr(node, refer, reified.receiver)
+      ctx.infer.for_rt(ctx, *args).reified
     end
 
     def lookup_local_ident(ref : Refer::Local)
@@ -1067,8 +980,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     # This visitor never replaces nodes, it just touches them and returns them.
     def visit(ctx, node)
       if classify.type_expr?(node)
-        # For type expressions, don't do the usual touch - instead,
-        # construct the MetaType and assign it to the new node.
+        # For type expressions, don't do the usual touch - construct info here.
         @analysis[node] = FixedTypeExpr.new(node.pos, node)
       else
         touch(node)
@@ -1313,18 +1225,6 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
           @analysis[node] = FixedPrelude.new(node.pos, "Bool")
         end
 
-        if need_to_check_if_right_is_subtype_of_left
-          # The right side must be a subtype of the left side.
-          rhs_mt = resolve(ctx, rhs_info)
-          lhs_mt = resolve(ctx, lhs_info)
-          if !rhs_mt.subtype_of?(ctx, lhs_mt)
-            Error.at node, "This type check will never match", [
-              {rhs_info.pos, "the match type is #{rhs_mt.show_type}"},
-              {lhs_info.pos, "which is not a subtype of #{lhs_mt.show_type}"},
-            ]
-          end
-        end
-
       else raise NotImplementedError.new(node.op.value)
       end
     end
@@ -1359,7 +1259,6 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
 
     def touch(node : AST::Choice)
-      skip_later_bodies = false
       branches = [] of Info
       node.list.each do |cond, body|
         # Visit the cond AST - we skipped it before with visit_children: false.
@@ -1379,46 +1278,14 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
           @analysis[refine] = Refinement.new(
             cond_info.pos, self[cond_info.refine], cond_info.refine_type
           )
-        elsif cond_info.is_a?(TypeParamCondition)
-          refine_type = resolve(ctx, cond_info.refine_type) # TODO: postpone to second half of infer pass
-
-          for_rt.push_type_param_refinement(
-            cond_info.refine,
-            refine_type,
-          )
-
-          # When the type param is currently partially or fully reified with
-          # a type that is incompatible with the refinement, we skip the body.
-          current_type_param = lookup_type_param(cond_info.refine)
-          if !current_type_param.satisfies_bound?(ctx, refine_type)
-            skip_body = true
-          end
-        elsif cond_info.is_a?(TypeConditionStatic)
-          if cond_info.evaluate(ctx, self)
-            # A statically true condition prevents all later branch bodies
-            # from having a chance to be executed, since it happens first.
-            skip_later_bodies = true
-          else
-            # A statically false condition will not execute its branch body.
-            skip_body = true
-          end
-        elsif skip_later_bodies
-          skip_body = true
         end
 
-        if skip_body
-          @analysis[body] = Unreachable.instance
-        else
-          # Visit the body AST - we skipped it before with visit_children: false.
-          # We needed to act on information from the cond analysis first.
-          body.accept(ctx, self)
-        end
+        # Visit the body AST - we skipped it before with visit_children: false.
+        body.accept(ctx, self)
 
         # Remove the override we put in place before, if any.
         if cond_info.is_a?(TypeCondition)
           @local_ident_overrides.delete(cond_info.refine).not_nil!
-        elsif cond_info.is_a?(TypeParamCondition)
-          for_rt.pop_type_param_refinement(cond_info.refine)
         end
 
         # Hold on to the body info for later in this function.
@@ -1480,6 +1347,249 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       else
         raise NotImplementedError.new([node, info].inspect)
       end
+    end
+  end
+
+  class ForReifiedFunc < Mare::AST::Visitor
+    private getter ctx : Context
+    getter analysis : ReifiedFuncAnalysis
+    getter for_f : ForFunc
+    getter for_rt : ForReifiedType
+    getter reified : ReifiedFunction
+
+    def initialize(@ctx, @analysis, @for_rt, @for_f, @reified)
+      @local_idents = Hash(Refer::Local, AST::Node).new
+      @local_ident_overrides = Hash(AST::Node, AST::Node).new
+      @redirects = Hash(AST::Node, AST::Node).new
+      @already_ran = false
+      @prevent_reentrance = {} of Info => Int32
+    end
+
+    def func
+      reified.func(ctx)
+    end
+
+    def params
+      func.params.try(&.terms) || ([] of AST::Node)
+    end
+
+    def ret
+      # The ident is used as a fake local variable that represents the return.
+      func.ident
+    end
+
+    def refer
+      ctx.refer[reified.link]
+    end
+
+    def classify
+      ctx.classify[reified.link]
+    end
+
+    def jumps
+      ctx.jumps[reified.link]
+    end
+
+    def already_resolved?(info : Info) : Bool
+      @analysis.resolved_infos.has_key?(info)
+    end
+
+    def resolve(ctx : Context, info : Info) : MetaType
+      @analysis.resolved_infos[info]? || begin
+        mt = info.resolve!(ctx, self)
+        @analysis.resolved_infos[info] = mt.simplify(ctx)
+        info.post_resolve!(ctx, self, mt)
+        mt
+      end
+    end
+    # TODO: remove this cheat and stop using the ctx field we hold, so to remove it later...
+    def resolve(node) : MetaType
+      @analysis.resolved[node] ||= resolve(ctx, @for_f[node])
+    end
+
+    # This variant has protection to prevent infinite recursion.
+    # It is mainly used by FromCall, since it interacts across reified funcs.
+    def resolve_with_reentrance_prevention(ctx : Context, info : Info) : MetaType
+      orig_count = @prevent_reentrance[info]?
+      if (orig_count || 0) > 2 # TODO: can we remove this counter and use a set instead of a map?
+        kind = info.is_a?(DynamicInfo) ? " #{info.describe_kind}" : ""
+        Error.at info.pos,
+          "This#{kind} needs an explicit type; it could not be inferred"
+      end
+      @prevent_reentrance[info] = (orig_count || 0) + 1
+      resolve(ctx, info)
+      .tap { orig_count ? (@prevent_reentrance[info] = orig_count) : @prevent_reentrance.delete(info) }
+    end
+
+    def extra_called_func!(pos, rt, f)
+      @analysis.called_funcs.add({pos, rt, f})
+    end
+
+    def run
+      return if @already_ran
+      @already_ran = true
+
+      func.params.try(&.accept(ctx, self))
+      func.body.try(&.accept(ctx, self))
+
+      # Assign the resolved types to a map for safekeeping.
+      # This also has the effect of running some final checks on everything.
+      # TODO: Is it possible to remove the simplify calls here?
+      # Is it actually a significant performance impact or not?
+      @for_f.analysis.each_info.each do |node, info|
+        @analysis.resolved[node] ||= resolve(ctx, info).simplify(ctx)
+      end
+      if (info = @for_f.yield_in_info; info)
+        @analysis.yield_in_resolved = resolve(ctx, info).simplify(ctx)
+      end
+      @analysis.yield_out_resolved = @for_f.yield_out_infos.map do |info|
+        resolve(ctx, info).simplify(ctx)
+      end
+      @analysis.ret_resolved = @analysis.resolved[ret]
+
+      # Parameters must be sendable when the function is asynchronous,
+      # or when it is a constructor with elevated capability.
+      require_sendable =
+        if func.has_tag?(:async)
+          "An asynchronous function"
+        elsif func.has_tag?(:constructor) \
+        && !resolve(ctx, @for_f[ret]).subtype_of?(ctx, MetaType.cap("ref"))
+          "A constructor with elevated capability"
+        end
+      if require_sendable
+        func.params.try do |params|
+
+          errs = [] of {Source::Pos, String}
+          params.terms.each do |param|
+            param_mt = resolve(ctx, @for_f[param])
+
+            unless param_mt.is_sendable?
+              # TODO: Remove this hacky special case.
+              next if param_mt.show_type.starts_with? "CPointer"
+
+              errs << {param.pos,
+                "this parameter type (#{param_mt.show_type}) is not sendable"}
+            end
+          end
+
+          Error.at func.cap.pos,
+            "#{require_sendable} must only have sendable parameters", errs \
+              unless errs.empty?
+        end
+      end
+
+      nil
+    end
+
+    def prelude_type(ctx, name)
+      @ctx.namespace.prelude_type(name)
+    end
+    # TODO: remove this alias of the above method that relies on interior @ctx.
+    def prelude_type(name)
+      @ctx.namespace.prelude_type(name)
+    end
+
+    def reified_type(*args)
+      ctx.infer.for_rt(ctx, *args).reified
+    end
+
+    def lookup_type_param(ref, refer = refer(), receiver = reified.receiver)
+      @for_rt.lookup_type_param(ref, refer, receiver)
+    end
+
+    def lookup_type_param_bound(type_param)
+      @for_rt.lookup_type_param_bound(type_param)
+    end
+
+    def type_expr(node)
+      @for_rt.type_expr(node, refer, reified.receiver)
+    end
+
+    # This visitor never replaces nodes, it just touches them and returns them.
+    def visit(ctx, node)
+      touch(node)
+
+      node
+    end
+
+    # TODO: Can this be moved somehow into an Info#post_resolve! logic instead?
+    def touch(node : AST::Relate)
+      case node.op.value
+      when "<:"
+        info = @for_f[node]
+        unless info.is_a?(TypeParamCondition) || info.is_a?(TypeConditionStatic)
+          # The right side must be a subtype of the left side.
+          rhs_info = @for_f[node.rhs]
+          lhs_info = @for_f[node.lhs]
+          rhs_mt = resolve(ctx, rhs_info)
+          lhs_mt = resolve(ctx, lhs_info)
+          if !rhs_mt.subtype_of?(ctx, lhs_mt)
+            Error.at node, "This type check will never match", [
+              {rhs_info.pos, "the match type is #{rhs_mt.show_type}"},
+              {lhs_info.pos, "which is not a subtype of #{lhs_mt.show_type}"},
+            ]
+          end
+        end
+      end
+    end
+
+    def touch(node : AST::Choice)
+      skip_later_bodies = false
+      branches = [] of Info
+      node.list.each do |cond, body|
+        # Visit the cond AST - we skipped it before with visit_children: false.
+        cond.accept(ctx, self)
+
+        cond_info = @for_f[cond]
+
+        # If we have a type condition as the cond, that implies that it returned
+        # true if we are in the body; hence we can apply the type refinement.
+        # TODO: Do this in a less special-casey sort of way if possible.
+        # TODO: Do we need to override things besides locals? should we skip for non-locals?
+        if cond_info.is_a?(TypeParamCondition)
+          refine_type = resolve(ctx, cond_info.refine_type) # TODO: postpone to second half of infer pass
+
+          for_rt.push_type_param_refinement(
+            cond_info.refine,
+            refine_type,
+          )
+
+          # When the type param is currently partially or fully reified with
+          # a type that is incompatible with the refinement, we skip the body.
+          current_type_param = lookup_type_param(cond_info.refine)
+          if !current_type_param.satisfies_bound?(ctx, refine_type)
+            skip_body = true
+          end
+        elsif cond_info.is_a?(TypeConditionStatic)
+          if cond_info.evaluate(ctx, self)
+            # A statically true condition prevents all later branch bodies
+            # from having a chance to be executed, since it happens first.
+            skip_later_bodies = true
+          else
+            # A statically false condition will not execute its branch body.
+            skip_body = true
+          end
+        elsif skip_later_bodies
+          skip_body = true
+        end
+
+        if skip_body
+          raise "how?\n#{cond.pos.show}"
+        else
+          # Visit the body AST - we skipped it before with visit_children: false.
+          # We needed to act on information from the cond analysis first.
+          body.accept(ctx, self)
+        end
+
+        # Remove the type param refinement we put in place before, if any.
+        if cond_info.is_a?(TypeParamCondition)
+          for_rt.pop_type_param_refinement(cond_info.refine)
+        end
+      end
+    end
+
+    def touch(node : AST::Node)
+      # Do nothing for other nodes.
     end
   end
 end

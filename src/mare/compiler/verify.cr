@@ -90,12 +90,12 @@ class Mare::Compiler::Verify < Mare::AST::Visitor
     new_rf = ctx.infer[new_f_link].each_reified_func(main_rt).first.not_nil!
     new_f_param = new_f.params.not_nil!.terms.first.not_nil!
     infer = ctx.infer[new_rf]
-    new_f_param_mt = infer.resolve(new_f_param)
+    new_f_param_mt = infer.resolved(ctx, new_f_param)
 
     Error.at new_f_param,
       "The parameter of Main.new has the wrong type", [
         {env.ident.pos, "it should accept a parameter of type Env"},
-        {infer[new_f_param].pos,
+        {ctx.infer[new_f_link][new_f_param].pos,
           "but the parameter type is #{new_f_param_mt.show_type}"},
       ] \
         unless new_f_param_mt == env_mt
@@ -174,11 +174,11 @@ class Mare::Compiler::Verify < Mare::AST::Visitor
     case node.op.value
     when "<:"
       # Skip this verification if this just a compile-time type check.
-      return if infer[node.lhs].is_a?(Infer::FixedTypeExpr)
+      return if ctx.infer[infer.reified.link][node.lhs].is_a?(Infer::FixedTypeExpr)
 
       # Verify that it is safe to perform this runtime type check.
-      lhs_mt = infer.resolve(node.lhs)
-      rhs_mt = infer.resolve(node.rhs)
+      lhs_mt = infer.resolved(ctx, node.lhs)
+      rhs_mt = infer.resolved(ctx, node.rhs)
       case lhs_mt.safe_to_match_as?(ctx, rhs_mt)
       when false
         Error.at node,

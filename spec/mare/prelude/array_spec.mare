@@ -35,11 +35,11 @@
     @assert = array.size == 0
     @assert = try (array[0]!, False | True)
 
-  :it "can reserve undefined space for numeric elements"
-    array Array(U8) = [3, 6, 12]
-    @assert = array.reserve_undefined(10) is array
-    @assert = array.size  == 10
-    @assert = array.space == 16
+  // :it "can reserve undefined space for numeric elements"
+  //   array Array(U8) = [3, 6, 12]
+  //   @assert = array.reserve_undefined(10) is array
+  //   @assert = array.size  == 10
+  //   @assert = array.space == 16
 
   :it "won't reserve undefined space for a non-numeric element type"
     array = ["foo", "bar", "baz"]
@@ -55,9 +55,9 @@
     @assert = ["foo", "bar", "baz"] != ["baz", "bar", "foo"]
     @assert = ["foo", "bar"] != ["food", "bar"]
 
-  :it "clones itself into a new array"
-    array Array(U8) = [3, 6, 12]
-    @assert = array.clone == [3, 6, 12]
+  // :it "clones itself into a new array"
+  //   array Array(U8) = [3, 6, 12]
+  //   @assert = array.clone == [3, 6, 12]
 
   :it "cannot clone if the elements aren't aliasable"
     array Array(ArraySpecOpaqueObject'iso) = [
@@ -143,18 +143,18 @@
     array Array(U8) = [1, 2, 3]
     @assert = array.reject -> (num | False) == array
 
-  :it "sorts the elements in the array"
-    array Array(U8) = [
-      13, 25, 7, 36, 30, 11, 29, 8, 5, 15, 21, 24
-      28, 10, 1, 14, 34, 2, 6, 23, 31, 16, 20, 26
-      32, 9, 12, 17, 3, 35, 18, 22, 19, 27, 33, 4
-    ]
+  // :it "sorts the elements in the array"
+  //   array Array(U8) = [
+  //     13, 25, 7, 36, 30, 11, 29, 8, 5, 15, 21, 24
+  //     28, 10, 1, 14, 34, 2, 6, 23, 31, 16, 20, 26
+  //     32, 9, 12, 17, 3, 35, 18, 22, 19, 27, 33, 4
+  //   ]
 
-    @assert = array.sort == [
-       1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12
-      13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24
-      25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36
-    ]
+  //   @assert = array.sort == [
+  //      1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12
+  //     13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24
+  //     25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36
+  //   ]
 
   :it "cannot sort elements that aren't comparable"
     array Array(ArraySpecOpaqueObject) = [
