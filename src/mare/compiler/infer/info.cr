@@ -706,13 +706,12 @@ class Mare::Compiler::Infer
   class FromCall < DynamicInfo
     getter lhs : Info
     getter member : String
-    getter args_pos : Array(Source::Pos) # TODO: remove; args as Nodes makes this obsolete.
-    getter args : Array(AST::Node)
+    getter args : AST::Group?
     getter yield_params : AST::Group?
     getter yield_block : AST::Group?
     getter ret_value_used : Bool
 
-    def initialize(@pos, @lhs, @member, @args, @args_pos, @yield_params, @yield_block, @ret_value_used)
+    def initialize(@pos, @lhs, @member, @args, @yield_params, @yield_block, @ret_value_used)
     end
 
     def describe_kind; "return value" end
@@ -850,20 +849,21 @@ class Mare::Compiler::Infer
 
       # Just check the number of arguments.
       # We will check the types in another Info type (TowardCallParam)
+      arg_count = call.args.try(&.terms.size) || 0
       max = other_infer.params.size
       min = other_infer.params.count { |param| !AST::Extract.param(param)[2] }
       func_pos = call_func.ident.pos
-      if call.args.size > max
-        args = max == 1 ? "argument" : "arguments"
+      if arg_count > max
+        max_text = "#{max} #{max == 1 ? "argument" : "arguments"}"
         params_pos = call_func.params.try(&.pos) || call_func.ident.pos
         problems << {call.pos, "the call site has too many arguments"}
-        problems << {params_pos, "the function allows at most #{max} #{args}"}
+        problems << {params_pos, "the function allows at most #{max_text}"}
         return
-      elsif call.args.size < min
-        args = min == 1 ? "argument" : "arguments"
+      elsif arg_count < min
+        min_text = "#{min} #{min == 1 ? "argument" : "arguments"}"
         params_pos = call_func.params.try(&.pos) || call_func.ident.pos
         problems << {call.pos, "the call site has too few arguments"}
-        problems << {params_pos, "the function requires at least #{min} #{args}"}
+        problems << {params_pos, "the function requires at least #{min_text}"}
         return
       end
     end
@@ -896,14 +896,14 @@ class Mare::Compiler::Infer
 
       # TODO: It should be safe to pass in a TRN if the receiver is TRN,
       # so is_sendable? isn't quite liberal enough to allow all valid cases.
-      call.args.each do |arg|
+      call.args.try(&.terms.each do |arg|
         inferred_arg = infer.resolve(ctx, infer[arg])
         unless inferred_arg.alias.is_sendable?
           problems << {arg.pos,
             "the argument (when aliased) has a type of " \
             "#{inferred_arg.alias.show_type}, which isn't sendable"}
         end
-      end
+      end)
 
       Error.at call,
         "This function call won't work unless the receiver is ephemeral; " \
@@ -1053,8 +1053,6 @@ class Mare::Compiler::Infer
       other_infers = @call.follow_call_resolve_other_infers(ctx, infer)
 
       other_infers.map do |other_infer, _|
-        arg = call.args[@index]
-        arg_pos = call.args_pos[@index]
         param = other_infer.params[@index]
         param_info = other_infer.analysis[param].as(Param)
         param_mt = other_infer.resolve(ctx, param_info)
@@ -1068,13 +1066,8 @@ class Mare::Compiler::Infer
 
       MetaType.new_intersection(
         other_infers.map do |other_infer, _|
-          arg = call.args[@index]
-          arg_pos = call.args_pos[@index]
           param = other_infer.params[@index]
-          param_info = other_infer.analysis[param].as(Param)
-          param_mt = other_infer.resolve(ctx, param_info)
-
-          param_mt
+          other_infer.resolve(ctx, other_infer.analysis[param]).as(MetaType)
         end
       )
     end
