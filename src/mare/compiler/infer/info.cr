@@ -29,7 +29,7 @@ class Mare::Compiler::Infer
     end
   end
 
-  abstract class DownstreamableInfo < Info
+  abstract class DynamicInfo < Info
     # Must be implemented by the child class as an required hook.
     abstract def describe_kind : String
 
@@ -102,37 +102,10 @@ class Mare::Compiler::Infer
       return true if @downstreams.empty?
       meta_type.within_constraints?(ctx, [total_downstream_constraint(ctx, infer)])
     end
-  end
-
-  class Unreachable < Info
-    INSTANCE = new
-    def self.instance; INSTANCE end
-
-    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
-      MetaType.new(MetaType::Unsatisfiable.instance)
-    end
-
-    def add_downstream(ctx : Context, infer : ForReifiedFunc, use_pos : Source::Pos, info : Info, aliases : Int32)
-      # Do nothing; we're already unsatisfiable...
-    end
-  end
-
-  abstract class DynamicInfo < DownstreamableInfo
-    # Must be implemented by the child class as an required hook.
-    abstract def inner_resolve!(ctx : Context, infer : ForReifiedFunc)
-    # TODO: Get rid of inner_resolve, as it's obsoleted by the addition of post_resolve
-    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
-      inner_resolve!(ctx, infer)
-    end
-
-    # May be implemented by the child class as an optional hook.
-    def after_resolve!(ctx : Context, infer : ForReifiedFunc, meta_type : MetaType); end
 
     # The final MetaType must meet all constraints that have been imposed.
-    # This method is *not* intended to be overridden by the child class;
-    # please override the after_resolve! method instead.
     def post_resolve!(ctx : Context, infer : ForReifiedFunc, meta_type : MetaType)
-      return after_resolve!(ctx, infer, meta_type) if downstreams_empty?
+      return if downstreams_empty?
 
       # TODO: print a different error message when the downstream constraints are
       # internally conflicting, even before adding this meta_type into the mix.
@@ -178,8 +151,19 @@ class Mare::Compiler::Infer
           end
         end
       end
+    end
+  end
 
-      after_resolve!(ctx, infer, meta_type)
+  class Unreachable < Info
+    INSTANCE = new
+    def self.instance; INSTANCE end
+
+    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
+      MetaType.new(MetaType::Unsatisfiable.instance)
+    end
+
+    def add_downstream(ctx : Context, infer : ForReifiedFunc, use_pos : Source::Pos, info : Info, aliases : Int32)
+      # Do nothing; we're already unsatisfiable...
     end
   end
 
@@ -202,7 +186,7 @@ class Mare::Compiler::Infer
       @pos
     end
 
-    def inner_resolve!(ctx : Context, infer : ForReifiedFunc)
+    def resolve!(ctx : Context, infer : ForReifiedFunc)
       explicit = @explicit
 
       if explicit
@@ -276,7 +260,7 @@ class Mare::Compiler::Infer
     def initialize(@pos, @name)
     end
 
-    def inner_resolve!(ctx : Context, infer : ForReifiedFunc)
+    def resolve!(ctx : Context, infer : ForReifiedFunc)
       MetaType.new(infer.reified_type(infer.prelude_type(@name)))
     end
   end
@@ -289,7 +273,7 @@ class Mare::Compiler::Infer
     def initialize(@pos, @node)
     end
 
-    def inner_resolve!(ctx : Context, infer : ForReifiedFunc)
+    def resolve!(ctx : Context, infer : ForReifiedFunc)
       infer.type_expr(@node)
     end
   end
@@ -302,7 +286,7 @@ class Mare::Compiler::Infer
     def initialize(@pos, @node)
     end
 
-    def inner_resolve!(ctx : Context, infer : ForReifiedFunc)
+    def resolve!(ctx : Context, infer : ForReifiedFunc)
       infer.type_expr(@node)
     end
   end
@@ -316,7 +300,7 @@ class Mare::Compiler::Infer
     def initialize(@pos, @node, @type_param_ref = nil)
     end
 
-    def inner_resolve!(ctx : Context, infer : ForReifiedFunc)
+    def resolve!(ctx : Context, infer : ForReifiedFunc)
       # If this node is further qualified, we don't want to both resolving it,
       # and doing so would trigger errors during type argument validation,
       # because the type arguments haven't been applied yet; they will be
@@ -343,7 +327,7 @@ class Mare::Compiler::Infer
       end
     end
 
-    def inner_resolve!(ctx : Context, infer : ForReifiedFunc)
+    def resolve!(ctx : Context, infer : ForReifiedFunc)
       infer.analysis.resolved_self
     end
   end
@@ -354,7 +338,7 @@ class Mare::Compiler::Infer
     def initialize(@pos, @cap : String)
     end
 
-    def inner_resolve!(ctx : Context, infer : ForReifiedFunc)
+    def resolve!(ctx : Context, infer : ForReifiedFunc)
       # A constructor returns the ephemeral of the self type with the given cap.
       # TODO: should the ephemeral be removed, given Mare's ephemeral semantics?
       MetaType.new(infer.reified.type, @cap).ephemeralize
@@ -369,7 +353,7 @@ class Mare::Compiler::Infer
     def initialize(@pos, @reflect_type)
     end
 
-    def inner_resolve!(ctx : Context, infer : ForReifiedFunc)
+    def resolve!(ctx : Context, infer : ForReifiedFunc)
       follow_reflection(ctx, infer)
     end
 
@@ -408,7 +392,7 @@ class Mare::Compiler::Infer
     def initialize(@pos, @possible : MetaType)
     end
 
-    def inner_resolve!(ctx : Context, infer : ForReifiedFunc)
+    def resolve!(ctx : Context, infer : ForReifiedFunc)
       total_constraint = total_downstream_constraint(ctx, infer)
 
       # Literal values (such as numeric literals) sometimes have
@@ -461,7 +445,7 @@ class Mare::Compiler::Infer
       )
     end
 
-    def inner_resolve!(ctx : Context, infer : ForReifiedFunc)
+    def resolve!(ctx : Context, infer : ForReifiedFunc)
       follow_field(ctx, infer)
     end
 
@@ -492,7 +476,7 @@ class Mare::Compiler::Infer
       @field.pos
     end
 
-    def inner_resolve!(ctx : Context, infer : ForReifiedFunc)
+    def resolve!(ctx : Context, infer : ForReifiedFunc)
       origin_mt = infer.resolve(ctx, @origin)
       field_mt = infer.resolve(ctx, @field)
       field_mt.viewed_from(origin_mt).alias
@@ -509,7 +493,7 @@ class Mare::Compiler::Infer
       @field.pos
     end
 
-    def inner_resolve!(ctx : Context, infer : ForReifiedFunc)
+    def resolve!(ctx : Context, infer : ForReifiedFunc)
       origin_mt = infer.resolve(ctx, @origin)
       field_mt = infer.resolve(ctx, @field)
       field_mt.extracted_from(origin_mt).ephemeralize
@@ -559,7 +543,7 @@ class Mare::Compiler::Infer
     def initialize(@pos, @refine, @refine_type)
     end
 
-    def inner_resolve!(ctx : Context, infer : ForReifiedFunc)
+    def resolve!(ctx : Context, infer : ForReifiedFunc)
       MetaType.new(infer.reified_type(infer.prelude_type("Bool")))
     end
   end
@@ -573,7 +557,7 @@ class Mare::Compiler::Infer
     def initialize(@pos, @refine, @refine_type)
     end
 
-    def inner_resolve!(ctx : Context, infer : ForReifiedFunc)
+    def resolve!(ctx : Context, infer : ForReifiedFunc)
       MetaType.new(infer.reified_type(infer.prelude_type("Bool")))
     end
   end
@@ -593,7 +577,7 @@ class Mare::Compiler::Infer
       lhs_mt.satisfies_bound?(ctx, rhs_mt)
     end
 
-    def inner_resolve!(ctx : Context, infer : ForReifiedFunc)
+    def resolve!(ctx : Context, infer : ForReifiedFunc)
       MetaType.new(infer.reified_type(infer.prelude_type("Bool")))
     end
   end
@@ -607,7 +591,7 @@ class Mare::Compiler::Infer
     def initialize(@pos, @refine, @refine_type)
     end
 
-    def inner_resolve!(ctx : Context, infer : ForReifiedFunc)
+    def resolve!(ctx : Context, infer : ForReifiedFunc)
       infer.resolve(ctx, @refine).intersect(infer.resolve(ctx, @refine_type))
     end
   end
@@ -641,7 +625,7 @@ class Mare::Compiler::Infer
 
     def describe_kind; "array literal" end
 
-    def inner_resolve!(ctx : Context, infer : ForReifiedFunc)
+    def resolve!(ctx : Context, infer : ForReifiedFunc)
       array_defn = infer.prelude_type("Array")
 
       # Determine the lowest common denominator MetaType of all elements.
@@ -713,7 +697,7 @@ class Mare::Compiler::Infer
     end
   end
 
-  class ArrayLiteralElementAntecedent < DownstreamableInfo
+  class ArrayLiteralElementAntecedent < DynamicInfo
     getter array : ArrayLiteral
 
     def initialize(@pos, @array)
@@ -741,7 +725,7 @@ class Mare::Compiler::Infer
 
     def describe_kind; "return value" end
 
-    def inner_resolve!(ctx : Context, infer : ForReifiedFunc)
+    def resolve!(ctx : Context, infer : ForReifiedFunc)
       follow_call(ctx, infer)
     end
 
@@ -1009,7 +993,7 @@ class Mare::Compiler::Infer
     def initialize(@pos, @call, @index)
     end
 
-    def inner_resolve!(ctx : Context, infer : ForReifiedFunc)
+    def resolve!(ctx : Context, infer : ForReifiedFunc)
       # We must first resolve the FromCall itself to collect the other_infers.
       infer.resolve(ctx, @call)
       other_infers = infer.analysis.call_infers_for[@call]
@@ -1040,7 +1024,7 @@ class Mare::Compiler::Infer
     def initialize(@pos, @call)
     end
 
-    def inner_resolve!(ctx : Context, infer : ForReifiedFunc)
+    def resolve!(ctx : Context, infer : ForReifiedFunc)
       # We must first resolve the FromCall itself to collect the other_infers.
       infer.resolve(ctx, @call)
       other_infers = infer.analysis.call_infers_for[@call]
@@ -1087,7 +1071,7 @@ class Mare::Compiler::Infer
       end
     end
 
-    def inner_resolve!(ctx : Context, infer : ForReifiedFunc)
+    def resolve!(ctx : Context, infer : ForReifiedFunc)
       other_infers = @call.follow_call_resolve_other_infers(ctx, infer)
 
       MetaType.new_intersection(
