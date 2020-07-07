@@ -22,7 +22,6 @@ jobs:
           command: make ci
 
   tooling-vscode-publish:
-    branches: { only: [master] }
     executor: node
     steps:
       - checkout
