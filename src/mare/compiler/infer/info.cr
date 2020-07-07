@@ -45,9 +45,7 @@ class Mare::Compiler::Infer
     def add_downstream(ctx : Context, infer : ForReifiedFunc, use_pos : Source::Pos, info : Info, aliases : Int32)
       @downstreams << {use_pos, info, aliases + adds_alias}
       after_add_downstream(ctx, infer, use_pos, info, aliases)
-      if infer.already_resolved?(self)
-        within_downstream_constraints!(ctx, infer, infer.resolve(ctx, self))
-      end
+      raise "this should never happen" if infer.already_resolved?(self)
     end
     def downstreams_empty?
       @downstreams.empty?
@@ -243,21 +241,6 @@ class Mare::Compiler::Infer
         "This #{describe_kind} needs an explicit type; it could not be inferred"
     end
 
-    def after_resolve!(ctx : Context, infer : ForReifiedFunc, meta_type : MetaType)
-      # TODO: Verify all upstreams instead of just beyond 1?
-      if @upstreams.size > 1
-        fixed = Fixed.new(pos, meta_type.strip_ephemeral)
-        infer.resolve(ctx, fixed)
-
-        @upstreams[1..-1].each do |other_upstream, other_upstream_pos|
-          other_upstream.add_downstream(ctx, infer, other_upstream_pos, fixed, 0) # TODO: should we really use 0 here?
-
-          other_mt = infer.resolve(ctx, other_upstream)
-          raise "sanity check" unless other_mt.subtype_of?(ctx, meta_type)
-        end
-      end
-    end
-
     def set_explicit(ctx : Context, infer : ForReifiedFunc, explicit : Info)
       raise "already set_explicit" if @explicit
       raise "shouldn't have an upstream yet" unless @upstreams.empty?
@@ -277,26 +260,11 @@ class Mare::Compiler::Infer
     def assign(ctx : Context, infer : ForReifiedFunc, upstream : Info, upstream_pos : Source::Pos)
       @upstreams << {upstream, upstream_pos}
 
-      upstream.add_downstream(
-        ctx,
-        infer,
-        upstream_pos,
-        @explicit.not_nil!,
-        0,
-      ) if @explicit
-    end
-  end
-
-  class Fixed < DynamicInfo
-    property inner : MetaType
-
-    def describe_kind; "expression" end
-
-    def initialize(@pos, @inner)
-    end
-
-    def inner_resolve!(ctx : Context, infer : ForReifiedFunc)
-      @inner
+      if @explicit
+        upstream.add_downstream(ctx, infer, upstream_pos, @explicit.not_nil!, 0)
+      elsif @upstreams.size > 1
+        upstream.add_downstream(ctx, infer, upstream_pos, self, 0)
+      end
     end
   end
 
