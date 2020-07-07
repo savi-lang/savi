@@ -64,7 +64,7 @@ class Mare::Compiler::Infer
         @downstreams.map { |_, other_info, _|
           infer.resolve(ctx, other_info).as(MetaType)
         }
-      ).simplify(ctx) # TODO: is this simplify needed? when is it needed? can it be optimized?
+      )
     end
 
     # TODO: document
@@ -108,12 +108,7 @@ class Mare::Compiler::Infer
       # TODO: print a different error message when the downstream constraints are
       # internally conflicting, even before adding this meta_type into the mix.
 
-      total_downstream_constraint =
-        total_downstream_constraint(ctx, infer).simplify(ctx)
-
-      meta_type_ephemeral = meta_type.ephemeralize
-
-      if !meta_type_ephemeral.within_constraints?(ctx, [total_downstream_constraint])
+      if !meta_type.ephemeralize.within_constraints?(ctx, [total_downstream_constraint(ctx, infer)])
         extra = describe_downstream_constraints(ctx, infer)
         extra << {pos,
           "but the type of the #{describe_kind} was #{meta_type.show_type}"}
@@ -391,8 +386,6 @@ class Mare::Compiler::Infer
     end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc)
-      total_constraint = total_downstream_constraint(ctx, infer)
-
       # Literal values (such as numeric literals) sometimes have
       # an ambiguous type. Here, we intersect with the downstream constraints
       # to (hopefully) arrive at a single concrete type to return.
@@ -677,7 +670,7 @@ class Mare::Compiler::Infer
     def possible_element_antecedents(ctx, infer) : Array(MetaType)
       results = [] of MetaType
 
-      total_downstream_constraint(ctx, infer).each_reachable_defn.to_a.each do |rt|
+      total_downstream_constraint(ctx, infer).simplify(ctx).each_reachable_defn.to_a.each do |rt|
         # TODO: Support more element antecedent detection patterns.
         if rt.link == infer.prelude_type("Array") \
         && rt.args.size == 1
