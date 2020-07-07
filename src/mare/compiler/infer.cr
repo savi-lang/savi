@@ -1223,14 +1223,14 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       when "."
         call_ident, call_args, yield_params, yield_block = AST::Extract.call(node)
 
-        # Visit lhs, args, and yield params before resolving the call.
+        # Visit the left hand side of the call first, to get its info.
         # Note that we skipped it before with visit_children: false.
         node.lhs.try(&.accept(ctx, self))
-        call_args.try(&.accept(ctx, self))
+        lhs_info = self[node.lhs]
 
-        call = FromCall.new(
+        @analysis[node] = call = FromCall.new(
           call_ident.pos,
-          self[node.lhs],
+          lhs_info,
           call_ident.value,
           (call_args ? call_args.terms.map(&.itself) : [] of AST::Node),
           (call_args ? call_args.terms.map(&.pos) : [] of Source::Pos),
@@ -1238,10 +1238,9 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
           yield_block,
           classify.value_needed?(node),
         )
-        @analysis[node] = call
 
         # Each arg needs a link back to the FromCall with an arg index.
-        # call_args.try(&.accept(ctx, self))
+        call_args.try(&.accept(ctx, self))
         if call_args
           call_args.terms.each_with_index do |call_arg, index|
             new_info = TowardCallParam.new(call_arg.pos, call, index)
