@@ -1195,12 +1195,12 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         # If the left-hand side is the name of a type parameter...
         elsif lhs_info.is_a?(FixedSingleton) && lhs_info.type_param_ref
           # Strip the "non" from the fixed type, as if it were a type expr.
-          @analysis[node.lhs] = FixedTypeExpr.new(node.lhs.pos, node.lhs)
+          @analysis[node.lhs] = new_lhs_info = FixedTypeExpr.new(node.lhs.pos, node.lhs)
 
           # Set up a type param refinement condition, which can be used within
           # a choice body to inform the type system about the type relationship.
           refine = lhs_info.type_param_ref.not_nil!
-          @analysis[node] = TypeParamCondition.new(node.pos, refine, rhs_info)
+          @analysis[node] = TypeParamCondition.new(node.pos, refine, new_lhs_info, rhs_info)
 
         # If the left-hand side is the name of any other fixed type...
         elsif lhs_info.is_a?(FixedSingleton)
@@ -1382,6 +1382,16 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         info.resolve_others!(ctx, self)
         mt
       end
+    end
+
+    # This variant lets you eagerly choose the MetaType that a different Info
+    # resolves as, with that Info having no say in the matter. Use with caution.
+    def resolve_as(ctx : Context, info : Info, meta_type : MetaType) : MetaType
+      raise "already resolved #{info}\n" \
+        "as #{@analysis.resolved_infos[info].show_type}" \
+          if @analysis.resolved_infos.has_key?(info)
+
+      @analysis.resolved_infos[info] = meta_type
     end
 
     # This variant has protection to prevent infinite recursion.

@@ -156,19 +156,6 @@ class Mare::Compiler::Infer
     end
   end
 
-  class Unreachable < Info
-    INSTANCE = new
-    def self.instance; INSTANCE end
-
-    def add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
-      # Do nothing; we're already unsatisfiable...
-    end
-
-    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
-      MetaType.new(MetaType::Unsatisfiable.instance)
-    end
-  end
-
   abstract class NamedInfo < DynamicInfo
     @explicit : Info?
     @upstreams = [] of Tuple(Info, Source::Pos)
@@ -637,7 +624,14 @@ class Mare::Compiler::Infer
 
       # Resolve the types inside the body and capture the result type,
       # unless there is no body or we have determined we must skip this body.
-      meta_type = infer.resolve(ctx, body) if body && !skip_body
+      if body
+        if skip_body
+          # We use "unconstrained" as a marker that this is unreachable.
+          infer.resolve_as(ctx, body, MetaType.unconstrained)
+        else
+          meta_type = infer.resolve(ctx, body)
+        end
+      end
 
       # Remove the type param refinement we put in place before, if any.
       if inner_cond.is_a?(TypeParamCondition)
@@ -650,15 +644,21 @@ class Mare::Compiler::Infer
 
   class TypeParamCondition < DynamicInfo
     getter refine : Refer::TypeParam
+    getter lhs : Info
     getter refine_type : Info
 
     def describe_kind; "type parameter condition" end
 
-    def initialize(@pos, @refine, @refine_type)
+    def initialize(@pos, @refine, @lhs, @refine_type)
     end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc)
       MetaType.new(infer.reified_type(infer.prelude_type("Bool")))
+    end
+
+    def resolve_others!(ctx : Context, infer : ForReifiedFunc)
+      infer.resolve(ctx, @lhs)
+      infer.resolve(ctx, @refine_type)
     end
   end
 

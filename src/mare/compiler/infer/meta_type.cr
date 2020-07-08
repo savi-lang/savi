@@ -222,6 +222,10 @@ struct Mare::Compiler::Infer::MetaType
     @inner.is_a?(Unsatisfiable)
   end
 
+  def unconstrained?
+    @inner.is_a?(Unconstrained)
+  end
+
   def singular?
     !!single?
   end

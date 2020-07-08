@@ -396,6 +396,11 @@ class Mare::Compiler::CodeGen
     @target_machine.data_layout.abi_size(llvm_type)
   end
 
+  def meta_type_of(expr : AST::Node, in_gfunc : GenFunc? = nil)
+    in_gfunc ||= func_frame.gfunc.not_nil!
+    in_gfunc.infer.resolved(ctx, expr)
+  end
+
   def type_of(expr : AST::Node, in_gfunc : GenFunc? = nil)
     in_gfunc ||= func_frame.gfunc.not_nil!
     ctx.reach[in_gfunc.infer.resolved(ctx, expr)]
@@ -2663,7 +2668,7 @@ class Mare::Compiler::CodeGen
       @builder.cond(cond_value, case_block, next_block)
 
       @builder.position_at_end(case_block)
-      if ctx.infer[func_frame.gfunc.not_nil!.link][fore[1]].is_a?(Infer::Unreachable)
+      if meta_type_of(fore[1]).unconstrained?
         # We skip generating code for the case block if it is unreachable,
         # meaning that the cond was deemed at compile time to never be true.
         @builder.unreachable
@@ -2698,7 +2703,7 @@ class Mare::Compiler::CodeGen
     @builder.br(case_block)
 
     @builder.position_at_end(case_block)
-    if ctx.infer[func_frame.gfunc.not_nil!.link][expr.list.last[1]].is_a?(Infer::Unreachable)
+    if meta_type_of(expr.list.last[1]).unconstrained?
       # We skip generating code for the case block if it is unreachable,
       # meaning that the cond was deemed at compile time to never be true.
       @builder.unreachable
