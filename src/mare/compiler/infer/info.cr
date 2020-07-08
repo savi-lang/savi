@@ -2,6 +2,8 @@ class Mare::Compiler::Infer
   abstract class Info
     property pos : Source::Pos = Source::Pos.none
 
+    abstract def add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
+
     abstract def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
     def post_resolve!(ctx : Context, infer : ForReifiedFunc, mt : MetaType)
     end
@@ -10,8 +12,6 @@ class Mare::Compiler::Infer
     # this method to resolve everything in their tree.
     def resolve_others!(ctx : Context, infer : ForReifiedFunc)
     end
-
-    abstract def add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
 
     # In the rare case that an Info subclass needs to dynamically pretend to be
     # a different downstream constraint, it can override this method.
@@ -160,12 +160,12 @@ class Mare::Compiler::Infer
     INSTANCE = new
     def self.instance; INSTANCE end
 
-    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
-      MetaType.new(MetaType::Unsatisfiable.instance)
-    end
-
     def add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
       # Do nothing; we're already unsatisfiable...
+    end
+
+    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
+      MetaType.new(MetaType::Unsatisfiable.instance)
     end
   end
 
@@ -176,10 +176,6 @@ class Mare::Compiler::Infer
     def initialize(@pos)
     end
 
-    def explicit? : Bool
-      !!@explicit
-    end
-
     def adds_alias; 1 end
 
     def first_viable_constraint_pos : Source::Pos
@@ -188,9 +184,35 @@ class Mare::Compiler::Infer
       @pos
     end
 
-    # def resolve_others!(ctx : Context, infer : ForReifiedFunc)
-    #   @upstreams.each { |upstream, _| infer.resolve(ctx, upstream) }
-    # end
+    def explicit? : Bool
+      !!@explicit
+    end
+
+    def set_explicit(explicit : Info)
+      raise "already set_explicit" if @explicit
+      raise "shouldn't have an upstream yet" unless @upstreams.empty?
+
+      @explicit = explicit
+      @pos = explicit.pos
+    end
+
+    def after_add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
+      return if @explicit
+
+      @upstreams.each do |upstream, upstream_pos|
+        upstream.add_downstream(use_pos, info, aliases)
+      end
+    end
+
+    def assign(ctx : Context, upstream : Info, upstream_pos : Source::Pos)
+      @upstreams << {upstream, upstream_pos}
+
+      if @explicit
+        upstream.add_downstream(upstream_pos, @explicit.not_nil!, 0)
+      elsif @upstreams.size > 1
+        upstream.add_downstream(upstream_pos, self, 0)
+      end
+    end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc)
       explicit = @explicit
@@ -229,32 +251,6 @@ class Mare::Compiler::Infer
       # If we get here, we've failed and don't have enough info to continue.
       Error.at self,
         "This #{describe_kind} needs an explicit type; it could not be inferred"
-    end
-
-    def set_explicit(explicit : Info)
-      raise "already set_explicit" if @explicit
-      raise "shouldn't have an upstream yet" unless @upstreams.empty?
-
-      @explicit = explicit
-      @pos = explicit.pos
-    end
-
-    def after_add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
-      return if @explicit
-
-      @upstreams.each do |upstream, upstream_pos|
-        upstream.add_downstream(use_pos, info, aliases)
-      end
-    end
-
-    def assign(ctx : Context, upstream : Info, upstream_pos : Source::Pos)
-      @upstreams << {upstream, upstream_pos}
-
-      if @explicit
-        upstream.add_downstream(upstream_pos, @explicit.not_nil!, 0)
-      elsif @upstreams.size > 1
-        upstream.add_downstream(upstream_pos, self, 0)
-      end
     end
   end
 
@@ -514,14 +510,12 @@ class Mare::Compiler::Infer
     def initialize(@pos)
     end
 
-    def describe_kind; "error expression" end
+    def add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
+      raise "can't be downstream of a RaiseError"
+    end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc)
       MetaType.new(MetaType::Unsatisfiable.instance)
-    end
-
-    def add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
-      raise "can't be downstream of a RaiseError"
     end
   end
 
@@ -537,7 +531,9 @@ class Mare::Compiler::Infer
       @final_term = @terms.empty? ? FixedPrelude.new(@pos, "None") : @terms.last
     end
 
-    def describe_kind; "block" end
+    def add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
+      final_term.add_downstream(use_pos, info, aliases)
+    end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc)
       infer.resolve(ctx, final_term)
@@ -545,10 +541,6 @@ class Mare::Compiler::Infer
 
     def resolve_others!(ctx : Context, infer : ForReifiedFunc)
       terms.each { |term| infer.resolve(ctx, term) }
-    end
-
-    def add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
-      final_term.add_downstream(use_pos, info, aliases)
     end
   end
 
@@ -559,13 +551,13 @@ class Mare::Compiler::Infer
   class Phi < DynamicInfo
     getter branches : Array({Info?, Info, Bool})
 
+    def describe_kind; "choice block" end
+
     def initialize(@pos, @branches)
       @branches.each do |cond, body, body_jumps_away|
         body.add_downstream(@pos, self, 0) unless body_jumps_away
       end
     end
-
-    def describe_kind; "choice block" end
 
     def as_downstream_constraint_meta_type(ctx : Context, infer : ForReifiedFunc) : MetaType?
       total_downstream_constraint(ctx, infer)
@@ -822,10 +814,20 @@ class Mare::Compiler::Infer
   class ArrayLiteral < DynamicInfo
     getter terms : Array(Info)
 
+    def describe_kind; "array literal" end
+
     def initialize(@pos, @terms)
     end
 
-    def describe_kind; "array literal" end
+    def after_add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
+      # Only do this after the first downstream is added.
+      return unless @downstreams.size == 1
+
+      elem_downstream = ArrayLiteralElementAntecedent.new(@downstreams.first[1].pos, self)
+      @terms.each do |term|
+        term.add_downstream(downstream_use_pos, elem_downstream, 0)
+      end
+    end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc)
       array_defn = infer.prelude_type("Array")
@@ -874,16 +876,6 @@ class Mare::Compiler::Infer
       mt
     end
 
-    def after_add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
-      # Only do this after the first downstream is added.
-      return unless @downstreams.size == 1
-
-      elem_downstream = ArrayLiteralElementAntecedent.new(@downstreams.first[1].pos, self)
-      @terms.each do |term|
-        term.add_downstream(downstream_use_pos, elem_downstream, 0)
-      end
-    end
-
     def possible_element_antecedents(ctx, infer) : Array(MetaType)
       results = [] of MetaType
 
@@ -902,10 +894,10 @@ class Mare::Compiler::Infer
   class ArrayLiteralElementAntecedent < DynamicInfo
     getter array : ArrayLiteral
 
+    def describe_kind; "array element" end
+
     def initialize(@pos, @array)
     end
-
-    def describe_kind; "array element" end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc)
       antecedents = @array.possible_element_antecedents(ctx, infer)
