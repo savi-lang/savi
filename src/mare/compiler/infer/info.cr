@@ -19,6 +19,15 @@ class Mare::Compiler::Infer
     )
 
     # In the rare case that an Info subclass needs to dynamically pretend to be
+    # a different downstream constraint, it can override this method.
+    # If you need to report multiple positions, also override the other method
+    # below called as_multiple_downstream_constraints.
+    # This will prevent upstream DynamicInfos from eagerly resolving you.
+    def as_downstream_constraint_meta_type(ctx : Context, infer : ForReifiedFunc) : MetaType?
+      infer.resolve(ctx, self)
+    end
+
+    # In the rare case that an Info subclass needs to dynamically pretend to be
     # multiple different downstream constraints, it can override this method.
     # This is only used to report positions in more detail, and it is expected
     # that the intersection of all MetaTypes here is the same as the resolve.
@@ -66,9 +75,9 @@ class Mare::Compiler::Infer
     # those constraints into one intersection of them all.
     def total_downstream_constraint(ctx : Context, infer : ForReifiedFunc)
       MetaType.new_intersection(
-        @downstreams.map { |_, other_info, _|
-          infer.resolve(ctx, other_info).as(MetaType)
-        }
+        @downstreams.map do |_, other_info, _|
+          other_info.as_downstream_constraint_meta_type(ctx, infer).as(MetaType)
+        end
       )
     end
 
@@ -552,17 +561,24 @@ class Mare::Compiler::Infer
   # as well as necessary/sufficient conditions for each branch to be in play
   # letting us better specialize the codegen later by eliminating impossible
   # branches in particular reifications of this type or function.
-  class Phi < Info
+  class Phi < DynamicInfo
     getter branches : Array({Info?, Info, Bool})
 
-    def initialize(@pos, @branches)
+    def initialize(ctx, @pos, @branches)
+      @branches.each do |cond, body, body_jumps_away|
+        body.add_downstream(ctx, @pos, self, 0) unless body_jumps_away
+      end
     end
 
     def describe_kind; "choice block" end
 
-    def add_downstream(ctx : Context, use_pos : Source::Pos, info : Info, aliases : Int32)
-      branches.each do |cond, body, body_jumps_away|
-        body.add_downstream(ctx, use_pos, info, aliases) unless body_jumps_away
+    def as_downstream_constraint_meta_type(ctx : Context, infer : ForReifiedFunc) : MetaType?
+      total_downstream_constraint(ctx, infer)
+    end
+
+    def as_multiple_downstream_constraints(ctx : Context, infer : ForReifiedFunc) : Array({Source::Pos, MetaType})?
+      @downstreams.map do |pos, info, aliases|
+        {pos, info.as_downstream_constraint_meta_type(ctx, infer)}
       end
     end
 

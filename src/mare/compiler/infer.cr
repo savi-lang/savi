@@ -1286,7 +1286,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         {cond ? self[cond] : nil, self[body], jumps.away?(body)}
       end
 
-      @analysis[node] = Phi.new(node.pos, branches)
+      @analysis[node] = Phi.new(ctx, node.pos, branches)
     end
 
     def touch(node : AST::Loop)
@@ -1295,14 +1295,14 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       cond_info = self[node.cond]
       cond_info.add_downstream(ctx, node.pos, fixed_bool, 1)
 
-      @analysis[node] = Phi.new(node.pos, [
+      @analysis[node] = Phi.new(ctx, node.pos, [
         {self[node.cond], self[node.body], jumps.away?(node.body)},
         {nil, self[node.else_body], jumps.away?(node.else_body)},
       ])
     end
 
     def touch(node : AST::Try)
-      @analysis[node] = Phi.new(node.pos, [
+      @analysis[node] = Phi.new(ctx, node.pos, [
         {nil, self[node.body], jumps.away?(node.body)},
         {nil, self[node.else_body], jumps.away?(node.else_body)},
       ] of {Info?, Info, Bool})
