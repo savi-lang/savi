@@ -845,7 +845,9 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       func.params.try do |params|
         params.accept(ctx, self)
         params.terms.each do |param|
-          finish_param(param, self[param]) unless self[param].is_a?(Param)
+          param_info = self[param]
+          finish_param(param, param_info) unless param_info.is_a?(Param) \
+            || (param_info.is_a?(FromAssign) && param_info.lhs.is_a?(Param))
 
           # TODO: special-case this somewhere else?
           if link.type.name == "Main" \
@@ -1118,10 +1120,10 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         case lhs
         when Local
           lhs.assign(ctx, @analysis[node.rhs], node.rhs.pos)
-          @analysis.redirect(node, node.lhs)
+          @analysis[node] = FromAssign.new(node.pos, lhs, @analysis[node.rhs])
         when Param
           lhs.assign(ctx, @analysis[node.rhs], node.rhs.pos)
-          @analysis.redirect(node, node.lhs)
+          @analysis[node] = FromAssign.new(node.pos, lhs, @analysis[node.rhs])
         else
           raise NotImplementedError.new(node.lhs)
         end

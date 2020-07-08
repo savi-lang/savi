@@ -766,6 +766,28 @@ class Mare::Compiler::Infer
     end
   end
 
+  class FromAssign < Info
+    getter lhs : NamedInfo
+    getter rhs : Info
+
+    def describe_kind; "assign result" end
+
+    def initialize(@pos, @lhs, @rhs)
+    end
+
+    def resolve!(ctx : Context, infer : ForReifiedFunc)
+      infer.resolve(ctx, @lhs).alias
+    end
+
+    def resolve_others!(ctx : Context, infer : ForReifiedFunc)
+      infer.resolve(ctx, @rhs)
+    end
+
+    def add_downstream(ctx : Context, use_pos : Source::Pos, info : Info, aliases : Int32)
+      @lhs.add_downstream(ctx, use_pos, info, aliases)
+    end
+  end
+
   class FromYield < NamedInfo
     def describe_kind; "yield block result" end
   end
