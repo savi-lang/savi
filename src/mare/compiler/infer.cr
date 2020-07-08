@@ -1188,14 +1188,10 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
           # Set up a local type refinement condition, which can be used within
           # a choice body to inform the type system about the type relationship.
           refine = @analysis.follow_redirects(node.lhs)
-          @analysis[node] = TypeCondition.new(node.pos, refine, rhs_info)
+          @analysis[node] = TypeConditionForLocal.new(node.pos, refine, rhs_info)
 
         # If the left-hand side is the name of a type parameter...
         elsif lhs_info.is_a?(FixedSingleton) && lhs_info.type_param_ref
-          # For type parameter refinements we do not verify that the right side
-          # must be a subtype of the left side - it breaks partial reification.
-          need_to_check_if_right_is_subtype_of_left = false
-
           # Strip the "non" from the fixed type, as if it were a type expr.
           @analysis[node.lhs] = FixedTypeExpr.new(node.lhs.pos, node.lhs)
 
@@ -1206,10 +1202,6 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
 
         # If the left-hand side is the name of any other fixed type...
         elsif lhs_info.is_a?(FixedSingleton)
-          # For statically known type comparisons we cannot require that they
-          # have the possibility of being true - it breaks full reification.
-          need_to_check_if_right_is_subtype_of_left = false
-
           # Strip the "non" from the fixed types, as if each were a type expr.
           @analysis[node.lhs] = lhs_info = FixedTypeExpr.new(node.lhs.pos, node.lhs)
           @analysis[node.rhs] = rhs_info = FixedTypeExpr.new(node.rhs.pos, node.rhs)
@@ -1219,10 +1211,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
 
         # For all other possible left-hand sides...
         else
-          # Just know that the result of this expression is a boolean.
-          @analysis[node] = new_info = FixedPrelude.new(node.pos, "Bool")
-          new_info.resolvables << lhs_info
-          new_info.resolvables << rhs_info
+          @analysis[node] = TypeCondition.new(node.pos, lhs_info, rhs_info)
         end
 
       else raise NotImplementedError.new(node.op.value)
@@ -1277,7 +1266,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         # true if we are in the body; hence we can apply the type refinement.
         # TODO: Do this in a less special-casey sort of way if possible.
         # TODO: Do we need to override things besides locals? should we skip for non-locals?
-        if inner_cond_info.is_a?(TypeCondition)
+        if inner_cond_info.is_a?(TypeConditionForLocal)
           @local_ident_overrides[inner_cond_info.refine] = refine = inner_cond_info.refine.dup
           @analysis[refine] = Refinement.new(
             inner_cond_info.pos, self[inner_cond_info.refine], inner_cond_info.refine_type
@@ -1288,7 +1277,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         body.accept(ctx, self)
 
         # Remove the override we put in place before, if any.
-        if inner_cond_info.is_a?(TypeCondition)
+        if inner_cond_info.is_a?(TypeConditionForLocal)
           @local_ident_overrides.delete(inner_cond_info.refine).not_nil!
         end
 
@@ -1506,27 +1495,6 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       touch(node)
 
       node
-    end
-
-    # TODO: Can this be moved somehow into an Info#post_resolve! logic instead?
-    def touch(node : AST::Relate)
-      case node.op.value
-      when "<:"
-        info = @for_f[node]
-        unless info.is_a?(TypeParamCondition) || info.is_a?(TypeConditionStatic)
-          # The right side must be a subtype of the left side.
-          rhs_info = @for_f[node.rhs]
-          lhs_info = @for_f[node.lhs]
-          rhs_mt = resolve(ctx, rhs_info)
-          lhs_mt = resolve(ctx, lhs_info)
-          if !rhs_mt.subtype_of?(ctx, lhs_mt)
-            Error.at node, "This type check will never match", [
-              {rhs_info.pos, "the match type is #{rhs_mt.show_type}"},
-              {lhs_info.pos, "which is not a subtype of #{lhs_mt.show_type}"},
-            ]
-          end
-        end
-      end
     end
 
     def touch(node : AST::Choice)

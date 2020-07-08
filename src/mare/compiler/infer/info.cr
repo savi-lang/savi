@@ -597,6 +597,33 @@ class Mare::Compiler::Infer
   end
 
   class TypeCondition < DynamicInfo
+    getter lhs : Info
+    getter rhs : Info
+
+    def describe_kind; "type condition" end
+
+    def initialize(@pos, @lhs, @rhs)
+    end
+
+    def resolve!(ctx : Context, infer : ForReifiedFunc)
+      MetaType.new(infer.reified_type(infer.prelude_type("Bool")))
+    end
+
+    def post_resolve!(ctx : Context, infer : ForReifiedFunc, meta_type : MetaType)
+      super
+
+      rhs_mt = infer.resolve(ctx, @rhs)
+      lhs_mt = infer.resolve(ctx, @lhs)
+      if !rhs_mt.subtype_of?(ctx, lhs_mt)
+        Error.at @pos, "This type check will never match", [
+          {@rhs.pos, "the match type is #{rhs_mt.show_type}"},
+          {@lhs.pos, "which is not a subtype of #{lhs_mt.show_type}"},
+        ]
+      end
+    end
+  end
+
+  class TypeConditionForLocal < DynamicInfo
     getter refine : AST::Node
     getter refine_type : Info
 
@@ -607,6 +634,21 @@ class Mare::Compiler::Infer
 
     def resolve!(ctx : Context, infer : ForReifiedFunc)
       MetaType.new(infer.reified_type(infer.prelude_type("Bool")))
+    end
+
+    def post_resolve!(ctx : Context, infer : ForReifiedFunc, meta_type : MetaType)
+      super
+
+      lhs_info = infer.for_f[@refine].as(NamedInfo)
+      rhs_mt = infer.resolve(ctx, @refine_type)
+      lhs_mt = infer.resolve(ctx, lhs_info)
+      if !rhs_mt.subtype_of?(ctx, lhs_mt)
+        Error.at @pos, "This type check will never match", [
+          {@refine_type.pos, "the match type is #{rhs_mt.show_type}"},
+          {lhs_info.first_viable_constraint_pos,
+            "which is not a subtype of #{lhs_mt.show_type}"},
+        ]
+      end
     end
   end
 
