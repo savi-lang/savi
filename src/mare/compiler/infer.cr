@@ -1150,7 +1150,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         if call_args
           call_args.terms.each_with_index do |call_arg, index|
             new_info = TowardCallParam.new(call_arg.pos, call, index)
-            @analysis[call_arg].add_downstream(ctx, call_arg.pos, new_info, 0)
+            @analysis[call_arg].add_downstream(call_arg.pos, new_info, 0)
             call.resolvables << new_info
           end
         end
@@ -1169,7 +1169,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         yield_block.try(&.accept(ctx, self))
         if yield_block
           new_info = TowardCallYieldIn.new(yield_block.pos, call)
-          @analysis[yield_block].add_downstream(ctx, yield_block.pos, new_info, 0)
+          @analysis[yield_block].add_downstream(yield_block.pos, new_info, 0)
           call.resolvables << new_info
         end
 
@@ -1257,7 +1257,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         # Each condition in a choice must evaluate to a type of Bool.
         fixed_bool = FixedPrelude.new(node.pos, "Bool")
         cond_info = self[cond]
-        cond_info.add_downstream(ctx, node.pos, fixed_bool, 1)
+        cond_info.add_downstream(node.pos, fixed_bool, 1)
 
         inner_cond_info = cond_info
         while inner_cond_info.is_a?(Sequence)
@@ -1286,23 +1286,23 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         {cond ? self[cond] : nil, self[body], jumps.away?(body)}
       end
 
-      @analysis[node] = Phi.new(ctx, node.pos, branches)
+      @analysis[node] = Phi.new(node.pos, branches)
     end
 
     def touch(node : AST::Loop)
       # The condition of the loop must evaluate to a type of Bool.
       fixed_bool = FixedPrelude.new(node.pos, "Bool")
       cond_info = self[node.cond]
-      cond_info.add_downstream(ctx, node.pos, fixed_bool, 1)
+      cond_info.add_downstream(node.pos, fixed_bool, 1)
 
-      @analysis[node] = Phi.new(ctx, node.pos, [
+      @analysis[node] = Phi.new(node.pos, [
         {self[node.cond], self[node.body], jumps.away?(node.body)},
         {nil, self[node.else_body], jumps.away?(node.else_body)},
       ])
     end
 
     def touch(node : AST::Try)
-      @analysis[node] = Phi.new(ctx, node.pos, [
+      @analysis[node] = Phi.new(node.pos, [
         {nil, self[node.body], jumps.away?(node.body)},
         {nil, self[node.else_body], jumps.away?(node.else_body)},
       ] of {Info?, Info, Bool})

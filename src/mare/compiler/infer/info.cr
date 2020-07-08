@@ -11,12 +11,7 @@ class Mare::Compiler::Infer
     def resolve_others!(ctx : Context, infer : ForReifiedFunc)
     end
 
-    abstract def add_downstream(
-      ctx : Context,
-      use_pos : Source::Pos,
-      info : Info,
-      aliases : Int32,
-    )
+    abstract def add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
 
     # In the rare case that an Info subclass needs to dynamically pretend to be
     # a different downstream constraint, it can override this method.
@@ -55,9 +50,9 @@ class Mare::Compiler::Infer
     # Info node types are fixed, meaning that they act only as constraints
     # on their upstreams, and are not influenced at all by upstream info nodes.
     @downstreams = [] of Tuple(Source::Pos, Info, Int32)
-    def add_downstream(ctx : Context, use_pos : Source::Pos, info : Info, aliases : Int32)
+    def add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
       @downstreams << {use_pos, info, aliases + adds_alias}
-      after_add_downstream(ctx, use_pos, info, aliases)
+      after_add_downstream(use_pos, info, aliases)
     end
     def downstreams_empty?
       @downstreams.empty?
@@ -67,7 +62,7 @@ class Mare::Compiler::Infer
     end
 
     # May be implemented by the child class as an optional hook.
-    def after_add_downstream(ctx : Context, use_pos : Source::Pos, info : Info, aliases : Int32)
+    def after_add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
     end
 
     # When we need to take into consideration the downstreams' constraints
@@ -169,7 +164,7 @@ class Mare::Compiler::Infer
       MetaType.new(MetaType::Unsatisfiable.instance)
     end
 
-    def add_downstream(ctx : Context, use_pos : Source::Pos, info : Info, aliases : Int32)
+    def add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
       # Do nothing; we're already unsatisfiable...
     end
   end
@@ -244,11 +239,11 @@ class Mare::Compiler::Infer
       @pos = explicit.pos
     end
 
-    def after_add_downstream(ctx : Context, use_pos : Source::Pos, info : Info, aliases : Int32)
+    def after_add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
       return if @explicit
 
       @upstreams.each do |upstream, upstream_pos|
-        upstream.add_downstream(ctx, use_pos, info, aliases)
+        upstream.add_downstream(use_pos, info, aliases)
       end
     end
 
@@ -256,9 +251,9 @@ class Mare::Compiler::Infer
       @upstreams << {upstream, upstream_pos}
 
       if @explicit
-        upstream.add_downstream(ctx, upstream_pos, @explicit.not_nil!, 0)
+        upstream.add_downstream(upstream_pos, @explicit.not_nil!, 0)
       elsif @upstreams.size > 1
-        upstream.add_downstream(ctx, upstream_pos, self, 0)
+        upstream.add_downstream(upstream_pos, self, 0)
       end
     end
   end
@@ -452,7 +447,7 @@ class Mare::Compiler::Infer
     def describe_kind; "field reference" end
 
     def assign(ctx : Context, upstream : Info, upstream_pos : Source::Pos)
-      upstream.add_downstream(ctx, upstream_pos, self, 0)
+      upstream.add_downstream(upstream_pos, self, 0)
       @upstreams << upstream
     end
 
@@ -525,7 +520,7 @@ class Mare::Compiler::Infer
       MetaType.new(MetaType::Unsatisfiable.instance)
     end
 
-    def add_downstream(ctx : Context, use_pos : Source::Pos, info : Info, aliases : Int32)
+    def add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
       raise "can't be downstream of a RaiseError"
     end
   end
@@ -552,8 +547,8 @@ class Mare::Compiler::Infer
       terms.each { |term| infer.resolve(ctx, term) }
     end
 
-    def add_downstream(ctx : Context, use_pos : Source::Pos, info : Info, aliases : Int32)
-      final_term.add_downstream(ctx, use_pos, info, aliases)
+    def add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
+      final_term.add_downstream(use_pos, info, aliases)
     end
   end
 
@@ -564,9 +559,9 @@ class Mare::Compiler::Infer
   class Phi < DynamicInfo
     getter branches : Array({Info?, Info, Bool})
 
-    def initialize(ctx, @pos, @branches)
+    def initialize(@pos, @branches)
       @branches.each do |cond, body, body_jumps_away|
-        body.add_downstream(ctx, @pos, self, 0) unless body_jumps_away
+        body.add_downstream(@pos, self, 0) unless body_jumps_away
       end
     end
 
@@ -777,8 +772,8 @@ class Mare::Compiler::Infer
       infer.resolve(ctx, @local).ephemeralize
     end
 
-    def add_downstream(ctx : Context, use_pos : Source::Pos, info : Info, aliases : Int32)
-      @local.add_downstream(ctx, use_pos, info, aliases - 1)
+    def add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
+      @local.add_downstream(use_pos, info, aliases - 1)
     end
   end
 
@@ -791,8 +786,8 @@ class Mare::Compiler::Infer
     def initialize(@pos, @lhs, @rhs)
     end
 
-    def add_downstream(ctx : Context, use_pos : Source::Pos, info : Info, aliases : Int32)
-      @lhs.add_downstream(ctx, use_pos, info, aliases)
+    def add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
+      @lhs.add_downstream(use_pos, info, aliases)
     end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc)
@@ -811,8 +806,8 @@ class Mare::Compiler::Infer
     def initialize(@pos, @yield_in, @terms)
     end
 
-    def add_downstream(ctx : Context, use_pos : Source::Pos, info : Info, aliases : Int32)
-      @yield_in.add_downstream(ctx, use_pos, info, aliases)
+    def add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
+      @yield_in.add_downstream(use_pos, info, aliases)
     end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc)
@@ -879,13 +874,13 @@ class Mare::Compiler::Infer
       mt
     end
 
-    def after_add_downstream(ctx : Context, use_pos : Source::Pos, info : Info, aliases : Int32)
+    def after_add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
       # Only do this after the first downstream is added.
       return unless @downstreams.size == 1
 
       elem_downstream = ArrayLiteralElementAntecedent.new(@downstreams.first[1].pos, self)
       @terms.each do |term|
-        term.add_downstream(ctx, downstream_use_pos, elem_downstream, 0)
+        term.add_downstream(downstream_use_pos, elem_downstream, 0)
       end
     end
 
