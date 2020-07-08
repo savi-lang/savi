@@ -560,25 +560,88 @@ class Mare::Compiler::Infer
 
     def describe_kind; "choice block" end
 
-    def resolve!(ctx : Context, infer : ForReifiedFunc)
-      MetaType.new_union(
-        branches.map { |cond, body, body_jumps_away|
-          infer.resolve(ctx, body).as(MetaType) unless body_jumps_away
-        }.compact
-      )
-    end
-
-    def resolve_others!(ctx : Context, infer : ForReifiedFunc)
-      branches.each do |cond, body|
-        infer.resolve(ctx, cond) if cond
-        infer.resolve(ctx, body)
-      end
-    end
-
     def add_downstream(ctx : Context, use_pos : Source::Pos, info : Info, aliases : Int32)
       branches.each do |cond, body, body_jumps_away|
         body.add_downstream(ctx, use_pos, info, aliases) unless body_jumps_away
       end
+    end
+
+    def resolve!(ctx : Context, infer : ForReifiedFunc)
+      MetaType.new_union(
+        follow_branches(ctx, infer)
+      )
+    end
+
+    def follow_branches(ctx : Context, infer : ForReifiedFunc)
+      meta_types = [] of MetaType
+      statically_true_conds = [] of Info
+      branches.each do |cond, body, body_jumps_away|
+        meta_type = follow_branch(ctx, infer, cond, body, statically_true_conds)
+        meta_types << meta_type if meta_type && !body_jumps_away
+        break unless statically_true_conds.empty?
+      end
+
+      meta_types
+    end
+
+    def follow_branch(
+      ctx : Context,
+      infer : ForReifiedFunc,
+      cond : Info?,
+      body : Info,
+      statically_true_conds : Array(Info),
+    )
+      infer.resolve(ctx, cond) if cond
+      return unless body
+
+      inner_cond = cond
+      while inner_cond.is_a?(Sequence)
+        inner_cond = inner_cond.final_term
+      end
+
+      skip_body = false
+
+      # If we have a type condition as the cond, that implies that it returned
+      # true if we are in the body; hence we can apply the type refinement.
+      # TODO: Do this in a less special-casey sort of way if possible.
+      # TODO: Do we need to override things besides locals? should we skip for non-locals?
+      if inner_cond.is_a?(TypeParamCondition)
+        refine_type = infer.resolve(ctx, inner_cond.refine_type)
+
+        infer.for_rt.push_type_param_refinement(
+          inner_cond.refine,
+          refine_type,
+        )
+
+        # When the type param is currently partially or fully reified with
+        # a type that is incompatible with the refinement, we skip the body.
+        current_type_param = infer.lookup_type_param(inner_cond.refine)
+        if current_type_param.satisfies_bound?(ctx, refine_type)
+          # TODO: this is one of the statically_true_conds as well, right?
+        else
+          skip_body = true
+        end
+      elsif inner_cond.is_a?(TypeConditionStatic)
+        if inner_cond.evaluate(ctx, infer)
+          # A statically true condition prevents all later branch bodies
+          # from having a chance to be executed, since it happens first.
+          statically_true_conds << inner_cond
+        else
+          # A statically false condition will not execute its branch body.
+          skip_body = true
+        end
+      end
+
+      # Resolve the types inside the body and capture the result type,
+      # unless there is no body or we have determined we must skip this body.
+      meta_type = infer.resolve(ctx, body) if body && !skip_body
+
+      # Remove the type param refinement we put in place before, if any.
+      if inner_cond.is_a?(TypeParamCondition)
+        infer.for_rt.pop_type_param_refinement(inner_cond.refine)
+      end
+
+      meta_type
     end
   end
 

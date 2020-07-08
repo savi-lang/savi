@@ -1369,14 +1369,6 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       ctx.classify[reified.link]
     end
 
-    def jumps
-      ctx.jumps[reified.link]
-    end
-
-    def already_resolved?(info : Info) : Bool
-      @analysis.resolved_infos.has_key?(info)
-    end
-
     def resolve(ctx : Context, info : Info) : MetaType
       @analysis.resolved_infos[info]? || begin
         mt = info.resolve!(ctx, self)
@@ -1411,9 +1403,6 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
 
       func_params = func.params
       func_body = func.body
-
-      func_params.accept(ctx, self) if func_params
-      func_body.accept(ctx, self) if func_body
 
       resolve(ctx, @for_f[func_body]) if func_body
       resolve(ctx, @for_f[func_params]) if func_params
@@ -1488,72 +1477,6 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
 
     def type_expr(node)
       @for_rt.type_expr(node, refer, reified.receiver)
-    end
-
-    # This visitor never replaces nodes, it just touches them and returns them.
-    def visit(ctx, node)
-      touch(node)
-
-      node
-    end
-
-    def touch(node : AST::Choice)
-      skip_later_bodies = false
-      branches = [] of Info
-      node.list.each do |cond, body|
-        # Visit the cond AST - we skipped it before with visit_children: false.
-        cond.accept(ctx, self)
-
-        cond_info = @for_f[cond]
-
-        # If we have a type condition as the cond, that implies that it returned
-        # true if we are in the body; hence we can apply the type refinement.
-        # TODO: Do this in a less special-casey sort of way if possible.
-        # TODO: Do we need to override things besides locals? should we skip for non-locals?
-        if cond_info.is_a?(TypeParamCondition)
-          refine_type = resolve(ctx, cond_info.refine_type) # TODO: postpone to second half of infer pass
-
-          for_rt.push_type_param_refinement(
-            cond_info.refine,
-            refine_type,
-          )
-
-          # When the type param is currently partially or fully reified with
-          # a type that is incompatible with the refinement, we skip the body.
-          current_type_param = lookup_type_param(cond_info.refine)
-          if !current_type_param.satisfies_bound?(ctx, refine_type)
-            skip_body = true
-          end
-        elsif cond_info.is_a?(TypeConditionStatic)
-          if cond_info.evaluate(ctx, self)
-            # A statically true condition prevents all later branch bodies
-            # from having a chance to be executed, since it happens first.
-            skip_later_bodies = true
-          else
-            # A statically false condition will not execute its branch body.
-            skip_body = true
-          end
-        elsif skip_later_bodies
-          skip_body = true
-        end
-
-        if skip_body
-          raise "how?\n#{cond.pos.show}"
-        else
-          # Visit the body AST - we skipped it before with visit_children: false.
-          # We needed to act on information from the cond analysis first.
-          body.accept(ctx, self)
-        end
-
-        # Remove the type param refinement we put in place before, if any.
-        if cond_info.is_a?(TypeParamCondition)
-          for_rt.pop_type_param_refinement(cond_info.refine)
-        end
-      end
-    end
-
-    def touch(node : AST::Node)
-      # Do nothing for other nodes.
     end
   end
 end

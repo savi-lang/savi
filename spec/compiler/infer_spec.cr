@@ -2001,6 +2001,25 @@ describe Mare::Compiler::Infer do
     end
   end
 
+  pending "can also refine a type parameter within a choice body" do
+    source = Mare::Source.new_example <<-SOURCE
+    :trait Sizeable
+      :fun size USize
+
+    :class Generic (A)
+      :prop _value A
+      :new (@_value)
+      :fun ref value_size
+        if (A <: Sizeable) (@_value.size)
+
+    :actor Main
+      :new
+        Generic(String).new("example").value_size
+    SOURCE
+
+    Mare::Compiler.compile([source], :infer)
+  end
+
   it "complains when too many type arguments are provided" do
     source = Mare::Source.new_example <<-SOURCE
     :class Generic (P1, P2)
