@@ -184,9 +184,9 @@ class Mare::Compiler::Infer
       @pos
     end
 
-    def resolve_others!(ctx : Context, infer : ForReifiedFunc)
-      @upstreams.each { |upstream, _| infer.resolve(ctx, upstream) }
-    end
+    # def resolve_others!(ctx : Context, infer : ForReifiedFunc)
+    #   @upstreams.each { |upstream, _| infer.resolve(ctx, upstream) }
+    # end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc)
       explicit = @explicit
@@ -775,6 +775,10 @@ class Mare::Compiler::Infer
     def initialize(@pos, @lhs, @rhs)
     end
 
+    def add_downstream(ctx : Context, use_pos : Source::Pos, info : Info, aliases : Int32)
+      @lhs.add_downstream(ctx, use_pos, info, aliases)
+    end
+
     def resolve!(ctx : Context, infer : ForReifiedFunc)
       infer.resolve(ctx, @lhs).alias
     end
@@ -782,14 +786,26 @@ class Mare::Compiler::Infer
     def resolve_others!(ctx : Context, infer : ForReifiedFunc)
       infer.resolve(ctx, @rhs)
     end
-
-    def add_downstream(ctx : Context, use_pos : Source::Pos, info : Info, aliases : Int32)
-      @lhs.add_downstream(ctx, use_pos, info, aliases)
-    end
   end
 
-  class FromYield < NamedInfo
-    def describe_kind; "yield block result" end
+  class FromYield < Info
+    getter yield_in : Info
+    getter terms : Array(Info)
+
+    def initialize(@pos, @yield_in, @terms)
+    end
+
+    def add_downstream(ctx : Context, use_pos : Source::Pos, info : Info, aliases : Int32)
+      @yield_in.add_downstream(ctx, use_pos, info, aliases)
+    end
+
+    def resolve!(ctx : Context, infer : ForReifiedFunc)
+      infer.resolve(ctx, @yield_in)
+    end
+
+    def resolve_others!(ctx : Context, infer : ForReifiedFunc)
+      @terms.each { |term| infer.resolve(ctx, term) }
+    end
   end
 
   class ArrayLiteral < DynamicInfo

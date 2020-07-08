@@ -783,7 +783,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     private getter ctx : Context
     getter analysis : FuncAnalysis
     getter yield_out_infos : Array(Local)
-    getter! yield_in_info : FromYield
+    getter! yield_in_info : Local
 
     def initialize(@ctx, @analysis)
       @local_idents = Hash(Refer::Local, AST::Node).new
@@ -891,7 +891,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       yield_out_arg_count.times do
         yield_out_infos << Local.new((func.yield_out || func.ident).pos)
       end
-      @yield_in_info = FromYield.new((func.yield_in || func.ident).pos)
+      @yield_in_info = Local.new((func.yield_in || func.ident).pos)
 
       # Constrain via the "yield out" part of the explicit signature if present.
       func.yield_out.try do |yield_out|
@@ -1312,11 +1312,14 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       raise "TODO: Nice error message for this" \
         if yield_out_infos.size != node.terms.size
 
-      yield_out_infos.zip(node.terms).each do |info, term|
-        info.assign(ctx, @analysis[term], term.pos)
-      end
+      term_infos =
+        yield_out_infos.zip(node.terms).map do |info, term|
+          term_info = @analysis[term]
+          info.assign(ctx, @analysis[term], term.pos)
+          term_info
+        end
 
-      @analysis[node] = yield_in_info
+      @analysis[node] = FromYield.new(node.pos, yield_in_info, term_infos)
     end
 
     def touch(node : AST::Node)
