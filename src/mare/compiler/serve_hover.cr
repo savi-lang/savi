@@ -126,7 +126,7 @@ class Mare::Compiler::ServeHover
     if node.is_a?(AST::Relate) && node.op.value == "."
       begin
         messages << "This is a function call on an inferred receiver type of " \
-                    "#{infer.resolve(node.lhs).show_type}."
+                    "#{infer.analysis.resolved(ctx, node.lhs).show_type}."
       rescue
         messages << "This is a function call."
       end
@@ -134,7 +134,7 @@ class Mare::Compiler::ServeHover
     end
 
     begin
-      inf = infer.resolve(node)
+      inf = infer.analysis.resolved(ctx, node)
       messages << "It has an inferred #{describe_type} of #{inf.show_type}."
     rescue
     end

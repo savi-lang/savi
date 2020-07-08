@@ -6,6 +6,11 @@ class Mare::Compiler::Infer
     def post_resolve!(ctx : Context, infer : ForReifiedFunc, mt : MetaType)
     end
 
+    # For Info types which represent a tree of Info nodes, they should override
+    # this method to resolve everything in their tree.
+    def resolve_others!(ctx : Context, infer : ForReifiedFunc)
+    end
+
     abstract def add_downstream(
       ctx : Context,
       use_pos : Source::Pos,
@@ -179,6 +184,10 @@ class Mare::Compiler::Infer
       @pos
     end
 
+    def resolve_others!(ctx : Context, infer : ForReifiedFunc)
+      @upstreams.each { |upstream, _| infer.resolve(ctx, upstream) }
+    end
+
     def resolve!(ctx : Context, infer : ForReifiedFunc)
       explicit = @explicit
 
@@ -247,14 +256,20 @@ class Mare::Compiler::Infer
 
   class FixedPrelude < DynamicInfo
     getter name : String
+    getter resolvables : Array(Info)
 
     def describe_kind; "expression" end
 
     def initialize(@pos, @name)
+      @resolvables = [] of Info
     end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc)
       MetaType.new(infer.reified_type(infer.prelude_type(@name)))
+    end
+
+    def resolve_others!(ctx : Context, infer : ForReifiedFunc)
+      @resolvables.each { |resolvable| infer.resolve(ctx, resolvable) }
     end
   end
 
@@ -316,7 +331,7 @@ class Mare::Compiler::Infer
     def downstream_constraints(ctx : Context, analysis : ReifiedFuncAnalysis)
       @downstreams.flat_map do |_, info, _|
         info.as_multiple_downstream_constraints(ctx, analysis) \
-        || [{info.pos, analysis.resolve(info)}]
+        || [{info.pos, analysis.resolved(info)}]
       end
     end
 
@@ -422,16 +437,22 @@ class Mare::Compiler::Infer
 
   class Field < DynamicInfo
     def initialize(@pos, @name : String)
+      @upstreams = [] of Info
     end
 
     def describe_kind; "field reference" end
 
     def assign(ctx : Context, upstream : Info, upstream_pos : Source::Pos)
       upstream.add_downstream(ctx, upstream_pos, self, 0)
+      @upstreams << upstream
     end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc)
       follow_field(ctx, infer)
+    end
+
+    def resolve_others!(ctx : Context, infer : ForReifiedFunc)
+      @upstreams.each { |upstream| infer.resolve(ctx, upstream) }
     end
 
     def follow_field(ctx : Context, infer : ForReifiedFunc) : MetaType
@@ -500,8 +521,39 @@ class Mare::Compiler::Infer
     end
   end
 
+  # TODO: add some kind of logic for analyzing exhausted choices,
+  # as well as necessary/sufficient conditions for each branch to be in play
+  # letting us better specialize the codegen later by eliminating impossible
+  # branches in particular reifications of this type or function.
+  class Sequence < Info
+    getter terms : Array(Info)
+    getter final_term : Info
+
+    def initialize(@pos, @terms)
+      @final_term = @terms.empty? ? FixedPrelude.new(@pos, "None") : @terms.last
+    end
+
+    def describe_kind; "block" end
+
+    def resolve!(ctx : Context, infer : ForReifiedFunc)
+      infer.resolve(ctx, final_term)
+    end
+
+    def resolve_others!(ctx : Context, infer : ForReifiedFunc)
+      terms.each { |term| infer.resolve(ctx, term) }
+    end
+
+    def add_downstream(ctx : Context, use_pos : Source::Pos, info : Info, aliases : Int32)
+      final_term.add_downstream(ctx, use_pos, info, aliases)
+    end
+  end
+
+  # TODO: add some kind of logic for analyzing exhausted choices,
+  # as well as necessary/sufficient conditions for each branch to be in play
+  # letting us better specialize the codegen later by eliminating impossible
+  # branches in particular reifications of this type or function.
   class Phi < Info
-    getter branches : Array(Info)
+    getter branches : Array({Info?, Info, Bool})
 
     def initialize(@pos, @branches)
     end
@@ -509,12 +561,23 @@ class Mare::Compiler::Infer
     def describe_kind; "choice block" end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc)
-      MetaType.new_union(branches.map { |node| infer.resolve(ctx, node).as(MetaType) })
+      MetaType.new_union(
+        branches.map { |cond, body, body_jumps_away|
+          infer.resolve(ctx, body).as(MetaType) unless body_jumps_away
+        }.compact
+      )
+    end
+
+    def resolve_others!(ctx : Context, infer : ForReifiedFunc)
+      branches.each do |cond, body|
+        infer.resolve(ctx, cond) if cond
+        infer.resolve(ctx, body)
+      end
     end
 
     def add_downstream(ctx : Context, use_pos : Source::Pos, info : Info, aliases : Int32)
-      branches.each do |node|
-        node.add_downstream(ctx, use_pos, info, aliases)
+      branches.each do |cond, body, body_jumps_away|
+        body.add_downstream(ctx, use_pos, info, aliases) unless body_jumps_away
       end
     end
   end
@@ -703,14 +766,24 @@ class Mare::Compiler::Infer
     getter yield_params : AST::Group?
     getter yield_block : AST::Group?
     getter ret_value_used : Bool
+    getter resolvables : Array(Info)
 
     def initialize(@pos, @lhs, @member, @args, @yield_params, @yield_block, @ret_value_used)
+      @resolvables = [] of Info
     end
 
     def describe_kind; "return value" end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc)
       follow_call(ctx, infer)
+    end
+
+    def resolve_others!(ctx : Context, infer : ForReifiedFunc)
+      infer.resolve(ctx, infer.for_f[@args.not_nil!]) if @args
+      infer.resolve(ctx, infer.for_f[@yield_block.not_nil!]) if @yield_block
+      infer.resolve(ctx, infer.for_f[@yield_params.not_nil!]) if @yield_params
+
+      resolvables.each { |resolvable| infer.resolve(ctx, resolvable) }
     end
 
     def follow_call_get_call_defns(ctx : Context, infer : ForReifiedFunc) : Set({MetaType::Inner, ReifiedType?, Program::Function?})Set

@@ -82,7 +82,6 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     def [](node : AST::Node); @infos[follow_redirects(node)]; end
     def []?(node : AST::Node); @infos[follow_redirects(node)]?; end
     protected def []=(node, info); @infos[follow_redirects(node)] = info; end
-    def each_info; @infos.each; end
   end
 
   struct ReifiedTypeAnalysis
@@ -117,7 +116,6 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   end
 
   struct ReifiedFuncAnalysis
-    protected getter resolved
     protected getter resolved_infos
     protected getter called_funcs
     protected getter call_infers_for
@@ -129,7 +127,6 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       f = @rf.link.resolve(ctx)
 
       @is_constructor = f.has_tag?(:constructor).as(Bool)
-      @resolved = {} of AST::Node => MetaType
       @resolved_infos = {} of Info => MetaType
       @called_funcs = Set({Source::Pos, ReifiedType, Program::Function::Link}).new
 
@@ -142,13 +139,13 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
 
     # TODO: rename as [] and rename [] to info_for or similar?
-    def resolve(info : Info)
+    def resolved(info : Info)
       @resolved_infos[info]
     end
 
     # TODO: rename as [] and rename [] to info_for or similar?
     def resolved(ctx, node : AST::Node)
-      @resolved_infos[ctx.infer[@rf.link][node]]
+      resolved(ctx.infer[@rf.link][node])
     end
 
     def resolved_self_cap : MetaType
@@ -162,7 +159,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     def each_meta_type(&block)
       yield @rf.receiver
       yield resolved_self
-      @resolved.each_value { |mt| yield mt }
+      @resolved_infos.each_value { |mt| yield mt }
     end
 
     def each_called_func
@@ -1066,12 +1063,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       when "|"
         # Do nothing here - we'll handle it in one of the parent nodes.
       when "(", ":"
-        if node.terms.empty?
-          @analysis[node] = FixedPrelude.new(node.pos, "None")
-        else
-          # A non-empty group always has the node of its final child.
-          @analysis.redirect(node, node.terms.last)
-        end
+        @analysis[node] =
+          Sequence.new(node.pos, node.terms.map { |term| self[term] })
       when "["
         @analysis[node] =
           ArrayLiteral.new(node.pos, node.terms.map { |term| self[term] })
@@ -1156,6 +1149,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
           call_args.terms.each_with_index do |call_arg, index|
             new_info = TowardCallParam.new(call_arg.pos, call, index)
             @analysis[call_arg].add_downstream(ctx, call_arg.pos, new_info, 0)
+            call.resolvables << new_info
           end
         end
 
@@ -1165,6 +1159,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
           yield_params.terms.each_with_index do |yield_param, index|
             new_info = FromCallYieldOut.new(yield_param.pos, call, index)
             @analysis[yield_param].as(Local).assign(ctx, new_info, yield_param.pos)
+            call.resolvables << new_info
           end
         end
 
@@ -1173,11 +1168,14 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         if yield_block
           new_info = TowardCallYieldIn.new(yield_block.pos, call)
           @analysis[yield_block].add_downstream(ctx, yield_block.pos, new_info, 0)
+          call.resolvables << new_info
         end
 
       when "is"
         # Just know that the result of this expression is a boolean.
-        @analysis[node] = FixedPrelude.new(node.pos, "Bool")
+        @analysis[node] = new_info = FixedPrelude.new(node.pos, "Bool")
+        new_info.resolvables << self[node.lhs]
+        new_info.resolvables << self[node.rhs]
       when "<:"
         need_to_check_if_right_is_subtype_of_left = true
         lhs_info = self[node.lhs]
@@ -1222,7 +1220,9 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         # For all other possible left-hand sides...
         else
           # Just know that the result of this expression is a boolean.
-          @analysis[node] = FixedPrelude.new(node.pos, "Bool")
+          @analysis[node] = new_info = FixedPrelude.new(node.pos, "Bool")
+          new_info.resolvables << lhs_info
+          new_info.resolvables << rhs_info
         end
 
       else raise NotImplementedError.new(node.op.value)
@@ -1259,8 +1259,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
 
     def touch(node : AST::Choice)
-      branches = [] of Info
-      node.list.each do |cond, body|
+      branches = node.list.map do |cond, body|
         # Visit the cond AST - we skipped it before with visit_children: false.
         cond.accept(ctx, self)
 
@@ -1269,14 +1268,19 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         cond_info = self[cond]
         cond_info.add_downstream(ctx, node.pos, fixed_bool, 1)
 
+        inner_cond_info = cond_info
+        while inner_cond_info.is_a?(Sequence)
+          inner_cond_info = inner_cond_info.final_term
+        end
+
         # If we have a type condition as the cond, that implies that it returned
         # true if we are in the body; hence we can apply the type refinement.
         # TODO: Do this in a less special-casey sort of way if possible.
         # TODO: Do we need to override things besides locals? should we skip for non-locals?
-        if cond_info.is_a?(TypeCondition)
-          @local_ident_overrides[cond_info.refine] = refine = cond_info.refine.dup
+        if inner_cond_info.is_a?(TypeCondition)
+          @local_ident_overrides[inner_cond_info.refine] = refine = inner_cond_info.refine.dup
           @analysis[refine] = Refinement.new(
-            cond_info.pos, self[cond_info.refine], cond_info.refine_type
+            inner_cond_info.pos, self[inner_cond_info.refine], inner_cond_info.refine_type
           )
         end
 
@@ -1284,19 +1288,13 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         body.accept(ctx, self)
 
         # Remove the override we put in place before, if any.
-        if cond_info.is_a?(TypeCondition)
-          @local_ident_overrides.delete(cond_info.refine).not_nil!
+        if inner_cond_info.is_a?(TypeCondition)
+          @local_ident_overrides.delete(inner_cond_info.refine).not_nil!
         end
 
-        # Hold on to the body info for later in this function.
-        # Ignore branches that jump away without resulting in a value.
-        branches << self[body] unless jumps.away?(body)
+        {cond ? self[cond] : nil, self[body], jumps.away?(body)}
       end
 
-      # TODO: also track cond infos in Phi, for analyzing exhausted choices,
-      # as well as necessary/sufficient conditions for each branch to be in play
-      # letting us better specialize the codegen later by eliminating impossible
-      # branches in particular reifications of this type or function.
       @analysis[node] = Phi.new(node.pos, branches)
     end
 
@@ -1306,21 +1304,17 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       cond_info = self[node.cond]
       cond_info.add_downstream(ctx, node.pos, fixed_bool, 1)
 
-      # Ignore branches that jump away without resulting in a value.
-      branches = [node.body, node.else_body]
-        .reject { |node| jumps.away?(node) }
-        .map { |node| self[node] }
-
-      @analysis[node] = Phi.new(node.pos, branches)
+      @analysis[node] = Phi.new(node.pos, [
+        {self[node.cond], self[node.body], jumps.away?(node.body)},
+        {nil, self[node.else_body], jumps.away?(node.else_body)},
+      ])
     end
 
     def touch(node : AST::Try)
-      # Ignore branches that jump away without resulting in a value.
-      branches = [node.body, node.else_body]
-        .reject { |node| jumps.away?(node) }
-        .map { |node| self[node] }
-
-      @analysis[node] = Phi.new(node.pos, branches)
+      @analysis[node] = Phi.new(node.pos, [
+        {nil, self[node.body], jumps.away?(node.body)},
+        {nil, self[node.else_body], jumps.away?(node.else_body)},
+      ] of {Info?, Info, Bool})
     end
 
     def touch(node : AST::Yield)
@@ -1399,12 +1393,9 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         mt = info.resolve!(ctx, self)
         @analysis.resolved_infos[info] = mt.simplify(ctx)
         info.post_resolve!(ctx, self, mt)
+        info.resolve_others!(ctx, self)
         mt
       end
-    end
-    # TODO: remove this cheat and stop using the ctx field we hold, so to remove it later...
-    def resolve(node) : MetaType
-      @analysis.resolved[node] ||= resolve(ctx, @for_f[node])
     end
 
     # This variant has protection to prevent infinite recursion.
@@ -1429,23 +1420,28 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       return if @already_ran
       @already_ran = true
 
-      func.params.try(&.accept(ctx, self))
-      func.body.try(&.accept(ctx, self))
+      func_params = func.params
+      func_body = func.body
+
+      func_params.accept(ctx, self) if func_params
+      func_body.accept(ctx, self) if func_body
+
+      resolve(ctx, @for_f[func_body]) if func_body
+      resolve(ctx, @for_f[func_params]) if func_params
+      resolve(ctx, @for_f[ret])
 
       # Assign the resolved types to a map for safekeeping.
       # This also has the effect of running some final checks on everything.
       # TODO: Is it possible to remove the simplify calls here?
       # Is it actually a significant performance impact or not?
-      @for_f.analysis.each_info.each do |node, info|
-        @analysis.resolved[node] ||= resolve(ctx, info).simplify(ctx)
-      end
+
       if (info = @for_f.yield_in_info; info)
         @analysis.yield_in_resolved = resolve(ctx, info).simplify(ctx)
       end
       @analysis.yield_out_resolved = @for_f.yield_out_infos.map do |info|
         resolve(ctx, info).simplify(ctx)
       end
-      @analysis.ret_resolved = @analysis.resolved[ret]
+      @analysis.ret_resolved = @analysis.resolved_infos[@for_f[ret]]
 
       # Parameters must be sendable when the function is asynchronous,
       # or when it is a constructor with elevated capability.

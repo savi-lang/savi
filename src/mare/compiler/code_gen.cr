@@ -2637,9 +2637,7 @@ class Mare::Compiler::CodeGen
   def gen_choice(expr : AST::Choice)
     raise NotImplementedError.new(expr.inspect) if expr.list.empty?
 
-    # Get the LLVM type for the phi that joins the final value of each branch.
-    # Each such value will needed to be bitcast to the that type.
-    phi_type = type_of(expr)
+    phi_type = nil
 
     # Create all of the instruction blocks we'll need for this choice.
     j = expr.list.size
@@ -2676,7 +2674,8 @@ class Mare::Compiler::CodeGen
         value = gen_expr(fore[1])
         unless func_frame.jumps.away?(fore[1])
           if func_frame.classify.value_needed?(expr)
-            value = gen_assign_cast(value, phi_type, fore[1])
+            phi_type ||= type_of(expr)
+            value = gen_assign_cast(value, phi_type.not_nil!, fore[1])
             phi_blocks << @builder.insert_block
             phi_values << value
           end
@@ -2709,7 +2708,8 @@ class Mare::Compiler::CodeGen
       value = gen_expr(expr.list.last[1])
       unless func_frame.jumps.away?(expr.list.last[1])
         if func_frame.classify.value_needed?(expr)
-          value = gen_assign_cast(value, phi_type, expr.list.last[1])
+          phi_type ||= type_of(expr)
+          value = gen_assign_cast(value, phi_type.not_nil!, expr.list.last[1])
           phi_blocks << @builder.insert_block
           phi_values << value
         end
@@ -2727,7 +2727,7 @@ class Mare::Compiler::CodeGen
     # the cases above, using the LLVM mechanism called a "phi" instruction.
     @builder.position_at_end(post_block)
     if func_frame.classify.value_needed?(expr)
-      @builder.phi(llvm_type_of(phi_type), phi_blocks, phi_values, "phi_choice")
+      @builder.phi(llvm_type_of(phi_type.not_nil!), phi_blocks, phi_values, "phi_choice")
     else
       gen_none
     end
@@ -2798,11 +2798,8 @@ class Mare::Compiler::CodeGen
   end
 
   def gen_try(expr : AST::Try)
-    # Get the LLVM type for the phi that joins the final value of each branch.
-    # Each such value will needed to be bitcast to the that type.
-    phi_type = type_of(expr)
-
     # Prepare to capture state for the final phi.
+    phi_type = nil
     phi_blocks = [] of LLVM::BasicBlock
     phi_values = [] of LLVM::Value
 
@@ -2820,7 +2817,8 @@ class Mare::Compiler::CodeGen
     @builder.position_at_end(body_block)
     body_value = gen_expr(expr.body)
     unless func_frame.jumps.away?(expr.body)
-      body_value = gen_assign_cast(body_value, phi_type, expr.body)
+      phi_type ||= type_of(expr)
+      body_value = gen_assign_cast(body_value, phi_type.not_nil!, expr.body)
       phi_blocks << @builder.insert_block
       phi_values << body_value
       @builder.br(post_block)
@@ -2848,7 +2846,8 @@ class Mare::Compiler::CodeGen
     # Generate the body code of the else clause, then proceed to the post block.
     else_value = gen_expr(expr.else_body)
     unless func_frame.jumps.away?(expr.else_body)
-      else_value = gen_assign_cast(else_value, phi_type, expr.else_body)
+      phi_type ||= type_of(expr)
+      else_value = gen_assign_cast(else_value, phi_type.not_nil!, expr.else_body)
       phi_blocks << @builder.insert_block
       phi_values << else_value
       @builder.br(post_block)
@@ -2864,7 +2863,7 @@ class Mare::Compiler::CodeGen
     # Here at the post block, we receive the value that was returned by one of
     # the bodies above, using the LLVM mechanism called a "phi" instruction.
     @builder.position_at_end(post_block)
-    @builder.phi(llvm_type_of(phi_type), phi_blocks, phi_values, "phi_try")
+    @builder.phi(llvm_type_of(phi_type.not_nil!), phi_blocks, phi_values, "phi_try")
   end
 
   def gen_raise_error(error_value : LLVM::Value, from_expr : AST::Node)

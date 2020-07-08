@@ -209,8 +209,8 @@ class Mare::Compiler::Infer::SubtypingInfo
     end
 
     # Covariant return type.
-    this_ret = this_infer.resolve(this_infer.ret)
-    that_ret = that_infer.resolve(that_infer.ret)
+    this_ret = this_infer.resolve(ctx, this_infer.for_f[this_infer.ret])
+    that_ret = that_infer.resolve(ctx, that_infer.for_f[that_infer.ret])
     unless that_ret.subtype_of?(ctx, this_ret)
       errors << {(that_func.ret || that_func.ident).pos,
         "this function's return type is #{that_ret.show_type}"}
@@ -222,8 +222,8 @@ class Mare::Compiler::Infer::SubtypingInfo
     that_func.params.try do |l_params|
       this_func.params.try do |r_params|
         l_params.terms.zip(r_params.terms).each do |(l_param, r_param)|
-          l_param_mt = that_infer.resolve(l_param)
-          r_param_mt = this_infer.resolve(r_param)
+          l_param_mt = that_infer.resolve(ctx, that_infer.for_f[l_param])
+          r_param_mt = this_infer.resolve(ctx, this_infer.for_f[r_param])
           unless r_param_mt.subtype_of?(ctx, l_param_mt)
             errors << {l_param.pos,
               "this parameter type is #{l_param_mt.show_type}"}

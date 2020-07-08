@@ -237,8 +237,8 @@ describe Mare::Compiler::Infer do
     body = infer.reified.func(ctx).body.not_nil!
     assign = body.terms.first.as(Mare::AST::Relate)
 
-    infer.resolve(assign.lhs).show_type.should eq "String"
-    infer.resolve(assign.rhs).show_type.should eq "String"
+    infer.analysis.resolved(ctx, assign.lhs).show_type.should eq "String"
+    infer.analysis.resolved(ctx, assign.rhs).show_type.should eq "String"
   end
 
   it "infers a prop's type based on the prop initializer" do
@@ -255,7 +255,7 @@ describe Mare::Compiler::Infer do
     body = infer.reified.func(ctx).body.not_nil!
     prop = body.terms.first
 
-    infer.resolve(prop).show_type.should eq "String"
+    infer.analysis.resolved(ctx, prop).show_type.should eq "String"
   end
 
   it "infers an integer literal based on an assignment" do
@@ -271,8 +271,8 @@ describe Mare::Compiler::Infer do
     body = infer.reified.func(ctx).body.not_nil!
     assign = body.terms.first.as(Mare::AST::Relate)
 
-    infer.resolve(assign.lhs).show_type.should eq "(U64 | None)"
-    infer.resolve(assign.rhs).show_type.should eq "U64"
+    infer.analysis.resolved(ctx, assign.lhs).show_type.should eq "(U64 | None)"
+    infer.analysis.resolved(ctx, assign.rhs).show_type.should eq "U64"
   end
 
   it "infers an integer literal based on a prop type" do
@@ -294,7 +294,7 @@ describe Mare::Compiler::Infer do
     body = infer.reified.func(ctx).body.not_nil!
     field = body.terms.first
 
-    infer.resolve(field).show_type.should eq "U64"
+    infer.analysis.resolved(ctx, field).show_type.should eq "U64"
   end
 
   it "infers an integer literal through an if statement" do
@@ -314,9 +314,9 @@ describe Mare::Compiler::Infer do
       .as(Mare::AST::Choice).list[0][1]
       .as(Mare::AST::LiteralInteger)
 
-    infer.resolve(assign.lhs).show_type.should eq "(U64 | String | None)"
-    infer.resolve(assign.rhs).show_type.should eq "(U64 | None)"
-    infer.resolve(literal).show_type.should eq "U64"
+    infer.analysis.resolved(ctx, assign.lhs).show_type.should eq "(U64 | String | None)"
+    infer.analysis.resolved(ctx, assign.rhs).show_type.should eq "(U64 | None)"
+    infer.analysis.resolved(ctx, literal).show_type.should eq "U64"
   end
 
   it "complains when a literal couldn't be resolved to a single type" do
@@ -429,7 +429,7 @@ describe Mare::Compiler::Infer do
       infer = ctx.infer.for_func_simple(ctx, source, t_name, f_name)
       call = infer.reified.func(ctx).body.not_nil!.terms.first
 
-      infer.resolve(call).show_type.should eq "I32"
+      infer.analysis.resolved(ctx, call).show_type.should eq "I32"
     end
   end
 
@@ -454,7 +454,7 @@ describe Mare::Compiler::Infer do
       infer = ctx.infer.for_func_simple(ctx, source, t_name, f_name)
       expr = infer.reified.func(ctx).body.not_nil!.terms.first
 
-      infer.resolve(expr).show_type.should eq "I32"
+      infer.analysis.resolved(ctx, expr).show_type.should eq "I32"
     end
   end
 
@@ -529,8 +529,8 @@ describe Mare::Compiler::Infer do
     body = infer.reified.func(ctx).body.not_nil!
     assign = body.terms.first.as(Mare::AST::Relate)
 
-    infer.resolve(assign.lhs).show_type.should eq "X"
-    infer.resolve(assign.rhs).show_type.should eq "X"
+    infer.analysis.resolved(ctx, assign.lhs).show_type.should eq "X"
+    infer.analysis.resolved(ctx, assign.rhs).show_type.should eq "X"
   end
 
   it "requires allocation for non-non references of an allocated class" do
@@ -1046,8 +1046,8 @@ describe Mare::Compiler::Infer do
     body = infer.reified.func(ctx).body.not_nil!
     assign = body.terms.first.as(Mare::AST::Relate)
 
-    infer.resolve(assign.lhs).show_type.should eq "Array(String)"
-    infer.resolve(assign.rhs).show_type.should eq "Array(String)"
+    infer.analysis.resolved(ctx, assign.lhs).show_type.should eq "Array(String)"
+    infer.analysis.resolved(ctx, assign.rhs).show_type.should eq "Array(String)"
   end
 
   it "infers the element types of an array literal from an assignment" do
@@ -1064,9 +1064,9 @@ describe Mare::Compiler::Infer do
     assign = body.terms.first.as(Mare::AST::Relate)
     elem_0 = assign.rhs.as(Mare::AST::Group).terms.first
 
-    infer.resolve(assign.lhs).show_type.should eq "Array((U64 | None))"
-    infer.resolve(assign.rhs).show_type.should eq "Array((U64 | None))"
-    infer.resolve(elem_0).show_type.should eq "U64"
+    infer.analysis.resolved(ctx, assign.lhs).show_type.should eq "Array((U64 | None))"
+    infer.analysis.resolved(ctx, assign.rhs).show_type.should eq "Array((U64 | None))"
+    infer.analysis.resolved(ctx, elem_0).show_type.should eq "U64"
   end
 
   it "infers an empty array literal from its antecedent" do
@@ -1083,8 +1083,8 @@ describe Mare::Compiler::Infer do
     body = infer.reified.func(ctx).body.not_nil!
     assign = body.terms.first.as(Mare::AST::Relate)
 
-    infer.resolve(assign.lhs).show_type.should eq "Array(U64)"
-    infer.resolve(assign.rhs).show_type.should eq "Array(U64)"
+    infer.analysis.resolved(ctx, assign.lhs).show_type.should eq "Array(U64)"
+    infer.analysis.resolved(ctx, assign.rhs).show_type.should eq "Array(U64)"
   end
 
   it "complains when an empty array literal has no antecedent" do
