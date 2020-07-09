@@ -208,19 +208,17 @@
     @pad2((time.year % 100).u64, '0')
 
   :fun year_divided_by_100 (time Time'box)
-    str = String.new
-
-    Inspect.into(str, (time.year / 100).u32)
-
-    str.clone
+    Inspect[(time.year / 100).u32].clone
 
   :fun full_or_short_year (time Time'box)
     @year(time)
 
   :fun calendar_week_year (time Time'box)
-    // TODO
-    // pad4(time.calendar_week[0], '0')
-    ""
+    try (
+      @pad4(time.calendar_week()[0]!, '0')
+    | 
+      String.new_iso
+    )
 
   :fun calendar_week_year_modulo100 (time Time'box)
     // TODO

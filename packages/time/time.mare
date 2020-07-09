@@ -5,6 +5,28 @@
 :: The number of seconds is represented with 64-bit integer precision,
 :: with an additional 32-bit integer to specify nanoseconds within the second.
 
+:enum DayOfWeek
+  :member NoDay: 0
+  :member Monday: 1
+  :member Tuesday: 2
+  :member Wednesday: 3
+  :member Thursday: 4
+  :member Friday: 5
+  :member Saturday: 6
+  :member Sunday: 7
+  
+  :fun non from_value (value U8)
+    case (
+      | value == 1 | Monday
+      | value == 2 | Tuesday
+      | value == 3 | Wednesday
+      | value == 4 | Thursday
+      | value == 5 | Friday
+      | value == 6 | Saturday
+      | value == 7 | Sunday
+      | NoDay
+    )
+
 :class val Time
   :is Comparable(Time)
 
@@ -15,6 +37,9 @@
   :const _days_per_400_years U64: 146097
   :const _days_per_100_years U64: 36524
   :const _days_per_4_years U64: 1461
+
+  :fun non _days_month Array(U64):      [0.u64, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+  :fun non _days_month_leap Array(U64): [0.u64, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
 
   :: The total number of seconds since `0001-01-01 00:00:00.0` UTC
   :prop total_seconds U64
@@ -216,6 +241,105 @@
     - year.u64 / 100
     + year.u64 / 400
     + days_since_jan_1
+
+  :fun year_month_day_day_year Array(U64)
+    total_days = (@total_seconds / @_seconds_per_day).u64
+
+    num400 = (total_days / @_days_per_400_years).u64
+    total_days -= num400 * @_days_per_400_years
+
+    num100 = (total_days / @_days_per_100_years).u64
+    if (num100 == 4) (// leap
+      num100 = 3.u64
+    )
+    total_days -= num100 * @_days_per_100_years
+
+    num4 = (total_days / @_days_per_4_years).u64
+    total_days -= num4 * @_days_per_4_years
+
+    numyears = (total_days / 365).u64
+    if (numyears == 4.u64) (// leap
+      numyears = 3.u64
+    )
+    total_days -= numyears * 365.u64
+
+    year = num400 * 400.u64 + num100 * 100.u64 + num4 * 4.u64 + numyears + 1.u64
+
+    ordinal_day_in_year = total_days + 1.u64
+
+    month = 1.u64
+
+    try (
+      while True (
+        days_in_month = @_days_in_month(month.u8, year.u32).u64
+        if (total_days < days_in_month) (
+          error! // TODO use break
+        )
+
+        total_days -= days_in_month
+        month += 1.u64
+      )
+    )
+
+    day = total_days + 1.u64
+
+    [year, month, day, ordinal_day_in_year]
+
+  :fun calendar_week Array(U64) // TODO USE TUPPLE INSTEAD
+    try (
+      tmp = @year_month_day_day_year
+
+      year = tmp[0]!
+      month = tmp[1]!
+      day = tmp[2]!
+      day_year = tmp[3]!
+
+      day_of_week = @day_of_week
+
+      // The week number can be calculated as number of Mondays in the year up to
+      // the ordinal date.
+      // The addition by +10 consists of +7 to start the week numbering with 1
+      // instead of 0 and +3 because the first week has already started in the
+      // previous year and the first Monday is actually in week 2.
+      week_number = (day_year - day_of_week.u64 + 10.u64) // 7
+
+      if (week_number == 0.u64) (
+        // Week number 0 means the date belongs to the last week of the previous year.
+        year -= 1.u64
+
+        // The week number depends on whether the previous year has 52 or 53 weeks
+        // which can be determined by the day of week of January 1.
+        // The year has 53 weeks if Januar 1 is on a Friday or the year was a leap
+        // year and January 1 is on a Saturday.
+        jan1_day_of_week = DayOfWeek.from_value(((day_of_week.u64 - day_year + 1.u64) % 7.u64).u8)
+
+        if ((jan1_day_of_week == Friday) || (jan1_day_of_week == Saturday && @_is_leap_year(year.u32))) (
+          week_number = 53.u64
+        |
+          week_number = 52.u64
+        )
+      | 
+        if (week_number == 53.u64) (
+          // Week number 53 is actually week number 1 of the following year, if
+          // December 31 is on a Monday, Tuesday or Wednesday.
+          dec31_day_of_week = (day_of_week.u64 + 31.u64 - day) % 7.u64
+
+          if (dec31_day_of_week <= Wednesday.u64) (
+            year += 1.u64
+            week_number = 1.u64
+          )
+        )
+      )
+
+      [year, week_number]
+    |
+      // THIS SHOULD BE UNREACHABLE
+      []
+    )
+
+  :fun day_of_week
+    days = (@total_seconds / @_seconds_per_day).u64
+    DayOfWeek.from_value((days % 7.u64 + 1.u64).u8)
 
   :fun to_s
     @format("%Y")
