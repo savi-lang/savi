@@ -216,3 +216,9 @@
     - year.u64 / 100
     + year.u64 / 400
     + days_since_jan_1
+
+  :fun to_s
+    @format("%Y")
+
+  :fun format (pattern String'box) String'val
+    TimeFormatter.new(pattern).format(@)

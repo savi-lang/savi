@@ -1,11 +1,11 @@
 :class TimeFormatter
   :prop pattern String'box
-  :new(@pattern)
+  :new (@pattern)
 
   :fun format (time Time'box)
     i USize = 0
 
-    str = String.new
+    str = String.new_iso
 
     while (i < @pattern.size()) (
       try (
@@ -122,17 +122,17 @@
             str.push_byte(char)
           )
           i += 1
-        ) else (
+        |
           str.push_byte(char)
         )
         i += 1
       )
     )
 
-    str
+    --str
 
   :fun date_and_time (time Time'box)
-    str = String.new
+    str = String.new_iso
 
     str << @short_day_name(time)
     str.push_byte(' ')
@@ -144,10 +144,10 @@
     str.push_byte(' ')
     str << @year(time)
 
-    str
+    --str
 
   :fun date (time Time'box)
-    str = String.new
+    str = String.new_iso
 
     str << @month_zero_padded(time)
     str.push_byte('/')
@@ -155,10 +155,10 @@
     str.push_byte('/')
     str << @year_modulo_100(time)
 
-    str
+    --str
 
   :fun year_month_day (time Time'box)
-    str = String.new
+    str = String.new_iso
 
     str << @year(time)
     str.push_byte('-')
@@ -166,10 +166,10 @@
     str.push_byte('-')
     str << @day_of_month_zero_padded(time)
 
-    str
+    --str
 
   :fun twelve_hour_time (time Time'box)
-    str = String.new
+    str = String.new_iso
 
     str << @hour_12_zero_padded(time)
     str.push_byte(':')
@@ -179,19 +179,19 @@
     str.push_byte(' ')
     str << @am_pm_upcase(time)
 
-    str
+    --str
 
   :fun twenty_four_hour_time (time Time'box)
-    str = String.new
+    str = String.new_iso
 
     str << @hour_24_zero_padded(time)
     str.push_byte(':')
     str << @minute(time)
 
-    str
+    --str
 
   :fun twenty_four_hour_time_with_seconds (time Time'box)
-    str = String.new
+    str = String.new_iso
 
     str << @hour_24_zero_padded(time)
     str.push_byte(':')
@@ -199,16 +199,20 @@
     str.push_byte(':')
     str << @second(time)
 
-    str
+    --str
 
   :fun year (time Time'box)
-    @pad4(time.year, '0')
+    @pad4(time.year.u64, '0')
 
   :fun year_modulo_100 (time Time'box)
-    @pad2(time.year % 100, '0')
+    @pad2((time.year % 100).u64, '0')
 
   :fun year_divided_by_100 (time Time'box)
-    (time.year // 100).string()
+    str = String.new
+
+    Inspect.into(str, (time.year / 100).u32)
+
+    str.clone
 
   :fun full_or_short_year (time Time'box)
     @year(time)
@@ -224,13 +228,17 @@
     ""
 
   :fun month (time Time'box)
-    time.month.string()
+    str = String.new
+    
+    Inspect.into(str, time.month)
+
+    str.clone
 
   :fun month_zero_padded (time Time'box)
-    @pad2(time.month, '0')
+    @pad2(time.month.u64, '0')
 
   :fun month_blank_padded (time Time'box)
-    @pad2(time.month, ' ')
+    @pad2(time.month.u64, ' ')
 
   :fun month_name (time Time'box)
     @get_month_name(time)
@@ -254,13 +262,17 @@
     ""
 
   :fun day_of_month (time Time'box)
-    time.day.string()
+    str = String.new
+    
+    Inspect.into(str, time.day)
+
+    str.clone
 
   :fun day_of_month_zero_padded (time Time'box)
-    @pad2(time.day, '0')
+    @pad2(time.day.u64, '0')
 
   :fun day_of_month_blank_padded (time Time'box)
-    @pad2(time.day, ' ')
+    @pad2(time.day.u64, ' ')
 
   :fun day_name (time Time'box)
     @get_day_name(time)
@@ -279,13 +291,13 @@
     ""
 
   :fun short_day_name_with_comma! (time Time'box)
-    str = String.new
+    str = String.new_iso
 
     str << @short_day_name(time)
     str.push_byte(',')
     str.push_byte(' ')
     
-    str
+    --str
 
   :fun day_of_year_zero_padded (time Time'box)
     // TODO
@@ -293,39 +305,39 @@
     ""
 
   :fun hour_24_zero_padded (time Time'box)
-    @pad2(time.hour, '0')
+    @pad2(time.hour.u64, '0')
 
   :fun hour_24_blank_padded (time Time'box)
-    @pad2(time.hour, ' ')
+    @pad2(time.hour.u64, ' ')
 
   :fun hour_12_zero_padded (time Time'box)
-    h = (time.hour % 12)
-    @pad2(if (h == 0) (12) else (h)), '0')
+    h = (time.hour % 12).u64
+    @pad2(if (h == 0) (12 | h), '0')
 
   :fun hour_12_blank_padded (time Time'box)
-    h = (time.hour % 12)
-    @pad2(if (h == 0) (12) else (h), ' ')
+    h = (time.hour % 12).u64
+    @pad2(if (h == 0) (12 | h), ' ')
 
   :fun minute (time Time'box)
-    @pad2(time.minute, '0')
+    @pad2(time.minute.u64, '0')
 
   :fun second (time Time'box)
-    @pad2(time.second, '0')
+    @pad2(time.second.u64, '0')
 
   :fun milliseconds (time Time'box)
-    @pad3(time.nanosecond // 1000000, '0')
+    @pad3((time.nanosecond / 1000000).u64, '0')
 
   :fun microseconds (time Time'box)
-    @pad6(time.nanosecond // 1000, '0')
+    @pad6((time.nanosecond / 1000).u64, '0')
 
   :fun nanoseconds (time Time'box)
-    @pad9(time.nanosecond, '0')
+    @pad9(time.nanosecond.u64, '0')
 
   :fun second_fraction (time Time'box)
     @nanoseconds(time)
 
   :fun second_fraction! (time Time'box, fraction_digits I32 = 9)
-    str = String.new
+    str = String.new_iso
 
     case (
     | fraction_digits == 0 |
@@ -342,19 +354,19 @@
       error!
     )
 
-    str
+    --str
 
   :fun am_pm (time Time'box)
     if (time.hour < 12) (
       "am"
-    ) else (
+    |
       "pm"
     )
 
   :fun am_pm_upcase (time Time'box)
     if (time.hour < 12) (
       "AM"
-    ) else (
+    |
       "PM"
     )
 
@@ -373,7 +385,7 @@
     // io << time.to_unix
     ""
 
-  :fun time_zone(with_seconds = false) (time Time'box)
+  :fun time_zone (time Time'box, with_seconds = False)
     // TODO
     // time_zone_offset(format_seconds: with_seconds)
     ""
@@ -390,13 +402,13 @@
   //   time.zone.format(io, with_colon: force_colon, with_seconds: format_seconds)
   // end
 
-  :fun time_zone_colon (time Time'box, with_seconds Bool = false)
+  :fun time_zone_colon (time Time'box, with_seconds = False)
     // TODO
     // time_zone_offset(force_colon: true, format_seconds: with_seconds)
     ""
 
   :fun time_zone_colon_with_seconds (time Time'box)
-    @time_zone_colon(time, true)
+    @time_zone_colon(time, True)
 
   :fun time_zone_gmt (time Time'box)
     "GMT"
@@ -434,62 +446,61 @@
     // get_day_name[0, 3]
     ""
 
-  :fun pad2(value U32, padding U8)
+  :fun pad2 (value U64, padding U8)
     str = String.new
 
     if (value < 10) (
-      str.write_byte(padding) 
+      str.push_byte(padding) 
     )
-    str << value.string()
+    Inspect.into(str, value)
     
-    str
+    str.clone()
 
-  :fun pad3(value U32, padding U8)
-    str = String.new
+  :fun pad3 (value U64, padding U8)
+    str = String.new_iso
 
     if (value < 100) (
-      str.write_byte(padding)
+      str.push_byte(padding)
     )
     str << @pad2(value, padding)
     
-    str
+    --str
 
-  :fun pad4(value U32, padding U8)
-    str = String.new
+  :fun pad4 (value U64, padding U8)
+    str = String.new_iso
 
     if (value < 1000) (
-      str.write_byte(padding)
+      str.push_byte(padding)
     )
     str << @pad3(value, padding)
     
-    str
+    --str
 
-  :fun pad6(value U32, padding U8)
-    str = String.new
+  :fun pad6 (value U64, padding U8)
+    str = String.new_iso
 
     if (value < 100000) (
-      str.write_byte(padding)
+      str.push_byte(padding)
     )
     if (value < 10000) (
-      str.write_byte(padding)
+      str.push_byte(padding)
     )
     str << @pad4(value, padding)
     
-    str
+    --str
 
-  :fun pad9(value U32, padding U8)
-    str = String.new
+  :fun pad9 (value U64, padding U8)
+    str = String.new_iso
 
     if (value < 100000000) (
-      str.write_byte(padding)
+      str.push_byte(padding)
     )
     if (value < 10000000) (
-      str.write_byte(padding)
+      str.push_byte(padding)
     )
     if (value < 1000000) (
-      str.write_byte(padding)
+      str.push_byte(padding)
     )
     str << @pad6(value, padding)
     
-    str
-
+    --str
