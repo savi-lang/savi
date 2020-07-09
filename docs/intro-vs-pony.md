@@ -31,6 +31,7 @@ A declaration "head" is any such line beginning with a colon-prefixed identifier
 
 Unlike functions in pony, in Mare:
 * function declaration doesn't require parenthesis if there are no arguments
+* function call doesn't require parenthesis if there are no arguments
 * it's mandatory to put a whitespace between function name and it's parameters
 * partial functions' names must end with `!` instead of `?` after the return type (like it is in pony)
 
