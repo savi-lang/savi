@@ -44,9 +44,6 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         @partial_reifieds.each
       end
     end
-    def each_non_partial_reified
-      @reached_fully_reifieds.each.chain([no_args].each)
-    end
   end
 
   struct FuncAnalysis
@@ -246,7 +243,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         # (this should include all reifications reachable from any defined
         # function, though not necessarily all reachable from Main.new)
         # TODO: Should we be limiting to only paths reachable from Main.new?
-        t_analysis.each_non_partial_reified.each do |rt|
+        t_analysis.each_reached_fully_reified.each do |rt|
           rt_analysis = self[rt]
 
           # Store the array of all known complete subtypes that have been
@@ -299,7 +296,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       # (this should include all reifications reachable from any defined
       # function, though not necessarily all reachable from Main.new)
       # TODO: Should we be limiting to only paths reachable from Main.new?
-      t_analysis.each_non_partial_reified.each do |rt|
+      t_analysis.each_reached_fully_reified.each do |rt|
 
         # For each known complete subtypes that have been established
         # by testing via some code path in the program thus far...
