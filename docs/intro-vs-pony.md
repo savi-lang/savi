@@ -207,18 +207,18 @@ Not all operators are sugar for functions. For example, the boolean binary opera
 
 #### FFI Block
 
-While in pony we use @ to mark that we are calling the C function, in mare we declare an ffi block:
+While in pony we use `@` to mark that we are calling a C function, in Mare we declare an `:ffi` type:
 
 ```mare
 :ffi LibC
   :fun printf (format CPointer(U8), arg1 CPointer(U8)) I32
 ```
 
-In the example above you see that we are declearing plaint functions. You need to specify all types just like in pony. All ffi functions have `non` rcap
+In the example above you see that we are declearing plain functions. You need to specify all types, just like in pony. All FFI functions have the `non` reference capability.
 
 #### Usage example
 
-In Mare all ffi functions are namespaced so to call them you can do this:
+In Mare, all FFI functions are namespaced by the `:ffi` type name you declared, so you can call them just like a method of a type is called:
 ```mare
 :class Greeting
   :prop message1 String
