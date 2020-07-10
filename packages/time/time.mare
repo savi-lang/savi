@@ -38,6 +38,10 @@
   :const _days_per_100_years U64: 36524
   :const _days_per_4_years U64: 1461
 
+  :const _unix_epoch U64: 62135596800
+  :fun non unix_epoch
+    @seconds(@_unix_epoch)
+
   :fun non _days_month Array(U64):      [0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
   :fun non _days_month_leap Array(U64): [0, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
 
@@ -338,11 +342,11 @@
     )
 
   :fun to_unix I64
-    (total_seconds - UNIX_EPOCH.total_seconds).i64
+    (@total_seconds - @_unix_epoch).i64
 
   :fun day_of_year U64
     try (
-      year_month_day_day_year[3]!
+      @year_month_day_day_year[3]!
     | 
       0
     )

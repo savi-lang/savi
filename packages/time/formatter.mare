@@ -1,5 +1,5 @@
 :class TimeFormatter
-  :const month_names Array(String): [
+  :fun non month_names Array(String): [
     "January"
     "February"
     "March"
@@ -14,7 +14,7 @@
     "December"
   ]
 
-  :const day_names Array(String): [
+  :fun non day_names Array(String): [
     "Sunday"
     "Monday"
     "Tuesday"
@@ -439,23 +439,23 @@
 
   :fun get_month_name (time Time'box)
     try (
-      @month_names[time.month - 1]!
+      @month_names[time.month.usize - 1]!
     | 
-      String.new_iso
+      ""
     )
 
   :fun get_short_month_name (time Time'box)
-    @get_month_name.substring(0, 3)
+    @get_month_name(time).substring(0, 3)
 
   :fun get_day_name (time Time'box)
     try (
       @day_names[time.day_of_week.usize % 7]!
     |
-      String.new_iso
+      ""
     )
 
   :fun get_short_day_name (time Time'box)
-    @get_day_name.substring(0, 3)
+    @get_day_name(time).substring(0, 3)
 
   :fun pad2 (value U64, padding U8)
     str = String.new

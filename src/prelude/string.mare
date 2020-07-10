@@ -1,3 +1,4 @@
+:import "collections" (Count)
 :class val String
   :is Comparable(String'box)
 
@@ -271,15 +272,14 @@
       to = @_size
     )
 
-    if (from >= to) (
-      return String.new_iso
-    )
-
     str = String.new_iso
 
-    Count.to(to - from) -> ( i |
-      try (
-        str.push_byte(@[i]!)
+    if (from < to) (
+      Count.to(to - from) -> ( i |
+        try (
+          str.push_byte(@[i]!)
+          None // TODO Fix value is not used
+        )
       )
     )
 
