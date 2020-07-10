@@ -870,19 +870,15 @@ class Mare::Compiler::CodeGen
         gen_expr(body)
       end
 
-    # For field initializers, make sure the LLVM type of the return value
-    # matches the LLVM return type declared in the function head.
-    # TODO: Why only field initializers? Why not all functions?
-    if gfunc.func.has_tag?(:field)
-      return_type = gfunc.reach_func.signature.ret
-      last_value = gen_assign_cast(last_value, return_type, last_expr) if last_expr
-    end
-
     unless func_frame.jumps.away?(gfunc.func.body.not_nil!)
       case gfunc.calling_convention(ctx)
       when :constructor_cc
         @builder.ret
       when :simple_cc
+        if last_expr
+          return_type = gfunc.reach_func.signature.ret
+          last_value = gen_assign_cast(last_value, return_type, last_expr)
+        end
         @builder.ret(last_value)
       when :error_cc
         gen_return_using_error_cc(last_value, last_expr.not_nil!, false)
@@ -1929,6 +1925,7 @@ class Mare::Compiler::CodeGen
     from_llvm_type = llvm_type_of(from_type)
     to_llvm_type = llvm_type_of(to_type)
 
+    pp (from_frame || func_frame).llvm_func unless value.type == from_llvm_type
     # We assert that the origin llvm type derived from type analysis is the
     # same as the actual type of the llvm value we are being asked to cast.
     raise "value type #{value.type} doesn't match #{from_llvm_type}:\n" +
