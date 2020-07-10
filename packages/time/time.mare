@@ -5,6 +5,7 @@
 :: The number of seconds is represented with 64-bit integer precision,
 :: with an additional 32-bit integer to specify nanoseconds within the second.
 
+
 :enum DayOfWeek
   :member NoDay: 0
   :member Monday: 1
@@ -294,6 +295,7 @@
       tmp = @year_month_day_day_year
 
       year = tmp[0]!
+
       month = tmp[1]!
       day = tmp[2]!
       day_year = tmp[3]!
@@ -305,7 +307,7 @@
       // The addition by +10 consists of +7 to start the week numbering with 1
       // instead of 0 and +3 because the first week has already started in the
       // previous year and the first Monday is actually in week 2.
-      week_number = (day_year - day_of_week.u64 + 10) // 7
+      week_number = ((day_year - day_of_week.u64 + 10) / 7).u64
 
       if (week_number == 0) (
         // Week number 0 means the date belongs to the last week of the previous year.
@@ -356,7 +358,7 @@
     DayOfWeek.from_value((days % 7 + 1).u8)
 
   :fun to_s
-    @format("%Y")
+    @format("%m/%d/%y")
 
   :fun format (pattern String'box) String'val
     TimeFormatter.new(pattern).format(@)

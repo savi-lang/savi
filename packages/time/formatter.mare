@@ -32,9 +32,14 @@
 
     str = String.new_iso
 
+    is_bad_format = False
+
     while (i < @pattern.size()) (
       try (
         char U8 = @pattern[i]!
+
+        ok = True
+
         if (char == '%') (
           char = @pattern[i + 1]!
           case (
@@ -77,20 +82,22 @@
             case (
             | char == 'm' | str << @month_blank_padded(time)
             |
+              ok = False
               str.push_byte('%')
               str.push_byte('_')
             )
-            i += 1
+            if ok (i += 1)
           | char == '-' |
             char = @pattern[i + 2]!
             case (
             | char == 'd' | str << @day_of_month(time)
             | char == 'm' | str << @month(time)
             |
+              ok = False
               str.push_byte('%')
               str.push_byte('-')
             )
-            i += 1
+            if ok (i += 1)
           | char == '^' |
             char = @pattern[i + 2]!
             case (
@@ -99,10 +106,11 @@
             | (char == 'b') || (char == 'h') | str << @short_month_name_upcase(time)
             | char == 'B' | str << @month_name_upcase(time)
             |
+              ok = False
               str.push_byte('%')
               str.push_byte('^')
             )
-            i += 1
+            if ok (i += 1)
           | char == ':' |
             char = @pattern[i + 2]!
             case (
@@ -112,34 +120,34 @@
               case (
               | char == 'z' | str << @time_zone_colon_with_seconds(time)
               |
+                ok = False
                 str.push_byte('%')
                 str.push_byte(':')
                 str.push_byte(':')
               )
-              i += 1
+              if ok (i += 1)
             |
               str.push_byte('%')
               str.push_byte(':')
             )
-            i += 1
+            if ok (i += 1)
           | (char == '3') || (char == '6') || (char == '9') |
             digit_char = char
             char = @pattern[i + 2]!
             case (
             | char == 'N' |
               case (
-              | char == '3' | str << @milliseconds(time)
-              | char == '6' | str << @microseconds(time)
-              | char == '9' | str << @nanoseconds(time)
-              |
-                error!
+              | digit_char == '3' | str << @milliseconds(time)
+              | digit_char == '6' | str << @microseconds(time)
+              | digit_char == '9' | str << @nanoseconds(time)
               )
               i += 1
             |
+              ok = False
               str.push_byte('%')
               str.push_byte(digit_char)
             )
-            i += 1
+            if ok (i += 1)
           | char == '%' |
             str.push_byte('%')
           |
@@ -151,7 +159,13 @@
           str.push_byte(char)
         )
         i += 1
+      |
+        is_bad_format = True
       )
+    )
+
+    if is_bad_format (
+      str = String.new_iso
     )
 
     --str
