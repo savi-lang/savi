@@ -211,6 +211,30 @@ Just like in Pony, most major operators are really just function calls in disgui
 
 Not all operators are sugar for functions. For example, the boolean binary operators `&&` and `||` are not function calls, because they have so-called "short-circuiting" semantics that violate normal control flow expectations for function call arguments.
 
+### C-FFI
+
+#### FFI Block
+
+While in pony we use `@` to mark that we are calling a C function, in Mare we declare an `:ffi` type:
+
+```mare
+:ffi LibC
+  :fun printf (format CPointer(U8), arg1 CPointer(U8)) I32
+```
+
+In the example above you see that we are declearing plain functions. You need to specify all types, just like in pony. All FFI functions have the `non` reference capability.
+
+#### Usage example
+
+In Mare, all FFI functions are namespaced by the `:ffi` type name you declared, so you can call them just like a method of a type is called:
+```mare
+:class Greeting
+  :prop message1 String
+  :new iso (@message1)
+  :fun say
+    LibC.printf("%s\n".cstring, @message1.cstring)
+```
+
 ### [TODO: More Syntax Info...]
 
 ## Semantics
