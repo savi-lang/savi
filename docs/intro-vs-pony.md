@@ -261,6 +261,31 @@ If you want to take some other fallback action rather than raising an error, you
     )
 ```
 
+### Generics
+
+#### Generic functions
+
+Generic functions in Mare are very different from Pony's ones.
+
+[TODO: Generic functions info...]
+
+#### Generic types
+
+Generic types are have a bit different syntax
+```mare
+:class Map (K, V, H HashFunction(K))
+
+:trait Comparable (A Comparable(A)'read)
+```
+Here you can see that we are using parenthesis instead of square brackets. Also we specify the restrictions as we are specifying types of variables. 
+
+To use this type you need to specify types in parenthesis
+```
+Map(String, I32).new // we instantiate new Map
+U64[0] // here we cast a numeric type to the U64 type
+Array(String) // it can be used as a restriction
+```
+
 ### C-FFI
 
 #### FFI Block
