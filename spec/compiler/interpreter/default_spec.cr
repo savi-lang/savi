@@ -43,4 +43,23 @@ describe Mare::Compiler::Interpreter::Default do
       Mare::Compiler.compile([source], :import)
     end
   end
+
+  it "correctly handles an explicit union return type" do
+    source = Mare::Source.new_example <<-SOURCE
+    :trait Greeter
+      :fun greeting (String | None)
+    SOURCE
+
+    ctx = Mare::Compiler.compile([source], :import)
+
+    greeter = ctx.program.types.first
+    greeting = greeter.functions.first
+    greeting.params.should eq nil
+    greeting.ret.not_nil!.to_a.pretty_inspect(74).should eq <<-AST
+    [:group,
+     "|",
+     [:group, "(", [:ident, "String"]],
+     [:group, "(", [:ident, "None"]]]
+    AST
+  end
 end

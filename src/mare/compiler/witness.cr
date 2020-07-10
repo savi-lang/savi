@@ -155,7 +155,7 @@ class Mare::Witness
       end
     when "params"
       # TODO: more specific requirements here
-      term.is_a?(AST::Group)
+      term.is_a?(AST::Group) && term.style == "("
     else raise NotImplementedError.new(t)
     end
   end
