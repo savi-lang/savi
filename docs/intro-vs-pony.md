@@ -29,11 +29,12 @@ A declaration "head" is any such line beginning with a colon-prefixed identifier
 
 ### Functions
 
-Unlike functions in pony, in Mare:
-* function declaration doesn't require parenthesis if there are no arguments
-* function call doesn't require parenthesis if there are no arguments
-* it's mandatory to put a whitespace between function name and it's parameters
-* partial functions' names must end with `!` instead of `?` after the return type (like it is in pony)
+Function calls and function declarations in Mare have a few differences from Pony:
+
+- a function declaration doesn't require parenthesis if there are no parameters
+- function call doesn't require parenthesis if there are no arguments
+- it's mandatory to put whitespace between function name and it's parameters (this may be changed or relaxed in the future, pending more syntax decisions)
+- partial functions' names must end with `!`, rather than marking them with `?` after the return type as it is done in Pony
 
 ### Comments
 
@@ -52,7 +53,7 @@ Unlike in Pony, the documentation comments for a type of function appear *above*
   ::
   :: $ Example.greeting
   :: > "Hello, World!"
-  
+
   :fun greeting
     "Hello, World!" // this is a line comment, discarded by the parser
 ```
@@ -198,13 +199,13 @@ Just like in Pony, most major operators are really just function calls in disgui
   :prop x U64
   :prop y U64
   :new (@x, @y)
-  
+
   :fun "+" (other Vector)
     @new(@x + other.x, @y + other.y)
-  
+
   :fun "-" (other Vector)
     @new(@x - other.x, @y - other.y)
-  
+
   :fun "==" (other Vector)
     (@x == other.x) && (@y == other.y)
 ```
@@ -246,14 +247,14 @@ If you want to take some other fallback action rather than raising an error, you
 
 #### FFI Block
 
-While in pony we use `@` to mark that we are calling a C function, in Mare we declare an `:ffi` type:
+While in Pony we use `@` to mark that we are calling a C function, in Mare we declare an `:ffi` type:
 
 ```mare
 :ffi LibC
   :fun printf (format CPointer(U8), arg1 CPointer(U8)) I32
 ```
 
-In the example above you see that we are declearing plain functions. You need to specify all types, just like in pony. All FFI functions have the `non` reference capability.
+In the example above you see that we are declearing plain functions. You need to specify all types, just like in Pony. All FFI functions have the `non` reference capability.
 
 #### Usage example
 
