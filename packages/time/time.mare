@@ -38,8 +38,8 @@
   :const _days_per_100_years U64: 36524
   :const _days_per_4_years U64: 1461
 
-  :fun non _days_month Array(U64):      [0.u64, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
-  :fun non _days_month_leap Array(U64): [0.u64, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+  :fun non _days_month Array(U64):      [0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+  :fun non _days_month_leap Array(U64): [0, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
 
   :: The total number of seconds since `0001-01-01 00:00:00.0` UTC
   :prop total_seconds U64
@@ -243,31 +243,31 @@
     + days_since_jan_1
 
   :fun year_month_day_day_year Array(U64)
-    total_days = (@total_seconds / @_seconds_per_day).u64
-
-    num400 = (total_days / @_days_per_400_years).u64
+    total_days U64 = (@total_seconds / @_seconds_per_day)
+    
+    num400 U64 = (total_days / @_days_per_400_years)
     total_days -= num400 * @_days_per_400_years
 
-    num100 = (total_days / @_days_per_100_years).u64
+    num100 = (total_days / @_days_per_100_years)
     if (num100 == 4) (// leap
-      num100 = 3.u64
+      num100 = 3
     )
     total_days -= num100 * @_days_per_100_years
 
-    num4 = (total_days / @_days_per_4_years).u64
+    num4 U64 = (total_days / @_days_per_4_years)
     total_days -= num4 * @_days_per_4_years
 
-    numyears = (total_days / 365).u64
-    if (numyears == 4.u64) (// leap
-      numyears = 3.u64
+    numyears = (total_days / 365)
+    if (numyears == 4) (// leap
+      numyears = 3
     )
-    total_days -= numyears * 365.u64
+    total_days -= numyears * 365
 
-    year = num400 * 400.u64 + num100 * 100.u64 + num4 * 4.u64 + numyears + 1.u64
+    year = num400 * 400 + num100 * 100 + num4 * 4 + numyears + 1
 
-    ordinal_day_in_year = total_days + 1.u64
+    ordinal_day_in_year U64 = total_days + 1
 
-    month = 1.u64
+    month U64 = 1
 
     try (
       while True (
@@ -277,11 +277,11 @@
         )
 
         total_days -= days_in_month
-        month += 1.u64
+        month += 1
       )
     )
 
-    day = total_days + 1.u64
+    day U64 = total_days + 1
 
     [year, month, day, ordinal_day_in_year]
 
@@ -301,32 +301,32 @@
       // The addition by +10 consists of +7 to start the week numbering with 1
       // instead of 0 and +3 because the first week has already started in the
       // previous year and the first Monday is actually in week 2.
-      week_number = (day_year - day_of_week.u64 + 10.u64) // 7
+      week_number = (day_year - day_of_week.u64 + 10) // 7
 
-      if (week_number == 0.u64) (
+      if (week_number == 0) (
         // Week number 0 means the date belongs to the last week of the previous year.
-        year -= 1.u64
+        year -= 1
 
         // The week number depends on whether the previous year has 52 or 53 weeks
         // which can be determined by the day of week of January 1.
         // The year has 53 weeks if Januar 1 is on a Friday or the year was a leap
         // year and January 1 is on a Saturday.
-        jan1_day_of_week = DayOfWeek.from_value(((day_of_week.u64 - day_year + 1.u64) % 7.u64).u8)
+        jan1_day_of_week = DayOfWeek.from_value(((day_of_week.u64 - day_year + 1) % 7).u8)
 
         if ((jan1_day_of_week == Friday) || (jan1_day_of_week == Saturday && @_is_leap_year(year.u32))) (
-          week_number = 53.u64
+          week_number = 53
         |
-          week_number = 52.u64
+          week_number = 52
         )
       | 
-        if (week_number == 53.u64) (
+        if (week_number == 53) (
           // Week number 53 is actually week number 1 of the following year, if
           // December 31 is on a Monday, Tuesday or Wednesday.
-          dec31_day_of_week = (day_of_week.u64 + 31.u64 - day) % 7.u64
+          dec31_day_of_week = (day_of_week.u64 + 31 - day) % 7
 
           if (dec31_day_of_week <= Wednesday.u64) (
-            year += 1.u64
-            week_number = 1.u64
+            year += 1
+            week_number = 1
           )
         )
       )
@@ -337,9 +337,19 @@
       []
     )
 
+  :fun to_unix I64
+    (total_seconds - UNIX_EPOCH.total_seconds).i64
+
+  :fun day_of_year U64
+    try (
+      year_month_day_day_year[3]!
+    | 
+      0
+    )
+
   :fun day_of_week
-    days = (@total_seconds / @_seconds_per_day).u64
-    DayOfWeek.from_value((days % 7.u64 + 1.u64).u8)
+    days U64 = (@total_seconds / @_seconds_per_day)
+    DayOfWeek.from_value((days % 7 + 1).u8)
 
   :fun to_s
     @format("%Y")
