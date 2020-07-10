@@ -25,7 +25,7 @@ describe Mare::Compiler::Privacy do
 
   pending "won't allow an interface in the local library to circumvent"
 
-  pending "won't try (and fail) to check privacy of unreachable choice branches" do
+  it "won't try (and fail) to check privacy of unreachable choice branches" do
     source = Mare::Source.new_example <<-SOURCE
     :trait Trait
       :fun trait None

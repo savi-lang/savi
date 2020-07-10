@@ -27,6 +27,14 @@ A declaration "head" is any such line beginning with a colon-prefixed identifier
   :fun greeting: "Hello, World!"
 ```
 
+### Functions
+
+Unlike functions in pony, in Mare:
+* function declaration doesn't require parenthesis if there are no arguments
+* function call doesn't require parenthesis if there are no arguments
+* it's mandatory to put a whitespace between function name and it's parameters
+* partial functions' names must end with `!` instead of `?` after the return type (like it is in pony)
+
 ### Comments
 
 Like Pony, Mare has comments using the `//` syntax to mark the beginning of a comment, causing the parser to ignore all of the rest of the characters on that line.
@@ -202,6 +210,61 @@ Just like in Pony, most major operators are really just function calls in disgui
 ```
 
 Not all operators are sugar for functions. For example, the boolean binary operators `&&` and `||` are not function calls, because they have so-called "short-circuiting" semantics that violate normal control flow expectations for function call arguments.
+
+### Type Checking at Runtime
+
+Pony has two ways of "casting" to a more specific type - `as` and `match`. In Mare, we have both of these options but they look a little different.
+
+Just like in Pony, we use `as` for forcefully "casting" in a way that can raise an error. But rather than looking like a keyword, it looks like a method call, and it has the `!` symbol as part of its name, just like all other method calls that can raise an error:
+
+```mare
+:trait Greeter
+  :fun greeting (String | None)
+
+:class World
+  :fun meet! (greeter Greeter)
+    greeter.greeting.as!(String)
+```
+
+If you want to take some other fallback action rather than raising an error, you can use the subtype check operator (`<:`) to check the type of a local variable in the clause of an `if` block:
+
+```mare
+:trait Greeter
+  :fun greeting (String | None)
+
+:class World
+  :fun meet (greeter Greeter) String
+    greeting = greeter.greeting
+    if (greeting <: String) (
+      greeting
+    |
+      "(a fallback greeting, to ensure the function always returns a String)"
+    )
+```
+
+### C-FFI
+
+#### FFI Block
+
+While in pony we use `@` to mark that we are calling a C function, in Mare we declare an `:ffi` type:
+
+```mare
+:ffi LibC
+  :fun printf (format CPointer(U8), arg1 CPointer(U8)) I32
+```
+
+In the example above you see that we are declearing plain functions. You need to specify all types, just like in pony. All FFI functions have the `non` reference capability.
+
+#### Usage example
+
+In Mare, all FFI functions are namespaced by the `:ffi` type name you declared, so you can call them just like a method of a type is called:
+```mare
+:class Greeting
+  :prop message1 String
+  :new iso (@message1)
+  :fun say
+    LibC.printf("%s\n".cstring, @message1.cstring)
+```
 
 ### [TODO: More Syntax Info...]
 

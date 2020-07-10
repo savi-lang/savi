@@ -2,6 +2,8 @@ class Mare::Compiler::Infer
   abstract class Info
     property pos : Source::Pos = Source::Pos.none
 
+    abstract def add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
+
     abstract def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
     def post_resolve!(ctx : Context, infer : ForReifiedFunc, mt : MetaType)
     end
@@ -11,12 +13,14 @@ class Mare::Compiler::Infer
     def resolve_others!(ctx : Context, infer : ForReifiedFunc)
     end
 
-    abstract def add_downstream(
-      ctx : Context,
-      use_pos : Source::Pos,
-      info : Info,
-      aliases : Int32,
-    )
+    # In the rare case that an Info subclass needs to dynamically pretend to be
+    # a different downstream constraint, it can override this method.
+    # If you need to report multiple positions, also override the other method
+    # below called as_multiple_downstream_constraints.
+    # This will prevent upstream DynamicInfos from eagerly resolving you.
+    def as_downstream_constraint_meta_type(ctx : Context, infer : ForReifiedFunc) : MetaType?
+      infer.resolve(ctx, self)
+    end
 
     # In the rare case that an Info subclass needs to dynamically pretend to be
     # multiple different downstream constraints, it can override this method.
@@ -46,9 +50,9 @@ class Mare::Compiler::Infer
     # Info node types are fixed, meaning that they act only as constraints
     # on their upstreams, and are not influenced at all by upstream info nodes.
     @downstreams = [] of Tuple(Source::Pos, Info, Int32)
-    def add_downstream(ctx : Context, use_pos : Source::Pos, info : Info, aliases : Int32)
+    def add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
       @downstreams << {use_pos, info, aliases + adds_alias}
-      after_add_downstream(ctx, use_pos, info, aliases)
+      after_add_downstream(use_pos, info, aliases)
     end
     def downstreams_empty?
       @downstreams.empty?
@@ -58,7 +62,7 @@ class Mare::Compiler::Infer
     end
 
     # May be implemented by the child class as an optional hook.
-    def after_add_downstream(ctx : Context, use_pos : Source::Pos, info : Info, aliases : Int32)
+    def after_add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
     end
 
     # When we need to take into consideration the downstreams' constraints
@@ -66,9 +70,9 @@ class Mare::Compiler::Infer
     # those constraints into one intersection of them all.
     def total_downstream_constraint(ctx : Context, infer : ForReifiedFunc)
       MetaType.new_intersection(
-        @downstreams.map { |_, other_info, _|
-          infer.resolve(ctx, other_info).as(MetaType)
-        }
+        @downstreams.map do |_, other_info, _|
+          other_info.as_downstream_constraint_meta_type(ctx, infer).as(MetaType)
+        end
       )
     end
 
@@ -152,28 +156,11 @@ class Mare::Compiler::Infer
     end
   end
 
-  class Unreachable < Info
-    INSTANCE = new
-    def self.instance; INSTANCE end
-
-    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
-      MetaType.new(MetaType::Unsatisfiable.instance)
-    end
-
-    def add_downstream(ctx : Context, use_pos : Source::Pos, info : Info, aliases : Int32)
-      # Do nothing; we're already unsatisfiable...
-    end
-  end
-
   abstract class NamedInfo < DynamicInfo
     @explicit : Info?
     @upstreams = [] of Tuple(Info, Source::Pos)
 
     def initialize(@pos)
-    end
-
-    def explicit? : Bool
-      !!@explicit
     end
 
     def adds_alias; 1 end
@@ -184,8 +171,34 @@ class Mare::Compiler::Infer
       @pos
     end
 
-    def resolve_others!(ctx : Context, infer : ForReifiedFunc)
-      @upstreams.each { |upstream, _| infer.resolve(ctx, upstream) }
+    def explicit? : Bool
+      !!@explicit
+    end
+
+    def set_explicit(explicit : Info)
+      raise "already set_explicit" if @explicit
+      raise "shouldn't have an upstream yet" unless @upstreams.empty?
+
+      @explicit = explicit
+      @pos = explicit.pos
+    end
+
+    def after_add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
+      return if @explicit
+
+      @upstreams.each do |upstream, upstream_pos|
+        upstream.add_downstream(use_pos, info, aliases)
+      end
+    end
+
+    def assign(ctx : Context, upstream : Info, upstream_pos : Source::Pos)
+      @upstreams << {upstream, upstream_pos}
+
+      if @explicit
+        upstream.add_downstream(upstream_pos, @explicit.not_nil!, 0)
+      elsif @upstreams.size > 1
+        upstream.add_downstream(upstream_pos, self, 0)
+      end
     end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc)
@@ -225,32 +238,6 @@ class Mare::Compiler::Infer
       # If we get here, we've failed and don't have enough info to continue.
       Error.at self,
         "This #{describe_kind} needs an explicit type; it could not be inferred"
-    end
-
-    def set_explicit(explicit : Info)
-      raise "already set_explicit" if @explicit
-      raise "shouldn't have an upstream yet" unless @upstreams.empty?
-
-      @explicit = explicit
-      @pos = explicit.pos
-    end
-
-    def after_add_downstream(ctx : Context, use_pos : Source::Pos, info : Info, aliases : Int32)
-      return if @explicit
-
-      @upstreams.each do |upstream, upstream_pos|
-        upstream.add_downstream(ctx, use_pos, info, aliases)
-      end
-    end
-
-    def assign(ctx : Context, upstream : Info, upstream_pos : Source::Pos)
-      @upstreams << {upstream, upstream_pos}
-
-      if @explicit
-        upstream.add_downstream(ctx, upstream_pos, @explicit.not_nil!, 0)
-      elsif @upstreams.size > 1
-        upstream.add_downstream(ctx, upstream_pos, self, 0)
-      end
     end
   end
 
@@ -412,11 +399,19 @@ class Mare::Compiler::Infer
       # to print a consistent error message instead of printing it here.
       return @possible if meta_type.unsatisfiable?
 
-      if !meta_type.singular?
+      unless meta_type.singular? && meta_type.single!.link.is_concrete?
+        extra_info = describe_downstream_constraints(ctx, infer)
+        extra_info.push({pos,
+          "and the literal itself has an intrinsic type of #{meta_type.show_type}"
+        })
+        extra_info.push({Source::Pos.none,
+          "Please wrap an explicit numeric type around the literal " \
+            "(for example: U64[#{@pos.content}])"
+        })
+
         Error.at self,
           "This literal value couldn't be inferred as a single concrete type",
-          describe_downstream_constraints(ctx, infer).push({pos,
-            "and the literal itself has an intrinsic type of #{meta_type.show_type}"})
+          extra_info
       end
 
       meta_type
@@ -443,7 +438,7 @@ class Mare::Compiler::Infer
     def describe_kind; "field reference" end
 
     def assign(ctx : Context, upstream : Info, upstream_pos : Source::Pos)
-      upstream.add_downstream(ctx, upstream_pos, self, 0)
+      upstream.add_downstream(upstream_pos, self, 0)
       @upstreams << upstream
     end
 
@@ -510,14 +505,12 @@ class Mare::Compiler::Infer
     def initialize(@pos)
     end
 
-    def describe_kind; "error expression" end
+    def add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
+      raise "can't be downstream of a RaiseError"
+    end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc)
       MetaType.new(MetaType::Unsatisfiable.instance)
-    end
-
-    def add_downstream(ctx : Context, use_pos : Source::Pos, info : Info, aliases : Int32)
-      raise "can't be downstream of a RaiseError"
     end
   end
 
@@ -533,7 +526,9 @@ class Mare::Compiler::Infer
       @final_term = @terms.empty? ? FixedPrelude.new(@pos, "None") : @terms.last
     end
 
-    def describe_kind; "block" end
+    def add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
+      final_term.add_downstream(use_pos, info, aliases)
+    end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc)
       infer.resolve(ctx, final_term)
@@ -542,57 +537,136 @@ class Mare::Compiler::Infer
     def resolve_others!(ctx : Context, infer : ForReifiedFunc)
       terms.each { |term| infer.resolve(ctx, term) }
     end
-
-    def add_downstream(ctx : Context, use_pos : Source::Pos, info : Info, aliases : Int32)
-      final_term.add_downstream(ctx, use_pos, info, aliases)
-    end
   end
 
   # TODO: add some kind of logic for analyzing exhausted choices,
   # as well as necessary/sufficient conditions for each branch to be in play
   # letting us better specialize the codegen later by eliminating impossible
   # branches in particular reifications of this type or function.
-  class Phi < Info
+  class Phi < DynamicInfo
     getter branches : Array({Info?, Info, Bool})
-
-    def initialize(@pos, @branches)
-    end
 
     def describe_kind; "choice block" end
 
+    def initialize(@pos, @branches)
+      @branches.each do |cond, body, body_jumps_away|
+        body.add_downstream(@pos, self, 0) unless body_jumps_away
+      end
+    end
+
+    def as_downstream_constraint_meta_type(ctx : Context, infer : ForReifiedFunc) : MetaType?
+      total_downstream_constraint(ctx, infer)
+    end
+
+    def as_multiple_downstream_constraints(ctx : Context, infer : ForReifiedFunc) : Array({Source::Pos, MetaType})?
+      @downstreams.map do |pos, info, aliases|
+        {pos, info.as_downstream_constraint_meta_type(ctx, infer)}
+      end
+    end
+
     def resolve!(ctx : Context, infer : ForReifiedFunc)
       MetaType.new_union(
-        branches.map { |cond, body, body_jumps_away|
-          infer.resolve(ctx, body).as(MetaType) unless body_jumps_away
-        }.compact
+        follow_branches(ctx, infer)
       )
     end
 
-    def resolve_others!(ctx : Context, infer : ForReifiedFunc)
-      branches.each do |cond, body|
-        infer.resolve(ctx, cond) if cond
-        infer.resolve(ctx, body)
+    def follow_branches(ctx : Context, infer : ForReifiedFunc)
+      meta_types = [] of MetaType
+      statically_true_conds = [] of Info
+      branches.each do |cond, body, body_jumps_away|
+        meta_type = follow_branch(ctx, infer, cond, body, statically_true_conds)
+        meta_types << meta_type if meta_type && !body_jumps_away
+        break unless statically_true_conds.empty?
       end
+
+      meta_types
     end
 
-    def add_downstream(ctx : Context, use_pos : Source::Pos, info : Info, aliases : Int32)
-      branches.each do |cond, body, body_jumps_away|
-        body.add_downstream(ctx, use_pos, info, aliases) unless body_jumps_away
+    def follow_branch(
+      ctx : Context,
+      infer : ForReifiedFunc,
+      cond : Info?,
+      body : Info,
+      statically_true_conds : Array(Info),
+    )
+      infer.resolve(ctx, cond) if cond
+      return unless body
+
+      inner_cond = cond
+      while inner_cond.is_a?(Sequence)
+        inner_cond = inner_cond.final_term
       end
+
+      skip_body = false
+
+      # If we have a type condition as the cond, that implies that it returned
+      # true if we are in the body; hence we can apply the type refinement.
+      # TODO: Do this in a less special-casey sort of way if possible.
+      # TODO: Do we need to override things besides locals? should we skip for non-locals?
+      if inner_cond.is_a?(TypeParamCondition)
+        refine_type = infer.resolve(ctx, inner_cond.refine_type)
+
+        infer.for_rt.push_type_param_refinement(
+          inner_cond.refine,
+          refine_type,
+        )
+
+        # When the type param is currently partially or fully reified with
+        # a type that is incompatible with the refinement, we skip the body.
+        current_type_param = infer.lookup_type_param(inner_cond.refine)
+        if current_type_param.satisfies_bound?(ctx, refine_type)
+          # TODO: this is one of the statically_true_conds as well, right?
+        else
+          skip_body = true
+        end
+      elsif inner_cond.is_a?(TypeConditionStatic)
+        if inner_cond.evaluate(ctx, infer)
+          # A statically true condition prevents all later branch bodies
+          # from having a chance to be executed, since it happens first.
+          statically_true_conds << inner_cond
+        else
+          # A statically false condition will not execute its branch body.
+          skip_body = true
+        end
+      end
+
+      # Resolve the types inside the body and capture the result type,
+      # unless there is no body or we have determined we must skip this body.
+      if body
+        if skip_body
+          # We use "unconstrained" as a marker that this is unreachable.
+          infer.resolve_as(ctx, body, MetaType.unconstrained)
+        else
+          meta_type = infer.resolve(ctx, body)
+        end
+      end
+
+      # Remove the type param refinement we put in place before, if any.
+      if inner_cond.is_a?(TypeParamCondition)
+        infer.for_rt.pop_type_param_refinement(inner_cond.refine)
+      end
+
+      meta_type
     end
   end
 
   class TypeParamCondition < DynamicInfo
     getter refine : Refer::TypeParam
+    getter lhs : Info
     getter refine_type : Info
 
     def describe_kind; "type parameter condition" end
 
-    def initialize(@pos, @refine, @refine_type)
+    def initialize(@pos, @refine, @lhs, @refine_type)
     end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc)
       MetaType.new(infer.reified_type(infer.prelude_type("Bool")))
+    end
+
+    def resolve_others!(ctx : Context, infer : ForReifiedFunc)
+      infer.resolve(ctx, @lhs)
+      infer.resolve(ctx, @refine_type)
     end
   end
 
@@ -698,22 +772,70 @@ class Mare::Compiler::Infer
       infer.resolve(ctx, @local).ephemeralize
     end
 
-    def add_downstream(ctx : Context, use_pos : Source::Pos, info : Info, aliases : Int32)
-      @local.add_downstream(ctx, use_pos, info, aliases - 1)
+    def add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
+      @local.add_downstream(use_pos, info, aliases - 1)
     end
   end
 
-  class FromYield < NamedInfo
-    def describe_kind; "yield block result" end
+  class FromAssign < Info
+    getter lhs : NamedInfo
+    getter rhs : Info
+
+    def describe_kind; "assign result" end
+
+    def initialize(@pos, @lhs, @rhs)
+    end
+
+    def add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
+      @lhs.add_downstream(use_pos, info, aliases)
+    end
+
+    def resolve!(ctx : Context, infer : ForReifiedFunc)
+      infer.resolve(ctx, @lhs).alias
+    end
+
+    def resolve_others!(ctx : Context, infer : ForReifiedFunc)
+      infer.resolve(ctx, @rhs)
+    end
+  end
+
+  class FromYield < Info
+    getter yield_in : Info
+    getter terms : Array(Info)
+
+    def initialize(@pos, @yield_in, @terms)
+    end
+
+    def add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
+      @yield_in.add_downstream(use_pos, info, aliases)
+    end
+
+    def resolve!(ctx : Context, infer : ForReifiedFunc)
+      infer.resolve(ctx, @yield_in)
+    end
+
+    def resolve_others!(ctx : Context, infer : ForReifiedFunc)
+      @terms.each { |term| infer.resolve(ctx, term) }
+    end
   end
 
   class ArrayLiteral < DynamicInfo
     getter terms : Array(Info)
 
+    def describe_kind; "array literal" end
+
     def initialize(@pos, @terms)
     end
 
-    def describe_kind; "array literal" end
+    def after_add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
+      # Only do this after the first downstream is added.
+      return unless @downstreams.size == 1
+
+      elem_downstream = ArrayLiteralElementAntecedent.new(@downstreams.first[1].pos, self)
+      @terms.each do |term|
+        term.add_downstream(downstream_use_pos, elem_downstream, 0)
+      end
+    end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc)
       array_defn = infer.prelude_type("Array")
@@ -762,16 +884,6 @@ class Mare::Compiler::Infer
       mt
     end
 
-    def after_add_downstream(ctx : Context, use_pos : Source::Pos, info : Info, aliases : Int32)
-      # Only do this after the first downstream is added.
-      return unless @downstreams.size == 1
-
-      elem_downstream = ArrayLiteralElementAntecedent.new(@downstreams.first[1].pos, self)
-      @terms.each do |term|
-        term.add_downstream(ctx, downstream_use_pos, elem_downstream, 0)
-      end
-    end
-
     def possible_element_antecedents(ctx, infer) : Array(MetaType)
       results = [] of MetaType
 
@@ -790,10 +902,10 @@ class Mare::Compiler::Infer
   class ArrayLiteralElementAntecedent < DynamicInfo
     getter array : ArrayLiteral
 
+    def describe_kind; "array element" end
+
     def initialize(@pos, @array)
     end
-
-    def describe_kind; "array element" end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc)
       antecedents = @array.possible_element_antecedents(ctx, infer)

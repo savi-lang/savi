@@ -783,7 +783,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     private getter ctx : Context
     getter analysis : FuncAnalysis
     getter yield_out_infos : Array(Local)
-    getter! yield_in_info : FromYield
+    getter! yield_in_info : Local
 
     def initialize(@ctx, @analysis)
       @local_idents = Hash(Refer::Local, AST::Node).new
@@ -845,7 +845,9 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       func.params.try do |params|
         params.accept(ctx, self)
         params.terms.each do |param|
-          finish_param(param, self[param]) unless self[param].is_a?(Param)
+          param_info = self[param]
+          finish_param(param, param_info) unless param_info.is_a?(Param) \
+            || (param_info.is_a?(FromAssign) && param_info.lhs.is_a?(Param))
 
           # TODO: special-case this somewhere else?
           if link.type.name == "Main" \
@@ -889,7 +891,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       yield_out_arg_count.times do
         yield_out_infos << Local.new((func.yield_out || func.ident).pos)
       end
-      @yield_in_info = FromYield.new((func.yield_in || func.ident).pos)
+      @yield_in_info = Local.new((func.yield_in || func.ident).pos)
 
       # Constrain via the "yield out" part of the explicit signature if present.
       func.yield_out.try do |yield_out|
@@ -1118,10 +1120,10 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         case lhs
         when Local
           lhs.assign(ctx, @analysis[node.rhs], node.rhs.pos)
-          @analysis.redirect(node, node.lhs)
+          @analysis[node] = FromAssign.new(node.pos, lhs, @analysis[node.rhs])
         when Param
           lhs.assign(ctx, @analysis[node.rhs], node.rhs.pos)
-          @analysis.redirect(node, node.lhs)
+          @analysis[node] = FromAssign.new(node.pos, lhs, @analysis[node.rhs])
         else
           raise NotImplementedError.new(node.lhs)
         end
@@ -1148,7 +1150,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         if call_args
           call_args.terms.each_with_index do |call_arg, index|
             new_info = TowardCallParam.new(call_arg.pos, call, index)
-            @analysis[call_arg].add_downstream(ctx, call_arg.pos, new_info, 0)
+            @analysis[call_arg].add_downstream(call_arg.pos, new_info, 0)
             call.resolvables << new_info
           end
         end
@@ -1167,7 +1169,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         yield_block.try(&.accept(ctx, self))
         if yield_block
           new_info = TowardCallYieldIn.new(yield_block.pos, call)
-          @analysis[yield_block].add_downstream(ctx, yield_block.pos, new_info, 0)
+          @analysis[yield_block].add_downstream(yield_block.pos, new_info, 0)
           call.resolvables << new_info
         end
 
@@ -1193,12 +1195,12 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         # If the left-hand side is the name of a type parameter...
         elsif lhs_info.is_a?(FixedSingleton) && lhs_info.type_param_ref
           # Strip the "non" from the fixed type, as if it were a type expr.
-          @analysis[node.lhs] = FixedTypeExpr.new(node.lhs.pos, node.lhs)
+          @analysis[node.lhs] = new_lhs_info = FixedTypeExpr.new(node.lhs.pos, node.lhs)
 
           # Set up a type param refinement condition, which can be used within
           # a choice body to inform the type system about the type relationship.
           refine = lhs_info.type_param_ref.not_nil!
-          @analysis[node] = TypeParamCondition.new(node.pos, refine, rhs_info)
+          @analysis[node] = TypeParamCondition.new(node.pos, refine, new_lhs_info, rhs_info)
 
         # If the left-hand side is the name of any other fixed type...
         elsif lhs_info.is_a?(FixedSingleton)
@@ -1255,7 +1257,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         # Each condition in a choice must evaluate to a type of Bool.
         fixed_bool = FixedPrelude.new(node.pos, "Bool")
         cond_info = self[cond]
-        cond_info.add_downstream(ctx, node.pos, fixed_bool, 1)
+        cond_info.add_downstream(node.pos, fixed_bool, 1)
 
         inner_cond_info = cond_info
         while inner_cond_info.is_a?(Sequence)
@@ -1291,7 +1293,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       # The condition of the loop must evaluate to a type of Bool.
       fixed_bool = FixedPrelude.new(node.pos, "Bool")
       cond_info = self[node.cond]
-      cond_info.add_downstream(ctx, node.pos, fixed_bool, 1)
+      cond_info.add_downstream(node.pos, fixed_bool, 1)
 
       @analysis[node] = Phi.new(node.pos, [
         {self[node.cond], self[node.body], jumps.away?(node.body)},
@@ -1310,11 +1312,14 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       raise "TODO: Nice error message for this" \
         if yield_out_infos.size != node.terms.size
 
-      yield_out_infos.zip(node.terms).each do |info, term|
-        info.assign(ctx, @analysis[term], term.pos)
-      end
+      term_infos =
+        yield_out_infos.zip(node.terms).map do |info, term|
+          term_info = @analysis[term]
+          info.assign(ctx, @analysis[term], term.pos)
+          term_info
+        end
 
-      @analysis[node] = yield_in_info
+      @analysis[node] = FromYield.new(node.pos, yield_in_info, term_infos)
     end
 
     def touch(node : AST::Node)
@@ -1369,14 +1374,6 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       ctx.classify[reified.link]
     end
 
-    def jumps
-      ctx.jumps[reified.link]
-    end
-
-    def already_resolved?(info : Info) : Bool
-      @analysis.resolved_infos.has_key?(info)
-    end
-
     def resolve(ctx : Context, info : Info) : MetaType
       @analysis.resolved_infos[info]? || begin
         mt = info.resolve!(ctx, self)
@@ -1385,6 +1382,16 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         info.resolve_others!(ctx, self)
         mt
       end
+    end
+
+    # This variant lets you eagerly choose the MetaType that a different Info
+    # resolves as, with that Info having no say in the matter. Use with caution.
+    def resolve_as(ctx : Context, info : Info, meta_type : MetaType) : MetaType
+      raise "already resolved #{info}\n" \
+        "as #{@analysis.resolved_infos[info].show_type}" \
+          if @analysis.resolved_infos.has_key?(info)
+
+      @analysis.resolved_infos[info] = meta_type
     end
 
     # This variant has protection to prevent infinite recursion.
@@ -1411,9 +1418,6 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
 
       func_params = func.params
       func_body = func.body
-
-      func_params.accept(ctx, self) if func_params
-      func_body.accept(ctx, self) if func_body
 
       resolve(ctx, @for_f[func_body]) if func_body
       resolve(ctx, @for_f[func_params]) if func_params
@@ -1488,72 +1492,6 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
 
     def type_expr(node)
       @for_rt.type_expr(node, refer, reified.receiver)
-    end
-
-    # This visitor never replaces nodes, it just touches them and returns them.
-    def visit(ctx, node)
-      touch(node)
-
-      node
-    end
-
-    def touch(node : AST::Choice)
-      skip_later_bodies = false
-      branches = [] of Info
-      node.list.each do |cond, body|
-        # Visit the cond AST - we skipped it before with visit_children: false.
-        cond.accept(ctx, self)
-
-        cond_info = @for_f[cond]
-
-        # If we have a type condition as the cond, that implies that it returned
-        # true if we are in the body; hence we can apply the type refinement.
-        # TODO: Do this in a less special-casey sort of way if possible.
-        # TODO: Do we need to override things besides locals? should we skip for non-locals?
-        if cond_info.is_a?(TypeParamCondition)
-          refine_type = resolve(ctx, cond_info.refine_type) # TODO: postpone to second half of infer pass
-
-          for_rt.push_type_param_refinement(
-            cond_info.refine,
-            refine_type,
-          )
-
-          # When the type param is currently partially or fully reified with
-          # a type that is incompatible with the refinement, we skip the body.
-          current_type_param = lookup_type_param(cond_info.refine)
-          if !current_type_param.satisfies_bound?(ctx, refine_type)
-            skip_body = true
-          end
-        elsif cond_info.is_a?(TypeConditionStatic)
-          if cond_info.evaluate(ctx, self)
-            # A statically true condition prevents all later branch bodies
-            # from having a chance to be executed, since it happens first.
-            skip_later_bodies = true
-          else
-            # A statically false condition will not execute its branch body.
-            skip_body = true
-          end
-        elsif skip_later_bodies
-          skip_body = true
-        end
-
-        if skip_body
-          raise "how?\n#{cond.pos.show}"
-        else
-          # Visit the body AST - we skipped it before with visit_children: false.
-          # We needed to act on information from the cond analysis first.
-          body.accept(ctx, self)
-        end
-
-        # Remove the type param refinement we put in place before, if any.
-        if cond_info.is_a?(TypeParamCondition)
-          for_rt.pop_type_param_refinement(cond_info.refine)
-        end
-      end
-    end
-
-    def touch(node : AST::Node)
-      # Do nothing for other nodes.
     end
   end
 end
