@@ -341,6 +341,34 @@ describe Mare::Compiler::Infer do
       from (example):3:
         x (F64 | U64) = 42
                         ^~
+
+    - Please wrap an explicit numeric type around the literal (for example: U64[42])
+    MSG
+
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :infer)
+    end
+  end
+
+  it "complains when literal couldn't resolve even when calling u64 method" do
+    source = Mare::Source.new_example <<-SOURCE
+    :actor Main
+      :new
+        x = 42.u64
+    SOURCE
+
+    expected = <<-MSG
+    This literal value couldn't be inferred as a single concrete type:
+    from (example):3:
+        x = 42.u64
+            ^~
+
+    - and the literal itself has an intrinsic type of Numeric:
+      from (example):3:
+        x = 42.u64
+            ^~
+
+    - Please wrap an explicit numeric type around the literal (for example: U64[42])
     MSG
 
     expect_raises Mare::Error, expected do

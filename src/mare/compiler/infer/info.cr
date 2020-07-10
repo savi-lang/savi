@@ -399,11 +399,19 @@ class Mare::Compiler::Infer
       # to print a consistent error message instead of printing it here.
       return @possible if meta_type.unsatisfiable?
 
-      if !meta_type.singular?
+      unless meta_type.singular? && meta_type.single!.link.is_concrete?
+        extra_info = describe_downstream_constraints(ctx, infer)
+        extra_info.push({pos,
+          "and the literal itself has an intrinsic type of #{meta_type.show_type}"
+        })
+        extra_info.push({Source::Pos.none,
+          "Please wrap an explicit numeric type around the literal " \
+            "(for example: U64[#{@pos.content}])"
+        })
+
         Error.at self,
           "This literal value couldn't be inferred as a single concrete type",
-          describe_downstream_constraints(ctx, infer).push({pos,
-            "and the literal itself has an intrinsic type of #{meta_type.show_type}"})
+          extra_info
       end
 
       meta_type
