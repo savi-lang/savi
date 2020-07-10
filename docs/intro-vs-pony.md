@@ -210,7 +210,25 @@ Just like in Pony, most major operators are really just function calls in disgui
     (@x == other.x) && (@y == other.y)
 ```
 
-Not all operators are sugar for functions. For example, the boolean binary operators `&&` and `||` are not function calls, because they have so-called "short-circuiting" semantics that violate normal control flow expectations for function call arguments.
+Not all operators are sugar for functions. For example, the boolean binary operators `&&` and `||` are not function calls, because they have so-called "short-circuiting" semantics that violate normal control flow expectations for function call arguments. Also, the subtype check operator `<:` mentioned in the next section is also a special operator that is not a function call.
+
+There are also assignment-like compound operators, like `+=` which acts as if you had called the `+` method then assigned the result to the named value on the left-hand-side of the operator.
+
+This is the current list of operators that are officially supported by the parser (in order of precedence), but more will be added as needed while the standard library expands:
+
+- multiplication and division: `*`, `/`, `%`
+- addition and subtraction: `+`, `-`
+- comparison: `==`, `!=`, `<`, `>`, `<=`, `>=`, `<:`
+- assignment-like: `+=`, `-=`, `<<=`, `=`
+- short-circuiting boolean: `&&`, `||`
+- element and property access:
+  - `[]` (get by key)
+  - `[]!` (partial get by key)
+  - `[]=` (set value for key)
+  - `property_name=` (property set, returning the new value)
+  - `property_name<<=` (displacing property set, returning the old value)
+
+Note that the property access operators are a form of syntax sugar that allows you to emulate a property using methods that define how the property get, set, and displacing set should work.
 
 ### Type Checking at Runtime
 
