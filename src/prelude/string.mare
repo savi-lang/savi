@@ -265,3 +265,22 @@
       )
     )
     output * possible_negation
+
+  :fun substring (from USize, to USize) String'iso
+    if (to == 0) (
+      to = @_size
+    )
+
+    if (from >= to) (
+      return String.new_iso
+    )
+
+    str = String.new_iso
+
+    Count.to(to - from) -> ( i |
+      try (
+        str.push_byte(@[i]!)
+      )
+    )
+
+    --str
