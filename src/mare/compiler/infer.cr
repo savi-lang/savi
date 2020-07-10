@@ -180,6 +180,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
 
     reach_additional_subtype_relationships(ctx)
+    reach_additional_subfunc_relationships(ctx)
   end
 
   def run_for_library(ctx, library)
@@ -280,6 +281,44 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
               subtype_rt_analysis.is_supertype_of?(ctx, other_subtype_rt)
               keep_going = true \
                 if orig_size != subtype_rt_analysis.each_known_subtype.size
+            end
+          end
+        end
+      end
+    end
+  end
+
+  def reach_additional_subfunc_relationships(ctx)
+    # For each abstract type in the program that we have analyzed...
+    # (this should be all of the abstract types in the program)
+    @t_analyses.each do |t_link, t_analysis|
+      t = t_link.resolve(ctx)
+      next unless t_link.is_abstract?
+
+      # For each "fully baked" reification of that type we have checked...
+      # (this should include all reifications reachable from any defined
+      # function, though not necessarily all reachable from Main.new)
+      # TODO: Should we be limiting to only paths reachable from Main.new?
+      t_analysis.each_non_partial_reified.each do |rt|
+
+        # For each known complete subtypes that have been established
+        # by testing via some code path in the program thus far...
+        # TODO: Should we be limiting to only paths reachable from Main.new?
+        self[rt].each_known_complete_subtype(ctx).each do |subtype_rt|
+
+          # For each function in the abstract type and its
+          # corresponding function that is required to be in the subtype...
+          t.functions.each do |f|
+            f_link = f.make_link(rt.link)
+            subtype_f_link = f.make_link(subtype_rt.link)
+
+            # For each reification of that function in the abstract type.
+            self[f_link].each_reified_func(rt).each do |rf|
+
+              # Reach the corresponding concrete reification in the subtype.
+              # This ensures that we have reached the correct reification(s)
+              # of each concrete function we may call via an abstract trait.
+              for_rf = for_rf(ctx, subtype_rt, subtype_f_link, rf.receiver.cap_only).tap(&.run)
             end
           end
         end

@@ -2318,6 +2318,39 @@ describe Mare::Compiler::Infer do
     trait_subtypes.should contain(sub_rt)
   end
 
+  it "resolves all matching concrete reificaions of abstract functions" do
+    source = Mare::Source.new_example <<-SOURCE
+    :class Person
+      :fun greeting
+        "Hello, World"
+
+    :trait Greeter
+      :fun greeting (String | None)
+
+    :class World
+      :fun meet! (greeter Greeter)
+        greeter.greeting.as!(String)
+
+    :actor Main
+      :new (env)
+        try env.out.print(World.new.meet!(Person.new))
+    SOURCE
+
+    ctx = Mare::Compiler.compile([source], :infer)
+
+    t = ctx.namespace[source]["Person"].as(Mare::Program::Type::Link)
+    rt = ctx.infer[t].no_args
+    f = rt.defn(ctx).find_func!("greeting")
+    f_link = f.make_link(rt.link)
+    rfs = ctx.infer[f_link].each_reified_func(rt).to_a
+
+    # Thanks to Infer#reach_additional_subtype_relationships, we expect that
+    # both the box and ref reifications of this concrete function have been
+    # reached, because ref is reached via the abstract Greeter'ref.greeting
+    # (and box is reached always as part of normal type checking).
+    rfs.map(&.receiver.cap_only.show_type).sort.should eq ["box", "ref"]
+  end
+
   pending "complains when the yield block result doesn't match the expected type"
   pending "enforces yield properties as part of trait subtyping"
 end
