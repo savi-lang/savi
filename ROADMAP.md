@@ -20,6 +20,7 @@
 - [x] - Looping flow control (`while`)
 - [x] - Partial functions and partial calls
 - [x] - ~For-loop iterator syntax sugar (`for x in y`)~ (replaced by the new feature known as yielding functions)
+- [ ] - Rcaps manual recovering (`recover` block)
 - [ ] - Tuple values
 - [ ] - Finalizer functions
 - [ ] - FFI-compatible struct types
