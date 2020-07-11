@@ -472,14 +472,12 @@
     @get_day_name(time).substring(0, 3)
 
   :fun pad2 (value U64, padding U8)
-    str = String.new
-
+    str = String.new_iso
+    
     if (value < 10) (
       str.push_byte(padding) 
     )
-    Inspect.into(str, value)
-    
-    str.clone
+    Inspect.into(--str, value)
 
   :fun pad3 (value U64, padding U8)
     str = String.new_iso

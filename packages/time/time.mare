@@ -15,7 +15,7 @@
   :member Friday: 5
   :member Saturday: 6
   :member Sunday: 7
-  
+
   :fun non from_value (value U8)
     case (
       | value == 1 | Monday
@@ -158,15 +158,16 @@
     (@total_seconds % @_seconds_per_minute).u8
 
   :: Print the time data for human inspection (the format is subject to change).
-  :fun inspect_into (output String'ref)
+  :fun inspect_into (output String'iso)
     // TODO: Properly pad numbers with zeroes for a constant string width.
-    Inspect.into(output, @year),       output.push_byte('-')
-    Inspect.into(output, @month),      output.push_byte('-')
-    Inspect.into(output, @day),        output.push_byte(' ')
-    Inspect.into(output, @hour),       output.push_byte(':')
-    Inspect.into(output, @minute),     output.push_byte(':')
-    Inspect.into(output, @second),     output.push_byte('\'')
-    Inspect.into(output, @nanosecond)
+    output = Inspect.into(--output, @year),       output.push_byte('-')
+    output = Inspect.into(--output, @month),      output.push_byte('-')
+    output = Inspect.into(--output, @day),        output.push_byte(' ')
+    output = Inspect.into(--output, @hour),       output.push_byte(':')
+    output = Inspect.into(--output, @minute),     output.push_byte(':')
+    output = Inspect.into(--output, @second),     output.push_byte('\'')
+    output = Inspect.into(--output, @nanosecond)
+    --output
 
   :: Returns a bit-packed representation of the year, month, and day,
   :: for internal reuse by other functions that need this information.
@@ -249,7 +250,7 @@
 
   :fun year_month_day_day_year Array(U64)
     total_days U64 = (@total_seconds / @_seconds_per_day)
-    
+
     num400 U64 = (total_days / @_days_per_400_years)
     total_days -= num400 * @_days_per_400_years
 
@@ -324,7 +325,7 @@
         |
           week_number = 52
         )
-      | 
+      |
         if (week_number == 53) (
           // Week number 53 is actually week number 1 of the following year, if
           // December 31 is on a Monday, Tuesday or Wednesday.
@@ -349,7 +350,7 @@
   :fun day_of_year U64
     try (
       @year_month_day_day_year[3]!
-    | 
+    |
       0
     )
 

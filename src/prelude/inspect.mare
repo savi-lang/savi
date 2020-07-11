@@ -11,27 +11,25 @@
   :fun member_name String
 
 :trait box _InspectCustom
-  :fun inspect_into (output String'ref) None
+  :fun inspect_into (output String'iso) String'iso
 
 // TODO: Move this out of prelude maybe? Does that make sense?
 // TODO: Make this into a trait with "implement for"/typeclass style polymorphism
 :primitive Inspect
-  :fun "[]" (input box) String'box // TODO: return String'val using recover
-    output = String.new
-    @into(output, input)
-    output
+  :fun "[]" (input box) String'val
+    @into(String.new_iso, input)
 
   :fun out (input box)
     InspectLibC.puts(@[input].cstring)
 
-  :fun into (output String'ref, input box) None // TODO: use something like Crystal IO instead of String?
+  :fun into (output String'iso, input box) String'iso // TODO: use something like Crystal IO instead of String?
     case (
-    | input <: _InspectCustom | input.inspect_into(output)
-    | input <: _InspectEnum | output << input.member_name
-    | input <: U8    | @into(output, input.u64) // TODO: unify into one integer clause?
-    | input <: U16   | @into(output, input.u64) // TODO: unify into one integer clause?
-    | input <: U32   | @into(output, input.u64) // TODO: unify into one integer clause?
-    | input <: USize | @into(output, input.u64) // TODO: unify into one integer clause?
+    | input <: _InspectCustom | input.inspect_into(--output)
+    | input <: _InspectEnum | output << input.member_name, --output
+    | input <: U8    | @into(--output, input.u64) // TODO: unify into one integer clause?
+    | input <: U16   | @into(--output, input.u64) // TODO: unify into one integer clause?
+    | input <: U32   | @into(--output, input.u64) // TODO: unify into one integer clause?
+    | input <: USize | @into(--output, input.u64) // TODO: unify into one integer clause?
     | input <: U64   |                          // TODO: unify into one integer clause?
       number = input
       digits Array(U8) = []
@@ -39,29 +37,35 @@
         digits << (number % 10).u8 + '0'
         number = number / 10
       )
-      digits.reverse_each -> (digit | output.push_byte(digit))
+      digits.reverse_each -> (digit | output.push_byte(digit), None) // TODO: None should not be needed here
       if (digits.size == 0) (output.push_byte('0'))
-    | input <: I8    | @into(output, input.i64) // TODO: unify into one integer clause?
-    | input <: I16   | @into(output, input.i64) // TODO: unify into one integer clause?
-    | input <: I32   | @into(output, input.i64) // TODO: unify into one integer clause?
-    | input <: ISize | @into(output, input.i64) // TODO: unify into one integer clause?
+      --output
+    | input <: I8    | @into(--output, input.i64) // TODO: unify into one integer clause?
+    | input <: I16   | @into(--output, input.i64) // TODO: unify into one integer clause?
+    | input <: I32   | @into(--output, input.i64) // TODO: unify into one integer clause?
+    | input <: ISize | @into(--output, input.i64) // TODO: unify into one integer clause?
     | input <: I64   |                          // TODO: unify into one integer clause?
       positive = if (input >= 0) (input | output.push_byte('-'), input.abs)
-      @into(output, positive.u64)
+      @into(--output, positive.u64)
     | input <: String'box |
       output.push_byte('"')
-      output << input // TODO: show some characters as escaped.
+      output << input.clone // TODO: show some characters as escaped.
       output.push_byte('"')
+      --output
     | input <: _InspectEach |
       output.push_byte('[')
       index USize = 0
       while (index < input.size) (
         if (index > 0) (output.push_byte(','), output.push_byte(' '))
-        try (@into(output, input[index]!))
+        try (
+          element = input[index]!
+          output = @into(--output, element)
+        )
         index += 1
       )
       output.push_byte(']')
+      --output
     | // TODO: support inspection of more types
       output << "<uninspectable>"
+      --output
     )
-    None
