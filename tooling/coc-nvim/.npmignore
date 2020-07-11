@@ -1,0 +1,6 @@
+.gitignore
+src
+tsconfig.json
+tslint.json
+*.map
+webpack.config.js
