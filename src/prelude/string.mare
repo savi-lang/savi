@@ -1,4 +1,3 @@
-:import "collections" (Count)
 :class val String
   :is Comparable(String'box)
 
@@ -6,6 +5,7 @@
   :prop _alloc USize // TODO: rename as `_space`
   :prop _ptr CPointer(U8)'ref
   :new ref from_cpointer (@_ptr, @_size, @_alloc)
+  :new iso iso_from_cpointer (@_ptr, @_size, @_alloc) // TODO: remove this and use recover instead?
   :new val val_from_cpointer (@_ptr, @_size, @_alloc) // TODO: remove this and use recover instead?
   :fun cpointer CPointer(U8): @_ptr
   :fun hash: @_ptr._hash(@_size)
@@ -267,20 +267,16 @@
     )
     output * possible_negation
 
-  :fun substring (from USize, to USize) String'iso
-    if (to == 0) (
+  :fun substring (from USize, to USize = 0) String'iso
+    if (to == 0 || to > @_size) (
       to = @_size
     )
-
-    str = String.new_iso
-
     if (from < to) (
-      Count.to(to - from) -> ( i |
-        try (
-          str.push_byte(@[i]!)
-          None // TODO Fix value is not used
-        )
-      )
+      new_size = to - from
+      new_alloc = new_size.next_pow2
+      new_ptr = @_ptr._alloc(new_alloc)
+      @_ptr._offset(from)._unsafe._copy_to(new_ptr, new_size)
+      @iso_from_cpointer(new_ptr, new_size, new_alloc)
+    |
+      String.new_iso
     )
-
-    --str
