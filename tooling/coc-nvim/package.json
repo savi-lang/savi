@@ -1,0 +1,78 @@
+{
+	"name": "coc-mare",
+	"displayName": "Mare Language Test",
+	"description": "Test Support for the Mare programming language for coc.nvim.",
+	"version": "0.0.11",
+	"publisher": "teggot",
+	"engines": {
+		"coc": ">=0.0.77"
+	},
+	"keywords": [
+		"coc.nvim",
+		"mare",
+		"languageserver"
+	],
+	"categories": [
+		"Programming Languages"
+	],
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/jemc/mare"
+	},
+	"devDependencies": {
+		"@chemzqm/tsconfig": "^0.0.3",
+		"@chemzqm/tslint-config": "^1.0.18",
+		"@types/node": "^11.13.10",
+		"coc.nvim": "^0.0.77",
+		"rimraf": "^2.6.3",
+		"ts-loader": "^6.0.3",
+		"tslint": "^5.16.0",
+		"typescript": "^3.4.4",
+		"vscode-languageserver-protocol": "^3.15.0-next.4",
+		"webpack": "^4.34.0",
+		"webpack-cli": "^3.3.4"
+	},
+	"dependencies": {},
+	"main": "lib/index.js",
+	"scripts": {
+		"clean": "rimraf lib",
+		"build": "webpack",
+		"prepare": "npx npm-run-all clean build"
+	},
+	"activationEvents": [
+		"onLanguage:mare"
+	],
+	"contributes": {
+		"commands": [
+			{
+				"command": "mare.restart",
+				"title": "Restart the Mare Language Server",
+				"description": "Restart the Mare Language Server process",
+				"category": "Mare"
+			},
+			{
+				"command": "mare.update",
+				"title": "Update the Mare Language Server",
+				"description": "Pull the latest Mare compiler image",
+				"category": "Mare"
+			}
+		],
+		"configuration": {
+			"type": "object",
+			"title": "Mare configuration",
+			"properties": {
+				"mare-client.trace.server": {
+					"type": "string",
+					"enum": [
+						"off",
+						"messages",
+						"verbose"
+					],
+					"default": "off",
+					"description": "Trace the communication between VS Code and the Mare Language Server, for debugging purposes.",
+					"scope": "window"
+				}
+			}
+		}
+	}
+}
