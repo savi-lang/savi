@@ -1,0 +1,531 @@
+:class TimeFormatter
+  :fun non month_names Array(String): [
+    "January"
+    "February"
+    "March"
+    "April"
+    "May"
+    "June"
+    "July"
+    "August"
+    "September"
+    "October"
+    "November"
+    "December"
+  ]
+
+  :fun non day_names Array(String): [
+    "Sunday"
+    "Monday"
+    "Tuesday"
+    "Wednesday"
+    "Thursday"
+    "Friday"
+    "Saturday"
+  ]
+
+  :prop pattern String'box
+  :new (@pattern)
+
+  :fun format (time Time'box)
+    i USize = 0
+
+    str = String.new_iso
+
+    is_bad_format = False
+
+    while (i < @pattern.size()) (
+      try (
+        char U8 = @pattern[i]!
+
+        ok = True
+
+        if (char == '%') (
+          char = @pattern[i + 1]!
+          case (
+          | char == 'a' | str << @short_day_name(time)
+          | char == 'A' | str << @day_name(time)
+          | (char == 'b') || (char == 'h') | str << @short_month_name(time)
+          | char == 'c' | str << @date_and_time(time)
+          | char == 'B' | str << @month_name(time)
+          | char == 'C' | str << @year_divided_by_100(time)
+          | char == 'd' | str << @day_of_month_zero_padded(time)
+          | (char == 'D') || (char == 'x') | str << @date(time)
+          | char == 'e' | str << @day_of_month_blank_padded(time)
+          | char == 'F' | str << @year_month_day(time)
+          | char == 'g' | str << @calendar_week_year_modulo100(time)
+          | char == 'G' | str << @calendar_week_year(time)
+          | char == 'H' | str << @hour_24_zero_padded(time)
+          | char == 'I' | str << @hour_12_zero_padded(time)
+          | char == 'j' | str << @day_of_year_zero_padded(time)
+          | char == 'k' | str << @hour_24_blank_padded(time)
+          | char == 'l' | str << @hour_12_blank_padded(time)
+          | char == 'L' | str << @milliseconds(time)
+          | char == 'm' | str << @month_zero_padded(time)
+          | char == 'M' | str << @minute(time)
+          | char == 'N' | str << @second_fraction(time)
+          | char == 'p' | str << @am_pm(time)
+          | char == 'P' | str << @am_pm_upcase(time)
+          | char == 'r' | str << @twelve_hour_time(time)
+          | char == 'R' | str << @twenty_four_hour_time(time)
+          | char == 's' | str << @unix_seconds(time)
+          | char == 'S' | str << @second(time)
+          | (char == 'T') || (char == 'X') | str << @twenty_four_hour_time_with_seconds(time)
+          | char == 'u' | str << @day_of_week_monday_1_7(time)
+          | char == 'V' | str << @calendar_week_week(time)
+          | char == 'w' | str << @day_of_week_sunday_0_6(time)
+          | char == 'y' | str << @year_modulo_100(time)
+          | char == 'Y' | str << @year(time)
+          | char == 'z' | str << @time_zone(time)
+          | char == '_' |
+            char = @pattern[i + 2]!
+            case (
+            | char == 'm' | str << @month_blank_padded(time)
+            |
+              ok = False
+              str.push_byte('%')
+              str.push_byte('_')
+            )
+            if ok (i += 1)
+          | char == '-' |
+            char = @pattern[i + 2]!
+            case (
+            | char == 'd' | str << @day_of_month(time)
+            | char == 'm' | str << @month(time)
+            |
+              ok = False
+              str.push_byte('%')
+              str.push_byte('-')
+            )
+            if ok (i += 1)
+          | char == '^' |
+            char = @pattern[i + 2]!
+            case (
+            | char == 'a' | str << @short_day_name_upcase(time)
+            | char == 'A' | str << @day_name_upcase(time)
+            | (char == 'b') || (char == 'h') | str << @short_month_name_upcase(time)
+            | char == 'B' | str << @month_name_upcase(time)
+            |
+              ok = False
+              str.push_byte('%')
+              str.push_byte('^')
+            )
+            if ok (i += 1)
+          | char == ':' |
+            char = @pattern[i + 2]!
+            case (
+            | char == 'z' | str << @time_zone_colon(time)
+            | char == ':' |
+              char = @pattern[i + 3]!
+              case (
+              | char == 'z' | str << @time_zone_colon_with_seconds(time)
+              |
+                ok = False
+                str.push_byte('%')
+                str.push_byte(':')
+                str.push_byte(':')
+              )
+              if ok (i += 1)
+            |
+              str.push_byte('%')
+              str.push_byte(':')
+            )
+            if ok (i += 1)
+          | (char == '3') || (char == '6') || (char == '9') |
+            digit_char = char
+            char = @pattern[i + 2]!
+            case (
+            | char == 'N' |
+              case (
+              | digit_char == '3' | str << @milliseconds(time)
+              | digit_char == '6' | str << @microseconds(time)
+              | digit_char == '9' | str << @nanoseconds(time)
+              )
+              i += 1
+            |
+              ok = False
+              str.push_byte('%')
+              str.push_byte(digit_char)
+            )
+            if ok (i += 1)
+          | char == '%' |
+            str.push_byte('%')
+          |
+            str.push_byte('%')
+            str.push_byte(char)
+          )
+          i += 1
+        |
+          str.push_byte(char)
+        )
+        i += 1
+      |
+        is_bad_format = True
+      )
+    )
+
+    if is_bad_format (
+      str = String.new_iso
+    )
+
+    --str
+
+  :fun date_and_time (time Time'box)
+    str = String.new_iso
+
+    str << @short_day_name(time)
+    str.push_byte(' ')
+    str << @short_month_name(time)
+    str.push_byte(' ')
+    str << @day_of_month_blank_padded(time)
+    str.push_byte(' ')
+    str << @twenty_four_hour_time_with_seconds(time)
+    str.push_byte(' ')
+    str << @year(time)
+
+    --str
+
+  :fun date (time Time'box)
+    str = String.new_iso
+
+    str << @month_zero_padded(time)
+    str.push_byte('/')
+    str << @day_of_month_zero_padded(time)
+    str.push_byte('/')
+    str << @year_modulo_100(time)
+
+    --str
+
+  :fun year_month_day (time Time'box)
+    str = String.new_iso
+
+    str << @year(time)
+    str.push_byte('-')
+    str << @month_zero_padded(time)
+    str.push_byte('-')
+    str << @day_of_month_zero_padded(time)
+
+    --str
+
+  :fun twelve_hour_time (time Time'box)
+    str = String.new_iso
+
+    str << @hour_12_zero_padded(time)
+    str.push_byte(':')
+    str << @minute(time)
+    str.push_byte(':')
+    str << @second(time)
+    str.push_byte(' ')
+    str << @am_pm_upcase(time)
+
+    --str
+
+  :fun twenty_four_hour_time (time Time'box)
+    str = String.new_iso
+
+    str << @hour_24_zero_padded(time)
+    str.push_byte(':')
+    str << @minute(time)
+
+    --str
+
+  :fun twenty_four_hour_time_with_seconds (time Time'box)
+    str = String.new_iso
+
+    str << @hour_24_zero_padded(time)
+    str.push_byte(':')
+    str << @minute(time)
+    str.push_byte(':')
+    str << @second(time)
+
+    --str
+
+  :fun year (time Time'box)
+    @pad4(time.year.u64, '0')
+
+  :fun year_modulo_100 (time Time'box)
+    @pad2((time.year % 100).u64, '0')
+
+  :fun year_divided_by_100 (time Time'box)
+    Inspect[(time.year / 100).u32].clone
+
+  :fun full_or_short_year (time Time'box)
+    @year(time)
+
+  :fun calendar_week_year (time Time'box)
+    try (
+      @pad4(time.calendar_week()[0]!, '0')
+    | 
+      String.new_iso
+    )
+
+  :fun calendar_week_year_modulo100 (time Time'box)
+    try (
+      @pad2(time.calendar_week()[0]! % 100, '0')
+    | 
+      String.new_iso
+    )
+
+  :fun month (time Time'box)
+    Inspect[time.month].clone
+
+  :fun month_zero_padded (time Time'box)
+    @pad2(time.month.u64, '0')
+
+  :fun month_blank_padded (time Time'box)
+    @pad2(time.month.u64, ' ')
+
+  :fun month_name (time Time'box)
+    @get_month_name(time)
+
+  :fun month_name_upcase (time Time'box)
+    // TODO
+    // get_month_name.upcase
+    ""
+
+  :fun short_month_name (time Time'box)
+    @get_short_month_name(time)
+
+  :fun short_month_name_upcase (time Time'box)
+    // TODO
+    // get_short_month_name.upcase
+    ""
+
+  :fun calendar_week_week (time Time'box)
+    try (
+      @pad2(time.calendar_week()[1]!, '0')
+    | 
+      String.new_iso
+    )
+
+  :fun day_of_month (time Time'box)
+    Inspect[time.day].clone
+
+  :fun day_of_month_zero_padded (time Time'box)
+    @pad2(time.day.u64, '0')
+
+  :fun day_of_month_blank_padded (time Time'box)
+    @pad2(time.day.u64, ' ')
+
+  :fun day_name (time Time'box)
+    @get_day_name(time)
+
+  :fun day_name_upcase (time Time'box)
+    // TODO
+    // @get_day_name(time).upcase
+    ""
+
+  :fun short_day_name (time Time'box)
+    @get_short_day_name(time)
+
+  :fun short_day_name_upcase (time Time'box)
+    // TODO
+    // get_short_day_name.upcase
+    ""
+
+  :fun short_day_name_with_comma! (time Time'box)
+    str = String.new_iso
+
+    str << @short_day_name(time)
+    str.push_byte(',')
+    str.push_byte(' ')
+    
+    --str
+
+  :fun day_of_year_zero_padded (time Time'box)
+    @pad3(time.day_of_year, '0')
+
+  :fun hour_24_zero_padded (time Time'box)
+    @pad2(time.hour.u64, '0')
+
+  :fun hour_24_blank_padded (time Time'box)
+    @pad2(time.hour.u64, ' ')
+
+  :fun hour_12_zero_padded (time Time'box)
+    h = (time.hour % 12).u64
+    @pad2(if (h == 0) (12 | h), '0')
+
+  :fun hour_12_blank_padded (time Time'box)
+    h = (time.hour % 12).u64
+    @pad2(if (h == 0) (12 | h), ' ')
+
+  :fun minute (time Time'box)
+    @pad2(time.minute.u64, '0')
+
+  :fun second (time Time'box)
+    @pad2(time.second.u64, '0')
+
+  :fun milliseconds (time Time'box)
+    @pad3((time.nanosecond / 1000000).u64, '0')
+
+  :fun microseconds (time Time'box)
+    @pad6((time.nanosecond / 1000).u64, '0')
+
+  :fun nanoseconds (time Time'box)
+    @pad9(time.nanosecond.u64, '0')
+
+  :fun second_fraction (time Time'box)
+    @nanoseconds(time)
+
+  :fun second_fraction! (time Time'box, fraction_digits I32 = 9)
+    str = String.new_iso
+
+    case (
+    | fraction_digits == 0 |
+    | fraction_digits == 3 |
+      str.push_byte('.')
+      str << @milliseconds(time)
+    | fraction_digits == 6 |
+      str.push_byte('.')
+      str << @microseconds(time)
+    | fraction_digits == 9 |
+      str.push_byte('.')
+      str << @nanoseconds(time)
+    |
+      error!
+    )
+
+    --str
+
+  :fun am_pm (time Time'box)
+    if (time.hour < 12) (
+      "am"
+    |
+      "pm"
+    )
+
+  :fun am_pm_upcase (time Time'box)
+    if (time.hour < 12) (
+      "AM"
+    |
+      "PM"
+    )
+
+  :fun day_of_week_monday_1_7 (time Time'box)
+    Inspect[time.day_of_week.u64].clone
+
+  :fun day_of_week_sunday_0_6 (time Time'box)
+    Inspect[time.day_of_week.u64 % 7].clone
+
+  :fun unix_seconds (time Time'box)
+    Inspect[time.to_unix].clone
+
+  :fun time_zone (time Time'box, with_seconds = False)
+    // TODO
+    // time_zone_offset(format_seconds: with_seconds)
+    ""
+
+  // def time_zone_z_or_offset(**options)
+  //   if time.utc?
+  //     io << 'Z'
+  //   else
+  //     time_zone_offset(**options)
+  //   end
+  // end
+
+  // def time_zone_offset(force_colon = false, allow_colon = true, format_seconds = false, parse_seconds = true)
+  //   time.zone.format(io, with_colon: force_colon, with_seconds: format_seconds)
+  // end
+
+  :fun time_zone_colon (time Time'box, with_seconds = False)
+    // TODO
+    // time_zone_offset(force_colon: true, format_seconds: with_seconds)
+    ""
+
+  :fun time_zone_colon_with_seconds (time Time'box)
+    @time_zone_colon(time, True)
+
+  :fun time_zone_gmt (time Time'box)
+    "GMT"
+
+  :fun time_zone_rfc2822 (time Time'box)
+    // TODO
+    // time_zone_offset(allow_colon: false)
+    ""
+
+  // def time_zone_gmt_or_rfc2822(**options)
+  //   if time.utc? || time.location.name == "UT" || time.location.name == "GMT"
+  //     time_zone_gmt
+  //   else
+  //     time_zone_rfc2822
+  //   end
+  // end
+
+  :fun get_month_name (time Time'box)
+    try (
+      @month_names[time.month.usize - 1]!
+    | 
+      ""
+    )
+
+  :fun get_short_month_name (time Time'box)
+    @get_month_name(time).substring(0, 3)
+
+  :fun get_day_name (time Time'box)
+    try (
+      @day_names[time.day_of_week.usize % 7]!
+    |
+      ""
+    )
+
+  :fun get_short_day_name (time Time'box)
+    @get_day_name(time).substring(0, 3)
+
+  :fun pad2 (value U64, padding U8)
+    str = String.new
+
+    if (value < 10) (
+      str.push_byte(padding) 
+    )
+    Inspect.into(str, value)
+    
+    str.clone
+
+  :fun pad3 (value U64, padding U8)
+    str = String.new_iso
+
+    if (value < 100) (
+      str.push_byte(padding)
+    )
+    str << @pad2(value, padding)
+    
+    --str
+
+  :fun pad4 (value U64, padding U8)
+    str = String.new_iso
+
+    if (value < 1000) (
+      str.push_byte(padding)
+    )
+    str << @pad3(value, padding)
+    
+    --str
+
+  :fun pad6 (value U64, padding U8)
+    str = String.new_iso
+
+    if (value < 100000) (
+      str.push_byte(padding)
+    )
+    if (value < 10000) (
+      str.push_byte(padding)
+    )
+    str << @pad4(value, padding)
+    
+    --str
+
+  :fun pad9 (value U64, padding U8)
+    str = String.new_iso
+
+    if (value < 100000000) (
+      str.push_byte(padding)
+    )
+    if (value < 10000000) (
+      str.push_byte(padding)
+    )
+    if (value < 1000000) (
+      str.push_byte(padding)
+    )
+    str << @pad6(value, padding)
+    
+    --str
