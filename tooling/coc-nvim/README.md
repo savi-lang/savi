@@ -1,8 +1,8 @@
-# Mare support for VS Code
+# Mare support for coc.nvim
 
-[![](https://vsmarketplacebadge.apphb.com/version/mare-lang.mare.svg)](https://marketplace.visualstudio.com/items?itemName=mare-lang.mare)
+[![npm version](http://img.shields.io/npm/v/coc-mare.svg?style=flat)](https://npmjs.org/package/coc-mare "View this project on npm")
 
-This extension adds to VS Code syntax highlighting and various Intellisense features for the Mare Programming Language.
+This extension adds various Intellisense features for the Mare Programming Language to the coc.nvim.
 
 ## Prerequisites
 
