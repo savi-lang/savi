@@ -295,5 +295,39 @@ describe Mare::Compiler::Consumes do
     end
   end
 
-  pending "allows re-assigning a consumed variable, under certain conditions"
+  it "unconsumes a variable if assigned from an expression that consumes it" do
+    source = Mare::Source.new_example <<-SOURCE
+    :actor Main
+      :fun non @indirect (s String'iso) String'iso: s
+      :fun non @indirect_partial! (s String'iso) String'iso: s
+      :new
+        x = String.new_iso
+        x = @indirect(--x) // okay; unconsumed
+        x
+        if True (x = @indirect(--x)) // okay; unconsumed
+        x
+        i U8 = 0, while (i < 5) (i += 1, x = @indirect(--x)) // okay; unconsumed
+        x
+        try (x = @indirect(--x), error!) // okay; unconsumed
+        x
+        try (x = @indirect_partial!(--x)) // NOT OKAY; reassignment is partial
+        x
+    SOURCE
+
+    expected = <<-MSG
+    This variable can't be used here; it might already be consumed:
+    from (example):15:
+        x
+        ^
+
+    - it was consumed here:
+      from (example):14:
+        try (x = @indirect_partial!(--x)) // NOT OKAY; reassignment is partial
+                                    ^~~
+    MSG
+
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :consumes)
+    end
+  end
 end

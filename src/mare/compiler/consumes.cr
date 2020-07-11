@@ -80,6 +80,7 @@ module Mare::Compiler::Consumes
       case node.op.value
       when "="
         info = @refer[node.lhs]?
+        maybe_unconsume(node, info) if info.is_a?(Refer::Local | Refer::LocalUnion)
       when "."
         node.lhs.accept(ctx, self)
         ident, args, yield_params, yield_block = AST::Extract.call(node)
@@ -87,6 +88,22 @@ module Mare::Compiler::Consumes
         args.try(&.accept(ctx, self))
         touch_yield_loop(ctx, yield_params, yield_block)
       end
+    end
+
+    def maybe_unconsume(node : AST::Relate, info : Refer::Local | Refer::LocalUnion)
+      # If the local we are assigning to in this assignment relate
+      # is one that was consumed within the right hand side of the expression,
+      # we may be able to mark it as safe to use again ("unconsume" it).
+      consumed_at = @consumes[info]?
+      return unless consumed_at && node.rhs.span_pos.contains?(consumed_at)
+
+      # If the right hand side has any possibility of jumping away,
+      # then it isn't safe to unconsume here, because something
+      # might catch the flow jump while the consumed variable is still in scope.
+      return if @jumps.not_nil!.away_possibly?(node.rhs)
+
+      # If we've met these conditions, it's safe to unconsume
+      @consumes.delete(info)
     end
 
     # We don't visit anything under a choice with this visitor;
