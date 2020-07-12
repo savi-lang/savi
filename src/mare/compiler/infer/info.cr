@@ -1276,7 +1276,9 @@ class Mare::Compiler::Infer
 
       other_infers.map do |other_infer, _|
         param = other_infer.params[@index]
-        param_info = other_infer.for_f[param].as(Param)
+        param_info = other_infer.for_f[param]
+        param_info = param_info.lhs if param_info.is_a?(FromAssign)
+        param_info = param_info.as(Param)
         param_mt = other_infer.resolve(ctx, param_info)
 
         {param_info.first_viable_constraint_pos, param_mt}.as({Source::Pos, MetaType})
