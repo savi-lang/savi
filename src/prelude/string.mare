@@ -139,6 +139,18 @@
       @val_from_cpointer(@_ptr._null, 0, 0)
     )
 
+  :fun ref trim_in_place (from ISize = 0, to ISize = 0x7FFF_FFFF_FFFF_FFFF) // TODO: ISize.max_value
+    start = @_offset_to_index(from)
+    finish = @_offset_to_index(to).min(@size)
+
+    if (start < @_size && start < finish) (
+      @_size = finish - start
+      @_ptr = @_ptr._offset(start)
+    |
+      @_size = 0
+    )
+    @
+
   :fun ref push_byte (byte U8)
     @reserve(@_size + 1)
     @_ptr._assign_at(@_size, byte)
