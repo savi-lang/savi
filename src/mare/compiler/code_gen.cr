@@ -2621,6 +2621,16 @@ class Mare::Compiler::CodeGen
   def gen_dynamic_array(expr : AST::Group)
     gtype = gtype_of(expr)
 
+    # If this array expression is inside of a constant, we know that it has
+    # been typechecked to be a constant expression and can generate it as such.
+    # TODO: Is it possible to determine that other array expressions in other
+    # code snippets are safe to be lifted to constant expressions?
+    if func_frame.gfunc.try(&.func.has_tag?(:constant))
+      return gen_array(gtype, expr.terms.map { |term|
+        gen_expr(term).as(LLVM::Value)
+      })
+    end
+
     receiver = gen_alloc(gtype, expr, "#{gtype.type_def.llvm_name}.new")
     size_arg = @i64.const_int(expr.terms.size)
     @builder.call(gtype.default_constructor.llvm_func, [receiver, size_arg])

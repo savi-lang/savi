@@ -352,6 +352,29 @@ struct Mare::Compiler::Infer::MetaType
     @inner.each_reachable_defn
   end
 
+  def each_reachable_defn_with_cap : Array({ReifiedType, Capability})
+    results = [] of {ReifiedType, Capability}
+
+    inner = @inner
+    intersects =
+      case inner
+      when Intersection; [inner]
+      when Union; inner.intersects
+      else return results
+      end
+
+    intersects.not_nil!.each do |intersect|
+      cap = intersect.cap
+      next unless cap
+
+      intersect.each_reachable_defn.each do |defn|
+        results << {defn, cap}
+      end
+    end
+
+    results
+  end
+
   def find_callable_func_defns(
     ctx : Context,
     infer : ForReifiedFunc,

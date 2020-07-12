@@ -1,5 +1,5 @@
 :class TimeFormatter
-  :fun non month_names Array(String): [
+  :const month_names Array(String)'val: [
     "January"
     "February"
     "March"
@@ -14,7 +14,7 @@
     "December"
   ]
 
-  :fun non day_names Array(String): [
+  :const day_names Array(String)'val: [
     "Sunday"
     "Monday"
     "Tuesday"
