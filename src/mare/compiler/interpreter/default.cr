@@ -532,7 +532,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
           AST::Identifier.new("non").from(data["keyword"]),
           data["ident"].as(AST::Identifier),
           nil,
-          data["ret"]?.as(AST::Identifier?),
+          data["ret"]?.as(AST::Term?),
           decl.body,
         ).tap(&.add_tag(:constant))
       when "prop"

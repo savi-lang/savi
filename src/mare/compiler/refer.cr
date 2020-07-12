@@ -47,18 +47,17 @@ module Mare::Compiler::Refer
   class Visitor < Mare::AST::Visitor
     getter analysis
     getter locals
-    getter consumes
 
     def initialize(
       @analysis : Analysis,
       @refer_type : ReferType::Analysis,
       @locals = {} of String => (Local | LocalUnion),
-      @consumes = {} of (Local | LocalUnion) => Source::Pos,)
+    )
       @param_count = 0
     end
 
     def sub_branch(ctx, group : AST::Node?, init_locals = @locals.dup)
-      Visitor.new(@analysis, @refer_type, init_locals, @consumes.dup).tap do |branch|
+      Visitor.new(@analysis, @refer_type, init_locals).tap do |branch|
         @analysis.set_scope(group, branch) if group.is_a?(AST::Group)
         group.try(&.accept(ctx, branch))
         @analysis = branch.analysis
@@ -100,38 +99,7 @@ module Mare::Compiler::Refer
           " it was assigned a value in some but not all branches", extra
       end
 
-      # Raise an error if trying to use a consumed local.
-      if info.is_a?(Local | LocalUnion) && @consumes.has_key?(info)
-        Error.at node,
-          "This variable can't be used here; it might already be consumed", [
-            {@consumes[info], "it was consumed here"}
-          ]
-      end
-      if info.is_a?(LocalUnion) && info.list.any? { |l| @consumes.has_key?(l) }
-        Error.at node,
-          "This variable can't be used here; it might already be consumed",
-          info.list.select { |l| @consumes.has_key?(l) }.map { |local|
-            {@consumes[local], "it was consumed here"}
-          }
-      end
-
       @analysis[node] = info
-    end
-
-    def touch(ctx, node : AST::Prefix)
-      case node.op.value
-      when "source_code_position_of_argument", "reflection_of_type",
-            "identity_digest_of"
-        nil # ignore this prefix type
-      when "--"
-        info = @analysis[node.term]
-        Error.at node, "Only a local variable can be consumed" \
-          unless info.is_a?(Local | LocalUnion)
-
-        @consumes[info] = node.pos
-      else
-        raise NotImplementedError.new(node.op.value)
-      end
     end
 
     # For a FieldRead, FieldWrite, or FieldReplace; take note of it by name.
@@ -181,23 +149,14 @@ module Mare::Compiler::Refer
     def touch(ctx, node : AST::Choice)
       # Prepare to collect the list of new locals exposed in each branch.
       branch_locals = {} of String => Array(Local | LocalUnion)
-      body_consumes = {} of (Local | LocalUnion) => Source::Pos
 
       # Iterate over each clause, visiting both the cond and body of the clause.
       node.list.each do |cond, body|
         # Visit the cond first.
         cond_branch = sub_branch(ctx, cond)
 
-        # Absorb any consumes from the cond branch into this parent branch.
-        # This makes them visible both in the parent and in future sub branches.
-        @consumes.merge!(cond_branch.consumes)
-
         # Visit the body next. Locals from the cond are available in the body.
-        # Consumes from any earlier cond are also visible in the body.
         body_branch = sub_branch(ctx, body, cond_branch.locals.dup)
-
-        # Collect any consumes from the body branch.
-        body_consumes.merge!(body_branch.consumes)
 
         # Collect the list of new locals exposed in the body branch.
         body_branch.locals.each do |name, local|
@@ -205,9 +164,6 @@ module Mare::Compiler::Refer
           (branch_locals[name] ||= Array(Local | LocalUnion).new) << local
         end
       end
-
-      # Absorb any consumes from the cond branches into this parent branch.
-      @consumes.merge!(body_consumes)
 
       # Expose the locals from the branches as LocalUnion instances.
       # Those locals that were exposed in only some of the branches are to be
@@ -229,33 +185,19 @@ module Mare::Compiler::Refer
     def touch(ctx, node : AST::Loop)
       # Prepare to collect the list of new locals exposed in each branch.
       branch_locals = {} of String => Array(Local | LocalUnion)
-      body_consumes = {} of (Local | LocalUnion) => Source::Pos
 
       # Visit the loop cond twice (nested) to simulate repeated execution.
       cond_branch = sub_branch(ctx, node.cond)
       cond_branch_2 = cond_branch.sub_branch(ctx, node.cond)
 
-      # Absorb any consumes from the cond branch into this parent branch.
-      # This makes them visible both in the parent and in future sub branches.
-      @consumes.merge!(cond_branch.consumes)
-
       # Now, visit the else body, if any.
       node.else_body.try do |else_body|
         else_branch = sub_branch(ctx, else_body)
-
-        # Collect any consumes from the else body branch.
-        body_consumes.merge!(else_branch.consumes)
       end
 
       # Now, visit the main body twice (nested) to simulate repeated execution.
       body_branch = sub_branch(ctx, node.body)
       body_branch_2 = body_branch.sub_branch(ctx, node.body, @locals.dup)
-
-      # Collect any consumes from the body branch.
-      body_consumes.merge!(body_branch.consumes)
-
-      # Absorb any consumes from the body branches into this parent branch.
-      @consumes.merge!(body_consumes)
 
       # TODO: Is it possible/safe to collect locals from the body branches?
     end
@@ -271,9 +213,6 @@ module Mare::Compiler::Refer
       params.try(&.terms.each { |param| sub_branch2.create_local(param) })
       block.try(&.accept(ctx, sub_branch2))
       @analysis.set_scope(block, sub_branch) if block.is_a?(AST::Group)
-
-      # Absorb any consumes from the block branch into this parent branch.
-      @consumes.merge!(sub_branch.consumes)
     end
 
     def touch(ctx, node : AST::Node)

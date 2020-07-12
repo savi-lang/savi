@@ -1082,7 +1082,7 @@ describe Mare::Compiler::Infer do
     source = Mare::Source.new_example <<-SOURCE
     :actor Main
       :new
-        x Array((U64 | None)) = [1, 2, 3] // TODO: allow syntax: Array(U64 | None)?
+        x Array((U64 | None))'val = [1, 2, 3] // TODO: allow syntax: Array(U64 | None)'val?
     SOURCE
 
     ctx = Mare::Compiler.compile([source], :infer)
@@ -1092,9 +1092,35 @@ describe Mare::Compiler::Infer do
     assign = body.terms.first.as(Mare::AST::Relate)
     elem_0 = assign.rhs.as(Mare::AST::Group).terms.first
 
-    infer.analysis.resolved(ctx, assign.lhs).show_type.should eq "Array((U64 | None))"
-    infer.analysis.resolved(ctx, assign.rhs).show_type.should eq "Array((U64 | None))"
+    infer.analysis.resolved(ctx, assign.lhs).show_type.should eq "Array((U64 | None))'val"
+    infer.analysis.resolved(ctx, assign.rhs).show_type.should eq "Array((U64 | None))'val"
     infer.analysis.resolved(ctx, elem_0).show_type.should eq "U64"
+  end
+
+  it "complains when lifting the cap of an array with non-sendable elements" do
+    source = Mare::Source.new_example <<-SOURCE
+    :actor Main
+      :new
+        s String'ref = String.new
+        array1 Array(String'ref)'val = [String.new_iso, String.new_iso]
+        array2 Array(String'ref)'val = [s, s]
+    SOURCE
+
+    expected = <<-MSG
+    This array literal can't have a reference cap of val unless all of its elements are sendable:
+    from (example):5:
+        array2 Array(String'ref)'val = [s, s]
+                                       ^~~~~~
+
+    - it is required here to be a subtype of Array(String'ref)'val:
+      from (example):5:
+        array2 Array(String'ref)'val = [s, s]
+               ^~~~~~~~~~~~~~~~~~~~~
+    MSG
+
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :infer)
+    end
   end
 
   it "infers an empty array literal from its antecedent" do
@@ -1591,6 +1617,38 @@ describe Mare::Compiler::Infer do
       from (example):2:
       :be call (a String'ref, b String'val, c String'box)
                                             ^~~~~~~~~~~~
+    MSG
+
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :infer)
+    end
+  end
+
+  it "complains when a constant doesn't meet the expected type" do
+    source = Mare::Source.new_example <<-SOURCE
+    :actor Main
+      :new
+      :const i8 I8: 1
+      :const u64 U64: 2
+      :const f64 F32: 3.3
+      :const str String: "Hello, World!"
+      :const array_i8 Array(I8)'val: [1]
+      :const array_u64 Array(U64)'val: [2]
+      :const array_f32 Array(F32)'val: [3.3]
+      :const array_str Array(String)'val: ["Hello", "World"]
+      :const array_ref_str Array(String)'ref: ["Hello", "World"] // NOT VAL
+    SOURCE
+
+    expected = <<-MSG
+    The type of a constant may only be String, a numeric type, or an immutable Array of one of these:
+    from (example):11:
+      :const array_ref_str Array(String)'ref: ["Hello", "World"] // NOT VAL
+             ^~~~~~~~~~~~~
+
+    - but the type is Array(String):
+      from (example):11:
+      :const array_ref_str Array(String)'ref: ["Hello", "World"] // NOT VAL
+                           ^~~~~~~~~~~~~~~~~
     MSG
 
     expect_raises Mare::Error, expected do

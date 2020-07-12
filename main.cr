@@ -18,5 +18,10 @@ elsif ARGV[0]? == "run"
     exit 1
   end
 else
-  Mare::Compiler.compile(Dir.current, :binary)
+  begin
+    Mare::Compiler.compile(Dir.current, :binary)
+  rescue e : Mare::Error
+    STDERR.puts "Compilation Error:\n\n#{e.message}\n\n"
+    exit 1
+  end
 end

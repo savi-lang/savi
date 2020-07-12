@@ -1472,6 +1472,31 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       end
       @analysis.ret_resolved = @analysis.resolved_infos[@for_f[ret]]
 
+      # Return types of constant "functions" are very restrictive.
+      if func.has_tag?(:constant)
+        ret_mt = @analysis.ret_resolved
+        ret_rt = ret_mt.single?.try(&.defn)
+        is_val = ret_mt.cap_only.inner == MetaType::Capability::VAL
+        unless is_val && ret_rt.is_a?(ReifiedType) && ret_rt.link.is_concrete? && (
+          ret_rt.not_nil!.link == prelude_type("String") ||
+          ret_mt.subtype_of?(ctx, MetaType.new_nominal(reified_type(prelude_type("Numeric")))) ||
+          (ret_rt.not_nil!.link == prelude_type("Array") && begin
+            elem_mt = ret_rt.args.first
+            elem_rt = elem_mt.single?.try(&.defn)
+            elem_is_val = elem_mt.cap_only.inner == MetaType::Capability::VAL
+            is_val && elem_rt.is_a?(ReifiedType) && elem_rt.link.is_concrete? && (
+              elem_rt.not_nil!.link == prelude_type("String") ||
+              elem_mt.subtype_of?(ctx, MetaType.new_nominal(reified_type(prelude_type("Numeric"))))
+            )
+          end)
+        )
+          Error.at ret, "The type of a constant may only be String, " \
+            "a numeric type, or an immutable Array of one of these", [
+              {func.ret || func.body || ret, "but the type is #{ret_mt.show_type}"}
+            ]
+        end
+      end
+
       # Parameters must be sendable when the function is asynchronous,
       # or when it is a constructor with elevated capability.
       require_sendable =

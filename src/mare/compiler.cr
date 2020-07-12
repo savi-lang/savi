@@ -11,6 +11,7 @@ module Mare::Compiler
     when :refer            then ctx.run(ctx.refer)
     when :classify         then ctx.run(ctx.classify)
     when :jumps            then ctx.run(ctx.jumps)
+    when :consumes       then ctx.run(ctx.consumes)
     when :inventory        then ctx.run(ctx.inventory)
     when :infer            then ctx.run_whole_program(ctx.infer)
     when :privacy          then ctx.run(Privacy)
@@ -45,6 +46,7 @@ module Mare::Compiler
     when :refer then [:lambda, :populate, :sugar, :macros, :refer_type, :namespace]
     when :classify then [:refer, :lambda, :sugar, :macros]
     when :jumps then [:classify]
+    when :consumes then [:jumps, :refer]
     when :inventory then [:classify]
     when :infer then [:inventory, :jumps, :classify, :refer, :lambda, :populate]
     when :privacy then [:infer]
@@ -52,9 +54,9 @@ module Mare::Compiler
     when :reach then [:infer]
     when :verify then [:reach]
     when :paint then [:reach]
-    when :codegen then [:paint, :verify, :reach, :completeness, :privacy, :infer, :inventory, :jumps]
+    when :codegen then [:paint, :verify, :reach, :completeness, :privacy, :infer, :inventory, :consumes, :jumps]
     when :lifetime then [:reach, :infer]
-    when :codegen_verona then [:lifetime, :paint, :verify, :reach, :completeness, :privacy, :infer, :inventory, :jumps]
+    when :codegen_verona then [:lifetime, :paint, :verify, :reach, :completeness, :privacy, :infer, :inventory, :consumes, :jumps]
     when :eval then [:codegen]
     when :binary then [:codegen]
     when :binary_verona then [:codegen_verona]

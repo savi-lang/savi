@@ -51,6 +51,11 @@ module Mare::Compiler::Jumps
       always_error?(node)
       # TODO: early returns also jump away
     end
+
+    def away_possibly?(node)
+      any_error?(node)
+      # TODO: early returns also jump away
+    end
   end
 
   class Visitor < Mare::AST::Visitor

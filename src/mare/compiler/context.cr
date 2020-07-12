@@ -9,6 +9,7 @@ class Mare::Compiler::Context
   getter infer
   getter inventory
   getter jumps
+  getter consumes
   getter lifetime
   getter namespace
   getter paint
@@ -30,6 +31,7 @@ class Mare::Compiler::Context
     @infer = Infer.new
     @inventory = Inventory::Pass.new
     @jumps = Jumps::Pass.new
+    @consumes = Consumes::Pass.new
     @lifetime = Lifetime.new
     @namespace = Namespace.new
     @paint = Paint.new

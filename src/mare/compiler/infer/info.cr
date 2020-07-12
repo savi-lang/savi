@@ -840,25 +840,31 @@ class Mare::Compiler::Infer
     def resolve!(ctx : Context, infer : ForReifiedFunc)
       array_defn = infer.prelude_type("Array")
 
+      # By default, an array literal has a cap of `ref`.
+      array_cap = MetaType::Capability::REF
+
       # Determine the lowest common denominator MetaType of all elements.
       elem_mts = terms.map { |term| infer.resolve(ctx, term).as(MetaType) }.uniq
       elem_mt = MetaType.new_union(elem_mts).simplify(ctx)
+      orig_elem_mt_union = elem_mt
 
       # Look for exactly one antecedent type that matches the inferred type.
       # Essentially, this is the correlating "outside" inference with "inside".
       # If such a type is found, it replaces our inferred element type.
       # If no such type is found, stick with what we inferred for now.
-      possible_antes = [] of MetaType
-      possible_element_antecedents(ctx, infer).each do |ante|
+      possible_antes = [] of {MetaType, MetaType::Capability}
+      possible_element_antecedents(ctx, infer).each do |ante, cap|
         if elem_mts.empty? || elem_mt.subtype_of?(ctx, ante)
-          possible_antes << ante
+          possible_antes << {ante, cap}
         end
       end
       if possible_antes.size > 1
         # TODO: nice error for the below:
         raise "too many possible antecedents"
       elsif possible_antes.size == 1
-        elem_mt = possible_antes.first
+        # We have a suitable antecedent, so we adopt the element type
+        # as well as the associated capability for the array container type.
+        elem_mt, array_cap = possible_antes.first
       else
         # Leave elem_mt alone and let it ride.
       end
@@ -871,7 +877,17 @@ class Mare::Compiler::Infer
 
       # Now that we have the element type to use, construct the result.
       rt = infer.reified_type(infer.prelude_type(ctx, "Array"), [elem_mt])
-      mt = MetaType.new(rt)
+      mt = MetaType.new(rt, array_cap.value.as(String))
+
+      # If the array cap is not ref or "lesser", we must recover to the
+      # higher capability, meaning all element expressions must be sendable.
+      unless array_cap.supertype_of?(MetaType::Capability::REF)
+        unless orig_elem_mt_union.alias.is_sendable?
+          Error.at @pos, "This array literal can't have a reference cap of " \
+            "#{array_cap.value} unless all of its elements are sendable",
+              describe_downstream_constraints(ctx, infer)
+        end
+      end
 
       # Reach the functions we will use during CodeGen.
       ["new", "<<"].each do |f_name|
@@ -884,14 +900,14 @@ class Mare::Compiler::Infer
       mt
     end
 
-    def possible_element_antecedents(ctx, infer) : Array(MetaType)
-      results = [] of MetaType
+    def possible_element_antecedents(ctx, infer) : Array({MetaType, MetaType::Capability})
+      results = [] of {MetaType, MetaType::Capability}
 
-      total_downstream_constraint(ctx, infer).simplify(ctx).each_reachable_defn.to_a.each do |rt|
+      total_downstream_constraint(ctx, infer).simplify(ctx).each_reachable_defn_with_cap.each do |rt, cap|
         # TODO: Support more element antecedent detection patterns.
         if rt.link == infer.prelude_type("Array") \
         && rt.args.size == 1
-          results << rt.args.first
+          results << {rt.args.first, cap}
         end
       end
 
@@ -909,7 +925,7 @@ class Mare::Compiler::Infer
 
     def resolve!(ctx : Context, infer : ForReifiedFunc)
       antecedents = @array.possible_element_antecedents(ctx, infer)
-      antecedents.empty? ? MetaType.unconstrained : MetaType.new_union(antecedents)
+      antecedents.empty? ? MetaType.unconstrained : MetaType.new_union(antecedents.map(&.first))
     end
   end
 
@@ -1276,7 +1292,9 @@ class Mare::Compiler::Infer
 
       other_infers.map do |other_infer, _|
         param = other_infer.params[@index]
-        param_info = other_infer.for_f[param].as(Param)
+        param_info = other_infer.for_f[param]
+        param_info = param_info.lhs if param_info.is_a?(FromAssign)
+        param_info = param_info.as(Param)
         param_mt = other_infer.resolve(ctx, param_info)
 
         {param_info.first_viable_constraint_pos, param_mt}.as({Source::Pos, MetaType})

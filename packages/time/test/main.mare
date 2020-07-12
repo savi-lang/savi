@@ -4,4 +4,5 @@
   :new (env)
     Specs.run(env, [
       SpecRun(TimeSpec).new(env)
+      SpecRun(TimeFormatterSpec).new(env)
     ])
