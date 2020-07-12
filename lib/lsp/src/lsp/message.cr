@@ -173,6 +173,7 @@ module LSP::Message
     Completion |
     CompletionItemResolve |
     Hover |
+    Definition |
     SignatureHelp
 
   alias AnyInResponse =
@@ -195,6 +196,7 @@ module LSP::Message
     Completion::Response |
     CompletionItemResolve::Response |
     Hover::Response |
+    Definition::Response |
     SignatureHelp::Response
 
   alias AnyOutErrorResponse =
@@ -204,6 +206,7 @@ module LSP::Message
     Completion::ErrorResponse |
     CompletionItemResolve::ErrorResponse |
     Hover::ErrorResponse |
+    Definition::ErrorResponse |
     SignatureHelp::ErrorResponse
 
   alias AnyOutRequest =
@@ -790,6 +793,33 @@ module LSP::Message
 
     alias Params = Data::CompletionItem
     alias Result = Data::CompletionItem
+    alias ErrorData = Nil
+  end
+
+  # The hover request is sent from the client to the server to request hover
+  # information at a given text document position.
+  struct Definition
+    Message.def_request("textDocument/definition")
+
+    struct Params
+      JSON.mapping({
+        # The text document.
+        text_document: {
+          type: Data::TextDocumentIdentifier,
+          key: "textDocument",
+        },
+
+        # The position inside the text document.
+        position: Data::Position,
+      })
+      def initialize(
+        @text_document = Data::TextDocumentIdentifier.new,
+        @position = Data::Position.new)
+      end
+    end
+
+    alias Result = Data::Location
+
     alias ErrorData = Nil
   end
 

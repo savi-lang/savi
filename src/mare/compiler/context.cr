@@ -16,6 +16,7 @@ class Mare::Compiler::Context
   getter refer
   getter refer_type
   getter serve_hover
+  getter serve_definition
 
   def initialize
     @program = Program.new
@@ -36,6 +37,7 @@ class Mare::Compiler::Context
     @refer = Refer::Pass.new
     @refer_type = ReferType::Pass.new
     @serve_hover = ServeHover.new
+    @serve_definition = ServeDefinition.new
   end
 
   def compile_library(*args)
