@@ -92,6 +92,7 @@ class Mare::Server
   # When a text document is saved, do nothing.
   def handle(msg : LSP::Message::DidSave)
     # Ignore.
+    @ctx = nil
   end
 
   def handle(msg : LSP::Message::Definition)
