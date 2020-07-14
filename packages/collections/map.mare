@@ -6,7 +6,10 @@
   :prop value V
   :new (@key, @value)
 
-:class Map (K, V, H HashFunction(K))
+:alias Map (K Hashable(K)'read, V): HashMap(K, V, HashEq(K))
+:alias MapIs (K, V): HashMap(K, V, HashIs(K))
+
+:class HashMap (K, V, H HashFunction(K)) // TODO rename as Map when we default type arguments are possible and H can have a default of HashEq
   :is MapReadable(K, V)
   :prop _size USize: 0
   :prop _array Array((_KV(K, V) | _MapEmpty | _MapDeleted))

@@ -5,7 +5,7 @@
   :fun has_duo  (line): @has_target_count(line, 2)
   :fun has_trio (line): @has_target_count(line, 3)
   :fun has_target_count (line String, target_count I64)
-    letters = Map(U8, I64, HashEq(U8)).new
+    letters = Map(U8, I64).new
     line.each_byte -> (letter |
       try ( // TODO: use an upsert method instead?
         letters[letter] = letters[letter]! + 1

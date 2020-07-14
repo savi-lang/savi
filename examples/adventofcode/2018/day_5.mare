@@ -4,7 +4,7 @@
 
 :class Day5Polymer
   :prop input String'box
-  :prop skips: Map(USize, None, HashEq(USize)).new // TODO: Use Set instead of Map
+  :prop skips: Map(USize, None).new // TODO: Use Set instead of Map
   :new (@input)
 
   :fun size: @input.size - @skips.size

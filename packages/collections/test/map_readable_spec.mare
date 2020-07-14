@@ -1,11 +1,11 @@
 :import "spec"
-:import ".." (Map, MapReadable, HashEq, HashId)
+:import ".." (Map, MapReadable)
 
 :class MapReadableSpec
   :is Spec
   :const describes: "MapReadable"
 
-  :fun new_mutable_map: Map(String, U64, HashEq(String)).new // TODO: implicit default for HashFunction type argument
+  :fun new_mutable_map: Map(String, U64).new
 
   :: Create a mutable map, yield it to the caller for initialization,
   :: then return it as read-only using the MapReadable trait as the type.

@@ -71,11 +71,9 @@ module Mare::Compiler::ReferType
       when Program::Type::Link
         Refer::Type.new(found)
       when Program::TypeAlias::Link
-        target = found
-        while !target.is_a?(Program::Type::Link)
-          target = namespace[target.resolve(ctx).target.value]
-        end
-        Refer::TypeAlias.new(found, target)
+        Refer::TypeAlias.new(found)
+      when Program::TypeWithValue::Link
+        Refer::Type.new(found.resolve(ctx).target, found)
       end
     end
 
@@ -93,7 +91,38 @@ module Mare::Compiler::ReferType
     end
   end
 
-  class Pass < Compiler::Pass::Analyze(Analysis, Analysis)
+  class Pass < Compiler::Pass::Analyze(Analysis, Analysis, Analysis)
+    def analyze_type_alias(ctx, t, t_link)
+      t_analysis = Analysis.new
+
+      # If the type has type parameters, collect them into the params map.
+      t.params.try do |type_params|
+        type_params.terms.each_with_index do |param, index|
+          param_ident, param_bound = AST::Extract.type_param(param)
+          t_analysis.observe_type_param(
+            Refer::TypeParam.new(
+              t_link,
+              index,
+              param_ident,
+              param_bound || AST::Identifier.new("any").from(param),
+            )
+          )
+        end
+      end
+
+      # Run as a visitor on the ident itself and every type param.
+      namespace = ctx.namespace[t.ident.pos.source]
+      visitor = Visitor.new(t_analysis, namespace)
+      t.ident.accept(ctx, visitor)
+      t.params.try(&.accept(ctx, visitor))
+
+      # Additionally, run on the target expression as well
+      # (this is the part that is unique to a TypeAlias vs a Type).
+      t.target.accept(ctx, visitor)
+
+      visitor.analysis
+    end
+
     def analyze_type(ctx, t, t_link)
       t_analysis = Analysis.new
 

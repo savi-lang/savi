@@ -13,7 +13,7 @@ class Mare::Compiler::Infer::MetaType::Unconstrained
     io << "<unconstrained>"
   end
 
-  def each_reachable_defn : Iterator(Infer::ReifiedType)
+  def each_reachable_defn(ctx : Context) : Iterator(Infer::ReifiedType)
     ([] of Infer::ReifiedType).each
   end
 

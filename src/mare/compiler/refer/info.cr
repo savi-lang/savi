@@ -66,8 +66,9 @@ module Mare::Compiler::Refer
 
   struct Type
     getter link : Program::Type::Link
+    getter with_value : Program::TypeWithValue::Link?
 
-    def initialize(@link)
+    def initialize(@link, @with_value = nil)
     end
 
     def defn(ctx)
@@ -81,26 +82,21 @@ module Mare::Compiler::Refer
 
   struct TypeAlias
     getter link_alias : Program::TypeAlias::Link
-    getter link : Program::Type::Link
 
-    def initialize(@link_alias, @link)
+    def initialize(@link_alias)
     end
 
     def defn_alias(ctx)
       link_alias.resolve(ctx)
     end
 
-    def defn(ctx)
-      link.resolve(ctx)
-    end
-
     def metadata(ctx)
-      defn(ctx).metadata.merge(defn_alias(ctx).metadata)
+      defn_alias(ctx).metadata
     end
   end
 
   struct TypeParam
-    getter parent_link : Program::Type::Link
+    getter parent_link : (Program::Type::Link | Program::TypeAlias::Link)
     getter index : Int32
     getter ident : AST::Identifier
     getter bound : AST::Term
@@ -108,7 +104,7 @@ module Mare::Compiler::Refer
     def initialize(@parent_link, @index, @ident, @bound)
     end
 
-    def parent(ctx)
+    def parent(ctx) : (Program::Type | Program::TypeAlias)
       parent_link.resolve(ctx)
     end
   end

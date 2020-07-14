@@ -193,7 +193,11 @@ module Mare::Compiler::Consumes
     end
   end
 
-  class Pass < Compiler::Pass::Analyze(Nil, Nil)
+  class Pass < Compiler::Pass::Analyze(Nil, Nil, Nil)
+    def analyze_type_alias(ctx, t, t_link)
+      nil # no analysis output
+    end
+
     def analyze_type(ctx, t, t_link)
       nil # no analysis output
     end

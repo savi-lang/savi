@@ -169,6 +169,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     @map_for_f = {} of Program::Function::Link => ForFunc
     @map = {} of ReifiedFunction => ForReifiedFunc
     @types = {} of ReifiedType => ForReifiedType
+    @aliases = {} of ReifiedTypeAlias => ForReifiedTypeAlias
+    @unwrapping_set = Set(ReifiedTypeAlias).new
   end
 
   def run(ctx)
@@ -469,6 +471,36 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     )
   end
 
+  def for_rt_alias(
+    ctx : Context,
+    link : Program::TypeAlias::Link,
+    type_args : Array(MetaType) = [] of MetaType
+  ) : ForReifiedTypeAlias
+    rt_alias = ReifiedTypeAlias.new(link, type_args)
+    @aliases[rt_alias] ||= ForReifiedTypeAlias.new(ctx, rt_alias)
+  end
+
+  def unwrap_alias(ctx : Context, rt_alias : ReifiedTypeAlias) : MetaType
+    # Guard against recursion in alias unwrapping.
+    if @unwrapping_set.includes?(rt_alias)
+      t_alias = rt_alias.link.resolve(ctx)
+      Error.at t_alias.ident,
+        "This type alias is directly recursive, which is not supported",
+        [{t_alias.target,
+          "only recursion via type arguments in this expression is supported"
+        }]
+    end
+    @unwrapping_set.add(rt_alias)
+
+    # Unwrap the alias.
+    refer = ctx.refer[rt_alias.link]
+    @aliases[rt_alias].type_expr(rt_alias.target_type_expr(ctx), refer)
+    .simplify(ctx)
+
+    # Remove the recursion guard.
+    .tap { @unwrapping_set.delete(rt_alias) }
+  end
+
   # TODO: Get rid of this
   protected def for_rt!(rt)
     @types[rt]
@@ -533,6 +565,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       # Skip checking type arguments that contain type parameters.
       next unless arg.type_params.empty?
 
+      arg = arg.simplify(ctx)
+
       param_bound = @types[rt].get_type_param_bound(index)
       unless arg.satisfies_bound?(ctx, param_bound)
         bound_pos =
@@ -548,9 +582,43 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
 
   struct TypeParam
     getter ref : Refer::TypeParam
-    getter parent_rt : StructRef(ReifiedType)?
-    def initialize(@ref, parent_rt : ReifiedType? = nil)
-      @parent_rt = StructRef(ReifiedType).new(parent_rt) if parent_rt
+    getter parent_rt : StructRef(ReifiedType | ReifiedTypeAlias)?
+
+    def initialize(@ref, parent_rt : ReifiedType | ReifiedTypeAlias? = nil)
+      @parent_rt = StructRef(ReifiedType | ReifiedTypeAlias).new(parent_rt) if parent_rt
+    end
+  end
+
+  struct ReifiedTypeAlias
+    getter link : Program::TypeAlias::Link
+    getter args : Array(MetaType)
+
+    def initialize(@link, @args = [] of MetaType)
+    end
+
+    def target_type_expr(ctx) : AST::Term
+      link.resolve(ctx).target
+    end
+
+    def show_type
+      String.build { |io| show_type(io) }
+    end
+
+    def show_type(io : IO)
+      io << link.name
+
+      unless args.empty?
+        io << "("
+        args.each_with_index do |mt, index|
+          io << ", " unless index == 0
+          mt.inner.inspect(io)
+        end
+        io << ")"
+      end
+    end
+
+    def inspect(io : IO)
+      show_type(io)
     end
   end
 
@@ -630,7 +698,152 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
   end
 
+  module TypeExprEvaluation
+    abstract def reified : (ReifiedType | ReifiedTypeAlias)
+
+    def reified_type(*args)
+      ctx.infer.for_rt(ctx, *args).reified
+    end
+
+    def reified_type_alias(*args)
+      ctx.infer.for_rt_alias(ctx, *args).reified
+    end
+
+    # An identifier type expression must refer to a type.
+    def type_expr(node : AST::Identifier, refer, receiver = nil) : MetaType
+      ref = refer[node]?
+      case ref
+      when Refer::Self
+        receiver || MetaType.new(reified)
+      when Refer::Type
+        MetaType.new(reified_type(ref.link))
+      when Refer::TypeAlias
+        MetaType.new_alias(reified_type_alias(ref.link_alias))
+      when Refer::TypeParam
+        lookup_type_param(ref, refer, receiver)
+      when Refer::Unresolved, nil
+        case node.value
+        when "iso", "trn", "val", "ref", "box", "tag", "non"
+          MetaType.new(MetaType::Capability.new(node.value))
+        when "any", "alias", "send", "share", "read"
+          MetaType.new(MetaType::Capability.new_generic(node.value))
+        else
+          Error.at node, "This type couldn't be resolved"
+        end
+      else
+        raise NotImplementedError.new(ref.inspect)
+      end
+    end
+
+    # An relate type expression must be an explicit capability qualifier.
+    def type_expr(node : AST::Relate, refer, receiver = nil) : MetaType
+      if node.op.value == "'"
+        cap_ident = node.rhs.as(AST::Identifier)
+        case cap_ident.value
+        when "aliased"
+          type_expr(node.lhs, refer, receiver).simplify(ctx).alias
+        else
+          cap = type_expr(cap_ident, refer, receiver)
+          type_expr(node.lhs, refer, receiver).simplify(ctx).override_cap(cap)
+        end
+      elsif node.op.value == "->"
+        type_expr(node.rhs, refer, receiver).simplify(ctx).viewed_from(type_expr(node.lhs, refer, receiver))
+      elsif node.op.value == "->>"
+        type_expr(node.rhs, refer, receiver).simplify(ctx).extracted_from(type_expr(node.lhs, refer, receiver))
+      else
+        raise NotImplementedError.new(node.to_a.inspect)
+      end
+    end
+
+    # A "|" group must be a union of type expressions, and a "(" group is
+    # considered to be just be a single parenthesized type expression (for now).
+    def type_expr(node : AST::Group, refer, receiver = nil) : MetaType
+      if node.style == "|"
+        MetaType.new_union(
+          node.terms
+          .select { |t| t.is_a?(AST::Group) && t.terms.size > 0 }
+          .map { |t| type_expr(t, refer, receiver).as(MetaType)}
+        )
+      elsif node.style == "(" && node.terms.size == 1
+        type_expr(node.terms.first, refer, receiver)
+      else
+        raise NotImplementedError.new(node.to_a.inspect)
+      end
+    end
+
+    # A "(" qualify is used to add type arguments to a type.
+    def type_expr(node : AST::Qualify, refer, receiver = nil) : MetaType
+      raise NotImplementedError.new(node.to_a) unless node.group.style == "("
+
+      target = type_expr(node.term, refer, receiver)
+      args = node.group.terms.map do |t|
+        resolve_type_param_parent_links(type_expr(t, refer, receiver)).as(MetaType)
+      end
+
+      target_inner = target.inner
+      if target_inner.is_a?(MetaType::Nominal) \
+      && target_inner.defn.is_a?(ReifiedTypeAlias)
+        MetaType.new(reified_type_alias(target_inner.defn.as(ReifiedTypeAlias).link, args))
+      else
+        cap = begin target.cap_only rescue nil end
+        mt = MetaType.new(reified_type(target.single!, args))
+        mt = mt.override_cap(cap) if cap
+        mt
+      end
+    end
+
+    # All other AST nodes are unsupported as type expressions.
+    def type_expr(node : AST::Node, refer, receiver = nil) : MetaType
+      raise NotImplementedError.new(node.to_a)
+    end
+
+    # TODO: Can we do this more eagerly? Chicken and egg problem.
+    # Can every TypeParam contain the parent_rt from birth, so we can avoid
+    # the cost of scanning and substituting them here later?
+    # It's a chicken-and-egg problem because the parent_rt may contain
+    # references to type params in its type arguments, which means those
+    # references have to exist somehow before the parent_rt is settled,
+    # but then that changes the parent_rt which needs to be embedded in them.
+    def resolve_type_param_parent_links(mt : MetaType) : MetaType
+      substitutions = {} of TypeParam => MetaType
+      mt.type_params.each do |type_param|
+        next if type_param.parent_rt
+        next if type_param.ref.parent_link != reified.link
+
+        scoped_type_param = TypeParam.new(type_param.ref, reified)
+        substitutions[type_param] = MetaType.new_type_param(scoped_type_param)
+      end
+
+      mt = mt.substitute_type_params(substitutions) if substitutions.any?
+
+      mt
+    end
+  end
+
+  class ForReifiedTypeAlias
+    include TypeExprEvaluation
+
+    private getter ctx : Context
+    getter reified : ReifiedTypeAlias
+
+    def initialize(@ctx, @reified)
+    end
+
+    def lookup_type_param(ref : Refer::TypeParam, refer, receiver = nil)
+      raise NotImplementedError.new(ref) if ref.parent_link != reified.link
+
+      # Lookup the type parameter on self type and return the arg if present
+      arg = reified.args[ref.index]?
+      return arg if arg
+
+      # Otherwise, return it as an unreified type parameter nominal.
+      MetaType.new_type_param(TypeParam.new(ref))
+    end
+  end
+
   class ForReifiedType
+    include TypeExprEvaluation
+
     private getter ctx : Context
     getter analysis : ReifiedTypeAnalysis
     getter reified : ReifiedType
@@ -649,10 +862,6 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
 
         ctx.infer.for_rt!(trait).analysis.subtyping.assert(reified, f.ident.pos)
       end
-    end
-
-    def reified_type(*args)
-      ctx.infer.for_rt(ctx, *args).reified
     end
 
     def refer
@@ -681,8 +890,9 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     def lookup_type_param_bound(type_param : TypeParam)
       parent_rt = type_param.parent_rt
       if parent_rt && parent_rt != reified
+        raise NotImplementedError.new(parent_rt) if parent_rt.is_a?(ReifiedTypeAlias)
         return (
-          ctx.infer.for_rt(ctx, parent_rt.link, parent_rt.args)
+          ctx.infer.for_rt(ctx, parent_rt.link.as(Program::Type::Link), parent_rt.args)
             .lookup_type_param_bound(type_param)
         )
       end
@@ -717,101 +927,6 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     def pop_type_param_refinement(ref)
       list = @type_param_refinements[ref]
       list.empty? ? @type_param_refinements.delete(ref) : list.pop
-    end
-
-    # An identifier type expression must refer to a type.
-    def type_expr(node : AST::Identifier, refer, receiver = nil) : MetaType
-      ref = refer[node]?
-      case ref
-      when Refer::Self
-        receiver || MetaType.new(reified)
-      when Refer::Type, Refer::TypeAlias
-        MetaType.new(reified_type(ref.link))
-      when Refer::TypeParam
-        lookup_type_param(ref, refer, receiver)
-      when Refer::Unresolved, nil
-        case node.value
-        when "iso", "trn", "val", "ref", "box", "tag", "non"
-          MetaType.new(MetaType::Capability.new(node.value))
-        when "any", "alias", "send", "share", "read"
-          MetaType.new(MetaType::Capability.new_generic(node.value))
-        else
-          Error.at node, "This type couldn't be resolved"
-        end
-      else
-        raise NotImplementedError.new(ref.inspect)
-      end
-    end
-
-    # An relate type expression must be an explicit capability qualifier.
-    def type_expr(node : AST::Relate, refer, receiver = nil) : MetaType
-      if node.op.value == "'"
-        cap_ident = node.rhs.as(AST::Identifier)
-        case cap_ident.value
-        when "aliased"
-          type_expr(node.lhs, refer, receiver).alias
-        else
-          cap = type_expr(cap_ident, refer, receiver)
-          type_expr(node.lhs, refer, receiver).override_cap(cap)
-        end
-      elsif node.op.value == "->"
-        type_expr(node.rhs, refer, receiver).viewed_from(type_expr(node.lhs, refer, receiver))
-      elsif node.op.value == "->>"
-        type_expr(node.rhs, refer, receiver).extracted_from(type_expr(node.lhs, refer, receiver))
-      else
-        raise NotImplementedError.new(node.to_a.inspect)
-      end
-    end
-
-    # A "|" group must be a union of type expressions, and a "(" group is
-    # considered to be just be a single parenthesized type expression (for now).
-    def type_expr(node : AST::Group, refer, receiver = nil) : MetaType
-      if node.style == "|"
-        MetaType.new_union(node.terms.map { |t| type_expr(t, refer, receiver).as(MetaType) }) # TODO: is it possible to remove this superfluous "as"?
-      elsif node.style == "(" && node.terms.size == 1
-        type_expr(node.terms.first, refer, receiver)
-      else
-        raise NotImplementedError.new(node.to_a.inspect)
-      end
-    end
-
-    # A "(" qualify is used to add type arguments to a type.
-    def type_expr(node : AST::Qualify, refer, receiver = nil) : MetaType
-      raise NotImplementedError.new(node.to_a) unless node.group.style == "("
-
-      target = type_expr(node.term, refer, receiver)
-      args = node.group.terms.map do |t|
-        resolve_type_param_parent_links(type_expr(t, refer, receiver))
-      end
-      rt = reified_type(target.single!, args)
-      MetaType.new(rt)
-    end
-
-    # All other AST nodes are unsupported as type expressions.
-    def type_expr(node : AST::Node, refer, receiver = nil) : MetaType
-      raise NotImplementedError.new(node.to_a)
-    end
-
-    # TODO: Can we do this more eagerly? Chicken and egg problem.
-    # Can every TypeParam contain the parent_rt from birth, so we can avoid
-    # the cost of scanning and substituting them here later?
-    # It's a chicken-and-egg problem because the parent_rt may contain
-    # references to type params in its type arguments, which means those
-    # references have to exist somehow before the parent_rt is settled,
-    # but then that changes the parent_rt which needs to be embedded in them.
-    def resolve_type_param_parent_links(mt : MetaType) : MetaType
-      substitutions = {} of TypeParam => MetaType
-      mt.type_params.each do |type_param|
-        next if type_param.parent_rt
-        next if type_param.ref.parent_link != reified.link
-
-        scoped_type_param = TypeParam.new(type_param.ref, reified)
-        substitutions[type_param] = MetaType.new_type_param(scoped_type_param)
-      end
-
-      mt = mt.substitute_type_params(substitutions) if substitutions.any?
-
-      mt
     end
   end
 
@@ -988,6 +1103,10 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       ctx.infer.for_rt(ctx, *args).reified
     end
 
+    def reified_type_alias(*args)
+      ctx.infer.for_rt_alias(ctx, *args).reified
+    end
+
     def lookup_local_ident(ref : Refer::Local)
       node = @local_idents[ref]?
       return unless node
@@ -1030,8 +1149,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     def touch(node : AST::Identifier)
       ref = refer[node]
       case ref
-      when Refer::Type, Refer::TypeAlias
-        if ref.metadata(ctx)[:enum_value]?
+      when Refer::Type
+        if ref.with_value
           # We allow it to be resolved as if it were a type expression,
           # since this enum value literal will have the type of its referent.
           @analysis[node] = FixedEnumValue.new(node.pos, node)
@@ -1042,6 +1161,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
           # where that value is a stateless singleton able to call `:fun non`s.
           @analysis[node] = FixedSingleton.new(node.pos, node)
         end
+      when Refer::TypeAlias
+        @analysis[node] = FixedSingleton.new(node.pos, node)
       when Refer::TypeParam
         @analysis[node] = FixedSingleton.new(node.pos, node, ref)
       when Refer::Local
@@ -1412,8 +1533,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
 
     def resolve(ctx : Context, info : Info) : MetaType
       @analysis.resolved_infos[info]? || begin
-        mt = info.resolve!(ctx, self)
-        @analysis.resolved_infos[info] = mt.simplify(ctx)
+        mt = info.resolve!(ctx, self).simplify(ctx)
+        @analysis.resolved_infos[info] = mt
         info.post_resolve!(ctx, self, mt)
         info.resolve_others!(ctx, self)
         mt
@@ -1468,7 +1589,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         @analysis.yield_in_resolved = resolve(ctx, info).simplify(ctx)
       end
       @analysis.yield_out_resolved = @for_f.yield_out_infos.map do |info|
-        resolve(ctx, info).simplify(ctx)
+        resolve(ctx, info).simplify(ctx).as(MetaType)
       end
       @analysis.ret_resolved = @analysis.resolved_infos[@for_f[ret]]
 
@@ -1541,6 +1662,10 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
 
     def reified_type(*args)
       ctx.infer.for_rt(ctx, *args).reified
+    end
+
+    def reified_type_alias(*args)
+      ctx.infer.for_rt_alias(ctx, *args).reified
     end
 
     def lookup_type_param(ref, refer = refer(), receiver = reified.receiver)

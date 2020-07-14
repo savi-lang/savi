@@ -1,19 +1,40 @@
-abstract class Mare::Compiler::Pass::Analyze(TypeAnalysis, FuncAnalysis)
+abstract class Mare::Compiler::Pass::Analyze(TypeAliasAnalysis, TypeAnalysis, FuncAnalysis)
   def initialize
+    @for_alias = {} of Program::TypeAlias::Link => TypeAliasAnalysis
     @for_type = {} of Program::Type::Link => TypeAnalysis
     @for_func = {} of Program::Function::Link => FuncAnalysis
   end
 
+  def [](t_link : Program::TypeAlias::Link); @for_alias[t_link] end
+  def []?(t_link : Program::TypeAlias::Link); @for_alias[t_link]? end
   def [](t_link : Program::Type::Link); @for_type[t_link] end
   def []?(t_link : Program::Type::Link); @for_type[t_link]? end
   def [](f_link : Program::Function::Link); @for_func[f_link] end
   def []?(f_link : Program::Function::Link); @for_func[f_link]? end
 
   def run(ctx : Context, library : Program::Library)
+    # Run for each of the type aliases in the library.
+    library.aliases.each do |t|
+      run_for_type_alias(ctx, t, t.make_link(library))
+    end
+
     # Run for each of the types in the library.
     library.types.each do |t|
       run_for_type(ctx, t, t.make_link(library))
     end
+  end
+
+  def run_for_type_alias(
+    ctx : Context,
+    t : Program::TypeAlias,
+    t_link : Program::TypeAlias::Link
+  )
+    # If we already have an analysis completed for the type, return it.
+    already_analysis = @for_alias[t_link]?
+    return already_analysis if already_analysis
+
+    # Generate the analysis for the type and save it to our map.
+    @for_alias[t_link] = analyze_type_alias(ctx, t, t_link)
   end
 
   def run_for_type(
@@ -22,7 +43,7 @@ abstract class Mare::Compiler::Pass::Analyze(TypeAnalysis, FuncAnalysis)
     t_link : Program::Type::Link
   )
     # If we already have an analysis completed for the type, return it.
-    already_analysis = @for_func[t_link]?
+    already_analysis = @for_type[t_link]?
     return already_analysis if already_analysis
 
     # Generate the analysis for the type and save it to our map.
@@ -50,6 +71,13 @@ abstract class Mare::Compiler::Pass::Analyze(TypeAnalysis, FuncAnalysis)
     # Generate the analysis for the function and save it to our map.
     @for_func[f_link] = analyze_func(ctx, f, f_link, t_analysis)
   end
+
+  # Required hook to make the pass create an analysis for the given type alias.
+  abstract def analyze_type_alias(
+    ctx : Context,
+    t : Program::Type,
+    t_link : Program::Type::Link
+  ) : TypeAnalysis
 
   # Required hook to make the pass create an analysis for the given type.
   abstract def analyze_type(

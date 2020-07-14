@@ -12,7 +12,7 @@ struct Mare::Compiler::Infer::MetaType::AntiNominal
     io << "'any"
   end
 
-  def each_reachable_defn : Iterator(ReifiedType)
+  def each_reachable_defn(ctx : Context) : Iterator(ReifiedType)
     ([] of ReifiedType).each
   end
 

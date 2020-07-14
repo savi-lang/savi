@@ -83,14 +83,14 @@ struct Mare::Compiler::Infer::MetaType::Union
     io << ")"
   end
 
-  def each_reachable_defn : Iterator(Infer::ReifiedType)
+  def each_reachable_defn(ctx : Context) : Iterator(Infer::ReifiedType)
     iter = ([] of Infer::ReifiedType).each
 
     iter = iter.chain(
-      terms.not_nil!.map(&.each_reachable_defn).flat_map(&.to_a).each
+      terms.not_nil!.map(&.each_reachable_defn(ctx).as(Iterator(Infer::ReifiedType))).flat_map(&.to_a).each
     ) if terms
     iter = iter.chain(
-      intersects.not_nil!.map(&.each_reachable_defn).flat_map(&.to_a).each
+      intersects.not_nil!.map(&.each_reachable_defn(ctx).as(Iterator(Infer::ReifiedType))).flat_map(&.to_a).each
     ) if intersects
 
     iter
@@ -389,8 +389,11 @@ struct Mare::Compiler::Infer::MetaType::Union
   end
 
   def is_sendable?
-    return caps.not_nil!.all?(&.is_sendable?) if caps
-    false
+    (!caps || caps.not_nil!.all?(&.is_sendable?)) &&
+    (!terms || terms.not_nil!.all?(&.is_sendable?)) &&
+    (!anti_terms || anti_terms.not_nil!.all?(&.is_sendable?)) &&
+    (!intersects || intersects.not_nil!.all?(&.is_sendable?)) &&
+    true
   end
 
   def safe_to_match_as?(ctx : Context, other) : Bool?

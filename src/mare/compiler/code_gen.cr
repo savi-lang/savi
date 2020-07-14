@@ -1989,10 +1989,10 @@ class Mare::Compiler::CodeGen
           type_of(expr),
           ref.defn,
         )
-      elsif ref.is_a?(Refer::Type) || ref.is_a?(Refer::TypeAlias)
-        enum_value = ref.metadata(ctx)[:enum_value]?
+      elsif ref.is_a?(Refer::Type)
+        enum_value = ref.with_value.try(&.resolve(ctx).value)
         if enum_value
-          llvm_type_of(expr).const_int(enum_value.as(Int32))
+          llvm_type_of(expr).const_int(enum_value)
         elsif ref.defn(ctx).has_tag?(:numeric)
           llvm_type = llvm_type_of(expr)
           case llvm_type.kind
@@ -2005,12 +2005,8 @@ class Mare::Compiler::CodeGen
           gtype_of(expr).singleton
         end
       elsif ref.is_a?(Refer::TypeParam)
-        # TODO: unify with above clause
         defn = gtype_of(expr).type_def.program_type.resolve(ctx)
-        enum_value = defn.metadata[:enum_value]?
-        if enum_value
-          llvm_type_of(expr).const_int(enum_value.as(UInt64).to_i32)
-        elsif defn.has_tag?(:numeric)
+        if defn.has_tag?(:numeric)
           llvm_type = llvm_type_of(expr)
           case llvm_type.kind
           when LLVM::Type::Kind::Integer then llvm_type.const_int(0)

@@ -60,7 +60,11 @@ module Mare::Compiler::Inventory
     end
   end
 
-  class Pass < Mare::Compiler::Pass::Analyze(Nil, Analysis)
+  class Pass < Mare::Compiler::Pass::Analyze(Nil, Nil, Analysis)
+    def analyze_type_alias(ctx, t, t_link)
+      nil # no analysis at the type level
+    end
+
     def analyze_type(ctx, t, t_link)
       nil # no analysis at the type level
     end

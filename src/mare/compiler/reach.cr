@@ -437,12 +437,12 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
 
     def cpointer_type_arg(ctx)
       raise "not a cpointer" unless is_cpointer?(ctx)
-      Ref.new(@reified.args.first)
+      Ref.new(@reified.args.first.simplify(ctx))
     end
 
     def array_type_arg(ctx)
       raise "not an array" unless is_array?(ctx)
-      Ref.new(@reified.args.first)
+      Ref.new(@reified.args.first.simplify(ctx))
     end
 
     def is_numeric?(ctx)
@@ -619,7 +619,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     return if @refs.has_key?(meta_type)
 
     # First, reach any type definitions referenced by this type reference.
-    meta_type.each_reachable_defn.each { |t| handle_type_def(ctx, t) }
+    meta_type.each_reachable_defn(ctx).each { |t| handle_type_def(ctx, t) }
 
     # Now, save a Ref instance for this meta type.
     @refs[meta_type] = Ref.new(meta_type)

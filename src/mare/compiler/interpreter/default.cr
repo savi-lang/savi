@@ -5,7 +5,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
   def finished(context)
   end
 
-  def keywords; %w{import actor class trait numeric enum primitive ffi} end
+  def keywords; %w{import alias actor class trait numeric enum primitive ffi} end
 
   @@declare_import = Witness.new([
     {
@@ -17,6 +17,25 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
       "kind" => "term",
       "name" => "ident",
       "type" => "ident|string",
+    },
+    {
+      "kind" => "term",
+      "name" => "params",
+      "type" => "params",
+      "optional" => true,
+    },
+  ] of Hash(String, String | Bool))
+
+  @@declare_alias = Witness.new([
+    {
+      "kind" => "keyword",
+      "name" => "keyword",
+      "value" => "alias",
+    },
+    {
+      "kind" => "term",
+      "name" => "ident",
+      "type" => "ident",
     },
     {
       "kind" => "term",
@@ -54,6 +73,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
 
   def compile(context, decl)
     return compile_import(context, decl) if decl.keyword == "import"
+    return compile_alias(context, decl) if decl.keyword == "alias"
 
     data = @@declare_type.run(decl)
     keyword = data["keyword"].as(AST::Identifier)
@@ -119,6 +139,22 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
     )
   end
 
+  def compile_alias(context, decl)
+    data = @@declare_alias.run(decl)
+    body = decl.body
+
+    Error.at data["ident"].pos, "This alias declaration needs a body "\
+      "containing a single type expression to indicate what it is an alias of" \
+        unless body.is_a?(AST::Group) \
+          && body.terms.size == 1 \
+
+    @library.aliases << Program::TypeAlias.new(
+      data["ident"].as(AST::Identifier),
+      data["params"]?.as(AST::Group?),
+      body.not_nil!.terms.first,
+    )
+  end
+
   class Type < Interpreter
     property keyword : String # TODO: read-only as getter
     getter type : Program::Type
@@ -126,7 +162,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
     getter members
 
     def initialize(@keyword, @type, @library)
-      @members = [] of Program::TypeAlias
+      @members = [] of Program::TypeWithValue
     end
 
     # TODO: dedup these with the Witness mechanism.
@@ -648,14 +684,13 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
           unless body.is_a?(AST::Group) \
             && body.terms.size == 1 \
             && body.terms[0].is_a?(AST::LiteralInteger)
-        value = body.terms[0].as(AST::LiteralInteger)
+        value = body.terms[0].as(AST::LiteralInteger).value.to_u64
 
-        type_alias = Program::TypeAlias.new(ident, @type.ident.dup)
-        type_alias.metadata[:enum_value] =
-          body.terms[0].as(AST::LiteralInteger).value.to_i32
+        type_with_value =
+          Program::TypeWithValue.new(ident, @type.make_link(@library), value)
 
-        @members << type_alias
-        @library.aliases << type_alias
+        @members << type_with_value
+        @library.enum_members << type_with_value
       end
 
       if func

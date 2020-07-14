@@ -13,12 +13,14 @@ class Mare::Program
   class Library
     getter types : Array(Type)
     getter aliases
+    getter enum_members
     getter imports
     getter source_library : Source::Library
 
     def initialize(@source_library)
       @types = [] of Type
       @aliases = [] of TypeAlias
+      @enum_members = [] of TypeWithValue
       @imports = [] of Import
     end
 
@@ -37,6 +39,7 @@ class Mare::Program
       return false unless @source_library == other.source_library
       return false unless @types == other.types
       return false unless @aliases == other.aliases
+      return false unless @enum_members == other.enum_members
       return false unless @imports == other.imports
       true
     end
@@ -81,22 +84,24 @@ class Mare::Program
 
   class TypeAlias
     property ident : AST::Identifier
-    property target : AST::Identifier
+    property params : AST::Group?
+    property target : AST::Term
 
     getter metadata
 
-    def initialize(@ident, @target)
-      @metadata = Hash(Symbol, Int32 | Bool).new # TODO: should be UInt64?
+    def initialize(@ident, @params, @target)
+      @metadata = Hash(Symbol, UInt64 | Bool).new
     end
 
     def inspect(io : IO)
-      io << "#<#{self.class} #{@ident.value}: #{@target.value}>"
+      io << "#<#{self.class} #{@ident.value} #{@params.try(&.to_a)}: #{@target.try(&.to_a)}>"
     end
 
     def ==(other)
       return false unless other.is_a?(TypeAlias)
       return false unless @ident == other.ident
-      return false unless @target== other.target
+      return false unless @params == other.params
+      return false unless @target == other.target
       true
     end
 
@@ -122,6 +127,52 @@ class Mare::Program
       end
       def resolve(ctx : Compiler::Context)
         @library.resolve(ctx).aliases.find(&.ident.value.==(@name)).not_nil!
+      end
+    end
+  end
+
+  class TypeWithValue
+    property ident : AST::Identifier
+    property target : Type::Link
+    property value : UInt64
+
+    def initialize(@ident, @target, @value)
+    end
+
+    def inspect(io : IO)
+      io << "#<#{self.class} #{@ident.value}: #{@value} (#{@target})>"
+    end
+
+    def ==(other)
+      return false unless other.is_a?(TypeWithValue)
+      return false unless @ident == other.ident
+      return false unless @target == other.target
+      return false unless @value == other.value
+      true
+    end
+
+    def add_tag(tag : Symbol)
+      raise NotImplementedError.new(self)
+    end
+
+    def has_tag?(tag : Symbol)
+      false # not implemented
+    end
+
+    def make_link(library : Library)
+      make_link(library.make_link)
+    end
+    def make_link(library : Library::Link)
+      Link.new(library, ident.value)
+    end
+
+    struct Link
+      getter library : Library::Link
+      getter name : String
+      def initialize(@library, @name)
+      end
+      def resolve(ctx : Compiler::Context)
+        @library.resolve(ctx).enum_members.find(&.ident.value.==(@name)).not_nil!
       end
     end
   end

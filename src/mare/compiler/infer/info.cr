@@ -854,7 +854,8 @@ class Mare::Compiler::Infer
       # If no such type is found, stick with what we inferred for now.
       possible_antes = [] of {MetaType, MetaType::Capability}
       possible_element_antecedents(ctx, infer).each do |ante, cap|
-        if elem_mts.empty? || elem_mt.subtype_of?(ctx, ante)
+        ante_simple = ante.simplify(ctx)
+        if elem_mts.empty? || elem_mt.subtype_of?(ctx, ante_simple)
           possible_antes << {ante, cap}
         end
       end
@@ -903,7 +904,7 @@ class Mare::Compiler::Infer
     def possible_element_antecedents(ctx, infer) : Array({MetaType, MetaType::Capability})
       results = [] of {MetaType, MetaType::Capability}
 
-      total_downstream_constraint(ctx, infer).simplify(ctx).each_reachable_defn_with_cap.each do |rt, cap|
+      total_downstream_constraint(ctx, infer).simplify(ctx).each_reachable_defn_with_cap(ctx).each do |rt, cap|
         # TODO: Support more element antecedent detection patterns.
         if rt.link == infer.prelude_type("Array") \
         && rt.args.size == 1

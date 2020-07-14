@@ -190,7 +190,11 @@ module Mare::Compiler::Classify
     end
   end
 
-  class Pass < Compiler::Pass::Analyze(Nil, Analysis)
+  class Pass < Compiler::Pass::Analyze(Nil, Nil, Analysis)
+    def analyze_type_alias(ctx, t, t_link)
+      nil # no analysis at the type alias level
+    end
+
     def analyze_type(ctx, t, t_link)
       nil # no analysis at the type level
     end

@@ -14,7 +14,9 @@ class Mare::Compiler::Namespace
     protected getter types
 
     def initialize(@source : Source)
-      @types = {} of String => (Program::Type::Link | Program::TypeAlias::Link)
+      @types = {} of String => (
+        Program::Type::Link | Program::TypeAlias::Link | Program::TypeWithValue::Link \
+      )
     end
 
     def [](name : String); @types[name]; end
@@ -22,7 +24,9 @@ class Mare::Compiler::Namespace
   end
 
   def initialize
-    @types_by_library = Hash(Program::Library::Link, Hash(String, Program::Type::Link | Program::TypeAlias::Link)).new
+    @types_by_library = Hash(Program::Library::Link, Hash(String,
+      Program::Type::Link | Program::TypeAlias::Link | Program::TypeWithValue::Link
+    )).new
     @source_analyses = Hash(Source, SourceAnalysis).new
   end
 
@@ -44,6 +48,10 @@ class Mare::Compiler::Namespace
         add_type_to_source(t, library)
       end
       library.aliases.each do |t|
+        add_type_to_library(ctx, t, library)
+        add_type_to_source(t, library)
+      end
+      library.enum_members.each do |t|
         add_type_to_library(ctx, t, library)
         add_type_to_source(t, library)
       end
@@ -108,8 +116,9 @@ class Mare::Compiler::Namespace
   private def add_type_to_library(ctx, new_type, library)
     name = new_type.ident.value
 
-    types = @types_by_library[library.make_link] ||=
-      Hash(String, Program::Type::Link | Program::TypeAlias::Link).new
+    types = @types_by_library[library.make_link] ||= Hash(String,
+      Program::Type::Link | Program::TypeAlias::Link | Program::TypeWithValue::Link
+    ).new
 
     already_type_link = types[name]?
     if already_type_link
@@ -160,7 +169,9 @@ class Mare::Compiler::Namespace
     importable_types = @types_by_library[ctx.import[import]]
 
     # Determine the list of types to be imported.
-    imported_types = [] of Tuple(Source::Pos, Program::Type::Link | Program::TypeAlias::Link)
+    imported_types = [] of Tuple(Source::Pos,
+      Program::Type::Link | Program::TypeAlias::Link | Program::TypeWithValue::Link
+    )
     if import.names
       import.names.not_nil!.terms.map do |ident|
         raise NotImplementedError.new(ident) unless ident.is_a?(AST::Identifier)

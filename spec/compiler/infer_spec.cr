@@ -2409,6 +2409,60 @@ describe Mare::Compiler::Infer do
     rfs.map(&.receiver.cap_only.show_type).sort.should eq ["box", "ref"]
   end
 
+  it "handles type-parameter-recursive type aliases" do
+    source = Mare::Source.new_example <<-SOURCE
+    :alias MyData (A Array'read): (String | U64 | A(MyData(A)))
+
+    :actor Main
+      :new (env)
+        data MyData(Array'val) = ["Hello", "World", 99, ["Wow", [1, 2, 3]]]
+    SOURCE
+
+    ctx = Mare::Compiler.compile([source], :infer)
+
+    t, f, infer = ctx.infer.test_simple!(ctx, source, "Main", "new")
+    assign = f.body.not_nil!.terms.first.not_nil!.as(Mare::AST::Relate)
+    l_type = assign.lhs.as(Mare::AST::Group).terms.last
+    array1 = assign.rhs.as(Mare::AST::Group)
+    array2 = array1.terms[3].as(Mare::AST::Group)
+    array3 = array2.terms[1].as(Mare::AST::Group)
+
+    expected_left_type = "(String | U64 | Array(MyData(Array'val))'val)"
+    expected_right_type = "Array(MyData(Array'val))'val"
+
+    infer.resolved(ctx, assign).show_type.should eq expected_left_type
+    infer.resolved(ctx, l_type).show_type.should eq expected_left_type
+    infer.resolved(ctx, array1).show_type.should eq expected_right_type
+    infer.resolved(ctx, array2).show_type.should eq expected_right_type
+    infer.resolved(ctx, array3).show_type.should eq expected_right_type
+  end
+
+  it "complains when a type-parameter is directly recursive" do
+    source = Mare::Source.new_example <<-SOURCE
+    :alias AdInfinitum: (String | U64 | AdInfinitum)
+
+    :actor Main
+      :new (env)
+        data AdInfinitum = "Uh oh"
+    SOURCE
+
+    expected = <<-MSG
+    This type alias is directly recursive, which is not supported:
+    from (example):1:
+    :alias AdInfinitum: (String | U64 | AdInfinitum)
+           ^~~~~~~~~~~
+
+    - only recursion via type arguments in this expression is supported:
+      from (example):1:
+    :alias AdInfinitum: (String | U64 | AdInfinitum)
+                        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    MSG
+
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :infer)
+    end
+  end
+
   pending "complains when the yield block result doesn't match the expected type"
   pending "enforces yield properties as part of trait subtyping"
 end

@@ -27,7 +27,7 @@
 
     current_freq I64 = 0
     try (
-      freqs = Map(I64, None, HashEq(I64)).new // TODO: use Set instead of Map
+      freqs = Map(I64, None).new // TODO: use Set instead of Map
       while True (
         changes.each -> (change |
           freqs[current_freq] = None

@@ -77,7 +77,7 @@
     )
 
     // Take note of each minute in which each guard was asleep for which night.
-    sleeps = Map(String, Map(I32, Array(U32), HashEq(I32)), HashEq(String)).new
+    sleeps = Map(String, Map(I32, Array(U32))).new
     last_entry = try (entries[0]! | Day4Entry.empty)
     entries.each -> (entry |
       if (entry.event == Day4EventAwake) (
@@ -86,7 +86,7 @@
         )
 
         times = try (sleeps[entry.guard]! |
-          sleeps[entry.guard] = Map(I32, Array(U32), HashEq(I32)).new
+          sleeps[entry.guard] = Map(I32, Array(U32)).new
         )
 
         minute_id = last_entry.minute_id

@@ -294,7 +294,17 @@ module Mare::Compiler::Refer
     end
   end
 
-  class Pass < Compiler::Pass::Analyze(Analysis, Analysis)
+  class Pass < Compiler::Pass::Analyze(Analysis, Analysis, Analysis)
+    def analyze_type_alias(ctx, t, t_link)
+      refer_type = ctx.refer_type[t_link]
+      visitor = Visitor.new(Analysis.new, refer_type)
+
+      t.params.try(&.accept(ctx, visitor))
+      t.target.accept(ctx, visitor)
+
+      visitor.analysis
+    end
+
     def analyze_type(ctx, t, t_link)
       refer_type = ctx.refer_type[t_link]
       visitor = Visitor.new(Analysis.new, refer_type)

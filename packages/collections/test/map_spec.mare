@@ -1,5 +1,5 @@
 :import "spec"
-:import ".." (Map, HashEq, HashId)
+:import ".." (Map, MapIs)
 
 :actor MapSpecActor
 
@@ -7,8 +7,8 @@
   :is Spec
   :const describes: "Map"
 
-  :fun new_map: Map(String, U64, HashEq(String)).new // TODO: implicit default for HashFunction type argument
-  :fun new_actor_map: Map(MapSpecActor, U64, HashId(MapSpecActor)).new
+  :fun new_map: Map(String, U64).new
+  :fun new_actor_map: MapIs(MapSpecActor, U64).new
 
   :it "stores and removes values at a given key"
     map = @new_map
