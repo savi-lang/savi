@@ -1181,6 +1181,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
           classify.value_needed?(node),
         )
 
+        @analysis[call_ident] = call
+
         # Each arg needs a link back to the FromCall with an arg index.
         call_args.try(&.accept(ctx, self))
         if call_args

@@ -83,8 +83,8 @@ class Mare::Compiler::ServeDefinition
                 t_link = t.make_link(library)
                 f_link = f.make_link(t_link)
 
-                pos = self[t_link, f_link, node]
-                return pos unless pos.is_a? Nil
+                other_pos = self[t_link, f_link, node]
+                return other_pos unless other_pos.is_a? Nil
               end
             end
           end
@@ -102,19 +102,32 @@ class Mare::Compiler::ServeDefinition
 
     describe_type = "type"
 
-    pos = Nil
-
     begin
-      inf = infer.analysis.resolved(ctx, node)
-      case inner = inf.inner
-      when Compiler::Infer::MetaType::Intersection
-        case defn = inner.terms.not_nil!.first.defn
-        when Compiler::Infer::ReifiedType
-          pos = defn.link.resolve(ctx).ident.pos
+      infer_info = ctx.infer[f_link][node]?
+      if infer_info.is_a? Infer::FromCall
+        infer_info.follow_call_get_call_defns(ctx, infer).map do |_, _, other_f|
+          next unless other_f
+          other_f.ident.pos
+        end.first
+      else
+        ref = refer[node]?
+        case ref
+        when Refer::Local, Refer::LocalUnion
+          case ref
+          when Refer::Local
+            ref.defn.pos
+          when Refer::LocalUnion
+            ref.list.map do |local|
+              local.defn.pos
+            end.first
+          end
+        else
+          inf = infer.analysis.resolved(ctx, node)
+          inf.each_reachable_defn.map do |defn|
+            defn.link.resolve(ctx).ident.pos
+          end.first
         end
       end
     end
-
-    pos
   end
 end

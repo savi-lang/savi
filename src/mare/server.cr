@@ -23,6 +23,17 @@ class Mare::Server
   def setup
     @stderr.puts("LSP Server is starting...")
 
+    ENV["STD_DIRECTORY_MAPPING"]?.try do |mapping|
+      mapping.split(":").each_slice 2 do |pair|
+        next unless pair.size == 2
+        host_path = pair[0]
+        dest_path = pair[1]
+
+        @stderr.puts(Process.run("cp", [Compiler::STANDARD_LIBRARY_DIRNAME, dest_path, "-r"]).exit_code)
+        @stderr.puts(Process.run("cp", [Compiler.prelude_library_path, dest_path, "-r"]).exit_code)
+      end
+    end
+
     # Before we exit, say goodbye.
     at_exit do
       @stderr.puts("... the LSP Server is closed.")
@@ -108,6 +119,23 @@ class Mare::Server
     # If we're running in a docker container, or in some other remote
     # environment, the host's source path may not match ours, and we
     # can apply the needed transformation as specified in this ENV var.
+    ENV["STD_DIRECTORY_MAPPING"]?.try do |mapping|
+      mapping.split(":").each_slice 2 do |pair|
+        next unless pair.size == 2
+        host_path = pair[0]
+        dest_path = pair[1]
+
+        if filename.starts_with?(host_path)
+          filename = 
+            if filename.includes?("prelude")
+              tmp_fname = filename.sub(host_path, Compiler.prelude_library_path)
+              tmp_fname.sub("prelude/prelude", "prelude")
+            else
+              filename.sub(host_path, Compiler::STANDARD_LIBRARY_DIRNAME)
+            end
+        end
+      end
+    end
     ENV["SOURCE_DIRECTORY_MAPPING"]?.try do |mapping|
       mapping.split(":").each_slice 2 do |pair|
         next unless pair.size == 2
@@ -126,49 +154,52 @@ class Mare::Server
     source = sources.find { |s| s.path == filename }.not_nil!
     source_pos = Source::Pos.point(source, pos.line.to_i32, pos.character.to_i32)
 
-    begin
-      if @ctx.nil?
-        @ctx = Compiler.compile(sources, :serve_lsp)
-      end
-      ctx = @ctx.not_nil!
+    if @ctx.nil?
+      @ctx = Compiler.compile(sources, :serve_lsp)
+    end
+    ctx = @ctx.not_nil!
 
+    begin
       definition_pos = ctx.serve_definition[source_pos]
     rescue
     end
 
     if definition_pos.is_a? Mare::Source::Pos
-      local_filepath = definition_pos.source.path 
-      user_filepath = local_filepath
+      user_filepath = definition_pos.source.path 
 
-      local_workspace = @workspace
+      ENV["STD_DIRECTORY_MAPPING"]?.try do |mapping|
+        mapping.split(":").each_slice 2 do |pair|
+          next unless pair.size == 2
+          host_path = pair[0]
+          dest_path = pair[1]
 
+          if user_filepath.starts_with?(Compiler.prelude_library_path)
+            user_filepath = user_filepath.sub(Compiler.prelude_library_path, File.join(host_path, "prelude"))
+          end
+
+          if user_filepath.starts_with?(Compiler::STANDARD_LIBRARY_DIRNAME)
+            user_filepath = user_filepath.sub(Compiler::STANDARD_LIBRARY_DIRNAME, host_path)
+          end
+        end
+      end
       ENV["SOURCE_DIRECTORY_MAPPING"]?.try do |mapping|
         mapping.split(":").each_slice 2 do |pair|
           next unless pair.size == 2
           host_path = pair[0]
           dest_path = pair[1]
 
-          if local_workspace.starts_with?(host_path)
-            local_workspace = local_workspace.sub(host_path, dest_path)
-          end
           if user_filepath.starts_with?(dest_path)
             user_filepath = user_filepath.sub(dest_path, host_path)
           end
         end
       end
 
-      if local_filepath.starts_with?(Compiler.prelude_library_path)
-        prelude_dir = File.join(local_workspace, ".prelude/")
-        Dir.mkdir(prelude_dir) unless Dir.exists? prelude_dir
-
-        tmp_filepath = File.join(prelude_dir, File.basename(local_filepath))
-        File.write tmp_filepath, File.read(local_filepath)
-
-        user_filepath = File.join(@workspace, ".prelude/", File.basename(local_filepath))
-      end
-
       @wire.respond msg do |msg|
         msg.result = LSP::Data::Location.new(URI.new(path: user_filepath), LSP::Data::Range.new(LSP::Data::Position.new(definition_pos.row.to_i64, definition_pos.col.to_i64), LSP::Data::Position.new(definition_pos.row.to_i64, definition_pos.col.to_i64 + (definition_pos.finish - definition_pos.start))))
+        msg
+      end
+    else
+      @wire.error_respond msg do |msg|
         msg
       end
     end
@@ -186,6 +217,23 @@ class Mare::Server
     # If we're running in a docker container, or in some other remote
     # environment, the host's source path may not match ours, and we
     # can apply the needed transformation as specified in this ENV var.
+    ENV["STD_DIRECTORY_MAPPING"]?.try do |mapping|
+      mapping.split(":").each_slice 2 do |pair|
+        next unless pair.size == 2
+        host_path = pair[0]
+        dest_path = pair[1]
+
+        if filename.starts_with?(host_path)
+          filename = 
+            if filename.includes?("prelude")
+              tmp_fname = filename.sub(host_path, Compiler.prelude_library_path)
+              tmp_fname.sub("prelude/prelude", "prelude")
+            else
+              filename.sub(host_path, Compiler::STANDARD_LIBRARY_DIRNAME)
+            end
+        end
+      end
+    end
     ENV["SOURCE_DIRECTORY_MAPPING"]?.try do |mapping|
       mapping.split(":").each_slice 2 do |pair|
         next unless pair.size == 2

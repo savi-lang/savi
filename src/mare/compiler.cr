@@ -139,9 +139,11 @@ module Mare::Compiler
 
     ctx.compile_library(docs.first.source.library, docs)
 
-    prelude_sources = get_library_sources(prelude_library_path)
-    prelude_docs = prelude_sources.map { |s| Parser.parse(s) }
-    ctx.compile_library(prelude_sources.first.library, prelude_docs)
+    unless docs.first.source.library.path == prelude_library_path()
+      prelude_sources = get_library_sources(prelude_library_path)
+      prelude_docs = prelude_sources.map { |s| Parser.parse(s) }
+      ctx.compile_library(prelude_sources.first.library, prelude_docs)
+    end
 
     satisfy(ctx, target)
   end
