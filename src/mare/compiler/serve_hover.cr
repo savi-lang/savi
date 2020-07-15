@@ -123,14 +123,21 @@ class Mare::Compiler::ServeHover
     else raise NotImplementedError.new(ref)
     end
 
+    infer_info = ctx.infer[f_link][node]?
     if node.is_a?(AST::Relate) && node.op.value == "."
       begin
         messages << "This is a function call on an inferred receiver type of " \
                     "#{infer.analysis.resolved(ctx, node.lhs).show_type}."
       rescue
-        messages << "This is a function call."
       end
-      describe_type = "return type"
+    elsif infer_info.is_a? Infer::FromCall
+      infer_info.follow_call_get_call_defns(ctx, infer).each do |x, y, z|
+        unless y.nil?
+          messages << "This is a function call on type #{y.show_type}."
+          describe_type = "return type"
+          break
+        end
+      end
     end
 
     begin
