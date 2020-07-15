@@ -1,11 +1,10 @@
 require "llvm"
 
 ##
-# The purpose of the ServeHover pass is to serve up information about a given
-# hover position in the source code, represented as a Source::Pos.
-# When the [] method is called with a Source::Pos, it returns an Array(String)
-# of messages describing the entity at that position, as well as an output
-# Source::Pos value that points to the entirety of that entity's source.
+# The purpose of the ServeDefinition pass is to look up the definition position
+# of a given entity specified by the cursor's incoming position.
+# When the [] method is called with a Source::Pos, it returns an output
+# Source::Pos value that points to the found definition of that entity's source.
 #
 # This pass does not mutate the Program topology.
 # This pass does not mutate the AST.
@@ -35,33 +34,27 @@ class Mare::Compiler::ServeDefinition
     refer = ctx.refer[f_link]
     infer = ctx.infer.for_func_simple(ctx, f_link.type, f_link)
 
-    describe_type = "type"
-
-    begin
-      infer_info = ctx.infer[f_link][node]?
-      if infer_info.is_a? Infer::FromCall
-        infer_info.follow_call_get_call_defns(ctx, infer).map do |_, _, other_f|
-          next unless other_f
-          other_f.ident.pos
-        end.first
+    infer_info = ctx.infer[f_link][node]?
+    if infer_info.is_a? Infer::FromCall
+      # Show function definition site of a call.
+      infer_info.follow_call_get_call_defns(ctx, infer).map do |_, _, other_f|
+        next unless other_f
+        other_f.ident.pos
+      end.first
+    else
+      ref = refer[node]?
+      case ref
+      when Refer::Local
+        # Show local variable definition site.
+        ref.defn.pos
+      when Refer::LocalUnion
+        # Show local variable definition site.
+        ref.list.first.defn.pos
       else
-        ref = refer[node]?
-        case ref
-        when Refer::Local, Refer::LocalUnion
-          case ref
-          when Refer::Local
-            ref.defn.pos
-          when Refer::LocalUnion
-            ref.list.map do |local|
-              local.defn.pos
-            end.first
-          end
-        else
-          inf = infer.analysis.resolved(ctx, node)
-          inf.each_reachable_defn(ctx).map do |defn|
-            defn.link.resolve(ctx).ident.pos
-          end.first
-        end
+        # Show type definition site of the resolved type of whatever we found.
+        infer.analysis.resolved(ctx, node).each_reachable_defn(ctx).map do |defn|
+          defn.link.resolve(ctx).ident.pos
+        end.first
       end
     end
   end
