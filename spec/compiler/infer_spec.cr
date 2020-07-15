@@ -2121,7 +2121,7 @@ describe Mare::Compiler::Infer do
         Generic(String, String, String, String)
         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    - 2 type arguments were expected:
+    - at most 2 type arguments were expected:
       from (example):1:
     :class Generic (P1, P2)
                    ^~~~~~~~
@@ -2157,7 +2157,7 @@ describe Mare::Compiler::Infer do
         Generic(String)
         ^~~~~~~~~~~~~~~
 
-    - 3 type arguments were expected:
+    - at least 3 type arguments were expected:
       from (example):1:
     :class Generic (P1, P2, P3)
                    ^~~~~~~~~~~~

@@ -92,23 +92,28 @@ module Mare::Compiler::ReferType
   end
 
   class Pass < Compiler::Pass::Analyze(Analysis, Analysis, Analysis)
-    def analyze_type_alias(ctx, t, t_link)
-      t_analysis = Analysis.new
-
+    def observe_type_params(ctx, t, t_link, t_analysis)
       # If the type has type parameters, collect them into the params map.
       t.params.try do |type_params|
         type_params.terms.each_with_index do |param, index|
-          param_ident, param_bound = AST::Extract.type_param(param)
+          param_ident, param_bound, param_default = AST::Extract.type_param(param)
           t_analysis.observe_type_param(
             Refer::TypeParam.new(
               t_link,
               index,
               param_ident,
               param_bound || AST::Identifier.new("any").from(param),
+              param_default,
             )
           )
         end
       end
+    end
+
+    def analyze_type_alias(ctx, t, t_link)
+      t_analysis = Analysis.new
+
+      observe_type_params(ctx, t, t_link, t_analysis)
 
       # Run as a visitor on the ident itself and every type param.
       namespace = ctx.namespace[t.ident.pos.source]
@@ -126,20 +131,7 @@ module Mare::Compiler::ReferType
     def analyze_type(ctx, t, t_link)
       t_analysis = Analysis.new
 
-      # If the type has type parameters, collect them into the params map.
-      t.params.try do |type_params|
-        type_params.terms.each_with_index do |param, index|
-          param_ident, param_bound = AST::Extract.type_param(param)
-          t_analysis.observe_type_param(
-            Refer::TypeParam.new(
-              t_link,
-              index,
-              param_ident,
-              param_bound || AST::Identifier.new("any").from(param),
-            )
-          )
-        end
-      end
+      observe_type_params(ctx, t, t_link, t_analysis)
 
       # Run as a visitor on the ident itself and every type param.
       namespace = ctx.namespace[t.ident.pos.source]

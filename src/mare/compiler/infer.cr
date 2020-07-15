@@ -374,10 +374,11 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   end
 
   def for_type_partial_reifications(ctx, t, t_link, no_args_rt, refer)
-    return [] of ReifiedType if 0 == (t.params.try(&.terms.size) || 0)
+    type_params = AST::Extract.type_params(t.params)
+    return [] of ReifiedType if type_params.empty?
 
     params_partial_reifications =
-      t.params.not_nil!.terms.map do |param|
+      type_params.map do |(param, _, _)|
         # Get the MetaType of the bound.
         param_ref = refer[param].as(Refer::TypeParam)
         bound_node = param_ref.bound
@@ -515,11 +516,16 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     return unless mt.singular? # this skip partially reified type params
     rt = mt.single!
     rt_defn = rt.defn(ctx)
-    rt_params_count = rt.params_count(ctx)
+    type_params = AST::Extract.type_params(rt.defn(ctx).params)
     arg_terms = node.is_a?(AST::Qualify) ? node.group.terms : [] of AST::Node
 
+    # The minimum number of params is the number that don't have defaults.
+    # The maximum number of params is the total number of them.
+    type_params_min = type_params.select { |(_, _, default)| !default }.size
+    type_params_max = type_params.size
+
     if rt.args.empty?
-      if rt_params_count == 0
+      if type_params_min == 0
         # If there are no type args or type params there's nothing to check.
         return
       else
@@ -544,17 +550,17 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       Error.at node, "This type needs to be qualified with type arguments", [
         {rt_defn.params.not_nil!, "these type parameters are expecting arguments"}
       ]
-    elsif rt.args.size > rt_params_count
+    elsif rt.args.size > type_params_max
       params_pos = (rt_defn.params || rt_defn.ident).pos
       Error.at node, "This type qualification has too many type arguments", [
-        {params_pos, "#{rt_params_count} type arguments were expected"},
-      ].concat(arg_terms[rt_params_count..-1].map { |arg|
+        {params_pos, "at most #{type_params_max} type arguments were expected"},
+      ].concat(arg_terms[type_params_max..-1].map { |arg|
         {arg.pos, "this is an excessive type argument"}
       })
-    elsif rt.args.size < rt_params_count
+    elsif rt.args.size < type_params_min
       params = rt_defn.params.not_nil!
       Error.at node, "This type qualification has too few type arguments", [
-        {params.pos, "#{rt_params_count} type arguments were expected"},
+        {params.pos, "at least #{type_params_min} type arguments were expected"},
       ].concat(params.terms[rt.args.size..-1].map { |param|
         {param.pos, "this additional type parameter needs an argument"}
       })
@@ -596,8 +602,12 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     def initialize(@link, @args = [] of MetaType)
     end
 
+    def defn(ctx)
+      link.resolve(ctx)
+    end
+
     def target_type_expr(ctx) : AST::Term
-      link.resolve(ctx).target
+      defn(ctx).target
     end
 
     def show_type
@@ -619,6 +629,14 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
 
     def inspect(io : IO)
       show_type(io)
+    end
+
+    def is_complete?(ctx)
+      params_count_min =
+        AST::Extract.type_params(defn(ctx).params)
+        .select { |_, _, default| !default }.size
+
+      args.size >= params_count_min && args.all?(&.type_params.empty?)
     end
   end
 
@@ -667,7 +685,11 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
 
     def is_complete?(ctx)
-      args.size == params_count(ctx) && args.all?(&.type_params.empty?)
+      params_count_min =
+        AST::Extract.type_params(defn(ctx).params)
+        .select { |_, _, default| !default }.size
+
+      args.size >= params_count_min && args.all?(&.type_params.empty?)
     end
   end
 
@@ -836,6 +858,12 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       arg = reified.args[ref.index]?
       return arg if arg
 
+      # Use the default type argument if this type parameter has one.
+      ref_default = ref.default
+      return type_expr(ref_default, ctx.refer[reified.link]) if ref_default
+
+      raise "halt" if reified.is_complete?(ctx)
+
       # Otherwise, return it as an unreified type parameter nominal.
       MetaType.new_type_param(TypeParam.new(ref))
     end
@@ -882,6 +910,12 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       # Lookup the type parameter on self type and return the arg if present
       arg = reified.args[ref.index]?
       return arg if arg
+
+      # Use the default type argument if this type parameter has one.
+      ref_default = ref.default
+      return type_expr(ref_default, ctx.refer[reified.link]) if ref_default
+
+      raise "halt" if reified.is_complete?(ctx)
 
       # Otherwise, return it as an unreified type parameter nominal.
       MetaType.new_type_param(TypeParam.new(ref))

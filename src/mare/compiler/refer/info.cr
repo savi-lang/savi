@@ -100,8 +100,9 @@ module Mare::Compiler::Refer
     getter index : Int32
     getter ident : AST::Identifier
     getter bound : AST::Term
+    getter default : AST::Term?
 
-    def initialize(@parent_link, @index, @ident, @bound)
+    def initialize(@parent_link, @index, @ident, @bound, @default)
     end
 
     def parent(ctx) : (Program::Type | Program::TypeAlias)
