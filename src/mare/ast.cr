@@ -176,6 +176,7 @@ module Mare::AST
     property yield_out : AST::Term?
     property yield_in : AST::Term?
     def initialize(@cap, @ident, @params = nil, @ret = nil, @body = nil)
+      @pos = @ident.pos
     end
 
     def span_pos
