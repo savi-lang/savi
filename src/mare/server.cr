@@ -195,7 +195,19 @@ class Mare::Server
       end
 
       @wire.respond msg do |msg|
-        msg.result = LSP::Data::Location.new(URI.new(path: user_filepath), LSP::Data::Range.new(LSP::Data::Position.new(definition_pos.row.to_i64, definition_pos.col.to_i64), LSP::Data::Position.new(definition_pos.row.to_i64, definition_pos.col.to_i64 + (definition_pos.finish - definition_pos.start))))
+        msg.result = LSP::Data::Location.new(
+          URI.new(path: user_filepath),
+          LSP::Data::Range.new(
+            LSP::Data::Position.new(
+              definition_pos.row.to_i64,
+              definition_pos.col.to_i64,
+            ),
+            LSP::Data::Position.new(
+              definition_pos.row.to_i64,
+              definition_pos.col.to_i64 + (definition_pos.finish - definition_pos.start),
+            ),
+          ),
+        )
         msg
       end
     else
