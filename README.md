@@ -34,6 +34,8 @@ ${PATH_TO_YOUR_CODE}/main
 
 If you're a VS Code user, you may be interested to install our [language extension for that editor](./tooling/vscode), which includes both syntax highlighting and some Intellisense features via using the docker image as an LSP server.
 
+We also have [a vim/nvim extension](./tooling/coc-nvim) as well.
+
 Finally, if you want to contribute to Mare, read on through the next section to learn about some of the basic development commands.
 
 ## Developing
