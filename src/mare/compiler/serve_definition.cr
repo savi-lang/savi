@@ -1,5 +1,4 @@
 require "llvm"
-require "debug"
 
 ##
 # The purpose of the ServeHover pass is to serve up information about a given

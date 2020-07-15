@@ -11,7 +11,7 @@ module Mare::Compiler
     when :refer            then ctx.run(ctx.refer)
     when :classify         then ctx.run(ctx.classify)
     when :jumps            then ctx.run(ctx.jumps)
-    when :consumes       then ctx.run(ctx.consumes)
+    when :consumes         then ctx.run(ctx.consumes)
     when :inventory        then ctx.run(ctx.inventory)
     when :infer            then ctx.run_whole_program(ctx.infer)
     when :privacy          then ctx.run(Privacy)

@@ -13,7 +13,7 @@ describe Mare::Compiler::ServeDefinition do
     pos = ctx.serve_definition[Mare::Source::Pos.point(source, 4, 14)].not_nil!
     pos.row.should eq 0
     pos.col.should eq 7
-    pos.size.should eq "T".bytesize
+    pos.size.should eq "A".bytesize
   end
 
   it "can find local variable declaration" do
