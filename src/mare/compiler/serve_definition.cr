@@ -122,7 +122,7 @@ class Mare::Compiler::ServeDefinition
           end
         else
           inf = infer.analysis.resolved(ctx, node)
-          inf.each_reachable_defn.map do |defn|
+          inf.each_reachable_defn(ctx).map do |defn|
             defn.link.resolve(ctx).ident.pos
           end.first
         end
