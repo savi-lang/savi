@@ -1,31 +1,33 @@
 module Mare::Compiler
   def self.execute(ctx, target : Symbol)
     case target
-    when :import         then ctx.run_whole_program(ctx.import)
-    when :namespace      then ctx.run_whole_program(ctx.namespace)
-    when :macros         then ctx.run_copy_on_mutate(Macros)
-    when :sugar          then ctx.run_copy_on_mutate(Sugar)
-    when :refer_type     then ctx.run(ctx.refer_type)
-    when :populate       then ctx.run_copy_on_mutate(Populate)
-    when :lambda         then ctx.run_copy_on_mutate(Lambda)
-    when :refer          then ctx.run(ctx.refer)
-    when :classify       then ctx.run(ctx.classify)
-    when :jumps          then ctx.run(ctx.jumps)
-    when :consumes       then ctx.run(ctx.consumes)
-    when :inventory      then ctx.run(ctx.inventory)
-    when :infer          then ctx.run_whole_program(ctx.infer)
-    when :privacy        then ctx.run(Privacy)
-    when :completeness   then ctx.run(Completeness)
-    when :reach          then ctx.run_whole_program(ctx.reach)
-    when :verify         then ctx.run(Verify)
-    when :paint          then ctx.run_whole_program(ctx.paint)
-    when :codegen        then ctx.run_whole_program(ctx.code_gen)
-    when :lifetime       then ctx.run_whole_program(ctx.lifetime)
-    when :codegen_verona then ctx.run_whole_program(ctx.code_gen_verona)
-    when :eval           then ctx.run_whole_program(ctx.eval)
-    when :binary         then ctx.run_whole_program(Binary)
-    when :binary_verona  then ctx.run_whole_program(BinaryVerona)
-    when :serve_hover    then ctx.run_whole_program(ctx.serve_hover)
+    when :import           then ctx.run_whole_program(ctx.import)
+    when :namespace        then ctx.run_whole_program(ctx.namespace)
+    when :macros           then ctx.run_copy_on_mutate(Macros)
+    when :sugar            then ctx.run_copy_on_mutate(Sugar)
+    when :refer_type       then ctx.run(ctx.refer_type)
+    when :populate         then ctx.run_copy_on_mutate(Populate)
+    when :lambda           then ctx.run_copy_on_mutate(Lambda)
+    when :refer            then ctx.run(ctx.refer)
+    when :classify         then ctx.run(ctx.classify)
+    when :jumps            then ctx.run(ctx.jumps)
+    when :consumes         then ctx.run(ctx.consumes)
+    when :inventory        then ctx.run(ctx.inventory)
+    when :infer            then ctx.run_whole_program(ctx.infer)
+    when :privacy          then ctx.run(Privacy)
+    when :completeness     then ctx.run(Completeness)
+    when :reach            then ctx.run_whole_program(ctx.reach)
+    when :verify           then ctx.run(Verify)
+    when :paint            then ctx.run_whole_program(ctx.paint)
+    when :codegen          then ctx.run_whole_program(ctx.code_gen)
+    when :lifetime         then ctx.run_whole_program(ctx.lifetime)
+    when :codegen_verona   then ctx.run_whole_program(ctx.code_gen_verona)
+    when :eval             then ctx.run_whole_program(ctx.eval)
+    when :binary           then ctx.run_whole_program(Binary)
+    when :binary_verona    then ctx.run_whole_program(BinaryVerona)
+    when :serve_hover      then ctx.run_whole_program(ctx.serve_hover)
+    when :serve_definition then ctx.run_whole_program(ctx.serve_definition)
+    when :serve_lsp        then ctx
     else raise NotImplementedError.new(target)
     end
   end
@@ -59,6 +61,8 @@ module Mare::Compiler
     when :binary then [:codegen]
     when :binary_verona then [:codegen_verona]
     when :serve_hover then [:refer, :infer]
+    when :serve_definition then [:refer, :infer]
+    when :serve_lsp then [:serve_hover, :serve_definition]
     else raise NotImplementedError.new([:deps_of, target].inspect)
     end
   end
@@ -135,9 +139,11 @@ module Mare::Compiler
 
     ctx.compile_library(docs.first.source.library, docs)
 
-    prelude_sources = get_library_sources(prelude_library_path)
-    prelude_docs = prelude_sources.map { |s| Parser.parse(s) }
-    ctx.compile_library(prelude_sources.first.library, prelude_docs)
+    unless docs.first.source.library.path == prelude_library_path()
+      prelude_sources = get_library_sources(prelude_library_path)
+      prelude_docs = prelude_sources.map { |s| Parser.parse(s) }
+      ctx.compile_library(prelude_sources.first.library, prelude_docs)
+    end
 
     satisfy(ctx, target)
   end

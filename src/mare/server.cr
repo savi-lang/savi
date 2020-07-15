@@ -8,6 +8,9 @@ class Mare::Server
     @stderr : IO = STDERR)
     @wire = LSP::Wire.new(@stdin, @stdout)
     @open_files = {} of URI => String
+    @compiled = false
+    @ctx = nil.as Mare::Compiler::Context?
+    @workspace = ""
 
     @use_snippet_completions = false
   end
@@ -19,6 +22,17 @@ class Mare::Server
 
   def setup
     @stderr.puts("LSP Server is starting...")
+
+    ENV["STD_DIRECTORY_MAPPING"]?.try do |mapping|
+      mapping.split(":").each_slice 2 do |pair|
+        next unless pair.size == 2
+        host_path = pair[0]
+        dest_path = pair[1]
+
+        @stderr.puts(Process.run("cp", [Compiler::STANDARD_LIBRARY_DIRNAME, dest_path, "-r"]).exit_code)
+        @stderr.puts(Process.run("cp", [Compiler.prelude_library_path, dest_path, "-r"]).exit_code)
+      end
+    end
 
     # Before we exit, say goodbye.
     at_exit do
@@ -33,11 +47,14 @@ class Mare::Server
         .text_document.completion
         .completion_item.snippet_support
 
+    @workspace = msg.params.workspace_folders[0].uri.path.not_nil!
+
     @wire.respond msg do |msg|
       msg.result.capabilities.text_document_sync.open_close = true
       msg.result.capabilities.text_document_sync.change =
         LSP::Data::TextDocumentSyncKind::Full
       msg.result.capabilities.hover_provider = true
+      msg.result.capabilities.definition_provider = true
       msg.result.capabilities.completion_provider =
         LSP::Data::ServerCapabilities::CompletionOptions.new(false, [":"])
       msg
@@ -75,6 +92,7 @@ class Mare::Server
   def handle(msg : LSP::Message::DidChange)
     @open_files[msg.params.text_document.uri] =
       msg.params.content_changes.last.text
+    @ctx = nil
   end
 
   # When a text document is closed, remove it from our local set.
@@ -85,20 +103,39 @@ class Mare::Server
   # When a text document is saved, do nothing.
   def handle(msg : LSP::Message::DidSave)
     # Ignore.
+    @ctx = nil
   end
 
-  def handle(msg : LSP::Message::Hover)
+  def handle(msg : LSP::Message::Definition)
     pos = msg.params.position
     text = @open_files[msg.params.text_document.uri]? || ""
 
     raise NotImplementedError.new("not a file") \
       if msg.params.text_document.uri.scheme != "file"
 
+    host_filename = msg.params.text_document.uri.path.not_nil!
     filename = msg.params.text_document.uri.path.not_nil!
 
     # If we're running in a docker container, or in some other remote
     # environment, the host's source path may not match ours, and we
     # can apply the needed transformation as specified in this ENV var.
+    ENV["STD_DIRECTORY_MAPPING"]?.try do |mapping|
+      mapping.split(":").each_slice 2 do |pair|
+        next unless pair.size == 2
+        host_path = pair[0]
+        dest_path = pair[1]
+
+        if filename.starts_with?(host_path)
+          filename = 
+            if filename.includes?("prelude")
+              tmp_fname = filename.sub(host_path, Compiler.prelude_library_path)
+              tmp_fname.sub("prelude/prelude", "prelude")
+            else
+              filename.sub(host_path, Compiler::STANDARD_LIBRARY_DIRNAME)
+            end
+        end
+      end
+    end
     ENV["SOURCE_DIRECTORY_MAPPING"]?.try do |mapping|
       mapping.split(":").each_slice 2 do |pair|
         next unless pair.size == 2
@@ -117,19 +154,139 @@ class Mare::Server
     source = sources.find { |s| s.path == filename }.not_nil!
     source_pos = Source::Pos.point(source, pos.line.to_i32, pos.character.to_i32)
 
-    # TODO: Don't compile from scratch on each hover call.
-    info, info_pos =
-      Compiler.compile(sources, :serve_hover).serve_hover[source_pos]
+    if @ctx.nil?
+      @ctx = Compiler.compile(sources, :serve_lsp)
+    end
+    ctx = @ctx.not_nil!
+
+    begin
+      definition_pos = ctx.serve_definition[source_pos]
+    rescue
+    end
+
+    if definition_pos.is_a? Mare::Source::Pos
+      user_filepath = definition_pos.source.path 
+
+      ENV["STD_DIRECTORY_MAPPING"]?.try do |mapping|
+        mapping.split(":").each_slice 2 do |pair|
+          next unless pair.size == 2
+          host_path = pair[0]
+          dest_path = pair[1]
+
+          if user_filepath.starts_with?(Compiler.prelude_library_path)
+            user_filepath = user_filepath.sub(Compiler.prelude_library_path, File.join(host_path, "prelude"))
+          end
+
+          if user_filepath.starts_with?(Compiler::STANDARD_LIBRARY_DIRNAME)
+            user_filepath = user_filepath.sub(Compiler::STANDARD_LIBRARY_DIRNAME, host_path)
+          end
+        end
+      end
+      ENV["SOURCE_DIRECTORY_MAPPING"]?.try do |mapping|
+        mapping.split(":").each_slice 2 do |pair|
+          next unless pair.size == 2
+          host_path = pair[0]
+          dest_path = pair[1]
+
+          if user_filepath.starts_with?(dest_path)
+            user_filepath = user_filepath.sub(dest_path, host_path)
+          end
+        end
+      end
+
+      @wire.respond msg do |msg|
+        msg.result = LSP::Data::Location.new(
+          URI.new(path: user_filepath),
+          LSP::Data::Range.new(
+            LSP::Data::Position.new(
+              definition_pos.row.to_i64,
+              definition_pos.col.to_i64,
+            ),
+            LSP::Data::Position.new(
+              definition_pos.row.to_i64,
+              definition_pos.col.to_i64 + (definition_pos.finish - definition_pos.start),
+            ),
+          ),
+        )
+        msg
+      end
+    else
+      @wire.error_respond msg do |msg|
+        msg
+      end
+    end
+  end
+
+  def handle(msg : LSP::Message::Hover)
+    pos = msg.params.position
+    text = @open_files[msg.params.text_document.uri]? || ""
+
+    raise NotImplementedError.new("not a file") \
+      if msg.params.text_document.uri.scheme != "file"
+
+    filename = msg.params.text_document.uri.path.not_nil!
+
+    # If we're running in a docker container, or in some other remote
+    # environment, the host's source path may not match ours, and we
+    # can apply the needed transformation as specified in this ENV var.
+    ENV["STD_DIRECTORY_MAPPING"]?.try do |mapping|
+      mapping.split(":").each_slice 2 do |pair|
+        next unless pair.size == 2
+        host_path = pair[0]
+        dest_path = pair[1]
+
+        if filename.starts_with?(host_path)
+          filename = 
+            if filename.includes?("prelude")
+              tmp_fname = filename.sub(host_path, Compiler.prelude_library_path)
+              tmp_fname.sub("prelude/prelude", "prelude")
+            else
+              filename.sub(host_path, Compiler::STANDARD_LIBRARY_DIRNAME)
+            end
+        end
+      end
+    end
+    ENV["SOURCE_DIRECTORY_MAPPING"]?.try do |mapping|
+      mapping.split(":").each_slice 2 do |pair|
+        next unless pair.size == 2
+        host_path = pair[0]
+        dest_path = pair[1]
+
+        if filename.starts_with?(host_path)
+          filename = filename.sub(host_path, dest_path)
+        end
+      end
+    end
+
+    dirname = File.dirname(filename)
+    sources = Compiler.get_library_sources(dirname)
+
+    source = sources.find { |s| s.path == filename }.not_nil!
+    source_pos = Source::Pos.point(source, pos.line.to_i32, pos.character.to_i32)
+
+    info = [] of String
+    begin
+      if @ctx.nil?
+        @ctx = Compiler.compile(sources, :serve_lsp)
+      end
+      ctx = @ctx.not_nil!
+
+      info, info_pos =
+        ctx.serve_hover[source_pos]
+    rescue
+    end
 
     info << "(no hover information)" if info.empty?
 
     @wire.respond msg do |msg|
       msg.result.contents.kind = "plaintext"
       msg.result.contents.value = info.join("\n\n")
-      msg.result.range = LSP::Data::Range.new(
-        LSP::Data::Position.new(info_pos.row.to_i64, info_pos.col.to_i64),
-        LSP::Data::Position.new(info_pos.row.to_i64, info_pos.col.to_i64 + info_pos.size), # TODO: account for spilling over into a new row
-      )
+      if info_pos.is_a?(Mare::Source::Pos)
+        msg.result.range = LSP::Data::Range.new(
+          LSP::Data::Position.new(info_pos.row.to_i64, info_pos.col.to_i64),
+          LSP::Data::Position.new(info_pos.row.to_i64, info_pos.col.to_i64 + info_pos.size), # TODO: account for spilling over into a new row
+        )
+      end
       msg
     end
   end

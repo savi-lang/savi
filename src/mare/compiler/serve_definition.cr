@@ -13,7 +13,7 @@ require "llvm"
 # This pass keeps no state other than holding onto the Context.
 # This pass produces no output state.
 #
-class Mare::Compiler::ServeHover
+class Mare::Compiler::ServeDefinition
   getter! ctx : Context
 
   def initialize
@@ -78,10 +78,12 @@ class Mare::Compiler::ServeHover
           f.body.try do |body|
             if body.pos.contains?(pos)
               find(pos, body).reverse_each do |node|
+
                 t_link = t.make_link(library)
                 f_link = f.make_link(t_link)
-                messages, pos = self[t_link, f_link, node]
-                return {messages, pos} unless messages.empty?
+
+                other_pos = self[t_link, f_link, node]
+                return other_pos unless other_pos.is_a? Nil
               end
             end
           end
@@ -89,63 +91,42 @@ class Mare::Compiler::ServeHover
       end
     end
 
-    {[] of String, pos}
+    nil
   end
 
   def [](t_link : Program::Type::Link, f_link : Program::Function::Link, node : AST::Node)
-    messages = [] of String
-
     refer = ctx.refer[f_link]
+
     infer = ctx.infer.for_func_simple(ctx, t_link, f_link)
+
     describe_type = "type"
 
-    ref = refer[node]?
-    case ref
-    when Refer::Self
-      messages << "This refers to the current 'self' value " \
-                "(the instance of the type that implements this method)."
-    when Refer::RaiseError
-      messages << "This raises an error."
-    when Refer::Field
-      messages << "This refers to a field."
-    when Refer::Local
-      messages << "This is a local variable."
-    when Refer::LocalUnion
-      messages << "This is a local variable."
-    when Refer::Type
-      messages << "This is a type reference."
-    when Refer::TypeAlias
-      messages << "This is a type alias reference."
-    when Refer::TypeParam
-      messages << "This is a type parameter reference."
-    when Refer::Unresolved
-    when nil
-    else raise NotImplementedError.new(ref)
-    end
-
-    infer_info = ctx.infer[f_link][node]?
-    if node.is_a?(AST::Relate) && node.op.value == "."
-      begin
-        messages << "This is a function call on an inferred receiver type of " \
-                    "#{infer.analysis.resolved(ctx, node.lhs).show_type}."
-      rescue
-      end
-    elsif infer_info.is_a? Infer::FromCall
-      infer_info.follow_call_get_call_defns(ctx, infer).each do |x, y, z|
-        unless y.nil?
-          messages << "This is a function call on type #{y.show_type}."
-          describe_type = "return type"
-          break
+    begin
+      infer_info = ctx.infer[f_link][node]?
+      if infer_info.is_a? Infer::FromCall
+        infer_info.follow_call_get_call_defns(ctx, infer).map do |_, _, other_f|
+          next unless other_f
+          other_f.ident.pos
+        end.first
+      else
+        ref = refer[node]?
+        case ref
+        when Refer::Local, Refer::LocalUnion
+          case ref
+          when Refer::Local
+            ref.defn.pos
+          when Refer::LocalUnion
+            ref.list.map do |local|
+              local.defn.pos
+            end.first
+          end
+        else
+          inf = infer.analysis.resolved(ctx, node)
+          inf.each_reachable_defn.map do |defn|
+            defn.link.resolve(ctx).ident.pos
+          end.first
         end
       end
     end
-
-    begin
-      inf = infer.analysis.resolved(ctx, node)
-      messages << "It has an inferred #{describe_type} of #{inf.show_type}."
-    rescue
-    end
-
-    {messages, node.pos}
   end
 end

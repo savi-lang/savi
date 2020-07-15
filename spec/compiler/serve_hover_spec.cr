@@ -29,10 +29,10 @@ describe Mare::Compiler::ServeHover do
 
     messages, pos = ctx.serve_hover[Mare::Source::Pos.point(source, 3, 13)]
     pos.row.should eq 3
-    pos.col.should eq 4
-    pos.size.should eq "example.hash".bytesize
+    pos.col.should eq 12
+    pos.size.should eq "hash".bytesize
     messages.should eq [
-      "This is a function call on an inferred receiver type of String.",
+      "This is a function call on type String.",
       "It has an inferred return type of USize."
     ]
   end
@@ -49,10 +49,10 @@ describe Mare::Compiler::ServeHover do
 
     messages, pos = ctx.serve_hover[Mare::Source::Pos.point(source, 3, 6)]
     pos.row.should eq 3
-    pos.col.should eq 4
-    pos.size.should eq "@example".bytesize
+    pos.col.should eq 5
+    pos.size.should eq "example".bytesize
     messages.should eq [
-      "This is a function call on an inferred receiver type of Main'ref.",
+      "This is a function call on type Main.",
       "It has an inferred return type of U64.",
     ]
   end

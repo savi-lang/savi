@@ -24,6 +24,8 @@ export async function deactivate() {
   return Promise.all([...clients.values()].map(ws => ws.stop()))
 }
 
+const tmp = require("tmp");
+
 function didOpenTextDocument(
   document: TextDocument,
   ctx: ExtensionContext,
@@ -133,11 +135,15 @@ class MareClient {
     const cwd = this.folder.uri.fsPath
     const env = { ...process.env }
     
+    const tmpDir = tmp.dirSync().name;
+    
     let serverProcess = child_process.spawn(
       'docker', [
         'run', '-i', '--rm',
         '-v', `${cwd}:/opt/code`,
+        '-v', `${tmpDir}:/opt/host_std`,
         '-e', `SOURCE_DIRECTORY_MAPPING=${cwd}:/opt/code`,
+        '-e', `STD_DIRECTORY_MAPPING=${tmpDir}:/opt/host_std`,
         'jemc/mare',
         'server',
       ],
