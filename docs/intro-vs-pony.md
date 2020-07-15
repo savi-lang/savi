@@ -145,6 +145,108 @@ In other words, `@some_function` is syntax sugar for `@.some_function`, as demon
   :fun greet_the_world: @greet("World")
 ```
 
+### Control statements
+
+In contrast to Pony, control statements' bodies are surrounded by parenthesis
+
+#### If
+
+```mare
+:actor Main
+  :prop env Env
+
+  :fun test
+    env.out.print("example")
+    False
+
+  :fun false
+    False
+
+  :new (@env Env)
+    res I32 = 
+      if @false (
+        env.out.print("1")
+        1
+      |
+        if ((False == True) && @test) (
+          env.out.print("2")
+          2
+        |
+          env.out.print("3")
+          3
+        )
+      )
+
+    env.out.print(Inspect[res])
+```
+
+Here you can see that parenthesis around `if` argument is not mandatory (if it's a single term). Also Mare doesn't have `else if` keyword. To use `else` you should use `|` symbol. `@test` function won't be called as the `&&` is "short-circuiting" (you can see more about it in the operators section).
+
+#### While
+
+```mare
+:actor Main
+  :new (env Env)
+    i USize = 0
+    str = "hello world!"
+    // t type is (String | None)
+    t = while (i != str.size) (
+      env.out.print("h" * i)
+      i += 1
+    |
+      USize[0] // TODO improve inference here
+    )
+
+    t
+```
+
+While statement is like the one in Pony, but uses parenthesis instead of `do` and `end`.
+To use it as expression you need to provide an else brach using `|` or the result type will be infered as (T | None).
+
+#### Iterating
+
+In Mare you don't have `for .. in`. Though you can iterate over yielding functions with special syntax:
+
+```mare
+:import "collections"
+
+:actor Main
+  :new (env Env)
+    t = Count.to(10) -> ( i |
+      env.out.print(Inspect[i])
+    )
+
+    env.out.print(Inspect[t]) // will print 10
+```
+
+You can see here that we have no `None` here, also `try` has no else.
+That's because `->` type is infered from the function return type.
+`Count.to(limit)` yields USize(compiler infers this type for i) and returns USize(compiler infers this type for t)_.
+
+#### Try
+
+```mare
+:actor Main
+  :new (env Env)
+    str = "10231"
+
+    t = try (
+      str.parse_i64!
+    |
+      I64[10]
+    )
+
+    env.out.print(Inspect[t])
+
+    t1 = try (
+      str.parse_i64!
+    )
+
+    if (t1 <: I64) (
+      env.out.print(Inspect[t])
+    )
+```
+
 ### Properties and Related Sugar
 
 In Mare, a property is roughly equivalent to a field in Pony. It can be declared with the `prop` declarator, which allows specifying both the type and the initial value.
