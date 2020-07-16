@@ -5,19 +5,20 @@ class Mare::Compiler::Context
   getter classify
   getter code_gen
   getter code_gen_verona
+  getter consumes
   getter eval
   getter infer
   getter inventory
   getter jumps
-  getter consumes
   getter lifetime
   getter namespace
   getter paint
+  getter pre_infer
   getter reach
   getter refer
   getter refer_type
-  getter serve_hover
   getter serve_definition
+  getter serve_hover
 
   def initialize
     @program = Program.new
@@ -26,20 +27,21 @@ class Mare::Compiler::Context
     @classify = Classify::Pass.new
     @code_gen = CodeGen.new(CodeGen::PonyRT)
     @code_gen_verona = CodeGen.new(CodeGen::VeronaRT)
+    @consumes = Consumes::Pass.new
     @eval = Eval.new
     @import = Import.new
     @infer = Infer.new
     @inventory = Inventory::Pass.new
     @jumps = Jumps::Pass.new
-    @consumes = Consumes::Pass.new
     @lifetime = Lifetime.new
     @namespace = Namespace.new
     @paint = Paint.new
+    @pre_infer = PreInfer::Pass.new
     @reach = Reach.new
     @refer = Refer::Pass.new
     @refer_type = ReferType::Pass.new
-    @serve_hover = ServeHover.new
     @serve_definition = ServeDefinition.new
+    @serve_hover = ServeHover.new
   end
 
   def compile_library(*args)

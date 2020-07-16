@@ -13,6 +13,7 @@ module Mare::Compiler
     when :jumps            then ctx.run(ctx.jumps)
     when :consumes         then ctx.run(ctx.consumes)
     when :inventory        then ctx.run(ctx.inventory)
+    when :pre_infer        then ctx.run(ctx.pre_infer)
     when :infer            then ctx.run_whole_program(ctx.infer)
     when :privacy          then ctx.run(Privacy)
     when :completeness     then ctx.run(Completeness)
@@ -48,7 +49,8 @@ module Mare::Compiler
     when :jumps then [:classify]
     when :consumes then [:jumps, :refer]
     when :inventory then [:classify]
-    when :infer then [:inventory, :jumps, :classify, :refer, :lambda, :populate]
+    when :pre_infer then [:inventory, :jumps, :classify, :refer, :lambda, :populate]
+    when :infer then [:pre_infer, :classify]
     when :privacy then [:infer]
     when :completeness then [:jumps, :infer, :lambda, :sugar, :macros, :populate]
     when :reach then [:infer]

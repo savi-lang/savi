@@ -627,13 +627,13 @@ describe Mare::Compiler::Infer do
   it "complains when calling on types without that function" do
     source = Mare::Source.new_example <<-SOURCE
     :trait A
-      :fun foo
+      :fun foo: "foo"
 
     :primitive B
-      :fun bar
+      :fun bar: "bar"
 
     :class C
-      :fun baz
+      :fun baz: "baz"
 
     :actor Main
       :new

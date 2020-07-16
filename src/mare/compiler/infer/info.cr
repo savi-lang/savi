@@ -463,7 +463,7 @@ class Mare::Compiler::Infer
       other_infer = ctx.infer.for_rf(ctx, infer.reified.type, field_func_link, infer.analysis.resolved_self_cap).tap(&.run)
 
       # Get the return type.
-      other_infer.resolve(ctx, other_infer.for_f[other_infer.ret])
+      other_infer.resolve(ctx, other_infer.f_analysis[other_infer.ret])
     end
   end
 
@@ -713,7 +713,7 @@ class Mare::Compiler::Infer
     def post_resolve!(ctx : Context, infer : ForReifiedFunc, meta_type : MetaType)
       super
 
-      lhs_info = infer.for_f[@refine].as(NamedInfo)
+      lhs_info = infer.f_analysis[@refine].as(NamedInfo)
       rhs_mt = infer.resolve(ctx, @refine_type)
       lhs_mt = infer.resolve(ctx, lhs_info)
       if !rhs_mt.subtype_of?(ctx, lhs_mt)
@@ -950,9 +950,9 @@ class Mare::Compiler::Infer
     end
 
     def resolve_others!(ctx : Context, infer : ForReifiedFunc)
-      infer.resolve(ctx, infer.for_f[@args.not_nil!]) if @args
-      infer.resolve(ctx, infer.for_f[@yield_block.not_nil!]) if @yield_block
-      infer.resolve(ctx, infer.for_f[@yield_params.not_nil!]) if @yield_params
+      infer.resolve(ctx, infer.f_analysis[@args.not_nil!]) if @args
+      infer.resolve(ctx, infer.f_analysis[@yield_block.not_nil!]) if @yield_block
+      infer.resolve(ctx, infer.f_analysis[@yield_params.not_nil!]) if @yield_params
 
       resolvables.each { |resolvable| infer.resolve(ctx, resolvable) }
     end
@@ -1106,7 +1106,7 @@ class Mare::Compiler::Infer
     end
 
     def follow_call_check_yield_block(other_infer, problems)
-      yield_out_infos = other_infer.for_f.yield_out_infos
+      yield_out_infos = other_infer.f_analysis.yield_out_infos
 
       if yield_out_infos.empty?
         if yield_block
@@ -1136,7 +1136,7 @@ class Mare::Compiler::Infer
       # TODO: It should be safe to pass in a TRN if the receiver is TRN,
       # so is_sendable? isn't quite liberal enough to allow all valid cases.
       call.args.try(&.terms.each do |arg|
-        inferred_arg = infer.resolve(ctx, infer.for_f[arg])
+        inferred_arg = infer.resolve(ctx, infer.f_analysis[arg])
         unless inferred_arg.alias.is_sendable?
           problems << {arg.pos,
             "the argument (when aliased) has a type of " \
@@ -1199,7 +1199,7 @@ class Mare::Compiler::Infer
 
       rets = [] of MetaType
       other_infers.each do |other_infer, autorecover_needed|
-        inferred_ret_info = other_infer.for_f[other_infer.ret]
+        inferred_ret_info = other_infer.f_analysis[other_infer.ret]
         inferred_ret = other_infer.resolve_with_reentrance_prevention(ctx, inferred_ret_info)
         rets << inferred_ret
 
@@ -1236,10 +1236,10 @@ class Mare::Compiler::Infer
       other_infer = other_infers.first.first
 
       raise "TODO: Nice error message for this" \
-        if other_infer.for_f.yield_out_infos.size <= @index
+        if other_infer.f_analysis.yield_out_infos.size <= @index
 
       yield_param = call.yield_params.not_nil!.terms[@index]
-      yield_out = other_infer.for_f.yield_out_infos[@index]
+      yield_out = other_infer.f_analysis.yield_out_infos[@index]
 
       @pos = yield_out.first_viable_constraint_pos
 
@@ -1271,8 +1271,8 @@ class Mare::Compiler::Infer
       yield_in_resolved = other_infer.analysis.yield_in_resolved
       none = MetaType.new(infer.reified_type(infer.prelude_type("None")))
       if yield_in_resolved != none
-        # @pos = other_infer.for_f.yield_in_info.first_viable_constraint_pos
-        other_infer.resolve(ctx, other_infer.for_f.yield_in_info)
+        # @pos = other_infer.f_analysis.yield_in_info.first_viable_constraint_pos
+        other_infer.resolve(ctx, other_infer.f_analysis.yield_in_info)
       else
         MetaType.unconstrained
       end
@@ -1293,7 +1293,7 @@ class Mare::Compiler::Infer
 
       other_infers.map do |other_infer, _|
         param = other_infer.params[@index]
-        param_info = other_infer.for_f[param]
+        param_info = other_infer.f_analysis[param]
         param_info = param_info.lhs if param_info.is_a?(FromAssign)
         param_info = param_info.as(Param)
         param_mt = other_infer.resolve(ctx, param_info)
@@ -1308,7 +1308,7 @@ class Mare::Compiler::Infer
       MetaType.new_intersection(
         other_infers.map do |other_infer, _|
           param = other_infer.params[@index]
-          other_infer.resolve(ctx, other_infer.for_f[param]).as(MetaType)
+          other_infer.resolve(ctx, other_infer.f_analysis[param]).as(MetaType)
         end
       )
     end
