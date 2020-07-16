@@ -4,10 +4,15 @@ struct Mare::Compiler::Infer::MetaType::Nominal
   def initialize(@defn)
   end
 
+  def ignores_cap?
+    defn = @defn
+    defn.is_a?(ReifiedType) && defn.link.ignores_cap?
+  end
+
   def inspect(io : IO)
     inspect_without_cap(io)
 
-    io << "'any" unless defn.is_a?(ReifiedTypeAlias)
+    io << "'any" unless ignores_cap? || defn.is_a?(ReifiedTypeAlias)
   end
 
   def inspect_with_cap(io : IO, cap : Capability)
@@ -63,7 +68,7 @@ struct Mare::Compiler::Infer::MetaType::Nominal
     case defn
     when ReifiedType
       func = defn.defn(ctx).find_func?(name)
-      [{self, defn, func}] if func
+      [{self, defn, func}]
     when TypeParam
       infer.lookup_type_param_bound(defn)
         .find_callable_func_defns(ctx, infer, name)
@@ -107,6 +112,9 @@ struct Mare::Compiler::Infer::MetaType::Nominal
   end
 
   def intersect(other : Capability)
+    # As a small optimization, we can drop the cap here if we know it's ignored.
+    return self if ignores_cap?
+
     Intersection.new(other, [self].to_set)
   end
 
@@ -222,6 +230,9 @@ struct Mare::Compiler::Infer::MetaType::Nominal
   def is_sendable?
     raise NotImplementedError.new("simplify first to remove aliases") if defn.is_a?(ReifiedTypeAlias)
 
+    # A nominal that ignores capabilities is always sendable.
+    return true if ignores_cap?
+
     # An nominal is never itself sendable -
     # it specifies a single nominal, and says nothing about capabilities.
     false
@@ -236,11 +247,17 @@ struct Mare::Compiler::Infer::MetaType::Nominal
   def viewed_from(origin)
     raise NotImplementedError.new("simplify first to remove aliases") if defn.is_a?(ReifiedTypeAlias)
 
+    # A nominal that ignores capabilities also ignores viewpoint adaptation.
+    return self if ignores_cap?
+
     raise NotImplementedError.new("#{origin.inspect}->#{self.inspect}")
   end
 
   def extracted_from(origin)
     raise NotImplementedError.new("simplify first to remove aliases") if defn.is_a?(ReifiedTypeAlias)
+
+    # A nominal that ignores capabilities also ignores viewpoint adaptation.
+    return self if ignores_cap?
 
     raise NotImplementedError.new("#{origin.inspect}->>#{self.inspect}")
   end
@@ -248,7 +265,10 @@ struct Mare::Compiler::Infer::MetaType::Nominal
   def subtype_of?(ctx : Context, other : Capability) : Bool
     raise NotImplementedError.new("simplify first to remove aliases") if defn.is_a?(ReifiedTypeAlias)
 
-    # A nominal can never be a subtype of any capability -
+    # A nominal that ignores capabilities can be a subtype of any capability.
+    return true if ignores_cap?
+
+    # Otherwise, a nominal can never be a subtype of any capability -
     # it specifies a single nominal, and says nothing about capabilities.
     false
   end
@@ -323,11 +343,49 @@ struct Mare::Compiler::Infer::MetaType::Nominal
     other.subtype_of?(ctx, self) # delegate to the other class via symmetry
   end
 
+  def satisfies_bound?(ctx : Context, bound : Capability) : Bool
+    # A nominal that ignores capabilities can satisfy any capability.
+    return true if ignores_cap?
+
+    raise NotImplementedError.new("#{self} satisfies_bound? #{bound}")
+  end
+
   def satisfies_bound?(ctx : Context, bound : Nominal) : Bool
     subtype_of?(ctx, bound)
   end
 
-  def satisfies_bound?(ctx : Context, bound : (Capability | AntiNominal | Intersection | Union | Unconstrained | Unsatisfiable)) : Bool
+  def satisfies_bound?(ctx : Context, bound : AntiNominal) : Bool
     raise NotImplementedError.new("#{self} satisfies_bound? #{bound}")
+  end
+
+  def satisfies_bound?(ctx : Context, bound : Intersection) : Bool
+    # If the bound has a cap, then we can't satisfy it unless we can ignore it.
+    return false if bound.cap && !ignores_cap?
+
+    # If the bound has terms, then we must satisfy each term.
+    bound.terms.try do |bound_terms|
+      bound_terms.each do |bound_term|
+        return false unless self.satisfies_bound?(ctx, bound_term)
+      end
+    end
+
+    # If the bound has anti-terms, then we don't know how to handle that yet.
+    raise NotImplementedError.new("#{self} satisfies_bound? #{bound}") \
+      if bound.anti_terms
+
+    # If we get to this point, we've satisfied the bound.
+    true
+  end
+
+  def satisfies_bound?(ctx : Context, bound : Union) : Bool
+    raise NotImplementedError.new("#{self} satisfies_bound? #{bound}")
+  end
+
+  def satisfies_bound?(ctx : Context, bound : Unconstrained) : Bool
+    true # no constraints; always satisfied
+  end
+
+  def satisfies_bound?(ctx : Context, bound : Unsatisfiable) : Bool
+    false # never satisfied
   end
 end

@@ -138,11 +138,16 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       # Return the list of refs in this union, assuming it is a union.
       # TODO: Make this logic more robust/comprehensive, and move to MetaType.
       u = @meta_type.inner.as(Infer::MetaType::Union)
-      raise NotImplementedError.new(u) if u.caps || u.terms || u.anti_terms
+      raise NotImplementedError.new(u) if u.caps || u.anti_terms
 
-      u.intersects.not_nil!.map do |intersect|
-        Ref.new(Infer::MetaType.new(intersect))
-      end
+      children = [] of Ref
+      u.terms.try(&.each do |term|
+        children << Ref.new(Infer::MetaType.new(term))
+      end)
+      u.intersects.try(&.each do |intersect|
+        children << Ref.new(Infer::MetaType.new(intersect))
+      end)
+      children
     end
 
     def cap_only

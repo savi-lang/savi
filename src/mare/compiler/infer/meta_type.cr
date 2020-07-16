@@ -86,7 +86,9 @@ struct Mare::Compiler::Infer::MetaType
     MetaType.new(
       case inner
       when Capability; inner
-      when Intersection; inner.cap
+      when Nominal; Capability::NON if inner.ignores_cap?
+      when Intersection
+        inner.cap || (inner.ignores_cap? ? Capability::NON : nil)
       when Union
         caps = Set(Capability).new
         inner.caps.try(&.each { |cap| caps << cap })

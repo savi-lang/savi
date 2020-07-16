@@ -117,8 +117,8 @@ describe Mare::Compiler::Infer::MetaType do
 
     # Union of nominals, anti-nominals, and intersections.
     (c1 | c2 | -a1 | -a2 | (a3 & c3) | (a4 & c4)).inner.inspect.should eq \
-      "(C1'any | C2'any | -A1'any | -A2'any |" \
-      " (A3'any & C3'any) | (A4'any & C4'any))"
+      "((A3'any & C3'any) | (A4'any & C4'any) |" \
+      " -A1'any | -A2'any | C1'any | C2'any)"
 
     # Intersection of intersections.
     ((a1 & a2) & (a3 & a4)).inner.inspect.should eq \
@@ -126,8 +126,8 @@ describe Mare::Compiler::Infer::MetaType do
 
     # Union of unions.
     ((c1 | -a1 | (a3 & c3)) | (c2 | -a2 | (a4 & c4))).inner.inspect.should eq \
-      "(C1'any | C2'any | -A1'any | -A2'any |" \
-      " (A3'any & C3'any) | (A4'any & C4'any))"
+      "((A3'any & C3'any) | (A4'any & C4'any) |" \
+      " -A1'any | -A2'any | C1'any | C2'any)" \
 
     # Intersection of two simple unions.
     ((a1 | a2) & (a3 | a4)).inner.inspect.should eq \
@@ -142,7 +142,7 @@ describe Mare::Compiler::Infer::MetaType do
 
     # Negation of an intersection.
     (-(a1 & -a2 & a3 & -a4)).inner.inspect.should eq \
-      "(A2'any | A4'any | -A1'any | -A3'any)"
+      "(-A1'any | -A3'any | A2'any | A4'any)"
 
     # Negation of a union.
     (-(a1 | -a2 | a3 | -a4)).inner.inspect.should eq \

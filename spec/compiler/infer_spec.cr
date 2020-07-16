@@ -664,33 +664,38 @@ describe Mare::Compiler::Infer do
     :trait A
       :fun foo: "foo"
 
-    :primitive B
+    :class B
       :fun bar: "bar"
 
-    :class C
+    :primitive C
       :fun baz: "baz"
 
     :actor Main
       :new
-        c (A | B | C) = C.new
-        c.baz
+        b (A | B | C) = B.new
+        b.bar
     SOURCE
 
     expected = <<-MSG
-    The 'baz' function can't be called on (A | B | C):
+    The 'bar' function can't be called on (A | B | C):
     from (example):13:
-        c.baz
+        b.bar
           ^~~
 
-    - A has no 'baz' function:
+    - C has no 'bar' function:
+      from (example):7:
+    :primitive C
+               ^
+
+    - maybe you meant to call the 'baz' function:
+      from (example):8:
+      :fun baz: "baz"
+           ^~~
+
+    - A has no 'bar' function:
       from (example):1:
     :trait A
            ^
-
-    - B has no 'baz' function:
-      from (example):4:
-    :primitive B
-               ^
     MSG
 
     expect_raises Mare::Error, expected do

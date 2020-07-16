@@ -60,25 +60,25 @@ struct Mare::Compiler::Infer::MetaType::Union
     first = true
     io << "("
 
-    caps.not_nil!.each do |cap|
+    intersects.not_nil!.each do |intersect|
       io << " | " unless first; first = false
-      cap.inspect(io)
-    end if caps
-
-    terms.not_nil!.each do |term|
-      io << " | " unless first; first = false
-      term.inspect(io)
-    end if terms
+      intersect.inspect(io)
+    end if intersects
 
     anti_terms.not_nil!.each do |anti_term|
       io << " | " unless first; first = false
       anti_term.inspect(io)
     end if anti_terms
 
-    intersects.not_nil!.each do |intersect|
+    terms.not_nil!.each do |term|
       io << " | " unless first; first = false
-      intersect.inspect(io)
-    end if intersects
+      term.inspect(io)
+    end if terms
+
+    caps.not_nil!.each do |cap|
+      io << " | " unless first; first = false
+      cap.inspect(io)
+    end if caps
 
     io << ")"
   end
@@ -409,12 +409,15 @@ struct Mare::Compiler::Infer::MetaType::Union
 
   def viewed_from(origin)
     raise NotImplementedError.new("#{origin.inspect}->#{self.inspect}") \
-      if terms || anti_terms
+      if anti_terms
 
     result = Unsatisfiable::INSTANCE
     caps.not_nil!.each do |cap|
       result = result.unite(cap.viewed_from(origin))
     end if caps
+    terms.not_nil!.each do |term|
+      result = result.unite(term.viewed_from(origin))
+    end if terms
     intersects.not_nil!.each do |intersect|
       result = result.unite(intersect.viewed_from(origin))
     end if intersects
@@ -423,12 +426,15 @@ struct Mare::Compiler::Infer::MetaType::Union
 
   def extracted_from(origin)
     raise NotImplementedError.new("#{origin.inspect}->>#{self.inspect}") \
-      if terms || anti_terms
+      if anti_terms
 
     result = Unsatisfiable::INSTANCE
     caps.not_nil!.each do |cap|
       result = result.unite(cap.extracted_from(origin))
     end if caps
+    terms.not_nil!.each do |term|
+      result = result.unite(term.extracted_from(origin))
+    end if terms
     intersects.not_nil!.each do |intersect|
       result = result.unite(intersect.extracted_from(origin))
     end if intersects

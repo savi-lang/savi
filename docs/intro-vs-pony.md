@@ -271,7 +271,7 @@ Generic types are have a bit different syntax
 
 :trait Comparable (A Comparable(A)'read)
 ```
-Here you can see that we are using parenthesis instead of square brackets. Also we specify the restrictions as we are specifying types of variables/parameters. 
+Here you can see that we are using parenthesis instead of square brackets. Also we specify the restrictions as we are specifying types of variables/parameters.
 
 To use this type you need to specify types in parenthesis
 ```
@@ -375,6 +375,8 @@ Probably the most notable semantics change from Pony is the addition of a new re
   - appropriate for cases where you want to define and call functions on a type without allocating an instance of it at runtime (i.e. stateless "singleton" types, or stateless "class methods" defined on a stateful type)
 
 As you might expect from the description, primitives in Mare have a capability of `non` (rather than `val`, as they do in Pony). As a result, even stateful types can be used "like a primitive" by defining `non` functions on them - such functions can be called without an allocated instance of the type. This replaces the common pattern in Pony of defining a "utility primitive" alongside a stateful type (e.g. `primitive Promises` alongside `actor Promise` from the Pony standard libarary) - in Mare, all these functions can be within the same type without any inconvenience. Moreover, all types become first-class values, just like primitives.
+
+However, because it is safe, we allow typechecking of primitives capabilities to ignore capabilities, which smooths over certain issues with migrating Pony code where you were depending on primitives to be a subtype of `val` or `box`, as well as new patterns, such as dependency-injecting a primitive where a mutable type is expected. A primitive can have no field-accessing methods, so this is all safe and allowable.
 
 ### [TODO: More Semantics Info...]
 

@@ -191,6 +191,7 @@ class Mare::Program
       :actor,
       :allocated,
       :hygienic,
+      :ignores_cap,
       :no_desc,
       :numeric,
       :private,
@@ -283,6 +284,10 @@ class Mare::Program
       !has_tag?(:abstract)
     end
 
+    def ignores_cap?
+      has_tag?(:ignores_cap)
+    end
+
     def is_instantiable?
       has_tag?(:allocated) && is_concrete?
     end
@@ -325,7 +330,7 @@ class Mare::Program
       make_link(library.make_link)
     end
     def make_link(library : Library::Link)
-      Link.new(library, ident.value, cap.value, is_concrete?)
+      Link.new(library, ident.value, cap.value, is_concrete?, ignores_cap?)
     end
 
     struct Link
@@ -333,9 +338,11 @@ class Mare::Program
       getter name : String
       getter cap : String # TODO: remove this? need to refactor MetaType.new and MetaType#inspect
       getter concrete : Bool # TODO: remove this? need to refactor MetaType#is_concrete?
+      getter ignores_cap : Bool # TODO: remove this?
       def is_concrete?; concrete; end
       def is_abstract?; !concrete; end
-      def initialize(@library, @name, @cap, @concrete)
+      def ignores_cap?; ignores_cap; end
+      def initialize(@library, @name, @cap, @concrete, @ignores_cap)
       end
       def resolve(ctx : Compiler::Context)
         @library.resolve(ctx).types.find(&.ident.value.==(@name)).not_nil!

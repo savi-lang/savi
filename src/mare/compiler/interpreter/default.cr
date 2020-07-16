@@ -121,7 +121,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
       t.type.add_tag(:numeric)
       t.type.add_tag(:no_desc)
     when "primitive"
-      # no type-level tags
+      t.type.add_tag(:ignores_cap)
     when "ffi"
       t.type.add_tag(:private)
     end

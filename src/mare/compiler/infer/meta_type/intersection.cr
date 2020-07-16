@@ -14,6 +14,10 @@ struct Mare::Compiler::Infer::MetaType::Intersection
     raise "empty anti_terms" if anti_terms && anti_terms.try(&.empty?)
   end
 
+  def ignores_cap?
+    terms.try(&.any?(&.ignores_cap?))
+  end
+
   # This function works like .new, but it accounts for cases where there
   # aren't enough terms and anti-terms to build a real Intersection.
   # Returns Unconstrained if no terms or anti-terms are supplied.
@@ -139,6 +143,9 @@ struct Mare::Compiler::Infer::MetaType::Intersection
   end
 
   def intersect(other : Capability)
+    # As a small optimization, we can ignore this if any of our terms does.
+    return self if ignores_cap?
+
     new_cap = cap.try(&.intersect(other)) || other
     return self if new_cap == cap
     return new_cap if new_cap.is_a?(Unsatisfiable)
@@ -157,6 +164,9 @@ struct Mare::Compiler::Infer::MetaType::Intersection
     # Unsatisfiable if there are two non-identical concrete types.
     return Unsatisfiable.instance \
       if other.is_concrete? && terms && terms.not_nil!.any?(&.is_concrete?)
+
+    # # As a small optimization, we can drop the cap if this new term does.
+    cap = cap() unless other.ignores_cap?
 
     # Add this to existing terms (if any) and create the intersection.
     new_terms =
@@ -315,7 +325,7 @@ struct Mare::Compiler::Infer::MetaType::Intersection
   end
 
   def is_sendable?
-    cap.try(&.is_sendable?) || false
+    cap.try(&.is_sendable?) || ignores_cap? || false
   end
 
   def safe_to_match_as?(ctx : Context, other) : Bool?
@@ -349,7 +359,7 @@ struct Mare::Compiler::Infer::MetaType::Intersection
     # This intersection is a subtype of the given capability if and only if
     # it has a capability as part of the intersection, and that capability
     # is a subtype of the given capability.
-    cap.try(&.subtype_of?(ctx, other)) || false
+    cap.try(&.subtype_of?(ctx, other)) || ignores_cap? || false
   end
 
   def supertype_of?(ctx : Context, other : Capability) : Bool
@@ -394,7 +404,7 @@ struct Mare::Compiler::Infer::MetaType::Intersection
   def supertype_of?(ctx : Context, other : Nominal) : Bool
     # If we have a capability restriction, we can't possibly be a supertype of
     # other, because a nominal says nothing about capabilities.
-    return false if cap
+    return false if cap && !other.ignores_cap?
 
     # We don't handle anti-terms here yet. Error if they are present.
     raise NotImplementedError.new("intersection supertyping with anti terms") \
@@ -421,7 +431,7 @@ struct Mare::Compiler::Infer::MetaType::Intersection
     return false if other.cap && (
       !cap ||
       !cap.not_nil!.subtype_of?(ctx, other.cap.not_nil!)
-    )
+    ) && !ignores_cap?
 
     # We don't handle anti-terms here yet. Error if they are present.
     raise NotImplementedError.new("intersection subtyping with anti terms") \
@@ -489,7 +499,7 @@ struct Mare::Compiler::Infer::MetaType::Intersection
     # If the bound has a cap, then we must have a cap that satisfies it.
     bound.cap.try do |bound_cap|
       return false unless cap.try(&.satisfies_bound?(ctx, bound_cap))
-    end
+    end unless ignores_cap?
 
     # If the bound has terms, then we must satisfy each term.
     bound.terms.try do |bound_terms|
