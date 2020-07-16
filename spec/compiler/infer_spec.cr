@@ -354,6 +354,30 @@ describe Mare::Compiler::Infer do
     infer.analysis.resolved(ctx, literal).show_type.should eq "U64"
   end
 
+  it "infers an integer literal within the else body of an if statement" do
+    source = Mare::Source.new_example <<-SOURCE
+    :actor Main
+      :new
+        u = U64[99]
+        x = if True (u | 0)
+    SOURCE
+
+    ctx = Mare::Compiler.compile([source], :infer)
+
+    infer = ctx.infer.for_func_simple(ctx, source, "Main", "new")
+    body = infer.reified.func(ctx).body.not_nil!
+    assign = body.terms[1].as(Mare::AST::Relate)
+    literal = assign.rhs
+      .as(Mare::AST::Group).terms.last
+      .as(Mare::AST::Choice).list[1][1]
+      .as(Mare::AST::Group).terms.last
+      .as(Mare::AST::LiteralInteger)
+
+    infer.analysis.resolved(ctx, assign.lhs).show_type.should eq "U64"
+    infer.analysis.resolved(ctx, assign.rhs).show_type.should eq "U64"
+    infer.analysis.resolved(ctx, literal).show_type.should eq "U64"
+  end
+
   it "complains when a literal couldn't be resolved to a single type" do
     source = Mare::Source.new_example <<-SOURCE
     :actor Main
@@ -372,7 +396,7 @@ describe Mare::Compiler::Infer do
         x (F64 | U64) = 42
           ^~~~~~~~~~~
 
-    - and the literal itself has an intrinsic type of (F64 | U64):
+    - and the literal itself has an intrinsic type of Numeric:
       from (example):3:
         x (F64 | U64) = 42
                         ^~
@@ -404,6 +428,46 @@ describe Mare::Compiler::Infer do
             ^~
 
     - Please wrap an explicit numeric type around the literal (for example: U64[42])
+    MSG
+
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :infer)
+    end
+  end
+
+  it "complains when literal couldn't resolve and had conflicting hints" do
+    source = Mare::Source.new_example <<-SOURCE
+    :actor Main
+      :fun non example (string String)
+        case (
+        | string.size < 10 | U64[99]
+        | string.size > 90 | I64[88]
+        | 0
+        )
+      :new
+        @example("Hello, World!")
+    SOURCE
+
+    expected = <<-MSG
+    This literal value couldn't be inferred as a single concrete type:
+    from (example):6:
+        | 0
+          ^
+
+    - it is suggested here that it might be a U64:
+      from (example):4:
+        | string.size < 10 | U64[99]
+                                ^~~~
+
+    - it is suggested here that it might be a I64:
+      from (example):5:
+        | string.size > 90 | I64[88]
+                                ^~~~
+
+    - and the literal itself has an intrinsic type of Numeric:
+      from (example):6:
+        | 0
+          ^
     MSG
 
     expect_raises Mare::Error, expected do

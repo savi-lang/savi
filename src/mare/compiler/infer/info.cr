@@ -5,6 +5,11 @@ class Mare::Compiler::Infer
 
     abstract def add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
 
+    # Most Info types ignore hints, but a few override this method to see them,
+    # or to pass them along to other nodes that may wish to see them.
+    def add_peer_hint(peer : Info)
+    end
+
     abstract def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
     def post_resolve!(ctx : Context, infer : ForReifiedFunc, mt : MetaType)
     end
@@ -390,6 +395,18 @@ class Mare::Compiler::Infer
     def describe_kind; "literal value" end
 
     def initialize(@pos, @possible : MetaType)
+      @peer_hints = [] of Info
+    end
+
+    def add_peer_hint(peer : Info)
+      @peer_hints << peer
+    end
+
+    def describe_peer_hints(ctx : Context, infer : ForReifiedFunc)
+      @peer_hints.map do |peer|
+        mt = infer.resolve(ctx, peer)
+        {peer.pos, "it is suggested here that it might be a #{mt.show_type}"}
+      end
     end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc)
@@ -404,22 +421,35 @@ class Mare::Compiler::Infer
       # to print a consistent error message instead of printing it here.
       return @possible if meta_type.unsatisfiable?
 
-      unless meta_type.singular? && meta_type.single!.link.is_concrete?
-        extra_info = describe_downstream_constraints(ctx, infer)
-        extra_info.push({pos,
-          "and the literal itself has an intrinsic type of #{meta_type.show_type}"
-        })
-        extra_info.push({Source::Pos.none,
-          "Please wrap an explicit numeric type around the literal " \
-            "(for example: U64[#{@pos.content}])"
-        })
+      # If we've resolved to a single concrete type, we can successfully return.
+      return meta_type if meta_type.singular? && meta_type.single!.link.is_concrete?
 
-        Error.at self,
-          "This literal value couldn't be inferred as a single concrete type",
-          extra_info
+      # Next we try to use peer hints to make a viable guess.
+      if @peer_hints.any?
+        meta_type = MetaType.new_intersection(
+          @peer_hints.map { |peer| infer.resolve(ctx, peer).as(MetaType) }
+        ).intersect(@possible).simplify(ctx)
+
+        # This guess works for us if it meets those same criteria from before.
+        return meta_type if meta_type.singular? && meta_type.single!.link.is_concrete?
       end
 
-      meta_type
+      # We've failed on all fronts. Print an error describing what we know,
+      # so that the user can figure out how to give us better information.
+      error_info = describe_downstream_constraints(ctx, infer)
+      error_info.concat(describe_peer_hints(ctx, infer))
+      error_info.push({pos,
+        "and the literal itself has an intrinsic type of #{@possible.show_type}"
+      })
+      error_info.push({Source::Pos.none,
+        "Please wrap an explicit numeric type around the literal " \
+          "(for example: U64[#{@pos.content}])"
+      })
+      Error.at self,
+        "This literal value couldn't be inferred as a single concrete type",
+        error_info
+
+      raise "unreachable end of function"
     end
   end
 
@@ -519,20 +549,21 @@ class Mare::Compiler::Infer
     end
   end
 
-  # TODO: add some kind of logic for analyzing exhausted choices,
-  # as well as necessary/sufficient conditions for each branch to be in play
-  # letting us better specialize the codegen later by eliminating impossible
-  # branches in particular reifications of this type or function.
   class Sequence < Info
     getter terms : Array(Info)
     getter final_term : Info
 
-    def initialize(@pos, @terms)
-      @final_term = @terms.empty? ? FixedPrelude.new(@pos, "None") : @terms.last
+    def initialize(pos, @terms)
+      @final_term = @terms.empty? ? FixedPrelude.new(pos, "None") : @terms.last
+      @pos = @final_term.pos
     end
 
     def add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
       final_term.add_downstream(use_pos, info, aliases)
+    end
+
+    def add_peer_hint(peer : Info)
+      final_term.add_peer_hint(peer)
     end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc)
@@ -554,8 +585,13 @@ class Mare::Compiler::Infer
     def describe_kind; "choice block" end
 
     def initialize(@pos, @branches)
+      prior_bodies = [] of Info
+
       @branches.each do |cond, body, body_jumps_away|
-        body.add_downstream(@pos, self, 0) unless body_jumps_away
+        next if body_jumps_away
+        body.add_downstream(@pos, self, 0)
+        prior_bodies.each { |prior_body| body.add_peer_hint(prior_body) }
+        prior_bodies << body
       end
     end
 
@@ -780,6 +816,10 @@ class Mare::Compiler::Infer
     def add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
       @local.add_downstream(use_pos, info, aliases - 1)
     end
+
+    def add_peer_hint(peer : Info)
+      @local.add_peer_hint(peer)
+    end
   end
 
   class FromAssign < Info
@@ -793,6 +833,10 @@ class Mare::Compiler::Infer
 
     def add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
       @lhs.add_downstream(use_pos, info, aliases)
+    end
+
+    def add_peer_hint(peer : Info)
+      @lhs.add_peer_hint(peer)
     end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc)
@@ -813,6 +857,10 @@ class Mare::Compiler::Infer
 
     def add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
       @yield_in.add_downstream(use_pos, info, aliases)
+    end
+
+    def add_peer_hint(peer : Info)
+      @yield_in.add_peer_hint(peer)
     end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc)
