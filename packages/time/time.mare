@@ -43,9 +43,6 @@
   :fun non unix_epoch
     @seconds(@_unix_epoch)
 
-  :fun non _days_month Array(U64):      [0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
-  :fun non _days_month_leap Array(U64): [0, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
-
   :: The total number of seconds since `0001-01-01 00:00:00.0` UTC
   :prop total_seconds U64
   :: The number of nanoseconds of the second
