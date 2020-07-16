@@ -127,6 +127,12 @@ class Mare::Compiler::Macros < Mare::AST::CopyOnMutateVisitor
         "the reference whose compile-time type is to be reflected",
       ])
       visit_reflection_of_type(node)
+    elsif Util.match_ident?(node, 0, "reflection_of_runtime_type_name")
+      Util.require_terms(node, [
+        nil,
+        "the reference whose type name is to be reflected at runtime",
+      ])
+      visit_reflection_of_runtime_type_name(node)
     elsif Util.match_ident?(node, 0, "identity_digest_of")
       Util.require_terms(node, [
         nil,
@@ -319,6 +325,17 @@ class Mare::Compiler::Macros < Mare::AST::CopyOnMutateVisitor
     term = node.terms[1]
 
     op = AST::Operator.new("reflection_of_type").from(orig)
+
+    AST::Group.new("(", [
+      AST::Prefix.new(op, term).from(node),
+    ] of AST::Term).from(node)
+  end
+
+  def visit_reflection_of_runtime_type_name(node : AST::Group)
+    orig = node.terms[0]
+    term = node.terms[1]
+
+    op = AST::Operator.new("reflection_of_runtime_type_name").from(orig)
 
     AST::Group.new("(", [
       AST::Prefix.new(op, term).from(node),

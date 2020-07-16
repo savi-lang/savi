@@ -65,7 +65,9 @@
       )
       output.push_byte(']')
       --output
-    | // TODO: support inspection of more types
-      output << "<uninspectable>"
+    // TODO: support inspection of more types
+    |
+      // Otherwise, fall back to just printing the name of the type.
+      output << reflection_of_runtime_type_name input
       --output
     )

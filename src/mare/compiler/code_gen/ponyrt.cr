@@ -319,7 +319,7 @@ class Mare::Compiler::CodeGen::PonyRT
   DESC_FINAL_FN                  = 12
   DESC_EVENT_NOTIFY              = 13
   DESC_TRAITS                    = 14
-  DESC_FIELDS                    = 15
+  DESC_TYPE_NAME                 = 15
   DESC_VTABLE                    = 16
 
   # This defines the generic LLVM struct type for what a type descriptor holds.
@@ -343,7 +343,7 @@ class Mare::Compiler::CodeGen::PonyRT
       @final_fn_ptr,                  # 12: final fn
       @i32,                           # 13: event notify
       @isize.array(0).pointer,        # 14: traits bitmap
-      @pptr,                          # 15: TODO: fields descriptors
+      @ptr,                           # 15: type name (REPLACES unused field descriptors from Pony)
       @ptr.array(0),                  # 16: vtable
     ]
   end
@@ -368,7 +368,7 @@ class Mare::Compiler::CodeGen::PonyRT
       @final_fn_ptr,                             # 12: final fn
       @i32,                                      # 13: event notify
       @isize.array(g.trait_bitmap_size).pointer, # 14: traits bitmap
-      @pptr,                                     # 15: TODO: fields descriptors
+      @ptr,                                      # 15: type name (REPLACES unused field descriptors from Pony)
       @ptr.array(vtable_size),                   # 16: vtable
     ], "#{type_def.llvm_name}.DESC"
   end
@@ -377,13 +377,19 @@ class Mare::Compiler::CodeGen::PonyRT
   # which is held as the first value in an object, used for identifying its
   # type at runtime, as well as a host of other functions related to dealing
   # with objects in the runtime, such as allocating them and tracing them.
-  def gen_desc(g : CodeGen, gtype : GenType, vtable)
+  def gen_desc(g : CodeGen, gtype : GenType)
     type_def = gtype.type_def
 
     desc = g.mod.globals.add(gtype.desc_type, "#{type_def.llvm_name}.DESC")
     desc.linkage = LLVM::Linkage::LinkerPrivate
     desc.global_constant = true
     desc
+  end
+
+  # This populates the descriptor for the given type with its initialized data.
+  def gen_desc_init(g : CodeGen, gtype : GenType, vtable)
+    desc = gtype.desc
+    type_def = gtype.type_def
 
     abi_size = g.abi_size_of(gtype.struct_type)
     field_offset =
@@ -443,6 +449,11 @@ class Mare::Compiler::CodeGen::PonyRT
       is_asio_event_notify ? gtype["_event_notify"].vtable_index : -1
     )
 
+    # Save the name of the gtype's type_def as a proper String,
+    # casting it to an opaque pointer to avoid circular dependency on descs.
+    type_name_string_opaque =
+      g.builder.bit_cast(g.gen_string(type_def.llvm_name), @ptr)
+
     desc.initializer = gtype.desc_type.const_struct [
       @i32.const_int(type_def.desc_id),      # 0: id
       @i32.const_int(abi_size),              # 1: size
@@ -459,7 +470,7 @@ class Mare::Compiler::CodeGen::PonyRT
       @final_fn_ptr.null,                    # 12: final fn
       event_notify_vtable_index,             # 13: event notify TODO
       traits_bitmap_global,                  # 14: traits bitmap
-      @pptr.null,                            # 15: TODO: fields
+      type_name_string_opaque,               # 15: type name (REPLACES unused field descriptors from Pony)
       @ptr.const_array(vtable),              # 16: vtable
     ]
 
@@ -472,6 +483,12 @@ class Mare::Compiler::CodeGen::PonyRT
 
   def gen_traits_gep_get(g, desc, name)
     g.builder.struct_gep(desc, DESC_TRAITS, name)
+  end
+
+  def gen_type_name_get(g, desc, name)
+    gep = g.builder.struct_gep(desc, DESC_TYPE_NAME, "#{name}.GEP")
+    opaque = g.builder.load(gep, "#{name}.OPAQUE")
+    opaque = g.builder.bit_cast(opaque, g.gtypes["String"].struct_ptr, name)
   end
 
   def gen_struct_type(g : CodeGen, gtype : GenType)

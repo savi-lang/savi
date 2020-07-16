@@ -147,12 +147,20 @@ class Mare::Compiler::CodeGen
       vtable
     end
 
-    # Generate the type descriptor value for this type.
+    # Generate the type descriptor global for this type.
     # We skip this for abstract types (traits).
     def gen_desc(g : CodeGen)
       return if @type_def.is_abstract?(g.ctx)
 
-      @desc = g.gen_desc(self, gen_vtable(g))
+      @desc = g.gen_desc(self)
+    end
+
+    # Generate the initializer data for the type descriptor for this type.
+    # We skip this for abstract types (traits).
+    def gen_desc_init(g : CodeGen)
+      return if @type_def.is_abstract?(g.ctx)
+
+      @desc = g.gen_desc_init(self, gen_vtable(g))
     end
 
     # Generate the global singleton value for this type.
@@ -499,8 +507,11 @@ class Mare::Compiler::CodeGen
     # Generate all function declarations.
     @gtypes.each_value(&.gen_func_decls(self))
 
-    # Generate all global descriptor instances.
+    # Generate all global descriptors.
     @gtypes.each_value(&.gen_desc(self))
+
+    # Generate all global descriptor initializers.
+    @gtypes.each_value(&.gen_desc_init(self))
 
     # Generate all global values associated with this type.
     @gtypes.each_value(&.gen_singleton(self))
@@ -2072,6 +2083,8 @@ class Mare::Compiler::CodeGen
       case expr.op.value
       when "reflection_of_type"
         gen_reflection_of_type(expr, expr.term)
+      when "reflection_of_runtime_type_name"
+        gen_reflection_of_runtime_type_name(expr, expr.term)
       when "identity_digest_of"
         gen_identity_digest_of(expr.term)
       when "--"
@@ -2571,6 +2584,11 @@ class Mare::Compiler::CodeGen
     vtable[mutator_call_gfunc.vtable_index] =
       @llvm.const_bit_cast(via_llvm_func.to_value, @ptr)
 
+    # Save the name of the mutator gtype's type_def as a proper String,
+    # casting it to an opaque pointer to avoid circular dependency on descs.
+    type_name_string_opaque =
+      @builder.bit_cast(gen_string(mutator_gtype.type_def.llvm_name), @ptr)
+
     # Generate a type descriptor, so this can masquerade as a real primitive.
     raise NotImplementedError.new("gen_reflection_mutator_of_type in Verona") \
       if @runtime.is_a?(VeronaRT)
@@ -2590,12 +2608,30 @@ class Mare::Compiler::CodeGen
       @final_fn_ptr.null,                  # 12: final fn
       @i32.const_int(-1),                  # 13: event notify
       traits_bitmap_global,                # 14: traits bitmap
-      @pptr.null,                          # 15: field descriptors
+      type_name_string_opaque,             # 15: type name (REPLACES unused field descriptors from Pony)
       @ptr.const_array(vtable),            # 16: vtable
     ])
 
     # Finally, create the singleton "instance" for this fake primitve.
     gen_global_for_const(@obj.const_struct([desc]))
+  end
+
+  def gen_reflection_of_runtime_type_name(expr, term_expr)
+    value = gen_expr(term_expr)
+    value_type = value.type
+
+    desc =
+      if value_type.kind == LLVM::Type::Kind::Pointer \
+        && value_type.element_type.kind == LLVM::Type::Kind::Struct
+        # This has an object header, so we can get the descriptor at runtime.
+        gen_get_desc(value)
+      else
+        # Otherwise this is an unboxed machine word value with no descriptor,
+        # and we need to get the descriptor at compile time instead.
+        gtype_of(term_expr).desc
+      end
+
+    @runtime.gen_type_name_get(self, desc, "#{value.name}.DESC.TYPE_NAME")
   end
 
   def gen_sequence(expr : AST::Group)
@@ -3062,8 +3098,13 @@ class Mare::Compiler::CodeGen
   # which is held as the first value in an object, used for identifying its
   # type at runtime, as well as a host of other functions related to dealing
   # with objects in the runtime, such as allocating them and tracing them.
-  def gen_desc(gtype, vtable)
-    @runtime.gen_desc(self, gtype, vtable)
+  def gen_desc(gtype)
+    @runtime.gen_desc(self, gtype)
+  end
+
+  # This populates the descriptor for the given type with its initialized data.
+  def gen_desc_init(gtype, vtable)
+    @runtime.gen_desc_init(self, gtype, vtable)
   end
 
   # This defines the LLVM struct type for objects of this type.

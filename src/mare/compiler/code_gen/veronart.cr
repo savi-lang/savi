@@ -216,13 +216,19 @@ class Mare::Compiler::CodeGen::VeronaRT
   # which is held as the first value in an object, used for identifying its
   # type at runtime, as well as a host of other functions related to dealing
   # with objects in the runtime, such as allocating them and tracing them.
-  def gen_desc(g : CodeGen, gtype : GenType, vtable)
+  def gen_desc(g : CodeGen, gtype : GenType)
     type_def = gtype.type_def
 
     desc = g.mod.globals.add(gtype.desc_type, "#{type_def.llvm_name}.DESC")
     desc.linkage = LLVM::Linkage::LinkerPrivate
     desc.global_constant = true
     desc
+  end
+
+  # This populates the descriptor for the given type with its initialized data.
+  def gen_desc_init(g : CodeGen, gtype : GenType, vtable)
+    desc = gtype.desc
+    type_def = gtype.type_def
 
     abi_size = g.abi_size_of(gtype.struct_type)
 
@@ -281,6 +287,10 @@ class Mare::Compiler::CodeGen::VeronaRT
 
   def gen_traits_gep_get(g, desc, name)
     raise NotImplementedError.new("Verona runtime: gen_vtable_traits_get")
+  end
+
+  def gen_type_name_get(g, desc, name)
+    raise NotImplementedError.new("Verona runtime: gen_type_name_get")
   end
 
   def gen_struct_type(g : CodeGen, gtype : GenType)

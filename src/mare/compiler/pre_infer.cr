@@ -497,10 +497,14 @@ module Mare::Compiler::PreInfer
         @analysis[node] = Infer::FixedPrelude.new(node.pos, "SourceCodePosition")
       when "reflection_of_type"
         @analysis[node] = Infer::ReflectionOfType.new(node.pos, @analysis[node.term])
+      when "reflection_of_runtime_type_name"
+        @analysis[node] = info = Infer::FixedPrelude.new(node.pos, "String")
+        info.resolvables << @analysis[node.term]
       when "identity_digest_of"
-        @analysis[node] = Infer::FixedPrelude.new(node.pos, "USize")
+        @analysis[node] = info = Infer::FixedPrelude.new(node.pos, "USize")
+        info.resolvables << @analysis[node.term]
       when "--"
-        @analysis[node] = Infer::Consume.new(node.pos, self[node.term])
+        @analysis[node] = Infer::Consume.new(node.pos, @analysis[node.term])
       else
         raise NotImplementedError.new(node.op.value)
       end
