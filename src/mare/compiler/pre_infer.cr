@@ -552,6 +552,9 @@ module Mare::Compiler::PreInfer
       cond_info = self[node.cond]
       cond_info.add_downstream(node.pos, fixed_bool, 1)
 
+      self[node.else_body].override_describe_kind =
+        "loop's result when it runs zero times"
+
       @analysis[node] = Infer::Phi.new(node.pos, [
         {self[node.cond], self[node.body], @jumps.away?(node.body)},
         {nil, self[node.else_body], @jumps.away?(node.else_body)},
@@ -559,6 +562,9 @@ module Mare::Compiler::PreInfer
     end
 
     def touch(ctx : Context, node : AST::Try)
+      self[node.else_body].override_describe_kind =
+        "try result when it catches an error"
+
       @analysis[node] = Infer::Phi.new(node.pos, [
         {nil, self[node.body], @jumps.away?(node.body)},
         {nil, self[node.else_body], @jumps.away?(node.else_body)},

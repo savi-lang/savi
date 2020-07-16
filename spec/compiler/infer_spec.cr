@@ -224,6 +224,41 @@ describe Mare::Compiler::Infer do
     end
   end
 
+  it "complains when a loop's implicit '| None' result doesn't pass checks" do
+    source = Mare::Source.new_example <<-SOURCE
+    :actor Main
+      :new(env Env)
+        i USize = 0
+
+        result = while (i < 2) (i += 1
+          "This loop ran at least once"
+        )
+
+        env.out.print(result)
+    SOURCE
+
+    expected = <<-MSG
+    The type of this expression doesn't meet the constraints imposed on it:
+    from (example):5:
+        result = while (i < 2) (i += 1
+                 ^~~~~
+
+    - it is required here to be a subtype of String:
+      from (example):9:
+        env.out.print(result)
+                      ^~~~~~
+
+    - but the type of the loop's result when it runs zero times was None:
+      from (example):5:
+        result = while (i < 2) (i += 1
+                 ^~~~~~~~~~~~~~~~~~~~~···
+    MSG
+
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :infer)
+    end
+  end
+
   it "infers a local's type based on assignment" do
     source = Mare::Source.new_example <<-SOURCE
     :actor Main

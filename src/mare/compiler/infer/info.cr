@@ -1,6 +1,7 @@
 class Mare::Compiler::Infer
   abstract class Info
     property pos : Source::Pos = Source::Pos.none
+    property override_describe_kind : String?
 
     abstract def add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
 
@@ -40,6 +41,10 @@ class Mare::Compiler::Infer
   abstract class DynamicInfo < Info
     # Must be implemented by the child class as an required hook.
     abstract def describe_kind : String
+
+    def described_kind
+      override_describe_kind || describe_kind
+    end
 
     # May be implemented by the child class as an optional hook.
     def adds_alias; 0 end
@@ -98,7 +103,7 @@ class Mare::Compiler::Infer
       if !within_downstream_constraints?(ctx, infer, meta_type)
         extra = describe_downstream_constraints(ctx, infer)
         extra << {pos,
-          "but the type of the #{describe_kind} was #{meta_type.show_type}"}
+          "but the type of the #{described_kind} was #{meta_type.show_type}"}
 
         Error.at downstream_use_pos, "The type of this expression " \
           "doesn't meet the constraints imposed on it",
@@ -120,7 +125,7 @@ class Mare::Compiler::Infer
       if !meta_type.ephemeralize.within_constraints?(ctx, [total_downstream_constraint(ctx, infer)])
         extra = describe_downstream_constraints(ctx, infer)
         extra << {pos,
-          "but the type of the #{describe_kind} was #{meta_type.show_type}"}
+          "but the type of the #{described_kind} was #{meta_type.show_type}"}
 
         Error.at downstream_use_pos, "The type of this expression " \
           "doesn't meet the constraints imposed on it",
@@ -142,7 +147,7 @@ class Mare::Compiler::Infer
             if !meta_type_alias.within_constraints?(ctx, [constraint])
               extra = describe_downstream_constraints(ctx, infer)
               extra << {pos,
-                "but the type of the #{describe_kind} " \
+                "but the type of the #{described_kind} " \
                 "(when aliased) was #{meta_type_alias.show_type}"
               }
 
@@ -237,7 +242,7 @@ class Mare::Compiler::Infer
 
       # If we get here, we've failed and don't have enough info to continue.
       Error.at self,
-        "This #{describe_kind} needs an explicit type; it could not be inferred"
+        "This #{described_kind} needs an explicit type; it could not be inferred"
     end
   end
 
