@@ -145,11 +145,30 @@ In other words, `@some_function` is syntax sugar for `@.some_function`, as demon
   :fun greet_the_world: @greet("World")
 ```
 
-### Control statements
+### Control Flow Macros
 
-In contrast to Pony, control statements' bodies are surrounded by parenthesis
+In Mare, control flow constructs (things like blocks that conditionally evaluate, or loop, or catch errors) are implemented internally as macros rather than reserved keywords. That is, the word that defines the macro only acts as such when it's in the right syntactical context, but In the future it will be possible to configure user-defined macros, but at this time only built-in macros are possible.
+
+Usually these macros take the form of a word followed by one or more terms separated by mandatory whitespace. Often, one of these terms ends up being a parenthesized expression, and sometimes that parenthesized block is further broken into sub-blocks by the pipe character (`|`). In general, the forms often look something like this:
+
+```
+some_macro term1 (term2_a | term2_b)
+some_macro (term1_a == term1_b) term2
+some_macro (
+| term1_a | term1_b
+| term1_c | term1_d
+| term1_e | term1_f
+)
+```
 
 #### If
+
+An `if` macro has two terms:
+- the first term is the condition to evaluate
+- the second term is the block to execute if the condition is true
+  - if the second term is a block split by `|`:
+    - the first half of the block executes if the condition is true
+    - the second half of the block executes if the condition is false
 
 ```mare
 :actor Main
@@ -163,7 +182,7 @@ In contrast to Pony, control statements' bodies are surrounded by parenthesis
     False
 
   :new (@env Env)
-    res I32 = 
+    res I32 =
       if @false (
         env.out.print("1")
         1
@@ -180,50 +199,72 @@ In contrast to Pony, control statements' bodies are surrounded by parenthesis
     env.out.print(Inspect[res])
 ```
 
-Here you can see that parenthesis around `if` argument is not mandatory (if it's a single term). Also Mare doesn't have `else if` keyword. To use `else` you should use `|` symbol. `@test` function won't be called as the `&&` is "short-circuiting" (you can see more about it in the operators section).
+Here you can see that parentheses around `if` condition are not mandatory (if it's a single term). In this example, the `@test` function won't be called as the `&&` is "short-circuiting" (as explained in the operators section).
 
-#### While
+Since this example follows the pattern of testing another condition in the "else" block (sometimes seen as an "else if" pattern in other languages), a more clear way to write this would be to use the `case` macro instead, as explained in the following section.
+
+#### Case
+
+The `case` macro is the preferred way to test many alternative conditions, and it takes just one parenthesized term, divided into many parts by the `|` character.
+
+- the first part is the first condition to evaluate
+- the second part is the block to execute if that condition was true
+- the next part is the condition to try next if the first condition failed
+- the next part is the block to execute if that second condition was true
+- (and so on, with each pair of parts being a condition and its block to execute)
+- (one or more of the condition blocks will be evaluated, stopping at the first true one)
+- (at most one of the corresponding blocks will be evaluated - the first whose condition was true)
+- (if there are an odd number of parts, then the last executes as a fallback when no conditions were true)
+- (to make things look a bit nicer in a multiline format, if the first part is left empty, it is ignored and the next part will be the first condition)
+
+Let's look at the same code sample from the `if` section above, rewritten to use `case`:
 
 ```mare
 :actor Main
-  :new (env Env)
-    i USize = 0
-    str = "hello world!"
-    // t type is (String | None)
-    t = while (i != str.size) (
-      env.out.print("h" * i)
-      i += 1
-    |
-      USize[0] // TODO improve inference here
-    )
+  :prop env Env
 
-    t
+  :fun test
+    env.out.print("example")
+    False
+
+  :fun false
+    False
+
+  :new (@env Env)
+    res I32 =
+      case (
+      | @false |
+        env.out.print("1")
+        1
+      | (False == True) && @test |
+        env.out.print("2")
+        2
+      |
+        env.out.print("3")
+        3
+      )
+
+    env.out.print(Inspect[res])
 ```
 
-While statement is like the one in Pony, but uses parenthesis instead of `do` and `end`.
-To use it as expression you need to provide an else brach using `|` or the result type will be infered as (T | None).
-
-#### Iterating
-
-In Mare you don't have `for .. in`. Though you can iterate over yielding functions with special syntax:
+Now let's look at an example of `case` used with the subtype check operator:
 
 ```mare
-:import "collections"
-
-:actor Main
-  :new (env Env)
-    t = Count.to(10) -> ( i |
-      env.out.print(Inspect[i])
+:primitive Example
+  :fun thing_to_number (thing Any'box) I64
+    case (
+    | thing <: Numeric | thing.i64
+    | thing <: String  | try (thing.parse_i64! | -1)
+    | thing <: None    | 0
+    | -1
     )
-
-    env.out.print(Inspect[t]) // will print 10
 ```
-
-You can see here that we have no `None` here, also `try` has no else.
-That's because `->` type is infered from the function return type.
-`Count.to(limit)` yields USize(compiler infers this type for i) and returns USize(compiler infers this type for t)_.
 
 #### Try
+
+A `try` macro has just one term: the block to execute with a landing pad to "catch" any errors it might raise.
+
+If the term is a parenthesized expression split in half by the `|` character, then the second have of the block is the block to evaluate if the error was caught.
 
 ```mare
 :actor Main
@@ -238,13 +279,101 @@ That's because `->` type is infered from the function return type.
 
     env.out.print(Inspect[t])
 
-    t1 = try (
-      str.parse_i64!
-    )
+    t1 = try str.parse_i64!
 
     if (t1 <: I64) (
       env.out.print(Inspect[t])
     )
+```
+
+Here you can see that as before, the parentheses are not required when it is a single term being attempted.
+
+The result value of the expression is either the final value of the tried block (if it executed with no errors) or the final value of the "else" branch of the block (if an error was caught). If no such "else" branch was given, the result of that branch will implicitly be `None`, making the result type of the expression to be inferred as `(T | None)`.
+
+#### While
+
+A `while` macro has two terms:
+- the first term is the condition to check, evaluated before each iteration
+- the second term is the block to execute each time the condition is true
+  - if the second term is a block split by `|`:
+    - the first half of the block executes each time the condition is true
+    - the second half of the block executes if the condition failed on the first time, meaning the other block never executed
+
+```mare
+:actor Main
+  :new (env Env)
+    i USize = 0
+    str = "Hello, World!"
+    result = while (i < str.size) (
+      env.out.print("." * i)
+      i += 1
+    |
+      0
+    )
+
+    env.out.print("This is how many times we looped:")
+    env.out.print(Inspect[result])
+```
+
+As shown above, providing the latter part of the block after the `|` character is usually used to give a fallback value for when the result of the loop needs to be used. If you don't provide such a fallback block, then the value of that branch will implicitly be `None`, making the result type of the expression to be inferred as `(T | None)`.
+
+#### Iterating (and more!) with Yield Blocks
+
+Some functions can interrupt themselves in the middle of their execution to pass control back to the caller temporarily for a block, before resuming execution again. This is not done with macros, but with an extension to the function call syntax using the `->` arrow followed by a parenthesized block.
+
+When the parenthesized block is split by the `|` character, the first half of the block describes the "parameters" of the block (the values that the function "yields out"), and the result value of the block is what gets passed back to the caller.
+
+In the standard library, this kind of function is often used for iteration, but it can be used in any other case where a function needs to pass values back and forth with the caller before the function finishes executing.
+
+```mare
+:import "collections"
+
+:actor Main
+  :new (env Env)
+    count = Count.to(10) -> ( i |
+      env.out.print(Inspect[i]) // will print 0 through 9 in order
+    )
+    env.out.print(Inspect[count]) // will print 10
+
+    // This will print "three", "two", and "one":
+    ["one", "two", "three"].reverse_each -> (string | env.out.print(string))
+```
+
+If you want to create such a function, you can use the :yields declaration to describe what it yields out and what it expects to receive back from the caller (or `None` if not specified), then use the `yield` macro with one term within the function body to suspend execution temporarily while the caller executes its embedded block.
+
+Note that the block is not a value that can be carried around - yielding cannot be asynchronous and must take place within the normal execution of the yielding function. However this restriction on the yielder gives benefits to the caller because it is efficient and it can be used to modify local variables in the scope of the caller, without many of the reference capability pitfalls that lambdas in Pony have. Mare will also have Pony-like lambdas, but these yield blocks are to be preferred for synchronous and immediate callbacks / inversion of control.
+
+```mare
+:primitive Blabber
+  :const sentences Array(String)'val: [
+    "Hello, nice to meet you!"
+    "Are you enjoying this lovely day?"
+    "It really is gorgeous weather we're having"
+    "Imagine what it would be like to be one of those clouds..."
+    "High above it all, not a care in the world..."
+    "Like a fluffy, carefree marshmallow!"
+    "Dissolving in a sea of blue breeze..."
+    "Hey, are you still listening?"
+    "Hello?"
+    "Hello??"
+  ]
+
+  :fun blab_until
+    :yields (String, USize) for Bool
+      index USize = 0
+      @sentences.each_until -> (sentence |
+        stopped_listening = yield (sentence, index)
+        index += 1
+        stopped_listening // stop iterating when caller stops listening
+      )
+
+:actor Main
+  :new (env Env)
+    Blabber.blab_until -> (sentence, index |
+      env.out.print(sentence)
+      index >= 5 // stop listening after 5 sentences
+    )
+
 ```
 
 ### Properties and Related Sugar
