@@ -84,15 +84,19 @@ class Mare::Server
 
   # When a text document is opened, store it in our local set.
   def handle(msg : LSP::Message::DidOpen)
-    @open_files[msg.params.text_document.uri] =
-      msg.params.text_document.text
+    text = msg.params.text_document.text
+    @open_files[msg.params.text_document.uri] = text
+
+    send_diagnostics(msg.params.text_document.uri.path.not_nil!, text)
   end
 
   # When a text document is changed, update it in our local set.
   def handle(msg : LSP::Message::DidChange)
-    @open_files[msg.params.text_document.uri] =
-      msg.params.content_changes.last.text
+    text = msg.params.content_changes.last.text
+    @open_files[msg.params.text_document.uri] = text
+
     @ctx = nil
+    send_diagnostics(msg.params.text_document.uri.path.not_nil!, text)
   end
 
   # When a text document is closed, remove it from our local set.
@@ -102,8 +106,9 @@ class Mare::Server
 
   # When a text document is saved, do nothing.
   def handle(msg : LSP::Message::DidSave)
-    # Ignore.
     @ctx = nil
+
+    send_diagnostics(msg.params.text_document.uri.path.not_nil!)
   end
 
   def handle(msg : LSP::Message::Definition)
@@ -119,34 +124,7 @@ class Mare::Server
     # If we're running in a docker container, or in some other remote
     # environment, the host's source path may not match ours, and we
     # can apply the needed transformation as specified in this ENV var.
-    ENV["STD_DIRECTORY_MAPPING"]?.try do |mapping|
-      mapping.split(":").each_slice 2 do |pair|
-        next unless pair.size == 2
-        host_path = pair[0]
-        dest_path = pair[1]
-
-        if filename.starts_with?(host_path)
-          filename = 
-            if filename.includes?("prelude")
-              tmp_fname = filename.sub(host_path, Compiler.prelude_library_path)
-              tmp_fname.sub("prelude/prelude", "prelude")
-            else
-              filename.sub(host_path, Compiler::STANDARD_LIBRARY_DIRNAME)
-            end
-        end
-      end
-    end
-    ENV["SOURCE_DIRECTORY_MAPPING"]?.try do |mapping|
-      mapping.split(":").each_slice 2 do |pair|
-        next unless pair.size == 2
-        host_path = pair[0]
-        dest_path = pair[1]
-
-        if filename.starts_with?(host_path)
-          filename = filename.sub(host_path, dest_path)
-        end
-      end
-    end
+    filename = convert_path_to_local(filename)
 
     dirname = File.dirname(filename)
     sources = Compiler.get_library_sources(dirname)
@@ -165,34 +143,7 @@ class Mare::Server
     end
 
     if definition_pos.is_a? Mare::Source::Pos
-      user_filepath = definition_pos.source.path 
-
-      ENV["STD_DIRECTORY_MAPPING"]?.try do |mapping|
-        mapping.split(":").each_slice 2 do |pair|
-          next unless pair.size == 2
-          host_path = pair[0]
-          dest_path = pair[1]
-
-          if user_filepath.starts_with?(Compiler.prelude_library_path)
-            user_filepath = user_filepath.sub(Compiler.prelude_library_path, File.join(host_path, "prelude"))
-          end
-
-          if user_filepath.starts_with?(Compiler::STANDARD_LIBRARY_DIRNAME)
-            user_filepath = user_filepath.sub(Compiler::STANDARD_LIBRARY_DIRNAME, host_path)
-          end
-        end
-      end
-      ENV["SOURCE_DIRECTORY_MAPPING"]?.try do |mapping|
-        mapping.split(":").each_slice 2 do |pair|
-          next unless pair.size == 2
-          host_path = pair[0]
-          dest_path = pair[1]
-
-          if user_filepath.starts_with?(dest_path)
-            user_filepath = user_filepath.sub(dest_path, host_path)
-          end
-        end
-      end
+      user_filepath = convert_path_to_host(definition_pos.source.path)
 
       @wire.respond msg do |msg|
         msg.result = LSP::Data::Location.new(
@@ -229,34 +180,7 @@ class Mare::Server
     # If we're running in a docker container, or in some other remote
     # environment, the host's source path may not match ours, and we
     # can apply the needed transformation as specified in this ENV var.
-    ENV["STD_DIRECTORY_MAPPING"]?.try do |mapping|
-      mapping.split(":").each_slice 2 do |pair|
-        next unless pair.size == 2
-        host_path = pair[0]
-        dest_path = pair[1]
-
-        if filename.starts_with?(host_path)
-          filename = 
-            if filename.includes?("prelude")
-              tmp_fname = filename.sub(host_path, Compiler.prelude_library_path)
-              tmp_fname.sub("prelude/prelude", "prelude")
-            else
-              filename.sub(host_path, Compiler::STANDARD_LIBRARY_DIRNAME)
-            end
-        end
-      end
-    end
-    ENV["SOURCE_DIRECTORY_MAPPING"]?.try do |mapping|
-      mapping.split(":").each_slice 2 do |pair|
-        next unless pair.size == 2
-        host_path = pair[0]
-        dest_path = pair[1]
-
-        if filename.starts_with?(host_path)
-          filename = filename.sub(host_path, dest_path)
-        end
-      end
-    end
+    filename = convert_path_to_local(filename)
 
     dirname = File.dirname(filename)
     sources = Compiler.get_library_sources(dirname)
@@ -339,5 +263,163 @@ class Mare::Server
   def handle(msg)
     @stderr.puts "Unhandled incoming message!"
     @stderr.puts msg.to_json
+  end
+
+  def convert_path_to_local(path : String)
+    ENV["STD_DIRECTORY_MAPPING"]?.try do |mapping|
+      mapping.split(":").each_slice 2 do |pair|
+        next unless pair.size == 2
+        host_path = pair[0]
+        dest_path = pair[1]
+
+        if path.starts_with?(host_path)
+          path = 
+            if path.includes?("prelude")
+              tmp_fname = path.sub(host_path, Compiler.prelude_library_path)
+              tmp_fname.sub("prelude/prelude", "prelude")
+            else
+              path.sub(host_path, Compiler::STANDARD_LIBRARY_DIRNAME)
+            end
+        end
+      end
+    end
+    ENV["SOURCE_DIRECTORY_MAPPING"]?.try do |mapping|
+      mapping.split(":").each_slice 2 do |pair|
+        next unless pair.size == 2
+        host_path = pair[0]
+        dest_path = pair[1]
+
+        if path.starts_with?(host_path)
+          path = path.sub(host_path, dest_path)
+        end
+      end
+    end
+    
+    path
+  end
+
+  def convert_path_to_host(path : String)
+    ENV["STD_DIRECTORY_MAPPING"]?.try do |mapping|
+      mapping.split(":").each_slice 2 do |pair|
+        next unless pair.size == 2
+        host_path = pair[0]
+        dest_path = pair[1]
+
+        if path.starts_with?(Compiler.prelude_library_path)
+          path = path.sub(Compiler.prelude_library_path, File.join(host_path, "prelude"))
+        end
+
+        if path.starts_with?(Compiler::STANDARD_LIBRARY_DIRNAME)
+          path = path.sub(Compiler::STANDARD_LIBRARY_DIRNAME, host_path)
+        end
+      end
+    end
+    ENV["SOURCE_DIRECTORY_MAPPING"]?.try do |mapping|
+      mapping.split(":").each_slice 2 do |pair|
+        next unless pair.size == 2
+        host_path = pair[0]
+        dest_path = pair[1]
+
+        if path.starts_with?(dest_path)
+          path = path.sub(dest_path, host_path)
+        end
+      end
+    end
+
+    path
+  end
+
+  def send_diagnostics(filename : String, content : String? = nil)
+    filename = convert_path_to_local(filename)
+
+    dirname = File.dirname(filename)
+    sources = Compiler.get_library_sources(dirname)
+
+    source_index = sources.index { |s| s.path == filename }.not_nil!
+    if content
+      source = sources[source_index]
+      source.content = content
+      sources[source_index] = source
+    else
+      content = sources[source_index].content
+    end
+
+    begin
+      Compiler.compile(sources, :completeness)
+    rescue e : Error | Pegmatite::Pattern::MatchError | NotImplementedError
+      err = e
+    end
+
+    host_filepath = convert_path_to_host(filename)
+
+    @wire.notify(LSP::Message::PublishDiagnostics) do |msg|
+      msg.params.uri = URI.new(path: host_filepath)
+
+      case err
+      when NotImplementedError
+        msg.params.diagnostics = [
+          LSP::Data::Diagnostic.new(
+            LSP::Data::Range.new(
+              LSP::Data::Position.new(
+                0i64, 0i64
+              ),
+              LSP::Data::Position.new(
+                0i64, 0i64
+              ),
+            ),
+            message: err.message || "Something definitely went wrong..."
+          )
+        ]
+      when Error
+        msg.params.diagnostics = [
+          LSP::Data::Diagnostic.new(
+            LSP::Data::Range.new(
+              LSP::Data::Position.new(
+                err.pos.row.to_i64,
+                err.pos.col.to_i64,
+              ),
+              LSP::Data::Position.new(
+                err.pos.row.to_i64,
+                err.pos.col.to_i64 + (
+                  err.pos.finish - err.pos.start
+                ),
+              ),
+            ),
+            message: err.message
+          )
+        ]
+      when Pegmatite::Pattern::MatchError
+        message = err.message.not_nil!
+        offset_line = message.split(":").first
+        offset = offset_line[32..offset_line.size].to_i 
+
+        line_start = (content.rindex("\n", [offset - 1, 0].max) || -1) + 1
+        line_finish = (content.index("\n", offset) || content.size)
+
+        line_no = content[0..line_finish].count('\n')
+        col_no = offset - line_start
+
+        line = content[line_start...line_finish]
+        cursor = " " * col_no + "^"
+
+        msg.params.diagnostics = [
+          LSP::Data::Diagnostic.new(
+            LSP::Data::Range.new(
+              LSP::Data::Position.new(
+                line_no.to_i64,
+                col_no.to_i64,
+              ),
+              LSP::Data::Position.new(
+                line_no.to_i64,
+                col_no.to_i64,
+              ),
+            ),
+            message: "unexpected token at #{line_no}:#{col_no}\n#{line}\n#{cursor}"
+          )
+        ]
+      end
+
+      msg
+    end
   end
 end
