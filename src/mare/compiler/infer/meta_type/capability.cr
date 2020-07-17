@@ -412,6 +412,19 @@ struct Mare::Compiler::Infer::MetaType::Capability
     end
   end
 
+  def recovered : Capability
+    raise "unsupported recovered: #{self}" \
+      unless ALL_NON_EPH.includes?(self)
+
+    case self
+    when ISO, VAL then self # these caps are already as lifted as they can be
+    when TRN, REF then ISO  # mutable caps can become iso when isolated
+    when BOX then VAL       # read-only caps can become immutable when isolated
+    when TAG, NON then self # these caps have no access, and cannot gain any
+    else raise NotImplementedError.new(self.inspect)
+    end
+  end
+
   def viewed_from(origin : Union)
     raise NotImplementedError.new(origin.inspect) \
       if origin.terms || origin.anti_terms || origin.intersects

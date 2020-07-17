@@ -196,6 +196,10 @@ struct Mare::Compiler::Infer::MetaType
     inner.safe_to_match_as?(ctx, other.inner)
   end
 
+  def recovered
+    MetaType.new(inner.recovered)
+  end
+
   def viewed_from(origin : MetaType)
     origin_inner = origin.inner
     case origin_inner

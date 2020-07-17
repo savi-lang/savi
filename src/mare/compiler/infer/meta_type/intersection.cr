@@ -341,6 +341,10 @@ struct Mare::Compiler::Infer::MetaType::Intersection
     true
   end
 
+  def recovered
+    Intersection.new(cap.try(&.recovered), terms, anti_terms)
+  end
+
   def viewed_from(origin)
     raise NotImplementedError.new("#{origin.inspect}->(nil cap)") unless cap
 

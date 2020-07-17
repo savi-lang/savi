@@ -143,6 +143,10 @@ struct Mare::Compiler::Infer::MetaType::AntiNominal
     raise NotImplementedError.new("#{self.inspect} safe_to_match_as?")
   end
 
+  def recovered
+    raise NotImplementedError.new("#{self.inspect} recovered")
+  end
+
   def viewed_from(origin)
     raise NotImplementedError.new("#{origin.inspect}->#{self.inspect}")
   end

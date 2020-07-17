@@ -407,6 +407,23 @@ struct Mare::Compiler::Infer::MetaType::Union
     nil
   end
 
+  def recovered
+    raise NotImplementedError.new("#{self.inspect} recovered") \
+      if anti_terms
+
+    result = Unsatisfiable::INSTANCE
+    caps.not_nil!.each do |cap|
+      result = result.unite(cap.recovered)
+    end if caps
+    terms.not_nil!.each do |term|
+      result = result.unite(term.recovered)
+    end if terms
+    intersects.not_nil!.each do |intersect|
+      result = result.unite(intersect.recovered)
+    end if intersects
+    result
+  end
+
   def viewed_from(origin)
     raise NotImplementedError.new("#{origin.inspect}->#{self.inspect}") \
       if anti_terms

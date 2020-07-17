@@ -244,6 +244,12 @@ struct Mare::Compiler::Infer::MetaType::Nominal
     supertype_of?(ctx, other) ? true : nil
   end
 
+  def recovered
+    raise NotImplementedError.new("simplify first to remove aliases") if defn.is_a?(ReifiedTypeAlias)
+
+    self
+  end
+
   def viewed_from(origin)
     raise NotImplementedError.new("simplify first to remove aliases") if defn.is_a?(ReifiedTypeAlias)
 

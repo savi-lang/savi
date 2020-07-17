@@ -79,6 +79,10 @@ class Mare::Compiler::Infer::MetaType::Unconstrained
     raise NotImplementedError.new("#{self.inspect} safe_to_match_as?")
   end
 
+  def recovered
+    self
+  end
+
   def viewed_from(origin)
     raise NotImplementedError.new("#{origin.inspect}->#{self.inspect}")
   end
