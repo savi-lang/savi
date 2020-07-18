@@ -420,7 +420,7 @@ struct Mare::Compiler::Infer::MetaType
       when Intersection then intersects.add(result)
       else raise NotImplementedError.new(result.inspect)
       end
-    end
+    end if inner.intersects
 
     Union.build(caps.to_set, terms.to_set, anti_terms.to_set, intersects.to_set)
   end
