@@ -90,7 +90,7 @@
     @assert = string_b == [0, 1]
 
   :it "copies bytes from the given string onto the end of the string"
-    @assert = (String.new << "foo" << "bar") == "foobar"
+    @assert = (String.new << "foo" << "" << "bar") == "foobar"
 
   :it "creates a multiplicit copy of the string"
     @assert = ("Hey" * 3) == "HeyHeyHey"

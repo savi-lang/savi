@@ -174,14 +174,16 @@
     @
 
   :fun ref "<<" (other String'box)
-    new_size = @_size + other._size
-    @reserve(new_size)
-    if other.is_null_terminated (
-      other._ptr._copy_to(@_ptr._offset(@_size), other.size + 1)
-    |
-      other._ptr._copy_to(@_ptr._offset(@_size), other.size)
+    if (other._size > 0) (
+      new_size = @_size + other._size
+      @reserve(new_size)
+      if other.is_null_terminated (
+        other._ptr._copy_to(@_ptr._offset(@_size), other.size + 1)
+      |
+        other._ptr._copy_to(@_ptr._offset(@_size), other.size)
+      )
+      @_size = new_size
     )
-    @_size = new_size
     @
 
   :: Return a new string consisting of the original string copied `n` times.
