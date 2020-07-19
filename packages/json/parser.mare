@@ -1,0 +1,280 @@
+:import "collections" (Count)
+
+:class Parser
+  :prop _notify ParserNotify: ParserNotifyNone
+  :prop _source String'box: ""
+  :prop _offset USize: 0
+  :prop _offset_start USize: 0
+  :prop _abort Bool: False
+
+  :prop last_number (I64 | F64): I64[0]
+  :prop last_string String: ""
+
+  :fun ref _set_defaults
+    @_offset       = 0
+    @_offset_start = 0
+    @_abort        = False
+    @last_number   = I64[0]
+    @last_string   = ""
+
+  :fun ref parse! (@_source, @_notify)
+    @_set_defaults
+    if @_detect_empty.not (
+      @_parse_data!
+      @_verify_final!
+    )
+
+  :fun source: @_source
+  :fun token_start: @_offset_start
+  :fun token_end: @_offset
+
+  // :fun describe_error String
+  //   if (@_offset < @_source.size) (
+  //     "invalid JSON at byte offset: "          + @_offset.string
+  //   |
+  //     "unfinished JSON; stream ends at byte: " + @_source.size.string
+  //   )
+
+  :fun ref abort: @_abort = True // TODO: include a message?
+
+  :fun ref _has_next Bool: @_offset < @_source.size
+
+  :fun ref _next! U8: b = @_peek!, @_advance, b
+
+  :fun _peek! U8: @_source[@_offset]!
+
+  :fun _peek_softly U8: try (@_source[@_offset]! | ' ')
+
+  :fun ref _eat! (b U8): if (b != @_source[@_offset]!) error!, @_advance
+
+  :fun ref _advance (n USize = 1): @_offset += n
+
+  :fun ref _rewind (n USize = 1): @_offset -= n
+
+  :fun ref _pre_token: @_offset_start = @_offset
+
+  :fun ref _yield! (t Token)
+    @_notify.apply(@, t)
+    if @_abort error!
+
+  :fun ref _skip_whitespace
+    keep_going = True
+    while (keep_going && @_has_next) (
+      peeked = @_peek_softly
+      case (
+      | peeked == ' '  | @_advance
+      | peeked == '\r' | @_advance
+      | peeked == '\t' | @_advance
+      | peeked == '\n' | @_advance
+      | keep_going = False
+      )
+    )
+
+  :fun ref _detect_empty Bool
+    @_skip_whitespace
+    @_has_next.not
+
+  :fun ref _verify_final!
+    @_skip_whitespace
+    if @_has_next error!
+
+  :fun ref _parse_data!
+    @_skip_whitespace
+    @_pre_token
+    peeked = @_peek!
+    case (
+    | peeked == 'n' | @_advance, @_eat!('u'), @_eat!('l'), @_eat!('l'),              @_yield!(TokenNull)
+    | peeked == 't' | @_advance, @_eat!('r'), @_eat!('u'), @_eat!('e'),              @_yield!(TokenTrue)
+    | peeked == 'f' | @_advance, @_eat!('a'), @_eat!('l'), @_eat!('s'), @_eat!('e'), @_yield!(TokenFalse)
+    | peeked == '"' | @_parse_string!
+    | peeked == '{' | @_parse_object!
+    | peeked == '[' | @_parse_array!
+    | peeked == '-' | @_parse_number!
+    | (peeked >= '0') && (peeked <= '9') | @_parse_number!
+    | error!
+    )
+
+  :fun ref _parse_array!
+    @_advance // past the opening bracket
+    @_yield!(TokenArrayStart)
+    @_skip_whitespace
+
+    if (@_peek! == ']') (
+      @_pre_token
+      @_advance
+    |
+      keep_going = True
+      while keep_going (
+        @_parse_data!
+        @_skip_whitespace
+        @_pre_token // prepare for possible array end token
+        next = @_next!
+        case (
+        | next == ',' | @_skip_whitespace
+        | next == ']' | keep_going = False
+        | @_rewind, error!
+        )
+      )
+    )
+    @_yield!(TokenArrayEnd)
+
+  :fun ref _parse_object!
+    @_advance // past the opening bracket
+    @_yield!(TokenObjectStart)
+    @_skip_whitespace
+
+    if (@_peek! == '}') (
+      @_pre_token
+      @_advance
+    |
+      keep_going = True
+      while keep_going (
+        @_eat!('"'), @_rewind, @_parse_string!(True), @_skip_whitespace
+        @_eat!(':'), @_parse_data!, @_skip_whitespace
+        @_pre_token, @_yield!(TokenPairPost)
+        next = @_next!
+        case (
+        | next == ',' | @_skip_whitespace
+        | next == '}' | keep_going = False
+        | @_rewind, error!
+        )
+      )
+    )
+
+    @_yield!(TokenObjectEnd)
+
+  :fun ref _parse_number!
+    @_yield!(TokenNumberPre)
+    @last_number = @_read_number!
+    @_yield!(TokenNumber)
+
+  :fun ref _read_number! (I64 | F64)
+    sign I64 = if (@_peek_softly == '-') (@_advance, -1 | 1)
+
+    integer = @_read_number_digits!
+
+    dot F64 = 0
+    has_dot = (@_peek_softly == '.')
+    if has_dot (
+      @_advance
+      dot = @_read_number_digits_as_fractional!
+    )
+
+    exp I64 = 0
+    peeked = @_peek_softly
+    has_exp = (peeked == 'e' || peeked == 'E')
+    if has_exp (
+      @_advance
+      peeked = @_peek!
+      exp_negative =
+        case (
+        | peeked == '+' | @_advance, False
+        | peeked == '-' | @_advance, True
+        | False
+        )
+      exp = @_read_number_digits!
+      if exp_negative (exp = exp.negate)
+    )
+
+    if (has_dot || has_exp) (
+      sign.f64 * (integer.f64 + dot) * F64[10].pow(exp.f64)
+    |
+      sign * integer
+    )
+
+  :fun ref _read_number_digits_as_fractional! F64
+    orig_offset = @_offset
+    integer = @_read_number_digits!
+    integer.f64 / F64[10].pow((@_offset - orig_offset).f64)
+
+  :fun ref _read_number_digits! I64
+    value I64 = 0
+    byte = @_peek!
+    while @_is_number_digit(byte) (
+      value = (value * 10) + (byte - '0').i64
+      @_advance
+      byte = @_peek_softly
+    )
+    value
+
+  :fun non _is_number_digit (b U8) Bool: (b >= '0') && (b <= '9')
+
+  :fun ref _parse_string! (is_key Bool = False)
+    @_advance // past the opening quote
+    @_pre_token
+    @_yield!(if is_key (TokenKeyPre | TokenStringPre))
+
+    buf = String.new // TODO: don't allocate here - let the caller construct the string from escape tokens if/when they choose
+    keep_going = True
+    while keep_going (
+      next = @_next!
+      case (
+      | next == '"'  | keep_going = False
+      | next == '\\' | buf = @_push_escape_seq!(buf)
+      | buf.push_byte(next)
+      )
+    )
+    @last_string = buf.clone // TODO: skip clone here by skipping allocating in the first place - see above TODO comment
+
+    @_rewind
+    @_yield!(if is_key (TokenKey | TokenString))
+    @_advance
+
+  :fun ref _push_escape_seq! (buf String'ref) String'ref
+    next = @_next!
+    case (
+    | next == '"'  | buf.push_byte('"')
+    | next == '\\' | buf.push_byte('\\')
+    | next == '/'  | buf.push_byte('/')
+    | next == 'b'  | buf.push_byte(0x08)
+    | next == 't'  | buf.push_byte(0x09)
+    | next == 'n'  | buf.push_byte(0x0a)
+    | next == 'f'  | buf.push_byte(0x0c)
+    | next == 'r'  | buf.push_byte(0x0d)
+    | next == 'u'  | buf.push_utf32(@_read_unicode_seq!)
+    | error!
+    )
+    --buf
+
+  :fun ref _read_unicode_seq! U32
+    // We've already read the initial "\u" bytes, so start reading the digits.
+    value = @_read_unicode_value!
+
+    if ((value < 0xD800) || (value >= 0xE000)) (
+      // If the value we read is a valid single UTF-16 value, return it now.
+      value
+    |
+      // Otherwise, it is half of a surrogate pair, so we expect another half,
+      // in another unicode escape sequence immediately following this one.
+      @_eat!('\\'), @_eat!('u')
+      value_2 = @_read_unicode_value!
+
+      if ((value < 0xDC00) && (value_2 >= 0xDC00) && (value_2 < 0xE000)) (
+        // If the two values make a valid pair, return the combined value.
+        U32[0x10000]
+        + value.bit_and(0x3FF).bit_shl(10)
+        + value_2.bit_and(0x3FF)
+      |
+        // The two are an invalid pair. Backtrack to show the error position.
+        @_rewind(4)
+        error!
+      )
+    )
+
+  :fun ref _read_unicode_value! U32
+    value U32 = 0
+
+    Count.to(4) -> (
+      b = @_next!
+      digit =
+        case (
+        | (b >= '0') && (b <= '9') | b - '0'
+        | (b >= 'a') && (b <= 'f') | (b - 'a') + 10
+        | (b >= 'A') && (b <= 'F') | (b - 'A') + 10
+        | @_rewind, error!
+        )
+
+      value = (value * 16) + digit.u32
+    )
+
+    value

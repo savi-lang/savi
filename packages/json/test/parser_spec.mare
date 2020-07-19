@@ -1,0 +1,220 @@
+:import "spec"
+:import ".." (Parser, ParserNotify, Token)
+
+:class _TestParserNotify
+  :is ParserNotify
+  :prop tokens Array(Array(
+    (Token | USize | USize | I64 | F64 | String | None)
+  )): []
+
+  :fun inspect_into (out String'iso) String'iso
+    @tokens.each -> (item |
+      out = Inspect.into(--out, item)
+      out.push_byte('\n')
+      None // TODO: this None shouldn't be needed
+    )
+    out.trim_in_place(0, -1) // remove the final newline
+    --out
+
+  :fun ref apply (parser Parser, token Token) None
+    @tokens << [
+      token
+      parser.token_start
+      parser.token_end
+      try (parser.last_number.as!(I64) | 0)
+      try (parser.last_number.as!(F64) | 0)
+      parser.last_string
+    ]
+
+:class ParserSpec
+  :is Spec
+  :const describes: "Parser"
+
+  :fun example (source String, expected String) Bool
+    notify = _TestParserNotify.new
+    parser = Parser.new
+    try (
+      parser.parse!(source, notify)
+      actual = Inspect[notify]
+      if (actual == expected) (
+        True
+      |
+        @env.err.print("\n")
+        @env.err.write("expected "), @env.err.write(Inspect[source])
+        @env.err.print(" to parse as:"), @env.err.print(expected)
+        @env.err.print("but actually parsed as:"), @env.err.print(actual)
+        False
+      )
+    |
+      @env.err.write("\nexpected "), @env.err.write(Inspect[source])
+      @env.err.print(" to parse, but it failed to parse")
+      False
+    )
+
+  :it "parses keywords"
+    @assert = @example("null", <<<
+      [TokenNull, 0, 4, 0, 0.0, ""]
+    >>>)
+    @assert = @example("true", <<<
+      [TokenTrue, 0, 4, 0, 0.0, ""]
+    >>>)
+    @assert = @example("false", <<<
+      [TokenFalse, 0, 5, 0, 0.0, ""]
+    >>>)
+    @assert = @example(" \t\nnull\n\t ", <<<
+      [TokenNull, 3, 7, 0, 0.0, ""]
+    >>>)
+
+  :it "parses numbers"
+    @assert = @example("123", <<<
+      [TokenNumberPre, 0, 0, 0, 0.0, ""]
+      [TokenNumber, 0, 3, 123, 0.0, ""]
+    >>>)
+    @assert = @example("-123", <<<
+      [TokenNumberPre, 0, 0, 0, 0.0, ""]
+      [TokenNumber, 0, 4, -123, 0.0, ""]
+    >>>)
+    @assert = @example("123.456", <<<
+      [TokenNumberPre, 0, 0, 0, 0.0, ""]
+      [TokenNumber, 0, 7, 0, 123.456, ""]
+    >>>)
+    @assert = @example("-123.456", <<<
+      [TokenNumberPre, 0, 0, 0, 0.0, ""]
+      [TokenNumber, 0, 8, 0, -123.456, ""]
+    >>>)
+    @assert = @example("123e2", <<<
+      [TokenNumberPre, 0, 0, 0, 0.0, ""]
+      [TokenNumber, 0, 5, 0, 12300, ""]
+    >>>)
+    @assert = @example("-123e-2", <<<
+      [TokenNumberPre, 0, 0, 0, 0.0, ""]
+      [TokenNumber, 0, 7, 0, -1.23, ""]
+    >>>)
+    @assert = @example("-123.456e2", <<<
+      [TokenNumberPre, 0, 0, 0, 0.0, ""]
+      [TokenNumber, 0, 10, 0, -12345.6, ""]
+    >>>)
+    @assert = @example("-123.4e-2", <<<
+      [TokenNumberPre, 0, 0, 0, 0.0, ""]
+      [TokenNumber, 0, 9, 0, -1.234, ""]
+    >>>)
+
+  :it "parses strings"
+    @assert = @example(<<<"apple">>>, <<<
+      [TokenStringPre, 1, 1, 0, 0.0, ""]
+      [TokenString, 1, 6, 0, 0.0, "apple"]
+    >>>)
+    @assert = @example("                    \"apple\"   ", <<<
+      [TokenStringPre, 21, 21, 0, 0.0, ""]
+      [TokenString, 21, 26, 0, 0.0, "apple"]
+    >>>)
+    @assert = @example("                    \"\"   ", <<<
+      [TokenStringPre, 21, 21, 0, 0.0, ""]
+      [TokenString, 21, 21, 0, 0.0, ""]
+    >>>)
+
+  :it "parses arrays"
+    @assert = @example("[]", <<<
+      [TokenArrayStart, 0, 1, 0, 0.0, ""]
+      [TokenArrayEnd, 1, 2, 0, 0.0, ""]
+    >>>)
+    @assert = @example("  [  ]  ", <<<
+      [TokenArrayStart, 2, 3, 0, 0.0, ""]
+      [TokenArrayEnd, 5, 6, 0, 0.0, ""]
+    >>>)
+    @assert = @example("[1,2,3]", <<<
+      [TokenArrayStart, 0, 1, 0, 0.0, ""]
+      [TokenNumberPre, 1, 1, 0, 0.0, ""]
+      [TokenNumber, 1, 2, 1, 0.0, ""]
+      [TokenNumberPre, 3, 3, 1, 0.0, ""]
+      [TokenNumber, 3, 4, 2, 0.0, ""]
+      [TokenNumberPre, 5, 5, 2, 0.0, ""]
+      [TokenNumber, 5, 6, 3, 0.0, ""]
+      [TokenArrayEnd, 6, 7, 3, 0.0, ""]
+    >>>)
+    @assert = @example("  [  1  ,  2  ,  3  ]  ", <<<
+      [TokenArrayStart, 2, 3, 0, 0.0, ""]
+      [TokenNumberPre, 5, 5, 0, 0.0, ""]
+      [TokenNumber, 5, 6, 1, 0.0, ""]
+      [TokenNumberPre, 11, 11, 1, 0.0, ""]
+      [TokenNumber, 11, 12, 2, 0.0, ""]
+      [TokenNumberPre, 17, 17, 2, 0.0, ""]
+      [TokenNumber, 17, 18, 3, 0.0, ""]
+      [TokenArrayEnd, 20, 21, 3, 0.0, ""]
+    >>>)
+    @assert = @example("[[[true]]]", <<<
+      [TokenArrayStart, 0, 1, 0, 0.0, ""]
+      [TokenArrayStart, 1, 2, 0, 0.0, ""]
+      [TokenArrayStart, 2, 3, 0, 0.0, ""]
+      [TokenTrue, 3, 7, 0, 0.0, ""]
+      [TokenArrayEnd, 7, 8, 0, 0.0, ""]
+      [TokenArrayEnd, 8, 9, 0, 0.0, ""]
+      [TokenArrayEnd, 9, 10, 0, 0.0, ""]
+    >>>)
+
+  :it "parses objects"
+    @assert = @example("{}", <<<
+      [TokenObjectStart, 0, 1, 0, 0.0, ""]
+      [TokenObjectEnd, 1, 2, 0, 0.0, ""]
+    >>>)
+    @assert = @example("  {  }  ", <<<
+      [TokenObjectStart, 2, 3, 0, 0.0, ""]
+      [TokenObjectEnd, 5, 6, 0, 0.0, ""]
+    >>>)
+    @assert = @example(<<<{"fruit":"apple","edible":true}>>>, <<<
+      [TokenObjectStart, 0, 1, 0, 0.0, ""]
+      [TokenKeyPre, 2, 2, 0, 0.0, ""]
+      [TokenKey, 2, 7, 0, 0.0, "fruit"]
+      [TokenStringPre, 10, 10, 0, 0.0, "fruit"]
+      [TokenString, 10, 15, 0, 0.0, "apple"]
+      [TokenPairPost, 16, 16, 0, 0.0, "apple"]
+      [TokenKeyPre, 18, 18, 0, 0.0, "apple"]
+      [TokenKey, 18, 24, 0, 0.0, "edible"]
+      [TokenTrue, 26, 30, 0, 0.0, "edible"]
+      [TokenPairPost, 30, 30, 0, 0.0, "edible"]
+      [TokenObjectEnd, 30, 31, 0, 0.0, "edible"]
+    >>>)
+    @assert = @example(<<<  {  "a"  :  1  ,  "b"  :  2  }  >>>, <<<
+      [TokenObjectStart, 2, 3, 0, 0.0, ""]
+      [TokenKeyPre, 6, 6, 0, 0.0, ""]
+      [TokenKey, 6, 7, 0, 0.0, "a"]
+      [TokenNumberPre, 13, 13, 0, 0.0, "a"]
+      [TokenNumber, 13, 14, 1, 0.0, "a"]
+      [TokenPairPost, 16, 16, 1, 0.0, "a"]
+      [TokenKeyPre, 20, 20, 1, 0.0, "a"]
+      [TokenKey, 20, 21, 1, 0.0, "b"]
+      [TokenNumberPre, 27, 27, 1, 0.0, "b"]
+      [TokenNumber, 27, 28, 2, 0.0, "b"]
+      [TokenPairPost, 30, 30, 2, 0.0, "b"]
+      [TokenObjectEnd, 30, 31, 2, 0.0, "b"]
+    >>>)
+    @assert = @example(<<<{"t":[{"e":[{"s":[{"t":[]}]}]}]}>>>, <<<
+      [TokenObjectStart, 0, 1, 0, 0.0, ""]
+      [TokenKeyPre, 2, 2, 0, 0.0, ""]
+      [TokenKey, 2, 3, 0, 0.0, "t"]
+      [TokenArrayStart, 5, 6, 0, 0.0, "t"]
+      [TokenObjectStart, 6, 7, 0, 0.0, "t"]
+      [TokenKeyPre, 8, 8, 0, 0.0, "t"]
+      [TokenKey, 8, 9, 0, 0.0, "e"]
+      [TokenArrayStart, 11, 12, 0, 0.0, "e"]
+      [TokenObjectStart, 12, 13, 0, 0.0, "e"]
+      [TokenKeyPre, 14, 14, 0, 0.0, "e"]
+      [TokenKey, 14, 15, 0, 0.0, "s"]
+      [TokenArrayStart, 17, 18, 0, 0.0, "s"]
+      [TokenObjectStart, 18, 19, 0, 0.0, "s"]
+      [TokenKeyPre, 20, 20, 0, 0.0, "s"]
+      [TokenKey, 20, 21, 0, 0.0, "t"]
+      [TokenArrayStart, 23, 24, 0, 0.0, "t"]
+      [TokenArrayEnd, 24, 25, 0, 0.0, "t"]
+      [TokenPairPost, 25, 25, 0, 0.0, "t"]
+      [TokenObjectEnd, 25, 26, 0, 0.0, "t"]
+      [TokenArrayEnd, 26, 27, 0, 0.0, "t"]
+      [TokenPairPost, 27, 27, 0, 0.0, "t"]
+      [TokenObjectEnd, 27, 28, 0, 0.0, "t"]
+      [TokenArrayEnd, 28, 29, 0, 0.0, "t"]
+      [TokenPairPost, 29, 29, 0, 0.0, "t"]
+      [TokenObjectEnd, 29, 30, 0, 0.0, "t"]
+      [TokenArrayEnd, 30, 31, 0, 0.0, "t"]
+      [TokenPairPost, 31, 31, 0, 0.0, "t"]
+      [TokenObjectEnd, 31, 32, 0, 0.0, "t"]
+    >>>)

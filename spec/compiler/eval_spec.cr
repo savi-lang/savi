@@ -34,4 +34,13 @@ describe Mare::Compiler::Eval do
 
     no_test_failures.should eq true
   end
+
+  it "evaluates the json package's tests" do
+    source_dir = File.join(__DIR__, "../../packages/json/test")
+
+    no_test_failures =
+      Mare::Compiler.compile(source_dir, :eval).eval.exitcode == 0
+
+    no_test_failures.should eq true
+  end
 end
