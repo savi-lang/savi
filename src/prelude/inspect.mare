@@ -1,6 +1,8 @@
 // TODO: Get rid of this hack:
 :ffi InspectLibC
   :fun puts (string CPointer(U8)) I32
+  :fun strlen (string CPointer(U8)) I32
+  :fun snprintf (buffer CPointer(U8), buffer_size I32, fmt CPointer(U8), value F64) I32
 
 :trait box _InspectEach
   // TODO: use each instead of size and []!
@@ -47,6 +49,8 @@
     | input <: I64   |                          // TODO: unify into one integer clause?
       positive = if (input >= 0) (input | output.push_byte('-'), input.abs)
       @into(--output, positive.u64)
+    | input <: F32 | @_inspect_float_into(--output, input.f64) // TODO: unify into one float clause?
+    | input <: F64 | @_inspect_float_into(--output, input.f64) // TODO: unify into one float clause?
     | input <: String'box |
       output.push_byte('"')
       output << input.clone // TODO: show some characters as escaped.
@@ -71,3 +75,33 @@
       output << reflection_of_runtime_type_name input
       --output
     )
+
+  :fun non _inspect_float_into (out String'iso, value F64) String'iso
+    if value.is_negative (
+      out.push_byte('-')
+      value = value.negate
+    )
+    case (
+    | value == 0 | out << "0.0"
+    | value.is_finite | out = @_inspect_finite_positive_float_into(--out, value)
+    | value.is_infinite | out << "Infinity"
+    | out << "NaN"
+    )
+    --out
+
+  :const _inspect_float_buffer_size USize: 128
+
+  :fun non _inspect_finite_positive_float_into (out String'iso, value F64) String'iso
+    // TODO: use grisu3 algorithm like Crystal does, for better performance
+    // for those numbers that the algorithm handles, using this as a fallback:
+    out.reserve(out.size + @_inspect_float_buffer_size)
+    out_offset_cpointer = out.cpointer._unsafe._offset(out.size)
+    buffer = InspectLibC.snprintf(
+      out_offset_cpointer
+      @_inspect_float_buffer_size.i32
+      "%.17g".cstring
+      value
+    )
+    out._size += InspectLibC.strlen(out_offset_cpointer).usize
+    --out
+
