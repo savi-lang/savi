@@ -850,6 +850,15 @@ class Mare::Compiler::CodeGen
         end
     end
 
+    # Declare a "local" for the self in the debug info to aid in debugging.
+    self_gep = gen_alloca(func_frame.receiver_value.type, "@")
+    @builder.store(func_frame.receiver_value, self_gep)
+    @di.declare_self_local(
+      (gfunc.func.cap || gfunc.func.ident).pos,
+      gtype.type_def.as_ref(ctx),
+      self_gep,
+    )
+
     # If this is a constructor, first assign any field initializers.
     if gfunc.func.has_tag?(:constructor)
       gtype.fields.each do |name, _|

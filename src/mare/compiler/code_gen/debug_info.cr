@@ -66,6 +66,15 @@ class Mare::Compiler::CodeGen
     def declare_local(ref : Refer::Local, t : Reach::Ref, storage : LLVM::Value)
       pos = ref.defn.pos
       name = ref.name
+      declare_local_inner(pos, name, t, storage)
+    end
+
+    def declare_self_local(pos : Source::Pos, t : Reach::Ref, storage : LLVM::Value)
+      name = "@"
+      declare_local_inner(pos, name, t, storage)
+    end
+
+    def declare_local_inner(pos : Source::Pos, name : String, t : Reach::Ref, storage : LLVM::Value)
       file = di_file(pos.source)
 
       info = @di.create_auto_variable(
