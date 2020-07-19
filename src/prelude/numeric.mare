@@ -38,6 +38,7 @@
   :fun val "/" (other @) @: compiler intrinsic
   :fun val "%" (other @) @: compiler intrinsic
 
+  :fun val negate: @zero - @
   :fun val min (other @) @: if (@ < other) (@ | other)
   :fun val max (other @) @: if (@ > other) (@ | other)
   :fun val abs: if (@is_signed && @ < @zero) (@zero - @ | @)
@@ -100,6 +101,14 @@
   :fun non max_value:    @from_bits(0x7F7F_FFFF)
   :fun non min_value:    @from_bits(0xFF7F_FFFF)
 
+  :fun val log @: compiler intrinsic
+  :fun val log2 @: compiler intrinsic
+  :fun val log10 @: compiler intrinsic
+  :fun val pow (exp @) @: compiler intrinsic
+
+  :fun val is_positive: @bits.bit_and(0x8000_0000) == 0 // sign bit
+  :fun val is_negative: @bits.bit_and(0x8000_0000) != 0 // sign bit
+
   // Return true if the number is NaN.
   :fun val is_nan
     @bits.bit_and(0x7F80_0000) == 0x7F80_0000 && // exponent
@@ -123,6 +132,14 @@
   :fun non neg_infinity: @from_bits(0xFFF0_0000_0000_0000)
   :fun non max_value:    @from_bits(0x7FEF_FFFF_FFFF_FFFF)
   :fun non min_value:    @from_bits(0xFFEF_FFFF_FFFF_FFFF)
+
+  :fun val log @: compiler intrinsic
+  :fun val log2 @: compiler intrinsic
+  :fun val log10 @: compiler intrinsic
+  :fun val pow (y @) @: compiler intrinsic
+
+  :fun val is_positive: @bits.bit_and(0x8000_0000_0000_0000) == 0 // sign bit
+  :fun val is_negative: @bits.bit_and(0x8000_0000_0000_0000) != 0 // sign bit
 
   // Return true if the number is NaN.
   :fun val is_nan

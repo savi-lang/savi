@@ -1430,6 +1430,58 @@ class Mare::Compiler::CodeGen
         when 64 then @builder.bit_cast(params[0], @f64)
         else raise NotImplementedError.new(bit_width_of(gtype))
         end
+      when "log"
+        raise "log integer" unless gtype.type_def.is_floating_point_numeric?(ctx)
+        op_func =
+          case bit_width_of(gtype)
+          when 32
+            @mod.functions["llvm.log.f32"]? ||
+              @mod.functions.add("llvm.log.f32", [@f32], @f32)
+          when 64
+            @mod.functions["llvm.log.f64"]? ||
+              @mod.functions.add("llvm.log.f64", [@f64], @f64)
+          else raise NotImplementedError.new(bit_width_of(gtype))
+          end
+        @builder.call(op_func, [params[0]])
+      when "log2"
+        raise "log2 integer" unless gtype.type_def.is_floating_point_numeric?(ctx)
+        op_func =
+          case bit_width_of(gtype)
+          when 32
+            @mod.functions["llvm.log2.f32"]? ||
+              @mod.functions.add("llvm.log2.f32", [@f32], @f32)
+          when 64
+            @mod.functions["llvm.log2.f64"]? ||
+              @mod.functions.add("llvm.log2.f64", [@f64], @f64)
+          else raise NotImplementedError.new(bit_width_of(gtype))
+          end
+        @builder.call(op_func, [params[0]])
+      when "log10"
+        raise "log10 integer" unless gtype.type_def.is_floating_point_numeric?(ctx)
+        op_func =
+          case bit_width_of(gtype)
+          when 32
+            @mod.functions["llvm.log10.f32"]? ||
+              @mod.functions.add("llvm.log10.f32", [@f32], @f32)
+          when 64
+            @mod.functions["llvm.log10.f64"]? ||
+              @mod.functions.add("llvm.log10.f64", [@f64], @f64)
+          else raise NotImplementedError.new(bit_width_of(gtype))
+          end
+        @builder.call(op_func, [params[0]])
+      when "pow"
+        raise "pow integer" unless gtype.type_def.is_floating_point_numeric?(ctx)
+        op_func =
+          case bit_width_of(gtype)
+          when 32
+            @mod.functions["llvm.pow.f32"]? ||
+              @mod.functions.add("llvm.pow.f32", [@f32, @f32], @f32)
+          when 64
+            @mod.functions["llvm.pow.f64"]? ||
+              @mod.functions.add("llvm.pow.f64", [@f64, @f64], @f64)
+          else raise NotImplementedError.new(bit_width_of(gtype))
+          end
+        @builder.call(op_func, [params[0], params[1]])
       when "next_pow2"
         raise "next_pow2 float" if gtype.type_def.is_floating_point_numeric?(ctx)
 

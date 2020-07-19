@@ -226,6 +226,14 @@
     @assert = F32[3.6] .abs == 3.6
     @assert = F32[-3.6].abs == 3.6
 
+  :it "negates the value"
+    @assert = U32[36]  .negate == -36
+    @assert = U32[-36] .negate == 36
+    @assert = I32[36]  .negate == -36
+    @assert = I32[-36] .negate == 36
+    @assert = F32[3.6] .negate == -3.6
+    @assert = F32[-3.6].negate == 3.6
+
   :it "implements bitwise analysis and manipulation for integers"
     @assert = U8[18]                == 0b00010010
     @assert = U8[18].invert         == 0b11101101
@@ -242,6 +250,28 @@
     @assert = U8[127].next_pow2     == 128
     @assert = U8[128].next_pow2     == 128
     @assert = U8[129].next_pow2     == 0
+
+  :it "implements logarithms and exponents for floating points"
+    @assert = F64[1].log == 0
+    @assert = F32[1].log == 0
+    @assert = F64[2.71828182845904523536028747135266249775724709369995].log == 1
+    @assert = F32[2.71828182845904523536028747135266249775724709369995].log == 1
+    @assert = F64[1000000000].log10 == 9
+    @assert = F32[1000000000].log10 == 9
+    @assert = F64[0.0000000001].log10 == -10
+    @assert = F32[0.0000000001].log10 == -10
+    @assert = F64[1024].log2 == 10
+    @assert = F32[1024].log2 == 10
+    @assert = F64[0.0625].log2 == -4
+    @assert = F32[0.0625].log2 == -4
+    @assert = F64[2].pow(-4) == 0.0625
+    @assert = F32[2].pow(-4) == 0.0625
+    @assert = F64[2].pow(10) == 1024
+    @assert = F32[2].pow(10) == 1024
+    @assert = F64[10].pow(-10) == 0.0000000001
+    @assert = F32[10].pow(-10) == 0.0000000001
+    @assert = F64[10].pow(9) == 1000000000
+    @assert = F32[10].pow(9) == 1000000000
 
   :it "hashes the value of the integer"
     @assert = U64[24].hash   == 11168194413345819337 // TODO: fix this test for 32-bit platforms
@@ -296,3 +326,19 @@
     @assert = F64.max_value.is_finite
     @assert = F32.min_value.is_finite
     @assert = F64.min_value.is_finite
+    @assert = F64.infinity.is_positive
+    @assert = F32.infinity.is_positive
+    @assert = F64.infinity.is_negative.is_false
+    @assert = F32.infinity.is_negative.is_false
+    @assert = F64.neg_infinity.is_positive.is_false
+    @assert = F32.neg_infinity.is_positive.is_false
+    @assert = F64.neg_infinity.is_negative
+    @assert = F32.neg_infinity.is_negative
+    @assert = F64[123.456].is_positive
+    @assert = F32[123.456].is_positive
+    @assert = F64[123.456].is_negative.is_false
+    @assert = F32[123.456].is_negative.is_false
+    @assert = F64[-123.456].is_positive.is_false
+    @assert = F32[-123.456].is_positive.is_false
+    @assert = F64[-123.456].is_negative
+    @assert = F32[-123.456].is_negative
