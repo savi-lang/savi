@@ -30,27 +30,6 @@
   :is Spec
   :const describes: "Parser"
 
-  :fun example (source String, expected String) Bool
-    notify = _TestParserNotify.new
-    parser = Parser.new
-    try (
-      parser.parse!(source, notify)
-      actual = Inspect[notify]
-      if (actual == expected) (
-        True
-      |
-        @env.err.print("\n")
-        @env.err.write("expected "), @env.err.write(Inspect[source])
-        @env.err.print(" to parse as:"), @env.err.print(expected)
-        @env.err.print("but actually parsed as:"), @env.err.print(actual)
-        False
-      )
-    |
-      @env.err.write("\nexpected "), @env.err.write(Inspect[source])
-      @env.err.print(" to parse, but it failed to parse")
-      False
-    )
-
   :it "parses keywords"
     @assert = @example("null", <<<
       [TokenNull, 0, 4, 0, 0.0, ""]
@@ -64,6 +43,11 @@
     @assert = @example(" \t\nnull\n\t ", <<<
       [TokenNull, 3, 7, 0, 0.0, ""]
     >>>)
+
+    @assert = @example_error("nugget",    "nu")
+    @assert = @example_error("truth",     "tru")
+    @assert = @example_error("falsehood", "false")
+    @assert = @example_error("bogus",     "")
 
   :it "parses numbers"
     @assert = @example("123", <<<
@@ -99,6 +83,18 @@
       [TokenNumber, 0, 9, 0, -1.234, ""]
     >>>)
 
+    @assert = @example_error("---",             "-")
+    @assert = @example_error("123456789ABCDEF", "123456789")
+    @assert = @example_error("0x0",             "0")
+    @assert = @example_error("123...",          "123.")
+    @assert = @example_error("123.",            "123.")
+    @assert = @example_error("127.0.0.1",       "127.0")
+    @assert = @example_error("5eed",            "5e")
+    @assert = @example_error("5e---",           "5e-")
+    @assert = @example_error("5e",              "5e")
+    @assert = @example_error("1.2e3.4",         "1.2e3")
+    @assert = @example_error(" 1 2 3 ",         " 1 ")
+
   :it "parses strings"
     @assert = @example(<<<"apple">>>, <<<
       [TokenStringPre, 1, 1, 0, 0.0, ""]
@@ -112,6 +108,15 @@
       [TokenStringPre, 21, 21, 0, 0.0, ""]
       [TokenString, 21, 21, 0, 0.0, ""]
     >>>)
+
+    @assert = @example_error(" \" ",                       " \" ")
+    @assert = @example_error(" \"apple",                   " \"apple")
+    @assert = @example_error(" \"\\\"",                    " \"\\\"")
+    @assert = @example_error(" \"\\urge\" ",               " \"\\u")
+    @assert = @example_error(" \"\\u123\" ",               " \"\\u123")
+    @assert = @example_error(" \"\\ud800\\n\" ",           " \"\\ud800\\")
+    @assert = @example_error(" \"apple \\ud800 banana\" ", " \"apple \\ud800")
+    @assert = @example_error(" \"\\ud800\\ud800\" ",       " \"\\ud800\\u")
 
   :it "parses arrays"
     @assert = @example("[]", <<<
@@ -151,6 +156,12 @@
       [TokenArrayEnd, 8, 9, 0, 0.0, ""]
       [TokenArrayEnd, 9, 10, 0, 0.0, ""]
     >>>)
+
+    @assert = @example_error("]]]",                   "")
+    @assert = @example_error("[[[",                   "[[[")
+    @assert = @example_error("[1,,,]",                "[1,")
+    @assert = @example_error("[1,2,3}",               "[1,2,3")
+    @assert = @example_error(<<<["fruit":"apple"]>>>, <<<["fruit">>>)
 
   :it "parses objects"
     @assert = @example("{}", <<<
@@ -218,3 +229,55 @@
       [TokenPairPost, 31, 31, 0, 0.0, "t"]
       [TokenObjectEnd, 31, 32, 0, 0.0, "t"]
     >>>)
+
+    @assert = @example_error("}}}",                    "")
+    @assert = @example_error("{{{",                    "{")
+    @assert = @example_error(<<<{"a":1,,,"b":2}>>>,    <<<{"a":1,>>>)
+    @assert = @example_error(<<<{"a":{"b":>>>,         <<<{"a":{"b":>>>)
+    @assert = @example_error(<<<{"a":1,"b":2]>>>,      <<<{"a":1,"b":2>>>)
+    @assert = @example_error(<<<{"apple","edible"}>>>, <<<{"apple">>>)
+
+  :fun example (source String, expected String) Bool
+    notify = _TestParserNotify.new
+    parser = Parser.new
+    try (
+      parser.parse!(source, notify)
+      actual = Inspect[notify]
+      if (actual == expected) (
+        True
+      |
+        @env.err.print("\n")
+        @env.err.write("expected "), @env.err.write(Inspect[source])
+        @env.err.print(" to parse as:"), @env.err.print(expected)
+        @env.err.print("but actually parsed as:"), @env.err.print(actual)
+        False
+      )
+    |
+      @env.err.write("\nexpected "), @env.err.write(Inspect[source])
+      @env.err.print(" to parse, but it failed to parse")
+      False
+    )
+
+  :fun example_error (source String, valid_part String) Bool
+    notify = _TestParserNotify.new
+    parser = Parser.new
+    try (
+      parser.parse!(source, notify)
+      @env.err.write("\nexpected error parsing ")
+      @env.err.write(Inspect[source])
+      @env.err.print(" but it parsed successfully")
+      False
+    |
+      actual = source.trim(0, parser.token_end.isize)
+      if (valid_part == actual) (
+        True
+      |
+        @env.err.write("\nexpected the valid part of ")
+        @env.err.print(Inspect[source])
+        @env.err.write("to equal:   ")
+        @env.err.print(Inspect[valid_part])
+        @env.err.write("but it was: ")
+        @env.err.print(Inspect[actual])
+        False
+      )
+    )
