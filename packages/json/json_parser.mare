@@ -125,7 +125,7 @@
     )
     yield JsonTokenArrayEnd
 
-  :fun ref _read_array! // exposed in the Reader class
+  :fun ref _read_each_in_array! // exposed in the Reader class
     :yields USize for None
     @_skip_whitespace
     @_eat!('[')
@@ -185,7 +185,7 @@
 
     yield JsonTokenObjectEnd
 
-  :fun ref _read_object! // exposed in the Reader class
+  :fun ref _read_each_in_object! // exposed in the Reader class
     :yields String for None
     @_skip_whitespace
     @_eat!('{')

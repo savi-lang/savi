@@ -4,12 +4,12 @@
 :class _JsonReaderSpecUser
   :prop name String: ""
   :prop admin Bool: False
-  :fun ref from_json! (reader JsonReader)
-    reader.read_object! -> (key |
+  :fun ref from_json! (read JsonReader)
+    read.each_in_object! -> (key |
       case (
-      | key == "name" | try (@name = reader.read_string!)
-      | key == "admin" | try (@admin = reader.read_bool!)
-      | reader.skip_value
+      | key == "name" | try (@name = read.string!)
+      | key == "admin" | try (@admin = read.bool!)
+      | read.unexpected_key
       )
     )
     @
@@ -19,22 +19,54 @@
   :const describes: "JsonReader"
 
   :it "can fill objects with data read from JSON"
-    reader = JsonReader.new(<<<[
+    read = JsonReader.new(<<<[
       { "name": "Alice", "admin": true },
       { "name": "Bob" },
       { "name": "Cyril", "admin": false }
     ]>>>)
 
     users Array(_JsonReaderSpecUser) = []
-    try reader.read_array! -> (index |
+    try read.each_in_array! -> (index |
       try (
-        users << _JsonReaderSpecUser.new.from_json!(reader)
+        users << _JsonReaderSpecUser.new.from_json!(read)
       )
     )
+
+    @assert = read.errors.is_empty
 
     @assert = try (users[0]!.name == "Alice" | False)
     @assert = try (users[0]!.admin == True | False)
     @assert = try (users[1]!.name == "Bob" | False)
+    @assert = try (users[1]!.admin == False | False)
+    @assert = try (users[2]!.name == "Cyril" | False)
+    @assert = try (users[2]!.admin == False | False)
+
+  :it "can report nice errors when the data doesn't match expectations"
+    read = JsonReader.new(<<<[
+      { "bogus": true, "name": "Alice", "admin": true },
+      { "name": true },
+      { "name": "Cyril", "admin": "huh?" },
+      false
+    ]>>>)
+
+    users Array(_JsonReaderSpecUser) = []
+    try read.each_in_array! -> (index |
+      try (
+        users << _JsonReaderSpecUser.new.from_json!(read)
+      )
+    )
+
+    @assert = Inspect[read.errors].trim(0, -1) == <<<
+      - unexpected key encountered at path: $[0]["bogus"]
+      - expected to read a string value at path: $[1]["name"]
+      - expected to read a boolean value at path: $[2]["admin"]
+      - expected to read an object value at path: $[3]
+    >>>
+
+    // Note that the valid data still made it into our data structures!
+    @assert = try (users[0]!.name == "Alice" | False)
+    @assert = try (users[0]!.admin == True | False)
+    @assert = try (users[1]!.name == "" | False)
     @assert = try (users[1]!.admin == False | False)
     @assert = try (users[2]!.name == "Cyril" | False)
     @assert = try (users[2]!.admin == False | False)

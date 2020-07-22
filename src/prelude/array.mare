@@ -37,6 +37,7 @@
   :fun space: @_alloc
   :fun cpointer (offset = 0) tag: @_ptr._offset(offset)
 
+  :fun is_empty: @_size == 0
   :fun ref clear: @_size = 0, @
 
   :fun ref truncate (size): @_size = @_size.min(size)
@@ -114,11 +115,17 @@
     if (@size <= index) error!
     @_ptr._assign_at(index, --value)
 
-  :fun ref "<<" (value)
+  :fun ref "<<" (value): @push(--value)
+  :fun ref push (value)
     @reserve(@_size + 1)
     @_ptr._assign_at(@_size, --value)
     @_size = @_size + 1
     @
+
+  :fun ref pop! A
+    if (@size < 1) error!
+    @_size -= 1
+    @_ptr._get_at_no_alias(@_size)
 
   :fun "!=" (other): (@ == other).not // TODO: move this to the Equatable trait?
   :fun "==" (other Array(A)'box)
