@@ -29,8 +29,8 @@ class Mare::Server
         host_path = pair[0]
         dest_path = pair[1]
 
-        @stderr.puts(Process.run("cp", [Compiler::STANDARD_LIBRARY_DIRNAME, dest_path, "-r"]).exit_code)
-        @stderr.puts(Process.run("cp", [Compiler.prelude_library_path, dest_path, "-r"]).exit_code)
+        Process.run("cp", [Compiler::STANDARD_LIBRARY_DIRNAME, dest_path, "-r"]).exit_code
+        Process.run("cp", [Compiler.prelude_library_path, dest_path, "-r"]).exit_code
       end
     end
 
@@ -371,6 +371,27 @@ class Mare::Server
           )
         ]
       when Error
+        related_information = err.info.map do |info|
+          location = LSP::Data::Location.new(
+            URI.new(path: convert_path_to_host(info[0].source.path)),
+            LSP::Data::Range.new(
+              LSP::Data::Position.new(
+                info[0].row.to_i64,
+                info[0].col.to_i64,
+              ),
+              LSP::Data::Position.new(
+                info[0].row.to_i64,
+                info[0].col.to_i64 + (
+                  info[0].finish - info[0].start
+                ),
+              ),
+            ),
+          )
+          LSP::Data::Diagnostic::RelatedInformation.new(
+            location,
+            info[1]
+          )
+        end
         msg.params.diagnostics = [
           LSP::Data::Diagnostic.new(
             LSP::Data::Range.new(
@@ -385,7 +406,8 @@ class Mare::Server
                 ),
               ),
             ),
-            message: err.message
+            related_information: related_information,
+            message: err.message,
           )
         ]
       when Pegmatite::Pattern::MatchError
