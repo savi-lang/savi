@@ -3,6 +3,6 @@
 :actor Main
   :new (env)
     Specs.run(env, [
-      SpecRun(ParserSpec).new(env)
-      SpecRun(ReaderSpec).new(env)
+      SpecRun(JsonParserSpec).new(env)
+      SpecRun(JsonReaderSpec).new(env)
     ])

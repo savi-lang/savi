@@ -1,10 +1,10 @@
 :import "spec"
-:import ".." (Reader)
+:import ".." (JsonReader)
 
-:class _ReaderSpecUser
+:class _JsonReaderSpecUser
   :prop name String: ""
   :prop admin Bool: False
-  :fun ref from_json! (reader Reader)
+  :fun ref from_json! (reader JsonReader)
     reader.read_object! -> (key |
       case (
       | key == "name" | try (@name = reader.read_string!)
@@ -14,21 +14,21 @@
     )
     @
 
-:class ReaderSpec
+:class JsonReaderSpec
   :is Spec
-  :const describes: "Reader"
+  :const describes: "JsonReader"
 
   :it "can fill objects with data read from JSON"
-    reader = Reader.new(<<<[
+    reader = JsonReader.new(<<<[
       { "name": "Alice", "admin": true },
       { "name": "Bob" },
       { "name": "Cyril", "admin": false }
     ]>>>)
 
-    users Array(_ReaderSpecUser) = []
+    users Array(_JsonReaderSpecUser) = []
     try reader.read_array! -> (index |
       try (
-        users << _ReaderSpecUser.new.from_json!(reader)
+        users << _JsonReaderSpecUser.new.from_json!(reader)
       )
     )
 

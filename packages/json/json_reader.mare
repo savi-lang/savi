@@ -1,5 +1,5 @@
-:class Reader
-  :prop _parser Parser: Parser.new
+:class JsonReader
+  :prop _parser: JsonParser.new
   :new (source)
     @_parser.source = source
 

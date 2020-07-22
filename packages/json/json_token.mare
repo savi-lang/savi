@@ -1,0 +1,31 @@
+:alias JsonToken
+  (JsonTokenNull
+  | JsonTokenTrue
+  | JsonTokenFalse
+  | JsonTokenNumberPre
+  | JsonTokenNumber
+  | JsonTokenStringPre
+  | JsonTokenString
+  | JsonTokenKeyPre
+  | JsonTokenKey
+  | JsonTokenPairPost
+  | JsonTokenObjectStart
+  | JsonTokenObjectEnd
+  | JsonTokenArrayStart
+  | JsonTokenArrayEnd
+  )
+
+:primitive JsonTokenNull
+:primitive JsonTokenTrue
+:primitive JsonTokenFalse
+:primitive JsonTokenNumberPre
+:primitive JsonTokenNumber
+:primitive JsonTokenStringPre
+:primitive JsonTokenString
+:primitive JsonTokenKeyPre
+:primitive JsonTokenKey
+:primitive JsonTokenPairPost
+:primitive JsonTokenObjectStart
+:primitive JsonTokenObjectEnd
+:primitive JsonTokenArrayStart
+:primitive JsonTokenArrayEnd
