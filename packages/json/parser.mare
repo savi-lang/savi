@@ -1,10 +1,10 @@
 :import "collections" (Count)
 
 :class Parser
-  :prop _source String'box: ""
   :prop _offset USize: 0
   :prop _offset_start USize: 0
 
+  :prop source String'box: ""
   :prop last_number (I64 | F64): I64[0]
   :prop last_string String: ""
 
@@ -14,7 +14,7 @@
     @last_number   = I64[0]
     @last_string   = ""
 
-  :fun ref parse! (@_source)
+  :fun ref parse! (@source)
     :yields Token for None
     @_set_defaults
     if @_detect_empty.not (
@@ -22,26 +22,25 @@
       @_verify_final!
     )
 
-  :fun source: @_source
   :fun token_start: @_offset_start
   :fun token_end: @_offset
 
   // :fun describe_error String
-  //   if (@_offset < @_source.size) (
+  //   if (@_offset < @source.size) (
   //     "invalid JSON at byte offset: "          + @_offset.string
   //   |
-  //     "unfinished JSON; stream ends at byte: " + @_source.size.string
+  //     "unfinished JSON; stream ends at byte: " + @source.size.string
   //   )
 
-  :fun ref _has_next Bool: @_offset < @_source.size
+  :fun ref _has_next Bool: @_offset < @source.size
 
   :fun ref _next! U8: b = @_peek!, @_advance, b
 
-  :fun _peek! U8: @_source[@_offset]!
+  :fun _peek! U8: @source[@_offset]!
 
-  :fun _peek_softly U8: try (@_source[@_offset]! | ' ')
+  :fun _peek_softly U8: try (@source[@_offset]! | ' ')
 
-  :fun ref _eat! (b U8): if (b != @_source[@_offset]!) error!, @_advance
+  :fun ref _eat! (b U8): if (b != @source[@_offset]!) error!, @_advance
 
   :fun ref _advance (n USize = 1): @_offset += n
 
@@ -88,6 +87,19 @@
     )
     None
 
+  :fun ref skip_value None
+    try @_parse_data! -> (token | None)
+
+  :fun ref _read_bool! Bool // exposed in the Reader class
+    @_skip_whitespace
+    @_pre_token
+    peeked = @_peek!
+    case (
+    | peeked == 't' | @_advance, @_eat!('r'), @_eat!('u'), @_eat!('e'),              True
+    | peeked == 'f' | @_advance, @_eat!('a'), @_eat!('l'), @_eat!('s'), @_eat!('e'), False
+    | error!
+    )
+
   :fun ref _parse_array!
     :yields Token for None
     @_advance // past the opening bracket
@@ -113,12 +125,41 @@
     )
     yield TokenArrayEnd
 
+  :fun ref _read_array! // exposed in the Reader class
+    :yields USize for None
+    @_skip_whitespace
+    @_eat!('[')
+    @_skip_whitespace
+    index = 0
+
+    if (@_peek! == ']') (
+      @_pre_token
+      @_advance
+    |
+      keep_going = True
+      while keep_going (
+        yield index
+        index += 1
+        // Expect that the caller has handled reading the value at this index,
+        // leaving us ready to parse the comma or end of object next.
+
+        @_skip_whitespace
+        @_pre_token // prepare for possible array end token
+        next = @_next!
+        case (
+        | next == ',' | @_skip_whitespace
+        | next == ']' | keep_going = False
+        | @_rewind, error!
+        )
+      )
+    )
+    None
+
   :fun ref _parse_object!
     :yields Token for None
     @_advance // past the opening bracket
     yield TokenObjectStart
     @_skip_whitespace
-
     if (@_peek! == '}') (
       @_pre_token
       @_advance
@@ -127,6 +168,7 @@
       while keep_going (
         @_eat!('"'), @_rewind
         @_parse_string!(True) -> (token | yield token)
+
         @_skip_whitespace
         @_eat!(':')
         @_parse_data! -> (token | yield token)
@@ -142,6 +184,37 @@
     )
 
     yield TokenObjectEnd
+
+  :fun ref _read_object! // exposed in the Reader class
+    :yields String for None
+    @_skip_whitespace
+    @_eat!('{')
+    @_skip_whitespace
+
+    if (@_peek! == '}') (
+      @_pre_token
+      @_advance
+    |
+      keep_going = True
+      while keep_going (
+        @_eat!('"'), @_rewind
+        @_parse_string!(True) -> (token | )
+        @_skip_whitespace
+        @_eat!(':')
+
+        yield @last_string
+        // Expect that the caller has handled reading the value for this key,
+        // leaving us ready to parse the comma or end of object next.
+
+        @_skip_whitespace
+        next = @_next!
+        case (
+        | next == ',' | @_skip_whitespace
+        | next == '}' | keep_going = False
+        | @_rewind, error!
+        )
+      )
+    )
 
   :fun ref _parse_number!
     :yields Token for None
@@ -221,6 +294,12 @@
     @_rewind
     yield (if is_key (TokenKey | TokenString))
     @_advance
+
+  :fun ref _read_string! String // exposed in the Reader class
+    @_skip_whitespace
+    @_eat!('"'), @_rewind
+    @_parse_string! -> (token | None)
+    @last_string
 
   :fun ref _push_escape_seq! (buf String'ref) String'ref
     next = @_next!

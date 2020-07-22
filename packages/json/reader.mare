@@ -1,0 +1,21 @@
+:class Reader
+  :prop _parser Parser: Parser.new
+  :new (source)
+    @_parser.source = source
+
+  :fun ref skip_value None
+    @_parser.skip_value
+
+  :fun ref read_bool! Bool
+    @_parser._read_bool!
+
+  :fun ref read_string! String
+    @_parser._read_string!
+
+  :fun ref read_array! None
+    :yields USize for None
+    @_parser._read_array! -> (index | yield index)
+
+  :fun ref read_object! None
+    :yields String for None
+    @_parser._read_object! -> (key | yield key)

@@ -1,0 +1,40 @@
+:import "spec"
+:import ".." (Reader)
+
+:class _ReaderSpecUser
+  :prop name String: ""
+  :prop admin Bool: False
+  :fun ref from_json! (reader Reader)
+    reader.read_object! -> (key |
+      case (
+      | key == "name" | try (@name = reader.read_string!)
+      | key == "admin" | try (@admin = reader.read_bool!)
+      | reader.skip_value
+      )
+    )
+    @
+
+:class ReaderSpec
+  :is Spec
+  :const describes: "Reader"
+
+  :it "can fill objects with data read from JSON"
+    reader = Reader.new(<<<[
+      { "name": "Alice", "admin": true },
+      { "name": "Bob" },
+      { "name": "Cyril", "admin": false }
+    ]>>>)
+
+    users Array(_ReaderSpecUser) = []
+    try reader.read_array! -> (index |
+      try (
+        users << _ReaderSpecUser.new.from_json!(reader)
+      )
+    )
+
+    @assert = try (users[0]!.name == "Alice" | False)
+    @assert = try (users[0]!.admin == True | False)
+    @assert = try (users[1]!.name == "Bob" | False)
+    @assert = try (users[1]!.admin == False | False)
+    @assert = try (users[2]!.name == "Cyril" | False)
+    @assert = try (users[2]!.admin == False | False)
