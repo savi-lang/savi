@@ -88,9 +88,33 @@ class Mare::Compiler::CodeGen
       end
     end
 
-    def check_next_func_is_null(cont : LLVM::Value)
-      null = gfunc.continuation_llvm_func_ptr.null
-      builder.icmp(LLVM::IntPredicate::EQ, get_next_func(cont), null)
+    def set_as_error(cont : LLVM::Value)
+      next_func_gep = struct_gep_for_next_func(cont)
+
+      # Assign a value of 1 to the continuation's function pointer,
+      # signifying the end of the call, with an error for the caller to raise.
+      builder.store(continuation_llvm_func_as_error_value, next_func_gep)
+    end
+
+    def continuation_llvm_func_as_error_value
+      @g.builder.int_to_ptr(
+        @g.isize.const_int(1),
+        gfunc.continuation_llvm_func_ptr,
+      )
+    end
+
+    def check_is_error(cont : LLVM::Value)
+      # The yielding call is understood as being over with an error
+      # if the next_func has a value of one (not a valid pointer).
+      one = continuation_llvm_func_as_error_value
+      builder.icmp(LLVM::IntPredicate::EQ, get_next_func(cont), one)
+    end
+
+    def check_is_finished(cont : LLVM::Value)
+      # The yielding call is understood as being over (with or without an error)
+      # if the next_func has a value of zero or one (not a valid pointer).
+      one = continuation_llvm_func_as_error_value
+      builder.icmp(LLVM::IntPredicate::ULE, get_next_func(cont), one)
     end
 
     def initial_cont(frame : Frame)

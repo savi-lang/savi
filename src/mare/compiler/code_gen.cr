@@ -266,6 +266,7 @@ class Mare::Compiler::CodeGen
 
       return :simple_cc if list.empty?
       return list.first if list.size == 1
+      return :yield_error_cc if list == [:error_cc, :yield_cc]
       raise NotImplementedError.new(list)
     end
 
@@ -290,6 +291,7 @@ class Mare::Compiler::CodeGen
   getter di
   getter gtypes
   getter bitwidth
+  getter isize
 
   def initialize(runtime : PonyRT.class | VeronaRT.class = PonyRT)
     LLVM.init_x86
@@ -573,7 +575,10 @@ class Mare::Compiler::CodeGen
     @builder.position_at_end(func_frame.entry_block)
 
     # We have some extra work to do here if this is a yielding function.
-    if gfunc && gfunc.calling_convention(ctx) == :yield_cc
+    if gfunc && (
+      gfunc.calling_convention(ctx) == :yield_cc ||
+      gfunc.calling_convention(ctx) == :yield_error_cc
+    )
       # We need to pre-declare the code blocks that follow each yield statement.
       gfunc.after_yield_blocks = [] of LLVM::BasicBlock
       ctx.inventory[gfunc.link].yield_count.times do |index|
@@ -651,7 +656,8 @@ class Mare::Compiler::CodeGen
 
     # If this is a yielding function, we must first declare the type that will
     # be used to hold continuation data for the subsequent continuing calls.
-    if gfunc.calling_convention(ctx) == :yield_cc
+    case gfunc.calling_convention(ctx)
+    when :yield_cc, :yield_error_cc
       gfunc.continuation_type =
         @llvm.struct_create_named("#{gfunc.llvm_name}.CONTINUATION")
     end
@@ -666,7 +672,7 @@ class Mare::Compiler::CodeGen
         simple_ret_type
       when :error_cc
         llvm.struct([simple_ret_type, @i1])
-      when :yield_cc
+      when :yield_cc, :yield_error_cc
         cont_ptr = gfunc.continuation_type.pointer
 
         # Gather the LLVM::Types to use for the yield out values.
@@ -807,7 +813,8 @@ class Mare::Compiler::CodeGen
     # If this is a yielding function, we need to generate the alternate
     # versions of it, each with their own different entrypoint block
     # that will take the control flow to continuing where that yield was.
-    if gfunc.calling_convention(ctx) == :yield_cc
+    case gfunc.calling_convention(ctx)
+    when :yield_cc, :yield_error_cc
       continue_param_types = [
         gfunc.continuation_type.pointer, # TODO: pass by value instead of by pointer
         llvm_type_of(ctx.reach[gfunc.infer.yield_in_resolved]),
@@ -902,7 +909,7 @@ class Mare::Compiler::CodeGen
         @builder.ret(last_value)
       when :error_cc
         gen_return_using_error_cc(last_value, last_expr.not_nil!, false)
-      when :yield_cc
+      when :yield_cc, :yield_error_cc
         gen_final_return_using_yield_cc(last_value, last_expr.not_nil!)
       else
         raise NotImplementedError.new(gfunc.calling_convention(ctx))
@@ -1631,11 +1638,12 @@ class Mare::Compiler::CodeGen
 
       @builder.position_at_end(after_block)
       result = @builder.extract_value(result, 0)
-    when :yield_cc
+    when :yield_cc, :yield_error_cc
       # Since a yield block is kind of like a loop, we need an alloca to cover
       # the "variable" that changes each iteration - the last call result.
       result_alloca =
-        if func_frame.gfunc.not_nil!.calling_convention(ctx) == :yield_cc
+        case func_frame.gfunc.not_nil!.calling_convention(ctx)
+        when :yield_cc, :yield_error_cc
           func_frame.gfunc.not_nil!.continuation_info
             .struct_gep_for_yielded_result(func_frame, relate)
         else
@@ -1647,6 +1655,10 @@ class Mare::Compiler::CodeGen
       # Declare some code blocks in which we'll generate this pseudo-loop.
       maybe_block = gen_block("maybe_yield_block")
       yield_block = gen_block("yield_block")
+      if gfunc.calling_convention(ctx) == :yield_error_cc
+        check_error_block = gen_block("check_error_block")
+        error_block = gen_block("error_block")
+      end
       after_block = gen_block("after_call")
 
       # We start at the "maybe block" right after the first call above.
@@ -1662,8 +1674,20 @@ class Mare::Compiler::CodeGen
         gfunc.yield_cc_yield_return_type.pointer, "RESULT.YIELDED.ALLOCA")
       yield_result = @builder.load(yield_result_alloca, "RESULT.YIELDED")
       cont = @builder.extract_value(yield_result, 0, "CONT")
-      is_finished = gfunc.continuation_info.check_next_func_is_null(cont)
-      @builder.cond(is_finished, after_block, yield_block)
+      is_finished = gfunc.continuation_info.check_is_finished(cont)
+      @builder.cond(is_finished, check_error_block || after_block, yield_block)
+
+      # If applicable, generate the code for checking error of the result,
+      # as well as the code for raising the error if it was present.
+      if check_error_block
+        @builder.position_at_end(check_error_block)
+        is_error = gfunc.continuation_info.check_is_error(cont)
+        @builder.cond(is_error, error_block.not_nil!, after_block)
+
+        @builder.position_at_end(error_block.not_nil!)
+        # TODO: Allow an error value of something other than None.
+        gen_raise_error(gen_none, relate)
+      end
 
       # Move our cursor to the yield block to start generating code there.
       @builder.position_at_end(yield_block)
@@ -2982,9 +3006,14 @@ class Mare::Compiler::CodeGen
     # making (and checking) the assumption that we are in such a function.
     if @try_else_stack.empty?
       calling_convention = func_frame.gfunc.not_nil!.calling_convention(ctx)
-      raise "unsupported empty try else stack for #{calling_convention}" \
-        unless calling_convention == :error_cc
-      gen_return_using_error_cc(error_value, from_expr, true)
+      case calling_convention
+      when :error_cc
+        gen_return_using_error_cc(error_value, from_expr, true)
+      when :yield_error_cc
+        gen_error_return_using_yield_cc
+      else
+        raise "unsupported empty try else stack for #{calling_convention}"
+      end
     else
       # Store the state needed to catch the value in the try else block.
       else_stack_tuple = @try_else_stack.last
@@ -3096,6 +3125,23 @@ class Mare::Compiler::CodeGen
     tuple = @builder.insert_value(tuple, cont, 0)
     tuple = @builder.insert_value(tuple, cast_value, 1)
     tuple.name = "FINAL.RETURN"
+    @builder.ret(gen_struct_bit_cast(tuple, func_frame.llvm_func.return_type))
+  end
+
+  def gen_error_return_using_yield_cc
+    raise "inconsistent frames" if @frames.size > 1
+
+    gfunc = func_frame.gfunc.not_nil!
+    return_type = gfunc.yield_cc_final_return_type
+
+    # Grab the continuation value from local memory and mark it as an error.
+    cont = func_frame.continuation_value
+    gfunc.continuation_info.set_as_error(cont)
+
+    # Return the tuple: {continuation_value, (undefined)}
+    tuple = return_type.undef
+    tuple = @builder.insert_value(tuple, cont, 0)
+    tuple.name = "ERROR.RETURN"
     @builder.ret(gen_struct_bit_cast(tuple, func_frame.llvm_func.return_type))
   end
 
@@ -3241,7 +3287,8 @@ class Mare::Compiler::CodeGen
 
     # If this is a yielding function, we store locals in the continuation data.
     # Otherwise, we store each in its own alloca, which we create at the entry.
-    if gfunc.calling_convention(ctx) == :yield_cc
+    case gfunc.calling_convention(ctx)
+    when :yield_cc, :yield_error_cc
       cont = func_frame.continuation_value
       gep = gfunc.continuation_info.struct_gep_for_local(cont, ref)
       # TODO: bitcast to llvm_type?

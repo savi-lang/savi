@@ -1321,11 +1321,10 @@ class Mare::Compiler::Infer
 
       # Check that the type of the yield block result matches what's expected,
       # but don't bother if the type requirement of just None.
-      yield_in_resolved = other_infer.analysis.yield_in_resolved
+      yield_in_resolved = other_infer.resolve(ctx, other_infer.f_analysis.yield_in_info)
       none = MetaType.new(infer.reified_type(infer.prelude_type("None")))
       if yield_in_resolved != none
-        # @pos = other_infer.f_analysis.yield_in_info.first_viable_constraint_pos
-        other_infer.resolve(ctx, other_infer.f_analysis.yield_in_info)
+        yield_in_resolved
       else
         MetaType.unconstrained
       end

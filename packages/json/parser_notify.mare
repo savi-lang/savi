@@ -1,5 +1,0 @@
-:trait ParserNotify
-  :fun ref apply (parser Parser, token Token) None
-
-:primitive ParserNotifyNone
-  :fun ref apply (parser Parser, token Token) None: None

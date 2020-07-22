@@ -1,30 +1,5 @@
 :import "spec"
-:import ".." (Parser, ParserNotify, Token)
-
-:class _TestParserNotify
-  :is ParserNotify
-  :prop tokens Array(Array(
-    (Token | USize | USize | I64 | F64 | String | None)
-  )): []
-
-  :fun inspect_into (out String'iso) String'iso
-    @tokens.each -> (item |
-      out = Inspect.into(--out, item)
-      out.push_byte('\n')
-      None // TODO: this None shouldn't be needed
-    )
-    out.trim_in_place(0, -1) // remove the final newline
-    --out
-
-  :fun ref apply (parser Parser, token Token) None
-    @tokens << [
-      token
-      parser.token_start
-      parser.token_end
-      try (parser.last_number.as!(I64) | 0)
-      try (parser.last_number.as!(F64) | 0)
-      parser.last_string
-    ]
+:import ".." (Parser, Token)
 
 :class ParserSpec
   :is Spec
@@ -238,11 +213,11 @@
     @assert = @example_error(<<<{"apple","edible"}>>>, <<<{"apple">>>)
 
   :fun example (source String, expected String) Bool
-    notify = _TestParserNotify.new
+    collector = _TestParserCollector.new
     parser = Parser.new
     try (
-      parser.parse!(source, notify)
-      actual = Inspect[notify]
+      parser.parse!(source) -> (token | collector.collect(parser, token))
+      actual = Inspect[collector]
       if (actual == expected) (
         True
       |
@@ -259,10 +234,9 @@
     )
 
   :fun example_error (source String, valid_part String) Bool
-    notify = _TestParserNotify.new
     parser = Parser.new
     try (
-      parser.parse!(source, notify)
+      parser.parse!(source) -> (token | None)
       @env.err.write("\nexpected error parsing ")
       @env.err.write(Inspect[source])
       @env.err.print(" but it parsed successfully")
@@ -281,3 +255,27 @@
         False
       )
     )
+
+:class _TestParserCollector
+  :prop tokens Array(Array(
+    (Token | USize | USize | I64 | F64 | String | None)
+  )): []
+
+  :fun inspect_into (out String'iso) String'iso
+    @tokens.each -> (item |
+      out = Inspect.into(--out, item)
+      out.push_byte('\n')
+      None // TODO: this None shouldn't be needed
+    )
+    out.trim_in_place(0, -1) // remove the final newline
+    --out
+
+  :fun ref collect (parser Parser, token Token) None
+    @tokens << [
+      token
+      parser.token_start
+      parser.token_end
+      try (parser.last_number.as!(I64) | 0)
+      try (parser.last_number.as!(F64) | 0)
+      parser.last_string
+    ]
