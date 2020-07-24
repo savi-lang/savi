@@ -1000,7 +1000,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     def resolve_as(ctx : Context, info : Info, meta_type : MetaType) : MetaType
       raise "already resolved #{info}\n" \
         "as #{@analysis.resolved_infos[info].show_type}" \
-          if @analysis.resolved_infos.has_key?(info)
+          if @analysis.resolved_infos.has_key?(info) \
+          && @analysis.resolved_infos[info] != meta_type
 
       @analysis.resolved_infos[info] = meta_type
     end

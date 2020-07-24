@@ -251,7 +251,7 @@
     num400 U64 = (total_days / @_days_per_400_years)
     total_days -= num400 * @_days_per_400_years
 
-    num100 = (total_days / @_days_per_100_years)
+    num100 U64 = (total_days / @_days_per_100_years)
     if (num100 == 4) (// leap
       num100 = 3
     )

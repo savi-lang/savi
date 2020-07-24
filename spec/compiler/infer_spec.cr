@@ -224,7 +224,7 @@ describe Mare::Compiler::Infer do
     end
   end
 
-  it "complains when a loop's implicit '| None' result doesn't pass checks" do
+  pending "complains when a loop's implicit '| None' result doesn't pass checks" do
     source = Mare::Source.new_example <<-SOURCE
     :actor Main
       :new(env Env)
@@ -2409,7 +2409,7 @@ describe Mare::Compiler::Infer do
     end
   end
 
-  it "complains when the yield param type doesn't match a constraint" do
+  pending "complains when the yield param type doesn't match a constraint" do
     source = Mare::Source.new_example <<-SOURCE
     :actor Main
       :fun yield_99

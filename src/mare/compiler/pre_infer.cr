@@ -87,8 +87,11 @@ module Mare::Compiler::PreInfer
     end
 
     def run(ctx)
+      func_ret = func.ret
+      func_body = func.body
+
       # Complain if neither return type nor function body were specified.
-      unless func.ret || func.body
+      unless func_ret || func_body
         Error.at func.ident, \
           "This function's return type is totally unconstrained"
       end
@@ -122,11 +125,12 @@ module Mare::Compiler::PreInfer
         self[ret].as(Infer::FuncBody).set_explicit(
           Infer::FromConstructor.new(func.cap.not_nil!.pos, func.cap.not_nil!.value)
         )
-      else
-        func.ret.try do |ret_t|
-          ret_t.accept(ctx, self)
-          self[ret].as(Infer::FuncBody).set_explicit(@analysis[ret_t])
-        end
+      elsif func_ret
+        func_ret.accept(ctx, self)
+        self[ret].as(Infer::FuncBody).set_explicit(@analysis[func_ret])
+      elsif func_body && @jumps.always_error?(func_body)
+        none = Infer::FixedPrelude.new(ret.pos, "None")
+        self[ret].as(Infer::FuncBody).set_explicit(none)
       end
 
       # Determine the number of "yield out" arguments, based on the maximum
@@ -174,8 +178,6 @@ module Mare::Compiler::PreInfer
 
       # Don't bother further typechecking functions that have no body
       # (such as FFI function declarations).
-      func_body = func.body
-
       if func_body
         # Visit the function body, taking note of all observed constraints.
         func_body.accept(ctx, self)
@@ -187,7 +189,7 @@ module Mare::Compiler::PreInfer
         # We don't do this for constructors, since constructors implicitly return
         # self no matter what the last term of the body of the function is.
         self[ret].as(Infer::FuncBody).assign(ctx, @analysis[func_body], func_body_pos) \
-          unless func.has_tag?(:constructor)
+          unless func.has_tag?(:constructor) || @jumps.always_error?(func_body)
       end
 
       nil

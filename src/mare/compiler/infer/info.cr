@@ -1,9 +1,53 @@
 class Mare::Compiler::Infer
+  struct Tether
+    def initialize(@info : Info, @below : StructRef(Tether)? = nil)
+    end
+
+    def self.via(info : Info, list : Array(Tether))
+      list.map { |below| new(info, StructRef(Tether).new(below)) }
+    end
+
+    def root : Info
+      below = @below
+      below ? below.root : @info
+    end
+
+    def to_a : Array(Info)
+      below = @below
+      below ? below.to_a.tap(&.push(@info)) : [@info]
+    end
+
+    def constraint(ctx : Context, infer : ForReifiedFunc, immediate : Bool = false) : MetaType
+      below = @below
+      if below
+        if immediate
+          below.constraint(ctx, infer)
+        else
+          @info.tether_upward_transform(ctx, infer, below.constraint(ctx, infer))
+        end
+      else
+        @info.tether_resolve(ctx, infer)
+      end
+    end
+
+    def includes?(other_info) : Bool
+      @info == other_info || @below.try(&.includes?(other_info)) || false
+    end
+  end
+
   abstract class Info
     property pos : Source::Pos = Source::Pos.none
     property override_describe_kind : String?
 
     abstract def add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
+
+    abstract def tethers(querent : Info) : Array(Tether)
+    def tether_upward_transform(ctx : Context, infer : ForReifiedFunc, meta_type : MetaType) : MetaType
+      raise NotImplementedError.new("tether_upward_transform for #{self.class}:\n#{pos.show}")
+    end
+    def tether_resolve(ctx : Context, infer : ForReifiedFunc)
+      raise NotImplementedError.new("tether_resolve for #{self.class}:\n#{pos.show}")
+    end
 
     # Most Info types ignore hints, but a few override this method to see them,
     # or to pass them along to other nodes that may wish to see them.
@@ -75,6 +119,25 @@ class Mare::Compiler::Infer
     def after_add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
     end
 
+    def tethers(querent : Info) : Array(Tether)
+      @downstreams.flat_map do |pos, info, aliases|
+        next [] of Tether if querent == info
+        Tether.via(self, info.tethers(querent))
+      end
+    end
+
+    def tether_constraints(ctx : Context, infer : ForReifiedFunc)
+      tethers(self).map(&.constraint(ctx, infer, true).as(MetaType))
+    end
+
+    def describe_tether_constraints(ctx : Context, infer : ForReifiedFunc)
+      tethers(self).map do |tether|
+        mt = tether.constraint(ctx, infer, true)
+        {tether.root.pos,
+          "it is required here to be a subtype of #{mt.show_type}"}
+      end
+    end
+
     # When we need to take into consideration the downstreams' constraints
     # in order to infer our type from them, we can use this to collect all
     # those constraints into one intersection of them all.
@@ -86,7 +149,7 @@ class Mare::Compiler::Infer
       )
     end
 
-    # TODO: document
+    # TODO: remove?
     def describe_downstream_constraints(ctx : Context, infer : ForReifiedFunc)
       @downstreams.flat_map do |_, other_info, _|
         multi = other_info.as_multiple_downstream_constraints(ctx, infer)
@@ -198,6 +261,15 @@ class Mare::Compiler::Infer
       @pos = explicit.pos
     end
 
+    def tethers(querent : Info) : Array(Tether)
+      results = [] of Tether
+      results.concat(@explicit.not_nil!.tethers(querent)) if @explicit && querent != @explicit
+      @downstreams.each do |pos, info, aliases|
+        results.concat(Tether.via(self, info.tethers(querent))) if querent != info
+      end
+      results
+    end
+
     def after_add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
       return if @explicit
 
@@ -206,12 +278,17 @@ class Mare::Compiler::Infer
       end
     end
 
+    def tether_upward_transform(ctx : Context, infer : ForReifiedFunc, meta_type : MetaType) : MetaType
+      # TODO: aliasing/ephemerality
+      meta_type
+    end
+
     def assign(ctx : Context, upstream : Info, upstream_pos : Source::Pos)
       @upstreams << {upstream, upstream_pos}
 
       if @explicit
         upstream.add_downstream(upstream_pos, @explicit.not_nil!, 0)
-      elsif @upstreams.size > 1
+      else
         upstream.add_downstream(upstream_pos, self, 0)
       end
     end
@@ -243,11 +320,11 @@ class Mare::Compiler::Infer
         # If we only have upstreams to go on, return the first upstream type.
         return infer.resolve(ctx, @upstreams.first[0]).strip_ephemeral
       elsif !downstreams_empty?
-        # If we only have downstream constraints, just do our best with those.
-        return \
-          total_downstream_constraint(ctx, infer)
-            .simplify(ctx)
-            .strip_ephemeral
+        # If we only have downstream tethers, just do our best with those.
+        return MetaType
+          .new_intersection(tether_constraints(ctx, infer))
+          .simplify(ctx)
+          .strip_ephemeral
       end
 
       # If we get here, we've failed and don't have enough info to continue.
@@ -256,7 +333,17 @@ class Mare::Compiler::Infer
     end
   end
 
-  class FixedPrelude < DynamicInfo
+  abstract class FixedInfo < DynamicInfo # TODO: rename or split DynamicInfo to make this line make more sense
+    def tethers(querent : Info) : Array(Tether)
+      [Tether.new(self)]
+    end
+
+    def tether_resolve(ctx : Context, infer : ForReifiedFunc)
+      infer.resolve(ctx, self)
+    end
+  end
+
+  class FixedPrelude < FixedInfo
     getter name : String
     getter resolvables : Array(Info)
 
@@ -275,7 +362,7 @@ class Mare::Compiler::Infer
     end
   end
 
-  class FixedTypeExpr < DynamicInfo
+  class FixedTypeExpr < FixedInfo
     getter node : AST::Node
 
     def describe_kind; "type expression" end
@@ -288,7 +375,7 @@ class Mare::Compiler::Infer
     end
   end
 
-  class FixedEnumValue < DynamicInfo
+  class FixedEnumValue < FixedInfo
     getter node : AST::Node
 
     def describe_kind; "expression" end
@@ -301,7 +388,7 @@ class Mare::Compiler::Infer
     end
   end
 
-  class FixedSingleton < DynamicInfo
+  class FixedSingleton < FixedInfo
     getter node : AST::Node
     getter type_param_ref : Refer::TypeParam?
 
@@ -324,7 +411,7 @@ class Mare::Compiler::Infer
     end
   end
 
-  class Self < DynamicInfo
+  class Self < FixedInfo
     def describe_kind; "receiver value" end
 
     def initialize(@pos)
@@ -342,7 +429,7 @@ class Mare::Compiler::Infer
     end
   end
 
-  class FromConstructor < DynamicInfo
+  class FromConstructor < FixedInfo
     def describe_kind; "constructed object" end
 
     def initialize(@pos, @cap : String)
@@ -415,11 +502,13 @@ class Mare::Compiler::Infer
     end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc)
+      tether_constraints = tether_constraints(ctx, infer)
+
       # Literal values (such as numeric literals) sometimes have
       # an ambiguous type. Here, we intersect with the downstream constraints
       # to (hopefully) arrive at a single concrete type to return.
-      meta_type = total_downstream_constraint(ctx, infer)
-        .intersect(@possible)
+      meta_type = MetaType
+        .new_intersection(tether_constraints + [@possible])
         .simplify(ctx)
 
       # If we don't satisfy the constraints, leave it to DynamicInfo.resolve!
@@ -441,7 +530,7 @@ class Mare::Compiler::Infer
 
       # We've failed on all fronts. Print an error describing what we know,
       # so that the user can figure out how to give us better information.
-      error_info = describe_downstream_constraints(ctx, infer)
+      error_info = describe_tether_constraints(ctx, infer)
       error_info.concat(describe_peer_hints(ctx, infer))
       error_info.push({pos,
         "and the literal itself has an intrinsic type of #{@possible.show_type}"
@@ -480,6 +569,14 @@ class Mare::Compiler::Infer
     def assign(ctx : Context, upstream : Info, upstream_pos : Source::Pos)
       upstream.add_downstream(upstream_pos, self, 0)
       @upstreams << upstream
+    end
+
+    def tethers(querent : Info) : Array(Tether)
+      [Tether.new(self)]
+    end
+
+    def tether_resolve(ctx : Context, infer : ForReifiedFunc)
+      infer.resolve(ctx, self)
     end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc)
@@ -549,6 +646,10 @@ class Mare::Compiler::Infer
       raise "can't be downstream of a RaiseError"
     end
 
+    def tethers(querent : Info) : Array(Tether)
+      [] of Tether
+    end
+
     def resolve!(ctx : Context, infer : ForReifiedFunc)
       MetaType.new(MetaType::Unsatisfiable.instance)
     end
@@ -565,6 +666,10 @@ class Mare::Compiler::Infer
 
     def add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
       final_term.add_downstream(use_pos, info, aliases)
+    end
+
+    def tethers(querent : Info) : Array(Tether)
+      final_term.tethers(querent)
     end
 
     def add_peer_hint(peer : Info)
@@ -598,6 +703,11 @@ class Mare::Compiler::Infer
         prior_bodies.each { |prior_body| body.add_peer_hint(prior_body) }
         prior_bodies << body
       end
+    end
+
+    def tether_upward_transform(ctx : Context, infer : ForReifiedFunc, meta_type : MetaType) : MetaType
+      # TODO: account for unreachable branches? maybe? maybe not?
+      meta_type
     end
 
     def as_downstream_constraint_meta_type(ctx : Context, infer : ForReifiedFunc) : MetaType?
@@ -696,7 +806,7 @@ class Mare::Compiler::Infer
     end
   end
 
-  class TypeParamCondition < DynamicInfo
+  class TypeParamCondition < FixedInfo
     getter refine : Refer::TypeParam
     getter lhs : Info
     getter refine_type : Info
@@ -716,7 +826,7 @@ class Mare::Compiler::Infer
     end
   end
 
-  class TypeCondition < DynamicInfo
+  class TypeCondition < FixedInfo
     getter lhs : Info
     getter rhs : Info
 
@@ -743,7 +853,7 @@ class Mare::Compiler::Infer
     end
   end
 
-  class TypeConditionForLocal < DynamicInfo
+  class TypeConditionForLocal < FixedInfo
     getter refine : AST::Node
     getter refine_type : Info
 
@@ -772,7 +882,7 @@ class Mare::Compiler::Infer
     end
   end
 
-  class TypeConditionStatic < DynamicInfo
+  class TypeConditionStatic < FixedInfo
     getter lhs : Info
     getter rhs : Info
 
@@ -822,6 +932,11 @@ class Mare::Compiler::Infer
       @local.add_downstream(use_pos, info, aliases - 1)
     end
 
+    def tethers(querent : Info) : Array(Tether)
+      return [] of Tether if querent == @local
+      Tether.via(self, @local.tethers(querent))
+    end
+
     def add_peer_hint(peer : Info)
       @local.add_peer_hint(peer)
     end
@@ -838,6 +953,11 @@ class Mare::Compiler::Infer
 
     def add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
       @lhs.add_downstream(use_pos, info, aliases)
+    end
+
+    def tethers(querent : Info) : Array(Tether)
+      return [] of Tether if querent == @lhs
+      Tether.via(self, @lhs.tethers(querent))
     end
 
     def add_peer_hint(peer : Info)
@@ -862,6 +982,11 @@ class Mare::Compiler::Infer
 
     def add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
       @yield_in.add_downstream(use_pos, info, aliases)
+    end
+
+    def tethers(querent : Info) : Array(Tether)
+      return [] of Tether if querent == @yield_in
+      Tether.via(self, @yield_in.tethers(querent))
     end
 
     def add_peer_hint(peer : Info)
@@ -893,6 +1018,10 @@ class Mare::Compiler::Infer
       @terms.each do |term|
         term.add_downstream(downstream_use_pos, elem_downstream, 0)
       end
+    end
+
+    def tether_upward_transform(ctx : Context, infer : ForReifiedFunc, meta_type : MetaType) : MetaType
+      meta_type
     end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc)
@@ -944,7 +1073,7 @@ class Mare::Compiler::Infer
         unless orig_elem_mt_union.alias.is_sendable?
           Error.at @pos, "This array literal can't have a reference cap of " \
             "#{array_cap.value} unless all of its elements are sendable",
-              describe_downstream_constraints(ctx, infer)
+              describe_tether_constraints(ctx, infer)
         end
       end
 
@@ -962,13 +1091,16 @@ class Mare::Compiler::Infer
     def possible_element_antecedents(ctx, infer) : Array({MetaType, MetaType::Capability})
       results = [] of {MetaType, MetaType::Capability}
 
-      total_downstream_constraint(ctx, infer).simplify(ctx).each_reachable_defn_with_cap(ctx).each do |rt, cap|
-        # TODO: Support more element antecedent detection patterns.
-        if rt.link == infer.prelude_type("Array") \
-        && rt.args.size == 1
-          results << {rt.args.first, cap}
+      MetaType
+        .new_intersection(tether_constraints(ctx, infer))
+        .simplify(ctx)
+        .each_reachable_defn_with_cap(ctx).each do |rt, cap|
+          # TODO: Support more element antecedent detection patterns.
+          if rt.link == infer.prelude_type("Array") \
+          && rt.args.size == 1
+            results << {rt.args.first, cap}
+          end
         end
-      end
 
       results
     end
@@ -980,6 +1112,30 @@ class Mare::Compiler::Infer
     def describe_kind; "array element" end
 
     def initialize(@pos, @array)
+    end
+
+    def tethers(querent : Info) : Array(Tether)
+      return [] of Tether if querent == @array
+      Tether.via(self, @array.tethers(querent))
+    end
+
+    def tether_upward_transform(ctx : Context, infer : ForReifiedFunc, meta_type : MetaType) : MetaType
+      results = [] of MetaType
+
+      meta_type.simplify(ctx).each_reachable_defn(ctx).each do |rt|
+        # TODO: Support more element antecedent detection patterns.
+        if rt.link == infer.prelude_type("Array") \
+        && rt.args.size == 1
+          results << rt.args.first.simplify(ctx)
+        end
+      end
+
+      # TODO: support multiple antecedents gracefully?
+      if results.size != 1
+        return MetaType.unconstrained
+      end
+
+      results.first.not_nil!
     end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc)
@@ -1002,6 +1158,17 @@ class Mare::Compiler::Infer
     end
 
     def describe_kind; "return value" end
+
+    def tethers(querent : Info) : Array(Tether)
+      return [] of Tether if querent == @lhs
+      Tether.via(self, @lhs.tethers(querent))
+    end
+
+    def tether_upward_transform(ctx : Context, infer : ForReifiedFunc, meta_type : MetaType) : MetaType
+      # TODO: is it possible to use the meta_type passed to us above,
+      # at least in some cases, instead of eagerly resolving here?
+      infer.resolve(ctx, self)
+    end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc)
       meta_type = follow_call(ctx, infer)
@@ -1318,6 +1485,15 @@ class Mare::Compiler::Infer
     def initialize(@pos, @call, @index)
     end
 
+    def tethers(querent : Info) : Array(Tether)
+      # TODO: is it possible to tether downward to the below chain of @call
+      [Tether.new(self)]
+    end
+
+    def tether_resolve(ctx : Context, infer : ForReifiedFunc)
+      infer.resolve(ctx, self)
+    end
+
     def resolve!(ctx : Context, infer : ForReifiedFunc)
       # We must first resolve the FromCall itself to collect the other_infers.
       infer.resolve(ctx, @call)
@@ -1379,6 +1555,15 @@ class Mare::Compiler::Infer
     def describe_kind; "parameter for this argument" end
 
     def initialize(@pos, @call, @index)
+    end
+
+    def tethers(querent : Info) : Array(Tether)
+      # TODO: is it possible to tether downward to the below chain of @call.lhs?
+      [Tether.new(self)]
+    end
+
+    def tether_resolve(ctx : Context, infer : ForReifiedFunc)
+      resolve!(ctx, infer) # TODO: should this be infer.resolve(ctx, self) instead?
     end
 
     def as_multiple_downstream_constraints(ctx : Context, infer : ForReifiedFunc) : Array({Source::Pos, MetaType})?

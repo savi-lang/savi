@@ -111,7 +111,7 @@
   :: > 33
   ::
   :fun ref "[]=" (key K, value V)
-    value_alias = value
+    value_alias V'aliased = value // TODO: remove the V'aliased explicit type?
     try (
       index = @_search(key)
       entry = @_array[index]!
