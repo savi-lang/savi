@@ -120,6 +120,9 @@ class Mare::Compiler::Infer
       meta_type.within_constraints?(ctx, [total_downstream_constraint(ctx, infer)])
     end
 
+    # This property can be set to give a hint in the event of a typecheck error.
+    property this_would_be_possible_if : Tuple(Source::Pos, String)?
+
     # The final MetaType must meet all constraints that have been imposed.
     def post_resolve!(ctx : Context, infer : ForReifiedFunc, meta_type : MetaType)
       return if downstreams_empty?
@@ -131,6 +134,7 @@ class Mare::Compiler::Infer
         extra = describe_downstream_constraints(ctx, infer)
         extra << {pos,
           "but the type of the #{described_kind} was #{meta_type.show_type}"}
+        extra << this_would_be_possible_if.not_nil! if this_would_be_possible_if
 
         Error.at downstream_use_pos, "The type of this expression " \
           "doesn't meet the constraints imposed on it",
@@ -155,6 +159,7 @@ class Mare::Compiler::Infer
                 "but the type of the #{described_kind} " \
                 "(when aliased) was #{meta_type_alias.show_type}"
               }
+              extra << this_would_be_possible_if.not_nil! if this_would_be_possible_if
 
               Error.at use_pos, "This aliasing violates uniqueness " \
                 "(did you forget to consume the variable?)",
@@ -999,7 +1004,43 @@ class Mare::Compiler::Infer
     def describe_kind; "return value" end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc)
-      follow_call(ctx, infer)
+      meta_type = follow_call(ctx, infer)
+
+      # TODO: auto-recovery of call result:
+
+      # # If we have no downstreams, return now.
+      # downstream = @downstreams[0][1] unless @downstreams.empty?
+      # return meta_type unless downstream
+
+      # # If recovering the call result would make no difference, return now.
+      # meta_type_recovered = meta_type.alias.recovered
+      # return meta_type if meta_type_recovered == meta_type.alias
+
+      # # If the result value type matches downstream metatype, return it now.
+      # downstream_mt = (
+      #   downstream.as_downstream_constraint_meta_type(ctx, infer) ||
+      #   infer.resolve_with_nil_on_reentrance(ctx, downstream)
+      # )
+      # return meta_type if downstream_mt.nil? || meta_type.subtype_of?(ctx, downstream_mt)
+
+      # # If the type would work after recovering the result,
+      # # see if it would be safe to do so by checking if all args are sendable.
+      # if meta_type_recovered.subtype_of?(ctx, downstream_mt)
+      #   if @yield_params.nil? && @yield_block.nil? \
+      #   && infer.resolve(ctx, @lhs).is_sendable? \
+      #   && (
+      #     @args.nil? || @args.not_nil!.terms.all? { |arg|
+      #       infer.resolve(ctx, infer.f_analysis[arg]).is_sendable?
+      #     }
+      #   )
+      #     return meta_type_recovered
+      #   else
+      #     self.this_would_be_possible_if = {pos,
+      #       "the receiver and all arguments were sendable"}
+      #   end
+      # end
+
+      meta_type
     end
 
     def resolve_others!(ctx : Context, infer : ForReifiedFunc)
