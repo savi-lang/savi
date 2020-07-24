@@ -1175,24 +1175,23 @@ class Mare::Compiler::Infer
 
       # TODO: auto-recovery of call result:
 
-      # # If we have no downstreams, return now.
-      # downstream = @downstreams[0][1] unless @downstreams.empty?
-      # return meta_type unless downstream
-
       # # If recovering the call result would make no difference, return now.
       # meta_type_recovered = meta_type.alias.recovered
       # return meta_type if meta_type_recovered == meta_type.alias
 
+      # # If we have no tether constraints, return now.
+      # tether_constraints = tether_constraints(ctx, infer)
+      # puts pos.show
+      # pp tether_constraints
+      # return meta_type if tether_constraints.empty?
+
       # # If the result value type matches downstream metatype, return it now.
-      # downstream_mt = (
-      #   downstream.as_downstream_constraint_meta_type(ctx, infer) ||
-      #   infer.resolve_with_nil_on_reentrance(ctx, downstream)
-      # )
-      # return meta_type if downstream_mt.nil? || meta_type.subtype_of?(ctx, downstream_mt)
+      # tether_mt = MetaType.new_intersection(tether_constraints).simplify(ctx)
+      # return meta_type if meta_type.subtype_of?(ctx, tether_mt)
 
       # # If the type would work after recovering the result,
       # # see if it would be safe to do so by checking if all args are sendable.
-      # if meta_type_recovered.subtype_of?(ctx, downstream_mt)
+      # if meta_type_recovered.subtype_of?(ctx, tether_mt)
       #   if @yield_params.nil? && @yield_block.nil? \
       #   && infer.resolve(ctx, @lhs).is_sendable? \
       #   && (
