@@ -505,6 +505,8 @@ module Mare::Compiler::PreInfer
       when "identity_digest_of"
         @analysis[node] = info = Infer::FixedPrelude.new(node.pos, "USize")
         info.resolvables << @analysis[node.term]
+      when "address_of"
+        @analysis[node] = Infer::AddressOf.new(node.pos, @analysis[node.term])
       when "--"
         @analysis[node] = Infer::Consume.new(node.pos, @analysis[node.term])
       else
