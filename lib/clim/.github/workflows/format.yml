@@ -1,0 +1,12 @@
+name: clim format-check
+
+on: [push]
+
+jobs:
+  format-check:
+    runs-on: ubuntu-latest
+    steps:
+    - name: checkout
+      uses: actions/checkout@v2
+    - name: format-check
+      run: make format-check

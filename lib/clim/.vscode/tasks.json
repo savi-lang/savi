@@ -1,0 +1,59 @@
+{
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    // for the documentation about the tasks.json format
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "crystal spec all",
+            "type": "shell",
+            "group": {
+                "kind": "test",
+                "isDefault": true
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            },
+            "command": "make spec"
+        },
+        {
+            "label": "crystal spec current file",
+            "type": "shell",
+            "group": {
+                "kind": "test",
+                "isDefault": true
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            },
+            "command": "crystal spec ${relativeFile} --error-trace"
+        },
+        {
+            "label": "crystal spec current line",
+            "type": "shell",
+            "group": {
+                "kind": "test",
+                "isDefault": true
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            },
+            "command": "crystal spec ${relativeFile}:${lineNumber} --error-trace"
+        },
+        {
+            "label": "crystal tool expand",
+            "type": "shell",
+            "group": {
+                "kind": "test",
+                "isDefault": true
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            },
+            "command": "crystal tool expand -c ${relativeFile}:${lineNumber}:1 ${relativeFile}"
+        }
+    ]
+}

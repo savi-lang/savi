@@ -1,0 +1,5 @@
+/doc/
+/bin/
+/lib/
+/.shards/
+!/.vscode/

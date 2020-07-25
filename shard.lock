@@ -1,5 +1,9 @@
 version: 1.0
 shards:
+  clim:
+    github: at-grandpa/clim
+    version: 0.13.0
+
   lsp:
     github: jemc/crystal-lsp
     commit: c1850e4fac8144fc8b895747a74d5cc6714ed1e7
