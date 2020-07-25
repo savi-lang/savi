@@ -24,7 +24,7 @@ export async function deactivate() {
   return Promise.all([...clients.values()].map(ws => ws.stop()))
 }
 
-const tmp = require("tmp");
+import * as tmp from "tmp";
 
 function didOpenTextDocument(
   document: TextDocument,
