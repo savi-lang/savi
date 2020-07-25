@@ -39,6 +39,11 @@ class Mare::Compiler::Binary
       -fuse-ld=lld -rdynamic -static -fpic
       -lc -pthread -ldl -latomic -lexecinfo
     }
+
+    ctx.link_libraries.each do |x|
+      link_args << "-l" + x
+    end
+
     link_args << obj_filename
     link_args << "-o" << "main" # TODO: customizable output binary filename
 
