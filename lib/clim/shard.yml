@@ -1,0 +1,13 @@
+name: clim
+version: 0.13.0
+
+authors:
+  - at-grandpa <@at_grandpa>
+
+targets:
+  clim:
+    main: src/clim.cr
+
+crystal: 0.35.1
+
+license: MIT
