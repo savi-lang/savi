@@ -457,7 +457,7 @@ class Mare::Compiler::Infer
   class AddressOf < DynamicInfo
     getter variable : Info
 
-    def describe_kind; "address of" end
+    def describe_kind; "address of this variable" end
 
     def initialize(@pos, @variable)
     end
