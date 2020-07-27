@@ -35,7 +35,7 @@ class Mare::Compiler::BinaryVerona
 
     link_args = %w{clang++
       -fuse-ld=lld -rdynamic -static -fpic
-      -lc -pthread -ldl -latomic -lexecinfo
+      -lc -pthread -ldl -latomic
     }
     link_args << obj_filename
     link_args << VERONA_STATIC_LIB

@@ -330,7 +330,7 @@ class Mare::Compiler::CodeGen
 
     @bitwidth = @isize.int_width.to_u.as(UInt32)
     @memcpy = mod.functions.add("llvm.memcpy.p0i8.p0i8.i#{@bitwidth}",
-      [@ptr, @ptr, @isize, @i32, @i1], @void).as(LLVM::Function)
+      [@ptr, @ptr, @isize, @i1], @void).as(LLVM::Function)
 
     @frames = [] of Frame
     @cstring_globals = {} of String => LLVM::Value
@@ -1033,7 +1033,6 @@ class Mare::Compiler::CodeGen
             params[2],
             @isize.const_int(elem_size_value),
           ),
-          @i32.const_int(1),
           @i1.const_int(0),
         ])
         gen_none
@@ -2209,17 +2208,17 @@ class Mare::Compiler::CodeGen
   def gen_integer(expr : (AST::LiteralInteger | AST::LiteralCharacter))
     type_ref = type_of(expr)
     case type_ref.llvm_use_type(ctx)
-    when :i1 then @i1.const_int(expr.value.to_i8)
-    when :i8 then @i8.const_int(expr.value.to_i8)
-    when :i16 then @i16.const_int(expr.value.to_i16)
-    when :i32 then @i32.const_int(expr.value.to_i32)
-    when :i64 then @i64.const_int(expr.value.to_i64)
-    when :f32 then @f32.const_float(expr.value.to_f32)
-    when :f64 then @f64.const_double(expr.value.to_f64)
+    when :i1 then @i1.const_int(expr.value.to_i8!)
+    when :i8 then @i8.const_int(expr.value.to_i8!)
+    when :i16 then @i16.const_int(expr.value.to_i16!)
+    when :i32 then @i32.const_int(expr.value.to_i32!)
+    when :i64 then @i64.const_int(expr.value.to_i64!)
+    when :f32 then @f32.const_float(expr.value.to_f32!)
+    when :f64 then @f64.const_double(expr.value.to_f64!)
     when :isize then @isize.const_int(
       (abi_size_of(@isize) == 8) \
-      ? expr.value.to_i64
-      : expr.value.to_i32
+      ? expr.value.to_i64!
+      : expr.value.to_i32!
     )
     else raise "invalid numeric literal type: #{type_ref.inspect}"
     end
