@@ -142,7 +142,7 @@ class Mare::Compiler::Macros < Mare::AST::CopyOnMutateVisitor
     elsif Util.match_ident?(node, 0, "address_of")
       Util.require_terms(node, [
         nil,
-        "the value whose address is to be gotten",
+        "the local variable whose address is to be referenced",
       ])
       visit_address_of(node)
     elsif Util.match_ident?(node, 1, "is")
