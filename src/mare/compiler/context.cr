@@ -20,6 +20,8 @@ class Mare::Compiler::Context
   getter serve_definition
   getter serve_hover
 
+  getter link_libraries
+
   def initialize
     @program = Program.new
     @stack = [] of Interpreter
@@ -42,6 +44,7 @@ class Mare::Compiler::Context
     @refer_type = ReferType::Pass.new
     @serve_definition = ServeDefinition.new
     @serve_hover = ServeHover.new
+    @link_libraries = Set(String).new
   end
 
   def compile_library(*args)

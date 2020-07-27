@@ -32,7 +32,7 @@ class Mare::Compiler::Import
 
   def run_for_library(ctx, library)
     # For each import statement found in the library, resolve it.
-    library.imports.each do |import|
+    library.imports.each.with_index do |import, i|
       # Skip imports that have already been resolved.
       next if @libraries_by_import.has_key?(import)
 
@@ -41,6 +41,14 @@ class Mare::Compiler::Import
       relative_path = import.ident
       raise NotImplementedError.new(import.ident.to_a) \
         unless relative_path.is_a?(AST::LiteralString)
+
+      # Check if we are linking library
+      if (path = relative_path.value).starts_with? "lib:"
+        path = path[4..path.size]
+        ctx.link_libraries << path
+        library.imports.delete_at(i)
+        next
+      end
 
       # Based on the source file that the import statement was declared in
       # and the relative path mentioned in the import statement itself,
