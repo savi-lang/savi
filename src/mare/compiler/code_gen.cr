@@ -1894,7 +1894,6 @@ class Mare::Compiler::CodeGen
   end
 
   def gen_address_of(term_expr)
-    # term_expr = term_expr.as AST::Identifier
     ref = func_frame.refer[term_expr].as Refer::Local
 
     alloca = func_frame.current_locals[ref]
