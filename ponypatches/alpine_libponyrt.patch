@@ -1,0 +1,54 @@
+diff --git a/Makefile b/Makefile
+index d6540bc..6778be4 100644
+--- a/Makefile
++++ b/Makefile
+@@ -162,8 +162,9 @@ crossBuildDir := $(srcDir)/build/$(arch)/build_$(config)
+ 
+ cross-libponyrt:
+ 	$(SILENT)mkdir -p $(crossBuildDir)
+-	$(SILENT)cd '$(crossBuildDir)' && env CC=$(CC) CXX=$(CXX) cmake -B '$(crossBuildDir)' -S '$(srcDir)' -DCMAKE_SYSTEM_NAME=Linux -DCMAKE_SYSTEM_PROCESSOR=$(arch) -DCMAKE_C_COMPILER=$(CC) -DCMAKE_CXX_COMPILER=$(CXX) -DPONY_CROSS_LIBPONYRT=true -DCMAKE_BUILD_TYPE=$(config) -DCMAKE_C_FLAGS="-march=$(arch) -mtune=$(tune)" -DCMAKE_CXX_FLAGS="-march=$(arch) -mtune=$(tune)" -DPONYC_VERSION=$(version) -DLL_FLAGS="-O3;-march=$(llc_arch);-mcpu=$(tune)"
++	$(SILENT)cd '$(crossBuildDir)' && env CC=$(CC) CXX=$(CXX) cmake -B '$(crossBuildDir)' -S '$(srcDir)' -DCMAKE_SYSTEM_NAME=Linux -DCMAKE_SYSTEM_PROCESSOR=$(arch) -DCMAKE_C_COMPILER=$(CC) -DCMAKE_CXX_COMPILER=$(CXX) -DPONY_CROSS_LIBPONYRT=true -DCMAKE_BUILD_TYPE=$(config) -DCMAKE_C_FLAGS="-march=$(arch) -mtune=$(tune)" -DCMAKE_CXX_FLAGS="-march=$(arch) -mtune=$(tune)" -DPONYC_VERSION=$(version) -DLL_FLAGS="-O3;-march=$(llc_arch);-mcpu=$(tune)" $(BITCODE_FLAGS)
+ 	$(SILENT)cd '$(crossBuildDir)' && env CC=$(CC) CXX=$(CXX) cmake --build '$(crossBuildDir)' --config $(config) --target libponyrt -- $(build_flags)
++	$(SILENT)cd '$(crossBuildDir)' && env CC=$(CC) CXX=$(CXX) cmake --build '$(crossBuildDir)' --config $(config) --target libponyrt_bc -- $(build_flags)
+ 
+ test: all test-core test-stdlib-release test-examples
+ 
+diff --git a/src/libponyrt/CMakeLists.txt b/src/libponyrt/CMakeLists.txt
+index 01a3117..7e70774 100644
+--- a/src/libponyrt/CMakeLists.txt
++++ b/src/libponyrt/CMakeLists.txt
+@@ -132,7 +132,7 @@ if(PONY_RUNTIME_BITCODE)
+         #message("${libponyrt_SOURCE_DIR}/${_src_file} -> ${libponyrt_BINARY_DIR}/${_src_file}.bc")
+         get_filename_component(_src_dir ${_src_file} DIRECTORY)
+         add_custom_command(
+-            COMMAND mkdir -p "${libponyrt_BINARY_DIR}/${_src_dir}" && clang -DBUILD_COMPILER="${CMAKE_C_COMPILER_VERSION}" -D_FILE_OFFSET_BITS=64 -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS -DLLVM_BUILD_MODE=${PONY_LLVM_BUILD_MODE} -DLLVM_VERSION="${LLVM_VERSION}" -DPONY_ALWAYS_ASSERT -DPONY_COMPILER="${CMAKE_C_COMPILER}" -DPONY_ARCH="${CMAKE_SYSTEM_PROCESSOR}" -DPONY_BUILD_CONFIG="release" -DPONY_USE_BIGINT -DPONY_VERSION="${PONYC_VERSION}" -DPONY_VERSION_STR="${PONYC_VERSION} [release]\\nCompiled with: LLVM ${LLVM_VERSION} -- ${CMAKE_C_COMPILER_ID}-${CMAKE_C_COMPILER_VERSION}-${CMAKE_C_COMPILER_ARCHITECTURE_ID}" -fexceptions -std=gnu11 -Werror -Wconversion -Wno-sign-conversion -Wno-atomic-alignment -Wextra -Wall -I. -I../common -emit-llvm -o "${libponyrt_BINARY_DIR}/${_src_file}.bc" -c ${_src_file}
++	    COMMAND mkdir -p "${libponyrt_BINARY_DIR}/${_src_dir}" && clang -DBUILD_COMPILER="${CMAKE_C_COMPILER_VERSION}" -D_FILE_OFFSET_BITS=64 -D__STDC_CONSTANT_MACROS -fPIC -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS -DLLVM_BUILD_MODE=${PONY_LLVM_BUILD_MODE} -DLLVM_VERSION="${LLVM_VERSION}" -DPONY_ALWAYS_ASSERT -DPONY_COMPILER="${CMAKE_C_COMPILER}" -DPONY_ARCH="${CMAKE_SYSTEM_PROCESSOR}" -DPONY_BUILD_CONFIG="release" -DPONY_USE_BIGINT -DPONY_VERSION="${PONYC_VERSION}" -DPONY_VERSION_STR="${PONYC_VERSION} [release]\\nCompiled with: LLVM ${LLVM_VERSION} -- ${CMAKE_C_COMPILER_ID}-${CMAKE_C_COMPILER_VERSION}-${CMAKE_C_COMPILER_ARCHITECTURE_ID}" -fexceptions -std=gnu11 -Werror -Wconversion -Wno-sign-conversion -Wno-atomic-alignment -Wextra -Wall -I. -I../common -emit-llvm -o "${libponyrt_BINARY_DIR}/${_src_file}.bc" -c ${_src_file}
+             WORKING_DIRECTORY ${libponyrt_SOURCE_DIR}
+             DEPENDS "${libponyrt_SOURCE_DIR}/${_src_file}"
+             OUTPUT "${libponyrt_BINARY_DIR}/${_src_file}.bc"
+diff --git a/src/libponyrt/lang/socket.c b/src/libponyrt/lang/socket.c
+index 9de01b4..197fdca 100644
+--- a/src/libponyrt/lang/socket.c
++++ b/src/libponyrt/lang/socket.c
+@@ -4470,8 +4470,8 @@ PONY_API int pony_os_sockopt_option(int option)
+ #ifdef SO_RCVLOWAT
+     case 886: return SO_RCVLOWAT;
+ #endif
+-#ifdef SO_RCVTIMEO
+-    case 887: return SO_RCVTIMEO;
++#ifdef SO_RCVTIMEO_OLD
++    case 887: return SO_RCVTIMEO_OLD;
+ #endif
+ #ifdef SO_RDS_TRANSPORT
+     case 888: return SO_RDS_TRANSPORT;
+@@ -4527,8 +4527,8 @@ PONY_API int pony_os_sockopt_option(int option)
+ #ifdef SO_SNDLOWAT
+     case 905: return SO_SNDLOWAT;
+ #endif
+-#ifdef SO_SNDTIMEO
+-    case 906: return SO_SNDTIMEO;
++#ifdef SO_SNDTIMEO_OLD
++    case 906: return SO_SNDTIMEO_OLD;
+ #endif
+ #ifdef SO_TIMESTAMP
+     case 907: return SO_TIMESTAMP;

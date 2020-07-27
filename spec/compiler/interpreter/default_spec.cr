@@ -1,4 +1,4 @@
-require "../../../spec_helper"
+require "../../spec_helper"
 
 describe Mare::Compiler::Interpreter::Default do
   it "complains when the function doesn't have a space before the params" do
