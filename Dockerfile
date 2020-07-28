@@ -2,7 +2,7 @@
 # Dev stage: outputs an alpine image with everything needed for development.
 # (this image is used by the `make ready` command to create a dev environment)
 
-FROM alpine as dev
+FROM alpine:3.12 as dev
 
 # Install build tools, Pony dependencies, LLVM libraries, and Crystal.
 RUN apk add --no-cache --update \
