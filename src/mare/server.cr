@@ -253,7 +253,9 @@ class Mare::Server
                 end
               end
           end
+        else
         end
+      else
       end
       msg
     end
@@ -352,12 +354,10 @@ class Mare::Server
 
     host_filepath = convert_path_to_host(filename)
 
-    @wire.notify(LSP::Message::PublishDiagnostics) do |msg|
-      msg.params.uri = URI.new(path: host_filepath)
-
+    diagnostics = 
       case err
       when NotImplementedError
-        msg.params.diagnostics = [
+        [
           LSP::Data::Diagnostic.new(
             LSP::Data::Range.new(
               LSP::Data::Position.new(
@@ -392,7 +392,7 @@ class Mare::Server
             info[1]
           )
         end
-        msg.params.diagnostics = [
+        [
           LSP::Data::Diagnostic.new(
             LSP::Data::Range.new(
               LSP::Data::Position.new(
@@ -424,7 +424,7 @@ class Mare::Server
         line = content[line_start...line_finish]
         cursor = " " * col_no + "^"
 
-        msg.params.diagnostics = [
+        [
           LSP::Data::Diagnostic.new(
             LSP::Data::Range.new(
               LSP::Data::Position.new(
@@ -439,9 +439,17 @@ class Mare::Server
             message: "unexpected token at #{line_no}:#{col_no}\n#{line}\n#{cursor}"
           )
         ]
+      else
+        nil
       end
 
-      msg
+    if diagnostics
+      @wire.notify(LSP::Message::PublishDiagnostics) do |msg|
+        msg.params.uri = URI.new(path: host_filepath)
+        msg.params.diagnostics = diagnostics
+
+        msg
+      end
     end
   end
 end

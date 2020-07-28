@@ -125,6 +125,7 @@ module Mare::Compiler::Refer
         ident.accept(ctx, self)
         args.try(&.accept(ctx, self))
         touch_yield_loop(ctx, yield_params, yield_block)
+      else
       end
     end
 
@@ -295,7 +296,7 @@ module Mare::Compiler::Refer
   end
 
   class Pass < Compiler::Pass::Analyze(Analysis, Analysis, Analysis)
-    def analyze_type_alias(ctx, t, t_link)
+    def analyze_type_alias(ctx, t, t_link) : Analysis
       refer_type = ctx.refer_type[t_link]
       visitor = Visitor.new(Analysis.new, refer_type)
 
@@ -305,7 +306,7 @@ module Mare::Compiler::Refer
       visitor.analysis
     end
 
-    def analyze_type(ctx, t, t_link)
+    def analyze_type(ctx, t, t_link) : Analysis
       refer_type = ctx.refer_type[t_link]
       visitor = Visitor.new(Analysis.new, refer_type)
 
@@ -314,7 +315,7 @@ module Mare::Compiler::Refer
       visitor.analysis
     end
 
-    def analyze_func(ctx, f, f_link, t_analysis)
+    def analyze_func(ctx, f, f_link, t_analysis) : Analysis
       refer_type = ctx.refer_type[f_link]
       visitor = Visitor.new(Analysis.new, refer_type)
 

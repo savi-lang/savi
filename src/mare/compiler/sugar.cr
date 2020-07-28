@@ -205,6 +205,8 @@ class Mare::Compiler::Sugar < Mare::AST::CopyOnMutateVisitor
       case node.group.style
       when "[" then "[]"
       when "[!" then "[]!"
+      else
+        nil
       end
     if square_bracket
       # PONY special case: square brackets are type params in Pony

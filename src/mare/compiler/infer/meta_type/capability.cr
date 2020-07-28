@@ -364,10 +364,12 @@ struct Mare::Compiler::Infer::MetaType::Capability
 
     case origin
     when TAG, NON then return NON
+    else
     end
 
     case self
     when TAG, NON then return self
+    else
     end
 
     case origin
@@ -456,10 +458,12 @@ struct Mare::Compiler::Infer::MetaType::Capability
     case origin
     when VAL, BOX, TAG, NON then
       raise "can't extract from non-writable cap #{origin}"
+    else
     end
 
     case self
     when TAG, NON then return self
+    else
     end
 
     case origin

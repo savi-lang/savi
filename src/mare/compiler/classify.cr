@@ -68,6 +68,7 @@ module Mare::Compiler::Classify
       when AST::Loop
         recursive_value_not_needed!(node.body)
         recursive_value_not_needed!(node.else_body)
+      else
       end
     end
 
@@ -82,6 +83,7 @@ module Mare::Compiler::Classify
       when AST::Loop
         recursive_value_needed!(node.body)
         recursive_value_needed!(node.else_body)
+      else
       end
     end
   end
@@ -138,6 +140,7 @@ module Mare::Compiler::Classify
         else
           raise NotImplementedError.new(group.to_a.inspect)
         end
+      else
       end
     end
 
@@ -182,6 +185,7 @@ module Mare::Compiler::Classify
         @analysis.no_value!(args) if args
         @analysis.no_value!(yield_params) if yield_params
         @analysis.value_needed!(yield_block) if yield_block
+      else
       end
     end
 
@@ -191,15 +195,15 @@ module Mare::Compiler::Classify
   end
 
   class Pass < Compiler::Pass::Analyze(Nil, Nil, Analysis)
-    def analyze_type_alias(ctx, t, t_link)
+    def analyze_type_alias(ctx, t, t_link) : Nil
       nil # no analysis at the type alias level
     end
 
-    def analyze_type(ctx, t, t_link)
+    def analyze_type(ctx, t, t_link) : Nil
       nil # no analysis at the type level
     end
 
-    def analyze_func(ctx, f, f_link, t_analysis)
+    def analyze_func(ctx, f, f_link, t_analysis) : Analysis
       refer = ctx.refer[f_link]
       visitor = Visitor.new(Analysis.new, refer)
 

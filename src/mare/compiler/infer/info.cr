@@ -305,7 +305,7 @@ class Mare::Compiler::Infer
       end
     end
 
-    def resolve!(ctx : Context, infer : ForReifiedFunc)
+    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
       explicit = @explicit
 
       if explicit
@@ -359,13 +359,13 @@ class Mare::Compiler::Infer
     getter name : String
     getter resolvables : Array(Info)
 
-    def describe_kind; "expression" end
+    def describe_kind : String; "expression" end
 
     def initialize(@pos, @name)
       @resolvables = [] of Info
     end
 
-    def resolve!(ctx : Context, infer : ForReifiedFunc)
+    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
       MetaType.new(infer.reified_type(infer.prelude_type(@name)))
     end
 
@@ -377,12 +377,12 @@ class Mare::Compiler::Infer
   class FixedTypeExpr < FixedInfo
     getter node : AST::Node
 
-    def describe_kind; "type expression" end
+    def describe_kind : String; "type expression" end
 
     def initialize(@pos, @node)
     end
 
-    def resolve!(ctx : Context, infer : ForReifiedFunc)
+    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
       infer.type_expr(@node)
     end
   end
@@ -390,12 +390,12 @@ class Mare::Compiler::Infer
   class FixedEnumValue < FixedInfo
     getter node : AST::Node
 
-    def describe_kind; "expression" end
+    def describe_kind : String; "expression" end
 
     def initialize(@pos, @node)
     end
 
-    def resolve!(ctx : Context, infer : ForReifiedFunc)
+    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
       infer.type_expr(@node)
     end
   end
@@ -404,12 +404,12 @@ class Mare::Compiler::Infer
     getter node : AST::Node
     getter type_param_ref : Refer::TypeParam?
 
-    def describe_kind; "singleton value for this type" end
+    def describe_kind : String; "singleton value for this type" end
 
     def initialize(@pos, @node, @type_param_ref = nil)
     end
 
-    def resolve!(ctx : Context, infer : ForReifiedFunc)
+    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
       # If this node is further qualified, we don't want to both resolving it,
       # and doing so would trigger errors during type argument validation,
       # because the type arguments haven't been applied yet; they will be
@@ -424,7 +424,7 @@ class Mare::Compiler::Infer
   end
 
   class Self < FixedInfo
-    def describe_kind; "receiver value" end
+    def describe_kind : String; "receiver value" end
 
     def initialize(@pos)
     end
@@ -436,18 +436,18 @@ class Mare::Compiler::Infer
       end
     end
 
-    def resolve!(ctx : Context, infer : ForReifiedFunc)
+    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
       infer.analysis.resolved_self
     end
   end
 
   class FromConstructor < FixedInfo
-    def describe_kind; "constructed object" end
+    def describe_kind : String; "constructed object" end
 
     def initialize(@pos, @cap : String)
     end
 
-    def resolve!(ctx : Context, infer : ForReifiedFunc)
+    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
       # A constructor returns the ephemeral of the self type with the given cap.
       # TODO: should the ephemeral be removed, given Mare's ephemeral semantics?
       MetaType.new(infer.reified.type, @cap).ephemeralize
@@ -457,12 +457,12 @@ class Mare::Compiler::Infer
   class ReflectionOfType < DynamicInfo
     getter reflect_type : Info
 
-    def describe_kind; "type reflection" end
+    def describe_kind : String; "type reflection" end
 
     def initialize(@pos, @reflect_type)
     end
 
-    def resolve!(ctx : Context, infer : ForReifiedFunc)
+    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
       follow_reflection(ctx, infer)
     end
 
@@ -496,7 +496,7 @@ class Mare::Compiler::Infer
   end
 
   class Literal < DynamicInfo
-    def describe_kind; "literal value" end
+    def describe_kind : String; "literal value" end
 
     def initialize(@pos, @possible : MetaType)
       @peer_hints = [] of Info
@@ -513,7 +513,7 @@ class Mare::Compiler::Infer
       end
     end
 
-    def resolve!(ctx : Context, infer : ForReifiedFunc)
+    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
       tether_constraints = tether_constraints(ctx, infer)
 
       # Literal values (such as numeric literals) sometimes have
@@ -560,15 +560,15 @@ class Mare::Compiler::Infer
   end
 
   class FuncBody < NamedInfo
-    def describe_kind; "function body" end
+    def describe_kind : String; "function body" end
   end
 
   class Local < NamedInfo
-    def describe_kind; "local variable" end
+    def describe_kind : String; "local variable" end
   end
 
   class Param < NamedInfo
-    def describe_kind; "parameter" end
+    def describe_kind : String; "parameter" end
   end
 
   class Field < DynamicInfo
@@ -576,7 +576,7 @@ class Mare::Compiler::Infer
       @upstreams = [] of Info
     end
 
-    def describe_kind; "field reference" end
+    def describe_kind : String; "field reference" end
 
     def assign(ctx : Context, upstream : Info, upstream_pos : Source::Pos)
       upstream.add_downstream(upstream_pos, self, 0)
@@ -591,7 +591,7 @@ class Mare::Compiler::Infer
       infer.resolve(ctx, self)
     end
 
-    def resolve!(ctx : Context, infer : ForReifiedFunc)
+    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
       follow_field(ctx, infer)
     end
 
@@ -620,13 +620,13 @@ class Mare::Compiler::Infer
     def initialize(@field : Field, @origin : Self)
     end
 
-    def describe_kind; "field read" end
+    def describe_kind : String; "field read" end
 
     def pos
       @field.pos
     end
 
-    def resolve!(ctx : Context, infer : ForReifiedFunc)
+    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
       origin_mt = infer.resolve(ctx, @origin)
       field_mt = infer.resolve(ctx, @field)
       field_mt.viewed_from(origin_mt).alias
@@ -637,13 +637,13 @@ class Mare::Compiler::Infer
     def initialize(@field : Field, @origin : Self)
     end
 
-    def describe_kind; "field extraction" end
+    def describe_kind : String; "field extraction" end
 
     def pos
       @field.pos
     end
 
-    def resolve!(ctx : Context, infer : ForReifiedFunc)
+    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
       origin_mt = infer.resolve(ctx, @origin)
       field_mt = infer.resolve(ctx, @field)
       field_mt.extracted_from(origin_mt).ephemeralize
@@ -662,7 +662,7 @@ class Mare::Compiler::Infer
       [] of Tether
     end
 
-    def resolve!(ctx : Context, infer : ForReifiedFunc)
+    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
       MetaType.new(MetaType::Unsatisfiable.instance)
     end
   end
@@ -688,7 +688,7 @@ class Mare::Compiler::Infer
       final_term.add_peer_hint(peer)
     end
 
-    def resolve!(ctx : Context, infer : ForReifiedFunc)
+    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
       infer.resolve(ctx, final_term)
     end
 
@@ -704,7 +704,7 @@ class Mare::Compiler::Infer
   class Phi < DynamicInfo
     getter branches : Array({Info?, Info, Bool})
 
-    def describe_kind; "choice block" end
+    def describe_kind : String; "choice block" end
 
     def initialize(@pos, @branches)
       prior_bodies = [] of Info
@@ -732,7 +732,7 @@ class Mare::Compiler::Infer
       end
     end
 
-    def resolve!(ctx : Context, infer : ForReifiedFunc)
+    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
       MetaType.new_union(
         follow_branches(ctx, infer)
       )
@@ -823,12 +823,12 @@ class Mare::Compiler::Infer
     getter lhs : Info
     getter refine_type : Info
 
-    def describe_kind; "type parameter condition" end
+    def describe_kind : String; "type parameter condition" end
 
     def initialize(@pos, @refine, @lhs, @refine_type)
     end
 
-    def resolve!(ctx : Context, infer : ForReifiedFunc)
+    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
       MetaType.new(infer.reified_type(infer.prelude_type("Bool")))
     end
 
@@ -842,12 +842,12 @@ class Mare::Compiler::Infer
     getter lhs : Info
     getter rhs : Info
 
-    def describe_kind; "type condition" end
+    def describe_kind : String; "type condition" end
 
     def initialize(@pos, @lhs, @rhs)
     end
 
-    def resolve!(ctx : Context, infer : ForReifiedFunc)
+    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
       MetaType.new(infer.reified_type(infer.prelude_type("Bool")))
     end
 
@@ -869,12 +869,12 @@ class Mare::Compiler::Infer
     getter refine : AST::Node
     getter refine_type : Info
 
-    def describe_kind; "type condition" end
+    def describe_kind : String; "type condition" end
 
     def initialize(@pos, @refine, @refine_type)
     end
 
-    def resolve!(ctx : Context, infer : ForReifiedFunc)
+    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
       MetaType.new(infer.reified_type(infer.prelude_type("Bool")))
     end
 
@@ -898,7 +898,7 @@ class Mare::Compiler::Infer
     getter lhs : Info
     getter rhs : Info
 
-    def describe_kind; "static type condition" end
+    def describe_kind : String; "static type condition" end
 
     def initialize(@pos, @lhs, @rhs)
     end
@@ -909,7 +909,7 @@ class Mare::Compiler::Infer
       lhs_mt.satisfies_bound?(ctx, rhs_mt)
     end
 
-    def resolve!(ctx : Context, infer : ForReifiedFunc)
+    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
       MetaType.new(infer.reified_type(infer.prelude_type("Bool")))
     end
   end
@@ -918,12 +918,12 @@ class Mare::Compiler::Infer
     getter refine : Info
     getter refine_type : Info
 
-    def describe_kind; "type refinement" end
+    def describe_kind : String; "type refinement" end
 
     def initialize(@pos, @refine, @refine_type)
     end
 
-    def resolve!(ctx : Context, infer : ForReifiedFunc)
+    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
       infer.resolve(ctx, @refine).intersect(infer.resolve(ctx, @refine_type))
     end
   end
@@ -931,12 +931,12 @@ class Mare::Compiler::Infer
   class Consume < Info
     getter local : Info
 
-    def describe_kind; "consumed reference" end
+    def describe_kind : String; "consumed reference" end
 
     def initialize(@pos, @local)
     end
 
-    def resolve!(ctx : Context, infer : ForReifiedFunc)
+    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
       infer.resolve(ctx, @local).ephemeralize
     end
 
@@ -957,7 +957,7 @@ class Mare::Compiler::Infer
     getter lhs : NamedInfo
     getter rhs : Info
 
-    def describe_kind; "assign result" end
+    def describe_kind : String; "assign result" end
 
     def initialize(@pos, @lhs, @rhs)
     end
@@ -974,7 +974,7 @@ class Mare::Compiler::Infer
       @lhs.add_peer_hint(peer)
     end
 
-    def resolve!(ctx : Context, infer : ForReifiedFunc)
+    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
       infer.resolve(ctx, @lhs).alias
     end
 
@@ -1002,7 +1002,7 @@ class Mare::Compiler::Infer
       @yield_in.add_peer_hint(peer)
     end
 
-    def resolve!(ctx : Context, infer : ForReifiedFunc)
+    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
       infer.resolve(ctx, @yield_in)
     end
 
@@ -1014,7 +1014,7 @@ class Mare::Compiler::Infer
   class ArrayLiteral < DynamicInfo
     getter terms : Array(Info)
 
-    def describe_kind; "array literal" end
+    def describe_kind : String; "array literal" end
 
     def initialize(@pos, @terms)
     end
@@ -1033,7 +1033,7 @@ class Mare::Compiler::Infer
       meta_type
     end
 
-    def resolve!(ctx : Context, infer : ForReifiedFunc)
+    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
       array_defn = infer.prelude_type("Array")
 
       # By default, an array literal has a cap of `ref`.
@@ -1118,7 +1118,7 @@ class Mare::Compiler::Infer
   class ArrayLiteralElementAntecedent < DynamicInfo
     getter array : ArrayLiteral
 
-    def describe_kind; "array element" end
+    def describe_kind : String; "array element" end
 
     def initialize(@pos, @array)
     end
@@ -1146,7 +1146,7 @@ class Mare::Compiler::Infer
       results.first.not_nil!
     end
 
-    def resolve!(ctx : Context, infer : ForReifiedFunc)
+    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
       antecedents = @array.possible_element_antecedents(ctx, infer)
       antecedents.empty? ? MetaType.unconstrained : MetaType.new_union(antecedents.map(&.first))
     end
@@ -1165,7 +1165,7 @@ class Mare::Compiler::Infer
       @resolvables = [] of Info
     end
 
-    def describe_kind; "return value" end
+    def describe_kind : String; "return value" end
 
     def tethers(querent : Info) : Array(Tether)
       Tether.chain(@lhs, querent)
@@ -1177,7 +1177,7 @@ class Mare::Compiler::Infer
       infer.resolve(ctx, self)
     end
 
-    def resolve!(ctx : Context, infer : ForReifiedFunc)
+    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
       meta_type = follow_call(ctx, infer)
 
       # TODO: auto-recovery of call result:
@@ -1486,7 +1486,7 @@ class Mare::Compiler::Infer
     getter call : FromCall
     getter index : Int32
 
-    def describe_kind; "value yielded to this block" end
+    def describe_kind : String; "value yielded to this block" end
 
     def initialize(@pos, @call, @index)
     end
@@ -1499,7 +1499,7 @@ class Mare::Compiler::Infer
       infer.resolve(ctx, self)
     end
 
-    def resolve!(ctx : Context, infer : ForReifiedFunc)
+    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
       # We must first resolve the FromCall itself to collect the other_infers.
       infer.resolve(ctx, @call)
       other_infers = infer.analysis.call_infers_for[@call]
@@ -1525,12 +1525,12 @@ class Mare::Compiler::Infer
   class TowardCallYieldIn < DynamicInfo
     getter call : FromCall
 
-    def describe_kind; "expected for the yield result" end
+    def describe_kind : String; "expected for the yield result" end
 
     def initialize(@pos, @call)
     end
 
-    def resolve!(ctx : Context, infer : ForReifiedFunc)
+    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
       # We must first resolve the FromCall itself to collect the other_infers.
       infer.resolve(ctx, @call)
       other_infers = infer.analysis.call_infers_for[@call]
@@ -1557,7 +1557,7 @@ class Mare::Compiler::Infer
     getter call : FromCall
     getter index : Int32
 
-    def describe_kind; "parameter for this argument" end
+    def describe_kind : String; "parameter for this argument" end
 
     def initialize(@pos, @call, @index)
     end
@@ -1584,7 +1584,7 @@ class Mare::Compiler::Infer
       end
     end
 
-    def resolve!(ctx : Context, infer : ForReifiedFunc)
+    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
       other_infers = @call.follow_call_resolve_other_infers(ctx, infer)
 
       MetaType.new_intersection(

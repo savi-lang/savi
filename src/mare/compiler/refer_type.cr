@@ -74,6 +74,8 @@ module Mare::Compiler::ReferType
         Refer::TypeAlias.new(found)
       when Program::TypeWithValue::Link
         Refer::Type.new(found.resolve(ctx).target, found)
+      else
+        nil
       end
     end
 
@@ -110,7 +112,7 @@ module Mare::Compiler::ReferType
       end
     end
 
-    def analyze_type_alias(ctx, t, t_link)
+    def analyze_type_alias(ctx, t, t_link) : Analysis
       t_analysis = Analysis.new
 
       observe_type_params(ctx, t, t_link, t_analysis)
@@ -128,7 +130,7 @@ module Mare::Compiler::ReferType
       visitor.analysis
     end
 
-    def analyze_type(ctx, t, t_link)
+    def analyze_type(ctx, t, t_link) : Analysis
       t_analysis = Analysis.new
 
       observe_type_params(ctx, t, t_link, t_analysis)
@@ -142,7 +144,7 @@ module Mare::Compiler::ReferType
       visitor.analysis
     end
 
-    def analyze_func(ctx, f, f_link, t_analysis)
+    def analyze_func(ctx, f, f_link, t_analysis) : Analysis
       f_analysis = Analysis.new(t_analysis)
       namespace = ctx.namespace[f.ident.pos.source]
       visitor = Visitor.new(f_analysis, namespace)

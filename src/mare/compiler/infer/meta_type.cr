@@ -97,6 +97,8 @@ struct Mare::Compiler::Infer::MetaType
           caps << cap if cap
         })
         caps.size == 1 && caps.first
+      else
+        nil
       end.as(Capability)
     )
   end

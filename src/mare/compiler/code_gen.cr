@@ -660,6 +660,7 @@ class Mare::Compiler::CodeGen
     when :yield_cc, :yield_error_cc
       gfunc.continuation_type =
         @llvm.struct_create_named("#{gfunc.llvm_name}.CONTINUATION")
+    else
     end
 
     # Determine the LLVM type to return, based on the calling convention.
@@ -834,6 +835,7 @@ class Mare::Compiler::CodeGen
         end.to_a
 
       gfunc.continuation_type.struct_set_body(gfunc.continuation_info.struct_element_types)
+    else
     end
   end
 

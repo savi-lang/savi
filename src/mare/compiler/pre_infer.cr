@@ -608,15 +608,15 @@ module Mare::Compiler::PreInfer
   end
 
   class Pass < Compiler::Pass::Analyze(Nil, Nil, Analysis)
-    def analyze_type_alias(ctx, t, t_link)
+    def analyze_type_alias(ctx, t, t_link) : Nil
       nil
     end
 
-    def analyze_type(ctx, t, t_link)
+    def analyze_type(ctx, t, t_link) : Nil
       nil
     end
 
-    def analyze_func(ctx, f, f_link, t_analysis)
+    def analyze_func(ctx, f, f_link, t_analysis) : Analysis
       FuncVisitor.new(
         f,
         f_link,
