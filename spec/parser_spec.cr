@@ -40,9 +40,9 @@ describe Mare::Parser do
        ":",
        [:relate,
         [:relate,
-         [:relate, [:ident, "c"], [:op, "*"], [:integer, 9_u64]],
+         [:relate, [:ident, "c"], [:op, "*"], [:integer, 9]],
          [:op, "/"],
-         [:integer, 5_u64]],
+         [:integer, 5]],
         [:op, "+"],
         [:float, 32.0]]]]]
     AST
@@ -241,10 +241,10 @@ describe Mare::Parser do
      [:declare, [[:ident, "primitive"], [:ident, "Example"]], [:group, ":"]],
      [:declare,
       [[:ident, "const"], [:ident, "x"], [:ident, "U64"]],
-      [:group, ":", [:integer, 1_u64]]],
+      [:group, ":", [:integer, 1]]],
      [:declare,
       [[:ident, "const"], [:ident, "y"], [:ident, "U64"]],
-      [:group, ":", [:integer, -1_i64]]]]
+      [:group, ":", [:integer, -1]]]]
     AST
   end
 
@@ -304,9 +304,9 @@ describe Mare::Parser do
        ":",
        [:relate,
         [:relate,
-         [:relate, [:ident, "c"], [:op, "*"], [:integer, 9_u64]],
+         [:relate, [:ident, "c"], [:op, "*"], [:integer, 9]],
          [:op, "/"],
-         [:integer, 5_u64]],
+         [:integer, 5]],
         [:op, "+"],
         [:float, 32.0]]]]]
     AST

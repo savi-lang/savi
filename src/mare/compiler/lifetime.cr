@@ -89,6 +89,8 @@ class Mare::Compiler::Lifetime
       when AST::Group
         scope = refer.scope?(node)
         touch_scope_pre(node, scope) if scope
+      else
+        nil
       end
     end
     def touch(node : AST::Node)
@@ -103,8 +105,12 @@ class Mare::Compiler::Lifetime
         when "."
           touch_call(node)
           # TODO: Handle more cases
+        else
+          nil
         end
       # TODO: Handle more cases
+      else
+        nil
       end
     end
 

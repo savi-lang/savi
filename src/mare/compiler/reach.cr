@@ -329,6 +329,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       when Infer::MetaType::Capability::TRN,
            Infer::MetaType::Capability::REF,
            Infer::MetaType::Capability::BOX then return :mutable
+      else
       end
 
       if src_cap == Infer::MetaType::Capability::ISO

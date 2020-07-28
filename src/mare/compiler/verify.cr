@@ -187,7 +187,9 @@ class Mare::Compiler::Verify < Mare::AST::Visitor
             {node.lhs.pos, "but the origin type #{lhs_mt.show_type} has " \
               "possibilities with the same type but different capability"}
           ]
+      else
       end
+    else
     end
   end
 

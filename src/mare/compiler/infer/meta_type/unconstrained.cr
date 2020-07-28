@@ -13,8 +13,8 @@ class Mare::Compiler::Infer::MetaType::Unconstrained
     io << "<unconstrained>"
   end
 
-  def each_reachable_defn(ctx : Context) : Iterator(Infer::ReifiedType)
-    ([] of Infer::ReifiedType).each
+  def each_reachable_defn(ctx : Context) : Array(Infer::ReifiedType)
+    ([] of Infer::ReifiedType)
   end
 
   def find_callable_func_defns(ctx, infer : ForReifiedFunc, name : String)

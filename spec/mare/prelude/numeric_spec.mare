@@ -254,8 +254,8 @@
   :it "implements logarithms and exponents for floating points"
     @assert = F64[1].log == 0
     @assert = F32[1].log == 0
-    @assert = F64[2.71828182845904523536028747135266249775724709369995].log == 1
-    @assert = F32[2.71828182845904523536028747135266249775724709369995].log == 1
+    @assert = F64[2.718281828459045].log == 1
+    @assert = F32[2.718282].log == 1
     @assert = F64[1000000000].log10 == 9
     @assert = F32[1000000000].log10 == 9
     @assert = F64[0.0000000001].log10 == -10

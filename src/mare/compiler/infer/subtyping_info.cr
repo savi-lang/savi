@@ -157,6 +157,7 @@ class Mare::Compiler::Infer::SubtypingInfo
       errors << {this_func.ident.pos,
         "the constructor in the supertype is here"}
       return false
+    else
     end
 
     # A constant can only match another constant.
@@ -173,6 +174,7 @@ class Mare::Compiler::Infer::SubtypingInfo
       errors << {this_func.ident.pos,
         "the constant in the supertype is here"}
       return false
+    else
     end
 
     # Must have the same number of parameters.

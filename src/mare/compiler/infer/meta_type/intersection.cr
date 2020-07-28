@@ -69,12 +69,10 @@ struct Mare::Compiler::Infer::MetaType::Intersection
     io << ")"
   end
 
-  def each_reachable_defn(ctx : Context) : Iterator(ReifiedType)
-    iter = ([] of ReifiedType).each
+  def each_reachable_defn(ctx : Context) : Array(ReifiedType)
+    iter = ([] of ReifiedType)
 
-    iter = iter.chain(
-      terms.not_nil!.map(&.each_reachable_defn(ctx)).flat_map(&.to_a).each
-    ) if terms
+    iter += terms.not_nil!.map(&.each_reachable_defn(ctx)).flatten if terms
 
     iter
   end

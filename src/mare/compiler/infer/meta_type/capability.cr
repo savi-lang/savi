@@ -82,8 +82,8 @@ struct Mare::Compiler::Infer::MetaType::Capability
     end
   end
 
-  def each_reachable_defn(ctx : Context) : Iterator(ReifiedType)
-    ([] of ReifiedType).each
+  def each_reachable_defn(ctx : Context) : Array(ReifiedType)
+    ([] of ReifiedType)
   end
 
   def find_callable_func_defns(ctx, infer : ForReifiedFunc, name : String)
@@ -364,10 +364,12 @@ struct Mare::Compiler::Infer::MetaType::Capability
 
     case origin
     when TAG, NON then return NON
+    else
     end
 
     case self
     when TAG, NON then return self
+    else
     end
 
     case origin
@@ -456,10 +458,12 @@ struct Mare::Compiler::Infer::MetaType::Capability
     case origin
     when VAL, BOX, TAG, NON then
       raise "can't extract from non-writable cap #{origin}"
+    else
     end
 
     case self
     when TAG, NON then return self
+    else
     end
 
     case origin

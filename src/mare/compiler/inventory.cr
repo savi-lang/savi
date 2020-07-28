@@ -54,6 +54,7 @@ module Mare::Compiler::Inventory
             @analysis.observe_yielding_call(node)
           end
         end
+      else
       end
 
       node
@@ -61,15 +62,15 @@ module Mare::Compiler::Inventory
   end
 
   class Pass < Mare::Compiler::Pass::Analyze(Nil, Nil, Analysis)
-    def analyze_type_alias(ctx, t, t_link)
+    def analyze_type_alias(ctx, t, t_link) : Nil
       nil # no analysis at the type level
     end
 
-    def analyze_type(ctx, t, t_link)
+    def analyze_type(ctx, t, t_link) : Nil
       nil # no analysis at the type level
     end
 
-    def analyze_func(ctx, f, f_link, t_analysis)
+    def analyze_func(ctx, f, f_link, t_analysis) : Analysis
       refer = ctx.refer[f_link]
       visitor = Visitor.new(Analysis.new, refer)
 

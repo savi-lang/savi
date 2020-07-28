@@ -87,6 +87,7 @@ module Mare::Compiler::Consumes
         ident.accept(ctx, self)
         args.try(&.accept(ctx, self))
         touch_yield_loop(ctx, yield_params, yield_block)
+      else
       end
     end
 
@@ -194,15 +195,15 @@ module Mare::Compiler::Consumes
   end
 
   class Pass < Compiler::Pass::Analyze(Nil, Nil, Nil)
-    def analyze_type_alias(ctx, t, t_link)
+    def analyze_type_alias(ctx, t, t_link) : Nil
       nil # no analysis output
     end
 
-    def analyze_type(ctx, t, t_link)
+    def analyze_type(ctx, t, t_link) : Nil
       nil # no analysis output
     end
 
-    def analyze_func(ctx, f, f_link, t_analysis)
+    def analyze_func(ctx, f, f_link, t_analysis) : Nil
       refer = ctx.refer[f_link]
       jumps = ctx.jumps[f_link]
       visitor = Visitor.new(refer, jumps)

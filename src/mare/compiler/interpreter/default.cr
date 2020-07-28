@@ -5,7 +5,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
   def finished(context)
   end
 
-  def keywords; %w{import alias actor class trait numeric enum primitive ffi} end
+  def keywords : Array(String); %w{import alias actor class trait numeric enum primitive ffi} end
 
   @@declare_import = Witness.new([
     {
@@ -124,6 +124,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
       t.type.add_tag(:ignores_cap)
     when "ffi"
       t.type.add_tag(:private)
+    else
     end
 
     @library.types << t.type
@@ -167,7 +168,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
 
     # TODO: dedup these with the Witness mechanism.
     # TODO: be more specific (for example, `member` is only allowed for `enum`)
-    def keywords; ["is", "prop", "fun", "be", "new", "const", "member", "it"] end
+    def keywords : Array(String); ["is", "prop", "fun", "be", "new", "const", "member", "it"] end
 
     def finished(context)
       # Numeric types need some basic metadata attached to know the native type.
@@ -691,6 +692,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
 
         @members << type_with_value
         @library.enum_members << type_with_value
+      else
       end
 
       if func
@@ -710,7 +712,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
     end
 
     # TODO: dedup these with the Witness mechanism.
-    def keywords; ["yields"] end
+    def keywords : Array(String); ["yields"] end
 
     def finished(context)
     end
@@ -760,6 +762,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
 
         @func.yield_out = data["out"]?.as(AST::Term?)
         @func.yield_in  = data["in"]?.as(AST::Term?)
+      else
       end
     end
   end

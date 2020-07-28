@@ -37,7 +37,7 @@ class Mare::Compiler::Binary
 
     link_args = %w{clang
       -fuse-ld=lld -rdynamic -static -fpic
-      -lc -pthread -ldl -latomic -lexecinfo
+      -lc -pthread -ldl -latomic
     }
 
     ctx.link_libraries.each do |x|
