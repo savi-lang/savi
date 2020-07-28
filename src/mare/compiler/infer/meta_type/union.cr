@@ -83,17 +83,13 @@ struct Mare::Compiler::Infer::MetaType::Union
     io << ")"
   end
 
-  def each_reachable_defn(ctx : Context) : Iterator(Infer::ReifiedType)
-    iter = ([] of Infer::ReifiedType).each
+  def each_reachable_defn(ctx : Context) : Array(Infer::ReifiedType)
+    defns = [] of Infer::ReifiedType
 
-    iter = iter.chain(
-      terms.not_nil!.map(&.each_reachable_defn(ctx).as(Iterator(Infer::ReifiedType))).flat_map(&.to_a).each
-    ) if terms
-    iter = iter.chain(
-      intersects.not_nil!.map(&.each_reachable_defn(ctx).as(Iterator(Infer::ReifiedType))).flat_map(&.to_a).each
-    ) if intersects
+    defns += terms.not_nil!.map(&.each_reachable_defn(ctx)).flatten if terms
+    defns += intersects.not_nil!.map(&.each_reachable_defn(ctx)).flatten if intersects
 
-    iter
+    defns
   end
 
   def find_callable_func_defns(ctx, infer : ForReifiedFunc, name : String)

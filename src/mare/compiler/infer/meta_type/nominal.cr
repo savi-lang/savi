@@ -47,13 +47,13 @@ struct Mare::Compiler::Infer::MetaType::Nominal
     end
   end
 
-  def each_reachable_defn(ctx : Context) : Iterator(ReifiedType)
+  def each_reachable_defn(ctx : Context) : Array(ReifiedType)
     defn = defn()
     case defn
     when TypeParam
-      ([] of ReifiedType).each
+      ([] of ReifiedType)
     when ReifiedType
-      [defn].each
+      [defn]
     when ReifiedTypeAlias
       MetaType.simplify_inner(ctx, self).each_reachable_defn(ctx)
     else

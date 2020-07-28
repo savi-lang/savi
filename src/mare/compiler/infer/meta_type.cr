@@ -445,7 +445,7 @@ struct Mare::Compiler::Infer::MetaType
     inner.satisfies_bound?(ctx, other.inner)
   end
 
-  def each_reachable_defn(ctx : Context) : Iterator(ReifiedType)
+  def each_reachable_defn(ctx : Context) : Array(ReifiedType)
     @inner.each_reachable_defn(ctx)
   end
 

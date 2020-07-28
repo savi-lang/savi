@@ -82,8 +82,8 @@ struct Mare::Compiler::Infer::MetaType::Capability
     end
   end
 
-  def each_reachable_defn(ctx : Context) : Iterator(ReifiedType)
-    ([] of ReifiedType).each
+  def each_reachable_defn(ctx : Context) : Array(ReifiedType)
+    ([] of ReifiedType)
   end
 
   def find_callable_func_defns(ctx, infer : ForReifiedFunc, name : String)
