@@ -104,10 +104,10 @@ module Mare
 
     def self.run(options, backtrace = false)
       if backtrace
-        exit Mare::Compiler.compile(Dir.current, :eval).eval.exitcode
+        exit Mare::Compiler.compile(Dir.current, :eval, options).eval.exitcode
       else
         begin
-          exit Mare::Compiler.compile(Dir.current, :eval).eval.exitcode
+          exit Mare::Compiler.compile(Dir.current, :eval, options).eval.exitcode
         rescue e
           STDERR.puts "Compilation Error:\n\n#{e.message}\n\n"
           exit 1
@@ -117,10 +117,10 @@ module Mare
 
     def self.eval(code, options, backtrace = false)
       if backtrace
-        exit Mare::Compiler.eval(code)
+        exit Mare::Compiler.eval(code, options)
       else
         begin
-          exit Mare::Compiler.eval(code)
+          exit Mare::Compiler.eval(code, options)
         rescue e
           STDERR.puts "Compilation Error:\n\n#{e.message}\n\n"
           exit 1

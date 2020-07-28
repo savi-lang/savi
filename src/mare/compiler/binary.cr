@@ -42,7 +42,7 @@ class Mare::Compiler::Binary
 
     link_args <<
       if ctx.options.release
-        "-O2"
+        "-O3"
       else
         "-O0"
       end
@@ -55,7 +55,7 @@ class Mare::Compiler::Binary
     link_args << "-o" << ctx.options.binary_name
 
     res = Process.run("/usr/bin/env", link_args, output: STDOUT, error: STDERR)
-    res = Process.run("/usr/bin/env", ["strip", ctx.options.binary_name], output: STDOUT, error: STDERR)
+    # res = Process.run("/usr/bin/env", ["strip", ctx.options.binary_name], output: STDOUT, error: STDERR) if ctx.options.release
     raise "linker failed" unless res.exit_status == 0
   ensure
     File.delete(obj_filename) if obj_filename

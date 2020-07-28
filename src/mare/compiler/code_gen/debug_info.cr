@@ -29,7 +29,7 @@ class Mare::Compiler::CodeGen
         LLVM::ModuleFlag::Warning.value,
         "Debug Info Version",
         LLVM::DEBUG_METADATA_VERSION
-      ])) if @generate_debug_info
+      ])) if !ctx.options.no_debug
     end
 
     def func_start(gfunc : GenFunc, llvm_func : LLVM::Function)

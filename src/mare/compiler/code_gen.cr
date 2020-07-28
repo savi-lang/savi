@@ -549,11 +549,11 @@ class Mare::Compiler::CodeGen
 
       fun_pass_manager = @mod.new_function_pass_manager
       pass_manager_builder.populate fun_pass_manager
-      fun_pass_manager.run @mod
 
       mod_pass_manager = LLVM::ModulePassManager.new
       pass_manager_builder.populate mod_pass_manager
 
+      fun_pass_manager.run @mod
       mod_pass_manager.run @mod
     end
   end
