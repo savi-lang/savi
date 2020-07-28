@@ -105,7 +105,7 @@ module Mare::Compiler::Refer
     def touch(ctx, node : AST::Prefix)
       case node.op.value
       when "address_of"
-        unless @analysis[node.term].is_a? Local
+        unless @analysis[node.term]?.is_a? Local
           Error.at node.term, "address_of can be applied only to variable"
         end
       end
