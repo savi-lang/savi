@@ -111,6 +111,25 @@ describe Mare::Compiler::Refer do
     ]
   end
 
+  it "complains when trying to take address_of not local variable" do
+    source = Mare::Source.new_example <<-SOURCE
+    :actor Main
+      :new
+        t = address_of ""
+    SOURCE
+
+    expected = <<-MSG
+    address_of can be applied only to variable:
+    from (example):3:
+        t = address_of ""
+                        ^
+    MSG
+
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :refer)
+    end
+  end
+
   it "complains when referencing a local declared in only some branches" do
     source = Mare::Source.new_example <<-SOURCE
     :actor Main

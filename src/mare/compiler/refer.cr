@@ -102,6 +102,15 @@ module Mare::Compiler::Refer
       @analysis[node] = info
     end
 
+    def touch(ctx, node : AST::Prefix)
+      case node.op.value
+      when "address_of"
+        unless @analysis[node.term]?.is_a? Local
+          Error.at node.term, "address_of can be applied only to variable"
+        end
+      end
+    end
+
     # For a FieldRead, FieldWrite, or FieldReplace; take note of it by name.
     def touch(ctx, node : AST::FieldRead | AST::FieldWrite | AST::FieldReplace)
       @analysis[node] = Field.new(node.value)

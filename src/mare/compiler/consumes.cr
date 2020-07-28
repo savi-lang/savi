@@ -56,7 +56,7 @@ module Mare::Compiler::Consumes
     def touch(ctx, node : AST::Prefix)
       case node.op.value
       when "source_code_position_of_argument", "identity_digest_of",
-           "reflection_of_type", "reflection_of_runtime_type_name",
+           "reflection_of_type", "reflection_of_runtime_type_name", "address_of",
         nil # ignore this prefix type
       when "--"
         info = @refer[node.term]

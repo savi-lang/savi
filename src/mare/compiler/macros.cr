@@ -139,6 +139,12 @@ class Mare::Compiler::Macros < Mare::AST::CopyOnMutateVisitor
         "the value whose identity is to be hashed",
       ])
       visit_identity_digest_of(node)
+    elsif Util.match_ident?(node, 0, "address_of")
+      Util.require_terms(node, [
+        nil,
+        "the local variable whose address is to be referenced",
+      ])
+      visit_address_of(node)
     elsif Util.match_ident?(node, 1, "is")
       Util.require_terms(node, [
         "one of the two operands whose identity is to be compared",
@@ -336,6 +342,17 @@ class Mare::Compiler::Macros < Mare::AST::CopyOnMutateVisitor
     term = node.terms[1]
 
     op = AST::Operator.new("reflection_of_runtime_type_name").from(orig)
+
+    AST::Group.new("(", [
+      AST::Prefix.new(op, term).from(node),
+    ] of AST::Term).from(node)
+  end
+
+  def visit_address_of(node : AST::Group)
+    orig = node.terms[0]
+    term = node.terms[1]
+
+    op = AST::Operator.new("address_of").from(orig)
 
     AST::Group.new("(", [
       AST::Prefix.new(op, term).from(node),

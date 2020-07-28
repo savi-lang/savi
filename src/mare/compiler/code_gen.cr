@@ -1893,6 +1893,14 @@ class Mare::Compiler::CodeGen
     end
   end
 
+  def gen_address_of(term_expr)
+    ref = func_frame.refer[term_expr].as Refer::Local
+
+    alloca = func_frame.current_locals[ref]
+
+    alloca
+  end
+
   def gen_identity_digest_of(term_expr)
     term_type = type_of(term_expr)
     value = gen_expr(term_expr)
@@ -2172,6 +2180,8 @@ class Mare::Compiler::CodeGen
         gen_reflection_of_runtime_type_name(expr, expr.term)
       when "identity_digest_of"
         gen_identity_digest_of(expr.term)
+      when "address_of"
+        gen_address_of(expr.term)
       when "--"
         gen_expr(expr.term, const_only)
       else
