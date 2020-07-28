@@ -37,18 +37,31 @@ class Mare::Compiler::BinaryVerona
       -fuse-ld=lld -rdynamic -static -fpic
       -lc -pthread -ldl -latomic
     }
+
+    ctx.link_libraries.each do |x|
+      link_args << "-l" + x
+    end
+
+    link_args <<
+      if ctx.options.release
+        "-O2"
+      else
+        "-O0"
+      end
+
     link_args << obj_filename
     link_args << VERONA_STATIC_LIB
-    link_args << "-o" << "main" # TODO: customizable output binary filename
+    link_args << "-o" << ctx.options.binary_name
 
     res = Process.run("/usr/bin/env", link_args, output: STDOUT, error: STDERR)
+    res = Process.run("/usr/bin/env", ["strip", ctx.options.binary_name], output: STDOUT, error: STDERR)
     raise "linker failed" unless res.exit_status == 0
   ensure
     File.delete(obj_filename) if obj_filename
   end
 
   def self.run_last_compiled_program
-    res = Process.run("/usr/bin/env", ["./main"], output: STDOUT, error: STDERR)
+    res = Process.run("/usr/bin/env", ["./" + Compiler::CompilerOptions::DEFAULT_BINARY_NAME], output: STDOUT, error: STDERR)
     res.exit_status
   end
 end

@@ -537,6 +537,25 @@ class Mare::Compiler::CodeGen
       @mod.dump
       raise ex
     end
+
+    if ctx.options.release
+      registry = LLVM::PassRegistry.instance
+      registry.initialize_all
+
+      pass_manager_builder = LLVM::PassManagerBuilder.new
+      pass_manager_builder.opt_level = 3
+      pass_manager_builder.size_level = 0
+      pass_manager_builder.use_inliner_with_threshold = 275
+
+      fun_pass_manager = @mod.new_function_pass_manager
+      pass_manager_builder.populate fun_pass_manager
+      fun_pass_manager.run @mod
+
+      mod_pass_manager = LLVM::ModulePassManager.new
+      pass_manager_builder.populate mod_pass_manager
+
+      mod_pass_manager.run @mod
+    end
   end
 
   def gen_wrapper

@@ -20,9 +20,11 @@ class Mare::Compiler::Context
   getter serve_definition
   getter serve_hover
 
+  getter options
+
   getter link_libraries
 
-  def initialize
+  def initialize(@options = CompilerOptions.new)
     @program = Program.new
     @stack = [] of Interpreter
 

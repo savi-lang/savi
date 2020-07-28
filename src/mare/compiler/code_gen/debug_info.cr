@@ -11,6 +11,7 @@ class Mare::Compiler::CodeGen
       @mod : LLVM::Module,
       @builder : LLVM::Builder,
       @target_data : LLVM::TargetData,
+      @generate_debug_info = true,
     )
       @di = LLVM::DIBuilder.new(@mod)
 
@@ -28,10 +29,11 @@ class Mare::Compiler::CodeGen
         LLVM::ModuleFlag::Warning.value,
         "Debug Info Version",
         LLVM::DEBUG_METADATA_VERSION
-      ]))
+      ])) if @generate_debug_info
     end
 
     def func_start(gfunc : GenFunc, llvm_func : LLVM::Function)
+
       pos = gfunc.func.ident.pos
       name = llvm_func.name
       file = di_file(pos.source)
