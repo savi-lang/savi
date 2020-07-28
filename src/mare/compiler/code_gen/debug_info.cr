@@ -11,7 +11,6 @@ class Mare::Compiler::CodeGen
       @mod : LLVM::Module,
       @builder : LLVM::Builder,
       @target_data : LLVM::TargetData,
-      @generate_debug_info = true,
     )
       @di = LLVM::DIBuilder.new(@mod)
 
