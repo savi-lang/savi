@@ -28,10 +28,11 @@ class Mare::Compiler::CodeGen
         LLVM::ModuleFlag::Warning.value,
         "Debug Info Version",
         LLVM::DEBUG_METADATA_VERSION
-      ]))
+      ])) if !ctx.options.no_debug
     end
 
     def func_start(gfunc : GenFunc, llvm_func : LLVM::Function)
+
       pos = gfunc.func.ident.pos
       name = llvm_func.name
       file = di_file(pos.source)

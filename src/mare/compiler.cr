@@ -1,4 +1,19 @@
 module Mare::Compiler
+  class CompilerOptions
+    property release
+    property no_debug
+    property binary_name
+
+    DEFAULT_BINARY_NAME = "main"
+
+    def initialize(
+      @release = false,
+      @no_debug = false,
+      @binary_name = DEFAULT_BINARY_NAME
+    )
+    end
+  end
+
   def self.execute(ctx, target : Symbol)
     case target
     when :import           then ctx.run_whole_program(ctx.import)
@@ -118,26 +133,26 @@ module Mare::Compiler
     end
   end
 
-  def self.eval(string : String) : Int32
+  def self.eval(string : String, options = CompilerOptions.new) : Int32
     content = ":actor Main\n:new (env)\n#{string}"
     library = Mare::Source::Library.new("(eval)")
     source = Mare::Source.new("(eval)", content, library)
 
-    Mare::Compiler.compile([source], :eval).eval.exitcode
+    Mare::Compiler.compile([source], :eval, options).eval.exitcode
   end
 
-  def self.compile(dirname : String, target : Symbol = :eval)
-    compile(get_library_sources(dirname), target)
+  def self.compile(dirname : String, target : Symbol = :eval, options = CompilerOptions.new)
+    compile(get_library_sources(dirname), target, options)
   end
 
-  def self.compile(sources : Array(Source), target : Symbol = :eval)
-    compile(sources.map { |s| Parser.parse(s) }, target)
+  def self.compile(sources : Array(Source), target : Symbol = :eval, options = CompilerOptions.new)
+    compile(sources.map { |s| Parser.parse(s) }, target, options)
   end
 
-  def self.compile(docs : Array(AST::Document), target : Symbol = :eval)
+  def self.compile(docs : Array(AST::Document), target : Symbol = :eval, options = CompilerOptions.new)
     raise "No source documents given!" if docs.empty?
 
-    ctx = Context.new
+    ctx = Context.new options
 
     ctx.compile_library(docs.first.source.library, docs)
 

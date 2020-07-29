@@ -36,19 +36,31 @@ class Mare::Compiler::Binary
     machine.emit_obj_to_file(mod, obj_filename)
 
     link_args = %w{clang
-      -fuse-ld=lld -rdynamic -static -fpic
+      -fuse-ld=lld -rdynamic -static -fpic -flto=thin
       -lc -pthread -ldl -latomic
     }
+
+    link_args <<
+      if ctx.options.release
+        "-O3"
+      else
+        "-O0"
+      end
 
     ctx.link_libraries.each do |x|
       link_args << "-l" + x
     end
 
     link_args << obj_filename
-    link_args << "-o" << "main" # TODO: customizable output binary filename
+    link_args << "-o" << ctx.options.binary_name
 
-    res =  Process.run("/usr/bin/env", link_args, output: STDOUT, error: STDERR)
+    res = Process.run("/usr/bin/env", link_args, output: STDOUT, error: STDERR)
     raise "linker failed" unless res.exit_status == 0
+
+    if ctx.options.release
+      res = Process.run("/usr/bin/env", ["strip", ctx.options.binary_name], output: STDOUT, error: STDERR)
+      raise "strip failed" unless res.exit_status == 0
+    end
   ensure
     File.delete(obj_filename) if obj_filename
   end

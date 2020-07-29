@@ -10,12 +10,18 @@ module Mare
       version "mare version: 0.0.1", short: "-v"
       help short: "-h"
       option "-b", "--backtrace", desc: "Show backtrace on error", type: Bool, default: false
+      option "-r", "--release", desc: "Compile in release mode", type: Bool, default: false
+      option "--no-debug", desc: "Compile without debug info", type: Bool, default: false
+      option "-o NAME", "--output=NAME", desc: "Name of the output binary"
       run do |opts, args|
-        if opts.backtrace
-          Cli.compile_backtrace
-        else
-          Cli.compile
+        options = Mare::Compiler::CompilerOptions.new(
+          release: opts.release,
+          no_debug: opts.no_debug,
+        )
+        if opts.output
+          options.binary_name = opts.output.not_nil!
         end
+        Cli.compile options, opts.backtrace
       end
       sub "server" do
         alias_name "s"
@@ -33,12 +39,14 @@ module Mare
         help short: "-h"
         argument "code", type: String, required: true, desc: "code to evaluate"
         option "-b", "--backtrace", desc: "Show backtrace on error", type: Bool, default: false
+        option "-r", "--release", desc: "Compile in release mode", type: Bool, default: false
+        option "--no-debug", desc: "Compile without debug info", type: Bool, default: false
         run do |opts, args|
-          if opts.backtrace
-            Cli.eval_backtrace(args.code)
-          else
-            Cli.eval(args.code)
-          end
+          options = Mare::Compiler::CompilerOptions.new(
+            release: opts.release,
+            no_debug: opts.no_debug,
+          )
+          Cli.eval args.code, options, opts.backtrace
         end
       end
       sub "run" do
@@ -47,12 +55,14 @@ module Mare
         usage "mare run [options]"
         help short: "-h"
         option "-b", "--backtrace", desc: "Show backtrace on error", type: Bool, default: false
+        option "-r", "--release", desc: "Compile in release mode", type: Bool, default: false
+        option "--no-debug", desc: "Compile without debug info", type: Bool, default: false
         run do |opts, args|
-          if opts.backtrace
-            Cli.run_backtrace
-          else
-            Cli.run
-          end
+          options = Mare::Compiler::CompilerOptions.new(
+            release: opts.release,
+            no_debug: opts.no_debug,
+          )
+          Cli.run options, opts.backtrace
         end
       end
       sub "build" do
@@ -61,71 +71,63 @@ module Mare
         usage "mare build [options]"
         help short: "-h"
         option "-b", "--backtrace", desc: "Show backtrace on error", type: Bool, default: false
+        option "-r", "--release", desc: "Compile in release mode", type: Bool, default: false
+        option "-o NAME", "--output=NAME", desc: "Name of the output binary"
+        option "--no-debug", desc: "Compile without debug info", type: Bool, default: false
         run do |opts, args|
-          if opts.backtrace
-            Cli.compile_backtrace
-          else
-            Cli.compile
+          options = Mare::Compiler::CompilerOptions.new(
+            release: opts.release,
+            no_debug: opts.no_debug,
+          )
+          if opts.output
+            options.binary_name = opts.output.not_nil!
           end
+          Cli.compile options, opts.backtrace
         end
       end
     end
 
-    def self.compile
-      Mare::Compiler.compile(Dir.current, :binary)
-      exit 0
-    rescue e : Mare::Error
-      STDERR.puts "Compilation Error:\n\n#{e.message}\n\n"
-      exit 1
+    def self._add_backtrace(backtrace = false)
+      if backtrace
+        exit yield
+      else
+        begin
+          yield
+          exit 0
+        rescue e : Error | Pegmatite::Pattern::MatchError
+          STDERR.puts "Compilation Error:\n\n#{e.message}\n\n"
+          exit 1
+        rescue e
+          message = if e.message
+            "Mare compiler error occured with message \"#{e.message}\". Consider submitting new issue."
+          else
+            "Unknown Mare compiler error occured. Consider submitting new issue."
+          end
+          STDERR.puts message
+          exit 1
+        end
+      end
     end
 
-    def self.compile_backtrace
-      Mare::Compiler.compile(Dir.current, :binary)
-      exit 0
+    def self.compile(options, backtrace = false)
+      _add_backtrace backtrace do
+        Mare::Compiler.compile(Dir.current, :binary, options)
+        0
+      end
     end
 
-    def self.run
-      exit Mare::Compiler.compile(Dir.current, :eval).eval.exitcode
-    rescue e : Mare::Error
-      STDERR.puts "Compilation Error:\n\n#{e.message}\n\n"
-      exit 1
+    def self.run(options, backtrace = false)
+      _add_backtrace backtrace do
+        Mare::Compiler.compile(Dir.current, :eval, options).eval.exitcode
+      end
     end
 
-    def self.run_backtrace
-      exit Mare::Compiler.compile(Dir.current, :eval).eval.exitcode
-    end
-
-    def self.eval(code)
-      exit Mare::Compiler.eval(code)
-    rescue e : Mare::Error
-      STDERR.puts "Compilation Error:\n\n#{e.message}\n\n"
-      exit 1
-    end
-
-    def self.eval_backtrace(code)
-      exit Mare::Compiler.eval(code)
+    def self.eval(code, options, backtrace = false)
+      _add_backtrace backtrace do
+        Mare::Compiler.eval(code, options)
+      end
     end
   end
 end
 
 Mare::Cli.start(ARGV)
-
-# # TODO: Use more sophisticated CLI parsing.
-# if ARGV == ["server"]
-# elsif ARGV[0]? == "eval"
-#   begin
-#     exit Mare::Compiler.eval(ARGV[1])
-#   rescue e : Mare::Error
-#     STDERR.puts "Compilation Error:\n\n#{e.message}\n\n"
-#     exit 1
-#   end
-# elsif ARGV[0]? == "run"
-#   begin
-#     exit Mare::Compiler.compile(Dir.current, :eval).eval.exitcode
-#   rescue e : Mare::Error
-#     STDERR.puts "Compilation Error:\n\n#{e.message}\n\n"
-#     exit 1
-#   end
-# else
-#   Mare::Compiler.compile(Dir.current, :binary)
-# end
