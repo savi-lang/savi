@@ -119,7 +119,7 @@ FROM alpine:3.12 as release
 
 # Install runtime dependencies of the compiler.
 RUN apk add --no-cache --update \
-  llvm5-libs gc pcre gcc clang lld libgcc libevent musl-dev libexecinfo-dev
+  llvm10-libs gc pcre gcc clang lld libgcc libevent musl-dev libexecinfo-dev
 
 RUN mkdir /opt/code
 WORKDIR /opt/code

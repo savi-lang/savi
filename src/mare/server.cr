@@ -5,7 +5,8 @@ class Mare::Server
   def initialize(
     @stdin : IO = STDIN,
     @stdout : IO = STDOUT,
-    @stderr : IO = STDERR)
+    @stderr : IO = STDERR
+  )
     @wire = LSP::Wire.new(@stdin, @stdout)
     @open_files = {} of URI => String
     @compiled = false
@@ -116,7 +117,7 @@ class Mare::Server
     text = @open_files[msg.params.text_document.uri]? || ""
 
     raise NotImplementedError.new("not a file") \
-      if msg.params.text_document.uri.scheme != "file"
+       if msg.params.text_document.uri.scheme != "file"
 
     host_filename = msg.params.text_document.uri.path.not_nil!
     filename = msg.params.text_document.uri.path.not_nil!
@@ -173,7 +174,7 @@ class Mare::Server
     text = @open_files[msg.params.text_document.uri]? || ""
 
     raise NotImplementedError.new("not a file") \
-      if msg.params.text_document.uri.scheme != "file"
+       if msg.params.text_document.uri.scheme != "file"
 
     filename = msg.params.text_document.uri.path.not_nil!
 
@@ -275,7 +276,7 @@ class Mare::Server
         dest_path = pair[1]
 
         if path.starts_with?(host_path)
-          path = 
+          path =
             if path.includes?("prelude")
               tmp_fname = path.sub(host_path, Compiler.prelude_library_path)
               tmp_fname.sub("prelude/prelude", "prelude")
@@ -296,7 +297,7 @@ class Mare::Server
         end
       end
     end
-    
+
     path
   end
 
@@ -344,32 +345,21 @@ class Mare::Server
       sources[source_index] = source
     else
       content = sources[source_index].content
+      source = sources[source_index]
     end
+
+    is_mare_error = true
 
     begin
       Compiler.compile(sources, :completeness)
-    rescue e : Error | Pegmatite::Pattern::MatchError | NotImplementedError
+    rescue e # Error and Pegmatite::Pattern::MatchError are Compiling errors, others are Compiler errors
       err = e
     end
 
     host_filepath = convert_path_to_host(filename)
 
-    diagnostics = 
+    diagnostics =
       case err
-      when NotImplementedError
-        [
-          LSP::Data::Diagnostic.new(
-            LSP::Data::Range.new(
-              LSP::Data::Position.new(
-                0i64, 0i64
-              ),
-              LSP::Data::Position.new(
-                0i64, 0i64
-              ),
-            ),
-            message: err.message || "Something definitely went wrong..."
-          )
-        ]
       when Error
         related_information = err.info.map do |info|
           location = LSP::Data::Location.new(
@@ -408,12 +398,12 @@ class Mare::Server
             ),
             related_information: related_information,
             message: err.message,
-          )
+          ),
         ]
       when Pegmatite::Pattern::MatchError
         message = err.message.not_nil!
         offset_line = message.split(":").first
-        offset = offset_line[32..offset_line.size].to_i 
+        offset = offset_line[32..offset_line.size].to_i
 
         line_start = (content.rindex("\n", [offset - 1, 0].max) || -1) + 1
         line_finish = (content.index("\n", offset) || content.size)
@@ -437,19 +427,43 @@ class Mare::Server
               ),
             ),
             message: "unexpected token at #{line_no}:#{col_no}\n#{line}\n#{cursor}"
-          )
+          ),
         ]
+      when Nil
+        [] of LSP::Data::Diagnostic
       else
-        nil
+        offset = source.content.not_nil!.size
+
+        line_start = (content.rindex("\n", [offset - 1, 0].max) || -1) + 1
+        line_finish = (content.index("\n", offset) || content.size)
+
+        line_no = content[0..line_finish].count('\n')
+        col_no = offset - line_start
+
+        [
+          LSP::Data::Diagnostic.new(
+            LSP::Data::Range.new(
+              LSP::Data::Position.new(
+                0i64, 0i64
+              ),
+              LSP::Data::Position.new(
+                line_no.to_i64, col_no.to_i64
+              ),
+            ),
+            message: if err.message
+              "Mare compiler error occured with message \"#{err.message}\". Consider submitting new issue."
+            else
+              "Unknown Mare compiler error occured. Consider submitting new issue."
+            end
+          ),
+        ]
       end
 
-    if diagnostics
-      @wire.notify(LSP::Message::PublishDiagnostics) do |msg|
-        msg.params.uri = URI.new(path: host_filepath)
-        msg.params.diagnostics = diagnostics
+    @wire.notify(LSP::Message::PublishDiagnostics) do |msg|
+      msg.params.uri = URI.new(path: host_filepath)
+      msg.params.diagnostics = diagnostics
 
-        msg
-      end
+      msg
     end
   end
 end
