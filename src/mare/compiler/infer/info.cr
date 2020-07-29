@@ -457,12 +457,12 @@ class Mare::Compiler::Infer
   class AddressOf < DynamicInfo
     getter variable : Info
 
-    def describe_kind; "address of this variable" end
+    def describe_kind : String; "address of this variable" end
 
     def initialize(@pos, @variable)
     end
 
-    def resolve!(ctx : Context, infer : ForReifiedFunc)
+    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
       t = infer.resolve(ctx, @variable)
 
       cpointer = infer.reified_type(infer.prelude_type("CPointer"))
