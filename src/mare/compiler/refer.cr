@@ -108,6 +108,7 @@ module Mare::Compiler::Refer
         unless @analysis[node.term]?.is_a? Local
           Error.at node.term, "address_of can be applied only to variable"
         end
+      else
       end
     end
 
