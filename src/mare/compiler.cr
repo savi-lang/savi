@@ -4,7 +4,7 @@ module Mare::Compiler
     property no_debug
     property binary_name
 
-    DEFAULT_BINARY_NAME = "main.out"
+    DEFAULT_BINARY_NAME = "main"
 
     def initialize(
       @release = false,
