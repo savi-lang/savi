@@ -55,7 +55,7 @@
     replacement CPointer(U8)
     rlength USize
     output_buffer CPointer(U8)
-    output_buffer_length USize
+    output_buffer_length CPointer(USize)
   ) I32
 
   :fun pcre2_substring_number_from_name (
@@ -77,8 +77,7 @@
   :prop _str String
   :prop _jit Bool
 
-  :new new! (_str String, jit = True)
-    @_str = _str
+  :new new! (@_str, jit = True)
     err I32 = 0
     erroffset ISize = 0
 
@@ -133,7 +132,7 @@
 
     while (rc != Regex.err_no_memory) (
       rc = _PCRE2.pcre2_substitute_8(@_pattern, subject.cpointer, subject.size, offset, opt,
-        CPointer(U8).null, CPointer(U8).null, value.cpointer, value.size, out.cpointer, address_of len)
+        CPointer(_MatchData).null, CPointer(U8).null, value.cpointer, value.size, out.cpointer, address_of len)
 
       if (rc == Regex.err_no_memory) (
         len = if (out.is_null_terminated) (len - 1 | len) * 2
@@ -157,7 +156,7 @@
 
     try (
       while (off < subject.size) (
-        m1 = @_match!(subject, off, _PCRE2.not_empty)
+        m1 = @_match!(subject, off, Regex.not_empty)
       )
     )
 
