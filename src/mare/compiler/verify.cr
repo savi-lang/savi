@@ -112,12 +112,12 @@ class Mare::Compiler::Verify < Mare::AST::Visitor
     func_body = func.body
 
     if func_body && jumps.any_error?(func_body)
-      if func.has_tag?(:constructor)
+      if func.has_tag?(:constructor) && infer.reified.type.defn(ctx).has_tag?(:actor)
         finder = ErrorFinderVisitor.new(func_body, jumps)
         func_body.accept(ctx, finder)
 
         Error.at func.ident,
-          "This constructor may raise an error, but that is not allowed",
+          "This actor constructor may raise an error, but that is not allowed",
           finder.found.map { |pos| {pos, "an error may be raised here"} }
       end
 
