@@ -1,0 +1,193 @@
+:import "lib:pcre2-8"
+
+:ffi _PCRE2
+  :fun pcre2_compile_8 (
+    buffer CPointer(U8)
+    length USize
+    options U32
+    err CPointer(I32)
+    erroffset CPointer(ISize)
+	  context CPointer(U8)
+  ) CPointer(_Pattern)
+
+  :fun pcre2_jit_compile_8 (
+    pattern CPointer(_Pattern)
+    options U32
+  ) I32
+
+  :fun pcre2_match_data_free_8 (
+    match_data CPointer(_MatchData)
+  ) None
+
+  :fun pcre2_match_data_create_from_pattern_8 (
+    pattern CPointer(_Pattern)
+    generic_ctx CPointer(U8)
+  ) CPointer(_MatchData)
+  
+  :fun pcre2_jit_match_8 (
+    pattern CPointer(_Pattern)
+    subject CPointer(U8)
+    length USize
+    start_offset USize
+    options U32
+    match_data CPointer(_MatchData)
+    match_context CPointer(U8)
+  ) I32
+  
+  :fun pcre2_match_8 (
+    pattern CPointer(_Pattern)
+    subject CPointer(U8)
+    length USize
+    start_offset USize
+    options U32
+    match_data CPointer(_MatchData)
+    match_context CPointer(U8)
+  ) I32
+
+  :fun pcre2_substitute_8 (
+    pattern CPointer(_Pattern)
+    subject CPointer(U8)
+    length USize
+    offset USize
+    options U32
+    match_data CPointer(_MatchData)
+    match_context CPointer(U8)
+    replacement CPointer(U8)
+    rlength USize
+    output_buffer CPointer(U8)
+    output_buffer_length USize
+  ) I32
+
+  :fun pcre2_substring_number_from_name (
+    pattern CPointer(_Pattern)
+    name CPointer(U8)
+  ) I32
+
+  :fun pcre2_get_ovector_count_8 (match_data CPointer(_MatchData)) U32
+
+:primitive _Pattern
+
+:class Regex
+  :fun non utf U32: 0x00080000
+  :fun non substitute_global U32 : 0x00000100  // PCRE2_SUBSTITUTE_GLOBAL
+  :fun non not_empty U32 : 0x00000004          // PCRE2_NOTEMPTY
+  :fun non err_no_memory I32 : -48             // PCRE2_ERROR_NOMEMORY
+
+  :prop _pattern CPointer(_Pattern)
+  :prop _str String
+  :prop _jit Bool
+
+  :new new! (_str String, jit = True)
+    @_str = _str
+    err I32 = 0
+    erroffset ISize = 0
+
+    @_pattern = _PCRE2.pcre2_compile_8(@_str.cpointer, @_str.size, Regex.utf, address_of err, address_of erroffset, CPointer(U8).null)
+
+    if (@_pattern.is_null) (
+      error!
+    )
+
+    @_jit = jit && (_PCRE2.pcre2_jit_compile_8(@_pattern, 1) == 0)
+
+  :fun "==" (subject (String | Regex))
+    case (
+    | subject <: Regex  | @_str == subject._str
+    | subject <: String | 
+      try (
+        m = @_match!(subject)
+        _PCRE2.pcre2_match_data_free_8(m)
+        True
+      |
+        False
+      )
+    | False
+    )
+
+  :fun "!=" (subject (String | Regex))
+    (@ == subject).not
+
+  :fun match! (subject String, offset USize = 0)
+    m = @_match!(subject, offset, 0)
+    Match._new(subject, m)
+
+  :fun replace! (
+    subject String,
+    value String,
+    offset USize = 0,
+    global = False
+  )
+    if @_pattern.is_null (error!)
+
+    opt = if global (
+      Regex.substitute_global
+    |
+      U32[0]
+    )
+
+    len = subject.size.max(64)
+    out = String.new(len)
+    len = if (out.is_null_terminated) (len - 1 | len)
+
+    rc I32 = 0
+
+    while (rc != Regex.err_no_memory) (
+      rc = _PCRE2.pcre2_substitute_8(@_pattern, subject.cpointer, subject.size, offset, opt,
+        CPointer(U8).null, CPointer(U8).null, value.cpointer, value.size, out.cpointer, address_of len)
+
+      if (rc == Regex.err_no_memory) (
+        len = if (out.is_null_terminated) (len - 1 | len) * 2
+        out.reserve(len)
+        len = if (out.is_null_terminated) (len - 1 | len)
+      )
+    )
+
+    if (rc <= 0) (
+      error!
+    )
+
+  :fun split! (
+    subject String,
+    offset USize = 0
+  )
+    if @_pattern.is_null (error!)
+
+    out = Array(String)
+    off = offset
+
+    try (
+      while (off < subject.size) (
+        m1 = @_match!(subject, off, _PCRE2.not_empty)
+      )
+    )
+
+    out
+
+  :fun index! (name String)
+    rc = _PCRE2.pcre2_substring_number_from_name(@_pattern, name.cpointer)
+
+    if (rc < 0) (
+      error!
+    )
+    
+    rc.usize
+
+  :fun _match! (
+    subject String,
+    offset USize = 0,
+    options U32 = 0
+  )
+    m = _PCRE2.pcre2_match_data_create_from_pattern_8(@_pattern, CPointer(U8).null)
+
+    rc = if @_jit (
+      _PCRE2.pcre2_jit_match_8(@_pattern, subject.cpointer, subject.size, offset, options, m, CPointer(U8).null)
+    |
+      _PCRE2.pcre2_match_8(@_pattern, subject.cpointer, subject.size, offset, options, m, CPointer(U8).null)
+    )
+
+    if (rc <= 0) (
+      _PCRE2.pcre2_match_data_free_8(m)
+      error!
+    )
+
+    m

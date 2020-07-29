@@ -1,0 +1,11 @@
+:primitive _MatchData
+
+:class Match
+  :prop _match CPointer(_MatchData)
+  :prop _subject String
+  :prop _size U32
+
+  :new _new (_subject String, _match CPointer(_MatchData))
+    @_subject = _subject
+    @_match = _match
+    _size = _PCRE2.pcre2_get_ovector_count_8(@_match)
