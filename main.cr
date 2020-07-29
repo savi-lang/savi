@@ -87,67 +87,47 @@ module Mare
       end
     end
 
-    def self.compile(options, backtrace = false)
+    def self._add_backtrace(backtrace = false)
       if backtrace
-        Mare::Compiler.compile(Dir.current, :binary, options)
-        exit 0
+        exit yield
       else
         begin
-          Mare::Compiler.compile(Dir.current, :binary, options)
+          yield
           exit 0
-        rescue e
+        rescue e : Error | Pegmatite::Pattern::MatchError
           STDERR.puts "Compilation Error:\n\n#{e.message}\n\n"
           exit 1
+        rescue e
+          message = if e.message
+            "Mare compiler error occured with message \"#{e.message}\". Consider submitting new issue."
+          else
+            "Unknown Mare compiler error occured. Consider submitting new issue."
+          end
+          STDERR.puts message
+          exit 1
         end
+      end
+    end
+
+    def self.compile(options, backtrace = false)
+      _add_backtrace backtrace do
+        Mare::Compiler.compile(Dir.current, :binary, options)
+        0
       end
     end
 
     def self.run(options, backtrace = false)
-      if backtrace
-        exit Mare::Compiler.compile(Dir.current, :eval, options).eval.exitcode
-      else
-        begin
-          exit Mare::Compiler.compile(Dir.current, :eval, options).eval.exitcode
-        rescue e
-          STDERR.puts "Compilation Error:\n\n#{e.message}\n\n"
-          exit 1
-        end
+      _add_backtrace backtrace do
+        Mare::Compiler.compile(Dir.current, :eval, options).eval.exitcode
       end
     end
 
     def self.eval(code, options, backtrace = false)
-      if backtrace
-        exit Mare::Compiler.eval(code, options)
-      else
-        begin
-          exit Mare::Compiler.eval(code, options)
-        rescue e
-          STDERR.puts "Compilation Error:\n\n#{e.message}\n\n"
-          exit 1
-        end
+      _add_backtrace backtrace do
+        Mare::Compiler.eval(code, options)
       end
     end
   end
 end
 
 Mare::Cli.start(ARGV)
-
-# # TODO: Use more sophisticated CLI parsing.
-# if ARGV == ["server"]
-# elsif ARGV[0]? == "eval"
-#   begin
-#     exit Mare::Compiler.eval(ARGV[1])
-#   rescue e : Mare::Error
-#     STDERR.puts "Compilation Error:\n\n#{e.message}\n\n"
-#     exit 1
-#   end
-# elsif ARGV[0]? == "run"
-#   begin
-#     exit Mare::Compiler.compile(Dir.current, :eval).eval.exitcode
-#   rescue e : Mare::Error
-#     STDERR.puts "Compilation Error:\n\n#{e.message}\n\n"
-#     exit 1
-#   end
-# else
-#   Mare::Compiler.compile(Dir.current, :binary)
-# end
