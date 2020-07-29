@@ -465,8 +465,7 @@ class Mare::Compiler::Infer
     def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
       t = infer.resolve(ctx, @variable)
 
-      cpointer = infer.reified_type(infer.prelude_type("CPointer"))
-      cpointer.args << t
+      cpointer = infer.reified_type(infer.prelude_type("CPointer"), [t])
 
       MetaType.new cpointer
     end
