@@ -171,7 +171,7 @@ describe Mare::Compiler::Verify do
     end
   end
 
-  it "complains when a constructor has an error-able body" do
+  it "complains when an actor constructor has an error-able body" do
     source = Mare::Source.new_example <<-SOURCE
     :actor Main
       :new (env)
@@ -179,7 +179,7 @@ describe Mare::Compiler::Verify do
     SOURCE
 
     expected = <<-MSG
-    This constructor may raise an error, but that is not allowed:
+    This actor constructor may raise an error, but that is not allowed:
     from (example):2:
       :new (env)
        ^~~
