@@ -2,6 +2,7 @@ module Mare::Compiler
   class CompilerOptions
     property release
     property no_debug
+    property print_ir
     property binary_name
 
     DEFAULT_BINARY_NAME = "main"
@@ -9,6 +10,7 @@ module Mare::Compiler
     def initialize(
       @release = false,
       @no_debug = false,
+      @print_ir = false,
       @binary_name = DEFAULT_BINARY_NAME
     )
     end

@@ -42,9 +42,9 @@ example-run.inner: PHONY /tmp/bin/mare
 
 # Compile the files in the given directory.
 example-compile: PHONY
-	docker exec -ti mare-dev make dir="$(dir)" example-compile.inner
+	docker exec -ti mare-dev make dir="$(dir)" extra_args="$(extra_args)" example-compile.inner
 example-compile.inner: PHONY /tmp/bin/mare
-	echo && cd "/opt/code/$(dir)" && /tmp/bin/mare
+	echo && cd "/opt/code/$(dir)" && /tmp/bin/mare $(extra_args)
 
 # Compile and run the mare binary in the given directory.
 example: example-compile

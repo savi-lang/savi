@@ -556,6 +556,8 @@ class Mare::Compiler::CodeGen
       fun_pass_manager.run @mod
       mod_pass_manager.run @mod
     end
+
+    @mod.dump if ctx.options.print_ir
   end
 
   def gen_wrapper
