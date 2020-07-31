@@ -11,7 +11,7 @@ ready: PHONY Dockerfile
 # Run the full CI suite.
 ci: PHONY
 	make test extra_args="$(extra_args)"
-	make example-run dir="examples/adventofcode/2018"
+	make example-run extra_args="" dir="examples/adventofcode/2018"
 
 # Run the test suite.
 test: PHONY
@@ -36,9 +36,9 @@ example-eval.inner: PHONY /tmp/bin/mare
 
 # Run the files in the given directory.
 example-run: PHONY
-	docker exec -ti mare-dev make dir="$(dir)" example-run.inner
+	docker exec -ti mare-dev make dir="$(dir)" extra_args="$(extra_args)" example-run.inner
 example-run.inner: PHONY /tmp/bin/mare
-	echo && cd "/opt/code/$(dir)" && /tmp/bin/mare run
+	echo && cd "/opt/code/$(dir)" && /tmp/bin/mare run $(extra_args)
 
 # Compile the files in the given directory.
 example-compile: PHONY
@@ -55,7 +55,7 @@ example-mare-callgrind: PHONY
 	docker exec -ti mare-dev make extra_args="$(extra_args)" example-mare-callgrind.inner
 /tmp/bin/mare: main.cr $(shell find lib -name '*.cr') $(shell find src -name '*.cr')
 	mkdir -p /tmp/bin
-	crystal build --debug main.cr -o $@
+	crystal build --debug main.cr --error-trace -o $@
 	ldd /tmp/bin/mare | grep libponyrt # prove that libponyrt was actually linked
 /tmp/callgrind.out: /tmp/bin/mare
 	echo && cd example && valgrind --tool=callgrind --callgrind-out-file=$@ $<

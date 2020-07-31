@@ -8,7 +8,7 @@ FROM alpine:3.12 as dev
 RUN apk add --no-cache --update \
     sudo \
     alpine-sdk coreutils linux-headers clang-dev lld \
-    valgrind perl \
+    valgrind perl lldb \
     cmake \
     libexecinfo-dev libressl-dev pcre2-dev \
     llvm10-dev llvm10-static \
