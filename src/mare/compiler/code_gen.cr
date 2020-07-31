@@ -384,7 +384,7 @@ class Mare::Compiler::CodeGen
     @builder.position_at_end(func_frame.entry_block)
 
     # We have some extra work to do here if this is a yielding function.
-    if gfunc && gfunc.needs_continuation?(ctx)
+    if gfunc && gfunc.needs_continuation?
       # We need to pre-declare the code blocks that follow each yield statement.
       # TODO: store these in the func_frame instead of the gfunc because
       # the gfunc is shared across multiple llvm_funcs.
@@ -419,7 +419,7 @@ class Mare::Compiler::CodeGen
         ref = func_frame.refer[param].as(Refer::Local)
         param_idx = ref.param_idx.not_nil!
         param_idx -= 1 unless gfunc.needs_receiver?
-        param_idx += 1 if gfunc.needs_continuation?(ctx)
+        param_idx += 1 if gfunc.needs_continuation?
         value = frame.llvm_func.params[param_idx]
         gep = gen_local_gep(ref, value.type)
         func_frame.current_locals[ref] = gep
@@ -467,7 +467,7 @@ class Mare::Compiler::CodeGen
     end
 
     # Add implicit continuation parameter and/or receiver parameter if needed.
-    if gfunc.needs_continuation?(ctx)
+    if gfunc.needs_continuation?
       param_types.unshift(gfunc.continuation_info.struct_type.pointer)
     end
     if gfunc.needs_receiver?
@@ -534,7 +534,7 @@ class Mare::Compiler::CodeGen
 
           gen_func_end
         end
-      elsif gfunc.needs_continuation?(ctx)
+      elsif gfunc.needs_continuation?
         gfunc.llvm_func # TODO: unwrap virtual continuation code, here and also in cases above
       else
         # Otherwise the function needs no wrapper; it can be naked in the table.
@@ -559,7 +559,7 @@ class Mare::Compiler::CodeGen
 
     # If this is a yielding function, we need to generate the alternate
     # version of it used for continuing from after a yield block finishes.
-    if gfunc.needs_continuation?(ctx)
+    if gfunc.needs_continuation?
       # Declare the continue function to handle all continues.
       continue_param_types = [
         gfunc.continuation_info.struct_type.pointer,
@@ -663,24 +663,8 @@ class Mare::Compiler::CodeGen
         gen_expr(body)
       end
 
-    unless func_frame.jumps.away?(gfunc.func.body.not_nil!)
-      case gfunc.calling_convention
-      when GenFunc::Constructor
-        @builder.ret
-      when GenFunc::Simple
-        if last_expr
-          return_type = gfunc.reach_func.signature.ret
-          last_value = gen_assign_cast(last_value, return_type, last_expr)
-        end
-        @builder.ret(last_value)
-      when GenFunc::Errorable
-        gen_return_using_error_cc(last_value, last_expr.not_nil!, false)
-      when GenFunc::Yielding, GenFunc::YieldingErrorable
-        gen_final_return_using_yield_cc(last_value, last_expr.not_nil!)
-      else
-        raise NotImplementedError.new(gfunc.calling_convention)
-      end
-    end
+    gfunc.calling_convention.gen_return(self, gfunc, last_value, last_expr) \
+      unless func_frame.jumps.away?(gfunc.func.body.not_nil!)
 
     gen_func_end(gfunc)
   end
@@ -730,11 +714,11 @@ class Mare::Compiler::CodeGen
         @pony_error_personality_fn,
         [] of LLVM::Value,
       )
-      gen_return_using_error_cc(gen_none, nil, true)
+      gfunc.calling_convention.gen_error_return(self, gfunc, gen_none, nil)
 
       # In the then block, return the value using our error calling convention.
       @builder.position_at_end(then_block)
-      gen_return_using_error_cc(value, nil, false)
+      gfunc.calling_convention.gen_return(self, gfunc, value, nil)
     else
       raise NotImplementedError.new(gfunc.calling_convention)
     end
@@ -1392,7 +1376,7 @@ class Mare::Compiler::CodeGen
 
     # Prepend the continuation to the args list if necessary.
     cont = nil
-    if gfunc.needs_continuation?(ctx)
+    if gfunc.needs_continuation?
       cont = gen_yielding_call_cont_gep(relate, "#{gfunc.llvm_name}.CONT")
 
       # We need to cast the cont argument if this is a virtual call.
@@ -1413,7 +1397,7 @@ class Mare::Compiler::CodeGen
     if gfunc.needs_receiver? || needs_virtual_call || gfunc.needs_send?
       # The receiver must be stored in a gep if this is a yielding call,
       # since it isn't guaranteed to be in every continue path.
-      if gfunc.needs_continuation?(ctx)
+      if gfunc.needs_continuation?
         receiver_gep = gen_yielding_call_receiver_gep(relate, "#{gfunc.llvm_name}.@")
         @builder.store(receiver, receiver_gep)
       end
@@ -1456,7 +1440,7 @@ class Mare::Compiler::CodeGen
       # Declare some code blocks in which we'll generate this pseudo-loop.
       maybe_block = gen_block("maybe_yield_block")
       yield_block = gen_block("yield_block")
-      if gfunc.calling_convention.is_a?(GenFunc::YieldingErrorable)
+      if gfunc.can_error?
         check_error_block = gen_block("check_error_block")
         error_block = gen_block("error_block")
       end
@@ -2821,18 +2805,10 @@ class Mare::Compiler::CodeGen
     error_value = gen_none
 
     # If we have no local try to catch the value, then we return it
-    # using the error-able calling convention function style,
-    # making (and checking) the assumption that we are in such a function.
+    # using the error return approach for this calling convention.
     if @try_else_stack.empty?
-      calling_convention = func_frame.gfunc.not_nil!.calling_convention
-      case calling_convention
-      when GenFunc::Errorable
-        gen_return_using_error_cc(error_value, from_expr, true)
-      when GenFunc::YieldingErrorable
-        gen_error_return_using_yield_cc
-      else
-        raise "unsupported empty try else stack for #{calling_convention}"
-      end
+      gfunc = func_frame.gfunc.not_nil!
+      gfunc.calling_convention.gen_error_return(self, gfunc, error_value, from_expr)
     else
       # Store the state needed to catch the value in the try else block.
       else_stack_tuple = @try_else_stack.last
@@ -2842,19 +2818,6 @@ class Mare::Compiler::CodeGen
       # Jump to the try else block.
       @builder.br(else_stack_tuple[0])
     end
-  end
-
-  def gen_return_using_error_cc(value, value_expr : AST::Node?, is_error : Bool)
-    raise "inconsistent frames" if @frames.size > 1
-
-    value_type = func_frame.gfunc.not_nil!.reach_func.signature.ret
-    value = gen_assign_cast(value, value_type, value_expr) \
-      if value_expr && !is_error
-
-    tuple = func_frame.llvm_func.return_type.undef
-    tuple = @builder.insert_value(tuple, value, 0)
-    tuple = @builder.insert_value(tuple, is_error ? @i1_true : @i1_false, 1)
-    @builder.ret(tuple)
   end
 
   def gen_yield(expr : AST::Yield)
@@ -2873,7 +2836,8 @@ class Mare::Compiler::CodeGen
 
     # Generate the return statement, which terminates this basic block and
     # returns the tuple of the yield value and continuation data to the caller.
-    gen_yield_return_using_yield_cc(yield_index, yield_values, expr.terms)
+    gfunc.calling_convention
+      .gen_yield_return(self, gfunc, yield_index, yield_values, expr.terms)
 
     # Now start generating the code that comes after the yield expression.
     # Note that this code block will be dead code (with "no predecessors")
@@ -2894,51 +2858,6 @@ class Mare::Compiler::CodeGen
     else
       gfunc.continuation_info.yield_in_type.undef
     end
-  end
-
-  def gen_yield_return_using_yield_cc(next_yield_index, values, value_exprs)
-    raise "inconsistent frames" if @frames.size > 1
-    gfunc = func_frame.gfunc.not_nil!
-
-    # Cast the given values to the appropriate type.
-    cast_values =
-      values.zip(value_exprs).map_with_index do |(value, value_expr), index|
-        cast_type = gfunc.reach_func.signature.yield_out[index]
-        gen_assign_cast(value, cast_type, value_expr)
-      end
-
-    # Grab the continuation value from local memory and set the next func.
-    # Also set the tuple of yield out values into the continuation data.
-    cont = func_frame.continuation_value
-    tuple = gfunc.continuation_info.struct_type_for_yield_out.undef
-    tuple.name = "YIELDOUT"
-    cast_values.each_with_index do |cast_value, index|
-      tuple = @builder.insert_value(tuple, cast_value, index)
-    end
-    gfunc.continuation_info.set_yield_out(cont, tuple)
-    gfunc.continuation_info.set_next_yield_index(cont, next_yield_index)
-
-    # Return void.
-    @builder.ret
-  end
-
-  def gen_final_return_using_yield_cc(value, from_expr : AST::Node)
-    raise "inconsistent frames" if @frames.size > 1
-    gfunc = func_frame.gfunc.not_nil!
-
-    # Cast the given value to the appropriate type.
-    cast_type = gfunc.reach_func.signature.ret
-    cast_value = gen_assign_cast(value, cast_type, from_expr)
-
-    # Grab the continuation value from local memory, clear the next func
-    # to signify the final end of the yielding function, then set the final
-    # return value within the continuation and return.
-    cont = func_frame.continuation_value
-    gfunc.continuation_info.set_as_finished(cont)
-    gfunc.continuation_info.set_final_return(cont, cast_value)
-
-    # Return void.
-    @builder.ret
   end
 
   def gen_error_return_using_yield_cc
@@ -3095,7 +3014,7 @@ class Mare::Compiler::CodeGen
 
     # If this is a yielding function, we store locals in the continuation data.
     # Otherwise, we store each in its own alloca, which we create at the entry.
-    if gfunc.needs_continuation?(ctx)
+    if gfunc.needs_continuation?
       cont = func_frame.continuation_value
       gep = gfunc.continuation_info.struct_gep_for_local(cont, ref)
       # TODO: bitcast to llvm_type?
@@ -3111,7 +3030,7 @@ class Mare::Compiler::CodeGen
 
     # If this is a yielding function, we store nested conts in our own cont.
     # Otherwise, we store each in its own alloca, which we create at the entry.
-    if gfunc.not_nil!.needs_continuation?(ctx)
+    if gfunc.not_nil!.needs_continuation?
       func_frame.yielding_call_conts[relate]
     else
       gen_alloca(resolve_yielding_call_cont_type(relate), name)
@@ -3121,7 +3040,7 @@ class Mare::Compiler::CodeGen
   def gen_yielding_call_receiver_gep(relate, name)
     gfunc = func_frame.gfunc.not_nil!
 
-    if gfunc.not_nil!.needs_continuation?(ctx)
+    if gfunc.not_nil!.needs_continuation?
       func_frame.yielding_call_receivers[relate]
     else
       gen_alloca(llvm_type_of(relate.lhs), name)
