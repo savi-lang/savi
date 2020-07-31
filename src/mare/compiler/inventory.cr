@@ -23,8 +23,9 @@ module Mare::Compiler::Inventory
 
     def has_local?(x); @locals.includes?(x); end
 
-    def yield_count; @yields.size; end
     def local_count; @locals.size; end
+    def yield_count; @yields.size; end
+    def yielding_call_count; @yielding_calls.size; end
 
     def each_local; @locals.each end
     def each_yield; @yields.each end

@@ -476,7 +476,7 @@ struct Mare::Compiler::Infer::MetaType
 
   def find_callable_func_defns(
     ctx : Context,
-    infer : ForReifiedFunc,
+    infer : ForReifiedFunc?,
     name : String,
   ) : Set(Tuple(Inner, ReifiedType?, Program::Function?))
     set = Set(Tuple(Inner, ReifiedType?, Program::Function?)).new

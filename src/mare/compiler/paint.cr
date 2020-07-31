@@ -42,9 +42,14 @@ class Mare::Compiler::Paint
 
   # Public: return the color id for the given function,
   # assuming that this pass has already been run on the program.
-  def [](ctx, rf); color_of(ctx, rf) end
-  def color_of(ctx, reach_func : Reach::Func) : Color
-    @results[reach_func.reach_def][reach_func.signature.codegen_compat_name(ctx)]
+  def [](ctx, reach_func, for_continue = false) : Color
+    self[ctx, reach_func, for_continue].not_nil!
+  end
+
+  def []?(ctx, reach_func : Reach::Func, for_continue : Bool = false) : Color?
+    name = reach_func.signature.codegen_compat_name(ctx)
+    name = "#{name}.CONTINUE" if for_continue
+    @results[reach_func.reach_def][name]?
   end
 
   # Return the next color id to assign when we need a previously unused color.
@@ -57,8 +62,16 @@ class Mare::Compiler::Paint
   # Take notice of the given function, under the given type.
   private def observe_func(ctx, reach_def : Reach::Def, reach_func : Reach::Func)
     sig = reach_func.signature
-    set = @defs_by_sig_compat[sig.codegen_compat_name(ctx)] ||= Set(Reach::Def).new
+    name = sig.codegen_compat_name(ctx)
+    set = @defs_by_sig_compat[name] ||= Set(Reach::Def).new
     set.add(reach_def)
+
+    # If this function yields, paint another selector for its continue function.
+    if ctx.inventory[reach_func.reified.link].yield_count > 0
+      name = "#{name}.CONTINUE"
+      set = @defs_by_sig_compat[name] ||= Set(Reach::Def).new
+      set.add(reach_def)
+    end
   end
 
   # For all the function signatures we know about, assign "color" ids

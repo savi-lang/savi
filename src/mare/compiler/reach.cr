@@ -58,8 +58,25 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       ctx.reach[@meta_type.single!]
     end
 
-    def any_callable_defn_for(ctx, name) : Infer::ReifiedType
-      @meta_type.any_callable_func_defn_type(ctx, name).not_nil!
+    def any_callable_def_for(ctx, name) : Def
+      ctx.reach[@meta_type.any_callable_func_defn_type(ctx, name).not_nil!]
+    end
+
+    def all_callable_concrete_defs_for(ctx, name) : Array(Def)
+      results = [] of Def
+
+      @meta_type.find_callable_func_defns(ctx, nil, name).each do |(_, rt, _)|
+        next unless rt
+        if rt.link.is_abstract?
+          ctx.infer[rt].each_known_complete_subtype(ctx).each do |other_rt|
+            results << ctx.reach[other_rt] unless other_rt.link.is_abstract?
+          end
+        else
+          results << ctx.reach[rt]
+        end
+      end
+
+      results.uniq
     end
 
     def tuple_count

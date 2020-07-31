@@ -77,7 +77,7 @@ struct Mare::Compiler::Infer::MetaType::Intersection
     iter
   end
 
-  def find_callable_func_defns(ctx, infer : ForReifiedFunc, name : String)
+  def find_callable_func_defns(ctx, infer : ForReifiedFunc?, name : String)
     list = [] of Tuple(Inner, ReifiedType?, Program::Function?)
 
     # Collect a result for nominal in this intersection that has this func.
