@@ -36,6 +36,7 @@ class Mare::Compiler::CodeGen
       return Simple::INSTANCE if list.empty?
       return list.first if list.size == 1
       return YieldingErrorable::INSTANCE if list == [Errorable::INSTANCE, Yielding::INSTANCE]
+      return Errorable::INSTANCE if list == [Constructor::INSTANCE, Errorable::INSTANCE]
       raise NotImplementedError.new(list)
     end
 
