@@ -1,6 +1,11 @@
 :import "lib:pcre2-8"
 
 :ffi _PCRE2
+  :const utf U32: 0x00080000
+  :const substitute_global U32: 0x00000100  // PCRE2_SUBSTITUTE_GLOBAL
+  :const not_empty U32: 0x00000004          // PCRE2_NOTEMPTY
+  :const err_no_memory I32: -48             // PCRE2_ERROR_NOMEMORY
+
   :fun pcre2_compile_8 (
     buffer CPointer(U8)
     length USize
@@ -68,11 +73,6 @@
 :primitive _Pattern
 
 :class Regex
-  :fun non utf U32: 0x00080000
-  :fun non substitute_global U32 : 0x00000100  // PCRE2_SUBSTITUTE_GLOBAL
-  :fun non not_empty U32 : 0x00000004          // PCRE2_NOTEMPTY
-  :fun non err_no_memory I32 : -48             // PCRE2_ERROR_NOMEMORY
-
   :prop _pattern CPointer(_Pattern)
   :prop _str String
   :prop _jit Bool
@@ -81,7 +81,7 @@
     err I32 = 0
     erroffset ISize = 0
 
-    @_pattern = _PCRE2.pcre2_compile_8(@_str.cpointer, @_str.size, Regex.utf, address_of err, address_of erroffset, CPointer(U8).null)
+    @_pattern = _PCRE2.pcre2_compile_8(@_str.cpointer, @_str.size, _PCRE2.utf, address_of err, address_of erroffset, CPointer(U8).null)
 
     if (@_pattern.is_null) (
       error!
@@ -119,7 +119,7 @@
     if @_pattern.is_null (error!)
 
     opt = if global (
-      Regex.substitute_global
+      _PCRE2.substitute_global
     |
       U32[0]
     )
@@ -130,11 +130,11 @@
 
     rc I32 = 0
 
-    while (rc != Regex.err_no_memory) (
+    while (rc != _PCRE2.err_no_memory) (
       rc = _PCRE2.pcre2_substitute_8(@_pattern, subject.cpointer, subject.size, offset, opt,
         CPointer(_MatchData).null, CPointer(U8).null, value.cpointer, value.size, out.cpointer, address_of len)
 
-      if (rc == Regex.err_no_memory) (
+      if (rc == _PCRE2.err_no_memory) (
         len = if (out.is_null_terminated) (len - 1 | len) * 2
         out.reserve(len)
         len = if (out.is_null_terminated) (len - 1 | len)
@@ -156,7 +156,7 @@
 
     try (
       while (off < subject.size) (
-        m1 = @_match!(subject, off, Regex.not_empty)
+        m1 = @_match!(subject, off, _PCRE2.not_empty)
       )
     )
 
