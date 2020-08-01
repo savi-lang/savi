@@ -115,6 +115,29 @@ class Mare::Compiler::Macros < Mare::AST::CopyOnMutateVisitor
         "the value to be yielded out to the calling function",
       ])
       visit_yield(node)
+    elsif Util.match_ident?(node, 0, "return")
+      Util.require_terms(node, [
+        nil,
+        "the value to return",
+      ])
+      visit_jump(node, AST::Jump::Kind::Return)
+    elsif Util.match_ident?(node, 0, "error!")
+      Util.require_terms(node, [
+        nil,
+      ])
+      visit_jump(node, AST::Jump::Kind::Error)
+    elsif Util.match_ident?(node, 0, "break")
+      Util.require_terms(node, [
+        nil,
+        "the value to break loop with",
+      ])
+      visit_jump(node, AST::Jump::Kind::Break)
+    elsif Util.match_ident?(node, 0, "continue")
+      Util.require_terms(node, [
+        nil,
+        "the value to continue loop with",
+      ])
+      visit_jump(node, AST::Jump::Kind::Continue)
     elsif Util.match_ident?(node, 0, "source_code_position_of_argument")
       Util.require_terms(node, [
         nil,
@@ -295,6 +318,15 @@ class Mare::Compiler::Macros < Mare::AST::CopyOnMutateVisitor
 
     AST::Group.new("(", [
       AST::Yield.new(terms).from(orig),
+    ] of AST::Term).from(node)
+  end
+
+  def visit_jump(node : AST::Group, kind)
+    orig = node.terms[0]
+    term = node.terms[1]?
+
+    AST::Group.new("(", [
+      AST::Jump.new(term, kind).from(orig)
     ] of AST::Term).from(node)
   end
 

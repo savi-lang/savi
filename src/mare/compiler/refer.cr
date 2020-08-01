@@ -83,8 +83,8 @@ module Mare::Compiler::Refer
           @locals[name]? || @refer_type[node]? || Unresolved::INSTANCE
         end
 
-      # If this is an "error!" identifier, it's not actually unresolved.
-      info = RaiseError::INSTANCE if info.is_a?(Unresolved) && name == "error!"
+      # # If this is an "error!" identifier, it's not actually unresolved.
+      # info = RaiseError::INSTANCE if info.is_a?(Unresolved) && name == "error!"
 
       # Raise an error if trying to use an "incomplete" union of locals.
       if info.is_a?(LocalUnion) && info.incomplete

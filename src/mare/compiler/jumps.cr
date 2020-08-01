@@ -14,9 +14,12 @@ module Mare::Compiler::Jumps
   FLAG_ALWAYS_ERROR = 0x01_u8
   FLAG_MAYBE_ERROR  = 0x02_u8
 
+  alias JumpKind = AST::Jump::Kind
+
   struct Analysis
     def initialize
       @flags = {} of AST::Node => UInt8
+      @catches = {} of AST::Node => Array(AST::Jump)
     end
 
     private def set_flag(node, flag_bit)
@@ -35,6 +38,12 @@ module Mare::Compiler::Jumps
       bits = @flags[node]?
       return false unless bits
       (bits & flag_bit) != 0
+    end
+
+    def catch(node, jump)
+      catches[node] = [] of AST::Jump unless catches[node]?
+
+      catches[node] << jump
     end
 
     protected def always_error!(node); set_flag(node, FLAG_ALWAYS_ERROR) end
@@ -64,6 +73,10 @@ module Mare::Compiler::Jumps
     def initialize(@analysis, @classify)
     end
 
+    def find_first_parent_of_type(node, type : AST::Node.class) : AST::Node?
+      nil
+    end
+
     # We don't deal with type expressions at all.
     def visit_children?(ctx, node)
       !@classify.type_expr?(node)
@@ -76,12 +89,31 @@ module Mare::Compiler::Jumps
     end
 
     def touch(node : AST::Identifier)
-      if node.value == "error!"
-        # An identifier is an always error if it is the special case of "error!".
-        @analysis.always_error!(node)
-      elsif node.value[-1] == '!'
+      if node.value[-1] == '!'
         # Otherwise, it is a maybe error if it ends in an exclamation point.
         @analysis.maybe_error!(node)
+      end
+    end
+
+    def touch(node : AST::Jump)
+      case node.kind
+      when JumpKind::Error
+        @analysis.always_error!(node)
+      when JumpKind::Break || JumpKind::Continue
+        loop_node = find_first_parent_of_type(node, AST::Loop)
+
+        Error.at node, 
+          "Expected to be used in loops" unless loop_node
+
+        analysis.catch(loop_node.not_nil!, node)
+      when JumpKind::Return
+        func_node = find_first_parent_of_type(node, AST::Function)
+
+        Error.at node, 
+          "Expected to be used in functions" unless func_node
+
+        analysis.catch(func_node.not_nil!, node)
+      else
       end
     end
 

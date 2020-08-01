@@ -586,7 +586,7 @@ describe Mare::Compiler::Sugar do
               [:ident, "hygienic_local.1"], [:op, "<:"], [:ident, "Y"]],
               [:ident, "hygienic_local.1"]
             ],
-            [[:ident, "True"], [:ident, "error!"]]
+            [[:ident, "True"], [:jump, "error"]]
           ]
         ],
         [:op, "."],
