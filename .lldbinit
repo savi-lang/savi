@@ -1,2 +1,6 @@
 # Remap source filenames under /opt/code to be under the current working dir.
 settings set target.source-map /opt/code .
+
+# Add nice printing of TYPE and TYPESTRING builtin types.
+type summary add TYPE --summary-string "${var.name._ptr} (id=${var.id})"
+type summary add TYPESTRING --summary-string "${var._ptr}"

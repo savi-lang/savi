@@ -11,6 +11,7 @@ class Mare::Compiler::CodeGen
       @mod : LLVM::Module,
       @builder : LLVM::Builder,
       @target_data : LLVM::TargetData,
+      @runtime : PonyRT | VeronaRT
     )
       @di = LLVM::DIBuilder.new(@mod)
 
@@ -91,7 +92,7 @@ class Mare::Compiler::CodeGen
       @di.insert_declare_at_end(storage, info, expr, @builder.current_debug_location, @builder.insert_block)
     end
 
-    private def metadata(args)
+    def metadata(args)
       values = args.map do |value|
         case value
         when String         then @llvm.md_string(value.to_s)
@@ -107,30 +108,51 @@ class Mare::Compiler::CodeGen
       @llvm.md_node(values)
     end
 
-    private def di_file(source : Source)
+    def di_file(source : Source)
       di_files = (@di_files ||= {} of String => LibLLVMExt::Metadata)
       di_files[source.path] ||=
         @di.create_file(File.basename(source.path), File.dirname(source.path))
     end
 
-    private def di_create_basic_type(
-      t : Reach::Ref,
+    def di_create_basic_type(
+      t : Reach::Ref | String,
       llvm_type : LLVM::Type,
       dwarf_type : LLVM::DwarfTypeEncoding,
     )
       @di.create_basic_type(
-        t.show_type,
+        t.is_a?(Reach::Ref) ? t.show_type : t.to_s,
         @target_data.abi_size(llvm_type) * 8,
         @target_data.abi_alignment(llvm_type) * 8,
         dwarf_type,
       )
     end
 
-    private def di_create_struct_pointer_type(
+    def di_create_pointer_type(
+      name : String,
+      element_di_type : LibLLVMExt::Metadata,
+    )
+      @di.create_pointer_type(
+        element_di_type,
+        @target_data.abi_size(@llvm.int8.pointer) * 8,
+        @target_data.abi_alignment(@llvm.int8.pointer) * 8,
+        name,
+      )
+    end
+
+    @di_runtime_member_info : Hash(Int32, Tuple(String, LibLLVMExt::Metadata))?
+    def di_runtime_member_info
+      @di_runtime_member_info ||= begin
+        @runtime.di_runtime_member_info(self)
+          .as(Hash(Int32, Tuple(String, LibLLVMExt::Metadata)))
+      end
+    end
+
+    def di_create_struct_pointer_type(
       t : Reach::Ref,
       llvm_type : LLVM::Type,
     )
       llvm_struct_type = llvm_type.element_type
+      reach_def = t.single_def!(ctx)
       ident = t.single!.defn(ctx).ident
       name = ident.value
       pos = ident.pos
@@ -141,10 +163,13 @@ class Mare::Compiler::CodeGen
       tmp_debug_type = @di.create_replaceable_composite_type(nil, name, nil, 1, @llvm)
       @di_types.not_nil![t] = tmp_debug_type
 
+      # First gather the debug type information for the type descriptor,
+      # which is specific to the runtime we are using.
+      di_member_info = Hash(Int32, Tuple(String, LibLLVMExt::Metadata)).new
+      di_member_info.merge!(di_runtime_member_info)
+
       # Now go gather the debug type information for all user-visible fields.
-      reach_def = t.single_def!(ctx)
       reach_fields = reach_def.fields.dup
-      element_debug_types = [] of LibLLVMExt::Metadata
       struct_element_types = llvm_struct_type.struct_element_types
       struct_element_types.each_with_index do |elem_llvm_type, index|
         # We skip over fields the user shouldn't know about,
@@ -152,32 +177,13 @@ class Mare::Compiler::CodeGen
         next if index < (struct_element_types.size - reach_def.fields.size)
 
         field_name, field_reach_ref = reach_fields.shift
-        element_debug_types <<
-          @di.create_member_type(nil, field_name, nil, 1,
-            @target_data.abi_size(elem_llvm_type) * 8,
-            @target_data.abi_alignment(elem_llvm_type) * 8,
-            @target_data.offset_of_element(llvm_struct_type, index) * 8,
-            LLVM::DIFlags::Zero,
-            di_type(field_reach_ref, elem_llvm_type)
-          )
+        di_member_info[index] =
+          {field_name, di_type(field_reach_ref, elem_llvm_type)}
       end
 
       # Create the debug type, as a struct pointer with those element types.
-      debug_type = @di.create_pointer_type(
-        @di.create_struct_type(
-          di_file(pos.source),
-          name,
-          di_file(pos.source),
-          pos.row + 1,
-          @target_data.abi_size(llvm_struct_type) * 8,
-          @target_data.abi_alignment(llvm_struct_type) * 8,
-          LLVM::DIFlags::Zero,
-          nil,
-          @di.get_or_create_type_array(element_debug_types),
-        ),
-        @target_data.abi_size(llvm_type) * 8,
-        @target_data.abi_alignment(llvm_type) * 8,
-        name,
+      debug_type = di_create_pointer_type(name,
+        di_create_struct_type(name, llvm_struct_type, di_member_info, pos),
       )
 
       # Finally, replace the temporary stand-in we created above and return.
@@ -185,7 +191,40 @@ class Mare::Compiler::CodeGen
       debug_type
     end
 
-    private def di_type(t : Reach::Ref, llvm_type : LLVM::Type)
+    # This function is for cases where we are generating some internal struct
+    # type with no Reach::Ref, so the caller must supply the info directly.
+    def di_create_struct_type(
+      name : String,
+      llvm_type : LLVM::Type,
+      member_infos : Hash(Int32, Tuple(String, LibLLVMExt::Metadata)),
+      pos : Source::Pos? = nil
+    )
+      @di.create_struct_type(
+        pos.try { |pos| di_file(pos.source) },
+        name,
+        pos.try { |pos| di_file(pos.source) },
+        (pos.try(&.row) || 0) + 1,
+        @target_data.abi_size(llvm_type) * 8,
+        @target_data.abi_alignment(llvm_type) * 8,
+        LLVM::DIFlags::Zero,
+        nil,
+        @di.get_or_create_type_array(
+          member_infos.map do |index, (member_name, member_di_type)|
+            member_llvm_type = llvm_type.struct_element_types[index]
+
+            @di.create_member_type(nil, member_name, nil, 1,
+              @target_data.abi_size(member_llvm_type) * 8,
+              @target_data.abi_alignment(member_llvm_type) * 8,
+              @target_data.offset_of_element(llvm_type, index) * 8,
+              LLVM::DIFlags::Zero,
+              member_di_type,
+            )
+          end.compact
+        )
+      )
+    end
+
+    def di_type(t : Reach::Ref, llvm_type : LLVM::Type)
       di_types = (@di_types ||= {} of Reach::Ref => LibLLVMExt::Metadata)
       di_types[t] ||=
         if t.is_floating_point_numeric?(ctx)
@@ -195,14 +234,12 @@ class Mare::Compiler::CodeGen
         elsif t.is_numeric?(ctx)
           di_create_basic_type(t, llvm_type, LLVM::DwarfTypeEncoding::Unsigned)
         elsif t.llvm_use_type(ctx) == :ptr
-          @di.create_pointer_type(
+          di_create_pointer_type(
+            t.show_type,
             di_type(
               t.single_def!(ctx).cpointer_type_arg(ctx),
               llvm_type.element_type,
             ),
-            @target_data.abi_size(llvm_type) * 8,
-            @target_data.abi_alignment(llvm_type) * 8,
-            t.show_type,
           )
         elsif t.llvm_use_type(ctx) == :struct_ptr
           di_create_struct_pointer_type(t, llvm_type)
@@ -215,7 +252,7 @@ class Mare::Compiler::CodeGen
     end
 
     # TODO: build a real type description here.
-    private def di_func_type(gfunc : GenFunc, file : LibLLVMExt::Metadata)
+    def di_func_type(gfunc : GenFunc, file : LibLLVMExt::Metadata)
       # This is just a stub that pretends there is just one int parameter.
       int = @di.create_basic_type("int", 32, 32, LLVM::DwarfTypeEncoding::Signed)
       param_types = @di.get_or_create_type_array([int])

@@ -129,6 +129,7 @@ class Mare::Compiler::CodeGen::PonyRT
     @dispatch_fn_ptr = @dispatch_fn.pointer.as(LLVM::Type)
     @final_fn = LLVM::Type.function([@obj_ptr], @void).as(LLVM::Type)
     @final_fn_ptr = @final_fn.pointer.as(LLVM::Type)
+    @typestring = llvm.struct([@ptr, @isize, @isize, @ptr]).as(LLVM::Type)
   end
 
   def gen_runtime_decls(g : CodeGen)
@@ -371,6 +372,24 @@ class Mare::Compiler::CodeGen::PonyRT
       @ptr,                                      # 15: type name (REPLACES unused field descriptors from Pony)
       @ptr.array(vtable_size),                   # 16: vtable
     ], "#{type_def.llvm_name}.DESC"
+  end
+
+  def di_runtime_member_info(debug : DebugInfo)
+    di_type_u32 = debug.di_create_basic_type("uint32_t", @i32, LLVM::DwarfTypeEncoding::Unsigned)
+    di_type_char = debug.di_create_basic_type("char", @i8, LLVM::DwarfTypeEncoding::Signed)
+    di_type_cstring = debug.di_create_pointer_type("char*", di_type_char)
+    di_type_typestring_ptr = debug.di_create_pointer_type("TYPESTRING*",
+      debug.di_create_struct_type("TYPESTRING", @typestring, {
+        3 => {"_ptr", di_type_cstring},
+      }),
+    )
+    di_type_desc_ptr = debug.di_create_pointer_type("TYPE*",
+      debug.di_create_struct_type("TYPE", @desc, {
+        DESC_ID => {"id", di_type_u32},
+        DESC_TYPE_NAME => {"name", di_type_typestring_ptr},
+      }),
+    )
+    { 0 => {"TYPE", di_type_desc_ptr} }
   end
 
   # This defines a global constant for the type descriptor of a type,

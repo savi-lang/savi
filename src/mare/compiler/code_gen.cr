@@ -92,9 +92,9 @@ class Mare::Compiler::CodeGen
     @llvm = LLVM::Context.new
     @mod = @llvm.new_module("main")
     @builder = @llvm.new_builder
-    @di = DebugInfo.new(@llvm, @mod, @builder, @target_machine.data_layout)
 
     @runtime = runtime.new(@llvm, @target_machine).as(PonyRT | VeronaRT)
+    @di = DebugInfo.new(@llvm, @mod, @builder, @target_machine.data_layout, @runtime)
 
     @default_linkage = LLVM::Linkage::External
 
