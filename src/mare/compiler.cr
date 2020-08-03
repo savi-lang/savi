@@ -65,7 +65,7 @@ module Mare::Compiler
     when :jumps then [:classify]
     when :refer then [:lambda, :populate, :sugar, :jumps, :macros, :refer_type, :namespace]
     when :consumes then [:jumps, :refer]
-    when :inventory then [:classify]
+    when :inventory then [:refer]
     when :pre_infer then [:inventory, :jumps, :classify, :refer, :lambda, :populate]
     when :infer then [:pre_infer, :classify]
     when :privacy then [:infer]
