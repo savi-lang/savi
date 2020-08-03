@@ -327,36 +327,4 @@ describe Mare::Compiler::Verify do
       Mare::Compiler.compile([source], :verify)
     end
   end
-
-  it "complains when a check would require runtime knowledge of capabilties" do
-    source = Mare::Source.new_example <<-SOURCE
-    :actor Main
-      :new (env): @example("example")
-      :fun example (x (String'val | String'ref))
-        if (x <: String'ref) (
-          x << "..."
-        )
-    SOURCE
-
-    expected = <<-MSG
-    This type check would require runtime knowledge of capabilities:
-    from (example):4:
-        if (x <: String'ref) (
-            ^~~~~~~~~~~~~~~
-
-    - the target type is String'ref:
-      from (example):4:
-        if (x <: String'ref) (
-                 ^~~~~~~~~~
-
-    - but the origin type (String | String'ref) has possibilities with the same type but different capability:
-      from (example):4:
-        if (x <: String'ref) (
-            ^
-    MSG
-
-    expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :verify)
-    end
-  end
 end
