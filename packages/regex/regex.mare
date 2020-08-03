@@ -1,12 +1,84 @@
 :import "lib:pcre2-8"
 
+:primitive RegexError
+  :const NOMATCH           I32: -1
+  :const PARTIAL           I32: -2
+  :const UTF8_ERR1         I32: -3
+  :const UTF8_ERR2         I32: -4
+  :const UTF8_ERR3         I32: -5
+  :const UTF8_ERR4         I32: -6
+  :const UTF8_ERR5         I32: -7
+  :const UTF8_ERR6         I32: -8
+  :const UTF8_ERR7         I32: -9
+  :const UTF8_ERR8         I32: -10
+  :const UTF8_ERR9         I32: -11
+  :const UTF8_ERR10        I32: -12
+  :const UTF8_ERR11        I32: -13
+  :const UTF8_ERR12        I32: -14
+  :const UTF8_ERR13        I32: -15
+  :const UTF8_ERR14        I32: -16
+  :const UTF8_ERR15        I32: -17
+  :const UTF8_ERR16        I32: -18
+  :const UTF8_ERR17        I32: -19
+  :const UTF8_ERR18        I32: -20
+  :const UTF8_ERR19        I32: -21
+  :const UTF8_ERR20        I32: -22
+  :const UTF8_ERR21        I32: -23
+  :const UTF16_ERR1        I32: -24
+  :const UTF16_ERR2        I32: -25
+  :const UTF16_ERR3        I32: -26
+  :const UTF32_ERR1        I32: -27
+  :const UTF32_ERR2        I32: -28
+  :const BADDATA           I32: -29
+  :const MIXEDTABLES       I32: -30
+  :const BADMAGIC          I32: -31
+  :const BADMODE           I32: -32
+  :const BADOFFSET         I32: -33
+  :const BADOPTION         I32: -34
+  :const BADREPLACEMENT    I32: -35
+  :const BADUTFOFFSET      I32: -36
+  :const CALLOUT           I32: -37
+  :const DFA_BADRESTART    I32: -38
+  :const DFA_RECURSE       I32: -39
+  :const DFA_UCOND         I32: -40
+  :const DFA_UFUNC         I32: -41
+  :const DFA_UITEM         I32: -42
+  :const DFA_WSSIZE        I32: -43
+  :const INTERNAL          I32: -44
+  :const JIT_BADOPTION     I32: -45
+  :const JIT_STACKLIMIT    I32: -46
+  :const MATCHLIMIT        I32: -47
+  :const NOMEMORY          I32: -48
+  :const NOSUBSTRING       I32: -49
+  :const NOUNIQUESUBSTRING I32: -50
+  :const NULL              I32: -51
+  :const RECURSELOOP       I32: -52
+  :const RECURSIONLIMIT    I32: -53
+  :const UNAVAILABLE       I32: -54
+
 :ffi _PCRE2
+  :fun pcre2_get_startchar_8 (
+    match_data CPointer(_MatchData)
+  ) USize
+
+  :fun pcre2_substring_length_byname_8 (
+    match_data CPointer(_MatchData)
+    name CPointer(U8)
+    length CPointer(USize)
+  ) I32
+
+  :fun pcre2_substring_length_bynumber_8 (
+    match_data CPointer(_MatchData)
+    number U32
+    length CPointer(USize)
+  ) I32
+
   :fun pcre2_compile_8 (
     buffer CPointer(U8)
     length USize
     options U32
     err CPointer(I32)
-    erroffset CPointer(ISize)
+    erroffset CPointer(USize)
 	  context CPointer(U8)
   ) CPointer(_Pattern)
 
@@ -58,6 +130,20 @@
     output_buffer_length CPointer(USize)
   ) I32
 
+  :fun pcre2_substring_copy_bynumber_8 (
+    match_data CPointer(_MatchData)
+    number U32
+    buffer CPointer(U8)
+    length CPointer(USize)
+  ) I32
+
+  :fun pcre2_substring_copy_byname_8 (
+    match_data CPointer(_MatchData)
+    name CPointer(U8)
+    buffer CPointer(U8)
+    length CPointer(USize)
+  ) I32
+
   :fun pcre2_substring_number_from_name_8 (
     pattern CPointer(_Pattern)
     name CPointer(U8)
@@ -67,6 +153,15 @@
 
 :primitive _Pattern
 
+:class RegexCompileError
+  :prop _err I32
+  :prop _erroffset USize
+
+  :new (@_err, @_erroffset)
+
+  :fun err: @_err
+  :fun erroffset: @_erroffset
+
 :class Regex
   :fun non utf U32: 0x00080000
   :fun non substitute_global U32 : 0x00000100  // PCRE2_SUBSTITUTE_GLOBAL
@@ -74,14 +169,12 @@
   :fun non err_no_memory I32 : -48             // PCRE2_ERROR_NOMEMORY
 
   :prop _pattern CPointer(_Pattern)
-  :prop _str String
-  :prop _jit Bool
+  :prop _str String'box
+  :prop _jit Bool: False
 
-  :new new! (@_str, jit = True)
-    err I32 = 0
-    erroffset ISize = 0
-
-    @_pattern = _PCRE2.pcre2_compile_8(@_str.cpointer, @_str.size, Regex.utf, address_of err, address_of erroffset, CPointer(U8).null)
+  :new _new! (@_str, jit = True, err CPointer(I32), erroffset CPointer(USize))
+    @_pattern = _PCRE2.pcre2_compile_8(@_str.cpointer, @_str.size, Regex.utf,
+      err, erroffset, CPointer(U8).null)
 
     if (@_pattern.is_null) (
       error!
@@ -89,10 +182,26 @@
 
     @_jit = jit && (_PCRE2.pcre2_jit_compile_8(@_pattern, 1) == 0)
 
-  :fun "==" (subject (String | Regex))
+  :fun non new! (_str String'box, jit = True)
+    err I32 = 0
+    erroffset USize = 0
+    
+    regex = Regex._new!(_str, jit, address_of err, address_of erroffset)
+
+  :fun non new (_str, jit = True)
+    err I32 = 0
+    erroffset USize = 0
+    
+    try (
+      Regex._new!(_str, jit, address_of err, address_of erroffset)
+    |
+      RegexCompileError.new(err, erroffset)
+    )
+
+  :fun "==" (subject (String'box | Regex))
     case (
     | subject <: Regex  | @_str == subject._str
-    | subject <: String | 
+    | subject <: String'box | 
       try (
         m = @_match!(subject)
         _PCRE2.pcre2_match_data_free_8(m)
@@ -103,66 +212,118 @@
     | False
     )
 
-  :fun "!=" (subject (String | Regex))
+  :fun "!=" (subject (String'box | Regex))
     (@ == subject).not
 
-  :fun match! (subject String, offset USize = 0)
+  :fun match! (subject String'box, offset USize = 0)
     m = @_match!(subject, offset, 0)
     Match._new(subject, m)
 
-  :fun replace! (
-    subject String,
-    value String,
-    offset USize = 0,
-    global = False
-  )
-    if @_pattern.is_null (error!)
+  :fun matches (subject String'box)
+    offset = 0
+    has_next = True
 
-    opt = if global (
-      Regex.substitute_global
-    |
-      U32[0]
-    )
-
-    len = subject.size.max(64)
-    out = String.new(len)
-    len = if (out.is_null_terminated) (len - 1 | len)
-
-    rc I32 = 0
-
-    while (rc != Regex.err_no_memory) (
-      rc = _PCRE2.pcre2_substitute_8(@_pattern, subject.cpointer, subject.size, offset, opt,
-        CPointer(_MatchData).null, CPointer(U8).null, value.cpointer, value.size, out.cpointer, address_of len)
-
-      if (rc == Regex.err_no_memory) (
-        len = if (out.is_null_terminated) (len - 1 | len) * 2
-        out.reserve(len)
-        len = if (out.is_null_terminated) (len - 1 | len)
+    // TODO: Use break
+    while (has_next) (
+      try (
+        m = @match!(subject, offset)
+        offset = m.end_pos + 1
+        yield m
+      |
+        has_next = False
       )
     )
 
-    if (rc <= 0) (
-      error!
+  :fun replace! (
+    subject String'box
+    value String'box
+    offset USize = 0
+    global = True
+  )
+    if @_pattern.is_null (error!)
+
+    res = @replace(subject, value, offset, global)
+
+    case (
+    | res <: I32 || res <: None | error!
+    )
+
+    --res.as!(String'iso)
+
+  // TODO: RETURN VALUES WITH ERRORS
+  :: returns None if _pattern is null
+  :: returns I32 if pcre2 error appeared. error code can be compared to RegexError
+  :: returns String if replaced with no errors
+  :fun replace (
+    subject String'box
+    value String'box
+    offset USize = 0
+    global = True
+  )
+    if @_pattern.is_null (
+      None
+    |
+      opt = if global (
+        Regex.substitute_global
+      |
+        U32[0]
+      )
+      
+      len = subject.size.max(64)
+      out = String.new_iso(len)
+      len = out.space
+      rc I32 = 0
+
+      // TODO: Use break
+      ok = True
+      while ok (
+        rc = _PCRE2.pcre2_substitute_8(@_pattern,
+          subject.cpointer, subject.size, offset, opt, CPointer(_MatchData).null,
+          CPointer(U8).null, value.cpointer, value.size, out.cpointer,
+          address_of len)
+
+        if (rc == Regex.err_no_memory) (
+          len = out.space * 2
+          out.reserve(len)
+          len = out.space
+        )
+
+        ok = rc == Regex.err_no_memory
+      )
+
+      if (rc <= 0) (
+        rc
+      |
+        out.truncate(len)
+        --out
+      )
     )
 
   :fun split! (
-    subject String,
+    subject String'box,
     offset USize = 0
   )
     if @_pattern.is_null (error!)
 
-    out = Array(String)
+    out = Array(String'iso).new_iso
     off = offset
 
     try (
       while (off < subject.size) (
-        m1 = @_match!(subject, off, Regex.not_empty)
+        m_data = @_match!(subject, off, Regex.not_empty)
+        m = Match._new(subject, m_data)
+        m_offset = m.start_pos
+        out << subject.substring(off, m_offset)
+        off = m.end_pos + 1
       )
+    |
+      out << subject.substring(off)
+      None
     )
 
-    out
+    --out
 
-  :fun index! (name String)
+  :fun index! (name String'box)
     rc = _PCRE2.pcre2_substring_number_from_name_8(@_pattern, name.cpointer)
 
     if (rc < 0) (
@@ -172,7 +333,7 @@
     rc.usize
 
   :fun _match! (
-    subject String,
+    subject String'box,
     offset USize = 0,
     options U32 = 0
   )

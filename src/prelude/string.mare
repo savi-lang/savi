@@ -26,6 +26,17 @@
     @_alloc = data.space
     @_ptr = data.cpointer._unsafe
 
+  :fun ref truncate (len USize)
+    if (len >= @_alloc) (
+      @_size = len.min(@_alloc)
+      @reserve(@_alloc + 1)
+    |
+      @_size = len.min(@_alloc - 1)
+    )
+
+    @_ptr._update(@_size, 0)
+
+
   :fun "==" (other String'box)
     (@_size == other._size) && (@_ptr._compare(other._ptr, @_size) == 0)
 
@@ -50,6 +61,9 @@
     copy._clone_from(_ptr_tag, @size)
     copy._size = @size
     --copy // TODO: auto-consume at end of the function?
+
+  :fun space
+    if (@is_null_terminated) (@_alloc - 1 | @_alloc)
 
   :fun ref _clone_from (other_ptr CPointer(U8), size USize)
     other_ptr._unsafe._copy_to(@_ptr, size)

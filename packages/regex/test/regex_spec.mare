@@ -1,0 +1,9 @@
+:import "spec"
+:import ".."
+
+:class RegexSpec
+  :is Spec
+  :const describes: "Regex"
+
+  :it "can compare itself to string"
+    re = Regex.new("").as!(Regex)

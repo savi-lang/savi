@@ -2,8 +2,116 @@
 
 :class Match
   :prop _match CPointer(_MatchData)
-  :prop _subject String
+  :prop _subject String'box
   :prop _size U32
 
   :new _new (@_subject, @_match)
     @_size = _PCRE2.pcre2_get_ovector_count_8(@_match)
+
+  :fun size
+    @_size
+
+  :fun start_pos
+    _PCRE2.pcre2_get_startchar_8(@_match)
+
+  :fun end_pos
+    len USize = 0
+    _PCRE2.pcre2_substring_length_bynumber_8(@_match, 0, address_of len)
+    @start_pos + (len - 1)
+
+  :fun groups
+    res = Array(String'iso).new_iso
+    i U32 = 1
+
+    while (i < @size) (
+      try (
+        res << @[i]!
+        // TODO REMOVE NONE
+        None
+      |
+        res.push(String.new_iso)
+        // TODO REMOVE NONE
+        None
+      )
+    )
+
+    --res
+
+  :: returns None when i >= size
+  :: returns I32 when pcre error. Use RegexError to compare to
+  :: returns String otherwise
+  :fun find_capture_by_index (i U32) 
+    // TODO: USE RETURN
+    if (i >= @size).not (
+      len USize = 0
+      rc = _PCRE2.pcre2_substring_length_bynumber_8(@_match, i, address_of len)
+      if (rc != 0) (
+        rc
+      |
+        len += 1
+        
+        out = String.new_iso(len)
+        len = out.space
+        rc = _PCRE2.pcre2_substring_copy_bynumber_8(@_match, i, out.cpointer, address_of len)
+        if (rc != 0) (
+          rc
+        |
+          out.truncate(len)
+          --out
+        )
+      )
+    )
+
+  :: returns None when i >= size
+  :: returns I32 when pcre error. Use RegexError to compare to
+  :: returns String otherwise
+  :fun find_capture_by_name (name String'box) 
+    // TODO: USE RETURN
+    len USize = 0
+    rc = _PCRE2.pcre2_substring_length_byname_8(@_match, name.cstring, address_of len)
+    if (rc != 0) (
+      rc
+    |
+      len += 1
+      
+      out = String.new_iso(len)
+      len = out.space
+      rc = _PCRE2.pcre2_substring_copy_byname_8(@_match, name.cstring, out.cpointer, address_of len)
+      if (rc != 0) (
+        rc
+      |
+        out.truncate(len)
+        --out
+      )
+    )
+
+  :fun "[]" (value (U32 | String'box)) 
+    res = case (
+      | value <: String | @find_capture_by_name(value)
+      | value <: U32 | @find_capture_by_index(value)
+      | None
+    )
+
+    if (res <: String'iso) (
+      --res
+    )
+    
+  :fun "[]!" (value (U32 | String)) String'iso
+    case (
+      | value <: String | 
+        res = @find_capture_by_name(value)
+        if (res <: String'iso) (
+          --res
+        |
+          error!
+        )
+      | value <: U32 | 
+        res = @find_capture_by_index(value)
+        if (res <: String'iso) (
+          --res
+        |
+          error!
+        )
+      | error!
+    )
+
