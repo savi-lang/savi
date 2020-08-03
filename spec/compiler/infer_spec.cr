@@ -2175,15 +2175,52 @@ describe Mare::Compiler::Infer do
         if (x <: Exampleable) x.example
             ^~~~~~~~~~~~~~~~
 
-    - the match type is Exampleable:
+    - the runtime match type, ignoring capabilities, is Exampleable'any:
       from (example):7:
         if (x <: Exampleable) x.example
                  ^~~~~~~~~~~
 
-    - which is not a subtype of String:
+    - which does not intersect at all with String:
       from (example):6:
       :fun refine (x String)
                      ^~~~~~
+    MSG
+
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :infer)
+    end
+  end
+
+  it "complains when a check would require runtime knowledge of capabilities" do
+    source = Mare::Source.new_example <<-SOURCE
+    :actor Main
+      :new (env): @example("example")
+      :fun example (x (String'val | String'ref))
+        if (x <: String'ref) (
+          x << "..."
+        )
+    SOURCE
+
+    expected = <<-MSG
+    This type check could violate capabilities:
+    from (example):4:
+        if (x <: String'ref) (
+            ^~~~~~~~~~~~~~~
+
+    - the runtime match type, ignoring capabilities, is String'any:
+      from (example):4:
+        if (x <: String'ref) (
+                 ^~~~~~~~~~
+
+    - if it successfully matches, the type will be (String | String'ref):
+      from (example):3:
+      :fun example (x (String'val | String'ref))
+                      ^~~~~~~~~~~~~~~~~~~~~~~~~
+
+    - which is not a subtype of String'ref:
+      from (example):4:
+        if (x <: String'ref) (
+                 ^~~~~~~~~~
     MSG
 
     expect_raises Mare::Error, expected do

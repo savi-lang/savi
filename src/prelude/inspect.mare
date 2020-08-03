@@ -28,12 +28,12 @@
     case (
     | input <: _InspectCustom | input.inspect_into(--output)
     | input <: _InspectEnum | output << input.member_name, --output
-    | input <: U8    | @into(--output, input.u64) // TODO: unify into one integer clause?
-    | input <: U16   | @into(--output, input.u64) // TODO: unify into one integer clause?
-    | input <: U32   | @into(--output, input.u64) // TODO: unify into one integer clause?
-    | input <: USize | @into(--output, input.u64) // TODO: unify into one integer clause?
-    | input <: U64   |                          // TODO: unify into one integer clause?
-      number = input
+    | input <: U8'box    | @into(--output, input.u64) // TODO: unify into one integer clause?
+    | input <: U16'box   | @into(--output, input.u64) // TODO: unify into one integer clause?
+    | input <: U32'box   | @into(--output, input.u64) // TODO: unify into one integer clause?
+    | input <: USize'box | @into(--output, input.u64) // TODO: unify into one integer clause?
+    | input <: U64'box   |                            // TODO: unify into one integer clause?
+      number = input.u64
       digits Array(U8) = []
       while (number > 0) (
         digits << (number % 10).u8 + '0'
@@ -42,15 +42,16 @@
       digits.reverse_each -> (digit | output.push_byte(digit), None) // TODO: None should not be needed here
       if (digits.size == 0) (output.push_byte('0'))
       --output
-    | input <: I8    | @into(--output, input.i64) // TODO: unify into one integer clause?
-    | input <: I16   | @into(--output, input.i64) // TODO: unify into one integer clause?
-    | input <: I32   | @into(--output, input.i64) // TODO: unify into one integer clause?
-    | input <: ISize | @into(--output, input.i64) // TODO: unify into one integer clause?
-    | input <: I64   |                          // TODO: unify into one integer clause?
-      positive = if (input >= 0) (input | output.push_byte('-'), input.abs)
+    | input <: I8'box    | @into(--output, input.i64) // TODO: unify into one integer clause?
+    | input <: I16'box   | @into(--output, input.i64) // TODO: unify into one integer clause?
+    | input <: I32'box   | @into(--output, input.i64) // TODO: unify into one integer clause?
+    | input <: ISize'box | @into(--output, input.i64) // TODO: unify into one integer clause?
+    | input <: I64'box   |                            // TODO: unify into one integer clause?
+      number = input.i64
+      positive = if (number >= 0) (number | output.push_byte('-'), number.abs)
       @into(--output, positive.u64)
-    | input <: F32 | @_inspect_float_into(--output, input.f64) // TODO: unify into one float clause?
-    | input <: F64 | @_inspect_float_into(--output, input.f64) // TODO: unify into one float clause?
+    | input <: F32'box | @_inspect_float_into(--output, input.f64) // TODO: unify into one float clause?
+    | input <: F64'box | @_inspect_float_into(--output, input.f64) // TODO: unify into one float clause?
     | input <: String'box |
       output.push_byte('"')
       output << input.clone // TODO: show some characters as escaped.

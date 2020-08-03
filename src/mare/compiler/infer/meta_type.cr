@@ -194,6 +194,9 @@ struct Mare::Compiler::Infer::MetaType
   # Returns true if it is safe to refine the type of self to other at runtime.
   # Returns false if doing so would violate capabilities.
   # Returns nil if doing so would be impossible even if we ignored capabilities.
+  # TODO: This function isn't actually used by match types - it's only used for
+  # Pony runtime trace characteristics, and we're not fully sure it's correct.
+  # Needs auditing for correctness in that context, and potential renaming.
   def safe_to_match_as?(ctx : Context, other : MetaType) : Bool?
     inner.safe_to_match_as?(ctx, other.inner)
   end

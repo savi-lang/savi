@@ -212,6 +212,11 @@ class Mare::Compiler::CodeGen::VeronaRT
     ], "#{type_def.llvm_name}.DESC"
   end
 
+  def di_runtime_member_info(debug : DebugInfo)
+    # TODO: Expose runtime member info, like PonyRT does.
+    {} of Int32 => {String, LibLLVMExt::Metadata}
+  end
+
   # This defines a global constant for the type descriptor of a type,
   # which is held as the first value in an object, used for identifying its
   # type at runtime, as well as a host of other functions related to dealing

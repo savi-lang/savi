@@ -170,29 +170,6 @@ class Mare::Compiler::Verify < Mare::AST::Visitor
     end
   end
 
-  def touch(ctx, node : AST::Relate)
-    case node.op.value
-    when "<:"
-      # Skip this verification if this just a compile-time type check.
-      return if ctx.infer[infer.reified.link][node.lhs].is_a?(Infer::FixedTypeExpr)
-
-      # Verify that it is safe to perform this runtime type check.
-      lhs_mt = infer.resolved(ctx, node.lhs)
-      rhs_mt = infer.resolved(ctx, node.rhs)
-      case lhs_mt.safe_to_match_as?(ctx, rhs_mt)
-      when false
-        Error.at node,
-          "This type check would require runtime knowledge of capabilities", [
-            {node.rhs.pos, "the target type is #{rhs_mt.show_type}"},
-            {node.lhs.pos, "but the origin type #{lhs_mt.show_type} has " \
-              "possibilities with the same type but different capability"}
-          ]
-      else
-      end
-    else
-    end
-  end
-
   def touch(ctx, node : AST::Node)
     # Do nothing for all other AST::Nodes.
   end

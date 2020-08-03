@@ -8,8 +8,8 @@
   :prop _after (_KVBA(K, V) | None): None
   :fun ref "before=" (entry): @_before = entry
   :fun ref "after=" (entry): @_after = entry
-  :fun before!: @_before.as!(_KVBA(K, V))
-  :fun after!: @_after.as!(_KVBA(K, V))
+  :fun before!: @_before.as!(@->(_KVBA(K, V))) // TODO: fix @-> parentheses, but use not!(None) instead
+  :fun after!: @_after.as!(@->(_KVBA(K, V)))   // TODO: fix @-> parentheses, but use not!(None) instead
 
 :: OrderedMap is an alternative to the Map class that incurs more overhead cost
 :: but preserves the order of key/value pair insertion when iterating.
@@ -99,7 +99,7 @@
   :: > error! // this key no longer has an assigned value
   ::
   :fun "[]!" (key K)
-    @_array[@_search(key)]!.as!(_KVBA(K, V)).value
+    @_array[@_search(key)]!.as!(@->(_KVBA(K, V))).value // TODO: fix @-> parentheses, but use not!(None) instead
 
   :: Assign the given value to the given key in the map.
   :: The previous value will be overwritten and discarded if present.
@@ -153,10 +153,10 @@
   :fun ref delete (key K)
     try (
       index = @_search(key)
-      entry = @_array[index]!.as!(_KVBA(K, V))
+      entry = @_array[index]!.as!(@->(_KVBA(K, V))) // TODO: fix @-> parentheses, but use not!(None) instead
       @_array[index]! = _MapDeleted // TODO: destructive read/pop instead of read then write
       @_size -= 1
-      @_head = if (@_size == 0) (None | @_head.as!(_KVBA(K, V)).before!)
+      @_head = if (@_size == 0) (None | @_head.as!(@->(_KVBA(K, V))).before!) // TODO: fix @-> parentheses, but use not!(None) instead
       @_remove_entry_from_place(entry)
     )
     None
@@ -207,7 +207,7 @@
   :: with the oldest key/value pairs appearing first, ending with the newest.
   :fun each
     try ( // this should only fail when the map is empty, thus yielding nothing
-      head = @_head.as!(_KVBA(K, V))
+      head = @_head.as!(@->(_KVBA(K, V))) // TODO: fix @-> parentheses, but use not!(None) instead
       entry = head.after!
       while (entry isnt head) (
         yield (entry.key, entry.value)
@@ -223,7 +223,7 @@
     :yields for Bool
     early_stop = False
     try ( // this should only fail when the map is empty, thus yielding nothing
-      head = @_head.as!(_KVBA(K, V))
+      head = @_head.as!(@->(_KVBA(K, V))) // TODO: fix @-> parentheses, but use not!(None) instead
       entry = head.after!
       while (entry isnt head && early_stop.not) (
         early_stop = yield (entry.key, entry.value)
