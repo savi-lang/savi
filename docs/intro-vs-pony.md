@@ -476,7 +476,18 @@ Just like in Pony, we use `as` for forcefully "casting" in a way that can raise 
     greeter.greeting.as!(String)
 ```
 
-If you want to take some other fallback action rather than raising an error, you can use the subtype check operator (`<:`) to check the type of a local variable in the clause of an `if` block:
+You can also cast to check for exclusion of a type with `not!`:
+
+```mare
+:trait Greeter
+  :fun greeting (String | None)
+
+:class World
+  :fun meet! (greeter Greeter)
+    greeter.greeting.not!(None)
+```
+
+If you want to take some other fallback action rather than raising an error, you can use the subtype check operator (`<:`) or its opposite operator (`!<:`) to check the type of a local variable in the clause of an `if` block:
 
 ```mare
 :trait Greeter

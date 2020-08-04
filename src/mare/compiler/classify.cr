@@ -167,7 +167,7 @@ module Mare::Compiler::Classify
 
     def touch(ctx, relate : AST::Relate)
       case relate.op.value
-      when "<:"
+      when "<:", "!<:"
         type_expr_visit(ctx, relate.rhs)
       when "."
         # In a function call Relate, a value is not needed for the right side.

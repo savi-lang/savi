@@ -839,10 +839,11 @@ class Mare::Compiler::Infer
     getter refine : Refer::TypeParam
     getter lhs : Info
     getter refine_type : Info
+    getter positive_check : Bool
 
     def describe_kind : String; "type parameter condition" end
 
-    def initialize(@pos, @refine, @lhs, @refine_type)
+    def initialize(@pos, @refine, @lhs, @refine_type, @positive_check)
     end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
@@ -858,10 +859,11 @@ class Mare::Compiler::Infer
   class TypeCondition < FixedInfo
     getter lhs : Info
     getter rhs : Info
+    getter positive_check : Bool
 
     def describe_kind : String; "type condition" end
 
-    def initialize(@pos, @lhs, @rhs)
+    def initialize(@pos, @lhs, @rhs, @positive_check)
     end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
@@ -923,10 +925,11 @@ class Mare::Compiler::Infer
   class TypeConditionForLocal < FixedInfo
     getter refine : AST::Node
     getter refine_type : Info
+    getter positive_check : Bool
 
     def describe_kind : String; "type condition" end
 
-    def initialize(@pos, @refine, @refine_type)
+    def initialize(@pos, @refine, @refine_type, @positive_check)
     end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
@@ -950,16 +953,19 @@ class Mare::Compiler::Infer
   class TypeConditionStatic < FixedInfo
     getter lhs : Info
     getter rhs : Info
+    getter positive_check : Bool
 
     def describe_kind : String; "static type condition" end
 
-    def initialize(@pos, @lhs, @rhs)
+    def initialize(@pos, @lhs, @rhs, @positive_check)
     end
 
     def evaluate(ctx : Context, infer : ForReifiedFunc) : Bool
       lhs_mt = infer.resolve(ctx, lhs)
       rhs_mt = infer.resolve(ctx, rhs)
-      lhs_mt.satisfies_bound?(ctx, rhs_mt)
+      result = lhs_mt.satisfies_bound?(ctx, rhs_mt)
+      result = !result if !positive_check
+      result
     end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
@@ -970,14 +976,17 @@ class Mare::Compiler::Infer
   class Refinement < DynamicInfo
     getter refine : Info
     getter refine_type : Info
+    getter positive_check : Bool
 
     def describe_kind : String; "type refinement" end
 
-    def initialize(@pos, @refine, @refine_type)
+    def initialize(@pos, @refine, @refine_type, @positive_check)
     end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
-      infer.resolve(ctx, @refine).intersect(infer.resolve(ctx, @refine_type))
+      rhs_mt = infer.resolve(ctx, @refine_type)
+      rhs_mt = rhs_mt.strip_cap.negate if !positive_check
+      infer.resolve(ctx, @refine).intersect(rhs_mt)
     end
   end
 

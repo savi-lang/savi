@@ -1748,7 +1748,7 @@ class Mare::Compiler::CodeGen
     end
   end
 
-  def gen_check_subtype(relate : AST::Relate)
+  def gen_check_subtype(relate : AST::Relate, positive_check : Bool)
     infer_f = ctx.infer[func_frame.gfunc.not_nil!.link]
 
     if infer_f[relate.lhs].is_a?(Infer::FixedTypeExpr)
@@ -1758,22 +1758,36 @@ class Mare::Compiler::CodeGen
       lhs_meta_type = infer.resolved(ctx, relate.lhs)
       rhs_meta_type = infer.resolved(ctx, relate.rhs)
 
-      gen_bool(lhs_meta_type.satisfies_bound?(ctx, rhs_meta_type))
+      result = lhs_meta_type.satisfies_bound?(ctx, rhs_meta_type)
+      result = !result if !positive_check
+      gen_bool(result)
     else
       # Otherwise, we generate code that checks the type descriptor of the
       # left-hand side against the compile-time type of the right-hand side.
-      gen_check_subtype_at_runtime(gen_expr(relate.lhs), type_of(relate.rhs))
+      gen_check_subtype_at_runtime(
+        gen_expr(relate.lhs),
+        type_of(relate.rhs),
+        positive_check,
+      )
     end
   end
 
-  def gen_check_subtype_at_runtime(lhs : LLVM::Value, rhs_type : Reach::Ref)
+  def gen_check_subtype_at_runtime(
+    lhs : LLVM::Value,
+    rhs_type : Reach::Ref,
+    positive_check : Bool,
+  )
+    op_name = positive_check ? "<:" : "!<:"
     if rhs_type.is_concrete?(ctx)
       rhs_gtype = @gtypes[ctx.reach[rhs_type.single!].llvm_name]
 
       lhs_desc = gen_get_desc_opaque(lhs)
       rhs_desc = gen_get_desc_opaque(rhs_gtype)
 
-      @builder.icmp LLVM::IntPredicate::EQ, lhs_desc, rhs_desc, "#{lhs.name}<:"
+      # For a positive check, we check if the type descriptors are equal.
+      # For a negative check, we succeed if they are NOT equal.
+      pred = positive_check ? LLVM::IntPredicate::EQ : LLVM::IntPredicate::NE
+      @builder.icmp(pred, lhs_desc, rhs_desc, "#{lhs.name}#{op_name}")
     else
       type_def = rhs_type.single_def!(ctx)
       rhs_name = type_def.llvm_name
@@ -1796,12 +1810,14 @@ class Mare::Compiler::CodeGen
       bits_gep = @builder.inbounds_gep(traits, @i32_0, shift, "#{lhs.name}.DESC.TRAITS.GEP.#{rhs_name}")
       bits = @builder.load(bits_gep, "#{lhs.name}.DESC.TRAITS.#{rhs_name}")
 
-      # If the bit for this trait is present, then it's a runtime type match.
+      # For a positive check, we check if the trait bit intersection is nonzero.
+      # For a negative check, we succeed if it DOES equal zero.
+      pred = positive_check ? LLVM::IntPredicate::NE : LLVM::IntPredicate::EQ
       @builder.icmp(
-        LLVM::IntPredicate::NE,
+        pred,
         @builder.and(bits, mask, "#{lhs.name}<:#{rhs_name}.BITS"),
         @isize.const_int(0),
-        "#{lhs.name}<:#{rhs_name}"
+        "#{lhs.name}#{op_name}#{rhs_name}"
       )
     end
   end
@@ -1943,7 +1959,8 @@ class Mare::Compiler::CodeGen
       when "." then gen_dot(expr)
       when "=" then gen_eq(expr)
       when "is" then gen_check_identity_is(expr)
-      when "<:" then gen_check_subtype(expr)
+      when "<:" then gen_check_subtype(expr, true)
+      when "!<:" then gen_check_subtype(expr, false)
       else raise NotImplementedError.new(expr.inspect)
       end
     when AST::Group

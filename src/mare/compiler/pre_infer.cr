@@ -437,7 +437,8 @@ module Mare::Compiler::PreInfer
         @analysis[node] = new_info = Infer::FixedPrelude.new(node.pos, "Bool")
         new_info.resolvables << self[node.lhs]
         new_info.resolvables << self[node.rhs]
-      when "<:"
+      when "<:", "!<:"
+        positive_check = node.op.value == "<:"
         need_to_check_if_right_is_subtype_of_left = true
         lhs_info = self[node.lhs]
         rhs_info = self[node.rhs]
@@ -449,7 +450,7 @@ module Mare::Compiler::PreInfer
           # Set up a local type refinement condition, which can be used within
           # a choice body to inform the type system about the type relationship.
           refine = @analysis.follow_redirects(node.lhs)
-          @analysis[node] = Infer::TypeConditionForLocal.new(node.pos, refine, rhs_info)
+          @analysis[node] = Infer::TypeConditionForLocal.new(node.pos, refine, rhs_info, positive_check)
 
         # If the left-hand side is the name of a type parameter...
         elsif lhs_info.is_a?(Infer::FixedSingleton) && lhs_info.type_param_ref
@@ -459,7 +460,7 @@ module Mare::Compiler::PreInfer
           # Set up a type param refinement condition, which can be used within
           # a choice body to inform the type system about the type relationship.
           refine = lhs_info.type_param_ref.not_nil!
-          @analysis[node] = Infer::TypeParamCondition.new(node.pos, refine, new_lhs_info, rhs_info)
+          @analysis[node] = Infer::TypeParamCondition.new(node.pos, refine, new_lhs_info, rhs_info, positive_check)
 
         # If the left-hand side is the name of any other fixed type...
         elsif lhs_info.is_a?(Infer::FixedSingleton)
@@ -468,11 +469,11 @@ module Mare::Compiler::PreInfer
           @analysis[node.rhs] = rhs_info = Infer::FixedTypeExpr.new(node.rhs.pos, node.rhs)
 
           # We can know statically at compile time whether it's true or false.
-          @analysis[node] = Infer::TypeConditionStatic.new(node.pos, lhs_info, rhs_info)
+          @analysis[node] = Infer::TypeConditionStatic.new(node.pos, lhs_info, rhs_info, positive_check)
 
         # For all other possible left-hand sides...
         else
-          @analysis[node] = Infer::TypeCondition.new(node.pos, lhs_info, rhs_info)
+          @analysis[node] = Infer::TypeCondition.new(node.pos, lhs_info, rhs_info, positive_check)
         end
 
       else raise NotImplementedError.new(node.op.value)
@@ -536,7 +537,10 @@ module Mare::Compiler::PreInfer
         if inner_cond_info.is_a?(Infer::TypeConditionForLocal)
           @local_ident_overrides[inner_cond_info.refine] = refine = inner_cond_info.refine.dup
           @analysis[refine] = Infer::Refinement.new(
-            inner_cond_info.pos, self[inner_cond_info.refine], inner_cond_info.refine_type
+            inner_cond_info.pos,
+            self[inner_cond_info.refine],
+            inner_cond_info.refine_type,
+            inner_cond_info.positive_check,
           )
         end
 

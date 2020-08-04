@@ -11,7 +11,7 @@ ready: PHONY Dockerfile
 # Run the full CI suite.
 ci: PHONY
 	make test extra_args="$(extra_args)"
-	make example-run extra_args="" dir="examples/adventofcode/2018"
+	make example-run dir="examples/adventofcode/2018" extra_args="--backtrace"
 
 # Run the test suite.
 test: PHONY

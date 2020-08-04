@@ -107,7 +107,8 @@ module Mare::Parser
     op2 = (char('+') | char('-')).named(:op)
     op3 = (str("<|>") | str("<~>") | str("<<~") | str("~>>") |
             str("<<") | str(">>") | str("<~") | str("~>") |
-            str("<:") | str(">=") | str("<=") | char('<') | char('>') |
+            str("<:") | str("!<:") |
+            str(">=") | str("<=") | char('<') | char('>') |
             str("===") | str("==") | str("!==") | str("!=") |
             str("=~")).named(:op)
     op4 = (str("&&") | str("||")).named(:op)

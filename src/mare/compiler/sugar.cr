@@ -265,7 +265,7 @@ class Mare::Compiler::Sugar < Mare::AST::CopyOnMutateVisitor
 
   def visit(ctx, node : AST::Relate)
     case node.op.value
-    when ".", "'", " ", "<:", "is", "DEFAULTPARAM"
+    when ".", "'", " ", "<:", "!<:", "is", "DEFAULTPARAM"
       node # skip these special-case operators
     when "->", "->>"
       # If a dot relation is within this (which doesn't happen in the parser,
@@ -369,8 +369,7 @@ class Mare::Compiler::Sugar < Mare::AST::CopyOnMutateVisitor
     end
   end
 
-  # Handle pseudo-method sugar like `as!` calls.
-  # TODO: Can this be done as a "universal method" rather than sugar?
+  # Handle pseudo-method sugar like `as!` and `not!` calls.
   class PseudoCalls < Mare::AST::CopyOnMutateVisitor
     def self.run(ctx : Context, f : Program::Function, sugar : Sugar)
       ps = new(sugar)
@@ -395,13 +394,19 @@ class Mare::Compiler::Sugar < Mare::AST::CopyOnMutateVisitor
       return node unless call_ident
 
       case call_ident.value
-      when "as!"
+      when "as!", "not!"
         Error.at call_ident,
           "This call requires exactly one argument (the type to check)" \
             unless call_args && call_args.terms.size == 1
 
         local_name = sugar.next_local_name
         type_arg = call_args.terms.first
+        op =
+          case call_ident.value
+          when "as!" then "<:"
+          when "not!" then "!<:"
+          else raise NotImplementedError.new(call_ident)
+          end
 
         group = AST::Group.new("(").from(node)
         group.terms << AST::Relate.new(
@@ -413,7 +418,7 @@ class Mare::Compiler::Sugar < Mare::AST::CopyOnMutateVisitor
           {
             AST::Relate.new(
               AST::Identifier.new(local_name).from(node.lhs),
-              AST::Operator.new("<:").from(call_ident),
+              AST::Operator.new(op).from(call_ident),
               type_arg,
             ).from(call_ident),
             AST::Identifier.new(local_name).from(node.lhs),

@@ -335,7 +335,7 @@ struct Mare::Compiler::Infer::MetaType
     removed_terms = Set(Nominal).new
     new_terms = inner.terms.try(&.select do |l|
       # Return Unsatisfiable if any term is a subtype of an anti-term.
-      if inner.anti_terms.try(&.any? { |r| l.subtype_of?(ctx, r) })
+      if inner.anti_terms.try(&.any? { |r| l.subtype_of?(ctx, r.negate) })
         return Unsatisfiable.instance
       end
 
@@ -355,11 +355,24 @@ struct Mare::Compiler::Infer::MetaType
       true # keep this term
     end)
 
+    removed_anti_terms = Set(AntiNominal).new
+    new_anti_terms = inner.anti_terms.try(&.select do |l|
+      # Remove anti terms that are not subtypes of a term - they are redundant.
+      unless inner.terms.try(&.any? do |r|
+        r.subtype_of?(ctx, l.negate)
+      end)
+        removed_anti_terms.add(l)
+        next
+      end
+
+      true # keep this term
+    end)
+
     # If we didn't remove anything, there was no change.
-    return inner if removed_terms.empty?
+    return inner if removed_terms.empty? && removed_anti_terms.empty?
 
     # Otherwise, return as a new intersection.
-    Intersection.build(inner.cap, new_terms.try(&.to_set), inner.anti_terms)
+    Intersection.build(inner.cap, new_terms.try(&.to_set), new_anti_terms.try(&.to_set))
   end
 
   private def self.simplify_union(ctx : Context, inner : Union)

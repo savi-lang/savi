@@ -997,7 +997,7 @@ class Mare::Compiler::CodeGen::PonyRT
       return unless src_type_def.has_desc?(g.ctx) && src_type_def.has_allocation?(g.ctx)
 
       # Generate code to check if this value is a subtype of this at runtime.
-      is_subtype = g.gen_check_subtype_at_runtime(dst, src_type)
+      is_subtype = g.gen_check_subtype_at_runtime(dst, src_type, true)
       true_block = g.gen_block("trace.is_subtype_of.#{src_type.show_type}")
       false_block = g.gen_block("trace.not_subtype_of.#{src_type.show_type}")
       g.builder.cond(is_subtype, true_block, false_block)
