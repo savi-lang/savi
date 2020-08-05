@@ -1,22 +1,128 @@
+:: CPointer is a raw memory pointer, used internally in the representation
+:: of basic types like Array and String.
+::
+:: Most of its functions are private, so that only types in this trusted package
+:: can use them - exposing them to other packages would break memory safety.
+:: If you are implementing code in this package using any of these methods,
+:: please use extreme caution to prove to yourself and others that what you're
+:: doing is safe, because you're doing it without compiler guardrails.
+::
+:: Pretty much the only use cases for this type in other packages is to use it
+:: in conjunction with FFI functions, which also break memory safety.
 :class tag CPointer (A) // TODO: don't special-case in compiler as a faux-class
-  :fun non null @'tag: compiler intrinsic
-  :fun non _null @'ref: compiler intrinsic
-  :fun non _alloc (space USize) @'ref: compiler intrinsic
-  :fun ref _realloc (space USize) @: compiler intrinsic
-  :fun tag _unsafe @'ref: compiler intrinsic
-  :fun box _offset (offset USize) @'ref: compiler intrinsic
-  :fun box _get_at (index USize) A'aliased: compiler intrinsic
-  :fun ref _get_at_no_alias (index USize) A: compiler intrinsic
-  :fun ref _assign_at (index USize, value A) A'aliased: compiler intrinsic
-  :fun ref _displace_at (index USize, value A) A: compiler intrinsic
-  :fun box _copy_to (other @'ref, count USize) None: compiler intrinsic
-  :fun box _compare (other @'box, size USize) I32: compiler intrinsic // TODO: shouldn't need 'box in arg type?
-  :fun box _hash (size USize) USize: compiler intrinsic
-  :fun tag is_null Bool: compiler intrinsic
-  :fun tag is_not_null Bool: compiler intrinsic
-  :fun tag usize USize: compiler intrinsic
-  :fun non from_usize (number USize) @'tag: compiler intrinsic
   :new _this_pseudo_class_has_no_constructor // TODO: shouldn't need this hack?
+
+  :: Create a null pointer. The pointer is a tag, which cannot be used to
+  :: construct a String or Array, so it is safe to be a public method,
+  :: though very limited in its general usefulness.
+  :fun non null @'tag: compiler intrinsic
+
+  :: Create a null pointer that has the mutable capability.
+  ::
+  :: The pointer isn't safe to use, but it is compatible in the type system
+  :: with the internals of a data structure that needs a mutable pointer.
+  :fun non _null @'ref: compiler intrinsic
+
+  :: Allocate a new pointer with enough space for the given number of elements.
+  ::
+  :: The contents of the memory will be undefined, so the caller is
+  :: expected to store elements in that memory before trying to load them.
+  :fun non _alloc (space USize) @'ref: compiler intrinsic
+
+  :: Reallocate the pointer with enough space for the given number of elements,
+  :: preserving the contents of the memory referenced by the original pointer
+  :: as the head the new memory that will be referenced by the new pointer.
+  ::
+  :: The remaining segment of memory will be undefined, so the caller is
+  :: expected to store elements in that memory before trying to load them.
+  :fun ref _realloc (space USize) @: compiler intrinsic
+
+  :: Allow unsafely converting from a opaque capability to a mutable one,
+  :: which is required for the internals of this package, but obviously
+  :: not suitable for capability safety in general programs.
+  ::
+  :: The caller is expected to only do this for memory they know that they own.
+  :fun tag _unsafe @'ref: compiler intrinsic
+
+  :: Get a pointer that points to a subset of this original pointer's memory,
+  :: starting at the given element index from the current pointer's address,
+  :: as a basic building block for operations that begin starting at an offset.
+  ::
+  :: Note that this is element index rather than byte offset, meaning that
+  :: the element type's memory size is taken into account in the calculation.
+  ::
+  :: The caller is expected to only do this for indexes that are within
+  :: the size of the originally allocated pointer and not to reach outside
+  :: that bounds into memory owned by other pointers.
+  :fun box _offset (index USize) @'ref: compiler intrinsic
+
+  :: Return an alias of the element at the given index.
+  ::
+  :: The caller is expected to only do this for in-bounds indexes.
+  :fun box _get_at (index USize) A'aliased: compiler intrinsic
+
+  :: Return the element at the given index, without capability aliasing.
+  :: This lack of aliasing breaks capability safety, so the caller is expected
+  :: to use this duplicate element reference safely. Usually this means that
+  :: they are about to destroy the pointer's reference using some other method,
+  :: or make it inaccessible to the general program in some other way.
+  ::
+  :: The caller is expected to only do this for in-bounds indexes.
+  :fun ref _get_at_no_alias (index USize) A: compiler intrinsic
+
+  :: Store the given value at the given element index,
+  :: returning an alias of the newly stored value.
+  ::
+  :: The caller is expected to only do this for in-bounds indexes.
+  :fun ref _assign_at (index USize, value A) A'aliased: compiler intrinsic
+
+  :: Store the given value at the given element index,
+  :: returning the element that was previously stored at that index.
+  ::
+  :: The caller is expected to only do this for in-bounds indexes.
+  :fun ref _displace_at (index USize, value A) A: compiler intrinsic
+
+  :: Copy the given number of elements from this pointer to the other pointer.
+  :: Elements are always copied from the head of the pointer's memory, so if
+  :: you need to copy starting at some offset, use the `_offset` method first.
+  ::
+  :: The caller is expected to only do this for in-bounds element counts.
+  :fun box _copy_to (other @'ref, count USize) None: compiler intrinsic
+
+  :: Compare the memory referenced by this pointer to that of the other pointer,
+  :: across the byte range indicated by the given element count.
+  ::
+  :: Because this only compares the memory referenced by the pointers, it will
+  :: compare by value for "raw" types (e.g. numerics not in a type union),
+  :: and it will compare by object address for allocated object types,
+  :: or otherwise-raw types that are wrapped in an object by being in a union.
+  :: As such, callers should avoid using this without statically knowing the
+  :: ramifications of what kind of representation the element has in its memory.
+  ::
+  :: The caller is expected to only do this for in-bounds element counts.
+  :fun box _compare (other @'box, count USize) I32: compiler intrinsic
+
+  :: Calculate the hash of the block of memory starting at this pointer's head,
+  :: continuing through the given number of elements in that memory.
+  ::
+  :: On the Pony runtime, this uses the `ponyint_hash_block` function.
+  ::
+  :: Only the direct memory referenced by the pointer is hashed, so similar
+  :: caveats to those documented for the `_compare` method also apply here.
+  :: As such, callers should avoid using this without statically knowing the
+  :: ramifications of what kind of representation the element has in its memory.
+  ::
+  :: The caller is expected to only do this for in-bounds element counts.
+  :fun box _hash (count USize) USize: compiler intrinsic
+
+  :: Return True if this is a null pointer (i.e. a zero address).
+  :fun tag is_null Bool: compiler intrinsic
+
+  :: Return True unless this is a null pointer (i.e. a zero address).
+  :fun tag is_not_null Bool: compiler intrinsic
+
+  :: Return the address of this pointer as an integer.
+  :fun tag usize USize: compiler intrinsic
 
   // PONY special case: method aliases that Pony `builtin` uses internally.
   // Remove these when Mare prelude library is a superset of Pony's `builtin`.
