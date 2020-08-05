@@ -625,23 +625,23 @@ actor Main
     str._set(len, 0)
     --str
 
-//   fun repeat_str(num: USize = 1, sep: PonyString = ""): PonyString iso^ =>
-//     """
-//     Returns a copy of the string repeated `num` times with an optional
-//     separator added inbetween repeats.
-//     """
-//     var c = num
-//     var str = recover PonyString((_size + sep.size()) * c) end
+  fun repeat_str(num: USize = 1, sep: PonyString): PonyString iso^ =>
+    """
+    Returns a copy of the string repeated `num` times with an optional
+    separator added inbetween repeats.
+    """
+    var c = num
+    var str = recover PonyString.create((this._size + sep.size()) * c) end
 
-//     while c > 0 do
-//       c = c - 1
-//       str = (consume str)._append(this)
-//       if (sep.size() > 0) and (c != 0) then
-//         str = (consume str)._append(sep)
-//       end
-//     end
+    while c > 0 do
+      c = c - 1
+      str = (consume str)._append(this)
+      if (sep.size() > 0) and (c != 0) then
+        str = (consume str)._append(sep)
+      end
+    end
 
-//     consume str
+    consume str
 
 //   fun mul(num: USize): PonyString iso^ =>
 //     """
@@ -1302,16 +1302,16 @@ actor Main
 //       end
 //     end
 
-//   fun iso _append(s: PonyString box): PonyString iso^ =>
-//     let len = _size + s._size
-//     reserve(len)
-//     if s.is_null_terminated() then
-//       s._copy_to(_ptr._unsafe(), s._size + 1, 0, _size)
-//     else
-//       s._copy_to(_ptr._unsafe(), s._size, 0, _size)
-//     end
-//     _size = len
-//     consume this
+  fun iso _append(s: PonyString box): PonyString iso^ =>
+    let len = this._size + s._size
+    this.reserve(len)
+    if s.is_null_terminated() then
+      s._copy_to(this._ptr._unsafe(), s._size + 1, 0, this._size)
+    else
+      s._copy_to(this._ptr._unsafe(), s._size, 0, this._size)
+    end
+    this._size = len
+    consume this
 
 //   fun add(that: PonyString box): PonyString =>
 //     """

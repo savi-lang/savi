@@ -51,6 +51,36 @@ describe Mare::Compiler::Consumes do
     end
   end
 
+  it "complains when an already-consumed @ is referenced" do
+    source = Mare::Source.new_example <<-SOURCE
+    :class Example
+      :fun iso call
+        result = --@
+        @.call
+        result
+
+    :actor Main
+      :new
+        Example.call
+    SOURCE
+
+    expected = <<-MSG
+    This variable can't be used here; it might already be consumed:
+    from (example):4:
+        @.call
+        ^
+
+    - it was consumed here:
+      from (example):3:
+        result = --@
+                 ^~~
+    MSG
+
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :consumes)
+    end
+  end
+
   it "complains when referencing a possibly-consumed local from a choice" do
     source = Mare::Source.new_example <<-SOURCE
     :actor Main

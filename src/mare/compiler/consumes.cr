@@ -17,7 +17,7 @@ module Mare::Compiler::Consumes
     def initialize(
       @refer : Refer::Analysis,
       @jumps : Jumps::Analysis,
-      @consumes = {} of (Refer::Local | Refer::LocalUnion) => Source::Pos,
+      @consumes = {} of (Refer::Local | Refer::LocalUnion | Refer::Self) => Source::Pos,
     )
     end
 
@@ -38,7 +38,7 @@ module Mare::Compiler::Consumes
       info = @refer[node]
 
       # Raise an error if trying to use a consumed local.
-      if info.is_a?(Refer::Local | Refer::LocalUnion) && @consumes.has_key?(info)
+      if info.is_a?(Refer::Local | Refer::LocalUnion | Refer::Self) && @consumes.has_key?(info)
         Error.at node,
           "This variable can't be used here; it might already be consumed", [
             {@consumes[info], "it was consumed here"}
@@ -61,8 +61,8 @@ module Mare::Compiler::Consumes
         nil # ignore this prefix type
       when "--"
         info = @refer[node.term]
-        Error.at node, "Only a local variable can be consumed" \
-          unless info.is_a?(Refer::Local | Refer::LocalUnion)
+        Error.at node, "Only a local variable (or @) can be consumed" \
+          unless info.is_a?(Refer::Local | Refer::LocalUnion | Refer::Self)
 
         @consumes[info] = node.pos
       else
@@ -117,7 +117,7 @@ module Mare::Compiler::Consumes
     # For a Choice, do a branching analysis of the clauses contained within it.
     def touch(ctx, node : AST::Choice)
       # Prepare to collect the list of new consumes exposed in each branch.
-      body_consumes = {} of (Refer::Local | Refer::LocalUnion) => Source::Pos
+      body_consumes = {} of (Refer::Local | Refer::LocalUnion | Refer::Self) => Source::Pos
 
       # Iterate over each clause, visiting both the cond and body of the clause.
       node.list.each do |cond, body|
@@ -148,7 +148,7 @@ module Mare::Compiler::Consumes
     # For a Loop, do a branching analysis of the clauses contained within it.
     def touch(ctx, node : AST::Loop)
       # Prepare to collect the list of new consumes exposed in each branch.
-      body_consumes = {} of (Refer::Local | Refer::LocalUnion) => Source::Pos
+      body_consumes = {} of (Refer::Local | Refer::LocalUnion | Refer::Self) => Source::Pos
 
       # Visit the loop cond twice (nested) to simulate repeated execution.
       cond_branch = sub_branch(ctx, node.cond)
