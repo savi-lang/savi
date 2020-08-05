@@ -1478,6 +1478,103 @@ describe Mare::Compiler::Infer do
     end
   end
 
+  it "allows reading the value of a property getter function" do
+    source = Mare::Source.new_example <<-SOURCE
+    :class Inner
+      :new iso
+
+    :class Outer
+      :prop inner_iso Inner'iso: Inner.new
+      :prop inner_trn Inner'trn: Inner.new
+      :prop inner_ref Inner'ref: Inner.new
+      :prop inner_val Inner'val: Inner.new
+      :prop inner_box Inner'box: Inner.new
+      :prop inner_tag Inner'tag: Inner.new
+      :new iso
+      :new trn new_trn
+
+    :actor Main
+      :new
+        outer_iso Outer'iso = Outer.new
+        outer_trn Outer'trn = Outer.new
+        outer_ref Outer'ref = Outer.new
+        outer_val Outer'val = Outer.new
+        outer_box Outer'box = Outer.new
+
+        result_a1 Inner'iso = Outer.new.inner_iso
+        result_a2 Inner'iso = Outer.new.inner_trn
+        result_a3 Inner'iso = Outer.new.inner_ref
+        result_a4 Inner'val = Outer.new.inner_val
+        result_a5 Inner'val = Outer.new.inner_box
+        result_a6 Inner'tag = Outer.new.inner_tag
+
+        result_b1 Inner'iso'aliased = outer_iso.inner_iso
+        result_b2 Inner'iso'aliased = outer_iso.inner_trn
+        result_b3 Inner'iso'aliased = outer_iso.inner_ref
+        result_b4 Inner'val = outer_iso.inner_val
+        result_b5 Inner'tag = outer_iso.inner_box
+        result_b6 Inner'tag = outer_iso.inner_tag
+
+        result_c1 Inner'iso = Outer.new_trn.inner_iso
+        result_c2 Inner'trn = Outer.new_trn.inner_trn
+        result_c3 Inner'trn = Outer.new_trn.inner_ref
+        result_c4 Inner'val = Outer.new_trn.inner_val
+        result_c5 Inner'val = Outer.new_trn.inner_box
+        result_c6 Inner'tag = Outer.new_trn.inner_tag
+
+        result_d1 Inner'iso'aliased = outer_trn.inner_iso
+        result_d2 Inner'trn'aliased = outer_trn.inner_trn
+        result_d3 Inner'trn'aliased = outer_trn.inner_ref
+        result_d4 Inner'val = outer_trn.inner_val
+        result_d5 Inner'box = outer_trn.inner_box
+        result_d6 Inner'tag = outer_trn.inner_tag
+
+        result_e1 Inner'iso'aliased = outer_ref.inner_iso
+        result_e2 Inner'trn'aliased = outer_ref.inner_trn
+        result_e3 Inner'ref = outer_ref.inner_ref
+        result_e4 Inner'val = outer_ref.inner_val
+        result_e5 Inner'box = outer_ref.inner_box
+        result_e6 Inner'tag = outer_ref.inner_tag
+
+        result_f1 Inner'val = outer_val.inner_iso
+        result_f2 Inner'val = outer_val.inner_trn
+        result_f3 Inner'val = outer_val.inner_ref
+        result_f4 Inner'val = outer_val.inner_val
+        result_f5 Inner'val = outer_val.inner_box
+        result_f6 Inner'tag = outer_val.inner_tag
+
+        result_g1 Inner'tag = outer_box.inner_iso
+        result_g2 Inner'box = outer_box.inner_trn
+        result_g3 Inner'box = outer_box.inner_ref
+        result_g4 Inner'val = outer_box.inner_val
+        result_g5 Inner'box = outer_box.inner_box
+        result_g6 Inner'tag = outer_box.inner_tag
+
+        bad_example Inner'trn = outer_trn.inner_trn
+    SOURCE
+
+    expected = <<-MSG
+    The type of this expression doesn't meet the constraints imposed on it:
+    from (example):71:
+        bad_example Inner'trn = outer_trn.inner_trn
+                                ^~~~~~~~~~~~~~~~~~~
+
+    - it is required here to be a subtype of Inner'trn:
+      from (example):71:
+        bad_example Inner'trn = outer_trn.inner_trn
+                    ^~~~~~~~~
+
+    - but the type of the return value was Inner'box:
+      from (example):71:
+        bad_example Inner'trn = outer_trn.inner_trn
+                                          ^~~~~~~~~
+    MSG
+
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :infer)
+    end
+  end
+
   it "allows capturing the extracted value of a property replace function" do
     source = Mare::Source.new_example <<-SOURCE
     :class Inner

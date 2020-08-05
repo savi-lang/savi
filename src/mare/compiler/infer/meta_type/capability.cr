@@ -25,36 +25,42 @@ struct Mare::Compiler::Infer::MetaType::Capability
   ALL_NON_EPH = [ISO, TRN, REF, VAL, BOX, TAG, NON]
   ALL_SINGLE = [ISO_EPH, TRN_EPH] + ALL_NON_EPH
 
-  ANY          = new([ISO, TRN, REF, VAL, BOX, TAG, NON].to_set) # all (non-ephemeral) caps
-  ALIAS        = new([REF, VAL, BOX, TAG, NON].to_set)           # alias as themselves
-  SEND         = new([ISO, VAL, TAG, NON].to_set)                # are sendable
-  SHARE        = new([VAL, TAG, NON].to_set)                     # are sendable & alias as themselves
-  READ         = new([REF, VAL, BOX].to_set)                     # are readable & alias as themselves
-  MUTABLE      = new([ISO, TRN, REF].to_set)                     # are mutable
-  MUTABLE_PLUS = new([ISO_EPH, TRN_EPH, ISO, TRN, REF].to_set)   # are mutable, incl ephemeral
+  ANY           = new([ISO, TRN, REF, VAL, BOX, TAG, NON].to_set)         # all (non-ephemeral) caps
+  ALIAS         = new([REF, VAL, BOX, TAG, NON].to_set)                   # alias as themselves
+  SEND          = new([ISO, VAL, TAG, NON].to_set)                        # are sendable
+  SHARE         = new([VAL, TAG, NON].to_set)                             # are sendable & alias as themselves
+  READ          = new([REF, VAL, BOX].to_set)                             # are readable & alias as themselves
+  MUTABLE       = new([ISO, TRN, REF].to_set)                             # are mutable
+  MUTABLE_PLUS  = new([ISO_EPH, TRN_EPH, ISO, TRN, REF].to_set)           # are mutable, incl ephemeral
+  READABLE      = new([ISO, TRN, REF, VAL, BOX].to_set)                   # are readable
+  READABLE_PLUS = new([ISO_EPH, ISO, TRN_EPH, TRN, REF, VAL, BOX].to_set) # are readable, incl ephemeral
 
   def self.new_generic(name)
     case name
-    when "any"         then ANY
-    when "alias"       then ALIAS
-    when "send"        then SEND
-    when "share"       then SHARE
-    when "read"        then READ
-    when "mutable"     then MUTABLE
-    when "mutableplus" then MUTABLE_PLUS # TODO: can this special case for <<= be removed somehow?
+    when "any"          then ANY
+    when "alias"        then ALIAS
+    when "send"         then SEND
+    when "share"        then SHARE
+    when "read"         then READ
+    when "mutable"      then MUTABLE
+    when "mutableplus"  then MUTABLE_PLUS # TODO: can this special case for <<= be removed somehow?
+    when "readable"     then READABLE
+    when "readableplus" then READABLE_PLUS # TODO: can this special case for getters be removed somehow?
     else raise NotImplementedError.new(name)
     end
   end
 
   def self.new_maybe_generic(name)
     case name
-    when "any"         then ANY
-    when "alias"       then ALIAS
-    when "send"        then SEND
-    when "share"       then SHARE
-    when "read"        then READ
-    when "mutable"     then MUTABLE
-    when "mutableplus" then MUTABLE_PLUS # TODO: can this special case for <<= be removed somehow?
+    when "any"          then ANY
+    when "alias"        then ALIAS
+    when "send"         then SEND
+    when "share"        then SHARE
+    when "read"         then READ
+    when "mutable"      then MUTABLE
+    when "mutableplus"  then MUTABLE_PLUS # TODO: can this special case for <<= be removed somehow?
+    when "readable"     then READABLE
+    when "readableplus" then READABLE_PLUS # TODO: can this special case for getters be removed somehow?
     else new(name)
     end
   end

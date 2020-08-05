@@ -83,9 +83,13 @@ module Mare::Compiler::Completeness
       next_f_cap : String,
       call_crumb : Source::Pos,
     )
+      # TODO: should we use a specific cap here, or is any of them acceptable?
+      reify_cap =
+        Infer::MetaType::Capability.new_maybe_generic(next_f_cap).each_cap.first
+
       next_rf = ctx.infer[next_f_link]
         .each_reified_func(type)
-        .find(&.receiver.cap_only.cap_value.==(next_f_cap)).not_nil!
+        .find(&.receiver.cap_only.cap_value.==(reify_cap.value)).not_nil!
 
       # Use caching of function branches to prevent infinite recursion.
       # We cache by both seen_fields and func so that we don't combine

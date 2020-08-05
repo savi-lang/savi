@@ -589,7 +589,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         field_func.add_tag(:field)
         func = field_func
 
-        getter_cap = AST::Identifier.new("box").from(data["keyword"])
+        getter_cap = AST::Identifier.new("readableplus").from(data["keyword"])
         if ret
           getter_ret = AST::Relate.new(
             AST::Relate.new(
