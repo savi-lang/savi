@@ -63,7 +63,7 @@ actor Main
   var _alloc: USize
   var _ptr: CPointer[U8] ref
 
-  new create(len: USize = 0) =>
+  new ref create(len: USize = 0) =>
     """
     An empty string. Enough space for len bytes is reserved.
     """
@@ -394,31 +394,31 @@ actor Main
       this._ptr = this._ptr._offset(offset)
     end
 
-  // fun val trim(from: USize = 0, to: USize = -1): String val =>
-  //   """
-  //   Return a shared portion of this string, covering `from` until `to`.
-  //   Both the original and the new string are immutable, as they share memory.
-  //   The operation does not allocate a new string pointer nor copy elements.
-  //   """
-  //   let last = this._size.min(to)
-  //   let offset = last.min(from)
+  fun val trim(from: USize = 0, to: USize = -1): PonyString val =>
+    """
+    Return a shared portion of this string, covering `from` until `to`.
+    Both the original and the new string are immutable, as they share memory.
+    The operation does not allocate a new string pointer nor copy elements.
+    """
+    let last = this._size.min(to)
+    let offset = last.min(from)
 
-  //   recover
-  //     let size' = last - offset
+    recover
+      let size' = last - offset
 
-  //     // use the new size' for alloc if we're not including the last used byte
-  //     // from the original data and only include the extra allocated bytes if
-  //     // we're including the last byte.
-  //     let alloc = if last == this._size then this._alloc - offset else size' end
+      // use the new size' for alloc if we're not including the last used byte
+      // from the original data and only include the extra allocated bytes if
+      // we're including the last byte.
+      let alloc = if last == this._size then this._alloc - offset else size' end
 
-  //     if size' > 0 then
-  //       this.from_cpointer(this._ptr._offset(offset)._unsafe(), size', alloc)
-  //     else
-  //       this.create()
-  //     end
-  //   end
+      if size' > 0 then
+        this.from_cpointer(this._ptr._offset(offset)._unsafe(), size', alloc)
+      else
+        this.create()
+      end
+    end
 
-//   fun iso chop(split_point: USize): (String iso^, String iso^) =>
+//   fun iso chop(split_point: USize): (PonyString iso^, PonyString iso^) =>
 //     """
 //     Chops the string in half at the split point requested and returns both
 //     the left and right portions. The original string is trimmed in place and
@@ -444,7 +444,7 @@ actor Main
 
 //     (consume this, consume right)
 
-//   fun iso unchop(b: String iso): ((String iso^, String iso^) | String iso^) =>
+//   fun iso unchop(b: PonyString iso): ((PonyString iso^, PonyString iso^) | PonyString iso^) =>
 //     """
 //     Unchops two iso strings to return the original string they were chopped
 //     from. Both input strings are isolated and mutable and were originally
@@ -613,25 +613,25 @@ actor Main
     """
     this.update(this.offset_to_index(offset), value)? // TODO: update sugar instead of this.update?
 
-//   fun clone(): String iso^ =>
-//     """
-//     Returns a copy of the string. The resulting string is
-//     null-terminated even if the original is not.
-//     """
-//     let len = _size
-//     let str = recover String(len) end
-//     _ptr._copy_to(str._ptr._unsafe(), len)
-//     str._size = len
-//     str._set(len, 0)
-//     str
+  fun clone(): PonyString iso^ =>
+    """
+    Returns a copy of the string. The resulting string is
+    null-terminated even if the original is not.
+    """
+    let len = this._size
+    let str: PonyString iso = recover PonyString.create(len) end
+    this._ptr._copy_to(str._ptr._unsafe(), len)
+    str._size = len
+    str._set(len, 0)
+    --str
 
-//   fun repeat_str(num: USize = 1, sep: String = ""): String iso^ =>
+//   fun repeat_str(num: USize = 1, sep: PonyString = ""): PonyString iso^ =>
 //     """
 //     Returns a copy of the string repeated `num` times with an optional
 //     separator added inbetween repeats.
 //     """
 //     var c = num
-//     var str = recover String((_size + sep.size()) * c) end
+//     var str = recover PonyString((_size + sep.size()) * c) end
 
 //     while c > 0 do
 //       c = c - 1
@@ -643,13 +643,13 @@ actor Main
 
 //     consume str
 
-//   fun mul(num: USize): String iso^ =>
+//   fun mul(num: USize): PonyString iso^ =>
 //     """
 //     Returns a copy of the string repeated `num` times.
 //     """
 //     repeat_str(num)
 
-//   fun find(s: String box, offset: ISize = 0, nth: USize = 0): ISize ? =>
+//   fun find(s: PonyString box, offset: ISize = 0, nth: USize = 0): ISize ? =>
 //     """
 //     Return the index of the n-th instance of s in the string starting from the
 //     beginning. Raise an error if there is no n-th occurrence of s or s is empty.
@@ -678,7 +678,7 @@ actor Main
 //     end
 //     error
 
-//   fun rfind(s: String box, offset: ISize = -1, nth: USize = 0): ISize ? =>
+//   fun rfind(s: PonyString box, offset: ISize = -1, nth: USize = 0): ISize ? =>
 //     """
 //     Return the index of n-th instance of `s` in the string starting from the
 //     end. The `offset` represents the highest index to included in the search.
@@ -709,7 +709,7 @@ actor Main
 //     end
 //     error
 
-//   fun contains(s: String box, offset: ISize = 0, nth: USize = 0): Bool =>
+//   fun contains(s: PonyString box, offset: ISize = 0, nth: USize = 0): Bool =>
 //     """
 //     Returns true if contains s as a substring, false otherwise.
 //     """
@@ -737,7 +737,7 @@ actor Main
 //     end
 //     false
 
-//   fun count(s: String box, offset: ISize = 0): USize =>
+//   fun count(s: PonyString box, offset: ISize = 0): USize =>
 //     """
 //     Counts the non-overlapping occurrences of s in the string.
 //     """
@@ -760,7 +760,7 @@ actor Main
 
 //     i
 
-//   fun at(s: String box, offset: ISize = 0): Bool =>
+//   fun at(s: PonyString box, offset: ISize = 0): Bool =>
 //     """
 //     Returns true if the substring s is present at the given offset.
 //     """
@@ -785,7 +785,7 @@ actor Main
 //       _set(_size, 0)
 //     end
 
-//   fun substring(from: ISize, to: ISize = ISize.max_value()): String iso^ =>
+//   fun substring(from: ISize, to: ISize = ISize.max_value()): PonyString iso^ =>
 //     """
 //     Returns a substring. Index range [`from` .. `to`) is half-open.
 //     Returns an empty string if nothing is in the range.
@@ -799,16 +799,16 @@ actor Main
 
 //     if (start < _size) and (start < finish) then
 //       let len = finish - start
-//       let str = recover String(len) end
+//       let str = recover PonyString(len) end
 //       _ptr._offset(start)._copy_to(str._ptr._unsafe(), len)
 //       str._size = len
 //       str._set(len, 0)
 //       str
 //     else
-//       recover String end
+//       recover PonyString end
 //     end
 
-//   fun lower(): String iso^ =>
+//   fun lower(): PonyString iso^ =>
 //     """
 //     Returns a lower case version of the string.
 //     """
@@ -832,7 +832,7 @@ actor Main
 //       i = i + 1
 //     end
 
-//   fun upper(): String iso^ =>
+//   fun upper(): PonyString iso^ =>
 //     """
 //     Returns an upper case version of the string. Currently only knows ASCII
 //     case.
@@ -857,7 +857,7 @@ actor Main
 //       i = i + 1
 //     end
 
-//   fun reverse(): String iso^ =>
+//   fun reverse(): PonyString iso^ =>
 //     """
 //     Returns a reversed version of the string.
 //     """
@@ -942,7 +942,7 @@ actor Main
 //     reserve(_size + copy_len)
 
 //     match seq
-//     | let s: (String box | Array[U8] box) =>
+//     | let s: (PonyString box | Array[U8] box) =>
 //       s._copy_to(_ptr, copy_len, offset, _size)
 //       _size = _size + copy_len
 //       _set(_size, 0)
@@ -996,7 +996,7 @@ actor Main
 //     _set(0, 0)
 //     _size = 0
 
-//   fun insert(offset: ISize, that: String): String iso^ =>
+//   fun insert(offset: ISize, that: PonyString): PonyString iso^ =>
 //     """
 //     Returns a version of the string with the given string inserted at the given
 //     offset.
@@ -1005,7 +1005,7 @@ actor Main
 //     s.insert_in_place(offset, that)
 //     s
 
-//   fun ref insert_in_place(offset: ISize, that: String box) =>
+//   fun ref insert_in_place(offset: ISize, that: PonyString box) =>
 //     """
 //     Inserts the given string at the given offset. Appends the string if the
 //     offset is out of bounds.
@@ -1030,7 +1030,7 @@ actor Main
 //     _size = _size + 1
 //     _set(_size, 0)
 
-//   fun cut(from: ISize, to: ISize = ISize.max_value()): String iso^ =>
+//   fun cut(from: ISize, to: ISize = ISize.max_value()): PonyString iso^ =>
 //     """
 //     Returns a version of the string with the given range deleted.
 //     Index range [`from` .. `to`) is half-open.
@@ -1061,7 +1061,7 @@ actor Main
 //       _set(_size, 0)
 //     end
 
-//   fun ref remove(s: String box): USize =>
+//   fun ref remove(s: PonyString box): USize =>
 //     """
 //     Remove all instances of s from the string. Returns the count of removed
 //     instances.
@@ -1078,7 +1078,7 @@ actor Main
 //     end
 //     n
 
-//   fun ref replace(from: String box, to: String box, n: USize = 0): USize =>
+//   fun ref replace(from: PonyString box, to: PonyString box, n: USize = 0): USize =>
 //     """
 //     Replace up to n occurrences of `from` in `this` with `to`. If n is 0, all
 //     occurrences will be replaced. Returns the count of replaced occurrences.
@@ -1104,9 +1104,9 @@ actor Main
 //     occur
 
 //   fun split_by(
-//     delim: String,
+//     delim: PonyString,
 //     n: USize = USize.max_value())
-//     : Array[String] iso^
+//     : Array[PonyString] iso^
 //   =>
 //     """
 //     Split the string into an array of strings that are delimited by `delim` in
@@ -1115,9 +1115,9 @@ actor Main
 //     Example:
 
 //     ```pony
-//     let original: String = "<b><span>Hello!</span></b>"
-//     let delimiter: String = "><"
-//     let split_array: Array[String] = original.split_by(delimiter)
+//     let original: PonyString = "<b><span>Hello!</span></b>"
+//     let delimiter: PonyString = "><"
+//     let split_array: Array[PonyString] = original.split_by(delimiter)
 //     env.out.print("OUTPUT:")
 //     for value in split_array.values() do
 //       env.out.print(value)
@@ -1141,7 +1141,7 @@ actor Main
 //     let delim_size = ISize.from[USize](delim.size())
 //     let total_size = ISize.from[USize](size())
 
-//     let result = recover Array[String] end
+//     let result = recover Array[PonyString] end
 //     var current = ISize(0)
 
 //     while ((result.size() + 1) < n) and (current < total_size) do
@@ -1154,7 +1154,7 @@ actor Main
 //     result.push(substring(current))
 //     consume result
 
-//   fun split(delim: String = " \t\v\f\r\n", n: USize = 0): Array[String] iso^ =>
+//   fun split(delim: PonyString = " \t\v\f\r\n", n: USize = 0): Array[PonyString] iso^ =>
 //     """
 //     Split the string into an array of strings with any character in the
 //     delimiter string. By default, the string is split with whitespace
@@ -1163,9 +1163,9 @@ actor Main
 //     Example:
 
 //     ```pony
-//     let original: String = "name,job;department"
-//     let delimiter: String = ".,;"
-//     let split_array: Array[String] = original.split(delimiter)
+//     let original: PonyString = "name,job;department"
+//     let delimiter: PonyString = ".,;"
+//     let split_array: Array[PonyString] = original.split(delimiter)
 //     env.out.print("OUTPUT:")
 //     for value in split_array.values() do
 //       env.out.print(value)
@@ -1183,7 +1183,7 @@ actor Main
 //     If you want to split the string with the entire delimiter string `delim`,
 //     use [`split_by`](#split_by).
 //     """
-//     let result = recover Array[String] end
+//     let result = recover Array[PonyString] end
 
 //     if _size > 0 then
 //       let chars = Array[U32](delim.size())
@@ -1192,7 +1192,7 @@ actor Main
 //         chars.push(rune)
 //       end
 
-//       var cur = recover String end
+//       var cur = recover PonyString end
 //       var i = USize(0)
 //       var occur = USize(0)
 
@@ -1208,7 +1208,7 @@ actor Main
 //               break
 //             end
 
-//             result.push(cur = recover String end)
+//             result.push(cur = recover PonyString end)
 //           else
 //             // Add bytes to the current string.
 //             var j = U8(0)
@@ -1234,13 +1234,13 @@ actor Main
 
 //     consume result
 
-//   fun ref strip(s: String box = " \t\v\f\r\n") =>
+//   fun ref strip(s: PonyString box = " \t\v\f\r\n") =>
 //     """
 //     Remove all leading and trailing characters from the string that are in s.
 //     """
 //     this .> lstrip(s) .> rstrip(s)
 
-//   fun ref rstrip(s: String box = " \t\v\f\r\n") =>
+//   fun ref rstrip(s: PonyString box = " \t\v\f\r\n") =>
 //     """
 //     Remove all trailing characters within the string that are in s. By default,
 //     trailing whitespace is removed.
@@ -1272,7 +1272,7 @@ actor Main
 //       truncate(truncate_at)
 //     end
 
-//   fun ref lstrip(s: String box = " \t\v\f\r\n") =>
+//   fun ref lstrip(s: PonyString box = " \t\v\f\r\n") =>
 //     """
 //     Remove all leading characters within the string that are in s. By default,
 //     leading whitespace is removed.
@@ -1302,7 +1302,7 @@ actor Main
 //       end
 //     end
 
-//   fun iso _append(s: String box): String iso^ =>
+//   fun iso _append(s: PonyString box): PonyString iso^ =>
 //     let len = _size + s._size
 //     reserve(len)
 //     if s.is_null_terminated() then
@@ -1313,20 +1313,20 @@ actor Main
 //     _size = len
 //     consume this
 
-//   fun add(that: String box): String =>
+//   fun add(that: PonyString box): PonyString =>
 //     """
 //     Return a string that is a concatenation of this and that.
 //     """
 //     let len = _size + that._size
-//     let s = recover String(len) end
+//     let s = recover PonyString(len) end
 //     (consume s)._append(this)._append(that)
 
-//   fun join(data: Iterator[Stringable]): String iso^ =>
+//   fun join(data: Iterator[PonyStringable]): PonyString iso^ =>
 //     """
 //     Return a string that is a concatenation of the strings in data, using this
 //     as a separator.
 //     """
-//     var buf = recover String end
+//     var buf = recover PonyString end
 //     var first = true
 //     for v in data do
 //       if first then
@@ -1338,14 +1338,14 @@ actor Main
 //     end
 //     buf
 
-//   fun compare(that: String box): Compare =>
+//   fun compare(that: PonyString box): Compare =>
 //     """
 //     Lexically compare two strings.
 //     """
 //     compare_sub(that, _size.max(that._size))
 
 //   fun compare_sub(
-//     that: String box,
+//     that: PonyString box,
 //     n: USize,
 //     offset: ISize = 0,
 //     that_offset: ISize = 0,
@@ -1401,7 +1401,7 @@ actor Main
 //     end
 //     Equal
 
-//   fun eq(that: String box): Bool =>
+//   fun eq(that: PonyString box): Bool =>
 //     """
 //     Returns true if the two strings have the same contents.
 //     """
@@ -1411,7 +1411,7 @@ actor Main
 //       false
 //     end
 
-//   fun lt(that: String box): Bool =>
+//   fun lt(that: PonyString box): Bool =>
 //     """
 //     Returns true if this is lexically less than that. Needs to be made UTF-8
 //     safe.
@@ -1429,7 +1429,7 @@ actor Main
 //     end
 //     _size < that._size
 
-//   fun le(that: String box): Bool =>
+//   fun le(that: PonyString box): Bool =>
 //     """
 //     Returns true if this is lexically less than or equal to that. Needs to be
 //     made UTF-8 safe.
@@ -1670,20 +1670,20 @@ actor Main
 //   fun hash64(): U64 =>
 //     @ponyint_hash_block64[U64](_ptr, _size)
 
-//   fun string(): String iso^ =>
+//   fun string(): PonyString iso^ =>
 //     clone()
 
-//   fun values(): StringBytes^ =>
+//   fun values(): PonyStringBytes^ =>
 //     """
 //     Return an iterator over the bytes in the string.
 //     """
-//     StringBytes(this)
+//     PonyStringBytes(this)
 
-//   fun runes(): StringRunes^ =>
+//   fun runes(): PonyStringRunes^ =>
 //     """
 //     Return an iterator over the codepoints in the string.
 //     """
-//     StringRunes(this)
+//     PonyStringRunes(this)
 
   fun ref _set(i: USize, value: U8): U8 =>
     """
@@ -1691,11 +1691,11 @@ actor Main
     """
     this._ptr._update(i, value)
 
-// class StringBytes is Iterator[U8]
-//   let _string: String box
+// class PonyStringBytes is Iterator[U8]
+//   let _string: PonyString box
 //   var _i: USize
 
-//   new create(string: String box) =>
+//   new create(string: PonyString box) =>
 //     _string = string
 //     _i = 0
 
@@ -1705,11 +1705,11 @@ actor Main
 //   fun ref next(): U8 ? =>
 //     _string(_i = _i + 1)?
 
-// class StringRunes is Iterator[U32]
-//   let _string: String box
+// class PonyStringRunes is Iterator[U32]
+//   let _string: PonyString box
 //   var _i: USize
 
-//   new create(string: String box) =>
+//   new create(string: PonyString box) =>
 //     _string = string
 //     _i = 0
 

@@ -81,7 +81,7 @@ module Mare::Parser
       str("ref") | str("box") | str("tag") | str("non") |
       str("any") | str("alias") | str("send") | str("share") |
       str("read") | str("mutable") | str("mutableplus")
-    ).named(:ident)
+    ).named(:ident) >> char('^').maybe # TODO: figure out how to incorporate Pony ephemerality properly? or don't?
     capmod = str("aliased").named(:ident)
 
     # Define a compound to be a closely bound chain of atoms.
@@ -160,7 +160,13 @@ module Mare::Parser
       (str("else") >> rsn >> control_block >> sn).maybe >>
       str("end")
     ).named(:pony_control_while)
-    control.define control_var | control_if | control_while
+    control_recover = (
+      str("recover") >> rsn >>
+      (cap >> rsn).maybe >>
+      control_block >> sn >>
+      str("end")
+    ).named(:pony_control_recover)
+    control.define control_var | control_if | control_while | control_recover
     control_mid_keywords = str("do") | str("then") | str("else") | str("end")
 
     method_decl_start = (str("fun") | str("be") | str("new")).named(:ident)

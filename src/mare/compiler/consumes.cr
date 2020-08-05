@@ -57,6 +57,7 @@ module Mare::Compiler::Consumes
       case node.op.value
       when "source_code_position_of_argument", "identity_digest_of",
            "reflection_of_type", "reflection_of_runtime_type_name", "address_of",
+           "recover_UNSAFE"
         nil # ignore this prefix type
       when "--"
         info = @refer[node.term]

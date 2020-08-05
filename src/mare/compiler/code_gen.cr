@@ -1992,7 +1992,7 @@ class Mare::Compiler::CodeGen
         gen_identity_digest_of(expr.term)
       when "address_of"
         gen_address_of(expr.term)
-      when "--"
+      when "--", "recover_UNSAFE"
         gen_expr(expr.term, const_only)
       else
         raise NotImplementedError.new(expr.inspect)

@@ -1015,6 +1015,36 @@ class Mare::Compiler::Infer
     end
   end
 
+  class RecoverUnsafe < Info
+    getter body : Info
+
+    def describe_kind : String; "recover block" end
+
+    def initialize(@pos, @body)
+    end
+
+    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
+      infer.resolve(ctx, @body).recovered.ephemeralize
+    end
+
+    def add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
+      # TODO: Make recover safe.
+      # @body.add_downstream(use_pos, info, aliases)
+    end
+
+    def tethers(querent : Info) : Array(Tether)
+      Tether.chain(@body, querent)
+    end
+
+    def tether_upward_transform(ctx : Context, infer : ForReifiedFunc, meta_type : MetaType) : MetaType
+      meta_type.strip_cap
+    end
+
+    def add_peer_hint(peer : Info)
+      @body.add_peer_hint(peer)
+    end
+  end
+
   class FromAssign < Info
     getter lhs : NamedInfo
     getter rhs : Info

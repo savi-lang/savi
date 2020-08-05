@@ -152,11 +152,12 @@ module Mare::Parser::Builder
     when :prefix   then build_prefix(main, iter, state)
     when :qualify  then build_qualify(main, iter, state)
     when :compound then build_compound(main, iter, state)
-    when :pony_prop_decl     then build_pony_prop_decl(main, iter, state)
-    when :pony_method_decl   then build_pony_method_decl(main, iter, state)
-    when :pony_control_block then build_pony_control_block(main, iter, state)
-    when :pony_control_if    then build_pony_control_if(main, iter, state)
-    when :pony_control_while then build_pony_control_while(main, iter, state)
+    when :pony_prop_decl       then build_pony_prop_decl(main, iter, state)
+    when :pony_method_decl     then build_pony_method_decl(main, iter, state)
+    when :pony_control_block   then build_pony_control_block(main, iter, state)
+    when :pony_control_if      then build_pony_control_if(main, iter, state)
+    when :pony_control_while   then build_pony_control_while(main, iter, state)
+    when :pony_control_recover then build_pony_control_recover(main, iter, state)
     else
       raise NotImplementedError.new(kind)
     end
@@ -324,6 +325,31 @@ module Mare::Parser::Builder
       stack.shift(),
       stack.last? || AST::Identifier.new("None").with_pos(pos),
     ).with_pos(pos)
+  end
+
+  private def self.build_pony_control_recover(main, iter, state)
+    assert_kind(main, :pony_control_recover)
+    pos = state.pos(main)
+    stack = [] of AST::Term
+
+    iter.while_next_is_child_of(main) do |child|
+      term = build_term(child, iter, state)
+
+      raise "stray operator: #{term}" if term.is_a?(AST::Operator)
+
+      stack.push(term)
+    end
+
+    if stack.size == 1
+      AST::Prefix.new(
+        AST::Operator.new("recover_UNSAFE").with_pos(pos), # TODO: make recover safe
+        stack.shift(),
+      ).with_pos(pos)
+    elsif stack.size == 2
+      raise NotImplementedError.new("pony_control_recover with explicit cap")
+    else
+      raise "wrong number of terms: #{stack.to_a.inspect}"
+    end
   end
 
   private def self.build_prefix(main, iter, state)

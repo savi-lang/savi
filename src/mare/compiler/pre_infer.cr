@@ -510,6 +510,8 @@ module Mare::Compiler::PreInfer
         @analysis[node] = Infer::AddressOf.new(node.pos, @analysis[node.term])
       when "--"
         @analysis[node] = Infer::Consume.new(node.pos, @analysis[node.term])
+      when "recover_UNSAFE"
+        @analysis[node] = Infer::RecoverUnsafe.new(node.pos, @analysis[node.term])
       else
         raise NotImplementedError.new(node.op.value)
       end
