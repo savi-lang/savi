@@ -1917,11 +1917,18 @@ class Mare::Compiler::CodeGen
       elsif ref.is_a?(Refer::Self)
         raise "#{ref.inspect} isn't a constant value" if const_only
         func_frame.receiver_value
-      elsif ref.is_a?(Refer::RaiseError)
-        # TODO: Allow an error value of something other than None.
-        gen_raise_error(gen_none, expr)
       else
         raise NotImplementedError.new("#{ref}\n#{expr.pos.show}")
+      end
+    when AST::Jump
+      case expr.kind
+      when AST::Jump::Kind::Error
+        # TODO: Allow an error value of something other than None.
+        gen_raise_error(gen_expr(expr.term), expr)
+      when AST::Jump::Kind::Return
+        gen_return_value(gen_expr(expr.term), expr)
+      else
+        raise NotImplementedError.new("for this kind of just")
       end
     when AST::FieldRead
       gen_field_load(expr.value)
@@ -2796,6 +2803,11 @@ class Mare::Compiler::CodeGen
     # the bodies above, using the LLVM mechanism called a "phi" instruction.
     @builder.position_at_end(post_block)
     @builder.phi(llvm_type_of(phi_type.not_nil!), phi_blocks, phi_values, "phi_try")
+  end
+
+  def gen_return_value(value : LLVM::Value, from_expr : AST::Node)
+    gfunc = func_frame.gfunc.not_nil!
+    gfunc.calling_convention.gen_return(self, gfunc, value, from_expr)
   end
 
   def gen_raise_error(error_value : LLVM::Value, from_expr : AST::Node)

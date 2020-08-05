@@ -667,21 +667,35 @@ class Mare::Compiler::Infer
     end
   end
 
-  class RaiseError < Info
-    def initialize(@pos)
+  class JumpError < Info
+    getter term : Info?
+    def initialize(@pos, @term)
     end
 
     def add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
-      raise "can't be downstream of a RaiseError"
+      term.try(&.add_downstream(use_pos, info, aliases))
     end
 
     def tethers(querent : Info) : Array(Tether)
-      [] of Tether
+      term.try(&.tethers(querent)) || [] of Tether
     end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
-      MetaType.new(MetaType::Unsatisfiable.instance)
+      if term
+        infer.resolve(ctx, term.not_nil!)
+      else
+        MetaType.new(MetaType::Unsatisfiable.instance)
+      end
     end
+  end
+  
+  class JumpReturn < JumpError
+  end
+  
+  class JumpBreak < JumpError
+  end
+  
+  class JumpContinue < JumpError
   end
 
   class Sequence < Info

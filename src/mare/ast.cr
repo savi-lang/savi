@@ -585,7 +585,7 @@ module Mare::AST
       Continue
     end
 
-    property term : Term?
+    property term : Term
     property kind : Kind
 
     def initialize(@term, @kind)
@@ -600,23 +600,20 @@ module Mare::AST
     def name; :jump end
     def to_a: Array(A)
       res = [name] of A
-      res.concat(term.not_nil!.to_a) if term
+      res.concat(term.to_a)
       res << kind.to_s.downcase
       res
     end
     def children_accept(ctx : Compiler::Context, visitor : Visitor)
-      term.not_nil!.accept(ctx, visitor) if term
+      term.accept(ctx, visitor)
     end
     def children_accept(ctx : Compiler::Context, visitor : CopyOnMutateVisitor)
-      if @term
-        new_term, term_changed = child_single_accept(ctx, @term.not_nil!, visitor)
-        return self unless term_changed
-        dup.tap do |node|
-          node.term = new_term
-        end
-      else
-        self
+      new_term, term_changed = child_single_accept(ctx, @term, visitor)
+      return self unless term_changed
+      dup.tap do |node|
+        node.term = new_term
       end
+      self
     end
   end
 end

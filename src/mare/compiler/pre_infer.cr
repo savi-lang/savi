@@ -188,8 +188,12 @@ module Mare::Compiler::PreInfer
         # and also of allowing inference if there is no explicit type.
         # We don't do this for constructors, since constructors implicitly return
         # self no matter what the last term of the body of the function is.
-        self[ret].as(Infer::FuncBody).assign(ctx, @analysis[func_body], func_body_pos) \
-          unless func.has_tag?(:constructor) || @jumps.always_error?(func_body)
+        unless func.has_tag?(:constructor) || @jumps.always_error?(func_body)
+          self[ret].as(Infer::FuncBody).assign(ctx, @analysis[func_body], func_body_pos) 
+          @jumps.catches[func.ast]?.try(&.each do |jump|
+            self[ret].as(Infer::FuncBody).assign(ctx, self[jump.term], jump.pos)
+          end)
+        end
       end
 
       nil
@@ -276,8 +280,6 @@ module Mare::Compiler::PreInfer
         end
       when Refer::Self
         @analysis[node] = Infer::Self.new(node.pos)
-      when Refer::RaiseError
-        @analysis[node] = Infer::RaiseError.new(node.pos)
       when Refer::Unresolved
         # Leave the node as unresolved if this identifer is not a value.
         return if @classify.no_value?(node)
@@ -286,6 +288,27 @@ module Mare::Compiler::PreInfer
         Error.at node, "This identifer couldn't be resolved"
       else
         raise NotImplementedError.new(ref)
+      end
+    end
+
+    def touch(ctx : Context, node : AST::Jump)
+      term_info = 
+        if node.term
+          @analysis[node.term.not_nil!]
+        else
+          nil
+        end
+      @analysis[node] = case node.kind
+      when AST::Jump::Kind::Error
+        Infer::JumpError.new(node.pos, term_info)
+      when AST::Jump::Kind::Return
+        Infer::JumpReturn.new(node.pos, term_info)
+      when AST::Jump::Kind::Break
+        Infer::JumpBreak.new(node.pos, term_info)
+      when AST::Jump::Kind::Continue
+        Infer::JumpContinue.new(node.pos, term_info)
+      else
+        raise ""
       end
     end
 
@@ -328,24 +351,28 @@ module Mare::Compiler::PreInfer
         @analysis[node] =
           Infer::ArrayLiteral.new(node.pos, node.terms.map { |term| self[term] })
       when " "
-        ref = @refer[node.terms[0]]
-        if ref.is_a?(Refer::Local) && ref.defn == node.terms[0]
-          local_ident = @local_idents[ref]
-
-          local = self[local_ident]
-          case local
-          when Infer::Local, Infer::Param
-            info = self[node.terms[1]]
-            case info
-            when Infer::FixedTypeExpr, Infer::Self then local.set_explicit(info)
-            else raise NotImplementedError.new(info)
-            end
-          else raise NotImplementedError.new(local)
-          end
-
-          @analysis.redirect(node, local_ident)
+        if node.terms[0].is_a? AST::Jump
+          touch(ctx, node.terms[0])
         else
-          raise NotImplementedError.new(node.to_a)
+          ref = @refer[node.terms[0]]
+          if ref.is_a?(Refer::Local) && ref.defn == node.terms[0]
+            local_ident = @local_idents[ref]
+
+            local = self[local_ident]
+            case local
+            when Infer::Local, Infer::Param
+              info = self[node.terms[1]]
+              case info
+              when Infer::FixedTypeExpr, Infer::Self then local.set_explicit(info)
+              else raise NotImplementedError.new(info)
+              end
+            else raise NotImplementedError.new(local)
+            end
+
+            @analysis.redirect(node, local_ident)
+          else
+            raise NotImplementedError.new(node.to_a)
+          end
         end
       else raise NotImplementedError.new(node.style)
       end

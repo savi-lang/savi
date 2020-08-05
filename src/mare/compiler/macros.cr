@@ -1,3 +1,4 @@
+require "debug"
 ##
 # The purpose of the Macros pass is to parse and expand semantic forms that
 # may be more context-sensitive/dynamic than those parsed in the parser itself.
@@ -80,6 +81,10 @@ class Mare::Compiler::Macros < Mare::AST::CopyOnMutateVisitor
     # groups that we may match and interpret as if they are macros.
     return node unless node.style == " "
 
+    if node.terms[0]?.is_a?(AST::Jump)
+      return visit_jump(node)
+    end
+
     if Util.match_ident?(node, 0, "if")
       Util.require_terms(node, [
         nil,
@@ -115,29 +120,30 @@ class Mare::Compiler::Macros < Mare::AST::CopyOnMutateVisitor
         "the value to be yielded out to the calling function",
       ])
       visit_yield(node)
-    elsif Util.match_ident?(node, 0, "return")
+    elsif Util.match_jump?(node, 0, AST::Jump::Kind::Return)
       Util.require_terms(node, [
         nil,
         "the value to return",
       ])
-      visit_jump(node, AST::Jump::Kind::Return)
-    elsif Util.match_ident?(node, 0, "error!")
+      visit_jump(node)
+    elsif Util.match_jump?(node, 0, AST::Jump::Kind::Error)
       Util.require_terms(node, [
         nil,
+        "the error to raise",
       ])
-      visit_jump(node, AST::Jump::Kind::Error)
-    elsif Util.match_ident?(node, 0, "break")
+      visit_jump(node)
+    elsif Util.match_jump?(node, 0, AST::Jump::Kind::Break)
       Util.require_terms(node, [
         nil,
         "the value to break loop with",
       ])
-      visit_jump(node, AST::Jump::Kind::Break)
-    elsif Util.match_ident?(node, 0, "continue")
+      visit_jump(node)
+    elsif Util.match_jump?(node, 0, AST::Jump::Kind::Continue)
       Util.require_terms(node, [
         nil,
         "the value to continue loop with",
       ])
-      visit_jump(node, AST::Jump::Kind::Continue)
+      visit_jump(node)
     elsif Util.match_ident?(node, 0, "source_code_position_of_argument")
       Util.require_terms(node, [
         nil,
@@ -182,6 +188,21 @@ class Mare::Compiler::Macros < Mare::AST::CopyOnMutateVisitor
         "the other of the two operands whose identity is to be compared",
       ])
       visit_isnt(node)
+    else
+      node
+    end
+  end
+
+  def visit(ctx, node : AST::Identifier)
+    case node.value
+    when "error!"
+      AST::Jump.new(AST::Identifier.new("None").from(node), AST::Jump::Kind::Error).from(node)
+    when "return"
+      AST::Jump.new(AST::Identifier.new("None").from(node), AST::Jump::Kind::Return).from(node)
+    when "break"
+      AST::Jump.new(AST::Identifier.new("None").from(node), AST::Jump::Kind::Break).from(node)
+    when "continue"
+      AST::Jump.new(AST::Identifier.new("None").from(node), AST::Jump::Kind::Continue).from(node)
     else
       node
     end
@@ -321,12 +342,12 @@ class Mare::Compiler::Macros < Mare::AST::CopyOnMutateVisitor
     ] of AST::Term).from(node)
   end
 
-  def visit_jump(node : AST::Group, kind)
+  def visit_jump(node : AST::Group)
     orig = node.terms[0]
-    term = node.terms[1]?
+    term = node.terms[1]? || AST::Identifier.new("None").from(orig)
 
     AST::Group.new("(", [
-      AST::Jump.new(term, kind).from(orig)
+      AST::Jump.new(term, orig.as(AST::Jump).kind).from(orig)
     ] of AST::Term).from(node)
   end
 

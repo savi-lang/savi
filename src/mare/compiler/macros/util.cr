@@ -6,6 +6,13 @@ module Mare::Compiler::Macros::Util
     true
   end
 
+  def self.match_jump?(node : AST::Group, index : Int32, value : AST::Jump::Kind? = nil)
+    child = node.terms[index]?
+    return false unless child.is_a?(AST::Jump)
+    return false unless value.nil? || value == child.kind
+    true
+  end
+
   def self.require_terms(
     node : AST::Group,
     term_docs : Array(String?),

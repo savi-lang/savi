@@ -7,10 +7,6 @@ module Mare::Compiler::Refer
     INSTANCE = new
   end
 
-  struct RaiseError
-    INSTANCE = new
-  end
-
   struct Field
     getter name : String
 
@@ -113,7 +109,8 @@ module Mare::Compiler::Refer
   alias Info = (
     Self | Local | LocalUnion | Field |
     Type | TypeAlias | TypeParam |
-    RaiseError | Unresolved)
+    # TODO ADD JUMP INFOS
+    Unresolved)
 
   struct Scope
     getter locals : Hash(String, (Local | LocalUnion))

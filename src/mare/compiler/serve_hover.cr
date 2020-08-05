@@ -45,8 +45,9 @@ class Mare::Compiler::ServeHover
     when Refer::Self
       messages << "This refers to the current 'self' value " \
                 "(the instance of the type that implements this method)."
-    when Refer::RaiseError
-      messages << "This raises an error."
+    # TODO: FIX Error raise
+    # when Refer::RaiseError
+    #   messages << "This raises an error."
     when Refer::Field
       messages << "This refers to a field."
     when Refer::Local
