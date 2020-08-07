@@ -16,11 +16,3 @@
 
 - Tooling is paramount.
     - Developer experience is governed not only by language features, but also by tooling. To provide an attractive developer experience, Mare needs excellent tooling support.
-
-### Non-Goals
-
-- A comprehensive standard library that contains everything you need.
-    - The standard library should be a stable, minimal set of tools that change slowly and deliberately, doing no more than they need to. The package ecosystem outside the standard library is the place for rapid and diverse innovation.
-
-- A homogenous culture of mechanical code formatting.
-    - Code is an art form, and the manner in which you as an author choose to express yourself is important. There are many "bad" (hard to read) ways to format your code, but there are also many "good" (easy to read) ways to format your code, and it is your responsibility to find the "best" (most readable) way, which may often depend on context too subtle for a mechanical formatter to understand.
