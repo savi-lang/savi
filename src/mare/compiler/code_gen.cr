@@ -129,6 +129,13 @@ class Mare::Compiler::CodeGen
     @source_code_pos_globals = {} of Source::Pos => LLVM::Value
     @reflection_of_type_globals = {} of GenType => LLVM::Value
     @gtypes = {} of String => GenType
+    @loop_continue_stack = Array(Tuple(
+      LLVM::BasicBlock, Array(LLVM::BasicBlock), Array(LLVM::Value), Reach::Ref,
+    )).new
+    @loop_break_stack = Array(Tuple(
+      LLVM::BasicBlock, Array(LLVM::BasicBlock), Array(LLVM::Value), Reach::Ref
+    )).new
+
     @try_else_stack = Array(Tuple(
       LLVM::BasicBlock, Array(LLVM::BasicBlock), Array(LLVM::Value)
     )).new
@@ -1924,11 +1931,15 @@ class Mare::Compiler::CodeGen
       case expr.kind
       when AST::Jump::Kind::Error
         # TODO: Allow an error value of something other than None.
-        gen_raise_error(gen_expr(expr.term), expr)
+        gen_raise_error(gen_expr(expr.term), expr.term)
       when AST::Jump::Kind::Return
-        gen_return_value(gen_expr(expr.term), expr)
+        gen_return_value(gen_expr(expr.term), expr.term)
+      when AST::Jump::Kind::Break
+        gen_break_loop(gen_expr(expr.term), expr.term)
+      when AST::Jump::Kind::Continue
+        gen_continue_loop(gen_expr(expr.term), expr.term)
       else
-        raise NotImplementedError.new("for this kind of just")
+        raise NotImplementedError.new("for this kind of jump")
       end
     when AST::FieldRead
       gen_field_load(expr.value)
@@ -2677,14 +2688,32 @@ class Mare::Compiler::CodeGen
     # Each such value will needed to be bitcast to the that type.
     phi_type = type_of(expr)
 
+    # TODO: REMOVE
+    # infer = ctx.infer[func_frame.gfunc.not_nil!.link]
+    # pp phi_type unless infer[expr].as(Infer::Loop).early_breaks.empty?
+
     # Prepare to capture state for the final phi.
     phi_blocks = [] of LLVM::BasicBlock
     phi_values = [] of LLVM::Value
 
     # Create all of the instruction blocks we'll need for this loop.
     body_block = gen_block("body_loop")
+    continue_block = gen_block("continue_loop")
     else_block = gen_block("else_loop")
     post_block = gen_block("after_loop")
+
+    @loop_continue_stack << {
+      continue_block,
+      [] of LLVM::BasicBlock,
+      [] of LLVM::Value,
+      phi_type.not_nil!,
+    }
+    @loop_break_stack << {
+      post_block,
+      [] of LLVM::BasicBlock,
+      [] of LLVM::Value,
+      phi_type.not_nil!,
+    }
 
     # Start by generating the code to test the condition value.
     # If the cond is true, go to the body block; otherwise, the else block.
@@ -2696,6 +2725,11 @@ class Mare::Compiler::CodeGen
     # If the cond is true, repeat the body block; otherwise, go to post block.
     @builder.position_at_end(body_block)
     body_value = gen_expr(expr.body)
+
+    continue_stack_tuple = @loop_continue_stack.pop
+    raise "invalid post continue stack" \
+      unless continue_stack_tuple[0] == continue_block
+
     unless func_frame.jumps.away?(expr.body)
       cond_value = gen_expr(expr.cond)
 
@@ -2705,7 +2739,33 @@ class Mare::Compiler::CodeGen
         phi_values << body_value
       end
       @builder.cond(cond_value, body_block, post_block)
+
+      @builder.position_at_end(continue_block)
+      cond_value = gen_expr(expr.cond)
+      continue_value = 
+        if continue_stack_tuple[1].empty?
+          gen_assign_cast(gen_none, phi_type.not_nil!, expr.body)
+        else
+          @builder.phi(
+            llvm_type_of(phi_type.not_nil!),
+            continue_stack_tuple[1],
+            continue_stack_tuple[2],
+            "continue_expression_value",
+          )
+        end
+      phi_blocks << @builder.insert_block
+      phi_values << continue_value
+      @builder.cond(cond_value, body_block, post_block)
+    else
+      @builder.position_at_end(continue_block)
+      phi_blocks << @builder.insert_block
+      phi_values << gen_assign_cast(gen_none, phi_type.not_nil!, expr.body)
+      @builder.br(post_block)
     end
+
+    break_stack_tuple = @loop_break_stack.pop
+    raise "invalid post break stack" \
+      unless break_stack_tuple[0] == post_block
 
     # In the body block, generate code to arrive at the else value,
     # Then skip straight to the post block.
@@ -2730,7 +2790,12 @@ class Mare::Compiler::CodeGen
     # the bodies above, using the LLVM mechanism called a "phi" instruction.
     @builder.position_at_end(post_block)
     if func_frame.classify.value_needed?(expr)
-      @builder.phi(llvm_type_of(phi_type), phi_blocks, phi_values, "phi_loop")
+      @builder.phi(
+        llvm_type_of(phi_type),
+        phi_blocks + break_stack_tuple[1],
+        phi_values + break_stack_tuple[2],
+        "phi_loop",
+      )
     else
       gen_none
     end
@@ -2813,6 +2878,8 @@ class Mare::Compiler::CodeGen
   def gen_raise_error(error_value : LLVM::Value, from_expr : AST::Node)
     raise "inconsistent frames" if @frames.size > 1
 
+    # error_value now is generated properly from the error! argument
+    # but we need to replace it with None for now
     # TODO: Allow an error value of something other than None.
     error_value = gen_none
 
@@ -2830,6 +2897,28 @@ class Mare::Compiler::CodeGen
       # Jump to the try else block.
       @builder.br(else_stack_tuple[0])
     end
+  end
+
+  def gen_continue_loop(value : LLVM::Value, from_expr : AST::Node)
+    raise NotImplementedError.new("") if @loop_continue_stack.empty?
+
+    continue_stack_tuple = @loop_continue_stack.last.not_nil!
+    typ = continue_stack_tuple[3]
+    continue_stack_tuple[1] << @builder.insert_block
+    continue_stack_tuple[2] << gen_assign_cast(value, typ, from_expr)
+
+    @builder.br(continue_stack_tuple[0])
+  end
+
+  def gen_break_loop(value : LLVM::Value, from_expr : AST::Node)
+    raise NotImplementedError.new("") if @loop_break_stack.empty?
+
+    break_stack_tuple = @loop_break_stack.last.not_nil!
+    typ = break_stack_tuple[3]
+    break_stack_tuple[1] << @builder.insert_block
+    break_stack_tuple[2] << gen_assign_cast(value, typ, from_expr)
+
+    @builder.br(break_stack_tuple[0])
   end
 
   def gen_yield(expr : AST::Yield)

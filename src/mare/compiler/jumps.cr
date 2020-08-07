@@ -153,7 +153,7 @@ module Mare::Compiler::Jumps
         else
         end
 
-        loop_node = @stack.reverse.find(&.is_a?(AST::Loop))
+        loop_node = @stack.reverse.find(&.is_a?(AST::Loop | AST::Yield))
 
         Error.at node, 
           "Expected to be used in loops" unless loop_node
