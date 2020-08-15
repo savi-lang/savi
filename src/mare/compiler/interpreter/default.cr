@@ -359,12 +359,6 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         "type" => "type",
         "optional" => true,
       },
-      {
-        "kind" => "keyword",
-        "name" => "can_error",
-        "value" => "!",
-        "optional" => true,
-      },
     ] of Hash(String, String | Bool))
 
     @@declare_be = Witness.new([
@@ -515,10 +509,6 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
           end
 
         ident = data["ident"].as(AST::Identifier)
-
-        if data["can_error"]? && !ident.value.ends_with?("!")
-          ident = AST::Identifier.new("#{ident.value}!").from(ident)
-        end
 
         func = Program::Function.new(
           data["cap"].as(AST::Identifier),
