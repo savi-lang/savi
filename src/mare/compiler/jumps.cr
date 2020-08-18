@@ -54,6 +54,9 @@ module Mare::Compiler::Jumps
       @catches[node] << jump
     end
 
+    protected def always_error!(node); set_flag(node, FLAG_ALWAYS_ERROR) end
+    protected def maybe_error!(node); set_flag(node, FLAG_MAYBE_ERROR) end
+
     protected def always_return!(node); set_flag(node, FLAG_ALWAYS_RETURN) end
     protected def maybe_return!(node); set_flag(node, FLAG_MAYBE_RETURN) end
 
@@ -63,8 +66,8 @@ module Mare::Compiler::Jumps
     protected def always_continue!(node); set_flag(node, FLAG_ALWAYS_CONTINUE) end
     protected def maybe_continue!(node); set_flag(node, FLAG_MAYBE_CONTINUE) end
 
-    protected def always_error!(node); set_flag(node, FLAG_ALWAYS_ERROR) end
-    protected def maybe_error!(node); set_flag(node, FLAG_MAYBE_ERROR) end
+    def always_error?(node); has_flag?(node, FLAG_ALWAYS_ERROR) end
+    def maybe_error?(node); has_flag?(node, FLAG_MAYBE_ERROR) end
 
     def always_return?(node); has_flag?(node, FLAG_ALWAYS_RETURN) end
     def maybe_return?(node); has_flag?(node, FLAG_MAYBE_RETURN) end
@@ -72,11 +75,12 @@ module Mare::Compiler::Jumps
     def always_break?(node); has_flag?(node, FLAG_ALWAYS_BREAK) end
     def maybe_break?(node); has_flag?(node, FLAG_MAYBE_BREAK) end
 
-    def always_continue?(node); has_flag?(node, FLAG_ALWAYS_BREAK) end
-    def maybe_continue?(node); has_flag?(node, FLAG_MAYBE_BREAK) end
+    def always_continue?(node); has_flag?(node, FLAG_ALWAYS_CONTINUE) end
+    def maybe_continue?(node); has_flag?(node, FLAG_MAYBE_CONTINUE) end
 
-    def always_error?(node); has_flag?(node, FLAG_ALWAYS_ERROR) end
-    def maybe_error?(node); has_flag?(node, FLAG_MAYBE_ERROR) end
+    def any_error?(node)
+      has_flag?(node, (FLAG_ALWAYS_ERROR | FLAG_MAYBE_ERROR))
+    end
 
     def any_return?(node)
       has_flag?(node, (FLAG_ALWAYS_RETURN | FLAG_MAYBE_RETURN))
@@ -88,10 +92,6 @@ module Mare::Compiler::Jumps
 
     def any_continue?(node)
       has_flag?(node, (FLAG_ALWAYS_CONTINUE | FLAG_MAYBE_CONTINUE))
-    end
-
-    def any_error?(node)
-      has_flag?(node, (FLAG_ALWAYS_ERROR | FLAG_MAYBE_ERROR))
     end
 
     def away?(node)
@@ -144,7 +144,7 @@ module Mare::Compiler::Jumps
         try_node = @stack.reverse.find(&.is_a?(AST::Try))
 
         analysis.catch(try_node.not_nil!, node) if try_node
-      when JumpKind::Break || JumpKind::Continue
+      when JumpKind::Break, JumpKind::Continue
         case node.kind
         when JumpKind::Break
           @analysis.always_break!(node)
@@ -155,7 +155,7 @@ module Mare::Compiler::Jumps
 
         loop_node = @stack.reverse.find(&.is_a?(AST::Loop | AST::Yield))
 
-        Error.at node, 
+        Error.at node,
           "Expected to be used in loops" unless loop_node
 
         analysis.catch(loop_node.not_nil!, node)
@@ -164,6 +164,7 @@ module Mare::Compiler::Jumps
 
         analysis.catch(@function, node)
       else
+        raise NotImplementedError.new(node.kind)
       end
     end
 
@@ -416,31 +417,27 @@ module Mare::Compiler::Jumps
         @analysis.maybe_return!(node)
       end
 
-      if @analysis.always_break?(node.cond) || (
-        @analysis.always_break?(node.body) && @analysis.always_break?(node.else_body)
-      )
+      if @analysis.always_break?(node.cond)
         # A loop is an always break if the cond is an always break,
-        # or if both the body and else body are always break.
+        # LOOP NOTE: we ignore any break in the body - the loop catches it.
         @analysis.always_break!(node)
       elsif @analysis.maybe_break?(node.cond) \
-      || @analysis.any_break?(node.body) \
       || @analysis.any_break?(node.else_body)
         # A loop is a maybe break if the cond is a maybe break,
-        # or if either the body or else body are always break or maybe break.
+        # or if the else body is always break or maybe break.
+        # LOOP NOTE: we ignore any break in the body - the loop catches it.
         @analysis.maybe_break!(node)
       end
 
-      if @analysis.always_continue?(node.cond) || (
-        @analysis.always_continue?(node.body) && @analysis.always_continue?(node.else_body)
-      )
+      if @analysis.always_continue?(node.cond)
         # A loop is an always continue if the cond is an always continue,
-        # or if both the body and else body are always continue.
+        # LOOP NOTE: we ignore any continue in the body - the loop catches it.
         @analysis.always_continue!(node)
       elsif @analysis.maybe_continue?(node.cond) \
-      || @analysis.any_continue?(node.body) \
       || @analysis.any_continue?(node.else_body)
         # A loop is a maybe continue if the cond is a maybe continue,
-        # or if either the body or else body are always continue or maybe continue.
+        # or if the else body is always continue or maybe continue.
+        # LOOP NOTE: we ignore any continue in the body - the loop catches it.
         @analysis.maybe_continue!(node)
       end
     end

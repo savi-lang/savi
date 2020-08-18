@@ -117,7 +117,7 @@ module Mare::Compiler::PreInfer
 
       # Create a fake local variable that represents the return value.
       # See also the #ret method.
-      @analysis[ret] = Infer::FuncBody.new(ret.pos, 
+      @analysis[ret] = Infer::FuncBody.new(ret.pos,
         @jumps.catches[ret]?.try(
           &.select(&.kind.is_a? AST::Jump::Kind::Return).map do |jump|
             inf = @analysis[jump]
@@ -198,7 +198,7 @@ module Mare::Compiler::PreInfer
         # We don't do this for constructors, since constructors implicitly return
         # self no matter what the last term of the body of the function is.
         unless func.has_tag?(:constructor) || @jumps.always_error?(func_body)
-          self[ret].as(Infer::FuncBody).assign(ctx, @analysis[func_body], func_body_pos) 
+          self[ret].as(Infer::FuncBody).assign(ctx, @analysis[func_body], func_body_pos)
           @jumps.catches[func.ast]?.try(&.each do |jump|
             self[ret].as(Infer::FuncBody).assign(ctx, self[jump.term], jump.pos)
           end)

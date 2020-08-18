@@ -2739,28 +2739,22 @@ class Mare::Compiler::CodeGen
         phi_values << body_value
       end
       @builder.cond(cond_value, body_block, post_block)
+    end
 
-      @builder.position_at_end(continue_block)
-      cond_value = gen_expr(expr.cond)
-      continue_value = 
-        if continue_stack_tuple[1].empty?
-          gen_assign_cast(gen_none, phi_type.not_nil!, expr.body)
-        else
-          @builder.phi(
-            llvm_type_of(phi_type.not_nil!),
-            continue_stack_tuple[1],
-            continue_stack_tuple[2],
-            "continue_expression_value",
-          )
-        end
+    @builder.position_at_end(continue_block)
+    if continue_stack_tuple[1].empty?
+      @builder.unreachable
+    else
+      continue_value = @builder.phi(
+        llvm_type_of(phi_type.not_nil!),
+        continue_stack_tuple[1],
+        continue_stack_tuple[2],
+        "continue_expression_value",
+      )
       phi_blocks << @builder.insert_block
       phi_values << continue_value
+      cond_value = gen_expr(expr.cond)
       @builder.cond(cond_value, body_block, post_block)
-    else
-      @builder.position_at_end(continue_block)
-      phi_blocks << @builder.insert_block
-      phi_values << gen_assign_cast(gen_none, phi_type.not_nil!, expr.body)
-      @builder.br(post_block)
     end
 
     break_stack_tuple = @loop_break_stack.pop

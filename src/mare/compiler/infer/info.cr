@@ -703,6 +703,12 @@ class Mare::Compiler::Infer
     end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
+      # A jump expression has no result value, so the resolved type is always
+      # unsatisfiable - the term's type goes to the jump's catching entity.
+      MetaType.new(MetaType::Unsatisfiable.instance)
+    end
+
+    def resolve_others!(ctx : Context, infer : ForReifiedFunc) : MetaType
       infer.resolve(ctx, term)
     end
   end
@@ -710,15 +716,15 @@ class Mare::Compiler::Infer
   class JumpError < JumpInfo
     def error_jump_name; "error!" end
   end
-  
+
   class JumpReturn < JumpError
     def error_jump_name; "return" end
   end
-  
+
   class JumpBreak < JumpError
     def error_jump_name; "break" end
   end
-  
+
   class JumpContinue < JumpError
     def error_jump_name; "continue" end
   end
