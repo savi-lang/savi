@@ -1,4 +1,3 @@
-require "debug"
 ##
 # The purpose of the Macros pass is to parse and expand semantic forms that
 # may be more context-sensitive/dynamic than those parsed in the parser itself.
