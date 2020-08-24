@@ -120,7 +120,6 @@ module Mare::Compiler::Completeness
     def visit_pre(ctx, node)
       if node.is_a? AST::Loop
         @loop_stack << node
-        debug! node
       end
     end
 

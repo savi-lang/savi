@@ -540,7 +540,6 @@ module Mare::Compiler::Jumps
       if write_unreal_flags
         @analysis.set_flag(node, @away_flag, false)
       end
-      debug! node if node.pos.start >= 70 && node.pos.finish <= 100
       node
     end
   end
