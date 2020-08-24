@@ -46,23 +46,35 @@ module Mare::Compiler::Refer
 
   class Visitor < Mare::AST::Visitor
     getter analysis
-    getter locals
 
     def initialize(
       @analysis : Analysis,
       @refer_type : ReferType::Analysis,
-      @locals = {} of String => (Local | LocalUnion),
+      @jumps : Jumps::Analysis? = nil,
+      @parent_locals = {} of String => (Local | LocalUnion),
     )
+      @locals = {} of String => (Local | LocalUnion)
+      @sub_locals = {} of String => (Local | LocalUnion)
       @param_count = 0
     end
 
-    def sub_branch(ctx, group : AST::Node?, init_locals = @locals.dup)
-      Visitor.new(@analysis, @refer_type, init_locals).tap do |branch|
+    def locals
+      @parent_locals.merge(@locals).merge(@sub_locals)
+    end
+
+    def sub_branch(ctx, group : AST::Node?, init_locals = locals)
+      Visitor.new(@analysis, @refer_type, @jumps, init_locals).tap do |branch|
         @analysis.set_scope(group, branch) if group.is_a?(AST::Group)
         group.try(&.accept(ctx, branch))
         @analysis = branch.analysis
       end
     end
+
+    # def visit_pre(ctx, node)
+    #   if node.is_a? AST::
+    #   end
+    #   node
+    # end
 
     # This visitor never replaces nodes, it just touches them and returns them.
     def visit(ctx, node)
@@ -74,17 +86,19 @@ module Mare::Compiler::Refer
     def touch(ctx, node : AST::Identifier)
       name = node.value
 
+      is_sub_local = false
       # If this is an @ symbol, it refers to the this/self object.
       info =
         if name == "@"
           Self::INSTANCE
         else
           # First, try to resolve as local, then as type, else it's unresolved.
-          @locals[name]? || @refer_type[node]? || Unresolved::INSTANCE
+          is_sub_local = @sub_locals[name]?
+          locals[name]? || @refer_type[node]? || Unresolved::INSTANCE
         end
 
       # Raise an error if trying to use an "incomplete" union of locals.
-      if info.is_a?(LocalUnion) && info.incomplete
+      if info.is_a?(LocalUnion) && (info.incomplete || !info.caught?)
         extra = info.list.map do |local|
           {local.as(Local).defn.pos, "it was assigned here"}
         end
@@ -94,6 +108,10 @@ module Mare::Compiler::Refer
         Error.at node,
           "This variable can't be used here;" \
           " it was assigned a value in some but not all branches", extra
+      elsif is_sub_local && info.is_a?(Local) && !info.caught?
+        Error.at node,
+          "This variable can't be used here;" \
+          " it was assigned a value, but it can jump away before this usage"
       end
 
       @analysis[node] = info
@@ -147,6 +165,65 @@ module Mare::Compiler::Refer
       end
     end
 
+    # For a Try, do away analysis
+    def touch(ctx, node : AST::Choice)
+      # Visit the body next. Locals from the cond are available in the body.
+      body_branch = sub_branch(ctx, body, cond_branch.locals.dup)
+
+      # Collect the list of new locals exposed in the body branch.
+      body_branch.locals.each do |name, local|
+        next if locals[name]?
+        (branch_locals[name] ||= Array(Local | LocalUnion).new) << local
+      end
+
+      # Expose the locals from the branches as LocalUnion instances.
+      # Those locals that were exposed in only some of the branches are to be
+      # marked as incomplete, so that we'll see an error if we try to use them.
+      branch_locals.each do |name, list|
+        info = LocalUnion.build(list)
+        info.incomplete = true if list.size < node.list.size
+        @sub_locals[name] = info
+      end
+    end
+
+    # We don't visit anything under a try with this visitor;
+    # we instead spawn new visitor instances in the touch method below.
+    def visit_children?(ctx, node : AST::Try)
+      false
+    end
+
+    # For a Try, do a branching analysis of the clauses contained within it.
+    def touch(ctx, node : AST::Try)
+      branch_locals = {} of String => Array(Local | LocalUnion)
+
+      body_branch = sub_branch(ctx, node.body)
+      else_branch = sub_branch(ctx, node.else_body)
+
+      else_branch.locals.each do |name, local|
+        next if locals[name]?
+        (branch_locals[name] ||= Array(Local | LocalUnion).new) << local
+      end
+
+      body_branch.locals.each do |name, local|
+        next if locals[name]?
+        locals = branch_locals[name]?
+        if locals
+          locals << local
+        else
+          info = LocalUnion.build([local])
+          info.incomplete = true
+          (branch_locals[name] = Array(Local | LocalUnion).new) << info
+        end
+      end
+
+      # Expose the locals from the branches as LocalUnion instances.
+      # Those locals that were exposed in only some of the branches are to be
+      # marked as incomplete, so that we'll see an error if we try to use them.
+      branch_locals.each do |name, list|
+        @sub_locals[name] = LocalUnion.build(list)
+      end
+    end
+
     # We don't visit anything under a choice with this visitor;
     # we instead spawn new visitor instances in the touch method below.
     def visit_children?(ctx, node : AST::Choice)
@@ -168,7 +245,7 @@ module Mare::Compiler::Refer
 
         # Collect the list of new locals exposed in the body branch.
         body_branch.locals.each do |name, local|
-          next if @locals[name]?
+          next if locals[name]?
           (branch_locals[name] ||= Array(Local | LocalUnion).new) << local
         end
       end
@@ -179,7 +256,7 @@ module Mare::Compiler::Refer
       branch_locals.each do |name, list|
         info = LocalUnion.build(list)
         info.incomplete = true if list.size < node.list.size
-        @locals[name] = info
+        @sub_locals[name] = info
       end
     end
 
@@ -205,7 +282,7 @@ module Mare::Compiler::Refer
 
       # Now, visit the main body twice (nested) to simulate repeated execution.
       body_branch = sub_branch(ctx, node.body)
-      body_branch_2 = body_branch.sub_branch(ctx, node.body, @locals.dup)
+      body_branch_2 = body_branch.sub_branch(ctx, node.body, locals)
 
       # TODO: Is it possible/safe to collect locals from the body branches?
     end
@@ -217,7 +294,7 @@ module Mare::Compiler::Refer
       sub_branch = sub_branch(ctx, params)
       params.try(&.terms.each { |param| sub_branch.create_local(param) })
       block.try(&.accept(ctx, sub_branch))
-      sub_branch2 = sub_branch.sub_branch(ctx, params, @locals.dup)
+      sub_branch2 = sub_branch.sub_branch(ctx, params, locals)
       params.try(&.terms.each { |param| sub_branch2.create_local(param) })
       block.try(&.accept(ctx, sub_branch2))
       @analysis.set_scope(block, sub_branch) if block.is_a?(AST::Group)
@@ -237,8 +314,10 @@ module Mare::Compiler::Refer
         ]
       end
 
+      caught = !@jumps.not_nil!.away_possibly_unreal?(node)
+
       # Create the local entry, so later references to this name will see it.
-      local = Local.new(node.value, node)
+      local = Local.new(node.value, node, caught)
       @locals[node.value] = local unless node.value == "_"
       @analysis[node] = local
     end
@@ -257,7 +336,7 @@ module Mare::Compiler::Refer
         # Treat this as a parameter with only an identifier and no type.
         ident = node
 
-        local = Local.new(ident.value, ident, @param_count += 1)
+        local = Local.new(ident.value, ident, true, @param_count += 1)
         @locals[ident.value] = local unless ident.value == "_"
         @analysis[ident] = local
       else
@@ -294,7 +373,7 @@ module Mare::Compiler::Refer
 
       ident = node.terms[0].as(AST::Identifier)
 
-      local = Local.new(ident.value, ident, @param_count += 1)
+      local = Local.new(ident.value, ident, true, @param_count += 1)
       @locals[ident.value] = local unless ident.value == "_"
       @analysis[ident] = local
 
@@ -324,7 +403,8 @@ module Mare::Compiler::Refer
 
     def analyze_func(ctx, f, f_link, t_analysis) : Analysis
       refer_type = ctx.refer_type[f_link]
-      visitor = Visitor.new(Analysis.new, refer_type)
+      jumps = ctx.jumps[f_link]
+      visitor = Visitor.new(Analysis.new, refer_type, jumps)
 
       f.params.try(&.terms.each { |param|
         param.accept(ctx, visitor)

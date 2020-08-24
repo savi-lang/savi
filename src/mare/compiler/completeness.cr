@@ -60,6 +60,8 @@ module Mare::Compiler::Completeness
     getter all_fields : Array(Program::Function)
     getter seen_fields : Set(String)
     getter call_crumbs : Array(Source::Pos)
+    getter jumps : Jumps::Analysis
+
     def initialize(
       @ctx,
       @type,
@@ -67,7 +69,11 @@ module Mare::Compiler::Completeness
       @branch_cache,
       @all_fields,
       @seen_fields = Set(String).new,
-      @call_crumbs = Array(Source::Pos).new)
+      @call_crumbs = Array(Source::Pos).new,
+      @possibly_away = false,
+      @loop_stack = [] of AST::Loop,
+    )
+      @jumps = @ctx.jumps[@func.link]
     end
 
     def sub_branch(node : AST::Node)
@@ -82,6 +88,7 @@ module Mare::Compiler::Completeness
       next_f_link : Program::Function::Link,
       next_f_cap : String,
       call_crumb : Source::Pos,
+      possibly_away = false,
     )
       next_rf = ctx.infer[next_f_link]
         .each_reified_func(type)
@@ -96,7 +103,7 @@ module Mare::Compiler::Completeness
       branch_cache.fetch cache_key do
         branch_cache[cache_key] = branch =
           Branch.new(ctx, type, next_rf, branch_cache, all_fields,
-            seen_fields.dup, call_crumbs.dup)
+            seen_fields.dup, call_crumbs.dup, possibly_away, @loop_stack)
         branch.call_crumbs << call_crumb
         next_rf.func(ctx).body.not_nil!.accept(ctx, branch)
         branch
@@ -110,9 +117,20 @@ module Mare::Compiler::Completeness
         .map { |f| {f.ident, "this field didn't get initialized"} }
     end
 
+    def visit_pre(ctx, node)
+      if node.is_a? AST::Loop
+        @loop_stack << node
+        debug! node
+      end
+    end
+
     # This visitor never replaces nodes, it just touches them and returns them.
     def visit(ctx, node)
       touch(node)
+
+      if node.is_a? AST::Loop
+        @loop_stack.pop
+      end
 
       node
     end
@@ -143,11 +161,13 @@ module Mare::Compiler::Completeness
     end
 
     def touch(node : AST::FieldWrite)
-      seen_fields.add(node.value)
+      seen_fields.add(node.value) unless @possibly_away ||\
+        !@loop_stack.empty? || @jumps.away_possibly_unreal?(node)
     end
 
     def touch(node : AST::FieldReplace)
-      seen_fields.add(node.value)
+      seen_fields.add(node.value) unless @possibly_away ||\
+        !@loop_stack.empty? || @jumps.away_possibly_unreal?(node)
     end
 
     def touch(node : AST::Identifier)
@@ -202,7 +222,7 @@ module Mare::Compiler::Completeness
         # seen in that branch as if they had been seen in this branch.
         next_f = type.defn(ctx).find_func!(func_name)
         next_f_cap = next_f.cap.value # TODO: reify with which cap?
-        branch = sub_branch(next_f.make_link(type.link), next_f_cap, node.pos)
+        branch = sub_branch(next_f.make_link(type.link), next_f_cap, node.pos, @jumps.away_possibly_unreal?(node))
         seen_fields.concat(branch.seen_fields)
       end
     end

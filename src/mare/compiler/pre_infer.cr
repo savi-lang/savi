@@ -278,14 +278,20 @@ module Mare::Compiler::PreInfer
         @analysis[node] = Infer::FixedSingleton.new(node.pos, node)
       when Refer::TypeParam
         @analysis[node] = Infer::FixedSingleton.new(node.pos, node, ref)
-      when Refer::Local
-        # If it's a local, track the possibly new node in our @local_idents map.
-        local_ident = lookup_local_ident(ref)
+      when Refer::LocalUnion, Refer::Local
+        local_ref =
+          if ref.is_a? Refer::LocalUnion
+            ref.list[0]
+          else
+            ref
+          end
+
+        local_ident = lookup_local_ident(local_ref)
         if local_ident
           @analysis.redirect(node, local_ident)
         else
-          @analysis[node] = ref.param_idx ? Infer::Param.new(node.pos) : Infer::Local.new(node.pos)
-          @local_idents[ref] = node
+          @analysis[node] = local_ref.param_idx ? Infer::Param.new(node.pos) : Infer::Local.new(node.pos)
+          @local_idents[local_ref] = node
         end
       when Refer::Self
         @analysis[node] = Infer::Self.new(node.pos)

@@ -13,7 +13,7 @@ describe Mare::Compiler::Macros do
       func.body.not_nil!.to_a.should eq [:group, ":",
         [:group, "(",
           [:try,
-            [:group, "(", [:jump, "error"]],
+            [:group, "(", [:jump, "error", [:ident, "None"]]],
             [:group, "(", [:ident, "True"]],
           ],
         ],

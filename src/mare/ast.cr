@@ -600,8 +600,8 @@ module Mare::AST
     def name; :jump end
     def to_a: Array(A)
       res = [name] of A
-      res.concat(term.to_a)
       res << kind.to_s.downcase
+      res << term.to_a
       res
     end
     def children_accept(ctx : Compiler::Context, visitor : Visitor)
