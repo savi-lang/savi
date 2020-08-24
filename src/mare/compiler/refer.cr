@@ -207,13 +207,7 @@ module Mare::Compiler::Refer
       body_branch.locals.each do |name, local|
         next if locals[name]?
         locals = branch_locals[name]?
-        if locals
-          locals << local
-        else
-          info = LocalUnion.build([local])
-          info.incomplete = true
-          (branch_locals[name] = Array(Local | LocalUnion).new) << info
-        end
+        locals << local if locals
       end
 
       # Expose the locals from the branches as LocalUnion instances.
