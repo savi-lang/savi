@@ -28,7 +28,7 @@ describe Mare::Compiler::Completeness do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :completeness)
+      Mare.compiler.compile([source], :completeness)
     end
   end
 
@@ -67,7 +67,7 @@ describe Mare::Compiler::Completeness do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :completeness)
+      Mare.compiler.compile([source], :completeness)
     end
   end
 
@@ -93,7 +93,7 @@ describe Mare::Compiler::Completeness do
         )
     SOURCE
 
-    Mare::Compiler.compile([source], :completeness)
+    Mare.compiler.compile([source], :completeness)
   end
 
   it "won't blow its stack on mutually recursive branching paths" do
@@ -125,7 +125,7 @@ describe Mare::Compiler::Completeness do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :completeness)
+      Mare.compiler.compile([source], :completeness)
     end
   end
 
@@ -158,7 +158,7 @@ describe Mare::Compiler::Completeness do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :completeness)
+      Mare.compiler.compile([source], :completeness)
     end
   end
 
@@ -173,7 +173,7 @@ describe Mare::Compiler::Completeness do
         @x << 3
     SOURCE
 
-    Mare::Compiler.compile([source], :completeness)
+    Mare.compiler.compile([source], :completeness)
   end
 
   it "complains if a field initializer tries to read an uninitialized field" do
@@ -206,7 +206,7 @@ describe Mare::Compiler::Completeness do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :completeness)
+      Mare.compiler.compile([source], :completeness)
     end
   end
 
@@ -250,7 +250,7 @@ describe Mare::Compiler::Completeness do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :completeness)
+      Mare.compiler.compile([source], :completeness)
     end
   end
 
@@ -277,7 +277,7 @@ describe Mare::Compiler::Completeness do
         Access.data(@)
     SOURCE
 
-    Mare::Compiler.compile([source], :completeness)
+    Mare.compiler.compile([source], :completeness)
   end
 
   pending "accounts for jumping away in its completeness detection"

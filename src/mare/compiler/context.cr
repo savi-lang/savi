@@ -21,10 +21,11 @@ class Mare::Compiler::Context
   getter serve_hover
 
   getter options
+  property prev_ctx : Context?
 
   getter link_libraries
 
-  def initialize(@options = CompilerOptions.new)
+  def initialize(@options = CompilerOptions.new, @prev_ctx = nil)
     @program = Program.new
     @stack = [] of Interpreter
 

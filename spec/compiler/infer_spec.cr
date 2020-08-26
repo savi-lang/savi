@@ -14,7 +14,7 @@ describe Mare::Compiler::Infer do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :infer)
+      Mare.compiler.compile([source], :infer)
     end
   end
 
@@ -34,7 +34,7 @@ describe Mare::Compiler::Infer do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :infer)
+      Mare.compiler.compile([source], :infer)
     end
   end
 
@@ -53,7 +53,7 @@ describe Mare::Compiler::Infer do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :infer)
+      Mare.compiler.compile([source], :infer)
     end
   end
 
@@ -72,7 +72,7 @@ describe Mare::Compiler::Infer do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :infer)
+      Mare.compiler.compile([source], :infer)
     end
   end
 
@@ -105,7 +105,7 @@ describe Mare::Compiler::Infer do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :infer)
+      Mare.compiler.compile([source], :infer)
     end
   end
 
@@ -134,7 +134,7 @@ describe Mare::Compiler::Infer do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :infer)
+      Mare.compiler.compile([source], :infer)
     end
   end
 
@@ -162,7 +162,7 @@ describe Mare::Compiler::Infer do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :infer)
+      Mare.compiler.compile([source], :infer)
     end
   end
 
@@ -191,7 +191,7 @@ describe Mare::Compiler::Infer do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :infer)
+      Mare.compiler.compile([source], :infer)
     end
   end
 
@@ -220,7 +220,7 @@ describe Mare::Compiler::Infer do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :infer)
+      Mare.compiler.compile([source], :infer)
     end
   end
 
@@ -255,7 +255,7 @@ describe Mare::Compiler::Infer do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :infer)
+      Mare.compiler.compile([source], :infer)
     end
   end
 
@@ -266,7 +266,7 @@ describe Mare::Compiler::Infer do
         x = "Hello, World!"
     SOURCE
 
-    ctx = Mare::Compiler.compile([source], :infer)
+    ctx = Mare.compiler.compile([source], :infer)
 
     infer = ctx.infer.for_func_simple(ctx, source, "Main", "new")
     body = infer.reified.func(ctx).body.not_nil!
@@ -284,7 +284,7 @@ describe Mare::Compiler::Infer do
         @x
     SOURCE
 
-    ctx = Mare::Compiler.compile([source], :infer)
+    ctx = Mare.compiler.compile([source], :infer)
 
     infer = ctx.infer.for_func_simple(ctx, source, "Main", "new")
     body = infer.reified.func(ctx).body.not_nil!
@@ -300,7 +300,7 @@ describe Mare::Compiler::Infer do
         x (U64 | None) = 42
     SOURCE
 
-    ctx = Mare::Compiler.compile([source], :infer)
+    ctx = Mare.compiler.compile([source], :infer)
 
     infer = ctx.infer.for_func_simple(ctx, source, "Main", "new")
     body = infer.reified.func(ctx).body.not_nil!
@@ -318,7 +318,7 @@ describe Mare::Compiler::Infer do
         @x
     SOURCE
 
-    ctx = Mare::Compiler.compile([source], :infer)
+    ctx = Mare.compiler.compile([source], :infer)
 
     main = ctx.namespace.main_type!(ctx)
     main_infer = ctx.infer.for_rt(ctx, main)
@@ -339,7 +339,7 @@ describe Mare::Compiler::Infer do
         x (U64 | String | None) = if True 42
     SOURCE
 
-    ctx = Mare::Compiler.compile([source], :infer)
+    ctx = Mare.compiler.compile([source], :infer)
 
     infer = ctx.infer.for_func_simple(ctx, source, "Main", "new")
     body = infer.reified.func(ctx).body.not_nil!
@@ -362,7 +362,7 @@ describe Mare::Compiler::Infer do
         x = if True (u | 0)
     SOURCE
 
-    ctx = Mare::Compiler.compile([source], :infer)
+    ctx = Mare.compiler.compile([source], :infer)
 
     infer = ctx.infer.for_func_simple(ctx, source, "Main", "new")
     body = infer.reified.func(ctx).body.not_nil!
@@ -405,7 +405,7 @@ describe Mare::Compiler::Infer do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :infer)
+      Mare.compiler.compile([source], :infer)
     end
   end
 
@@ -431,7 +431,7 @@ describe Mare::Compiler::Infer do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :infer)
+      Mare.compiler.compile([source], :infer)
     end
   end
 
@@ -471,7 +471,7 @@ describe Mare::Compiler::Infer do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :infer)
+      Mare.compiler.compile([source], :infer)
     end
   end
 
@@ -501,7 +501,7 @@ describe Mare::Compiler::Infer do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :infer)
+      Mare.compiler.compile([source], :infer)
     end
   end
 
@@ -531,7 +531,7 @@ describe Mare::Compiler::Infer do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :infer)
+      Mare.compiler.compile([source], :infer)
     end
   end
 
@@ -546,7 +546,7 @@ describe Mare::Compiler::Infer do
         Infer.from_call_return(42)
     SOURCE
 
-    ctx = Mare::Compiler.compile([source], :infer)
+    ctx = Mare.compiler.compile([source], :infer)
 
     [
       {"Infer", "from_param"},
@@ -572,7 +572,7 @@ describe Mare::Compiler::Infer do
         Infer.from_return_type(42)
     SOURCE
 
-    ctx = Mare::Compiler.compile([source], :infer)
+    ctx = Mare.compiler.compile([source], :infer)
 
     [
       {"Infer", "from_assign"},
@@ -604,7 +604,7 @@ describe Mare::Compiler::Infer do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :infer)
+      Mare.compiler.compile([source], :infer)
     end
   end
 
@@ -637,7 +637,7 @@ describe Mare::Compiler::Infer do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :infer)
+      Mare.compiler.compile([source], :infer)
     end
   end
 
@@ -650,7 +650,7 @@ describe Mare::Compiler::Infer do
         x = X.new
     SOURCE
 
-    ctx = Mare::Compiler.compile([source], :infer)
+    ctx = Mare.compiler.compile([source], :infer)
 
     infer = ctx.infer.for_func_simple(ctx, source, "Main", "new")
     body = infer.reified.func(ctx).body.not_nil!
@@ -687,7 +687,7 @@ describe Mare::Compiler::Infer do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :infer)
+      Mare.compiler.compile([source], :infer)
     end
   end
 
@@ -719,7 +719,7 @@ describe Mare::Compiler::Infer do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :infer)
+      Mare.compiler.compile([source], :infer)
     end
   end
 
@@ -763,7 +763,7 @@ describe Mare::Compiler::Infer do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :infer)
+      Mare.compiler.compile([source], :infer)
     end
   end
 
@@ -797,7 +797,7 @@ describe Mare::Compiler::Infer do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :infer)
+      Mare.compiler.compile([source], :infer)
     end
   end
 
@@ -829,7 +829,7 @@ describe Mare::Compiler::Infer do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :infer)
+      Mare.compiler.compile([source], :infer)
     end
   end
 
@@ -861,7 +861,7 @@ describe Mare::Compiler::Infer do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :infer)
+      Mare.compiler.compile([source], :infer)
     end
   end
 
@@ -888,7 +888,7 @@ describe Mare::Compiler::Infer do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :infer)
+      Mare.compiler.compile([source], :infer)
     end
   end
 
@@ -922,7 +922,7 @@ describe Mare::Compiler::Infer do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :infer)
+      Mare.compiler.compile([source], :infer)
     end
   end
 
@@ -955,7 +955,7 @@ describe Mare::Compiler::Infer do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :infer)
+      Mare.compiler.compile([source], :infer)
     end
   end
 
@@ -988,7 +988,7 @@ describe Mare::Compiler::Infer do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :infer)
+      Mare.compiler.compile([source], :infer)
     end
   end
 
@@ -1029,7 +1029,7 @@ describe Mare::Compiler::Infer do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :infer)
+      Mare.compiler.compile([source], :infer)
     end
   end
 
@@ -1065,7 +1065,7 @@ describe Mare::Compiler::Infer do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :infer)
+      Mare.compiler.compile([source], :infer)
     end
   end
 
@@ -1083,7 +1083,7 @@ describe Mare::Compiler::Infer do
         xc iso = --orig // okay
     SOURCE
 
-    Mare::Compiler.compile([source], :infer)
+    Mare.compiler.compile([source], :infer)
   end
 
   it "complains when violating uniqueness into an argument" do
@@ -1122,7 +1122,7 @@ describe Mare::Compiler::Infer do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :infer)
+      Mare.compiler.compile([source], :infer)
     end
   end
 
@@ -1161,7 +1161,7 @@ describe Mare::Compiler::Infer do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :infer)
+      Mare.compiler.compile([source], :infer)
     end
   end
 
@@ -1172,7 +1172,7 @@ describe Mare::Compiler::Infer do
         x = ["one", "two", "three"]
     SOURCE
 
-    ctx = Mare::Compiler.compile([source], :infer)
+    ctx = Mare.compiler.compile([source], :infer)
 
     infer = ctx.infer.for_func_simple(ctx, source, "Main", "new")
     body = infer.reified.func(ctx).body.not_nil!
@@ -1189,7 +1189,7 @@ describe Mare::Compiler::Infer do
         x Array((U64 | None))'val = [1, 2, 3] // TODO: allow syntax: Array(U64 | None)'val?
     SOURCE
 
-    ctx = Mare::Compiler.compile([source], :infer)
+    ctx = Mare.compiler.compile([source], :infer)
 
     infer = ctx.infer.for_func_simple(ctx, source, "Main", "new")
     body = infer.reified.func(ctx).body.not_nil!
@@ -1223,7 +1223,7 @@ describe Mare::Compiler::Infer do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :infer)
+      Mare.compiler.compile([source], :infer)
     end
   end
 
@@ -1235,7 +1235,7 @@ describe Mare::Compiler::Infer do
         x << 99
     SOURCE
 
-    ctx = Mare::Compiler.compile([source], :infer)
+    ctx = Mare.compiler.compile([source], :infer)
 
     infer = ctx.infer.for_func_simple(ctx, source, "Main", "new")
     body = infer.reified.func(ctx).body.not_nil!
@@ -1261,7 +1261,7 @@ describe Mare::Compiler::Infer do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :infer)
+      Mare.compiler.compile([source], :infer)
     end
   end
 
@@ -1302,7 +1302,7 @@ describe Mare::Compiler::Infer do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :infer)
+      Mare.compiler.compile([source], :infer)
     end
   end
 
@@ -1337,7 +1337,7 @@ describe Mare::Compiler::Infer do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :infer)
+      Mare.compiler.compile([source], :infer)
     end
   end
 
@@ -1377,7 +1377,7 @@ describe Mare::Compiler::Infer do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :infer)
+      Mare.compiler.compile([source], :infer)
     end
   end
 
@@ -1418,7 +1418,7 @@ describe Mare::Compiler::Infer do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :infer)
+      Mare.compiler.compile([source], :infer)
     end
   end
 
@@ -1439,7 +1439,7 @@ describe Mare::Compiler::Infer do
         inner_val Inner'val = outer_val.inner
     SOURCE
 
-    Mare::Compiler.compile([source], :infer)
+    Mare.compiler.compile([source], :infer)
   end
 
   it "allows safe auto-recovery of a property setter call" do
@@ -1474,7 +1474,7 @@ describe Mare::Compiler::Infer do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :infer)
+      Mare.compiler.compile([source], :infer)
     end
   end
 
@@ -1571,7 +1571,7 @@ describe Mare::Compiler::Infer do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :infer)
+      Mare.compiler.compile([source], :infer)
     end
   end
 
@@ -1652,7 +1652,7 @@ describe Mare::Compiler::Infer do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :infer)
+      Mare.compiler.compile([source], :infer)
     end
   end
 
@@ -1684,7 +1684,7 @@ describe Mare::Compiler::Infer do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :infer)
+      Mare.compiler.compile([source], :infer)
     end
   end
 
@@ -1717,7 +1717,7 @@ describe Mare::Compiler::Infer do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :infer)
+      Mare.compiler.compile([source], :infer)
     end
   end
 
@@ -1755,7 +1755,7 @@ describe Mare::Compiler::Infer do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :infer)
+      Mare.compiler.compile([source], :infer)
     end
   end
 
@@ -1788,7 +1788,7 @@ describe Mare::Compiler::Infer do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :infer)
+      Mare.compiler.compile([source], :infer)
     end
   end
 
@@ -1821,7 +1821,7 @@ describe Mare::Compiler::Infer do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :infer)
+      Mare.compiler.compile([source], :infer)
     end
   end
 
@@ -1853,7 +1853,7 @@ describe Mare::Compiler::Infer do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :infer)
+      Mare.compiler.compile([source], :infer)
     end
   end
 
@@ -1891,7 +1891,7 @@ describe Mare::Compiler::Infer do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :infer)
+      Mare.compiler.compile([source], :infer)
     end
   end
 
@@ -1993,7 +1993,7 @@ describe Mare::Compiler::Infer do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :infer)
+      Mare.compiler.compile([source], :infer)
     end
   end
 
@@ -2053,7 +2053,7 @@ describe Mare::Compiler::Infer do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :infer)
+      Mare.compiler.compile([source], :infer)
     end
   end
 
@@ -2093,7 +2093,7 @@ describe Mare::Compiler::Infer do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :infer)
+      Mare.compiler.compile([source], :infer)
     end
   end
 
@@ -2133,7 +2133,7 @@ describe Mare::Compiler::Infer do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :infer)
+      Mare.compiler.compile([source], :infer)
     end
   end
 
@@ -2195,7 +2195,7 @@ describe Mare::Compiler::Infer do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :infer)
+      Mare.compiler.compile([source], :infer)
     end
   end
 
@@ -2225,7 +2225,7 @@ describe Mare::Compiler::Infer do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :infer)
+      Mare.compiler.compile([source], :infer)
     end
   end
 
@@ -2239,7 +2239,7 @@ describe Mare::Compiler::Infer do
         )
     SOURCE
 
-    Mare::Compiler.compile([source], :infer)
+    Mare.compiler.compile([source], :infer)
   end
 
   it "allows assigning from a parameter with its refined type" do
@@ -2252,7 +2252,7 @@ describe Mare::Compiler::Infer do
         )
     SOURCE
 
-    Mare::Compiler.compile([source], :infer)
+    Mare.compiler.compile([source], :infer)
   end
 
   it "complains when the match type isn't a subtype of the original" do
@@ -2284,7 +2284,7 @@ describe Mare::Compiler::Infer do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :infer)
+      Mare.compiler.compile([source], :infer)
     end
   end
 
@@ -2321,7 +2321,7 @@ describe Mare::Compiler::Infer do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :infer)
+      Mare.compiler.compile([source], :infer)
     end
   end
 
@@ -2341,7 +2341,7 @@ describe Mare::Compiler::Infer do
         Generic(String).new("example").value_size
     SOURCE
 
-    Mare::Compiler.compile([source], :infer)
+    Mare.compiler.compile([source], :infer)
   end
 
   it "complains when too many type arguments are provided" do
@@ -2376,7 +2376,7 @@ describe Mare::Compiler::Infer do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :infer)
+      Mare.compiler.compile([source], :infer)
     end
   end
 
@@ -2412,7 +2412,7 @@ describe Mare::Compiler::Infer do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :infer)
+      Mare.compiler.compile([source], :infer)
     end
   end
 
@@ -2438,7 +2438,7 @@ describe Mare::Compiler::Infer do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :infer)
+      Mare.compiler.compile([source], :infer)
     end
   end
 
@@ -2470,7 +2470,7 @@ describe Mare::Compiler::Infer do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :infer)
+      Mare.compiler.compile([source], :infer)
     end
   end
 
@@ -2489,7 +2489,7 @@ describe Mare::Compiler::Infer do
         @count_to(5) -> (i| sum = sum + i)
     SOURCE
 
-    Mare::Compiler.compile([source], :infer)
+    Mare.compiler.compile([source], :infer)
   end
 
   it "complains when a yield block is present on a non-yielding call" do
@@ -2513,7 +2513,7 @@ describe Mare::Compiler::Infer do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :infer)
+      Mare.compiler.compile([source], :infer)
     end
   end
 
@@ -2539,7 +2539,7 @@ describe Mare::Compiler::Infer do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :infer)
+      Mare.compiler.compile([source], :infer)
     end
   end
 
@@ -2571,7 +2571,7 @@ describe Mare::Compiler::Infer do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :infer)
+      Mare.compiler.compile([source], :infer)
     end
   end
 
@@ -2590,7 +2590,7 @@ describe Mare::Compiler::Infer do
         @maybe_call_example(Example)
     SOURCE
 
-    ctx = Mare::Compiler.compile([source], :infer)
+    ctx = Mare.compiler.compile([source], :infer)
 
     any = ctx.namespace[source]["Any"].as(Mare::Program::Type::Link)
     trait = ctx.namespace[source]["Exampleable"].as(Mare::Program::Type::Link)
@@ -2632,7 +2632,7 @@ describe Mare::Compiler::Infer do
         try env.out.print(World.new.meet!(Person.new))
     SOURCE
 
-    ctx = Mare::Compiler.compile([source], :infer)
+    ctx = Mare.compiler.compile([source], :infer)
 
     t = ctx.namespace[source]["Person"].as(Mare::Program::Type::Link)
     rt = ctx.infer[t].no_args
@@ -2656,7 +2656,7 @@ describe Mare::Compiler::Infer do
         data MyData(Array'val) = ["Hello", "World", 99, ["Wow", [1, 2, 3]]]
     SOURCE
 
-    ctx = Mare::Compiler.compile([source], :infer)
+    ctx = Mare.compiler.compile([source], :infer)
 
     t, f, infer = ctx.infer.test_simple!(ctx, source, "Main", "new")
     assign = f.body.not_nil!.terms.first.not_nil!.as(Mare::AST::Relate)
@@ -2697,7 +2697,7 @@ describe Mare::Compiler::Infer do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :infer)
+      Mare.compiler.compile([source], :infer)
     end
   end
 

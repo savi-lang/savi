@@ -1,4 +1,6 @@
-module Mare::Compiler
+class Mare::Compiler
+  INSTANCE = new
+
   class CompilerOptions
     property release
     property no_debug
@@ -16,7 +18,7 @@ module Mare::Compiler
     end
   end
 
-  def self.execute(ctx, target : Symbol)
+  def execute(ctx, target : Symbol)
     case target
     when :import           then ctx.run_whole_program(ctx.import)
     when :namespace        then ctx.run_whole_program(ctx.namespace)
@@ -52,7 +54,7 @@ module Mare::Compiler
 
   # TODO: Add invalidation, such that passes like :lambda can invalidate
   # passes like :classify and :refer instead of marking a dependency.
-  def self.deps_of(target : Symbol) : Array(Symbol)
+  def deps_of(target : Symbol) : Array(Symbol)
     case target
     when :import then [] of Symbol
     when :namespace then [:import]
@@ -86,21 +88,20 @@ module Mare::Compiler
     end
   end
 
-  def self.all_deps_of(target : Symbol) : Set(Symbol)
+  def all_deps_of(target : Symbol) : Set(Symbol)
     deps_of(target).reduce(Set(Symbol).new) do |set, t|
       set.add(t)
       set.concat(all_deps_of(t))
     end
   end
 
-  def self.satisfy(ctx, target : Symbol)
+  def satisfy(ctx, target : Symbol)
     all_deps_of_target = all_deps_of(target)
     all_deps = all_deps_of_target.map { |t| {t, all_deps_of(t)} }
     all_deps << {target, all_deps_of_target}
     all_deps.sort_by(&.last.size).map(&.first).each do |target|
       execute(ctx, target)
     end
-    ctx
   end
 
   STANDARD_LIBRARY_DIRNAME = File.expand_path("../../packages", __DIR__)
@@ -135,36 +136,42 @@ module Mare::Compiler
     end
   end
 
-  def self.eval(string : String, options = CompilerOptions.new) : Int32
+  def eval(string : String, options = CompilerOptions.new) : Int32
     content = ":actor Main\n:new (env)\n#{string}"
     library = Mare::Source::Library.new("(eval)")
     source = Mare::Source.new("(eval)", content, library)
 
-    Mare::Compiler.compile([source], :eval, options).eval.exitcode
+    Mare.compiler.compile([source], :eval, options).eval.exitcode
   end
 
-  def self.compile(dirname : String, target : Symbol = :eval, options = CompilerOptions.new)
-    compile(get_library_sources(dirname), target, options)
+  def compile(dirname : String, target : Symbol = :eval, options = CompilerOptions.new)
+    compile(Compiler.get_library_sources(dirname), target, options)
   end
 
-  def self.compile(sources : Array(Source), target : Symbol = :eval, options = CompilerOptions.new)
+  def compile(sources : Array(Source), target : Symbol = :eval, options = CompilerOptions.new)
     compile(sources.map { |s| Parser.parse(s) }, target, options)
   end
 
-  def self.compile(docs : Array(AST::Document), target : Symbol = :eval, options = CompilerOptions.new)
+  @prev_ctx : Context?
+  def compile(docs : Array(AST::Document), target : Symbol = :eval, options = CompilerOptions.new)
     raise "No source documents given!" if docs.empty?
 
-    ctx = Context.new options
+    ctx = Context.new(options, @prev_ctx)
 
     ctx.compile_library(docs.first.source.library, docs)
 
-    unless docs.first.source.library.path == prelude_library_path()
-      prelude_sources = get_library_sources(prelude_library_path)
+    unless docs.first.source.library.path == Compiler.prelude_library_path
+      prelude_sources = Compiler.get_library_sources(Compiler.prelude_library_path)
       prelude_docs = prelude_sources.map { |s| Parser.parse(s) }
       ctx.compile_library(prelude_sources.first.library, prelude_docs)
     end
 
     satisfy(ctx, target)
+
+    ctx.prev_ctx = nil
+    @prev_ctx = ctx
+
+    ctx
   end
 
   def self.prelude_library_path

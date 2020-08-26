@@ -10,7 +10,7 @@ describe Mare::Compiler::Macros do
           )
       SOURCE
 
-      ctx = Mare::Compiler.compile([source], :macros)
+      ctx = Mare.compiler.compile([source], :macros)
 
       func = ctx.namespace.find_func!(ctx, source, "Main", "new")
       func.body.not_nil!.terms.first.to_a.should eq [:group, "(", [:choice,
@@ -37,7 +37,7 @@ describe Mare::Compiler::Macros do
           )
       SOURCE
 
-      ctx = Mare::Compiler.compile([source], :macros)
+      ctx = Mare.compiler.compile([source], :macros)
 
       func = ctx.namespace.find_func!(ctx, source, "Main", "new")
       func.body.not_nil!.terms.first.to_a.should eq [:group, "(", [:choice,
@@ -60,7 +60,7 @@ describe Mare::Compiler::Macros do
           case (x == 1 | "one" | x == 2 | "two")
       SOURCE
 
-      ctx = Mare::Compiler.compile([source], :macros)
+      ctx = Mare.compiler.compile([source], :macros)
 
       func = ctx.namespace.find_func!(ctx, source, "Main", "new")
       func.body.not_nil!.terms.first.to_a.should eq [:group, "(", [:choice,
@@ -111,7 +111,7 @@ describe Mare::Compiler::Macros do
       MSG
 
       expect_raises Mare::Error, expected do
-        Mare::Compiler.compile([source], :macros)
+        Mare.compiler.compile([source], :macros)
       end
     end
 
@@ -133,7 +133,7 @@ describe Mare::Compiler::Macros do
       MSG
 
       expect_raises Mare::Error, expected do
-        Mare::Compiler.compile([source], :macros)
+        Mare.compiler.compile([source], :macros)
       end
     end
 
@@ -155,7 +155,7 @@ describe Mare::Compiler::Macros do
       MSG
 
       expect_raises Mare::Error, expected do
-        Mare::Compiler.compile([source], :macros)
+        Mare.compiler.compile([source], :macros)
       end
     end
   end

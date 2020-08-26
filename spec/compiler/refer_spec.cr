@@ -10,8 +10,8 @@ describe Mare::Compiler::Refer do
         Greeting.greet(env)
     SOURCE
 
-    ctx1 = Mare::Compiler.compile([source], :refer)
-    ctx2 = Mare::Compiler.compile([source], :refer)
+    ctx1 = Mare.compiler.compile([source], :refer)
+    ctx2 = Mare.compiler.compile([source], :refer)
 
     t_link_g = ctx1.namespace[source]["Greeting"].as(Mare::Program::Type::Link)
     f_link_g = t_link_g.make_func_link_simple("greet")
@@ -37,7 +37,7 @@ describe Mare::Compiler::Refer do
         )
     SOURCE
 
-    ctx = Mare::Compiler.compile([source], :refer)
+    ctx = Mare.compiler.compile([source], :refer)
 
     main = ctx.namespace.main_type!(ctx)
     func = main.resolve(ctx).find_func!("new")
@@ -69,7 +69,7 @@ describe Mare::Compiler::Refer do
         x
     SOURCE
 
-    ctx = Mare::Compiler.compile([source], :refer)
+    ctx = Mare.compiler.compile([source], :refer)
 
     main = ctx.namespace.main_type!(ctx)
     func = main.resolve(ctx).find_func!("new")
@@ -126,7 +126,7 @@ describe Mare::Compiler::Refer do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :refer)
+      Mare.compiler.compile([source], :refer)
     end
   end
 
@@ -166,7 +166,7 @@ describe Mare::Compiler::Refer do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :refer)
+      Mare.compiler.compile([source], :refer)
     end
   end
 
@@ -184,7 +184,7 @@ describe Mare::Compiler::Refer do
         )
     SOURCE
 
-    Mare::Compiler.compile([source], :refer)
+    Mare.compiler.compile([source], :refer)
   end
 
   pending "complains when a local variable name ends with an exclamation"

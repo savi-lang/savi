@@ -19,7 +19,7 @@ describe Mare::Compiler::Privacy do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :privacy)
+      Mare.compiler.compile([source], :privacy)
     end
   end
 
@@ -41,6 +41,6 @@ describe Mare::Compiler::Privacy do
         Generic(String).new("example").value_trait
     SOURCE
 
-    Mare::Compiler.compile([source], :privacy)
+    Mare.compiler.compile([source], :privacy)
   end
 end

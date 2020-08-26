@@ -17,7 +17,7 @@ describe Mare::Compiler::Reach do
         i.foo
     SOURCE
 
-    ctx = Mare::Compiler.compile([source], :reach)
+    ctx = Mare.compiler.compile([source], :reach)
 
     i_foo = ctx.infer.for_func_simple(ctx, source, "Trait", "foo").reified
     c_foo = ctx.infer.for_func_simple(ctx, source, "Class", "foo").reified

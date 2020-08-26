@@ -13,7 +13,7 @@ describe Mare::Compiler::Populate do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :populate)
+      Mare.compiler.compile([source], :populate)
     end
   end
 end

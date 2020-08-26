@@ -21,7 +21,7 @@ describe Mare::Compiler::Consumes do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :consumes)
+      Mare.compiler.compile([source], :consumes)
     end
   end
 
@@ -47,7 +47,7 @@ describe Mare::Compiler::Consumes do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :consumes)
+      Mare.compiler.compile([source], :consumes)
     end
   end
 
@@ -77,7 +77,7 @@ describe Mare::Compiler::Consumes do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :consumes)
+      Mare.compiler.compile([source], :consumes)
     end
   end
 
@@ -129,7 +129,7 @@ describe Mare::Compiler::Consumes do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :consumes)
+      Mare.compiler.compile([source], :consumes)
     end
   end
 
@@ -148,7 +148,7 @@ describe Mare::Compiler::Consumes do
         )
     SOURCE
 
-    Mare::Compiler.compile([source], :consumes)
+    Mare.compiler.compile([source], :consumes)
   end
 
   it "complains when a choice body uses a local consumed in an earlier cond" do
@@ -178,7 +178,7 @@ describe Mare::Compiler::Consumes do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :consumes)
+      Mare.compiler.compile([source], :consumes)
     end
   end
 
@@ -206,7 +206,7 @@ describe Mare::Compiler::Consumes do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :consumes)
+      Mare.compiler.compile([source], :consumes)
     end
   end
 
@@ -231,7 +231,7 @@ describe Mare::Compiler::Consumes do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :consumes)
+      Mare.compiler.compile([source], :consumes)
     end
   end
 
@@ -256,7 +256,7 @@ describe Mare::Compiler::Consumes do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :consumes)
+      Mare.compiler.compile([source], :consumes)
     end
   end
 
@@ -282,7 +282,7 @@ describe Mare::Compiler::Consumes do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :consumes)
+      Mare.compiler.compile([source], :consumes)
     end
   end
 
@@ -294,7 +294,7 @@ describe Mare::Compiler::Consumes do
         while True (x | --x)
     SOURCE
 
-    Mare::Compiler.compile([source], :consumes)
+    Mare.compiler.compile([source], :consumes)
   end
 
   it "complains when a loop cond uses a local consumed before the loop" do
@@ -321,7 +321,7 @@ describe Mare::Compiler::Consumes do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :consumes)
+      Mare.compiler.compile([source], :consumes)
     end
   end
 
@@ -357,7 +357,7 @@ describe Mare::Compiler::Consumes do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :consumes)
+      Mare.compiler.compile([source], :consumes)
     end
   end
 end

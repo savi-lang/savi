@@ -10,8 +10,8 @@ describe Mare::Compiler::ReferType do
         Greeting.greet(env)
     SOURCE
 
-    ctx1 = Mare::Compiler.compile([source], :refer_type)
-    ctx2 = Mare::Compiler.compile([source], :refer_type)
+    ctx1 = Mare.compiler.compile([source], :refer_type)
+    ctx2 = Mare.compiler.compile([source], :refer_type)
 
     t_link_g = ctx1.namespace[source]["Greeting"].as(Mare::Program::Type::Link)
     f_link_g = t_link_g.make_func_link_simple("greet")

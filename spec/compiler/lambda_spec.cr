@@ -6,7 +6,7 @@ describe Mare::Compiler::Lambda do
         apple = ^(Fruit.new("apple").flavor)
     SOURCE
 
-    ctx = Mare::Compiler.compile([source], :lambda)
+    ctx = Mare.compiler.compile([source], :lambda)
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "thunk")
     func.body.not_nil!.to_a.should eq [:group, ":",
@@ -39,7 +39,7 @@ describe Mare::Compiler::Lambda do
         apple = ^(Fruit.new(^1, ^2).flavor)
     SOURCE
 
-    ctx = Mare::Compiler.compile([source], :lambda)
+    ctx = Mare.compiler.compile([source], :lambda)
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "lambdas")
     func.body.not_nil!.to_a.should eq [:group, ":",
@@ -83,7 +83,7 @@ describe Mare::Compiler::Lambda do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :lambda)
+      Mare.compiler.compile([source], :lambda)
     end
   end
 end

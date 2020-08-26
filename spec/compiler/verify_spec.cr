@@ -18,7 +18,7 @@ describe Mare::Compiler::Verify do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :verify)
+      Mare.compiler.compile([source], :verify)
     end
   end
 
@@ -35,7 +35,7 @@ describe Mare::Compiler::Verify do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :verify)
+      Mare.compiler.compile([source], :verify)
     end
   end
 
@@ -52,7 +52,7 @@ describe Mare::Compiler::Verify do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :verify)
+      Mare.compiler.compile([source], :verify)
     end
   end
 
@@ -75,7 +75,7 @@ describe Mare::Compiler::Verify do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :verify)
+      Mare.compiler.compile([source], :verify)
     end
   end
 
@@ -93,7 +93,7 @@ describe Mare::Compiler::Verify do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :verify)
+      Mare.compiler.compile([source], :verify)
     end
   end
 
@@ -116,7 +116,7 @@ describe Mare::Compiler::Verify do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :verify)
+      Mare.compiler.compile([source], :verify)
     end
   end
 
@@ -139,7 +139,7 @@ describe Mare::Compiler::Verify do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :verify)
+      Mare.compiler.compile([source], :verify)
     end
   end
 
@@ -167,7 +167,7 @@ describe Mare::Compiler::Verify do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :verify)
+      Mare.compiler.compile([source], :verify)
     end
   end
 
@@ -191,7 +191,7 @@ describe Mare::Compiler::Verify do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :verify)
+      Mare.compiler.compile([source], :verify)
     end
   end
 
@@ -223,7 +223,7 @@ describe Mare::Compiler::Verify do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :verify)
+      Mare.compiler.compile([source], :verify)
     end
   end
 
@@ -247,7 +247,7 @@ describe Mare::Compiler::Verify do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :verify)
+      Mare.compiler.compile([source], :verify)
     end
   end
 
@@ -284,7 +284,7 @@ describe Mare::Compiler::Verify do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :verify)
+      Mare.compiler.compile([source], :verify)
     end
   end
 
@@ -324,7 +324,7 @@ describe Mare::Compiler::Verify do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :verify)
+      Mare.compiler.compile([source], :verify)
     end
   end
 end

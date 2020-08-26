@@ -7,7 +7,7 @@ describe Mare::Compiler::Macros do
           yield True
       SOURCE
 
-      ctx = Mare::Compiler.compile([source], :macros)
+      ctx = Mare.compiler.compile([source], :macros)
 
       func = ctx.namespace.find_func!(ctx, source, "Main", "new")
       func.body.not_nil!.to_a.should eq [:group, ":",
@@ -47,7 +47,7 @@ describe Mare::Compiler::Macros do
       MSG
 
       expect_raises Mare::Error, expected do
-        Mare::Compiler.compile([source], :macros)
+        Mare.compiler.compile([source], :macros)
       end
     end
   end

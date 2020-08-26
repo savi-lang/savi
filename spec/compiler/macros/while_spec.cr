@@ -7,7 +7,7 @@ describe Mare::Compiler::Macros do
           while True 42
       SOURCE
 
-      ctx = Mare::Compiler.compile([source], :macros)
+      ctx = Mare.compiler.compile([source], :macros)
 
       func = ctx.namespace.find_func!(ctx, source, "Main", "new")
       func.body.not_nil!.to_a.should eq [:group, ":",
@@ -55,7 +55,7 @@ describe Mare::Compiler::Macros do
       MSG
 
       expect_raises Mare::Error, expected do
-        Mare::Compiler.compile([source], :macros)
+        Mare.compiler.compile([source], :macros)
       end
     end
 
@@ -85,7 +85,7 @@ describe Mare::Compiler::Macros do
       MSG
 
       expect_raises Mare::Error, expected do
-        Mare::Compiler.compile([source], :macros)
+        Mare.compiler.compile([source], :macros)
       end
     end
 
@@ -96,7 +96,7 @@ describe Mare::Compiler::Macros do
           while True (42 | 7)
       SOURCE
 
-      ctx = Mare::Compiler.compile([source], :macros)
+      ctx = Mare.compiler.compile([source], :macros)
 
       func = ctx.namespace.find_func!(ctx, source, "Main", "new")
       func.body.not_nil!.to_a.should eq [:group, ":",
@@ -145,7 +145,7 @@ describe Mare::Compiler::Macros do
       MSG
 
       expect_raises Mare::Error, expected do
-        Mare::Compiler.compile([source], :macros)
+        Mare.compiler.compile([source], :macros)
       end
     end
   end

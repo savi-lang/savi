@@ -10,7 +10,7 @@ class Mare::Server
     @wire = LSP::Wire.new(@stdin, @stdout)
     @open_files = {} of URI => String
     @compiled = false
-    @ctx = nil.as Mare::Compiler::Context?
+    @ctx = nil.as Compiler::Context?
     @workspace = ""
 
     @use_snippet_completions = false
@@ -134,7 +134,7 @@ class Mare::Server
     source_pos = Source::Pos.point(source, pos.line.to_i32, pos.character.to_i32)
 
     if @ctx.nil?
-      @ctx = Compiler.compile(sources, :serve_lsp)
+      @ctx = Mare.compiler.compile(sources, :serve_lsp)
     end
     ctx = @ctx.not_nil!
 
@@ -192,7 +192,7 @@ class Mare::Server
     info = [] of String
     begin
       if @ctx.nil?
-        @ctx = Compiler.compile(sources, :serve_lsp)
+        @ctx = Mare.compiler.compile(sources, :serve_lsp)
       end
       ctx = @ctx.not_nil!
 
@@ -351,7 +351,7 @@ class Mare::Server
     is_mare_error = true
 
     begin
-      Compiler.compile(sources, :completeness)
+      Mare.compiler.compile(sources, :completeness)
     rescue e # Error and Pegmatite::Pattern::MatchError are Compiling errors, others are Compiler errors
       err = e
     end

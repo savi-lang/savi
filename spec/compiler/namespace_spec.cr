@@ -6,8 +6,8 @@ describe Mare::Compiler::Namespace do
         env.out.print("Hello, World")
     SOURCE
 
-    ctx1 = Mare::Compiler.compile([source], :namespace)
-    ctx2 = Mare::Compiler.compile([source], :namespace)
+    ctx1 = Mare.compiler.compile([source], :namespace)
+    ctx2 = Mare.compiler.compile([source], :namespace)
 
     ctx1.namespace[source].should eq ctx2.namespace[source]
   end
@@ -31,7 +31,7 @@ describe Mare::Compiler::Namespace do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :namespace)
+      Mare.compiler.compile([source], :namespace)
     end
   end
 
@@ -61,7 +61,7 @@ describe Mare::Compiler::Namespace do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :namespace)
+      Mare.compiler.compile([source], :namespace)
     end
   end
 
@@ -83,7 +83,7 @@ describe Mare::Compiler::Namespace do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :namespace)
+      Mare.compiler.compile([source], :namespace)
     end
   end
 
@@ -98,7 +98,7 @@ describe Mare::Compiler::Namespace do
     :ffi LibPony // defined in the prelude, but private, so no conflict here
     SOURCE
 
-    Mare::Compiler.compile([source], :namespace)
+    Mare.compiler.compile([source], :namespace)
   end
 
   # TODO: Figure out how to test these in our test suite - they need a library.

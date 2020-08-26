@@ -6,8 +6,8 @@ describe Mare::Compiler::Import do
         env.out.print("Hello, World")
     SOURCE
 
-    ctx1 = Mare::Compiler.compile([source], :import)
-    ctx2 = Mare::Compiler.compile([source], :import)
+    ctx1 = Mare.compiler.compile([source], :import)
+    ctx2 = Mare.compiler.compile([source], :import)
 
     ctx1.program.libraries.should eq ctx2.program.libraries
   end

@@ -119,20 +119,20 @@ module Mare
 
     def self.compile(options, backtrace = false)
       _add_backtrace backtrace do
-        Mare::Compiler.compile(Dir.current, :binary, options)
+        Mare.compiler.compile(Dir.current, :binary, options)
         0
       end
     end
 
     def self.run(options, backtrace = false)
       _add_backtrace backtrace do
-        Mare::Compiler.compile(Dir.current, :eval, options).eval.exitcode
+        Mare.compiler.compile(Dir.current, :eval, options).eval.exitcode
       end
     end
 
     def self.eval(code, options, backtrace = false)
       _add_backtrace backtrace do
-        Mare::Compiler.eval(code, options)
+        Mare.compiler.eval(code, options)
       end
     end
   end

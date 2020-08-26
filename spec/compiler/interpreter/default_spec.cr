@@ -21,7 +21,7 @@ describe Mare::Compiler::Interpreter::Default do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :import)
+      Mare.compiler.compile([source], :import)
     end
   end
 
@@ -40,7 +40,7 @@ describe Mare::Compiler::Interpreter::Default do
     MSG
 
     expect_raises Mare::Error, expected do
-      Mare::Compiler.compile([source], :import)
+      Mare.compiler.compile([source], :import)
     end
   end
 
@@ -50,7 +50,7 @@ describe Mare::Compiler::Interpreter::Default do
       :fun greeting (String | None)
     SOURCE
 
-    ctx = Mare::Compiler.compile([source], :import)
+    ctx = Mare.compiler.compile([source], :import)
 
     greeter = ctx.program.types.first
     greeting = greeter.functions.first

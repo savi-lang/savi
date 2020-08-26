@@ -8,7 +8,7 @@ describe Mare::Compiler::ServeDefinition do
         example = A.new
     SOURCE
 
-    ctx = Mare::Compiler.compile([source], :serve_definition)
+    ctx = Mare.compiler.compile([source], :serve_definition)
 
     pos = ctx.serve_definition[Mare::Source::Pos.point(source, 4, 14)].not_nil!
     pos.row.should eq 0
@@ -26,7 +26,7 @@ describe Mare::Compiler::ServeDefinition do
         example2 = example1 * 1
     SOURCE
 
-    ctx = Mare::Compiler.compile([source], :serve_definition)
+    ctx = Mare.compiler.compile([source], :serve_definition)
 
     pos = ctx.serve_definition[Mare::Source::Pos.point(source, 3, 21)].not_nil!
     pos.row.should eq 2
@@ -60,7 +60,7 @@ describe Mare::Compiler::ServeDefinition do
         example2 = example1.test
     SOURCE
 
-    ctx = Mare::Compiler.compile([source], :serve_definition)
+    ctx = Mare.compiler.compile([source], :serve_definition)
 
     pos = ctx.serve_definition[Mare::Source::Pos.point(source, 9, 18)].not_nil!
     pos.row.should eq 1

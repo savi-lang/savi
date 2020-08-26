@@ -22,7 +22,7 @@ describe Mare::Compiler::Sugar do
       ]]
     ]
 
-    ctx = Mare::Compiler.compile([source], :sugar)
+    ctx = Mare.compiler.compile([source], :sugar)
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "return_none")
     func.body.not_nil!.to_a.should eq [:group, ":",
@@ -37,7 +37,7 @@ describe Mare::Compiler::Sugar do
     ]
 
     # Compiling again should yield an equivalent program tree:
-    ctx2 = Mare::Compiler.compile([source], :sugar)
+    ctx2 = Mare.compiler.compile([source], :sugar)
     ctx.program.libraries.should eq ctx2.program.libraries
   end
 
@@ -61,7 +61,7 @@ describe Mare::Compiler::Sugar do
       ]],
     ]
 
-    ctx = Mare::Compiler.compile([ast], :sugar)
+    ctx = Mare.compiler.compile([ast], :sugar)
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "prop_assign")
     func.body.not_nil!.to_a.should eq [:group, ":",
@@ -73,7 +73,7 @@ describe Mare::Compiler::Sugar do
     ]
 
     # Compiling again should yield an equivalent program tree:
-    ctx2 = Mare::Compiler.compile([source], :sugar)
+    ctx2 = Mare.compiler.compile([source], :sugar)
     ctx.program.libraries.should eq ctx2.program.libraries
   end
 
@@ -102,7 +102,7 @@ describe Mare::Compiler::Sugar do
       ]],
     ]
 
-    ctx = Mare::Compiler.compile([ast], :sugar)
+    ctx = Mare.compiler.compile([ast], :sugar)
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "prop_assign")
     func.body.not_nil!.to_a.should eq [:group, ":",
@@ -131,7 +131,7 @@ describe Mare::Compiler::Sugar do
     ]
 
     # Compiling again should yield an equivalent program tree:
-    ctx2 = Mare::Compiler.compile([source], :sugar)
+    ctx2 = Mare.compiler.compile([source], :sugar)
     ctx.program.libraries.should eq ctx2.program.libraries
   end
 
@@ -151,7 +151,7 @@ describe Mare::Compiler::Sugar do
       ]],
     ]
 
-    ctx = Mare::Compiler.compile([ast], :sugar)
+    ctx = Mare.compiler.compile([ast], :sugar)
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "plus")
     func.body.not_nil!.to_a.should eq [:group, ":",
@@ -163,7 +163,7 @@ describe Mare::Compiler::Sugar do
     ]
 
     # Compiling again should yield an equivalent program tree:
-    ctx2 = Mare::Compiler.compile([source], :sugar)
+    ctx2 = Mare.compiler.compile([source], :sugar)
     ctx.program.libraries.should eq ctx2.program.libraries
   end
 
@@ -191,7 +191,7 @@ describe Mare::Compiler::Sugar do
       ]],
     ]
 
-    ctx = Mare::Compiler.compile([ast], :sugar)
+    ctx = Mare.compiler.compile([ast], :sugar)
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "countdown")
     func.body.not_nil!.to_a.should eq [:group, ":",
@@ -207,7 +207,7 @@ describe Mare::Compiler::Sugar do
     ]
 
     # Compiling again should yield an equivalent program tree:
-    ctx2 = Mare::Compiler.compile([source], :sugar)
+    ctx2 = Mare.compiler.compile([source], :sugar)
     ctx.program.libraries.should eq ctx2.program.libraries
   end
 
@@ -227,7 +227,7 @@ describe Mare::Compiler::Sugar do
       ]],
     ]
 
-    ctx = Mare::Compiler.compile([ast], :sugar)
+    ctx = Mare.compiler.compile([ast], :sugar)
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "square")
     func.body.not_nil!.to_a.should eq [:group, ":",
@@ -239,7 +239,7 @@ describe Mare::Compiler::Sugar do
     ]
 
     # Compiling again should yield an equivalent program tree:
-    ctx2 = Mare::Compiler.compile([source], :sugar)
+    ctx2 = Mare.compiler.compile([source], :sugar)
     ctx.program.libraries.should eq ctx2.program.libraries
   end
 
@@ -292,7 +292,7 @@ describe Mare::Compiler::Sugar do
       ]],
     ]
 
-    ctx = Mare::Compiler.compile([ast], :sugar)
+    ctx = Mare.compiler.compile([ast], :sugar)
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "chained")
     func.body.not_nil!.to_a.should eq [:group, ":",
@@ -334,7 +334,7 @@ describe Mare::Compiler::Sugar do
     ]
 
     # Compiling again should yield an equivalent program tree:
-    ctx2 = Mare::Compiler.compile([source], :sugar)
+    ctx2 = Mare.compiler.compile([source], :sugar)
     ctx.program.libraries.should eq ctx2.program.libraries
   end
 
@@ -358,7 +358,7 @@ describe Mare::Compiler::Sugar do
       ]],
     ]
 
-    ctx = Mare::Compiler.compile([ast], :sugar)
+    ctx = Mare.compiler.compile([ast], :sugar)
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "square")
     func.body.not_nil!.to_a.should eq [:group, ":",
@@ -370,7 +370,7 @@ describe Mare::Compiler::Sugar do
     ]
 
     # Compiling again should yield an equivalent program tree:
-    ctx2 = Mare::Compiler.compile([source], :sugar)
+    ctx2 = Mare.compiler.compile([source], :sugar)
     ctx.program.libraries.should eq ctx2.program.libraries
   end
 
@@ -392,7 +392,7 @@ describe Mare::Compiler::Sugar do
       ]],
     ]
 
-    ctx = Mare::Compiler.compile([ast], :sugar)
+    ctx = Mare.compiler.compile([ast], :sugar)
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "selfish")
     func.body.not_nil!.to_a.should eq [:group, ":",
@@ -405,7 +405,7 @@ describe Mare::Compiler::Sugar do
     ]
 
     # Compiling again should yield an equivalent program tree:
-    ctx2 = Mare::Compiler.compile([source], :sugar)
+    ctx2 = Mare.compiler.compile([source], :sugar)
     ctx.program.libraries.should eq ctx2.program.libraries
   end
 
@@ -425,7 +425,7 @@ describe Mare::Compiler::Sugar do
       ]]
     ]
 
-    ctx = Mare::Compiler.compile([ast], :sugar)
+    ctx = Mare.compiler.compile([ast], :sugar)
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "new")
     func.body.not_nil!.to_a.should eq [:group, ":",
@@ -434,7 +434,7 @@ describe Mare::Compiler::Sugar do
     ]
 
     # Compiling again should yield an equivalent program tree:
-    ctx2 = Mare::Compiler.compile([source], :sugar)
+    ctx2 = Mare.compiler.compile([source], :sugar)
     ctx.program.libraries.should eq ctx2.program.libraries
   end
 
@@ -457,7 +457,7 @@ describe Mare::Compiler::Sugar do
       ]],
     ]
 
-    ctx = Mare::Compiler.compile([ast], :sugar)
+    ctx = Mare.compiler.compile([ast], :sugar)
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "param_assigns")
     func.body.not_nil!.to_a.should eq [:group, ":",
@@ -483,7 +483,7 @@ describe Mare::Compiler::Sugar do
     ]
 
     # Compiling again should yield an equivalent program tree:
-    ctx2 = Mare::Compiler.compile([source], :sugar)
+    ctx2 = Mare.compiler.compile([source], :sugar)
     ctx.program.libraries.should eq ctx2.program.libraries
   end
 
@@ -515,7 +515,7 @@ describe Mare::Compiler::Sugar do
       ]],
     ]
 
-    ctx = Mare::Compiler.compile([ast], :sugar)
+    ctx = Mare.compiler.compile([ast], :sugar)
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "logical")
     func.body.not_nil!.to_a.should eq [:group, ":",
@@ -538,7 +538,7 @@ describe Mare::Compiler::Sugar do
     ]
 
     # Compiling again should yield an equivalent program tree:
-    ctx2 = Mare::Compiler.compile([source], :sugar)
+    ctx2 = Mare.compiler.compile([source], :sugar)
     ctx.program.libraries.should eq ctx2.program.libraries
   end
 
@@ -583,7 +583,7 @@ describe Mare::Compiler::Sugar do
       ]]
     ]
 
-    ctx = Mare::Compiler.compile([ast], :sugar)
+    ctx = Mare.compiler.compile([ast], :sugar)
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "type_cast")
     func.body.not_nil!.to_a.should eq [:group, ":",
@@ -626,7 +626,7 @@ describe Mare::Compiler::Sugar do
     ]
 
     # Compiling again should yield an equivalent program tree:
-    ctx2 = Mare::Compiler.compile([source], :sugar)
+    ctx2 = Mare.compiler.compile([source], :sugar)
     ctx.program.libraries.should eq ctx2.program.libraries
   end
 end
