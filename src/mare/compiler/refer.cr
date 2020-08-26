@@ -86,16 +86,9 @@ module Mare::Compiler::Refer
     def touch(ctx, node : AST::Identifier)
       name = node.value
 
-      is_sub_local = false
-      # If this is an @ symbol, it refers to the this/self object.
-      info =
-        if name == "@"
-          Self::INSTANCE
-        else
-          # First, try to resolve as local, then as type, else it's unresolved.
-          is_sub_local = @sub_locals[name]?
-          locals[name]? || @refer_type[node]? || Unresolved::INSTANCE
-        end
+      # First, try to resolve as local, then as type, else it's unresolved.
+      is_sub_local = @sub_locals[name]?
+      info = locals[name]? || @refer_type[node]? || Unresolved::INSTANCE
 
       # Raise an error if trying to use an "incomplete" union of locals.
       if info.is_a?(LocalUnion) && (info.incomplete || !info.caught?)

@@ -63,6 +63,8 @@ module Mare::Compiler::ReferType
     end
 
     def find_type?(ctx, node : AST::Identifier)
+      return Refer::Self::INSTANCE if node.value == "@"
+
       found = @analysis.type_param_for?(node.value)
       return found if found
 
