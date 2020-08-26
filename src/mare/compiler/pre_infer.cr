@@ -676,15 +676,18 @@ module Mare::Compiler::PreInfer
     end
 
     def analyze_func(ctx, f, f_link, t_analysis) : Analysis
-      FuncVisitor.new(
-        f,
-        f_link,
-        Analysis.new,
-        ctx.inventory[f_link],
-        ctx.jumps[f_link],
-        ctx.classify[f_link],
-        ctx.refer[f_link],
-      ).tap(&.run(ctx)).analysis
+      inventory = ctx.inventory[f_link]
+      jumps = ctx.jumps[f_link]
+      classify = ctx.classify[f_link]
+      refer = ctx.refer[f_link]
+      deps = {inventory, jumps, classify, refer}
+      prev = ctx.prev_ctx.try(&.pre_infer)
+
+      maybe_from_func_cache(ctx, prev, f, f_link, deps) do
+        FuncVisitor.new(
+          f, f_link, Analysis.new, inventory, jumps, classify, refer,
+        ).tap(&.run(ctx)).analysis
+      end
     end
   end
 end

@@ -1,8 +1,15 @@
 abstract class Mare::Compiler::Pass::Analyze(TypeAliasAnalysis, TypeAnalysis, FuncAnalysis)
+  getter cache_info_for_alias
+  getter cache_info_for_type
+  getter cache_info_for_func
+
   def initialize
     @for_alias = {} of Program::TypeAlias::Link => TypeAliasAnalysis
     @for_type = {} of Program::Type::Link => TypeAnalysis
     @for_func = {} of Program::Function::Link => FuncAnalysis
+    @cache_info_for_alias = {} of Program::TypeAlias::Link => UInt64
+    @cache_info_for_type = {} of Program::Type::Link => UInt64
+    @cache_info_for_func = {} of Program::Function::Link => UInt64
   end
 
   def [](t_link : Program::TypeAlias::Link); @for_alias[t_link] end
@@ -70,6 +77,54 @@ abstract class Mare::Compiler::Pass::Analyze(TypeAliasAnalysis, TypeAnalysis, Fu
 
     # Generate the analysis for the function and save it to our map.
     @for_func[f_link] = analyze_func(ctx, f, f_link, t_analysis)
+  end
+
+  # Optionally, the analyze_type_alias method of the subclass can use this function
+  # to cache the analysis from the previous compiler run into this one,
+  # based on whether the type alias itself or the list of deps has changed.
+  private def maybe_from_type_alias_cache(ctx, prev, t, t_link, deps) : FuncAnalysis
+    if prev \
+    && (prev_hash = prev.cache_info_for_alias[t_link]?; prev_hash) \
+    && (prev_hash == {t, deps}.hash)
+      cache_info_for_alias[t_link] = prev_hash
+      prev[t_link]
+    else
+      puts "    RERUN . #{self.class} #{t_link.show}" if prev && ctx.options.print_perf
+      cache_info_for_alias[t_link] = {t, deps}.hash
+      yield
+    end
+  end
+
+  # Optionally, the analyze_type method of the subclass can use this function
+  # to cache the analysis from the previous compiler run into this one,
+  # based on whether the type itself or the list of deps has changed.
+  private def maybe_from_type_cache(ctx, prev, t, t_link, deps) : FuncAnalysis
+    if prev \
+    && (prev_hash = prev.cache_info_for_type[t_link]?; prev_hash) \
+    && (prev_hash == {t, deps}.hash)
+      cache_info_for_type[t_link] = prev_hash
+      prev[t_link]
+    else
+      puts "    RERUN . #{self.class} #{t_link.show}" if prev && ctx.options.print_perf
+      cache_info_for_type[t_link] = {t, deps}.hash
+      yield
+    end
+  end
+
+  # Optionally, the analyze_func method of the subclass can use this function
+  # to cache the analysis from the previous compiler run into this one,
+  # based on whether the function itself or the list of deps has changed.
+  private def maybe_from_func_cache(ctx, prev, f, f_link, deps) : FuncAnalysis
+    if prev \
+    && (prev_hash = prev.cache_info_for_func[f_link]?; prev_hash) \
+    && (prev_hash == {f, deps}.hash)
+      cache_info_for_func[f_link] = prev_hash
+      prev[f_link]
+    else
+      puts "    RERUN . #{self.class} #{f_link.show}" if prev && ctx.options.print_perf
+      cache_info_for_func[f_link] = {f, deps}.hash
+      yield
+    end
   end
 
   # Required hook to make the pass create an analysis for the given type alias.

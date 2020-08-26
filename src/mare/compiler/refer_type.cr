@@ -113,45 +113,58 @@ module Mare::Compiler::ReferType
     end
 
     def analyze_type_alias(ctx, t, t_link) : Analysis
-      t_analysis = Analysis.new
-
-      observe_type_params(ctx, t, t_link, t_analysis)
-
-      # Run as a visitor on the ident itself and every type param.
       namespace = ctx.namespace[t.ident.pos.source]
-      visitor = Visitor.new(t_analysis, namespace)
-      t.ident.accept(ctx, visitor)
-      t.params.try(&.accept(ctx, visitor))
+      deps = namespace
+      prev = ctx.prev_ctx.try(&.refer_type)
 
-      # Additionally, run on the target expression as well
-      # (this is the part that is unique to a TypeAlias vs a Type).
-      t.target.accept(ctx, visitor)
+      maybe_from_type_alias_cache(ctx, prev, t, t_link, deps) do
+        t_analysis = Analysis.new
+        observe_type_params(ctx, t, t_link, t_analysis)
 
-      visitor.analysis
+        # Run as a visitor on the ident itself and every type param.
+        visitor = Visitor.new(t_analysis, namespace)
+        t.ident.accept(ctx, visitor)
+        t.params.try(&.accept(ctx, visitor))
+
+        # Additionally, run on the target expression as well
+        # (this is the part that is unique to a TypeAlias vs a Type).
+        t.target.accept(ctx, visitor)
+
+        visitor.analysis
+      end
     end
 
     def analyze_type(ctx, t, t_link) : Analysis
-      t_analysis = Analysis.new
-
-      observe_type_params(ctx, t, t_link, t_analysis)
-
-      # Run as a visitor on the ident itself and every type param.
       namespace = ctx.namespace[t.ident.pos.source]
-      visitor = Visitor.new(t_analysis, namespace)
-      t.ident.accept(ctx, visitor)
-      t.params.try(&.accept(ctx, visitor))
+      deps = namespace
+      prev = ctx.prev_ctx.try(&.refer_type)
 
-      visitor.analysis
+      maybe_from_type_cache(ctx, prev, t, t_link, deps) do
+        t_analysis = Analysis.new
+        observe_type_params(ctx, t, t_link, t_analysis)
+
+        # Run as a visitor on the ident itself and every type param.
+        visitor = Visitor.new(t_analysis, namespace)
+        t.ident.accept(ctx, visitor)
+        t.params.try(&.accept(ctx, visitor))
+
+        visitor.analysis
+      end
     end
 
     def analyze_func(ctx, f, f_link, t_analysis) : Analysis
-      f_analysis = Analysis.new(t_analysis)
       namespace = ctx.namespace[f.ident.pos.source]
-      visitor = Visitor.new(f_analysis, namespace)
+      deps = namespace
+      prev = ctx.prev_ctx.try(&.refer_type)
 
-      f.ast.accept(ctx, visitor)
+      maybe_from_func_cache(ctx, prev, f, f_link, deps) do
+        f_analysis = Analysis.new(t_analysis)
+        visitor = Visitor.new(f_analysis, namespace)
 
-      visitor.analysis
+        f.ast.accept(ctx, visitor)
+
+        visitor.analysis
+      end
     end
   end
 end

@@ -378,39 +378,54 @@ module Mare::Compiler::Refer
   class Pass < Compiler::Pass::Analyze(Analysis, Analysis, Analysis)
     def analyze_type_alias(ctx, t, t_link) : Analysis
       refer_type = ctx.refer_type[t_link]
-      visitor = Visitor.new(Analysis.new, refer_type)
+      deps = refer_type
+      prev = ctx.prev_ctx.try(&.refer)
 
-      t.params.try(&.accept(ctx, visitor))
-      t.target.accept(ctx, visitor)
+      maybe_from_type_alias_cache(ctx, prev, t, t_link, deps) do
+        visitor = Visitor.new(Analysis.new, refer_type)
 
-      visitor.analysis
+        t.params.try(&.accept(ctx, visitor))
+        t.target.accept(ctx, visitor)
+
+        visitor.analysis
+      end
     end
 
     def analyze_type(ctx, t, t_link) : Analysis
       refer_type = ctx.refer_type[t_link]
-      visitor = Visitor.new(Analysis.new, refer_type)
+      deps = refer_type
+      prev = ctx.prev_ctx.try(&.refer)
 
-      t.params.try(&.accept(ctx, visitor))
+      maybe_from_type_cache(ctx, prev, t, t_link, deps) do
+        visitor = Visitor.new(Analysis.new, refer_type)
 
-      visitor.analysis
+        t.params.try(&.accept(ctx, visitor))
+
+        visitor.analysis
+      end
     end
 
     def analyze_func(ctx, f, f_link, t_analysis) : Analysis
       refer_type = ctx.refer_type[f_link]
       jumps = ctx.jumps[f_link]
-      visitor = Visitor.new(Analysis.new, refer_type, jumps)
+      deps = {refer_type, jumps}
+      prev = ctx.prev_ctx.try(&.refer)
 
-      f.params.try(&.terms.each { |param|
-        param.accept(ctx, visitor)
-        visitor.create_param_local(param)
-      })
-      f.ret.try(&.accept(ctx, visitor))
-      f.body.try(&.accept(ctx, visitor))
-      f.yield_out.try(&.accept(ctx, visitor))
-      f.yield_in.try(&.accept(ctx, visitor))
+      maybe_from_func_cache(ctx, prev, f, f_link, deps) do
+        visitor = Visitor.new(Analysis.new, refer_type, jumps)
 
-      visitor.analysis.tap do |f_analysis|
-        f.body.try { |body| f_analysis.set_scope(body, visitor) }
+        f.params.try(&.terms.each { |param|
+          param.accept(ctx, visitor)
+          visitor.create_param_local(param)
+        })
+        f.ret.try(&.accept(ctx, visitor))
+        f.body.try(&.accept(ctx, visitor))
+        f.yield_out.try(&.accept(ctx, visitor))
+        f.yield_in.try(&.accept(ctx, visitor))
+
+        visitor.analysis.tap do |f_analysis|
+          f.body.try { |body| f_analysis.set_scope(body, visitor) }
+        end
       end
     end
   end

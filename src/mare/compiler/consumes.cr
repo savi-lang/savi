@@ -207,15 +207,20 @@ module Mare::Compiler::Consumes
     def analyze_func(ctx, f, f_link, t_analysis) : Nil
       refer = ctx.refer[f_link]
       jumps = ctx.jumps[f_link]
-      visitor = Visitor.new(refer, jumps)
+      deps = {refer, jumps}
+      prev = ctx.prev_ctx.try(&.consumes)
 
-      f.params.try(&.accept(ctx, visitor))
-      f.ret.try(&.accept(ctx, visitor))
-      f.body.try(&.accept(ctx, visitor))
-      f.yield_out.try(&.accept(ctx, visitor))
-      f.yield_in.try(&.accept(ctx, visitor))
+      maybe_from_func_cache(ctx, prev, f, f_link, deps) do
+        visitor = Visitor.new(refer, jumps)
 
-      nil # no analysis output
+        f.params.try(&.accept(ctx, visitor))
+        f.ret.try(&.accept(ctx, visitor))
+        f.body.try(&.accept(ctx, visitor))
+        f.yield_out.try(&.accept(ctx, visitor))
+        f.yield_in.try(&.accept(ctx, visitor))
+
+        nil # no analysis output
+      end
     end
   end
 end

@@ -205,16 +205,21 @@ module Mare::Compiler::Classify
 
     def analyze_func(ctx, f, f_link, t_analysis) : Analysis
       refer_type = ctx.refer_type[f_link]
-      visitor = Visitor.new(Analysis.new, refer_type)
+      deps = refer_type
+      prev = ctx.prev_ctx.try(&.classify)
 
-      f.params.try(&.accept(ctx, visitor))
-      f.ret.try(&.accept(ctx, visitor))
-      visitor.type_expr_visit(ctx, f.ret)
-      f.body.try(&.accept(ctx, visitor))
-      visitor.type_expr_visit(ctx, f.yield_out)
-      visitor.type_expr_visit(ctx, f.yield_in)
+      maybe_from_func_cache(ctx, prev, f, f_link, deps) do
+        visitor = Visitor.new(Analysis.new, refer_type)
 
-      visitor.analysis
+        f.params.try(&.accept(ctx, visitor))
+        f.ret.try(&.accept(ctx, visitor))
+        visitor.type_expr_visit(ctx, f.ret)
+        f.body.try(&.accept(ctx, visitor))
+        visitor.type_expr_visit(ctx, f.yield_out)
+        visitor.type_expr_visit(ctx, f.yield_in)
+
+        visitor.analysis
+      end
     end
   end
 end

@@ -64,6 +64,9 @@ class Mare::Program
       def resolve(ctx : Compiler::Context)
         ctx.program.libraries.find(&.source_library.path.==(@path)).not_nil!
       end
+      def show
+        path
+      end
     end
   end
 
@@ -128,6 +131,9 @@ class Mare::Program
       def resolve(ctx : Compiler::Context)
         @library.resolve(ctx).aliases.find(&.ident.value.==(@name)).not_nil!
       end
+      def show
+        "#{library.show} #{name}"
+      end
     end
   end
 
@@ -173,6 +179,9 @@ class Mare::Program
       end
       def resolve(ctx : Compiler::Context)
         @library.resolve(ctx).enum_members.find(&.ident.value.==(@name)).not_nil!
+      end
+      def show
+        "#{library.show} #{name}"
       end
     end
   end
@@ -351,6 +360,9 @@ class Mare::Program
       def make_func_link_simple(name : String)
         Function::Link.new(self, name, nil)
       end
+      def show
+        "#{library.show} #{name}"
+      end
     end
   end
 
@@ -473,6 +485,9 @@ class Mare::Program
         else
           functions.find { |f| f.ident.value == name && !f.has_tag?(:hygienic) }
         end.not_nil!
+      end
+      def show
+        "#{type.show}.#{name}#{" (hygienic)" if hygienic_id}"
       end
     end
   end

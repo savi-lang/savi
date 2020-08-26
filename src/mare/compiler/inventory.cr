@@ -73,12 +73,17 @@ module Mare::Compiler::Inventory
 
     def analyze_func(ctx, f, f_link, t_analysis) : Analysis
       refer = ctx.refer[f_link]
-      visitor = Visitor.new(Analysis.new, refer)
+      deps = refer
+      prev = ctx.prev_ctx.try(&.inventory)
 
-      f.params.try(&.accept(ctx, visitor))
-      f.body.try(&.accept(ctx, visitor))
+      maybe_from_func_cache(ctx, prev, f, f_link, deps) do
+        visitor = Visitor.new(Analysis.new, refer)
 
-      visitor.analysis
+        f.params.try(&.accept(ctx, visitor))
+        f.body.try(&.accept(ctx, visitor))
+
+        visitor.analysis
+      end
     end
   end
 end

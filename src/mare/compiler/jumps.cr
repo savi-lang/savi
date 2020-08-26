@@ -552,15 +552,20 @@ module Mare::Compiler::Jumps
 
     def analyze_func(ctx, f, f_link, t_analysis) : Analysis
       classify = ctx.classify[f_link]
-      visitor = Visitor.new(Analysis.new, classify, f.ast, ctx)
+      deps = classify
+      prev = ctx.prev_ctx.try(&.jumps)
 
-      f = f_link.resolve(ctx)
-      f.ident.try(&.accept(ctx, visitor))
-      f.params.try(&.accept(ctx, visitor))
-      f.ret.try(&.accept(ctx, visitor))
-      f.body.try(&.accept(ctx, visitor))
+      maybe_from_func_cache(ctx, prev, f, f_link, deps) do
+        visitor = Visitor.new(Analysis.new, classify, f.ast, ctx)
 
-      visitor.analysis
+        f = f_link.resolve(ctx)
+        f.ident.try(&.accept(ctx, visitor))
+        f.params.try(&.accept(ctx, visitor))
+        f.ret.try(&.accept(ctx, visitor))
+        f.body.try(&.accept(ctx, visitor))
+
+        visitor.analysis
+      end
     end
   end
 end
