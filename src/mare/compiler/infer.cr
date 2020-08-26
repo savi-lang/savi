@@ -428,7 +428,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     rf = ReifiedFunction.new(rt, f, mt)
     @map[rf] ||= (
       f_analysis = get_or_create_f_analysis(ctx, f)
-      ForReifiedFunc.new(ctx, f_analysis, ReifiedFuncAnalysis.new(ctx, rf), @types[rt], rf)
+      refer = ctx.refer[f]
+      ForReifiedFunc.new(ctx, f_analysis, ReifiedFuncAnalysis.new(ctx, rf), @types[rt], rf, refer)
       .tap { f_analysis.observe_reified_func(rf) }
     )
   end
@@ -451,7 +452,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   ) : ForReifiedType
     rt = ReifiedType.new(link, type_args)
     @types[rt]? || (
-      ft = @types[rt] = ForReifiedType.new(ctx, ReifiedTypeAnalysis.new(rt), rt)
+      refer = ctx.refer[link]
+      ft = @types[rt] = ForReifiedType.new(ctx, ReifiedTypeAnalysis.new(rt), rt, refer)
       ft.tap(&.initialize_assertions(ctx))
       .tap { |ft| get_or_create_t_analysis(link).observe_reified_type(ctx, rt) }
     )
@@ -462,8 +464,9 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     link : Program::TypeAlias::Link,
     type_args : Array(MetaType) = [] of MetaType
   ) : ForReifiedTypeAlias
+    refer = ctx.refer[link]
     rt_alias = ReifiedTypeAlias.new(link, type_args)
-    @aliases[rt_alias] ||= ForReifiedTypeAlias.new(ctx, rt_alias)
+    @aliases[rt_alias] ||= ForReifiedTypeAlias.new(ctx, rt_alias, refer)
   end
 
   def unwrap_alias(ctx : Context, rt_alias : ReifiedTypeAlias) : MetaType
@@ -727,7 +730,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       when Refer::TypeAlias
         MetaType.new_alias(reified_type_alias(ref.link_alias))
       when Refer::TypeParam
-        lookup_type_param(ref, refer, receiver)
+        lookup_type_param(ref, receiver)
       when Refer::Unresolved, nil
         case node.value
         when "iso", "trn", "val", "ref", "box", "tag", "non"
@@ -832,11 +835,12 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
 
     private getter ctx : Context
     getter reified : ReifiedTypeAlias
+    private getter refer : Refer::Analysis
 
-    def initialize(@ctx, @reified)
+    def initialize(@ctx, @reified, @refer)
     end
 
-    def lookup_type_param(ref : Refer::TypeParam, refer, receiver = nil)
+    def lookup_type_param(ref : Refer::TypeParam, receiver = nil)
       raise NotImplementedError.new(ref) if ref.parent_link != reified.link
 
       # Lookup the type parameter on self type and return the arg if present
@@ -845,7 +849,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
 
       # Use the default type argument if this type parameter has one.
       ref_default = ref.default
-      return type_expr(ref_default, ctx.refer[reified.link]) if ref_default
+      return type_expr(ref_default, refer) if ref_default
 
       raise "halt" if reified.is_complete?(ctx)
 
@@ -860,8 +864,9 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     private getter ctx : Context
     getter analysis : ReifiedTypeAnalysis
     getter reified : ReifiedType
+    private getter refer : Refer::Analysis
 
-    def initialize(@ctx, @analysis, @reified)
+    def initialize(@ctx, @analysis, @reified, @refer)
       @type_param_refinements = {} of Refer::TypeParam => Array(MetaType)
     end
 
@@ -877,19 +882,14 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       end
     end
 
-    def refer
-      ctx.refer[reified.link]
-    end
-
     def get_type_param_bound(index : Int32)
-      refer = ctx.refer[reified.link]
       param_node = reified.defn(ctx).params.not_nil!.terms[index]
       param_bound_node = refer[param_node].as(Refer::TypeParam).bound
 
       type_expr(param_bound_node.not_nil!, refer, nil)
     end
 
-    def lookup_type_param(ref : Refer::TypeParam, refer, receiver = nil)
+    def lookup_type_param(ref : Refer::TypeParam, receiver = nil)
       raise NotImplementedError.new(ref) if ref.parent_link != reified.link
 
       # Lookup the type parameter on self type and return the arg if present
@@ -898,7 +898,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
 
       # Use the default type argument if this type parameter has one.
       ref_default = ref.default
-      return type_expr(ref_default, ctx.refer[reified.link]) if ref_default
+      return type_expr(ref_default, refer) if ref_default
 
       raise "halt" if reified.is_complete?(ctx)
 
@@ -951,12 +951,13 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
 
   class ForReifiedFunc < Mare::AST::Visitor
     private getter ctx : Context
+    private getter refer : Refer::Analysis
     getter f_analysis : FuncAnalysis
     getter analysis : ReifiedFuncAnalysis
     getter for_rt : ForReifiedType
     getter reified : ReifiedFunction
 
-    def initialize(@ctx, @f_analysis, @analysis, @for_rt, @reified)
+    def initialize(@ctx, @f_analysis, @analysis, @for_rt, @reified, @refer)
       @local_idents = Hash(Refer::Local, AST::Node).new
       @local_ident_overrides = Hash(AST::Node, AST::Node).new
       @redirects = Hash(AST::Node, AST::Node).new
@@ -975,10 +976,6 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     def ret
       # The ident is used as a fake local variable that represents the return.
       func.ident
-    end
-
-    def refer
-      ctx.refer[reified.link]
     end
 
     def classify
@@ -1123,8 +1120,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       ctx.infer.for_rt_alias(ctx, *args).reified
     end
 
-    def lookup_type_param(ref, refer = refer(), receiver = reified.receiver)
-      @for_rt.lookup_type_param(ref, refer, receiver)
+    def lookup_type_param(ref, receiver = reified.receiver)
+      @for_rt.lookup_type_param(ref, receiver)
     end
 
     def lookup_type_param_bound(type_param)
