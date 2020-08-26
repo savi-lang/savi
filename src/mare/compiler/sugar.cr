@@ -178,7 +178,7 @@ class Mare::Compiler::Sugar < Mare::AST::CopyOnMutateVisitor
         AST::Identifier.new("@").from(node)
       # PONY special case: uses the keyword `error` for the error statement.
       elsif node.value == "error"
-        AST::Identifier.new("error!").from(node)
+        AST::Jump.new(AST::Identifier.new("None").from(node), AST::Jump::Kind::Error).from(node)
       else
         node
       end
@@ -425,7 +425,7 @@ class Mare::Compiler::Sugar < Mare::AST::CopyOnMutateVisitor
           },
           {
             AST::Identifier.new("True").from(call_ident),
-            AST::Identifier.new("error!").from(call_ident),
+            AST::Jump.new(AST::Identifier.new("None").from(node), AST::Jump::Kind::Error).from(call_ident),
           },
         ] of {AST::Term, AST::Term}).from(node.op)
 

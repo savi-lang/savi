@@ -117,7 +117,16 @@ module Mare::Compiler::PreInfer
 
       # Create a fake local variable that represents the return value.
       # See also the #ret method.
-      @analysis[ret] = Infer::FuncBody.new(ret.pos)
+      @analysis[ret] = Infer::FuncBody.new(ret.pos,
+        @jumps.catches[ret]?.try(
+          &.select(&.kind.is_a? AST::Jump::Kind::Return).map do |jump|
+            inf = @analysis[jump]
+            raise NotImplementedError.new("Jump should be of 'return' kind") \
+              unless inf.is_a? Infer::JumpReturn
+            inf.as Infer::JumpReturn
+          end
+        ) || [] of Infer::JumpReturn,
+      )
 
       # Take note of the return type constraint if given.
       # For constructors, this is the self type and listed receiver cap.
@@ -188,8 +197,12 @@ module Mare::Compiler::PreInfer
         # and also of allowing inference if there is no explicit type.
         # We don't do this for constructors, since constructors implicitly return
         # self no matter what the last term of the body of the function is.
-        self[ret].as(Infer::FuncBody).assign(ctx, @analysis[func_body], func_body_pos) \
-          unless func.has_tag?(:constructor) || @jumps.always_error?(func_body)
+        unless func.has_tag?(:constructor) || @jumps.always_error?(func_body)
+          self[ret].as(Infer::FuncBody).assign(ctx, @analysis[func_body], func_body_pos)
+          @jumps.catches[func.ast]?.try(&.each do |jump|
+            self[ret].as(Infer::FuncBody).assign(ctx, self[jump.term], jump.pos)
+          end)
+        end
       end
 
       nil
@@ -265,19 +278,23 @@ module Mare::Compiler::PreInfer
         @analysis[node] = Infer::FixedSingleton.new(node.pos, node)
       when Refer::TypeParam
         @analysis[node] = Infer::FixedSingleton.new(node.pos, node, ref)
-      when Refer::Local
-        # If it's a local, track the possibly new node in our @local_idents map.
-        local_ident = lookup_local_ident(ref)
+      when Refer::LocalUnion, Refer::Local
+        local_ref =
+          if ref.is_a? Refer::LocalUnion
+            ref.list[0]
+          else
+            ref
+          end
+
+        local_ident = lookup_local_ident(local_ref)
         if local_ident
           @analysis.redirect(node, local_ident)
         else
-          @analysis[node] = ref.param_idx ? Infer::Param.new(node.pos) : Infer::Local.new(node.pos)
-          @local_idents[ref] = node
+          @analysis[node] = local_ref.param_idx ? Infer::Param.new(node.pos) : Infer::Local.new(node.pos)
+          @local_idents[local_ref] = node
         end
       when Refer::Self
         @analysis[node] = Infer::Self.new(node.pos)
-      when Refer::RaiseError
-        @analysis[node] = Infer::RaiseError.new(node.pos)
       when Refer::Unresolved
         # Leave the node as unresolved if this identifer is not a value.
         return if @classify.no_value?(node)
@@ -286,6 +303,23 @@ module Mare::Compiler::PreInfer
         Error.at node, "This identifer couldn't be resolved"
       else
         raise NotImplementedError.new(ref)
+      end
+    end
+
+    def touch(ctx : Context, node : AST::Jump)
+      term_info = @analysis[node.term.not_nil!]
+
+      @analysis[node] = case node.kind
+      when AST::Jump::Kind::Error
+        Infer::JumpError.new(node.pos, term_info)
+      when AST::Jump::Kind::Return
+        Infer::JumpReturn.new(node.pos, term_info)
+      when AST::Jump::Kind::Break
+        Infer::JumpBreak.new(node.pos, term_info)
+      when AST::Jump::Kind::Continue
+        Infer::JumpContinue.new(node.pos, term_info)
+      else
+        raise ""
       end
     end
 
@@ -328,7 +362,7 @@ module Mare::Compiler::PreInfer
         @analysis[node] =
           Infer::ArrayLiteral.new(node.pos, node.terms.map { |term| self[term] })
       when " "
-        ref = @refer[node.terms[0]]
+        ref = @refer[node.terms[0]]?
         if ref.is_a?(Refer::Local) && ref.defn == node.terms[0]
           local_ident = @local_idents[ref]
 
@@ -557,7 +591,7 @@ module Mare::Compiler::PreInfer
         {cond ? self[cond] : nil, self[body], @jumps.away?(body)}
       end
 
-      @analysis[node] = Infer::Phi.new(node.pos, branches)
+      @analysis[node] = Infer::Choice.new(node.pos, branches)
     end
 
     def touch(ctx : Context, node : AST::Loop)
@@ -569,17 +603,34 @@ module Mare::Compiler::PreInfer
       self[node.else_body].override_describe_kind =
         "loop's result when it runs zero times"
 
-      @analysis[node] = Infer::Phi.new(node.pos, [
-        {self[node.cond], self[node.body], @jumps.away?(node.body)},
-        {nil, self[node.else_body], @jumps.away?(node.else_body)},
-      ])
+      @analysis[node] = Infer::Loop.new(node.pos, [
+          {self[node.cond], self[node.body], @jumps.away?(node.body)},
+          {nil, self[node.else_body], @jumps.away?(node.else_body)},
+        ],
+        @jumps.catches[node]?.try(
+          &.select(&.kind.is_a? AST::Jump::Kind::Break).map do |jump|
+            inf = @analysis[jump]
+            raise NotImplementedError.new("Jump should be of 'break' kind") \
+              unless inf.is_a? Infer::JumpBreak
+            inf.as Infer::JumpBreak
+          end
+        ) || [] of Infer::JumpBreak,
+        @jumps.catches[node]?.try(
+          &.select(&.kind.is_a? AST::Jump::Kind::Continue).map do |jump|
+            inf = @analysis[jump]
+            raise NotImplementedError.new("Jump should be of 'continue' kind") \
+              unless inf.is_a? Infer::JumpContinue
+            inf.as Infer::JumpContinue
+          end
+        ) || [] of Infer::JumpContinue,
+      )
     end
 
     def touch(ctx : Context, node : AST::Try)
       self[node.else_body].override_describe_kind =
         "try result when it catches an error"
 
-      @analysis[node] = Infer::Phi.new(node.pos, [
+      @analysis[node] = Infer::Choice.new(node.pos, [
         {nil, self[node.body], @jumps.away?(node.body)},
         {nil, self[node.else_body], @jumps.away?(node.else_body)},
       ] of {Infer::Info?, Infer::Info, Bool})

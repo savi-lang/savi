@@ -576,4 +576,44 @@ module Mare::AST
       end
     end
   end
+
+  class Jump < Node
+    enum Kind
+      Error
+      Return
+      Break
+      Continue
+    end
+
+    property term : Term
+    property kind : Kind
+
+    def initialize(@term, @kind)
+    end
+
+    def span_pos
+      pos.span([
+        @term.try(&.span_pos)
+      ].compact)
+    end
+
+    def name; :jump end
+    def to_a: Array(A)
+      res = [name] of A
+      res << kind.to_s.downcase
+      res << term.to_a
+      res
+    end
+    def children_accept(ctx : Compiler::Context, visitor : Visitor)
+      term.accept(ctx, visitor)
+    end
+    def children_accept(ctx : Compiler::Context, visitor : CopyOnMutateVisitor)
+      new_term, term_changed = child_single_accept(ctx, @term, visitor)
+      return self unless term_changed
+      dup.tap do |node|
+        node.term = new_term
+      end
+      self
+    end
+  end
 end

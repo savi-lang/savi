@@ -599,7 +599,7 @@ describe Mare::Compiler::Sugar do
               [:ident, "hygienic_local.1"], [:op, "<:"], [:ident, "Y"]],
               [:ident, "hygienic_local.1"]
             ],
-            [[:ident, "True"], [:ident, "error!"]]
+            [[:ident, "True"], [:jump, "error", [:ident, "None"]]]
           ]
         ],
         [:op, "."],
@@ -617,7 +617,7 @@ describe Mare::Compiler::Sugar do
               [:ident, "hygienic_local.2"], [:op, "!<:"], [:ident, "None"]],
               [:ident, "hygienic_local.2"]
             ],
-            [[:ident, "True"], [:ident, "error!"]]
+            [[:ident, "True"], [:jump, "error", [:ident, "None"]]]
           ]
         ],
         [:op, "."],

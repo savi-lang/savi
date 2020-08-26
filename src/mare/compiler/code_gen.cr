@@ -129,6 +129,13 @@ class Mare::Compiler::CodeGen
     @source_code_pos_globals = {} of Source::Pos => LLVM::Value
     @reflection_of_type_globals = {} of GenType => LLVM::Value
     @gtypes = {} of String => GenType
+    @loop_continue_stack = Array(Tuple(
+      LLVM::BasicBlock, Array(LLVM::BasicBlock), Array(LLVM::Value), Reach::Ref,
+    )).new
+    @loop_break_stack = Array(Tuple(
+      LLVM::BasicBlock, Array(LLVM::BasicBlock), Array(LLVM::Value), Reach::Ref
+    )).new
+
     @try_else_stack = Array(Tuple(
       LLVM::BasicBlock, Array(LLVM::BasicBlock), Array(LLVM::Value)
     )).new
@@ -1894,13 +1901,21 @@ class Mare::Compiler::CodeGen
     case expr
     when AST::Identifier
       ref = func_frame.refer[expr]
-      if ref.is_a?(Refer::Local)
-        raise "#{ref.inspect} isn't a constant value" if const_only
-        alloca = func_frame.current_locals[ref]
+      if ref.is_a?(Refer::Local) || ref.is_a?(Refer::LocalUnion)
+        local_ref =
+          if ref.is_a? Refer::LocalUnion
+            ref.list[0]
+          else
+            ref
+          end
+
+        raise "#{local_ref.inspect} isn't a constant value" if const_only
+
+        alloca = func_frame.current_locals[local_ref]
         gen_assign_cast(
-          @builder.load(alloca, ref.name),
+          @builder.load(alloca, local_ref.name),
           type_of(expr),
-          ref.defn,
+          local_ref.defn,
         )
       elsif ref.is_a?(Refer::Type)
         enum_value = ref.with_value.try(&.resolve(ctx).value)
@@ -1933,11 +1948,22 @@ class Mare::Compiler::CodeGen
       elsif ref.is_a?(Refer::Self)
         raise "#{ref.inspect} isn't a constant value" if const_only
         func_frame.receiver_value
-      elsif ref.is_a?(Refer::RaiseError)
-        # TODO: Allow an error value of something other than None.
-        gen_raise_error(gen_none, expr)
       else
         raise NotImplementedError.new("#{ref}\n#{expr.pos.show}")
+      end
+    when AST::Jump
+      case expr.kind
+      when AST::Jump::Kind::Error
+        # TODO: Allow an error value of something other than None.
+        gen_raise_error(gen_expr(expr.term), expr.term)
+      when AST::Jump::Kind::Return
+        gen_return_value(gen_expr(expr.term), expr.term)
+      when AST::Jump::Kind::Break
+        gen_break_loop(gen_expr(expr.term), expr.term)
+      when AST::Jump::Kind::Continue
+        gen_continue_loop(gen_expr(expr.term), expr.term)
+      else
+        raise NotImplementedError.new("for this kind of jump")
       end
     when AST::FieldRead
       gen_field_load(expr.value)
@@ -2687,14 +2713,32 @@ class Mare::Compiler::CodeGen
     # Each such value will needed to be bitcast to the that type.
     phi_type = type_of(expr)
 
+    # check if we have any early continues to not to generate continue block
+    infer = ctx.infer[func_frame.gfunc.not_nil!.link]
+    has_continues = !infer[expr].as(Infer::Loop).early_continues.empty?
+
     # Prepare to capture state for the final phi.
     phi_blocks = [] of LLVM::BasicBlock
     phi_values = [] of LLVM::Value
 
     # Create all of the instruction blocks we'll need for this loop.
     body_block = gen_block("body_loop")
+    continue_block = gen_block("continue_loop") if has_continues
     else_block = gen_block("else_loop")
     post_block = gen_block("after_loop")
+
+    @loop_continue_stack << {
+      continue_block,
+      [] of LLVM::BasicBlock,
+      [] of LLVM::Value,
+      phi_type.not_nil!,
+    } if continue_block
+    @loop_break_stack << {
+      post_block,
+      [] of LLVM::BasicBlock,
+      [] of LLVM::Value,
+      phi_type.not_nil!,
+    }
 
     # Start by generating the code to test the condition value.
     # If the cond is true, go to the body block; otherwise, the else block.
@@ -2706,6 +2750,7 @@ class Mare::Compiler::CodeGen
     # If the cond is true, repeat the body block; otherwise, go to post block.
     @builder.position_at_end(body_block)
     body_value = gen_expr(expr.body)
+
     unless func_frame.jumps.away?(expr.body)
       cond_value = gen_expr(expr.cond)
 
@@ -2716,6 +2761,29 @@ class Mare::Compiler::CodeGen
       end
       @builder.cond(cond_value, body_block, post_block)
     end
+
+    if continue_block
+      continue_stack_tuple = @loop_continue_stack.pop
+      raise "invalid post continue stack" \
+        unless continue_stack_tuple[0] == continue_block
+
+      @builder.position_at_end(continue_block)
+      continue_value =
+        @builder.phi(
+          llvm_type_of(phi_type.not_nil!),
+          continue_stack_tuple[1],
+          continue_stack_tuple[2],
+          "continue_expression_value",
+        )
+      cond_value = gen_expr(expr.cond)
+      phi_blocks << @builder.insert_block
+      phi_values << continue_value
+      @builder.cond(cond_value, body_block, post_block)
+    end
+
+    break_stack_tuple = @loop_break_stack.pop
+    raise "invalid post break stack" \
+      unless break_stack_tuple[0] == post_block
 
     # In the body block, generate code to arrive at the else value,
     # Then skip straight to the post block.
@@ -2740,7 +2808,12 @@ class Mare::Compiler::CodeGen
     # the bodies above, using the LLVM mechanism called a "phi" instruction.
     @builder.position_at_end(post_block)
     if func_frame.classify.value_needed?(expr)
-      @builder.phi(llvm_type_of(phi_type), phi_blocks, phi_values, "phi_loop")
+      @builder.phi(
+        llvm_type_of(phi_type),
+        phi_blocks + break_stack_tuple[1],
+        phi_values + break_stack_tuple[2],
+        "phi_loop",
+      )
     else
       gen_none
     end
@@ -2815,9 +2888,16 @@ class Mare::Compiler::CodeGen
     @builder.phi(llvm_type_of(phi_type.not_nil!), phi_blocks, phi_values, "phi_try")
   end
 
+  def gen_return_value(value : LLVM::Value, from_expr : AST::Node)
+    gfunc = func_frame.gfunc.not_nil!
+    gfunc.calling_convention.gen_return(self, gfunc, value, from_expr)
+  end
+
   def gen_raise_error(error_value : LLVM::Value, from_expr : AST::Node)
     raise "inconsistent frames" if @frames.size > 1
 
+    # error_value now is generated properly from the error! argument
+    # but we need to replace it with None for now
     # TODO: Allow an error value of something other than None.
     error_value = gen_none
 
@@ -2835,6 +2915,28 @@ class Mare::Compiler::CodeGen
       # Jump to the try else block.
       @builder.br(else_stack_tuple[0])
     end
+  end
+
+  def gen_continue_loop(value : LLVM::Value, from_expr : AST::Node)
+    raise NotImplementedError.new("") if @loop_continue_stack.empty?
+
+    continue_stack_tuple = @loop_continue_stack.last.not_nil!
+    typ = continue_stack_tuple[3]
+    continue_stack_tuple[1] << @builder.insert_block
+    continue_stack_tuple[2] << gen_assign_cast(value, typ, from_expr)
+
+    @builder.br(continue_stack_tuple[0])
+  end
+
+  def gen_break_loop(value : LLVM::Value, from_expr : AST::Node)
+    raise NotImplementedError.new("") if @loop_break_stack.empty?
+
+    break_stack_tuple = @loop_break_stack.last.not_nil!
+    typ = break_stack_tuple[3]
+    break_stack_tuple[1] << @builder.insert_block
+    break_stack_tuple[2] << gen_assign_cast(value, typ, from_expr)
+
+    @builder.br(break_stack_tuple[0])
   end
 
   def gen_yield(expr : AST::Yield)

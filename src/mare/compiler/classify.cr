@@ -102,8 +102,8 @@ module Mare::Compiler::Classify
 
   class Visitor < Mare::AST::Visitor
     getter analysis : Analysis
-    getter refer : Refer::Analysis
-    def initialize(@analysis, @refer)
+    getter refer_type : ReferType::Analysis
+    def initialize(@analysis, @refer_type)
     end
 
     def type_expr_visit(ctx, node)
@@ -148,7 +148,7 @@ module Mare::Compiler::Classify
       # In a Qualify, we mark the term as being in such a qualify.
       @analysis.further_qualified!(qualify.term)
 
-      case @refer[qualify.term]
+      case @refer_type[qualify.term.as AST::Identifier]? || Refer::Unresolved::INSTANCE
       when Refer::Type, Refer::TypeAlias, Refer::TypeParam
         # We assume this qualify to be type with type arguments.
         # None of the arguments will have their value used,
@@ -204,8 +204,8 @@ module Mare::Compiler::Classify
     end
 
     def analyze_func(ctx, f, f_link, t_analysis) : Analysis
-      refer = ctx.refer[f_link]
-      visitor = Visitor.new(Analysis.new, refer)
+      refer_type = ctx.refer_type[f_link]
+      visitor = Visitor.new(Analysis.new, refer_type)
 
       f.params.try(&.accept(ctx, visitor))
       f.ret.try(&.accept(ctx, visitor))

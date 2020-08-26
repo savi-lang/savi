@@ -271,7 +271,8 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         # Otherwise, an error is raised. Sad.
         from_u64_choices << {
           AST::Identifier.new("True").from(@type.ident),
-          AST::Identifier.new("error!").from(@type.ident),
+          AST::Jump.new(AST::Identifier.new("None").from(@type.ident),
+            AST::Jump::Kind::Error).from(@type.ident),
         }
 
         # Create function parameters for the value parameter.

@@ -4,6 +4,11 @@
   :fun non now!: @inner!
   :fun non inner!: error!
 
+:primitive _EarlyReturn
+  :fun non conditional (early Bool) U64
+    if early (return 33)
+    11
+
 :class Container (A)
   :prop value A
   :new (@value)
@@ -106,6 +111,52 @@
     test["try call error; with error"].pass = U64[33] == (
       try (Err.now!, 11 | 33)
     )
+
+    test["while; resulting in break value"].pass = U64[33] == (
+      i = USize[0]
+      while (i < 1) (i += 1, break 33 | 11)
+    )
+
+    test["while; resulting in continue value"].pass = U64[33] == (
+      i = USize[0]
+      while (i < 1) (i += 1, continue 33 | 11)
+    )
+
+    test["while; not executing the break"].pass = U64[33] == (
+      i = USize[0]
+      while (i < 1) (i += 1
+        if (zero > 1) (break 22)
+        33
+      |
+        11
+      )
+    )
+
+    test["while; not executing the continue"].pass = U64[33] == (
+      i = USize[0]
+      while (i < 1) (i += 1
+        if (zero > 1) (continue 22)
+        33
+      |
+        11
+      )
+    )
+
+    test["while; not using the value of the continue"].pass = U64[33] == (
+      i = USize[0]
+      while (i < 2) (i += 1
+        if (i < 1) (continue 22)
+        33
+      |
+        11
+      )
+    )
+
+    test["return; with early return value"].pass =
+      U64[33] == _EarlyReturn.conditional(True)
+
+    test["return; with early return value"].pass =
+      U64[11] == _EarlyReturn.conditional(False)
 
     test["reflection_of_type.string String"].pass =
       (reflection_of_type "example").string == "String"

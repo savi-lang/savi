@@ -305,6 +305,17 @@ class Mare::Compiler::Infer
       end
     end
 
+    # By default, a NamedInfo will only treat the first assignment as relevant
+    # for inferring when there is no explicit, but some subclasses may override.
+    def infer_from_all_upstreams? : Bool; false end
+    private def resolve_upstream(ctx : Context, infer : ForReifiedFunc) : MetaType
+      if infer_from_all_upstreams?
+        MetaType.new_union(@upstreams.map { |mt, _| infer.resolve(ctx, mt) })
+      else
+        infer.resolve(ctx, @upstreams.first[0])
+      end
+    end
+
     def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
       explicit = @explicit
 
@@ -316,9 +327,9 @@ class Mare::Compiler::Infer
           return explicit_mt
         elsif !@upstreams.empty?
           # If there are upstreams, use the explicit cap applied to the type
-          # of the first upstream expression, which becomes canonical.
+          # of the upstream, which becomes canonical.
           return (
-            infer.resolve(ctx, @upstreams.first[0])
+            resolve_upstream(ctx, infer)
             .strip_cap.intersect(explicit_mt).strip_ephemeral
             .strip_ephemeral
           )
@@ -329,8 +340,8 @@ class Mare::Compiler::Infer
           return any.intersect(explicit_mt)
         end
       elsif !@upstreams.empty?
-        # If we only have upstreams to go on, return the first upstream type.
-        return infer.resolve(ctx, @upstreams.first[0]).strip_ephemeral
+        # If we only have upstreams to go on, return the upstream type.
+        return resolve_upstream(ctx, infer).strip_ephemeral
       elsif !downstreams_empty?
         # If we only have downstream tethers, just do our best with those.
         return MetaType
@@ -577,7 +588,15 @@ class Mare::Compiler::Infer
   end
 
   class FuncBody < NamedInfo
+    getter early_returns : Array(JumpReturn)
+    def initialize(pos, @early_returns)
+      super(pos)
+
+      early_returns.each(&.term.try(&.add_downstream(@pos, self, 0)))
+    end
     def describe_kind : String; "function body" end
+
+    def infer_from_all_upstreams? : Bool; true end
   end
 
   class Local < NamedInfo
@@ -667,21 +686,47 @@ class Mare::Compiler::Infer
     end
   end
 
-  class RaiseError < Info
-    def initialize(@pos)
+  abstract class JumpInfo < Info
+    getter term : Info
+    def initialize(@pos, @term)
     end
 
+    abstract def error_jump_name
+
     def add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
-      raise "can't be downstream of a RaiseError"
+      Error.at use_pos,
+        "\"#{error_jump_name}\" expression never returns any value"
     end
 
     def tethers(querent : Info) : Array(Tether)
-      [] of Tether
+      term.tethers(querent)
     end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
+      # A jump expression has no result value, so the resolved type is always
+      # unsatisfiable - the term's type goes to the jump's catching entity.
       MetaType.new(MetaType::Unsatisfiable.instance)
     end
+
+    def resolve_others!(ctx : Context, infer : ForReifiedFunc) : MetaType
+      infer.resolve(ctx, term)
+    end
+  end
+
+  class JumpError < JumpInfo
+    def error_jump_name; "error!" end
+  end
+
+  class JumpReturn < JumpError
+    def error_jump_name; "return" end
+  end
+
+  class JumpBreak < JumpError
+    def error_jump_name; "break" end
+  end
+
+  class JumpContinue < JumpError
+    def error_jump_name; "continue" end
   end
 
   class Sequence < Info
@@ -718,7 +763,7 @@ class Mare::Compiler::Infer
   # as well as necessary/sufficient conditions for each branch to be in play
   # letting us better specialize the codegen later by eliminating impossible
   # branches in particular reifications of this type or function.
-  class Phi < DynamicInfo
+  abstract class Phi < DynamicInfo
     getter branches : Array({Info?, Info, Bool})
 
     def describe_kind : String; "choice block" end
@@ -833,6 +878,34 @@ class Mare::Compiler::Infer
 
       meta_type
     end
+  end
+
+  class Loop < Phi
+    getter early_breaks : Array(JumpBreak)
+    getter early_continues : Array(JumpContinue)
+
+    def initialize(pos, branches, @early_breaks, @early_continues)
+      super(pos, branches)
+
+      early_breaks.each(&.term.add_downstream(@pos, self, 0))
+      early_continues.each(&.term.add_downstream(@pos, self, 0))
+    end
+
+    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
+      MetaType.new_union(
+        [super] + \
+        early_breaks.map { |jump| infer.resolve(ctx, jump.term) } + \
+        early_continues.map { |jump| infer.resolve(ctx, jump.term) }
+      )
+    end
+
+    def resolve_others!(ctx : Context, infer : ForReifiedFunc)
+      early_breaks.each { |jump| infer.resolve(ctx, jump) }
+      early_continues.each { |jump| infer.resolve(ctx, jump) }
+    end
+  end
+
+  class Choice < Phi
   end
 
   class TypeParamCondition < FixedInfo
