@@ -191,10 +191,10 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     # reifications of all generic type parameters.
     sorted_types.each do |t|
       t_link = t.make_link(library)
-      refer = ctx.refer[t_link]
+      refer_type = ctx.refer_type[t_link]
 
       no_args_rt = for_rt(ctx, t_link).reified
-      rts = for_type_partial_reifications(ctx, t, t_link, no_args_rt, refer)
+      rts = for_type_partial_reifications(ctx, t, t_link, no_args_rt, refer_type)
 
       @t_analyses[t_link].each_non_argumented_reified.each do |rt|
         t.functions.each do |f|
@@ -362,16 +362,16 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     {t, f, infer}
   end
 
-  def for_type_partial_reifications(ctx, t, t_link, no_args_rt, refer)
+  def for_type_partial_reifications(ctx, t, t_link, no_args_rt, refer_type)
     type_params = AST::Extract.type_params(t.params)
     return [] of ReifiedType if type_params.empty?
 
     params_partial_reifications =
       type_params.map do |(param, _, _)|
         # Get the MetaType of the bound.
-        param_ref = refer[param].as(Refer::TypeParam)
+        param_ref = refer_type[param.as(AST::Identifier)].as(Refer::TypeParam)
         bound_node = param_ref.bound
-        bound_mt = self.for_rt(ctx, no_args_rt).type_expr(bound_node, refer)
+        bound_mt = self.for_rt(ctx, no_args_rt).type_expr(bound_node, refer_type)
 
         # TODO: Refactor the partial_reifications to return cap only already.
         caps = bound_mt.partial_reifications.map(&.cap_only)
@@ -428,8 +428,9 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     rf = ReifiedFunction.new(rt, f, mt)
     @map[rf] ||= (
       f_analysis = get_or_create_f_analysis(ctx, f)
-      refer = ctx.refer[f]
-      ForReifiedFunc.new(ctx, f_analysis, ReifiedFuncAnalysis.new(ctx, rf), @types[rt], rf, refer)
+      refer_type = ctx.refer_type[f]
+      classify = ctx.classify[f]
+      ForReifiedFunc.new(ctx, f_analysis, ReifiedFuncAnalysis.new(ctx, rf), @types[rt], rf, refer_type, classify)
       .tap { f_analysis.observe_reified_func(rf) }
     )
   end
@@ -452,8 +453,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   ) : ForReifiedType
     rt = ReifiedType.new(link, type_args)
     @types[rt]? || (
-      refer = ctx.refer[link]
-      ft = @types[rt] = ForReifiedType.new(ctx, ReifiedTypeAnalysis.new(rt), rt, refer)
+      refer_type = ctx.refer_type[link]
+      ft = @types[rt] = ForReifiedType.new(ctx, ReifiedTypeAnalysis.new(rt), rt, refer_type)
       ft.tap(&.initialize_assertions(ctx))
       .tap { |ft| get_or_create_t_analysis(link).observe_reified_type(ctx, rt) }
     )
@@ -464,9 +465,9 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     link : Program::TypeAlias::Link,
     type_args : Array(MetaType) = [] of MetaType
   ) : ForReifiedTypeAlias
-    refer = ctx.refer[link]
+    refer_type = ctx.refer_type[link]
     rt_alias = ReifiedTypeAlias.new(link, type_args)
-    @aliases[rt_alias] ||= ForReifiedTypeAlias.new(ctx, rt_alias, refer)
+    @aliases[rt_alias] ||= ForReifiedTypeAlias.new(ctx, rt_alias, refer_type)
   end
 
   def unwrap_alias(ctx : Context, rt_alias : ReifiedTypeAlias) : MetaType
@@ -482,8 +483,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     @unwrapping_set.add(rt_alias)
 
     # Unwrap the alias.
-    refer = ctx.refer[rt_alias.link]
-    @aliases[rt_alias].type_expr(rt_alias.target_type_expr(ctx), refer)
+    refer_type = ctx.refer_type[rt_alias.link]
+    @aliases[rt_alias].type_expr(rt_alias.target_type_expr(ctx), refer_type)
     .simplify(ctx)
 
     # Remove the recursion guard.
@@ -719,9 +720,9 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       ctx.infer.for_rt_alias(ctx, *args).reified
     end
 
-    # An identifier type expression must refer to a type.
-    def type_expr(node : AST::Identifier, refer, receiver = nil) : MetaType
-      ref = refer[node]?
+    # An identifier type expression must refer_type to a type.
+    def type_expr(node : AST::Identifier, refer_type, receiver = nil) : MetaType
+      ref = refer_type[node]?
       case ref
       when Refer::Self
         receiver || MetaType.new(reified)
@@ -731,7 +732,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         MetaType.new_alias(reified_type_alias(ref.link_alias))
       when Refer::TypeParam
         lookup_type_param(ref, receiver)
-      when Refer::Unresolved, nil
+      when nil
         case node.value
         when "iso", "trn", "val", "ref", "box", "tag", "non"
           MetaType.new(MetaType::Capability.new(node.value))
@@ -746,20 +747,20 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
 
     # An relate type expression must be an explicit capability qualifier.
-    def type_expr(node : AST::Relate, refer, receiver = nil) : MetaType
+    def type_expr(node : AST::Relate, refer_type, receiver = nil) : MetaType
       if node.op.value == "'"
         cap_ident = node.rhs.as(AST::Identifier)
         case cap_ident.value
         when "aliased"
-          type_expr(node.lhs, refer, receiver).simplify(ctx).alias
+          type_expr(node.lhs, refer_type, receiver).simplify(ctx).alias
         else
-          cap = type_expr(cap_ident, refer, receiver)
-          type_expr(node.lhs, refer, receiver).simplify(ctx).override_cap(cap)
+          cap = type_expr(cap_ident, refer_type, receiver)
+          type_expr(node.lhs, refer_type, receiver).simplify(ctx).override_cap(cap)
         end
       elsif node.op.value == "->"
-        type_expr(node.rhs, refer, receiver).simplify(ctx).viewed_from(type_expr(node.lhs, refer, receiver))
+        type_expr(node.rhs, refer_type, receiver).simplify(ctx).viewed_from(type_expr(node.lhs, refer_type, receiver))
       elsif node.op.value == "->>"
-        type_expr(node.rhs, refer, receiver).simplify(ctx).extracted_from(type_expr(node.lhs, refer, receiver))
+        type_expr(node.rhs, refer_type, receiver).simplify(ctx).extracted_from(type_expr(node.lhs, refer_type, receiver))
       else
         raise NotImplementedError.new(node.to_a.inspect)
       end
@@ -767,27 +768,27 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
 
     # A "|" group must be a union of type expressions, and a "(" group is
     # considered to be just be a single parenthesized type expression (for now).
-    def type_expr(node : AST::Group, refer, receiver = nil) : MetaType
+    def type_expr(node : AST::Group, refer_type, receiver = nil) : MetaType
       if node.style == "|"
         MetaType.new_union(
           node.terms
           .select { |t| t.is_a?(AST::Group) && t.terms.size > 0 }
-          .map { |t| type_expr(t, refer, receiver).as(MetaType)}
+          .map { |t| type_expr(t, refer_type, receiver).as(MetaType)}
         )
       elsif node.style == "(" && node.terms.size == 1
-        type_expr(node.terms.first, refer, receiver)
+        type_expr(node.terms.first, refer_type, receiver)
       else
         raise NotImplementedError.new(node.to_a.inspect)
       end
     end
 
     # A "(" qualify is used to add type arguments to a type.
-    def type_expr(node : AST::Qualify, refer, receiver = nil) : MetaType
+    def type_expr(node : AST::Qualify, refer_type, receiver = nil) : MetaType
       raise NotImplementedError.new(node.to_a) unless node.group.style == "("
 
-      target = type_expr(node.term, refer, receiver)
+      target = type_expr(node.term, refer_type, receiver)
       args = node.group.terms.map do |t|
-        resolve_type_param_parent_links(type_expr(t, refer, receiver)).as(MetaType)
+        resolve_type_param_parent_links(type_expr(t, refer_type, receiver)).as(MetaType)
       end
 
       target_inner = target.inner
@@ -803,7 +804,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
 
     # All other AST nodes are unsupported as type expressions.
-    def type_expr(node : AST::Node, refer, receiver = nil) : MetaType
+    def type_expr(node : AST::Node, refer_type, receiver = nil) : MetaType
       raise NotImplementedError.new(node.to_a)
     end
 
@@ -835,9 +836,9 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
 
     private getter ctx : Context
     getter reified : ReifiedTypeAlias
-    private getter refer : Refer::Analysis
+    private getter refer_type : ReferType::Analysis
 
-    def initialize(@ctx, @reified, @refer)
+    def initialize(@ctx, @reified, @refer_type)
     end
 
     def lookup_type_param(ref : Refer::TypeParam, receiver = nil)
@@ -849,7 +850,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
 
       # Use the default type argument if this type parameter has one.
       ref_default = ref.default
-      return type_expr(ref_default, refer) if ref_default
+      return type_expr(ref_default, refer_type) if ref_default
 
       raise "halt" if reified.is_complete?(ctx)
 
@@ -864,9 +865,9 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     private getter ctx : Context
     getter analysis : ReifiedTypeAnalysis
     getter reified : ReifiedType
-    private getter refer : Refer::Analysis
+    private getter refer_type : ReferType::Analysis
 
-    def initialize(@ctx, @analysis, @reified, @refer)
+    def initialize(@ctx, @analysis, @reified, @refer_type)
       @type_param_refinements = {} of Refer::TypeParam => Array(MetaType)
     end
 
@@ -876,17 +877,17 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         next unless f.has_tag?(:is)
 
         f_link = f.make_link(reified.link)
-        trait = type_expr(f.ret.not_nil!, ctx.refer[f_link]).single!
+        trait = type_expr(f.ret.not_nil!, ctx.refer_type[f_link]).single!
 
         ctx.infer.for_rt!(trait).analysis.subtyping.assert(reified, f.ident.pos)
       end
     end
 
     def get_type_param_bound(index : Int32)
-      param_node = reified.defn(ctx).params.not_nil!.terms[index]
-      param_bound_node = refer[param_node].as(Refer::TypeParam).bound
+      param_node = reified.defn(ctx).params.not_nil!.terms[index].as(AST::Identifier)
+      param_bound_node = refer_type[param_node].as(Refer::TypeParam).bound
 
-      type_expr(param_bound_node.not_nil!, refer, nil)
+      type_expr(param_bound_node.not_nil!, refer_type, nil)
     end
 
     def lookup_type_param(ref : Refer::TypeParam, receiver = nil)
@@ -898,7 +899,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
 
       # Use the default type argument if this type parameter has one.
       ref_default = ref.default
-      return type_expr(ref_default, refer) if ref_default
+      return type_expr(ref_default, refer_type) if ref_default
 
       raise "halt" if reified.is_complete?(ctx)
 
@@ -922,7 +923,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       end
 
       # Get the MetaType of the declared bound for this type parameter.
-      bound : MetaType = type_expr(type_param.ref.bound, refer, nil)
+      bound : MetaType = type_expr(type_param.ref.bound, refer_type, nil)
 
       # If we have temporary refinements for this type param, apply them now.
       @type_param_refinements[type_param.ref]?.try(&.each { |refine_type|
@@ -950,14 +951,15 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
   end
 
   class ForReifiedFunc < Mare::AST::Visitor
-    private getter ctx : Context
-    private getter refer : Refer::Analysis
     getter f_analysis : FuncAnalysis
     getter analysis : ReifiedFuncAnalysis
     getter for_rt : ForReifiedType
     getter reified : ReifiedFunction
+    private getter ctx : Context
+    private getter refer_type : ReferType::Analysis
+    protected getter classify : Classify::Analysis
 
-    def initialize(@ctx, @f_analysis, @analysis, @for_rt, @reified, @refer)
+    def initialize(@ctx, @f_analysis, @analysis, @for_rt, @reified, @refer_type, @classify)
       @local_idents = Hash(Refer::Local, AST::Node).new
       @local_ident_overrides = Hash(AST::Node, AST::Node).new
       @redirects = Hash(AST::Node, AST::Node).new
@@ -976,10 +978,6 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     def ret
       # The ident is used as a fake local variable that represents the return.
       func.ident
-    end
-
-    def classify
-      ctx.classify[reified.link]
     end
 
     def resolve(ctx : Context, info : Info) : MetaType
@@ -1129,7 +1127,7 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
 
     def type_expr(node)
-      @for_rt.type_expr(node, refer, reified.receiver)
+      @for_rt.type_expr(node, refer_type, reified.receiver)
     end
   end
 end

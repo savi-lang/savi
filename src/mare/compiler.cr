@@ -76,7 +76,7 @@ class Mare::Compiler
     when :consumes then [:jumps, :refer]
     when :inventory then [:refer]
     when :pre_infer then [:inventory, :jumps, :classify, :refer, :lambda, :populate]
-    when :infer then [:pre_infer, :classify]
+    when :infer then [:pre_infer, :classify, :refer_type]
     when :privacy then [:infer]
     when :completeness then [:jumps, :infer, :lambda, :sugar, :macros, :populate]
     when :reach then [:infer]
