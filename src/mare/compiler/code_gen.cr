@@ -1885,13 +1885,21 @@ class Mare::Compiler::CodeGen
     case expr
     when AST::Identifier
       ref = func_frame.refer[expr]
-      if ref.is_a?(Refer::Local)
-        raise "#{ref.inspect} isn't a constant value" if const_only
-        alloca = func_frame.current_locals[ref]
+      if ref.is_a?(Refer::Local) || ref.is_a?(Refer::LocalUnion)
+        local_ref =
+          if ref.is_a? Refer::LocalUnion
+            ref.list[0]
+          else
+            ref
+          end
+
+        raise "#{local_ref.inspect} isn't a constant value" if const_only
+
+        alloca = func_frame.current_locals[local_ref]
         gen_assign_cast(
-          @builder.load(alloca, ref.name),
+          @builder.load(alloca, local_ref.name),
           type_of(expr),
-          ref.defn,
+          local_ref.defn,
         )
       elsif ref.is_a?(Refer::Type)
         enum_value = ref.with_value.try(&.resolve(ctx).value)
@@ -2688,9 +2696,9 @@ class Mare::Compiler::CodeGen
     # Each such value will needed to be bitcast to the that type.
     phi_type = type_of(expr)
 
-    # TODO: REMOVE
-    # infer = ctx.infer[func_frame.gfunc.not_nil!.link]
-    # pp phi_type unless infer[expr].as(Infer::Loop).early_breaks.empty?
+    # check if we have any early continues to not to generate continue block
+    infer = ctx.infer[func_frame.gfunc.not_nil!.link]
+    has_continues = !infer[expr].as(Infer::Loop).early_continues.empty?
 
     # Prepare to capture state for the final phi.
     phi_blocks = [] of LLVM::BasicBlock
@@ -2698,7 +2706,7 @@ class Mare::Compiler::CodeGen
 
     # Create all of the instruction blocks we'll need for this loop.
     body_block = gen_block("body_loop")
-    continue_block = gen_block("continue_loop")
+    continue_block = gen_block("continue_loop") if has_continues
     else_block = gen_block("else_loop")
     post_block = gen_block("after_loop")
 
@@ -2707,7 +2715,7 @@ class Mare::Compiler::CodeGen
       [] of LLVM::BasicBlock,
       [] of LLVM::Value,
       phi_type.not_nil!,
-    }
+    } if continue_block
     @loop_break_stack << {
       post_block,
       [] of LLVM::BasicBlock,
@@ -2726,10 +2734,6 @@ class Mare::Compiler::CodeGen
     @builder.position_at_end(body_block)
     body_value = gen_expr(expr.body)
 
-    continue_stack_tuple = @loop_continue_stack.pop
-    raise "invalid post continue stack" \
-      unless continue_stack_tuple[0] == continue_block
-
     unless func_frame.jumps.away?(expr.body)
       cond_value = gen_expr(expr.cond)
 
@@ -2741,19 +2745,22 @@ class Mare::Compiler::CodeGen
       @builder.cond(cond_value, body_block, post_block)
     end
 
-    @builder.position_at_end(continue_block)
-    if continue_stack_tuple[1].empty?
-      @builder.unreachable
-    else
-      continue_value = @builder.phi(
-        llvm_type_of(phi_type.not_nil!),
-        continue_stack_tuple[1],
-        continue_stack_tuple[2],
-        "continue_expression_value",
-      )
+    if continue_block
+      continue_stack_tuple = @loop_continue_stack.pop
+      raise "invalid post continue stack" \
+        unless continue_stack_tuple[0] == continue_block
+
+      @builder.position_at_end(continue_block)
+      continue_value =
+        @builder.phi(
+          llvm_type_of(phi_type.not_nil!),
+          continue_stack_tuple[1],
+          continue_stack_tuple[2],
+          "continue_expression_value",
+        )
+      cond_value = gen_expr(expr.cond)
       phi_blocks << @builder.insert_block
       phi_values << continue_value
-      cond_value = gen_expr(expr.cond)
       @builder.cond(cond_value, body_block, post_block)
     end
 

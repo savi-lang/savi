@@ -18,8 +18,17 @@ module Mare::Compiler::Refer
     getter name : String
     getter defn : AST::Node
     getter param_idx : Int32?
+    @caught : Bool
 
-    def initialize(@name, @defn, @param_idx = nil)
+    def initialize(@name, @defn, @caught, @param_idx = nil)
+    end
+
+    def catch
+      @caught = true
+    end
+
+    def caught?
+      @caught
     end
 
     def is_defn_assign?(node : AST::Relate)
@@ -38,6 +47,14 @@ module Mare::Compiler::Refer
     property incomplete : Bool = false
 
     def initialize(@list)
+    end
+
+    def caught?
+      @list.all?(&.caught?)
+    end
+
+    def catch
+      @list.each(&.catch)
     end
 
     def self.build(list)

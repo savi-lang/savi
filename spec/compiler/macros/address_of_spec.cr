@@ -29,12 +29,12 @@ describe Mare::Compiler::Macros do
       from (example):4:
           address_of t 5
           ^~~~~~~~~~~~~~
-      
+
       - this term is the local variable whose address is to be referenced:
         from (example):4:
           address_of t 5
                      ^
-      
+
       - this is an excessive term:
         from (example):4:
           address_of t 5

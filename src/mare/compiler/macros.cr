@@ -80,10 +80,6 @@ class Mare::Compiler::Macros < Mare::AST::CopyOnMutateVisitor
     # groups that we may match and interpret as if they are macros.
     return node unless node.style == " "
 
-    if node.terms[0]?.is_a?(AST::Jump)
-      return visit_jump(node)
-    end
-
     if Util.match_ident?(node, 0, "if")
       Util.require_terms(node, [
         nil,

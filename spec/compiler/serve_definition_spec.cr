@@ -22,7 +22,7 @@ describe Mare::Compiler::ServeDefinition do
       :new
         example = "Hello, World!"
         example1 = example
-        
+
         example2 = example1 * 1
     SOURCE
 

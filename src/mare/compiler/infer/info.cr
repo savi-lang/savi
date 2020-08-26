@@ -699,7 +699,7 @@ class Mare::Compiler::Infer
     end
 
     def tethers(querent : Info) : Array(Tether)
-      term.tethers(querent) || [] of Tether
+      term.tethers(querent)
     end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
@@ -889,6 +889,14 @@ class Mare::Compiler::Infer
 
       early_breaks.each(&.term.add_downstream(@pos, self, 0))
       early_continues.each(&.term.add_downstream(@pos, self, 0))
+    end
+
+    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
+      MetaType.new_union(
+        [super] + \
+        early_breaks.map { |jump| infer.resolve(ctx, jump.term) } + \
+        early_continues.map { |jump| infer.resolve(ctx, jump.term) }
+      )
     end
 
     def resolve_others!(ctx : Context, infer : ForReifiedFunc)
