@@ -13,12 +13,14 @@ module Mare
       option "-r", "--release", desc: "Compile in release mode", type: Bool, default: false
       option "--no-debug", desc: "Compile without debug info", type: Bool, default: false
       option "--print-ir", desc: "Print generated LLVM IR", type: Bool, default: false
+      option "--print-perf", desc: "Print compiler performance info", type: Bool, default: false
       option "-o NAME", "--output=NAME", desc: "Name of the output binary"
       run do |opts, args|
         options = Mare::Compiler::CompilerOptions.new(
           release: opts.release,
           no_debug: opts.no_debug,
           print_ir: opts.print_ir,
+          print_perf: opts.print_perf,
         )
         if opts.output
           options.binary_name = opts.output.not_nil!
@@ -44,11 +46,13 @@ module Mare
         option "-r", "--release", desc: "Compile in release mode", type: Bool, default: false
         option "--no-debug", desc: "Compile without debug info", type: Bool, default: false
         option "--print-ir", desc: "Print generated LLVM IR", type: Bool, default: false
+        option "--print-perf", desc: "Print compiler performance info", type: Bool, default: false
         run do |opts, args|
           options = Mare::Compiler::CompilerOptions.new(
             release: opts.release,
             no_debug: opts.no_debug,
             print_ir: opts.print_ir,
+            print_perf: opts.print_perf,
           )
           Cli.eval args.code, options, opts.backtrace
         end
@@ -62,11 +66,13 @@ module Mare
         option "-r", "--release", desc: "Compile in release mode", type: Bool, default: false
         option "--no-debug", desc: "Compile without debug info", type: Bool, default: false
         option "--print-ir", desc: "Print generated LLVM IR", type: Bool, default: false
+        option "--print-perf", desc: "Print compiler performance info", type: Bool, default: false
         run do |opts, args|
           options = Mare::Compiler::CompilerOptions.new(
             release: opts.release,
             no_debug: opts.no_debug,
             print_ir: opts.print_ir,
+            print_perf: opts.print_perf,
           )
           Cli.run options, opts.backtrace
         end
@@ -81,11 +87,13 @@ module Mare
         option "-o NAME", "--output=NAME", desc: "Name of the output binary"
         option "--no-debug", desc: "Compile without debug info", type: Bool, default: false
         option "--print-ir", desc: "Print generated LLVM IR", type: Bool, default: false
+        option "--print-perf", desc: "Print compiler performance info", type: Bool, default: false
         run do |opts, args|
           options = Mare::Compiler::CompilerOptions.new(
             release: opts.release,
             no_debug: opts.no_debug,
             print_ir: opts.print_ir,
+            print_perf: opts.print_perf,
           )
           if opts.output
             options.binary_name = opts.output.not_nil!
