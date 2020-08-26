@@ -884,8 +884,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
     end
 
     def get_type_param_bound(index : Int32)
-      param_node = reified.defn(ctx).params.not_nil!.terms[index].as(AST::Identifier)
-      param_bound_node = refer_type[param_node].as(Refer::TypeParam).bound
+      param_ident = AST::Extract.type_param(reified.defn(ctx).params.not_nil!.terms[index]).first
+      param_bound_node = refer_type[param_ident].as(Refer::TypeParam).bound
 
       type_expr(param_bound_node.not_nil!, refer_type, nil)
     end
