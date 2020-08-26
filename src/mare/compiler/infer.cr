@@ -1049,15 +1049,15 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
         ret_rt = ret_mt.single?.try(&.defn)
         is_val = ret_mt.cap_only.inner == MetaType::Capability::VAL
         unless is_val && ret_rt.is_a?(ReifiedType) && ret_rt.link.is_concrete? && (
-          ret_rt.not_nil!.link == prelude_type("String") ||
-          ret_mt.subtype_of?(ctx, MetaType.new_nominal(reified_type(prelude_type("Numeric")))) ||
-          (ret_rt.not_nil!.link == prelude_type("Array") && begin
+          ret_rt.not_nil!.link.name == "String" ||
+          ret_mt.subtype_of?(ctx, MetaType.new_nominal(reified_prelude_type("Numeric"))) ||
+          (ret_rt.not_nil!.link.name == "Array" && begin
             elem_mt = ret_rt.args.first
             elem_rt = elem_mt.single?.try(&.defn)
             elem_is_val = elem_mt.cap_only.inner == MetaType::Capability::VAL
             is_val && elem_rt.is_a?(ReifiedType) && elem_rt.link.is_concrete? && (
-              elem_rt.not_nil!.link == prelude_type("String") ||
-              elem_mt.subtype_of?(ctx, MetaType.new_nominal(reified_type(prelude_type("Numeric"))))
+              elem_rt.not_nil!.link.name == "String" ||
+              elem_mt.subtype_of?(ctx, MetaType.new_nominal(reified_prelude_type("Numeric")))
             )
           end)
         )
@@ -1102,12 +1102,8 @@ class Mare::Compiler::Infer < Mare::AST::Visitor
       nil
     end
 
-    def prelude_type(ctx, name)
-      @ctx.namespace.prelude_type(name)
-    end
-    # TODO: remove this alias of the above method that relies on interior @ctx.
-    def prelude_type(name)
-      @ctx.namespace.prelude_type(name)
+    def reified_prelude_type(name, *args)
+      ctx.infer.for_rt(ctx, @ctx.namespace.prelude_type(name), *args).reified
     end
 
     def reified_type(*args)

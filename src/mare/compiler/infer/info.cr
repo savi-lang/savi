@@ -336,7 +336,7 @@ class Mare::Compiler::Infer
         else
           # If we have no upstreams and an explicit cap, return
           # the empty trait called `Any` intersected with that cap.
-          any = MetaType.new_nominal(infer.reified_type(infer.prelude_type("Any")))
+          any = MetaType.new_nominal(infer.reified_prelude_type("Any"))
           return any.intersect(explicit_mt)
         end
       elsif !@upstreams.empty?
@@ -377,7 +377,7 @@ class Mare::Compiler::Infer
     end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
-      MetaType.new(infer.reified_type(infer.prelude_type(@name)))
+      MetaType.new(infer.reified_prelude_type(@name))
     end
 
     def resolve_others!(ctx : Context, infer : ForReifiedFunc)
@@ -476,7 +476,7 @@ class Mare::Compiler::Infer
     def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
       t = infer.resolve(ctx, @variable)
 
-      cpointer = infer.reified_type(infer.prelude_type("CPointer"), [t])
+      cpointer = infer.reified_prelude_type("CPointer", [t])
 
       MetaType.new cpointer
     end
@@ -505,7 +505,7 @@ class Mare::Compiler::Infer
           # seem like there is anything more meaningful we could do here.
           # This happens when typechecking on not-yet-reified functions,
           # so it isn't really avoidable. But it shouldn't reach CodeGen.
-          infer.reified_type(infer.prelude_type("None"))
+          infer.reified_prelude_type("None")
         end
 
       # Reach all functions that might possibly be reflected.
@@ -518,7 +518,7 @@ class Mare::Compiler::Infer
         infer.extra_called_func!(@pos, reflect_rt, f_link)
       end
 
-      MetaType.new(infer.reified_type(infer.prelude_type("ReflectionOfType"), [reflect_mt]))
+      MetaType.new(infer.reified_prelude_type("ReflectionOfType", [reflect_mt]))
     end
 
   end
@@ -920,7 +920,7 @@ class Mare::Compiler::Infer
     end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
-      MetaType.new(infer.reified_type(infer.prelude_type("Bool")))
+      MetaType.new(infer.reified_prelude_type("Bool"))
     end
 
     def resolve_others!(ctx : Context, infer : ForReifiedFunc)
@@ -940,7 +940,7 @@ class Mare::Compiler::Infer
     end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
-      MetaType.new(infer.reified_type(infer.prelude_type("Bool")))
+      MetaType.new(infer.reified_prelude_type("Bool"))
     end
 
     def post_resolve!(ctx : Context, infer : ForReifiedFunc, meta_type : MetaType)
@@ -1006,7 +1006,7 @@ class Mare::Compiler::Infer
     end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
-      MetaType.new(infer.reified_type(infer.prelude_type("Bool")))
+      MetaType.new(infer.reified_prelude_type("Bool"))
     end
 
     def post_resolve!(ctx : Context, infer : ForReifiedFunc, meta_type : MetaType)
@@ -1042,7 +1042,7 @@ class Mare::Compiler::Infer
     end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
-      MetaType.new(infer.reified_type(infer.prelude_type("Bool")))
+      MetaType.new(infer.reified_prelude_type("Bool"))
     end
   end
 
@@ -1199,8 +1199,6 @@ class Mare::Compiler::Infer
     end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
-      array_defn = infer.prelude_type("Array")
-
       # By default, an array literal has a cap of `ref`.
       array_cap = MetaType::Capability::REF
 
@@ -1238,7 +1236,7 @@ class Mare::Compiler::Infer
       end
 
       # Now that we have the element type to use, construct the result.
-      rt = infer.reified_type(infer.prelude_type(ctx, "Array"), [elem_mt])
+      rt = infer.reified_prelude_type("Array", [elem_mt])
       mt = MetaType.new(rt, array_cap.value.as(String))
 
       # If the array cap is not ref or "lesser", we must recover to the
@@ -1270,7 +1268,7 @@ class Mare::Compiler::Infer
         .simplify(ctx)
         .each_reachable_defn_with_cap(ctx).each do |rt, cap|
           # TODO: Support more element antecedent detection patterns.
-          if rt.link == infer.prelude_type("Array") \
+          if rt.link.name == "Array" \
           && rt.args.size == 1
             results << {rt.args.first, cap}
           end
@@ -1297,7 +1295,7 @@ class Mare::Compiler::Infer
 
       meta_type.simplify(ctx).each_reachable_defn(ctx).each do |rt|
         # TODO: Support more element antecedent detection patterns.
-        if rt.link == infer.prelude_type("Array") \
+        if rt.link.name == "Array" \
         && rt.args.size == 1
           results << rt.args.first.simplify(ctx)
         end
@@ -1709,7 +1707,7 @@ class Mare::Compiler::Infer
       # Check that the type of the yield block result matches what's expected,
       # but don't bother if the type requirement of just None.
       yield_in_resolved = other_infer.resolve(ctx, other_infer.f_analysis.yield_in_info)
-      none = MetaType.new(infer.reified_type(infer.prelude_type("None")))
+      none = MetaType.new(infer.reified_prelude_type("None"))
       if yield_in_resolved != none
         yield_in_resolved
       else
