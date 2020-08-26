@@ -83,14 +83,15 @@ abstract class Mare::Compiler::Pass::Analyze(TypeAliasAnalysis, TypeAnalysis, Fu
   # to cache the analysis from the previous compiler run into this one,
   # based on whether the type alias itself or the list of deps has changed.
   private def maybe_from_type_alias_cache(ctx, prev, t, t_link, deps) : FuncAnalysis
+    hashable = {t, deps}
     if prev \
     && (prev_hash = prev.cache_info_for_alias[t_link]?; prev_hash) \
-    && (prev_hash == {t, deps}.hash)
+    && (prev_hash == hashable.hash)
       cache_info_for_alias[t_link] = prev_hash
       prev[t_link]
     else
       puts "    RERUN . #{self.class} #{t_link.show}" if prev && ctx.options.print_perf
-      cache_info_for_alias[t_link] = {t, deps}.hash
+      cache_info_for_alias[t_link] = hashable.hash
       yield
     end
   end
@@ -99,14 +100,15 @@ abstract class Mare::Compiler::Pass::Analyze(TypeAliasAnalysis, TypeAnalysis, Fu
   # to cache the analysis from the previous compiler run into this one,
   # based on whether the type itself or the list of deps has changed.
   private def maybe_from_type_cache(ctx, prev, t, t_link, deps) : FuncAnalysis
+    hashable = {t.head_hash, deps}
     if prev \
     && (prev_hash = prev.cache_info_for_type[t_link]?; prev_hash) \
-    && (prev_hash == {t, deps}.hash)
+    && (prev_hash == hashable.hash)
       cache_info_for_type[t_link] = prev_hash
       prev[t_link]
     else
       puts "    RERUN . #{self.class} #{t_link.show}" if prev && ctx.options.print_perf
-      cache_info_for_type[t_link] = {t, deps}.hash
+      cache_info_for_type[t_link] = hashable.hash
       yield
     end
   end
@@ -115,14 +117,15 @@ abstract class Mare::Compiler::Pass::Analyze(TypeAliasAnalysis, TypeAnalysis, Fu
   # to cache the analysis from the previous compiler run into this one,
   # based on whether the function itself or the list of deps has changed.
   private def maybe_from_func_cache(ctx, prev, f, f_link, deps) : FuncAnalysis
+    hashable = {f, deps}
     if prev \
     && (prev_hash = prev.cache_info_for_func[f_link]?; prev_hash) \
-    && (prev_hash == {f, deps}.hash)
+    && (prev_hash == hashable.hash)
       cache_info_for_func[f_link] = prev_hash
       prev[f_link]
     else
       puts "    RERUN . #{self.class} #{f_link.show}" if prev && ctx.options.print_perf
-      cache_info_for_func[f_link] = {f, deps}.hash
+      cache_info_for_func[f_link] = hashable.hash
       yield
     end
   end

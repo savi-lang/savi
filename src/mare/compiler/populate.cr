@@ -11,8 +11,16 @@
 # This pass keeps temporary state (on the stack) at the per-type level.
 # This pass produces no output state.
 #
-module Mare::Compiler::Populate
-  def self.run(ctx, library)
+class Mare::Compiler::Populate
+  protected getter default_constructors
+
+  def initialize
+    # This map lets us cache the default constructors we create in this pass,
+    # allowing us to drop in the exact same constructor next time it is needed.
+    @default_constructors = {} of UInt64 => Program::Function
+  end
+
+  def run(ctx, library)
     library.types_map_cow do |dest|
       orig_functions = dest.functions
       dest_link = dest.make_link(library)
@@ -92,18 +100,22 @@ module Mare::Compiler::Populate
       # If the type doesn't have a constructor and needs one, then add one.
       if dest.has_tag?(:allocated) && !dest.has_tag?(:abstract) \
       && !dest.functions.any? { |f| f.has_tag?(:constructor) }
-        f = Program::Function.new(
-          AST::Identifier.new("ref").from(dest.ident),
-          AST::Identifier.new("new").from(dest.ident),
-          nil,
-          nil,
-          AST::Group.new(":").from(dest.ident).tap { |body|
-            body.terms << AST::Identifier.new("@").from(dest.ident)
-          },
-        ).tap do |f|
-          f.add_tag(:constructor)
-          f.add_tag(:async) if dest.has_tag?(:actor)
+        # Create the default constructor function, unless we have one cached.
+        f = ctx.prev_ctx.try(&.populate.default_constructors[dest.head_hash]?) || begin
+          Program::Function.new(
+            AST::Identifier.new("ref").from(dest.ident),
+            AST::Identifier.new("new").from(dest.ident),
+            nil,
+            nil,
+            AST::Group.new(":").from(dest.ident).tap { |body|
+              body.terms << AST::Identifier.new("@").from(dest.ident)
+            },
+          ).tap do |f|
+            f.add_tag(:constructor)
+            f.add_tag(:async) if dest.has_tag?(:actor)
+          end
         end
+        default_constructors[dest.head_hash] = f
 
         if dest.functions.same?(orig_functions)
           dest = dest.dup
@@ -125,7 +137,7 @@ module Mare::Compiler::Populate
   # For each concrete function in the given source, copy it to the destination
   # if the destination doesn't already have an implementation for it.
   # Don't actually copy yet - just return the new functions to be copied in.
-  def self.copy_from(
+  def copy_from(
     ctx : Context,
     source : Program::Type,
     dest : Program::Type

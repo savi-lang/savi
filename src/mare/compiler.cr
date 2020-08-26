@@ -28,7 +28,7 @@ class Mare::Compiler
       when :macros           then ctx.run_copy_on_mutate(Macros)
       when :sugar            then ctx.run_copy_on_mutate(Sugar)
       when :refer_type       then ctx.run(ctx.refer_type)
-      when :populate         then ctx.run_copy_on_mutate(Populate)
+      when :populate         then ctx.run_copy_on_mutate(ctx.populate)
       when :lambda           then ctx.run_copy_on_mutate(Lambda)
       when :refer            then ctx.run(ctx.refer)
       when :classify         then ctx.run(ctx.classify)

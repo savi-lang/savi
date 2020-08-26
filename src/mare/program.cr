@@ -222,6 +222,16 @@ class Mare::Program
       super().tap(&.dup_init(*args))
     end
 
+    def head_hash
+      head_hash(Crystal::Hasher.new).result
+    end
+
+    def head_hash(hasher)
+      cap.hash(hasher)
+      ident.hash(hasher)
+      params.hash(hasher)
+    end
+
     def ==(other)
       return false unless other.is_a?(Type)
       return false unless @cap == other.cap

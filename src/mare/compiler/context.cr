@@ -13,6 +13,7 @@ class Mare::Compiler::Context
   getter lifetime
   getter namespace
   getter paint
+  getter populate
   getter pre_infer
   getter reach
   getter refer
@@ -41,6 +42,7 @@ class Mare::Compiler::Context
     @lifetime = Lifetime.new
     @namespace = Namespace.new
     @paint = Paint.new
+    @populate = Populate.new
     @pre_infer = PreInfer::Pass.new
     @reach = Reach.new
     @refer = Refer::Pass.new
