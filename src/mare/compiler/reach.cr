@@ -555,10 +555,15 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       new_f = main.resolve(ctx).find_default_constructor?
       handle_func(ctx, ctx.infer[main].no_args, new_f.make_link(main)) if new_f
     end
+
+    # Reach extra functions and types that are used by the runtime,
+    # even if they are not used/reached by the user-written program.
     env = ctx.namespace.prelude_type("Env")
     handle_func(ctx, ctx.infer[env].no_args, env.resolve(ctx).find_func!("_create").make_link(env))
     n = ctx.namespace.prelude_type("AsioEventNotify")
     handle_func(ctx, ctx.infer[n].no_args, n.resolve(ctx).find_func!("_event_notify").make_link(n))
+    string = ctx.namespace.prelude_type("String")
+    handle_type_def(ctx, ctx.infer[string].no_args)
 
     # Run our "sympathetic resonance" mini-pass.
     sympathetic_resonance(ctx)
