@@ -13,7 +13,7 @@ require "levenshtein"
 # This pass keeps state at the per-type and per-function level.
 # This pass produces output state at the per-type and per-function level.
 #
-class Mare::Compiler::Infer < Mare::AST::Visitor
+class Mare::Compiler::Infer
   struct FuncAnalysis
     getter link
 
