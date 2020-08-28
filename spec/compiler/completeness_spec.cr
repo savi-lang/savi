@@ -32,6 +32,58 @@ describe Mare::Compiler::Completeness do
     end
   end
 
+  it "complains when field write is in while loop in constructor" do
+    source = Mare::Source.new_example <<-SOURCE
+    :class Data
+      :prop w U64
+      :new
+        while True (
+          @w = 0
+        )
+    SOURCE
+
+    expected = <<-MSG
+    This field may be read before it is initialized by a constructor:
+    from (example):2:
+      :prop w U64
+            ^
+
+    - traced from a call here:
+      from (example):5:
+        @w = 0
+        ^~~~~~
+    MSG
+
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :completeness)
+    end
+  end
+  it "complains when field write is away in constructor" do
+    source = Mare::Source.new_example <<-SOURCE
+    :class Data
+      :prop w U64
+      :new
+        return
+        @w = 0
+    SOURCE
+
+    expected = <<-MSG
+    This field may be read before it is initialized by a constructor:
+    from (example):2:
+      :prop w U64
+            ^
+
+    - traced from a call here:
+      from (example):5:
+        @w = 0
+        ^~~~~~
+    MSG
+
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :completeness)
+    end
+  end
+
   it "complains when a field is only conditionally initialized" do
     source = Mare::Source.new_example <<-SOURCE
     :class Data

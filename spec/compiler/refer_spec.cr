@@ -130,6 +130,82 @@ describe Mare::Compiler::Refer do
     end
   end
 
+  it "complains when referencing a local declared only in try body" do
+    source = Mare::Source.new_example <<-SOURCE
+    :actor Main
+      :new
+        arr = [""]
+        try (
+          x = arr[1]!
+        )
+        x
+    SOURCE
+
+    expected = <<-MSG
+    This variable can't be used here; it was assigned a value in some but not all branches:
+    from (example):7:
+        x
+        ^
+
+    - it was assigned here:
+      from (example):5:
+          x = arr[1]!
+          ^
+
+    - but there were other possible branches where it wasn't assigned
+    MSG
+
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :refer)
+    end
+  end
+
+  it "complains when referencing a local declared only in try else" do
+    source = Mare::Source.new_example <<-SOURCE
+    :actor Main
+      :new
+        arr = [""]
+        try (
+        |
+          x = ""
+        )
+        x
+    SOURCE
+
+    expected = <<-MSG
+    This variable can't be used here; it was assigned a value in some but not all branches:
+    from (example):8:
+        x
+        ^
+
+    - it was assigned here:
+      from (example):6:
+          x = ""
+          ^
+
+    - but there were other possible branches where it wasn't assigned
+    MSG
+
+    expect_raises Mare::Error, expected do
+      Mare::Compiler.compile([source], :refer)
+    end
+  end
+
+  pending "allows referencing a local declared in try body before any error" do
+    source = Mare::Source.new_example <<-SOURCE
+    :actor Main
+      :new
+        arr = [""]
+        try (
+          x = ""
+          error!
+        )
+        x
+    SOURCE
+
+    Mare::Compiler.compile([source], :refer)
+  end
+
   it "complains when referencing a local declared in only some branches" do
     source = Mare::Source.new_example <<-SOURCE
     :actor Main

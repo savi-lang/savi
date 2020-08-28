@@ -196,6 +196,7 @@ module Mare::Compiler::Refer
     def touch(ctx, node : AST::Try)
       branch_locals = {} of String => Array(Local | LocalUnion)
 
+      # TODO check if variable is defined before error in body branch
       body_branch = sub_branch(ctx, node.body)
       else_branch = sub_branch(ctx, node.else_body)
 
