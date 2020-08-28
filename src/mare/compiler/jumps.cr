@@ -11,14 +11,17 @@
 # This pass produces no output state.
 #
 module Mare::Compiler::Jumps
-  FLAG_ALWAYS_ERROR = 0b1_u8
-  FLAG_MAYBE_ERROR  = 0b10_u8
-  FLAG_ALWAYS_RETURN = 0b100_u8
-  FLAG_MAYBE_RETURN  = 0b1000_u8
-  FLAG_ALWAYS_BREAK = 0b10000_u8
-  FLAG_MAYBE_BREAK  = 0b100000_u8
-  FLAG_ALWAYS_CONTINUE = 0b1000000_u8
-  FLAG_MAYBE_CONTINUE  = 0b10000000_u8
+  FLAG_ALWAYS_ERROR = 1_u16
+  FLAG_MAYBE_ERROR  = 2_u16
+  FLAG_ALWAYS_RETURN = 4_u16
+  FLAG_MAYBE_RETURN  = 8_u16
+  FLAG_ALWAYS_BREAK = 16_u16
+  FLAG_MAYBE_BREAK  = 32_u16
+  FLAG_ALWAYS_CONTINUE = 64_u16
+  FLAG_MAYBE_CONTINUE  = 128_u16
+
+  # MAX
+  FLAG_REAL_AWAY  = 32768_u16
 
   alias JumpKind = AST::Jump::Kind
 
@@ -26,38 +29,35 @@ module Mare::Compiler::Jumps
     getter catches
 
     def initialize
-      @flags = {} of AST::Node => {UInt8, Bool}
+      @flags = {} of AST::Node => UInt16
       @catches = {} of AST::Node => Array(AST::Jump)
       @check_unreal = false
     end
 
-    def set_flag(node, flag_bit, is_real = true)
-      flags = @flags[node]?
-      if flags
-        bits, is_real = flags
-        @flags[node] = {bits | flag_bit, is_real}
-      else
-        @flags[node] = {flag_bit, is_real}
-      end
+    def set_flag(node, flag_bit)
+      bits = @flags[node]?
+      @flags[node] = bits ? bits | flag_bit : flag_bit
       nil
-    rescue
+    end
+
+    def set_real_flag(node, flag_bit)
+      set_flag(node, flag_bit | FLAG_REAL_AWAY)
     end
 
     private def unset_flag(node, flag_bit)
-      bits, is_real = @flags[node]
-      @flags[node] = {bits & ~flag_bit, is_real}
+      bits = @flags[node]
+      @flags[node] = bits & ~flag_bit
       nil
     rescue
     end
 
     private def has_flag?(node, flag_bit)
-      bits, is_real = @flags[node]
+      bits = @flags[node]?
+      return false unless bits
       unless @check_unreal
-        return false unless is_real
+        return false if (bits & FLAG_REAL_AWAY) == 0
       end
       (bits & flag_bit) != 0
-    rescue
-      false
     end
 
     def check_unreal(&block)
@@ -73,17 +73,17 @@ module Mare::Compiler::Jumps
       @catches[node] << jump
     end
 
-    protected def always_error!(node); set_flag(node, FLAG_ALWAYS_ERROR) end
-    protected def maybe_error!(node); set_flag(node, FLAG_MAYBE_ERROR) end
+    protected def always_error!(node); set_real_flag(node, FLAG_ALWAYS_ERROR) end
+    protected def maybe_error!(node); set_real_flag(node, FLAG_MAYBE_ERROR) end
 
-    protected def always_return!(node); set_flag(node, FLAG_ALWAYS_RETURN) end
-    protected def maybe_return!(node); set_flag(node, FLAG_MAYBE_RETURN) end
+    protected def always_return!(node); set_real_flag(node, FLAG_ALWAYS_RETURN) end
+    protected def maybe_return!(node); set_real_flag(node, FLAG_MAYBE_RETURN) end
 
-    protected def always_break!(node); set_flag(node, FLAG_ALWAYS_BREAK) end
-    protected def maybe_break!(node); set_flag(node, FLAG_MAYBE_BREAK) end
+    protected def always_break!(node); set_real_flag(node, FLAG_ALWAYS_BREAK) end
+    protected def maybe_break!(node); set_real_flag(node, FLAG_MAYBE_BREAK) end
 
-    protected def always_continue!(node); set_flag(node, FLAG_ALWAYS_CONTINUE) end
-    protected def maybe_continue!(node); set_flag(node, FLAG_MAYBE_CONTINUE) end
+    protected def always_continue!(node); set_real_flag(node, FLAG_ALWAYS_CONTINUE) end
+    protected def maybe_continue!(node); set_real_flag(node, FLAG_MAYBE_CONTINUE) end
 
     def always_error?(node); has_flag?(node, FLAG_ALWAYS_ERROR) end
     def maybe_error?(node); has_flag?(node, FLAG_MAYBE_ERROR) end
@@ -196,7 +196,7 @@ module Mare::Compiler::Jumps
     end
 
     def touch(node : AST::Group)
-      away_flag = 0_u8
+      away_flag = 0_u16
       visitor = AwayVisitor.new(@analysis, away_flag)
 
       node.terms.each do |t|
@@ -221,21 +221,16 @@ module Mare::Compiler::Jumps
           @analysis.maybe_continue!(node)
         end
         begin
-          away_flag |= @analysis.@flags[t][0]
+          away_flag |= @analysis.@flags[t]
+          away_flag &= ~FLAG_REAL_AWAY
         rescue
         end
 
-        @analysis.set_flag(node, away_flag)
+        @analysis.set_real_flag(node, away_flag)
 
         if away_flag > 0 && node.style == ":"
           visitor.away_flag = away_flag
-          write_unreal_flags = true
-          if flags = @analysis.@flags[t]?
-            write_unreal_flags = false if flags[1]
-          end
-          if write_unreal_flags
-            @analysis.set_flag(t, away_flag, false)
-          end
+          @analysis.set_flag(t, away_flag)
           t.accept(@ctx, visitor)
         end
       end
@@ -524,19 +519,14 @@ module Mare::Compiler::Jumps
 
   class AwayVisitor < Mare::AST::Visitor
     getter analysis : Analysis
-    property away_flag : UInt8
+    property away_flag : UInt16
 
     def initialize(@analysis, @away_flag)
     end
 
     def visit(ctx, node)
       write_unreal_flags = true
-      if flags = @analysis.@flags[node]?
-        write_unreal_flags = false if flags[1]
-      end
-      if write_unreal_flags
-        @analysis.set_flag(node, @away_flag, false)
-      end
+      @analysis.set_flag(node, @away_flag)
       node
     end
   end
