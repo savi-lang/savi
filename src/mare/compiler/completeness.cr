@@ -70,7 +70,6 @@ module Mare::Compiler::Completeness
       @all_fields,
       @seen_fields = Set(String).new,
       @call_crumbs = Array(Source::Pos).new,
-      @possibly_away = false,
       @loop_stack = [] of AST::Loop,
     )
       @jumps = @ctx.jumps[@func.link]
@@ -88,7 +87,6 @@ module Mare::Compiler::Completeness
       next_f_link : Program::Function::Link,
       next_f_cap : String,
       call_crumb : Source::Pos,
-      possibly_away = false,
     )
       # TODO: should we use a specific cap here, or is any of them acceptable?
       reify_cap =
@@ -107,7 +105,7 @@ module Mare::Compiler::Completeness
       branch_cache.fetch cache_key do
         branch_cache[cache_key] = branch =
           Branch.new(ctx, type, next_rf, branch_cache, all_fields,
-            seen_fields.dup, call_crumbs.dup, possibly_away, @loop_stack)
+            seen_fields.dup, call_crumbs.dup)
         branch.call_crumbs << call_crumb
         next_rf.func(ctx).body.not_nil!.accept(ctx, branch)
         branch
@@ -164,13 +162,11 @@ module Mare::Compiler::Completeness
     end
 
     def touch(node : AST::FieldWrite)
-      seen_fields.add(node.value) unless @possibly_away ||\
-        !@loop_stack.empty? || @jumps.away_possibly_unreal?(node)
+      seen_fields.add(node.value)
     end
 
     def touch(node : AST::FieldReplace)
-      seen_fields.add(node.value) unless @possibly_away ||\
-        !@loop_stack.empty? || @jumps.away_possibly_unreal?(node)
+      seen_fields.add(node.value)
     end
 
     def touch(node : AST::Identifier)
@@ -217,7 +213,8 @@ module Mare::Compiler::Completeness
       # not all fields are initialized - we will follow the call and continue
       # our branching analysis of field initialization in that other function.
       lhs = node.lhs
-      if lhs.is_a?(AST::Identifier) && lhs.value == "@"
+      if lhs.is_a?(AST::Identifier) && lhs.value == "@" && \
+          !@jumps.away_possibly_unreal?(node) && @loop_stack.empty?
         # Extract the function name from the right side.
         func_name = AST::Extract.call(node)[0].value
 
@@ -225,7 +222,7 @@ module Mare::Compiler::Completeness
         # seen in that branch as if they had been seen in this branch.
         next_f = type.defn(ctx).find_func!(func_name)
         next_f_cap = next_f.cap.value # TODO: reify with which cap?
-        branch = sub_branch(next_f.make_link(type.link), next_f_cap, node.pos, @jumps.away_possibly_unreal?(node))
+        branch = sub_branch(next_f.make_link(type.link), next_f_cap, node.pos)
         seen_fields.concat(branch.seen_fields)
       end
     end

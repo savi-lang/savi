@@ -43,15 +43,15 @@ describe Mare::Compiler::Completeness do
     SOURCE
 
     expected = <<-MSG
-    This field may be read before it is initialized by a constructor:
-    from (example):2:
+    This constructor doesn't initialize all of its fields:
+    from (example):3:
+      :new
+       ^~~
+
+    - this field didn't get initialized:
+      from (example):2:
       :prop w U64
             ^
-
-    - traced from a call here:
-      from (example):5:
-        @w = 0
-        ^~~~~~
     MSG
 
     expect_raises Mare::Error, expected do
@@ -68,15 +68,15 @@ describe Mare::Compiler::Completeness do
     SOURCE
 
     expected = <<-MSG
-    This field may be read before it is initialized by a constructor:
-    from (example):2:
+    This constructor doesn't initialize all of its fields:
+    from (example):3:
+      :new
+       ^~~
+
+    - this field didn't get initialized:
+      from (example):2:
       :prop w U64
             ^
-
-    - traced from a call here:
-      from (example):5:
-        @w = 0
-        ^~~~~~
     MSG
 
     expect_raises Mare::Error, expected do
