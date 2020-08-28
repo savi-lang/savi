@@ -199,22 +199,23 @@ module Mare::Compiler::Refer
       body_branch = sub_branch(ctx, node.body)
       else_branch = sub_branch(ctx, node.else_body)
 
-      else_branch.locals.each do |name, local|
+      body_branch.locals.each do |name, local|
         next if locals[name]?
         (branch_locals[name] ||= Array(Local | LocalUnion).new) << local
       end
 
-      body_branch.locals.each do |name, local|
+      else_branch.locals.each do |name, local|
         next if locals[name]?
-        locals = branch_locals[name]?
-        locals << local if locals
+        (branch_locals[name] ||= Array(Local | LocalUnion).new) << local
       end
 
       # Expose the locals from the branches as LocalUnion instances.
       # Those locals that were exposed in only some of the branches are to be
       # marked as incomplete, so that we'll see an error if we try to use them.
       branch_locals.each do |name, list|
-        @sub_locals[name] = LocalUnion.build(list)
+        info = LocalUnion.build(list)
+        info.incomplete = true if list.size < 2
+        @sub_locals[name] = info
       end
     end
 
