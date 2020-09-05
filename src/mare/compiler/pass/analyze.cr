@@ -27,7 +27,12 @@ abstract class Mare::Compiler::Pass::Analyze(TypeAliasAnalysis, TypeAnalysis, Fu
 
     # Run for each of the types in the library.
     library.types.each do |t|
-      run_for_type(ctx, t, t.make_link(library))
+      t_analysis = run_for_type(ctx, t, t_link = t.make_link(library))
+
+      # Run for each of the functions in the type.
+      t.functions.each do |f|
+        run_for_func(ctx, f, f.make_link(t_link), t_analysis)
+      end
     end
   end
 
@@ -35,7 +40,7 @@ abstract class Mare::Compiler::Pass::Analyze(TypeAliasAnalysis, TypeAnalysis, Fu
     ctx : Context,
     t : Program::TypeAlias,
     t_link : Program::TypeAlias::Link
-  )
+  ) : TypeAliasAnalysis
     # If we already have an analysis completed for the type, return it.
     already_analysis = @for_alias[t_link]?
     return already_analysis if already_analysis
@@ -48,18 +53,13 @@ abstract class Mare::Compiler::Pass::Analyze(TypeAliasAnalysis, TypeAnalysis, Fu
     ctx : Context,
     t : Program::Type,
     t_link : Program::Type::Link
-  )
+  ) : TypeAnalysis
     # If we already have an analysis completed for the type, return it.
     already_analysis = @for_type[t_link]?
     return already_analysis if already_analysis
 
     # Generate the analysis for the type and save it to our map.
     @for_type[t_link] = t_analysis = analyze_type(ctx, t, t_link)
-
-    # Run for each of the functions in the type.
-    t.functions.each do |f|
-      run_for_func(ctx, f, f.make_link(t_link), t_analysis)
-    end
   end
 
   def run_for_func(
@@ -67,7 +67,7 @@ abstract class Mare::Compiler::Pass::Analyze(TypeAliasAnalysis, TypeAnalysis, Fu
     f : Program::Function,
     f_link : Program::Function::Link,
     optional_t_analysis : TypeAnalysis? = nil
-  )
+  ) : FuncAnalysis
     # If we already have an analysis completed for the function, return it.
     already_analysis = @for_func[f_link]?
     return already_analysis if already_analysis
