@@ -7,6 +7,7 @@ class Mare::Compiler
     property print_ir
     property print_perf
     property binary_name
+    property target_pass : Symbol?
 
     DEFAULT_BINARY_NAME = "main"
 
@@ -15,8 +16,44 @@ class Mare::Compiler
       @no_debug = false,
       @print_ir = false,
       @print_perf = false,
-      @binary_name = DEFAULT_BINARY_NAME
+      @binary_name = DEFAULT_BINARY_NAME,
+      @target_pass = nil
     )
+    end
+  end
+
+  def self.pass_symbol(pass)
+    case pass
+    when "import"           then :import
+    when "namespace"        then :namespace
+    when "macros"           then :macros
+    when "sugar"            then :sugar
+    when "refer_type"       then :refer_type
+    when "populate"         then :populate
+    when "lambda"           then :lambda
+    when "refer"            then :refer
+    when "classify"         then :classify
+    when "jumps"            then :jumps
+    when "consumes"         then :consumes
+    when "inventory"        then :inventory
+    when "pre_infer"        then :pre_infer
+    when "alt_infer"        then :alt_infer
+    when "infer"            then :infer
+    when "privacy"          then :privacy
+    when "completeness"     then :completeness
+    when "reach"            then :reach
+    when "verify"           then :verify
+    when "paint"            then :paint
+    when "codegen"          then :codegen
+    when "lifetime"         then :lifetime
+    when "codegen_verona"   then :codegen_verona
+    when "eval"             then :eval
+    when "binary"           then :binary
+    when "binary_verona"    then :binary_verona
+    when "serve_hover"      then :serve_hover
+    when "serve_definition" then :serve_definition
+    when "serve_lsp"        then :serve_lsp
+    else raise NotImplementedError.new(pass)
     end
   end
 
@@ -36,6 +73,7 @@ class Mare::Compiler
       when :consumes         then ctx.run(ctx.consumes)
       when :inventory        then ctx.run(ctx.inventory)
       when :pre_infer        then ctx.run(ctx.pre_infer)
+      when :alt_infer        then ctx.run(ctx.alt_infer)
       when :infer            then ctx.run_whole_program(ctx.infer)
       when :privacy          then ctx.run(Privacy)
       when :completeness     then ctx.run(Completeness)
@@ -76,6 +114,7 @@ class Mare::Compiler
     when :consumes then [:jumps, :refer]
     when :inventory then [:refer]
     when :pre_infer then [:inventory, :jumps, :classify, :refer, :lambda, :populate]
+    when :alt_infer then [:pre_infer, :classify, :refer_type]
     when :infer then [:pre_infer, :classify, :refer_type]
     when :privacy then [:infer]
     when :completeness then [:jumps, :infer, :lambda, :sugar, :macros, :populate]

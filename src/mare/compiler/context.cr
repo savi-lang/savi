@@ -2,6 +2,7 @@ class Mare::Compiler::Context
   getter program
   getter import
 
+  getter alt_infer
   getter classify
   getter code_gen
   getter code_gen_verona
@@ -30,6 +31,7 @@ class Mare::Compiler::Context
     @program = Program.new
     @stack = [] of Interpreter
 
+    @alt_infer = AltInfer::Pass.new
     @classify = Classify::Pass.new
     @code_gen = CodeGen.new(CodeGen::PonyRT)
     @code_gen_verona = CodeGen.new(CodeGen::VeronaRT)

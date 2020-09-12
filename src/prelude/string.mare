@@ -208,7 +208,7 @@
   :fun "*" (times USize)
     if (times > 0) (
       ptr = @_ptr._alloc(@size * times)
-      size = 0
+      size USize = 0
 
       while (times > 0) (times -= 1
         @_ptr._copy_to(ptr._offset(size), @size)

@@ -73,7 +73,9 @@ abstract class Mare::Compiler::Pass::Analyze(TypeAliasAnalysis, TypeAnalysis, Fu
     return already_analysis if already_analysis
 
     # If the caller didn't supply the analysis for the type, we look it up.
-    t_analysis = optional_t_analysis || @for_type[f_link.type]
+    t_link = f_link.type
+    t_analysis = optional_t_analysis || @for_type[t_link]? \
+      || run_for_type(ctx, t_link.resolve(ctx), t_link)
 
     # Generate the analysis for the function and save it to our map.
     @for_func[f_link] = analyze_func(ctx, f, f_link, t_analysis)

@@ -92,6 +92,28 @@ struct Mare::Compiler::Infer::MetaType::Union
     defns
   end
 
+  def alt_find_callable_func_defns(ctx, infer : AltInfer::Visitor?, name : String)
+    list = [] of Tuple(Inner, Infer::ReifiedType?, Program::Function?)
+
+    # Every nominal in the union must have an implementation of the call.
+    # If it doesn't, we will collect it here as a failure to find it.
+    terms.not_nil!.each do |term|
+      defn = term.defn
+      result = term.alt_find_callable_func_defns(ctx, infer, name)
+      result ||= [{term, (defn if defn.is_a?(Infer::ReifiedType)), nil}]
+      list.concat(result)
+    end if terms
+
+    # Every intersection must have one or more implementations of the call.
+    # Otherwise, it will return some error infomration in its list for us.
+    intersects.not_nil!.each do |intersect|
+      result = intersect.alt_find_callable_func_defns(ctx, infer, name).not_nil!
+      list.concat(result)
+    end if intersects
+
+    list
+  end
+
   def find_callable_func_defns(ctx, infer : ForReifiedFunc?, name : String)
     list = [] of Tuple(Inner, Infer::ReifiedType?, Program::Function?)
 

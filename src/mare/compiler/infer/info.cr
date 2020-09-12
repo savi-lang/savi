@@ -47,6 +47,10 @@ class Mare::Compiler::Infer
 
     abstract def add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
 
+    def resolve_span!(ctx : Context, infer : AltInfer::Visitor)
+      raise NotImplementedError.new("resolve_span! for #{self.class}")
+    end
+
     abstract def tethers(querent : Info) : Array(Tether)
     def tether_terminal?
       false
@@ -69,7 +73,7 @@ class Mare::Compiler::Infer
 
     # For Info types which represent a tree of Info nodes, they should override
     # this method to resolve everything in their tree.
-    def resolve_others!(ctx : Context, infer : ForReifiedFunc)
+    def resolve_others!(ctx : Context, infer)
     end
 
     # In the rare case that an Info subclass needs to dynamically pretend to be
@@ -273,6 +277,52 @@ class Mare::Compiler::Infer
       @pos = explicit.pos
     end
 
+    def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
+      explicit = @explicit
+
+      if explicit
+        explicit_span = infer.resolve(ctx, explicit)
+
+        if !explicit_span.points.any?(&.first.cap_only?)
+          # If we have an explicit type that is more than just a cap, return it.
+          explicit_span
+        elsif !@upstreams.empty?
+          # If there are upstreams, use the explicit cap applied to the type of
+          # each span entry of the upstreams, which becomes the canonical span.
+          AltInfer::Span.join(
+            # TODO: map across all upstreams if we can avoid infinite recursion
+            [@upstreams.first].map { |info, pos| infer.resolve(ctx, info) }
+          ).combine_mt(explicit_span) { |upstream_mt, cap_mt|
+            upstream_mt.strip_cap.intersect(cap_mt).strip_ephemeral
+          }
+        else
+          # If we have no upstreams and an explicit cap, return a span with
+          # the empty trait called `Any` intersected with that cap.
+          explicit_span.transform_mt do |explicit_mt|
+            any = MetaType.new_nominal(infer.prelude_reified_type(ctx, "Any"))
+            any.intersect(explicit_mt)
+          end
+        end
+      elsif !@upstreams.empty?
+        # If we only have upstreams to go on, return the join of upstream spans.
+        AltInfer::Span.join(
+          # TODO: map across all upstreams if we can avoid infinite recursion
+          [@upstreams.first].map { |info, pos| infer.resolve(ctx, info) }
+        )
+      elsif !downstreams_empty?
+        # If we only have downstreams, just do our best with those.
+        AltInfer::Span.combine_mts(
+          @downstreams.map do |pos, info, aliases|
+            infer.resolve(ctx, info)
+          end
+        ) { |mts| MetaType.new_intersection(mts).simplify(ctx).strip_ephemeral }
+      else
+        # If we get here, we've failed and don't have enough info to continue.
+        Error.at self,
+          "This #{described_kind} needs an explicit type; it could not be inferred"
+      end
+    end
+
     def tethers(querent : Info) : Array(Tether)
       results = [] of Tether
       results.concat(Tether.chain(@explicit.not_nil!, querent)) if @explicit
@@ -376,11 +426,15 @@ class Mare::Compiler::Infer
       @resolvables = [] of Info
     end
 
+    def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
+      infer.prelude_type_span(ctx, @name)
+    end
+
     def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
       MetaType.new(infer.reified_prelude_type(@name))
     end
 
-    def resolve_others!(ctx : Context, infer : ForReifiedFunc)
+    def resolve_others!(ctx : Context, infer)
       @resolvables.each { |resolvable| infer.resolve(ctx, resolvable) }
     end
   end
@@ -391,6 +445,10 @@ class Mare::Compiler::Infer
     def describe_kind : String; "type expression" end
 
     def initialize(@pos, @node)
+    end
+
+    def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
+      infer.type_expr_span(ctx, @node)
     end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
@@ -406,6 +464,10 @@ class Mare::Compiler::Infer
     def initialize(@pos, @node)
     end
 
+    def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
+      infer.type_expr_span(ctx, @node)
+    end
+
     def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
       infer.type_expr(@node)
     end
@@ -418,6 +480,19 @@ class Mare::Compiler::Infer
     def describe_kind : String; "singleton value for this type" end
 
     def initialize(@pos, @node, @type_param_ref = nil)
+    end
+
+    def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
+      # If this node is further qualified, we don't want to both resolving it,
+      # and doing so would trigger errors during type argument validation,
+      # because the type arguments haven't been applied yet; they will be
+      # applied in a different FixedSingleton that wraps this one in range.
+      # We don't have to resolve it because nothing will ever be its downstream.
+      return AltInfer::Span.simple(Infer::MetaType.unsatisfiable) \
+        if @node.is_a?(AST::Identifier) \
+        && infer.classify.further_qualified?(@node)
+
+      infer.type_expr_span(ctx, @node).transform_mt(&.override_cap("non"))
     end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
@@ -447,6 +522,10 @@ class Mare::Compiler::Infer
       end
     end
 
+    def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
+      AltInfer::Span.self_with_reify_cap(ctx, infer)
+    end
+
     def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
       infer.analysis.resolved_self
     end
@@ -456,6 +535,10 @@ class Mare::Compiler::Infer
     def describe_kind : String; "constructed object" end
 
     def initialize(@pos, @cap : String)
+    end
+
+    def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
+      AltInfer::Span.self_ephemeral_with_cap(ctx, infer, @cap)
     end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
@@ -541,6 +624,11 @@ class Mare::Compiler::Infer
       end
     end
 
+    def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
+      # TODO: narrow possible based on downstreams/tethers.
+      AltInfer::Span.simple(@possible)
+    end
+
     def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
       tether_constraints = tether_constraints(ctx, infer)
 
@@ -619,6 +707,22 @@ class Mare::Compiler::Infer
       @upstreams << upstream
     end
 
+    def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
+      AltInfer::Span.self_with_reify_cap(ctx, infer).expand do |call_mt, conds|
+        call_defn = call_mt.single!
+        call_func = call_defn.defn(ctx).functions.find do |f|
+          f.ident.value == @name && f.has_tag?(:field)
+        end.not_nil!
+
+        call_link = call_func.make_link(call_defn.link)
+        ret_span = infer
+          .depends_on_call_ret_span(ctx, call_func, call_link)
+          .filter_remove_cond(:f_cap, call_mt.cap_only)
+
+        ret_span.points
+      end
+    end
+
     def tether_terminal?
       true
     end
@@ -631,7 +735,7 @@ class Mare::Compiler::Infer
       follow_field(ctx, infer)
     end
 
-    def resolve_others!(ctx : Context, infer : ForReifiedFunc)
+    def resolve_others!(ctx : Context, infer)
       @upstreams.each { |upstream| infer.resolve(ctx, upstream) }
     end
 
@@ -662,6 +766,12 @@ class Mare::Compiler::Infer
       @field.pos
     end
 
+    def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
+      origin_span = infer.resolve(ctx, @origin)
+      field_span = infer.resolve(ctx, @field)
+      origin_span.combine_mt(field_span) { |o, f| f.viewed_from(o).alias }
+    end
+
     def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
       origin_mt = infer.resolve(ctx, @origin)
       field_mt = infer.resolve(ctx, @field)
@@ -677,6 +787,12 @@ class Mare::Compiler::Infer
 
     def pos
       @field.pos
+    end
+
+    def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
+      origin_span = infer.resolve(ctx, @origin)
+      field_span = infer.resolve(ctx, @field)
+      origin_span.combine_mt(field_span) { |o, f| f.extracted_from(o).ephemeralize }
     end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
@@ -708,7 +824,7 @@ class Mare::Compiler::Infer
       MetaType.new(MetaType::Unsatisfiable.instance)
     end
 
-    def resolve_others!(ctx : Context, infer : ForReifiedFunc) : MetaType
+    def resolve_others!(ctx : Context, infer)
       infer.resolve(ctx, term)
     end
   end
@@ -750,11 +866,15 @@ class Mare::Compiler::Infer
       final_term.add_peer_hint(peer)
     end
 
+    def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
+      infer.resolve(ctx, final_term)
+    end
+
     def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
       infer.resolve(ctx, final_term)
     end
 
-    def resolve_others!(ctx : Context, infer : ForReifiedFunc)
+    def resolve_others!(ctx : Context, infer)
       terms.each { |term| infer.resolve(ctx, term) }
     end
   end
@@ -777,6 +897,15 @@ class Mare::Compiler::Infer
         prior_bodies.each { |prior_body| body.add_peer_hint(prior_body) }
         prior_bodies << body
       end
+    end
+
+    def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
+      # TODO: split into different spans if conds can be statically determined
+      return AltInfer::Span.join(
+        @branches.map { |cond, body, body_jumps_away|
+          infer.resolve(ctx, body) unless body_jumps_away
+        }.compact
+      )
     end
 
     def tether_upward_transform(ctx : Context, infer : ForReifiedFunc, meta_type : MetaType) : MetaType
@@ -899,7 +1028,7 @@ class Mare::Compiler::Infer
       )
     end
 
-    def resolve_others!(ctx : Context, infer : ForReifiedFunc)
+    def resolve_others!(ctx : Context, infer)
       early_breaks.each { |jump| infer.resolve(ctx, jump) }
       early_continues.each { |jump| infer.resolve(ctx, jump) }
     end
@@ -923,7 +1052,7 @@ class Mare::Compiler::Infer
       MetaType.new(infer.reified_prelude_type("Bool"))
     end
 
-    def resolve_others!(ctx : Context, infer : ForReifiedFunc)
+    def resolve_others!(ctx : Context, infer)
       infer.resolve(ctx, @lhs)
       infer.resolve(ctx, @refine_type)
     end
@@ -1071,6 +1200,10 @@ class Mare::Compiler::Infer
     def initialize(@pos, @local)
     end
 
+    def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
+      infer.resolve(ctx, @local).transform_mt(&.ephemeralize)
+    end
+
     def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
       infer.resolve(ctx, @local).ephemeralize
     end
@@ -1139,11 +1272,15 @@ class Mare::Compiler::Infer
       @lhs.add_peer_hint(peer)
     end
 
+    def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
+      infer.resolve(ctx, @lhs).transform_mt(&.alias)
+    end
+
     def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
       infer.resolve(ctx, @lhs).alias
     end
 
-    def resolve_others!(ctx : Context, infer : ForReifiedFunc)
+    def resolve_others!(ctx : Context, infer)
       infer.resolve(ctx, @rhs)
     end
   end
@@ -1167,11 +1304,15 @@ class Mare::Compiler::Infer
       @yield_in.add_peer_hint(peer)
     end
 
+    def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
+      infer.resolve(ctx, @yield_in)
+    end
+
     def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
       infer.resolve(ctx, @yield_in)
     end
 
-    def resolve_others!(ctx : Context, infer : ForReifiedFunc)
+    def resolve_others!(ctx : Context, infer)
       @terms.each { |term| infer.resolve(ctx, term) }
     end
   end
@@ -1340,6 +1481,29 @@ class Mare::Compiler::Infer
       infer.resolve(ctx, self)
     end
 
+    def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
+      infer.resolve(ctx, @lhs).expand do |lhs_mt, conds|
+        call_defns = lhs_mt.alt_find_callable_func_defns(ctx, infer, @member)
+
+        call_defns.map do |(call_mti, call_defn, call_func)|
+          call_mt = MetaType.new(call_mti) # TODO: remove call_mti?
+
+          puts pos.show unless call_defn && call_func
+          raise NotImplementedError.new({call_mti, call_defn, call_func}) \
+            unless call_defn && call_func
+
+          call_link = call_func.make_link(call_defn.link)
+          ret_span = infer
+            .depends_on_call_ret_span(ctx, call_func, call_link)
+            .filter_remove_cond(:f_cap, call_mt.cap_only)
+
+          ret_mt = Infer::MetaType.new_union(ret_span.points.map(&.first))
+
+          {ret_mt, AltInfer::Span.add_cond(conds, @lhs, MetaType.new(call_mti))}.as(AltInfer::Span::P)
+        end
+      end
+    end
+
     def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
       meta_type = follow_call(ctx, infer)
 
@@ -1379,7 +1543,7 @@ class Mare::Compiler::Infer
       meta_type
     end
 
-    def resolve_others!(ctx : Context, infer : ForReifiedFunc)
+    def resolve_others!(ctx : Context, infer)
       infer.resolve(ctx, infer.f_analysis[@args.not_nil!]) if @args
       infer.resolve(ctx, infer.f_analysis[@yield_block.not_nil!]) if @yield_block
       infer.resolve(ctx, infer.f_analysis[@yield_params.not_nil!]) if @yield_params
@@ -1662,6 +1826,28 @@ class Mare::Compiler::Infer
       infer.resolve(ctx, self)
     end
 
+    def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
+      infer.resolve(ctx, @call.lhs).expand do |lhs_mt, conds|
+        call_defns = lhs_mt.alt_find_callable_func_defns(ctx, infer, @call.member)
+
+        call_defns.map do |(call_mti, call_defn, call_func)|
+          call_mt = MetaType.new(call_mti) # TODO: remove call_mti?
+
+          raise NotImplementedError.new({call_mti, call_defn, call_func}) \
+            unless call_defn && call_func
+
+          call_link = call_func.make_link(call_defn.link)
+          ret_span = infer
+            .depends_on_call_yield_out_span(ctx, call_func, call_link, @index)
+            .filter_remove_cond(:f_cap, call_mt.cap_only)
+
+          ret_mt = Infer::MetaType.new_union(ret_span.points.map(&.first))
+
+          {ret_mt, AltInfer::Span.add_cond(conds, @call.lhs, MetaType.new(call_mti))}.as(AltInfer::Span::P)
+        end
+      end
+    end
+
     def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
       # We must first resolve the FromCall itself to collect the other_infers.
       infer.resolve(ctx, @call)
@@ -1691,6 +1877,28 @@ class Mare::Compiler::Infer
     def describe_kind : String; "expected for the yield result" end
 
     def initialize(@pos, @call)
+    end
+
+    def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
+      infer.resolve(ctx, @call.lhs).expand do |lhs_mt, conds|
+        call_defns = lhs_mt.alt_find_callable_func_defns(ctx, infer, @call.member)
+
+        call_defns.map do |(call_mti, call_defn, call_func)|
+          call_mt = MetaType.new(call_mti) # TODO: remove call_mti?
+
+          raise NotImplementedError.new({call_mti, call_defn, call_func}) \
+            unless call_defn && call_func
+
+          call_link = call_func.make_link(call_defn.link)
+          ret_span = infer
+            .depends_on_call_yield_in_span(ctx, call_func, call_link)
+            .filter_remove_cond(:f_cap, call_mt.cap_only)
+
+          ret_mt = Infer::MetaType.new_union(ret_span.points.map(&.first))
+
+          {ret_mt, AltInfer::Span.add_cond(conds, @call.lhs, MetaType.new(call_mti))}.as(AltInfer::Span::P)
+        end
+      end
     end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
@@ -1744,6 +1952,28 @@ class Mare::Compiler::Infer
         param_mt = other_infer.resolve(ctx, param_info)
 
         {param_info.first_viable_constraint_pos, param_mt}.as({Source::Pos, MetaType})
+      end
+    end
+
+    def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
+      infer.resolve(ctx, @call.lhs).expand do |lhs_mt, conds|
+        call_defns = lhs_mt.alt_find_callable_func_defns(ctx, infer, @call.member)
+
+        call_defns.map do |(call_mti, call_defn, call_func)|
+          call_mt = MetaType.new(call_mti) # TODO: remove call_mti?
+
+          raise NotImplementedError.new({call_mti, call_defn, call_func}) \
+            unless call_defn && call_func
+
+          call_link = call_func.make_link(call_defn.link)
+          param_span = infer
+            .depends_on_call_param_span(ctx, call_func, call_link, @index)
+            .filter_remove_cond(:f_cap, call_mt.cap_only)
+
+          param_mt = Infer::MetaType.new_union(param_span.points.map(&.first))
+
+          {param_mt, AltInfer::Span.add_cond(conds, @call.lhs, MetaType.new(call_mti))}.as(AltInfer::Span::P)
+        end
       end
     end
 

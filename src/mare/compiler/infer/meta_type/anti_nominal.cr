@@ -16,6 +16,10 @@ struct Mare::Compiler::Infer::MetaType::AntiNominal
     ([] of ReifiedType)
   end
 
+  def alt_find_callable_func_defns(ctx, infer : AltInfer::Visitor?, name : String)
+    nil
+  end
+
   def find_callable_func_defns(ctx, infer : ForReifiedFunc?, name : String)
     nil
   end

@@ -15,6 +15,7 @@ module Mare
       option "--print-ir", desc: "Print generated LLVM IR", type: Bool, default: false
       option "--print-perf", desc: "Print compiler performance info", type: Bool, default: false
       option "-o NAME", "--output=NAME", desc: "Name of the output binary"
+      option "-p NAME", "--pass=NAME", desc: "Name of the compiler pass to target"
       run do |opts, args|
         options = Mare::Compiler::CompilerOptions.new(
           release: opts.release,
@@ -22,9 +23,8 @@ module Mare
           print_ir: opts.print_ir,
           print_perf: opts.print_perf,
         )
-        if opts.output
-          options.binary_name = opts.output.not_nil!
-        end
+        options.binary_name = opts.output.not_nil! if opts.output
+        options.target_pass = Mare::Compiler.pass_symbol(opts.pass) if opts.pass
         Cli.compile options, opts.backtrace
       end
       sub "server" do
@@ -67,6 +67,7 @@ module Mare
         option "--no-debug", desc: "Compile without debug info", type: Bool, default: false
         option "--print-ir", desc: "Print generated LLVM IR", type: Bool, default: false
         option "--print-perf", desc: "Print compiler performance info", type: Bool, default: false
+        option "-p NAME", "--pass=NAME", desc: "Name of the compiler pass to target"
         run do |opts, args|
           options = Mare::Compiler::CompilerOptions.new(
             release: opts.release,
@@ -74,6 +75,7 @@ module Mare
             print_ir: opts.print_ir,
             print_perf: opts.print_perf,
           )
+          options.target_pass = Mare::Compiler.pass_symbol(opts.pass) if opts.pass
           Cli.run options, opts.backtrace
         end
       end
@@ -127,14 +129,14 @@ module Mare
 
     def self.compile(options, backtrace = false)
       _add_backtrace backtrace do
-        Mare.compiler.compile(Dir.current, :binary, options)
+        Mare.compiler.compile(Dir.current, options.target_pass || :binary, options)
         0
       end
     end
 
     def self.run(options, backtrace = false)
       _add_backtrace backtrace do
-        Mare.compiler.compile(Dir.current, :eval, options).eval.exitcode
+        Mare.compiler.compile(Dir.current, options.target_pass || :eval, options).eval.exitcode
       end
     end
 
