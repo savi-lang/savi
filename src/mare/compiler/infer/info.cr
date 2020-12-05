@@ -315,7 +315,7 @@ class Mare::Compiler::Infer
           @downstreams.map do |pos, info, aliases|
             infer.resolve(ctx, info)
           end
-        ) { |mts| MetaType.new_intersection(mts).simplify(ctx).strip_ephemeral }
+        ) { |mts| MetaType.new_intersection(mts).strip_ephemeral }
       else
         # If we get here, we've failed and don't have enough info to continue.
         Error.at self,
@@ -1337,6 +1337,60 @@ class Mare::Compiler::Infer
 
     def tether_upward_transform(ctx : Context, infer : ForReifiedFunc, meta_type : MetaType) : MetaType
       meta_type
+    end
+
+    def possible_element_antecedents_span(ctx, infer) : AltInfer::Span
+      array_info = self
+      downstream_spans =
+        @downstreams.map { |pos, info, aliases| infer.resolve(ctx, info) }
+
+      return AltInfer::Span.new if downstream_spans.empty?
+
+      AltInfer::Span
+      .combine_mts(downstream_spans) { |mts| MetaType.new_intersection(mts) }
+      .expand { |mt, conds|
+        mt.each_reachable_defn_with_cap(ctx).map { |rt, cap|
+          cap_conds =
+            AltInfer::Span.add_cond(conds, array_info, MetaType.new(cap))
+              .as(AltInfer::Span::C?)
+
+          # TODO: Support more element antecedent detection patterns.
+          if rt.link.name == "Array" && rt.args.size == 1
+            {rt.args.first, cap_conds}
+          end
+        }.compact
+      }
+    end
+
+    def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
+      # By default, an array literal has a cap of `ref`.
+      # TODO: span should allow ref, val, trn, or iso cap possibilities.
+      array_cap = MetaType::Capability::REF
+
+      ante_span = possible_element_antecedents_span(ctx, infer)
+
+      elem_spans = terms.map { |term| infer.resolve(ctx, term).as(AltInfer::Span) }
+      elem_span = AltInfer::Span.combine_mts(elem_spans) { |mts| MetaType.new_union(mts) }
+
+      elem_span =
+        if ante_span.points.empty?
+          elem_span
+        elsif elem_span.points.empty?
+          ante_span
+        else
+          ante_span.combine_mt(elem_span) { |ante_mt, elem_mt|
+            ante_mt.intersect(elem_mt)
+          }
+        end
+
+      elem_span.transform { |elem_mt, conds|
+        array_cap = AltInfer::Span.get_cond(conds, self).try(&.inner.as(MetaType::Capability)) || MetaType::Capability::REF
+
+        rt = infer.prelude_reified_type(ctx, "Array", [elem_mt])
+        mt = MetaType.new(rt, array_cap.value.as(String))
+
+        {mt, conds}
+      }
     end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType

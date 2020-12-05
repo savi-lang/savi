@@ -44,6 +44,15 @@ module Mare::Compiler::AltInfer
       res
     end
 
+    def self.get_cond(a : C?, k : CK) : Infer::MetaType?
+      return nil unless a
+      a[k]?
+    end
+
+    def self.get_cond!(a : C?, k : CK) : Infer::MetaType
+      get_cond(a, k).not_nil!
+    end
+
     def self.merge_conds(a : C?, b : C?) : C?
       return nil if !a && !b
       return a if !b
@@ -100,6 +109,10 @@ module Mare::Compiler::AltInfer
       Span.new(points.flat_map { |mt, conds| (yield mt, conds) })
     end
 
+    def transform : Span
+      Span.new(points.map { |mt, conds| (yield mt, conds) })
+    end
+
     def transform_mt : Span
       Span.new(points.map { |mt, conds| {(yield mt), conds} })
     end
@@ -129,6 +142,7 @@ module Mare::Compiler::AltInfer
     end
 
     def self.combine_mts(spans : Array(Span))
+      return Span.new if spans.empty?
       spans[0].combine_mts(spans[1..-1]) do |mt, other_mts|
         yield [mt] + other_mts
       end
@@ -220,8 +234,8 @@ module Mare::Compiler::AltInfer
       func.ident
     end
 
-    def prelude_reified_type(ctx : Context, name : String)
-      Infer::ReifiedType.new(ctx.namespace.prelude_type(name))
+    def prelude_reified_type(ctx : Context, name : String, args = [] of Infer::MetaType)
+      Infer::ReifiedType.new(ctx.namespace.prelude_type(name), args)
     end
 
     def prelude_type_span(ctx : Context, name : String)
