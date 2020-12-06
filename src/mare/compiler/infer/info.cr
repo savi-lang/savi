@@ -1185,6 +1185,14 @@ class Mare::Compiler::Infer
     def initialize(@pos, @refine, @refine_type, @positive_check)
     end
 
+    def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
+      infer.resolve(ctx, @refine)
+      .combine_mt(infer.resolve(ctx, @refine_type)) { |lhs_mt, rhs_mt|
+        rhs_mt = rhs_mt.strip_cap.negate if !@positive_check
+        lhs_mt.intersect(rhs_mt)
+      }
+    end
+
     def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
       rhs_mt = infer.resolve(ctx, @refine_type)
       rhs_mt = rhs_mt.strip_cap.negate if !positive_check
