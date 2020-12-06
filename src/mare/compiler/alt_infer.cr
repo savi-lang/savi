@@ -190,17 +190,31 @@ module Mare::Compiler::AltInfer
     end
 
     def depends_on_call_ret_span(ctx, other_f, other_f_link)
-      # TODO: Track dependencies and invalidate cache based on those.
-      other_pre = ctx.pre_infer.run_for_func(ctx, other_f, other_f_link)
-      other_analysis = ctx.alt_infer.run_for_func(ctx, other_f, other_f_link)
-      other_analysis[other_pre[other_f.ident]]
+      ret_ast = other_f.ret
+      if ret_ast
+        deps = ctx.alt_infer.gather_deps_for_func(ctx, other_f, other_f_link)
+        visitor = Visitor.new(other_f, other_f_link, Analysis.new, *deps)
+        visitor.type_expr_span(ctx, ret_ast)
+      else
+        # TODO: Track dependencies and invalidate cache based on those.
+        other_pre = ctx.pre_infer.run_for_func(ctx, other_f, other_f_link)
+        other_analysis = ctx.alt_infer.run_for_func(ctx, other_f, other_f_link)
+        other_analysis[other_pre[other_f.ident]]
+      end
     end
 
     def depends_on_call_param_span(ctx, other_f, other_f_link, index)
-      # TODO: Track dependencies and invalidate cache based on those.
-      other_pre = ctx.pre_infer.run_for_func(ctx, other_f, other_f_link)
-      other_analysis = ctx.alt_infer.run_for_func(ctx, other_f, other_f_link)
-      other_analysis[other_pre[AST::Extract.params(other_f.params)[index].first]]
+      ident_ast, type_ast, default_ast = AST::Extract.params(other_f.params)[index]
+      if type_ast
+        deps = ctx.alt_infer.gather_deps_for_func(ctx, other_f, other_f_link)
+        visitor = Visitor.new(other_f, other_f_link, Analysis.new, *deps)
+        visitor.type_expr_span(ctx, type_ast)
+      else
+        # TODO: Track dependencies and invalidate cache based on those.
+        other_pre = ctx.pre_infer.run_for_func(ctx, other_f, other_f_link)
+        other_analysis = ctx.alt_infer.run_for_func(ctx, other_f, other_f_link)
+        other_analysis[other_pre[AST::Extract.params(other_f.params)[index].first]]
+      end
     end
 
     def depends_on_call_yield_in_span(ctx, other_f, other_f_link)
@@ -357,16 +371,21 @@ module Mare::Compiler::AltInfer
     end
 
     def analyze_func(ctx, f, f_link, t_analysis) : Analysis
-      refer_type = ctx.refer_type[f_link]
-      refer_type_parent = ctx.refer_type[f_link.type]
-      classify = ctx.classify[f_link]
-      pre_infer = ctx.pre_infer[f_link]
-      deps = {refer_type, refer_type_parent, classify, pre_infer}
+      deps = gather_deps_for_func(ctx, f, f_link)
       prev = ctx.prev_ctx.try(&.alt_infer)
 
       maybe_from_func_cache(ctx, prev, f, f_link, deps) do
         Visitor.new(f, f_link, Analysis.new, *deps).tap(&.run(ctx)).analysis
       end
+    end
+
+    def gather_deps_for_func(ctx, f, f_link)
+      refer_type = ctx.refer_type[f_link]
+      refer_type_parent = ctx.refer_type[f_link.type]
+      classify = ctx.classify[f_link]
+      pre_infer = ctx.pre_infer[f_link]
+
+      {refer_type, refer_type_parent, classify, pre_infer}
     end
   end
 end
