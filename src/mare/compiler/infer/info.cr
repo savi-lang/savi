@@ -51,6 +51,12 @@ class Mare::Compiler::Infer
       raise NotImplementedError.new("resolve_span! for #{self.class}")
     end
 
+    def resolve_one!(ctx : Context, infer : TypeCheck::ForReifiedFunc)
+      raise NotImplementedError.new("resolve_one! for #{self.class}")
+    end
+    def post_resolve_one!(ctx : Context, infer : TypeCheck::ForReifiedFunc, mt : MetaType)
+    end
+
     abstract def tethers(querent : Info) : Array(Tether)
     def tether_terminal?
       false
@@ -867,6 +873,10 @@ class Mare::Compiler::Infer
     end
 
     def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
+      infer.resolve(ctx, final_term)
+    end
+
+    def resolve_one!(ctx : Context, infer : TypeCheck::ForReifiedFunc) : MetaType
       infer.resolve(ctx, final_term)
     end
 
