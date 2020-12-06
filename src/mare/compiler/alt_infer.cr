@@ -69,11 +69,10 @@ module Mare::Compiler::AltInfer
     end
 
     def self.self_with_reify_cap(ctx : Context, infer : Visitor)
-      rt_args = infer.link.type.resolve(ctx).params.try(&.terms.map { |type_param|
-        type_param_ident = AST::Extract.type_param(type_param).first
-        ref = infer.refer_type[type_param_ident]? || infer.refer_type_parent[type_param_ident]
-        Infer::MetaType.new_type_param(Infer::TypeParam.new(ref.as(Refer::TypeParam)))
-      }) || [] of Infer::MetaType
+      rt_args = infer
+        .type_params_for(ctx, infer.link.type)
+        .map { |type_param| Infer::MetaType.new_type_param(type_param) }
+
       rt = Infer::ReifiedType.new(infer.link.type, rt_args)
       f = infer.func
       Span.new(
@@ -85,21 +84,22 @@ module Mare::Compiler::AltInfer
     end
 
     def self.self_ephemeral_with_cap(ctx : Context, infer : Visitor, cap : String)
-      rt_args = infer.link.type.resolve(ctx).params.try(&.terms.map { |type_param|
-        type_param_ident = AST::Extract.type_param(type_param).first
-        ref = infer.refer_type[type_param_ident]? || infer.refer_type_parent[type_param_ident]
-        Infer::MetaType.new_type_param(Infer::TypeParam.new(ref.as(Refer::TypeParam)))
-      }) || [] of Infer::MetaType
+      rt_args = infer
+        .type_params_for(ctx, infer.link.type)
+        .map { |type_param| Infer::MetaType.new_type_param(type_param) }
+
       rt = Infer::ReifiedType.new(infer.link.type, rt_args)
       mt = Infer::MetaType.new(rt, cap).ephemeralize
       new([{mt, nil}] of P)
     end
 
-    def filter_remove_cond(cond_key : CK, cond_mt : Infer::MetaType)
+    def filter_remove_cond(cond_key : CK)
       Span.new(
         points.map do |mt, conds|
-          if conds && conds[cond_key]? == cond_mt # TODO: is_subtype instead of ==
-            {mt, conds.reject(cond_key).as(C?)}
+          should_keep = conds ? (yield conds[cond_key]?) : (yield nil)
+
+          if should_keep
+            {mt, conds ? conds.reject(cond_key).as(C?) : nil}
           end
         end.compact
       )
@@ -189,11 +189,31 @@ module Mare::Compiler::AltInfer
       end
     end
 
-    def depends_on_call_ret_span(ctx, other_f, other_f_link)
+    def type_params_for(ctx : Context, type_link : Program::Type::Link) : Array(Infer::TypeParam)
+      type_link.resolve(ctx).params.try(&.terms.map { |type_param|
+        ident = AST::Extract.type_param(type_param).first
+        ref = refer_type[ident]? || refer_type_parent[ident]
+        Infer::TypeParam.new(ref.as(Refer::TypeParam))
+      }) || [] of Infer::TypeParam
+    end
+
+    def lookup_type_param_bound(ctx : Context, type_param : Infer::TypeParam)
+      ref = type_param.ref
+      raise "lookup on wrong visitor" unless ref.parent_link == link.type
+      span = type_expr_span(ctx, ref.bound)
+      Infer::MetaType.new_union(span.points.map(&.first)) # TODO: return span instead of MetaType
+    end
+
+    def substs_for(ctx : Context, rt : Infer::ReifiedType) : Hash(Infer::TypeParam, Infer::MetaType)
+      type_params_for(ctx, rt.link).zip(rt.args).to_h
+    end
+
+    def depends_on_call_ret_span(ctx, other_rt, other_f, other_f_link)
+      deps = ctx.alt_infer.gather_deps_for_func(ctx, other_f, other_f_link)
+      visitor = Visitor.new(other_f, other_f_link, Analysis.new, *deps)
+
       ret_ast = other_f.ret
       if ret_ast
-        deps = ctx.alt_infer.gather_deps_for_func(ctx, other_f, other_f_link)
-        visitor = Visitor.new(other_f, other_f_link, Analysis.new, *deps)
         visitor.type_expr_span(ctx, ret_ast)
       else
         # TODO: Track dependencies and invalidate cache based on those.
@@ -201,13 +221,15 @@ module Mare::Compiler::AltInfer
         other_analysis = ctx.alt_infer.run_for_func(ctx, other_f, other_f_link)
         other_analysis[other_pre[other_f.ident]]
       end
+      .transform_mt(&.substitute_type_params(visitor.substs_for(ctx, other_rt)))
     end
 
-    def depends_on_call_param_span(ctx, other_f, other_f_link, index)
+    def depends_on_call_param_span(ctx, other_rt, other_f, other_f_link, index)
+      deps = ctx.alt_infer.gather_deps_for_func(ctx, other_f, other_f_link)
+      visitor = Visitor.new(other_f, other_f_link, Analysis.new, *deps)
+
       ident_ast, type_ast, default_ast = AST::Extract.params(other_f.params)[index]
       if type_ast
-        deps = ctx.alt_infer.gather_deps_for_func(ctx, other_f, other_f_link)
-        visitor = Visitor.new(other_f, other_f_link, Analysis.new, *deps)
         visitor.type_expr_span(ctx, type_ast)
       else
         # TODO: Track dependencies and invalidate cache based on those.
@@ -215,20 +237,23 @@ module Mare::Compiler::AltInfer
         other_analysis = ctx.alt_infer.run_for_func(ctx, other_f, other_f_link)
         other_analysis[other_pre[AST::Extract.params(other_f.params)[index].first]]
       end
+      .transform_mt(&.substitute_type_params(visitor.substs_for(ctx, other_rt)))
     end
 
-    def depends_on_call_yield_in_span(ctx, other_f, other_f_link)
+    def depends_on_call_yield_in_span(ctx, other_rt, other_f, other_f_link)
       # TODO: Track dependencies and invalidate cache based on those.
       other_pre = ctx.pre_infer.run_for_func(ctx, other_f, other_f_link)
       other_analysis = ctx.alt_infer.run_for_func(ctx, other_f, other_f_link)
       other_analysis[other_pre.yield_in_info.not_nil!]
+      # TODO: .transform_mt(&.substitute_type_params(visitor.substs_for(ctx, other_rt)))
     end
 
-    def depends_on_call_yield_out_span(ctx, other_f, other_f_link, index)
+    def depends_on_call_yield_out_span(ctx, other_rt, other_f, other_f_link, index)
       # TODO: Track dependencies and invalidate cache based on those.
       other_pre = ctx.pre_infer.run_for_func(ctx, other_f, other_f_link)
       other_analysis = ctx.alt_infer.run_for_func(ctx, other_f, other_f_link)
       other_analysis[other_pre.yield_out_infos[index]]
+      # TODO: .transform_mt(&.substitute_type_params(visitor.substs_for(ctx, other_rt)))
     end
 
     def run(ctx : Context)
