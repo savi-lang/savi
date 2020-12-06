@@ -725,7 +725,7 @@ class Mare::Compiler::Infer
           .depends_on_call_ret_span(ctx, call_defn, call_func, call_link)
           .filter_remove_cond(:f_cap) { |f_cap| !f_cap || f_cap == call_mt.cap_only }
 
-        ret_span.points
+        ret_span.with_prior_conds(conds).points
       end
     end
 
@@ -910,12 +910,12 @@ class Mare::Compiler::Infer
     end
 
     def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
-      # TODO: split into different spans if conds can be statically determined
-      return AltInfer::Span.join(
+      # TODO: keep in separate span points if conds can be statically determined
+      return AltInfer::Span.combine_mts(
         @branches.map { |cond, body, body_jumps_away|
           infer.resolve(ctx, body) unless body_jumps_away
         }.compact
-      )
+      ) { |mts| MetaType.new_union(mts) }
     end
 
     def tether_upward_transform(ctx : Context, infer : ForReifiedFunc, meta_type : MetaType) : MetaType

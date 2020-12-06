@@ -53,19 +53,28 @@ module Mare::Compiler::AltInfer
       get_cond(a, k).not_nil!
     end
 
-    def self.merge_conds(a : C?, b : C?) : C?
-      return nil if !a && !b
-      return a if !b
-      return b if !a
+    def self.merge_conds(point : P, b : C?) : P?
+      mt, a = point
+      return {mt, nil} if !a && !b
+      return {mt, a} if !b
+      return {mt, b} if !a
 
       res = a ? a.dup : C.new
       b.each do |k, v|
         # TODO: simplify merged conds to remove duplicated conds
         # TODO: remove points with mutually-excluding conds - they are impossible
-        raise NotImplementedError.new("merge cond keys") if res[k]? && res[k]? != v
-        res[k] = v
+        existing = res[k]?
+        if existing && existing != v
+          if k == :f_cap
+            return nil # remove points with differing f_cap keys
+          else
+            raise NotImplementedError.new("merge cond keys")
+          end
+        else
+          res[k] = v
+        end
       end
-      res
+      {mt, res}
     end
 
     def self.self_with_reify_cap(ctx : Context, infer : Visitor)
@@ -117,11 +126,15 @@ module Mare::Compiler::AltInfer
       Span.new(points.map { |mt, conds| {(yield mt), conds} })
     end
 
+    def with_prior_conds(conds : C?) : Span
+      Span.new(points.map { |point| Span.merge_conds(point, conds) }.compact)
+    end
+
     def combine_mt(other : Span) : Span
       Span.new(
         points.flat_map do |mt, conds|
-          other.points.map do |other_mt, other_conds|
-            {(yield mt, other_mt), Span.merge_conds(conds, other_conds)}
+          other.with_prior_conds(conds).points.map do |other_mt, merged_conds|
+            {(yield mt, other_mt), merged_conds}
           end
         end
       )
@@ -131,8 +144,8 @@ module Mare::Compiler::AltInfer
       combos = points.map { |mt, conds| {mt, [] of Infer::MetaType, conds} }
       others.each do |other|
         combos = combos.flat_map do |mt, other_mts, conds|
-          other.points.map do |other_mt, other_conds|
-            {mt, other_mts + [other_mt], Span.merge_conds(conds, other_conds)}
+          other.with_prior_conds(conds).points.map do |other_mt, merged_conds|
+            {mt, other_mts + [other_mt], merged_conds}
           end
         end
       end
