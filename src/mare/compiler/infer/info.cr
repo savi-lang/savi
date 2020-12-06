@@ -1550,9 +1550,7 @@ class Mare::Compiler::Infer
         call_defns.map do |(call_mti, call_defn, call_func)|
           call_mt = MetaType.new(call_mti) # TODO: remove call_mti?
 
-          puts pos.show unless call_defn && call_func
-          raise NotImplementedError.new({call_mti, call_defn, call_func}) \
-            unless call_defn && call_func
+          next unless call_defn && call_func
 
           call_link = call_func.make_link(call_defn.link)
           ret_span = infer
@@ -1562,7 +1560,7 @@ class Mare::Compiler::Infer
           ret_mt = Infer::MetaType.new_union(ret_span.points.map(&.first))
 
           {ret_mt, AltInfer::Span.add_cond(conds, @lhs, MetaType.new(call_mti))}.as(AltInfer::Span::P)
-        end
+        end.compact
       end
     end
 
@@ -2024,8 +2022,7 @@ class Mare::Compiler::Infer
         call_defns.map do |(call_mti, call_defn, call_func)|
           call_mt = MetaType.new(call_mti) # TODO: remove call_mti?
 
-          raise NotImplementedError.new({call_mti, call_defn, call_func}) \
-            unless call_defn && call_func
+          next unless call_defn && call_func
 
           call_link = call_func.make_link(call_defn.link)
           param_span = infer
@@ -2035,7 +2032,7 @@ class Mare::Compiler::Infer
           param_mt = Infer::MetaType.new_union(param_span.points.map(&.first))
 
           {param_mt, AltInfer::Span.add_cond(conds, @call.lhs, MetaType.new(call_mti))}.as(AltInfer::Span::P)
-        end
+        end.compact
       end
     end
 
