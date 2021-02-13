@@ -44,7 +44,7 @@
   :fun is_empty:     @size == 0
   :fun is_not_empty: @size != 0
 
-  :fun clone iso
+  :fun clone @'iso
     copy = @new_iso(@size)
     _ptr_tag CPointer(U8)'tag = @_ptr // TODO: this indirection shouldn't be needed
     copy._clone_from(_ptr_tag, @size)
@@ -88,12 +88,12 @@
 
   :fun cstring CPointer(U8)
     if @is_null_terminated (
-      ret tag = @_ptr // TODO: remove this type hint - it shouldn't be needed
+      ret CPointer(U8)'tag = @_ptr // TODO: remove this type hint - it shouldn't be needed
     |
       ptr = @_ptr._alloc(@_size + 1)
       @_ptr._copy_to(ptr._unsafe, @_size)
       ptr._assign_at(@_size, 0)
-      ret tag = ptr // TODO: remove this type hint - it shouldn't be needed
+      ret CPointer(U8)'tag = ptr // TODO: remove this type hint - it shouldn't be needed
     )
 
   :: Ensure enough capacity is allocated for the given space, in bytes.

@@ -855,7 +855,7 @@ class Mare::Compiler::TypeCheck
 
     def filter_span(info : Info) : MetaType
       span = @f_analysis.span(info)
-      filtered_span = span.filter_remove_cond(:f_cap) { |f_cap| !f_cap || f_cap == reified.receiver_cap }
+      filtered_span = span.filter_remove_f_cap(reified.receiver_cap, func)
       if filtered_span.points.size != 1
         puts info.pos.show
         pp info

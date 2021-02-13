@@ -117,19 +117,19 @@ module Mare::Compiler::AltInfer
       )
     end
 
-    def filter_remove_f_cap(call_mt : Infer::MetaType, call_func : Program::Function)
+    def filter_remove_f_cap(call_mt_cap : Infer::MetaType, call_func : Program::Function)
       exact_span = filter_remove_cond(:f_cap) { |f_cap|
-        !f_cap || f_cap == call_mt.cap_only
+        !f_cap || f_cap == call_mt_cap
       }
       return exact_span unless exact_span.points.empty?
 
       filter_remove_cond(:f_cap) { |f_cap|
         !f_cap ||
-        f_cap == call_mt.cap_only ||
-        call_mt.cap_only_inner.subtype_of?(f_cap.not_nil!.cap_only_inner) ||
+        f_cap == call_mt_cap ||
+        call_mt_cap.cap_only_inner.subtype_of?(f_cap.not_nil!.cap_only_inner) ||
         call_func.has_tag?(:constructor) || # TODO: better way to do this?
-        call_mt.cap_only.inner == Infer::MetaType::Capability::ISO || # TODO: better way to handle auto recovery ||
-        call_mt.cap_only.inner == Infer::MetaType::Capability::TRN # TODO: better way to handle auto recovery
+        call_mt_cap.inner == Infer::MetaType::Capability::ISO || # TODO: better way to handle auto recovery ||
+        call_mt_cap.inner == Infer::MetaType::Capability::TRN # TODO: better way to handle auto recovery
       }
     end
 
