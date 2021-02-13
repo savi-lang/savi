@@ -1093,6 +1093,7 @@ class Mare::Compiler::Infer
     end
 
     def resolve_others!(ctx : Context, infer)
+      super(ctx, infer)
       early_breaks.each { |jump| infer.resolve(ctx, jump) }
       early_continues.each { |jump| infer.resolve(ctx, jump) }
     end

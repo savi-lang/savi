@@ -77,6 +77,17 @@ module Mare::Compiler::AltInfer
       {mt, res}
     end
 
+    def self.self_with_specified_cap(ctx : Context, infer : Visitor, cap_value : String)
+      rt_args = infer
+        .type_params_for(ctx, infer.link.type)
+        .map { |type_param| Infer::MetaType.new_type_param(type_param) }
+
+      rt = Infer::ReifiedType.new(infer.link.type, rt_args)
+      cap_mt = Infer::MetaType::Capability.new_maybe_generic(cap_value)
+      mt = Infer::MetaType.new(rt).override_cap(cap_mt)
+      Span.simple(mt)
+    end
+
     def self.self_with_reify_cap(ctx : Context, infer : Visitor)
       rt_args = infer
         .type_params_for(ctx, infer.link.type)
@@ -279,7 +290,9 @@ module Mare::Compiler::AltInfer
       visitor = Visitor.new(other_f, other_f_link, Analysis.new, *deps)
 
       ret_ast = other_f.ret
-      if ret_ast
+      if other_f.has_tag?(:constructor)
+        Span.self_with_specified_cap(ctx, visitor, other_f.cap.not_nil!.value)
+      elsif ret_ast
         visitor.type_expr_span(ctx, ret_ast)
       else
         # TODO: Track dependencies and invalidate cache based on those.
