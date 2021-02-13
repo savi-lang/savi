@@ -35,7 +35,7 @@
 
   :fun size: @_size
   :fun space: @_alloc
-  :fun cpointer (offset = 0) tag: @_ptr._offset(offset)
+  :fun cpointer (offset = 0) CPointer(A)'tag: @_ptr._offset(offset) // TODO: simply tag as return type; infer CPointer(A) part of it
 
   :fun is_empty: @_size == 0
   :fun ref clear: @_size = 0, @

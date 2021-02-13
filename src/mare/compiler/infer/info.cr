@@ -723,7 +723,7 @@ class Mare::Compiler::Infer
         call_link = call_func.make_link(call_defn.link)
         ret_span = infer
           .depends_on_call_ret_span(ctx, call_defn, call_func, call_link)
-          .filter_remove_cond(:f_cap) { |f_cap| !f_cap || f_cap == call_mt.cap_only }
+          .filter_remove_f_cap(call_mt, call_func)
 
         ret_span.with_prior_conds(conds).points
       end
@@ -1565,7 +1565,7 @@ class Mare::Compiler::Infer
           call_link = call_func.make_link(call_defn.link)
           ret_span = infer
             .depends_on_call_ret_span(ctx, call_defn, call_func, call_link)
-            .filter_remove_cond(:f_cap) { |f_cap| !f_cap || f_cap == call_mt.cap_only }
+            .filter_remove_f_cap(call_mt, call_func)
 
           ret_mt = Infer::MetaType.new_union(ret_span.points.map(&.first))
 
@@ -1909,7 +1909,7 @@ class Mare::Compiler::Infer
           call_link = call_func.make_link(call_defn.link)
           ret_span = infer
             .depends_on_call_yield_out_span(ctx, call_defn, call_func, call_link, @index)
-            .filter_remove_cond(:f_cap) { |f_cap| !f_cap || f_cap == call_mt.cap_only }
+            .filter_remove_f_cap(call_mt, call_func)
 
           ret_mt = Infer::MetaType.new_union(ret_span.points.map(&.first))
 
@@ -1962,7 +1962,7 @@ class Mare::Compiler::Infer
           call_link = call_func.make_link(call_defn.link)
           ret_span = infer
             .depends_on_call_yield_in_span(ctx, call_defn, call_func, call_link)
-            .filter_remove_cond(:f_cap) { |f_cap| !f_cap || f_cap == call_mt.cap_only }
+            .filter_remove_f_cap(call_mt, call_func)
 
           ret_mt = Infer::MetaType.new_union(ret_span.points.map(&.first))
 
@@ -2037,7 +2037,7 @@ class Mare::Compiler::Infer
           call_link = call_func.make_link(call_defn.link)
           param_span = infer
             .depends_on_call_param_span(ctx, call_defn, call_func, call_link, @index)
-            .filter_remove_cond(:f_cap) { |f_cap| !f_cap || f_cap == call_mt.cap_only }
+            .filter_remove_f_cap(call_mt, call_func)
 
           param_mt = Infer::MetaType.new_union(param_span.points.map(&.first))
 

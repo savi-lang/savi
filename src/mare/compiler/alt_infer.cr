@@ -84,8 +84,11 @@ module Mare::Compiler::AltInfer
 
       rt = Infer::ReifiedType.new(infer.link.type, rt_args)
       f = infer.func
+      f_cap_value = f.cap.value
+      f_cap_value = "ref" if f.has_tag?(:constructor)
+      f_cap_value = "read" if f_cap_value == "box" # TODO: figure out if we can remove this Pony-originating semantic hack
       Span.new(
-        Infer::MetaType::Capability.new_maybe_generic(f.cap.value).each_cap.map do |cap|
+        Infer::MetaType::Capability.new_maybe_generic(f_cap_value).each_cap.map do |cap|
           cap_mt = Infer::MetaType.new(cap)
           {Infer::MetaType.new(rt).override_cap(cap_mt), { :f_cap.as(CK) => cap_mt }}.as(P)
         end.to_a
@@ -112,6 +115,22 @@ module Mare::Compiler::AltInfer
           end
         end.compact
       )
+    end
+
+    def filter_remove_f_cap(call_mt : Infer::MetaType, call_func : Program::Function)
+      exact_span = filter_remove_cond(:f_cap) { |f_cap|
+        !f_cap || f_cap == call_mt.cap_only
+      }
+      return exact_span unless exact_span.points.empty?
+
+      filter_remove_cond(:f_cap) { |f_cap|
+        !f_cap ||
+        f_cap == call_mt.cap_only ||
+        call_mt.cap_only_inner.subtype_of?(f_cap.not_nil!.cap_only_inner) ||
+        call_func.has_tag?(:constructor) || # TODO: better way to do this?
+        call_mt.cap_only.inner == Infer::MetaType::Capability::ISO || # TODO: better way to handle auto recovery ||
+        call_mt.cap_only.inner == Infer::MetaType::Capability::TRN # TODO: better way to handle auto recovery
+      }
     end
 
     def expand : Span
