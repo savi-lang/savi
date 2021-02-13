@@ -34,6 +34,7 @@ class Mare::Compiler::TypeCheck
     def []?(node : AST::Node); @pre[node]?; end
     def yield_in_info; @pre.yield_in_info; end
     def yield_out_infos; @pre.yield_out_infos; end
+    def each_info; @pre.each_info; end
 
     def span(node : AST::Node); span(@spans[node]); end
     def span?(node : AST::Node); span?(@spans[node]?); end
@@ -82,7 +83,7 @@ class Mare::Compiler::TypeCheck
 
     # TODO: Remove this and refactor callers to use the more efficient/direct variant?
     def is_subtype_of?(ctx : Context, other : ReifiedType, errors = [] of Error::Info)
-      ctx.infer[other].is_supertype_of?(ctx, @rt, errors)
+      ctx.type_check[other].is_supertype_of?(ctx, @rt, errors)
     end
 
     def is_supertype_of?(ctx : Context, other : ReifiedType, errors = [] of Error::Info)
@@ -98,7 +99,7 @@ class Mare::Compiler::TypeCheck
         if rt.is_complete?(ctx)
           rt
         else
-          ctx.infer[rt.link].each_reached_fully_reified
+          ctx.type_check[rt.link].each_reached_fully_reified
         end
       end
     end
@@ -134,7 +135,7 @@ class Mare::Compiler::TypeCheck
 
     # TODO: rename as [] and rename [] to info_for or similar?
     def resolved(ctx, node : AST::Node)
-      resolved(ctx.infer[@rf.link][node])
+      resolved(ctx.type_check[@rf.link][node])
     end
 
     def resolved_self_cap : MetaType
@@ -163,9 +164,13 @@ class Mare::Compiler::TypeCheck
     @types = {} of ReifiedType => ForReifiedType
     @aliases = {} of ReifiedTypeAlias => ForReifiedTypeAlias
     @unwrapping_set = Set(ReifiedTypeAlias).new
+    @has_started = false
   end
 
+  def has_started?; @has_started; end
+
   def run(ctx)
+    @has_started = true
     ctx.program.libraries.each do |library|
       run_for_library(ctx, library)
     end
@@ -586,11 +591,11 @@ class Mare::Compiler::TypeCheck
     abstract def reified : (ReifiedType | ReifiedTypeAlias)
 
     def reified_type(*args)
-      ctx.infer.for_rt(ctx, *args).reified
+      ctx.type_check.for_rt(ctx, *args).reified
     end
 
     def reified_type_alias(*args)
-      ctx.infer.for_rt_alias(ctx, *args).reified
+      ctx.type_check.for_rt_alias(ctx, *args).reified
     end
 
     # An identifier type expression must refer_type to a type.
@@ -752,7 +757,7 @@ class Mare::Compiler::TypeCheck
         f_link = f.make_link(reified.link)
         trait = type_expr(f.ret.not_nil!, ctx.refer_type[f_link]).single!
 
-        ctx.infer.for_rt!(trait).analysis.subtyping.assert(reified, f.ident.pos)
+        ctx.type_check.for_rt!(trait).analysis.subtyping.assert(reified, f.ident.pos)
       end
     end
 
@@ -785,7 +790,7 @@ class Mare::Compiler::TypeCheck
       if parent_rt && parent_rt != reified
         raise NotImplementedError.new(parent_rt) if parent_rt.is_a?(ReifiedTypeAlias)
         return (
-          ctx.infer.for_rt(ctx, parent_rt.link.as(Program::Type::Link), parent_rt.args)
+          ctx.type_check.for_rt(ctx, parent_rt.link.as(Program::Type::Link), parent_rt.args)
             .lookup_type_param_bound(type_param)
         )
       end
@@ -853,8 +858,10 @@ class Mare::Compiler::TypeCheck
       func.ident
     end
 
-    def filter_span(info : Info) : MetaType
-      span = @f_analysis.span(info)
+    def filter_span(info : Info) : MetaType?
+      span = @f_analysis.span?(info)
+      return MetaType.unconstrained unless span
+
       filtered_span = span.filter_remove_f_cap(reified.receiver_cap, func)
       if filtered_span.points.size != 1
         puts info.pos.show
@@ -876,10 +883,66 @@ class Mare::Compiler::TypeCheck
         # raise "halt"
         # mt = info.resolve_one!(ctx, self).simplify(ctx)
         @analysis.resolved_infos[info] = mt
+        type_check(info, mt)
         # info.post_resolve_one!(ctx, self, mt)
         # info.resolve_others!(ctx, self)
         mt
       end
+    end
+
+    def type_check(info : Infer::DynamicInfo, meta_type : Infer::MetaType)
+      return if info.downstreams_empty?
+
+      # TODO: print a different error message when the downstream constraints are
+      # internally conflicting, even before adding this meta_type into the mix.
+
+      if !meta_type.ephemeralize.within_constraints?(ctx, [
+        info.total_downstream_constraint(ctx, self)
+      ])
+        extra = info.describe_downstream_constraints(ctx, self)
+        extra << {info.pos,
+          "but the type of the #{info.described_kind} was #{meta_type.show_type}"}
+        this_would_be_possible_if = info.this_would_be_possible_if
+        extra << this_would_be_possible_if if this_would_be_possible_if
+
+        Error.at info.downstream_use_pos, "The type of this expression " \
+          "doesn't meet the constraints imposed on it",
+            extra
+      end
+
+      # If aliasing makes a difference, we need to evaluate each constraint
+      # that has nonzero aliases with an aliased version of the meta_type.
+      if meta_type != meta_type.strip_ephemeral.alias
+        meta_type_alias = meta_type.strip_ephemeral.alias
+
+        # TODO: Do we need to do anything here to weed out union types with
+        # differing capabilities of compatible terms? Is it possible that
+        # the type that fulfills the total_downstream_constraint is not compatible
+        # with the ephemerality requirement, while some other union member is?
+        info.downstreams_each.each do |use_pos, other_info, aliases|
+          if aliases > 0
+            constraint = resolve(ctx, other_info)
+            if !meta_type_alias.within_constraints?(ctx, [constraint])
+              extra = info.describe_downstream_constraints(ctx, self)
+              extra << {info.pos,
+                "but the type of the #{info.described_kind} " \
+                "(when aliased) was #{meta_type_alias.show_type}"
+              }
+              this_would_be_possible_if = info.this_would_be_possible_if
+              extra << this_would_be_possible_if if this_would_be_possible_if
+
+              Error.at use_pos, "This aliasing violates uniqueness " \
+                "(did you forget to consume the variable?)",
+                extra
+            end
+          end
+        end
+      end
+    end
+
+    # For all other info types we do nothing.
+    # TODO: should we do something?
+    def type_check(info : Infer::Info, meta_type : Infer::MetaType)
     end
 
     # This variant lets you eagerly choose the MetaType that a different Info
@@ -918,9 +981,12 @@ class Mare::Compiler::TypeCheck
       func_params = func.params
       func_body = func.body
 
+      # TODO: Remove explicit resolve calls here; just resolve everything below.
       resolve(ctx, @f_analysis[func_body]) if func_body
       resolve(ctx, @f_analysis[func_params]) if func_params
       resolve(ctx, @f_analysis[ret])
+
+      @f_analysis.each_info.each { |info| resolve(ctx, info) }
 
       # Assign the resolved types to a map for safekeeping.
       # This also has the effect of running some final checks on everything.
@@ -995,15 +1061,15 @@ class Mare::Compiler::TypeCheck
     end
 
     def reified_prelude_type(name, *args)
-      ctx.infer.for_rt(ctx, @ctx.namespace.prelude_type(name), *args).reified
+      ctx.type_check.for_rt(ctx, @ctx.namespace.prelude_type(name), *args).reified
     end
 
     def reified_type(*args)
-      ctx.infer.for_rt(ctx, *args).reified
+      ctx.type_check.for_rt(ctx, *args).reified
     end
 
     def reified_type_alias(*args)
-      ctx.infer.for_rt_alias(ctx, *args).reified
+      ctx.type_check.for_rt_alias(ctx, *args).reified
     end
 
     def lookup_type_param(ref, receiver = reified.receiver)

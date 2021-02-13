@@ -49,6 +49,7 @@ module Mare::Compiler::PreInfer
       @backwards[info] ||= node
     end
     def node_for?(info : Infer::Info); @backwards[info]?; end
+    def each_info; @infos.each_value; end
   end
 
   class FuncVisitor < Mare::AST::Visitor

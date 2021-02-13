@@ -90,12 +90,18 @@ class Mare::Compiler::Infer
     def as_downstream_constraint_meta_type(ctx : Context, infer : ForReifiedFunc) : MetaType?
       infer.resolve(ctx, self)
     end
+    def as_downstream_constraint_meta_type(ctx : Context, infer : TypeCheck::ForReifiedFunc) : MetaType?
+      infer.resolve(ctx, self)
+    end
 
     # In the rare case that an Info subclass needs to dynamically pretend to be
     # multiple different downstream constraints, it can override this method.
     # This is only used to report positions in more detail, and it is expected
     # that the intersection of all MetaTypes here is the same as the resolve.
     def as_multiple_downstream_constraints(ctx : Context, infer : ForReifiedFunc) : Array({Source::Pos, MetaType})?
+      nil
+    end
+    def as_multiple_downstream_constraints(ctx : Context, infer : TypeCheck::ForReifiedFunc) : Array({Source::Pos, MetaType})?
       nil
     end
 
@@ -133,6 +139,7 @@ class Mare::Compiler::Infer
     def downstream_use_pos
       @downstreams.first[0]
     end
+    def downstreams_each; @downstreams.each; end
 
     # May be implemented by the child class as an optional hook.
     def after_add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
@@ -170,9 +177,31 @@ class Mare::Compiler::Infer
         end
       )
     end
+    def total_downstream_constraint(ctx : Context, infer : TypeCheck::ForReifiedFunc)
+      MetaType.new_intersection(
+        @downstreams.map do |_, other_info, _|
+          other_info.as_downstream_constraint_meta_type(ctx, infer).as(MetaType)
+        end
+      )
+    end
 
     # TODO: remove?
     def describe_downstream_constraints(ctx : Context, infer : ForReifiedFunc)
+      @downstreams.flat_map do |_, other_info, _|
+        multi = other_info.as_multiple_downstream_constraints(ctx, infer)
+        if multi
+          multi.map do |other_info_pos, mt|
+            {other_info_pos,
+              "it is required here to be a subtype of #{mt.show_type}"}
+          end
+        else
+          mt = infer.resolve(ctx, other_info)
+          [{other_info.pos,
+            "it is required here to be a subtype of #{mt.show_type}"}]
+        end
+      end.to_h.to_a
+    end
+    def describe_downstream_constraints(ctx : Context, infer : TypeCheck::ForReifiedFunc)
       @downstreams.flat_map do |_, other_info, _|
         multi = other_info.as_multiple_downstream_constraints(ctx, infer)
         if multi
@@ -207,6 +236,12 @@ class Mare::Compiler::Infer
 
     # This property can be set to give a hint in the event of a typecheck error.
     property this_would_be_possible_if : Tuple(Source::Pos, String)?
+
+    def resolve_others!(ctx : Context, infer)
+      @downstreams.each do |use_pos, other_info, aliases|
+        infer.resolve(ctx, other_info) if other_info.is_a?(FixedInfo)
+      end
+    end
 
     # The final MetaType must meet all constraints that have been imposed.
     def post_resolve!(ctx : Context, infer : ForReifiedFunc, meta_type : MetaType)
@@ -262,6 +297,8 @@ class Mare::Compiler::Infer
 
     def initialize(@pos)
     end
+
+    def upstream_infos; @upstreams.map(&.first) end
 
     def adds_alias; 1 end
 
@@ -918,6 +955,15 @@ class Mare::Compiler::Infer
       ) { |mts| MetaType.new_union(mts) }
     end
 
+    def resolve_others!(ctx : Context, infer)
+      if infer.is_a?(AltInfer::Visitor)
+        @branches.each do |cond, body, body_jumps_away|
+          infer.resolve(ctx, cond) if cond
+          infer.resolve(ctx, body) unless body_jumps_away
+        end
+      end
+    end
+
     def tether_upward_transform(ctx : Context, infer : ForReifiedFunc, meta_type : MetaType) : MetaType
       # TODO: account for unreachable branches? maybe? maybe not?
       meta_type
@@ -926,8 +972,16 @@ class Mare::Compiler::Infer
     def as_downstream_constraint_meta_type(ctx : Context, infer : ForReifiedFunc) : MetaType?
       total_downstream_constraint(ctx, infer)
     end
+    def as_downstream_constraint_meta_type(ctx : Context, infer : TypeCheck::ForReifiedFunc) : MetaType?
+      total_downstream_constraint(ctx, infer)
+    end
 
     def as_multiple_downstream_constraints(ctx : Context, infer : ForReifiedFunc) : Array({Source::Pos, MetaType})?
+      @downstreams.map do |pos, info, aliases|
+        {pos, info.as_downstream_constraint_meta_type(ctx, infer)}
+      end
+    end
+    def as_multiple_downstream_constraints(ctx : Context, infer : TypeCheck::ForReifiedFunc) : Array({Source::Pos, MetaType})?
       @downstreams.map do |pos, info, aliases|
         {pos, info.as_downstream_constraint_meta_type(ctx, infer)}
       end
@@ -1058,6 +1112,10 @@ class Mare::Compiler::Infer
     def initialize(@pos, @refine, @lhs, @refine_type, @positive_check)
     end
 
+    def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
+      infer.prelude_type_span(ctx, "Bool")
+    end
+
     def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
       MetaType.new(infer.reified_prelude_type("Bool"))
     end
@@ -1076,6 +1134,10 @@ class Mare::Compiler::Infer
     def describe_kind : String; "type condition" end
 
     def initialize(@pos, @lhs, @rhs, @positive_check)
+    end
+
+    def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
+      infer.prelude_type_span(ctx, "Bool")
     end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
@@ -1144,6 +1206,10 @@ class Mare::Compiler::Infer
     def initialize(@pos, @refine, @refine_type, @positive_check)
     end
 
+    def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
+      infer.prelude_type_span(ctx, "Bool")
+    end
+
     def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
       MetaType.new(infer.reified_prelude_type("Bool"))
     end
@@ -1178,6 +1244,10 @@ class Mare::Compiler::Infer
       result = lhs_mt.satisfies_bound?(ctx, rhs_mt)
       result = !result if !positive_check
       result
+    end
+
+    def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
+      infer.prelude_type_span(ctx, "Bool")
     end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
@@ -2024,6 +2094,19 @@ class Mare::Compiler::Infer
         {param_info.first_viable_constraint_pos, param_mt}.as({Source::Pos, MetaType})
       end
     end
+    # def as_multiple_downstream_constraints(ctx : Context, infer : TypeCheck::ForReifiedFunc) : Array({Source::Pos, MetaType})?
+    #   other_infers = @call.follow_call_resolve_other_infers(ctx, infer)
+
+    #   other_infers.map do |other_infer, _|
+    #     param = other_infer.params[@index]
+    #     param_info = other_infer.f_analysis[param]
+    #     param_info = param_info.lhs if param_info.is_a?(FromAssign)
+    #     param_info = param_info.as(Param)
+    #     param_mt = other_infer.resolve(ctx, param_info)
+
+    #     {param_info.first_viable_constraint_pos, param_mt}.as({Source::Pos, MetaType})
+    #   end
+    # end
 
     def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
       infer.resolve(ctx, @call.lhs).expand do |lhs_mt, conds|
