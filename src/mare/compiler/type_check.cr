@@ -928,10 +928,10 @@ class Mare::Compiler::TypeCheck
       # Is it actually a significant performance impact or not?
 
       if (info = @f_analysis.yield_in_info; info)
-        @analysis.yield_in_resolved = resolve(ctx, info).simplify(ctx)
+        @analysis.yield_in_resolved = resolve(ctx, info) # TODO: simplify?
       end
       @analysis.yield_out_resolved = @f_analysis.yield_out_infos.map do |info|
-        resolve(ctx, info).simplify(ctx).as(MetaType)
+        resolve(ctx, info).as(MetaType) # TODO: simplify?
       end
       @analysis.ret_resolved = @analysis.resolved_infos[@f_analysis[ret]]
 
