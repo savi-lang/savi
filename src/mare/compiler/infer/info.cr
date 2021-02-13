@@ -861,10 +861,16 @@ class Mare::Compiler::Infer
       term.tethers(querent)
     end
 
+    def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
+      # A jump expression has no result value, so the resolved type is always
+      # unconstrained - the term's type goes to the jump's catching entity.
+      AltInfer::Span.simple(MetaType.unconstrained)
+    end
+
     def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
       # A jump expression has no result value, so the resolved type is always
-      # unsatisfiable - the term's type goes to the jump's catching entity.
-      MetaType.new(MetaType::Unsatisfiable.instance)
+      # unconstrained - the term's type goes to the jump's catching entity.
+      MetaType.unconstrained
     end
 
     def resolve_others!(ctx : Context, infer)
@@ -959,7 +965,7 @@ class Mare::Compiler::Infer
       if infer.is_a?(AltInfer::Visitor)
         @branches.each do |cond, body, body_jumps_away|
           infer.resolve(ctx, cond) if cond
-          infer.resolve(ctx, body) unless body_jumps_away
+          infer.resolve(ctx, body)
         end
       end
     end
@@ -2021,6 +2027,8 @@ class Mare::Compiler::Infer
     end
 
     def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
+      none = MetaType.new(infer.prelude_reified_type(ctx, "None"))
+
       infer.resolve(ctx, @call.lhs).expand do |lhs_mt, conds|
         call_defns = lhs_mt.alt_find_callable_func_defns(ctx, infer, @call.member)
 
@@ -2039,6 +2047,11 @@ class Mare::Compiler::Infer
 
           {ret_mt, AltInfer::Span.add_cond(conds, @call.lhs, MetaType.new(call_mti))}.as(AltInfer::Span::P)
         end
+      end.transform_mt do |mt|
+        # If the type requirement is None, treat it as unconstrained,
+        # so that the caller need not specify an explicit None.
+        # TODO: consider adding a special case Void type like Swift has?
+        mt == none ? MetaType.unconstrained : mt
       end
     end
 
