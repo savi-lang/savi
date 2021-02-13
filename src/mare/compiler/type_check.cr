@@ -863,18 +863,24 @@ class Mare::Compiler::TypeCheck
       return MetaType.unconstrained unless span
 
       filtered_span = span.filter_remove_f_cap(reified.receiver_cap, func)
-      if filtered_span.points.size != 1
-        puts info.pos.show
-        pp info
-        pp span
-        pp filtered_span
-        raise "halt"
-      end
+      first_point_mt = filtered_span.points.first.first
 
-      filtered_span.points.first.first
+      # If only one point remains after filtering for f_cap, return it now.
+      return first_point_mt if filtered_span.points.size == 1
+
+      puts info.pos.show
+      pp info
+      pp span
+      pp filtered_span
+      raise "halt"
     end
 
-    def resolve(ctx : Context, info : Info) : MetaType
+    # TODO: remove this convenience alias:
+    def resolve(ctx : Context, ast : AST::Node) : MetaType
+      resolve(ctx, @f_analysis[ast])
+    end
+
+    def resolve(ctx : Context, info : Infer::Info) : MetaType
       @analysis.resolved_infos[info]? || begin
         mt = filter_span(info)
 

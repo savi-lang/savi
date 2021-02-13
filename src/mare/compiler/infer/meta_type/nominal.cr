@@ -318,7 +318,7 @@ struct Mare::Compiler::Infer::MetaType::Nominal
         return true if defn == other_defn
         # When both sides are ReifiedTypes, delegate to the SubtypingInfo logic.
         for_rt = if ctx.type_check.has_started?
-          ctx.type_check.for_rt(ctx, defn.link, defn.args).analysis
+          ctx.type_check.for_rt(ctx, other_defn.link, other_defn.args).analysis
         else
           ctx.infer[other_defn]
         end

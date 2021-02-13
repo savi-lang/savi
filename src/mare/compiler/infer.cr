@@ -980,6 +980,11 @@ class Mare::Compiler::Infer
       func.ident
     end
 
+    # TODO: remove this convenience alias:
+    def resolve(ctx : Context, ast : AST::Node) : MetaType
+      resolve(ctx, @f_analysis[ast])
+    end
+
     def resolve(ctx : Context, info : Info) : MetaType
       @analysis.resolved_infos[info]? || begin
         mt = info.resolve!(ctx, self).simplify(ctx)

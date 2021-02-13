@@ -140,8 +140,13 @@ class Mare::Compiler::Infer::SubtypingInfo
     raise "found hygienic function" if that_func.has_tag?(:hygienic)
 
     # Get the Infer instance for both this and that function, to compare them.
-    this_infer = ctx.infer.for_rf(ctx, this, this_func.make_link(this.link), MetaType.new(this_cap)).tap(&.run)
-    that_infer = ctx.infer.for_rf(ctx, that, that_func.make_link(that.link), MetaType.new(that_cap)).tap(&.run)
+    this_infer = ctx.type_check.has_started? \
+      ? ctx.type_check.for_rf(ctx, this, this_func.make_link(this.link), MetaType.new(this_cap)).tap(&.run) \
+      : ctx.infer.for_rf(ctx, this, this_func.make_link(this.link), MetaType.new(this_cap)).tap(&.run)
+
+    that_infer = ctx.type_check.has_started? \
+      ? ctx.type_check.for_rf(ctx, that, that_func.make_link(that.link), MetaType.new(that_cap)).tap(&.run) \
+      : ctx.infer.for_rf(ctx, that, that_func.make_link(that.link), MetaType.new(that_cap)).tap(&.run)
 
     # A constructor can only match another constructor.
     case {that_func.has_tag?(:constructor), this_func.has_tag?(:constructor)}
@@ -211,8 +216,16 @@ class Mare::Compiler::Infer::SubtypingInfo
     end
 
     # Covariant return type.
-    this_ret = this_infer.resolve(ctx, this_infer.f_analysis[this_infer.ret])
-    that_ret = that_infer.resolve(ctx, that_infer.f_analysis[that_infer.ret])
+    this_ret_ast = this_infer.is_a?(Infer::ForReifiedFunc) ? \
+      this_infer.ret : this_infer.as(TypeCheck::ForReifiedFunc).ret
+    that_ret_ast = that_infer.is_a?(Infer::ForReifiedFunc) ? \
+      that_infer.ret : that_infer.as(TypeCheck::ForReifiedFunc).ret
+    this_ret = this_infer.is_a?(Infer::ForReifiedFunc) \
+      ? this_infer.resolve(ctx, this_ret_ast) \
+      : this_infer.as(TypeCheck::ForReifiedFunc).resolve(ctx, this_ret_ast)
+    that_ret = that_infer.is_a?(Infer::ForReifiedFunc) \
+      ? that_infer.resolve(ctx, that_ret_ast) \
+      : that_infer.as(TypeCheck::ForReifiedFunc).resolve(ctx, that_ret_ast)
     unless that_ret.subtype_of?(ctx, this_ret)
       errors << {(that_func.ret || that_func.ident).pos,
         "this function's return type is #{that_ret.show_type}"}
@@ -224,8 +237,12 @@ class Mare::Compiler::Infer::SubtypingInfo
     that_func.params.try do |l_params|
       this_func.params.try do |r_params|
         l_params.terms.zip(r_params.terms).each do |(l_param, r_param)|
-          l_param_mt = that_infer.resolve(ctx, that_infer.f_analysis[l_param])
-          r_param_mt = this_infer.resolve(ctx, this_infer.f_analysis[r_param])
+          l_param_mt = that_infer.is_a?(Infer::ForReifiedFunc) \
+            ? that_infer.resolve(ctx, l_param) \
+            : that_infer.as(TypeCheck::ForReifiedFunc).resolve(ctx, l_param)
+          r_param_mt = this_infer.is_a?(Infer::ForReifiedFunc) \
+            ? this_infer.resolve(ctx, r_param) \
+            : this_infer.as(TypeCheck::ForReifiedFunc).resolve(ctx, r_param)
           unless r_param_mt.subtype_of?(ctx, l_param_mt)
             errors << {l_param.pos,
               "this parameter type is #{l_param_mt.show_type}"}

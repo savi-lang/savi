@@ -668,8 +668,19 @@ class Mare::Compiler::Infer
     end
 
     def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
-      # TODO: narrow possible based on downstreams/tethers.
-      AltInfer::Span.simple(@possible)
+      # If we have zero downstreams, or multiple downstreams, give up
+      # on any hope of narrowing, and just return the wide literal type.
+      # TODO: narrowing based on multiple downstreams/tethers?
+      return AltInfer::Span.simple(@possible) if @downstreams.size != 1
+
+      # If we have a downstream span, intersect it with the wide literal type.
+      downstream_span = infer.resolve(ctx, @downstreams[0][1])
+      downstream_span.transform_mt do |mt|
+        intersect_mt = mt.intersect(@possible) # TODO: simplify?
+
+        # TODO: narrowing based on peer hints?
+        intersect_mt
+      end
     end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
