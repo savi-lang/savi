@@ -220,10 +220,12 @@ class Mare::Compiler
 
     satisfy(ctx, target)
 
-    ctx.prev_ctx = nil
-    @prev_ctx = ctx
-
     ctx
+  ensure
+    # Save the previous context for the purposes of caching in the next one,
+    # letting us quickly recompile any code that successfully compiled.
+    ctx.try(&.prev_ctx=(nil))
+    @prev_ctx = ctx
   end
 
   def self.prelude_library_path
