@@ -3,6 +3,7 @@ class Mare::Compiler::Context
   getter import
 
   getter alt_infer
+  getter alt_infer_edge
   getter classify
   getter code_gen
   getter code_gen_verona
@@ -34,6 +35,7 @@ class Mare::Compiler::Context
     @stack = [] of Interpreter
 
     @alt_infer = AltInfer::Pass.new
+    @alt_infer_edge = AltInfer::PassEdge.new
     @classify = Classify::Pass.new
     @code_gen = CodeGen.new(CodeGen::PonyRT)
     @code_gen_verona = CodeGen.new(CodeGen::VeronaRT)

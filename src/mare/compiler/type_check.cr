@@ -442,7 +442,8 @@ class Mare::Compiler::TypeCheck
       f_analysis = get_or_create_f_analysis(ctx, f)
       refer_type = ctx.refer_type[f]
       classify = ctx.classify[f]
-      ForReifiedFunc.new(ctx, f_analysis, ReifiedFuncAnalysis.new(ctx, rf), @types[rt], rf, refer_type, classify)
+      for_rt = for_rt(ctx, rt.link, rt.args)
+      ForReifiedFunc.new(ctx, f_analysis, ReifiedFuncAnalysis.new(ctx, rf), for_rt, rf, refer_type, classify)
       .tap { f_analysis.observe_reified_func(rf) }
     )
   end

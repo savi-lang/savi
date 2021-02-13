@@ -236,7 +236,6 @@ module Mare::Compiler::AltInfer
 
         @analysis[info] = span
 
-        info.resolve_others!(ctx, self)
         span
       end
     end
@@ -290,6 +289,7 @@ module Mare::Compiler::AltInfer
       visitor = Visitor.new(other_f, other_f_link, Analysis.new, *deps)
 
       ret_ast = other_f.ret
+      # TODO: can these first two if clauses be removed, now that we have alt_infer_edge?
       if other_f.has_tag?(:constructor)
         Span.self_with_specified_cap(ctx, visitor, other_f.cap.not_nil!.value)
       elsif ret_ast
@@ -297,7 +297,7 @@ module Mare::Compiler::AltInfer
       else
         # TODO: Track dependencies and invalidate cache based on those.
         other_pre = ctx.pre_infer.run_for_func(ctx, other_f, other_f_link)
-        other_analysis = ctx.alt_infer.run_for_func(ctx, other_f, other_f_link)
+        other_analysis = ctx.alt_infer_edge.run_for_func(ctx, other_f, other_f_link)
         other_analysis[other_pre[other_f.ident]]
       end
       .transform_mt(&.substitute_type_params(visitor.substs_for(ctx, other_rt)))
@@ -307,13 +307,14 @@ module Mare::Compiler::AltInfer
       deps = ctx.alt_infer.gather_deps_for_func(ctx, other_f, other_f_link)
       visitor = Visitor.new(other_f, other_f_link, Analysis.new, *deps)
 
+      # TODO: can this first if clause be removed, now that we have alt_infer_edge?
       ident_ast, type_ast, default_ast = AST::Extract.params(other_f.params)[index]
       if type_ast
         visitor.type_expr_span(ctx, type_ast)
       else
         # TODO: Track dependencies and invalidate cache based on those.
         other_pre = ctx.pre_infer.run_for_func(ctx, other_f, other_f_link)
-        other_analysis = ctx.alt_infer.run_for_func(ctx, other_f, other_f_link)
+        other_analysis = ctx.alt_infer_edge.run_for_func(ctx, other_f, other_f_link)
         other_analysis[other_pre[AST::Extract.params(other_f.params)[index].first]]
       end
       .transform_mt(&.substitute_type_params(visitor.substs_for(ctx, other_rt)))
@@ -322,7 +323,7 @@ module Mare::Compiler::AltInfer
     def depends_on_call_yield_in_span(ctx, other_rt, other_f, other_f_link)
       # TODO: Track dependencies and invalidate cache based on those.
       other_pre = ctx.pre_infer.run_for_func(ctx, other_f, other_f_link)
-      other_analysis = ctx.alt_infer.run_for_func(ctx, other_f, other_f_link)
+      other_analysis = ctx.alt_infer_edge.run_for_func(ctx, other_f, other_f_link)
       other_analysis[other_pre.yield_in_info.not_nil!]
       # TODO: .transform_mt(&.substitute_type_params(visitor.substs_for(ctx, other_rt)))
     end
@@ -330,21 +331,25 @@ module Mare::Compiler::AltInfer
     def depends_on_call_yield_out_span(ctx, other_rt, other_f, other_f_link, index)
       # TODO: Track dependencies and invalidate cache based on those.
       other_pre = ctx.pre_infer.run_for_func(ctx, other_f, other_f_link)
-      other_analysis = ctx.alt_infer.run_for_func(ctx, other_f, other_f_link)
+      other_analysis = ctx.alt_infer_edge.run_for_func(ctx, other_f, other_f_link)
       other_analysis[other_pre.yield_out_infos[index]]
       # TODO: .transform_mt(&.substitute_type_params(visitor.substs_for(ctx, other_rt)))
     end
 
-    def run(ctx : Context)
+    def run_edge(ctx : Context)
       func_params = func.params
-      func_body = func.body
-
-      resolve(ctx, @pre_infer[func_body]) if func_body
       resolve(ctx, @pre_infer[func_params]) if func_params
       resolve(ctx, @pre_infer[ret])
 
       @pre_infer.yield_in_info.try { |info| resolve(ctx, info) }
       @pre_infer.yield_out_infos.map { |info| resolve(ctx, info) }
+    end
+
+    def run(ctx : Context)
+      func_body = func.body
+      resolve(ctx, @pre_infer[func_body]) if func_body
+
+      @pre_infer.each_info.each { |info| resolve(ctx, info) }
     end
 
     def ret
@@ -465,6 +470,39 @@ module Mare::Compiler::AltInfer
     end
   end
 
+  # The "edge" version of the pass only resolves the minimal amount of nodes
+  # needed to understand the type signature of each function in the program.
+  class PassEdge < Compiler::Pass::Analyze(Nil, Nil, Analysis)
+    def analyze_type_alias(ctx, t, t_link) : Nil
+      nil
+    end
+
+    def analyze_type(ctx, t, t_link) : Nil
+      nil
+    end
+
+    def analyze_func(ctx, f, f_link, t_analysis) : Analysis
+      deps = gather_deps_for_func(ctx, f, f_link)
+      prev = ctx.prev_ctx.try(&.alt_infer_edge)
+
+      maybe_from_func_cache(ctx, prev, f, f_link, deps) do
+        Visitor.new(f, f_link, Analysis.new, *deps).tap(&.run_edge(ctx)).analysis
+      end
+    end
+
+    def gather_deps_for_func(ctx, f, f_link)
+      refer_type = ctx.refer_type[f_link]
+      refer_type_parent = ctx.refer_type[f_link.type]
+      classify = ctx.classify[f_link]
+      type_context = ctx.type_context[f_link]
+      pre_infer = ctx.pre_infer[f_link]
+
+      {refer_type, refer_type_parent, classify, type_context, pre_infer}
+    end
+  end
+
+  # This pass picks up the Analysis wherever the PassEdge last left off,
+  # resolving all of the other nodes that weren't reached in edge analysis.
   class Pass < Compiler::Pass::Analyze(Nil, Nil, Analysis)
     def analyze_type_alias(ctx, t, t_link) : Nil
       nil
@@ -478,8 +516,9 @@ module Mare::Compiler::AltInfer
       deps = gather_deps_for_func(ctx, f, f_link)
       prev = ctx.prev_ctx.try(&.alt_infer)
 
+      edge_analysis = ctx.alt_infer_edge[f_link]
       maybe_from_func_cache(ctx, prev, f, f_link, deps) do
-        Visitor.new(f, f_link, Analysis.new, *deps).tap(&.run(ctx)).analysis
+        Visitor.new(f, f_link, edge_analysis, *deps).tap(&.run(ctx)).analysis
       end
     end
 

@@ -531,7 +531,7 @@ class Mare::Compiler::Infer
       # because the type arguments haven't been applied yet; they will be
       # applied in a different FixedSingleton that wraps this one in range.
       # We don't have to resolve it because nothing will ever be its downstream.
-      return AltInfer::Span.simple(Infer::MetaType.unsatisfiable) \
+      return AltInfer::Span.simple(Infer::MetaType.unconstrained) \
         if @node.is_a?(AST::Identifier) \
         && infer.classify.further_qualified?(@node)
 
@@ -668,19 +668,30 @@ class Mare::Compiler::Infer
     end
 
     def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
-      # If we have zero downstreams, or multiple downstreams, give up
-      # on any hope of narrowing, and just return the wide literal type.
-      # TODO: narrowing based on multiple downstreams/tethers?
-      return AltInfer::Span.simple(@possible) if @downstreams.size != 1
+      simple = AltInfer::Span.simple(@possible)
 
-      # If we have a downstream span, intersect it with the wide literal type.
-      downstream_span = infer.resolve(ctx, @downstreams[0][1])
-      downstream_span.transform_mt do |mt|
-        intersect_mt = mt.intersect(@possible) # TODO: simplify?
-
-        # TODO: narrowing based on peer hints?
-        intersect_mt
+      # Intersect with the downstream spans.
+      span = simple
+      # TODO: use all downstreams (really, tethers), not just the last one.
+      # TODO: Also, this code and others like it really need to have
+      # subtype checking available to be able to properly narrow the type,
+      # which means it needs to be brought into the AltInfer pass somehow.
+      # Probably we need to make it so that AltInfer pass does just enough
+      # typechecking work to know the type signature of every function in the
+      # program, then we can do all "intra-function" checks in TypeCheck pass.
+      [@downstreams.last].each do |use_pos, other_info, aliases|
+        span = span.combine_mt(infer.resolve(ctx, other_info)) do |mt, other_mt|
+          mt.intersect(other_mt)
+        end
       end
+
+      # If we don't satisfy the constraints, leave it to the type check pass
+      # to print a consistent error message based on the simple literal type.
+      return simple if span.points.any?(&.first.unsatisfiable?)
+
+      # TODO: narrowing based on peer hints?
+
+      span
     end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
