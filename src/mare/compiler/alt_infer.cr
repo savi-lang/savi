@@ -285,38 +285,24 @@ module Mare::Compiler::AltInfer
     end
 
     def depends_on_call_ret_span(ctx, other_rt, other_f, other_f_link)
-      deps = ctx.alt_infer.gather_deps_for_func(ctx, other_f, other_f_link)
+      deps = ctx.alt_infer_edge.gather_deps_for_func(ctx, other_f, other_f_link)
       visitor = Visitor.new(other_f, other_f_link, Analysis.new, *deps)
 
-      ret_ast = other_f.ret
-      # TODO: can these first two if clauses be removed, now that we have alt_infer_edge?
-      if other_f.has_tag?(:constructor)
-        Span.self_with_specified_cap(ctx, visitor, other_f.cap.not_nil!.value)
-      elsif ret_ast
-        visitor.type_expr_span(ctx, ret_ast)
-      else
-        # TODO: Track dependencies and invalidate cache based on those.
-        other_pre = ctx.pre_infer.run_for_func(ctx, other_f, other_f_link)
-        other_analysis = ctx.alt_infer_edge.run_for_func(ctx, other_f, other_f_link)
-        other_analysis[other_pre[other_f.ident]]
-      end
+      # TODO: Track dependencies and invalidate cache based on those.
+      other_pre = ctx.pre_infer.run_for_func(ctx, other_f, other_f_link)
+      other_analysis = ctx.alt_infer_edge.run_for_func(ctx, other_f, other_f_link)
+      other_analysis[other_pre[other_f.ident]]
       .transform_mt(&.substitute_type_params(visitor.substs_for(ctx, other_rt)))
     end
 
     def depends_on_call_param_span(ctx, other_rt, other_f, other_f_link, index)
-      deps = ctx.alt_infer.gather_deps_for_func(ctx, other_f, other_f_link)
+      deps = ctx.alt_infer_edge.gather_deps_for_func(ctx, other_f, other_f_link)
       visitor = Visitor.new(other_f, other_f_link, Analysis.new, *deps)
 
-      # TODO: can this first if clause be removed, now that we have alt_infer_edge?
-      ident_ast, type_ast, default_ast = AST::Extract.params(other_f.params)[index]
-      if type_ast
-        visitor.type_expr_span(ctx, type_ast)
-      else
-        # TODO: Track dependencies and invalidate cache based on those.
-        other_pre = ctx.pre_infer.run_for_func(ctx, other_f, other_f_link)
-        other_analysis = ctx.alt_infer_edge.run_for_func(ctx, other_f, other_f_link)
-        other_analysis[other_pre[AST::Extract.params(other_f.params)[index].first]]
-      end
+      # TODO: Track dependencies and invalidate cache based on those.
+      other_pre = ctx.pre_infer.run_for_func(ctx, other_f, other_f_link)
+      other_analysis = ctx.alt_infer_edge.run_for_func(ctx, other_f, other_f_link)
+      other_analysis[other_pre[AST::Extract.params(other_f.params)[index].first]]
       .transform_mt(&.substitute_type_params(visitor.substs_for(ctx, other_rt)))
     end
 
@@ -337,12 +323,14 @@ module Mare::Compiler::AltInfer
     end
 
     def run_edge(ctx : Context)
-      func_params = func.params
-      resolve(ctx, @pre_infer[func_params]) if func_params
+      func.params.try do |params|
+        params.terms.each { |param| resolve(ctx, @pre_infer[param]) }
+      end
+
       resolve(ctx, @pre_infer[ret])
 
       @pre_infer.yield_in_info.try { |info| resolve(ctx, info) }
-      @pre_infer.yield_out_infos.map { |info| resolve(ctx, info) }
+      @pre_infer.yield_out_infos.each { |info| resolve(ctx, info) }
     end
 
     def run(ctx : Context)
