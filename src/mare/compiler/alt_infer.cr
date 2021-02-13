@@ -209,13 +209,22 @@ module Mare::Compiler::AltInfer
       @refer_type : ReferType::Analysis,
       @refer_type_parent : ReferType::Analysis,
       @classify : Classify::Analysis,
+      @type_context : TypeContext::Analysis,
       @pre_infer : PreInfer::Analysis,
     )
+      @substs_for_layer = Hash(TypeContext::Layer, Hash(Infer::TypeParam, Infer::MetaType)).new
     end
 
     def resolve(ctx : Context, info : Infer::Info) : Span
       @analysis[info]? || begin
-        @analysis[info] = span = info.resolve_span!(ctx, self)
+        ast = @pre_infer.node_for?(info)
+        substs = substs_for_layer(ctx, ast) if ast
+
+        span = info.resolve_span!(ctx, self)
+        span = span.transform_mt(&.substitute_type_params(substs)) if substs
+
+        @analysis[info] = span
+
         info.resolve_others!(ctx, self)
         span
       end
@@ -238,6 +247,31 @@ module Mare::Compiler::AltInfer
 
     def substs_for(ctx : Context, rt : Infer::ReifiedType) : Hash(Infer::TypeParam, Infer::MetaType)
       type_params_for(ctx, rt.link).zip(rt.args).to_h
+    end
+
+    def substs_for_layer(ctx : Context, node : AST::Node) : Hash(Infer::TypeParam, Infer::MetaType)?
+      layer = @type_context[node]?
+      return nil unless layer
+
+      @substs_for_layer[layer] ||= (
+        # TODO: also handle negative conditions
+        layer.all_positive_conds.compact_map do |cond|
+          cond_info = @pre_infer[cond]
+          case cond_info
+          when Infer::TypeParamCondition
+            type_param = Infer::TypeParam.new(cond_info.refine)
+            # TODO: carry through entire span, not just union of its MetaTypes
+            meta_type = Infer::MetaType.new_type_param(type_param).intersect(
+              Infer::MetaType.new_union(
+                resolve(ctx, cond_info.refine_type).points.map(&.first)
+              )
+            )
+            {type_param, meta_type}
+          # TODO: also handle other conditions?
+          else nil
+          end
+        end.to_h
+      )
     end
 
     def depends_on_call_ret_span(ctx, other_rt, other_f, other_f_link)
@@ -440,9 +474,10 @@ module Mare::Compiler::AltInfer
       refer_type = ctx.refer_type[f_link]
       refer_type_parent = ctx.refer_type[f_link.type]
       classify = ctx.classify[f_link]
+      type_context = ctx.type_context[f_link]
       pre_infer = ctx.pre_infer[f_link]
 
-      {refer_type, refer_type_parent, classify, pre_infer}
+      {refer_type, refer_type_parent, classify, type_context, pre_infer}
     end
   end
 end

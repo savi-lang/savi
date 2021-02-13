@@ -22,6 +22,7 @@ class Mare::Compiler::Context
   getter serve_definition
   getter serve_hover
   getter type_check
+  getter type_context
 
   getter options
   property prev_ctx : Context?
@@ -52,8 +53,10 @@ class Mare::Compiler::Context
     @refer_type = ReferType::Pass.new
     @serve_definition = ServeDefinition.new
     @serve_hover = ServeHover.new
-    @link_libraries = Set(String).new
     @type_check = TypeCheck.new
+    @type_context = TypeContext::Pass.new
+
+    @link_libraries = Set(String).new
   end
 
   def compile_library(*args)

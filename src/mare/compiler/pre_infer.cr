@@ -25,6 +25,7 @@ module Mare::Compiler::PreInfer
       @yield_out_infos = [] of Infer::Local
       @redirects = {} of AST::Node => AST::Node
       @infos = {} of AST::Node => Infer::Info
+      @backwards = {} of Infer::Info => AST::Node # TODO: try to remove this and put the Node link directly into each Info?
     end
 
     protected def redirect(from : AST::Node, to : AST::Node)
@@ -43,7 +44,11 @@ module Mare::Compiler::PreInfer
 
     def [](node : AST::Node); @infos[follow_redirects(node)]; end
     def []?(node : AST::Node); @infos[follow_redirects(node)]?; end
-    protected def []=(node, info); @infos[follow_redirects(node)] = info; end
+    protected def []=(node, info)
+      @infos[follow_redirects(node)] = info
+      @backwards[info] ||= node
+    end
+    def node_for?(info : Infer::Info); @backwards[info]?; end
   end
 
   class FuncVisitor < Mare::AST::Visitor

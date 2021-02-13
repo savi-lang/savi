@@ -175,6 +175,7 @@ struct Mare::Compiler::Infer::MetaType
   end
 
   def substitute_type_params(substitutions : Hash(TypeParam, MetaType))
+    return self if substitutions.empty?
     MetaType.new(inner.substitute_type_params(substitutions))
   end
 

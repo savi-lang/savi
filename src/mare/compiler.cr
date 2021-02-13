@@ -36,6 +36,7 @@ class Mare::Compiler
     when "jumps"            then :jumps
     when "consumes"         then :consumes
     when "inventory"        then :inventory
+    when "type_context"     then :type_context
     when "pre_infer"        then :pre_infer
     when "alt_infer"        then :alt_infer
     when "type_check"       then :type_check
@@ -73,6 +74,7 @@ class Mare::Compiler
       when :jumps            then ctx.run(ctx.jumps)
       when :consumes         then ctx.run(ctx.consumes)
       when :inventory        then ctx.run(ctx.inventory)
+      when :type_context     then ctx.run(ctx.type_context)
       when :pre_infer        then ctx.run(ctx.pre_infer)
       when :alt_infer        then ctx.run(ctx.alt_infer)
       when :type_check       then ctx.run_whole_program(ctx.type_check)
@@ -115,8 +117,9 @@ class Mare::Compiler
     when :refer then [:lambda, :populate, :sugar, :jumps, :macros, :refer_type, :namespace]
     when :consumes then [:jumps, :refer]
     when :inventory then [:refer]
+    when :type_context then [:refer]
     when :pre_infer then [:inventory, :jumps, :classify, :refer, :lambda, :populate]
-    when :alt_infer then [:pre_infer, :classify, :refer_type]
+    when :alt_infer then [:type_context, :pre_infer, :classify, :refer_type]
     when :type_check then [:alt_infer, :pre_infer]
     when :infer then [:pre_infer, :classify, :refer_type]
     when :privacy then [:infer]

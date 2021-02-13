@@ -138,6 +138,7 @@ struct Mare::Compiler::Infer::MetaType::Capability
   def intersect(other : Capability)
     if !ALL_SINGLE.includes?(other)
       if !ALL_SINGLE.includes?(self)
+        return self if other == self
         raise "unsupported intersect: #{self} & #{other}"
       else
         return other.intersect(self)
