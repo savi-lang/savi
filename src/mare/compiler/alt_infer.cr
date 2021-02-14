@@ -237,6 +237,10 @@ module Mare::Compiler::AltInfer
         @analysis[info] = span
 
         span
+      rescue Compiler::Pass::Analyze::ReentranceError
+        kind = info.is_a?(Infer::DynamicInfo) ? " #{info.describe_kind}" : ""
+        Error.at info.pos,
+          "This#{kind} needs an explicit type; it could not be inferred"
       end
     end
 
@@ -289,7 +293,7 @@ module Mare::Compiler::AltInfer
       visitor = Visitor.new(other_f, other_f_link, Analysis.new, *deps)
 
       # TODO: Track dependencies and invalidate cache based on those.
-      other_pre = ctx.pre_infer.run_for_func(ctx, other_f, other_f_link)
+      other_pre = deps.last
       other_analysis = ctx.alt_infer_edge.run_for_func(ctx, other_f, other_f_link)
       other_analysis[other_pre[other_f.ident]]
       .transform_mt(&.substitute_type_params(visitor.substs_for(ctx, other_rt)))
@@ -300,26 +304,32 @@ module Mare::Compiler::AltInfer
       visitor = Visitor.new(other_f, other_f_link, Analysis.new, *deps)
 
       # TODO: Track dependencies and invalidate cache based on those.
-      other_pre = ctx.pre_infer.run_for_func(ctx, other_f, other_f_link)
+      other_pre = deps.last
       other_analysis = ctx.alt_infer_edge.run_for_func(ctx, other_f, other_f_link)
       other_analysis[other_pre[AST::Extract.params(other_f.params)[index].first]]
       .transform_mt(&.substitute_type_params(visitor.substs_for(ctx, other_rt)))
     end
 
     def depends_on_call_yield_in_span(ctx, other_rt, other_f, other_f_link)
+      deps = ctx.alt_infer_edge.gather_deps_for_func(ctx, other_f, other_f_link)
+      visitor = Visitor.new(other_f, other_f_link, Analysis.new, *deps)
+
       # TODO: Track dependencies and invalidate cache based on those.
-      other_pre = ctx.pre_infer.run_for_func(ctx, other_f, other_f_link)
+      other_pre = deps.last
       other_analysis = ctx.alt_infer_edge.run_for_func(ctx, other_f, other_f_link)
       other_analysis[other_pre.yield_in_info.not_nil!]
-      # TODO: .transform_mt(&.substitute_type_params(visitor.substs_for(ctx, other_rt)))
+      .transform_mt(&.substitute_type_params(visitor.substs_for(ctx, other_rt)))
     end
 
     def depends_on_call_yield_out_span(ctx, other_rt, other_f, other_f_link, index)
+      deps = ctx.alt_infer_edge.gather_deps_for_func(ctx, other_f, other_f_link)
+      visitor = Visitor.new(other_f, other_f_link, Analysis.new, *deps)
+
       # TODO: Track dependencies and invalidate cache based on those.
-      other_pre = ctx.pre_infer.run_for_func(ctx, other_f, other_f_link)
+      other_pre = deps.last
       other_analysis = ctx.alt_infer_edge.run_for_func(ctx, other_f, other_f_link)
       other_analysis[other_pre.yield_out_infos[index]]
-      # TODO: .transform_mt(&.substitute_type_params(visitor.substs_for(ctx, other_rt)))
+      .transform_mt(&.substitute_type_params(visitor.substs_for(ctx, other_rt)))
     end
 
     def run_edge(ctx : Context)

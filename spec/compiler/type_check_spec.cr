@@ -108,4 +108,31 @@ describe Mare::Compiler::TypeCheck do
       Mare.compiler.compile([source], :type_check)
     end
   end
+
+  # ...
+
+  it "complains when unable to infer mutually recursive return types" do
+    source = Mare::Source.new_example <<-SOURCE
+    :primitive Tweedle
+      :fun dee (n I32): Tweedle.dum(n)
+      :fun dum (n I32): Tweedle.dee(n)
+
+    :actor Main
+      :new
+        Tweedle.dum(42)
+    SOURCE
+
+    expected = <<-MSG
+    This return value needs an explicit type; it could not be inferred:
+    from (example):3:
+      :fun dum (n I32): Tweedle.dee(n)
+                                ^~~
+    MSG
+
+    expect_raises Mare::Error, expected do
+      Mare.compiler.compile([source], :type_check)
+    end
+  end
+
+  # ...
 end
