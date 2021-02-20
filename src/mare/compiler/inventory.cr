@@ -1,7 +1,8 @@
 require "./pass/analyze"
 
 ##
-# The purpose of the Inventory pass is to take note of certain expressions.
+# The purpose of the Inventory pass is to take note of certain expressions
+# within functions, as well as taking note of the functions within types.
 #
 # This pass does not mutate the Program topology.
 # This pass does not mutate ASTs.
@@ -10,6 +11,46 @@ require "./pass/analyze"
 # This pass produces output state at the per-function level.
 #
 module Mare::Compiler::Inventory
+  struct TypeAnalysis
+    def initialize()
+      @is_concrete = false
+      @func_arities = Set({String, Int32}).new
+      @is_assertions = [] of {Refer::Type, AST::Group?}
+    end
+
+    protected def observe_concreteness
+      @is_concrete = true
+    end
+
+    protected def observe_func(f, f_link)
+      @func_arities.add({f_link.name, f.params.try(&.terms.size) || 0})
+    end
+
+    protected def observe_is(f, f_link, refer_type)
+      target_ast = f.ret.not_nil!
+
+      @is_assertions << (
+        case target_ast
+        when AST::Identifier
+          ident = target_ast
+          {refer_type[ident].as(Refer::Type), nil}
+        when AST::Qualify
+          ident = target_ast.term.as(AST::Identifier)
+          {refer_type[ident].as(Refer::Type), target_ast.group}
+        else
+          raise NotImplementedError.new(target_ast.to_a.inspect)
+        end
+      )
+    end
+
+    def is_concrete?; @is_concrete; end
+    def func_count; @func_arities.size; end
+    def each_func_arity; @func_arities.each; end
+    def each_is_assertion; @is_assertions.each; end
+
+    def has_func_arity?(x); @func_arities.includes?(x); end
+  end
+
   struct Analysis
     def initialize
       @locals = [] of Refer::Local
@@ -62,13 +103,28 @@ module Mare::Compiler::Inventory
     end
   end
 
-  class Pass < Mare::Compiler::Pass::Analyze(Nil, Nil, Analysis)
+  class Pass < Mare::Compiler::Pass::Analyze(Nil, TypeAnalysis, Analysis)
     def analyze_type_alias(ctx, t, t_link) : Nil
-      nil # no analysis at the type level
+      nil # no analysis at the type alias level
     end
 
-    def analyze_type(ctx, t, t_link) : Nil
-      nil # no analysis at the type level
+    def analyze_type(ctx, t, t_link) : TypeAnalysis
+      # TODO: is caching possible? is it necessary for such a simple pass?
+      analysis = TypeAnalysis.new
+
+      t.functions.each do |f|
+        f_link = f.make_link(t_link)
+        if f.has_tag?(:is)
+          refer_type = ctx.refer_type[f_link]
+          analysis.observe_is(f, f_link, refer_type)
+        elsif f.has_tag?(:hygienic)
+          # skip
+        else
+          analysis.observe_func(f, f_link)
+        end
+      end
+
+      analysis
     end
 
     def analyze_func(ctx, f, f_link, t_analysis) : Analysis

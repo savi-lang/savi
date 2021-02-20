@@ -105,7 +105,7 @@ abstract class Mare::Compiler::Pass::Analyze(TypeAliasAnalysis, TypeAnalysis, Fu
   # Optionally, the analyze_type_alias method of the subclass can use this function
   # to cache the analysis from the previous compiler run into this one,
   # based on whether the type alias itself or the list of deps has changed.
-  private def maybe_from_type_alias_cache(ctx, prev, t, t_link, deps) : FuncAnalysis
+  private def maybe_from_type_alias_cache(ctx, prev, t, t_link, deps) : TypeAliasAnalysis
     hashable = {t, deps}
     if prev \
     && (prev_hash = prev.cache_info_for_alias[t_link]?; prev_hash) \
@@ -122,7 +122,7 @@ abstract class Mare::Compiler::Pass::Analyze(TypeAliasAnalysis, TypeAnalysis, Fu
   # Optionally, the analyze_type method of the subclass can use this function
   # to cache the analysis from the previous compiler run into this one,
   # based on whether the type itself or the list of deps has changed.
-  private def maybe_from_type_cache(ctx, prev, t, t_link, deps) : FuncAnalysis
+  private def maybe_from_type_cache(ctx, prev, t, t_link, deps) : TypeAnalysis
     hashable = {t.head_hash, deps}
     if prev \
     && (prev_hash = prev.cache_info_for_type[t_link]?; prev_hash) \
@@ -158,7 +158,7 @@ abstract class Mare::Compiler::Pass::Analyze(TypeAliasAnalysis, TypeAnalysis, Fu
     ctx : Context,
     t : Program::Type,
     t_link : Program::Type::Link
-  ) : TypeAnalysis
+  ) : TypeAliasAnalysis
 
   # Required hook to make the pass create an analysis for the given type.
   abstract def analyze_type(

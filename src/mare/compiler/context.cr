@@ -17,6 +17,7 @@ class Mare::Compiler::Context
   getter paint
   getter populate
   getter pre_infer
+  getter pre_subtyping
   getter reach
   getter refer
   getter refer_type
@@ -50,6 +51,7 @@ class Mare::Compiler::Context
     @paint = Paint.new
     @populate = Populate.new
     @pre_infer = PreInfer::Pass.new
+    @pre_subtyping = PreSubtyping::Pass.new
     @reach = Reach.new
     @refer = Refer::Pass.new
     @refer_type = ReferType::Pass.new

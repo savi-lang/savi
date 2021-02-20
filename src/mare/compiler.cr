@@ -38,6 +38,7 @@ class Mare::Compiler
     when "inventory"        then :inventory
     when "type_context"     then :type_context
     when "pre_infer"        then :pre_infer
+    when "pre_subtyping"    then :pre_subtyping
     when "alt_infer_edge"   then :alt_infer_edge
     when "alt_infer"        then :alt_infer
     when "type_check"       then :type_check
@@ -77,6 +78,7 @@ class Mare::Compiler
       when :inventory        then ctx.run(ctx.inventory)
       when :type_context     then ctx.run(ctx.type_context)
       when :pre_infer        then ctx.run(ctx.pre_infer)
+      when :pre_subtyping    then ctx.run(ctx.pre_subtyping)
       when :alt_infer_edge   then ctx.run(ctx.alt_infer_edge)
       when :alt_infer        then ctx.run(ctx.alt_infer)
       when :type_check       then ctx.run_whole_program(ctx.type_check)
@@ -121,7 +123,8 @@ class Mare::Compiler
     when :inventory then [:refer]
     when :type_context then [:refer]
     when :pre_infer then [:inventory, :jumps, :classify, :refer, :lambda, :populate]
-    when :alt_infer_edge then [:type_context, :pre_infer, :classify, :refer_type]
+    when :pre_subtyping then [:inventory]
+    when :alt_infer_edge then [:pre_subtyping, :pre_infer, :type_context, :classify, :refer_type]
     when :alt_infer then [:alt_infer_edge]
     when :type_check then [:alt_infer, :pre_infer]
     when :infer then [:pre_infer, :classify, :refer_type]
