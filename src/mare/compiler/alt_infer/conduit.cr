@@ -4,9 +4,14 @@ module Mare::Compiler::AltInfer
     def initialize(@inner)
     end
 
-    def as_upstream_infos : Array(Infer::Info)
-      inner.as_upstream_infos
+    def flatten : Array(Conduit)
+      inner.flatten.map { |flat_inner| Conduit.new(flat_inner) }
     end
+
+    def directly_references?(other_info : Infer::Info) : Bool
+      inner.directly_references?(other_info)
+    end
+
     def resolve_span!(ctx : Context, infer : Visitor) : Span
       inner.resolve_span!(ctx, infer)
     end
@@ -15,7 +20,8 @@ module Mare::Compiler::AltInfer
     end
 
     abstract struct Inner
-      abstract def as_upstream_infos : Array(Infer::Info)
+      abstract def flatten : Array(Inner)
+      abstract def directly_references?(other_info : Infer::Info) : Bool
       abstract def resolve_span!(ctx : Context, infer : Visitor) : Span
       abstract def resolve!(ctx : Context, infer : TypeCheck::ForReifiedFunc) : Infer::MetaType
     end
@@ -29,9 +35,14 @@ module Mare::Compiler::AltInfer
       def initialize(@info)
       end
 
-      def as_upstream_infos : Array(Infer::Info)
-        info.as_upstream_infos
+      def flatten : Array(Inner)
+        [self] of Inner
       end
+
+      def directly_references?(other_info : Infer::Info) : Bool
+        @info == other_info
+      end
+
       def resolve_span!(ctx : Context, infer : Visitor) : Span
         infer.resolve(ctx, info)
       end
@@ -50,9 +61,17 @@ module Mare::Compiler::AltInfer
         raise ArgumentError.new("empty union") if @infos.empty?
       end
 
-      def as_upstream_infos : Array(Infer::Info)
-        infos.flat_map(&.as_upstream_infos)
+      def flatten : Array(Inner)
+        infos.flat_map do |info|
+          conduit = info.as_conduit?
+          conduit ? conduit.inner.flatten : [Direct.new(info)] of Inner
+        end
       end
+
+      def directly_references?(other_info : Infer::Info) : Bool
+        @infos.includes?(other_info)
+      end
+
       def resolve_span!(ctx : Context, infer : Visitor) : Span
         spans = @infos.map { |info| infer.resolve(ctx, info) }
         Span
@@ -74,9 +93,25 @@ module Mare::Compiler::AltInfer
       def initialize(@info)
       end
 
-      def as_upstream_infos : Array(Infer::Info)
-        [] of Infer::Info # TODO: somehow pass on upstream while retaining aliasing
+      def flatten : Array(Inner)
+        conduit = info.as_conduit?
+        return [self] of Inner unless conduit
+
+        conduit.flatten.map do |flat_conduit|
+          flat_inner = flat_conduit.inner
+          case flat_inner
+          when Direct; Ephemeralize.new(flat_inner.info)
+          when Ephemeralize; Ephemeralize.new(flat_inner.info)
+          when Alias; Direct.new(flat_inner.info)
+          else raise NotImplementedError.new(flat_inner.inspect)
+          end
+        end
       end
+
+      def directly_references?(other_info : Infer::Info) : Bool
+        @info == other_info
+      end
+
       def resolve_span!(ctx : Context, infer : Visitor) : Span
         infer.resolve(ctx, info).transform_mt(&.ephemeralize)
       end
@@ -94,9 +129,25 @@ module Mare::Compiler::AltInfer
       def initialize(@info)
       end
 
-      def as_upstream_infos : Array(Infer::Info)
-        [] of Infer::Info # TODO: somehow pass on upstream while retaining aliasing
+      def flatten : Array(Inner)
+        conduit = info.as_conduit?
+        return [self] of Inner unless conduit
+
+        conduit.flatten.map do |flat_conduit|
+          flat_inner = flat_conduit.inner
+          case flat_inner
+          when Direct; Alias.new(flat_inner.info)
+          when Ephemeralize; Direct.new(flat_inner.info)
+          when Alias; Alias.new(flat_inner.info)
+          else raise NotImplementedError.new(flat_inner.inspect)
+          end
+        end
       end
+
+      def directly_references?(other_info : Infer::Info) : Bool
+        @info == other_info
+      end
+
       def resolve_span!(ctx : Context, infer : Visitor) : Span
         infer.resolve(ctx, info).transform_mt(&.alias)
       end

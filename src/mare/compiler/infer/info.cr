@@ -54,12 +54,12 @@ class Mare::Compiler::Infer
     def as_conduit? : AltInfer::Conduit?
       nil # if non-nil, a conduit will be used instead of a span.
     end
-    def as_upstream_infos : Array(Info)
+    def as_upstream_conduits : Array(AltInfer::Conduit)
       conduit = as_conduit?
       if conduit
-        conduit.as_upstream_infos
+        conduit.flatten
       else
-        [self] of Info
+        [AltInfer::Conduit.direct(self)]
       end
     end
     def resolve_span!(ctx : Context, infer : AltInfer::Visitor)
@@ -441,9 +441,9 @@ class Mare::Compiler::Infer
         infer_from_all_upstreams? ? upstream_infos : [upstream_infos.first]
 
       upstream_spans =
-        use_upstream_infos.flat_map(&.as_upstream_infos).compact_map do |upstream_info|
-          next if upstream_info == self
-          upstream_span = infer.resolve(ctx, upstream_info)
+        use_upstream_infos.flat_map(&.as_upstream_conduits).compact_map do |upstream_conduit|
+          next if upstream_conduit.directly_references?(self)
+          upstream_span = upstream_conduit.resolve_span!(ctx, infer)
           upstream_span unless upstream_span.any_uncertain?
         end
 

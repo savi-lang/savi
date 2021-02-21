@@ -482,7 +482,115 @@ describe Mare::Compiler::TypeCheck do
     end
   end
 
-  # ...
+  it "complains when a less specific type than required is assigned" do
+    source = Mare::Source.new_example <<-SOURCE
+    :actor Main
+      :new
+        x (U64 | None) = 42
+        y U64 = x
+    SOURCE
+
+    expected = <<-MSG
+    The type of this expression doesn't meet the constraints imposed on it:
+    from (example):4:
+        y U64 = x
+                ^
+
+    - it is required here to be a subtype of U64:
+      from (example):4:
+        y U64 = x
+          ^~~
+
+    - but the type of the local variable was (U64 | None):
+      from (example):3:
+        x (U64 | None) = 42
+          ^~~~~~~~~~~~
+    MSG
+
+    expect_raises Mare::Error, expected do
+      Mare.compiler.compile([source], :type_check)
+    end
+  end
+
+  it "complains when a different type is assigned on reassignment" do
+    source = Mare::Source.new_example <<-SOURCE
+    :actor Main
+      :new
+        x = U64[0]
+        x = "a string"
+    SOURCE
+
+    expected = <<-MSG
+    The type of this expression doesn't meet the constraints imposed on it:
+    from (example):4:
+        x = "a string"
+             ^~~~~~~~
+
+    - it is required here to be a subtype of U64:
+      from (example):3:
+        x = U64[0]
+        ^
+
+    - but the type of the expression was String:
+      from (example):4:
+        x = "a string"
+             ^~~~~~~~
+    MSG
+
+    expect_raises Mare::Error, expected do
+      Mare.compiler.compile([source], :type_check)
+    end
+  end
+
+  it "resolves return type from param type or another return type" do
+    source = Mare::Source.new_example <<-SOURCE
+    :primitive Infer
+      :fun from_param (n I32): n
+      :fun from_call_return (n I32): Infer.from_param(n)
+
+    :actor Main
+      :new
+        Infer.from_call_return(42)
+    SOURCE
+
+    ctx = Mare.compiler.compile([source], :type_check)
+
+    [
+      {"Infer", "from_param"},
+      {"Infer", "from_call_return"},
+      {"Main", "new"},
+    ].each do |t_name, f_name|
+      type_check = ctx.type_check.for_func_simple(ctx, source, t_name, f_name)
+      call = type_check.reified.func(ctx).body.not_nil!.terms.first
+
+      type_check.analysis.resolved(ctx, call).show_type.should eq "I32"
+    end
+  end
+
+  it "resolves param type from local assignment or from the return type" do
+    source = Mare::Source.new_example <<-SOURCE
+    :primitive Infer
+      :fun from_assign (n): m I32 = n
+      :fun from_return_type (n) I32: n
+
+    :actor Main
+      :new
+        Infer.from_assign(42)
+        Infer.from_return_type(42)
+    SOURCE
+
+    ctx = Mare.compiler.compile([source], :type_check)
+
+    [
+      {"Infer", "from_assign"},
+      {"Infer", "from_return_type"},
+    ].each do |t_name, f_name|
+      type_check = ctx.type_check.for_func_simple(ctx, source, t_name, f_name)
+      expr = type_check.reified.func(ctx).body.not_nil!.terms.first
+
+      type_check.analysis.resolved(ctx, expr).show_type.should eq "I32"
+    end
+  end
 
   it "complains when unable to infer mutually recursive return types" do
     source = Mare::Source.new_example <<-SOURCE
@@ -500,6 +608,90 @@ describe Mare::Compiler::TypeCheck do
     from (example):3:
       :fun dum (n I32): Tweedle.dee(n)
                                 ^~~
+    MSG
+
+    expect_raises Mare::Error, expected do
+      Mare.compiler.compile([source], :type_check)
+    end
+  end
+
+
+  it "complains about problems with unreachable functions too" do
+    source = Mare::Source.new_example <<-SOURCE
+    :primitive NeverCalled
+      :fun call
+        x I32 = True
+
+    :actor Main
+      :new
+        None
+    SOURCE
+
+    expected = <<-MSG
+    The type of this expression doesn't meet the constraints imposed on it:
+    from (example):3:
+        x I32 = True
+                ^~~~
+
+    - it is required here to be a subtype of I32:
+      from (example):3:
+        x I32 = True
+          ^~~
+
+    - but the type of the expression was Bool:
+      from (example):3:
+        x I32 = True
+                ^~~~
+    MSG
+
+    expect_raises Mare::Error, expected do
+      Mare.compiler.compile([source], :type_check)
+    end
+  end
+
+  it "resolves assignment from an allocated class" do
+    source = Mare::Source.new_example <<-SOURCE
+    :class X
+
+    :actor Main
+      :new
+        x = X.new
+    SOURCE
+
+    ctx = Mare.compiler.compile([source], :type_check)
+
+    type_check = ctx.type_check.for_func_simple(ctx, source, "Main", "new")
+    body = type_check.reified.func(ctx).body.not_nil!
+    assign = body.terms.first.as(Mare::AST::Relate)
+
+    type_check.analysis.resolved(ctx, assign.lhs).show_type.should eq "X"
+    type_check.analysis.resolved(ctx, assign.rhs).show_type.should eq "X"
+  end
+
+  it "requires allocation for non-non references of an allocated class" do
+    source = Mare::Source.new_example <<-SOURCE
+    :class X
+
+    :actor Main
+      :new
+        x X = X
+    SOURCE
+
+    expected = <<-MSG
+    The type of this expression doesn't meet the constraints imposed on it:
+    from (example):5:
+        x X = X
+              ^
+
+    - it is required here to be a subtype of X:
+      from (example):5:
+        x X = X
+          ^
+
+    - but the type of the singleton value for this type was X'non:
+      from (example):5:
+        x X = X
+              ^
     MSG
 
     expect_raises Mare::Error, expected do
