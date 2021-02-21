@@ -109,6 +109,35 @@ describe Mare::Compiler::TypeCheck do
     end
   end
 
+  it "complains when the assignment type doesn't match the right-hand-side" do
+    source = Mare::Source.new_example <<-SOURCE
+    :actor Main
+      :new
+        name String = 42
+    SOURCE
+
+    expected = <<-MSG
+    The type of this expression doesn't meet the constraints imposed on it:
+    from (example):3:
+        name String = 42
+                      ^~
+
+    - it is required here to be a subtype of String:
+      from (example):3:
+        name String = 42
+             ^~~~~~
+
+    - but the type of the literal value was Numeric:
+      from (example):3:
+        name String = 42
+                      ^~
+    MSG
+
+    expect_raises Mare::Error, expected do
+      Mare.compiler.compile([source], :type_check)
+    end
+  end
+
   # ...
 
   it "complains when unable to infer mutually recursive return types" do

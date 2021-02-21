@@ -886,9 +886,19 @@ class Mare::Compiler::TypeCheck
     def resolve(ctx : Context, info : Infer::Info) : MetaType
       @analysis.resolved_infos[info]? || begin
         conduit = info.as_conduit?
-        return conduit.resolve!(ctx, self) if conduit
+        if conduit
+          mt = conduit.resolve!(ctx, self).simplify(ctx)
+          type_check(info, mt)
+          return mt
+        end
 
-        mt = filter_span(info)
+        mt =
+          case info
+          when Infer::Literal
+            resolve_sensitive(ctx, info)
+          else
+            filter_span(info).simplify(ctx)
+          end
 
         # puts info.pos.show
         # pp @f_analysis.span(info)
@@ -900,6 +910,31 @@ class Mare::Compiler::TypeCheck
         # info.resolve_others!(ctx, self)
         mt
       end
+    end
+
+    def resolve_sensitive(ctx : Context, info : Infer::Literal) : MetaType
+      simple = filter_span(info)
+      mt = simple
+
+      # Intersect with the downstream meta-types.
+      span = simple
+      # TODO: use all downstreams (really, tethers), not just the last one.
+      # TODO: Also, this code and others like it really need to have
+      # subtype checking available to be able to properly narrow the type,
+      # which means it needs to be brought into the AltInfer pass somehow.
+      # Probably we need to make it so that AltInfer pass does just enough
+      # typechecking work to know the type signature of every function in the
+      # program, then we can do all "intra-function" checks in TypeCheck pass.
+      info.downstreams_each.each do |use_pos, other_info, aliases|
+        mt = mt.intersect(resolve(ctx, other_info))
+      end
+      mt = mt.simplify(ctx)
+
+      # If we don't satisfy the constraints, leave it to the type check pass
+      # to print a consistent error message based on the simple literal type.
+      return simple if mt.unsatisfiable?
+
+      mt
     end
 
     def type_check(info : Infer::DynamicInfo, meta_type : Infer::MetaType)

@@ -674,30 +674,7 @@ class Mare::Compiler::Infer
     end
 
     def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
-      simple = AltInfer::Span.simple(@possible)
-
-      # Intersect with the downstream spans.
-      span = simple
-      # TODO: use all downstreams (really, tethers), not just the last one.
-      # TODO: Also, this code and others like it really need to have
-      # subtype checking available to be able to properly narrow the type,
-      # which means it needs to be brought into the AltInfer pass somehow.
-      # Probably we need to make it so that AltInfer pass does just enough
-      # typechecking work to know the type signature of every function in the
-      # program, then we can do all "intra-function" checks in TypeCheck pass.
-      [@downstreams.last].each do |use_pos, other_info, aliases|
-        span = span.combine_mt(infer.resolve(ctx, other_info)) do |mt, other_mt|
-          mt.intersect(other_mt)
-        end
-      end
-
-      # If we don't satisfy the constraints, leave it to the type check pass
-      # to print a consistent error message based on the simple literal type.
-      return simple if span.any_mt?(&.unsatisfiable?)
-
-      # TODO: narrowing based on peer hints?
-
-      span
+      AltInfer::Span.simple(@possible)
     end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
