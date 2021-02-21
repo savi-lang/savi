@@ -18,11 +18,11 @@ require "./pass/analyze"
 #
 module Mare::Compiler::PreInfer
   struct Analysis
-    getter yield_out_infos : Array(Infer::Local)
-    property! yield_in_info : Infer::Local
+    getter yield_out_infos : Array(Infer::YieldOut)
+    property! yield_in_info : Infer::YieldIn
 
     def initialize
-      @yield_out_infos = [] of Infer::Local
+      @yield_out_infos = [] of Infer::YieldOut
       @redirects = {} of AST::Node => AST::Node
       @infos = {} of AST::Node => Infer::Info
       @backwards = {} of Infer::Info => AST::Node # TODO: try to remove this and put the Node link directly into each Info?
@@ -168,9 +168,9 @@ module Mare::Compiler::PreInfer
 
       # Create fake local variables that represents the yield-related types.
       yield_out_arg_count.times do
-        @analysis.yield_out_infos << Infer::Local.new((func.yield_out || func.ident).pos)
+        @analysis.yield_out_infos << Infer::YieldOut.new((func.yield_out || func.ident).pos)
       end
-      @analysis.yield_in_info = Infer::Local.new((func.yield_in || func.ident).pos)
+      @analysis.yield_in_info = Infer::YieldIn.new((func.yield_in || func.ident).pos)
 
       # Constrain via the "yield out" part of the explicit signature if present.
       func.yield_out.try do |yield_out|

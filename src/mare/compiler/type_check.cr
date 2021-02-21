@@ -947,8 +947,8 @@ class Mare::Compiler::TypeCheck
 
       # We've failed on all fronts. Print an error describing what we know,
       # so that the user can figure out how to give us better information.
-      error_info = info.describe_downstream_constraints(ctx, self)
-      error_info.concat(info.describe_peer_hints(ctx, self))
+      error_info = info.describe_peer_hints(ctx, self)
+      error_info.concat(info.describe_downstream_constraints(ctx, self))
       error_info.push({info.pos,
         "and the literal itself has an intrinsic type of #{simple.show_type}"
       })

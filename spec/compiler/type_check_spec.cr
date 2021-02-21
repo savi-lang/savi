@@ -378,6 +378,110 @@ describe Mare::Compiler::TypeCheck do
     type_check.analysis.resolved(ctx, literal).show_type.should eq "U64"
   end
 
+  it "complains when a literal couldn't be resolved to a single type" do
+    source = Mare::Source.new_example <<-SOURCE
+    :actor Main
+      :new
+        x (F64 | U64) = 42
+    SOURCE
+
+    expected = <<-MSG
+    This literal value couldn't be inferred as a single concrete type:
+    from (example):3:
+        x (F64 | U64) = 42
+                        ^~
+
+    - it is required here to be a subtype of (F64 | U64):
+      from (example):3:
+        x (F64 | U64) = 42
+          ^~~~~~~~~~~
+
+    - and the literal itself has an intrinsic type of Numeric:
+      from (example):3:
+        x (F64 | U64) = 42
+                        ^~
+
+    - Please wrap an explicit numeric type around the literal (for example: U64[42])
+    MSG
+
+    expect_raises Mare::Error, expected do
+      Mare.compiler.compile([source], :type_check)
+    end
+  end
+
+  it "complains when literal couldn't resolve even when calling u64 method" do
+    source = Mare::Source.new_example <<-SOURCE
+    :actor Main
+      :new
+        x = 42.u64
+    SOURCE
+
+    expected = <<-MSG
+    This literal value couldn't be inferred as a single concrete type:
+    from (example):3:
+        x = 42.u64
+            ^~
+
+    - and the literal itself has an intrinsic type of Numeric:
+      from (example):3:
+        x = 42.u64
+            ^~
+
+    - Please wrap an explicit numeric type around the literal (for example: U64[42])
+    MSG
+
+    expect_raises Mare::Error, expected do
+      Mare.compiler.compile([source], :type_check)
+    end
+  end
+
+  it "complains when literal couldn't resolve and had conflicting hints" do
+    source = Mare::Source.new_example <<-SOURCE
+    :actor Main
+      :fun non example (string String)
+        case (
+        | string.size < 10 | U64[99]
+        | string.size > 90 | I64[88]
+        | 0
+        )
+      :new
+        @example("Hello, World!")
+    SOURCE
+
+    expected = <<-MSG
+    This literal value couldn't be inferred as a single concrete type:
+    from (example):6:
+        | 0
+          ^
+
+    - it is suggested here that it might be a U64:
+      from (example):4:
+        | string.size < 10 | U64[99]
+                                ^~~~
+
+    - it is suggested here that it might be a I64:
+      from (example):5:
+        | string.size > 90 | I64[88]
+                                ^~~~
+
+    - it is required here to be a subtype of (U64 | I64):
+      from (example):3:
+        case (
+        ^~~~~~···
+
+    - and the literal itself has an intrinsic type of Numeric:
+      from (example):6:
+        | 0
+          ^
+
+    - Please wrap an explicit numeric type around the literal (for example: U64[0])
+    MSG
+
+    expect_raises Mare::Error, expected do
+      Mare.compiler.compile([source], :type_check)
+    end
+  end
+
   # ...
 
   it "complains when unable to infer mutually recursive return types" do

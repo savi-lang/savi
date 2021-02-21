@@ -335,6 +335,21 @@ class Mare::Compiler::Infer
       @pos = explicit.pos
     end
 
+    def as_conduit? : AltInfer::Conduit?
+      # If we have an explicit type, we are not a conduit.
+      return nil if @explicit
+
+      # Only do conduit for Local variables, not any other NamedInfo.
+      # TODO: Can/should we remove this limitation somehow,
+      # or at least move this method override to that subclass instead?
+      return nil unless is_a?(Local)
+
+      # If the first immediate upstream is another NamedInfo, conduit to it.
+      return nil if @upstreams.empty?
+      return nil unless (upstream = @upstreams.first.first).is_a?(NamedInfo)
+      AltInfer::Conduit.direct(upstream)
+    end
+
     def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
       explicit = @explicit
 
@@ -422,11 +437,17 @@ class Mare::Compiler::Infer
       end
     end
     private def resolve_upstream_span(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span?
-      # TODO: support infer_from_all_upstreams? ?
-      upstream_infos.flat_map(&.as_upstream_infos).each do |upstream_info|
-        upstream_span = infer.resolve(ctx, upstream_info)
-        return upstream_span unless upstream_span.any_uncertain?
-      end
+      use_upstream_infos =
+        infer_from_all_upstreams? ? upstream_infos : [upstream_infos.first]
+
+      upstream_spans =
+        use_upstream_infos.flat_map(&.as_upstream_infos).compact_map do |upstream_info|
+          next if upstream_info == self
+          upstream_span = infer.resolve(ctx, upstream_info)
+          upstream_span unless upstream_span.any_uncertain?
+        end
+
+      AltInfer::Span.combine_mts(upstream_spans) { |mts| MetaType.new_union(mts) }
     end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
@@ -763,6 +784,14 @@ class Mare::Compiler::Infer
 
   class Param < NamedInfo
     def describe_kind : String; "parameter" end
+  end
+
+  class YieldIn < NamedInfo
+    def describe_kind : String; "yielded argument" end
+  end
+
+  class YieldOut < NamedInfo
+    def describe_kind : String; "yielded result" end
   end
 
   class Field < DynamicInfo
