@@ -35,8 +35,15 @@ module Mare::Compiler::AltInfer
       def initialize(@info)
       end
 
+      def pretty_print(format : PrettyPrint)
+        format.surround("Direct(", ")", left_break: nil, right_break: nil) do
+          format.text(info.to_s)
+        end
+      end
+
       def flatten : Array(Inner)
-        [self] of Inner
+        conduit = info.as_conduit?
+        conduit ? conduit.inner.flatten : [self] of Inner
       end
 
       def directly_references?(other_info : Infer::Info) : Bool
@@ -59,6 +66,15 @@ module Mare::Compiler::AltInfer
       getter infos : Array(Infer::Info)
       def initialize(@infos)
         raise ArgumentError.new("empty union") if @infos.empty?
+      end
+
+      def pretty_print(format : PrettyPrint)
+        format.surround("Union([", " ])", left_break: " ", right_break: nil) do
+          infos.each_with_index do |info, index|
+            format.breakable ", " if index != 0
+            format.text(info.to_s)
+          end
+        end
       end
 
       def flatten : Array(Inner)
@@ -91,6 +107,12 @@ module Mare::Compiler::AltInfer
     struct Ephemeralize < Inner
       getter info : Infer::Info
       def initialize(@info)
+      end
+
+      def pretty_print(format : PrettyPrint)
+        format.surround("Ephemeralize(", ")", left_break: nil, right_break: nil) do
+          format.text(info.to_s)
+        end
       end
 
       def flatten : Array(Inner)
@@ -127,6 +149,12 @@ module Mare::Compiler::AltInfer
     struct Alias < Inner
       getter info : Infer::Info
       def initialize(@info)
+      end
+
+      def pretty_print(format : PrettyPrint)
+        format.surround("Alias(", ")", left_break: nil, right_break: nil) do
+          format.text(info.to_s)
+        end
       end
 
       def flatten : Array(Inner)
