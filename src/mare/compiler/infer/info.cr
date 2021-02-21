@@ -47,6 +47,9 @@ class Mare::Compiler::Infer
 
     abstract def add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
 
+    def as_conduit? : AltInfer::Conduit?
+      nil # if non-nil, a conduit will be used instead of a span.
+    end
     def resolve_span!(ctx : Context, infer : AltInfer::Visitor)
       raise NotImplementedError.new("resolve_span! for #{self.class}")
     end
@@ -937,8 +940,8 @@ class Mare::Compiler::Infer
       final_term.add_peer_hint(peer)
     end
 
-    def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
-      infer.resolve(ctx, final_term)
+    def as_conduit? : AltInfer::Conduit?
+      AltInfer::Conduit.direct(@final_term)
     end
 
     def resolve_one!(ctx : Context, infer : TypeCheck::ForReifiedFunc) : MetaType
@@ -974,22 +977,14 @@ class Mare::Compiler::Infer
       end
     end
 
-    def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
-      # TODO: keep in separate span points if conds can be statically determined
-      return AltInfer::Span.combine_mts(
-        @branches.map { |cond, body, body_jumps_away|
-          infer.resolve(ctx, body) unless body_jumps_away
-        }.compact
-      ) { |mts| MetaType.new_union(mts) }
-    end
-
-    def resolve_others!(ctx : Context, infer)
-      if infer.is_a?(AltInfer::Visitor)
-        @branches.each do |cond, body, body_jumps_away|
-          infer.resolve(ctx, cond) if cond
-          infer.resolve(ctx, body)
+    def as_conduit? : AltInfer::Conduit?
+      # TODO: Keep in separate span points instead of union if any of the conds
+      # can be statically determinable, leaving room for specialization.
+      AltInfer::Conduit.union(
+        @branches.compact_map do |cond, body, body_jumps_away|
+          body unless body_jumps_away
         end
-      end
+      )
     end
 
     def tether_upward_transform(ctx : Context, infer : ForReifiedFunc, meta_type : MetaType) : MetaType
@@ -1317,8 +1312,8 @@ class Mare::Compiler::Infer
     def initialize(@pos, @local)
     end
 
-    def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
-      infer.resolve(ctx, @local).transform_mt(&.ephemeralize)
+    def as_conduit? : AltInfer::Conduit?
+      AltInfer::Conduit.ephemeralize(@local)
     end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
@@ -1389,8 +1384,8 @@ class Mare::Compiler::Infer
       @lhs.add_peer_hint(peer)
     end
 
-    def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
-      infer.resolve(ctx, @lhs).transform_mt(&.alias)
+    def as_conduit? : AltInfer::Conduit?
+      AltInfer::Conduit.alias(@lhs)
     end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
@@ -1421,8 +1416,8 @@ class Mare::Compiler::Infer
       @yield_in.add_peer_hint(peer)
     end
 
-    def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
-      infer.resolve(ctx, @yield_in)
+    def as_conduit? : AltInfer::Conduit?
+      AltInfer::Conduit.direct(@yield_in)
     end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType

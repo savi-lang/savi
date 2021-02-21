@@ -883,6 +883,9 @@ class Mare::Compiler::TypeCheck
 
     def resolve(ctx : Context, info : Infer::Info) : MetaType
       @analysis.resolved_infos[info]? || begin
+        conduit = info.as_conduit?
+        return conduit.resolve!(ctx, self) if conduit
+
         mt = filter_span(info)
 
         # puts info.pos.show

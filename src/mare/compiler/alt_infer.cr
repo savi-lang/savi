@@ -231,6 +231,11 @@ module Mare::Compiler::AltInfer
         ast = @pre_infer.node_for?(info)
         substs = substs_for_layer(ctx, ast) if ast
 
+        # If this info resolves as a conduit, resolve the conduit,
+        # and do not save the result locally for this span.
+        conduit = info.as_conduit?
+        return conduit.resolve_span!(ctx, self) if conduit
+
         span = info.resolve_span!(ctx, self)
         span = span.transform_mt(&.substitute_type_params(substs)) if substs
 
