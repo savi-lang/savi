@@ -19,175 +19,297 @@ require "./pass/analyze"
 # This pass produces output state at the per-function level.
 #
 module Mare::Compiler::AltInfer
+  alias Info = Infer::Info
+  alias MetaType = Infer::MetaType
+  alias ReifiedType = Infer::ReifiedType
+
   struct Span
-    alias CK = (Infer::Info | Symbol)
-    alias C = Hash(CK, Infer::MetaType)
-    alias P = {Infer::MetaType, C?}
+    alias Key = Info | Symbol
 
-    getter points : Array(P)
-
-    def initialize(@points = [] of P)
+    getter inner : Inner
+    def initialize(@inner)
     end
 
-    def self.simple(mt : Infer::MetaType) : Span
-      new([{mt, nil}] of P)
-    end
-
-    def self.join(spans : Enumerable(Span))
-      new(spans.flat_map(&.points))
-    end
-
-    def self.add_cond(a : C?, k : CK, v : Infer::MetaType) : C?
-      res = a ? a.dup : C.new
-      raise NotImplementedError.new("merge cond keys") if res[k]? && res[k]? != v
-      res[k] = v
-      res
-    end
-
-    def self.get_cond(a : C?, k : CK) : Infer::MetaType?
-      return nil unless a
-      a[k]?
-    end
-
-    def self.get_cond!(a : C?, k : CK) : Infer::MetaType
-      get_cond(a, k).not_nil!
-    end
-
-    def self.merge_conds(point : P, b : C?) : P?
-      mt, a = point
-      return {mt, nil} if !a && !b
-      return {mt, a} if !b
-      return {mt, b} if !a
-
-      res = a ? a.dup : C.new
-      b.each do |k, v|
-        # TODO: simplify merged conds to remove duplicated conds
-        # TODO: remove points with mutually-excluding conds - they are impossible
-        existing = res[k]?
-        if existing && existing != v
-          if k == :f_cap
-            return nil # remove points with differing f_cap keys
-          else
-            raise NotImplementedError.new("merge cond keys")
-          end
-        else
-          res[k] = v
-        end
+    def pretty_print(format : PrettyPrint)
+      format.surround("Span(", ")", left_break: nil, right_break: nil) do
+        inner.pretty_print(format)
       end
-      {mt, res}
     end
 
-    def self.self_with_specified_cap(ctx : Context, infer : Visitor, cap_value : String)
-      rt_args = infer
-        .type_params_for(ctx, infer.link.type)
-        .map { |type_param| Infer::MetaType.new_type_param(type_param) }
+    def self.simple(mt : MetaType); new(Terminal.new(mt)); end
+    def self.decision(key : Key, span_map : Hash(MetaType, Span))
+      map = span_map.transform_values(&.inner)
 
-      rt = Infer::ReifiedType.new(infer.link.type, rt_args)
-      cap_mt = Infer::MetaType::Capability.new_maybe_generic(cap_value)
-      mt = Infer::MetaType.new(rt).override_cap(cap_mt)
-      Span.simple(mt)
+      raise NotImplementedError.new("new decision key conflict") \
+        if map.values.any?(&.has_key?(key))
+
+      new(Decision.build(key, map))
     end
 
     def self.self_with_reify_cap(ctx : Context, infer : Visitor)
       rt_args = infer
         .type_params_for(ctx, infer.link.type)
-        .map { |type_param| Infer::MetaType.new_type_param(type_param) }
+        .map { |type_param| MetaType.new_type_param(type_param) }
 
-      rt = Infer::ReifiedType.new(infer.link.type, rt_args)
+      rt = ReifiedType.new(infer.link.type, rt_args)
       f = infer.func
       f_cap_value = f.cap.value
       f_cap_value = "ref" if f.has_tag?(:constructor)
       f_cap_value = "read" if f_cap_value == "box" # TODO: figure out if we can remove this Pony-originating semantic hack
-      Span.new(
-        Infer::MetaType::Capability.new_maybe_generic(f_cap_value).each_cap.map do |cap|
-          cap_mt = Infer::MetaType.new(cap)
-          {Infer::MetaType.new(rt).override_cap(cap_mt), { :f_cap.as(CK) => cap_mt }}.as(P)
-        end.to_a
+      Span.decision(
+        :f_cap,
+        MetaType::Capability.new_maybe_generic(f_cap_value).each_cap.map do |cap|
+          cap_mt = MetaType.new(cap)
+          {cap_mt, Span.simple(MetaType.new(rt).override_cap(cap_mt))}
+        end.to_h
       )
     end
 
     def self.self_ephemeral_with_cap(ctx : Context, infer : Visitor, cap : String)
       rt_args = infer
         .type_params_for(ctx, infer.link.type)
-        .map { |type_param| Infer::MetaType.new_type_param(type_param) }
+        .map { |type_param| MetaType.new_type_param(type_param) }
 
-      rt = Infer::ReifiedType.new(infer.link.type, rt_args)
-      mt = Infer::MetaType.new(rt, cap).ephemeralize
-      new([{mt, nil}] of P)
+      rt = ReifiedType.new(infer.link.type, rt_args)
+      mt = MetaType.new(rt, cap).ephemeralize
+      simple(mt)
     end
 
-    def filter_remove_cond(cond_key : CK)
-      Span.new(
-        points.map do |mt, conds|
-          should_keep = conds ? (yield conds[cond_key]?) : (yield nil)
-
-          if should_keep
-            {mt, conds ? conds.reject(cond_key).as(C?) : nil}
-          end
-        end.compact
-      )
+    def has_key?(key : Key) : Bool
+      inner.has_key?(key)
     end
 
-    def filter_remove_f_cap(call_mt_cap : Infer::MetaType, call_func : Program::Function)
-      exact_span = filter_remove_cond(:f_cap) { |f_cap|
-        !f_cap || f_cap == call_mt_cap
-      }
-      return exact_span unless exact_span.points.empty?
-
-      filter_remove_cond(:f_cap) { |f_cap|
-        !f_cap ||
-        f_cap == call_mt_cap ||
-        call_mt_cap.cap_only_inner.subtype_of?(f_cap.not_nil!.cap_only_inner) ||
-        call_func.has_tag?(:constructor) || # TODO: better way to do this?
-        call_mt_cap.inner == Infer::MetaType::Capability::ISO || # TODO: better way to handle auto recovery ||
-        call_mt_cap.inner == Infer::MetaType::Capability::TRN # TODO: better way to handle auto recovery
-      }
+    # TODO: remove this function?
+    def all_terminal_meta_types : Array(MetaType)
+      inner.all_terminal_meta_types
     end
 
-    def expand : Span
-      Span.new(points.flat_map { |mt, conds| (yield mt, conds) })
+    def any_mt?(&block : MetaType -> Bool) : Bool
+      inner.any_mt?(&block)
     end
 
-    def transform : Span
-      Span.new(points.map { |mt, conds| (yield mt, conds) })
+    def transform_mt(&block : MetaType -> MetaType) : Span
+      Span.new(inner.transform_mt(&block))
     end
 
-    def transform_mt : Span
-      Span.new(points.map { |mt, conds| {(yield mt), conds} })
+    def transform_mt_using(key : Key, &block : (MetaType, MetaType?) -> MetaType) : Span
+      Span.new(inner.transform_mt_using(key, nil, &block))
     end
 
-    def with_prior_conds(conds : C?) : Span
-      Span.new(points.map { |point| Span.merge_conds(point, conds) }.compact)
+    def decided_by(key : Key, &block : MetaType -> Enumerable({MetaType, Span})) : Span
+      orig_keys = inner.gather_all_keys
+      Span.new(inner.decided_by(key, orig_keys, &block))
     end
 
-    def combine_mt(other : Span) : Span
-      Span.new(
-        points.flat_map do |mt, conds|
-          other.with_prior_conds(conds).points.map do |other_mt, merged_conds|
-            {(yield mt, other_mt), merged_conds}
-          end
+    def combine_mt(other : Span, &block : (MetaType, MetaType) -> MetaType) : Span
+      Span.new(inner.combine_mt(other.inner, nil, &block))
+    end
+
+    def combine_mts(spans : Array(Span), &block : (MetaType, Array(MetaType)) -> MetaType) : Span
+      others = spans.map(&.inner)
+      raise NotImplementedError.new("combine_mts") \
+        unless inner.is_a?(Terminal) && others.all?(&.is_a?(Terminal))
+
+      Span.new(Terminal.new(block.call(
+        inner.as(Terminal).meta_type,
+        others.map(&.as(Terminal).meta_type)
+      )))
+    end
+
+    def self.combine_mts(spans : Array(Span), &block : Array(MetaType) -> MetaType) : Span?
+      case spans.size
+      when 0; nil
+      when 1; spans.first
+      when 2
+        spans.first.combine_mt(spans.last) { |mt, other_mt|
+          block.call([mt, other_mt])
+        }
+      else
+        spans.first.combine_mts(spans[1..-1]) do |mt, other_mts|
+          block.call([mt] + other_mts)
         end
-      )
+      end
     end
 
-    def combine_mts(others : Array(Span)) : Span
-      combos = points.map { |mt, conds| {mt, [] of Infer::MetaType, conds} }
-      others.each do |other|
-        combos = combos.flat_map do |mt, other_mts, conds|
-          other.with_prior_conds(conds).points.map do |other_mt, merged_conds|
-            {mt, other_mts + [other_mt], merged_conds}
+    def deciding_f_cap(f_cap_mt : MetaType, is_constructor : Bool) : Span?
+      inner.deciding_f_cap(f_cap_mt, is_constructor).try { |new_inner| Span.new(new_inner) }
+    end
+
+    abstract struct Inner
+      abstract def has_key?(key : Key) : Bool
+      abstract def gather_all_keys(set = Set(Key).new) : Set(Key)
+      abstract def all_terminal_meta_types : Array(MetaType)
+      abstract def any_mt?(&block : MetaType -> Bool) : Bool
+      abstract def transform_mt(&block : MetaType -> MetaType) : Inner
+      abstract def transform_mt_using(key : Key, maybe_value : MetaType?, &block : (MetaType, MetaType?) -> MetaType) : Inner
+      abstract def decided_by(key : Key, orig_keys : Set(Key), &block : MetaType -> Enumerable({MetaType, Span})) : Inner
+      abstract def combine_mt(other : Inner, maybe_other_mt : MetaType?, &block : (MetaType, MetaType) -> MetaType) : Inner
+      abstract def deciding_f_cap(f_cap_mt : MetaType, is_constructor : Bool) : Inner?
+    end
+
+    struct Terminal < Inner
+      getter meta_type : MetaType
+      def initialize(@meta_type)
+      end
+
+      def pretty_print(format : PrettyPrint)
+        meta_type.inner.pretty_print(format)
+      end
+
+      def has_key?(key : Key) : Bool
+        false
+      end
+
+      def gather_all_keys(set = Set(Key).new) : Set(Key)
+        set
+      end
+
+      def all_terminal_meta_types : Array(MetaType)
+        [@meta_type]
+      end
+
+      def any_mt?(&block : MetaType -> Bool) : Bool
+        block.call(meta_type)
+      end
+
+      def transform_mt(&block : MetaType -> MetaType) : Inner
+        Terminal.new(block.call(meta_type))
+      end
+
+      def transform_mt_using(key : Key, maybe_value : MetaType?, &block : (MetaType, MetaType?) -> MetaType) : Inner
+        Terminal.new(block.call(meta_type, maybe_value))
+      end
+
+      def decided_by(key : Key, orig_keys : Set(Key), &block : MetaType -> Enumerable({MetaType, Span})) : Inner
+        map = block.call(meta_type).to_h.transform_values(&.inner)
+
+        new_keys = Set(Key).new
+        map.each_value { |inner| inner.gather_all_keys(new_keys) }
+        raise NotImplementedError.new("decision key conflict") \
+          if new_keys.any? { |new_key| orig_keys.includes?(new_key) }
+
+        Decision.build(key, map)
+      end
+
+      def combine_mt(other : Inner, maybe_other_mt : MetaType?, &block : (MetaType, MetaType) -> MetaType) : Inner
+        if maybe_other_mt
+          Terminal.new(block.call(meta_type, maybe_other_mt))
+        else
+          other.combine_mt(self, meta_type) { |b, a| block.call(a, b) }
+        end
+      end
+
+      def deciding_f_cap(f_cap_mt : MetaType, is_constructor : Bool) : Inner?
+        self # a terminal node ignores f_cap_mt
+      end
+    end
+
+    struct Decision < Inner
+      getter key : Key
+      getter map : Hash(MetaType, Inner)
+      def initialize(@key, @map)
+      end
+
+      def self.build(key, map)
+        raise ArgumentError.new("empty decision") if map.empty?
+
+        first_inner = map.values.first
+        return first_inner if map.values.all?(&.==(first_inner))
+
+        new(key, map)
+      end
+
+      def pretty_print(format : PrettyPrint)
+        format.group do
+          format.text(key.to_s)
+          format.surround(" : {", " }", left_break: " ", right_break: nil) do
+            @map.each_with_index do |pair, index|
+              value, inner = pair
+
+              format.breakable ", " if index != 0
+              format.group do
+                value.inner.pretty_print(format)
+                format.text " => "
+                format.nest do
+                  inner.pretty_print(format)
+                end
+              end
+            end
           end
         end
       end
-      Span.new(
-        combos.map { |mt, other_mts, conds| {(yield mt, other_mts), conds} }
-      )
-    end
 
-    def self.combine_mts(spans : Array(Span))
-      return Span.new if spans.empty?
-      spans[0].combine_mts(spans[1..-1]) do |mt, other_mts|
-        yield [mt] + other_mts
+      def has_key?(key : Key) : Bool
+        map.values.any?(&.has_key?(key))
+      end
+
+      def gather_all_keys(set = Set(Key).new) : Set(Key)
+        set.add(@key)
+        map.values.each(&.gather_all_keys(set))
+        set
+      end
+
+      def all_terminal_meta_types : Array(MetaType)
+        map.values.flat_map(&.all_terminal_meta_types)
+      end
+
+      def any_mt?(&block : MetaType -> Bool) : Bool
+        map.values.any?(&.any_mt?(&block))
+      end
+
+      def transform_mt(&block : MetaType -> MetaType) : Inner
+        Decision.build(@key, @map.transform_values(&.transform_mt(&block)))
+      end
+
+      def transform_mt_using(key : Key, maybe_value : MetaType?, &block : (MetaType, MetaType?) -> MetaType) : Inner
+        Decision.build(@key,
+          if @key == key
+            @map.map do |value, inner|
+              {value, inner.transform_mt_using(key, value, &block)}
+            end.to_h
+          else
+            @map.transform_values(&.transform_mt_using(key, maybe_value, &block))
+          end
+        )
+      end
+
+      def decided_by(key : Key, orig_keys : Set(Key), &block : MetaType -> Enumerable({MetaType, Span})) : Inner
+        raise NotImplementedError.new("decision key conflict") if @key == key
+        Decision.build(@key, @map.transform_values(&.decided_by(key, orig_keys, &block)))
+      end
+
+      def combine_mt(other : Inner, maybe_other_mt : MetaType?, &block : (MetaType, MetaType) -> MetaType) : Inner
+        if maybe_other_mt
+          Decision.build(@key, @map.transform_values(&.combine_mt(other, maybe_other_mt, &block).as(Inner)))
+        else
+          if other.is_a?(Terminal)
+            return other.combine_mt(self, nil) { |b, a| block.call(a, b) }
+          else
+            raise NotImplementedError.new("combine_mt for two decisions")
+          end
+        end
+      end
+
+      def deciding_f_cap(f_cap_mt : MetaType, is_constructor : Bool) : Inner?
+        if @key == :f_cap
+          exact_inner = @map[f_cap_mt]?
+          return exact_inner if exact_inner
+
+          @map.find do |value, inner|
+            f_cap_mt.cap_only_inner.subtype_of?(value.not_nil!.cap_only_inner) ||
+            f_cap_mt.inner == MetaType::Capability::ISO || # TODO: better way to handle auto recovery
+            f_cap_mt.inner == MetaType::Capability::TRN || # TODO: better way to handle auto recovery
+            is_constructor # TODO: better way to do this?
+          end.try(&.last)
+        else
+          Decision.build(@key,
+            @map.transform_values do |inner|
+              new_inner = inner.deciding_f_cap(f_cap_mt, is_constructor)
+              return nil unless new_inner
+              new_inner
+            end
+          )
+        end
       end
     end
   end
@@ -237,7 +359,7 @@ module Mare::Compiler::AltInfer
         return conduit.resolve_span!(ctx, self) if conduit
 
         span = info.resolve_span!(ctx, self)
-        span = span.transform_mt(&.substitute_type_params(substs)) if substs
+        span = span.transform_mt(&.substitute_type_params(substs.not_nil!)) if substs
 
         @analysis[info] = span
 
@@ -261,7 +383,7 @@ module Mare::Compiler::AltInfer
       ref = type_param.ref
       raise "lookup on wrong visitor" unless ref.parent_link == link.type
       span = type_expr_span(ctx, ref.bound)
-      Infer::MetaType.new_union(span.points.map(&.first)) # TODO: return span instead of MetaType
+      MetaType.new_union(span.all_terminal_meta_types) # TODO: return a proper span instead of dumb union MetaType
     end
 
     def substs_for(ctx : Context, rt : Infer::ReifiedType) : Hash(Infer::TypeParam, Infer::MetaType)
@@ -282,7 +404,7 @@ module Mare::Compiler::AltInfer
             # TODO: carry through entire span, not just union of its MetaTypes
             meta_type = Infer::MetaType.new_type_param(type_param).intersect(
               Infer::MetaType.new_union(
-                resolve(ctx, cond_info.refine_type).points.map(&.first)
+                resolve(ctx, cond_info.refine_type).all_terminal_meta_types
               )
             )
             {type_param, meta_type}
@@ -434,7 +556,9 @@ module Mare::Compiler::AltInfer
           .select { |t| t.is_a?(AST::Group) && t.terms.size > 0 }
           .map { |t| type_expr_span(ctx, t).as(Span) }
 
-        Span.combine_mts(spans) { |mts| Infer::MetaType.new_union(mts) }
+        raise NotImplementedError.new("empty union") if spans.empty?
+
+        Span.combine_mts(spans) { |mts| Infer::MetaType.new_union(mts) }.not_nil!
       elsif node.style == "(" && node.terms.size == 1
         type_expr_span(ctx, node.terms.first)
       else

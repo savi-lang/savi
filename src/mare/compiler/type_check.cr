@@ -863,11 +863,13 @@ class Mare::Compiler::TypeCheck
       span = @f_analysis.span?(info)
       return MetaType.unconstrained unless span
 
-      filtered_span = span.filter_remove_f_cap(reified.receiver_cap, func)
-      first_point_mt = filtered_span.points.first.first
+      filtered_span = span.deciding_f_cap(
+        reified.receiver_cap,
+        func.has_tag?(:constructor)
+      )
 
-      # If only one point remains after filtering for f_cap, return it now.
-      return first_point_mt if filtered_span.points.size == 1
+      inner = filtered_span.try(&.inner)
+      return inner.meta_type if inner.is_a?(AltInfer::Span::Terminal)
 
       puts info.pos.show
       pp info

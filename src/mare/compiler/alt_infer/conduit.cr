@@ -40,11 +40,14 @@ module Mare::Compiler::AltInfer
     struct Union < Inner
       getter infos : Array(Infer::Info)
       def initialize(@infos)
+        raise ArgumentError.new("empty union") if @infos.empty?
       end
 
       def resolve_span!(ctx : Context, infer : Visitor) : Span
         spans = @infos.map { |info| infer.resolve(ctx, info) }
-        Span.combine_mts(spans) { |mts| Infer::MetaType.new_union(mts) }
+        Span
+          .combine_mts(spans) { |mts| Infer::MetaType.new_union(mts) }
+          .not_nil!
       end
       def resolve!(ctx : Context, infer : TypeCheck::ForReifiedFunc) : Infer::MetaType
         mts = @infos.map { |info| infer.resolve(ctx, info) }

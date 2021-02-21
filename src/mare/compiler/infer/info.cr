@@ -45,6 +45,10 @@ class Mare::Compiler::Infer
     property pos : Source::Pos = Source::Pos.none
     property override_describe_kind : String?
 
+    def to_s
+      "#<#{self.class.name.split("::").last} #{pos.inspect}>"
+    end
+
     abstract def add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
 
     def as_conduit? : AltInfer::Conduit?
@@ -329,16 +333,15 @@ class Mare::Compiler::Infer
       if explicit
         explicit_span = infer.resolve(ctx, explicit)
 
-        if !explicit_span.points.any?(&.first.cap_only?)
+        if !explicit_span.any_mt?(&.cap_only?)
           # If we have an explicit type that is more than just a cap, return it.
           explicit_span
         elsif !@upstreams.empty?
           # If there are upstreams, use the explicit cap applied to the type of
           # each span entry of the upstreams, which becomes the canonical span.
-          AltInfer::Span.join(
-            # TODO: map across all upstreams if we can avoid infinite recursion
-            [@upstreams.first].map { |info, pos| infer.resolve(ctx, info) }
-          ).combine_mt(explicit_span) { |upstream_mt, cap_mt|
+          # TODO: use all upstreams if we can avoid infinite recursion
+          upstream_span = infer.resolve(ctx, @upstreams.first.first)
+          upstream_span.combine_mt(explicit_span) { |upstream_mt, cap_mt|
             upstream_mt.strip_cap.intersect(cap_mt).strip_ephemeral
           }
         else
@@ -351,10 +354,9 @@ class Mare::Compiler::Infer
         end
       elsif !@upstreams.empty?
         # If we only have upstreams to go on, return the join of upstream spans.
-        AltInfer::Span.join(
-          # TODO: map across all upstreams if we can avoid infinite recursion
-          [@upstreams.first].map { |info, pos| infer.resolve(ctx, info) }
-        )
+        # TODO: use all upstreams if we can avoid infinite recursion
+        upstream_span = infer.resolve(ctx, @upstreams.first.first)
+        upstream_span
       elsif !downstreams_empty?
         # If we only have downstreams, just do our best with those.
         AltInfer::Span.combine_mts(
@@ -362,6 +364,7 @@ class Mare::Compiler::Infer
             infer.resolve(ctx, info)
           end
         ) { |mts| MetaType.new_intersection(mts).strip_ephemeral }
+        .not_nil!
       else
         # If we get here, we've failed and don't have enough info to continue.
         Error.at self,
@@ -690,7 +693,7 @@ class Mare::Compiler::Infer
 
       # If we don't satisfy the constraints, leave it to the type check pass
       # to print a consistent error message based on the simple literal type.
-      return simple if span.points.any?(&.first.unsatisfiable?)
+      return simple if span.any_mt?(&.unsatisfiable?)
 
       # TODO: narrowing based on peer hints?
 
@@ -776,7 +779,7 @@ class Mare::Compiler::Infer
     end
 
     def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
-      AltInfer::Span.self_with_reify_cap(ctx, infer).expand do |call_mt, conds|
+      AltInfer::Span.self_with_reify_cap(ctx, infer).transform_mt do |call_mt|
         call_defn = call_mt.single!
         call_func = call_defn.defn(ctx).functions.find do |f|
           f.ident.value == @name && f.has_tag?(:field)
@@ -785,9 +788,14 @@ class Mare::Compiler::Infer
         call_link = call_func.make_link(call_defn.link)
         ret_span = infer
           .depends_on_call_ret_span(ctx, call_defn, call_func, call_link)
-          .filter_remove_f_cap(call_mt.cap_only, call_func)
+          .deciding_f_cap(call_mt.cap_only, call_func.has_tag?(:constructor))
+          .not_nil!
 
-        ret_span.with_prior_conds(conds).points
+        ret_mt = Infer::MetaType.new_union(ret_span.all_terminal_meta_types)
+        # TODO: Retain original ret_span maybe? Or filter it down further based on type params...
+        # Does it ever make sense to have a multiple span point in type signature?
+
+        ret_mt
       end
     end
 
@@ -1456,19 +1464,19 @@ class Mare::Compiler::Infer
       downstream_spans =
         @downstreams.map { |pos, info, aliases| infer.resolve(ctx, info) }
 
-      return AltInfer::Span.new if downstream_spans.empty?
+      raise NotImplementedError.new("unused array literal") if downstream_spans.empty?
 
       AltInfer::Span
       .combine_mts(downstream_spans) { |mts| MetaType.new_intersection(mts) }
-      .expand { |mt, conds|
-        mt.each_reachable_defn_with_cap(ctx).map { |rt, cap|
-          cap_conds =
-            AltInfer::Span.add_cond(conds, array_info, MetaType.new(cap))
-              .as(AltInfer::Span::C?)
-
+      .not_nil!
+      .decided_by(array_info) { |mt|
+        mt.each_reachable_defn_with_cap(ctx).compact_map { |rt, cap|
           # TODO: Support more element antecedent detection patterns.
           if rt.link.name == "Array" && rt.args.size == 1
-            {rt.args.first, cap_conds}
+            {
+              MetaType.new_nominal(rt).intersect(MetaType.new(cap)),
+              AltInfer::Span.simple(rt.args.first)
+            }
           end
         }.compact
       }
@@ -1485,23 +1493,29 @@ class Mare::Compiler::Infer
       elem_span = AltInfer::Span.combine_mts(elem_spans) { |mts| MetaType.new_union(mts) }
 
       elem_span =
-        if ante_span.points.empty?
-          elem_span
-        elsif elem_span.points.empty?
-          ante_span
+        if ante_span
+          if elem_span
+            ante_span.combine_mt(elem_span) { |ante_mt, elem_mt|
+              ante_mt.intersect(elem_mt)
+            }
+          else
+            ante_span
+          end
         else
-          ante_span.combine_mt(elem_span) { |ante_mt, elem_mt|
-            ante_mt.intersect(elem_mt)
-          }
+          if elem_span
+            elem_span
+          else
+            AltInfer::Span.simple(MetaType.unsatisfiable)
+          end
         end
 
-      elem_span.transform { |elem_mt, conds|
-        array_cap = AltInfer::Span.get_cond(conds, self).try(&.inner.as(MetaType::Capability)) || MetaType::Capability::REF
+      elem_span.transform_mt_using(self) { |elem_mt, maybe_self_mt|
+        array_cap = maybe_self_mt.try(&.inner.as(MetaType::Capability)) || MetaType::Capability::REF
 
         rt = infer.prelude_reified_type(ctx, "Array", [elem_mt])
         mt = MetaType.new(rt, array_cap.value.as(String))
 
-        {mt, conds}
+        mt
       }
     end
 
@@ -1648,10 +1662,10 @@ class Mare::Compiler::Infer
     end
 
     def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
-      infer.resolve(ctx, @lhs).expand do |lhs_mt, conds|
+      infer.resolve(ctx, @lhs).decided_by(@lhs) do |lhs_mt|
         call_defns = lhs_mt.alt_find_callable_func_defns(ctx, infer, @member)
 
-        call_defns.map do |(call_mti, call_defn, call_func)|
+        call_defns.compact_map do |(call_mti, call_defn, call_func)|
           call_mt = MetaType.new(call_mti) # TODO: remove call_mti?
 
           next unless call_defn && call_func
@@ -1659,12 +1673,17 @@ class Mare::Compiler::Infer
           call_link = call_func.make_link(call_defn.link)
           ret_span = infer
             .depends_on_call_ret_span(ctx, call_defn, call_func, call_link)
-            .filter_remove_f_cap(call_mt.cap_only, call_func)
+            .deciding_f_cap(call_mt.cap_only, call_func.has_tag?(:constructor))
+            .not_nil!
 
-          ret_mt = Infer::MetaType.new_union(ret_span.points.map(&.first))
+          ret_mt = Infer::MetaType.new_union(ret_span.all_terminal_meta_types)
+          raise "halto" if ret_mt.unsatisfiable?
+          simple_ret_span = AltInfer::Span.simple(ret_mt)
+          # TODO: Retain original ret_span maybe? Or filter it down further based on type params...
+          # Does it ever make sense to have a multiple span point in type signature?
 
-          {ret_mt, AltInfer::Span.add_cond(conds, @lhs, MetaType.new(call_mti))}.as(AltInfer::Span::P)
-        end.compact
+          {call_mt, simple_ret_span}.as({MetaType, AltInfer::Span})
+        end
       end
     end
 
@@ -1991,23 +2010,26 @@ class Mare::Compiler::Infer
     end
 
     def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
-      infer.resolve(ctx, @call.lhs).expand do |lhs_mt, conds|
+      infer.resolve(ctx, @call.lhs).decided_by(@call.lhs) do |lhs_mt|
         call_defns = lhs_mt.alt_find_callable_func_defns(ctx, infer, @call.member)
 
-        call_defns.map do |(call_mti, call_defn, call_func)|
+        call_defns.compact_map do |(call_mti, call_defn, call_func)|
           call_mt = MetaType.new(call_mti) # TODO: remove call_mti?
 
-          raise NotImplementedError.new({call_mti, call_defn, call_func}) \
-            unless call_defn && call_func
+          next unless call_defn && call_func
 
           call_link = call_func.make_link(call_defn.link)
           ret_span = infer
             .depends_on_call_yield_out_span(ctx, call_defn, call_func, call_link, @index)
-            .filter_remove_f_cap(call_mt.cap_only, call_func)
+            .deciding_f_cap(call_mt.cap_only, call_func.has_tag?(:constructor))
+            .not_nil!
 
-          ret_mt = Infer::MetaType.new_union(ret_span.points.map(&.first))
+          ret_mt = Infer::MetaType.new_union(ret_span.all_terminal_meta_types)
+          simple_ret_span = AltInfer::Span.simple(ret_mt)
+          # TODO: Retain original ret_span maybe? Or filter it down further based on type rets...
+          # Does it ever make sense to have a multiple span point in type signature?
 
-          {ret_mt, AltInfer::Span.add_cond(conds, @call.lhs, MetaType.new(call_mti))}.as(AltInfer::Span::P)
+          {call_mt, simple_ret_span}.as({MetaType, AltInfer::Span})
         end
       end
     end
@@ -2046,23 +2068,26 @@ class Mare::Compiler::Infer
     def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
       none = MetaType.new(infer.prelude_reified_type(ctx, "None"))
 
-      infer.resolve(ctx, @call.lhs).expand do |lhs_mt, conds|
+      infer.resolve(ctx, @call.lhs).decided_by(@call.lhs) do |lhs_mt|
         call_defns = lhs_mt.alt_find_callable_func_defns(ctx, infer, @call.member)
 
-        call_defns.map do |(call_mti, call_defn, call_func)|
+        call_defns.compact_map do |(call_mti, call_defn, call_func)|
           call_mt = MetaType.new(call_mti) # TODO: remove call_mti?
 
-          raise NotImplementedError.new({call_mti, call_defn, call_func}) \
-            unless call_defn && call_func
+          next unless call_defn && call_func
 
           call_link = call_func.make_link(call_defn.link)
           ret_span = infer
             .depends_on_call_yield_in_span(ctx, call_defn, call_func, call_link)
-            .filter_remove_f_cap(call_mt.cap_only, call_func)
+            .deciding_f_cap(call_mt.cap_only, call_func.has_tag?(:constructor))
+            .not_nil!
 
-          ret_mt = Infer::MetaType.new_union(ret_span.points.map(&.first))
+          ret_mt = Infer::MetaType.new_union(ret_span.all_terminal_meta_types)
+          simple_ret_span = AltInfer::Span.simple(ret_mt)
+          # TODO: Retain original ret_span maybe? Or filter it down further based on type params...
+          # Does it ever make sense to have a multiple span point in type signature?
 
-          {ret_mt, AltInfer::Span.add_cond(conds, @call.lhs, MetaType.new(call_mti))}.as(AltInfer::Span::P)
+          {call_mt, simple_ret_span}.as({MetaType, AltInfer::Span})
         end
       end.transform_mt do |mt|
         # If the type requirement is None, treat it as unconstrained,
@@ -2140,10 +2165,10 @@ class Mare::Compiler::Infer
     # end
 
     def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
-      infer.resolve(ctx, @call.lhs).expand do |lhs_mt, conds|
+      infer.resolve(ctx, @call.lhs).decided_by(@call.lhs) do |lhs_mt|
         call_defns = lhs_mt.alt_find_callable_func_defns(ctx, infer, @call.member)
 
-        call_defns.map do |(call_mti, call_defn, call_func)|
+        call_defns.compact_map do |(call_mti, call_defn, call_func)|
           call_mt = MetaType.new(call_mti) # TODO: remove call_mti?
 
           next unless call_defn && call_func
@@ -2151,12 +2176,16 @@ class Mare::Compiler::Infer
           call_link = call_func.make_link(call_defn.link)
           param_span = infer
             .depends_on_call_param_span(ctx, call_defn, call_func, call_link, @index)
-            .filter_remove_f_cap(call_mt.cap_only, call_func)
+            .deciding_f_cap(call_mt.cap_only, call_func.has_tag?(:constructor))
+            .not_nil!
 
-          param_mt = Infer::MetaType.new_union(param_span.points.map(&.first))
+          param_mt = Infer::MetaType.new_union(param_span.all_terminal_meta_types)
+          simple_param_span = AltInfer::Span.simple(param_mt)
+          # TODO: Retain original ret_span maybe? Or filter it down further based on type params...
+          # Does it ever make sense to have a multiple span point in type signature?
 
-          {param_mt, AltInfer::Span.add_cond(conds, @call.lhs, MetaType.new(call_mti))}.as(AltInfer::Span::P)
-        end.compact
+          {call_mt, simple_param_span}.as({MetaType, AltInfer::Span})
+        end
       end
     end
 
