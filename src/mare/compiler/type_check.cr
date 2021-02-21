@@ -885,19 +885,16 @@ class Mare::Compiler::TypeCheck
 
     def resolve(ctx : Context, info : Infer::Info) : MetaType
       @analysis.resolved_infos[info]? || begin
-        conduit = info.as_conduit?
-        if conduit
-          mt = conduit.resolve!(ctx, self).simplify(ctx)
-          type_check(info, mt)
-          return mt
-        end
-
         mt =
-          case info
-          when Infer::Literal
-            resolve_sensitive(ctx, info)
+          if (conduit = info.as_conduit?)
+            conduit.resolve!(ctx, self).simplify(ctx)
           else
-            filter_span(info).simplify(ctx)
+            case info
+            when Infer::Literal
+              resolve_sensitive(ctx, info)
+            else
+              filter_span(info).simplify(ctx)
+            end
           end
 
         # puts info.pos.show

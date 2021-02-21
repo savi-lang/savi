@@ -224,6 +224,136 @@ describe Mare::Compiler::TypeCheck do
     end
   end
 
+  pending "complains when a loop's implicit '| None' result doesn't pass checks" do
+    source = Mare::Source.new_example <<-SOURCE
+    :actor Main
+      :new(env Env)
+        i USize = 0
+
+        result = while (i < 2) (i += 1
+          "This loop ran at least once"
+        )
+
+        env.out.print(result)
+    SOURCE
+
+    expected = <<-MSG
+    The type of this expression doesn't meet the constraints imposed on it:
+    from (example):5:
+        result = while (i < 2) (i += 1
+                 ^~~~~
+
+    - it is required here to be a subtype of String:
+      from (example):9:
+        env.out.print(result)
+                      ^~~~~~
+
+    - but the type of the loop's result when it runs zero times was None:
+      from (example):5:
+        result = while (i < 2) (i += 1
+                 ^~~~~~~~~~~~~~~~~~~~~···
+    MSG
+
+    expect_raises Mare::Error, expected do
+      Mare.compiler.compile([source], :type_check)
+    end
+  end
+
+  it "resolves a local's type based on assignment" do
+    source = Mare::Source.new_example <<-SOURCE
+    :actor Main
+      :new
+        x = "Hello, World!"
+    SOURCE
+
+    ctx = Mare.compiler.compile([source], :type_check)
+
+    type_check = ctx.type_check.for_func_simple(ctx, source, "Main", "new")
+    body = type_check.reified.func(ctx).body.not_nil!
+    assign = body.terms.first.as(Mare::AST::Relate)
+
+    type_check.analysis.resolved(ctx, assign.lhs).show_type.should eq "String"
+    type_check.analysis.resolved(ctx, assign.rhs).show_type.should eq "String"
+  end
+
+  it "resolves a prop's type based on the prop initializer" do
+    source = Mare::Source.new_example <<-SOURCE
+    :actor Main
+      :prop x: "Hello, World!"
+      :new
+        @x
+    SOURCE
+
+    ctx = Mare.compiler.compile([source], :type_check)
+
+    type_check = ctx.type_check.for_func_simple(ctx, source, "Main", "new")
+    body = type_check.reified.func(ctx).body.not_nil!
+    prop = body.terms.first
+
+    type_check.analysis.resolved(ctx, prop).show_type.should eq "String"
+  end
+
+  it "resolves an integer literal based on an assignment" do
+    source = Mare::Source.new_example <<-SOURCE
+    :actor Main
+      :new
+        x (U64 | None) = 42
+    SOURCE
+
+    ctx = Mare.compiler.compile([source], :type_check)
+
+    type_check = ctx.type_check.for_func_simple(ctx, source, "Main", "new")
+    body = type_check.reified.func(ctx).body.not_nil!
+    assign = body.terms.first.as(Mare::AST::Relate)
+
+    type_check.analysis.resolved(ctx, assign.lhs).show_type.should eq "(U64 | None)"
+    type_check.analysis.resolved(ctx, assign.rhs).show_type.should eq "U64"
+  end
+
+  it "resolves an integer literal based on a prop type" do
+    source = Mare::Source.new_example <<-SOURCE
+    :actor Main
+      :prop x (U64 | None): 42
+      :new
+        @x
+    SOURCE
+
+    ctx = Mare.compiler.compile([source], :type_check)
+
+    main = ctx.namespace.main_type!(ctx)
+    main_type_check = ctx.type_check.for_rt(ctx, main)
+    func = main_type_check.reified.defn(ctx).functions.find(&.has_tag?(:field)).not_nil!
+    func_link = func.make_link(main)
+    func_cap = Mare::Compiler::Infer::MetaType.cap(func.cap.value)
+    type_check = ctx.type_check.for_rf(ctx, main_type_check.reified, func_link, func_cap)
+    body = type_check.reified.func(ctx).body.not_nil!
+    field = body.terms.first
+
+    type_check.analysis.resolved(ctx, field).show_type.should eq "U64"
+  end
+
+  it "resolves an integer literal through an if statement" do
+    source = Mare::Source.new_example <<-SOURCE
+    :actor Main
+      :new
+        x (U64 | String | None) = if True 42
+    SOURCE
+
+    ctx = Mare.compiler.compile([source], :type_check)
+
+    type_check = ctx.type_check.for_func_simple(ctx, source, "Main", "new")
+    body = type_check.reified.func(ctx).body.not_nil!
+    assign = body.terms.first.as(Mare::AST::Relate)
+    literal = assign.rhs
+      .as(Mare::AST::Group).terms.last
+      .as(Mare::AST::Choice).list[0][1]
+      .as(Mare::AST::LiteralInteger)
+
+    type_check.analysis.resolved(ctx, assign.lhs).show_type.should eq "(U64 | String | None)"
+    type_check.analysis.resolved(ctx, assign.rhs).show_type.should eq "(U64 | None)"
+    type_check.analysis.resolved(ctx, literal).show_type.should eq "U64"
+  end
+
   # ...
 
   it "complains when unable to infer mutually recursive return types" do
