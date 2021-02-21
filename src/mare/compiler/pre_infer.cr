@@ -26,6 +26,7 @@ module Mare::Compiler::PreInfer
       @redirects = {} of AST::Node => AST::Node
       @infos = {} of AST::Node => Infer::Info
       @backwards = {} of Infer::Info => AST::Node # TODO: try to remove this and put the Node link directly into each Info?
+      @extra_infos = [] of Infer::Info
     end
 
     protected def redirect(from : AST::Node, to : AST::Node)
@@ -49,7 +50,13 @@ module Mare::Compiler::PreInfer
       @backwards[info] ||= node
     end
     def node_for?(info : Infer::Info); @backwards[info]?; end
-    def each_info; @infos.each_value; end
+    def each_info(&block : Infer::Info -> Nil)
+      @infos.each_value(&block)
+      @extra_infos.each(&block)
+    end
+    protected def observe_extra_info(info)
+      @extra_infos << info
+    end
   end
 
   class FuncVisitor < Mare::AST::Visitor
@@ -561,11 +568,7 @@ module Mare::Compiler::PreInfer
       branches = node.list.map do |cond, body|
         # Visit the cond AST - we skipped it before with visit_children: false.
         cond.accept(ctx, self)
-
-        # Each condition in a choice must evaluate to a type of Bool.
-        fixed_bool = Infer::FixedPrelude.new(node.pos, "Bool")
         cond_info = self[cond]
-        cond_info.add_downstream(node.pos, fixed_bool, 1)
 
         inner_cond_info = cond_info
         while inner_cond_info.is_a?(Infer::Sequence)
@@ -597,22 +600,27 @@ module Mare::Compiler::PreInfer
         {cond ? self[cond] : nil, self[body], @jumps.away?(body)}
       end
 
-      @analysis[node] = Infer::Choice.new(node.pos, branches)
+      fixed_bool = Infer::FixedPrelude.new(node.pos, "Bool")
+      @analysis.observe_extra_info(fixed_bool)
+
+      @analysis[node] = choice = Infer::Choice.new(node.pos, branches, fixed_bool)
     end
 
     def touch(ctx : Context, node : AST::Loop)
-      # The condition of the loop must evaluate to a type of Bool.
-      fixed_bool = Infer::FixedPrelude.new(node.pos, "Bool")
       cond_info = self[node.cond]
-      cond_info.add_downstream(node.pos, fixed_bool, 1)
 
       self[node.else_body].override_describe_kind =
         "loop's result when it runs zero times"
 
-      @analysis[node] = Infer::Loop.new(node.pos, [
+      fixed_bool = Infer::FixedPrelude.new(node.pos, "Bool")
+      @analysis.observe_extra_info(fixed_bool)
+
+      @analysis[node] = Infer::Loop.new(node.pos,
+        [
           {self[node.cond], self[node.body], @jumps.away?(node.body)},
           {nil, self[node.else_body], @jumps.away?(node.else_body)},
         ],
+        fixed_bool,
         @jumps.catches[node]?.try(
           &.select(&.kind.is_a? AST::Jump::Kind::Break).map do |jump|
             inf = @analysis[jump]
@@ -636,10 +644,16 @@ module Mare::Compiler::PreInfer
       self[node.else_body].override_describe_kind =
         "try result when it catches an error"
 
-      @analysis[node] = Infer::Choice.new(node.pos, [
-        {nil, self[node.body], @jumps.away?(node.body)},
-        {nil, self[node.else_body], @jumps.away?(node.else_body)},
-      ] of {Infer::Info?, Infer::Info, Bool})
+      fixed_bool = Infer::FixedPrelude.new(node.pos, "Bool")
+      @analysis.observe_extra_info(fixed_bool)
+
+      @analysis[node] = choice = Infer::Choice.new(node.pos,
+        [
+          {nil, self[node.body], @jumps.away?(node.body)},
+          {nil, self[node.else_body], @jumps.away?(node.else_body)},
+        ] of {Infer::Info?, Infer::Info, Bool},
+        fixed_bool
+      )
     end
 
     def touch(ctx : Context, node : AST::Yield)

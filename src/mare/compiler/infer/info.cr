@@ -94,10 +94,10 @@ class Mare::Compiler::Infer
     # If you need to report multiple positions, also override the other method
     # below called as_multiple_downstream_constraints.
     # This will prevent upstream DynamicInfos from eagerly resolving you.
-    def as_downstream_constraint_meta_type(ctx : Context, infer : ForReifiedFunc) : MetaType?
+    def as_downstream_constraint_meta_type(ctx : Context, infer : ForReifiedFunc) : MetaType
       infer.resolve(ctx, self)
     end
-    def as_downstream_constraint_meta_type(ctx : Context, infer : TypeCheck::ForReifiedFunc) : MetaType?
+    def as_downstream_constraint_meta_type(ctx : Context, infer : TypeCheck::ForReifiedFunc) : MetaType
       infer.resolve(ctx, self)
     end
 
@@ -947,18 +947,25 @@ class Mare::Compiler::Infer
   # letting us better specialize the codegen later by eliminating impossible
   # branches in particular reifications of this type or function.
   abstract class Phi < DynamicInfo
+    getter fixed_bool : Info
     getter branches : Array({Info?, Info, Bool})
 
     def describe_kind : String; "choice block" end
 
-    def initialize(@pos, @branches)
-      prior_bodies = [] of Info
+    def initialize(@pos, @branches, @fixed_bool)
+      @resolvables = [] of Info
 
+      prior_bodies = [] of Info
       @branches.each do |cond, body, body_jumps_away|
         next if body_jumps_away
         body.add_downstream(@pos, self, 0)
         prior_bodies.each { |prior_body| body.add_peer_hint(prior_body) }
         prior_bodies << body
+      end
+
+      # Each condition must evaluate to a type of Bool.
+      @branches.each do |cond, body, body_jumps_away|
+        cond.add_downstream(pos, @fixed_bool, 1) if cond
       end
     end
 
@@ -977,10 +984,10 @@ class Mare::Compiler::Infer
       meta_type
     end
 
-    def as_downstream_constraint_meta_type(ctx : Context, infer : ForReifiedFunc) : MetaType?
+    def as_downstream_constraint_meta_type(ctx : Context, infer : ForReifiedFunc) : MetaType
       total_downstream_constraint(ctx, infer)
     end
-    def as_downstream_constraint_meta_type(ctx : Context, infer : TypeCheck::ForReifiedFunc) : MetaType?
+    def as_downstream_constraint_meta_type(ctx : Context, infer : TypeCheck::ForReifiedFunc) : MetaType
       total_downstream_constraint(ctx, infer)
     end
 
@@ -1085,8 +1092,8 @@ class Mare::Compiler::Infer
     getter early_breaks : Array(JumpBreak)
     getter early_continues : Array(JumpContinue)
 
-    def initialize(pos, branches, @early_breaks, @early_continues)
-      super(pos, branches)
+    def initialize(pos, branches, fixed_bool, @early_breaks, @early_continues)
+      super(pos, branches, fixed_bool)
 
       early_breaks.each(&.term.add_downstream(@pos, self, 0))
       early_continues.each(&.term.add_downstream(@pos, self, 0))

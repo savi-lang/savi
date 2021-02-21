@@ -474,7 +474,7 @@ module Mare::Compiler::AltInfer
       func_body = func.body
       resolve(ctx, @pre_infer[func_body]) if func_body
 
-      @pre_infer.each_info.each { |info| resolve(ctx, info) }
+      @pre_infer.each_info { |info| resolve(ctx, info) }
     end
 
     def ret

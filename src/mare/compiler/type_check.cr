@@ -34,7 +34,7 @@ class Mare::Compiler::TypeCheck
     def []?(node : AST::Node); @pre[node]?; end
     def yield_in_info; @pre.yield_in_info; end
     def yield_out_infos; @pre.yield_out_infos; end
-    def each_info; @pre.each_info; end
+    def each_info(&block : Infer::Info -> Nil); @pre.each_info(&block); end
 
     def span(node : AST::Node); span(@spans[node]); end
     def span?(node : AST::Node); span?(@spans[node]?); end
@@ -926,7 +926,8 @@ class Mare::Compiler::TypeCheck
       # typechecking work to know the type signature of every function in the
       # program, then we can do all "intra-function" checks in TypeCheck pass.
       info.downstreams_each.each do |use_pos, other_info, aliases|
-        mt = mt.intersect(resolve(ctx, other_info))
+        constraint_mt = other_info.as_downstream_constraint_meta_type(ctx, self)
+        mt = mt.intersect(constraint_mt)
       end
       mt = mt.simplify(ctx)
 
@@ -1033,7 +1034,7 @@ class Mare::Compiler::TypeCheck
       resolve(ctx, @f_analysis[func_params]) if func_params
       resolve(ctx, @f_analysis[ret])
 
-      @f_analysis.each_info.each { |info| resolve(ctx, info) }
+      @f_analysis.each_info { |info| resolve(ctx, info) }
 
       # Assign the resolved types to a map for safekeeping.
       # This also has the effect of running some final checks on everything.
