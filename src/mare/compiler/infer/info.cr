@@ -54,6 +54,14 @@ class Mare::Compiler::Infer
     def as_conduit? : AltInfer::Conduit?
       nil # if non-nil, a conduit will be used instead of a span.
     end
+    def as_upstream_infos : Array(Info)
+      conduit = as_conduit?
+      if conduit
+        conduit.as_upstream_infos
+      else
+        [self] of Info
+      end
+    end
     def resolve_span!(ctx : Context, infer : AltInfer::Visitor)
       raise NotImplementedError.new("resolve_span! for #{self.class}")
     end
@@ -352,10 +360,9 @@ class Mare::Compiler::Infer
             any.intersect(explicit_mt)
           end
         end
-      elsif !@upstreams.empty?
-        # If we only have upstreams to go on, return the join of upstream spans.
+      elsif !@upstreams.empty? && (upstream_span = resolve_upstream_span(ctx, infer))
+        # If we only have upstreams to go on, return the first upstream span.
         # TODO: use all upstreams if we can avoid infinite recursion
-        upstream_span = infer.resolve(ctx, @upstreams.first.first)
         upstream_span
       elsif !downstreams_empty?
         # If we only have downstreams, just do our best with those.
@@ -412,6 +419,13 @@ class Mare::Compiler::Infer
         MetaType.new_union(@upstreams.map { |mt, _| infer.resolve(ctx, mt) })
       else
         infer.resolve(ctx, @upstreams.first[0])
+      end
+    end
+    private def resolve_upstream_span(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span?
+      # TODO: support infer_from_all_upstreams? ?
+      upstream_infos.flat_map(&.as_upstream_infos).each do |upstream_info|
+        upstream_span = infer.resolve(ctx, upstream_info)
+        return upstream_span unless upstream_span.any_uncertain?
       end
     end
 
@@ -656,6 +670,8 @@ class Mare::Compiler::Infer
   end
 
   class Literal < DynamicInfo
+    getter peer_hints
+
     def describe_kind : String; "literal value" end
 
     def initialize(@pos, @possible : MetaType)
@@ -672,9 +688,15 @@ class Mare::Compiler::Infer
         {peer.pos, "it is suggested here that it might be a #{mt.show_type}"}
       end
     end
+    def describe_peer_hints(ctx : Context, infer : TypeCheck::ForReifiedFunc)
+      @peer_hints.map do |peer|
+        mt = infer.resolve(ctx, peer)
+        {peer.pos, "it is suggested here that it might be a #{mt.show_type}"}
+      end
+    end
 
     def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
-      AltInfer::Span.simple(@possible)
+      AltInfer::Span.uncertain(@possible)
     end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType

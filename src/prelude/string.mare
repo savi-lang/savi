@@ -109,6 +109,7 @@
       )
       @_ptr = @_ptr._realloc(@_alloc)
     )
+    @
 
   :fun "[]!" (index USize)
     if (@size <= index) error!

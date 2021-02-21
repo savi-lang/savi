@@ -354,6 +354,30 @@ describe Mare::Compiler::TypeCheck do
     type_check.analysis.resolved(ctx, literal).show_type.should eq "U64"
   end
 
+  it "resolves an integer literal within the else body of an if statement" do
+    source = Mare::Source.new_example <<-SOURCE
+    :actor Main
+      :new
+        u = U64[99]
+        x = if True (u | 0)
+    SOURCE
+
+    ctx = Mare.compiler.compile([source], :type_check)
+
+    type_check = ctx.type_check.for_func_simple(ctx, source, "Main", "new")
+    body = type_check.reified.func(ctx).body.not_nil!
+    assign = body.terms[1].as(Mare::AST::Relate)
+    literal = assign.rhs
+      .as(Mare::AST::Group).terms.last
+      .as(Mare::AST::Choice).list[1][1]
+      .as(Mare::AST::Group).terms.last
+      .as(Mare::AST::LiteralInteger)
+
+    type_check.analysis.resolved(ctx, assign.lhs).show_type.should eq "U64"
+    type_check.analysis.resolved(ctx, assign.rhs).show_type.should eq "U64"
+    type_check.analysis.resolved(ctx, literal).show_type.should eq "U64"
+  end
+
   # ...
 
   it "complains when unable to infer mutually recursive return types" do

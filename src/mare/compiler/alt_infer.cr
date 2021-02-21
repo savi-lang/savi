@@ -36,7 +36,8 @@ module Mare::Compiler::AltInfer
       end
     end
 
-    def self.simple(mt : MetaType); new(Terminal.new(mt)); end
+    def self.simple(mt : MetaType); new(Terminal.new(mt, false)); end
+    def self.uncertain(mt : MetaType); new(Terminal.new(mt, true)); end
     def self.decision(key : Key, span_map : Hash(MetaType, Span))
       map = span_map.transform_values(&.inner)
 
@@ -75,6 +76,10 @@ module Mare::Compiler::AltInfer
       simple(mt)
     end
 
+    def any_uncertain?
+      inner.any_uncertain?
+    end
+
     def has_key?(key : Key) : Bool
       inner.has_key?(key)
     end
@@ -110,10 +115,15 @@ module Mare::Compiler::AltInfer
       raise NotImplementedError.new("combine_mts") \
         unless inner.is_a?(Terminal) && others.all?(&.is_a?(Terminal))
 
-      Span.new(Terminal.new(block.call(
+      new_meta_type = block.call(
         inner.as(Terminal).meta_type,
         others.map(&.as(Terminal).meta_type)
-      )))
+      )
+      new_uncertain = \
+        inner.as(Terminal).uncertain \
+        || others.any?(&.as(Terminal).uncertain)
+
+      Span.new(Terminal.new(new_meta_type, new_uncertain))
     end
 
     def self.combine_mts(spans : Array(Span), &block : Array(MetaType) -> MetaType) : Span?
@@ -136,6 +146,7 @@ module Mare::Compiler::AltInfer
     end
 
     abstract struct Inner
+      abstract def any_uncertain? : Bool
       abstract def has_key?(key : Key) : Bool
       abstract def gather_all_keys(set = Set(Key).new) : Set(Key)
       abstract def all_terminal_meta_types : Array(MetaType)
@@ -143,17 +154,23 @@ module Mare::Compiler::AltInfer
       abstract def transform_mt(&block : MetaType -> MetaType) : Inner
       abstract def transform_mt_using(key : Key, maybe_value : MetaType?, &block : (MetaType, MetaType?) -> MetaType) : Inner
       abstract def decided_by(key : Key, orig_keys : Set(Key), &block : MetaType -> Enumerable({MetaType, Span})) : Inner
-      abstract def combine_mt(other : Inner, maybe_other_mt : MetaType?, &block : (MetaType, MetaType) -> MetaType) : Inner
+      abstract def combine_mt(other : Inner, maybe_other_terminal : Terminal?, &block : (MetaType, MetaType) -> MetaType) : Inner
       abstract def deciding_f_cap(f_cap_mt : MetaType, is_constructor : Bool) : Inner?
     end
 
     struct Terminal < Inner
       getter meta_type : MetaType
-      def initialize(@meta_type)
+      getter uncertain : Bool
+      def initialize(@meta_type, @uncertain)
       end
 
       def pretty_print(format : PrettyPrint)
         meta_type.inner.pretty_print(format)
+        format.text(" (uncertain)") if uncertain
+      end
+
+      def any_uncertain? : Bool
+        @uncertain
       end
 
       def has_key?(key : Key) : Bool
@@ -173,11 +190,11 @@ module Mare::Compiler::AltInfer
       end
 
       def transform_mt(&block : MetaType -> MetaType) : Inner
-        Terminal.new(block.call(meta_type))
+        Terminal.new(block.call(meta_type), @uncertain)
       end
 
       def transform_mt_using(key : Key, maybe_value : MetaType?, &block : (MetaType, MetaType?) -> MetaType) : Inner
-        Terminal.new(block.call(meta_type, maybe_value))
+        Terminal.new(block.call(meta_type, maybe_value), @uncertain)
       end
 
       def decided_by(key : Key, orig_keys : Set(Key), &block : MetaType -> Enumerable({MetaType, Span})) : Inner
@@ -191,11 +208,13 @@ module Mare::Compiler::AltInfer
         Decision.build(key, map)
       end
 
-      def combine_mt(other : Inner, maybe_other_mt : MetaType?, &block : (MetaType, MetaType) -> MetaType) : Inner
-        if maybe_other_mt
-          Terminal.new(block.call(meta_type, maybe_other_mt))
+      def combine_mt(other : Inner, maybe_other_terminal : Terminal?, &block : (MetaType, MetaType) -> MetaType) : Inner
+        if maybe_other_terminal
+          new_meta_type = block.call(@meta_type, maybe_other_terminal.meta_type)
+          new_uncertain = @uncertain || maybe_other_terminal.uncertain
+          Terminal.new(new_meta_type, new_uncertain)
         else
-          other.combine_mt(self, meta_type) { |b, a| block.call(a, b) }
+          other.combine_mt(self, self) { |b, a| block.call(a, b) }
         end
       end
 
@@ -239,8 +258,12 @@ module Mare::Compiler::AltInfer
         end
       end
 
+      def any_uncertain? : Bool
+        map.values.any?(&.any_uncertain?)
+      end
+
       def has_key?(key : Key) : Bool
-        map.values.any?(&.has_key?(key))
+        @key == key || map.values.any?(&.has_key?(key))
       end
 
       def gather_all_keys(set = Set(Key).new) : Set(Key)
@@ -278,9 +301,9 @@ module Mare::Compiler::AltInfer
         Decision.build(@key, @map.transform_values(&.decided_by(key, orig_keys, &block)))
       end
 
-      def combine_mt(other : Inner, maybe_other_mt : MetaType?, &block : (MetaType, MetaType) -> MetaType) : Inner
-        if maybe_other_mt
-          Decision.build(@key, @map.transform_values(&.combine_mt(other, maybe_other_mt, &block).as(Inner)))
+      def combine_mt(other : Inner, maybe_other_terminal : Terminal?, &block : (MetaType, MetaType) -> MetaType) : Inner
+        if maybe_other_terminal
+          Decision.build(@key, @map.transform_values(&.combine_mt(other, maybe_other_terminal, &block).as(Inner)))
         else
           if other.is_a?(Terminal)
             return other.combine_mt(self, nil) { |b, a| block.call(a, b) }

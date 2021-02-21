@@ -457,7 +457,8 @@ module Mare::Compiler::PreInfer
           call_args.terms.each_with_index do |call_arg, index|
             new_info = Infer::TowardCallParam.new(call_arg.pos, call, index)
             @analysis[call_arg].add_downstream(call_arg.pos, new_info, 0)
-            call.resolvables << new_info
+            @analysis.observe_extra_info(new_info)
+            call.resolvables << new_info # TODO: remove in favor of above line
           end
         end
 
@@ -467,7 +468,8 @@ module Mare::Compiler::PreInfer
           yield_params.terms.each_with_index do |yield_param, index|
             new_info = Infer::FromCallYieldOut.new(yield_param.pos, call, index)
             @analysis[yield_param].as(Infer::Local).assign(ctx, new_info, yield_param.pos)
-            call.resolvables << new_info
+            @analysis.observe_extra_info(new_info)
+            call.resolvables << new_info # TODO: remove in favor of above line
           end
         end
 
@@ -476,7 +478,8 @@ module Mare::Compiler::PreInfer
         if yield_block
           new_info = Infer::TowardCallYieldIn.new(yield_block.pos, call)
           @analysis[yield_block].add_downstream(yield_block.pos, new_info, 0)
-          call.resolvables << new_info
+          @analysis.observe_extra_info(new_info)
+          call.resolvables << new_info # TODO: remove in favor of above line
         end
 
       when "is"

@@ -928,11 +928,39 @@ class Mare::Compiler::TypeCheck
       end
       mt = mt.simplify(ctx)
 
-      # If we don't satisfy the constraints, leave it to the type check pass
+      # If we don't satisfy the constraints, leave it to the type check function
       # to print a consistent error message based on the simple literal type.
       return simple if mt.unsatisfiable?
 
-      mt
+      # If we've resolved to a single concrete type, we can successfully return.
+      return mt if mt.singular? && mt.single!.link.is_concrete?
+
+      # Next we try to use peer hints to make a viable guess.
+      if info.peer_hints.any?
+        mt = MetaType.new_intersection(
+          info.peer_hints.map { |peer| resolve(ctx, peer).as(MetaType) }
+        ).intersect(simple).simplify(ctx)
+
+        # This guess works for us if it meets those same criteria from before.
+        return mt if mt.singular? && mt.single!.link.is_concrete?
+      end
+
+      # We've failed on all fronts. Print an error describing what we know,
+      # so that the user can figure out how to give us better information.
+      error_info = info.describe_downstream_constraints(ctx, self)
+      error_info.concat(info.describe_peer_hints(ctx, self))
+      error_info.push({info.pos,
+        "and the literal itself has an intrinsic type of #{simple.show_type}"
+      })
+      error_info.push({Source::Pos.none,
+        "Please wrap an explicit numeric type around the literal " \
+          "(for example: U64[#{info.pos.content}])"
+      })
+      Error.at info,
+        "This literal value couldn't be inferred as a single concrete type",
+        error_info
+
+      raise "unreachable end of function"
     end
 
     def type_check(info : Infer::DynamicInfo, meta_type : Infer::MetaType)

@@ -4,6 +4,9 @@ module Mare::Compiler::AltInfer
     def initialize(@inner)
     end
 
+    def as_upstream_infos : Array(Infer::Info)
+      inner.as_upstream_infos
+    end
     def resolve_span!(ctx : Context, infer : Visitor) : Span
       inner.resolve_span!(ctx, infer)
     end
@@ -12,6 +15,7 @@ module Mare::Compiler::AltInfer
     end
 
     abstract struct Inner
+      abstract def as_upstream_infos : Array(Infer::Info)
       abstract def resolve_span!(ctx : Context, infer : Visitor) : Span
       abstract def resolve!(ctx : Context, infer : TypeCheck::ForReifiedFunc) : Infer::MetaType
     end
@@ -25,6 +29,9 @@ module Mare::Compiler::AltInfer
       def initialize(@info)
       end
 
+      def as_upstream_infos : Array(Infer::Info)
+        info.as_upstream_infos
+      end
       def resolve_span!(ctx : Context, infer : Visitor) : Span
         infer.resolve(ctx, info)
       end
@@ -43,6 +50,9 @@ module Mare::Compiler::AltInfer
         raise ArgumentError.new("empty union") if @infos.empty?
       end
 
+      def as_upstream_infos : Array(Infer::Info)
+        infos.flat_map(&.as_upstream_infos)
+      end
       def resolve_span!(ctx : Context, infer : Visitor) : Span
         spans = @infos.map { |info| infer.resolve(ctx, info) }
         Span
@@ -64,6 +74,9 @@ module Mare::Compiler::AltInfer
       def initialize(@info)
       end
 
+      def as_upstream_infos : Array(Infer::Info)
+        [] of Infer::Info # TODO: somehow pass on upstream while retaining aliasing
+      end
       def resolve_span!(ctx : Context, infer : Visitor) : Span
         infer.resolve(ctx, info).transform_mt(&.ephemeralize)
       end
@@ -81,6 +94,9 @@ module Mare::Compiler::AltInfer
       def initialize(@info)
       end
 
+      def as_upstream_infos : Array(Infer::Info)
+        [] of Infer::Info # TODO: somehow pass on upstream while retaining aliasing
+      end
       def resolve_span!(ctx : Context, infer : Visitor) : Span
         infer.resolve(ctx, info).transform_mt(&.alias)
       end
