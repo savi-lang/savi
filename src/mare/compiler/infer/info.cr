@@ -1602,8 +1602,16 @@ class Mare::Compiler::Infer
       elem_span =
         if ante_span
           if elem_span
-            ante_span.combine_mt(elem_span) { |ante_mt, elem_mt|
-              ante_mt.intersect(elem_mt)
+            ante_span.combine_mt_to_span(elem_span) { |ante_mt, elem_mt|
+              # For every pair of element MetaType and antecedent MetaType,
+              # Treat the antecedent MetaType as the default, but
+              # fall back to using the element MetaType if the intersection
+              # of those two turns out to be unsatisfiable.
+              AltInfer::Span.simple_with_fallback(ante_mt,
+                ante_mt.intersect(elem_mt), [
+                  {:mt_unsatisfiable, AltInfer::Span.simple(elem_mt)}
+                ]
+              )
             }
           else
             ante_span

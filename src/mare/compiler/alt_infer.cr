@@ -37,6 +37,7 @@ module Mare::Compiler::AltInfer
     end
 
     def self.simple(mt : MetaType); new(Terminal.new(mt)); end
+
     def self.decision(key : Key, span_map : Hash(MetaType, Span))
       map = span_map.transform_values(&.inner)
 
@@ -44,6 +45,18 @@ module Mare::Compiler::AltInfer
         if map.values.any?(&.has_key?(key))
 
       new(Decision.build(key, map))
+    end
+
+    def self.simple_with_fallback(
+      default_mt : MetaType,
+      evaluate_mt : MetaType,
+      options : Array({Symbol, Span}),
+    )
+      new(Fallback.build(
+        Terminal.new(default_mt),
+        evaluate_mt,
+        options.map { |(cond, span)| {cond, span.inner} }
+      ))
     end
 
     def self.error(*args); new(ErrorPropagate.new(Error.build(*args))); end
@@ -111,21 +124,34 @@ module Mare::Compiler::AltInfer
       Span.new(inner.decided_by(key, orig_keys, &block))
     end
 
+    def combine_mt_to_span(other : Span, &block : (MetaType, MetaType) -> Span) : Span
+      Span.new(inner.combine_mt_to_span(other.inner, nil, &block))
+    end
+
     def combine_mt(other : Span, &block : (MetaType, MetaType) -> MetaType) : Span
-      Span.new(inner.combine_mt(other.inner, nil, &block))
+      mt_block = ->(a : MetaType, b : MetaType) {
+        Span.simple(block.call(a, b))
+      }
+      Span.new(inner.combine_mt_to_span(other.inner, nil, &mt_block))
     end
 
     def combine_mts(spans : Array(Span), &block : (MetaType, Array(MetaType)) -> MetaType) : Span
       others = spans.map(&.inner)
-      raise NotImplementedError.new("combine_mts") \
-        unless inner.is_a?(Terminal) && others.all?(&.is_a?(Terminal))
-
-      new_meta_type = block.call(
-        inner.as(Terminal).meta_type,
-        others.map(&.as(Terminal).meta_type)
-      )
-
-      Span.new(Terminal.new(new_meta_type))
+      if inner.is_a?(Terminal) && others.all?(&.is_a?(Terminal))
+        # If all are terminals, we can easily combine them with one block call.
+        Span.new(Terminal.new(block.call(
+          inner.as(Terminal).meta_type,
+          others.map(&.as(Terminal).meta_type)
+        )))
+      elsif others.all?(&.==(inner))
+        # If all spans are equivalent we can take a shortcut: using transform_mt
+        # on just one of the spans, then presenting that to the block as if we
+        # had gotten that value from all of the presented spans.
+        transform_block = ->(mt : MetaType) { block.call(mt, spans.map { mt }) }
+        Span.new(inner.transform_mt(&transform_block))
+      else
+        raise NotImplementedError.new("combine_mts")
+      end
     end
 
     def self.combine_mts(spans : Array(Span), &block : Array(MetaType) -> MetaType) : Span?
@@ -168,7 +194,7 @@ module Mare::Compiler::AltInfer
       abstract def transform_mt(&block : MetaType -> MetaType) : Inner
       abstract def transform_mt_using(key : Key, maybe_value : MetaType?, &block : (MetaType, MetaType?) -> MetaType) : Inner
       abstract def decided_by(key : Key, orig_keys : Set(Key), &block : MetaType -> Enumerable({MetaType, Span})) : Inner
-      abstract def combine_mt(other : Inner, maybe_other_terminal : Terminal?, &block : (MetaType, MetaType) -> MetaType) : Inner
+      abstract def combine_mt_to_span(other : Inner, maybe_other_terminal : Terminal?, &block : (MetaType, MetaType) -> Span) : Inner
       abstract def deciding_f_cap(f_cap_mt : MetaType, is_constructor : Bool) : Inner?
       abstract def maybe_fallback_based_on_mt_simplify(options : Array({Symbol, Inner})) : Inner
       abstract def final_mt_simplify(ctx : Context) : Inner
@@ -226,13 +252,12 @@ module Mare::Compiler::AltInfer
         Decision.build(key, map)
       end
 
-      def combine_mt(other : Inner, maybe_other_terminal : Terminal?, &block : (MetaType, MetaType) -> MetaType) : Inner
+      def combine_mt_to_span(other : Inner, maybe_other_terminal : Terminal?, &block : (MetaType, MetaType) -> Span) : Inner
         if maybe_other_terminal
-          new_meta_type = block.call(@meta_type, maybe_other_terminal.meta_type)
-          Terminal.new(new_meta_type)
+          block.call(self.meta_type, maybe_other_terminal.meta_type).inner
         else
           swap_block = -> (b : MetaType, a : MetaType) { block.call(a, b) }
-          other.combine_mt(self, self, &swap_block)
+          other.combine_mt_to_span(self, self, &swap_block)
         end
       end
 
@@ -359,15 +384,15 @@ module Mare::Compiler::AltInfer
         Decision.build(@key, @map.transform_values(&.decided_by(key, orig_keys, &block)))
       end
 
-      def combine_mt(other : Inner, maybe_other_terminal : Terminal?, &block : (MetaType, MetaType) -> MetaType) : Inner
+      def combine_mt_to_span(other : Inner, maybe_other_terminal : Terminal?, &block : (MetaType, MetaType) -> Span) : Inner
         if maybe_other_terminal
-          Decision.build(@key, @map.transform_values(&.combine_mt(other, maybe_other_terminal, &block).as(Inner)))
+          Decision.build(@key, @map.transform_values(&.combine_mt_to_span(other, maybe_other_terminal, &block).as(Inner)))
         else
           if other.is_a?(Terminal)
             swap_block = -> (b : MetaType, a : MetaType) { block.call(a, b) }
-            return other.combine_mt(self, nil, &swap_block)
+            return other.combine_mt_to_span(self, nil, &swap_block)
           else
-            raise NotImplementedError.new("combine_mt for a decision and another non-terminal")
+            raise NotImplementedError.new("combine_mt_to_span for a decision and another non-terminal")
           end
         end
       end
@@ -493,19 +518,19 @@ module Mare::Compiler::AltInfer
         )
       end
 
-      def combine_mt(other : Inner, maybe_other_terminal : Terminal?, &block : (MetaType, MetaType) -> MetaType) : Inner
+      def combine_mt_to_span(other : Inner, maybe_other_terminal : Terminal?, &block : (MetaType, MetaType) -> Span) : Inner
         if maybe_other_terminal
           Fallback.build(
-            @default.value.combine_mt(other, maybe_other_terminal, &block),
+            @default.value.combine_mt_to_span(other, maybe_other_terminal, &block),
             @evaluate_mt,
-            @options.map { |(cond, inner)| {cond, inner.combine_mt(other, maybe_other_terminal, &block).as(Inner)} }
+            @options.map { |(cond, inner)| {cond, inner.combine_mt_to_span(other, maybe_other_terminal, &block).as(Inner)} }
           )
         else
           if other.is_a?(Terminal)
             swap_block = -> (b : MetaType, a : MetaType) { block.call(a, b) }
-            return other.combine_mt(self, nil, &swap_block)
+            return other.combine_mt_to_span(self, nil, &swap_block)
           else
-            raise NotImplementedError.new("combine_mt for a fallback and another non-terminal")
+            raise NotImplementedError.new("combine_mt_to_span for a fallback and another non-terminal")
           end
         end
       end
@@ -599,7 +624,7 @@ module Mare::Compiler::AltInfer
         self
       end
 
-      def combine_mt(other : Inner, maybe_other_terminal : Terminal?, &block : (MetaType, MetaType) -> MetaType) : Inner
+      def combine_mt_to_span(other : Inner, maybe_other_terminal : Terminal?, &block : (MetaType, MetaType) -> Span) : Inner
         self
       end
 
