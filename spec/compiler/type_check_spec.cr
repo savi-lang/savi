@@ -1017,5 +1017,42 @@ describe Mare::Compiler::TypeCheck do
     end
   end
 
+  it "infers the type of an array literal from its elements" do
+    source = Mare::Source.new_example <<-SOURCE
+    :actor Main
+      :new
+        x = ["one", "two", "three"]
+    SOURCE
+
+    ctx = Mare.compiler.compile([source], :type_check)
+
+    type_check = ctx.type_check.for_func_simple(ctx, source, "Main", "new")
+    body = type_check.reified.func(ctx).body.not_nil!
+    assign = body.terms.first.as(Mare::AST::Relate)
+
+    type_check.analysis.resolved(ctx, assign.lhs).show_type.should eq "Array(String)"
+    type_check.analysis.resolved(ctx, assign.rhs).show_type.should eq "Array(String)"
+  end
+
+  # ...
+
+  it "infers an empty array literal from its antecedent" do
+    source = Mare::Source.new_example <<-SOURCE
+    :actor Main
+      :new
+        x Array(U64) = []
+        x << 99
+    SOURCE
+
+    ctx = Mare.compiler.compile([source], :type_check)
+
+    type_check = ctx.type_check.for_func_simple(ctx, source, "Main", "new")
+    body = type_check.reified.func(ctx).body.not_nil!
+    assign = body.terms.first.as(Mare::AST::Relate)
+
+    type_check.analysis.resolved(ctx, assign.lhs).show_type.should eq "Array(U64)"
+    type_check.analysis.resolved(ctx, assign.rhs).show_type.should eq "Array(U64)"
+  end
+
   # ...
 end

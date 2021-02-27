@@ -35,6 +35,14 @@ class Mare::Compiler::Infer
         @info.tether_resolve(ctx, infer)
       end
     end
+    def constraint_span(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
+      below = @below
+      if below
+        @info.tether_upward_transform_span(ctx, infer, below.constraint_span(ctx, infer))
+      else
+        @info.tether_resolve_span(ctx, infer)
+      end
+    end
 
     def includes?(other_info) : Bool
       @info == other_info || @below.try(&.includes?(other_info)) || false
@@ -79,8 +87,14 @@ class Mare::Compiler::Infer
     def tether_upward_transform(ctx : Context, infer : ForReifiedFunc, meta_type : MetaType) : MetaType
       raise NotImplementedError.new("tether_upward_transform for #{self.class}:\n#{pos.show}")
     end
+    def tether_upward_transform_span(ctx : Context, infer : AltInfer::Visitor, span : AltInfer::Span) : AltInfer::Span
+      raise NotImplementedError.new("tether_upward_transform_span for #{self.class}:\n#{pos.show}")
+    end
     def tether_resolve(ctx : Context, infer : ForReifiedFunc)
       raise NotImplementedError.new("tether_resolve for #{self.class}:\n#{pos.show}")
+    end
+    def tether_resolve_span(ctx : Context, infer : AltInfer::Visitor)
+      raise NotImplementedError.new("tether_resolve_span for #{self.class}:\n#{pos.show}")
     end
 
     # Most Info types ignore hints, but a few override this method to see them,
@@ -172,6 +186,9 @@ class Mare::Compiler::Infer
 
     def tether_constraints(ctx : Context, infer : ForReifiedFunc)
       tethers(self).map(&.constraint(ctx, infer).as(MetaType))
+    end
+    def tether_constraint_spans(ctx : Context, infer : AltInfer::Visitor)
+      tethers(self).map(&.constraint_span(ctx, infer).as(AltInfer::Span))
     end
 
     def describe_tether_constraints(ctx : Context, infer : ForReifiedFunc)
@@ -415,6 +432,10 @@ class Mare::Compiler::Infer
       # TODO: aliasing/ephemerality
       meta_type
     end
+    def tether_upward_transform_span(ctx : Context, infer : AltInfer::Visitor, span : AltInfer::Span) : AltInfer::Span
+      # TODO: aliasing/ephemerality
+      span
+    end
 
     def assign(ctx : Context, upstream : Info, upstream_pos : Source::Pos)
       @upstreams << {upstream, upstream_pos}
@@ -496,6 +517,9 @@ class Mare::Compiler::Infer
     end
 
     def tether_resolve(ctx : Context, infer : ForReifiedFunc)
+      infer.resolve(ctx, self)
+    end
+    def tether_resolve_span(ctx : Context, infer : AltInfer::Visitor)
       infer.resolve(ctx, self)
     end
   end
@@ -834,6 +858,9 @@ class Mare::Compiler::Infer
     def tether_resolve(ctx : Context, infer : ForReifiedFunc)
       infer.resolve(ctx, self)
     end
+    def tether_resolve_span(ctx : Context, infer : AltInfer::Visitor)
+      infer.resolve(ctx, self)
+    end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
       follow_field(ctx, infer)
@@ -1037,6 +1064,10 @@ class Mare::Compiler::Infer
     def tether_upward_transform(ctx : Context, infer : ForReifiedFunc, meta_type : MetaType) : MetaType
       # TODO: account for unreachable branches? maybe? maybe not?
       meta_type
+    end
+    def tether_upward_transform_span(ctx : Context, infer : AltInfer::Visitor, span : AltInfer::Span) : AltInfer::Span
+      # TODO: account for unreachable branches? maybe? maybe not?
+      span
     end
 
     def as_downstream_constraint_meta_type(ctx : Context, infer : ForReifiedFunc) : MetaType
@@ -1404,6 +1435,9 @@ class Mare::Compiler::Infer
     def tether_upward_transform(ctx : Context, infer : ForReifiedFunc, meta_type : MetaType) : MetaType
       meta_type.strip_cap
     end
+    def tether_upward_transform_span(ctx : Context, infer : AltInfer::Visitor, span : AltInfer::Span) : AltInfer::Span
+      span.transform_mt(&.strip_cap)
+    end
 
     def add_peer_hint(peer : Info)
       @body.add_peer_hint(peer)
@@ -1499,16 +1533,18 @@ class Mare::Compiler::Infer
     def tether_upward_transform(ctx : Context, infer : ForReifiedFunc, meta_type : MetaType) : MetaType
       meta_type
     end
+    def tether_upward_transform_span(ctx : Context, infer : AltInfer::Visitor, span : AltInfer::Span) : AltInfer::Span
+      span
+    end
 
-    def possible_element_antecedents_span(ctx, infer) : AltInfer::Span
+    def possible_element_antecedents_span(ctx, infer) : AltInfer::Span?
       array_info = self
-      downstream_spans =
-        @downstreams.map { |pos, info, aliases| infer.resolve(ctx, info) }
+      tether_spans = tether_constraint_spans(ctx, infer)
 
-      raise NotImplementedError.new("unused array literal") if downstream_spans.empty?
+      return nil if tether_spans.empty?
 
       AltInfer::Span
-      .combine_mts(downstream_spans) { |mts| MetaType.new_intersection(mts) }
+      .combine_mts(tether_spans) { |mts| MetaType.new_intersection(mts) }
       .not_nil!
       .decided_by(array_info) { |mt|
         mt.each_reachable_defn_with_cap(ctx).compact_map { |rt, cap|
@@ -1670,6 +1706,26 @@ class Mare::Compiler::Infer
 
       results.first.not_nil!
     end
+    def tether_upward_transform_span(ctx : Context, infer : AltInfer::Visitor, span : AltInfer::Span) : AltInfer::Span
+      span.transform_mt do |meta_type|
+        results = [] of MetaType
+
+        meta_type.simplify(ctx).each_reachable_defn(ctx).each do |rt|
+          # TODO: Support more element antecedent detection patterns.
+          if rt.link.name == "Array" \
+          && rt.args.size == 1
+            results << rt.args.first.simplify(ctx)
+          end
+        end
+
+        # TODO: support multiple antecedents gracefully?
+        if results.size != 1
+          next MetaType.unconstrained
+        end
+
+        results.first.not_nil!
+      end
+    end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
       antecedents = @array.possible_element_antecedents(ctx, infer)
@@ -1697,6 +1753,11 @@ class Mare::Compiler::Infer
     end
 
     def tether_upward_transform(ctx : Context, infer : ForReifiedFunc, meta_type : MetaType) : MetaType
+      # TODO: is it possible to use the meta_type passed to us above,
+      # at least in some cases, instead of eagerly resolving here?
+      infer.resolve(ctx, self)
+    end
+    def tether_upward_transform_span(ctx : Context, infer : AltInfer::Visitor, span : AltInfer::Span) : AltInfer::Span
       # TODO: is it possible to use the meta_type passed to us above,
       # at least in some cases, instead of eagerly resolving here?
       infer.resolve(ctx, self)
@@ -2129,6 +2190,9 @@ class Mare::Compiler::Infer
     def tether_resolve(ctx : Context, infer : ForReifiedFunc)
       infer.resolve(ctx, self)
     end
+    def tether_resolve_span(ctx : Context, infer : AltInfer::Visitor)
+      infer.resolve(ctx, self)
+    end
 
     def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
       infer.resolve(ctx, @call.lhs).decided_by(@call.lhs) do |lhs_mt|
@@ -2256,6 +2320,9 @@ class Mare::Compiler::Infer
 
     def tether_resolve(ctx : Context, infer : ForReifiedFunc)
       resolve!(ctx, infer) # TODO: should this be infer.resolve(ctx, self) instead?
+    end
+    def tether_resolve_span(ctx : Context, infer : AltInfer::Visitor)
+      resolve_span!(ctx, infer) # TODO: should this be infer.resolve(ctx, self) instead?
     end
 
     def as_multiple_downstream_constraints(ctx : Context, infer : ForReifiedFunc) : Array({Source::Pos, MetaType})?
