@@ -1038,7 +1038,7 @@ describe Mare::Compiler::TypeCheck do
     source = Mare::Source.new_example <<-SOURCE
     :actor Main
       :new
-        x Array((U64 | None)) = [1, 2, 3] // TODO: allow syntax: Array(U64 | None)?
+        x Array((U64 | None))'val = [1, 2, 3] // TODO: allow syntax: Array(U64 | None)'val?
     SOURCE
 
     ctx = Mare.compiler.compile([source], :type_check)
@@ -1048,8 +1048,8 @@ describe Mare::Compiler::TypeCheck do
     assign = body.terms.first.as(Mare::AST::Relate)
     elem_0 = assign.rhs.as(Mare::AST::Group).terms.first
 
-    type_check.analysis.resolved(ctx, assign.lhs).show_type.should eq "Array((U64 | None))"
-    type_check.analysis.resolved(ctx, assign.rhs).show_type.should eq "Array((U64 | None))"
+    type_check.analysis.resolved(ctx, assign.lhs).show_type.should eq "Array((U64 | None))'val"
+    type_check.analysis.resolved(ctx, assign.rhs).show_type.should eq "Array((U64 | None))'val"
     type_check.analysis.resolved(ctx, elem_0).show_type.should eq "U64"
   end
 

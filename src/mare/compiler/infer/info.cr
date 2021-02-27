@@ -1567,7 +1567,7 @@ class Mare::Compiler::Infer
       span
     end
 
-    def possible_element_antecedents_span(ctx, infer) : AltInfer::Span?
+    def possible_antecedents_span(ctx, infer) : AltInfer::Span?
       array_info = self
       tether_spans = tether_constraint_spans(ctx, infer)
 
@@ -1580,12 +1580,10 @@ class Mare::Compiler::Infer
         mt.each_reachable_defn_with_cap(ctx).compact_map { |rt, cap|
           # TODO: Support more element antecedent detection patterns.
           if rt.link.name == "Array" && rt.args.size == 1
-            {
-              MetaType.new_nominal(rt).intersect(MetaType.new(cap)),
-              AltInfer::Span.simple(rt.args.first)
-            }
+            array_mt = MetaType.new_nominal(rt).intersect(MetaType.new(cap))
+            {array_mt, AltInfer::Span.simple(array_mt)}
           end
-        }.compact
+        }
       }
     end
 
@@ -1594,44 +1592,49 @@ class Mare::Compiler::Infer
       # TODO: span should allow ref, val, trn, or iso cap possibilities.
       array_cap = MetaType::Capability::REF
 
-      ante_span = possible_element_antecedents_span(ctx, infer)
+      ante_span = possible_antecedents_span(ctx, infer)
 
       elem_spans = terms.map { |term| infer.resolve(ctx, term).as(AltInfer::Span) }
       elem_span = AltInfer::Span.combine_mts(elem_spans) { |mts| MetaType.new_union(mts) }
 
-      elem_span =
-        if ante_span
-          if elem_span
-            ante_span.combine_mt_to_span(elem_span) { |ante_mt, elem_mt|
-              # For every pair of element MetaType and antecedent MetaType,
-              # Treat the antecedent MetaType as the default, but
-              # fall back to using the element MetaType if the intersection
-              # of those two turns out to be unsatisfiable.
-              AltInfer::Span.simple_with_fallback(ante_mt,
-                ante_mt.intersect(elem_mt), [
-                  {:mt_unsatisfiable, AltInfer::Span.simple(elem_mt)}
-                ]
-              )
-            }
-          else
-            ante_span
-          end
+      if ante_span
+        if elem_span
+          ante_span.combine_mt_to_span(elem_span) { |ante_mt, elem_mt|
+            # We know/assert that the antecedent MetaType is in the form of
+            # a cap intersected with an Array ReifiedType, so we know that
+            # we can get the element MetaType from the ReifiedType's type args.
+            ante_elem_mt = ante_mt.single!.args[0]
+            fallback_rt = infer.prelude_reified_type(ctx, "Array", [elem_mt])
+            fallback_mt = MetaType.new(fallback_rt).intersect(MetaType.cap("ref"))
+
+            # For every pair of element MetaType and antecedent MetaType,
+            # Treat the antecedent MetaType as the default, but
+            # fall back to using the element MetaType if the intersection
+            # of those two turns out to be unsatisfiable.
+            AltInfer::Span.simple_with_fallback(ante_mt,
+              ante_elem_mt.intersect(elem_mt), [
+                {:mt_unsatisfiable, AltInfer::Span.simple(fallback_mt)}
+              ]
+            )
+          }
         else
-          if elem_span
-            elem_span
-          else
-            AltInfer::Span.simple(MetaType.unsatisfiable)
-          end
+          ante_span
         end
+      else
+        if elem_span
+          # TODO: is this "transform_mt_using" call even doing anything?
+          array_span = elem_span.transform_mt_using(self) { |elem_mt, maybe_self_mt|
+            array_cap = maybe_self_mt.try(&.inner.as(MetaType::Capability)) || MetaType::Capability::REF
 
-      elem_span.transform_mt_using(self) { |elem_mt, maybe_self_mt|
-        array_cap = maybe_self_mt.try(&.inner.as(MetaType::Capability)) || MetaType::Capability::REF
+            rt = infer.prelude_reified_type(ctx, "Array", [elem_mt])
+            mt = MetaType.new(rt, array_cap.value.as(String))
 
-        rt = infer.prelude_reified_type(ctx, "Array", [elem_mt])
-        mt = MetaType.new(rt, array_cap.value.as(String))
-
-        mt
-      }
+            mt
+          }
+        else
+          AltInfer::Span.simple(MetaType.unsatisfiable)
+        end
+      end
     end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
