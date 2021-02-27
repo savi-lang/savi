@@ -1097,5 +1097,25 @@ describe Mare::Compiler::TypeCheck do
     type_check.analysis.resolved(ctx, assign.rhs).show_type.should eq "Array(U64)"
   end
 
+  it "complains when an empty array literal has no antecedent" do
+    source = Mare::Source.new_example <<-SOURCE
+    :actor Main
+      :new
+        x = []
+        x << 99
+    SOURCE
+
+    expected = <<-MSG
+    The type of this empty array literal could not be inferred (it needs an explicit type):
+    from (example):3:
+        x = []
+            ^~
+    MSG
+
+    expect_raises Mare::Error, expected do
+      Mare.compiler.compile([source], :type_check)
+    end
+  end
+
   # ...
 end

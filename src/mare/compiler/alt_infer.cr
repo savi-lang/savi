@@ -149,6 +149,12 @@ module Mare::Compiler::AltInfer
         # had gotten that value from all of the presented spans.
         transform_block = ->(mt : MetaType) { block.call(mt, spans.map { mt }) }
         Span.new(inner.transform_mt(&transform_block))
+      elsif inner.is_a?(ErrorPropagate)
+        # If this Span is an error propagate, we can easily just propagate it.
+        Span.new(inner)
+      elsif (other_error = others.find(&.is_a?(ErrorPropagate)))
+        # Similarly for any ErrorPropagate we may find in the others list.
+        Span.new(other_error)
       else
         raise NotImplementedError.new("combine_mts")
       end

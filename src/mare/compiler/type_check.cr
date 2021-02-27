@@ -909,8 +909,6 @@ class Mare::Compiler::TypeCheck
 
     # Sometimes print a special case error message for Literal values.
     def type_check_pre(ctx : Context, info : Infer::Literal, mt : MetaType)
-      mt = filter_span(ctx, info)
-
       # If we've resolved to a single concrete type already, move forward.
       return if mt.singular? && mt.single!.link.is_concrete?
 

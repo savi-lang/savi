@@ -1632,7 +1632,8 @@ class Mare::Compiler::Infer
             mt
           }
         else
-          AltInfer::Span.simple(MetaType.unsatisfiable)
+          AltInfer::Span.error(pos, "The type of this empty array literal " \
+            "could not be inferred (it needs an explicit type)")
         end
       end
     end
