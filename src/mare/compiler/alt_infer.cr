@@ -90,6 +90,10 @@ module Mare::Compiler::AltInfer
       inner.any_uncertain?
     end
 
+    def as_uncertain
+      Span.new(inner.as_uncertain)
+    end
+
     def has_key?(key : Key) : Bool
       inner.has_key?(key)
     end
@@ -159,6 +163,7 @@ module Mare::Compiler::AltInfer
       abstract def any_error? : Bool
       abstract def total_error : Error?
       abstract def any_uncertain? : Bool
+      abstract def as_uncertain : Inner
       abstract def has_key?(key : Key) : Bool
       abstract def gather_all_keys(set = Set(Key).new) : Set(Key)
       abstract def all_terminal_meta_types : Array(MetaType)
@@ -191,6 +196,11 @@ module Mare::Compiler::AltInfer
 
       def any_uncertain? : Bool
         @uncertain
+      end
+
+      def as_uncertain : Inner
+        return self if @uncertain
+        Terminal.new(@meta_type, true)
       end
 
       def has_key?(key : Key) : Bool
@@ -281,6 +291,10 @@ module Mare::Compiler::AltInfer
 
       def any_error? : Bool
         map.values.any?(&.any_error?)
+      end
+
+      def as_uncertain : Inner
+        Decision.new(key, map.transform_values(&.as_uncertain))
       end
 
       def total_error : Error?
@@ -411,6 +425,10 @@ module Mare::Compiler::AltInfer
 
       def any_uncertain? : Bool
         false
+      end
+
+      def as_uncertain : Inner
+        self
       end
 
       def has_key?(key : Key) : Bool
