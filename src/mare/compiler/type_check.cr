@@ -1037,7 +1037,7 @@ class Mare::Compiler::TypeCheck
     def resolve_with_reentrance_prevention(ctx : Context, info : Info) : MetaType
       orig_count = @prevent_reentrance[info]?
       if (orig_count || 0) > 2 # TODO: can we remove this counter and use a set instead of a map?
-        kind = info.is_a?(DynamicInfo) ? " #{info.describe_kind}" : ""
+        kind = info.is_a?(Infer::DynamicInfo) ? " #{info.describe_kind}" : ""
         Error.at info.pos,
           "This#{kind} needs an explicit type; it could not be inferred"
       end

@@ -884,4 +884,138 @@ describe Mare::Compiler::TypeCheck do
   end
 
   # ...
+
+  it "complains when violating uniqueness into a reassigned local" do
+    source = Mare::Source.new_example <<-SOURCE
+    :class X
+      :new iso
+
+    :actor Main
+      :new
+        xb val = X.new // okay
+        xb     = X.new // okay
+
+        xa iso = X.new
+        xb     = xa    // not okay
+    SOURCE
+
+    expected = <<-MSG
+    This aliasing violates uniqueness (did you forget to consume the variable?):
+    from (example):10:
+        xb     = xa    // not okay
+                 ^~
+
+    - it is required here to be a subtype of val:
+      from (example):6:
+        xb val = X.new // okay
+           ^~~
+
+    - but the type of the local variable (when aliased) was X'tag:
+      from (example):9:
+        xa iso = X.new
+           ^~~
+    MSG
+
+    expect_raises Mare::Error, expected do
+      Mare.compiler.compile([source], :type_check)
+    end
+  end
+
+  it "allows extra aliases that don't violate uniqueness" do
+    source = Mare::Source.new_example <<-SOURCE
+    :class X
+      :new iso
+
+    :actor Main
+      :new
+        orig = X.new
+
+        xa tag = orig   // okay
+        xb tag = orig   // okay
+        xc iso = --orig // okay
+    SOURCE
+
+    Mare.compiler.compile([source], :type_check)
+  end
+
+  it "complains when violating uniqueness into an argument" do
+    source = Mare::Source.new_example <<-SOURCE
+    :class X
+      :new iso
+
+    :actor Main
+      :new
+        @example(X.new) // okay
+
+        x1 iso = X.new
+        @example(--x1) // okay
+
+        x2 iso = X.new
+        @example(x2) // not okay
+
+      :fun example (x X'val)
+    SOURCE
+
+    expected = <<-MSG
+    This aliasing violates uniqueness (did you forget to consume the variable?):
+    from (example):12:
+        @example(x2) // not okay
+                 ^~
+
+    - it is required here to be a subtype of X'val:
+      from (example):14:
+      :fun example (x X'val)
+                      ^~~~~
+
+    - but the type of the local variable (when aliased) was X'tag:
+      from (example):11:
+        x2 iso = X.new
+           ^~~
+    MSG
+
+    expect_raises Mare::Error, expected do
+      Mare.compiler.compile([source], :type_check)
+    end
+  end
+
+  it "strips the ephemeral modifier from the capability of an inferred local" do
+    source = Mare::Source.new_example <<-SOURCE
+    :class X
+      :new iso
+
+    :actor Main
+      :new
+        x = X.new // inferred as X'iso+, stripped to X'iso
+        x2 iso = x // not okay, but would work if not for the above stripping
+        x3 iso = x // not okay, but would work if not for the above stripping
+    SOURCE
+
+    expected = <<-MSG
+    This aliasing violates uniqueness (did you forget to consume the variable?):
+    from (example):7:
+        x2 iso = x // not okay, but would work if not for the above stripping
+                 ^
+
+    - it is required here to be a subtype of iso:
+      from (example):7:
+        x2 iso = x // not okay, but would work if not for the above stripping
+           ^~~
+
+    - it is required here to be a subtype of iso:
+      from (example):8:
+        x3 iso = x // not okay, but would work if not for the above stripping
+           ^~~
+
+    - but the type of the local variable (when aliased) was X'tag:
+      from (example):6:
+        x = X.new // inferred as X'iso+, stripped to X'iso
+        ^
+    MSG
+
+    expect_raises Mare::Error, expected do
+      Mare.compiler.compile([source], :type_check)
+    end
+  end
+
+  # ...
 end

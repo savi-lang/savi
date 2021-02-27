@@ -1814,7 +1814,7 @@ class Mare::Compiler::Infer
       resolvables.each { |resolvable| infer.resolve(ctx, resolvable) }
     end
 
-    def follow_call_get_call_defns(ctx : Context, infer : ForReifiedFunc) : Set({MetaType::Inner, ReifiedType?, Program::Function?})Set
+    def follow_call_get_call_defns(ctx : Context, infer) : Set({MetaType::Inner, ReifiedType?, Program::Function?})
       call = self
       receiver = infer.resolve_with_reentrance_prevention(ctx, @lhs)
       call_defns = receiver.find_callable_func_defns(ctx, infer, @member)
@@ -1862,7 +1862,7 @@ class Mare::Compiler::Infer
       call_defns
     end
 
-    def follow_call_check_receiver_cap(ctx : Context, infer : ForReifiedFunc, call_mt, call_func, problems)
+    def follow_call_check_receiver_cap(ctx : Context, infer, call_mt, call_func, problems)
       call = self
       call_cap_mt = call_mt.cap_only
       autorecover_needed = false
@@ -1938,7 +1938,7 @@ class Mare::Compiler::Infer
       {reify_cap, autorecover_needed}
     end
 
-    def follow_call_check_args(ctx : Context, infer : ForReifiedFunc, call_func, other_infer, problems)
+    def follow_call_check_args(ctx : Context, infer, call_func, other_infer, problems)
       call = self
 
       # Just check the number of arguments.
@@ -2037,6 +2037,47 @@ class Mare::Compiler::Infer
         # TODO: don't infer anything in the body of that func if type and params
         # were explicitly specified in the function signature.
         other_infer = ctx.infer.for_rf(ctx, call_defn, call_func_link, reify_cap).tap(&.run)
+
+        follow_call_check_args(ctx, infer, call_func, other_infer, problems)
+        follow_call_check_yield_block(other_infer, problems)
+
+        other_infers.add({other_infer, autorecover_needed})
+      end
+      Error.at call,
+        "This function call doesn't meet subtyping requirements",
+          problems unless problems.empty?
+
+      infer.analysis.call_infers_for[self] = other_infers
+    end
+    def follow_call_resolve_other_infers(ctx : Context, infer : TypeCheck::ForReifiedFunc) : Set({TypeCheck::ForReifiedFunc, Bool})
+      other_infers = infer.analysis.call_infers_for[self]?
+      return other_infers if other_infers
+
+      other_infers = Set({TypeCheck::ForReifiedFunc, Bool}).new
+
+      call = self
+      call_defns = follow_call_get_call_defns(ctx, infer)
+
+      # For each receiver type definition that is possible, track down the infer
+      # for the function that we're trying to call, evaluating the constraints
+      # for each possibility such that all of them must hold true.
+      problems = [] of {Source::Pos, String}
+      call_defns.each do |(call_mti, call_defn, call_func)|
+        call_mt = MetaType.new(call_mti)
+        call_defn = call_defn.not_nil!
+        call_func = call_func.not_nil!
+        call_func_link = call_func.make_link(call_defn.link)
+
+        # Keep track that we called this function.
+        infer.analysis.called_funcs.add({call.pos, call_defn, call_func_link})
+
+        reify_cap, autorecover_needed =
+          follow_call_check_receiver_cap(ctx, infer, call_mt, call_func, problems)
+
+        # Get the ForReifiedFunc instance for call_func, possibly creating and running it.
+        # TODO: don't infer anything in the body of that func if type and params
+        # were explicitly specified in the function signature.
+        other_infer = ctx.type_check.for_rf(ctx, call_defn, call_func_link, reify_cap).tap(&.run)
 
         follow_call_check_args(ctx, infer, call_func, other_infer, problems)
         follow_call_check_yield_block(other_infer, problems)
@@ -2230,19 +2271,19 @@ class Mare::Compiler::Infer
         {param_info.first_viable_constraint_pos, param_mt}.as({Source::Pos, MetaType})
       end
     end
-    # def as_multiple_downstream_constraints(ctx : Context, infer : TypeCheck::ForReifiedFunc) : Array({Source::Pos, MetaType})?
-    #   other_infers = @call.follow_call_resolve_other_infers(ctx, infer)
+    def as_multiple_downstream_constraints(ctx : Context, infer : TypeCheck::ForReifiedFunc) : Array({Source::Pos, MetaType})?
+      other_infers = @call.follow_call_resolve_other_infers(ctx, infer)
 
-    #   other_infers.map do |other_infer, _|
-    #     param = other_infer.params[@index]
-    #     param_info = other_infer.f_analysis[param]
-    #     param_info = param_info.lhs if param_info.is_a?(FromAssign)
-    #     param_info = param_info.as(Param)
-    #     param_mt = other_infer.resolve(ctx, param_info)
+      other_infers.map do |other_infer, _|
+        param = other_infer.params[@index]
+        param_info = other_infer.f_analysis[param]
+        param_info = param_info.lhs if param_info.is_a?(FromAssign)
+        param_info = param_info.as(Param)
+        param_mt = other_infer.resolve(ctx, param_info)
 
-    #     {param_info.first_viable_constraint_pos, param_mt}.as({Source::Pos, MetaType})
-    #   end
-    # end
+        {param_info.first_viable_constraint_pos, param_mt}.as({Source::Pos, MetaType})
+      end
+    end
 
     def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
       infer.resolve(ctx, @call.lhs).decided_by(@call.lhs) do |lhs_mt|

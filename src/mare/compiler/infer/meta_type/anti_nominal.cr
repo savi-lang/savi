@@ -23,6 +23,9 @@ struct Mare::Compiler::Infer::MetaType::AntiNominal
   def find_callable_func_defns(ctx, infer : ForReifiedFunc?, name : String)
     nil
   end
+  def find_callable_func_defns(ctx, infer : TypeCheck::ForReifiedFunc?, name : String)
+    nil
+  end
 
   def any_callable_func_defn_type(ctx, name : String) : ReifiedType?
     nil

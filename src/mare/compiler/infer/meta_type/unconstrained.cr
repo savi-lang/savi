@@ -24,6 +24,9 @@ class Mare::Compiler::Infer::MetaType::Unconstrained
   def find_callable_func_defns(ctx, infer : ForReifiedFunc?, name : String)
     nil
   end
+  def find_callable_func_defns(ctx, infer : TypeCheck::ForReifiedFunc?, name : String)
+    nil
+  end
 
   def any_callable_func_defn_type(ctx, name : String) : Infer::ReifiedType?
     nil
