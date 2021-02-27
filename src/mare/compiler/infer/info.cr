@@ -911,6 +911,8 @@ class Mare::Compiler::Infer
     def initialize(@pos, @term)
     end
 
+    def describe_kind : String; "control flow jump" end
+
     abstract def error_jump_name
 
     def add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
@@ -958,6 +960,8 @@ class Mare::Compiler::Infer
   class Sequence < Info
     getter terms : Array(Info)
     getter final_term : Info
+
+    def describe_kind : String; "sequence" end
 
     def initialize(pos, @terms)
       @final_term = @terms.empty? ? FixedPrelude.new(pos, "None") : @terms.last
@@ -1444,6 +1448,8 @@ class Mare::Compiler::Infer
     getter yield_in : Info
     getter terms : Array(Info)
 
+    def describe_kind : String; "value returned by the yield block" end
+
     def initialize(@pos, @yield_in, @terms)
     end
 
@@ -1703,7 +1709,46 @@ class Mare::Compiler::Infer
         call_defns.compact_map do |(call_mti, call_defn, call_func)|
           call_mt = MetaType.new(call_mti) # TODO: remove call_mti?
 
-          next unless call_defn && call_func
+          problems = [] of {Source::Pos, String}
+          if call_defn.nil?
+            problems << {@pos,
+              "the type #{call_mti.inspect} has no referencable types in it"}
+          elsif call_func.nil?
+            call_defn_defn = call_defn.defn(ctx)
+
+            problems << {call_defn_defn.ident.pos,
+              "#{call_defn_defn.ident.value} has no '#{@member}' function"}
+
+            found_similar = false
+            if @member.ends_with?("!")
+              call_defn_defn.find_func?(@member[0...-1]).try do |similar|
+                found_similar = true
+                problems << {similar.ident.pos,
+                  "maybe you meant to call '#{similar.ident.value}' (without '!')"}
+              end
+            else
+              call_defn_defn.find_func?("#{@member}!").try do |similar|
+                found_similar = true
+                problems << {similar.ident.pos,
+                  "maybe you meant to call '#{similar.ident.value}' (with a '!')"}
+              end
+            end
+
+            unless found_similar
+              similar = call_defn_defn.find_similar_function(@member)
+              problems << {similar.ident.pos,
+                "maybe you meant to call the '#{similar.ident.value}' function"} \
+                  if similar
+            end
+          end
+
+          next {call_mt, AltInfer::Span.error(@pos,
+            "The '#{@member}' function can't be called on this #{@lhs.describe_kind}",
+            problems
+          )} unless problems.empty?
+
+          call_defn = call_defn.not_nil!
+          call_func = call_func.not_nil!
 
           call_link = call_func.make_link(call_defn.link)
           ret_span = infer

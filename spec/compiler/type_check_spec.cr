@@ -699,5 +699,189 @@ describe Mare::Compiler::TypeCheck do
     end
   end
 
+  it "complains when assigning with an insufficient right-hand capability" do
+    source = Mare::Source.new_example <<-SOURCE
+    :class C
+
+    :actor Main
+      :new
+        c1 ref = C.new
+        c2 C'iso = c1
+    SOURCE
+
+    expected = <<-MSG
+    The type of this expression doesn't meet the constraints imposed on it:
+    from (example):6:
+        c2 C'iso = c1
+                   ^~
+
+    - it is required here to be a subtype of C'iso:
+      from (example):6:
+        c2 C'iso = c1
+           ^~~~~
+
+    - but the type of the local variable was C:
+      from (example):5:
+        c1 ref = C.new
+           ^~~
+    MSG
+
+    expect_raises Mare::Error, expected do
+      Mare.compiler.compile([source], :type_check)
+    end
+  end
+
+  it "complains when calling on types without that function" do
+    source = Mare::Source.new_example <<-SOURCE
+    :trait A
+      :fun foo: "foo"
+
+    :class B
+      :fun bar: "bar"
+
+    :primitive C
+      :fun baz: "baz"
+
+    :actor Main
+      :new
+        b (A | B | C) = B.new
+        b.bar
+    SOURCE
+
+    expected = <<-MSG
+    The 'bar' function can't be called on this local variable:
+    from (example):13:
+        b.bar
+          ^~~
+
+    - this local variable may have type C:
+      from (example):12:
+        b (A | B | C) = B.new
+          ^~~~~~~~~~~
+
+    - C has no 'bar' function:
+      from (example):7:
+    :primitive C
+               ^
+
+    - maybe you meant to call the 'baz' function:
+      from (example):8:
+      :fun baz: "baz"
+           ^~~
+
+    - this local variable may have type A:
+      from (example):12:
+        b (A | B | C) = B.new
+          ^~~~~~~~~~~
+
+    - A has no 'bar' function:
+      from (example):1:
+    :trait A
+           ^
+    MSG
+
+    expect_raises Mare::Error, expected do
+      Mare.compiler.compile([source], :type_check)
+    end
+  end
+
+  it "suggests a similarly named function when found" do
+    source = Mare::Source.new_example <<-SOURCE
+    :primitive Example
+      :fun hey
+      :fun hell
+      :fun hello_world
+
+    :actor Main
+      :new
+        Example.hello
+    SOURCE
+
+    expected = <<-MSG
+    The 'hello' function can't be called on this singleton value for this type:
+    from (example):8:
+        Example.hello
+                ^~~~~
+
+    - Example has no 'hello' function:
+      from (example):1:
+    :primitive Example
+               ^~~~~~~
+
+    - maybe you meant to call the 'hell' function:
+      from (example):3:
+      :fun hell
+           ^~~~
+    MSG
+
+    expect_raises Mare::Error, expected do
+      Mare.compiler.compile([source], :type_check)
+    end
+  end
+
+  it "suggests a similarly named function (without '!') when found" do
+    source = Mare::Source.new_example <<-SOURCE
+    :primitive Example
+      :fun hello
+
+    :actor Main
+      :new
+        Example.hello!
+    SOURCE
+
+    expected = <<-MSG
+    The 'hello!' function can't be called on this singleton value for this type:
+    from (example):6:
+        Example.hello!
+                ^~~~~~
+
+    - Example has no 'hello!' function:
+      from (example):1:
+    :primitive Example
+               ^~~~~~~
+
+    - maybe you meant to call 'hello' (without '!'):
+      from (example):2:
+      :fun hello
+           ^~~~~
+    MSG
+
+    expect_raises Mare::Error, expected do
+      Mare.compiler.compile([source], :type_check)
+    end
+  end
+
+  it "suggests a similarly named function (with '!') when found" do
+    source = Mare::Source.new_example <<-SOURCE
+    :primitive Example
+      :fun hello!
+
+    :actor Main
+      :new
+        Example.hello
+    SOURCE
+
+    expected = <<-MSG
+    The 'hello' function can't be called on this singleton value for this type:
+    from (example):6:
+        Example.hello
+                ^~~~~
+
+    - Example has no 'hello' function:
+      from (example):1:
+    :primitive Example
+               ^~~~~~~
+
+    - maybe you meant to call 'hello!' (with a '!'):
+      from (example):2:
+      :fun hello!
+           ^~~~~~
+    MSG
+
+    expect_raises Mare::Error, expected do
+      Mare.compiler.compile([source], :type_check)
+    end
+  end
+
   # ...
 end

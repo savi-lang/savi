@@ -871,6 +871,9 @@ class Mare::Compiler::TypeCheck
       inner = filtered_span.try(&.inner)
       return inner.meta_type if inner.is_a?(AltInfer::Span::Terminal)
 
+      raise filtered_span.not_nil!.total_error.not_nil! \
+        if filtered_span.try(&.any_error?)
+
       puts info.pos.show
       pp info
       pp span

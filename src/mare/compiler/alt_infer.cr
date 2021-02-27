@@ -47,6 +47,8 @@ module Mare::Compiler::AltInfer
       new(Decision.build(key, map))
     end
 
+    def self.error(*args); new(ErrorPropagate.new(Error.build(*args))); end
+
     def self.self_with_reify_cap(ctx : Context, infer : Visitor)
       rt_args = infer
         .type_params_for(ctx, infer.link.type)
@@ -74,6 +76,14 @@ module Mare::Compiler::AltInfer
       rt = ReifiedType.new(infer.link.type, rt_args)
       mt = MetaType.new(rt, cap).ephemeralize
       simple(mt)
+    end
+
+    def any_error?
+      inner.any_error?
+    end
+
+    def total_error
+      inner.total_error
     end
 
     def any_uncertain?
@@ -146,6 +156,8 @@ module Mare::Compiler::AltInfer
     end
 
     abstract struct Inner
+      abstract def any_error? : Bool
+      abstract def total_error : Error?
       abstract def any_uncertain? : Bool
       abstract def has_key?(key : Key) : Bool
       abstract def gather_all_keys(set = Set(Key).new) : Set(Key)
@@ -167,6 +179,14 @@ module Mare::Compiler::AltInfer
       def pretty_print(format : PrettyPrint)
         meta_type.inner.pretty_print(format)
         format.text(" (uncertain)") if uncertain
+      end
+
+      def any_error? : Bool
+        false
+      end
+
+      def total_error : Error?
+        nil
       end
 
       def any_uncertain? : Bool
@@ -214,7 +234,8 @@ module Mare::Compiler::AltInfer
           new_uncertain = @uncertain || maybe_other_terminal.uncertain
           Terminal.new(new_meta_type, new_uncertain)
         else
-          other.combine_mt(self, self) { |b, a| block.call(a, b) }
+          swap_block = -> (b : MetaType, a : MetaType) { block.call(a, b) }
+          other.combine_mt(self, self, &swap_block)
         end
       end
 
@@ -253,6 +274,42 @@ module Mare::Compiler::AltInfer
                   inner.pretty_print(format)
                 end
               end
+            end
+          end
+        end
+      end
+
+      def any_error? : Bool
+        map.values.any?(&.any_error?)
+      end
+
+      def total_error : Error?
+        errors = [] of {Source::Pos, String, Array(Error::Info)}
+
+        key = @key
+        key_pos = key.is_a?(Info) ? key.pos : Source::Pos.none
+        key_describe =
+          case key
+          when Info; "this #{key.describe_kind}"
+          when :f_cap; "the function receiver capability"
+          else raise NotImplementedError.new(key)
+          end
+
+        map.to_a.compact_map do |mt, inner|
+          inner_err = inner.total_error
+          next unless inner_err
+          {"#{key_describe} may have type #{mt.show_type}", inner_err}
+        end.reduce(nil) do |accum, (key_message, inner_err)|
+          if accum
+            Error.new(accum.pos, accum.headline).tap do |total|
+              total.info.concat(accum.info)
+              total.info << {key_pos, key_message}
+              total.info.concat(inner_err.info)
+            end
+          else
+            Error.new(inner_err.pos, inner_err.headline).tap do |total|
+              total.info << {key_pos, key_message}
+              total.info.concat(inner_err.info)
             end
           end
         end
@@ -306,7 +363,8 @@ module Mare::Compiler::AltInfer
           Decision.build(@key, @map.transform_values(&.combine_mt(other, maybe_other_terminal, &block).as(Inner)))
         else
           if other.is_a?(Terminal)
-            return other.combine_mt(self, nil) { |b, a| block.call(a, b) }
+            swap_block = -> (b : MetaType, a : MetaType) { block.call(a, b) }
+            return other.combine_mt(self, nil, &swap_block)
           else
             raise NotImplementedError.new("combine_mt for two decisions")
           end
@@ -333,6 +391,62 @@ module Mare::Compiler::AltInfer
             end
           )
         end
+      end
+    end
+
+    # This kind of Span::Inner "poisons" a Span with an error,
+    # such that any further span operations only propagate that error.
+    struct ErrorPropagate < Inner
+      getter error : Error
+      def initialize(@error)
+      end
+
+      def any_error? : Bool
+        true
+      end
+
+      def total_error : Error?
+        error
+      end
+
+      def any_uncertain? : Bool
+        false
+      end
+
+      def has_key?(key : Key) : Bool
+        false
+      end
+
+      def gather_all_keys(set = Set(Key).new) : Set(Key)
+        set
+      end
+
+      def all_terminal_meta_types : Array(MetaType)
+        [] of MetaType
+      end
+
+      def any_mt?(&block : MetaType -> Bool) : Bool
+        false
+      end
+
+      def transform_mt(&block : MetaType -> MetaType) : Inner
+        self
+      end
+
+      def transform_mt_using(key : Key, maybe_value : MetaType?, &block : (MetaType, MetaType?) -> MetaType) : Inner
+        self
+      end
+
+      def decided_by(key : Key, orig_keys : Set(Key), &block : MetaType -> Enumerable({MetaType, Span})) : Inner
+        self
+      end
+
+      def combine_mt(other : Inner, maybe_other_terminal : Terminal?, &block : (MetaType, MetaType) -> MetaType) : Inner
+        self
+      end
+
+      def deciding_f_cap(f_cap_mt : MetaType, is_constructor : Bool) : Inner?
+        self
       end
     end
   end
