@@ -1053,7 +1053,31 @@ describe Mare::Compiler::TypeCheck do
     type_check.analysis.resolved(ctx, elem_0).show_type.should eq "U64"
   end
 
-  # ...
+  it "complains when lifting the cap of an array with non-sendable elements" do
+    source = Mare::Source.new_example <<-SOURCE
+    :actor Main
+      :new
+        s String'ref = String.new
+        array1 Array(String'ref)'val = [String.new_iso, String.new_iso] // okay
+        array2 Array(String'ref)'val = [s, s] // not okay
+    SOURCE
+
+    expected = <<-MSG
+    This array literal can't have a reference cap of val unless all of its elements are sendable:
+    from (example):5:
+        array2 Array(String'ref)'val = [s, s] // not okay
+                                       ^~~~~~
+
+    - it is required here to be a subtype of Array(String'ref)'val:
+      from (example):5:
+        array2 Array(String'ref)'val = [s, s] // not okay
+               ^~~~~~~~~~~~~~~~~~~~~
+    MSG
+
+    expect_raises Mare::Error, expected do
+      Mare.compiler.compile([source], :type_check)
+    end
+  end
 
   it "infers an empty array literal from its antecedent" do
     source = Mare::Source.new_example <<-SOURCE

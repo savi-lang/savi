@@ -890,8 +890,11 @@ class Mare::Compiler::TypeCheck
       @analysis.resolved_infos[info]? || begin
         mt = info.as_conduit?.try(&.resolve!(ctx, self)) || filter_span(ctx, info)
 
+        # Some info kinds are subject to extra type checks:
         case info
         when Infer::Literal
+          type_check_pre(ctx, info, mt)
+        when Infer::ArrayLiteral
           type_check_pre(ctx, info, mt)
         else
           nil
@@ -930,6 +933,20 @@ class Mare::Compiler::TypeCheck
       Error.at info,
         "This literal value couldn't be inferred as a single concrete type",
         error_info
+    end
+
+    # Sometimes print a special case error message for ArrayLiteral values.
+    def type_check_pre(ctx : Context, info : Infer::ArrayLiteral, mt : MetaType)
+      # If the array cap is not ref or "lesser", we must recover to the
+      # higher capability, meaning all element expressions must be sendable.
+      array_cap = mt.cap_only_inner
+      unless array_cap.supertype_of?(MetaType::Capability::REF)
+        unless info.terms.all? { |elem| resolve(ctx, elem).alias.is_sendable? }
+          Error.at info.pos, "This array literal can't have a reference cap of " \
+            "#{array_cap.value} unless all of its elements are sendable",
+              info.describe_downstream_constraints(ctx, self)
+        end
+      end
     end
 
     def type_check(info : Infer::DynamicInfo, meta_type : Infer::MetaType)
