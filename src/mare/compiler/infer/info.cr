@@ -464,8 +464,7 @@ class Mare::Compiler::Infer
       upstream_spans =
         use_upstream_infos.flat_map(&.as_upstream_conduits).compact_map do |upstream_conduit|
           next if upstream_conduit.directly_references?(self)
-          upstream_span = upstream_conduit.resolve_span!(ctx, infer)
-          upstream_span unless upstream_span.any_uncertain?
+          upstream_conduit.resolve_span!(ctx, infer)
         end
 
       AltInfer::Span.combine_mts(upstream_spans) { |mts| MetaType.new_union(mts) }
@@ -741,7 +740,38 @@ class Mare::Compiler::Infer
     end
 
     def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
-      AltInfer::Span.uncertain(@possible)
+      simple_span = AltInfer::Span.simple(@possible)
+
+      # Look at downstream tether constraints to try to resolve the literal
+      # to a more specific type than the simple "possible" type indicated by it.
+      tether_constraint_spans = tether_constraint_spans(ctx, infer)
+      constrained_span = simple_span.combine_mts(tether_constraint_spans) { |mt, mts|
+        constrained_mt = MetaType.new_intersection(mts).intersect(mt)
+        constrained_mt.unsatisfiable? ? @possible : constrained_mt
+      }
+
+      constrained_span
+      .maybe_fallback_based_on_mt_simplify([
+        # If we don't satisfy the constraints, go with our simply type
+        # and let the type checker print a message about why it doesn't work.
+        {:mt_unsatisfiable, simple_span},
+
+        # If, after constraining, we are still not a single concrete type,
+        # try to apply peer hints to the constrained type if any are available.
+        {:mt_non_singular_concrete,
+          constrained_span.combine_mts(
+            @peer_hints.map { |peer| infer.resolve(ctx, peer).as(AltInfer::Span) }
+          ) { |constrained_mt, peer_mts|
+            hinted_mt = MetaType.new_intersection(peer_mts).intersect(constrained_mt)
+            hinted_mt.unsatisfiable? ? @possible : hinted_mt
+          }
+          .maybe_fallback_based_on_mt_simplify([
+            # If, with peer hints, we are still not a single concrete type,
+            # there's nothing more to try, so we return the simple type.
+            {:mt_non_singular_concrete, simple_span}
+          ])
+        }
+      ])
     end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType

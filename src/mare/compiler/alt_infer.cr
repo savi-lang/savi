@@ -36,8 +36,7 @@ module Mare::Compiler::AltInfer
       end
     end
 
-    def self.simple(mt : MetaType); new(Terminal.new(mt, false)); end
-    def self.uncertain(mt : MetaType); new(Terminal.new(mt, true)); end
+    def self.simple(mt : MetaType); new(Terminal.new(mt)); end
     def self.decision(key : Key, span_map : Hash(MetaType, Span))
       map = span_map.transform_values(&.inner)
 
@@ -86,14 +85,6 @@ module Mare::Compiler::AltInfer
       inner.total_error
     end
 
-    def any_uncertain?
-      inner.any_uncertain?
-    end
-
-    def as_uncertain
-      Span.new(inner.as_uncertain)
-    end
-
     def has_key?(key : Key) : Bool
       inner.has_key?(key)
     end
@@ -133,11 +124,8 @@ module Mare::Compiler::AltInfer
         inner.as(Terminal).meta_type,
         others.map(&.as(Terminal).meta_type)
       )
-      new_uncertain = \
-        inner.as(Terminal).uncertain \
-        || others.any?(&.as(Terminal).uncertain)
 
-      Span.new(Terminal.new(new_meta_type, new_uncertain))
+      Span.new(Terminal.new(new_meta_type))
     end
 
     def self.combine_mts(spans : Array(Span), &block : Array(MetaType) -> MetaType) : Span?
@@ -156,14 +144,23 @@ module Mare::Compiler::AltInfer
     end
 
     def deciding_f_cap(f_cap_mt : MetaType, is_constructor : Bool) : Span?
-      inner.deciding_f_cap(f_cap_mt, is_constructor).try { |new_inner| Span.new(new_inner) }
+      inner.deciding_f_cap(f_cap_mt, is_constructor)
+      .try { |new_inner| Span.new(new_inner) }
+    end
+
+    def maybe_fallback_based_on_mt_simplify(options : Array({Symbol, Span}))
+      Span.new(inner.maybe_fallback_based_on_mt_simplify(
+        options.map { |(cond, span)| {cond, span.inner} }
+      ))
+    end
+
+    def final_mt_simplify(ctx : Context) : Span
+      Span.new(inner.final_mt_simplify(ctx))
     end
 
     abstract struct Inner
       abstract def any_error? : Bool
       abstract def total_error : Error?
-      abstract def any_uncertain? : Bool
-      abstract def as_uncertain : Inner
       abstract def has_key?(key : Key) : Bool
       abstract def gather_all_keys(set = Set(Key).new) : Set(Key)
       abstract def all_terminal_meta_types : Array(MetaType)
@@ -173,17 +170,17 @@ module Mare::Compiler::AltInfer
       abstract def decided_by(key : Key, orig_keys : Set(Key), &block : MetaType -> Enumerable({MetaType, Span})) : Inner
       abstract def combine_mt(other : Inner, maybe_other_terminal : Terminal?, &block : (MetaType, MetaType) -> MetaType) : Inner
       abstract def deciding_f_cap(f_cap_mt : MetaType, is_constructor : Bool) : Inner?
+      abstract def maybe_fallback_based_on_mt_simplify(options : Array({Symbol, Inner})) : Inner
+      abstract def final_mt_simplify(ctx : Context) : Inner
     end
 
     struct Terminal < Inner
       getter meta_type : MetaType
-      getter uncertain : Bool
-      def initialize(@meta_type, @uncertain)
+      def initialize(@meta_type)
       end
 
       def pretty_print(format : PrettyPrint)
         meta_type.inner.pretty_print(format)
-        format.text(" (uncertain)") if uncertain
       end
 
       def any_error? : Bool
@@ -192,15 +189,6 @@ module Mare::Compiler::AltInfer
 
       def total_error : Error?
         nil
-      end
-
-      def any_uncertain? : Bool
-        @uncertain
-      end
-
-      def as_uncertain : Inner
-        return self if @uncertain
-        Terminal.new(@meta_type, true)
       end
 
       def has_key?(key : Key) : Bool
@@ -220,11 +208,11 @@ module Mare::Compiler::AltInfer
       end
 
       def transform_mt(&block : MetaType -> MetaType) : Inner
-        Terminal.new(block.call(meta_type), @uncertain)
+        Terminal.new(block.call(meta_type))
       end
 
       def transform_mt_using(key : Key, maybe_value : MetaType?, &block : (MetaType, MetaType?) -> MetaType) : Inner
-        Terminal.new(block.call(meta_type, maybe_value), @uncertain)
+        Terminal.new(block.call(meta_type, maybe_value))
       end
 
       def decided_by(key : Key, orig_keys : Set(Key), &block : MetaType -> Enumerable({MetaType, Span})) : Inner
@@ -241,8 +229,7 @@ module Mare::Compiler::AltInfer
       def combine_mt(other : Inner, maybe_other_terminal : Terminal?, &block : (MetaType, MetaType) -> MetaType) : Inner
         if maybe_other_terminal
           new_meta_type = block.call(@meta_type, maybe_other_terminal.meta_type)
-          new_uncertain = @uncertain || maybe_other_terminal.uncertain
-          Terminal.new(new_meta_type, new_uncertain)
+          Terminal.new(new_meta_type)
         else
           swap_block = -> (b : MetaType, a : MetaType) { block.call(a, b) }
           other.combine_mt(self, self, &swap_block)
@@ -251,6 +238,14 @@ module Mare::Compiler::AltInfer
 
       def deciding_f_cap(f_cap_mt : MetaType, is_constructor : Bool) : Inner?
         self # a terminal node ignores f_cap_mt
+      end
+
+      def maybe_fallback_based_on_mt_simplify(options : Array({Symbol, Inner})) : Inner
+        Fallback.build(self, @meta_type, options)
+      end
+
+      def final_mt_simplify(ctx : Context) : Inner
+        Terminal.new(meta_type.simplify(ctx))
       end
     end
 
@@ -293,10 +288,6 @@ module Mare::Compiler::AltInfer
         map.values.any?(&.any_error?)
       end
 
-      def as_uncertain : Inner
-        Decision.new(key, map.transform_values(&.as_uncertain))
-      end
-
       def total_error : Error?
         errors = [] of {Source::Pos, String, Array(Error::Info)}
 
@@ -327,10 +318,6 @@ module Mare::Compiler::AltInfer
             end
           end
         end
-      end
-
-      def any_uncertain? : Bool
-        map.values.any?(&.any_uncertain?)
       end
 
       def has_key?(key : Key) : Bool
@@ -380,7 +367,7 @@ module Mare::Compiler::AltInfer
             swap_block = -> (b : MetaType, a : MetaType) { block.call(a, b) }
             return other.combine_mt(self, nil, &swap_block)
           else
-            raise NotImplementedError.new("combine_mt for two decisions")
+            raise NotImplementedError.new("combine_mt for a decision and another non-terminal")
           end
         end
       end
@@ -406,6 +393,167 @@ module Mare::Compiler::AltInfer
           )
         end
       end
+
+      def maybe_fallback_based_on_mt_simplify(options : Array({Symbol, Inner})) : Inner
+        Decision.build(@key, @map.transform_values(&.maybe_fallback_based_on_mt_simplify(options)))
+      end
+
+      def final_mt_simplify(ctx : Context) : Inner
+        Decision.build(@key, @map.transform_values(&.final_mt_simplify(ctx)))
+      end
+    end
+
+    struct Fallback < Inner
+      getter default : StructRef(Inner)
+      getter evaluate_mt : MetaType
+      getter options : Array({Symbol, Inner})
+      def initialize(@default, @evaluate_mt, @options)
+      end
+
+      def self.build(default : Inner, evaluate_mt, options)
+        # If no fallback options were given, just use the default node.
+        return default if options.empty?
+
+        # If all options are the same as default, just use the default node.
+        return default if options.all?(&.last.==(default))
+
+        # Otherwise, build the node as requested.
+        new(StructRef(Inner).new(default), evaluate_mt, options)
+      end
+
+      def pretty_print(format : PrettyPrint)
+        format.group do
+          @evaluate_mt.inner.pretty_print(format)
+          format.surround(" ?: {", " }", left_break: " ", right_break: nil) do
+            @options.each do |(cond, inner)|
+              format.group do
+                cond.pretty_print(format)
+                format.text " => "
+                format.nest do
+                  inner.pretty_print(format)
+                end
+              end
+              format.breakable ", "
+            end
+            format.text "_ => "
+            format.nest do
+              @default.value.pretty_print(format)
+            end
+          end
+        end
+      end
+
+      def any_error? : Bool
+        @default.value.any_error? || @options.any?(&.last.any_error?)
+      end
+
+      def total_error : Error?
+        raise NotImplementedError.new("total_error for Fallback")
+      end
+
+      def has_key?(key : Key) : Bool
+        @default.value.has_key?(key) || @options.any?(&.last.has_key?(key))
+      end
+
+      def gather_all_keys(set = Set(Key).new) : Set(Key)
+        @default.value.gather_all_keys(set)
+        @options.each(&.last.gather_all_keys(set))
+        set
+      end
+
+      def all_terminal_meta_types : Array(MetaType)
+        @default.value.all_terminal_meta_types + @options.flat_map(&.last.all_terminal_meta_types)
+      end
+
+      def any_mt?(&block : MetaType -> Bool) : Bool
+        @default.value.any_mt?(&block) || @options.any?(&.last.any_mt?(&block))
+      end
+
+      def transform_mt(&block : MetaType -> MetaType) : Inner
+        Fallback.build(
+          @default.value.transform_mt(&block),
+          @evaluate_mt,
+          @options.map { |(cond, inner)| {cond, inner.transform_mt(&block)} }
+        )
+      end
+
+      def transform_mt_using(key : Key, maybe_value : MetaType?, &block : (MetaType, MetaType?) -> MetaType) : Inner
+        Fallback.build(
+          @default.value.transform_mt_using(key, maybe_value, &block),
+          @evaluate_mt,
+          @options.map { |(cond, inner)| {cond, inner.transform_mt_using(key, maybe_value, &block)} }
+        )
+      end
+
+      def decided_by(key : Key, orig_keys : Set(Key), &block : MetaType -> Enumerable({MetaType, Span})) : Inner
+        Fallback.build(
+          @default.value.decided_by(key, orig_keys, &block),
+          @evaluate_mt,
+          @options.map { |(cond, inner)| {cond, inner.decided_by(key, orig_keys, &block)} }
+        )
+      end
+
+      def combine_mt(other : Inner, maybe_other_terminal : Terminal?, &block : (MetaType, MetaType) -> MetaType) : Inner
+        if maybe_other_terminal
+          Fallback.build(
+            @default.value.combine_mt(other, maybe_other_terminal, &block),
+            @evaluate_mt,
+            @options.map { |(cond, inner)| {cond, inner.combine_mt(other, maybe_other_terminal, &block).as(Inner)} }
+          )
+        else
+          if other.is_a?(Terminal)
+            swap_block = -> (b : MetaType, a : MetaType) { block.call(a, b) }
+            return other.combine_mt(self, nil, &swap_block)
+          else
+            raise NotImplementedError.new("combine_mt for a fallback and another non-terminal")
+          end
+        end
+      end
+
+      def deciding_f_cap(f_cap_mt : MetaType, is_constructor : Bool) : Inner?
+        new_default = @default.value.deciding_f_cap(f_cap_mt, is_constructor)
+        raise NotImplementedError.new("new_default missing in Fallback.build") \
+          unless new_default
+
+        Fallback.build(
+          new_default,
+          @evaluate_mt,
+          @options.map { |(cond, inner)|
+            new_inner = inner.deciding_f_cap(f_cap_mt, is_constructor)
+            raise NotImplementedError.new("new_inner missing in Fallback.build") \
+              unless new_inner
+
+            {cond, new_inner}
+          }
+        )
+      end
+
+      def maybe_fallback_based_on_mt_simplify(other_options : Array({Symbol, Inner})) : Inner
+        Fallback.build(
+          @default.value.maybe_fallback_based_on_mt_simplify(other_options),
+          @evaluate_mt,
+          @options.map { |(cond, inner)| {cond, inner.maybe_fallback_based_on_mt_simplify(other_options)} }
+        )
+      end
+
+      def final_mt_simplify(ctx : Context) : Inner
+        evaluate_mt = @evaluate_mt.simplify(ctx)
+
+        # Find the fallback option for which the evaluated MetaType matches
+        # the associated condition, if any. If none match, use the default.
+        @options.find { |(cond, inner)|
+          case cond
+          when :mt_unsatisfiable
+            evaluate_mt.unsatisfiable?
+          when :mt_non_singular_concrete
+            !(evaluate_mt.singular? && evaluate_mt.single!.link.is_concrete?)
+          else
+            raise NotImplementedError.new(cond)
+          end
+        }
+        .try(&.last.final_mt_simplify(ctx)) \
+        || @default.final_mt_simplify(ctx)
+      end
     end
 
     # This kind of Span::Inner "poisons" a Span with an error,
@@ -421,14 +569,6 @@ module Mare::Compiler::AltInfer
 
       def total_error : Error?
         error
-      end
-
-      def any_uncertain? : Bool
-        false
-      end
-
-      def as_uncertain : Inner
-        self
       end
 
       def has_key?(key : Key) : Bool
@@ -464,6 +604,14 @@ module Mare::Compiler::AltInfer
       end
 
       def deciding_f_cap(f_cap_mt : MetaType, is_constructor : Bool) : Inner?
+        self
+      end
+
+      def maybe_fallback_based_on_mt_simplify(options : Array({Symbol, Inner})) : Inner
+        self
+      end
+
+      def final_mt_simplify(ctx : Context) : Inner
         self
       end
     end

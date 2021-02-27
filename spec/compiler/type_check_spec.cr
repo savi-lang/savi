@@ -464,7 +464,7 @@ describe Mare::Compiler::TypeCheck do
         | string.size > 90 | I64[88]
                                 ^~~~
 
-    - it is required here to be a subtype of (U64 | I64):
+    - it is required here to be a subtype of (U64 | I64 | Numeric):
       from (example):3:
         case (
         ^~~~~~···

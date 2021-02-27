@@ -859,14 +859,14 @@ class Mare::Compiler::TypeCheck
       func.ident
     end
 
-    def filter_span(info : Info) : MetaType?
+    def filter_span(ctx, info : Info) : MetaType?
       span = @f_analysis.span?(info)
       return MetaType.unconstrained unless span
 
       filtered_span = span.deciding_f_cap(
         reified.receiver_cap,
         func.has_tag?(:constructor)
-      )
+      ).try(&.final_mt_simplify(ctx))
 
       inner = filtered_span.try(&.inner)
       return inner.meta_type if inner.is_a?(AltInfer::Span::Terminal)
@@ -888,72 +888,40 @@ class Mare::Compiler::TypeCheck
 
     def resolve(ctx : Context, info : Infer::Info) : MetaType
       @analysis.resolved_infos[info]? || begin
-        mt =
-          if (conduit = info.as_conduit?)
-            conduit.resolve!(ctx, self).simplify(ctx)
-          else
-            case info
-            when Infer::Literal
-              resolve_sensitive(ctx, info)
-            else
-              filter_span(info).simplify(ctx)
-            end
-          end
+        mt = info.as_conduit?.try(&.resolve!(ctx, self)) || filter_span(ctx, info)
 
-        # puts info.pos.show
-        # pp @f_analysis.span(info)
-        # raise "halt"
-        # mt = info.resolve_one!(ctx, self).simplify(ctx)
+        case info
+        when Infer::Literal
+          type_check_pre(ctx, info, mt)
+        else
+          nil
+        end
+
         @analysis.resolved_infos[info] = mt
         type_check(info, mt)
-        # info.post_resolve_one!(ctx, self, mt)
-        # info.resolve_others!(ctx, self)
+
         mt
       end
     end
 
-    def resolve_sensitive(ctx : Context, info : Infer::Literal) : MetaType
-      simple = filter_span(info)
-      mt = simple
+    # Sometimes print a special case error message for Literal values.
+    def type_check_pre(ctx : Context, info : Infer::Literal, mt : MetaType)
+      mt = filter_span(ctx, info)
 
-      # Intersect with the downstream meta-types.
-      span = simple
-      # TODO: use all downstreams (really, tethers), not just the last one.
-      # TODO: Also, this code and others like it really need to have
-      # subtype checking available to be able to properly narrow the type,
-      # which means it needs to be brought into the AltInfer pass somehow.
-      # Probably we need to make it so that AltInfer pass does just enough
-      # typechecking work to know the type signature of every function in the
-      # program, then we can do all "intra-function" checks in TypeCheck pass.
-      info.downstreams_each.each do |use_pos, other_info, aliases|
-        constraint_mt = other_info.as_downstream_constraint_meta_type(ctx, self)
-        mt = mt.intersect(constraint_mt)
-      end
-      mt = mt.simplify(ctx)
+      # If we've resolved to a single concrete type already, move forward.
+      return if mt.singular? && mt.single!.link.is_concrete?
 
-      # If we don't satisfy the constraints, leave it to the type check function
-      # to print a consistent error message based on the simple literal type.
-      return simple if mt.unsatisfiable?
+      # If we can't be satisfiably intersected with the downstream constraints,
+      # move forward and let the standard type checker error happen.
+      constrained_mt = mt.intersect(info.total_downstream_constraint(ctx, self))
+      return if constrained_mt.simplify(ctx).unsatisfiable?
 
-      # If we've resolved to a single concrete type, we can successfully return.
-      return mt if mt.singular? && mt.single!.link.is_concrete?
-
-      # Next we try to use peer hints to make a viable guess.
-      if info.peer_hints.any?
-        mt = MetaType.new_intersection(
-          info.peer_hints.map { |peer| resolve(ctx, peer).as(MetaType) }
-        ).intersect(simple).simplify(ctx)
-
-        # This guess works for us if it meets those same criteria from before.
-        return mt if mt.singular? && mt.single!.link.is_concrete?
-      end
-
-      # We've failed on all fronts. Print an error describing what we know,
-      # so that the user can figure out how to give us better information.
+      # Otherwise, print a Literal-specific error that includes peer hints,
+      # as well as a call to action to use an explicit numeric type.
       error_info = info.describe_peer_hints(ctx, self)
       error_info.concat(info.describe_downstream_constraints(ctx, self))
       error_info.push({info.pos,
-        "and the literal itself has an intrinsic type of #{simple.show_type}"
+        "and the literal itself has an intrinsic type of #{mt.show_type}"
       })
       error_info.push({Source::Pos.none,
         "Please wrap an explicit numeric type around the literal " \
@@ -962,8 +930,6 @@ class Mare::Compiler::TypeCheck
       Error.at info,
         "This literal value couldn't be inferred as a single concrete type",
         error_info
-
-      raise "unreachable end of function"
     end
 
     def type_check(info : Infer::DynamicInfo, meta_type : Infer::MetaType)
