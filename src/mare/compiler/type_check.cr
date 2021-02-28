@@ -589,7 +589,7 @@ class Mare::Compiler::TypeCheck
 
       arg = arg.simplify(ctx)
 
-      param_bound = @types[rt].get_type_param_bound(index)
+      param_bound = for_rt(ctx, rt.link, rt.args).get_type_param_bound(index)
       unless arg.satisfies_bound?(ctx, param_bound)
         bound_pos =
           rt_defn.params.not_nil!.terms[index].as(AST::Group).terms.last.pos
@@ -903,26 +903,18 @@ class Mare::Compiler::TypeCheck
     def resolve(ctx : Context, info : Infer::Info) : MetaType
       @analysis.resolved_infos[info]? || begin
         mt = info.as_conduit?.try(&.resolve!(ctx, self)) || filter_span(ctx, info)
-
-        # Some info kinds are subject to extra type checks:
-        case info
-        when Infer::Literal
-          type_check_pre(ctx, info, mt)
-        when Infer::ArrayLiteral
-          type_check_pre(ctx, info, mt)
-        when Infer::TypeCondition
-          type_check_pre(ctx, info, mt)
-        when Infer::TypeConditionForLocal
-          type_check_pre(ctx, info, mt)
-        else
-          nil
-        end
-
         @analysis.resolved_infos[info] = mt
+
+        type_check_pre(ctx, info, mt)
         type_check(info, mt)
 
         mt
       end
+    end
+
+    # Validate type arguments for FixedSingleton values.
+    def type_check_pre(ctx : Context, info : Infer::FixedSingleton, mt : MetaType)
+      ctx.type_check.validate_type_args(ctx, self, info.node, mt)
     end
 
     # Sometimes print a special case error message for Literal values.
@@ -985,6 +977,11 @@ class Mare::Compiler::TypeCheck
         lhs_info.first_viable_constraint_pos,
         rhs_info.pos,
       )
+    end
+
+    # Other types of Info nodes do not have extra type checks.
+    def type_check_pre(ctx : Context, info : Infer::Info, mt : MetaType)
+      # There is nothing extra here.
     end
 
     def type_check(info : Infer::DynamicInfo, meta_type : Infer::MetaType)
