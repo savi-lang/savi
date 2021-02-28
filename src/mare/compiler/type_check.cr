@@ -910,6 +910,10 @@ class Mare::Compiler::TypeCheck
           type_check_pre(ctx, info, mt)
         when Infer::ArrayLiteral
           type_check_pre(ctx, info, mt)
+        when Infer::TypeCondition
+          type_check_pre(ctx, info, mt)
+        when Infer::TypeConditionForLocal
+          type_check_pre(ctx, info, mt)
         else
           nil
         end
@@ -959,6 +963,28 @@ class Mare::Compiler::TypeCheck
               info.describe_downstream_constraints(ctx, self)
         end
       end
+    end
+
+    # Check runtime match safety for TypeCondition expressions.
+    def type_check_pre(ctx : Context, info : Infer::TypeCondition, mt : MetaType)
+      # TODO: move that function here into this file/module.
+      Infer::TypeCondition.verify_safety_of_runtime_type_match(ctx, info.pos,
+        resolve(ctx, info.lhs),
+        resolve(ctx, info.rhs),
+        info.lhs.pos,
+        info.rhs.pos,
+      )
+    end
+    def type_check_pre(ctx : Context, info : Infer::TypeConditionForLocal, mt : MetaType)
+      lhs_info = @f_analysis[info.refine].as(Infer::NamedInfo)
+      rhs_info = info.refine_type
+      # TODO: move that function here into this file/module.
+      Infer::TypeCondition.verify_safety_of_runtime_type_match(ctx, info.pos,
+        resolve(ctx, lhs_info),
+        resolve(ctx, rhs_info),
+        lhs_info.first_viable_constraint_pos,
+        rhs_info.pos,
+      )
     end
 
     def type_check(info : Infer::DynamicInfo, meta_type : Infer::MetaType)

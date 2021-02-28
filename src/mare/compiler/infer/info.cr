@@ -1279,7 +1279,7 @@ class Mare::Compiler::Infer
     def post_resolve!(ctx : Context, infer : ForReifiedFunc, meta_type : MetaType)
       super
 
-      TypeCondition.verify_safety_of_runtime_type_match(ctx, infer, @pos,
+      TypeCondition.verify_safety_of_runtime_type_match(ctx, @pos,
         infer.resolve(ctx, @lhs),
         infer.resolve(ctx, @rhs),
         @lhs.pos,
@@ -1287,9 +1287,9 @@ class Mare::Compiler::Infer
       )
     end
 
+    # TODO: move this function into the TypeCheck pass file.
     def self.verify_safety_of_runtime_type_match(
       ctx : Context,
-      infer : ForReifiedFunc,
       pos : Source::Pos,
       lhs_mt : MetaType,
       rhs_mt : MetaType,
@@ -1351,7 +1351,7 @@ class Mare::Compiler::Infer
 
       lhs_info = infer.f_analysis[@refine].as(NamedInfo)
 
-      TypeCondition.verify_safety_of_runtime_type_match(ctx, infer, @pos,
+      TypeCondition.verify_safety_of_runtime_type_match(ctx, @pos,
         infer.resolve(ctx, lhs_info),
         infer.resolve(ctx, @refine_type),
         lhs_info.first_viable_constraint_pos,

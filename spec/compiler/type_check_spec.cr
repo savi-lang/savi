@@ -1945,5 +1945,101 @@ describe Mare::Compiler::TypeCheck do
     end
   end
 
+  it "allows assigning from a variable with its refined type" do
+    source = Mare::Source.new_example <<-SOURCE
+    :actor Main
+      :new
+        x val = "example"
+        if (x <: String) (
+          y String = x
+        )
+    SOURCE
+
+    Mare.compiler.compile([source], :type_check)
+  end
+
+  it "allows assigning from a parameter with its refined type" do
+    source = Mare::Source.new_example <<-SOURCE
+    :actor Main
+      :new: @refine("example")
+      :fun refine (x val)
+        if (x <: String) (
+          y String = x
+        )
+    SOURCE
+
+    Mare.compiler.compile([source], :type_check)
+  end
+
+  it "complains when the match type isn't a subtype of the original" do
+    source = Mare::Source.new_example <<-SOURCE
+    :trait non Exampleable
+      :fun non example String
+
+    :actor Main
+      :new: @refine("example")
+      :fun refine (x String)
+        if (x <: Exampleable) x.example
+    SOURCE
+
+    expected = <<-MSG
+    This type check will never match:
+    from (example):7:
+        if (x <: Exampleable) x.example
+            ^~~~~~~~~~~~~~~~
+
+    - the runtime match type, ignoring capabilities, is Exampleable'any:
+      from (example):7:
+        if (x <: Exampleable) x.example
+                 ^~~~~~~~~~~
+
+    - which does not intersect at all with String:
+      from (example):6:
+      :fun refine (x String)
+                     ^~~~~~
+    MSG
+
+    expect_raises Mare::Error, expected do
+      Mare.compiler.compile([source], :type_check)
+    end
+  end
+
+  it "complains when a check would require runtime knowledge of capabilities" do
+    source = Mare::Source.new_example <<-SOURCE
+    :actor Main
+      :new (env): @example("example")
+      :fun example (x (String'val | String'ref))
+        if (x <: String'ref) (
+          x << "..."
+        )
+    SOURCE
+
+    expected = <<-MSG
+    This type check could violate capabilities:
+    from (example):4:
+        if (x <: String'ref) (
+            ^~~~~~~~~~~~~~~
+
+    - the runtime match type, ignoring capabilities, is String'any:
+      from (example):4:
+        if (x <: String'ref) (
+                 ^~~~~~~~~~
+
+    - if it successfully matches, the type will be (String | String'ref):
+      from (example):3:
+      :fun example (x (String'val | String'ref))
+                      ^~~~~~~~~~~~~~~~~~~~~~~~~
+
+    - which is not a subtype of String'ref:
+      from (example):4:
+        if (x <: String'ref) (
+                 ^~~~~~~~~~
+    MSG
+
+    expect_raises Mare::Error, expected do
+      Mare.compiler.compile([source], :type_check)
+    end
+  end
+
   # ...
 end
