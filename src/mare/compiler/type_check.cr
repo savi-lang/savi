@@ -216,9 +216,12 @@ class Mare::Compiler::TypeCheck
           end
         end
       end
+    end
 
-      # Check the assertion list for the type, to confirm that it is a subtype
-      # of any it claimed earlier, which we took on faith and now verify.
+    # Check the assertion list for each type, to confirm that it is a subtype
+    # of any it claimed earlier, which we took on faith and now verify.
+    sorted_types.each do |t|
+      t_link = t.make_link(library)
       @t_analyses[t_link].each_non_argumented_reified.each do |rt|
         self[rt].subtyping.check_assertions(ctx)
       end
