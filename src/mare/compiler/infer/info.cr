@@ -1573,18 +1573,26 @@ class Mare::Compiler::Infer
 
       return nil if tether_spans.empty?
 
-      AltInfer::Span
-      .combine_mts(tether_spans) { |mts| MetaType.new_intersection(mts) }
-      .not_nil!
-      .decided_by(array_info) { |mt|
-        mt.each_reachable_defn_with_cap(ctx).compact_map { |rt, cap|
-          # TODO: Support more element antecedent detection patterns.
-          if rt.link.name == "Array" && rt.args.size == 1
-            array_mt = MetaType.new_nominal(rt).intersect(MetaType.new(cap))
-            {array_mt, AltInfer::Span.simple(array_mt)}
+      ante_span =
+        AltInfer::Span
+        .combine_mts(tether_spans) { |mts| MetaType.new_intersection(mts) }
+        .not_nil!
+        .decided_by(array_info) { |mt|
+          pairs = mt.each_reachable_defn_with_cap(ctx).compact_map { |rt, cap|
+            # TODO: Support more element antecedent detection patterns.
+            if rt.link.name == "Array" && rt.args.size == 1
+              array_mt = MetaType.new_nominal(rt).intersect(MetaType.new(cap))
+              {array_mt, AltInfer::Span.simple(array_mt)}
+            end
+          }
+          if pairs.empty?
+            unconstrained = MetaType.unconstrained
+            pairs << {unconstrained, AltInfer::Span.simple(unconstrained)}
           end
+          pairs
         }
-      }
+
+      ante_span unless ante_span.any_mt?(&.unconstrained?)
     end
 
     def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span

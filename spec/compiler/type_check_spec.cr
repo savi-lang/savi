@@ -1118,4 +1118,41 @@ describe Mare::Compiler::TypeCheck do
   end
 
   # ...
+
+  it "complains when trying to implicitly recover an array literal" do
+    source = Mare::Source.new_example <<-SOURCE
+    :class X
+
+    :actor Main
+      :new
+        x_ref X'ref = X.new
+        array_ref ref = [x_ref] // okay
+        array_box box = [x_ref] // okay
+        array_val val = [x_ref] // not okay
+    SOURCE
+
+    # TODO: This error message will change when we have array literal recovery.
+    expected = <<-MSG
+    The type of this expression doesn't meet the constraints imposed on it:
+    from (example):8:
+        array_val val = [x_ref] // not okay
+                        ^~~~~~~
+
+    - it is required here to be a subtype of val:
+      from (example):8:
+        array_val val = [x_ref] // not okay
+                  ^~~
+
+    - but the type of the array literal was Array(X):
+      from (example):8:
+        array_val val = [x_ref] // not okay
+                        ^~~~~~~
+    MSG
+
+    expect_raises Mare::Error, expected do
+      Mare.compiler.compile([source], :type_check)
+    end
+  end
+
+  # ...
 end
