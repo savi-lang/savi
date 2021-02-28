@@ -1915,5 +1915,35 @@ describe Mare::Compiler::TypeCheck do
     end
   end
 
+  it "prefers to show an error about assertions over other subtype failures" do
+    source = Mare::Source.new_example <<-SOURCE
+    :trait non Trait
+      :fun example None
+
+    :primitive Concrete
+      :is Trait
+
+    :actor Main
+      :new
+        x Trait = Concrete
+    SOURCE
+
+    expected = <<-MSG
+    Concrete isn't a subtype of Trait, as it is required to be here:
+    from (example):5:
+      :is Trait
+       ^~
+
+    - this function isn't present in the subtype:
+      from (example):2:
+      :fun example None
+           ^~~~~~~
+    MSG
+
+    expect_raises Mare::Error, expected do
+      Mare.compiler.compile([source], :type_check)
+    end
+  end
+
   # ...
 end

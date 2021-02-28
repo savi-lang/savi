@@ -171,6 +171,17 @@ class Mare::Compiler::TypeCheck
 
   def run(ctx)
     @has_started = true
+
+    # First, make sure we know about each type, without type arguments
+    # (just so that we know it has initialized its subtype assertions).
+    ctx.program.libraries.each do |library|
+      library.types.each do |t|
+        t_link = t.make_link(library)
+        for_rt(ctx, t_link)
+      end
+    end
+
+    # Now do the main type checking pass in each library.
     ctx.program.libraries.each do |library|
       run_for_library(ctx, library)
     end
