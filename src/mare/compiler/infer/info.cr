@@ -1992,7 +1992,7 @@ class Mare::Compiler::Infer
       call_defns
     end
 
-    def follow_call_check_receiver_cap(ctx : Context, infer, call_mt, call_func, problems)
+    def follow_call_check_receiver_cap(ctx : Context, calling_func, call_mt, call_func, problems)
       call = self
       call_cap_mt = call_mt.cap_only
       autorecover_needed = false
@@ -2049,7 +2049,7 @@ class Mare::Compiler::Infer
         # If the receiver of the call is the self (the receiver of the caller),
         # then we can give an extra hint about changing its capability to match.
         if @lhs.is_a?(Self)
-          problems << {infer.func.cap.pos, "this would be possible if the " \
+          problems << {calling_func.cap.pos, "this would be possible if the " \
             "calling function were declared as `:fun #{required_cap}`"}
         end
 
@@ -2161,7 +2161,7 @@ class Mare::Compiler::Infer
         infer.analysis.called_funcs.add({call.pos, call_defn, call_func_link})
 
         reify_cap, autorecover_needed =
-          follow_call_check_receiver_cap(ctx, infer, call_mt, call_func, problems)
+          follow_call_check_receiver_cap(ctx, infer.func, call_mt, call_func, problems)
 
         # Get the ForReifiedFunc instance for call_func, possibly creating and running it.
         # TODO: don't infer anything in the body of that func if type and params
@@ -2202,7 +2202,7 @@ class Mare::Compiler::Infer
         infer.analysis.called_funcs.add({call.pos, call_defn, call_func_link})
 
         reify_cap, autorecover_needed =
-          follow_call_check_receiver_cap(ctx, infer, call_mt, call_func, problems)
+          follow_call_check_receiver_cap(ctx, infer.func, call_mt, call_func, problems)
 
         # Get the ForReifiedFunc instance for call_func, possibly creating and running it.
         # TODO: don't infer anything in the body of that func if type and params

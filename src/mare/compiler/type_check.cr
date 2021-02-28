@@ -905,6 +905,12 @@ class Mare::Compiler::TypeCheck
         mt = info.as_conduit?.try(&.resolve!(ctx, self)) || filter_span(ctx, info)
         @analysis.resolved_infos[info] = mt
 
+        # TODO: can we somehow reduce this possibly expensive reaching?
+        # Is it actually expensive? Good things to investigate.
+        # We only do this here because we need to be sure we call for_rt
+        # for every ReifiedType that is reached by the program.
+        mt.each_reachable_defn(ctx).each { |rt| ctx.type_check.for_rt(ctx, rt.link, rt.args) }
+
         type_check_pre(ctx, info, mt)
         type_check(info, mt)
 
@@ -977,6 +983,29 @@ class Mare::Compiler::TypeCheck
         lhs_info.first_viable_constraint_pos,
         rhs_info.pos,
       )
+    end
+
+    # Reach the particular reification of the function called in a FromCall.
+    def type_check_pre(ctx : Context, info : Infer::FromCall, mt : MetaType)
+      receiver_mt = resolve(ctx, info.lhs)
+      call_defns = receiver_mt.find_callable_func_defns(ctx, self, info.member)
+
+      problems = [] of {Source::Pos, String}
+      call_defns.each do |(call_mti, call_defn, call_func)|
+        call_mt = MetaType.new(call_mti)
+        next unless call_defn
+        next unless call_func
+        call_func_link = call_func.make_link(call_defn.link)
+
+        # TODO: type checking based on reify_cap and auto-recover needed.
+        reify_cap, autorecover_needed =
+          info.follow_call_check_receiver_cap(ctx, self.func, call_mt, call_func, problems)
+
+        # Reach the reified function we are calling, with the right reify_cap.
+        ctx.type_check.for_rf(ctx, call_defn, call_func_link, reify_cap)
+      end
+
+      # TODO: Raise when we see non-empty problems
     end
 
     # Other types of Info nodes do not have extra type checks.
