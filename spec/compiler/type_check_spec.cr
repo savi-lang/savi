@@ -2190,5 +2190,153 @@ describe Mare::Compiler::TypeCheck do
     end
   end
 
+  it "yields values to the caller" do
+    source = Mare::Source.new_example <<-SOURCE
+    :actor Main
+      :fun count_to (count U64) None
+        :yields U64 for None
+        i U64 = 0
+        while (i < count) (
+          i = i + 1
+          yield i
+        )
+      :new
+        sum U64 = 0
+        @count_to(5) -> (i| sum = sum + i)
+    SOURCE
+
+    Mare.compiler.compile([source], :type_check)
+  end
+
+  it "complains when a yield block is present on a non-yielding call" do
+    source = Mare::Source.new_example <<-SOURCE
+    :actor Main
+      :fun will_not_yield: None
+      :new
+        @will_not_yield -> (i| i)
+    SOURCE
+
+    expected = <<-MSG
+    This function call doesn't meet subtyping requirements:
+    from (example):4:
+        @will_not_yield -> (i| i)
+         ^~~~~~~~~~~~~~
+
+    - it has a yield block:
+      from (example):4:
+        @will_not_yield -> (i| i)
+                              ^~
+
+    - but 'Main.will_not_yield' has no yields:
+      from (example):2:
+      :fun will_not_yield: None
+           ^~~~~~~~~~~~~~
+    MSG
+
+    expect_raises Mare::Error, expected do
+      Mare.compiler.compile([source], :type_check)
+    end
+  end
+
+  it "complains when a yield block is not present on a yielding call" do
+    source = Mare::Source.new_example <<-SOURCE
+    :actor Main
+      :fun yield_99
+        yield U64[99]
+      :new
+        @yield_99
+    SOURCE
+
+    expected = <<-MSG
+    This function call doesn't meet subtyping requirements:
+    from (example):5:
+        @yield_99
+         ^~~~~~~~
+
+    - it has no yield block but 'Main.yield_99' does yield:
+      from (example):3:
+        yield U64[99]
+              ^~~~~~~
+    MSG
+
+    expect_raises Mare::Error, expected do
+      Mare.compiler.compile([source], :type_check)
+    end
+  end
+
+  pending "complains when the yield param type doesn't match a constraint" do
+    source = Mare::Source.new_example <<-SOURCE
+    :actor Main
+      :fun yield_99
+        yield U64[99]
+      :new
+        sum U32 = 0
+        @yield_99 -> (i| j U32 = i)
+    SOURCE
+
+    expected = <<-MSG
+    The type of this expression doesn't meet the constraints imposed on it:
+    from (example):6:
+        @yield_99 -> (i| j U32 = i)
+                                 ^
+
+    - it is required here to be a subtype of U32:
+      from (example):6:
+        @yield_99 -> (i| j U32 = i)
+                           ^~~
+
+    - but the type of the value yielded to this block was U64:
+      from (example):3:
+        yield U64[99]
+              ^~~~~~~
+    MSG
+
+    expect_raises Mare::Error, expected do
+      Mare.compiler.compile([source], :type_check)
+    end
+  end
+
+  it "tests and conveys transitively reached subtypes to the reach pass" do
+    source = Mare::Source.new_example <<-SOURCE
+    :trait non Exampleable
+      :fun non example String
+
+    :primitive Example
+      :fun non example String: "Hello, World!"
+
+    :actor Main
+      :fun maybe_call_example (e non)
+        if (e <: Exampleable) e.example
+      :new
+        @maybe_call_example(Example)
+    SOURCE
+
+    ctx = Mare.compiler.compile([source], :type_check)
+
+    any = ctx.namespace[source]["Any"].as(Mare::Program::Type::Link)
+    trait = ctx.namespace[source]["Exampleable"].as(Mare::Program::Type::Link)
+    sub = ctx.namespace[source]["Example"].as(Mare::Program::Type::Link)
+
+    any_rt = ctx.type_check[any].no_args
+    trait_rt = ctx.type_check[trait].no_args
+    sub_rt = ctx.type_check[sub].no_args
+
+    mce_t, mce_f, mce_type_check =
+      ctx.type_check.test_simple!(ctx, source, "Main", "maybe_call_example")
+    e_param = mce_f.params.not_nil!.terms.first.not_nil!
+    mce_type_check.resolved(ctx, e_param).single!.should eq any_rt
+
+    any_subtypes = ctx.type_check[any_rt].each_known_complete_subtype(ctx).to_a
+    trait_subtypes = ctx.type_check[trait_rt].each_known_complete_subtype(ctx).to_a
+    sub_subtypes = ctx.type_check[sub_rt].each_known_complete_subtype(ctx).to_a
+
+    any_subtypes.should contain(sub_rt)
+    any_subtypes.should contain(trait_rt)
+    trait_subtypes.should contain(sub_rt)
+  end
+
   # ...
+
+  pending "complains when the yield block result doesn't match the expected type"
+  pending "enforces yield properties as part of trait subtyping"
 end

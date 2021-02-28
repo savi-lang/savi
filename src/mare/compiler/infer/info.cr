@@ -1860,8 +1860,27 @@ class Mare::Compiler::Infer
 
           call_defn = call_defn.not_nil!
           call_func = call_func.not_nil!
-
           call_link = call_func.make_link(call_defn.link)
+
+          yield_out_span = infer
+            .depends_on_call_yield_out_span(ctx, call_defn, call_func, call_link, 0)
+          if !yield_out_span && @yield_block
+            problems << {@yield_block.not_nil!.pos, "it has a yield block"}
+            problems << {call_func.ident.pos,
+              "but '#{call_defn.defn(ctx).ident.value}.#{@member}' has no yields"}
+          elsif yield_out_span && !@yield_block
+            problems << {
+              ctx.pre_infer[call_link].yield_out_infos.first.first_viable_constraint_pos,
+              "it has no yield block but " \
+                "'#{call_defn.defn(ctx).ident.value}.#{@member}' does yield"
+            }
+          end
+
+          next {call_mt, AltInfer::Span.error(@pos,
+            "This function call doesn't meet subtyping requirements",
+            problems
+          )} unless problems.empty?
+
           ret_span = infer
             .depends_on_call_ret_span(ctx, call_defn, call_func, call_link)
             .deciding_f_cap(call_mt.cap_only, call_func.has_tag?(:constructor))
@@ -2254,8 +2273,13 @@ class Mare::Compiler::Infer
           next unless call_defn && call_func
 
           call_link = call_func.make_link(call_defn.link)
-          ret_span = infer
+          raw_ret_span = infer
             .depends_on_call_yield_out_span(ctx, call_defn, call_func, call_link, @index)
+
+          next {call_mt, AltInfer::Span.simple(MetaType.unconstrained)} \
+            unless raw_ret_span
+
+          ret_span = raw_ret_span
             .deciding_f_cap(call_mt.cap_only, call_func.has_tag?(:constructor))
             .not_nil!
 
@@ -2312,8 +2336,13 @@ class Mare::Compiler::Infer
           next unless call_defn && call_func
 
           call_link = call_func.make_link(call_defn.link)
-          ret_span = infer
+          raw_ret_span = infer
             .depends_on_call_yield_in_span(ctx, call_defn, call_func, call_link)
+
+          next {call_mt, AltInfer::Span.simple(MetaType.unconstrained)} \
+            unless raw_ret_span
+
+          ret_span = raw_ret_span
             .deciding_f_cap(call_mt.cap_only, call_func.has_tag?(:constructor))
             .not_nil!
 

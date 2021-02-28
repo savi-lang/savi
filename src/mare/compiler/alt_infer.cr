@@ -777,8 +777,10 @@ module Mare::Compiler::AltInfer
 
       # TODO: Track dependencies and invalidate cache based on those.
       other_pre = deps.last
+      yield_in_info = other_pre.yield_in_info
+      return unless yield_in_info
       other_analysis = ctx.alt_infer_edge.run_for_func(ctx, other_f, other_f_link)
-      other_analysis[other_pre.yield_in_info.not_nil!]
+      other_analysis[yield_in_info]
       .transform_mt(&.substitute_type_params(visitor.substs_for(ctx, other_rt)))
     end
 
@@ -788,8 +790,10 @@ module Mare::Compiler::AltInfer
 
       # TODO: Track dependencies and invalidate cache based on those.
       other_pre = deps.last
+      yield_out_info = other_pre.yield_out_infos[index]?
+      return unless yield_out_info
       other_analysis = ctx.alt_infer_edge.run_for_func(ctx, other_f, other_f_link)
-      other_analysis[other_pre.yield_out_infos[index]]
+      other_analysis[yield_out_info]
       .transform_mt(&.substitute_type_params(visitor.substs_for(ctx, other_rt)))
     end
 

@@ -2614,7 +2614,7 @@ describe Mare::Compiler::Infer do
     trait_subtypes.should contain(sub_rt)
   end
 
-  it "resolves all matching concrete reificaions of abstract functions" do
+  it "resolves all matching concrete reifications of abstract functions" do
     source = Mare::Source.new_example <<-SOURCE
     :class Person
       :fun greeting
