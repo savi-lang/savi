@@ -53,6 +53,16 @@
 				"language": "mare",
 				"scopeName": "source.mare",
 				"path": "./syntaxes/Mare.tmLanguage"
+			},
+			{
+				"scopeName": "markdown.mare.codeblock",
+				"path": "./syntaxes/codeblock.json",
+				"injectTo": [
+					"text.html.markdown"
+				],
+				"embeddedLanguages": {
+					"meta.embedded.block.mare": "mare"
+				}
 			}
 		],
 		"commands": [
