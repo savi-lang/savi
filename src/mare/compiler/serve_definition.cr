@@ -37,7 +37,7 @@ class Mare::Compiler::ServeDefinition
     infer_info = ctx.infer[f_link][node]?
     if infer_info.is_a? Infer::FromCall
       # Show function definition site of a call.
-      infer_info.follow_call_get_call_defns(ctx, infer).map do |_, _, other_f|
+      infer_info.follow_call_get_call_defns(ctx, infer).not_nil!.map do |_, _, other_f|
         next unless other_f
         other_f.ident.pos
       end.first

@@ -75,12 +75,6 @@ class Mare::Compiler::Infer
       raise NotImplementedError.new("resolve_span! for #{self.class}")
     end
 
-    def resolve_one!(ctx : Context, infer : TypeCheck::ForReifiedFunc)
-      raise NotImplementedError.new("resolve_one! for #{self.class}")
-    end
-    def post_resolve_one!(ctx : Context, infer : TypeCheck::ForReifiedFunc, mt : MetaType)
-    end
-
     abstract def tethers(querent : Info) : Array(Tether)
     def tether_terminal?
       false
@@ -120,7 +114,7 @@ class Mare::Compiler::Infer
     def as_downstream_constraint_meta_type(ctx : Context, infer : ForReifiedFunc) : MetaType
       infer.resolve(ctx, self)
     end
-    def as_downstream_constraint_meta_type(ctx : Context, infer : TypeCheck::ForReifiedFunc) : MetaType
+    def as_downstream_constraint_meta_type(ctx : Context, infer : TypeCheck::ForReifiedFunc) : MetaType?
       infer.resolve(ctx, self)
     end
 
@@ -244,8 +238,12 @@ class Mare::Compiler::Infer
           end
         else
           mt = infer.resolve(ctx, other_info)
-          [{other_info.pos,
-            "it is required here to be a subtype of #{mt.show_type}"}]
+          if mt
+            [{other_info.pos,
+              "it is required here to be a subtype of #{mt.show_type}"}]
+          else
+            [] of {Source::Pos, String}
+          end
         end
       end.to_h.to_a
     end
@@ -741,8 +739,9 @@ class Mare::Compiler::Infer
       end
     end
     def describe_peer_hints(ctx : Context, infer : TypeCheck::ForReifiedFunc)
-      @peer_hints.map do |peer|
+      @peer_hints.compact_map do |peer|
         mt = infer.resolve(ctx, peer)
+        next unless mt
         {peer.pos, "it is suggested here that it might be a #{mt.show_type}"}
       end
     end
@@ -865,10 +864,6 @@ class Mare::Compiler::Infer
 
     def as_conduit? : AltInfer::Conduit?
       AltInfer::Conduit.direct(@info)
-    end
-
-    def resolve_one!(ctx : Context, infer : TypeCheck::ForReifiedFunc) : MetaType
-      infer.resolve(ctx, @info)
     end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
@@ -1099,10 +1094,6 @@ class Mare::Compiler::Infer
       AltInfer::Conduit.direct(@final_term)
     end
 
-    def resolve_one!(ctx : Context, infer : TypeCheck::ForReifiedFunc) : MetaType
-      infer.resolve(ctx, final_term)
-    end
-
     def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
       infer.resolve(ctx, final_term)
     end
@@ -1171,8 +1162,10 @@ class Mare::Compiler::Infer
       end
     end
     def as_multiple_downstream_constraints(ctx : Context, infer : TypeCheck::ForReifiedFunc) : Array({Source::Pos, MetaType})?
-      @downstreams.map do |pos, info, aliases|
-        {pos, info.as_downstream_constraint_meta_type(ctx, infer)}
+      @downstreams.compact_map do |pos, info, aliases|
+        mt = info.as_downstream_constraint_meta_type(ctx, infer)
+        next unless mt
+        {pos, mt}
       end
     end
 
@@ -2002,10 +1995,12 @@ class Mare::Compiler::Infer
       resolvables.each { |resolvable| infer.resolve(ctx, resolvable) }
     end
 
-    def follow_call_get_call_defns(ctx : Context, infer) : Set({MetaType::Inner, ReifiedType?, Program::Function?})
+    def follow_call_get_call_defns(ctx : Context, infer) : Set({MetaType::Inner, ReifiedType?, Program::Function?})?
       call = self
       receiver = infer.resolve_with_reentrance_prevention(ctx, @lhs)
-      call_defns = receiver.find_callable_func_defns(ctx, infer, @member)
+      return nil unless receiver
+
+      call_defns = receiver.try(&.find_callable_func_defns(ctx, infer, @member))
 
       # Raise an error if we don't have a callable function for every possibility.
       call_defns << {receiver.inner, nil, nil} if call_defns.empty?
@@ -2204,6 +2199,7 @@ class Mare::Compiler::Infer
 
       call = self
       call_defns = follow_call_get_call_defns(ctx, infer)
+      return other_infers unless call_defns
 
       # For each receiver type definition that is possible, track down the infer
       # for the function that we're trying to call, evaluating the constraints
@@ -2245,6 +2241,7 @@ class Mare::Compiler::Infer
 
       call = self
       call_defns = follow_call_get_call_defns(ctx, infer)
+      return other_infers unless call_defns
 
       # For each receiver type definition that is possible, track down the infer
       # for the function that we're trying to call, evaluating the constraints
@@ -2478,12 +2475,13 @@ class Mare::Compiler::Infer
     def as_multiple_downstream_constraints(ctx : Context, infer : TypeCheck::ForReifiedFunc) : Array({Source::Pos, MetaType})?
       other_infers = @call.follow_call_resolve_other_infers(ctx, infer)
 
-      other_infers.map do |other_infer, _|
+      other_infers.compact_map do |other_infer, _|
         param = other_infer.params[@index]
         param_info = other_infer.f_analysis[param]
         param_info = param_info.lhs if param_info.is_a?(FromAssign)
         param_info = param_info.as(Param)
         param_mt = other_infer.resolve(ctx, param_info)
+        next unless param_mt
 
         {param_info.first_viable_constraint_pos, param_mt}.as({Source::Pos, MetaType})
       end

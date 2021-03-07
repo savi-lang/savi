@@ -73,7 +73,7 @@ class Mare::Compiler::ServeHover
       rescue
       end
     elsif infer_info.is_a? Infer::FromCall
-      infer_info.follow_call_get_call_defns(ctx, infer).each do |x, y, z|
+      infer_info.follow_call_get_call_defns(ctx, infer).not_nil!.each do |x, y, z|
         unless y.nil?
           messages << "This is a function call on type #{y.show_type}."
           describe_type = "return type"

@@ -15,7 +15,7 @@ module Mare::Compiler::AltInfer
     def resolve_span!(ctx : Context, infer : Visitor) : Span
       inner.resolve_span!(ctx, infer)
     end
-    def resolve!(ctx : Context, infer : TypeCheck::ForReifiedFunc) : Infer::MetaType
+    def resolve!(ctx : Context, infer : TypeCheck::ForReifiedFunc) : Infer::MetaType?
       inner.resolve!(ctx, infer)
     end
 
@@ -23,7 +23,7 @@ module Mare::Compiler::AltInfer
       abstract def flatten : Array(Inner)
       abstract def directly_references?(other_info : Infer::Info) : Bool
       abstract def resolve_span!(ctx : Context, infer : Visitor) : Span
-      abstract def resolve!(ctx : Context, infer : TypeCheck::ForReifiedFunc) : Infer::MetaType
+      abstract def resolve!(ctx : Context, infer : TypeCheck::ForReifiedFunc) : Infer::MetaType?
     end
 
     def self.direct(info)
@@ -53,7 +53,7 @@ module Mare::Compiler::AltInfer
       def resolve_span!(ctx : Context, infer : Visitor) : Span
         infer.resolve(ctx, info)
       end
-      def resolve!(ctx : Context, infer : TypeCheck::ForReifiedFunc) : Infer::MetaType
+      def resolve!(ctx : Context, infer : TypeCheck::ForReifiedFunc) : Infer::MetaType?
         infer.resolve(ctx, info)
       end
     end
@@ -94,8 +94,9 @@ module Mare::Compiler::AltInfer
           .reduce_combine_mts(spans) { |accum, mt| accum.unite(mt) }
           .not_nil!
       end
-      def resolve!(ctx : Context, infer : TypeCheck::ForReifiedFunc) : Infer::MetaType
-        mts = @infos.map { |info| infer.resolve(ctx, info) }
+      def resolve!(ctx : Context, infer : TypeCheck::ForReifiedFunc) : Infer::MetaType?
+        mts = @infos.compact_map { |info| infer.resolve(ctx, info) }
+        return nil if mts.empty?
         Infer::MetaType.new_union(mts)
       end
     end
@@ -137,8 +138,8 @@ module Mare::Compiler::AltInfer
       def resolve_span!(ctx : Context, infer : Visitor) : Span
         infer.resolve(ctx, info).transform_mt(&.ephemeralize)
       end
-      def resolve!(ctx : Context, infer : TypeCheck::ForReifiedFunc) : Infer::MetaType
-        infer.resolve(ctx, info).ephemeralize
+      def resolve!(ctx : Context, infer : TypeCheck::ForReifiedFunc) : Infer::MetaType?
+        infer.resolve(ctx, info).try(&.ephemeralize)
       end
     end
 
@@ -179,8 +180,8 @@ module Mare::Compiler::AltInfer
       def resolve_span!(ctx : Context, infer : Visitor) : Span
         infer.resolve(ctx, info).transform_mt(&.alias)
       end
-      def resolve!(ctx : Context, infer : TypeCheck::ForReifiedFunc) : Infer::MetaType
-        infer.resolve(ctx, info).alias
+      def resolve!(ctx : Context, infer : TypeCheck::ForReifiedFunc) : Infer::MetaType?
+        infer.resolve(ctx, info).try(&.alias)
       end
     end
   end

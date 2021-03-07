@@ -1047,11 +1047,11 @@ class Mare::Compiler::TypeCheck
     end
 
     # TODO: remove this convenience alias:
-    def resolve(ctx : Context, ast : AST::Node) : MetaType
+    def resolve(ctx : Context, ast : AST::Node) : MetaType?
       resolve(ctx, @f_analysis[ast])
     end
 
-    def resolve(ctx : Context, info : Infer::Info) : MetaType
+    def resolve(ctx : Context, info : Infer::Info) : MetaType?
       # If our type param reification doesn't match any of the conditions
       # for the layer associated with the given info, then
       # we will not do any typechecking here - we just return unconstrained.
@@ -1111,7 +1111,8 @@ class Mare::Compiler::TypeCheck
       # higher capability, meaning all element expressions must be sendable.
       array_cap = mt.cap_only_inner
       unless array_cap.supertype_of?(MetaType::Capability::REF)
-        unless info.terms.all? { |elem| resolve(ctx, elem).alias.is_sendable? }
+        term_mts = info.terms.compact_map { |term| resolve(ctx, term) }
+        unless term_mts.all?(&.alias.is_sendable?)
           Error.at info.pos, "This array literal can't have a reference cap of " \
             "#{array_cap.value} unless all of its elements are sendable",
               info.describe_downstream_constraints(ctx, self)
@@ -1121,30 +1122,38 @@ class Mare::Compiler::TypeCheck
 
     # Check runtime match safety for TypeCondition expressions.
     def type_check_pre(ctx : Context, info : Infer::TypeCondition, mt : MetaType)
+      lhs_mt = resolve(ctx, info.lhs)
+      rhs_mt = resolve(ctx, info.rhs)
+
       # TODO: move that function here into this file/module.
       Infer::TypeCondition.verify_safety_of_runtime_type_match(ctx, info.pos,
-        resolve(ctx, info.lhs),
-        resolve(ctx, info.rhs),
+        lhs_mt,
+        rhs_mt,
         info.lhs.pos,
         info.rhs.pos,
-      )
+      ) if lhs_mt && rhs_mt
     end
     def type_check_pre(ctx : Context, info : Infer::TypeConditionForLocal, mt : MetaType)
       lhs_info = @f_analysis[info.refine]
       lhs_info = lhs_info.info if lhs_info.is_a?(Infer::LocalRef)
       rhs_info = info.refine_type
+      lhs_mt = resolve(ctx, lhs_info)
+      rhs_mt = resolve(ctx, rhs_info)
+
       # TODO: move that function here into this file/module.
       Infer::TypeCondition.verify_safety_of_runtime_type_match(ctx, info.pos,
-        resolve(ctx, lhs_info),
-        resolve(ctx, rhs_info),
+        lhs_mt,
+        rhs_mt,
         lhs_info.as(Infer::NamedInfo).first_viable_constraint_pos,
         rhs_info.pos,
-      )
+      ) if lhs_mt && rhs_mt
     end
 
     # Reach the particular reification of the function called in a FromCall.
     def type_check_pre(ctx : Context, info : Infer::FromCall, mt : MetaType)
       receiver_mt = resolve(ctx, info.lhs)
+      return unless receiver_mt
+
       call_defns = receiver_mt.find_callable_func_defns(ctx, self, info.member)
 
       problems = [] of {Source::Pos, String}
@@ -1200,21 +1209,23 @@ class Mare::Compiler::TypeCheck
         # the type that fulfills the total_downstream_constraint is not compatible
         # with the ephemerality requirement, while some other union member is?
         info.downstreams_each.each do |use_pos, other_info, aliases|
-          if aliases > 0
-            constraint = resolve(ctx, other_info)
-            if !meta_type_alias.within_constraints?(ctx, [constraint])
-              extra = info.describe_downstream_constraints(ctx, self)
-              extra << {info.pos,
-                "but the type of the #{info.described_kind} " \
-                "(when aliased) was #{meta_type_alias.show_type}"
-              }
-              this_would_be_possible_if = info.this_would_be_possible_if
-              extra << this_would_be_possible_if if this_would_be_possible_if
+          next unless aliases > 0
 
-              Error.at use_pos, "This aliasing violates uniqueness " \
-                "(did you forget to consume the variable?)",
-                extra
-            end
+          constraint = resolve(ctx, other_info)
+          next unless constraint
+
+          if !meta_type_alias.within_constraints?(ctx, [constraint])
+            extra = info.describe_downstream_constraints(ctx, self)
+            extra << {info.pos,
+              "but the type of the #{info.described_kind} " \
+              "(when aliased) was #{meta_type_alias.show_type}"
+            }
+            this_would_be_possible_if = info.this_would_be_possible_if
+            extra << this_would_be_possible_if if this_would_be_possible_if
+
+            Error.at use_pos, "This aliasing violates uniqueness " \
+              "(did you forget to consume the variable?)",
+              extra
           end
         end
       end
@@ -1238,7 +1249,7 @@ class Mare::Compiler::TypeCheck
 
     # This variant has protection to prevent infinite recursion.
     # It is mainly used by FromCall, since it interacts across reified funcs.
-    def resolve_with_reentrance_prevention(ctx : Context, info : Info) : MetaType
+    def resolve_with_reentrance_prevention(ctx : Context, info : Info) : MetaType?
       orig_count = @prevent_reentrance[info]?
       if (orig_count || 0) > 2 # TODO: can we remove this counter and use a set instead of a map?
         kind = info.is_a?(Infer::DynamicInfo) ? " #{info.describe_kind}" : ""
@@ -1274,10 +1285,10 @@ class Mare::Compiler::TypeCheck
       # Is it actually a significant performance impact or not?
 
       if (info = @f_analysis.yield_in_info; info)
-        @analysis.yield_in_resolved = resolve(ctx, info) # TODO: simplify?
+        @analysis.yield_in_resolved = resolve(ctx, info).not_nil! # TODO: simplify?
       end
       @analysis.yield_out_resolved = @f_analysis.yield_out_infos.map do |info|
-        resolve(ctx, info).as(MetaType) # TODO: simplify?
+        resolve(ctx, info).as(MetaType).not_nil! # TODO: simplify?
       end
       @analysis.ret_resolved = @analysis.resolved_infos[@f_analysis[ret]]
 
@@ -1312,7 +1323,7 @@ class Mare::Compiler::TypeCheck
         if func.has_tag?(:async)
           "An asynchronous function"
         elsif func.has_tag?(:constructor) \
-        && !resolve(ctx, @f_analysis[ret]).subtype_of?(ctx, MetaType.cap("ref"))
+        && !resolve(ctx, @f_analysis[ret]).not_nil!.subtype_of?(ctx, MetaType.cap("ref"))
           "A constructor with elevated capability"
         end
       if require_sendable
@@ -1320,7 +1331,7 @@ class Mare::Compiler::TypeCheck
 
           errs = [] of {Source::Pos, String}
           params.terms.each do |param|
-            param_mt = resolve(ctx, @f_analysis[param])
+            param_mt = resolve(ctx, @f_analysis[param]).not_nil!
 
             unless param_mt.is_sendable?
               # TODO: Remove this hacky special case.
