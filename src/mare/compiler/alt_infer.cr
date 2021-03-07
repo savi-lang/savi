@@ -174,6 +174,11 @@ module Mare::Compiler::AltInfer
       .try { |new_inner| Span.new(new_inner) }
     end
 
+    def narrowing_type_param(type_param : Infer::TypeParam, cap : MetaType) : Span?
+      inner.narrowing_type_param(type_param, cap)
+      .try { |new_inner| Span.new(new_inner) }
+    end
+
     def maybe_fallback_based_on_mt_simplify(options : Array({Symbol, Span}))
       Span.new(inner.maybe_fallback_based_on_mt_simplify(
         options.map { |(cond, span)| {cond, span.inner} }
@@ -198,6 +203,7 @@ module Mare::Compiler::AltInfer
       abstract def combine_mt_to_span(other : Inner, maybe_other_terminal : Terminal?, always_yields_terminal = false, &block : (MetaType, MetaType) -> Span) : Inner
       abstract def deciding_f_cap(f_cap_mt : MetaType, is_constructor : Bool) : Inner?
       abstract def deciding_type_param(type_param : Infer::TypeParam, cap : MetaType) : Inner?
+      abstract def narrowing_type_param(type_param : Infer::TypeParam, cap : MetaType) : Inner?
       abstract def maybe_fallback_based_on_mt_simplify(options : Array({Symbol, Inner})) : Inner
       abstract def final_mt_simplify(ctx : Context) : Inner
     end
@@ -272,6 +278,10 @@ module Mare::Compiler::AltInfer
       end
 
       def deciding_type_param(type_param : Infer::TypeParam, cap : MetaType) : Inner?
+        self # a terminal node ignores further decisions
+      end
+
+      def narrowing_type_param(type_param : Infer::TypeParam, cap : MetaType) : Inner?
         self # a terminal node ignores further decisions
       end
 
@@ -476,6 +486,26 @@ module Mare::Compiler::AltInfer
         end
       end
 
+      def narrowing_type_param(type_param : Infer::TypeParam, cap : MetaType) : Inner?
+        key = @key
+        if key.is_a?(Infer::TypeParam) && key == type_param
+          new_map = @map.select { |value, inner|
+            value.cap_only_inner.satisfies_bound?(cap.cap_only_inner)
+          }.to_h
+          return nil unless new_map
+
+          Decision.build(@key, new_map)
+        else
+          Decision.build(@key,
+            @map.transform_values do |inner|
+              new_inner = inner.narrowing_type_param(type_param, cap)
+              return nil unless new_inner
+              new_inner
+            end
+          )
+        end
+      end
+
       def maybe_fallback_based_on_mt_simplify(options : Array({Symbol, Inner})) : Inner
         Decision.build(@key, @map.transform_values(&.maybe_fallback_based_on_mt_simplify(options)))
       end
@@ -643,6 +673,24 @@ module Mare::Compiler::AltInfer
         )
       end
 
+      def narrowing_type_param(type_param : Infer::TypeParam, cap : MetaType) : Inner?
+        new_default = @default.value.narrowing_type_param(type_param, cap)
+        raise NotImplementedError.new("new_default missing in Fallback.build") \
+          unless new_default
+
+        Fallback.build(
+          new_default,
+          @evaluate_mt,
+          @options.map { |(cond, inner)|
+            new_inner = inner.narrowing_type_param(type_param, cap)
+            raise NotImplementedError.new("new_inner missing in Fallback.build") \
+              unless new_inner
+
+            {cond, new_inner}
+          }
+        )
+      end
+
       def maybe_fallback_based_on_mt_simplify(other_options : Array({Symbol, Inner})) : Inner
         Fallback.build(
           @default.value.maybe_fallback_based_on_mt_simplify(other_options),
@@ -730,6 +778,10 @@ module Mare::Compiler::AltInfer
         self
       end
 
+      def narrowing_type_param(type_param : Infer::TypeParam, cap : MetaType) : Inner?
+        self
+      end
+
       def maybe_fallback_based_on_mt_simplify(options : Array({Symbol, Inner})) : Inner
         self
       end
@@ -772,21 +824,22 @@ module Mare::Compiler::AltInfer
       @pre_infer : PreInfer::Analysis,
     )
       @currently_looking_up_param_bounds = Set(Infer::TypeParam).new
-      @substs_for_layer = Hash(TypeContext::Layer, Hash(Infer::TypeParam, Infer::MetaType)).new
     end
 
     def resolve(ctx : Context, info : Infer::Info) : Span
       @analysis[info]? || begin
-        ast = @pre_infer.node_for?(info)
-        substs = substs_for_layer(ctx, ast) if ast
-
         # If this info resolves as a conduit, resolve the conduit,
         # and do not save the result locally for this span.
         conduit = info.as_conduit?
         return conduit.resolve_span!(ctx, self) if conduit
 
         span = info.resolve_span!(ctx, self)
-        span = span.transform_mt(&.substitute_type_params(substs.not_nil!)) if substs
+
+        # Deal with type parameter substitutions if needed.
+        # This happens when we have a localized type refinement,
+        # such as inside a conditional block with a type condition.
+        ast = @pre_infer.node_for?(info)
+        span = apply_substs_for_layer(ctx, ast, span) if ast
 
         # substitute lazy type params if needed
         lazy_type_params = Set(Infer::TypeParam).new
@@ -881,29 +934,33 @@ module Mare::Compiler::AltInfer
       type_params_for(ctx, rt.link).zip(rt.args.map(&.strip_cap)).to_h
     end
 
-    def substs_for_layer(ctx : Context, node : AST::Node) : Hash(Infer::TypeParam, Infer::MetaType)?
+    def apply_substs_for_layer(ctx : Context, node : AST::Node, span : Span) : Span
       layer = @type_context[node]?
-      return nil unless layer
+      return span unless layer
 
-      @substs_for_layer[layer] ||= (
-        # TODO: also handle negative conditions
-        layer.all_positive_conds.compact_map do |cond|
-          cond_info = @pre_infer[cond]
-          case cond_info
-          when Infer::TypeParamCondition
-            type_param = Infer::TypeParam.new(cond_info.refine)
-            # TODO: carry through entire span, not just union of its MetaTypes
-            meta_type = Infer::MetaType.new_type_param(type_param).intersect(
-              Infer::MetaType.new_union(
-                resolve(ctx, cond_info.refine_type).all_terminal_meta_types
-              )
-            )
-            {type_param, meta_type}
-          # TODO: also handle other conditions?
-          else nil
-          end
-        end.to_h
-      )
+      # TODO: also handle negative conditions
+      layer.all_positive_conds.reduce(span) { |span, cond|
+        cond_info = @pre_infer[cond]
+        case cond_info
+        when Infer::TypeParamCondition
+          type_param = Infer::TypeParam.new(cond_info.refine)
+          refine_span = resolve(ctx, cond_info.refine_type)
+          refine_cap_mt =
+            Infer::MetaType.new_union(refine_span.all_terminal_meta_types.map(&.cap_only))
+          raise NotImplementedError.new("varying caps in a refined span") unless refine_cap_mt.cap_only?
+
+          span
+            .narrowing_type_param(type_param, refine_cap_mt)
+            .not_nil!
+            .combine_mt(refine_span.narrowing_type_param(type_param, refine_cap_mt).not_nil!) { |mt, refine_mt|
+              mt.substitute_type_params({
+                type_param => Infer::MetaType.new_type_param(type_param).intersect(refine_mt.strip_cap)
+              })
+            }
+        # TODO: also handle other conditions?
+        else span
+        end
+      }
     end
 
     def self_with_no_cap_yet(ctx : Context)

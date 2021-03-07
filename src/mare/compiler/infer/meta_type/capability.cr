@@ -254,7 +254,7 @@ struct Mare::Compiler::Infer::MetaType::Capability
     other.subtype_of?(ctx, self) # delegate to the other class via symmetry
   end
 
-  def satisfies_bound?(ctx : Context, bound : Capability) : Bool
+  def satisfies_bound?(bound : Capability) : Bool
     return true if value.is_a?(String) && self == bound
 
     value = value()
@@ -268,6 +268,9 @@ struct Mare::Compiler::Infer::MetaType::Capability
     end
 
     false
+  end
+  def satisfies_bound?(ctx : Context, bound : Capability) : Bool
+    satisfies_bound?(bound)
   end
 
   def satisfies_bound?(ctx : Context, bound : (Nominal | AntiNominal | Intersection | Union | Unconstrained | Unsatisfiable)) : Bool

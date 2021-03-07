@@ -14,6 +14,7 @@ class Mare::Compiler::TypeCheck
 
   struct FuncAnalysis
     getter link
+    protected getter pre # TODO: remove
 
     def initialize(
       @link : Program::Function::Link,
@@ -456,8 +457,9 @@ class Mare::Compiler::TypeCheck
       f_analysis = get_or_create_f_analysis(ctx, f)
       refer_type = ctx.refer_type[f]
       classify = ctx.classify[f]
+      type_context = ctx.type_context[f]
       for_rt = for_rt(ctx, rt.link, rt.args)
-      ForReifiedFunc.new(ctx, f_analysis, ReifiedFuncAnalysis.new(ctx, rf), for_rt, rf, refer_type, classify)
+      ForReifiedFunc.new(ctx, f_analysis, ReifiedFuncAnalysis.new(ctx, rf), for_rt, rf, refer_type, classify, type_context)
       .tap { f_analysis.observe_reified_func(rf) }
     )
   end
@@ -866,6 +868,16 @@ class Mare::Compiler::TypeCheck
       type_params.zip(@reified.args)
     end
 
+    def type_arg_for_type_param(ctx, type_param : TypeParam) : MetaType?
+      index =
+        @reified.link.resolve(ctx).params.try(&.terms.index { |type_param_ast|
+          ident = AST::Extract.type_param(type_param_ast).first
+          @refer_type[ident]? == type_param.ref
+        })
+
+      @reified.args[index] if index
+    end
+
     def get_type_param_bound(index : Int32)
       param_ident = AST::Extract.type_param(reified.defn(ctx).params.not_nil!.terms[index]).first
       param_bound_node = refer_type[param_ident].as(Refer::TypeParam).bound
@@ -941,8 +953,9 @@ class Mare::Compiler::TypeCheck
     private getter ctx : Context
     private getter refer_type : ReferType::Analysis
     protected getter classify : Classify::Analysis
+    private getter type_context : TypeContext::Analysis
 
-    def initialize(@ctx, @f_analysis, @analysis, @for_rt, @reified, @refer_type, @classify)
+    def initialize(@ctx, @f_analysis, @analysis, @for_rt, @reified, @refer_type, @classify, @type_context)
       @local_idents = Hash(Refer::Local, AST::Node).new
       @local_ident_overrides = Hash(AST::Node, AST::Node).new
       @redirects = Hash(AST::Node, AST::Node).new
@@ -993,7 +1006,8 @@ class Mare::Compiler::TypeCheck
         if filtered_span.try(&.any_error?)
 
       puts info.pos.show
-      pp info
+      puts info
+      pp @for_rt.reified
       pp span
       pp filtered_span
       raise "halt"
@@ -1005,6 +1019,24 @@ class Mare::Compiler::TypeCheck
     end
 
     def resolve(ctx : Context, info : Infer::Info) : MetaType
+      # If our type param reification doesn't match any of the conditions
+      # for the layer associated with the given info, then
+      # we will not do any typechecking here - we just return unsatisfiable.
+      ast = @f_analysis.pre.node_for?(info)
+      layer = @type_context[ast]? if ast
+      return MetaType.unsatisfiable unless !layer || layer.all_positive_conds.all? { |cond|
+        cond_info = @f_analysis[cond]
+        case cond_info
+        when Infer::TypeParamCondition
+          type_param = Infer::TypeParam.new(cond_info.refine)
+          refine_mt = resolve(ctx, cond_info.refine_type)
+          type_arg = @for_rt.type_arg_for_type_param(ctx, type_param).not_nil!
+          type_arg.satisfies_bound?(ctx, refine_mt)
+        # TODO: also handle other conditions?
+        else true
+        end
+      }
+
       @analysis.resolved_infos[info]? || begin
         mt = info.as_conduit?.try(&.resolve!(ctx, self)) || filter_span(ctx, info)
         @analysis.resolved_infos[info] = mt
