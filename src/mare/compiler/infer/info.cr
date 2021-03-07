@@ -468,7 +468,7 @@ class Mare::Compiler::Infer
           upstream_conduit.resolve_span!(ctx, infer)
         end
 
-      AltInfer::Span.combine_mts(upstream_spans) { |mts| MetaType.new_union(mts) }
+      AltInfer::Span.reduce_combine_mts(upstream_spans) { |accum, mt| accum.unite(mt) }
     end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
@@ -757,6 +757,10 @@ class Mare::Compiler::Infer
         constrained_mt.unsatisfiable? ? @possible : constrained_mt
       }
 
+      peer_hints_span = AltInfer::Span.reduce_combine_mts(
+        @peer_hints.map { |peer| infer.resolve(ctx, peer).as(AltInfer::Span) }
+      ) { |accum, mt| accum.intersect(mt) }
+
       constrained_span
       .maybe_fallback_based_on_mt_simplify([
         # If we don't satisfy the constraints, go with our simply type
@@ -766,17 +770,19 @@ class Mare::Compiler::Infer
         # If, after constraining, we are still not a single concrete type,
         # try to apply peer hints to the constrained type if any are available.
         {:mt_non_singular_concrete,
-          constrained_span.combine_mts(
-            @peer_hints.map { |peer| infer.resolve(ctx, peer).as(AltInfer::Span) }
-          ) { |constrained_mt, peer_mts|
-            hinted_mt = MetaType.new_intersection(peer_mts).intersect(constrained_mt)
-            hinted_mt.unsatisfiable? ? @possible : hinted_mt
-          }
-          .maybe_fallback_based_on_mt_simplify([
-            # If, with peer hints, we are still not a single concrete type,
-            # there's nothing more to try, so we return the simple type.
-            {:mt_non_singular_concrete, simple_span}
-          ])
+          if peer_hints_span
+            constrained_span.combine_mt(peer_hints_span) { |constrained_mt, peers_mt|
+              hinted_mt = constrained_mt.intersect(peers_mt)
+              hinted_mt.unsatisfiable? ? @possible : hinted_mt
+            }
+            .maybe_fallback_based_on_mt_simplify([
+              # If, with peer hints, we are still not a single concrete type,
+              # there's nothing more to try, so we return the simple type.
+              {:mt_non_singular_concrete, simple_span}
+            ])
+          else
+            simple_span
+          end
         }
       ])
     end
@@ -1582,7 +1588,7 @@ class Mare::Compiler::Infer
 
       ante_span =
         AltInfer::Span
-        .combine_mts(tether_spans) { |mts| MetaType.new_intersection(mts) }
+        .reduce_combine_mts(tether_spans) { |accum, mt| accum.intersect(mt) }
         .not_nil!
         .decided_by(array_info) { |mt|
           pairs = mt.each_reachable_defn_with_cap(ctx).compact_map { |rt, cap|
@@ -1610,7 +1616,7 @@ class Mare::Compiler::Infer
       ante_span = possible_antecedents_span(ctx, infer)
 
       elem_spans = terms.map { |term| infer.resolve(ctx, term).as(AltInfer::Span) }
-      elem_span = AltInfer::Span.combine_mts(elem_spans) { |mts| MetaType.new_union(mts) }
+      elem_span = AltInfer::Span.reduce_combine_mts(elem_spans) { |accum, mt| accum.unite(mt) }
 
       if ante_span
         if elem_span

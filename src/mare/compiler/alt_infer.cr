@@ -603,13 +603,23 @@ module Mare::Compiler::AltInfer
             @evaluate_mt,
             @options.map { |(cond, inner)| {cond, inner.combine_mt_to_span(other, maybe_other_terminal, always_yields_terminal, &block).as(Inner)} }
           )
+        elsif !other.is_a?(Fallback)
+          swap_block = -> (b : MetaType, a : MetaType) { block.call(a, b) }
+          return other.combine_mt_to_span(self, nil, always_yields_terminal, &swap_block)
+        elsif other.is_a?(Fallback) && \
+          other.evaluate_mt == self.evaluate_mt && \
+          other.options.map(&.first) == self.options.map(&.first)
+
+          Fallback.build(
+            @default.value.combine_mt_to_span(other.default.value, nil, always_yields_terminal, &block),
+            @evaluate_mt,
+            @options.map { |(cond, inner)|
+              other_inner = other.options.find(&.first.==(cond)).not_nil!.last
+              {cond, inner.combine_mt_to_span(other_inner, nil, always_yields_terminal, &block).as(Inner)}
+            }
+          )
         else
-          if other.is_a?(Terminal)
-            swap_block = -> (b : MetaType, a : MetaType) { block.call(a, b) }
-            return other.combine_mt_to_span(self, nil, always_yields_terminal, &swap_block)
-          else
-            raise NotImplementedError.new("combine_mt_to_span for a fallback and another non-terminal")
-          end
+          raise NotImplementedError.new("combine_mt_to_span for two unlike fallbacks")
         end
       end
 
