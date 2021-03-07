@@ -134,7 +134,7 @@ class Mare::Compiler
     when :reach then [:type_check, :refer, :namespace]
     when :paint then [:reach, :inventory]
     when :codegen then [:paint, :verify, :reach, :completeness, :privacy, :type_check, :inventory, :consumes, :jumps]
-    when :lifetime then [:reach, :infer]
+    when :lifetime then [:reach, :refer, :classify]
     when :codegen_verona then [:lifetime, :paint, :verify, :reach, :completeness, :privacy, :type_check, :inventory, :consumes, :jumps]
     when :eval then [:codegen]
     when :binary then [:codegen]
