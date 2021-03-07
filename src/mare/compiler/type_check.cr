@@ -1063,12 +1063,6 @@ class Mare::Compiler::TypeCheck
         mt = info.as_conduit?.try(&.resolve!(ctx, self)) || filter_span(ctx, info)
         @analysis.resolved_infos[info] = mt
 
-        # TODO: can we somehow reduce this possibly expensive reaching?
-        # Is it actually expensive? Good things to investigate.
-        # We only do this here because we need to be sure we call for_rt
-        # for every ReifiedType that is reached by the program.
-        mt.each_reachable_defn(ctx).each { |rt| ctx.type_check.for_rt(ctx, rt.link, rt.args) }
-
         type_check_pre(ctx, info, mt)
         type_check(info, mt)
 
