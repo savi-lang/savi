@@ -14,7 +14,6 @@ class Mare::Compiler::TypeCheck
 
   struct FuncAnalysis
     getter link
-    protected getter pre # TODO: remove
 
     def initialize(
       @link : Program::Function::Link,
@@ -1110,13 +1109,14 @@ class Mare::Compiler::TypeCheck
       )
     end
     def type_check_pre(ctx : Context, info : Infer::TypeConditionForLocal, mt : MetaType)
-      lhs_info = @f_analysis[info.refine].as(Infer::NamedInfo)
+      lhs_info = @f_analysis[info.refine]
+      lhs_info = lhs_info.info if lhs_info.is_a?(Infer::LocalRef)
       rhs_info = info.refine_type
       # TODO: move that function here into this file/module.
       Infer::TypeCondition.verify_safety_of_runtime_type_match(ctx, info.pos,
         resolve(ctx, lhs_info),
         resolve(ctx, rhs_info),
-        lhs_info.first_viable_constraint_pos,
+        lhs_info.as(Infer::NamedInfo).first_viable_constraint_pos,
         rhs_info.pos,
       )
     end

@@ -25,7 +25,6 @@ module Mare::Compiler::PreInfer
       @yield_out_infos = [] of Infer::YieldOut
       @redirects = {} of AST::Node => AST::Node
       @infos = {} of AST::Node => Infer::Info
-      @backwards = {} of Infer::Info => AST::Node # TODO: try to remove this and put the Node link directly into each Info?
       @extra_infos = [] of Infer::Info
     end
 
@@ -47,9 +46,7 @@ module Mare::Compiler::PreInfer
     def []?(node : AST::Node); @infos[follow_redirects(node)]?; end
     protected def []=(node, info)
       @infos[follow_redirects(node)] = info
-      @backwards[info] ||= node
     end
-    def node_for?(info : Infer::Info); @backwards[info]?; end
     def each_info(&block : Infer::Info -> Nil)
       @infos.each_value(&block)
       @extra_infos.each(&block)
@@ -307,7 +304,8 @@ module Mare::Compiler::PreInfer
 
         local_ident = lookup_local_ident(local_ref)
         if local_ident
-          @analysis.redirect(node, local_ident)
+          local_info = @analysis[local_ident].as(Infer::DynamicInfo)
+          @analysis[node] = Infer::LocalRef.new(local_info, layer(node), local_ref)
         else
           @analysis[node] = local_ref.param_idx \
             ? Infer::Param.new(node.pos, layer(node)) \
@@ -429,6 +427,7 @@ module Mare::Compiler::PreInfer
         # Do nothing here - we'll handle it in one of the parent nodes.
       when "=", "DEFAULTPARAM"
         lhs = self[node.lhs]
+        lhs = lhs.info if lhs.is_a?(Infer::LocalRef)
         case lhs
         when Infer::Local
           lhs.assign(ctx, @analysis[node.rhs], node.rhs.pos)
@@ -505,7 +504,7 @@ module Mare::Compiler::PreInfer
           unless rhs_info.is_a?(Infer::FixedTypeExpr)
 
         # If the left-hand side is the name of a local variable...
-        if lhs_info.is_a?(Infer::Local) || lhs_info.is_a?(Infer::Param)
+        if lhs_info.is_a?(Infer::LocalRef) || lhs_info.is_a?(Infer::Local) || lhs_info.is_a?(Infer::Param)
           # Set up a local type refinement condition, which can be used within
           # a choice body to inform the type system about the type relationship.
           refine = @analysis.follow_redirects(node.lhs)
@@ -591,12 +590,21 @@ module Mare::Compiler::PreInfer
         # true if we are in the body; hence we can apply the type refinement.
         # TODO: Do this in a less special-casey sort of way if possible.
         # TODO: Do we need to override things besides locals? should we skip for non-locals?
+        override_key = nil
         if inner_cond_info.is_a?(Infer::TypeConditionForLocal)
-          @local_ident_overrides[inner_cond_info.refine] = refine = inner_cond_info.refine.dup
+          local_node = inner_cond_info.refine
+          local_info = self[local_node]
+          if local_info.is_a?(Infer::LocalRef)
+            local_node = lookup_local_ident(local_info.ref).not_nil!
+            local_info = self[local_node]
+          end
+
+          override_key = local_node
+          @local_ident_overrides[override_key] = refine = local_node.dup
           @analysis[refine] = Infer::Refinement.new(
             inner_cond_info.pos,
             inner_cond_info.layer_index,
-            self[inner_cond_info.refine],
+            local_info,
             inner_cond_info.refine_type,
             inner_cond_info.positive_check,
           )
@@ -606,9 +614,7 @@ module Mare::Compiler::PreInfer
         body.accept(ctx, self)
 
         # Remove the override we put in place before, if any.
-        if inner_cond_info.is_a?(Infer::TypeConditionForLocal)
-          @local_ident_overrides.delete(inner_cond_info.refine).not_nil!
-        end
+        @local_ident_overrides.delete(override_key).not_nil! if override_key
 
         {cond ? self[cond] : nil, self[body], @jumps.away?(body)}
       end

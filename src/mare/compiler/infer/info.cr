@@ -838,6 +838,44 @@ class Mare::Compiler::Infer
     end
   end
 
+  class LocalRef < Info
+    getter info : DynamicInfo
+    getter ref : Refer::Local
+
+    def describe_kind : String; info.describe_kind end
+
+    def initialize(@info, @layer_index, @ref)
+    end
+
+    def pos
+      @info.pos
+    end
+
+    def add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
+      @info.add_downstream(use_pos, info, aliases)
+    end
+
+    def tethers(querent : Info) : Array(Tether)
+      @info.tethers(querent)
+    end
+
+    def add_peer_hint(peer : Info)
+      @info.add_peer_hint(peer)
+    end
+
+    def as_conduit? : AltInfer::Conduit?
+      AltInfer::Conduit.direct(@info)
+    end
+
+    def resolve_one!(ctx : Context, infer : TypeCheck::ForReifiedFunc) : MetaType
+      infer.resolve(ctx, @info)
+    end
+
+    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
+      infer.resolve(ctx, @info)
+    end
+  end
+
   class FuncBody < NamedInfo
     getter early_returns : Array(JumpReturn)
     def initialize(pos, layer_index, @early_returns)

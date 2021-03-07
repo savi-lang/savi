@@ -838,8 +838,7 @@ module Mare::Compiler::AltInfer
         # Deal with type parameter substitutions if needed.
         # This happens when we have a localized type refinement,
         # such as inside a conditional block with a type condition.
-        ast = @pre_infer.node_for?(info)
-        span = apply_substs_for_layer(ctx, ast, span) if ast
+        span = apply_substs_for_layer(ctx, info, span)
 
         # substitute lazy type params if needed
         lazy_type_params = Set(Infer::TypeParam).new
@@ -934,9 +933,8 @@ module Mare::Compiler::AltInfer
       type_params_for(ctx, rt.link).zip(rt.args.map(&.strip_cap)).to_h
     end
 
-    def apply_substs_for_layer(ctx : Context, node : AST::Node, span : Span) : Span
-      layer = @type_context[node]
-      return span unless layer
+    def apply_substs_for_layer(ctx : Context, info : Info, span : Span) : Span
+      layer = @type_context[info.layer_index]
 
       # TODO: also handle negative conditions
       layer.all_positive_conds.reduce(span) { |span, cond|
