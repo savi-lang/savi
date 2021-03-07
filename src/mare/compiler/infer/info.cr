@@ -134,6 +134,10 @@ class Mare::Compiler::Infer
       infer = ctx.infer.for_rf_existing!(analysis.reified)
       as_multiple_downstream_constraints(ctx, infer)
     end
+    def as_multiple_downstream_constraints(ctx : Context, analysis : TypeCheck::ReifiedFuncAnalysis) : Array({Source::Pos, MetaType})?
+      infer = ctx.type_check.for_rf_existing!(analysis.reified)
+      as_multiple_downstream_constraints(ctx, infer)
+    end
   end
 
   abstract class DynamicInfo < Info
@@ -629,6 +633,12 @@ class Mare::Compiler::Infer
     end
 
     def downstream_constraints(ctx : Context, analysis : ReifiedFuncAnalysis)
+      @downstreams.flat_map do |_, info, _|
+        info.as_multiple_downstream_constraints(ctx, analysis) \
+        || [{info.pos, analysis.resolved(info)}]
+      end
+    end
+    def downstream_constraints(ctx : Context, analysis : TypeCheck::ReifiedFuncAnalysis)
       @downstreams.flat_map do |_, info, _|
         info.as_multiple_downstream_constraints(ctx, analysis) \
         || [{info.pos, analysis.resolved(info)}]

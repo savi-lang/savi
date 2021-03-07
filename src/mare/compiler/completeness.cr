@@ -15,11 +15,11 @@ module Mare::Compiler::Completeness
   def self.run(ctx, library)
     library.types.each do |t|
       t_link = t.make_link(library)
-      ctx.infer[t_link].each_non_argumented_reified.each do |rt|
+      ctx.type_check[t_link].each_non_argumented_reified.each do |rt|
         branch_cache = {} of Tuple(Set(String), Infer::ReifiedFunction) => Branch
         t.functions.each do |f|
           f_link = f.make_link(t_link)
-          ctx.infer[f_link].each_reified_func(rt).each do |rf|
+          ctx.type_check[f_link].each_reified_func(rt).each do |rf|
             check_constructor(ctx, rt, rf, branch_cache)
           end
         end
@@ -94,7 +94,7 @@ module Mare::Compiler::Completeness
       reify_cap =
         Infer::MetaType::Capability.new_maybe_generic(next_f_cap).each_cap.first
 
-      next_rf = ctx.infer[next_f_link]
+      next_rf = ctx.type_check[next_f_link]
         .each_reified_func(type)
         .find(&.receiver.cap_only.cap_value.==(reify_cap.value)).not_nil!
 
@@ -174,10 +174,10 @@ module Mare::Compiler::Completeness
     end
 
     def touch(node : AST::Identifier)
-      infer = ctx.infer[func]
+      type_check = ctx.type_check[func]
 
       # Ignore this identifier if it is not of the self.
-      info = ctx.infer[func.link][node]?
+      info = ctx.type_check[func.link][node]?
       return unless info.is_a?(Infer::Self)
 
       # We only care about further analysis if not all fields are initialized.
@@ -191,7 +191,7 @@ module Mare::Compiler::Completeness
 
       # Walk through each constraint imposed on the self in the earlier
       # Infer pass that tracked all of those constraints.
-      info.downstream_constraints(ctx, infer).each do |pos, constraint|
+      info.downstream_constraints(ctx, type_check).each do |pos, constraint|
         # If tag will meet the constraint, then this use of the self is okay.
         return if tag_self.subtype_of?(ctx, constraint)
 
