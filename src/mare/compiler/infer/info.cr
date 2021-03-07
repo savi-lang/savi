@@ -2253,9 +2253,6 @@ class Mare::Compiler::Infer
         call_func = call_func.not_nil!
         call_func_link = call_func.make_link(call_defn.link)
 
-        # Keep track that we called this function.
-        infer.analysis.called_funcs.add({call.pos, call_defn, call_func_link})
-
         reify_cap, autorecover_needed =
           follow_call_check_receiver_cap(ctx, infer.func, call_mt, call_func, problems)
 

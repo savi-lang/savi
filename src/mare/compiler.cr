@@ -128,7 +128,7 @@ class Mare::Compiler
     when :alt_infer then [:alt_infer_edge]
     when :type_check then [:alt_infer, :pre_infer]
     when :infer then [:pre_infer, :classify, :refer_type]
-    when :privacy then [:infer]
+    when :privacy then [:type_check]
     when :completeness then [:jumps, :infer, :lambda, :sugar, :macros, :populate]
     when :reach then [:infer]
     when :verify then [:reach]

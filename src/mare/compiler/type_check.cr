@@ -1159,6 +1159,9 @@ class Mare::Compiler::TypeCheck
         next unless call_func
         call_func_link = call_func.make_link(call_defn.link)
 
+        # Keep track that we called this function.
+        @analysis.called_funcs.add({info.pos, call_defn, call_func_link})
+
         # TODO: type checking based on reify_cap and auto-recover needed.
         reify_cap, autorecover_needed =
           info.follow_call_check_receiver_cap(ctx, self.func, call_mt, call_func, problems)

@@ -13,21 +13,21 @@ class Mare::Compiler::Privacy
   def self.run(ctx, library)
     library.types.each do |t|
       t_link = t.make_link(library)
-      ctx.infer[t_link].each_non_argumented_reified.each do |rt|
+      ctx.type_check[t_link].each_non_argumented_reified.each do |rt|
         t.functions.each do |f|
           f_link = f.make_link(t_link)
-          ctx.infer[f_link].each_reified_func(rt).each do |rf|
-            infer = ctx.infer[rf]
+          ctx.type_check[f_link].each_reified_func(rt).each do |rf|
+            type_check = ctx.type_check[rf]
 
-            check_reified_func(ctx, infer)
+            check_reified_func(ctx, type_check)
           end
         end
       end
     end
   end
 
-  def self.check_reified_func(ctx, infer : Infer::ReifiedFuncAnalysis)
-    infer.each_called_func.each do |pos, called_rt, called_func_link|
+  def self.check_reified_func(ctx, type_check : TypeCheck::ReifiedFuncAnalysis)
+    type_check.each_called_func.each do |pos, called_rt, called_func_link|
       # Only handle private calls (beginning with an underscore).
       return unless called_func_link.name.starts_with?("_")
 
