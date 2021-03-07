@@ -722,6 +722,10 @@ class Mare::Compiler::Infer
       name
     end
 
+    def show_full_name
+      @type.show_type + name
+    end
+
     def receiver_cap
       receiver.cap_only
     end

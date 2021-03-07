@@ -962,6 +962,7 @@ class Mare::Compiler::TypeCheck
       @prevent_reentrance = {} of Info => Int32
       @layers_ignored = [] of Int32
       @layers_accepted = [] of Int32
+      @rt_is_complete = @reified.type.is_complete?(ctx).as(Bool)
     end
 
     def func
@@ -1022,6 +1023,8 @@ class Mare::Compiler::TypeCheck
           func.has_tag?(:constructor)
         )
 
+      type_params_and_type_args = @for_rt.type_params_and_type_args(ctx)
+
       # Filter the span by deciding the type parameter capability.
       if filtered_span && !filtered_span.inner.is_a?(AltInfer::Span::Terminal)
         filtered_span = @for_rt.type_params_and_type_args(ctx)
@@ -1030,6 +1033,14 @@ class Mare::Compiler::TypeCheck
 
             filtered_span.deciding_type_param(type_param, type_arg.cap_only)
           }
+      end
+
+      # If this is a complete reified type (not partially reified),
+      # then also substitute in the type args for each type param.
+      if @rt_is_complete && type_params_and_type_args.any?
+        filtered_span = filtered_span.try(&.transform_mt { |mt|
+          mt.substitute_type_params(type_params_and_type_args.to_h)
+        })
       end
 
       filtered_span = filtered_span.try(&.final_mt_simplify(ctx))
@@ -1167,7 +1178,7 @@ class Mare::Compiler::TypeCheck
           info.follow_call_check_receiver_cap(ctx, self.func, call_mt, call_func, problems)
 
         # Reach the reified function we are calling, with the right reify_cap.
-        ctx.type_check.for_rf(ctx, call_defn, call_func_link, reify_cap)
+        ctx.type_check.for_rf(ctx, call_defn, call_func_link, reify_cap).run
       end
 
       # TODO: Raise when we see non-empty problems
