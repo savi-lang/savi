@@ -340,7 +340,7 @@ struct Mare::Compiler::Infer::MetaType::Union
   end
 
   def ephemeralize
-    Union.new(
+    Union.build(
       (caps.not_nil!.map(&.ephemeralize).to_set if caps),
       terms,
       anti_terms,
@@ -349,7 +349,7 @@ struct Mare::Compiler::Infer::MetaType::Union
   end
 
   def strip_ephemeral
-    Union.new(
+    Union.build(
       (caps.not_nil!.map(&.strip_ephemeral).to_set if caps),
       terms,
       anti_terms,
@@ -358,7 +358,7 @@ struct Mare::Compiler::Infer::MetaType::Union
   end
 
   def alias
-    Union.new(
+    Union.build(
       (caps.not_nil!.map(&.alias).to_set if caps),
       terms,
       anti_terms,
