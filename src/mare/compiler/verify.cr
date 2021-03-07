@@ -18,16 +18,16 @@ class Mare::Compiler::Verify < Mare::AST::Visitor
 
     library.types.each do |t|
       t_link = t.make_link(library)
-      ctx.infer[t_link].each_non_argumented_reified.each do |rt|
+      ctx.type_check[t_link].each_non_argumented_reified.each do |rt|
         t.functions.each do |f|
           f_link = f.make_link(t_link)
           jumps = ctx.jumps[f_link]
           inventory = ctx.inventory[f_link]
 
-          ctx.infer[f_link].each_reified_func(rt).each do |rf|
-            infer = ctx.infer[rf]
+          ctx.type_check[f_link].each_reified_func(rt).each do |rf|
+            type_check = ctx.type_check[rf]
 
-            visitor = new(infer, jumps, inventory)
+            visitor = new(type_check, jumps, inventory)
             visitor.check_function(ctx, f)
             f.params.try(&.terms.each(&.accept(ctx, visitor)))
             f.body.try(&.accept(ctx, visitor))
@@ -84,35 +84,35 @@ class Mare::Compiler::Verify < Mare::AST::Visitor
       ] \
         unless new_f.params.not_nil!.terms.size == 1
 
-    env_rt = ctx.infer[env_link].no_args
+    env_rt = ctx.type_check[env_link].no_args
     env_mt = Infer::MetaType.new(env_rt)
-    main_rt = ctx.infer[main_link].no_args
-    new_rf = ctx.infer[new_f_link].each_reified_func(main_rt).first.not_nil!
+    main_rt = ctx.type_check[main_link].no_args
+    new_rf = ctx.type_check[new_f_link].each_reified_func(main_rt).first.not_nil!
     new_f_param = new_f.params.not_nil!.terms.first.not_nil!
-    infer = ctx.infer[new_rf]
-    new_f_param_mt = infer.resolved(ctx, new_f_param)
+    type_check = ctx.type_check[new_rf]
+    new_f_param_mt = type_check.resolved(ctx, new_f_param)
 
     Error.at new_f_param,
       "The parameter of Main.new has the wrong type", [
         {env.ident.pos, "it should accept a parameter of type Env"},
-        {ctx.infer[new_f_link][new_f_param].pos,
+        {ctx.type_check[new_f_link][new_f_param].pos,
           "but the parameter type is #{new_f_param_mt.show_type}"},
       ] \
         unless new_f_param_mt == env_mt
   end
 
-  getter infer : Infer::ReifiedFuncAnalysis
+  getter type_check : TypeCheck::ReifiedFuncAnalysis
   getter jumps : Jumps::Analysis
   getter inventory : Inventory::Analysis
 
-  def initialize(@infer, @jumps, @inventory)
+  def initialize(@type_check, @jumps, @inventory)
   end
 
   def check_function(ctx, func)
     func_body = func.body
 
     if func_body && jumps.any_error?(func_body)
-      if func.has_tag?(:constructor) && infer.reified.type.defn(ctx).has_tag?(:actor)
+      if func.has_tag?(:constructor) && type_check.reified.type.defn(ctx).has_tag?(:actor)
         finder = ErrorFinderVisitor.new(func_body, jumps)
         func_body.accept(ctx, finder)
 

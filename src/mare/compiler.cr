@@ -85,8 +85,8 @@ class Mare::Compiler
       when :infer            then ctx.run_whole_program(ctx.infer)
       when :privacy          then ctx.run(Privacy)
       when :completeness     then ctx.run(Completeness)
-      when :reach            then ctx.run_whole_program(ctx.reach)
       when :verify           then ctx.run(Verify)
+      when :reach            then ctx.run_whole_program(ctx.reach)
       when :paint            then ctx.run_whole_program(ctx.paint)
       when :codegen          then ctx.run_whole_program(ctx.code_gen)
       when :lifetime         then ctx.run_whole_program(ctx.lifetime)
@@ -130,8 +130,8 @@ class Mare::Compiler
     when :infer then [:pre_infer, :classify, :refer_type]
     when :privacy then [:type_check]
     when :completeness then [:type_check, :jumps, :lambda, :sugar, :macros, :populate]
+    when :verify then [:type_check, :inventory, :jumps]
     when :reach then [:type_check]
-    when :verify then [:reach]
     when :paint then [:reach]
     when :codegen then [:paint, :verify, :reach, :completeness, :privacy, :infer, :inventory, :consumes, :jumps]
     when :lifetime then [:reach, :infer]
