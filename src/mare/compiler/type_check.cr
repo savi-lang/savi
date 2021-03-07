@@ -960,6 +960,8 @@ class Mare::Compiler::TypeCheck
       @redirects = Hash(AST::Node, AST::Node).new
       @already_ran = false
       @prevent_reentrance = {} of Info => Int32
+      @layers_ignored = [] of Int32
+      @layers_accepted = [] of Int32
     end
 
     def func
@@ -973,6 +975,38 @@ class Mare::Compiler::TypeCheck
     def ret
       # The ident is used as a fake local variable that represents the return.
       func.ident
+    end
+
+    # Returns true if the specified type context layer has some conditions
+    # that we do not satisfy in our current reification of this function.
+    # In such a case, we will ignore that layer and not do typechecking on it,
+    # because doing so would run into unsatisfiable combinations of types.
+    def ignores_layer?(layer_index : Int32)
+      return false if @layers_accepted.includes?(layer_index)
+      return true if @layers_ignored.includes?(layer_index)
+
+      layer = @type_context[layer_index]
+
+      should_ignore = !layer.all_positive_conds.all? { |cond|
+        cond_info = @f_analysis[cond]
+        case cond_info
+        when Infer::TypeParamCondition
+          type_param = Infer::TypeParam.new(cond_info.refine)
+          refine_mt = resolve(ctx, cond_info.refine_type)
+          type_arg = @for_rt.type_arg_for_type_param(ctx, type_param).not_nil!
+          type_arg.satisfies_bound?(ctx, refine_mt)
+        # TODO: also handle other conditions?
+        else true
+        end
+      }
+
+      if should_ignore
+        @layers_ignored << layer_index
+      else
+        @layers_accepted << layer_index
+      end
+
+      should_ignore
     end
 
     def filter_span(ctx, info : Info) : MetaType?
@@ -1020,21 +1054,8 @@ class Mare::Compiler::TypeCheck
     def resolve(ctx : Context, info : Infer::Info) : MetaType
       # If our type param reification doesn't match any of the conditions
       # for the layer associated with the given info, then
-      # we will not do any typechecking here - we just return unsatisfiable.
-      ast = @f_analysis.pre.node_for?(info)
-      layer = @type_context[ast] if ast
-      return MetaType.unsatisfiable unless !layer || layer.all_positive_conds.all? { |cond|
-        cond_info = @f_analysis[cond]
-        case cond_info
-        when Infer::TypeParamCondition
-          type_param = Infer::TypeParam.new(cond_info.refine)
-          refine_mt = resolve(ctx, cond_info.refine_type)
-          type_arg = @for_rt.type_arg_for_type_param(ctx, type_param).not_nil!
-          type_arg.satisfies_bound?(ctx, refine_mt)
-        # TODO: also handle other conditions?
-        else true
-        end
-      }
+      # we will not do any typechecking here - we just return unconstrained.
+      # TODO: return MetaType.unconstrained if ignores_layer?(info.layer_index)
 
       @analysis.resolved_infos[info]? || begin
         mt = info.as_conduit?.try(&.resolve!(ctx, self)) || filter_span(ctx, info)
