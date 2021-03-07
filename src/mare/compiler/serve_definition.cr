@@ -32,12 +32,12 @@ class Mare::Compiler::ServeDefinition
 
   def [](f_link : Program::Function::Link, node : AST::Node)
     refer = ctx.refer[f_link]
-    infer = ctx.infer.for_func_simple(ctx, f_link.type, f_link)
+    type_check = ctx.type_check.for_func_simple(ctx, f_link.type, f_link)
 
-    infer_info = ctx.infer[f_link][node]?
-    if infer_info.is_a? Infer::FromCall
+    type_check_info = ctx.type_check[f_link][node]?
+    if type_check_info.is_a? Infer::FromCall
       # Show function definition site of a call.
-      infer_info.follow_call_get_call_defns(ctx, infer).not_nil!.map do |_, _, other_f|
+      type_check_info.follow_call_get_call_defns(ctx, type_check).not_nil!.map do |_, _, other_f|
         next unless other_f
         other_f.ident.pos
       end.first
@@ -52,7 +52,7 @@ class Mare::Compiler::ServeDefinition
         ref.list.first.defn.pos
       else
         # Show type definition site of the resolved type of whatever we found.
-        infer.analysis.resolved(ctx, node).each_reachable_defn(ctx).map do |defn|
+        type_check.analysis.resolved(ctx, node).each_reachable_defn(ctx).map do |defn|
           defn.link.resolve(ctx).ident.pos
         end.first
       end
