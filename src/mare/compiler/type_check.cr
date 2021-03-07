@@ -993,6 +993,8 @@ class Mare::Compiler::TypeCheck
         when Infer::TypeParamCondition
           type_param = Infer::TypeParam.new(cond_info.refine)
           refine_mt = resolve(ctx, cond_info.refine_type)
+          next false unless refine_mt
+
           type_arg = @for_rt.type_arg_for_type_param(ctx, type_param).not_nil!
           type_arg.satisfies_bound?(ctx, refine_mt)
         # TODO: also handle other conditions?
@@ -1054,8 +1056,8 @@ class Mare::Compiler::TypeCheck
     def resolve(ctx : Context, info : Infer::Info) : MetaType?
       # If our type param reification doesn't match any of the conditions
       # for the layer associated with the given info, then
-      # we will not do any typechecking here - we just return unconstrained.
-      # TODO: return MetaType.unconstrained if ignores_layer?(info.layer_index)
+      # we will not do any typechecking here - we just return nil.
+      return nil if ignores_layer?(info.layer_index)
 
       @analysis.resolved_infos[info]? || begin
         mt = info.as_conduit?.try(&.resolve!(ctx, self)) || filter_span(ctx, info)
@@ -1211,7 +1213,7 @@ class Mare::Compiler::TypeCheck
         info.downstreams_each.each do |use_pos, other_info, aliases|
           next unless aliases > 0
 
-          constraint = resolve(ctx, other_info)
+          constraint = resolve(ctx, other_info).as(Infer::MetaType?)
           next unless constraint
 
           if !meta_type_alias.within_constraints?(ctx, [constraint])

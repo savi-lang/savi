@@ -206,8 +206,8 @@ class Mare::Compiler::Infer
     end
     def total_downstream_constraint(ctx : Context, infer : TypeCheck::ForReifiedFunc)
       MetaType.new_intersection(
-        @downstreams.map do |_, other_info, _|
-          other_info.as_downstream_constraint_meta_type(ctx, infer).as(MetaType)
+        @downstreams.compact_map do |_, other_info, _|
+          other_info.as_downstream_constraint_meta_type(ctx, infer).as(MetaType?)
         end
       )
     end

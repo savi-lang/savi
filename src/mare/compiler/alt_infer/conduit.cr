@@ -95,7 +95,7 @@ module Mare::Compiler::AltInfer
           .not_nil!
       end
       def resolve!(ctx : Context, infer : TypeCheck::ForReifiedFunc) : Infer::MetaType?
-        mts = @infos.compact_map { |info| infer.resolve(ctx, info) }
+        mts = @infos.compact_map { |info| infer.resolve(ctx, info).as(Infer::MetaType?) }
         return nil if mts.empty?
         Infer::MetaType.new_union(mts)
       end
