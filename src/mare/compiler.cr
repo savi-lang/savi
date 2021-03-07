@@ -139,7 +139,7 @@ class Mare::Compiler
     when :eval then [:codegen]
     when :binary then [:codegen]
     when :binary_verona then [:codegen_verona]
-    when :serve_hover then [:refer, :infer]
+    when :serve_hover then [:refer, :type_check]
     when :serve_definition then [:refer, :infer]
     when :serve_lsp then [:serve_hover, :serve_definition]
     else raise NotImplementedError.new([:deps_of, target].inspect)

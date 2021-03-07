@@ -37,7 +37,7 @@ class Mare::Compiler::ServeHover
     messages = [] of String
 
     refer = ctx.refer[f_link]
-    infer = ctx.infer.for_func_simple(ctx, f_link.type, f_link)
+    type_check = ctx.type_check.for_func_simple(ctx, f_link.type, f_link)
     describe_type = "type"
 
     ref = refer[node]?
@@ -65,15 +65,15 @@ class Mare::Compiler::ServeHover
     else raise NotImplementedError.new(ref)
     end
 
-    infer_info = ctx.infer[f_link][node]?
+    type_check_info = ctx.type_check[f_link][node]?
     if node.is_a?(AST::Relate) && node.op.value == "."
       begin
         messages << "This is a function call on an inferred receiver type of " \
-                    "#{infer.analysis.resolved(ctx, node.lhs).show_type}."
+                    "#{type_check.analysis.resolved(ctx, node.lhs).show_type}."
       rescue
       end
-    elsif infer_info.is_a? Infer::FromCall
-      infer_info.follow_call_get_call_defns(ctx, infer).not_nil!.each do |x, y, z|
+    elsif type_check_info.is_a? Infer::FromCall
+      type_check_info.follow_call_get_call_defns(ctx, type_check).not_nil!.each do |x, y, z|
         unless y.nil?
           messages << "This is a function call on type #{y.show_type}."
           describe_type = "return type"
@@ -83,7 +83,7 @@ class Mare::Compiler::ServeHover
     end
 
     begin
-      inf = infer.analysis.resolved(ctx, node)
+      inf = type_check.analysis.resolved(ctx, node)
       messages << "It has an inferred #{describe_type} of #{inf.show_type}."
     rescue
     end
