@@ -56,6 +56,11 @@ module Mare::Compiler::TypeContext
       @layers[@non_root_nodes.fetch(node, 0)]?
     end
 
+    protected def observe_root_layer(layer : Layer)
+      raise "root layer must be observed first" if @layers.any?
+      @layers = [layer]
+    end
+
     protected def observe_node(node : AST::Node, layer : Layer)
       layer_index = @layers.index(layer)
 
@@ -74,6 +79,7 @@ module Mare::Compiler::TypeContext
 
     def initialize(func : Program::Function, @analysis, @refer)
       @layer_stack = [Layer.new(func.ast)] # start with a root layer
+      @analysis.observe_root_layer(current_layer)
     end
 
     def current_layer
@@ -110,8 +116,15 @@ module Mare::Compiler::TypeContext
             negative_conds + prior_positive_conds,
             current_layer
           )
-          prior_positive_conds.concat(positive_conds)
-          prior_negative_conds.concat(negative_conds)
+          prior_positive_conds += positive_conds
+          prior_negative_conds += negative_conds
+        else
+          layer = Layer.new(
+            body,
+            prior_negative_conds,
+            prior_positive_conds,
+            current_layer
+          )
         end
 
         cond.accept(ctx, self)
