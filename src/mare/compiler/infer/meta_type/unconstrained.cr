@@ -77,6 +77,14 @@ class Mare::Compiler::Infer::MetaType::Unconstrained
     self # no type params are present to be substituted
   end
 
+  def substitute_lazy_type_params(substitutions : Hash(TypeParam, MetaType), max_depth : Int)
+    self # no type params are present to be substituted
+  end
+
+  def gather_lazy_type_params_referenced(ctx : Context, set : Set(TypeParam), max_depth : Int) : Set(TypeParam)
+    set # no type params are present to be gathered
+  end
+
   def is_sendable?
     # Unconstrained is never sendable - it makes no guarantees at all.
     false

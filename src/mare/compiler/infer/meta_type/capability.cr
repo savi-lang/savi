@@ -337,6 +337,14 @@ struct Mare::Compiler::Infer::MetaType::Capability
     self # no type params are present to be substituted
   end
 
+  def substitute_lazy_type_params(substitutions : Hash(TypeParam, MetaType), max_depth : Int)
+    self # no type params are present to be substituted
+  end
+
+  def gather_lazy_type_params_referenced(ctx : Context, set : Set(TypeParam), max_depth : Int) : Set(TypeParam)
+    set # no type params are present to be gathered
+  end
+
   def is_sendable?
     case self
     when ISO_EPH, TRN_EPH

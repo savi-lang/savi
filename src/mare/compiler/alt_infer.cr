@@ -24,7 +24,7 @@ module Mare::Compiler::AltInfer
   alias ReifiedType = Infer::ReifiedType
 
   struct Span
-    alias Key = Info | Symbol
+    alias Key = Info | Symbol | Infer::TypeParam
 
     getter inner : Inner
     def initialize(@inner)
@@ -61,35 +61,6 @@ module Mare::Compiler::AltInfer
 
     def self.error(*args); new(ErrorPropagate.new(Error.build(*args))); end
 
-    def self.self_with_reify_cap(ctx : Context, infer : Visitor)
-      rt_args = infer
-        .type_params_for(ctx, infer.link.type)
-        .map { |type_param| MetaType.new_type_param(type_param) }
-
-      rt = ReifiedType.new(infer.link.type, rt_args)
-      f = infer.func
-      f_cap_value = f.cap.value
-      f_cap_value = "ref" if f.has_tag?(:constructor)
-      f_cap_value = "read" if f_cap_value == "box" # TODO: figure out if we can remove this Pony-originating semantic hack
-      Span.decision(
-        :f_cap,
-        MetaType::Capability.new_maybe_generic(f_cap_value).each_cap.map do |cap|
-          cap_mt = MetaType.new(cap)
-          {cap_mt, Span.simple(MetaType.new(rt).override_cap(cap_mt))}
-        end.to_h
-      )
-    end
-
-    def self.self_ephemeral_with_cap(ctx : Context, infer : Visitor, cap : String)
-      rt_args = infer
-        .type_params_for(ctx, infer.link.type)
-        .map { |type_param| MetaType.new_type_param(type_param) }
-
-      rt = ReifiedType.new(infer.link.type, rt_args)
-      mt = MetaType.new(rt, cap).ephemeralize
-      simple(mt)
-    end
-
     def any_error?
       inner.any_error?
     end
@@ -109,6 +80,10 @@ module Mare::Compiler::AltInfer
 
     def any_mt?(&block : MetaType -> Bool) : Bool
       inner.any_mt?(&block)
+    end
+
+    def each_mt(&block : MetaType -> Nil) : Nil
+      inner.each_mt(&block)
     end
 
     def transform_mt(&block : MetaType -> MetaType) : Span
@@ -132,9 +107,21 @@ module Mare::Compiler::AltInfer
       mt_block = ->(a : MetaType, b : MetaType) {
         Span.simple(block.call(a, b))
       }
-      Span.new(inner.combine_mt_to_span(other.inner, nil, &mt_block))
+      Span.new(inner.combine_mt_to_span(other.inner, nil, true, &mt_block))
     end
 
+    def reduce_combine_mts(spans : Array(Span), &block : (MetaType, MetaType) -> MetaType) : Span
+      case spans.size
+      when 0; self
+      when 1; combine_mt(spans.last, &block)
+      else
+        spans.reduce(self) { |span, other_span|
+          span.combine_mt(other_span, &block)
+        }
+      end
+    end
+
+    # TODO: Remove this method in favor of the one above
     def combine_mts(spans : Array(Span), &block : (MetaType, Array(MetaType)) -> MetaType) : Span
       others = spans.map(&.inner)
       if inner.is_a?(Terminal) && others.all?(&.is_a?(Terminal))
@@ -155,11 +142,29 @@ module Mare::Compiler::AltInfer
       elsif (other_error = others.find(&.is_a?(ErrorPropagate)))
         # Similarly for any ErrorPropagate we may find in the others list.
         Span.new(other_error)
+      elsif spans.size == 1
+        # If there's only one other span to combine with, delegate as singular.
+        wrap_block = ->(a : MetaType, b : MetaType) { block.call(a, [b]) }
+        combine_mt(spans.first, &wrap_block)
       else
         raise NotImplementedError.new("combine_mts")
       end
     end
 
+    def self.reduce_combine_mts(spans : Array(Span), &block : (MetaType, MetaType) -> MetaType) : Span?
+      case spans.size
+      when 0; nil
+      when 1; spans.first
+      when 2
+        spans.first.combine_mt(spans.last, &block)
+      else
+        spans[1..-1].reduce(spans.first) { |span, other_span|
+          span.combine_mt(other_span, &block)
+        }
+      end
+    end
+
+    # TODO: Remove this method in favor of the one above
     def self.combine_mts(spans : Array(Span), &block : Array(MetaType) -> MetaType) : Span?
       case spans.size
       when 0; nil
@@ -180,6 +185,11 @@ module Mare::Compiler::AltInfer
       .try { |new_inner| Span.new(new_inner) }
     end
 
+    def deciding_type_param(type_param : Infer::TypeParam, cap : MetaType) : Span?
+      inner.deciding_type_param(type_param, cap)
+      .try { |new_inner| Span.new(new_inner) }
+    end
+
     def maybe_fallback_based_on_mt_simplify(options : Array({Symbol, Span}))
       Span.new(inner.maybe_fallback_based_on_mt_simplify(
         options.map { |(cond, span)| {cond, span.inner} }
@@ -197,11 +207,13 @@ module Mare::Compiler::AltInfer
       abstract def gather_all_keys(set = Set(Key).new) : Set(Key)
       abstract def all_terminal_meta_types : Array(MetaType)
       abstract def any_mt?(&block : MetaType -> Bool) : Bool
+      abstract def each_mt(&block : MetaType -> Nil) : Nil
       abstract def transform_mt(&block : MetaType -> MetaType) : Inner
       abstract def transform_mt_using(key : Key, maybe_value : MetaType?, &block : (MetaType, MetaType?) -> MetaType) : Inner
       abstract def decided_by(key : Key, orig_keys : Set(Key), &block : MetaType -> Enumerable({MetaType, Span})) : Inner
-      abstract def combine_mt_to_span(other : Inner, maybe_other_terminal : Terminal?, &block : (MetaType, MetaType) -> Span) : Inner
+      abstract def combine_mt_to_span(other : Inner, maybe_other_terminal : Terminal?, always_yields_terminal = false, &block : (MetaType, MetaType) -> Span) : Inner
       abstract def deciding_f_cap(f_cap_mt : MetaType, is_constructor : Bool) : Inner?
+      abstract def deciding_type_param(type_param : Infer::TypeParam, cap : MetaType) : Inner?
       abstract def maybe_fallback_based_on_mt_simplify(options : Array({Symbol, Inner})) : Inner
       abstract def final_mt_simplify(ctx : Context) : Inner
     end
@@ -239,6 +251,10 @@ module Mare::Compiler::AltInfer
         block.call(meta_type)
       end
 
+      def each_mt(&block : MetaType -> Nil) : Nil
+        block.call(meta_type)
+      end
+
       def transform_mt(&block : MetaType -> MetaType) : Inner
         Terminal.new(block.call(meta_type))
       end
@@ -258,7 +274,7 @@ module Mare::Compiler::AltInfer
         Decision.build(key, map)
       end
 
-      def combine_mt_to_span(other : Inner, maybe_other_terminal : Terminal?, &block : (MetaType, MetaType) -> Span) : Inner
+      def combine_mt_to_span(other : Inner, maybe_other_terminal : Terminal?, always_yields_terminal = false, &block : (MetaType, MetaType) -> Span) : Inner
         if maybe_other_terminal
           block.call(self.meta_type, maybe_other_terminal.meta_type).inner
         else
@@ -268,7 +284,11 @@ module Mare::Compiler::AltInfer
       end
 
       def deciding_f_cap(f_cap_mt : MetaType, is_constructor : Bool) : Inner?
-        self # a terminal node ignores f_cap_mt
+        self # a terminal node ignores further decisions
+      end
+
+      def deciding_type_param(type_param : Infer::TypeParam, cap : MetaType) : Inner?
+        self # a terminal node ignores further decisions
       end
 
       def maybe_fallback_based_on_mt_simplify(options : Array({Symbol, Inner})) : Inner
@@ -369,6 +389,10 @@ module Mare::Compiler::AltInfer
         map.values.any?(&.any_mt?(&block))
       end
 
+      def each_mt(&block : MetaType -> Nil) : Nil
+        map.values.each(&.each_mt(&block))
+      end
+
       def transform_mt(&block : MetaType -> MetaType) : Inner
         Decision.build(@key, @map.transform_values(&.transform_mt(&block)))
       end
@@ -390,13 +414,41 @@ module Mare::Compiler::AltInfer
         Decision.build(@key, @map.transform_values(&.decided_by(key, orig_keys, &block)))
       end
 
-      def combine_mt_to_span(other : Inner, maybe_other_terminal : Terminal?, &block : (MetaType, MetaType) -> Span) : Inner
+      def combine_mt_to_span(other : Inner, maybe_other_terminal : Terminal?, always_yields_terminal = false, &block : (MetaType, MetaType) -> Span) : Inner
         if maybe_other_terminal
-          Decision.build(@key, @map.transform_values(&.combine_mt_to_span(other, maybe_other_terminal, &block).as(Inner)))
+          Decision.build(@key, @map.transform_values(&.combine_mt_to_span(other, maybe_other_terminal, always_yields_terminal, &block).as(Inner)))
         else
           if other.is_a?(Terminal)
             swap_block = -> (b : MetaType, a : MetaType) { block.call(a, b) }
-            return other.combine_mt_to_span(self, nil, &swap_block)
+            return other.combine_mt_to_span(self, nil, always_yields_terminal, &swap_block)
+          elsif other.is_a?(Decision) && other.key != @key \
+            && @map.values.all?(&.is_a?(Terminal)) \
+            && other.map.values.all?(&.is_a?(Terminal))
+            # This is one easy special case we can handle right now.
+            # We easily handle it because we don't need to do any merging keys.
+            Decision.build(@key, @map.transform_values(&.combine_mt_to_span(other, nil, always_yields_terminal, &block).as(Inner)))
+          elsif other.is_a?(Decision) && other.key == @key \
+            && other.map.keys.all? { |other_value| @map.has_key?(other_value) }
+            # Here's another simple case. We have the same key and a map with
+            # all the same values, so we can trivially merge them pairwise.
+            Decision.build(@key, @map.map { |value, inner|
+              {value, inner.combine_mt_to_span(other.map[value], nil, always_yields_terminal, &block)}
+              .as({MetaType, Inner})
+            }.to_h)
+          elsif @map.all? { |value, inner|
+            inner.is_a?(Decision) && other.is_a?(Decision) \
+            && other.key == inner.key \
+            && other.map.keys.all? { |other_value| inner.map.has_key?(other_value) } \
+            && other.map.values.all? { |other_inner| other_inner.is_a?(Terminal) }
+          }
+            # This is getting a bit ridiculous! We need to write the code that
+            # handles the general case, but this is a special case we handle.
+            Decision.build(@key, @map.transform_values(&.combine_mt_to_span(other, nil, always_yields_terminal, &block).as(Inner)))
+          elsif always_yields_terminal \
+            && (other_keys = other.gather_all_keys; true) \
+            && gather_all_keys.all? { |key| !other_keys.includes?(key) }
+            # If we know we have no overlapping keys, we can descend to the next level.
+            Decision.build(@key, @map.transform_values(&.combine_mt_to_span(other, nil, always_yields_terminal, &block).as(Inner)))
           else
             raise NotImplementedError.new("combine_mt_to_span for a decision and another non-terminal")
           end
@@ -418,6 +470,21 @@ module Mare::Compiler::AltInfer
           Decision.build(@key,
             @map.transform_values do |inner|
               new_inner = inner.deciding_f_cap(f_cap_mt, is_constructor)
+              return nil unless new_inner
+              new_inner
+            end
+          )
+        end
+      end
+
+      def deciding_type_param(type_param : Infer::TypeParam, cap : MetaType) : Inner?
+        key = @key
+        if key.is_a?(Infer::TypeParam) && key == type_param
+          @map[cap]?
+        else
+          Decision.build(@key,
+            @map.transform_values do |inner|
+              new_inner = inner.deciding_type_param(type_param, cap)
               return nil unless new_inner
               new_inner
             end
@@ -500,6 +567,11 @@ module Mare::Compiler::AltInfer
         @default.value.any_mt?(&block) || @options.any?(&.last.any_mt?(&block))
       end
 
+      def each_mt(&block : MetaType -> Nil) : Nil
+        @default.value.each_mt(&block)
+        @options.each(&.last.each_mt(&block))
+      end
+
       def transform_mt(&block : MetaType -> MetaType) : Inner
         Fallback.build(
           @default.value.transform_mt(&block),
@@ -524,17 +596,17 @@ module Mare::Compiler::AltInfer
         )
       end
 
-      def combine_mt_to_span(other : Inner, maybe_other_terminal : Terminal?, &block : (MetaType, MetaType) -> Span) : Inner
+      def combine_mt_to_span(other : Inner, maybe_other_terminal : Terminal?, always_yields_terminal = false, &block : (MetaType, MetaType) -> Span) : Inner
         if maybe_other_terminal
           Fallback.build(
-            @default.value.combine_mt_to_span(other, maybe_other_terminal, &block),
+            @default.value.combine_mt_to_span(other, maybe_other_terminal, always_yields_terminal, &block),
             @evaluate_mt,
-            @options.map { |(cond, inner)| {cond, inner.combine_mt_to_span(other, maybe_other_terminal, &block).as(Inner)} }
+            @options.map { |(cond, inner)| {cond, inner.combine_mt_to_span(other, maybe_other_terminal, always_yields_terminal, &block).as(Inner)} }
           )
         else
           if other.is_a?(Terminal)
             swap_block = -> (b : MetaType, a : MetaType) { block.call(a, b) }
-            return other.combine_mt_to_span(self, nil, &swap_block)
+            return other.combine_mt_to_span(self, nil, always_yields_terminal, &swap_block)
           else
             raise NotImplementedError.new("combine_mt_to_span for a fallback and another non-terminal")
           end
@@ -551,6 +623,24 @@ module Mare::Compiler::AltInfer
           @evaluate_mt,
           @options.map { |(cond, inner)|
             new_inner = inner.deciding_f_cap(f_cap_mt, is_constructor)
+            raise NotImplementedError.new("new_inner missing in Fallback.build") \
+              unless new_inner
+
+            {cond, new_inner}
+          }
+        )
+      end
+
+      def deciding_type_param(type_param : Infer::TypeParam, cap : MetaType) : Inner?
+        new_default = @default.value.deciding_type_param(type_param, cap)
+        raise NotImplementedError.new("new_default missing in Fallback.build") \
+          unless new_default
+
+        Fallback.build(
+          new_default,
+          @evaluate_mt,
+          @options.map { |(cond, inner)|
+            new_inner = inner.deciding_type_param(type_param, cap)
             raise NotImplementedError.new("new_inner missing in Fallback.build") \
               unless new_inner
 
@@ -618,6 +708,10 @@ module Mare::Compiler::AltInfer
         false
       end
 
+      def each_mt(&block : MetaType -> Nil) : Nil
+        nil
+      end
+
       def transform_mt(&block : MetaType -> MetaType) : Inner
         self
       end
@@ -630,11 +724,15 @@ module Mare::Compiler::AltInfer
         self
       end
 
-      def combine_mt_to_span(other : Inner, maybe_other_terminal : Terminal?, &block : (MetaType, MetaType) -> Span) : Inner
+      def combine_mt_to_span(other : Inner, maybe_other_terminal : Terminal?, always_yields_terminal = false, &block : (MetaType, MetaType) -> Span) : Inner
         self
       end
 
       def deciding_f_cap(f_cap_mt : MetaType, is_constructor : Bool) : Inner?
+        self
+      end
+
+      def deciding_type_param(type_param : Infer::TypeParam, cap : MetaType) : Inner?
         self
       end
 
@@ -679,6 +777,7 @@ module Mare::Compiler::AltInfer
       @type_context : TypeContext::Analysis,
       @pre_infer : PreInfer::Analysis,
     )
+      @currently_looking_up_param_bounds = Set(Infer::TypeParam).new
       @substs_for_layer = Hash(TypeContext::Layer, Hash(Infer::TypeParam, Infer::MetaType)).new
     end
 
@@ -694,6 +793,24 @@ module Mare::Compiler::AltInfer
 
         span = info.resolve_span!(ctx, self)
         span = span.transform_mt(&.substitute_type_params(substs.not_nil!)) if substs
+
+        # substitute lazy type params if needed
+        lazy_type_params = Set(Infer::TypeParam).new
+        max_depth = 1
+        span.each_mt { |mt|
+          mt.gather_lazy_type_params_referenced(ctx, lazy_type_params, max_depth)
+        }
+        if lazy_type_params.any?
+          span = lazy_type_params.reduce(span) { |span, type_param|
+            type_param_span = lookup_type_param_partial_reified_span(ctx, type_param)
+
+            span.combine_mt(type_param_span) { |mt, type_param_mt|
+              mt.substitute_lazy_type_params({
+                type_param => type_param_mt # MetaType.new_type_param(type_param).intersect(type_param_mt.cap_only)
+              }, max_depth)
+            }
+          }
+        end
 
         @analysis[info] = span
 
@@ -713,15 +830,61 @@ module Mare::Compiler::AltInfer
       }) || [] of Infer::TypeParam
     end
 
+     # TODO: remove this in favor of the span-returning function below.
     def lookup_type_param_bound(ctx : Context, type_param : Infer::TypeParam)
+      span = lookup_type_param_bound_span(ctx, type_param)
+      MetaType.new_union(span.all_terminal_meta_types)
+    end
+    def lookup_type_param_bound_span(ctx : Context, type_param : Infer::TypeParam)
+      @currently_looking_up_param_bounds.add(type_param)
+
       ref = type_param.ref
       raise "lookup on wrong visitor" unless ref.parent_link == link.type
-      span = type_expr_span(ctx, ref.bound)
-      MetaType.new_union(span.all_terminal_meta_types) # TODO: return a proper span instead of dumb union MetaType
+      type_expr_span(ctx, ref.bound)
+
+      .tap { @currently_looking_up_param_bounds.delete(type_param) }
+    end
+    def lookup_type_param_partial_reified_span(ctx : Context, type_param : Infer::TypeParam)
+      # Avoid infinite recursion by taking a lazy approach if we are already
+      # recursed into this type param's bound resolution.
+      # This lazy reference can be unwrapped by other logic later as needed.
+      if @currently_looking_up_param_bounds.includes?(type_param)
+        lazy = Infer::TypeParam.new(type_param.ref)
+        lazy.lazy = true
+        return Span.simple(MetaType.new_type_param(lazy))
+      end
+
+      # Otherwise, continue by looking up the bound of this type param,
+      # and intersect it with the type param reference itself, expanding the
+      # span to include every possible single cap instead of using a multi-cap.
+      lookup_type_param_bound_span(ctx, type_param).decided_by(type_param) { |bound_mt|
+        bound_mt.cap_only_inner.each_cap.map { |cap|
+          cap_mt = MetaType.new(cap)
+          mt = MetaType
+            .new_type_param(type_param)
+            .intersect(cap_mt)
+            # .intersect(bound_mt.strip_cap)
+          # TODO: Introduce a Fact Span that adds the bound_mt as a fact?
+          {cap_mt, Span.simple(mt)}
+        }.to_h
+      }
+    end
+
+    def unwrap_lazy_parts_of_type_expr_span(ctx : Context, span : Span) : Span
+      span # TODO
+      # # Currently the only lazy part is type params nested in type args.
+      # # But in the future we will also handle type aliases here.
+      # type_params = type_params_for(ctx, link.type)
+      # type_param_spans = type_params.map { |type_param|
+      #   lookup_type_param_partial_reified_span(ctx, type_param).as(Span)
+      # }
+      # span.combine_mts(type_param_spans) { |mt, type_param_mts|
+      #   mt.substitute_type_params_in_type_args(type_params.zip(type_param_mts).to_h)
+      # }
     end
 
     def substs_for(ctx : Context, rt : Infer::ReifiedType) : Hash(Infer::TypeParam, Infer::MetaType)
-      type_params_for(ctx, rt.link).zip(rt.args).to_h
+      type_params_for(ctx, rt.link).zip(rt.args.map(&.strip_cap)).to_h
     end
 
     def substs_for_layer(ctx : Context, node : AST::Node) : Hash(Infer::TypeParam, Infer::MetaType)?
@@ -749,6 +912,69 @@ module Mare::Compiler::AltInfer
       )
     end
 
+    def self_with_no_cap_yet(ctx : Context)
+      link = self.link
+
+      # Get the spans for each partially reified type param in this type.
+      type_param_spans = type_params_for(ctx, link.type).map { |type_param|
+        lookup_type_param_partial_reified_span(ctx, type_param).as(Span)
+      }
+
+      # Combine the spans in all combinations of those partial reifications.
+      # If there are no type params to combine, we just use a simple span.
+      Span.simple(MetaType.new_nominal(ReifiedType.new(link.type)))
+        .reduce_combine_mts(type_param_spans) { |accum_mt, arg_mt|
+          rt = accum_mt.single!
+          MetaType.new_nominal(ReifiedType.new(rt.link, rt.args + [arg_mt]))
+        }
+    end
+
+    def self_with_reify_cap(ctx : Context)
+      rt_span = self_with_no_cap_yet(ctx)
+
+      # Finally, build the top of the span's decision tree with possible f_caps.
+      f = self.func
+      f_cap_value = f.cap.value
+      f_cap_value = "ref" if f.has_tag?(:constructor)
+      f_cap_value = "read" if f_cap_value == "box" # TODO: figure out if we can remove this Pony-originating semantic hack
+      Span.decision(
+        :f_cap,
+        MetaType::Capability.new_maybe_generic(f_cap_value).each_cap.map do |cap|
+          cap_mt = MetaType.new(cap)
+          {cap_mt, rt_span.transform_mt(&.intersect(cap_mt))}
+        end.to_h
+      )
+    end
+
+    def self_ephemeral_with_cap(ctx : Context, cap : String)
+      self_with_no_cap_yet(ctx)
+        .transform_mt(&.intersect(MetaType.cap(cap)).ephemeralize)
+    end
+
+    def deciding_type_args_of(ctx : Context, rt : Infer::ReifiedType, raw_span : Span) : Span
+      return raw_span if rt.args.empty?
+
+      # Many spans are simple terminals, so we can optimize things a bit here
+      # by skipping the rest of this deciding when there is nothing to decide
+      # because terminals have no decisions to be made.
+      return raw_span if raw_span.inner.is_a?(Span::Terminal)
+
+      type_params_for(ctx, rt.link).zip(rt.args)
+      .reduce(raw_span) { |span, (type_param, type_arg)|
+        next unless span
+
+        # When a type argument is passed from a raw type param,
+        # we do not decide the capability here, because the type param
+        # does not necessarily have just one capability.
+        # TODO: Should we figure out how to combine the spans in some way
+        # to make at least a span-contingent decision here?
+        next span if type_arg.type_param_only?
+
+        span.deciding_type_param(type_param, type_arg.cap_only)
+      }
+      .not_nil!
+    end
+
     def depends_on_call_ret_span(ctx, other_rt, other_f, other_f_link)
       deps = ctx.alt_infer_edge.gather_deps_for_func(ctx, other_f, other_f_link)
       visitor = Visitor.new(other_f, other_f_link, Analysis.new, *deps)
@@ -756,7 +982,9 @@ module Mare::Compiler::AltInfer
       # TODO: Track dependencies and invalidate cache based on those.
       other_pre = deps.last
       other_analysis = ctx.alt_infer_edge.run_for_func(ctx, other_f, other_f_link)
-      other_analysis[other_pre[other_f.ident]]
+      raw_span = other_analysis[other_pre[other_f.ident]]
+
+      visitor.deciding_type_args_of(ctx, other_rt, raw_span)
       .transform_mt(&.substitute_type_params(visitor.substs_for(ctx, other_rt)))
     end
 
@@ -767,7 +995,9 @@ module Mare::Compiler::AltInfer
       # TODO: Track dependencies and invalidate cache based on those.
       other_pre = deps.last
       other_analysis = ctx.alt_infer_edge.run_for_func(ctx, other_f, other_f_link)
-      other_analysis[other_pre[AST::Extract.params(other_f.params)[index].first]]
+      raw_span = other_analysis[other_pre[AST::Extract.params(other_f.params)[index].first]]
+
+      visitor.deciding_type_args_of(ctx, other_rt, raw_span)
       .transform_mt(&.substitute_type_params(visitor.substs_for(ctx, other_rt)))
     end
 
@@ -780,7 +1010,9 @@ module Mare::Compiler::AltInfer
       yield_in_info = other_pre.yield_in_info
       return unless yield_in_info
       other_analysis = ctx.alt_infer_edge.run_for_func(ctx, other_f, other_f_link)
-      other_analysis[yield_in_info]
+      raw_span = other_analysis[yield_in_info]
+
+      visitor.deciding_type_args_of(ctx, other_rt, raw_span)
       .transform_mt(&.substitute_type_params(visitor.substs_for(ctx, other_rt)))
     end
 
@@ -793,7 +1025,9 @@ module Mare::Compiler::AltInfer
       yield_out_info = other_pre.yield_out_infos[index]?
       return unless yield_out_info
       other_analysis = ctx.alt_infer_edge.run_for_func(ctx, other_f, other_f_link)
-      other_analysis[yield_out_info]
+      raw_span = other_analysis[yield_out_info]
+
+      visitor.deciding_type_args_of(ctx, other_rt, raw_span)
       .transform_mt(&.substitute_type_params(visitor.substs_for(ctx, other_rt)))
     end
 
@@ -841,16 +1075,16 @@ module Mare::Compiler::AltInfer
 
     # An identifier type expression must refer to a type.
     def type_expr_span(ctx : Context, node : AST::Identifier) : Span
-      ref = refer_type[node]?
+      ref = refer_type[node]? || refer_type_parent[node]?
       case ref
       when Refer::Self
-        Span.self_with_reify_cap(ctx, self)
+        self_with_reify_cap(ctx)
       when Refer::Type
         Span.simple(Infer::MetaType.new(Infer::ReifiedType.new(ref.link)))
       # when Refer::TypeAlias
       #   Infer::MetaType.new_alias(reified_type_alias(ref.link_alias))
       when Refer::TypeParam
-        Span.simple(Infer::MetaType.new_type_param(Infer::TypeParam.new(ref)))
+        lookup_type_param_partial_reified_span(ctx, Infer::TypeParam.new(ref))
       when nil
         Span.simple(Infer::MetaType.new(type_expr_cap(node)))
       else
@@ -874,11 +1108,11 @@ module Mare::Compiler::AltInfer
           end
         end
       elsif node.op.value == "->"
-        lhs = type_expr_span(ctx, node.lhs)
+        lhs = type_expr_span(ctx, node.lhs).transform_mt(&.cap_only)
         rhs = type_expr_span(ctx, node.rhs)
         lhs.combine_mt(rhs) { |lhs_mt, rhs_mt| rhs_mt.viewed_from(lhs_mt) }
       elsif node.op.value == "->>"
-        lhs = type_expr_span(ctx, node.lhs)
+        lhs = type_expr_span(ctx, node.lhs).transform_mt(&.cap_only)
         rhs = type_expr_span(ctx, node.rhs)
         lhs.combine_mt(rhs) { |lhs_mt, rhs_mt| rhs_mt.extracted_from(lhs_mt) }
       else

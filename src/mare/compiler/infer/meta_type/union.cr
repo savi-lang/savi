@@ -427,6 +427,48 @@ struct Mare::Compiler::Infer::MetaType::Union
     result
   end
 
+  def substitute_lazy_type_params(substitutions : Hash(TypeParam, MetaType), max_depth : Int)
+    result = Unsatisfiable.instance
+
+    caps.try(&.each { |cap|
+      result = result.unite(cap.substitute_lazy_type_params(substitutions, max_depth))
+    })
+
+    terms.try(&.each { |term|
+      result = result.unite(term.substitute_lazy_type_params(substitutions, max_depth))
+    })
+
+    anti_terms.try(&.each { |anti_term|
+      result = result.unite(anti_term.substitute_lazy_type_params(substitutions, max_depth))
+    })
+
+    intersects.try(&.each { |intersect|
+      result = result.unite(intersect.substitute_lazy_type_params(substitutions, max_depth))
+    })
+
+    result
+  end
+
+  def gather_lazy_type_params_referenced(ctx : Context, set : Set(TypeParam), max_depth : Int) : Set(TypeParam)
+    caps.try(&.each { |cap|
+      cap.gather_lazy_type_params_referenced(ctx, set, max_depth)
+    })
+
+    terms.try(&.each { |term|
+      term.gather_lazy_type_params_referenced(ctx, set, max_depth)
+    })
+
+    anti_terms.try(&.each { |anti_term|
+      anti_term.gather_lazy_type_params_referenced(ctx, set, max_depth)
+    })
+
+    intersects.try(&.each { |intersect|
+      intersect.gather_lazy_type_params_referenced(ctx, set, max_depth)
+    })
+
+    set
+  end
+
   def is_sendable?
     (!caps || caps.not_nil!.all?(&.is_sendable?)) &&
     (!terms || terms.not_nil!.all?(&.is_sendable?)) &&

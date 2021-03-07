@@ -213,7 +213,7 @@
 
   :fun reject
     :yields for Bool
-    new_array = Array(A'aliased).new
+    new_array = Array(A'aliased).new // TODO: allow the caller to specify space
     index USize = 0
     while (index < @_size) (
       element = @_ptr._get_at(index)

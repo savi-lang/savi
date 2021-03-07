@@ -91,7 +91,7 @@ module Mare::Compiler::AltInfer
       def resolve_span!(ctx : Context, infer : Visitor) : Span
         spans = @infos.map { |info| infer.resolve(ctx, info) }
         Span
-          .combine_mts(spans) { |mts| Infer::MetaType.new_union(mts) }
+          .reduce_combine_mts(spans) { |accum, mt| accum.unite(mt) }
           .not_nil!
       end
       def resolve!(ctx : Context, infer : TypeCheck::ForReifiedFunc) : Infer::MetaType

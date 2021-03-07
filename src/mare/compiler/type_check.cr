@@ -397,7 +397,7 @@ class Mare::Compiler::TypeCheck
         # Get the MetaType of the bound.
         param_ref = refer_type[param.as(AST::Identifier)].as(Refer::TypeParam)
         bound_node = param_ref.bound
-        bound_mt = self.for_rt(ctx, no_args_rt).type_expr(bound_node, refer_type)
+        bound_mt = self.for_rt(ctx, no_args_rt).type_expr_cap_only(bound_node, refer_type)
 
         # TODO: Refactor the partial_reifications to return cap only already.
         caps = bound_mt.partial_reifications.map(&.cap_only)
@@ -701,6 +701,85 @@ class Mare::Compiler::TypeCheck
       raise NotImplementedError.new(node.to_a)
     end
 
+    # TODO: Somehow unify type_expr_cap_only with the above,
+    # or get rid of them both entirely in favor of what is in AltInfer.
+
+    # An identifier type expression must refer_type to a type.
+    def type_expr_cap_only(node : AST::Identifier, refer_type, receiver = nil) : MetaType
+      ref = refer_type[node]?
+      case ref
+      when Refer::Self
+        (receiver || MetaType.new(reified)).cap_only
+      when Refer::Type
+        MetaType.new(reified_type(ref.link)).cap_only
+      when Refer::TypeAlias
+        MetaType.new_alias(reified_type_alias(ref.link_alias)).cap_only
+      when Refer::TypeParam
+        lookup_type_param(ref, receiver).cap_only
+      when nil
+        case node.value
+        when "iso", "trn", "val", "ref", "box", "tag", "non"
+          MetaType.new(MetaType::Capability.new(node.value))
+        when "any", "alias", "send", "share", "read"
+          MetaType.new(MetaType::Capability.new_generic(node.value))
+        else
+          Error.at node, "This type couldn't be resolved"
+        end
+      else
+        raise NotImplementedError.new(ref.inspect)
+      end
+    end
+
+    # An relate type expression must be an explicit capability qualifier.
+    def type_expr_cap_only(node : AST::Relate, refer_type, receiver = nil) : MetaType
+      if node.op.value == "'"
+        cap_ident = node.rhs.as(AST::Identifier)
+        case cap_ident.value
+        when "aliased"
+          type_expr_cap_only(node.lhs, refer_type, receiver).simplify(ctx).alias
+        else
+          cap = type_expr_cap_only(cap_ident, refer_type, receiver)
+          type_expr_cap_only(node.lhs, refer_type, receiver).simplify(ctx).override_cap(cap)
+        end
+      elsif node.op.value == "->"
+        type_expr_cap_only(node.rhs, refer_type, receiver).simplify(ctx).viewed_from(type_expr_cap_only(node.lhs, refer_type, receiver))
+      elsif node.op.value == "->>"
+        type_expr_cap_only(node.rhs, refer_type, receiver).simplify(ctx).extracted_from(type_expr_cap_only(node.lhs, refer_type, receiver))
+      else
+        raise NotImplementedError.new(node.to_a.inspect)
+      end
+    end
+
+    # A "|" group must be a union of type expressions, and a "(" group is
+    # considered to be just be a single parenthesized type expression (for now).
+    def type_expr_cap_only(node : AST::Group, refer_type, receiver = nil) : MetaType
+      if node.style == "|"
+        MetaType.new_union(
+          node.terms
+          .select { |t| t.is_a?(AST::Group) && t.terms.size > 0 }
+          .map { |t| type_expr_cap_only(t, refer_type, receiver).as(MetaType)}
+        )
+      elsif node.style == "(" && node.terms.size == 1
+        type_expr_cap_only(node.terms.first, refer_type, receiver)
+      else
+        raise NotImplementedError.new(node.to_a.inspect)
+      end
+    end
+
+    # A "(" qualify is used to add type arguments to a type.
+    def type_expr_cap_only(node : AST::Qualify, refer_type, receiver = nil) : MetaType
+      raise NotImplementedError.new(node.to_a) unless node.group.style == "("
+
+      # Type arguments do not contribute to the type expression's cap,
+      # so we ignore them here and only consider the term.
+      type_expr_cap_only(node.term, refer_type, receiver)
+    end
+
+    # All other AST nodes are unsupported as type expressions.
+    def type_expr_cap_only(node : AST::Node, refer_type, receiver = nil) : MetaType
+      raise NotImplementedError.new(node.to_a)
+    end
+
     # TODO: Can we do this more eagerly? Chicken and egg problem.
     # Can every TypeParam contain the parent_rt from birth, so we can avoid
     # the cost of scanning and substituting them here later?
@@ -774,6 +853,17 @@ class Mare::Compiler::TypeCheck
 
         ctx.type_check.for_rt!(trait).analysis.subtyping.assert(reified, f.ident.pos)
       end
+    end
+
+    def type_params_and_type_args(ctx)
+      type_params =
+        @reified.link.resolve(ctx).params.try(&.terms.map { |type_param|
+          ident = AST::Extract.type_param(type_param).first
+          ref = @refer_type[ident]?
+          Infer::TypeParam.new(ref.as(Refer::TypeParam))
+        }) || [] of Infer::TypeParam
+
+      type_params.zip(@reified.args)
     end
 
     def get_type_param_bound(index : Int32)
@@ -877,10 +967,24 @@ class Mare::Compiler::TypeCheck
       span = @f_analysis.span?(info)
       return MetaType.unconstrained unless span
 
-      filtered_span = span.deciding_f_cap(
-        reified.receiver_cap,
-        func.has_tag?(:constructor)
-      ).try(&.final_mt_simplify(ctx))
+      # Filter the span by deciding the function capability.
+      filtered_span = span
+        .deciding_f_cap(
+          reified.receiver_cap,
+          func.has_tag?(:constructor)
+        )
+
+      # Filter the span by deciding the type parameter capability.
+      if filtered_span && !filtered_span.inner.is_a?(AltInfer::Span::Terminal)
+        filtered_span = @for_rt.type_params_and_type_args(ctx)
+          .reduce(filtered_span) { |filtered_span, (type_param, type_arg)|
+            next unless filtered_span
+
+            filtered_span.deciding_type_param(type_param, type_arg.cap_only)
+          }
+      end
+
+      filtered_span = filtered_span.try(&.final_mt_simplify(ctx))
 
       inner = filtered_span.try(&.inner)
       return inner.meta_type if inner.is_a?(AltInfer::Span::Terminal)

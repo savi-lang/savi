@@ -383,6 +383,32 @@ struct Mare::Compiler::Infer::MetaType::Intersection
     result
   end
 
+  def substitute_lazy_type_params(substitutions : Hash(TypeParam, MetaType), max_depth : Int)
+    result = cap || Unconstrained.instance
+
+    terms.try(&.each { |term|
+      result = result.intersect(term.substitute_lazy_type_params(substitutions, max_depth))
+    })
+
+    anti_terms.try(&.each { |anti_term|
+      result = result.intersect(anti_term.substitute_lazy_type_params(substitutions, max_depth))
+    })
+
+    result
+  end
+
+  def gather_lazy_type_params_referenced(ctx : Context, set : Set(TypeParam), max_depth : Int) : Set(TypeParam)
+    terms.try(&.each { |term|
+      term.gather_lazy_type_params_referenced(ctx, set, max_depth)
+    })
+
+    anti_terms.try(&.each { |anti_term|
+      anti_term.gather_lazy_type_params_referenced(ctx, set, max_depth)
+    })
+
+    set
+  end
+
   def is_sendable?
     cap.try(&.is_sendable?) || ignores_cap? || false
   end
@@ -490,6 +516,8 @@ struct Mare::Compiler::Infer::MetaType::Intersection
   end
 
   def subtype_of?(ctx : Context, other : Intersection) : Bool
+    return true if self == other
+
     # Firstly, our cap must be a subtype of the other cap (if present).
     return false if other.cap && (
       !cap ||

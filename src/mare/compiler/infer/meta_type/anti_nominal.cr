@@ -140,6 +140,14 @@ struct Mare::Compiler::Infer::MetaType::AntiNominal
     raise NotImplementedError.new("#{self} substitute_type_params")
   end
 
+  def substitute_lazy_type_params(substitutions : Hash(TypeParam, MetaType), max_depth : Int)
+    raise NotImplementedError.new("#{self} substitute_lazy_type_params")
+  end
+
+  def gather_lazy_type_params_referenced(ctx : Context, set : Set(TypeParam), max_depth : Int) : Set(TypeParam)
+    raise NotImplementedError.new("#{self} gather_lazy_type_params_referenced")
+  end
+
   def is_sendable?
     # An anti-nominal is never itself sendable -
     # it excludes a single nominal, and says nothing about capabilities.

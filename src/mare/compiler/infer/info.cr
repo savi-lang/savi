@@ -398,12 +398,13 @@ class Mare::Compiler::Infer
         upstream_span
       elsif !downstreams_empty?
         # If we only have downstreams, just do our best with those.
-        AltInfer::Span.combine_mts(
+        AltInfer::Span.reduce_combine_mts(
           @downstreams.map do |pos, info, aliases|
             infer.resolve(ctx, info)
           end
-        ) { |mts| MetaType.new_intersection(mts).strip_ephemeral }
+        ) { |accum, mt| accum.intersect(mt) }
         .not_nil!
+        .transform_mt(&.strip_ephemeral)
       else
         # If we get here, we've failed and don't have enough info to continue.
         Error.at self,
@@ -555,7 +556,9 @@ class Mare::Compiler::Infer
     end
 
     def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
-      infer.type_expr_span(ctx, @node)
+      infer.unwrap_lazy_parts_of_type_expr_span(ctx,
+        infer.type_expr_span(ctx, @node)
+      )
     end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
@@ -572,7 +575,9 @@ class Mare::Compiler::Infer
     end
 
     def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
-      infer.type_expr_span(ctx, @node)
+      infer.unwrap_lazy_parts_of_type_expr_span(ctx,
+        infer.type_expr_span(ctx, @node)
+      )
     end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
@@ -599,7 +604,9 @@ class Mare::Compiler::Infer
         if @node.is_a?(AST::Identifier) \
         && infer.classify.further_qualified?(@node)
 
-      infer.type_expr_span(ctx, @node).transform_mt(&.override_cap("non"))
+      infer.unwrap_lazy_parts_of_type_expr_span(ctx,
+        infer.type_expr_span(ctx, @node).transform_mt(&.override_cap("non"))
+      )
     end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
@@ -630,7 +637,7 @@ class Mare::Compiler::Infer
     end
 
     def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
-      AltInfer::Span.self_with_reify_cap(ctx, infer)
+      infer.self_with_reify_cap(ctx)
     end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
@@ -645,7 +652,7 @@ class Mare::Compiler::Infer
     end
 
     def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
-      AltInfer::Span.self_ephemeral_with_cap(ctx, infer, @cap)
+      infer.self_ephemeral_with_cap(ctx, @cap)
     end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
@@ -861,7 +868,7 @@ class Mare::Compiler::Infer
     end
 
     def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
-      AltInfer::Span.self_with_reify_cap(ctx, infer).transform_mt do |call_mt|
+      infer.self_with_reify_cap(ctx).transform_mt do |call_mt|
         call_defn = call_mt.single!
         call_func = call_defn.defn(ctx).functions.find do |f|
           f.ident.value == @name && f.has_tag?(:field)
