@@ -19,7 +19,6 @@ class Mare::Compiler::CodeGen
       @vtable_size = 0
       @type_def.each_function(g.ctx).each do |reach_func|
         rf = reach_func.reified
-        infer = reach_func.infer
 
         unless rf.link.hygienic_id
           vtable_index = g.ctx.paint[g.ctx, reach_func]?

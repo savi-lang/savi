@@ -44,8 +44,8 @@ class Mare::Compiler::CodeGen
       @reach_func.reach_def
     end
 
-    def infer
-      @reach_func.infer
+    def type_check
+      @reach_func.type_check
     end
 
     def link

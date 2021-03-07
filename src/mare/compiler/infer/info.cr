@@ -910,7 +910,9 @@ class Mare::Compiler::Infer
   end
 
   class Field < DynamicInfo
-    def initialize(@pos, @layer_index, @name : String)
+    getter name : String
+
+    def initialize(@pos, @layer_index, @name)
       @upstreams = [] of Info
     end
 

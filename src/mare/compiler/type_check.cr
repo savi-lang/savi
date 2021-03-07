@@ -162,6 +162,7 @@ class Mare::Compiler::TypeCheck
     @f_analyses = {} of Program::Function::Link => FuncAnalysis
     @map = {} of ReifiedFunction => ForReifiedFunc
     @types = {} of ReifiedType => ForReifiedType
+    @invalid_types = Set(ReifiedType).new
     @aliases = {} of ReifiedTypeAlias => ForReifiedTypeAlias
     @unwrapping_set = Set(ReifiedTypeAlias).new
     @has_started = false
@@ -524,6 +525,54 @@ class Mare::Compiler::TypeCheck
     @types[rt]
   end
 
+  def ensure_rt(ctx : Context, rt : ReifiedType)
+    return true if @types.has_key?(rt)
+    return false if @invalid_types.includes?(rt)
+
+    if rt_valid?(ctx, rt)
+      # TODO: shouldn't have to pull the rt apart here and reassemble inside.
+      for_rt(ctx, rt.link, rt.args)
+      true
+    else
+      @invalid_types.add(rt)
+      false
+    end
+  end
+
+  def rt_valid?(ctx : Context, rt : ReifiedType)
+    rt_defn = rt.defn(ctx)
+    type_params = AST::Extract.type_params(rt_defn.params)
+
+    # The minimum number of params is the number that don't have defaults.
+    # The maximum number of params is the total number of them.
+    type_params_min = type_params.select { |(_, _, default)| !default }.size
+    type_params_max = type_params.size
+
+    # Handle the case where no type args are given.
+    if rt.args.empty?
+      if type_params_min == 0
+        return true
+      else
+        return false
+      end
+    end
+
+    # Check number of type args against number of type params.
+    if rt.args.size > type_params_max
+      return false
+    elsif rt.args.size < type_params_min
+      return false
+    end
+
+    # Check each type arg against the bound of the corresponding type param.
+    rt.args.each_with_index do |arg, index|
+      param_bound = for_rt(ctx, rt.link).get_type_param_bound(index)
+      return false if !arg.satisfies_bound?(ctx, param_bound)
+    end
+
+    true
+  end
+
   def validate_type_args(
     ctx : Context,
     infer : (ForReifiedFunc | ForReifiedType),
@@ -533,7 +582,7 @@ class Mare::Compiler::TypeCheck
     return unless mt.singular? # this skip partially reified type params
     rt = mt.single!
     rt_defn = rt.defn(ctx)
-    type_params = AST::Extract.type_params(rt.defn(ctx).params)
+    type_params = AST::Extract.type_params(rt_defn.params)
     arg_terms = node.is_a?(AST::Qualify) ? node.group.terms : [] of AST::Node
 
     # The minimum number of params is the number that don't have defaults.
@@ -1077,6 +1126,12 @@ class Mare::Compiler::TypeCheck
         type_check_pre(ctx, info, mt)
         type_check(info, mt)
 
+        # Reach any types that are within this MetaType.
+        # TODO: Refactor this to take a block instead of returning an Array.
+        mt.each_reachable_defn(ctx).each { |rt|
+          ctx.type_check.ensure_rt(ctx, rt)
+        }
+
         mt
       end
     end
@@ -1182,6 +1237,25 @@ class Mare::Compiler::TypeCheck
       end
 
       # TODO: Raise when we see non-empty problems
+    end
+
+    # Reach the underlying field "function" of a Field.
+    def type_check_pre(ctx : Context, info : Infer::Field, mt : MetaType)
+      field_func = @reified.type.defn(ctx).functions.find do |f|
+        f.ident.value == info.name && f.has_tag?(:field)
+      end.not_nil!
+      field_func_link = field_func.make_link(@reified.type.link)
+
+      # Keep track that we touched the "function" of the field_func.
+      @analysis.called_funcs.add({info.pos, @reified.type, field_func_link})
+
+      # Get the visitor for the field_func, possibly creating and running it.
+      ctx.type_check.for_rf(
+        ctx,
+        @reified.type,
+        field_func_link,
+        @analysis.resolved_self_cap
+      ).tap(&.run)
     end
 
     # Other types of Info nodes do not have extra type checks.

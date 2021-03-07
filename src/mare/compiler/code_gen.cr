@@ -206,12 +206,12 @@ class Mare::Compiler::CodeGen
 
   def meta_type_of(expr : AST::Node, in_gfunc : GenFunc? = nil)
     in_gfunc ||= func_frame.gfunc.not_nil!
-    in_gfunc.infer.resolved(ctx, expr)
+    in_gfunc.type_check.resolved(ctx, expr)
   end
 
   def type_of(expr : AST::Node, in_gfunc : GenFunc? = nil)
     in_gfunc ||= func_frame.gfunc.not_nil!
-    ctx.reach[in_gfunc.infer.resolved(ctx, expr)]
+    ctx.reach[in_gfunc.type_check.resolved(ctx, expr)]
   end
 
   def llvm_type_of(gtype : GenType)
@@ -1756,14 +1756,14 @@ class Mare::Compiler::CodeGen
   end
 
   def gen_check_subtype(relate : AST::Relate, positive_check : Bool)
-    infer_f = ctx.infer[func_frame.gfunc.not_nil!.link]
+    type_check_f = ctx.type_check[func_frame.gfunc.not_nil!.link]
 
-    if infer_f[relate.lhs].is_a?(Infer::FixedTypeExpr)
+    if type_check_f[relate.lhs].is_a?(Infer::FixedTypeExpr)
       # If the left-hand side is a fixed compile-time type (and knowing that
       # the right-hand side always is), we can return a compile-time true/false.
-      infer = func_frame.gfunc.not_nil!.infer
-      lhs_meta_type = infer.resolved(ctx, relate.lhs)
-      rhs_meta_type = infer.resolved(ctx, relate.rhs)
+      type_check = func_frame.gfunc.not_nil!.type_check
+      lhs_meta_type = type_check.resolved(ctx, relate.lhs)
+      rhs_meta_type = type_check.resolved(ctx, relate.rhs)
 
       result = lhs_meta_type.satisfies_bound?(ctx, rhs_meta_type)
       result = !result if !positive_check
@@ -2608,7 +2608,7 @@ class Mare::Compiler::CodeGen
     receiver
   end
 
-  # TODO: Use infer resolution for static True/False finding where possible.
+  # TODO: Use type_check resolution for static True/False finding where possible.
   def gen_choice(expr : AST::Choice)
     raise NotImplementedError.new(expr.inspect) if expr.list.empty?
 
@@ -2714,8 +2714,8 @@ class Mare::Compiler::CodeGen
     phi_type = type_of(expr)
 
     # check if we have any early continues to not to generate continue block
-    infer = ctx.infer[func_frame.gfunc.not_nil!.link]
-    has_continues = !infer[expr].as(Infer::Loop).early_continues.empty?
+    type_check = ctx.type_check[func_frame.gfunc.not_nil!.link]
+    has_continues = !type_check[expr].as(Infer::Loop).early_continues.empty?
 
     # Prepare to capture state for the final phi.
     phi_blocks = [] of LLVM::BasicBlock

@@ -441,9 +441,9 @@ class Mare::Compiler::CodeGen::PonyRT
     # This is used for runtime type matching against abstract types (traits).
     is_asio_event_notify = false
     traits_bitmap = g.trait_bitmap_size.times.map { 0 }.to_a
-    infer = g.ctx.infer[gtype.type_def.reified]
+    type_check = g.ctx.type_check[gtype.type_def.reified]
     g.ctx.reach.each_type_def.each do |other_def|
-      if infer.is_subtype_of?(g.ctx, other_def.reified)
+      if type_check.is_subtype_of?(g.ctx, other_def.reified)
         next if gtype.type_def == other_def
         raise "can't be subtype of a concrete" unless other_def.is_abstract?(g.ctx)
 
