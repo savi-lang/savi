@@ -164,22 +164,6 @@ module Mare::Compiler::AltInfer
       end
     end
 
-    # TODO: Remove this method in favor of the one above
-    def self.combine_mts(spans : Array(Span), &block : Array(MetaType) -> MetaType) : Span?
-      case spans.size
-      when 0; nil
-      when 1; spans.first
-      when 2
-        spans.first.combine_mt(spans.last) { |mt, other_mt|
-          block.call([mt, other_mt])
-        }
-      else
-        spans.first.combine_mts(spans[1..-1]) do |mt, other_mts|
-          block.call([mt] + other_mts)
-        end
-      end
-    end
-
     def deciding_f_cap(f_cap_mt : MetaType, is_constructor : Bool) : Span?
       inner.deciding_f_cap(f_cap_mt, is_constructor)
       .try { |new_inner| Span.new(new_inner) }
@@ -1140,7 +1124,7 @@ module Mare::Compiler::AltInfer
 
         raise NotImplementedError.new("empty union") if spans.empty?
 
-        Span.combine_mts(spans) { |mts| Infer::MetaType.new_union(mts) }.not_nil!
+        Span.reduce_combine_mts(spans) { |accum, mt| accum.unite(mt) }.not_nil!
       elsif node.style == "(" && node.terms.size == 1
         type_expr_span(ctx, node.terms.first)
       else

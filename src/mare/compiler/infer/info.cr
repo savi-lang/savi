@@ -751,11 +751,15 @@ class Mare::Compiler::Infer
 
       # Look at downstream tether constraints to try to resolve the literal
       # to a more specific type than the simple "possible" type indicated by it.
-      tether_constraint_spans = tether_constraint_spans(ctx, infer)
-      constrained_span = simple_span.combine_mts(tether_constraint_spans) { |mt, mts|
-        constrained_mt = MetaType.new_intersection(mts).intersect(mt)
-        constrained_mt.unsatisfiable? ? @possible : constrained_mt
-      }
+      constrained_span =
+        AltInfer::Span.reduce_combine_mts(
+          tether_constraint_spans(ctx, infer)
+        ) { |accum, mt| accum.intersect(mt) }.try { |constraint_span|
+          constraint_span.combine_mt(simple_span) { |constraint_mt, mt|
+            constrained_mt = mt.intersect(constraint_mt)
+            constrained_mt.unsatisfiable? ? @possible : constrained_mt
+          }
+        } || simple_span
 
       peer_hints_span = AltInfer::Span.reduce_combine_mts(
         @peer_hints.map { |peer| infer.resolve(ctx, peer).as(AltInfer::Span) }
