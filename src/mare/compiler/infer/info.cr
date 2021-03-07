@@ -51,6 +51,7 @@ class Mare::Compiler::Infer
 
   abstract class Info
     property pos : Source::Pos = Source::Pos.none
+    property! layer_index : Int32 # Corresponding to TypeContext::Analysis
     property override_describe_kind : String?
 
     def to_s
@@ -327,7 +328,7 @@ class Mare::Compiler::Infer
     @explicit : Info?
     @upstreams = [] of Tuple(Info, Source::Pos)
 
-    def initialize(@pos)
+    def initialize(@pos, @layer_index)
     end
 
     def upstream_infos; @upstreams.map(&.first) end
@@ -530,7 +531,7 @@ class Mare::Compiler::Infer
 
     def describe_kind : String; "expression" end
 
-    def initialize(@pos, @name)
+    def initialize(@pos, @layer_index, @name)
       @resolvables = [] of Info
     end
 
@@ -552,7 +553,7 @@ class Mare::Compiler::Infer
 
     def describe_kind : String; "type expression" end
 
-    def initialize(@pos, @node)
+    def initialize(@pos, @layer_index, @node)
     end
 
     def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
@@ -571,7 +572,7 @@ class Mare::Compiler::Infer
 
     def describe_kind : String; "expression" end
 
-    def initialize(@pos, @node)
+    def initialize(@pos, @layer_index, @node)
     end
 
     def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
@@ -591,7 +592,7 @@ class Mare::Compiler::Infer
 
     def describe_kind : String; "singleton value for this type" end
 
-    def initialize(@pos, @node, @type_param_ref = nil)
+    def initialize(@pos, @layer_index, @node, @type_param_ref = nil)
     end
 
     def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
@@ -626,7 +627,7 @@ class Mare::Compiler::Infer
   class Self < FixedInfo
     def describe_kind : String; "receiver value" end
 
-    def initialize(@pos)
+    def initialize(@pos, @layer_index)
     end
 
     def downstream_constraints(ctx : Context, analysis : ReifiedFuncAnalysis)
@@ -648,7 +649,7 @@ class Mare::Compiler::Infer
   class FromConstructor < FixedInfo
     def describe_kind : String; "constructed object" end
 
-    def initialize(@pos, @cap : String)
+    def initialize(@pos, @layer_index, @cap : String)
     end
 
     def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
@@ -667,7 +668,7 @@ class Mare::Compiler::Infer
 
     def describe_kind : String; "address of this variable" end
 
-    def initialize(@pos, @variable)
+    def initialize(@pos, @layer_index, @variable)
     end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
@@ -684,7 +685,7 @@ class Mare::Compiler::Infer
 
     def describe_kind : String; "type reflection" end
 
-    def initialize(@pos, @reflect_type)
+    def initialize(@pos, @layer_index, @reflect_type)
     end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
@@ -725,7 +726,7 @@ class Mare::Compiler::Infer
 
     def describe_kind : String; "literal value" end
 
-    def initialize(@pos, @possible : MetaType)
+    def initialize(@pos, @layer_index, @possible : MetaType)
       @peer_hints = [] of Info
     end
 
@@ -839,8 +840,8 @@ class Mare::Compiler::Infer
 
   class FuncBody < NamedInfo
     getter early_returns : Array(JumpReturn)
-    def initialize(pos, @early_returns)
-      super(pos)
+    def initialize(pos, layer_index, @early_returns)
+      super(pos, layer_index)
 
       early_returns.each(&.term.try(&.add_downstream(@pos, self, 0)))
     end
@@ -866,7 +867,7 @@ class Mare::Compiler::Infer
   end
 
   class Field < DynamicInfo
-    def initialize(@pos, @name : String)
+    def initialize(@pos, @layer_index, @name : String)
       @upstreams = [] of Info
     end
 
@@ -936,6 +937,7 @@ class Mare::Compiler::Infer
 
   class FieldRead < DynamicInfo
     def initialize(@field : Field, @origin : Self)
+      @layer_index = @field.layer_index
     end
 
     def describe_kind : String; "field read" end
@@ -959,6 +961,7 @@ class Mare::Compiler::Infer
 
   class FieldExtract < DynamicInfo
     def initialize(@field : Field, @origin : Self)
+      @layer_index = @field.layer_index
     end
 
     def describe_kind : String; "field extraction" end
@@ -982,7 +985,7 @@ class Mare::Compiler::Infer
 
   abstract class JumpInfo < Info
     getter term : Info
-    def initialize(@pos, @term)
+    def initialize(@pos, @layer_index, @term)
     end
 
     def describe_kind : String; "control flow jump" end
@@ -1037,8 +1040,8 @@ class Mare::Compiler::Infer
 
     def describe_kind : String; "sequence" end
 
-    def initialize(pos, @terms)
-      @final_term = @terms.empty? ? FixedPrelude.new(pos, "None") : @terms.last
+    def initialize(pos, @layer_index, @terms)
+      @final_term = @terms.empty? ? FixedPrelude.new(pos, @layer_index, "None") : @terms.last
       @pos = @final_term.pos
     end
 
@@ -1081,7 +1084,7 @@ class Mare::Compiler::Infer
 
     def describe_kind : String; "choice block" end
 
-    def initialize(@pos, @branches, @fixed_bool)
+    def initialize(@pos, @layer_index, @branches, @fixed_bool)
       @resolvables = [] of Info
 
       prior_bodies = [] of Info
@@ -1225,8 +1228,8 @@ class Mare::Compiler::Infer
     getter early_breaks : Array(JumpBreak)
     getter early_continues : Array(JumpContinue)
 
-    def initialize(pos, branches, fixed_bool, @early_breaks, @early_continues)
-      super(pos, branches, fixed_bool)
+    def initialize(pos, layer_index, branches, fixed_bool, @early_breaks, @early_continues)
+      super(pos, layer_index, branches, fixed_bool)
 
       early_breaks.each(&.term.add_downstream(@pos, self, 0))
       early_continues.each(&.term.add_downstream(@pos, self, 0))
@@ -1258,7 +1261,7 @@ class Mare::Compiler::Infer
 
     def describe_kind : String; "type parameter condition" end
 
-    def initialize(@pos, @refine, @lhs, @refine_type, @positive_check)
+    def initialize(@pos, @layer_index, @refine, @lhs, @refine_type, @positive_check)
     end
 
     def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
@@ -1282,7 +1285,7 @@ class Mare::Compiler::Infer
 
     def describe_kind : String; "type condition" end
 
-    def initialize(@pos, @lhs, @rhs, @positive_check)
+    def initialize(@pos, @layer_index, @lhs, @rhs, @positive_check)
     end
 
     def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
@@ -1352,7 +1355,7 @@ class Mare::Compiler::Infer
 
     def describe_kind : String; "type condition" end
 
-    def initialize(@pos, @refine, @refine_type, @positive_check)
+    def initialize(@pos, @layer_index, @refine, @refine_type, @positive_check)
     end
 
     def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
@@ -1384,7 +1387,7 @@ class Mare::Compiler::Infer
 
     def describe_kind : String; "static type condition" end
 
-    def initialize(@pos, @lhs, @rhs, @positive_check)
+    def initialize(@pos, @layer_index, @lhs, @rhs, @positive_check)
     end
 
     def evaluate(ctx : Context, infer : ForReifiedFunc) : Bool
@@ -1411,7 +1414,7 @@ class Mare::Compiler::Infer
 
     def describe_kind : String; "type refinement" end
 
-    def initialize(@pos, @refine, @refine_type, @positive_check)
+    def initialize(@pos, @layer_index, @refine, @refine_type, @positive_check)
     end
 
     def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
@@ -1434,7 +1437,7 @@ class Mare::Compiler::Infer
 
     def describe_kind : String; "consumed reference" end
 
-    def initialize(@pos, @local)
+    def initialize(@pos, @layer_index, @local)
     end
 
     def as_conduit? : AltInfer::Conduit?
@@ -1463,7 +1466,7 @@ class Mare::Compiler::Infer
 
     def describe_kind : String; "recover block" end
 
-    def initialize(@pos, @body)
+    def initialize(@pos, @layer_index, @body)
     end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
@@ -1497,7 +1500,7 @@ class Mare::Compiler::Infer
 
     def describe_kind : String; "assign result" end
 
-    def initialize(@pos, @lhs, @rhs)
+    def initialize(@pos, @layer_index, @lhs, @rhs)
     end
 
     def add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
@@ -1531,7 +1534,7 @@ class Mare::Compiler::Infer
 
     def describe_kind : String; "value returned by the yield block" end
 
-    def initialize(@pos, @yield_in, @terms)
+    def initialize(@pos, @layer_index, @yield_in, @terms)
     end
 
     def add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
@@ -1564,14 +1567,14 @@ class Mare::Compiler::Infer
 
     def describe_kind : String; "array literal" end
 
-    def initialize(@pos, @terms)
+    def initialize(@pos, @layer_index, @terms)
     end
 
     def after_add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
       # Only do this after the first downstream is added.
       return unless @downstreams.size == 1
 
-      elem_downstream = ArrayLiteralElementAntecedent.new(@downstreams.first[1].pos, self)
+      elem_downstream = ArrayLiteralElementAntecedent.new(@downstreams.first[1].pos, @layer_index, self)
       @terms.each do |term|
         term.add_downstream(downstream_use_pos, elem_downstream, 0)
       end
@@ -1748,7 +1751,7 @@ class Mare::Compiler::Infer
 
     def describe_kind : String; "array element" end
 
-    def initialize(@pos, @array)
+    def initialize(@pos, @layer_index, @array)
     end
 
     def tethers(querent : Info) : Array(Tether)
@@ -1809,7 +1812,7 @@ class Mare::Compiler::Infer
     getter ret_value_used : Bool
     getter resolvables : Array(Info)
 
-    def initialize(@pos, @lhs, @member, @args, @yield_params, @yield_block, @ret_value_used)
+    def initialize(@pos, @layer_index, @lhs, @member, @args, @yield_params, @yield_block, @ret_value_used)
       @resolvables = [] of Info
     end
 
@@ -2266,7 +2269,7 @@ class Mare::Compiler::Infer
 
     def describe_kind : String; "value yielded to this block" end
 
-    def initialize(@pos, @call, @index)
+    def initialize(@pos, @layer_index, @call, @index)
     end
 
     def tether_terminal?
@@ -2338,7 +2341,7 @@ class Mare::Compiler::Infer
 
     def describe_kind : String; "expected for the yield result" end
 
-    def initialize(@pos, @call)
+    def initialize(@pos, @layer_index, @call)
     end
 
     def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
@@ -2407,7 +2410,7 @@ class Mare::Compiler::Infer
 
     def describe_kind : String; "parameter for this argument" end
 
-    def initialize(@pos, @call, @index)
+    def initialize(@pos, @layer_index, @call, @index)
     end
 
     def tether_terminal?
