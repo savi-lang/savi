@@ -228,14 +228,6 @@ module Mare::Compiler::PreInfer
       ctx.namespace.prelude_type(name)
     end
 
-    def reified_type(ctx : Context, *args)
-      ctx.infer.for_rt(ctx, *args).reified
-    end
-
-    def reified_type_alias(ctx : Context, *args)
-      ctx.infer.for_rt_alias(ctx, *args).reified
-    end
-
     def lookup_local_ident(ref : Refer::Local)
       node = @local_idents[ref]?
       return unless node
@@ -348,25 +340,23 @@ module Mare::Compiler::PreInfer
 
     # A literal character could be any integer or floating-point machine type.
     def touch(ctx : Context, node : AST::LiteralCharacter)
-      defns = [prelude_type(ctx, "Numeric")]
-      mts = defns.map { |defn| Infer::MetaType.new(reified_type(ctx, defn)) }
-      mt = Infer::MetaType.new_union(mts).cap("val")
+      t_link = prelude_type(ctx, "Numeric")
+      mt = Infer::MetaType.new(Infer::ReifiedType.new(t_link), "val")
       @analysis[node] = Infer::Literal.new(node.pos, layer(node), mt)
     end
 
     # A literal integer could be any integer or floating-point machine type.
     def touch(ctx : Context, node : AST::LiteralInteger)
-      defns = [prelude_type(ctx, "Numeric")]
-      mts = defns.map { |defn| Infer::MetaType.new(reified_type(ctx, defn)) }
-      mt = Infer::MetaType.new_union(mts).cap("val")
+      t_link = prelude_type(ctx, "Numeric")
+      mt = Infer::MetaType.new(Infer::ReifiedType.new(t_link), "val")
       @analysis[node] = Infer::Literal.new(node.pos, layer(node), mt)
     end
 
     # A literal float could be any floating-point machine type.
     def touch(ctx : Context, node : AST::LiteralFloat)
-      defns = [prelude_type(ctx, "F32"), prelude_type(ctx, "F64")]
-      mts = defns.map { |defn| Infer::MetaType.new(reified_type(ctx, defn)) }
-      mt = Infer::MetaType.new_union(mts).cap("val")
+      t_links = [prelude_type(ctx, "F32"), prelude_type(ctx, "F64")]
+      mts = t_links.map { |t_link| Infer::MetaType.new(Infer::ReifiedType.new(t_link), "val") }
+      mt = Infer::MetaType.new_union(mts)
       @analysis[node] = Infer::Literal.new(node.pos, layer(node), mt)
     end
 

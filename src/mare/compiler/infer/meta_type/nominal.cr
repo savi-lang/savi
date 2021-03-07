@@ -378,17 +378,11 @@ struct Mare::Compiler::Infer::MetaType::Nominal
     other_defn = other.defn()
     errors = [] of Error::Info # TODO: accept this as an argument?
 
-    infer = ctx.type_check.has_started? ? ctx.type_check : ctx.infer
-
     if defn.is_a?(ReifiedType)
       if other_defn.is_a?(ReifiedType)
         return true if defn == other_defn
         # When both sides are ReifiedTypes, delegate to the SubtypingInfo logic.
-        for_rt = if ctx.type_check.has_started?
-          ctx.type_check.for_rt(ctx, other_defn.link, other_defn.args).analysis
-        else
-          ctx.infer[other_defn]
-        end
+        for_rt = ctx.type_check.for_rt(ctx, other_defn.link, other_defn.args).analysis
         for_rt.is_supertype_of?(ctx, defn, errors)
       elsif other_defn.is_a?(TypeParam)
         return false if ctx.type_check.has_started?
@@ -397,7 +391,7 @@ struct Mare::Compiler::Infer::MetaType::Nominal
         l = MetaType.new_nominal(defn)
         other_parent_link = other_defn.ref.parent_link
         if other_parent_link.is_a?(Program::Type::Link)
-          r = infer.for_rt(ctx, other_parent_link)
+          r = ctx.type_check.for_rt(ctx, other_parent_link)
                 .lookup_type_param_bound(other_defn).strip_cap
         elsif other_parent_link.is_a?(Program::TypeAlias::Link)
           raise NotImplementedError.new("lookup_type_param_bound for TypeAlias")
@@ -413,7 +407,7 @@ struct Mare::Compiler::Infer::MetaType::Nominal
         return false if ctx.type_check.has_started?
 
         # When this is a TypeParam, use its bound MetaType and run again.
-        l = infer.for_rt(ctx, defn.ref.parent_link.as(Program::Type::Link))
+        l = ctx.type_check.for_rt(ctx, defn.ref.parent_link.as(Program::Type::Link))
               .lookup_type_param_bound(defn).strip_cap
         r = MetaType.new_nominal(other_defn)
         l.subtype_of?(ctx, r)
