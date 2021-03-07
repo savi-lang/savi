@@ -27,10 +27,18 @@ describe Mare::Compiler::TypeContext do
     left_expr = choice.list[0].last.as(Mare::AST::Group).terms.first
     right_expr = choice.list[1].last.as(Mare::AST::Group).terms.first
 
+    type_context.layer_index(choice).should eq 0
+    type_context[choice].should eq type_context[0]
     type_context[choice].all_positive_conds.size.should eq 0
     type_context[choice].all_negative_conds.size.should eq 0
+
+    type_context.layer_index(left_expr).should eq 1
+    type_context[left_expr].should eq type_context[1]
     type_context[left_expr].all_positive_conds.size.should eq 1
     type_context[left_expr].all_negative_conds.size.should eq 0
+
+    type_context.layer_index(right_expr).should eq 2
+    type_context[right_expr].should eq type_context[2]
     type_context[right_expr].all_positive_conds.size.should eq 0
     type_context[right_expr].all_negative_conds.size.should eq 1
   end

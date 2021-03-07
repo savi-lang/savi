@@ -1023,7 +1023,7 @@ class Mare::Compiler::TypeCheck
       # for the layer associated with the given info, then
       # we will not do any typechecking here - we just return unsatisfiable.
       ast = @f_analysis.pre.node_for?(info)
-      layer = @type_context[ast]? if ast
+      layer = @type_context[ast] if ast
       return MetaType.unsatisfiable unless !layer || layer.all_positive_conds.all? { |cond|
         cond_info = @f_analysis[cond]
         case cond_info

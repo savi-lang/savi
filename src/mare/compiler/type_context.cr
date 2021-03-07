@@ -49,11 +49,14 @@ module Mare::Compiler::TypeContext
       @non_root_nodes = {} of AST::Node => Int32
     end
 
-    def [](node : AST::Node) : Layer
-      @layers[@non_root_nodes.fetch(node, 0)]
+    def layer_index(node : AST::Node) : Int32
+      @non_root_nodes.fetch(node, 0)
     end
-    def []?(node : AST::Node) : Layer?
-      @layers[@non_root_nodes.fetch(node, 0)]?
+    def [](index : Int32) : Layer
+      @layers[index]
+    end
+    def [](node : AST::Node) : Layer
+      self[layer_index(node)]
     end
 
     protected def observe_root_layer(layer : Layer)

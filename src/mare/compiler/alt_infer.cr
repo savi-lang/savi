@@ -935,7 +935,7 @@ module Mare::Compiler::AltInfer
     end
 
     def apply_substs_for_layer(ctx : Context, node : AST::Node, span : Span) : Span
-      layer = @type_context[node]?
+      layer = @type_context[node]
       return span unless layer
 
       # TODO: also handle negative conditions
