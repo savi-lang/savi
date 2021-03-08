@@ -17,9 +17,8 @@ describe Mare::Compiler::Verify do
     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :verify)
-    end
+    Mare.compiler.compile([source], :verify)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains if the Main type is not an actor" do
@@ -34,9 +33,8 @@ describe Mare::Compiler::Verify do
            ^~~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :verify)
-    end
+    Mare.compiler.compile([source], :verify)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains if the Main actor has type parameters" do
@@ -51,9 +49,8 @@ describe Mare::Compiler::Verify do
                 ^~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :verify)
-    end
+    Mare.compiler.compile([source], :verify)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains if the Main actor has no `new` constructor" do
@@ -74,9 +71,8 @@ describe Mare::Compiler::Verify do
            ^~~~~~~~~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :verify)
-    end
+    Mare.compiler.compile([source], :verify)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains if the Main.new function is not a constructor" do
@@ -92,9 +88,8 @@ describe Mare::Compiler::Verify do
            ^~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :verify)
-    end
+    Mare.compiler.compile([source], :verify)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains if the Main.new function has no parameters" do
@@ -115,9 +110,8 @@ describe Mare::Compiler::Verify do
                ^~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :verify)
-    end
+    Mare.compiler.compile([source], :verify)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains if the Main.new function has too many parameters" do
@@ -138,9 +132,8 @@ describe Mare::Compiler::Verify do
                ^~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :verify)
-    end
+    Mare.compiler.compile([source], :verify)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains if the Main.new function is of the wrong type" do
@@ -166,9 +159,8 @@ describe Mare::Compiler::Verify do
                 ^~~~~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :verify)
-    end
+    Mare.compiler.compile([source], :verify)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains when an actor constructor has an error-able body" do
@@ -190,9 +182,8 @@ describe Mare::Compiler::Verify do
         ^~~~~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :verify)
-    end
+    Mare.compiler.compile([source], :verify)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains when a no-exclamation function has an error-able body" do
@@ -222,9 +213,8 @@ describe Mare::Compiler::Verify do
                      ^~~~~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :verify)
-    end
+    Mare.compiler.compile([source], :verify)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains when a try body has no possible errors to catch" do
@@ -246,9 +236,8 @@ describe Mare::Compiler::Verify do
             ^~~~~~~~~~~~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :verify)
-    end
+    Mare.compiler.compile([source], :verify)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains when an async function declares or tries to yield" do
@@ -283,9 +272,8 @@ describe Mare::Compiler::Verify do
         ^~~~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :verify)
-    end
+    Mare.compiler.compile([source], :verify)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains when a constructor declares or tries to yield" do
@@ -323,8 +311,7 @@ describe Mare::Compiler::Verify do
         ^~~~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :verify)
-    end
+    Mare.compiler.compile([source], :verify)
+      .errors.map(&.message).join("\n").should eq expected
   end
 end

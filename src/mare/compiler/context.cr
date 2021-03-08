@@ -31,6 +31,8 @@ class Mare::Compiler::Context
 
   getter link_libraries
 
+  getter errors = [] of Error
+
   def initialize(@options = CompilerOptions.new, @prev_ctx = nil)
     @program = Program.new
     @stack = [] of Interpreter
@@ -67,6 +69,10 @@ class Mare::Compiler::Context
     library = compile_library_inner(*args)
     @program.libraries << library
     library
+  rescue e : Error
+    @errors << e
+    @stack.clear
+    library || Program::Library.new(args.first)
   end
 
   @@cache = {} of String => {Array(AST::Document), Program::Library}
@@ -111,24 +117,45 @@ class Mare::Compiler::Context
   end
 
   def run(obj)
+    return false if @errors.any?
+
     @program.libraries.each do |library|
       obj.run(self, library)
     end
     finish
-    obj
+
+    return false if @errors.any?
+    true
+  rescue e : Error
+    @errors << e
+    false
   end
 
   def run_copy_on_mutate(obj)
+    return false if @errors.any?
+
     @program.libraries.map! do |library|
       obj.run(self, library)
     end
     finish
-    obj
+
+    return false if @errors.any?
+    true
+  rescue e : Error
+    @errors << e
+    false
   end
 
   def run_whole_program(obj)
+    return false if @errors.any?
+
     obj.run(self)
     finish
-    obj
+
+    return false if @errors.any?
+    true
+  rescue e : Error
+    @errors << e
+    false
   end
 end

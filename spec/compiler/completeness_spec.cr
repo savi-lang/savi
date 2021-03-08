@@ -27,9 +27,8 @@ describe Mare::Compiler::Completeness do
             ^
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :completeness)
-    end
+    Mare.compiler.compile([source], :completeness)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains when a field is only conditionally initialized" do
@@ -66,9 +65,8 @@ describe Mare::Compiler::Completeness do
             ^
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :completeness)
-    end
+    Mare.compiler.compile([source], :completeness)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "allows a field to be initialized in every case of a choice" do
@@ -124,9 +122,8 @@ describe Mare::Compiler::Completeness do
             ^
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :completeness)
-    end
+    Mare.compiler.compile([source], :completeness)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains when a field is read before it has been initialized" do
@@ -157,9 +154,8 @@ describe Mare::Compiler::Completeness do
              ^~~~~~~~~~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :completeness)
-    end
+    Mare.compiler.compile([source], :completeness)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "allows a field to be read if it has an initializer" do
@@ -205,9 +201,8 @@ describe Mare::Compiler::Completeness do
             ^
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :completeness)
-    end
+    Mare.compiler.compile([source], :completeness)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains when access to the self is shared while still incomplete" do
@@ -249,9 +244,8 @@ describe Mare::Compiler::Completeness do
             ^
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :completeness)
-    end
+    Mare.compiler.compile([source], :completeness)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "allows opaque sharing of the self while still incomplete" \

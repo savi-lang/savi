@@ -10,6 +10,7 @@ describe Mare::Compiler::Macros do
       SOURCE
 
       ctx = Mare.compiler.compile([source], :macros)
+      ctx.errors.should be_empty
 
       func = ctx.namespace.find_func!(ctx, source, "Main", "new")
       func.params.not_nil!.to_a.should eq [:group, "(",
@@ -50,9 +51,8 @@ describe Mare::Compiler::Macros do
                                                                         ^~~
       MSG
 
-      expect_raises Mare::Error, expected do
-        Mare.compiler.compile([source], :macros)
-      end
+      Mare.compiler.compile([source], :macros)
+        .errors.map(&.message).join("\n").should eq expected
     end
 
     it "complains if the term isn't an identifier" do
@@ -71,9 +71,8 @@ describe Mare::Compiler::Macros do
                                                                     ^~
       MSG
 
-      expect_raises Mare::Error, expected do
-        Mare.compiler.compile([source], :macros)
-      end
+      Mare.compiler.compile([source], :macros)
+        .errors.map(&.message).join("\n").should eq expected
     end
 
     it "complains if the identifier isn't a parameter" do
@@ -97,9 +96,8 @@ describe Mare::Compiler::Macros do
              ^···
       MSG
 
-      expect_raises Mare::Error, expected do
-        Mare.compiler.compile([source], :macros)
-      end
+      Mare.compiler.compile([source], :macros)
+        .errors.map(&.message).join("\n").should eq expected
     end
 
     it "complains if the macro isn't used as the default arg of a parameter" do
@@ -121,9 +119,8 @@ describe Mare::Compiler::Macros do
              ^~~~~~~~~~~~
       MSG
 
-      expect_raises Mare::Error, expected do
-        Mare.compiler.compile([source], :macros)
-      end
+      Mare.compiler.compile([source], :macros)
+        .errors.map(&.message).join("\n").should eq expected
     end
   end
 end

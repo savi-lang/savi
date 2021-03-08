@@ -14,6 +14,8 @@ describe Mare::Compiler::TypeContext do
     SOURCE
 
     ctx = Mare.compiler.compile([source], :type_context)
+    ctx.errors.should be_empty
+
     t_link = ctx.namespace[source]["Container"].as(Mare::Program::Type::Link)
     f_link = t_link.make_func_link_simple("string")
     func = f_link.resolve(ctx)

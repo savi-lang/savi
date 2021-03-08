@@ -18,6 +18,7 @@ describe Mare::Compiler::Reach do
     SOURCE
 
     ctx = Mare.compiler.compile([source], :reach)
+    ctx.errors.should be_empty
 
     i_foo = ctx.type_check.for_func_simple(ctx, source, "Trait", "foo").reified
     c_foo = ctx.type_check.for_func_simple(ctx, source, "Class", "foo").reified

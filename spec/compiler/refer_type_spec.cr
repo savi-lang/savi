@@ -12,6 +12,8 @@ describe Mare::Compiler::ReferType do
 
     ctx1 = Mare.compiler.compile([source], :refer_type)
     ctx2 = Mare.compiler.compile([source], :refer_type)
+    ctx1.errors.should be_empty
+    ctx2.errors.should be_empty
 
     t_link_g = ctx1.namespace[source]["Greeting"].as(Mare::Program::Type::Link)
     f_link_g = t_link_g.make_func_link_simple("greet")

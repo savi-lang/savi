@@ -129,20 +129,25 @@ module Mare
 
     def self.compile(options, backtrace = false)
       _add_backtrace backtrace do
-        Mare.compiler.compile(Dir.current, options.target_pass || :binary, options)
+        ctx = Mare.compiler.compile(Dir.current, options.target_pass || :binary, options)
+        raise ctx.errors.first if ctx.errors.any? # TODO: show multiple errors
         0
       end
     end
 
     def self.run(options, backtrace = false)
       _add_backtrace backtrace do
-        Mare.compiler.compile(Dir.current, options.target_pass || :eval, options).eval.exitcode
+        ctx = Mare.compiler.compile(Dir.current, options.target_pass || :eval, options)
+        raise ctx.errors.first if ctx.errors.any? # TODO: show multiple errors
+        ctx.eval.exitcode
       end
     end
 
     def self.eval(code, options, backtrace = false)
       _add_backtrace backtrace do
-        Mare.compiler.eval(code, options)
+        ctx = Mare.compiler.eval(code, options)
+        raise ctx.errors.first if ctx.errors.any? # TODO: show multiple errors
+        ctx.eval.exitcode
       end
     end
   end

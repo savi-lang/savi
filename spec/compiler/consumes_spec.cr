@@ -20,9 +20,8 @@ describe Mare::Compiler::Consumes do
         ^~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :consumes)
-    end
+    Mare.compiler.compile([source], :consumes)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains when an possibly-consumed local is referenced" do
@@ -46,9 +45,8 @@ describe Mare::Compiler::Consumes do
                  ^~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :consumes)
-    end
+    Mare.compiler.compile([source], :consumes)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains when an already-consumed @ is referenced" do
@@ -76,9 +74,8 @@ describe Mare::Compiler::Consumes do
                  ^~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :consumes)
-    end
+    Mare.compiler.compile([source], :consumes)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains when referencing a possibly-consumed local from a choice" do
@@ -128,9 +125,8 @@ describe Mare::Compiler::Consumes do
                       ^~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :consumes)
-    end
+    Mare.compiler.compile([source], :consumes)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "allows referencing a local consumed in an earlier choice branch" do
@@ -177,9 +173,8 @@ describe Mare::Compiler::Consumes do
             ^~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :consumes)
-    end
+    Mare.compiler.compile([source], :consumes)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains when a choice cond uses a local consumed before the choice" do
@@ -205,9 +200,8 @@ describe Mare::Compiler::Consumes do
         ^~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :consumes)
-    end
+    Mare.compiler.compile([source], :consumes)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains when consuming a local in a loop cond" do
@@ -230,9 +224,8 @@ describe Mare::Compiler::Consumes do
               ^~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :consumes)
-    end
+    Mare.compiler.compile([source], :consumes)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains when consuming a local in a loop body" do
@@ -255,9 +248,8 @@ describe Mare::Compiler::Consumes do
                     ^~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :consumes)
-    end
+    Mare.compiler.compile([source], :consumes)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains when using a local possibly consumed in a loop else body" do
@@ -281,9 +273,8 @@ describe Mare::Compiler::Consumes do
                            ^~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :consumes)
-    end
+    Mare.compiler.compile([source], :consumes)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "allows referencing a local in the body of a loop consumed in the else" do
@@ -320,9 +311,8 @@ describe Mare::Compiler::Consumes do
         ^~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :consumes)
-    end
+    Mare.compiler.compile([source], :consumes)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "unconsumes a variable if assigned from an expression that consumes it" do
@@ -356,8 +346,7 @@ describe Mare::Compiler::Consumes do
                                     ^~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :consumes)
-    end
+    Mare.compiler.compile([source], :consumes)
+      .errors.map(&.message).join("\n").should eq expected
   end
 end

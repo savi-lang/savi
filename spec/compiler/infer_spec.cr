@@ -13,9 +13,8 @@ describe Mare::Compiler::Infer do
           ^~~~~~~~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :infer)
-    end
+    Mare.compiler.compile([source], :infer)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains when the return type identifier couldn't be resolved" do
@@ -33,9 +32,8 @@ describe Mare::Compiler::Infer do
              ^~~~~~~~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :infer)
-    end
+    Mare.compiler.compile([source], :infer)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains when the local identifier couldn't be resolved" do
@@ -52,9 +50,8 @@ describe Mare::Compiler::Infer do
             ^
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :infer)
-    end
+    Mare.compiler.compile([source], :infer)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains when a local identifier wasn't declared, even when unused" do
@@ -71,9 +68,8 @@ describe Mare::Compiler::Infer do
         ^~~~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :infer)
-    end
+    Mare.compiler.compile([source], :infer)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains when the function body doesn't match the return type" do
@@ -104,9 +100,8 @@ describe Mare::Compiler::Infer do
          ^~~~~~~~~~~~~~~~~~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :infer)
-    end
+    Mare.compiler.compile([source], :infer)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains when the assignment type doesn't match the right-hand-side" do
@@ -133,9 +128,8 @@ describe Mare::Compiler::Infer do
                       ^~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :infer)
-    end
+    Mare.compiler.compile([source], :infer)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains when the prop type doesn't match the initializer value" do
@@ -161,9 +155,8 @@ describe Mare::Compiler::Infer do
                          ^~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :infer)
-    end
+    Mare.compiler.compile([source], :infer)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "treats an empty sequence as producing None" do
@@ -190,9 +183,8 @@ describe Mare::Compiler::Infer do
                       ^~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :infer)
-    end
+    Mare.compiler.compile([source], :infer)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains when a choice condition type isn't boolean" do
@@ -219,9 +211,8 @@ describe Mare::Compiler::Infer do
             ^~~~~~~~~~~~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :infer)
-    end
+    Mare.compiler.compile([source], :infer)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   pending "complains when a loop's implicit '| None' result doesn't pass checks" do
@@ -254,9 +245,8 @@ describe Mare::Compiler::Infer do
                  ^~~~~~~~~~~~~~~~~~~~~···
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :infer)
-    end
+    Mare.compiler.compile([source], :infer)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "infers a local's type based on assignment" do
@@ -267,6 +257,7 @@ describe Mare::Compiler::Infer do
     SOURCE
 
     ctx = Mare.compiler.compile([source], :infer)
+    ctx.errors.should be_empty
 
     infer = ctx.infer.for_func_simple(ctx, source, "Main", "new")
     body = infer.reified.func(ctx).body.not_nil!
@@ -285,6 +276,7 @@ describe Mare::Compiler::Infer do
     SOURCE
 
     ctx = Mare.compiler.compile([source], :infer)
+    ctx.errors.should be_empty
 
     infer = ctx.infer.for_func_simple(ctx, source, "Main", "new")
     body = infer.reified.func(ctx).body.not_nil!
@@ -301,6 +293,7 @@ describe Mare::Compiler::Infer do
     SOURCE
 
     ctx = Mare.compiler.compile([source], :infer)
+    ctx.errors.should be_empty
 
     infer = ctx.infer.for_func_simple(ctx, source, "Main", "new")
     body = infer.reified.func(ctx).body.not_nil!
@@ -319,6 +312,7 @@ describe Mare::Compiler::Infer do
     SOURCE
 
     ctx = Mare.compiler.compile([source], :infer)
+    ctx.errors.should be_empty
 
     main = ctx.namespace.main_type!(ctx)
     main_infer = ctx.infer.for_rt(ctx, main)
@@ -340,6 +334,7 @@ describe Mare::Compiler::Infer do
     SOURCE
 
     ctx = Mare.compiler.compile([source], :infer)
+    ctx.errors.should be_empty
 
     infer = ctx.infer.for_func_simple(ctx, source, "Main", "new")
     body = infer.reified.func(ctx).body.not_nil!
@@ -363,6 +358,7 @@ describe Mare::Compiler::Infer do
     SOURCE
 
     ctx = Mare.compiler.compile([source], :infer)
+    ctx.errors.should be_empty
 
     infer = ctx.infer.for_func_simple(ctx, source, "Main", "new")
     body = infer.reified.func(ctx).body.not_nil!
@@ -404,9 +400,8 @@ describe Mare::Compiler::Infer do
     - Please wrap an explicit numeric type around the literal (for example: U64[42])
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :infer)
-    end
+    Mare.compiler.compile([source], :infer)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains when literal couldn't resolve even when calling u64 method" do
@@ -430,9 +425,8 @@ describe Mare::Compiler::Infer do
     - Please wrap an explicit numeric type around the literal (for example: U64[42])
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :infer)
-    end
+    Mare.compiler.compile([source], :infer)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains when literal couldn't resolve and had conflicting hints" do
@@ -470,9 +464,8 @@ describe Mare::Compiler::Infer do
           ^
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :infer)
-    end
+    Mare.compiler.compile([source], :infer)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains when a less specific type than required is assigned" do
@@ -500,9 +493,8 @@ describe Mare::Compiler::Infer do
           ^~~~~~~~~~~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :infer)
-    end
+    Mare.compiler.compile([source], :infer)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains when a different type is assigned on reassignment" do
@@ -530,9 +522,8 @@ describe Mare::Compiler::Infer do
              ^~~~~~~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :infer)
-    end
+    Mare.compiler.compile([source], :infer)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "infers return type from param type or another return type" do
@@ -547,6 +538,7 @@ describe Mare::Compiler::Infer do
     SOURCE
 
     ctx = Mare.compiler.compile([source], :infer)
+    ctx.errors.should be_empty
 
     [
       {"Infer", "from_param"},
@@ -573,6 +565,7 @@ describe Mare::Compiler::Infer do
     SOURCE
 
     ctx = Mare.compiler.compile([source], :infer)
+    ctx.errors.should be_empty
 
     [
       {"Infer", "from_assign"},
@@ -603,9 +596,8 @@ describe Mare::Compiler::Infer do
            ^~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :infer)
-    end
+    Mare.compiler.compile([source], :infer)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains about problems with unreachable functions too" do
@@ -636,9 +628,8 @@ describe Mare::Compiler::Infer do
                 ^~~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :infer)
-    end
+    Mare.compiler.compile([source], :infer)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "infers assignment from an allocated class" do
@@ -651,6 +642,7 @@ describe Mare::Compiler::Infer do
     SOURCE
 
     ctx = Mare.compiler.compile([source], :infer)
+    ctx.errors.should be_empty
 
     infer = ctx.infer.for_func_simple(ctx, source, "Main", "new")
     body = infer.reified.func(ctx).body.not_nil!
@@ -686,9 +678,8 @@ describe Mare::Compiler::Infer do
               ^
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :infer)
-    end
+    Mare.compiler.compile([source], :infer)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains when assigning with an insufficient right-hand capability" do
@@ -718,9 +709,8 @@ describe Mare::Compiler::Infer do
            ^~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :infer)
-    end
+    Mare.compiler.compile([source], :infer)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains when calling on types without that function" do
@@ -762,9 +752,8 @@ describe Mare::Compiler::Infer do
            ^
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :infer)
-    end
+    Mare.compiler.compile([source], :infer)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "suggests a similarly named function when found" do
@@ -796,9 +785,8 @@ describe Mare::Compiler::Infer do
            ^~~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :infer)
-    end
+    Mare.compiler.compile([source], :infer)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "suggests a similarly named function (without '!') when found" do
@@ -828,9 +816,8 @@ describe Mare::Compiler::Infer do
            ^~~~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :infer)
-    end
+    Mare.compiler.compile([source], :infer)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "suggests a similarly named function (with '!') when found" do
@@ -860,9 +847,8 @@ describe Mare::Compiler::Infer do
            ^~~~~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :infer)
-    end
+    Mare.compiler.compile([source], :infer)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains when calling with an insufficient receiver capability" do
@@ -887,9 +873,8 @@ describe Mare::Compiler::Infer do
            ^~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :infer)
-    end
+    Mare.compiler.compile([source], :infer)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains with an extra hint when using insufficient capability of @" do
@@ -921,9 +906,8 @@ describe Mare::Compiler::Infer do
        ^~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :infer)
-    end
+    Mare.compiler.compile([source], :infer)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains when calling on a function with too many arguments" do
@@ -954,9 +938,8 @@ describe Mare::Compiler::Infer do
                    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :infer)
-    end
+    Mare.compiler.compile([source], :infer)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains when calling on a function with too few arguments" do
@@ -987,9 +970,8 @@ describe Mare::Compiler::Infer do
                    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :infer)
-    end
+    Mare.compiler.compile([source], :infer)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains when violating uniqueness into a local" do
@@ -1028,9 +1010,8 @@ describe Mare::Compiler::Infer do
             ^~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :infer)
-    end
+    Mare.compiler.compile([source], :infer)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains when violating uniqueness into a reassigned local" do
@@ -1064,9 +1045,8 @@ describe Mare::Compiler::Infer do
            ^~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :infer)
-    end
+    Mare.compiler.compile([source], :infer)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "allows extra aliases that don't violate uniqueness" do
@@ -1121,9 +1101,8 @@ describe Mare::Compiler::Infer do
            ^~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :infer)
-    end
+    Mare.compiler.compile([source], :infer)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "strips the ephemeral modifier from the capability of an inferred local" do
@@ -1160,9 +1139,8 @@ describe Mare::Compiler::Infer do
         ^
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :infer)
-    end
+    Mare.compiler.compile([source], :infer)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "infers the type of an array literal from its elements" do
@@ -1173,6 +1151,7 @@ describe Mare::Compiler::Infer do
     SOURCE
 
     ctx = Mare.compiler.compile([source], :infer)
+    ctx.errors.should be_empty
 
     infer = ctx.infer.for_func_simple(ctx, source, "Main", "new")
     body = infer.reified.func(ctx).body.not_nil!
@@ -1190,6 +1169,7 @@ describe Mare::Compiler::Infer do
     SOURCE
 
     ctx = Mare.compiler.compile([source], :infer)
+    ctx.errors.should be_empty
 
     infer = ctx.infer.for_func_simple(ctx, source, "Main", "new")
     body = infer.reified.func(ctx).body.not_nil!
@@ -1222,9 +1202,8 @@ describe Mare::Compiler::Infer do
                ^~~~~~~~~~~~~~~~~~~~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :infer)
-    end
+    Mare.compiler.compile([source], :infer)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "infers an empty array literal from its antecedent" do
@@ -1236,6 +1215,7 @@ describe Mare::Compiler::Infer do
     SOURCE
 
     ctx = Mare.compiler.compile([source], :infer)
+    ctx.errors.should be_empty
 
     infer = ctx.infer.for_func_simple(ctx, source, "Main", "new")
     body = infer.reified.func(ctx).body.not_nil!
@@ -1260,9 +1240,8 @@ describe Mare::Compiler::Infer do
             ^~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :infer)
-    end
+    Mare.compiler.compile([source], :infer)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains when violating uniqueness into an array literal" do
@@ -1301,9 +1280,8 @@ describe Mare::Compiler::Infer do
            ^~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :infer)
-    end
+    Mare.compiler.compile([source], :infer)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains when trying to implicitly recover an array literal" do
@@ -1336,9 +1314,8 @@ describe Mare::Compiler::Infer do
                         ^~~~~~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :infer)
-    end
+    Mare.compiler.compile([source], :infer)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "reflects viewpoint adaptation in the return type of a prop getter" do
@@ -1376,9 +1353,8 @@ describe Mare::Compiler::Infer do
                                          ^~~~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :infer)
-    end
+    Mare.compiler.compile([source], :infer)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "respects explicit viewpoint adaptation notation in the return type" do
@@ -1417,9 +1393,8 @@ describe Mare::Compiler::Infer do
                                          ^~~~~~~~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :infer)
-    end
+    Mare.compiler.compile([source], :infer)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "treats box functions as being implicitly specialized on receiver cap" do
@@ -1473,9 +1448,8 @@ describe Mare::Compiler::Infer do
                           ^~~~~~~~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :infer)
-    end
+    Mare.compiler.compile([source], :infer)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "allows reading the value of a property getter function" do
@@ -1570,9 +1544,8 @@ describe Mare::Compiler::Infer do
                                           ^~~~~~~~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :infer)
-    end
+    Mare.compiler.compile([source], :infer)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "allows capturing the extracted value of a property replace function" do
@@ -1651,9 +1624,8 @@ describe Mare::Compiler::Infer do
                                           ^~~~~~~~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :infer)
-    end
+    Mare.compiler.compile([source], :infer)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains on auto-recovery of a property setter whose return is used" do
@@ -1683,9 +1655,8 @@ describe Mare::Compiler::Infer do
             ^~~~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :infer)
-    end
+    Mare.compiler.compile([source], :infer)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains on auto-recovery for a val method receiver" do
@@ -1716,9 +1687,8 @@ describe Mare::Compiler::Infer do
            ^~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :infer)
-    end
+    Mare.compiler.compile([source], :infer)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "infers prop setters to return the alias of the assigned value" do
@@ -1754,9 +1724,8 @@ describe Mare::Compiler::Infer do
                                     ^~~~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :infer)
-    end
+    Mare.compiler.compile([source], :infer)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains if some params of an elevated constructor are not sendable" do
@@ -1787,9 +1756,8 @@ describe Mare::Compiler::Infer do
                                             ^~~~~~~~~~~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :infer)
-    end
+    Mare.compiler.compile([source], :infer)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains if some params of an asynchronous function are not sendable" do
@@ -1820,9 +1788,8 @@ describe Mare::Compiler::Infer do
                                             ^~~~~~~~~~~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :infer)
-    end
+    Mare.compiler.compile([source], :infer)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains when a constant doesn't meet the expected type" do
@@ -1852,9 +1819,8 @@ describe Mare::Compiler::Infer do
                            ^~~~~~~~~~~~~~~~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :infer)
-    end
+    Mare.compiler.compile([source], :infer)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "requires a sub-func to be present in the subtype" do
@@ -1890,9 +1856,8 @@ describe Mare::Compiler::Infer do
            ^~~~~~~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :infer)
-    end
+    Mare.compiler.compile([source], :infer)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "requires a sub-func to have the same constructor or constant tags" do
@@ -1992,9 +1957,8 @@ describe Mare::Compiler::Infer do
            ^~~~~~~~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :infer)
-    end
+    Mare.compiler.compile([source], :infer)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "requires a sub-func to have the same number of params" do
@@ -2052,9 +2016,8 @@ describe Mare::Compiler::Infer do
                     ^~~~~~~~~~~~~~~~~~~~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :infer)
-    end
+    Mare.compiler.compile([source], :infer)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "requires a sub-constructor to have a covariant receiver capability" do
@@ -2092,9 +2055,8 @@ describe Mare::Compiler::Infer do
            ^~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :infer)
-    end
+    Mare.compiler.compile([source], :infer)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "requires a sub-func to have a contravariant receiver capability" do
@@ -2132,9 +2094,8 @@ describe Mare::Compiler::Infer do
            ^~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :infer)
-    end
+    Mare.compiler.compile([source], :infer)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "requires a sub-func to have covariant return and contravariant params" do
@@ -2194,9 +2155,8 @@ describe Mare::Compiler::Infer do
                                            ^~~~~~~~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :infer)
-    end
+    Mare.compiler.compile([source], :infer)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "prefers to show an error about assertions over other subtype failures" do
@@ -2224,9 +2184,8 @@ describe Mare::Compiler::Infer do
            ^~~~~~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :infer)
-    end
+    Mare.compiler.compile([source], :infer)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "allows assigning from a variable with its refined type" do
@@ -2283,9 +2242,8 @@ describe Mare::Compiler::Infer do
                      ^~~~~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :infer)
-    end
+    Mare.compiler.compile([source], :infer)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains when a check would require runtime knowledge of capabilities" do
@@ -2320,9 +2278,8 @@ describe Mare::Compiler::Infer do
                  ^~~~~~~~~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :infer)
-    end
+    Mare.compiler.compile([source], :infer)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   pending "can also refine a type parameter within a choice body" do
@@ -2375,9 +2332,8 @@ describe Mare::Compiler::Infer do
                                         ^~~~~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :infer)
-    end
+    Mare.compiler.compile([source], :infer)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains when too few type arguments are provided" do
@@ -2411,9 +2367,8 @@ describe Mare::Compiler::Infer do
                             ^~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :infer)
-    end
+    Mare.compiler.compile([source], :infer)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains when no type arguments are provided and some are expected" do
@@ -2437,9 +2392,8 @@ describe Mare::Compiler::Infer do
                    ^~~~~~~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :infer)
-    end
+    Mare.compiler.compile([source], :infer)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains when a type argument doesn't satisfy the bound" do
@@ -2469,9 +2423,8 @@ describe Mare::Compiler::Infer do
                 ^~~~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :infer)
-    end
+    Mare.compiler.compile([source], :infer)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "yields values to the caller" do
@@ -2512,9 +2465,8 @@ describe Mare::Compiler::Infer do
                               ^~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :infer)
-    end
+    Mare.compiler.compile([source], :infer)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains when a yield block is not present on a yielding call" do
@@ -2538,9 +2490,8 @@ describe Mare::Compiler::Infer do
               ^~~~~~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :infer)
-    end
+    Mare.compiler.compile([source], :infer)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   pending "complains when the yield param type doesn't match a constraint" do
@@ -2570,9 +2521,8 @@ describe Mare::Compiler::Infer do
               ^~~~~~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :infer)
-    end
+    Mare.compiler.compile([source], :infer)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "tests and conveys transitively reached subtypes to the reach pass" do
@@ -2591,6 +2541,7 @@ describe Mare::Compiler::Infer do
     SOURCE
 
     ctx = Mare.compiler.compile([source], :infer)
+    ctx.errors.should be_empty
 
     any = ctx.namespace[source]["Any"].as(Mare::Program::Type::Link)
     trait = ctx.namespace[source]["Exampleable"].as(Mare::Program::Type::Link)
@@ -2633,6 +2584,7 @@ describe Mare::Compiler::Infer do
     SOURCE
 
     ctx = Mare.compiler.compile([source], :infer)
+    ctx.errors.should be_empty
 
     t = ctx.namespace[source]["Person"].as(Mare::Program::Type::Link)
     rt = ctx.infer[t].no_args
@@ -2657,6 +2609,7 @@ describe Mare::Compiler::Infer do
     SOURCE
 
     ctx = Mare.compiler.compile([source], :infer)
+    ctx.errors.should be_empty
 
     t, f, infer = ctx.infer.test_simple!(ctx, source, "Main", "new")
     assign = f.body.not_nil!.terms.first.not_nil!.as(Mare::AST::Relate)
@@ -2696,9 +2649,8 @@ describe Mare::Compiler::Infer do
                         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :infer)
-    end
+    Mare.compiler.compile([source], :infer)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   pending "complains when the yield block result doesn't match the expected type"

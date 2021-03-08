@@ -12,8 +12,7 @@ describe Mare::Compiler::Populate do
           ^~~~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :populate)
-    end
+    Mare.compiler.compile([source], :populate)
+      .errors.map(&.message).join("\n").should eq expected
   end
 end

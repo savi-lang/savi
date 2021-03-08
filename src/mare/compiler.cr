@@ -194,12 +194,12 @@ class Mare::Compiler
     end
   end
 
-  def eval(string : String, options = CompilerOptions.new) : Int32
+  def eval(string : String, options = CompilerOptions.new) : Context
     content = ":actor Main\n:new (env)\n#{string}"
     library = Mare::Source::Library.new("(eval)")
     source = Mare::Source.new("(eval)", content, library)
 
-    Mare.compiler.compile([source], :eval, options).eval.exitcode
+    Mare.compiler.compile([source], :eval, options)
   end
 
   def compile(dirname : String, target : Symbol = :eval, options = CompilerOptions.new)

@@ -18,9 +18,8 @@ describe Mare::Compiler::Privacy do
                ^~~~~~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :privacy)
-    end
+    Mare.compiler.compile([source], :privacy)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   pending "won't allow an interface in the local library to circumvent"

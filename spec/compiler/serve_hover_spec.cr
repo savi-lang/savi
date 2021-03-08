@@ -8,6 +8,7 @@ describe Mare::Compiler::ServeHover do
     SOURCE
 
     ctx = Mare.compiler.compile([source], :serve_hover)
+    ctx.errors.should be_empty
 
     messages, pos = ctx.serve_hover[Mare::Source::Pos.point(source, 2, 5)]
     pos.row.should eq 2
@@ -46,6 +47,7 @@ describe Mare::Compiler::ServeHover do
     SOURCE
 
     ctx = Mare.compiler.compile([source], :serve_hover)
+    ctx.errors.should be_empty
 
     messages, pos = ctx.serve_hover[Mare::Source::Pos.point(source, 3, 6)]
     pos.row.should eq 3
@@ -73,6 +75,7 @@ describe Mare::Compiler::ServeHover do
     SOURCE
 
     ctx = Mare.compiler.compile([source], :serve_hover)
+    ctx.errors.should be_empty
 
     messages, pos = ctx.serve_hover[Mare::Source::Pos.point(source, 7, 9)]
     pos.row.should eq 7
