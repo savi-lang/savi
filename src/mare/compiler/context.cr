@@ -158,4 +158,9 @@ class Mare::Compiler::Context
     @errors << e
     false
   end
+
+  def error_at(*args)
+    @errors << Error.build(*args)
+    nil
+  end
 end

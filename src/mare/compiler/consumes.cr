@@ -39,13 +39,13 @@ module Mare::Compiler::Consumes
 
       # Raise an error if trying to use a consumed local.
       if info.is_a?(Refer::Local | Refer::LocalUnion | Refer::Self) && @consumes.has_key?(info)
-        Error.at node,
+        ctx.error_at node,
           "This variable can't be used here; it might already be consumed", [
             {@consumes[info], "it was consumed here"}
           ]
       end
       if info.is_a?(Refer::LocalUnion) && info.list.any? { |l| @consumes.has_key?(l) }
-        Error.at node,
+        ctx.error_at node,
           "This variable can't be used here; it might already be consumed",
           info.list.select { |l| @consumes.has_key?(l) }.map { |local|
             {@consumes[local], "it was consumed here"}
@@ -61,10 +61,11 @@ module Mare::Compiler::Consumes
         nil # ignore this prefix type
       when "--"
         info = @refer[node.term]
-        Error.at node, "Only a local variable (or @) can be consumed" \
-          unless info.is_a?(Refer::Local | Refer::LocalUnion | Refer::Self)
-
-        @consumes[info] = node.pos
+        if info.is_a?(Refer::Local | Refer::LocalUnion | Refer::Self)
+          @consumes[info] = node.pos
+        else
+          ctx.error_at node, "Only a local variable (or @) can be consumed"
+        end
       else
         raise NotImplementedError.new(node.op.value)
       end
