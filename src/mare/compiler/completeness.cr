@@ -47,7 +47,7 @@ module Mare::Compiler::Completeness
 
     # Any fields that were not seen in the branching analysis are errors.
     unseen = branch.show_unseen_fields
-    Error.at rf_func.ident,
+    ctx.error_at rf_func.ident,
       "This constructor doesn't initialize all of its fields", unseen \
         unless unseen.empty?
   end
@@ -157,7 +157,7 @@ module Mare::Compiler::Completeness
 
     def touch(node : AST::FieldRead)
       if !seen_fields.includes?(node.value)
-        Error.at node,
+        ctx.error_at node,
           "This field may be read before it is initialized by a constructor",
             call_crumbs.reverse.map { |pos| {pos, "traced from a call here"} }
       end
@@ -196,7 +196,7 @@ module Mare::Compiler::Completeness
         return if tag_self.subtype_of?(ctx, constraint)
 
         # Otherwise, we must raise an error.
-        Error.at node,
+        ctx.error_at node,
           "This usage of `@` shares field access to the object" \
           " from a constructor before all fields are initialized", [
             {pos,
