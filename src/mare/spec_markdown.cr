@@ -44,7 +44,7 @@ class Mare::SpecMarkdown
   # while bare text in between those code blocks has a "kind" of `nil`.
   def segments_groups
     main_body.split(/^---$/m).map(&\
-      .scan(/\s*(?:^```(\w+)\n(.*?)^```\n\s*|(.+?)\s*(?=^---|\s*^```|\z))/m)
+      .scan(/\s*(?:^```(\w+)\n(.*?)^```$\s*|(.+?)\s*(?=^---|\s*^```|\z))/m)
       .map { |match| match[3]?.try { |text| {nil, text} } || {match[1], match[2]} }
     )
   end

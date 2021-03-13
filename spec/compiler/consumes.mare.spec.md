@@ -235,16 +235,6 @@ This variable can't be used here; it might already be consumed:
     --u
     ^~~
 ```
-TODO: Don't show this error twice in the output.
-```error
-This variable can't be used here; it might already be consumed:
-    while (u == 1) ("one" | "other")
-           ^
-
-- it was consumed here:
-    --u
-    ^~~
-```
 
 ---
 

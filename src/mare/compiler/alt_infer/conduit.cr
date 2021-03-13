@@ -184,5 +184,40 @@ module Mare::Compiler::AltInfer
         infer.resolve(ctx, info).try(&.alias)
       end
     end
+
+    def self.array_literal_element_antecedent(array_info)
+      new(ArrayLiteralElementAntecedent.new(array_info))
+    end
+
+    struct ArrayLiteralElementAntecedent < Inner
+      getter array_info : Infer::Info
+      def initialize(@array_info)
+      end
+
+      def pretty_print(format : PrettyPrint)
+        name = "ArrayLiteralElementAntecedent"
+        format.surround("#{name}(", ")", left_break: nil, right_break: nil) do
+          format.text(array_info.to_s)
+        end
+      end
+
+      def flatten : Array(Inner)
+        conduit = array_info.as_conduit?
+        return [self] of Inner unless conduit
+
+        conduit.flatten.map(&.inner)
+      end
+
+      def directly_references?(other_info : Infer::Info) : Bool
+        @array_info == other_info
+      end
+
+      def resolve_span!(ctx : Context, infer : Visitor) : Span
+        infer.resolve(ctx, array_info).transform_mt(&.single!.args.first)
+      end
+      def resolve!(ctx : Context, infer : TypeCheck::ForReifiedFunc) : Infer::MetaType?
+        infer.resolve(ctx, array_info).try(&.single!.args.first)
+      end
+    end
   end
 end

@@ -11,6 +11,12 @@ class Mare::Error < Exception
     @info = [] of {Source::Pos, String}
   end
 
+  def ==(other : Error)
+    @pos == other.pos && \
+    @headline == other.headline && \
+    @info == other.info
+  end
+
   def message
     strings = ["#{headline}:\n#{pos.show}\n"]
     info.each do |info_pos, info_msg|

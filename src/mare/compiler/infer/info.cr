@@ -410,7 +410,7 @@ class Mare::Compiler::Infer
         .transform_mt(&.strip_ephemeral)
       else
         # If we get here, we've failed and don't have enough info to continue.
-        Error.at self,
+        AltInfer::Span.error self,
           "This #{described_kind} needs an explicit type; it could not be inferred"
       end
     end
@@ -1204,10 +1204,14 @@ class Mare::Compiler::Infer
       end
     end
     def as_multiple_downstream_constraints(ctx : Context, infer : TypeCheck::ForReifiedFunc) : Array({Source::Pos, MetaType})?
-      @downstreams.compact_map do |pos, info, aliases|
+      @downstreams.flat_map do |pos, info, aliases|
+        multi = info.as_multiple_downstream_constraints(ctx, infer)
+        next multi if multi
+
         mt = info.as_downstream_constraint_meta_type(ctx, infer)
-        next unless mt
-        {pos, mt}
+        next {info.pos, mt} if mt
+
+        [] of {Source::Pos, MetaType}
       end
     end
 
@@ -1696,7 +1700,9 @@ class Mare::Compiler::Infer
       ante_span = possible_antecedents_span(ctx, infer)
 
       elem_spans = terms.map { |term| infer.resolve(ctx, term).as(AltInfer::Span) }
-      elem_span = AltInfer::Span.reduce_combine_mts(elem_spans) { |accum, mt| accum.unite(mt) }
+      elem_span = AltInfer::Span
+        .reduce_combine_mts(elem_spans) { |accum, mt| accum.unite(mt) }
+        .try(&.transform_mt(&.alias))
 
       if ante_span
         if elem_span
@@ -1713,7 +1719,7 @@ class Mare::Compiler::Infer
             # fall back to using the element MetaType if the intersection
             # of those two turns out to be unsatisfiable.
             AltInfer::Span.simple_with_fallback(ante_mt,
-              ante_elem_mt.intersect(elem_mt), [
+              ante_elem_mt.intersect(elem_mt.ephemeralize), [
                 {:mt_unsatisfiable, AltInfer::Span.simple(fallback_mt)}
               ]
             )
@@ -1825,6 +1831,10 @@ class Mare::Compiler::Infer
     def describe_kind : String; "array element" end
 
     def initialize(@pos, @layer_index, @array)
+    end
+
+    def as_conduit? : AltInfer::Conduit?
+      AltInfer::Conduit.array_literal_element_antecedent(@array)
     end
 
     def tethers(querent : Info) : Array(Tether)
