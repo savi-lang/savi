@@ -409,6 +409,25 @@ struct Mare::Compiler::Infer::MetaType::Intersection
     set
   end
 
+  def each_type_alias_in_first_layer(&block : ReifiedTypeAlias -> _)
+    terms.try(&.each(&.each_type_alias_in_first_layer(&block)))
+    anti_terms.try(&.each(&.each_type_alias_in_first_layer(&block)))
+  end
+
+  def substitute_each_type_alias_in_first_layer(&block : ReifiedTypeAlias -> MetaType) : Inner
+    result = cap || Unconstrained.instance
+
+    terms.try(&.each { |term|
+      result = result.intersect(term.substitute_each_type_alias_in_first_layer(&block))
+    })
+
+    anti_terms.try(&.each { |anti_term|
+      result = result.intersect(anti_term.substitute_each_type_alias_in_first_layer(&block))
+    })
+
+    result
+  end
+
   def is_sendable?
     cap.try(&.is_sendable?) || ignores_cap? || false
   end

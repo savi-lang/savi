@@ -148,6 +148,14 @@ struct Mare::Compiler::Infer::MetaType::AntiNominal
     raise NotImplementedError.new("#{self} gather_lazy_type_params_referenced")
   end
 
+  def each_type_alias_in_first_layer(&block : ReifiedTypeAlias -> _)
+    raise NotImplementedError.new("#{self} each_type_alias_in_first_layer")
+  end
+
+  def substitute_each_type_alias_in_first_layer(&block : ReifiedTypeAlias -> MetaType) : Inner
+    raise NotImplementedError.new("#{self} substitute_each_type_alias_in_first_layer")
+  end
+
   def is_sendable?
     # An anti-nominal is never itself sendable -
     # it excludes a single nominal, and says nothing about capabilities.

@@ -348,6 +348,14 @@ struct Mare::Compiler::Infer::MetaType::Capability
     set # no type params are present to be gathered
   end
 
+  def each_type_alias_in_first_layer(&block : ReifiedTypeAlias -> _)
+    nil # no type params are present to be yielded
+  end
+
+  def substitute_each_type_alias_in_first_layer(&block : ReifiedTypeAlias -> MetaType) : Inner
+    self # to type aliases are present to be substituted
+  end
+
   def is_sendable?
     case self
     when ISO_EPH, TRN_EPH

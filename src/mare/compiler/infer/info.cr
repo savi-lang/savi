@@ -676,7 +676,7 @@ class Mare::Compiler::Infer
     end
 
     def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
-      infer.self_with_reify_cap(ctx)
+      infer.self_type_expr_span(ctx)
     end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
@@ -954,7 +954,7 @@ class Mare::Compiler::Infer
     end
 
     def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
-      infer.self_with_reify_cap(ctx).transform_mt do |call_mt|
+      infer.self_type_expr_span(ctx).transform_mt do |call_mt|
         call_defn = call_mt.single!
         call_func = call_defn.defn(ctx).functions.find do |f|
           f.ident.value == @name && f.has_tag?(:field)
@@ -1716,6 +1716,11 @@ class Mare::Compiler::Infer
             fallback_rt = infer.prelude_reified_type(ctx, "Array", [elem_mt])
             fallback_mt = MetaType.new(fallback_rt).intersect(MetaType.cap("ref"))
 
+            # We may need to unwrap lazy elements from this inner layer.
+            ante_elem_mt = infer
+              .unwrap_lazy_parts_of_type_expr_span(ctx, AltInfer::Span.simple(ante_elem_mt))
+              .inner.as(AltInfer::Span::Terminal).meta_type
+
             # For every pair of element MetaType and antecedent MetaType,
             # Treat the antecedent MetaType as the default, but
             # fall back to using the element MetaType if the intersection
@@ -1862,24 +1867,26 @@ class Mare::Compiler::Infer
       results.first.not_nil!
     end
     def tether_upward_transform_span(ctx : Context, infer : AltInfer::Visitor, span : AltInfer::Span) : AltInfer::Span
-      span.transform_mt do |meta_type|
-        results = [] of MetaType
+      infer.unwrap_lazy_parts_of_type_expr_span(ctx,
+        span.transform_mt do |meta_type|
+          results = [] of MetaType
 
-        meta_type.simplify(ctx).each_reachable_defn(ctx).each do |rt|
-          # TODO: Support more element antecedent detection patterns.
-          if rt.link.name == "Array" \
-          && rt.args.size == 1
-            results << rt.args.first.simplify(ctx)
+          meta_type.simplify(ctx).each_reachable_defn(ctx).each do |rt|
+            # TODO: Support more element antecedent detection patterns.
+            if rt.link.name == "Array" \
+            && rt.args.size == 1
+              results << rt.args.first.simplify(ctx)
+            end
           end
-        end
 
-        # TODO: support multiple antecedents gracefully?
-        if results.size != 1
-          next MetaType.unconstrained
-        end
+          # TODO: support multiple antecedents gracefully?
+          if results.size != 1
+            next MetaType.unconstrained
+          end
 
-        results.first.not_nil!
-      end
+          results.first.not_nil!
+        end
+      )
     end
 
     def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType

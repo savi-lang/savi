@@ -188,6 +188,22 @@ struct Mare::Compiler::Infer::MetaType
     inner.gather_lazy_type_params_referenced(ctx, set, max_depth)
   end
 
+  def each_type_alias_in_first_layer(&block : ReifiedTypeAlias -> _)
+    @inner.each_type_alias_in_first_layer(&block)
+  end
+
+  def substitute_each_type_alias_in_first_layer(&block : ReifiedTypeAlias -> MetaType)
+    MetaType.new(@inner.substitute_each_type_alias_in_first_layer(&block))
+  end
+
+  def any_type_alias_in_first_layer?
+    # TODO: A less hacky approach here would be good.
+    each_type_alias_in_first_layer { raise "here's one" }
+    false
+  rescue
+    true
+  end
+
   def is_sendable? : Bool
     inner.is_sendable?
   end
@@ -330,11 +346,11 @@ struct Mare::Compiler::Infer::MetaType
         return result if result.is_a?(Unsatisfiable)
       end
       inner.terms.not_nil!.each do |term|
-        # Here is where we deal with the special case of unwrapping aliases:
-        begin
-          term_defn = term.defn
-          term = ctx.infer.unwrap_alias(ctx, term_defn).inner if term_defn.is_a?(ReifiedTypeAlias)
-        end
+        # # Here is where we deal with the special case of unwrapping aliases:
+        # begin
+        #   term_defn = term.defn
+        #   term = ctx.infer.unwrap_alias(ctx, term_defn).inner if term_defn.is_a?(ReifiedTypeAlias)
+        # end
         result = result.intersect(term)
         return result if result.is_a?(Unsatisfiable)
       end if inner.terms
@@ -409,11 +425,11 @@ struct Mare::Compiler::Infer::MetaType
         return result if result.is_a?(Unconstrained)
       end if inner.caps
       inner.terms.not_nil!.each do |term|
-        # Here is where we deal with the special case of unwrapping aliases:
-        begin
-          term_defn = term.defn
-          term = ctx.infer.unwrap_alias(ctx, term_defn).inner if term_defn.is_a?(ReifiedTypeAlias)
-        end
+        # # Here is where we deal with the special case of unwrapping aliases:
+        # begin
+        #   term_defn = term.defn
+        #   term = ctx.infer.unwrap_alias(ctx, term_defn).inner if term_defn.is_a?(ReifiedTypeAlias)
+        # end
         result = result.unite(term)
         return result if result.is_a?(Unconstrained)
       end if inner.terms
@@ -464,12 +480,12 @@ struct Mare::Compiler::Infer::MetaType
   end
 
   private def self.simplify_nominal(ctx : Context, inner : Nominal)
-    inner_defn = inner.defn
-    if inner_defn.is_a?(ReifiedTypeAlias)
-      simplify_inner(ctx, ctx.infer.unwrap_alias(ctx, inner_defn).inner)
-    else
+    # inner_defn = inner.defn
+    # if inner_defn.is_a?(ReifiedTypeAlias)
+    #   simplify_inner(ctx, ctx.infer.unwrap_alias(ctx, inner_defn).inner)
+    # else
       inner
-    end
+    # end
   end
 
   # Return true if this MetaType is a subtype of the other MetaType.

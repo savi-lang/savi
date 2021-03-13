@@ -216,7 +216,13 @@ module Mare::Compiler::AltInfer
         infer.resolve(ctx, array_info).transform_mt(&.single!.args.first)
       end
       def resolve!(ctx : Context, infer : TypeCheck::ForReifiedFunc) : Infer::MetaType?
-        infer.resolve(ctx, array_info).try(&.single!.args.first)
+        infer.resolve(ctx, array_info)
+          .try(&.single!.args.first)
+
+          # We may need to unwrap type aliases.
+          .try(&.substitute_each_type_alias_in_first_layer { |rta|
+            ctx.type_check.unwrap_alias(ctx, rta).not_nil!
+          })
       end
     end
   end

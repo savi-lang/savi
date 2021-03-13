@@ -311,6 +311,16 @@ struct Mare::Compiler::Infer::MetaType::Nominal
     set
   end
 
+  def each_type_alias_in_first_layer(&block : ReifiedTypeAlias -> _)
+    defn = defn()
+    defn.is_a?(ReifiedTypeAlias) ? block.call(defn) : nil
+  end
+
+  def substitute_each_type_alias_in_first_layer(&block : ReifiedTypeAlias -> MetaType) : Inner
+    defn = defn()
+    defn.is_a?(ReifiedTypeAlias) ? block.call(defn).inner : self
+  end
+
   def is_sendable?
     raise NotImplementedError.new("simplify first to remove aliases") if defn.is_a?(ReifiedTypeAlias)
 

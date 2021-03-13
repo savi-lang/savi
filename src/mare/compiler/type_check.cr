@@ -18,7 +18,7 @@ class Mare::Compiler::TypeCheck
     def initialize(
       @link : Program::Function::Link,
       @pre : PreInfer::Analysis,
-      @spans : AltInfer::Analysis
+      @spans : AltInfer::FuncAnalysis
     )
       @reified_funcs = {} of ReifiedType => Set(ReifiedFunction)
     end
@@ -500,25 +500,11 @@ class Mare::Compiler::TypeCheck
     @aliases[rt_alias] ||= ForReifiedTypeAlias.new(ctx, rt_alias, refer_type)
   end
 
-  def unwrap_alias(ctx : Context, rt_alias : ReifiedTypeAlias) : MetaType
-    # Guard against recursion in alias unwrapping.
-    if @unwrapping_set.includes?(rt_alias)
-      t_alias = rt_alias.link.resolve(ctx)
-      Error.at t_alias.ident,
-        "This type alias is directly recursive, which is not supported",
-        [{t_alias.target,
-          "only recursion via type arguments in this expression is supported"
-        }]
-    end
-    @unwrapping_set.add(rt_alias)
-
-    # Unwrap the alias.
+  def unwrap_alias(ctx : Context, rt_alias : ReifiedTypeAlias) : MetaType?
     refer_type = ctx.refer_type[rt_alias.link]
-    @aliases[rt_alias].type_expr(rt_alias.target_type_expr(ctx), refer_type)
-    .simplify(ctx)
-
-    # Remove the recursion guard.
-    .tap { @unwrapping_set.delete(rt_alias) }
+    for_rt_alias(ctx, rt_alias.link, rt_alias.args)
+      .type_expr(rt_alias.target_type_expr(ctx), refer_type)
+      .try(&.simplify(ctx))
   end
 
   # TODO: Get rid of this
@@ -569,6 +555,9 @@ class Mare::Compiler::TypeCheck
     rt.args.each_with_index do |arg, index|
       param_bound = for_rt(ctx, rt.link).get_type_param_bound(index)
       next unless param_bound
+
+      # TODO: We may need to unwrap type aliases within the type argument.
+      next if arg.any_type_alias_in_first_layer?
 
       return false if !arg.satisfies_bound?(ctx, param_bound)
     end

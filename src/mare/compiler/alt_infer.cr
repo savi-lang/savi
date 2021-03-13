@@ -121,36 +121,6 @@ module Mare::Compiler::AltInfer
       end
     end
 
-    # TODO: Remove this method in favor of the one above
-    def combine_mts(spans : Array(Span), &block : (MetaType, Array(MetaType)) -> MetaType) : Span
-      others = spans.map(&.inner)
-      if inner.is_a?(Terminal) && others.all?(&.is_a?(Terminal))
-        # If all are terminals, we can easily combine them with one block call.
-        Span.new(Terminal.new(block.call(
-          inner.as(Terminal).meta_type,
-          others.map(&.as(Terminal).meta_type)
-        )))
-      elsif others.all?(&.==(inner))
-        # If all spans are equivalent we can take a shortcut: using transform_mt
-        # on just one of the spans, then presenting that to the block as if we
-        # had gotten that value from all of the presented spans.
-        transform_block = ->(mt : MetaType) { block.call(mt, spans.map { mt }) }
-        Span.new(inner.transform_mt(&transform_block))
-      elsif inner.is_a?(ErrorPropagate)
-        # If this Span is an error propagate, we can easily just propagate it.
-        Span.new(inner)
-      elsif (other_error = others.find(&.is_a?(ErrorPropagate)))
-        # Similarly for any ErrorPropagate we may find in the others list.
-        Span.new(other_error)
-      elsif spans.size == 1
-        # If there's only one other span to combine with, delegate as singular.
-        wrap_block = ->(a : MetaType, b : MetaType) { block.call(a, [b]) }
-        combine_mt(spans.first, &wrap_block)
-      else
-        raise NotImplementedError.new("combine_mts")
-      end
-    end
-
     def self.reduce_combine_mts(spans : Array(Span), &block : (MetaType, MetaType) -> MetaType) : Span?
       case spans.size
       when 0; nil
@@ -792,7 +762,7 @@ module Mare::Compiler::AltInfer
     end
   end
 
-  struct Analysis
+  abstract struct Analysis
     def initialize
       @spans = {} of Infer::Info => Span
     end
@@ -800,216 +770,27 @@ module Mare::Compiler::AltInfer
     def [](info : Infer::Info); @spans[info]; end
     def []?(info : Infer::Info); @spans[info]?; end
     protected def []=(info, span); @spans[info] = span; end
-  end
 
-  class Visitor < Mare::AST::Visitor
-    getter analysis
-    protected getter func
-    protected getter link
-    protected getter refer_type
-    protected getter refer_type_parent
-    protected getter classify
-    protected getter pre_infer
+    getter! type_params : Array(Infer::TypeParam)
+    protected setter type_params
 
-    protected def f_analysis; pre_infer; end # TODO: remove this alias
-
-    def initialize(
-      @func : Program::Function,
-      @link : Program::Function::Link,
-      @analysis : Analysis,
-      @refer_type : ReferType::Analysis,
-      @refer_type_parent : ReferType::Analysis,
-      @classify : Classify::Analysis,
-      @type_context : TypeContext::Analysis,
-      @pre_infer : PreInfer::Analysis,
-    )
-      @currently_looking_up_param_bounds = Set(Infer::TypeParam).new
+    def type_param_substs(type_args : Array(MetaType)) : Hash(Infer::TypeParam, Infer::MetaType)
+      type_params.zip(type_args.map(&.strip_cap)).to_h
     end
 
-    def resolve(ctx : Context, info : Infer::Info) : Span
-      @analysis[info]? || begin
-        # If this info resolves as a conduit, resolve the conduit,
-        # and do not save the result locally for this span.
-        conduit = info.as_conduit?
-        return conduit.resolve_span!(ctx, self) if conduit
-
-        span = info.resolve_span!(ctx, self)
-
-        # Deal with type parameter substitutions if needed.
-        # This happens when we have a localized type refinement,
-        # such as inside a conditional block with a type condition.
-        span = apply_substs_for_layer(ctx, info, span)
-
-        # substitute lazy type params if needed
-        lazy_type_params = Set(Infer::TypeParam).new
-        max_depth = 1
-        span.each_mt { |mt|
-          mt.gather_lazy_type_params_referenced(ctx, lazy_type_params, max_depth)
-        }
-        if lazy_type_params.any?
-          span = lazy_type_params.reduce(span) { |span, type_param|
-            type_param_span = lookup_type_param_partial_reified_span(ctx, type_param)
-
-            span.combine_mt(type_param_span) { |mt, type_param_mt|
-              mt.substitute_lazy_type_params({
-                type_param => type_param_mt # MetaType.new_type_param(type_param).intersect(type_param_mt.cap_only)
-              }, max_depth)
-            }
-          }
-        end
-
-        @analysis[info] = span
-
-        span
-      rescue Compiler::Pass::Analyze::ReentranceError
-        kind = info.is_a?(Infer::DynamicInfo) ? " #{info.describe_kind}" : ""
-        AltInfer::Span.error info.pos,
-          "This#{kind} needs an explicit type; it could not be inferred"
-      end
-    end
-
-    def type_params_for(ctx : Context, type_link : Program::Type::Link) : Array(Infer::TypeParam)
-      type_link.resolve(ctx).params.try(&.terms.map { |type_param|
-        ident = AST::Extract.type_param(type_param).first
-        ref = refer_type[ident]? || refer_type_parent[ident]
-        Infer::TypeParam.new(ref.as(Refer::TypeParam))
-      }) || [] of Infer::TypeParam
-    end
-
-     # TODO: remove this in favor of the span-returning function below.
-    def lookup_type_param_bound(ctx : Context, type_param : Infer::TypeParam)
-      span = lookup_type_param_bound_span(ctx, type_param)
-      MetaType.new_union(span.all_terminal_meta_types)
-    end
-    def lookup_type_param_bound_span(ctx : Context, type_param : Infer::TypeParam)
-      @currently_looking_up_param_bounds.add(type_param)
-
-      ref = type_param.ref
-      raise "lookup on wrong visitor" unless ref.parent_link == link.type
-      type_expr_span(ctx, ref.bound)
-
-      .tap { @currently_looking_up_param_bounds.delete(type_param) }
-    end
-    def lookup_type_param_partial_reified_span(ctx : Context, type_param : Infer::TypeParam)
-      # Avoid infinite recursion by taking a lazy approach if we are already
-      # recursed into this type param's bound resolution.
-      # This lazy reference can be unwrapped by other logic later as needed.
-      if @currently_looking_up_param_bounds.includes?(type_param)
-        lazy = Infer::TypeParam.new(type_param.ref)
-        lazy.lazy = true
-        return Span.simple(MetaType.new_type_param(lazy))
-      end
-
-      # Otherwise, continue by looking up the bound of this type param,
-      # and intersect it with the type param reference itself, expanding the
-      # span to include every possible single cap instead of using a multi-cap.
-      lookup_type_param_bound_span(ctx, type_param).decided_by(type_param) { |bound_mt|
-        bound_mt.cap_only_inner.each_cap.map { |cap|
-          cap_mt = MetaType.new(cap)
-          mt = MetaType
-            .new_type_param(type_param)
-            .intersect(cap_mt)
-            # .intersect(bound_mt.strip_cap)
-          # TODO: Introduce a Fact Span that adds the bound_mt as a fact?
-          {cap_mt, Span.simple(mt)}
-        }.to_h
-      }
-    end
-
-    def unwrap_lazy_parts_of_type_expr_span(ctx : Context, span : Span) : Span
-      span # TODO
-      # # Currently the only lazy part is type params nested in type args.
-      # # But in the future we will also handle type aliases here.
-      # type_params = type_params_for(ctx, link.type)
-      # type_param_spans = type_params.map { |type_param|
-      #   lookup_type_param_partial_reified_span(ctx, type_param).as(Span)
-      # }
-      # span.combine_mts(type_param_spans) { |mt, type_param_mts|
-      #   mt.substitute_type_params_in_type_args(type_params.zip(type_param_mts).to_h)
-      # }
-    end
-
-    def substs_for(ctx : Context, rt : Infer::ReifiedType) : Hash(Infer::TypeParam, Infer::MetaType)
-      type_params_for(ctx, rt.link).zip(rt.args.map(&.strip_cap)).to_h
-    end
-
-    def apply_substs_for_layer(ctx : Context, info : Info, span : Span) : Span
-      layer = @type_context[info.layer_index]
-
-      # TODO: also handle negative conditions
-      layer.all_positive_conds.reduce(span) { |span, cond|
-        cond_info = @pre_infer[cond]
-        case cond_info
-        when Infer::TypeParamCondition
-          type_param = Infer::TypeParam.new(cond_info.refine)
-          refine_span = resolve(ctx, cond_info.refine_type)
-          refine_cap_mt =
-            Infer::MetaType.new_union(refine_span.all_terminal_meta_types.map(&.cap_only))
-          raise NotImplementedError.new("varying caps in a refined span") unless refine_cap_mt.cap_only?
-
-          span
-            .narrowing_type_param(type_param, refine_cap_mt)
-            .not_nil!
-            .combine_mt(refine_span.narrowing_type_param(type_param, refine_cap_mt).not_nil!) { |mt, refine_mt|
-              mt.substitute_type_params({
-                type_param => Infer::MetaType.new_type_param(type_param).intersect(refine_mt.strip_cap)
-              })
-            }
-        # TODO: also handle other conditions?
-        else span
-        end
-      }
-    end
-
-    def self_with_no_cap_yet(ctx : Context)
-      link = self.link
-
-      # Get the spans for each partially reified type param in this type.
-      type_param_spans = type_params_for(ctx, link.type).map { |type_param|
-        lookup_type_param_partial_reified_span(ctx, type_param).as(Span)
-      }
-
-      # Combine the spans in all combinations of those partial reifications.
-      # If there are no type params to combine, we just use a simple span.
-      Span.simple(MetaType.new_nominal(ReifiedType.new(link.type)))
-        .reduce_combine_mts(type_param_spans) { |accum_mt, arg_mt|
-          rt = accum_mt.single!
-          MetaType.new_nominal(ReifiedType.new(rt.link, rt.args + [arg_mt]))
-        }
-    end
-
-    def self_with_reify_cap(ctx : Context)
-      rt_span = self_with_no_cap_yet(ctx)
-
-      # Finally, build the top of the span's decision tree with possible f_caps.
-      f = self.func
-      f_cap_value = f.cap.value
-      f_cap_value = "ref" if f.has_tag?(:constructor)
-      f_cap_value = "read" if f_cap_value == "box" # TODO: figure out if we can remove this Pony-originating semantic hack
-      Span.decision(
-        :f_cap,
-        MetaType::Capability.new_maybe_generic(f_cap_value).each_cap.map do |cap|
-          cap_mt = MetaType.new(cap)
-          {cap_mt, rt_span.transform_mt(&.intersect(cap_mt))}
-        end.to_h
-      )
-    end
-
-    def self_ephemeral_with_cap(ctx : Context, cap : String)
-      self_with_no_cap_yet(ctx)
-        .transform_mt(&.intersect(MetaType.cap(cap)).ephemeralize)
-    end
-
-    def deciding_type_args_of(ctx : Context, rt : Infer::ReifiedType, raw_span : Span) : Span
-      return raw_span if rt.args.empty?
+    def deciding_type_args_of(
+      ctx : Context,
+      args : Array(Infer::MetaType),
+      raw_span : Span
+    ) : Span
+      return raw_span if args.empty?
 
       # Many spans are simple terminals, so we can optimize things a bit here
       # by skipping the rest of this deciding when there is nothing to decide
       # because terminals have no decisions to be made.
       return raw_span if raw_span.inner.is_a?(Span::Terminal)
 
-      type_params_for(ctx, rt.link).zip(rt.args)
-      .reduce(raw_span) { |span, (type_param, type_arg)|
+      type_params.zip(args).reduce(raw_span) { |span, (type_param, type_arg)|
         next unless span
 
         # When a type argument is passed from a raw type param,
@@ -1023,93 +804,24 @@ module Mare::Compiler::AltInfer
       }
       .not_nil!
     end
+  end
 
-    def depends_on_call_ret_span(ctx, other_rt, other_f, other_f_link)
-      deps = ctx.alt_infer_edge.gather_deps_for_func(ctx, other_f, other_f_link)
-      visitor = Visitor.new(other_f, other_f_link, Analysis.new, *deps)
+  struct FuncAnalysis < Analysis
+  end
 
-      # TODO: Track dependencies and invalidate cache based on those.
-      other_pre = deps.last
-      other_analysis = ctx.alt_infer_edge.run_for_func(ctx, other_f, other_f_link)
-      raw_span = other_analysis[other_pre[other_f.ident]]
+  struct TypeAnalysis < Analysis
+  end
 
-      visitor.deciding_type_args_of(ctx, other_rt, raw_span)
-      .transform_mt(&.substitute_type_params(visitor.substs_for(ctx, other_rt)))
-    end
+  struct TypeAliasAnalysis < Analysis
+    getter! target_span : Span
+    protected def target_span=(span : Span); @target_span = span; end
+  end
 
-    def depends_on_call_param_span(ctx, other_rt, other_f, other_f_link, index)
-      deps = ctx.alt_infer_edge.gather_deps_for_func(ctx, other_f, other_f_link)
-      visitor = Visitor.new(other_f, other_f_link, Analysis.new, *deps)
+  abstract class TypeExprEvaluator
+    abstract def t_link : (Program::Type::Link | Program::TypeAlias::Link)
 
-      # TODO: Track dependencies and invalidate cache based on those.
-      other_pre = deps.last
-      other_analysis = ctx.alt_infer_edge.run_for_func(ctx, other_f, other_f_link)
-      raw_span = other_analysis[other_pre[AST::Extract.params(other_f.params)[index].first]]
-
-      visitor.deciding_type_args_of(ctx, other_rt, raw_span)
-      .transform_mt(&.substitute_type_params(visitor.substs_for(ctx, other_rt)))
-    end
-
-    def depends_on_call_yield_in_span(ctx, other_rt, other_f, other_f_link)
-      deps = ctx.alt_infer_edge.gather_deps_for_func(ctx, other_f, other_f_link)
-      visitor = Visitor.new(other_f, other_f_link, Analysis.new, *deps)
-
-      # TODO: Track dependencies and invalidate cache based on those.
-      other_pre = deps.last
-      yield_in_info = other_pre.yield_in_info
-      return unless yield_in_info
-      other_analysis = ctx.alt_infer_edge.run_for_func(ctx, other_f, other_f_link)
-      raw_span = other_analysis[yield_in_info]
-
-      visitor.deciding_type_args_of(ctx, other_rt, raw_span)
-      .transform_mt(&.substitute_type_params(visitor.substs_for(ctx, other_rt)))
-    end
-
-    def depends_on_call_yield_out_span(ctx, other_rt, other_f, other_f_link, index)
-      deps = ctx.alt_infer_edge.gather_deps_for_func(ctx, other_f, other_f_link)
-      visitor = Visitor.new(other_f, other_f_link, Analysis.new, *deps)
-
-      # TODO: Track dependencies and invalidate cache based on those.
-      other_pre = deps.last
-      yield_out_info = other_pre.yield_out_infos[index]?
-      return unless yield_out_info
-      other_analysis = ctx.alt_infer_edge.run_for_func(ctx, other_f, other_f_link)
-      raw_span = other_analysis[yield_out_info]
-
-      visitor.deciding_type_args_of(ctx, other_rt, raw_span)
-      .transform_mt(&.substitute_type_params(visitor.substs_for(ctx, other_rt)))
-    end
-
-    def run_edge(ctx : Context)
-      func.params.try do |params|
-        params.terms.each { |param| resolve(ctx, @pre_infer[param]) }
-      end
-
-      resolve(ctx, @pre_infer[ret])
-
-      @pre_infer.yield_in_info.try { |info| resolve(ctx, info) }
-      @pre_infer.yield_out_infos.each { |info| resolve(ctx, info) }
-    end
-
-    def run(ctx : Context)
-      func_body = func.body
-      resolve(ctx, @pre_infer[func_body]) if func_body
-
-      @pre_infer.each_info { |info| resolve(ctx, info) }
-    end
-
-    def ret
-      # The ident is used as a fake local variable that represents the return.
-      func.ident
-    end
-
-    def prelude_reified_type(ctx : Context, name : String, args = [] of Infer::MetaType)
-      Infer::ReifiedType.new(ctx.namespace.prelude_type(name), args)
-    end
-
-    def prelude_type_span(ctx : Context, name : String)
-      Span.simple(Infer::MetaType.new(prelude_reified_type(ctx, name)))
-    end
+    abstract def refer_type_for(node : AST::Node) : Refer::Info?
+    abstract def self_type_expr_span(ctx : Context) : Span
 
     def type_expr_cap(node : AST::Identifier) : Infer::MetaType::Capability?
       case node.value
@@ -1124,14 +836,14 @@ module Mare::Compiler::AltInfer
 
     # An identifier type expression must refer to a type.
     def type_expr_span(ctx : Context, node : AST::Identifier) : Span
-      ref = refer_type[node]? || refer_type_parent[node]?
+      ref = refer_type_for(node)
       case ref
       when Refer::Self
-        self_with_reify_cap(ctx)
+        self_type_expr_span(ctx)
       when Refer::Type
         Span.simple(Infer::MetaType.new(Infer::ReifiedType.new(ref.link)))
-      # when Refer::TypeAlias
-      #   Infer::MetaType.new_alias(reified_type_alias(ref.link_alias))
+      when Refer::TypeAlias
+        Span.simple(Infer::MetaType.new_alias(Infer::ReifiedTypeAlias.new(ref.link_alias)))
       when Refer::TypeParam
         lookup_type_param_partial_reified_span(ctx, Infer::TypeParam.new(ref))
       when nil
@@ -1205,45 +917,432 @@ module Mare::Compiler::AltInfer
         type_expr_span(ctx, t).as(Span)
       end
 
-      target_span.combine_mts(arg_spans) do |target_mt, arg_mts|
+      Span.reduce_combine_mts([target_span] + arg_spans) { |target_mt, arg_mt|
+        cap = begin target_mt.cap_only rescue nil end
+
         target_inner = target_mt.inner
-        if target_inner.is_a?(Infer::MetaType::Nominal) \
-        && target_inner.defn.is_a?(Infer::ReifiedTypeAlias)
-          link = target_inner.defn.as(Infer::ReifiedTypeAlias).link
-          Infer::MetaType.new(Infer::ReifiedTypeAlias.new(link, arg_mts))
-        else
-          link = target_mt.single!.link
-          cap = begin target_mt.cap_only rescue nil end
-          mt = Infer::MetaType.new(Infer::ReifiedType.new(link, arg_mts))
-          mt = mt.override_cap(cap) if cap
-          mt
-        end
-      end
+        mt =
+          if target_inner.is_a?(Infer::MetaType::Nominal) \
+          && target_inner.defn.is_a?(Infer::ReifiedTypeAlias)
+            rta = target_inner.defn.as(Infer::ReifiedTypeAlias)
+            arg_mts = rta.args + [arg_mt]
+            Infer::MetaType.new(Infer::ReifiedTypeAlias.new(rta.link, arg_mts))
+          # elsif target_inner.is_a?(Infer::MetaType::Nominal) \
+          # && target_inner.defn.is_a?(Infer::TypeParam)
+          #   # TODO: Some kind of ReifiedTypeParam monstrosity, to represent
+          #   # an unknown type param invoked with type arguments?
+          else
+            rt = target_mt.single!
+            arg_mts = rt.args + [arg_mt]
+            Infer::MetaType.new(Infer::ReifiedType.new(rt.link, arg_mts))
+          end
+
+        mt = mt.override_cap(cap) if cap
+        mt
+      }.not_nil!
     end
 
     # All other AST nodes are unsupported as type expressions.
     def type_expr_span(ctx : Context, node : AST::Node) : Span
       raise NotImplementedError.new(node.to_a)
     end
+
+    @currently_looking_up_param_bounds = Set(Infer::TypeParam).new
+    def lookup_type_param_bound_span(ctx : Context, type_param : Infer::TypeParam)
+      @currently_looking_up_param_bounds.add(type_param)
+
+      ref = type_param.ref
+      raise "lookup on wrong visitor" unless ref.parent_link == t_link
+      type_expr_span(ctx, ref.bound)
+
+      .tap { @currently_looking_up_param_bounds.delete(type_param) }
+    end
+    def lookup_type_param_partial_reified_span(ctx : Context, type_param : Infer::TypeParam)
+      # Avoid infinite recursion by taking a lazy approach if we are already
+      # recursed into this type param's bound resolution.
+      # This lazy reference can be unwrapped by other logic later as needed.
+      if @currently_looking_up_param_bounds.includes?(type_param)
+        lazy = Infer::TypeParam.new(type_param.ref)
+        lazy.lazy = true
+        return Span.simple(MetaType.new_type_param(lazy))
+      end
+
+      # Otherwise, continue by looking up the bound of this type param,
+      # and intersect it with the type param reference itself, expanding the
+      # span to include every possible single cap instead of using a multi-cap.
+      lookup_type_param_bound_span(ctx, type_param).decided_by(type_param) { |bound_mt|
+        bound_mt.cap_only_inner.each_cap.map { |cap|
+          cap_mt = MetaType.new(cap)
+          mt = MetaType
+            .new_type_param(type_param)
+            .intersect(cap_mt)
+            # .intersect(bound_mt.strip_cap)
+          # TODO: Introduce a Fact Span that adds the bound_mt as a fact?
+          {cap_mt, Span.simple(mt)}
+        }.to_h
+      }
+    end
+  end
+
+  class TypeVisitor < TypeExprEvaluator
+    getter analysis
+
+    def initialize(
+      @type : Program::Type,
+      @link : Program::Type::Link,
+      @analysis : TypeAnalysis,
+      @refer_type : ReferType::Analysis
+    )
+      @analysis.type_params =
+        @type.params.try(&.terms.map { |type_param|
+          ident = AST::Extract.type_param(type_param).first
+          ref = refer_type_for(ident)
+          Infer::TypeParam.new(ref.as(Refer::TypeParam))
+        }) || [] of Infer::TypeParam
+    end
+
+    def run(ctx)
+    end
+
+    def t_link : (Program::Type::Link | Program::TypeAlias::Link)
+      @link
+    end
+
+    def refer_type_for(node : AST::Node) : Refer::Info?
+      @refer_type[node]?
+    end
+
+    def self_type_expr_span(ctx : Context) : Span
+      raise NotImplementedError.new("#{self.class} self_type_expr_span")
+    end
+  end
+
+  class TypeAliasVisitor < TypeExprEvaluator
+    getter analysis
+
+    def initialize(
+      @type_alias : Program::TypeAlias,
+      @link : Program::TypeAlias::Link,
+      @analysis : TypeAliasAnalysis,
+      @refer_type : ReferType::Analysis
+    )
+      @analysis.type_params =
+        @type_alias.params.try(&.terms.map { |type_param|
+          ident = AST::Extract.type_param(type_param).first
+          ref = refer_type_for(ident)
+          Infer::TypeParam.new(ref.as(Refer::TypeParam))
+        }) || [] of Infer::TypeParam
+    end
+
+    def run(ctx)
+      @analysis.target_span = get_target_span(ctx)
+    end
+
+    private def get_target_span(ctx)
+      target_span = type_expr_span(ctx, @type_alias.target)
+
+      if target_span.all_terminal_meta_types.any? { |mt|
+        is_directly_recursive = false
+        mt.each_type_alias_in_first_layer { |rta|
+          is_directly_recursive ||= rta.link == @link
+        }
+        is_directly_recursive
+      }
+        return Span.error @type_alias.ident.pos,
+          "This type alias is directly recursive, which is not supported",
+          [{@type_alias.target.pos,
+            "only recursion via type arguments is supported in this expression"
+          }]
+      end
+
+      target_span
+    end
+
+    def t_link : (Program::Type::Link | Program::TypeAlias::Link)
+      @link
+    end
+
+    def refer_type_for(node : AST::Node) : Refer::Info?
+      @refer_type[node]?
+    end
+
+    def self_type_expr_span(ctx : Context) : Span
+      raise NotImplementedError.new("#{self.class} self_type_expr_span")
+    end
+  end
+
+  class Visitor < TypeExprEvaluator
+    getter analysis
+    protected getter func
+    protected getter link
+    protected getter t_analysis
+    protected getter refer_type
+    protected getter refer_type_parent
+    protected getter classify
+    protected getter pre_infer
+
+    protected def f_analysis; pre_infer; end # TODO: remove this alias
+
+    def initialize(
+      @func : Program::Function,
+      @link : Program::Function::Link,
+      @analysis : FuncAnalysis,
+      @t_analysis : TypeAnalysis,
+      @refer_type : ReferType::Analysis,
+      @refer_type_parent : ReferType::Analysis,
+      @classify : Classify::Analysis,
+      @type_context : TypeContext::Analysis,
+      @pre_infer : PreInfer::Analysis,
+    )
+      @analysis.type_params = @t_analysis.type_params
+    end
+
+    def t_link : (Program::Type::Link | Program::TypeAlias::Link)
+      @link.type
+    end
+
+    def resolve(ctx : Context, info : Infer::Info) : Span
+      @analysis[info]? || begin
+        # If this info resolves as a conduit, resolve the conduit,
+        # and do not save the result locally for this span.
+        conduit = info.as_conduit?
+        return conduit.resolve_span!(ctx, self) if conduit
+
+        span = info.resolve_span!(ctx, self)
+
+        # Deal with type parameter substitutions if needed.
+        # This happens when we have a localized type refinement,
+        # such as inside a conditional block with a type condition.
+        span = apply_substs_for_layer(ctx, info, span)
+
+        # substitute lazy type params if needed
+        lazy_type_params = Set(Infer::TypeParam).new
+        max_depth = 1
+        span.each_mt { |mt|
+          mt.gather_lazy_type_params_referenced(ctx, lazy_type_params, max_depth)
+        }
+        if lazy_type_params.any?
+          span = lazy_type_params.reduce(span) { |span, type_param|
+            type_param_span = lookup_type_param_partial_reified_span(ctx, type_param)
+
+            span.combine_mt(type_param_span) { |mt, type_param_mt|
+              mt.substitute_lazy_type_params({
+                type_param => type_param_mt # MetaType.new_type_param(type_param).intersect(type_param_mt.cap_only)
+              }, max_depth)
+            }
+          }
+        end
+
+        @analysis[info] = span
+
+        span
+      rescue Compiler::Pass::Analyze::ReentranceError
+        kind = info.is_a?(Infer::DynamicInfo) ? " #{info.describe_kind}" : ""
+        AltInfer::Span.error info.pos,
+          "This#{kind} needs an explicit type; it could not be inferred"
+      end
+    end
+
+    # TODO: remove this in favor of the span-returning function within.
+    def lookup_type_param_bound(ctx : Context, type_param : Infer::TypeParam)
+      span = lookup_type_param_bound_span(ctx, type_param)
+      MetaType.new_union(span.all_terminal_meta_types)
+    end
+
+    def unwrap_lazy_parts_of_type_expr_span(ctx : Context, span : Span) : Span
+      # Currently the only lazy part we handle here is type aliases.
+      span.transform_mt { |mt|
+        mt.substitute_each_type_alias_in_first_layer { |rta|
+          other_analysis = ctx.alt_infer_edge.run_for_type_alias(ctx, rta.link.resolve(ctx), rta.link)
+          span = other_analysis.deciding_type_args_of(ctx, rta.args, other_analysis.target_span)
+            .transform_mt(&.substitute_type_params(other_analysis.type_param_substs(rta.args)))
+          span_inner = span.inner
+
+          # TODO: better way of dealing with ErrorPropagate, related to other TODO below:
+          raise span_inner.error if span_inner.is_a?(Span::ErrorPropagate)
+
+          # TODO: support dealing with the entire span instead of just asserting its singularity
+          span_inner.as(Span::Terminal).meta_type
+        }
+      }
+    rescue error : Error
+      Span.new(Span::ErrorPropagate.new(error))
+    end
+
+    def apply_substs_for_layer(ctx : Context, info : Info, span : Span) : Span
+      layer = @type_context[info.layer_index]
+
+      # TODO: also handle negative conditions
+      layer.all_positive_conds.reduce(span) { |span, cond|
+        cond_info = @pre_infer[cond]
+        case cond_info
+        when Infer::TypeParamCondition
+          type_param = Infer::TypeParam.new(cond_info.refine)
+          refine_span = resolve(ctx, cond_info.refine_type)
+          refine_cap_mt =
+            Infer::MetaType.new_union(refine_span.all_terminal_meta_types.map(&.cap_only))
+          raise NotImplementedError.new("varying caps in a refined span") unless refine_cap_mt.cap_only?
+
+          span
+            .narrowing_type_param(type_param, refine_cap_mt)
+            .not_nil!
+            .combine_mt(refine_span.narrowing_type_param(type_param, refine_cap_mt).not_nil!) { |mt, refine_mt|
+              mt.substitute_type_params({
+                type_param => Infer::MetaType.new_type_param(type_param).intersect(refine_mt.strip_cap)
+              })
+            }
+        # TODO: also handle other conditions?
+        else span
+        end
+      }
+    end
+
+    def refer_type_for(node : AST::Node) : Refer::Info?
+      @refer_type[node]? || refer_type_parent[node]?
+    end
+
+    def self_with_no_cap_yet(ctx : Context)
+      # Get the spans for each partially reified type param in this type.
+      type_param_spans = @analysis.type_params.map { |type_param|
+        lookup_type_param_partial_reified_span(ctx, type_param).as(Span)
+      }
+
+      # Combine the spans in all combinations of those partial reifications.
+      # If there are no type params to combine, we just use a simple span.
+      Span.simple(MetaType.new_nominal(ReifiedType.new(link.type)))
+        .reduce_combine_mts(type_param_spans) { |accum_mt, arg_mt|
+          rt = accum_mt.single!
+          MetaType.new_nominal(ReifiedType.new(rt.link, rt.args + [arg_mt]))
+        }
+    end
+
+    def self_type_expr_span(ctx : Context) : Span
+      rt_span = self_with_no_cap_yet(ctx)
+
+      # Finally, build the top of the span's decision tree with possible f_caps.
+      f = self.func
+      f_cap_value = f.cap.value
+      f_cap_value = "ref" if f.has_tag?(:constructor)
+      f_cap_value = "read" if f_cap_value == "box" # TODO: figure out if we can remove this Pony-originating semantic hack
+      Span.decision(
+        :f_cap,
+        MetaType::Capability.new_maybe_generic(f_cap_value).each_cap.map do |cap|
+          cap_mt = MetaType.new(cap)
+          {cap_mt, rt_span.transform_mt(&.intersect(cap_mt))}
+        end.to_h
+      )
+    end
+
+    def self_ephemeral_with_cap(ctx : Context, cap : String)
+      self_with_no_cap_yet(ctx)
+        .transform_mt(&.intersect(MetaType.cap(cap)).ephemeralize)
+    end
+
+    def depends_on_call_ret_span(ctx, other_rt, other_f, other_f_link)
+      # TODO: Track dependencies and invalidate cache based on those.
+      other_pre = ctx.pre_infer[other_f_link]
+      other_analysis = ctx.alt_infer_edge.run_for_func(ctx, other_f, other_f_link)
+      raw_span = other_analysis[other_pre[other_f.ident]]
+
+      other_analysis.deciding_type_args_of(ctx, other_rt.args, raw_span)
+      .transform_mt(&.substitute_type_params(other_analysis.type_param_substs(other_rt.args)))
+    end
+
+    def depends_on_call_param_span(ctx, other_rt, other_f, other_f_link, index)
+      # TODO: Track dependencies and invalidate cache based on those.
+      other_pre = ctx.pre_infer[other_f_link]
+      other_analysis = ctx.alt_infer_edge.run_for_func(ctx, other_f, other_f_link)
+      raw_span = other_analysis[other_pre[AST::Extract.params(other_f.params)[index].first]]
+
+      other_analysis.deciding_type_args_of(ctx, other_rt.args, raw_span)
+      .transform_mt(&.substitute_type_params(other_analysis.type_param_substs(other_rt.args)))
+    end
+
+    def depends_on_call_yield_in_span(ctx, other_rt, other_f, other_f_link)
+      # TODO: Track dependencies and invalidate cache based on those.
+      other_pre = ctx.pre_infer[other_f_link]
+      yield_in_info = other_pre.yield_in_info
+      return unless yield_in_info
+      other_analysis = ctx.alt_infer_edge.run_for_func(ctx, other_f, other_f_link)
+      raw_span = other_analysis[yield_in_info]
+
+      other_analysis.deciding_type_args_of(ctx, other_rt.args, raw_span)
+      .transform_mt(&.substitute_type_params(other_analysis.type_param_substs(other_rt.args)))
+    end
+
+    def depends_on_call_yield_out_span(ctx, other_rt, other_f, other_f_link, index)
+      # TODO: Track dependencies and invalidate cache based on those.
+      other_pre = ctx.pre_infer[other_f_link]
+      yield_out_info = other_pre.yield_out_infos[index]?
+      return unless yield_out_info
+      other_analysis = ctx.alt_infer_edge.run_for_func(ctx, other_f, other_f_link)
+      raw_span = other_analysis[yield_out_info]
+
+      other_analysis.deciding_type_args_of(ctx, other_rt.args, raw_span)
+      .transform_mt(&.substitute_type_params(other_analysis.type_param_substs(other_rt.args)))
+    end
+
+    def run_edge(ctx : Context)
+      func.params.try do |params|
+        params.terms.each { |param| resolve(ctx, @pre_infer[param]) }
+      end
+
+      resolve(ctx, @pre_infer[ret])
+
+      @pre_infer.yield_in_info.try { |info| resolve(ctx, info) }
+      @pre_infer.yield_out_infos.each { |info| resolve(ctx, info) }
+    end
+
+    def run(ctx : Context)
+      func_body = func.body
+      resolve(ctx, @pre_infer[func_body]) if func_body
+
+      @pre_infer.each_info { |info| resolve(ctx, info) }
+    end
+
+    def ret
+      # The ident is used as a fake local variable that represents the return.
+      func.ident
+    end
+
+    def prelude_reified_type(ctx : Context, name : String, args = [] of Infer::MetaType)
+      Infer::ReifiedType.new(ctx.namespace.prelude_type(name), args)
+    end
+
+    def prelude_type_span(ctx : Context, name : String)
+      Span.simple(Infer::MetaType.new(prelude_reified_type(ctx, name)))
+    end
   end
 
   # The "edge" version of the pass only resolves the minimal amount of nodes
   # needed to understand the type signature of each function in the program.
-  class PassEdge < Compiler::Pass::Analyze(Nil, Nil, Analysis)
-    def analyze_type_alias(ctx, t, t_link) : Nil
-      nil
+  class PassEdge < Compiler::Pass::Analyze(TypeAliasAnalysis, TypeAnalysis, FuncAnalysis)
+    def analyze_type_alias(ctx, t, t_link) : TypeAliasAnalysis
+      refer_type = ctx.refer_type[t_link]
+      deps = refer_type
+      prev = ctx.prev_ctx.try(&.alt_infer_edge)
+
+      maybe_from_type_alias_cache(ctx, prev, t, t_link, deps) do
+        TypeAliasVisitor.new(t, t_link, TypeAliasAnalysis.new, refer_type).tap(&.run(ctx)).analysis
+      end
     end
 
-    def analyze_type(ctx, t, t_link) : Nil
-      nil
+    def analyze_type(ctx, t, t_link) : TypeAnalysis
+      refer_type = ctx.refer_type[t_link]
+      deps = refer_type
+      prev = ctx.prev_ctx.try(&.alt_infer_edge)
+
+      maybe_from_type_cache(ctx, prev, t, t_link, deps) do
+        TypeVisitor.new(t, t_link, TypeAnalysis.new, refer_type).tap(&.run(ctx)).analysis
+      end
     end
 
-    def analyze_func(ctx, f, f_link, t_analysis) : Analysis
+    def analyze_func(ctx, f, f_link, t_analysis) : FuncAnalysis
       deps = gather_deps_for_func(ctx, f, f_link)
       prev = ctx.prev_ctx.try(&.alt_infer_edge)
 
       maybe_from_func_cache(ctx, prev, f, f_link, deps) do
-        Visitor.new(f, f_link, Analysis.new, *deps).tap(&.run_edge(ctx)).analysis
+        Visitor.new(f, f_link, FuncAnalysis.new, t_analysis, *deps).tap(&.run_edge(ctx)).analysis
       end
     end
 
@@ -1258,24 +1357,24 @@ module Mare::Compiler::AltInfer
     end
   end
 
-  # This pass picks up the Analysis wherever the PassEdge last left off,
+  # This pass picks up the FuncAnalysis wherever the PassEdge last left off,
   # resolving all of the other nodes that weren't reached in edge analysis.
-  class Pass < Compiler::Pass::Analyze(Nil, Nil, Analysis)
-    def analyze_type_alias(ctx, t, t_link) : Nil
-      nil
+  class Pass < Compiler::Pass::Analyze(TypeAliasAnalysis, TypeAnalysis, FuncAnalysis)
+    def analyze_type_alias(ctx, t, t_link) : TypeAliasAnalysis
+      ctx.alt_infer_edge[t_link]
     end
 
-    def analyze_type(ctx, t, t_link) : Nil
-      nil
+    def analyze_type(ctx, t, t_link) : TypeAnalysis
+      ctx.alt_infer_edge[t_link]
     end
 
-    def analyze_func(ctx, f, f_link, t_analysis) : Analysis
+    def analyze_func(ctx, f, f_link, t_analysis) : FuncAnalysis
       deps = gather_deps_for_func(ctx, f, f_link)
       prev = ctx.prev_ctx.try(&.alt_infer)
 
       edge_analysis = ctx.alt_infer_edge[f_link]
       maybe_from_func_cache(ctx, prev, f, f_link, deps) do
-        Visitor.new(f, f_link, edge_analysis, *deps).tap(&.run(ctx)).analysis
+        Visitor.new(f, f_link, edge_analysis, t_analysis, *deps).tap(&.run(ctx)).analysis
       end
     end
 

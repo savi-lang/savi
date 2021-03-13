@@ -469,6 +469,34 @@ struct Mare::Compiler::Infer::MetaType::Union
     set
   end
 
+  def each_type_alias_in_first_layer(&block : ReifiedTypeAlias -> _)
+    terms.try(&.each(&.each_type_alias_in_first_layer(&block)))
+    anti_terms.try(&.each(&.each_type_alias_in_first_layer(&block)))
+    intersects.try(&.each(&.each_type_alias_in_first_layer(&block)))
+  end
+
+  def substitute_each_type_alias_in_first_layer(&block : ReifiedTypeAlias -> MetaType) : Inner
+    result = Unsatisfiable.instance
+
+    caps.try(&.each { |cap|
+      result = result.unite(cap.substitute_each_type_alias_in_first_layer(&block))
+    })
+
+    terms.try(&.each { |term|
+      result = result.unite(term.substitute_each_type_alias_in_first_layer(&block))
+    })
+
+    anti_terms.try(&.each { |anti_term|
+      result = result.unite(anti_term.substitute_each_type_alias_in_first_layer(&block))
+    })
+
+    intersects.try(&.each { |intersect|
+      result = result.unite(intersect.substitute_each_type_alias_in_first_layer(&block))
+    })
+
+    result
+  end
+
   def is_sendable?
     (!caps || caps.not_nil!.all?(&.is_sendable?)) &&
     (!terms || terms.not_nil!.all?(&.is_sendable?)) &&
