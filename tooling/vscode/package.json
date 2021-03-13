@@ -2,7 +2,7 @@
 	"name": "mare",
 	"displayName": "Mare Language",
 	"description": "Support for the Mare programming language.",
-	"version": "0.4.6",
+	"version": "0.4.7",
 	"publisher": "mare-lang",
 	"engines": {
 		"vscode": "^1.35.0"
@@ -53,6 +53,16 @@
 				"language": "mare",
 				"scopeName": "source.mare",
 				"path": "./syntaxes/Mare.tmLanguage"
+			},
+			{
+				"scopeName": "markdown.mare.codeblock",
+				"path": "./syntaxes/codeblock.json",
+				"injectTo": [
+					"text.html.markdown"
+				],
+				"embeddedLanguages": {
+					"meta.embedded.block.mare": "mare"
+				}
 			}
 		],
 		"commands": [

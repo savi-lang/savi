@@ -11,12 +11,12 @@
 # This pass produces no output state.
 #
 module Mare::Compiler::Jumps
-  FLAG_ALWAYS_ERROR = 0b1_u8
-  FLAG_MAYBE_ERROR  = 0b10_u8
-  FLAG_ALWAYS_RETURN = 0b100_u8
-  FLAG_MAYBE_RETURN  = 0b1000_u8
-  FLAG_ALWAYS_BREAK = 0b10000_u8
-  FLAG_MAYBE_BREAK  = 0b100000_u8
+  FLAG_ALWAYS_ERROR    = 0b1_u8
+  FLAG_MAYBE_ERROR     = 0b10_u8
+  FLAG_ALWAYS_RETURN   = 0b100_u8
+  FLAG_MAYBE_RETURN    = 0b1000_u8
+  FLAG_ALWAYS_BREAK    = 0b10000_u8
+  FLAG_MAYBE_BREAK     = 0b100000_u8
   FLAG_ALWAYS_CONTINUE = 0b1000000_u8
   FLAG_MAYBE_CONTINUE  = 0b10000000_u8
 
@@ -26,45 +26,32 @@ module Mare::Compiler::Jumps
     getter catches
 
     def initialize
-      @flags = {} of AST::Node => {UInt8, Bool}
+      @flags = {} of AST::Node => UInt8
       @catches = {} of AST::Node => Array(AST::Jump)
-      @check_unreal = false
     end
 
-    def set_flag(node, flag_bit, is_real = true)
-      flags = @flags[node]?
-      if flags
-        bits, is_real = flags
-        @flags[node] = {bits | flag_bit, is_real}
+    def set_flag(node, flag_bit)
+      bits = @flags[node]?
+      if bits
+        @flags[node] = bits | flag_bit
       else
-        @flags[node] = {flag_bit, is_real}
+        @flags[node] = flag_bit
       end
       nil
-    rescue
     end
 
     private def unset_flag(node, flag_bit)
-      bits, is_real = @flags[node]
-      @flags[node] = {bits & ~flag_bit, is_real}
+      bits = @flags[node]?
+      if bits
+        @flags[node] = bits & ~flag_bit
+      end
       nil
-    rescue
     end
 
     private def has_flag?(node, flag_bit)
-      bits, is_real = @flags[node]
-      unless @check_unreal
-        return false unless is_real
-      end
+      bits = @flags[node]?
+      return false unless bits
       (bits & flag_bit) != 0
-    rescue
-      false
-    end
-
-    def check_unreal(&block)
-      @check_unreal = true
-      res = yield
-      @check_unreal = false
-      res
     end
 
     def catch(node, jump)
@@ -117,16 +104,8 @@ module Mare::Compiler::Jumps
       always_error?(node) || always_return?(node) || always_break?(node) || always_continue?(node)
     end
 
-    def away_unreal?(node)
-      check_unreal { away?(node) }
-    end
-
     def away_possibly?(node)
       any_error?(node) || any_return?(node) || any_break?(node) || any_continue?(node)
-    end
-
-    def away_possibly_unreal?(node)
-      check_unreal { away_possibly?(node) }
     end
   end
 
@@ -196,48 +175,36 @@ module Mare::Compiler::Jumps
     end
 
     def touch(node : AST::Group)
-      away_flag = 0_u8
-      visitor = AwayVisitor.new(@analysis, away_flag)
+      if node.terms.any? { |t| @analysis.always_error?(t) }
+        # A group is an always error if any term in it is.
+        @analysis.always_error!(node)
+      elsif node.terms.any? { |t| @analysis.maybe_error?(t) }
+        # Otherwise, it is a maybe error if any term in it is.
+        @analysis.maybe_error!(node)
+      end
 
-      node.terms.each do |t|
-        if @analysis.always_error?(t)
-          @analysis.always_error!(node)
-        elsif @analysis.maybe_error?(t)
-          @analysis.maybe_error!(node)
-        end
-        if @analysis.always_return?(t)
-          @analysis.always_return!(node)
-        elsif @analysis.maybe_return?(t)
-          @analysis.maybe_return!(node)
-        end
-        if @analysis.always_break?(t)
-          @analysis.always_break!(node)
-        elsif @analysis.maybe_break?(t)
-          @analysis.maybe_break!(node)
-        end
-        if @analysis.always_continue?(t)
-          @analysis.always_continue!(node)
-        elsif @analysis.maybe_continue?(t)
-          @analysis.maybe_continue!(node)
-        end
-        begin
-          away_flag |= @analysis.@flags[t][0]
-        rescue
-        end
+      if node.terms.any? { |t| @analysis.always_return?(t) }
+        # A group is an always return if any term in it is.
+        @analysis.always_return!(node)
+      elsif node.terms.any? { |t| @analysis.maybe_return?(t) }
+        # Otherwise, it is a maybe return if any term in it is.
+        @analysis.maybe_return!(node)
+      end
 
-        @analysis.set_flag(node, away_flag)
+      if node.terms.any? { |t| @analysis.always_break?(t) }
+        # A group is an always break if any term in it is.
+        @analysis.always_break!(node)
+      elsif node.terms.any? { |t| @analysis.maybe_break?(t) }
+        # Otherwise, it is a maybe break if any term in it is.
+        @analysis.maybe_break!(node)
+      end
 
-        if away_flag > 0 && node.style == ":"
-          visitor.away_flag = away_flag
-          write_unreal_flags = true
-          if flags = @analysis.@flags[t]?
-            write_unreal_flags = false if flags[1]
-          end
-          if write_unreal_flags
-            @analysis.set_flag(t, away_flag, false)
-          end
-          t.accept(@ctx, visitor)
-        end
+      if node.terms.any? { |t| @analysis.always_continue?(t) }
+        # A group is an always continue if any term in it is.
+        @analysis.always_continue!(node)
+      elsif node.terms.any? { |t| @analysis.maybe_continue?(t) }
+        # Otherwise, it is a maybe continue if any term in it is.
+        @analysis.maybe_continue!(node)
       end
     end
 
@@ -519,25 +486,6 @@ module Mare::Compiler::Jumps
 
     def touch(node)
       # On all other nodes, do nothing.
-    end
-  end
-
-  class AwayVisitor < Mare::AST::Visitor
-    getter analysis : Analysis
-    property away_flag : UInt8
-
-    def initialize(@analysis, @away_flag)
-    end
-
-    def visit(ctx, node)
-      write_unreal_flags = true
-      if flags = @analysis.@flags[node]?
-        write_unreal_flags = false if flags[1]
-      end
-      if write_unreal_flags
-        @analysis.set_flag(node, @away_flag, false)
-      end
-      node
     end
   end
 

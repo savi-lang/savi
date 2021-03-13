@@ -301,7 +301,7 @@ module Mare::Compiler::Refer
         ]
       end
 
-      caught = !@jumps.not_nil!.away_possibly_unreal?(node)
+      caught = !@jumps.not_nil!.away_possibly?(node)
 
       # Create the local entry, so later references to this name will see it.
       local = Local.new(node.value, node, caught)

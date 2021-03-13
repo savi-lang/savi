@@ -165,12 +165,12 @@ module Mare::Compiler::Completeness
 
     def touch(node : AST::FieldWrite)
       seen_fields.add(node.value) unless @possibly_away ||\
-        !@loop_stack.empty? || @jumps.away_possibly_unreal?(node)
+        !@loop_stack.empty? || @jumps.away_possibly?(node)
     end
 
     def touch(node : AST::FieldReplace)
       seen_fields.add(node.value) unless @possibly_away ||\
-        !@loop_stack.empty? || @jumps.away_possibly_unreal?(node)
+        !@loop_stack.empty? || @jumps.away_possibly?(node)
     end
 
     def touch(node : AST::Identifier)
@@ -225,7 +225,7 @@ module Mare::Compiler::Completeness
         # seen in that branch as if they had been seen in this branch.
         next_f = type.defn(ctx).find_func!(func_name)
         next_f_cap = next_f.cap.value # TODO: reify with which cap?
-        branch = sub_branch(next_f.make_link(type.link), next_f_cap, node.pos, @jumps.away_possibly_unreal?(node))
+        branch = sub_branch(next_f.make_link(type.link), next_f_cap, node.pos, @jumps.away_possibly?(node))
         seen_fields.concat(branch.seen_fields)
       end
     end
