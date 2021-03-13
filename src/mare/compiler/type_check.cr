@@ -1260,12 +1260,22 @@ class Mare::Compiler::TypeCheck
         # Keep track that we called this function.
         @analysis.called_funcs.add({info.pos, call_defn, call_func_link})
 
-        # TODO: type checking based on reify_cap and auto-recover needed.
+        # Determine the correct capability to reify, checking for cap errors.
         reify_cap, autorecover_needed =
           info.follow_call_check_receiver_cap(ctx, self.func, call_mt, call_func, problems)
 
-        # Reach the reified function we are calling, with the right reify_cap.
-        ctx.type_check.for_rf(ctx, call_defn, call_func_link, reify_cap).run
+        # Reach the reified function we are calling, with the right reify_cap,
+        # and also get its analysis in case we need to for further checks.
+        other_analysis =
+          ctx.type_check.for_rf(ctx, call_defn, call_func_link, reify_cap)
+            .tap(&.run)
+            .analysis
+
+        # Check if auto-recovery of the receiver is possible.
+        if autorecover_needed
+          ret_mt = other_analysis.ret_resolved
+          info.follow_call_check_autorecover_cap(ctx, self, call_func, ret_mt)
+        end
       end
       ctx.error_at info,
         "This function call doesn't meet subtyping requirements", problems \

@@ -100,9 +100,9 @@ It correctly applies viewpoint adaptation for the whole truth table:
     outer_box Outer'box = Outer.new
 
     // Viewed from iso ephemeral:
-    Outer.new.inner_iso ::type=> Inner'iso
-    Outer.new.inner_trn ::type=> Inner'iso
-    Outer.new.inner_ref ::type=> Inner'iso
+    Outer.new.inner_iso ::type=> Inner'iso+
+    Outer.new.inner_trn ::type=> Inner'iso+
+    Outer.new.inner_ref ::type=> Inner'iso+
     Outer.new.inner_val ::type=> Inner'val
     Outer.new.inner_box ::type=> Inner'val
     Outer.new.inner_tag ::type=> Inner'tag
@@ -116,9 +116,9 @@ It correctly applies viewpoint adaptation for the whole truth table:
     outer_iso.inner_tag ::type=> Inner'tag
 
     // Viewed from trn ephemeral:
-    Outer.new_trn.inner_iso ::type=> Inner'iso
-    Outer.new_trn.inner_trn ::type=> Inner'trn
-    Outer.new_trn.inner_ref ::type=> Inner'trn
+    Outer.new_trn.inner_iso ::type=> Inner'iso+
+    Outer.new_trn.inner_trn ::type=> Inner'trn+
+    Outer.new_trn.inner_ref ::type=> Inner'trn+
     Outer.new_trn.inner_val ::type=> Inner'val
     Outer.new_trn.inner_box ::type=> Inner'val
     Outer.new_trn.inner_tag ::type=> Inner'tag

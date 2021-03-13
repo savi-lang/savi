@@ -385,7 +385,7 @@ class Mare::Compiler::Infer
           # TODO: use all upstreams if we can avoid infinite recursion
           upstream_span = infer.resolve(ctx, @upstreams.first.first)
           upstream_span.combine_mt(explicit_span) { |upstream_mt, cap_mt|
-            upstream_mt.strip_cap.intersect(cap_mt).strip_ephemeral
+            upstream_mt.strip_cap.intersect(cap_mt)
           }
         else
           # If we have no upstreams and an explicit cap, return a span with
@@ -407,12 +407,12 @@ class Mare::Compiler::Infer
           end
         ) { |accum, mt| accum.intersect(mt) }
         .not_nil!
-        .transform_mt(&.strip_ephemeral)
       else
         # If we get here, we've failed and don't have enough info to continue.
         AltInfer::Span.error self,
           "This #{described_kind} needs an explicit type; it could not be inferred"
       end
+      .transform_mt(&.strip_ephemeral)
     end
 
     def tethers(querent : Info) : Array(Tether)
@@ -1997,6 +1997,7 @@ class Mare::Compiler::Infer
             .depends_on_call_ret_span(ctx, call_defn, call_func, call_link)
             .deciding_f_cap(call_mt.cap_only, call_func.has_tag?(:constructor))
             .not_nil!
+            .transform_mt(&.ephemeralize)
 
           next {call_mt, ret_span} if ret_span.inner.is_a?(AltInfer::Span::ErrorPropagate)
 
@@ -2226,7 +2227,7 @@ class Mare::Compiler::Infer
       end
     end
 
-    def follow_call_check_autorecover_cap(ctx, infer, other_infer, inferred_ret)
+    def follow_call_check_autorecover_cap(ctx, infer : Infer::ForReifiedFunc, other_infer : Infer::ForReifiedFunc, inferred_ret)
       call = self
 
       # If autorecover of the receiver cap was needed to make this call work,
@@ -2252,6 +2253,42 @@ class Mare::Compiler::Infer
       end)
 
       Error.at call,
+        "This function call won't work unless the receiver is ephemeral; " \
+        "it must either be consumed or be allowed to be auto-recovered. "\
+        "Auto-recovery didn't work for these reasons",
+          problems unless problems.empty?
+    end
+    def follow_call_check_autorecover_cap(
+      ctx : Context,
+      infer : TypeCheck::ForReifiedFunc,
+      call_func : Program::Function,
+      ret_mt : MetaType
+    )
+      call = self
+
+      # If autorecover of the receiver cap was needed to make this call work,
+      # we now have to confirm that arguments and return value are all sendable.
+      problems = [] of {Source::Pos, String}
+
+      unless ret_mt.is_sendable? || !call.ret_value_used
+        problems << {(call_func.ret || call_func.ident).pos,
+          "the return type #{ret_mt.show_type} isn't sendable " \
+          "and the return value is used (the return type wouldn't matter " \
+          "if the calling side entirely ignored the return value)"}
+      end
+
+      # TODO: It should be safe to pass in a TRN if the receiver is TRN,
+      # so is_sendable? isn't quite liberal enough to allow all valid cases.
+      call.args.try(&.terms.each do |arg|
+        inferred_arg = infer.resolve(ctx, infer.f_analysis[arg])
+        if inferred_arg && !inferred_arg.alias.is_sendable?
+          problems << {arg.pos,
+            "the argument (when aliased) has a type of " \
+            "#{inferred_arg.alias.show_type}, which isn't sendable"}
+        end
+      end)
+
+      ctx.error_at call,
         "This function call won't work unless the receiver is ephemeral; " \
         "it must either be consumed or be allowed to be auto-recovered. "\
         "Auto-recovery didn't work for these reasons",

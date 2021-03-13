@@ -2,6 +2,18 @@
 pass: type_check
 ---
 
+The following types are used in some but not all of the examples below:
+```mare
+:class Inner
+  :new iso
+
+:class Outer
+  :prop inner Inner: Inner.new
+  :new iso
+```
+
+---
+
 It complains when calling on types without that function:
 
 ```mare
@@ -192,4 +204,45 @@ This function call doesn't meet subtyping requirements:
 - auto-recovery was attempted because the receiver's type is FunValImmutableString'iso:
     wrapper FunValImmutableString'iso = FunValImmutableString.new
             ^~~~~~~~~~~~~~~~~~~~~~~~~
+```
+
+---
+
+It complains on auto-recovery when the argument is not sendable:
+
+```mare
+    outer_iso Outer'iso = Outer.new
+    inner_iso Inner'iso = Inner.new
+    inner_ref Inner'ref = Inner.new
+
+    outer_iso.inner = --inner_iso // okay; argument is sendable
+    outer_iso.inner = inner_ref   // not okay
+```
+```error
+This function call won't work unless the receiver is ephemeral; it must either be consumed or be allowed to be auto-recovered. Auto-recovery didn't work for these reasons:
+    outer_iso.inner = inner_ref   // not okay
+              ^~~~~
+
+- the argument (when aliased) has a type of Inner, which isn't sendable:
+    outer_iso.inner = inner_ref   // not okay
+                      ^~~~~~~~~
+```
+
+---
+
+It complains on auto-recovery of a property setter whose return is used:
+
+```mare
+    outer_trn Outer'trn = Outer.new
+    outer_trn.inner = Inner.new         // okay; return value is unused
+    inner = outer_trn.inner = Inner.new // not okay
+```
+```error
+This function call won't work unless the receiver is ephemeral; it must either be consumed or be allowed to be auto-recovered. Auto-recovery didn't work for these reasons:
+    inner = outer_trn.inner = Inner.new // not okay
+                      ^~~~~
+
+- the return type Inner isn't sendable and the return value is used (the return type wouldn't matter if the calling side entirely ignored the return value):
+  :prop inner Inner: Inner.new
+              ^~~~~
 ```
