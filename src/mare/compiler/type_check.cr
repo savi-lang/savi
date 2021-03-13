@@ -1264,6 +1264,9 @@ class Mare::Compiler::TypeCheck
         reify_cap, autorecover_needed =
           info.follow_call_check_receiver_cap(ctx, self.func, call_mt, call_func, problems)
 
+        # Check the number of arguments.
+        info.follow_call_check_args(ctx, self, call_func, problems)
+
         # Reach the reified function we are calling, with the right reify_cap,
         # and also get its analysis in case we need to for further checks.
         other_analysis =

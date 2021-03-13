@@ -2189,27 +2189,26 @@ class Mare::Compiler::Infer
       {reify_cap, autorecover_needed}
     end
 
-    def follow_call_check_args(ctx : Context, infer, call_func, other_infer, problems)
+    def follow_call_check_args(ctx : Context, infer, call_func, problems)
       call = self
 
       # Just check the number of arguments.
       # We will check the types in another Info type (TowardCallParam)
       arg_count = call.args.try(&.terms.size) || 0
-      max = other_infer.params.size
-      min = other_infer.params.count { |param| !AST::Extract.param(param)[2] }
+      max = AST::Extract.params(call_func.params).size
+      min = AST::Extract.params(call_func.params).count { |(ident, type, default)| !default }
       func_pos = call_func.ident.pos
+
       if arg_count > max
         max_text = "#{max} #{max == 1 ? "argument" : "arguments"}"
         params_pos = call_func.params.try(&.pos) || call_func.ident.pos
         problems << {call.pos, "the call site has too many arguments"}
         problems << {params_pos, "the function allows at most #{max_text}"}
-        return
       elsif arg_count < min
         min_text = "#{min} #{min == 1 ? "argument" : "arguments"}"
         params_pos = call_func.params.try(&.pos) || call_func.ident.pos
         problems << {call.pos, "the call site has too few arguments"}
         problems << {params_pos, "the function requires at least #{min_text}"}
-        return
       end
     end
 
@@ -2326,7 +2325,7 @@ class Mare::Compiler::Infer
         # were explicitly specified in the function signature.
         other_infer = ctx.infer.for_rf(ctx, call_defn, call_func_link, reify_cap).tap(&.run)
 
-        follow_call_check_args(ctx, infer, call_func, other_infer, problems)
+        follow_call_check_args(ctx, infer, call_func, problems)
         follow_call_check_yield_block(other_infer, problems)
 
         other_infers.add({other_infer, autorecover_needed})
@@ -2365,14 +2364,8 @@ class Mare::Compiler::Infer
         # were explicitly specified in the function signature.
         other_infer = ctx.type_check.for_rf(ctx, call_defn, call_func_link, reify_cap).tap(&.run)
 
-        follow_call_check_args(ctx, infer, call_func, other_infer, problems)
-        follow_call_check_yield_block(other_infer, problems)
-
         other_infers.add({other_infer, autorecover_needed})
       end
-      Error.at call,
-        "This function call doesn't meet subtyping requirements",
-          problems unless problems.empty?
 
       infer.analysis.call_infers_for[self] = other_infers
     end
@@ -2583,7 +2576,9 @@ class Mare::Compiler::Infer
       other_infers = @call.follow_call_resolve_other_infers(ctx, infer)
 
       other_infers.compact_map do |other_infer, _|
-        param = other_infer.params[@index]
+        param = other_infer.params[@index]?
+        next unless param
+
         param_info = other_infer.f_analysis[param]
         param_info = param_info.lhs if param_info.is_a?(FromAssign)
         param_info = param_info.as(Param)
@@ -2606,6 +2601,15 @@ class Mare::Compiler::Infer
           call_link = call_func.make_link(call_defn.link)
           param_span = infer
             .depends_on_call_param_span(ctx, call_defn, call_func, call_link, @index)
+
+          # If we can't get a valid param span, treat it as unconstrained,
+          # so that any type can be allowed to flow into it,
+          # We will show a relevant error message later in the TypeCheck pass
+          # when we check the number of parameters.
+          next {call_mt, AltInfer::Span.simple((MetaType.unconstrained))} \
+            unless param_span
+
+          param_span = param_span
             .deciding_f_cap(call_mt.cap_only, call_func.has_tag?(:constructor))
             .not_nil!
 

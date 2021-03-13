@@ -1249,10 +1249,13 @@ module Mare::Compiler::AltInfer
     end
 
     def depends_on_call_param_span(ctx, other_rt, other_f, other_f_link, index)
+      param = AST::Extract.params(other_f.params)[index]?
+      return unless param
+
       # TODO: Track dependencies and invalidate cache based on those.
       other_pre = ctx.pre_infer[other_f_link]
       other_analysis = ctx.alt_infer_edge.run_for_func(ctx, other_f, other_f_link)
-      raw_span = other_analysis[other_pre[AST::Extract.params(other_f.params)[index].first]]
+      raw_span = other_analysis[other_pre[param.first]]
 
       other_analysis.deciding_type_args_of(ctx, other_rt.args, raw_span)
       .transform_mt(&.substitute_type_params(other_analysis.type_param_substs(other_rt.args)))
