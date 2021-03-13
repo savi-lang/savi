@@ -1,63 +1,4 @@
 describe Mare::Compiler::Infer do
-  it "complains when calling with an insufficient receiver capability" do
-    source = Mare::Source.new_example <<-SOURCE
-    :primitive Example
-      :fun ref mutate
-
-    :actor Main
-      :new
-        Example.mutate
-    SOURCE
-
-    expected = <<-MSG
-    This function call doesn't meet subtyping requirements:
-    from (example):6:
-        Example.mutate
-                ^~~~~~
-
-    - the type Example isn't a subtype of the required capability of 'ref':
-      from (example):2:
-      :fun ref mutate
-           ^~~
-    MSG
-
-    Mare.compiler.compile([source], :infer)
-      .errors.map(&.message).join("\n").should eq expected
-  end
-
-  it "complains with an extra hint when using insufficient capability of @" do
-    source = Mare::Source.new_example <<-SOURCE
-    :class Example
-      :fun ref mutate
-      :fun readonly
-        @mutate
-
-    :actor Main
-      :new
-        Example.new.readonly
-    SOURCE
-
-    expected = <<-MSG
-    This function call doesn't meet subtyping requirements:
-    from (example):4:
-        @mutate
-         ^~~~~~
-
-    - the type Example'box isn't a subtype of the required capability of 'ref':
-      from (example):2:
-      :fun ref mutate
-           ^~~
-
-    - this would be possible if the calling function were declared as `:fun ref`:
-      from (example):3:
-      :fun readonly
-       ^~~
-    MSG
-
-    Mare.compiler.compile([source], :infer)
-      .errors.map(&.message).join("\n").should eq expected
-  end
-
   it "complains when calling on a function with too many arguments" do
     source = Mare::Source.new_example <<-SOURCE
     :actor Main
@@ -182,38 +123,6 @@ describe Mare::Compiler::Infer do
       from (example):5:
       :prop inner Inner: Inner.new
             ^~~~~
-    MSG
-
-    Mare.compiler.compile([source], :infer)
-      .errors.map(&.message).join("\n").should eq expected
-  end
-
-  it "complains on auto-recovery for a val method receiver" do
-    source = Mare::Source.new_example <<-SOURCE
-    :class Inner
-      :new iso
-
-    :class Outer
-      :prop inner Inner: Inner.new
-      :fun val immutable Inner'val: @inner
-      :new iso
-
-    :actor Main
-      :new
-        outer Outer'iso = Outer.new
-        inner Inner'val = outer.immutable
-    SOURCE
-
-    expected = <<-MSG
-    This function call doesn't meet subtyping requirements:
-    from (example):12:
-        inner Inner'val = outer.immutable
-                                ^~~~~~~~~
-
-    - the function's receiver capability is `val` but only a `ref` or `box` receiver can be auto-recovered:
-      from (example):6:
-      :fun val immutable Inner'val: @inner
-           ^~~
     MSG
 
     Mare.compiler.compile([source], :infer)

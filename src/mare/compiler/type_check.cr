@@ -1267,7 +1267,9 @@ class Mare::Compiler::TypeCheck
         # Reach the reified function we are calling, with the right reify_cap.
         ctx.type_check.for_rf(ctx, call_defn, call_func_link, reify_cap).run
       end
-      # TODO: Report errors when we see non-empty problems
+      ctx.error_at info,
+        "This function call doesn't meet subtyping requirements", problems \
+          unless problems.empty?
 
       true
     end

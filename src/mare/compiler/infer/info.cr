@@ -2177,8 +2177,12 @@ class Mare::Compiler::Infer
       if autorecover_needed \
       && required_cap.value != "ref" && required_cap.value != "box"
         problems << {call_func.cap.pos,
-          "the function's receiver capability is `#{required_cap}` " \
-          "but only a `ref` or `box` receiver can be auto-recovered"}
+          "the function's required receiver capability is `#{required_cap}` " \
+          "but only a `ref` or `box` function can be auto-recovered"}
+
+        problems << {@lhs.pos,
+          "auto-recovery was attempted because the receiver's type is " \
+          "#{call_mt.inner.inspect}"}
       end
 
       {reify_cap, autorecover_needed}

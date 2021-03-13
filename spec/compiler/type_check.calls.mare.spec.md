@@ -120,3 +120,76 @@ The 'hello' function can't be called on this singleton value for this type:
   :fun hello!
        ^~~~~~
 ```
+
+---
+
+It complains when calling with an insufficient receiver capability:
+
+```mare
+:class FunRefMutate
+  :fun ref mutate
+```
+```mare
+    mutatable box = FunRefMutate.new
+    mutatable.mutate
+```
+```error
+This function call doesn't meet subtyping requirements:
+    mutatable.mutate
+              ^~~~~~
+
+- the type FunRefMutate'box isn't a subtype of the required capability of 'ref':
+  :fun ref mutate
+       ^~~
+```
+
+---
+
+It complains with an extra hint when using insufficient capability of @:
+
+```mare
+:class FunRefMutateFunReadOnly
+  :fun ref mutate: None
+  :fun readonly: @mutate
+```
+```error
+This function call doesn't meet subtyping requirements:
+  :fun readonly: @mutate
+                  ^~~~~~
+
+- the type FunRefMutateFunReadOnly'box isn't a subtype of the required capability of 'ref':
+  :fun ref mutate: None
+       ^~~
+
+- this would be possible if the calling function were declared as `:fun ref`:
+  :fun readonly: @mutate
+   ^~~
+```
+
+---
+
+It complains on auto-recovery for a val method receiver:
+
+```mare
+:class FunValImmutableString
+  :prop string String'ref: String.new
+  :fun val immutable_string: @string
+  :new iso
+```
+```mare
+    wrapper FunValImmutableString'iso = FunValImmutableString.new
+    string String'val = wrapper.immutable_string
+```
+```error
+This function call doesn't meet subtyping requirements:
+    string String'val = wrapper.immutable_string
+                                ^~~~~~~~~~~~~~~~
+
+- the function's required receiver capability is `val` but only a `ref` or `box` function can be auto-recovered:
+  :fun val immutable_string: @string
+       ^~~
+
+- auto-recovery was attempted because the receiver's type is FunValImmutableString'iso:
+    wrapper FunValImmutableString'iso = FunValImmutableString.new
+            ^~~~~~~~~~~~~~~~~~~~~~~~~
+```
