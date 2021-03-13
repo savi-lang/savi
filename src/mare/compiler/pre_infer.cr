@@ -307,12 +307,11 @@ module Mare::Compiler::PreInfer
       when Refer::Self
         @analysis[node] = Infer::Self.new(node.pos, layer(node))
       when Refer::Unresolved
-        # Leave the node as unresolved if this identifer is not a value.
+        # Leave the node as unresolved if this identifier is not a value.
         return if @classify.no_value?(node)
 
-        # Otherwise, raise an error to the user:
-        # Error.at node, "This identifer couldn't be resolved"
-        @analysis[node] = Infer::ErrorInfo.new(node, "This identifer couldn't be resolved")
+        # Otherwise, record an error to show the user:
+        @analysis[node] = Infer::ErrorInfo.new(node, "This identifier couldn't be resolved")
       else
         raise NotImplementedError.new(ref)
       end

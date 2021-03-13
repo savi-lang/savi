@@ -34,7 +34,7 @@ It complains when a local identifier wasn't declared:
     x = y
 ```
 ```error
-This identifer couldn't be resolved:
+This identifier couldn't be resolved:
     x = y
         ^
 ```
@@ -47,7 +47,7 @@ It complains when a local identifier wasn't declared, even when unused:
     bogus
 ```
 ```error
-This identifer couldn't be resolved:
+This identifier couldn't be resolved:
     bogus
     ^~~~~
 ```
