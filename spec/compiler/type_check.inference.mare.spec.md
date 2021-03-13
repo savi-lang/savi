@@ -24,13 +24,14 @@ It infers a prop's type based on the prop initializer:
 It infers assignment from an allocated class:
 
 ```mare
+:class SomeAllocatableClass
+```
+```mare
     x = SomeAllocatableClass.new ::type=> SomeAllocatableClass
     x                            ::type=> SomeAllocatableClass
     x_non = SomeAllocatableClass ::type=> SomeAllocatableClass'non
     x_non                        ::type=> SomeAllocatableClass'non
     nope SomeAllocatableClass = SomeAllocatableClass // not okay; right is a non
-
-:class SomeAllocatableClass
 ```
 ```error
 The type of this expression doesn't meet the constraints imposed on it:

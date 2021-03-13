@@ -5,9 +5,10 @@ pass: type_check
 It complains when too many type arguments are provided:
 
 ```mare
-    Generic2(String, String, String, String)
-
 :class Generic2 (P1, P2)
+```
+```mare
+    Generic2(String, String, String, String)
 ```
 ```error
 This type qualification has too many type arguments:
@@ -32,9 +33,10 @@ This type qualification has too many type arguments:
 It complains when too few type arguments are provided:
 
 ```mare
-    Generic3(String)
-
 :class Generic3 (P1, P2, P3)
+```
+```mare
+    Generic3(String)
 ```
 ```error
 This type qualification has too few type arguments:
@@ -59,9 +61,10 @@ This type qualification has too few type arguments:
 It complains when no type arguments are provided and some are expected:
 
 ```mare
-    GenericNeedsTypeArgs
-
 :class GenericNeedsTypeArgs (P1, P2)
+```
+```mare
+    GenericNeedsTypeArgs
 ```
 ```error
 This type needs to be qualified with type arguments:
@@ -78,9 +81,10 @@ This type needs to be qualified with type arguments:
 It complains when a type argument doesn't satisfy the bound:
 
 ```mare
-    GenericSendable(String'ref)
-
 :class GenericSendable (P1 send)
+```
+```mare
+    GenericSendable(String'ref)
 ```
 ```error
 This type argument won't satisfy the type parameter bound:
