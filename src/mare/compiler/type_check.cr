@@ -394,11 +394,12 @@ class Mare::Compiler::TypeCheck
     return [] of ReifiedType if type_params.empty?
 
     params_partial_reifications =
-      type_params.map do |(param, _, _)|
+      type_params.compact_map do |(param, _, _)|
         # Get the MetaType of the bound.
         param_ref = refer_type[param.as(AST::Identifier)].as(Refer::TypeParam)
         bound_node = param_ref.bound
         bound_mt = self.for_rt(ctx, no_args_rt).type_expr_cap_only(bound_node, refer_type)
+        next unless bound_mt
 
         # TODO: Refactor the partial_reifications to return cap only already.
         caps = bound_mt.partial_reifications.map(&.cap_only)
@@ -567,6 +568,8 @@ class Mare::Compiler::TypeCheck
     # Check each type arg against the bound of the corresponding type param.
     rt.args.each_with_index do |arg, index|
       param_bound = for_rt(ctx, rt.link).get_type_param_bound(index)
+      next unless param_bound
+
       return false if !arg.satisfies_bound?(ctx, param_bound)
     end
 
@@ -596,10 +599,11 @@ class Mare::Compiler::TypeCheck
         return
       else
         # If there are type params but no type args we have a problem.
-        Error.at node, "This type needs to be qualified with type arguments", [
+        ctx.error_at node, "This type needs to be qualified with type arguments", [
           {rt_defn.params.not_nil!,
             "these type parameters are expecting arguments"}
         ]
+        return
       end
     end
 
@@ -613,23 +617,26 @@ class Mare::Compiler::TypeCheck
 
     # Check number of type args against number of type params.
     if rt.args.empty?
-      Error.at node, "This type needs to be qualified with type arguments", [
+      ctx.error_at node, "This type needs to be qualified with type arguments", [
         {rt_defn.params.not_nil!, "these type parameters are expecting arguments"}
       ]
+      return
     elsif rt.args.size > type_params_max
       params_pos = (rt_defn.params || rt_defn.ident).pos
-      Error.at node, "This type qualification has too many type arguments", [
+      ctx.error_at node, "This type qualification has too many type arguments", [
         {params_pos, "at most #{type_params_max} type arguments were expected"},
       ].concat(arg_terms[type_params_max..-1].map { |arg|
         {arg.pos, "this is an excessive type argument"}
       })
+      return
     elsif rt.args.size < type_params_min
       params = rt_defn.params.not_nil!
-      Error.at node, "This type qualification has too few type arguments", [
+      ctx.error_at node, "This type qualification has too few type arguments", [
         {params.pos, "at least #{type_params_min} type arguments were expected"},
       ].concat(params.terms[rt.args.size..-1].map { |param|
         {param.pos, "this additional type parameter needs an argument"}
       })
+      return
     end
 
     # Check each type arg against the bound of the corresponding type param.
@@ -640,10 +647,12 @@ class Mare::Compiler::TypeCheck
       arg = arg.simplify(ctx)
 
       param_bound = for_rt(ctx, rt.link, rt.args).get_type_param_bound(index)
+      next unless param_bound
+
       unless arg.satisfies_bound?(ctx, param_bound)
         bound_pos =
           rt_defn.params.not_nil!.terms[index].as(AST::Group).terms.last.pos
-        Error.at arg_node,
+        ctx.error_at arg_node,
           "This type argument won't satisfy the type parameter bound", [
             {bound_pos, "the type parameter bound is #{param_bound.show_type}"},
             {arg_node.pos, "the type argument is #{arg.show_type}"},
@@ -664,7 +673,7 @@ class Mare::Compiler::TypeCheck
     end
 
     # An identifier type expression must refer_type to a type.
-    def type_expr(node : AST::Identifier, refer_type, receiver = nil) : MetaType
+    def type_expr(node : AST::Identifier, refer_type, receiver = nil) : MetaType?
       ref = refer_type[node]?
       case ref
       when Refer::Self
@@ -682,7 +691,8 @@ class Mare::Compiler::TypeCheck
         when "any", "alias", "send", "share", "read"
           MetaType.new(MetaType::Capability.new_generic(node.value))
         else
-          Error.at node, "This type couldn't be resolved"
+          ctx.error_at node, "This type couldn't be resolved"
+          nil
         end
       else
         raise NotImplementedError.new(ref.inspect)
@@ -690,20 +700,24 @@ class Mare::Compiler::TypeCheck
     end
 
     # An relate type expression must be an explicit capability qualifier.
-    def type_expr(node : AST::Relate, refer_type, receiver = nil) : MetaType
+    def type_expr(node : AST::Relate, refer_type, receiver = nil) : MetaType?
       if node.op.value == "'"
         cap_ident = node.rhs.as(AST::Identifier)
         case cap_ident.value
         when "aliased"
-          type_expr(node.lhs, refer_type, receiver).simplify(ctx).alias
+          type_expr(node.lhs, refer_type, receiver).try(&.simplify(ctx).alias)
         else
           cap = type_expr(cap_ident, refer_type, receiver)
-          type_expr(node.lhs, refer_type, receiver).simplify(ctx).override_cap(cap)
+          type_expr(node.lhs, refer_type, receiver).try(&.simplify(ctx).override_cap(cap)) if cap
         end
       elsif node.op.value == "->"
-        type_expr(node.rhs, refer_type, receiver).simplify(ctx).viewed_from(type_expr(node.lhs, refer_type, receiver))
+        lhs_mt = type_expr(node.lhs, refer_type, receiver)
+        rhs_mt = type_expr(node.rhs, refer_type, receiver)
+        rhs_mt.simplify(ctx).viewed_from(lhs_mt) if lhs_mt && rhs_mt
       elsif node.op.value == "->>"
-        type_expr(node.rhs, refer_type, receiver).simplify(ctx).extracted_from(type_expr(node.lhs, refer_type, receiver))
+        lhs_mt = type_expr(node.lhs, refer_type, receiver)
+        rhs_mt = type_expr(node.rhs, refer_type, receiver)
+        rhs_mt.simplify(ctx).extracted_from(lhs_mt) if lhs_mt && rhs_mt
       else
         raise NotImplementedError.new(node.to_a.inspect)
       end
@@ -711,13 +725,16 @@ class Mare::Compiler::TypeCheck
 
     # A "|" group must be a union of type expressions, and a "(" group is
     # considered to be just be a single parenthesized type expression (for now).
-    def type_expr(node : AST::Group, refer_type, receiver = nil) : MetaType
+    def type_expr(node : AST::Group, refer_type, receiver = nil) : MetaType?
       if node.style == "|"
-        MetaType.new_union(
-          node.terms
+        mts = node.terms
           .select { |t| t.is_a?(AST::Group) && t.terms.size > 0 }
-          .map { |t| type_expr(t, refer_type, receiver).as(MetaType)}
-        )
+          .compact_map { |t| type_expr(t, refer_type, receiver).as(MetaType) }
+
+        # Bail out if any of the inner nodes were nil.
+        return nil if mts.size < node.terms.size
+
+        MetaType.new_union(mts)
       elsif node.style == "(" && node.terms.size == 1
         type_expr(node.terms.first, refer_type, receiver)
       else
@@ -726,13 +743,18 @@ class Mare::Compiler::TypeCheck
     end
 
     # A "(" qualify is used to add type arguments to a type.
-    def type_expr(node : AST::Qualify, refer_type, receiver = nil) : MetaType
+    def type_expr(node : AST::Qualify, refer_type, receiver = nil) : MetaType?
       raise NotImplementedError.new(node.to_a) unless node.group.style == "("
 
       target = type_expr(node.term, refer_type, receiver)
-      args = node.group.terms.map do |t|
-        resolve_type_param_parent_links(type_expr(t, refer_type, receiver)).as(MetaType)
+      args = node.group.terms.compact_map do |t|
+        mt = type_expr(t, refer_type, receiver)
+        resolve_type_param_parent_links(mt).as(MetaType) if mt
       end
+
+      # Bail out if any of the inner nodes were nil.
+      return nil unless target
+      return nil if args.size < node.group.terms.size
 
       target_inner = target.inner
       if target_inner.is_a?(MetaType::Nominal) \
@@ -747,7 +769,7 @@ class Mare::Compiler::TypeCheck
     end
 
     # All other AST nodes are unsupported as type expressions.
-    def type_expr(node : AST::Node, refer_type, receiver = nil) : MetaType
+    def type_expr(node : AST::Node, refer_type, receiver = nil) : MetaType?
       raise NotImplementedError.new(node.to_a)
     end
 
@@ -755,7 +777,7 @@ class Mare::Compiler::TypeCheck
     # or get rid of them both entirely in favor of what is in AltInfer.
 
     # An identifier type expression must refer_type to a type.
-    def type_expr_cap_only(node : AST::Identifier, refer_type, receiver = nil) : MetaType
+    def type_expr_cap_only(node : AST::Identifier, refer_type, receiver = nil) : MetaType?
       ref = refer_type[node]?
       case ref
       when Refer::Self
@@ -765,7 +787,7 @@ class Mare::Compiler::TypeCheck
       when Refer::TypeAlias
         MetaType.new_alias(reified_type_alias(ref.link_alias)).cap_only
       when Refer::TypeParam
-        lookup_type_param(ref, receiver).cap_only
+        lookup_type_param(ref, receiver).try(&.cap_only)
       when nil
         case node.value
         when "iso", "trn", "val", "ref", "box", "tag", "non"
@@ -773,7 +795,8 @@ class Mare::Compiler::TypeCheck
         when "any", "alias", "send", "share", "read"
           MetaType.new(MetaType::Capability.new_generic(node.value))
         else
-          Error.at node, "This type couldn't be resolved"
+          ctx.error_at node, "This type couldn't be resolved"
+          nil
         end
       else
         raise NotImplementedError.new(ref.inspect)
@@ -781,20 +804,24 @@ class Mare::Compiler::TypeCheck
     end
 
     # An relate type expression must be an explicit capability qualifier.
-    def type_expr_cap_only(node : AST::Relate, refer_type, receiver = nil) : MetaType
+    def type_expr_cap_only(node : AST::Relate, refer_type, receiver = nil) : MetaType?
       if node.op.value == "'"
         cap_ident = node.rhs.as(AST::Identifier)
         case cap_ident.value
         when "aliased"
-          type_expr_cap_only(node.lhs, refer_type, receiver).simplify(ctx).alias
+          type_expr_cap_only(node.lhs, refer_type, receiver).try(&.simplify(ctx).alias)
         else
           cap = type_expr_cap_only(cap_ident, refer_type, receiver)
-          type_expr_cap_only(node.lhs, refer_type, receiver).simplify(ctx).override_cap(cap)
+          type_expr_cap_only(node.lhs, refer_type, receiver).try(&.simplify(ctx).override_cap(cap)) if cap
         end
       elsif node.op.value == "->"
-        type_expr_cap_only(node.rhs, refer_type, receiver).simplify(ctx).viewed_from(type_expr_cap_only(node.lhs, refer_type, receiver))
+        lhs_mt = type_expr_cap_only(node.lhs, refer_type, receiver)
+        rhs_mt = type_expr_cap_only(node.rhs, refer_type, receiver)
+        rhs_mt.simplify(ctx).viewed_from(lhs_mt) if lhs_mt && rhs_mt
       elsif node.op.value == "->>"
-        type_expr_cap_only(node.rhs, refer_type, receiver).simplify(ctx).extracted_from(type_expr_cap_only(node.lhs, refer_type, receiver))
+        lhs_mt = type_expr_cap_only(node.lhs, refer_type, receiver)
+        rhs_mt = type_expr_cap_only(node.rhs, refer_type, receiver)
+        rhs_mt.simplify(ctx).extracted_from(lhs_mt) if lhs_mt && rhs_mt
       else
         raise NotImplementedError.new(node.to_a.inspect)
       end
@@ -802,13 +829,16 @@ class Mare::Compiler::TypeCheck
 
     # A "|" group must be a union of type expressions, and a "(" group is
     # considered to be just be a single parenthesized type expression (for now).
-    def type_expr_cap_only(node : AST::Group, refer_type, receiver = nil) : MetaType
+    def type_expr_cap_only(node : AST::Group, refer_type, receiver = nil) : MetaType?
       if node.style == "|"
-        MetaType.new_union(
-          node.terms
+        mts = node.terms
           .select { |t| t.is_a?(AST::Group) && t.terms.size > 0 }
-          .map { |t| type_expr_cap_only(t, refer_type, receiver).as(MetaType)}
-        )
+          .compact_map { |t| type_expr_cap_only(t, refer_type, receiver).as(MetaType) }
+
+        # Bail out if any of the inner nodes were nil.
+        return nil if mts.size < node.terms.size
+
+        MetaType.new_union(mts)
       elsif node.style == "(" && node.terms.size == 1
         type_expr_cap_only(node.terms.first, refer_type, receiver)
       else
@@ -817,7 +847,7 @@ class Mare::Compiler::TypeCheck
     end
 
     # A "(" qualify is used to add type arguments to a type.
-    def type_expr_cap_only(node : AST::Qualify, refer_type, receiver = nil) : MetaType
+    def type_expr_cap_only(node : AST::Qualify, refer_type, receiver = nil) : MetaType?
       raise NotImplementedError.new(node.to_a) unless node.group.style == "("
 
       # Type arguments do not contribute to the type expression's cap,
@@ -826,7 +856,7 @@ class Mare::Compiler::TypeCheck
     end
 
     # All other AST nodes are unsupported as type expressions.
-    def type_expr_cap_only(node : AST::Node, refer_type, receiver = nil) : MetaType
+    def type_expr_cap_only(node : AST::Node, refer_type, receiver = nil) : MetaType?
       raise NotImplementedError.new(node.to_a)
     end
 
@@ -899,9 +929,11 @@ class Mare::Compiler::TypeCheck
         next unless f.has_tag?(:is)
 
         f_link = f.make_link(reified.link)
-        trait = type_expr(f.ret.not_nil!, ctx.refer_type[f_link]).single!
+        trait_mt = type_expr(f.ret.not_nil!, ctx.refer_type[f_link])
+        next unless trait_mt
 
-        ctx.type_check.for_rt!(trait).analysis.subtyping.assert(reified, f.ident.pos)
+        trait_rt = trait_mt.single!
+        ctx.type_check.for_rt!(trait_rt).analysis.subtyping.assert(reified, f.ident.pos)
       end
     end
 
@@ -966,7 +998,8 @@ class Mare::Compiler::TypeCheck
       end
 
       # Get the MetaType of the declared bound for this type parameter.
-      bound : MetaType = type_expr(type_param.ref.bound, refer_type, nil)
+      bound : MetaType? = type_expr(type_param.ref.bound, refer_type, nil)
+      return unless bound
 
       # If we have temporary refinements for this type param, apply them now.
       @type_param_refinements[type_param.ref]?.try(&.each { |refine_type|

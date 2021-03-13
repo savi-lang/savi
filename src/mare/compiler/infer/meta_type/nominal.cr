@@ -108,7 +108,8 @@ struct Mare::Compiler::Infer::MetaType::Nominal
       [{self, defn, func}]
     when TypeParam
       infer.not_nil!.lookup_type_param_bound(defn)
-        .find_callable_func_defns(ctx, infer, name)
+        .try(&.find_callable_func_defns(ctx, infer, name)) \
+          || [] of Tuple(Inner, ReifiedType?, Program::Function?)
     else
       raise NotImplementedError.new(defn)
     end
@@ -392,7 +393,8 @@ struct Mare::Compiler::Infer::MetaType::Nominal
         other_parent_link = other_defn.ref.parent_link
         if other_parent_link.is_a?(Program::Type::Link)
           r = ctx.type_check.for_rt(ctx, other_parent_link)
-                .lookup_type_param_bound(other_defn).strip_cap
+                .lookup_type_param_bound(other_defn).try(&.strip_cap) || \
+                  MetaType.unsatisfiable
         elsif other_parent_link.is_a?(Program::TypeAlias::Link)
           raise NotImplementedError.new("lookup_type_param_bound for TypeAlias")
         else
@@ -408,7 +410,8 @@ struct Mare::Compiler::Infer::MetaType::Nominal
 
         # When this is a TypeParam, use its bound MetaType and run again.
         l = ctx.type_check.for_rt(ctx, defn.ref.parent_link.as(Program::Type::Link))
-              .lookup_type_param_bound(defn).strip_cap
+              .lookup_type_param_bound(defn).try(&.strip_cap)
+        return false unless l
         r = MetaType.new_nominal(other_defn)
         l.subtype_of?(ctx, r)
       elsif other_defn.is_a?(TypeParam)

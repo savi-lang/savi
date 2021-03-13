@@ -1111,14 +1111,14 @@ module Mare::Compiler::AltInfer
       Span.simple(Infer::MetaType.new(prelude_reified_type(ctx, name)))
     end
 
-    def type_expr_cap(node : AST::Identifier) : Infer::MetaType::Capability
+    def type_expr_cap(node : AST::Identifier) : Infer::MetaType::Capability?
       case node.value
       when "iso", "trn", "val", "ref", "box", "tag", "non"
         Infer::MetaType::Capability.new(node.value)
       when "any", "alias", "send", "share", "read"
         Infer::MetaType::Capability.new_generic(node.value)
       else
-        Error.at node, "This type couldn't be resolved"
+        nil
       end
     end
 
@@ -1135,7 +1135,12 @@ module Mare::Compiler::AltInfer
       when Refer::TypeParam
         lookup_type_param_partial_reified_span(ctx, Infer::TypeParam.new(ref))
       when nil
-        Span.simple(Infer::MetaType.new(type_expr_cap(node)))
+        cap = type_expr_cap(node)
+        if cap
+          Span.simple(Infer::MetaType.new(cap))
+        else
+          Span.error node, "This type couldn't be resolved"
+        end
       else
         raise NotImplementedError.new(ref.inspect)
       end
@@ -1152,8 +1157,12 @@ module Mare::Compiler::AltInfer
           end
         else
           cap = type_expr_cap(cap_ident)
-          type_expr_span(ctx, node.lhs).transform_mt do |lhs_mt|
-            lhs_mt.override_cap(cap)
+          if cap
+            type_expr_span(ctx, node.lhs).transform_mt do |lhs_mt|
+              lhs_mt.override_cap(cap.not_nil!)
+            end
+          else
+            Span.error cap_ident, "This type couldn't be resolved"
           end
         end
       elsif node.op.value == "->"

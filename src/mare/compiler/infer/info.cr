@@ -514,6 +514,36 @@ class Mare::Compiler::Infer
     end
   end
 
+  class ErrorInfo < Info
+    getter error : Error
+
+    def pos; error.pos; end
+
+    def layer_index; 0; end
+
+    def describe_kind; ""; end
+
+    def initialize(*args)
+      @error = Error.build(*args)
+    end
+
+    def add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
+      nil
+    end
+
+    def tethers(querent : Info) : Array(Tether)
+      [] of Tether
+    end
+
+    def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
+      AltInfer::Span.new(AltInfer::Span::ErrorPropagate.new(error))
+    end
+
+    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
+      raise error
+    end
+  end
+
   abstract class FixedInfo < DynamicInfo # TODO: rename or split DynamicInfo to make this line make more sense
     def tether_terminal?
       true

@@ -311,7 +311,8 @@ module Mare::Compiler::PreInfer
         return if @classify.no_value?(node)
 
         # Otherwise, raise an error to the user:
-        Error.at node, "This identifer couldn't be resolved"
+        # Error.at node, "This identifer couldn't be resolved"
+        @analysis[node] = Infer::ErrorInfo.new(node, "This identifer couldn't be resolved")
       else
         raise NotImplementedError.new(ref)
       end
@@ -426,7 +427,7 @@ module Mare::Compiler::PreInfer
           lhs.assign(ctx, @analysis[node.rhs], node.rhs.pos)
           @analysis[node] = Infer::FromAssign.new(node.pos, layer(node), lhs, @analysis[node.rhs])
         else
-          raise NotImplementedError.new(node.lhs)
+          raise NotImplementedError.new(lhs)
         end
       when "."
         call_ident, call_args, yield_params, yield_block = AST::Extract.call(node)
