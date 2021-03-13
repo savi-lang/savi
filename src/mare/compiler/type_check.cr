@@ -235,7 +235,7 @@ class Mare::Compiler::TypeCheck
     sorted_types.each do |t|
       t_link = t.make_link(library)
       @t_analyses[t_link].each_non_argumented_reified.each do |rt|
-        self[rt].subtyping.check_assertions(ctx)
+        self[rt].subtyping.check_and_clear_assertions(ctx)
       end
     end
   end

@@ -20,22 +20,27 @@ class Mare::Compiler::Infer::SubtypingInfo
     errors = [] of Error::Info
 
     @asserted.each do |that, pos|
-      if check(ctx, that, errors)
+      if check(ctx, that, errors, ignore_assertions: true)
         raise "inconsistent logic" if errors.size > 0
       else
-        Error.at pos,
+        ctx.error_at pos,
           "#{that} isn't a subtype of #{this}, as it is required to be here",
           errors
       end
     end
   end
+  def check_and_clear_assertions(ctx)
+    check_assertions(ctx)
+    .tap { @asserted.clear }
+  end
 
   # Return true if that type satisfies the requirements of the this type.
-  def check(ctx, that : ReifiedType, errors : Array(Error::Info) = [] of Error::Info)
-    # TODO: for each return false, carry info about why it was false?
-    # Maybe we only want to go to the trouble of collecting this info
-    # when it is requested by the caller, so as not to slow the base case.
-
+  def check(
+    ctx : Context,
+    that : ReifiedType,
+    errors : Array(Error::Info) = [] of Error::Info,
+    ignore_assertions = false
+  )
     # If these are literally the same type, we can trivially return true.
     return true if this == that
 
@@ -57,6 +62,10 @@ class Mare::Compiler::Infer::SubtypingInfo
       return false
     end
 
+    # If that type is asserted to be a subtype, believe the assertion for now,
+    # and let problems get identified later in a final check_assertions sweep.
+    return true if !ignore_assertions && @asserted.has_key?(that)
+
     # If we have a temp assumption that that is a subtype of this, return true.
     # Otherwise, move forward with the check and add such an assumption.
     # This is done to prevent infinite recursion in the typechecking.
@@ -77,15 +86,6 @@ class Mare::Compiler::Infer::SubtypingInfo
     if is_subtype
       @confirmed.add(that)
     else
-      # If we happened to just invalidate an assertion, we need to raise that
-      # error here instead of continuing to return true or false -
-      # this makes sure that we show the most relevant error to the user.
-      if (assert_pos = @asserted[that]?)
-        Error.at assert_pos,
-          "#{that} isn't a subtype of #{this}, as it is required to be here",
-          errors
-      end
-
       raise "no errors logged" if errors.empty?
       @disproved[that] = errors
     end
@@ -196,11 +196,11 @@ class Mare::Compiler::Infer::SubtypingInfo
     # Check the receiver capability.
     if that_func.has_tag?(:constructor)
       # Covariant receiver rcap for constructors.
-      unless that_cap.subtype_of?(this_cap)
+      unless that_cap.ephemeralize.subtype_of?(this_cap.ephemeralize)
         errors << {that_func.cap.pos,
-          "this constructor's receiver capability is #{that_cap.inspect}"}
+          "this constructor's return capability is #{that_cap.ephemeralize.inspect}"}
         errors << {this_func.cap.pos,
-          "it is required to be a subtype of #{this_cap.inspect}"}
+          "it is required to be a subtype of #{this_cap.ephemeralize.inspect}"}
       end
     else
       # Contravariant receiver rcap for normal functions.
@@ -213,15 +213,17 @@ class Mare::Compiler::Infer::SubtypingInfo
     end
 
     # Covariant return type.
-    this_ret_ast = this_type_check.ret
-    that_ret_ast = that_type_check.ret
-    this_ret = this_type_check.resolve(ctx, this_ret_ast).not_nil!
-    that_ret = that_type_check.resolve(ctx, that_ret_ast).not_nil!
-    unless that_ret.subtype_of?(ctx, this_ret)
-      errors << {(that_func.ret || that_func.ident).pos,
-        "this function's return type is #{that_ret.show_type}"}
-      errors << {(this_func.ret || this_func.ident).pos,
-        "it is required to be a subtype of #{this_ret.show_type}"}
+    unless this_func.has_tag?(:constructor) || that_func.has_tag?(:constructor)
+      this_ret_ast = this_type_check.ret
+      that_ret_ast = that_type_check.ret
+      this_ret = this_type_check.resolve(ctx, this_ret_ast).not_nil!
+      that_ret = that_type_check.resolve(ctx, that_ret_ast).not_nil!
+      unless that_ret.subtype_of?(ctx, this_ret)
+        errors << {(that_func.ret || that_func.ident).pos,
+          "this function's return type is #{that_ret.show_type}"}
+        errors << {(this_func.ret || this_func.ident).pos,
+          "it is required to be a subtype of #{this_ret.show_type}"}
+      end
     end
 
     # Contravariant parameter types.
