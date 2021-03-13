@@ -2382,8 +2382,14 @@ class Mare::Compiler::Infer
           raw_ret_span = infer
             .depends_on_call_yield_out_span(ctx, call_defn, call_func, call_link, @index)
 
-          next {call_mt, AltInfer::Span.simple(MetaType.unconstrained)} \
-            unless raw_ret_span
+          unless raw_ret_span
+            call_name = "#{call_defn.defn(ctx).ident.value}.#{@call.member}"
+            next {call_mt, AltInfer::Span.error(pos,
+              "This yield block parameter will never be received", [
+                {call_func.ident.pos, "'#{call_name}' does not yield it"}
+              ]
+            )}
+          end
 
           ret_span = raw_ret_span
             .deciding_f_cap(call_mt.cap_only, call_func.has_tag?(:constructor))

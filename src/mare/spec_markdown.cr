@@ -65,7 +65,7 @@ class Mare::SpecMarkdown
           when nil
             example.comments << content
           when "mare"
-            example.code += "\n" + content
+            example.code_blocks << content
           when "error"
             example.expected_errors << content
           else
@@ -89,11 +89,11 @@ class Mare::SpecMarkdown
 
   struct Example
     property comments = [] of String
-    property code = ""
+    property code_blocks = [] of String
     property expected_errors = [] of String
 
     def incomplete?
-      code == ""
+      code_blocks.empty?
     end
 
     def generated_comments_code
@@ -105,12 +105,16 @@ class Mare::SpecMarkdown
     end
 
     def generated_code
-      [
-        generated_comments_code,
-        ":class #{generated_class_name}",
-        "  :new",
-        code
-      ].join("\n")
+      (
+        [generated_comments_code] +
+        code_blocks.each_with_index.flat_map { |(code, index)|
+          [
+            ":class #{generated_class_name}#{index}",
+            "  :new",
+            code,
+          ]
+        }.to_a
+      ).join("\n")
     end
   end
 
