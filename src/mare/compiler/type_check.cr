@@ -1097,8 +1097,10 @@ class Mare::Compiler::TypeCheck
       inner = filtered_span.try(&.inner)
       return inner.meta_type if inner.is_a?(AltInfer::Span::Terminal)
 
-      raise filtered_span.not_nil!.total_error.not_nil! \
-        if filtered_span.try(&.any_error?)
+      if filtered_span.try(&.any_error?)
+        ctx.errors << filtered_span.not_nil!.total_error.not_nil!
+        return nil
+      end
 
       puts info.pos.show
       puts info
@@ -1121,35 +1123,37 @@ class Mare::Compiler::TypeCheck
 
       @analysis.resolved_infos[info]? || begin
         mt = info.as_conduit?.try(&.resolve!(ctx, self)) || filter_span(ctx, info)
-        @analysis.resolved_infos[info] = mt
+        @analysis.resolved_infos[info] = mt || MetaType.unconstrained
+        return nil unless mt
 
-        type_check_pre(ctx, info, mt)
-        type_check(info, mt)
+        okay = type_check_pre(ctx, info, mt)
+        type_check(info, mt) if okay
 
         # Reach any types that are within this MetaType.
         # TODO: Refactor this to take a block instead of returning an Array.
         mt.each_reachable_defn(ctx).each { |rt|
           ctx.type_check.ensure_rt(ctx, rt)
-        }
+        } if okay
 
         mt
       end
     end
 
     # Validate type arguments for FixedSingleton values.
-    def type_check_pre(ctx : Context, info : Infer::FixedSingleton, mt : MetaType)
+    def type_check_pre(ctx : Context, info : Infer::FixedSingleton, mt : MetaType) : Bool
       ctx.type_check.validate_type_args(ctx, self, info.node, mt)
+      true
     end
 
     # Sometimes print a special case error message for Literal values.
-    def type_check_pre(ctx : Context, info : Infer::Literal, mt : MetaType)
+    def type_check_pre(ctx : Context, info : Infer::Literal, mt : MetaType) : Bool
       # If we've resolved to a single concrete type already, move forward.
-      return if mt.singular? && mt.single!.link.is_concrete?
+      return true if mt.singular? && mt.single!.link.is_concrete?
 
       # If we can't be satisfiably intersected with the downstream constraints,
       # move forward and let the standard type checker error happen.
       constrained_mt = mt.intersect(info.total_downstream_constraint(ctx, self))
-      return if constrained_mt.simplify(ctx).unsatisfiable?
+      return true if constrained_mt.simplify(ctx).unsatisfiable?
 
       # Otherwise, print a Literal-specific error that includes peer hints,
       # as well as a call to action to use an explicit numeric type.
@@ -1162,28 +1166,30 @@ class Mare::Compiler::TypeCheck
         "Please wrap an explicit numeric type around the literal " \
           "(for example: U64[#{info.pos.content}])"
       })
-      Error.at info,
+      ctx.error_at info,
         "This literal value couldn't be inferred as a single concrete type",
         error_info
+      false
     end
 
     # Sometimes print a special case error message for ArrayLiteral values.
-    def type_check_pre(ctx : Context, info : Infer::ArrayLiteral, mt : MetaType)
+    def type_check_pre(ctx : Context, info : Infer::ArrayLiteral, mt : MetaType) : Bool
       # If the array cap is not ref or "lesser", we must recover to the
       # higher capability, meaning all element expressions must be sendable.
       array_cap = mt.cap_only_inner
       unless array_cap.supertype_of?(MetaType::Capability::REF)
         term_mts = info.terms.compact_map { |term| resolve(ctx, term) }
         unless term_mts.all?(&.alias.is_sendable?)
-          Error.at info.pos, "This array literal can't have a reference cap of " \
+          ctx.error_at info.pos, "This array literal can't have a reference cap of " \
             "#{array_cap.value} unless all of its elements are sendable",
               info.describe_downstream_constraints(ctx, self)
         end
       end
+      true
     end
 
     # Check runtime match safety for TypeCondition expressions.
-    def type_check_pre(ctx : Context, info : Infer::TypeCondition, mt : MetaType)
+    def type_check_pre(ctx : Context, info : Infer::TypeCondition, mt : MetaType) : Bool
       lhs_mt = resolve(ctx, info.lhs)
       rhs_mt = resolve(ctx, info.rhs)
 
@@ -1194,8 +1200,10 @@ class Mare::Compiler::TypeCheck
         info.lhs.pos,
         info.rhs.pos,
       ) if lhs_mt && rhs_mt
+
+      true
     end
-    def type_check_pre(ctx : Context, info : Infer::TypeConditionForLocal, mt : MetaType)
+    def type_check_pre(ctx : Context, info : Infer::TypeConditionForLocal, mt : MetaType) : Bool
       lhs_info = @f_analysis[info.refine]
       lhs_info = lhs_info.info if lhs_info.is_a?(Infer::LocalRef)
       rhs_info = info.refine_type
@@ -1209,12 +1217,14 @@ class Mare::Compiler::TypeCheck
         lhs_info.as(Infer::NamedInfo).first_viable_constraint_pos,
         rhs_info.pos,
       ) if lhs_mt && rhs_mt
+
+      true
     end
 
     # Reach the particular reification of the function called in a FromCall.
-    def type_check_pre(ctx : Context, info : Infer::FromCall, mt : MetaType)
+    def type_check_pre(ctx : Context, info : Infer::FromCall, mt : MetaType) : Bool
       receiver_mt = resolve(ctx, info.lhs)
-      return unless receiver_mt
+      return false unless receiver_mt
 
       call_defns = receiver_mt.find_callable_func_defns(ctx, self, info.member)
 
@@ -1235,12 +1245,13 @@ class Mare::Compiler::TypeCheck
         # Reach the reified function we are calling, with the right reify_cap.
         ctx.type_check.for_rf(ctx, call_defn, call_func_link, reify_cap).run
       end
+      # TODO: Report errors when we see non-empty problems
 
-      # TODO: Raise when we see non-empty problems
+      true
     end
 
     # Reach the underlying field "function" of a Field.
-    def type_check_pre(ctx : Context, info : Infer::Field, mt : MetaType)
+    def type_check_pre(ctx : Context, info : Infer::Field, mt : MetaType) : Bool
       field_func = @reified.type.defn(ctx).functions.find do |f|
         f.ident.value == info.name && f.has_tag?(:field)
       end.not_nil!
@@ -1256,11 +1267,13 @@ class Mare::Compiler::TypeCheck
         field_func_link,
         @analysis.resolved_self_cap
       ).tap(&.run)
+
+      true
     end
 
     # Other types of Info nodes do not have extra type checks.
-    def type_check_pre(ctx : Context, info : Infer::Info, mt : MetaType)
-      # There is nothing extra here.
+    def type_check_pre(ctx : Context, info : Infer::Info, mt : MetaType) : Bool
+      true # There is nothing extra here.
     end
 
     def type_check(info : Infer::DynamicInfo, meta_type : Infer::MetaType)
@@ -1278,7 +1291,7 @@ class Mare::Compiler::TypeCheck
         this_would_be_possible_if = info.this_would_be_possible_if
         extra << this_would_be_possible_if if this_would_be_possible_if
 
-        Error.at info.downstream_use_pos, "The type of this expression " \
+        ctx.error_at info.downstream_use_pos, "The type of this expression " \
           "doesn't meet the constraints imposed on it",
             extra
       end
@@ -1307,7 +1320,7 @@ class Mare::Compiler::TypeCheck
             this_would_be_possible_if = info.this_would_be_possible_if
             extra << this_would_be_possible_if if this_would_be_possible_if
 
-            Error.at use_pos, "This aliasing violates uniqueness " \
+            ctx.error_at use_pos, "This aliasing violates uniqueness " \
               "(did you forget to consume the variable?)",
               extra
           end

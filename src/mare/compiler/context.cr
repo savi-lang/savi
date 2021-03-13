@@ -109,6 +109,7 @@ class Mare::Compiler::Context
   end
 
   def finish
+    @errors.uniq!
     @stack.clear
   end
 

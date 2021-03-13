@@ -1949,6 +1949,8 @@ class Mare::Compiler::Infer
             .deciding_f_cap(call_mt.cap_only, call_func.has_tag?(:constructor))
             .not_nil!
 
+          next {call_mt, ret_span} if ret_span.inner.is_a?(AltInfer::Span::ErrorPropagate)
+
           ret_mt = Infer::MetaType.new_union(ret_span.all_terminal_meta_types)
           raise "halto" if ret_mt.unsatisfiable?
           simple_ret_span = AltInfer::Span.simple(ret_mt)

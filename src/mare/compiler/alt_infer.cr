@@ -863,7 +863,7 @@ module Mare::Compiler::AltInfer
         span
       rescue Compiler::Pass::Analyze::ReentranceError
         kind = info.is_a?(Infer::DynamicInfo) ? " #{info.describe_kind}" : ""
-        Error.at info.pos,
+        AltInfer::Span.error info.pos,
           "This#{kind} needs an explicit type; it could not be inferred"
       end
     end

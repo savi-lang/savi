@@ -14,7 +14,7 @@ describe Mare::Compiler::TypeCheck do
     MSG
 
     Mare.compiler.compile([source], :type_check)
-      .errors.map(&.message).join("\n").should eq expected
+      .errors.map(&.message).join("\n").should contain expected
   end
 
   it "complains when the return type identifier couldn't be resolved" do
@@ -33,7 +33,7 @@ describe Mare::Compiler::TypeCheck do
     MSG
 
     Mare.compiler.compile([source], :type_check)
-      .errors.map(&.message).join("\n").should eq expected
+      .errors.map(&.message).join("\n").should contain expected
   end
 
   it "complains when the local identifier couldn't be resolved" do
@@ -51,7 +51,7 @@ describe Mare::Compiler::TypeCheck do
     MSG
 
     Mare.compiler.compile([source], :type_check)
-      .errors.map(&.message).join("\n").should eq expected
+      .errors.map(&.message).join("\n").should contain expected
   end
 
   it "complains when a local identifier wasn't declared, even when unused" do
@@ -69,7 +69,7 @@ describe Mare::Compiler::TypeCheck do
     MSG
 
     Mare.compiler.compile([source], :type_check)
-      .errors.map(&.message).join("\n").should eq expected
+      .errors.map(&.message).join("\n").should contain expected
   end
 
   it "complains when the function body doesn't match the return type" do
@@ -101,7 +101,7 @@ describe Mare::Compiler::TypeCheck do
     MSG
 
     Mare.compiler.compile([source], :type_check)
-      .errors.map(&.message).join("\n").should eq expected
+      .errors.map(&.message).join("\n").should contain expected
   end
 
   it "complains when the assignment type doesn't match the right-hand-side" do
@@ -129,7 +129,7 @@ describe Mare::Compiler::TypeCheck do
     MSG
 
     Mare.compiler.compile([source], :type_check)
-      .errors.map(&.message).join("\n").should eq expected
+      .errors.map(&.message).join("\n").should contain expected
   end
 
   it "complains when the prop type doesn't match the initializer value" do
@@ -156,7 +156,7 @@ describe Mare::Compiler::TypeCheck do
     MSG
 
     Mare.compiler.compile([source], :type_check)
-      .errors.map(&.message).join("\n").should eq expected
+      .errors.map(&.message).join("\n").should contain expected
   end
 
   it "treats an empty sequence as producing None" do
@@ -184,7 +184,7 @@ describe Mare::Compiler::TypeCheck do
     MSG
 
     Mare.compiler.compile([source], :type_check)
-      .errors.map(&.message).join("\n").should eq expected
+      .errors.map(&.message).join("\n").should contain expected
   end
 
   it "complains when a choice condition type isn't boolean" do
@@ -212,7 +212,7 @@ describe Mare::Compiler::TypeCheck do
     MSG
 
     Mare.compiler.compile([source], :type_check)
-      .errors.map(&.message).join("\n").should eq expected
+      .errors.map(&.message).join("\n").should contain expected
   end
 
   pending "complains when a loop's implicit '| None' result doesn't pass checks" do
@@ -246,233 +246,7 @@ describe Mare::Compiler::TypeCheck do
     MSG
 
     Mare.compiler.compile([source], :type_check)
-      .errors.map(&.message).join("\n").should eq expected
-  end
-
-  it "resolves a local's type based on assignment" do
-    source = Mare::Source.new_example <<-SOURCE
-    :actor Main
-      :new
-        x = "Hello, World!"
-    SOURCE
-
-    ctx = Mare.compiler.compile([source], :type_check)
-    ctx.errors.should be_empty
-
-    type_check = ctx.type_check.for_func_simple(ctx, source, "Main", "new")
-    body = type_check.reified.func(ctx).body.not_nil!
-    assign = body.terms.first.as(Mare::AST::Relate)
-
-    type_check.analysis.resolved(ctx, assign.lhs).show_type.should eq "String"
-    type_check.analysis.resolved(ctx, assign.rhs).show_type.should eq "String"
-  end
-
-  it "resolves a prop's type based on the prop initializer" do
-    source = Mare::Source.new_example <<-SOURCE
-    :actor Main
-      :prop x: "Hello, World!"
-      :new
-        @x
-    SOURCE
-
-    ctx = Mare.compiler.compile([source], :type_check)
-    ctx.errors.should be_empty
-
-    type_check = ctx.type_check.for_func_simple(ctx, source, "Main", "new")
-    body = type_check.reified.func(ctx).body.not_nil!
-    prop = body.terms.first
-
-    type_check.analysis.resolved(ctx, prop).show_type.should eq "String"
-  end
-
-  it "resolves an integer literal based on an assignment" do
-    source = Mare::Source.new_example <<-SOURCE
-    :actor Main
-      :new
-        x (U64 | None) = 42
-    SOURCE
-
-    ctx = Mare.compiler.compile([source], :type_check)
-    ctx.errors.should be_empty
-
-    type_check = ctx.type_check.for_func_simple(ctx, source, "Main", "new")
-    body = type_check.reified.func(ctx).body.not_nil!
-    assign = body.terms.first.as(Mare::AST::Relate)
-
-    type_check.analysis.resolved(ctx, assign.lhs).show_type.should eq "(U64 | None)"
-    type_check.analysis.resolved(ctx, assign.rhs).show_type.should eq "U64"
-  end
-
-  it "resolves an integer literal based on a prop type" do
-    source = Mare::Source.new_example <<-SOURCE
-    :actor Main
-      :prop x (U64 | None): 42
-      :new
-        @x
-    SOURCE
-
-    ctx = Mare.compiler.compile([source], :type_check)
-    ctx.errors.should be_empty
-
-    main = ctx.namespace.main_type!(ctx)
-    main_type_check = ctx.type_check.for_rt(ctx, main)
-    func = main_type_check.reified.defn(ctx).functions.find(&.has_tag?(:field)).not_nil!
-    func_link = func.make_link(main)
-    func_cap = Mare::Compiler::Infer::MetaType.cap(func.cap.value)
-    type_check = ctx.type_check.for_rf(ctx, main_type_check.reified, func_link, func_cap)
-    body = type_check.reified.func(ctx).body.not_nil!
-    field = body.terms.first
-
-    type_check.analysis.resolved(ctx, field).show_type.should eq "U64"
-  end
-
-  it "resolves an integer literal through an if statement" do
-    source = Mare::Source.new_example <<-SOURCE
-    :actor Main
-      :new
-        x (U64 | String | None) = if True 42
-    SOURCE
-
-    ctx = Mare.compiler.compile([source], :type_check)
-    ctx.errors.should be_empty
-
-    type_check = ctx.type_check.for_func_simple(ctx, source, "Main", "new")
-    body = type_check.reified.func(ctx).body.not_nil!
-    assign = body.terms.first.as(Mare::AST::Relate)
-    literal = assign.rhs
-      .as(Mare::AST::Group).terms.last
-      .as(Mare::AST::Choice).list[0][1]
-      .as(Mare::AST::LiteralInteger)
-
-    type_check.analysis.resolved(ctx, assign.lhs).show_type.should eq "(U64 | String | None)"
-    type_check.analysis.resolved(ctx, assign.rhs).show_type.should eq "(U64 | None)"
-    type_check.analysis.resolved(ctx, literal).show_type.should eq "U64"
-  end
-
-  it "resolves an integer literal within the else body of an if statement" do
-    source = Mare::Source.new_example <<-SOURCE
-    :actor Main
-      :new
-        u = U64[99]
-        x = if True (u | 0)
-    SOURCE
-
-    ctx = Mare.compiler.compile([source], :type_check)
-    ctx.errors.should be_empty
-
-    type_check = ctx.type_check.for_func_simple(ctx, source, "Main", "new")
-    body = type_check.reified.func(ctx).body.not_nil!
-    assign = body.terms[1].as(Mare::AST::Relate)
-    literal = assign.rhs
-      .as(Mare::AST::Group).terms.last
-      .as(Mare::AST::Choice).list[1][1]
-      .as(Mare::AST::Group).terms.last
-      .as(Mare::AST::LiteralInteger)
-
-    type_check.analysis.resolved(ctx, assign.lhs).show_type.should eq "U64"
-    type_check.analysis.resolved(ctx, assign.rhs).show_type.should eq "U64"
-    type_check.analysis.resolved(ctx, literal).show_type.should eq "U64"
-  end
-
-  it "complains when a literal couldn't be resolved to a single type" do
-    source = Mare::Source.new_example <<-SOURCE
-    :actor Main
-      :new
-        x (F64 | U64) = 42
-    SOURCE
-
-    expected = <<-MSG
-    This literal value couldn't be inferred as a single concrete type:
-    from (example):3:
-        x (F64 | U64) = 42
-                        ^~
-
-    - it is required here to be a subtype of (F64 | U64):
-      from (example):3:
-        x (F64 | U64) = 42
-          ^~~~~~~~~~~
-
-    - and the literal itself has an intrinsic type of Numeric:
-      from (example):3:
-        x (F64 | U64) = 42
-                        ^~
-
-    - Please wrap an explicit numeric type around the literal (for example: U64[42])
-    MSG
-
-    Mare.compiler.compile([source], :type_check)
-      .errors.map(&.message).join("\n").should eq expected
-  end
-
-  it "complains when literal couldn't resolve even when calling u64 method" do
-    source = Mare::Source.new_example <<-SOURCE
-    :actor Main
-      :new
-        x = 42.u64
-    SOURCE
-
-    expected = <<-MSG
-    This literal value couldn't be inferred as a single concrete type:
-    from (example):3:
-        x = 42.u64
-            ^~
-
-    - and the literal itself has an intrinsic type of Numeric:
-      from (example):3:
-        x = 42.u64
-            ^~
-
-    - Please wrap an explicit numeric type around the literal (for example: U64[42])
-    MSG
-
-    Mare.compiler.compile([source], :type_check)
-      .errors.map(&.message).join("\n").should eq expected
-  end
-
-  it "complains when literal couldn't resolve and had conflicting hints" do
-    source = Mare::Source.new_example <<-SOURCE
-    :actor Main
-      :fun non example (string String)
-        case (
-        | string.size < 10 | U64[99]
-        | string.size > 90 | I64[88]
-        | 0
-        )
-      :new
-        @example("Hello, World!")
-    SOURCE
-
-    expected = <<-MSG
-    This literal value couldn't be inferred as a single concrete type:
-    from (example):6:
-        | 0
-          ^
-
-    - it is suggested here that it might be a U64:
-      from (example):4:
-        | string.size < 10 | U64[99]
-                                ^~~~
-
-    - it is suggested here that it might be a I64:
-      from (example):5:
-        | string.size > 90 | I64[88]
-                                ^~~~
-
-    - it is required here to be a subtype of (U64 | I64 | Numeric):
-      from (example):3:
-        case (
-        ^~~~~~···
-
-    - and the literal itself has an intrinsic type of Numeric:
-      from (example):6:
-        | 0
-          ^
-
-    - Please wrap an explicit numeric type around the literal (for example: U64[0])
-    MSG
-
-    Mare.compiler.compile([source], :type_check)
-      .errors.map(&.message).join("\n").should eq expected
+      .errors.map(&.message).join("\n").should contain expected
   end
 
   it "complains when a less specific type than required is assigned" do
@@ -501,7 +275,7 @@ describe Mare::Compiler::TypeCheck do
     MSG
 
     Mare.compiler.compile([source], :type_check)
-      .errors.map(&.message).join("\n").should eq expected
+      .errors.map(&.message).join("\n").should contain expected
   end
 
   it "complains when a different type is assigned on reassignment" do
@@ -530,164 +304,7 @@ describe Mare::Compiler::TypeCheck do
     MSG
 
     Mare.compiler.compile([source], :type_check)
-      .errors.map(&.message).join("\n").should eq expected
-  end
-
-  it "resolves return type from param type or another return type" do
-    source = Mare::Source.new_example <<-SOURCE
-    :primitive Infer
-      :fun from_param (n I32): n
-      :fun from_call_return (n I32): Infer.from_param(n)
-
-    :actor Main
-      :new
-        Infer.from_call_return(42)
-    SOURCE
-
-    ctx = Mare.compiler.compile([source], :type_check)
-    ctx.errors.should be_empty
-
-    [
-      {"Infer", "from_param"},
-      {"Infer", "from_call_return"},
-      {"Main", "new"},
-    ].each do |t_name, f_name|
-      type_check = ctx.type_check.for_func_simple(ctx, source, t_name, f_name)
-      call = type_check.reified.func(ctx).body.not_nil!.terms.first
-
-      type_check.analysis.resolved(ctx, call).show_type.should eq "I32"
-    end
-  end
-
-  it "resolves param type from local assignment or from the return type" do
-    source = Mare::Source.new_example <<-SOURCE
-    :primitive Infer
-      :fun from_assign (n): m I32 = n
-      :fun from_return_type (n) I32: n
-
-    :actor Main
-      :new
-        Infer.from_assign(42)
-        Infer.from_return_type(42)
-    SOURCE
-
-    ctx = Mare.compiler.compile([source], :type_check)
-    ctx.errors.should be_empty
-
-    [
-      {"Infer", "from_assign"},
-      {"Infer", "from_return_type"},
-    ].each do |t_name, f_name|
-      type_check = ctx.type_check.for_func_simple(ctx, source, t_name, f_name)
-      expr = type_check.reified.func(ctx).body.not_nil!.terms.first
-
-      type_check.analysis.resolved(ctx, expr).show_type.should eq "I32"
-    end
-  end
-
-  it "complains when unable to infer mutually recursive return types" do
-    source = Mare::Source.new_example <<-SOURCE
-    :primitive Tweedle
-      :fun dee (n I32): Tweedle.dum(n)
-      :fun dum (n I32): Tweedle.dee(n)
-
-    :actor Main
-      :new
-        Tweedle.dum(42)
-    SOURCE
-
-    expected = <<-MSG
-    This return value needs an explicit type; it could not be inferred:
-    from (example):3:
-      :fun dum (n I32): Tweedle.dee(n)
-                                ^~~
-    MSG
-
-    Mare.compiler.compile([source], :type_check)
-      .errors.map(&.message).join("\n").should eq expected
-  end
-
-
-  it "complains about problems with unreachable functions too" do
-    source = Mare::Source.new_example <<-SOURCE
-    :primitive NeverCalled
-      :fun call
-        x I32 = True
-
-    :actor Main
-      :new
-        None
-    SOURCE
-
-    expected = <<-MSG
-    The type of this expression doesn't meet the constraints imposed on it:
-    from (example):3:
-        x I32 = True
-                ^~~~
-
-    - it is required here to be a subtype of I32:
-      from (example):3:
-        x I32 = True
-          ^~~
-
-    - but the type of the expression was Bool:
-      from (example):3:
-        x I32 = True
-                ^~~~
-    MSG
-
-    Mare.compiler.compile([source], :type_check)
-      .errors.map(&.message).join("\n").should eq expected
-  end
-
-  it "resolves assignment from an allocated class" do
-    source = Mare::Source.new_example <<-SOURCE
-    :class X
-
-    :actor Main
-      :new
-        x = X.new
-    SOURCE
-
-    ctx = Mare.compiler.compile([source], :type_check)
-    ctx.errors.should be_empty
-
-    type_check = ctx.type_check.for_func_simple(ctx, source, "Main", "new")
-    body = type_check.reified.func(ctx).body.not_nil!
-    assign = body.terms.first.as(Mare::AST::Relate)
-
-    type_check.analysis.resolved(ctx, assign.lhs).show_type.should eq "X"
-    type_check.analysis.resolved(ctx, assign.rhs).show_type.should eq "X"
-  end
-
-  it "requires allocation for non-non references of an allocated class" do
-    source = Mare::Source.new_example <<-SOURCE
-    :class X
-
-    :actor Main
-      :new
-        x X = X
-    SOURCE
-
-    expected = <<-MSG
-    The type of this expression doesn't meet the constraints imposed on it:
-    from (example):5:
-        x X = X
-              ^
-
-    - it is required here to be a subtype of X:
-      from (example):5:
-        x X = X
-          ^
-
-    - but the type of the singleton value for this type was X'non:
-      from (example):5:
-        x X = X
-              ^
-    MSG
-
-    Mare.compiler.compile([source], :type_check)
-      .errors.map(&.message).join("\n").should eq expected
+      .errors.map(&.message).join("\n").should contain expected
   end
 
   it "complains when assigning with an insufficient right-hand capability" do
@@ -718,7 +335,7 @@ describe Mare::Compiler::TypeCheck do
     MSG
 
     Mare.compiler.compile([source], :type_check)
-      .errors.map(&.message).join("\n").should eq expected
+      .errors.map(&.message).join("\n").should contain expected
   end
 
   it "complains when calling on types without that function" do
@@ -771,7 +388,7 @@ describe Mare::Compiler::TypeCheck do
     MSG
 
     Mare.compiler.compile([source], :type_check)
-      .errors.map(&.message).join("\n").should eq expected
+      .errors.map(&.message).join("\n").should contain expected
   end
 
   it "suggests a similarly named function when found" do
@@ -804,7 +421,7 @@ describe Mare::Compiler::TypeCheck do
     MSG
 
     Mare.compiler.compile([source], :type_check)
-      .errors.map(&.message).join("\n").should eq expected
+      .errors.map(&.message).join("\n").should contain expected
   end
 
   it "suggests a similarly named function (without '!') when found" do
@@ -835,7 +452,7 @@ describe Mare::Compiler::TypeCheck do
     MSG
 
     Mare.compiler.compile([source], :type_check)
-      .errors.map(&.message).join("\n").should eq expected
+      .errors.map(&.message).join("\n").should contain expected
   end
 
   it "suggests a similarly named function (with '!') when found" do
@@ -866,7 +483,7 @@ describe Mare::Compiler::TypeCheck do
     MSG
 
     Mare.compiler.compile([source], :type_check)
-      .errors.map(&.message).join("\n").should eq expected
+      .errors.map(&.message).join("\n").should contain expected
   end
 
   # ...
@@ -903,7 +520,7 @@ describe Mare::Compiler::TypeCheck do
     MSG
 
     Mare.compiler.compile([source], :type_check)
-      .errors.map(&.message).join("\n").should eq expected
+      .errors.map(&.message).join("\n").should contain expected
   end
 
   it "allows extra aliases that don't violate uniqueness" do
@@ -959,7 +576,7 @@ describe Mare::Compiler::TypeCheck do
     MSG
 
     Mare.compiler.compile([source], :type_check)
-      .errors.map(&.message).join("\n").should eq expected
+      .errors.map(&.message).join("\n").should contain expected
   end
 
   it "strips the ephemeral modifier from the capability of an inferred local" do
@@ -997,145 +614,10 @@ describe Mare::Compiler::TypeCheck do
     MSG
 
     Mare.compiler.compile([source], :type_check)
-      .errors.map(&.message).join("\n").should eq expected
-  end
-
-  it "infers the type of an array literal from its elements" do
-    source = Mare::Source.new_example <<-SOURCE
-    :actor Main
-      :new
-        x = ["one", "two", "three"]
-    SOURCE
-
-    ctx = Mare.compiler.compile([source], :type_check)
-    ctx.errors.should be_empty
-
-    type_check = ctx.type_check.for_func_simple(ctx, source, "Main", "new")
-    body = type_check.reified.func(ctx).body.not_nil!
-    assign = body.terms.first.as(Mare::AST::Relate)
-
-    type_check.analysis.resolved(ctx, assign.lhs).show_type.should eq "Array(String)"
-    type_check.analysis.resolved(ctx, assign.rhs).show_type.should eq "Array(String)"
-  end
-
-  it "infers the element types of an array literal from an assignment" do
-    source = Mare::Source.new_example <<-SOURCE
-    :actor Main
-      :new
-        x Array((U64 | None))'val = [1, 2, 3] // TODO: allow syntax: Array(U64 | None)'val?
-    SOURCE
-
-    ctx = Mare.compiler.compile([source], :type_check)
-    ctx.errors.should be_empty
-
-    type_check = ctx.type_check.for_func_simple(ctx, source, "Main", "new")
-    body = type_check.reified.func(ctx).body.not_nil!
-    assign = body.terms.first.as(Mare::AST::Relate)
-    elem_0 = assign.rhs.as(Mare::AST::Group).terms.first
-
-    type_check.analysis.resolved(ctx, assign.lhs).show_type.should eq "Array((U64 | None))'val"
-    type_check.analysis.resolved(ctx, assign.rhs).show_type.should eq "Array((U64 | None))'val"
-    type_check.analysis.resolved(ctx, elem_0).show_type.should eq "U64"
-  end
-
-  it "complains when lifting the cap of an array with non-sendable elements" do
-    source = Mare::Source.new_example <<-SOURCE
-    :actor Main
-      :new
-        s String'ref = String.new
-        array1 Array(String'ref)'val = [String.new_iso, String.new_iso] // okay
-        array2 Array(String'ref)'val = [s, s] // not okay
-    SOURCE
-
-    expected = <<-MSG
-    This array literal can't have a reference cap of val unless all of its elements are sendable:
-    from (example):5:
-        array2 Array(String'ref)'val = [s, s] // not okay
-                                       ^~~~~~
-
-    - it is required here to be a subtype of Array(String'ref)'val:
-      from (example):5:
-        array2 Array(String'ref)'val = [s, s] // not okay
-               ^~~~~~~~~~~~~~~~~~~~~
-    MSG
-
-    Mare.compiler.compile([source], :type_check)
-      .errors.map(&.message).join("\n").should eq expected
-  end
-
-  it "infers an empty array literal from its antecedent" do
-    source = Mare::Source.new_example <<-SOURCE
-    :actor Main
-      :new
-        x Array(U64) = []
-        x << 99
-    SOURCE
-
-    ctx = Mare.compiler.compile([source], :type_check)
-    ctx.errors.should be_empty
-
-    type_check = ctx.type_check.for_func_simple(ctx, source, "Main", "new")
-    body = type_check.reified.func(ctx).body.not_nil!
-    assign = body.terms.first.as(Mare::AST::Relate)
-
-    type_check.analysis.resolved(ctx, assign.lhs).show_type.should eq "Array(U64)"
-    type_check.analysis.resolved(ctx, assign.rhs).show_type.should eq "Array(U64)"
-  end
-
-  it "complains when an empty array literal has no antecedent" do
-    source = Mare::Source.new_example <<-SOURCE
-    :actor Main
-      :new
-        x = []
-        x << 99
-    SOURCE
-
-    expected = <<-MSG
-    The type of this empty array literal could not be inferred (it needs an explicit type):
-    from (example):3:
-        x = []
-            ^~
-    MSG
-
-    Mare.compiler.compile([source], :type_check)
-      .errors.map(&.message).join("\n").should eq expected
+      .errors.map(&.message).join("\n").should contain expected
   end
 
   # ...
-
-  it "complains when trying to implicitly recover an array literal" do
-    source = Mare::Source.new_example <<-SOURCE
-    :class X
-
-    :actor Main
-      :new
-        x_ref X'ref = X.new
-        array_ref ref = [x_ref] // okay
-        array_box box = [x_ref] // okay
-        array_val val = [x_ref] // not okay
-    SOURCE
-
-    # TODO: This error message will change when we have array literal recovery.
-    expected = <<-MSG
-    The type of this expression doesn't meet the constraints imposed on it:
-    from (example):8:
-        array_val val = [x_ref] // not okay
-                        ^~~~~~~
-
-    - it is required here to be a subtype of val:
-      from (example):8:
-        array_val val = [x_ref] // not okay
-                  ^~~
-
-    - but the type of the array literal was Array(X):
-      from (example):8:
-        array_val val = [x_ref] // not okay
-                        ^~~~~~~
-    MSG
-
-    Mare.compiler.compile([source], :type_check)
-      .errors.map(&.message).join("\n").should eq expected
-  end
 
   it "reflects viewpoint adaptation in the return type of a prop getter" do
     source = Mare::Source.new_example <<-SOURCE
@@ -1173,7 +655,7 @@ describe Mare::Compiler::TypeCheck do
     MSG
 
     Mare.compiler.compile([source], :type_check)
-      .errors.map(&.message).join("\n").should eq expected
+      .errors.map(&.message).join("\n").should contain expected
   end
 
   it "respects explicit viewpoint adaptation notation in the return type" do
@@ -1213,7 +695,7 @@ describe Mare::Compiler::TypeCheck do
     MSG
 
     Mare.compiler.compile([source], :type_check)
-      .errors.map(&.message).join("\n").should eq expected
+      .errors.map(&.message).join("\n").should contain expected
   end
 
   it "treats box functions as being implicitly specialized on receiver cap" do
@@ -1331,7 +813,7 @@ describe Mare::Compiler::TypeCheck do
     MSG
 
     Mare.compiler.compile([source], :type_check)
-      .errors.map(&.message).join("\n").should eq expected
+      .errors.map(&.message).join("\n").should contain expected
   end
 
   it "allows capturing the extracted value of a property replace function" do
@@ -1411,7 +893,7 @@ describe Mare::Compiler::TypeCheck do
     MSG
 
     Mare.compiler.compile([source], :type_check)
-      .errors.map(&.message).join("\n").should eq expected
+      .errors.map(&.message).join("\n").should contain expected
   end
 
   # ...
@@ -1450,7 +932,7 @@ describe Mare::Compiler::TypeCheck do
     MSG
 
     Mare.compiler.compile([source], :type_check)
-      .errors.map(&.message).join("\n").should eq expected
+      .errors.map(&.message).join("\n").should contain expected
   end
 
   it "complains if some params of an elevated constructor are not sendable" do
@@ -1482,7 +964,7 @@ describe Mare::Compiler::TypeCheck do
     MSG
 
     Mare.compiler.compile([source], :type_check)
-      .errors.map(&.message).join("\n").should eq expected
+      .errors.map(&.message).join("\n").should contain expected
   end
 
   it "complains if some params of an asynchronous function are not sendable" do
@@ -1514,7 +996,7 @@ describe Mare::Compiler::TypeCheck do
     MSG
 
     Mare.compiler.compile([source], :type_check)
-      .errors.map(&.message).join("\n").should eq expected
+      .errors.map(&.message).join("\n").should contain expected
   end
 
   it "complains when a constant doesn't meet the expected type" do
@@ -1545,7 +1027,7 @@ describe Mare::Compiler::TypeCheck do
     MSG
 
     Mare.compiler.compile([source], :type_check)
-      .errors.map(&.message).join("\n").should eq expected
+      .errors.map(&.message).join("\n").should contain expected
   end
 
   it "requires a sub-func to be present in the subtype" do
@@ -1582,7 +1064,7 @@ describe Mare::Compiler::TypeCheck do
     MSG
 
     Mare.compiler.compile([source], :type_check)
-      .errors.map(&.message).join("\n").should eq expected
+      .errors.map(&.message).join("\n").should contain expected
   end
 
   it "requires a sub-func to have the same constructor or constant tags" do
@@ -1683,7 +1165,7 @@ describe Mare::Compiler::TypeCheck do
     MSG
 
     Mare.compiler.compile([source], :type_check)
-      .errors.map(&.message).join("\n").should eq expected
+      .errors.map(&.message).join("\n").should contain expected
   end
 
   it "requires a sub-func to have the same number of params" do
@@ -1742,7 +1224,7 @@ describe Mare::Compiler::TypeCheck do
     MSG
 
     Mare.compiler.compile([source], :type_check)
-      .errors.map(&.message).join("\n").should eq expected
+      .errors.map(&.message).join("\n").should contain expected
   end
 
   it "requires a sub-constructor to have a covariant receiver capability" do
@@ -1820,7 +1302,7 @@ describe Mare::Compiler::TypeCheck do
     MSG
 
     Mare.compiler.compile([source], :type_check)
-      .errors.map(&.message).join("\n").should eq expected
+      .errors.map(&.message).join("\n").should contain expected
   end
 
   it "requires a sub-func to have covariant return and contravariant params" do
@@ -1881,7 +1363,7 @@ describe Mare::Compiler::TypeCheck do
     MSG
 
     Mare.compiler.compile([source], :type_check)
-      .errors.map(&.message).join("\n").should eq expected
+      .errors.map(&.message).join("\n").should contain expected
   end
 
   it "prefers to show an error about assertions over other subtype failures" do
@@ -1910,7 +1392,7 @@ describe Mare::Compiler::TypeCheck do
     MSG
 
     Mare.compiler.compile([source], :type_check)
-      .errors.map(&.message).join("\n").should eq expected
+      .errors.map(&.message).join("\n").should contain expected
   end
 
   it "allows assigning from a variable with its refined type" do
@@ -1968,7 +1450,7 @@ describe Mare::Compiler::TypeCheck do
     MSG
 
     Mare.compiler.compile([source], :type_check)
-      .errors.map(&.message).join("\n").should eq expected
+      .errors.map(&.message).join("\n").should contain expected
   end
 
   it "complains when a check would require runtime knowledge of capabilities" do
@@ -2004,7 +1486,7 @@ describe Mare::Compiler::TypeCheck do
     MSG
 
     Mare.compiler.compile([source], :type_check)
-      .errors.map(&.message).join("\n").should eq expected
+      .errors.map(&.message).join("\n").should contain expected
   end
 
   pending "can also refine a type parameter within a choice body" do
@@ -2058,7 +1540,7 @@ describe Mare::Compiler::TypeCheck do
     MSG
 
     Mare.compiler.compile([source], :type_check)
-      .errors.map(&.message).join("\n").should eq expected
+      .errors.map(&.message).join("\n").should contain expected
   end
 
   it "complains when too few type arguments are provided" do
@@ -2093,7 +1575,7 @@ describe Mare::Compiler::TypeCheck do
     MSG
 
     Mare.compiler.compile([source], :type_check)
-      .errors.map(&.message).join("\n").should eq expected
+      .errors.map(&.message).join("\n").should contain expected
   end
 
   it "complains when no type arguments are provided and some are expected" do
@@ -2118,7 +1600,7 @@ describe Mare::Compiler::TypeCheck do
     MSG
 
     Mare.compiler.compile([source], :type_check)
-      .errors.map(&.message).join("\n").should eq expected
+      .errors.map(&.message).join("\n").should contain expected
   end
 
   it "complains when a type argument doesn't satisfy the bound" do
@@ -2149,7 +1631,7 @@ describe Mare::Compiler::TypeCheck do
     MSG
 
     Mare.compiler.compile([source], :type_check)
-      .errors.map(&.message).join("\n").should eq expected
+      .errors.map(&.message).join("\n").should contain expected
   end
 
   it "yields values to the caller" do
@@ -2196,7 +1678,7 @@ describe Mare::Compiler::TypeCheck do
     MSG
 
     Mare.compiler.compile([source], :type_check)
-      .errors.map(&.message).join("\n").should eq expected
+      .errors.map(&.message).join("\n").should contain expected
   end
 
   it "complains when a yield block is not present on a yielding call" do
@@ -2221,7 +1703,7 @@ describe Mare::Compiler::TypeCheck do
     MSG
 
     Mare.compiler.compile([source], :type_check)
-      .errors.map(&.message).join("\n").should eq expected
+      .errors.map(&.message).join("\n").should contain expected
   end
 
   pending "complains when the yield param type doesn't match a constraint" do
@@ -2252,7 +1734,7 @@ describe Mare::Compiler::TypeCheck do
     MSG
 
     Mare.compiler.compile([source], :type_check)
-      .errors.map(&.message).join("\n").should eq expected
+      .errors.map(&.message).join("\n").should contain expected
   end
 
   it "tests and conveys transitively reached subtypes to the reach pass" do
