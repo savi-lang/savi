@@ -1399,19 +1399,20 @@ class Mare::Compiler::Infer
 
       # If the intersection comes up empty, the type check will never match.
       if isect_mt.unsatisfiable?
-        Error.at pos, "This type check will never match", [
+        ctx.error_at pos, "This type check will never match", [
           {rhs_pos,
             "the runtime match type, ignoring capabilities, " \
             "is #{rhs_mt.strip_cap.show_type}"},
           {lhs_pos,
             "which does not intersect at all with #{lhs_mt.show_type}"},
         ]
+        return
       end
 
       # If the intersection isn't a subtype of the right hand side, then we know
       # the type descriptors can match but the capabilities would be unsafe.
       if !isect_mt.subtype_of?(ctx, rhs_mt)
-        Error.at pos,
+        ctx.error_at pos,
           "This type check could violate capabilities", [
             {rhs_pos,
               "the runtime match type, ignoring capabilities, " \
@@ -1421,6 +1422,7 @@ class Mare::Compiler::Infer
               "the type will be #{isect_mt.show_type}"},
             {rhs_pos, "which is not a subtype of #{rhs_mt.show_type}"},
           ]
+        return
       end
     end
   end
