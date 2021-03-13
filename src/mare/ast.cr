@@ -41,6 +41,7 @@ module Mare::AST
 
   abstract class Node
     getter! pos
+    property annotations : Array(Annotation)?
 
     def with_pos(pos : Source::Pos)
       @pos = pos
@@ -129,7 +130,6 @@ module Mare::AST
   end
 
   class Declare < Node
-    property doc_strings : Array(DocString)?
     property head
     property body
     def initialize(@head = [] of Term, @body = Group.new(":"))
@@ -143,7 +143,6 @@ module Mare::AST
     def name; :declare end
     def to_a: Array(A)
       res = [name] of A
-      res << doc_strings.not_nil!.map(&.value) if doc_strings
       res << head.map(&.to_a)
       res << body.to_a
       res
@@ -231,12 +230,12 @@ module Mare::AST
     end
   end
 
-  alias Term = DocString | Identifier \
+  alias Term = Annotation | Identifier \
     | LiteralString | LiteralCharacter | LiteralInteger | LiteralFloat \
     | Operator | Prefix | Relate | Group \
     | FieldRead | FieldWrite | Choice | Loop | Try
 
-  class DocString < Node
+  class Annotation < Node
     property value
     def initialize(@value : String)
     end

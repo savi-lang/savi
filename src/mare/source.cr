@@ -63,6 +63,25 @@ struct Mare::Source::Pos
     new(source, start, start, line_start, line_finish, row, col)
   end
 
+  def self.index_range(source : Source, new_start : Int32, new_finish : Int32)
+    # TODO: dedup with similar logic in span and subset
+    new_row = 0
+    new_line_start = 0
+    source.content[0...new_start].each_char.each_with_index do |char, index|
+      next unless char == '\n'
+      new_row += 1
+      new_line_start = index
+    end
+    new_line_finish = (source.content.index("\n", new_line_start) || source.content.size) - 1
+    new_col = new_start - new_line_start
+
+    new(
+      source, new_start, new_finish,
+      new_line_start, new_line_finish,
+      new_row, new_col
+    )
+  end
+
   def self.show_library_path(library : Library)
     source = Source.new("", library.path, library, :path)
     new(source, 0, library.path.size, 0, library.path.size, 0, 0)

@@ -1,19 +1,22 @@
 class Mare::SpecMarkdown
   getter filename : String
-  getter library : Source::Library
+  getter source_library : Source::Library
 
   def initialize(path : String)
     @filename = File.basename(path)
-    @library = Source::Library.new("(compiler-spec)")
+    @source_library = Source::Library.new("(compiler-spec)")
     @raw_content = File.read(path)
   end
 
-  def sources
-    [Source.new(@filename, compiled_content, @library)]
+  def sources; [source]; end
+  def source
+    Source.new(@filename, compiled_content, @source_library)
   end
 
+  @compiled_content : String?
   def compiled_content
-    examples.map(&.generated_code).join("\n")
+    @compiled_content ||= examples.map(&.generated_code).join("\n")
+    @compiled_content.not_nil!
   end
 
   def front_matter; front_matter_and_main_body.first; end
@@ -78,6 +81,12 @@ class Mare::SpecMarkdown
     .not_nil!
   end
 
+  def get_example_pos(example : Example)
+    start = compiled_content.index(example.generated_code).not_nil!
+    finish = start + example.generated_code.size
+    Source::Pos.index_range(source, start, finish)
+  end
+
   struct Example
     property comments = [] of String
     property code = ""
@@ -107,7 +116,77 @@ class Mare::SpecMarkdown
 
   # Verify that the final state of the given compilation matches expectations,
   # printing info returning true on success, otherwise returning false.
-  def verify!(ctx : Compiler::Context)
+  def verify!(ctx : Compiler::Context) : Bool
+    okay = true
+    okay = false unless verify_annotations!(ctx)
+    okay = false unless verify_errors!(ctx)
+    puts "# PASSED: #{@filename}" if okay
+    okay
+  end
+
+  def verify_annotations!(ctx : Compiler::Context) : Bool
+    library = ctx.program.libraries
+      .find { |library| library.source_library == @source_library }
+      .not_nil!
+
+    errors = [] of {Example, Error}
+
+    examples.compact_map { |example|
+      example_pos = get_example_pos(example)
+
+      library.types.each { |type|
+        next true unless example_pos.contains?(type.ident.pos)
+        t_link = type.make_link(library)
+
+        type.functions.each { |func|
+          f_link = func.make_link(t_link)
+
+          AST::Gather.annotated_nodes(ctx, func.ast).each { |node|
+            annotations = node.annotations.not_nil!
+            string = annotations.map(&.value).join("\n")
+            match = string.match(/\s*(\w+)\s*=>\s*(.+)/m)
+            next unless match
+
+            kind = match[1]
+            expected = match[2]
+
+            case kind
+            when "type"
+              type_check = ctx.type_check.for_func_simple(ctx, t_link, f_link)
+              actual = type_check.analysis.resolved(ctx, node).show_type
+
+              if actual != expected
+                errors << {example, Error.build(annotations.first.pos,
+                  "This annotation expects a type of '#{expected}'", [
+                    {node.pos, "but it actually had a type of '#{actual}'"},
+                  ]
+                )}
+              end
+            else
+              errors << {example, Error.build(annotations.first.pos,
+                "Compiler spec annotation '#{kind}' not known")}
+            end
+          }
+        }
+      }
+    }
+
+    return true if errors.empty?
+
+    errors.group_by(&.first).map { |example, pairs|
+      puts "---"
+      puts
+      puts example.generated_comments_code
+      puts
+      puts "Unfulfilled Annotations:"
+      puts
+      pairs.each { |(example, error)| puts error.message; puts }
+    }
+
+    false
+  end
+
+  def verify_errors!(ctx : Compiler::Context) : Bool
     # Pull out the error messages, scrubbing away the filename/line numbers.
     # We will mutate this array by removing when matched to an expected error.
     actual_errors =
@@ -130,7 +209,6 @@ class Mare::SpecMarkdown
 
     # If there's no mismatches in expectation, we're done!
     if missing_errors.empty? && actual_errors.empty?
-      puts "# PASSED: #{@filename}"
       return true
     end
 
