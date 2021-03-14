@@ -1477,7 +1477,7 @@ class Mare::Compiler::TypeCheck
             end
           end
 
-          Error.at func.cap.pos,
+          ctx.error_at func.cap.pos,
             "#{require_sendable} must only have sendable parameters", errs \
               unless errs.empty?
         end

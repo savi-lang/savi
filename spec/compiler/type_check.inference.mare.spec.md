@@ -294,3 +294,30 @@ The type of this expression doesn't meet the constraints imposed on it:
     array_val val = [x_ref] // not okay
                     ^~~~~~~
 ```
+
+---
+
+It infers prop setters to return the alias of the assigned value:
+
+```mare
+:class HasStringTrn
+  :prop string_trn String'trn: String.new_iso
+```
+```mare
+    wrapper = HasStringTrn.new
+    string_box String'box = wrapper.string_trn = String.new_iso // okay
+    string_trn String'trn = wrapper.string_trn = String.new_iso // not okay
+```
+```error
+The type of this expression doesn't meet the constraints imposed on it:
+    string_trn String'trn = wrapper.string_trn = String.new_iso // not okay
+    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- it is required here to be a subtype of String'trn:
+    string_trn String'trn = wrapper.string_trn = String.new_iso // not okay
+               ^~~~~~~~~~
+
+- but the type of the return value was String'box:
+    string_trn String'trn = wrapper.string_trn = String.new_iso // not okay
+                                    ^~~~~~~~~~
+```
