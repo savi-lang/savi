@@ -861,12 +861,19 @@ class Mare::Compiler::TypeCheck
       reified_defn.functions.each do |f|
         next unless f.has_tag?(:is)
 
+        # Get the MetaType of the asserted supertype trait
         f_link = f.make_link(reified.link)
-        trait_mt = type_expr(f.ret.not_nil!, ctx.refer_type[f_link])
+        pre_infer = ctx.pre_infer[f_link]
+        alt_infer = ctx.alt_infer[f_link]
+        ret_info = alt_infer[pre_infer[f.ret.not_nil!]]
+        trait_mt = alt_infer
+          .deciding_type_args_of(reified.args, ret_info)
+          .try(&.final_mt!(ctx))
         next unless trait_mt
 
         trait_rt = trait_mt.single!
-        ctx.type_check.for_rt!(trait_rt).analysis.subtyping.assert(reified, f.ident.pos)
+        ctx.type_check.for_rt(ctx, trait_rt.link, trait_rt.args)
+          .analysis.subtyping.assert(reified, f.ident.pos)
       end
     end
 

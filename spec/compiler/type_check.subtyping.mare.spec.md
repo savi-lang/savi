@@ -307,7 +307,7 @@ It can use type parameters as type arguments in the subtype assertion:
   :fun convert (input C): "This one has the trait arguments backwards"
 ```
 ```error
-ConcreteConvertToStringBackwards(C'val) isn't a subtype of TraitConvertAToB(String, [C from ConcreteConvertToStringBackwards(C'val)]'val), as it is required to be here:
+ConcreteConvertToStringBackwards(C'val) isn't a subtype of TraitConvertAToB(String, C'val), as it is required to be here:
   :is TraitConvertAToB(String, C)
    ^~
 
@@ -315,7 +315,7 @@ ConcreteConvertToStringBackwards(C'val) isn't a subtype of TraitConvertAToB(Stri
   :fun convert (input C): "This one has the trait arguments backwards"
        ^~~~~~~
 
-- it is required to be a subtype of [C from ConcreteConvertToStringBackwards(C'val)]'val:
+- it is required to be a subtype of C'val:
   :fun convert (input A) B
                          ^
 
