@@ -666,7 +666,11 @@ class Mare::Compiler::TypeCheck
 
       arg = arg.simplify(ctx)
 
-      param_bound = for_rt(ctx, rt.link, rt.args).get_type_param_bound(index)
+      alt_infer = ctx.alt_infer[rt.link]
+      bound_span = alt_infer.type_param_bound_spans[index]
+      param_bound = alt_infer
+        .deciding_type_args_of(rt.args, bound_span)
+        .try(&.final_mt!(ctx))
       next unless param_bound
 
       unless arg.satisfies_bound?(ctx, param_bound)
@@ -720,7 +724,6 @@ class Mare::Compiler::TypeCheck
     protected getter refer_type : ReferType::Analysis
 
     def initialize(@ctx, @analysis, @reified, @refer_type)
-      @type_param_refinements = {} of Refer::TypeParam => Array(MetaType)
     end
 
     def initialize_assertions(ctx)
@@ -772,12 +775,6 @@ class Mare::Compiler::TypeCheck
       @reified.args[index] if index
     end
 
-    def get_type_param_bound(index : Int32)
-      alt_infer = ctx.alt_infer[@reified.link]
-      span = alt_infer.type_param_bound_spans[index]
-      alt_infer.deciding_type_args_of(@reified.args, span).try(&.final_mt!(ctx))
-    end
-
     def lookup_type_param(ref : Refer::TypeParam, receiver = nil)
       raise NotImplementedError.new(ref) if ref.parent_link != reified.link
 
@@ -819,33 +816,9 @@ class Mare::Compiler::TypeCheck
       # Get the MetaType of the declared bound for this type parameter.
       alt_infer = ctx.alt_infer[reified.link]
       bound_span = alt_infer.type_param_bound_spans[type_param.ref.index]
-      bound = alt_infer
+      alt_infer
         .deciding_type_args_of(reified.args, bound_span)
         .try(&.final_mt!(ctx))
-      return unless bound
-
-      # If we have temporary refinements for this type param, apply them now.
-      @type_param_refinements[type_param.ref]?.try(&.each { |refine_type|
-        # TODO: make this less of a special case, somehow:
-        bound = bound.strip_cap.intersect(refine_type.strip_cap).intersect(
-          MetaType.new(
-            bound.cap_only.inner.as(MetaType::Capability).set_intersect(
-              refine_type.cap_only.inner.as(MetaType::Capability)
-            )
-          )
-        )
-      })
-
-      bound
-    end
-
-    def push_type_param_refinement(ref, refine_type)
-      (@type_param_refinements[ref] ||= [] of MetaType) << refine_type
-    end
-
-    def pop_type_param_refinement(ref)
-      list = @type_param_refinements[ref]
-      list.empty? ? @type_param_refinements.delete(ref) : list.pop
     end
   end
 
