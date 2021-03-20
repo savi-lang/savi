@@ -624,7 +624,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     ret = ctx.reach[type_check.ret_resolved]
 
     yield_out = type_check.yield_out_resolved.map do |resolved|
-      ctx.reach[resolved]
+      ctx.reach[resolved.not_nil!]
     end
 
     Signature.new(type_check.reified.name, receiver, params, ret, yield_out)

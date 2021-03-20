@@ -287,3 +287,43 @@ ConcreteWithoutExampleNone isn't a subtype of TraitExampleNone, as it is require
   :fun example None
        ^~~~~~~
 ```
+
+---
+
+It can use type parameters as type arguments in the subtype assertion:
+
+```mare
+:trait TraitConvertAToB (A read, B val)
+  :fun convert (input A) B
+
+// This class is a valid subtype of the trait as it asserts itself to be.
+:class ConcreteConvertToString (C Numeric'read)
+  :is TraitConvertAToB(C, String)
+  :fun convert (input C): "Pretend this is a string representation of C"
+
+// This class is not. It has the type arguments backwards in its assertion.
+:class ConcreteConvertToStringBackwards (C Numeric'val)
+  :is TraitConvertAToB(String, C)
+  :fun convert (input C): "This one has the trait arguments backwards"
+```
+```error
+ConcreteConvertToStringBackwards(C'val) isn't a subtype of TraitConvertAToB(String, [C from ConcreteConvertToStringBackwards(C'val)]'val), as it is required to be here:
+  :is TraitConvertAToB(String, C)
+   ^~
+
+- this function's return type is String:
+  :fun convert (input C): "This one has the trait arguments backwards"
+       ^~~~~~~
+
+- it is required to be a subtype of [C from ConcreteConvertToStringBackwards(C'val)]'val:
+  :fun convert (input A) B
+                         ^
+
+- this parameter type is C'val:
+  :fun convert (input C): "This one has the trait arguments backwards"
+                ^~~~~~~
+
+- it is required to be a supertype of String:
+  :fun convert (input A) B
+                ^~~~~~~
+```

@@ -408,11 +408,15 @@ module Mare::Compiler::AltInfer
             # This is getting a bit ridiculous! We need to write the code that
             # handles the general case, but this is a special case we handle.
             Decision.build(@key, @map.transform_values(&.combine_mt_to_span(other, nil, always_yields_terminal, &block).as(Inner)))
-          elsif always_yields_terminal \
-            && (other_keys = other.gather_all_keys; true) \
-            && gather_all_keys.all? { |key| !other_keys.includes?(key) }
-            # If we know we have no overlapping keys, we can descend to the next level.
+          elsif always_yields_terminal && !(other.gather_all_keys.includes?(@key))
+            # If the other one does not ovelap with our immediate key,
+            # we can descend to the next level and continue.
             Decision.build(@key, @map.transform_values(&.combine_mt_to_span(other, nil, always_yields_terminal, &block).as(Inner)))
+          elsif other.is_a?(Decision) && \
+            always_yields_terminal && !(gather_all_keys.includes?(other.key))
+            # This is the inverse of the above condition.
+            swap_block = -> (b : MetaType, a : MetaType) { block.call(a, b) }
+            Decision.build(other.key, other.map.transform_values(&.combine_mt_to_span(self, nil, always_yields_terminal, &swap_block).as(Inner)))
           else
             raise NotImplementedError.new("combine_mt_to_span for a decision and another non-terminal")
           end

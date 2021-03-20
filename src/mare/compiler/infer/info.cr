@@ -400,13 +400,12 @@ class Mare::Compiler::Infer
         # TODO: use all upstreams if we can avoid infinite recursion
         upstream_span
       elsif !downstreams_empty?
-        # If we only have downstreams, just do our best with those.
+        # If we only have downstream tethers, just do our best with those.
         AltInfer::Span.reduce_combine_mts(
-          @downstreams.map do |pos, info, aliases|
-            infer.resolve(ctx, info)
-          end
+          tether_constraint_spans(ctx, infer)
         ) { |accum, mt| accum.intersect(mt) }
         .not_nil!
+        .transform_mt(&.strip_ephemeral) # TODO: add this?
       else
         # If we get here, we've failed and don't have enough info to continue.
         AltInfer::Span.error self,

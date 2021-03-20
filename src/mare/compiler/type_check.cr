@@ -15,6 +15,9 @@ class Mare::Compiler::TypeCheck
   struct FuncAnalysis
     getter link
 
+    # TODO: remove this alias 
+    protected def alt_infer; @spans; end
+
     def initialize(
       @link : Program::Function::Link,
       @pre : PreInfer::Analysis,
@@ -111,7 +114,7 @@ class Mare::Compiler::TypeCheck
     protected getter call_infers_for
     getter! ret_resolved : MetaType; protected setter ret_resolved
     getter! yield_in_resolved : MetaType; protected setter yield_in_resolved
-    getter! yield_out_resolved : Array(MetaType); protected setter yield_out_resolved
+    getter! yield_out_resolved : Array(MetaType?); protected setter yield_out_resolved
 
     def initialize(ctx : Context, @rf : ReifiedFunction)
       f = @rf.link.resolve(ctx)
@@ -136,6 +139,12 @@ class Mare::Compiler::TypeCheck
     # TODO: rename as [] and rename [] to info_for or similar?
     def resolved(ctx, node : AST::Node)
       resolved(ctx.type_check[@rf.link][node])
+    end
+
+    # TODO: remove this silly alias:
+    def resolved_or_unconstrained(ctx, node : AST::Node)
+      info = ctx.type_check[@rf.link][node]
+      @resolved_infos[info]? || MetaType.unconstrained
     end
 
     def resolved_self_cap : MetaType
@@ -178,7 +187,11 @@ class Mare::Compiler::TypeCheck
     ctx.program.libraries.each do |library|
       library.types.each do |t|
         t_link = t.make_link(library)
-        for_rt(ctx, t_link)
+        rts = for_type_partial_reifications(ctx, t_link)
+
+        # If there are no partial reifications (thus no type parameters),
+        # then run it for the reified type with no arguments.
+        for_rt(ctx, t_link) if rts.empty?
       end
     end
 
@@ -231,12 +244,7 @@ class Mare::Compiler::TypeCheck
 
     # Check the assertion list for each type, to confirm that it is a subtype
     # of any it claimed earlier, which we took on faith and now verify.
-    sorted_types.each do |t|
-      t_link = t.make_link(library)
-      @t_analyses[t_link].each_non_argumented_reified.each do |rt|
-        self[rt].subtyping.check_and_clear_assertions(ctx)
-      end
-    end
+    @types.each(&.last.analysis.subtyping.check_and_clear_assertions(ctx))
   end
 
   def reach_additional_subtype_relationships(ctx)
@@ -1064,6 +1072,11 @@ class Mare::Compiler::TypeCheck
       @layers_ignored = [] of Int32
       @layers_accepted = [] of Int32
       @rt_is_complete = @reified.type.is_complete?(ctx).as(Bool)
+      @rt_contains_foreign_type_params = @reified.type.args.any? { |arg|
+        arg.type_params.any? { |type_param|
+          !@f_analysis.alt_infer.type_params.includes?(type_param)
+        }
+      }.as(Bool)
     end
 
     def func
@@ -1138,7 +1151,7 @@ class Mare::Compiler::TypeCheck
 
       # If this is a complete reified type (not partially reified),
       # then also substitute in the type args for each type param.
-      if @rt_is_complete && type_params_and_type_args.any?
+      if type_params_and_type_args.any?
         substs = type_params_and_type_args.to_h.transform_values(&.strip_cap)
 
         filtered_span = filtered_span.try(&.transform_mt { |mt|
@@ -1287,6 +1300,11 @@ class Mare::Compiler::TypeCheck
 
     # Reach the particular reification of the function called in a FromCall.
     def type_check_pre(ctx : Context, info : Infer::FromCall, mt : MetaType) : Bool
+      # Skip further checks if any foreign type params are present.
+      # TODO: Move these checks to an non-reified function analysis pass
+      # that operates on the spans instead of the fully resolved/reified types?
+      return true if @rt_contains_foreign_type_params
+
       receiver_mt = resolve(ctx, info.lhs)
       return false unless receiver_mt
 
@@ -1358,6 +1376,7 @@ class Mare::Compiler::TypeCheck
       reflection_mt = mt
       reflection_rt = mt.single!
       reflect_mt = reflection_rt.args.first
+      return true if reflect_mt.type_params.any? # TODO: can we handle unreified type param cases?
       reflect_rt = reflect_mt.single!
 
       # Reach all functions that might possibly be reflected.
@@ -1489,7 +1508,7 @@ class Mare::Compiler::TypeCheck
         @analysis.yield_in_resolved = resolve(ctx, info).not_nil! # TODO: simplify?
       end
       @analysis.yield_out_resolved = @f_analysis.yield_out_infos.map do |info|
-        resolve(ctx, info).as(MetaType).not_nil! # TODO: simplify?
+        resolve(ctx, info).as(MetaType?)
       end
       @analysis.ret_resolved = @analysis.resolved_infos[@f_analysis[ret]]
 
@@ -1511,7 +1530,7 @@ class Mare::Compiler::TypeCheck
             )
           end)
         )
-          Error.at ret, "The type of a constant may only be String, " \
+          ctx.error_at ret, "The type of a constant may only be String, " \
             "a numeric type, or an immutable Array of one of these", [
               {func.ret || func.body || ret, "but the type is #{ret_mt.show_type}"}
             ]

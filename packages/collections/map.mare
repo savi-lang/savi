@@ -58,7 +58,7 @@
   :: > error! // this key no longer has an assigned value
   ::
   :fun "[]!" (key K)
-    @_array[@_search(key)]!.as!(_KV(K, V)).value
+    @_array[@_search(key)]!.as!(@->(_KV(K, V))).value
 
   :: Assign the given value to the given key in the map.
   :: The previous value will be overwritten and discarded if present.
@@ -122,7 +122,7 @@
         entry = @_array[idx]!
 
         case (
-        | entry <: _KV(K, V) |
+        | entry <: @->(_KV(K, V)) |
           if H.equal(key, entry.key) (
             result_idx = idx
             found = True
@@ -151,7 +151,7 @@
   :: Yield each key and value in the map.
   :fun each
     @_array.each -> (entry |
-      if (entry <: _KV(K, V)) (
+      if (entry <: @->(_KV(K, V))) (
         yield (entry.key, entry.value)
       )
     )
@@ -162,7 +162,7 @@
   :fun each_until
     :yields for Bool
     @_array.each_until -> (entry |
-      if (entry <: _KV(K, V)) (
+      if (entry <: @->(_KV(K, V))) (
         yield (entry.key, entry.value)
       |
         False

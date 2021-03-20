@@ -137,15 +137,71 @@ struct Mare::Compiler::Infer::MetaType::AntiNominal
   end
 
   def substitute_type_params(substitutions : Hash(TypeParam, MetaType))
-    raise NotImplementedError.new("#{self} substitute_type_params")
+    defn = defn()
+    case defn
+    when TypeParam
+      substitutions[defn]?.try(&.inner.negate) || self
+    when ReifiedType
+      args = defn.args.map do |arg|
+        arg.substitute_type_params(substitutions).as(MetaType)
+      end
+
+      AntiNominal.new(ReifiedType.new(defn.link, args))
+    when ReifiedTypeAlias
+      args = defn.args.map do |arg|
+        arg.substitute_type_params(substitutions).as(MetaType)
+      end
+
+      AntiNominal.new(ReifiedTypeAlias.new(defn.link, args))
+    else
+      raise NotImplementedError.new(defn)
+    end
   end
 
   def substitute_lazy_type_params(substitutions : Hash(TypeParam, MetaType), max_depth : Int)
-    raise NotImplementedError.new("#{self} substitute_lazy_type_params")
+    defn = defn()
+    case defn
+    when TypeParam
+      return self unless defn.lazy?
+      substitutions[defn]?.try(&.inner.negate) || self
+    when ReifiedType
+      return self unless max_depth > 0
+
+      args = defn.args.map do |arg|
+        arg.substitute_lazy_type_params(substitutions, max_depth - 1).as(MetaType)
+      end
+
+      AntiNominal.new(ReifiedType.new(defn.link, args))
+    when ReifiedTypeAlias
+      return self unless max_depth > 0
+
+      args = defn.args.map do |arg|
+        arg.substitute_lazy_type_params(substitutions, max_depth - 1).as(MetaType)
+      end
+
+      AntiNominal.new(ReifiedTypeAlias.new(defn.link, args))
+    else
+      raise NotImplementedError.new(defn)
+    end
   end
 
   def gather_lazy_type_params_referenced(ctx : Context, set : Set(TypeParam), max_depth : Int) : Set(TypeParam)
-    raise NotImplementedError.new("#{self} gather_lazy_type_params_referenced")
+    defn = defn()
+    case defn
+    when TypeParam
+      set.add(defn) if defn.lazy?
+    when ReifiedType
+      if max_depth > 0
+        defn.args.each(&.gather_lazy_type_params_referenced(ctx, set, max_depth - 1))
+      end
+    when ReifiedTypeAlias
+      if max_depth > 0
+        defn.args.each(&.gather_lazy_type_params_referenced(ctx, set, max_depth - 1))
+      end
+    else
+      raise NotImplementedError.new(defn)
+    end
+    set
   end
 
   def each_type_alias_in_first_layer(&block : ReifiedTypeAlias -> _)

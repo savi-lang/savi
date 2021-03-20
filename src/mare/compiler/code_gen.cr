@@ -209,6 +209,11 @@ class Mare::Compiler::CodeGen
     in_gfunc.type_check.resolved(ctx, expr)
   end
 
+  def meta_type_unconstrained?(expr : AST::Node, in_gfunc : GenFunc? = nil)
+    in_gfunc ||= func_frame.gfunc.not_nil!
+    in_gfunc.type_check.resolved_or_unconstrained(ctx, expr).unconstrained?
+  end
+
   def type_of(expr : AST::Node, in_gfunc : GenFunc? = nil)
     in_gfunc ||= func_frame.gfunc.not_nil!
     ctx.reach[in_gfunc.type_check.resolved(ctx, expr)]
@@ -1677,7 +1682,8 @@ class Mare::Compiler::CodeGen
         gen_bool(false)
       end
     elsif (
-      lhs_type == rhs_type || lhs.type == @obj_ptr || rhs.type == @obj_ptr
+      lhs_type == rhs_type || lhs.type == rhs.type || \
+      lhs.type == @obj_ptr || rhs.type == @obj_ptr
     ) \
     && lhs.type.kind == LLVM::Type::Kind::Pointer \
     && rhs.type.kind == LLVM::Type::Kind::Pointer
@@ -2639,7 +2645,7 @@ class Mare::Compiler::CodeGen
       @builder.cond(cond_value, case_block, next_block)
 
       @builder.position_at_end(case_block)
-      if meta_type_of(fore[1]).unconstrained? && !func_frame.jumps.away?(fore[1])
+      if meta_type_unconstrained?(fore[1]) && !func_frame.jumps.away?(fore[1])
         # We skip generating code for the case block if it is unreachable,
         # meaning that the cond was deemed at compile time to never be true.
         # This is marked by an unconstrained result MetaType, provided that
@@ -2676,7 +2682,7 @@ class Mare::Compiler::CodeGen
     @builder.br(case_block)
 
     @builder.position_at_end(case_block)
-    if meta_type_of(expr.list.last[1]).unconstrained? && !func_frame.jumps.away?(expr.list.last[1])
+    if meta_type_unconstrained?(expr.list.last[1]) && !func_frame.jumps.away?(expr.list.last[1])
       # We skip generating code for the case block if it is unreachable,
       # meaning that the cond was deemed at compile time to never be true.
       # This is marked by an unconstrained result MetaType, provided that

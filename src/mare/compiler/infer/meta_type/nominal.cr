@@ -430,7 +430,7 @@ struct Mare::Compiler::Infer::MetaType::Nominal
           return true if defn.parent_rt.nil?
           return true if other_defn.parent_rt.nil?
         end
-        raise NotImplementedError.new("type param <: type param")
+        false
       else
         raise NotImplementedError.new("type param <: ?")
       end
