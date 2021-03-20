@@ -159,6 +159,20 @@ module Mare::Compiler::AltInfer
       Span.new(inner.final_mt_simplify(ctx))
     end
 
+    def final_mt!(ctx : Context) : MetaType?
+      span = self.final_mt_simplify(ctx)
+
+      if span.try(&.any_error?)
+        ctx.errors << span.total_error.not_nil!
+        return nil
+      end
+
+      inner = span.inner
+      return inner.meta_type if inner.is_a?(Terminal)
+
+      raise NotImplementedError.new(span.inspect)
+    end
+
     abstract struct Inner
       abstract def any_error? : Bool
       abstract def total_error : Error?

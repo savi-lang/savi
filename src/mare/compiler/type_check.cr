@@ -512,11 +512,11 @@ class Mare::Compiler::TypeCheck
     @aliases[rt_alias] ||= ForReifiedTypeAlias.new(ctx, rt_alias, refer_type)
   end
 
-  def unwrap_alias(ctx : Context, rt_alias : ReifiedTypeAlias) : MetaType?
-    refer_type = ctx.refer_type[rt_alias.link]
-    for_rt_alias(ctx, rt_alias.link, rt_alias.args)
-      .type_expr(rt_alias.target_type_expr(ctx), refer_type)
-      .try(&.simplify(ctx))
+  def self.unwrap_alias(ctx : Context, rt_alias : ReifiedTypeAlias) : MetaType?
+    alt_infer = ctx.alt_infer[rt_alias.link]
+    alt_infer
+      .deciding_type_args_of(rt_alias.args, alt_infer.target_span)
+      .try(&.final_mt!(ctx))
   end
 
   # TODO: Get rid of this
@@ -566,7 +566,7 @@ class Mare::Compiler::TypeCheck
     # Unwrap any type aliases present in the first layer of each type arg.
     unwrapped_args = rt.args.map { |arg|
       arg.substitute_each_type_alias_in_first_layer { |rta|
-        unwrap_alias(ctx, rta).not_nil!
+        TypeCheck.unwrap_alias(ctx, rta).not_nil!
       }
     }
 
@@ -881,7 +881,7 @@ class Mare::Compiler::TypeCheck
 
       type_args = @reified.args.map { |arg|
         arg.substitute_each_type_alias_in_first_layer { |rta|
-          ctx.type_check.unwrap_alias(ctx, rta).not_nil!
+          TypeCheck.unwrap_alias(ctx, rta).not_nil!
         }
       }
 
@@ -1072,22 +1072,7 @@ class Mare::Compiler::TypeCheck
         })
       end
 
-      filtered_span = filtered_span.try(&.final_mt_simplify(ctx))
-
-      inner = filtered_span.try(&.inner)
-      return inner.meta_type if inner.is_a?(AltInfer::Span::Terminal)
-
-      if filtered_span.try(&.any_error?)
-        ctx.errors << filtered_span.not_nil!.total_error.not_nil!
-        return nil
-      end
-
-      puts info.pos.show
-      puts info
-      pp @for_rt.reified
-      pp span
-      pp filtered_span
-      raise "halt"
+      filtered_span.try(&.final_mt!(ctx))
     end
 
     # TODO: remove this convenience alias:

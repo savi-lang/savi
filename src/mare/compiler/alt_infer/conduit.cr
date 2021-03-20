@@ -223,7 +223,7 @@ module Mare::Compiler::AltInfer
 
           # We may need to unwrap type aliases.
           .try(&.substitute_each_type_alias_in_first_layer { |rta|
-            ctx.type_check.unwrap_alias(ctx, rta).not_nil!
+            TypeCheck.unwrap_alias(ctx, rta).not_nil!
           })
       end
     end
