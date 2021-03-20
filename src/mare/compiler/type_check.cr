@@ -112,7 +112,7 @@ class Mare::Compiler::TypeCheck
   struct ReifiedFuncAnalysis
     protected getter resolved_infos
     protected getter called_funcs
-    protected getter call_infers_for
+    protected getter call_rfs_for
     getter! ret_resolved : MetaType; protected setter ret_resolved
     getter! yield_in_resolved : MetaType; protected setter yield_in_resolved
     getter! yield_out_resolved : Array(MetaType?); protected setter yield_out_resolved
@@ -125,7 +125,7 @@ class Mare::Compiler::TypeCheck
       @called_funcs = Set({Source::Pos, ReifiedType, Program::Function::Link}).new
 
       # TODO: can this be removed or made more clean without sacrificing performance?
-      @call_infers_for = {} of Infer::FromCall => Set({ForReifiedFunc, Bool})
+      @call_rfs_for = {} of Infer::FromCall => Set(ReifiedFunction)
     end
 
     def reified

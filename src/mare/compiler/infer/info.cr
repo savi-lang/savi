@@ -1625,15 +1625,15 @@ module Mare::Compiler::Infer
           problems unless problems.empty?
     end
 
-    def follow_call_resolve_other_infers(ctx : Context, infer : TypeCheck::ForReifiedFunc) : Set({TypeCheck::ForReifiedFunc, Bool})
-      other_infers = infer.analysis.call_infers_for[self]?
-      return other_infers if other_infers
+    def follow_call_resolve_other_rfs(ctx : Context, infer : TypeCheck::ForReifiedFunc) : Set(ReifiedFunction)
+      other_rfs = infer.analysis.call_rfs_for[self]?
+      return other_rfs if other_rfs
 
-      other_infers = Set({TypeCheck::ForReifiedFunc, Bool}).new
+      other_rfs = Set(ReifiedFunction).new
 
       call = self
       call_defns = follow_call_get_call_defns(ctx, infer)
-      return other_infers unless call_defns
+      return other_rfs unless call_defns
 
       # For each receiver type definition that is possible, track down the infer
       # for the function that we're trying to call, evaluating the constraints
@@ -1648,15 +1648,12 @@ module Mare::Compiler::Infer
         reify_cap, autorecover_needed =
           follow_call_check_receiver_cap(ctx, infer.func, call_mt, call_func, problems)
 
-        # Get the ForReifiedFunc instance for call_func, possibly creating and running it.
-        # TODO: don't infer anything in the body of that func if type and params
-        # were explicitly specified in the function signature.
-        other_infer = ctx.type_check.for_rf(ctx, call_defn, call_func_link, reify_cap).tap(&.run)
-
-        other_infers.add({other_infer, autorecover_needed})
+        # Construct the ReifiedFunction corresponding to this called function.
+        receiver = MetaType.new(call_defn, reify_cap.cap_only_inner.value.as(String))
+        other_rfs.add(ReifiedFunction.new(call_defn, call_func_link, receiver))
       end
 
-      infer.analysis.call_infers_for[self] = other_infers
+      infer.analysis.call_rfs_for[self] = other_rfs
     end
   end
 
@@ -1778,16 +1775,19 @@ module Mare::Compiler::Infer
     end
 
     def as_multiple_downstream_constraints(ctx : Context, infer : TypeCheck::ForReifiedFunc) : Array({Source::Pos, MetaType})?
-      other_infers = @call.follow_call_resolve_other_infers(ctx, infer)
-
-      other_infers.compact_map do |other_infer, _|
-        param = other_infer.params[@index]?
+      @call.follow_call_resolve_other_rfs(ctx, infer).compact_map do |other_rf|
+        # TODO: similar to the below TODO, should have this ready for us
+        # already in the Infer::ReifiedFuncAnalysis for us to just grab.
+        param = other_rf.link.resolve(ctx).params.try(&.terms.[@index]?)
         next unless param
 
-        param_info = other_infer.f_analysis[param]
+        # TODO: remove the need for this pre_infer lookup by having this
+        # directly in the Infer::ReifiedFuncAnalysis inside meta_type_of.
+        pre_infer = ctx.pre_infer[other_rf.link]
+        param_info = pre_infer[param]
         param_info = param_info.lhs if param_info.is_a?(FromAssign)
         param_info = param_info.as(Param)
-        param_mt = other_infer.resolve(ctx, param_info)
+        param_mt = other_rf.meta_type_of(ctx, param_info)
         next unless param_mt
 
         {param_info.first_viable_constraint_pos, param_mt}.as({Source::Pos, MetaType})
