@@ -906,10 +906,9 @@ class Mare::Compiler::TypeCheck
     end
 
     def get_type_param_bound(index : Int32)
-      param_ident = AST::Extract.type_param(reified.defn(ctx).params.not_nil!.terms[index]).first
-      param_bound_node = refer_type[param_ident].as(Refer::TypeParam).bound
-
-      type_expr(param_bound_node.not_nil!, refer_type, nil)
+      alt_infer = ctx.alt_infer[@reified.link]
+      span = alt_infer.type_param_bound_spans[index]
+      alt_infer.deciding_type_args_of(@reified.args, span).try(&.final_mt!(ctx))
     end
 
     def lookup_type_param(ref : Refer::TypeParam, receiver = nil)
