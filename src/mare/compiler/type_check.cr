@@ -15,7 +15,7 @@ class Mare::Compiler::TypeCheck
   struct FuncAnalysis
     getter link
 
-    # TODO: remove this alias 
+    # TODO: remove this alias
     protected def alt_infer; @spans; end
 
     def initialize(
@@ -47,7 +47,7 @@ class Mare::Compiler::TypeCheck
 
   struct TypeAnalysis
     protected getter partial_reifieds
-    protected getter reached_fully_reifieds # TODO: populate this during the pass
+    protected getter reached_fully_reifieds
 
     def initialize(@link : Program::Type::Link)
       @partial_reifieds = [] of ReifiedType
