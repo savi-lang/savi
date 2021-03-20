@@ -83,8 +83,8 @@ struct Mare::Compiler::Infer::MetaType::Union
     io << ")"
   end
 
-  def each_reachable_defn(ctx : Context) : Array(Infer::ReifiedType)
-    defns = [] of Infer::ReifiedType
+  def each_reachable_defn(ctx : Context) : Array(ReifiedType)
+    defns = [] of ReifiedType
 
     defns += terms.not_nil!.map(&.each_reachable_defn(ctx)).flatten if terms
     defns += intersects.not_nil!.map(&.each_reachable_defn(ctx)).flatten if intersects
@@ -92,22 +92,22 @@ struct Mare::Compiler::Infer::MetaType::Union
     defns
   end
 
-  def alt_find_callable_func_defns(ctx, infer : AltInfer::Visitor?, name : String)
-    list = [] of Tuple(Inner, Infer::ReifiedType?, Program::Function?)
+  def gather_callable_func_defns(ctx, infer : Visitor?, name : String)
+    list = [] of Tuple(Inner, ReifiedType?, Program::Function?)
 
     # Every nominal in the union must have an implementation of the call.
     # If it doesn't, we will collect it here as a failure to find it.
     terms.not_nil!.each do |term|
       defn = term.defn
-      result = term.alt_find_callable_func_defns(ctx, infer, name)
-      result ||= [{term, (defn if defn.is_a?(Infer::ReifiedType)), nil}]
+      result = term.gather_callable_func_defns(ctx, infer, name)
+      result ||= [{term, (defn if defn.is_a?(ReifiedType)), nil}]
       list.concat(result)
     end if terms
 
     # Every intersection must have one or more implementations of the call.
     # Otherwise, it will return some error infomration in its list for us.
     intersects.not_nil!.each do |intersect|
-      result = intersect.alt_find_callable_func_defns(ctx, infer, name).not_nil!
+      result = intersect.gather_callable_func_defns(ctx, infer, name).not_nil!
       list.concat(result)
     end if intersects
 
@@ -115,14 +115,14 @@ struct Mare::Compiler::Infer::MetaType::Union
   end
 
   def find_callable_func_defns(ctx, infer : TypeCheck::ForReifiedFunc?, name : String)
-    list = [] of Tuple(Inner, Infer::ReifiedType?, Program::Function?)
+    list = [] of Tuple(Inner, ReifiedType?, Program::Function?)
 
     # Every nominal in the union must have an implementation of the call.
     # If it doesn't, we will collect it here as a failure to find it.
     terms.not_nil!.each do |term|
       defn = term.defn
       result = term.find_callable_func_defns(ctx, infer, name)
-      result ||= [{term, (defn if defn.is_a?(Infer::ReifiedType)), nil}]
+      result ||= [{term, (defn if defn.is_a?(ReifiedType)), nil}]
       list.concat(result)
     end if terms
 
@@ -136,7 +136,7 @@ struct Mare::Compiler::Infer::MetaType::Union
     list
   end
 
-  def any_callable_func_defn_type(ctx, name : String) : Infer::ReifiedType?
+  def any_callable_func_defn_type(ctx, name : String) : ReifiedType?
     # Return the first nominal or intersection in this union that has this func.
     terms.try(&.each do |term|
       term.any_callable_func_defn_type(ctx, name).try do |result|

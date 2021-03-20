@@ -17,12 +17,12 @@ class Mare::Compiler::TypeCheck
     getter link
 
     # TODO: remove this alias
-    protected def alt_infer; @spans; end
+    protected def infer; @spans; end
 
     def initialize(
       @link : Program::Function::Link,
       @pre : PreInfer::Analysis,
-      @spans : AltInfer::FuncAnalysis
+      @spans : Infer::FuncAnalysis
     )
       @reified_funcs = {} of ReifiedType => Set(ReifiedFunction)
     end
@@ -366,7 +366,7 @@ class Mare::Compiler::TypeCheck
   end
 
   protected def get_or_create_f_analysis(ctx, f_link : Program::Function::Link)
-    @f_analyses[f_link] ||= FuncAnalysis.new(f_link, ctx.pre_infer[f_link], ctx.alt_infer[f_link])
+    @f_analyses[f_link] ||= FuncAnalysis.new(f_link, ctx.pre_infer[f_link], ctx.infer[f_link])
   end
 
   def [](rf : ReifiedFunction)
@@ -398,18 +398,18 @@ class Mare::Compiler::TypeCheck
   end
 
   def for_type_partial_reifications(ctx, t_link)
-    alt_infer = ctx.alt_infer[t_link]
+    infer = ctx.infer[t_link]
 
-    type_params = alt_infer.type_params
+    type_params = infer.type_params
     return [] of ReifiedType if type_params.empty?
 
     params_partial_reifications =
       type_params.each_with_index.map do |(param, index)|
-        bound_span = alt_infer.type_param_bound_spans[index].transform_mt(&.cap_only)
+        bound_span = infer.type_param_bound_spans[index].transform_mt(&.cap_only)
 
         bound_span_inner = bound_span.inner
         raise NotImplementedError.new(bound_span.inspect) \
-          unless bound_span_inner.is_a?(AltInfer::Span::Terminal)
+          unless bound_span_inner.is_a?(Infer::Span::Terminal)
 
         bound_mt = bound_span_inner.meta_type
 
@@ -514,9 +514,9 @@ class Mare::Compiler::TypeCheck
   end
 
   def self.unwrap_alias(ctx : Context, rt_alias : ReifiedTypeAlias) : MetaType?
-    alt_infer = ctx.alt_infer[rt_alias.link]
-    alt_infer
-      .deciding_type_args_of(rt_alias.args, alt_infer.target_span)
+    infer = ctx.infer[rt_alias.link]
+    infer
+      .deciding_type_args_of(rt_alias.args, infer.target_span)
       .try(&.final_mt!(ctx))
   end
 
@@ -573,9 +573,9 @@ class Mare::Compiler::TypeCheck
 
     # Check each type arg against the bound of the corresponding type param.
     unwrapped_args.each_with_index do |arg, index|
-      alt_infer = ctx.alt_infer[rt.link]
-      param_bound_span = alt_infer.deciding_type_args_of(unwrapped_args,
-        alt_infer.type_param_bound_spans[index]
+      infer = ctx.infer[rt.link]
+      param_bound_span = infer.deciding_type_args_of(unwrapped_args,
+        infer.type_param_bound_spans[index]
       )
       return false unless param_bound_span
 
@@ -583,9 +583,9 @@ class Mare::Compiler::TypeCheck
       param_bound_span_inner = param_bound_span.inner
       param_bound_mt =
         case param_bound_span_inner
-        when AltInfer::Span::Terminal
+        when Infer::Span::Terminal
           param_bound_span_inner.meta_type
-        when AltInfer::Span::ErrorPropagate
+        when Infer::Span::ErrorPropagate
           return false
         else
           raise NotImplementedError.new(param_bound_span.inspect)
@@ -667,9 +667,9 @@ class Mare::Compiler::TypeCheck
 
       arg = arg.simplify(ctx)
 
-      alt_infer = ctx.alt_infer[rt.link]
-      bound_span = alt_infer.type_param_bound_spans[index]
-      param_bound = alt_infer
+      infer = ctx.infer[rt.link]
+      bound_span = infer.type_param_bound_spans[index]
+      param_bound = infer
         .deciding_type_args_of(rt.args, bound_span)
         .try(&.final_mt!(ctx))
       next unless param_bound
@@ -703,9 +703,9 @@ class Mare::Compiler::TypeCheck
 
       # Use the default type argument if this type parameter has one.
       if ref.default
-        alt_infer = ctx.alt_infer[@reified.link]
-        default_span = alt_infer.type_param_default_spans[ref.index].not_nil!
-        return alt_infer
+        infer = ctx.infer[@reified.link]
+        default_span = infer.type_param_default_spans[ref.index].not_nil!
+        return infer
           .deciding_type_args_of(@reified.args, default_span)
           .not_nil!
           .final_mt!(ctx)
@@ -735,9 +735,9 @@ class Mare::Compiler::TypeCheck
         # Get the MetaType of the asserted supertype trait
         f_link = f.make_link(reified.link)
         pre_infer = ctx.pre_infer[f_link]
-        alt_infer = ctx.alt_infer[f_link]
-        ret_info = alt_infer[pre_infer[f.ret.not_nil!]]
-        trait_mt = alt_infer
+        infer = ctx.infer[f_link]
+        ret_info = infer[pre_infer[f.ret.not_nil!]]
+        trait_mt = infer
           .deciding_type_args_of(reified.args, ret_info)
           .try(&.final_mt!(ctx))
         next unless trait_mt
@@ -785,9 +785,9 @@ class Mare::Compiler::TypeCheck
 
       # Use the default type argument if this type parameter has one.
       if ref.default
-        alt_infer = ctx.alt_infer[@reified.link]
-        default_span = alt_infer.type_param_default_spans[ref.index].not_nil!
-        return alt_infer
+        infer = ctx.infer[@reified.link]
+        default_span = infer.type_param_default_spans[ref.index].not_nil!
+        return infer
           .deciding_type_args_of(@reified.args, default_span)
           .not_nil!
           .final_mt!(ctx)
@@ -815,9 +815,9 @@ class Mare::Compiler::TypeCheck
       end
 
       # Get the MetaType of the declared bound for this type parameter.
-      alt_infer = ctx.alt_infer[reified.link]
-      bound_span = alt_infer.type_param_bound_spans[type_param.ref.index]
-      alt_infer
+      infer = ctx.infer[reified.link]
+      bound_span = infer.type_param_bound_spans[type_param.ref.index]
+      infer
         .deciding_type_args_of(reified.args, bound_span)
         .try(&.final_mt!(ctx))
     end
@@ -844,7 +844,7 @@ class Mare::Compiler::TypeCheck
       @rt_is_complete = @reified.type.is_complete?(ctx).as(Bool)
       @rt_contains_foreign_type_params = @reified.type.args.any? { |arg|
         arg.type_params.any? { |type_param|
-          !@f_analysis.alt_infer.type_params.includes?(type_param)
+          !@f_analysis.infer.type_params.includes?(type_param)
         }
       }.as(Bool)
     end
@@ -910,7 +910,7 @@ class Mare::Compiler::TypeCheck
       type_params_and_type_args = @for_rt.type_params_and_type_args(ctx)
 
       # Filter the span by deciding the type parameter capability.
-      if filtered_span && !filtered_span.inner.is_a?(AltInfer::Span::Terminal)
+      if filtered_span && !filtered_span.inner.is_a?(Infer::Span::Terminal)
         filtered_span = @for_rt.type_params_and_type_args(ctx)
           .reduce(filtered_span) { |filtered_span, (type_param, type_arg)|
             next unless filtered_span

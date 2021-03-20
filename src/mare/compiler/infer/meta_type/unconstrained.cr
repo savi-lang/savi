@@ -13,11 +13,11 @@ class Mare::Compiler::Infer::MetaType::Unconstrained
     io << "<unconstrained>"
   end
 
-  def each_reachable_defn(ctx : Context) : Array(Infer::ReifiedType)
-    ([] of Infer::ReifiedType)
+  def each_reachable_defn(ctx : Context) : Array(ReifiedType)
+    ([] of ReifiedType)
   end
 
-  def alt_find_callable_func_defns(ctx, infer : AltInfer::Visitor?, name : String)
+  def gather_callable_func_defns(ctx, infer : Visitor?, name : String)
     nil
   end
 
@@ -25,7 +25,7 @@ class Mare::Compiler::Infer::MetaType::Unconstrained
     nil
   end
 
-  def any_callable_func_defn_type(ctx, name : String) : Infer::ReifiedType?
+  def any_callable_func_defn_type(ctx, name : String) : ReifiedType?
     nil
   end
 

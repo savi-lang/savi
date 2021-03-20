@@ -67,7 +67,7 @@ struct Mare::Compiler::Infer::MetaType::Nominal
     end
   end
 
-  def alt_find_callable_func_defns(ctx, infer : AltInfer::Visitor?, name : String)
+  def gather_callable_func_defns(ctx, infer : Visitor?, name : String)
     raise NotImplementedError.new("simplify first to remove aliases") if defn.is_a?(ReifiedTypeAlias)
 
     defn = defn()
@@ -77,7 +77,7 @@ struct Mare::Compiler::Infer::MetaType::Nominal
       [{self, defn, func}]
     when TypeParam
       infer.not_nil!.lookup_type_param_bound(ctx, defn)
-        .alt_find_callable_func_defns(ctx, infer, name)
+        .gather_callable_func_defns(ctx, infer, name)
     else
       raise NotImplementedError.new(defn)
     end

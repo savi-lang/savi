@@ -1,4 +1,4 @@
-module Mare::Compiler::AltInfer
+module Mare::Compiler::Infer
   struct Conduit
     getter inner : Inner
     def initialize(@inner)
@@ -8,22 +8,22 @@ module Mare::Compiler::AltInfer
       inner.flatten.map { |flat_inner| Conduit.new(flat_inner) }
     end
 
-    def directly_references?(other_info : Infer::Info) : Bool
+    def directly_references?(other_info : Info) : Bool
       inner.directly_references?(other_info)
     end
 
     def resolve_span!(ctx : Context, infer : Visitor) : Span
       inner.resolve_span!(ctx, infer)
     end
-    def resolve!(ctx : Context, infer : TypeCheck::ForReifiedFunc) : Infer::MetaType?
+    def resolve!(ctx : Context, infer : TypeCheck::ForReifiedFunc) : MetaType?
       inner.resolve!(ctx, infer)
     end
 
     abstract struct Inner
       abstract def flatten : Array(Inner)
-      abstract def directly_references?(other_info : Infer::Info) : Bool
+      abstract def directly_references?(other_info : Info) : Bool
       abstract def resolve_span!(ctx : Context, infer : Visitor) : Span
-      abstract def resolve!(ctx : Context, infer : TypeCheck::ForReifiedFunc) : Infer::MetaType?
+      abstract def resolve!(ctx : Context, infer : TypeCheck::ForReifiedFunc) : MetaType?
     end
 
     def self.direct(info)
@@ -31,7 +31,7 @@ module Mare::Compiler::AltInfer
     end
 
     struct Direct < Inner
-      getter info : Infer::Info
+      getter info : Info
       def initialize(@info)
       end
 
@@ -46,14 +46,14 @@ module Mare::Compiler::AltInfer
         conduit ? conduit.inner.flatten : [self] of Inner
       end
 
-      def directly_references?(other_info : Infer::Info) : Bool
+      def directly_references?(other_info : Info) : Bool
         @info == other_info
       end
 
       def resolve_span!(ctx : Context, infer : Visitor) : Span
         infer.resolve(ctx, info)
       end
-      def resolve!(ctx : Context, infer : TypeCheck::ForReifiedFunc) : Infer::MetaType?
+      def resolve!(ctx : Context, infer : TypeCheck::ForReifiedFunc) : MetaType?
         infer.resolve(ctx, info)
       end
     end
@@ -63,7 +63,7 @@ module Mare::Compiler::AltInfer
     end
 
     struct Union < Inner
-      getter infos : Array(Infer::Info)
+      getter infos : Array(Info)
       def initialize(@infos)
       end
 
@@ -83,7 +83,7 @@ module Mare::Compiler::AltInfer
         end
       end
 
-      def directly_references?(other_info : Infer::Info) : Bool
+      def directly_references?(other_info : Info) : Bool
         @infos.includes?(other_info)
       end
 
@@ -96,10 +96,10 @@ module Mare::Compiler::AltInfer
           .not_nil!
       end
 
-      def resolve!(ctx : Context, infer : TypeCheck::ForReifiedFunc) : Infer::MetaType?
-        mts = @infos.compact_map { |info| infer.resolve(ctx, info).as(Infer::MetaType?) }
+      def resolve!(ctx : Context, infer : TypeCheck::ForReifiedFunc) : MetaType?
+        mts = @infos.compact_map { |info| infer.resolve(ctx, info).as(MetaType?) }
         return nil if mts.empty?
-        Infer::MetaType.new_union(mts)
+        MetaType.new_union(mts)
       end
     end
 
@@ -108,7 +108,7 @@ module Mare::Compiler::AltInfer
     end
 
     struct Ephemeralize < Inner
-      getter info : Infer::Info
+      getter info : Info
       def initialize(@info)
       end
 
@@ -133,14 +133,14 @@ module Mare::Compiler::AltInfer
         end
       end
 
-      def directly_references?(other_info : Infer::Info) : Bool
+      def directly_references?(other_info : Info) : Bool
         @info == other_info
       end
 
       def resolve_span!(ctx : Context, infer : Visitor) : Span
         infer.resolve(ctx, info).transform_mt(&.ephemeralize)
       end
-      def resolve!(ctx : Context, infer : TypeCheck::ForReifiedFunc) : Infer::MetaType?
+      def resolve!(ctx : Context, infer : TypeCheck::ForReifiedFunc) : MetaType?
         infer.resolve(ctx, info).try(&.ephemeralize)
       end
     end
@@ -150,7 +150,7 @@ module Mare::Compiler::AltInfer
     end
 
     struct Alias < Inner
-      getter info : Infer::Info
+      getter info : Info
       def initialize(@info)
       end
 
@@ -175,14 +175,14 @@ module Mare::Compiler::AltInfer
         end
       end
 
-      def directly_references?(other_info : Infer::Info) : Bool
+      def directly_references?(other_info : Info) : Bool
         @info == other_info
       end
 
       def resolve_span!(ctx : Context, infer : Visitor) : Span
         infer.resolve(ctx, info).transform_mt(&.alias)
       end
-      def resolve!(ctx : Context, infer : TypeCheck::ForReifiedFunc) : Infer::MetaType?
+      def resolve!(ctx : Context, infer : TypeCheck::ForReifiedFunc) : MetaType?
         infer.resolve(ctx, info).try(&.alias)
       end
     end
@@ -192,7 +192,7 @@ module Mare::Compiler::AltInfer
     end
 
     struct ArrayLiteralElementAntecedent < Inner
-      getter array_info : Infer::Info
+      getter array_info : Info
       def initialize(@array_info)
       end
 
@@ -210,14 +210,14 @@ module Mare::Compiler::AltInfer
         conduit.flatten.map(&.inner)
       end
 
-      def directly_references?(other_info : Infer::Info) : Bool
+      def directly_references?(other_info : Info) : Bool
         @array_info == other_info
       end
 
       def resolve_span!(ctx : Context, infer : Visitor) : Span
         infer.resolve(ctx, array_info).transform_mt(&.single!.args.first)
       end
-      def resolve!(ctx : Context, infer : TypeCheck::ForReifiedFunc) : Infer::MetaType?
+      def resolve!(ctx : Context, infer : TypeCheck::ForReifiedFunc) : MetaType?
         infer.resolve(ctx, array_info)
           .try(&.single!.args.first)
 

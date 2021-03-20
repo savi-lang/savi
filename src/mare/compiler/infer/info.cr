@@ -27,7 +27,7 @@ module Mare::Compiler::Infer
       below ? below.to_a.tap(&.push(@info)) : [@info]
     end
 
-    def constraint_span(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
+    def constraint_span(ctx : Context, infer : Visitor) : Span
       below = @below
       if below
         @info.tether_upward_transform_span(ctx, infer, below.constraint_span(ctx, infer))
@@ -52,18 +52,18 @@ module Mare::Compiler::Infer
 
     abstract def add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
 
-    def as_conduit? : AltInfer::Conduit?
+    def as_conduit? : Conduit?
       nil # if non-nil, a conduit will be used instead of a span.
     end
-    def as_upstream_conduits : Array(AltInfer::Conduit)
+    def as_upstream_conduits : Array(Conduit)
       conduit = as_conduit?
       if conduit
         conduit.flatten
       else
-        [AltInfer::Conduit.direct(self)]
+        [Conduit.direct(self)]
       end
     end
-    def resolve_span!(ctx : Context, infer : AltInfer::Visitor)
+    def resolve_span!(ctx : Context, infer : Visitor)
       raise NotImplementedError.new("resolve_span! for #{self.class}")
     end
 
@@ -71,10 +71,10 @@ module Mare::Compiler::Infer
     def tether_terminal?
       false
     end
-    def tether_upward_transform_span(ctx : Context, infer : AltInfer::Visitor, span : AltInfer::Span) : AltInfer::Span
+    def tether_upward_transform_span(ctx : Context, infer : Visitor, span : Span) : Span
       raise NotImplementedError.new("tether_upward_transform_span for #{self.class}:\n#{pos.show}")
     end
-    def tether_resolve_span(ctx : Context, infer : AltInfer::Visitor)
+    def tether_resolve_span(ctx : Context, infer : Visitor)
       raise NotImplementedError.new("tether_resolve_span for #{self.class}:\n#{pos.show}")
     end
 
@@ -155,8 +155,8 @@ module Mare::Compiler::Infer
       downstream_tethers(querent)
     end
 
-    def tether_constraint_spans(ctx : Context, infer : AltInfer::Visitor)
-      tethers(self).map(&.constraint_span(ctx, infer).as(AltInfer::Span))
+    def tether_constraint_spans(ctx : Context, infer : Visitor)
+      tethers(self).map(&.constraint_span(ctx, infer).as(Span))
     end
 
     # When we need to take into consideration the downstreams' constraints
@@ -230,7 +230,7 @@ module Mare::Compiler::Infer
       @pos = explicit.pos
     end
 
-    def as_conduit? : AltInfer::Conduit?
+    def as_conduit? : Conduit?
       # If we have an explicit type, we are not a conduit.
       return nil if @explicit
 
@@ -242,10 +242,10 @@ module Mare::Compiler::Infer
       # If the first immediate upstream is another NamedInfo, conduit to it.
       return nil if @upstreams.empty?
       return nil unless (upstream = @upstreams.first.first).is_a?(NamedInfo)
-      AltInfer::Conduit.direct(upstream)
+      Conduit.direct(upstream)
     end
 
-    def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
+    def resolve_span!(ctx : Context, infer : Visitor) : Span
       explicit = @explicit
 
       if explicit
@@ -276,14 +276,14 @@ module Mare::Compiler::Infer
         upstream_span
       elsif !downstreams_empty?
         # If we only have downstream tethers, just do our best with those.
-        AltInfer::Span.reduce_combine_mts(
+        Span.reduce_combine_mts(
           tether_constraint_spans(ctx, infer)
         ) { |accum, mt| accum.intersect(mt) }
         .not_nil!
         .transform_mt(&.strip_ephemeral) # TODO: add this?
       else
         # If we get here, we've failed and don't have enough info to continue.
-        AltInfer::Span.error self,
+        Span.error self,
           "This #{described_kind} needs an explicit type; it could not be inferred"
       end
       .transform_mt(&.strip_ephemeral)
@@ -306,7 +306,7 @@ module Mare::Compiler::Infer
       end
     end
 
-    def tether_upward_transform_span(ctx : Context, infer : AltInfer::Visitor, span : AltInfer::Span) : AltInfer::Span
+    def tether_upward_transform_span(ctx : Context, infer : Visitor, span : Span) : Span
       # TODO: aliasing/ephemerality
       span
     end
@@ -324,7 +324,7 @@ module Mare::Compiler::Infer
     # By default, a NamedInfo will only treat the first assignment as relevant
     # for inferring when there is no explicit, but some subclasses may override.
     def infer_from_all_upstreams? : Bool; false end
-    private def resolve_upstream_span(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span?
+    private def resolve_upstream_span(ctx : Context, infer : Visitor) : Span?
       use_upstream_infos =
         infer_from_all_upstreams? ? upstream_infos : [upstream_infos.first]
 
@@ -334,7 +334,7 @@ module Mare::Compiler::Infer
           upstream_conduit.resolve_span!(ctx, infer)
         end
 
-      AltInfer::Span.reduce_combine_mts(upstream_spans) { |accum, mt| accum.unite(mt) }
+      Span.reduce_combine_mts(upstream_spans) { |accum, mt| accum.unite(mt) }
     end
   end
 
@@ -359,8 +359,8 @@ module Mare::Compiler::Infer
       [] of Tether
     end
 
-    def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
-      AltInfer::Span.new(AltInfer::Span::ErrorPropagate.new(error))
+    def resolve_span!(ctx : Context, infer : Visitor) : Span
+      Span.new(Span::ErrorPropagate.new(error))
     end
   end
 
@@ -369,7 +369,7 @@ module Mare::Compiler::Infer
       true
     end
 
-    def tether_resolve_span(ctx : Context, infer : AltInfer::Visitor)
+    def tether_resolve_span(ctx : Context, infer : Visitor)
       infer.resolve(ctx, self)
     end
   end
@@ -384,7 +384,7 @@ module Mare::Compiler::Infer
       @resolvables = [] of Info
     end
 
-    def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
+    def resolve_span!(ctx : Context, infer : Visitor) : Span
       infer.prelude_type_span(ctx, @name)
     end
 
@@ -401,7 +401,7 @@ module Mare::Compiler::Infer
     def initialize(@pos, @layer_index, @node)
     end
 
-    def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
+    def resolve_span!(ctx : Context, infer : Visitor) : Span
       infer.unwrap_lazy_parts_of_type_expr_span(ctx,
         infer.type_expr_span(ctx, @node)
       )
@@ -416,7 +416,7 @@ module Mare::Compiler::Infer
     def initialize(@pos, @layer_index, @node)
     end
 
-    def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
+    def resolve_span!(ctx : Context, infer : Visitor) : Span
       infer.unwrap_lazy_parts_of_type_expr_span(ctx,
         infer.type_expr_span(ctx, @node)
       )
@@ -432,13 +432,13 @@ module Mare::Compiler::Infer
     def initialize(@pos, @layer_index, @node, @type_param_ref = nil)
     end
 
-    def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
+    def resolve_span!(ctx : Context, infer : Visitor) : Span
       # If this node is further qualified, we don't want to both resolving it,
       # and doing so would trigger errors during type argument validation,
       # because the type arguments haven't been applied yet; they will be
       # applied in a different FixedSingleton that wraps this one in range.
       # We don't have to resolve it because nothing will ever be its downstream.
-      return AltInfer::Span.simple(Infer::MetaType.unconstrained) \
+      return Span.simple(MetaType.unconstrained) \
         if @node.is_a?(AST::Identifier) \
         && infer.classify.further_qualified?(@node)
 
@@ -467,7 +467,7 @@ module Mare::Compiler::Infer
       end
     end
 
-    def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
+    def resolve_span!(ctx : Context, infer : Visitor) : Span
       infer.self_type_expr_span(ctx)
     end
   end
@@ -478,7 +478,7 @@ module Mare::Compiler::Infer
     def initialize(@pos, @layer_index, @cap : String)
     end
 
-    def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
+    def resolve_span!(ctx : Context, infer : Visitor) : Span
       infer.self_ephemeral_with_cap(ctx, @cap)
     end
   end
@@ -500,7 +500,7 @@ module Mare::Compiler::Infer
     def initialize(@pos, @layer_index, @reflect_type)
     end
 
-    def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
+    def resolve_span!(ctx : Context, infer : Visitor) : Span
       infer.prelude_type_span(ctx, "ReflectionOfType")
         .combine_mt(infer.resolve(ctx, @reflect_type)) { |target_mt, arg_mt|
           MetaType.new(ReifiedType.new(target_mt.single!.link, [arg_mt]))
@@ -529,13 +529,13 @@ module Mare::Compiler::Infer
       end
     end
 
-    def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
-      simple_span = AltInfer::Span.simple(@possible)
+    def resolve_span!(ctx : Context, infer : Visitor) : Span
+      simple_span = Span.simple(@possible)
 
       # Look at downstream tether constraints to try to resolve the literal
       # to a more specific type than the simple "possible" type indicated by it.
       constrained_span =
-        AltInfer::Span.reduce_combine_mts(
+        Span.reduce_combine_mts(
           tether_constraint_spans(ctx, infer)
         ) { |accum, mt| accum.intersect(mt) }.try { |constraint_span|
           constraint_span.combine_mt(simple_span) { |constraint_mt, mt|
@@ -544,8 +544,8 @@ module Mare::Compiler::Infer
           }
         } || simple_span
 
-      peer_hints_span = AltInfer::Span.reduce_combine_mts(
-        @peer_hints.map { |peer| infer.resolve(ctx, peer).as(AltInfer::Span) }
+      peer_hints_span = Span.reduce_combine_mts(
+        @peer_hints.map { |peer| infer.resolve(ctx, peer).as(Span) }
       ) { |accum, mt| accum.intersect(mt) }
 
       constrained_span
@@ -600,8 +600,8 @@ module Mare::Compiler::Infer
       @info.add_peer_hint(peer)
     end
 
-    def as_conduit? : AltInfer::Conduit?
-      AltInfer::Conduit.direct(@info)
+    def as_conduit? : Conduit?
+      Conduit.direct(@info)
     end
   end
 
@@ -647,7 +647,7 @@ module Mare::Compiler::Infer
       @upstreams << upstream
     end
 
-    def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
+    def resolve_span!(ctx : Context, infer : Visitor) : Span
       infer.self_type_expr_span(ctx).transform_mt do |call_mt|
         call_defn = call_mt.single!
         call_func = call_defn.defn(ctx).functions.find do |f|
@@ -661,21 +661,21 @@ module Mare::Compiler::Infer
           .not_nil!
 
         raise ret_span.total_error.not_nil! if ret_span.any_error?
-        ret_mt = Infer::MetaType.new_union(ret_span.all_terminal_meta_types)
+        ret_mt = MetaType.new_union(ret_span.all_terminal_meta_types)
         # TODO: Retain original ret_span maybe? Or filter it down further based on type params...
         # Does it ever make sense to have a multiple span point in type signature?
 
         ret_mt
       end
     rescue error : Error
-      AltInfer::Span.new(AltInfer::Span::ErrorPropagate.new(error))
+      Span.new(Span::ErrorPropagate.new(error))
     end
 
     def tether_terminal?
       true
     end
 
-    def tether_resolve_span(ctx : Context, infer : AltInfer::Visitor)
+    def tether_resolve_span(ctx : Context, infer : Visitor)
       infer.resolve(ctx, self)
     end
 
@@ -697,7 +697,7 @@ module Mare::Compiler::Infer
       @field.pos
     end
 
-    def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
+    def resolve_span!(ctx : Context, infer : Visitor) : Span
       origin_span = infer.resolve(ctx, @origin)
       field_span = infer.resolve(ctx, @field)
       origin_span.combine_mt(field_span) { |o, f| f.viewed_from(o).alias }
@@ -715,7 +715,7 @@ module Mare::Compiler::Infer
       @field.pos
     end
 
-    def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
+    def resolve_span!(ctx : Context, infer : Visitor) : Span
       origin_span = infer.resolve(ctx, @origin)
       field_span = infer.resolve(ctx, @field)
       origin_span.combine_mt(field_span) { |o, f| f.extracted_from(o).ephemeralize }
@@ -740,10 +740,10 @@ module Mare::Compiler::Infer
       term.tethers(querent)
     end
 
-    def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
+    def resolve_span!(ctx : Context, infer : Visitor) : Span
       # A jump expression has no result value, so the resolved type is always
       # unconstrained - the term's type goes to the jump's catching entity.
-      AltInfer::Span.simple(MetaType.unconstrained)
+      Span.simple(MetaType.unconstrained)
     end
 
     def resolve_others!(ctx : Context, infer)
@@ -790,8 +790,8 @@ module Mare::Compiler::Infer
       final_term.add_peer_hint(peer)
     end
 
-    def as_conduit? : AltInfer::Conduit?
-      AltInfer::Conduit.direct(@final_term)
+    def as_conduit? : Conduit?
+      Conduit.direct(@final_term)
     end
 
     def resolve_others!(ctx : Context, infer)
@@ -826,17 +826,17 @@ module Mare::Compiler::Infer
       end
     end
 
-    def as_conduit? : AltInfer::Conduit?
+    def as_conduit? : Conduit?
       # TODO: Keep in separate span points instead of union if any of the conds
       # can be statically determinable, leaving room for specialization.
-      AltInfer::Conduit.union(
+      Conduit.union(
         @branches.compact_map do |cond, body, body_jumps_away|
           body unless body_jumps_away
         end
       )
     end
 
-    def tether_upward_transform_span(ctx : Context, infer : AltInfer::Visitor, span : AltInfer::Span) : AltInfer::Span
+    def tether_upward_transform_span(ctx : Context, infer : Visitor, span : Span) : Span
       # TODO: account for unreachable branches? maybe? maybe not?
       span
     end
@@ -890,7 +890,7 @@ module Mare::Compiler::Infer
     def initialize(@pos, @layer_index, @refine, @lhs, @refine_type, @positive_check)
     end
 
-    def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
+    def resolve_span!(ctx : Context, infer : Visitor) : Span
       infer.prelude_type_span(ctx, "Bool")
     end
 
@@ -910,7 +910,7 @@ module Mare::Compiler::Infer
     def initialize(@pos, @layer_index, @lhs, @rhs, @positive_check)
     end
 
-    def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
+    def resolve_span!(ctx : Context, infer : Visitor) : Span
       infer.prelude_type_span(ctx, "Bool")
     end
 
@@ -967,7 +967,7 @@ module Mare::Compiler::Infer
     def initialize(@pos, @layer_index, @refine, @refine_type, @positive_check)
     end
 
-    def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
+    def resolve_span!(ctx : Context, infer : Visitor) : Span
       infer.prelude_type_span(ctx, "Bool")
     end
   end
@@ -982,7 +982,7 @@ module Mare::Compiler::Infer
     def initialize(@pos, @layer_index, @lhs, @rhs, @positive_check)
     end
 
-    def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
+    def resolve_span!(ctx : Context, infer : Visitor) : Span
       infer.prelude_type_span(ctx, "Bool")
     end
   end
@@ -997,7 +997,7 @@ module Mare::Compiler::Infer
     def initialize(@pos, @layer_index, @refine, @refine_type, @positive_check)
     end
 
-    def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
+    def resolve_span!(ctx : Context, infer : Visitor) : Span
       infer.resolve(ctx, @refine)
       .combine_mt(infer.resolve(ctx, @refine_type)) { |lhs_mt, rhs_mt|
         rhs_mt = rhs_mt.strip_cap.negate if !@positive_check
@@ -1014,8 +1014,8 @@ module Mare::Compiler::Infer
     def initialize(@pos, @layer_index, @local)
     end
 
-    def as_conduit? : AltInfer::Conduit?
-      AltInfer::Conduit.ephemeralize(@local)
+    def as_conduit? : Conduit?
+      Conduit.ephemeralize(@local)
     end
 
     def add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
@@ -1048,7 +1048,7 @@ module Mare::Compiler::Infer
       Tether.chain(@body, querent)
     end
 
-    def tether_upward_transform_span(ctx : Context, infer : AltInfer::Visitor, span : AltInfer::Span) : AltInfer::Span
+    def tether_upward_transform_span(ctx : Context, infer : Visitor, span : Span) : Span
       span.transform_mt(&.strip_cap)
     end
 
@@ -1078,8 +1078,8 @@ module Mare::Compiler::Infer
       @lhs.add_peer_hint(peer)
     end
 
-    def as_conduit? : AltInfer::Conduit?
-      AltInfer::Conduit.alias(@lhs)
+    def as_conduit? : Conduit?
+      Conduit.alias(@lhs)
     end
 
     def resolve_others!(ctx : Context, infer)
@@ -1108,8 +1108,8 @@ module Mare::Compiler::Infer
       @yield_in.add_peer_hint(peer)
     end
 
-    def as_conduit? : AltInfer::Conduit?
-      AltInfer::Conduit.direct(@yield_in)
+    def as_conduit? : Conduit?
+      Conduit.direct(@yield_in)
     end
 
     def resolve_others!(ctx : Context, infer)
@@ -1135,18 +1135,18 @@ module Mare::Compiler::Infer
       end
     end
 
-    def tether_upward_transform_span(ctx : Context, infer : AltInfer::Visitor, span : AltInfer::Span) : AltInfer::Span
+    def tether_upward_transform_span(ctx : Context, infer : Visitor, span : Span) : Span
       span
     end
 
-    def possible_antecedents_span(ctx, infer) : AltInfer::Span?
+    def possible_antecedents_span(ctx, infer) : Span?
       array_info = self
       tether_spans = tether_constraint_spans(ctx, infer)
 
       return nil if tether_spans.empty?
 
       ante_span =
-        AltInfer::Span
+        Span
         .reduce_combine_mts(tether_spans) { |accum, mt| accum.intersect(mt) }
         .not_nil!
         .decided_by(array_info) { |mt|
@@ -1154,12 +1154,12 @@ module Mare::Compiler::Infer
             # TODO: Support more element antecedent detection patterns.
             if rt.link.name == "Array" && rt.args.size == 1
               array_mt = MetaType.new_nominal(rt).intersect(MetaType.new(cap))
-              {array_mt, AltInfer::Span.simple(array_mt)}
+              {array_mt, Span.simple(array_mt)}
             end
           }
           if pairs.empty?
             unconstrained = MetaType.unconstrained
-            pairs << {unconstrained, AltInfer::Span.simple(unconstrained)}
+            pairs << {unconstrained, Span.simple(unconstrained)}
           end
           pairs
         }
@@ -1167,15 +1167,15 @@ module Mare::Compiler::Infer
       ante_span unless ante_span.any_mt?(&.unconstrained?)
     end
 
-    def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
+    def resolve_span!(ctx : Context, infer : Visitor) : Span
       # By default, an array literal has a cap of `ref`.
       # TODO: span should allow ref, val, trn, or iso cap possibilities.
       array_cap = MetaType::Capability::REF
 
       ante_span = possible_antecedents_span(ctx, infer)
 
-      elem_spans = terms.map { |term| infer.resolve(ctx, term).as(AltInfer::Span) }
-      elem_span = AltInfer::Span
+      elem_spans = terms.map { |term| infer.resolve(ctx, term).as(Span) }
+      elem_span = Span
         .reduce_combine_mts(elem_spans) { |accum, mt| accum.unite(mt) }
         .try(&.transform_mt(&.alias))
 
@@ -1191,16 +1191,16 @@ module Mare::Compiler::Infer
 
             # We may need to unwrap lazy elements from this inner layer.
             ante_elem_mt = infer
-              .unwrap_lazy_parts_of_type_expr_span(ctx, AltInfer::Span.simple(ante_elem_mt))
-              .inner.as(AltInfer::Span::Terminal).meta_type
+              .unwrap_lazy_parts_of_type_expr_span(ctx, Span.simple(ante_elem_mt))
+              .inner.as(Span::Terminal).meta_type
 
             # For every pair of element MetaType and antecedent MetaType,
             # Treat the antecedent MetaType as the default, but
             # fall back to using the element MetaType if the intersection
             # of those two turns out to be unsatisfiable.
-            AltInfer::Span.simple_with_fallback(ante_mt,
+            Span.simple_with_fallback(ante_mt,
               ante_elem_mt.intersect(elem_mt.ephemeralize), [
-                {:mt_unsatisfiable, AltInfer::Span.simple(fallback_mt)}
+                {:mt_unsatisfiable, Span.simple(fallback_mt)}
               ]
             )
           }
@@ -1219,7 +1219,7 @@ module Mare::Compiler::Infer
             mt
           }
         else
-          AltInfer::Span.error(pos, "The type of this empty array literal " \
+          Span.error(pos, "The type of this empty array literal " \
             "could not be inferred (it needs an explicit type)")
         end
       end
@@ -1234,15 +1234,15 @@ module Mare::Compiler::Infer
     def initialize(@pos, @layer_index, @array)
     end
 
-    def as_conduit? : AltInfer::Conduit?
-      AltInfer::Conduit.array_literal_element_antecedent(@array)
+    def as_conduit? : Conduit?
+      Conduit.array_literal_element_antecedent(@array)
     end
 
     def tethers(querent : Info) : Array(Tether)
       Tether.chain(@array, querent)
     end
 
-    def tether_upward_transform_span(ctx : Context, infer : AltInfer::Visitor, span : AltInfer::Span) : AltInfer::Span
+    def tether_upward_transform_span(ctx : Context, infer : Visitor, span : Span) : Span
       infer.unwrap_lazy_parts_of_type_expr_span(ctx,
         span.transform_mt do |meta_type|
           results = [] of MetaType
@@ -1285,15 +1285,15 @@ module Mare::Compiler::Infer
       Tether.chain(@lhs, querent)
     end
 
-    def tether_upward_transform_span(ctx : Context, infer : AltInfer::Visitor, span : AltInfer::Span) : AltInfer::Span
+    def tether_upward_transform_span(ctx : Context, infer : Visitor, span : Span) : Span
       # TODO: is it possible to use the meta_type passed to us above,
       # at least in some cases, instead of eagerly resolving here?
       infer.resolve(ctx, self)
     end
 
-    def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
+    def resolve_span!(ctx : Context, infer : Visitor) : Span
       infer.resolve(ctx, @lhs).decided_by(@lhs) do |lhs_mt|
-        call_defns = lhs_mt.alt_find_callable_func_defns(ctx, infer, @member)
+        call_defns = lhs_mt.gather_callable_func_defns(ctx, infer, @member)
 
         call_defns.compact_map do |(call_mti, call_defn, call_func)|
           call_mt = MetaType.new(call_mti) # TODO: remove call_mti?
@@ -1331,7 +1331,7 @@ module Mare::Compiler::Infer
             end
           end
 
-          next {call_mt, AltInfer::Span.error(@pos,
+          next {call_mt, Span.error(@pos,
             "The '#{@member}' function can't be called on this #{@lhs.describe_kind}",
             problems
           )} unless problems.empty?
@@ -1354,7 +1354,7 @@ module Mare::Compiler::Infer
             }
           end
 
-          next {call_mt, AltInfer::Span.error(@pos,
+          next {call_mt, Span.error(@pos,
             "This function call doesn't meet subtyping requirements",
             problems
           )} unless problems.empty?
@@ -1368,7 +1368,7 @@ module Mare::Compiler::Infer
               .intersect(MetaType.cap(call_func.cap.value))
               .ephemeralize
 
-            next {call_mt, AltInfer::Span.simple(new_mt)}
+            next {call_mt, Span.simple(new_mt)}
           end
 
           ret_span = infer
@@ -1377,15 +1377,15 @@ module Mare::Compiler::Infer
             .not_nil!
             .transform_mt(&.ephemeralize)
 
-          next {call_mt, ret_span} if ret_span.inner.is_a?(AltInfer::Span::ErrorPropagate)
+          next {call_mt, ret_span} if ret_span.inner.is_a?(Span::ErrorPropagate)
 
-          ret_mt = Infer::MetaType.new_union(ret_span.all_terminal_meta_types)
+          ret_mt = MetaType.new_union(ret_span.all_terminal_meta_types)
           raise "halto" if ret_mt.unsatisfiable?
-          simple_ret_span = AltInfer::Span.simple(ret_mt)
+          simple_ret_span = Span.simple(ret_mt)
           # TODO: Retain original ret_span maybe? Or filter it down further based on type params...
           # Does it ever make sense to have a multiple span point in type signature?
 
-          {call_mt, simple_ret_span}.as({MetaType, AltInfer::Span})
+          {call_mt, simple_ret_span}.as({MetaType, Span})
         end
       end
     end
@@ -1557,7 +1557,7 @@ module Mare::Compiler::Infer
       end
     end
 
-    def follow_call_check_autorecover_cap(ctx, infer : Infer::ForReifiedFunc, other_infer : Infer::ForReifiedFunc, inferred_ret)
+    def follow_call_check_autorecover_cap(ctx, infer : ForReifiedFunc, other_infer : ForReifiedFunc, inferred_ret)
       call = self
 
       # If autorecover of the receiver cap was needed to make this call work,
@@ -1673,13 +1673,13 @@ module Mare::Compiler::Infer
       true
     end
 
-    def tether_resolve_span(ctx : Context, infer : AltInfer::Visitor)
+    def tether_resolve_span(ctx : Context, infer : Visitor)
       infer.resolve(ctx, self)
     end
 
-    def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
+    def resolve_span!(ctx : Context, infer : Visitor) : Span
       infer.resolve(ctx, @call.lhs).decided_by(@call.lhs) do |lhs_mt|
-        call_defns = lhs_mt.alt_find_callable_func_defns(ctx, infer, @call.member)
+        call_defns = lhs_mt.gather_callable_func_defns(ctx, infer, @call.member)
 
         call_defns.compact_map do |(call_mti, call_defn, call_func)|
           call_mt = MetaType.new(call_mti) # TODO: remove call_mti?
@@ -1692,7 +1692,7 @@ module Mare::Compiler::Infer
 
           unless raw_ret_span
             call_name = "#{call_defn.defn(ctx).ident.value}.#{@call.member}"
-            next {call_mt, AltInfer::Span.error(pos,
+            next {call_mt, Span.error(pos,
               "This yield block parameter will never be received", [
                 {call_func.ident.pos, "'#{call_name}' does not yield it"}
               ]
@@ -1703,12 +1703,12 @@ module Mare::Compiler::Infer
             .deciding_f_cap(call_mt.cap_only, call_func.has_tag?(:constructor))
             .not_nil!
 
-          ret_mt = Infer::MetaType.new_union(ret_span.all_terminal_meta_types)
-          simple_ret_span = AltInfer::Span.simple(ret_mt)
+          ret_mt = MetaType.new_union(ret_span.all_terminal_meta_types)
+          simple_ret_span = Span.simple(ret_mt)
           # TODO: Retain original ret_span maybe? Or filter it down further based on type rets...
           # Does it ever make sense to have a multiple span point in type signature?
 
-          {call_mt, simple_ret_span}.as({MetaType, AltInfer::Span})
+          {call_mt, simple_ret_span}.as({MetaType, Span})
         end
       end
     end
@@ -1722,11 +1722,11 @@ module Mare::Compiler::Infer
     def initialize(@pos, @layer_index, @call)
     end
 
-    def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
+    def resolve_span!(ctx : Context, infer : Visitor) : Span
       none = MetaType.new(infer.prelude_reified_type(ctx, "None"))
 
       infer.resolve(ctx, @call.lhs).decided_by(@call.lhs) do |lhs_mt|
-        call_defns = lhs_mt.alt_find_callable_func_defns(ctx, infer, @call.member)
+        call_defns = lhs_mt.gather_callable_func_defns(ctx, infer, @call.member)
 
         call_defns.compact_map do |(call_mti, call_defn, call_func)|
           call_mt = MetaType.new(call_mti) # TODO: remove call_mti?
@@ -1737,19 +1737,19 @@ module Mare::Compiler::Infer
           raw_ret_span = infer
             .depends_on_call_yield_in_span(ctx, call_defn, call_func, call_link)
 
-          next {call_mt, AltInfer::Span.simple(MetaType.unconstrained)} \
+          next {call_mt, Span.simple(MetaType.unconstrained)} \
             unless raw_ret_span
 
           ret_span = raw_ret_span
             .deciding_f_cap(call_mt.cap_only, call_func.has_tag?(:constructor))
             .not_nil!
 
-          ret_mt = Infer::MetaType.new_union(ret_span.all_terminal_meta_types)
-          simple_ret_span = AltInfer::Span.simple(ret_mt)
+          ret_mt = MetaType.new_union(ret_span.all_terminal_meta_types)
+          simple_ret_span = Span.simple(ret_mt)
           # TODO: Retain original ret_span maybe? Or filter it down further based on type params...
           # Does it ever make sense to have a multiple span point in type signature?
 
-          {call_mt, simple_ret_span}.as({MetaType, AltInfer::Span})
+          {call_mt, simple_ret_span}.as({MetaType, Span})
         end
       end.transform_mt do |mt|
         # If the type requirement is None, treat it as unconstrained,
@@ -1773,7 +1773,7 @@ module Mare::Compiler::Infer
       true
     end
 
-    def tether_resolve_span(ctx : Context, infer : AltInfer::Visitor)
+    def tether_resolve_span(ctx : Context, infer : Visitor)
       resolve_span!(ctx, infer) # TODO: should this be infer.resolve(ctx, self) instead?
     end
 
@@ -1794,9 +1794,9 @@ module Mare::Compiler::Infer
       end
     end
 
-    def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
+    def resolve_span!(ctx : Context, infer : Visitor) : Span
       infer.resolve(ctx, @call.lhs).decided_by(@call.lhs) do |lhs_mt|
-        call_defns = lhs_mt.alt_find_callable_func_defns(ctx, infer, @call.member)
+        call_defns = lhs_mt.gather_callable_func_defns(ctx, infer, @call.member)
 
         call_defns.compact_map do |(call_mti, call_defn, call_func)|
           call_mt = MetaType.new(call_mti) # TODO: remove call_mti?
@@ -1811,19 +1811,19 @@ module Mare::Compiler::Infer
           # so that any type can be allowed to flow into it,
           # We will show a relevant error message later in the TypeCheck pass
           # when we check the number of parameters.
-          next {call_mt, AltInfer::Span.simple((MetaType.unconstrained))} \
+          next {call_mt, Span.simple((MetaType.unconstrained))} \
             unless param_span
 
           param_span = param_span
             .deciding_f_cap(call_mt.cap_only, call_func.has_tag?(:constructor))
             .not_nil!
 
-          param_mt = Infer::MetaType.new_union(param_span.all_terminal_meta_types)
-          simple_param_span = AltInfer::Span.simple(param_mt)
+          param_mt = MetaType.new_union(param_span.all_terminal_meta_types)
+          simple_param_span = Span.simple(param_mt)
           # TODO: Retain original ret_span maybe? Or filter it down further based on type params...
           # Does it ever make sense to have a multiple span point in type signature?
 
-          {call_mt, simple_param_span}.as({MetaType, AltInfer::Span})
+          {call_mt, simple_param_span}.as({MetaType, Span})
         end
       end
     end

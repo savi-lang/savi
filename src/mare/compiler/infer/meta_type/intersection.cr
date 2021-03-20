@@ -77,12 +77,12 @@ struct Mare::Compiler::Infer::MetaType::Intersection
     iter
   end
 
-  def alt_find_callable_func_defns(ctx, infer : AltInfer::Visitor?, name : String)
+  def gather_callable_func_defns(ctx, infer : Visitor?, name : String)
     list = [] of Tuple(Inner, ReifiedType?, Program::Function?)
 
     # Collect a result for each nominal in this intersection that has this func.
     terms.try(&.each do |term|
-      term.alt_find_callable_func_defns(ctx, infer, name).try do |result|
+      term.gather_callable_func_defns(ctx, infer, name).try do |result|
         result.each do |_, defn, func|
           # Replace the inner term with an inner of this intersection.
           # This will be used for subtype checking later, and we want to
