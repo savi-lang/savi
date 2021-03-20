@@ -346,11 +346,6 @@ struct Mare::Compiler::Infer::MetaType
         return result if result.is_a?(Unsatisfiable)
       end
       inner.terms.not_nil!.each do |term|
-        # # Here is where we deal with the special case of unwrapping aliases:
-        # begin
-        #   term_defn = term.defn
-        #   term = ctx.infer.unwrap_alias(ctx, term_defn).inner if term_defn.is_a?(ReifiedTypeAlias)
-        # end
         result = result.intersect(term)
         return result if result.is_a?(Unsatisfiable)
       end if inner.terms
@@ -422,11 +417,6 @@ struct Mare::Compiler::Infer::MetaType
         return result if result.is_a?(Unconstrained)
       end if inner.caps
       inner.terms.not_nil!.each do |term|
-        # # Here is where we deal with the special case of unwrapping aliases:
-        # begin
-        #   term_defn = term.defn
-        #   term = ctx.infer.unwrap_alias(ctx, term_defn).inner if term_defn.is_a?(ReifiedTypeAlias)
-        # end
         result = result.unite(term)
         return result if result.is_a?(Unconstrained)
       end if inner.terms
@@ -540,17 +530,6 @@ struct Mare::Compiler::Infer::MetaType
     set
   end
 
-  def find_callable_func_defns(
-    ctx : Context,
-    infer : ForReifiedFunc?,
-    name : String,
-  ) : Set(Tuple(Inner, ReifiedType?, Program::Function?))
-    set = Set(Tuple(Inner, ReifiedType?, Program::Function?)).new
-    @inner.find_callable_func_defns(ctx, infer, name).try(&.each { |tuple|
-      set.add(tuple)
-    })
-    set
-  end
   def find_callable_func_defns(
     ctx : Context,
     infer : TypeCheck::ForReifiedFunc?,

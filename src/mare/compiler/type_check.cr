@@ -1,4 +1,5 @@
 require "levenshtein"
+require "./infer/reified" # TODO: can this be removed?
 
 ##
 # TODO: Document this pass

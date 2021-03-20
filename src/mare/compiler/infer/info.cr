@@ -1,4 +1,4 @@
-class Mare::Compiler::Infer
+module Mare::Compiler::Infer
   struct Tether
     def initialize(@info : Info, @below : StructRef(Tether)? = nil)
     end
@@ -27,14 +27,6 @@ class Mare::Compiler::Infer
       below ? below.to_a.tap(&.push(@info)) : [@info]
     end
 
-    def constraint(ctx : Context, infer : ForReifiedFunc) : MetaType
-      below = @below
-      if below
-        @info.tether_upward_transform(ctx, infer, below.constraint(ctx, infer))
-      else
-        @info.tether_resolve(ctx, infer)
-      end
-    end
     def constraint_span(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
       below = @below
       if below
@@ -79,14 +71,8 @@ class Mare::Compiler::Infer
     def tether_terminal?
       false
     end
-    def tether_upward_transform(ctx : Context, infer : ForReifiedFunc, meta_type : MetaType) : MetaType
-      raise NotImplementedError.new("tether_upward_transform for #{self.class}:\n#{pos.show}")
-    end
     def tether_upward_transform_span(ctx : Context, infer : AltInfer::Visitor, span : AltInfer::Span) : AltInfer::Span
       raise NotImplementedError.new("tether_upward_transform_span for #{self.class}:\n#{pos.show}")
-    end
-    def tether_resolve(ctx : Context, infer : ForReifiedFunc)
-      raise NotImplementedError.new("tether_resolve for #{self.class}:\n#{pos.show}")
     end
     def tether_resolve_span(ctx : Context, infer : AltInfer::Visitor)
       raise NotImplementedError.new("tether_resolve_span for #{self.class}:\n#{pos.show}")
@@ -95,10 +81,6 @@ class Mare::Compiler::Infer
     # Most Info types ignore hints, but a few override this method to see them,
     # or to pass them along to other nodes that may wish to see them.
     def add_peer_hint(peer : Info)
-    end
-
-    abstract def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
-    def post_resolve!(ctx : Context, infer : ForReifiedFunc, mt : MetaType)
     end
 
     # For Info types which represent a tree of Info nodes, they should override
@@ -111,9 +93,6 @@ class Mare::Compiler::Infer
     # If you need to report multiple positions, also override the other method
     # below called as_multiple_downstream_constraints.
     # This will prevent upstream DynamicInfos from eagerly resolving you.
-    def as_downstream_constraint_meta_type(ctx : Context, infer : ForReifiedFunc) : MetaType
-      infer.resolve(ctx, self)
-    end
     def as_downstream_constraint_meta_type(ctx : Context, infer : TypeCheck::ForReifiedFunc) : MetaType?
       infer.resolve(ctx, self)
     end
@@ -122,18 +101,11 @@ class Mare::Compiler::Infer
     # multiple different downstream constraints, it can override this method.
     # This is only used to report positions in more detail, and it is expected
     # that the intersection of all MetaTypes here is the same as the resolve.
-    def as_multiple_downstream_constraints(ctx : Context, infer : ForReifiedFunc) : Array({Source::Pos, MetaType})?
-      nil
-    end
     def as_multiple_downstream_constraints(ctx : Context, infer : TypeCheck::ForReifiedFunc) : Array({Source::Pos, MetaType})?
       nil
     end
 
     # TODO: remove this cheap hacky alias somehow:
-    def as_multiple_downstream_constraints(ctx : Context, analysis : ReifiedFuncAnalysis) : Array({Source::Pos, MetaType})?
-      infer = ctx.infer.for_rf_existing!(analysis.reified)
-      as_multiple_downstream_constraints(ctx, infer)
-    end
     def as_multiple_downstream_constraints(ctx : Context, analysis : TypeCheck::ReifiedFuncAnalysis) : Array({Source::Pos, MetaType})?
       infer = ctx.type_check.for_rf_existing!(analysis.reified)
       as_multiple_downstream_constraints(ctx, infer)
@@ -183,31 +155,13 @@ class Mare::Compiler::Infer
       downstream_tethers(querent)
     end
 
-    def tether_constraints(ctx : Context, infer : ForReifiedFunc)
-      tethers(self).map(&.constraint(ctx, infer).as(MetaType))
-    end
     def tether_constraint_spans(ctx : Context, infer : AltInfer::Visitor)
       tethers(self).map(&.constraint_span(ctx, infer).as(AltInfer::Span))
-    end
-
-    def describe_tether_constraints(ctx : Context, infer : ForReifiedFunc)
-      tethers(self).map do |tether|
-        mt = tether.constraint(ctx, infer)
-        {tether.root.pos,
-          "it is required here to be a subtype of #{mt.show_type}"}
-      end
     end
 
     # When we need to take into consideration the downstreams' constraints
     # in order to infer our type from them, we can use this to collect all
     # those constraints into one intersection of them all.
-    def total_downstream_constraint(ctx : Context, infer : ForReifiedFunc)
-      MetaType.new_intersection(
-        @downstreams.map do |_, other_info, _|
-          other_info.as_downstream_constraint_meta_type(ctx, infer).as(MetaType)
-        end
-      )
-    end
     def total_downstream_constraint(ctx : Context, infer : TypeCheck::ForReifiedFunc)
       MetaType.new_intersection(
         @downstreams.compact_map do |_, other_info, _|
@@ -217,21 +171,6 @@ class Mare::Compiler::Infer
     end
 
     # TODO: remove?
-    def describe_downstream_constraints(ctx : Context, infer : ForReifiedFunc)
-      @downstreams.flat_map do |_, other_info, _|
-        multi = other_info.as_multiple_downstream_constraints(ctx, infer)
-        if multi
-          multi.map do |other_info_pos, mt|
-            {other_info_pos,
-              "it is required here to be a subtype of #{mt.show_type}"}
-          end
-        else
-          mt = infer.resolve(ctx, other_info)
-          [{other_info.pos,
-            "it is required here to be a subtype of #{mt.show_type}"}]
-        end
-      end.to_h.to_a
-    end
     def describe_downstream_constraints(ctx : Context, infer : TypeCheck::ForReifiedFunc)
       @downstreams.flat_map do |_, other_info, _|
         multi = other_info.as_multiple_downstream_constraints(ctx, infer)
@@ -252,76 +191,12 @@ class Mare::Compiler::Infer
       end.to_h.to_a
     end
 
-    # TODO: document
-    def within_downstream_constraints!(ctx : Context, infer : ForReifiedFunc, meta_type : MetaType)
-      if !within_downstream_constraints?(ctx, infer, meta_type)
-        extra = describe_downstream_constraints(ctx, infer)
-        extra << {pos,
-          "but the type of the #{described_kind} was #{meta_type.show_type}"}
-
-        Error.at downstream_use_pos, "The type of this expression " \
-          "doesn't meet the constraints imposed on it",
-            extra
-      end
-    end
-    def within_downstream_constraints?(ctx : Context, infer : ForReifiedFunc, meta_type : MetaType)
-      return true if @downstreams.empty?
-      meta_type.within_constraints?(ctx, [total_downstream_constraint(ctx, infer)])
-    end
-
     # This property can be set to give a hint in the event of a typecheck error.
     property this_would_be_possible_if : Tuple(Source::Pos, String)?
 
     def resolve_others!(ctx : Context, infer)
       @downstreams.each do |use_pos, other_info, aliases|
         infer.resolve(ctx, other_info) if other_info.is_a?(FixedInfo)
-      end
-    end
-
-    # The final MetaType must meet all constraints that have been imposed.
-    def post_resolve!(ctx : Context, infer : ForReifiedFunc, meta_type : MetaType)
-      return if downstreams_empty?
-
-      # TODO: print a different error message when the downstream constraints are
-      # internally conflicting, even before adding this meta_type into the mix.
-
-      if !meta_type.ephemeralize.within_constraints?(ctx, [total_downstream_constraint(ctx, infer)])
-        extra = describe_downstream_constraints(ctx, infer)
-        extra << {pos,
-          "but the type of the #{described_kind} was #{meta_type.show_type}"}
-        extra << this_would_be_possible_if.not_nil! if this_would_be_possible_if
-
-        Error.at downstream_use_pos, "The type of this expression " \
-          "doesn't meet the constraints imposed on it",
-            extra
-      end
-
-      # If aliasing makes a difference, we need to evaluate each constraint
-      # that has nonzero aliases with an aliased version of the meta_type.
-      if meta_type != meta_type.strip_ephemeral.alias
-        meta_type_alias = meta_type.strip_ephemeral.alias
-
-        # TODO: Do we need to do anything here to weed out union types with
-        # differing capabilities of compatible terms? Is it possible that
-        # the type that fulfills the total_downstream_constraint is not compatible
-        # with the ephemerality requirement, while some other union member is?
-        @downstreams.each do |use_pos, other_info, aliases|
-          if aliases > 0
-            constraint = infer.resolve(ctx, other_info)
-            if !meta_type_alias.within_constraints?(ctx, [constraint])
-              extra = describe_downstream_constraints(ctx, infer)
-              extra << {pos,
-                "but the type of the #{described_kind} " \
-                "(when aliased) was #{meta_type_alias.show_type}"
-              }
-              extra << this_would_be_possible_if.not_nil! if this_would_be_possible_if
-
-              Error.at use_pos, "This aliasing violates uniqueness " \
-                "(did you forget to consume the variable?)",
-                extra
-            end
-          end
-        end
       end
     end
   end
@@ -431,10 +306,6 @@ class Mare::Compiler::Infer
       end
     end
 
-    def tether_upward_transform(ctx : Context, infer : ForReifiedFunc, meta_type : MetaType) : MetaType
-      # TODO: aliasing/ephemerality
-      meta_type
-    end
     def tether_upward_transform_span(ctx : Context, infer : AltInfer::Visitor, span : AltInfer::Span) : AltInfer::Span
       # TODO: aliasing/ephemerality
       span
@@ -453,13 +324,6 @@ class Mare::Compiler::Infer
     # By default, a NamedInfo will only treat the first assignment as relevant
     # for inferring when there is no explicit, but some subclasses may override.
     def infer_from_all_upstreams? : Bool; false end
-    private def resolve_upstream(ctx : Context, infer : ForReifiedFunc) : MetaType
-      if infer_from_all_upstreams?
-        MetaType.new_union(@upstreams.map { |mt, _| infer.resolve(ctx, mt) })
-      else
-        infer.resolve(ctx, @upstreams.first[0])
-      end
-    end
     private def resolve_upstream_span(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span?
       use_upstream_infos =
         infer_from_all_upstreams? ? upstream_infos : [upstream_infos.first]
@@ -471,45 +335,6 @@ class Mare::Compiler::Infer
         end
 
       AltInfer::Span.reduce_combine_mts(upstream_spans) { |accum, mt| accum.unite(mt) }
-    end
-
-    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
-      explicit = @explicit
-
-      if explicit
-        explicit_mt = infer.resolve(ctx, explicit)
-
-        if !explicit_mt.cap_only?
-          # If we have an explicit type that is more than just a cap, return it.
-          return explicit_mt
-        elsif !@upstreams.empty?
-          # If there are upstreams, use the explicit cap applied to the type
-          # of the upstream, which becomes canonical.
-          return (
-            resolve_upstream(ctx, infer)
-            .strip_cap.intersect(explicit_mt).strip_ephemeral
-            .strip_ephemeral
-          )
-        else
-          # If we have no upstreams and an explicit cap, return
-          # the empty trait called `Any` intersected with that cap.
-          any = MetaType.new_nominal(infer.reified_prelude_type("Any"))
-          return any.intersect(explicit_mt)
-        end
-      elsif !@upstreams.empty?
-        # If we only have upstreams to go on, return the upstream type.
-        return resolve_upstream(ctx, infer).strip_ephemeral
-      elsif !downstreams_empty?
-        # If we only have downstream tethers, just do our best with those.
-        return MetaType
-          .new_intersection(tether_constraints(ctx, infer))
-          .simplify(ctx)
-          .strip_ephemeral
-      end
-
-      # If we get here, we've failed and don't have enough info to continue.
-      Error.at self,
-        "This #{described_kind} needs an explicit type; it could not be inferred"
     end
   end
 
@@ -537,10 +362,6 @@ class Mare::Compiler::Infer
     def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
       AltInfer::Span.new(AltInfer::Span::ErrorPropagate.new(error))
     end
-
-    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
-      raise error
-    end
   end
 
   abstract class FixedInfo < DynamicInfo # TODO: rename or split DynamicInfo to make this line make more sense
@@ -548,9 +369,6 @@ class Mare::Compiler::Infer
       true
     end
 
-    def tether_resolve(ctx : Context, infer : ForReifiedFunc)
-      infer.resolve(ctx, self)
-    end
     def tether_resolve_span(ctx : Context, infer : AltInfer::Visitor)
       infer.resolve(ctx, self)
     end
@@ -568,10 +386,6 @@ class Mare::Compiler::Infer
 
     def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
       infer.prelude_type_span(ctx, @name)
-    end
-
-    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
-      MetaType.new(infer.reified_prelude_type(@name))
     end
 
     def resolve_others!(ctx : Context, infer)
@@ -592,10 +406,6 @@ class Mare::Compiler::Infer
         infer.type_expr_span(ctx, @node)
       )
     end
-
-    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
-      infer.type_expr(@node)
-    end
   end
 
   class FixedEnumValue < FixedInfo
@@ -610,10 +420,6 @@ class Mare::Compiler::Infer
       infer.unwrap_lazy_parts_of_type_expr_span(ctx,
         infer.type_expr_span(ctx, @node)
       )
-    end
-
-    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
-      infer.type_expr(@node)
     end
   end
 
@@ -640,19 +446,6 @@ class Mare::Compiler::Infer
         infer.type_expr_span(ctx, @node).transform_mt(&.override_cap("non"))
       )
     end
-
-    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
-      # If this node is further qualified, we don't want to both resolving it,
-      # and doing so would trigger errors during type argument validation,
-      # because the type arguments haven't been applied yet; they will be
-      # applied in a different FixedSingleton that wraps this one in range.
-      # We don't have to resolve it because nothing will ever be its downstream.
-      return MetaType.unsatisfiable if @node.is_a?(AST::Identifier) \
-        && infer.classify.further_qualified?(@node)
-
-      infer.type_expr(@node).override_cap("non")
-      .tap { |mt| ctx.infer.validate_type_args(ctx, infer, @node, mt) }
-    end
   end
 
   class Self < FixedInfo
@@ -677,10 +470,6 @@ class Mare::Compiler::Infer
     def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
       infer.self_type_expr_span(ctx)
     end
-
-    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
-      infer.analysis.resolved_self
-    end
   end
 
   class FromConstructor < FixedInfo
@@ -692,12 +481,6 @@ class Mare::Compiler::Infer
     def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
       infer.self_ephemeral_with_cap(ctx, @cap)
     end
-
-    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
-      # A constructor returns the ephemeral of the self type with the given cap.
-      # TODO: should the ephemeral be removed, given Mare's ephemeral semantics?
-      MetaType.new(infer.reified.type, @cap).ephemeralize
-    end
   end
 
   class AddressOf < DynamicInfo
@@ -707,14 +490,6 @@ class Mare::Compiler::Infer
 
     def initialize(@pos, @layer_index, @variable)
     end
-
-    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
-      t = infer.resolve(ctx, @variable)
-
-      cpointer = infer.reified_prelude_type("CPointer", [t])
-
-      MetaType.new cpointer
-    end
   end
 
   class ReflectionOfType < DynamicInfo
@@ -723,37 +498,6 @@ class Mare::Compiler::Infer
     def describe_kind : String; "type reflection" end
 
     def initialize(@pos, @layer_index, @reflect_type)
-    end
-
-    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
-      follow_reflection(ctx, infer)
-    end
-
-    def follow_reflection(ctx : Context, infer : ForReifiedFunc)
-      reflect_mt = infer.for_rt.resolve_type_param_parent_links(infer.resolve(ctx, @reflect_type))
-      reflect_rt =
-        if reflect_mt.type_params.empty?
-          reflect_mt.single!
-        else
-          # If trying to reflect a type with unreified type params in it,
-          # we just shrug and reflect the type None instead, since it doesn't
-          # seem like there is anything more meaningful we could do here.
-          # This happens when typechecking on not-yet-reified functions,
-          # so it isn't really avoidable. But it shouldn't reach CodeGen.
-          infer.reified_prelude_type("None")
-        end
-
-      # Reach all functions that might possibly be reflected.
-      reflect_rt.defn(ctx).functions.each do |f|
-        next if f.has_tag?(:hygienic) || f.body.nil?
-        f_link = f.make_link(reflect_rt.link)
-        MetaType::Capability.new_maybe_generic(f.cap.value).each_cap.each do |f_cap|
-          ctx.infer.for_rf(ctx, reflect_rt, f_link, MetaType.new(f_cap)).tap(&.run)
-        end
-        infer.extra_called_func!(@pos, reflect_rt, f_link)
-      end
-
-      MetaType.new(infer.reified_prelude_type("ReflectionOfType", [reflect_mt]))
     end
 
     def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
@@ -777,12 +521,6 @@ class Mare::Compiler::Infer
       @peer_hints << peer
     end
 
-    def describe_peer_hints(ctx : Context, infer : ForReifiedFunc)
-      @peer_hints.map do |peer|
-        mt = infer.resolve(ctx, peer)
-        {peer.pos, "it is suggested here that it might be a #{mt.show_type}"}
-      end
-    end
     def describe_peer_hints(ctx : Context, infer : TypeCheck::ForReifiedFunc)
       @peer_hints.compact_map do |peer|
         mt = infer.resolve(ctx, peer)
@@ -835,51 +573,6 @@ class Mare::Compiler::Infer
         }
       ])
     end
-
-    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
-      tether_constraints = tether_constraints(ctx, infer)
-
-      # Literal values (such as numeric literals) sometimes have
-      # an ambiguous type. Here, we intersect with the downstream constraints
-      # to (hopefully) arrive at a single concrete type to return.
-      meta_type = MetaType
-        .new_intersection(tether_constraints + [@possible])
-        .simplify(ctx)
-
-      # If we don't satisfy the constraints, leave it to DynamicInfo.resolve!
-      # to print a consistent error message instead of printing it here.
-      return @possible if meta_type.unsatisfiable?
-
-      # If we've resolved to a single concrete type, we can successfully return.
-      return meta_type if meta_type.singular? && meta_type.single!.link.is_concrete?
-
-      # Next we try to use peer hints to make a viable guess.
-      if @peer_hints.any?
-        meta_type = MetaType.new_intersection(
-          @peer_hints.map { |peer| infer.resolve(ctx, peer).as(MetaType) }
-        ).intersect(@possible).simplify(ctx)
-
-        # This guess works for us if it meets those same criteria from before.
-        return meta_type if meta_type.singular? && meta_type.single!.link.is_concrete?
-      end
-
-      # We've failed on all fronts. Print an error describing what we know,
-      # so that the user can figure out how to give us better information.
-      error_info = describe_tether_constraints(ctx, infer)
-      error_info.concat(describe_peer_hints(ctx, infer))
-      error_info.push({pos,
-        "and the literal itself has an intrinsic type of #{@possible.show_type}"
-      })
-      error_info.push({Source::Pos.none,
-        "Please wrap an explicit numeric type around the literal " \
-          "(for example: U64[#{@pos.content}])"
-      })
-      Error.at self,
-        "This literal value couldn't be inferred as a single concrete type",
-        error_info
-
-      raise "unreachable end of function"
-    end
   end
 
   class LocalRef < Info
@@ -909,10 +602,6 @@ class Mare::Compiler::Infer
 
     def as_conduit? : AltInfer::Conduit?
       AltInfer::Conduit.direct(@info)
-    end
-
-    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
-      infer.resolve(ctx, @info)
     end
   end
 
@@ -986,35 +675,12 @@ class Mare::Compiler::Infer
       true
     end
 
-    def tether_resolve(ctx : Context, infer : ForReifiedFunc)
-      infer.resolve(ctx, self)
-    end
     def tether_resolve_span(ctx : Context, infer : AltInfer::Visitor)
       infer.resolve(ctx, self)
     end
 
-    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
-      follow_field(ctx, infer)
-    end
-
     def resolve_others!(ctx : Context, infer)
       @upstreams.each { |upstream| infer.resolve(ctx, upstream) }
-    end
-
-    def follow_field(ctx : Context, infer : ForReifiedFunc) : MetaType
-      field_func = infer.reified.type.defn(ctx).functions.find do |f|
-        f.ident.value == @name && f.has_tag?(:field)
-      end.not_nil!
-      field_func_link = field_func.make_link(infer.reified.type.link)
-
-      # Keep track that we touched this "function".
-      infer.analysis.called_funcs.add({pos, infer.reified.type, field_func_link})
-
-      # Get the ForReifiedFunc instance for field_func, possibly creating and running it.
-      other_infer = ctx.infer.for_rf(ctx, infer.reified.type, field_func_link, infer.analysis.resolved_self_cap).tap(&.run)
-
-      # Get the return type.
-      other_infer.resolve(ctx, other_infer.f_analysis[other_infer.ret])
     end
   end
 
@@ -1036,12 +702,6 @@ class Mare::Compiler::Infer
       field_span = infer.resolve(ctx, @field)
       origin_span.combine_mt(field_span) { |o, f| f.viewed_from(o).alias }
     end
-
-    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
-      origin_mt = infer.resolve(ctx, @origin)
-      field_mt = infer.resolve(ctx, @field)
-      field_mt.viewed_from(origin_mt).alias
-    end
   end
 
   class FieldExtract < DynamicInfo
@@ -1059,12 +719,6 @@ class Mare::Compiler::Infer
       origin_span = infer.resolve(ctx, @origin)
       field_span = infer.resolve(ctx, @field)
       origin_span.combine_mt(field_span) { |o, f| f.extracted_from(o).ephemeralize }
-    end
-
-    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
-      origin_mt = infer.resolve(ctx, @origin)
-      field_mt = infer.resolve(ctx, @field)
-      field_mt.extracted_from(origin_mt).ephemeralize
     end
   end
 
@@ -1090,12 +744,6 @@ class Mare::Compiler::Infer
       # A jump expression has no result value, so the resolved type is always
       # unconstrained - the term's type goes to the jump's catching entity.
       AltInfer::Span.simple(MetaType.unconstrained)
-    end
-
-    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
-      # A jump expression has no result value, so the resolved type is always
-      # unconstrained - the term's type goes to the jump's catching entity.
-      MetaType.unconstrained
     end
 
     def resolve_others!(ctx : Context, infer)
@@ -1146,10 +794,6 @@ class Mare::Compiler::Infer
       AltInfer::Conduit.direct(@final_term)
     end
 
-    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
-      infer.resolve(ctx, final_term)
-    end
-
     def resolve_others!(ctx : Context, infer)
       terms.each { |term| infer.resolve(ctx, term) }
     end
@@ -1192,27 +836,15 @@ class Mare::Compiler::Infer
       )
     end
 
-    def tether_upward_transform(ctx : Context, infer : ForReifiedFunc, meta_type : MetaType) : MetaType
-      # TODO: account for unreachable branches? maybe? maybe not?
-      meta_type
-    end
     def tether_upward_transform_span(ctx : Context, infer : AltInfer::Visitor, span : AltInfer::Span) : AltInfer::Span
       # TODO: account for unreachable branches? maybe? maybe not?
       span
     end
 
-    def as_downstream_constraint_meta_type(ctx : Context, infer : ForReifiedFunc) : MetaType
-      total_downstream_constraint(ctx, infer)
-    end
     def as_downstream_constraint_meta_type(ctx : Context, infer : TypeCheck::ForReifiedFunc) : MetaType
       total_downstream_constraint(ctx, infer)
     end
 
-    def as_multiple_downstream_constraints(ctx : Context, infer : ForReifiedFunc) : Array({Source::Pos, MetaType})?
-      @downstreams.map do |pos, info, aliases|
-        {pos, info.as_downstream_constraint_meta_type(ctx, infer)}
-      end
-    end
     def as_multiple_downstream_constraints(ctx : Context, infer : TypeCheck::ForReifiedFunc) : Array({Source::Pos, MetaType})?
       @downstreams.flat_map do |pos, info, aliases|
         multi = info.as_multiple_downstream_constraints(ctx, infer)
@@ -1223,91 +855,6 @@ class Mare::Compiler::Infer
 
         [] of {Source::Pos, MetaType}
       end
-    end
-
-    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
-      MetaType.new_union(
-        follow_branches(ctx, infer)
-      )
-    end
-
-    def follow_branches(ctx : Context, infer : ForReifiedFunc)
-      meta_types = [] of MetaType
-      statically_true_conds = [] of Info
-      branches.each do |cond, body, body_jumps_away|
-        meta_type = follow_branch(ctx, infer, cond, body, statically_true_conds)
-        meta_types << meta_type if meta_type && !body_jumps_away
-        break unless statically_true_conds.empty?
-      end
-
-      meta_types
-    end
-
-    def follow_branch(
-      ctx : Context,
-      infer : ForReifiedFunc,
-      cond : Info?,
-      body : Info,
-      statically_true_conds : Array(Info),
-    )
-      infer.resolve(ctx, cond) if cond
-      return unless body
-
-      inner_cond = cond
-      while inner_cond.is_a?(Sequence)
-        inner_cond = inner_cond.final_term
-      end
-
-      skip_body = false
-
-      # If we have a type condition as the cond, that implies that it returned
-      # true if we are in the body; hence we can apply the type refinement.
-      # TODO: Do this in a less special-casey sort of way if possible.
-      # TODO: Do we need to override things besides locals? should we skip for non-locals?
-      if inner_cond.is_a?(TypeParamCondition)
-        refine_type = infer.resolve(ctx, inner_cond.refine_type)
-
-        infer.for_rt.push_type_param_refinement(
-          inner_cond.refine,
-          refine_type,
-        )
-
-        # When the type param is currently partially or fully reified with
-        # a type that is incompatible with the refinement, we skip the body.
-        current_type_param = infer.lookup_type_param(inner_cond.refine)
-        if current_type_param.satisfies_bound?(ctx, refine_type)
-          # TODO: this is one of the statically_true_conds as well, right?
-        else
-          skip_body = true
-        end
-      elsif inner_cond.is_a?(TypeConditionStatic)
-        if inner_cond.evaluate(ctx, infer)
-          # A statically true condition prevents all later branch bodies
-          # from having a chance to be executed, since it happens first.
-          statically_true_conds << inner_cond
-        else
-          # A statically false condition will not execute its branch body.
-          skip_body = true
-        end
-      end
-
-      # Resolve the types inside the body and capture the result type,
-      # unless there is no body or we have determined we must skip this body.
-      if body
-        if skip_body
-          # We use "unconstrained" as a marker that this is unreachable.
-          infer.resolve_as(ctx, body, MetaType.unconstrained)
-        else
-          meta_type = infer.resolve(ctx, body)
-        end
-      end
-
-      # Remove the type param refinement we put in place before, if any.
-      if inner_cond.is_a?(TypeParamCondition)
-        infer.for_rt.pop_type_param_refinement(inner_cond.refine)
-      end
-
-      meta_type
     end
   end
 
@@ -1320,14 +867,6 @@ class Mare::Compiler::Infer
 
       early_breaks.each(&.term.add_downstream(@pos, self, 0))
       early_continues.each(&.term.add_downstream(@pos, self, 0))
-    end
-
-    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
-      MetaType.new_union(
-        [super] + \
-        early_breaks.map { |jump| infer.resolve(ctx, jump.term) } + \
-        early_continues.map { |jump| infer.resolve(ctx, jump.term) }
-      )
     end
 
     def resolve_others!(ctx : Context, infer)
@@ -1355,10 +894,6 @@ class Mare::Compiler::Infer
       infer.prelude_type_span(ctx, "Bool")
     end
 
-    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
-      MetaType.new(infer.reified_prelude_type("Bool"))
-    end
-
     def resolve_others!(ctx : Context, infer)
       infer.resolve(ctx, @lhs)
       infer.resolve(ctx, @refine_type)
@@ -1377,21 +912,6 @@ class Mare::Compiler::Infer
 
     def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
       infer.prelude_type_span(ctx, "Bool")
-    end
-
-    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
-      MetaType.new(infer.reified_prelude_type("Bool"))
-    end
-
-    def post_resolve!(ctx : Context, infer : ForReifiedFunc, meta_type : MetaType)
-      super
-
-      TypeCondition.verify_safety_of_runtime_type_match(ctx, @pos,
-        infer.resolve(ctx, @lhs),
-        infer.resolve(ctx, @rhs),
-        @lhs.pos,
-        @rhs.pos,
-      )
     end
 
     # TODO: move this function into the TypeCheck pass file.
@@ -1450,23 +970,6 @@ class Mare::Compiler::Infer
     def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
       infer.prelude_type_span(ctx, "Bool")
     end
-
-    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
-      MetaType.new(infer.reified_prelude_type("Bool"))
-    end
-
-    def post_resolve!(ctx : Context, infer : ForReifiedFunc, meta_type : MetaType)
-      super
-
-      lhs_info = infer.f_analysis[@refine].as(NamedInfo)
-
-      TypeCondition.verify_safety_of_runtime_type_match(ctx, @pos,
-        infer.resolve(ctx, lhs_info),
-        infer.resolve(ctx, @refine_type),
-        lhs_info.first_viable_constraint_pos,
-        @refine_type.pos,
-      )
-    end
   end
 
   class TypeConditionStatic < FixedInfo
@@ -1479,20 +982,8 @@ class Mare::Compiler::Infer
     def initialize(@pos, @layer_index, @lhs, @rhs, @positive_check)
     end
 
-    def evaluate(ctx : Context, infer : ForReifiedFunc) : Bool
-      lhs_mt = infer.resolve(ctx, lhs)
-      rhs_mt = infer.resolve(ctx, rhs)
-      result = lhs_mt.satisfies_bound?(ctx, rhs_mt)
-      result = !result if !positive_check
-      result
-    end
-
     def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
       infer.prelude_type_span(ctx, "Bool")
-    end
-
-    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
-      MetaType.new(infer.reified_prelude_type("Bool"))
     end
   end
 
@@ -1513,12 +1004,6 @@ class Mare::Compiler::Infer
         lhs_mt.intersect(rhs_mt)
       }
     end
-
-    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
-      rhs_mt = infer.resolve(ctx, @refine_type)
-      rhs_mt = rhs_mt.strip_cap.negate if !positive_check
-      infer.resolve(ctx, @refine).intersect(rhs_mt)
-    end
   end
 
   class Consume < Info
@@ -1531,10 +1016,6 @@ class Mare::Compiler::Infer
 
     def as_conduit? : AltInfer::Conduit?
       AltInfer::Conduit.ephemeralize(@local)
-    end
-
-    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
-      infer.resolve(ctx, @local).ephemeralize
     end
 
     def add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
@@ -1558,10 +1039,6 @@ class Mare::Compiler::Infer
     def initialize(@pos, @layer_index, @body)
     end
 
-    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
-      infer.resolve(ctx, @body).recovered.ephemeralize
-    end
-
     def add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
       # TODO: Make recover safe.
       # @body.add_downstream(use_pos, info, aliases)
@@ -1571,9 +1048,6 @@ class Mare::Compiler::Infer
       Tether.chain(@body, querent)
     end
 
-    def tether_upward_transform(ctx : Context, infer : ForReifiedFunc, meta_type : MetaType) : MetaType
-      meta_type.strip_cap
-    end
     def tether_upward_transform_span(ctx : Context, infer : AltInfer::Visitor, span : AltInfer::Span) : AltInfer::Span
       span.transform_mt(&.strip_cap)
     end
@@ -1608,10 +1082,6 @@ class Mare::Compiler::Infer
       AltInfer::Conduit.alias(@lhs)
     end
 
-    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
-      infer.resolve(ctx, @lhs).alias
-    end
-
     def resolve_others!(ctx : Context, infer)
       infer.resolve(ctx, @rhs)
     end
@@ -1642,10 +1112,6 @@ class Mare::Compiler::Infer
       AltInfer::Conduit.direct(@yield_in)
     end
 
-    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
-      infer.resolve(ctx, @yield_in)
-    end
-
     def resolve_others!(ctx : Context, infer)
       @terms.each { |term| infer.resolve(ctx, term) }
     end
@@ -1669,9 +1135,6 @@ class Mare::Compiler::Infer
       end
     end
 
-    def tether_upward_transform(ctx : Context, infer : ForReifiedFunc, meta_type : MetaType) : MetaType
-      meta_type
-    end
     def tether_upward_transform_span(ctx : Context, infer : AltInfer::Visitor, span : AltInfer::Span) : AltInfer::Span
       span
     end
@@ -1761,85 +1224,6 @@ class Mare::Compiler::Infer
         end
       end
     end
-
-    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
-      # By default, an array literal has a cap of `ref`.
-      array_cap = MetaType::Capability::REF
-
-      # Determine the lowest common denominator MetaType of all elements.
-      elem_mts = terms.map { |term| infer.resolve(ctx, term).as(MetaType) }.uniq
-      elem_mt = MetaType.new_union(elem_mts).simplify(ctx)
-      orig_elem_mt_union = elem_mt
-
-      # Look for exactly one antecedent type that matches the inferred type.
-      # Essentially, this is the correlating "outside" inference with "inside".
-      # If such a type is found, it replaces our inferred element type.
-      # If no such type is found, stick with what we inferred for now.
-      possible_antes = [] of {MetaType, MetaType::Capability}
-      possible_element_antecedents(ctx, infer).each do |ante, cap|
-        ante_simple = ante.simplify(ctx)
-        if elem_mts.empty? || elem_mt.subtype_of?(ctx, ante_simple)
-          possible_antes << {ante, cap}
-        end
-      end
-      if possible_antes.size > 1
-        # TODO: nice error for the below:
-        raise "too many possible antecedents"
-      elsif possible_antes.size == 1
-        # We have a suitable antecedent, so we adopt the element type
-        # as well as the associated capability for the array container type.
-        elem_mt, array_cap = possible_antes.first
-      else
-        # Leave elem_mt alone and let it ride.
-      end
-
-      if elem_mt.unsatisfiable?
-        Error.at pos,
-          "The type of this empty array literal could not be inferred " \
-          "(it needs an explicit type)"
-      end
-
-      # Now that we have the element type to use, construct the result.
-      rt = infer.reified_prelude_type("Array", [elem_mt])
-      mt = MetaType.new(rt, array_cap.value.as(String))
-
-      # If the array cap is not ref or "lesser", we must recover to the
-      # higher capability, meaning all element expressions must be sendable.
-      unless array_cap.supertype_of?(MetaType::Capability::REF)
-        unless orig_elem_mt_union.alias.is_sendable?
-          Error.at @pos, "This array literal can't have a reference cap of " \
-            "#{array_cap.value} unless all of its elements are sendable",
-              describe_tether_constraints(ctx, infer)
-        end
-      end
-
-      # Reach the functions we will use during CodeGen.
-      ["new", "<<"].each do |f_name|
-        f = rt.defn(ctx).find_func!(f_name)
-        f_link = f.make_link(rt.link)
-        ctx.infer.for_rf(ctx, rt, f_link, MetaType.cap(f.cap.value)).run
-        infer.extra_called_func!(pos, rt, f_link)
-      end
-
-      mt
-    end
-
-    def possible_element_antecedents(ctx, infer) : Array({MetaType, MetaType::Capability})
-      results = [] of {MetaType, MetaType::Capability}
-
-      MetaType
-        .new_intersection(tether_constraints(ctx, infer))
-        .simplify(ctx)
-        .each_reachable_defn_with_cap(ctx).each do |rt, cap|
-          # TODO: Support more element antecedent detection patterns.
-          if rt.link.name == "Array" \
-          && rt.args.size == 1
-            results << {rt.args.first, cap}
-          end
-        end
-
-      results
-    end
   end
 
   class ArrayLiteralElementAntecedent < DynamicInfo
@@ -1858,24 +1242,6 @@ class Mare::Compiler::Infer
       Tether.chain(@array, querent)
     end
 
-    def tether_upward_transform(ctx : Context, infer : ForReifiedFunc, meta_type : MetaType) : MetaType
-      results = [] of MetaType
-
-      meta_type.simplify(ctx).each_reachable_defn(ctx).each do |rt|
-        # TODO: Support more element antecedent detection patterns.
-        if rt.link.name == "Array" \
-        && rt.args.size == 1
-          results << rt.args.first.simplify(ctx)
-        end
-      end
-
-      # TODO: support multiple antecedents gracefully?
-      if results.size != 1
-        return MetaType.unconstrained
-      end
-
-      results.first.not_nil!
-    end
     def tether_upward_transform_span(ctx : Context, infer : AltInfer::Visitor, span : AltInfer::Span) : AltInfer::Span
       infer.unwrap_lazy_parts_of_type_expr_span(ctx,
         span.transform_mt do |meta_type|
@@ -1898,11 +1264,6 @@ class Mare::Compiler::Infer
         end
       )
     end
-
-    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
-      antecedents = @array.possible_element_antecedents(ctx, infer)
-      antecedents.empty? ? MetaType.unconstrained : MetaType.new_union(antecedents.map(&.first))
-    end
   end
 
   class FromCall < DynamicInfo
@@ -1924,11 +1285,6 @@ class Mare::Compiler::Infer
       Tether.chain(@lhs, querent)
     end
 
-    def tether_upward_transform(ctx : Context, infer : ForReifiedFunc, meta_type : MetaType) : MetaType
-      # TODO: is it possible to use the meta_type passed to us above,
-      # at least in some cases, instead of eagerly resolving here?
-      infer.resolve(ctx, self)
-    end
     def tether_upward_transform_span(ctx : Context, infer : AltInfer::Visitor, span : AltInfer::Span) : AltInfer::Span
       # TODO: is it possible to use the meta_type passed to us above,
       # at least in some cases, instead of eagerly resolving here?
@@ -2032,53 +1388,6 @@ class Mare::Compiler::Infer
           {call_mt, simple_ret_span}.as({MetaType, AltInfer::Span})
         end
       end
-    end
-
-    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
-      meta_type = follow_call(ctx, infer)
-
-      # TODO: auto-recovery of call result:
-
-      # # If recovering the call result would make no difference, return now.
-      # meta_type_recovered = meta_type.alias.recovered
-      # return meta_type if meta_type_recovered == meta_type.alias
-
-      # # If we have no tether constraints, return now.
-      # # Note that we use the downstream tethers, rather than the tethers
-      # # we report to our upstreams (which use the lhs as the defining value).
-      # tether_constraints = downstream_tethers(self).map(&.constraint(ctx, infer).as(MetaType))
-      # return meta_type if tether_constraints.empty?
-
-      # # If the result value type matches downstream metatype, return it now.
-      # tether_mt = MetaType.new_intersection(tether_constraints).simplify(ctx)
-      # return meta_type if meta_type.subtype_of?(ctx, tether_mt)
-
-      # # If the type would work after recovering the result,
-      # # see if it would be safe to do so by checking if all args are sendable.
-      # if meta_type_recovered.subtype_of?(ctx, tether_mt)
-      #   if @yield_params.nil? && @yield_block.nil? \
-      #   && infer.resolve(ctx, @lhs).is_sendable? \
-      #   && (
-      #     @args.nil? || @args.not_nil!.terms.all? { |arg|
-      #       infer.resolve(ctx, infer.f_analysis[arg]).is_sendable?
-      #     }
-      #   )
-      #     return meta_type_recovered
-      #   else
-      #     self.this_would_be_possible_if = {pos,
-      #       "the receiver and all arguments were sendable"}
-      #   end
-      # end
-
-      meta_type
-    end
-
-    def resolve_others!(ctx : Context, infer)
-      infer.resolve(ctx, infer.f_analysis[@args.not_nil!]) if @args
-      infer.resolve(ctx, infer.f_analysis[@yield_block.not_nil!]) if @yield_block
-      infer.resolve(ctx, infer.f_analysis[@yield_params.not_nil!]) if @yield_params
-
-      resolvables.each { |resolvable| infer.resolve(ctx, resolvable) }
     end
 
     def follow_call_get_call_defns(ctx : Context, infer) : Set({MetaType::Inner, ReifiedType?, Program::Function?})?
@@ -2316,48 +1625,6 @@ class Mare::Compiler::Infer
           problems unless problems.empty?
     end
 
-    def follow_call_resolve_other_infers(ctx : Context, infer : ForReifiedFunc) : Set({ForReifiedFunc, Bool})
-      other_infers = infer.analysis.call_infers_for[self]?
-      return other_infers if other_infers
-
-      other_infers = Set({ForReifiedFunc, Bool}).new
-
-      call = self
-      call_defns = follow_call_get_call_defns(ctx, infer)
-      return other_infers unless call_defns
-
-      # For each receiver type definition that is possible, track down the infer
-      # for the function that we're trying to call, evaluating the constraints
-      # for each possibility such that all of them must hold true.
-      problems = [] of {Source::Pos, String}
-      call_defns.each do |(call_mti, call_defn, call_func)|
-        call_mt = MetaType.new(call_mti)
-        call_defn = call_defn.not_nil!
-        call_func = call_func.not_nil!
-        call_func_link = call_func.make_link(call_defn.link)
-
-        # Keep track that we called this function.
-        infer.analysis.called_funcs.add({call.pos, call_defn, call_func_link})
-
-        reify_cap, autorecover_needed =
-          follow_call_check_receiver_cap(ctx, infer.func, call_mt, call_func, problems)
-
-        # Get the ForReifiedFunc instance for call_func, possibly creating and running it.
-        # TODO: don't infer anything in the body of that func if type and params
-        # were explicitly specified in the function signature.
-        other_infer = ctx.infer.for_rf(ctx, call_defn, call_func_link, reify_cap).tap(&.run)
-
-        follow_call_check_args(ctx, infer, call_func, problems)
-        follow_call_check_yield_block(other_infer, problems)
-
-        other_infers.add({other_infer, autorecover_needed})
-      end
-      Error.at call,
-        "This function call doesn't meet subtyping requirements",
-          problems unless problems.empty?
-
-      infer.analysis.call_infers_for[self] = other_infers
-    end
     def follow_call_resolve_other_infers(ctx : Context, infer : TypeCheck::ForReifiedFunc) : Set({TypeCheck::ForReifiedFunc, Bool})
       other_infers = infer.analysis.call_infers_for[self]?
       return other_infers if other_infers
@@ -2391,27 +1658,6 @@ class Mare::Compiler::Infer
 
       infer.analysis.call_infers_for[self] = other_infers
     end
-
-    def follow_call(ctx : Context, infer : ForReifiedFunc)
-      other_infers = follow_call_resolve_other_infers(ctx, infer)
-      raise "this call didn't have any call defns:\n#{pos.show}" if other_infers.empty?
-
-      rets = [] of MetaType
-      other_infers.each do |other_infer, autorecover_needed|
-        inferred_ret_info = other_infer.f_analysis[other_infer.ret]
-        inferred_ret = other_infer.resolve_with_reentrance_prevention(ctx, inferred_ret_info)
-        rets << inferred_ret
-
-        if autorecover_needed
-          follow_call_check_autorecover_cap(ctx, infer, other_infer, inferred_ret)
-        end
-      end
-
-      # Constrain the return value as the union of all observed return types.
-      ret = rets.size == 1 ? rets.first : MetaType.new_union(rets)
-
-      ret.ephemeralize
-    end
   end
 
   class FromCallYieldOut < DynamicInfo
@@ -2427,9 +1673,6 @@ class Mare::Compiler::Infer
       true
     end
 
-    def tether_resolve(ctx : Context, infer : ForReifiedFunc)
-      infer.resolve(ctx, self)
-    end
     def tether_resolve_span(ctx : Context, infer : AltInfer::Visitor)
       infer.resolve(ctx, self)
     end
@@ -2468,28 +1711,6 @@ class Mare::Compiler::Infer
           {call_mt, simple_ret_span}.as({MetaType, AltInfer::Span})
         end
       end
-    end
-
-    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
-      # We must first resolve the FromCall itself to collect the other_infers.
-      infer.resolve(ctx, @call)
-      other_infers = infer.analysis.call_infers_for[@call]
-
-      # TODO: Figure out how to support this multiple call defns case somehow.
-      # It may be easier now that FromCall has been made more lazy?
-      raise NotImplementedError.new("yield_block with multiple other_infers") \
-        if other_infers.size > 1
-      other_infer = other_infers.first.first
-
-      raise "TODO: Nice error message for this" \
-        if other_infer.f_analysis.yield_out_infos.size <= @index
-
-      yield_param = call.yield_params.not_nil!.terms[@index]
-      yield_out = other_infer.f_analysis.yield_out_infos[@index]
-
-      @pos = yield_out.first_viable_constraint_pos
-
-      other_infer.resolve(ctx, yield_out)
     end
   end
 
@@ -2537,28 +1758,6 @@ class Mare::Compiler::Infer
         mt == none ? MetaType.unconstrained : mt
       end
     end
-
-    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
-      # We must first resolve the FromCall itself to collect the other_infers.
-      infer.resolve(ctx, @call)
-      other_infers = infer.analysis.call_infers_for[@call]
-
-      # TODO: Figure out how to support this multiple call defns case somehow.
-      # It may be easier now that FromCall has been made more lazy?
-      raise NotImplementedError.new("yield_block with multiple other_infers") \
-        if other_infers.size > 1
-      other_infer = other_infers.first.first
-
-      # Check that the type of the yield block result matches what's expected,
-      # but don't bother if the type requirement of just None.
-      yield_in_resolved = other_infer.resolve(ctx, other_infer.f_analysis.yield_in_info)
-      none = MetaType.new(infer.reified_prelude_type("None"))
-      if yield_in_resolved != none
-        yield_in_resolved
-      else
-        MetaType.unconstrained
-      end
-    end
   end
 
   class TowardCallParam < DynamicInfo
@@ -2574,26 +1773,10 @@ class Mare::Compiler::Infer
       true
     end
 
-    def tether_resolve(ctx : Context, infer : ForReifiedFunc)
-      resolve!(ctx, infer) # TODO: should this be infer.resolve(ctx, self) instead?
-    end
     def tether_resolve_span(ctx : Context, infer : AltInfer::Visitor)
       resolve_span!(ctx, infer) # TODO: should this be infer.resolve(ctx, self) instead?
     end
 
-    def as_multiple_downstream_constraints(ctx : Context, infer : ForReifiedFunc) : Array({Source::Pos, MetaType})?
-      other_infers = @call.follow_call_resolve_other_infers(ctx, infer)
-
-      other_infers.map do |other_infer, _|
-        param = other_infer.params[@index]
-        param_info = other_infer.f_analysis[param]
-        param_info = param_info.lhs if param_info.is_a?(FromAssign)
-        param_info = param_info.as(Param)
-        param_mt = other_infer.resolve(ctx, param_info)
-
-        {param_info.first_viable_constraint_pos, param_mt}.as({Source::Pos, MetaType})
-      end
-    end
     def as_multiple_downstream_constraints(ctx : Context, infer : TypeCheck::ForReifiedFunc) : Array({Source::Pos, MetaType})?
       other_infers = @call.follow_call_resolve_other_infers(ctx, infer)
 
@@ -2643,17 +1826,6 @@ class Mare::Compiler::Infer
           {call_mt, simple_param_span}.as({MetaType, AltInfer::Span})
         end
       end
-    end
-
-    def resolve!(ctx : Context, infer : ForReifiedFunc) : MetaType
-      other_infers = @call.follow_call_resolve_other_infers(ctx, infer)
-
-      MetaType.new_intersection(
-        other_infers.map do |other_infer, _|
-          param = other_infer.params[@index]
-          other_infer.resolve(ctx, other_infer.f_analysis[param]).as(MetaType)
-        end
-      )
     end
   end
 end

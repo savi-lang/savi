@@ -9,7 +9,6 @@ class Mare::Compiler::Context
   getter code_gen_verona
   getter consumes
   getter eval
-  getter infer
   getter inventory
   getter jumps
   getter lifetime
@@ -45,7 +44,6 @@ class Mare::Compiler::Context
     @consumes = Consumes::Pass.new
     @eval = Eval.new
     @import = Import.new
-    @infer = Infer.new
     @inventory = Inventory::Pass.new
     @jumps = Jumps::Pass.new
     @lifetime = Lifetime.new
