@@ -2001,6 +2001,18 @@ class Mare::Compiler::Infer
             problems
           )} unless problems.empty?
 
+          # If this is a constructor, we know what the result type will be
+          # without needing to actually depend on the other analysis' span.
+          if call_func.has_tag?(:constructor)
+            new_mt = call_mt
+              .intersect(lhs_mt)
+              .strip_cap
+              .intersect(MetaType.cap(call_func.cap.value))
+              .ephemeralize
+
+            next {call_mt, AltInfer::Span.simple(new_mt)}
+          end
+
           ret_span = infer
             .depends_on_call_ret_span(ctx, call_defn, call_func, call_link)
             .deciding_f_cap(call_mt.cap_only, call_func.has_tag?(:constructor))

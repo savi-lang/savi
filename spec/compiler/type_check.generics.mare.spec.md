@@ -99,3 +99,23 @@ This type argument won't satisfy the type parameter bound:
     GenericSendable(String'ref)
                     ^~~~~~~~~~
 ```
+
+---
+
+It can call the constructor of a type parameter:
+
+```mare
+    ConstructingGeneric(ConstructableClass).construct ::type=> ConstructableClass
+```
+```mare
+:trait ConstructableTrait
+  :new (number USize)
+
+:class ConstructableClass
+  :prop number USize
+  :new (@number)
+
+:class ConstructingGeneric (A ConstructableTrait)
+  :fun non construct A
+    A.new(99)
+```
