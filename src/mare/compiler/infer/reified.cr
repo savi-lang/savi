@@ -121,7 +121,10 @@ module Mare::Compiler::Infer
     end
 
     def is_partial_reify?(ctx)
-      args.size == params_count(ctx) && args.all?(&.is_partial_reify_type_param?)
+      params = ctx.infer[link].type_params
+      params.size == args.size && params.zip(args).all? { |param, arg|
+        arg.is_partial_reify_of_type_param?(param)
+      }
     end
 
     def is_complete?(ctx)

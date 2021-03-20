@@ -209,13 +209,13 @@ struct Mare::Compiler::Infer::MetaType
   end
 
   # A partial reify type param is a type param intersected with a capability.
-  def is_partial_reify_type_param? : Bool
+  def is_partial_reify_of_type_param?(param : TypeParam) : Bool
     inner = inner()
     return false unless inner.is_a?(Intersection)
     return false unless inner.cap
     return false unless inner.anti_terms == nil
     return false unless inner.terms.try(&.size) == 1
-    return false unless inner.terms.try(&.first.try(&.defn.is_a?(TypeParam)))
+    return false unless inner.terms.try(&.first.try(&.defn.==(param)))
     true
   end
 

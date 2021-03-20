@@ -140,10 +140,12 @@ class Mare::Compiler::Infer::SubtypingInfo
     raise "found hygienic function" if that_func.has_tag?(:hygienic)
 
     # Get the Infer instance for both this and that function, to compare them.
-    this_type_check =
-      ctx.type_check.for_rf(ctx, this, this_func.make_link(this.link), MetaType.new(this_cap)).tap(&.run)
-    that_type_check =
-      ctx.type_check.for_rf(ctx, that, that_func.make_link(that.link), MetaType.new(that_cap)).tap(&.run)
+    this_rf = ReifiedFunction.new(this, this_func.make_link(this.link), MetaType.new(this, this_cap.value.as(String)))
+    that_rf = ReifiedFunction.new(that, that_func.make_link(that.link), MetaType.new(that, that_cap.value.as(String)))
+    this_infer = ctx.infer[this_func.make_link(this.link)]
+    that_infer = ctx.infer[that_func.make_link(that.link)]
+    this_pre_infer = ctx.pre_infer[this_func.make_link(this.link)]
+    that_pre_infer = ctx.pre_infer[that_func.make_link(that.link)]
 
     # A constructor can only match another constructor.
     case {that_func.has_tag?(:constructor), this_func.has_tag?(:constructor)}
@@ -214,10 +216,10 @@ class Mare::Compiler::Infer::SubtypingInfo
 
     # Covariant return type.
     unless this_func.has_tag?(:constructor) || that_func.has_tag?(:constructor)
-      this_ret_ast = this_type_check.ret
-      that_ret_ast = that_type_check.ret
-      this_ret = this_type_check.resolve(ctx, this_ret_ast).not_nil!
-      that_ret = that_type_check.resolve(ctx, that_ret_ast).not_nil!
+      this_ret_info = this_pre_infer[this_func.ident]
+      that_ret_info = that_pre_infer[that_func.ident]
+      this_ret = this_rf.meta_type_of(ctx, this_ret_info, this_infer).not_nil!
+      that_ret = that_rf.meta_type_of(ctx, that_ret_info, that_infer).not_nil!
       unless that_ret.subtype_of?(ctx, this_ret)
         errors << {(that_func.ret || that_func.ident).pos,
           "this function's return type is #{that_ret.show_type}"}
@@ -230,8 +232,10 @@ class Mare::Compiler::Infer::SubtypingInfo
     that_func.params.try do |l_params|
       this_func.params.try do |r_params|
         l_params.terms.zip(r_params.terms).each do |(l_param, r_param)|
-          l_param_mt = that_type_check.resolve(ctx, l_param).not_nil!
-          r_param_mt = this_type_check.resolve(ctx, r_param).not_nil!
+          l_param_info = that_pre_infer[AST::Extract.param(l_param).first]
+          r_param_info = this_pre_infer[AST::Extract.param(r_param).first]
+          l_param_mt = that_rf.meta_type_of(ctx, l_param_info, that_infer).not_nil!
+          r_param_mt = this_rf.meta_type_of(ctx, r_param_info, this_infer).not_nil!
           unless r_param_mt.subtype_of?(ctx, l_param_mt)
             errors << {l_param.pos,
               "this parameter type is #{l_param_mt.show_type}"}

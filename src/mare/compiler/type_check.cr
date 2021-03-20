@@ -815,7 +815,7 @@ class Mare::Compiler::TypeCheck
       @prevent_reentrance = {} of Info => Int32
       @layers_ignored = [] of Int32
       @layers_accepted = [] of Int32
-      @rt_is_complete = @reified.type.is_complete?(ctx).as(Bool)
+
       @rt_contains_foreign_type_params = @reified.type.args.any? { |arg|
         arg.type_params.any? { |type_param|
           !@f_analysis.infer.type_params.includes?(type_param)

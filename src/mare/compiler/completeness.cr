@@ -94,9 +94,7 @@ module Mare::Compiler::Completeness
       reify_cap =
         Infer::MetaType::Capability.new_maybe_generic(next_f_cap).each_cap.first
 
-      next_rf = ctx.type_check[next_f_link]
-        .each_reified_func(type)
-        .find(&.receiver.cap_only.cap_value.==(reify_cap.value)).not_nil!
+      next_rf = Infer::ReifiedFunction.new(type, next_f_link, Infer::MetaType.new(type, reify_cap.value.as(String)))
 
       # Use caching of function branches to prevent infinite recursion.
       # We cache by both seen_fields and func so that we don't combine
