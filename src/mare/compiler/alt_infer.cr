@@ -795,6 +795,9 @@ module Mare::Compiler::AltInfer
     getter! type_param_bound_spans : Array(Span)
     protected setter type_param_bound_spans
 
+    getter! type_param_default_spans : Array(Span?)
+    protected setter type_param_default_spans
+
     def deciding_type_args_of(
       args : Array(Infer::MetaType),
       raw_span : Span
@@ -1018,6 +1021,10 @@ module Mare::Compiler::AltInfer
       @analysis.type_param_bound_spans = @analysis.type_params.map { |type_param|
         lookup_type_param_bound_span(ctx, type_param)
       }
+      @analysis.type_param_default_spans = @analysis.type_params.map { |type_param|
+        default = type_param.ref.default
+        type_expr_span(ctx, default) if default
+      }
     end
 
     def t_link : (Program::Type::Link | Program::TypeAlias::Link)
@@ -1054,6 +1061,10 @@ module Mare::Compiler::AltInfer
       @analysis.target_span = get_target_span(ctx)
       @analysis.type_param_bound_spans = @analysis.type_params.map { |type_param|
         lookup_type_param_bound_span(ctx, type_param)
+      }
+      @analysis.type_param_default_spans = @analysis.type_params.map { |type_param|
+        default = type_param.ref.default
+        type_expr_span(ctx, default) if default
       }
     end
 
@@ -1115,6 +1126,7 @@ module Mare::Compiler::AltInfer
     )
       @analysis.type_params = @t_analysis.type_params
       @analysis.type_param_bound_spans = @t_analysis.type_param_bound_spans
+      @analysis.type_param_default_spans = @t_analysis.type_param_default_spans
     end
 
     def t_link : (Program::Type::Link | Program::TypeAlias::Link)

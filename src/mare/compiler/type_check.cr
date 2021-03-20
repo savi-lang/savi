@@ -834,10 +834,16 @@ class Mare::Compiler::TypeCheck
       return arg if arg
 
       # Use the default type argument if this type parameter has one.
-      ref_default = ref.default
-      return type_expr(ref_default, refer_type) if ref_default
+      if ref.default
+        alt_infer = ctx.alt_infer[@reified.link]
+        default_span = alt_infer.type_param_default_spans[ref.index].not_nil!
+        return alt_infer
+          .deciding_type_args_of(@reified.args, default_span)
+          .not_nil!
+          .final_mt!(ctx)
+      end
 
-      raise "halt" if reified.is_complete?(ctx)
+      raise "inconsistent type param logic" if reified.is_complete?(ctx)
 
       # Otherwise, return it as an unreified type parameter nominal.
       MetaType.new_type_param(TypeParam.new(ref))
@@ -919,10 +925,16 @@ class Mare::Compiler::TypeCheck
       return arg if arg
 
       # Use the default type argument if this type parameter has one.
-      ref_default = ref.default
-      return type_expr(ref_default, refer_type) if ref_default
+      if ref.default
+        alt_infer = ctx.alt_infer[@reified.link]
+        default_span = alt_infer.type_param_default_spans[ref.index].not_nil!
+        return alt_infer
+          .deciding_type_args_of(@reified.args, default_span)
+          .not_nil!
+          .final_mt!(ctx)
+      end
 
-      raise "halt" if reified.is_complete?(ctx)
+      raise "inconsistent type param logic" if reified.is_complete?(ctx)
 
       # Otherwise, return it as an unreified type parameter nominal.
       MetaType.new_type_param(TypeParam.new(ref))
