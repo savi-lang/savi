@@ -757,6 +757,12 @@ class Mare::Compiler::Infer
       MetaType.new(infer.reified_prelude_type("ReflectionOfType", [reflect_mt]))
     end
 
+    def resolve_span!(ctx : Context, infer : AltInfer::Visitor) : AltInfer::Span
+      infer.prelude_type_span(ctx, "ReflectionOfType")
+        .combine_mt(infer.resolve(ctx, @reflect_type)) { |target_mt, arg_mt|
+          MetaType.new(ReifiedType.new(target_mt.single!.link, [arg_mt]))
+        }
+    end
   end
 
   class Literal < DynamicInfo
@@ -1011,6 +1017,8 @@ class Mare::Compiler::Infer
   end
 
   class FieldRead < DynamicInfo
+    getter :field
+
     def initialize(@field : Field, @origin : Self)
       @layer_index = @field.layer_index
     end

@@ -774,35 +774,35 @@ module Mare::Compiler::AltInfer
     getter! type_params : Array(Infer::TypeParam)
     protected setter type_params
 
-    def type_param_substs(type_args : Array(MetaType)) : Hash(Infer::TypeParam, Infer::MetaType)
-      type_params.zip(type_args.map(&.strip_cap)).to_h
-    end
+    getter! type_param_bound_spans : Array(Span)
+    protected setter type_param_bound_spans
 
     def deciding_type_args_of(
-      ctx : Context,
       args : Array(Infer::MetaType),
       raw_span : Span
-    ) : Span
+    ) : Span?
       return raw_span if args.empty?
+
+      type_param_substs = type_params.zip(args.map(&.strip_cap)).to_h
 
       # Many spans are simple terminals, so we can optimize things a bit here
       # by skipping the rest of this deciding when there is nothing to decide
       # because terminals have no decisions to be made.
-      return raw_span if raw_span.inner.is_a?(Span::Terminal)
+      (raw_span.inner.is_a?(Span::Terminal) ? raw_span : (
+        type_params.zip(args).reduce(raw_span) { |span, (type_param, type_arg)|
+          next unless span
 
-      type_params.zip(args).reduce(raw_span) { |span, (type_param, type_arg)|
-        next unless span
+          # When a type argument is passed from a raw type param,
+          # we do not decide the capability here, because the type param
+          # does not necessarily have just one capability.
+          # TODO: Should we figure out how to combine the spans in some way
+          # to make at least a span-contingent decision here?
+          next span if type_arg.type_param_only?
 
-        # When a type argument is passed from a raw type param,
-        # we do not decide the capability here, because the type param
-        # does not necessarily have just one capability.
-        # TODO: Should we figure out how to combine the spans in some way
-        # to make at least a span-contingent decision here?
-        next span if type_arg.type_param_only?
-
-        span.deciding_type_param(type_param, type_arg.cap_only)
-      }
-      .not_nil!
+          span.deciding_type_param(type_param, type_arg.cap_only)
+        }
+      ))
+      .try(&.transform_mt(&.substitute_type_params(type_param_substs)))
     end
   end
 
@@ -821,7 +821,7 @@ module Mare::Compiler::AltInfer
     abstract def t_link : (Program::Type::Link | Program::TypeAlias::Link)
 
     abstract def refer_type_for(node : AST::Node) : Refer::Info?
-    abstract def self_type_expr_span(ctx : Context) : Span
+    abstract def self_type_expr_span(ctx : Context, cap_only = false) : Span
 
     def type_expr_cap(node : AST::Identifier) : Infer::MetaType::Capability?
       case node.value
@@ -835,17 +835,21 @@ module Mare::Compiler::AltInfer
     end
 
     # An identifier type expression must refer to a type.
-    def type_expr_span(ctx : Context, node : AST::Identifier) : Span
+    def type_expr_span(ctx : Context, node : AST::Identifier, cap_only = false) : Span
       ref = refer_type_for(node)
       case ref
       when Refer::Self
-        self_type_expr_span(ctx)
+        self_type_expr_span(ctx, cap_only)
       when Refer::Type
-        Span.simple(Infer::MetaType.new(Infer::ReifiedType.new(ref.link)))
+        span = Span.simple(Infer::MetaType.new(Infer::ReifiedType.new(ref.link)))
+        cap_only ? span.transform_mt(&.cap_only) : span
       when Refer::TypeAlias
-        Span.simple(Infer::MetaType.new_alias(Infer::ReifiedTypeAlias.new(ref.link_alias)))
+        span = Span.simple(Infer::MetaType.new_alias(Infer::ReifiedTypeAlias.new(ref.link_alias)))
+        cap_only ? span.transform_mt(&.cap_only) : span
       when Refer::TypeParam
-        lookup_type_param_partial_reified_span(ctx, Infer::TypeParam.new(ref))
+        cap_only \
+          ? Span.simple(MetaType.unconstrained) \
+          : lookup_type_param_partial_reified_span(ctx, Infer::TypeParam.new(ref))
       when nil
         cap = type_expr_cap(node)
         if cap
@@ -859,18 +863,18 @@ module Mare::Compiler::AltInfer
     end
 
     # An relate type expression must be an explicit capability qualifier.
-    def type_expr_span(ctx : Context, node : AST::Relate) : Span
+    def type_expr_span(ctx : Context, node : AST::Relate, cap_only = false) : Span
       if node.op.value == "'"
         cap_ident = node.rhs.as(AST::Identifier)
         case cap_ident.value
         when "aliased"
-          type_expr_span(ctx, node.lhs).transform_mt do |lhs_mt|
+          type_expr_span(ctx, node.lhs, cap_only).transform_mt do |lhs_mt|
             lhs_mt.alias
           end
         else
           cap = type_expr_cap(cap_ident)
           if cap
-            type_expr_span(ctx, node.lhs).transform_mt do |lhs_mt|
+            type_expr_span(ctx, node.lhs, cap_only).transform_mt do |lhs_mt|
               lhs_mt.override_cap(cap.not_nil!)
             end
           else
@@ -878,12 +882,12 @@ module Mare::Compiler::AltInfer
           end
         end
       elsif node.op.value == "->"
-        lhs = type_expr_span(ctx, node.lhs).transform_mt(&.cap_only)
-        rhs = type_expr_span(ctx, node.rhs)
+        lhs = type_expr_span(ctx, node.lhs, cap_only).transform_mt(&.cap_only)
+        rhs = type_expr_span(ctx, node.rhs, cap_only)
         lhs.combine_mt(rhs) { |lhs_mt, rhs_mt| rhs_mt.viewed_from(lhs_mt) }
       elsif node.op.value == "->>"
-        lhs = type_expr_span(ctx, node.lhs).transform_mt(&.cap_only)
-        rhs = type_expr_span(ctx, node.rhs)
+        lhs = type_expr_span(ctx, node.lhs, cap_only).transform_mt(&.cap_only)
+        rhs = type_expr_span(ctx, node.rhs, cap_only)
         lhs.combine_mt(rhs) { |lhs_mt, rhs_mt| rhs_mt.extracted_from(lhs_mt) }
       else
         raise NotImplementedError.new(node.to_a.inspect)
@@ -892,27 +896,29 @@ module Mare::Compiler::AltInfer
 
     # A "|" group must be a union of type expressions, and a "(" group is
     # considered to be just be a single parenthesized type expression (for now).
-    def type_expr_span(ctx : Context, node : AST::Group) : Span
+    def type_expr_span(ctx : Context, node : AST::Group, cap_only = false) : Span
       if node.style == "|"
         spans = node.terms
           .select { |t| t.is_a?(AST::Group) && t.terms.size > 0 }
-          .map { |t| type_expr_span(ctx, t).as(Span) }
+          .map { |t| type_expr_span(ctx, t, cap_only).as(Span) }
 
         raise NotImplementedError.new("empty union") if spans.empty?
 
         Span.reduce_combine_mts(spans) { |accum, mt| accum.unite(mt) }.not_nil!
       elsif node.style == "(" && node.terms.size == 1
-        type_expr_span(ctx, node.terms.first)
+        type_expr_span(ctx, node.terms.first, cap_only)
       else
         raise NotImplementedError.new(node.to_a.inspect)
       end
     end
 
     # A "(" qualify is used to add type arguments to a type.
-    def type_expr_span(ctx : Context, node : AST::Qualify) : Span
+    def type_expr_span(ctx : Context, node : AST::Qualify, cap_only = false) : Span
       raise NotImplementedError.new(node.to_a) unless node.group.style == "("
 
-      target_span = type_expr_span(ctx, node.term)
+      target_span = type_expr_span(ctx, node.term, cap_only)
+      return target_span if cap_only
+
       arg_spans = node.group.terms.map do |t|
         type_expr_span(ctx, t).as(Span)
       end
@@ -943,41 +949,30 @@ module Mare::Compiler::AltInfer
     end
 
     # All other AST nodes are unsupported as type expressions.
-    def type_expr_span(ctx : Context, node : AST::Node) : Span
+    def type_expr_span(ctx : Context, node : AST::Node, cap_only = false) : Span
       raise NotImplementedError.new(node.to_a)
     end
 
     @currently_looking_up_param_bounds = Set(Infer::TypeParam).new
-    def lookup_type_param_bound_span(ctx : Context, type_param : Infer::TypeParam)
+    def lookup_type_param_bound_span(ctx : Context, type_param : Infer::TypeParam, cap_only = false)
       @currently_looking_up_param_bounds.add(type_param)
 
       ref = type_param.ref
       raise "lookup on wrong visitor" unless ref.parent_link == t_link
-      type_expr_span(ctx, ref.bound)
+      type_expr_span(ctx, ref.bound, cap_only)
 
       .tap { @currently_looking_up_param_bounds.delete(type_param) }
     end
     def lookup_type_param_partial_reified_span(ctx : Context, type_param : Infer::TypeParam)
-      # Avoid infinite recursion by taking a lazy approach if we are already
-      # recursed into this type param's bound resolution.
-      # This lazy reference can be unwrapped by other logic later as needed.
-      if @currently_looking_up_param_bounds.includes?(type_param)
-        lazy = Infer::TypeParam.new(type_param.ref)
-        lazy.lazy = true
-        return Span.simple(MetaType.new_type_param(lazy))
-      end
-
-      # Otherwise, continue by looking up the bound of this type param,
+      # Look up the bound cap of this type param (that is, cap only),
       # and intersect it with the type param reference itself, expanding the
       # span to include every possible single cap instead of using a multi-cap.
-      lookup_type_param_bound_span(ctx, type_param).decided_by(type_param) { |bound_mt|
+      lookup_type_param_bound_span(ctx, type_param, true).decided_by(type_param) { |bound_mt|
         bound_mt.cap_only_inner.each_cap.map { |cap|
           cap_mt = MetaType.new(cap)
           mt = MetaType
             .new_type_param(type_param)
             .intersect(cap_mt)
-            # .intersect(bound_mt.strip_cap)
-          # TODO: Introduce a Fact Span that adds the bound_mt as a fact?
           {cap_mt, Span.simple(mt)}
         }.to_h
       }
@@ -1002,6 +997,9 @@ module Mare::Compiler::AltInfer
     end
 
     def run(ctx)
+      @analysis.type_param_bound_spans = @analysis.type_params.map { |type_param|
+        lookup_type_param_bound_span(ctx, type_param)
+      }
     end
 
     def t_link : (Program::Type::Link | Program::TypeAlias::Link)
@@ -1012,7 +1010,7 @@ module Mare::Compiler::AltInfer
       @refer_type[node]?
     end
 
-    def self_type_expr_span(ctx : Context) : Span
+    def self_type_expr_span(ctx : Context, cap_only = false) : Span
       raise NotImplementedError.new("#{self.class} self_type_expr_span")
     end
   end
@@ -1036,6 +1034,9 @@ module Mare::Compiler::AltInfer
 
     def run(ctx)
       @analysis.target_span = get_target_span(ctx)
+      @analysis.type_param_bound_spans = @analysis.type_params.map { |type_param|
+        lookup_type_param_bound_span(ctx, type_param)
+      }
     end
 
     private def get_target_span(ctx)
@@ -1066,7 +1067,7 @@ module Mare::Compiler::AltInfer
       @refer_type[node]?
     end
 
-    def self_type_expr_span(ctx : Context) : Span
+    def self_type_expr_span(ctx : Context, cap_only = false) : Span
       raise NotImplementedError.new("#{self.class} self_type_expr_span")
     end
   end
@@ -1095,6 +1096,7 @@ module Mare::Compiler::AltInfer
       @pre_infer : PreInfer::Analysis,
     )
       @analysis.type_params = @t_analysis.type_params
+      @analysis.type_param_bound_spans = @t_analysis.type_param_bound_spans
     end
 
     def t_link : (Program::Type::Link | Program::TypeAlias::Link)
@@ -1154,8 +1156,7 @@ module Mare::Compiler::AltInfer
       span.transform_mt { |mt|
         mt.substitute_each_type_alias_in_first_layer { |rta|
           other_analysis = ctx.alt_infer_edge.run_for_type_alias(ctx, rta.link.resolve(ctx), rta.link)
-          span = other_analysis.deciding_type_args_of(ctx, rta.args, other_analysis.target_span)
-            .transform_mt(&.substitute_type_params(other_analysis.type_param_substs(rta.args)))
+          span = other_analysis.deciding_type_args_of(rta.args, other_analysis.target_span).not_nil!
           span_inner = span.inner
 
           # TODO: better way of dealing with ErrorPropagate, related to other TODO below:
@@ -1216,8 +1217,8 @@ module Mare::Compiler::AltInfer
         }
     end
 
-    def self_type_expr_span(ctx : Context) : Span
-      rt_span = self_with_no_cap_yet(ctx)
+    def self_type_expr_span(ctx : Context, cap_only = false) : Span
+      rt_span = cap_only ? Span.simple(MetaType.unconstrained) : self_with_no_cap_yet(ctx)
 
       # Finally, build the top of the span's decision tree with possible f_caps.
       f = self.func
@@ -1228,6 +1229,7 @@ module Mare::Compiler::AltInfer
         :f_cap,
         MetaType::Capability.new_maybe_generic(f_cap_value).each_cap.map do |cap|
           cap_mt = MetaType.new(cap)
+
           {cap_mt, rt_span.transform_mt(&.intersect(cap_mt))}
         end.to_h
       )
@@ -1244,8 +1246,7 @@ module Mare::Compiler::AltInfer
       other_analysis = ctx.alt_infer_edge.run_for_func(ctx, other_f, other_f_link)
       raw_span = other_analysis[other_pre[other_f.ident]]
 
-      other_analysis.deciding_type_args_of(ctx, other_rt.args, raw_span)
-      .transform_mt(&.substitute_type_params(other_analysis.type_param_substs(other_rt.args)))
+      other_analysis.deciding_type_args_of(other_rt.args, raw_span).not_nil!
     end
 
     def depends_on_call_param_span(ctx, other_rt, other_f, other_f_link, index)
@@ -1257,8 +1258,7 @@ module Mare::Compiler::AltInfer
       other_analysis = ctx.alt_infer_edge.run_for_func(ctx, other_f, other_f_link)
       raw_span = other_analysis[other_pre[param.first]]
 
-      other_analysis.deciding_type_args_of(ctx, other_rt.args, raw_span)
-      .transform_mt(&.substitute_type_params(other_analysis.type_param_substs(other_rt.args)))
+      other_analysis.deciding_type_args_of(other_rt.args, raw_span).not_nil!
     end
 
     def depends_on_call_yield_in_span(ctx, other_rt, other_f, other_f_link)
@@ -1269,8 +1269,7 @@ module Mare::Compiler::AltInfer
       other_analysis = ctx.alt_infer_edge.run_for_func(ctx, other_f, other_f_link)
       raw_span = other_analysis[yield_in_info]
 
-      other_analysis.deciding_type_args_of(ctx, other_rt.args, raw_span)
-      .transform_mt(&.substitute_type_params(other_analysis.type_param_substs(other_rt.args)))
+      other_analysis.deciding_type_args_of(other_rt.args, raw_span).not_nil!
     end
 
     def depends_on_call_yield_out_span(ctx, other_rt, other_f, other_f_link, index)
@@ -1281,8 +1280,7 @@ module Mare::Compiler::AltInfer
       other_analysis = ctx.alt_infer_edge.run_for_func(ctx, other_f, other_f_link)
       raw_span = other_analysis[yield_out_info]
 
-      other_analysis.deciding_type_args_of(ctx, other_rt.args, raw_span)
-      .transform_mt(&.substitute_type_params(other_analysis.type_param_substs(other_rt.args)))
+      other_analysis.deciding_type_args_of(other_rt.args, raw_span).not_nil!
     end
 
     def run_edge(ctx : Context)

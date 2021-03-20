@@ -481,6 +481,7 @@ class Mare::Compiler::TypeCheck
     link : Program::Type::Link,
     type_args : Array(MetaType) = [] of MetaType
   ) : ForReifiedType
+    type_args = type_args.map(&.simplify(ctx))
     rt = ReifiedType.new(link, type_args)
     @types[rt]? || (
       refer_type = ctx.refer_type[link]
@@ -551,15 +552,34 @@ class Mare::Compiler::TypeCheck
       return false
     end
 
+    # Unwrap any type aliases present in the first layer of each type arg.
+    unwrapped_args = rt.args.map { |arg|
+      arg.substitute_each_type_alias_in_first_layer { |rta|
+        unwrap_alias(ctx, rta).not_nil!
+      }
+    }
+
     # Check each type arg against the bound of the corresponding type param.
-    rt.args.each_with_index do |arg, index|
-      param_bound = for_rt(ctx, rt.link).get_type_param_bound(index)
-      next unless param_bound
+    unwrapped_args.each_with_index do |arg, index|
+      alt_infer = ctx.alt_infer[rt.link]
+      param_bound_span = alt_infer.deciding_type_args_of(unwrapped_args,
+        alt_infer.type_param_bound_spans[index]
+      )
+      return false unless param_bound_span
 
-      # TODO: We may need to unwrap type aliases within the type argument.
-      next if arg.any_type_alias_in_first_layer?
+      # TODO: move this unwrapping code to a common place?
+      param_bound_span_inner = param_bound_span.inner
+      param_bound_mt =
+        case param_bound_span_inner
+        when AltInfer::Span::Terminal
+          param_bound_span_inner.meta_type
+        when AltInfer::Span::ErrorPropagate
+          return false
+        else
+          raise NotImplementedError.new(param_bound_span.inspect)
+        end
 
-      return false if !arg.satisfies_bound?(ctx, param_bound)
+      return false if !arg.satisfies_bound?(ctx, param_bound_mt)
     end
 
     true
@@ -877,7 +897,7 @@ class Mare::Compiler::TypeCheck
 
     private getter ctx : Context
     getter reified : ReifiedTypeAlias
-    private getter refer_type : ReferType::Analysis
+    protected getter refer_type : ReferType::Analysis
 
     def initialize(@ctx, @reified, @refer_type)
     end
@@ -906,7 +926,7 @@ class Mare::Compiler::TypeCheck
     private getter ctx : Context
     getter analysis : ReifiedTypeAnalysis
     getter reified : ReifiedType
-    private getter refer_type : ReferType::Analysis
+    protected getter refer_type : ReferType::Analysis
 
     def initialize(@ctx, @analysis, @reified, @refer_type)
       @type_param_refinements = {} of Refer::TypeParam => Array(MetaType)
@@ -926,6 +946,7 @@ class Mare::Compiler::TypeCheck
       end
     end
 
+    # TODO: caching here?
     def type_params_and_type_args(ctx)
       type_params =
         @reified.link.resolve(ctx).params.try(&.terms.map { |type_param|
@@ -934,7 +955,13 @@ class Mare::Compiler::TypeCheck
           Infer::TypeParam.new(ref.as(Refer::TypeParam))
         }) || [] of Infer::TypeParam
 
-      type_params.zip(@reified.args)
+      type_args = @reified.args.map { |arg|
+        arg.substitute_each_type_alias_in_first_layer { |rta|
+          ctx.type_check.unwrap_alias(ctx, rta).not_nil!
+        }
+      }
+
+      type_params.zip(type_args)
     end
 
     def type_arg_for_type_param(ctx, type_param : TypeParam) : MetaType?
@@ -1207,6 +1234,16 @@ class Mare::Compiler::TypeCheck
               info.describe_downstream_constraints(ctx, self)
         end
       end
+
+      # Reach the functions we will use during CodeGen.
+      array_rt = mt.single!
+      ["new", "<<"].each do |f_name|
+        f = array_rt.defn(ctx).find_func!(f_name)
+        f_link = f.make_link(array_rt.link)
+        ctx.type_check.for_rf(ctx, array_rt, f_link, MetaType.cap(f.cap.value)).run
+        @analysis.called_funcs.add({info.pos, array_rt, f_link})
+      end
+
       true
     end
 
@@ -1288,6 +1325,9 @@ class Mare::Compiler::TypeCheck
     end
 
     # Reach the underlying field "function" of a Field.
+    def type_check_pre(ctx : Context, info : Infer::FieldRead, mt : MetaType) : Bool
+      type_check_pre(ctx, info.field, mt)
+    end
     def type_check_pre(ctx : Context, info : Infer::Field, mt : MetaType) : Bool
       field_func = @reified.type.defn(ctx).functions.find do |f|
         f.ident.value == info.name && f.has_tag?(:field)
@@ -1308,6 +1348,28 @@ class Mare::Compiler::TypeCheck
       true
     end
 
+    # Reach the reflectable functions assocaited with a ReflectionOfType.
+    def type_check_pre(ctx : Context, info : Infer::ReflectionOfType, mt : MetaType) : Bool
+      reflection_mt = mt
+      reflection_rt = mt.single!
+      reflect_mt = reflection_rt.args.first
+      reflect_rt = reflect_mt.single!
+
+      # Reach all functions that might possibly be reflected.
+      reflect_rt.defn(ctx).functions.each do |f|
+        next if f.has_tag?(:hygienic)
+        next if f.body.nil?
+        next if f.ident.value.starts_with?("_")
+        f_link = f.make_link(reflect_rt.link)
+        MetaType::Capability.new_maybe_generic(f.cap.value).each_cap.each do |f_cap|
+          ctx.type_check.for_rf(ctx, reflect_rt, f_link, MetaType.new(f_cap)).tap(&.run)
+        end
+        @analysis.called_funcs.add({info.pos, reflect_rt, f_link})
+      end
+
+      true
+    end
+
     # Other types of Info nodes do not have extra type checks.
     def type_check_pre(ctx : Context, info : Infer::Info, mt : MetaType) : Bool
       true # There is nothing extra here.
@@ -1318,7 +1380,6 @@ class Mare::Compiler::TypeCheck
 
       # TODO: print a different error message when the downstream constraints are
       # internally conflicting, even before adding this meta_type into the mix.
-
       if !meta_type.ephemeralize.within_constraints?(ctx, [
         info.total_downstream_constraint(ctx, self)
       ])

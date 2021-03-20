@@ -2439,6 +2439,7 @@ class Mare::Compiler::CodeGen
         features =
           gtype.gfuncs.values
             .reject(&.func.has_tag?(:hygienic))
+            .reject(&.func.ident.value.starts_with?("_"))
             .map do |gfunc|
               tags = gfunc.func.tags_sorted.map { |tag| gen_string(tag.to_s) }
 
@@ -2638,9 +2639,11 @@ class Mare::Compiler::CodeGen
       @builder.cond(cond_value, case_block, next_block)
 
       @builder.position_at_end(case_block)
-      if meta_type_of(fore[1]).unconstrained?
+      if meta_type_of(fore[1]).unconstrained? && !func_frame.jumps.away?(fore[1])
         # We skip generating code for the case block if it is unreachable,
         # meaning that the cond was deemed at compile time to never be true.
+        # This is marked by an unconstrained result MetaType, provided that
+        # the block does not jump away (which is also unconstrained).
         @builder.unreachable
       else
         # Generate code for the case block that we execute, finishing by
@@ -2673,9 +2676,11 @@ class Mare::Compiler::CodeGen
     @builder.br(case_block)
 
     @builder.position_at_end(case_block)
-    if meta_type_of(expr.list.last[1]).unconstrained?
+    if meta_type_of(expr.list.last[1]).unconstrained? && !func_frame.jumps.away?(expr.list.last[1])
       # We skip generating code for the case block if it is unreachable,
       # meaning that the cond was deemed at compile time to never be true.
+      # This is marked by an unconstrained result MetaType, provided that
+      # the block does not jump away (which is also unconstrained).
       @builder.unreachable
     else
       # Generate code for the final case block using exactly the same strategy

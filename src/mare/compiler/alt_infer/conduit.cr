@@ -65,7 +65,6 @@ module Mare::Compiler::AltInfer
     struct Union < Inner
       getter infos : Array(Infer::Info)
       def initialize(@infos)
-        raise ArgumentError.new("empty union") if @infos.empty?
       end
 
       def pretty_print(format : PrettyPrint)
@@ -89,11 +88,14 @@ module Mare::Compiler::AltInfer
       end
 
       def resolve_span!(ctx : Context, infer : Visitor) : Span
+        return Span.simple(MetaType.unsatisfiable) if @infos.empty?
+
         spans = @infos.map { |info| infer.resolve(ctx, info) }
         Span
           .reduce_combine_mts(spans) { |accum, mt| accum.unite(mt) }
           .not_nil!
       end
+
       def resolve!(ctx : Context, infer : TypeCheck::ForReifiedFunc) : Infer::MetaType?
         mts = @infos.compact_map { |info| infer.resolve(ctx, info).as(Infer::MetaType?) }
         return nil if mts.empty?

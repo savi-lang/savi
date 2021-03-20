@@ -389,7 +389,7 @@ struct Mare::Compiler::Infer::MetaType
       end
 
       true # keep this term
-    end)
+    end.map { |term| simplify_nominal(ctx, term) })
 
     removed_anti_terms = Set(AntiNominal).new
     new_anti_terms = inner.anti_terms.try(&.select do |l|
@@ -403,9 +403,6 @@ struct Mare::Compiler::Infer::MetaType
 
       true # keep this term
     end)
-
-    # If we didn't remove anything, there was no change.
-    return inner if removed_terms.empty? && removed_anti_terms.empty?
 
     # Otherwise, return as a new intersection.
     Intersection.build(inner.cap, new_terms.try(&.to_set), new_anti_terms.try(&.to_set))
@@ -480,12 +477,17 @@ struct Mare::Compiler::Infer::MetaType
   end
 
   private def self.simplify_nominal(ctx : Context, inner : Nominal)
-    # inner_defn = inner.defn
-    # if inner_defn.is_a?(ReifiedTypeAlias)
-    #   simplify_inner(ctx, ctx.infer.unwrap_alias(ctx, inner_defn).inner)
-    # else
+    inner_defn = inner.defn
+    case inner_defn
+    when ReifiedType
+      return inner if inner_defn.args.empty?
+      Nominal.new(ReifiedType.new(inner_defn.link, inner_defn.args.map(&.simplify(ctx))))
+    when ReifiedTypeAlias
+      return inner if inner_defn.args.empty?
+      Nominal.new(ReifiedTypeAlias.new(inner_defn.link, inner_defn.args.map(&.simplify(ctx))))
+    else
       inner
-    # end
+    end
   end
 
   # Return true if this MetaType is a subtype of the other MetaType.
