@@ -238,6 +238,21 @@ module Mare::Compiler::Infer
     ) : MetaType?
       meta_type_of(ctx, infer.type_param_default_spans[index], infer)
     end
+
+    def meta_type_of_ret(
+      ctx : Context,
+      infer : Analysis = ctx.infer[@link]
+    ) : MetaType?
+      meta_type_of(ctx, infer.ret_span, infer)
+    end
+
+    def meta_type_of_param(
+      ctx : Context,
+      index : Int,
+      infer : Analysis = ctx.infer[@link]
+    ) : MetaType?
+      meta_type_of(ctx, infer.param_spans[index], infer)
+    end
   end
 
   struct TypeParam

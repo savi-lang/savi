@@ -67,6 +67,17 @@ module Mare::Compiler::Infer
   end
 
   struct FuncAnalysis < Analysis
+    getter! param_spans : Array(Span)
+    protected setter param_spans
+
+    getter! ret_span : Span
+    protected setter ret_span
+
+    getter yield_in_span : Span?
+    protected setter yield_in_span
+
+    getter! yield_out_spans : Array(Span)
+    protected setter yield_out_spans
   end
 
   struct TypeAnalysis < Analysis
@@ -74,7 +85,7 @@ module Mare::Compiler::Infer
 
   struct TypeAliasAnalysis < Analysis
     getter! target_span : Span
-    protected def target_span=(span : Span); @target_span = span; end
+    protected setter target_span
   end
 
   abstract class TypeExprEvaluator
@@ -553,14 +564,18 @@ module Mare::Compiler::Infer
     end
 
     def run_edge(ctx : Context)
-      func.params.try do |params|
-        params.terms.each { |param| resolve(ctx, @pre_infer[param]) }
-      end
+      @analysis.param_spans =
+        func.params.try { |params|
+          params.terms.map { |param| resolve(ctx, @pre_infer[param]) }
+        } || [] of Span
 
-      resolve(ctx, @pre_infer[ret])
+      @analysis.ret_span = resolve(ctx, @pre_infer[ret])
 
-      @pre_infer.yield_in_info.try { |info| resolve(ctx, info) }
-      @pre_infer.yield_out_infos.each { |info| resolve(ctx, info) }
+      @analysis.yield_in_span =
+        @pre_infer.yield_in_info.try { |info| resolve(ctx, info) }
+
+      @analysis.yield_out_spans =
+        @pre_infer.yield_out_infos.map { |info| resolve(ctx, info) }
     end
 
     def run(ctx : Context)

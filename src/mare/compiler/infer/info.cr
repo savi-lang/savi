@@ -1557,37 +1557,6 @@ module Mare::Compiler::Infer
       end
     end
 
-    def follow_call_check_autorecover_cap(ctx, infer : ForReifiedFunc, other_infer : ForReifiedFunc, inferred_ret)
-      call = self
-
-      # If autorecover of the receiver cap was needed to make this call work,
-      # we now have to confirm that arguments and return value are all sendable.
-      problems = [] of {Source::Pos, String}
-
-      unless inferred_ret.is_sendable? || !call.ret_value_used
-        problems << {other_infer.ret.pos,
-          "the return type #{inferred_ret.show_type} isn't sendable " \
-          "and the return value is used (the return type wouldn't matter " \
-          "if the calling side entirely ignored the return value"}
-      end
-
-      # TODO: It should be safe to pass in a TRN if the receiver is TRN,
-      # so is_sendable? isn't quite liberal enough to allow all valid cases.
-      call.args.try(&.terms.each do |arg|
-        inferred_arg = infer.resolve(ctx, infer.f_analysis[arg])
-        unless inferred_arg.alias.is_sendable?
-          problems << {arg.pos,
-            "the argument (when aliased) has a type of " \
-            "#{inferred_arg.alias.show_type}, which isn't sendable"}
-        end
-      end)
-
-      Error.at call,
-        "This function call won't work unless the receiver is ephemeral; " \
-        "it must either be consumed or be allowed to be auto-recovered. "\
-        "Auto-recovery didn't work for these reasons",
-          problems unless problems.empty?
-    end
     def follow_call_check_autorecover_cap(
       ctx : Context,
       infer : TypeCheck::ForReifiedFunc,
@@ -1776,20 +1745,14 @@ module Mare::Compiler::Infer
 
     def as_multiple_downstream_constraints(ctx : Context, infer : TypeCheck::ForReifiedFunc) : Array({Source::Pos, MetaType})?
       @call.follow_call_resolve_other_rfs(ctx, infer).compact_map do |other_rf|
-        # TODO: similar to the below TODO, should have this ready for us
-        # already in the Infer::ReifiedFuncAnalysis for us to just grab.
-        param = other_rf.link.resolve(ctx).params.try(&.terms.[@index]?)
-        next unless param
+        param_mt = other_rf.meta_type_of_param(ctx, @index)
+        next unless param_mt
 
-        # TODO: remove the need for this pre_infer lookup by having this
-        # directly in the Infer::ReifiedFuncAnalysis inside meta_type_of.
+        param = other_rf.link.resolve(ctx).params.not_nil!.terms.[@index]
         pre_infer = ctx.pre_infer[other_rf.link]
         param_info = pre_infer[param]
         param_info = param_info.lhs if param_info.is_a?(FromAssign)
         param_info = param_info.as(Param)
-        param_mt = other_rf.meta_type_of(ctx, param_info)
-        next unless param_mt
-
         {param_info.first_viable_constraint_pos, param_mt}.as({Source::Pos, MetaType})
       end
     end

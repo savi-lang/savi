@@ -1056,17 +1056,17 @@ class Mare::Compiler::TypeCheck
         # Check the number of arguments.
         info.follow_call_check_args(ctx, self, call_func, problems)
 
-        # Reach the reified function we are calling, with the right reify_cap,
-        # and also get its analysis in case we need to for further checks.
-        other_analysis =
-          ctx.type_check.for_rf(ctx, call_defn, call_func_link, reify_cap)
-            .tap(&.run)
-            .analysis
+        # Reach the reified function we are calling, with the right reify_cap.
+        # TODO: Remove this line and make the Reach pass responsible for this.
+        ctx.type_check.for_rf(ctx, call_defn, call_func_link, reify_cap).try(&.tap(&.run))
 
         # Check if auto-recovery of the receiver is possible.
         if autorecover_needed
-          ret_mt = other_analysis.ret_resolved
-          info.follow_call_check_autorecover_cap(ctx, self, call_func, ret_mt)
+          receiver = MetaType.new(call_defn, reify_cap.cap_only_inner.value.as(String))
+          other_rf = ReifiedFunction.new(call_defn, call_func_link, receiver)
+          ret_mt = other_rf.meta_type_of_ret(ctx)
+          info.follow_call_check_autorecover_cap(ctx, self, call_func, ret_mt) \
+            if ret_mt
         end
       end
       ctx.error_at info,
