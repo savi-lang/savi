@@ -10,10 +10,6 @@ module Mare::Compiler::Infer
       link.resolve(ctx)
     end
 
-    def target_type_expr(ctx) : AST::Term
-      defn(ctx).target
-    end
-
     def show_type
       String.build { |io| show_type(io) }
     end
@@ -41,6 +37,46 @@ module Mare::Compiler::Infer
         .select { |_, _, default| !default }.size
 
       args.size >= params_count_min && args.all?(&.type_params.empty?)
+    end
+
+    def meta_type_of(
+      ctx : Context,
+      span : Span?,
+      infer : Analysis = ctx.infer[@link]
+    ) : MetaType?
+      return unless span
+      infer.deciding_type_args_of(@args, span).try(&.final_mt!(ctx))
+    end
+
+    def meta_type_of(
+      ctx : Context,
+      info : Info,
+      infer : Analysis = ctx.infer[@link]
+    ) : MetaType?
+      meta_type_of(ctx, infer[info], infer)
+    end
+
+    def meta_type_of_target(
+      ctx : Context,
+      infer : Analysis = ctx.infer[@link]
+    ) : MetaType?
+      meta_type_of(ctx, infer.target_span, infer)
+    end
+
+    def meta_type_of_type_param_bound(
+      ctx : Context,
+      index : Int,
+      infer : Analysis = ctx.infer[@link]
+    ) : MetaType?
+      meta_type_of(ctx, infer.type_param_bound_spans[index], infer)
+    end
+
+    def meta_type_of_type_param_default(
+      ctx : Context,
+      index : Int,
+      infer : Analysis = ctx.infer[@link]
+    ) : MetaType?
+      meta_type_of(ctx, infer.type_param_default_spans[index], infer)
     end
   end
 
@@ -95,6 +131,39 @@ module Mare::Compiler::Infer
 
       args.size >= params_count_min && args.all?(&.type_params.empty?)
     end
+
+    def meta_type_of(
+      ctx : Context,
+      span : Span?,
+      infer : Analysis = ctx.infer[@link]
+    ) : MetaType?
+      return unless span
+      infer.deciding_type_args_of(@args, span).try(&.final_mt!(ctx))
+    end
+
+    def meta_type_of(
+      ctx : Context,
+      info : Info,
+      infer : Analysis = ctx.infer[@link]
+    ) : MetaType?
+      meta_type_of(ctx, infer[info], infer)
+    end
+
+    def meta_type_of_type_param_bound(
+      ctx : Context,
+      index : Int,
+      infer : Analysis = ctx.infer[@link]
+    ) : MetaType?
+      meta_type_of(ctx, infer.type_param_bound_spans[index], infer)
+    end
+
+    def meta_type_of_type_param_default(
+      ctx : Context,
+      index : Int,
+      infer : Analysis = ctx.infer[@link]
+    ) : MetaType?
+      meta_type_of(ctx, infer.type_param_default_spans[index], infer)
+    end
   end
 
   struct ReifiedFunction
@@ -125,6 +194,46 @@ module Mare::Compiler::Infer
 
     def receiver_cap
       receiver.cap_only
+    end
+
+    def meta_type_of(
+      ctx : Context,
+      span : Span?,
+      infer : Analysis = ctx.infer[@link]
+    ) : MetaType?
+      return unless span
+
+      span = span
+        .deciding_f_cap(self.receiver_cap, func(ctx).has_tag?(:constructor))
+      return unless span
+
+      infer
+        .deciding_type_args_of(@type.args, span)
+        .try(&.final_mt!(ctx))
+    end
+
+    def meta_type_of(
+      ctx : Context,
+      info : Info,
+      infer : Analysis = ctx.infer[@link]
+    ) : MetaType?
+      meta_type_of(ctx, infer[info], infer)
+    end
+
+    def meta_type_of_type_param_bound(
+      ctx : Context,
+      index : Int,
+      infer : Analysis = ctx.infer[@link]
+    ) : MetaType?
+      meta_type_of(ctx, infer.type_param_bound_spans[index], infer)
+    end
+
+    def meta_type_of_type_param_default(
+      ctx : Context,
+      index : Int,
+      infer : Analysis = ctx.infer[@link]
+    ) : MetaType?
+      meta_type_of(ctx, infer.type_param_default_spans[index], infer)
     end
   end
 

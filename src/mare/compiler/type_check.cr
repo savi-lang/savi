@@ -514,10 +514,7 @@ class Mare::Compiler::TypeCheck
   end
 
   def self.unwrap_alias(ctx : Context, rt_alias : ReifiedTypeAlias) : MetaType?
-    infer = ctx.infer[rt_alias.link]
-    infer
-      .deciding_type_args_of(rt_alias.args, infer.target_span)
-      .try(&.final_mt!(ctx))
+    rt_alias.meta_type_of_target(ctx)
   end
 
   # TODO: Get rid of this
@@ -667,11 +664,7 @@ class Mare::Compiler::TypeCheck
 
       arg = arg.simplify(ctx)
 
-      infer = ctx.infer[rt.link]
-      bound_span = infer.type_param_bound_spans[index]
-      param_bound = infer
-        .deciding_type_args_of(rt.args, bound_span)
-        .try(&.final_mt!(ctx))
+      param_bound = rt.meta_type_of_type_param_bound(ctx, index)
       next unless param_bound
 
       unless arg.satisfies_bound?(ctx, param_bound)
@@ -702,14 +695,8 @@ class Mare::Compiler::TypeCheck
       return arg if arg
 
       # Use the default type argument if this type parameter has one.
-      if ref.default
-        infer = ctx.infer[@reified.link]
-        default_span = infer.type_param_default_spans[ref.index].not_nil!
-        return infer
-          .deciding_type_args_of(@reified.args, default_span)
-          .not_nil!
-          .final_mt!(ctx)
-      end
+      return @reified.meta_type_of_type_param_default(ctx, ref.index) \
+        if ref.default
 
       raise "inconsistent type param logic" if reified.is_complete?(ctx)
 
@@ -735,11 +722,8 @@ class Mare::Compiler::TypeCheck
         # Get the MetaType of the asserted supertype trait
         f_link = f.make_link(reified.link)
         pre_infer = ctx.pre_infer[f_link]
-        infer = ctx.infer[f_link]
-        ret_info = infer[pre_infer[f.ret.not_nil!]]
-        trait_mt = infer
-          .deciding_type_args_of(reified.args, ret_info)
-          .try(&.final_mt!(ctx))
+        rf = ReifiedFunction.new(reified, f_link, MetaType.new(reified, "non"))
+        trait_mt = rf.meta_type_of(ctx, pre_infer[f.ret.not_nil!])
         next unless trait_mt
 
         trait_rt = trait_mt.single!
@@ -784,14 +768,8 @@ class Mare::Compiler::TypeCheck
       return arg if arg
 
       # Use the default type argument if this type parameter has one.
-      if ref.default
-        infer = ctx.infer[@reified.link]
-        default_span = infer.type_param_default_spans[ref.index].not_nil!
-        return infer
-          .deciding_type_args_of(@reified.args, default_span)
-          .not_nil!
-          .final_mt!(ctx)
-      end
+      return @reified.meta_type_of_type_param_default(ctx, ref.index) \
+        if ref.default
 
       raise "inconsistent type param logic" if reified.is_complete?(ctx)
 
@@ -815,11 +793,7 @@ class Mare::Compiler::TypeCheck
       end
 
       # Get the MetaType of the declared bound for this type parameter.
-      infer = ctx.infer[reified.link]
-      bound_span = infer.type_param_bound_spans[type_param.ref.index]
-      infer
-        .deciding_type_args_of(reified.args, bound_span)
-        .try(&.final_mt!(ctx))
+      reified.meta_type_of_type_param_bound(ctx, type_param.ref.index)
     end
   end
 
