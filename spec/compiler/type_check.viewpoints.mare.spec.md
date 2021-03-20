@@ -205,3 +205,25 @@ It correctly applies extracting-viewpoint adaptation for the whole truth table:
     result_e5 = outer_ref.inner_box <<= Inner.new, result_e5 ::type=> Inner'box
     result_e6 = outer_ref.inner_tag <<= Inner.new, result_e6 ::type=> Inner'tag
 ```
+
+---
+
+It correctly applies viewpoint adaptation for array access via a box receiver:
+
+```mare
+:class OuterArray
+  :prop array Array(Inner'ref)
+  :new iso: @array = [Inner.new]
+  :fun first!: @array[0]!
+```
+```mare
+    outer_box OuterArray'box = OuterArray.new
+    outer_ref OuterArray'ref = OuterArray.new
+    outer_val OuterArray'val = OuterArray.new
+
+    try (
+      outer_box.first! ::type=> Inner'box
+      outer_ref.first! ::type=> Inner
+      outer_val.first! ::type=> Inner'val
+    )
+```

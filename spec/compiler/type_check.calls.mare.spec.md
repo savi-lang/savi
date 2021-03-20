@@ -177,6 +177,19 @@ This function call doesn't meet subtyping requirements:
   :fun readonly: @mutate
    ^~~
 ```
+```error
+This function call doesn't meet subtyping requirements:
+  :fun readonly: @mutate
+                  ^~~~~~
+
+- the type FunRefMutateFunReadOnly'val isn't a subtype of the required capability of 'ref':
+  :fun ref mutate: None
+       ^~~
+
+- this would be possible if the calling function were declared as `:fun ref`:
+  :fun readonly: @mutate
+   ^~~
+```
 
 ---
 

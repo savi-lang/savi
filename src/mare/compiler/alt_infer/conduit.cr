@@ -127,9 +127,9 @@ module Mare::Compiler::AltInfer
           case flat_inner
           when Direct; Ephemeralize.new(flat_inner.info)
           when Ephemeralize; Ephemeralize.new(flat_inner.info)
-          when Alias; Direct.new(flat_inner.info)
+          when Alias; Ephemeralize.new(flat_inner.info)
           else raise NotImplementedError.new(flat_inner.inspect)
-          end
+          end.as(Inner)
         end
       end
 

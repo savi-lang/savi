@@ -215,15 +215,14 @@ class Mare::Compiler::TypeCheck
     # reifications of all generic type parameters.
     sorted_types.each do |t|
       t_link = t.make_link(library)
-      refer_type = ctx.refer_type[t_link]
+      rts = for_type_partial_reifications(ctx, t_link)
 
-      no_args_rt = for_rt(ctx, t_link).reified
-      rts = for_type_partial_reifications(ctx, t, t_link, no_args_rt, refer_type)
-
-      @t_analyses[t_link].each_non_argumented_reified.each do |rt|
+      get_or_create_t_analysis(t_link).each_non_argumented_reified.each do |rt|
         t.functions.each do |f|
           f_link = f.make_link(t_link)
-          MetaType::Capability.new_maybe_generic(f.cap.value).each_cap.each do |f_cap|
+          f_cap_value = f.cap.value
+          f_cap_value = "read" if f_cap_value == "box" # TODO: figure out if we can remove this Pony-originating semantic hack
+          MetaType::Capability.new_maybe_generic(f_cap_value).each_cap.each do |f_cap|
             for_rf(ctx, rt, f_link, MetaType.new(f_cap)).run
           end
         end
@@ -389,24 +388,28 @@ class Mare::Compiler::TypeCheck
     {t, f, infer}
   end
 
-  def for_type_partial_reifications(ctx, t, t_link, no_args_rt, refer_type)
-    type_params = AST::Extract.type_params(t.params)
+  def for_type_partial_reifications(ctx, t_link)
+    alt_infer = ctx.alt_infer[t_link]
+
+    type_params = alt_infer.type_params
     return [] of ReifiedType if type_params.empty?
 
     params_partial_reifications =
-      type_params.compact_map do |(param, _, _)|
-        # Get the MetaType of the bound.
-        param_ref = refer_type[param.as(AST::Identifier)].as(Refer::TypeParam)
-        bound_node = param_ref.bound
-        bound_mt = self.for_rt(ctx, no_args_rt).type_expr_cap_only(bound_node, refer_type)
-        next unless bound_mt
+      type_params.each_with_index.map do |(param, index)|
+        bound_span = alt_infer.type_param_bound_spans[index].transform_mt(&.cap_only)
+
+        bound_span_inner = bound_span.inner
+        raise NotImplementedError.new(bound_span.inspect) \
+          unless bound_span_inner.is_a?(AltInfer::Span::Terminal)
+
+        bound_mt = bound_span_inner.meta_type
 
         # TODO: Refactor the partial_reifications to return cap only already.
         caps = bound_mt.partial_reifications.map(&.cap_only)
 
         # Return the list of MetaTypes that partially reify the bound;
         # that is, a list that constitutes every possible cap substitution.
-        {TypeParam.new(param_ref), bound_mt, caps}
+        {param, bound_mt, caps}
       end
 
     substitution_sets = [[] of {TypeParam, MetaType, MetaType}]
@@ -1136,8 +1139,10 @@ class Mare::Compiler::TypeCheck
       # If this is a complete reified type (not partially reified),
       # then also substitute in the type args for each type param.
       if @rt_is_complete && type_params_and_type_args.any?
+        substs = type_params_and_type_args.to_h.transform_values(&.strip_cap)
+
         filtered_span = filtered_span.try(&.transform_mt { |mt|
-          mt.substitute_type_params(type_params_and_type_args.to_h)
+          mt.substitute_type_params(substs)
         })
       end
 

@@ -972,12 +972,15 @@ class Mare::Compiler::Infer
           .deciding_f_cap(call_mt.cap_only, call_func.has_tag?(:constructor))
           .not_nil!
 
+        raise ret_span.total_error.not_nil! if ret_span.any_error?
         ret_mt = Infer::MetaType.new_union(ret_span.all_terminal_meta_types)
         # TODO: Retain original ret_span maybe? Or filter it down further based on type params...
         # Does it ever make sense to have a multiple span point in type signature?
 
         ret_mt
       end
+    rescue error : Error
+      AltInfer::Span.new(AltInfer::Span::ErrorPropagate.new(error))
     end
 
     def tether_terminal?
