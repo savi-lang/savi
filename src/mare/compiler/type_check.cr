@@ -1058,7 +1058,7 @@ class Mare::Compiler::TypeCheck
 
         # Reach the reified function we are calling, with the right reify_cap.
         # TODO: Remove this line and make the Reach pass responsible for this.
-        ctx.type_check.for_rf(ctx, call_defn, call_func_link, reify_cap).try(&.tap(&.run))
+        ctx.type_check.for_rf(ctx, call_defn, call_func_link, reify_cap).try(&.run)
 
         # Check if auto-recovery of the receiver is possible.
         if autorecover_needed

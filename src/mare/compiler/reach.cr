@@ -487,6 +487,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
         .flat_map { |rf| ctx.reach.reached_funcs_for(rf) }
     end
 
+    # TODO: remove this unused ctx parameter
     def as_ref(ctx, cap = nil) : Ref
       Ref.new(Infer::MetaType.new(@reified, cap))
     end
@@ -524,19 +525,15 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
 
   struct Func
     getter reach_def : Def
+    protected getter infer : Infer::FuncAnalysis # TODO: can/should this be removed or is it good to remain here?
     protected getter type_check : TypeCheck::ReifiedFuncAnalysis # TODO: can/should this be removed or is it good to remain here?
     getter signature : Signature
-
-    # TODO: remove this alias
-    def infer
-      type_check
-    end
 
     def reified
       type_check.reified
     end
 
-    def initialize(@reach_def, @type_check, @signature)
+    def initialize(@reach_def, @infer, @type_check, @signature)
     end
 
     def resolve(ctx, node)
@@ -575,6 +572,8 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
   end
 
   def handle_func(ctx, rt : Infer::ReifiedType, f_link : Program::Function::Link)
+    infer = ctx.infer[f_link]
+
     # Get each type_check instance associated with this function.
     ctx.type_check[f_link].each_reified_func(rt).each do |rf|
       type_check = ctx.type_check[rf]
@@ -591,7 +590,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
 
       # Add this function with its signature.
       reach_def = ctx.reach[rt]
-      reach_funcs << Func.new(reach_def, type_check, signature_for(ctx, type_check))
+      reach_funcs << Func.new(reach_def, infer, type_check, signature_for(ctx, rf, infer))
 
       # Reach all functions called by this function.
       type_check.each_called_func.each do |pos, called_rt, called_func_link|
@@ -612,39 +611,37 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     handle_type_def(ctx, rt)
   end
 
-  def signature_for(ctx, type_check : TypeCheck::ReifiedFuncAnalysis) : Signature
-    receiver = ctx.reach[type_check.reified.receiver]
+  def signature_for(
+    ctx : Context,
+    rf : Infer::ReifiedFunction,
+    infer : Infer::FuncAnalysis
+  ) : Signature
+    receiver = ctx.reach[rf.receiver]
 
-    params = [] of Ref
-    type_check.reified.func(ctx).params.try do |param_exprs|
-      param_exprs.terms.map do |param_expr|
-        params << ctx.reach[type_check.resolved(ctx, param_expr)]
-      end
-    end
-    ret = ctx.reach[type_check.ret_resolved]
+    params = infer.param_spans.map { |span|
+      ctx.reach[rf.meta_type_of(ctx, span, infer).not_nil!]
+    }
+    ret = ctx.reach[rf.meta_type_of_ret(ctx, infer).not_nil!]
 
-    yield_out = type_check.yield_out_resolved.map do |resolved|
-      ctx.reach[resolved.not_nil!]
-    end
+    yield_out = infer.yield_out_spans.map { |span|
+      ctx.reach[rf.meta_type_of(ctx, span, infer).not_nil!]
+    }
 
-    Signature.new(type_check.reified.name, receiver, params, ret, yield_out)
+    Signature.new(rf.name, receiver, params, ret, yield_out)
   end
 
   def handle_field(ctx, rt : Infer::ReifiedType, f_link, ident) : {String, Ref}?
     # Reach the metatype of the field.
-    ref = nil
-    ctx.type_check[f_link].each_reified_func(rt).each do |rf|
-      # TODO: should we choose a specific reification instead of just taking the final one?
-      ref = ctx.type_check[rf].resolved(ctx, ident)
-      handle_type_ref(ctx, ref)
-    end
-    return unless ref
+    rf = Infer::ReifiedFunction.new(rt, f_link, Infer::MetaType.new(rt, "ref"))
+    mt = rf.meta_type_of(ctx, ident)
+    return unless mt
+    handle_type_ref(ctx, mt)
 
     # Handle the field as if it were a function.
     handle_func(ctx, rt, f_link)
 
     # Return the Ref instance for this meta type.
-    {f_link.name, @refs[ref]}
+    {f_link.name, @refs[mt]}
   end
 
   def handle_type_ref(ctx, meta_type : Infer::MetaType)
@@ -731,6 +728,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
                   # signature, so that it is codegen-compatible with the abstract.
                   subtype_seen << Func.new(
                     subtype_seen.first.reach_def,
+                    subtype_seen.first.infer,
                     subtype_seen.first.type_check,
                     abstract_func.signature,
                   )
@@ -748,9 +746,13 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
   @trait_count = 0
   def next_trait_id(ctx, new_def : Def)
     # Don't assign a new trait id if it is identical to another existing trait
-    type_check = ctx.type_check[new_def.reified]
     identical_def = @defs.values.find do |other_def|
       next unless other_def.reified.link.is_abstract?
+
+      # TODO: don't use for_rt here, which modifies TypeCheck pass state.
+      # In fact, don't use the TypeCheck pass at all!
+      ctx.type_check.for_rt(ctx, other_def.reified.link, other_def.reified.args)
+      ctx.type_check.for_rt(ctx, new_def.reified.link, new_def.reified.args)
 
       ctx.type_check[other_def.reified].is_subtype_of?(ctx, new_def.reified) \
       && ctx.type_check[new_def.reified].is_subtype_of?(ctx, other_def.reified)

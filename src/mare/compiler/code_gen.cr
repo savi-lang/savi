@@ -206,7 +206,7 @@ class Mare::Compiler::CodeGen
 
   def meta_type_of(expr : AST::Node, in_gfunc : GenFunc? = nil)
     in_gfunc ||= func_frame.gfunc.not_nil!
-    in_gfunc.type_check.resolved(ctx, expr)
+    in_gfunc.reified.meta_type_of(ctx, expr, in_gfunc.infer)
   end
 
   def meta_type_unconstrained?(expr : AST::Node, in_gfunc : GenFunc? = nil)
@@ -215,8 +215,12 @@ class Mare::Compiler::CodeGen
   end
 
   def type_of(expr : AST::Node, in_gfunc : GenFunc? = nil)
-    in_gfunc ||= func_frame.gfunc.not_nil!
-    ctx.reach[in_gfunc.type_check.resolved(ctx, expr)]
+    ctx.reach[meta_type_of(expr, in_gfunc).not_nil!]
+  end
+
+  def type_of_unless_unsatisfiable(expr : AST::Node, in_gfunc : GenFunc? = nil)
+    mt = meta_type_of(expr, in_gfunc).not_nil!
+    ctx.reach[mt] unless mt.unsatisfiable?
   end
 
   def llvm_type_of(gtype : GenType)
@@ -2722,7 +2726,7 @@ class Mare::Compiler::CodeGen
   def gen_loop(expr : AST::Loop)
     # Get the LLVM type for the phi that joins the final value of each branch.
     # Each such value will needed to be bitcast to the that type.
-    phi_type = type_of(expr)
+    phi_type = type_of_unless_unsatisfiable(expr) || @gtypes["None"].type_def.as_ref(ctx)
 
     # check if we have any early continues to not to generate continue block
     type_check = ctx.type_check[func_frame.gfunc.not_nil!.link]

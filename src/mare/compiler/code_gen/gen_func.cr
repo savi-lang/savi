@@ -44,6 +44,14 @@ class Mare::Compiler::CodeGen
       @reach_func.reach_def
     end
 
+    def reified
+      @reach_func.reified
+    end
+
+    def infer
+      @reach_func.infer
+    end
+
     def type_check
       @reach_func.type_check
     end

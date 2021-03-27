@@ -24,8 +24,18 @@ module Mare::Compiler::Infer
       @spans = {} of Info => Span
     end
 
-    def [](info : Info); @spans[info]; end
+    def [](info : Info)
+      conduit = info.as_conduit?
+      if conduit
+        conduit.resolve_span!(self)
+      else
+        @spans[info]
+      end
+    end
     def []?(info : Info); @spans[info]?; end
+
+    protected def direct_span(info); @spans[info]; end
+    protected def direct_span?(info); @spans[info]?; end
     protected def []=(info, span); @spans[info] = span; end
 
     getter! type_params : Array(TypeParam)
@@ -67,6 +77,9 @@ module Mare::Compiler::Infer
   end
 
   struct FuncAnalysis < Analysis
+    getter! pre_infer : PreInfer::Analysis
+    protected setter pre_infer
+
     getter! param_spans : Array(Span)
     protected setter param_spans
 
@@ -377,6 +390,8 @@ module Mare::Compiler::Infer
       @analysis.type_params = @t_analysis.type_params
       @analysis.type_param_bound_spans = @t_analysis.type_param_bound_spans
       @analysis.type_param_default_spans = @t_analysis.type_param_default_spans
+
+      @analysis.pre_infer = @pre_infer
     end
 
     def t_link : (Program::Type::Link | Program::TypeAlias::Link)
@@ -384,7 +399,7 @@ module Mare::Compiler::Infer
     end
 
     def resolve(ctx : Context, info : Info) : Span
-      @analysis[info]? || begin
+      @analysis.direct_span?(info) || begin
         # If this info resolves as a conduit, resolve the conduit,
         # and do not save the result locally for this span.
         conduit = info.as_conduit?
@@ -524,7 +539,7 @@ module Mare::Compiler::Infer
       # TODO: Track dependencies and invalidate cache based on those.
       other_pre = ctx.pre_infer[other_f_link]
       other_analysis = ctx.infer_edge.run_for_func(ctx, other_f, other_f_link)
-      raw_span = other_analysis[other_pre[other_f.ident]]
+      raw_span = other_analysis.direct_span(other_pre[other_f.ident])
 
       other_analysis.deciding_type_args_of(other_rt.args, raw_span).not_nil!
     end
@@ -536,7 +551,7 @@ module Mare::Compiler::Infer
       # TODO: Track dependencies and invalidate cache based on those.
       other_pre = ctx.pre_infer[other_f_link]
       other_analysis = ctx.infer_edge.run_for_func(ctx, other_f, other_f_link)
-      raw_span = other_analysis[other_pre[param.first]]
+      raw_span = other_analysis.direct_span(other_pre[param.first])
 
       other_analysis.deciding_type_args_of(other_rt.args, raw_span).not_nil!
     end
@@ -547,7 +562,7 @@ module Mare::Compiler::Infer
       yield_in_info = other_pre.yield_in_info
       return unless yield_in_info
       other_analysis = ctx.infer_edge.run_for_func(ctx, other_f, other_f_link)
-      raw_span = other_analysis[yield_in_info]
+      raw_span = other_analysis.direct_span(yield_in_info)
 
       other_analysis.deciding_type_args_of(other_rt.args, raw_span).not_nil!
     end
@@ -558,7 +573,7 @@ module Mare::Compiler::Infer
       yield_out_info = other_pre.yield_out_infos[index]?
       return unless yield_out_info
       other_analysis = ctx.infer_edge.run_for_func(ctx, other_f, other_f_link)
-      raw_span = other_analysis[yield_out_info]
+      raw_span = other_analysis.direct_span(yield_out_info)
 
       other_analysis.deciding_type_args_of(other_rt.args, raw_span).not_nil!
     end

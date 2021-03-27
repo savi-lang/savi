@@ -56,6 +56,14 @@ module Mare::Compiler::Infer
       meta_type_of(ctx, infer[info], infer)
     end
 
+    def meta_type_of(
+      ctx : Context,
+      ast : AST::Node,
+      infer : Analysis = ctx.infer[@link]
+    ) : MetaType?
+      meta_type_of(ctx, infer.pre_infer[ast], infer)
+    end
+
     def meta_type_of_target(
       ctx : Context,
       infer : Analysis = ctx.infer[@link]
@@ -152,6 +160,14 @@ module Mare::Compiler::Infer
       meta_type_of(ctx, infer[info], infer)
     end
 
+    def meta_type_of(
+      ctx : Context,
+      ast : AST::Node,
+      infer : Analysis = ctx.infer[@link]
+    ) : MetaType?
+      meta_type_of(ctx, infer.pre_infer[ast], infer)
+    end
+
     def meta_type_of_type_param_bound(
       ctx : Context,
       index : Int,
@@ -223,6 +239,14 @@ module Mare::Compiler::Infer
       meta_type_of(ctx, infer[info], infer)
     end
 
+    def meta_type_of(
+      ctx : Context,
+      ast : AST::Node,
+      infer : Analysis = ctx.infer[@link]
+    ) : MetaType?
+      meta_type_of(ctx, infer.pre_infer[ast], infer)
+    end
+
     def meta_type_of_type_param_bound(
       ctx : Context,
       index : Int,
@@ -252,6 +276,21 @@ module Mare::Compiler::Infer
       infer : Analysis = ctx.infer[@link]
     ) : MetaType?
       meta_type_of(ctx, infer.param_spans[index], infer)
+    end
+
+    def meta_type_of_yield_out(
+      ctx : Context,
+      index : Int,
+      infer : Analysis = ctx.infer[@link]
+    ) : MetaType?
+      meta_type_of(ctx, infer.yield_out_spans[index], infer)
+    end
+
+    def meta_type_of_yield_in(
+      ctx : Context,
+      infer : Analysis = ctx.infer[@link]
+    ) : MetaType?
+      meta_type_of(ctx, infer.yield_in_span, infer)
     end
   end
 
