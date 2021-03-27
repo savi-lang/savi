@@ -414,7 +414,7 @@ struct Mare::Compiler::Infer::MetaType::Nominal
       if other_defn.is_a?(ReifiedType)
         return true if defn == other_defn
         # When both sides are ReifiedTypes, delegate to the SubtypingInfo logic.
-        ctx.type_check.is_subtype_of?(ctx, defn, other_defn)
+        ctx.subtyping.is_subtype_of?(ctx, defn, other_defn)
       elsif other_defn.is_a?(TypeParam)
         return false if ctx.type_check.has_started?
 

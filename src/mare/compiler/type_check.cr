@@ -81,31 +81,12 @@ class Mare::Compiler::TypeCheck
   struct ReifiedTypeAnalysis
     protected getter subtyping
 
-    def initialize(@rt : ReifiedType)
-      @subtyping = SubtypingInfo.new(rt)
-    end
-
-    # TODO: Remove this and refactor callers to use the more efficient/direct variant?
-    def is_subtype_of?(ctx : Context, other : ReifiedType, errors = [] of Error::Info)
-      ctx.type_check[other].is_supertype_of?(ctx, @rt, errors)
+    def initialize(ctx, @rt : ReifiedType)
+      @subtyping = ctx.subtyping.for_rt(rt).as(Infer::SubtypingInfo)
     end
 
     def is_supertype_of?(ctx : Context, other : ReifiedType, errors = [] of Error::Info)
       @subtyping.check(ctx, other, errors)
-    end
-
-    def each_known_subtype
-      @subtyping.each_known_subtype
-    end
-
-    def each_known_complete_subtype(ctx)
-      each_known_subtype.flat_map do |rt|
-        if rt.is_complete?(ctx)
-          rt
-        else
-          ctx.type_check[rt.link].each_reached_fully_reified
-        end
-      end
     end
   end
 
@@ -211,8 +192,6 @@ class Mare::Compiler::TypeCheck
     ctx.program.libraries.each do |library|
       run_for_library(ctx, library)
     end
-
-    reach_additional_subtype_relationships(ctx)
   end
 
   def run_for_library(ctx, library)
@@ -256,65 +235,6 @@ class Mare::Compiler::TypeCheck
     # Check the assertion list for each type, to confirm that it is a subtype
     # of any it claimed earlier, which we took on faith and now verify.
     @types.each(&.last.analysis.subtyping.check_and_clear_assertions(ctx))
-  end
-
-  def reach_additional_subtype_relationships(ctx)
-    # Keep looping as long as the keep_going variable gets set to true in
-    # each iteration of the loop by at least one item in the subtype topology
-    # changing in one of the deeply nested loops.
-    keep_going = true
-    while keep_going
-      keep_going = false
-
-      # For each abstract type in the program that we have analyzed...
-      # (this should be all of the abstract types in the program)
-      @t_analyses.each do |t_link, t_analysis|
-        next unless t_link.is_abstract?
-
-        # For each "fully baked" reification of that type we have checked...
-        # (this should include all reifications reachable from any defined
-        # function, though not necessarily all reachable from Main.new)
-        # TODO: Should we be limiting to only paths reachable from Main.new?
-        t_analysis.each_reached_fully_reified.each do |rt|
-          rt_analysis = self[rt]
-
-          # Store the array of all known complete subtypes that have been
-          # tested by any defined code in the program.
-          # TODO: Should we be limiting to only paths reachable from Main.new?
-          each_known_complete_subtype =
-            rt_analysis.each_known_complete_subtype(ctx).to_a
-
-          # For each abstract type in that subtypes list...
-          each_known_complete_subtype.each do |subtype_rt|
-            next unless subtype_rt.link.is_abstract?
-            subtype_rt_analysis = self[subtype_rt]
-
-            # For each other/distinct type in that subtypes list...
-            each_known_complete_subtype.each do |other_subtype_rt|
-              next if other_subtype_rt == subtype_rt
-
-              # Check if the first subtype is a supertype of the other subtype.
-              # For example, if Foo and Bar are both used as subtypes of Any
-              # in the program, we check here if Foo is a subtype of Bar,
-              # or in another iteration, if Bar is a subtype of Foo.
-              #
-              # This lets us be sure that later trait mapping for the runtime
-              # knows about the relationship of types which may be matched at
-              # runtime after having been "carried" as a common supertype.
-              #
-              # If our test here has changed the topology of known subtypes,
-              # then we need to keep going in our overall iteration, since
-              # we need to uncover other transitive relationships at deeper
-              # levels of transitivity until there is nothing left to uncover.
-              orig_size = subtype_rt_analysis.each_known_subtype.size
-              subtype_rt_analysis.is_supertype_of?(ctx, other_subtype_rt)
-              keep_going = true \
-                if orig_size != subtype_rt_analysis.each_known_subtype.size
-            end
-          end
-        end
-      end
-    end
   end
 
   def [](t_link : Program::Type::Link)
@@ -470,7 +390,7 @@ class Mare::Compiler::TypeCheck
     rt = ReifiedType.new(link, type_args)
     @types[rt]? || (
       refer_type = ctx.refer_type[link]
-      ft = @types[rt] = ForReifiedType.new(ctx, ReifiedTypeAnalysis.new(rt), rt, refer_type)
+      ft = @types[rt] = ForReifiedType.new(ctx, ReifiedTypeAnalysis.new(ctx, rt), rt, refer_type)
       ft.tap(&.initialize_assertions(ctx))
       .tap { |ft| get_or_create_t_analysis(link).observe_reified_type(ctx, rt) }
     )

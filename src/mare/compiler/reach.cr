@@ -61,16 +61,17 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     def all_callable_concrete_defs_for(ctx, name) : Array(Def)
       results = [] of Def
 
-      @meta_type.find_callable_func_defns(ctx, nil, name).each do |(_, rt, _)|
+      @meta_type.find_callable_func_defns(ctx, nil, name).each { |(_, rt, _)|
         next unless rt
+        this_def = ctx.reach[rt]
         if rt.link.is_abstract?
-          ctx.type_check[rt].each_known_complete_subtype(ctx).each do |other_rt|
-            results << ctx.reach[other_rt] unless other_rt.link.is_abstract?
-          end
+          ctx.reach.each_reached_subtype_of(ctx, this_def) { |other_def|
+            results << other_def unless other_def.link.is_abstract?
+          }
         else
-          results << ctx.reach[rt]
+          results << this_def
         end
-      end
+      }
 
       results.uniq
     end
@@ -712,8 +713,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     @defs.values.each { |other_def|
       next if other_def == abstract_def
 
-      # TODO: Don't depend on TypeCheck pass here for this - some other cache.
-      next unless ctx.type_check.is_subtype_of?(ctx, other_def.reified, abstract_def.reified)
+      next unless ctx.subtyping.is_subtype_of?(ctx, other_def.reified, abstract_def.reified)
 
       yield other_def
     }
@@ -790,9 +790,8 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     identical_def = @defs.values.find do |other_def|
       next unless other_def.reified.link.is_abstract?
 
-      # TODO: Don't depend on TypeCheck pass here for this - some other cache.
-      ctx.type_check.is_subtype_of?(ctx, other_def.reified, new_def.reified) \
-      && ctx.type_check.is_subtype_of?(ctx, new_def.reified, other_def.reified)
+      ctx.subtyping.is_subtype_of?(ctx, other_def.reified, new_def.reified) \
+      && ctx.subtyping.is_subtype_of?(ctx, new_def.reified, other_def.reified)
     end
     return identical_def.desc_id if identical_def
 

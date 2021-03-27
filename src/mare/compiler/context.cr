@@ -23,6 +23,7 @@ class Mare::Compiler::Context
   getter refer_type
   getter serve_definition
   getter serve_hover
+  getter subtyping
   getter type_check
   getter type_context
 
@@ -59,6 +60,7 @@ class Mare::Compiler::Context
     @refer_type = ReferType::Pass.new
     @serve_definition = ServeDefinition.new
     @serve_hover = ServeHover.new
+    @subtyping = SubtypingCache.new
     @type_check = TypeCheck.new
     @type_context = TypeContext::Pass.new
 
