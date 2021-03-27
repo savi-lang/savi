@@ -16,7 +16,9 @@ require "./infer/reified" # TODO: can this be removed?
 # This cache depends on the following passes, and thus can be used at any time
 # after these passes have completed and made their analysis fully available:
 #
+# - ctx.type_context
 # - ctx.pre_subtyping
+# - ctx.pre_infer
 # - ctx.infer
 #
 class Mare::Compiler::SubtypingCache
@@ -26,11 +28,15 @@ class Mare::Compiler::SubtypingCache
 
   def initialize
     @by_rt = {} of ReifiedType => ForReifiedType
+    @by_rf = {} of ReifiedFunction => ForReifiedFunc
   end
 
-  # TODO: Make this private so the TypeCheck pass can't use these internals.
+  # TODO: Make these private?
   def for_rt(rt : ReifiedType)
     @by_rt[rt] ||= ForReifiedType.new(rt)
+  end
+  def for_rf(rf : ReifiedFunction)
+    @by_rf[rf] ||= ForReifiedFunc.new(rf)
   end
 
   def is_subtype_of?(ctx, sub_rt : ReifiedType, super_rt : ReifiedType) : Bool
@@ -40,6 +46,50 @@ class Mare::Compiler::SubtypingCache
     return false unless possible_subtype_links.includes?(sub_rt.link)
 
     for_rt(super_rt).check(ctx, sub_rt)
+  end
+
+  class ForReifiedFunc
+    private getter this
+    def initialize(@this : ReifiedFunction)
+      @layers_accepted = [] of Int32
+      @layers_ignored = [] of Int32
+    end
+
+    # Returns true if the specified type context layer has some conditions
+    # that we do not satisfy in our current reification of this function.
+    # In such a case, we will ignore that layer and not do typechecking on it,
+    # because doing so would run into unsatisfiable combinations of types.
+    def ignores_layer?(ctx, layer_index : Int32)
+      return false if @layers_accepted.includes?(layer_index)
+      return true if @layers_ignored.includes?(layer_index)
+
+      layer = ctx.type_context[@this.link][layer_index]
+      pre_infer = ctx.pre_infer[@this.link]
+      infer = ctx.infer[@this.link]
+
+      should_ignore = !layer.all_positive_conds.all? { |cond|
+        cond_info = pre_infer[cond]
+        case cond_info
+        when Infer::TypeParamCondition
+          type_param = Infer::TypeParam.new(cond_info.refine)
+          refine_mt = @this.meta_type_of(ctx, cond_info.refine_type, infer)
+          next false unless refine_mt
+
+          type_arg = @this.type.args[type_param.ref.index]
+          type_arg.satisfies_bound?(ctx, refine_mt)
+        # TODO: also handle other conditions?
+        else true
+        end
+      }
+
+      if should_ignore
+        @layers_ignored << layer_index
+      else
+        @layers_accepted << layer_index
+      end
+
+      should_ignore
+    end
   end
 
   class ForReifiedType

@@ -88,10 +88,9 @@ module Mare::Compiler::Infer
       }
     end
 
-    def each_called_func_within(ctx, rf : ReifiedFunction, type_check)
+    def each_called_func_within(ctx, rf : ReifiedFunction)
       called_func_spans.each { |info, (call_defn_span, func_names)|
-        # TODO: Remove dependency on TypeCheck pass here
-        next if type_check.ignores_layer?(info.layer_index)
+        next if ctx.subtyping.for_rf(rf).ignores_layer?(ctx, info.layer_index)
 
         called_mt = rf.meta_type_of(ctx, call_defn_span, self)
 
@@ -113,12 +112,12 @@ module Mare::Compiler::Infer
       }
     end
 
-    def each_meta_type_within(ctx, rf : ReifiedFunction, type_check)
+    def each_meta_type_within(ctx, rf : ReifiedFunction)
       seen_spans = Set(Span).new
+      subtyping = ctx.subtyping.for_rf(rf)
 
       @spans.each { |info, span|
-        # TODO: Remove dependency on TypeCheck pass here
-        next if type_check.ignores_layer?(info.layer_index)
+        next if subtyping.ignores_layer?(ctx, info.layer_index)
 
         next if seen_spans.includes?(span)
         seen_spans.add(span)

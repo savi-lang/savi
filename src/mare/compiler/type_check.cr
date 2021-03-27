@@ -92,8 +92,6 @@ class Mare::Compiler::TypeCheck
   struct ReifiedFuncAnalysis
     protected getter resolved_infos
     protected getter call_rfs_for
-    protected getter layers_accepted
-    protected getter layers_ignored
     getter! ret_resolved : MetaType; protected setter ret_resolved
     getter! yield_in_resolved : MetaType; protected setter yield_in_resolved
     getter! yield_out_resolved : Array(MetaType?); protected setter yield_out_resolved
@@ -106,9 +104,6 @@ class Mare::Compiler::TypeCheck
 
       # TODO: can this be removed or made more clean without sacrificing performance?
       @call_rfs_for = {} of Infer::FromCall => Set(ReifiedFunction)
-
-      @layers_ignored = [] of Int32
-      @layers_accepted = [] of Int32
     end
 
     def reified
@@ -137,12 +132,6 @@ class Mare::Compiler::TypeCheck
 
     def resolved_self
       MetaType.new(@rf.type).override_cap(resolved_self_cap)
-    end
-
-    def ignores_layer?(layer_index : Int32)
-      return false if @layers_accepted.includes?(layer_index)
-      return true if @layers_ignored.includes?(layer_index)
-      raise "this layer was never checked"
     end
   end
 
@@ -350,8 +339,9 @@ class Mare::Compiler::TypeCheck
       refer_type = ctx.refer_type[f]
       classify = ctx.classify[f]
       type_context = ctx.type_context[f]
+      subtyping = ctx.subtyping.for_rf(rf)
       for_rt = for_rt(ctx, rt.link, rt.args)
-      ForReifiedFunc.new(ctx, f_analysis, ReifiedFuncAnalysis.new(ctx, rf), for_rt, rf, refer_type, classify, type_context)
+      ForReifiedFunc.new(ctx, f_analysis, ReifiedFuncAnalysis.new(ctx, rf), for_rt, rf, refer_type, classify, type_context, subtyping)
       .tap { f_analysis.observe_reified_func(rf) }
     )
   end
@@ -697,8 +687,9 @@ class Mare::Compiler::TypeCheck
     private getter refer_type : ReferType::Analysis
     protected getter classify : Classify::Analysis
     private getter type_context : TypeContext::Analysis
+    private getter subtyping : SubtypingCache::ForReifiedFunc
 
-    def initialize(@ctx, @f_analysis, @analysis, @for_rt, @reified, @refer_type, @classify, @type_context)
+    def initialize(@ctx, @f_analysis, @analysis, @for_rt, @reified, @refer_type, @classify, @type_context, @subtyping)
       @local_idents = Hash(Refer::Local, AST::Node).new
       @local_ident_overrides = Hash(AST::Node, AST::Node).new
       @redirects = Hash(AST::Node, AST::Node).new
@@ -723,40 +714,6 @@ class Mare::Compiler::TypeCheck
     def ret
       # The ident is used as a fake local variable that represents the return.
       func.ident
-    end
-
-    # Returns true if the specified type context layer has some conditions
-    # that we do not satisfy in our current reification of this function.
-    # In such a case, we will ignore that layer and not do typechecking on it,
-    # because doing so would run into unsatisfiable combinations of types.
-    def ignores_layer?(layer_index : Int32)
-      return false if @analysis.layers_accepted.includes?(layer_index)
-      return true if @analysis.layers_ignored.includes?(layer_index)
-
-      layer = @type_context[layer_index]
-
-      should_ignore = !layer.all_positive_conds.all? { |cond|
-        cond_info = @f_analysis[cond]
-        case cond_info
-        when Infer::TypeParamCondition
-          type_param = Infer::TypeParam.new(cond_info.refine)
-          refine_mt = resolve(ctx, cond_info.refine_type)
-          next false unless refine_mt
-
-          type_arg = @for_rt.type_arg_for_type_param(ctx, type_param).not_nil!
-          type_arg.satisfies_bound?(ctx, refine_mt)
-        # TODO: also handle other conditions?
-        else true
-        end
-      }
-
-      if should_ignore
-        @analysis.layers_ignored << layer_index
-      else
-        @analysis.layers_accepted << layer_index
-      end
-
-      should_ignore
     end
 
     def filter_span(ctx, info : Info) : MetaType?
@@ -804,7 +761,7 @@ class Mare::Compiler::TypeCheck
       # If our type param reification doesn't match any of the conditions
       # for the layer associated with the given info, then
       # we will not do any typechecking here - we just return nil.
-      return nil if ignores_layer?(info.layer_index)
+      return nil if subtyping.ignores_layer?(ctx, info.layer_index)
 
       @analysis.resolved_infos[info]? || begin
         mt = info.as_conduit?.try(&.resolve!(ctx, self)) || filter_span(ctx, info)
