@@ -81,7 +81,7 @@ class Mare::Compiler
       when :infer_edge       then ctx.run(ctx.infer_edge)
       when :infer            then ctx.run(ctx.infer)
       when :type_check       then ctx.run_whole_program(ctx.type_check)
-      when :privacy          then ctx.run(Privacy)
+      when :privacy          then ctx.run(ctx.privacy)
       when :completeness     then ctx.run(Completeness)
       when :verify           then ctx.run(Verify)
       when :reach            then ctx.run_whole_program(ctx.reach)
@@ -125,7 +125,7 @@ class Mare::Compiler
     when :infer_edge then [:pre_subtyping, :pre_infer, :classify, :refer_type]
     when :infer then [:infer_edge]
     when :type_check then [:infer, :pre_infer]
-    when :privacy then [:type_check]
+    when :privacy then [:infer]
     when :completeness then [:type_check, :jumps, :lambda, :sugar, :macros, :populate]
     when :verify then [:type_check, :inventory, :jumps]
     when :reach then [:type_check, :infer, :pre_subtyping, :refer, :namespace]

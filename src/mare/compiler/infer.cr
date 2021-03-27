@@ -54,6 +54,32 @@ module Mare::Compiler::Infer
 
     protected getter called_func_spans
 
+    def each_called_func_link(ctx)
+      called_func_spans.flat_map { |info, (call_defn_span, func_names)|
+        call_defn_span.all_terminal_meta_types.flat_map { |terminal_mt|
+          terminal_mt.map_each_union_member { |union_member_mt|
+            union_member_mt.map_each_intersection_term_and_or_cap { |term_mt|
+              called_rt = term_mt.single?.try(&.defn)
+              next unless called_rt.is_a?(ReifiedType)
+
+              if func_names.is_a?(String)
+                func_name = func_names
+                called_link = Program::Function::Link.new(called_rt.link, func_name, nil)
+                [{info, called_link}]
+              else
+                func_names.as(Array(String)).map { |func_name|
+                  called_link = Program::Function::Link.new(called_rt.link, func_name, nil)
+                  {info, called_link}
+                }
+              end
+            }.compact.flatten
+          }.flatten
+        }
+      }.uniq.each { |(info, called_link)|
+        yield info, called_link
+      }
+    end
+
     def each_called_func_within(ctx, rf : ReifiedFunction, type_check)
       called_func_spans.each { |info, (call_defn_span, func_names)|
         # TODO: Remove dependency on TypeCheck pass here
