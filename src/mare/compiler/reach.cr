@@ -614,25 +614,24 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
 
     # Reach all functions called by this function.
     infer.each_called_func_within(ctx, rf, type_check) { |info, called_rf|
-      # next if type_check.ignores_layer?(info.layer_index)
-
-      # # TODO: Can this check be removed by better implementing each_called_func_within to respect type context layers?
-      # next if called_rf.type.args.any?(&.unsatisfiable?)
-
       handle_func(ctx, called_rf)
     }
-    # TODO: remove this line when the above line handles all needed funcs.
-    type_check.each_called_func.each do |pos, called_rt, called_func_link|
-      handle_func(ctx, called_rt, called_func_link)
-    end
 
     # Reach all functions callable via reflection from this function.
     infer.each_reflection.each do |reflection_info|
       reflection_mt = rf.meta_type_of(ctx, reflection_info, infer).not_nil!
       reflection_rt = reflection_mt.single!
-      reflection_rt.link.resolve(ctx).functions.each do |func|
-        reflection_func_link = func.make_link(reflection_rt.link)
-        handle_func(ctx, reflection_rt, reflection_func_link)
+      reflect_mt = reflection_rt.args.first
+      reflect_rt = reflect_mt.single!
+
+      reflect_rt.defn(ctx).functions.each do |f|
+        next if f.has_tag?(:hygienic)
+        next if f.body.nil?
+        next if f.ident.value.starts_with?("_")
+
+        reflect_f_link = f.make_link(reflect_rt.link)
+        reflect_rf = Infer::ReifiedFunction.new(reflect_rt, reflect_f_link, reflect_mt)
+        handle_func(ctx, reflect_rf)
       end
     end
 
