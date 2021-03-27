@@ -1,6 +1,7 @@
 class Mare::Compiler::CodeGen
   class GenFunc
     getter func : Program::Function
+    getter infer : Infer::FuncAnalysis
     getter reach_func : Reach::Func
     getter calling_convention : CallingConvention
     getter! continuation_info : ContinuationInfo
@@ -17,7 +18,9 @@ class Mare::Compiler::CodeGen
     property! after_yield_blocks : Array(LLVM::BasicBlock)
 
     def initialize(ctx, gtype, @reach_func, @vtable_index, @vtable_index_continue)
-      @func = @reach_func.reified.link.resolve(ctx)
+      link = @reach_func.reified.link
+      @func = link.resolve(ctx)
+      @infer = ctx.infer[link]
       @needs_receiver = type_def.has_state?(ctx) && !(func.cap.value == "non")
 
       @llvm_name = "#{type_def.llvm_name}#{@reach_func.reified.name}"
@@ -46,10 +49,6 @@ class Mare::Compiler::CodeGen
 
     def reified
       @reach_func.reified
-    end
-
-    def infer
-      @reach_func.infer
     end
 
     def type_check

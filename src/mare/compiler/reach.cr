@@ -519,23 +519,14 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
 
   struct Func
     getter reach_def : Def
-    protected getter infer : Infer::FuncAnalysis # TODO: can/should this be removed or is it good to remain here?
-    protected getter type_check : TypeCheck::ReifiedFuncAnalysis # TODO: can/should this be removed or is it good to remain here?
+    getter reified : Infer::ReifiedFunction
     getter signature : Signature
 
-    def reified
-      type_check.reified
-    end
-
     def link
-      reified.link
+      @reified.link
     end
 
-    def initialize(@reach_def, @infer, @type_check, @signature)
-    end
-
-    def resolve(ctx, node)
-      ctx.reach[type_check.resolve(node)]
+    def initialize(@reach_def, @reified, @signature)
     end
   end
 
@@ -607,7 +598,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
 
     # Add this function with its signature.
     reach_def = handle_type_def(ctx, rt)
-    reach_funcs << Func.new(reach_def, infer, type_check, signature_for(ctx, rf, infer))
+    reach_funcs << Func.new(reach_def, rf, signature_for(ctx, rf, infer))
 
     # Reach all functions called by this function.
     infer.each_called_func_within(ctx, rf) { |info, called_rf|
@@ -772,8 +763,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
               # signature, so that it is codegen-compatible with the abstract.
               subtype_funcs << Func.new(
                 subtype_funcs.first.reach_def,
-                subtype_funcs.first.infer,
-                subtype_funcs.first.type_check,
+                subtype_funcs.first.reified,
                 abstract_func.signature,
               )
             }
