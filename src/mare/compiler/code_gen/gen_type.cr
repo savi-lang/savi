@@ -17,7 +17,7 @@ class Mare::Compiler::CodeGen
 
       # Take down info on all functions.
       @vtable_size = 0
-      @type_def.each_function(g.ctx).each do |reach_func|
+      g.ctx.reach.reached_funcs_for(@type_def).each do |reach_func|
         rf = reach_func.reified
 
         unless rf.link.hygienic_id

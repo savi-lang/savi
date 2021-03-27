@@ -480,13 +480,6 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       is_numeric?(ctx) && @reified.defn(ctx).const_bool("is_signed")
     end
 
-    def each_function(ctx)
-      rt = @reified
-      rt.defn(ctx).functions
-        .flat_map { |f| ctx.type_check[f.make_link(rt.link)].each_reified_func(rt) }
-        .flat_map { |rf| ctx.reach.reached_funcs_for(rf) }
-    end
-
     # TODO: remove this unused ctx parameter
     def as_ref(ctx, cap = nil) : Ref
       Ref.new(Infer::MetaType.new(@reified, cap))
@@ -867,8 +860,10 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     @seen_funcs.has_key?(rf)
   end
 
-  def reached_funcs_for(rf : Infer::ReifiedFunction)
-    @seen_funcs[rf]? || Array(Func).new
+  def reached_funcs_for(reach_def : Def)
+    @seen_funcs
+      .select { |rf, _| rf.type == reach_def.reified }
+      .flat_map(&.last)
   end
 
   def each_type_def
