@@ -39,8 +39,8 @@ class Mare::Compiler
     when "type_context"     then :type_context
     when "pre_infer"        then :pre_infer
     when "pre_subtyping"    then :pre_subtyping
-    when "infer_edge"   then :infer_edge
-    when "infer"        then :infer
+    when "infer_edge"       then :infer_edge
+    when "infer"            then :infer
     when "type_check"       then :type_check
     when "privacy"          then :privacy
     when "completeness"     then :completeness
@@ -78,8 +78,8 @@ class Mare::Compiler
       when :type_context     then ctx.run(ctx.type_context)
       when :pre_infer        then ctx.run(ctx.pre_infer)
       when :pre_subtyping    then ctx.run(ctx.pre_subtyping)
-      when :infer_edge   then ctx.run(ctx.infer_edge)
-      when :infer        then ctx.run(ctx.infer)
+      when :infer_edge       then ctx.run(ctx.infer_edge)
+      when :infer            then ctx.run(ctx.infer)
       when :type_check       then ctx.run_whole_program(ctx.type_check)
       when :privacy          then ctx.run(Privacy)
       when :completeness     then ctx.run(Completeness)
@@ -130,9 +130,9 @@ class Mare::Compiler
     when :verify then [:type_check, :inventory, :jumps]
     when :reach then [:type_check, :infer, :pre_subtyping, :refer, :namespace]
     when :paint then [:reach, :inventory]
-    when :codegen then [:paint, :verify, :reach, :completeness, :privacy, :type_check, :infer, :inventory, :consumes, :jumps]
+    when :codegen then [:paint, :verify, :reach, :completeness, :privacy, :type_check, :infer, :pre_infer, :inventory, :consumes, :jumps]
     when :lifetime then [:reach, :refer, :classify]
-    when :codegen_verona then [:lifetime, :paint, :verify, :reach, :completeness, :privacy, :type_check, :infer, :inventory, :consumes, :jumps]
+    when :codegen_verona then [:lifetime, :paint, :verify, :reach, :completeness, :privacy, :type_check, :infer, :pre_infer, :inventory, :consumes, :jumps]
     when :eval then [:codegen]
     when :binary then [:codegen]
     when :binary_verona then [:codegen_verona]

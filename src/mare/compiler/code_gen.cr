@@ -211,7 +211,9 @@ class Mare::Compiler::CodeGen
 
   def meta_type_unconstrained?(expr : AST::Node, in_gfunc : GenFunc? = nil)
     in_gfunc ||= func_frame.gfunc.not_nil!
-    in_gfunc.type_check.resolved_or_unconstrained(ctx, expr).unconstrained?
+    # TODO: Remove this usage of the TypeCheck pass here, preferring Infer.
+    # TODO: Before we can use meta_type_of, we need to be able to rightly ignore layers
+    ctx.type_check[in_gfunc.reified].resolved_or_unconstrained(ctx, expr).unconstrained?
   end
 
   def type_of(expr : AST::Node, in_gfunc : GenFunc? = nil)
@@ -1766,14 +1768,14 @@ class Mare::Compiler::CodeGen
   end
 
   def gen_check_subtype(relate : AST::Relate, positive_check : Bool)
-    type_check_f = ctx.type_check[func_frame.gfunc.not_nil!.link]
+    pre_infer = ctx.pre_infer[func_frame.gfunc.not_nil!.link]
 
-    if type_check_f[relate.lhs].is_a?(Infer::FixedTypeExpr)
+    if pre_infer[relate.lhs].is_a?(Infer::FixedTypeExpr)
       # If the left-hand side is a fixed compile-time type (and knowing that
       # the right-hand side always is), we can return a compile-time true/false.
-      type_check = func_frame.gfunc.not_nil!.type_check
-      lhs_meta_type = type_check.resolved(ctx, relate.lhs)
-      rhs_meta_type = type_check.resolved(ctx, relate.rhs)
+      gfunc = func_frame.gfunc.not_nil!
+      lhs_meta_type = gfunc.reified.meta_type_of(ctx, relate.lhs, gfunc.infer).not_nil!
+      rhs_meta_type = gfunc.reified.meta_type_of(ctx, relate.rhs, gfunc.infer).not_nil!
 
       result = lhs_meta_type.satisfies_bound?(ctx, rhs_meta_type)
       result = !result if !positive_check
@@ -2619,7 +2621,7 @@ class Mare::Compiler::CodeGen
     receiver
   end
 
-  # TODO: Use type_check resolution for static True/False finding where possible.
+  # TODO: Use infer resolution for static True/False finding where possible.
   def gen_choice(expr : AST::Choice)
     raise NotImplementedError.new(expr.inspect) if expr.list.empty?
 
@@ -2729,8 +2731,8 @@ class Mare::Compiler::CodeGen
     phi_type = type_of_unless_unsatisfiable(expr) || @gtypes["None"].type_def.as_ref(ctx)
 
     # check if we have any early continues to not to generate continue block
-    type_check = ctx.type_check[func_frame.gfunc.not_nil!.link]
-    has_continues = !type_check[expr].as(Infer::Loop).early_continues.empty?
+    pre_infer = ctx.pre_infer[func_frame.gfunc.not_nil!.link]
+    has_continues = !pre_infer[expr].as(Infer::Loop).early_continues.empty?
 
     # Prepare to capture state for the final phi.
     phi_blocks = [] of LLVM::BasicBlock
