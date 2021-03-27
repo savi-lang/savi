@@ -592,10 +592,6 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       handle_type_ref(ctx, meta_type)
     }
 
-    # TODO: Remove mutation of and dependency on the type_check pass here.
-    ctx.type_check.for_rf(ctx, rt, rf.link, rf.receiver.cap_only).tap(&.run)
-    type_check = ctx.type_check[rf]
-
     # Add this function with its signature.
     reach_def = handle_type_def(ctx, rt)
     reach_funcs << Func.new(reach_def, rf, signature_for(ctx, rf, infer))

@@ -211,9 +211,14 @@ class Mare::Compiler::CodeGen
 
   def meta_type_unconstrained?(expr : AST::Node, in_gfunc : GenFunc? = nil)
     in_gfunc ||= func_frame.gfunc.not_nil!
-    # TODO: Remove this usage of the TypeCheck pass here, preferring Infer.
-    # TODO: Before we can use meta_type_of, we need to be able to rightly ignore layers
-    ctx.type_check[in_gfunc.reified].resolved_or_unconstrained(ctx, expr).unconstrained?
+    # TODO: Simplify the following circuitous/unoptimized code
+    info = ctx.pre_infer[in_gfunc.link][expr]
+    return true if ctx.subtyping.for_rf(in_gfunc.reified).ignores_layer?(ctx, info.layer_index)
+
+    mt = in_gfunc.reified.meta_type_of(ctx, expr, in_gfunc.infer)
+    return true unless mt
+
+    mt.unconstrained?
   end
 
   def type_of(expr : AST::Node, in_gfunc : GenFunc? = nil)
