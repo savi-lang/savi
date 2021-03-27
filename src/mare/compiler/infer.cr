@@ -113,6 +113,21 @@ module Mare::Compiler::Infer
       }
     end
 
+    def each_meta_type_within(ctx, rf : ReifiedFunction, type_check)
+      seen_spans = Set(Span).new
+
+      @spans.each { |info, span|
+        # TODO: Remove dependency on TypeCheck pass here
+        next if type_check.ignores_layer?(info.layer_index)
+
+        next if seen_spans.includes?(span)
+        seen_spans.add(span)
+
+        mt = rf.meta_type_of(ctx, span, self)
+        yield mt if mt
+      }
+    end
+
     def deciding_type_args_of(
       args : Array(MetaType),
       raw_span : Span

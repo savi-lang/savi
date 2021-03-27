@@ -91,7 +91,6 @@ class Mare::Compiler::TypeCheck
 
   struct ReifiedFuncAnalysis
     protected getter resolved_infos
-    protected getter called_funcs
     protected getter call_rfs_for
     protected getter layers_accepted
     protected getter layers_ignored
@@ -104,7 +103,6 @@ class Mare::Compiler::TypeCheck
 
       @is_constructor = f.has_tag?(:constructor).as(Bool)
       @resolved_infos = {} of Info => MetaType
-      @called_funcs = Set({Info, ReifiedType, Program::Function::Link}).new
 
       # TODO: can this be removed or made more clean without sacrificing performance?
       @call_rfs_for = {} of Infer::FromCall => Set(ReifiedFunction)
@@ -139,16 +137,6 @@ class Mare::Compiler::TypeCheck
 
     def resolved_self
       MetaType.new(@rf.type).override_cap(resolved_self_cap)
-    end
-
-    def each_meta_type(&block)
-      yield @rf.receiver
-      yield resolved_self
-      @resolved_infos.each_value { |mt| yield mt }
-    end
-
-    def each_called_func
-      @called_funcs.each
     end
 
     def ignores_layer?(layer_index : Int32)
@@ -935,9 +923,6 @@ class Mare::Compiler::TypeCheck
         next unless call_defn
         next unless call_func
         call_func_link = call_func.make_link(call_defn.link)
-
-        # Keep track that we called this function.
-        @analysis.called_funcs.add({info, call_defn, call_func_link})
 
         # Determine the correct capability to reify, checking for cap errors.
         reify_cap, autorecover_needed =

@@ -601,12 +601,12 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     type_check = ctx.type_check[rf]
 
     # Reach all type references seen by this function.
-    type_check.each_meta_type do |meta_type|
+    infer.each_meta_type_within(ctx, rf, type_check) { |meta_type|
       handle_type_ref(ctx, meta_type)
-    end
+    }
 
     # Add this function with its signature.
-    reach_def = ctx.reach[rt]
+    reach_def = handle_type_def(ctx, rt)
     reach_funcs << Func.new(reach_def, infer, type_check, signature_for(ctx, rf, infer))
 
     # Reach all functions called by this function.
@@ -631,8 +631,6 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
         handle_func(ctx, reflect_rf)
       end
     end
-
-    handle_type_def(ctx, rt)
   end
 
   def signature_for(
@@ -664,8 +662,8 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     # Handle the field as if it were a function.
     handle_func(ctx, rf)
 
-    # Return the Ref instance for this meta type.
-    {f_link.name, @refs[mt]}
+    # Return the name and Ref for this field.
+    {f_link.name, Ref.new(mt)}
   end
 
   def handle_type_ref(ctx, meta_type : Infer::MetaType) : Ref
@@ -682,15 +680,16 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
 
   def handle_type_def(ctx, rt : Infer::ReifiedType)
     # Skip this type def if we've already seen it.
-    return if @defs.has_key?(rt)
+    existing_def = @defs[rt]?
+    return existing_def if existing_def
 
-    # Skip this type def if it's not completely reified.
-    return unless rt.is_complete?(ctx)
+    # Confirm that this type def is completely reified.
+    raise "this type is not complete: #{rt}" unless rt.is_complete?(ctx)
 
     # Now, save a Def instance for this program type.
     # We do this sooner rather than later because we may recurse here.
     fields = [] of {String, Ref}
-    @defs[rt] = Def.new(ctx, rt, self, fields)
+    @defs[rt] = new_def = Def.new(ctx, rt, self, fields)
 
     # Now, if the type has any type arguments, reach those as well.
     rt.args.each { |arg| handle_type_ref(ctx, arg) }
@@ -700,6 +699,8 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     fields.concat(rt.defn(ctx).functions.select(&.has_tag?(:field)).map do |f|
       handle_field(ctx, rt, f.make_link(rt.link), f.ident)
     end.compact)
+
+    new_def
   end
 
   def each_reached_subtype_of(ctx, abstract_def : Def)
@@ -824,7 +825,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
   end
 
   def [](meta_type : Infer::MetaType)
-    @refs[meta_type]
+    Ref.new(meta_type)
   end
 
   def [](rt : Infer::ReifiedType)
