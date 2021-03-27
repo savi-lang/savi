@@ -10,7 +10,6 @@ class Mare::Compiler::TypeCheck
   alias ReifiedTypeAlias = Infer::ReifiedTypeAlias
   alias ReifiedType = Infer::ReifiedType
   alias ReifiedFunction = Infer::ReifiedFunction
-  alias SubtypingInfo = Infer::SubtypingInfo
   alias Info = Infer::Info
 
   struct FuncAnalysis
@@ -82,7 +81,7 @@ class Mare::Compiler::TypeCheck
     protected getter subtyping
 
     def initialize(ctx, @rt : ReifiedType)
-      @subtyping = ctx.subtyping.for_rt(rt).as(Infer::SubtypingInfo)
+      @subtyping = ctx.subtyping.for_rt(rt).as(SubtypingCache::ForReifiedType)
     end
 
     def is_supertype_of?(ctx : Context, other : ReifiedType, errors = [] of Error::Info)
