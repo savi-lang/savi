@@ -1619,37 +1619,33 @@ module Mare::Compiler::Infer
     end
 
     def resolve_span!(ctx : Context, infer : Visitor) : Span
-      infer.resolve(ctx, @call.lhs).decided_by(@call.lhs) do |lhs_mt|
-        call_defns = lhs_mt.gather_callable_func_defns(ctx, infer, @call.member)
+      @call.resolve_receiver_span(ctx, infer).transform_mt_to_span { |call_receiver_mt|
+        union_member_spans = call_receiver_mt.map_each_union_member { |union_member_mt|
+          intersection_term_spans = union_member_mt.map_each_intersection_term_and_or_cap { |term_mt|
+            call_defn = term_mt.single!
+            call_func = call_defn.defn(ctx).find_func!(@call.member)
+            call_link = call_func.make_link(call_defn.link)
 
-        call_defns.compact_map do |(call_mt, call_defn, call_func)|
-          next unless call_defn && call_func
+            raw_ret_span = infer
+              .depends_on_call_yield_out_span(ctx, call_defn, call_func, call_link, @index)
 
-          call_link = call_func.make_link(call_defn.link)
-          raw_ret_span = infer
-            .depends_on_call_yield_out_span(ctx, call_defn, call_func, call_link, @index)
+            unless raw_ret_span
+              call_name = "#{call_defn.defn(ctx).ident.value}.#{@call.member}"
+              next Span.error(pos,
+                "This yield block parameter will never be received", [
+                  {call_func.ident.pos, "'#{call_name}' does not yield it"}
+                ]
+              )
+            end
 
-          unless raw_ret_span
-            call_name = "#{call_defn.defn(ctx).ident.value}.#{@call.member}"
-            next {call_mt, Span.error(pos,
-              "This yield block parameter will never be received", [
-                {call_func.ident.pos, "'#{call_name}' does not yield it"}
-              ]
-            )}
-          end
-
-          ret_span = raw_ret_span
-            .deciding_f_cap(call_mt.cap_only, call_func.has_tag?(:constructor))
-            .not_nil!
-
-          ret_mt = MetaType.new_union(ret_span.all_terminal_meta_types)
-          simple_ret_span = Span.simple(ret_mt)
-          # TODO: Retain original ret_span maybe? Or filter it down further based on type rets...
-          # Does it ever make sense to have a multiple span point in type signature?
-
-          {call_mt, simple_ret_span}.as({MetaType, Span})
-        end
-      end
+            raw_ret_span
+              .deciding_f_cap(term_mt.cap_only, call_func.has_tag?(:constructor))
+              .not_nil!
+          }
+          Span.reduce_combine_mts(intersection_term_spans) { |accum, mt| accum.intersect(mt) }.not_nil!
+        }
+        Span.reduce_combine_mts(union_member_spans) { |accum, mt| accum.unite(mt) }.not_nil!
+      }
     end
   end
 
@@ -1736,7 +1732,7 @@ module Mare::Compiler::Infer
 
             next Span.simple(MetaType.unconstrained) unless param_span
 
-            param_span = param_span
+            param_span
               .deciding_f_cap(term_mt.cap_only, call_func.has_tag?(:constructor))
               .not_nil!
           }
