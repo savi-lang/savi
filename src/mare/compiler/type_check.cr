@@ -213,7 +213,6 @@ class Mare::Compiler::TypeCheck
     end
 
     reach_additional_subtype_relationships(ctx)
-    reach_additional_subfunc_relationships(ctx)
   end
 
   def run_for_library(ctx, library)
@@ -311,44 +310,6 @@ class Mare::Compiler::TypeCheck
               subtype_rt_analysis.is_supertype_of?(ctx, other_subtype_rt)
               keep_going = true \
                 if orig_size != subtype_rt_analysis.each_known_subtype.size
-            end
-          end
-        end
-      end
-    end
-  end
-
-  def reach_additional_subfunc_relationships(ctx)
-    # For each abstract type in the program that we have analyzed...
-    # (this should be all of the abstract types in the program)
-    @t_analyses.each do |t_link, t_analysis|
-      t = t_link.resolve(ctx)
-      next unless t_link.is_abstract?
-
-      # For each "fully baked" reification of that type we have checked...
-      # (this should include all reifications reachable from any defined
-      # function, though not necessarily all reachable from Main.new)
-      # TODO: Should we be limiting to only paths reachable from Main.new?
-      t_analysis.each_reached_fully_reified.each do |rt|
-
-        # For each known complete subtypes that have been established
-        # by testing via some code path in the program thus far...
-        # TODO: Should we be limiting to only paths reachable from Main.new?
-        self[rt].each_known_complete_subtype(ctx).each do |subtype_rt|
-
-          # For each function in the abstract type and its
-          # corresponding function that is required to be in the subtype...
-          t.functions.each do |f|
-            f_link = f.make_link(rt.link)
-            subtype_f_link = f.make_link(subtype_rt.link)
-
-            # For each reification of that function in the abstract type.
-            self[f_link].each_reified_func(rt).each do |rf|
-
-              # Reach the corresponding concrete reification in the subtype.
-              # This ensures that we have reached the correct reification(s)
-              # of each concrete function we may call via an abstract trait.
-              for_rf = for_rf(ctx, subtype_rt, subtype_f_link, rf.receiver.cap_only).tap(&.run)
             end
           end
         end
@@ -1003,15 +964,6 @@ class Mare::Compiler::TypeCheck
         end
       end
 
-      # Reach the functions we will use during CodeGen.
-      array_rt = mt.single!
-      ["new", "<<"].each do |f_name|
-        f = array_rt.defn(ctx).find_func!(f_name)
-        f_link = f.make_link(array_rt.link)
-        ctx.type_check.for_rf(ctx, array_rt, f_link, MetaType.cap(f.cap.value)).run
-        @analysis.called_funcs.add({info, array_rt, f_link})
-      end
-
       true
     end
 
@@ -1048,7 +1000,6 @@ class Mare::Compiler::TypeCheck
       true
     end
 
-    # Reach the particular reification of the function called in a FromCall.
     def type_check_pre(ctx : Context, info : Infer::FromCall, mt : MetaType) : Bool
       # Skip further checks if any foreign type params are present.
       # TODO: Move these checks to an non-reified function analysis pass
@@ -1076,10 +1027,6 @@ class Mare::Compiler::TypeCheck
         # Check the number of arguments.
         info.follow_call_check_args(ctx, self, call_func, problems)
 
-        # Reach the reified function we are calling, with the right reify_cap.
-        # TODO: Remove this line and make the Reach pass responsible for this.
-        ctx.type_check.for_rf(ctx, call_defn, call_func_link, reify_cap).try(&.run)
-
         # Check if auto-recovery of the receiver is possible.
         if autorecover_needed
           receiver = MetaType.new(call_defn, reify_cap.cap_only_inner.value.as(String))
@@ -1092,53 +1039,6 @@ class Mare::Compiler::TypeCheck
       ctx.error_at info,
         "This function call doesn't meet subtyping requirements", problems \
           unless problems.empty?
-
-      true
-    end
-
-    # Reach the underlying field "function" of a Field.
-    def type_check_pre(ctx : Context, info : Infer::FieldRead, mt : MetaType) : Bool
-      type_check_pre(ctx, info.field, mt)
-    end
-    def type_check_pre(ctx : Context, info : Infer::Field, mt : MetaType) : Bool
-      field_func = @reified.type.defn(ctx).functions.find do |f|
-        f.ident.value == info.name && f.has_tag?(:field)
-      end.not_nil!
-      field_func_link = field_func.make_link(@reified.type.link)
-
-      # Keep track that we touched the "function" of the field_func.
-      @analysis.called_funcs.add({info, @reified.type, field_func_link})
-
-      # Get the visitor for the field_func, possibly creating and running it.
-      ctx.type_check.for_rf(
-        ctx,
-        @reified.type,
-        field_func_link,
-        @analysis.resolved_self_cap
-      ).tap(&.run)
-
-      true
-    end
-
-    # Reach the reflectable functions assocaited with a ReflectionOfType.
-    def type_check_pre(ctx : Context, info : Infer::ReflectionOfType, mt : MetaType) : Bool
-      reflection_mt = mt
-      reflection_rt = mt.single!
-      reflect_mt = reflection_rt.args.first
-      return true if reflect_mt.type_params.any? # TODO: can we handle unreified type param cases?
-      reflect_rt = reflect_mt.single!
-
-      # Reach all functions that might possibly be reflected.
-      reflect_rt.defn(ctx).functions.each do |f|
-        next if f.has_tag?(:hygienic)
-        next if f.body.nil?
-        next if f.ident.value.starts_with?("_")
-        f_link = f.make_link(reflect_rt.link)
-        MetaType::Capability.new_maybe_generic(f.cap.value).each_cap.each do |f_cap|
-          ctx.type_check.for_rf(ctx, reflect_rt, f_link, MetaType.new(f_cap)).tap(&.run)
-        end
-        @analysis.called_funcs.add({info, reflect_rt, f_link})
-      end
 
       true
     end
