@@ -30,14 +30,36 @@ It complains when calling on types without that function:
     object (Fooable | Barable | Bazable) = Barable.new
     object.bar
 ```
+```mare
+// TODO: Show this more complete version of the error:
+// The 'bar' function can't be called on this local variable:
+//     object.bar
+//            ^~~
+
+// - this local variable may have type Bazable:
+//     object (Fooable | Barable | Bazable) = Barable.new
+//            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+// - Bazable has no 'bar' function:
+// :primitive Bazable
+//            ^~~~~~~
+
+// - maybe you meant to call the 'baz' function:
+//   :fun baz: "baz"
+//        ^~~
+
+// - this local variable may have type Fooable:
+//     object (Fooable | Barable | Bazable) = Barable.new
+//            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+// - Fooable has no 'bar' function:
+// :trait Fooable
+//        ^~~~~~~
+```
 ```error
-The 'bar' function can't be called on this local variable:
+The 'bar' function can't be called on this receiver:
     object.bar
            ^~~
-
-- this local variable may have type Bazable:
-    object (Fooable | Barable | Bazable) = Barable.new
-           ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 - Bazable has no 'bar' function:
 :primitive Bazable
@@ -46,14 +68,6 @@ The 'bar' function can't be called on this local variable:
 - maybe you meant to call the 'baz' function:
   :fun baz: "baz"
        ^~~
-
-- this local variable may have type Fooable:
-    object (Fooable | Barable | Bazable) = Barable.new
-           ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-- Fooable has no 'bar' function:
-:trait Fooable
-       ^~~~~~~
 ```
 
 ---
@@ -70,7 +84,7 @@ It suggests a similarly named function when found:
     SomeHFunctions.hello
 ```
 ```error
-The 'hello' function can't be called on this singleton value for this type:
+The 'hello' function can't be called on this receiver:
     SomeHFunctions.hello
                    ^~~~~
 
@@ -95,7 +109,7 @@ It suggests a similarly named function (without '!') when found:
     HelloNotPartial.hello!
 ```
 ```error
-The 'hello!' function can't be called on this singleton value for this type:
+The 'hello!' function can't be called on this receiver:
     HelloNotPartial.hello!
                     ^~~~~~
 
@@ -120,7 +134,7 @@ It suggests a similarly named function (with '!') when found:
     HelloPartial.hello
 ```
 ```error
-The 'hello' function can't be called on this singleton value for this type:
+The 'hello' function can't be called on this receiver:
     HelloPartial.hello
                  ^~~~~
 

@@ -1299,109 +1299,71 @@ module Mare::Compiler::Infer
       infer.resolve(ctx, self)
     end
 
-    def resolve_span!(ctx : Context, infer : Visitor) : Span
-      call_receiver_span = infer.resolve(ctx, @lhs)
-        .transform_mt_to_span(&.gather_call_receiver_span(ctx, @pos, infer, @member))
+    def resolve_receiver_span(ctx : Context, infer : Visitor) : Span
+      infer.analysis.called_func_spans[self]?.try(&.first) || begin
+        call_receiver_span = infer.resolve(ctx, @lhs)
+          .transform_mt_to_span(&.gather_call_receiver_span(ctx, @pos, infer, @member))
 
-      # Save the call defn span to the analysis (used later for reachability).
-      infer.analysis.called_func_spans[self] = {call_receiver_span, @member}
+        # Save the call defn span to the analysis (used later for reachability).
+        infer.analysis.called_func_spans[self] = {call_receiver_span, @member}
 
-      # TODO: use above call_receiver_span to derive this one below
-      # instead of duplicating half the code here.
-      infer.resolve(ctx, @lhs).decided_by(@lhs) do |lhs_mt|
-        call_defns = lhs_mt.gather_callable_func_defns(ctx, infer, @member)
-
-        call_defns.compact_map do |(call_mt, call_defn, call_func)|
-          problems = [] of {Source::Pos, String}
-          if call_defn.nil?
-            problems << {@pos,
-              "the type #{call_mt.show_type} has no referencable types in it"}
-          elsif call_func.nil?
-            call_defn_defn = call_defn.defn(ctx)
-
-            problems << {call_defn_defn.ident.pos,
-              "#{call_defn_defn.ident.value} has no '#{@member}' function"}
-
-            found_similar = false
-            if @member.ends_with?("!")
-              call_defn_defn.find_func?(@member[0...-1]).try do |similar|
-                found_similar = true
-                problems << {similar.ident.pos,
-                  "maybe you meant to call '#{similar.ident.value}' (without '!')"}
-              end
-            else
-              call_defn_defn.find_func?("#{@member}!").try do |similar|
-                found_similar = true
-                problems << {similar.ident.pos,
-                  "maybe you meant to call '#{similar.ident.value}' (with a '!')"}
-              end
-            end
-
-            unless found_similar
-              similar = call_defn_defn.find_similar_function(@member)
-              problems << {similar.ident.pos,
-                "maybe you meant to call the '#{similar.ident.value}' function"} \
-                  if similar
-            end
-          end
-
-          next {call_mt, Span.error(@pos,
-            "The '#{@member}' function can't be called on this #{@lhs.describe_kind}",
-            problems
-          )} unless problems.empty?
-
-          call_defn = call_defn.not_nil!
-          call_func = call_func.not_nil!
-          call_link = call_func.make_link(call_defn.link)
-
-          yield_out_span = infer
-            .depends_on_call_yield_out_span(ctx, call_defn, call_func, call_link, 0)
-          if !yield_out_span && @yield_block
-            problems << {@yield_block.not_nil!.pos, "it has a yield block"}
-            problems << {call_func.ident.pos,
-              "but '#{call_defn.defn(ctx).ident.value}.#{@member}' has no yields"}
-          elsif yield_out_span && !@yield_block
-            problems << {
-              ctx.pre_infer[call_link].yield_out_infos.first.first_viable_constraint_pos,
-              "it has no yield block but " \
-                "'#{call_defn.defn(ctx).ident.value}.#{@member}' does yield"
-            }
-          end
-
-          next {call_mt, Span.error(@pos,
-            "This function call doesn't meet subtyping requirements",
-            problems
-          )} unless problems.empty?
-
-          # If this is a constructor, we know what the result type will be
-          # without needing to actually depend on the other analysis' span.
-          if call_func.has_tag?(:constructor)
-            new_mt = call_mt
-              .intersect(lhs_mt)
-              .strip_cap
-              .intersect(MetaType.cap(call_func.cap.value))
-              .ephemeralize
-
-            next {call_mt, Span.simple(new_mt)}
-          end
-
-          ret_span = infer
-            .depends_on_call_ret_span(ctx, call_defn, call_func, call_link)
-            .deciding_f_cap(call_mt.cap_only, call_func.has_tag?(:constructor))
-            .not_nil!
-            .transform_mt(&.ephemeralize)
-
-          next {call_mt, ret_span} if ret_span.inner.is_a?(Span::ErrorPropagate)
-
-          ret_mt = MetaType.new_union(ret_span.all_terminal_meta_types)
-          raise "halto" if ret_mt.unsatisfiable?
-          simple_ret_span = Span.simple(ret_mt)
-          # TODO: Retain original ret_span maybe? Or filter it down further based on type params...
-          # Does it ever make sense to have a multiple span point in type signature?
-
-          {call_mt, simple_ret_span}.as({MetaType, Span})
-        end
+        call_receiver_span
       end
+    end
+
+    def resolve_span!(ctx : Context, infer : Visitor) : Span
+      lhs_span = infer.resolve(ctx, @lhs)
+      resolve_receiver_span(ctx, infer).combine_mt_to_span(lhs_span) { |call_receiver_mt, lhs_mt|
+        union_member_spans = call_receiver_mt.map_each_union_member { |union_member_mt|
+          intersection_term_spans = union_member_mt.map_each_intersection_term_and_or_cap { |term_mt|
+            call_mt = union_member_mt
+            call_defn = term_mt.single!
+            call_func = call_defn.defn(ctx).find_func!(@member)
+            call_link = call_func.make_link(call_defn.link)
+
+            problems = [] of {Source::Pos, String}
+
+            yield_out_span = infer
+              .depends_on_call_yield_out_span(ctx, call_defn, call_func, call_link, 0)
+            if !yield_out_span && @yield_block
+              problems << {@yield_block.not_nil!.pos, "it has a yield block"}
+              problems << {call_func.ident.pos,
+                "but '#{call_defn.defn(ctx).ident.value}.#{@member}' has no yields"}
+            elsif yield_out_span && !@yield_block
+              problems << {
+                ctx.pre_infer[call_link].yield_out_infos.first.first_viable_constraint_pos,
+                "it has no yield block but " \
+                  "'#{call_defn.defn(ctx).ident.value}.#{@member}' does yield"
+              }
+            end
+
+            next Span.error(@pos,
+              "This function call doesn't meet subtyping requirements",
+              problems
+            ) unless problems.empty?
+
+            # If this is a constructor, we know what the result type will be
+            # without needing to actually depend on the other analysis' span.
+            if call_func.has_tag?(:constructor)
+              new_mt = call_mt
+                .intersect(lhs_mt)
+                .strip_cap
+                .intersect(MetaType.cap(call_func.cap.value))
+                .ephemeralize
+
+              next Span.simple(new_mt)
+            end
+
+            infer
+              .depends_on_call_ret_span(ctx, call_defn, call_func, call_link)
+              .deciding_f_cap(call_mt.cap_only, call_func.has_tag?(:constructor))
+              .not_nil!
+              .transform_mt(&.ephemeralize)
+          }
+          Span.reduce_combine_mts(intersection_term_spans) { |accum, mt| accum.intersect(mt) }.not_nil!
+        }
+        Span.reduce_combine_mts(union_member_spans) { |accum, mt| accum.unite(mt) }.not_nil!
+      }
     end
 
     def follow_call_get_call_defns(ctx : Context, infer) : Set({MetaType, ReifiedType?, Program::Function?})?

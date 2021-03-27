@@ -518,6 +518,53 @@ struct Mare::Compiler::Infer::MetaType
     results
   end
 
+  def map_each_union_member(&block : MetaType -> T) forall T
+    results = [] of T
+
+    inner = @inner
+    case inner
+    when Union
+      inner.caps.try(&.each { |cap|
+        results << yield MetaType.new(cap)
+      })
+      inner.terms.try(&.each { |term|
+        results << yield MetaType.new(term)
+      })
+      inner.anti_terms.try(&.each { |anti_term|
+        results << yield MetaType.new(anti_term)
+      })
+      inner.intersects.try(&.each { |intersect|
+        results << yield MetaType.new(intersect)
+      })
+    when Intersection; results << yield MetaType.new(inner)
+    when Nominal;      results << yield MetaType.new(inner)
+    when Capability;   results << yield MetaType.new(inner)
+    else NotImplementedError.new("map_each_union_member for #{inner.inspect}")
+    end
+
+    results
+  end
+
+  def map_each_intersection_term_and_or_cap(&block : MetaType -> T) forall T
+    results = [] of T
+
+    inner = @inner
+    case inner
+    when Union
+      raise "wrap a call to map_each_union_member around this method first"
+    when Intersection
+      cap = MetaType.new(inner.cap || Unconstrained.instance)
+      inner.terms.try(&.each { |term|
+        results << yield MetaType.new(term).intersect(cap)
+      })
+    when Nominal; results << yield MetaType.new(inner)
+    when Capability; results << yield MetaType.new(inner)
+    else NotImplementedError.new("each_intersection_term_and_or_cap for #{inner.inspect}")
+    end
+
+    results
+  end
+
   def gather_call_receiver_span(
     ctx : Context,
     pos : Source::Pos,
