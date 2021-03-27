@@ -575,15 +575,15 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     loop {
       func_count = @seen_funcs.values.flat_map(&.size)
 
-      sympathetic_resonance_v2(ctx)
+      sympathetic_resonance(ctx)
 
       new_func_count = @seen_funcs.values.flat_map(&.size)
       break if new_func_count == func_count
       func_count = new_func_count
     }
 
-    # TODO: remove this old version of the "sympathetic resonance" mini-pass:
-    sympathetic_resonance(ctx)
+    # Finally, resonate the incompatible signatures of all compatible functions.
+    sympathetic_signature_resonance(ctx)
   end
 
   def handle_func(ctx, rf : Infer::ReifiedFunction)
@@ -719,7 +719,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     }
   end
 
-  def sympathetic_resonance_v2(ctx)
+  def sympathetic_resonance(ctx)
     @seen_funcs.keys.group_by(&.type).each { |abstract_rt, abstract_rfs|
       abstract_def = @defs[abstract_rt]
 
@@ -742,68 +742,44 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     }
   end
 
-  def sympathetic_resonance(ctx)
-    # For each reachable abstract type def in the program,
-    # collect the type defs that are subtypes of it.
-    abstract_defs = Hash(Reach::Def, Array(Reach::Def)).new
-    each_type_def.select(&.is_abstract?(ctx)).each do |abstract_def|
-      abstract_defs[abstract_def] = subtype_defs = [] of Reach::Def
-      ctx.type_check[abstract_def.reified]
-      .each_known_complete_subtype(ctx).to_a.uniq.each do |other_rt|
-        other_def = @defs[other_rt]?
-        subtype_defs << other_def if other_def
-      end
-    end
+  def sympathetic_signature_resonance(ctx)
+    @seen_funcs.group_by(&.first.type).each { |abstract_rt, abstract_func_pairs|
+      abstract_def = @defs[abstract_rt]
 
-    # For each method in each abstract type, sympathetically resonate into
-    # the corresponding methods in each concrete type that is a subtype of it.
-    abstract_defs.each do |abstract_def, subtype_defs|
-      subtype_defs.each do |subtype_def|
-        abstract_def.reified.defn(ctx).functions.each do |abstract_f|
-          abstract_f_link = abstract_f.make_link(abstract_def.reified.link)
-          ctx.type_check[abstract_f_link].each_reified_func(abstract_def.reified).each do |abstract_rf|
-            abstract_seen = @seen_funcs[abstract_rf]?
-            next unless abstract_seen && !abstract_seen.empty?
+      each_reached_subtype_of(ctx, abstract_def) { |subtype_def|
+        reached_func_sets_for(subtype_def).each { |(subtype_rf, subtype_funcs)|
+          abstract_func_pairs.each { |abstract_rf, abstract_funcs|
+            # Skip to the next subtype function if this isn't the right one
+            # corresponding to the current function on the abstract type.
+            next unless abstract_funcs.any? { |abstract_func|
+              subtype_funcs.any? { |subtype_func|
+                subtype_func.signature.subtype_of?(ctx, abstract_func.signature)
+              }
+            }
 
-            subtype_def.reified.defn(ctx).functions.each do |subtype_f|
-              subtype_f_link = subtype_f.make_link(subtype_def.reified.link)
-              ctx.type_check[subtype_f_link].each_reified_func(subtype_def.reified).each do |subtype_rf|
-                subtype_seen = @seen_funcs[subtype_rf]?
-                next unless subtype_seen && !subtype_seen.empty?
+            # For each signature known to this abstract type for this function,
+            # sympathetically resonate that signature into the subtype.
+            abstract_funcs.each { |abstract_func|
+              # Skip if the subtype already has a version with this signature,
+              # or at least one that is codegen-compatible.
+              next if subtype_funcs.any? { |subtype_func|
+                abstract_func.signature.codegen_compat(ctx) == \
+                  subtype_func.signature.codegen_compat(ctx)
+              }
 
-                # Skip to the next subtype function if this isn't the right one
-                # corresponding to the current function on the abstract type.
-                next unless (abstract_seen.any? do |abstract_func|
-                  subtype_seen.any? do |subtype_func|
-                    subtype_func.signature.subtype_of?(ctx, abstract_func.signature)
-                  end
-                end)
-
-                # For each signature known to this abstract type for this function,
-                # sympathetically resonate that signature into the subtype.
-                abstract_seen.each do |abstract_func|
-                  # Skip if the subtype already has a version with this signature,
-                  # or at least one that is codegen-compatible.
-                  next if (subtype_seen.any? do |subtype_func|
-                    abstract_func.signature.codegen_compat(ctx) == \
-                      subtype_func.signature.codegen_compat(ctx)
-                  end)
-
-                  # Create a new function manifestation in the subtype with this
-                  # signature, so that it is codegen-compatible with the abstract.
-                  subtype_seen << Func.new(
-                    subtype_seen.first.reach_def,
-                    subtype_seen.first.infer,
-                    subtype_seen.first.type_check,
-                    abstract_func.signature,
-                  )
-                end
-              end
-            end
-          end
-        end
-      end
-    end
+              # Create a new function manifestation in the subtype with this
+              # signature, so that it is codegen-compatible with the abstract.
+              subtype_funcs << Func.new(
+                subtype_funcs.first.reach_def,
+                subtype_funcs.first.infer,
+                subtype_funcs.first.type_check,
+                abstract_func.signature,
+              )
+            }
+          }
+        }
+      }
+    }
   end
 
   # Traits are numbered 0, 1, 2, 3, 4, ...
@@ -864,6 +840,11 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     @seen_funcs
       .select { |rf, _| rf.type == reach_def.reified }
       .flat_map(&.last)
+  end
+
+  def reached_func_sets_for(reach_def : Def)
+    @seen_funcs
+      .select { |rf, _| rf.type == reach_def.reified }
   end
 
   def each_type_def
