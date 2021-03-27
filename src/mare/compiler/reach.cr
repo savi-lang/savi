@@ -18,10 +18,6 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       @meta_type.show_type
     end
 
-    def is_subtype?(type_check, other : Ref)
-      @meta_type.subtype_of?(type_check, other.meta_type)
-    end
-
     def is_tuple?
       false # TODO
     end
@@ -560,20 +556,27 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
 
   def run(ctx)
     # Reach functions called starting from the entrypoint of the program.
-    main = ctx.namespace.main_type?(ctx)
-    if main
-      new_f = main.resolve(ctx).find_default_constructor?
-      handle_func(ctx, ctx.type_check[main].no_args, new_f.make_link(main)) if new_f
+    main_rt = ctx.namespace.main_type?(ctx).try { |link| Infer::ReifiedType.new(link) }
+    if main_rt
+      main_f_link = main_rt.defn(ctx).find_default_constructor?.try(&.make_link(main_rt.link))
+      if main_f_link
+        main_rf = Infer::ReifiedFunction.new(main_rt, main_f_link, Infer::MetaType.new(main_rt, "ref"))
+        handle_func(ctx, main_rf)
+      end
     end
 
     # Reach extra functions and types that are used by the runtime,
     # even if they are not used/reached by the user-written program.
-    env = ctx.namespace.prelude_type("Env")
-    handle_func(ctx, ctx.type_check[env].no_args, env.resolve(ctx).find_func!("_create").make_link(env))
-    n = ctx.namespace.prelude_type("AsioEventNotify")
-    handle_func(ctx, ctx.type_check[n].no_args, n.resolve(ctx).find_func!("_event_notify").make_link(n))
-    string = ctx.namespace.prelude_type("String")
-    handle_type_def(ctx, ctx.type_check[string].no_args)
+    env_rt = Infer::ReifiedType.new(ctx.namespace.prelude_type("Env"))
+    env_f_link = env_rt.defn(ctx).find_func!("_create").make_link(env_rt.link)
+    env_rf = Infer::ReifiedFunction.new(env_rt, env_f_link, Infer::MetaType.new(env_rt, "val"))
+    handle_func(ctx, env_rf)
+    notify_rt = Infer::ReifiedType.new(ctx.namespace.prelude_type("AsioEventNotify"))
+    notify_f_link = notify_rt.defn(ctx).find_func!("_event_notify").make_link(notify_rt.link)
+    notify_rf = Infer::ReifiedFunction.new(notify_rt, notify_f_link, Infer::MetaType.new(notify_rt, "ref"))
+    handle_func(ctx, notify_rf)
+    string_rt = Infer::ReifiedType.new(ctx.namespace.prelude_type("String"))
+    handle_type_def(ctx, string_rt)
 
     # Run our "sympathetic resonance" mini-pass until there are no new funcs.
     loop {
@@ -638,13 +641,6 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     handle_type_def(ctx, rt)
   end
 
-  # TODO: Remove this alias and stop depending on the type_check pass to reach.
-  def handle_func(ctx, rt : Infer::ReifiedType, f_link : Program::Function::Link)
-    ctx.type_check[f_link].each_reified_func(rt).each do |rf|
-      handle_func(ctx, rf)
-    end
-  end
-
   def signature_for(
     ctx : Context,
     rf : Infer::ReifiedFunction,
@@ -672,7 +668,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     handle_type_ref(ctx, mt)
 
     # Handle the field as if it were a function.
-    handle_func(ctx, rt, f_link)
+    handle_func(ctx, rf)
 
     # Return the Ref instance for this meta type.
     {f_link.name, @refs[mt]}
@@ -722,14 +718,9 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
 
     @defs.values.each { |other_def|
       next if other_def == abstract_def
-      next unless possible_subtype_links.includes?(other_def.link)
 
-      # TODO: don't use for_rt here, which modifies TypeCheck pass state.
-      # In fact, don't use the TypeCheck pass at all!
-      ctx.type_check.for_rt(ctx, other_def.reified.link, other_def.reified.args)
-      ctx.type_check.for_rt(ctx, abstract_def.reified.link, abstract_def.reified.args)
-      next unless ctx.type_check[other_def.reified]
-        .is_subtype_of?(ctx, abstract_def.reified)
+      # TODO: Don't depend on TypeCheck pass here for this - some other cache.
+      next unless ctx.type_check.is_subtype_of?(ctx, other_def.reified, abstract_def.reified)
 
       yield other_def
     }
@@ -830,13 +821,9 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     identical_def = @defs.values.find do |other_def|
       next unless other_def.reified.link.is_abstract?
 
-      # TODO: don't use for_rt here, which modifies TypeCheck pass state.
-      # In fact, don't use the TypeCheck pass at all!
-      ctx.type_check.for_rt(ctx, other_def.reified.link, other_def.reified.args)
-      ctx.type_check.for_rt(ctx, new_def.reified.link, new_def.reified.args)
-
-      ctx.type_check[other_def.reified].is_subtype_of?(ctx, new_def.reified) \
-      && ctx.type_check[new_def.reified].is_subtype_of?(ctx, other_def.reified)
+      # TODO: Don't depend on TypeCheck pass here for this - some other cache.
+      ctx.type_check.is_subtype_of?(ctx, other_def.reified, new_def.reified) \
+      && ctx.type_check.is_subtype_of?(ctx, new_def.reified, other_def.reified)
     end
     return identical_def.desc_id if identical_def
 
