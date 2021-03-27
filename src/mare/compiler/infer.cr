@@ -1,22 +1,30 @@
 require "./pass/analyze"
 
 ##
-# TODO: Document
+# This pass determines for each type/function, for all possible reifications,
+# for each expression within it, the Span of possible types for that expression
+# in each of those possible reifications. Information from upstream and
+# sometimes downstream of each expression is used to infer types where needed.
 #
-# This pass is an experimental refactoring of the Infer pass, tracking
-# the space of possibilities for a node's type as a Span, so that the Span
-# can be resolved quickly later for any given reification.
-# The expectation is that this approach will reduce compile times
-# and maybe also provide more powerful inference capabilities.
+# A MetaType represents the type of an expression, which may refer to one
+# or more type definitions and capabilities in various combinations
+# (such as unions, intersections, etc), while a Span represents the set of
+# those MetaTypes that are possible in the different possible reifications.
+# A function or type with no type parameters or generic capabilities present
+# will only have one possible reification, so all expressions therein
+# will have a Span with just one Terminal MetaType in it.
 #
-# Currently this pass is not used for compilation, unless you use the
-# --pass=infer flag when running the `mare` binary.
+# After this pass, the types of expressions will be known, but not fully
+# type-checked, as that work of type system verification happens in the later
+# TypeCheck pass, which is decoupled from this pass because in theory
+# type-checking is not necessary to compile a correct program, so it is a
+# separate concern from that of marking the types of expressions in the program.
 #
 # This pass does not mutate the Program topology.
 # This pass does not mutate the AST.
 # This pass may raise a compilation error.
-# This pass keeps state at the per-function level.
-# This pass produces output state at the per-function level.
+# This pass keeps state at the per-type and per-function level.
+# This pass produces output state at the per-type and per-function level.
 #
 module Mare::Compiler::Infer
   abstract struct Analysis
