@@ -105,10 +105,6 @@ struct Mare::Compiler::Infer::MetaType::Capability
     )
   end
 
-  def gather_callable_func_defns(ctx, infer : Visitor?, name : String)
-    nil
-  end
-
   def find_callable_func_defns(ctx, infer : TypeCheck::ForReifiedFunc?, name : String)
     nil
   end

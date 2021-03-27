@@ -574,18 +574,6 @@ struct Mare::Compiler::Infer::MetaType
     @inner.gather_call_receiver_span(ctx, pos, infer, name)
   end
 
-  def gather_callable_func_defns(
-    ctx : Context,
-    infer : Visitor?,
-    name : String,
-  ) : Set(Tuple(MetaType, ReifiedType?, Program::Function?))
-    set = Set(Tuple(MetaType, ReifiedType?, Program::Function?)).new
-    @inner.gather_callable_func_defns(ctx, infer, name).try(&.each { |tuple|
-      set.add(tuple)
-    })
-    set
-  end
-
   def find_callable_func_defns(
     ctx : Context,
     infer : TypeCheck::ForReifiedFunc?,

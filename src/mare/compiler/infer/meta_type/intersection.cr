@@ -104,37 +104,6 @@ struct Mare::Compiler::Infer::MetaType::Intersection
     span
   end
 
-  def gather_callable_func_defns(ctx, infer : Visitor?, name : String)
-    list = [] of Tuple(MetaType, ReifiedType?, Program::Function?)
-
-    # Collect a result for each nominal in this intersection that has this func.
-    terms.try(&.each do |term|
-      term.gather_callable_func_defns(ctx, infer, name).try do |result|
-        result.each do |_, defn, func|
-          # Replace the inner term with an inner of this intersection.
-          # This will be used for subtype checking later, and we want to
-          # make sure that our cap will be taken into account, if any.
-          list << {MetaType.new(self), defn, func} if func
-        end
-      end
-    end)
-
-    # If none of the nominals in this intersection had the func,
-    # we're in trouble; collect the list of types that failed our search.
-    if list.empty?
-      terms.try(&.each do |term|
-        defn = term.defn
-        list << {MetaType.new(self), (defn if defn.is_a?(ReifiedType)), nil}
-      end)
-    end
-
-    # If for some reason we're still empty (like in the case of an
-    # intersection of anti-nominals), we have to return nil.
-    list << {MetaType.new(self), nil, nil} if list.empty?
-
-    list
-  end
-
   def find_callable_func_defns(ctx, infer : TypeCheck::ForReifiedFunc?, name : String)
     list = [] of Tuple(MetaType, ReifiedType?, Program::Function?)
 
