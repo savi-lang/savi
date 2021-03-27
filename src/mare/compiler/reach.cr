@@ -404,6 +404,10 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       ctx.refer[@reified.link]
     end
 
+    def link
+      @reified.link
+    end
+    # TODO: remove this alias:
     def program_type
       @reified.link
     end
@@ -533,6 +537,10 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       type_check.reified
     end
 
+    def link
+      reified.link
+    end
+
     def initialize(@reach_def, @infer, @type_check, @signature)
     end
 
@@ -567,48 +575,75 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     string = ctx.namespace.prelude_type("String")
     handle_type_def(ctx, ctx.type_check[string].no_args)
 
-    # Run our "sympathetic resonance" mini-pass.
+    # Run our "sympathetic resonance" mini-pass until there are no new funcs.
+    loop {
+      func_count = @seen_funcs.values.flat_map(&.size)
+
+      sympathetic_resonance_v2(ctx)
+
+      new_func_count = @seen_funcs.values.flat_map(&.size)
+      break if new_func_count == func_count
+      func_count = new_func_count
+    }
+
+    # TODO: remove this old version of the "sympathetic resonance" mini-pass:
     sympathetic_resonance(ctx)
   end
 
-  def handle_func(ctx, rt : Infer::ReifiedType, f_link : Program::Function::Link)
-    infer = ctx.infer[f_link]
+  def handle_func(ctx, rf : Infer::ReifiedFunction)
+    # Skip this function if we've already seen it.
+    return if @seen_funcs.has_key?(rf)
+    reach_funcs = Array(Func).new
+    @seen_funcs[rf] = reach_funcs
 
-    # Get each type_check instance associated with this function.
-    ctx.type_check[f_link].each_reified_func(rt).each do |rf|
-      type_check = ctx.type_check[rf]
+    rt = rf.type
+    infer = ctx.infer[rf.link]
 
-      # Skip this function if we've already seen it.
-      next if @seen_funcs.has_key?(rf)
-      reach_funcs = Array(Func).new
-      @seen_funcs[rf] = reach_funcs
+    # TODO: Remove mutation of and dependency on the type_check pass here.
+    ctx.type_check.for_rf(ctx, rt, rf.link, rf.receiver.cap_only).tap(&.run)
+    type_check = ctx.type_check[rf]
 
-      # Reach all type references seen by this function.
-      type_check.each_meta_type do |meta_type|
-        handle_type_ref(ctx, meta_type)
-      end
+    # Reach all type references seen by this function.
+    type_check.each_meta_type do |meta_type|
+      handle_type_ref(ctx, meta_type)
+    end
 
-      # Add this function with its signature.
-      reach_def = ctx.reach[rt]
-      reach_funcs << Func.new(reach_def, infer, type_check, signature_for(ctx, rf, infer))
+    # Add this function with its signature.
+    reach_def = ctx.reach[rt]
+    reach_funcs << Func.new(reach_def, infer, type_check, signature_for(ctx, rf, infer))
 
-      # Reach all functions called by this function.
-      type_check.each_called_func.each do |pos, called_rt, called_func_link|
-        handle_func(ctx, called_rt, called_func_link)
-      end
+    # Reach all functions called by this function.
+    infer.each_called_func_within(ctx, rf, type_check) { |info, called_rf|
+      # next if type_check.ignores_layer?(info.layer_index)
 
-      # Reach all functions that have the same name as this function and
-      # belong to a type that is a subtype of this one.
-      # TODO: Can this be combined with the sympathetic_resonance mini-pass somehow?
-      if rt.link.is_abstract?
-        ctx.type_check[rt].each_known_complete_subtype(ctx).to_a.uniq.each do |other_rt|
-          other_func = other_rt.defn(ctx).find_func!(f_link.name)
-          handle_func(ctx, other_rt, other_func.make_link(other_rt.link))
-        end
+      # # TODO: Can this check be removed by better implementing each_called_func_within to respect type context layers?
+      # next if called_rf.type.args.any?(&.unsatisfiable?)
+
+      handle_func(ctx, called_rf)
+    }
+    # TODO: remove this line when the above line handles all needed funcs.
+    type_check.each_called_func.each do |pos, called_rt, called_func_link|
+      handle_func(ctx, called_rt, called_func_link)
+    end
+
+    # Reach all functions callable via reflection from this function.
+    infer.each_reflection.each do |reflection_info|
+      reflection_mt = rf.meta_type_of(ctx, reflection_info, infer).not_nil!
+      reflection_rt = reflection_mt.single!
+      reflection_rt.link.resolve(ctx).functions.each do |func|
+        reflection_func_link = func.make_link(reflection_rt.link)
+        handle_func(ctx, reflection_rt, reflection_func_link)
       end
     end
 
     handle_type_def(ctx, rt)
+  end
+
+  # TODO: Remove this alias and stop depending on the type_check pass to reach.
+  def handle_func(ctx, rt : Infer::ReifiedType, f_link : Program::Function::Link)
+    ctx.type_check[f_link].each_reified_func(rt).each do |rf|
+      handle_func(ctx, rf)
+    end
   end
 
   def signature_for(
@@ -616,15 +651,15 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     rf : Infer::ReifiedFunction,
     infer : Infer::FuncAnalysis
   ) : Signature
-    receiver = ctx.reach[rf.receiver]
+    receiver = ctx.reach.handle_type_ref(ctx, rf.receiver)
 
     params = infer.param_spans.map { |span|
-      ctx.reach[rf.meta_type_of(ctx, span, infer).not_nil!]
+      ctx.reach.handle_type_ref(ctx, rf.meta_type_of(ctx, span, infer).not_nil!)
     }
-    ret = ctx.reach[rf.meta_type_of_ret(ctx, infer).not_nil!]
+    ret = ctx.reach.handle_type_ref(ctx, rf.meta_type_of_ret(ctx, infer).not_nil!)
 
     yield_out = infer.yield_out_spans.map { |span|
-      ctx.reach[rf.meta_type_of(ctx, span, infer).not_nil!]
+      ctx.reach.handle_type_ref(ctx, rf.meta_type_of(ctx, span, infer).not_nil!)
     }
 
     Signature.new(rf.name, receiver, params, ret, yield_out)
@@ -644,9 +679,10 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     {f_link.name, @refs[mt]}
   end
 
-  def handle_type_ref(ctx, meta_type : Infer::MetaType)
+  def handle_type_ref(ctx, meta_type : Infer::MetaType) : Ref
     # Skip this type ref if we've already seen it.
-    return if @refs.has_key?(meta_type)
+    existing_ref = @refs[meta_type]?
+    return existing_ref if existing_ref
 
     # First, reach any type definitions referenced by this type reference.
     meta_type.each_reachable_defn(ctx).each { |t| handle_type_def(ctx, t) }
@@ -675,6 +711,52 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     fields.concat(rt.defn(ctx).functions.select(&.has_tag?(:field)).map do |f|
       handle_field(ctx, rt, f.make_link(rt.link), f.ident)
     end.compact)
+  end
+
+  def each_reached_subtype_of(ctx, abstract_def : Def)
+    abstract_link = abstract_def.link
+
+    # Only continue if this is an abstract type (one which may have subtypes).
+    return nil unless abstract_link.is_abstract?
+
+    possible_subtype_links = ctx.pre_subtyping[abstract_link].possible_subtypes
+
+    @defs.values.each { |other_def|
+      next if other_def == abstract_def
+      next unless possible_subtype_links.includes?(other_def.link)
+
+      # TODO: don't use for_rt here, which modifies TypeCheck pass state.
+      # In fact, don't use the TypeCheck pass at all!
+      ctx.type_check.for_rt(ctx, other_def.reified.link, other_def.reified.args)
+      ctx.type_check.for_rt(ctx, abstract_def.reified.link, abstract_def.reified.args)
+      next unless ctx.type_check[other_def.reified]
+        .is_subtype_of?(ctx, abstract_def.reified)
+
+      yield other_def
+    }
+  end
+
+  def sympathetic_resonance_v2(ctx)
+    @seen_funcs.keys.group_by(&.type).each { |abstract_rt, abstract_rfs|
+      abstract_def = @defs[abstract_rt]
+
+      each_reached_subtype_of(ctx, abstract_def) { |subtype_def|
+        abstract_rfs.each { |abstract_rf|
+          next if abstract_rf.link.is_hygienic?
+
+          # Construct the ReifiedFunction in the subtype that corresponds to
+          # that ReifiedFunction in the abstract type (which can reach it).
+          subtype_rt = subtype_def.reified
+          subtype_rf = Infer::ReifiedFunction.new(
+            subtype_rt,
+            Program::Function::Link.new(subtype_rt.link, abstract_rf.link.name, nil),
+            Infer::MetaType.new_nominal(subtype_rt).intersect(abstract_rf.receiver.cap_only)
+          )
+
+          handle_func(ctx, subtype_rf)
+        }
+      }
+    }
   end
 
   def sympathetic_resonance(ctx)

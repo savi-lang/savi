@@ -128,7 +128,7 @@ class Mare::Compiler
     when :privacy then [:type_check]
     when :completeness then [:type_check, :jumps, :lambda, :sugar, :macros, :populate]
     when :verify then [:type_check, :inventory, :jumps]
-    when :reach then [:type_check, :infer, :refer, :namespace]
+    when :reach then [:type_check, :infer, :pre_subtyping, :refer, :namespace]
     when :paint then [:reach, :inventory]
     when :codegen then [:paint, :verify, :reach, :completeness, :privacy, :type_check, :infer, :inventory, :consumes, :jumps]
     when :lifetime then [:reach, :refer, :classify]

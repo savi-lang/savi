@@ -92,15 +92,46 @@ struct Mare::Compiler::Infer::MetaType::Union
     defns
   end
 
+  def gather_call_receiver_span(
+    ctx : Context,
+    pos : Source::Pos,
+    infer : Visitor?,
+    name : String
+  ) : Span
+    span = Span.simple(MetaType.unsatisfiable)
+
+    terms.try { |terms|
+      span = span.reduce_combine_mts(
+        terms.map(&.gather_call_receiver_span(ctx, pos, infer, name))
+      ) { |accum, mt| accum.unite(mt) }
+    }
+
+    intersects.try { |intersects|
+      span = span.reduce_combine_mts(
+        intersects.map(&.gather_call_receiver_span(ctx, pos, infer, name))
+      ) { |accum, mt| accum.unite(mt) }
+    }
+
+    if span.any_mt?(&.unsatisfiable?)
+      return Span.error(pos,
+        "The '#{name}' function can't be called on this receiver", [
+          {pos, "the type #{self.inspect} has no types defining that function"}
+        ]
+      )
+    end
+
+    span
+  end
+
   def gather_callable_func_defns(ctx, infer : Visitor?, name : String)
-    list = [] of Tuple(Inner, ReifiedType?, Program::Function?)
+    list = [] of Tuple(MetaType, ReifiedType?, Program::Function?)
 
     # Every nominal in the union must have an implementation of the call.
     # If it doesn't, we will collect it here as a failure to find it.
     terms.not_nil!.each do |term|
       defn = term.defn
       result = term.gather_callable_func_defns(ctx, infer, name)
-      result ||= [{term, (defn if defn.is_a?(ReifiedType)), nil}]
+      result ||= [{MetaType.new(term), (defn if defn.is_a?(ReifiedType)), nil}]
       list.concat(result)
     end if terms
 
@@ -115,14 +146,14 @@ struct Mare::Compiler::Infer::MetaType::Union
   end
 
   def find_callable_func_defns(ctx, infer : TypeCheck::ForReifiedFunc?, name : String)
-    list = [] of Tuple(Inner, ReifiedType?, Program::Function?)
+    list = [] of Tuple(MetaType, ReifiedType?, Program::Function?)
 
     # Every nominal in the union must have an implementation of the call.
     # If it doesn't, we will collect it here as a failure to find it.
     terms.not_nil!.each do |term|
       defn = term.defn
       result = term.find_callable_func_defns(ctx, infer, name)
-      result ||= [{term, (defn if defn.is_a?(ReifiedType)), nil}]
+      result ||= [{MetaType.new(term), (defn if defn.is_a?(ReifiedType)), nil}]
       list.concat(result)
     end if terms
 

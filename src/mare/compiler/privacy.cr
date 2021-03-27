@@ -27,7 +27,9 @@ class Mare::Compiler::Privacy
   end
 
   def self.check_reified_func(ctx, type_check : TypeCheck::ReifiedFuncAnalysis)
-    type_check.each_called_func.each do |pos, called_rt, called_func_link|
+    type_check.each_called_func.each do |info, called_rt, called_func_link|
+      pos = info.pos
+
       # Only handle private calls (beginning with an underscore).
       return unless called_func_link.name.starts_with?("_")
 

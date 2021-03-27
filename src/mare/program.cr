@@ -488,6 +488,7 @@ class Mare::Program
       getter hygienic_id : UInt64?
       def initialize(@type, @name, @hygienic_id)
       end
+      def is_hygienic?; hygienic_id != nil; end
       def resolve(ctx : Compiler::Context)
         functions = @type.resolve(ctx).functions
         if hygienic_id

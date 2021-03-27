@@ -22,6 +22,8 @@ module Mare::Compiler::Infer
   abstract struct Analysis
     def initialize
       @spans = {} of Info => Span
+      @reflections = Set(ReflectionOfType).new
+      @called_func_spans = {} of Info => {Span, String | Array(String)}
     end
 
     def [](info : Info)
@@ -47,32 +49,73 @@ module Mare::Compiler::Infer
     getter! type_param_default_spans : Array(Span?)
     protected setter type_param_default_spans
 
+    protected getter reflections
+    def each_reflection; @reflections.each; end
+
+    protected getter called_func_spans
+
+    def each_called_func_within(ctx, rf : ReifiedFunction, type_check)
+      called_func_spans.each { |info, (call_defn_span, func_names)|
+        # TODO: Remove dependency on TypeCheck pass here
+        next if type_check.ignores_layer?(info.layer_index)
+
+        called_mt = rf.meta_type_of(ctx, call_defn_span, self)
+
+        next unless called_mt
+        called_rt = called_mt.single!
+
+        if func_names.is_a?(String)
+          func_name = func_names
+          called_link = Program::Function::Link.new(called_rt.link, func_name, nil)
+          called_rf = ReifiedFunction.new(called_rt, called_link, called_mt)
+          yield({info, called_rf})
+        else
+          func_names.as(Array(String)).each { |func_name|
+            called_link = Program::Function::Link.new(called_rt.link, func_name, nil)
+            called_rf = ReifiedFunction.new(called_rt, called_link, called_mt)
+            yield({info, called_rf})
+          }
+        end
+      }
+    end
+
     def deciding_type_args_of(
       args : Array(MetaType),
       raw_span : Span
     ) : Span?
+      # Fast path for the case of no type arguments present.
       return raw_span if args.empty?
 
       type_param_substs = type_params.zip(args.map(&.strip_cap)).to_h
 
+      deciding_type_args_for_cap_only_of(args, raw_span)
+        .try(&.transform_mt(&.substitute_type_params(type_param_substs)))
+    end
+
+    def deciding_type_args_for_cap_only_of(
+      args : Array(MetaType),
+      raw_span : Span
+    ) : Span?
+      # Fast path for the case of no type arguments present.
+      return raw_span if args.empty?
+
       # Many spans are simple terminals, so we can optimize things a bit here
       # by skipping the rest of this deciding when there is nothing to decide
       # because terminals have no decisions to be made.
-      (raw_span.inner.is_a?(Span::Terminal) ? raw_span : (
-        type_params.zip(args).reduce(raw_span) { |span, (type_param, type_arg)|
-          next unless span
+      return raw_span if raw_span.inner.is_a?(Span::Terminal)
 
-          # When a type argument is passed from a raw type param,
-          # we do not decide the capability here, because the type param
-          # does not necessarily have just one capability.
-          # TODO: Should we figure out how to combine the spans in some way
-          # to make at least a span-contingent decision here?
-          next span if type_arg.type_param_only?
+      type_params.zip(args).reduce(raw_span) { |span, (type_param, type_arg)|
+        next unless span
 
-          span.deciding_type_param(type_param, type_arg.cap_only)
-        }
-      ))
-      .try(&.transform_mt(&.substitute_type_params(type_param_substs)))
+        # When a type argument is passed from a raw type param,
+        # we do not decide the capability here, because the type param
+        # does not necessarily have just one capability.
+        # TODO: Should we figure out how to combine the spans in some way
+        # to make at least a span-contingent decision here?
+        next span if type_arg.type_param_only?
+
+        span.deciding_type_param(type_param, type_arg.cap_only)
+      }
     end
   end
 

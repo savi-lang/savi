@@ -22,6 +22,7 @@ module Mare::Compiler::PreSubtyping
     end
 
     protected def observe_possible_subtype(x); @possible_subtypes << x; end
+    getter possible_subtypes
   end
 
   class Analyst

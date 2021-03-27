@@ -70,6 +70,10 @@ module Mare::Compiler::Infer
       Span.new(inner.transform_mt_using(key, nil, &block))
     end
 
+    def transform_mt_to_span(&block : MetaType -> Span) : Span
+      Span.new(inner.transform_mt_to_span([] of {Key, MetaType}, &block))
+    end
+
     def decided_by(key : Key, &block : MetaType -> Enumerable({MetaType, Span})) : Span
       orig_keys = inner.gather_all_keys
       Span.new(inner.decided_by(key, orig_keys, &block))
@@ -108,6 +112,11 @@ module Mare::Compiler::Infer
           span.combine_mt(other_span, &block)
         }
       end
+    end
+
+    def deciding_exact(key : Key, mt : MetaType) : Span?
+      inner.deciding_exact(key, mt)
+      .try { |new_inner| Span.new(new_inner) }
     end
 
     def deciding_f_cap(f_cap_mt : MetaType, is_constructor : Bool) : Span?
@@ -159,8 +168,10 @@ module Mare::Compiler::Infer
       abstract def each_mt(&block : MetaType -> Nil) : Nil
       abstract def transform_mt(&block : MetaType -> MetaType) : Inner
       abstract def transform_mt_using(key : Key, maybe_value : MetaType?, &block : (MetaType, MetaType?) -> MetaType) : Inner
+      abstract def transform_mt_to_span(decided : Array({Key, MetaType}), &block : MetaType -> Span) : Inner
       abstract def decided_by(key : Key, orig_keys : Set(Key), &block : MetaType -> Enumerable({MetaType, Span})) : Inner
       abstract def combine_mt_to_span(other : Inner, maybe_other_terminal : Terminal?, always_yields_terminal = false, &block : (MetaType, MetaType) -> Span) : Inner
+      abstract def deciding_exact(key : Key, mt : MetaType) : Inner?
       abstract def deciding_f_cap(f_cap_mt : MetaType, is_constructor : Bool) : Inner?
       abstract def deciding_type_param(type_param : TypeParam, cap : MetaType) : Inner?
       abstract def narrowing_type_param(type_param : TypeParam, cap : MetaType) : Inner?
@@ -213,6 +224,14 @@ module Mare::Compiler::Infer
         Terminal.new(block.call(meta_type, maybe_value))
       end
 
+      def transform_mt_to_span(decided : Array({Key, MetaType}), &block : MetaType -> Span) : Inner
+        span = block.call(@meta_type)
+        decided.each { |(key, mt)|
+          span = span.deciding_exact(key, mt).not_nil! # TODO: how can we nicely handle this nil case?
+        }
+        span.inner
+      end
+
       def decided_by(key : Key, orig_keys : Set(Key), &block : MetaType -> Enumerable({MetaType, Span})) : Inner
         map = block.call(meta_type).to_h.transform_values(&.inner)
 
@@ -231,6 +250,10 @@ module Mare::Compiler::Infer
           swap_block = -> (b : MetaType, a : MetaType) { block.call(a, b) }
           other.combine_mt_to_span(self, self, &swap_block)
         end
+      end
+
+      def deciding_exact(key : Key, mt : MetaType) : Inner?
+        self # a terminal node ignores further decisions
       end
 
       def deciding_f_cap(f_cap_mt : MetaType, is_constructor : Bool) : Inner?
@@ -363,6 +386,12 @@ module Mare::Compiler::Infer
         )
       end
 
+      def transform_mt_to_span(decided : Array({Key, MetaType}), &block : MetaType -> Span) : Inner
+        Decision.build(@key, @map.map { |value, inner|
+          {value, inner.transform_mt_to_span(decided + [{key, value}], &block)}
+        }.to_h)
+      end
+
       def decided_by(key : Key, orig_keys : Set(Key), &block : MetaType -> Enumerable({MetaType, Span})) : Inner
         raise NotImplementedError.new("decision key conflict") if @key == key
         Decision.build(@key, @map.transform_values(&.decided_by(key, orig_keys, &block)))
@@ -410,6 +439,20 @@ module Mare::Compiler::Infer
           else
             raise NotImplementedError.new("combine_mt_to_span for a decision and another non-terminal")
           end
+        end
+      end
+
+      def deciding_exact(key : Key, mt : MetaType) : Inner?
+        if @key == key
+          exact_inner = @map[mt]?
+        else
+          Decision.build(@key,
+            @map.transform_values do |inner|
+              new_inner = inner.deciding_exact(key, mt)
+              return nil unless new_inner
+              new_inner
+            end
+          )
         end
       end
 
@@ -566,6 +609,16 @@ module Mare::Compiler::Infer
         )
       end
 
+      def transform_mt_to_span(decided : Array({Key, MetaType}), &block : MetaType -> Span) : Inner
+        Fallback.build(
+          @default.value.transform_mt_to_span(decided, &block),
+          @evaluate_mt,
+          @options.map { |(cond, inner)|
+            {cond, inner.transform_mt_to_span(decided, &block)}
+          }
+        )
+      end
+
       def decided_by(key : Key, orig_keys : Set(Key), &block : MetaType -> Enumerable({MetaType, Span})) : Inner
         Fallback.build(
           @default.value.decided_by(key, orig_keys, &block),
@@ -599,6 +652,24 @@ module Mare::Compiler::Infer
         else
           raise NotImplementedError.new("combine_mt_to_span for two unlike fallbacks")
         end
+      end
+
+      def deciding_exact(key : Key, mt : MetaType) : Inner?
+        new_default = @default.value.deciding_exact(key, mt)
+        raise NotImplementedError.new("new_default missing in Fallback.build") \
+          unless new_default
+
+        Fallback.build(
+          new_default,
+          @evaluate_mt,
+          @options.map { |(cond, inner)|
+            new_inner = inner.deciding_exact(key, mt)
+            raise NotImplementedError.new("new_inner missing in Fallback.build") \
+              unless new_inner
+
+            {cond, new_inner}
+          }
+        )
       end
 
       def deciding_f_cap(f_cap_mt : MetaType, is_constructor : Bool) : Inner?
@@ -722,6 +793,10 @@ module Mare::Compiler::Infer
         self
       end
 
+      def transform_mt_to_span(decided : Array({Key, MetaType}), &block : MetaType -> Span) : Inner
+        self
+      end
+
       def transform_mt_using(key : Key, maybe_value : MetaType?, &block : (MetaType, MetaType?) -> MetaType) : Inner
         self
       end
@@ -731,6 +806,10 @@ module Mare::Compiler::Infer
       end
 
       def combine_mt_to_span(other : Inner, maybe_other_terminal : Terminal?, always_yields_terminal = false, &block : (MetaType, MetaType) -> Span) : Inner
+        self
+      end
+
+      def deciding_exact(key : Key, mt : MetaType) : Inner?
         self
       end
 

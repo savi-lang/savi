@@ -16,6 +16,19 @@ struct Mare::Compiler::Infer::MetaType::AntiNominal
     ([] of ReifiedType)
   end
 
+  def gather_call_receiver_span(
+    ctx : Context,
+    pos : Source::Pos,
+    infer : Visitor?,
+    name : String
+  ) : Span
+    Span.error(pos,
+      "The '#{name}' function can't be called on this receiver", [
+        {pos, "the type #{self.inspect} has no types defining that function"}
+      ]
+    )
+  end
+
   def gather_callable_func_defns(ctx, infer : Visitor?, name : String)
     nil
   end

@@ -501,6 +501,9 @@ module Mare::Compiler::Infer
     end
 
     def resolve_span!(ctx : Context, infer : Visitor) : Span
+      # Take note of this reflection.
+      infer.analysis.reflections.add(self)
+
       infer.prelude_type_span(ctx, "ReflectionOfType")
         .combine_mt(infer.resolve(ctx, @reflect_type)) { |target_mt, arg_mt|
           MetaType.new(ReifiedType.new(target_mt.single!.link, [arg_mt]))
@@ -1223,6 +1226,11 @@ module Mare::Compiler::Infer
             "could not be inferred (it needs an explicit type)")
         end
       end
+
+      # Take note of the function calls implied (used later for reachability).
+      .tap { |array_span|
+        infer.analysis.called_func_spans[self] = {array_span, ["new", "<<"]}
+      }
     end
   end
 
@@ -1292,16 +1300,22 @@ module Mare::Compiler::Infer
     end
 
     def resolve_span!(ctx : Context, infer : Visitor) : Span
+      call_receiver_span = infer.resolve(ctx, @lhs)
+        .transform_mt_to_span(&.gather_call_receiver_span(ctx, @pos, infer, @member))
+
+      # Save the call defn span to the analysis (used later for reachability).
+      infer.analysis.called_func_spans[self] = {call_receiver_span, @member}
+
+      # TODO: use above call_receiver_span to derive this one below
+      # instead of duplicating half the code here.
       infer.resolve(ctx, @lhs).decided_by(@lhs) do |lhs_mt|
         call_defns = lhs_mt.gather_callable_func_defns(ctx, infer, @member)
 
-        call_defns.compact_map do |(call_mti, call_defn, call_func)|
-          call_mt = MetaType.new(call_mti) # TODO: remove call_mti?
-
+        call_defns.compact_map do |(call_mt, call_defn, call_func)|
           problems = [] of {Source::Pos, String}
           if call_defn.nil?
             problems << {@pos,
-              "the type #{call_mti.inspect} has no referencable types in it"}
+              "the type #{call_mt.show_type} has no referencable types in it"}
           elsif call_func.nil?
             call_defn_defn = call_defn.defn(ctx)
 
@@ -1390,7 +1404,7 @@ module Mare::Compiler::Infer
       end
     end
 
-    def follow_call_get_call_defns(ctx : Context, infer) : Set({MetaType::Inner, ReifiedType?, Program::Function?})?
+    def follow_call_get_call_defns(ctx : Context, infer) : Set({MetaType, ReifiedType?, Program::Function?})?
       call = self
       receiver = infer.resolve_with_reentrance_prevention(ctx, @lhs)
       return nil unless receiver
@@ -1398,12 +1412,12 @@ module Mare::Compiler::Infer
       call_defns = receiver.try(&.find_callable_func_defns(ctx, infer, @member))
 
       # Raise an error if we don't have a callable function for every possibility.
-      call_defns << {receiver.inner, nil, nil} if call_defns.empty?
+      call_defns << {receiver, nil, nil} if call_defns.empty?
       problems = [] of {Source::Pos, String}
-      call_defns.each do |(call_mti, call_defn, call_func)|
+      call_defns.each do |(call_mt, call_defn, call_func)|
         if call_defn.nil?
           problems << {@pos,
-            "the type #{call_mti.inspect} has no referencable types in it"}
+            "the type #{call_mt.show_type} has no referencable types in it"}
         elsif call_func.nil?
           call_defn_defn = call_defn.defn(ctx)
 
@@ -1608,8 +1622,7 @@ module Mare::Compiler::Infer
       # for the function that we're trying to call, evaluating the constraints
       # for each possibility such that all of them must hold true.
       problems = [] of {Source::Pos, String}
-      call_defns.each do |(call_mti, call_defn, call_func)|
-        call_mt = MetaType.new(call_mti)
+      call_defns.each do |(call_mt, call_defn, call_func)|
         call_defn = call_defn.not_nil!
         call_func = call_func.not_nil!
         call_func_link = call_func.make_link(call_defn.link)
@@ -1647,9 +1660,7 @@ module Mare::Compiler::Infer
       infer.resolve(ctx, @call.lhs).decided_by(@call.lhs) do |lhs_mt|
         call_defns = lhs_mt.gather_callable_func_defns(ctx, infer, @call.member)
 
-        call_defns.compact_map do |(call_mti, call_defn, call_func)|
-          call_mt = MetaType.new(call_mti) # TODO: remove call_mti?
-
+        call_defns.compact_map do |(call_mt, call_defn, call_func)|
           next unless call_defn && call_func
 
           call_link = call_func.make_link(call_defn.link)
@@ -1694,9 +1705,7 @@ module Mare::Compiler::Infer
       infer.resolve(ctx, @call.lhs).decided_by(@call.lhs) do |lhs_mt|
         call_defns = lhs_mt.gather_callable_func_defns(ctx, infer, @call.member)
 
-        call_defns.compact_map do |(call_mti, call_defn, call_func)|
-          call_mt = MetaType.new(call_mti) # TODO: remove call_mti?
-
+        call_defns.compact_map do |(call_mt, call_defn, call_func)|
           next unless call_defn && call_func
 
           call_link = call_func.make_link(call_defn.link)
@@ -1761,9 +1770,7 @@ module Mare::Compiler::Infer
       infer.resolve(ctx, @call.lhs).decided_by(@call.lhs) do |lhs_mt|
         call_defns = lhs_mt.gather_callable_func_defns(ctx, infer, @call.member)
 
-        call_defns.compact_map do |(call_mti, call_defn, call_func)|
-          call_mt = MetaType.new(call_mti) # TODO: remove call_mti?
-
+        call_defns.compact_map do |(call_mt, call_defn, call_func)|
           next unless call_defn && call_func
 
           call_link = call_func.make_link(call_defn.link)

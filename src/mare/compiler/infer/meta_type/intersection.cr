@@ -77,8 +77,35 @@ struct Mare::Compiler::Infer::MetaType::Intersection
     iter
   end
 
+  def gather_call_receiver_span(
+    ctx : Context,
+    pos : Source::Pos,
+    infer : Visitor?,
+    name : String
+  ) : Span
+    span = Span.simple(MetaType.new(cap || Unconstrained.instance))
+
+    terms.try { |terms|
+      term_spans = terms.map(&.gather_call_receiver_span(ctx, pos, infer, name))
+      term_spans_no_errors = term_spans.reject(&.any_error?)
+      term_spans = term_spans_no_errors unless term_spans_no_errors.empty?
+      span = span
+        .reduce_combine_mts(term_spans) { |accum, mt| accum.intersect(mt) }
+    }
+
+    if span.any_mt?(&.unconstrained?)
+      return Span.error(pos,
+        "The '#{name}' function can't be called on this receiver", [
+          {pos, "the type #{self.inspect} has no types defining that function"}
+        ]
+      )
+    end
+
+    span
+  end
+
   def gather_callable_func_defns(ctx, infer : Visitor?, name : String)
-    list = [] of Tuple(Inner, ReifiedType?, Program::Function?)
+    list = [] of Tuple(MetaType, ReifiedType?, Program::Function?)
 
     # Collect a result for each nominal in this intersection that has this func.
     terms.try(&.each do |term|
@@ -87,7 +114,7 @@ struct Mare::Compiler::Infer::MetaType::Intersection
           # Replace the inner term with an inner of this intersection.
           # This will be used for subtype checking later, and we want to
           # make sure that our cap will be taken into account, if any.
-          list << {self, defn, func} if func
+          list << {MetaType.new(self), defn, func} if func
         end
       end
     end)
@@ -97,19 +124,19 @@ struct Mare::Compiler::Infer::MetaType::Intersection
     if list.empty?
       terms.try(&.each do |term|
         defn = term.defn
-        list << {self, (defn if defn.is_a?(ReifiedType)), nil}
+        list << {MetaType.new(self), (defn if defn.is_a?(ReifiedType)), nil}
       end)
     end
 
     # If for some reason we're still empty (like in the case of an
     # intersection of anti-nominals), we have to return nil.
-    list << {self, nil, nil} if list.empty?
+    list << {MetaType.new(self), nil, nil} if list.empty?
 
     list
   end
 
   def find_callable_func_defns(ctx, infer : TypeCheck::ForReifiedFunc?, name : String)
-    list = [] of Tuple(Inner, ReifiedType?, Program::Function?)
+    list = [] of Tuple(MetaType, ReifiedType?, Program::Function?)
 
     # Collect a result for nominal in this intersection that has this func.
     terms.try(&.each do |term|
@@ -118,7 +145,7 @@ struct Mare::Compiler::Infer::MetaType::Intersection
           # Replace the inner term with an inner of this intersection.
           # This will be used for subtype checking later, and we want to
           # make sure that our cap will be taken into account, if any.
-          list << {self, defn, func}
+          list << {MetaType.new(self), defn, func}
         end
       end
     end)
@@ -128,13 +155,13 @@ struct Mare::Compiler::Infer::MetaType::Intersection
     if list.empty?
       terms.try(&.each do |term|
         defn = term.defn
-        list << {self, (defn if defn.is_a?(ReifiedType)), nil}
+        list << {MetaType.new(self), (defn if defn.is_a?(ReifiedType)), nil}
       end)
     end
 
     # If for some reason we're still empty (like in the case of an
     # intersection of anti-nominals), we have to return nil.
-    list << {self, nil, nil} if list.empty?
+    list << {MetaType.new(self), nil, nil} if list.empty?
 
     list
   end
@@ -193,9 +220,6 @@ struct Mare::Compiler::Infer::MetaType::Intersection
     # Unsatisfiable if there are two non-identical concrete types.
     return Unsatisfiable.instance \
       if other.is_concrete? && terms && terms.not_nil!.any?(&.is_concrete?)
-
-    # # As a small optimization, we can drop the cap if this new term does.
-    cap = cap() unless other.ignores_cap?
 
     # Add this to existing terms (if any) and create the intersection.
     new_terms =

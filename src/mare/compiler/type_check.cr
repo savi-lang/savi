@@ -113,6 +113,8 @@ class Mare::Compiler::TypeCheck
     protected getter resolved_infos
     protected getter called_funcs
     protected getter call_rfs_for
+    protected getter layers_accepted
+    protected getter layers_ignored
     getter! ret_resolved : MetaType; protected setter ret_resolved
     getter! yield_in_resolved : MetaType; protected setter yield_in_resolved
     getter! yield_out_resolved : Array(MetaType?); protected setter yield_out_resolved
@@ -122,10 +124,13 @@ class Mare::Compiler::TypeCheck
 
       @is_constructor = f.has_tag?(:constructor).as(Bool)
       @resolved_infos = {} of Info => MetaType
-      @called_funcs = Set({Source::Pos, ReifiedType, Program::Function::Link}).new
+      @called_funcs = Set({Info, ReifiedType, Program::Function::Link}).new
 
       # TODO: can this be removed or made more clean without sacrificing performance?
       @call_rfs_for = {} of Infer::FromCall => Set(ReifiedFunction)
+
+      @layers_ignored = [] of Int32
+      @layers_accepted = [] of Int32
     end
 
     def reified
@@ -164,6 +169,12 @@ class Mare::Compiler::TypeCheck
 
     def each_called_func
       @called_funcs.each
+    end
+
+    def ignores_layer?(layer_index : Int32)
+      return false if @layers_accepted.includes?(layer_index)
+      return true if @layers_ignored.includes?(layer_index)
+      raise "this layer was never checked"
     end
   end
 
@@ -493,7 +504,8 @@ class Mare::Compiler::TypeCheck
     link : Program::Type::Link,
     type_args : Array(MetaType) = [] of MetaType
   ) : ForReifiedType
-    type_args = type_args.map(&.simplify(ctx))
+    type_args_simplified = type_args.map(&.simplify(ctx))
+    type_args = type_args_simplified
     rt = ReifiedType.new(link, type_args)
     @types[rt]? || (
       refer_type = ctx.refer_type[link]
@@ -520,6 +532,17 @@ class Mare::Compiler::TypeCheck
   # TODO: Get rid of this
   protected def for_rt!(rt)
     @types[rt]
+  end
+
+  # TODO: Remove this and make some other caching system in charge of this check.
+  def is_subtype_of?(ctx, sub_rt : ReifiedType, super_rt : ReifiedType) : Bool
+    return false unless super_rt.link.is_abstract?
+
+    possible_subtype_links = ctx.pre_subtyping[super_rt.link].possible_subtypes
+    return false unless possible_subtype_links.includes?(sub_rt.link)
+
+    analysis = for_rt(ctx, super_rt.link, super_rt.args).analysis
+    analysis.is_supertype_of?(ctx, sub_rt)
   end
 
   def ensure_rt(ctx : Context, rt : ReifiedType)
@@ -813,8 +836,6 @@ class Mare::Compiler::TypeCheck
       @redirects = Hash(AST::Node, AST::Node).new
       @already_ran = false
       @prevent_reentrance = {} of Info => Int32
-      @layers_ignored = [] of Int32
-      @layers_accepted = [] of Int32
 
       @rt_contains_foreign_type_params = @reified.type.args.any? { |arg|
         arg.type_params.any? { |type_param|
@@ -841,8 +862,8 @@ class Mare::Compiler::TypeCheck
     # In such a case, we will ignore that layer and not do typechecking on it,
     # because doing so would run into unsatisfiable combinations of types.
     def ignores_layer?(layer_index : Int32)
-      return false if @layers_accepted.includes?(layer_index)
-      return true if @layers_ignored.includes?(layer_index)
+      return false if @analysis.layers_accepted.includes?(layer_index)
+      return true if @analysis.layers_ignored.includes?(layer_index)
 
       layer = @type_context[layer_index]
 
@@ -862,9 +883,9 @@ class Mare::Compiler::TypeCheck
       }
 
       if should_ignore
-        @layers_ignored << layer_index
+        @analysis.layers_ignored << layer_index
       else
-        @layers_accepted << layer_index
+        @analysis.layers_accepted << layer_index
       end
 
       should_ignore
@@ -988,7 +1009,7 @@ class Mare::Compiler::TypeCheck
         f = array_rt.defn(ctx).find_func!(f_name)
         f_link = f.make_link(array_rt.link)
         ctx.type_check.for_rf(ctx, array_rt, f_link, MetaType.cap(f.cap.value)).run
-        @analysis.called_funcs.add({info.pos, array_rt, f_link})
+        @analysis.called_funcs.add({info, array_rt, f_link})
       end
 
       true
@@ -1040,14 +1061,13 @@ class Mare::Compiler::TypeCheck
       call_defns = receiver_mt.find_callable_func_defns(ctx, self, info.member)
 
       problems = [] of {Source::Pos, String}
-      call_defns.each do |(call_mti, call_defn, call_func)|
-        call_mt = MetaType.new(call_mti)
+      call_defns.each do |(call_mt, call_defn, call_func)|
         next unless call_defn
         next unless call_func
         call_func_link = call_func.make_link(call_defn.link)
 
         # Keep track that we called this function.
-        @analysis.called_funcs.add({info.pos, call_defn, call_func_link})
+        @analysis.called_funcs.add({info, call_defn, call_func_link})
 
         # Determine the correct capability to reify, checking for cap errors.
         reify_cap, autorecover_needed =
@@ -1087,7 +1107,7 @@ class Mare::Compiler::TypeCheck
       field_func_link = field_func.make_link(@reified.type.link)
 
       # Keep track that we touched the "function" of the field_func.
-      @analysis.called_funcs.add({info.pos, @reified.type, field_func_link})
+      @analysis.called_funcs.add({info, @reified.type, field_func_link})
 
       # Get the visitor for the field_func, possibly creating and running it.
       ctx.type_check.for_rf(
@@ -1117,7 +1137,7 @@ class Mare::Compiler::TypeCheck
         MetaType::Capability.new_maybe_generic(f.cap.value).each_cap.each do |f_cap|
           ctx.type_check.for_rf(ctx, reflect_rt, f_link, MetaType.new(f_cap)).tap(&.run)
         end
-        @analysis.called_funcs.add({info.pos, reflect_rt, f_link})
+        @analysis.called_funcs.add({info, reflect_rt, f_link})
       end
 
       true
@@ -1208,10 +1228,6 @@ class Mare::Compiler::TypeCheck
       @prevent_reentrance[info] = (orig_count || 0) + 1
       resolve(ctx, info)
       .tap { orig_count ? (@prevent_reentrance[info] = orig_count) : @prevent_reentrance.delete(info) }
-    end
-
-    def extra_called_func!(pos, rt, f)
-      @analysis.called_funcs.add({pos, rt, f})
     end
 
     def run
