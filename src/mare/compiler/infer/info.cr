@@ -83,25 +83,20 @@ module Mare::Compiler::Infer
     def add_peer_hint(peer : Info)
     end
 
-    # For Info types which represent a tree of Info nodes, they should override
-    # this method to resolve everything in their tree.
-    def resolve_others!(ctx : Context, infer)
-    end
-
     # In the rare case that an Info subclass needs to dynamically pretend to be
     # a different downstream constraint, it can override this method.
     # If you need to report multiple positions, also override the other method
     # below called as_multiple_downstream_constraints.
     # This will prevent upstream DynamicInfos from eagerly resolving you.
-    def as_downstream_constraint_meta_type(ctx : Context, infer : TypeCheck::ForReifiedFunc) : MetaType?
-      infer.resolve(ctx, self)
+    def as_downstream_constraint_meta_type(ctx : Context, type_check : TypeCheck::ForReifiedFunc) : MetaType?
+      type_check.resolve(ctx, self)
     end
 
     # In the rare case that an Info subclass needs to dynamically pretend to be
     # multiple different downstream constraints, it can override this method.
     # This is only used to report positions in more detail, and it is expected
     # that the intersection of all MetaTypes here is the same as the resolve.
-    def as_multiple_downstream_constraints(ctx : Context, infer : TypeCheck::ForReifiedFunc) : Array({Source::Pos, MetaType})?
+    def as_multiple_downstream_constraints(ctx : Context, type_check : TypeCheck::ForReifiedFunc) : Array({Source::Pos, MetaType})?
       nil
     end
   end
@@ -156,42 +151,36 @@ module Mare::Compiler::Infer
     # When we need to take into consideration the downstreams' constraints
     # in order to infer our type from them, we can use this to collect all
     # those constraints into one intersection of them all.
-    def total_downstream_constraint(ctx : Context, infer : TypeCheck::ForReifiedFunc)
+    def total_downstream_constraint(ctx : Context, type_check : TypeCheck::ForReifiedFunc)
       MetaType.new_intersection(
         @downstreams.compact_map do |_, other_info, _|
-          other_info.as_downstream_constraint_meta_type(ctx, infer).as(MetaType?)
+          other_info.as_downstream_constraint_meta_type(ctx, type_check).as(MetaType?)
         end
       )
     end
 
-    def list_downstream_constraints(ctx : Context, infer : TypeCheck::ForReifiedFunc)
+    def list_downstream_constraints(ctx : Context, type_check : TypeCheck::ForReifiedFunc)
       list = Array({Source::Pos, MetaType}).new
       @downstreams.each do |_, info, _|
-        multi = info.as_multiple_downstream_constraints(ctx, infer)
+        multi = info.as_multiple_downstream_constraints(ctx, type_check)
         if multi
           list.concat(multi)
         else
-          mt = infer.resolve(ctx, info)
+          mt = type_check.resolve(ctx, info)
           list.push({info.pos, mt}) if mt
         end
       end
       list.to_h.to_a
     end
 
-    def describe_downstream_constraints(ctx : Context, infer : TypeCheck::ForReifiedFunc)
-      list_downstream_constraints(ctx, infer).map { |other_pos, mt|
+    def describe_downstream_constraints(ctx : Context, type_check : TypeCheck::ForReifiedFunc)
+      list_downstream_constraints(ctx, type_check).map { |other_pos, mt|
         {other_pos, "it is required here to be a subtype of #{mt.show_type}"}
       }
     end
 
     # This property can be set to give a hint in the event of a typecheck error.
     property this_would_be_possible_if : Tuple(Source::Pos, String)?
-
-    def resolve_others!(ctx : Context, infer)
-      @downstreams.each do |use_pos, other_info, aliases|
-        infer.resolve(ctx, other_info) if other_info.is_a?(FixedInfo)
-      end
-    end
   end
 
   abstract class NamedInfo < DynamicInfo
@@ -369,20 +358,14 @@ module Mare::Compiler::Infer
 
   class FixedPrelude < FixedInfo
     getter name : String
-    getter resolvables : Array(Info)
 
     def describe_kind : String; "expression" end
 
     def initialize(@pos, @layer_index, @name)
-      @resolvables = [] of Info
     end
 
     def resolve_span!(ctx : Context, infer : Visitor) : Span
       infer.prelude_type_span(ctx, @name)
-    end
-
-    def resolve_others!(ctx : Context, infer)
-      @resolvables.each { |resolvable| infer.resolve(ctx, resolvable) }
     end
   end
 
@@ -504,9 +487,9 @@ module Mare::Compiler::Infer
       @peer_hints << peer
     end
 
-    def describe_peer_hints(ctx : Context, infer : TypeCheck::ForReifiedFunc)
+    def describe_peer_hints(ctx : Context, type_check : TypeCheck::ForReifiedFunc)
       @peer_hints.compact_map do |peer|
-        mt = infer.resolve(ctx, peer)
+        mt = type_check.resolve(ctx, peer)
         next unless mt
         {peer.pos, "it is suggested here that it might be a #{mt.show_type}"}
       end
@@ -661,10 +644,6 @@ module Mare::Compiler::Infer
     def tether_resolve_span(ctx : Context, infer : Visitor)
       infer.resolve(ctx, self)
     end
-
-    def resolve_others!(ctx : Context, infer)
-      @upstreams.each { |upstream| infer.resolve(ctx, upstream) }
-    end
   end
 
   class FieldRead < DynamicInfo
@@ -728,10 +707,6 @@ module Mare::Compiler::Infer
       # unconstrained - the term's type goes to the jump's catching entity.
       Span.simple(MetaType.unconstrained)
     end
-
-    def resolve_others!(ctx : Context, infer)
-      infer.resolve(ctx, term)
-    end
   end
 
   class JumpError < JumpInfo
@@ -776,10 +751,6 @@ module Mare::Compiler::Infer
     def as_conduit? : Conduit?
       Conduit.direct(@final_term)
     end
-
-    def resolve_others!(ctx : Context, infer)
-      terms.each { |term| infer.resolve(ctx, term) }
-    end
   end
 
   # TODO: add some kind of logic for analyzing exhausted choices,
@@ -793,8 +764,6 @@ module Mare::Compiler::Infer
     def describe_kind : String; "choice block" end
 
     def initialize(@pos, @layer_index, @branches, @fixed_bool)
-      @resolvables = [] of Info
-
       prior_bodies = [] of Info
       @branches.each do |cond, body, body_jumps_away|
         next if body_jumps_away
@@ -824,16 +793,16 @@ module Mare::Compiler::Infer
       span
     end
 
-    def as_downstream_constraint_meta_type(ctx : Context, infer : TypeCheck::ForReifiedFunc) : MetaType
-      total_downstream_constraint(ctx, infer)
+    def as_downstream_constraint_meta_type(ctx : Context, type_check : TypeCheck::ForReifiedFunc) : MetaType
+      total_downstream_constraint(ctx, type_check)
     end
 
-    def as_multiple_downstream_constraints(ctx : Context, infer : TypeCheck::ForReifiedFunc) : Array({Source::Pos, MetaType})?
+    def as_multiple_downstream_constraints(ctx : Context, type_check : TypeCheck::ForReifiedFunc) : Array({Source::Pos, MetaType})?
       @downstreams.flat_map do |pos, info, aliases|
-        multi = info.as_multiple_downstream_constraints(ctx, infer)
+        multi = info.as_multiple_downstream_constraints(ctx, type_check)
         next multi if multi
 
-        mt = info.as_downstream_constraint_meta_type(ctx, infer)
+        mt = info.as_downstream_constraint_meta_type(ctx, type_check)
         next {info.pos, mt} if mt
 
         [] of {Source::Pos, MetaType}
@@ -850,12 +819,6 @@ module Mare::Compiler::Infer
 
       early_breaks.each(&.term.add_downstream(@pos, self, 0))
       early_continues.each(&.term.add_downstream(@pos, self, 0))
-    end
-
-    def resolve_others!(ctx : Context, infer)
-      super(ctx, infer)
-      early_breaks.each { |jump| infer.resolve(ctx, jump) }
-      early_continues.each { |jump| infer.resolve(ctx, jump) }
     end
   end
 
@@ -875,11 +838,6 @@ module Mare::Compiler::Infer
 
     def resolve_span!(ctx : Context, infer : Visitor) : Span
       infer.prelude_type_span(ctx, "Bool")
-    end
-
-    def resolve_others!(ctx : Context, infer)
-      infer.resolve(ctx, @lhs)
-      infer.resolve(ctx, @refine_type)
     end
   end
 
@@ -1064,10 +1022,6 @@ module Mare::Compiler::Infer
     def as_conduit? : Conduit?
       Conduit.alias(@lhs)
     end
-
-    def resolve_others!(ctx : Context, infer)
-      infer.resolve(ctx, @rhs)
-    end
   end
 
   class FromYield < Info
@@ -1093,10 +1047,6 @@ module Mare::Compiler::Infer
 
     def as_conduit? : Conduit?
       Conduit.direct(@yield_in)
-    end
-
-    def resolve_others!(ctx : Context, infer)
-      @terms.each { |term| infer.resolve(ctx, term) }
     end
   end
 
@@ -1261,10 +1211,8 @@ module Mare::Compiler::Infer
     getter yield_params : AST::Group?
     getter yield_block : AST::Group?
     getter ret_value_used : Bool
-    getter resolvables : Array(Info)
 
     def initialize(@pos, @layer_index, @lhs, @member, @args, @yield_params, @yield_block, @ret_value_used)
-      @resolvables = [] of Info
     end
 
     def describe_kind : String; "return value" end
@@ -1501,7 +1449,7 @@ module Mare::Compiler::Infer
 
     def follow_call_check_autorecover_cap(
       ctx : Context,
-      infer : TypeCheck::ForReifiedFunc,
+      type_check : TypeCheck::ForReifiedFunc,
       call_func : Program::Function,
       ret_mt : MetaType
     )
@@ -1521,11 +1469,11 @@ module Mare::Compiler::Infer
       # TODO: It should be safe to pass in a TRN if the receiver is TRN,
       # so is_sendable? isn't quite liberal enough to allow all valid cases.
       call.args.try(&.terms.each do |arg|
-        inferred_arg = infer.resolve(ctx, infer.pre_infer[arg])
-        if inferred_arg && !inferred_arg.alias.is_sendable?
+        resolved_arg = type_check.resolve(ctx, type_check.pre_infer[arg])
+        if resolved_arg && !resolved_arg.alias.is_sendable?
           problems << {arg.pos,
             "the argument (when aliased) has a type of " \
-            "#{inferred_arg.alias.show_type}, which isn't sendable"}
+            "#{resolved_arg.alias.show_type}, which isn't sendable"}
         end
       end)
 
@@ -1536,17 +1484,17 @@ module Mare::Compiler::Infer
           problems unless problems.empty?
     end
 
-    def follow_call_resolve_other_rfs(ctx : Context, infer : TypeCheck::ForReifiedFunc) : Set(ReifiedFunction)
-      other_rfs = infer.analysis.call_rfs_for[self]?
+    def follow_call_resolve_other_rfs(ctx : Context, type_check : TypeCheck::ForReifiedFunc) : Set(ReifiedFunction)
+      other_rfs = type_check.analysis.call_rfs_for[self]?
       return other_rfs if other_rfs
 
       other_rfs = Set(ReifiedFunction).new
 
       call = self
-      call_defns = follow_call_get_call_defns(ctx, infer)
+      call_defns = follow_call_get_call_defns(ctx, type_check)
       return other_rfs unless call_defns
 
-      # For each receiver type definition that is possible, track down the infer
+      # For each receiver type definition that is possible, track down the type_check
       # for the function that we're trying to call, evaluating the constraints
       # for each possibility such that all of them must hold true.
       problems = [] of {Source::Pos, String}
@@ -1556,14 +1504,14 @@ module Mare::Compiler::Infer
         call_func_link = call_func.make_link(call_defn.link)
 
         reify_cap, autorecover_needed =
-          follow_call_check_receiver_cap(ctx, infer.func, call_mt, call_func, problems)
+          follow_call_check_receiver_cap(ctx, type_check.func, call_mt, call_func, problems)
 
         # Construct the ReifiedFunction corresponding to this called function.
         receiver = MetaType.new(call_defn, reify_cap.cap_only_inner.value.as(String))
         other_rfs.add(ReifiedFunction.new(call_defn, call_func_link, receiver))
       end
 
-      infer.analysis.call_rfs_for[self] = other_rfs
+      type_check.analysis.call_rfs_for[self] = other_rfs
     end
   end
 
@@ -1671,8 +1619,8 @@ module Mare::Compiler::Infer
       resolve_span!(ctx, infer) # TODO: should this be infer.resolve(ctx, self) instead?
     end
 
-    def as_multiple_downstream_constraints(ctx : Context, infer : TypeCheck::ForReifiedFunc) : Array({Source::Pos, MetaType})?
-      @call.follow_call_resolve_other_rfs(ctx, infer).compact_map do |other_rf|
+    def as_multiple_downstream_constraints(ctx : Context, type_check : TypeCheck::ForReifiedFunc) : Array({Source::Pos, MetaType})?
+      @call.follow_call_resolve_other_rfs(ctx, type_check).compact_map do |other_rf|
         param_mt = other_rf.meta_type_of_param(ctx, @index)
         next unless param_mt
 

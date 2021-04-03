@@ -456,7 +456,6 @@ module Mare::Compiler::PreInfer
             new_info = Infer::TowardCallParam.new(call_arg.pos, layer(node), call, index)
             @analysis[call_arg].add_downstream(call_arg.pos, new_info, 0)
             @analysis.observe_extra_info(new_info)
-            call.resolvables << new_info # TODO: remove in favor of above line
           end
         end
 
@@ -467,7 +466,6 @@ module Mare::Compiler::PreInfer
             new_info = Infer::FromCallYieldOut.new(yield_param.pos, layer(node), call, index)
             @analysis[yield_param].as(Infer::Local).assign(ctx, new_info, yield_param.pos)
             @analysis.observe_extra_info(new_info)
-            call.resolvables << new_info # TODO: remove in favor of above line
           end
         end
 
@@ -477,14 +475,11 @@ module Mare::Compiler::PreInfer
           new_info = Infer::TowardCallYieldIn.new(yield_block.pos, layer(node), call)
           @analysis[yield_block].add_downstream(yield_block.pos, new_info, 0)
           @analysis.observe_extra_info(new_info)
-          call.resolvables << new_info # TODO: remove in favor of above line
         end
 
       when "is"
         # Just know that the result of this expression is a boolean.
         @analysis[node] = new_info = Infer::FixedPrelude.new(node.pos, layer(node), "Bool")
-        new_info.resolvables << self[node.lhs]
-        new_info.resolvables << self[node.rhs]
       when "<:", "!<:"
         positive_check = node.op.value == "<:"
         need_to_check_if_right_is_subtype_of_left = true
@@ -550,10 +545,8 @@ module Mare::Compiler::PreInfer
         @analysis[node] = Infer::ReflectionOfType.new(node.pos, layer(node), @analysis[node.term])
       when "reflection_of_runtime_type_name"
         @analysis[node] = info = Infer::FixedPrelude.new(node.pos, layer(node), "String")
-        info.resolvables << @analysis[node.term]
       when "identity_digest_of"
         @analysis[node] = info = Infer::FixedPrelude.new(node.pos, layer(node), "USize")
-        info.resolvables << @analysis[node.term]
       when "address_of"
         @analysis[node] = Infer::AddressOf.new(node.pos, layer(node), @analysis[node.term])
       when "--"
