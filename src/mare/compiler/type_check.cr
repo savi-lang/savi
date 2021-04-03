@@ -248,18 +248,6 @@ class Mare::Compiler::TypeCheck
     @types[rt]?.try(&.analysis)
   end
 
-  # This is only for use in testing.
-  def test_simple!(ctx, source, t_name, f_name)
-    t_link = ctx.namespace[source][t_name].as(Program::Type::Link)
-    t = t_link.resolve(ctx)
-    f = t.find_func!(f_name)
-    f_link = f.make_link(t_link)
-    rt = self[t_link].no_args
-    rf = self[f_link].each_reified_func(rt).first
-    infer = self[rf]
-    {t, f, infer}
-  end
-
   def for_type_partial_reifications(ctx, t_link)
     infer = ctx.infer[t_link]
 
