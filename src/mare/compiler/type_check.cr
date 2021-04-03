@@ -92,9 +92,6 @@ class Mare::Compiler::TypeCheck
   struct ReifiedFuncAnalysis
     protected getter resolved_infos
     protected getter call_rfs_for
-    getter! ret_resolved : MetaType; protected setter ret_resolved
-    getter! yield_in_resolved : MetaType; protected setter yield_in_resolved
-    getter! yield_out_resolved : Array(MetaType?); protected setter yield_out_resolved
 
     def initialize(ctx : Context, @rf : ReifiedFunction)
       f = @rf.link.resolve(ctx)
@@ -366,15 +363,6 @@ class Mare::Compiler::TypeCheck
     @aliases[rt_alias] ||= ForReifiedTypeAlias.new(ctx, rt_alias, refer_type)
   end
 
-  def self.unwrap_alias(ctx : Context, rt_alias : ReifiedTypeAlias) : MetaType?
-    rt_alias.meta_type_of_target(ctx)
-  end
-
-  # TODO: Get rid of this
-  protected def for_rt!(rt)
-    @types[rt]
-  end
-
   # TODO: Remove this and make some other caching system in charge of this check.
   def is_subtype_of?(ctx, sub_rt : ReifiedType, super_rt : ReifiedType) : Bool
     return false unless super_rt.link.is_abstract?
@@ -428,7 +416,7 @@ class Mare::Compiler::TypeCheck
     # Unwrap any type aliases present in the first layer of each type arg.
     unwrapped_args = rt.args.map { |arg|
       arg.substitute_each_type_alias_in_first_layer { |rta|
-        TypeCheck.unwrap_alias(ctx, rta).not_nil!
+        rta.meta_type_of_target(ctx).not_nil!
       }
     }
 
@@ -607,7 +595,7 @@ class Mare::Compiler::TypeCheck
 
       type_args = @reified.args.map { |arg|
         arg.substitute_each_type_alias_in_first_layer { |rta|
-          TypeCheck.unwrap_alias(ctx, rta).not_nil!
+          rta.meta_type_of_target(ctx).not_nil!
         }
       }
 
@@ -978,44 +966,28 @@ class Mare::Compiler::TypeCheck
       return if @already_ran
       @already_ran = true
 
-      func_params = func.params
-      func_body = func.body
-
-      # TODO: Remove explicit resolve calls here; just resolve everything below.
-      resolve(ctx, @f_analysis[func_body]) if func_body
-      resolve(ctx, @f_analysis[func_params]) if func_params
-      resolve(ctx, @f_analysis[ret])
-
       @f_analysis.each_info { |info| resolve(ctx, info) }
 
-      # Assign the resolved types to a map for safekeeping.
-      # This also has the effect of running some final checks on everything.
-      # TODO: Is it possible to remove the simplify calls here?
-      # Is it actually a significant performance impact or not?
+      ret_resolved = @analysis.resolved_infos[@f_analysis[ret]]
 
-      if (info = @f_analysis.yield_in_info; info)
-        @analysis.yield_in_resolved = resolve(ctx, info).not_nil! # TODO: simplify?
-      end
-      @analysis.yield_out_resolved = @f_analysis.yield_out_infos.map do |info|
-        resolve(ctx, info).as(MetaType?)
-      end
-      @analysis.ret_resolved = @analysis.resolved_infos[@f_analysis[ret]]
+      numeric_rt = ReifiedType.new(@ctx.namespace.prelude_type("Numeric"))
+      numeric_mt = MetaType.new_nominal(numeric_rt)
 
       # Return types of constant "functions" are very restrictive.
       if func.has_tag?(:constant)
-        ret_mt = @analysis.ret_resolved
+        ret_mt = ret_resolved
         ret_rt = ret_mt.single?.try(&.defn)
         is_val = ret_mt.cap_only.inner == MetaType::Capability::VAL
         unless is_val && ret_rt.is_a?(ReifiedType) && ret_rt.link.is_concrete? && (
           ret_rt.not_nil!.link.name == "String" ||
-          ret_mt.subtype_of?(ctx, MetaType.new_nominal(reified_prelude_type("Numeric"))) ||
+          ret_mt.subtype_of?(ctx, numeric_mt) ||
           (ret_rt.not_nil!.link.name == "Array" && begin
             elem_mt = ret_rt.args.first
             elem_rt = elem_mt.single?.try(&.defn)
             elem_is_val = elem_mt.cap_only.inner == MetaType::Capability::VAL
             is_val && elem_rt.is_a?(ReifiedType) && elem_rt.link.is_concrete? && (
               elem_rt.not_nil!.link.name == "String" ||
-              elem_mt.subtype_of?(ctx, MetaType.new_nominal(reified_prelude_type("Numeric")))
+              elem_mt.subtype_of?(ctx, numeric_mt)
             )
           end)
         )
@@ -1058,18 +1030,6 @@ class Mare::Compiler::TypeCheck
       end
 
       nil
-    end
-
-    def reified_prelude_type(name, *args)
-      ctx.type_check.for_rt(ctx, @ctx.namespace.prelude_type(name), *args).reified
-    end
-
-    def reified_type(*args)
-      ctx.type_check.for_rt(ctx, *args).reified
-    end
-
-    def reified_type_alias(*args)
-      ctx.type_check.for_rt_alias(ctx, *args).reified
     end
 
     def lookup_type_param(ref, receiver = reified.receiver)

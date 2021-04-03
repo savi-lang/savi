@@ -247,7 +247,7 @@ module Mare::Compiler::Infer
 
           # We may need to unwrap type aliases.
           .try(&.substitute_each_type_alias_in_first_layer { |rta|
-            TypeCheck.unwrap_alias(ctx, rta).not_nil!
+            rta.meta_type_of_target(ctx).not_nil!
           })
       end
     end
