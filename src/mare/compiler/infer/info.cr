@@ -1040,17 +1040,17 @@ module Mare::Compiler::Infer
         Span
         .reduce_combine_mts(tether_spans) { |accum, mt| accum.intersect(mt) }
         .not_nil!
-        .decided_by(array_info) { |mt|
+        .simple_decided_by(array_info) { |mt| # TODO: is this simple_decided_by actually needed?
           pairs = mt.each_reachable_defn_with_cap(ctx).compact_map { |rt, cap|
             # TODO: Support more element antecedent detection patterns.
             if rt.link.name == "Array" && rt.args.size == 1
               array_mt = MetaType.new_nominal(rt).intersect(MetaType.new(cap))
-              {array_mt, Span.simple(array_mt)}
+              {array_mt, array_mt}
             end
           }
           if pairs.empty?
             unconstrained = MetaType.unconstrained
-            pairs << {unconstrained, Span.simple(unconstrained)}
+            pairs << {unconstrained, unconstrained}
           end
           pairs
         }

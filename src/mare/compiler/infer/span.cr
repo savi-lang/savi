@@ -74,9 +74,8 @@ module Mare::Compiler::Infer
       Span.new(inner.transform_mt_to_span([] of {Key, MetaType}, &block))
     end
 
-    def decided_by(key : Key, &block : MetaType -> Enumerable({MetaType, Span})) : Span
-      orig_keys = inner.gather_all_keys
-      Span.new(inner.decided_by(key, orig_keys, &block))
+    def simple_decided_by(key : Key, &block : MetaType -> Enumerable({MetaType, MetaType})) : Span
+      Span.new(inner.simple_decided_by(key, &block))
     end
 
     def combine_mt_to_span(other : Span, &block : (MetaType, MetaType) -> Span) : Span
@@ -169,7 +168,7 @@ module Mare::Compiler::Infer
       abstract def transform_mt(&block : MetaType -> MetaType) : Inner
       abstract def transform_mt_using(key : Key, maybe_value : MetaType?, &block : (MetaType, MetaType?) -> MetaType) : Inner
       abstract def transform_mt_to_span(decided : Array({Key, MetaType}), &block : MetaType -> Span) : Inner
-      abstract def decided_by(key : Key, orig_keys : Set(Key), &block : MetaType -> Enumerable({MetaType, Span})) : Inner
+      abstract def simple_decided_by(key : Key, &block : MetaType -> Enumerable({MetaType, MetaType})) : Inner
       abstract def combine_mt_to_span(other : Inner, maybe_other_terminal : Terminal?, always_yields_terminal = false, &block : (MetaType, MetaType) -> Span) : Inner
       abstract def deciding_exact(key : Key, mt : MetaType) : Inner?
       abstract def deciding_f_cap(f_cap_mt : MetaType, is_constructor : Bool) : Inner?
@@ -232,14 +231,8 @@ module Mare::Compiler::Infer
         span.inner
       end
 
-      def decided_by(key : Key, orig_keys : Set(Key), &block : MetaType -> Enumerable({MetaType, Span})) : Inner
-        map = block.call(meta_type).to_h.transform_values(&.inner)
-
-        new_keys = Set(Key).new
-        map.each_value { |inner| inner.gather_all_keys(new_keys) }
-        raise NotImplementedError.new("decision key conflict") \
-          if new_keys.any? { |new_key| orig_keys.includes?(new_key) }
-
+      def simple_decided_by(key : Key, &block : MetaType -> Enumerable({MetaType, MetaType})) : Inner
+        map = block.call(meta_type).to_h.transform_values { |mt| Terminal.new(mt).as(Inner) }
         Decision.build(key, map)
       end
 
@@ -392,9 +385,9 @@ module Mare::Compiler::Infer
         }.to_h)
       end
 
-      def decided_by(key : Key, orig_keys : Set(Key), &block : MetaType -> Enumerable({MetaType, Span})) : Inner
+      def simple_decided_by(key : Key, &block : MetaType -> Enumerable({MetaType, MetaType})) : Inner
         raise NotImplementedError.new("decision key conflict") if @key == key
-        Decision.build(@key, @map.transform_values(&.decided_by(key, orig_keys, &block)))
+        Decision.build(@key, @map.transform_values(&.simple_decided_by(key, &block)))
       end
 
       def combine_mt_to_span(other : Inner, maybe_other_terminal : Terminal?, always_yields_terminal = false, &block : (MetaType, MetaType) -> Span) : Inner
@@ -619,11 +612,11 @@ module Mare::Compiler::Infer
         )
       end
 
-      def decided_by(key : Key, orig_keys : Set(Key), &block : MetaType -> Enumerable({MetaType, Span})) : Inner
+      def simple_decided_by(key : Key, &block : MetaType -> Enumerable({MetaType, MetaType})) : Inner
         Fallback.build(
-          @default.value.decided_by(key, orig_keys, &block),
+          @default.value.simple_decided_by(key, &block),
           @evaluate_mt,
-          @options.map { |(cond, inner)| {cond, inner.decided_by(key, orig_keys, &block)} }
+          @options.map { |(cond, inner)| {cond, inner.simple_decided_by(key, &block)} }
         )
       end
 
@@ -801,7 +794,7 @@ module Mare::Compiler::Infer
         self
       end
 
-      def decided_by(key : Key, orig_keys : Set(Key), &block : MetaType -> Enumerable({MetaType, Span})) : Inner
+      def simple_decided_by(key : Key, &block : MetaType -> Enumerable({MetaType, MetaType})) : Inner
         self
       end
 

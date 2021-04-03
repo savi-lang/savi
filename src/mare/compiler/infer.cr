@@ -347,13 +347,13 @@ module Mare::Compiler::Infer
       # Look up the bound cap of this type param (that is, cap only),
       # and intersect it with the type param reference itself, expanding the
       # span to include every possible single cap instead of using a multi-cap.
-      lookup_type_param_bound_span(ctx, type_param, true).decided_by(type_param) { |bound_mt|
+      lookup_type_param_bound_span(ctx, type_param, true).simple_decided_by(type_param) { |bound_mt|
         bound_mt.cap_only_inner.each_cap.map { |cap|
           cap_mt = MetaType.new(cap)
           mt = MetaType
             .new_type_param(type_param)
             .intersect(cap_mt)
-          {cap_mt, Span.simple(mt)}
+          {cap_mt, mt}
         }.to_h
       }
     end
