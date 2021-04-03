@@ -104,12 +104,6 @@ module Mare::Compiler::Infer
     def as_multiple_downstream_constraints(ctx : Context, infer : TypeCheck::ForReifiedFunc) : Array({Source::Pos, MetaType})?
       nil
     end
-
-    # TODO: remove this cheap hacky alias somehow:
-    def as_multiple_downstream_constraints(ctx : Context, analysis : TypeCheck::ReifiedFuncAnalysis) : Array({Source::Pos, MetaType})?
-      infer = ctx.type_check.for_rf_existing!(analysis.reified)
-      as_multiple_downstream_constraints(ctx, infer)
-    end
   end
 
   abstract class DynamicInfo < Info
@@ -170,25 +164,24 @@ module Mare::Compiler::Infer
       )
     end
 
-    # TODO: remove?
-    def describe_downstream_constraints(ctx : Context, infer : TypeCheck::ForReifiedFunc)
-      @downstreams.flat_map do |_, other_info, _|
-        multi = other_info.as_multiple_downstream_constraints(ctx, infer)
+    def list_downstream_constraints(ctx : Context, infer : TypeCheck::ForReifiedFunc)
+      list = Array({Source::Pos, MetaType}).new
+      @downstreams.each do |_, info, _|
+        multi = info.as_multiple_downstream_constraints(ctx, infer)
         if multi
-          multi.map do |other_info_pos, mt|
-            {other_info_pos,
-              "it is required here to be a subtype of #{mt.show_type}"}
-          end
+          list.concat(multi)
         else
-          mt = infer.resolve(ctx, other_info)
-          if mt
-            [{other_info.pos,
-              "it is required here to be a subtype of #{mt.show_type}"}]
-          else
-            [] of {Source::Pos, String}
-          end
+          mt = infer.resolve(ctx, info)
+          list.push({info.pos, mt}) if mt
         end
-      end.to_h.to_a
+      end
+      list.to_h.to_a
+    end
+
+    def describe_downstream_constraints(ctx : Context, infer : TypeCheck::ForReifiedFunc)
+      list_downstream_constraints(ctx, infer).map { |other_pos, mt|
+        {other_pos, "it is required here to be a subtype of #{mt.show_type}"}
+      }
     end
 
     # This property can be set to give a hint in the event of a typecheck error.
@@ -452,19 +445,6 @@ module Mare::Compiler::Infer
     def describe_kind : String; "receiver value" end
 
     def initialize(@pos, @layer_index)
-    end
-
-    def downstream_constraints(ctx : Context, analysis : ReifiedFuncAnalysis)
-      @downstreams.flat_map do |_, info, _|
-        info.as_multiple_downstream_constraints(ctx, analysis) \
-        || [{info.pos, analysis.resolved(info)}]
-      end
-    end
-    def downstream_constraints(ctx : Context, analysis : TypeCheck::ReifiedFuncAnalysis)
-      @downstreams.flat_map do |_, info, _|
-        info.as_multiple_downstream_constraints(ctx, analysis) \
-        || [{info.pos, analysis.resolved(info)}]
-      end
     end
 
     def resolve_span!(ctx : Context, infer : Visitor) : Span

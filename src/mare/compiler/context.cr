@@ -7,6 +7,7 @@ class Mare::Compiler::Context
   getter classify
   getter code_gen
   getter code_gen_verona
+  getter completeness
   getter consumes
   getter eval
   getter inventory
@@ -44,6 +45,7 @@ class Mare::Compiler::Context
     @classify = Classify::Pass.new
     @code_gen = CodeGen.new(CodeGen::PonyRT)
     @code_gen_verona = CodeGen.new(CodeGen::VeronaRT)
+    @completeness = Completeness::Pass.new
     @consumes = Consumes::Pass.new
     @eval = Eval.new
     @import = Import.new

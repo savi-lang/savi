@@ -299,9 +299,11 @@ class Mare::Compiler::TypeCheck
       refer_type = ctx.refer_type[f]
       classify = ctx.classify[f]
       type_context = ctx.type_context[f]
+      completeness = ctx.completeness[f]
       subtyping = ctx.subtyping.for_rf(rf)
       for_rt = for_rt(ctx, rt.link, rt.args)
-      ForReifiedFunc.new(ctx, f_analysis, ReifiedFuncAnalysis.new(ctx, rf), for_rt, rf, refer_type, classify, type_context, subtyping)
+      ForReifiedFunc.new(ctx, f_analysis, ReifiedFuncAnalysis.new(ctx, rf),
+        for_rt, rf, refer_type, classify, type_context, completeness, subtyping)
       .tap { f_analysis.observe_reified_func(rf) }
     )
   end
@@ -615,9 +617,12 @@ class Mare::Compiler::TypeCheck
     private getter refer_type : ReferType::Analysis
     protected getter classify : Classify::Analysis
     private getter type_context : TypeContext::Analysis
+    private getter completeness : Completeness::Analysis
     private getter subtyping : SubtypingCache::ForReifiedFunc
 
-    def initialize(@ctx, @f_analysis, @analysis, @for_rt, @reified, @refer_type, @classify, @type_context, @subtyping)
+    def initialize(@ctx, @f_analysis, @analysis, @for_rt, @reified,
+      @refer_type, @classify, @type_context, @completeness, @subtyping
+    )
       @local_idents = Hash(Refer::Local, AST::Node).new
       @local_ident_overrides = Hash(AST::Node, AST::Node).new
       @redirects = Hash(AST::Node, AST::Node).new
@@ -713,6 +718,43 @@ class Mare::Compiler::TypeCheck
     def type_check_pre(ctx : Context, info : Infer::FixedSingleton, mt : MetaType) : Bool
       ctx.type_check.validate_type_args(ctx, self, info.node, mt)
       true
+    end
+
+    # Check completeness of self references inside a constructor.
+    def type_check_pre(ctx : Context, info : Infer::Self, mt : MetaType) : Bool
+      # If this is a complete self, no additional checks are required.
+      unseen_fields = completeness.unseen_fields_for(info)
+      return true unless unseen_fields
+
+      # This represents the self type as opaque, with no field access.
+      # We'll use this to guarantee that no usage of the current self object
+      # will require  any access to the fields of the object.
+      tag_self = mt.override_cap("tag")
+      total_constraint = info.total_downstream_constraint(ctx, self)
+      return true if tag_self.within_constraints?(ctx, [total_constraint])
+
+      # If even the non-tag self isn't within constraints, return true here
+      # and let the later type_check code catch this problem.
+      return true if !mt.within_constraints?(ctx, [total_constraint])
+
+      # Walk through each constraint imposed on the self, and raise an error
+      # for each one that is not satisfiable by a tag self.
+      info.list_downstream_constraints(ctx, self).each do |pos, constraint|
+        # If tag will meet the constraint, then this use of the self is okay.
+        next if tag_self.within_constraints?(ctx, [constraint])
+
+        # Otherwise, we must raise an error.
+        ctx.error_at info.pos,
+          "This usage of `@` shares field access to the object" \
+          " from a constructor before all fields are initialized", [
+            {pos,
+              "if this constraint were specified as `tag` or lower" \
+              " it would not grant field access"}
+          ] + unseen_fields.map { |ident|
+            {ident.pos, "this field didn't get initialized"}
+          }
+      end
+      false
     end
 
     # Sometimes print a special case error message for Literal values.
