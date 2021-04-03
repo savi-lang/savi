@@ -1294,56 +1294,6 @@ module Mare::Compiler::Infer
       }
     end
 
-    def follow_call_get_call_defns(ctx : Context, infer) : Set({MetaType, ReifiedType?, Program::Function?})?
-      call = self
-      receiver = infer.resolve_with_reentrance_prevention(ctx, @lhs)
-      return nil unless receiver
-
-      call_defns = receiver.try(&.find_callable_func_defns(ctx, infer, @member))
-
-      # Raise an error if we don't have a callable function for every possibility.
-      call_defns << {receiver, nil, nil} if call_defns.empty?
-      problems = [] of {Source::Pos, String}
-      call_defns.each do |(call_mt, call_defn, call_func)|
-        if call_defn.nil?
-          problems << {@pos,
-            "the type #{call_mt.show_type} has no referencable types in it"}
-        elsif call_func.nil?
-          call_defn_defn = call_defn.defn(ctx)
-
-          problems << {call_defn_defn.ident.pos,
-            "#{call_defn_defn.ident.value} has no '#{@member}' function"}
-
-          found_similar = false
-          if @member.ends_with?("!")
-            call_defn_defn.find_func?(@member[0...-1]).try do |similar|
-              found_similar = true
-              problems << {similar.ident.pos,
-                "maybe you meant to call '#{similar.ident.value}' (without '!')"}
-            end
-          else
-            call_defn_defn.find_func?("#{@member}!").try do |similar|
-              found_similar = true
-              problems << {similar.ident.pos,
-                "maybe you meant to call '#{similar.ident.value}' (with a '!')"}
-            end
-          end
-
-          unless found_similar
-            similar = call_defn_defn.find_similar_function(@member)
-            problems << {similar.ident.pos,
-              "maybe you meant to call the '#{similar.ident.value}' function"} \
-                if similar
-          end
-        end
-      end
-      Error.at call,
-        "The '#{@member}' function can't be called on #{receiver.show_type}",
-          problems unless problems.empty?
-
-      call_defns
-    end
-
     def follow_call_check_receiver_cap(ctx : Context, calling_func, call_mt, call_func, problems)
       call = self
       call_cap_mt = call_mt.cap_only
@@ -1483,36 +1433,6 @@ module Mare::Compiler::Infer
         "Auto-recovery didn't work for these reasons",
           problems unless problems.empty?
     end
-
-    def follow_call_resolve_other_rfs(ctx : Context, type_check : TypeCheck::ForReifiedFunc) : Set(ReifiedFunction)
-      other_rfs = type_check.analysis.call_rfs_for[self]?
-      return other_rfs if other_rfs
-
-      other_rfs = Set(ReifiedFunction).new
-
-      call = self
-      call_defns = follow_call_get_call_defns(ctx, type_check)
-      return other_rfs unless call_defns
-
-      # For each receiver type definition that is possible, track down the type_check
-      # for the function that we're trying to call, evaluating the constraints
-      # for each possibility such that all of them must hold true.
-      problems = [] of {Source::Pos, String}
-      call_defns.each do |(call_mt, call_defn, call_func)|
-        call_defn = call_defn.not_nil!
-        call_func = call_func.not_nil!
-        call_func_link = call_func.make_link(call_defn.link)
-
-        reify_cap, autorecover_needed =
-          follow_call_check_receiver_cap(ctx, type_check.func, call_mt, call_func, problems)
-
-        # Construct the ReifiedFunction corresponding to this called function.
-        receiver = MetaType.new(call_defn, reify_cap.cap_only_inner.value.as(String))
-        other_rfs.add(ReifiedFunction.new(call_defn, call_func_link, receiver))
-      end
-
-      type_check.analysis.call_rfs_for[self] = other_rfs
-    end
   end
 
   class FromCallYieldOut < DynamicInfo
@@ -1620,7 +1540,12 @@ module Mare::Compiler::Infer
     end
 
     def as_multiple_downstream_constraints(ctx : Context, type_check : TypeCheck::ForReifiedFunc) : Array({Source::Pos, MetaType})?
-      @call.follow_call_resolve_other_rfs(ctx, type_check).compact_map do |other_rf|
+      rf = type_check.reified
+      results = [] of {Source::Pos, MetaType}
+
+      ctx.infer[rf.link].each_called_func_within(ctx, rf, for_info: @call) { |other_info, other_rf|
+        next unless other_info == call
+
         param_mt = other_rf.meta_type_of_param(ctx, @index)
         next unless param_mt
 
@@ -1629,8 +1554,10 @@ module Mare::Compiler::Infer
         param_info = pre_infer[param]
         param_info = param_info.lhs if param_info.is_a?(FromAssign)
         param_info = param_info.as(Param)
-        {param_info.first_viable_constraint_pos, param_mt}.as({Source::Pos, MetaType})
-      end
+        results << {param_info.first_viable_constraint_pos, param_mt}
+      }
+
+      results
     end
 
     def resolve_span!(ctx : Context, infer : Visitor) : Span

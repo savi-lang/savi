@@ -152,8 +152,12 @@ module Mare::Compiler::Infer
       }
     end
 
-    def each_called_func_within(ctx, rf : ReifiedFunction)
+    def each_called_func_within(ctx, rf : ReifiedFunction, for_info : Info? = nil)
       called_func_spans.each { |info, (call_defn_span, func_names)|
+        # Allow the caller to filter by a specific Info if given.
+        next if for_info && for_info != info
+
+        # Filter away calls from within ignored layers.
         next if ctx.subtyping.for_rf(rf).ignores_layer?(ctx, info.layer_index)
 
         called_mt = rf.meta_type_of(ctx, call_defn_span, self)

@@ -13,21 +13,11 @@ class Mare::Compiler::TypeCheck
   alias Info = Infer::Info
 
   struct ReifiedFuncAnalysis
+    getter reified : ReifiedFunction
     protected getter resolved_infos
-    protected getter call_rfs_for
 
-    def initialize(ctx : Context, @rf : ReifiedFunction)
-      f = @rf.link.resolve(ctx)
-
-      @is_constructor = f.has_tag?(:constructor).as(Bool)
+    def initialize(@reified)
       @resolved_infos = {} of Info => MetaType
-
-      # TODO: can this be removed or made more clean without sacrificing performance?
-      @call_rfs_for = {} of Infer::FromCall => Set(ReifiedFunction)
-    end
-
-    def reified
-      @rf
     end
   end
 
@@ -158,7 +148,7 @@ class Mare::Compiler::TypeCheck
       infer = ctx.infer[f]
       subtyping = ctx.subtyping.for_rf(rf)
       for_rt = for_rt(ctx, rt.link, rt.args)
-      ForReifiedFunc.new(ctx, ReifiedFuncAnalysis.new(ctx, rf),
+      ForReifiedFunc.new(ctx, ReifiedFuncAnalysis.new(rf),
         for_rt, rf, refer_type, classify, type_context, completeness,
         pre_infer, infer, subtyping)
     )
