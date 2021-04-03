@@ -506,24 +506,6 @@ module Mare::Compiler::Infer
         # such as inside a conditional block with a type condition.
         span = apply_substs_for_layer(ctx, info, span)
 
-        # substitute lazy type params if needed
-        lazy_type_params = Set(TypeParam).new
-        max_depth = 1
-        span.each_mt { |mt|
-          mt.gather_lazy_type_params_referenced(ctx, lazy_type_params, max_depth)
-        }
-        if lazy_type_params.any?
-          span = lazy_type_params.reduce(span) { |span, type_param|
-            type_param_span = lookup_type_param_partial_reified_span(ctx, type_param)
-
-            span.combine_mt(type_param_span) { |mt, type_param_mt|
-              mt.substitute_lazy_type_params({
-                type_param => type_param_mt # MetaType.new_type_param(type_param).intersect(type_param_mt.cap_only)
-              }, max_depth)
-            }
-          }
-        end
-
         @analysis[info] = span
 
         span

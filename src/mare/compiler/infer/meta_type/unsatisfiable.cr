@@ -82,14 +82,6 @@ class Mare::Compiler::Infer::MetaType::Unsatisfiable
     self # no type params are present to be substituted
   end
 
-  def substitute_lazy_type_params(substitutions : Hash(TypeParam, MetaType), max_depth : Int)
-    self # no type params are present to be substituted
-  end
-
-  def gather_lazy_type_params_referenced(ctx : Context, set : Set(TypeParam), max_depth : Int) : Set(TypeParam)
-    set # no type params are present to be gathered
-  end
-
   def each_type_alias_in_first_layer(&block : ReifiedTypeAlias -> _)
     nil # no type params are present to be yielded
   end

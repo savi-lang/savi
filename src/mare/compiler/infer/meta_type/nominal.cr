@@ -11,7 +11,7 @@ struct Mare::Compiler::Infer::MetaType::Nominal
 
   def lazy?
     defn = @defn
-    defn.is_a?(ReifiedTypeAlias) || (defn.is_a?(TypeParam) && defn.lazy?)
+    defn.is_a?(ReifiedTypeAlias)
   end
 
   def inspect(io : IO)
@@ -39,17 +39,7 @@ struct Mare::Compiler::Infer::MetaType::Nominal
     when ReifiedType, ReifiedTypeAlias
       defn.show_type(io)
     when TypeParam
-      parent_rt = defn.parent_rt
-      if parent_rt
-        io << "["
-        io << defn.ref.ident.value
-        io << " from "
-        io << defn.parent_rt.try(&.show_type)
-        io << "]"
-      else
-        io << defn.ref.ident.value
-      end
-      io << "..." if defn.lazy?
+      io << defn.ref.ident.value
     end
   end
 
@@ -283,52 +273,6 @@ struct Mare::Compiler::Infer::MetaType::Nominal
     end
   end
 
-  def substitute_lazy_type_params(substitutions : Hash(TypeParam, MetaType), max_depth : Int)
-    defn = defn()
-    case defn
-    when TypeParam
-      return self unless defn.lazy?
-      substitutions[defn]?.try(&.inner) || self
-    when ReifiedType
-      return self unless max_depth > 0
-
-      args = defn.args.map do |arg|
-        arg.substitute_lazy_type_params(substitutions, max_depth - 1).as(MetaType)
-      end
-
-      Nominal.new(ReifiedType.new(defn.link, args))
-    when ReifiedTypeAlias
-      return self unless max_depth > 0
-
-      args = defn.args.map do |arg|
-        arg.substitute_lazy_type_params(substitutions, max_depth - 1).as(MetaType)
-      end
-
-      Nominal.new(ReifiedTypeAlias.new(defn.link, args))
-    else
-      raise NotImplementedError.new(defn)
-    end
-  end
-
-  def gather_lazy_type_params_referenced(ctx : Context, set : Set(TypeParam), max_depth : Int) : Set(TypeParam)
-    defn = defn()
-    case defn
-    when TypeParam
-      set.add(defn) if defn.lazy?
-    when ReifiedType
-      if max_depth > 0
-        defn.args.each(&.gather_lazy_type_params_referenced(ctx, set, max_depth - 1))
-      end
-    when ReifiedTypeAlias
-      if max_depth > 0
-        defn.args.each(&.gather_lazy_type_params_referenced(ctx, set, max_depth - 1))
-      end
-    else
-      raise NotImplementedError.new(defn)
-    end
-    set
-  end
-
   def each_type_alias_in_first_layer(&block : ReifiedTypeAlias -> _)
     defn = defn()
     defn.is_a?(ReifiedTypeAlias) ? block.call(defn) : nil
@@ -420,12 +364,7 @@ struct Mare::Compiler::Infer::MetaType::Nominal
       if other_defn.is_a?(ReifiedType)
         false
       elsif other_defn.is_a?(TypeParam)
-        if defn.ref == other_defn.ref
-          return true if defn.parent_rt == other_defn.parent_rt
-          return true if defn.parent_rt.nil?
-          return true if other_defn.parent_rt.nil?
-        end
-        false
+        defn.ref == other_defn.ref
       else
         raise NotImplementedError.new("type param <: ?")
       end

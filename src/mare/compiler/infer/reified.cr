@@ -296,20 +296,7 @@ module Mare::Compiler::Infer
 
   struct TypeParam
     getter ref : Refer::TypeParam
-    getter parent_rt : StructRef(ReifiedType | ReifiedTypeAlias)?
-    property lazy : Bool
-
-    def lazy?; lazy; end
-
-    def ==(other : TypeParam)
-      other.ref == @ref && \
-      other.parent_rt == @parent_rt
-      # lazy property doesn't come into play in equality checking
-    end
-
-    def initialize(@ref, parent_rt : ReifiedType | ReifiedTypeAlias? = nil)
-      @parent_rt = StructRef(ReifiedType | ReifiedTypeAlias).new(parent_rt) if parent_rt
-      @lazy = false
+    def initialize(@ref)
     end
 
     def to_s(io : IO)

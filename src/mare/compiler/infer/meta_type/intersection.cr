@@ -346,32 +346,6 @@ struct Mare::Compiler::Infer::MetaType::Intersection
     result
   end
 
-  def substitute_lazy_type_params(substitutions : Hash(TypeParam, MetaType), max_depth : Int)
-    result = cap || Unconstrained.instance
-
-    terms.try(&.each { |term|
-      result = result.intersect(term.substitute_lazy_type_params(substitutions, max_depth))
-    })
-
-    anti_terms.try(&.each { |anti_term|
-      result = result.intersect(anti_term.substitute_lazy_type_params(substitutions, max_depth))
-    })
-
-    result
-  end
-
-  def gather_lazy_type_params_referenced(ctx : Context, set : Set(TypeParam), max_depth : Int) : Set(TypeParam)
-    terms.try(&.each { |term|
-      term.gather_lazy_type_params_referenced(ctx, set, max_depth)
-    })
-
-    anti_terms.try(&.each { |anti_term|
-      anti_term.gather_lazy_type_params_referenced(ctx, set, max_depth)
-    })
-
-    set
-  end
-
   def each_type_alias_in_first_layer(&block : ReifiedTypeAlias -> _)
     terms.try(&.each(&.each_type_alias_in_first_layer(&block)))
     anti_terms.try(&.each(&.each_type_alias_in_first_layer(&block)))
