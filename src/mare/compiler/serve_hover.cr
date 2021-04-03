@@ -37,7 +37,6 @@ class Mare::Compiler::ServeHover
     messages = [] of String
 
     refer = ctx.refer[f_link]
-    type_check = ctx.type_check.for_func_simple(ctx, f_link.type, f_link)
     describe_type = "type"
 
     ref = refer[node]?
@@ -65,28 +64,29 @@ class Mare::Compiler::ServeHover
     else raise NotImplementedError.new(ref)
     end
 
-    type_check_info = ctx.type_check[f_link][node]?
-    if node.is_a?(AST::Relate) && node.op.value == "."
-      begin
-        messages << "This is a function call on an inferred receiver type of " \
-                    "#{type_check.analysis.resolved(ctx, node.lhs).show_type}."
-      rescue
-      end
-    elsif type_check_info.is_a? Infer::FromCall
-      type_check_info.follow_call_get_call_defns(ctx, type_check).not_nil!.each do |x, y, z|
-        unless y.nil?
-          messages << "This is a function call on type #{y.show_type}."
-          describe_type = "return type"
-          break
-        end
-      end
-    end
+    # TODO: Reimplement this using Infer instead of TypeCheck:
+    # type_check_info = ctx.type_check[f_link][node]?
+    # if node.is_a?(AST::Relate) && node.op.value == "."
+    #   begin
+    #     messages << "This is a function call on an inferred receiver type of " \
+    #                 "#{type_check.analysis.resolved(ctx, node.lhs).show_type}."
+    #   rescue
+    #   end
+    # elsif type_check_info.is_a? Infer::FromCall
+    #   type_check_info.follow_call_get_call_defns(ctx, type_check).not_nil!.each do |x, y, z|
+    #     unless y.nil?
+    #       messages << "This is a function call on type #{y.show_type}."
+    #       describe_type = "return type"
+    #       break
+    #     end
+    #   end
+    # end
 
-    begin
-      inf = type_check.analysis.resolved(ctx, node)
-      messages << "It has an inferred #{describe_type} of #{inf.show_type}."
-    rescue
-    end
+    # begin
+    #   inf = type_check.analysis.resolved(ctx, node)
+    #   messages << "It has an inferred #{describe_type} of #{inf.show_type}."
+    # rescue
+    # end
 
     {messages, node.pos}
   end
