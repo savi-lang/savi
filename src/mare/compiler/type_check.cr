@@ -143,14 +143,9 @@ class Mare::Compiler::TypeCheck
     @invalid_types = Set(ReifiedType).new
     @aliases = {} of ReifiedTypeAlias => ForReifiedTypeAlias
     @unwrapping_set = Set(ReifiedTypeAlias).new
-    @has_started = false
   end
 
-  def has_started?; @has_started; end
-
   def run(ctx)
-    @has_started = true
-
     # First, make sure we know about each type, without type arguments
     # (just so that we know it has initialized its subtype assertions).
     ctx.program.libraries.each do |library|

@@ -416,34 +416,13 @@ struct Mare::Compiler::Infer::MetaType::Nominal
         # When both sides are ReifiedTypes, delegate to the SubtypingCache.
         ctx.subtyping.is_subtype_of?(ctx, defn, other_defn)
       elsif other_defn.is_a?(TypeParam)
-        return false if ctx.type_check.has_started?
-
-        # When the other is a TypeParam, use its bound MetaType and run again.
-        l = MetaType.new_nominal(defn)
-        other_parent_link = other_defn.ref.parent_link
-        if other_parent_link.is_a?(Program::Type::Link)
-          r = ctx.type_check.for_rt(ctx, other_parent_link)
-                .lookup_type_param_bound(other_defn).try(&.strip_cap) || \
-                  MetaType.unsatisfiable
-        elsif other_parent_link.is_a?(Program::TypeAlias::Link)
-          raise NotImplementedError.new("lookup_type_param_bound for TypeAlias")
-        else
-          raise NotImplementedError.new(other_parent_link)
-        end
-        l.subtype_of?(ctx, r.not_nil!)
+        false
       else
         raise NotImplementedError.new("type <: ?")
       end
     elsif defn.is_a?(TypeParam)
       if other_defn.is_a?(ReifiedType)
-        return false if ctx.type_check.has_started?
-
-        # When this is a TypeParam, use its bound MetaType and run again.
-        l = ctx.type_check.for_rt(ctx, defn.ref.parent_link.as(Program::Type::Link))
-              .lookup_type_param_bound(defn).try(&.strip_cap)
-        return false unless l
-        r = MetaType.new_nominal(other_defn)
-        l.subtype_of?(ctx, r)
+        false
       elsif other_defn.is_a?(TypeParam)
         if defn.ref == other_defn.ref
           return true if defn.parent_rt == other_defn.parent_rt
