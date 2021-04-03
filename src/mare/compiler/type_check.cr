@@ -12,18 +12,8 @@ class Mare::Compiler::TypeCheck
   alias ReifiedFunction = Infer::ReifiedFunction
   alias Info = Infer::Info
 
-  struct ReifiedFuncAnalysis
-    getter reified : ReifiedFunction
-    protected getter resolved_infos
-
-    def initialize(@reified)
-      @resolved_infos = {} of Info => MetaType
-    end
-  end
-
   def initialize
     @map = {} of ReifiedFunction => ForReifiedFunc
-    @types = {} of ReifiedType => ForReifiedType
   end
 
   def run(ctx)
@@ -58,7 +48,7 @@ class Mare::Compiler::TypeCheck
         f_cap_value = f.cap.value
         f_cap_value = "read" if f_cap_value == "box" # TODO: figure out if we can remove this Pony-originating semantic hack
         MetaType::Capability.new_maybe_generic(f_cap_value).each_cap.each do |f_cap|
-          for_rf(ctx, rt, f_link, MetaType.new(f_cap)).run
+          for_rf(ctx, rt, f_link, MetaType.new(f_cap)).run(ctx)
         end
       end
     end
@@ -130,7 +120,7 @@ class Mare::Compiler::TypeCheck
     end
   end
 
-  def for_rf(
+  private def for_rf(
     ctx : Context,
     rt : ReifiedType,
     f : Program::Function::Link,
@@ -146,23 +136,16 @@ class Mare::Compiler::TypeCheck
       pre_infer = ctx.pre_infer[f]
       infer = ctx.infer[f]
       subtyping = ctx.subtyping.for_rf(rf)
-      for_rt = for_rt(ctx, rt)
-      ForReifiedFunc.new(ctx, ReifiedFuncAnalysis.new(rf),
-        for_rt, rf, refer_type, classify, type_context, completeness,
-        pre_infer, infer, subtyping)
+      ForReifiedFunc.new(ctx, rf,
+        refer_type, classify, type_context, completeness,
+        pre_infer, infer, subtyping
+      )
     )
   end
 
-  def for_rt(ctx : Context, rt : ReifiedType) : ForReifiedType
-    @types[rt]? || (
-      refer_type = ctx.refer_type[rt.link]
-      @types[rt] = ForReifiedType.new(ctx, rt, refer_type)
-    )
-  end
-
-  def validate_type_args(
+  def self.validate_type_args(
     ctx : Context,
-    infer : (ForReifiedFunc | ForReifiedType),
+    type_check : ForReifiedFunc,
     node : AST::Node,
     mt : MetaType,
   )
@@ -195,7 +178,7 @@ class Mare::Compiler::TypeCheck
     # it will have been validated at its referent location, and trying
     # to validate it here would break because we don't have the Qualify node.
     return if node.is_a?(AST::Identifier) \
-      && !infer.classify.further_qualified?(node)
+      && !type_check.classify.further_qualified?(node)
 
     raise "inconsistent arguments" if arg_terms.size != rt.args.size
 
@@ -245,34 +228,8 @@ class Mare::Compiler::TypeCheck
     end
   end
 
-  class ForReifiedType
-    getter type_params_and_type_args : Array({TypeParam, MetaType})
-
-    def initialize(ctx, reified : ReifiedType, refer_type : ReferType::Analysis)
-      @type_params_and_type_args = begin
-        type_params =
-          reified.link.resolve(ctx).params.try(&.terms.map { |type_param|
-            ident = AST::Extract.type_param(type_param).first
-            ref = refer_type[ident]?
-            Infer::TypeParam.new(ref.as(Refer::TypeParam))
-          }) || [] of Infer::TypeParam
-
-        type_args = reified.args.map { |arg|
-          arg.substitute_each_type_alias_in_first_layer { |rt|
-            rt.meta_type_of_target(ctx).not_nil!
-          }
-        }
-
-        type_params.zip(type_args)
-      end
-    end
-  end
-
   class ForReifiedFunc < Mare::AST::Visitor
-    getter analysis : ReifiedFuncAnalysis
-    getter for_rt : ForReifiedType
     getter reified : ReifiedFunction
-    private getter ctx : Context
     private getter refer_type : ReferType::Analysis
     protected getter classify : Classify::Analysis # TODO: make private
     private getter type_context : TypeContext::Analysis
@@ -281,16 +238,12 @@ class Mare::Compiler::TypeCheck
     private getter infer : Infer::Analysis
     private getter subtyping : SubtypingCache::ForReifiedFunc
 
-    def initialize(@ctx, @analysis, @for_rt, @reified,
+    def initialize(ctx, @reified,
       @refer_type, @classify, @type_context, @completeness,
       @pre_infer, @infer, @subtyping
     )
-      @local_idents = Hash(Refer::Local, AST::Node).new
-      @local_ident_overrides = Hash(AST::Node, AST::Node).new
-      @redirects = Hash(AST::Node, AST::Node).new
-      @already_ran = false
-      @prevent_reentrance = {} of Info => Int32
-
+      @resolved_infos = {} of Info => MetaType
+      @func = @reified.link.resolve(ctx).as(Program::Function)
       @rt_contains_foreign_type_params = @reified.type.args.any? { |arg|
         arg.type_params.any? { |type_param|
           !@infer.type_params.includes?(type_param)
@@ -298,17 +251,9 @@ class Mare::Compiler::TypeCheck
       }.as(Bool)
     end
 
-    def func
-      reified.func(ctx)
-    end
-
-    def params
-      func.params.try(&.terms) || ([] of AST::Node)
-    end
-
     def ret
       # The ident is used as a fake local variable that represents the return.
-      func.ident
+      @func.ident
     end
 
     def filter_span(ctx, info : Info) : MetaType?
@@ -319,10 +264,10 @@ class Mare::Compiler::TypeCheck
       filtered_span = span
         .deciding_f_cap(
           reified.receiver_cap,
-          func.has_tag?(:constructor)
+          @func.has_tag?(:constructor)
         )
 
-      type_params_and_type_args = @for_rt.type_params_and_type_args
+      type_params_and_type_args = @infer.type_params.zip(reified.type.args)
 
       # Filter the span by deciding the type parameter capability.
       if filtered_span && !filtered_span.inner.is_a?(Infer::Span::Terminal)
@@ -347,24 +292,19 @@ class Mare::Compiler::TypeCheck
       filtered_span.try(&.final_mt!(ctx))
     end
 
-    # TODO: remove this convenience alias:
-    def resolve(ctx : Context, ast : AST::Node) : MetaType?
-      resolve(ctx, @pre_infer[ast])
-    end
-
     def resolve(ctx : Context, info : Infer::Info) : MetaType?
       # If our type param reification doesn't match any of the conditions
       # for the layer associated with the given info, then
       # we will not do any typechecking here - we just return nil.
       return nil if subtyping.ignores_layer?(ctx, info.layer_index)
 
-      @analysis.resolved_infos[info]? || begin
+      @resolved_infos[info]? || begin
         mt = info.as_conduit?.try(&.resolve!(ctx, self)) || filter_span(ctx, info)
-        @analysis.resolved_infos[info] = mt || MetaType.unconstrained
+        @resolved_infos[info] = mt || MetaType.unconstrained
         return nil unless mt
 
         okay = type_check_pre(ctx, info, mt)
-        type_check(info, mt) if okay
+        type_check(ctx, info, mt) if okay
 
         mt
       end
@@ -372,7 +312,7 @@ class Mare::Compiler::TypeCheck
 
     # Validate type arguments for FixedSingleton values.
     def type_check_pre(ctx : Context, info : Infer::FixedSingleton, mt : MetaType) : Bool
-      ctx.type_check.validate_type_args(ctx, self, info.node, mt)
+      TypeCheck.validate_type_args(ctx, self, info.node, mt)
       true
     end
 
@@ -509,7 +449,7 @@ class Mare::Compiler::TypeCheck
 
         # Determine the correct capability to reify, checking for cap errors.
         reify_cap, autorecover_needed =
-          info.follow_call_check_receiver_cap(ctx, self.func, call_mt, call_func, problems)
+          info.follow_call_check_receiver_cap(ctx, @func, call_mt, call_func, problems)
 
         # Check the number of arguments.
         info.follow_call_check_args(ctx, self, call_func, problems)
@@ -535,7 +475,7 @@ class Mare::Compiler::TypeCheck
       true # There is nothing extra here.
     end
 
-    def type_check(info : Infer::DynamicInfo, meta_type : Infer::MetaType)
+    def type_check(ctx, info : Infer::DynamicInfo, meta_type : Infer::MetaType)
       return if info.downstreams_empty?
 
       # TODO: print a different error message when the downstream constraints are
@@ -587,50 +527,19 @@ class Mare::Compiler::TypeCheck
     end
 
     # For all other info types we do nothing.
-    # TODO: should we do something?
-    def type_check(info : Infer::Info, meta_type : Infer::MetaType)
+    # TODO: Should we do something?
+    def type_check(ctx, info : Infer::Info, meta_type : Infer::MetaType)
     end
 
-    # This variant lets you eagerly choose the MetaType that a different Info
-    # resolves as, with that Info having no say in the matter. Use with caution.
-    def resolve_as(ctx : Context, info : Info, meta_type : MetaType) : MetaType
-      raise "already resolved #{info}\n" \
-        "as #{@analysis.resolved_infos[info].show_type}" \
-          if @analysis.resolved_infos.has_key?(info) \
-          && @analysis.resolved_infos[info] != meta_type
-
-      @analysis.resolved_infos[info] = meta_type
-    end
-
-    # This variant has protection to prevent infinite recursion.
-    # It is mainly used by FromCall, since it interacts across reified funcs.
-    def resolve_with_reentrance_prevention(ctx : Context, info : Info) : MetaType?
-      orig_count = @prevent_reentrance[info]?
-      if (orig_count || 0) > 2 # TODO: can we remove this counter and use a set instead of a map?
-        kind = info.is_a?(Infer::DynamicInfo) ? " #{info.describe_kind}" : ""
-        ctx.error_at info.pos,
-          "This#{kind} needs an explicit type; it could not be inferred"
-        return nil
-      end
-      @prevent_reentrance[info] = (orig_count || 0) + 1
-      resolve(ctx, info)
-      .tap { orig_count ? (@prevent_reentrance[info] = orig_count) : @prevent_reentrance.delete(info) }
-    end
-
-    def run
-      return if @already_ran
-      @already_ran = true
-
+    def run(ctx)
       @pre_infer.each_info { |info| resolve(ctx, info) }
 
-      ret_resolved = @analysis.resolved_infos[@pre_infer[ret]]
-
-      numeric_rt = ReifiedType.new(@ctx.namespace.prelude_type("Numeric"))
-      numeric_mt = MetaType.new_nominal(numeric_rt)
-
       # Return types of constant "functions" are very restrictive.
-      if func.has_tag?(:constant)
-        ret_mt = ret_resolved
+      if @func.has_tag?(:constant)
+        numeric_rt = ReifiedType.new(ctx.namespace.prelude_type("Numeric"))
+        numeric_mt = MetaType.new_nominal(numeric_rt)
+
+        ret_mt = @resolved_infos[@pre_infer[ret]]
         ret_rt = ret_mt.single?.try(&.defn)
         is_val = ret_mt.cap_only.inner == MetaType::Capability::VAL
         unless is_val && ret_rt.is_a?(ReifiedType) && ret_rt.link.is_concrete? && (
@@ -648,7 +557,7 @@ class Mare::Compiler::TypeCheck
         )
           ctx.error_at ret, "The type of a constant may only be String, " \
             "a numeric type, or an immutable Array of one of these", [
-              {func.ret || func.body || ret, "but the type is #{ret_mt.show_type}"}
+              {@func.ret || @func.body || ret, "but the type is #{ret_mt.show_type}"}
             ]
         end
       end
@@ -656,14 +565,14 @@ class Mare::Compiler::TypeCheck
       # Parameters must be sendable when the function is asynchronous,
       # or when it is a constructor with elevated capability.
       require_sendable =
-        if func.has_tag?(:async)
+        if @func.has_tag?(:async)
           "An asynchronous function"
-        elsif func.has_tag?(:constructor) \
+        elsif @func.has_tag?(:constructor) \
         && !resolve(ctx, @pre_infer[ret]).not_nil!.subtype_of?(ctx, MetaType.cap("ref"))
           "A constructor with elevated capability"
         end
       if require_sendable
-        func.params.try do |params|
+        @func.params.try do |params|
 
           errs = [] of {Source::Pos, String}
           params.terms.each do |param|
@@ -678,7 +587,7 @@ class Mare::Compiler::TypeCheck
             end
           end
 
-          ctx.error_at func.cap.pos,
+          ctx.error_at @func.cap.pos,
             "#{require_sendable} must only have sendable parameters", errs \
               unless errs.empty?
         end
