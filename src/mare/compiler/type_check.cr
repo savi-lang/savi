@@ -322,7 +322,7 @@ class Mare::Compiler::TypeCheck
       # This represents the self type as opaque, with no field access.
       # We'll use this to guarantee that no usage of the current self object
       # will require  any access to the fields of the object.
-      tag_self = mt.override_cap("tag")
+      tag_self = mt.override_cap(Infer::Cap::TAG)
       total_constraint = info.total_downstream_constraint(ctx, self)
       return true if tag_self.within_constraints?(ctx, [total_constraint])
 
@@ -386,7 +386,7 @@ class Mare::Compiler::TypeCheck
         term_mts = info.terms.compact_map { |term| resolve(ctx, term) }
         unless term_mts.all?(&.alias.is_sendable?)
           ctx.error_at info.pos, "This array literal can't have a reference cap of " \
-            "#{array_cap.value} unless all of its elements are sendable",
+            "#{array_cap.inspect} unless all of its elements are sendable",
               info.describe_downstream_constraints(ctx, self)
         end
       end
@@ -448,7 +448,7 @@ class Mare::Compiler::TypeCheck
 
         # Check if auto-recovery of the receiver is possible.
         if autorecover_needed
-          receiver = MetaType.new(call_defn, reify_cap.cap_only_inner.value.as(String))
+          receiver = MetaType.new(call_defn, reify_cap.cap_only_inner.value.as(Infer::Cap))
           other_rf = ReifiedFunction.new(call_defn, call_func_link, receiver)
           ret_mt = other_rf.meta_type_of_ret(ctx)
           info.follow_call_check_autorecover_cap(ctx, self, call_func, ret_mt) \
@@ -560,7 +560,7 @@ class Mare::Compiler::TypeCheck
         if @func.has_tag?(:async)
           "An asynchronous function"
         elsif @func.has_tag?(:constructor) \
-        && !resolve(ctx, @pre_infer[ret]).not_nil!.subtype_of?(ctx, MetaType.cap("ref"))
+        && !resolve(ctx, @pre_infer[ret]).not_nil!.subtype_of?(ctx, MetaType.cap(Infer::Cap::REF))
           "A constructor with elevated capability"
         end
       if require_sendable

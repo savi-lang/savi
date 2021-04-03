@@ -231,7 +231,7 @@ class Mare::Compiler::CodeGen
   end
 
   def llvm_type_of(gtype : GenType)
-    llvm_type_of(gtype.type_def.as_ref(ctx)) # TODO: this is backwards - defs should have a llvm_use_type of their own, with refs delegating to that implementation when there is a singular meta_type
+    llvm_type_of(gtype.type_def.as_ref) # TODO: this is backwards - defs should have a llvm_use_type of their own, with refs delegating to that implementation when there is a singular meta_type
   end
 
   def llvm_type_of(expr : AST::Node, in_gfunc : GenFunc? = nil)
@@ -651,7 +651,7 @@ class Mare::Compiler::CodeGen
     @builder.store(func_frame.receiver_value, self_gep)
     @di.declare_self_local(
       (gfunc.func.cap || gfunc.func.ident).pos,
-      gtype.type_def.as_ref(ctx),
+      gtype.type_def.as_ref,
       self_gep,
     )
 
@@ -2733,7 +2733,7 @@ class Mare::Compiler::CodeGen
   def gen_loop(expr : AST::Loop)
     # Get the LLVM type for the phi that joins the final value of each branch.
     # Each such value will needed to be bitcast to the that type.
-    phi_type = type_of_unless_unsatisfiable(expr) || @gtypes["None"].type_def.as_ref(ctx)
+    phi_type = type_of_unless_unsatisfiable(expr) || @gtypes["None"].type_def.as_ref
 
     # check if we have any early continues to not to generate continue block
     pre_infer = ctx.pre_infer[func_frame.gfunc.not_nil!.link]

@@ -62,7 +62,7 @@ class Mare::Compiler::Verify
     env_rt = Infer::ReifiedType.new(env_link)
     env_mt = Infer::MetaType.new(env_rt)
     main_rt = Infer::ReifiedType.new(main_link)
-    main_mt_ref = Infer::MetaType.new(main_rt, "ref")
+    main_mt_ref = Infer::MetaType.new(main_rt, Infer::Cap::REF)
     new_rf = Infer::ReifiedFunction.new(main_rt, new_f_link, main_mt_ref)
     new_f_param = new_f.params.not_nil!.terms.first.not_nil!
     new_f_param_mt = new_rf.meta_type_of_param(ctx, 0, ctx.infer[new_f_link])

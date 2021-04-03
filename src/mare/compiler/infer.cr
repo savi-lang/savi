@@ -206,7 +206,7 @@ module Mare::Compiler::Infer
     def type_expr_cap(node : AST::Identifier) : MetaType::Capability?
       case node.value
       when "iso", "trn", "val", "ref", "box", "tag", "non"
-        MetaType::Capability.new(node.value)
+        MetaType::Capability.new(Cap.from_string(node.value))
       when "any", "alias", "send", "share", "read"
         MetaType::Capability.new_generic(node.value)
       else

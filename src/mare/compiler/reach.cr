@@ -481,9 +481,8 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       is_numeric?(ctx) && @reified.defn(ctx).const_bool("is_signed")
     end
 
-    # TODO: remove this unused ctx parameter
-    def as_ref(ctx, cap = nil) : Ref
-      Ref.new(Infer::MetaType.new(@reified, cap))
+    def as_ref(cap = nil) : Ref
+      Ref.new(Infer::MetaType.new(@reified))
     end
   end
 
@@ -545,7 +544,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     if main_rt
       main_f_link = main_rt.defn(ctx).find_default_constructor?.try(&.make_link(main_rt.link))
       if main_f_link
-        main_rf = Infer::ReifiedFunction.new(main_rt, main_f_link, Infer::MetaType.new(main_rt, "ref"))
+        main_rf = Infer::ReifiedFunction.new(main_rt, main_f_link, Infer::MetaType.new(main_rt, Infer::Cap::REF))
         handle_func(ctx, main_rf)
       end
     end
@@ -558,7 +557,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     handle_func(ctx, env_rf)
     notify_rt = Infer::ReifiedType.new(ctx.namespace.prelude_type("AsioEventNotify"))
     notify_f_link = notify_rt.defn(ctx).find_func!("_event_notify").make_link(notify_rt.link)
-    notify_rf = Infer::ReifiedFunction.new(notify_rt, notify_f_link, Infer::MetaType.new(notify_rt, "ref"))
+    notify_rf = Infer::ReifiedFunction.new(notify_rt, notify_f_link, Infer::MetaType.new(notify_rt, Infer::Cap::REF))
     handle_func(ctx, notify_rf)
     string_rt = Infer::ReifiedType.new(ctx.namespace.prelude_type("String"))
     handle_type_def(ctx, string_rt)
@@ -641,7 +640,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
 
   def handle_field(ctx, rt : Infer::ReifiedType, f_link, ident) : {String, Ref}?
     # Reach the metatype of the field.
-    rf = Infer::ReifiedFunction.new(rt, f_link, Infer::MetaType.new(rt, "ref"))
+    rf = Infer::ReifiedFunction.new(rt, f_link, Infer::MetaType.new(rt, Infer::Cap::REF))
     mt = rf.meta_type_of(ctx, ident)
     return unless mt
     handle_type_ref(ctx, mt)

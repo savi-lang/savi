@@ -27,7 +27,7 @@ struct Mare::Compiler::Infer::MetaType::Nominal
     # Otherwise, we'll print it here with the same syntax that the programmer
     # can use to specify it explicitly.
     defn = defn()
-    unless defn.is_a?(ReifiedType) && cap.value == defn.link.cap
+    unless defn.is_a?(ReifiedType) && cap.value == Cap.from_string(defn.link.cap)
       io << "'"
       cap.inspect(io)
     end

@@ -341,21 +341,21 @@ module Mare::Compiler::PreInfer
     # A literal character could be any integer or floating-point machine type.
     def touch(ctx : Context, node : AST::LiteralCharacter)
       t_link = prelude_type(ctx, "Numeric")
-      mt = Infer::MetaType.new(Infer::ReifiedType.new(t_link), "val")
+      mt = Infer::MetaType.new(Infer::ReifiedType.new(t_link), Infer::Cap::VAL)
       @analysis[node] = Infer::Literal.new(node.pos, layer(node), mt)
     end
 
     # A literal integer could be any integer or floating-point machine type.
     def touch(ctx : Context, node : AST::LiteralInteger)
       t_link = prelude_type(ctx, "Numeric")
-      mt = Infer::MetaType.new(Infer::ReifiedType.new(t_link), "val")
+      mt = Infer::MetaType.new(Infer::ReifiedType.new(t_link), Infer::Cap::VAL)
       @analysis[node] = Infer::Literal.new(node.pos, layer(node), mt)
     end
 
     # A literal float could be any floating-point machine type.
     def touch(ctx : Context, node : AST::LiteralFloat)
       t_links = [prelude_type(ctx, "F32"), prelude_type(ctx, "F64")]
-      mts = t_links.map { |t_link| Infer::MetaType.new(Infer::ReifiedType.new(t_link), "val") }
+      mts = t_links.map { |t_link| Infer::MetaType.new(Infer::ReifiedType.new(t_link), Infer::Cap::VAL) }
       mt = Infer::MetaType.new_union(mts)
       @analysis[node] = Infer::Literal.new(node.pos, layer(node), mt)
     end

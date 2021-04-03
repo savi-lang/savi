@@ -34,6 +34,10 @@ struct Mare::Compiler::Infer::MetaType
 
   def initialize(defn : ReifiedType, cap : String? = nil)
     cap ||= defn.link.cap
+    @inner = Nominal.new(defn).intersect(Capability.new(Cap.from_string(cap)))
+  end
+
+  def initialize(defn : ReifiedType, cap : Cap)
     @inner = Nominal.new(defn).intersect(Capability.new(cap))
   end
 
@@ -73,12 +77,20 @@ struct Mare::Compiler::Infer::MetaType
     MetaType.new(Unconstrained.instance)
   end
 
+  def self.cap(cap : Cap)
+    MetaType.new(Capability.new(cap))
+  end
+
   def self.cap(name : String)
-    MetaType.new(Capability.new(name))
+    MetaType.new(Capability.new(Cap.from_string(name)))
+  end
+
+  def cap(cap : Cap)
+    MetaType.new(@inner.intersect(Capability.new(cap)))
   end
 
   def cap(name : String)
-    MetaType.new(@inner.intersect(Capability.new(name)))
+    MetaType.new(@inner.intersect(Capability.new(Cap.from_string(name))))
   end
 
   def cap_only_inner
@@ -105,8 +117,12 @@ struct Mare::Compiler::Infer::MetaType
     MetaType.new(cap_only_inner)
   end
 
+  def override_cap(cap : Cap)
+    override_cap(Capability.new(cap))
+  end
+
   def override_cap(name : String)
-    override_cap(Capability.new(name))
+    override_cap(Capability.new(Cap.from_string(name)))
   end
 
   def override_cap(meta_type : MetaType)

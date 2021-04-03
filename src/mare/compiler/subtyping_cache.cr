@@ -108,7 +108,7 @@ class Mare::Compiler::SubtypingCache
         # Get the MetaType of the asserted supertype trait
         f_link = f.make_link(@this.link)
         pre_infer = ctx.pre_infer[f_link]
-        rf = ReifiedFunction.new(@this, f_link, MetaType.new(@this, "non"))
+        rf = ReifiedFunction.new(@this, f_link, MetaType.new(@this, Infer::Cap::NON))
         trait_mt = rf.meta_type_of(ctx, pre_infer[f.ret.not_nil!])
         next unless trait_mt
 
@@ -220,7 +220,7 @@ class Mare::Compiler::SubtypingCache
           this_cap = MetaType::Capability.new_maybe_generic(this_func.cap.value)
 
           # For "simple" capabilities, just use them to check the function.
-          if that_cap.value.is_a?(String) && this_cap.value.is_a?(String)
+          if that_cap.value.is_a?(Infer::Cap) && this_cap.value.is_a?(Infer::Cap)
             check_func(ctx, that, that_func, this_func, that_cap, this_cap, errors)
           else
             # If either capability is a generic cap, they must be equivalent.
@@ -253,8 +253,8 @@ class Mare::Compiler::SubtypingCache
       raise "found hygienic function" if this_func.has_tag?(:hygienic)
 
       # Get the Infer instance for both this and that function, to compare them.
-      this_rf = ReifiedFunction.new(this, this_func.make_link(this.link), MetaType.new(this, this_cap.value.as(String)))
-      that_rf = ReifiedFunction.new(that, that_func.make_link(that.link), MetaType.new(that, that_cap.value.as(String)))
+      this_rf = ReifiedFunction.new(this, this_func.make_link(this.link), MetaType.new(this, this_cap.value.as(Infer::Cap)))
+      that_rf = ReifiedFunction.new(that, that_func.make_link(that.link), MetaType.new(that, that_cap.value.as(Infer::Cap)))
       this_infer = ctx.infer[this_func.make_link(this.link)]
       that_infer = ctx.infer[that_func.make_link(that.link)]
 

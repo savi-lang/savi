@@ -296,7 +296,7 @@ struct Mare::Compiler::Infer::MetaType::Intersection
     if cap
       cap_value = cap.value
       case cap_value
-      when String
+      when Cap
         # If this intersection already has a single capability, it can't be
         # split into any further capability possibilities, so just return it.
         result.add(self)

@@ -419,7 +419,7 @@ module Mare::Compiler::Infer
         && infer.classify.further_qualified?(@node)
 
       infer.unwrap_lazy_parts_of_type_expr_span(ctx,
-        infer.type_expr_span(ctx, @node).transform_mt(&.override_cap("non"))
+        infer.type_expr_span(ctx, @node).transform_mt(&.override_cap(Infer::Cap::NON))
       )
     end
   end
@@ -1105,7 +1105,7 @@ module Mare::Compiler::Infer
             array_cap = maybe_self_mt.try(&.inner.as(MetaType::Capability)) || MetaType::Capability::REF
 
             rt = infer.prelude_reified_type(ctx, "Array", [elem_mt])
-            mt = MetaType.new(rt, array_cap.value.as(String))
+            mt = MetaType.new(rt, array_cap.value.as(Cap))
 
             mt
           }
@@ -1263,11 +1263,11 @@ module Mare::Compiler::Infer
       # The required capability is the receiver capability of the function,
       # unless it is an asynchronous function, in which case it is tag.
       required_cap = call_func_cap
-      required_cap = MetaType::Capability.new("tag") \
+      required_cap = MetaType::Capability.new(Cap::TAG) \
         if call_func.has_tag?(:async) && !call_func.has_tag?(:constructor)
 
       receiver_okay =
-        if required_cap.value.is_a?(String)
+        if required_cap.value.is_a?(Cap)
           call_cap_mt.subtype_of?(ctx, MetaType.new(required_cap))
         else
           call_cap_mt.satisfies_bound?(ctx, MetaType.new(required_cap))
@@ -1279,11 +1279,11 @@ module Mare::Compiler::Infer
         # Or rather, we use "ref", "box", or "val", depending on the caller cap.
         # For all other functions, we just use the cap from the func definition.
         reify_cap =
-          if required_cap.value == "box"
+          if required_cap.value == Cap::BOX
             case call_cap_mt.inner.as(MetaType::Capability).value
-            when "iso", "trn", "ref" then MetaType.cap("ref")
-            when "val" then MetaType.cap("val")
-            else MetaType.cap("box")
+            when Cap::ISO, Cap::TRN, Cap::REF then MetaType.cap(Cap::REF)
+            when Cap::VAL then MetaType.cap(Cap::VAL)
+            else MetaType.cap(Cap::BOX)
             end
           # TODO: This shouldn't be a special case - any generic cap should be accepted.
           elsif required_cap.value.is_a?(Set(MetaType::Capability))
@@ -1319,7 +1319,7 @@ module Mare::Compiler::Infer
       end
 
       if autorecover_needed \
-      && required_cap.value != "ref" && required_cap.value != "box"
+      && required_cap.value != Cap::REF && required_cap.value != Cap::BOX
         problems << {call_func.cap.pos,
           "the function's required receiver capability is `#{required_cap}` " \
           "but only a `ref` or `box` function can be auto-recovered"}

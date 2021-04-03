@@ -41,7 +41,7 @@ class Mare::Compiler::CodeGen
         raise "a value type with no descriptor can't have fields" \
           unless @fields.empty?
 
-        @fields << {"VALUE", @type_def.as_ref(g.ctx)}
+        @fields << {"VALUE", @type_def.as_ref}
       end
 
       # Generate descriptor type and struct type.

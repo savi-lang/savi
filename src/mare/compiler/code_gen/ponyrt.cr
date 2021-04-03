@@ -1007,10 +1007,10 @@ class Mare::Compiler::CodeGen::PonyRT
       mutability = src_type.trace_mutability_of_nominal(g.ctx, dst_type)
       refined_dst_type =
         case mutability
-        when :mutable   then src_type_def.as_ref(g.ctx, "iso")
-        when :immutable then src_type_def.as_ref(g.ctx, "val")
-        when :opaque    then src_type_def.as_ref(g.ctx, "tag")
-        when :non       then src_type_def.as_ref(g.ctx, "non")
+        when :mutable   then src_type_def.as_ref(Infer::Cap::ISO)
+        when :immutable then src_type_def.as_ref(Infer::Cap::VAL)
+        when :opaque    then src_type_def.as_ref(Infer::Cap::TAG)
+        when :non       then src_type_def.as_ref(Infer::Cap::NON)
         else
           raise NotImplementedError.new([src_type, dst_type])
         end
