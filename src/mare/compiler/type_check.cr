@@ -59,7 +59,7 @@ class Mare::Compiler::TypeCheck
     end
 
     rts.each { |rt|
-      ctx.subtyping.for_rt(rt).initialize_assertions_on_supertypes(ctx)
+      ctx.subtyping.for_rt(rt).initialize_assertions(ctx)
     }
 
     # Now do the main type checking pass in each ReifiedType.
@@ -76,7 +76,9 @@ class Mare::Compiler::TypeCheck
 
     # Check the assertion list for each type, to confirm that it is a subtype
     # of any it claimed earlier, which we took on faith and now verify.
-    ctx.subtyping.check_and_clear_all_assertions(ctx)
+    rts.each { |rt|
+      ctx.subtyping.for_rt(rt).check_assertions(ctx)
+    }
   end
 
   def [](t_link : Program::Type::Link)
