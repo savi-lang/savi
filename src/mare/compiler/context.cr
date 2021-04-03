@@ -26,6 +26,7 @@ class Mare::Compiler::Context
   getter subtyping
   getter type_check
   getter type_context
+  getter verify
 
   getter options
   property prev_ctx : Context?
@@ -63,6 +64,7 @@ class Mare::Compiler::Context
     @subtyping = SubtypingCache.new
     @type_check = TypeCheck.new
     @type_context = TypeContext::Pass.new
+    @verify = Verify::Pass.new
 
     @link_libraries = Set(String).new
   end
