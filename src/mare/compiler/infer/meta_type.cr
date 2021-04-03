@@ -576,11 +576,10 @@ struct Mare::Compiler::Infer::MetaType
 
   def find_callable_func_defns(
     ctx : Context,
-    infer : TypeCheck::ForReifiedFunc?,
     name : String,
   ) : Set(Tuple(MetaType, ReifiedType?, Program::Function?))
     set = Set(Tuple(MetaType, ReifiedType?, Program::Function?)).new
-    @inner.find_callable_func_defns(ctx, infer, name).try(&.each { |tuple|
+    @inner.find_callable_func_defns(ctx, name).try(&.each { |tuple|
       set.add(tuple)
     })
     set

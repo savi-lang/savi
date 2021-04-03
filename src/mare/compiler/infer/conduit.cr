@@ -18,15 +18,15 @@ module Mare::Compiler::Infer
     def resolve_span!(infer : Analysis) : Span
       inner.resolve_span!(infer)
     end
-    def resolve!(ctx : Context, infer : TypeCheck::ForReifiedFunc) : MetaType?
-      inner.resolve!(ctx, infer)
+    def resolve!(ctx : Context, type_check : TypeCheck::ForReifiedFunc) : MetaType?
+      inner.resolve!(ctx, type_check)
     end
 
     abstract struct Inner
       abstract def flatten : Array(Inner)
       abstract def directly_references?(other_info : Info) : Bool
       abstract def resolve_span!(ctx : Context, infer : Visitor) : Span
-      abstract def resolve!(ctx : Context, infer : TypeCheck::ForReifiedFunc) : MetaType?
+      abstract def resolve!(ctx : Context, type_check : TypeCheck::ForReifiedFunc) : MetaType?
     end
 
     def self.direct(info)
@@ -59,8 +59,8 @@ module Mare::Compiler::Infer
       def resolve_span!(infer : Analysis) : Span
         infer[info]
       end
-      def resolve!(ctx : Context, infer : TypeCheck::ForReifiedFunc) : MetaType?
-        infer.resolve(ctx, info)
+      def resolve!(ctx : Context, type_check : TypeCheck::ForReifiedFunc) : MetaType?
+        type_check.resolve(ctx, info)
       end
     end
 
@@ -111,8 +111,8 @@ module Mare::Compiler::Infer
           .not_nil!
       end
 
-      def resolve!(ctx : Context, infer : TypeCheck::ForReifiedFunc) : MetaType?
-        mts = @infos.compact_map { |info| infer.resolve(ctx, info).as(MetaType?) }
+      def resolve!(ctx : Context, type_check : TypeCheck::ForReifiedFunc) : MetaType?
+        mts = @infos.compact_map { |info| type_check.resolve(ctx, info).as(MetaType?) }
         return nil if mts.empty?
         MetaType.new_union(mts)
       end
@@ -158,8 +158,8 @@ module Mare::Compiler::Infer
       def resolve_span!(infer : Analysis) : Span
         infer[info].transform_mt(&.ephemeralize)
       end
-      def resolve!(ctx : Context, infer : TypeCheck::ForReifiedFunc) : MetaType?
-        infer.resolve(ctx, info).try(&.ephemeralize)
+      def resolve!(ctx : Context, type_check : TypeCheck::ForReifiedFunc) : MetaType?
+        type_check.resolve(ctx, info).try(&.ephemeralize)
       end
     end
 
@@ -203,8 +203,8 @@ module Mare::Compiler::Infer
       def resolve_span!(infer : Analysis) : Span
         infer[info].transform_mt(&.alias)
       end
-      def resolve!(ctx : Context, infer : TypeCheck::ForReifiedFunc) : MetaType?
-        infer.resolve(ctx, info).try(&.alias)
+      def resolve!(ctx : Context, type_check : TypeCheck::ForReifiedFunc) : MetaType?
+        type_check.resolve(ctx, info).try(&.alias)
       end
     end
 
@@ -241,8 +241,8 @@ module Mare::Compiler::Infer
       def resolve_span!(infer : Analysis) : Span
         infer[array_info].transform_mt(&.single!.args.first)
       end
-      def resolve!(ctx : Context, infer : TypeCheck::ForReifiedFunc) : MetaType?
-        infer.resolve(ctx, array_info)
+      def resolve!(ctx : Context, type_check : TypeCheck::ForReifiedFunc) : MetaType?
+        type_check.resolve(ctx, array_info)
           .try(&.single!.args.first)
 
           # We may need to unwrap type aliases.

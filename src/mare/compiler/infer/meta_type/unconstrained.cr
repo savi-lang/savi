@@ -30,7 +30,7 @@ class Mare::Compiler::Infer::MetaType::Unconstrained
     )
   end
 
-  def find_callable_func_defns(ctx, infer : TypeCheck::ForReifiedFunc?, name : String)
+  def find_callable_func_defns(ctx, infername : String)
     nil
   end
 

@@ -104,12 +104,12 @@ struct Mare::Compiler::Infer::MetaType::Intersection
     span
   end
 
-  def find_callable_func_defns(ctx, infer : TypeCheck::ForReifiedFunc?, name : String)
+  def find_callable_func_defns(ctx, name : String)
     list = [] of Tuple(MetaType, ReifiedType?, Program::Function?)
 
     # Collect a result for nominal in this intersection that has this func.
     terms.try(&.each do |term|
-      term.find_callable_func_defns(ctx, infer, name).try do |result|
+      term.find_callable_func_defns(ctx, name).try do |result|
         result.each do |_, defn, func|
           # Replace the inner term with an inner of this intersection.
           # This will be used for subtype checking later, and we want to

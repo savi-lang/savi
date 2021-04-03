@@ -153,7 +153,8 @@ module Mare::Compiler::Infer
     end
 
     def each_called_func_within(ctx, rf : ReifiedFunction, for_info : Info? = nil)
-      called_func_spans.each { |info, (call_defn_span, func_names)|
+      list = for_info ? [{for_info, called_func_spans[for_info]}] : called_func_spans
+      list.each { |info, (call_defn_span, func_names)|
         # Allow the caller to filter by a specific Info if given.
         next if for_info && for_info != info
 

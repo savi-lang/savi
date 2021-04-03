@@ -61,7 +61,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     def all_callable_concrete_defs_for(ctx, name) : Array(Def)
       results = [] of Def
 
-      @meta_type.find_callable_func_defns(ctx, nil, name).each { |(_, rt, _)|
+      @meta_type.find_callable_func_defns(ctx, name).each { |(_, rt, _)|
         next unless rt
         this_def = ctx.reach[rt]
         if rt.link.is_abstract?

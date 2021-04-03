@@ -24,7 +24,6 @@ class Mare::Compiler::TypeCheck
   def initialize
     @map = {} of ReifiedFunction => ForReifiedFunc
     @types = {} of ReifiedType => ForReifiedType
-    @invalid_types = Set(ReifiedType).new
   end
 
   def run(ctx)
@@ -40,7 +39,7 @@ class Mare::Compiler::TypeCheck
         if partial_rts.empty?
           # If there are no partial reifications (thus no type parameters),
           # then run it for the reified type with no arguments.
-          rts.push(for_rt(ctx, t_link).reified)
+          rts.push(ReifiedType.new(t_link))
         else
           # Otherwise, collect the partial reifications to type check.
           rts.concat(partial_rts)
@@ -127,7 +126,7 @@ class Mare::Compiler::TypeCheck
 
       args = substitutions_map.map(&.last.substitute_type_params(substitutions_map))
 
-      for_rt(ctx, t_link, args).reified
+      ReifiedType.new(t_link, args)
     end
   end
 
@@ -147,35 +146,17 @@ class Mare::Compiler::TypeCheck
       pre_infer = ctx.pre_infer[f]
       infer = ctx.infer[f]
       subtyping = ctx.subtyping.for_rf(rf)
-      for_rt = for_rt(ctx, rt.link, rt.args)
+      for_rt = for_rt(ctx, rt)
       ForReifiedFunc.new(ctx, ReifiedFuncAnalysis.new(rf),
         for_rt, rf, refer_type, classify, type_context, completeness,
         pre_infer, infer, subtyping)
     )
   end
 
-  def for_rt(
-    ctx : Context,
-    rt : ReifiedType,
-    type_args : Array(MetaType) = [] of MetaType
-  )
-    # Sanity check - the reified type shouldn't have any args yet.
-    raise "already has type args: #{rt.inspect}" unless rt.args.empty?
-
-    for_rt(ctx, rt.link, type_args)
-  end
-
-  def for_rt(
-    ctx : Context,
-    link : Program::Type::Link,
-    type_args : Array(MetaType) = [] of MetaType
-  ) : ForReifiedType
-    type_args_simplified = type_args.map(&.simplify(ctx))
-    type_args = type_args_simplified
-    rt = ReifiedType.new(link, type_args)
+  def for_rt(ctx : Context, rt : ReifiedType) : ForReifiedType
     @types[rt]? || (
-      refer_type = ctx.refer_type[link]
-      ft = @types[rt] = ForReifiedType.new(ctx, rt, refer_type)
+      refer_type = ctx.refer_type[rt.link]
+      @types[rt] = ForReifiedType.new(ctx, rt, refer_type)
     )
   end
 
@@ -264,91 +245,26 @@ class Mare::Compiler::TypeCheck
     end
   end
 
-  class ForReifiedTypeAlias
-    private getter ctx : Context
-    getter reified : ReifiedTypeAlias
-    protected getter refer_type : ReferType::Analysis
-
-    def initialize(@ctx, @reified, @refer_type)
-    end
-
-    def lookup_type_param(ref : Refer::TypeParam, receiver = nil)
-      raise NotImplementedError.new(ref) if ref.parent_link != reified.link
-
-      # Lookup the type parameter on self type and return the arg if present
-      arg = reified.args[ref.index]?
-      return arg if arg
-
-      # Use the default type argument if this type parameter has one.
-      return @reified.meta_type_of_type_param_default(ctx, ref.index) \
-        if ref.default
-
-      raise "inconsistent type param logic" if reified.is_complete?(ctx)
-
-      # Otherwise, return it as an unreified type parameter nominal.
-      MetaType.new_type_param(TypeParam.new(ref))
-    end
-  end
-
   class ForReifiedType
-    private getter ctx : Context
-    getter reified : ReifiedType
     getter type_params_and_type_args : Array({TypeParam, MetaType})
-    protected getter refer_type : ReferType::Analysis
 
-    def initialize(@ctx, @reified, @refer_type)
+    def initialize(ctx, reified : ReifiedType, refer_type : ReferType::Analysis)
       @type_params_and_type_args = begin
         type_params =
-          @reified.link.resolve(ctx).params.try(&.terms.map { |type_param|
+          reified.link.resolve(ctx).params.try(&.terms.map { |type_param|
             ident = AST::Extract.type_param(type_param).first
-            ref = @refer_type[ident]?
+            ref = refer_type[ident]?
             Infer::TypeParam.new(ref.as(Refer::TypeParam))
           }) || [] of Infer::TypeParam
 
-        type_args = @reified.args.map { |arg|
-          arg.substitute_each_type_alias_in_first_layer { |rta|
-            rta.meta_type_of_target(ctx).not_nil!
+        type_args = reified.args.map { |arg|
+          arg.substitute_each_type_alias_in_first_layer { |rt|
+            rt.meta_type_of_target(ctx).not_nil!
           }
         }
 
         type_params.zip(type_args)
       end
-    end
-
-    def lookup_type_param(ref : Refer::TypeParam, receiver = nil)
-      raise NotImplementedError.new(ref) if ref.parent_link != reified.link
-
-      # Lookup the type parameter on self type and return the arg if present
-      arg = reified.args[ref.index]?
-      return arg if arg
-
-      # Use the default type argument if this type parameter has one.
-      return @reified.meta_type_of_type_param_default(ctx, ref.index) \
-        if ref.default
-
-      raise "inconsistent type param logic" if reified.is_complete?(ctx)
-
-      # Otherwise, return it as an unreified type parameter nominal.
-      MetaType.new_type_param(TypeParam.new(ref))
-    end
-
-    def lookup_type_param_bound(type_param : TypeParam)
-      parent_rt = type_param.parent_rt
-      if parent_rt && parent_rt != reified
-        raise NotImplementedError.new(parent_rt) if parent_rt.is_a?(ReifiedTypeAlias)
-        return (
-          ctx.type_check.for_rt(ctx, parent_rt.link.as(Program::Type::Link), parent_rt.args)
-            .lookup_type_param_bound(type_param)
-        )
-      end
-
-      if type_param.ref.parent_link != reified.link
-        raise NotImplementedError.new([reified, type_param].inspect) \
-          unless parent_rt
-      end
-
-      # Get the MetaType of the declared bound for this type parameter.
-      reified.meta_type_of_type_param_bound(ctx, type_param.ref.index)
     end
   end
 
@@ -583,7 +499,7 @@ class Mare::Compiler::TypeCheck
       receiver_mt = resolve(ctx, info.lhs)
       return false unless receiver_mt
 
-      call_defns = receiver_mt.find_callable_func_defns(ctx, self, info.member)
+      call_defns = receiver_mt.find_callable_func_defns(ctx, info.member)
 
       problems = [] of {Source::Pos, String}
       call_defns.each do |(call_mt, call_defn, call_func)|
@@ -769,14 +685,6 @@ class Mare::Compiler::TypeCheck
       end
 
       nil
-    end
-
-    def lookup_type_param(ref, receiver = reified.receiver)
-      @for_rt.lookup_type_param(ref, receiver)
-    end
-
-    def lookup_type_param_bound(type_param)
-      @for_rt.lookup_type_param_bound(type_param)
     end
   end
 end

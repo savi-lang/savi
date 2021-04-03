@@ -120,7 +120,7 @@ struct Mare::Compiler::Infer::MetaType::Nominal
     end
   end
 
-  def find_callable_func_defns(ctx, infer : TypeCheck::ForReifiedFunc?, name : String)
+  def find_callable_func_defns(ctx, name : String)
     raise NotImplementedError.new("simplify first to remove aliases") if defn.is_a?(ReifiedTypeAlias)
 
     defn = defn()
@@ -128,12 +128,8 @@ struct Mare::Compiler::Infer::MetaType::Nominal
     when ReifiedType
       func = defn.defn(ctx).find_func?(name)
       [{MetaType.new(self), defn, func}]
-    when TypeParam
-      infer.not_nil!.lookup_type_param_bound(defn)
-        .try(&.find_callable_func_defns(ctx, infer, name)) \
-          || [] of Tuple(MetaType, ReifiedType?, Program::Function?)
     else
-      raise NotImplementedError.new(defn)
+      [] of {MetaType, ReifiedType?, Program::Function?}
     end
   end
 
