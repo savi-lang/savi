@@ -156,8 +156,12 @@ class Mare::SpecMarkdown
 
             case kind
             when "type"
-              type_check = ctx.type_check.for_func_simple(ctx, t_link, f_link)
-              actual = type_check.analysis.resolved(ctx, node).show_type
+              rt = Compiler::Infer::ReifiedType.new(t_link)
+              cap = f_link.resolve(ctx).cap.value
+              rf = Compiler::Infer::ReifiedFunction.new(rt, f_link,
+                Compiler::Infer::MetaType.new(rt, cap)
+              )
+              actual = rf.meta_type_of(ctx, node).try(&.show_type)
 
               if actual != expected
                 errors << {example, Error.build(annotations.first.pos,

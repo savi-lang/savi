@@ -1521,7 +1521,7 @@ module Mare::Compiler::Infer
       # TODO: It should be safe to pass in a TRN if the receiver is TRN,
       # so is_sendable? isn't quite liberal enough to allow all valid cases.
       call.args.try(&.terms.each do |arg|
-        inferred_arg = infer.resolve(ctx, infer.f_analysis[arg])
+        inferred_arg = infer.resolve(ctx, infer.pre_infer[arg])
         if inferred_arg && !inferred_arg.alias.is_sendable?
           problems << {arg.pos,
             "the argument (when aliased) has a type of " \

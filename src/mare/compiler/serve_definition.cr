@@ -32,10 +32,10 @@ class Mare::Compiler::ServeDefinition
 
   def [](f_link : Program::Function::Link, node : AST::Node)
     refer = ctx.refer[f_link]
-    type_check = ctx.type_check.for_func_simple(ctx, f_link.type, f_link)
 
     # TODO: Reimplement this using Infer instead of TypeCheck:
     nil
+    # type_check = ctx.type_check.for_func_simple(ctx, f_link.type, f_link)
     # type_check_info = ctx.type_check[f_link][node]?
     # if type_check_info.is_a? Infer::FromCall
     #   # Show function definition site of a call.

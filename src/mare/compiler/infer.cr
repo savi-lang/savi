@@ -465,8 +465,6 @@ module Mare::Compiler::Infer
     protected getter classify
     protected getter pre_infer
 
-    protected def f_analysis; pre_infer; end # TODO: remove this alias
-
     def initialize(
       @func : Program::Function,
       @link : Program::Function::Link,

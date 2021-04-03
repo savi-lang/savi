@@ -12,42 +12,15 @@ class Mare::Compiler::TypeCheck
   alias ReifiedFunction = Infer::ReifiedFunction
   alias Info = Infer::Info
 
-  struct FuncAnalysis
-    getter link
-
-    # TODO: remove this alias
-    protected def infer; @spans; end
-
-    def initialize(
-      @link : Program::Function::Link,
-      @pre : PreInfer::Analysis,
-      @spans : Infer::FuncAnalysis
-    )
-    end
-
-    def [](node : AST::Node); @pre[node]; end
-    def []?(node : AST::Node); @pre[node]?; end
-    def each_info(&block : Infer::Info -> Nil); @pre.each_info(&block); end
-
-    def span(node : AST::Node); span(@spans[node]); end
-    def span?(node : AST::Node); span?(@spans[node]?); end
-    def span(info : Infer::Info); @spans[info]; end
-    def span?(info : Infer::Info); @spans[info]?; end
-  end
-
   struct TypeAnalysis
     protected getter partial_reifieds
-    protected getter reached_fully_reifieds
 
     def initialize(@link : Program::Type::Link)
       @partial_reifieds = [] of ReifiedType
-      @reached_fully_reifieds = [] of ReifiedType
     end
 
     protected def observe_reified_type(ctx, rt)
-      if rt.is_complete?(ctx)
-        @reached_fully_reifieds << rt
-      elsif rt.is_partial_reify?(ctx)
+      if !rt.is_complete?(ctx) && rt.is_partial_reify?(ctx)
         @partial_reifieds << rt
       end
     end
@@ -78,40 +51,13 @@ class Mare::Compiler::TypeCheck
     def reified
       @rf
     end
-
-    # TODO: rename as [] and rename [] to info_for or similar?
-    def resolved(info : Info)
-      @resolved_infos[info]
-    end
-
-    # TODO: rename as [] and rename [] to info_for or similar?
-    def resolved(ctx, node : AST::Node)
-      resolved(ctx.type_check[@rf.link][node])
-    end
-
-    # TODO: remove this silly alias:
-    def resolved_or_unconstrained(ctx, node : AST::Node)
-      info = ctx.type_check[@rf.link][node]
-      @resolved_infos[info]? || MetaType.unconstrained
-    end
-
-    def resolved_self_cap : MetaType
-      @is_constructor ? MetaType.cap("ref") : @rf.receiver_cap
-    end
-
-    def resolved_self
-      MetaType.new(@rf.type).override_cap(resolved_self_cap)
-    end
   end
 
   def initialize
     @t_analyses = {} of Program::Type::Link => TypeAnalysis
-    @f_analyses = {} of Program::Function::Link => FuncAnalysis
     @map = {} of ReifiedFunction => ForReifiedFunc
     @types = {} of ReifiedType => ForReifiedType
     @invalid_types = Set(ReifiedType).new
-    @aliases = {} of ReifiedTypeAlias => ForReifiedTypeAlias
-    @unwrapping_set = Set(ReifiedTypeAlias).new
   end
 
   def run(ctx)
@@ -187,20 +133,8 @@ class Mare::Compiler::TypeCheck
     @t_analyses[t_link]?
   end
 
-  def [](f_link : Program::Function::Link)
-    @f_analyses[f_link]
-  end
-
-  def []?(f_link : Program::Function::Link)
-    @f_analyses[f_link]?
-  end
-
   protected def get_or_create_t_analysis(t_link : Program::Type::Link)
     @t_analyses[t_link] ||= TypeAnalysis.new(t_link)
-  end
-
-  protected def get_or_create_f_analysis(ctx, f_link : Program::Function::Link)
-    @f_analyses[f_link] ||= FuncAnalysis.new(f_link, ctx.pre_infer[f_link], ctx.infer[f_link])
   end
 
   def [](rf : ReifiedFunction)
@@ -255,18 +189,6 @@ class Mare::Compiler::TypeCheck
     end
   end
 
-  def for_func_simple(ctx : Context, source : Source, t_name : String, f_name : String)
-    t_link = ctx.namespace[source][t_name].as(Program::Type::Link)
-    f = t_link.resolve(ctx).find_func!(f_name)
-    f_link = f.make_link(t_link)
-    for_func_simple(ctx, t_link, f_link)
-  end
-
-  def for_func_simple(ctx : Context, t_link : Program::Type::Link, f_link : Program::Function::Link)
-    f = f_link.resolve(ctx)
-    for_rf(ctx, for_rt(ctx, t_link).reified, f_link, MetaType.cap(f.cap.value))
-  end
-
   # TODO: remove this cheap hacky alias somehow:
   def for_rf_existing!(rf)
     @map[rf]
@@ -281,15 +203,17 @@ class Mare::Compiler::TypeCheck
     mt = MetaType.new(rt).override_cap(cap)
     rf = ReifiedFunction.new(rt, f, mt)
     @map[rf] ||= (
-      f_analysis = get_or_create_f_analysis(ctx, f)
       refer_type = ctx.refer_type[f]
       classify = ctx.classify[f]
       type_context = ctx.type_context[f]
       completeness = ctx.completeness[f]
+      pre_infer = ctx.pre_infer[f]
+      infer = ctx.infer[f]
       subtyping = ctx.subtyping.for_rf(rf)
       for_rt = for_rt(ctx, rt.link, rt.args)
-      ForReifiedFunc.new(ctx, f_analysis, ReifiedFuncAnalysis.new(ctx, rf),
-        for_rt, rf, refer_type, classify, type_context, completeness, subtyping)
+      ForReifiedFunc.new(ctx, ReifiedFuncAnalysis.new(ctx, rf),
+        for_rt, rf, refer_type, classify, type_context, completeness,
+        pre_infer, infer, subtyping)
     )
   end
 
@@ -318,16 +242,6 @@ class Mare::Compiler::TypeCheck
       ft.tap(&.initialize_assertions(ctx))
       .tap { |ft| get_or_create_t_analysis(link).observe_reified_type(ctx, rt) }
     )
-  end
-
-  def for_rt_alias(
-    ctx : Context,
-    link : Program::TypeAlias::Link,
-    type_args : Array(MetaType) = [] of MetaType
-  ) : ForReifiedTypeAlias
-    refer_type = ctx.refer_type[link]
-    rt_alias = ReifiedTypeAlias.new(link, type_args)
-    @aliases[rt_alias] ||= ForReifiedTypeAlias.new(ctx, rt_alias, refer_type)
   end
 
   def ensure_rt(ctx : Context, rt : ReifiedType)
@@ -594,19 +508,21 @@ class Mare::Compiler::TypeCheck
   end
 
   class ForReifiedFunc < Mare::AST::Visitor
-    getter f_analysis : FuncAnalysis
     getter analysis : ReifiedFuncAnalysis
     getter for_rt : ForReifiedType
     getter reified : ReifiedFunction
     private getter ctx : Context
     private getter refer_type : ReferType::Analysis
-    protected getter classify : Classify::Analysis
+    protected getter classify : Classify::Analysis # TODO: make private
     private getter type_context : TypeContext::Analysis
     private getter completeness : Completeness::Analysis
+    protected getter pre_infer : PreInfer::Analysis # TODO: make private
+    private getter infer : Infer::Analysis
     private getter subtyping : SubtypingCache::ForReifiedFunc
 
-    def initialize(@ctx, @f_analysis, @analysis, @for_rt, @reified,
-      @refer_type, @classify, @type_context, @completeness, @subtyping
+    def initialize(@ctx, @analysis, @for_rt, @reified,
+      @refer_type, @classify, @type_context, @completeness,
+      @pre_infer, @infer, @subtyping
     )
       @local_idents = Hash(Refer::Local, AST::Node).new
       @local_ident_overrides = Hash(AST::Node, AST::Node).new
@@ -616,7 +532,7 @@ class Mare::Compiler::TypeCheck
 
       @rt_contains_foreign_type_params = @reified.type.args.any? { |arg|
         arg.type_params.any? { |type_param|
-          !@f_analysis.infer.type_params.includes?(type_param)
+          !@infer.type_params.includes?(type_param)
         }
       }.as(Bool)
     end
@@ -635,7 +551,7 @@ class Mare::Compiler::TypeCheck
     end
 
     def filter_span(ctx, info : Info) : MetaType?
-      span = @f_analysis.span?(info)
+      span = @infer[info]?
       return MetaType.unconstrained unless span
 
       # Filter the span by deciding the function capability.
@@ -672,7 +588,7 @@ class Mare::Compiler::TypeCheck
 
     # TODO: remove this convenience alias:
     def resolve(ctx : Context, ast : AST::Node) : MetaType?
-      resolve(ctx, @f_analysis[ast])
+      resolve(ctx, @pre_infer[ast])
     end
 
     def resolve(ctx : Context, info : Infer::Info) : MetaType?
@@ -802,7 +718,7 @@ class Mare::Compiler::TypeCheck
       true
     end
     def type_check_pre(ctx : Context, info : Infer::TypeConditionForLocal, mt : MetaType) : Bool
-      lhs_info = @f_analysis[info.refine]
+      lhs_info = @pre_infer[info.refine]
       lhs_info = lhs_info.info if lhs_info.is_a?(Infer::LocalRef)
       rhs_info = info.refine_type
       lhs_mt = resolve(ctx, lhs_info)
@@ -950,9 +866,9 @@ class Mare::Compiler::TypeCheck
       return if @already_ran
       @already_ran = true
 
-      @f_analysis.each_info { |info| resolve(ctx, info) }
+      @pre_infer.each_info { |info| resolve(ctx, info) }
 
-      ret_resolved = @analysis.resolved_infos[@f_analysis[ret]]
+      ret_resolved = @analysis.resolved_infos[@pre_infer[ret]]
 
       numeric_rt = ReifiedType.new(@ctx.namespace.prelude_type("Numeric"))
       numeric_mt = MetaType.new_nominal(numeric_rt)
@@ -988,7 +904,7 @@ class Mare::Compiler::TypeCheck
         if func.has_tag?(:async)
           "An asynchronous function"
         elsif func.has_tag?(:constructor) \
-        && !resolve(ctx, @f_analysis[ret]).not_nil!.subtype_of?(ctx, MetaType.cap("ref"))
+        && !resolve(ctx, @pre_infer[ret]).not_nil!.subtype_of?(ctx, MetaType.cap("ref"))
           "A constructor with elevated capability"
         end
       if require_sendable
@@ -996,7 +912,7 @@ class Mare::Compiler::TypeCheck
 
           errs = [] of {Source::Pos, String}
           params.terms.each do |param|
-            param_mt = resolve(ctx, @f_analysis[param]).not_nil!
+            param_mt = resolve(ctx, @pre_infer[param]).not_nil!
 
             unless param_mt.is_sendable?
               # TODO: Remove this hacky special case.
