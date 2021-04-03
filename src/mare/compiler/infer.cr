@@ -51,6 +51,12 @@ module Mare::Compiler::Infer
     getter! type_params : Array(TypeParam)
     protected setter type_params
 
+    getter! type_param_bound_cap_sets : Array(Array(Cap))
+    protected setter type_param_bound_cap_sets
+
+    getter! partial_reification_sets : Array(Array(Cap))
+    protected setter partial_reification_sets
+
     getter! type_param_bound_spans : Array(Span)
     protected setter type_param_bound_spans
 
@@ -343,6 +349,15 @@ module Mare::Compiler::Infer
 
       .tap { @currently_looking_up_param_bounds.delete(type_param) }
     end
+    def lookup_type_param_bound_cap(ctx : Context, type_param : TypeParam) : MetaType
+      lookup_type_param_bound_span(ctx, type_param, cap_only: true).terminal!
+    end
+    def lookup_type_param_bound_cap_set(ctx : Context, type_param : TypeParam) : Array(Cap)
+      lookup_type_param_bound_cap(ctx, type_param)
+        .cap_only_inner
+        .each_cap.map(&.value.as(Cap))
+        .to_a
+    end
     def lookup_type_param_partial_reified_span(ctx : Context, type_param : TypeParam)
       # Look up the bound cap of this type param (that is, cap only),
       # and intersect it with the type param reference itself, expanding the
@@ -377,6 +392,17 @@ module Mare::Compiler::Infer
     end
 
     def run(ctx)
+      @analysis.type_param_bound_cap_sets = @analysis.type_params.map { |type_param|
+        lookup_type_param_bound_cap_set(ctx, type_param)
+      }
+      @analysis.partial_reification_sets =
+        @analysis.type_param_bound_cap_sets.reduce([[] of Cap]) { |accum, caps|
+          accum.flat_map { |preceding|
+            caps.map { |cap| preceding + [cap] }
+          }
+        }
+
+      # TODO: Can this be removed eventually, now that the above is in place?
       @analysis.type_param_bound_spans = @analysis.type_params.map { |type_param|
         lookup_type_param_bound_span(ctx, type_param)
       }
@@ -482,6 +508,8 @@ module Mare::Compiler::Infer
       @pre_infer : PreInfer::Analysis,
     )
       @analysis.type_params = @t_analysis.type_params
+      @analysis.type_param_bound_cap_sets = @t_analysis.type_param_bound_cap_sets
+      @analysis.partial_reification_sets = @t_analysis.partial_reification_sets
       @analysis.type_param_bound_spans = @t_analysis.type_param_bound_spans
       @analysis.type_param_default_spans = @t_analysis.type_param_default_spans
 

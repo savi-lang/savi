@@ -37,6 +37,12 @@ module Mare::Compiler::Infer
 
     def self.error(*args); new(ErrorPropagate.new(Error.build(*args))); end
 
+    def terminal!
+      inner = inner()
+      raise NotImplementedError.new(self) unless inner.is_a?(Terminal)
+      inner.meta_type
+    end
+
     def any_error?
       inner.any_error?
     end

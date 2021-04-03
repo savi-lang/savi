@@ -82,42 +82,15 @@ class Mare::Compiler::TypeCheck
     type_params = infer.type_params
     return [] of ReifiedType if type_params.empty?
 
-    params_partial_reifications =
-      type_params.each_with_index.map do |(param, index)|
-        bound_span = infer.type_param_bound_spans[index].transform_mt(&.cap_only)
-
-        bound_span_inner = bound_span.inner
-        raise NotImplementedError.new(bound_span.inspect) \
-          unless bound_span_inner.is_a?(Infer::Span::Terminal)
-
-        bound_mt = bound_span_inner.meta_type
-
-        # TODO: Refactor the partial_reifications to return cap only already.
-        caps = bound_mt.partial_reifications.map(&.cap_only)
-
-        # Return the list of MetaTypes that partially reify the bound;
-        # that is, a list that constitutes every possible cap substitution.
-        {param, bound_mt, caps}
-      end
-
-    substitution_sets = [[] of {TypeParam, MetaType, MetaType}]
-    params_partial_reifications.each do |param, bound_mt, caps|
-      substitution_sets = substitution_sets.flat_map do |pairs|
-        caps.map { |cap| pairs + [{param, bound_mt, cap}] }
-      end
-    end
-
-    substitution_sets.map do |substitutions|
-      # TODO: Simplify/refactor in relation to code above
-      substitutions_map = {} of TypeParam => MetaType
-      substitutions.each do |param, bound, cap_mt|
-        substitutions_map[param] = MetaType.new_type_param(param).intersect(cap_mt)
-      end
+    infer.partial_reification_sets.map { |type_param_caps|
+      substitutions_map = type_params.zip(type_param_caps).map { |param, cap|
+        {param, MetaType.new_type_param(param).cap(cap)}
+      }.to_h
 
       args = substitutions_map.map(&.last.substitute_type_params(substitutions_map))
 
       ReifiedType.new(t_link, args)
-    end
+    }
   end
 
   private def for_rf(
