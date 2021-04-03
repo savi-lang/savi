@@ -12,28 +12,6 @@ class Mare::Compiler::TypeCheck
   alias ReifiedFunction = Infer::ReifiedFunction
   alias Info = Infer::Info
 
-  struct TypeAnalysis
-    protected getter partial_reifieds
-
-    def initialize(@link : Program::Type::Link)
-      @partial_reifieds = [] of ReifiedType
-    end
-
-    protected def observe_reified_type(ctx, rt)
-      if !rt.is_complete?(ctx) && rt.is_partial_reify?(ctx)
-        @partial_reifieds << rt
-      end
-    end
-
-    def each_non_argumented_reified
-      if @partial_reifieds.empty?
-        [ReifiedType.new(@link)].each
-      else
-        @partial_reifieds.each
-      end
-    end
-  end
-
   struct ReifiedFuncAnalysis
     protected getter resolved_infos
     protected getter call_rfs_for
@@ -54,75 +32,51 @@ class Mare::Compiler::TypeCheck
   end
 
   def initialize
-    @t_analyses = {} of Program::Type::Link => TypeAnalysis
     @map = {} of ReifiedFunction => ForReifiedFunc
     @types = {} of ReifiedType => ForReifiedType
     @invalid_types = Set(ReifiedType).new
   end
 
   def run(ctx)
-    # First, make sure we know about each type, without type arguments
-    # (just so that we know it has initialized its subtype assertions).
+    # Collect this list of types to check, including types with no type params,
+    # as well as partially reified types for those with type params.
+    # TODO: This shouldn't need to be a separate step, right?
+    rts = [] of ReifiedType
     ctx.program.libraries.each do |library|
       library.types.each do |t|
         t_link = t.make_link(library)
-        rts = for_type_partial_reifications(ctx, t_link)
+        partial_rts = for_type_partial_reifications(ctx, t_link)
 
-        # If there are no partial reifications (thus no type parameters),
-        # then run it for the reified type with no arguments.
-        for_rt(ctx, t_link) if rts.empty?
+        if partial_rts.empty?
+          # If there are no partial reifications (thus no type parameters),
+          # then run it for the reified type with no arguments.
+          rts.push(for_rt(ctx, t_link).reified)
+        else
+          # Otherwise, collect the partial reifications to type check.
+          rts.concat(partial_rts)
+        end
       end
     end
 
-    # Now do the main type checking pass in each library.
-    ctx.program.libraries.each do |library|
-      run_for_library(ctx, library)
-    end
-  end
+    rts.each { |rt|
+      ctx.subtyping.for_rt(rt).initialize_assertions_on_supertypes(ctx)
+    }
 
-  def run_for_library(ctx, library)
-    # Always evaluate the Main type first, if it's part of this library.
-    # TODO: This shouldn't be necessary, but it is right now for some reason...
-    # In both execution orders, the ReifiedType and ReifiedFunction for Main
-    # are identical, but for some reason the resulting type resolutions for
-    # expressions can turn out differently... Need to investigate more after
-    # more refactoring and cleanup on the analysis and state for this pass...
-    main = nil
-    sorted_types = library.types.reject do |t|
-      next if main
-      next if t.ident.value != "Main"
-      main = t
-      true
-    end
-    sorted_types.unshift(main) if main
-
-    # For each function in each type, run with a new instance,
-    # unless that function has already been reached with an infer instance.
-    # We probably reached most of them already by starting from Main.new,
-    # so this second pass just takes care of typechecking unreachable functions.
-    # This is also where we take care of typechecking for unused partial
-    # reifications of all generic type parameters.
-    sorted_types.each do |t|
-      t_link = t.make_link(library)
-      rts = for_type_partial_reifications(ctx, t_link)
-
-      get_or_create_t_analysis(t_link).each_non_argumented_reified.each do |rt|
-        t.functions.each do |f|
-          f_link = f.make_link(t_link)
-          f_cap_value = f.cap.value
-          f_cap_value = "read" if f_cap_value == "box" # TODO: figure out if we can remove this Pony-originating semantic hack
-          MetaType::Capability.new_maybe_generic(f_cap_value).each_cap.each do |f_cap|
-            for_rf(ctx, rt, f_link, MetaType.new(f_cap)).run
-          end
+    # Now do the main type checking pass in each ReifiedType.
+    rts.each do |rt|
+      rt.defn(ctx).functions.each do |f|
+        f_link = f.make_link(rt.link)
+        f_cap_value = f.cap.value
+        f_cap_value = "read" if f_cap_value == "box" # TODO: figure out if we can remove this Pony-originating semantic hack
+        MetaType::Capability.new_maybe_generic(f_cap_value).each_cap.each do |f_cap|
+          for_rf(ctx, rt, f_link, MetaType.new(f_cap)).run
         end
       end
     end
 
     # Check the assertion list for each type, to confirm that it is a subtype
     # of any it claimed earlier, which we took on faith and now verify.
-    @types.keys.each { |rt|
-      ctx.subtyping.for_rt(rt).check_and_clear_assertions(ctx)
-    }
+    ctx.subtyping.check_and_clear_all_assertions(ctx)
   end
 
   def [](t_link : Program::Type::Link)
@@ -131,10 +85,6 @@ class Mare::Compiler::TypeCheck
 
   def []?(t_link : Program::Type::Link)
     @t_analyses[t_link]?
-  end
-
-  protected def get_or_create_t_analysis(t_link : Program::Type::Link)
-    @t_analyses[t_link] ||= TypeAnalysis.new(t_link)
   end
 
   def [](rf : ReifiedFunction)
@@ -189,11 +139,6 @@ class Mare::Compiler::TypeCheck
     end
   end
 
-  # TODO: remove this cheap hacky alias somehow:
-  def for_rf_existing!(rf)
-    @map[rf]
-  end
-
   def for_rf(
     ctx : Context,
     rt : ReifiedType,
@@ -239,81 +184,7 @@ class Mare::Compiler::TypeCheck
     @types[rt]? || (
       refer_type = ctx.refer_type[link]
       ft = @types[rt] = ForReifiedType.new(ctx, rt, refer_type)
-      ft.tap(&.initialize_assertions(ctx))
-      .tap { |ft| get_or_create_t_analysis(link).observe_reified_type(ctx, rt) }
     )
-  end
-
-  def ensure_rt(ctx : Context, rt : ReifiedType)
-    return true if @types.has_key?(rt)
-    return false if @invalid_types.includes?(rt)
-
-    if rt_valid?(ctx, rt)
-      # TODO: shouldn't have to pull the rt apart here and reassemble inside.
-      for_rt(ctx, rt.link, rt.args)
-      true
-    else
-      @invalid_types.add(rt)
-      false
-    end
-  end
-
-  def rt_valid?(ctx : Context, rt : ReifiedType)
-    rt_defn = rt.defn(ctx)
-    type_params = AST::Extract.type_params(rt_defn.params)
-
-    # The minimum number of params is the number that don't have defaults.
-    # The maximum number of params is the total number of them.
-    type_params_min = type_params.select { |(_, _, default)| !default }.size
-    type_params_max = type_params.size
-
-    # Handle the case where no type args are given.
-    if rt.args.empty?
-      if type_params_min == 0
-        return true
-      else
-        return false
-      end
-    end
-
-    # Check number of type args against number of type params.
-    if rt.args.size > type_params_max
-      return false
-    elsif rt.args.size < type_params_min
-      return false
-    end
-
-    # Unwrap any type aliases present in the first layer of each type arg.
-    unwrapped_args = rt.args.map { |arg|
-      arg.substitute_each_type_alias_in_first_layer { |rta|
-        rta.meta_type_of_target(ctx).not_nil!
-      }
-    }
-
-    # Check each type arg against the bound of the corresponding type param.
-    unwrapped_args.each_with_index do |arg, index|
-      infer = ctx.infer[rt.link]
-      param_bound_span = infer.deciding_type_args_of(unwrapped_args,
-        infer.type_param_bound_spans[index]
-      )
-      return false unless param_bound_span
-
-      # TODO: move this unwrapping code to a common place?
-      param_bound_span_inner = param_bound_span.inner
-      param_bound_mt =
-        case param_bound_span_inner
-        when Infer::Span::Terminal
-          param_bound_span_inner.meta_type
-        when Infer::Span::ErrorPropagate
-          return false
-        else
-          raise NotImplementedError.new(param_bound_span.inspect)
-        end
-
-      return false if !arg.satisfies_bound?(ctx, param_bound_mt)
-    end
-
-    true
   end
 
   def validate_type_args(
@@ -430,44 +301,26 @@ class Mare::Compiler::TypeCheck
   class ForReifiedType
     private getter ctx : Context
     getter reified : ReifiedType
+    getter type_params_and_type_args : Array({TypeParam, MetaType})
     protected getter refer_type : ReferType::Analysis
 
     def initialize(@ctx, @reified, @refer_type)
-    end
+      @type_params_and_type_args = begin
+        type_params =
+          @reified.link.resolve(ctx).params.try(&.terms.map { |type_param|
+            ident = AST::Extract.type_param(type_param).first
+            ref = @refer_type[ident]?
+            Infer::TypeParam.new(ref.as(Refer::TypeParam))
+          }) || [] of Infer::TypeParam
 
-    def initialize_assertions(ctx)
-      reified_defn = reified.defn(ctx)
-      reified_defn.functions.each do |f|
-        next unless f.has_tag?(:is)
-
-        # Get the MetaType of the asserted supertype trait
-        f_link = f.make_link(reified.link)
-        pre_infer = ctx.pre_infer[f_link]
-        rf = ReifiedFunction.new(reified, f_link, MetaType.new(reified, "non"))
-        trait_mt = rf.meta_type_of(ctx, pre_infer[f.ret.not_nil!])
-        next unless trait_mt
-
-        trait_rt = trait_mt.single!
-        ctx.subtyping.for_rt(trait_rt).assert(reified, f.ident.pos)
-      end
-    end
-
-    # TODO: caching here?
-    def type_params_and_type_args(ctx)
-      type_params =
-        @reified.link.resolve(ctx).params.try(&.terms.map { |type_param|
-          ident = AST::Extract.type_param(type_param).first
-          ref = @refer_type[ident]?
-          Infer::TypeParam.new(ref.as(Refer::TypeParam))
-        }) || [] of Infer::TypeParam
-
-      type_args = @reified.args.map { |arg|
-        arg.substitute_each_type_alias_in_first_layer { |rta|
-          rta.meta_type_of_target(ctx).not_nil!
+        type_args = @reified.args.map { |arg|
+          arg.substitute_each_type_alias_in_first_layer { |rta|
+            rta.meta_type_of_target(ctx).not_nil!
+          }
         }
-      }
 
-      type_params.zip(type_args)
+        type_params.zip(type_args)
+      end
     end
 
     def lookup_type_param(ref : Refer::TypeParam, receiver = nil)
@@ -561,11 +414,11 @@ class Mare::Compiler::TypeCheck
           func.has_tag?(:constructor)
         )
 
-      type_params_and_type_args = @for_rt.type_params_and_type_args(ctx)
+      type_params_and_type_args = @for_rt.type_params_and_type_args
 
       # Filter the span by deciding the type parameter capability.
       if filtered_span && !filtered_span.inner.is_a?(Infer::Span::Terminal)
-        filtered_span = @for_rt.type_params_and_type_args(ctx)
+        filtered_span = type_params_and_type_args
           .reduce(filtered_span) { |filtered_span, (type_param, type_arg)|
             next unless filtered_span
 
@@ -604,12 +457,6 @@ class Mare::Compiler::TypeCheck
 
         okay = type_check_pre(ctx, info, mt)
         type_check(info, mt) if okay
-
-        # Reach any types that are within this MetaType.
-        # TODO: Refactor this to take a block instead of returning an Array.
-        mt.each_reachable_defn(ctx).each { |rt|
-          ctx.type_check.ensure_rt(ctx, rt)
-        } if okay
 
         mt
       end

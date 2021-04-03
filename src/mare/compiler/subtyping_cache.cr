@@ -45,7 +45,12 @@ class Mare::Compiler::SubtypingCache
     possible_subtype_links = ctx.pre_subtyping[super_rt.link].possible_subtypes
     return false unless possible_subtype_links.includes?(sub_rt.link)
 
+    for_rt(sub_rt).initialize_assertions_on_supertypes(ctx)
     for_rt(super_rt).check(ctx, sub_rt)
+  end
+
+  def check_and_clear_all_assertions(ctx)
+    @by_rt.values.each(&.check_and_clear_assertions(ctx))
   end
 
   class ForReifiedFunc
@@ -99,6 +104,30 @@ class Mare::Compiler::SubtypingCache
       @confirmed = Set(ReifiedType).new
       @disproved = Hash(ReifiedType, Array(Error::Info)).new
       @temp_assumptions = Set(ReifiedType).new
+
+      @already_initialized_assertions_on_supertypes = false
+    end
+
+    # TODO: How to make this cleaner? Maybe invert the entire flow and make
+    # ForReifiedType#check do checking of supertypes instead of subtypes?
+    def initialize_assertions_on_supertypes(ctx)
+      return if @already_initialized_assertions_on_supertypes
+
+      @this.defn(ctx).functions.each do |f|
+        next unless f.has_tag?(:is)
+
+        # Get the MetaType of the asserted supertype trait
+        f_link = f.make_link(@this.link)
+        pre_infer = ctx.pre_infer[f_link]
+        rf = ReifiedFunction.new(@this, f_link, MetaType.new(@this, "non"))
+        trait_mt = rf.meta_type_of(ctx, pre_infer[f.ret.not_nil!])
+        next unless trait_mt
+
+        trait_rt = trait_mt.single!
+        ctx.subtyping.for_rt(trait_rt).assert(@this, f.ident.pos)
+      end
+
+      @already_initialized_assertions_on_supertypes = true
     end
 
     def assert(that : ReifiedType, pos : Source::Pos)
