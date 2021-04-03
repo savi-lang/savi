@@ -854,48 +854,6 @@ module Mare::Compiler::Infer
     def resolve_span!(ctx : Context, infer : Visitor) : Span
       infer.prelude_type_span(ctx, "Bool")
     end
-
-    # TODO: move this function into the TypeCheck pass file.
-    def self.verify_safety_of_runtime_type_match(
-      ctx : Context,
-      pos : Source::Pos,
-      lhs_mt : MetaType,
-      rhs_mt : MetaType,
-      lhs_pos : Source::Pos,
-      rhs_pos : Source::Pos,
-    )
-      # This is what we'll get for lhs after testing for rhs type at runtime
-      # because at runtime, capabilities do not exist - we only check defns.
-      isect_mt = lhs_mt.intersect(rhs_mt.strip_cap).simplify(ctx)
-
-      # If the intersection comes up empty, the type check will never match.
-      if isect_mt.unsatisfiable?
-        ctx.error_at pos, "This type check will never match", [
-          {rhs_pos,
-            "the runtime match type, ignoring capabilities, " \
-            "is #{rhs_mt.strip_cap.show_type}"},
-          {lhs_pos,
-            "which does not intersect at all with #{lhs_mt.show_type}"},
-        ]
-        return
-      end
-
-      # If the intersection isn't a subtype of the right hand side, then we know
-      # the type descriptors can match but the capabilities would be unsafe.
-      if !isect_mt.subtype_of?(ctx, rhs_mt)
-        ctx.error_at pos,
-          "This type check could violate capabilities", [
-            {rhs_pos,
-              "the runtime match type, ignoring capabilities, " \
-              "is #{rhs_mt.strip_cap.show_type}"},
-            {lhs_pos,
-              "if it successfully matches, " \
-              "the type will be #{isect_mt.show_type}"},
-            {rhs_pos, "which is not a subtype of #{rhs_mt.show_type}"},
-          ]
-        return
-      end
-    end
   end
 
   class TypeConditionForLocal < FixedInfo

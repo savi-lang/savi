@@ -131,14 +131,12 @@ class Mare::Compiler::TypeCheck
     @map[rf] ||= (
       refer_type = ctx.refer_type[f]
       classify = ctx.classify[f]
-      type_context = ctx.type_context[f]
       completeness = ctx.completeness[f]
       pre_infer = ctx.pre_infer[f]
       infer = ctx.infer[f]
       subtyping = ctx.subtyping.for_rf(rf)
       ForReifiedFunc.new(ctx, rf,
-        refer_type, classify, type_context, completeness,
-        pre_infer, infer, subtyping
+        refer_type, classify, completeness, pre_infer, infer, subtyping
       )
     )
   end
@@ -228,68 +226,66 @@ class Mare::Compiler::TypeCheck
     end
   end
 
+  def self.verify_safety_of_runtime_type_match(
+    ctx : Context,
+    pos : Source::Pos,
+    lhs_mt : MetaType,
+    rhs_mt : MetaType,
+    lhs_pos : Source::Pos,
+    rhs_pos : Source::Pos,
+  )
+    # This is what we'll get for lhs after testing for rhs type at runtime
+    # because at runtime, capabilities do not exist - we only check defns.
+    isect_mt = lhs_mt.intersect(rhs_mt.strip_cap).simplify(ctx)
+
+    # If the intersection comes up empty, the type check will never match.
+    if isect_mt.unsatisfiable?
+      ctx.error_at pos, "This type check will never match", [
+        {rhs_pos,
+          "the runtime match type, ignoring capabilities, " \
+          "is #{rhs_mt.strip_cap.show_type}"},
+        {lhs_pos,
+          "which does not intersect at all with #{lhs_mt.show_type}"},
+      ]
+      return
+    end
+
+    # If the intersection isn't a subtype of the right hand side, then we know
+    # the type descriptors can match but the capabilities would be unsafe.
+    if !isect_mt.subtype_of?(ctx, rhs_mt)
+      ctx.error_at pos,
+        "This type check could violate capabilities", [
+          {rhs_pos,
+            "the runtime match type, ignoring capabilities, " \
+            "is #{rhs_mt.strip_cap.show_type}"},
+          {lhs_pos,
+            "if it successfully matches, " \
+            "the type will be #{isect_mt.show_type}"},
+          {rhs_pos, "which is not a subtype of #{rhs_mt.show_type}"},
+        ]
+      return
+    end
+  end
+
   class ForReifiedFunc < Mare::AST::Visitor
     getter reified : ReifiedFunction
     private getter refer_type : ReferType::Analysis
     protected getter classify : Classify::Analysis # TODO: make private
-    private getter type_context : TypeContext::Analysis
     private getter completeness : Completeness::Analysis
     protected getter pre_infer : PreInfer::Analysis # TODO: make private
     private getter infer : Infer::Analysis
     private getter subtyping : SubtypingCache::ForReifiedFunc
 
     def initialize(ctx, @reified,
-      @refer_type, @classify, @type_context, @completeness,
-      @pre_infer, @infer, @subtyping
+      @refer_type, @classify, @completeness, @pre_infer, @infer, @subtyping
     )
       @resolved_infos = {} of Info => MetaType
       @func = @reified.link.resolve(ctx).as(Program::Function)
-      @rt_contains_foreign_type_params = @reified.type.args.any? { |arg|
-        arg.type_params.any? { |type_param|
-          !@infer.type_params.includes?(type_param)
-        }
-      }.as(Bool)
     end
 
     def ret
       # The ident is used as a fake local variable that represents the return.
       @func.ident
-    end
-
-    def filter_span(ctx, info : Info) : MetaType?
-      span = @infer[info]?
-      return MetaType.unconstrained unless span
-
-      # Filter the span by deciding the function capability.
-      filtered_span = span
-        .deciding_f_cap(
-          reified.receiver_cap,
-          @func.has_tag?(:constructor)
-        )
-
-      type_params_and_type_args = @infer.type_params.zip(reified.type.args)
-
-      # Filter the span by deciding the type parameter capability.
-      if filtered_span && !filtered_span.inner.is_a?(Infer::Span::Terminal)
-        filtered_span = type_params_and_type_args
-          .reduce(filtered_span) { |filtered_span, (type_param, type_arg)|
-            next unless filtered_span
-
-            filtered_span.deciding_type_param(type_param, type_arg.cap_only)
-          }
-      end
-
-      # If this is a complete reified type (not partially reified),
-      # then also substitute in the type args for each type param.
-      if type_params_and_type_args.any?
-        substs = type_params_and_type_args.to_h.transform_values(&.strip_cap)
-
-        filtered_span = filtered_span.try(&.transform_mt { |mt|
-          mt.substitute_type_params(substs)
-        })
-      end
-
-      filtered_span.try(&.final_mt!(ctx))
     end
 
     def resolve(ctx : Context, info : Infer::Info) : MetaType?
@@ -299,7 +295,8 @@ class Mare::Compiler::TypeCheck
       return nil if subtyping.ignores_layer?(ctx, info.layer_index)
 
       @resolved_infos[info]? || begin
-        mt = info.as_conduit?.try(&.resolve!(ctx, self)) || filter_span(ctx, info)
+        mt = info.as_conduit?.try(&.resolve!(ctx, self)) \
+          || @reified.meta_type_of(ctx, info, @infer)
         @resolved_infos[info] = mt || MetaType.unconstrained
         return nil unless mt
 
@@ -403,7 +400,7 @@ class Mare::Compiler::TypeCheck
       rhs_mt = resolve(ctx, info.rhs)
 
       # TODO: move that function here into this file/module.
-      Infer::TypeCondition.verify_safety_of_runtime_type_match(ctx, info.pos,
+      TypeCheck.verify_safety_of_runtime_type_match(ctx, info.pos,
         lhs_mt,
         rhs_mt,
         info.lhs.pos,
@@ -420,7 +417,7 @@ class Mare::Compiler::TypeCheck
       rhs_mt = resolve(ctx, rhs_info)
 
       # TODO: move that function here into this file/module.
-      Infer::TypeCondition.verify_safety_of_runtime_type_match(ctx, info.pos,
+      TypeCheck.verify_safety_of_runtime_type_match(ctx, info.pos,
         lhs_mt,
         rhs_mt,
         lhs_info.as(Infer::NamedInfo).first_viable_constraint_pos,
@@ -431,11 +428,6 @@ class Mare::Compiler::TypeCheck
     end
 
     def type_check_pre(ctx : Context, info : Infer::FromCall, mt : MetaType) : Bool
-      # Skip further checks if any foreign type params are present.
-      # TODO: Move these checks to an non-reified function analysis pass
-      # that operates on the spans instead of the fully resolved/reified types?
-      return true if @rt_contains_foreign_type_params
-
       receiver_mt = resolve(ctx, info.lhs)
       return false unless receiver_mt
 
