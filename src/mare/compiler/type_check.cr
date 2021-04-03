@@ -23,14 +23,6 @@ class Mare::Compiler::TypeCheck
       @pre : PreInfer::Analysis,
       @spans : Infer::FuncAnalysis
     )
-      @reified_funcs = {} of ReifiedType => Set(ReifiedFunction)
-    end
-
-    def each_reified_func(rt : ReifiedType)
-      @reified_funcs[rt]?.try(&.each) || ([] of ReifiedFunction).each
-    end
-    protected def observe_reified_func(rf)
-      (@reified_funcs[rf.type] ||= Set(ReifiedFunction).new).add(rf)
     end
 
     def [](node : AST::Node); @pre[node]; end
@@ -52,10 +44,6 @@ class Mare::Compiler::TypeCheck
       @reached_fully_reifieds = [] of ReifiedType
     end
 
-    def no_args
-      ReifiedType.new(@link)
-    end
-
     protected def observe_reified_type(ctx, rt)
       if rt.is_complete?(ctx)
         @reached_fully_reifieds << rt
@@ -64,11 +52,9 @@ class Mare::Compiler::TypeCheck
       end
     end
 
-    def each_partial_reified; @partial_reifieds.each; end
-    def each_reached_fully_reified; @reached_fully_reifieds.each; end
     def each_non_argumented_reified
       if @partial_reifieds.empty?
-        [no_args].each
+        [ReifiedType.new(@link)].each
       else
         @partial_reifieds.each
       end
@@ -304,7 +290,6 @@ class Mare::Compiler::TypeCheck
       for_rt = for_rt(ctx, rt.link, rt.args)
       ForReifiedFunc.new(ctx, f_analysis, ReifiedFuncAnalysis.new(ctx, rf),
         for_rt, rf, refer_type, classify, type_context, completeness, subtyping)
-      .tap { f_analysis.observe_reified_func(rf) }
     )
   end
 
