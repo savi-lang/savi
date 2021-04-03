@@ -14,48 +14,50 @@ class Mare::Compiler::Verify
     main_link = ctx.namespace.main_type?(ctx)
     main = main_link.try(&.resolve(ctx))
 
-    Error.at Source::Pos.show_library_path(library.source_library),
-      "This directory is being compiled, but it has no Main actor defined" \
-        unless main
-    raise "inconsistent logic" unless main_link && main
+    unless main_link && main
+      ctx.error_at Source::Pos.show_library_path(library.source_library),
+        "This directory is being compiled, but it has no Main actor defined"
+      return # we can't check anything further about Main when it doesn't exist
+    end
 
-    Error.at main.ident,
+    ctx.error_at main.ident,
       "The Main type defined here must be defined as an actor" \
         unless main.has_tag?(:actor)
 
-    Error.at main.params.not_nil!,
+    ctx.error_at main.params.not_nil!,
       "The Main actor is not allowed to have type parameters" \
         if main.params
 
     new_f = main.find_default_constructor?
     new_f_link = new_f.make_link(main_link.not_nil!) if new_f
 
-    unless new_f
-      Error.at main.ident,
+    unless new_f_link && new_f
+      ctx.error_at main.ident,
         "The Main actor defined here must have a constructor named `new`",
           main.functions.select(&.has_tag?(:constructor)) \
             .map { |f| {f.ident.pos, "this constructor is not named `new`"} }
+      return # we can't check anything further about new when it doesn't exist
     end
-    raise "inconsistent logic" unless new_f_link && new_f
 
-    Error.at new_f.not_nil!.ident,
+    ctx.error_at new_f.not_nil!.ident,
       "The Main.new function defined here must be a constructor" \
         unless new_f.not_nil!.has_tag?(:constructor)
 
     env_link = ctx.namespace.prelude_type("Env")
     env = env_link.resolve(ctx)
 
-    Error.at new_f.params || new_f.ident,
-      "The Main.new function has too few parameters", [
-        {env.ident.pos, "it should accept exactly one parameter of type Env"},
-      ] \
-        unless new_f.params.try(&.terms.size.>=(1))
-
-    Error.at new_f.params.not_nil!,
-      "The Main.new function has too many parameters", [
-        {env.ident.pos, "it should accept exactly one parameter of type Env"},
-      ] \
-        unless new_f.params.not_nil!.terms.size == 1
+    if new_f.param_count < 1
+      ctx.error_at new_f.params || new_f.ident,
+        "The Main.new function has too few parameters", [
+          {env.ident.pos, "it should accept exactly one parameter of type Env"},
+        ]
+      return # we can't check anything further when no parameters are here
+    elsif new_f.param_count > 1
+      ctx.error_at new_f.params.not_nil!,
+        "The Main.new function has too many parameters", [
+          {env.ident.pos, "it should accept exactly one parameter of type Env"},
+        ]
+    end
 
     env_rt = Infer::ReifiedType.new(env_link)
     env_mt = Infer::MetaType.new(env_rt)
@@ -65,7 +67,7 @@ class Mare::Compiler::Verify
     new_f_param = new_f.params.not_nil!.terms.first.not_nil!
     new_f_param_mt = new_rf.meta_type_of_param(ctx, 0, ctx.infer[new_f_link])
 
-    Error.at new_f_param,
+    ctx.error_at new_f_param,
       "The parameter of Main.new has the wrong type", [
         {env.ident.pos, "it should accept a parameter of type Env"},
         {ctx.pre_infer[new_f_link][new_f_param].pos,
@@ -90,16 +92,14 @@ class Mare::Compiler::Verify
           finder = ErrorFinderVisitor.new(func_body, jumps)
           func_body.accept(ctx, finder)
 
-          Error.at func.ident,
+          ctx.error_at func.ident,
             "This actor constructor may raise an error, but that is not allowed",
             finder.found.map { |pos| {pos, "an error may be raised here"} }
-        end
-
-        if !jumps.any_error?(func.ident)
+        elsif !jumps.any_error?(func.ident)
           finder = ErrorFinderVisitor.new(func_body, jumps)
           func_body.accept(ctx, finder)
 
-          Error.at func.ident,
+          ctx.error_at func.ident,
             "This function name needs an exclamation point "\
             "because it may raise an error", [
               {func.ident, "it should be named '#{func.ident.value}!' instead"}
@@ -123,7 +123,7 @@ class Mare::Compiler::Verify
         inventory.each_yield.each do |node|
           errs << {node.pos, "it yields here"}
         end
-        Error.at func.ident, "#{no_yields} cannot yield values", errs \
+        ctx.error_at func.ident, "#{no_yields} cannot yield values", errs \
           unless errs.empty?
       end
     end
@@ -138,7 +138,7 @@ class Mare::Compiler::Verify
     # Verify that each try block has at least one possible error case.
     def touch(ctx, node : AST::Try)
       unless node.body.try { |body| jumps.any_error?(body) }
-        Error.at node, "This try block is unnecessary", [
+        ctx.error_at node, "This try block is unnecessary", [
           {node.body, "the body has no possible error cases to catch"}
         ]
       end
