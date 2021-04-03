@@ -1519,20 +1519,6 @@ module Mare::Compiler::Infer
       end
     end
 
-    def follow_call_check_yield_block(other_infer, problems)
-      yield_out_infos = other_infer.f_analysis.yield_out_infos
-
-      if yield_out_infos.empty?
-        if yield_block
-          problems << {yield_block.not_nil!.pos, "it has a yield block " \
-            "but the called function does not have any yields"}
-        end
-      elsif !yield_block
-        problems << {yield_out_infos.first.first_viable_constraint_pos,
-          "it has no yield block but the called function does yield"}
-      end
-    end
-
     def follow_call_check_autorecover_cap(
       ctx : Context,
       infer : TypeCheck::ForReifiedFunc,

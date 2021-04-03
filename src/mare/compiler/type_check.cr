@@ -35,8 +35,6 @@ class Mare::Compiler::TypeCheck
 
     def [](node : AST::Node); @pre[node]; end
     def []?(node : AST::Node); @pre[node]?; end
-    def yield_in_info; @pre.yield_in_info; end
-    def yield_out_infos; @pre.yield_out_infos; end
     def each_info(&block : Infer::Info -> Nil); @pre.each_info(&block); end
 
     def span(node : AST::Node); span(@spans[node]); end
@@ -74,18 +72,6 @@ class Mare::Compiler::TypeCheck
       else
         @partial_reifieds.each
       end
-    end
-  end
-
-  struct ReifiedTypeAnalysis
-    protected getter subtyping
-
-    def initialize(ctx, @rt : ReifiedType)
-      @subtyping = ctx.subtyping.for_rt(rt).as(SubtypingCache::ForReifiedType)
-    end
-
-    def is_supertype_of?(ctx : Context, other : ReifiedType, errors = [] of Error::Info)
-      @subtyping.check(ctx, other, errors)
     end
   end
 
@@ -202,7 +188,9 @@ class Mare::Compiler::TypeCheck
 
     # Check the assertion list for each type, to confirm that it is a subtype
     # of any it claimed earlier, which we took on faith and now verify.
-    @types.each(&.last.analysis.subtyping.check_and_clear_assertions(ctx))
+    @types.keys.each { |rt|
+      ctx.subtyping.for_rt(rt).check_and_clear_assertions(ctx)
+    }
   end
 
   def [](t_link : Program::Type::Link)
@@ -235,14 +223,6 @@ class Mare::Compiler::TypeCheck
 
   def []?(rf : ReifiedFunction)
     @map[rf]?.try(&.analysis)
-  end
-
-  def [](rt : ReifiedType)
-    @types[rt].analysis
-  end
-
-  def []?(rt : ReifiedType)
-    @types[rt]?.try(&.analysis)
   end
 
   def for_type_partial_reifications(ctx, t_link)
@@ -347,7 +327,7 @@ class Mare::Compiler::TypeCheck
     rt = ReifiedType.new(link, type_args)
     @types[rt]? || (
       refer_type = ctx.refer_type[link]
-      ft = @types[rt] = ForReifiedType.new(ctx, ReifiedTypeAnalysis.new(ctx, rt), rt, refer_type)
+      ft = @types[rt] = ForReifiedType.new(ctx, rt, refer_type)
       ft.tap(&.initialize_assertions(ctx))
       .tap { |ft| get_or_create_t_analysis(link).observe_reified_type(ctx, rt) }
     )
@@ -361,17 +341,6 @@ class Mare::Compiler::TypeCheck
     refer_type = ctx.refer_type[link]
     rt_alias = ReifiedTypeAlias.new(link, type_args)
     @aliases[rt_alias] ||= ForReifiedTypeAlias.new(ctx, rt_alias, refer_type)
-  end
-
-  # TODO: Remove this and make some other caching system in charge of this check.
-  def is_subtype_of?(ctx, sub_rt : ReifiedType, super_rt : ReifiedType) : Bool
-    return false unless super_rt.link.is_abstract?
-
-    possible_subtype_links = ctx.pre_subtyping[super_rt.link].possible_subtypes
-    return false unless possible_subtype_links.includes?(sub_rt.link)
-
-    analysis = for_rt(ctx, super_rt.link, super_rt.args).analysis
-    analysis.is_supertype_of?(ctx, sub_rt)
   end
 
   def ensure_rt(ctx : Context, rt : ReifiedType)
@@ -559,11 +528,10 @@ class Mare::Compiler::TypeCheck
 
   class ForReifiedType
     private getter ctx : Context
-    getter analysis : ReifiedTypeAnalysis
     getter reified : ReifiedType
     protected getter refer_type : ReferType::Analysis
 
-    def initialize(@ctx, @analysis, @reified, @refer_type)
+    def initialize(@ctx, @reified, @refer_type)
     end
 
     def initialize_assertions(ctx)
@@ -579,8 +547,7 @@ class Mare::Compiler::TypeCheck
         next unless trait_mt
 
         trait_rt = trait_mt.single!
-        ctx.type_check.for_rt(ctx, trait_rt.link, trait_rt.args)
-          .analysis.subtyping.assert(reified, f.ident.pos)
+        ctx.subtyping.for_rt(trait_rt).assert(reified, f.ident.pos)
       end
     end
 
@@ -600,16 +567,6 @@ class Mare::Compiler::TypeCheck
       }
 
       type_params.zip(type_args)
-    end
-
-    def type_arg_for_type_param(ctx, type_param : TypeParam) : MetaType?
-      index =
-        @reified.link.resolve(ctx).params.try(&.terms.index { |type_param_ast|
-          ident = AST::Extract.type_param(type_param_ast).first
-          @refer_type[ident]? == type_param.ref
-        })
-
-      @reified.args[index] if index
     end
 
     def lookup_type_param(ref : Refer::TypeParam, receiver = nil)
