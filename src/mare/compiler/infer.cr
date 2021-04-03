@@ -57,6 +57,70 @@ module Mare::Compiler::Infer
     getter! type_param_default_spans : Array(Span?)
     protected setter type_param_default_spans
 
+    def deciding_type_args_of(
+      args : Array(MetaType),
+      raw_span : Span
+    ) : Span?
+      # Fast path for the case of no type arguments present.
+      return raw_span if args.empty?
+
+      type_param_substs = type_params.zip(args.map(&.strip_cap)).to_h
+
+      deciding_type_args_for_cap_only_of(args, raw_span)
+        .try(&.transform_mt(&.substitute_type_params(type_param_substs)))
+    end
+
+    def deciding_type_args_for_cap_only_of(
+      args : Array(MetaType),
+      raw_span : Span
+    ) : Span?
+      # Fast path for the case of no type arguments present.
+      return raw_span if args.empty?
+
+      # Many spans are simple terminals, so we can optimize things a bit here
+      # by skipping the rest of this deciding when there is nothing to decide
+      # because terminals have no decisions to be made.
+      return raw_span if raw_span.inner.is_a?(Span::Terminal)
+
+      type_params.zip(args).reduce(raw_span) { |span, (type_param, type_arg)|
+        next unless span
+
+        # When a type argument is passed from a raw type param,
+        # we do not decide the capability here, because the type param
+        # does not necessarily have just one capability.
+        # TODO: Should we figure out how to combine the spans in some way
+        # to make at least a span-contingent decision here?
+        next span if type_arg.type_param_only?
+
+        span.deciding_type_param(type_param, type_arg.cap_only)
+      }
+    end
+  end
+
+  struct TypeAnalysis < Analysis
+  end
+
+  struct TypeAliasAnalysis < Analysis
+    getter! target_span : Span
+    protected setter target_span
+  end
+
+  struct FuncAnalysis < Analysis
+    getter! pre_infer : PreInfer::Analysis
+    protected setter pre_infer
+
+    getter! param_spans : Array(Span)
+    protected setter param_spans
+
+    getter! ret_span : Span
+    protected setter ret_span
+
+    getter yield_in_span : Span?
+    protected setter yield_in_span
+
+    getter! yield_out_spans : Array(Span)
+    protected setter yield_out_spans
+
     protected getter reflections
     def each_reflection; @reflections.each; end
 
@@ -126,70 +190,6 @@ module Mare::Compiler::Infer
         yield mt if mt
       }
     end
-
-    def deciding_type_args_of(
-      args : Array(MetaType),
-      raw_span : Span
-    ) : Span?
-      # Fast path for the case of no type arguments present.
-      return raw_span if args.empty?
-
-      type_param_substs = type_params.zip(args.map(&.strip_cap)).to_h
-
-      deciding_type_args_for_cap_only_of(args, raw_span)
-        .try(&.transform_mt(&.substitute_type_params(type_param_substs)))
-    end
-
-    def deciding_type_args_for_cap_only_of(
-      args : Array(MetaType),
-      raw_span : Span
-    ) : Span?
-      # Fast path for the case of no type arguments present.
-      return raw_span if args.empty?
-
-      # Many spans are simple terminals, so we can optimize things a bit here
-      # by skipping the rest of this deciding when there is nothing to decide
-      # because terminals have no decisions to be made.
-      return raw_span if raw_span.inner.is_a?(Span::Terminal)
-
-      type_params.zip(args).reduce(raw_span) { |span, (type_param, type_arg)|
-        next unless span
-
-        # When a type argument is passed from a raw type param,
-        # we do not decide the capability here, because the type param
-        # does not necessarily have just one capability.
-        # TODO: Should we figure out how to combine the spans in some way
-        # to make at least a span-contingent decision here?
-        next span if type_arg.type_param_only?
-
-        span.deciding_type_param(type_param, type_arg.cap_only)
-      }
-    end
-  end
-
-  struct FuncAnalysis < Analysis
-    getter! pre_infer : PreInfer::Analysis
-    protected setter pre_infer
-
-    getter! param_spans : Array(Span)
-    protected setter param_spans
-
-    getter! ret_span : Span
-    protected setter ret_span
-
-    getter yield_in_span : Span?
-    protected setter yield_in_span
-
-    getter! yield_out_spans : Array(Span)
-    protected setter yield_out_spans
-  end
-
-  struct TypeAnalysis < Analysis
-  end
-
-  struct TypeAliasAnalysis < Analysis
-    getter! target_span : Span
-    protected setter target_span
   end
 
   abstract class TypeExprEvaluator
