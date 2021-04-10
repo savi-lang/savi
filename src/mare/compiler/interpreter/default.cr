@@ -571,7 +571,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         ident = data["ident"].as(AST::Identifier)
         ret = data["ret"]?.as(AST::Term?)
 
-        field_cap = AST::Identifier.new("ref").from(data["keyword"])
+        field_cap = AST::Identifier.new("readableplus").from(data["keyword"])
         field_params = AST::Group.new("(").from(ident)
         field_body = decl.body
         field_body = nil if decl.body.try { |group| group.terms.size == 0 }

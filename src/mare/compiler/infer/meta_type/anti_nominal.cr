@@ -142,20 +142,24 @@ struct Mare::Compiler::Infer::MetaType::AntiNominal
     end
   end
 
-  def substitute_type_params(substitutions : Hash(TypeParam, MetaType))
+  def substitute_type_params_retaining_cap(
+    type_params : Array(TypeParam),
+    type_args : Array(MetaType)
+  ) : Inner
     defn = defn()
     case defn
     when TypeParam
-      substitutions[defn]?.try(&.inner.negate) || self
+      index = type_params.index(defn)
+      index ? type_args[index].strip_cap.inner.negate : self
     when ReifiedType
       args = defn.args.map do |arg|
-        arg.substitute_type_params(substitutions).as(MetaType)
+        arg.substitute_type_params_retaining_cap(type_params, type_args).as(MetaType)
       end
 
       AntiNominal.new(ReifiedType.new(defn.link, args))
     when ReifiedTypeAlias
       args = defn.args.map do |arg|
-        arg.substitute_type_params(substitutions).as(MetaType)
+        arg.substitute_type_params_retaining_cap(type_params, type_args).as(MetaType)
       end
 
       AntiNominal.new(ReifiedTypeAlias.new(defn.link, args))

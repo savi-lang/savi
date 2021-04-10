@@ -102,6 +102,7 @@ struct Mare::Compiler::Infer::MetaType::Nominal
         )
       end
     when TypeParam
+      # TODO: get from precalculated variable already saved to Infer Analysis
       infer.not_nil!
         .lookup_type_param_bound_span(ctx, defn)
         .transform_mt_to_span(&.gather_call_receiver_span(ctx, pos, infer, name))
@@ -251,20 +252,24 @@ struct Mare::Compiler::Infer::MetaType::Nominal
     end
   end
 
-  def substitute_type_params(substitutions : Hash(TypeParam, MetaType))
+  def substitute_type_params_retaining_cap(
+    type_params : Array(TypeParam),
+    type_args : Array(MetaType)
+  ) : Inner
     defn = defn()
     case defn
     when TypeParam
-      substitutions[defn]?.try(&.inner) || self
+      index = type_params.index(defn)
+      index ? type_args[index].strip_cap.inner : self
     when ReifiedType
       args = defn.args.map do |arg|
-        arg.substitute_type_params(substitutions).as(MetaType)
+        arg.substitute_type_params_retaining_cap(type_params, type_args).as(MetaType)
       end
 
       Nominal.new(ReifiedType.new(defn.link, args))
     when ReifiedTypeAlias
       args = defn.args.map do |arg|
-        arg.substitute_type_params(substitutions).as(MetaType)
+        arg.substitute_type_params_retaining_cap(type_params, type_args).as(MetaType)
       end
 
       Nominal.new(ReifiedTypeAlias.new(defn.link, args))

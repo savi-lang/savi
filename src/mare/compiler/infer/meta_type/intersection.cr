@@ -332,15 +332,22 @@ struct Mare::Compiler::Infer::MetaType::Intersection
     result
   end
 
-  def substitute_type_params(substitutions : Hash(TypeParam, MetaType))
+  def substitute_type_params_retaining_cap(
+    type_params : Array(TypeParam),
+    type_args : Array(MetaType)
+  ) : Inner
     result = cap || Unconstrained.instance
 
     terms.try(&.each { |term|
-      result = result.intersect(term.substitute_type_params(substitutions))
+      result = result.intersect(
+        term.substitute_type_params_retaining_cap(type_params, type_args)
+      )
     })
 
     anti_terms.try(&.each { |anti_term|
-      result = result.intersect(anti_term.substitute_type_params(substitutions))
+      result = result.intersect(
+        anti_term.substitute_type_params_retaining_cap(type_params, type_args)
+      )
     })
 
     result

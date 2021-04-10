@@ -54,66 +54,64 @@ module Mare::Compiler::Infer
     getter! type_param_bound_cap_sets : Array(Array(Cap))
     protected setter type_param_bound_cap_sets
 
-    getter! partial_reification_sets : Array(Array(Cap))
-    protected setter partial_reification_sets
+    getter! type_partial_reification_sets : Hash(Array(Cap), Int32)
+    protected setter type_partial_reification_sets
+
+    getter! type_partial_reifications : Array(MetaType)
+    protected setter type_partial_reifications
 
     getter! type_param_bound_spans : Array(Span)
     protected setter type_param_bound_spans
 
     getter! type_param_default_spans : Array(Span?)
     protected setter type_param_default_spans
-
-    def deciding_type_args_of(
-      args : Array(MetaType),
-      raw_span : Span
-    ) : Span?
-      # Fast path for the case of no type arguments present.
-      return raw_span if args.empty?
-
-      type_param_substs = type_params.zip(args.map(&.strip_cap)).to_h
-
-      deciding_type_args_for_cap_only_of(args, raw_span)
-        .try(&.transform_mt(&.substitute_type_params(type_param_substs)))
-    end
-
-    def deciding_type_args_for_cap_only_of(
-      args : Array(MetaType),
-      raw_span : Span
-    ) : Span?
-      # Fast path for the case of no type arguments present.
-      return raw_span if args.empty?
-
-      # Many spans are simple terminals, so we can optimize things a bit here
-      # by skipping the rest of this deciding when there is nothing to decide
-      # because terminals have no decisions to be made.
-      return raw_span if raw_span.inner.is_a?(Span::Terminal)
-
-      type_params.zip(args).reduce(raw_span) { |span, (type_param, type_arg)|
-        next unless span
-
-        # When a type argument is passed from a raw type param,
-        # we do not decide the capability here, because the type param
-        # does not necessarily have just one capability.
-        # TODO: Should we figure out how to combine the spans in some way
-        # to make at least a span-contingent decision here?
-        next span if type_arg.type_param_only?
-
-        span.deciding_type_param(type_param, type_arg.cap_only)
-      }
-    end
   end
 
   struct TypeAnalysis < Analysis
+    def deciding_reify_of(span : Span, args : Array(MetaType)) : Span
+      # Fast path for the case of no type arguments present.
+      return span if args.empty?
+
+      if span.inner.is_a?(Span::ByReifyCap)
+        arg_caps = args.map(&.cap_only_inner.value.as(Cap))
+        partial_reify_index = type_partial_reification_sets[arg_caps]
+        span = span.deciding_partial_reify_index(partial_reify_index.not_nil!)
+      end
+
+      span.transform_mt(&.substitute_type_params_retaining_cap(type_params, args))
+    end
   end
 
   struct TypeAliasAnalysis < Analysis
     getter! target_span : Span
     protected setter target_span
+
+    def deciding_reify_of(span : Span, args : Array(MetaType)) : Span
+      # Fast path for the case of no type arguments present.
+      return span if args.empty?
+
+      if span.inner.is_a?(Span::ByReifyCap)
+        arg_caps = args.map(&.cap_only_inner.value.as(Cap))
+        partial_reify_index = type_partial_reification_sets[arg_caps]
+        span = span.deciding_partial_reify_index(partial_reify_index.not_nil!)
+      end
+
+      span.transform_mt(&.substitute_type_params_retaining_cap(type_params, args))
+    end
   end
 
   struct FuncAnalysis < Analysis
     getter! pre_infer : PreInfer::Analysis
     protected setter pre_infer
+
+    getter! func_partial_reification_sets : Hash(Cap, Hash(Array(Cap), Int32))
+    protected setter func_partial_reification_sets
+
+    getter! func_partial_reification_sets_size : Int32
+    protected setter func_partial_reification_sets_size
+
+    getter! func_partial_reifications : Array(MetaType)
+    protected setter func_partial_reifications
 
     getter! param_spans : Array(Span)
     protected setter param_spans
@@ -200,6 +198,54 @@ module Mare::Compiler::Infer
         mt = rf.meta_type_of(ctx, span, self)
         yield mt if mt
       }
+    end
+
+    def deciding_reify_of(
+      span : Span,
+      args : Array(MetaType),
+      call_cap : Cap,
+      is_constructor : Bool
+    ) : Span
+      orig_span = span
+      if span.inner.is_a?(Span::ByReifyCap)
+        partial_reify_index = begin
+          type_partial_reification_sets =
+            func_partial_reification_sets[call_cap]? ||
+            func_partial_reification_sets.find { |(func_cap, _)|
+              MetaType::Capability.new(call_cap).subtype_of?(MetaType::Capability.new(func_cap)) ||
+              call_cap == Cap::ISO || # TODO: better way to handle auto recovery
+              call_cap == Cap::TRN || # TODO: better way to handle auto recovery
+              is_constructor # TODO: better way to do this?
+            }.not_nil!.last
+          arg_caps = args.map(&.cap_only_inner.value.as(Cap))
+          type_partial_reification_sets[arg_caps]
+        end
+
+        span = span.deciding_partial_reify_index(partial_reify_index)
+      end
+
+      # Fast path for the case of no type arguments present.
+      return span if args.empty?
+
+      span.transform_mt(&.substitute_type_params_retaining_cap(type_params, args))
+    end
+
+    def narrowing_type_param_cap(
+      span : Span,
+      type_param : TypeParam,
+      caps : Array(Cap),
+    ) : Span
+      return span unless span.inner.is_a?(Span::ByReifyCap)
+
+      target_bits = BitArray.new(func_partial_reification_sets_size)
+
+      func_partial_reification_sets.values.each(&.each { |param_caps, index|
+        next unless caps.includes?(param_caps[type_param.ref.index])
+        target_bits[index] = true
+      })
+      raise "incompatible caps: #{caps}" if !target_bits.any?
+
+      span.narrowing_partial_reify_indices(target_bits)
     end
   end
 
@@ -340,17 +386,19 @@ module Mare::Compiler::Infer
     end
 
     @currently_looking_up_param_bounds = Set(TypeParam).new
-    def lookup_type_param_bound_span(ctx : Context, type_param : TypeParam, cap_only = false)
+    def lookup_type_param_bound_span(ctx : Context, type_param : TypeParam)
       @currently_looking_up_param_bounds.add(type_param)
 
       ref = type_param.ref
       raise "lookup on wrong visitor" unless ref.parent_link == t_link
-      type_expr_span(ctx, ref.bound, cap_only)
+      type_expr_span(ctx, ref.bound).combine_mt(
+        lookup_type_param_partial_reified_span(ctx, type_param)
+      ) { |bound_mt, cap_mt| bound_mt.override_cap(cap_mt.cap_only_inner) }
 
       .tap { @currently_looking_up_param_bounds.delete(type_param) }
     end
     def lookup_type_param_bound_cap(ctx : Context, type_param : TypeParam) : MetaType
-      lookup_type_param_bound_span(ctx, type_param, cap_only: true).terminal!
+      type_expr_span(ctx, type_param.ref.bound, cap_only: true).terminal!
     end
     def lookup_type_param_bound_cap_set(ctx : Context, type_param : TypeParam) : Array(Cap)
       lookup_type_param_bound_cap(ctx, type_param)
@@ -358,19 +406,9 @@ module Mare::Compiler::Infer
         .each_cap.map(&.value.as(Cap))
         .to_a
     end
+
     def lookup_type_param_partial_reified_span(ctx : Context, type_param : TypeParam)
-      # Look up the bound cap of this type param (that is, cap only),
-      # and intersect it with the type param reference itself, expanding the
-      # span to include every possible single cap instead of using a multi-cap.
-      lookup_type_param_bound_span(ctx, type_param, true).simple_decided_by(type_param) { |bound_mt|
-        bound_mt.cap_only_inner.each_cap.map { |cap|
-          cap_mt = MetaType.new(cap)
-          mt = MetaType
-            .new_type_param(type_param)
-            .intersect(cap_mt)
-          {cap_mt, mt}
-        }.to_h
-      }
+      self_type_expr_span(ctx).transform_mt(&.single!.args[type_param.ref.index])
     end
   end
 
@@ -383,36 +421,51 @@ module Mare::Compiler::Infer
       @analysis : TypeAnalysis,
       @refer_type : ReferType::Analysis
     )
+    end
+
+    def init_analysis(ctx)
       @analysis.type_params =
         @type.params.try(&.terms.map { |type_param|
           ident = AST::Extract.type_param(type_param).first
           ref = refer_type_for(ident)
           TypeParam.new(ref.as(Refer::TypeParam))
         }) || [] of TypeParam
-    end
 
-    def run(ctx)
       @analysis.type_param_bound_cap_sets = @analysis.type_params.map { |type_param|
         lookup_type_param_bound_cap_set(ctx, type_param)
       }
-      @analysis.partial_reification_sets =
+      @analysis.type_partial_reification_sets =
         @analysis.type_param_bound_cap_sets.reduce([[] of Cap]) { |accum, caps|
           accum.flat_map { |preceding|
             caps.map { |cap| preceding + [cap] }
           }
-        }
+        }.each_with_index.to_h
 
-      # TODO: Can this be removed eventually, now that the above is in place?
+      @analysis.type_partial_reifications = begin
+        t_link = @link
+        @analysis.type_partial_reification_sets.keys.map { |type_param_caps|
+          args = @analysis.type_params
+            .zip(type_param_caps)
+            .map { |type_param, type_param_cap|
+              MetaType.new_type_param(type_param).cap(type_param_cap)
+            }
+          MetaType.new_nominal(ReifiedType.new(t_link, args))
+        }
+      end
+
       @analysis.type_param_bound_spans = @analysis.type_params.map { |type_param|
         lookup_type_param_bound_span(ctx, type_param)
       }
+
       @analysis.type_param_default_spans = @analysis.type_params.map { |type_param|
         default = type_param.ref.default
         type_expr_span(ctx, default) if default
       }
+
+      self
     end
 
-    def t_link : (Program::Type::Link | Program::TypeAlias::Link)
+    def t_link : Program::Type::Link
       @link
     end
 
@@ -421,7 +474,12 @@ module Mare::Compiler::Infer
     end
 
     def self_type_expr_span(ctx : Context, cap_only = false) : Span
-      raise NotImplementedError.new("#{self.class} self_type_expr_span")
+      self_span = (
+        @self_span ||=
+          Span.for_partial_reify(@analysis.type_partial_reifications).as(Span)
+      ).not_nil!
+
+      cap_only ? self_span.transform_mt(&.cap_only) : self_span
     end
   end
 
@@ -434,29 +492,56 @@ module Mare::Compiler::Infer
       @analysis : TypeAliasAnalysis,
       @refer_type : ReferType::Analysis
     )
+    end
+
+    def init_analysis(ctx)
       @analysis.type_params =
         @type_alias.params.try(&.terms.map { |type_param|
           ident = AST::Extract.type_param(type_param).first
           ref = refer_type_for(ident)
           TypeParam.new(ref.as(Refer::TypeParam))
         }) || [] of TypeParam
-    end
 
-    def run(ctx)
-      @analysis.target_span = get_target_span(ctx)
+      @analysis.type_param_bound_cap_sets = @analysis.type_params.map { |type_param|
+        lookup_type_param_bound_cap_set(ctx, type_param)
+      }
+      @analysis.type_partial_reification_sets =
+        @analysis.type_param_bound_cap_sets.reduce([[] of Cap]) { |accum, caps|
+          accum.flat_map { |preceding|
+            caps.map { |cap| preceding + [cap] }
+          }
+        }.each_with_index.to_h
+
+      @analysis.type_partial_reifications = begin
+        t_link = @link
+        @analysis.type_partial_reification_sets.keys.map { |type_param_caps|
+          args = @analysis.type_params
+            .zip(type_param_caps)
+            .map { |type_param, type_param_cap|
+              MetaType.new_type_param(type_param).cap(type_param_cap)
+            }
+          MetaType.new_alias(ReifiedTypeAlias.new(t_link, args))
+        }
+      end
+
       @analysis.type_param_bound_spans = @analysis.type_params.map { |type_param|
         lookup_type_param_bound_span(ctx, type_param)
       }
+
       @analysis.type_param_default_spans = @analysis.type_params.map { |type_param|
         default = type_param.ref.default
         type_expr_span(ctx, default) if default
       }
+
+      @analysis.target_span = get_target_span(ctx)
+
+      self
     end
 
     private def get_target_span(ctx)
       target_span = type_expr_span(ctx, @type_alias.target)
 
-      if target_span.all_terminal_meta_types.any? { |mt|
+      if target_span.any_mt? { |mt|
         is_directly_recursive = false
         mt.each_type_alias_in_first_layer { |rta|
           is_directly_recursive ||= rta.link == @link
@@ -473,7 +558,7 @@ module Mare::Compiler::Infer
       target_span
     end
 
-    def t_link : (Program::Type::Link | Program::TypeAlias::Link)
+    def t_link : Program::TypeAlias::Link
       @link
     end
 
@@ -482,7 +567,20 @@ module Mare::Compiler::Infer
     end
 
     def self_type_expr_span(ctx : Context, cap_only = false) : Span
-      raise NotImplementedError.new("#{self.class} self_type_expr_span")
+      self_span = (
+        @self_span ||=
+          Span.for_partial_reify(@analysis.type_partial_reifications).as(Span)
+      ).not_nil!
+
+      cap_only ? self_span.transform_mt(&.cap_only) : self_span
+    end
+
+    def lookup_type_param_partial_reified_span(ctx : Context, type_param : TypeParam)
+      self_type_expr_span(ctx).transform_mt(
+        &.inner.as(MetaType::Nominal).defn.as(ReifiedTypeAlias).args[
+          type_param.ref.index
+        ]
+      )
     end
   end
 
@@ -507,13 +605,48 @@ module Mare::Compiler::Infer
       @type_context : TypeContext::Analysis,
       @pre_infer : PreInfer::Analysis,
     )
+    end
+
+    def init_analysis
       @analysis.type_params = @t_analysis.type_params
       @analysis.type_param_bound_cap_sets = @t_analysis.type_param_bound_cap_sets
-      @analysis.partial_reification_sets = @t_analysis.partial_reification_sets
-      @analysis.type_param_bound_spans = @t_analysis.type_param_bound_spans
-      @analysis.type_param_default_spans = @t_analysis.type_param_default_spans
+      @analysis.type_partial_reification_sets = @t_analysis.type_partial_reification_sets
+
+      @analysis.func_partial_reification_sets = begin
+        f_cap_string = @func.cap.value
+        f_cap_string = "ref" if @func.has_tag?(:constructor)
+        f_cap_string = "read" if f_cap_string == "box" # TODO: figure out if we can remove this Pony-originating semantic hack
+        next_index: Int32 = 0
+        MetaType::Capability.new_maybe_generic(f_cap_string).each_cap.map { |f_cap|
+          {
+            f_cap.value.as(Cap),
+            @analysis.type_partial_reification_sets.keys.map { |type_param_caps|
+              index = next_index
+              next_index += 1
+              {type_param_caps, index}
+            }.to_h
+          }
+        }.to_h
+        .tap { @analysis.func_partial_reification_sets_size = next_index }
+      end
+
+      @analysis.func_partial_reifications = begin
+        t_link = @link.type
+        @analysis.func_partial_reification_sets.flat_map { |f_cap, type_sets|
+          type_sets.keys.map { |type_param_caps|
+            args = @analysis.type_params
+              .zip(type_param_caps)
+              .map { |type_param, type_param_cap|
+                MetaType.new_type_param(type_param).cap(type_param_cap)
+              }
+            MetaType.new_nominal(ReifiedType.new(t_link, args)).cap(f_cap)
+          }
+        }
+      end
 
       @analysis.pre_infer = @pre_infer
+
+      self
     end
 
     def t_link : (Program::Type::Link | Program::TypeAlias::Link)
@@ -544,18 +677,12 @@ module Mare::Compiler::Infer
       end
     end
 
-    # TODO: remove this in favor of the span-returning function within.
-    def lookup_type_param_bound(ctx : Context, type_param : TypeParam)
-      span = lookup_type_param_bound_span(ctx, type_param)
-      MetaType.new_union(span.all_terminal_meta_types)
-    end
-
     def unwrap_lazy_parts_of_type_expr_span(ctx : Context, span : Span) : Span
       # Currently the only lazy part we handle here is type aliases.
       span.transform_mt { |mt|
         mt.substitute_each_type_alias_in_first_layer { |rta|
           other_analysis = ctx.infer_edge.run_for_type_alias(ctx, rta.link.resolve(ctx), rta.link)
-          span = other_analysis.deciding_type_args_of(rta.args, other_analysis.target_span).not_nil!
+          span = other_analysis.deciding_reify_of(other_analysis.target_span, rta.args)
           span_inner = span.inner
 
           # TODO: better way of dealing with ErrorPropagate, related to other TODO below:
@@ -583,14 +710,17 @@ module Mare::Compiler::Infer
             MetaType.new_union(refine_span.all_terminal_meta_types.map(&.cap_only))
           raise NotImplementedError.new("varying caps in a refined span") unless refine_cap_mt.cap_only?
 
-          span
-            .narrowing_type_param(type_param, refine_cap_mt)
-            .not_nil!
-            .combine_mt(refine_span.narrowing_type_param(type_param, refine_cap_mt).not_nil!) { |mt, refine_mt|
-              mt.substitute_type_params({
-                type_param => MetaType.new_type_param(type_param).intersect(refine_mt.strip_cap)
-              })
-            }
+          refine_caps =
+            refine_cap_mt.cap_only_inner.each_cap.map(&.value.as(Cap)).to_a
+
+          span = @analysis.narrowing_type_param_cap(span, type_param, refine_caps)
+          refine_span = @analysis.narrowing_type_param_cap(refine_span, type_param, refine_caps)
+
+          span.combine_mt(refine_span) { |mt, refine_mt|
+            mt.substitute_type_params_retaining_cap([type_param], [
+              MetaType.new_type_param(type_param).intersect(refine_mt.strip_cap)
+            ])
+          }
         # TODO: also handle other conditions?
         else span
         end
@@ -601,54 +731,30 @@ module Mare::Compiler::Infer
       @refer_type[node]? || refer_type_parent[node]?
     end
 
-    def self_with_no_cap_yet(ctx : Context)
-      # Get the spans for each partially reified type param in this type.
-      type_param_spans = @analysis.type_params.map { |type_param|
-        lookup_type_param_partial_reified_span(ctx, type_param).as(Span)
-      }
-
-      # Combine the spans in all combinations of those partial reifications.
-      # If there are no type params to combine, we just use a simple span.
-      Span.simple(MetaType.new_nominal(ReifiedType.new(link.type)))
-        .reduce_combine_mts(type_param_spans) { |accum_mt, arg_mt|
-          rt = accum_mt.single!
-          MetaType.new_nominal(ReifiedType.new(rt.link, rt.args + [arg_mt]))
-        }
-    end
-
     def self_type_expr_span(ctx : Context, cap_only = false) : Span
-      rt_span = cap_only ? Span.simple(MetaType.unconstrained) : self_with_no_cap_yet(ctx)
+      self_span = (
+        @self_span ||=
+          Span.for_partial_reify(@analysis.func_partial_reifications).as(Span)
+      ).not_nil!
 
-      # Finally, build the top of the span's decision tree with possible f_caps.
-      f = self.func
-      f_cap_value = f.cap.value
-      f_cap_value = "ref" if f.has_tag?(:constructor)
-      f_cap_value = "read" if f_cap_value == "box" # TODO: figure out if we can remove this Pony-originating semantic hack
-      Span.decision(
-        :f_cap,
-        MetaType::Capability.new_maybe_generic(f_cap_value).each_cap.map do |cap|
-          cap_mt = MetaType.new(cap)
-
-          {cap_mt, rt_span.transform_mt(&.intersect(cap_mt))}
-        end.to_h
-      )
+      cap_only ? self_span.transform_mt(&.cap_only) : self_span
     end
 
     def self_ephemeral_with_cap(ctx : Context, cap : String)
-      self_with_no_cap_yet(ctx)
-        .transform_mt(&.intersect(MetaType.cap(cap)).ephemeralize)
+      self_type_expr_span(ctx).transform_mt(&.override_cap(MetaType.cap(cap)).ephemeralize)
     end
 
-    def depends_on_call_ret_span(ctx, other_rt, other_f, other_f_link)
+    def depends_on_call_ret_span(ctx, other_rt, other_f, other_f_link, call_cap : Cap)
       # TODO: Track dependencies and invalidate cache based on those.
       other_pre = ctx.pre_infer[other_f_link]
       other_analysis = ctx.infer_edge.run_for_func(ctx, other_f, other_f_link)
       raw_span = other_analysis.direct_span(other_pre[other_f.ident])
 
-      other_analysis.deciding_type_args_of(other_rt.args, raw_span).not_nil!
+      other_analysis.deciding_reify_of(raw_span,
+        other_rt.args, call_cap, other_f.has_tag?(:constructor))
     end
 
-    def depends_on_call_param_span(ctx, other_rt, other_f, other_f_link, index)
+    def depends_on_call_param_span(ctx, other_rt, other_f, other_f_link, call_cap : Cap, index)
       param = AST::Extract.params(other_f.params)[index]?
       return unless param
 
@@ -657,10 +763,11 @@ module Mare::Compiler::Infer
       other_analysis = ctx.infer_edge.run_for_func(ctx, other_f, other_f_link)
       raw_span = other_analysis.direct_span(other_pre[param.first])
 
-      other_analysis.deciding_type_args_of(other_rt.args, raw_span).not_nil!
+      other_analysis.deciding_reify_of(raw_span,
+        other_rt.args, call_cap, other_f.has_tag?(:constructor))
     end
 
-    def depends_on_call_yield_in_span(ctx, other_rt, other_f, other_f_link)
+    def depends_on_call_yield_in_span(ctx, other_rt, other_f, other_f_link, call_cap : Cap)
       # TODO: Track dependencies and invalidate cache based on those.
       other_pre = ctx.pre_infer[other_f_link]
       yield_in_info = other_pre.yield_in_info
@@ -668,10 +775,11 @@ module Mare::Compiler::Infer
       other_analysis = ctx.infer_edge.run_for_func(ctx, other_f, other_f_link)
       raw_span = other_analysis.direct_span(yield_in_info)
 
-      other_analysis.deciding_type_args_of(other_rt.args, raw_span).not_nil!
+      other_analysis.deciding_reify_of(raw_span,
+        other_rt.args, call_cap, other_f.has_tag?(:constructor))
     end
 
-    def depends_on_call_yield_out_span(ctx, other_rt, other_f, other_f_link, index)
+    def depends_on_call_yield_out_span(ctx, other_rt, other_f, other_f_link, call_cap : Cap, index)
       # TODO: Track dependencies and invalidate cache based on those.
       other_pre = ctx.pre_infer[other_f_link]
       yield_out_info = other_pre.yield_out_infos[index]?
@@ -679,7 +787,8 @@ module Mare::Compiler::Infer
       other_analysis = ctx.infer_edge.run_for_func(ctx, other_f, other_f_link)
       raw_span = other_analysis.direct_span(yield_out_info)
 
-      other_analysis.deciding_type_args_of(other_rt.args, raw_span).not_nil!
+      other_analysis.deciding_reify_of(raw_span,
+        other_rt.args, call_cap, other_f.has_tag?(:constructor))
     end
 
     def run_edge(ctx : Context)
@@ -727,7 +836,7 @@ module Mare::Compiler::Infer
       prev = ctx.prev_ctx.try(&.infer_edge)
 
       maybe_from_type_alias_cache(ctx, prev, t, t_link, deps) do
-        TypeAliasVisitor.new(t, t_link, TypeAliasAnalysis.new, refer_type).tap(&.run(ctx)).analysis
+        TypeAliasVisitor.new(t, t_link, TypeAliasAnalysis.new, refer_type).tap(&.init_analysis(ctx)).analysis
       end
     end
 
@@ -737,7 +846,7 @@ module Mare::Compiler::Infer
       prev = ctx.prev_ctx.try(&.infer_edge)
 
       maybe_from_type_cache(ctx, prev, t, t_link, deps) do
-        TypeVisitor.new(t, t_link, TypeAnalysis.new, refer_type).tap(&.run(ctx)).analysis
+        TypeVisitor.new(t, t_link, TypeAnalysis.new, refer_type).tap(&.init_analysis(ctx)).analysis
       end
     end
 
@@ -746,7 +855,7 @@ module Mare::Compiler::Infer
       prev = ctx.prev_ctx.try(&.infer_edge)
 
       maybe_from_func_cache(ctx, prev, f, f_link, deps) do
-        Visitor.new(f, f_link, FuncAnalysis.new, t_analysis, *deps).tap(&.run_edge(ctx)).analysis
+        Visitor.new(f, f_link, FuncAnalysis.new, t_analysis, *deps).init_analysis.tap(&.run_edge(ctx)).analysis
       end
     end
 

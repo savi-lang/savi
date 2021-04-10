@@ -78,7 +78,10 @@ class Mare::Compiler::Infer::MetaType::Unsatisfiable
     Set(TypeParam).new # no type params are present
   end
 
-  def substitute_type_params(substitutions : Hash(TypeParam, MetaType))
+  def substitute_type_params_retaining_cap(
+    type_params : Array(TypeParam),
+    type_args : Array(MetaType)
+  ) : Inner
     self # no type params are present to be substituted
   end
 

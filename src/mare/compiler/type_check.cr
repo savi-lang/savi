@@ -24,16 +24,7 @@ class Mare::Compiler::TypeCheck
     ctx.program.libraries.each do |library|
       library.types.each do |t|
         t_link = t.make_link(library)
-        partial_rts = for_type_partial_reifications(ctx, t_link)
-
-        if partial_rts.empty?
-          # If there are no partial reifications (thus no type parameters),
-          # then run it for the reified type with no arguments.
-          rts.push(ReifiedType.new(t_link))
-        else
-          # Otherwise, collect the partial reifications to type check.
-          rts.concat(partial_rts)
-        end
+        rts.concat(ctx.infer[t_link].type_partial_reifications.map(&.single!))
       end
     end
 
@@ -76,23 +67,6 @@ class Mare::Compiler::TypeCheck
     @map[rf]?.try(&.analysis)
   end
 
-  def for_type_partial_reifications(ctx, t_link)
-    infer = ctx.infer[t_link]
-
-    type_params = infer.type_params
-    return [] of ReifiedType if type_params.empty?
-
-    infer.partial_reification_sets.map { |type_param_caps|
-      substitutions_map = type_params.zip(type_param_caps).map { |param, cap|
-        {param, MetaType.new_type_param(param).cap(cap)}
-      }.to_h
-
-      args = substitutions_map.map(&.last.substitute_type_params(substitutions_map))
-
-      ReifiedType.new(t_link, args)
-    }
-  end
-
   private def for_rf(
     ctx : Context,
     rt : ReifiedType,
@@ -123,6 +97,7 @@ class Mare::Compiler::TypeCheck
     return unless mt.singular? # this skip partially reified type params
     rt = mt.single!
     rt_defn = rt.defn(ctx)
+    infer = ctx.infer[rt.link]
     type_params = AST::Extract.type_params(rt_defn.params)
     arg_terms = node.is_a?(AST::Qualify) ? node.group.terms : [] of AST::Node
 
@@ -184,7 +159,21 @@ class Mare::Compiler::TypeCheck
 
       arg = arg.simplify(ctx)
 
-      param_bound = rt.meta_type_of_type_param_bound(ctx, index)
+      arg_cap = arg.cap_only_inner.value.as(Infer::Cap)
+      cap_set = infer.type_param_bound_cap_sets[index]
+      unless cap_set.includes?(arg_cap)
+        bound_pos =
+          rt_defn.params.not_nil!.terms[index].as(AST::Group).terms.last.pos
+        cap_set_string = "{" + cap_set.map(&.string).join(", ") + "}"
+        ctx.error_at arg_node,
+          "This type argument won't satisfy the type parameter bound", [
+            {bound_pos, "the allowed caps are #{cap_set_string}"},
+            {arg_node.pos, "the type argument cap is #{arg_cap.string}"},
+          ]
+        next
+      end
+
+      param_bound = rt.meta_type_of_type_param_bound(ctx, index, infer)
       next unless param_bound
 
       unless arg.satisfies_bound?(ctx, param_bound)
@@ -195,6 +184,7 @@ class Mare::Compiler::TypeCheck
             {bound_pos, "the type parameter bound is #{param_bound.show_type}"},
             {arg_node.pos, "the type argument is #{arg.show_type}"},
           ]
+        next
       end
     end
   end
@@ -246,7 +236,7 @@ class Mare::Compiler::TypeCheck
     protected getter classify : Classify::Analysis # TODO: make private
     private getter completeness : Completeness::Analysis
     protected getter pre_infer : PreInfer::Analysis # TODO: make private
-    private getter infer : Infer::Analysis
+    private getter infer : Infer::FuncAnalysis
     private getter subtyping : SubtypingCache::ForReifiedFunc
 
     def initialize(ctx, @reified,
@@ -418,6 +408,21 @@ class Mare::Compiler::TypeCheck
 
         # Check the number of arguments.
         info.follow_call_check_args(ctx, self, call_func, problems)
+
+        # Check whether yield block presence matches the function's expectation.
+        other_pre_infer = ctx.pre_infer[call_func_link]
+        func_does_yield = other_pre_infer.yield_out_infos.any?
+        if info.yield_block && !func_does_yield
+          problems << {info.yield_block.not_nil!.pos, "it has a yield block"}
+          problems << {call_func.ident.pos,
+            "but '#{call_defn.defn(ctx).ident.value}.#{info.member}' has no yields"}
+        elsif !info.yield_block && func_does_yield
+          problems << {
+            other_pre_infer.yield_out_infos.first.first_viable_constraint_pos,
+            "it has no yield block but " \
+              "'#{call_defn.defn(ctx).ident.value}.#{info.member}' does yield"
+          }
+        end
 
         # Check if auto-recovery of the receiver is possible.
         if autorecover_needed

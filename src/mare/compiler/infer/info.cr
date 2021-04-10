@@ -614,24 +614,15 @@ module Mare::Compiler::Infer
     end
 
     def resolve_span!(ctx : Context, infer : Visitor) : Span
-      infer.self_type_expr_span(ctx).transform_mt do |call_mt|
+      infer.self_type_expr_span(ctx).transform_mt_to_span do |call_mt|
         call_defn = call_mt.single!
         call_func = call_defn.defn(ctx).functions.find do |f|
           f.ident.value == @name && f.has_tag?(:field)
         end.not_nil!
 
         call_link = call_func.make_link(call_defn.link)
-        ret_span = infer
-          .depends_on_call_ret_span(ctx, call_defn, call_func, call_link)
-          .deciding_f_cap(call_mt.cap_only, call_func.has_tag?(:constructor))
-          .not_nil!
-
-        raise ret_span.total_error.not_nil! if ret_span.any_error?
-        ret_mt = MetaType.new_union(ret_span.all_terminal_meta_types)
-        # TODO: Retain original ret_span maybe? Or filter it down further based on type params...
-        # Does it ever make sense to have a multiple span point in type signature?
-
-        ret_mt
+        infer.depends_on_call_ret_span(ctx, call_defn, call_func, call_link,
+            call_mt.cap_only_inner.value.as(Cap))
       end
     rescue error : Error
       Span.new(Span::ErrorPropagate.new(error))
@@ -1040,19 +1031,15 @@ module Mare::Compiler::Infer
         Span
         .reduce_combine_mts(tether_spans) { |accum, mt| accum.intersect(mt) }
         .not_nil!
-        .simple_decided_by(array_info) { |mt| # TODO: is this simple_decided_by actually needed?
-          pairs = mt.each_reachable_defn_with_cap(ctx).compact_map { |rt, cap|
+        .transform_mt { |mt|
+          ante_mts = mt.each_reachable_defn_with_cap(ctx).compact_map { |rt, cap|
             # TODO: Support more element antecedent detection patterns.
             if rt.link.name == "Array" && rt.args.size == 1
               array_mt = MetaType.new_nominal(rt).intersect(MetaType.new(cap))
-              {array_mt, array_mt}
+              array_mt
             end
           }
-          if pairs.empty?
-            unconstrained = MetaType.unconstrained
-            pairs << {unconstrained, unconstrained}
-          end
-          pairs
+          ante_mts.empty? ? MetaType.unconstrained : MetaType.new_union(ante_mts)
         }
 
       ante_span unless ante_span.any_mt?(&.unconstrained?)
@@ -1100,14 +1087,9 @@ module Mare::Compiler::Infer
         end
       else
         if elem_span
-          # TODO: is this "transform_mt_using" call even doing anything?
-          array_span = elem_span.transform_mt_using(self) { |elem_mt, maybe_self_mt|
-            array_cap = maybe_self_mt.try(&.inner.as(MetaType::Capability)) || MetaType::Capability::REF
-
+          array_span = elem_span.transform_mt { |elem_mt|
             rt = infer.prelude_reified_type(ctx, "Array", [elem_mt])
-            mt = MetaType.new(rt, array_cap.value.as(Cap))
-
-            mt
+            MetaType.new(rt, Cap::REF)
           }
         else
           Span.error(pos, "The type of this empty array literal " \
@@ -1117,7 +1099,10 @@ module Mare::Compiler::Infer
 
       # Take note of the function calls implied (used later for reachability).
       .tap { |array_span|
-        infer.analysis.called_func_spans[self] = {array_span, ["new", "<<"]}
+        infer.analysis.called_func_spans[self] = {
+          array_span.transform_mt(&.override_cap(Cap::REF)), # always use ref
+          ["new", "<<"]
+        }
       }
     end
   end
@@ -1199,34 +1184,16 @@ module Mare::Compiler::Infer
 
     def resolve_span!(ctx : Context, infer : Visitor) : Span
       lhs_span = infer.resolve(ctx, @lhs)
-      resolve_receiver_span(ctx, infer).combine_mt_to_span(lhs_span) { |call_receiver_mt, lhs_mt|
+      receiver_span = resolve_receiver_span(ctx, infer)
+
+      # receiver_span.transform_mt_to_span { |call_receiver_mt|
+      receiver_span.combine_mt_to_span(lhs_span) { |call_receiver_mt, lhs_mt|
         union_member_spans = call_receiver_mt.map_each_union_member { |union_member_mt|
           intersection_term_spans = union_member_mt.map_each_intersection_term_and_or_cap { |term_mt|
             call_mt = union_member_mt
             call_defn = term_mt.single!
             call_func = call_defn.defn(ctx).find_func!(@member)
             call_link = call_func.make_link(call_defn.link)
-
-            problems = [] of {Source::Pos, String}
-
-            yield_out_span = infer
-              .depends_on_call_yield_out_span(ctx, call_defn, call_func, call_link, 0)
-            if !yield_out_span && @yield_block
-              problems << {@yield_block.not_nil!.pos, "it has a yield block"}
-              problems << {call_func.ident.pos,
-                "but '#{call_defn.defn(ctx).ident.value}.#{@member}' has no yields"}
-            elsif yield_out_span && !@yield_block
-              problems << {
-                ctx.pre_infer[call_link].yield_out_infos.first.first_viable_constraint_pos,
-                "it has no yield block but " \
-                  "'#{call_defn.defn(ctx).ident.value}.#{@member}' does yield"
-              }
-            end
-
-            next Span.error(@pos,
-              "This function call doesn't meet subtyping requirements",
-              problems
-            ) unless problems.empty?
 
             # If this is a constructor, we know what the result type will be
             # without needing to actually depend on the other analysis' span.
@@ -1241,9 +1208,8 @@ module Mare::Compiler::Infer
             end
 
             infer
-              .depends_on_call_ret_span(ctx, call_defn, call_func, call_link)
-              .deciding_f_cap(call_mt.cap_only, call_func.has_tag?(:constructor))
-              .not_nil!
+              .depends_on_call_ret_span(ctx, call_defn, call_func, call_link,
+                call_mt.cap_only_inner.value.as(Cap))
               .transform_mt(&.ephemeralize)
           }
           Span.reduce_combine_mts(intersection_term_spans) { |accum, mt| accum.intersect(mt) }.not_nil!
@@ -1419,7 +1385,8 @@ module Mare::Compiler::Infer
             call_link = call_func.make_link(call_defn.link)
 
             raw_ret_span = infer
-              .depends_on_call_yield_out_span(ctx, call_defn, call_func, call_link, @index)
+              .depends_on_call_yield_out_span(ctx, call_defn, call_func, call_link,
+                term_mt.cap_only_inner.value.as(Cap), @index)
 
             unless raw_ret_span
               call_name = "#{call_defn.defn(ctx).ident.value}.#{@call.member}"
@@ -1430,9 +1397,7 @@ module Mare::Compiler::Infer
               )
             end
 
-            raw_ret_span
-              .deciding_f_cap(term_mt.cap_only, call_func.has_tag?(:constructor))
-              .not_nil!
+            raw_ret_span.not_nil!
           }
           Span.reduce_combine_mts(intersection_term_spans) { |accum, mt| accum.intersect(mt) }.not_nil!
         }
@@ -1460,13 +1425,12 @@ module Mare::Compiler::Infer
             call_link = call_func.make_link(call_defn.link)
 
             raw_ret_span = infer
-              .depends_on_call_yield_in_span(ctx, call_defn, call_func, call_link)
+              .depends_on_call_yield_in_span(ctx, call_defn, call_func, call_link,
+                term_mt.cap_only_inner.value.as(Cap))
 
             next Span.simple(MetaType.unconstrained) unless raw_ret_span
 
-            raw_ret_span
-              .deciding_f_cap(term_mt.cap_only, call_func.has_tag?(:constructor))
-              .not_nil!
+            raw_ret_span.not_nil!
           }
           Span.reduce_combine_mts(intersection_term_spans) { |accum, mt| accum.intersect(mt) }.not_nil!
         }
@@ -1527,13 +1491,12 @@ module Mare::Compiler::Infer
             call_link = call_func.make_link(call_defn.link)
 
             param_span = infer
-              .depends_on_call_param_span(ctx, call_defn, call_func, call_link, @index)
+              .depends_on_call_param_span(ctx, call_defn, call_func, call_link,
+                term_mt.cap_only_inner.value.as(Cap), @index)
 
             next Span.simple(MetaType.unconstrained) unless param_span
 
             param_span
-              .deciding_f_cap(term_mt.cap_only, call_func.has_tag?(:constructor))
-              .not_nil!
           }
           Span.reduce_combine_mts(intersection_term_spans) { |accum, mt| accum.intersect(mt) }.not_nil!
         }

@@ -190,9 +190,14 @@ struct Mare::Compiler::Infer::MetaType
     inner.type_params
   end
 
-  def substitute_type_params(substitutions : Hash(TypeParam, MetaType))
-    return self if substitutions.empty?
-    MetaType.new(inner.substitute_type_params(substitutions))
+  def substitute_type_params_retaining_cap(
+    type_params : Array(TypeParam),
+    type_args : Array(MetaType)
+  ) : MetaType
+    return self if type_params.empty?
+    MetaType.new(
+      inner.substitute_type_params_retaining_cap(type_params, type_args)
+    )
   end
 
   def each_type_alias_in_first_layer(&block : ReifiedTypeAlias -> _)

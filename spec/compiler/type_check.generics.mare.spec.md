@@ -81,23 +81,37 @@ This type needs to be qualified with type arguments:
 It complains when a type argument doesn't satisfy the bound:
 
 ```mare
-:class GenericSendable (P1 send)
+:class GenericSendable (P1 String'send)
 ```
 ```mare
     GenericSendable(String'ref)
+    GenericSendable(Bool'val)
 ```
 ```error
 This type argument won't satisfy the type parameter bound:
     GenericSendable(String'ref)
                     ^~~~~~~~~~
 
-- the type parameter bound is {iso, val, tag, non}:
-:class GenericSendable (P1 send)
-                           ^~~~
+- the allowed caps are {iso, val, tag, non}:
+:class GenericSendable (P1 String'send)
+                           ^~~~~~~~~~~
 
-- the type argument is String'ref:
+- the type argument cap is ref:
     GenericSendable(String'ref)
                     ^~~~~~~~~~
+```
+```error
+This type argument won't satisfy the type parameter bound:
+    GenericSendable(Bool'val)
+                    ^~~~~~~~
+
+- the type parameter bound is String:
+:class GenericSendable (P1 String'send)
+                           ^~~~~~~~~~~
+
+- the type argument is Bool:
+    GenericSendable(Bool'val)
+                    ^~~~~~~~
 ```
 
 ---

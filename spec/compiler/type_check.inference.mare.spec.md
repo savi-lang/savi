@@ -100,7 +100,7 @@ It infers an integer literal based on an assignment:
 It infers an integer literal based on a prop type:
 
 ```mare
-  :prop x (U64 | None): 42 ::type=> U64
+  :prop x (U64 | None): 42
   :fun test_x
     @x ::type=> (U64 | None)
 ```

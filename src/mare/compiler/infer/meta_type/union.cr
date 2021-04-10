@@ -393,23 +393,34 @@ struct Mare::Compiler::Infer::MetaType::Union
     result
   end
 
-  def substitute_type_params(substitutions : Hash(TypeParam, MetaType))
+  def substitute_type_params_retaining_cap(
+    type_params : Array(TypeParam),
+    type_args : Array(MetaType)
+  ) : Inner
     result = Unsatisfiable.instance
 
     caps.try(&.each { |cap|
-      result = result.unite(cap.substitute_type_params(substitutions))
+      result = result.unite(
+        cap.substitute_type_params_retaining_cap(type_params, type_args)
+      )
     })
 
     terms.try(&.each { |term|
-      result = result.unite(term.substitute_type_params(substitutions))
+      result = result.unite(
+        term.substitute_type_params_retaining_cap(type_params, type_args)
+      )
     })
 
     anti_terms.try(&.each { |anti_term|
-      result = result.unite(anti_term.substitute_type_params(substitutions))
+      result = result.unite(
+        anti_term.substitute_type_params_retaining_cap(type_params, type_args)
+      )
     })
 
     intersects.try(&.each { |intersect|
-      result = result.unite(intersect.substitute_type_params(substitutions))
+      result = result.unite(
+        intersect.substitute_type_params_retaining_cap(type_params, type_args)
+      )
     })
 
     result
