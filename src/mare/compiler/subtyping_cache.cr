@@ -44,8 +44,8 @@ class Mare::Compiler::SubtypingCache
   end
 
   class ForReifiedFunc
-    private getter that
-    def initialize(@that : ReifiedFunction)
+    private getter this
+    def initialize(@this : ReifiedFunction)
       @layers_accepted = [] of Int32
       @layers_ignored = [] of Int32
     end
@@ -58,19 +58,19 @@ class Mare::Compiler::SubtypingCache
       return false if @layers_accepted.includes?(layer_index)
       return true if @layers_ignored.includes?(layer_index)
 
-      layer = ctx.type_context[@that.link][layer_index]
-      pre_infer = ctx.pre_infer[@that.link]
-      infer = ctx.infer[@that.link]
+      layer = ctx.type_context[@this.link][layer_index]
+      pre_infer = ctx.pre_infer[@this.link]
+      infer = ctx.infer[@this.link]
 
       should_ignore = !layer.all_positive_conds.all? { |cond|
         cond_info = pre_infer[cond]
         case cond_info
         when Infer::TypeParamCondition
           type_param = Infer::TypeParam.new(cond_info.refine)
-          refine_mt = @that.meta_type_of(ctx, cond_info.refine_type, infer)
+          refine_mt = @this.meta_type_of(ctx, cond_info.refine_type, infer)
           next false unless refine_mt
 
-          type_arg = @that.type.args[type_param.ref.index]
+          type_arg = @this.type.args[type_param.ref.index]
           type_arg.satisfies_bound?(ctx, refine_mt)
         # TODO: also handle other conditions?
         else true
