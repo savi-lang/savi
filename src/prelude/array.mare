@@ -94,15 +94,15 @@
   :: if the element type isn't aliasable, the cloned array will be empty.
 
   :fun clone @'iso
-    // if (A <: alias) (
-    //   array = @new_iso(@size)
-    //   _ptr_tag CPointer(A)'tag = @_ptr // TODO: this indirection shouldn't be needed
-    //   array._clone_from(_ptr_tag, @size)
-    //   array._size = @size
-    //   --array
-    // |
+    if (A <: alias) (
+      array = @new_iso(@size)
+      _ptr_tag CPointer(A)'tag = @_ptr // TODO: this indirection shouldn't be needed
+      array._clone_from(_ptr_tag, @size)
+      array._size = @size
+      --array
+    |
       @new_iso(0)
-    // )
+    )
 
   :fun ref _clone_from (other_ptr CPointer(A), size USize)
     other_ptr._unsafe._copy_to(@_ptr, size)

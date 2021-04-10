@@ -359,7 +359,11 @@ module Mare::Compiler::Infer
       def narrowing_partial_reify_indices(target_bits : BitArray) : Inner
         ByReifyCap.build(@mapping.compact_map { |bits, inner|
           intersection_bits = target_bits.intersection?(bits)
-          {intersection_bits, inner} if intersection_bits
+          if intersection_bits
+            {intersection_bits, inner}
+          else
+            {bits, Terminal.new(MetaType.unsatisfiable)}
+          end
         })
       end
 
