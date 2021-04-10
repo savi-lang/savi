@@ -10,6 +10,7 @@ class Mare::Compiler::TypeCheck
   alias ReifiedTypeAlias = Infer::ReifiedTypeAlias
   alias ReifiedType = Infer::ReifiedType
   alias ReifiedFunction = Infer::ReifiedFunction
+  alias Cap = Infer::Cap
   alias Info = Infer::Info
 
   def initialize
@@ -159,7 +160,7 @@ class Mare::Compiler::TypeCheck
 
       arg = arg.simplify(ctx)
 
-      arg_cap = arg.cap_only_inner.value.as(Infer::Cap)
+      arg_cap = arg.cap_only_inner.value.as(Cap)
       cap_set = infer.type_param_bound_cap_sets[index]
       unless cap_set.includes?(arg_cap)
         bound_pos =
@@ -230,6 +231,142 @@ class Mare::Compiler::TypeCheck
     end
   end
 
+  def self.verify_call_receiver_cap(ctx : Context, call : Infer::FromCall, calling_func, call_mt, call_func, problems)
+    call_cap_mt = call_mt.cap_only
+    autorecover_needed = false
+
+    call_func_cap = MetaType::Capability.new_maybe_generic(call_func.cap.value)
+    call_func_cap_mt = MetaType.new(call_func_cap)
+
+    # The required capability is the receiver capability of the function,
+    # unless it is an asynchronous function, in which case it is tag.
+    required_cap = call_func_cap
+    required_cap = MetaType::Capability.new(Cap::TAG) \
+      if call_func.has_tag?(:async) && !call_func.has_tag?(:constructor)
+
+    receiver_okay =
+      if required_cap.value.is_a?(Cap)
+        call_cap_mt.subtype_of?(ctx, MetaType.new(required_cap))
+      else
+        call_cap_mt.satisfies_bound?(ctx, MetaType.new(required_cap))
+      end
+
+    # Enforce the capability restriction of the receiver.
+    if receiver_okay
+      # For box functions only, we reify with the actual cap on the caller side.
+      # Or rather, we use "ref", "box", or "val", depending on the caller cap.
+      # For all other functions, we just use the cap from the func definition.
+      reify_cap =
+        if required_cap.value == Cap::BOX
+          case call_cap_mt.inner.as(MetaType::Capability).value
+          when Cap::ISO, Cap::TRN, Cap::REF then MetaType.cap(Cap::REF)
+          when Cap::VAL then MetaType.cap(Cap::VAL)
+          else MetaType.cap(Cap::BOX)
+          end
+        # TODO: This shouldn't be a special case - any generic cap should be accepted.
+        elsif required_cap.value.is_a?(Set(MetaType::Capability))
+          call_cap_mt
+        else
+          call_func_cap_mt
+        end
+    elsif call_func.has_tag?(:constructor)
+      # Constructor calls ignore cap of the original receiver.
+      reify_cap = call_func_cap_mt
+    elsif call_cap_mt.ephemeralize.subtype_of?(ctx, MetaType.new(required_cap))
+      # We failed, but we may be able to use auto-recovery.
+      # Take note of this and we'll finish the auto-recovery checks later.
+      autorecover_needed = true
+      # For auto-recovered calls, always use the cap of the func definition.
+      reify_cap = call_func_cap_mt
+    else
+      # We failed entirely; note the problem and carry on.
+      problems << {call_func.cap.pos,
+        "the type #{call_mt.inner.inspect} isn't a subtype of the " \
+        "required capability of '#{required_cap}'"}
+
+      # If the receiver of the call is the self (the receiver of the caller),
+      # then we can give an extra hint about changing its capability to match.
+      if call.lhs.is_a?(Infer::Self)
+        problems << {calling_func.cap.pos, "this would be possible if the " \
+          "calling function were declared as `:fun #{required_cap}`"}
+      end
+
+      # We already failed subtyping for the receiver cap, but pretend
+      # for now that we didn't for the sake of further checks.
+      reify_cap = call_func_cap_mt
+    end
+
+    if autorecover_needed \
+    && required_cap.value != Cap::REF && required_cap.value != Cap::BOX
+      problems << {call_func.cap.pos,
+        "the function's required receiver capability is `#{required_cap}` " \
+        "but only a `ref` or `box` function can be auto-recovered"}
+
+      problems << {call.lhs.pos,
+        "auto-recovery was attempted because the receiver's type is " \
+        "#{call_mt.inner.inspect}"}
+    end
+
+    {reify_cap, autorecover_needed}
+  end
+
+  def self.verify_call_arg_count(ctx : Context, call : Infer::FromCall, call_func, problems)
+    # Just check the number of arguments.
+    # We will check the types in another Info type (TowardCallParam)
+    arg_count = call.args.try(&.terms.size) || 0
+    max = AST::Extract.params(call_func.params).size
+    min = AST::Extract.params(call_func.params).count { |(ident, type, default)| !default }
+    func_pos = call_func.ident.pos
+
+    if arg_count > max
+      max_text = "#{max} #{max == 1 ? "argument" : "arguments"}"
+      params_pos = call_func.params.try(&.pos) || call_func.ident.pos
+      problems << {call.pos, "the call site has too many arguments"}
+      problems << {params_pos, "the function allows at most #{max_text}"}
+    elsif arg_count < min
+      min_text = "#{min} #{min == 1 ? "argument" : "arguments"}"
+      params_pos = call_func.params.try(&.pos) || call_func.ident.pos
+      problems << {call.pos, "the call site has too few arguments"}
+      problems << {params_pos, "the function requires at least #{min_text}"}
+    end
+  end
+
+  def self.verify_call_autorecover(
+    ctx : Context,
+    type_check : TypeCheck::ForReifiedFunc,
+    call : Infer::FromCall,
+    call_func : Program::Function,
+    ret_mt : MetaType
+  )
+    # If autorecover of the receiver cap was needed to make this call work,
+    # we now have to confirm that arguments and return value are all sendable.
+    problems = [] of {Source::Pos, String}
+
+    unless ret_mt.is_sendable? || !call.ret_value_used
+      problems << {(call_func.ret || call_func.ident).pos,
+        "the return type #{ret_mt.show_type} isn't sendable " \
+        "and the return value is used (the return type wouldn't matter " \
+        "if the calling side entirely ignored the return value)"}
+    end
+
+    # TODO: It should be safe to pass in a TRN if the receiver is TRN,
+    # so is_sendable? isn't quite liberal enough to allow all valid cases.
+    call.args.try(&.terms.each { |arg|
+      resolved_arg = type_check.resolve(ctx, type_check.pre_infer[arg])
+      if resolved_arg && !resolved_arg.alias.is_sendable?
+        problems << {arg.pos,
+          "the argument (when aliased) has a type of " \
+          "#{resolved_arg.alias.show_type}, which isn't sendable"}
+      end
+    })
+
+    ctx.error_at call,
+      "This function call won't work unless the receiver is ephemeral; " \
+      "it must either be consumed or be allowed to be auto-recovered. "\
+      "Auto-recovery didn't work for these reasons",
+        problems unless problems.empty?
+  end
+
   class ForReifiedFunc < Mare::AST::Visitor
     getter reified : ReifiedFunction
     private getter refer_type : ReferType::Analysis
@@ -285,7 +422,7 @@ class Mare::Compiler::TypeCheck
       # This represents the self type as opaque, with no field access.
       # We'll use this to guarantee that no usage of the current self object
       # will require  any access to the fields of the object.
-      tag_self = mt.override_cap(Infer::Cap::TAG)
+      tag_self = mt.override_cap(Cap::TAG)
       total_constraint = info.total_downstream_constraint(ctx, self)
       return true if tag_self.within_constraints?(ctx, [total_constraint])
 
@@ -325,7 +462,11 @@ class Mare::Compiler::TypeCheck
 
       # Otherwise, print a Literal-specific error that includes peer hints,
       # as well as a call to action to use an explicit numeric type.
-      error_info = info.describe_peer_hints(ctx, self)
+      error_info = info.peer_hints.compact_map { |peer|
+        peer_mt = resolve(ctx, peer)
+        next unless peer_mt
+        {peer.pos, "it is suggested here that it might be a #{peer_mt.show_type}"}
+      }
       error_info.concat(info.describe_downstream_constraints(ctx, self))
       error_info.push({info.pos,
         "and the literal itself has an intrinsic type of #{mt.show_type}"
@@ -404,10 +545,10 @@ class Mare::Compiler::TypeCheck
 
         # Determine the correct capability to reify, checking for cap errors.
         reify_cap, autorecover_needed =
-          info.follow_call_check_receiver_cap(ctx, @func, call_mt, call_func, problems)
+          TypeCheck.verify_call_receiver_cap(ctx, info, @func, call_mt, call_func, problems)
 
         # Check the number of arguments.
-        info.follow_call_check_args(ctx, self, call_func, problems)
+        TypeCheck.verify_call_arg_count(ctx, info, call_func, problems)
 
         # Check whether yield block presence matches the function's expectation.
         other_pre_infer = ctx.pre_infer[call_func_link]
@@ -426,10 +567,10 @@ class Mare::Compiler::TypeCheck
 
         # Check if auto-recovery of the receiver is possible.
         if autorecover_needed
-          receiver = MetaType.new(call_defn, reify_cap.cap_only_inner.value.as(Infer::Cap))
+          receiver = MetaType.new(call_defn, reify_cap.cap_only_inner.value.as(Cap))
           other_rf = ReifiedFunction.new(call_defn, call_func_link, receiver)
           ret_mt = other_rf.meta_type_of_ret(ctx)
-          info.follow_call_check_autorecover_cap(ctx, self, call_func, ret_mt) \
+          TypeCheck.verify_call_autorecover(ctx, self, info, call_func, ret_mt) \
             if ret_mt
         end
       end
@@ -538,7 +679,7 @@ class Mare::Compiler::TypeCheck
         if @func.has_tag?(:async)
           "An asynchronous function"
         elsif @func.has_tag?(:constructor) \
-        && !resolve(ctx, @pre_infer[ret]).not_nil!.subtype_of?(ctx, MetaType.cap(Infer::Cap::REF))
+        && !resolve(ctx, @pre_infer[ret]).not_nil!.subtype_of?(ctx, MetaType.cap(Cap::REF))
           "A constructor with elevated capability"
         end
       if require_sendable
