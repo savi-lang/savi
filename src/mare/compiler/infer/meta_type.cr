@@ -371,33 +371,6 @@ struct Mare::Compiler::Infer::MetaType
   end
 
   private def self.simplify_intersection(ctx : Context, inner : Intersection)
-    # If we have any reified type aliases, we need to settle those first
-    # by unwrapping them, intersecting them, and recursively calling simplify.
-    if inner.terms.try(&.any?(&.defn.is_a?(ReifiedTypeAlias)))
-      result = Unconstrained.instance
-
-      # Intersect all of the pieces of this intersection, which would normally
-      # build up the same intersection again but for the unwrapping of the
-      # type aliases we find within, some of which may even be Unions
-      # (which would cause the resulting "intersection" to become a Union too).
-      inner.cap.try do |cap|
-        result = result.intersect(cap)
-        return result if result.is_a?(Unsatisfiable)
-      end
-      inner.terms.not_nil!.each do |term|
-        result = result.intersect(term)
-        return result if result.is_a?(Unsatisfiable)
-      end if inner.terms
-      inner.anti_terms.not_nil!.each do |term|
-        result = result.intersect(term)
-        return result if result.is_a?(Unsatisfiable)
-      end if inner.anti_terms
-
-      # Return the fully intersected result, simplified again via recursion.
-      # We stop recursing this code path when we see no more aliases to unwrap.
-      return simplify_inner(ctx, result)
-    end
-
     # TODO: complete the rest of the logic here (think about symmetry)
     removed_terms = Set(Nominal).new
     new_terms = inner.terms.try(&.select do |l|
@@ -443,41 +416,6 @@ struct Mare::Compiler::Infer::MetaType
   end
 
   private def self.simplify_union(ctx : Context, inner : Union)
-    # If we have any reified type aliases, we need to settle those first
-    # by unwrapping them, intersecting them, and recursively calling simplify.
-    if inner.terms.try(&.any?(&.defn.is_a?(ReifiedTypeAlias))) \
-    || inner.intersects.try(&.any?(&.terms.try(&.any?(&.defn.is_a?(ReifiedTypeAlias)))))
-      result = Unsatisfiable.instance
-
-      # Unite all of the pieces of this union, which would normally build up the
-      # same union again but for the unwrapping of the type aliases we find.
-      inner.caps.not_nil!.each do |cap|
-        result = result.unite(cap)
-        return result if result.is_a?(Unconstrained)
-      end if inner.caps
-      inner.terms.not_nil!.each do |term|
-        result = result.unite(term)
-        return result if result.is_a?(Unconstrained)
-      end if inner.terms
-      inner.anti_terms.not_nil!.each do |term|
-        result = result.unite(term)
-        return result if result.is_a?(Unconstrained)
-      end if inner.anti_terms
-      inner.intersects.not_nil!.each do |intersect|
-        # Here is where we deal with the special case of unwrapping aliases:
-        if intersect.terms.try(&.any?(&.defn.is_a?(ReifiedTypeAlias)))
-          result = result.unite(simplify_inner(ctx, intersect))
-        else
-          result = result.unite(intersect)
-        end
-        return result if result.is_a?(Unconstrained)
-      end if inner.intersects
-
-      # Return the fully intersected result, simplified again via recursion.
-      # We stop recursing this code path when we see no more aliases to unwrap.
-      return simplify_inner(ctx, result)
-    end
-
     caps = Set(Capability).new
     terms = Set(Nominal).new
     anti_terms = Set(AntiNominal).new

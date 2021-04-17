@@ -580,10 +580,15 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
   def handle_func(ctx, rf : Infer::ReifiedFunction)
     # Skip this function if we've already seen it.
     return if @seen_funcs.has_key?(rf)
+
+    # Give handle_type_def a chance to canonicalize the ReifiedType,
+    # possibly giving us an altered ReifiedFunction.
+    rt = handle_type_def(ctx, rf.type).reified
+    rf = Infer::ReifiedFunction.new(rt, rf.link, rf.receiver)
+
     reach_funcs = Array(Func).new
     @seen_funcs[rf] = reach_funcs
 
-    rt = rf.type
     infer = ctx.infer[rf.link]
 
     # Reach all type references seen by this function.
@@ -657,17 +662,32 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     existing_ref = @refs[meta_type]?
     return existing_ref if existing_ref
 
-    # First, reach any type definitions referenced by this type reference.
-    meta_type.each_reachable_defn(ctx).each { |t| handle_type_def(ctx, t) }
+    simple_meta_type = meta_type.substitute_each_type_alias_in_first_layer { |rta|
+      rta.meta_type_of_target(ctx).not_nil!
+    }.simplify(ctx)
 
-    # Now, save a Ref instance for this meta type.
-    @refs[meta_type] = Ref.new(meta_type)
+    # Reach any type definitions referenced by this type reference.
+    simple_meta_type.each_reachable_defn(ctx).each { |t| handle_type_def(ctx, t) }
+
+    # Save a Ref instance for this meta type.
+    @refs[meta_type] = Ref.new(simple_meta_type)
   end
 
   def handle_type_def(ctx, rt : Infer::ReifiedType)
     # Skip this type def if we've already seen it.
     existing_def = @defs[rt]?
     return existing_def if existing_def
+
+    # Handle the case of having type args that need to be simplified.
+    simple_arg_mts = rt.args.map(&.substitute_each_type_alias_in_first_layer { |rta|
+      rta.meta_type_of_target(ctx).not_nil!
+    }.simplify(ctx))
+    if simple_arg_mts != rt.args
+      simple_rt = Infer::ReifiedType.new(rt.link, simple_arg_mts)
+      simple_def = handle_type_def(ctx, simple_rt)
+      @defs[rt] = simple_def
+      return simple_def
+    end
 
     # Confirm that this type def is completely reified.
     raise "this type is not complete: #{rt}" unless rt.is_complete?(ctx)

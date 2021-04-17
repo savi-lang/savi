@@ -1024,13 +1024,14 @@ module Mare::Compiler::Infer
         .reduce_combine_mts(tether_spans) { |accum, mt| accum.intersect(mt) }
         .not_nil!
         .transform_mt { |mt|
-          ante_mts = mt.each_reachable_defn_with_cap(ctx).compact_map { |rt, cap|
-            # TODO: Support more element antecedent detection patterns.
+          ante_mts = mt.map_each_union_member { |union_member_mt|
+            rt = union_member_mt.single_rt?
+            next unless rt
+
             if rt.link.name == "Array" && rt.args.size == 1
-              array_mt = MetaType.new_nominal(rt).intersect(MetaType.new(cap))
-              array_mt
+              MetaType.new_nominal(rt).intersect(union_member_mt.cap_only)
             end
-          }
+          }.compact
           ante_mts.empty? ? MetaType.unconstrained : MetaType.new_union(ante_mts)
         }
 

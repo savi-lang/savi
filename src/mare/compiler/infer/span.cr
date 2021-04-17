@@ -483,8 +483,19 @@ module Mare::Compiler::Infer
               {cond, inner.combine_mt_to_span(other_inner, &block).as(Inner)}
             }
           )
+        elsif other.is_a?(Fallback) && other.evaluate_mt != self.evaluate_mt
+          Fallback.build(
+            @default.value.combine_mt_to_span(other, &block),
+            @evaluate_mt,
+            @options.map { |(cond, inner)|
+              {cond, inner.combine_mt_to_span(other, &block).as(Inner)}
+            }
+          )
         else
-          raise NotImplementedError.new("combine_mt_to_span for two unlike fallbacks")
+          raise NotImplementedError.new(
+            "combine_mt_to_span for two fallbacks with the same " \
+            "evaluate_mt but different options"
+          )
         end
       end
 

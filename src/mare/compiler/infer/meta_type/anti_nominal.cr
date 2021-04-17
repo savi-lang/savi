@@ -177,7 +177,8 @@ struct Mare::Compiler::Infer::MetaType::AntiNominal
   end
 
   def substitute_each_type_alias_in_first_layer(&block : ReifiedTypeAlias -> MetaType) : Inner
-    raise NotImplementedError.new("#{self} substitute_each_type_alias_in_first_layer")
+    defn = defn()
+    defn.is_a?(ReifiedTypeAlias) ? block.call(defn).inner.negate : self
   end
 
   def is_sendable?
