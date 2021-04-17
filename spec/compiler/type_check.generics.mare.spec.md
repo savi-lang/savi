@@ -133,3 +133,37 @@ It can call the constructor of a type parameter:
   :fun non construct A
     A.new(99)
 ```
+
+---
+
+It can supply a default type argument based on one of the other ones:
+
+```mare
+    GenericWithDefault(U64, String) ::type=> GenericWithDefault(U64, String, ToStringDefault(U64))
+    // TODO: We should be able to get a compile error for GenericWithBadDefault
+    // without needing to instantiate it here to instigate it to be checked.
+    GenericWithBadDefault(U64, String) // causes compile error
+```
+```mare
+:trait non ToStringFunction (A)
+  :fun non to_string (a A) String
+
+:primitive ToStringDefault (A)
+  :fun non to_string (a A): "(unknown)"
+
+:primitive GenericWithDefault (A share, B share, S ToStringFunction(A) = ToStringDefault(A))
+:primitive GenericWithBadDefault (A share, B share, S ToStringFunction(A) = None)
+```
+```error
+This type argument won't satisfy the type parameter bound:
+:primitive GenericWithBadDefault (A share, B share, S ToStringFunction(A) = None)
+                                                                            ^~~~
+
+- the type parameter bound is ToStringFunction(U64):
+:primitive GenericWithBadDefault (A share, B share, S ToStringFunction(A) = None)
+                                                      ^~~~~~~~~~~~~~~~~~~
+
+- the type argument is None:
+:primitive GenericWithBadDefault (A share, B share, S ToStringFunction(A) = None)
+                                                                            ^~~~
+```

@@ -252,6 +252,17 @@ struct Mare::Compiler::Infer::MetaType::Nominal
     end
   end
 
+  def with_additional_type_arg!(arg : MetaType) : Inner
+    defn = defn()
+    Nominal.new(
+      case defn
+      when ReifiedTypeAlias; defn.with_additional_arg(arg)
+      when ReifiedType; defn.with_additional_arg(arg)
+      else raise NotImplementedError.new("#{self} with_additional_type_arg!")
+      end
+    )
+  end
+
   def substitute_type_params_retaining_cap(
     type_params : Array(TypeParam),
     type_args : Array(MetaType)

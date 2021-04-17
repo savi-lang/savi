@@ -80,6 +80,23 @@ module Mare::Compiler::Infer
 
       span.transform_mt(&.substitute_type_params_retaining_cap(type_params, args))
     end
+
+    def deciding_cap_of_some_front_args(span : Span, args : Array(MetaType)) : Span
+      # Fast path for the case of no type arguments present.
+      return span if args.empty? || !span.inner.is_a?(Span::ByReifyCap)
+
+      arg_caps = args.map(&.cap_only_inner.value.as(Cap))
+
+      target_bits = BitArray.new(type_partial_reification_sets.size)
+
+      type_partial_reification_sets.each { |param_caps, index|
+        next unless arg_caps == param_caps[0...arg_caps.size]
+        target_bits[index] = true
+      }
+      raise "incompatible caps: #{arg_caps}" if !target_bits.any?
+
+      span.narrowing_partial_reify_indices(target_bits, mark_unsatisfiable: false)
+    end
   end
 
   struct TypeAliasAnalysis < Analysis
@@ -97,6 +114,23 @@ module Mare::Compiler::Infer
       end
 
       span.transform_mt(&.substitute_type_params_retaining_cap(type_params, args))
+    end
+
+    def deciding_cap_of_some_front_args(span : Span, args : Array(MetaType)) : Span
+      # Fast path for the case of no type arguments present.
+      return span if args.empty? || !span.inner.is_a?(Span::ByReifyCap)
+
+      arg_caps = args.map(&.cap_only_inner.value.as(Cap))
+
+      target_bits = BitArray.new(type_partial_reification_sets.size)
+
+      type_partial_reification_sets.each { |param_caps, index|
+        next unless arg_caps == param_caps[0...arg_caps.size]
+        target_bits[index] = true
+      }
+      raise "incompatible caps: #{arg_caps}" if !target_bits.any?
+
+      span.narrowing_partial_reify_indices(target_bits, mark_unsatisfiable: false)
     end
   end
 
@@ -351,33 +385,100 @@ module Mare::Compiler::Infer
       target_span = type_expr_span(ctx, node.term, cap_only)
       return target_span if cap_only
 
-      arg_spans = node.group.terms.map do |t|
+      arg_asts = node.group.terms
+      arg_spans = arg_asts.map do |t|
         type_expr_span(ctx, t).as(Span)
       end
 
-      Span.reduce_combine_mts([target_span] + arg_spans) { |target_mt, arg_mt|
-        cap = begin target_mt.cap_only rescue nil end
+      any_rt_has_wrong_number_of_type_args = false
+      span = target_span.reduce_combine_mts(arg_spans) { |target_mt, arg_mt|
+        mt = target_mt.with_additional_type_arg!(arg_mt)
+        rt = mt.single_rt_or_rta!
 
-        target_inner = target_mt.inner
-        mt =
-          if target_inner.is_a?(MetaType::Nominal) \
-          && target_inner.defn.is_a?(ReifiedTypeAlias)
-            rta = target_inner.defn.as(ReifiedTypeAlias)
-            arg_mts = rta.args + [arg_mt]
-            MetaType.new(ReifiedTypeAlias.new(rta.link, arg_mts))
-          # elsif target_inner.is_a?(MetaType::Nominal) \
-          # && target_inner.defn.is_a?(TypeParam)
-          #   # TODO: Some kind of ReifiedTypeParam monstrosity, to represent
-          #   # an unknown type param invoked with type arguments?
-          else
-            rt = target_mt.single!
-            arg_mts = rt.args + [arg_mt]
-            MetaType.new(ReifiedType.new(rt.link, arg_mts))
+        # If we've reached the final reduce call for the last explicit arg,
+        # then we also check if we have the right number of accumulated args.
+        if rt.args.size == arg_spans.size
+          any_rt_has_wrong_number_of_type_args ||= begin
+            AST::Extract.type_params(rt.defn(ctx).params).size != arg_spans.size
           end
+        end
 
-        mt = mt.override_cap(cap) if cap
         mt
-      }.not_nil!
+      }
+
+      return span unless any_rt_has_wrong_number_of_type_args
+
+      span.transform_mt_to_span { |target_mt|
+        rt = target_mt.single_rt_or_rta!
+        args = rt.args
+        raise "inconsistent arguments" if args.size != arg_asts.size
+
+        rt_defn = rt.defn(ctx)
+        type_param_asts = AST::Extract.type_params(rt_defn.params)
+
+        # The minimum number of params is the number that don't have defaults.
+        # The maximum number of params is the total number of them.
+        type_params_min = type_param_asts.select { |(_, _, default)| !default }.size
+        type_params_max = type_param_asts.size
+
+        if args.size == type_params_max
+          Span.simple(target_mt) # no changes needed
+        elsif args.size > type_params_max
+          params_pos = (rt_defn.params || rt_defn.ident).pos
+          Span.error node, "This type qualification has too many type arguments", [
+            {params_pos, "at most #{type_params_max} type arguments were expected"},
+          ].concat(arg_asts[type_params_max..-1].map { |arg|
+            {arg.pos, "this is an excessive type argument"}
+          })
+        elsif rt.args.size < type_params_min
+          params = rt_defn.params.not_nil!
+          Span.error node, "This type qualification has too few type arguments", [
+            {params.pos, "at least #{type_params_min} type arguments were expected"},
+          ].concat(params.terms[rt.args.size..-1].map { |param|
+            {param.pos, "this additional type parameter needs an argument"}
+          })
+        else # we need to append the default type arguments that are missing
+          infer =
+            case rt
+            when ReifiedTypeAlias
+              rt_defn = rt_defn.as(Program::TypeAlias)
+              ctx.infer_edge.run_for_type_alias(ctx, rt_defn, rt.link)
+            when ReifiedType
+              rt_defn = rt_defn.as(Program::Type)
+              ctx.infer_edge.run_for_type(ctx, rt_defn , rt.link)
+            else raise NotImplementedError.new(rt.class)
+            end
+
+          # Get the default spans for the missing arguments,
+          # correlating them to the caps of the "front args" we already have.
+          explicit_args_count = rt.args.size
+          default_spans = infer
+            .type_param_default_spans[explicit_args_count..-1]
+            .map(&.not_nil!)
+            .map { |default_span|
+              # TODO: The ceremony to calling this identical method is silly:
+              case infer
+              when Infer::TypeAnalysis;      infer.deciding_cap_of_some_front_args(default_span, rt.args)
+              when Infer::TypeAliasAnalysis; infer.deciding_cap_of_some_front_args(default_span, rt.args)
+              else raise NotImplementedError.new(infer.class)
+              end
+            }
+
+          # Finally, combine spans to add default args to the qualified type.
+          Span.simple(target_mt).reduce_combine_mts(default_spans) { |target_mt, arg_mt|
+            target_mt.with_additional_type_arg!(arg_mt)
+          }.transform_mt { |mt|
+            orig_mt = mt
+            while true
+              rt = mt.single_rt_or_rta!
+              mt = mt.substitute_type_params_retaining_cap(infer.type_params, rt.args)
+              break if mt == orig_mt
+              orig_mt = mt
+            end
+            mt
+          }
+        end
+      }
     end
 
     # All other AST nodes are unsupported as type expressions.

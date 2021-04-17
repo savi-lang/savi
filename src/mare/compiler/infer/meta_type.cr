@@ -190,6 +190,10 @@ struct Mare::Compiler::Infer::MetaType
     inner.type_params
   end
 
+  def with_additional_type_arg!(arg : MetaType) : MetaType
+    MetaType.new(inner.with_additional_type_arg!(arg))
+  end
+
   def substitute_type_params_retaining_cap(
     type_params : Array(TypeParam),
     type_args : Array(MetaType)
@@ -314,6 +318,26 @@ struct Mare::Compiler::Infer::MetaType
   def single!
     raise "not singular: #{show_type}" unless singular?
     single?.not_nil!.defn.as(ReifiedType)
+  end
+
+  def single_rt_or_rta!
+    single_rt_or_rta?.not_nil!
+  end
+  def single_rt_or_rta?
+    inner = inner()
+    case inner
+    when Intersection then
+      terms = inner.terms
+      MetaType.new(terms.first).single_rt_or_rta? if terms && terms.size == 1
+    when Nominal then
+      defn = inner.defn
+      case defn
+      when ReifiedTypeAlias; defn
+      when ReifiedType; defn
+      else nil
+      end
+    else nil
+    end
   end
 
   def -; negate end

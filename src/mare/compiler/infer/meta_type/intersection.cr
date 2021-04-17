@@ -332,6 +332,15 @@ struct Mare::Compiler::Infer::MetaType::Intersection
     result
   end
 
+  def with_additional_type_arg!(arg : MetaType) : Inner
+    terms = terms()
+    raise NotImplementedError.new("#{self} with_additional_type_arg!") \
+      unless terms && terms.size == 1 && anti_terms.nil?
+
+    new_terms = terms.map(&.with_additional_type_arg!(arg)).to_set
+    Intersection.new(cap, new_terms, anti_terms)
+  end
+
   def substitute_type_params_retaining_cap(
     type_params : Array(TypeParam),
     type_args : Array(MetaType)

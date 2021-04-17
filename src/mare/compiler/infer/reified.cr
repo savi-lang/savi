@@ -39,6 +39,10 @@ module Mare::Compiler::Infer
       args.size >= params_count_min && args.all?(&.type_params.empty?)
     end
 
+    def with_additional_arg(arg : MetaType)
+      self.class.new(link, args + [arg])
+    end
+
     def meta_type_of(
       ctx : Context,
       span : Span?,
@@ -141,6 +145,10 @@ module Mare::Compiler::Infer
         .select { |_, _, default| !default }.size
 
       args.size >= params_count_min && args.all?(&.type_params.empty?)
+    end
+
+    def with_additional_arg(arg : MetaType)
+      self.class.new(link, args + [arg])
     end
 
     def meta_type_of(

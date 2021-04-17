@@ -97,61 +97,37 @@ class Mare::Compiler::TypeCheck
   )
     return unless mt.singular? # this skip partially reified type params
     rt = mt.single!
-    rt_defn = rt.defn(ctx)
     infer = ctx.infer[rt.link]
-    type_params = AST::Extract.type_params(rt_defn.params)
-    arg_terms = node.is_a?(AST::Qualify) ? node.group.terms : [] of AST::Node
-
-    # The minimum number of params is the number that don't have defaults.
-    # The maximum number of params is the total number of them.
-    type_params_min = type_params.select { |(_, _, default)| !default }.size
-    type_params_max = type_params.size
 
     if rt.args.empty?
-      if type_params_min == 0
+      if infer.type_params.empty?
         # If there are no type args or type params there's nothing to check.
         return
       else
         # If there are type params but no type args we have a problem.
         ctx.error_at node, "This type needs to be qualified with type arguments", [
-          {rt_defn.params.not_nil!,
+          {rt.defn(ctx).params.not_nil!,
             "these type parameters are expecting arguments"}
         ]
         return
       end
     end
 
-    # If this is an identifier referencing a different type, skip it;
-    # it will have been validated at its referent location, and trying
-    # to validate it here would break because we don't have the Qualify node.
-    return if node.is_a?(AST::Identifier) \
-      && !type_check.classify.further_qualified?(node)
+    # If we have the wrong number of arguments, don't continue.
+    # Expect that the Infer pass will show an error for the problem of count.
+    return if rt.args.size != infer.type_params.size
+
+    # Get the AST node terms associated with the arguments, for error reporting.
+    # Also get the AST node terms associated
+    type_param_extracts = AST::Extract.type_params(rt.defn(ctx).params)
+    arg_terms = node.is_a?(AST::Qualify) ? node.group.terms : [] of AST::Node
+
+    # If some of the args come from defaults, go fetch those AST terms as well.
+    if arg_terms.size < rt.args.size
+      arg_terms = arg_terms + type_param_extracts[arg_terms.size..-1].map(&.last.not_nil!)
+    end
 
     raise "inconsistent arguments" if arg_terms.size != rt.args.size
-
-    # Check number of type args against number of type params.
-    if rt.args.empty?
-      ctx.error_at node, "This type needs to be qualified with type arguments", [
-        {rt_defn.params.not_nil!, "these type parameters are expecting arguments"}
-      ]
-      return
-    elsif rt.args.size > type_params_max
-      params_pos = (rt_defn.params || rt_defn.ident).pos
-      ctx.error_at node, "This type qualification has too many type arguments", [
-        {params_pos, "at most #{type_params_max} type arguments were expected"},
-      ].concat(arg_terms[type_params_max..-1].map { |arg|
-        {arg.pos, "this is an excessive type argument"}
-      })
-      return
-    elsif rt.args.size < type_params_min
-      params = rt_defn.params.not_nil!
-      ctx.error_at node, "This type qualification has too few type arguments", [
-        {params.pos, "at least #{type_params_min} type arguments were expected"},
-      ].concat(params.terms[rt.args.size..-1].map { |param|
-        {param.pos, "this additional type parameter needs an argument"}
-      })
-      return
-    end
 
     # Check each type arg against the bound of the corresponding type param.
     arg_terms.zip(rt.args).each_with_index do |(arg_node, arg), index|
@@ -163,8 +139,7 @@ class Mare::Compiler::TypeCheck
       arg_cap = arg.cap_only_inner.value.as(Cap)
       cap_set = infer.type_param_bound_cap_sets[index]
       unless cap_set.includes?(arg_cap)
-        bound_pos =
-          rt_defn.params.not_nil!.terms[index].as(AST::Group).terms.last.pos
+        bound_pos = type_param_extracts[index][1].not_nil!.pos
         cap_set_string = "{" + cap_set.map(&.string).join(", ") + "}"
         ctx.error_at arg_node,
           "This type argument won't satisfy the type parameter bound", [
@@ -178,8 +153,7 @@ class Mare::Compiler::TypeCheck
       next unless param_bound
 
       unless arg.satisfies_bound?(ctx, param_bound)
-        bound_pos =
-          rt_defn.params.not_nil!.terms[index].as(AST::Group).terms.last.pos
+        bound_pos = type_param_extracts[index][1].not_nil!.pos
         ctx.error_at arg_node,
           "This type argument won't satisfy the type parameter bound", [
             {bound_pos, "the type parameter bound is #{param_bound.show_type}"},

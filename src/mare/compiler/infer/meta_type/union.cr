@@ -393,6 +393,10 @@ struct Mare::Compiler::Infer::MetaType::Union
     result
   end
 
+  def with_additional_type_arg!(arg : MetaType) : Inner
+    raise NotImplementedError.new("#{self} with_additional_type_arg!")
+  end
+
   def substitute_type_params_retaining_cap(
     type_params : Array(TypeParam),
     type_args : Array(MetaType)

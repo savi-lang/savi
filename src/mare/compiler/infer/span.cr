@@ -108,8 +108,8 @@ module Mare::Compiler::Infer
       Span.new(inner.deciding_partial_reify_index(index))
     end
 
-    def narrowing_partial_reify_indices(target_bits : BitArray) : Span
-      Span.new(inner.narrowing_partial_reify_indices(target_bits))
+    def narrowing_partial_reify_indices(target_bits : BitArray, mark_unsatisfiable = true) : Span
+      Span.new(inner.narrowing_partial_reify_indices(target_bits, mark_unsatisfiable))
     end
 
     def maybe_fallback_based_on_mt_simplify(options : Array({Symbol, Span}))
@@ -146,7 +146,7 @@ module Mare::Compiler::Infer
       abstract def transform_mt_to_span(&block : MetaType -> Span) : Inner
       abstract def combine_mt_to_span(other : Inner, &block : (MetaType, MetaType) -> Span) : Inner
       abstract def deciding_partial_reify_index(index : Int) : Inner
-      abstract def narrowing_partial_reify_indices(target_bits : BitArray) : Inner
+      abstract def narrowing_partial_reify_indices(target_bits : BitArray, mark_unsatisfiable : Bool) : Inner
       abstract def maybe_fallback_based_on_mt_simplify(options : Array({Symbol, Inner})) : Inner
       abstract def final_mt_simplify(ctx : Context) : Inner
     end
@@ -201,7 +201,7 @@ module Mare::Compiler::Infer
         self
       end
 
-      def narrowing_partial_reify_indices(target_bits : BitArray) : Inner
+      def narrowing_partial_reify_indices(target_bits : BitArray, mark_unsatisfiable : Bool) : Inner
         self
       end
 
@@ -356,13 +356,13 @@ module Mare::Compiler::Infer
         @mapping.find(&.first.[](index)).not_nil!.last
       end
 
-      def narrowing_partial_reify_indices(target_bits : BitArray) : Inner
+      def narrowing_partial_reify_indices(target_bits : BitArray, mark_unsatisfiable : Bool) : Inner
         ByReifyCap.build(@mapping.compact_map { |bits, inner|
           intersection_bits = target_bits.intersection?(bits)
           if intersection_bits
             {intersection_bits, inner}
           else
-            {bits, Terminal.new(MetaType.unsatisfiable)}
+            {bits, Terminal.new(MetaType.unsatisfiable)} if mark_unsatisfiable
           end
         })
       end
@@ -492,7 +492,7 @@ module Mare::Compiler::Infer
         self
       end
 
-      def narrowing_partial_reify_indices(target_bits : BitArray) : Inner
+      def narrowing_partial_reify_indices(target_bits : BitArray, mark_unsatisfiable : Bool) : Inner
         self
       end
 
@@ -567,7 +567,7 @@ module Mare::Compiler::Infer
         self
       end
 
-      def narrowing_partial_reify_indices(target_bits : BitArray) : Inner
+      def narrowing_partial_reify_indices(target_bits : BitArray, mark_unsatisfiable : Bool) : Inner
         self
       end
 
