@@ -35,7 +35,7 @@ compiler-spec: PHONY
 compiler-spec.inner: PHONY /tmp/bin/mare
 	echo && /tmp/bin/mare compilerspec "$(target)" $(extra_args)
 compiler-spec.all: PHONY
-	find "spec/compiler" -name '*.mare.spec.md' | xargs -I '{}' make compiler-spec target="{}" extra_args="$(extra_args)"
+	find "spec/compiler" -name '*.mare.spec.md' | xargs -I '{}' sh -c 'make compiler-spec target="{}" extra_args="'$(extra_args)'" || exit 255'
 
 # Evaluate a Hello World example.
 example-eval: PHONY
