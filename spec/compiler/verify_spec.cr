@@ -24,6 +24,7 @@ describe Mare::Compiler::Verify do
   it "complains if the Main type is not an actor" do
     source = Mare::Source.new_example <<-SOURCE
     :class Main
+      :new (env Env)
     SOURCE
 
     expected = <<-MSG
@@ -40,6 +41,7 @@ describe Mare::Compiler::Verify do
   it "complains if the Main actor has type parameters" do
     source = Mare::Source.new_example <<-SOURCE
     :actor Main (A)
+      :new (env Env)
     SOURCE
 
     expected = <<-MSG
@@ -78,13 +80,13 @@ describe Mare::Compiler::Verify do
   it "complains if the Main.new function is not a constructor" do
     source = Mare::Source.new_example <<-SOURCE
     :actor Main
-      :fun new
+      :fun new (env Env)
     SOURCE
 
     expected = <<-MSG
     The Main.new function defined here must be a constructor:
     from (example):2:
-      :fun new
+      :fun new (env Env)
            ^~~
     MSG
 
