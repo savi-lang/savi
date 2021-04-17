@@ -1120,11 +1120,14 @@ module Mare::Compiler::Infer
         span.transform_mt do |meta_type|
           results = [] of MetaType
 
-          meta_type.simplify(ctx).each_reachable_defn(ctx).each do |rt|
+          meta_type.map_each_union_member do |union_member_mt|
+            rt = union_member_mt.single_rt?
+            next unless rt
+
             # TODO: Support more element antecedent detection patterns.
             if rt.link.name == "Array" \
             && rt.args.size == 1
-              results << rt.args.first.simplify(ctx)
+              results << rt.args.first
             end
           end
 

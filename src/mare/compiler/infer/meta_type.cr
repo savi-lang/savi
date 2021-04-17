@@ -314,6 +314,9 @@ struct Mare::Compiler::Infer::MetaType
       end
     nominal if nominal && nominal.defn.is_a?(ReifiedType)
   end
+  def single_rt?
+    single?.try(&.defn.as(ReifiedType))
+  end
 
   def single!
     raise "not singular: #{show_type}" unless singular?
