@@ -14,9 +14,9 @@
   :fun pony_os_connect_tcp (owner AsioEventNotify, host CPointer(U8), service CPointer(U8), from CPointer(U8), asio_flags U32) U32
   :fun pony_os_listen_tcp (owner AsioEventNotify, host CPointer(U8), service CPointer(U8)) CPointer(AsioEvent)
   :fun pony_os_accept (event CPointer(AsioEvent)) U32
-  :fun pony_os_socket_close (U32) None
-  :fun pony_os_socket_shutdown (U32) None
-  :fun pony_os_writev (event CPointer(AsioEvent), iov CPointer(CPointer(U8)), count USize) USize
+  :fun pony_os_socket_close (fd U32) None
+  :fun pony_os_socket_shutdown (fd U32) None
+  :fun pony_os_writev (event CPointer(AsioEvent), iov CPointer(USize), count USize) USize
   :fun pony_os_recv! (event CPointer(AsioEvent), buffer CPointer(U8), count USize) USize
   :fun pony_os_errno () OSError // TODO: shouldn't require empty param parens here
   :fun pony_os_sockname (fd U32, net_addr NetAddress'ref) None

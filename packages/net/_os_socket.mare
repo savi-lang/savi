@@ -23,7 +23,7 @@
   :fun shutdown (fd U32)
     LibPonyOs.pony_os_socket_shutdown(fd)
 
-  :fun writev (event CPointer(AsioEvent), buffers Array(CPointer(U8)), count USize)
+  :fun writev (event CPointer(AsioEvent), buffers Array(USize), count USize)
     LibPonyOs.pony_os_writev(event, buffers.cpointer, count)
 
   :fun recv! (event CPointer(AsioEvent), buffer Array(U8), offset USize = 0)
