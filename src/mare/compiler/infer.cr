@@ -168,8 +168,13 @@ module Mare::Compiler::Infer
       called_func_spans[for_info].first
     end
 
-    def each_called_func_link(ctx)
+    def each_called_func_link(ctx, for_info : Info? = nil)
       called_func_spans.flat_map { |info, (call_defn_span, func_names)|
+        # Allow the caller to filter by a specific Info if given.
+        # TODO: Simplify this case more - there's no reason to iterate over
+        # the map when we know the key we want - silly but good enough for now.
+        next [] of {Info, Program::Function::Link} if for_info && for_info != info
+
         call_defn_span.all_terminal_meta_types.flat_map { |terminal_mt|
           terminal_mt.map_each_union_member { |union_member_mt|
             union_member_mt.map_each_intersection_term_and_or_cap { |term_mt|

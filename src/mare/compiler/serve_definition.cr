@@ -32,32 +32,28 @@ class Mare::Compiler::ServeDefinition
 
   def [](f_link : Program::Function::Link, node : AST::Node)
     refer = ctx.refer[f_link]
+    pre_infer = ctx.pre_infer[f_link]
+    infer = ctx.infer[f_link]
 
-    # TODO: Reimplement this using Infer instead of TypeCheck:
-    nil
-    # type_check = ctx.type_check.for_func_simple(ctx, f_link.type, f_link)
-    # type_check_info = ctx.type_check[f_link][node]?
-    # if type_check_info.is_a? Infer::FromCall
-    #   # Show function definition site of a call.
-    #   type_check_info.follow_call_get_call_defns(ctx, type_check).not_nil!.map do |_, _, other_f|
-    #     next unless other_f
-    #     other_f.ident.pos
-    #   end.first
-    # else
-    #   ref = refer[node]?
-    #   case ref
-    #   when Refer::Local
-    #     # Show local variable definition site.
-    #     ref.defn.pos
-    #   when Refer::LocalUnion
-    #     # Show local variable definition site.
-    #     ref.list.first.defn.pos
-    #   else
-    #     # Show type definition site of the resolved type of whatever we found.
-    #     type_check.analysis.resolved(ctx, node).each_reachable_defn(ctx).map do |defn|
-    #       defn.link.resolve(ctx).ident.pos
-    #     end.first
-    #   end
-    # end
+    infer_info = pre_infer[node]?
+    if infer_info.is_a? Infer::FromCall
+      # Show first function definition site of a call.
+      # TODO: Can we gracefully deal with cases of multiple possibilities?
+      infer.each_called_func_link(ctx, for_info: infer_info) { |_, called_f_link|
+        return called_f_link.resolve(ctx).ident.pos
+      }
+    else
+      ref = refer[node]?
+      case ref
+      when Refer::Local
+        # Show local variable definition site.
+        ref.defn.pos
+      when Refer::LocalUnion
+        # Show local variable definition site.
+        ref.list.first.defn.pos
+      else
+        nil
+      end
+    end
   end
 end
