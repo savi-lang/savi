@@ -7,6 +7,7 @@ describe Mare::Compiler::Lambda do
     SOURCE
 
     ctx = Mare.compiler.compile([source], :lambda)
+    ctx.errors.should be_empty
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "thunk")
     func.body.not_nil!.to_a.should eq [:group, ":",
@@ -40,6 +41,7 @@ describe Mare::Compiler::Lambda do
     SOURCE
 
     ctx = Mare.compiler.compile([source], :lambda)
+    ctx.errors.should be_empty
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "lambdas")
     func.body.not_nil!.to_a.should eq [:group, ":",
@@ -82,8 +84,7 @@ describe Mare::Compiler::Lambda do
                 ^~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :lambda)
-    end
+    Mare.compiler.compile([source], :lambda)
+      .errors.map(&.message).join("\n").should eq expected
   end
 end

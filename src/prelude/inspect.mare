@@ -7,7 +7,7 @@
 :trait box _InspectEach
   // TODO: use each instead of size and []!
   :fun size USize
-  :fun "[]!" (index USize) box // TODO: allow any box
+  :fun "[]!" (index USize) Any'box // TODO: use `box` instead of `Any'box`
 
 :trait box _InspectEnum
   :fun member_name String
@@ -18,13 +18,13 @@
 // TODO: Move this out of prelude maybe? Does that make sense?
 // TODO: Make this into a trait with "implement for"/typeclass style polymorphism
 :primitive Inspect
-  :fun "[]" (input box) String'val
+  :fun "[]" (input Any'box) String'val // TODO: use `box` instead of `Any'box`
     @into(String.new_iso, input)
 
-  :fun out (input box)
+  :fun out (input Any'box) // TODO: use `box` instead of `Any'box`
     InspectLibC.puts(@[input].cstring)
 
-  :fun into (output String'iso, input box) String'iso // TODO: use something like Crystal IO instead of String?
+  :fun into (output String'iso, input Any'box) String'iso // TODO: use `box` instead of `Any'box` // TODO: use something like Crystal IO instead of String?
     case (
     | input <: _InspectCustom | input.inspect_into(--output)
     | input <: _InspectEnum | output << input.member_name, --output

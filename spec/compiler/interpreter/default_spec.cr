@@ -20,9 +20,8 @@ describe Mare::Compiler::Interpreter::Default do
                   ^~~~~~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :import)
-    end
+    Mare.compiler.compile([source], :import)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains when a capability is specified for a behaviour" do
@@ -39,9 +38,8 @@ describe Mare::Compiler::Interpreter::Default do
           ^~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :import)
-    end
+    Mare.compiler.compile([source], :import)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "correctly handles an explicit union return type" do
@@ -51,6 +49,7 @@ describe Mare::Compiler::Interpreter::Default do
     SOURCE
 
     ctx = Mare.compiler.compile([source], :import)
+    ctx.errors.should be_empty
 
     greeter = ctx.program.types.first
     greeting = greeter.functions.first

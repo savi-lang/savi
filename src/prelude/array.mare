@@ -35,7 +35,7 @@
 
   :fun size: @_size
   :fun space: @_alloc
-  :fun cpointer (offset = 0) tag: @_ptr._offset(offset)
+  :fun cpointer (offset = 0) CPointer(A)'tag: @_ptr._offset(offset) // TODO: simply tag as return type; infer CPointer(A) part of it
 
   :fun is_empty: @_size == 0
   :fun ref clear: @_size = 0, @
@@ -93,10 +93,10 @@
   :: aliasable as themselves (with non-unique reference capabilities), so
   :: if the element type isn't aliasable, the cloned array will be empty.
 
-  :fun clone iso
+  :fun clone @'iso
     if (A <: alias) (
       array = @new_iso(@size)
-      _ptr_tag tag = @_ptr // TODO: this indirection shouldn't be needed
+      _ptr_tag CPointer(A)'tag = @_ptr // TODO: this indirection shouldn't be needed
       array._clone_from(_ptr_tag, @size)
       array._size = @size
       --array
@@ -107,7 +107,7 @@
   :fun ref _clone_from (other_ptr CPointer(A), size USize)
     other_ptr._unsafe._copy_to(@_ptr, size)
 
-  :fun "[]!" (index)
+  :fun "[]!" (index) (@->A)'aliased
     if (@size <= index) error!
     @_ptr._get_at(index)
 
@@ -147,11 +147,11 @@
     is_found = False
     index USize = 0
     while (is_found.not && index < @_size) (
-      is_found = //if (A <: Equatable(A)'read) (
-      //   @_ptr._get_at(index) == expected
-      // |
+      is_found = if (A <: Equatable(A)'read) (
+        @_ptr._get_at(index) == expected
+      |
         @_ptr._get_at(index) is expected
-      // )
+      )
       index += 1
     )
     is_found
@@ -200,7 +200,7 @@
 
   :fun select
     :yields for Bool
-    new_array = Array(A'aliased).new // TODO: allow the caller to specify space
+    new_array = Array((@->A)'aliased).new // TODO: allow the caller to specify space
     index USize = 0
     while (index < @_size) (
       element = @_ptr._get_at(index)
@@ -213,7 +213,7 @@
 
   :fun reject
     :yields for Bool
-    new_array = Array(A'aliased).new
+    new_array = Array((@->A)'aliased).new // TODO: allow the caller to specify space
     index USize = 0
     while (index < @_size) (
       element = @_ptr._get_at(index)

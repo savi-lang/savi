@@ -441,11 +441,9 @@ class Mare::Compiler::CodeGen::PonyRT
     # This is used for runtime type matching against abstract types (traits).
     is_asio_event_notify = false
     traits_bitmap = g.trait_bitmap_size.times.map { 0 }.to_a
-    infer = g.ctx.infer[gtype.type_def.reified]
-    g.ctx.reach.each_type_def.each do |other_def|
-      if infer.is_subtype_of?(g.ctx, other_def.reified)
-        next if gtype.type_def == other_def
-        raise "can't be subtype of a concrete" unless other_def.is_abstract?(g.ctx)
+    g.ctx.reach.each_type_def.each { |other_def|
+      g.ctx.reach.each_reached_subtype_of(g.ctx, other_def) { |sub_def|
+        next unless sub_def == gtype.type_def
 
         index = other_def.desc_id >> Math.log2(g.bitwidth).to_i
         raise "bad index or trait_bitmap_size" unless index < g.trait_bitmap_size
@@ -455,8 +453,8 @@ class Mare::Compiler::CodeGen::PonyRT
 
         # Take special note if this type is a subtype of AsioEventNotify.
         is_asio_event_notify = true if other_def.llvm_name == "AsioEventNotify"
-      end
-    end
+      }
+    }
     traits_bitmap_global = g.gen_global_for_const \
       @isize.const_array(traits_bitmap.map { |bits| @isize.const_int(bits) }),
       "#{type_def.llvm_name}.DESC.TRAITS"
@@ -1009,10 +1007,10 @@ class Mare::Compiler::CodeGen::PonyRT
       mutability = src_type.trace_mutability_of_nominal(g.ctx, dst_type)
       refined_dst_type =
         case mutability
-        when :mutable   then src_type_def.as_ref(g.ctx, "iso")
-        when :immutable then src_type_def.as_ref(g.ctx, "val")
-        when :opaque    then src_type_def.as_ref(g.ctx, "tag")
-        when :non       then src_type_def.as_ref(g.ctx, "non")
+        when :mutable   then src_type_def.as_ref(Infer::Cap::ISO)
+        when :immutable then src_type_def.as_ref(Infer::Cap::VAL)
+        when :opaque    then src_type_def.as_ref(Infer::Cap::TAG)
+        when :non       then src_type_def.as_ref(Infer::Cap::NON)
         else
           raise NotImplementedError.new([src_type, dst_type])
         end

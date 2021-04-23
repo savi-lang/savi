@@ -417,13 +417,13 @@ class Mare::Compiler::CodeGen::VeronaRT
     return :bare if !type_def.has_allocation?(g.ctx) || type_def.is_cpointer?(g.ctx)
 
     case type_ref.cap_only.cap_value
-    when "iso" then :iso
-    when "iso+" then :iso_eph
-    when "ref" then :ref
-    when "box" then :box
-    when "val" then :val
-    when "non" then :non
-    when "tag"
+    when Infer::Cap::ISO then :iso
+    when Infer::Cap::ISO_EPH then :iso_eph
+    when Infer::Cap::REF then :ref
+    when Infer::Cap::BOX then :box
+    when Infer::Cap::VAL then :val
+    when Infer::Cap::NON then :non
+    when Infer::Cap::TAG
       Error.at pos, "Only actors are allowed to be tag on Verona" \
         unless type_def.is_actor?(g.ctx)
 

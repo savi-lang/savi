@@ -12,7 +12,7 @@ This document is a work in progress, and it may not always be pretty or polished
 
 Like Pony, Mare has an "open" syntax for classes, functions, and other declarations. That is, such declarative entities do not require an "end" token in the syntax for the parser to know that they are finished - it can figure that out just by the fact that you've started the next class, function, or other declaration.
 
-You can spot a Mare declaration whenever you notice that a line begins with an identifer prefixed with a colon. For example, this snippet declares a `class` called `Person` and a function (`fun`) called `greeting` within it:
+You can spot a Mare declaration whenever you notice that a line begins with an identifier prefixed with a colon. For example, this snippet declares a `class` called `Person` and a function (`fun`) called `greeting` within it:
 
 ```mare
 :class Person

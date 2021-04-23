@@ -36,10 +36,12 @@ class Mare::Compiler
     when "jumps"            then :jumps
     when "consumes"         then :consumes
     when "inventory"        then :inventory
+    when "type_context"     then :type_context
     when "pre_infer"        then :pre_infer
-    when "alt_infer"        then :alt_infer
-    when "type_check"       then :type_check
+    when "pre_subtyping"    then :pre_subtyping
+    when "infer_edge"       then :infer_edge
     when "infer"            then :infer
+    when "type_check"       then :type_check
     when "privacy"          then :privacy
     when "completeness"     then :completeness
     when "reach"            then :reach
@@ -73,14 +75,16 @@ class Mare::Compiler
       when :jumps            then ctx.run(ctx.jumps)
       when :consumes         then ctx.run(ctx.consumes)
       when :inventory        then ctx.run(ctx.inventory)
+      when :type_context     then ctx.run(ctx.type_context)
       when :pre_infer        then ctx.run(ctx.pre_infer)
-      when :alt_infer        then ctx.run(ctx.alt_infer)
+      when :pre_subtyping    then ctx.run(ctx.pre_subtyping)
+      when :infer_edge       then ctx.run(ctx.infer_edge)
+      when :infer            then ctx.run(ctx.infer)
+      when :completeness     then ctx.run(ctx.completeness)
       when :type_check       then ctx.run_whole_program(ctx.type_check)
-      when :infer            then ctx.run_whole_program(ctx.infer)
-      when :privacy          then ctx.run(Privacy)
-      when :completeness     then ctx.run(Completeness)
+      when :privacy          then ctx.run(ctx.privacy)
+      when :verify           then ctx.run(ctx.verify)
       when :reach            then ctx.run_whole_program(ctx.reach)
-      when :verify           then ctx.run(Verify)
       when :paint            then ctx.run_whole_program(ctx.paint)
       when :codegen          then ctx.run_whole_program(ctx.code_gen)
       when :lifetime         then ctx.run_whole_program(ctx.lifetime)
@@ -115,23 +119,25 @@ class Mare::Compiler
     when :refer then [:lambda, :populate, :sugar, :jumps, :macros, :refer_type, :namespace]
     when :consumes then [:jumps, :refer]
     when :inventory then [:refer]
-    when :pre_infer then [:inventory, :jumps, :classify, :refer, :lambda, :populate]
-    when :alt_infer then [:pre_infer, :classify, :refer_type]
-    when :type_check then [:alt_infer, :pre_infer]
-    when :infer then [:pre_infer, :classify, :refer_type]
+    when :type_context then [:refer]
+    when :pre_infer then [:refer, :type_context, :inventory, :jumps, :classify, :lambda, :populate]
+    when :pre_subtyping then [:inventory, :lambda, :populate]
+    when :infer_edge then [:pre_subtyping, :pre_infer, :classify, :refer_type]
+    when :infer then [:infer_edge]
+    when :completeness then [:jumps, :pre_infer]
+    when :type_check then [:completeness, :infer, :pre_infer]
     when :privacy then [:infer]
-    when :completeness then [:jumps, :infer, :lambda, :sugar, :macros, :populate]
-    when :reach then [:infer]
-    when :verify then [:reach]
-    when :paint then [:reach]
-    when :codegen then [:paint, :verify, :reach, :completeness, :privacy, :infer, :inventory, :consumes, :jumps]
-    when :lifetime then [:reach, :infer]
-    when :codegen_verona then [:lifetime, :paint, :verify, :reach, :completeness, :privacy, :infer, :inventory, :consumes, :jumps]
+    when :verify then [:infer, :pre_infer, :inventory, :jumps]
+    when :reach then [:infer, :pre_subtyping, :refer, :namespace]
+    when :paint then [:reach, :inventory]
+    when :codegen then [:paint, :verify, :reach, :completeness, :privacy, :type_check, :infer, :pre_infer, :inventory, :consumes, :jumps]
+    when :lifetime then [:reach, :refer, :classify]
+    when :codegen_verona then [:lifetime, :paint, :verify, :reach, :completeness, :privacy, :type_check, :infer, :pre_infer, :inventory, :consumes, :jumps]
     when :eval then [:codegen]
     when :binary then [:codegen]
     when :binary_verona then [:codegen_verona]
-    when :serve_hover then [:refer, :infer]
-    when :serve_definition then [:refer, :infer]
+    when :serve_hover then [:refer, :type_check]
+    when :serve_definition then [:refer, :type_check]
     when :serve_lsp then [:serve_hover, :serve_definition]
     else raise NotImplementedError.new([:deps_of, target].inspect)
     end
@@ -185,12 +191,12 @@ class Mare::Compiler
     end
   end
 
-  def eval(string : String, options = CompilerOptions.new) : Int32
+  def eval(string : String, options = CompilerOptions.new) : Context
     content = ":actor Main\n:new (env)\n#{string}"
     library = Mare::Source::Library.new("(eval)")
     source = Mare::Source.new("(eval)", content, library)
 
-    Mare.compiler.compile([source], :eval, options).eval.exitcode
+    Mare.compiler.compile([source], :eval, options)
   end
 
   def compile(dirname : String, target : Symbol = :eval, options = CompilerOptions.new)
@@ -217,10 +223,12 @@ class Mare::Compiler
 
     satisfy(ctx, target)
 
-    ctx.prev_ctx = nil
-    @prev_ctx = ctx
-
     ctx
+  ensure
+    # Save the previous context for the purposes of caching in the next one,
+    # letting us quickly recompile any code that successfully compiled.
+    ctx.try(&.prev_ctx=(nil))
+    @prev_ctx = ctx
   end
 
   def self.prelude_library_path

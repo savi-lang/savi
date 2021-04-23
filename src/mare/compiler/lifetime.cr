@@ -36,7 +36,7 @@ class Mare::Compiler::Lifetime
 
   def run(ctx)
     ctx.reach.each_type_def.each do |reach_def|
-      reach_def.each_function(ctx).each do |reach_func|
+      ctx.reach.reached_funcs_for(reach_def).each do |reach_func|
         for_func = ForFunc.new(ctx, reach_def, reach_func)
 
         func = reach_func.reified.func(ctx)

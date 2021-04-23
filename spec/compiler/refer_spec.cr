@@ -38,6 +38,7 @@ describe Mare::Compiler::Refer do
     SOURCE
 
     ctx = Mare.compiler.compile([source], :refer)
+    ctx.errors.should be_empty
 
     main = ctx.namespace.main_type!(ctx)
     func = main.resolve(ctx).find_func!("new")
@@ -70,6 +71,7 @@ describe Mare::Compiler::Refer do
     SOURCE
 
     ctx = Mare.compiler.compile([source], :refer)
+    ctx.errors.should be_empty
 
     main = ctx.namespace.main_type!(ctx)
     func = main.resolve(ctx).find_func!("new")
@@ -125,9 +127,8 @@ describe Mare::Compiler::Refer do
                         ^
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :refer)
-    end
+    Mare.compiler.compile([source], :refer)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains when referencing a local declared in only some branches" do
@@ -165,9 +166,8 @@ describe Mare::Compiler::Refer do
     - but there were other possible branches where it wasn't assigned
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :refer)
-    end
+    Mare.compiler.compile([source], :refer)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "allows the use of branch-scoped variables to assign to outer ones" do

@@ -10,6 +10,7 @@ ready: PHONY Dockerfile
 
 # Run the full CI suite.
 ci: PHONY
+	make compiler-spec.all
 	make test extra_args="$(extra_args)"
 	make example-run dir="examples/adventofcode/2018" extra_args="--backtrace"
 
@@ -27,6 +28,14 @@ test.narrow: PHONY
 	docker exec -ti mare-dev make target="$(target)" extra_args="$(extra_args)" test.narrow.inner
 test.narrow.inner: PHONY
 	crystal spec spec/spec_helper.cr "$(target)" $(extra_args)
+
+# Run the given compiler-spec target.
+compiler-spec: PHONY
+	docker exec -i mare-dev make target="$(target)" extra_args="$(extra_args)" compiler-spec.inner
+compiler-spec.inner: PHONY /tmp/bin/mare
+	echo && /tmp/bin/mare compilerspec "$(target)" $(extra_args)
+compiler-spec.all: PHONY
+	find "spec/compiler" -name '*.mare.spec.md' | xargs -I '{}' sh -c 'make compiler-spec target="{}" extra_args="'$(extra_args)'" || exit 255'
 
 # Evaluate a Hello World example.
 example-eval: PHONY

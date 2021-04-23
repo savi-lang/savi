@@ -28,8 +28,8 @@ class Mare::Compiler::Paint
   def run(ctx)
     # Collect a mapping of the types that implement each function name.
     ctx.reach.each_type_def.each do |reach_def|
-      reach_def.each_function(ctx).each do |reach_func|
-        next if reach_func.reified.func(ctx).has_tag?(:hygienic)
+      ctx.reach.reached_funcs_for(reach_def).each do |reach_func|
+        next if reach_func.link.is_hygienic?
 
         observe_func(ctx, reach_def, reach_func)
       end

@@ -34,6 +34,10 @@ struct Mare::Compiler::Infer::MetaType
 
   def initialize(defn : ReifiedType, cap : String? = nil)
     cap ||= defn.link.cap
+    @inner = Nominal.new(defn).intersect(Capability.new(Cap.from_string(cap)))
+  end
+
+  def initialize(defn : ReifiedType, cap : Cap)
     @inner = Nominal.new(defn).intersect(Capability.new(cap))
   end
 
@@ -73,38 +77,52 @@ struct Mare::Compiler::Infer::MetaType
     MetaType.new(Unconstrained.instance)
   end
 
+  def self.cap(cap : Cap)
+    MetaType.new(Capability.new(cap))
+  end
+
   def self.cap(name : String)
-    MetaType.new(Capability.new(name))
+    MetaType.new(Capability.new(Cap.from_string(name)))
+  end
+
+  def cap(cap : Cap)
+    MetaType.new(@inner.intersect(Capability.new(cap)))
   end
 
   def cap(name : String)
-    MetaType.new(@inner.intersect(Capability.new(name)))
+    MetaType.new(@inner.intersect(Capability.new(Cap.from_string(name))))
+  end
+
+  def cap_only_inner
+    inner = @inner
+    case inner
+    when Capability; inner
+    when Nominal; Capability::NON if inner.ignores_cap?
+    when Intersection
+      inner.cap || (inner.ignores_cap? ? Capability::NON : nil)
+    when Union
+      caps = Set(Capability).new
+      inner.caps.try(&.each { |cap| caps << cap })
+      inner.intersects.try(&.each { |intersect|
+        cap = intersect.cap
+        caps << cap if cap
+      })
+      caps.size == 1 && caps.first
+    else
+      nil
+    end.as(Capability)
   end
 
   def cap_only
-    inner = @inner
-    MetaType.new(
-      case inner
-      when Capability; inner
-      when Nominal; Capability::NON if inner.ignores_cap?
-      when Intersection
-        inner.cap || (inner.ignores_cap? ? Capability::NON : nil)
-      when Union
-        caps = Set(Capability).new
-        inner.caps.try(&.each { |cap| caps << cap })
-        inner.intersects.try(&.each { |intersect|
-          cap = intersect.cap
-          caps << cap if cap
-        })
-        caps.size == 1 && caps.first
-      else
-        nil
-      end.as(Capability)
-    )
+    MetaType.new(cap_only_inner)
+  end
+
+  def override_cap(cap : Cap)
+    override_cap(Capability.new(cap))
   end
 
   def override_cap(name : String)
-    override_cap(Capability.new(name))
+    override_cap(Capability.new(Cap.from_string(name)))
   end
 
   def override_cap(meta_type : MetaType)
@@ -172,8 +190,34 @@ struct Mare::Compiler::Infer::MetaType
     inner.type_params
   end
 
-  def substitute_type_params(substitutions : Hash(TypeParam, MetaType))
-    MetaType.new(inner.substitute_type_params(substitutions))
+  def with_additional_type_arg!(arg : MetaType) : MetaType
+    MetaType.new(inner.with_additional_type_arg!(arg))
+  end
+
+  def substitute_type_params_retaining_cap(
+    type_params : Array(TypeParam),
+    type_args : Array(MetaType)
+  ) : MetaType
+    return self if type_params.empty?
+    MetaType.new(
+      inner.substitute_type_params_retaining_cap(type_params, type_args)
+    )
+  end
+
+  def each_type_alias_in_first_layer(&block : ReifiedTypeAlias -> _)
+    @inner.each_type_alias_in_first_layer(&block)
+  end
+
+  def substitute_each_type_alias_in_first_layer(&block : ReifiedTypeAlias -> MetaType)
+    MetaType.new(@inner.substitute_each_type_alias_in_first_layer(&block))
+  end
+
+  def any_type_alias_in_first_layer?
+    # TODO: A less hacky approach here would be good.
+    each_type_alias_in_first_layer { raise "here's one" }
+    false
+  rescue
+    true
   end
 
   def is_sendable? : Bool
@@ -181,13 +225,13 @@ struct Mare::Compiler::Infer::MetaType
   end
 
   # A partial reify type param is a type param intersected with a capability.
-  def is_partial_reify_type_param? : Bool
+  def is_partial_reify_of_type_param?(param : TypeParam) : Bool
     inner = inner()
     return false unless inner.is_a?(Intersection)
     return false unless inner.cap
     return false unless inner.anti_terms == nil
     return false unless inner.terms.try(&.size) == 1
-    return false unless inner.terms.try(&.first.try(&.defn.is_a?(TypeParam)))
+    return false unless inner.terms.try(&.first.try(&.defn.==(param)))
     true
   end
 
@@ -233,6 +277,11 @@ struct Mare::Compiler::Infer::MetaType
     @inner.is_a?(Capability)
   end
 
+  def type_param_only?
+    inner = @inner
+    inner.is_a?(Nominal) && inner.defn.is_a?(TypeParam)
+  end
+
   def within_constraints?(ctx : Context, types : Iterable(MetaType))
     subtype_of?(ctx, self.class.new_intersection(types))
   end
@@ -265,10 +314,33 @@ struct Mare::Compiler::Infer::MetaType
       end
     nominal if nominal && nominal.defn.is_a?(ReifiedType)
   end
+  def single_rt?
+    single?.try(&.defn.as(ReifiedType))
+  end
 
   def single!
     raise "not singular: #{show_type}" unless singular?
     single?.not_nil!.defn.as(ReifiedType)
+  end
+
+  def single_rt_or_rta!
+    single_rt_or_rta?.not_nil!
+  end
+  def single_rt_or_rta?
+    inner = inner()
+    case inner
+    when Intersection then
+      terms = inner.terms
+      MetaType.new(terms.first).single_rt_or_rta? if terms && terms.size == 1
+    when Nominal then
+      defn = inner.defn
+      case defn
+      when ReifiedTypeAlias; defn
+      when ReifiedType; defn
+      else nil
+      end
+    else nil
+    end
   end
 
   def -; negate end
@@ -299,38 +371,6 @@ struct Mare::Compiler::Infer::MetaType
   end
 
   private def self.simplify_intersection(ctx : Context, inner : Intersection)
-    # If we have any reified type aliases, we need to settle those first
-    # by unwrapping them, intersecting them, and recursively calling simplify.
-    if inner.terms.try(&.any?(&.defn.is_a?(ReifiedTypeAlias)))
-      result = Unconstrained.instance
-
-      # Intersect all of the pieces of this intersection, which would normally
-      # build up the same intersection again but for the unwrapping of the
-      # type aliases we find within, some of which may even be Unions
-      # (which would cause the resulting "intersection" to become a Union too).
-      inner.cap.try do |cap|
-        result = result.intersect(cap)
-        return result if result.is_a?(Unsatisfiable)
-      end
-      inner.terms.not_nil!.each do |term|
-        # Here is where we deal with the special case of unwrapping aliases:
-        begin
-          term_defn = term.defn
-          term = ctx.infer.unwrap_alias(ctx, term_defn).inner if term_defn.is_a?(ReifiedTypeAlias)
-        end
-        result = result.intersect(term)
-        return result if result.is_a?(Unsatisfiable)
-      end if inner.terms
-      inner.anti_terms.not_nil!.each do |term|
-        result = result.intersect(term)
-        return result if result.is_a?(Unsatisfiable)
-      end if inner.anti_terms
-
-      # Return the fully intersected result, simplified again via recursion.
-      # We stop recursing this code path when we see no more aliases to unwrap.
-      return simplify_inner(ctx, result)
-    end
-
     # TODO: complete the rest of the logic here (think about symmetry)
     removed_terms = Set(Nominal).new
     new_terms = inner.terms.try(&.select do |l|
@@ -340,7 +380,10 @@ struct Mare::Compiler::Infer::MetaType
       end
 
       # Return Unsatisfiable if l is concrete and isn't a subtype of all others.
-      if l.is_concrete? && inner.terms.try(&.any? { |r| !l.subtype_of?(ctx, r) })
+      # However, type parameter references are exempt from this requirement.
+      if l.is_concrete? && inner.terms.try(&.any? { |r|
+        !r.defn.is_a?(TypeParam) && !l.subtype_of?(ctx, r)
+      })
         return Unsatisfiable.instance
       end
 
@@ -353,7 +396,7 @@ struct Mare::Compiler::Infer::MetaType
       end
 
       true # keep this term
-    end)
+    end.map { |term| simplify_nominal(ctx, term) })
 
     removed_anti_terms = Set(AntiNominal).new
     new_anti_terms = inner.anti_terms.try(&.select do |l|
@@ -368,54 +411,11 @@ struct Mare::Compiler::Infer::MetaType
       true # keep this term
     end)
 
-    # If we didn't remove anything, there was no change.
-    return inner if removed_terms.empty? && removed_anti_terms.empty?
-
     # Otherwise, return as a new intersection.
     Intersection.build(inner.cap, new_terms.try(&.to_set), new_anti_terms.try(&.to_set))
   end
 
   private def self.simplify_union(ctx : Context, inner : Union)
-    # If we have any reified type aliases, we need to settle those first
-    # by unwrapping them, intersecting them, and recursively calling simplify.
-    if inner.terms.try(&.any?(&.defn.is_a?(ReifiedTypeAlias))) \
-    || inner.intersects.try(&.any?(&.terms.try(&.any?(&.defn.is_a?(ReifiedTypeAlias)))))
-      result = Unsatisfiable.instance
-
-      # Unite all of the pieces of this union, which would normally build up the
-      # same union again but for the unwrapping of the type aliases we find.
-      inner.caps.not_nil!.each do |cap|
-        result = result.unite(cap)
-        return result if result.is_a?(Unconstrained)
-      end if inner.caps
-      inner.terms.not_nil!.each do |term|
-        # Here is where we deal with the special case of unwrapping aliases:
-        begin
-          term_defn = term.defn
-          term = ctx.infer.unwrap_alias(ctx, term_defn).inner if term_defn.is_a?(ReifiedTypeAlias)
-        end
-        result = result.unite(term)
-        return result if result.is_a?(Unconstrained)
-      end if inner.terms
-      inner.anti_terms.not_nil!.each do |term|
-        result = result.unite(term)
-        return result if result.is_a?(Unconstrained)
-      end if inner.anti_terms
-      inner.intersects.not_nil!.each do |intersect|
-        # Here is where we deal with the special case of unwrapping aliases:
-        if intersect.terms.try(&.any?(&.defn.is_a?(ReifiedTypeAlias)))
-          result = result.unite(simplify_inner(ctx, intersect))
-        else
-          result = result.unite(intersect)
-        end
-        return result if result.is_a?(Unconstrained)
-      end if inner.intersects
-
-      # Return the fully intersected result, simplified again via recursion.
-      # We stop recursing this code path when we see no more aliases to unwrap.
-      return simplify_inner(ctx, result)
-    end
-
     caps = Set(Capability).new
     terms = Set(Nominal).new
     anti_terms = Set(AntiNominal).new
@@ -445,8 +445,13 @@ struct Mare::Compiler::Infer::MetaType
 
   private def self.simplify_nominal(ctx : Context, inner : Nominal)
     inner_defn = inner.defn
-    if inner_defn.is_a?(ReifiedTypeAlias)
-      simplify_inner(ctx, ctx.infer.unwrap_alias(ctx, inner_defn).inner)
+    case inner_defn
+    when ReifiedType
+      return inner if inner_defn.args.empty?
+      Nominal.new(ReifiedType.new(inner_defn.link, inner_defn.args.map(&.simplify(ctx))))
+    when ReifiedTypeAlias
+      return inner if inner_defn.args.empty?
+      Nominal.new(ReifiedTypeAlias.new(inner_defn.link, inner_defn.args.map(&.simplify(ctx))))
     else
       inner
     end
@@ -490,25 +495,68 @@ struct Mare::Compiler::Infer::MetaType
     results
   end
 
-  def alt_find_callable_func_defns(
+  def map_each_union_member(&block : MetaType -> T) forall T
+    results = [] of T
+
+    inner = @inner
+    case inner
+    when Union
+      inner.caps.try(&.each { |cap|
+        results << yield MetaType.new(cap)
+      })
+      inner.terms.try(&.each { |term|
+        results << yield MetaType.new(term)
+      })
+      inner.anti_terms.try(&.each { |anti_term|
+        results << yield MetaType.new(anti_term)
+      })
+      inner.intersects.try(&.each { |intersect|
+        results << yield MetaType.new(intersect)
+      })
+    when Intersection; results << yield MetaType.new(inner)
+    when Nominal;      results << yield MetaType.new(inner)
+    when Capability;   results << yield MetaType.new(inner)
+    else NotImplementedError.new("map_each_union_member for #{inner.inspect}")
+    end
+
+    results
+  end
+
+  def map_each_intersection_term_and_or_cap(&block : MetaType -> T) forall T
+    results = [] of T
+
+    inner = @inner
+    case inner
+    when Union
+      raise "wrap a call to map_each_union_member around this method first"
+    when Intersection
+      cap = MetaType.new(inner.cap || Unconstrained.instance)
+      inner.terms.try(&.each { |term|
+        results << yield MetaType.new(term).intersect(cap)
+      })
+    when Nominal; results << yield MetaType.new(inner)
+    when Capability; results << yield MetaType.new(inner)
+    else NotImplementedError.new("each_intersection_term_and_or_cap for #{inner.inspect}")
+    end
+
+    results
+  end
+
+  def gather_call_receiver_span(
     ctx : Context,
-    infer : AltInfer::Visitor?,
-    name : String,
-  ) : Set(Tuple(Inner, ReifiedType?, Program::Function?))
-    set = Set(Tuple(Inner, ReifiedType?, Program::Function?)).new
-    @inner.alt_find_callable_func_defns(ctx, infer, name).try(&.each { |tuple|
-      set.add(tuple)
-    })
-    set
+    pos : Source::Pos,
+    infer : Visitor?,
+    name : String
+  ) : Span
+    @inner.gather_call_receiver_span(ctx, pos, infer, name)
   end
 
   def find_callable_func_defns(
     ctx : Context,
-    infer : ForReifiedFunc?,
     name : String,
-  ) : Set(Tuple(Inner, ReifiedType?, Program::Function?))
-    set = Set(Tuple(Inner, ReifiedType?, Program::Function?)).new
-    @inner.find_callable_func_defns(ctx, infer, name).try(&.each { |tuple|
+  ) : Set(Tuple(MetaType, ReifiedType?, Program::Function?))
+    set = Set(Tuple(MetaType, ReifiedType?, Program::Function?)).new
+    @inner.find_callable_func_defns(ctx, name).try(&.each { |tuple|
       set.add(tuple)
     })
     set

@@ -41,7 +41,7 @@
     @_init_array(space)
 
     old_array.each -> (entry |
-      if (entry <: _KVBA(K, V)) (
+      if (entry <: @->(_KVBA(K, V))) (
         try (@_array[@_search(entry.key)]! = entry)
       )
     )
@@ -117,7 +117,7 @@
       entry = @_array[index]!
 
       case (
-      | entry <: _KVBA(K, V) |
+      | entry <: @->(_KVBA(K, V)) |
         entry.value = --value
 
         // If this entry is not already the head, we will make it the new head.
@@ -177,7 +177,7 @@
         entry = @_array[idx]!
 
         case (
-        | entry <: _KVBA(K, V) |
+        | entry <: @->(_KVBA(K, V)) |
           if H.equal(key, entry.key) (
             result_idx = idx
             found = True

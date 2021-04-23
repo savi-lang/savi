@@ -18,10 +18,6 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       @meta_type.show_type
     end
 
-    def is_subtype?(infer, other : Ref)
-      @meta_type.subtype_of?(infer, other.meta_type)
-    end
-
     def is_tuple?
       false # TODO
     end
@@ -65,16 +61,17 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     def all_callable_concrete_defs_for(ctx, name) : Array(Def)
       results = [] of Def
 
-      @meta_type.find_callable_func_defns(ctx, nil, name).each do |(_, rt, _)|
+      @meta_type.find_callable_func_defns(ctx, name).each { |(_, rt, _)|
         next unless rt
+        this_def = ctx.reach[rt]
         if rt.link.is_abstract?
-          ctx.infer[rt].each_known_complete_subtype(ctx).each do |other_rt|
-            results << ctx.reach[other_rt] unless other_rt.link.is_abstract?
-          end
+          ctx.reach.each_reached_subtype_of(ctx, this_def) { |other_def|
+            results << other_def unless other_def.link.is_abstract?
+          }
         else
-          results << ctx.reach[rt]
+          results << this_def
         end
-      end
+      }
 
       results.uniq
     end
@@ -404,6 +401,10 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       ctx.refer[@reified.link]
     end
 
+    def link
+      @reified.link
+    end
+    # TODO: remove this alias:
     def program_type
       @reified.link
     end
@@ -480,15 +481,8 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       is_numeric?(ctx) && @reified.defn(ctx).const_bool("is_signed")
     end
 
-    def each_function(ctx)
-      rt = @reified
-      rt.defn(ctx).functions
-        .flat_map { |f| ctx.infer[f.make_link(rt.link)].each_reified_func(rt) }
-        .flat_map { |rf| ctx.reach.reached_funcs_for(rf) }
-    end
-
-    def as_ref(ctx, cap = nil) : Ref
-      Ref.new(Infer::MetaType.new(@reified, cap))
+    def as_ref(cap = nil) : Ref
+      Ref.new(Infer::MetaType.new(@reified))
     end
   end
 
@@ -524,18 +518,14 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
 
   struct Func
     getter reach_def : Def
-    protected getter infer : Infer::ReifiedFuncAnalysis # TODO: can/should this be removed or is it good to remain here?
+    getter reified : Infer::ReifiedFunction
     getter signature : Signature
 
-    def reified
-      infer.reified
+    def link
+      @reified.link
     end
 
-    def initialize(@reach_def, @infer, @signature)
-    end
-
-    def resolve(ctx, node)
-      ctx.reach[infer.resolve(node)]
+    def initialize(@reach_def, @reified, @signature)
     end
   end
 
@@ -550,120 +540,162 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
 
   def run(ctx)
     # Reach functions called starting from the entrypoint of the program.
-    main = ctx.namespace.main_type?(ctx)
-    if main
-      new_f = main.resolve(ctx).find_default_constructor?
-      handle_func(ctx, ctx.infer[main].no_args, new_f.make_link(main)) if new_f
+    main_rt = ctx.namespace.main_type?(ctx).try { |link| Infer::ReifiedType.new(link) }
+    if main_rt
+      main_f_link = main_rt.defn(ctx).find_default_constructor?.try(&.make_link(main_rt.link))
+      if main_f_link
+        main_rf = Infer::ReifiedFunction.new(main_rt, main_f_link, Infer::MetaType.new(main_rt, Infer::Cap::REF))
+        handle_func(ctx, main_rf)
+      end
     end
 
     # Reach extra functions and types that are used by the runtime,
     # even if they are not used/reached by the user-written program.
-    env = ctx.namespace.prelude_type("Env")
-    handle_func(ctx, ctx.infer[env].no_args, env.resolve(ctx).find_func!("_create").make_link(env))
-    n = ctx.namespace.prelude_type("AsioEventNotify")
-    handle_func(ctx, ctx.infer[n].no_args, n.resolve(ctx).find_func!("_event_notify").make_link(n))
-    string = ctx.namespace.prelude_type("String")
-    handle_type_def(ctx, ctx.infer[string].no_args)
+    env_rt = Infer::ReifiedType.new(ctx.namespace.prelude_type("Env"))
+    env_f_link = env_rt.defn(ctx).find_func!("_create").make_link(env_rt.link)
+    env_rf = Infer::ReifiedFunction.new(env_rt, env_f_link, Infer::MetaType.new(env_rt, "val"))
+    handle_func(ctx, env_rf)
+    notify_rt = Infer::ReifiedType.new(ctx.namespace.prelude_type("AsioEventNotify"))
+    notify_f_link = notify_rt.defn(ctx).find_func!("_event_notify").make_link(notify_rt.link)
+    notify_rf = Infer::ReifiedFunction.new(notify_rt, notify_f_link, Infer::MetaType.new(notify_rt, Infer::Cap::REF))
+    handle_func(ctx, notify_rf)
+    string_rt = Infer::ReifiedType.new(ctx.namespace.prelude_type("String"))
+    handle_type_def(ctx, string_rt)
 
-    # Run our "sympathetic resonance" mini-pass.
-    sympathetic_resonance(ctx)
+    # Run our "sympathetic resonance" mini-pass until there are no new funcs.
+    loop {
+      func_count = @seen_funcs.values.flat_map(&.size)
+
+      sympathetic_resonance(ctx)
+
+      new_func_count = @seen_funcs.values.flat_map(&.size)
+      break if new_func_count == func_count
+      func_count = new_func_count
+    }
+
+    # Finally, resonate the incompatible signatures of all compatible functions.
+    sympathetic_signature_resonance(ctx)
   end
 
-  def handle_func(ctx, rt : Infer::ReifiedType, f_link : Program::Function::Link)
-    # Get each infer instance associated with this function.
-    ctx.infer[f_link].each_reified_func(rt).each do |rf|
-      infer = ctx.infer[rf]
+  def handle_func(ctx, rf : Infer::ReifiedFunction)
+    # Skip this function if we've already seen it.
+    return if @seen_funcs.has_key?(rf)
 
-      # Skip this function if we've already seen it.
-      next if @seen_funcs.has_key?(rf)
-      reach_funcs = Array(Func).new
-      @seen_funcs[rf] = reach_funcs
+    # Give handle_type_def a chance to canonicalize the ReifiedType,
+    # possibly giving us an altered ReifiedFunction.
+    rt = handle_type_def(ctx, rf.type).reified
+    rf = Infer::ReifiedFunction.new(rt, rf.link, rf.receiver)
 
-      # Reach all type references seen by this function.
-      infer.each_meta_type do |meta_type|
-        handle_type_ref(ctx, meta_type)
-      end
+    reach_funcs = Array(Func).new
+    @seen_funcs[rf] = reach_funcs
 
-      # Add this function with its signature.
-      reach_def = ctx.reach[rt]
-      reach_funcs << Func.new(reach_def, infer, signature_for(ctx, infer))
+    infer = ctx.infer[rf.link]
 
-      # Reach all functions called by this function.
-      infer.each_called_func.each do |pos, called_rt, called_func_link|
-        handle_func(ctx, called_rt, called_func_link)
-      end
+    # Reach all type references seen by this function.
+    infer.each_meta_type_within(ctx, rf) { |meta_type|
+      handle_type_ref(ctx, meta_type)
+    }
 
-      # Reach all functions that have the same name as this function and
-      # belong to a type that is a subtype of this one.
-      # TODO: Can this be combined with the sympathetic_resonance mini-pass somehow?
-      if rt.link.is_abstract?
-        ctx.infer[rt].each_known_complete_subtype(ctx).to_a.uniq.each do |other_rt|
-          other_func = other_rt.defn(ctx).find_func!(f_link.name)
-          handle_func(ctx, other_rt, other_func.make_link(other_rt.link))
-        end
+    # Add this function with its signature.
+    reach_def = handle_type_def(ctx, rt)
+    reach_funcs << Func.new(reach_def, rf, signature_for(ctx, rf, infer))
+
+    # Reach all functions called by this function.
+    infer.each_called_func_within(ctx, rf) { |info, called_rf|
+      handle_func(ctx, called_rf)
+    }
+
+    # Reach all functions callable via reflection from this function.
+    infer.each_reflection.each do |reflection_info|
+      reflection_mt = rf.meta_type_of(ctx, reflection_info, infer).not_nil!
+      reflection_rt = reflection_mt.single!
+      reflect_mt = reflection_rt.args.first
+      reflect_rt = reflect_mt.single!
+
+      reflect_rt.defn(ctx).functions.each do |f|
+        next if f.has_tag?(:hygienic)
+        next if f.body.nil?
+        next if f.ident.value.starts_with?("_")
+
+        reflect_f_link = f.make_link(reflect_rt.link)
+        reflect_rf = Infer::ReifiedFunction.new(reflect_rt, reflect_f_link, reflect_mt)
+        handle_func(ctx, reflect_rf)
       end
     end
-
-    handle_type_def(ctx, rt)
   end
 
-  def signature_for(ctx, infer : Infer::ReifiedFuncAnalysis) : Signature
-    receiver = ctx.reach[infer.reified.receiver]
+  def signature_for(
+    ctx : Context,
+    rf : Infer::ReifiedFunction,
+    infer : Infer::FuncAnalysis
+  ) : Signature
+    receiver = ctx.reach.handle_type_ref(ctx, rf.receiver)
 
-    params = [] of Ref
-    infer.reified.func(ctx).params.try do |param_exprs|
-      param_exprs.terms.map do |param_expr|
-        params << ctx.reach[infer.resolved(ctx, param_expr)]
-      end
-    end
-    ret = ctx.reach[infer.ret_resolved]
+    params = infer.param_spans.map { |span|
+      ctx.reach.handle_type_ref(ctx, rf.meta_type_of(ctx, span, infer).not_nil!)
+    }
+    ret = ctx.reach.handle_type_ref(ctx, rf.meta_type_of_ret(ctx, infer).not_nil!)
 
-    yield_out = infer.yield_out_resolved.map do |resolved|
-      ctx.reach[resolved]
-    end
+    yield_out = infer.yield_out_spans.map { |span|
+      ctx.reach.handle_type_ref(ctx, rf.meta_type_of(ctx, span, infer).not_nil!)
+    }
 
-    Signature.new(infer.reified.name, receiver, params, ret, yield_out)
+    Signature.new(rf.name, receiver, params, ret, yield_out)
   end
 
   def handle_field(ctx, rt : Infer::ReifiedType, f_link, ident) : {String, Ref}?
     # Reach the metatype of the field.
-    ref = nil
-    ctx.infer[f_link].each_reified_func(rt).each do |rf|
-      # TODO: should we choose a specific reification instead of just taking the final one?
-      ref = ctx.infer[rf].resolved(ctx, ident)
-      handle_type_ref(ctx, ref)
-    end
-    return unless ref
+    rf = Infer::ReifiedFunction.new(rt, f_link, Infer::MetaType.new(rt, Infer::Cap::REF))
+    mt = rf.meta_type_of(ctx, ident)
+    return unless mt
+    handle_type_ref(ctx, mt)
 
     # Handle the field as if it were a function.
-    handle_func(ctx, rt, f_link)
+    handle_func(ctx, rf)
 
-    # Return the Ref instance for this meta type.
-    {f_link.name, @refs[ref]}
+    # Return the name and Ref for this field.
+    {f_link.name, Ref.new(mt)}
   end
 
-  def handle_type_ref(ctx, meta_type : Infer::MetaType)
+  def handle_type_ref(ctx, meta_type : Infer::MetaType) : Ref
     # Skip this type ref if we've already seen it.
-    return if @refs.has_key?(meta_type)
+    existing_ref = @refs[meta_type]?
+    return existing_ref if existing_ref
 
-    # First, reach any type definitions referenced by this type reference.
-    meta_type.each_reachable_defn(ctx).each { |t| handle_type_def(ctx, t) }
+    simple_meta_type = meta_type.substitute_each_type_alias_in_first_layer { |rta|
+      rta.meta_type_of_target(ctx).not_nil!
+    }.simplify(ctx)
 
-    # Now, save a Ref instance for this meta type.
-    @refs[meta_type] = Ref.new(meta_type)
+    # Reach any type definitions referenced by this type reference.
+    simple_meta_type.each_reachable_defn(ctx).each { |t| handle_type_def(ctx, t) }
+
+    # Save a Ref instance for this meta type.
+    @refs[meta_type] = Ref.new(simple_meta_type)
   end
 
   def handle_type_def(ctx, rt : Infer::ReifiedType)
     # Skip this type def if we've already seen it.
-    return if @defs.has_key?(rt)
+    existing_def = @defs[rt]?
+    return existing_def if existing_def
 
-    # Skip this type def if it's not completely reified.
-    return unless rt.is_complete?(ctx)
+    # Handle the case of having type args that need to be simplified.
+    simple_arg_mts = rt.args.map(&.substitute_each_type_alias_in_first_layer { |rta|
+      rta.meta_type_of_target(ctx).not_nil!
+    }.simplify(ctx))
+    if simple_arg_mts != rt.args
+      simple_rt = Infer::ReifiedType.new(rt.link, simple_arg_mts)
+      simple_def = handle_type_def(ctx, simple_rt)
+      @defs[rt] = simple_def
+      return simple_def
+    end
+
+    # Confirm that this type def is completely reified.
+    raise "this type is not complete: #{rt}" unless rt.is_complete?(ctx)
 
     # Now, save a Def instance for this program type.
     # We do this sooner rather than later because we may recurse here.
     fields = [] of {String, Ref}
-    @defs[rt] = Def.new(ctx, rt, self, fields)
+    @defs[rt] = new_def = Def.new(ctx, rt, self, fields)
 
     # Now, if the type has any type arguments, reach those as well.
     rt.args.each { |arg| handle_type_ref(ctx, arg) }
@@ -673,69 +705,87 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     fields.concat(rt.defn(ctx).functions.select(&.has_tag?(:field)).map do |f|
       handle_field(ctx, rt, f.make_link(rt.link), f.ident)
     end.compact)
+
+    new_def
+  end
+
+  def each_reached_subtype_of(ctx, abstract_def : Def)
+    abstract_link = abstract_def.link
+
+    # Only continue if this is an abstract type (one which may have subtypes).
+    return nil unless abstract_link.is_abstract?
+
+    possible_subtype_links = ctx.pre_subtyping[abstract_link].possible_subtypes
+
+    @defs.values.each { |other_def|
+      next if other_def == abstract_def
+
+      next unless ctx.subtyping.is_subtype_of?(ctx, other_def.reified, abstract_def.reified)
+
+      yield other_def
+    }
   end
 
   def sympathetic_resonance(ctx)
-    # For each reachable abstract type def in the program,
-    # collect the type defs that are subtypes of it.
-    abstract_defs = Hash(Reach::Def, Array(Reach::Def)).new
-    each_type_def.select(&.is_abstract?(ctx)).each do |abstract_def|
-      abstract_defs[abstract_def] = subtype_defs = [] of Reach::Def
-      ctx.infer[abstract_def.reified]
-      .each_known_complete_subtype(ctx).to_a.uniq.each do |other_rt|
-        other_def = @defs[other_rt]?
-        subtype_defs << other_def if other_def
-      end
-    end
+    @seen_funcs.keys.group_by(&.type).each { |abstract_rt, abstract_rfs|
+      abstract_def = @defs[abstract_rt]
 
-    # For each method in each abstract type, sympathetically resonate into
-    # the corresponding methods in each concrete type that is a subtype of it.
-    abstract_defs.each do |abstract_def, subtype_defs|
-      subtype_defs.each do |subtype_def|
-        abstract_def.reified.defn(ctx).functions.each do |abstract_f|
-          abstract_f_link = abstract_f.make_link(abstract_def.reified.link)
-          ctx.infer[abstract_f_link].each_reified_func(abstract_def.reified).each do |abstract_rf|
-            abstract_seen = @seen_funcs[abstract_rf]?
-            next unless abstract_seen && !abstract_seen.empty?
+      each_reached_subtype_of(ctx, abstract_def) { |subtype_def|
+        abstract_rfs.each { |abstract_rf|
+          next if abstract_rf.link.is_hygienic?
 
-            subtype_def.reified.defn(ctx).functions.each do |subtype_f|
-              subtype_f_link = subtype_f.make_link(subtype_def.reified.link)
-              ctx.infer[subtype_f_link].each_reified_func(subtype_def.reified).each do |subtype_rf|
-                subtype_seen = @seen_funcs[subtype_rf]?
-                next unless subtype_seen && !subtype_seen.empty?
+          # Construct the ReifiedFunction in the subtype that corresponds to
+          # that ReifiedFunction in the abstract type (which can reach it).
+          subtype_rt = subtype_def.reified
+          subtype_rf = Infer::ReifiedFunction.new(
+            subtype_rt,
+            Program::Function::Link.new(subtype_rt.link, abstract_rf.link.name, nil),
+            Infer::MetaType.new_nominal(subtype_rt).intersect(abstract_rf.receiver.cap_only)
+          )
 
-                # Skip to the next subtype function if this isn't the right one
-                # corresponding to the current function on the abstract type.
-                next unless (abstract_seen.any? do |abstract_func|
-                  subtype_seen.any? do |subtype_func|
-                    subtype_func.signature.subtype_of?(ctx, abstract_func.signature)
-                  end
-                end)
+          handle_func(ctx, subtype_rf)
+        }
+      }
+    }
+  end
 
-                # For each signature known to this abstract type for this function,
-                # sympathetically resonate that signature into the subtype.
-                abstract_seen.each do |abstract_func|
-                  # Skip if the subtype already has a version with this signature,
-                  # or at least one that is codegen-compatible.
-                  next if (subtype_seen.any? do |subtype_func|
-                    abstract_func.signature.codegen_compat(ctx) == \
-                      subtype_func.signature.codegen_compat(ctx)
-                  end)
+  def sympathetic_signature_resonance(ctx)
+    @seen_funcs.group_by(&.first.type).each { |abstract_rt, abstract_func_pairs|
+      abstract_def = @defs[abstract_rt]
 
-                  # Create a new function manifestation in the subtype with this
-                  # signature, so that it is codegen-compatible with the abstract.
-                  subtype_seen << Func.new(
-                    subtype_seen.first.reach_def,
-                    subtype_seen.first.infer,
-                    abstract_func.signature,
-                  )
-                end
-              end
-            end
-          end
-        end
-      end
-    end
+      each_reached_subtype_of(ctx, abstract_def) { |subtype_def|
+        reached_func_sets_for(subtype_def).each { |(subtype_rf, subtype_funcs)|
+          abstract_func_pairs.each { |abstract_rf, abstract_funcs|
+            # Skip to the next subtype function if this isn't the right one
+            # corresponding to the current function on the abstract type.
+            next unless abstract_funcs.any? { |abstract_func|
+              subtype_funcs.any? { |subtype_func|
+                subtype_func.signature.subtype_of?(ctx, abstract_func.signature)
+              }
+            }
+
+            # For each signature known to this abstract type for this function,
+            # sympathetically resonate that signature into the subtype.
+            abstract_funcs.each { |abstract_func|
+              # Skip if the subtype already has a version with this signature,
+              # or at least one that is codegen-compatible.
+              next if subtype_funcs.any? { |subtype_func|
+                abstract_func.signature.codegen_compat(ctx) == \
+                  subtype_func.signature.codegen_compat(ctx)
+              }
+
+              # Create a new function manifestation in the subtype with this
+              # signature, so that it is codegen-compatible with the abstract.
+              subtype_funcs << Func.new(
+                subtype_funcs.first.reach_def,
+                subtype_funcs.first.reified,
+                abstract_func.signature,
+              )
+            }
+          }
+        }
+      }
+    }
   end
 
   # Traits are numbered 0, 1, 2, 3, 4, ...
@@ -743,10 +793,11 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
   @trait_count = 0
   def next_trait_id(ctx, new_def : Def)
     # Don't assign a new trait id if it is identical to another existing trait
-    infer = ctx.infer[new_def.reified]
     identical_def = @defs.values.find do |other_def|
-      ctx.infer[other_def.reified].is_subtype_of?(ctx, new_def.reified) \
-      && ctx.infer[new_def.reified].is_subtype_of?(ctx, other_def.reified)
+      next unless other_def.reified.link.is_abstract?
+
+      ctx.subtyping.is_subtype_of?(ctx, other_def.reified, new_def.reified) \
+      && ctx.subtyping.is_subtype_of?(ctx, new_def.reified, other_def.reified)
     end
     return identical_def.desc_id if identical_def
 
@@ -779,7 +830,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
   end
 
   def [](meta_type : Infer::MetaType)
-    @refs[meta_type]
+    Ref.new(meta_type)
   end
 
   def [](rt : Infer::ReifiedType)
@@ -790,8 +841,15 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     @seen_funcs.has_key?(rf)
   end
 
-  def reached_funcs_for(rf : Infer::ReifiedFunction)
-    @seen_funcs[rf]? || Array(Func).new
+  def reached_funcs_for(reach_def : Def)
+    @seen_funcs
+      .select { |rf, _| rf.type == reach_def.reified }
+      .flat_map(&.last)
+  end
+
+  def reached_func_sets_for(reach_def : Def)
+    @seen_funcs
+      .select { |rf, _| rf.type == reach_def.reified }
   end
 
   def each_type_def

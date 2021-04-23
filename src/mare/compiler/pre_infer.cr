@@ -18,13 +18,14 @@ require "./pass/analyze"
 #
 module Mare::Compiler::PreInfer
   struct Analysis
-    getter yield_out_infos : Array(Infer::Local)
-    property! yield_in_info : Infer::Local
+    getter yield_out_infos : Array(Infer::YieldOut)
+    property! yield_in_info : Infer::YieldIn
 
     def initialize
-      @yield_out_infos = [] of Infer::Local
+      @yield_out_infos = [] of Infer::YieldOut
       @redirects = {} of AST::Node => AST::Node
       @infos = {} of AST::Node => Infer::Info
+      @extra_infos = [] of Infer::Info
     end
 
     protected def redirect(from : AST::Node, to : AST::Node)
@@ -43,7 +44,16 @@ module Mare::Compiler::PreInfer
 
     def [](node : AST::Node); @infos[follow_redirects(node)]; end
     def []?(node : AST::Node); @infos[follow_redirects(node)]?; end
-    protected def []=(node, info); @infos[follow_redirects(node)] = info; end
+    protected def []=(node, info)
+      @infos[follow_redirects(node)] = info
+    end
+    def each_info(&block : Infer::Info -> Nil)
+      @infos.each_value(&block)
+      @extra_infos.each(&block)
+    end
+    protected def observe_extra_info(info)
+      @extra_infos << info
+    end
   end
 
   class FuncVisitor < Mare::AST::Visitor
@@ -59,6 +69,7 @@ module Mare::Compiler::PreInfer
       @jumps : Jumps::Analysis,
       @classify : Classify::Analysis,
       @refer : Refer::Analysis,
+      @type_context : TypeContext::Analysis,
     )
       @local_idents = Hash(Refer::Local, AST::Node).new
       @local_ident_overrides = Hash(AST::Node, AST::Node).new
@@ -71,6 +82,11 @@ module Mare::Compiler::PreInfer
 
     def []?(node : AST::Node)
       @analysis[node]?
+    end
+
+    # Get the type context layer index of the given node.
+    private def layer(node : AST::Node)
+      @type_context.layer_index(node)
     end
 
     def link
@@ -108,7 +124,7 @@ module Mare::Compiler::PreInfer
           # TODO: special-case this somewhere else?
           if link.type.name == "Main" \
           && link.name == "new"
-            env = Infer::FixedPrelude.new(func.ident.pos, "Env")
+            env = Infer::FixedPrelude.new(func.ident.pos, 0, "Env")
             param_info = self[param].as(Infer::Param)
             param_info.set_explicit(env) unless param_info.explicit?
           end
@@ -117,7 +133,7 @@ module Mare::Compiler::PreInfer
 
       # Create a fake local variable that represents the return value.
       # See also the #ret method.
-      @analysis[ret] = Infer::FuncBody.new(ret.pos,
+      @analysis[ret] = Infer::FuncBody.new(ret.pos, 0,
         @jumps.catches[ret]?.try(
           &.select(&.kind.is_a? AST::Jump::Kind::Return).map do |jump|
             inf = @analysis[jump]
@@ -132,13 +148,13 @@ module Mare::Compiler::PreInfer
       # For constructors, this is the self type and listed receiver cap.
       if func.has_tag?(:constructor)
         self[ret].as(Infer::FuncBody).set_explicit(
-          Infer::FromConstructor.new(func.cap.not_nil!.pos, func.cap.not_nil!.value)
+          Infer::FromConstructor.new(func.cap.not_nil!.pos, 0, func.cap.not_nil!.value)
         )
       elsif func_ret
         func_ret.accept(ctx, self)
         self[ret].as(Infer::FuncBody).set_explicit(@analysis[func_ret])
       elsif func_body && @jumps.always_error?(func_body)
-        none = Infer::FixedPrelude.new(ret.pos, "None")
+        none = Infer::FixedPrelude.new(ret.pos, 0, "None")
         self[ret].as(Infer::FuncBody).set_explicit(none)
       end
 
@@ -155,9 +171,9 @@ module Mare::Compiler::PreInfer
 
       # Create fake local variables that represents the yield-related types.
       yield_out_arg_count.times do
-        @analysis.yield_out_infos << Infer::Local.new((func.yield_out || func.ident).pos)
+        @analysis.yield_out_infos << Infer::YieldOut.new((func.yield_out || func.ident).pos, 0)
       end
-      @analysis.yield_in_info = Infer::Local.new((func.yield_in || func.ident).pos)
+      @analysis.yield_in_info = Infer::YieldIn.new((func.yield_in || func.ident).pos, 0)
 
       # Constrain via the "yield out" part of the explicit signature if present.
       func.yield_out.try do |yield_out|
@@ -181,7 +197,7 @@ module Mare::Compiler::PreInfer
         yield_in.accept(ctx, self)
         @analysis.yield_in_info.set_explicit(@analysis[yield_in])
       else
-        fixed = Infer::FixedPrelude.new(@analysis.yield_in_info.pos, "None")
+        fixed = Infer::FixedPrelude.new(@analysis.yield_in_info.pos, 0, "None")
         @analysis.yield_in_info.set_explicit(fixed)
       end
 
@@ -212,14 +228,6 @@ module Mare::Compiler::PreInfer
       ctx.namespace.prelude_type(name)
     end
 
-    def reified_type(ctx : Context, *args)
-      ctx.infer.for_rt(ctx, *args).reified
-    end
-
-    def reified_type_alias(ctx : Context, *args)
-      ctx.infer.for_rt_alias(ctx, *args).reified
-    end
-
     def lookup_local_ident(ref : Refer::Local)
       node = @local_idents[ref]?
       return unless node
@@ -248,7 +256,7 @@ module Mare::Compiler::PreInfer
     def visit(ctx, node)
       if @classify.type_expr?(node)
         # For type expressions, don't do the usual touch - construct info here.
-        @analysis[node] = Infer::FixedTypeExpr.new(node.pos, node)
+        @analysis[node] = Infer::FixedTypeExpr.new(node.pos, layer(node), node)
       else
         touch(ctx, node)
       end
@@ -266,18 +274,18 @@ module Mare::Compiler::PreInfer
         if ref.with_value
           # We allow it to be resolved as if it were a type expression,
           # since this enum value literal will have the type of its referent.
-          @analysis[node] = Infer::FixedEnumValue.new(node.pos, node)
+          @analysis[node] = Infer::FixedEnumValue.new(node.pos, layer(node), node)
         else
           # A type reference whose value is used and is not itself a value
           # must be marked non, rather than having the default cap for that type.
           # This is used when we pass a type around as if it were a value,
           # where that value is a stateless singleton able to call `:fun non`s.
-          @analysis[node] = Infer::FixedSingleton.new(node.pos, node)
+          @analysis[node] = Infer::FixedSingleton.new(node.pos, layer(node), node)
         end
       when Refer::TypeAlias
-        @analysis[node] = Infer::FixedSingleton.new(node.pos, node)
+        @analysis[node] = Infer::FixedSingleton.new(node.pos, layer(node), node)
       when Refer::TypeParam
-        @analysis[node] = Infer::FixedSingleton.new(node.pos, node, ref)
+        @analysis[node] = Infer::FixedSingleton.new(node.pos, layer(node), node, ref)
       when Refer::LocalUnion, Refer::Local
         local_ref =
           if ref.is_a? Refer::LocalUnion
@@ -288,19 +296,22 @@ module Mare::Compiler::PreInfer
 
         local_ident = lookup_local_ident(local_ref)
         if local_ident
-          @analysis.redirect(node, local_ident)
+          local_info = @analysis[local_ident].as(Infer::DynamicInfo)
+          @analysis[node] = Infer::LocalRef.new(local_info, layer(node), local_ref)
         else
-          @analysis[node] = local_ref.param_idx ? Infer::Param.new(node.pos) : Infer::Local.new(node.pos)
+          @analysis[node] = local_ref.param_idx \
+            ? Infer::Param.new(node.pos, layer(node)) \
+            : Infer::Local.new(node.pos, layer(node))
           @local_idents[local_ref] = node
         end
       when Refer::Self
-        @analysis[node] = Infer::Self.new(node.pos)
+        @analysis[node] = Infer::Self.new(node.pos, layer(node))
       when Refer::Unresolved
-        # Leave the node as unresolved if this identifer is not a value.
+        # Leave the node as unresolved if this identifier is not a value.
         return if @classify.no_value?(node)
 
-        # Otherwise, raise an error to the user:
-        Error.at node, "This identifer couldn't be resolved"
+        # Otherwise, record an error to show the user:
+        @analysis[node] = Infer::ErrorInfo.new(node, "This identifier couldn't be resolved")
       else
         raise NotImplementedError.new(ref)
       end
@@ -311,44 +322,42 @@ module Mare::Compiler::PreInfer
 
       @analysis[node] = case node.kind
       when AST::Jump::Kind::Error
-        Infer::JumpError.new(node.pos, term_info)
+        Infer::JumpError.new(node.pos, layer(node), term_info)
       when AST::Jump::Kind::Return
-        Infer::JumpReturn.new(node.pos, term_info)
+        Infer::JumpReturn.new(node.pos, layer(node), term_info)
       when AST::Jump::Kind::Break
-        Infer::JumpBreak.new(node.pos, term_info)
+        Infer::JumpBreak.new(node.pos, layer(node), term_info)
       when AST::Jump::Kind::Continue
-        Infer::JumpContinue.new(node.pos, term_info)
+        Infer::JumpContinue.new(node.pos, layer(node), term_info)
       else
         raise ""
       end
     end
 
     def touch(ctx : Context, node : AST::LiteralString)
-      @analysis[node] = Infer::FixedPrelude.new(node.pos, "String")
+      @analysis[node] = Infer::FixedPrelude.new(node.pos, layer(node), "String")
     end
 
     # A literal character could be any integer or floating-point machine type.
     def touch(ctx : Context, node : AST::LiteralCharacter)
-      defns = [prelude_type(ctx, "Numeric")]
-      mts = defns.map { |defn| Infer::MetaType.new(reified_type(ctx, defn)).as(Infer::MetaType) } # TODO: is it possible to remove this superfluous "as"?
-      mt = Infer::MetaType.new_union(mts).cap("val")
-      @analysis[node] = Infer::Literal.new(node.pos, mt)
+      t_link = prelude_type(ctx, "Numeric")
+      mt = Infer::MetaType.new(Infer::ReifiedType.new(t_link), Infer::Cap::VAL)
+      @analysis[node] = Infer::Literal.new(node.pos, layer(node), mt)
     end
 
     # A literal integer could be any integer or floating-point machine type.
     def touch(ctx : Context, node : AST::LiteralInteger)
-      defns = [prelude_type(ctx, "Numeric")]
-      mts = defns.map { |defn| Infer::MetaType.new(reified_type(ctx, defn)).as(Infer::MetaType) } # TODO: is it possible to remove this superfluous "as"?
-      mt = Infer::MetaType.new_union(mts).cap("val")
-      @analysis[node] = Infer::Literal.new(node.pos, mt)
+      t_link = prelude_type(ctx, "Numeric")
+      mt = Infer::MetaType.new(Infer::ReifiedType.new(t_link), Infer::Cap::VAL)
+      @analysis[node] = Infer::Literal.new(node.pos, layer(node), mt)
     end
 
     # A literal float could be any floating-point machine type.
     def touch(ctx : Context, node : AST::LiteralFloat)
-      defns = [prelude_type(ctx, "F32"), prelude_type(ctx, "F64")]
-      mts = defns.map { |defn| Infer::MetaType.new(reified_type(ctx, defn)).as(Infer::MetaType) } # TODO: is it possible to remove this superfluous "as"?
-      mt = Infer::MetaType.new_union(mts).cap("val")
-      @analysis[node] = Infer::Literal.new(node.pos, mt)
+      t_links = [prelude_type(ctx, "F32"), prelude_type(ctx, "F64")]
+      mts = t_links.map { |t_link| Infer::MetaType.new(Infer::ReifiedType.new(t_link), Infer::Cap::VAL) }
+      mt = Infer::MetaType.new_union(mts)
+      @analysis[node] = Infer::Literal.new(node.pos, layer(node), mt)
     end
 
     def touch(ctx : Context, node : AST::Group)
@@ -357,10 +366,10 @@ module Mare::Compiler::PreInfer
         # Do nothing here - we'll handle it in one of the parent nodes.
       when "(", ":"
         @analysis[node] =
-          Infer::Sequence.new(node.pos, node.terms.map { |term| self[term] })
+          Infer::Sequence.new(node.pos, layer(node), node.terms.map { |term| self[term] })
       when "["
         @analysis[node] =
-          Infer::ArrayLiteral.new(node.pos, node.terms.map { |term| self[term] })
+          Infer::ArrayLiteral.new(node.pos, layer(node), node.terms.map { |term| self[term] })
       when " "
         ref = @refer[node.terms[0]]?
         if ref.is_a?(Refer::Local) && ref.defn == node.terms[0]
@@ -386,19 +395,19 @@ module Mare::Compiler::PreInfer
     end
 
     def touch(ctx : Context, node : AST::FieldRead)
-      field = Infer::Field.new(node.pos, node.value) # TODO: consider caching this to reduce duplication?
-      @analysis[node] = Infer::FieldRead.new(field, Infer::Self.new(field.pos))
+      field = Infer::Field.new(node.pos, layer(node), node.value)
+      @analysis[node] = Infer::FieldRead.new(field, Infer::Self.new(field.pos, layer(node)))
     end
 
     def touch(ctx : Context, node : AST::FieldWrite)
-      field = Infer::Field.new(node.pos, node.value) # TODO: consider caching this to reduce duplication?
+      field = Infer::Field.new(node.pos, layer(node), node.value)
       @analysis[node] = field
       field.assign(ctx, @analysis[node.rhs], node.rhs.pos)
     end
 
     def touch(ctx : Context, node : AST::FieldReplace)
-      field = Infer::Field.new(node.pos, node.value) # TODO: consider caching this to reduce duplication?
-      @analysis[node] = Infer::FieldExtract.new(field, Infer::Self.new(field.pos))
+      field = Infer::Field.new(node.pos, layer(node), node.value)
+      @analysis[node] = Infer::FieldExtract.new(field, Infer::Self.new(field.pos, layer(node)))
       field.assign(ctx, @analysis[node.rhs], node.rhs.pos)
     end
 
@@ -408,15 +417,16 @@ module Mare::Compiler::PreInfer
         # Do nothing here - we'll handle it in one of the parent nodes.
       when "=", "DEFAULTPARAM"
         lhs = self[node.lhs]
+        lhs = lhs.info if lhs.is_a?(Infer::LocalRef)
         case lhs
         when Infer::Local
           lhs.assign(ctx, @analysis[node.rhs], node.rhs.pos)
-          @analysis[node] = Infer::FromAssign.new(node.pos, lhs, @analysis[node.rhs])
+          @analysis[node] = Infer::FromAssign.new(node.pos, layer(node), lhs, @analysis[node.rhs])
         when Infer::Param
           lhs.assign(ctx, @analysis[node.rhs], node.rhs.pos)
-          @analysis[node] = Infer::FromAssign.new(node.pos, lhs, @analysis[node.rhs])
+          @analysis[node] = Infer::FromAssign.new(node.pos, layer(node), lhs, @analysis[node.rhs])
         else
-          raise NotImplementedError.new(node.lhs)
+          raise NotImplementedError.new(lhs)
         end
       when "."
         call_ident, call_args, yield_params, yield_block = AST::Extract.call(node)
@@ -428,6 +438,7 @@ module Mare::Compiler::PreInfer
 
         @analysis[node] = call = Infer::FromCall.new(
           call_ident.pos,
+          layer(node),
           lhs_info,
           call_ident.value,
           call_args,
@@ -442,9 +453,9 @@ module Mare::Compiler::PreInfer
         call_args.try(&.accept(ctx, self))
         if call_args
           call_args.terms.each_with_index do |call_arg, index|
-            new_info = Infer::TowardCallParam.new(call_arg.pos, call, index)
+            new_info = Infer::TowardCallParam.new(call_arg.pos, layer(node), call, index)
             @analysis[call_arg].add_downstream(call_arg.pos, new_info, 0)
-            call.resolvables << new_info
+            @analysis.observe_extra_info(new_info)
           end
         end
 
@@ -452,25 +463,23 @@ module Mare::Compiler::PreInfer
         yield_params.try(&.accept(ctx, self))
         if yield_params
           yield_params.terms.each_with_index do |yield_param, index|
-            new_info = Infer::FromCallYieldOut.new(yield_param.pos, call, index)
+            new_info = Infer::FromCallYieldOut.new(yield_param.pos, layer(node), call, index)
             @analysis[yield_param].as(Infer::Local).assign(ctx, new_info, yield_param.pos)
-            call.resolvables << new_info
+            @analysis.observe_extra_info(new_info)
           end
         end
 
         # The yield block result info needs a link back to the FromCall as well.
         yield_block.try(&.accept(ctx, self))
         if yield_block
-          new_info = Infer::TowardCallYieldIn.new(yield_block.pos, call)
+          new_info = Infer::TowardCallYieldIn.new(yield_block.pos, layer(node), call)
           @analysis[yield_block].add_downstream(yield_block.pos, new_info, 0)
-          call.resolvables << new_info
+          @analysis.observe_extra_info(new_info)
         end
 
       when "is"
         # Just know that the result of this expression is a boolean.
-        @analysis[node] = new_info = Infer::FixedPrelude.new(node.pos, "Bool")
-        new_info.resolvables << self[node.lhs]
-        new_info.resolvables << self[node.rhs]
+        @analysis[node] = new_info = Infer::FixedPrelude.new(node.pos, layer(node), "Bool")
       when "<:", "!<:"
         positive_check = node.op.value == "<:"
         need_to_check_if_right_is_subtype_of_left = true
@@ -480,34 +489,34 @@ module Mare::Compiler::PreInfer
           unless rhs_info.is_a?(Infer::FixedTypeExpr)
 
         # If the left-hand side is the name of a local variable...
-        if lhs_info.is_a?(Infer::Local) || lhs_info.is_a?(Infer::Param)
+        if lhs_info.is_a?(Infer::LocalRef) || lhs_info.is_a?(Infer::Local) || lhs_info.is_a?(Infer::Param)
           # Set up a local type refinement condition, which can be used within
           # a choice body to inform the type system about the type relationship.
           refine = @analysis.follow_redirects(node.lhs)
-          @analysis[node] = Infer::TypeConditionForLocal.new(node.pos, refine, rhs_info, positive_check)
+          @analysis[node] = Infer::TypeConditionForLocal.new(node.pos, layer(node), refine, rhs_info, positive_check)
 
         # If the left-hand side is the name of a type parameter...
         elsif lhs_info.is_a?(Infer::FixedSingleton) && lhs_info.type_param_ref
           # Strip the "non" from the fixed type, as if it were a type expr.
-          @analysis[node.lhs] = new_lhs_info = Infer::FixedTypeExpr.new(node.lhs.pos, node.lhs)
+          @analysis[node.lhs] = new_lhs_info = Infer::FixedTypeExpr.new(node.lhs.pos, layer(node), node.lhs)
 
           # Set up a type param refinement condition, which can be used within
           # a choice body to inform the type system about the type relationship.
           refine = lhs_info.type_param_ref.not_nil!
-          @analysis[node] = Infer::TypeParamCondition.new(node.pos, refine, new_lhs_info, rhs_info, positive_check)
+          @analysis[node] = Infer::TypeParamCondition.new(node.pos, layer(node), refine, new_lhs_info, rhs_info, positive_check)
 
         # If the left-hand side is the name of any other fixed type...
         elsif lhs_info.is_a?(Infer::FixedSingleton)
           # Strip the "non" from the fixed types, as if each were a type expr.
-          @analysis[node.lhs] = lhs_info = Infer::FixedTypeExpr.new(node.lhs.pos, node.lhs)
-          @analysis[node.rhs] = rhs_info = Infer::FixedTypeExpr.new(node.rhs.pos, node.rhs)
+          @analysis[node.lhs] = lhs_info = Infer::FixedTypeExpr.new(node.lhs.pos, layer(node.lhs), node.lhs)
+          @analysis[node.rhs] = rhs_info = Infer::FixedTypeExpr.new(node.rhs.pos, layer(node.rhs), node.rhs)
 
           # We can know statically at compile time whether it's true or false.
-          @analysis[node] = Infer::TypeConditionStatic.new(node.pos, lhs_info, rhs_info, positive_check)
+          @analysis[node] = Infer::TypeConditionStatic.new(node.pos, layer(node), lhs_info, rhs_info, positive_check)
 
         # For all other possible left-hand sides...
         else
-          @analysis[node] = Infer::TypeCondition.new(node.pos, lhs_info, rhs_info, positive_check)
+          @analysis[node] = Infer::TypeCondition.new(node.pos, layer(node), lhs_info, rhs_info, positive_check)
         end
 
       else raise NotImplementedError.new(node.op.value)
@@ -525,27 +534,25 @@ module Mare::Compiler::PreInfer
       # We only care about working with type arguments and type parameters now.
       return unless term_info.is_a?(Infer::FixedSingleton)
 
-      @analysis[node] = Infer::FixedSingleton.new(node.pos, node, term_info.type_param_ref)
+      @analysis[node] = Infer::FixedSingleton.new(node.pos, layer(node), node, term_info.type_param_ref)
     end
 
     def touch(ctx : Context, node : AST::Prefix)
       case node.op.value
       when "source_code_position_of_argument"
-        @analysis[node] = Infer::FixedPrelude.new(node.pos, "SourceCodePosition")
+        @analysis[node] = Infer::FixedPrelude.new(node.pos, layer(node), "SourceCodePosition")
       when "reflection_of_type"
-        @analysis[node] = Infer::ReflectionOfType.new(node.pos, @analysis[node.term])
+        @analysis[node] = Infer::ReflectionOfType.new(node.pos, layer(node), @analysis[node.term])
       when "reflection_of_runtime_type_name"
-        @analysis[node] = info = Infer::FixedPrelude.new(node.pos, "String")
-        info.resolvables << @analysis[node.term]
+        @analysis[node] = info = Infer::FixedPrelude.new(node.pos, layer(node), "String")
       when "identity_digest_of"
-        @analysis[node] = info = Infer::FixedPrelude.new(node.pos, "USize")
-        info.resolvables << @analysis[node.term]
+        @analysis[node] = info = Infer::FixedPrelude.new(node.pos, layer(node), "USize")
       when "address_of"
-        @analysis[node] = Infer::AddressOf.new(node.pos, @analysis[node.term])
+        @analysis[node] = Infer::AddressOf.new(node.pos, layer(node), @analysis[node.term])
       when "--"
-        @analysis[node] = Infer::Consume.new(node.pos, @analysis[node.term])
+        @analysis[node] = Infer::Consume.new(node.pos, layer(node), @analysis[node.term])
       when "recover_UNSAFE"
-        @analysis[node] = Infer::RecoverUnsafe.new(node.pos, @analysis[node.term])
+        @analysis[node] = Infer::RecoverUnsafe.new(node.pos, layer(node), @analysis[node.term])
       else
         raise NotImplementedError.new(node.op.value)
       end
@@ -555,11 +562,7 @@ module Mare::Compiler::PreInfer
       branches = node.list.map do |cond, body|
         # Visit the cond AST - we skipped it before with visit_children: false.
         cond.accept(ctx, self)
-
-        # Each condition in a choice must evaluate to a type of Bool.
-        fixed_bool = Infer::FixedPrelude.new(node.pos, "Bool")
         cond_info = self[cond]
-        cond_info.add_downstream(node.pos, fixed_bool, 1)
 
         inner_cond_info = cond_info
         while inner_cond_info.is_a?(Infer::Sequence)
@@ -570,11 +573,21 @@ module Mare::Compiler::PreInfer
         # true if we are in the body; hence we can apply the type refinement.
         # TODO: Do this in a less special-casey sort of way if possible.
         # TODO: Do we need to override things besides locals? should we skip for non-locals?
+        override_key = nil
         if inner_cond_info.is_a?(Infer::TypeConditionForLocal)
-          @local_ident_overrides[inner_cond_info.refine] = refine = inner_cond_info.refine.dup
+          local_node = inner_cond_info.refine
+          local_info = self[local_node]
+          if local_info.is_a?(Infer::LocalRef)
+            local_node = lookup_local_ident(local_info.ref).not_nil!
+            local_info = self[local_node]
+          end
+
+          override_key = local_node
+          @local_ident_overrides[override_key] = refine = local_node.dup
           @analysis[refine] = Infer::Refinement.new(
             inner_cond_info.pos,
-            self[inner_cond_info.refine],
+            inner_cond_info.layer_index,
+            local_info,
             inner_cond_info.refine_type,
             inner_cond_info.positive_check,
           )
@@ -584,29 +597,32 @@ module Mare::Compiler::PreInfer
         body.accept(ctx, self)
 
         # Remove the override we put in place before, if any.
-        if inner_cond_info.is_a?(Infer::TypeConditionForLocal)
-          @local_ident_overrides.delete(inner_cond_info.refine).not_nil!
-        end
+        @local_ident_overrides.delete(override_key).not_nil! if override_key
 
         {cond ? self[cond] : nil, self[body], @jumps.away?(body)}
       end
 
-      @analysis[node] = Infer::Choice.new(node.pos, branches)
+      fixed_bool = Infer::FixedPrelude.new(node.pos, layer(node), "Bool")
+      @analysis.observe_extra_info(fixed_bool)
+
+      @analysis[node] = choice = Infer::Choice.new(node.pos, layer(node), branches, fixed_bool)
     end
 
     def touch(ctx : Context, node : AST::Loop)
-      # The condition of the loop must evaluate to a type of Bool.
-      fixed_bool = Infer::FixedPrelude.new(node.pos, "Bool")
       cond_info = self[node.cond]
-      cond_info.add_downstream(node.pos, fixed_bool, 1)
 
       self[node.else_body].override_describe_kind =
         "loop's result when it runs zero times"
 
-      @analysis[node] = Infer::Loop.new(node.pos, [
+      fixed_bool = Infer::FixedPrelude.new(node.pos, layer(node), "Bool")
+      @analysis.observe_extra_info(fixed_bool)
+
+      @analysis[node] = Infer::Loop.new(node.pos, layer(node),
+        [
           {self[node.cond], self[node.body], @jumps.away?(node.body)},
           {nil, self[node.else_body], @jumps.away?(node.else_body)},
         ],
+        fixed_bool,
         @jumps.catches[node]?.try(
           &.select(&.kind.is_a? AST::Jump::Kind::Break).map do |jump|
             inf = @analysis[jump]
@@ -630,10 +646,16 @@ module Mare::Compiler::PreInfer
       self[node.else_body].override_describe_kind =
         "try result when it catches an error"
 
-      @analysis[node] = Infer::Choice.new(node.pos, [
-        {nil, self[node.body], @jumps.away?(node.body)},
-        {nil, self[node.else_body], @jumps.away?(node.else_body)},
-      ] of {Infer::Info?, Infer::Info, Bool})
+      fixed_bool = Infer::FixedPrelude.new(node.pos, layer(node), "Bool")
+      @analysis.observe_extra_info(fixed_bool)
+
+      @analysis[node] = choice = Infer::Choice.new(node.pos, layer(node),
+        [
+          {nil, self[node.body], @jumps.away?(node.body)},
+          {nil, self[node.else_body], @jumps.away?(node.else_body)},
+        ] of {Infer::Info?, Infer::Info, Bool},
+        fixed_bool
+      )
     end
 
     def touch(ctx : Context, node : AST::Yield)
@@ -647,7 +669,7 @@ module Mare::Compiler::PreInfer
           term_info
         end
 
-      @analysis[node] = Infer::FromYield.new(node.pos, @analysis.yield_in_info, term_infos)
+      @analysis[node] = Infer::FromYield.new(node.pos, layer(node), @analysis.yield_in_info, term_infos)
     end
 
     def touch(ctx : Context, node : AST::Node)
@@ -657,7 +679,7 @@ module Mare::Compiler::PreInfer
     def finish_param(node : AST::Node, info : Infer::Info)
       case info
       when Infer::FixedTypeExpr
-        param = Infer::Param.new(node.pos)
+        param = Infer::Param.new(node.pos, layer(node))
         param.set_explicit(info)
         @analysis[node] = param # assign new info
       else
@@ -680,13 +702,12 @@ module Mare::Compiler::PreInfer
       jumps = ctx.jumps[f_link]
       classify = ctx.classify[f_link]
       refer = ctx.refer[f_link]
-      deps = {inventory, jumps, classify, refer}
+      type_context = ctx.type_context[f_link]
+      deps = {inventory, jumps, classify, refer, type_context}
       prev = ctx.prev_ctx.try(&.pre_infer)
 
       maybe_from_func_cache(ctx, prev, f, f_link, deps) do
-        FuncVisitor.new(
-          f, f_link, Analysis.new, inventory, jumps, classify, refer,
-        ).tap(&.run(ctx)).analysis
+        FuncVisitor.new(f, f_link, Analysis.new, *deps).tap(&.run(ctx)).analysis
       end
     end
   end

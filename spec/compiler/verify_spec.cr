@@ -17,14 +17,14 @@ describe Mare::Compiler::Verify do
     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :verify)
-    end
+    Mare.compiler.compile([source], :verify)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains if the Main type is not an actor" do
     source = Mare::Source.new_example <<-SOURCE
     :class Main
+      :new (env Env)
     SOURCE
 
     expected = <<-MSG
@@ -34,14 +34,14 @@ describe Mare::Compiler::Verify do
            ^~~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :verify)
-    end
+    Mare.compiler.compile([source], :verify)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains if the Main actor has type parameters" do
     source = Mare::Source.new_example <<-SOURCE
     :actor Main (A)
+      :new (env Env)
     SOURCE
 
     expected = <<-MSG
@@ -51,9 +51,8 @@ describe Mare::Compiler::Verify do
                 ^~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :verify)
-    end
+    Mare.compiler.compile([source], :verify)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains if the Main actor has no `new` constructor" do
@@ -74,27 +73,25 @@ describe Mare::Compiler::Verify do
            ^~~~~~~~~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :verify)
-    end
+    Mare.compiler.compile([source], :verify)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains if the Main.new function is not a constructor" do
     source = Mare::Source.new_example <<-SOURCE
     :actor Main
-      :fun new
+      :fun new (env Env)
     SOURCE
 
     expected = <<-MSG
     The Main.new function defined here must be a constructor:
     from (example):2:
-      :fun new
+      :fun new (env Env)
            ^~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :verify)
-    end
+    Mare.compiler.compile([source], :verify)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains if the Main.new function has no parameters" do
@@ -115,9 +112,8 @@ describe Mare::Compiler::Verify do
                ^~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :verify)
-    end
+    Mare.compiler.compile([source], :verify)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains if the Main.new function has too many parameters" do
@@ -138,9 +134,8 @@ describe Mare::Compiler::Verify do
                ^~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :verify)
-    end
+    Mare.compiler.compile([source], :verify)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains if the Main.new function is of the wrong type" do
@@ -166,165 +161,7 @@ describe Mare::Compiler::Verify do
                 ^~~~~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :verify)
-    end
-  end
-
-  it "complains when an actor constructor has an error-able body" do
-    source = Mare::Source.new_example <<-SOURCE
-    :actor Main
-      :new (env)
-        error!
-    SOURCE
-
-    expected = <<-MSG
-    This actor constructor may raise an error, but that is not allowed:
-    from (example):2:
-      :new (env)
-       ^~~
-
-    - an error may be raised here:
-      from (example):3:
-        error!
-        ^~~~~~
-    MSG
-
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :verify)
-    end
-  end
-
-  it "complains when a no-exclamation function has an error-able body" do
-    source = Mare::Source.new_example <<-SOURCE
-    :actor Main
-      :new (env)
-
-    :primitive Example
-      :fun risky (x U64)
-        if (x == 0) (error!)
-    SOURCE
-
-    expected = <<-MSG
-    This function name needs an exclamation point because it may raise an error:
-    from (example):5:
-      :fun risky (x U64)
-           ^~~~~
-
-    - it should be named 'risky!' instead:
-      from (example):5:
-      :fun risky (x U64)
-           ^~~~~
-
-    - an error may be raised here:
-      from (example):6:
-        if (x == 0) (error!)
-                     ^~~~~~
-    MSG
-
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :verify)
-    end
-  end
-
-  it "complains when a try body has no possible errors to catch" do
-    source = Mare::Source.new_example <<-SOURCE
-    :actor Main
-      :new (env)
-        try (U64[33] * 3)
-    SOURCE
-
-    expected = <<-MSG
-    This try block is unnecessary:
-    from (example):3:
-        try (U64[33] * 3)
-        ^~~
-
-    - the body has no possible error cases to catch:
-      from (example):3:
-        try (U64[33] * 3)
-            ^~~~~~~~~~~~~
-    MSG
-
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :verify)
-    end
-  end
-
-  it "complains when an async function declares or tries to yield" do
-    source = Mare::Source.new_example <<-SOURCE
-    :actor Main
-      :new (env)
-      :be try_to_yield
-        :yields Bool
-        yield True
-        yield False
-    SOURCE
-
-    expected = <<-MSG
-    An asynchronous function cannot yield values:
-    from (example):3:
-      :be try_to_yield
-          ^~~~~~~~~~~~
-
-    - it declares a yield here:
-      from (example):4:
-        :yields Bool
-                ^~~~
-
-    - it yields here:
-      from (example):5:
-        yield True
-        ^~~~~
-
-    - it yields here:
-      from (example):6:
-        yield False
-        ^~~~~
-    MSG
-
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :verify)
-    end
-  end
-
-  it "complains when a constructor declares or tries to yield" do
-    source = Mare::Source.new_example <<-SOURCE
-    :class Example
-      :new try_to_yield
-        :yields Bool
-        yield True
-        yield False
-
-    :actor Main
-      :new (env)
-        Example.try_to_yield -> (bool | bool)
-    SOURCE
-
-    expected = <<-MSG
-    A constructor cannot yield values:
-    from (example):2:
-      :new try_to_yield
-           ^~~~~~~~~~~~
-
-    - it declares a yield here:
-      from (example):3:
-        :yields Bool
-                ^~~~
-
-    - it yields here:
-      from (example):4:
-        yield True
-        ^~~~~
-
-    - it yields here:
-      from (example):5:
-        yield False
-        ^~~~~
-    MSG
-
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :verify)
-    end
+    Mare.compiler.compile([source], :verify)
+      .errors.map(&.message).join("\n").should eq expected
   end
 end

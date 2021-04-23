@@ -11,6 +11,7 @@ describe Mare::Compiler::Macros do
       SOURCE
 
       ctx = Mare.compiler.compile([source], :macros)
+      ctx.errors.should be_empty
 
       func = ctx.namespace.find_func!(ctx, source, "Main", "new")
       func.body.not_nil!.terms.first.to_a.should eq [:group, "(", [:choice,
@@ -38,6 +39,7 @@ describe Mare::Compiler::Macros do
       SOURCE
 
       ctx = Mare.compiler.compile([source], :macros)
+      ctx.errors.should be_empty
 
       func = ctx.namespace.find_func!(ctx, source, "Main", "new")
       func.body.not_nil!.terms.first.to_a.should eq [:group, "(", [:choice,
@@ -61,6 +63,7 @@ describe Mare::Compiler::Macros do
       SOURCE
 
       ctx = Mare.compiler.compile([source], :macros)
+      ctx.errors.should be_empty
 
       func = ctx.namespace.find_func!(ctx, source, "Main", "new")
       func.body.not_nil!.terms.first.to_a.should eq [:group, "(", [:choice,
@@ -110,9 +113,8 @@ describe Mare::Compiler::Macros do
                                         ^~~
       MSG
 
-      expect_raises Mare::Error, expected do
-        Mare.compiler.compile([source], :macros)
-      end
+      Mare.compiler.compile([source], :macros)
+        .errors.map(&.message).join("\n").should eq expected
     end
 
     it "complains if the term isn't a group" do
@@ -132,9 +134,8 @@ describe Mare::Compiler::Macros do
                ^
       MSG
 
-      expect_raises Mare::Error, expected do
-        Mare.compiler.compile([source], :macros)
-      end
+      Mare.compiler.compile([source], :macros)
+        .errors.map(&.message).join("\n").should eq expected
     end
 
     it "complains if the term isn't a pipe-delimited group" do
@@ -154,9 +155,8 @@ describe Mare::Compiler::Macros do
                ^~~~~~~~
       MSG
 
-      expect_raises Mare::Error, expected do
-        Mare.compiler.compile([source], :macros)
-      end
+      Mare.compiler.compile([source], :macros)
+        .errors.map(&.message).join("\n").should eq expected
     end
   end
 end

@@ -7,6 +7,9 @@ abstract class Mare::Compiler::Pass::Analyze(TypeAliasAnalysis, TypeAnalysis, Fu
     @for_alias = {} of Program::TypeAlias::Link => TypeAliasAnalysis
     @for_type = {} of Program::Type::Link => TypeAnalysis
     @for_func = {} of Program::Function::Link => FuncAnalysis
+    @reentrance_for_alias = Set(Program::TypeAlias::Link).new
+    @reentrance_for_type = Set(Program::Type::Link).new
+    @reentrance_for_func = Set(Program::Function::Link).new
     @cache_info_for_alias = {} of Program::TypeAlias::Link => UInt64
     @cache_info_for_type = {} of Program::Type::Link => UInt64
     @cache_info_for_func = {} of Program::Function::Link => UInt64
@@ -36,6 +39,18 @@ abstract class Mare::Compiler::Pass::Analyze(TypeAliasAnalysis, TypeAnalysis, Fu
     end
   end
 
+  # Utility function used to guard against the action in the yield block
+  # re-entering itself (calling this function again with the same link).
+  class ReentranceError < Exception; end
+  def prevent_reentrance(set, link)
+    raise ReentranceError.new(link.inspect) if set.includes?(link)
+    set.add(link)
+
+    yield
+
+    .tap { set.delete(link) }
+  end
+
   def run_for_type_alias(
     ctx : Context,
     t : Program::TypeAlias,
@@ -46,7 +61,9 @@ abstract class Mare::Compiler::Pass::Analyze(TypeAliasAnalysis, TypeAnalysis, Fu
     return already_analysis if already_analysis
 
     # Generate the analysis for the type and save it to our map.
-    @for_alias[t_link] = analyze_type_alias(ctx, t, t_link)
+    prevent_reentrance(@reentrance_for_alias, t_link) do
+      @for_alias[t_link] = analyze_type_alias(ctx, t, t_link)
+    end
   end
 
   def run_for_type(
@@ -59,7 +76,9 @@ abstract class Mare::Compiler::Pass::Analyze(TypeAliasAnalysis, TypeAnalysis, Fu
     return already_analysis if already_analysis
 
     # Generate the analysis for the type and save it to our map.
-    @for_type[t_link] = t_analysis = analyze_type(ctx, t, t_link)
+    prevent_reentrance(@reentrance_for_type, t_link) do
+      @for_type[t_link] = t_analysis = analyze_type(ctx, t, t_link)
+    end
   end
 
   def run_for_func(
@@ -78,13 +97,15 @@ abstract class Mare::Compiler::Pass::Analyze(TypeAliasAnalysis, TypeAnalysis, Fu
       || run_for_type(ctx, t_link.resolve(ctx), t_link)
 
     # Generate the analysis for the function and save it to our map.
-    @for_func[f_link] = analyze_func(ctx, f, f_link, t_analysis)
+    prevent_reentrance(@reentrance_for_func, f_link) do
+      @for_func[f_link] = analyze_func(ctx, f, f_link, t_analysis)
+    end
   end
 
   # Optionally, the analyze_type_alias method of the subclass can use this function
   # to cache the analysis from the previous compiler run into this one,
   # based on whether the type alias itself or the list of deps has changed.
-  private def maybe_from_type_alias_cache(ctx, prev, t, t_link, deps) : FuncAnalysis
+  private def maybe_from_type_alias_cache(ctx, prev, t, t_link, deps) : TypeAliasAnalysis
     hashable = {t, deps}
     if prev \
     && (prev_hash = prev.cache_info_for_alias[t_link]?; prev_hash) \
@@ -101,7 +122,7 @@ abstract class Mare::Compiler::Pass::Analyze(TypeAliasAnalysis, TypeAnalysis, Fu
   # Optionally, the analyze_type method of the subclass can use this function
   # to cache the analysis from the previous compiler run into this one,
   # based on whether the type itself or the list of deps has changed.
-  private def maybe_from_type_cache(ctx, prev, t, t_link, deps) : FuncAnalysis
+  private def maybe_from_type_cache(ctx, prev, t, t_link, deps) : TypeAnalysis
     hashable = {t.head_hash, deps}
     if prev \
     && (prev_hash = prev.cache_info_for_type[t_link]?; prev_hash) \
@@ -137,7 +158,7 @@ abstract class Mare::Compiler::Pass::Analyze(TypeAliasAnalysis, TypeAnalysis, Fu
     ctx : Context,
     t : Program::Type,
     t_link : Program::Type::Link
-  ) : TypeAnalysis
+  ) : TypeAliasAnalysis
 
   # Required hook to make the pass create an analysis for the given type.
   abstract def analyze_type(

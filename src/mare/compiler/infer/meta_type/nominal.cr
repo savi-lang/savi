@@ -9,10 +9,15 @@ struct Mare::Compiler::Infer::MetaType::Nominal
     defn.is_a?(ReifiedType) && defn.link.ignores_cap?
   end
 
+  def lazy?
+    defn = @defn
+    defn.is_a?(ReifiedTypeAlias)
+  end
+
   def inspect(io : IO)
     inspect_without_cap(io)
 
-    io << "'any" unless ignores_cap? || defn.is_a?(ReifiedTypeAlias)
+    io << "'any" unless lazy? || ignores_cap?
   end
 
   def inspect_with_cap(io : IO, cap : Capability)
@@ -22,7 +27,7 @@ struct Mare::Compiler::Infer::MetaType::Nominal
     # Otherwise, we'll print it here with the same syntax that the programmer
     # can use to specify it explicitly.
     defn = defn()
-    unless defn.is_a?(ReifiedType) && cap.value == defn.link.cap
+    unless defn.is_a?(ReifiedType) && cap.value == Cap.from_string(defn.link.cap)
       io << "'"
       cap.inspect(io)
     end
@@ -34,16 +39,7 @@ struct Mare::Compiler::Infer::MetaType::Nominal
     when ReifiedType, ReifiedTypeAlias
       defn.show_type(io)
     when TypeParam
-      parent_rt = defn.parent_rt
-      if parent_rt
-        io << "["
-        io << defn.ref.ident.value
-        io << " from "
-        io << defn.parent_rt.try(&.show_type)
-        io << "]"
-      else
-        io << defn.ref.ident.value
-      end
+      io << defn.ref.ident.value
     end
   end
 
@@ -61,35 +57,70 @@ struct Mare::Compiler::Infer::MetaType::Nominal
     end
   end
 
-  def alt_find_callable_func_defns(ctx, infer : AltInfer::Visitor?, name : String)
+  def gather_call_receiver_span(
+    ctx : Context,
+    pos : Source::Pos,
+    infer : Visitor?,
+    name : String
+  ) : Span
     raise NotImplementedError.new("simplify first to remove aliases") if defn.is_a?(ReifiedTypeAlias)
 
     defn = defn()
     case defn
     when ReifiedType
-      func = defn.defn(ctx).find_func?(name)
-      [{self, defn, func}]
+      defn_defn = defn.defn(ctx)
+      if defn_defn.find_func?(name)
+        Span.simple(MetaType.new_nominal(defn))
+      else
+        hints = [{defn_defn.ident.pos,
+          "#{defn_defn.ident.value} has no '#{name}' function"}]
+
+        found_similar = false
+        if name.ends_with?("!")
+          defn_defn.find_func?(name[0...-1]).try do |similar|
+            found_similar = true
+            hints << {similar.ident.pos,
+              "maybe you meant to call '#{similar.ident.value}' (without '!')"}
+          end
+        else
+          defn_defn.find_func?("#{name}!").try do |similar|
+            found_similar = true
+            hints << {similar.ident.pos,
+              "maybe you meant to call '#{similar.ident.value}' (with a '!')"}
+          end
+        end
+
+        unless found_similar
+          similar = defn_defn.find_similar_function(name)
+          hints << {similar.ident.pos,
+            "maybe you meant to call the '#{similar.ident.value}' function"} \
+              if similar
+        end
+
+        Span.error(pos,
+          "The '#{name}' function can't be called on this receiver", hints
+        )
+      end
     when TypeParam
-      infer.not_nil!.lookup_type_param_bound(ctx, defn)
-        .alt_find_callable_func_defns(ctx, infer, name)
+      # TODO: get from precalculated variable already saved to Infer Analysis
+      infer.not_nil!
+        .lookup_type_param_bound_span(ctx, defn)
+        .transform_mt_to_span(&.gather_call_receiver_span(ctx, pos, infer, name))
     else
       raise NotImplementedError.new(defn)
     end
   end
 
-  def find_callable_func_defns(ctx, infer : ForReifiedFunc?, name : String)
+  def find_callable_func_defns(ctx, name : String)
     raise NotImplementedError.new("simplify first to remove aliases") if defn.is_a?(ReifiedTypeAlias)
 
     defn = defn()
     case defn
     when ReifiedType
       func = defn.defn(ctx).find_func?(name)
-      [{self, defn, func}]
-    when TypeParam
-      infer.not_nil!.lookup_type_param_bound(defn)
-        .find_callable_func_defns(ctx, infer, name)
+      [{MetaType.new(self), defn, func}]
     else
-      raise NotImplementedError.new(defn)
+      [] of {MetaType, ReifiedType?, Program::Function?}
     end
   end
 
@@ -221,26 +252,51 @@ struct Mare::Compiler::Infer::MetaType::Nominal
     end
   end
 
-  def substitute_type_params(substitutions : Hash(TypeParam, MetaType))
+  def with_additional_type_arg!(arg : MetaType) : Inner
+    defn = defn()
+    Nominal.new(
+      case defn
+      when ReifiedTypeAlias; defn.with_additional_arg(arg)
+      when ReifiedType; defn.with_additional_arg(arg)
+      else raise NotImplementedError.new("#{self} with_additional_type_arg!")
+      end
+    )
+  end
+
+  def substitute_type_params_retaining_cap(
+    type_params : Array(TypeParam),
+    type_args : Array(MetaType)
+  ) : Inner
     defn = defn()
     case defn
     when TypeParam
-      substitutions[defn]?.try(&.inner) || self
+      index = type_params.index(defn)
+      index ? type_args[index].strip_cap.inner : self
     when ReifiedType
       args = defn.args.map do |arg|
-        arg.substitute_type_params(substitutions).as(MetaType)
+        arg.substitute_type_params_retaining_cap(type_params, type_args).as(MetaType)
       end
 
       Nominal.new(ReifiedType.new(defn.link, args))
     when ReifiedTypeAlias
       args = defn.args.map do |arg|
-        arg.substitute_type_params(substitutions).as(MetaType)
+        arg.substitute_type_params_retaining_cap(type_params, type_args).as(MetaType)
       end
 
       Nominal.new(ReifiedTypeAlias.new(defn.link, args))
     else
       raise NotImplementedError.new(defn)
     end
+  end
+
+  def each_type_alias_in_first_layer(&block : ReifiedTypeAlias -> _)
+    defn = defn()
+    defn.is_a?(ReifiedTypeAlias) ? block.call(defn) : nil
+  end
+
+  def substitute_each_type_alias_in_first_layer(&block : ReifiedTypeAlias -> MetaType) : Inner
+    defn = defn()
+    defn.is_a?(ReifiedTypeAlias) ? block.call(defn).inner : self
   end
 
   def is_sendable?
@@ -309,42 +365,22 @@ struct Mare::Compiler::Infer::MetaType::Nominal
 
     defn = defn()
     other_defn = other.defn()
-    errors = [] of Error::Info # TODO: accept this as an argument?
 
     if defn.is_a?(ReifiedType)
       if other_defn.is_a?(ReifiedType)
-        # When both sides are ReifiedTypes, delegate to the SubtypingInfo logic.
-        ctx.infer[other_defn].is_supertype_of?(ctx, defn, errors)
+        return true if defn == other_defn
+        # When both sides are ReifiedTypes, delegate to the SubtypingCache.
+        ctx.subtyping.is_subtype_of?(ctx, defn, other_defn)
       elsif other_defn.is_a?(TypeParam)
-        # When the other is a TypeParam, use its bound MetaType and run again.
-        l = MetaType.new_nominal(defn)
-        other_parent_link = other_defn.ref.parent_link
-        if other_parent_link.is_a?(Program::Type::Link)
-          r = ctx.infer.for_rt(ctx, other_parent_link)
-                .lookup_type_param_bound(other_defn).strip_cap
-        elsif other_parent_link.is_a?(Program::TypeAlias::Link)
-          raise NotImplementedError.new("lookup_type_param_bound for TypeAlias")
-        else
-          raise NotImplementedError.new(other_parent_link)
-        end
-        l.subtype_of?(ctx, r.not_nil!)
+        false
       else
         raise NotImplementedError.new("type <: ?")
       end
     elsif defn.is_a?(TypeParam)
       if other_defn.is_a?(ReifiedType)
-        # When this is a TypeParam, use its bound MetaType and run again.
-        l = ctx.infer.for_rt(ctx, defn.ref.parent_link.as(Program::Type::Link))
-              .lookup_type_param_bound(defn).strip_cap
-        r = MetaType.new_nominal(other_defn)
-        l.subtype_of?(ctx, r)
+        false
       elsif other_defn.is_a?(TypeParam)
-        if defn.ref == other_defn.ref
-          return true if defn.parent_rt == other_defn.parent_rt
-          return true if defn.parent_rt.nil?
-          return true if other_defn.parent_rt.nil?
-        end
-        raise NotImplementedError.new("type param <: type param")
+        defn.ref == other_defn.ref
       else
         raise NotImplementedError.new("type param <: ?")
       end

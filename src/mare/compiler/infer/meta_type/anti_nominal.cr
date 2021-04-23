@@ -16,11 +16,20 @@ struct Mare::Compiler::Infer::MetaType::AntiNominal
     ([] of ReifiedType)
   end
 
-  def alt_find_callable_func_defns(ctx, infer : AltInfer::Visitor?, name : String)
-    nil
+  def gather_call_receiver_span(
+    ctx : Context,
+    pos : Source::Pos,
+    infer : Visitor?,
+    name : String
+  ) : Span
+    Span.error(pos,
+      "The '#{name}' function can't be called on this receiver", [
+        {pos, "the type #{self.inspect} has no types defining that function"}
+      ]
+    )
   end
 
-  def find_callable_func_defns(ctx, infer : ForReifiedFunc?, name : String)
+  def find_callable_func_defns(ctx, name : String)
     nil
   end
 
@@ -133,8 +142,43 @@ struct Mare::Compiler::Infer::MetaType::AntiNominal
     end
   end
 
-  def substitute_type_params(substitutions : Hash(TypeParam, MetaType))
-    raise NotImplementedError.new("#{self} substitute_type_params")
+  def with_additional_type_arg!(arg : MetaType) : Inner
+    raise NotImplementedError.new("#{self} with_additional_type_arg!")
+  end
+
+  def substitute_type_params_retaining_cap(
+    type_params : Array(TypeParam),
+    type_args : Array(MetaType)
+  ) : Inner
+    defn = defn()
+    case defn
+    when TypeParam
+      index = type_params.index(defn)
+      index ? type_args[index].strip_cap.inner.negate : self
+    when ReifiedType
+      args = defn.args.map do |arg|
+        arg.substitute_type_params_retaining_cap(type_params, type_args).as(MetaType)
+      end
+
+      AntiNominal.new(ReifiedType.new(defn.link, args))
+    when ReifiedTypeAlias
+      args = defn.args.map do |arg|
+        arg.substitute_type_params_retaining_cap(type_params, type_args).as(MetaType)
+      end
+
+      AntiNominal.new(ReifiedTypeAlias.new(defn.link, args))
+    else
+      raise NotImplementedError.new(defn)
+    end
+  end
+
+  def each_type_alias_in_first_layer(&block : ReifiedTypeAlias -> _)
+    raise NotImplementedError.new("#{self} each_type_alias_in_first_layer")
+  end
+
+  def substitute_each_type_alias_in_first_layer(&block : ReifiedTypeAlias -> MetaType) : Inner
+    defn = defn()
+    defn.is_a?(ReifiedTypeAlias) ? block.call(defn).inner.negate : self
   end
 
   def is_sendable?

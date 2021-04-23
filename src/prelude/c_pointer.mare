@@ -59,7 +59,7 @@
   :: Return an alias of the element at the given index.
   ::
   :: The caller is expected to only do this for in-bounds indexes.
-  :fun box _get_at (index USize) A'aliased: compiler intrinsic
+  :fun box _get_at (index USize) (@->A)'aliased: compiler intrinsic
 
   :: Return the element at the given index, without capability aliasing.
   :: This lack of aliasing breaks capability safety, so the caller is expected

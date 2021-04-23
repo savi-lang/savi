@@ -17,9 +17,8 @@ class Mare::Compiler::CodeGen
 
       # Take down info on all functions.
       @vtable_size = 0
-      @type_def.each_function(g.ctx).each do |reach_func|
+      g.ctx.reach.reached_funcs_for(@type_def).each do |reach_func|
         rf = reach_func.reified
-        infer = reach_func.infer
 
         unless rf.link.hygienic_id
           vtable_index = g.ctx.paint[g.ctx, reach_func]?
@@ -42,7 +41,7 @@ class Mare::Compiler::CodeGen
         raise "a value type with no descriptor can't have fields" \
           unless @fields.empty?
 
-        @fields << {"VALUE", @type_def.as_ref(g.ctx)}
+        @fields << {"VALUE", @type_def.as_ref}
       end
 
       # Generate descriptor type and struct type.

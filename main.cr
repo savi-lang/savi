@@ -103,6 +103,19 @@ module Mare
           Cli.compile options, opts.backtrace
         end
       end
+      sub "compilerspec" do
+        desc "run compiler specs"
+        usage "mare compilerspec [target] [options]"
+        help short: "-h"
+        argument "target", type: String, required: true, desc: "mare.spec.md file to run"
+        option "--print-perf", desc: "Print compiler performance info", type: Bool, default: false
+        run do |opts, args|
+          options = Mare::Compiler::CompilerOptions.new(
+            print_perf: opts.print_perf,
+          )
+          Cli.compilerspec args.target, options
+        end
+      end
     end
 
     def self._add_backtrace(backtrace = false)
@@ -129,20 +142,33 @@ module Mare
 
     def self.compile(options, backtrace = false)
       _add_backtrace backtrace do
-        Mare.compiler.compile(Dir.current, options.target_pass || :binary, options)
+        ctx = Mare.compiler.compile(Dir.current, options.target_pass || :binary, options)
+        raise ctx.errors.first if ctx.errors.any? # TODO: show multiple errors
         0
       end
     end
 
     def self.run(options, backtrace = false)
       _add_backtrace backtrace do
-        Mare.compiler.compile(Dir.current, options.target_pass || :eval, options).eval.exitcode
+        ctx = Mare.compiler.compile(Dir.current, options.target_pass || :eval, options)
+        raise ctx.errors.first if ctx.errors.any? # TODO: show multiple errors
+        ctx.eval.exitcode
       end
     end
 
     def self.eval(code, options, backtrace = false)
       _add_backtrace backtrace do
-        Mare.compiler.eval(code, options)
+        ctx = Mare.compiler.eval(code, options)
+        raise ctx.errors.first if ctx.errors.any? # TODO: show multiple errors
+        ctx.eval.exitcode
+      end
+    end
+
+    def self.compilerspec(target, options)
+      _add_backtrace true do
+        spec = Mare::SpecMarkdown.new(target)
+        ctx = Mare.compiler.compile(spec.sources, spec.target_pass, options)
+        spec.verify!(ctx) ? 0 : 1
       end
     end
   end

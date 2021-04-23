@@ -1,4 +1,5 @@
 require "levenshtein"
+require "./infer/reified" # TODO: can this be removed?
 
 ##
 # TODO: Document this pass
@@ -9,312 +10,46 @@ class Mare::Compiler::TypeCheck
   alias ReifiedTypeAlias = Infer::ReifiedTypeAlias
   alias ReifiedType = Infer::ReifiedType
   alias ReifiedFunction = Infer::ReifiedFunction
-  alias SubtypingInfo = Infer::SubtypingInfo
+  alias Cap = Infer::Cap
   alias Info = Infer::Info
 
-  struct FuncAnalysis
-    getter link
-
-    def initialize(
-      @link : Program::Function::Link,
-      @pre : PreInfer::Analysis,
-      @spans : AltInfer::Analysis
-    )
-      @reified_funcs = {} of ReifiedType => Set(ReifiedFunction)
-    end
-
-    def each_reified_func(rt : ReifiedType)
-      @reified_funcs[rt]?.try(&.each) || ([] of ReifiedFunction).each
-    end
-    protected def observe_reified_func(rf)
-      (@reified_funcs[rf.type] ||= Set(ReifiedFunction).new).add(rf)
-    end
-
-    def [](node : AST::Node); @pre[node]; end
-    def []?(node : AST::Node); @pre[node]?; end
-    def yield_in_info; @pre.yield_in_info; end
-    def yield_out_infos; @pre.yield_out_infos; end
-
-    def span(node : AST::Node); span(@spans[node]); end
-    def span?(node : AST::Node); span?(@spans[node]?); end
-    def span(info : Infer::Info); @spans[info]; end
-    def span?(info : Infer::Info); @spans[info]?; end
-  end
-
-  struct TypeAnalysis
-    protected getter partial_reifieds
-    protected getter reached_fully_reifieds # TODO: populate this during the pass
-
-    def initialize(@link : Program::Type::Link)
-      @partial_reifieds = [] of ReifiedType
-      @reached_fully_reifieds = [] of ReifiedType
-    end
-
-    def no_args
-      ReifiedType.new(@link)
-    end
-
-    protected def observe_reified_type(ctx, rt)
-      if rt.is_complete?(ctx)
-        @reached_fully_reifieds << rt
-      elsif rt.is_partial_reify?(ctx)
-        @partial_reifieds << rt
-      end
-    end
-
-    def each_partial_reified; @partial_reifieds.each; end
-    def each_reached_fully_reified; @reached_fully_reifieds.each; end
-    def each_non_argumented_reified
-      if @partial_reifieds.empty?
-        [no_args].each
-      else
-        @partial_reifieds.each
-      end
-    end
-  end
-
-  struct ReifiedTypeAnalysis
-    protected getter subtyping
-
-    def initialize(@rt : ReifiedType)
-      @subtyping = SubtypingInfo.new(rt)
-    end
-
-    # TODO: Remove this and refactor callers to use the more efficient/direct variant?
-    def is_subtype_of?(ctx : Context, other : ReifiedType, errors = [] of Error::Info)
-      ctx.infer[other].is_supertype_of?(ctx, @rt, errors)
-    end
-
-    def is_supertype_of?(ctx : Context, other : ReifiedType, errors = [] of Error::Info)
-      @subtyping.check(ctx, other, errors)
-    end
-
-    def each_known_subtype
-      @subtyping.each_known_subtype
-    end
-
-    def each_known_complete_subtype(ctx)
-      each_known_subtype.flat_map do |rt|
-        if rt.is_complete?(ctx)
-          rt
-        else
-          ctx.infer[rt.link].each_reached_fully_reified
-        end
-      end
-    end
-  end
-
-  struct ReifiedFuncAnalysis
-    protected getter resolved_infos
-    protected getter called_funcs
-    protected getter call_infers_for
-    getter! ret_resolved : MetaType; protected setter ret_resolved
-    getter! yield_in_resolved : MetaType; protected setter yield_in_resolved
-    getter! yield_out_resolved : Array(MetaType); protected setter yield_out_resolved
-
-    def initialize(ctx : Context, @rf : ReifiedFunction)
-      f = @rf.link.resolve(ctx)
-
-      @is_constructor = f.has_tag?(:constructor).as(Bool)
-      @resolved_infos = {} of Info => MetaType
-      @called_funcs = Set({Source::Pos, ReifiedType, Program::Function::Link}).new
-
-      # TODO: can this be removed or made more clean without sacrificing performance?
-      @call_infers_for = {} of Infer::FromCall => Set({ForReifiedFunc, Bool})
-    end
-
-    def reified
-      @rf
-    end
-
-    # TODO: rename as [] and rename [] to info_for or similar?
-    def resolved(info : Info)
-      @resolved_infos[info]
-    end
-
-    # TODO: rename as [] and rename [] to info_for or similar?
-    def resolved(ctx, node : AST::Node)
-      resolved(ctx.infer[@rf.link][node])
-    end
-
-    def resolved_self_cap : MetaType
-      @is_constructor ? MetaType.cap("ref") : @rf.receiver_cap
-    end
-
-    def resolved_self
-      MetaType.new(@rf.type).override_cap(resolved_self_cap)
-    end
-
-    def each_meta_type(&block)
-      yield @rf.receiver
-      yield resolved_self
-      @resolved_infos.each_value { |mt| yield mt }
-    end
-
-    def each_called_func
-      @called_funcs.each
-    end
-  end
-
   def initialize
-    @t_analyses = {} of Program::Type::Link => TypeAnalysis
-    @f_analyses = {} of Program::Function::Link => FuncAnalysis
     @map = {} of ReifiedFunction => ForReifiedFunc
-    @types = {} of ReifiedType => ForReifiedType
-    @aliases = {} of ReifiedTypeAlias => ForReifiedTypeAlias
-    @unwrapping_set = Set(ReifiedTypeAlias).new
   end
 
   def run(ctx)
+    # Collect this list of types to check, including types with no type params,
+    # as well as partially reified types for those with type params.
+    # TODO: This shouldn't need to be a separate step, right?
+    rts = [] of ReifiedType
     ctx.program.libraries.each do |library|
-      run_for_library(ctx, library)
-    end
-
-    reach_additional_subtype_relationships(ctx)
-    reach_additional_subfunc_relationships(ctx)
-  end
-
-  def run_for_library(ctx, library)
-    # Always evaluate the Main type first, if it's part of this library.
-    # TODO: This shouldn't be necessary, but it is right now for some reason...
-    # In both execution orders, the ReifiedType and ReifiedFunction for Main
-    # are identical, but for some reason the resulting type resolutions for
-    # expressions can turn out differently... Need to investigate more after
-    # more refactoring and cleanup on the analysis and state for this pass...
-    main = nil
-    sorted_types = library.types.reject do |t|
-      next if main
-      next if t.ident.value != "Main"
-      main = t
-      true
-    end
-    sorted_types.unshift(main) if main
-
-    # For each function in each type, run with a new instance,
-    # unless that function has already been reached with an infer instance.
-    # We probably reached most of them already by starting from Main.new,
-    # so this second pass just takes care of typechecking unreachable functions.
-    # This is also where we take care of typechecking for unused partial
-    # reifications of all generic type parameters.
-    sorted_types.each do |t|
-      t_link = t.make_link(library)
-      refer_type = ctx.refer_type[t_link]
-
-      no_args_rt = for_rt(ctx, t_link).reified
-      rts = for_type_partial_reifications(ctx, t, t_link, no_args_rt, refer_type)
-
-      @t_analyses[t_link].each_non_argumented_reified.each do |rt|
-        t.functions.each do |f|
-          f_link = f.make_link(t_link)
-          MetaType::Capability.new_maybe_generic(f.cap.value).each_cap.each do |f_cap|
-            for_rf(ctx, rt, f_link, MetaType.new(f_cap)).run
-          end
-        end
-      end
-
-      # Check the assertion list for the type, to confirm that it is a subtype
-      # of any it claimed earlier, which we took on faith and now verify.
-      @t_analyses[t_link].each_non_argumented_reified.each do |rt|
-        self[rt].subtyping.check_assertions(ctx)
+      library.types.each do |t|
+        t_link = t.make_link(library)
+        rts.concat(ctx.infer[t_link].type_partial_reifications.map(&.single!))
       end
     end
-  end
 
-  def reach_additional_subtype_relationships(ctx)
-    # Keep looping as long as the keep_going variable gets set to true in
-    # each iteration of the loop by at least one item in the subtype topology
-    # changing in one of the deeply nested loops.
-    keep_going = true
-    while keep_going
-      keep_going = false
+    rts.each { |rt|
+      ctx.subtyping.for_rt(rt).initialize_assertions(ctx)
+    }
 
-      # For each abstract type in the program that we have analyzed...
-      # (this should be all of the abstract types in the program)
-      @t_analyses.each do |t_link, t_analysis|
-        next unless t_link.is_abstract?
-
-        # For each "fully baked" reification of that type we have checked...
-        # (this should include all reifications reachable from any defined
-        # function, though not necessarily all reachable from Main.new)
-        # TODO: Should we be limiting to only paths reachable from Main.new?
-        t_analysis.each_reached_fully_reified.each do |rt|
-          rt_analysis = self[rt]
-
-          # Store the array of all known complete subtypes that have been
-          # tested by any defined code in the program.
-          # TODO: Should we be limiting to only paths reachable from Main.new?
-          each_known_complete_subtype =
-            rt_analysis.each_known_complete_subtype(ctx).to_a
-
-          # For each abstract type in that subtypes list...
-          each_known_complete_subtype.each do |subtype_rt|
-            next unless subtype_rt.link.is_abstract?
-            subtype_rt_analysis = self[subtype_rt]
-
-            # For each other/distinct type in that subtypes list...
-            each_known_complete_subtype.each do |other_subtype_rt|
-              next if other_subtype_rt == subtype_rt
-
-              # Check if the first subtype is a supertype of the other subtype.
-              # For example, if Foo and Bar are both used as subtypes of Any
-              # in the program, we check here if Foo is a subtype of Bar,
-              # or in another iteration, if Bar is a subtype of Foo.
-              #
-              # This lets us be sure that later trait mapping for the runtime
-              # knows about the relationship of types which may be matched at
-              # runtime after having been "carried" as a common supertype.
-              #
-              # If our test here has changed the topology of known subtypes,
-              # then we need to keep going in our overall iteration, since
-              # we need to uncover other transitive relationships at deeper
-              # levels of transitivity until there is nothing left to uncover.
-              orig_size = subtype_rt_analysis.each_known_subtype.size
-              subtype_rt_analysis.is_supertype_of?(ctx, other_subtype_rt)
-              keep_going = true \
-                if orig_size != subtype_rt_analysis.each_known_subtype.size
-            end
-          end
+    # Now do the main type checking pass in each ReifiedType.
+    rts.each do |rt|
+      rt.defn(ctx).functions.each do |f|
+        f_link = f.make_link(rt.link)
+        f_cap_value = f.cap.value
+        f_cap_value = "read" if f_cap_value == "box" # TODO: figure out if we can remove this Pony-originating semantic hack
+        MetaType::Capability.new_maybe_generic(f_cap_value).each_cap.each do |f_cap|
+          for_rf(ctx, rt, f_link, MetaType.new(f_cap)).run(ctx)
         end
       end
     end
-  end
 
-  def reach_additional_subfunc_relationships(ctx)
-    # For each abstract type in the program that we have analyzed...
-    # (this should be all of the abstract types in the program)
-    @t_analyses.each do |t_link, t_analysis|
-      t = t_link.resolve(ctx)
-      next unless t_link.is_abstract?
-
-      # For each "fully baked" reification of that type we have checked...
-      # (this should include all reifications reachable from any defined
-      # function, though not necessarily all reachable from Main.new)
-      # TODO: Should we be limiting to only paths reachable from Main.new?
-      t_analysis.each_reached_fully_reified.each do |rt|
-
-        # For each known complete subtypes that have been established
-        # by testing via some code path in the program thus far...
-        # TODO: Should we be limiting to only paths reachable from Main.new?
-        self[rt].each_known_complete_subtype(ctx).each do |subtype_rt|
-
-          # For each function in the abstract type and its
-          # corresponding function that is required to be in the subtype...
-          t.functions.each do |f|
-            f_link = f.make_link(rt.link)
-            subtype_f_link = f.make_link(subtype_rt.link)
-
-            # For each reification of that function in the abstract type.
-            self[f_link].each_reified_func(rt).each do |rf|
-
-              # Reach the corresponding concrete reification in the subtype.
-              # This ensures that we have reached the correct reification(s)
-              # of each concrete function we may call via an abstract trait.
-              for_rf = for_rf(ctx, subtype_rt, subtype_f_link, rf.receiver.cap_only).tap(&.run)
-            end
-          end
-        end
-      end
-    end
+    # Check the assertion list for each type, to confirm that it is a subtype
+    # of any it claimed earlier, which we took on faith and now verify.
+    rts.each { |rt|
+      ctx.subtyping.for_rt(rt).check_assertions(ctx)
+    }
   end
 
   def [](t_link : Program::Type::Link)
@@ -325,22 +60,6 @@ class Mare::Compiler::TypeCheck
     @t_analyses[t_link]?
   end
 
-  def [](f_link : Program::Function::Link)
-    @f_analyses[f_link]
-  end
-
-  def []?(f_link : Program::Function::Link)
-    @f_analyses[f_link]?
-  end
-
-  protected def get_or_create_t_analysis(t_link : Program::Type::Link)
-    @t_analyses[t_link] ||= TypeAnalysis.new(t_link)
-  end
-
-  protected def get_or_create_f_analysis(ctx, f_link : Program::Function::Link)
-    @f_analyses[f_link] ||= FuncAnalysis.new(f_link, ctx.pre_infer[f_link], ctx.alt_infer[f_link])
-  end
-
   def [](rf : ReifiedFunction)
     @map[rf].analysis
   end
@@ -349,83 +68,7 @@ class Mare::Compiler::TypeCheck
     @map[rf]?.try(&.analysis)
   end
 
-  def [](rt : ReifiedType)
-    @types[rt].analysis
-  end
-
-  def []?(rt : ReifiedType)
-    @types[rt]?.try(&.analysis)
-  end
-
-  # This is only for use in testing.
-  def test_simple!(ctx, source, t_name, f_name)
-    t_link = ctx.namespace[source][t_name].as(Program::Type::Link)
-    t = t_link.resolve(ctx)
-    f = t.find_func!(f_name)
-    f_link = f.make_link(t_link)
-    rt = self[t_link].no_args
-    rf = self[f_link].each_reified_func(rt).first
-    infer = self[rf]
-    {t, f, infer}
-  end
-
-  def for_type_partial_reifications(ctx, t, t_link, no_args_rt, refer_type)
-    type_params = AST::Extract.type_params(t.params)
-    return [] of ReifiedType if type_params.empty?
-
-    params_partial_reifications =
-      type_params.map do |(param, _, _)|
-        # Get the MetaType of the bound.
-        param_ref = refer_type[param.as(AST::Identifier)].as(Refer::TypeParam)
-        bound_node = param_ref.bound
-        bound_mt = self.for_rt(ctx, no_args_rt).type_expr(bound_node, refer_type)
-
-        # TODO: Refactor the partial_reifications to return cap only already.
-        caps = bound_mt.partial_reifications.map(&.cap_only)
-
-        # Return the list of MetaTypes that partially reify the bound;
-        # that is, a list that constitutes every possible cap substitution.
-        {TypeParam.new(param_ref), bound_mt, caps}
-      end
-
-    substitution_sets = [[] of {TypeParam, MetaType, MetaType}]
-    params_partial_reifications.each do |param, bound_mt, caps|
-      substitution_sets = substitution_sets.flat_map do |pairs|
-        caps.map { |cap| pairs + [{param, bound_mt, cap}] }
-      end
-    end
-
-    substitution_sets.map do |substitutions|
-      # TODO: Simplify/refactor in relation to code above
-      substitutions_map = {} of TypeParam => MetaType
-      substitutions.each do |param, bound, cap_mt|
-        substitutions_map[param] = MetaType.new_type_param(param).intersect(cap_mt)
-      end
-
-      args = substitutions_map.map(&.last.substitute_type_params(substitutions_map))
-
-      for_rt(ctx, t_link, args).reified
-    end
-  end
-
-  def for_func_simple(ctx : Context, source : Source, t_name : String, f_name : String)
-    t_link = ctx.namespace[source][t_name].as(Program::Type::Link)
-    f = t_link.resolve(ctx).find_func!(f_name)
-    f_link = f.make_link(t_link)
-    for_func_simple(ctx, t_link, f_link)
-  end
-
-  def for_func_simple(ctx : Context, t_link : Program::Type::Link, f_link : Program::Function::Link)
-    f = f_link.resolve(ctx)
-    for_rf(ctx, for_rt(ctx, t_link).reified, f_link, MetaType.cap(f.cap.value))
-  end
-
-  # TODO: remove this cheap hacky alias somehow:
-  def for_rf_existing!(rf)
-    @map[rf]
-  end
-
-  def for_rf(
+  private def for_rf(
     ctx : Context,
     rt : ReifiedType,
     f : Program::Function::Link,
@@ -434,133 +77,57 @@ class Mare::Compiler::TypeCheck
     mt = MetaType.new(rt).override_cap(cap)
     rf = ReifiedFunction.new(rt, f, mt)
     @map[rf] ||= (
-      f_analysis = get_or_create_f_analysis(ctx, f)
       refer_type = ctx.refer_type[f]
       classify = ctx.classify[f]
-      ForReifiedFunc.new(ctx, f_analysis, ReifiedFuncAnalysis.new(ctx, rf), @types[rt], rf, refer_type, classify)
-      .tap { f_analysis.observe_reified_func(rf) }
+      completeness = ctx.completeness[f]
+      pre_infer = ctx.pre_infer[f]
+      infer = ctx.infer[f]
+      subtyping = ctx.subtyping.for_rf(rf)
+      ForReifiedFunc.new(ctx, rf,
+        refer_type, classify, completeness, pre_infer, infer, subtyping
+      )
     )
   end
 
-  def for_rt(
+  def self.validate_type_args(
     ctx : Context,
-    rt : ReifiedType,
-    type_args : Array(MetaType) = [] of MetaType
-  )
-    # Sanity check - the reified type shouldn't have any args yet.
-    raise "already has type args: #{rt.inspect}" unless rt.args.empty?
-
-    for_rt(ctx, rt.link, type_args)
-  end
-
-  def for_rt(
-    ctx : Context,
-    link : Program::Type::Link,
-    type_args : Array(MetaType) = [] of MetaType
-  ) : ForReifiedType
-    rt = ReifiedType.new(link, type_args)
-    @types[rt]? || (
-      refer_type = ctx.refer_type[link]
-      ft = @types[rt] = ForReifiedType.new(ctx, ReifiedTypeAnalysis.new(rt), rt, refer_type)
-      ft.tap(&.initialize_assertions(ctx))
-      .tap { |ft| get_or_create_t_analysis(link).observe_reified_type(ctx, rt) }
-    )
-  end
-
-  def for_rt_alias(
-    ctx : Context,
-    link : Program::TypeAlias::Link,
-    type_args : Array(MetaType) = [] of MetaType
-  ) : ForReifiedTypeAlias
-    refer_type = ctx.refer_type[link]
-    rt_alias = ReifiedTypeAlias.new(link, type_args)
-    @aliases[rt_alias] ||= ForReifiedTypeAlias.new(ctx, rt_alias, refer_type)
-  end
-
-  def unwrap_alias(ctx : Context, rt_alias : ReifiedTypeAlias) : MetaType
-    # Guard against recursion in alias unwrapping.
-    if @unwrapping_set.includes?(rt_alias)
-      t_alias = rt_alias.link.resolve(ctx)
-      Error.at t_alias.ident,
-        "This type alias is directly recursive, which is not supported",
-        [{t_alias.target,
-          "only recursion via type arguments in this expression is supported"
-        }]
-    end
-    @unwrapping_set.add(rt_alias)
-
-    # Unwrap the alias.
-    refer_type = ctx.refer_type[rt_alias.link]
-    @aliases[rt_alias].type_expr(rt_alias.target_type_expr(ctx), refer_type)
-    .simplify(ctx)
-
-    # Remove the recursion guard.
-    .tap { @unwrapping_set.delete(rt_alias) }
-  end
-
-  # TODO: Get rid of this
-  protected def for_rt!(rt)
-    @types[rt]
-  end
-
-  def validate_type_args(
-    ctx : Context,
-    infer : (ForReifiedFunc | ForReifiedType),
+    type_check : ForReifiedFunc,
     node : AST::Node,
     mt : MetaType,
   )
     return unless mt.singular? # this skip partially reified type params
     rt = mt.single!
-    rt_defn = rt.defn(ctx)
-    type_params = AST::Extract.type_params(rt.defn(ctx).params)
-    arg_terms = node.is_a?(AST::Qualify) ? node.group.terms : [] of AST::Node
-
-    # The minimum number of params is the number that don't have defaults.
-    # The maximum number of params is the total number of them.
-    type_params_min = type_params.select { |(_, _, default)| !default }.size
-    type_params_max = type_params.size
+    infer = ctx.infer[rt.link]
 
     if rt.args.empty?
-      if type_params_min == 0
+      if infer.type_params.empty?
         # If there are no type args or type params there's nothing to check.
         return
       else
         # If there are type params but no type args we have a problem.
-        Error.at node, "This type needs to be qualified with type arguments", [
-          {rt_defn.params.not_nil!,
+        ctx.error_at node, "This type needs to be qualified with type arguments", [
+          {rt.defn(ctx).params.not_nil!,
             "these type parameters are expecting arguments"}
         ]
+        return
       end
     end
 
-    # If this is an identifier referencing a different type, skip it;
-    # it will have been validated at its referent location, and trying
-    # to validate it here would break because we don't have the Qualify node.
-    return if node.is_a?(AST::Identifier) \
-      && !infer.classify.further_qualified?(node)
+    # If we have the wrong number of arguments, don't continue.
+    # Expect that the Infer pass will show an error for the problem of count.
+    return if rt.args.size != infer.type_params.size
+
+    # Get the AST node terms associated with the arguments, for error reporting.
+    # Also get the AST node terms associated
+    type_param_extracts = AST::Extract.type_params(rt.defn(ctx).params)
+    arg_terms = node.is_a?(AST::Qualify) ? node.group.terms : [] of AST::Node
+
+    # If some of the args come from defaults, go fetch those AST terms as well.
+    if arg_terms.size < rt.args.size
+      arg_terms = arg_terms + type_param_extracts[arg_terms.size..-1].map(&.last.not_nil!)
+    end
 
     raise "inconsistent arguments" if arg_terms.size != rt.args.size
-
-    # Check number of type args against number of type params.
-    if rt.args.empty?
-      Error.at node, "This type needs to be qualified with type arguments", [
-        {rt_defn.params.not_nil!, "these type parameters are expecting arguments"}
-      ]
-    elsif rt.args.size > type_params_max
-      params_pos = (rt_defn.params || rt_defn.ident).pos
-      Error.at node, "This type qualification has too many type arguments", [
-        {params_pos, "at most #{type_params_max} type arguments were expected"},
-      ].concat(arg_terms[type_params_max..-1].map { |arg|
-        {arg.pos, "this is an excessive type argument"}
-      })
-    elsif rt.args.size < type_params_min
-      params = rt_defn.params.not_nil!
-      Error.at node, "This type qualification has too few type arguments", [
-        {params.pos, "at least #{type_params_min} type arguments were expected"},
-      ].concat(params.terms[rt.args.size..-1].map { |param|
-        {param.pos, "this additional type parameter needs an argument"}
-      })
-    end
 
     # Check each type arg against the bound of the corresponding type param.
     arg_terms.zip(rt.args).each_with_index do |(arg_node, arg), index|
@@ -569,393 +136,513 @@ class Mare::Compiler::TypeCheck
 
       arg = arg.simplify(ctx)
 
-      param_bound = @types[rt].get_type_param_bound(index)
+      arg_cap = arg.cap_only_inner.value.as(Cap)
+      cap_set = infer.type_param_bound_cap_sets[index]
+      unless cap_set.includes?(arg_cap)
+        bound_pos = type_param_extracts[index][1].not_nil!.pos
+        cap_set_string = "{" + cap_set.map(&.string).join(", ") + "}"
+        ctx.error_at arg_node,
+          "This type argument won't satisfy the type parameter bound", [
+            {bound_pos, "the allowed caps are #{cap_set_string}"},
+            {arg_node.pos, "the type argument cap is #{arg_cap.string}"},
+          ]
+        next
+      end
+
+      param_bound = rt.meta_type_of_type_param_bound(ctx, index, infer)
+      next unless param_bound
+
       unless arg.satisfies_bound?(ctx, param_bound)
-        bound_pos =
-          rt_defn.params.not_nil!.terms[index].as(AST::Group).terms.last.pos
-        Error.at arg_node,
+        bound_pos = type_param_extracts[index][1].not_nil!.pos
+        ctx.error_at arg_node,
           "This type argument won't satisfy the type parameter bound", [
             {bound_pos, "the type parameter bound is #{param_bound.show_type}"},
             {arg_node.pos, "the type argument is #{arg.show_type}"},
           ]
+        next
       end
     end
   end
 
-  module TypeExprEvaluation
-    abstract def reified : (ReifiedType | ReifiedTypeAlias)
+  def self.verify_safety_of_runtime_type_match(
+    ctx : Context,
+    pos : Source::Pos,
+    lhs_mt : MetaType,
+    rhs_mt : MetaType,
+    lhs_pos : Source::Pos,
+    rhs_pos : Source::Pos,
+  )
+    # This is what we'll get for lhs after testing for rhs type at runtime
+    # because at runtime, capabilities do not exist - we only check defns.
+    isect_mt = lhs_mt.intersect(rhs_mt.strip_cap).simplify(ctx)
 
-    def reified_type(*args)
-      ctx.infer.for_rt(ctx, *args).reified
+    # If the intersection comes up empty, the type check will never match.
+    if isect_mt.unsatisfiable?
+      ctx.error_at pos, "This type check will never match", [
+        {rhs_pos,
+          "the runtime match type, ignoring capabilities, " \
+          "is #{rhs_mt.strip_cap.show_type}"},
+        {lhs_pos,
+          "which does not intersect at all with #{lhs_mt.show_type}"},
+      ]
+      return
     end
 
-    def reified_type_alias(*args)
-      ctx.infer.for_rt_alias(ctx, *args).reified
+    # If the intersection isn't a subtype of the right hand side, then we know
+    # the type descriptors can match but the capabilities would be unsafe.
+    if !isect_mt.subtype_of?(ctx, rhs_mt)
+      ctx.error_at pos,
+        "This type check could violate capabilities", [
+          {rhs_pos,
+            "the runtime match type, ignoring capabilities, " \
+            "is #{rhs_mt.strip_cap.show_type}"},
+          {lhs_pos,
+            "if it successfully matches, " \
+            "the type will be #{isect_mt.show_type}"},
+          {rhs_pos, "which is not a subtype of #{rhs_mt.show_type}"},
+        ]
+      return
     end
+  end
 
-    # An identifier type expression must refer_type to a type.
-    def type_expr(node : AST::Identifier, refer_type, receiver = nil) : MetaType
-      ref = refer_type[node]?
-      case ref
-      when Refer::Self
-        receiver || MetaType.new(reified)
-      when Refer::Type
-        MetaType.new(reified_type(ref.link))
-      when Refer::TypeAlias
-        MetaType.new_alias(reified_type_alias(ref.link_alias))
-      when Refer::TypeParam
-        lookup_type_param(ref, receiver)
-      when nil
-        case node.value
-        when "iso", "trn", "val", "ref", "box", "tag", "non"
-          MetaType.new(MetaType::Capability.new(node.value))
-        when "any", "alias", "send", "share", "read"
-          MetaType.new(MetaType::Capability.new_generic(node.value))
+  def self.verify_call_receiver_cap(ctx : Context, call : Infer::FromCall, calling_func, call_mt, call_func, problems)
+    call_cap_mt = call_mt.cap_only
+    autorecover_needed = false
+
+    call_func_cap = MetaType::Capability.new_maybe_generic(call_func.cap.value)
+    call_func_cap_mt = MetaType.new(call_func_cap)
+
+    # The required capability is the receiver capability of the function,
+    # unless it is an asynchronous function, in which case it is tag.
+    required_cap = call_func_cap
+    required_cap = MetaType::Capability.new(Cap::TAG) \
+      if call_func.has_tag?(:async) && !call_func.has_tag?(:constructor)
+
+    receiver_okay =
+      if required_cap.value.is_a?(Cap)
+        call_cap_mt.subtype_of?(ctx, MetaType.new(required_cap))
+      else
+        call_cap_mt.satisfies_bound?(ctx, MetaType.new(required_cap))
+      end
+
+    # Enforce the capability restriction of the receiver.
+    if receiver_okay
+      # For box functions only, we reify with the actual cap on the caller side.
+      # Or rather, we use "ref", "box", or "val", depending on the caller cap.
+      # For all other functions, we just use the cap from the func definition.
+      reify_cap =
+        if required_cap.value == Cap::BOX
+          case call_cap_mt.inner.as(MetaType::Capability).value
+          when Cap::ISO, Cap::TRN, Cap::REF then MetaType.cap(Cap::REF)
+          when Cap::VAL then MetaType.cap(Cap::VAL)
+          else MetaType.cap(Cap::BOX)
+          end
+        # TODO: This shouldn't be a special case - any generic cap should be accepted.
+        elsif required_cap.value.is_a?(Set(MetaType::Capability))
+          call_cap_mt
         else
-          Error.at node, "This type couldn't be resolved"
+          call_func_cap_mt
         end
-      else
-        raise NotImplementedError.new(ref.inspect)
+    elsif call_func.has_tag?(:constructor)
+      # Constructor calls ignore cap of the original receiver.
+      reify_cap = call_func_cap_mt
+    elsif call_cap_mt.ephemeralize.subtype_of?(ctx, MetaType.new(required_cap))
+      # We failed, but we may be able to use auto-recovery.
+      # Take note of this and we'll finish the auto-recovery checks later.
+      autorecover_needed = true
+      # For auto-recovered calls, always use the cap of the func definition.
+      reify_cap = call_func_cap_mt
+    else
+      # We failed entirely; note the problem and carry on.
+      problems << {call_func.cap.pos,
+        "the type #{call_mt.inner.inspect} isn't a subtype of the " \
+        "required capability of '#{required_cap}'"}
+
+      # If the receiver of the call is the self (the receiver of the caller),
+      # then we can give an extra hint about changing its capability to match.
+      if call.lhs.is_a?(Infer::Self)
+        problems << {calling_func.cap.pos, "this would be possible if the " \
+          "calling function were declared as `:fun #{required_cap}`"}
       end
+
+      # We already failed subtyping for the receiver cap, but pretend
+      # for now that we didn't for the sake of further checks.
+      reify_cap = call_func_cap_mt
     end
 
-    # An relate type expression must be an explicit capability qualifier.
-    def type_expr(node : AST::Relate, refer_type, receiver = nil) : MetaType
-      if node.op.value == "'"
-        cap_ident = node.rhs.as(AST::Identifier)
-        case cap_ident.value
-        when "aliased"
-          type_expr(node.lhs, refer_type, receiver).simplify(ctx).alias
-        else
-          cap = type_expr(cap_ident, refer_type, receiver)
-          type_expr(node.lhs, refer_type, receiver).simplify(ctx).override_cap(cap)
-        end
-      elsif node.op.value == "->"
-        type_expr(node.rhs, refer_type, receiver).simplify(ctx).viewed_from(type_expr(node.lhs, refer_type, receiver))
-      elsif node.op.value == "->>"
-        type_expr(node.rhs, refer_type, receiver).simplify(ctx).extracted_from(type_expr(node.lhs, refer_type, receiver))
-      else
-        raise NotImplementedError.new(node.to_a.inspect)
-      end
+    if autorecover_needed \
+    && required_cap.value != Cap::REF && required_cap.value != Cap::BOX
+      problems << {call_func.cap.pos,
+        "the function's required receiver capability is `#{required_cap}` " \
+        "but only a `ref` or `box` function can be auto-recovered"}
+
+      problems << {call.lhs.pos,
+        "auto-recovery was attempted because the receiver's type is " \
+        "#{call_mt.inner.inspect}"}
     end
 
-    # A "|" group must be a union of type expressions, and a "(" group is
-    # considered to be just be a single parenthesized type expression (for now).
-    def type_expr(node : AST::Group, refer_type, receiver = nil) : MetaType
-      if node.style == "|"
-        MetaType.new_union(
-          node.terms
-          .select { |t| t.is_a?(AST::Group) && t.terms.size > 0 }
-          .map { |t| type_expr(t, refer_type, receiver).as(MetaType)}
-        )
-      elsif node.style == "(" && node.terms.size == 1
-        type_expr(node.terms.first, refer_type, receiver)
-      else
-        raise NotImplementedError.new(node.to_a.inspect)
-      end
-    end
+    {reify_cap, autorecover_needed}
+  end
 
-    # A "(" qualify is used to add type arguments to a type.
-    def type_expr(node : AST::Qualify, refer_type, receiver = nil) : MetaType
-      raise NotImplementedError.new(node.to_a) unless node.group.style == "("
+  def self.verify_call_arg_count(ctx : Context, call : Infer::FromCall, call_func, problems)
+    # Just check the number of arguments.
+    # We will check the types in another Info type (TowardCallParam)
+    arg_count = call.args.try(&.terms.size) || 0
+    max = AST::Extract.params(call_func.params).size
+    min = AST::Extract.params(call_func.params).count { |(ident, type, default)| !default }
+    func_pos = call_func.ident.pos
 
-      target = type_expr(node.term, refer_type, receiver)
-      args = node.group.terms.map do |t|
-        resolve_type_param_parent_links(type_expr(t, refer_type, receiver)).as(MetaType)
-      end
-
-      target_inner = target.inner
-      if target_inner.is_a?(MetaType::Nominal) \
-      && target_inner.defn.is_a?(ReifiedTypeAlias)
-        MetaType.new(reified_type_alias(target_inner.defn.as(ReifiedTypeAlias).link, args))
-      else
-        cap = begin target.cap_only rescue nil end
-        mt = MetaType.new(reified_type(target.single!, args))
-        mt = mt.override_cap(cap) if cap
-        mt
-      end
-    end
-
-    # All other AST nodes are unsupported as type expressions.
-    def type_expr(node : AST::Node, refer_type, receiver = nil) : MetaType
-      raise NotImplementedError.new(node.to_a)
-    end
-
-    # TODO: Can we do this more eagerly? Chicken and egg problem.
-    # Can every TypeParam contain the parent_rt from birth, so we can avoid
-    # the cost of scanning and substituting them here later?
-    # It's a chicken-and-egg problem because the parent_rt may contain
-    # references to type params in its type arguments, which means those
-    # references have to exist somehow before the parent_rt is settled,
-    # but then that changes the parent_rt which needs to be embedded in them.
-    def resolve_type_param_parent_links(mt : MetaType) : MetaType
-      substitutions = {} of TypeParam => MetaType
-      mt.type_params.each do |type_param|
-        next if type_param.parent_rt
-        next if type_param.ref.parent_link != reified.link
-
-        scoped_type_param = TypeParam.new(type_param.ref, reified)
-        substitutions[type_param] = MetaType.new_type_param(scoped_type_param)
-      end
-
-      mt = mt.substitute_type_params(substitutions) if substitutions.any?
-
-      mt
+    if arg_count > max
+      max_text = "#{max} #{max == 1 ? "argument" : "arguments"}"
+      params_pos = call_func.params.try(&.pos) || call_func.ident.pos
+      problems << {call.pos, "the call site has too many arguments"}
+      problems << {params_pos, "the function allows at most #{max_text}"}
+    elsif arg_count < min
+      min_text = "#{min} #{min == 1 ? "argument" : "arguments"}"
+      params_pos = call_func.params.try(&.pos) || call_func.ident.pos
+      problems << {call.pos, "the call site has too few arguments"}
+      problems << {params_pos, "the function requires at least #{min_text}"}
     end
   end
 
-  class ForReifiedTypeAlias
-    include TypeExprEvaluation
+  def self.verify_call_autorecover(
+    ctx : Context,
+    type_check : TypeCheck::ForReifiedFunc,
+    call : Infer::FromCall,
+    call_func : Program::Function,
+    ret_mt : MetaType
+  )
+    # If autorecover of the receiver cap was needed to make this call work,
+    # we now have to confirm that arguments and return value are all sendable.
+    problems = [] of {Source::Pos, String}
 
-    private getter ctx : Context
-    getter reified : ReifiedTypeAlias
-    private getter refer_type : ReferType::Analysis
-
-    def initialize(@ctx, @reified, @refer_type)
+    unless ret_mt.is_sendable? || !call.ret_value_used
+      problems << {(call_func.ret || call_func.ident).pos,
+        "the return type #{ret_mt.show_type} isn't sendable " \
+        "and the return value is used (the return type wouldn't matter " \
+        "if the calling side entirely ignored the return value)"}
     end
 
-    def lookup_type_param(ref : Refer::TypeParam, receiver = nil)
-      raise NotImplementedError.new(ref) if ref.parent_link != reified.link
-
-      # Lookup the type parameter on self type and return the arg if present
-      arg = reified.args[ref.index]?
-      return arg if arg
-
-      # Use the default type argument if this type parameter has one.
-      ref_default = ref.default
-      return type_expr(ref_default, refer_type) if ref_default
-
-      raise "halt" if reified.is_complete?(ctx)
-
-      # Otherwise, return it as an unreified type parameter nominal.
-      MetaType.new_type_param(TypeParam.new(ref))
-    end
-  end
-
-  class ForReifiedType
-    include TypeExprEvaluation
-
-    private getter ctx : Context
-    getter analysis : ReifiedTypeAnalysis
-    getter reified : ReifiedType
-    private getter refer_type : ReferType::Analysis
-
-    def initialize(@ctx, @analysis, @reified, @refer_type)
-      @type_param_refinements = {} of Refer::TypeParam => Array(MetaType)
-    end
-
-    def initialize_assertions(ctx)
-      reified_defn = reified.defn(ctx)
-      reified_defn.functions.each do |f|
-        next unless f.has_tag?(:is)
-
-        f_link = f.make_link(reified.link)
-        trait = type_expr(f.ret.not_nil!, ctx.refer_type[f_link]).single!
-
-        ctx.infer.for_rt!(trait).analysis.subtyping.assert(reified, f.ident.pos)
+    # TODO: It should be safe to pass in a TRN if the receiver is TRN,
+    # so is_sendable? isn't quite liberal enough to allow all valid cases.
+    call.args.try(&.terms.each { |arg|
+      resolved_arg = type_check.resolve(ctx, type_check.pre_infer[arg])
+      if resolved_arg && !resolved_arg.alias.is_sendable?
+        problems << {arg.pos,
+          "the argument (when aliased) has a type of " \
+          "#{resolved_arg.alias.show_type}, which isn't sendable"}
       end
-    end
+    })
 
-    def get_type_param_bound(index : Int32)
-      param_ident = AST::Extract.type_param(reified.defn(ctx).params.not_nil!.terms[index]).first
-      param_bound_node = refer_type[param_ident].as(Refer::TypeParam).bound
-
-      type_expr(param_bound_node.not_nil!, refer_type, nil)
-    end
-
-    def lookup_type_param(ref : Refer::TypeParam, receiver = nil)
-      raise NotImplementedError.new(ref) if ref.parent_link != reified.link
-
-      # Lookup the type parameter on self type and return the arg if present
-      arg = reified.args[ref.index]?
-      return arg if arg
-
-      # Use the default type argument if this type parameter has one.
-      ref_default = ref.default
-      return type_expr(ref_default, refer_type) if ref_default
-
-      raise "halt" if reified.is_complete?(ctx)
-
-      # Otherwise, return it as an unreified type parameter nominal.
-      MetaType.new_type_param(TypeParam.new(ref))
-    end
-
-    def lookup_type_param_bound(type_param : TypeParam)
-      parent_rt = type_param.parent_rt
-      if parent_rt && parent_rt != reified
-        raise NotImplementedError.new(parent_rt) if parent_rt.is_a?(ReifiedTypeAlias)
-        return (
-          ctx.infer.for_rt(ctx, parent_rt.link.as(Program::Type::Link), parent_rt.args)
-            .lookup_type_param_bound(type_param)
-        )
-      end
-
-      if type_param.ref.parent_link != reified.link
-        raise NotImplementedError.new([reified, type_param].inspect) \
-          unless parent_rt
-      end
-
-      # Get the MetaType of the declared bound for this type parameter.
-      bound : MetaType = type_expr(type_param.ref.bound, refer_type, nil)
-
-      # If we have temporary refinements for this type param, apply them now.
-      @type_param_refinements[type_param.ref]?.try(&.each { |refine_type|
-        # TODO: make this less of a special case, somehow:
-        bound = bound.strip_cap.intersect(refine_type.strip_cap).intersect(
-          MetaType.new(
-            bound.cap_only.inner.as(MetaType::Capability).set_intersect(
-              refine_type.cap_only.inner.as(MetaType::Capability)
-            )
-          )
-        )
-      })
-
-      bound
-    end
-
-    def push_type_param_refinement(ref, refine_type)
-      (@type_param_refinements[ref] ||= [] of MetaType) << refine_type
-    end
-
-    def pop_type_param_refinement(ref)
-      list = @type_param_refinements[ref]
-      list.empty? ? @type_param_refinements.delete(ref) : list.pop
-    end
+    ctx.error_at call,
+      "This function call won't work unless the receiver is ephemeral; " \
+      "it must either be consumed or be allowed to be auto-recovered. "\
+      "Auto-recovery didn't work for these reasons",
+        problems unless problems.empty?
   end
 
   class ForReifiedFunc < Mare::AST::Visitor
-    getter f_analysis : FuncAnalysis
-    getter analysis : ReifiedFuncAnalysis
-    getter for_rt : ForReifiedType
     getter reified : ReifiedFunction
-    private getter ctx : Context
     private getter refer_type : ReferType::Analysis
-    protected getter classify : Classify::Analysis
+    protected getter classify : Classify::Analysis # TODO: make private
+    private getter completeness : Completeness::Analysis
+    protected getter pre_infer : PreInfer::Analysis # TODO: make private
+    private getter infer : Infer::FuncAnalysis
+    private getter subtyping : SubtypingCache::ForReifiedFunc
 
-    def initialize(@ctx, @f_analysis, @analysis, @for_rt, @reified, @refer_type, @classify)
-      @local_idents = Hash(Refer::Local, AST::Node).new
-      @local_ident_overrides = Hash(AST::Node, AST::Node).new
-      @redirects = Hash(AST::Node, AST::Node).new
-      @already_ran = false
-      @prevent_reentrance = {} of Info => Int32
-    end
-
-    def func
-      reified.func(ctx)
-    end
-
-    def params
-      func.params.try(&.terms) || ([] of AST::Node)
+    def initialize(ctx, @reified,
+      @refer_type, @classify, @completeness, @pre_infer, @infer, @subtyping
+    )
+      @resolved_infos = {} of Info => MetaType
+      @func = @reified.link.resolve(ctx).as(Program::Function)
     end
 
     def ret
       # The ident is used as a fake local variable that represents the return.
-      func.ident
+      @func.ident
     end
 
-    def filter_span(info : Info) : MetaType
-      span = @f_analysis.span(info)
-      filtered_span = span.filter_remove_cond(:f_cap) { |f_cap| !f_cap || f_cap == reified.receiver_cap }
-      if filtered_span.points.size != 1
-        puts info.pos.show
-        pp info
-        pp span
-        pp filtered_span
-        raise "halt"
-      end
+    def resolve(ctx : Context, info : Infer::Info) : MetaType?
+      # If our type param reification doesn't match any of the conditions
+      # for the layer associated with the given info, then
+      # we will not do any typechecking here - we just return nil.
+      return nil if subtyping.ignores_layer?(ctx, info.layer_index)
 
-      filtered_span.points.first.first
-    end
+      @resolved_infos[info]? || begin
+        mt = info.as_conduit?.try(&.resolve!(ctx, self)) \
+          || @reified.meta_type_of(ctx, info, @infer)
+        @resolved_infos[info] = mt || MetaType.unconstrained
+        return nil unless mt
 
-    def resolve(ctx : Context, info : Info) : MetaType
-      @analysis.resolved_infos[info]? || begin
-        mt = filter_span(info)
+        okay = type_check_pre(ctx, info, mt)
+        type_check(ctx, info, mt) if okay
 
-        # puts info.pos.show
-        # pp @f_analysis.span(info)
-        # raise "halt"
-        # mt = info.resolve_one!(ctx, self).simplify(ctx)
-        @analysis.resolved_infos[info] = mt
-        # info.post_resolve_one!(ctx, self, mt)
-        # info.resolve_others!(ctx, self)
         mt
       end
     end
 
-    # This variant lets you eagerly choose the MetaType that a different Info
-    # resolves as, with that Info having no say in the matter. Use with caution.
-    def resolve_as(ctx : Context, info : Info, meta_type : MetaType) : MetaType
-      raise "already resolved #{info}\n" \
-        "as #{@analysis.resolved_infos[info].show_type}" \
-          if @analysis.resolved_infos.has_key?(info) \
-          && @analysis.resolved_infos[info] != meta_type
-
-      @analysis.resolved_infos[info] = meta_type
+    # Validate type arguments for FixedSingleton values.
+    def type_check_pre(ctx : Context, info : Infer::FixedSingleton, mt : MetaType) : Bool
+      TypeCheck.validate_type_args(ctx, self, info.node, mt)
+      true
     end
 
-    # This variant has protection to prevent infinite recursion.
-    # It is mainly used by FromCall, since it interacts across reified funcs.
-    def resolve_with_reentrance_prevention(ctx : Context, info : Info) : MetaType
-      orig_count = @prevent_reentrance[info]?
-      if (orig_count || 0) > 2 # TODO: can we remove this counter and use a set instead of a map?
-        kind = info.is_a?(DynamicInfo) ? " #{info.describe_kind}" : ""
-        Error.at info.pos,
-          "This#{kind} needs an explicit type; it could not be inferred"
+    # Check completeness of self references inside a constructor.
+    def type_check_pre(ctx : Context, info : Infer::Self, mt : MetaType) : Bool
+      # If this is a complete self, no additional checks are required.
+      unseen_fields = completeness.unseen_fields_for(info)
+      return true unless unseen_fields
+
+      # This represents the self type as opaque, with no field access.
+      # We'll use this to guarantee that no usage of the current self object
+      # will require  any access to the fields of the object.
+      tag_self = mt.override_cap(Cap::TAG)
+      total_constraint = info.total_downstream_constraint(ctx, self)
+      return true if tag_self.within_constraints?(ctx, [total_constraint])
+
+      # If even the non-tag self isn't within constraints, return true here
+      # and let the later type_check code catch this problem.
+      return true if !mt.within_constraints?(ctx, [total_constraint])
+
+      # Walk through each constraint imposed on the self, and raise an error
+      # for each one that is not satisfiable by a tag self.
+      info.list_downstream_constraints(ctx, self).each do |pos, constraint|
+        # If tag will meet the constraint, then this use of the self is okay.
+        next if tag_self.within_constraints?(ctx, [constraint])
+
+        # Otherwise, we must raise an error.
+        ctx.error_at info.pos,
+          "This usage of `@` shares field access to the object" \
+          " from a constructor before all fields are initialized", [
+            {pos,
+              "if this constraint were specified as `tag` or lower" \
+              " it would not grant field access"}
+          ] + unseen_fields.map { |ident|
+            {ident.pos, "this field didn't get initialized"}
+          }
       end
-      @prevent_reentrance[info] = (orig_count || 0) + 1
-      resolve(ctx, info)
-      .tap { orig_count ? (@prevent_reentrance[info] = orig_count) : @prevent_reentrance.delete(info) }
+      false
     end
 
-    def extra_called_func!(pos, rt, f)
-      @analysis.called_funcs.add({pos, rt, f})
+    # Sometimes print a special case error message for Literal values.
+    def type_check_pre(ctx : Context, info : Infer::Literal, mt : MetaType) : Bool
+      # If we've resolved to a single concrete type already, move forward.
+      return true if mt.singular? && mt.single!.link.is_concrete?
+
+      # If we can't be satisfiably intersected with the downstream constraints,
+      # move forward and let the standard type checker error happen.
+      constrained_mt = mt.intersect(info.total_downstream_constraint(ctx, self))
+      return true if constrained_mt.simplify(ctx).unsatisfiable?
+
+      # Otherwise, print a Literal-specific error that includes peer hints,
+      # as well as a call to action to use an explicit numeric type.
+      error_info = info.peer_hints.compact_map { |peer|
+        peer_mt = resolve(ctx, peer)
+        next unless peer_mt
+        {peer.pos, "it is suggested here that it might be a #{peer_mt.show_type}"}
+      }
+      error_info.concat(info.describe_downstream_constraints(ctx, self))
+      error_info.push({info.pos,
+        "and the literal itself has an intrinsic type of #{mt.show_type}"
+      })
+      error_info.push({Source::Pos.none,
+        "Please wrap an explicit numeric type around the literal " \
+          "(for example: U64[#{info.pos.content}])"
+      })
+      ctx.error_at info,
+        "This literal value couldn't be inferred as a single concrete type",
+        error_info
+      false
     end
 
-    def run
-      return if @already_ran
-      @already_ran = true
-
-      func_params = func.params
-      func_body = func.body
-
-      resolve(ctx, @f_analysis[func_body]) if func_body
-      resolve(ctx, @f_analysis[func_params]) if func_params
-      resolve(ctx, @f_analysis[ret])
-
-      # Assign the resolved types to a map for safekeeping.
-      # This also has the effect of running some final checks on everything.
-      # TODO: Is it possible to remove the simplify calls here?
-      # Is it actually a significant performance impact or not?
-
-      if (info = @f_analysis.yield_in_info; info)
-        @analysis.yield_in_resolved = resolve(ctx, info).simplify(ctx)
+    # Sometimes print a special case error message for ArrayLiteral values.
+    def type_check_pre(ctx : Context, info : Infer::ArrayLiteral, mt : MetaType) : Bool
+      # If the array cap is not ref or "lesser", we must recover to the
+      # higher capability, meaning all element expressions must be sendable.
+      array_cap = mt.cap_only_inner
+      unless array_cap.supertype_of?(MetaType::Capability::REF)
+        term_mts = info.terms.compact_map { |term| resolve(ctx, term) }
+        unless term_mts.all?(&.alias.is_sendable?)
+          ctx.error_at info.pos, "This array literal can't have a reference cap of " \
+            "#{array_cap.inspect} unless all of its elements are sendable",
+              info.describe_downstream_constraints(ctx, self)
+        end
       end
-      @analysis.yield_out_resolved = @f_analysis.yield_out_infos.map do |info|
-        resolve(ctx, info).simplify(ctx).as(MetaType)
+
+      true
+    end
+
+    # Check runtime match safety for TypeCondition expressions.
+    def type_check_pre(ctx : Context, info : Infer::TypeCondition, mt : MetaType) : Bool
+      lhs_mt = resolve(ctx, info.lhs)
+      rhs_mt = resolve(ctx, info.rhs)
+
+      # TODO: move that function here into this file/module.
+      TypeCheck.verify_safety_of_runtime_type_match(ctx, info.pos,
+        lhs_mt,
+        rhs_mt,
+        info.lhs.pos,
+        info.rhs.pos,
+      ) if lhs_mt && rhs_mt
+
+      true
+    end
+    def type_check_pre(ctx : Context, info : Infer::TypeConditionForLocal, mt : MetaType) : Bool
+      lhs_info = @pre_infer[info.refine]
+      lhs_info = lhs_info.info if lhs_info.is_a?(Infer::LocalRef)
+      rhs_info = info.refine_type
+      lhs_mt = resolve(ctx, lhs_info)
+      rhs_mt = resolve(ctx, rhs_info)
+
+      # TODO: move that function here into this file/module.
+      TypeCheck.verify_safety_of_runtime_type_match(ctx, info.pos,
+        lhs_mt,
+        rhs_mt,
+        lhs_info.as(Infer::NamedInfo).first_viable_constraint_pos,
+        rhs_info.pos,
+      ) if lhs_mt && rhs_mt
+
+      true
+    end
+
+    def type_check_pre(ctx : Context, info : Infer::FromCall, mt : MetaType) : Bool
+      receiver_mt = resolve(ctx, info.lhs)
+      return false unless receiver_mt
+
+      call_defns = receiver_mt.find_callable_func_defns(ctx, info.member)
+
+      problems = [] of {Source::Pos, String}
+      call_defns.each do |(call_mt, call_defn, call_func)|
+        next unless call_defn
+        next unless call_func
+        call_func_link = call_func.make_link(call_defn.link)
+
+        # Determine the correct capability to reify, checking for cap errors.
+        reify_cap, autorecover_needed =
+          TypeCheck.verify_call_receiver_cap(ctx, info, @func, call_mt, call_func, problems)
+
+        # Check the number of arguments.
+        TypeCheck.verify_call_arg_count(ctx, info, call_func, problems)
+
+        # Check whether yield block presence matches the function's expectation.
+        other_pre_infer = ctx.pre_infer[call_func_link]
+        func_does_yield = other_pre_infer.yield_out_infos.any?
+        if info.yield_block && !func_does_yield
+          problems << {info.yield_block.not_nil!.pos, "it has a yield block"}
+          problems << {call_func.ident.pos,
+            "but '#{call_defn.defn(ctx).ident.value}.#{info.member}' has no yields"}
+        elsif !info.yield_block && func_does_yield
+          problems << {
+            other_pre_infer.yield_out_infos.first.first_viable_constraint_pos,
+            "it has no yield block but " \
+              "'#{call_defn.defn(ctx).ident.value}.#{info.member}' does yield"
+          }
+        end
+
+        # Check if auto-recovery of the receiver is possible.
+        if autorecover_needed
+          receiver = MetaType.new(call_defn, reify_cap.cap_only_inner.value.as(Cap))
+          other_rf = ReifiedFunction.new(call_defn, call_func_link, receiver)
+          ret_mt = other_rf.meta_type_of_ret(ctx)
+          TypeCheck.verify_call_autorecover(ctx, self, info, call_func, ret_mt) \
+            if ret_mt
+        end
       end
-      @analysis.ret_resolved = @analysis.resolved_infos[@f_analysis[ret]]
+      ctx.error_at info,
+        "This function call doesn't meet subtyping requirements", problems \
+          unless problems.empty?
+
+      true
+    end
+
+    # Other types of Info nodes do not have extra type checks.
+    def type_check_pre(ctx : Context, info : Infer::Info, mt : MetaType) : Bool
+      true # There is nothing extra here.
+    end
+
+    def type_check(ctx, info : Infer::DynamicInfo, meta_type : Infer::MetaType)
+      return if info.downstreams_empty?
+
+      # TODO: print a different error message when the downstream constraints are
+      # internally conflicting, even before adding this meta_type into the mix.
+      if !meta_type.ephemeralize.within_constraints?(ctx, [
+        info.total_downstream_constraint(ctx, self)
+      ])
+        extra = info.describe_downstream_constraints(ctx, self)
+        extra << {info.pos,
+          "but the type of the #{info.described_kind} was #{meta_type.show_type}"}
+        this_would_be_possible_if = info.this_would_be_possible_if
+        extra << this_would_be_possible_if if this_would_be_possible_if
+
+        ctx.error_at info.downstream_use_pos, "The type of this expression " \
+          "doesn't meet the constraints imposed on it",
+            extra
+      end
+
+      # If aliasing makes a difference, we need to evaluate each constraint
+      # that has nonzero aliases with an aliased version of the meta_type.
+      if meta_type != meta_type.strip_ephemeral.alias
+        meta_type_alias = meta_type.strip_ephemeral.alias
+
+        # TODO: Do we need to do anything here to weed out union types with
+        # differing capabilities of compatible terms? Is it possible that
+        # the type that fulfills the total_downstream_constraint is not compatible
+        # with the ephemerality requirement, while some other union member is?
+        info.downstreams_each.each do |use_pos, other_info, aliases|
+          next unless aliases > 0
+
+          constraint = resolve(ctx, other_info).as(Infer::MetaType?)
+          next unless constraint
+
+          if !meta_type_alias.within_constraints?(ctx, [constraint])
+            extra = info.describe_downstream_constraints(ctx, self)
+            extra << {info.pos,
+              "but the type of the #{info.described_kind} " \
+              "(when aliased) was #{meta_type_alias.show_type}"
+            }
+            this_would_be_possible_if = info.this_would_be_possible_if
+            extra << this_would_be_possible_if if this_would_be_possible_if
+
+            ctx.error_at use_pos, "This aliasing violates uniqueness " \
+              "(did you forget to consume the variable?)",
+              extra
+          end
+        end
+      end
+    end
+
+    # For all other info types we do nothing.
+    # TODO: Should we do something?
+    def type_check(ctx, info : Infer::Info, meta_type : Infer::MetaType)
+    end
+
+    def run(ctx)
+      @pre_infer.each_info { |info| resolve(ctx, info) }
 
       # Return types of constant "functions" are very restrictive.
-      if func.has_tag?(:constant)
-        ret_mt = @analysis.ret_resolved
+      if @func.has_tag?(:constant)
+        numeric_rt = ReifiedType.new(ctx.namespace.prelude_type("Numeric"))
+        numeric_mt = MetaType.new_nominal(numeric_rt)
+
+        ret_mt = @resolved_infos[@pre_infer[ret]]
         ret_rt = ret_mt.single?.try(&.defn)
         is_val = ret_mt.cap_only.inner == MetaType::Capability::VAL
         unless is_val && ret_rt.is_a?(ReifiedType) && ret_rt.link.is_concrete? && (
           ret_rt.not_nil!.link.name == "String" ||
-          ret_mt.subtype_of?(ctx, MetaType.new_nominal(reified_prelude_type("Numeric"))) ||
+          ret_mt.subtype_of?(ctx, numeric_mt) ||
           (ret_rt.not_nil!.link.name == "Array" && begin
             elem_mt = ret_rt.args.first
             elem_rt = elem_mt.single?.try(&.defn)
             elem_is_val = elem_mt.cap_only.inner == MetaType::Capability::VAL
             is_val && elem_rt.is_a?(ReifiedType) && elem_rt.link.is_concrete? && (
               elem_rt.not_nil!.link.name == "String" ||
-              elem_mt.subtype_of?(ctx, MetaType.new_nominal(reified_prelude_type("Numeric")))
+              elem_mt.subtype_of?(ctx, numeric_mt)
             )
           end)
         )
-          Error.at ret, "The type of a constant may only be String, " \
+          ctx.error_at ret, "The type of a constant may only be String, " \
             "a numeric type, or an immutable Array of one of these", [
-              {func.ret || func.body || ret, "but the type is #{ret_mt.show_type}"}
+              {@func.ret || @func.body || ret, "but the type is #{ret_mt.show_type}"}
             ]
         end
       end
@@ -963,18 +650,18 @@ class Mare::Compiler::TypeCheck
       # Parameters must be sendable when the function is asynchronous,
       # or when it is a constructor with elevated capability.
       require_sendable =
-        if func.has_tag?(:async)
+        if @func.has_tag?(:async)
           "An asynchronous function"
-        elsif func.has_tag?(:constructor) \
-        && !resolve(ctx, @f_analysis[ret]).subtype_of?(ctx, MetaType.cap("ref"))
+        elsif @func.has_tag?(:constructor) \
+        && !resolve(ctx, @pre_infer[ret]).not_nil!.subtype_of?(ctx, MetaType.cap(Cap::REF))
           "A constructor with elevated capability"
         end
       if require_sendable
-        func.params.try do |params|
+        @func.params.try do |params|
 
           errs = [] of {Source::Pos, String}
           params.terms.each do |param|
-            param_mt = resolve(ctx, @f_analysis[param])
+            param_mt = resolve(ctx, @pre_infer[param]).not_nil!
 
             unless param_mt.is_sendable?
               # TODO: Remove this hacky special case.
@@ -985,37 +672,13 @@ class Mare::Compiler::TypeCheck
             end
           end
 
-          Error.at func.cap.pos,
+          ctx.error_at @func.cap.pos,
             "#{require_sendable} must only have sendable parameters", errs \
               unless errs.empty?
         end
       end
 
       nil
-    end
-
-    def reified_prelude_type(name, *args)
-      ctx.infer.for_rt(ctx, @ctx.namespace.prelude_type(name), *args).reified
-    end
-
-    def reified_type(*args)
-      ctx.infer.for_rt(ctx, *args).reified
-    end
-
-    def reified_type_alias(*args)
-      ctx.infer.for_rt_alias(ctx, *args).reified
-    end
-
-    def lookup_type_param(ref, receiver = reified.receiver)
-      @for_rt.lookup_type_param(ref, receiver)
-    end
-
-    def lookup_type_param_bound(type_param)
-      @for_rt.lookup_type_param_bound(type_param)
-    end
-
-    def type_expr(node)
-      @for_rt.type_expr(node, refer_type, reified.receiver)
     end
   end
 end

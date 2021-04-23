@@ -2,13 +2,14 @@ class Mare::Compiler::Context
   getter program
   getter import
 
-  getter alt_infer
+  getter infer
+  getter infer_edge
   getter classify
   getter code_gen
   getter code_gen_verona
+  getter completeness
   getter consumes
   getter eval
-  getter infer
   getter inventory
   getter jumps
   getter lifetime
@@ -16,30 +17,38 @@ class Mare::Compiler::Context
   getter paint
   getter populate
   getter pre_infer
+  getter pre_subtyping
+  getter privacy
   getter reach
   getter refer
   getter refer_type
   getter serve_definition
   getter serve_hover
+  getter subtyping
   getter type_check
+  getter type_context
+  getter verify
 
   getter options
   property prev_ctx : Context?
 
   getter link_libraries
 
+  getter errors = [] of Error
+
   def initialize(@options = CompilerOptions.new, @prev_ctx = nil)
     @program = Program.new
     @stack = [] of Interpreter
 
-    @alt_infer = AltInfer::Pass.new
+    @infer = Infer::Pass.new
+    @infer_edge = Infer::PassEdge.new
     @classify = Classify::Pass.new
     @code_gen = CodeGen.new(CodeGen::PonyRT)
     @code_gen_verona = CodeGen.new(CodeGen::VeronaRT)
+    @completeness = Completeness::Pass.new
     @consumes = Consumes::Pass.new
     @eval = Eval.new
     @import = Import.new
-    @infer = Infer.new
     @inventory = Inventory::Pass.new
     @jumps = Jumps::Pass.new
     @lifetime = Lifetime.new
@@ -47,19 +56,29 @@ class Mare::Compiler::Context
     @paint = Paint.new
     @populate = Populate.new
     @pre_infer = PreInfer::Pass.new
+    @pre_subtyping = PreSubtyping::Pass.new
+    @privacy = Privacy::Pass.new
     @reach = Reach.new
     @refer = Refer::Pass.new
     @refer_type = ReferType::Pass.new
     @serve_definition = ServeDefinition.new
     @serve_hover = ServeHover.new
-    @link_libraries = Set(String).new
+    @subtyping = SubtypingCache.new
     @type_check = TypeCheck.new
+    @type_context = TypeContext::Pass.new
+    @verify = Verify::Pass.new
+
+    @link_libraries = Set(String).new
   end
 
   def compile_library(*args)
     library = compile_library_inner(*args)
     @program.libraries << library
     library
+  rescue e : Error
+    @errors << e
+    @stack.clear
+    library || Program::Library.new(args.first)
   end
 
   @@cache = {} of String => {Array(AST::Document), Program::Library}
@@ -96,6 +115,7 @@ class Mare::Compiler::Context
   end
 
   def finish
+    @errors.uniq!
     @stack.clear
   end
 
@@ -104,24 +124,50 @@ class Mare::Compiler::Context
   end
 
   def run(obj)
+    return false if @errors.any?
+
     @program.libraries.each do |library|
       obj.run(self, library)
     end
     finish
-    obj
+
+    return false if @errors.any?
+    true
+  rescue e : Error
+    @errors << e
+    false
   end
 
   def run_copy_on_mutate(obj)
+    return false if @errors.any?
+
     @program.libraries.map! do |library|
       obj.run(self, library)
     end
     finish
-    obj
+
+    return false if @errors.any?
+    true
+  rescue e : Error
+    @errors << e
+    false
   end
 
   def run_whole_program(obj)
+    return false if @errors.any?
+
     obj.run(self)
     finish
-    obj
+
+    return false if @errors.any?
+    true
+  rescue e : Error
+    @errors << e
+    false
+  end
+
+  def error_at(*args)
+    @errors << Error.build(*args)
+    nil
   end
 end

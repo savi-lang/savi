@@ -83,8 +83,8 @@ struct Mare::Compiler::Infer::MetaType::Union
     io << ")"
   end
 
-  def each_reachable_defn(ctx : Context) : Array(Infer::ReifiedType)
-    defns = [] of Infer::ReifiedType
+  def each_reachable_defn(ctx : Context) : Array(ReifiedType)
+    defns = [] of ReifiedType
 
     defns += terms.not_nil!.map(&.each_reachable_defn(ctx)).flatten if terms
     defns += intersects.not_nil!.map(&.each_reachable_defn(ctx)).flatten if intersects
@@ -92,51 +92,60 @@ struct Mare::Compiler::Infer::MetaType::Union
     defns
   end
 
-  def alt_find_callable_func_defns(ctx, infer : AltInfer::Visitor?, name : String)
-    list = [] of Tuple(Inner, Infer::ReifiedType?, Program::Function?)
+  def gather_call_receiver_span(
+    ctx : Context,
+    pos : Source::Pos,
+    infer : Visitor?,
+    name : String
+  ) : Span
+    span = Span.simple(MetaType.unsatisfiable)
+
+    terms.try { |terms|
+      span = span.reduce_combine_mts(
+        terms.map(&.gather_call_receiver_span(ctx, pos, infer, name))
+      ) { |accum, mt| accum.unite(mt) }
+    }
+
+    intersects.try { |intersects|
+      span = span.reduce_combine_mts(
+        intersects.map(&.gather_call_receiver_span(ctx, pos, infer, name))
+      ) { |accum, mt| accum.unite(mt) }
+    }
+
+    if span.any_mt?(&.unsatisfiable?)
+      return Span.error(pos,
+        "The '#{name}' function can't be called on this receiver", [
+          {pos, "the type #{self.inspect} has no types defining that function"}
+        ]
+      )
+    end
+
+    span
+  end
+
+  def find_callable_func_defns(ctx, name : String)
+    list = [] of Tuple(MetaType, ReifiedType?, Program::Function?)
 
     # Every nominal in the union must have an implementation of the call.
     # If it doesn't, we will collect it here as a failure to find it.
     terms.not_nil!.each do |term|
       defn = term.defn
-      result = term.alt_find_callable_func_defns(ctx, infer, name)
-      result ||= [{term, (defn if defn.is_a?(Infer::ReifiedType)), nil}]
+      result = term.find_callable_func_defns(ctx, name)
+      result ||= [{MetaType.new(term), (defn if defn.is_a?(ReifiedType)), nil}]
       list.concat(result)
     end if terms
 
     # Every intersection must have one or more implementations of the call.
     # Otherwise, it will return some error infomration in its list for us.
     intersects.not_nil!.each do |intersect|
-      result = intersect.alt_find_callable_func_defns(ctx, infer, name).not_nil!
+      result = intersect.find_callable_func_defns(ctx, name).not_nil!
       list.concat(result)
     end if intersects
 
     list
   end
 
-  def find_callable_func_defns(ctx, infer : ForReifiedFunc?, name : String)
-    list = [] of Tuple(Inner, Infer::ReifiedType?, Program::Function?)
-
-    # Every nominal in the union must have an implementation of the call.
-    # If it doesn't, we will collect it here as a failure to find it.
-    terms.not_nil!.each do |term|
-      defn = term.defn
-      result = term.find_callable_func_defns(ctx, infer, name)
-      result ||= [{term, (defn if defn.is_a?(Infer::ReifiedType)), nil}]
-      list.concat(result)
-    end if terms
-
-    # Every intersection must have one or more implementations of the call.
-    # Otherwise, it will return some error infomration in its list for us.
-    intersects.not_nil!.each do |intersect|
-      result = intersect.find_callable_func_defns(ctx, infer, name).not_nil!
-      list.concat(result)
-    end if intersects
-
-    list
-  end
-
-  def any_callable_func_defn_type(ctx, name : String) : Infer::ReifiedType?
+  def any_callable_func_defn_type(ctx, name : String) : ReifiedType?
     # Return the first nominal or intersection in this union that has this func.
     terms.try(&.each do |term|
       term.any_callable_func_defn_type(ctx, name).try do |result|
@@ -319,7 +328,7 @@ struct Mare::Compiler::Infer::MetaType::Union
   end
 
   def ephemeralize
-    Union.new(
+    Union.build(
       (caps.not_nil!.map(&.ephemeralize).to_set if caps),
       terms,
       anti_terms,
@@ -328,7 +337,7 @@ struct Mare::Compiler::Infer::MetaType::Union
   end
 
   def strip_ephemeral
-    Union.new(
+    Union.build(
       (caps.not_nil!.map(&.strip_ephemeral).to_set if caps),
       terms,
       anti_terms,
@@ -337,7 +346,7 @@ struct Mare::Compiler::Infer::MetaType::Union
   end
 
   def alias
-    Union.new(
+    Union.build(
       (caps.not_nil!.map(&.alias).to_set if caps),
       terms,
       anti_terms,
@@ -384,23 +393,66 @@ struct Mare::Compiler::Infer::MetaType::Union
     result
   end
 
-  def substitute_type_params(substitutions : Hash(TypeParam, MetaType))
+  def with_additional_type_arg!(arg : MetaType) : Inner
+    raise NotImplementedError.new("#{self} with_additional_type_arg!")
+  end
+
+  def substitute_type_params_retaining_cap(
+    type_params : Array(TypeParam),
+    type_args : Array(MetaType)
+  ) : Inner
     result = Unsatisfiable.instance
 
     caps.try(&.each { |cap|
-      result = result.unite(cap.substitute_type_params(substitutions))
+      result = result.unite(
+        cap.substitute_type_params_retaining_cap(type_params, type_args)
+      )
     })
 
     terms.try(&.each { |term|
-      result = result.unite(term.substitute_type_params(substitutions))
+      result = result.unite(
+        term.substitute_type_params_retaining_cap(type_params, type_args)
+      )
     })
 
     anti_terms.try(&.each { |anti_term|
-      result = result.unite(anti_term.substitute_type_params(substitutions))
+      result = result.unite(
+        anti_term.substitute_type_params_retaining_cap(type_params, type_args)
+      )
     })
 
     intersects.try(&.each { |intersect|
-      result = result.unite(intersect.substitute_type_params(substitutions))
+      result = result.unite(
+        intersect.substitute_type_params_retaining_cap(type_params, type_args)
+      )
+    })
+
+    result
+  end
+
+  def each_type_alias_in_first_layer(&block : ReifiedTypeAlias -> _)
+    terms.try(&.each(&.each_type_alias_in_first_layer(&block)))
+    anti_terms.try(&.each(&.each_type_alias_in_first_layer(&block)))
+    intersects.try(&.each(&.each_type_alias_in_first_layer(&block)))
+  end
+
+  def substitute_each_type_alias_in_first_layer(&block : ReifiedTypeAlias -> MetaType) : Inner
+    result = Unsatisfiable.instance
+
+    caps.try(&.each { |cap|
+      result = result.unite(cap.substitute_each_type_alias_in_first_layer(&block))
+    })
+
+    terms.try(&.each { |term|
+      result = result.unite(term.substitute_each_type_alias_in_first_layer(&block))
+    })
+
+    anti_terms.try(&.each { |anti_term|
+      result = result.unite(anti_term.substitute_each_type_alias_in_first_layer(&block))
+    })
+
+    intersects.try(&.each { |intersect|
+      result = result.unite(intersect.substitute_each_type_alias_in_first_layer(&block))
     })
 
     result

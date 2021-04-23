@@ -1,5 +1,48 @@
+# TODO: Should this be in its own file?
+enum Mare::Compiler::Infer::Cap : UInt8
+  ISO_EPH
+  ISO
+  TRN_EPH
+  TRN
+  REF
+  VAL
+  BOX
+  TAG
+  NON
+
+  def inspect; string; end
+  def string
+    case self
+    when ISO_EPH; "iso+"
+    when ISO;     "iso"
+    when TRN_EPH; "trn+"
+    when TRN;     "trn"
+    when REF;     "ref"
+    when VAL;     "val"
+    when BOX;     "box"
+    when TAG;     "tag"
+    when NON;     "non"
+    end
+  end
+
+  def self.from_string(string)
+    case string
+    when "iso+"; ISO_EPH
+    when "iso";  ISO
+    when "trn+"; TRN_EPH
+    when "trn";  TRN
+    when "ref";  REF
+    when "val";  VAL
+    when "box";  BOX
+    when "tag";  TAG
+    when "non";  NON
+    else raise NotImplementedError.new(string)
+    end
+  end
+end
+
 struct Mare::Compiler::Infer::MetaType::Capability
-  getter value : (String | Set(Capability))
+  getter value : (Cap | Set(Capability))
 
   def initialize(@value)
   end
@@ -12,15 +55,15 @@ struct Mare::Compiler::Infer::MetaType::Capability
     end
   end
 
-  ISO_EPH = new("iso+")
-  ISO     = new("iso")
-  TRN_EPH = new("trn+")
-  TRN     = new("trn")
-  REF     = new("ref")
-  VAL     = new("val")
-  BOX     = new("box")
-  TAG     = new("tag")
-  NON     = new("non")
+  ISO_EPH = new(Cap::ISO_EPH)
+  ISO     = new(Cap::ISO)
+  TRN_EPH = new(Cap::TRN_EPH)
+  TRN     = new(Cap::TRN)
+  REF     = new(Cap::REF)
+  VAL     = new(Cap::VAL)
+  BOX     = new(Cap::BOX)
+  TAG     = new(Cap::TAG)
+  NON     = new(Cap::NON)
 
   ALL_NON_EPH = [ISO, TRN, REF, VAL, BOX, TAG, NON]
   ALL_SINGLE = [ISO_EPH, TRN_EPH] + ALL_NON_EPH
@@ -61,7 +104,7 @@ struct Mare::Compiler::Infer::MetaType::Capability
     when "mutableplus"  then MUTABLE_PLUS # TODO: can this special case for <<= be removed somehow?
     when "readable"     then READABLE
     when "readableplus" then READABLE_PLUS # TODO: can this special case for getters be removed somehow?
-    else new(name)
+    else new(Cap.from_string(name))
     end
   end
 
@@ -84,7 +127,7 @@ struct Mare::Compiler::Infer::MetaType::Capability
       end
       io << '}'
     else
-      io << value
+      io << value.string
     end
   end
 
@@ -92,11 +135,20 @@ struct Mare::Compiler::Infer::MetaType::Capability
     ([] of ReifiedType)
   end
 
-  def alt_find_callable_func_defns(ctx, infer : AltInfer::Visitor?, name : String)
-    nil
+  def gather_call_receiver_span(
+    ctx : Context,
+    pos : Source::Pos,
+    infer : Visitor?,
+    name : String
+  ) : Span
+    Span.error(pos,
+      "The '#{name}' function can't be called on this receiver", [
+        {pos, "the type #{self.inspect} has no types defining that function"}
+      ]
+    )
   end
 
-  def find_callable_func_defns(ctx, infer : ForReifiedFunc?, name : String)
+  def find_callable_func_defns(ctx, name : String)
     nil
   end
 
@@ -116,13 +168,13 @@ struct Mare::Compiler::Infer::MetaType::Capability
       if v2.is_a?(Set(Capability))
         Capability.new(v1 & v2)
       else
-        v1.includes?(v2.as(String)) ? other : Unsatisfiable.instance
+        v1.includes?(v2.as(Cap)) ? other : Unsatisfiable.instance
       end
     else
       if v2.is_a?(Set(Capability))
-        v2.includes?(v1.as(String)) ? self : Unsatisfiable.instance
+        v2.includes?(v1.as(Cap)) ? self : Unsatisfiable.instance
       else
-        v1.as(String) == v2.as(String) ? self : Unsatisfiable.instance
+        v1.as(Cap) == v2.as(Cap) ? self : Unsatisfiable.instance
       end
     end
   end
@@ -138,6 +190,7 @@ struct Mare::Compiler::Infer::MetaType::Capability
   def intersect(other : Capability)
     if !ALL_SINGLE.includes?(other)
       if !ALL_SINGLE.includes?(self)
+        return self if other == self
         raise "unsupported intersect: #{self} & #{other}"
       else
         return other.intersect(self)
@@ -250,8 +303,8 @@ struct Mare::Compiler::Infer::MetaType::Capability
     other.subtype_of?(ctx, self) # delegate to the other class via symmetry
   end
 
-  def satisfies_bound?(ctx : Context, bound : Capability) : Bool
-    return true if value.is_a?(String) && self == bound
+  def satisfies_bound?(bound : Capability) : Bool
+    return true if value.is_a?(Infer::Cap) && self == bound
 
     value = value()
     bound_value = bound.value
@@ -264,6 +317,9 @@ struct Mare::Compiler::Infer::MetaType::Capability
     end
 
     false
+  end
+  def satisfies_bound?(ctx : Context, bound : Capability) : Bool
+    satisfies_bound?(bound)
   end
 
   def satisfies_bound?(ctx : Context, bound : (Nominal | AntiNominal | Intersection | Union | Unconstrained | Unsatisfiable)) : Bool
@@ -319,7 +375,7 @@ struct Mare::Compiler::Infer::MetaType::Capability
   def partial_reifications : Set(Capability)
     value = value()
     case value
-    when String then [self].to_set
+    when Cap then [self].to_set
     when Set(Capability) then value
     else raise NotImplementedError.new("partial_reifications of #{self}")
     end
@@ -329,8 +385,23 @@ struct Mare::Compiler::Infer::MetaType::Capability
     Set(TypeParam).new # no type params are ever referenced by a cap
   end
 
-  def substitute_type_params(substitutions : Hash(TypeParam, MetaType))
+  def with_additional_type_arg!(arg : MetaType) : Inner
+    raise NotImplementedError.new("#{self} with_additional_type_arg!")
+  end
+
+  def substitute_type_params_retaining_cap(
+    type_params : Array(TypeParam),
+    type_args : Array(MetaType)
+  ) : Inner
     self # no type params are present to be substituted
+  end
+
+  def each_type_alias_in_first_layer(&block : ReifiedTypeAlias -> _)
+    nil # no type params are present to be yielded
+  end
+
+  def substitute_each_type_alias_in_first_layer(&block : ReifiedTypeAlias -> MetaType) : Inner
+    self # to type aliases are present to be substituted
   end
 
   def is_sendable?

@@ -77,48 +77,44 @@ struct Mare::Compiler::Infer::MetaType::Intersection
     iter
   end
 
-  def alt_find_callable_func_defns(ctx, infer : AltInfer::Visitor?, name : String)
-    list = [] of Tuple(Inner, ReifiedType?, Program::Function?)
+  def gather_call_receiver_span(
+    ctx : Context,
+    pos : Source::Pos,
+    infer : Visitor?,
+    name : String
+  ) : Span
+    span = Span.simple(MetaType.new(cap || Unconstrained.instance))
 
-    # Collect a result for nominal in this intersection that has this func.
-    terms.try(&.each do |term|
-      term.alt_find_callable_func_defns(ctx, infer, name).try do |result|
-        result.each do |_, defn, func|
-          # Replace the inner term with an inner of this intersection.
-          # This will be used for subtype checking later, and we want to
-          # make sure that our cap will be taken into account, if any.
-          list << {self, defn, func}
-        end
-      end
-    end)
+    terms.try { |terms|
+      term_spans = terms.map(&.gather_call_receiver_span(ctx, pos, infer, name))
+      term_spans_no_errors = term_spans.reject(&.any_error?)
+      term_spans = term_spans_no_errors unless term_spans_no_errors.empty?
+      span = span
+        .reduce_combine_mts(term_spans) { |accum, mt| accum.intersect(mt) }
+    }
 
-    # If none of the nominals in this intersection had the func,
-    # we're in trouble; collect the list of types that failed our search.
-    if list.empty?
-      terms.try(&.each do |term|
-        defn = term.defn
-        list << {self, (defn if defn.is_a?(ReifiedType)), nil}
-      end)
+    if span.any_mt?(&.unconstrained?)
+      return Span.error(pos,
+        "The '#{name}' function can't be called on this receiver", [
+          {pos, "the type #{self.inspect} has no types defining that function"}
+        ]
+      )
     end
 
-    # If for some reason we're still empty (like in the case of an
-    # intersection of anti-nominals), we have to return nil.
-    list << {self, nil, nil} if list.empty?
-
-    list
+    span
   end
 
-  def find_callable_func_defns(ctx, infer : ForReifiedFunc?, name : String)
-    list = [] of Tuple(Inner, ReifiedType?, Program::Function?)
+  def find_callable_func_defns(ctx, name : String)
+    list = [] of Tuple(MetaType, ReifiedType?, Program::Function?)
 
     # Collect a result for nominal in this intersection that has this func.
     terms.try(&.each do |term|
-      term.find_callable_func_defns(ctx, infer, name).try do |result|
+      term.find_callable_func_defns(ctx, name).try do |result|
         result.each do |_, defn, func|
           # Replace the inner term with an inner of this intersection.
           # This will be used for subtype checking later, and we want to
           # make sure that our cap will be taken into account, if any.
-          list << {self, defn, func}
+          list << {MetaType.new(self), defn, func}
         end
       end
     end)
@@ -128,13 +124,13 @@ struct Mare::Compiler::Infer::MetaType::Intersection
     if list.empty?
       terms.try(&.each do |term|
         defn = term.defn
-        list << {self, (defn if defn.is_a?(ReifiedType)), nil}
+        list << {MetaType.new(self), (defn if defn.is_a?(ReifiedType)), nil}
       end)
     end
 
     # If for some reason we're still empty (like in the case of an
     # intersection of anti-nominals), we have to return nil.
-    list << {self, nil, nil} if list.empty?
+    list << {MetaType.new(self), nil, nil} if list.empty?
 
     list
   end
@@ -193,9 +189,6 @@ struct Mare::Compiler::Infer::MetaType::Intersection
     # Unsatisfiable if there are two non-identical concrete types.
     return Unsatisfiable.instance \
       if other.is_concrete? && terms && terms.not_nil!.any?(&.is_concrete?)
-
-    # # As a small optimization, we can drop the cap if this new term does.
-    cap = cap() unless other.ignores_cap?
 
     # Add this to existing terms (if any) and create the intersection.
     new_terms =
@@ -303,7 +296,7 @@ struct Mare::Compiler::Infer::MetaType::Intersection
     if cap
       cap_value = cap.value
       case cap_value
-      when String
+      when Cap
         # If this intersection already has a single capability, it can't be
         # split into any further capability possibilities, so just return it.
         result.add(self)
@@ -339,15 +332,50 @@ struct Mare::Compiler::Infer::MetaType::Intersection
     result
   end
 
-  def substitute_type_params(substitutions : Hash(TypeParam, MetaType))
+  def with_additional_type_arg!(arg : MetaType) : Inner
+    terms = terms()
+    raise NotImplementedError.new("#{self} with_additional_type_arg!") \
+      unless terms && terms.size == 1 && anti_terms.nil?
+
+    new_terms = terms.map(&.with_additional_type_arg!(arg)).to_set
+    Intersection.new(cap, new_terms, anti_terms)
+  end
+
+  def substitute_type_params_retaining_cap(
+    type_params : Array(TypeParam),
+    type_args : Array(MetaType)
+  ) : Inner
     result = cap || Unconstrained.instance
 
     terms.try(&.each { |term|
-      result = result.intersect(term.substitute_type_params(substitutions))
+      result = result.intersect(
+        term.substitute_type_params_retaining_cap(type_params, type_args)
+      )
     })
 
     anti_terms.try(&.each { |anti_term|
-      result = result.intersect(anti_term.substitute_type_params(substitutions))
+      result = result.intersect(
+        anti_term.substitute_type_params_retaining_cap(type_params, type_args)
+      )
+    })
+
+    result
+  end
+
+  def each_type_alias_in_first_layer(&block : ReifiedTypeAlias -> _)
+    terms.try(&.each(&.each_type_alias_in_first_layer(&block)))
+    anti_terms.try(&.each(&.each_type_alias_in_first_layer(&block)))
+  end
+
+  def substitute_each_type_alias_in_first_layer(&block : ReifiedTypeAlias -> MetaType) : Inner
+    result = cap || Unconstrained.instance
+
+    terms.try(&.each { |term|
+      result = result.intersect(term.substitute_each_type_alias_in_first_layer(&block))
+    })
+
+    anti_terms.try(&.each { |anti_term|
+      result = result.intersect(anti_term.substitute_each_type_alias_in_first_layer(&block))
     })
 
     result
@@ -460,6 +488,8 @@ struct Mare::Compiler::Infer::MetaType::Intersection
   end
 
   def subtype_of?(ctx : Context, other : Intersection) : Bool
+    return true if self == other
+
     # Firstly, our cap must be a subtype of the other cap (if present).
     return false if other.cap && (
       !cap ||

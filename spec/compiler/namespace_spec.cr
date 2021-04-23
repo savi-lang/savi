@@ -30,9 +30,8 @@ describe Mare::Compiler::Namespace do
            ^~~~~~~~~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :namespace)
-    end
+    Mare.compiler.compile([source], :namespace)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains when a function has the same name as another" do
@@ -60,9 +59,8 @@ describe Mare::Compiler::Namespace do
              ^~~~~~~~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :namespace)
-    end
+    Mare.compiler.compile([source], :namespace)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains when a type has the same name as another" do
@@ -82,9 +80,8 @@ describe Mare::Compiler::Namespace do
                ^~~~~~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare.compiler.compile([source], :namespace)
-    end
+    Mare.compiler.compile([source], :namespace)
+      .errors.map(&.message).join("\n").should eq expected
   end
 
   # TODO: Figure out how to test these in our test suite - they need a library.

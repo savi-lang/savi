@@ -9,6 +9,7 @@ describe Mare::Compiler::ServeDefinition do
     SOURCE
 
     ctx = Mare.compiler.compile([source], :serve_definition)
+    ctx.errors.should be_empty
 
     pos = ctx.serve_definition[Mare::Source::Pos.point(source, 4, 14)].not_nil!
     pos.row.should eq 0
@@ -27,6 +28,7 @@ describe Mare::Compiler::ServeDefinition do
     SOURCE
 
     ctx = Mare.compiler.compile([source], :serve_definition)
+    ctx.errors.should be_empty
 
     pos = ctx.serve_definition[Mare::Source::Pos.point(source, 3, 21)].not_nil!
     pos.row.should eq 2
@@ -61,6 +63,7 @@ describe Mare::Compiler::ServeDefinition do
     SOURCE
 
     ctx = Mare.compiler.compile([source], :serve_definition)
+    ctx.errors.should be_empty
 
     pos = ctx.serve_definition[Mare::Source::Pos.point(source, 9, 18)].not_nil!
     pos.row.should eq 1

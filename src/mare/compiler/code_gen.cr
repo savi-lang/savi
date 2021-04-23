@@ -206,16 +206,32 @@ class Mare::Compiler::CodeGen
 
   def meta_type_of(expr : AST::Node, in_gfunc : GenFunc? = nil)
     in_gfunc ||= func_frame.gfunc.not_nil!
-    in_gfunc.infer.resolved(ctx, expr)
+    in_gfunc.reified.meta_type_of(ctx, expr, in_gfunc.infer)
+  end
+
+  def meta_type_unconstrained?(expr : AST::Node, in_gfunc : GenFunc? = nil)
+    in_gfunc ||= func_frame.gfunc.not_nil!
+    # TODO: Simplify the following circuitous/unoptimized code
+    info = ctx.pre_infer[in_gfunc.link][expr]
+    return true if ctx.subtyping.for_rf(in_gfunc.reified).ignores_layer?(ctx, info.layer_index)
+
+    mt = in_gfunc.reified.meta_type_of(ctx, expr, in_gfunc.infer)
+    return true unless mt
+
+    mt.unconstrained?
   end
 
   def type_of(expr : AST::Node, in_gfunc : GenFunc? = nil)
-    in_gfunc ||= func_frame.gfunc.not_nil!
-    ctx.reach[in_gfunc.infer.resolved(ctx, expr)]
+    ctx.reach[meta_type_of(expr, in_gfunc).not_nil!]
+  end
+
+  def type_of_unless_unsatisfiable(expr : AST::Node, in_gfunc : GenFunc? = nil)
+    mt = meta_type_of(expr, in_gfunc).not_nil!
+    ctx.reach[mt] unless mt.unsatisfiable?
   end
 
   def llvm_type_of(gtype : GenType)
-    llvm_type_of(gtype.type_def.as_ref(ctx)) # TODO: this is backwards - defs should have a llvm_use_type of their own, with refs delegating to that implementation when there is a singular meta_type
+    llvm_type_of(gtype.type_def.as_ref) # TODO: this is backwards - defs should have a llvm_use_type of their own, with refs delegating to that implementation when there is a singular meta_type
   end
 
   def llvm_type_of(expr : AST::Node, in_gfunc : GenFunc? = nil)
@@ -635,7 +651,7 @@ class Mare::Compiler::CodeGen
     @builder.store(func_frame.receiver_value, self_gep)
     @di.declare_self_local(
       (gfunc.func.cap || gfunc.func.ident).pos,
-      gtype.type_def.as_ref(ctx),
+      gtype.type_def.as_ref,
       self_gep,
     )
 
@@ -1677,7 +1693,8 @@ class Mare::Compiler::CodeGen
         gen_bool(false)
       end
     elsif (
-      lhs_type == rhs_type || lhs.type == @obj_ptr || rhs.type == @obj_ptr
+      lhs_type == rhs_type || lhs.type == rhs.type || \
+      lhs.type == @obj_ptr || rhs.type == @obj_ptr
     ) \
     && lhs.type.kind == LLVM::Type::Kind::Pointer \
     && rhs.type.kind == LLVM::Type::Kind::Pointer
@@ -1756,14 +1773,14 @@ class Mare::Compiler::CodeGen
   end
 
   def gen_check_subtype(relate : AST::Relate, positive_check : Bool)
-    infer_f = ctx.infer[func_frame.gfunc.not_nil!.link]
+    pre_infer = ctx.pre_infer[func_frame.gfunc.not_nil!.link]
 
-    if infer_f[relate.lhs].is_a?(Infer::FixedTypeExpr)
+    if pre_infer[relate.lhs].is_a?(Infer::FixedTypeExpr)
       # If the left-hand side is a fixed compile-time type (and knowing that
       # the right-hand side always is), we can return a compile-time true/false.
-      infer = func_frame.gfunc.not_nil!.infer
-      lhs_meta_type = infer.resolved(ctx, relate.lhs)
-      rhs_meta_type = infer.resolved(ctx, relate.rhs)
+      gfunc = func_frame.gfunc.not_nil!
+      lhs_meta_type = gfunc.reified.meta_type_of(ctx, relate.lhs, gfunc.infer).not_nil!
+      rhs_meta_type = gfunc.reified.meta_type_of(ctx, relate.rhs, gfunc.infer).not_nil!
 
       result = lhs_meta_type.satisfies_bound?(ctx, rhs_meta_type)
       result = !result if !positive_check
@@ -2439,6 +2456,7 @@ class Mare::Compiler::CodeGen
         features =
           gtype.gfuncs.values
             .reject(&.func.has_tag?(:hygienic))
+            .reject(&.func.ident.value.starts_with?("_"))
             .map do |gfunc|
               tags = gfunc.func.tags_sorted.map { |tag| gen_string(tag.to_s) }
 
@@ -2638,9 +2656,11 @@ class Mare::Compiler::CodeGen
       @builder.cond(cond_value, case_block, next_block)
 
       @builder.position_at_end(case_block)
-      if meta_type_of(fore[1]).unconstrained?
+      if meta_type_unconstrained?(fore[1]) && !func_frame.jumps.away?(fore[1])
         # We skip generating code for the case block if it is unreachable,
         # meaning that the cond was deemed at compile time to never be true.
+        # This is marked by an unconstrained result MetaType, provided that
+        # the block does not jump away (which is also unconstrained).
         @builder.unreachable
       else
         # Generate code for the case block that we execute, finishing by
@@ -2673,9 +2693,11 @@ class Mare::Compiler::CodeGen
     @builder.br(case_block)
 
     @builder.position_at_end(case_block)
-    if meta_type_of(expr.list.last[1]).unconstrained?
+    if meta_type_unconstrained?(expr.list.last[1]) && !func_frame.jumps.away?(expr.list.last[1])
       # We skip generating code for the case block if it is unreachable,
       # meaning that the cond was deemed at compile time to never be true.
+      # This is marked by an unconstrained result MetaType, provided that
+      # the block does not jump away (which is also unconstrained).
       @builder.unreachable
     else
       # Generate code for the final case block using exactly the same strategy
@@ -2711,11 +2733,11 @@ class Mare::Compiler::CodeGen
   def gen_loop(expr : AST::Loop)
     # Get the LLVM type for the phi that joins the final value of each branch.
     # Each such value will needed to be bitcast to the that type.
-    phi_type = type_of(expr)
+    phi_type = type_of_unless_unsatisfiable(expr) || @gtypes["None"].type_def.as_ref
 
     # check if we have any early continues to not to generate continue block
-    infer = ctx.infer[func_frame.gfunc.not_nil!.link]
-    has_continues = !infer[expr].as(Infer::Loop).early_continues.empty?
+    pre_infer = ctx.pre_infer[func_frame.gfunc.not_nil!.link]
+    has_continues = !pre_infer[expr].as(Infer::Loop).early_continues.empty?
 
     # Prepare to capture state for the final phi.
     phi_blocks = [] of LLVM::BasicBlock

@@ -25,12 +25,12 @@
   :fun non "[]" (value @'val) @'val: value
   :fun non zero @'val: compiler intrinsic
 
-  :fun "==" (other @) Bool: compiler intrinsic
-  :fun "!=" (other @) Bool: compiler intrinsic
-  :fun "<" (other @) Bool: compiler intrinsic
-  :fun "<=" (other @) Bool: compiler intrinsic
-  :fun ">" (other @) Bool: compiler intrinsic
-  :fun ">=" (other @) Bool: compiler intrinsic
+  :fun "==" (other @'box) Bool: compiler intrinsic
+  :fun "!=" (other @'box) Bool: compiler intrinsic
+  :fun "<" (other @'box) Bool: compiler intrinsic
+  :fun "<=" (other @'box) Bool: compiler intrinsic
+  :fun ">" (other @'box) Bool: compiler intrinsic
+  :fun ">=" (other @'box) Bool: compiler intrinsic
 
   :fun val "+" (other @) @: compiler intrinsic
   :fun val "-" (other @) @: compiler intrinsic

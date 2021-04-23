@@ -32,15 +32,16 @@ class Mare::Compiler::ServeDefinition
 
   def [](f_link : Program::Function::Link, node : AST::Node)
     refer = ctx.refer[f_link]
-    infer = ctx.infer.for_func_simple(ctx, f_link.type, f_link)
+    pre_infer = ctx.pre_infer[f_link]
+    infer = ctx.infer[f_link]
 
-    infer_info = ctx.infer[f_link][node]?
+    infer_info = pre_infer[node]?
     if infer_info.is_a? Infer::FromCall
-      # Show function definition site of a call.
-      infer_info.follow_call_get_call_defns(ctx, infer).map do |_, _, other_f|
-        next unless other_f
-        other_f.ident.pos
-      end.first
+      # Show first function definition site of a call.
+      # TODO: Can we gracefully deal with cases of multiple possibilities?
+      infer.each_called_func_link(ctx, for_info: infer_info) { |_, called_f_link|
+        return called_f_link.resolve(ctx).ident.pos
+      }
     else
       ref = refer[node]?
       case ref
@@ -51,10 +52,7 @@ class Mare::Compiler::ServeDefinition
         # Show local variable definition site.
         ref.list.first.defn.pos
       else
-        # Show type definition site of the resolved type of whatever we found.
-        infer.analysis.resolved(ctx, node).each_reachable_defn(ctx).map do |defn|
-          defn.link.resolve(ctx).ident.pos
-        end.first
+        nil
       end
     end
   end

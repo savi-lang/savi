@@ -13,19 +13,28 @@ class Mare::Compiler::Infer::MetaType::Unconstrained
     io << "<unconstrained>"
   end
 
-  def each_reachable_defn(ctx : Context) : Array(Infer::ReifiedType)
-    ([] of Infer::ReifiedType)
+  def each_reachable_defn(ctx : Context) : Array(ReifiedType)
+    ([] of ReifiedType)
   end
 
-  def alt_find_callable_func_defns(ctx, infer : AltInfer::Visitor?, name : String)
+  def gather_call_receiver_span(
+    ctx : Context,
+    pos : Source::Pos,
+    infer : Visitor?,
+    name : String
+  ) : Span
+    Span.error(pos,
+      "The '#{name}' function can't be called on this receiver", [
+        {pos, "the type #{self.inspect} has no types defining that function"}
+      ]
+    )
+  end
+
+  def find_callable_func_defns(ctx, infername : String)
     nil
   end
 
-  def find_callable_func_defns(ctx, infer : ForReifiedFunc?, name : String)
-    nil
-  end
-
-  def any_callable_func_defn_type(ctx, name : String) : Infer::ReifiedType?
+  def any_callable_func_defn_type(ctx, name : String) : ReifiedType?
     nil
   end
 
@@ -70,8 +79,23 @@ class Mare::Compiler::Infer::MetaType::Unconstrained
     Set(TypeParam).new # no type params are present
   end
 
-  def substitute_type_params(substitutions : Hash(TypeParam, MetaType))
+  def with_additional_type_arg!(arg : MetaType) : Inner
+    raise NotImplementedError.new("#{self} with_additional_type_arg!")
+  end
+
+  def substitute_type_params_retaining_cap(
+    type_params : Array(TypeParam),
+    type_args : Array(MetaType)
+  ) : Inner
     self # no type params are present to be substituted
+  end
+
+  def each_type_alias_in_first_layer(&block : ReifiedTypeAlias -> _)
+    nil # no type params are present to be yielded
+  end
+
+  def substitute_each_type_alias_in_first_layer(&block : ReifiedTypeAlias -> MetaType) : Inner
+    self # to type aliases are present to be substituted
   end
 
   def is_sendable?
