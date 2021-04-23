@@ -631,13 +631,18 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
   ) : Signature
     receiver = ctx.reach.handle_type_ref(ctx, rf.receiver)
 
+    # If we encounter any broken types, just place this bogus one in their place
+    # allowing us to continue forward while letting the error propagate to ctx.
+    # We use the receiver as the replacement type because we know it's valid.
+    bogus_mt = rf.receiver
+
     params = infer.param_spans.map { |span|
-      ctx.reach.handle_type_ref(ctx, rf.meta_type_of(ctx, span, infer).not_nil!)
+      ctx.reach.handle_type_ref(ctx, rf.meta_type_of(ctx, span, infer) || bogus_mt)
     }
-    ret = ctx.reach.handle_type_ref(ctx, rf.meta_type_of_ret(ctx, infer).not_nil!)
+    ret = ctx.reach.handle_type_ref(ctx, rf.meta_type_of_ret(ctx, infer) || bogus_mt)
 
     yield_out = infer.yield_out_spans.map { |span|
-      ctx.reach.handle_type_ref(ctx, rf.meta_type_of(ctx, span, infer).not_nil!)
+      ctx.reach.handle_type_ref(ctx, rf.meta_type_of(ctx, span, infer) || bogus_mt)
     }
 
     Signature.new(rf.name, receiver, params, ret, yield_out)
