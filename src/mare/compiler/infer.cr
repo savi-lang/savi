@@ -164,6 +164,10 @@ module Mare::Compiler::Infer
 
     protected getter called_func_spans
 
+    def called_func_receiver_span(for_info : FromCall?) : Span
+      called_func_spans[for_info].first
+    end
+
     def each_called_func_link(ctx)
       called_func_spans.flat_map { |info, (call_defn_span, func_names)|
         call_defn_span.all_terminal_meta_types.flat_map { |terminal_mt|

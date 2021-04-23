@@ -16,7 +16,7 @@ describe Mare::Compiler::ServeHover do
     pos.size.should eq "example".bytesize
     messages.should eq [
       "This is a local variable.",
-      "It has an inferred type of String.",
+      "It has an inferred type of: String",
     ]
 
     messages, pos = ctx.serve_hover[Mare::Source::Pos.point(source, 3, 5)]
@@ -25,7 +25,7 @@ describe Mare::Compiler::ServeHover do
     pos.size.should eq "example".bytesize
     messages.should eq [
       "This is a local variable.",
-      "It has an inferred type of String.",
+      "It has an inferred type of: String",
     ]
 
     messages, pos = ctx.serve_hover[Mare::Source::Pos.point(source, 3, 13)]
@@ -33,8 +33,8 @@ describe Mare::Compiler::ServeHover do
     pos.col.should eq 12
     pos.size.should eq "hash".bytesize
     messages.should eq [
-      "This is a function call on type String.",
-      "It has an inferred return type of USize."
+      "This is a function call on type: String",
+      "It has an inferred return type of: USize"
     ]
   end
 
@@ -54,8 +54,8 @@ describe Mare::Compiler::ServeHover do
     pos.col.should eq 5
     pos.size.should eq "example".bytesize
     messages.should eq [
-      "This is a function call on type Main.",
-      "It has an inferred return type of U64.",
+      "This is a function call on type: Main'ref",
+      "It has an inferred return type of: U64",
     ]
   end
 
@@ -83,7 +83,37 @@ describe Mare::Compiler::ServeHover do
     pos.size.should eq "example".bytesize
     messages.should eq [
       "This is a local variable.",
-      "It has an inferred type of U64.",
+      "It has an inferred type of: U64",
+    ]
+  end
+
+  it "describes type spans, even if not in a pretty way yet" do
+    source = Mare::Source.new_example <<-SOURCE
+    :actor Main
+      :prop buffer String'ref: String.new
+      :fun buffer_size: @buffer.size
+      :new
+        @buffer_size
+    SOURCE
+
+    ctx = Mare.compiler.compile([source], :serve_hover)
+    ctx.errors.should be_empty
+
+    messages, pos = ctx.serve_hover[Mare::Source::Pos.point(source, 2, 23)]
+    pos.row.should eq 2
+    pos.col.should eq 21
+    pos.size.should eq "buffer".bytesize
+    messages.should eq [
+      "This is a function call on type span:\n" +
+      "Span({\n" +
+      "  BitArray[100] => Main'ref\n" +
+      "  BitArray[010] => Main'val\n" +
+      "  BitArray[001] => Main'box })",
+      "It has an inferred return type span of:\n" +
+      "Span({\n" +
+      "  BitArray[100] => String'ref\n" +
+      "  BitArray[010] => String\n" +
+      "  BitArray[001] => String'box })",
     ]
   end
 end

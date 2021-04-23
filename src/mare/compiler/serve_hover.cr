@@ -37,7 +37,7 @@ class Mare::Compiler::ServeHover
     messages = [] of String
 
     refer = ctx.refer[f_link]
-    describe_type = "type"
+    phrase_used_for_type = "type"
 
     ref = refer[node]?
     case ref
@@ -64,29 +64,40 @@ class Mare::Compiler::ServeHover
     else raise NotImplementedError.new(ref)
     end
 
-    # TODO: Reimplement this using Infer instead of TypeCheck:
-    # type_check_info = ctx.type_check[f_link][node]?
-    # if node.is_a?(AST::Relate) && node.op.value == "."
-    #   begin
-    #     messages << "This is a function call on an inferred receiver type of " \
-    #                 "#{type_check.analysis.resolved(ctx, node.lhs).show_type}."
-    #   rescue
-    #   end
-    # elsif type_check_info.is_a? Infer::FromCall
-    #   type_check_info.follow_call_get_call_defns(ctx, type_check).not_nil!.each do |x, y, z|
-    #     unless y.nil?
-    #       messages << "This is a function call on type #{y.show_type}."
-    #       describe_type = "return type"
-    #       break
-    #     end
-    #   end
-    # end
+    pre_infer = ctx.pre_infer[f_link]
+    infer = ctx.infer[f_link]
 
-    # begin
-    #   inf = type_check.analysis.resolved(ctx, node)
-    #   messages << "It has an inferred #{describe_type} of #{inf.show_type}."
-    # rescue
-    # end
+    # Maybe show the type (span) of the receiver if this is a function call.
+    infer_info = pre_infer[node]?
+    if infer_info.is_a? Infer::FromCall
+      span = infer.called_func_receiver_span(infer_info)
+      span_inner = span.inner
+      messages << "This is a function call on " +
+        if span_inner.is_a?(Infer::Span::Terminal)
+          "type: #{span_inner.meta_type.show_type}"
+        else
+          # TODO: Nicer way to display a span to an end-user,
+          # who likely doesn't want to look at mysterious bit arrays.
+          "type span:\n#{span.pretty_inspect}"
+        end
+      phrase_used_for_type = "return type"
+    end
+
+    # Maybe show the type (span) of the resulting value.
+    begin
+      span = infer[infer_info.not_nil!]
+      span_inner = span.inner
+      messages << "It has an inferred " +
+        if span_inner.is_a?(Infer::Span::Terminal)
+          "#{phrase_used_for_type} of: #{span_inner.meta_type.show_type}"
+        else
+          # TODO: Nicer way to display a span to an end-user,
+          # who likely doesn't want to look at mysterious bit arrays.
+          "#{phrase_used_for_type} span of:\n#{span.pretty_inspect}"
+        end
+    rescue
+      # If anything went wrong, just don't show an inferred type message.
+    end
 
     {messages, node.pos}
   end
