@@ -143,24 +143,21 @@ module Mare
     def self.compile(options, backtrace = false)
       _add_backtrace backtrace do
         ctx = Mare.compiler.compile(Dir.current, options.target_pass || :binary, options)
-        raise ctx.errors.first if ctx.errors.any? # TODO: show multiple errors
-        0
+        ctx.errors.any? ? finish_with_errors(ctx, options) : 0
       end
     end
 
     def self.run(options, backtrace = false)
       _add_backtrace backtrace do
         ctx = Mare.compiler.compile(Dir.current, options.target_pass || :eval, options)
-        raise ctx.errors.first if ctx.errors.any? # TODO: show multiple errors
-        ctx.eval.exitcode
+        ctx.errors.any? ? finish_with_errors(ctx, options) : ctx.eval.exitcode
       end
     end
 
     def self.eval(code, options, backtrace = false)
       _add_backtrace backtrace do
         ctx = Mare.compiler.eval(code, options)
-        raise ctx.errors.first if ctx.errors.any? # TODO: show multiple errors
-        ctx.eval.exitcode
+        ctx.errors.any? ? finish_with_errors(ctx, options) : ctx.eval.exitcode
       end
     end
 
@@ -170,6 +167,19 @@ module Mare
         ctx = Mare.compiler.compile(spec.sources, spec.target_pass, options)
         spec.verify!(ctx) ? 0 : 1
       end
+    end
+
+    def self.finish_with_errors(ctx, options) : Int32
+      puts
+      puts "Compilation Error#{ctx.errors.size > 1 ? "s" : ""}:"
+      ctx.errors.each { |error|
+        puts
+        puts "---"
+        puts
+        puts error.message
+      }
+      puts
+      1 # exit code reflects the fact that compilation errors occurred
     end
   end
 end
