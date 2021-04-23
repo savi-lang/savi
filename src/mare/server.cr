@@ -351,7 +351,7 @@ class Mare::Server
     is_mare_error = true
 
     begin
-      Mare.compiler.compile(sources, :completeness)
+      Mare.compiler.compile(sources, :serve_errors)
     rescue e # Error and Pegmatite::Pattern::MatchError are Compiling errors, others are Compiler errors
       err = e
     end

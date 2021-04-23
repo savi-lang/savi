@@ -53,6 +53,7 @@ class Mare::Compiler
     when "eval"             then :eval
     when "binary"           then :binary
     when "binary_verona"    then :binary_verona
+    when "serve_errors"     then :serve_errors
     when "serve_hover"      then :serve_hover
     when "serve_definition" then :serve_definition
     when "serve_lsp"        then :serve_lsp
@@ -92,6 +93,7 @@ class Mare::Compiler
       when :eval             then ctx.run_whole_program(ctx.eval)
       when :binary           then ctx.run_whole_program(Binary)
       when :binary_verona    then ctx.run_whole_program(BinaryVerona)
+      when :serve_errors     then nil # we only care that the dependencies have run, to generate compile errors
       when :serve_hover      then ctx.run_whole_program(ctx.serve_hover)
       when :serve_definition then ctx.run_whole_program(ctx.serve_definition)
       when :serve_lsp        then ctx
@@ -136,6 +138,7 @@ class Mare::Compiler
     when :eval then [:codegen]
     when :binary then [:codegen]
     when :binary_verona then [:codegen_verona]
+    when :serve_errors then [:completeness, :privacy, :verify, :type_check]
     when :serve_hover then [:refer, :type_check]
     when :serve_definition then [:refer, :type_check]
     when :serve_lsp then [:serve_hover, :serve_definition]
