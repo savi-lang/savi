@@ -379,6 +379,8 @@ class Mare::Compiler::TypeCheck
 
         mt
       end
+    rescue exc : Exception
+      raise Error.compiler_hole_at(info, exc)
     end
 
     # Validate type arguments for FixedSingleton values.

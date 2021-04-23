@@ -111,6 +111,9 @@ class Mare::Compiler::Lambda < Mare::AST::CopyOnMutateVisitor
     @observed_refs_stack.last[num] ||= node
 
     node
+  rescue exc : Exception
+    raise exc if exc.is_a?(Error) # TODO: ctx.errors multi-error capability
+    raise Error.compiler_hole_at(node, exc)
   end
 
   def visit(ctx, node : AST::Group)
@@ -145,5 +148,8 @@ class Mare::Compiler::Lambda < Mare::AST::CopyOnMutateVisitor
     AST::Group.new("(").from(node).tap do |group|
       group.terms << AST::Identifier.new(name).from(node)
     end
+  rescue exc : Exception
+    raise exc if exc.is_a?(Error) # TODO: ctx.errors multi-error capability
+    raise Error.compiler_hole_at(node, exc)
   end
 end

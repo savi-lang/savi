@@ -119,6 +119,8 @@ module Mare::Compiler::Classify
     def visit(ctx, node)
       touch(ctx, node)
       node
+    rescue exc : Exception
+      raise Error.compiler_hole_at(node, exc)
     end
 
     # An Operator can never have a value, so its value should never be needed.

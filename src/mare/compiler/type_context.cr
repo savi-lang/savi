@@ -93,6 +93,8 @@ module Mare::Compiler::TypeContext
     def visit(ctx, node)
       @analysis.observe_node(node, current_layer)
       node
+    rescue exc : Exception
+      raise Error.compiler_hole_at(node, exc)
     end
 
     def visit_children?(ctx, node : AST::Node)
@@ -102,6 +104,8 @@ module Mare::Compiler::TypeContext
       else
         true # visit the children of all other node types as normal
       end
+    rescue exc : Exception
+      raise Error.compiler_hole_at(node, exc)
     end
 
     def visit_choice(ctx, node : AST::Choice)

@@ -123,8 +123,7 @@ module Mare
         exit yield
       else
         begin
-          yield
-          exit 0
+          exit yield
         rescue e : Error | Pegmatite::Pattern::MatchError
           STDERR.puts "Compilation Error:\n\n#{e.message}\n\n"
           exit 1
@@ -143,21 +142,21 @@ module Mare
     def self.compile(options, backtrace = false)
       _add_backtrace backtrace do
         ctx = Mare.compiler.compile(Dir.current, options.target_pass || :binary, options)
-        ctx.errors.any? ? finish_with_errors(ctx, options) : 0
+        ctx.errors.any? ? finish_with_errors(ctx, backtrace) : 0
       end
     end
 
     def self.run(options, backtrace = false)
       _add_backtrace backtrace do
         ctx = Mare.compiler.compile(Dir.current, options.target_pass || :eval, options)
-        ctx.errors.any? ? finish_with_errors(ctx, options) : ctx.eval.exitcode
+        ctx.errors.any? ? finish_with_errors(ctx, backtrace) : ctx.eval.exitcode
       end
     end
 
     def self.eval(code, options, backtrace = false)
       _add_backtrace backtrace do
         ctx = Mare.compiler.eval(code, options)
-        ctx.errors.any? ? finish_with_errors(ctx, options) : ctx.eval.exitcode
+        ctx.errors.any? ? finish_with_errors(ctx, backtrace) : ctx.eval.exitcode
       end
     end
 
@@ -169,14 +168,14 @@ module Mare
       end
     end
 
-    def self.finish_with_errors(ctx, options) : Int32
+    def self.finish_with_errors(ctx, backtrace = false) : Int32
       puts
       puts "Compilation Error#{ctx.errors.size > 1 ? "s" : ""}:"
       ctx.errors.each { |error|
         puts
         puts "---"
         puts
-        puts error.message
+        puts error.message(backtrace)
       }
       puts
       1 # exit code reflects the fact that compilation errors occurred

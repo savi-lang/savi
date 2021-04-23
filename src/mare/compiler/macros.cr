@@ -186,6 +186,9 @@ class Mare::Compiler::Macros < Mare::AST::CopyOnMutateVisitor
     else
       node
     end
+  rescue exc : Exception
+    raise exc if exc.is_a?(Error) # TODO: ctx.errors multi-error capability
+    raise Error.compiler_hole_at(node, exc)
   end
 
   def visit(ctx, node : AST::Identifier)
@@ -201,6 +204,9 @@ class Mare::Compiler::Macros < Mare::AST::CopyOnMutateVisitor
     else
       node
     end
+  rescue exc : Exception
+    raise exc if exc.is_a?(Error) # TODO: ctx.errors multi-error capability
+    raise Error.compiler_hole_at(node, exc)
   end
 
   def visit_if(node : AST::Group)

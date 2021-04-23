@@ -185,6 +185,8 @@ class Mare::Compiler::Sugar < Mare::AST::CopyOnMutateVisitor
     else
       node
     end
+  rescue exc : Exception
+    raise Error.compiler_hole_at(node, exc)
   end
 
   # PONY special case: many operators have different names in Pony.
@@ -197,6 +199,8 @@ class Mare::Compiler::Sugar < Mare::AST::CopyOnMutateVisitor
     when "or"      then AST::Operator.new("||").from(node)
     else node
     end
+  rescue exc : Exception
+    raise Error.compiler_hole_at(node, exc)
   end
 
   def visit(ctx, node : AST::Qualify)
@@ -261,6 +265,8 @@ class Mare::Compiler::Sugar < Mare::AST::CopyOnMutateVisitor
     end
 
     new_top || node
+  rescue exc : Exception
+    raise Error.compiler_hole_at(node, exc)
   end
 
   def visit(ctx, node : AST::Relate)
@@ -367,6 +373,8 @@ class Mare::Compiler::Sugar < Mare::AST::CopyOnMutateVisitor
       rhs = AST::Qualify.new(ident, args).from(node)
       AST::Relate.new(node.lhs, dot, rhs).from(node)
     end
+  rescue exc : Exception
+    raise Error.compiler_hole_at(node, exc)
   end
 
   # Handle pseudo-method sugar like `as!` and `not!` calls.
@@ -433,6 +441,8 @@ class Mare::Compiler::Sugar < Mare::AST::CopyOnMutateVisitor
       else
         node # all other calls are passed through unchanged
       end
+    rescue exc : Exception
+      raise Error.compiler_hole_at(node, exc)
     end
   end
 end

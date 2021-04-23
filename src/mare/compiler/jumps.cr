@@ -133,6 +133,8 @@ module Mare::Compiler::Jumps
     def visit(ctx, node)
       touch(node) unless @classify.type_expr?(node)
       node
+    rescue exc : Exception
+      raise Error.compiler_hole_at(node, exc)
     end
 
     def touch(node : AST::Identifier)

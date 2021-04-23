@@ -265,6 +265,8 @@ module Mare::Compiler::PreInfer
         if @classify.value_needed?(node) && self[node]? == nil
 
       node
+    rescue exc : Exception
+      raise Error.compiler_hole_at(node, exc)
     end
 
     def touch(ctx : Context, node : AST::Identifier)

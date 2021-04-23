@@ -133,6 +133,8 @@ class Mare::Compiler::Verify
       touch(ctx, node)
 
       node
+    rescue exc : Exception
+      raise Error.compiler_hole_at(node, exc)
     end
 
     # Verify that each try block has at least one possible error case.

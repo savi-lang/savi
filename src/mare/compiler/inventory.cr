@@ -100,6 +100,8 @@ module Mare::Compiler::Inventory
       end
 
       node
+    rescue exc : Exception
+      raise Error.compiler_hole_at(node, exc)
     end
   end
 

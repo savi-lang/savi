@@ -80,6 +80,9 @@ module Mare::Compiler::Refer
     def visit(ctx, node)
       touch(ctx, node)
       node
+    rescue exc : Exception
+      raise exc if exc.is_a?(Error) # TODO: ctx.errors multi-error capability
+      raise Error.compiler_hole_at(node, exc)
     end
 
     # For an Identifier, resolve it to any known local or type if possible.

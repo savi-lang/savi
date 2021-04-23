@@ -141,6 +141,8 @@ module Mare::Compiler::Completeness
       if node.is_a? AST::Loop
         @loop_stack << node
       end
+    rescue exc : Exception
+      raise Error.compiler_hole_at(node, exc)
     end
 
     # This visitor never replaces nodes, it just touches them and returns them.
@@ -152,6 +154,8 @@ module Mare::Compiler::Completeness
       end
 
       node
+    rescue exc : Exception
+      raise Error.compiler_hole_at(node, exc)
     end
 
     def visit_children?(ctx, node : AST::Choice)

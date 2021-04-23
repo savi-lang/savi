@@ -85,6 +85,8 @@ module Mare::Compiler::ReferType
     def visit(ctx, node)
       touch(ctx, node) if node.is_a?(AST::Identifier)
       node
+    rescue exc : Exception
+      raise Error.compiler_hole_at(node, exc)
     end
 
     # For an Identifier, resolve it to any known type if possible.

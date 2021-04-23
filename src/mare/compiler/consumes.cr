@@ -31,6 +31,8 @@ module Mare::Compiler::Consumes
     def visit(ctx, node)
       touch(ctx, node)
       node
+    rescue exc : Exception
+      raise Error.compiler_hole_at(node, exc)
     end
 
     # For an Identifier, resolve it to any known local or type if possible.

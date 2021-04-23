@@ -3,6 +3,7 @@
 class Mare::Error < Exception
   alias Info = {Source::Pos, String}
 
+  protected setter cause
   getter pos : Source::Pos
   getter headline : String
   getter info : Array(Info)
@@ -17,7 +18,7 @@ class Mare::Error < Exception
     @info == other.info
   end
 
-  def message
+  def message(show_compiler_hole_details = false)
     strings = ["#{headline}:\n#{pos.show}\n"]
     info.each do |info_pos, info_msg|
       if info_pos == Source::Pos.none
@@ -26,6 +27,17 @@ class Mare::Error < Exception
         strings << "- #{info_msg}:\n  #{info_pos.show}\n"
       end
     end
+    # If a causing exception is present, this indicates a compiler hole.
+    cause.try { |cause|
+      strings << if show_compiler_hole_details
+        "- Because you ran the compiler with the --backtrace option, " +
+        "the full backtrace of the original error is shown below:\n\n" +
+        cause.inspect_with_backtrace
+      else
+        "- To report a ticket or investigate the missing logic yourself, " +
+        "rerun the compiler with --backtrace to see the full backtrace."
+      end
+    }
     strings.join("\n").strip
   end
 
@@ -48,5 +60,19 @@ class Mare::Error < Exception
         err.info << {info_pos, info_msg}
       end
     end
+  end
+
+  def self.compiler_hole_at(pos, cause : Exception)
+    build(pos, "An unexpected compiler error occurred near here").tap { |err|
+      err.cause = cause
+      err.info << {Source::Pos.none,
+        "The compiler is missing logic to handle this code."}
+      err.info << {Source::Pos.none,
+        "Usually this means your code is invalid, and we just failed " +
+        "to have a helpful explanation here as to what you did wrong, " +
+        "but it's possible that your code is fine and there is a deeper bug. " +
+        "Either way, if you see this message, it counts as a compiler hole " +
+        "that needs to be patched up to give users like you a good experience."}
+    }
   end
 end

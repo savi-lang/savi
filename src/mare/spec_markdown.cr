@@ -198,7 +198,7 @@ class Mare::SpecMarkdown
     # Pull out the error messages, scrubbing away the filename/line numbers.
     # We will mutate this array by removing when matched to an expected error.
     actual_errors =
-      ctx.errors.map(&.message.gsub(/\n\s*from .*?:\d+:/, "").+("\n"))
+      ctx.errors.map(&.message(true).gsub(/\n\s*from .*?:\d+:/, "").+("\n"))
 
     # Keep track of which errors are missing when we looked for them.
     missing_errors = [] of {Example, String}
