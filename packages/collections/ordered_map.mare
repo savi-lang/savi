@@ -17,7 +17,7 @@
 :: The basic implementation of the hash map is the same, but each entry in the
 :: hash map is also part of a doubly-linked circular list, with the "head" of
 :: the circular list being the most recently inserted entry in the hash map.
-:class OrderedMap (K, V, H HashFunction(K))
+:class OrderedMap (K, V, H HashFunction(K) = HashEq(K))
   :is MapReadable(K, V)
 
   :prop _size USize: 0

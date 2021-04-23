@@ -56,7 +56,7 @@
 
 :class SpecReporterLinear
   :prop env Env
-  :prop statuses: OrderedMap(String, SpecStatus, HashEq(String)).new // TODO: implicit HashEq by default
+  :prop statuses: OrderedMap(String, SpecStatus).new
   :prop inner SpecReporter
   :prop current_spec: ""
   :prop current_example: ""

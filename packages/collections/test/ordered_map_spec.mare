@@ -5,7 +5,7 @@
   :is Spec
   :const describes: "OrderedMap"
 
-  :fun new_map: OrderedMap(String, U64, HashEq(String)).new // TODO: implicit default for HashFunction type argument
+  :fun new_map: OrderedMap(String, U64).new
 
   :it "stores and removes values at a given key"
     map = @new_map
