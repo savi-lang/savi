@@ -51,7 +51,10 @@
     if event.success (
       @env.err.write(".")
     |
-      @env.err.write("\n    FAIL: "), @env.err.print(event.pos.string)
+      @env.err.write("\n")
+      @env.err.write(Inspect[event.pos.row + 1])
+      @env.err.write(": FAIL: ")
+      @env.err.print(event.pos.string)
     )
 
 :class SpecReporterLinear
