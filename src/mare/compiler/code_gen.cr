@@ -2055,6 +2055,8 @@ class Mare::Compiler::CodeGen
     return gen_value_not_needed unless func_frame.classify.value_needed?(expr)
 
     value
+  rescue exc : Exception
+    raise Error.compiler_hole_at(expr, exc)
   end
 
   def gen_value_not_needed

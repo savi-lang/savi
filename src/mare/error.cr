@@ -63,6 +63,8 @@ class Mare::Error < Exception
   end
 
   def self.compiler_hole_at(pos, cause : Exception)
+    return cause if cause.is_a?(Error)
+
     build(pos, "An unexpected compiler error occurred near here").tap { |err|
       err.cause = cause
       err.info << {Source::Pos.none,
