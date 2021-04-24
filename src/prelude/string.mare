@@ -206,6 +206,20 @@
     )
     @
 
+  :fun ref concat_byte_slice (
+    other String'box
+    from ISize = 0
+    to ISize = 0x7FFF_FFFF_FFFF_FFFF // TODO: ISize.max_value
+  )
+    start = other._offset_to_index(from)
+    finish = other._offset_to_index(to).min(other.size)
+
+    if (start < other._size && start < finish) (
+      size = finish - start
+      other._ptr._offset(start)._copy_to(@_ptr._offset(@_size), size)
+      @_size += size
+    )
+
   :fun ref push_utf32 (value U32)
     _UTF32Encoder.encode(value) -> (byte_count, byte_1, byte_2, byte_3, byte_4 |
       i = @_size

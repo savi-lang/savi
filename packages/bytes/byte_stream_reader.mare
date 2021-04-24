@@ -210,12 +210,29 @@
   :: the returned String will share the underlying buffer instead of being a copy.
   :: Otherwise a new String buffer will be assembled by copying from multiple chunks.
   :fun token_as_string String
-    // TODO: optimize for case where entire token is all in the same chunk
-    // TODO: explicit variable type should not be needed in this line:
-    string String'iso = String.new_iso(@token_byte_size)
-    // TODO: do something efficient with memcpy here instead of byte-by-byte
-    @each_token_byte -> (byte | string.push_byte(byte), None) // TODO: this explicit None should not be needed
-    --string
+    if (@_mark_chunk_index == @_chunk_index) (
+      // If the token begins and ends in the same chunk, we can avoid copying
+      // by returning a String that uses a subset of the same underlying buffer.
+      try (
+        String.from_array(@_chunks[@_chunk_index]!)
+          .trim(@_mark_offset.isize, @_offset.isize)
+      |
+        // Failed to get the chunk. This can happen when the cursor and marker
+        // are both pointing to the end of the byte stream.
+        // In such a case, an empty string is the correct result.
+        ""
+      )
+    |
+      // Otherwise we must copy slices from separate chunks.
+      // TODO: explicit variable type should not be needed in this line:
+      string String'iso = String.new_iso(@token_byte_size)
+      @_each_token_slice -> (chunk, start, end |
+        chunk_string = String.from_array(chunk)
+        string.concat_byte_slice(chunk_string, start.isize, end.isize)
+        None // TODO: this explicit None should not be needed
+      )
+      --string
+    )
 
   :: Return the portion of the stream between the last marker and the current cursor,
   :: as an immutable String. If the portion happened to be within a single chunk,
