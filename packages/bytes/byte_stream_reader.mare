@@ -278,20 +278,32 @@
   :: Raises an error if there are not enough bytes to do so, leaving the cursor
   :: pointing to the next future byte that will arrive in the byte stream.
   :fun ref advance! (n USize)
-    // TODO: Optimize with advance_to_end for cases where N is greater than
-    // (raise an error) or equal to (no error) the number of bytes_ahead.
-    remaining_n = n
-    current_chunk_remaining_count = @_chunks[@_chunk_index]!.size - @_offset
-    while (remaining_n > current_chunk_remaining_count) (
-      remaining_n -= current_chunk_remaining_count
-      @_chunk_index += 1
-      @_offset = 0
-      @_bytes_ahead -= current_chunk_remaining_count
-      current_chunk_remaining_count = @_chunks[@_chunk_index]!.size
+    if (n >= @_bytes_ahead) (
+      too_many_n = n > @_bytes_ahead
+
+      // If we know this count will take us to the end of the stream,
+      // we can skip the extra work of iterating over chunks and jump there.
+      @advance_to_end
+
+      // If the caller requested too many bytes, then we also raise an error
+      // to indicate that more advancement is still needed to reach the goal.
+      if (too_many_n) error!
+    |
+      // Iterate through each chunk, keeping track of how much of the
+      // goal number of bytes remain to be consumed in the advancement.
+      remaining_n = n
+      current_chunk_remaining_count = @_chunks[@_chunk_index]!.size - @_offset
+      while (remaining_n > current_chunk_remaining_count) (
+        remaining_n -= current_chunk_remaining_count
+        @_chunk_index += 1
+        @_offset = 0
+        @_bytes_ahead -= current_chunk_remaining_count
+        current_chunk_remaining_count = @_chunks[@_chunk_index]!.size
+      )
+      @_offset += remaining_n
+      @_bytes_ahead -= remaining_n
+      @
     )
-    @_offset += remaining_n
-    @_bytes_ahead -= remaining_n
-    @
 
   :: Advance the cursor byte-by-byte for as long as the block yields True,
   :: stopping the cursor pointing at the byte for which it yielded False.
