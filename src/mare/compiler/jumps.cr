@@ -244,6 +244,40 @@ module Mare::Compiler::Jumps
       end
     end
 
+    def touch(node : AST::Yield)
+      if node.terms.any? { |term| @analysis.always_error?(term) }
+        # A yield expression is an always error if any of its terms are.
+        @analysis.always_error!(node)
+      elsif node.terms.any? { |term| @analysis.maybe_error?(term) }
+        # Otherwise, it is a maybe error if any of its terms are.
+        @analysis.maybe_error!(node)
+      end
+
+      if node.terms.any? { |term| @analysis.always_return?(term) }
+        # A yield expression is an always return if any of its terms are.
+        @analysis.always_return!(node)
+      elsif node.terms.any? { |term| @analysis.maybe_return?(term) }
+        # Otherwise, it is a maybe return if any of its terms are.
+        @analysis.maybe_return!(node)
+      end
+
+      if node.terms.any? { |term| @analysis.always_break?(term) }
+        # A yield expression is an always break if any of its terms are.
+        @analysis.always_break!(node)
+      elsif node.terms.any? { |term| @analysis.maybe_break?(term) }
+        # Otherwise, it is a maybe break if any of its terms are.
+        @analysis.maybe_break!(node)
+      end
+
+      if node.terms.any? { |term| @analysis.always_continue?(term) }
+        # A yield expression is an always continue if any of its terms are.
+        @analysis.always_continue!(node)
+      elsif node.terms.any? { |term| @analysis.maybe_continue?(term) }
+        # Otherwise, it is a maybe continue if any of its terms are.
+        @analysis.maybe_continue!(node)
+      end
+    end
+
     def touch(node : AST::Qualify)
       if @analysis.always_error?(node.term) || @analysis.always_error?(node.group)
         # A qualify is an always error if either its term or group is.
