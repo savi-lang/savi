@@ -198,6 +198,19 @@
     )
     early_stop
 
+  :fun find! (@->A)'aliased
+    :yields for Bool
+    index USize = 0
+    found ((@->A)'aliased | None) = None
+    early_stop = False
+    while (index < @_size && early_stop.not) (
+      element = @_ptr._get_at(index)
+      early_stop = yield element
+      if early_stop (found = element) // TODO: use early return to avoid later type match
+      index += 1
+    )
+    if early_stop (found.as!((@->A)'aliased) | error!)
+
   :fun select
     :yields for Bool
     new_array = Array((@->A)'aliased).new // TODO: allow the caller to specify space
