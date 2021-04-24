@@ -58,4 +58,14 @@ describe Mare::Compiler::Eval do
     no_test_failures = ctx.eval.exitcode == 0
     no_test_failures.should eq true
   end
+
+  it "evaluates the bytes package's tests" do
+    source_dir = File.join(__DIR__, "../../packages/bytes/test")
+
+    ctx = Mare.compiler.compile(source_dir, :eval)
+    ctx.errors.should be_empty
+
+    no_test_failures = ctx.eval.exitcode == 0
+    no_test_failures.should eq true
+  end
 end
