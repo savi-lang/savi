@@ -2,6 +2,9 @@
   :prop _size USize
   :prop _alloc USize
   :prop _ptr CPointer(A)'ref
+  :new ref from_cpointer (@_ptr, @_size, @_alloc)
+  :new iso iso_from_cpointer (@_ptr, @_size, @_alloc) // TODO: remove this and use recover instead?
+  :new val val_from_cpointer (@_ptr, @_size, @_alloc) // TODO: remove this and use recover instead?
 
   :fun ref _ptr_set_null
     @_alloc = 0

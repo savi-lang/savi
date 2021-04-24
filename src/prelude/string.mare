@@ -26,6 +26,8 @@
     @_alloc = data.space
     @_ptr = data.cpointer._unsafe
 
+  :fun val as_array: Array(U8).val_from_cpointer(@_ptr._unsafe, @_size, @_alloc)
+
   :fun "==" (other String'box)
     (@_size == other._size) && (@_ptr._compare(other._ptr, @_size) == 0)
 

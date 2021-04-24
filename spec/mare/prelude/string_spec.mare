@@ -4,6 +4,10 @@
   :is Spec
   :const describes: "String"
 
+  :it "converts to and from an array of bytes"
+    @assert = "string".as_array == ['s', 't', 'r', 'i', 'n', 'g']
+    @assert = String.from_array("string".as_array) == "string"
+
   :it "compares bytewise equality with another string"
     @assert = ("string" == "string")
     @assert = ("string" == "other").not
