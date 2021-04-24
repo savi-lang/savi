@@ -260,9 +260,10 @@
     peek_offset = @_offset
     remaining_n = n
     current_chunk_remaining_count = @_chunks[peek_chunk_index]!.size - @_offset
-    while (remaining_n > current_chunk_remaining_count) (
+    while (remaining_n >= current_chunk_remaining_count) (
       remaining_n -= current_chunk_remaining_count
       peek_chunk_index += 1
+      peek_offset = 0
       current_chunk_remaining_count = @_chunks[peek_chunk_index]!.size
     )
     peek_offset += remaining_n

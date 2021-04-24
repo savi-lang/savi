@@ -57,7 +57,23 @@
     @assert = stream.token_byte_size == 0
     @assert = stream.token_as_string == ""
 
-    // Advance the cursor across the first chunk boundary.
+    // Advance the cursor by one byte then peek ahead of the cursor position.
+    @assert = try (stream.advance!(1), True | False)
+    @assert = try (stream.peek_byte! == 'o' | False)
+    @assert = try (stream.peek_byte!(1) == 'w' | False)
+    @assert = try (stream.peek_byte!(2) == 'o' | False)
+    @assert = try (stream.peek_byte!(3) == 'r' | False)
+    @assert = try (stream.peek_byte!(4) == 'l' | False)
+    @assert = try (stream.peek_byte!(5) == 'd' | False)
+    @assert = try (stream.peek_byte!(6) == 'l' | False)
+    @assert = try (stream.peek_byte!(7) == 'i' | False)
+    @assert = try (stream.peek_byte!(8) == 'n' | False)
+    @assert = try (stream.peek_byte!(9) == 'g' | False)
+    @assert = try (stream.peek_byte!(10) == 's' | False)
+    @assert = try (stream.peek_byte!(11), False | True)
+
+    // Rewind then advance the cursor across the first chunk boundary.
+    stream.rewind_to_marker
     @assert = try (stream.advance!(3), True | False)
     @assert = stream.bytes_ahead == 9
     @assert = stream.bytes_ahead_of_marker == 12
