@@ -481,37 +481,47 @@ module Mare::AST
   end
 
   class Loop < Node
-    property cond : Term
+    property initial_cond : Term
     property body : Term
+    property repeat_cond : Term
     property else_body : Term
-    def initialize(@cond, @body, @else_body)
+    def initialize(@initial_cond, @body, @repeat_cond, @else_body)
     end
 
     def span_pos
-      pos.span([cond.span_pos, body.span_pos, else_body.span_pos])
+      pos.span([
+        initial_cond.span_pos,
+        body.span_pos,
+        repeat_cond.span_pos,
+        else_body.span_pos
+      ])
     end
 
     def name; :loop end
     def to_a: Array(A)
       res = [name] of A
-      res << cond.to_a
+      res << initial_cond.to_a
       res << body.to_a
+      res << repeat_cond.to_a
       res << else_body.to_a
       res
     end
     def children_accept(ctx : Compiler::Context, visitor : Visitor)
-      cond.accept(ctx, visitor)
+      initial_cond.accept(ctx, visitor)
       body.accept(ctx, visitor)
+      repeat_cond.accept(ctx, visitor)
       else_body.accept(ctx, visitor)
     end
     def children_accept(ctx : Compiler::Context, visitor : CopyOnMutateVisitor)
-      new_cond, cond_changed = child_single_accept(ctx, @cond, visitor)
+      new_initial_cond, initial_cond_changed = child_single_accept(ctx, @initial_cond, visitor)
       new_body, body_changed = child_single_accept(ctx, @body, visitor)
+      new_repeat_cond, repeat_cond_changed = child_single_accept(ctx, @repeat_cond, visitor)
       new_else_body, else_body_changed = child_single_accept(ctx, @else_body, visitor)
-      return self unless cond_changed || body_changed || else_body_changed
+      return self unless initial_cond_changed || body_changed || repeat_cond_changed || else_body_changed
       dup.tap do |node|
-        node.cond = new_cond
+        node.initial_cond = new_initial_cond
         node.body = new_body
+        node.repeat_cond = new_repeat_cond
         node.else_body = new_else_body
       end
     end

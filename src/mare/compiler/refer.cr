@@ -261,9 +261,8 @@ module Mare::Compiler::Refer
       # Prepare to collect the list of new locals exposed in each branch.
       branch_locals = {} of String => Array(Local | LocalUnion)
 
-      # Visit the loop cond twice (nested) to simulate repeated execution.
-      cond_branch = sub_branch(ctx, node.cond)
-      cond_branch_2 = cond_branch.sub_branch(ctx, node.cond)
+      # Visit the initial loop cond.
+      initial_cond_branch = sub_branch(ctx, node.initial_cond)
 
       # Now, visit the else body, if any.
       node.else_body.try do |else_body|
@@ -271,8 +270,11 @@ module Mare::Compiler::Refer
       end
 
       # Now, visit the main body twice (nested) to simulate repeated execution.
+      # Visit the repeat condition twice (nested) as well.
       body_branch = sub_branch(ctx, node.body)
-      body_branch_2 = body_branch.sub_branch(ctx, node.body, locals)
+      repeat_cond_branch = body_branch.sub_branch(ctx, node.repeat_cond)
+      body_branch_2 = repeat_cond_branch.sub_branch(ctx, node.body, locals)
+      repeat_cond_branch2 = body_branch_2.sub_branch(ctx, node.repeat_cond)
 
       # TODO: Is it possible/safe to collect locals from the body branches?
     end

@@ -13,7 +13,7 @@ describe Mare::Compiler::Macros do
       func = ctx.namespace.find_func!(ctx, source, "Main", "new")
       func.body.not_nil!.to_a.should eq [:group, ":",
         [:group, "(",
-          [:loop, [:ident, "True"], [:integer, 42], [:ident, "None"]],
+          [:loop, [:ident, "True"], [:integer, 42], [:ident, "True"], [:ident, "None"]],
         ],
       ]
     end
@@ -104,6 +104,7 @@ describe Mare::Compiler::Macros do
           [:loop,
             [:ident, "True"],
             [:group, "(", [:integer, 42_u64]],
+            [:ident, "True"],
             [:group, "(", [:integer, 7_u64]],
           ],
         ],

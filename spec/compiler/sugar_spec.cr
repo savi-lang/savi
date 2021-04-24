@@ -207,6 +207,11 @@ describe Mare::Compiler::Sugar do
           [:qualify, [:ident, ">"], [:group, "(", [:integer, 0_u64]]]
         ]],
         [:group, "(", [:ident, "y"]],
+        [:group, "(", [:relate,
+          [:ident, "x"],
+          [:op, "."],
+          [:qualify, [:ident, ">"], [:group, "(", [:integer, 0_u64]]]
+        ]],
         [:ident, "None"]
       ]]
     ]

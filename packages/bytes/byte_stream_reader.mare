@@ -299,8 +299,7 @@
   :fun ref advance_while!
     :yields U8 for Bool
     chunk = @_chunks[@_chunk_index]!
-    keep_going = yield chunk[@_offset]! // TODO: move this to the while condition
-    while keep_going (
+    while (yield chunk[@_offset]!) (
       @_offset += 1
       @_bytes_ahead -= 1
       if (@_offset == chunk.size) (
@@ -308,6 +307,5 @@
         @_offset = 0
         chunk = @_chunks[@_chunk_index]!
       )
-      keep_going = yield chunk[@_offset]! // TODO: move this to the while condition
     )
     @

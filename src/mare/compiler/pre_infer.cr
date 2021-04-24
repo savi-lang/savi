@@ -611,8 +611,6 @@ module Mare::Compiler::PreInfer
     end
 
     def touch(ctx : Context, node : AST::Loop)
-      cond_info = self[node.cond]
-
       self[node.else_body].override_describe_kind =
         "loop's result when it runs zero times"
 
@@ -621,7 +619,7 @@ module Mare::Compiler::PreInfer
 
       @analysis[node] = Infer::Loop.new(node.pos, layer(node),
         [
-          {self[node.cond], self[node.body], @jumps.away?(node.body)},
+          {self[node.initial_cond], self[node.body], @jumps.away?(node.body)},
           {nil, self[node.else_body], @jumps.away?(node.else_body)},
         ],
         fixed_bool,

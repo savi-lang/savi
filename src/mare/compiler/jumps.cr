@@ -431,54 +431,60 @@ module Mare::Compiler::Jumps
     def touch(node : AST::Loop)
       @stack.pop
 
-      if @analysis.always_error?(node.cond) || (
-        @analysis.always_error?(node.body) && @analysis.always_error?(node.else_body)
+      if @analysis.always_error?(node.initial_cond) || (
+        @analysis.always_error?(node.else_body) && (
+          @analysis.always_error?(node.body) ||
+          @analysis.always_error?(node.repeat_cond)
+        )
       )
-        # A loop is an always error if the cond is an always error,
-        # or if both the body and else body are always errors.
+        # A loop is an always error if the initialcond is an always error,
+        # or if the else body and the body or repeat cond are always errors.
         @analysis.always_error!(node)
-      elsif @analysis.maybe_error?(node.cond) \
+      elsif @analysis.any_error?(node.initial_cond) \
       || @analysis.any_error?(node.body) \
+      || @analysis.any_error?(node.repeat_cond) \
       || @analysis.any_error?(node.else_body)
-        # A loop is a maybe error if the cond is a maybe error,
-        # or if either the body or else body are always errors or maybe errors.
+        # A loop is a maybe error if any parts have any error.
         @analysis.maybe_error!(node)
       end
 
-      if @analysis.always_return?(node.cond) || (
-        @analysis.always_return?(node.body) && @analysis.always_return?(node.else_body)
+      if @analysis.always_return?(node.initial_cond) || (
+        @analysis.always_return?(node.else_body) && (
+          @analysis.always_return?(node.body) ||
+          @analysis.always_return?(node.repeat_cond)
+        )
       )
-        # A loop is an always return if the cond is an always return,
-        # or if both the body and else body are always return.
+        # A loop is an always return if the initialcond is an always return,
+        # or if the else body and the body or repeat cond are always returns.
         @analysis.always_return!(node)
-      elsif @analysis.maybe_return?(node.cond) \
+      elsif @analysis.any_return?(node.initial_cond) \
       || @analysis.any_return?(node.body) \
+      || @analysis.any_return?(node.repeat_cond) \
       || @analysis.any_return?(node.else_body)
-        # A loop is a maybe return if the cond is a maybe return,
-        # or if either the body or else body are always return or maybe return.
+        # A loop is a maybe return if any parts have any return.
         @analysis.maybe_return!(node)
       end
 
-      if @analysis.always_break?(node.cond)
-        # A loop is an always break if the cond is an always break,
+      if @analysis.always_break?(node.initial_cond)
+        # A loop is an always break if either cond is an always break,
         # LOOP NOTE: we ignore any break in the body - the loop catches it.
         @analysis.always_break!(node)
-      elsif @analysis.maybe_break?(node.cond) \
+      elsif @analysis.maybe_break?(node.initial_cond) \
+      || @analysis.maybe_break?(node.repeat_cond) \
       || @analysis.any_break?(node.else_body)
-        # A loop is a maybe break if the cond is a maybe break,
-        # or if the else body is always break or maybe break.
+        # A loop is a maybe break if either cond or the else body may break.
         # LOOP NOTE: we ignore any break in the body - the loop catches it.
         @analysis.maybe_break!(node)
       end
 
-      if @analysis.always_continue?(node.cond)
-        # A loop is an always continue if the cond is an always continue,
+      if @analysis.always_continue?(node.initial_cond)
+        # A loop is an always continue if either cond is an always continue,
         # LOOP NOTE: we ignore any continue in the body - the loop catches it.
         @analysis.always_continue!(node)
-      elsif @analysis.maybe_continue?(node.cond) \
+      elsif @analysis.maybe_continue?(node.initial_cond) \
+      || @analysis.maybe_continue?(node.repeat_cond) \
       || @analysis.any_continue?(node.else_body)
-        # A loop is a maybe continue if the cond is a maybe continue,
-        # or if the else body is always continue or maybe continue.
+        # A loop is a maybe continue if either cond or the else body may continue.
         # LOOP NOTE: we ignore any continue in the body - the loop catches it.
         @analysis.maybe_continue!(node)
       end

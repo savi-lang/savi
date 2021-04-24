@@ -153,13 +153,12 @@ module Mare::Compiler::Consumes
       # Prepare to collect the list of new consumes exposed in each branch.
       body_consumes = {} of (Refer::Local | Refer::LocalUnion | Refer::Self) => Source::Pos
 
-      # Visit the loop cond twice (nested) to simulate repeated execution.
-      cond_branch = sub_branch(ctx, node.cond)
-      cond_branch_2 = cond_branch.sub_branch(ctx, node.cond)
+      # Visit the initial loop cond twice.
+      initial_cond_branch = sub_branch(ctx, node.initial_cond)
 
       # Absorb any consumes from the cond branch into this parent branch.
       # This makes them visible both in the parent and in future sub branches.
-      @consumes.merge!(cond_branch.consumes)
+      @consumes.merge!(initial_cond_branch.consumes)
 
       # Now, visit the else body, if any.
       node.else_body.try do |else_body|
@@ -170,11 +169,15 @@ module Mare::Compiler::Consumes
       end
 
       # Now, visit the main body twice (nested) to simulate repeated execution.
+      # Visit the repeat condition twice (nested) as well.
       body_branch = sub_branch(ctx, node.body)
-      body_branch_2 = body_branch.sub_branch(ctx, node.body)
+      repeat_cond_branch = body_branch.sub_branch(ctx, node.repeat_cond)
+      body_branch_2 = repeat_cond_branch.sub_branch(ctx, node.body)
+      repeat_cond_branch2 = body_branch_2.sub_branch(ctx, node.repeat_cond)
 
-      # Collect any consumes from the body branch.
+      # Collect any consumes from the body branch and repeat cond branch.
       body_consumes.merge!(body_branch.consumes)
+      body_consumes.merge!(repeat_cond_branch.consumes)
 
       # Absorb any consumes from the body branches into this parent branch.
       @consumes.merge!(body_consumes)

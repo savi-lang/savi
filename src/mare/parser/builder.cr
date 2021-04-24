@@ -320,9 +320,11 @@ module Mare::Parser::Builder
     raise "wrong number of terms: #{stack.to_a.inspect}" \
       if stack.size < 2 || stack.size > 3
 
+    cond = stack.shift()
     AST::Loop.new(
+      cond,
       stack.shift(),
-      stack.shift(),
+      cond,
       stack.last? || AST::Identifier.new("None").with_pos(pos),
     ).with_pos(pos)
   end

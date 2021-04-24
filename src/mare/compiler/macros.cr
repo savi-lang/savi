@@ -243,8 +243,9 @@ class Mare::Compiler::Macros < Mare::AST::CopyOnMutateVisitor
 
   def visit_while(node : AST::Group)
     orig = node.terms[0]
-    cond = node.terms[1]
+    initial_cond = node.terms[1]
     body = node.terms[2]
+    repeat_cond = node.terms[1] # same as initial_cond
     else_body = nil
 
     if body.is_a?(AST::Group) && body.style == "|"
@@ -260,7 +261,7 @@ class Mare::Compiler::Macros < Mare::AST::CopyOnMutateVisitor
     else_body ||= AST::Identifier.new("None").from(node)
 
     AST::Group.new("(", [
-      AST::Loop.new(cond, body, else_body).from(orig),
+      AST::Loop.new(initial_cond, body, repeat_cond, else_body).from(orig),
     ] of AST::Term).from(node)
   end
 

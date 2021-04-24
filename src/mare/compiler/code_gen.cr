@@ -2764,7 +2764,7 @@ class Mare::Compiler::CodeGen
 
     # Start by generating the code to test the condition value.
     # If the cond is true, go to the body block; otherwise, the else block.
-    cond_value = gen_as_cond(gen_expr(expr.cond))
+    cond_value = gen_as_cond(gen_expr(expr.initial_cond))
     @builder.cond(cond_value, body_block, else_block)
 
     # In the body block, generate code to arrive at the body value,
@@ -2774,7 +2774,7 @@ class Mare::Compiler::CodeGen
     body_value = gen_expr(expr.body)
 
     unless func_frame.jumps.away?(expr.body)
-      cond_value = gen_expr(expr.cond)
+      cond_value = gen_as_cond(gen_expr(expr.repeat_cond))
 
       if func_frame.classify.value_needed?(expr)
         body_value = gen_assign_cast(body_value, phi_type, expr.body)
@@ -2797,7 +2797,7 @@ class Mare::Compiler::CodeGen
           continue_stack_tuple[2],
           "continue_expression_value",
         )
-      cond_value = gen_expr(expr.cond)
+      cond_value = gen_as_cond(gen_expr(expr.repeat_cond))
       phi_blocks << @builder.insert_block
       phi_values << continue_value
       @builder.cond(cond_value, body_block, post_block)
@@ -2970,7 +2970,19 @@ class Mare::Compiler::CodeGen
 
     # First, we must know which yield this is in the function -
     # each yield expression has a uniquely associated index.
-    yield_index = ctx.inventory[gfunc.link].each_yield.index(expr).not_nil!
+    all_yields = ctx.inventory[gfunc.link].each_yield.to_a
+    yield_index = all_yields.index(expr).not_nil!
+    after_block = gfunc.after_yield_blocks[yield_index]
+
+    # If this after_block is already taken, we need to find the next one
+    # that matches our expression. This can happen in cases when a block
+    # of code can be generated and executed in multiple contexts. For example,
+    # this happens in the initial_cond and repeat_cond of a `while` macro,
+    # which uses the same AST tree for both condition expressions.
+    until after_block.instructions.empty?
+      yield_index += 1 + all_yields[(yield_index + 1)..-1].index(expr).not_nil!
+      after_block = gfunc.after_yield_blocks[yield_index]
+    end
 
     # Generate code for the values of the yield, and capture the values.
     yield_values = expr.terms.map { |term| gen_expr(term).as(LLVM::Value) }
@@ -2984,7 +2996,6 @@ class Mare::Compiler::CodeGen
     # Note that this code block will be dead code (with "no predecessors")
     # in all but one of the continue functions that we generate - the one
     # continue function we grabbed above (which jumps to this block on entry).
-    after_block = gfunc.after_yield_blocks[yield_index]
     @builder.position_at_end(after_block)
 
     # Finally, use the "yield in" value returned from the caller.
