@@ -28,6 +28,20 @@
     @assert = "snafoozled".ends_with("foo").not
     @assert = "snafoozled".ends_with("")
 
+  :it "checks if it has a common bytes with another string at specific offsets"
+    @assert = "foodbar".is_byte_slice_equal(1, "broodbard", 2, 6)
+    @assert = "foodbar".is_byte_slice_equal(1, "broodbard", 2, 5)
+    @assert = "foodbar".is_byte_slice_equal(2, "broodbard", 2, 5).not
+    @assert = "foodbar".is_byte_slice_equal(1, "broodbard", 2, 7).not
+    @assert = "foodbar".is_byte_slice_equal(1, "broodbard", 1, 6).not
+    @assert = "foodbar".is_byte_slice_equal(0, "broodbard", 1, 6).not
+    @assert = "broodbard".is_byte_slice_equal(2, "foodbar", 1, 6)
+    @assert = "broodbard".is_byte_slice_equal(2, "foodbar", 1, 5)
+    @assert = "broodbard".is_byte_slice_equal(2, "foodbar", 2, 5).not
+    @assert = "broodbard".is_byte_slice_equal(2, "foodbar", 1, 7).not
+    @assert = "broodbard".is_byte_slice_equal(1, "foodbar", 1, 6).not
+    @assert = "broodbard".is_byte_slice_equal(1, "foodbar", 0, 6).not
+
   :it "checks if it is an empty string or not"
     @assert = "".is_empty
     @assert = "".is_not_empty.not

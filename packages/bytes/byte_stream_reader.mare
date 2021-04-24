@@ -137,16 +137,55 @@
     )
     early_stop
 
+  :: For the bytes in the currently marked token, yield each associated chunk,
+  :: along with the start and end offset of the chunk that are within the token.
+  :: This is used internally for chunk-wise comparison and copying operations.
+  :fun _each_token_slice None
+    :yields (Array(U8)'val, USize, USize) for None
+    @_each_token_slice_until -> (chunk, start, end |
+      yield (chunk, start, end)
+      False // continue iteration
+    )
+    None
+
+  :: Same as the each_token_byte function, but allows the yield block to return
+  :: True to stop iteration early, and in such a case the function returns True.
+  :fun _each_token_slice_until Bool
+    :yields (Array(U8)'val, USize, USize) for Bool
+    iter_chunk_index = @_mark_chunk_index
+    iter_offset = @_mark_offset
+    early_stop = False
+    while (early_stop.not && iter_chunk_index < @_chunk_index) (
+      try (
+        chunk = @_chunks[iter_chunk_index]!
+        early_stop = yield (chunk, iter_offset, chunk.size)
+      )
+      iter_chunk_index += 1
+      iter_offset = 0
+    )
+    if early_stop.not (
+      try (
+        chunk = @_chunks[iter_chunk_index]!
+        early_stop = yield (chunk, iter_offset, @_offset)
+      )
+    )
+    early_stop
+
   :: Return True if the bytes in the currently marked token are equivalent
   :: to the bytes referenced by the given string.
   :fun is_token_equal_to (other String)
     @token_byte_size == other.size && (
-      // TODO: do something efficient with memcmp here instead of byte-by-byte
-      index USize = 0
-      unequal = @each_token_byte_until -> (byte |
-        unequal_byte = try (byte != other[index]! | True)
-        index += 1
-        unequal_byte
+      other_start USize = 0
+      unequal = @_each_token_slice_until -> (chunk, start, end |
+        slice_size = end - start
+
+        unequal_slice = String
+          .from_array(chunk)
+          .is_byte_slice_equal(start, other, other_start, slice_size)
+          .not
+
+        other_start += slice_size
+        unequal_slice
       )
       unequal.invert
     )

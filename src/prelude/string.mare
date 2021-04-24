@@ -43,6 +43,23 @@
       @_ptr._offset(@_size - other.size)._compare(other._ptr, other.size) == 0
     )
 
+  :: Returns True if this String at the given offset is equivalent to
+  :: the given other String at the given other_offset, for at least as long
+  :: as the given number of bytes to be compared.
+  :fun is_byte_slice_equal (
+    offset USize
+    other String'box
+    other_offset USize
+    num_bytes USize
+  )
+    (num_bytes <= (@size - offset))
+    && (num_bytes <= (other.size - other_offset))
+    && (
+      ptr = @_ptr._offset(offset)
+      other_ptr = other._ptr._offset(other_offset)
+      ptr._compare(other_ptr, num_bytes) == 0
+    )
+
   :fun is_empty:     @size == 0
   :fun is_not_empty: @size != 0
 
