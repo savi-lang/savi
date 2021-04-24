@@ -1,5 +1,4 @@
 /bin/
 *.dwarf
-/example/main
-/main
+main
 .crystal-version
