@@ -444,9 +444,9 @@ class Mare::Compiler::CodeGen
         param_idx -= 1 unless gfunc.needs_receiver?
         param_idx += 1 if gfunc.needs_continuation?
         value = frame.llvm_func.params[param_idx]
-        gep = gen_local_gep(ref, value.type)
-        func_frame.current_locals[ref] = gep
-        @builder.store(value, gep)
+        alloca = gen_local_alloca(ref, value.type)
+        func_frame.current_locals[ref] = alloca
+        @builder.store(value, alloca)
       end)
     end
   end
@@ -1507,12 +1507,12 @@ class Mare::Compiler::CodeGen
 
           yield_param_ref = func_frame.refer[yield_param_ast]
           yield_param_ref = yield_param_ref.as(Refer::Local)
-          yield_param_gep = func_frame.current_locals[yield_param_ref] ||=
-            gen_local_gep(yield_param_ref, llvm_type_of(yield_param_ast))
+          yield_param_alloca =
+            gen_local_alloca(yield_param_ref, llvm_type_of(yield_param_ast))
 
           yield_out = @builder.extract_value(yield_out_all, index, yield_param_ref.name)
           yield_out = @builder.bit_cast(yield_out, llvm_type_of(yield_param_ast))
-          @builder.store(yield_out, yield_param_gep)
+          @builder.store(yield_out, yield_param_alloca)
         end
       end
 
@@ -1635,9 +1635,7 @@ class Mare::Compiler::CodeGen
 
     @di.set_loc(relate.op)
     if ref.is_a?(Refer::Local)
-      gep = func_frame.current_locals[ref] ||= gen_local_gep(ref, lhs_llvm_type)
-
-      @builder.store(cast_value, gep)
+      @builder.store(cast_value, gen_local_alloca(ref, lhs_llvm_type))
     else
       raise NotImplementedError.new(relate.inspect)
     end
@@ -2989,6 +2987,28 @@ class Mare::Compiler::CodeGen
     # Generate code for the values of the yield, and capture the values.
     yield_values = expr.terms.map { |term| gen_expr(term).as(LLVM::Value) }
 
+    # Capture the current value of each local variable, because we store every
+    # local not only in the continuation but also in its own dedicated alloca.
+    # Thus we need to load the current alloca values into the continuation
+    # before yielding, as the allocas will be popped off the stack on yield.
+    # Obviously this is redundant and not strictly necessary to store every
+    # value in two places, but the extra alloca makes debugging nice, since lldb
+    # doesn't seem to understand how to access non-alloca local variables.
+    # So we redundantly store in two places, and we count on LLVM optimization
+    # to get rid of either one of the two redundant stores, as it sees fit.
+    # Note that we really hope it will keep the alloca and get rid of
+    # the continuation struct when it inlines the yielding call,
+    # but this can't always happen (e.g. for recursive yielding calls).
+    ctx.inventory[gfunc.link].each_local.each_with_index do |ref, ref_index|
+      cont = func_frame.continuation_value
+      cont_local = @builder.bit_cast(
+        gfunc.continuation_info.struct_gep_for_local(cont, ref),
+        llvm_type_of(ref.defn).pointer
+      )
+      local = frame.current_locals[ref]
+      @builder.store(builder.load(local, "#{ref.name}.CURRENT"), cont_local)
+    end
+
     # Generate the return statement, which terminates this basic block and
     # returns the tuple of the yield value and continuation data to the caller.
     gfunc.calling_convention
@@ -3163,20 +3183,12 @@ class Mare::Compiler::CodeGen
     # TODO: tbaa? (from set_descriptor in libponyc/codegen/gencall.c)
   end
 
-  def gen_local_gep(ref, llvm_type)
-    gfunc = func_frame.gfunc.not_nil!
-
-    # If this is a yielding function, we store locals in the continuation data.
-    # Otherwise, we store each in its own alloca, which we create at the entry.
-    if gfunc.needs_continuation?
-      cont = func_frame.continuation_value
-      gep = gfunc.continuation_info.struct_gep_for_local(cont, ref)
-      # TODO: bitcast to llvm_type?
-      @builder.bit_cast(gep, llvm_type.pointer)
-    else
+  def gen_local_alloca(ref, llvm_type)
+    func_frame.current_locals[ref] ||= begin
+      gfunc = func_frame.gfunc.not_nil!
       gen_alloca(llvm_type, ref.name)
+      .tap { |alloca| @di.declare_local(ref, type_of(ref.defn), alloca) }
     end
-    .tap { |gep| @di.declare_local(ref, type_of(ref.defn), gep) }
   end
 
   def gen_yielding_call_cont_gep(relate, name)

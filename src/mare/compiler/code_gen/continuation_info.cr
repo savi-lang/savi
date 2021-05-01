@@ -259,7 +259,17 @@ class Mare::Compiler::CodeGen
         ref_index = ref_index + 1 # skip the next element - the final return
         ref_index = ref_index + 1 # skip the next element - the yield out values
         ref_type = struct_element_types[ref_index]
-        frame.current_locals[ref] = g.gen_local_gep(ref, ref_type)
+        local = g.gen_local_alloca(ref, ref_type)
+
+        # If this is a continue function resuming where we left off,
+        # then we also need to restore the value of each local variable.
+        if is_continue
+          cont_local = builder.bit_cast(
+            gfunc.continuation_info.struct_gep_for_local(cont, ref),
+            g.llvm_type_of(ref.defn).pointer,
+          )
+          builder.store(builder.load(cont_local, "#{ref.name}.RESTORED"), local)
+        end
       end
 
       # Eagerly create struct geps for all yielding call continuations
