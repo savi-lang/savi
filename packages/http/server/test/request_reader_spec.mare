@@ -1,5 +1,5 @@
 :import "spec"
-:import "bytes" (ByteStreamReader)
+:import "bytes" (ByteStreamChunkedReader)
 :import ".."
 
 :class RequestReaderSpec
@@ -77,7 +77,7 @@
   :fun example (source_chunks Array(String)) Bool
     :yields Request
     reader = RequestReader.new
-    stream = ByteStreamReader.new
+    stream = ByteStreamChunkedReader.new
 
     // Feed the data one byte at a time into the stream, which will
     // maximally test for parsing state problems at chunk boundaries.
@@ -135,7 +135,7 @@
     expected_error RequestError
   ) Bool
     reader = RequestReader.new
-    stream = ByteStreamReader.new
+    stream = ByteStreamChunkedReader.new
 
     // Feed the data one byte at a time into the stream, which will
     // maximally test for parsing state problems at chunk boundaries.

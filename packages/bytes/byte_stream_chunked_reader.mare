@@ -29,7 +29,7 @@
 :: Alternatively, garbage collection can happen in the midst of an ongoing
 :: stream using the compact method to drop only chunks that are behind
 :: both the marker and cursor, releasing chunks that cannot be read anymore.
-:class ByteStreamReader
+:class ByteStreamChunkedReader
   :prop _chunks Array(Array(U8)'val): []
   :prop _chunk_index USize: 0
   :prop _offset USize: 0

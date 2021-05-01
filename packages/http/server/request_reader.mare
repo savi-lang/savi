@@ -1,4 +1,4 @@
-:import "bytes" (ByteStreamReader)
+:import "bytes" (ByteStreamChunkedReader)
 
 :class val Request
   :new iso
@@ -57,7 +57,7 @@
 
   :fun last_error: @_error
 
-  :fun ref read! (stream ByteStreamReader) Request'iso
+  :fun ref read! (stream ByteStreamChunkedReader) Request'iso
     @_parser.parse!(stream) -> (token |
       case (
       | token == RequestTokenMethod |

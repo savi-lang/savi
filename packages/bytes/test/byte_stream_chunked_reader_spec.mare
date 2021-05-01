@@ -1,12 +1,12 @@
 :import "spec"
-:import ".." (ByteStreamReader)
+:import ".." (ByteStreamChunkedReader)
 
-:class ByteStreamReaderSpec
+:class ByteStreamChunkedReaderSpec
   :is Spec
-  :const describes: "ByteStreamReader"
+  :const describes: "ByteStreamChunkedReader"
 
   :it "can accept chunks, advance, and read tokens"
-    stream = ByteStreamReader.new
+    stream = ByteStreamChunkedReader.new
     @assert = stream.bytes_ahead == 0
     @assert = stream.bytes_ahead_of_marker == 0
     @assert = stream.token_byte_size == 0
@@ -159,7 +159,7 @@
     @assert = stream.token_as_string == ""
 
   :it "yields each byte of a token"
-    stream = ByteStreamReader.new
+    stream = ByteStreamChunkedReader.new
     stream << "hel".as_array
     stream << "lowo".as_array
     stream << "rld".as_array
@@ -182,7 +182,7 @@
     collected.clear
 
   :it "yields each byte of a token until the block returns True"
-    stream = ByteStreamReader.new
+    stream = ByteStreamChunkedReader.new
     stream << "hel".as_array
     stream << "lowo".as_array
     stream << "rld".as_array
@@ -203,7 +203,7 @@
     collected.clear
 
   :it "compares a token for equivalence to a given string"
-    stream = ByteStreamReader.new
+    stream = ByteStreamChunkedReader.new
     stream << "hel".as_array
     stream << "lowo".as_array
     stream << "rld".as_array
@@ -226,7 +226,7 @@
     @assert = stream.is_token_equal_to("lloWor") == False
 
   :it "compares an ASCII-lowercased token for equivalence to a given string"
-    stream = ByteStreamReader.new
+    stream = ByteStreamChunkedReader.new
     stream << "HeL".as_array
     stream << "LoWo".as_array
     stream << "RlD".as_array
@@ -249,7 +249,7 @@
     @assert = stream.is_token_ascii_lowercase_equal_to("lloWor") == False
 
   :it "parses a token as a positive integer in decimal notation"
-    stream = ByteStreamReader.new
+    stream = ByteStreamChunkedReader.new
     stream << "192".as_array
     stream << "8374".as_array
     stream << "650".as_array

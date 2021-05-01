@@ -1,4 +1,4 @@
-:import "bytes" (ByteStreamReader)
+:import "bytes" (ByteStreamChunkedReader)
 
 :enum RequestToken
   :const bit_width U8: 8 // TODO: the compiler should choose the smallest valid bit width by default if not explicitly specified
@@ -25,7 +25,7 @@
 
   :fun ref reset: @_state = _RequestAtStart
 
-  :fun ref parse! (stream ByteStreamReader)
+  :fun ref parse! (stream ByteStreamChunkedReader)
     :yields RequestToken
     try (
       while (@_state != _RequestAtEnd) (
