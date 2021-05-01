@@ -7,6 +7,7 @@
   :fun ref connected (conn TCPConnection'ref): None
   :fun ref sent (conn TCPConnection'ref, data String): data // TODO: ByteSeq instead of String
   :fun ref received (conn TCPConnection'ref, data String, call_count USize) Bool // TODO: ByteSeq instead of String
+  :fun ref expect (conn TCPConnection'ref, expect_size USize) USize: expect_size
   :fun ref closed (conn TCPConnection'ref): None
 
 :actor TCPConnection
@@ -129,6 +130,24 @@
           _OSSocket.writev(@_event, buffers, buffers.size / 2)
         )
       )
+    )
+
+  :: Specify that the next `received` callback should contain exactly the given
+  :: number of bytes, with the TCPConnection making this guarantee.
+  ::
+  :: If zero is specified, then no specific expectation is set and the
+  :: next `received` callback will contain an arbitrary/unknown number of bytes.
+  ::
+  :: This request will be ignored if called during the `sent` callback.
+  ::
+  :: Raises an error if the requested number of bytes exceeds the maximum
+  :: read buffer size that was supplied when the connection was created.
+  :fun ref expect! (expect_size USize)
+    if (expect_size > @_read_buffer_size) error!
+
+    if @_in_sent.not (
+      @_expect = @notify.expect(@, expect_size)
+      @_read_buffer_reserve
     )
 
   :: This is a special behaviour that hooks into the AsioEventNotify runtime,
@@ -287,6 +306,7 @@
     // TODO: Use chop instead of clone, to avoid copying bytes.
     copy Array(U8)'iso = @_read_buffer.clone // TODO: this explicit type should not be needed
     copy.trim_in_place(0, size)
+    @_read_buffer.trim_in_place(size)
 
     // Move our read buffer offset forward to the point at which we chopped,
     // so that future bytes will be read into the unused part of the buffer.

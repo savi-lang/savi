@@ -78,6 +78,8 @@
   :fun ref connected (conn TCPConnection'ref)
     @env.err.print("[Sender] Connected")
     conn.write("Hello, World!")
+    try conn.expect!(5)
+    None
 
   :fun ref connect_failed (conn TCPConnection'ref)
     @env.err.print("[Sender] Failed to connect:")
@@ -94,7 +96,12 @@
   :fun ref received (conn TCPConnection'ref, data String, call_count USize)
     @env.err.print("[Sender] Received:")
     @env.err.print(data)
-    conn.dispose
+    case (
+    | data == "Hello" | try conn.expect!(2)
+    | data == ", " | try conn.expect!(5)
+    | data == "World" | try conn.expect!(0)
+    | data == "!" | conn.dispose
+    )
     True
 
 :class TCPSpec
