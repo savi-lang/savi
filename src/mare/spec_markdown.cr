@@ -161,7 +161,7 @@ class Mare::SpecMarkdown
               rf = Compiler::Infer::ReifiedFunction.new(rt, f_link,
                 Compiler::Infer::MetaType.new(rt, cap)
               )
-              actual = rf.meta_type_of(ctx, node).try(&.show_type)
+              actual = rf.meta_type_of(ctx, node).try(&.show_type) rescue nil
 
               if actual != expected
                 errors << {example, Error.build(annotations.first.pos,
@@ -198,7 +198,7 @@ class Mare::SpecMarkdown
     # Pull out the error messages, scrubbing away the filename/line numbers.
     # We will mutate this array by removing when matched to an expected error.
     actual_errors =
-      ctx.errors.map(&.message(true).gsub(/\n\s*from .*?:\d+:/, "").+("\n"))
+      ctx.errors.map(&.message(true).gsub(/\n\s*from .*?:\d+:(?!\d)/, "").+("\n"))
 
     # Keep track of which errors are missing when we looked for them.
     missing_errors = [] of {Example, String}

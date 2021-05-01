@@ -11,7 +11,7 @@
 - [x] - Runtime type matching (`x <: Y`)
 - [x] - Boxed numeric values
 - [x] - Actors and behaviours
-- [x] - Rcaps (`iso`, `trn`, `val`, `ref`, `box`, `tag`)
+- [x] - Rcaps (`iso`, `val`, `ref`, `box`, `tag`) (`trn` was removed)
 - [x] - Rcap ephemerality (alias rcaps, ephemeral rcaps, `consume`)
 - [x] - Automatic receiver recovery for ephemeral receivers
 - [x] - Rcap viewpoint adaptation

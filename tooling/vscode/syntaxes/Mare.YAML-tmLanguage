@@ -17,7 +17,7 @@ patterns:
 
 - comment: Capability Operator
   name: keyword.operator.capability.mare
-  match: \'(?=iso|trn|val|ref|box|tag|non|any|alias|send|share|read|aliased)
+  match: \'(?=iso|val|ref|box|tag|non|any|alias|send|share|read|aliased)
 
 - comment: Double-Quote String
   name: string.quoted.double.mare

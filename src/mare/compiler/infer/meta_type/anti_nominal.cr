@@ -112,15 +112,15 @@ struct Mare::Compiler::Infer::MetaType::AntiNominal
     other.unite(self) # delegate to the "higher" class via commutativity
   end
 
-  def ephemeralize
+  def aliased
     self # no effect
   end
 
-  def strip_ephemeral
+  def consumed
     self # no effect
   end
 
-  def alias
+  def stabilized
     self # no effect
   end
 
@@ -191,16 +191,8 @@ struct Mare::Compiler::Infer::MetaType::AntiNominal
     raise NotImplementedError.new("#{self.inspect} safe_to_match_as?")
   end
 
-  def recovered
-    raise NotImplementedError.new("#{self.inspect} recovered")
-  end
-
   def viewed_from(origin)
     raise NotImplementedError.new("#{origin.inspect}->#{self.inspect}")
-  end
-
-  def extracted_from(origin)
-    raise NotImplementedError.new("#{origin.inspect}->>#{self.inspect}")
   end
 
   def subtype_of?(ctx : Context, other : Capability) : Bool

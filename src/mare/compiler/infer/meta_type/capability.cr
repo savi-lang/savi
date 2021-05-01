@@ -1,9 +1,7 @@
 # TODO: Should this be in its own file?
 enum Mare::Compiler::Infer::Cap : UInt8
-  ISO_EPH
   ISO
-  TRN_EPH
-  TRN
+  ISO_ALIASED
   REF
   VAL
   BOX
@@ -13,29 +11,25 @@ enum Mare::Compiler::Infer::Cap : UInt8
   def inspect; string; end
   def string
     case self
-    when ISO_EPH; "iso+"
-    when ISO;     "iso"
-    when TRN_EPH; "trn+"
-    when TRN;     "trn"
-    when REF;     "ref"
-    when VAL;     "val"
-    when BOX;     "box"
-    when TAG;     "tag"
-    when NON;     "non"
+    when ISO;         "iso"
+    when ISO_ALIASED; "iso'aliased"
+    when REF;         "ref"
+    when VAL;         "val"
+    when BOX;         "box"
+    when TAG;         "tag"
+    when NON;         "non"
     end
   end
 
   def self.from_string(string)
     case string
-    when "iso+"; ISO_EPH
-    when "iso";  ISO
-    when "trn+"; TRN_EPH
-    when "trn";  TRN
-    when "ref";  REF
-    when "val";  VAL
-    when "box";  BOX
-    when "tag";  TAG
-    when "non";  NON
+    when "iso";         ISO
+    when "iso'aliased"; ISO_ALIASED
+    when "ref";         REF
+    when "val";         VAL
+    when "box";         BOX
+    when "tag";         TAG
+    when "non";         NON
     else raise NotImplementedError.new(string)
     end
   end
@@ -55,28 +49,26 @@ struct Mare::Compiler::Infer::MetaType::Capability
     end
   end
 
-  ISO_EPH = new(Cap::ISO_EPH)
-  ISO     = new(Cap::ISO)
-  TRN_EPH = new(Cap::TRN_EPH)
-  TRN     = new(Cap::TRN)
-  REF     = new(Cap::REF)
-  VAL     = new(Cap::VAL)
-  BOX     = new(Cap::BOX)
-  TAG     = new(Cap::TAG)
-  NON     = new(Cap::NON)
+  ISO         = new(Cap::ISO)
+  ISO_ALIASED = new(Cap::ISO_ALIASED)
+  REF         = new(Cap::REF)
+  VAL         = new(Cap::VAL)
+  BOX         = new(Cap::BOX)
+  TAG         = new(Cap::TAG)
+  NON         = new(Cap::NON)
 
-  ALL_NON_EPH = [ISO, TRN, REF, VAL, BOX, TAG, NON]
-  ALL_SINGLE = [ISO_EPH, TRN_EPH] + ALL_NON_EPH
+  ALL_NON_ALIASED = [ISO, REF, VAL, BOX, TAG, NON]
+  ALL_SINGLE_INCL_ALIASED = [ISO_ALIASED] + ALL_NON_ALIASED
 
-  ANY           = new([ISO, TRN, REF, VAL, BOX, TAG, NON].to_set)         # all (non-ephemeral) caps
-  ALIAS         = new([REF, VAL, BOX, TAG, NON].to_set)                   # alias as themselves
-  SEND          = new([ISO, VAL, TAG, NON].to_set)                        # are sendable
-  SHARE         = new([VAL, TAG, NON].to_set)                             # are sendable & alias as themselves
-  READ          = new([REF, VAL, BOX].to_set)                             # are readable & alias as themselves
-  MUTABLE       = new([ISO, TRN, REF].to_set)                             # are mutable
-  MUTABLE_PLUS  = new([ISO_EPH, TRN_EPH, ISO, TRN, REF].to_set)           # are mutable, incl ephemeral
-  READABLE      = new([ISO, TRN, REF, VAL, BOX].to_set)                   # are readable
-  READABLE_PLUS = new([ISO_EPH, ISO, TRN_EPH, TRN, REF, VAL, BOX].to_set) # are readable, incl ephemeral
+  ANY           = new([ISO, REF, VAL, BOX, TAG, NON].to_set)    # all (non-aliased) caps
+  ALIAS         = new([REF, VAL, BOX, TAG, NON].to_set)         # alias as themselves
+  SEND          = new([ISO, VAL, TAG, NON].to_set)              # are sendable
+  SHARE         = new([VAL, TAG, NON].to_set)                   # are sendable & alias as themselves
+  READ          = new([REF, VAL, BOX].to_set)                   # are readable & alias as themselves
+  MUTABLE       = new([ISO, REF].to_set)                        # TODO: remove? are mutable
+  MUTABLE_PLUS  = new([ISO_ALIASED, ISO, REF].to_set)           # TODO: remove? are mutable, incl aliased
+  READABLE      = new([ISO, REF, VAL, BOX].to_set)              # TODO: remove? are readable
+  READABLE_PLUS = new([ISO_ALIASED, ISO, REF, VAL, BOX].to_set) # TODO: remove? are readable, incl aliased
 
   def self.new_generic(name)
     case name
@@ -85,10 +77,6 @@ struct Mare::Compiler::Infer::MetaType::Capability
     when "send"         then SEND
     when "share"        then SHARE
     when "read"         then READ
-    when "mutable"      then MUTABLE
-    when "mutableplus"  then MUTABLE_PLUS # TODO: can this special case for <<= be removed somehow?
-    when "readable"     then READABLE
-    when "readableplus" then READABLE_PLUS # TODO: can this special case for getters be removed somehow?
     else raise NotImplementedError.new(name)
     end
   end
@@ -100,10 +88,6 @@ struct Mare::Compiler::Infer::MetaType::Capability
     when "send"         then SEND
     when "share"        then SHARE
     when "read"         then READ
-    when "mutable"      then MUTABLE
-    when "mutableplus"  then MUTABLE_PLUS # TODO: can this special case for <<= be removed somehow?
-    when "readable"     then READABLE
-    when "readableplus" then READABLE_PLUS # TODO: can this special case for getters be removed somehow?
     else new(Cap.from_string(name))
     end
   end
@@ -188,14 +172,14 @@ struct Mare::Compiler::Infer::MetaType::Capability
   end
 
   def intersect(other : Capability)
-    if !ALL_SINGLE.includes?(other)
-      if !ALL_SINGLE.includes?(self)
+    if !ALL_SINGLE_INCL_ALIASED.includes?(other)
+      if !ALL_SINGLE_INCL_ALIASED.includes?(self)
         return self if other == self
         raise "unsupported intersect: #{self} & #{other}"
       else
         return other.intersect(self)
       end
-    elsif !ALL_SINGLE.includes?(self)
+    elsif !ALL_SINGLE_INCL_ALIASED.includes?(self)
       value = value().as(Set(Capability))
       new_value =
         value.map(&.intersect(other).as(Capability | Unsatisfiable))
@@ -215,6 +199,7 @@ struct Mare::Compiler::Infer::MetaType::Capability
     return other if other.subtype_of?(self)
 
     # If the two are unrelated by subtyping, this intersection is unsatisfiable.
+    # TODO: Should we return ISO here instead, since it can satisfy any cap?
     Unsatisfiable.instance
   end
 
@@ -251,33 +236,31 @@ struct Mare::Compiler::Infer::MetaType::Capability
     ##
     # Reference capability subtyping can be visualized using this graph,
     # wherein leftward caps are subtypes of caps that appear to their right,
-    # with ISO+ being a subtype of all, and NON being a supertype of all.
+    # with ISO being a subtype of all, and NON being a supertype of all.
     #
-    # Non-ephemeral ISO and TRN are supertypes of their ephemeral counterparts,
-    # and they are the direct subtypes of TAG and BOX, respectively.
+    # Aliased ISO is a supertype of its non-aliased counterpart,
+    # and it is the direct subtype of TAG.
     #
     # See George Steed's paper, "A Principled Design of Capabilities in Pony":
     # > https://www.imperial.ac.uk/media/imperial-college/faculty-of-engineering/computing/public/GeorgeSteed.pdf
     #
-    #                / REF \
-    # ISO+ <: TRN+ <:       <: BOX <: TAG <: NON
-    #  ^       ^     \ VAL /    |      |
-    #  |       |                |      |
-    #  |      TRN  <: ----------/      |
-    # ISO  <: -------------------------/
+    #       / REF \
+    # ISO <:       <: BOX <: TAG <: NON
+    #  ^    \ VAL /           |
+    #  |                      |
+    #  |                      |
+    # ISO& -------------------/
 
     # A capability always counts as a subtype of itself.
     return true if self == other
 
     # Otherwise, check the truth table corresponding to the subtyping graph.
     case self
-    when ISO_EPH
-      true
-    when TRN_EPH
-      other != ISO_EPH && other != ISO
     when ISO
+      true
+    when ISO_ALIASED
       TAG == other || NON == other
-    when TRN, REF, VAL
+    when REF, VAL
       BOX == other || TAG == other || NON == other
     when BOX
       TAG == other || NON == other
@@ -326,44 +309,45 @@ struct Mare::Compiler::Infer::MetaType::Capability
     raise NotImplementedError.new("#{self} satisfies_bound? #{bound}")
   end
 
-  def ephemeralize
-    raise "unsupported cap: #{self}" unless ALL_SINGLE.includes?(self)
+  def aliased : Capability
+    raise "unsupported cap: #{self}" unless ALL_SINGLE_INCL_ALIASED.includes?(self)
 
-    # ISO and TRN are the only capabilities which distinguish ephemerality,
-    # because they are the only ones that care about reference uniqueness.
     case self
-    when ISO then ISO_EPH
-    when TRN then TRN_EPH
+    # The alias of an ISO is the aliased counterpart of it.
+    when ISO then ISO_ALIASED
     else self
     end
   end
 
-  def strip_ephemeral
-    raise "unsupported cap: #{self}" unless ALL_SINGLE.includes?(self)
+  def consumed : Capability
+    raise "unsupported cap: #{self}" unless ALL_SINGLE_INCL_ALIASED.includes?(self)
 
-    # ISO and TRN are the only capabilities which distinguish ephemerality,
-    # because they are the only ones that care about reference uniqueness.
     case self
-    when ISO_EPH then ISO
-    when TRN_EPH then TRN
+    # The consumption of an ISO_ALIASED is the non-aliased counterpart of it.
+    when ISO_ALIASED then ISO
     else self
     end
   end
 
-  def alias
-    raise "unsupported cap: #{self}" unless ALL_SINGLE.includes?(self)
-
-    case self
-    # The alias of an ISO+ or TRN+ is the non-ephemeral counterpart of it.
-    when ISO_EPH then ISO
-    when TRN_EPH then TRN
-    # The alias of an ISO or TRN is the degradation of it that can only do
-    # the things not explicitly denied by the uniqueness constraints of them.
-    # That is, the alias of ISO (read+write unique) cannot read nor write (TAG),
-    # and the alias of TRN (write unique) can only read and not write (BOX).
-    when ISO then TAG
-    when TRN then BOX
-    else self
+  def stabilized : Capability
+    value = value()
+    case value
+    when Cap
+      case self
+      # The stable form of an ISO_ALIASED or ISO_ALIASED is the degradation of it that can only do
+      # the things not explicitly denied by the uniqueness constraints of them.
+      # That is, the alias of ISO (read+write unique) cannot read nor write (TAG).
+      when ISO_ALIASED then TAG
+      else self
+      end
+    when Set(Capability)
+      Capability.new(value.to_a.map { |cap|
+        case cap
+        when ISO_ALIASED then TAG
+        else cap
+        end
+      }.to_set)
+    else raise NotImplementedError.new("#{self} stabilized")
     end
   end
 
@@ -406,11 +390,9 @@ struct Mare::Compiler::Infer::MetaType::Capability
 
   def is_sendable?
     case self
-    when ISO_EPH, TRN_EPH
-      raise NotImplementedError.new("is_sendable? of an ephemeral cap")
     when ISO, VAL, TAG, NON
       true
-    when TRN, REF, BOX
+    when ISO_ALIASED, REF, BOX
       false
     else
       raise NotImplementedError.new("is_sendable? of #{self}")
@@ -423,88 +405,71 @@ struct Mare::Compiler::Infer::MetaType::Capability
 
   def viewed_from(origin : Capability) : Capability
     raise "unsupported viewed_from: #{origin}->#{self}" \
-      unless ALL_NON_EPH.includes?(self) && ALL_SINGLE.includes?(origin)
+      unless ALL_SINGLE_INCL_ALIASED.includes?(self) && ALL_SINGLE_INCL_ALIASED.includes?(origin)
 
     ##
-    # Non-extracting viewpoint adaptation table, with columns representing the
+    # Viewpoint adaptation table, with columns representing the
     # capability of the field, and rows representing the origin capability:
-    #        ISO  TRN  REF  VAL  BOX  TAG  NON
+    #        ISO  ISO& REF  VAL  BOX  TAG  NON
     #      ------------------------------------
-    # ISO+ | ISO+ ISO+ ISO+ VAL  VAL  TAG  NON
-    # ISO  | ISO  ISO  ISO  VAL  TAG  TAG  NON
-    # TRN+ | ISO+ TRN+ TRN+ VAL  VAL  TAG  NON
-    # TRN  | ISO  TRN  TRN  VAL  BOX  TAG  NON
-    # REF  | ISO  TRN  REF  VAL  BOX  TAG  NON
+    # ISO  | ISO  ISO  ISO  VAL  VAL  TAG  NON
+    # ISO& | ISO  ISO& ISO& VAL  TAG  TAG  NON
+    # REF  | ISO  ISO& REF  VAL  BOX  TAG  NON
     # VAL  | VAL  VAL  VAL  VAL  VAL  TAG  NON
-    # BOX  | TAG  BOX  BOX  VAL  BOX  TAG  NON
+    # BOX  | VAL  TAG  BOX  VAL  BOX  TAG  NON
     # TAG  | NON  NON  NON  NON  NON  NON  NON
     # NON  | NON  NON  NON  NON  NON  NON  NON
     #
-    # See George Steed's paper, "A Principled Design of Capabilities in Pony":
+    # Proved safe using prolog code from George Steed's paper, "A Principled Design of Capabilities in Pony":
     # > https://www.imperial.ac.uk/media/imperial-college/faculty-of-engineering/computing/public/GeorgeSteed.pdf
+    #
+    # But modified from the scheme in that paper in the following ways:
+    # - removing TRN and adding NON
+    # - renaming ISO- AS ISO, and ISO as ISO& (just a different terminology)
+    # - collapsing extracting and non-extracting viewpoints back into one op
+    # - completing the 7x7 square by allowing ISO ephemeral on the field side,
+    #   since we will use viewpoint adaptation not just for fields but also
+    #   for the return values of an auto-recovered call.
 
+    # Knock out the bottom two rows of the table.
     case origin
     when TAG, NON then return NON
     else
     end
 
+    # Knock out the remainder of three columns of the table.
     case self
-    when TAG, NON then return self
+    when VAL, TAG, NON then return self
     else
     end
 
+    # Knock out the remainder of the VAL row of the table.
+    return VAL if origin == VAL
+
+    # Now we just have a 4x4 table left to cover.
     case origin
-    when ISO_EPH
-      case self
-      when ISO, TRN, REF then ISO_EPH
-      when VAL, BOX      then VAL
-      else raise NotImplementedError.new(self.inspect)
-      end
     when ISO
       case self
-      when ISO, TRN, REF then ISO
-      when VAL           then VAL
-      when BOX           then TAG
+      when ISO, ISO_ALIASED, REF then ISO
+      when BOX                   then VAL
       else raise NotImplementedError.new(self.inspect)
       end
-    when TRN_EPH
+    when ISO_ALIASED
       case self
-      when ISO      then ISO_EPH
-      when TRN, REF then TRN_EPH
-      when VAL, BOX then VAL
-      else raise NotImplementedError.new(self.inspect)
-      end
-    when TRN
-      case self
-      when ISO      then ISO
-      when TRN, REF then TRN
-      when BOX      then BOX
-      when VAL      then VAL
+      when ISO              then ISO
+      when ISO_ALIASED, REF then ISO_ALIASED
+      when BOX              then TAG
       else raise NotImplementedError.new(self.inspect)
       end
     when REF then self
-    when VAL then VAL
     when BOX
       case self
-      when VAL           then VAL
-      when TRN, REF, BOX then BOX
-      when ISO           then TAG
+      when ISO         then VAL
+      when ISO_ALIASED then TAG
+      when REF, BOX    then BOX
       else raise NotImplementedError.new(self.inspect)
       end
     else raise NotImplementedError.new(origin.inspect)
-    end
-  end
-
-  def recovered : Capability
-    raise "unsupported recovered: #{self}" \
-      unless ALL_NON_EPH.includes?(self)
-
-    case self
-    when ISO, VAL then self # these caps are already as lifted as they can be
-    when TRN, REF then ISO  # mutable caps can become iso when isolated
-    when BOX then VAL       # read-only caps can become immutable when isolated
-    when TAG, NON then self # these caps have no access, and cannot gain any
-    else raise NotImplementedError.new(self.inspect)
     end
   end
 
@@ -514,78 +479,6 @@ struct Mare::Compiler::Infer::MetaType::Capability
 
     new_caps =
       origin.caps.not_nil!.map { |origin_cap| viewed_from(origin_cap) }
-
-    Union.build(new_caps.to_set)
-  end
-
-  def extracted_from(origin : Capability) : Capability
-    raise "unsupported extracted_from: #{origin}->>#{self}" \
-      unless ALL_NON_EPH.includes?(self) && ALL_SINGLE.includes?(origin)
-
-    ##
-    # Extracting viewpoint adaptation table, with columns representing the
-    # capability of the field, and rows representing the origin capability:
-    #        ISO  TRN  REF  VAL  BOX  TAG  NON
-    #      ------------------------------------
-    # ISO+ | ISO+ ISO+ ISO+ VAL  VAL  TAG  NON
-    # ISO  | ISO+ VAL  TAG  VAL  TAG  TAG  NON
-    # TRN+ | ISO+ TRN+ TRN+ VAL  VAL  TAG  NON
-    # TRN  | ISO+ VAL  BOX  VAL  BOX  TAG  NON
-    # REF  | ISO+ TRN+ REF  VAL  BOX  TAG  NON
-    #
-    # See George Steed's paper, "A Principled Design of Capabilities in Pony":
-    # > https://www.imperial.ac.uk/media/imperial-college/faculty-of-engineering/computing/public/GeorgeSteed.pdf
-
-    case origin
-    when VAL, BOX, TAG, NON then
-      raise "can't extract from non-writable cap #{origin}"
-    else
-    end
-
-    case self
-    when TAG, NON then return self
-    else
-    end
-
-    case origin
-    when ISO_EPH
-      case self
-      when ISO, TRN, REF then ISO_EPH
-      when VAL, BOX      then VAL
-      else raise NotImplementedError.new(self.inspect)
-      end
-    when ISO
-      case self
-      when ISO      then ISO_EPH
-      when TRN, VAL then VAL
-      when REF, BOX then TAG
-      else raise NotImplementedError.new(self.inspect)
-      end
-    when TRN_EPH
-      case self
-      when ISO      then ISO_EPH
-      when TRN, REF then TRN_EPH
-      when VAL, BOX then VAL
-      else raise NotImplementedError.new(self.inspect)
-      end
-    when TRN
-      case self
-      when ISO      then ISO_EPH
-      when TRN, VAL then VAL
-      when REF, BOX then BOX
-      else raise NotImplementedError.new(self.inspect)
-      end
-    when REF then self.ephemeralize
-    else raise NotImplementedError.new(origin.inspect)
-    end
-  end
-
-  def extracted_from(origin : Union)
-    raise NotImplementedError.new(origin.inspect) \
-      if origin.terms || origin.anti_terms || origin.intersects
-
-    new_caps =
-      origin.caps.not_nil!.map { |origin_cap| extracted_from(origin_cap) }
 
     Union.build(new_caps.to_set)
   end

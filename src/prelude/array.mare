@@ -110,7 +110,7 @@
   :fun ref _clone_from (other_ptr CPointer(A), size USize)
     other_ptr._unsafe._copy_to(@_ptr, size)
 
-  :fun "[]!" (index) (@->A)'aliased
+  :fun "[]!" (index) @->(A'aliased)
     if (@size <= index) error!
     @_ptr._get_at(index)
 
@@ -201,7 +201,7 @@
     )
     early_stop
 
-  :fun find! (@->A)'aliased
+  :fun find!
     :yields for Bool
     index USize = 0
     found ((@->A)'aliased | None) = None
@@ -212,7 +212,7 @@
       if early_stop (found = element) // TODO: use early return to avoid later type match
       index += 1
     )
-    if early_stop (found.as!((@->A)'aliased) | error!)
+    if early_stop (found.not!(None) | error!)
 
   :fun select
     :yields for Bool

@@ -171,7 +171,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     def is_singular_iso?
       iso_caps = [
         Infer::MetaType::Capability::ISO,
-        Infer::MetaType::Capability::ISO_EPH,
+        Infer::MetaType::Capability::ISO_ALIASED,
       ]
       singular? && iso_caps.includes?(@meta_type.cap_only.inner)
     end
@@ -267,7 +267,6 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
           when Infer::MetaType::Capability::TAG then :tag_unknown
           when Infer::MetaType::Capability::VAL then :val_unknown
           when Infer::MetaType::Capability::ISO,
-               Infer::MetaType::Capability::TRN,
                Infer::MetaType::Capability::REF,
                Infer::MetaType::Capability::BOX then :mut_unknown
           else raise NotImplementedError.new(single!)
@@ -282,7 +281,6 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
           when Infer::MetaType::Capability::TAG then :tag_known
           when Infer::MetaType::Capability::VAL then :val_known
           when Infer::MetaType::Capability::ISO,
-               Infer::MetaType::Capability::TRN,
                Infer::MetaType::Capability::REF,
                Infer::MetaType::Capability::BOX then :mut_known
           else raise NotImplementedError.new(single!)
@@ -340,8 +338,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       src_cap = @meta_type.cap_only.inner
       case src_cap
       when Infer::MetaType::Capability::NON then return :non
-      when Infer::MetaType::Capability::TRN,
-           Infer::MetaType::Capability::REF,
+      when Infer::MetaType::Capability::REF,
            Infer::MetaType::Capability::BOX then return :mutable
       else
       end

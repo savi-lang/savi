@@ -209,6 +209,19 @@ The type of this expression doesn't meet the constraints imposed on it:
     s_ref ref = String.new
           ^~~
 ```
+```error
+The type of this expression doesn't meet the constraints imposed on it:
+    s_iso String'iso = s_ref
+                       ^~~~~
+
+- it is required here to be a subtype of String'iso:
+    s_iso String'iso = s_ref
+          ^~~~~~~~~~
+
+- but the type of the local variable was String'ref:
+    s_ref ref = String.new
+          ^~~
+```
 
 ---
 
@@ -230,7 +243,7 @@ This aliasing violates uniqueness (did you forget to consume the variable?):
     s_val val = String.new_iso // okay
           ^~~
 
-- but the type of the local variable (when aliased) was String'tag:
+- but the type of the local variable (when aliased) was String'iso'aliased:
     s_iso iso = String.new_iso
           ^~~
 ```
@@ -271,7 +284,7 @@ This aliasing violates uniqueness (did you forget to consume the variable?):
   :fun example (x String'val)
                   ^~~~~~~~~~
 
-- but the type of the local variable (when aliased) was String'tag:
+- but the type of the local variable (when aliased) was String'iso'aliased:
     s2 iso = String.new_iso
        ^~~
 ```
@@ -281,42 +294,34 @@ This aliasing violates uniqueness (did you forget to consume the variable?):
 It strips the ephemeral modifier from the capability of an inferred local:
 
 ```mare
-    s = String.new_iso // inferred as String.new_iso+, stripped to String.new_iso
-    s2 iso = s // not okay, but would work if not for the above stripping
-    s3 iso = s // not okay, but would work if not for the above stripping
+    s = String.new_iso
+    s2 iso = s // not okay
+    s3 iso = s // not okay
 ```
 ```error
 This aliasing violates uniqueness (did you forget to consume the variable?):
-    s2 iso = s // not okay, but would work if not for the above stripping
+    s2 iso = s // not okay
              ^
 
 - it is required here to be a subtype of iso:
-    s2 iso = s // not okay, but would work if not for the above stripping
+    s2 iso = s // not okay
        ^~~
 
-- it is required here to be a subtype of iso:
-    s3 iso = s // not okay, but would work if not for the above stripping
-       ^~~
-
-- but the type of the local variable (when aliased) was String'tag:
-    s = String.new_iso // inferred as String.new_iso+, stripped to String.new_iso
+- but the type of the local variable (when aliased) was String'iso'aliased:
+    s = String.new_iso
     ^
 ```
 ```error
 This aliasing violates uniqueness (did you forget to consume the variable?):
-    s3 iso = s // not okay, but would work if not for the above stripping
+    s3 iso = s // not okay
              ^
 
 - it is required here to be a subtype of iso:
-    s2 iso = s // not okay, but would work if not for the above stripping
+    s3 iso = s // not okay
        ^~~
 
-- it is required here to be a subtype of iso:
-    s3 iso = s // not okay, but would work if not for the above stripping
-       ^~~
-
-- but the type of the local variable (when aliased) was String'tag:
-    s = String.new_iso // inferred as String.new_iso+, stripped to String.new_iso
+- but the type of the local variable (when aliased) was String'iso'aliased:
+    s = String.new_iso
     ^
 ```
 
@@ -337,15 +342,15 @@ It complains when violating uniqueness into an array literal:
     array_4 Array(String'val) = [s4] // not okay
 ```
 ```error
-This aliasing violates uniqueness (did you forget to consume the variable?):
+The type of this expression doesn't meet the constraints imposed on it:
     array_4 Array(String'val) = [s4] // not okay
                                 ^~~~
 
-- it is required here to be a subtype of String:
+- it is required here to be a subtype of Array(String):
     array_4 Array(String'val) = [s4] // not okay
             ^~~~~~~~~~~~~~~~~
 
-- but the type of the local variable (when aliased) was String'tag:
-    s4 iso = String.new_iso
-       ^~~
+- but the type of the array literal was Array(String'iso'aliased):
+    array_4 Array(String'val) = [s4] // not okay
+                                ^~~~
 ```

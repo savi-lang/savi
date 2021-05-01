@@ -240,7 +240,7 @@ class Mare::Server
 
                   if @use_snippet_completions
                     item.insert_text_format = LSP::Data::InsertTextFormat::Snippet
-                    new_text = "#{label}${1| , ref , val , iso , box , trn , tag , non |}${2:Name}\n  $0"
+                    new_text = "#{label}${1| , ref , val , iso , box , tag , non |}${2:Name}\n  $0"
                   else
                     new_text = "#{label} "
                   end

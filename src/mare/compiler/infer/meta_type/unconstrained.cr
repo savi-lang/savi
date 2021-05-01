@@ -54,15 +54,15 @@ class Mare::Compiler::Infer::MetaType::Unconstrained
     self
   end
 
-  def ephemeralize
+  def aliased
     self # no effect
   end
 
-  def strip_ephemeral
+  def consumed
     self # no effect
   end
 
-  def alias
+  def stabilized
     self # no effect
   end
 
@@ -107,16 +107,8 @@ class Mare::Compiler::Infer::MetaType::Unconstrained
     raise NotImplementedError.new("#{self.inspect} safe_to_match_as?")
   end
 
-  def recovered
-    self
-  end
-
   def viewed_from(origin)
     raise NotImplementedError.new("#{origin.inspect}->#{self.inspect}")
-  end
-
-  def extracted_from(origin)
-    raise NotImplementedError.new("#{origin.inspect}->>#{self.inspect}")
   end
 
   def subtype_of?(ctx : Context, other : Inner) : Bool

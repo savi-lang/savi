@@ -309,11 +309,11 @@ class Mare::Compiler::SubtypingCache
       # Check the receiver capability.
       if this_func.has_tag?(:constructor)
         # Covariant receiver rcap for constructors.
-        unless this_cap.ephemeralize.subtype_of?(that_cap.ephemeralize)
+        unless this_cap.subtype_of?(that_cap)
           errors << {this_func.cap.pos,
-            "this constructor's return capability is #{this_cap.ephemeralize.inspect}"}
+            "this constructor's return capability is #{this_cap.inspect}"}
           errors << {that_func.cap.pos,
-            "it is required to be a subtype of #{that_cap.ephemeralize.inspect}"}
+            "it is required to be a subtype of #{that_cap.inspect}"}
         end
       else
         # Contravariant receiver rcap for normal functions.

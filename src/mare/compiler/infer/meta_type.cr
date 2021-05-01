@@ -166,16 +166,16 @@ struct Mare::Compiler::Infer::MetaType
     )
   end
 
-  def ephemeralize
-    MetaType.new(inner.ephemeralize)
+  def aliased
+    MetaType.new(inner.aliased)
   end
 
-  def strip_ephemeral
-    MetaType.new(inner.strip_ephemeral)
+  def consumed
+    MetaType.new(inner.consumed)
   end
 
-  def alias
-    MetaType.new(inner.alias)
+  def stabilized
+    MetaType.new(inner.stabilized)
   end
 
   def strip_cap
@@ -245,10 +245,6 @@ struct Mare::Compiler::Infer::MetaType
     inner.safe_to_match_as?(ctx, other.inner)
   end
 
-  def recovered
-    MetaType.new(inner.recovered)
-  end
-
   def viewed_from(origin : MetaType)
     origin_inner = origin.inner
     case origin_inner
@@ -258,18 +254,6 @@ struct Mare::Compiler::Infer::MetaType
       MetaType.new(inner.viewed_from(origin_inner.cap.not_nil!)) # TODO: convert to_generic
     else
       raise NotImplementedError.new("#{origin_inner.inspect}->#{inner.inspect}")
-    end
-  end
-
-  def extracted_from(origin : MetaType)
-    origin_inner = origin.inner
-    case origin_inner
-    when Capability
-      MetaType.new(inner.extracted_from(origin_inner))
-    when Intersection
-      MetaType.new(inner.extracted_from(origin_inner.cap.not_nil!)) # TODO: convert to_generic
-    else
-      raise NotImplementedError.new("#{origin_inner.inspect}->>#{inner.inspect}")
     end
   end
 

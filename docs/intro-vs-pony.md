@@ -574,13 +574,6 @@ Probably the most notable semantics change from Pony is the addition of a new re
   - is sendable
   - appropriate for cases where you need to send something mutable
 
-- `trn`
-  - conveys the address of a runtime-allocated object of a specific type
-  - allows both reading and mutation of the data
-  - requires write uniqueness (no writable aliases)
-  - is not sendable
-  - appropriate for cases where you need to temporarily mutate something before making it permanently immutable
-
 - `val`
   - conveys the address of a runtime-allocated object of a specific type
   - allows only reading of the data

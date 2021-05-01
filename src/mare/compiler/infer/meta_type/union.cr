@@ -327,30 +327,30 @@ struct Mare::Compiler::Infer::MetaType::Union
     result
   end
 
-  def ephemeralize
+  def aliased
     Union.build(
-      (caps.not_nil!.map(&.ephemeralize).to_set if caps),
+      (caps.not_nil!.map(&.aliased).to_set if caps),
       terms,
       anti_terms,
-      (intersects.not_nil!.map(&.ephemeralize).to_set if intersects),
+      (intersects.not_nil!.map(&.aliased).to_set if intersects),
     )
   end
 
-  def strip_ephemeral
+  def consumed
     Union.build(
-      (caps.not_nil!.map(&.strip_ephemeral).to_set if caps),
+      (caps.not_nil!.map(&.consumed).to_set if caps),
       terms,
       anti_terms,
-      (intersects.not_nil!.map(&.strip_ephemeral).to_set if intersects),
+      (intersects.not_nil!.map(&.consumed).to_set if intersects),
     )
   end
 
-  def alias
+  def stabilized
     Union.build(
-      (caps.not_nil!.map(&.alias).to_set if caps),
+      (caps.not_nil!.map(&.stabilized).to_set if caps),
       terms,
       anti_terms,
-      (intersects.not_nil!.map(&.alias).to_set if intersects),
+      (intersects.not_nil!.map(&.stabilized).to_set if intersects),
     )
   end
 
@@ -477,23 +477,6 @@ struct Mare::Compiler::Infer::MetaType::Union
     nil
   end
 
-  def recovered
-    raise NotImplementedError.new("#{self.inspect} recovered") \
-      if anti_terms
-
-    result = Unsatisfiable::INSTANCE
-    caps.not_nil!.each do |cap|
-      result = result.unite(cap.recovered)
-    end if caps
-    terms.not_nil!.each do |term|
-      result = result.unite(term.recovered)
-    end if terms
-    intersects.not_nil!.each do |intersect|
-      result = result.unite(intersect.recovered)
-    end if intersects
-    result
-  end
-
   def viewed_from(origin)
     raise NotImplementedError.new("#{origin.inspect}->#{self.inspect}") \
       if anti_terms
@@ -507,23 +490,6 @@ struct Mare::Compiler::Infer::MetaType::Union
     end if terms
     intersects.not_nil!.each do |intersect|
       result = result.unite(intersect.viewed_from(origin))
-    end if intersects
-    result
-  end
-
-  def extracted_from(origin)
-    raise NotImplementedError.new("#{origin.inspect}->>#{self.inspect}") \
-      if anti_terms
-
-    result = Unsatisfiable::INSTANCE
-    caps.not_nil!.each do |cap|
-      result = result.unite(cap.extracted_from(origin))
-    end if caps
-    terms.not_nil!.each do |term|
-      result = result.unite(term.extracted_from(origin))
-    end if terms
-    intersects.not_nil!.each do |intersect|
-      result = result.unite(intersect.extracted_from(origin))
     end if intersects
     result
   end

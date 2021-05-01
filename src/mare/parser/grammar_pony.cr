@@ -77,17 +77,16 @@ module Mare::Parser
 
     # Define what a capability looks like.
     cap = (
-      str("iso") | str("trn") | str("val") |
-      str("ref") | str("box") | str("tag") | str("non") |
-      str("any") | str("alias") | str("send") | str("share") |
-      str("read") | str("mutable") | str("mutableplus")
+      str("iso") | str("val") | str("ref") |
+      str("box") | str("tag") | str("non") |
+      str("any") | str("alias") | str("send") | str("share") | str("read")
     ).named(:ident) >> char('^').maybe # TODO: figure out how to incorporate Pony ephemerality properly? or don't?
     capmod = str("aliased").named(:ident)
 
     # Define a compound to be a closely bound chain of atoms.
     opcap = s.named(:pony_opcap)
     opdot = char('.').named(:op)
-    oparrow = (str("->") | str("->>")).named(:op)
+    oparrow = (str("->")).named(:op)
     compound = (atom >> (
       (opcap >> (capmod | cap)) | \
       (s >> oparrow >> s >> atom) | \

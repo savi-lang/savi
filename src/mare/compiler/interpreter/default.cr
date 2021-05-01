@@ -54,7 +54,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
     {
       "kind" => "keyword",
       "name" => "cap",
-      "value" => "iso|trn|val|ref|box|tag|non",
+      "value" => "iso|val|ref|box|tag|non",
       "optional" => true,
     },
     {
@@ -339,7 +339,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
       {
         "kind" => "keyword",
         "name" => "cap",
-        "value" => "iso|trn|val|ref|box|tag|non",
+        "value" => "iso|val|ref|box|tag|non",
         "optional" => true,
       },
       {
@@ -372,7 +372,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         # it is only accepted here so that we can give a nicer error later.
         "kind" => "keyword",
         "name" => "cap",
-        "value" => "iso|trn|val|ref|box|tag|non",
+        "value" => "iso|val|ref|box|tag|non",
         "optional" => true,
       },
       {
@@ -398,7 +398,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
       {
         "kind" => "keyword",
         "name" => "cap",
-        "value" => "iso|trn|val|ref|box|tag|non",
+        "value" => "iso|val|ref|box|tag|non",
         "optional" => true,
       },
       {
@@ -571,7 +571,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         ident = data["ident"].as(AST::Identifier)
         ret = data["ret"]?.as(AST::Term?)
 
-        field_cap = AST::Identifier.new("readableplus").from(data["keyword"])
+        field_cap = AST::Identifier.new("box").from(data["keyword"])
         field_params = AST::Group.new("(").from(ident)
         field_body = decl.body
         field_body = nil if decl.body.try { |group| group.terms.size == 0 }
@@ -580,16 +580,16 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         field_func.add_tag(:field)
         func = field_func
 
-        getter_cap = AST::Identifier.new("readableplus").from(data["keyword"])
+        getter_cap = AST::Identifier.new("box").from(data["keyword"])
         if ret
           getter_ret = AST::Relate.new(
+            AST::Identifier.new("@").from(getter_cap),
+            AST::Operator.new("->").from(getter_cap),
             AST::Relate.new(
-              AST::Identifier.new("@").from(getter_cap),
-              AST::Operator.new("->").from(getter_cap),
-              ret
-            ).from(ret),
-            AST::Operator.new("'").from(getter_cap),
-            AST::Identifier.new("aliased").from(getter_cap),
+              ret,
+              AST::Operator.new("'").from(getter_cap),
+              AST::Identifier.new("aliased").from(getter_cap),
+            ).from(ret)
           ).from(ret)
         end
         getter_body = AST::Group.new(":").from(ident)
@@ -622,7 +622,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         setter_func = Program::Function.new(setter_cap, setter_ident, setter_params, setter_ret, setter_body)
         @type.functions << setter_func
 
-        replace_cap = AST::Identifier.new("mutableplus").from(data["keyword"])
+        replace_cap = AST::Identifier.new("ref").from(data["keyword"])
         replace_ident = AST::Identifier.new("#{ident.value}<<=").from(ident)
         replace_param = AST::Identifier.new("value").from(ident)
         if !ret.nil?
@@ -635,13 +635,9 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         replace_params.terms << replace_param
         if ret
           replace_ret = AST::Relate.new(
-            AST::Relate.new(
-              AST::Identifier.new("@").from(replace_cap),
-              AST::Operator.new("->>").from(replace_cap),
-              ret
-            ).from(ret),
-            AST::Operator.new("'").from(replace_cap),
-            AST::Identifier.new("aliased").from(replace_cap),
+            AST::Identifier.new("@").from(replace_cap),
+            AST::Operator.new("->").from(replace_cap),
+            ret
           ).from(ret)
         end
         replace_assign = AST::FieldReplace.new(

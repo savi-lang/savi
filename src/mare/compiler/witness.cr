@@ -142,7 +142,7 @@ class Mare::Witness
         check_type(term.term, t) &&
         term.group.terms.all? { |term2| check_type(term2, t) }
       when AST::Relate
-        ["'", "->", "->>"].includes?(term.op.value) &&
+        ["'", "->"].includes?(term.op.value) &&
         check_type(term.lhs, t) &&
         check_type(term.rhs, t)
       when AST::Group

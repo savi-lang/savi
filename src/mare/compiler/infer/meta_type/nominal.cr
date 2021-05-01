@@ -207,20 +207,21 @@ struct Mare::Compiler::Infer::MetaType::Nominal
     other.unite(self) # delegate to the "higher" class via commutativity
   end
 
-  def ephemeralize
+  def aliased
     raise NotImplementedError.new("simplify first to remove aliases") if defn.is_a?(ReifiedTypeAlias)
 
     self # no effect
   end
 
-  def strip_ephemeral
+  def consumed
     raise NotImplementedError.new("simplify first to remove aliases") if defn.is_a?(ReifiedTypeAlias)
 
     self # no effect
   end
 
-  def alias
-    raise NotImplementedError.new("simplify first to remove aliases") if defn.is_a?(ReifiedTypeAlias)
+  def stabilized
+    # TODO: Should we use this error?
+    # raise NotImplementedError.new("simplify first to remove aliases") if defn.is_a?(ReifiedTypeAlias)
 
     self # no effect
   end
@@ -316,12 +317,6 @@ struct Mare::Compiler::Infer::MetaType::Nominal
     supertype_of?(ctx, other) ? true : nil
   end
 
-  def recovered
-    raise NotImplementedError.new("simplify first to remove aliases") if defn.is_a?(ReifiedTypeAlias)
-
-    self
-  end
-
   def viewed_from(origin)
     raise NotImplementedError.new("simplify first to remove aliases") if defn.is_a?(ReifiedTypeAlias)
 
@@ -329,15 +324,6 @@ struct Mare::Compiler::Infer::MetaType::Nominal
     return self if ignores_cap?
 
     raise NotImplementedError.new("#{origin.inspect}->#{self.inspect}")
-  end
-
-  def extracted_from(origin)
-    raise NotImplementedError.new("simplify first to remove aliases") if defn.is_a?(ReifiedTypeAlias)
-
-    # A nominal that ignores capabilities also ignores viewpoint adaptation.
-    return self if ignores_cap?
-
-    raise NotImplementedError.new("#{origin.inspect}->>#{self.inspect}")
   end
 
   def subtype_of?(ctx : Context, other : Capability) : Bool

@@ -228,7 +228,7 @@ This function call doesn't meet subtyping requirements:
   :fun val immutable_string: @string
        ^~~
 
-- auto-recovery was attempted because the receiver's type is FunValImmutableString'iso:
+- auto-recovery was attempted because the receiver's type is FunValImmutableString'iso'aliased:
     wrapper FunValImmutableString'iso = FunValImmutableString.new
             ^~~~~~~~~~~~~~~~~~~~~~~~~
 ```
@@ -250,28 +250,9 @@ This function call won't work unless the receiver is ephemeral; it must either b
     outer_iso.inner = inner_ref   // not okay
               ^~~~~
 
-- the argument (when aliased) has a type of Inner, which isn't sendable:
+- the argument has a type of Inner, which isn't sendable:
     outer_iso.inner = inner_ref   // not okay
                       ^~~~~~~~~
-```
-
----
-
-It complains on auto-recovery of a property setter whose return is used:
-
-```mare
-    outer_trn Outer'trn = Outer.new
-    outer_trn.inner = Inner.new         // okay; return value is unused
-    inner = outer_trn.inner = Inner.new // not okay
-```
-```error
-This function call won't work unless the receiver is ephemeral; it must either be consumed or be allowed to be auto-recovered. Auto-recovery didn't work for these reasons:
-    inner = outer_trn.inner = Inner.new // not okay
-                      ^~~~~
-
-- the return type Inner isn't sendable and the return value is used (the return type wouldn't matter if the calling side entirely ignored the return value):
-  :prop inner Inner: Inner.new
-              ^~~~~
 ```
 
 ---

@@ -418,7 +418,7 @@ class Mare::Compiler::CodeGen::VeronaRT
 
     case type_ref.cap_only.cap_value
     when Infer::Cap::ISO then :iso
-    when Infer::Cap::ISO_EPH then :iso_eph
+    when Infer::Cap::ISO_ALIASED then :iso_aliased
     when Infer::Cap::REF then :ref
     when Infer::Cap::BOX then :box
     when Infer::Cap::VAL then :val
@@ -448,14 +448,14 @@ class Mare::Compiler::CodeGen::VeronaRT
     when {:ref, :box}
       # A mutable reference downgrades to read-only with no action needed.
       value
-    when {:iso_eph, :iso}
+    when {:iso, :iso_aliased}
       # An iso ephemeral can be captured as an iso with no action needed.
       value
-    when {:iso_eph, :ref}, {:iso_eph, :box}
+    when {:iso, :ref}, {:iso, :box}
       # When an ephemeral iso is moved to a local mutable cap,
       # it needs to be merged into the current local mutable region.
       gen_iso_merge_into_current_region(g, value)
-    when {:iso_eph, :val}
+    when {:iso, :val}
       # TODO: find a way to have both compile-time and runtime String'val
       raise NotImplementedError.new("runtime-alloc'd String'val in Verona") \
         if value.type == g.gtypes["String"].struct_ptr

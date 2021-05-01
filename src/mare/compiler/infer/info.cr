@@ -230,6 +230,7 @@ module Mare::Compiler::Infer
     def resolve_span!(ctx : Context, infer : Visitor) : Span
       explicit = @explicit
 
+      span =
       if explicit
         explicit_span = infer.resolve(ctx, explicit)
 
@@ -262,13 +263,17 @@ module Mare::Compiler::Infer
           tether_constraint_spans(ctx, infer)
         ) { |accum, mt| accum.intersect(mt) }
         .not_nil!
-        .transform_mt(&.strip_ephemeral) # TODO: add this?
       else
         # If we get here, we've failed and don't have enough info to continue.
         Span.error self,
           "This #{described_kind} needs an explicit type; it could not be inferred"
       end
-      .transform_mt(&.strip_ephemeral)
+
+      if is_a?(FuncBody)
+        span # do not stabilize the return type of a function body
+      else
+        span.transform_mt(&.stabilized)
+      end
     end
 
     def tethers(querent : Info) : Array(Tether)
@@ -371,16 +376,19 @@ module Mare::Compiler::Infer
 
   class FixedTypeExpr < FixedInfo
     getter node : AST::Node
+    property stabilize : Bool
 
     def describe_kind : String; "type expression" end
 
     def initialize(@pos, @layer_index, @node)
+      @stabilize = false
     end
 
     def resolve_span!(ctx : Context, infer : Visitor) : Span
       infer.unwrap_lazy_parts_of_type_expr_span(ctx,
         infer.type_expr_span(ctx, @node)
       )
+      .transform_mt { |mt| stabilize ? mt.stabilized : mt }
     end
   end
 
@@ -425,13 +433,17 @@ module Mare::Compiler::Infer
   end
 
   class Self < FixedInfo
+    property stabilize : Bool
+
     def describe_kind : String; "receiver value" end
 
     def initialize(@pos, @layer_index)
+      @stabilize = false
     end
 
     def resolve_span!(ctx : Context, infer : Visitor) : Span
       infer.self_type_expr_span(ctx)
+      .transform_mt { |mt| stabilize ? mt.stabilized : mt }
     end
   end
 
@@ -442,7 +454,7 @@ module Mare::Compiler::Infer
     end
 
     def resolve_span!(ctx : Context, infer : Visitor) : Span
-      infer.self_ephemeral_with_cap(ctx, @cap)
+      infer.self_with_specified_cap(ctx, @cap)
     end
   end
 
@@ -533,7 +545,7 @@ module Mare::Compiler::Infer
     end
   end
 
-  class LocalRef < Info
+  class LocalRef < DynamicInfo
     getter info : DynamicInfo
     getter ref : Refer::Local
 
@@ -547,6 +559,7 @@ module Mare::Compiler::Infer
     end
 
     def add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
+      super(use_pos, info, aliases)
       @info.add_downstream(use_pos, info, aliases)
     end
 
@@ -559,7 +572,7 @@ module Mare::Compiler::Infer
     end
 
     def as_conduit? : Conduit?
-      Conduit.direct(@info)
+      Conduit.aliased(@info)
     end
   end
 
@@ -645,7 +658,7 @@ module Mare::Compiler::Infer
     def resolve_span!(ctx : Context, infer : Visitor) : Span
       origin_span = infer.resolve(ctx, @origin)
       field_span = infer.resolve(ctx, @field)
-      origin_span.combine_mt(field_span) { |o, f| f.viewed_from(o).alias }
+      origin_span.combine_mt(field_span) { |o, f| f.viewed_from(o).aliased }
     end
   end
 
@@ -663,7 +676,7 @@ module Mare::Compiler::Infer
     def resolve_span!(ctx : Context, infer : Visitor) : Span
       origin_span = infer.resolve(ctx, @origin)
       field_span = infer.resolve(ctx, @field)
-      origin_span.combine_mt(field_span) { |o, f| f.extracted_from(o).ephemeralize }
+      origin_span.combine_mt(field_span) { |o, f| f.viewed_from(o) }
     end
   end
 
@@ -897,11 +910,15 @@ module Mare::Compiler::Infer
     end
 
     def as_conduit? : Conduit?
-      Conduit.ephemeralize(@local)
+      local = local()
+      local = local.info if local.is_a?(LocalRef)
+      Conduit.consumed(local)
     end
 
     def add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
-      @local.add_downstream(use_pos, info, aliases - 1)
+      local = local()
+      local = local.info if local.is_a?(LocalRef)
+      local.add_downstream(use_pos, info, aliases - 1)
     end
 
     def tethers(querent : Info) : Array(Tether)
@@ -961,7 +978,7 @@ module Mare::Compiler::Infer
     end
 
     def as_conduit? : Conduit?
-      Conduit.alias(@lhs)
+      Conduit.aliased(@lhs)
     end
   end
 
@@ -1040,7 +1057,7 @@ module Mare::Compiler::Infer
 
     def resolve_span!(ctx : Context, infer : Visitor) : Span
       # By default, an array literal has a cap of `ref`.
-      # TODO: span should allow ref, val, trn, or iso cap possibilities.
+      # TODO: span should allow ref, val, or iso cap possibilities.
       array_cap = MetaType::Capability::REF
 
       ante_span = possible_antecedents_span(ctx, infer)
@@ -1048,7 +1065,6 @@ module Mare::Compiler::Infer
       elem_spans = terms.map { |term| infer.resolve(ctx, term).as(Span) }
       elem_span = Span
         .reduce_combine_mts(elem_spans) { |accum, mt| accum.unite(mt) }
-        .try(&.transform_mt(&.alias))
 
       if ante_span
         if elem_span
@@ -1070,7 +1086,7 @@ module Mare::Compiler::Infer
             # fall back to using the element MetaType if the intersection
             # of those two turns out to be unsatisfiable.
             Span.simple_with_fallback(ante_mt,
-              ante_elem_mt.intersect(elem_mt.ephemeralize), [
+              ante_elem_mt.intersect(elem_mt), [
                 {:mt_unsatisfiable, Span.simple(fallback_mt)}
               ]
             )
@@ -1182,7 +1198,6 @@ module Mare::Compiler::Infer
       lhs_span = infer.resolve(ctx, @lhs)
       receiver_span = resolve_receiver_span(ctx, infer)
 
-      # receiver_span.transform_mt_to_span { |call_receiver_mt|
       receiver_span.combine_mt_to_span(lhs_span) { |call_receiver_mt, lhs_mt|
         union_member_spans = call_receiver_mt.map_each_union_member { |union_member_mt|
           intersection_term_spans = union_member_mt.map_each_intersection_term_and_or_cap { |term_mt|
@@ -1198,7 +1213,6 @@ module Mare::Compiler::Infer
                 .intersect(lhs_mt)
                 .strip_cap
                 .intersect(MetaType.cap(call_func.cap.value))
-                .ephemeralize
 
               next Span.simple(new_mt)
             end
@@ -1206,7 +1220,6 @@ module Mare::Compiler::Infer
             infer
               .depends_on_call_ret_span(ctx, call_defn, call_func, call_link,
                 call_mt.cap_only_inner.value.as(Cap))
-              .transform_mt(&.ephemeralize)
           }
           Span.reduce_combine_mts(intersection_term_spans) { |accum, mt| accum.intersect(mt) }.not_nil!
         }

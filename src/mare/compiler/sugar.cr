@@ -273,7 +273,7 @@ class Mare::Compiler::Sugar < Mare::AST::CopyOnMutateVisitor
     case node.op.value
     when ".", "'", " ", "<:", "!<:", "is", "DEFAULTPARAM"
       node # skip these special-case operators
-    when "->", "->>"
+    when "->"
       # If a dot relation is within this (which doesn't happen in the parser,
       # but may happen artifically such as the `@identifier` sugar above),
       # then always move the qualify into the right-hand-side of the dot.

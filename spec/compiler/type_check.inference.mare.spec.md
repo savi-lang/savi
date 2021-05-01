@@ -300,24 +300,24 @@ The type of this expression doesn't meet the constraints imposed on it:
 It infers prop setters to return the alias of the assigned value:
 
 ```mare
-:class HasStringTrn
-  :prop string_trn String'trn: String.new_iso
+:class HasStringIso
+  :prop string_iso String'iso: String.new_iso
 ```
 ```mare
-    wrapper = HasStringTrn.new
-    string_box String'box = wrapper.string_trn = String.new_iso // okay
-    string_trn String'trn = wrapper.string_trn = String.new_iso // not okay
+    wrapper_iso = HasStringIso.new
+    returned_2 String'tag = wrapper_iso.string_iso = String.new_iso // okay
+    returned_3 String'iso = wrapper_iso.string_iso = String.new_iso // not okay
 ```
 ```error
 The type of this expression doesn't meet the constraints imposed on it:
-    string_trn String'trn = wrapper.string_trn = String.new_iso // not okay
-    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    returned_3 String'iso = wrapper_iso.string_iso = String.new_iso // not okay
+    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- it is required here to be a subtype of String'trn:
-    string_trn String'trn = wrapper.string_trn = String.new_iso // not okay
+- it is required here to be a subtype of String'iso:
+    returned_3 String'iso = wrapper_iso.string_iso = String.new_iso // not okay
                ^~~~~~~~~~
 
-- but the type of the return value was String'box:
-    string_trn String'trn = wrapper.string_trn = String.new_iso // not okay
-                                    ^~~~~~~~~~
+- but the type of the return value was String'iso'aliased:
+    returned_3 String'iso = wrapper_iso.string_iso = String.new_iso // not okay
+                                        ^~~~~~~~~~
 ```

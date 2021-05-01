@@ -118,17 +118,17 @@ module Mare::Compiler::Infer
       end
     end
 
-    def self.ephemeralize(info)
-      new(Ephemeralize.new(info))
+    def self.consumed(info)
+      new(Consumed.new(info))
     end
 
-    struct Ephemeralize < Inner
+    struct Consumed < Inner
       getter info : Info
       def initialize(@info)
       end
 
       def pretty_print(format : PrettyPrint)
-        format.surround("Ephemeralize(", ")", left_break: nil, right_break: nil) do
+        format.surround("Consumed(", ")", left_break: nil, right_break: nil) do
           format.text(info.to_s)
         end
       end
@@ -140,9 +140,9 @@ module Mare::Compiler::Infer
         conduit.flatten.map do |flat_conduit|
           flat_inner = flat_conduit.inner
           case flat_inner
-          when Direct; Ephemeralize.new(flat_inner.info)
-          when Ephemeralize; Ephemeralize.new(flat_inner.info)
-          when Alias; Ephemeralize.new(flat_inner.info)
+          when Direct; Consumed.new(flat_inner.info)
+          when Consumed; Consumed.new(flat_inner.info)
+          when Aliased; Direct.new(flat_inner.info)
           else raise NotImplementedError.new(flat_inner.inspect)
           end.as(Inner)
         end
@@ -153,27 +153,27 @@ module Mare::Compiler::Infer
       end
 
       def resolve_span!(ctx : Context, infer : Visitor) : Span
-        infer.resolve(ctx, info).transform_mt(&.ephemeralize)
+        infer.resolve(ctx, info).transform_mt(&.consumed)
       end
       def resolve_span!(infer : Analysis) : Span
-        infer[info].transform_mt(&.ephemeralize)
+        infer[info].transform_mt(&.consumed)
       end
       def resolve!(ctx : Context, type_check : TypeCheck::ForReifiedFunc) : MetaType?
-        type_check.resolve(ctx, info).try(&.ephemeralize)
+        type_check.resolve(ctx, info).try(&.consumed)
       end
     end
 
-    def self.alias(info)
-      new(Alias.new(info))
+    def self.aliased(info)
+      new(Aliased.new(info))
     end
 
-    struct Alias < Inner
+    struct Aliased < Inner
       getter info : Info
       def initialize(@info)
       end
 
       def pretty_print(format : PrettyPrint)
-        format.surround("Alias(", ")", left_break: nil, right_break: nil) do
+        format.surround("Aliased(", ")", left_break: nil, right_break: nil) do
           format.text(info.to_s)
         end
       end
@@ -185,9 +185,9 @@ module Mare::Compiler::Infer
         conduit.flatten.map do |flat_conduit|
           flat_inner = flat_conduit.inner
           case flat_inner
-          when Direct; Alias.new(flat_inner.info)
-          when Ephemeralize; Direct.new(flat_inner.info)
-          when Alias; Alias.new(flat_inner.info)
+          when Direct; Aliased.new(flat_inner.info)
+          when Consumed; Direct.new(flat_inner.info)
+          when Aliased; Aliased.new(flat_inner.info)
           else raise NotImplementedError.new(flat_inner.inspect)
           end
         end
@@ -198,13 +198,13 @@ module Mare::Compiler::Infer
       end
 
       def resolve_span!(ctx : Context, infer : Visitor) : Span
-        infer.resolve(ctx, info).transform_mt(&.alias)
+        infer.resolve(ctx, info).transform_mt(&.aliased)
       end
       def resolve_span!(infer : Analysis) : Span
-        infer[info].transform_mt(&.alias)
+        infer[info].transform_mt(&.aliased)
       end
       def resolve!(ctx : Context, type_check : TypeCheck::ForReifiedFunc) : MetaType?
-        type_check.resolve(ctx, info).try(&.alias)
+        type_check.resolve(ctx, info).try(&.aliased)
       end
     end
 

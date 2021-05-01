@@ -273,16 +273,16 @@ struct Mare::Compiler::Infer::MetaType::Intersection
     other.unite(self) # delegate to the "higher" class via commutativity
   end
 
-  def ephemeralize
-    Intersection.new(cap.try(&.ephemeralize), terms, anti_terms)
+  def aliased
+    Intersection.new(cap.try(&.aliased), terms, anti_terms)
   end
 
-  def strip_ephemeral
-    Intersection.new(cap.try(&.strip_ephemeral), terms, anti_terms)
+  def consumed
+    Intersection.new(cap.try(&.consumed), terms, anti_terms)
   end
 
-  def alias
-    Intersection.new(cap.try(&.alias), terms, anti_terms)
+  def stabilized
+    Intersection.new(cap.try(&.stabilized), terms, anti_terms)
   end
 
   def strip_cap
@@ -398,22 +398,11 @@ struct Mare::Compiler::Infer::MetaType::Intersection
     true
   end
 
-  def recovered
-    Intersection.new(cap.try(&.recovered), terms, anti_terms)
-  end
-
   def viewed_from(origin)
     raise NotImplementedError.new("#{origin.inspect}->(nil cap)") unless cap
 
     Intersection.new(Capability::NON, terms, anti_terms)
       .intersect(cap.not_nil!.viewed_from(origin))
-  end
-
-  def extracted_from(origin)
-    raise NotImplementedError.new("#{origin.inspect}->>(nil cap)") unless cap
-
-    Intersection.new(Capability::NON, terms, anti_terms)
-      .intersect(cap.not_nil!.extracted_from(origin))
   end
 
   def subtype_of?(ctx : Context, other : Capability) : Bool

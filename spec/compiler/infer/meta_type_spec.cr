@@ -1,15 +1,13 @@
 describe Mare::Compiler::Infer::MetaType do
   # For convenience, alias each capability here by name.
-  iso     = Mare::Compiler::Infer::MetaType::Capability::ISO
-  iso_eph = Mare::Compiler::Infer::MetaType::Capability::ISO_EPH
-  trn     = Mare::Compiler::Infer::MetaType::Capability::TRN
-  trn_eph = Mare::Compiler::Infer::MetaType::Capability::TRN_EPH
-  ref     = Mare::Compiler::Infer::MetaType::Capability::REF
-  val     = Mare::Compiler::Infer::MetaType::Capability::VAL
-  box     = Mare::Compiler::Infer::MetaType::Capability::BOX
-  tag     = Mare::Compiler::Infer::MetaType::Capability::TAG
-  non     = Mare::Compiler::Infer::MetaType::Capability::NON
-  no      = Mare::Compiler::Infer::MetaType::Unsatisfiable::INSTANCE
+  iso   = Mare::Compiler::Infer::MetaType::Capability::ISO
+  iso_a = Mare::Compiler::Infer::MetaType::Capability::ISO_ALIASED
+  ref   = Mare::Compiler::Infer::MetaType::Capability::REF
+  val   = Mare::Compiler::Infer::MetaType::Capability::VAL
+  box   = Mare::Compiler::Infer::MetaType::Capability::BOX
+  tag   = Mare::Compiler::Infer::MetaType::Capability::TAG
+  non   = Mare::Compiler::Infer::MetaType::Capability::NON
+  no    = Mare::Compiler::Infer::MetaType::Unsatisfiable::INSTANCE
 
   it "implements logical operators that keep the expression in DNF form" do
     library = Mare::Program::Library.new(
@@ -156,21 +154,18 @@ describe Mare::Compiler::Infer::MetaType do
       " (A1'any & A2'any & -C1'any & -C2'any & -C3'any & -C4'any))"
   end
 
-  it "implements the correct table for non-extracting viewpoint adaptation" do
-    # See George Steed's paper, "A Principled Design of Capabilities in Pony":
-    # > https://www.imperial.ac.uk/media/imperial-college/faculty-of-engineering/computing/public/GeorgeSteed.pdf
+  it "implements the correct truth table for viewpoint adaptation" do
+    # See comments in the Capability#viewed_from function for more information.
 
-    columns =    {iso,     trn,     ref,     val, box, tag, non}
+    columns =  {iso,   iso_a, ref,   val,   box,   tag,   non}
     rows = {
-      iso_eph => {iso_eph, iso_eph, iso_eph, val, val, tag, non},
-      iso     => {iso,     iso,     iso,     val, tag, tag, non},
-      trn_eph => {iso_eph, trn_eph, trn_eph, val, val, tag, non},
-      trn     => {iso,     trn,     trn,     val, box, tag, non},
-      ref     => {iso,     trn,     ref,     val, box, tag, non},
-      val     => {val,     val,     val,     val, val, tag, non},
-      box     => {tag,     box,     box,     val, box, tag, non},
-      tag     => {non,     non,     non,     non, non, non, non},
-      non     => {non,     non,     non,     non, non, non, non},
+      iso   => {iso,   iso,   iso,   val,   val,   tag,   non},
+      iso_a => {iso,   iso_a, iso_a, val,   tag,   tag,   non},
+      ref   => {iso,   iso_a, ref,   val,   box,   tag,   non},
+      val   => {val,   val,   val,   val,   val,   tag,   non},
+      box   => {val,   tag,   box,   val,   box,   tag,   non},
+      tag   => {non,   non,   non,   non,   non,   non,   non},
+      non   => {non,   non,   non,   non,   non,   non,   non},
     }
 
     rows.each do |origin, results|
@@ -181,37 +176,16 @@ describe Mare::Compiler::Infer::MetaType do
     end
   end
 
-  it "implements the correct table for extracting viewpoint adaptation" do
-    # See George Steed's paper, "A Principled Design of Capabilities in Pony":
-    # > https://www.imperial.ac.uk/media/imperial-college/faculty-of-engineering/computing/public/GeorgeSteed.pdf
-
-    columns =    {iso,     trn,     ref,     val, box, tag, non}
-    rows = {
-      iso_eph => {iso_eph, iso_eph, iso_eph, val, val, tag, non},
-      iso     => {iso_eph, val,     tag,     val, tag, tag, non},
-      trn_eph => {iso_eph, trn_eph, trn_eph, val, val, tag, non},
-      trn     => {iso_eph, val,     box,     val, box, tag, non},
-      ref     => {iso_eph, trn_eph, ref,     val, box, tag, non},
-    }
-
-    rows.each do |origin, results|
-      columns.zip(results).each do |column, result|
-        actual = column.extracted_from(origin)
-        {origin, column, actual}.should eq({origin, column, result})
-      end
-    end
-  end
-
   it "correctly intersects capabilities" do
-    columns = {iso, trn, ref, val, box, tag, non}
+    columns =  {iso,   iso_a, ref,   val,   box,   tag,   non}
     rows = {
-      iso =>  {iso, no,  no,  no,  no,  iso, iso},
-      trn =>  {no,  trn, no,  no,  trn, trn, trn},
-      ref =>  {no,  no,  ref, no,  ref, ref, ref},
-      val =>  {no,  no,  no,  val, val, val, val},
-      box =>  {no,  trn, ref, val, box, box, box},
-      tag =>  {iso, trn, ref, val, box, tag, tag},
-      non =>  {iso, trn, ref, val, box, tag, non},
+      iso   => {iso,   iso,   iso,   iso,   iso,   iso,   iso},
+      iso_a => {iso,   iso_a, no,    no,    no,    iso_a, iso_a},
+      ref   => {iso,   no,    ref,   no,    ref,   ref,   ref},
+      val   => {iso,   no,    no,    val,   val,   val,   val},
+      box   => {iso,   no,    ref,   val,   box,   box,   box},
+      tag   => {iso,   iso_a, ref,   val,   box,   tag,   tag},
+      non   => {iso,   iso_a, ref,   val,   box,   tag,   non},
     }
 
     rows.each do |left, results|

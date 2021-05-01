@@ -233,7 +233,7 @@ class Mare::Compiler::TypeCheck
       reify_cap =
         if required_cap.value == Cap::BOX
           case call_cap_mt.inner.as(MetaType::Capability).value
-          when Cap::ISO, Cap::TRN, Cap::REF then MetaType.cap(Cap::REF)
+          when Cap::ISO, Cap::ISO_ALIASED, Cap::REF then MetaType.cap(Cap::REF)
           when Cap::VAL then MetaType.cap(Cap::VAL)
           else MetaType.cap(Cap::BOX)
           end
@@ -246,7 +246,7 @@ class Mare::Compiler::TypeCheck
     elsif call_func.has_tag?(:constructor)
       # Constructor calls ignore cap of the original receiver.
       reify_cap = call_func_cap_mt
-    elsif call_cap_mt.ephemeralize.subtype_of?(ctx, MetaType.new(required_cap))
+    elsif call_cap_mt.consumed.subtype_of?(ctx, MetaType.new(required_cap))
       # We failed, but we may be able to use auto-recovery.
       # Take note of this and we'll finish the auto-recovery checks later.
       autorecover_needed = true
@@ -323,14 +323,12 @@ class Mare::Compiler::TypeCheck
         "if the calling side entirely ignored the return value)"}
     end
 
-    # TODO: It should be safe to pass in a TRN if the receiver is TRN,
-    # so is_sendable? isn't quite liberal enough to allow all valid cases.
     call.args.try(&.terms.each { |arg|
       resolved_arg = type_check.resolve(ctx, type_check.pre_infer[arg])
-      if resolved_arg && !resolved_arg.alias.is_sendable?
+      if resolved_arg && !resolved_arg.is_sendable?
         problems << {arg.pos,
-          "the argument (when aliased) has a type of " \
-          "#{resolved_arg.alias.show_type}, which isn't sendable"}
+          "the argument has a type of " \
+          "#{resolved_arg.show_type}, which isn't sendable"}
       end
     })
 
@@ -464,7 +462,7 @@ class Mare::Compiler::TypeCheck
       array_cap = mt.cap_only_inner
       unless array_cap.supertype_of?(MetaType::Capability::REF)
         term_mts = info.terms.compact_map { |term| resolve(ctx, term) }
-        unless term_mts.all?(&.alias.is_sendable?)
+        unless term_mts.all?(&.is_sendable?)
           ctx.error_at info.pos, "This array literal can't have a reference cap of " \
             "#{array_cap.inspect} unless all of its elements are sendable",
               info.describe_downstream_constraints(ctx, self)
@@ -565,11 +563,34 @@ class Mare::Compiler::TypeCheck
     def type_check(ctx, info : Infer::DynamicInfo, meta_type : Infer::MetaType)
       return if info.downstreams_empty?
 
-      # TODO: print a different error message when the downstream constraints are
-      # internally conflicting, even before adding this meta_type into the mix.
-      if !meta_type.ephemeralize.within_constraints?(ctx, [
-        info.total_downstream_constraint(ctx, self)
-      ])
+      total_constraint = info.total_downstream_constraint(ctx, self)
+
+      # If we meet the constraints, there's nothing else to check here.
+      return if meta_type.within_constraints?(ctx, [total_constraint])
+
+      # If this and its downstreams are unconstrained, we surely have
+      # other errors involved, so just skip printing this error to cut
+      # down on noisy errors that don't help anything and let the user
+      # focus on the more meaningful errors that are present in the output.
+      return if meta_type.unconstrained? && total_constraint.unconstrained?
+
+      # Print a special error if this is an issue with local variable aliasing.
+      if (info.is_a?(Infer::Local) || info.is_a?(Infer::LocalRef)) \
+      && meta_type.consumed.within_constraints?(ctx, [total_constraint])
+        extra = info.describe_downstream_constraints(ctx, self)
+        extra << {info.pos,
+          "but the type of the #{info.described_kind} " \
+          "(when aliased) was #{meta_type.show_type}"
+        }
+        this_would_be_possible_if = info.this_would_be_possible_if
+        extra << this_would_be_possible_if if this_would_be_possible_if
+
+        ctx.error_at info.downstream_use_pos, "This aliasing violates " \
+          "uniqueness (did you forget to consume the variable?)",
+          extra
+      else
+        # TODO: print a different error message when the downstream constraints are
+        # internally conflicting, even before adding this meta_type into the mix.
         extra = info.describe_downstream_constraints(ctx, self)
         extra << {info.pos,
           "but the type of the #{info.described_kind} was #{meta_type.show_type}"}
@@ -579,37 +600,6 @@ class Mare::Compiler::TypeCheck
         ctx.error_at info.downstream_use_pos, "The type of this expression " \
           "doesn't meet the constraints imposed on it",
             extra
-      end
-
-      # If aliasing makes a difference, we need to evaluate each constraint
-      # that has nonzero aliases with an aliased version of the meta_type.
-      if meta_type != meta_type.strip_ephemeral.alias
-        meta_type_alias = meta_type.strip_ephemeral.alias
-
-        # TODO: Do we need to do anything here to weed out union types with
-        # differing capabilities of compatible terms? Is it possible that
-        # the type that fulfills the total_downstream_constraint is not compatible
-        # with the ephemerality requirement, while some other union member is?
-        info.downstreams_each.each do |use_pos, other_info, aliases|
-          next unless aliases > 0
-
-          constraint = resolve(ctx, other_info).as(Infer::MetaType?)
-          next unless constraint
-
-          if !meta_type_alias.within_constraints?(ctx, [constraint])
-            extra = info.describe_downstream_constraints(ctx, self)
-            extra << {info.pos,
-              "but the type of the #{info.described_kind} " \
-              "(when aliased) was #{meta_type_alias.show_type}"
-            }
-            this_would_be_possible_if = info.this_would_be_possible_if
-            extra << this_would_be_possible_if if this_would_be_possible_if
-
-            ctx.error_at use_pos, "This aliasing violates uniqueness " \
-              "(did you forget to consume the variable?)",
-              extra
-          end
-        end
       end
     end
 

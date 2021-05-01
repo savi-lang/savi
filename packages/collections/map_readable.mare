@@ -7,16 +7,16 @@
 :trait box MapReadable (K, V)
   :fun size USize
   :fun has_key (key K) Bool
-  :fun "[]!" (key K) (@->V)'aliased
+  :fun "[]!" (key K) @->(V'aliased)
 
   :: Yield each key and value in the map.
   :fun each None
-    :yields ((@->K)'aliased, (@->V)'aliased) for None
+    :yields (@->(K'aliased), @->(V'aliased)) for None
 
   :: Yield each key and value in the map, stopping iteration if the yield block
   :: returns True. Returns True if iteration was stopped early; else, False.
   :fun each_until Bool
-    :yields ((@->K)'aliased, (@->V)'aliased) for Bool
+    :yields (@->(K'aliased), @->(V'aliased)) for Bool
 
   :: Yield each key in the map.
   :fun each_key

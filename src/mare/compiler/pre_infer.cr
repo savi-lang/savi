@@ -382,7 +382,9 @@ module Mare::Compiler::PreInfer
           when Infer::Local, Infer::Param
             info = self[node.terms[1]]
             case info
-            when Infer::FixedTypeExpr, Infer::Self then local.set_explicit(info)
+            when Infer::FixedTypeExpr, Infer::Self
+              info.stabilize = true
+              local.set_explicit(info)
             else raise NotImplementedError.new(info)
             end
           else raise NotImplementedError.new(local)
@@ -489,6 +491,8 @@ module Mare::Compiler::PreInfer
         rhs_info = self[node.rhs]
         Error.at node.rhs, "expected this to have a fixed type at compile time" \
           unless rhs_info.is_a?(Infer::FixedTypeExpr)
+
+        rhs_info.stabilize = true
 
         # If the left-hand side is the name of a local variable...
         if lhs_info.is_a?(Infer::LocalRef) || lhs_info.is_a?(Infer::Local) || lhs_info.is_a?(Infer::Param)

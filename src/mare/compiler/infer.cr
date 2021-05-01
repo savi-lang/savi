@@ -256,8 +256,7 @@ module Mare::Compiler::Infer
             func_partial_reification_sets[call_cap]? ||
             func_partial_reification_sets.find { |(func_cap, _)|
               MetaType::Capability.new(call_cap).subtype_of?(MetaType::Capability.new(func_cap)) ||
-              call_cap == Cap::ISO || # TODO: better way to handle auto recovery
-              call_cap == Cap::TRN || # TODO: better way to handle auto recovery
+              call_cap == Cap::ISO_ALIASED || # TODO: better way to handle auto recovery
               is_constructor # TODO: better way to do this?
             }.not_nil!.last
           arg_caps = args.map(&.cap_only_inner.value.as(Cap))
@@ -300,7 +299,7 @@ module Mare::Compiler::Infer
 
     def type_expr_cap(node : AST::Identifier) : MetaType::Capability?
       case node.value
-      when "iso", "trn", "val", "ref", "box", "tag", "non"
+      when "iso", "val", "ref", "box", "tag", "non"
         MetaType::Capability.new(Cap.from_string(node.value))
       when "any", "alias", "send", "share", "read"
         MetaType::Capability.new_generic(node.value)
@@ -344,7 +343,7 @@ module Mare::Compiler::Infer
         case cap_ident.value
         when "aliased"
           type_expr_span(ctx, node.lhs, cap_only).transform_mt do |lhs_mt|
-            lhs_mt.alias
+            lhs_mt.aliased
           end
         else
           cap = type_expr_cap(cap_ident)
@@ -360,10 +359,6 @@ module Mare::Compiler::Infer
         lhs = type_expr_span(ctx, node.lhs, cap_only).transform_mt(&.cap_only)
         rhs = type_expr_span(ctx, node.rhs, cap_only)
         lhs.combine_mt(rhs) { |lhs_mt, rhs_mt| rhs_mt.viewed_from(lhs_mt) }
-      elsif node.op.value == "->>"
-        lhs = type_expr_span(ctx, node.lhs, cap_only).transform_mt(&.cap_only)
-        rhs = type_expr_span(ctx, node.rhs, cap_only)
-        lhs.combine_mt(rhs) { |lhs_mt, rhs_mt| rhs_mt.extracted_from(lhs_mt) }
       else
         raise NotImplementedError.new(node.to_a.inspect)
       end
@@ -401,7 +396,7 @@ module Mare::Compiler::Infer
 
       any_rt_has_wrong_number_of_type_args = false
       span = target_span.reduce_combine_mts(arg_spans) { |target_mt, arg_mt|
-        mt = target_mt.with_additional_type_arg!(arg_mt)
+        mt = target_mt.with_additional_type_arg!(arg_mt.stabilized)
         rt = mt.single_rt_or_rta!
 
         # If we've reached the final reduce call for the last explicit arg,
@@ -475,7 +470,7 @@ module Mare::Compiler::Infer
 
           # Finally, combine spans to add default args to the qualified type.
           Span.simple(target_mt).reduce_combine_mts(default_spans) { |target_mt, arg_mt|
-            target_mt.with_additional_type_arg!(arg_mt)
+            target_mt.with_additional_type_arg!(arg_mt.stabilized)
           }.transform_mt { |mt|
             orig_mt = mt
             while true
@@ -785,6 +780,8 @@ module Mare::Compiler::Infer
         Span.error info.pos,
           "This#{kind} needs an explicit type; it could not be inferred"
       end
+    rescue exc : Exception
+      raise Error.compiler_hole_at(info, exc)
     end
 
     def unwrap_lazy_parts_of_type_expr_span(ctx : Context, span : Span) : Span
@@ -850,8 +847,8 @@ module Mare::Compiler::Infer
       cap_only ? self_span.transform_mt(&.cap_only) : self_span
     end
 
-    def self_ephemeral_with_cap(ctx : Context, cap : String)
-      self_type_expr_span(ctx).transform_mt(&.override_cap(MetaType.cap(cap)).ephemeralize)
+    def self_with_specified_cap(ctx : Context, cap : String)
+      self_type_expr_span(ctx).transform_mt(&.override_cap(MetaType.cap(cap)))
     end
 
     def depends_on_call_ret_span(ctx, other_rt, other_f, other_f_link, call_cap : Cap)
@@ -860,8 +857,15 @@ module Mare::Compiler::Infer
       other_analysis = ctx.infer_edge.run_for_func(ctx, other_f, other_f_link)
       raw_span = other_analysis.direct_span(other_pre[other_f.ident])
 
-      other_analysis.deciding_reify_of(raw_span,
+      span = other_analysis.deciding_reify_of(raw_span,
         other_rt.args, call_cap, other_f.has_tag?(:constructor))
+
+      # Recovered calls get viewpoint adaptation on the return value.
+      if (call_cap == Cap::ISO || call_cap == Cap::ISO_ALIASED)
+        span = span.transform_mt(&.viewed_from(MetaType.cap(call_cap)))
+      end
+
+      span
     end
 
     def depends_on_call_param_span(ctx, other_rt, other_f, other_f_link, call_cap : Cap, index)
