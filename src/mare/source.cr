@@ -63,6 +63,22 @@ struct Mare::Source::Pos
     new(source, start, start, line_start, line_finish, row, col)
   end
 
+  def self.point(source : Source, offset : Int32)
+    line_start = 0
+    line_finish = source.content.index("\n") || source.content.size
+    row = 0
+
+    while line_finish < offset
+      line_start = line_finish + 1
+      line_finish = source.content.index("\n", line_start) || source.content.size
+      row += 1
+    end
+
+    col = offset - line_start
+
+    new(source, offset, offset, line_start, line_finish, row, col)
+  end
+
   def self.index_range(source : Source, new_start : Int32, new_finish : Int32)
     # TODO: dedup with similar logic in span and subset
     new_row = 0
