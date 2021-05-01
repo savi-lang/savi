@@ -50,7 +50,7 @@ module Mare::Compiler::Infer
       "#<#{self.class.name.split("::").last} #{pos.inspect}>"
     end
 
-    abstract def add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
+    abstract def add_downstream(use_pos : Source::Pos, info : Info)
 
     def as_conduit? : Conduit?
       nil # if non-nil, a conduit will be used instead of a span.
@@ -117,10 +117,10 @@ module Mare::Compiler::Infer
     # Type information can be inferred in either direction, but certain
     # Info node types are fixed, meaning that they act only as constraints
     # on their upstreams, and are not influenced at all by upstream info nodes.
-    @downstreams = [] of Tuple(Source::Pos, Info, Int32)
-    def add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
-      @downstreams << {use_pos, info, aliases + adds_alias}
-      after_add_downstream(use_pos, info, aliases)
+    @downstreams = [] of Tuple(Source::Pos, Info)
+    def add_downstream(use_pos : Source::Pos, info : Info)
+      @downstreams << {use_pos, info}
+      after_add_downstream(use_pos, info,)
     end
     def downstreams_empty?
       @downstreams.empty?
@@ -131,11 +131,11 @@ module Mare::Compiler::Infer
     def downstreams_each; @downstreams.each; end
 
     # May be implemented by the child class as an optional hook.
-    def after_add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
+    def after_add_downstream(use_pos : Source::Pos, info : Info)
     end
 
     def downstream_tethers(querent : Info) : Array(Tether)
-      @downstreams.flat_map do |pos, info, aliases|
+      @downstreams.flat_map do |pos, info|
         Tether.chain(info, querent).as(Array(Tether))
       end
     end
@@ -153,7 +153,7 @@ module Mare::Compiler::Infer
     # those constraints into one intersection of them all.
     def total_downstream_constraint(ctx : Context, type_check : TypeCheck::ForReifiedFunc)
       MetaType.new_intersection(
-        @downstreams.compact_map do |_, other_info, _|
+        @downstreams.compact_map do |_, other_info|
           other_info.as_downstream_constraint_meta_type(ctx, type_check).as(MetaType?)
         end
       )
@@ -161,7 +161,7 @@ module Mare::Compiler::Infer
 
     def list_downstream_constraints(ctx : Context, type_check : TypeCheck::ForReifiedFunc)
       list = Array({Source::Pos, MetaType}).new
-      @downstreams.each do |_, info, _|
+      @downstreams.each do |_, info|
         multi = info.as_multiple_downstream_constraints(ctx, type_check)
         if multi
           list.concat(multi)
@@ -279,17 +279,17 @@ module Mare::Compiler::Infer
     def tethers(querent : Info) : Array(Tether)
       results = [] of Tether
       results.concat(Tether.chain(@explicit.not_nil!, querent)) if @explicit
-      @downstreams.each do |pos, info, aliases|
+      @downstreams.each do |pos, info|
         results.concat(Tether.chain(info, querent))
       end
       results
     end
 
-    def after_add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
+    def after_add_downstream(use_pos : Source::Pos, info : Info)
       return if @explicit
 
       @upstreams.each do |upstream, upstream_pos|
-        upstream.add_downstream(use_pos, info, aliases)
+        upstream.add_downstream(use_pos, info)
       end
     end
 
@@ -302,9 +302,9 @@ module Mare::Compiler::Infer
       @upstreams << {upstream, upstream_pos}
 
       if @explicit
-        upstream.add_downstream(upstream_pos, @explicit.not_nil!, 0)
+        upstream.add_downstream(upstream_pos, @explicit.not_nil!)
       else
-        upstream.add_downstream(upstream_pos, self, 0)
+        upstream.add_downstream(upstream_pos, self)
       end
     end
 
@@ -338,7 +338,7 @@ module Mare::Compiler::Infer
       @error = Error.build(*args)
     end
 
-    def add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
+    def add_downstream(use_pos : Source::Pos, info : Info)
       nil
     end
 
@@ -558,9 +558,9 @@ module Mare::Compiler::Infer
       @info.pos
     end
 
-    def add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
-      super(use_pos, info, aliases)
-      @info.add_downstream(use_pos, info, aliases)
+    def add_downstream(use_pos : Source::Pos, info : Info)
+      super(use_pos, info)
+      @info.add_downstream(use_pos, info)
     end
 
     def tethers(querent : Info) : Array(Tether)
@@ -581,7 +581,7 @@ module Mare::Compiler::Infer
     def initialize(pos, layer_index, @early_returns)
       super(pos, layer_index)
 
-      early_returns.each(&.term.try(&.add_downstream(@pos, self, 0)))
+      early_returns.each(&.term.try(&.add_downstream(@pos, self)))
     end
     def describe_kind : String; "function body" end
 
@@ -614,7 +614,7 @@ module Mare::Compiler::Infer
     def describe_kind : String; "field reference" end
 
     def assign(ctx : Context, upstream : Info, upstream_pos : Source::Pos)
-      upstream.add_downstream(upstream_pos, self, 0)
+      upstream.add_downstream(upstream_pos, self)
       @upstreams << upstream
     end
 
@@ -689,7 +689,7 @@ module Mare::Compiler::Infer
 
     abstract def error_jump_name
 
-    def add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
+    def add_downstream(use_pos : Source::Pos, info : Info)
       Error.at use_pos,
         "\"#{error_jump_name}\" expression never returns any value"
     end
@@ -732,8 +732,8 @@ module Mare::Compiler::Infer
       @pos = @final_term.pos
     end
 
-    def add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
-      final_term.add_downstream(use_pos, info, aliases)
+    def add_downstream(use_pos : Source::Pos, info : Info)
+      final_term.add_downstream(use_pos, info)
     end
 
     def tethers(querent : Info) : Array(Tether)
@@ -763,14 +763,14 @@ module Mare::Compiler::Infer
       prior_bodies = [] of Info
       @branches.each do |cond, body, body_jumps_away|
         next if body_jumps_away
-        body.add_downstream(@pos, self, 0)
+        body.add_downstream(@pos, self)
         prior_bodies.each { |prior_body| body.add_peer_hint(prior_body) }
         prior_bodies << body
       end
 
       # Each condition must evaluate to a type of Bool.
       @branches.each do |cond, body, body_jumps_away|
-        cond.add_downstream(pos, @fixed_bool, 1) if cond
+        cond.add_downstream(pos, @fixed_bool) if cond
       end
     end
 
@@ -794,7 +794,7 @@ module Mare::Compiler::Infer
     end
 
     def as_multiple_downstream_constraints(ctx : Context, type_check : TypeCheck::ForReifiedFunc) : Array({Source::Pos, MetaType})?
-      @downstreams.flat_map do |pos, info, aliases|
+      @downstreams.flat_map do |pos, info|
         multi = info.as_multiple_downstream_constraints(ctx, type_check)
         next multi if multi
 
@@ -813,8 +813,8 @@ module Mare::Compiler::Infer
     def initialize(pos, layer_index, branches, fixed_bool, @early_breaks, @early_continues)
       super(pos, layer_index, branches, fixed_bool)
 
-      early_breaks.each(&.term.add_downstream(@pos, self, 0))
-      early_continues.each(&.term.add_downstream(@pos, self, 0))
+      early_breaks.each(&.term.add_downstream(@pos, self))
+      early_continues.each(&.term.add_downstream(@pos, self))
     end
   end
 
@@ -915,10 +915,10 @@ module Mare::Compiler::Infer
       Conduit.consumed(local)
     end
 
-    def add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
+    def add_downstream(use_pos : Source::Pos, info : Info)
       local = local()
       local = local.info if local.is_a?(LocalRef)
-      local.add_downstream(use_pos, info, aliases - 1)
+      local.add_downstream(use_pos, info)
     end
 
     def tethers(querent : Info) : Array(Tether)
@@ -938,9 +938,9 @@ module Mare::Compiler::Infer
     def initialize(@pos, @layer_index, @body)
     end
 
-    def add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
+    def add_downstream(use_pos : Source::Pos, info : Info)
       # TODO: Make recover safe.
-      # @body.add_downstream(use_pos, info, aliases)
+      # @body.add_downstream(use_pos, info)
     end
 
     def tethers(querent : Info) : Array(Tether)
@@ -965,8 +965,8 @@ module Mare::Compiler::Infer
     def initialize(@pos, @layer_index, @lhs, @rhs)
     end
 
-    def add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
-      @lhs.add_downstream(use_pos, info, aliases)
+    def add_downstream(use_pos : Source::Pos, info : Info)
+      @lhs.add_downstream(use_pos, info)
     end
 
     def tethers(querent : Info) : Array(Tether)
@@ -991,8 +991,8 @@ module Mare::Compiler::Infer
     def initialize(@pos, @layer_index, @yield_in, @terms)
     end
 
-    def add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
-      @yield_in.add_downstream(use_pos, info, aliases)
+    def add_downstream(use_pos : Source::Pos, info : Info)
+      @yield_in.add_downstream(use_pos, info)
     end
 
     def tethers(querent : Info) : Array(Tether)
@@ -1016,13 +1016,13 @@ module Mare::Compiler::Infer
     def initialize(@pos, @layer_index, @terms)
     end
 
-    def after_add_downstream(use_pos : Source::Pos, info : Info, aliases : Int32)
+    def after_add_downstream(use_pos : Source::Pos, info : Info)
       # Only do this after the first downstream is added.
       return unless @downstreams.size == 1
 
       elem_downstream = ArrayLiteralElementAntecedent.new(@downstreams.first[1].pos, @layer_index, self)
       @terms.each do |term|
-        term.add_downstream(downstream_use_pos, elem_downstream, 0)
+        term.add_downstream(downstream_use_pos, elem_downstream)
       end
     end
 

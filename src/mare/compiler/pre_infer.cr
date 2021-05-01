@@ -458,7 +458,7 @@ module Mare::Compiler::PreInfer
         if call_args
           call_args.terms.each_with_index do |call_arg, index|
             new_info = Infer::TowardCallParam.new(call_arg.pos, layer(node), call, index)
-            @analysis[call_arg].add_downstream(call_arg.pos, new_info, 0)
+            @analysis[call_arg].add_downstream(call_arg.pos, new_info)
             @analysis.observe_extra_info(new_info)
           end
         end
@@ -477,7 +477,7 @@ module Mare::Compiler::PreInfer
         yield_block.try(&.accept(ctx, self))
         if yield_block
           new_info = Infer::TowardCallYieldIn.new(yield_block.pos, layer(node), call)
-          @analysis[yield_block].add_downstream(yield_block.pos, new_info, 0)
+          @analysis[yield_block].add_downstream(yield_block.pos, new_info)
           @analysis.observe_extra_info(new_info)
         end
 
