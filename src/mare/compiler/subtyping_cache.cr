@@ -355,6 +355,8 @@ class Mare::Compiler::SubtypingCache
       end
 
       errors.empty?
+    rescue exc : Exception
+      raise Error.compiler_hole_at(this_func.ident, exc)
     end
   end
 end
