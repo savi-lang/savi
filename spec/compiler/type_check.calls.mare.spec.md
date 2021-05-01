@@ -250,7 +250,15 @@ This function call won't work unless the receiver is ephemeral; it must either b
     outer_iso.inner = inner_ref   // not okay
               ^~~~~
 
-- the argument has a type of Inner, which isn't sendable:
+- this argument has a type of Inner:
+    outer_iso.inner = inner_ref   // not okay
+                      ^~~~~~~~~
+
+- which isn't safe to write into Outer'iso'aliased:
+    outer_iso Outer'iso = Outer.new
+              ^~~~~~~~~
+
+- this would be possible if the argument were sendable, but it is ref, which is not sendable:
     outer_iso.inner = inner_ref   // not okay
                       ^~~~~~~~~
 ```

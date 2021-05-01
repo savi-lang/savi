@@ -309,26 +309,28 @@ class Mare::Compiler::TypeCheck
     ctx : Context,
     type_check : TypeCheck::ForReifiedFunc,
     call : Infer::FromCall,
-    call_func : Program::Function,
-    ret_mt : MetaType
+    call_mt : MetaType,
   )
-    # If autorecover of the receiver cap was needed to make this call work,
-    # we now have to confirm that arguments and return value are all sendable.
     problems = [] of {Source::Pos, String}
 
-    unless ret_mt.is_sendable? || !call.ret_value_used
-      problems << {(call_func.ret || call_func.ident).pos,
-        "the return type #{ret_mt.show_type} isn't sendable " \
-        "and the return value is used (the return type wouldn't matter " \
-        "if the calling side entirely ignored the return value)"}
-    end
-
+    # Each argument of an autorecovered call must follow "safe to write" rule,
+    # as if they were potentially being written as fields into that object.
     call.args.try(&.terms.each { |arg|
-      resolved_arg = type_check.resolve(ctx, type_check.pre_infer[arg])
-      if resolved_arg && !resolved_arg.is_sendable?
+      arg_mt = type_check.resolve(ctx, type_check.pre_infer[arg])
+      next unless arg_mt
+
+      if !arg_mt.cap_only_inner.is_safe_to_write_to?(call_mt.cap_only_inner)
         problems << {arg.pos,
-          "the argument has a type of " \
-          "#{resolved_arg.show_type}, which isn't sendable"}
+          "this argument has a type of #{arg_mt.show_type}"}
+        problems << {call.lhs.pos,
+          "which isn't safe to write into #{call_mt.show_type}"}
+
+        # In practice, in the absence of the `trn` capability, this is identical
+        # with a requirement that the argument be sendable, so we use that as
+        # our hint for resolving the issue, as it is likely to be more helpful.
+        problems << {arg.pos,
+          "this would be possible if the argument were sendable, " +
+          "but it is #{arg_mt.cap_only.show_type}, which is not sendable"}
       end
     })
 
@@ -543,9 +545,7 @@ class Mare::Compiler::TypeCheck
         if autorecover_needed
           receiver = MetaType.new(call_defn, reify_cap.cap_only_inner.value.as(Cap))
           other_rf = ReifiedFunction.new(call_defn, call_func_link, receiver)
-          ret_mt = other_rf.meta_type_of_ret(ctx)
-          TypeCheck.verify_call_autorecover(ctx, self, info, call_func, ret_mt) \
-            if ret_mt
+          TypeCheck.verify_call_autorecover(ctx, self, info, call_mt)
         end
       end
       ctx.error_at info,

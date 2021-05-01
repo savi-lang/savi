@@ -407,6 +407,26 @@ struct Mare::Compiler::Infer::MetaType::Capability
     supertype_of?(ctx, other) ? true : false
   end
 
+  def is_safe_to_write_to?(destination : Capability) : Bool
+    value = value()
+    dest_value = destination.value
+    raise "unsupported #{self} is_safe_to_write_to #{destination}" \
+      unless value.is_a?(Cap) && dest_value.is_a?(Cap)
+
+    # See George Steed's paper, "A Principled Design of Capabilities in Pony":
+    # > https://www.imperial.ac.uk/media/imperial-college/faculty-of-engineering/computing/public/GeorgeSteed.pdf
+
+    case dest_value
+    when Cap::ISO then true # everything is safe to write to an ephemeral iso
+    when Cap::ISO_ALIASED
+      Cap::ISO == value || Cap::ISO_ALIASED == value || \
+      Cap::VAL == value || Cap::TAG == value || Cap::NON == value
+    when Cap::REF then true # everything is safe to write to a ref
+    else
+      raise NotImplementedError.new "#{self} is_safe_to_write_to #{destination}"
+    end
+  end
+
   def viewed_from(origin : Capability) : Capability
     value = value()
     origin_value = origin.value
