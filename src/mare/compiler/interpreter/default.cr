@@ -120,6 +120,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
     when "enum"
       t.type.add_tag(:numeric)
       t.type.add_tag(:no_desc)
+      t.type.add_tag(:enum)
     when "primitive"
       t.type.add_tag(:ignores_cap)
     when "ffi"

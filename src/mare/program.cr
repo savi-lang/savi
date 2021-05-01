@@ -199,6 +199,7 @@ class Mare::Program
       :abstract,
       :actor,
       :allocated,
+      :enum,
       :hygienic,
       :ignores_cap,
       :no_desc,

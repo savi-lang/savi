@@ -224,10 +224,41 @@ class Mare::Compiler::CodeGen
       )
     end
 
+    def di_create_enum_type(t : Reach::Ref, llvm_type : LLVM::Type)
+      ident = t.single!.defn(ctx).ident
+      name = ident.value
+      pos = ident.pos
+      underlying_type =
+        if t.is_signed_numeric?(ctx)
+          di_create_basic_type(t, llvm_type, LLVM::DwarfTypeEncoding::Signed)
+        else
+          di_create_basic_type(t, llvm_type, LLVM::DwarfTypeEncoding::Unsigned)
+        end
+
+      di_members = @di.get_or_create_array(
+        t.find_enum_members!(ctx).map { |member|
+          @di.create_enumerator(member.ident.value, member.value)
+        }
+      )
+
+      @di.create_enumeration_type(
+        pos.try { |pos| di_file(pos.source) },
+        name,
+        pos.try { |pos| di_file(pos.source) },
+        (pos.try(&.row) || 0) + 1,
+        @target_data.abi_size(llvm_type) * 8,
+        @target_data.abi_alignment(llvm_type) * 8,
+        di_members,
+        underlying_type,
+      )
+    end
+
     def di_type(t : Reach::Ref, llvm_type : LLVM::Type)
       di_types = (@di_types ||= {} of Reach::Ref => LibLLVMExt::Metadata)
       di_types[t] ||=
-        if t.is_floating_point_numeric?(ctx)
+        if t.is_enum?(ctx)
+          di_create_enum_type(t, llvm_type)
+        elsif t.is_floating_point_numeric?(ctx)
           di_create_basic_type(t, llvm_type, LLVM::DwarfTypeEncoding::Float)
         elsif t.is_signed_numeric?(ctx)
           di_create_basic_type(t, llvm_type, LLVM::DwarfTypeEncoding::Signed)

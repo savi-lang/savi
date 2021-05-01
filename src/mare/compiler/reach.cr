@@ -97,6 +97,14 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       is_numeric?(ctx) && single!.defn(ctx).const_bool("is_signed")
     end
 
+    def is_enum?(ctx)
+      singular? && single!.defn(ctx).has_tag?(:enum)
+    end
+
+    def find_enum_members!(ctx)
+      single_def!(ctx).find_enum_members(ctx)
+    end
+
     def is_not_pointer?(ctx)
       !([:object_ptr, :struct_ptr].includes?(llvm_use_type(ctx)))
     end
@@ -476,6 +484,15 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
 
     def is_signed_numeric?(ctx)
       is_numeric?(ctx) && @reified.defn(ctx).const_bool("is_signed")
+    end
+
+    def is_enum?(ctx)
+      @reified.defn(ctx).has_tag?(:enum)
+    end
+
+    def find_enum_members(ctx)
+      t_link = @reified.link
+      t_link.library.resolve(ctx).enum_members.select(&.target.==(t_link))
     end
 
     def as_ref(cap = nil) : Ref
