@@ -143,7 +143,7 @@ module Mare::Compiler::Refer
       when "."
         node.lhs.accept(ctx, self)
         ident, args, yield_params, yield_block = AST::Extract.call(node)
-        ident.accept(ctx, self)
+        @analysis[ident] = Unresolved::INSTANCE
         args.try(&.accept(ctx, self))
         touch_yield_loop(ctx, yield_params, yield_block)
       else

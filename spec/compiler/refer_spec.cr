@@ -187,6 +187,32 @@ describe Mare::Compiler::Refer do
     Mare.compiler.compile([source], :refer)
   end
 
+  it "won't confuse method names as being occurrences of a local variable" do
+    source = Mare::Source.new_example <<-SOURCE
+    :actor Main
+      :new (env Env)
+        example = "example"
+        @example
+        env.example
+    SOURCE
+
+    ctx = Mare.compiler.compile([source], :refer)
+    ctx.errors.should be_empty
+
+    main = ctx.namespace.main_type!(ctx)
+    func = main.resolve(ctx).find_func!("new")
+    func_link = func.make_link(main)
+    refer = ctx.refer[func_link]
+    body = func.body.not_nil!.terms
+    example_1 = body[0].as(Mare::AST::Relate).lhs.as(Mare::AST::Identifier)
+    example_2 = body[1].as(Mare::AST::Relate).rhs.as(Mare::AST::Identifier)
+    example_3 = body[2].as(Mare::AST::Relate).rhs.as(Mare::AST::Identifier)
+
+    refer[example_1].class.should eq Mare::Compiler::Refer::Local
+    refer[example_2].class.should eq Mare::Compiler::Refer::Unresolved
+    refer[example_3].class.should eq Mare::Compiler::Refer::Unresolved
+  end
+
   pending "complains when a local variable name ends with an exclamation"
   pending "complains when a parameter name ends with an exclamation"
 end
