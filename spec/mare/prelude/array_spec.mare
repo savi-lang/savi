@@ -82,6 +82,11 @@
     ["foo", "bar", "baz"].each -> (string | array << string)
     @assert = array == ["foo", "bar", "baz"]
 
+  :it "yields each element of a subslice of the array"
+    array Array(String) = []
+    ["a", "b", "c", "d", "e", "f"].each(1, 5) -> (string | array << string)
+    @assert = array == ["b", "c", "d", "e"]
+
   :it "yields each element in the array, along with the index"
     array_a Array(String) = []
     array_b Array(USize) = []
@@ -124,6 +129,23 @@
     )
     @assert = early_stop == False
     @assert = array == ["foo", "bar", "baz"]
+
+  :it "yields each element of a subslice, stopping early if the criteria is met"
+    array Array(String) = []
+    early_stop = ["a", "b", "c", "d", "e", "f"].each_until(1, 5) -> (string |
+      array << string
+      string == "d"
+    )
+    @assert = early_stop == True
+    @assert = array == ["b", "c", "d"]
+
+    array.clear
+    early_stop = ["a", "b", "c", "d", "e", "f"].each_until(1, 5) -> (string |
+      array << string
+      string == "z"
+    )
+    @assert = early_stop == False
+    @assert = array == ["b", "c", "d", "e"]
 
   :it "finds the first element in the array that meets the criteria"
     array Array(U8) = [11, 22, 33, 44, 36, 27, 18]

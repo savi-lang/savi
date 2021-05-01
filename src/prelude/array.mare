@@ -159,11 +159,14 @@
     )
     is_found
 
-  :fun each
-    index USize = 0
-    while (index < @_size) (
-      yield @_ptr._get_at(index)
-      index += 1
+  :fun each (from USize = 0, to USize = -1) // TODO USize.max_value
+    to = @_size.min(to)
+    if (from < to) (
+      index = from
+      while (index < @_size.min(to)) (
+        yield @_ptr._get_at(index)
+        index += 1
+      )
     )
     None
 
@@ -191,13 +194,16 @@
     )
     None
 
-  :fun each_until
+  :fun each_until (from USize = 0, to USize = -1) // TODO USize.max_value
     :yields for Bool
-    index USize = 0
+    to = @_size.min(to)
     early_stop = False
-    while (index < @_size && early_stop.not) (
-      early_stop = yield @_ptr._get_at(index)
-      index += 1
+    if (from < to) (
+      index = from
+      while (index < @_size.min(to) && early_stop.not) (
+        early_stop = yield @_ptr._get_at(index)
+        index += 1
+      )
     )
     early_stop
 
