@@ -508,7 +508,7 @@ module Mare::Compiler::Infer
     def lookup_type_param_bound_cap_set(ctx : Context, type_param : TypeParam) : Array(Cap)
       lookup_type_param_bound_cap(ctx, type_param)
         .cap_only_inner
-        .each_cap.map(&.value.as(Cap))
+        .each_cap
         .to_a
     end
 
@@ -724,7 +724,7 @@ module Mare::Compiler::Infer
         next_index: Int32 = 0
         MetaType::Capability.new_maybe_generic(f_cap_string).each_cap.map { |f_cap|
           {
-            f_cap.value.as(Cap),
+            f_cap,
             @analysis.type_partial_reification_sets.keys.map { |type_param_caps|
               index = next_index
               next_index += 1
@@ -817,8 +817,7 @@ module Mare::Compiler::Infer
             MetaType.new_union(refine_span.all_terminal_meta_types.map(&.cap_only))
           raise NotImplementedError.new("varying caps in a refined span") unless refine_cap_mt.cap_only?
 
-          refine_caps =
-            refine_cap_mt.cap_only_inner.each_cap.map(&.value.as(Cap)).to_a
+          refine_caps = refine_cap_mt.cap_only_inner.each_cap.to_a
 
           span = @analysis.narrowing_type_param_cap(span, type_param, refine_caps)
           refine_span = @analysis.narrowing_type_param_cap(refine_span, type_param, refine_caps)

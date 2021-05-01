@@ -40,7 +40,7 @@ class Mare::Compiler::TypeCheck
         f_cap_value = f.cap.value
         f_cap_value = "read" if f_cap_value == "box" # TODO: figure out if we can remove this Pony-originating semantic hack
         MetaType::Capability.new_maybe_generic(f_cap_value).each_cap.each do |f_cap|
-          for_rf(ctx, rt, f_link, MetaType.new(f_cap)).run(ctx)
+          for_rf(ctx, rt, f_link, MetaType.cap(f_cap)).run(ctx)
         end
       end
     end

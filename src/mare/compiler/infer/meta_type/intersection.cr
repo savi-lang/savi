@@ -300,11 +300,12 @@ struct Mare::Compiler::Infer::MetaType::Intersection
         # If this intersection already has a single capability, it can't be
         # split into any further capability possibilities, so just return it.
         result.add(self)
-      when Set(Capability)
+      when Set(Cap)
         # If this intersection already has a set of capabilities,
         # intersect with each capability in the set.
         cap_value.each do |new_cap|
-          result.add(Intersection.build(new_cap, terms, anti_terms))
+          new_cap_mti = Capability.new(new_cap)
+          result.add(Intersection.build(new_cap_mti, terms, anti_terms))
         end
       else
         raise NotImplementedError.new(cap)

@@ -234,7 +234,8 @@ class Mare::Compiler::SubtypingCache
               # Now that we know they both use the same generic cap,
               # we can compare each reification of that generic cap.
               that_cap.each_cap.each do |cap|
-                check_func(ctx, that, that_func, this_func, cap, cap, errors)
+                cap_mti = MetaType::Capability.new(cap)
+                check_func(ctx, that, that_func, this_func, cap_mti, cap_mti, errors)
               end
             end
           end

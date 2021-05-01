@@ -36,19 +36,20 @@ enum Mare::Compiler::Infer::Cap : UInt8
 end
 
 struct Mare::Compiler::Infer::MetaType::Capability
-  getter value : (Cap | Set(Capability))
+  getter value : (Cap | Set(Cap))
 
   def initialize(@value)
   end
 
-  def self.build(caps : Set(Capability))
+  def self.build(caps : Set(Cap))
     case caps.size
     when 0 then Unsatisfiable.instance
-    when 1 then caps.first
+    when 1 then Capability.new(caps.first)
     else new(caps)
     end
   end
 
+  # Singular capabilities.
   ISO         = new(Cap::ISO)
   ISO_ALIASED = new(Cap::ISO_ALIASED)
   REF         = new(Cap::REF)
@@ -57,18 +58,12 @@ struct Mare::Compiler::Infer::MetaType::Capability
   TAG         = new(Cap::TAG)
   NON         = new(Cap::NON)
 
-  ALL_NON_ALIASED = [ISO, REF, VAL, BOX, TAG, NON]
-  ALL_SINGLE_INCL_ALIASED = [ISO_ALIASED] + ALL_NON_ALIASED
-
-  ANY           = new([ISO, REF, VAL, BOX, TAG, NON].to_set)    # all (non-aliased) caps
-  ALIAS         = new([REF, VAL, BOX, TAG, NON].to_set)         # alias as themselves
-  SEND          = new([ISO, VAL, TAG, NON].to_set)              # are sendable
-  SHARE         = new([VAL, TAG, NON].to_set)                   # are sendable & alias as themselves
-  READ          = new([REF, VAL, BOX].to_set)                   # are readable & alias as themselves
-  MUTABLE       = new([ISO, REF].to_set)                        # TODO: remove? are mutable
-  MUTABLE_PLUS  = new([ISO_ALIASED, ISO, REF].to_set)           # TODO: remove? are mutable, incl aliased
-  READABLE      = new([ISO, REF, VAL, BOX].to_set)              # TODO: remove? are readable
-  READABLE_PLUS = new([ISO_ALIASED, ISO, REF, VAL, BOX].to_set) # TODO: remove? are readable, incl aliased
+  # Canonical generic capability sets.
+  ANY   = new([Cap::ISO, Cap::REF, Cap::VAL, Cap::BOX, Cap::TAG, Cap::NON].to_set) # all (non-aliased) caps
+  ALIAS = new([Cap::REF, Cap::VAL, Cap::BOX, Cap::TAG, Cap::NON].to_set)           # alias as themselves
+  SEND  = new([Cap::ISO, Cap::VAL, Cap::TAG, Cap::NON].to_set)                     # are sendable
+  SHARE = new([Cap::VAL, Cap::TAG, Cap::NON].to_set)                               # are sendable & alias as themselves
+  READ  = new([Cap::REF, Cap::VAL, Cap::BOX].to_set)                               # are readable & alias as themselves
 
   def self.new_generic(name)
     case name
@@ -94,16 +89,16 @@ struct Mare::Compiler::Infer::MetaType::Capability
 
   def each_cap
     value = value()
-    if value.is_a?(Set(Capability))
+    if value.is_a?(Set(Cap))
       value.each
     else
-      [self].each
+      [value].each
     end
   end
 
   def inspect(io : IO)
     value = value()
-    if value.is_a?(Set(Capability))
+    if value.is_a?(Set(Cap))
       io << '{'
       value.each_with_index do |cap, index|
         io << ", " unless index == 0
@@ -148,14 +143,14 @@ struct Mare::Compiler::Infer::MetaType::Capability
     v1 = value()
     v2 = other.value
 
-    if v1.is_a?(Set(Capability))
-      if v2.is_a?(Set(Capability))
+    if v1.is_a?(Set(Cap))
+      if v2.is_a?(Set(Cap))
         Capability.new(v1 & v2)
       else
         v1.includes?(v2.as(Cap)) ? other : Unsatisfiable.instance
       end
     else
-      if v2.is_a?(Set(Capability))
+      if v2.is_a?(Set(Cap))
         v2.includes?(v1.as(Cap)) ? self : Unsatisfiable.instance
       else
         v1.as(Cap) == v2.as(Cap) ? self : Unsatisfiable.instance
@@ -171,20 +166,22 @@ struct Mare::Compiler::Infer::MetaType::Capability
     other
   end
 
-  def intersect(other : Capability)
-    if !ALL_SINGLE_INCL_ALIASED.includes?(other)
-      if !ALL_SINGLE_INCL_ALIASED.includes?(self)
+  def intersect(other : Capability) : (Capability | Unsatisfiable)
+    value = value()
+    other_value = other.value
+    if other_value.is_a?(Set(Cap))
+      if value.is_a?(Set(Cap))
         return self if other == self
         raise "unsupported intersect: #{self} & #{other}"
       else
         return other.intersect(self)
       end
-    elsif !ALL_SINGLE_INCL_ALIASED.includes?(self)
-      value = value().as(Set(Capability))
+    elsif value.is_a?(Set(Cap))
       new_value =
-        value.map(&.intersect(other).as(Capability | Unsatisfiable))
+        value.map { |cap| Capability.new(cap) }
+          .map(&.intersect(other).as(Capability | Unsatisfiable))
           .select(&.is_a?(Capability))
-          .map(&.as(Capability))
+          .map(&.as(Capability).value.as(Cap))
           .to_set
       return Capability.build(new_value)
     end
@@ -233,6 +230,9 @@ struct Mare::Compiler::Infer::MetaType::Capability
 
   def subtype_of?(ctx : Context, other : Capability); subtype_of?(other) end
   def subtype_of?(other : Capability) : Bool
+    value = value()
+    other_value = other.value
+
     ##
     # Reference capability subtyping can be visualized using this graph,
     # wherein leftward caps are subtypes of caps that appear to their right,
@@ -255,18 +255,18 @@ struct Mare::Compiler::Infer::MetaType::Capability
     return true if self == other
 
     # Otherwise, check the truth table corresponding to the subtyping graph.
-    case self
-    when ISO
+    case value
+    when Cap::ISO
       true
-    when ISO_ALIASED
-      TAG == other || NON == other
-    when REF, VAL
-      BOX == other || TAG == other || NON == other
-    when BOX
-      TAG == other || NON == other
-    when TAG
-      NON == other
-    when NON
+    when Cap::ISO_ALIASED
+      Cap::TAG == other_value || Cap::NON == other_value
+    when Cap::REF, Cap::VAL
+      Cap::BOX == other_value || Cap::TAG == other_value || Cap::NON == other_value
+    when Cap::BOX
+      Cap::TAG == other_value || Cap::NON == other_value
+    when Cap::TAG
+      Cap::NON == other_value
+    when Cap::NON
       false
     else
       raise NotImplementedError.new("#{self} <: #{other}")
@@ -291,10 +291,10 @@ struct Mare::Compiler::Infer::MetaType::Capability
 
     value = value()
     bound_value = bound.value
-    if bound_value.is_a?(Set(Capability))
-      return true if bound_value.includes?(self)
+    if bound_value.is_a?(Set(Cap))
+      return true if bound_value.includes?(value)
 
-      if value.is_a?(Set(Capability))
+      if value.is_a?(Set(Cap))
         return true if value.all? { |c| bound_value.includes?(c) }
       end
     end
@@ -310,21 +310,23 @@ struct Mare::Compiler::Infer::MetaType::Capability
   end
 
   def aliased : Capability
-    raise "unsupported cap: #{self}" unless ALL_SINGLE_INCL_ALIASED.includes?(self)
+    value = value()
+    raise "unsupported cap: #{self}" unless value.is_a?(Cap)
 
-    case self
+    case value
     # The alias of an ISO is the aliased counterpart of it.
-    when ISO then ISO_ALIASED
+    when Cap::ISO then ISO_ALIASED
     else self
     end
   end
 
   def consumed : Capability
-    raise "unsupported cap: #{self}" unless ALL_SINGLE_INCL_ALIASED.includes?(self)
+    value = value()
+    raise "unsupported cap: #{self}" unless value.is_a?(Cap)
 
-    case self
+    case value
     # The consumption of an ISO_ALIASED is the non-aliased counterpart of it.
-    when ISO_ALIASED then ISO
+    when Cap::ISO_ALIASED then ISO
     else self
     end
   end
@@ -333,17 +335,17 @@ struct Mare::Compiler::Infer::MetaType::Capability
     value = value()
     case value
     when Cap
-      case self
+      case value
       # The stable form of an ISO_ALIASED or ISO_ALIASED is the degradation of it that can only do
       # the things not explicitly denied by the uniqueness constraints of them.
       # That is, the alias of ISO (read+write unique) cannot read nor write (TAG).
-      when ISO_ALIASED then TAG
+      when Cap::ISO_ALIASED then Capability.new(Cap::TAG)
       else self
       end
-    when Set(Capability)
+    when Set(Cap)
       Capability.new(value.to_a.map { |cap|
         case cap
-        when ISO_ALIASED then TAG
+        when Cap::ISO_ALIASED then Cap::TAG
         else cap
         end
       }.to_set)
@@ -356,11 +358,11 @@ struct Mare::Compiler::Infer::MetaType::Capability
     Unconstrained.instance
   end
 
-  def partial_reifications : Set(Capability)
+  def partial_reifications : Set(Cap)
     value = value()
     case value
     when Cap then [self].to_set
-    when Set(Capability) then value
+    when Set(Cap) then value
     else raise NotImplementedError.new("partial_reifications of #{self}")
     end
   end
@@ -389,10 +391,12 @@ struct Mare::Compiler::Infer::MetaType::Capability
   end
 
   def is_sendable?
-    case self
-    when ISO, VAL, TAG, NON
+    value = value()
+
+    case value
+    when Cap::ISO, Cap::VAL, Cap::TAG, Cap::NON
       true
-    when ISO_ALIASED, REF, BOX
+    when Cap::ISO_ALIASED, Cap::REF, Cap::BOX
       false
     else
       raise NotImplementedError.new("is_sendable? of #{self}")
@@ -404,8 +408,10 @@ struct Mare::Compiler::Infer::MetaType::Capability
   end
 
   def viewed_from(origin : Capability) : Capability
+    value = value()
+    origin_value = origin.value
     raise "unsupported viewed_from: #{origin}->#{self}" \
-      unless ALL_SINGLE_INCL_ALIASED.includes?(self) && ALL_SINGLE_INCL_ALIASED.includes?(origin)
+      unless value.is_a?(Cap) && origin_value.is_a?(Cap)
 
     ##
     # Viewpoint adaptation table, with columns representing the
@@ -432,41 +438,41 @@ struct Mare::Compiler::Infer::MetaType::Capability
     #   for the return values of an auto-recovered call.
 
     # Knock out the bottom two rows of the table.
-    case origin
-    when TAG, NON then return NON
+    case origin_value
+    when Cap::TAG, Cap::NON then return NON
     else
     end
 
     # Knock out the remainder of three columns of the table.
-    case self
-    when VAL, TAG, NON then return self
+    case value
+    when Cap::VAL, Cap::TAG, Cap::NON then return self
     else
     end
 
     # Knock out the remainder of the VAL row of the table.
-    return VAL if origin == VAL
+    return VAL if origin_value == Cap::VAL
 
     # Now we just have a 4x4 table left to cover.
-    case origin
-    when ISO
-      case self
-      when ISO, ISO_ALIASED, REF then ISO
-      when BOX                   then VAL
+    case origin_value
+    when Cap::ISO
+      case value
+      when Cap::ISO, Cap::ISO_ALIASED, Cap::REF then ISO
+      when Cap::BOX                             then VAL
       else raise NotImplementedError.new(self.inspect)
       end
-    when ISO_ALIASED
-      case self
-      when ISO              then ISO
-      when ISO_ALIASED, REF then ISO_ALIASED
-      when BOX              then TAG
+    when Cap::ISO_ALIASED
+      case value
+      when Cap::ISO                   then ISO
+      when Cap::ISO_ALIASED, Cap::REF then ISO_ALIASED
+      when Cap::BOX                   then TAG
       else raise NotImplementedError.new(self.inspect)
       end
-    when REF then self
-    when BOX
-      case self
-      when ISO         then VAL
-      when ISO_ALIASED then TAG
-      when REF, BOX    then BOX
+    when Cap::REF then self
+    when Cap::BOX
+      case value
+      when Cap::ISO           then VAL
+      when Cap::ISO_ALIASED   then TAG
+      when Cap::REF, Cap::BOX then BOX
       else raise NotImplementedError.new(self.inspect)
       end
     else raise NotImplementedError.new(origin.inspect)
