@@ -165,7 +165,7 @@ module Mare::Compiler::PreInfer
         (@inventory.each_yield.map(&.terms.size).to_a + [0]).max,
         func.yield_out.try do |yield_out|
           yield_out.is_a?(AST::Group) && yield_out.style == "(" \
-          ? yield_out.terms.size : 0
+          ? yield_out.terms.size : 1
         end || 0
       ].max
 
