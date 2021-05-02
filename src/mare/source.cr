@@ -64,6 +64,8 @@ struct Mare::Source::Pos
   end
 
   def self.point(source : Source, offset : Int32)
+    offset = source.content.size - 1 if offset >= source.content.size
+
     line_start = 0
     line_finish = source.content.index("\n") || source.content.size
     row = 0
