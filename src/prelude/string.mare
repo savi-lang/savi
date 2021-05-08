@@ -2,37 +2,37 @@
   :is Comparable(String'box)
 
   :prop _size USize
-  :prop _alloc USize // TODO: rename as `_space`
+  :prop _space USize
   :prop _ptr CPointer(U8)'ref
-  :new ref from_cpointer (@_ptr, @_size, @_alloc)
-  :new iso iso_from_cpointer (@_ptr, @_size, @_alloc) // TODO: remove this and use recover instead?
-  :new val val_from_cpointer (@_ptr, @_size, @_alloc) // TODO: remove this and use recover instead?
+  :new ref from_cpointer (@_ptr, @_size, @_space)
+  :new iso iso_from_cpointer (@_ptr, @_size, @_space) // TODO: remove this and use recover instead?
+  :new val val_from_cpointer (@_ptr, @_size, @_space) // TODO: remove this and use recover instead?
   :fun cpointer CPointer(U8): @_ptr
   :fun hash: @_ptr._hash(@_size)
   :fun size: @_size
-  :fun space: @_alloc
+  :fun space: @_space
 
   :new ref (space USize = 0)
     @_size = 0
-    @_alloc = space.max(8)
-    @_ptr = CPointer(U8)._alloc(@_alloc)
+    @_space = space.max(8)
+    @_ptr = CPointer(U8)._alloc(@_space)
 
   :new iso new_iso (space USize = 0) // TODO: use `recover` with `new` instead
     @_size = 0
-    @_alloc = space.max(8)
-    @_ptr = CPointer(U8)._alloc(@_alloc)
+    @_space = space.max(8)
+    @_ptr = CPointer(U8)._alloc(@_space)
 
   :new val from_array (data Array(U8)'val)
     @_size = data.size
-    @_alloc = data.space
+    @_space = data.space
     @_ptr = data.cpointer._unsafe
 
   :new val from_bytes (data Bytes)
     @_size = data.size
-    @_alloc = data.space
+    @_space = data.space
     @_ptr = data.cpointer._unsafe
 
-  :fun val as_array: Array(U8).val_from_cpointer(@_ptr._unsafe, @_size, @_alloc)
+  :fun val as_array: Array(U8).val_from_cpointer(@_ptr._unsafe, @_size, @_space)
   :fun val as_bytes: Bytes.from_string(@)
 
   :fun "==" (other String'box)
@@ -104,7 +104,7 @@
   ::
   :: Use the cstring method to get a null-terminated version of the string.
 
-  :fun is_null_terminated: (@_alloc > @_size) && (@_ptr._get_at(@_size) == 0)
+  :fun is_null_terminated: (@_space > @_size) && (@_ptr._get_at(@_size) == 0)
 
   :: Returns a CPointer to a null-terminated version of this string,
   :: copying the string if necessary to get a null-terminated pointer.
@@ -126,14 +126,14 @@
   :: An additional byte will be reserved for a null terminator.
 
   :fun ref reserve (space)
-    if (@_alloc <= space) (
+    if (@_space <= space) (
       max_space = USize[-1] // TODO: USize.max_value ?
       if (space < (max_space / 2)) (
-        @_alloc = space.next_pow2
+        @_space = space.next_pow2
       |
-        @_alloc = space
+        @_space = space
       )
-      @_ptr = @_ptr._realloc(@_alloc)
+      @_ptr = @_ptr._realloc(@_space)
     )
     @
 
@@ -276,7 +276,7 @@
         yield @val_from_cpointer(
           @_ptr._offset(start)
           (finish - start)
-          @_alloc - start
+          @_space - start
         )
         finish = finish + 1
         start = finish
@@ -287,7 +287,7 @@
     yield @val_from_cpointer(
       @_ptr._offset(start)
       (finish - start)
-      @_alloc - start
+      @_space - start
     )
     @
 

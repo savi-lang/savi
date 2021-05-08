@@ -2428,7 +2428,7 @@ class Mare::Compiler::CodeGen
     @string_globals.fetch value do
       global = gen_global_const(@gtypes["String"], {
         "_size"  => @isize.const_int(value.size),
-        "_alloc" => @isize.const_int(value.size + 1),
+        "_space" => @isize.const_int(value.size + 1),
         "_ptr"   => gen_cstring(value),
       })
 
@@ -2440,7 +2440,7 @@ class Mare::Compiler::CodeGen
     @bstring_globals.fetch value do
       global = gen_global_const(@gtypes["Bytes"], {
         "_size"  => @isize.const_int(value.size),
-        "_alloc" => @isize.const_int(value.size + 1),
+        "_space" => @isize.const_int(value.size + 1),
         "_ptr"   => gen_cstring(value),
       })
 
@@ -2455,13 +2455,13 @@ class Mare::Compiler::CodeGen
 
       gen_global_const(array_gtype, {
         "_size"  => @isize.const_int(values.size),
-        "_alloc" => @isize.const_int(values.size),
+        "_space" => @isize.const_int(values.size),
         "_ptr"   => @llvm.const_inbounds_gep(values_global, [@i32_0, @i32_0])
       })
     else
       gen_global_const(array_gtype, {
         "_size"  => @isize.const_int(0),
-        "_alloc" => @isize.const_int(0),
+        "_space" => @isize.const_int(0),
         "_ptr"   => @ptr.null
       })
     end

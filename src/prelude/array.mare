@@ -1,22 +1,22 @@
 :class ref Array (A)
   :prop _size USize
-  :prop _alloc USize
+  :prop _space USize
   :prop _ptr CPointer(A)'ref
-  :new ref from_cpointer (@_ptr, @_size, @_alloc)
-  :new iso iso_from_cpointer (@_ptr, @_size, @_alloc) // TODO: remove this and use recover instead?
-  :new val val_from_cpointer (@_ptr, @_size, @_alloc) // TODO: remove this and use recover instead?
+  :new ref from_cpointer (@_ptr, @_size, @_space)
+  :new iso iso_from_cpointer (@_ptr, @_size, @_space) // TODO: remove this and use recover instead?
+  :new val val_from_cpointer (@_ptr, @_size, @_space) // TODO: remove this and use recover instead?
 
   :fun ref _ptr_set_null
-    @_alloc = 0
+    @_space = 0
     @_ptr = CPointer(A)._null
 
   :fun ref _ptr_allocate (space USize)
-    @_alloc = space.next_pow2.max(space).max(8)
-    @_ptr = CPointer(A)._alloc(@_alloc)
+    @_space = space.next_pow2.max(space).max(8)
+    @_ptr = CPointer(A)._alloc(@_space)
 
   :fun ref _ptr_reallocate (space USize)
-    @_alloc = space.next_pow2.max(space).max(8)
-    @_ptr = @_ptr._realloc(@_alloc)
+    @_space = space.next_pow2.max(space).max(8)
+    @_ptr = @_ptr._realloc(@_space)
 
   :new (space USize = 0)
     @_size = 0
@@ -37,7 +37,7 @@
     )
 
   :fun size: @_size
-  :fun space: @_alloc
+  :fun space: @_space
   :fun cpointer (offset = 0) CPointer(A)'tag: @_ptr._offset(offset) // TODO: simply tag as return type; infer CPointer(A) part of it
 
   :fun is_empty: @_size == 0
@@ -54,16 +54,16 @@
       // If our new final address lines up with the current final address,
       // then we can keep any extra bytes allocated beyond the current size.
       // We'll only trim off the left side.
-      @_alloc -= from
+      @_space -= from
     |
       // Otherwise, we can't keep the extra allocated bytes, and therefore
       // the new allocation size is the same as the new occupied size
-      @_alloc = size
+      @_space = size
     )
 
     @_size = size
 
-    if (@_alloc == 0) (
+    if (@_space == 0) (
       // If the new allocation space is zero, use a null pointer to avoid issue.
       @_ptr = CPointer(A)._null
     |
@@ -77,7 +77,7 @@
   :: The size (number of actual elements present in the array) does not change.
 
   :fun ref reserve (space USize)
-    if (@_alloc < space) \
+    if (@_space < space) \
       @_ptr_reallocate(space)
     @
 
