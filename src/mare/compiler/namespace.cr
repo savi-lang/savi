@@ -30,8 +30,12 @@ class Mare::Compiler::Namespace
     @source_analyses = Hash(Source, SourceAnalysis).new
   end
 
+  def root_library(ctx)
+    ctx.program.libraries.first
+  end
+
   def root_library_link(ctx)
-    ctx.program.libraries.first.make_link
+    root_library(ctx).make_link
   end
 
   def main_type!(ctx); main_type?(ctx).not_nil! end

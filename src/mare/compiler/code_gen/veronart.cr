@@ -394,10 +394,10 @@ class Mare::Compiler::CodeGen::VeronaRT
     gen_val_acquire_into_scope(g, env)
 
     # Create the Main actor.
-    main_actor = gen_alloc_actor(g, g.gtypes["Main"], "main")
+    main_actor = gen_alloc_actor(g, g.gtype_main, "main")
 
     # Call the Main actor's asynchronous constructor function, passing the Env.
-    g.builder.call(g.gtypes["Main"]["new"].send_llvm_func, [main_actor, env])
+    g.builder.call(g.gtype_main["new"].send_llvm_func, [main_actor, env])
 
     # Release the Env object, now that the program is otherwise done.
     # This is the counterpart to the implicit acquire at its original creation.

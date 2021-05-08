@@ -552,7 +552,7 @@ class Mare::Compiler::CodeGen::PonyRT
     g.func_frame.alloc_ctx = alloc_ctx
 
     # Create the main actor and become it.
-    main_actor = gen_alloc_actor(g, g.gtypes["Main"], "main", true)
+    main_actor = gen_alloc_actor(g, g.gtype_main, "main", true)
 
     # TODO: Create the Env from argc, argv, and envp.
     env = gen_alloc(g, g.gtypes["Env"], nil, "env")
@@ -563,7 +563,7 @@ class Mare::Compiler::CodeGen::PonyRT
     # TODO: Run primitive initialisers using the main actor's heap.
 
     # Send the env in a message to the main actor's constructor
-    g.builder.call(g.gtypes["Main"].default_constructor.send_llvm_func, [main_actor, env])
+    g.builder.call(g.gtype_main.default_constructor.send_llvm_func, [main_actor, env])
 
     # Start the runtime.
     start_success = g.builder.call(g.mod.functions["pony_start"], [

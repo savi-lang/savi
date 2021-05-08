@@ -14,11 +14,8 @@ class Mare::Compiler::Verify
     main_link = ctx.namespace.main_type?(ctx)
     main = main_link.try(&.resolve(ctx))
 
-    unless main_link && main
-      ctx.error_at Source::Pos.show_library_path(library.source_library),
-        "This directory is being compiled, but it has no Main actor defined"
-      return # we can't check anything further about Main when it doesn't exist
-    end
+    # We can't check anything further about Main when it doesn't exist
+    return unless main_link && main
 
     ctx.error_at main.ident,
       "The Main type defined here must be defined as an actor" \

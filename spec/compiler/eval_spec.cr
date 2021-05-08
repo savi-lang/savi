@@ -1,4 +1,26 @@
 describe Mare::Compiler::Eval do
+  it "complains if there is no Main actor defined in the root library" do
+    content = <<-SOURCE
+    :primitive Example
+    SOURCE
+
+    source = Mare::Source.new(
+      "example.mare",
+      content,
+      Mare::Source::Library.new("/path/to/fake/example/library"),
+    )
+
+    expected = <<-MSG
+    This is the root directory being compiled, but it has no Main actor:
+    from /path/to/fake/example/library/:1:
+    /path/to/fake/example/library
+    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    MSG
+
+    Mare.compiler.compile([source], :eval)
+      .errors.map(&.message).join("\n").should eq expected
+  end
+
   it "evaluates the semantic tests" do
     source_dir = File.join(__DIR__, "../mare/semantics")
 

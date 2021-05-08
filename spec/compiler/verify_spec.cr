@@ -1,24 +1,10 @@
 describe Mare::Compiler::Verify do
-  it "complains if there is no Main actor" do
-    content = <<-SOURCE
+  it "does not impose checks on the Main actor if it doesn't exist" do
+    source = Mare::Source.new_example <<-SOURCE
     :primitive Example
     SOURCE
 
-    source = Mare::Source.new(
-      "example.mare",
-      content,
-      Mare::Source::Library.new("/path/to/fake/example/library"),
-    )
-
-    expected = <<-MSG
-    This directory is being compiled, but it has no Main actor defined:
-    from /path/to/fake/example/library/:1:
-    /path/to/fake/example/library
-    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    MSG
-
-    Mare.compiler.compile([source], :verify)
-      .errors.map(&.message).join("\n").should eq expected
+    Mare.compiler.compile([source], :verify).errors.should be_empty
   end
 
   it "complains if the Main type is not an actor" do
