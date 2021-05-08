@@ -5,6 +5,8 @@
 class Pegmatite::DSL
   def self.define
     with new yield
+  ensure
+    clear_class_variableq_state
   end
 
   def declare; Pattern::Forward.new end
@@ -20,6 +22,31 @@ class Pegmatite::DSL
     max = max.ord if max.is_a?(Char)
     Pattern::UnicodeRange.new(min.to_u32, max.to_u32)
   end
+  def l(lit)
+    case lit
+    when Char
+      char(lit)
+    when String
+      str(lit)
+    when Range
+      range(lit.begin, lit.end)
+    else
+      raise "Invalid type `#{typeof(lit)}` for `l`. Must be Char, String, or Range."
+    end
+  end
+
+  # Define a DSL method for setting the pattern to use for whitespace in the
+  # ^ operator, which allows optional whitespace between concatenated patterns.
+  # Using class variables here is not ideal, but it's acceptable for a DSL.
+  def whitespace_pattern(pattern : Pattern)
+    @@last_defined_whitespace_pattern = pattern
+  end
+  def self.last_defined_whitespace_pattern
+    @@last_defined_whitespace_pattern.not_nil!
+  end
+  def self.clear_class_variableq_state
+    @@last_defined_whitespace_pattern = nil
+  end
 
   # These Methods are defined to be included in all Pattern instances,
   # for ease of combining and composing new Patterns.
@@ -34,6 +61,9 @@ class Pegmatite::DSL
     def dynamic_pop(label); Pattern::DynamicPop.new(self, label) end
     def named(label, tokenize = true)
       Pattern::Label.new(self, label, tokenize)
+    end
+    def ^(other)
+      self >> DSL.last_defined_whitespace_pattern.maybe >> other
     end
   end
 end
