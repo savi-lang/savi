@@ -5,7 +5,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
   def finished(context)
   end
 
-  def keywords : Array(String); %w{import alias actor class trait numeric enum primitive ffi} end
+  def keywords : Array(String); %w{import source alias actor class trait numeric enum primitive ffi} end
 
   @@declare_import = Witness.new([
     {
@@ -15,14 +15,27 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
     },
     {
       "kind" => "term",
-      "name" => "ident",
-      "type" => "ident|string",
+      "name" => "path",
+      "type" => "string",
     },
     {
       "kind" => "term",
       "name" => "params",
       "type" => "params",
       "optional" => true,
+    },
+  ] of Hash(String, String | Bool))
+
+  @@declare_source = Witness.new([
+    {
+      "kind" => "keyword",
+      "name" => "keyword",
+      "value" => "source",
+    },
+    {
+      "kind" => "term",
+      "name" => "path",
+      "type" => "string",
     },
   ] of Hash(String, String | Bool))
 
@@ -73,6 +86,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
 
   def compile(context, decl)
     return compile_import(context, decl) if decl.keyword == "import"
+    return compile_source(context, decl) if decl.keyword == "source"
     return compile_alias(context, decl) if decl.keyword == "alias"
 
     data = @@declare_type.run(decl)
@@ -136,8 +150,17 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
     data = @@declare_import.run(decl)
 
     @library.imports << Program::Import.new(
-      data["ident"].as(AST::Identifier | AST::LiteralString),
+      data["path"].as(AST::LiteralString),
       data["params"]?.as(AST::Group?),
+    )
+  end
+
+  def compile_source(context, decl)
+    data = @@declare_source.run(decl)
+
+    @library.imports << Program::Import.new(
+      data["path"].as(AST::LiteralString),
+      copy_sources: true
     )
   end
 

@@ -1,5 +1,4 @@
 :import "spec"
-:import ".." (JsonParser, JsonToken)
 
 :class JsonParserSpec
   :is Spec

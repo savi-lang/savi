@@ -32,30 +32,44 @@ class Mare::Compiler::Import
 
   def run_for_library(ctx, library)
     # For each import statement found in the library, resolve it.
-    library.imports.each.with_index do |import, i|
-      # Skip imports that have already been resolved.
-      next if @libraries_by_import.has_key?(import)
+    # Use select! to filter out imports that are not "true" imports,
+    # which each get resolved in some other way outside of the import system.
+    library.imports.select! do |import|
+      # If this is a "copy sources" import, then use that approach for it.
+      # This is used when :source instead of :import is used to load a library.
+      if import.copy_sources
+        # Based on the source file that the import statement was declared in
+        # and the relative path mentioned in the import statement itself,
+        # get the absolute path for the library that is to be loaded.
+        source = import.ident.pos.source
+        path = Compiler.resolve_library_dirname(
+          import.ident.value,
+          source.library.path
+        )
 
-      # Assert that the imported relative path is a string.
-      # TODO: remove this? why even allow a non-string here in the topology?
-      relative_path = import.ident
-      raise NotImplementedError.new(import.ident.to_a) \
-        unless relative_path.is_a?(AST::LiteralString)
+        add_sources_from_library(ctx, path, library)
+        next false # this is not a "true" import
+      end
 
-      # Check if we are linking library
-      if (path = relative_path.value).starts_with? "lib:"
+      # If this is a native library we are linking, then use that approach.
+      # TODO: This code path is not tested anywhere - we need tests for it.
+      if (path = import.ident.value).starts_with? "lib:"
         path = path[4..path.size]
         ctx.link_libraries << path
-        library.imports.delete_at(i)
-        next
+        next false # this is not a "true" import
       end
+
+      # Otherwise continue with the normal import process.
+
+      # Skip imports that have already been resolved.
+      next true if @libraries_by_import.has_key?(import)
 
       # Based on the source file that the import statement was declared in
       # and the relative path mentioned in the import statement itself,
       # get the absolute path for the library that is to be loaded.
-      source = relative_path.pos.source
+      source = import.ident.pos.source
       path = Compiler.resolve_library_dirname(
-        relative_path.value,
+        import.ident.value,
         source.library.path
       )
 
@@ -66,6 +80,8 @@ class Mare::Compiler::Import
       # Recursively run this pass on the loaded library.
       # TODO: In the future, rely on the compiler to run at the library level.
       run_for_library(ctx, loaded_library)
+
+      true # retain this in the list as a "true" import
     end
   end
 
@@ -78,5 +94,14 @@ class Mare::Compiler::Import
     library_sources = Compiler.get_library_sources(path)
     library_docs = library_sources.map { |s| Parser.parse(s) }
     ctx.compile_library(library_sources.first.library, library_docs)
+  end
+
+  # Load library sources from the given path, but copy them into this library.
+  # This is used when :source instead of :import is used to load a library.
+  def add_sources_from_library(ctx, path, into_library : Program::Library)
+    library_sources =
+      Compiler.get_library_sources(path, into_library.source_library)
+    library_docs = library_sources.map { |s| Parser.parse(s) }
+    ctx.compile_library_docs(into_library, library_docs)
   end
 end

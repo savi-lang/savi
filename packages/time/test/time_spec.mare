@@ -1,5 +1,4 @@
 :import "spec"
-:import ".." (Time)
 
 :class TimeSpec
   :is Spec

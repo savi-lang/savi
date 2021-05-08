@@ -1,10 +1,4 @@
 :import "spec"
-:import ".." (
-  TCPConnection
-  TCPConnectionNotify
-  TCPListener
-  TCPListenerNotify
-)
 
 :class iso TCPSpecListenerNotify
   :is TCPListenerNotify

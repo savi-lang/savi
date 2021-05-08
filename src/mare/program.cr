@@ -71,16 +71,18 @@ class Mare::Program
   end
 
   class Import
-    property ident : (AST::Identifier | AST::LiteralString)
+    property ident : AST::LiteralString
     property names : AST::Group?
+    property copy_sources : Bool
 
-    def initialize(@ident, @names = nil)
+    def initialize(@ident, @names = nil, @copy_sources = false)
     end
 
     def ==(other)
       return false unless other.is_a?(Import)
       return false unless @ident == other.ident
       return false unless @names == other.names
+      return false unless @copy_sources == other.copy_sources
       true
     end
   end

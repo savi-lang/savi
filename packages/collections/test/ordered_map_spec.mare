@@ -1,5 +1,4 @@
 :import "spec"
-:import ".." (OrderedMap, HashEq, HashIs)
 
 :class OrderedMapSpec
   :is Spec

@@ -1,5 +1,4 @@
 :import "spec"
-:import ".." (JsonReader)
 
 :class _JsonReaderSpecUser
   :prop name String: ""

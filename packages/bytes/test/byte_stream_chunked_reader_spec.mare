@@ -1,5 +1,4 @@
 :import "spec"
-:import ".." (ByteStreamChunkedReader)
 
 :class ByteStreamChunkedReaderSpec
   :is Spec

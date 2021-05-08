@@ -88,8 +88,14 @@ class Mare::Compiler::Context
       return cached_library if cached_docs == docs
     end
 
-    library = Program::Library.new(source_library)
+    compile_library_docs(Program::Library.new(source_library), docs)
 
+    .tap do |result|
+      @@cache[source_library.path] = {docs, result}
+    end
+  end
+
+  def compile_library_docs(library : Program::Library, docs : Array(AST::Document))
     docs.each do |doc|
       @stack.unshift(Interpreter::Default.new(library))
       doc.list.each { |decl| compile_decl(decl) }
@@ -98,10 +104,6 @@ class Mare::Compiler::Context
     end
 
     library
-
-    .tap do |result|
-      @@cache[source_library.path] = {docs, result}
-    end
   end
 
   def compile_decl(decl : AST::Declare)

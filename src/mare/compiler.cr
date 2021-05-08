@@ -177,8 +177,8 @@ class Mare::Compiler
     end
   end
 
-  def self.get_library_sources(dirname)
-    library = Source::Library.new(dirname)
+  def self.get_library_sources(dirname, library : Source::Library? = nil)
+    library ||= Source::Library.new(dirname)
 
     Dir.entries(dirname).map do |name|
       if name.ends_with?(".mare")
