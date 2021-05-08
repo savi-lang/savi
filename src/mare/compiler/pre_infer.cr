@@ -337,7 +337,16 @@ module Mare::Compiler::PreInfer
     end
 
     def touch(ctx : Context, node : AST::LiteralString)
-      @analysis[node] = Infer::FixedPrelude.new(node.pos, layer(node), "String")
+      @analysis[node] = (
+        case node.prefix_ident.try(&.value)
+        when nil then Infer::FixedPrelude.new(node.pos, layer(node), "String")
+        when "b" then Infer::FixedPrelude.new(node.pos, layer(node), "Bytes")
+        else
+          ctx.error_at node.prefix_ident.not_nil!,
+            "This type of string literal is not known; please remove this prefix"
+          Infer::FixedPrelude.new(node.pos, layer(node), "String")
+        end
+      )
     end
 
     # A literal character could be any integer or floating-point machine type.

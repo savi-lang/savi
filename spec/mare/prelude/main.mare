@@ -10,4 +10,5 @@
       SpecRun(NumericSpec).new(env)
       SpecRun(PlatformSpec).new(env)
       SpecRun(StringSpec).new(env)
+      SpecRun(BytesSpec).new(env)
     ])

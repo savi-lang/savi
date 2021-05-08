@@ -1,0 +1,335 @@
+:class val Bytes
+  :is Comparable(Bytes'box)
+
+  :prop _size USize
+  :prop _alloc USize // TODO: rename as `_space`
+  :prop _ptr CPointer(U8)'ref
+  :new ref from_cpointer (@_ptr, @_size, @_alloc)
+  :new iso iso_from_cpointer (@_ptr, @_size, @_alloc) // TODO: remove this and use recover instead?
+  :new val val_from_cpointer (@_ptr, @_size, @_alloc) // TODO: remove this and use recover instead?
+  :fun cpointer CPointer(U8): @_ptr
+  :fun hash: @_ptr._hash(@_size)
+  :fun size: @_size
+
+  :new ref (space USize = 0)
+    @_size = 0
+    @_alloc = space.max(8)
+    @_ptr = CPointer(U8)._alloc(@_alloc)
+
+  :new iso new_iso (space USize = 0) // TODO: use `recover` with `new` instead
+    @_size = 0
+    @_alloc = space.max(8)
+    @_ptr = CPointer(U8)._alloc(@_alloc)
+
+  :new val from_array (data Array(U8)'val)
+    @_size = data.size
+    @_alloc = data.space
+    @_ptr = data.cpointer._unsafe
+
+  :fun val as_array: Array(U8).val_from_cpointer(@_ptr._unsafe, @_size, @_alloc)
+
+  :fun "==" (other Bytes'box)
+    (@_size == other._size) && (@_ptr._compare(other._ptr, @_size) == 0)
+
+  :: Returns True if this Bytes starts with a substring equal to the other.
+  :: Otherwise, returns False.
+  :fun starts_with (other Bytes'box)
+    (@_size >= other.size) && (@_ptr._compare(other._ptr, other.size) == 0)
+
+  :: Returns True if this Bytes ends with a substring equal to the other.
+  :: Otherwise, returns False.
+  :fun ends_with (other Bytes'box)
+    (@_size >= other.size) && (
+      @_ptr._offset(@_size - other.size)._compare(other._ptr, other.size) == 0
+    )
+
+  :: Returns True if this Bytes at the given offset is equivalent to
+  :: the given other Bytes at the given other_offset, for at least as long
+  :: as the given number of bytes to be compared.
+  :fun is_byte_slice_equal (
+    offset USize
+    other Bytes'box
+    other_offset USize
+    num_bytes USize
+  )
+    (num_bytes <= (@size - offset))
+    && (num_bytes <= (other.size - other_offset))
+    && (
+      ptr = @_ptr._offset(offset)
+      other_ptr = other._ptr._offset(other_offset)
+      ptr._compare(other_ptr, num_bytes) == 0
+    )
+
+  :fun is_empty:     @size == 0
+  :fun is_not_empty: @size != 0
+
+  :fun clone @'iso
+    copy = @new_iso(@size)
+    _ptr_tag CPointer(U8)'tag = @_ptr // TODO: this indirection shouldn't be needed
+    copy._clone_from(_ptr_tag, @size)
+    copy._size = @size
+    --copy // TODO: auto-consume at end of the function?
+
+  :fun ref _clone_from (other_ptr CPointer(U8), size USize)
+    other_ptr._unsafe._copy_to(@_ptr, size)
+
+  :fun includes (other): try (@offset_of!(other), True | False)
+
+  :fun offset_of! (other Bytes'box, start_offset USize = 0)
+    found Bool = False
+    offset = start_offset
+    other_first = other[0]! // cache here and error out if the other is empty
+    while (found.not && offset < @_size) (
+      if (@_ptr._get_at(offset) == other_first) (
+        found = (@_ptr._offset(offset)._compare(other._ptr, other._size) == 0)
+      )
+      offset = offset + 1
+    )
+    if found.not error!
+    offset - 1
+
+  :: Returns true if the string is null-terminated and safe to pass to an FFI
+  :: function that doesn't accept a size argument, expecting a null-terminator.
+  ::
+  :: This method checks that there is a null byte just after the final position
+  :: of populated bytes in the string, but does not check for other null bytes
+  :: which may be present earlier in the content of the string.
+  ::
+  :: Use the cstring method to get a null-terminated version of the string.
+
+  :fun is_null_terminated: (@_alloc > @_size) && (@_ptr._get_at(@_size) == 0)
+
+  :: Returns a CPointer to a null-terminated version of this string,
+  :: copying the string if necessary to get a null-terminated pointer.
+  ::
+  :: Call the cpointer method instead when you don't need a null terminator
+  :: (that is, when the FFI function you are calling has a size argument).
+
+  :fun cstring CPointer(U8)
+    if @is_null_terminated (
+      ret CPointer(U8)'tag = @_ptr // TODO: remove this type hint - it shouldn't be needed
+    |
+      ptr = @_ptr._alloc(@_size + 1)
+      @_ptr._copy_to(ptr._unsafe, @_size)
+      ptr._assign_at(@_size, 0)
+      ret CPointer(U8)'tag = ptr // TODO: remove this type hint - it shouldn't be needed
+    )
+
+  :: Ensure enough capacity is allocated for the given space, in bytes.
+  :: An additional byte will be reserved for a null terminator.
+
+  :fun ref reserve (space)
+    if (@_alloc <= space) (
+      max_space = USize[-1] // TODO: USize.max_value ?
+      if (space < (max_space / 2)) (
+        @_alloc = space.next_pow2
+      |
+        @_alloc = space
+      )
+      @_ptr = @_ptr._realloc(@_alloc)
+    )
+    @
+
+  :fun "[]!" (index USize)
+    if (@size <= index) error!
+    @_ptr._get_at(index)
+
+  :fun _offset_to_index (offset ISize) USize
+    if (offset < 0) (offset.usize + @size | offset.usize)
+
+  :: Return a shared portion of this string, covering `from` until `to`,
+  :: with negative values in `from` and `to` representing indexes counting
+  :: backward from the end of the string.
+  ::
+  :: Both the original and the new string are immutable, as they share memory.
+  :: The operation does not allocate a new string pointer nor copy elements.
+
+  :fun val trim (from ISize = 0, to ISize = 0x7FFF_FFFF_FFFF_FFFF) // TODO: ISize.max_value
+    start = @_offset_to_index(from)
+    finish = @_offset_to_index(to).min(@size)
+
+    if (start < @_size && start < finish) (
+      size = finish - start
+      @val_from_cpointer(
+        @_ptr._offset(start)
+        size
+        size
+      )
+    |
+      @val_from_cpointer(@_ptr._null, 0, 0)
+    )
+
+  :fun ref trim_in_place (from ISize = 0, to ISize = 0x7FFF_FFFF_FFFF_FFFF) // TODO: ISize.max_value
+    start = @_offset_to_index(from)
+    finish = @_offset_to_index(to).min(@size)
+
+    if (start < @_size && start < finish) (
+      @_size = finish - start
+      @_ptr = @_ptr._offset(start)
+    |
+      @_size = 0
+    )
+    @
+
+  :fun ref push_byte (byte U8)
+    @reserve(@_size + 1)
+    @_ptr._assign_at(@_size, byte)
+    @_size += 1
+    @
+
+  :fun each_byte
+    index USize = 0
+    while (index < @_size) (
+      yield @_ptr._get_at(index)
+      index = index + 1
+    )
+    @
+
+  :fun each_byte_with_index
+    index USize = 0
+    while (index < @_size) (
+      yield (@_ptr._get_at(index), index)
+      index = index + 1
+    )
+    @
+
+  :fun ref "<<" (other Bytes'box)
+    if (other._size > 0) (
+      new_size = @_size + other._size
+      @reserve(new_size)
+      if other.is_null_terminated (
+        other._ptr._copy_to(@_ptr._offset(@_size), other.size + 1)
+      |
+        other._ptr._copy_to(@_ptr._offset(@_size), other.size)
+      )
+      @_size = new_size
+    )
+    @
+
+  :fun ref concat_byte_slice (
+    other Bytes'box
+    from ISize = 0
+    to ISize = 0x7FFF_FFFF_FFFF_FFFF // TODO: ISize.max_value
+  )
+    start = other._offset_to_index(from)
+    finish = other._offset_to_index(to).min(other.size)
+
+    if (start < other._size && start < finish) (
+      size = finish - start
+      other._ptr._offset(start)._copy_to(@_ptr._offset(@_size), size)
+      @_size += size
+    )
+
+  :fun ref push_utf32 (value U32)
+    _UTF32Encoder.encode(value) -> (byte_count, byte_1, byte_2, byte_3, byte_4 |
+      i = @_size
+      @_size = @_size + byte_count
+      @reserve(@_size)
+      @_ptr._assign_at(i, byte_1)
+      if (byte_count > 1) (
+        @_ptr._assign_at(i + 1, byte_2)
+        if (byte_count > 2) (
+          @_ptr._assign_at(i + 2, byte_3)
+          if (byte_count > 3) (
+            @_ptr._assign_at(i + 3, byte_4)
+          )
+        )
+      )
+    )
+    @
+
+  :: Return a new string consisting of the original string copied `n` times.
+  :fun "*" (times USize)
+    if (times > 0) (
+      ptr = @_ptr._alloc(@size * times)
+      size USize = 0
+
+      while (times > 0) (times -= 1
+        @_ptr._copy_to(ptr._offset(size), @size)
+        size += @size
+      )
+
+      @val_from_cpointer(ptr, size, size)
+    |
+      @val_from_cpointer(@_ptr._null, 0, 0)
+    )
+
+  :fun val split (split_byte U8) // TODO: a byte shouldn't be the only thing we can split by...
+    result Array(Bytes) = []
+    @each_split(split_byte) -> (s | result << s)
+    result
+
+  :fun val each_split (split_byte U8) // TODO: a byte shouldn't be the only thing we can split by...
+    :yields Bytes
+    finish USize = 0
+    start = finish
+    while (finish < @_size) (
+      byte = @_ptr._get_at(finish)
+      if (byte == split_byte) (
+        yield @val_from_cpointer(
+          @_ptr._offset(start)
+          (finish - start)
+          @_alloc - start
+        )
+        finish = finish + 1
+        start = finish
+      |
+        finish = finish + 1
+      )
+    )
+    yield @val_from_cpointer(
+      @_ptr._offset(start)
+      (finish - start)
+      @_alloc - start
+    )
+    @
+
+  :fun "<" (other Bytes'box)
+    min_size = @size.min(other.size)
+    index USize = 0
+    result = False
+    try (
+      while (index < min_size) (
+        a = @_ptr._get_at(index)
+        b = other._ptr._get_at(index)
+        case (
+        | a < b | result = True,  error! // TODO: use break or early return instead of error
+        | a > b | result = False, error! // TODO: use break or early return instead of error
+        )
+        index = index + 1
+      )
+      result = @size < other.size
+    )
+    result
+
+  :fun "<=" (other Bytes'box)
+    min_size = @size.min(other.size)
+    index USize = 0
+    result = False
+    try (
+      while (index < min_size) (
+        a = @_ptr._get_at(index)
+        b = other._ptr._get_at(index)
+        case (
+        | a < b | result = True,  error! // TODO: use break or early return instead of error
+        | a > b | result = False, error! // TODO: use break or early return instead of error
+        )
+        index = index + 1
+      )
+      result = @size <= other.size
+    )
+    result
+
+  :fun slice (from USize, to USize = 0) Bytes'iso
+    if (to == 0 || to > @_size) (
+      to = @_size
+    )
+    if (from < to) (
+      new_size = to - from
+      new_alloc = new_size.next_pow2
+      new_ptr = @_ptr._alloc(new_alloc)
+      @_ptr._offset(from)._unsafe._copy_to(new_ptr, new_size)
+      @iso_from_cpointer(new_ptr, new_size, new_alloc)
+    |
+      Bytes.new_iso
+    )

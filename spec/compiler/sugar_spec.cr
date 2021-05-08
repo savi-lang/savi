@@ -15,10 +15,10 @@ describe Mare::Compiler::Sugar do
       [:declare, [[:ident, "actor"], [:ident, "Example"]], [:group, ":"]],
       [:declare,
         [[:ident, "fun"], [:ident, "return_none"], [:ident, "None"]],
-        [:group, ":", [:string, "this isn't the return value"]],
+        [:group, ":", [:string, "this isn't the return value", nil]],
       ],
       [:declare, [[:ident, "be"], [:ident, "behave"]], [:group, ":",
-        [:string, "this isn't the return value"],
+        [:string, "this isn't the return value", nil],
       ]]
     ]
 
@@ -27,13 +27,13 @@ describe Mare::Compiler::Sugar do
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "return_none")
     func.body.not_nil!.to_a.should eq [:group, ":",
-      [:string, "this isn't the return value"],
+      [:string, "this isn't the return value", nil],
       [:ident, "None"],
     ]
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "behave")
     func.body.not_nil!.to_a.should eq [:group, ":",
-      [:string, "this isn't the return value"],
+      [:string, "this isn't the return value", nil],
       [:ident, "None"],
     ]
 

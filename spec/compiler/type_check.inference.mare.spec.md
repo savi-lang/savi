@@ -88,6 +88,14 @@ This return value needs an explicit type; it could not be inferred:
 
 ---
 
+It infers a b-prefixed string literal as a Bytes object:
+
+```mare
+    b"example" ::type=> Bytes
+```
+
+---
+
 It infers an integer literal based on an assignment:
 
 ```mare

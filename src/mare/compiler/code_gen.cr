@@ -126,6 +126,7 @@ class Mare::Compiler::CodeGen
     @frames = [] of Frame
     @cstring_globals = {} of String => LLVM::Value
     @string_globals = {} of String => LLVM::Value
+    @bstring_globals = {} of String => LLVM::Value
     @source_code_pos_globals = {} of Source::Pos => LLVM::Value
     @reflection_of_type_globals = {} of GenType => LLVM::Value
     @gtypes = {} of String => GenType
@@ -1999,7 +2000,11 @@ class Mare::Compiler::CodeGen
     when AST::FieldReplace
       gen_field_replace(expr)
     when AST::LiteralString
-      gen_string(expr.value)
+      case expr.prefix_ident.try(&.value)
+      when nil then gen_string(expr.value)
+      when "b" then gen_bstring(expr.value)
+      else raise NotImplementedError.new(expr.prefix_ident)
+      end
     when AST::LiteralCharacter
       gen_integer(expr)
     when AST::LiteralInteger
@@ -2406,6 +2411,18 @@ class Mare::Compiler::CodeGen
       })
 
       @string_globals[value] = global
+    end
+  end
+
+  def gen_bstring(value : String)
+    @bstring_globals.fetch value do
+      global = gen_global_const(@gtypes["Bytes"], {
+        "_size"  => @isize.const_int(value.size),
+        "_alloc" => @isize.const_int(value.size + 1),
+        "_ptr"   => gen_cstring(value),
+      })
+
+      @bstring_globals[value] = global
     end
   end
 

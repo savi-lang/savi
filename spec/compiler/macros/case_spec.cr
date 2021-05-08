@@ -17,11 +17,11 @@ describe Mare::Compiler::Macros do
       func.body.not_nil!.terms.first.to_a.should eq [:group, "(", [:choice,
         [
           [:group, "(", [:relate, [:ident, "x"], [:op, "=="], [:integer, 1]]],
-          [:group, "(", [:string, "one"]]
+          [:group, "(", [:string, "one", nil]]
         ],
         [
           [:group, "(", [:relate, [:ident, "x"], [:op, "=="], [:integer, 2]]],
-          [:group, "(", [:string, "two"]]
+          [:group, "(", [:string, "two", nil]]
         ],
         [[:ident, "True"], [:ident, "None"]],
       ]]
@@ -45,13 +45,13 @@ describe Mare::Compiler::Macros do
       func.body.not_nil!.terms.first.to_a.should eq [:group, "(", [:choice,
         [
           [:group, "(", [:relate, [:ident, "x"], [:op, "=="], [:integer, 1]]],
-          [:group, "(", [:string, "one"]]
+          [:group, "(", [:string, "one", nil]]
         ],
         [
           [:group, "(", [:relate, [:ident, "x"], [:op, "=="], [:integer, 2]]],
-          [:group, "(", [:string, "two"]]
+          [:group, "(", [:string, "two", nil]]
         ],
-        [[:ident, "True"], [:group, "(", [:string, "three"]]],
+        [[:ident, "True"], [:group, "(", [:string, "three", nil]]],
       ]]
     end
 
@@ -69,11 +69,11 @@ describe Mare::Compiler::Macros do
       func.body.not_nil!.terms.first.to_a.should eq [:group, "(", [:choice,
         [
           [:group, "(", [:relate, [:ident, "x"], [:op, "=="], [:integer, 1]]],
-          [:group, "(", [:string, "one"]]
+          [:group, "(", [:string, "one", nil]]
         ],
         [
           [:group, "(", [:relate, [:ident, "x"], [:op, "=="], [:integer, 2]]],
-          [:group, "(", [:string, "two"]]
+          [:group, "(", [:string, "two", nil]]
         ],
         [[:ident, "True"], [:ident, "None"]],
       ]]

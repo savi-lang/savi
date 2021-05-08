@@ -1,0 +1,145 @@
+:import "spec"
+
+:class BytesSpec
+  :is Spec
+  :const describes: "Bytes"
+
+  :it "converts to and from an array of bytes"
+    @assert = b"string".as_array == ['s', 't', 'r', 'i', 'n', 'g']
+    @assert = Bytes.from_array(b"string".as_array) == b"string"
+
+  :it "compares bytewise equality with another string"
+    @assert = (b"string" == b"string")
+    @assert = (b"string" == b"other").not
+
+  :it "checks if it starts with a substring equal to the other string"
+    @assert = b"foo".starts_with(b"foo")
+    @assert = b"foo".starts_with(b"food").not
+    @assert = b"food".starts_with(b"foo")
+    @assert = b"barfood".starts_with(b"foo").not
+    @assert = b"barfood".starts_with(b"barf")
+    @assert = b"barfood".starts_with(b"")
+
+  :it "checks if it ends with a substring equal to the other string"
+    @assert = b"food".ends_with(b"foo").not
+    @assert = b"foo".ends_with(b"foo")
+    @assert = b"foo".ends_with(b"food").not
+    @assert = b"snafoo".ends_with(b"foo")
+    @assert = b"snafoozled".ends_with(b"foo").not
+    @assert = b"snafoozled".ends_with(b"")
+
+  :it "checks if it has a common bytes with another string at specific offsets"
+    @assert = b"foodbar".is_byte_slice_equal(1, b"broodbard", 2, 6)
+    @assert = b"foodbar".is_byte_slice_equal(1, b"broodbard", 2, 5)
+    @assert = b"foodbar".is_byte_slice_equal(2, b"broodbard", 2, 5).not
+    @assert = b"foodbar".is_byte_slice_equal(1, b"broodbard", 2, 7).not
+    @assert = b"foodbar".is_byte_slice_equal(1, b"broodbard", 1, 6).not
+    @assert = b"foodbar".is_byte_slice_equal(0, b"broodbard", 1, 6).not
+    @assert = b"broodbard".is_byte_slice_equal(2, b"foodbar", 1, 6)
+    @assert = b"broodbard".is_byte_slice_equal(2, b"foodbar", 1, 5)
+    @assert = b"broodbard".is_byte_slice_equal(2, b"foodbar", 2, 5).not
+    @assert = b"broodbard".is_byte_slice_equal(2, b"foodbar", 1, 7).not
+    @assert = b"broodbard".is_byte_slice_equal(1, b"foodbar", 1, 6).not
+    @assert = b"broodbard".is_byte_slice_equal(1, b"foodbar", 0, 6).not
+
+  :it "checks if it is an empty string or not"
+    @assert = b"".is_empty
+    @assert = b"".is_not_empty.not
+    @assert = b"example".is_empty.not
+    @assert = b"example".is_not_empty
+    @assert = Bytes.new.is_empty
+    @assert = Bytes.new.is_not_empty.not
+    @assert = (Bytes.new << b"example").is_empty.not
+    @assert = (Bytes.new << b"example").is_not_empty
+
+  :it "clones itself into a new string"
+    string Bytes = b"example"
+    @assert = string.clone == b"example"
+
+  :it "finds the index of another substring within it"
+    @assert = try (b"bar food foo".offset_of!(b"foo") == 4 | False)
+    @assert = try (b"bar food foo".offset_of!(b"bard"), False | True)
+    @assert = try (b"bar food foo".offset_of!(b"nope"), False | True)
+    @assert = try (b"bar food foo".offset_of!(b""),     False | True)
+    @assert = b"bar food foo".includes(b"foo")
+    @assert = b"bar food foo".includes(b"bard").not
+    @assert = b"bar food foo".includes(b"nope").not
+    @assert = b"bar food foo".includes(b"").not
+
+  :it "hashes the bytes of the string"
+    @assert = (b"string".hash == 0x4CF51F4A5B5CF110)
+
+  :it "returns the byte at the given byte offset"
+    @assert = try (b"example"[3]! == 'm' | False)
+    @assert = try (b"example"[7]!, False | True)
+
+  :it "trims bytes off the start and end of the string"
+    @assert = b"example".trim(2)      == b"ample"
+    @assert = b"example".trim(3,  -2) == b"mp"
+    @assert = b"example".trim(7)      == b""
+    @assert = b"example".trim(5,   4) == b""
+    @assert = b"example".trim(-5, -2) == b"amp"
+    @assert = b"example".trim(-5,  5) == b"amp"
+
+  :it "trims a mutable string in place with the same semantics"
+    @assert = b"example".clone.trim_in_place(2)      == b"ample"
+    @assert = b"example".clone.trim_in_place(3,  -2) == b"mp"
+    @assert = b"example".clone.trim_in_place(7)      == b""
+    @assert = b"example".clone.trim_in_place(5,   4) == b""
+    @assert = b"example".clone.trim_in_place(-5, -2) == b"amp"
+    @assert = b"example".clone.trim_in_place(-5,  5) == b"amp"
+
+  :it "pushes a new byte onto the end of the string"
+    @assert = Bytes.new.push_byte('o').push_byte('k') == b"ok"
+
+  :it "yields each byte in the string"
+    string Array(U8) = []
+    b"foo".each_byte -> (byte | string << byte)
+    @assert = string == ['f', 'o', 'o']
+
+  :it "yields each byte in the string, along with the index"
+    string_a Array(U8) = []
+    string_b Array(USize) = []
+    b"yo".each_byte_with_index -> (byte, index |
+      string_a << byte
+      string_b << index
+    )
+    @assert = string_a == ['y', 'o']
+    @assert = string_b == [0, 1]
+
+  :it "copies bytes from the given string onto the end of the string"
+    @assert = (Bytes.new << b"foo" << b"" << b"bar") == b"foobar"
+
+  :it "creates a multiplicit copy of the string"
+    @assert = (b"Hey" * 3) == b"HeyHeyHey"
+    @assert = (b"Hey" * 1) == b"Hey"
+    @assert = (b"Hey" * 0) == b""
+
+  :it "splits the string at every occurrence of the given byte value"
+    @assert = b"foo.bar.baz".split('.') == [b"foo", b"bar", b"baz"]
+
+  :it "lexically compares the string with another string of the same length"
+    @assert = b"examplE" < b"example"
+    @assert = b"example" > b"examplE"
+    @assert = (b"example" < b"examplE").not
+    @assert = (b"examplE" > b"example").not
+    @assert = b"examplE" <= b"example"
+    @assert = b"example" >= b"examplE"
+    @assert = (b"example" <= b"examplE").not
+    @assert = (b"examplE" >= b"example").not
+
+  :it "lexically compares the string with an identical string"
+    @assert = (b"example" < b"example").not
+    @assert = (b"example" > b"example").not
+    @assert = b"example" <= b"example"
+    @assert = b"example" >= b"example"
+
+  :it "lexically compares with a nearly identical string of different length"
+    @assert = b"example" < b"example!"
+    @assert = b"example!" > b"example"
+    @assert = (b"example!" < b"example").not
+    @assert = (b"example" > b"example!").not
+    @assert = b"example" <= b"example!"
+    @assert = b"example!" >= b"example"
+    @assert = (b"example!" <= b"example").not
+    @assert = (b"example" >= b"example!").not

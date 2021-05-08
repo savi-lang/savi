@@ -253,10 +253,11 @@ module Mare::AST
 
   class LiteralString < Node
     property value
-    def initialize(@value : String)
+    property prefix_ident
+    def initialize(@value : String, @prefix_ident : Identifier? = nil)
     end
     def name; :string end
-    def to_a: Array(A); [name, value] of A end
+    def to_a: Array(A); [name, value, prefix_ident.try(&.to_a)] of A end
   end
 
   class LiteralCharacter < Node

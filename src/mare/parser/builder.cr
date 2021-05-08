@@ -104,8 +104,7 @@ module Mare::Parser::Builder
       value = state.slice(main)
       AST::Identifier.new(value).with_pos(state.pos(main))
     when :string
-      value = state.slice_with_escapes(main)
-      AST::LiteralString.new(value).with_pos(state.pos(main))
+      build_string(main, iter, state)
     when :char
       string = state.slice_with_escapes(main)
       reader = Char::Reader.new(string)
@@ -160,6 +159,34 @@ module Mare::Parser::Builder
     when :pony_control_recover then build_pony_control_recover(main, iter, state)
     else
       raise NotImplementedError.new(kind)
+    end
+  end
+
+  private def self.build_string(main, iter, state)
+    assert_kind(main, :string)
+    terms = [] of AST::Term
+
+    # See if this string has a nested identifier and/or string inside it.
+    child_ident : AST::Identifier? = nil
+    child_string : AST::LiteralString? = nil
+    iter.while_next_is_child_of(main) do |child|
+      term = build_term(child, iter, state)
+      case term
+      when AST::Identifier then child_ident = term
+      when AST::LiteralString then child_string = term
+      else
+        raise NotImplementedError.new(child)
+      end
+    end
+
+    # If there were child elements inside, use those.
+    # Otherwise, this is an inner string so we gather its slice directly.
+    if child_string
+      child_string.prefix_ident = child_ident
+      child_string
+    else
+      value = state.slice_with_escapes(main)
+      AST::LiteralString.new(value).with_pos(state.pos(main))
     end
   end
 

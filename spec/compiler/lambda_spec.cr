@@ -25,7 +25,7 @@ describe Mare::Compiler::Lambda do
     lambda.body.not_nil!.to_a.should eq [:group, ":",
       [:relate,
         [:relate, [:ident, "Fruit"], [:op, "."], [:qualify,
-          [:ident, "new"], [:group, "(", [:string, "apple"]]
+          [:ident, "new"], [:group, "(", [:string, "apple", nil]]
         ]],
         [:op, "."],
         [:ident, "flavor"],

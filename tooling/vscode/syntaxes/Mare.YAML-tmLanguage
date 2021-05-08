@@ -21,7 +21,7 @@ patterns:
 
 - comment: Double-Quote String
   name: string.quoted.double.mare
-  begin: (")
+  begin: ([_a-zA-Z0-9]?")
   end: (")
   patterns:
   - name: constant.character.escape.mare
