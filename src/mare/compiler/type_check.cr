@@ -636,6 +636,7 @@ class Mare::Compiler::TypeCheck
         is_val = ret_mt.cap_only.inner == MetaType::Capability::VAL
         unless is_val && ret_rt.is_a?(ReifiedType) && ret_rt.link.is_concrete? && (
           ret_rt.not_nil!.link.name == "String" ||
+          ret_rt.not_nil!.link.name == "Bytes" ||
           ret_mt.subtype_of?(ctx, numeric_mt) ||
           (ret_rt.not_nil!.link.name == "Array" && begin
             elem_mt = ret_rt.args.first
@@ -643,12 +644,13 @@ class Mare::Compiler::TypeCheck
             elem_is_val = elem_mt.cap_only.inner == MetaType::Capability::VAL
             is_val && elem_rt.is_a?(ReifiedType) && elem_rt.link.is_concrete? && (
               elem_rt.not_nil!.link.name == "String" ||
+              elem_rt.not_nil!.link.name == "Bytes" ||
               elem_mt.subtype_of?(ctx, numeric_mt)
             )
           end)
         )
           ctx.error_at ret, "The type of a constant may only be String, " \
-            "a numeric type, or an immutable Array of one of these", [
+            "Bytes, a numeric type, or an immutable Array of one of these", [
               {@func.ret || @func.body || ret, "but the type is #{ret_mt.show_type}"}
             ]
         end

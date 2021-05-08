@@ -77,7 +77,7 @@
           error!
         )
       | token == RequestTokenVersionString |
-        if stream.is_token_equal_to("HTTP/1.1") (
+        if stream.is_token_equal_to(b"HTTP/1.1") (
           // Version is okay - no action needed
           // TODO: Accept HTTP/1.0 and change `Connection` header behavior
         |
@@ -110,7 +110,7 @@
             error!
           )
         | @_next_header is "transfer-encoding" |
-          if stream.is_token_ascii_lowercase_equal_to("chunked") (
+          if stream.is_token_ascii_lowercase_equal_to(b"chunked") (
             @_request.transfer_encoding = TransferEncodingChunked
           |
             @_error = RequestErrorUnsupportedTransferEncoding
@@ -118,9 +118,9 @@
           )
         | @_next_header is "connection" |
           case (
-          | stream.is_token_ascii_lowercase_equal_to("close") |
+          | stream.is_token_ascii_lowercase_equal_to(b"close") |
             @_request.connection_header = ConnectionHeaderClose
-          | stream.is_token_ascii_lowercase_equal_to("keep-alive") |
+          | stream.is_token_ascii_lowercase_equal_to(b"keep-alive") |
             @_request.connection_header = ConnectionHeaderKeepAlive
           |
             @_error = RequestErrorUnsupportedConnectionHeader

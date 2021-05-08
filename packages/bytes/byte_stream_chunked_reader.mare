@@ -33,7 +33,7 @@
 :: stream using the compact method to drop only chunks that are behind
 :: both the marker and cursor, releasing chunks that cannot be read anymore.
 :class ByteStreamChunkedReader
-  :prop _chunks Array(Array(U8)'val): []
+  :prop _chunks Array(Bytes): []
   :prop _chunk_index USize: 0
   :prop _offset USize: 0
   :prop _bytes_ahead USize: 0
@@ -68,7 +68,7 @@
 
   :: Add another chunk to the list of chunks to read from.
   :: This is often used when another packet arrives from the source stream.
-  :fun ref "<<" (chunk Array(U8)'val)
+  :fun ref "<<" (chunk Bytes)
     @_chunks << chunk
     @_bytes_ahead += chunk.size
     @_mark_bytes_ahead += chunk.size
@@ -144,7 +144,7 @@
   :: along with the start and end offset of the chunk that are within the token.
   :: This is used internally for chunk-wise comparison and copying operations.
   :fun _each_token_slice None
-    :yields (Array(U8)'val, USize, USize) for None
+    :yields (Bytes, USize, USize) for None
     @_each_token_slice_until -> (chunk, start, end |
       yield (chunk, start, end)
       False // continue iteration
@@ -154,7 +154,7 @@
   :: Same as the each_token_byte function, but allows the yield block to return
   :: True to stop iteration early, and in such a case the function returns True.
   :fun _each_token_slice_until Bool
-    :yields (Array(U8)'val, USize, USize) for Bool
+    :yields (Bytes, USize, USize) for Bool
     iter_chunk_index = @_mark_chunk_index
     iter_offset = @_mark_offset
     early_stop = False
@@ -176,15 +176,14 @@
 
   :: Return True if the bytes in the currently marked token are equivalent
   :: to the bytes referenced by the given string.
-  :fun is_token_equal_to (other String)
+  :fun is_token_equal_to (other (Bytes'box | String'box))
     @token_byte_size == other.size && (
       other_start USize = 0
       unequal = @_each_token_slice_until -> (chunk, start, end |
         slice_size = end - start
 
-        unequal_slice = String
-          .from_array(chunk)
-          .is_byte_slice_equal(start, other, other_start, slice_size)
+        unequal_slice = chunk
+          .is_slice_equal(start, other, other_start, slice_size)
           .not
 
         other_start += slice_size
@@ -196,7 +195,7 @@
   :: Return True if the bytes in the currently marked token, after lowercasing
   :: any encountered ASCII letters (A-Z) are equivalent to the given string.
   :: That is, the given string should be supplied as already being lowercase.
-  :fun is_token_ascii_lowercase_equal_to (other String)
+  :fun is_token_ascii_lowercase_equal_to (other (Bytes'box | String'box))
     @token_byte_size == other.size && (
       index USize = 0
       unequal = @each_token_byte_until -> (byte |
@@ -217,7 +216,7 @@
       // If the token begins and ends in the same chunk, we can avoid copying
       // by returning a String that uses a subset of the same underlying buffer.
       try (
-        String.from_array(@_chunks[@_chunk_index]!)
+        String.from_bytes(@_chunks[@_chunk_index]!)
           .trim(@_mark_offset.isize, @_offset.isize)
       |
         // Failed to get the chunk. This can happen when the cursor and marker
@@ -230,7 +229,7 @@
       // TODO: explicit variable type should not be needed in this line:
       string String'iso = String.new_iso(@token_byte_size)
       @_each_token_slice -> (chunk, start, end |
-        chunk_string = String.from_array(chunk)
+        chunk_string = String.from_bytes(chunk)
         string.concat_byte_slice(chunk_string, start.isize, end.isize)
         None // TODO: this explicit None should not be needed
       )

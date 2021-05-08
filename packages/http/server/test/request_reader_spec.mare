@@ -98,7 +98,7 @@
               finished_too_soon = True
             )
           )
-          stream << [byte]
+          stream << Bytes.from_array([byte])
         )
       )
     )
@@ -156,7 +156,7 @@
               finished_too_soon = True
             )
           )
-          stream << [byte]
+          stream << Bytes.from_array([byte])
         )
       )
     )

@@ -1311,11 +1311,26 @@ class Mare::Compiler::CodeGen
     lhs_type = type_of(relate.lhs, in_gfunc)
     member = member_ast.value
 
-    # Even if there are multiple possible gtypes and thus gfuncs, we choose an
-    # arbitrary one for the purposes of checking arg types against param types.
-    # We make the assumption that signature differences have been prevented.
-    lhs_gtype = @gtypes[lhs_type.any_callable_def_for(ctx, member).llvm_name]
-    call_gfunc = lhs_gtype[member]
+    if lhs_type.is_abstract?(ctx)
+      # Even if there are multiple possible gtypes and thus gfuncs, we choose an
+      # arbitrary one for the purposes of checking arg types against param types.
+      # However we must take care to choose the right signature if there are
+      # multiple signatures available, so we find the right reach_func.
+      # TODO: This logic could be tidied up quite a bit with better abstractions.
+      reach_func : Reach::Func? = nil
+      in_gfunc ||= func_frame.gfunc.not_nil!
+      pre_infer = ctx.pre_infer[in_gfunc.reach_func.reified.link]
+      in_gfunc.infer.each_called_func_within(ctx, in_gfunc.reach_func.reified, pre_infer[relate]) { |info, called_rf|
+        reach_func = ctx.reach.reach_func_for(called_rf)
+      }
+      reach_func = reach_func.not_nil!
+
+      lhs_gtype = @gtypes[lhs_type.any_callable_def_for(ctx, member).llvm_name]
+      call_gfunc = lhs_gtype.gfuncs_by_sig_name[reach_func.signature.codegen_compat_name(ctx)]
+    else
+      lhs_gtype = @gtypes[lhs_type.any_callable_def_for(ctx, member).llvm_name]
+      call_gfunc = lhs_gtype[member]
+    end
 
     {lhs_gtype, call_gfunc}
   end
@@ -1629,6 +1644,13 @@ class Mare::Compiler::CodeGen
       else
         cast_args << arg
       end
+    end
+
+    # Sometimes we need one last cast at the LLVM level.
+    cast_args.each_with_index do |arg, index|
+      llvm_param_type = func.type.element_type.params_types[index]
+      next if arg.type == llvm_param_type
+      cast_args[index] = @builder.bit_cast(arg, llvm_param_type, "#{arg}.CAST")
     end
 
     @builder.call(func, cast_args)

@@ -51,19 +51,21 @@ It complains when a constant isn't of one of the supported types:
   :const i8 I8: 1
   :const u64 U64: 2
   :const f64 F32: 3.3
-  :const str String: "Hello, World!"
+  :const string String: "Hello, World!"
+  :const bytes Bytes: b"Hello, World!"
   :const array_i8 Array(I8)'val: [1]
   :const array_u64 Array(U64)'val: [2]
   :const array_f32 Array(F32)'val: [3.3]
-  :const array_str Array(String)'val: ["Hello", "World"]
-  :const array_ref_str Array(String)'ref: ["Hello", "World"] // NOT VAL
+  :const array_string Array(String)'val: ["Hello", "World"]
+  :const array_bytes Array(Bytes)'val: [b"Hello", b"World"]
+  :const array_ref_string Array(String)'ref: ["Hello", "World"] // NOT VAL
 ```
 ```error
-The type of a constant may only be String, a numeric type, or an immutable Array of one of these:
-  :const array_ref_str Array(String)'ref: ["Hello", "World"] // NOT VAL
-         ^~~~~~~~~~~~~
+The type of a constant may only be String, Bytes, a numeric type, or an immutable Array of one of these:
+  :const array_ref_string Array(String)'ref: ["Hello", "World"] // NOT VAL
+         ^~~~~~~~~~~~~~~~
 
 - but the type is Array(String):
-  :const array_ref_str Array(String)'ref: ["Hello", "World"] // NOT VAL
-                       ^~~~~~~~~~~~~~~~~
+  :const array_ref_string Array(String)'ref: ["Hello", "World"] // NOT VAL
+                          ^~~~~~~~~~~~~~~~~
 ```

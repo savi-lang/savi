@@ -2,6 +2,7 @@ class Mare::Compiler::CodeGen
   class GenType
     getter type_def : Reach::Def
     getter gfuncs : Hash(String, GenFunc)
+    getter gfuncs_by_sig_name : Hash(String, GenFunc)
     getter fields : Array(Tuple(String, Reach::Ref))
     getter vtable_size : Int32
     getter! desc_type : LLVM::Type
@@ -11,6 +12,7 @@ class Mare::Compiler::CodeGen
 
     def initialize(g : CodeGen, @type_def)
       @gfuncs = Hash(String, GenFunc).new
+      @gfuncs_by_sig_name = Hash(String, GenFunc).new
 
       # Take down info on all fields.
       @fields = @type_def.fields
@@ -30,7 +32,10 @@ class Mare::Compiler::CodeGen
         key = rf.link.name
         key += ".#{rf.link.hygienic_id}" if rf.link.hygienic_id
         key += ".#{Random::Secure.hex}" if @gfuncs.has_key?(key)
-        @gfuncs[key] = GenFunc.new(g.ctx, self, reach_func, vtable_index, vtable_index_continue)
+        gfunc = GenFunc.new(g.ctx, self, reach_func, vtable_index, vtable_index_continue)
+        @gfuncs[key] = gfunc
+        sig_name = reach_func.signature.codegen_compat_name(g.ctx)
+        @gfuncs_by_sig_name[sig_name] = gfunc
       end
 
       # If we're generating for a type that has no inherent descriptor,

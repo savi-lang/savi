@@ -860,6 +860,10 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     @seen_funcs.has_key?(rf)
   end
 
+  def reach_func_for(rf : Infer::ReifiedFunction) : Func
+    @seen_funcs[rf].first
+  end
+
   def reached_funcs_for(reach_def : Def)
     @seen_funcs
       .select { |rf, _| rf.type == reach_def.reified }

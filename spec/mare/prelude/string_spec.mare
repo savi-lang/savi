@@ -8,6 +8,10 @@
     @assert = "string".as_array == ['s', 't', 'r', 'i', 'n', 'g']
     @assert = String.from_array("string".as_array) == "string"
 
+  :it "converts to and from a byte string"
+    @assert = "string".as_bytes == b"string"
+    @assert = String.from_bytes(b"string") == "string"
+
   :it "compares bytewise equality with another string"
     @assert = ("string" == "string")
     @assert = ("string" == "other").not
@@ -29,18 +33,18 @@
     @assert = "snafoozled".ends_with("")
 
   :it "checks if it has a common bytes with another string at specific offsets"
-    @assert = "foodbar".is_byte_slice_equal(1, "broodbard", 2, 6)
-    @assert = "foodbar".is_byte_slice_equal(1, "broodbard", 2, 5)
-    @assert = "foodbar".is_byte_slice_equal(2, "broodbard", 2, 5).not
-    @assert = "foodbar".is_byte_slice_equal(1, "broodbard", 2, 7).not
-    @assert = "foodbar".is_byte_slice_equal(1, "broodbard", 1, 6).not
-    @assert = "foodbar".is_byte_slice_equal(0, "broodbard", 1, 6).not
-    @assert = "broodbard".is_byte_slice_equal(2, "foodbar", 1, 6)
-    @assert = "broodbard".is_byte_slice_equal(2, "foodbar", 1, 5)
-    @assert = "broodbard".is_byte_slice_equal(2, "foodbar", 2, 5).not
-    @assert = "broodbard".is_byte_slice_equal(2, "foodbar", 1, 7).not
-    @assert = "broodbard".is_byte_slice_equal(1, "foodbar", 1, 6).not
-    @assert = "broodbard".is_byte_slice_equal(1, "foodbar", 0, 6).not
+    @assert = "foodbar".is_byte_slice_equal(1, b"broodbard", 2, 6)
+    @assert = "foodbar".is_byte_slice_equal(1, b"broodbard", 2, 5)
+    @assert = "foodbar".is_byte_slice_equal(2, b"broodbard", 2, 5).not
+    @assert = "foodbar".is_byte_slice_equal(1, b"broodbard", 2, 7).not
+    @assert = "foodbar".is_byte_slice_equal(1, b"broodbard", 1, 6).not
+    @assert = "foodbar".is_byte_slice_equal(0, b"broodbard", 1, 6).not
+    @assert = "broodbard".is_byte_slice_equal(2, b"foodbar", 1, 6)
+    @assert = "broodbard".is_byte_slice_equal(2, b"foodbar", 1, 5)
+    @assert = "broodbard".is_byte_slice_equal(2, b"foodbar", 2, 5).not
+    @assert = "broodbard".is_byte_slice_equal(2, b"foodbar", 1, 7).not
+    @assert = "broodbard".is_byte_slice_equal(1, b"foodbar", 1, 6).not
+    @assert = "broodbard".is_byte_slice_equal(1, b"foodbar", 0, 6).not
 
   :it "checks if it is an empty string or not"
     @assert = "".is_empty

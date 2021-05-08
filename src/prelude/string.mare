@@ -10,6 +10,7 @@
   :fun cpointer CPointer(U8): @_ptr
   :fun hash: @_ptr._hash(@_size)
   :fun size: @_size
+  :fun space: @_alloc
 
   :new ref (space USize = 0)
     @_size = 0
@@ -26,7 +27,13 @@
     @_alloc = data.space
     @_ptr = data.cpointer._unsafe
 
+  :new val from_bytes (data Bytes)
+    @_size = data.size
+    @_alloc = data.space
+    @_ptr = data.cpointer._unsafe
+
   :fun val as_array: Array(U8).val_from_cpointer(@_ptr._unsafe, @_size, @_alloc)
+  :fun val as_bytes: Bytes.from_string(@)
 
   :fun "==" (other String'box)
     (@_size == other._size) && (@_ptr._compare(other._ptr, @_size) == 0)
@@ -48,7 +55,7 @@
   :: as the given number of bytes to be compared.
   :fun is_byte_slice_equal (
     offset USize
-    other String'box
+    other Bytes'box
     other_offset USize
     num_bytes USize
   )

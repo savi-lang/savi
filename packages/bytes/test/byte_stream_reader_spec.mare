@@ -12,7 +12,7 @@
     @assert = stream.token_as_string == ""
 
     // Add a chunk so that those bytes are available for reading.
-    stream << "hello".as_array
+    stream << b"hello"
     @assert = stream.bytes_ahead == 5
     @assert = stream.bytes_ahead_of_marker == 5
     @assert = stream.token_byte_size == 0
@@ -41,8 +41,8 @@
     @assert = stream.token_as_string == ""
 
     // Add some more chunks.
-    stream << "world".as_array
-    stream << "lings".as_array
+    stream << b"world"
+    stream << b"lings"
     @assert = stream.bytes_ahead == 15
     @assert = stream.bytes_ahead_of_marker == 15
     @assert = stream.token_byte_size == 0
@@ -159,9 +159,9 @@
 
   :it "yields each byte of a token"
     stream = ByteStreamReader.new
-    stream << "hel".as_array
-    stream << "lowo".as_array
-    stream << "rld".as_array
+    stream << b"hel"
+    stream << b"lowo"
+    stream << b"rld"
 
     collected Array(U8) = []
 
@@ -182,9 +182,9 @@
 
   :it "yields each byte of a token until the block returns True"
     stream = ByteStreamReader.new
-    stream << "hel".as_array
-    stream << "lowo".as_array
-    stream << "rld".as_array
+    stream << b"hel"
+    stream << b"lowo"
+    stream << b"rld"
 
     collected Array(U8) = []
 
@@ -203,9 +203,9 @@
 
   :it "compares a token for equivalence to a given string"
     stream = ByteStreamReader.new
-    stream << "hel".as_array
-    stream << "lowo".as_array
-    stream << "rld".as_array
+    stream << b"hel"
+    stream << b"lowo"
+    stream << b"rld"
 
     // Compare the entire stream.
     stream.advance_to_end
@@ -226,9 +226,9 @@
 
   :it "compares an ASCII-lowercased token for equivalence to a given string"
     stream = ByteStreamReader.new
-    stream << "HeL".as_array
-    stream << "LoWo".as_array
-    stream << "RlD".as_array
+    stream << b"HeL"
+    stream << b"LoWo"
+    stream << b"RlD"
 
     // Compare the entire stream.
     stream.advance_to_end
@@ -249,9 +249,9 @@
 
   :it "parses a token as a positive integer in decimal notation"
     stream = ByteStreamReader.new
-    stream << "192".as_array
-    stream << "8374".as_array
-    stream << "650".as_array
+    stream << b"192"
+    stream << b"8374"
+    stream << b"650"
 
     // Parse the entire stream as an integer.
     stream.advance_to_end
@@ -265,6 +265,6 @@
     @assert = try (stream.token_as_positive_integer! | 0) == 283746
 
     // Add an invalid character to the stream and get an error.
-    stream << ":".as_array // only digits (0-9) are valid
+    stream << b":" // only digits (0-9) are valid
     stream.advance_to_end
     @assert = try (stream.token_as_positive_integer!, False | True)

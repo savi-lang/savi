@@ -10,6 +10,7 @@
   :fun cpointer CPointer(U8): @_ptr
   :fun hash: @_ptr._hash(@_size)
   :fun size: @_size
+  :fun space: @_alloc
 
   :new ref (space USize = 0)
     @_size = 0
@@ -26,7 +27,13 @@
     @_alloc = data.space
     @_ptr = data.cpointer._unsafe
 
+  :new val from_string (data String)
+    @_size = data.size
+    @_alloc = data.space
+    @_ptr = data.cpointer._unsafe
+
   :fun val as_array: Array(U8).val_from_cpointer(@_ptr._unsafe, @_size, @_alloc)
+  :fun val as_string: String.from_bytes(@)
 
   :fun "==" (other Bytes'box)
     (@_size == other._size) && (@_ptr._compare(other._ptr, @_size) == 0)
@@ -46,9 +53,9 @@
   :: Returns True if this Bytes at the given offset is equivalent to
   :: the given other Bytes at the given other_offset, for at least as long
   :: as the given number of bytes to be compared.
-  :fun is_byte_slice_equal (
+  :fun is_slice_equal (
     offset USize
-    other Bytes'box
+    other (Bytes'box | String'box)
     other_offset USize
     num_bytes USize
   )
@@ -62,6 +69,8 @@
 
   :fun is_empty:     @size == 0
   :fun is_not_empty: @size != 0
+
+  :fun ref clear: @_size = 0, @
 
   :fun clone @'iso
     copy = @new_iso(@size)
@@ -171,21 +180,37 @@
     )
     @
 
-  :fun ref push_byte (byte U8)
+  :fun ref push (byte U8)
     @reserve(@_size + 1)
     @_ptr._assign_at(@_size, byte)
     @_size += 1
     @
 
-  :fun each_byte
-    index USize = 0
-    while (index < @_size) (
-      yield @_ptr._get_at(index)
-      index = index + 1
+  :fun each (from USize = 0, to USize = -1) // TODO USize.max_value
+    to = @_size.min(to)
+    if (from < to) (
+      index = from
+      while (index < @_size.min(to)) (
+        yield @_ptr._get_at(index)
+        index += 1
+      )
     )
-    @
+    None
 
-  :fun each_byte_with_index
+  :fun each_until (from USize = 0, to USize = -1) // TODO USize.max_value
+    :yields for Bool
+    to = @_size.min(to)
+    early_stop = False
+    if (from < to) (
+      index = from
+      while (index < @_size.min(to) && early_stop.not) (
+        early_stop = yield @_ptr._get_at(index)
+        index += 1
+      )
+    )
+    early_stop
+
+  :fun each_with_index
     index USize = 0
     while (index < @_size) (
       yield (@_ptr._get_at(index), index)

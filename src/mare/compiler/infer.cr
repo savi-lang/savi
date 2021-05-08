@@ -209,22 +209,24 @@ module Mare::Compiler::Infer
         next if ctx.subtyping.for_rf(rf).ignores_layer?(ctx, info.layer_index)
 
         called_mt = rf.meta_type_of(ctx, call_defn_span, self)
-
         next unless called_mt
-        called_rt = called_mt.single!
 
-        if func_names.is_a?(String)
-          func_name = func_names
-          called_link = Program::Function::Link.new(called_rt.link, func_name, nil)
-          called_rf = ReifiedFunction.new(called_rt, called_link, called_mt)
-          yield({info, called_rf})
-        else
-          func_names.as(Array(String)).each { |func_name|
+        called_mt.map_each_union_member { |union_member_mt|
+          called_rt = union_member_mt.single!
+
+          if func_names.is_a?(String)
+            func_name = func_names
             called_link = Program::Function::Link.new(called_rt.link, func_name, nil)
             called_rf = ReifiedFunction.new(called_rt, called_link, called_mt)
             yield({info, called_rf})
-          }
-        end
+          else
+            func_names.as(Array(String)).each { |func_name|
+              called_link = Program::Function::Link.new(called_rt.link, func_name, nil)
+              called_rf = ReifiedFunction.new(called_rt, called_link, called_mt)
+              yield({info, called_rf})
+            }
+          end
+        }
       }
     end
 
