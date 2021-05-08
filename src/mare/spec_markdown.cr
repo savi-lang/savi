@@ -10,7 +10,7 @@ class Mare::SpecMarkdown
 
   def sources; [source]; end
   def source
-    Source.new(@filename, compiled_content, @source_library)
+    Source.new(@source_library.path, @filename, compiled_content, @source_library)
   end
 
   @compiled_content : String?

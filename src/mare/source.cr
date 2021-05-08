@@ -1,10 +1,11 @@
 struct Mare::Source
+  property dirname : String
   property filename : String
   property content : String
   property library : Library
   property language : Symbol
 
-  def initialize(@filename, @content, @library, @language = :mare)
+  def initialize(@dirname, @filename, @content, @library, @language = :mare)
   end
 
   def pony?
@@ -12,18 +13,18 @@ struct Mare::Source
   end
 
   def path
-    File.join(@library.path, @filename)
+    File.join(@dirname, @filename)
   end
 
-  NONE = new("(none)", "", Library::NONE)
+  NONE = new("", "(none)", "", Library::NONE)
   def self.none; NONE end
 
   def self.new_example(content)
-    new("(example)", content, Library.new(""))
+    new("", "(example)", content, Library.new(""))
   end
 
   def self.new_pony_example(content)
-    new("(example)", content, Library.new(""), :pony)
+    new("", "(example)", content, Library.new(""), :pony)
   end
 end
 
@@ -101,7 +102,7 @@ struct Mare::Source::Pos
   end
 
   def self.show_library_path(library : Library)
-    source = Source.new("", library.path, library, :path)
+    source = Source.new(library.path, "", library.path, library, :path)
     new(source, 0, library.path.size, 0, library.path.size, 0, 0)
   end
 

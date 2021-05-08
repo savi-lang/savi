@@ -5,6 +5,7 @@ describe Mare::Compiler::Eval do
     SOURCE
 
     source = Mare::Source.new(
+      "/path/to/fake/example/library",
       "example.mare",
       content,
       Mare::Source::Library.new("/path/to/fake/example/library"),

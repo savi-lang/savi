@@ -7,6 +7,7 @@ module Spec::Methods
     content = File.read(path)
 
     Mare::Source.new(
+      File.dirname(path),
       File.basename(path),
       content,
       Mare::Source::Library.new(File.dirname(path)),
