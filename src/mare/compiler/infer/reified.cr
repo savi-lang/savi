@@ -139,6 +139,13 @@ module Mare::Compiler::Infer
       }
     end
 
+    def corresponding_partial_reification(ctx)
+      params = ctx.infer[link].type_params
+      ReifiedType.new(link, params.zip(args).map { |param, arg|
+        MetaType.new_type_param(param).intersect(arg.cap_only)
+      })
+    end
+
     def is_complete?(ctx)
       params_count_min =
         AST::Extract.type_params(defn(ctx).params)

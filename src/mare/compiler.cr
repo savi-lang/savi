@@ -41,11 +41,11 @@ class Mare::Compiler
     when "pre_subtyping"    then :pre_subtyping
     when "infer_edge"       then :infer_edge
     when "infer"            then :infer
-    when "type_check"       then :type_check
-    when "privacy"          then :privacy
     when "completeness"     then :completeness
-    when "reach"            then :reach
+    when "privacy"          then :privacy
     when "verify"           then :verify
+    when "reach"            then :reach
+    when "type_check"       then :type_check
     when "paint"            then :paint
     when "codegen"          then :codegen
     when "lifetime"         then :lifetime
@@ -82,10 +82,10 @@ class Mare::Compiler
       when :infer_edge       then ctx.run(ctx.infer_edge)
       when :infer            then ctx.run(ctx.infer)
       when :completeness     then ctx.run(ctx.completeness)
-      when :type_check       then ctx.run_whole_program(ctx.type_check)
       when :privacy          then ctx.run(ctx.privacy)
       when :verify           then ctx.run(ctx.verify)
       when :reach            then ctx.run_whole_program(ctx.reach)
+      when :type_check       then ctx.run_whole_program(ctx.type_check)
       when :paint            then ctx.run_whole_program(ctx.paint)
       when :codegen          then ctx.run_whole_program(ctx.code_gen)
       when :lifetime         then ctx.run_whole_program(ctx.lifetime)
@@ -127,10 +127,10 @@ class Mare::Compiler
     when :infer_edge then [:pre_subtyping, :pre_infer, :classify, :refer_type]
     when :infer then [:infer_edge]
     when :completeness then [:jumps, :pre_infer]
-    when :type_check then [:completeness, :infer, :pre_infer]
     when :privacy then [:infer]
     when :verify then [:infer, :pre_infer, :inventory, :jumps]
     when :reach then [:infer, :pre_subtyping, :refer, :namespace]
+    when :type_check then [:reach, :completeness, :infer, :pre_infer]
     when :paint then [:reach, :inventory]
     when :codegen then [:paint, :verify, :reach, :completeness, :privacy, :type_check, :infer, :pre_infer, :inventory, :consumes, :jumps]
     when :lifetime then [:reach, :refer, :classify]

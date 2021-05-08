@@ -20,15 +20,30 @@ class Mare::Compiler::TypeCheck
   def run(ctx)
     # Collect this list of types to check, including types with no type params,
     # as well as partially reified types for those with type params.
-    # TODO: This shouldn't need to be a separate step, right?
     rts = [] of ReifiedType
-    ctx.program.libraries.each do |library|
-      library.types.each do |t|
+
+    # Based on reachability analysis, type check any types used in the program.
+    # This will prove safety of the program.
+    ctx.reach.each_type_def.each { |reach_def|
+      rts << reach_def.reified.corresponding_partial_reification(ctx)
+    }
+
+    # From the root library, type check every possible partial reification
+    # of every type within that library (or pulled in using :source).
+    # This is useful for developing libraries, taking checks beyond
+    # just confirming safety of the example/test program being compiled,
+    # to confirm that this library won't have compile errors in any program.
+    ctx.namespace.root_library(ctx).tap { |library|
+      library.types.each { |t|
         t_link = t.make_link(library)
         rts.concat(ctx.infer[t_link].type_partial_reifications.map(&.single!))
-      end
-    end
+      }
+    }
 
+    # Remove redundant entries in the list of types to check.
+    rts.uniq!
+
+    # Initialize subtyping assertions for each type in the list.
     rts.each { |rt|
       ctx.subtyping.for_rt(rt).initialize_assertions(ctx)
     }
