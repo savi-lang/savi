@@ -6,7 +6,11 @@ Fixtures::JSONGrammar = Pegmatite::DSL.define do
   object = declare
 
   # Define what optional whitespace looks like.
-  s = (char(' ') | char('\t') | char('\r') | char('\n')).repeat
+  # The whitespace_pattern DSL method is used to define the pattern
+  # that is allowed/ignored when concatenating patterns with the ^ operator.
+  # That is, the ^ operator works like >>, but allows optional whitespace.
+  whitespace = (char(' ') | char('\t') | char('\r') | char('\n')).repeat
+  whitespace_pattern(whitespace)
 
   # Define what a number looks like.
   digit19 = range('1', '9')
@@ -38,18 +42,17 @@ Fixtures::JSONGrammar = Pegmatite::DSL.define do
     number | string | array | object
 
   # Define what an array is, in terms of zero or more values.
-  values = value >> s >> (char(',') >> s >> value).repeat
-  array.define \
-    (char('[') >> s >> values.maybe >> s >> char(']')).named(:array)
+  values = value ^ (char(',') ^ value).repeat
+  array.define (char('[') ^ values.maybe ^ char(']')).named(:array)
 
   # Define what an object is, in terms of zero or more key/value pairs.
-  pair = (string >> s >> char(':') >> s >> value).named(:pair)
-  pairs = pair >> s >> (char(',') >> s >> pair).repeat
+  pair = (string ^ char(':') ^ value).named(:pair)
+  pairs = pair ^ (char(',') ^ pair).repeat
   object.define \
-    (char('{') >> s >> pairs.maybe >> s >> char('}')).named(:object)
+    (char('{') ^ pairs.maybe ^ char('}')).named(:object)
 
   # A JSON document is an array or object with optional surrounding whitespace.
-  (s >> (array | object) >> s).then_eof
+  (whitespace >> (array | object) >> whitespace).then_eof
 end
 
 module Fixtures::JSONBuilder

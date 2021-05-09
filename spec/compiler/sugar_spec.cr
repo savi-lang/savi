@@ -22,7 +22,7 @@ describe Mare::Compiler::Sugar do
       ]]
     ]
 
-    ctx = Mare.compiler.compile([ast], :sugar)
+    ctx = Mare.compiler.compile([ast], Mare::Compiler::Context.new, :sugar)
     ctx.errors.should be_empty
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "return_none")
@@ -62,7 +62,7 @@ describe Mare::Compiler::Sugar do
       ]],
     ]
 
-    ctx = Mare.compiler.compile([ast], :sugar)
+    ctx = Mare.compiler.compile([ast], Mare::Compiler::Context.new, :sugar)
     ctx.errors.should be_empty
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "prop_assign")
@@ -104,7 +104,7 @@ describe Mare::Compiler::Sugar do
       ]],
     ]
 
-    ctx = Mare.compiler.compile([ast], :sugar)
+    ctx = Mare.compiler.compile([ast], Mare::Compiler::Context.new, :sugar)
     ctx.errors.should be_empty
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "prop_assign")
@@ -154,7 +154,7 @@ describe Mare::Compiler::Sugar do
       ]],
     ]
 
-    ctx = Mare.compiler.compile([ast], :sugar)
+    ctx = Mare.compiler.compile([ast], Mare::Compiler::Context.new, :sugar)
     ctx.errors.should be_empty
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "plus")
@@ -195,7 +195,7 @@ describe Mare::Compiler::Sugar do
       ]],
     ]
 
-    ctx = Mare.compiler.compile([ast], :sugar)
+    ctx = Mare.compiler.compile([ast], Mare::Compiler::Context.new, :sugar)
     ctx.errors.should be_empty
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "countdown")
@@ -237,7 +237,7 @@ describe Mare::Compiler::Sugar do
       ]],
     ]
 
-    ctx = Mare.compiler.compile([ast], :sugar)
+    ctx = Mare.compiler.compile([ast], Mare::Compiler::Context.new, :sugar)
     ctx.errors.should be_empty
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "square")
@@ -303,7 +303,7 @@ describe Mare::Compiler::Sugar do
       ]],
     ]
 
-    ctx = Mare.compiler.compile([ast], :sugar)
+    ctx = Mare.compiler.compile([ast], Mare::Compiler::Context.new, :sugar)
     ctx.errors.should be_empty
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "chained")
@@ -370,7 +370,7 @@ describe Mare::Compiler::Sugar do
       ]],
     ]
 
-    ctx = Mare.compiler.compile([ast], :sugar)
+    ctx = Mare.compiler.compile([ast], Mare::Compiler::Context.new, :sugar)
     ctx.errors.should be_empty
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "square")
@@ -405,7 +405,7 @@ describe Mare::Compiler::Sugar do
       ]],
     ]
 
-    ctx = Mare.compiler.compile([ast], :sugar)
+    ctx = Mare.compiler.compile([ast], Mare::Compiler::Context.new, :sugar)
     ctx.errors.should be_empty
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "selfish")
@@ -439,7 +439,7 @@ describe Mare::Compiler::Sugar do
       ]]
     ]
 
-    ctx = Mare.compiler.compile([ast], :sugar)
+    ctx = Mare.compiler.compile([ast], Mare::Compiler::Context.new, :sugar)
     ctx.errors.should be_empty
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "new")
@@ -472,7 +472,7 @@ describe Mare::Compiler::Sugar do
       ]],
     ]
 
-    ctx = Mare.compiler.compile([ast], :sugar)
+    ctx = Mare.compiler.compile([ast], Mare::Compiler::Context.new, :sugar)
     ctx.errors.should be_empty
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "param_assigns")
@@ -531,7 +531,7 @@ describe Mare::Compiler::Sugar do
       ]],
     ]
 
-    ctx = Mare.compiler.compile([ast], :sugar)
+    ctx = Mare.compiler.compile([ast], Mare::Compiler::Context.new, :sugar)
     ctx.errors.should be_empty
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "logical")
@@ -600,7 +600,7 @@ describe Mare::Compiler::Sugar do
       ]]
     ]
 
-    ctx = Mare.compiler.compile([ast], :sugar)
+    ctx = Mare.compiler.compile([ast], Mare::Compiler::Context.new, :sugar)
     ctx.errors.should be_empty
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "type_cast")

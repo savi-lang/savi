@@ -332,6 +332,47 @@ class Mare::Server
     path
   end
 
+  def build_diagnostic(err : Error)
+    related_information = err.info.map do |info|
+      location = LSP::Data::Location.new(
+        URI.new(path: convert_path_to_host(info[0].source.path)),
+        LSP::Data::Range.new(
+          LSP::Data::Position.new(
+            info[0].row.to_i64,
+            info[0].col.to_i64,
+          ),
+          LSP::Data::Position.new(
+            info[0].row.to_i64,
+            info[0].col.to_i64 + (
+              info[0].finish - info[0].start
+            ),
+          ),
+        ),
+      )
+      LSP::Data::Diagnostic::RelatedInformation.new(
+        location,
+        info[1]
+      )
+    end
+
+    LSP::Data::Diagnostic.new(
+      LSP::Data::Range.new(
+        LSP::Data::Position.new(
+          err.pos.row.to_i64,
+          err.pos.col.to_i64,
+        ),
+        LSP::Data::Position.new(
+          err.pos.row.to_i64,
+          err.pos.col.to_i64 + (
+            err.pos.finish - err.pos.start
+          ),
+        ),
+      ),
+      related_information: related_information,
+      message: err.message,
+    )
+  end
+
   def send_diagnostics(filename : String, content : String? = nil)
     filename = convert_path_to_local(filename)
 
@@ -348,120 +389,11 @@ class Mare::Server
       source = sources[source_index]
     end
 
-    is_mare_error = true
-
-    begin
-      Mare.compiler.compile(sources, :serve_errors)
-    rescue e # Error and Pegmatite::Pattern::MatchError are Compiling errors, others are Compiler errors
-      err = e
-    end
-
-    host_filepath = convert_path_to_host(filename)
-
-    diagnostics =
-      case err
-      when Error
-        related_information = err.info.map do |info|
-          location = LSP::Data::Location.new(
-            URI.new(path: convert_path_to_host(info[0].source.path)),
-            LSP::Data::Range.new(
-              LSP::Data::Position.new(
-                info[0].row.to_i64,
-                info[0].col.to_i64,
-              ),
-              LSP::Data::Position.new(
-                info[0].row.to_i64,
-                info[0].col.to_i64 + (
-                  info[0].finish - info[0].start
-                ),
-              ),
-            ),
-          )
-          LSP::Data::Diagnostic::RelatedInformation.new(
-            location,
-            info[1]
-          )
-        end
-        [
-          LSP::Data::Diagnostic.new(
-            LSP::Data::Range.new(
-              LSP::Data::Position.new(
-                err.pos.row.to_i64,
-                err.pos.col.to_i64,
-              ),
-              LSP::Data::Position.new(
-                err.pos.row.to_i64,
-                err.pos.col.to_i64 + (
-                  err.pos.finish - err.pos.start
-                ),
-              ),
-            ),
-            related_information: related_information,
-            message: err.message,
-          ),
-        ]
-      when Pegmatite::Pattern::MatchError
-        message = err.message.not_nil!
-        offset_line = message.split(":").first
-        offset = offset_line[32..offset_line.size].to_i
-
-        line_start = (content.rindex("\n", [offset - 1, 0].max) || -1) + 1
-        line_finish = (content.index("\n", offset) || content.size)
-
-        line_no = content[0..line_finish].count('\n')
-        col_no = offset - line_start
-
-        line = content[line_start...line_finish]
-        cursor = " " * col_no + "^"
-
-        [
-          LSP::Data::Diagnostic.new(
-            LSP::Data::Range.new(
-              LSP::Data::Position.new(
-                line_no.to_i64,
-                col_no.to_i64,
-              ),
-              LSP::Data::Position.new(
-                line_no.to_i64,
-                col_no.to_i64,
-              ),
-            ),
-            message: "unexpected token at #{line_no}:#{col_no}\n#{line}\n#{cursor}"
-          ),
-        ]
-      when Nil
-        [] of LSP::Data::Diagnostic
-      else
-        offset = source.content.not_nil!.size
-
-        line_start = (content.rindex("\n", [offset - 1, 0].max) || -1) + 1
-        line_finish = (content.index("\n", offset) || content.size)
-
-        line_no = content[0..line_finish].count('\n')
-        col_no = offset - line_start
-
-        [
-          LSP::Data::Diagnostic.new(
-            LSP::Data::Range.new(
-              LSP::Data::Position.new(
-                0i64, 0i64
-              ),
-              LSP::Data::Position.new(
-                line_no.to_i64, col_no.to_i64
-              ),
-            ),
-            message: if err.message
-              "Mare compiler error occured with message \"#{err.message}\". Consider submitting new issue."
-            else
-              "Unknown Mare compiler error occured. Consider submitting new issue."
-            end
-          ),
-        ]
-      end
+    ctx = Mare.compiler.compile(sources, :serve_errors)
 
     @wire.notify(LSP::Message::PublishDiagnostics) do |msg|
-      msg.params.uri = URI.new(path: host_filepath)
-      msg.params.diagnostics = diagnostics
+      msg.params.uri = URI.new(path: convert_path_to_host(filename))
+      msg.params.diagnostics = ctx.errors.map { |err| build_diagnostic(err) }
 
       msg
     end

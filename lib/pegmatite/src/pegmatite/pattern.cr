@@ -40,19 +40,21 @@ abstract class Pegmatite::Pattern
   # Higher-level methods may choose to represent errors as exceptions,
   # created in part by getting the description of the Pattern that failed.
   class MatchError < Exception
+    getter offset : Int32
+
     def initialize(source, fail : {Int32, Pattern})
-      offset, pattern = fail
+      @offset, pattern = fail
       description = pattern.description
 
-      line_start = (source.rindex("\n", [offset - 1, 0].max) || -1) + 1
-      line_finish = (source.index("\n", offset) || source.size)
+      line_start = (source.rindex("\n", [@offset - 1, 0].max) || -1) + 1
+      line_finish = (source.index("\n", @offset) || source.size)
 
       line = source[line_start...line_finish]
-      cursor = " " * (offset - line_start) + "^"
+      cursor = " " * (@offset - line_start) + "^"
 
       # TODO: Use pattern.description after reliably getting the right pattern.
       # TODO: Report source name/filename and line number too.
-      super("unexpected token at byte offset #{offset}:\n#{line}\n#{cursor}")
+      super("unexpected token at byte offset #{@offset}:\n#{line}\n#{cursor}")
     end
   end
 

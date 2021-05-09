@@ -211,15 +211,32 @@ class Mare::Compiler
     compile(Compiler.get_library_sources(dirname), target, options)
   end
 
+  @prev_ctx : Context?
   def compile(sources : Array(Source), target : Symbol = :eval, options = CompilerOptions.new)
-    compile(sources.map { |s| Parser.parse(s) }, target, options)
+    ctx = Context.new(options, @prev_ctx)
+
+    docs = sources.compact_map do |source|
+      begin
+        Parser.parse(source)
+      rescue err : Pegmatite::Pattern::MatchError
+        pos = Source::Pos.point(source, err.offset)
+        ctx.errors << Error.build(pos, "The source code syntax is invalid near here")
+        nil
+      end
+    end
+
+    return ctx unless ctx.errors.empty?
+
+    compile(docs, ctx, target)
+  ensure
+    # Save the previous context for the purposes of caching in the next one,
+    # letting us quickly recompile any code that successfully compiled.
+    ctx.try(&.prev_ctx=(nil))
+    @prev_ctx = ctx
   end
 
-  @prev_ctx : Context?
-  def compile(docs : Array(AST::Document), target : Symbol = :eval, options = CompilerOptions.new)
+  def compile(docs : Array(AST::Document), ctx : Context, target : Symbol = :eval)
     raise "No source documents given!" if docs.empty?
-
-    ctx = Context.new(options, @prev_ctx)
 
     ctx.compile_library(docs.first.source.library, docs)
 
@@ -232,11 +249,6 @@ class Mare::Compiler
     satisfy(ctx, target)
 
     ctx
-  ensure
-    # Save the previous context for the purposes of caching in the next one,
-    # letting us quickly recompile any code that successfully compiled.
-    ctx.try(&.prev_ctx=(nil))
-    @prev_ctx = ctx
   end
 
   def self.prelude_library_path

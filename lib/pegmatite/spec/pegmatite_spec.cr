@@ -156,4 +156,16 @@ describe Pegmatite do
       Pegmatite.tokenize(Fixtures::JSONGrammar, source)
     end
   end
+
+  describe Pegmatite::Pattern::MatchError do
+    it "provides the offset of where the parse error ocurred" do
+      source = "{\"hello\": \"uh oh"
+
+      begin
+        Pegmatite.tokenize(Fixtures::JSONGrammar, source)
+      rescue err : Pegmatite::Pattern::MatchError
+        err.offset.should eq(16)
+      end
+    end
+  end
 end
