@@ -210,17 +210,13 @@ class Mare::Compiler
   def compile(sources : Array(Source), target : Symbol = :eval, options = CompilerOptions.new)
     ctx = Context.new(options, @prev_ctx)
 
-    docs = sources.map do |source|
+    docs = sources.compact_map do |source|
       begin
         Parser.parse(source)
       rescue err : Pegmatite::Pattern::MatchError
         pos = Source::Pos.point(source, err.offset)
         ctx.errors << Error.build(pos, "The source code syntax is invalid near here")
-
-        # I don't like this. I'm just returning a shell AST node so the `compile`
-        # below this one types properly as an Array(AST::Document),
-        # even though it'll never be called if we have errors.
-        AST::Document.new
+        nil
       end
     end
 
