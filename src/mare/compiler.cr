@@ -138,7 +138,7 @@ class Mare::Compiler
     when :eval then [:codegen]
     when :binary then [:codegen]
     when :binary_verona then [:codegen_verona]
-    when :serve_errors then [:completeness, :privacy, :verify, :type_check]
+    when :serve_errors then [:completeness, :privacy, :verify, :type_check, :consumes]
     when :serve_hover then [:refer, :type_check]
     when :serve_definition then [:refer, :type_check]
     when :serve_lsp then [:serve_hover, :serve_definition]
