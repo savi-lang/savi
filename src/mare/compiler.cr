@@ -180,7 +180,7 @@ class Mare::Compiler
   def self.get_library_sources(dirname, library : Source::Library? = nil)
     library ||= Source::Library.new(dirname)
 
-    Dir.entries(dirname).compact_map { |name|
+    sources = Dir.entries(dirname).compact_map { |name|
       language =
         if name.ends_with?(".mare")
           :mare
@@ -191,12 +191,13 @@ class Mare::Compiler
 
       content = File.read(File.join(dirname, name))
       Source.new(dirname, name, content, library, language)
-    }
+    } rescue [] of Source
 
-    .tap do |sources|
-      raise "No '.mare' or '.pony' source files found in #{dirname.inspect}!" \
+    Error.at Source::Pos.show_library_path(library),
+      "No '.mare' or '.pony' source files found in this directory" \
         if sources.empty?
-    end
+
+    sources
   end
 
   def eval(string : String, options = CompilerOptions.new) : Context

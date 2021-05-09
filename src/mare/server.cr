@@ -379,14 +379,16 @@ class Mare::Server
     dirname = File.dirname(filename)
     sources = Compiler.get_library_sources(dirname)
 
-    source_index = sources.index { |s| s.path == filename }.not_nil!
-    if content
-      source = sources[source_index]
-      source.content = content
-      sources[source_index] = source
-    else
-      content = sources[source_index].content
-      source = sources[source_index]
+    source_index = sources.index { |s| s.path == filename }
+    if source_index
+      if content
+        source = sources[source_index]
+        source.content = content
+        sources[source_index] = source
+      else
+        content = sources[source_index].content
+        source = sources[source_index]
+      end
     end
 
     ctx = Mare.compiler.compile(sources, :serve_errors)
@@ -394,6 +396,15 @@ class Mare::Server
     @wire.notify(LSP::Message::PublishDiagnostics) do |msg|
       msg.params.uri = URI.new(path: convert_path_to_host(filename))
       msg.params.diagnostics = ctx.errors.map { |err| build_diagnostic(err) }
+
+      msg
+    end
+
+  # Catch an Error if it happens here at the top level.
+  rescue err : Error
+    @wire.notify(LSP::Message::PublishDiagnostics) do |msg|
+      msg.params.uri = URI.new(path: convert_path_to_host(filename.not_nil!))
+      msg.params.diagnostics = [build_diagnostic(err)]
 
       msg
     end
