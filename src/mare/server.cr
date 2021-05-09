@@ -332,6 +332,47 @@ class Mare::Server
     path
   end
 
+  def build_diagnostic(err : Error)
+    related_information = err.info.map do |info|
+      location = LSP::Data::Location.new(
+        URI.new(path: convert_path_to_host(info[0].source.path)),
+        LSP::Data::Range.new(
+          LSP::Data::Position.new(
+            info[0].row.to_i64,
+            info[0].col.to_i64,
+          ),
+          LSP::Data::Position.new(
+            info[0].row.to_i64,
+            info[0].col.to_i64 + (
+              info[0].finish - info[0].start
+            ),
+          ),
+        ),
+      )
+      LSP::Data::Diagnostic::RelatedInformation.new(
+        location,
+        info[1]
+      )
+    end
+
+    LSP::Data::Diagnostic.new(
+      LSP::Data::Range.new(
+        LSP::Data::Position.new(
+          err.pos.row.to_i64,
+          err.pos.col.to_i64,
+        ),
+        LSP::Data::Position.new(
+          err.pos.row.to_i64,
+          err.pos.col.to_i64 + (
+            err.pos.finish - err.pos.start
+          ),
+        ),
+      ),
+      related_information: related_information,
+      message: err.message,
+    )
+  end
+
   def send_diagnostics(filename : String, content : String? = nil)
     filename = convert_path_to_local(filename)
 
@@ -350,50 +391,9 @@ class Mare::Server
 
     ctx = Mare.compiler.compile(sources, :serve_errors)
 
-    diagnostics = ctx.errors.map do |err|
-      related_information = err.info.map do |info|
-        location = LSP::Data::Location.new(
-          URI.new(path: convert_path_to_host(info[0].source.path)),
-          LSP::Data::Range.new(
-            LSP::Data::Position.new(
-              info[0].row.to_i64,
-              info[0].col.to_i64,
-            ),
-            LSP::Data::Position.new(
-              info[0].row.to_i64,
-              info[0].col.to_i64 + (
-                info[0].finish - info[0].start
-              ),
-            ),
-          ),
-        )
-        LSP::Data::Diagnostic::RelatedInformation.new(
-          location,
-          info[1]
-        )
-      end
-
-      LSP::Data::Diagnostic.new(
-        LSP::Data::Range.new(
-          LSP::Data::Position.new(
-            err.pos.row.to_i64,
-            err.pos.col.to_i64,
-          ),
-          LSP::Data::Position.new(
-            err.pos.row.to_i64,
-            err.pos.col.to_i64 + (
-              err.pos.finish - err.pos.start
-            ),
-          ),
-        ),
-        related_information: related_information,
-        message: err.message,
-      )
-    end
-
     @wire.notify(LSP::Message::PublishDiagnostics) do |msg|
       msg.params.uri = URI.new(path: convert_path_to_host(filename))
-      msg.params.diagnostics = diagnostics
+      msg.params.diagnostics = ctx.errors.map { |err| build_diagnostic(err) }
 
       msg
     end
