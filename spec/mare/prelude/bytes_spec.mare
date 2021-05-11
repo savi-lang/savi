@@ -55,6 +55,26 @@
     @assert = data.cpointer.is_not_null
     @assert = data.cpointer.usize != orig_pointer_address
 
+  :it "can expand size to expose uninitialized bytes within the space available"
+    data = Bytes.new(12)
+    @assert = data.space == 16
+    @assert = data.size == 0
+
+    // We are allowed to expand the size.
+    data.resize_possibly_including_uninitialized_memory(10)
+    @assert = data.space == 16
+    @assert = data.size == 10
+
+    // Contracting to a smaller size is okay too!
+    data.resize_possibly_including_uninitialized_memory(8)
+    @assert = data.space == 16
+    @assert = data.size == 8
+
+    // We aren't allowed to expand beyond the space available.
+    data.resize_possibly_including_uninitialized_memory(100)
+    @assert = data.space == 16
+    @assert = data.size == 16
+
   :it "converts to and from an array of bytes"
     @assert = b"string".as_array == ['s', 't', 'r', 'i', 'n', 'g']
     @assert = Bytes.from_array(b"string".as_array) == b"string"

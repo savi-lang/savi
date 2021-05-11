@@ -141,6 +141,32 @@
     if (@_space < space) @_ptr_reallocate(space)
     @
 
+  :: Expand to the given size, filling the added space with unitialized memory.
+  :: The given size will be silently truncated to the maximum space available
+  :: within the current allocation if it is greater than the available space.
+  :: To avoid truncation, call reserve at some point prior to this call.
+  ::
+  :: This method is intended to be called after an FFI-based operation which
+  :: fills the underlying memory up to the given size, so that the bytes are
+  :: actually already initialized before expanding size on the Pony side.
+  :: Note that reserve should be called prior to such an FFI operation
+  :: to ensure there is enough room in the allocation for the intended bytes.
+  ::
+  :: For security purposes, please ensure the added bytes are initialized
+  :: prior to allowing any operation that can read from this memory.
+  :: Otherwise data from previously garbage-collected objects may be seen.
+  :: The name of this method is obnoxiously verbose as a kind of warning
+  :: to the programmer to carefully scrutinize the way this method is used,
+  :: and prefer other patterns of working wherever possible.
+  ::
+  :: However, please note that this method is at least safe enough to prevent
+  :: expanding beyond the allocated space into territory of other allocations,
+  :: so this method cannot violate memory safety in terms of address space.
+
+  :fun ref resize_possibly_including_uninitialized_memory (size USize)
+    @_size = size.min(@_space)
+    @
+
   :fun "[]!" (index USize)
     if (@size <= index) error!
     @_ptr._get_at(index)
