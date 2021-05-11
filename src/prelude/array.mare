@@ -20,21 +20,11 @@
 
   :new (space USize = 0)
     @_size = 0
-
-    if (space > 0) (
-      @_ptr_allocate(space)
-    |
-      @_ptr_set_null
-    )
+    if (space > 0) (@_ptr_allocate(space) | @_ptr_set_null)
 
   :new iso new_iso (space USize = 0) // TODO: use recover instead of this hack
     @_size = 0
-
-    if (space > 0) (
-      @_ptr_allocate(space)
-    |
-      @_ptr_set_null
-    )
+    if (space > 0) (@_ptr_allocate(space) | @_ptr_set_null)
 
   :fun size: @_size
   :fun space: @_space

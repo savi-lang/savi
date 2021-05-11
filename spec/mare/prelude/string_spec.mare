@@ -4,6 +4,57 @@
   :is Spec
   :const describes: "String"
 
+  :it "starts with zero space and a null pointer by default"
+    data = String.new
+    @assert = data.space == 0
+    @assert = data.size == 0
+    @assert = data.cpointer.is_null
+
+  :it "allocates the next highest power of two containing the requested space"
+    data = String.new(12)
+    @assert = data.space == 16
+    @assert = data.size == 0
+    @assert = data.cpointer.is_not_null
+
+    data = String.new(16)
+    @assert = data.space == 16
+    @assert = data.size == 0
+    @assert = data.cpointer.is_not_null
+
+    data = String.new(17)
+    @assert = data.space == 32
+    @assert = data.size == 0
+    @assert = data.cpointer.is_not_null
+
+  :it "won't reallocate when reserving space within the current allocation"
+    data = String.new(12)
+    orig_pointer_address = data.cpointer.usize
+
+    data.reserve(16)
+    @assert = data.space == 16
+    @assert = data.size == 0
+    @assert = data.cpointer.is_not_null
+    @assert = data.cpointer.usize == orig_pointer_address
+
+    data.reserve(0)
+    @assert = data.space == 16
+    @assert = data.size == 0
+    @assert = data.cpointer.is_not_null
+    @assert = data.cpointer.usize == orig_pointer_address
+
+  :it "will reallocate when reserving space beyond the current allocation"
+    data = String.new(12)
+    orig_pointer_address = data.cpointer.usize
+
+    // Go to a much larger size in a different allocator pool,
+    // to ensure that we actually get a new pointer address.
+    data.reserve(2040)
+
+    @assert = data.space == 2048
+    @assert = data.size == 0
+    @assert = data.cpointer.is_not_null
+    @assert = data.cpointer.usize != orig_pointer_address
+
   :it "converts to and from an array of bytes"
     @assert = "string".as_array == ['s', 't', 'r', 'i', 'n', 'g']
     @assert = String.from_array("string".as_array) == "string"

@@ -7,20 +7,30 @@
   :new ref from_cpointer (@_ptr, @_size, @_space)
   :new iso iso_from_cpointer (@_ptr, @_size, @_space) // TODO: remove this and use recover instead?
   :new val val_from_cpointer (@_ptr, @_size, @_space) // TODO: remove this and use recover instead?
-  :fun cpointer CPointer(U8): @_ptr
   :fun hash: @_ptr._hash(@_size)
   :fun size: @_size
   :fun space: @_space
+  :fun cpointer (offset = 0) CPointer(U8)'tag: @_ptr._offset(offset)
+
+  :fun ref _ptr_set_null
+    @_space = 0
+    @_ptr = CPointer(U8)._null
+
+  :fun ref _ptr_allocate (space USize)
+    @_space = space.next_pow2.max(space).max(8)
+    @_ptr = CPointer(U8)._alloc(@_space)
+
+  :fun ref _ptr_reallocate (space USize)
+    @_space = space.next_pow2.max(space).max(8)
+    @_ptr = @_ptr._realloc(@_space)
 
   :new ref (space USize = 0)
     @_size = 0
-    @_space = space.max(8)
-    @_ptr = CPointer(U8)._alloc(@_space)
+    if (space > 0) (@_ptr_allocate(space) | @_ptr_set_null)
 
-  :new iso new_iso (space USize = 0) // TODO: use `recover` with `new` instead
+  :new iso new_iso (space USize = 0) // TODO: use recover instead of this hack
     @_size = 0
-    @_space = space.max(8)
-    @_ptr = CPointer(U8)._alloc(@_space)
+    if (space > 0) (@_ptr_allocate(space) | @_ptr_set_null)
 
   :new val from_array (data Array(U8)'val)
     @_size = data.size
@@ -125,18 +135,10 @@
     )
 
   :: Ensure enough capacity is allocated for the given space, in bytes.
-  :: An additional byte will be reserved for a null terminator.
+  :: The size (number of actual bytes present in the string) does not change.
 
-  :fun ref reserve (space)
-    if (@_space <= space) (
-      max_space = USize[-1] // TODO: USize.max_value ?
-      if (space < (max_space / 2)) (
-        @_space = space.next_pow2
-      |
-        @_space = space
-      )
-      @_ptr = @_ptr._realloc(@_space)
-    )
+  :fun ref reserve (space USize)
+    if (@_space < space) @_ptr_reallocate(space)
     @
 
   :fun "[]!" (index USize)
