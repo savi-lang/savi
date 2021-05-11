@@ -124,6 +124,11 @@
   :: Return the address of this pointer as an integer.
   :fun tag usize USize: compiler intrinsic
 
+  :: Unsafely convert the given integer to a pointer with that as the address.
+  ::
+  :: The caller is expected to only do this for memory they know that they own.
+  :fun non _from_usize (number USize) @'ref: compiler intrinsic
+
   // PONY special case: method aliases that Pony `builtin` uses internally.
   // Remove these when Mare prelude library is a superset of Pony's `builtin`.
   :fun _apply (index): @_get_at(--index)

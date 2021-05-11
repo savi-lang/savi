@@ -4,6 +4,7 @@
   :const is_floating_point Bool: False
   // TODO: arithmetic method traits with type parameters on Numeric[A] type
 
+  :fun non byte_width: @bit_width / 8
   :fun u8 U8: compiler intrinsic
   :fun u16 U16: compiler intrinsic
   :fun u32 U32: compiler intrinsic
