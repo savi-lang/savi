@@ -504,7 +504,7 @@ module Mare::AST
   end
 
   # A Relate node has a left Term and right Term, related by an infix Operator.
-  # One common example is assignment (op.value == "["):
+  # One common example is assignment (op.value == "="):
   #
   # example = "string"
   # ^~~~~~~            (lhs)
