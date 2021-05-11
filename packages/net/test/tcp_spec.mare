@@ -43,7 +43,7 @@
     @env.err.print("[Echoer] Closed")
     try conn.listen.as!(TCPListener).dispose
 
-  :fun ref received (conn TCPConnectionEngine, data Bytes, call_count USize)
+  :fun ref received (conn TCPConnectionEngine, data Bytes)
     @env.err.print("[Echoer] Received:")
     @env.err.print(data.as_string)
     conn.write(data)
@@ -76,7 +76,7 @@
     @env.err.print(data.as_string)
     data
 
-  :fun ref received (conn TCPConnectionEngine, data Bytes, call_count USize)
+  :fun ref received (conn TCPConnectionEngine, data Bytes)
     @env.err.print("[Sender] Received:")
     @env.err.print(data.as_string)
     case (

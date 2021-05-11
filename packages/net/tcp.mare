@@ -5,7 +5,7 @@
   :fun ref connecting (conn TCPConnectionEngine, count U32): None
   :fun ref connect_failed (conn TCPConnectionEngine) None
   :fun ref connected (conn TCPConnectionEngine): None
-  :fun ref received (conn TCPConnectionEngine, data Bytes, call_count USize) Bool
+  :fun ref received (conn TCPConnectionEngine, data Bytes) Bool
   :fun ref closed (conn TCPConnectionEngine): None
 
 :actor TCPConnection
@@ -29,7 +29,7 @@
 
     | action == IOActionRead |
       @_io.pending_reads -> (data |
-        @notify.received(@_io, data, 0) // TODO: remove last arg
+        @notify.received(@_io, data)
       )
     )
     @
@@ -72,7 +72,7 @@
       yield_after_writing
     )
     @notify.accepted(@_io)
-    @_io.pending_reads -> (data | @notify.received(@_io, data, 0))
+    @_io.pending_reads -> (data | @notify.received(@_io, data))
 
 :class TCPConnectionEngine
   :is IOEngine(IOAction)
