@@ -235,6 +235,15 @@ module Mare::AST
     | Operator | Prefix | Relate | Group \
     | FieldRead | FieldWrite | Choice | Loop | Try
 
+  # Annotation is a comment attached to an expression, such as a doc string.
+  # These are differentiated from true comments, which are discarded in the AST.
+  # Annotations use the `::` syntax instead of `//` and run til the end of line.
+  # These are currently used in compiler specs to mark checks for an expression,
+  # such as in the following example, which in a compiler spec will assert that
+  # the LiteralString expression gets its type inferred as `String`:
+  #
+  # example = "example" ::type=> String
+  #                       ^~~~~~~~~~~~~
   class Annotation < Node
     property value
     def initialize(@value : String)
@@ -243,6 +252,12 @@ module Mare::AST
     def to_a: Array(A); [name, value] of A end
   end
 
+  # An Identifier is any "bare word" in the source code, identifying something.
+  # In the following example of a local variable declaration whose value comes
+  # from a call with arguments, all of the underlined words are identifiers:
+  #
+  # example SomeType'val = other_1.find("string", 90, other_2)
+  # ^~~~~~~ ^~~~~~~~ ^~~   ^~~~~~~ ^~~~               ^~~~~~~
   class Identifier < Node
     property value
     def initialize(@value : String)
@@ -251,6 +266,18 @@ module Mare::AST
     def to_a: Array(A); [name, value] of A end
   end
 
+  # A LiteralString is a value surrounded by double-quotes in source code,
+  # such as the right-hand-side of the assignment in the following example:
+  #
+  # example = "example"
+  #            ^~~~~~~
+  #
+  # A LiteralString can have an optional prefix identifier, such as in the
+  # following example demonstrating a byte string (rather than a normal string),
+  # (in this case the prefix_ident is an Identifier pointing to the letter `b`):
+  #
+  # example = b"example"
+  #             ^~~~~~~
   class LiteralString < Node
     property value
     property prefix_ident
@@ -260,6 +287,13 @@ module Mare::AST
     def to_a: Array(A); [name, value, prefix_ident.try(&.to_a)] of A end
   end
 
+  # A LiteralCharacter is similar to a LiteralString, but it uses single-quotes
+  # and it resolves at parse time to a single integer value. For example,
+  # the following are character literals helping to define an array of bytes
+  # (which happen to be 5 ASCII letters followed by a newline byte):
+  #
+  # example Array(U8)'val = ['h', 'e', 'l', 'l', 'o', '/n']
+  #                           ^    ^    ^    ^    ^    ^~
   class LiteralCharacter < Node
     property value
     def initialize(@value : UInt64 | Int64)
@@ -268,6 +302,19 @@ module Mare::AST
     def to_a: Array(A); [name, value] of A end
   end
 
+  # A LiteralInteger is an integer-appearing number in the source code,
+  # which resolves at parse time to an integer value, including support for
+  # explicitly negative numbers, such as in this example (whose value is -99):
+  #
+  # example_int I32 = -99
+  #                   ^~~
+  #
+  # Note that because the true inferred types are not yet known at parse-time,
+  # this AST type is also used for floating-point values which "look" like
+  # integers, such as in the following example:
+  #
+  # example_int F32 = -99
+  #                   ^~~
   class LiteralInteger < Node
     property value
     def initialize(@value : UInt64 | Int64)
@@ -276,6 +323,13 @@ module Mare::AST
     def to_a: Array(A); [name, value] of A end
   end
 
+  # A LiteralFloat is a floating-point-appearing number in the source code,
+  # which resolves at parse time to an floating-point value. The presence of
+  # a decimal and/or exponent (e/E symbol) the the source code makes a number
+  # parse as a LiteralFloat rather than a LiteralInteger:
+  #
+  # example_float F32 = -9.9e2
+  #                     ^~~~~~
   class LiteralFloat < Node
     property value
     def initialize(@value : Float64)
@@ -284,6 +338,13 @@ module Mare::AST
     def to_a: Array(A); [name, value] of A end
   end
 
+  # An Operator is a non-Identifier symbol used in Relate and Prefix nodes,
+  # representing the particular operation indicated in those kinds of nodes.
+  # The following shows Relate assignment (`=`) with Prefix consume (`--`),
+  # in the common case of moving an old variable into a new one:
+  #
+  # new_var = --old_var
+  #         ^ ^~
   class Operator < Node
     property value
     def initialize(@value : String)
@@ -292,6 +353,12 @@ module Mare::AST
     def to_a: Array(A); [name, value] of A end
   end
 
+  # A Prefix is an AST node containing a single Term to which a single Operator
+  # is being applied, such as in the following example of consume (`--`),
+  # (where the Operator is `--` and the Term (an Identifier) is `old_var`):
+  #
+  # new_var = --old_var
+  #           ^~~~~~~~~
   class Prefix < Node
     property op
     property term
@@ -319,6 +386,12 @@ module Mare::AST
     end
   end
 
+  # A Qualify is an AST node containing a Term to which a Group is applied.
+  # This is commonly used in both function calls and generic type instances,
+  # such as in the following example demonstrating both:
+  #
+  # example Map(String, U64) = Settings.read(content, true)
+  #         ^~~~~~~~~~~~~~~~            ^~~~~~~~~~~~~~~~~~~
   class Qualify < Node
     property term
     property group
@@ -346,6 +419,61 @@ module Mare::AST
     end
   end
 
+  # A Group is a list of Terms with a particular "style" indicated.
+  # A parenthesized group in a function call like this will have `style == "("`:
+  #
+  # Settings.read(content, true)
+  #               ^~~~~~~  ^~~~  (terms)
+  #              ^~~~~~~~~~~~~~~ (group)
+  #
+  # Less commonly, parenthesized Groups can also be used to specify a sequence
+  # of statements to execute, separated by commas and/or newlines, with the
+  # result value of the Group being the value of the last statement in it:
+  #
+  # double_content = (content = half_1 + half_2, content + content)
+  #                   ^~~~~~~~~~~~~~~~~~~~~~~~~  ^~~~~~~~~~~~~~~~~  (terms)
+  #                  ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ (group)
+  #
+  # Such Groups can be further delineated into sections separated by a pipe `|`,
+  # which form an AST with a root Group whose `style == "|"`, each Term of
+  # which is a sub-Group whose `style == "("`. This is commonly used in
+  # control flow macros prior to their macro result being expanded,
+  # such as in the following example of an try macro prior to expansion:
+  #
+  # try (settings.get!("dark_mode") | settings.put("dark_mode"), False)
+  #      ^~~~~~~~~~~~~~~~~~~~~~~~~~   ^~~~~~~~~~~~~~~~~~~~~~~~~  ^~~~~  (terms of sub-groups)
+  #      ^~~~~~~~~~~~~~~~~~~~~~~~~~   ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~  (sub-groups as terms)
+  #     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ (group)
+  #
+  # Array literals are represented as a Group with `style == "["`, with each
+  # term in the Group being an element of the array being constructed:
+  #
+  # example Array(U8)'val = ['h', 'e', 'l', 'l', 'o', '/n']
+  #                           ^    ^    ^    ^    ^    ^~   (terms)
+  #                         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ (group)
+  #
+  # The same style is also used in `[]` and `[]!` method call sugar, prior to
+  # the Sugar pass in which it is turned into an Identifier and Qualify.
+  # The following example shows a `style == "["` Group on the left and
+  # a style == "[!" Group on the right side of the assignment, prior to Sugar:
+  #
+  # settings["dark_mode"] = try (settings["dark_mode"]! | False)
+  #         ^~~~~~~~~~~~~                ^~~~~~~~~~~~~~
+  #         (style == "[")               (style == "[!")
+  #
+  # Lastly, a Group with `style == " "` is used for whitespace-separated Terms,
+  # such as the type declaration of a local variable or as commonly used in
+  # control flow macros prior to their macro expansion:
+  #
+  # body_size USize = if (body <: String) (body.size | 0)
+  # ^~~~~~~~~ ^~~~~   ^~ ^~~~~~~~~~~~~~~~ ^~~~~~~~~~~~~~~
+  # ^~~~~~~~~~~~~~~   ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  # (style == " ")    (style == " ")
+  #
+  # As you can see, we try to avoid specifying what the meaning of a Group is
+  # in the early AST, and only indicate its syntactical "style" since the
+  # actual semantics of the node may not be known until a later Pass, where we
+  # are able to take into account sugar and macro expansion to resolve them.
   class Group < Node
     property style
     property terms
@@ -375,6 +503,38 @@ module Mare::AST
     end
   end
 
+  # A Relate node has a left Term and right Term, related by an infix Operator.
+  # One common example is assignment (op.value == "["):
+  #
+  # example = "string"
+  # ^~~~~~~            (lhs)
+  #         ^          (op)
+  #            ^~~~~~  (rhs)
+  # ^~~~~~~~~~~~~~~~~~ (relate)
+  #
+  # Another common example is method calls, which have `(op.value == ".")`,
+  # whose `rhs` may either be a Qualify (with args) or an Identifier (no args).
+  #
+  # Settings.read(content, true)
+  # ^~~~~~~~                     (lhs)
+  #         ^                    (op)
+  #          ^~~~~~~~~~~~~~~~~~~ (rhs)
+  # ^~~~~~~~~~~~~~~~~~~~~~~~~~~~ (relate)
+  #
+  # Other examples include binary operators prior to Sugar pass expansion
+  # (usually these get converted to method calls in the Sugar pass):
+  #
+  # number_1 + number_2 + number_3
+  # ^~~~~~~~                       (inner relate lhs)
+  #          ^                     (inner relate op)
+  #            ^~~~~~~~            (inner relate rhs)
+  # ^~~~~~~~~~~~~~~~~~~            (outer relate lhs -> inner relate)
+  #                     ^          (outer relate op)
+  #                       ^~~~~~~~ (outer relate rhs)
+  # ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ (outer relate)
+  #
+  # Operator precedence is settled at the parser/builder level,
+  # so associativity is decided when first building the AST.
   class Relate < Node
     property lhs
     property op
@@ -406,6 +566,10 @@ module Mare::AST
     end
   end
 
+  # A FieldRead node indicates a value being read from a particular field.
+  #
+  # This is an internal AST type which has no corresponding source code syntax,
+  # because field reads only happen inside of generated property getters.
   class FieldRead < Node
     property value
     def initialize(@value : String)
@@ -414,6 +578,10 @@ module Mare::AST
     def to_a: Array(A); [name, value] of A end
   end
 
+  # A FieldWrite node indicates a value being written to a particular field.
+  #
+  # This is an internal AST type which has no corresponding source code syntax,
+  # because field writes only happen inside of generated property getters.
   class FieldWrite < Node
     property value
     property rhs
@@ -434,6 +602,11 @@ module Mare::AST
     end
   end
 
+  # A FieldReplace node indicates a new value displacing the old value
+  # that was within a particular field, returning the old value of the field.
+  #
+  # This is an internal AST type which has no corresponding source code syntax,
+  # because field writes only happen inside of generated property displacers.
   class FieldReplace < Node
     property value
     property rhs
@@ -454,6 +627,17 @@ module Mare::AST
     end
   end
 
+  # A Choice node indicates a branching flow control, with a list of possible
+  # condition Terms and corresponding body Terms. During execution, each
+  # condition Term is evaluated in order until the first one that returns True,
+  # at which point the corresponding body Term is evaluated and its result
+  # becomes the result value of the Choice block, and later other branches
+  # will not be executed at all. This is roughly an if/else-if/... block.
+  #
+  # This is an internal AST type which has no corresponding source code syntax,
+  # because such a construct is only created inside macro expansions.
+  #
+  # However, the most obvious examples of use are in the `if` and `case` macros.
   class Choice < Node
     property list
     def initialize(@list : Array({Term, Term}))
@@ -481,6 +665,21 @@ module Mare::AST
     end
   end
 
+  # A Loop node indicates a looping flow control, with a `body` Term which
+  # may be executed zero or more times. The `initial_cond` Term is evaluated
+  # once at the start to determine whether any looping should be done.
+  # After the first execution of the `body` Term, then the `repeat_cond` Term
+  # is evaluated to determine whether looping will continue.
+  # If the `initial_cond` returned False, the result value of the loop is
+  # the result of evaluating the `else_body` Term; otherwise, the result
+  # of the final execution of the `body` Term will be used as the result value.
+  # In simple cases, the `repeat_cond` is the same as the `initial_cond` and
+  # the `else_body` just returns a simple value of the `None` primitive.
+  #
+  # This is an internal AST type which has no corresponding source code syntax,
+  # because such a construct is only created inside macro expansions.
+  #
+  # However, the most obvious example of use is in the `while` macro.
   class Loop < Node
     property initial_cond : Term
     property body : Term
@@ -528,6 +727,14 @@ module Mare::AST
     end
   end
 
+  # A Try node indicates a fallback flow control where a block interrupted by
+  # a possible runtime error in the `body` Term will fall back to executing
+  # the `else_body` Term to obtain a result value for the overall result.
+  #
+  # This is an internal AST type which has no corresponding source code syntax,
+  # because such a construct is only created inside macro expansions.
+  #
+  # However, the most obvious example of use is in the `try` macro.
   class Try < Node
     property body : Term
     property else_body : Term
@@ -560,6 +767,18 @@ module Mare::AST
     end
   end
 
+  # A Yield node indicates a kind of "intermediate return" where a function
+  # returns some yielded values back to the "yield block" of the caller,
+  # after which the caller can "continue" the yielding function back at the
+  # same place of execution where it was at that particular Yield.
+  # The result value of a Yield is the result value that was at the end
+  # of the "yield block" on the caller side, so this construct can also be used
+  # to get values back from the caller as well.
+  #
+  # This is an internal AST type which has no corresponding source code syntax,
+  # because such a construct is only created inside macro expansions.
+  #
+  # However, the most obvious example of use is in the `yield` macro.
   class Yield < Node
     property terms : Array(Term)
     def initialize(@terms)
@@ -587,6 +806,7 @@ module Mare::AST
     end
   end
 
+  # TODO: Document this node type and possibly refactor it to be more general.
   class Jump < Node
     enum Kind
       Error
