@@ -26,13 +26,13 @@
   :fun writev (event CPointer(AsioEvent), buffers Array(USize), count USize)
     LibPonyOs.pony_os_writev(event, buffers.cpointer, count)
 
-  :fun recv! (event CPointer(AsioEvent), buffer Array(U8), offset USize = 0)
-    LibPonyOs.pony_os_recv!(event, buffer.cpointer(offset), buffer.size - offset)
+  :fun recv! (event CPointer(AsioEvent), buffer Bytes'ref, offset USize = 0)
+    LibPonyOs.pony_os_recv!(event, buffer.cpointer(offset), buffer.space - offset)
 
   :fun check_os_error (fd U32) OSError
     option_max_size USize = 4
     option_size = [option_max_size] // TODO: use ffi_address_of instead?
-    option = Array(U8).new(option_max_size).reserve_undefined(option_max_size)
+    option = Bytes.new(option_max_size)
     result = LibC.getsockopt(
       fd, @level_socket, @option_error, option.cpointer, option_size.cpointer
     )
@@ -44,19 +44,10 @@
     |
       // Use the option_size value from the getsockopt call to trim the size
       // of the option result, as demanded by the getsockopt convention.
-      option.truncate(try (option_size[0]! | 0))
+      options_size_value = try (option_size[0]! | 0)
+      option.resize_possibly_including_uninitialized_memory(options_size_value)
 
       // Convert the 4-byte array to the equivalent 32-bit OSError value.
-      // TODO: Array.read_u32 optimization from Pony
-      // TODO: cross-platform (little-endian vs big-endian) (not necessary if the above optimization is pursued)
-      try (
-        OSError.from_u64!(
-          (option[3]!.u64.bit_shl(24)) +
-          (option[2]!.u64.bit_shl(16)) +
-          (option[1]!.u64.bit_shl(8)) +
-          option[0]!.u64
-        )
-      |
-        EINVAL
-      )
+      // TODO: Should OSError enum provide a from_u32! method?
+      try (OSError.from_u64!(option.read_native_u32!(0).u64) | EINVAL)
     )

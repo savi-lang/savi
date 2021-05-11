@@ -71,16 +71,6 @@
       @_ptr_reallocate(space)
     @
 
-  :: Reserve enough total space for the given number of elements,
-  :: and expand to that size, filling the added space with arbitrary memory.
-  :: This expansion of size only happens for an array of Numeric type elements;
-  :: if the type of the elements is not Numeric, this is the same as `reserve`.
-
-  :fun ref reserve_undefined (space USize)
-    @reserve(space)
-    if (A <: Numeric) (@_size = space)
-    @
-
   :: Create a clone of this array, containing references to the same elements
   :: that are held by this array. This is only safe if the references are
   :: aliasable as themselves (with non-unique reference capabilities), so

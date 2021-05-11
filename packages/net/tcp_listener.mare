@@ -8,7 +8,7 @@
 
 :actor TCPListener
   :prop notify TCPListenerNotify
-  :prop listen_error OSError: EINVAL
+  :prop listen_error OSError: OSErrorNone
 
   :prop _fd U32: -1
   :prop _event CPointer(AsioEvent): CPointer(AsioEvent).null
@@ -34,21 +34,20 @@
     @_yield_after_reading = 16384
     @_yield_after_writing = 16384
   )
-    @notify = --notify // TODO: is it possible to use param assign sugar for this?
+    new_notify TCPListenerNotify'ref = --notify // TODO: should not be needed
+    @notify = new_notify
+
     event = _OSSocket.listen_tcp(@, host, service)
     case (
-    | event <: CPointer(AsioEvent) | @_event = event
-    | event <: OSError             | @listen_error = event
-    )
-    @_fd = AsioEvent.fd(@_event)
-    @_notify_listening
-
-  :fun ref _notify_listening
-    if @_event.is_not_null (
-      @notify.listening(@)
-    |
+    | event <: CPointer(AsioEvent) |
+      @_event = event
+      @_fd = AsioEvent.fd(@_event)
+      error = LibPonyOs.pony_os_errno
+      new_notify.listening(@)
+    | event <: OSError |
+      @listen_error = event
       @_closed = True
-      @notify.not_listening(@)
+      new_notify.not_listening(@)
     )
 
   :: This is a special behaviour that hooks into the AsioEventNotify runtime,
