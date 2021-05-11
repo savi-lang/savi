@@ -21,7 +21,7 @@
     :yields ActionType for None
 
 :trait IOActor (ActionType val)
-  :fun _io @->(IOEngine(ActionType))
+  :fun io @->(IOEngine(ActionType)) // TODO: somehow private... allow the trait to use this, but make it private to other callers?
   :fun ref _io_react (action ActionType) @
 
   :: This is a special behaviour that hooks into the AsioEventNotify runtime,
@@ -30,7 +30,7 @@
   :: We expect the _io engine to interpret the event into an action to yield,
   :: and we will forward the yielded action the the _io_react method.
   :be _event_notify (event CPointer(AsioEvent), flags U32, arg U32)
-    @_io.react(event, flags, arg) -> (action | @_io_react(action))
+    @io.react(event, flags, arg) -> (action | @_io_react(action))
 
 :class IOCoreEngine
   :is IOEngine(IOAction)
@@ -66,7 +66,9 @@
   )
     asio_flags =
       if Platform.windows (AsioEvent.read_write | AsioEvent.read_write_oneshot)
-    connect_count = _OSSocket.connect_tcp(actor, host, service, from, asio_flags)
+    connect_count = LibPonyOs.pony_os_connect_tcp(
+      actor, host.cstring, service.cstring, from.cstring, asio_flags
+    )
     if (connect_count == 0) error!
     @_pending_connect_count = connect_count
 
@@ -99,7 +101,7 @@
           // _pending_writev_total = _pending_writev_total + data.size()
           // _pending_writes()
           buffers = [data.cpointer.usize, data.size]
-          _OSSocket.writev(@_event, buffers, buffers.size / 2)
+          LibPonyOs.pony_os_writev(@_event, buffers.cpointer, buffers.size / 2)
         )
       )
     )
@@ -113,7 +115,11 @@
   // The lack of safety here is in not knowing if offset is out of bounds.
   :fun ref recv! (read_buffer Bytes'ref, offset USize) USize
     try (
-      bytes_read = _OSSocket.recv!(@_event, read_buffer, offset)
+      bytes_read = LibPonyOs.pony_os_recv!(
+        @_event
+        read_buffer.cpointer(offset)
+        read_buffer.space - offset
+      )
       new_size = offset + bytes_read
       read_buffer.resize_possibly_including_uninitialized_memory(new_size)
 
@@ -134,12 +140,12 @@
 
   :fun ref _adopt_event! (event CPointer(AsioEvent)) @
     fd = AsioEvent.fd(event)
-    os_error = _OSSocket.check_os_error(fd)
+    os_error = _PonyOs.check_os_error(fd)
 
     // Check if the above system call failed. If so, we bail out here.
     if (os_error != OSErrorNone) (
       AsioEvent.unsubscribe(event)
-      _OSSocket.close(fd)
+      LibPonyOs.pony_os_socket_close(fd)
       @_os_error = os_error
       error!
     )
@@ -221,7 +227,11 @@
       // && @_pending_writev_total == 0
     ) (
       @_is_send_shutdown = True
-      if @is_open (_OSSocket.shutdown(@_fd) | @_is_recv_shutdown = True)
+      if @is_open (
+        LibPonyOs.pony_os_socket_shutdown(@_fd)
+      |
+        @_is_recv_shutdown = True
+      )
     )
 
     // Finish with a hard close if the socket is ready for that step.
@@ -261,7 +271,7 @@
         AsioEvent.set_writeable(@_event, False)
       )
 
-      _OSSocket.close(@_fd)
+      LibPonyOs.pony_os_socket_close(@_fd)
       @_has_closed = True
       @_is_send_shutdown = True
       @_is_recv_shutdown = True

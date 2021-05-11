@@ -383,8 +383,13 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     getter! desc_id : Int32
     getter fields : Array({String, Ref})
     getter reified
+    property unique_name : String
 
     def initialize(ctx, @reified : Infer::ReifiedType, reach : Reach, @fields)
+      # Temporarily assume this is unique - we will verify that below.
+      @unique_name = @reified.show_type
+
+      # Calculate the next available descriptor id for this kind of type.
       @desc_id = 0
       @desc_id =
         if is_numeric?(ctx)
@@ -396,6 +401,16 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
         else
           reach.next_object_id
         end
+
+      # We need to ensure uniqueness of the type name throughout the program.
+      # For example, separate packages may have private types with the same name,
+      # or even public types with the same name that are never imported together,
+      # such that they do not present a source code ambiguity, but would still
+      # present an ambiguity during CodeGen if we do not ensure uniqueness here.
+      while reach.defs_by_unique_name.has_key?(@unique_name)
+        @unique_name += "_" # simple hack - just add an underline
+      end
+      reach.defs_by_unique_name[@unique_name] = self
     end
 
     def inner
@@ -415,8 +430,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     end
 
     def llvm_name : String
-      # TODO: guarantee global uniqueness
-      @reified.show_type
+      unique_name
       .gsub("(", "[").gsub(")", "]") # LLDB doesn't handle parens very well...
     end
 
@@ -545,10 +559,12 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
 
   getter seen_funcs
   getter trait_count
+  protected getter defs_by_unique_name
 
   def initialize
     @refs = Hash(Infer::MetaType, Ref).new
     @defs = Hash(Infer::ReifiedType, Def).new
+    @defs_by_unique_name = Hash(String, Def).new
     @seen_funcs = Hash(Infer::ReifiedFunction, Array(Func)).new
   end
 

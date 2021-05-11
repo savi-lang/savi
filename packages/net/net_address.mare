@@ -12,10 +12,10 @@
   :prop _ipv6d  U32: 0 :: Bits 97-128 of an IPv6 address in network byte order.
   :prop _scope  U32: 0 :: IPv6 scope (unicast, anycast, multicast, etc...).
 
-  :new _for_fd (fd): LibPonyOs.pony_os_sockname(fd, @)
+  :new _for_fd (fd): LibPonyOS.pony_os_sockname(fd, @)
 
-  :fun is_ipv4: LibPonyOs.pony_os_ipv4(@)
-  :fun is_ipv6: LibPonyOs.pony_os_ipv6(@)
+  :fun is_ipv4: LibPonyOS.pony_os_ipv4(@)
+  :fun is_ipv6: LibPonyOS.pony_os_ipv6(@)
 
   :fun port:      LibC.ntohs(@_port)  // (converted to host byte order)
   :fun scope:     LibC.ntohl(@_scope) // (converted to host byte order)

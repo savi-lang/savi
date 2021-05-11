@@ -1,33 +1,24 @@
 :import "os/error"
 
-:primitive _OSSocket
+:ffi LibC
+  :fun getsockopt (
+    fd U32, level I32, option I32
+    out_value CPointer(U8), out_length CPointer(USize)
+  ) I32
+
+:ffi LibPonyOs
+  :fun pony_os_sockopt_level (level I32) I32
+  :fun pony_os_sockopt_option (option I32) I32
+  :fun pony_os_connect_tcp (owner AsioEventNotify, host CPointer(U8), service CPointer(U8), from CPointer(U8), asio_flags U32) U32
+  :fun pony_os_socket_close (fd U32) None
+  :fun pony_os_socket_shutdown (fd U32) None
+  :fun pony_os_writev (event CPointer(AsioEvent), iov CPointer(USize), count USize) USize
+  :fun pony_os_recv! (event CPointer(AsioEvent), buffer CPointer(U8), count USize) USize
+  :fun pony_os_errno () OSError // TODO: shouldn't require empty param parens here
+
+:primitive _PonyOs
   :fun level_socket  I32: LibPonyOs.pony_os_sockopt_level(4138)
   :fun option_error  I32: LibPonyOs.pony_os_sockopt_option(827)
-  :fun option_rcvbuf I32: LibPonyOs.pony_os_sockopt_option(884)
-  :fun option_sndbuf I32: LibPonyOs.pony_os_sockopt_option(903)
-
-  :fun connect_tcp (owner, host String, service String, from String, asio_flags)
-    LibPonyOs.pony_os_connect_tcp(
-      owner, host.cstring, service.cstring, from.cstring, asio_flags)
-
-  :fun listen_tcp (owner, host String, service String)
-    event = LibPonyOs.pony_os_listen_tcp(owner, host.cstring, service.cstring)
-    if event.is_not_null (event | LibPonyOs.pony_os_errno)
-
-  :fun accept (event) U32
-    LibPonyOs.pony_os_accept(event)
-
-  :fun close (fd U32)
-    LibPonyOs.pony_os_socket_close(fd)
-
-  :fun shutdown (fd U32)
-    LibPonyOs.pony_os_socket_shutdown(fd)
-
-  :fun writev (event CPointer(AsioEvent), buffers Array(USize), count USize)
-    LibPonyOs.pony_os_writev(event, buffers.cpointer, count)
-
-  :fun recv! (event CPointer(AsioEvent), buffer Bytes'ref, offset USize = 0)
-    LibPonyOs.pony_os_recv!(event, buffer.cpointer(offset), buffer.space - offset)
 
   :fun check_os_error (fd U32) OSError
     option_max_size USize = 4

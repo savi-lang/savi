@@ -37,15 +37,14 @@
     new_notify TCPListenerNotify'ref = --notify // TODO: should not be needed
     @notify = new_notify
 
-    event = _OSSocket.listen_tcp(@, host, service)
-    case (
-    | event <: CPointer(AsioEvent) |
+    event = LibPonyOS.pony_os_listen_tcp(@, host.cstring, service.cstring)
+    if event.is_not_null (
       @_event = event
       @_fd = AsioEvent.fd(@_event)
-      error = LibPonyOs.pony_os_errno
+      error = LibPonyOS.pony_os_errno
       new_notify.listening(@)
-    | event <: OSError |
-      @listen_error = event
+    |
+      @listen_error = LibPonyOS.pony_os_errno
       @_closed = True
       new_notify.not_listening(@)
     )
@@ -70,7 +69,7 @@
       if @_closed.not (
         try (
           while (@_limit == 0 || @_count < @_limit) (
-            conn_fd = _OSSocket.accept(@_event)
+            conn_fd = LibPonyOS.pony_os_accept(@_event)
             case (
             | conn_fd ==  0 | error! // EWOULDBLOCK, don't try again
             | conn_fd == -1 | None   // Some other error, so we can try again
@@ -94,7 +93,7 @@
       )
       @_count += 1
     |
-      _OSSocket.close(conn_fd)
+      LibPonyOS.pony_os_socket_close(conn_fd)
     )
 
   :be _conn_closed
@@ -113,7 +112,7 @@
       // When not on windows, unsubscribe immediately here instead of later.
       if Platform.windows.not AsioEvent.unsubscribe(@_event)
 
-      _OSSocket.close(@_fd)
+      LibPonyOS.pony_os_socket_close(@_fd)
       @_fd = -1
 
       @notify.closed(@)

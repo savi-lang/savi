@@ -1,4 +1,5 @@
-:import "os/error"
+:import "os/error" // TODO: can this be removed?
+:import "io"
 
 :trait TCPConnectionNotify
   :fun ref accepted (conn TCPConnectionEngine): None
@@ -11,25 +12,25 @@
 :actor TCPConnection
   :is IOActor(IOAction)
   :prop notify TCPConnectionNotify
-  :prop _io TCPConnectionEngine
+  :prop io TCPConnectionEngine
 
-  :be write (data): @_io.write(data)
-  :be dispose: @_io.close
+  :be write (data): @io.write(data)
+  :be dispose: @io.close
 
   :fun ref _io_react (action IOAction)
     case (
     | action == IOActionOpened |
-      @notify.connected(@_io)
+      @notify.connected(@io)
 
     | action == IOActionOpenFailed |
-      @notify.connect_failed(@_io)
+      @notify.connect_failed(@io)
 
     | action == IOActionClosed |
-      @notify.closed(@_io)
+      @notify.closed(@io)
 
     | action == IOActionRead |
-      @_io.pending_reads -> (data |
-        @notify.received(@_io, data)
+      @io.pending_reads -> (data |
+        @notify.received(@io, data)
       )
     )
     @
@@ -45,14 +46,14 @@
     yield_after_writing = 16384
   )
     @notify = --notify
-    @_io = TCPConnectionEngine.connect(@
+    @io = TCPConnectionEngine.connect(@
       host, service, from
       read_buffer_size
       yield_after_reading
       yield_after_writing
     )
-    if (@_io.connect_error != OSErrorNone) (
-      @notify.connect_failed(@_io)
+    if (@io.connect_error != OSErrorNone) (
+      @notify.connect_failed(@io)
     )
 
   :new _accept (
@@ -65,18 +66,18 @@
     yield_after_writing
   )
     @notify = --notify
-    @_io = TCPConnectionEngine._accept(@
+    @io = TCPConnectionEngine._accept(@
       listen, fd
       read_buffer_size
       yield_after_reading
       yield_after_writing
     )
-    @notify.accepted(@_io)
-    @_io.pending_reads -> (data | @notify.received(@_io, data))
+    @notify.accepted(@io)
+    @io.pending_reads -> (data | @notify.received(@io, data))
 
 :class TCPConnectionEngine
   :is IOEngine(IOAction)
-  :prop _io: IOCoreEngine.new
+  :prop io: IOCoreEngine.new
   :prop listen (TCPListener | None): None
   :prop connect_error OSError: OSErrorNone
 
@@ -139,7 +140,7 @@
 
   :new _new_with_io (
     // TODO: TCPConnectionAuth, rather than ambient authority.
-    @_io
+    @io
     @_read_buffer_max_size = 16384
     @_yield_after_reading = 16384
     @_yield_after_writing = 16384
@@ -148,13 +149,13 @@
     @_read_buffer.reserve(@_read_buffer_max_size)
 
   :fun ref close
-    @_io.close
+    @io.close
     @
 
   :: Write a single sequence of bytes.
   :: WARNING: Data will be silently discarded if the socket isn't connected.
   :fun ref write (data)
-    @_io.write(data)
+    @io.write(data)
     @
 
   :fun ref pending_reads
@@ -183,7 +184,7 @@
 
   :fun ref react (event CPointer(AsioEvent), flags U32, arg U32) @
     :yields IOAction
-    @_io.react(event, flags, arg) -> (action |
+    @io.react(event, flags, arg) -> (action |
       case (
       | action == IOActionClosed |
         try @listen.as!(TCPListener)._conn_closed
@@ -234,7 +235,7 @@
         // Prepare the buffer, then receive bytes into it from the socket.
         @_read_buffer_reserve
         bytes_read = try (
-          @_io.recv!(@_read_buffer, @_read_buffer_offset)
+          @io.recv!(@_read_buffer, @_read_buffer_offset)
         |
           @_readable = False
           error!

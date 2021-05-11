@@ -1,23 +1,13 @@
 :import "os/error"
 
 :ffi LibC
-  :fun getsockopt (
-    fd U32, level I32, option I32
-    out_value CPointer(U8), out_length CPointer(USize)
-  ) I32
   :fun ntohs (network_short U16) U16
   :fun ntohl (network_long U32) U32
 
-:ffi LibPonyOs
-  :fun pony_os_sockopt_level (level I32) I32
-  :fun pony_os_sockopt_option (option I32) I32
-  :fun pony_os_connect_tcp (owner AsioEventNotify, host CPointer(U8), service CPointer(U8), from CPointer(U8), asio_flags U32) U32
+:ffi LibPonyOS
   :fun pony_os_listen_tcp (owner AsioEventNotify, host CPointer(U8), service CPointer(U8)) CPointer(AsioEvent)
   :fun pony_os_accept (event CPointer(AsioEvent)) U32
   :fun pony_os_socket_close (fd U32) None
-  :fun pony_os_socket_shutdown (fd U32) None
-  :fun pony_os_writev (event CPointer(AsioEvent), iov CPointer(USize), count USize) USize
-  :fun pony_os_recv! (event CPointer(AsioEvent), buffer CPointer(U8), count USize) USize
   :fun pony_os_errno () OSError // TODO: shouldn't require empty param parens here
   :fun pony_os_sockname (fd U32, net_addr NetAddress'ref) None
   :fun pony_os_ipv4 (net_addr NetAddress'box) Bool
