@@ -19,7 +19,7 @@
   :fun minute_id I32: @time.minute.i32 + (@_offset_time.hour.i32 - 12) * 60
   :fun night_id U32: @_offset_time.day.u32 + @_offset_time.month.u32 * 100
 
-  :fun non parse! (line String)
+  :fun non parse!(line String)
     halves = line.split(']')
 
     // Parse the event type from the message.
@@ -53,7 +53,7 @@
     @new(guard, event, time)
 
 :primitive Day4
-  :fun sleeps_data_from (env Env, input String)
+  :fun sleeps_data_from(env Env, input String)
     // Parse the lines of the input, keeping the current guard id in memory
     // so that we can assign it wherever it was omitted from the journal entry.
     entries Array(Day4Entry) = []
@@ -101,7 +101,7 @@
 
     sleeps
 
-  :fun a (env Env, input String) I64
+  :fun a(env Env, input String) I64
     sleeps = @sleeps_data_from(env, input)
 
     // Find the guard who slept the most total minutes.
@@ -140,7 +140,7 @@
       0
     )
 
-  :fun b (env Env, input String) I64
+  :fun b(env Env, input String) I64
     sleeps = @sleeps_data_from(env, input)
 
     // Find the guard who most often slept during a consistently same minute,

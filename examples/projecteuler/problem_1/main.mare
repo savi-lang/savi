@@ -7,7 +7,7 @@
 
   :new (@count = 0)
 
-  :be increment (number = 1)
+  :be increment(number = 1)
     @count = @count + number
     None
 
@@ -26,5 +26,5 @@
     // [SPOILER ALERT] sum is 233168.
     counter.display
 
-  :fun multiple_of_three_or_five (number USize)
+  :fun multiple_of_three_or_five(number USize)
     number % 3 == 0 || number % 5 == 0

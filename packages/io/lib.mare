@@ -1,26 +1,26 @@
 :import "os/error"
 
 :ffi LibC
-  :fun getsockopt (
+  :fun getsockopt(
     fd U32, level I32, option I32
     out_value CPointer(U8), out_length CPointer(USize)
   ) I32
 
 :ffi LibPonyOs
-  :fun pony_os_sockopt_level (level I32) I32
-  :fun pony_os_sockopt_option (option I32) I32
-  :fun pony_os_connect_tcp (owner AsioEventNotify, host CPointer(U8), service CPointer(U8), from CPointer(U8), asio_flags U32) U32
-  :fun pony_os_socket_close (fd U32) None
-  :fun pony_os_socket_shutdown (fd U32) None
-  :fun pony_os_writev (event CPointer(AsioEvent), iov CPointer(USize), count USize) USize
-  :fun pony_os_recv! (event CPointer(AsioEvent), buffer CPointer(U8), count USize) USize
-  :fun pony_os_errno () OSError // TODO: shouldn't require empty param parens here
+  :fun pony_os_sockopt_level(level I32) I32
+  :fun pony_os_sockopt_option(option I32) I32
+  :fun pony_os_connect_tcp(owner AsioEventNotify, host CPointer(U8), service CPointer(U8), from CPointer(U8), asio_flags U32) U32
+  :fun pony_os_socket_close(fd U32) None
+  :fun pony_os_socket_shutdown(fd U32) None
+  :fun pony_os_writev(event CPointer(AsioEvent), iov CPointer(USize), count USize) USize
+  :fun pony_os_recv!(event CPointer(AsioEvent), buffer CPointer(U8), count USize) USize
+  :fun pony_os_errno OSError
 
 :primitive _PonyOs
   :fun level_socket  I32: LibPonyOs.pony_os_sockopt_level(4138)
   :fun option_error  I32: LibPonyOs.pony_os_sockopt_option(827)
 
-  :fun check_os_error (fd U32) OSError
+  :fun check_os_error(fd U32) OSError
     option_max_size USize = 4
     option_size = [option_max_size] // TODO: use ffi_address_of instead?
     option = Bytes.new(option_max_size)

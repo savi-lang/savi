@@ -1,2 +1,2 @@
-:trait Equatable (A Equatable(A)'read)
-  :fun "==" (other A'box) Bool
+:trait Equatable(A Equatable(A)'read)
+  :fun "=="(other A'box) Bool

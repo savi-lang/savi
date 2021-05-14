@@ -58,7 +58,7 @@
   :prop _list Array(JsonReaderError): []
 
   :fun is_empty: @_list.is_empty
-  :fun inspect_into (out String'iso) String'iso
+  :fun inspect_into(out String'iso) String'iso
     @_list.each -> (error |
       out << "- "
       out = error.inspect_into(--out)
@@ -67,22 +67,22 @@
     )
     --out
 
-  :fun ref start_scope (segment): @_path.push(segment)
+  :fun ref start_scope(segment): @_path.push(segment)
   :fun ref finish_scope: @_path.pop
 
   :fun ref unexpected_key_here
     @_list << JsonReaderErrorUnexpectedKeyHere.new(@_path.clone)
-  :fun ref expected_here (what)
+  :fun ref expected_here(what)
     @_list << JsonReaderErrorExpectedHere.new(@_path.clone, what)
 
 :trait JsonReaderError
-  :fun inspect_into (out String'iso) String'iso
+  :fun inspect_into(out String'iso) String'iso
 
 :class JsonReaderErrorUnexpectedKeyHere
   :is JsonReaderError
   :prop path JsonPath'val
   :new (@path)
-  :fun inspect_into (out String'iso) String'iso
+  :fun inspect_into(out String'iso) String'iso
     out << "unexpected key encountered at path: "
     @path.inspect_into(--out)
 
@@ -91,7 +91,7 @@
   :prop path JsonPath'val
   :prop what String
   :new (@path, @what)
-  :fun inspect_into (out String'iso) String'iso
+  :fun inspect_into(out String'iso) String'iso
     out << "expected to read "
     out << @what
     out << " at path: "

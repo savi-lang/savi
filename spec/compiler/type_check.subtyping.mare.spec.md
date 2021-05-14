@@ -116,15 +116,15 @@ It requires a sub-func to have the same number of params:
 
 ```mare
 :trait non Trait3Params
-  :fun example1 (a U64, b U64, c U64) None
-  :fun example2 (a U64, b U64, c U64) None
-  :fun example3 (a U64, b U64, c U64) None
+  :fun example1(a U64, b U64, c U64) None
+  :fun example2(a U64, b U64, c U64) None
+  :fun example3(a U64, b U64, c U64) None
 
 :primitive ConcreteNot3Params
   :is Trait3Params
   :fun example1 None
-  :fun example2 (a U64, b U64) None
-  :fun example3 (a U64, b U64, c U64, d U64) None
+  :fun example2(a U64, b U64) None
+  :fun example3(a U64, b U64, c U64, d U64) None
 ```
 ```error
 ConcreteNot3Params isn't a subtype of Trait3Params, as it is required to be here:
@@ -136,24 +136,24 @@ ConcreteNot3Params isn't a subtype of Trait3Params, as it is required to be here
        ^~~~~~~~
 
 - the supertype has 3 parameters:
-  :fun example1 (a U64, b U64, c U64) None
-                ^~~~~~~~~~~~~~~~~~~~~
+  :fun example1(a U64, b U64, c U64) None
+               ^~~~~~~~~~~~~~~~~~~~~
 
 - this function has too few parameters:
-  :fun example2 (a U64, b U64) None
-                ^~~~~~~~~~~~~~
+  :fun example2(a U64, b U64) None
+               ^~~~~~~~~~~~~~
 
 - the supertype has 3 parameters:
-  :fun example2 (a U64, b U64, c U64) None
-                ^~~~~~~~~~~~~~~~~~~~~
+  :fun example2(a U64, b U64, c U64) None
+               ^~~~~~~~~~~~~~~~~~~~~
 
 - this function has too many parameters:
-  :fun example3 (a U64, b U64, c U64, d U64) None
-                ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  :fun example3(a U64, b U64, c U64, d U64) None
+               ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 - the supertype has 3 parameters:
-  :fun example3 (a U64, b U64, c U64) None
-                ^~~~~~~~~~~~~~~~~~~~~
+  :fun example3(a U64, b U64, c U64) None
+               ^~~~~~~~~~~~~~~~~~~~~
 ```
 
 ---
@@ -224,15 +224,15 @@ It requires a sub-func to have covariant return and contravariant params:
 :trait non TraitParamsReturn
   :fun example1 Numeric
   :fun example2 U64
-  :fun example3 (a U64, b U64, c U64) None
-  :fun example4 (a Numeric, b Numeric, c Numeric) None
+  :fun example3(a U64, b U64, c U64) None
+  :fun example4(a Numeric, b Numeric, c Numeric) None
 
 :primitive ConcreteParamsReturn
   :is TraitParamsReturn
   :fun example1 U64: 0
   :fun example2 Numeric: U64[0]
-  :fun example3 (a Numeric, b U64, c Numeric) None:
-  :fun example4 (a U64, b Numeric, c U64) None:
+  :fun example3(a Numeric, b U64, c Numeric) None:
+  :fun example4(a U64, b Numeric, c U64) None:
 ```
 ```error
 ConcreteParamsReturn isn't a subtype of TraitParamsReturn, as it is required to be here:
@@ -248,20 +248,20 @@ ConcreteParamsReturn isn't a subtype of TraitParamsReturn, as it is required to 
                 ^~~
 
 - this parameter type is U64:
-  :fun example4 (a U64, b Numeric, c U64) None:
-                 ^~~~~
+  :fun example4(a U64, b Numeric, c U64) None:
+                ^~~~~
 
 - it is required to be a supertype of Numeric:
-  :fun example4 (a Numeric, b Numeric, c Numeric) None
-                 ^~~~~~~~~
+  :fun example4(a Numeric, b Numeric, c Numeric) None
+                ^~~~~~~~~
 
 - this parameter type is U64:
-  :fun example4 (a U64, b Numeric, c U64) None:
-                                   ^~~~~
+  :fun example4(a U64, b Numeric, c U64) None:
+                                  ^~~~~
 
 - it is required to be a supertype of Numeric:
-  :fun example4 (a Numeric, b Numeric, c Numeric) None
-                                       ^~~~~~~~~
+  :fun example4(a Numeric, b Numeric, c Numeric) None
+                                      ^~~~~~~~~
 ```
 
 ---
@@ -293,18 +293,18 @@ ConcreteWithoutExampleNone isn't a subtype of TraitExampleNone, as it is require
 It can use type parameters as type arguments in the subtype assertion:
 
 ```mare
-:trait TraitConvertAToB (A read, B val)
-  :fun convert (input A) B
+:trait TraitConvertAToB(A read, B val)
+  :fun convert(input A) B
 
 // This class is a valid subtype of the trait as it asserts itself to be.
-:class ConcreteConvertToString (C Numeric'read)
+:class ConcreteConvertToString(C Numeric'read)
   :is TraitConvertAToB(C, String)
-  :fun convert (input C): "Pretend this is a string representation of C"
+  :fun convert(input C): "Pretend this is a string representation of C"
 
 // This class is not. It has the type arguments backwards in its assertion.
-:class ConcreteConvertToStringBackwards (C Numeric'val)
+:class ConcreteConvertToStringBackwards(C Numeric'val)
   :is TraitConvertAToB(String, C)
-  :fun convert (input C): "This one has the trait arguments backwards"
+  :fun convert(input C): "This one has the trait arguments backwards"
 ```
 ```error
 ConcreteConvertToStringBackwards(C'val) isn't a subtype of TraitConvertAToB(String, C'val), as it is required to be here:
@@ -312,18 +312,18 @@ ConcreteConvertToStringBackwards(C'val) isn't a subtype of TraitConvertAToB(Stri
    ^~
 
 - this function's return type is String:
-  :fun convert (input C): "This one has the trait arguments backwards"
+  :fun convert(input C): "This one has the trait arguments backwards"
        ^~~~~~~
 
 - it is required to be a subtype of C'val:
-  :fun convert (input A) B
-                         ^
+  :fun convert(input A) B
+                        ^
 
 - this parameter type is C'val:
-  :fun convert (input C): "This one has the trait arguments backwards"
-                ^~~~~~~
+  :fun convert(input C): "This one has the trait arguments backwards"
+               ^~~~~~~
 
 - it is required to be a supertype of String:
-  :fun convert (input A) B
-                ^~~~~~~
+  :fun convert(input A) B
+               ^~~~~~~
 ```

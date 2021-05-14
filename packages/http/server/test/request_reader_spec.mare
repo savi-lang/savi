@@ -73,7 +73,7 @@
   :: Parse the given source_chunks into a request and yield it to the caller.
   :: Returns True if everything went smoothly.
   :: Returns False and prints a message if something unexpected happened.
-  :fun example (source_chunks Array(String)) Bool
+  :fun example(source_chunks Array(String)) Bool
     :yields Request
     reader = RequestReader.new
     stream = ByteStreamChunkedReader.new
@@ -129,7 +129,7 @@
   :: Parse the given source_chunks into a request, expecting the given error.
   :: Returns True if the given error was indeed produced by the RequestReader.
   :: Returns False and prints a message if something unexpected happened.
-  :fun example_error (
+  :fun example_error(
     source_chunks Array(String)
     expected_error RequestError
   ) Bool

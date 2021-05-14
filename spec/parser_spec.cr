@@ -10,7 +10,7 @@ describe Mare::Parser do
       :fun greeting String
         "Hello, " + @name + "!"
 
-      :fun degreesF (c F64) F64
+      :fun degreesF(c F64) F64
         c * 9 / 5 + 32.0
     SOURCE
 
@@ -32,8 +32,9 @@ describe Mare::Parser do
         [:string, "!", nil]]]],
      [:declare,
       [[:ident, "fun"],
-       [:ident, "degreesF"],
-       [:group, "(", [:group, " ", [:ident, "c"], [:ident, "F64"]]],
+       [:qualify,
+        [:ident, "degreesF"],
+        [:group, "(", [:group, " ", [:ident, "c"], [:ident, "F64"]]]],
        [:ident, "F64"]],
       [:group,
        ":",

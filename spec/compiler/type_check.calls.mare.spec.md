@@ -274,7 +274,7 @@ It complains when calling a function with too many or too few arguments:
     @example(1, 2, 3, 4, 5)
     @example(1, 2, 3, 4, 5, U8[6])
 
-  :fun example (a U8, b U8, c U8, d U8 = 4, e U8 = 5)
+  :fun example(a U8, b U8, c U8, d U8 = 4, e U8 = 5)
 ```
 ```error
 This function call doesn't meet subtyping requirements:
@@ -286,8 +286,8 @@ This function call doesn't meet subtyping requirements:
      ^~~~~~~
 
 - the function requires at least 3 arguments:
-  :fun example (a U8, b U8, c U8, d U8 = 4, e U8 = 5)
-               ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  :fun example(a U8, b U8, c U8, d U8 = 4, e U8 = 5)
+              ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ```
 ```error
 This function call doesn't meet subtyping requirements:
@@ -299,6 +299,6 @@ This function call doesn't meet subtyping requirements:
      ^~~~~~~
 
 - the function allows at most 5 arguments:
-  :fun example (a U8, b U8, c U8, d U8 = 4, e U8 = 5)
-               ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  :fun example(a U8, b U8, c U8, d U8 = 4, e U8 = 5)
+              ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ```

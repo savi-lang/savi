@@ -26,7 +26,7 @@ TODO: It won't allow an interface in the local library to circumvent
 It won't crash on private calls within a type-conditional layer:
 
 ```mare
-:class Generic (A)
+:class Generic(A)
   :prop _value A
   :new (@_value)
   :fun numeric_bit_width

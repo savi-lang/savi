@@ -16,20 +16,20 @@
   :member IOActionWrite: 4
   :member IOActionClosed: 5
 
-:trait IOEngine (ActionType val)
-  :fun ref react (event CPointer(AsioEvent), flags U32, arg U32) @
+:trait IOEngine(ActionType val)
+  :fun ref react(event CPointer(AsioEvent), flags U32, arg U32) @
     :yields ActionType for None
 
-:trait IOActor (ActionType val)
+:trait IOActor(ActionType val)
   :fun io @->(IOEngine(ActionType)) // TODO: somehow private... allow the trait to use this, but make it private to other callers?
-  :fun ref _io_react (action ActionType) @
+  :fun ref _io_react(action ActionType) @
 
   :: This is a special behaviour that hooks into the AsioEventNotify runtime,
   :: called whenever an event handle we're subscribed to receives an event.
   ::
   :: We expect the _io engine to interpret the event into an action to yield,
   :: and we will forward the yielded action the the _io_react method.
-  :be _event_notify (event CPointer(AsioEvent), flags U32, arg U32)
+  :be _event_notify(event CPointer(AsioEvent), flags U32, arg U32)
     @io.react(event, flags, arg) -> (action | @_io_react(action))
 
 :class IOCoreEngine
@@ -58,7 +58,7 @@
 
   :new
 
-  :new new_tcp_connect! (
+  :new new_tcp_connect!(
     actor AsioEventNotify
     host String
     service String
@@ -72,7 +72,7 @@
     if (connect_count == 0) error!
     @_pending_connect_count = connect_count
 
-  :new new_from_fd_rw (actor AsioEventNotify, @_fd)
+  :new new_from_fd_rw(actor AsioEventNotify, @_fd)
     asio_flags =
       if Platform.windows (AsioEvent.read_write | AsioEvent.read_write_oneshot)
     @_event = AsioEvent.create(actor, @_fd, asio_flags, 0, True)
@@ -86,7 +86,7 @@
     @_is_send_shutdown = True
     @_is_recv_shutdown = True
 
-  :fun ref write (data Bytes'val)
+  :fun ref write(data Bytes'val)
     if @is_open (
       // Don't sent 0 byte payloads; windows doesn't like it (and it's wasteful)
       if (data.size > 0) (
@@ -113,7 +113,7 @@
   // TODO: Try to make this a safe interface instead of an unsafe one,
   // perhaps by bringing the read buffer into this class to be contained here.
   // The lack of safety here is in not knowing if offset is out of bounds.
-  :fun ref recv! (read_buffer Bytes'ref, offset USize) USize
+  :fun ref recv!(read_buffer Bytes'ref, offset USize) USize
     try (
       bytes_read = LibPonyOs.pony_os_recv!(
         @_event
@@ -138,7 +138,7 @@
       error!
     )
 
-  :fun ref _adopt_event! (event CPointer(AsioEvent)) @
+  :fun ref _adopt_event!(event CPointer(AsioEvent)) @
     fd = AsioEvent.fd(event)
     os_error = _PonyOs.check_os_error(fd)
 
@@ -157,7 +157,7 @@
     @_is_readable = True // TODO: Remove these lines?
     @
 
-  :fun ref react (event CPointer(AsioEvent), flags U32, arg U32) @
+  :fun ref react(event CPointer(AsioEvent), flags U32, arg U32) @
     :yields IOAction for None
     case (
     // First, if this is a disposable event handle, just dispose of it.
@@ -196,7 +196,7 @@
     @
 
   :: Handle incoming events for the event handle that we already own.
-  :fun ref _event_notify_continue (flags U32, arg U32)
+  :fun ref _event_notify_continue(flags U32, arg U32)
     :yields IOAction for None
     if AsioEvent.is_writeable(flags) (
       @_is_writeable = True

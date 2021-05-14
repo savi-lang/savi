@@ -2,9 +2,9 @@
 :import "collections"
 
 :primitive Day2
-  :fun has_duo  (line): @has_target_count(line, 2)
-  :fun has_trio (line): @has_target_count(line, 3)
-  :fun has_target_count (line String, target_count I64)
+  :fun has_duo(line): @has_target_count(line, 2)
+  :fun has_trio(line): @has_target_count(line, 3)
+  :fun has_target_count(line String, target_count I64)
     letters = Map(U8, I64).new
     line.each_byte -> (letter |
       try ( // TODO: use an upsert method instead?
@@ -15,7 +15,7 @@
     )
     letters.has_any -> (letter, count | count == target_count)
 
-  :fun a (input String)
+  :fun a(input String)
     // Find the number of lines that have a byte repeated exactly twice,
     // and the number of lines that have a byte repeated exactly thrice,
     // and multiply these two counts together to get the checksum.
@@ -26,7 +26,7 @@
     )
     count_duo * count_trio
 
-  :fun b (input String)
+  :fun b(input String)
     found_l = ""
     found_r = ""
     diff USize = -1

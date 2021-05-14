@@ -51,6 +51,8 @@ patterns:
   endCaptures:
     '1': {name: keyword.declare.mare}
   patterns:
+  - name: entity.other.attribute-name.mare
+    match: (\w+(?:\?|\!)?)(?=\()
   - include: $self
   - name: entity.other.attribute-name.mare
     match: (\w+)

@@ -1,30 +1,30 @@
 // TODO: Get rid of this hack:
 :ffi InspectLibC
-  :fun puts (string CPointer(U8)) I32
-  :fun strlen (string CPointer(U8)) I32
-  :fun snprintf (buffer CPointer(U8), buffer_size I32, fmt CPointer(U8), value F64) I32
+  :fun puts(string CPointer(U8)) I32
+  :fun strlen(string CPointer(U8)) I32
+  :fun snprintf(buffer CPointer(U8), buffer_size I32, fmt CPointer(U8), value F64) I32
 
 :trait box _InspectEach
   // TODO: use each instead of size and []!
   :fun size USize
-  :fun "[]!" (index USize) Any'box // TODO: use `box` instead of `Any'box`
+  :fun "[]!"(index USize) Any'box // TODO: use `box` instead of `Any'box`
 
 :trait box _InspectEnum
   :fun member_name String
 
 :trait box _InspectCustom
-  :fun inspect_into (output String'iso) String'iso
+  :fun inspect_into(output String'iso) String'iso
 
 // TODO: Move this out of prelude maybe? Does that make sense?
 // TODO: Make this into a trait with "implement for"/typeclass style polymorphism
 :primitive Inspect
-  :fun "[]" (input Any'box) String'val // TODO: use `box` instead of `Any'box`
+  :fun "[]"(input Any'box) String'val // TODO: use `box` instead of `Any'box`
     @into(String.new_iso, input)
 
-  :fun out (input Any'box) // TODO: use `box` instead of `Any'box`
+  :fun out(input Any'box) // TODO: use `box` instead of `Any'box`
     InspectLibC.puts(@[input].cstring)
 
-  :fun into (output String'iso, input Any'box) String'iso // TODO: use `box` instead of `Any'box` // TODO: use something like Crystal IO instead of String?
+  :fun into(output String'iso, input Any'box) String'iso // TODO: use `box` instead of `Any'box` // TODO: use something like Crystal IO instead of String?
     case (
     | input <: _InspectCustom | input.inspect_into(--output)
     | input <: _InspectEnum | output << input.member_name, --output
@@ -77,7 +77,7 @@
       --output
     )
 
-  :fun non _inspect_float_into (out String'iso, value F64) String'iso
+  :fun non _inspect_float_into(out String'iso, value F64) String'iso
     if value.is_negative (
       out.push_byte('-')
       value = value.negate
@@ -92,7 +92,7 @@
 
   :const _inspect_float_buffer_size USize: 128
 
-  :fun non _inspect_finite_positive_float_into (out String'iso, value F64) String'iso
+  :fun non _inspect_finite_positive_float_into(out String'iso, value F64) String'iso
     // TODO: use grisu3 algorithm like Crystal does, for better performance
     // for those numbers that the algorithm handles, using this as a fallback:
     out.reserve(out.size + @_inspect_float_buffer_size)

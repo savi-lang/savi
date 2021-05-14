@@ -5,20 +5,20 @@ pass: type_check
 It complains if some params of an elevated constructor are not sendable:
 
 ```mare
-  :new val bad_constructor (a String'ref, b String'val, c String'box)
+  :new val bad_constructor(a String'ref, b String'val, c String'box)
 ```
 ```error
 A constructor with elevated capability must only have sendable parameters:
-  :new val bad_constructor (a String'ref, b String'val, c String'box)
+  :new val bad_constructor(a String'ref, b String'val, c String'box)
        ^~~
 
 - this parameter type (String'ref) is not sendable:
-  :new val bad_constructor (a String'ref, b String'val, c String'box)
-                            ^~~~~~~~~~~~
+  :new val bad_constructor(a String'ref, b String'val, c String'box)
+                           ^~~~~~~~~~~~
 
 - this parameter type (String'box) is not sendable:
-  :new val bad_constructor (a String'ref, b String'val, c String'box)
-                                                        ^~~~~~~~~~~~
+  :new val bad_constructor(a String'ref, b String'val, c String'box)
+                                                       ^~~~~~~~~~~~
 ```
 
 ---
@@ -27,20 +27,20 @@ It complains if some params of an asynchronous function are not sendable:
 
 ```mare
 :actor BadActor
-  :be bad_behavior (a String'ref, b String'val, c String'box)
+  :be bad_behavior(a String'ref, b String'val, c String'box)
 ```
 ```error
 An asynchronous function must only have sendable parameters:
-  :be bad_behavior (a String'ref, b String'val, c String'box)
+  :be bad_behavior(a String'ref, b String'val, c String'box)
    ^~
 
 - this parameter type (String'ref) is not sendable:
-  :be bad_behavior (a String'ref, b String'val, c String'box)
-                    ^~~~~~~~~~~~
+  :be bad_behavior(a String'ref, b String'val, c String'box)
+                   ^~~~~~~~~~~~
 
 - this parameter type (String'box) is not sendable:
-  :be bad_behavior (a String'ref, b String'val, c String'box)
-                                                ^~~~~~~~~~~~
+  :be bad_behavior(a String'ref, b String'val, c String'box)
+                                               ^~~~~~~~~~~~
 ```
 
 ---

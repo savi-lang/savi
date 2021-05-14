@@ -5,7 +5,7 @@ describe Mare::Compiler::TypeContext do
       :new
         Container(String).new("Hello").string
 
-    :class Container (A val)
+    :class Container(A val)
       :prop a A
       :new (@a)
       :fun string String

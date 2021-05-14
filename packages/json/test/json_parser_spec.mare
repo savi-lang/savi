@@ -211,7 +211,7 @@
     @assert = @example_error(<<<{"a":1,"b":2]>>>,      <<<{"a":1,"b":2>>>)
     @assert = @example_error(<<<{"apple","edible"}>>>, <<<{"apple">>>)
 
-  :fun example (source String, expected String) Bool
+  :fun example(source String, expected String) Bool
     collector = _TestJsonParserCollector.new
     parser = JsonParser.new
     try (
@@ -232,7 +232,7 @@
       False
     )
 
-  :fun example_error (source String, valid_part String) Bool
+  :fun example_error(source String, valid_part String) Bool
     parser = JsonParser.new
     try (
       parser.parse!(source) -> (token | None)
@@ -260,7 +260,7 @@
     (JsonToken | USize | USize | I64 | F64 | String | None)
   )): []
 
-  :fun inspect_into (out String'iso) String'iso
+  :fun inspect_into(out String'iso) String'iso
     @tokens.each -> (item |
       out = Inspect.into(--out, item)
       out.push_byte('\n')
@@ -269,7 +269,7 @@
     out.trim_in_place(0, -1) // remove the final newline
     --out
 
-  :fun ref collect (parser JsonParser, token JsonToken) None
+  :fun ref collect(parser JsonParser, token JsonToken) None
     @tokens << [
       token
       parser.token_start

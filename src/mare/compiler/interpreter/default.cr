@@ -47,14 +47,8 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
     },
     {
       "kind" => "term",
-      "name" => "ident",
-      "type" => "ident",
-    },
-    {
-      "kind" => "term",
-      "name" => "params",
-      "type" => "params",
-      "optional" => true,
+      "name" => "ident_maybe_with_params",
+      "type" => "ident|ident+params",
     },
   ] of Hash(String, String | Bool))
 
@@ -72,15 +66,8 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
     },
     {
       "kind" => "term",
-      "name" => "ident",
-      "type" => "ident|string",
-      "convert_string_to_ident" => true,
-    },
-    {
-      "kind" => "term",
-      "name" => "params",
-      "type" => "params",
-      "optional" => true,
+      "name" => "ident_maybe_with_params",
+      "type" => "ident|ident+params",
     },
   ] of Hash(String, String | Bool))
 
@@ -108,12 +95,24 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
       AST::Identifier.new(cap_value).from(keyword)
     )
 
+    ident_maybe_with_params = data["ident_maybe_with_params"]
+    case ident_maybe_with_params
+    when AST::Identifier
+      ident = ident_maybe_with_params
+      params = nil
+    when AST::Qualify
+      ident = ident_maybe_with_params.term.as(AST::Identifier)
+      params = ident_maybe_with_params.group
+    else
+      raise NotImplementedError.new(ident_maybe_with_params)
+    end
+
     t = Type.new(
       keyword.value,
       Program::Type.new(
         data["cap"].as(AST::Identifier),
-        data["ident"].as(AST::Identifier),
-        data["params"]?.as(AST::Group?),
+        ident,
+        params,
       ),
       @library,
     )
@@ -168,14 +167,26 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
     data = @@declare_alias.run(decl)
     body = decl.body
 
-    Error.at data["ident"].pos, "This alias declaration needs a body "\
+    ident_maybe_with_params = data["ident_maybe_with_params"]
+    case ident_maybe_with_params
+    when AST::Identifier
+      ident = ident_maybe_with_params
+      params = nil
+    when AST::Qualify
+      ident = ident_maybe_with_params.term.as(AST::Identifier)
+      params = ident_maybe_with_params.group
+    else
+      raise NotImplementedError.new(ident_maybe_with_params)
+    end
+
+    Error.at ident.pos, "This alias declaration needs a body "\
       "containing a single type expression to indicate what it is an alias of" \
         unless body.is_a?(AST::Group) \
           && body.terms.size == 1 \
 
     @library.aliases << Program::TypeAlias.new(
-      data["ident"].as(AST::Identifier),
-      data["params"]?.as(AST::Group?),
+      ident,
+      params,
       body.not_nil!.terms.first,
     )
   end
@@ -368,15 +379,9 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
       },
       {
         "kind" => "term",
-        "name" => "ident",
-        "type" => "ident|string",
+        "name" => "ident_maybe_with_params",
+        "type" => "ident|string|ident+params|string+params",
         "convert_string_to_ident" => true,
-      },
-      {
-        "kind" => "term",
-        "name" => "params",
-        "type" => "params",
-        "optional" => true,
       },
       {
         "kind" => "term",
@@ -401,15 +406,9 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
       },
       {
         "kind" => "term",
-        "name" => "ident",
-        "type" => "ident|string",
+        "name" => "ident_maybe_with_params",
+        "type" => "ident|string|ident+params|string+params",
         "convert_string_to_ident" => true,
-      },
-      {
-        "kind" => "term",
-        "name" => "params",
-        "type" => "params",
-        "optional" => true,
       },
     ] of Hash(String, String | Bool))
 
@@ -427,17 +426,11 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
       },
       {
         "kind" => "term",
-        "name" => "ident",
-        "type" => "ident|string",
+        "name" => "ident_and_or_params",
+        "type" => "ident|string|ident+params|string+params|params",
         "convert_string_to_ident" => true,
         "optional" => true,
         "default_copy_term" => "keyword",
-      },
-      {
-        "kind" => "term",
-        "name" => "params",
-        "type" => "params",
-        "optional" => true,
       },
     ] of Hash(String, String | Bool))
 
@@ -533,12 +526,22 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
             end
           end
 
-        ident = data["ident"].as(AST::Identifier)
+        ident_maybe_with_params = data["ident_maybe_with_params"]
+        case ident_maybe_with_params
+        when AST::Identifier
+          ident = ident_maybe_with_params
+          params = nil
+        when AST::Qualify
+          ident = ident_maybe_with_params.term.as(AST::Identifier)
+          params = ident_maybe_with_params.group
+        else
+          raise NotImplementedError.new(ident_maybe_with_params)
+        end
 
         func = Program::Function.new(
           data["cap"].as(AST::Identifier),
           ident,
-          data["params"]?.as(AST::Group?),
+          params,
           data["ret"]?.as(AST::Term?),
           decl.body,
         )
@@ -552,11 +555,23 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         Error.at cap, "A behaviour can't have an explicit receiver capability" \
           if cap
 
+        ident_maybe_with_params = data["ident_maybe_with_params"]
+        case ident_maybe_with_params
+        when AST::Identifier
+          ident = ident_maybe_with_params
+          params = nil
+        when AST::Qualify
+          ident = ident_maybe_with_params.term.as(AST::Identifier)
+          params = ident_maybe_with_params.group
+        else
+          raise NotImplementedError.new(ident_maybe_with_params)
+        end
+
         func = Program::Function.new(
           AST::Identifier.new("ref").from(data["keyword"]),
-          data["ident"].as(AST::Identifier),
-          data["params"]?.as(AST::Group?),
-          AST::Identifier.new("None").from(data["ident"]),
+          ident,
+          params,
+          AST::Identifier.new("None").from(ident),
           decl.body,
         ).tap(&.add_tag(:async))
       when "new"
@@ -567,11 +582,27 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
 
         data["cap"] ||= @type.cap.dup
 
+        ident_and_or_params = data["ident_and_or_params"]
+        case ident_and_or_params
+        when AST::Identifier
+          ident = ident_and_or_params
+          params = nil
+        when AST::Qualify
+          ident = ident_and_or_params.term.as(AST::Identifier)
+          params = ident_and_or_params.group
+        when AST::Group
+          ident_value = data["keyword"].as(AST::Identifier).value
+          ident = AST::Identifier.new(ident_value).from(data["keyword"])
+          params = ident_and_or_params
+        else
+          raise NotImplementedError.new(ident_and_or_params)
+        end
+
         func = Program::Function.new(
           data["cap"].as(AST::Identifier),
-          data["ident"].as(AST::Identifier),
-          data["params"]?.as(AST::Group?),
-          AST::Identifier.new("@").from(data["ident"]),
+          ident,
+          params,
+          AST::Identifier.new("@").from(ident),
           decl.body,
         ).tap do |f|
           f.add_tag(:constructor)

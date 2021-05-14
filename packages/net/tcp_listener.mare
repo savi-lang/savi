@@ -1,10 +1,10 @@
 :import "os/error"
 
 :trait TCPListenerNotify
-  :fun ref listening (listen TCPListener'ref): None
-  :fun ref not_listening (listen TCPListener'ref) None
-  :fun ref closed (listen TCPListener'ref): None
-  :fun ref connected! (listen TCPListener'ref) TCPConnectionNotify'iso
+  :fun ref listening(listen TCPListener'ref): None
+  :fun ref not_listening(listen TCPListener'ref) None
+  :fun ref closed(listen TCPListener'ref): None
+  :fun ref connected!(listen TCPListener'ref) TCPConnectionNotify'iso
 
 :actor TCPListener
   :prop notify TCPListenerNotify
@@ -51,7 +51,7 @@
 
   :: This is a special behaviour that hooks into the AsioEventNotify runtime,
   :: called whenever an event handle we're subscribed to receives an event.
-  :be _event_notify (event CPointer(AsioEvent), flags U32, arg U32)
+  :be _event_notify(event CPointer(AsioEvent), flags U32, arg U32)
     if (@_event is event) (
       if AsioEvent.is_readable(flags) (
         @_accept(arg)
@@ -62,7 +62,7 @@
       )
     )
 
-  :be _accept (ns U32 = 0)
+  :be _accept(ns U32 = 0)
     if Platform.windows (
       // TODO
     |
@@ -81,7 +81,7 @@
       )
     )
 
-  :fun ref _spawn (conn_fd U32)
+  :fun ref _spawn(conn_fd U32)
     try (
       TCPConnection._accept(
         @

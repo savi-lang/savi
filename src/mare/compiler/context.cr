@@ -108,7 +108,7 @@ class Mare::Compiler::Context
 
   def compile_decl(decl : AST::Declare)
     loop do
-      raise "Unrecognized keyword: #{decl.keyword}" if @stack.size == 0
+      Error.at decl, "Unrecognized keyword: #{decl.keyword}" if @stack.size == 0
       break if @stack.last.keywords.includes?(decl.keyword)
       @stack.pop.finished(self)
     end

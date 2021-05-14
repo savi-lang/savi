@@ -14,7 +14,7 @@
     @last_number   = I64[0]
     @last_string   = ""
 
-  :fun ref parse! (@source)
+  :fun ref parse!(@source)
     :yields JsonToken for None
     @_set_defaults
     if @_detect_empty.not (
@@ -40,11 +40,11 @@
 
   :fun _peek_softly U8: try (@source[@_offset]! | ' ')
 
-  :fun ref _eat! (b U8): if (b != @source[@_offset]!) error!, @_advance
+  :fun ref _eat!(b U8): if (b != @source[@_offset]!) error!, @_advance
 
-  :fun ref _advance (n USize = 1): @_offset += n
+  :fun ref _advance(n USize = 1): @_offset += n
 
-  :fun ref _rewind (n USize = 1): @_offset -= n
+  :fun ref _rewind(n USize = 1): @_offset -= n
 
   :fun ref _pre_token: @_offset_start = @_offset
 
@@ -271,9 +271,9 @@
     )
     value
 
-  :fun non _is_number_digit (b U8) Bool: (b >= '0') && (b <= '9')
+  :fun non _is_number_digit(b U8) Bool: (b >= '0') && (b <= '9')
 
-  :fun ref _parse_string! (is_key Bool = False)
+  :fun ref _parse_string!(is_key Bool = False)
     :yields JsonToken for None
     @_advance // past the opening quote
     @_pre_token
@@ -301,7 +301,7 @@
     @_parse_string! -> (token | None)
     @last_string
 
-  :fun ref _push_escape_seq! (buf String'ref) String'ref
+  :fun ref _push_escape_seq!(buf String'ref) String'ref
     next = @_next!
     case (
     | next == '"'  | buf.push_byte('"')

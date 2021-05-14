@@ -1,4 +1,4 @@
-:class _KVBA (K, V)
+:class _KVBA(K, V)
   :prop key K
   :prop value V
   :new (@key, @value)
@@ -6,8 +6,8 @@
   // TODO: some kind of declare sugar for this common pattern
   :prop _before (_KVBA(K, V) | None): None
   :prop _after (_KVBA(K, V) | None): None
-  :fun ref "before=" (entry): @_before = entry
-  :fun ref "after=" (entry): @_after = entry
+  :fun ref "before="(entry): @_before = entry
+  :fun ref "after="(entry): @_after = entry
   :fun before!: @_before.not!(None)
   :fun after!: @_after.not!(None)
 
@@ -17,7 +17,7 @@
 :: The basic implementation of the hash map is the same, but each entry in the
 :: hash map is also part of a doubly-linked circular list, with the "head" of
 :: the circular list being the most recently inserted entry in the hash map.
-:class OrderedMap (K, V, H HashFunction(K) = HashEq(K))
+:class OrderedMap(K, V, H HashFunction(K) = HashEq(K))
   :is MapReadable(K, V)
 
   :prop _size USize: 0
@@ -29,11 +29,11 @@
   :new (prealloc USize = 6)
     @_init_array(((prealloc * 4) / 3).max(8).next_pow2)
 
-  :fun ref _init_array (space USize)
+  :fun ref _init_array(space USize)
     @_array = Array((_KVBA(K, V) | _MapEmpty | _MapDeleted)).new(space)
     Count.to(space) -> (@_array << _MapEmpty)
 
-  :fun ref _resize (space USize)
+  :fun ref _resize(space USize)
     space = space.max(@_size) // only grow the array - never shrink it
     old_array = @_array
 
@@ -54,7 +54,7 @@
     @_init_array(8) // the default prealloc of 6 corresponds to an array of 8
     @
 
-  :fun ref _remove_entry_from_place (entry _KVBA(K, V))
+  :fun ref _remove_entry_from_place(entry _KVBA(K, V))
     try ( // this should never fail - _KVBA instances are always initialized
       // Join the entries before and after together to eachother,
       // effectively removing this entry from that point in the circle.
@@ -62,7 +62,7 @@
       entry.after!.before = entry.before!
     )
 
-  :fun ref _place_entry_as_head (entry _KVBA(K, V))
+  :fun ref _place_entry_as_head(entry _KVBA(K, V))
     head = @_head
     if (head <: _KVBA(K, V)) (
       try ( // this should never fail - _KVBA instances are always initialized
@@ -84,7 +84,7 @@
     )
 
   :: Return True if the given key is present.
-  :fun has_key (key K)
+  :fun has_key(key K)
     try (@[--key]!, True | False)
 
   :: Return the value assigned to the given key, if present.
@@ -98,7 +98,7 @@
   :: $ map.delete("example"), map["example"]!
   :: > error! // this key no longer has an assigned value
   ::
-  :fun "[]!" (key K)
+  :fun "[]!"(key K)
     @_array[@_search(key)]!.as!(@->(_KVBA(K, V))).value // TODO: fix @-> parentheses
 
   :: Assign the given value to the given key in the map.
@@ -110,7 +110,7 @@
   :: $ map["example"] = 33, map["example"]!
   :: > 33
   ::
-  :fun ref "[]=" (key K, value V)
+  :fun ref "[]="(key K, value V)
     value_alias V'aliased = value // TODO: remove the V'aliased explicit type?
     try (
       index = @_search(key)
@@ -150,7 +150,7 @@
   :: > error! // this key no longer has an assigned value
   :: $ map.delete("example") // deleting it again has no effect
   ::
-  :fun ref delete (key K)
+  :fun ref delete(key K)
     try (
       index = @_search(key)
       entry = @_array[index]!.as!(@->(_KVBA(K, V))) // TODO: fix @-> parentheses
@@ -162,7 +162,7 @@
     None
 
   :: Given a key, find the internal index associated with the hash of that key.
-  :fun _search (key)
+  :fun _search(key)
     hash = H.hash(key).usize()
 
     idx_del = @_array.size

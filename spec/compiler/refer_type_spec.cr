@@ -2,7 +2,7 @@ describe Mare::Compiler::ReferType do
   it "returns the same output state when compiled again with same sources" do
     source = Mare::Source.new_example <<-SOURCE
     :primitive Greeting
-      :fun greet (env Env):
+      :fun greet(env Env):
         env.out.print("Hello, World")
 
     :actor Main

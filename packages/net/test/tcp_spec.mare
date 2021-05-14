@@ -5,7 +5,7 @@
   :prop env Env
   :new (@env)
 
-  :fun ref listening (listen TCPListener'ref)
+  :fun ref listening(listen TCPListener'ref)
     // TODO: get port dynamically instead of hard-coding it.
     TCPConnection.new(
       TCPSpecNotify.new(@env)
@@ -14,14 +14,14 @@
     )
     @env.err.print("[Listener] Listening")
 
-  :fun ref not_listening (listen TCPListener'ref) None
+  :fun ref not_listening(listen TCPListener'ref) None
     @env.err.print("[Listener] Not listening:")
     @env.err.print(listen.listen_error.name)
 
-  :fun ref closed (listen TCPListener'ref): None
+  :fun ref closed(listen TCPListener'ref): None
     @env.err.print("[Listener] Stopped listening")
 
-  :fun ref connected! (listen TCPListener'ref) TCPConnectionNotify'iso
+  :fun ref connected!(listen TCPListener'ref) TCPConnectionNotify'iso
     TCPSpecEchoNotify.new(@env)
 
 :class iso TCPSpecEchoNotify
@@ -29,21 +29,21 @@
   :prop env Env
   :new (@env)
 
-  :fun ref accepted (conn TCPConnectionEngine)
+  :fun ref accepted(conn TCPConnectionEngine)
     @env.err.print("[Echoer] Accepted")
 
-  :fun ref connected (conn TCPConnectionEngine)
+  :fun ref connected(conn TCPConnectionEngine)
     @env.err.print("[Echoer] Connected")
 
-  :fun ref connect_failed (conn TCPConnectionEngine)
+  :fun ref connect_failed(conn TCPConnectionEngine)
     @env.err.print("[Echoer] Failed to connect:")
     @env.err.print(conn.connect_error.name)
 
-  :fun ref closed (conn TCPConnectionEngine)
+  :fun ref closed(conn TCPConnectionEngine)
     @env.err.print("[Echoer] Closed")
     try conn.listen.as!(TCPListener).dispose
 
-  :fun ref received (conn TCPConnectionEngine, data Bytes)
+  :fun ref received(conn TCPConnectionEngine, data Bytes)
     @env.err.print("[Echoer] Received:")
     @env.err.print(data.as_string)
     conn.write(data)
@@ -55,28 +55,28 @@
   :prop env Env
   :new (@env)
 
-  :fun ref accepted (conn TCPConnectionEngine)
+  :fun ref accepted(conn TCPConnectionEngine)
     @env.err.print("[Sender] Accepted")
 
-  :fun ref connected (conn TCPConnectionEngine)
+  :fun ref connected(conn TCPConnectionEngine)
     @env.err.print("[Sender] Connected")
     conn.write(b"Hello, World!")
     try conn.expect!(5)
     None
 
-  :fun ref connect_failed (conn TCPConnectionEngine)
+  :fun ref connect_failed(conn TCPConnectionEngine)
     @env.err.print("[Sender] Failed to connect:")
     @env.err.print(conn.connect_error.name)
 
-  :fun ref closed (conn TCPConnectionEngine)
+  :fun ref closed(conn TCPConnectionEngine)
     @env.err.print("[Sender] Closed")
 
-  :fun ref sent (conn TCPConnectionEngine, data Bytes)
+  :fun ref sent(conn TCPConnectionEngine, data Bytes)
     @env.err.print("[Sender] Sent:")
     @env.err.print(data.as_string)
     data
 
-  :fun ref received (conn TCPConnectionEngine, data Bytes)
+  :fun ref received(conn TCPConnectionEngine, data Bytes)
     @env.err.print("[Sender] Received:")
     @env.err.print(data.as_string)
     case (

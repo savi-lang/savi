@@ -5,11 +5,11 @@
   :fun non inner!: error!
 
 :primitive _EarlyReturn
-  :fun non conditional (early Bool) U64
+  :fun non conditional(early Bool) U64
     if early (return 33)
     11
 
-:class Container (A)
+:class Container(A)
   :prop value A
   :new (@value)
 
@@ -183,7 +183,7 @@
 
     test.print_line_break // TODO: move to MicroTest constructor and finalizer
 
-  :fun non source_code_position_of_argument_string (
+  :fun non source_code_position_of_argument_string(
     arg Bool
     pos SourceCodePosition = source_code_position_of_argument arg
   )

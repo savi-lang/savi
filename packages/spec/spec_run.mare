@@ -1,13 +1,13 @@
 :trait val SpecRunAny
-  :fun val run (specs Specs) None // TODO: fun box instead of fun val
+  :fun val run(specs Specs) None // TODO: fun box instead of fun val
 
-:class val SpecRun (A Spec)
+:class val SpecRun(A Spec)
   :is SpecRunAny
   :prop env Env
   :new (@env)
 
   // TODO: avoid this indirection
-  :fun _new_spec (specs) A
+  :fun _new_spec(specs) A
     A.new(TestHelper.new(@env, specs, A.describes, ""))
 
   :: Run all spec features for the Spec type indicated by the type argument,
@@ -15,7 +15,7 @@
   ::
   :: A summary of successes and failures will be printed to `env.out`.
   :: If there are one or more failures, `env.exit_code` will be set accordingly.
-  :fun val run (specs Specs) None // TODO: fun box instead of fun val
+  :fun val run(specs Specs) None // TODO: fun box instead of fun val
     type ReflectionOfType(A) = (reflection_of_type @_new_spec(specs))
     features = type.features.select -> (feature |
       feature.tags.includes("it")
@@ -27,7 +27,7 @@
       SpecExampleRunner(A).new(@env, specs, feature)
     )
 
-:actor SpecExampleRunner (A Spec)
+:actor SpecExampleRunner(A Spec)
   :prop example ReflectionFeatureOfType(A)
 
   :new (env, specs, @example)

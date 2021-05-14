@@ -9,26 +9,26 @@
   :new (@env, @spec_count)
     @reporter = SpecReporterLinear.new(@env, @statuses, SpecReporterFull.new(@env))
 
-  :fun non run (env, runners Array(SpecRunAny)) // TODO: shouldn't need this indirection
+  :fun non run(env, runners Array(SpecRunAny)) // TODO: shouldn't need this indirection
     specs = @new(env, runners.size)
     runners.each -> (runner | runner.run(specs))
 
-  :fun non _fail (env Env)
+  :fun non _fail(env Env)
     env.exit_code = 1 // Mark the entire process as a failure.
 
-  :fun non _bug (env Env, text)
+  :fun non _bug(env Env, text)
     env.err.write("You've encountered a bug in the spec library: ")
     env.err.print(text)
     Specs._fail(env)
 
-  :be spec_began (spec String, expected_examples USize)
+  :be spec_began(spec String, expected_examples USize)
     // TODO: complain if spec is empty or duplicate
     status = SpecStatus.new(spec)
     status.expected_examples = expected_examples
     @statuses[spec] = status
     @reporter.spec_began(spec)
 
-  :fun ref spec_ended (spec String)
+  :fun ref spec_ended(spec String)
     try (
       status = @statuses[spec]!
       status.ended = True
@@ -42,7 +42,7 @@
       Specs._bug(@env, "spec_ended before the spec_began")
     )
 
-  :be example_began (spec String, example String):
+  :be example_began(spec String, example String):
     // TODO: complain if example is empty or duplicate
     try (
       @statuses[spec]!.examples[example] = SpecExampleStatus.new(example)
@@ -51,8 +51,8 @@
       Specs._bug(@env, "example_began before the spec_began")
     )
 
-  :be example_close (spec String, example String): @example_ended(spec, example)
-  :fun ref example_ended (spec String, example String)
+  :be example_close(spec String, example String): @example_ended(spec, example)
+  :fun ref example_ended(spec String, example String)
     try (
       status = @statuses[spec]!
       example_status = status.examples[example]!
@@ -70,7 +70,7 @@
       Specs._bug(@env, "example_ended before the example_began")
     )
 
-  :be assert (spec String, example String, success Bool, pos SourceCodePosition)
+  :be assert(spec String, example String, success Bool, pos SourceCodePosition)
     event = SpecEventAssert.new(success, pos)
 
     // If it was a failed assertion, mark the entire process as a failure.

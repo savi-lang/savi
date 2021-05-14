@@ -7,7 +7,7 @@
   :: indicating what entity the tests are describing the specification for.
   :const describes String
 
-  :fun ref "assert=" (
+  :fun ref "assert="(
     success Bool
     pos SourceCodePosition = source_code_position_of_argument success
   )
@@ -20,11 +20,11 @@
   :prop example String
   :new (@env, @specs, @spec, @example)
 
-  :fun assert (success, pos) // TODO: avoid needing this alias
+  :fun assert(success, pos) // TODO: avoid needing this alias
     @specs.assert(@spec, @example, success, pos)
     success
 
-  :fun "assert=" (
+  :fun "assert="(
     success Bool
     pos SourceCodePosition = source_code_position_of_argument success
   )

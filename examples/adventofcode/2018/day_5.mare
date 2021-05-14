@@ -18,7 +18,7 @@
     )
     result
 
-  :fun ref remove_all (lowercase_byte U8)
+  :fun ref remove_all(lowercase_byte U8)
     uppercase_byte = lowercase_byte - 'a' + 'A'
     @input.each_byte_with_index -> (byte, index |
       if (byte == lowercase_byte || byte == uppercase_byte) (
@@ -74,10 +74,10 @@
     @
 
 :primitive Day5
-  :fun a (input)
+  :fun a(input)
     Day5Polymer.new(input).reduce.size
 
-  :fun b (input String'box)
+  :fun b(input String'box)
     // First, reduce the input so as to make the next iterations faster.
     input = Day5Polymer.new(input).reduce.result
 

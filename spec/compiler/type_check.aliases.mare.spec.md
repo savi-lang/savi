@@ -8,9 +8,9 @@ It allows type aliases to pass along type parameters:
 :trait Sizeable
   :fun size USize
 
-:class GenericClass (A, B Sizeable'read)
+:class GenericClass(A, B Sizeable'read)
 
-:alias GenericAlias (C, D String'read): GenericClass(C, D)
+:alias GenericAlias(C, D String'read): GenericClass(C, D)
 ```
 ```mare
     a = GenericAlias(U64, String'ref).new ::type=> GenericClass(U64, String'ref)

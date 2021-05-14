@@ -63,7 +63,7 @@ This variable can't be used here; it might already be consumed:
 It complains when referencing a possibly-consumed local from a choice:
 
 ```mare
-  :fun show (u U64)
+  :fun show(u U64)
     if (u <= 3) (
       case (
       | u == 1 | x = "one" // no consume
@@ -103,7 +103,7 @@ This variable can't be used here; it might already be consumed:
 It allows referencing a local consumed in an earlier choice branch:
 
 ```mare
-  :fun show (u U64)
+  :fun show(u U64)
     case (
     | u == 1 | --u, x = "one"
     | u == 2 | --u, x = "two"
@@ -117,7 +117,7 @@ It allows referencing a local consumed in an earlier choice branch:
 It complains when a choice body uses a local consumed in an earlier cond:
 
 ```mare
-  :fun show (u U64)
+  :fun show(u U64)
     if (--u == 1) (
       "one"
     |
@@ -139,7 +139,7 @@ This variable can't be used here; it might already be consumed:
 It complains when a choice cond uses a local consumed before the choice:
 
 ```mare
-  :fun show (u U64)
+  :fun show(u U64)
     --u
     if (u == 1) ("one" | "other")
 ```
@@ -222,7 +222,7 @@ It allows referencing a local in the body of a loop consumed in the else:
 It complains when a loop cond uses a local consumed before the loop:
 
 ```mare
-  :fun show (u U64)
+  :fun show(u U64)
     --u
     while (u == 1) ("one" | "other")
 ```
@@ -253,8 +253,8 @@ It unconsumes a variable if assigned from an expression that consumes it:
     try (x = @indirect_partial!(--x))
     x // NOT OKAY; reassignment is partial
 
-  :fun non @indirect (s String'iso) String'iso: --s
-  :fun non @indirect_partial! (s String'iso) String'iso: --s
+  :fun non indirect(s String'iso) String'iso: --s
+  :fun non indirect_partial!(s String'iso) String'iso: --s
 ```
 ```error
 This variable can't be used here; it might already be consumed:

@@ -11,7 +11,7 @@ This type will be used throughout the following examples to demonstrate calling 
   :fun yield_99
     yield U64[99]
 
-  :fun count_to (count U64) None
+  :fun count_to(count U64) None
     :yields U64 for None
     i U64 = 0
     while (i < count) (

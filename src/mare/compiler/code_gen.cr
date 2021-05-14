@@ -706,9 +706,9 @@ class Mare::Compiler::CodeGen
   end
 
   def gen_ffi_decl(gfunc)
-    params = gfunc.func.params.not_nil!.terms.map do |param|
+    params = gfunc.func.params.try(&.terms.map { |param|
       llvm_type_of(param, gfunc)
-    end
+    }) || [] of LLVM::Type
     ret = llvm_type_of(gfunc.func.ret.not_nil!, gfunc)
 
     ffi_link_name = gfunc.func.metadata[:ffi_link_name].as(String)

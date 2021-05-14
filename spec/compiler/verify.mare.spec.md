@@ -34,16 +34,16 @@ This actor constructor may raise an error, but that is not allowed:
 It complains when a no-exclamation function has an error-able body:
 
 ```mare
-  :fun risky (x U64)
+  :fun risky(x U64)
     if (x == 0) (error!)
 ```
 ```error
 This function name needs an exclamation point because it may raise an error:
-  :fun risky (x U64)
+  :fun risky(x U64)
        ^~~~~
 
 - it should be named 'risky!' instead:
-  :fun risky (x U64)
+  :fun risky(x U64)
        ^~~~~
 
 - an error may be raised here:

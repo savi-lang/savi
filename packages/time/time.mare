@@ -16,7 +16,7 @@
   :member Saturday: 6
   :member Sunday: 7
 
-  :fun non from_value (value U8)
+  :fun non from_value(value U8)
     case (
       | value == 1 | Monday
       | value == 2 | Tuesday
@@ -49,11 +49,11 @@
   :prop nanosecond U32: 0
 
   :: An internal-only direct constructor.
-  :new val _new (@total_seconds, @nanosecond)
+  :new val _new(@total_seconds, @nanosecond)
 
   :: Represent the moment in time indicated by the given year, month, day,
   :: and optional hour, minute, second, and nanosecond (in the UTC time zone).
-  :new val utc (
+  :new val utc(
     year   U32
     month  U8
     day    U8
@@ -69,7 +69,7 @@
       + second.u64
 
   :: Represent a duration of the given number of nanoseconds.
-  :new nanoseconds (n U32):
+  :new nanoseconds(n U32):
     @total_seconds = 0
     while (@_nanoseconds_per_second < n) (
       n -= @_nanoseconds_per_second
@@ -78,35 +78,35 @@
     @nanosecond = n
 
   :: Represent a duration of the given number of seconds.
-  :new seconds (n): @total_seconds = n
+  :new seconds(n): @total_seconds = n
 
   :: Represent a duration of the given number of minutes.
-  :new minutes (n): @total_seconds = @_seconds_per_minute * n
+  :new minutes(n): @total_seconds = @_seconds_per_minute * n
 
   :: Represent a duration of the given number of hours.
-  :new hours (n): @total_seconds = @_seconds_per_hour * n
+  :new hours(n): @total_seconds = @_seconds_per_hour * n
 
   :: Represent a duration of the given number of days.
-  :new days (n): @total_seconds = @_seconds_per_day * n
+  :new days(n): @total_seconds = @_seconds_per_day * n
 
   :: Return True if the given time is exactly equivalent to this one.
-  :fun "==" (other Time'box)
+  :fun "=="(other Time'box)
     @total_seconds == other.total_seconds
     && @nanosecond == other.nanosecond
 
   :: Return True if the given time is less than (earlier than) this one.
-  :fun "<" (other Time'box)
+  :fun "<"(other Time'box)
     @total_seconds < other.total_seconds
     || (@total_seconds == other.total_seconds && @nanosecond < other.nanosecond)
 
   :: Return True if the given time is greater than (later than) this one.
-  :fun ">" (other Time'box)
+  :fun ">"(other Time'box)
     @total_seconds > other.total_seconds
     || (@total_seconds == other.total_seconds && @nanosecond > other.nanosecond)
 
   :: Subtract the given time (elapsed since `0001-01-01 00:00:00.0` UTC)
   :: from this time and return the result.
-  :fun "-" (other Time'box)
+  :fun "-"(other Time'box)
     total = @total_seconds, other_total = other.total_seconds
     nano  = @nanosecond,    other_nano  = other.nanosecond
 
@@ -119,7 +119,7 @@
 
   :: Add the given time (elapsed since `0001-01-01 00:00:00.0` UTC)
   :: to this time and return the result.
-  :fun "+" (other Time'box)
+  :fun "+"(other Time'box)
     total = @total_seconds + other.total_seconds
     nano  = @nanosecond    + other.nanosecond
 
@@ -155,7 +155,7 @@
     (@total_seconds % @_seconds_per_minute).u8
 
   :: Print the time data for human inspection (the format is subject to change).
-  :fun inspect_into (output String'iso)
+  :fun inspect_into(output String'iso)
     // TODO: Properly pad numbers with zeroes for a constant string width.
     output = Inspect.into(--output, @year),       output.push_byte('-')
     output = Inspect.into(--output, @month),      output.push_byte('-')
@@ -202,11 +202,11 @@
     .bit_or(day.u64.bit_shl(40))
 
   :: Returns True if the given year is a leap year.
-  :fun non _is_leap_year (year U32)
+  :fun non _is_leap_year(year U32)
     year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)
 
   :: Returns the number of days in the given month of the given year.
-  :fun non _days_in_month (month U8, year) U8
+  :fun non _days_in_month(month U8, year) U8
     case (
     | month ==  1 | 31 // January
     | month ==  2 | if @_is_leap_year(year) (29 | 28) // Feb.
@@ -225,7 +225,7 @@
 
   :: Returns the number of days from `0001-01-01` to the date indicated
   :: by the given year, month, and day in the proleptic Gregorian calendar.
-  :fun non _absolute_days (year U32, month U8, day U8) U64
+  :fun non _absolute_days(year U32, month U8, day U8) U64
     // Normalize the month index, treating months beyond 12 as additional years.
     while (month > 12) (year += 1, month -= 12)
 
@@ -358,5 +358,5 @@
   :fun to_s
     @format("%m/%d/%y")
 
-  :fun format (pattern String'box) String'val
+  :fun format(pattern String'box) String'val
     TimeFormatter.new(pattern).format(@)

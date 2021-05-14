@@ -4,23 +4,23 @@
   :prop _size USize
   :prop _space USize
   :prop _ptr CPointer(U8)'ref
-  :new ref from_cpointer (@_ptr, @_size, @_space)
-  :new iso iso_from_cpointer (@_ptr, @_size, @_space) // TODO: remove this and use recover instead?
-  :new val val_from_cpointer (@_ptr, @_size, @_space) // TODO: remove this and use recover instead?
+  :new ref from_cpointer(@_ptr, @_size, @_space)
+  :new iso iso_from_cpointer(@_ptr, @_size, @_space) // TODO: remove this and use recover instead?
+  :new val val_from_cpointer(@_ptr, @_size, @_space) // TODO: remove this and use recover instead?
   :fun hash: @_ptr._hash(@_size)
   :fun size: @_size
   :fun space: @_space
-  :fun cpointer (offset = 0) CPointer(U8)'tag: @_ptr._offset(offset)
+  :fun cpointer(offset = 0) CPointer(U8)'tag: @_ptr._offset(offset)
 
   :fun ref _ptr_set_null
     @_space = 0
     @_ptr = CPointer(U8)._null
 
-  :fun ref _ptr_allocate (space USize)
+  :fun ref _ptr_allocate(space USize)
     @_space = space.next_pow2.max(space).max(8)
     @_ptr = CPointer(U8)._alloc(@_space)
 
-  :fun ref _ptr_reallocate (space USize)
+  :fun ref _ptr_reallocate(space USize)
     @_space = space.next_pow2.max(space).max(8)
     @_ptr = @_ptr._realloc(@_space)
 
@@ -28,16 +28,16 @@
     @_size = 0
     if (space > 0) (@_ptr_allocate(space) | @_ptr_set_null)
 
-  :new iso new_iso (space USize = 0) // TODO: use recover instead of this hack
+  :new iso new_iso(space USize = 0) // TODO: use recover instead of this hack
     @_size = 0
     if (space > 0) (@_ptr_allocate(space) | @_ptr_set_null)
 
-  :new val from_array (data Array(U8)'val)
+  :new val from_array(data Array(U8)'val)
     @_size = data.size
     @_space = data.space
     @_ptr = data.cpointer._unsafe
 
-  :new val from_string (data String)
+  :new val from_string(data String)
     @_size = data.size
     @_space = data.space
     @_ptr = data.cpointer._unsafe
@@ -45,17 +45,17 @@
   :fun val as_array: Array(U8).val_from_cpointer(@_ptr._unsafe, @_size, @_space)
   :fun val as_string: String.from_bytes(@)
 
-  :fun "==" (other Bytes'box)
+  :fun "=="(other Bytes'box)
     (@_size == other._size) && (@_ptr._compare(other._ptr, @_size) == 0)
 
   :: Returns True if this Bytes starts with a substring equal to the other.
   :: Otherwise, returns False.
-  :fun starts_with (other Bytes'box)
+  :fun starts_with(other Bytes'box)
     (@_size >= other.size) && (@_ptr._compare(other._ptr, other.size) == 0)
 
   :: Returns True if this Bytes ends with a substring equal to the other.
   :: Otherwise, returns False.
-  :fun ends_with (other Bytes'box)
+  :fun ends_with(other Bytes'box)
     (@_size >= other.size) && (
       @_ptr._offset(@_size - other.size)._compare(other._ptr, other.size) == 0
     )
@@ -63,7 +63,7 @@
   :: Returns True if this Bytes at the given offset is equivalent to
   :: the given other Bytes at the given other_offset, for at least as long
   :: as the given number of bytes to be compared.
-  :fun is_slice_equal (
+  :fun is_slice_equal(
     offset USize
     other (Bytes'box | String'box)
     other_offset USize
@@ -89,12 +89,12 @@
     copy._size = @size
     --copy // TODO: auto-consume at end of the function?
 
-  :fun ref _clone_from (other_ptr CPointer(U8), size USize)
+  :fun ref _clone_from(other_ptr CPointer(U8), size USize)
     other_ptr._unsafe._copy_to(@_ptr, size)
 
-  :fun includes (other): try (@offset_of!(other), True | False)
+  :fun includes(other): try (@offset_of!(other), True | False)
 
-  :fun offset_of! (other Bytes'box, start_offset USize = 0)
+  :fun offset_of!(other Bytes'box, start_offset USize = 0)
     found Bool = False
     offset = start_offset
     other_first = other[0]! // cache here and error out if the other is empty
@@ -137,7 +137,7 @@
   :: Ensure enough capacity is allocated for the given space, in bytes.
   :: The size (number of actual bytes present in the string) does not change.
 
-  :fun ref reserve (space USize)
+  :fun ref reserve(space USize)
     if (@_space < space) @_ptr_reallocate(space)
     @
 
@@ -163,15 +163,15 @@
   :: expanding beyond the allocated space into territory of other allocations,
   :: so this method cannot violate memory safety in terms of address space.
 
-  :fun ref resize_possibly_including_uninitialized_memory (size USize)
+  :fun ref resize_possibly_including_uninitialized_memory(size USize)
     @_size = size.min(@_space)
     @
 
-  :fun "[]!" (index USize)
+  :fun "[]!"(index USize)
     if (@size <= index) error!
     @_ptr._get_at(index)
 
-  :fun _offset_to_index (offset ISize) USize
+  :fun _offset_to_index(offset ISize) USize
     if (offset < 0) (offset.usize + @size | offset.usize)
 
   :: Return a shared portion of this string, covering `from` until `to`,
@@ -181,7 +181,7 @@
   :: Both the original and the new string are immutable, as they share memory.
   :: The operation does not allocate a new string pointer nor copy elements.
 
-  :fun val trim (from ISize = 0, to ISize = 0x7FFF_FFFF_FFFF_FFFF) // TODO: ISize.max_value
+  :fun val trim(from ISize = 0, to ISize = 0x7FFF_FFFF_FFFF_FFFF) // TODO: ISize.max_value
     start = @_offset_to_index(from)
     finish = @_offset_to_index(to).min(@size)
 
@@ -196,7 +196,7 @@
       @val_from_cpointer(@_ptr._null, 0, 0)
     )
 
-  :fun ref trim_in_place (from ISize = 0, to ISize = 0x7FFF_FFFF_FFFF_FFFF) // TODO: ISize.max_value
+  :fun ref trim_in_place(from ISize = 0, to ISize = 0x7FFF_FFFF_FFFF_FFFF) // TODO: ISize.max_value
     start = @_offset_to_index(from)
     finish = @_offset_to_index(to).min(@size)
 
@@ -208,13 +208,13 @@
     )
     @
 
-  :fun ref push (byte U8)
+  :fun ref push(byte U8)
     @reserve(@_size + 1)
     @_ptr._assign_at(@_size, byte)
     @_size += 1
     @
 
-  :fun each (from USize = 0, to USize = -1) // TODO USize.max_value
+  :fun each(from USize = 0, to USize = -1) // TODO USize.max_value
     to = @_size.min(to)
     if (from < to) (
       index = from
@@ -225,7 +225,7 @@
     )
     None
 
-  :fun each_until (from USize = 0, to USize = -1) // TODO USize.max_value
+  :fun each_until(from USize = 0, to USize = -1) // TODO USize.max_value
     :yields for Bool
     to = @_size.min(to)
     early_stop = False
@@ -246,7 +246,7 @@
     )
     @
 
-  :fun ref "<<" (other Bytes'box)
+  :fun ref "<<"(other Bytes'box)
     if (other._size > 0) (
       new_size = @_size + other._size
       @reserve(new_size)
@@ -259,7 +259,7 @@
     )
     @
 
-  :fun ref concat_byte_slice (
+  :fun ref concat_byte_slice(
     other Bytes'box
     from ISize = 0
     to ISize = 0x7FFF_FFFF_FFFF_FFFF // TODO: ISize.max_value
@@ -273,7 +273,7 @@
       @_size += size
     )
 
-  :fun ref push_utf32 (value U32)
+  :fun ref push_utf32(value U32)
     _UTF32Encoder.encode(value) -> (byte_count, byte_1, byte_2, byte_3, byte_4 |
       i = @_size
       @_size = @_size + byte_count
@@ -292,7 +292,7 @@
     @
 
   :: Return a new string consisting of the original string copied `n` times.
-  :fun "*" (times USize)
+  :fun "*"(times USize)
     if (times > 0) (
       ptr = @_ptr._alloc(@size * times)
       size USize = 0
@@ -307,12 +307,12 @@
       @val_from_cpointer(@_ptr._null, 0, 0)
     )
 
-  :fun val split (split_byte U8) // TODO: a byte shouldn't be the only thing we can split by...
+  :fun val split(split_byte U8) // TODO: a byte shouldn't be the only thing we can split by...
     result Array(Bytes) = []
     @each_split(split_byte) -> (s | result << s)
     result
 
-  :fun val each_split (split_byte U8) // TODO: a byte shouldn't be the only thing we can split by...
+  :fun val each_split(split_byte U8) // TODO: a byte shouldn't be the only thing we can split by...
     :yields Bytes
     finish USize = 0
     start = finish
@@ -337,7 +337,7 @@
     )
     @
 
-  :fun "<" (other Bytes'box)
+  :fun "<"(other Bytes'box)
     min_size = @size.min(other.size)
     index USize = 0
     result = False
@@ -355,7 +355,7 @@
     )
     result
 
-  :fun "<=" (other Bytes'box)
+  :fun "<="(other Bytes'box)
     min_size = @size.min(other.size)
     index USize = 0
     result = False
@@ -373,7 +373,7 @@
     )
     result
 
-  :fun slice (from USize, to USize = 0) Bytes'iso
+  :fun slice(from USize, to USize = 0) Bytes'iso
     if (to == 0 || to > @_size) (
       to = @_size
     )
@@ -390,7 +390,7 @@
   :: Read a U32 from the bytes at the given offset, with native byte order.
   :: This is not suitable for protocols using a platform-independent byte order.
   :: Raises an error if there aren't enough bytes at that offset to fill a U32.
-  :fun read_native_u32! (offset USize) U32
+  :fun read_native_u32!(offset USize) U32
     if ((offset + U32.byte_width.usize) > @_size) error!
     CPointer(U32)._from_usize(@_ptr._offset(offset).usize)._get_at(0)
 
@@ -398,14 +398,14 @@
   :: This is not suitable for protocols using a platform-independent byte order.
   :: Raises an error if there aren't enough bytes at that offset to fit a U32.
   :: Use push_native_u32 instead if writing past the end is needed.
-  :fun ref write_native_u32! (offset USize, number U32)
+  :fun ref write_native_u32!(offset USize, number U32)
     if ((offset + U32.byte_width.usize) > @_size) error!
     CPointer(U32)._from_usize(@_ptr._offset(offset).usize)._assign_at(0, number)
     @
 
   :: Add a U32 as bytes onto the end of the buffer, in native byte order.
   :: This is not suitable for protocols using a platform-independent byte order.
-  :fun ref push_native_u32 (number U32)
+  :fun ref push_native_u32(number U32)
     @reserve(@_size + U32.byte_width.usize)
     CPointer(U32)._from_usize(@_ptr._offset(@_size).usize)._assign_at(0, number)
     @_size += U32.byte_width.usize
@@ -414,7 +414,7 @@
   :: Read a U64 from the bytes at the given offset, with native byte order.
   :: This is not suitable for protocols using a platform-independent byte order.
   :: Raises an error if there aren't enough bytes at that offset to fill a U64.
-  :fun read_native_u64! (offset USize) U64
+  :fun read_native_u64!(offset USize) U64
     if ((offset + U64.byte_width.usize) > @_size) error!
     CPointer(U64)._from_usize(@_ptr._offset(offset).usize)._get_at(0)
 
@@ -422,14 +422,14 @@
   :: This is not suitable for protocols using a platform-independent byte order.
   :: Raises an error if there aren't enough bytes at that offset to fit a U64.
   :: Use push_native_u64 instead if writing past the end is needed.
-  :fun ref write_native_u64! (offset USize, number U64)
+  :fun ref write_native_u64!(offset USize, number U64)
     if ((offset + U64.byte_width.usize) > @_size) error!
     CPointer(U64)._from_usize(@_ptr._offset(offset).usize)._assign_at(0, number)
     @
 
   :: Add a U64 as bytes onto the end of the buffer, in native byte order.
   :: This is not suitable for protocols using a platform-independent byte order.
-  :fun ref push_native_u64 (number U64)
+  :fun ref push_native_u64(number U64)
     @reserve(@_size + U64.byte_width.usize)
     CPointer(U64)._from_usize(@_ptr._offset(@_size).usize)._assign_at(0, number)
     @_size += U64.byte_width.usize

@@ -1,14 +1,14 @@
 :primitive _MapEmpty
 :primitive _MapDeleted
 
-:class _KV (K, V) // TODO: use a tuple literal instead
+:class _KV(K, V) // TODO: use a tuple literal instead
   :prop key K
   :prop value V
   :new (@key, @value)
 
-:alias MapIs (K, V): Map(K, V, HashIs(K))
+:alias MapIs(K, V): Map(K, V, HashIs(K))
 
-:class Map (K, V, H HashFunction(K) = HashEq(K))
+:class Map(K, V, H HashFunction(K) = HashEq(K))
   :is MapReadable(K, V)
   :prop _size USize: 0
   :prop _array Array((_KV(K, V) | _MapEmpty | _MapDeleted))
@@ -18,11 +18,11 @@
   :new (prealloc USize = 6)
     @_init_array(((prealloc * 4) / 3).max(8).next_pow2)
 
-  :fun ref _init_array (space USize)
+  :fun ref _init_array(space USize)
     @_array = Array((_KV(K, V) | _MapEmpty | _MapDeleted)).new(space)
     Count.to(space) -> (@_array << _MapEmpty)
 
-  :fun ref _resize (space USize)
+  :fun ref _resize(space USize)
     space = space.max(@_size) // only grow the array - never shrink it
     old_array = @_array
 
@@ -43,7 +43,7 @@
     @
 
   :: Return True if the given key is present.
-  :fun has_key (key K)
+  :fun has_key(key K)
     try (@[--key]!, True | False)
 
   :: Return the value assigned to the given key, if present.
@@ -57,7 +57,7 @@
   :: $ map.delete("example"), map["example"]!
   :: > error! // this key no longer has an assigned value
   ::
-  :fun "[]!" (key K)
+  :fun "[]!"(key K)
     @_array[@_search(key)]!.as!(@->(_KV(K, V))).value
 
   :: Assign the given value to the given key in the map.
@@ -69,7 +69,7 @@
   :: $ map["example"] = 33, map["example"]!
   :: > 33
   ::
-  :fun ref "[]=" (key K, value V)
+  :fun ref "[]="(key K, value V)
     value_alias V'aliased = value // TODO: remove the V'aliased explicit type?
     try (
       index = @_search(key)
@@ -99,7 +99,7 @@
   :: > error! // this key no longer has an assigned value
   :: $ map.delete("example") // deleting it again has no effect
   ::
-  :fun ref delete (key K)
+  :fun ref delete(key K)
     try (
       @_array[@_search(key)]! = _MapDeleted
       @_size -= 1
@@ -107,7 +107,7 @@
     None
 
   :: Given a key, find the internal index associated with the hash of that key.
-  :fun _search (key)
+  :fun _search(key)
     hash = H.hash(key).usize()
 
     idx_del = @_array.size

@@ -68,7 +68,7 @@
 
   :: Add another chunk to the list of chunks to read from.
   :: This is often used when another packet arrives from the source stream.
-  :fun ref "<<" (chunk Bytes)
+  :fun ref "<<"(chunk Bytes)
     @_chunks << chunk
     @_bytes_ahead += chunk.size
     @_mark_bytes_ahead += chunk.size
@@ -176,7 +176,7 @@
 
   :: Return True if the bytes in the currently marked token are equivalent
   :: to the bytes referenced by the given string.
-  :fun is_token_equal_to (other (Bytes'box | String'box))
+  :fun is_token_equal_to(other (Bytes'box | String'box))
     @token_byte_size == other.size && (
       other_start USize = 0
       unequal = @_each_token_slice_until -> (chunk, start, end |
@@ -195,7 +195,7 @@
   :: Return True if the bytes in the currently marked token, after lowercasing
   :: any encountered ASCII letters (A-Z) are equivalent to the given string.
   :: That is, the given string should be supplied as already being lowercase.
-  :fun is_token_ascii_lowercase_equal_to (other (Bytes'box | String'box))
+  :fun is_token_ascii_lowercase_equal_to(other (Bytes'box | String'box))
     @token_byte_size == other.size && (
       index USize = 0
       unequal = @each_token_byte_until -> (byte |
@@ -256,7 +256,7 @@
 
   :: Return the byte value that is N bytes ahead, without moving the cursor.
   :: Raises an error if there are not enough bytes to do so.
-  :fun peek_byte! (n USize = 0) U8
+  :fun peek_byte!(n USize = 0) U8
     peek_chunk_index = @_chunk_index
     peek_offset = @_offset
     remaining_n = n
@@ -279,7 +279,7 @@
   :: Advance the cursor forward in the byte stream by N total bytes.
   :: Raises an error if there are not enough bytes to do so, leaving the cursor
   :: pointing to the next future byte that will arrive in the byte stream.
-  :fun ref advance! (n USize)
+  :fun ref advance!(n USize)
     if (n >= @_bytes_ahead) (
       too_many_n = n > @_bytes_ahead
 

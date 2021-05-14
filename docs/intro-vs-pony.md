@@ -95,7 +95,7 @@ Just like in Pony, a type is declared with a capitalized identifier, and it is r
     "Hello, World!"
 
 :class World
-  :fun meet (person Person)
+  :fun meet(person Person)
     person.greeting
 ```
 
@@ -107,7 +107,7 @@ Just like in Pony, each type has an implicit capability which is assumed when no
     "Hello, World!"
 
 :class World
-  :fun meet (person Person'ref)
+  :fun meet(person Person'ref)
     person.greeting
 ```
 
@@ -119,7 +119,7 @@ Just like in Pony, the implicit capability of the type can be selected by placin
     "Hello, World!"
 
 :class World
-  :fun meet (person Person)
+  :fun meet(person Person)
     person.greeting
 ```
 
@@ -141,7 +141,7 @@ In other words, `@some_function` is syntax sugar for `@.some_function`, as demon
 
 ```mare
 :class Person
-  :fun greet (thing): "Hello, " + thing + "!"
+  :fun greet(thing): "Hello, " + thing + "!"
   :fun greet_the_world: @greet("World")
 ```
 
@@ -251,7 +251,7 @@ Now let's look at an example of `case` used with the subtype check operator:
 
 ```mare
 :primitive Example
-  :fun thing_to_number (thing Any'box) I64
+  :fun thing_to_number(thing Any'box) I64
     case (
     | thing <: Numeric | thing.i64
     | thing <: String  | try (thing.parse_i64! | -1)
@@ -408,7 +408,7 @@ Note that parameter assignment sugar works on any function - not just a construc
 :class Person
   :prop name String
   :new (@name)
-  :fun ref change_name (@name)
+  :fun ref change_name(@name)
 ```
 
 However, note that we don't need to define our own function for changing a property, because the `prop` declarator automatically defines a "getter" and "setter" for the property. In this example, the "getter" is a function called `Person.name`, and the "setter" is a function called `Person.name=`. Mare has syntax sugar for calling a function that ends in `=`, and you can define your own such functions that work just the same way as property setter functions do, which makes it easy to write property-like implementations that fulfill the same structural interfaces as "real" properties:
@@ -418,7 +418,7 @@ However, note that we don't need to define our own function for changing a prope
   :prop inner Person
   :new (@inner)
   :fun name: inner.name
-  :fun ref "name=" (value): inner.name = value
+  :fun ref "name="(value): inner.name = value
 ```
 
 ### Operators / Function Sugar
@@ -431,13 +431,13 @@ Just like in Pony, most major operators are really just function calls in disgui
   :prop y U64
   :new (@x, @y)
 
-  :fun "+" (other Vector)
+  :fun "+"(other Vector)
     @new(@x + other.x, @y + other.y)
 
-  :fun "-" (other Vector)
+  :fun "-"(other Vector)
     @new(@x - other.x, @y - other.y)
 
-  :fun "==" (other Vector)
+  :fun "=="(other Vector)
     (@x == other.x) && (@y == other.y)
 ```
 
@@ -469,10 +469,10 @@ Just like in Pony, we use `as` for forcefully "casting" in a way that can raise 
 
 ```mare
 :trait Greeter
-  :fun greeting (String | None)
+  :fun greeting(String | None)
 
 :class World
-  :fun meet! (greeter Greeter)
+  :fun meet!(greeter Greeter)
     greeter.greeting.as!(String)
 ```
 
@@ -480,10 +480,10 @@ You can also cast to check for exclusion of a type with `not!`:
 
 ```mare
 :trait Greeter
-  :fun greeting (String | None)
+  :fun greeting(String | None)
 
 :class World
-  :fun meet! (greeter Greeter)
+  :fun meet!(greeter Greeter)
     greeter.greeting.not!(None)
 ```
 
@@ -491,10 +491,10 @@ If you want to take some other fallback action rather than raising an error, you
 
 ```mare
 :trait Greeter
-  :fun greeting (String | None)
+  :fun greeting(String | None)
 
 :class World
-  :fun meet (greeter Greeter) String
+  :fun meet(greeter Greeter) String
     greeting = greeter.greeting
     if (greeting <: String) (
       greeting
@@ -530,7 +530,7 @@ Though we have a workaround
 ```mare
 :class A (B, C)
   // also you can mark it as non rcap to use as static method
-  :fun foo (bar B) C
+  :fun foo(bar B) C
 ```
 
 ##### [TODO: Generic functions info...]
@@ -543,7 +543,7 @@ While in Pony we use `@` to mark that we are calling a C function, in Mare we de
 
 ```mare
 :ffi LibC
-  :fun printf (format CPointer(U8), arg1 CPointer(U8)) I32
+  :fun printf(format CPointer(U8), arg1 CPointer(U8)) I32
 ```
 
 In the example above you see that we are declearing plain functions. You need to specify all types, just like in Pony. All FFI functions have the `non` reference capability.

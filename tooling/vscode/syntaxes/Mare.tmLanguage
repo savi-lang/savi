@@ -125,6 +125,12 @@
 			<key>patterns</key>
 			<array>
 				<dict>
+					<key>match</key>
+					<string>(\w+(?:\?|\!)?)(?=\()</string>
+					<key>name</key>
+					<string>entity.other.attribute-name.mare</string>
+				</dict>
+				<dict>
 					<key>include</key>
 					<string>$self</string>
 				</dict>

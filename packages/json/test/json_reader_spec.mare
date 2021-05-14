@@ -3,7 +3,7 @@
 :class _JsonReaderSpecUser
   :prop name String: ""
   :prop admin Bool: False
-  :fun ref from_json! (read JsonReader)
+  :fun ref from_json!(read JsonReader)
     read.each_in_object! -> (key |
       case (
       | key == "name" | try (@name = read.string!)

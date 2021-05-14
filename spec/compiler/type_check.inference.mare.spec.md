@@ -54,8 +54,8 @@ It infers return type from param type or another return type:
 ```mare
     @infer_from_call_return(42) ::type=> I32
 
-  :fun non infer_from_param (n I32): n ::type=> I32
-  :fun non infer_from_call_return (n I32): @infer_from_param(n) ::type=> I32
+  :fun non infer_from_param(n I32): n ::type=> I32
+  :fun non infer_from_call_return(n I32): @infer_from_param(n) ::type=> I32
 ```
 
 ---
@@ -66,8 +66,8 @@ It infers param type from local assignment or from the return type:
     @infer_from_assign(42) ::type=> I32
     @infer_from_return_type(42) ::type=> I32
 
-  :fun non infer_from_assign (n): m I32 = n ::type=> I32
-  :fun non infer_from_return_type (n) I32: n ::type=> I32
+  :fun non infer_from_assign(n): m I32 = n ::type=> I32
+  :fun non infer_from_return_type(n) I32: n ::type=> I32
 ```
 
 ---
@@ -77,13 +77,13 @@ It complains when unable to infer mutually recursive return types:
 ```mare
     @tweedle_dum(42)
 
-  :fun non tweedle_dee (n I32): @tweedle_dum(n)
-  :fun non tweedle_dum (n I32): @tweedle_dee(n)
+  :fun non tweedle_dee(n I32): @tweedle_dum(n)
+  :fun non tweedle_dum(n I32): @tweedle_dee(n)
 ```
 ```error
 This return value needs an explicit type; it could not be inferred:
-  :fun non tweedle_dum (n I32): @tweedle_dee(n)
-                                 ^~~~~~~~~~~
+  :fun non tweedle_dum(n I32): @tweedle_dee(n)
+                                ^~~~~~~~~~~
 ```
 
 ---

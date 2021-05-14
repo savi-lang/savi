@@ -1,20 +1,20 @@
-:class ref Array (A)
+:class ref Array(A)
   :prop _size USize
   :prop _space USize
   :prop _ptr CPointer(A)'ref
-  :new ref from_cpointer (@_ptr, @_size, @_space)
-  :new iso iso_from_cpointer (@_ptr, @_size, @_space) // TODO: remove this and use recover instead?
-  :new val val_from_cpointer (@_ptr, @_size, @_space) // TODO: remove this and use recover instead?
+  :new ref from_cpointer(@_ptr, @_size, @_space)
+  :new iso iso_from_cpointer(@_ptr, @_size, @_space) // TODO: remove this and use recover instead?
+  :new val val_from_cpointer(@_ptr, @_size, @_space) // TODO: remove this and use recover instead?
 
   :fun ref _ptr_set_null
     @_space = 0
     @_ptr = CPointer(A)._null
 
-  :fun ref _ptr_allocate (space USize)
+  :fun ref _ptr_allocate(space USize)
     @_space = space.next_pow2.max(space).max(8)
     @_ptr = CPointer(A)._alloc(@_space)
 
-  :fun ref _ptr_reallocate (space USize)
+  :fun ref _ptr_reallocate(space USize)
     @_space = space.next_pow2.max(space).max(8)
     @_ptr = @_ptr._realloc(@_space)
 
@@ -22,20 +22,20 @@
     @_size = 0
     if (space > 0) (@_ptr_allocate(space) | @_ptr_set_null)
 
-  :new iso new_iso (space USize = 0) // TODO: use recover instead of this hack
+  :new iso new_iso(space USize = 0) // TODO: use recover instead of this hack
     @_size = 0
     if (space > 0) (@_ptr_allocate(space) | @_ptr_set_null)
 
   :fun size: @_size
   :fun space: @_space
-  :fun cpointer (offset = 0) CPointer(A)'tag: @_ptr._offset(offset) // TODO: simply tag as return type; infer CPointer(A) part of it
+  :fun cpointer(offset = 0) CPointer(A)'tag: @_ptr._offset(offset) // TODO: simply tag as return type; infer CPointer(A) part of it
 
   :fun is_empty: @_size == 0
   :fun ref clear: @_size = 0, @
 
-  :fun ref truncate (size): @_size = @_size.min(size)
+  :fun ref truncate(size): @_size = @_size.min(size)
 
-  :fun ref trim_in_place (from USize, to USize = -1)
+  :fun ref trim_in_place(from USize, to USize = -1)
     to = to.min(@_size)
     from = from.min(to)
     size = to - from
@@ -66,7 +66,7 @@
   :: Reserve enough total space for the given number of elements.
   :: The size (number of actual elements present in the array) does not change.
 
-  :fun ref reserve (space USize)
+  :fun ref reserve(space USize)
     if (@_space < space) \
       @_ptr_reallocate(space)
     @
@@ -87,19 +87,19 @@
       @new_iso(0)
     )
 
-  :fun ref _clone_from (other_ptr CPointer(A), size USize)
+  :fun ref _clone_from(other_ptr CPointer(A), size USize)
     other_ptr._unsafe._copy_to(@_ptr, size)
 
-  :fun "[]!" (index) @->(A'aliased)
+  :fun "[]!"(index) @->(A'aliased)
     if (@size <= index) error!
     @_ptr._get_at(index)
 
-  :fun ref "[]=!" (index, value)
+  :fun ref "[]=!"(index, value)
     if (@size <= index) error!
     @_ptr._assign_at(index, --value)
 
-  :fun ref "<<" (value): @push(--value)
-  :fun ref push (value)
+  :fun ref "<<"(value): @push(--value)
+  :fun ref push(value)
     @reserve(@_size + 1)
     @_ptr._assign_at(@_size, --value)
     @_size = @_size + 1
@@ -110,8 +110,8 @@
     @_size -= 1
     @_ptr._get_at_no_alias(@_size)
 
-  :fun "!=" (other): (@ == other).not // TODO: move this to the Equatable trait?
-  :fun "==" (other Array(A)'box)
+  :fun "!="(other): (@ == other).not // TODO: move this to the Equatable trait?
+  :fun "=="(other Array(A)'box)
     // TODO: optimize for cases when the elements can be pointer-compared by
     // value/identity instead of structural equality (e.g. Array(U8))
     equal_so_far = (@size == other.size)
@@ -126,7 +126,7 @@
     )
     equal_so_far
 
-  :fun includes (expected A)
+  :fun includes(expected A)
     is_found = False
     index USize = 0
     while (is_found.not && index < @_size) (
@@ -139,7 +139,7 @@
     )
     is_found
 
-  :fun each (from USize = 0, to USize = -1) // TODO USize.max_value
+  :fun each(from USize = 0, to USize = -1) // TODO USize.max_value
     to = @_size.min(to)
     if (from < to) (
       index = from
@@ -174,7 +174,7 @@
     )
     None
 
-  :fun each_until (from USize = 0, to USize = -1) // TODO USize.max_value
+  :fun each_until(from USize = 0, to USize = -1) // TODO USize.max_value
     :yields for Bool
     to = @_size.min(to)
     early_stop = False
@@ -239,7 +239,7 @@
   :fun ref sort_in_place
     if @_sort_in_place(0, @size.isize - 1) (@ | @.clear)
 
-  :fun ref _sort_in_place (lo_pivot ISize, hi_pivot ISize) Bool // TODO: should be actually private
+  :fun ref _sort_in_place(lo_pivot ISize, hi_pivot ISize) Bool // TODO: should be actually private
     if (A <: Comparable(A)'read) (
       if (lo_pivot < hi_pivot) (
         // Choose the outermost elements as pivots, ensuring that the higher
@@ -307,7 +307,7 @@
       False // return false if the elements are not Comparable
     )
 
-  :fun ref _swap (a USize, b USize)
+  :fun ref _swap(a USize, b USize)
     a_elem = @_ptr._get_at_no_alias(a)
     b_elem = @_ptr._get_at_no_alias(b)
     @_ptr._assign_at(a, --b_elem)

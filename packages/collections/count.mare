@@ -1,7 +1,7 @@
 :primitive Count
   :: Yield each successive integer that is less than the given limit.
   :: For example, Count.to(3) will yield 0, 1, and 2.
-  :fun to (limit USize)
+  :fun to(limit USize)
     i = USize[0]
     while (i < limit) (
       yield i

@@ -15,7 +15,7 @@ It complains when access to the self is shared while still incomplete:
   :prop z U64
 
 :primitive AccessWhileIncomplete
-  :fun data (any Any'box)
+  :fun data(any Any'box)
     any
 ```
 ```error
@@ -24,8 +24,8 @@ This usage of `@` shares field access to the object from a constructor before al
                                ^
 
 - if this constraint were specified as `tag` or lower it would not grant field access:
-  :fun data (any Any'box)
-                 ^~~~~~~
+  :fun data(any Any'box)
+                ^~~~~~~
 
 - this field didn't get initialized:
   :prop y U64
@@ -52,10 +52,10 @@ It allows opaque sharing of the self while still incomplete and non-opaque shari
   :prop z U64
 
 :primitive AccessAfterComplete
-  :fun data (any Any'box)
+  :fun data(any Any'box)
     any
 
 :primitive TouchWhileIncomplete
-  :fun data (any Any'tag)
+  :fun data(any Any'tag)
     any
 ```

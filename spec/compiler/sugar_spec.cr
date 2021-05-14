@@ -456,7 +456,7 @@ describe Mare::Compiler::Sugar do
   it "transforms non-identifier parameters into assignment expressions" do
     source = Mare::Source.new_example <<-SOURCE
     :class Example
-      :fun param_assigns (@x, @y.z)
+      :fun param_assigns(@x, @y.z)
         @y.after
     SOURCE
 
@@ -464,10 +464,13 @@ describe Mare::Compiler::Sugar do
 
     ast.to_a.should eq [:doc,
       [:declare, [[:ident, "class"], [:ident, "Example"]], [:group, ":"]],
-      [:declare, [[:ident, "fun"], [:ident, "param_assigns"], [:group, "(",
-        [:ident, "@x"],
-        [:relate, [:ident, "@y"], [:op, "."], [:ident, "z"]]],
-      ], [:group, ":",
+      [:declare, [[:ident, "fun"], [:qualify, [:ident, "param_assigns"],
+          [:group, "(",
+            [:ident, "@x"],
+            [:relate, [:ident, "@y"], [:op, "."], [:ident, "z"]]
+          ],
+        ]],
+        [:group, ":",
         [:relate, [:ident, "@y"], [:op, "."], [:ident, "after"]],
       ]],
     ]

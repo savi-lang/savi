@@ -2,7 +2,7 @@
 :import "collections"
 
 :primitive Day1
-  :fun a (env Env, input String)
+  :fun a(env Env, input String)
     total I64 = 0
     input.each_split('\n') -> (line |
       try (
@@ -14,7 +14,7 @@
     )
     total
 
-  :fun b (env Env, input String)
+  :fun b(env Env, input String)
     changes Array(I64) = []
     input.each_split('\n') -> (line |
       try (

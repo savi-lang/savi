@@ -23,25 +23,25 @@
   :const is_signed Bool
   :const is_floating_point Bool
 
-  :fun non "[]" (value @'val) @'val: value
+  :fun non "[]"(value @'val) @'val: value
   :fun non zero @'val: compiler intrinsic
 
-  :fun "==" (other @'box) Bool: compiler intrinsic
-  :fun "!=" (other @'box) Bool: compiler intrinsic
-  :fun "<" (other @'box) Bool: compiler intrinsic
-  :fun "<=" (other @'box) Bool: compiler intrinsic
-  :fun ">" (other @'box) Bool: compiler intrinsic
-  :fun ">=" (other @'box) Bool: compiler intrinsic
+  :fun "=="(other @'box) Bool: compiler intrinsic
+  :fun "!="(other @'box) Bool: compiler intrinsic
+  :fun "<"(other @'box) Bool: compiler intrinsic
+  :fun "<="(other @'box) Bool: compiler intrinsic
+  :fun ">"(other @'box) Bool: compiler intrinsic
+  :fun ">="(other @'box) Bool: compiler intrinsic
 
-  :fun val "+" (other @) @: compiler intrinsic
-  :fun val "-" (other @) @: compiler intrinsic
-  :fun val "*" (other @) @: compiler intrinsic
-  :fun val "/" (other @) @: compiler intrinsic
-  :fun val "%" (other @) @: compiler intrinsic
+  :fun val "+"(other @) @: compiler intrinsic
+  :fun val "-"(other @) @: compiler intrinsic
+  :fun val "*"(other @) @: compiler intrinsic
+  :fun val "/"(other @) @: compiler intrinsic
+  :fun val "%"(other @) @: compiler intrinsic
 
   :fun val negate: @zero - @
-  :fun val min (other @) @: if (@ < other) (@ | other)
-  :fun val max (other @) @: if (@ > other) (@ | other)
+  :fun val min(other @) @: if (@ < other) (@ | other)
+  :fun val max(other @) @: if (@ > other) (@ | other)
   :fun val abs: if (@is_signed && @ < @zero) (@zero - @ | @)
 
 :trait val IntegerMethods // TODO: don't use :trait for this... `common`?
@@ -53,11 +53,11 @@
   :fun non min_value @'val: compiler intrinsic
   :fun non max_value @'val: compiler intrinsic
 
-  :fun val bit_and (other @) @: compiler intrinsic
-  :fun val bit_or (other @) @: compiler intrinsic
-  :fun val bit_xor (other @) @: compiler intrinsic
-  :fun val bit_shl (bits U8) @: compiler intrinsic
-  :fun val bit_shr (bits U8) @: compiler intrinsic
+  :fun val bit_and(other @) @: compiler intrinsic
+  :fun val bit_or(other @) @: compiler intrinsic
+  :fun val bit_xor(other @) @: compiler intrinsic
+  :fun val bit_shl(bits U8) @: compiler intrinsic
+  :fun val bit_shr(bits U8) @: compiler intrinsic
   :fun val invert @: compiler intrinsic
   :fun val reverse_bits @: compiler intrinsic
   :fun val swap_bytes @: compiler intrinsic
@@ -93,7 +93,7 @@
     x
 
 :trait val Float32Methods
-  :fun non from_bits (bits U32) @'val: compiler intrinsic
+  :fun non from_bits(bits U32) @'val: compiler intrinsic
   :fun val bits U32: compiler intrinsic
 
   :fun non nan:          @from_bits(0x7FC0_0000)
@@ -105,7 +105,7 @@
   :fun val log @: compiler intrinsic
   :fun val log2 @: compiler intrinsic
   :fun val log10 @: compiler intrinsic
-  :fun val pow (exp @) @: compiler intrinsic
+  :fun val pow(exp @) @: compiler intrinsic
 
   :fun val is_positive: @bits.bit_and(0x8000_0000) == 0 // sign bit
   :fun val is_negative: @bits.bit_and(0x8000_0000) != 0 // sign bit
@@ -125,7 +125,7 @@
     @bits.bit_and(0x7F80_0000) != 0x7F80_0000 // exponent
 
 :trait val Float64Methods
-  :fun non from_bits (bits U64) @'val: compiler intrinsic
+  :fun non from_bits(bits U64) @'val: compiler intrinsic
   :fun val bits U64: compiler intrinsic
 
   :fun non nan:          @from_bits(0x7FF8_0000_0000_0000)
@@ -137,7 +137,7 @@
   :fun val log @: compiler intrinsic
   :fun val log2 @: compiler intrinsic
   :fun val log10 @: compiler intrinsic
-  :fun val pow (y @) @: compiler intrinsic
+  :fun val pow(y @) @: compiler intrinsic
 
   :fun val is_positive: @bits.bit_and(0x8000_0000_0000_0000) == 0 // sign bit
   :fun val is_negative: @bits.bit_and(0x8000_0000_0000_0000) != 0 // sign bit

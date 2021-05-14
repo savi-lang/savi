@@ -5,7 +5,7 @@ pass: type_check
 It complains when too many type arguments are provided:
 
 ```mare
-:class Generic2 (P1, P2)
+:class Generic2(P1, P2)
 ```
 ```mare
     Generic2(String, String, String, String)
@@ -16,8 +16,8 @@ This type qualification has too many type arguments:
     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 - at most 2 type arguments were expected:
-:class Generic2 (P1, P2)
-                ^~~~~~~~
+:class Generic2(P1, P2)
+               ^~~~~~~~
 
 - this is an excessive type argument:
     Generic2(String, String, String, String)
@@ -33,7 +33,7 @@ This type qualification has too many type arguments:
 It complains when too few type arguments are provided:
 
 ```mare
-:class Generic3 (P1, P2, P3)
+:class Generic3(P1, P2, P3)
 ```
 ```mare
     Generic3(String)
@@ -44,16 +44,16 @@ This type qualification has too few type arguments:
     ^~~~~~~~~~~~~~~~
 
 - at least 3 type arguments were expected:
-:class Generic3 (P1, P2, P3)
-                ^~~~~~~~~~~~
+:class Generic3(P1, P2, P3)
+               ^~~~~~~~~~~~
 
 - this additional type parameter needs an argument:
-:class Generic3 (P1, P2, P3)
-                     ^~
+:class Generic3(P1, P2, P3)
+                    ^~
 
 - this additional type parameter needs an argument:
-:class Generic3 (P1, P2, P3)
-                         ^~
+:class Generic3(P1, P2, P3)
+                        ^~
 ```
 
 ---
@@ -61,7 +61,7 @@ This type qualification has too few type arguments:
 It complains when no type arguments are provided and some are expected:
 
 ```mare
-:class GenericNeedsTypeArgs (P1, P2)
+:class GenericNeedsTypeArgs(P1, P2)
 ```
 ```mare
     GenericNeedsTypeArgs
@@ -72,8 +72,8 @@ This type needs to be qualified with type arguments:
     ^~~~~~~~~~~~~~~~~~~~
 
 - these type parameters are expecting arguments:
-:class GenericNeedsTypeArgs (P1, P2)
-                            ^~~~~~~~
+:class GenericNeedsTypeArgs(P1, P2)
+                           ^~~~~~~~
 ```
 
 ---
@@ -81,7 +81,7 @@ This type needs to be qualified with type arguments:
 It complains when a type argument doesn't satisfy the bound:
 
 ```mare
-:class GenericSendable (P1 String'send)
+:class GenericSendable(P1 String'send)
 ```
 ```mare
     GenericSendable(String'ref)
@@ -93,8 +93,8 @@ This type argument won't satisfy the type parameter bound:
                     ^~~~~~~~~~
 
 - the allowed caps are {iso, val, tag, non}:
-:class GenericSendable (P1 String'send)
-                           ^~~~~~~~~~~
+:class GenericSendable(P1 String'send)
+                          ^~~~~~~~~~~
 
 - the type argument cap is ref:
     GenericSendable(String'ref)
@@ -106,8 +106,8 @@ This type argument won't satisfy the type parameter bound:
                     ^~~~~~~~
 
 - the type parameter bound is String:
-:class GenericSendable (P1 String'send)
-                           ^~~~~~~~~~~
+:class GenericSendable(P1 String'send)
+                          ^~~~~~~~~~~
 
 - the type argument is Bool:
     GenericSendable(Bool'val)
@@ -129,7 +129,7 @@ It can call the constructor of a type parameter:
   :prop number USize
   :new (@number)
 
-:class ConstructingGeneric (A ConstructableTrait)
+:class ConstructingGeneric(A ConstructableTrait)
   :fun non construct A
     A.new(99)
 ```
@@ -145,25 +145,25 @@ It can supply a default type argument based on one of the other ones:
     GenericWithBadDefault(U64, String) // causes compile error
 ```
 ```mare
-:trait non ToStringFunction (A)
-  :fun non to_string (a A) String
+:trait non ToStringFunction(A)
+  :fun non to_string(a A) String
 
-:primitive ToStringDefault (A)
-  :fun non to_string (a A): "(unknown)"
+:primitive ToStringDefault(A)
+  :fun non to_string(a A): "(unknown)"
 
-:primitive GenericWithDefault (A share, B share, S ToStringFunction(A) = ToStringDefault(A))
-:primitive GenericWithBadDefault (A share, B share, S ToStringFunction(A) = None)
+:primitive GenericWithDefault(A share, B share, S ToStringFunction(A) = ToStringDefault(A))
+:primitive GenericWithBadDefault(A share, B share, S ToStringFunction(A) = None)
 ```
 ```error
 This type argument won't satisfy the type parameter bound:
-:primitive GenericWithBadDefault (A share, B share, S ToStringFunction(A) = None)
-                                                                            ^~~~
+:primitive GenericWithBadDefault(A share, B share, S ToStringFunction(A) = None)
+                                                                           ^~~~
 
 - the type parameter bound is ToStringFunction(U64):
-:primitive GenericWithBadDefault (A share, B share, S ToStringFunction(A) = None)
-                                                      ^~~~~~~~~~~~~~~~~~~
+:primitive GenericWithBadDefault(A share, B share, S ToStringFunction(A) = None)
+                                                     ^~~~~~~~~~~~~~~~~~~
 
 - the type argument is None:
-:primitive GenericWithBadDefault (A share, B share, S ToStringFunction(A) = None)
-                                                                            ^~~~
+:primitive GenericWithBadDefault(A share, B share, S ToStringFunction(A) = None)
+                                                                           ^~~~
 ```

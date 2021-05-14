@@ -12,7 +12,7 @@
   :prop _ipv6d  U32: 0 :: Bits 97-128 of an IPv6 address in network byte order.
   :prop _scope  U32: 0 :: IPv6 scope (unicast, anycast, multicast, etc...).
 
-  :new _for_fd (fd): LibPonyOS.pony_os_sockname(fd, @)
+  :new _for_fd(fd): LibPonyOS.pony_os_sockname(fd, @)
 
   :fun is_ipv4: LibPonyOS.pony_os_ipv4(@)
   :fun is_ipv6: LibPonyOS.pony_os_ipv6(@)
@@ -23,7 +23,7 @@
   // TODO: ipv6_addr (needs tuple return value)
   // TODO: family (needs Platform.bidendian)
 
-  :fun "==" (other NetAddress'box)
+  :fun "=="(other NetAddress'box)
     @_family == other._family
     && @_port == other._port
     && (

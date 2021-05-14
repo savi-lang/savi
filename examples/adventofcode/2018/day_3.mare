@@ -8,7 +8,7 @@
   :prop width USize
   :prop height USize
   :new (@id, @left, @top, @width, @height)
-  :fun non parse! (line String)
+  :fun non parse!(line String)
     halves      = line.split('@')
     id          = halves[0]!.trim(1, -1)
     words       = halves[1]!.split(' ')
@@ -23,7 +23,7 @@
     )
 
 :primitive Day3
-  :fun input_to_claims (env Env, input String)
+  :fun input_to_claims(env Env, input String)
     claims Array(Day3Claim) = [] // TODO: use split.map or map_split instead?
     input.each_split('\n') -> (line |
       try (
@@ -36,7 +36,7 @@
     )
     claims
 
-  :fun claims_to_cloth (env Env, claims Array(Day3Claim))
+  :fun claims_to_cloth(env Env, claims Array(Day3Claim))
     cloth Array(Array(U64)) = []
     claims.each -> (claim |
       // Make sure the number of rows and width of rows is enough for the claim.
@@ -59,7 +59,7 @@
     )
     cloth
 
-  :fun a (env Env, input String)
+  :fun a(env Env, input String)
     claims = @input_to_claims(env, input)
     cloth  = @claims_to_cloth(env, claims)
 
@@ -72,7 +72,7 @@
     )
     overlap_count
 
-  :fun b (env Env, input String)
+  :fun b(env Env, input String)
     claims = @input_to_claims(env, input)
     cloth  = @claims_to_cloth(env, claims)
 

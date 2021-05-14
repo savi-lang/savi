@@ -1,4 +1,4 @@
-:class val ReflectionOfType (A)
+:class val ReflectionOfType(A)
   :: The string used in compiler messages to represent the type with capability.
   :: If the capability is the same as the default for that type, it will be
   :: omitted for brevity. Type arguments will also be included if present.
@@ -13,12 +13,12 @@
 
   :prop features Array(ReflectionFeatureOfType(A)): []
 
-:class val ReflectionFeatureOfType (A)
+:class val ReflectionFeatureOfType(A)
   :prop name String: ""
   :prop tags Array(String): []
   :prop mutator (ReflectionMutatorOfType(A) | None): None
 
-  :fun maybe_call_mutator (a A) Bool
+  :fun maybe_call_mutator(a A) Bool
     mutator = @mutator // TODO: somehow avoid typecheck-aiding temporary variable
     if (mutator <: ReflectionMutatorOfType(A)) (
       mutator.call(--a)
@@ -27,5 +27,5 @@
       False
     )
 
-:trait non ReflectionMutatorOfType (A)
-  :fun non call (a A) None
+:trait non ReflectionMutatorOfType(A)
+  :fun non call(a A) None

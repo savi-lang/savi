@@ -1,24 +1,24 @@
 :import "collections" (OrderedMap, HashEq)
 
 :trait SpecReporter
-  :fun ref spec_began (spec String): None
-  :fun ref spec_ended (spec String): None
-  :fun ref example_began (spec String, example String): None
-  :fun ref example_ended (spec String, example String): None
-  :fun ref event (spec String, example String, event SpecEventAssert): None
+  :fun ref spec_began(spec String): None
+  :fun ref spec_ended(spec String): None
+  :fun ref example_began(spec String, example String): None
+  :fun ref example_ended(spec String, example String): None
+  :fun ref event(spec String, example String, event SpecEventAssert): None
 
 :class SpecReporterDots
   :is SpecReporter
   :prop env Env
   :new (@env)
 
-  :fun ref spec_ended (spec String)
+  :fun ref spec_ended(spec String)
     @env.err.write(";")
 
-  :fun ref example_began (spec String, example String)
+  :fun ref example_began(spec String, example String)
     @env.err.write(" ")
 
-  :fun ref event (spec String, example String, event SpecEventAssert)
+  :fun ref event(spec String, example String, event SpecEventAssert)
     if event.success (
       @env.err.write(".")
     |
@@ -34,20 +34,20 @@
   :prop env Env
   :new (@env)
 
-  :fun ref spec_began (spec String)
+  :fun ref spec_began(spec String)
     @env.err.print(spec)
 
-  :fun ref spec_ended (spec String)
+  :fun ref spec_ended(spec String)
     @env.err.print("") // just a newline
 
-  :fun ref example_began (spec String, example String)
+  :fun ref example_began(spec String, example String)
     @env.err.write("  ")
     @env.err.write(example)
 
-  :fun ref example_ended (spec String, example String)
+  :fun ref example_ended(spec String, example String)
     @env.err.print(" OK")
 
-  :fun ref event (spec String, example String, event SpecEventAssert)
+  :fun ref event(spec String, example String, event SpecEventAssert)
     if event.success (
       @env.err.write(".")
     |
@@ -65,11 +65,11 @@
   :prop current_example: ""
   :new (@env, @statuses, @inner)
 
-  :fun ref spec_began (spec String): @_changed
-  :fun ref spec_ended (spec String): @_changed
-  :fun ref example_began (spec String, example String): @_changed
-  :fun ref example_ended (spec String, example String): @_changed
-  :fun ref event (spec String, example String, event SpecEventAssert): @_changed
+  :fun ref spec_began(spec String): @_changed
+  :fun ref spec_ended(spec String): @_changed
+  :fun ref example_began(spec String, example String): @_changed
+  :fun ref example_ended(spec String, example String): @_changed
+  :fun ref event(spec String, example String, event SpecEventAssert): @_changed
 
   :fun ref _changed None // TODO: be able to infer return type for maybe-recursive functions
     // If no spec and example are selected for linear reporting, pick them now.

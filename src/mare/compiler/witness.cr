@@ -102,8 +102,14 @@ class Mare::Witness
       end
 
       # Convert LiteralString to Identifier if requested.
-      if plan["convert_string_to_ident"]? && term.is_a?(AST::LiteralString)
-        term = AST::Identifier.new(term.value).from(term)
+      if plan["convert_string_to_ident"]?
+        if term.is_a?(AST::LiteralString)
+          term = AST::Identifier.new(term.value).from(term)
+        elsif term.is_a?(AST::Qualify) && term.term.is_a?(AST::LiteralString)
+          value = term.term.as(AST::LiteralString).value
+          ident = AST::Identifier.new(value).from(term.term)
+          term = AST::Qualify.new(ident, term.group).from(term)
+        end
       end
     else
       raise NotImplementedError.new(plan)
@@ -135,6 +141,14 @@ class Mare::Witness
     case t
     when "ident" then term.is_a?(AST::Identifier)
     when "string" then term.is_a?(AST::LiteralString)
+    when "ident+params"
+      term.is_a?(AST::Qualify) &&
+      check_type(term.term, "ident") &&
+      check_type(term.group, "params")
+    when "string+params"
+      term.is_a?(AST::Qualify) &&
+      check_type(term.term, "string") &&
+      check_type(term.group, "params")
     when "type"
       case term
       when AST::Identifier then true # TODO: maybe disallow lowercase?
