@@ -1,4 +1,5 @@
 :import "os/error" // TODO: can this be removed?
+:import "bytes" (ByteStreamReader)
 :import "io"
 
 :trait TCPConnectionNotify
@@ -42,19 +43,10 @@
     service String
     from String = ""
     read_buffer_size = 16384
-    yield_after_reading = 16384
-    yield_after_writing = 16384
   )
     @notify = --notify
-    @io = TCPConnectionEngine.connect(@
-      host, service, from
-      read_buffer_size
-      yield_after_reading
-      yield_after_writing
-    )
-    if (@io.connect_error != OSErrorNone) (
-      @notify.connect_failed(@io)
-    )
+    @io = TCPConnectionEngine.connect(@, host, service, from, read_buffer_size)
+    if (@io.connect_error != OSErrorNone) @notify.connect_failed(@io)
 
   :new _accept(
     // TODO: TCPConnectionAuth, rather than ambient authority.
@@ -62,16 +54,9 @@
     notify TCPConnectionNotify'iso
     fd
     read_buffer_size
-    yield_after_reading
-    yield_after_writing
   )
     @notify = --notify
-    @io = TCPConnectionEngine._accept(@
-      listen, fd
-      read_buffer_size
-      yield_after_reading
-      yield_after_writing
-    )
+    @io = TCPConnectionEngine._accept(@, listen, fd, read_buffer_size)
     @notify.accepted(@io)
     @io.pending_reads -> (data | @notify.received(@io, data))
 
@@ -80,18 +65,11 @@
   :prop io: IOCoreEngine.new
   :prop listen (TCPListener | None): None
   :prop connect_error OSError: OSErrorNone
+  :prop read_stream ByteStreamReader
 
-  :prop _read_buffer Bytes'ref // TODO: iso
-  :prop _read_buffer_offset USize: 0
   :prop _read_buffer_max_size USize
-  :prop _yield_after_reading USize
-  :prop _yield_after_writing USize
 
   :prop _expect USize: 0
-
-  :prop _pending_sent USize: 0
-  :prop _pending_writev_total USize: 0
-  :prop _pending_writev Array(CPointer(U8)): []
 
   :prop _readable Bool: False
   :prop _muted    Bool: False
@@ -103,15 +81,11 @@
     service String
     from String = ""
     read_buffer_max_size USize = 16384
-    yield_after_reading USize = 16384
-    yield_after_writing USize = 16384
   )
     try (
       @_new_with_io(
         IOCoreEngine.new_tcp_connect!(actor, host, service, from)
         read_buffer_max_size
-        yield_after_reading
-        yield_after_writing
       )
     |
       invalid = @_new_with_io(IOCoreEngine.new)
@@ -120,33 +94,19 @@
     )
 
   :fun non _accept(
-    // TODO: TCPConnectionAuth, rather than ambient authority.
     actor AsioEventNotify
     listen TCPListener
     fd U32
     read_buffer_max_size USize = 16384
-    yield_after_reading USize = 16384
-    yield_after_writing USize = 16384
   )
-    new = @_new_with_io(
-      IOCoreEngine.new_from_fd_rw(actor, fd)
-      read_buffer_max_size
-      yield_after_reading
-      yield_after_writing
-    )
+    io = IOCoreEngine.new_from_fd_rw(actor, fd)
+    new = @_new_with_io(io, read_buffer_max_size)
     new.listen = listen
     new._readable = True // TODO: is this still needed?
     new
 
-  :new _new_with_io(
-    // TODO: TCPConnectionAuth, rather than ambient authority.
-    @io
-    @_read_buffer_max_size = 16384
-    @_yield_after_reading = 16384
-    @_yield_after_writing = 16384
-  )
-    @_read_buffer = Bytes.new(@_read_buffer_max_size)
-    @_read_buffer.reserve(@_read_buffer_max_size)
+  :new _new_with_io(@io, @_read_buffer_max_size = 16384)
+    @read_stream = ByteStreamReader.new(@_read_buffer_max_size)
 
   :fun ref close
     @io.close
@@ -155,6 +115,7 @@
   :: Write a single sequence of bytes.
   :: WARNING: Data will be silently discarded if the socket isn't connected.
   :fun ref write(data)
+    // TODO: Port _yield_after_writing logic from Pony.
     @io.write(data)
     @
 
@@ -163,7 +124,7 @@
     if Platform.windows (
       // TODO: @_windows_complete_reads(arg)
     |
-      @_pending_reads_inner -> (data | yield data)
+      @_pending_reads_unix -> (data | yield data)
     )
     @
 
@@ -180,7 +141,7 @@
   :fun ref expect!(expect_size USize)
     if (expect_size > @_read_buffer_max_size) error!
     @_expect = expect_size
-    @_read_buffer_reserve
+    @_read_stream_reserve
 
   :fun ref react(event CPointer(AsioEvent), flags U32, arg U32) @
     :yields IOAction
@@ -199,12 +160,8 @@
     )
     @
 
-  // TODO: what to do about this? It used to be a behavior.
-  :fun ref _pending_reads_later: None
-
-  :fun ref _pending_reads_inner None
+  :fun ref _pending_reads_unix None
     :yields Bytes for None
-    total_bytes_read USize = 0
 
     // Read data from the socket as long as it is readable, or until one of
     // our several early return conditions is reached (throwing an error!)
@@ -213,56 +170,39 @@
         // TODO: Port mute/unmute logic from Pony.
 
         // Distribute data from the read buffer if we have some that is ready.
-        while (@_read_buffer_offset >= @_expect && @_read_buffer_offset > 0) (
-          // If the caller is expecting a specific number of bytes,
-          // respect that and give them exactly that many bytes from the buffer.
-          // Otherwise, we'll give them everything that we have received so far.
-          chop_at = if (@_expect == 0) (@_read_buffer_offset | @_expect)
+        // TODO: cleaner control flow macro for this - maybe `try repeat (...)`?
+        try (while True (yield @_read_stream_chop!))
 
-          // Yield the chopped data.
-          data = @_read_buffer_chop(chop_at)
-          yield data
-        )
-
-        // Stop reading if we've already read the maximum number of bytes
-        // per call to this function. We have this limit in place to prevent
-        // a socket with a lot of data from starving the other actors.
-        if (total_bytes_read >= @_yield_after_reading) (
-          @_pending_reads_later
-          error! // TODO: early return instead of error?
-        )
+        // TODO: Port _yield_after_reading logic from Pony.
 
         // Prepare the buffer, then receive bytes into it from the socket.
-        @_read_buffer_reserve
+        @_read_stream_reserve
         bytes_read = try (
-          @io.recv!(@_read_buffer, @_read_buffer_offset)
+          @read_stream.receive_from!(@io)
         |
           @_readable = False
           error!
         )
-
-        // Move our read buffer offset forward, as well as our running total.
-        @_read_buffer_offset += bytes_read
-        total_bytes_read += bytes_read
       )
     )
 
   :: Resize the read buffer if it is empty or smaller than the next payload.
-  :fun ref _read_buffer_reserve
-    if (@_read_buffer.size <= @_expect) (
-      @_read_buffer.reserve(@_read_buffer_max_size)
+  :fun ref _read_stream_reserve
+    // TODO: use underflow-checked subtraction instead of conditional subtraction?
+    space_ahead_of_marker = @read_stream.space_ahead_of_marker
+    if (space_ahead_of_marker <= @_expect) (
+      @read_stream.reserve_additional(@_expect - space_ahead_of_marker)
     )
 
   :: Remove the given number of bytes from the left side of the read buffer,
   :: returning the removed bytes, keeping the right side of the buffer in place.
-  :fun ref _read_buffer_chop(size USize) Bytes
-    // TODO: Use chop instead of clone, to avoid copying bytes.
-    copy Bytes'iso = @_read_buffer.clone // TODO: this explicit type should not be needed
-    copy.trim_in_place(0, size.isize)
-    @_read_buffer.trim_in_place(size.isize)
+  :fun ref _read_stream_chop! Bytes
+    if (@_expect == 0) (
+      if (@read_stream.bytes_ahead_of_marker == 0) error!
+      @read_stream.advance_to_end
+    |
+      if (@read_stream.bytes_ahead_of_marker < @_expect) error!
+      try @read_stream.advance!(@_expect - @read_stream.token_byte_size)
+    )
 
-    // Move our read buffer offset forward to the point at which we chopped,
-    // so that future bytes will be read into the unused part of the buffer.
-    @_read_buffer_offset -= size
-
-    --copy
+    @read_stream.extract_token

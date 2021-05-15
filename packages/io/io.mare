@@ -1,4 +1,5 @@
 :import "os/error"
+:import "bytes" (ByteStreamSource)
 
 // TODO: Move everything in this file to a separate "io" package,
 // once the interface is settled and deemed to be safe for non-FFI users.
@@ -34,6 +35,8 @@
 
 :class IOCoreEngine
   :is IOEngine(IOAction)
+  :is ByteStreamSource
+
   :prop _event CPointer(AsioEvent): AsioEvent.none
   :prop _fd U32: -1
   :prop _os_error: OSErrorNone
@@ -113,7 +116,7 @@
   // TODO: Try to make this a safe interface instead of an unsafe one,
   // perhaps by bringing the read buffer into this class to be contained here.
   // The lack of safety here is in not knowing if offset is out of bounds.
-  :fun ref recv!(read_buffer Bytes'ref, offset USize) USize
+  :fun ref emit_bytes_into!(read_buffer Bytes'ref, offset USize) USize
     try (
       bytes_read = LibPonyOs.pony_os_recv!(
         @_event

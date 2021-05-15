@@ -81,19 +81,12 @@
       )
     )
 
-  :fun ref _spawn(conn_fd U32)
+  :fun ref _spawn(fd U32)
     try (
-      TCPConnection._accept(
-        @
-        @notify.connected!(@)
-        conn_fd
-        @_read_buffer_size
-        @_yield_after_reading
-        @_yield_after_writing
-      )
+      TCPConnection._accept(@, @notify.connected!(@), fd, @_read_buffer_size)
       @_count += 1
     |
-      LibPonyOS.pony_os_socket_close(conn_fd)
+      LibPonyOS.pony_os_socket_close(fd)
     )
 
   :be _conn_closed
