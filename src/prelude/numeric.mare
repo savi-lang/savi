@@ -53,6 +53,13 @@
   :fun non min_value @'val: compiler intrinsic
   :fun non max_value @'val: compiler intrinsic
 
+  // These arithmetic methods raise an error in case of overflow/underflow.
+  // This can potentially be more efficient in some cases than comparing
+  // the two operands first prior to applying the arithmetic operation.
+  :fun val "+!"(other @) @: compiler intrinsic
+  :fun val "-!"(other @) @: compiler intrinsic
+  :fun val "*!"(other @) @: compiler intrinsic
+
   :fun val bit_and(other @) @: compiler intrinsic
   :fun val bit_or(other @) @: compiler intrinsic
   :fun val bit_xor(other @) @: compiler intrinsic

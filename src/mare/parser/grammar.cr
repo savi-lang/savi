@@ -106,8 +106,8 @@ module Mare::Parser
     # from most tightly binding to most loosely binding.
     # Operators in the same group have the same level of precedence.
     opw = (char(' ') | char('\t'))
-    op1 = (char('*') | char('/') | char('%')).named(:op)
-    op2 = (char('+') | char('-')).named(:op)
+    op1 = (str("*!") | char('*') | char('/') | char('%')).named(:op)
+    op2 = (str("+!") | str("-!") | char('+') | char('-')).named(:op)
     op3 = (str("<|>") | str("<~>") | str("<<~") | str("~>>") |
             str("<<") | str(">>") | str("<~") | str("~>") |
             str("<:") | str("!<:") |

@@ -59,7 +59,7 @@ patterns:
 
 - comment: Error-Raising Calls/Names
   name: markup.deleted.mare
-  match: (\w+\!)
+  match: ((\w+|\+|\-|\*)\!)
 
 - comment: Numeric Values
   name: constant.numeric.mare

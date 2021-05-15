@@ -146,7 +146,7 @@
 			<key>comment</key>
 			<string>Error-Raising Calls/Names</string>
 			<key>match</key>
-			<string>(\w+\!)</string>
+			<string>((\w+|\+|\-|\*)\!)</string>
 			<key>name</key>
 			<string>markup.deleted.mare</string>
 		</dict>

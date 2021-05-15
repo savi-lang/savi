@@ -874,7 +874,8 @@ class Mare::Compiler::CodeGen
     gen_func_start(llvm_func)
     params = llvm_func.params
 
-    @builder.ret \
+    already_returned = false # set to true if the intrinsic does a return in it
+    return_value =
       case gfunc.func.ident.value
       when "bit_width"
         @i8.const_int(
@@ -1217,6 +1218,57 @@ class Mare::Compiler::CodeGen
           end
         gen_numeric_conv gtype, @gtypes["U8"], \
           @builder.call(op_func, [params[0]])
+      when "+!", "-!", "*!"
+        raise NotImplementedError.new("overflow-checked arithmetic for float") \
+          if gtype.type_def.is_floating_point_numeric?(ctx)
+        basename =
+          case gfunc.func.ident.value
+          when "+!" then gtype.type_def.is_signed_numeric?(ctx) ? "sadd" : "uadd"
+          when "-!" then gtype.type_def.is_signed_numeric?(ctx) ? "ssub" : "usub"
+          when "*!" then gtype.type_def.is_signed_numeric?(ctx) ? "smul" : "umul"
+          else raise NotImplementedError.new(gfunc.func.ident.value)
+          end
+        op_func =
+          case bit_width_of(gtype)
+          when 1
+            @mod.functions["llvm.#{basename}.with.overflow.i1"]? ||
+              @mod.functions.add("llvm.#{basename}.with.overflow.i1",
+                [@i1, @i1], @llvm.struct([@i1, @i1]))
+          when 8
+            @mod.functions["llvm.#{basename}.with.overflow.i8"]? ||
+              @mod.functions.add("llvm.#{basename}.with.overflow.i8",
+                [@i8, @i8], @llvm.struct([@i8, @i1]))
+          when 16
+            @mod.functions["llvm.#{basename}.with.overflow.i16"]? ||
+              @mod.functions.add("llvm.#{basename}.with.overflow.i16",
+                [@i16, @i16], @llvm.struct([@i16, @i1]))
+          when 32
+            @mod.functions["llvm.#{basename}.with.overflow.i32"]? ||
+              @mod.functions.add("llvm.#{basename}.with.overflow.i32",
+                [@i32, @i32], @llvm.struct([@i32, @i1]))
+          when 64
+            @mod.functions["llvm.#{basename}.with.overflow.i64"]? ||
+              @mod.functions.add("llvm.#{basename}.with.overflow.i64",
+                [@i64, @i64], @llvm.struct([@i64, @i1]))
+          else raise NotImplementedError.new(bit_width_of(gtype))
+          end
+
+        overflow_block = gen_block("overflow")
+        after_block = gen_block("after")
+
+        result = @builder.call(op_func, [params[0], params[1]])
+
+        is_overflow = @builder.extract_value(result, 1)
+        @builder.cond(is_overflow, overflow_block, after_block)
+
+        @builder.position_at_end(overflow_block)
+        gfunc.calling_convention.gen_error_return(self, gfunc, gen_none, nil)
+
+        @builder.position_at_end(after_block)
+        result_value = @builder.extract_value(result, 0)
+        gfunc.calling_convention.gen_return(self, gfunc, result_value, nil)
+
+        .tap { already_returned = true }
       when "bits"
         raise "bits integer" unless gtype.type_def.is_floating_point_numeric?(ctx)
         case bit_width_of(gtype)
@@ -1302,6 +1354,8 @@ class Mare::Compiler::CodeGen
       else
         raise NotImplementedError.new(gfunc.func.ident.inspect)
       end
+
+    @builder.ret(return_value) unless already_returned
 
     gen_func_end
   end
