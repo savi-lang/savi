@@ -180,6 +180,62 @@
     @assert = b"example".clone.trim_in_place(-5, -2) == b"amp"
     @assert = b"example".clone.trim_in_place(-5,  5) == b"amp"
 
+  :it "truncates from the left or right"
+    @assert = b"example".clone.truncate(5)        == b"examp"
+    @assert = b"example".clone.truncate_left(2)   == b"ample"
+    @assert = b"example".clone.truncate(0)        == b""
+    @assert = b"example".clone.truncate_left(0)   == b"example"
+    @assert = b"example".clone.truncate(7)        == b"example"
+    @assert = b"example".clone.truncate_left(7)   == b""
+    @assert = b"example".clone.truncate(100)      == b"example"
+    @assert = b"example".clone.truncate_left(100) == b""
+
+  :it "chops off the left or right"
+    center Bytes'ref = b"example".clone
+    original_padding = center.space - center.size
+    left = center.chop_left(2)
+    right = center.chop_right(3)
+
+    @assert = left == b"ex"
+    @assert = center == b"amp"
+    @assert = right == b"le"
+
+    // The three buffers are adjacent in memory.
+    @assert = left.cpointer(2).usize == center.cpointer.usize
+    @assert = center.cpointer(3).usize == right.cpointer.usize
+
+    // The first two buffers have a space exactly the same as their size,
+    // and the right buffer retains whatever space padding was in the original.
+    @assert = left.space == left.size
+    @assert = center.space == center.size
+    @assert = right.space == right.size + original_padding
+
+    // Any of the three can have a byte appended without bleeding into the
+    // adjacent memory of the other buffers, since under the hood, this
+    // extension of either the left or center buffer forces reallocation of it.
+    left.push('t'), center.push('s'), right.push('l')
+    @assert = left == b"ext"
+    @assert = center == b"amps"
+    @assert = right == b"lel"
+
+    // After the pushes above, The buffers are no longer adjacent in memory,
+    // checking with a pointer offset of both the original size and new size.
+    @assert = left.cpointer(2).usize != center.cpointer.usize
+    @assert = left.cpointer(3).usize != center.cpointer.usize
+    @assert = center.cpointer(3).usize != right.cpointer.usize
+    @assert = center.cpointer(4).usize != right.cpointer.usize
+
+    // Also now the first two buffers have some padding in their space,
+    // since they reserved more space when they were forced to reallocate.
+    @assert = left.space > left.size
+    @assert = center.space > center.size
+
+    // Chopping with an out-of-bounds offset implicitly uses the full size.
+    left_left = left.chop_left(100)
+    @assert = left_left == b"ext", @assert = left == b""
+    right_right = right.chop_right(100)
+    @assert = right_right == b"", @assert = right == b"lel"
+
   :it "pushes a new byte onto the end of the buffer"
     @assert = Bytes.new.push('o').push('k') == b"ok"
 

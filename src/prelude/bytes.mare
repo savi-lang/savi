@@ -387,6 +387,59 @@
       Bytes.new_iso
     )
 
+  :: Discard all bytes after the given offset.
+  :fun ref truncate(offset USize)
+    offset = offset.min(@_size)
+    @_size = offset
+    @
+
+  :: Discard all bytes to the left of the given offset.
+  :fun ref truncate_left(offset USize)
+    offset = offset.min(@_size)
+    @_ptr = @_ptr._offset(offset)
+    @_size -= offset
+    @_space -= offset
+    @
+
+  :: Split this byte buffer at the given offset, leaving the right side here
+  :: but chopping the left side off to return it as an isolated buffer.
+  ::
+  :: This method does not copy, and the existing allocation will be shared,
+  :: with the two buffers occupying adjacent memory in the same allocation.
+  ::
+  :: Both buffers remain mutable because they cannot access each other's bytes.
+  ::
+  :: If the left side later expands its size, it will then reallocate and copy,
+  :: because the right side has retained claim over the right-adjacent memory.
+  :fun ref chop_left(offset USize) Bytes'iso
+    offset = offset.min(@_size)
+    chopped = Bytes.iso_from_cpointer(@_ptr, offset, offset)
+    @_ptr = @_ptr._offset(offset)
+    @_size -= offset
+    @_space -= offset
+    --chopped
+
+  :: Split this byte buffer at the given offset, leaving the left side here
+  :: but chopping the right side off to return it as an isolated buffer.
+  ::
+  :: This method does not copy, and the existing allocation will be shared,
+  :: with the two buffers occupying adjacent memory in the same allocation.
+  ::
+  :: Both buffers remain mutable because they cannot access each other's bytes.
+  ::
+  :: If the left side later expands its size, it will then reallocate and copy,
+  :: because the right side has retained claim over the right-adjacent memory.
+  :fun ref chop_right(offset USize) Bytes'iso
+    offset = offset.min(@_size)
+    chopped = Bytes.iso_from_cpointer(
+      @_ptr._offset(offset)
+      @_size - offset
+      @_space - offset
+    )
+    @_size = offset
+    @_space = offset
+    --chopped
+
   :: Read a U32 from the bytes at the given offset, with native byte order.
   :: This is not suitable for protocols using a platform-independent byte order.
   :: Raises an error if there aren't enough bytes at that offset to fill a U32.
