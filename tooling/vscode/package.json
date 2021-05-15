@@ -2,7 +2,7 @@
 	"name": "mare",
 	"displayName": "Mare Language",
 	"description": "Support for the Mare programming language.",
-	"version": "0.4.9",
+	"version": "0.4.10",
 	"publisher": "mare-lang",
 	"engines": {
 		"vscode": "^1.35.0"
