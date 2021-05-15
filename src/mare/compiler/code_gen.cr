@@ -897,10 +897,10 @@ class Mare::Compiler::CodeGen
           if gtype.type_def.is_signed_numeric?(ctx)
             case bit_width_of(gtype)
             when 1 then llvm_type_of(gtype).const_int(1)
-            when 8 then llvm_type_of(gtype).const_int(0xFF)
-            when 16 then llvm_type_of(gtype).const_int(0xFFFF)
-            when 32 then llvm_type_of(gtype).const_int(0xFFFFFFFF)
-            when 64 then llvm_type_of(gtype).const_int(0xFFFFFFFFFFFFFFFF)
+            when 8 then llvm_type_of(gtype).const_int(0x80)
+            when 16 then llvm_type_of(gtype).const_int(0x8000)
+            when 32 then llvm_type_of(gtype).const_int(0x80000000)
+            when 64 then llvm_type_of(gtype).const_int(0x8000000000000000)
             else raise NotImplementedError.new(bit_width_of(gtype))
             end
           else

@@ -108,16 +108,16 @@
     @assert = U16  .min_value == 0
     @assert = U32  .min_value == 0
     @assert = U64  .min_value == 0
-    @assert = I8   .min_value == 0xFF
-    @assert = I16  .min_value == 0xFFFF
-    @assert = I32  .min_value == 0xFFFF_FFFF
-    @assert = I64  .min_value == 0xFFFF_FFFF_FFFF_FFFF
+    @assert = I8   .min_value == 0x80
+    @assert = I16  .min_value == 0x8000
+    @assert = I32  .min_value == 0x8000_0000
+    @assert = I64  .min_value == 0x8000_0000_0000_0000
     if Platform.lp64 (
       @assert = USize.min_value == 0
-      @assert = ISize.min_value == 0xFFFF_FFFF_FFFF_FFFF
+      @assert = ISize.min_value == 0x8000_0000_0000_0000
     |
       @assert = USize.min_value == 0
-      @assert = ISize.min_value == 0xFFFF_FFFF
+      @assert = ISize.min_value == 0x8000_0000
     )
 
   :it "converts between different integer types"
