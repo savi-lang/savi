@@ -105,7 +105,7 @@
           // _pending_writev_posix << push((data.cpointer(), data.size()))
           // _pending_writev_total = _pending_writev_total + data.size()
           // _pending_writes()
-          buffers = [data.cpointer.usize, data.size]
+          buffers = [data.cpointer, CPointer(U8).from_usize(data.size)]
           LibPonyOs.pony_os_writev(@_event, buffers.cpointer, buffers.size / 2)
         )
       )
