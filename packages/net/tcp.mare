@@ -42,7 +42,7 @@
     host String
     service String
     from String = ""
-    read_buffer_size = 16384
+    read_buffer_size = 0x4000
   )
     @notify = --notify
     @io = TCPConnectionEngine.connect(@, host, service, from, read_buffer_size)
@@ -68,7 +68,7 @@
     host String
     service String
     from String = ""
-    read_buffer_max_size USize = 16384
+    read_buffer_max_size USize = 0x4000
   )
     try (
       @_new_with_io(
@@ -85,7 +85,7 @@
     actor AsioEventNotify
     listen TCPListener
     ticket TCPAcceptTicket
-    read_buffer_max_size USize = 16384
+    read_buffer_max_size USize = 0x4000
   )
     io = IOCoreEngine.new_from_fd_rw(actor, ticket._fd)
     new = @_new_with_io(io, read_buffer_max_size)
@@ -93,7 +93,7 @@
     new._readable = True // TODO: is this still needed?
     new
 
-  :new _new_with_io(@io, @_read_buffer_max_size = 16384)
+  :new _new_with_io(@io, @_read_buffer_max_size = 0x4000)
     @read_stream = ByteStreamReader.new(@_read_buffer_max_size)
 
   :fun ref close
