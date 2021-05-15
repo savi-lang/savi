@@ -164,11 +164,14 @@
     :yields IOAction for None
     case (
     // First, if this is a disposable event handle, just dispose of it.
-    // We won't yield any actions back to the caller about this.
+    // We won't yield any actions back to the caller about this,
+    // unless it is the event that we own.
     | AsioEvent.is_disposable(flags) |
-      yield IOActionClosed
       AsioEvent.destroy(event)
-      if (@_event is event) @_clear_state_after_final_dispose
+      if (@_event is event) (
+        @_clear_state_after_final_dispose
+        yield IOActionClosed
+      )
 
     // If we own this event, continue by yielding any relevant actions.
     | @_event is event |

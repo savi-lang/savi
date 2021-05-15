@@ -1,5 +1,6 @@
 :import "spec"
 :import "io"
+:import "os/error" // TODO: remove?
 
 :class iso TCPSpecListenerNotify
   :is TCPListenerNotify
@@ -7,11 +8,7 @@
   :new (@env)
 
   :fun ref listening(listen TCPListener'ref)
-    TCPConnection.new(
-      TCPSpecNotify.new(@env)
-      "localhost"
-      Inspect[listen.local_address.port].clone // TODO: shouldn't need clone
-    )
+    TCPSpecEchoClient.new(@env, Inspect[listen.local_address.port])
     @env.err.print("[Listener] Listening")
 
   :fun ref not_listening(listen TCPListener'ref) None
@@ -47,42 +44,49 @@
     )
     @
 
-:class iso TCPSpecNotify
-  :is TCPConnectionNotify
+:actor TCPSpecEchoClient
+  :is IOActor(IOAction)
   :prop env Env
-  :new (@env)
+  :prop io TCPConnectionEngine
+  :new (@env, service)
+    @io = TCPConnectionEngine.connect(@, "localhost", service)
 
-  :fun ref accepted(conn TCPConnectionEngine)
-    @env.err.print("[Sender] Accepted")
-
-  :fun ref connected(conn TCPConnectionEngine)
-    @env.err.print("[Sender] Connected")
-    conn.write(b"Hello, World!")
-    try conn.expect!(5)
-    None
-
-  :fun ref connect_failed(conn TCPConnectionEngine)
-    @env.err.print("[Sender] Failed to connect:")
-    @env.err.print(conn.connect_error.name)
-
-  :fun ref closed(conn TCPConnectionEngine)
-    @env.err.print("[Sender] Closed")
-
-  :fun ref sent(conn TCPConnectionEngine, data Bytes)
-    @env.err.print("[Sender] Sent:")
-    @env.err.print(data.as_string)
-    data
-
-  :fun ref received(conn TCPConnectionEngine, data Bytes)
-    @env.err.print("[Sender] Received:")
-    @env.err.print(data.as_string)
-    case (
-    | data == b"Hello" | try conn.expect!(2)
-    | data == b", "    | try conn.expect!(5)
-    | data == b"World" | try conn.expect!(0)
-    | data == b"!"     | conn.close
+    // TODO: Can we make this trigger _io_react with IOActionOpenFailed
+    // automatically via the same mechanism we will use for queuing later
+    // pending reads, instead of checking for this error case here?
+    if (@io.connect_error != OSErrorNone) (
+      @env.err.print("[EchoClient] Failed to connect:")
+      @env.err.print(@io.connect_error.name)
     )
-    True
+
+  :fun ref _io_react(action IOAction)
+    case (
+    | action == IOActionOpened |
+      @env.err.print("[EchoClient] Connected")
+      @io.write(b"Hello, World!")
+      try @io.expect!(5)
+
+    | action == IOActionOpenFailed |
+      @env.err.print("[EchoClient] Failed to connect:")
+      @env.err.print(@io.connect_error.name)
+
+    | action == IOActionRead |
+      @io.pending_reads -> (data |
+        @env.err.print("[EchoClient] Received:")
+        @env.err.print(data.as_string)
+        case (
+        | data == b"Hello" | try @io.expect!(2)
+        | data == b", "    | try @io.expect!(5)
+        | data == b"World" | try @io.expect!(0)
+        | data == b"!"     | @io.close
+        )
+      )
+
+    | action == IOActionClosed |
+      @env.err.print("[EchoClient] Closed")
+      try @io.listen.as!(TCPListener).dispose
+    )
+    @
 
 :class TCPSpec
   :is Spec

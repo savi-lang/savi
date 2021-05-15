@@ -2,52 +2,6 @@
 :import "bytes" (ByteStreamReader)
 :import "io"
 
-:trait TCPConnectionNotify
-  :fun ref accepted(conn TCPConnectionEngine): None
-  :fun ref connecting(conn TCPConnectionEngine, count U32): None
-  :fun ref connect_failed(conn TCPConnectionEngine) None
-  :fun ref connected(conn TCPConnectionEngine): None
-  :fun ref received(conn TCPConnectionEngine, data Bytes) Bool
-  :fun ref closed(conn TCPConnectionEngine): None
-
-:actor TCPConnection
-  :is IOActor(IOAction)
-  :prop notify TCPConnectionNotify
-  :prop io TCPConnectionEngine
-
-  :be write(data): @io.write(data)
-  :be dispose: @io.close
-
-  :fun ref _io_react(action IOAction)
-    case (
-    | action == IOActionOpened |
-      @notify.connected(@io)
-
-    | action == IOActionOpenFailed |
-      @notify.connect_failed(@io)
-
-    | action == IOActionClosed |
-      @notify.closed(@io)
-
-    | action == IOActionRead |
-      @io.pending_reads -> (data |
-        @notify.received(@io, data)
-      )
-    )
-    @
-
-  :new (
-    // TODO: TCPConnectionAuth, rather than ambient authority.
-    notify TCPConnectionNotify'iso
-    host String
-    service String
-    from String = ""
-    read_buffer_size = 0x4000
-  )
-    @notify = --notify
-    @io = TCPConnectionEngine.connect(@, host, service, from, read_buffer_size)
-    if (@io.connect_error != OSErrorNone) @notify.connect_failed(@io)
-
 :class TCPConnectionEngine
   :is IOEngine(IOAction)
   :prop io: IOCoreEngine.new
