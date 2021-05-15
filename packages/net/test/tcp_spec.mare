@@ -32,10 +32,12 @@
   :fun ref _io_react(action IOAction)
     case (
     | action == IOActionRead |
-      @io.pending_reads -> (data |
+      @io.pending_reads -> (bytes_available |
+        @io.read_stream.advance_to_end
+        bytes val = @io.read_stream.extract_token
         @env.err.print("[Echoer] Received:")
-        @env.err.print(data.as_string)
-        @io.write(data)
+        @env.err.print(bytes.as_string)
+        @io.write(bytes.clone)
         @io.close
       )
     | action == IOActionClosed |
@@ -64,21 +66,18 @@
     | action == IOActionOpened |
       @env.err.print("[EchoClient] Connected")
       @io.write(b"Hello, World!")
-      try @io.expect!(5)
 
     | action == IOActionOpenFailed |
       @env.err.print("[EchoClient] Failed to connect:")
       @env.err.print(@io.connect_error.name)
 
     | action == IOActionRead |
-      @io.pending_reads -> (data |
-        @env.err.print("[EchoClient] Received:")
-        @env.err.print(data.as_string)
-        case (
-        | data == b"Hello" | try @io.expect!(2)
-        | data == b", "    | try @io.expect!(5)
-        | data == b"World" | try @io.expect!(0)
-        | data == b"!"     | @io.close
+      @io.pending_reads -> (bytes_available |
+        if (bytes_available >= b"Hello, World!".size) (
+          @io.read_stream.advance_to_end
+          @env.err.print("[EchoClient] Received:")
+          @env.err.print(@io.read_stream.extract_token.as_string)
+          @io.close
         )
       )
 

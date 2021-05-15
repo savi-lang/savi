@@ -57,6 +57,8 @@
   :fun is_waiting_to_open: @has_opened.not
   :fun has_closed: @_has_closed
 
+  :fun is_readable: @_is_readable
+
   :fun os_error: @_os_error
 
   :new
@@ -113,11 +115,9 @@
   :: Receive bytes into the given read buffer, starting at the given offset.
   :: Raises an error and initiates a hard close if the socket was closed
   :: on the other side of the connection.
-  // TODO: Try to make this a safe interface instead of an unsafe one,
-  // perhaps by bringing the read buffer into this class to be contained here.
-  // The lack of safety here is in not knowing if offset is out of bounds.
   :fun ref emit_bytes_into!(read_buffer Bytes'ref, offset USize) USize
     try (
+      // TODO: Safety checking on offset value, maybe using checked subtraction?
       bytes_read = LibPonyOs.pony_os_recv!(
         @_event
         read_buffer.cpointer(offset)
@@ -138,6 +138,7 @@
 
       bytes_read
     |
+      @_is_readable = False
       error!
     )
 

@@ -7,14 +7,7 @@
   :prop io: IOCoreEngine.new
   :prop listen (TCPListener | None): None
   :prop connect_error OSError: OSErrorNone
-  :prop read_stream ByteStreamReader
-
-  :prop _read_buffer_max_size USize
-
-  :prop _expect USize: 0
-
-  :prop _readable Bool: False
-  :prop _muted    Bool: False
+  :prop read_stream ByteStreamReader: ByteStreamReader.new
 
   :fun non connect(
     // TODO: TCPConnectionAuth, rather than ambient authority.
@@ -22,13 +15,9 @@
     host String
     service String
     from String = ""
-    read_buffer_max_size USize = 0x4000
   )
     try (
-      @_new_with_io(
-        IOCoreEngine.new_tcp_connect!(actor, host, service, from)
-        read_buffer_max_size
-      )
+      @_new_with_io(IOCoreEngine.new_tcp_connect!(actor, host, service, from))
     |
       invalid = @_new_with_io(IOCoreEngine.new)
       invalid.connect_error = EINVAL
@@ -39,51 +28,13 @@
     actor AsioEventNotify
     listen TCPListener
     ticket TCPAcceptTicket
-    read_buffer_max_size USize = 0x4000
   )
     io = IOCoreEngine.new_from_fd_rw(actor, ticket._fd)
-    new = @_new_with_io(io, read_buffer_max_size)
+    new = @_new_with_io(io)
     new.listen = listen
-    new._readable = True // TODO: is this still needed?
     new
 
-  :new _new_with_io(@io, @_read_buffer_max_size = 0x4000)
-    @read_stream = ByteStreamReader.new(@_read_buffer_max_size)
-
-  :fun ref close
-    @io.close
-    @
-
-  :: Write a single sequence of bytes.
-  :: WARNING: Data will be silently discarded if the socket isn't connected.
-  :fun ref write(data)
-    // TODO: Port _yield_after_writing logic from Pony.
-    @io.write(data)
-    @
-
-  :fun ref pending_reads
-    :yields Bytes for None
-    if Platform.windows (
-      // TODO: @_windows_complete_reads(arg)
-    |
-      @_pending_reads_unix -> (data | yield data)
-    )
-    @
-
-  :: Specify that the next `received` callback should contain exactly the given
-  :: number of bytes, with the TCPConnection making this guarantee.
-  ::
-  :: If zero is specified, then no specific expectation is set and the
-  :: next `received` callback will contain an arbitrary/unknown number of bytes.
-  ::
-  :: This request will be ignored if called during the `sent` callback.
-  ::
-  :: Raises an error if the requested number of bytes exceeds the maximum
-  :: read buffer size that was supplied when the connection was created.
-  :fun ref expect!(expect_size USize)
-    if (expect_size > @_read_buffer_max_size) error!
-    @_expect = expect_size
-    @_read_stream_reserve
+  :new _new_with_io(@io)
 
   :fun ref react(event CPointer(AsioEvent), flags U32, arg U32) @
     :yields IOAction
@@ -92,59 +43,38 @@
       | action == IOActionClosed |
         try @listen.as!(TCPListener)._conn_closed
 
-      | action == IOActionRead |
-        @_readable = True
-
-      | action == IOActionWrite |
-        // TODO: complete writes, pending writes logic from Pony
+      // TODO: complete writes, pending writes logic from Pony
+      // | action == IOActionWrite |
+      //   ...
       )
       yield action
     )
     @
 
+  :fun ref close
+    @io.close
+    @
+
+  :: Write a single sequence of bytes.
+  :: WARNING: Data will be silently discarded if the socket isn't connected.
+  :fun ref write(data)
+    @io.write(data)
+    @
+
+  :fun ref pending_reads
+    :yields USize for None
+    if Platform.windows (
+      // TODO: @_windows_complete_reads(arg)
+    |
+      @_pending_reads_unix -> (bytes_available | yield bytes_available)
+    )
+    @
+
   :fun ref _pending_reads_unix None
-    :yields Bytes for None
-
-    // Read data from the socket as long as it is readable, or until one of
-    // our several early return conditions is reached (throwing an error!)
-    try (
-      while @_readable (
-        // TODO: Port mute/unmute logic from Pony.
-
-        // Distribute data from the read buffer if we have some that is ready.
-        // TODO: cleaner control flow macro for this - maybe `try repeat (...)`?
-        try (while True (yield @_read_stream_chop!))
-
-        // TODO: Port _yield_after_reading logic from Pony.
-
-        // Prepare the buffer, then receive bytes into it from the socket.
-        @_read_stream_reserve
-        bytes_read = try (
-          @read_stream.receive_from!(@io)
-        |
-          @_readable = False
-          error!
-        )
+    :yields USize for None
+    while @io.is_readable (
+      try (
+        bytes_read = @read_stream.receive_from!(@io)
+        if (bytes_read > 0) (yield @read_stream.bytes_ahead_of_marker)
       )
     )
-
-  :: Resize the read buffer if it is empty or smaller than the next payload.
-  :fun ref _read_stream_reserve
-    // TODO: use underflow-checked subtraction instead of conditional subtraction?
-    space_ahead_of_marker = @read_stream.space_ahead_of_marker
-    if (space_ahead_of_marker <= @_expect) (
-      @read_stream.reserve_additional(@_expect - space_ahead_of_marker)
-    )
-
-  :: Remove the given number of bytes from the left side of the read buffer,
-  :: returning the removed bytes, keeping the right side of the buffer in place.
-  :fun ref _read_stream_chop! Bytes
-    if (@_expect == 0) (
-      if (@read_stream.bytes_ahead_of_marker == 0) error!
-      @read_stream.advance_to_end
-    |
-      if (@read_stream.bytes_ahead_of_marker < @_expect) error!
-      try @read_stream.advance!(@_expect - @read_stream.token_byte_size)
-    )
-
-    @read_stream.extract_token

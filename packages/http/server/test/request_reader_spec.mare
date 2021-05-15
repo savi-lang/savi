@@ -1,5 +1,5 @@
 :import "spec"
-:import "bytes" (ByteStreamChunkedReader)
+:import "bytes" (ByteStreamReader, ByteStreamSource)
 
 :class RequestReaderSpec
   :is Spec
@@ -76,7 +76,8 @@
   :fun example(source_chunks Array(String)) Bool
     :yields Request
     reader = RequestReader.new
-    stream = ByteStreamChunkedReader.new
+    stream = ByteStreamReader.new
+    write_stream = TestByteStreamSource.new(stream)
 
     // Feed the data one byte at a time into the stream, which will
     // maximally test for parsing state problems at chunk boundaries.
@@ -98,7 +99,7 @@
               finished_too_soon = True
             )
           )
-          stream << Bytes.from_array([byte])
+          write_stream << Bytes.from_array([byte])
         )
       )
     )
@@ -134,7 +135,8 @@
     expected_error RequestError
   ) Bool
     reader = RequestReader.new
-    stream = ByteStreamChunkedReader.new
+    stream = ByteStreamReader.new
+    write_stream = TestByteStreamSource.new(stream)
 
     // Feed the data one byte at a time into the stream, which will
     // maximally test for parsing state problems at chunk boundaries.
@@ -156,7 +158,7 @@
               finished_too_soon = True
             )
           )
-          stream << Bytes.from_array([byte])
+          write_stream << Bytes.from_array([byte])
         )
       )
     )
@@ -184,3 +186,28 @@
       @env.err.print(" to have an error, but it finished successfully")
       False
     )
+
+// This is a utility class used here in testing as a way to get chunks
+// inserted into the byte stream of a ByteStreamReader, one chunk at a time.
+// TODO: Is there a better way to share this across different packages' tests?
+:class TestByteStreamSource
+  // On creation, accept a ByteStreamReader to target.
+  :prop _target_read_stream ByteStreamReader
+  :new (@_target_read_stream)
+
+  // When a new chunk is accepted, add it to the list we hold and invoke
+  // the target's receive_from! method, using us as the source, indirectly
+  // invoking the emit_bytes_into! method back here in our own class.
+  :prop _chunks: Array(Bytes).new
+  :fun ref "<<"(chunk Bytes)
+    @_chunks << chunk
+    try @_target_read_stream.receive_from!(@)
+    @
+
+  // We are a source of bytes, able to push all available bytes into the buffer.
+  :is ByteStreamSource
+  :fun ref emit_bytes_into!(buffer Bytes'ref, offset USize)
+    orig_size = buffer.size
+    @_chunks.each -> (chunk | chunk.each -> (byte | buffer.push(byte)))
+    @_chunks.clear
+    buffer.size - orig_size
