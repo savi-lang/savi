@@ -48,18 +48,6 @@
     @io = TCPConnectionEngine.connect(@, host, service, from, read_buffer_size)
     if (@io.connect_error != OSErrorNone) @notify.connect_failed(@io)
 
-  :new _accept(
-    // TODO: TCPConnectionAuth, rather than ambient authority.
-    listen TCPListener
-    notify TCPConnectionNotify'iso
-    fd
-    read_buffer_size
-  )
-    @notify = --notify
-    @io = TCPConnectionEngine._accept(@, listen, fd, read_buffer_size)
-    @notify.accepted(@io)
-    @io.pending_reads -> (data | @notify.received(@io, data))
-
 :class TCPConnectionEngine
   :is IOEngine(IOAction)
   :prop io: IOCoreEngine.new
@@ -93,13 +81,13 @@
       invalid
     )
 
-  :fun non _accept(
+  :fun non accept(
     actor AsioEventNotify
     listen TCPListener
-    fd U32
+    ticket TCPAcceptTicket
     read_buffer_max_size USize = 16384
   )
-    io = IOCoreEngine.new_from_fd_rw(actor, fd)
+    io = IOCoreEngine.new_from_fd_rw(actor, ticket._fd)
     new = @_new_with_io(io, read_buffer_max_size)
     new.listen = listen
     new._readable = True // TODO: is this still needed?

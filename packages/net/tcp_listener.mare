@@ -1,10 +1,17 @@
 :import "os/error"
+:import "io"
 
 :trait TCPListenerNotify
   :fun ref listening(listen TCPListener'ref): None
   :fun ref not_listening(listen TCPListener'ref) None
   :fun ref closed(listen TCPListener'ref): None
-  :fun ref connected!(listen TCPListener'ref) TCPConnectionNotify'iso
+  :fun ref connected!(listen TCPListener'ref, ticket TCPAcceptTicket) IOActor(IOAction)
+
+// TODO: Is there another way to protect the fd by making it non-forgeable,
+// while avoiding the overhead of an allocation and pointer indirection?
+:class iso TCPAcceptTicket
+  :prop _fd U32
+  :new iso _new(@_fd)
 
 :actor TCPListener
   :prop notify TCPListenerNotify
@@ -83,7 +90,7 @@
 
   :fun ref _spawn(fd U32)
     try (
-      TCPConnection._accept(@, @notify.connected!(@), fd, @_read_buffer_size)
+      @notify.connected!(@, TCPAcceptTicket._new(fd))
       @_count += 1
     |
       LibPonyOS.pony_os_socket_close(fd)

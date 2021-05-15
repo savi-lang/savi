@@ -21,7 +21,7 @@
   :fun ref react(event CPointer(AsioEvent), flags U32, arg U32) @
     :yields ActionType for None
 
-:trait IOActor(ActionType val)
+:trait tag IOActor(ActionType val)
   :fun io @->(IOEngine(ActionType)) // TODO: somehow private... allow the trait to use this, but make it private to other callers?
   :fun ref _io_react(action ActionType) @
 

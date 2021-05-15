@@ -1,4 +1,5 @@
 :import "spec"
+:import "io"
 
 :class iso TCPSpecListenerNotify
   :is TCPListenerNotify
@@ -6,7 +7,6 @@
   :new (@env)
 
   :fun ref listening(listen TCPListener'ref)
-    // TODO: get port dynamically instead of hard-coding it.
     TCPConnection.new(
       TCPSpecNotify.new(@env)
       "localhost"
@@ -21,34 +21,31 @@
   :fun ref closed(listen TCPListener'ref): None
     @env.err.print("[Listener] Stopped listening")
 
-  :fun ref connected!(listen TCPListener'ref) TCPConnectionNotify'iso
-    TCPSpecEchoNotify.new(@env)
+  :fun ref connected!(listen TCPListener'ref, ticket TCPAcceptTicket)
+    TCPSpecEchoer.new(@env, listen, --ticket)
 
-:class iso TCPSpecEchoNotify
-  :is TCPConnectionNotify
+:actor TCPSpecEchoer
+  :is IOActor(IOAction)
   :prop env Env
-  :new (@env)
-
-  :fun ref accepted(conn TCPConnectionEngine)
+  :prop io TCPConnectionEngine
+  :new (@env, listen, ticket)
+    @io = TCPConnectionEngine.accept(@, listen, --ticket)
     @env.err.print("[Echoer] Accepted")
 
-  :fun ref connected(conn TCPConnectionEngine)
-    @env.err.print("[Echoer] Connected")
-
-  :fun ref connect_failed(conn TCPConnectionEngine)
-    @env.err.print("[Echoer] Failed to connect:")
-    @env.err.print(conn.connect_error.name)
-
-  :fun ref closed(conn TCPConnectionEngine)
-    @env.err.print("[Echoer] Closed")
-    try conn.listen.as!(TCPListener).dispose
-
-  :fun ref received(conn TCPConnectionEngine, data Bytes)
-    @env.err.print("[Echoer] Received:")
-    @env.err.print(data.as_string)
-    conn.write(data)
-    conn.close
-    True
+  :fun ref _io_react(action IOAction)
+    case (
+    | action == IOActionRead |
+      @io.pending_reads -> (data |
+        @env.err.print("[Echoer] Received:")
+        @env.err.print(data.as_string)
+        @io.write(data)
+        @io.close
+      )
+    | action == IOActionClosed |
+      @env.err.print("[Echoer] Closed")
+      try @io.listen.as!(TCPListener).dispose
+    )
+    @
 
 :class iso TCPSpecNotify
   :is TCPConnectionNotify
