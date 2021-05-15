@@ -4,17 +4,29 @@
   :is Spec
   :const describes: "ByteStreamReader"
 
+  :it "starts with a large amount of space available, or whatever was specified"
+    @assert = ByteStreamReader.new.space_ahead == 0x4000
+    // @assert = ByteStreamReader.new(0x8000).space_ahead == 0x8000
+    @assert = ByteStreamReader.new(0x2000).space_ahead == 0x2000
+
   :it "can accept chunks, advance, and read tokens"
     stream = ByteStreamReader.new
+    write_stream = TestByteStreamSource.new(stream)
+    initial_space = stream.space_ahead
+
     @assert = stream.bytes_ahead == 0
     @assert = stream.bytes_ahead_of_marker == 0
+    @assert = stream.space_ahead == initial_space
+    @assert = stream.space_ahead_of_marker == initial_space
     @assert = stream.token_byte_size == 0
     @assert = stream.token_as_string == ""
 
     // Add a chunk so that those bytes are available for reading.
-    stream << b"hello"
+    write_stream << b"hello"
     @assert = stream.bytes_ahead == 5
     @assert = stream.bytes_ahead_of_marker == 5
+    @assert = stream.space_ahead == initial_space
+    @assert = stream.space_ahead_of_marker == initial_space
     @assert = stream.token_byte_size == 0
     @assert = stream.token_as_string == ""
 
@@ -22,6 +34,8 @@
     @assert = try (stream.advance!(4), True | False)
     @assert = stream.bytes_ahead == 1
     @assert = stream.bytes_ahead_of_marker == 5
+    @assert = stream.space_ahead == initial_space - 4
+    @assert = stream.space_ahead_of_marker == initial_space
     @assert = stream.token_byte_size == 4
     @assert = stream.token_as_string == "hell"
 
@@ -30,6 +44,8 @@
     @assert = try (stream.advance!(4), False | True)
     @assert = stream.bytes_ahead == 0
     @assert = stream.bytes_ahead_of_marker == 5
+    @assert = stream.space_ahead == initial_space - 5
+    @assert = stream.space_ahead_of_marker == initial_space
     @assert = stream.token_byte_size == 5
     @assert = stream.token_as_string == "hello"
 
@@ -37,14 +53,18 @@
     stream.rewind_to_marker
     @assert = stream.bytes_ahead == 5
     @assert = stream.bytes_ahead_of_marker == 5
+    @assert = stream.space_ahead == initial_space
+    @assert = stream.space_ahead_of_marker == initial_space
     @assert = stream.token_byte_size == 0
     @assert = stream.token_as_string == ""
 
     // Add some more chunks.
-    stream << b"world"
-    stream << b"lings"
+    write_stream << b"world"
+    write_stream << b"lings"
     @assert = stream.bytes_ahead == 15
     @assert = stream.bytes_ahead_of_marker == 15
+    @assert = stream.space_ahead == initial_space
+    @assert = stream.space_ahead_of_marker == initial_space
     @assert = stream.token_byte_size == 0
     @assert = stream.token_as_string == ""
 
@@ -53,6 +73,8 @@
     stream.mark_here
     @assert = stream.bytes_ahead == 12
     @assert = stream.bytes_ahead_of_marker == 12
+    @assert = stream.space_ahead == initial_space - 3
+    @assert = stream.space_ahead_of_marker == initial_space - 3
     @assert = stream.token_byte_size == 0
     @assert = stream.token_as_string == ""
 
@@ -76,6 +98,8 @@
     @assert = try (stream.advance!(3), True | False)
     @assert = stream.bytes_ahead == 9
     @assert = stream.bytes_ahead_of_marker == 12
+    @assert = stream.space_ahead == initial_space - 6
+    @assert = stream.space_ahead_of_marker == initial_space - 3
     @assert = stream.token_byte_size == 3
     @assert = stream.token_as_string == "low"
 
@@ -84,6 +108,8 @@
     @assert = try (stream.advance!(10), True | False)
     @assert = stream.bytes_ahead == 2
     @assert = stream.bytes_ahead_of_marker == 12
+    @assert = stream.space_ahead == initial_space - 13
+    @assert = stream.space_ahead_of_marker == initial_space - 3
     @assert = stream.token_byte_size == 10
     @assert = stream.token_as_string == "loworldlin"
 
@@ -92,6 +118,8 @@
     @assert = try (stream.advance!(12), True | False)
     @assert = stream.bytes_ahead == 0
     @assert = stream.bytes_ahead_of_marker == 12
+    @assert = stream.space_ahead == initial_space - 15
+    @assert = stream.space_ahead_of_marker == initial_space - 3
     @assert = stream.token_byte_size == 12
     @assert = stream.token_as_string == "loworldlings"
 
@@ -100,6 +128,8 @@
     @assert = try (stream.advance!(13), False | True)
     @assert = stream.bytes_ahead == 0
     @assert = stream.bytes_ahead_of_marker == 12
+    @assert = stream.space_ahead == initial_space - 15
+    @assert = stream.space_ahead_of_marker == initial_space - 3
     @assert = stream.token_byte_size == 12
     @assert = stream.token_as_string == "loworldlings"
 
@@ -108,6 +138,8 @@
     stream.advance_to_end
     @assert = stream.bytes_ahead == 0
     @assert = stream.bytes_ahead_of_marker == 12
+    @assert = stream.space_ahead == initial_space - 15
+    @assert = stream.space_ahead_of_marker == initial_space - 3
     @assert = stream.token_byte_size == 12
     @assert = stream.token_as_string == "loworldlings"
 
@@ -121,6 +153,8 @@
     )
     @assert = stream.bytes_ahead == 8
     @assert = stream.bytes_ahead_of_marker == 12
+    @assert = stream.space_ahead == initial_space - 7
+    @assert = stream.space_ahead_of_marker == initial_space - 3
     @assert = stream.token_byte_size == 4
     @assert = stream.token_as_string == "lowo"
 
@@ -157,11 +191,26 @@
     @assert = stream.token_byte_size == 0
     @assert = stream.token_as_string == ""
 
+  :it "extracts an isolated token destructively from the stream"
+    stream = ByteStreamReader.new
+    write_stream = TestByteStreamSource.new(stream)
+    write_stream << b"hel"
+    write_stream << b"lowo"
+    write_stream << b"rld"
+
+    try stream.advance!(2).mark_here.advance!(6)
+
+    extracted Bytes'iso = stream.extract_token
+    @assert = extracted == b"llowor"
+    @assert = stream.bytes_ahead == 2
+    @assert = stream.bytes_ahead_of_marker == 2
+
   :it "yields each byte of a token"
     stream = ByteStreamReader.new
-    stream << b"hel"
-    stream << b"lowo"
-    stream << b"rld"
+    write_stream = TestByteStreamSource.new(stream)
+    write_stream << b"hel"
+    write_stream << b"lowo"
+    write_stream << b"rld"
 
     collected Array(U8) = []
 
@@ -182,9 +231,10 @@
 
   :it "yields each byte of a token until the block returns True"
     stream = ByteStreamReader.new
-    stream << b"hel"
-    stream << b"lowo"
-    stream << b"rld"
+    write_stream = TestByteStreamSource.new(stream)
+    write_stream << b"hel"
+    write_stream << b"lowo"
+    write_stream << b"rld"
 
     collected Array(U8) = []
 
@@ -203,9 +253,10 @@
 
   :it "compares a token for equivalence to a given string"
     stream = ByteStreamReader.new
-    stream << b"hel"
-    stream << b"lowo"
-    stream << b"rld"
+    write_stream = TestByteStreamSource.new(stream)
+    write_stream << b"hel"
+    write_stream << b"lowo"
+    write_stream << b"rld"
 
     // Compare the entire stream.
     stream.advance_to_end
@@ -226,9 +277,10 @@
 
   :it "compares an ASCII-lowercased token for equivalence to a given string"
     stream = ByteStreamReader.new
-    stream << b"HeL"
-    stream << b"LoWo"
-    stream << b"RlD"
+    write_stream = TestByteStreamSource.new(stream)
+    write_stream << b"HeL"
+    write_stream << b"LoWo"
+    write_stream << b"RlD"
 
     // Compare the entire stream.
     stream.advance_to_end
@@ -249,9 +301,10 @@
 
   :it "parses a token as a positive integer in decimal notation"
     stream = ByteStreamReader.new
-    stream << b"192"
-    stream << b"8374"
-    stream << b"650"
+    write_stream = TestByteStreamSource.new(stream)
+    write_stream << b"192"
+    write_stream << b"8374"
+    write_stream << b"650"
 
     // Parse the entire stream as an integer.
     stream.advance_to_end
@@ -265,6 +318,30 @@
     @assert = try (stream.token_as_positive_integer! | 0) == 283746
 
     // Add an invalid character to the stream and get an error.
-    stream << b":" // only digits (0-9) are valid
+    write_stream << b":" // only digits (0-9) are valid
     stream.advance_to_end
     @assert = try (stream.token_as_positive_integer!, False | True)
+
+// This is a utility class used here in testing as a way to get chunks
+// inserted into the byte stream of a ByteStreamReader, one chunk at a time.
+:class TestByteStreamSource
+  // On creation, accept a ByteStreamReader to target.
+  :prop _target_read_stream ByteStreamReader
+  :new (@_target_read_stream)
+
+  // When a new chunk is accepted, add it to the list we hold and invoke
+  // the target's receive_from! method, using us as the source, indirectly
+  // invoking the emit_bytes_into! method back here in our own class.
+  :prop _chunks: Array(Bytes).new
+  :fun ref "<<"(chunk Bytes)
+    @_chunks << chunk
+    try @_target_read_stream.receive_from!(@)
+    @
+
+  // We are a source of bytes, able to push all available bytes into the buffer.
+  :is ByteStreamSource
+  :fun ref emit_bytes_into!(buffer Bytes'ref, offset USize)
+    orig_size = buffer.size
+    @_chunks.each -> (chunk | chunk.each -> (byte | buffer.push(byte)))
+    @_chunks.clear
+    buffer.size - orig_size

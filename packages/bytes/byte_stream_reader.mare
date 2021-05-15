@@ -1,3 +1,13 @@
+:: This trait is meant to create a common interface that can be used to get
+:: bytes into a ByteStreamReader, including compatibility with efficient
+:: patterns that write directly into a buffer from an I/O or network stack.
+:trait ByteStreamSource
+  :: Emit zero or more bytes into the given buffer starting at the given offset,
+  :: possibly expanding the size of the buffer if that turns out to be needed.
+  :: Returns the number of bytes that were written.
+  :: Raises an error if the source has become permanently closed off.
+  :fun ref emit_bytes_into!(buffer Bytes'ref, offset USize) USize
+
 :: This class provides convenience methods for reading data from a stream of
 :: bytes that presents itself in the form of a byte buffer that extends
 :: "to the right" over time (such as data coming from the network),
@@ -28,9 +38,12 @@
 :: stream using the compact method to drop only bytes that are behind
 :: both the marker and cursor, releasing bytes that cannot be read anymore.
 :class ByteStreamReader
-  :prop _data Bytes'ref: Bytes.new
+  :prop _data Bytes'ref
   :prop _offset USize: 0
   :prop _mark_offset USize: 0
+
+  :new (space USize = 0x4000)
+    @_data = Bytes.new(space)
 
   :: Reset this object back to an empty state so that it can be reused.
   :: All data held and all cursor and mark state will be dropped.
@@ -53,16 +66,11 @@
   //   // ...
   //   @
 
-  // TODO: Figure out the right abstraction for allowing an IOCoreEngine
-  // to add bytes into our internal data buffer while remaining safe for both.
-  // That is, we need to isolate pointer-unsafe/FFI code to "io" package, but
-  // we also need to prevent logic outside of ByteStreamReader from doing
-  // anything here other than adding bytes to the end of the data stream
-  // (we can't allow the caller to mutate the data arbitrarily).
-  :fun ref "<<"(chunk Bytes)
-    // TODO: zero copy here - implies chunk param needs to be consumed/extracted
-    chunk.each -> (byte | @_data.push(byte))
-    @
+  :: Receive some bytes from the given source, extending the end of the stream.
+  :: Returns the number of bytes that were received, as reported by the source.
+  :: Raises an error if the source has become permanently closed off.
+  :fun ref receive_from!(source ByteStreamSource)
+    source.emit_bytes_into!(@_data, @_data.size)
 
   :: Move the mark position to match the current cursor position.
   :: This is often used to mark the start of a token in a token stream,
@@ -86,6 +94,24 @@
   :: Get the number of bytes available in the stream ahead of the marker.
   :: This will always be equal to or greater than those ahead of the cursor.
   :fun bytes_ahead_of_marker: @_data.size - @_mark_offset
+
+  :: Get the space available in the underlying allocation ahead of the cursor.
+  :: This is equivalent to the number of available bytes ahead of the cursor
+  :: plus the number of further bytes that can be received from a
+  :: ByteStreamSource prior to forcing a reallocation of the underlying buffer.
+  :fun space_ahead: @_data.space - @_offset
+
+  :: Get the space available in the underlying allocation ahead of the marker.
+  :: This is equivalent to the number of available bytes ahead of the marker
+  :: plus the number of further bytes that can be received from a
+  :: ByteStreamSource prior to forcing a reallocation of the underlying buffer.
+  :fun space_ahead_of_marker: @_data.space - @_mark_offset
+
+  :: Reserve additional space in the underlying byte buffer, which forces a
+  :: reallocation now, but sets a minimum number of bytes that the buffer
+  :: can receive in the future without forcing a reallocation.
+  :fun ref reserve_additional(space USize)
+    @_data.reserve(@_data.space + space)
 
   :: Get the number of bytes in the currently marked token.
   :: That is, the number of bytes between the marker and the cursor.
@@ -151,7 +177,15 @@
       unequal.invert
     )
 
-  // TODO: Add way to chop/extract a token instead of copying it.
+  :: Return the portion of the stream between the marker and the cursor,
+  :: as isolated Bytes, advancing the marker past the token so that it may
+  :: never be read again, which allows the returned Bytes to avoid a copy.
+  :fun ref extract_token Bytes'iso
+    extracted = @_data.chop_left(@_offset)
+    extracted.truncate_left(@_mark_offset)
+    @_offset = 0
+    @_mark_offset = 0
+    --extracted
 
   :: Return the portion of the stream between the marker and the cursor,
   :: as an immutable String.
