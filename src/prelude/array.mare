@@ -139,7 +139,7 @@
     )
     is_found
 
-  :fun each(from USize = 0, to USize = -1) // TODO USize.max_value
+  :fun each(from USize = 0, to USize = USize.max_value)
     to = @_size.min(to)
     if (from < to) (
       index = from

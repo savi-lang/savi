@@ -153,7 +153,7 @@
   :: Both the original and the new string are immutable, as they share memory.
   :: The operation does not allocate a new string pointer nor copy elements.
 
-  :fun val trim(from ISize = 0, to ISize = 0x7FFF_FFFF_FFFF_FFFF) // TODO: ISize.max_value
+  :fun val trim(from ISize = 0, to = ISize.max_value)
     start = @_offset_to_index(from)
     finish = @_offset_to_index(to).min(@size)
 
@@ -168,7 +168,7 @@
       @val_from_cpointer(@_ptr._null, 0, 0)
     )
 
-  :fun ref trim_in_place(from ISize = 0, to ISize = 0x7FFF_FFFF_FFFF_FFFF) // TODO: ISize.max_value
+  :fun ref trim_in_place(from ISize = 0, to = ISize.max_value)
     start = @_offset_to_index(from)
     finish = @_offset_to_index(to).min(@size)
 
@@ -218,7 +218,7 @@
   :fun ref concat_byte_slice(
     other String'box
     from ISize = 0
-    to ISize = 0x7FFF_FFFF_FFFF_FFFF // TODO: ISize.max_value
+    to = ISize.max_value
   )
     start = other._offset_to_index(from)
     finish = other._offset_to_index(to).min(other.size)
