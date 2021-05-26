@@ -41,6 +41,15 @@
           | OpAnyByte.u8 == program_byte |
             @_continue!(next_threads, address +! 1)
 
+          // For OpByteRange, we read the next two bytes in the program,
+          // continuing only if the input byte is within that range.
+          | OpByteRange.u8 == program_byte |
+            low = @program[address +! 1]!
+            high = @program[address +! 2]!
+            if (input_byte >= low && input_byte <= high) (
+              @_continue!(next_threads, address +! 3)
+            )
+
           // For OpByte, we read the next byte in the bytecode program,
           // and compare it to the input byte to see if it fails to match.
           | OpByte.u8 == program_byte |

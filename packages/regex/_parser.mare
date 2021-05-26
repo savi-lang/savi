@@ -3,17 +3,31 @@
     choice = PatternChoice.new
     pattern Pattern = PatternNone.new
 
+    is_in_escape_sequence = False
+
     input.each_byte -> (byte |
-      pattern = case (
-      | byte == '.' | pattern.concat(PatternAnyByte.new) // TODO: proper UTF-8
-      | byte == '?' | pattern.with_question
-      | byte == '*' | pattern.with_star
-      | byte == '+' | pattern.with_plus
-      | byte == '|' | choice.children.push(pattern), pattern = PatternNone.new
+      if is_in_escape_sequence (
+        is_in_escape_sequence = False
+        pattern = case (
+        | byte == 'd' | pattern.concat(PatternByteRange.new('0', '9'))
+        |
+          // TODO: proper UTF-8 support here
+          char = PatternCharacter.new(byte, 0, 0, 0)
+          pattern.concat(char)
+        )
       |
-        // TODO: proper UTF-8 support here
-        char = PatternCharacter.new(byte, 0, 0, 0)
-        pattern.concat(char)
+        pattern = case (
+        | byte == '\\' | is_in_escape_sequence = True, pattern
+        | byte == '.' | pattern.concat(PatternAnyByte.new) // TODO: proper UTF-8
+        | byte == '?' | pattern.with_question
+        | byte == '*' | pattern.with_star
+        | byte == '+' | pattern.with_plus
+        | byte == '|' | choice.children.push(pattern), pattern = PatternNone.new
+        |
+          // TODO: proper UTF-8 support here
+          char = PatternCharacter.new(byte, 0, 0, 0)
+          pattern.concat(char)
+        )
       )
     )
 

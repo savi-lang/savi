@@ -56,6 +56,15 @@
     if (@byte_3 != 0) (yield @byte_3)
     if (@byte_4 != 0) (yield @byte_4)
 
+:: Match any byte whose value is within the given range (inclusive).
+:: This cannot be used with multibyte UTF-8 codepoints, but it is nice and
+:: efficient for the common case of byte ranges in ASCII character classes.
+:class PatternByteRange
+  :is Pattern
+  :prop low U8
+  :prop high U8
+  :new (@low, @high)
+
 :: Match a sequence of concatenated patterns, one after the other.
 :class PatternSequence
   :is Pattern

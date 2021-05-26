@@ -15,7 +15,7 @@
   :member OpSplit: 0xF7
   :member OpSplitMany: 0xF8
   :member OpAnyByte: 0xF9
-  :member OpCharClass: 0xFA
+  :member OpByteRange: 0xFA
   :member OpSaveStart: 0xFB
   :member OpSaveFinish: 0xFC
   :member OpBackrefCompare: 0xFD
@@ -54,6 +54,11 @@
           @_byte(byte)
         )
       )
+
+    | pattern <: PatternByteRange |
+      @_op(OpByteRange)
+      @_byte(pattern.low)
+      @_byte(pattern.high)
 
     | pattern <: PatternSequence |
       pattern.children.each -> (child | @_pattern(child))

@@ -95,7 +95,10 @@ module Mare::Parser::Builder
               end
               result << codepoint
             else
-              raise "invalid escape character: #{reader.current_char}"
+              # Not a valid escape character - pass it on as a literal slash
+              # followed by that literal character, as if not an escape.
+              result << '\\'
+              result << reader.current_char
             end
           else
             result << reader.current_char
