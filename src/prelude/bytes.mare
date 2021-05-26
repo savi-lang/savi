@@ -246,6 +246,16 @@
     )
     @
 
+  :fun each_with_index_until
+    :yields for Bool
+    early_stop = False
+    index USize = 0
+    while (index < @_size && early_stop.not) (
+      early_stop = yield (@_ptr._get_at(index), index)
+      index += 1
+    )
+    early_stop
+
   :fun ref "<<"(other Bytes'box)
     if (other._size > 0) (
       new_size = @_size + other._size
