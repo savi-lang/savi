@@ -45,6 +45,15 @@
     | pattern <: PatternAnyByte |
       @_op(OpAnyByte)
 
+    | pattern <: PatternByte |
+      @_op(OpByte)
+      @_byte(pattern.byte)
+
+    | pattern <: PatternByteRange |
+      @_op(OpByteRange)
+      @_byte(pattern.low)
+      @_byte(pattern.high)
+
     | pattern <: PatternCharacter |
       pattern.each_byte -> (byte |
         if (byte < Op.min_op) (
@@ -54,11 +63,6 @@
           @_byte(byte)
         )
       )
-
-    | pattern <: PatternByteRange |
-      @_op(OpByteRange)
-      @_byte(pattern.low)
-      @_byte(pattern.high)
 
     | pattern <: PatternSequence |
       pattern.children.each -> (child | @_pattern(child))

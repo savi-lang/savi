@@ -47,6 +47,6 @@
       PatternByteRange.new('a', 'z')
       PatternByteRange.new('A', 'Z')
       PatternByteRange.new('0', '9')
-      PatternCharacter.new('_', 0, 0, 0)
+      PatternByte.new('_')
     ])
 
