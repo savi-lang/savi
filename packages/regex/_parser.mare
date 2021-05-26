@@ -1,17 +1,9 @@
-:class _Parser
-  :prop _input: ""
-  :prop _offset USize: 0
-  :fun ref _reset: @_offset = 0
-
-  :fun ref parse(@_input) Pattern
-    @_reset
-    @_parse
-
-  :fun ref _parse Pattern
+:primitive _Parser
+  :fun parse(input String) Pattern
     choice = PatternChoice.new
     pattern Pattern = PatternNone.new
 
-    @_input.each_byte -> (byte |
+    input.each_byte -> (byte |
       pattern = case (
       | byte == '.' | pattern.concat(PatternAnyByte.new) // TODO: proper UTF-8
       | byte == '?' | pattern.with_question

@@ -2,7 +2,7 @@
   :prop program Bytes
 
   :new val compile(regex String)
-    pattern = _Parser.new.parse(regex)
+    pattern = _Parser.parse(regex)
     program = _ProgramWriter.new.compile(pattern).program
     @program = program.clone // TODO: recover instead of clone
 
