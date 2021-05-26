@@ -1,0 +1,8 @@
+:import "spec"
+:source ".."
+
+:actor Main
+  :new (env)
+    Specs.run(env, [
+      SpecRun(RegexSpec).new(env)
+    ])

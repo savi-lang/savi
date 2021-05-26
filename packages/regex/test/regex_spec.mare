@@ -1,0 +1,47 @@
+:import "spec"
+
+:class RegexSpec
+  :is Spec
+  :const describes: "Regex"
+
+  :it "matches an optional character zero or one time with `?`"
+    regex = Regex.compile("ab?c")
+    @assert = regex.matches("a").not
+    @assert = regex.matches("ac")
+    @assert = regex.matches("abc")
+    @assert = regex.matches("abbc").not
+    @assert = regex.matches("abbbc").not
+
+  :it "matches a character repeated zero or more times with `*`"
+    regex = Regex.compile("ab*c")
+    @assert = regex.matches("a").not
+    @assert = regex.matches("ac")
+    @assert = regex.matches("abc")
+    @assert = regex.matches("abbc")
+    @assert = regex.matches("abbbc")
+
+  :it "matches a character repeated one or more times with `+`"
+    regex = Regex.compile("ab+c")
+    @assert = regex.matches("a").not
+    @assert = regex.matches("ac").not
+    @assert = regex.matches("abc")
+    @assert = regex.matches("abbc")
+    @assert = regex.matches("abbbc")
+
+  :it "matches one of several choices with `|`"
+    regex = Regex.compile("abc|jkl|xyz")
+    @assert = regex.matches("abc")
+    @assert = regex.matches("ab").not
+    @assert = regex.matches("jkl")
+    @assert = regex.matches("kl").not
+    @assert = regex.matches("xyz")
+    @assert = regex.matches("xz").not
+
+    // Internally, a choice of 2 is a special case, so we test it separately.
+    regex = Regex.compile("abc|jkl")
+    @assert = regex.matches("abc")
+    @assert = regex.matches("ab").not
+    @assert = regex.matches("jkl")
+    @assert = regex.matches("kl").not
+    @assert = regex.matches("xyz").not
+    @assert = regex.matches("xz").not
