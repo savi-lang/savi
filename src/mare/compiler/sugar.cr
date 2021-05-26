@@ -314,7 +314,13 @@ class Mare::Compiler::Sugar < Mare::AST::CopyOnMutateVisitor
       if lhs.is_a?(AST::Relate) \
       && lhs.op.value == "." \
       && lhs.rhs.is_a?(AST::Identifier)
-        name = "#{lhs.rhs.as(AST::Identifier).value}#{node.op.value}"
+        base_name = lhs.rhs.as(AST::Identifier).value
+        suffix = ""
+        if base_name.ends_with?("!")
+          base_name = base_name[0...-1]
+          suffix = "!"
+        end
+        name = "#{base_name}#{node.op.value}#{suffix}"
         ident = AST::Identifier.new(name).from(lhs.rhs)
         args = AST::Group.new("(", [node.rhs]).from(node.rhs)
         rhs = AST::Qualify.new(ident, args).from(node)
