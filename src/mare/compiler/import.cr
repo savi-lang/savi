@@ -44,7 +44,7 @@ class Mare::Compiler::Import
         source = import.ident.pos.source
         path = Compiler.resolve_library_dirname(
           import.ident.value,
-          source.library.path
+          source.dirname
         )
 
         add_sources_from_library(ctx, path, library)
@@ -70,7 +70,7 @@ class Mare::Compiler::Import
       source = import.ident.pos.source
       path = Compiler.resolve_library_dirname(
         import.ident.value,
-        source.library.path
+        source.dirname
       )
 
       # Finally, load the library, then recursively run this pass on it.
