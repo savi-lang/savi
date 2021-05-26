@@ -36,9 +36,9 @@
         run_threads.each_until -> (address |
           program_byte = @program[address]!
           case (
-          // For OpAny, consume the byte of input regardless of what it is,
-          // then qcontinue with the next byte of the program.
-          | OpAny.u8 == program_byte |
+          // For OpAnyByte, consume the byte of input regardless of what it is,
+          // then continue with the next byte of the program.
+          | OpAnyByte.u8 == program_byte |
             @_continue!(next_threads, address +! 1)
 
           // For OpByte, we read the next byte in the bytecode program,

@@ -4,10 +4,20 @@
   :is Spec
   :const describes: "Regex"
 
+  :it "matches any character with `.`"
+    regex = Regex.compile("a.c")
+    @assert = regex.matches("a").not
+    @assert = regex.matches("ac").not
+    @assert = regex.matches("a c")
+    @assert = regex.matches("abc")
+    @assert = regex.matches("abbc").not
+    @assert = regex.matches("abbbc").not
+
   :it "matches an optional character zero or one time with `?`"
     regex = Regex.compile("ab?c")
     @assert = regex.matches("a").not
     @assert = regex.matches("ac")
+    @assert = regex.matches("a c").not
     @assert = regex.matches("abc")
     @assert = regex.matches("abbc").not
     @assert = regex.matches("abbbc").not
@@ -16,6 +26,7 @@
     regex = Regex.compile("ab*c")
     @assert = regex.matches("a").not
     @assert = regex.matches("ac")
+    @assert = regex.matches("a c").not
     @assert = regex.matches("abc")
     @assert = regex.matches("abbc")
     @assert = regex.matches("abbbc")
@@ -24,6 +35,7 @@
     regex = Regex.compile("ab+c")
     @assert = regex.matches("a").not
     @assert = regex.matches("ac").not
+    @assert = regex.matches("a c").not
     @assert = regex.matches("abc")
     @assert = regex.matches("abbc")
     @assert = regex.matches("abbbc")

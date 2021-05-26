@@ -13,6 +13,7 @@
 
     @_input.each_byte -> (byte |
       pattern = case (
+      | byte == '.' | pattern.concat(PatternAnyByte.new) // TODO: proper UTF-8
       | byte == '?' | pattern.with_question
       | byte == '*' | pattern.with_star
       | byte == '+' | pattern.with_plus

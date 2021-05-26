@@ -37,7 +37,12 @@
   :fun ref with_star: @
   :fun ref with_plus: @
 
-:: Match a UTF-8 character consisting of one to four bytes.
+:: Match any byte.
+// TODO: Replace this with something UTF-8-aware.
+:class PatternAnyByte
+  :is Pattern
+
+:: Match a specific UTF-8 character consisting of one to four bytes.
 :class PatternCharacter
   :is Pattern
   :prop byte_1 U8

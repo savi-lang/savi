@@ -14,7 +14,7 @@
   :member OpJump: 0xF6
   :member OpSplit: 0xF7
   :member OpSplitMany: 0xF8
-  :member OpAny: 0xF9
+  :member OpAnyByte: 0xF9
   :member OpCharClass: 0xFA
   :member OpSaveStart: 0xFB
   :member OpSaveFinish: 0xFC
@@ -42,6 +42,9 @@
 
   :fun ref _pattern(pattern Pattern)
     case (
+    | pattern <: PatternAnyByte |
+      @_op(OpAnyByte)
+
     | pattern <: PatternCharacter |
       pattern.each_byte -> (byte |
         if (byte < Op.min_op) (
