@@ -80,10 +80,28 @@
     @assert = try (array[3]!, False | True)
     @assert = try (array[3]! = 36, False | True)
 
+  :it "gives convenient access to the first and last elements, if existent"
+    array Array(U8) = [3, 6, 12]
+    @assert = try (array.first! == 3 | False)
+    @assert = try (array.last! == 12 | False)
+    @assert = try (array.first! = 4, True | False)
+    @assert = try (array.last! = 11, True | False)
+    @assert = try (array.first! == 4 | False)
+    @assert = try (array.last! == 11 | False)
+    array.clear
+    @assert = try (array.first!, False | True)
+    @assert = try (array.last!, False | True)
+
   :it "can be cleared to an empty size"
     array Array(U8) = [3, 6, 12]
+    @assert = array.size == 3
+    @assert = array.is_empty.not
+    @assert = array.is_not_empty
+
     array.clear
     @assert = array.size == 0
+    @assert = array.is_empty
+    @assert = array.is_not_empty.not
     @assert = try (array[0]!, False | True)
 
   :it "compares equality for the elements in the array"
