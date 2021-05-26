@@ -66,3 +66,15 @@
     @assert = regex.matches("abc").not
     @assert = regex.matches("a0c")
     @assert = regex.matches("a9c")
+
+  :it "matches any ASCII word character with `\w`"
+    regex = Regex.compile("a\wc")
+    @assert = regex.matches("a").not
+    @assert = regex.matches("ac").not
+    @assert = regex.matches("a c").not
+    @assert = regex.matches("a_c")
+    @assert = regex.matches("abc")
+    @assert = regex.matches("a0c")
+    @assert = regex.matches("a9c")
+    @assert = regex.matches("aBc")
+    @assert = regex.matches("ABC").not
