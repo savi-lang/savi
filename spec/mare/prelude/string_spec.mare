@@ -204,3 +204,38 @@
     @assert = try ("+36".parse_i64! == 36  | False)
     @assert = try ("-36".parse_i64! == -36 | False)
     @assert = try ("36bad".parse_i64!, False | True)
+
+  :it "returns the unicode codepoint found at the given offset, if valid"
+    string = "नमस्ते"
+    @assert = try (string.char_at!(0) == 'न' | False) // valid
+    @assert = try (string.char_at!(1) == '�' | False) // invalid
+    @assert = try (string.char_at!(2) == '�' | False) // invalid
+    @assert = try (string.char_at!(3) == 'म' | False) // valid
+    @assert = try (string.char_at!(4) == '�' | False) // invalid
+    @assert = try (string.char_at!(5) == '�' | False) // invalid
+    @assert = try (string.char_at!(6) == 'स' | False) // valid
+    @assert = try (string.char_at!(7) == '�' | False) // invalid
+    @assert = try (string.char_at!(8) == '�' | False) // invalid
+    @assert = try (string.char_at!(9) == '्' | False) // valid (diacritic)
+    @assert = try (string.char_at!(10) == '�' | False) // invalid
+    @assert = try (string.char_at!(11) == '�' | False) // invalid
+    @assert = try (string.char_at!(12) == 'त' | False) // valid
+    @assert = try (string.char_at!(13) == '�' | False) // invalid
+    @assert = try (string.char_at!(14) == '�' | False) // invalid
+    @assert = try (string.char_at!(15) == 'े' | False) // valid (diacritic)
+    @assert = try (string.char_at!(16) == '�' | False) // invalid
+    @assert = try (string.char_at!(17) == '�' | False) // invalid
+    @assert = try (string.char_at!(18), False | True) // out of bounds
+
+  :it "iterates over unicode codepoints with starting indices and byte widths"
+    codepoints Array(U32) = []
+    indices Array(USize) = []
+    widths Array(USize) = []
+    "\"नमस्ते!\"".each_char_with_index_and_width -> (codepoint, index, width |
+      codepoints << codepoint
+      indices << index
+      widths << width
+    )
+    @assert = codepoints == ['"', 'न', 'म', 'स', '्', 'त', 'े', '!', '"']
+    @assert = indices    == [ 0,   1,   4,   7,  10,  13,  16,  19,  20]
+    @assert = widths     == [ 1,   3,   3,   3,   3,   3,   3,   1,   1]

@@ -298,7 +298,6 @@
     )
     @assert = bytes == ['a', 'b', 'c', 'd', 'e', 'f']
     @assert = indices == [0, 1, 2, 3, 4, 5]
-    Inspect.out(indices)
     @assert = early_stop == False
 
   :it "copies bytes from the given buffer onto the end of the byte string"

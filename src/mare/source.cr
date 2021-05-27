@@ -55,25 +55,25 @@ struct Mare::Source::Pos
       current_row += 1
       line_start =
         source.content.index("\n", line_start).try(&.+(1)) \
-        || source.content.size
+        || source.content.bytesize
     end
 
-    line_finish = source.content.index("\n", line_start) || source.content.size
+    line_finish = source.content.index("\n", line_start) || source.content.bytesize
     start = line_start + col
 
     new(source, start, start, line_start, line_finish, row, col)
   end
 
   def self.point(source : Source, offset : Int32)
-    offset = source.content.size - 1 if offset >= source.content.size
+    offset = source.content.bytesize - 1 if offset >= source.content.bytesize
 
     line_start = 0
-    line_finish = source.content.index("\n") || source.content.size
+    line_finish = source.content.index("\n") || source.content.bytesize
     row = 0
 
     while line_finish < offset
       line_start = line_finish + 1
-      line_finish = source.content.index("\n", line_start) || source.content.size
+      line_finish = source.content.index("\n", line_start) || source.content.bytesize
       row += 1
     end
 
@@ -86,12 +86,12 @@ struct Mare::Source::Pos
     # TODO: dedup with similar logic in span and subset
     new_row = 0
     new_line_start = 0
-    source.content[0...new_start].each_char.each_with_index do |char, index|
+    source.content.byte_slice(0, new_start).each_char.each_with_index do |char, index|
       next unless char == '\n'
       new_row += 1
       new_line_start = index
     end
-    new_line_finish = (source.content.index("\n", new_line_start) || source.content.size) - 1
+    new_line_finish = (source.content.index("\n", new_line_start) || source.content.bytesize) - 1
     new_col = new_start - new_line_start
 
     new(
@@ -103,7 +103,7 @@ struct Mare::Source::Pos
 
   def self.show_library_path(library : Library)
     source = Source.new(library.path, "", library.path, library, :path)
-    new(source, 0, library.path.size, 0, library.path.size, 0, 0)
+    new(source, 0, library.path.bytesize, 0, library.path.bytesize, 0, 0)
   end
 
   def initialize(
@@ -134,12 +134,13 @@ struct Mare::Source::Pos
     # TODO: dedup with similar logic in span
     new_row = @row
     new_line_start = @line_start
-    content[0...trim_left].each_char.each_with_index do |char, index|
+
+    content.byte_slice(0, trim_left).each_char.each_with_index do |char, index|
       next unless char == '\n'
       new_row += 1
       new_line_start = @line_start + index
     end
-    new_line_finish = (source.content.index("\n", new_line_start) || source.content.size) - 1
+    new_line_finish = (source.content.index("\n", new_line_start) || source.content.bytesize) - 1
     new_col = new_start - new_line_start
 
     self.class.new(
@@ -172,7 +173,7 @@ struct Mare::Source::Pos
         new_row += 1
         new_line_start = @line_start + index
       end
-      new_line_finish = (source.content.index("\n", new_line_start) || source.content.size) - 1
+      new_line_finish = (source.content.index("\n", new_line_start) || source.content.bytesize) - 1
       new_col = new_start - new_line_start
 
       self.class.new(
@@ -189,7 +190,7 @@ struct Mare::Source::Pos
   end
 
   def content
-    source.content[start...finish]
+    source.content.byte_slice(start, finish - start)
   end
 
   def show
@@ -206,7 +207,7 @@ struct Mare::Source::Pos
 
     [
       "from #{source.path}:#{row + 1}:",
-      source.content[line_start..line_finish],
+      source.content.byte_slice(line_start, line_finish - line_start + 1),
       (" " * col) + "^" + ("~" * twiddle_width) + tail,
     ].join("\n")
   end

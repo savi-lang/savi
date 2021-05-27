@@ -41,7 +41,7 @@
           // two different byte indexes between the two strings are found.
           try (
             line_l.each_byte_with_index -> (byte_l, index |
-              if (byte_l != line_r[index]!) (
+              if (byte_l != line_r.byte_at!(index)) (
                 if (diff != -1) (
                   // We already found a difference, but this is another one,
                   // so we know this isn't the pair we wanted. Error out.
