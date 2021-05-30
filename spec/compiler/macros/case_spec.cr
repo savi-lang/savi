@@ -1,12 +1,12 @@
 describe Mare::Compiler::Macros do
   describe "case" do
-    it "is transformed into a choice" do
+    it "is transformed into a choice", focus: true do
       source = Mare::Source.new_example <<-SOURCE
       :actor Main
         :new
-          case (
-          | x == 1 | "one"
-          | x == 2 | "two"
+          case x == (
+          | 1 | "one"
+          | 2 | "two"
           )
       SOURCE
 
