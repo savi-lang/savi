@@ -96,12 +96,12 @@ class Mare::Compiler::Macros < Mare::AST::CopyOnMutateVisitor
         "  including an optional else clause partitioned by `|`",
       ])
       visit_while(node)
-    # elsif Util.match_ident?(node, 0, "case")
-    #   Util.require_terms(node, [
-    #     nil,
-    #     "the group of cases to check, partitioned by `|`",
-    #   ])
-    #   visit_case(node)
+    elsif Util.match_ident?(node, 0, "case")
+      Util.require_terms(node, [
+        nil,
+        "the group of cases to check, partitioned by `|`",
+      ])
+      visit_case(node)
     elsif Util.match_ident?(node, 0, "try")
       Util.require_terms(node, [
         nil,
@@ -209,14 +209,22 @@ class Mare::Compiler::Macros < Mare::AST::CopyOnMutateVisitor
     raise Error.compiler_hole_at(node, exc)
   end
 
-  def visit(ctx, node : AST::Relate)
-    idents = node.lhs.as(AST::Group)
+  # This clause picks up a special form of case which is inside a Relate node,
+  # where the Relate gets reshuffled into the case clauses.
+  # We need it to be a visit_pre rather than a normal visit, because
+  # if we visited the children first as we normally do, then it would try
+  # to expand the `case` macro inside the Relate before running this code,
+  # and fail because the inner `case` Group doesn't have the right terms.
+  def visit_pre(ctx, node : AST::Relate)
+    lhs = node.lhs
+    return node unless \
+      lhs.is_a?(AST::Group) &&
+      lhs.style == " " &&
+      Util.match_ident?(lhs, 0, "case")
 
-    return node unless Util.match_ident?(idents, 0, "case")
-
-    Error.at idents.terms[1],
+    Error.at lhs.terms[1],
       "Expected this term to be an identifier" \
-        unless Util.match_ident?(idents, 1)
+        unless Util.match_ident?(lhs, 1)
 
     group = node.rhs
     Error.at group,

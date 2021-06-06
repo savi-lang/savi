@@ -1,6 +1,33 @@
 describe Mare::Compiler::Macros do
   describe "case" do
-    it "is transformed into a choice", focus: true do
+    it "is transformed into a choice" do
+      source = Mare::Source.new_example <<-SOURCE
+      :actor Main
+        :new
+          case (
+          | x == 1 | "one"
+          | x == 2 | "two"
+          )
+      SOURCE
+
+      ctx = Mare.compiler.compile([source], :macros)
+      ctx.errors.should be_empty
+
+      func = ctx.namespace.find_func!(ctx, source, "Main", "new")
+      func.body.not_nil!.terms.first.to_a.should eq [:group, "(", [:choice,
+        [
+          [:group, "(", [:relate, [:ident, "x"], [:op, "=="], [:integer, 1]]],
+          [:group, "(", [:string, "one", nil]]
+        ],
+        [
+          [:group, "(", [:relate, [:ident, "x"], [:op, "=="], [:integer, 2]]],
+          [:group, "(", [:string, "two", nil]]
+        ],
+        [[:ident, "True"], [:ident, "None"]],
+      ]]
+    end
+    
+    it "allows the identifier and operator outside the group" do
       source = Mare::Source.new_example <<-SOURCE
       :actor Main
         :new
@@ -117,7 +144,7 @@ describe Mare::Compiler::Macros do
         .errors.map(&.message).join("\n").should eq expected
     end
 
-    it "complains if the term isn't a group" do
+    it "complains if the last term isn't a group" do
       source = Mare::Source.new_example <<-SOURCE
       :actor Main
         :new
@@ -131,7 +158,7 @@ describe Mare::Compiler::Macros do
         with an optional else body section at the end:
       from (example):3:
           case x == 1
-               ^
+                    ^
       MSG
 
       Mare.compiler.compile([source], :macros)
