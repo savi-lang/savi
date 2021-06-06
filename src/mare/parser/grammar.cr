@@ -48,7 +48,7 @@ module Mare::Parser
       str("\\b") | str("\\f") | str("\\n") | str("\\r") | str("\\t") |
       str("\b")  | str("\f")  | str("\n")  | str("\r")  | str("\t") |
       (str("\\u") >> digithex >> digithex >> digithex >> digithex) |
-      (~char('"') >> ~char('\\') >> range(' ', 0x10FFFF_u32))
+      str("\\").maybe >> (~char('"') >> ~char('\\') >> range(' ', 0x10FFFF_u32))
     string = (
       ident_letter.named(:ident).maybe >>
       char('"') >>

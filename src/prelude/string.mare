@@ -95,7 +95,7 @@
   :fun offset_of!(other String'box, start_offset USize = 0)
     found Bool = False
     offset = start_offset
-    other_first = other[0]! // cache here and error out if the other is empty
+    other_first = other.byte_at!(0) // cache and error out if the other is empty
     while (found.not && offset < @_size) (
       if (@_ptr._get_at(offset) == other_first) (
         found = (@_ptr._offset(offset)._compare(other._ptr, other._size) == 0)
@@ -139,9 +139,31 @@
     if (@_space < space) @_ptr_reallocate(space)
     @
 
-  :fun "[]!"(index USize)
+  :fun byte_at!(index USize) U8
     if (@size <= index) error!
     @_ptr._get_at(index)
+
+  :fun "[]!"(index): @char_at!(index)
+
+  :: Return the UTF8-encoded Unicode codepoint starting at the given byte index.
+  :: Raises an error if the given index is out of bounds.
+  :: Returns 0xFFFD (Unicode "Replacement Character") if the given byte index
+  :: is not pointing to the start of a well-formed UTF-8-encoded codepoint.
+  :fun char_at!(index USize) U32
+    if (@size <= index) error!
+
+    codepoint U32 = 0
+    state U8 = 0
+
+    early_stop = @each_byte_until(index, index + 4) -> (byte |
+      codepoint = UTF8Decoding.read_byte_into_codepoint(byte, state, codepoint)
+      state = UTF8Decoding.next_state(byte, state)
+
+      // Stop iterating when we have accepted an entire codepoint.
+      state == 0
+    )
+
+    if early_stop (codepoint | 0xFFFD)
 
   :fun _offset_to_index(offset ISize) USize
     if (offset < 0) (offset.usize + @size | offset.usize)
@@ -186,19 +208,73 @@
     @_size += 1
     @
 
-  :fun each_byte
-    index USize = 0
-    while (index < @_size) (
+  :fun each_byte(from USize = 0, to = USize.max_value, stride USize = 1)
+    to = @_size.min(to)
+    index = from
+    while (index < to) (
       yield @_ptr._get_at(index)
-      index = index + 1
+      index = index + stride
     )
     @
 
-  :fun each_byte_with_index
-    index USize = 0
-    while (index < @_size) (
+  :fun each_byte_until(from USize = 0, to = USize.max_value, stride USize = 1)
+    :yields for Bool
+    early_stop = False
+    to = @_size.min(to)
+    index = from
+    while (index < to && early_stop.not) (
+      early_stop = yield @_ptr._get_at(index)
+      index += stride
+    )
+    early_stop
+
+  :fun each_byte_with_index(from USize = 0, to = USize.max_value, stride USize = 1)
+    to = @_size.min(to)
+    index = from
+    while (index < to) (
       yield (@_ptr._get_at(index), index)
+      index = index + stride
+    )
+    @
+
+  :: Starting from the given byte index and continuing up to the given end,
+  :: yield each UTF8-encoded Unicode codepoint, its starting byte index,
+  :: and its byte width (the number of bytes that were used to encode it).
+  ::
+  :: When multibyte codepoints are observed, the yielded byte index will skip
+  :: some sequential numbers and the yielded byte width will be greater than 1.
+  ::
+  :: When invalid UTF8 encoded bytes are observed, (whether because the String
+  :: is invalid UTF8, or the starting byte index was pointing to the middle
+  :: of a multibyte codepoint rather than its start), the value 0xFFFD,
+  :: known as a Unicode "Replacement character" will be yielded for those bytes.
+  ::
+  :: If the given byte range is outside of the bounds of the actual byte buffer,
+  :: then the start and/or end will be silently truncated to the nearest bound.
+  ::
+  :: If no byte range parameters are given, the entire String will be read.
+  :fun each_char_with_index_and_width(from USize = 0, to = USize.max_value)
+    codepoint U32 = 0
+    state U8 = 0
+    to = @_size.min(to)
+    index = from
+    start_index = index
+
+    while (index < to) (
+      byte = @_ptr._get_at(index)
+      codepoint = UTF8Decoding.read_byte_into_codepoint(byte, state, codepoint)
+      state = UTF8Decoding.next_state(byte, state)
       index = index + 1
+
+      case (
+      | state == 0 |
+        yield (codepoint, start_index, index - start_index)
+        start_index = index
+      | UTF8Decoding.is_error_state(state) |
+        yield (U32[0xFFFD], start_index, index - start_index)
+        start_index = index
+        state = 0
+      )
     )
     @
 
@@ -229,8 +305,8 @@
       @_size += size
     )
 
-  :fun ref push_utf32(value U32)
-    _UTF32Encoder.encode(value) -> (byte_count, byte_1, byte_2, byte_3, byte_4 |
+  :fun ref push_utf8(value U32)
+    _UTF8Encoder.encode(value) -> (byte_count, byte_1, byte_2, byte_3, byte_4 |
       i = @_size
       @_size = @_size + byte_count
       @reserve(@_size)
@@ -359,7 +435,7 @@
 
 :: Encode the code point into UTF-8. It returns a tuple with the size of the
 :: encoded data and then the data.
-:primitive _UTF32Encoder
+:primitive _UTF8Encoder
   :fun encode(value U32)
     :yields (USize, U8, U8, U8, U8)
     case (

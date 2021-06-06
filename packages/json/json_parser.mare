@@ -36,11 +36,11 @@
 
   :fun ref _next! U8: b = @_peek!, @_advance, b
 
-  :fun _peek! U8: @source[@_offset]!
+  :fun _peek! U8: @source.byte_at!(@_offset)
 
-  :fun _peek_softly U8: try (@source[@_offset]! | ' ')
+  :fun _peek_softly U8: try (@source.byte_at!(@_offset) | ' ')
 
-  :fun ref _eat!(b U8): if (b != @source[@_offset]!) error!, @_advance
+  :fun ref _eat!(b U8): if (b != @source.byte_at!(@_offset)) error!, @_advance
 
   :fun ref _advance(n USize = 1): @_offset += n
 
@@ -312,7 +312,7 @@
     | next == 'n'  | buf.push_byte(0x0a)
     | next == 'f'  | buf.push_byte(0x0c)
     | next == 'r'  | buf.push_byte(0x0d)
-    | next == 'u'  | buf.push_utf32(@_read_unicode_seq!)
+    | next == 'u'  | buf.push_utf8(@_read_unicode_seq!)
     | error!
     )
     --buf

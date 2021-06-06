@@ -1732,6 +1732,34 @@ class Mare::Compiler::CodeGen
     cast_value
   end
 
+  def gen_displacing_eq(relate)
+    ref = func_frame.refer[relate.lhs]
+    value = gen_expr(relate.rhs).as(LLVM::Value)
+    name = value.name
+    lhs_type = ref.is_a?(Refer::Local) ? type_of(ref.defn) : type_of(relate.lhs)
+    lhs_llvm_type = llvm_type_of(lhs_type)
+
+    cast_value = gen_assign_cast(value, lhs_type, relate.rhs)
+    cast_value.name = value.name
+
+    @runtime.gen_expr_post(self, relate.lhs, cast_value)
+
+    local_ref = ref.as(Refer::Local)
+    alloca = func_frame.current_locals[local_ref]
+
+    @di.set_loc(relate.op)
+
+    displaced_value = gen_assign_cast(
+      @builder.load(alloca, local_ref.as(Refer::Local).name),
+      type_of(relate),
+      local_ref.defn,
+    )
+
+    @builder.store(cast_value, alloca)
+
+    displaced_value
+  end
+
   def gen_field_eq(node : AST::FieldWrite)
     value = gen_expr(node.rhs).as(LLVM::Value)
     name = value.name
@@ -2092,6 +2120,7 @@ class Mare::Compiler::CodeGen
       case expr.op.as(AST::Operator).value
       when "." then gen_dot(expr)
       when "=" then gen_eq(expr)
+      when "<<=" then gen_displacing_eq(expr)
       when "is" then gen_check_identity_is(expr)
       when "<:" then gen_check_subtype(expr, true)
       when "!<:" then gen_check_subtype(expr, false)
@@ -2481,8 +2510,8 @@ class Mare::Compiler::CodeGen
   def gen_string(value : String)
     @string_globals.fetch value do
       global = gen_global_const(@gtypes["String"], {
-        "_size"  => @isize.const_int(value.size),
-        "_space" => @isize.const_int(value.size + 1),
+        "_size"  => @isize.const_int(value.bytesize),
+        "_space" => @isize.const_int(value.bytesize + 1),
         "_ptr"   => gen_cstring(value),
       })
 

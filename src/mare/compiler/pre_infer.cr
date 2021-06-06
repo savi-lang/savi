@@ -428,7 +428,7 @@ module Mare::Compiler::PreInfer
       case node.op.value
       when "->"
         # Do nothing here - we'll handle it in one of the parent nodes.
-      when "=", "DEFAULTPARAM"
+      when "=", "<<=", "DEFAULTPARAM"
         lhs = self[node.lhs]
         lhs = lhs.info if lhs.is_a?(Infer::LocalRef)
         case lhs

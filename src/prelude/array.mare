@@ -31,6 +31,7 @@
   :fun cpointer(offset = 0) CPointer(A)'tag: @_ptr._offset(offset) // TODO: simply tag as return type; infer CPointer(A) part of it
 
   :fun is_empty: @_size == 0
+  :fun is_not_empty: @_size != 0
   :fun ref clear: @_size = 0, @
 
   :fun ref truncate(size): @_size = @_size.min(size)
@@ -109,6 +110,28 @@
     if (@size < 1) error!
     @_size -= 1
     @_ptr._get_at_no_alias(@_size)
+
+  :: Return the first element in the array.
+  :: Raises an error if the array is empty.
+  :fun first! @->(A'aliased)
+    if (@size == 0) error!
+    @_ptr._get_at(0)
+
+  :: Assign the given value to replace the first element in the array.
+  :: Raises an error if the array is empty.
+  :fun ref "first=!"(value A)
+    if (@size == 0) error!
+    @_ptr._assign_at(0, --value)
+
+  :: Return the last element in the array.
+  :: Raises an error if the array is empty.
+  :fun last! @->(A'aliased)
+    @_ptr._get_at(@size -! 1)
+
+  :: Assign the given value to replace the last element in the array.
+  :: Raises an error if the array is empty.
+  :fun ref "last=!"(value A)
+    @_ptr._assign_at(@size -! 1, --value)
 
   :fun "!="(other): (@ == other).not // TODO: move this to the Equatable trait?
   :fun "=="(other Array(A)'box)

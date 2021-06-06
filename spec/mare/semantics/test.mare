@@ -177,9 +177,14 @@
     test["source_code_position_of_argument string"].pass =
       @source_code_position_of_argument_string(zero == 0) == "zero == 0"
 
+    displacable = "original"
+    displaced = displacable <<= "new"
+    test["<<= result"].pass = displaced == "original"
+    test["<<= effect"].pass = displacable == "new"
+
     container_string = Container(String).new("original")
-    test["<<= result"].pass = (container_string.value <<= "new") == "original"
-    test["<<= effect"].pass = container_string.value == "new"
+    test["<<= result 2"].pass = (container_string.value <<= "new") == "original"
+    test["<<= effect 2"].pass = container_string.value == "new"
 
     test.print_line_break // TODO: move to MicroTest constructor and finalizer
 

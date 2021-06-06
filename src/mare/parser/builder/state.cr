@@ -8,7 +8,7 @@ module Mare::Parser::Builder
       @row = 0
       @line_start = 0
       @line_finish =
-        ((@source.content.index("\n") || @source.content.size) - 1).as(Int32)
+        ((@source.content.index("\n") || @source.content.bytesize) - 1).as(Int32)
     end
 
     private def content
@@ -18,7 +18,7 @@ module Mare::Parser::Builder
     private def next_line
       @row += 1
       @line_start = @line_finish + 2
-      @line_finish = (content.index("\n", @line_start) || content.size) - 1
+      @line_finish = (content.index("\n", @line_start) || content.bytesize) - 1
     end
 
     private def prev_line
@@ -52,7 +52,7 @@ module Mare::Parser::Builder
     end
 
     def slice(range : Range)
-      content[range]
+      content.byte_slice(range.begin, range.size)
     end
 
     def slice_with_escapes(token : Pegmatite::Token)
@@ -61,7 +61,7 @@ module Mare::Parser::Builder
     end
 
     def slice_with_escapes(range : Range)
-      string = content[range]
+      string = slice(range)
       reader = Char::Reader.new(string)
 
       String.build string.bytesize do |result|
@@ -95,7 +95,10 @@ module Mare::Parser::Builder
               end
               result << codepoint
             else
-              raise "invalid escape character: #{reader.current_char}"
+              # Not a valid escape character - pass it on as a literal slash
+              # followed by that literal character, as if not an escape.
+              result << '\\'
+              result << reader.current_char
             end
           else
             result << reader.current_char

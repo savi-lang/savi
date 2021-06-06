@@ -1,18 +1,21 @@
 module Pegmatite
   # Pattern::UnicodeAny is used to consume any single arbitrary character.
   #
-  # Parsing will fail if a valid UTF-32 codepoint couldn't be parsed.
+  # Parsing will fail if a valid UTF-8 codepoint couldn't be parsed.
   # Otherwise, the pattern succeeds, consuming the matched bytes.
   class Pattern::UnicodeAny < Pattern
     # This class is stateless, so to save memory, you can use this singleton
     # INSTANCE instead of allocating a new one every time.
     INSTANCE = new
 
-    # This helper method is used to extract a UTF-32 codepoint from the given
+    # This helper method is used to extract a UTF-8 codepoint from the given
     # byte offset of the given source string, returning the codepoint itself
     # along with the number of bytes that were consumed by its representation.
-    def self.utf32_at(source, offset) : {UInt32, Int32}
-      err = {0xFFFD_u32, 1}
+    #
+    # TODO: Use Crystal's Char::Reader abstraction for Pegmatite,
+    # which would potentially obviate the need for this logic to be here.
+    def self.utf8_at(source, offset) : {UInt32, Int32, Bool}
+      err = {0xFFFD_u32, 1, false}
 
       # Get the first byte in the character.
       return err if source.bytesize <= offset
@@ -20,7 +23,7 @@ module Pegmatite
 
       if c < 0x80_u32
         # This is a one-byte character.
-        {c, 1}
+        {c, 1, true}
       elsif c < 0xC2_u32
         # This is a stray continuation.
         err
@@ -33,7 +36,7 @@ module Pegmatite
         return err if (c2 & 0xC0_u32) != 0x80_u32
 
         # Return the two-byte character.
-        {((c << 6) + c2) - 0x3080_u32, 2}
+        {((c << 6) + c2) - 0x3080_u32, 2, true}
       elsif c < 0xF0_u32
         # This is a three-byte character.
         return err if source.bytesize <= offset + 2
@@ -48,7 +51,7 @@ module Pegmatite
         return err if (c == 0xE0_u32) && (c2 < 0xA0_u32)
 
         # Return the three-byte character.
-        {((c << 12) + (c2 << 6) + c3) - 0xE2080_u32, 3}
+        {((c << 12) + (c2 << 6) + c3) - 0xE2080_u32, 3, true}
       elsif c < 0xF5_u32
         # This is a four-byte character.
         return err if source.bytesize <= offset + 3
@@ -68,7 +71,7 @@ module Pegmatite
         return err if (c == 0xF4_u32) && (c2 >= 0x90_u32)
 
         # Return the four-byte character.
-        {((c2 << 18) + (c2 << 12) + (c3 << 6) + c4) - 0x3C82080_u32, 4}
+        {((c2 << 18) + (c2 << 12) + (c3 << 6) + c4) - 0x3C82080_u32, 4, true}
       else
         # The result would not be <= 0x10FFFF.
         err
@@ -88,10 +91,10 @@ module Pegmatite
     end
 
     def _match(source, offset, state) : MatchResult
-      c, length = Pattern::UnicodeAny.utf32_at(source, offset)
+      c, length, is_valid = Pattern::UnicodeAny.utf8_at(source, offset)
 
-      # Fail if a valid UTF-32 character couldn't be parsed.
-      return {0, self} if c == 0xFFFD_u32
+      # Fail if a valid UTF-8 character couldn't be parsed.
+      return {0, self} if !is_valid
 
       # Otherwise, pass.
       {length, nil}

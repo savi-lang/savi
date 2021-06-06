@@ -1,0 +1,54 @@
+:import "./pattern"
+
+:primitive _Parser
+  :fun parse(input String) Pattern
+    choice = PatternChoice.new
+    pattern Pattern = PatternNone.new
+
+    is_in_escape_sequence = False
+
+    input.each_byte -> (byte |
+      if is_in_escape_sequence (
+        is_in_escape_sequence = False
+        pattern = case (
+        | byte == 'd' | pattern.concat(@_builtin_class_digit)
+        | byte == 'w' | pattern.concat(@_builtin_class_word)
+        |
+          // TODO: proper UTF-8 support here
+          char = PatternCharacter.new(byte, 0, 0, 0)
+          pattern.concat(char)
+        )
+      |
+        pattern = case (
+        | byte == '\\' | is_in_escape_sequence = True, pattern
+        | byte == '.' | pattern.concat(PatternAnyByte.new) // TODO: proper UTF-8
+        | byte == '?' | pattern.with_question
+        | byte == '*' | pattern.with_star
+        | byte == '+' | pattern.with_plus
+        | byte == '|' | choice.children.push(pattern), pattern = PatternNone.new
+        |
+          // TODO: proper UTF-8 support here
+          char = PatternCharacter.new(byte, 0, 0, 0)
+          pattern.concat(char)
+        )
+      )
+    )
+
+    if choice.children.is_not_empty (
+      choice.children.push(pattern)
+      choice
+    |
+      pattern
+    )
+
+  :fun non _builtin_class_digit
+    PatternByteRange.new('0', '9')
+
+  :fun non _builtin_class_word
+    PatternChoice.new([
+      PatternByteRange.new('a', 'z')
+      PatternByteRange.new('A', 'Z')
+      PatternByteRange.new('0', '9')
+      PatternByte.new('_')
+    ])
+

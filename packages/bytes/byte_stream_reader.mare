@@ -171,7 +171,7 @@
       index USize = 0
       unequal = @each_token_byte_until -> (byte |
         lower_byte = if (byte >= 'A' && byte <= 'Z') (byte - 'A' + 'a' | byte)
-        unequal_byte = try (lower_byte != other[index]! | True)
+        unequal_byte = try (lower_byte != other.byte_at!(index) | True)
         index += 1
         unequal_byte
       )

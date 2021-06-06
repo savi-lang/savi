@@ -47,6 +47,7 @@ describe Mare::Compiler::Sugar do
     :class Example
       :fun prop_assign
         x.y = z
+        x.y! = z
     SOURCE
 
     ast = Mare::Parser.parse(source)
@@ -56,6 +57,11 @@ describe Mare::Compiler::Sugar do
       [:declare, [[:ident, "fun"], [:ident, "prop_assign"]], [:group, ":",
         [:relate,
           [:relate, [:ident, "x"], [:op, "."], [:ident, "y"]],
+          [:op, "="],
+          [:ident, "z"],
+        ],
+        [:relate,
+          [:relate, [:ident, "x"], [:op, "."], [:ident, "y!"]],
           [:op, "="],
           [:ident, "z"],
         ],
@@ -71,6 +77,11 @@ describe Mare::Compiler::Sugar do
         [:ident, "x"],
         [:op, "."],
         [:qualify, [:ident, "y="], [:group, "(", [:ident, "z"]]],
+      ],
+      [:relate,
+        [:ident, "x"],
+        [:op, "."],
+        [:qualify, [:ident, "y=!"], [:group, "(", [:ident, "z"]]],
       ],
     ]
 

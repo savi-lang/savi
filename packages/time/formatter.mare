@@ -34,12 +34,12 @@
 
     while (i < @pattern.size()) (
       try (
-        char U8 = @pattern[i]!
+        char U8 = @pattern.byte_at!(i)
 
         ok = True
 
         if (char == '%') (
-          char = @pattern[i + 1]!
+          char = @pattern.byte_at!(i + 1)
           case (
           | char == 'a' | out = @short_day_name(time, --out)
           | char == 'A' | out = @day_name(time, --out)
@@ -76,7 +76,7 @@
           | char == 'Y' | out = @year(time, --out)
           | char == 'z' | out = @time_zone(time, False, --out)
           | char == '_' |
-            char = @pattern[i + 2]!
+            char = @pattern.byte_at!(i + 2)
             case (
             | char == 'm' | out << @month_blank_padded(time)
             |
@@ -86,7 +86,7 @@
             )
             if ok (i += 1)
           | char == '-' |
-            char = @pattern[i + 2]!
+            char = @pattern.byte_at!(i + 2)
             case (
             | char == 'd' | out << @day_of_month(time)
             | char == 'm' | out << @month(time)
@@ -97,7 +97,7 @@
             )
             if ok (i += 1)
           | char == '^' |
-            char = @pattern[i + 2]!
+            char = @pattern.byte_at!(i + 2)
             case (
             | char == 'a' | out << @short_day_name_upcase(time)
             | char == 'A' | out << @day_name_upcase(time)
@@ -110,11 +110,11 @@
             )
             if ok (i += 1)
           | char == ':' |
-            char = @pattern[i + 2]!
+            char = @pattern.byte_at!(i + 2)
             case (
             | char == 'z' | out << @time_zone_colon(time)
             | char == ':' |
-              char = @pattern[i + 3]!
+              char = @pattern.byte_at!(i + 3)
               case (
               | char == 'z' | out << @time_zone_colon_with_seconds(time)
               |
@@ -131,7 +131,7 @@
             if ok (i += 1)
           | (char == '3') || (char == '6') || (char == '9') |
             digit_char = char
-            char = @pattern[i + 2]!
+            char = @pattern.byte_at!(i + 2)
             case (
             | char == 'N' |
               case (

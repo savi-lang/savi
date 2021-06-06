@@ -10,5 +10,5 @@ shards:
 
   pegmatite:
     github: jemc/crystal-pegmatite
-    commit: 52483e2ffdfac6913342b2dae16ba11d6e4b8d07
+    commit: 601363cb2ce9c57ccc70967eb270005950f2f7b0
 
