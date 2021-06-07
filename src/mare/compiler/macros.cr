@@ -209,6 +209,37 @@ class Mare::Compiler::Macros < Mare::AST::CopyOnMutateVisitor
     raise Error.compiler_hole_at(node, exc)
   end
 
+  # This clause picks up a special form of case which is inside a Relate node,
+  # where the Relate gets reshuffled into the case clauses.
+  # We need it to be a visit_pre rather than a normal visit, because
+  # if we visited the children first as we normally do, then it would try
+  # to expand the `case` macro inside the Relate before running this code,
+  # and fail because the inner `case` Group doesn't have the right terms.
+  def visit_pre(ctx, node : AST::Relate)
+    lhs = node.lhs
+    return node unless \
+      lhs.is_a?(AST::Group) &&
+      lhs.style == " " &&
+      Util.match_ident?(lhs, 0, "case")
+
+    Error.at lhs.terms[1],
+      "Expected this term to be an identifier" \
+        unless Util.match_ident?(lhs, 1)
+
+    group = node.rhs
+    Error.at group,
+      "Expected this term to be a parenthesized group of cases to check,\n" \
+      "  partitioned into sections by `|`, in which each body section\n" \
+      "  is preceded by a condition section to be evaluated as a Bool,\n" \
+      "  with an optional else body section at the end" \
+        unless group.is_a?(AST::Group) && group.style == "|"
+
+    visit_case(node)
+  rescue exc : Exception
+    raise exc if exc.is_a?(Error) # TODO: ctx.errors multi-error capability
+    raise Error.compiler_hole_at(node, exc)
+  end
+
   def visit_if(node : AST::Group)
     orig = node.terms[0]
     cond = node.terms[1]
@@ -303,6 +334,48 @@ class Mare::Compiler::Macros < Mare::AST::CopyOnMutateVisitor
 
     AST::Group.new("(", [
       AST::Choice.new(clauses).from(orig),
+    ] of AST::Term).from(node)
+  end
+
+  def visit_case(node : AST::Relate)
+    ident = node.lhs.as(AST::Group).terms[1]
+    op = node.op
+    group = node.rhs.as(AST::Group)
+    orig = group.terms[0]
+
+    # By construction, every term in a `|` group must be a `(` group.
+    sections = group.terms.map(&.as(AST::Group))
+
+    # Discard an empty section at the beginning if present.
+    # This gives aesthetic alternatives for single vs multi-line renderings.
+    sections.shift if sections.first.terms.empty?
+
+    # Add a condition and case body for each pair of sections we encounter.
+    # Clauses are constructed as a new Relate node using the top-level
+    # identifier and operation, plus the identifier in each even section.
+    clauses = [] of {AST::Term, AST::Term}
+    while sections.size >= 2
+      cond = sections.shift
+      body = sections.shift
+      relate = AST::Relate.new(ident, op, cond.terms[0]).from(cond)
+      clauses << {
+        AST::Group.new("(", [relate] of AST::Term).from(cond),
+        body
+      }
+    end
+
+    # Add an else case at the end. This has an implicit value of None,
+    # unless the number of total sections was odd, in which case the last
+    # section is counted as being the body to execute in the else case.
+    # TODO: add a pass to detect a Choice that doesn't have this,
+    # or maybe implicitly assume it later without adding it to the AST?
+    clauses << {
+      AST::Identifier.new("True").from(orig),
+      sections.empty? ? AST::Identifier.new("None").from(orig) : sections.pop
+    }
+
+    AST::Group.new("(", [
+      AST::Choice.new(clauses).from(node),
     ] of AST::Term).from(node)
   end
 
