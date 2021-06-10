@@ -1,5 +1,5 @@
 :class JsonPath
-  :prop segments Array((String | USize)): []
+  :var segments Array((String | USize)): []
   :new (@segments = [])
   :new iso new_iso(s Array((String | USize))'iso = []): @segments = --s
   :fun ref push(segment): @segments.push(segment)

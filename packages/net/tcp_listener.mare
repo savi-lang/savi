@@ -10,24 +10,24 @@
 // TODO: Is there another way to protect the fd by making it non-forgeable,
 // while avoiding the overhead of an allocation and pointer indirection?
 :class iso TCPAcceptTicket
-  :prop _fd U32
+  :var _fd U32
   :new iso _new(@_fd)
 
 :actor TCPListener
-  :prop notify TCPListenerNotify
-  :prop listen_error OSError: OSErrorNone
+  :let notify TCPListenerNotify
+  :var listen_error OSError: OSErrorNone
 
-  :prop _fd U32: -1
-  :prop _event CPointer(AsioEvent): CPointer(AsioEvent).null
+  :var _fd U32: -1
+  :var _event CPointer(AsioEvent): CPointer(AsioEvent).null
 
-  :prop _count USize: 0
-  :prop _limit USize
-  :prop _read_buffer_size USize
-  :prop _yield_after_reading USize
-  :prop _yield_after_writing USize
+  :var _count USize: 0
+  :var _limit USize
+  :var _read_buffer_size USize
+  :var _yield_after_reading USize
+  :var _yield_after_writing USize
 
-  :prop _closed Bool: False
-  :prop _paused Bool: False
+  :var _closed Bool: False
+  :var _paused Bool: False
 
   :fun local_address: NetAddress._for_fd(@_fd)
 

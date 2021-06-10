@@ -8,7 +8,7 @@ The following types are used in some but not all of the examples below:
   :new iso
 
 :class Outer
-  :prop inner Inner: Inner.new
+  :var inner Inner: Inner.new
   :new iso
 ```
 
@@ -211,7 +211,7 @@ It complains on auto-recovery for a val method receiver:
 
 ```mare
 :class FunValImmutableString
-  :prop string String'ref: String.new
+  :var string String'ref: String.new
   :fun val immutable_string: @string
   :new iso
 ```
@@ -301,4 +301,66 @@ This function call doesn't meet subtyping requirements:
 - the function allows at most 5 arguments:
   :fun example(a U8, b U8, c U8, d U8 = 4, e U8 = 5)
               ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+```
+
+---
+
+It complains when assigning to a let property outside of a constructor or indirectly inside of a constructor:
+
+```mare
+    @x = 1
+    indirect_self = @
+    indirect_self.x = 2
+    indirect_self.x <<= 3
+
+  :let x U64
+
+  :fun ref set_x(@x)
+  :fun ref set_x_explicitly(x): @x = x
+  :fun ref displace_x(x): @x <<= x
+```
+```error
+A `let` property can only be assigned without indirection:
+    indirect_self.x = 2
+                  ^
+
+- declare this property with `var` instead of `let` if indirection is needed:
+  :let x U64
+       ^
+```
+```error
+A `let` property can only be assigned without indirection:
+    indirect_self.x <<= 3
+                  ^
+
+- declare this property with `var` instead of `let` if indirection is needed:
+  :let x U64
+       ^
+```
+```error
+A `let` property can only be assigned inside a constructor:
+  :fun ref set_x(@x)
+                  ^
+
+- declare this property with `var` instead of `let` if reassignment is needed:
+  :let x U64
+       ^
+```
+```error
+A `let` property can only be assigned inside a constructor:
+  :fun ref set_x_explicitly(x): @x = x
+                                 ^
+
+- declare this property with `var` instead of `let` if reassignment is needed:
+  :let x U64
+       ^
+```
+```error
+A `let` property can only be assigned inside a constructor:
+  :fun ref displace_x(x): @x <<= x
+                           ^
+
+- declare this property with `var` instead of `let` if reassignment is needed:
+  :let x U64
+       ^
 ```

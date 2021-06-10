@@ -1,10 +1,10 @@
 :import "collections" (OrderedMap, HashEq)
 
 :actor Specs
-  :prop env Env
-  :prop reporter SpecReporter
-  :prop spec_count USize
-  :prop statuses: OrderedMap(String, SpecStatus).new
+  :let env Env
+  :let reporter SpecReporter
+  :var spec_count USize
+  :let statuses: OrderedMap(String, SpecStatus).new
 
   :new (@env, @spec_count)
     @reporter = SpecReporterLinear.new(@env, @statuses, SpecReporterFull.new(@env))

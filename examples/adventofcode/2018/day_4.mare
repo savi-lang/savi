@@ -9,9 +9,9 @@
   :member Day4EventAwake: 2
 
 :class Day4Entry
-  :prop guard String
-  :prop event Day4Event
-  :prop time Time
+  :var guard String
+  :var event Day4Event
+  :var time Time
   :new (@guard, @event, @time)
   :new empty: @guard = "", @event = 0, @time = Time.seconds(0)
 

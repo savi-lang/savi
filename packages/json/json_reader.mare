@@ -1,6 +1,6 @@
 :class JsonReader
-  :prop _parser: JsonParser.new
-  :prop errors: JsonReaderErrors.new
+  :let _parser: JsonParser.new
+  :let errors: JsonReaderErrors.new
   :new (source)
     @_parser.source = source
 
@@ -54,8 +54,8 @@
     )
 
 :class JsonReaderErrors
-  :prop _path: JsonPath.new
-  :prop _list Array(JsonReaderError): []
+  :let _path: JsonPath.new
+  :let _list Array(JsonReaderError): []
 
   :fun is_empty: @_list.is_empty
   :fun inspect_into(out String'iso) String'iso
@@ -80,7 +80,7 @@
 
 :class JsonReaderErrorUnexpectedKeyHere
   :is JsonReaderError
-  :prop path JsonPath'val
+  :let path JsonPath'val
   :new (@path)
   :fun inspect_into(out String'iso) String'iso
     out << "unexpected key encountered at path: "
@@ -88,8 +88,8 @@
 
 :class JsonReaderErrorExpectedHere
   :is JsonReaderError
-  :prop path JsonPath'val
-  :prop what String
+  :let path JsonPath'val
+  :let what String
   :new (@path, @what)
   :fun inspect_into(out String'iso) String'iso
     out << "expected to read "

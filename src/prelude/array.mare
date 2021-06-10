@@ -1,7 +1,7 @@
 :class ref Array(A)
-  :prop _size USize
-  :prop _space USize
-  :prop _ptr CPointer(A)'ref
+  :var _size USize
+  :var _space USize
+  :var _ptr CPointer(A)'ref
   :new ref from_cpointer(@_ptr, @_size, @_space)
   :new iso iso_from_cpointer(@_ptr, @_size, @_space) // TODO: remove this and use recover instead?
   :new val val_from_cpointer(@_ptr, @_size, @_space) // TODO: remove this and use recover instead?

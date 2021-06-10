@@ -66,7 +66,7 @@ Creating a local variable is simply an assignment:
 greeting = "Hello, World!"
 ```
 
-There is no need to declare before the first assignment with `var` or `let` as required in Pony. As a result, there is also no distinction between `var` and `let` semantics - all local variables are reassignable:
+There is no need to declare before the first assignment with `var` or `let` as required in Pony. As a result, there is also no distinction between `var` and `let` semantics for local variables - all local variables are reassignable:
 
 ```mare
 greeting = "Hello, World!"
@@ -172,7 +172,7 @@ An `if` macro has two terms:
 
 ```mare
 :actor Main
-  :prop env Env
+  :let env Env
 
   :fun test
     env.out.print("example")
@@ -221,7 +221,7 @@ Let's look at the same code sample from the `if` section above, rewritten to use
 
 ```mare
 :actor Main
-  :prop env Env
+  :let env Env
 
   :fun test
     env.out.print("example")
@@ -378,18 +378,22 @@ Note that the block is not a value that can be carried around - yielding cannot 
 
 ### Properties and Related Sugar
 
-In Mare, a property is roughly equivalent to a field in Pony. It can be declared with the `prop` declarator, which allows specifying both the type and the initial value.
+In Mare, a property is roughly equivalent to a field in Pony. It can be declared with the `var` or `let` declarator. Similar to Pony, the `var` declarator will allow assigning a new value at any time, whereas fields declared with `let` cannot be reassigned once all fields have been assigned at least once in the constructor.
+
+This is a bit more lenient than Pony in that it allows you to potentially reassign `let` fields prior to the "completion" of all field assignments, since that is the point in the code at which the constructed instance is considered fully initialized and able to begin sharing itself externally. Once this externally-shareable point is reached, `let` fields are locked in place. Just as in Pony, `let` fields are not strictly immutable - the object pointed to by the field can potentially be internally mutated, but the field cannot be re-pointed to a new object. Where deep immutability of a field is desired, the `let` declarator can be paired with the `val` reference capability for the field type.
+
+Field declarators allow you to specify a type and an initial value, as shown below;
 
 ```mare
 :class Person
-  :prop name String: "Bob"
+  :var name String: "Bob"
 ```
 
 Just like in Pony, if you don't specify an initial value, a value must be assigned in every constructor that exists on the type. Note that as mentioned in the previous section, Mare allows you to have a parameter with the same identifier, because the `@` prefix when referring to the property makes it unambiguous:
 
 ```mare
 :class Person
-  :prop name String
+  :var name String
   :new (name)
     @name = name
 ```
@@ -398,7 +402,7 @@ However, we can do even better here, using "parameter assignment sugar", which i
 
 ```mare
 :class Person
-  :prop name String
+  :var name String
   :new (@name)
 ```
 
@@ -406,16 +410,16 @@ Note that parameter assignment sugar works on any function - not just a construc
 
 ```mare
 :class Person
-  :prop name String
+  :var name String
   :new (@name)
   :fun ref change_name(@name)
 ```
 
-However, note that we don't need to define our own function for changing a property, because the `prop` declarator automatically defines a "getter" and "setter" for the property. In this example, the "getter" is a function called `Person.name`, and the "setter" is a function called `Person.name=`. Mare has syntax sugar for calling a function that ends in `=`, and you can define your own such functions that work just the same way as property setter functions do, which makes it easy to write property-like implementations that fulfill the same structural interfaces as "real" properties:
+However, note that we don't need to define our own function for changing a property, because the `var` declarator automatically defines a "getter" and "setter" for the property. In this example, the "getter" is a function called `Person.name`, and the "setter" is a function called `Person.name=`. Mare has syntax sugar for calling a function that ends in `=`, and you can define your own such functions that work just the same way as property setter functions do, which makes it easy to write property-like implementations that fulfill the same structural interfaces as "real" properties:
 
 ```mare
 :class Wrapper
-  :prop inner Person
+  :var inner Person
   :new (@inner)
   :fun name: inner.name
   :fun ref "name="(value): inner.name = value
@@ -427,8 +431,8 @@ Just like in Pony, most major operators are really just function calls in disgui
 
 ```mare
 :class Vector
-  :prop x U64
-  :prop y U64
+  :var x U64
+  :var y U64
   :new (@x, @y)
 
   :fun "+"(other Vector)
@@ -553,10 +557,10 @@ In the example above you see that we are declearing plain functions. You need to
 In Mare, all FFI functions are namespaced by the `:ffi` type name you declared, so you can call them just like a method of a type is called:
 ```mare
 :class Greeting
-  :prop message1 String
-  :new iso (@message1)
+  :let message String
+  :new iso (@message)
   :fun say
-    LibC.printf("%s\n".cstring, @message1.cstring)
+    LibC.printf("%s\n".cstring, @message.cstring)
 ```
 
 ### [TODO: More Syntax Info...]

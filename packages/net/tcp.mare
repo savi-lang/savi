@@ -4,10 +4,10 @@
 
 :class TCPConnectionEngine
   :is IOEngine(IOAction)
-  :prop io: IOCoreEngine.new
-  :prop listen (TCPListener | None): None
-  :prop connect_error OSError: OSErrorNone
-  :prop read_stream ByteStreamReader: ByteStreamReader.new
+  :var io: IOCoreEngine.new
+  :var listen (TCPListener | None): None
+  :var connect_error OSError: OSErrorNone
+  :let read_stream ByteStreamReader: ByteStreamReader.new
 
   :fun non connect(
     // TODO: TCPConnectionAuth, rather than ambient authority.

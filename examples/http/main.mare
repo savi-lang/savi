@@ -1,0 +1,47 @@
+:import "io"
+:import "net"
+:import "http/server"
+
+:actor Main
+  :new (env)
+    TCPListener.new(TCPSpecListenerNotify.new(env), "", "8080")
+
+:class iso TCPSpecListenerNotify
+  :is TCPListenerNotify
+  :let env Env
+  :new (@env)
+
+  :fun ref listening(listen TCPListener'ref)
+    @env.err.print("[Listener] Listening on port:")
+    @env.err.print(Inspect[listen.local_address.port])
+
+  :fun ref not_listening(listen TCPListener'ref) None
+    @env.err.print("[Listener] Not listening:")
+    @env.err.print(listen.listen_error.name)
+
+  :fun ref closed(listen TCPListener'ref): None
+    @env.err.print("[Listener] Stopped listening")
+
+  :fun ref connected!(listen TCPListener'ref, ticket TCPAcceptTicket)
+    HTTPConnection.new(@env, listen, --ticket)
+
+:actor HTTPConnection
+  :is IOActor(IOAction)
+  :let env Env
+  :let io TCPConnectionEngine
+  :let reader: RequestReader.new
+
+  :new (@env, listen, ticket)
+    @io = TCPConnectionEngine.accept(@, listen, --ticket)
+
+  :fun ref _io_react(action IOAction)
+    case (
+    | action == IOActionRead |
+      @io.pending_reads -> (data |
+        try (
+          request = @reader.read!(@io.read_stream)
+          @io.write(b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n")
+        )
+      )
+    )
+    @

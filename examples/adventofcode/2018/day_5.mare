@@ -3,8 +3,8 @@
 :import "collections"
 
 :class Day5Polymer
-  :prop input String'box
-  :prop skips: Map(USize, None).new // TODO: Use Set instead of Map
+  :let input String'box
+  :let skips: Map(USize, None).new // TODO: Use Set instead of Map
   :new (@input)
 
   :fun size: @input.size - @skips.size

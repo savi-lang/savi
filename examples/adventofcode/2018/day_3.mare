@@ -2,11 +2,11 @@
 :import "collections"
 
 :class Day3Claim
-  :prop id String
-  :prop left USize
-  :prop top USize
-  :prop width USize
-  :prop height USize
+  :let id String
+  :let left USize
+  :let top USize
+  :let width USize
+  :let height USize
   :new (@id, @left, @top, @width, @height)
   :fun non parse!(line String)
     halves      = line.split('@')

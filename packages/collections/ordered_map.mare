@@ -1,11 +1,11 @@
 :class _KVBA(K, V)
-  :prop key K
-  :prop value V
+  :var key K
+  :var value V
   :new (@key, @value)
 
   // TODO: some kind of declare sugar for this common pattern
-  :prop _before (_KVBA(K, V) | None): None
-  :prop _after (_KVBA(K, V) | None): None
+  :var _before (_KVBA(K, V) | None): None
+  :var _after (_KVBA(K, V) | None): None
   :fun ref "before="(entry): @_before = entry
   :fun ref "after="(entry): @_after = entry
   :fun before!: @_before.not!(None)
@@ -20,9 +20,9 @@
 :class OrderedMap(K, V, H HashFunction(K) = HashEq(K))
   :is MapReadable(K, V)
 
-  :prop _size USize: 0
-  :prop _array Array((_KVBA(K, V) | _MapEmpty | _MapDeleted))
-  :prop _head (_KVBA(K, V) | None): None
+  :var _size USize: 0
+  :var _array Array((_KVBA(K, V) | _MapEmpty | _MapDeleted))
+  :var _head (_KVBA(K, V) | None): None
 
   :fun size: @_size
 

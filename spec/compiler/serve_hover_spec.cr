@@ -90,7 +90,7 @@ describe Mare::Compiler::ServeHover do
   it "describes type spans, even if not in a pretty way yet" do
     source = Mare::Source.new_example <<-SOURCE
     :actor Main
-      :prop buffer String'ref: String.new
+      :let buffer String'ref: String.new
       :fun buffer_size: @buffer.size
       :new
         @buffer_size

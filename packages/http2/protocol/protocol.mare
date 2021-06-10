@@ -1,0 +1,59 @@
+:enum FrameType
+  :const bit_width U8: 8
+  :member FrameTypeData:         0x0
+  :member FrameTypeHeaders:      0x1
+  :member FrameTypePriority:     0x2
+  :member FrameTypeResetStream:  0x3
+  :member FrameTypeSettings:     0x4
+  :member FrameTypePushPromise:  0x5
+  :member FrameTypePing:         0x6
+  :member FrameTypeGoAway:       0x7
+  :member FrameTypeWindowUpdate: 0x8
+  :member FrameTypeContinuation: 0x9
+
+:enum ErrorCode
+  :const bit_width U8: 32
+  :member NoError:                 0x0
+  :member ProtocolError:           0x1
+  :member InternalError:           0x2
+  :member FlowControlError:        0x3
+  :member SettingsTimeoutError:    0x4
+  :member StreamClosedError:       0x5
+  :member FrameSizeError:          0x6
+  :member StreamRefusedError:      0x7
+  :member StreamCancelError:       0x8
+  :member CompressionError:        0x9
+  :member ConnectError:            0xa
+  :member EnhanceYourCalmError:    0xb
+  :member InadequateSecurityError: 0xc
+  :member HTTP11RequiredError:     0xd
+
+:enum SettingsType
+  :const bit_width U8: 8 // TODO: should really be 16 bits, according to spec
+  :member SettingsTypeHeaderTableSize:      0x1
+  :member SettingsTypeEnablePush:           0x2
+  :member SettingsTypeMaxConcurrentStreams: 0x3
+  :member SettingsTypeInitialWindowSize:    0x4
+  :member SettingsTypeMaxFrameSize:         0x5
+  :member SettingsTypeMaxHeaderListSize:    0x6
+
+:primitive ProtocolLimits
+  :const max_stream_id USize:   0x7FFFFFFF
+  :const max_window_size USize: 0x7FFFFFFF
+  :const max_frame_size USize:  0x00FFFFFF
+
+:class Settings
+  :var initial_window_size U32:    ProtocolLimits.max_window_size
+  :var max_concurrent_streams U32: ProtocolLimits.max_stream_id
+  :var max_frame_size U32:         ProtocolLimits.max_frame_size
+  :var header_table_size U32:      0x1000
+  :var enable_push:                True
+
+// Request pseudo-headers
+":method" // required
+":scheme" // required
+":authority" // optional - ommitted when in "origin form" or "asterisk form"
+":path" // required
+
+// Response pseudo-headers
+":status"

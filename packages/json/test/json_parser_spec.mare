@@ -256,7 +256,7 @@
     )
 
 :class _TestJsonParserCollector
-  :prop tokens Array(Array(
+  :let tokens Array(Array(
     (JsonToken | USize | USize | I64 | F64 | String | None)
   )): []
 

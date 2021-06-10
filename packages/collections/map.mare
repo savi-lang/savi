@@ -1,17 +1,17 @@
 :primitive _MapEmpty
 :primitive _MapDeleted
 
-:class _KV(K, V) // TODO: use a tuple literal instead
-  :prop key K
-  :prop value V
+:class _KV(K, V) // TODO: use a value type or tuple literal instead
+  :var key K
+  :var value V
   :new (@key, @value)
 
 :alias MapIs(K, V): Map(K, V, HashIs(K))
 
 :class Map(K, V, H HashFunction(K) = HashEq(K))
   :is MapReadable(K, V)
-  :prop _size USize: 0
-  :prop _array Array((_KV(K, V) | _MapEmpty | _MapDeleted))
+  :var _size USize: 0
+  :var _array Array((_KV(K, V) | _MapEmpty | _MapDeleted))
 
   :fun size: @_size
 

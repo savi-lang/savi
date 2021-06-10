@@ -38,9 +38,9 @@
 :: stream using the compact method to drop only bytes that are behind
 :: both the marker and cursor, releasing bytes that cannot be read anymore.
 :class ByteStreamReader
-  :prop _data Bytes'ref
-  :prop _offset USize: 0
-  :prop _mark_offset USize: 0
+  :let _data Bytes'ref
+  :var _offset USize: 0
+  :var _mark_offset USize: 0
 
   :new (space USize = 0x4000)
     @_data = Bytes.new(space)

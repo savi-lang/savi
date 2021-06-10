@@ -2,7 +2,7 @@
   :fun printf(format CPointer(U8), arg1 CPointer(U8)) I32
 
 :class MicroTest
-  :prop env Env
+  :var env Env
   :new (@env)
   :fun non _printf(f String, t String): LibC.printf(f.cstring, t.cstring)
   :fun non print_line_break: @_printf("%s", "\n")
@@ -10,8 +10,8 @@
     MicroTestInstance.new(@env, text)
 
 :class MicroTestInstance
-  :prop env Env
-  :prop text String
+  :var env Env
+  :var text String
   :new (@env, @text)
   :fun "pass="(pass Bool)
     if pass (

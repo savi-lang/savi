@@ -203,7 +203,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
 
     # TODO: dedup these with the Witness mechanism.
     # TODO: be more specific (for example, `member` is only allowed for `enum`)
-    def keywords : Array(String); ["is", "prop", "fun", "be", "new", "const", "member", "it"] end
+    def keywords : Array(String); ["is", "let", "var", "fun", "be", "new", "const", "member", "it"] end
 
     def finished(context)
       # Numeric types need some basic metadata attached to know the native type.
@@ -454,11 +454,31 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
       },
     ] of Hash(String, String | Bool))
 
-    @@declare_prop = Witness.new([
+    @@declare_let = Witness.new([
       {
         "kind" => "keyword",
         "name" => "keyword",
-        "value" => "prop",
+        "value" => "let",
+      },
+      {
+        "kind" => "term",
+        "name" => "ident",
+        "type" => "ident|string",
+        "convert_string_to_ident" => true,
+      },
+      {
+        "kind" => "term",
+        "name" => "ret",
+        "type" => "type",
+        "optional" => true,
+      },
+    ] of Hash(String, String | Bool))
+
+    @@declare_var = Witness.new([
+      {
+        "kind" => "keyword",
+        "name" => "keyword",
+        "value" => "var",
       },
       {
         "kind" => "term",
@@ -618,11 +638,12 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
           data["ret"]?.as(AST::Term?),
           decl.body,
         ).tap(&.add_tag(:constant))
-      when "prop"
+      when "let", "var"
         raise "stateless types can't have properties" \
           unless @type.has_tag?(:allocated) || @type.has_tag?(:abstract)
 
-        data = @@declare_prop.run(decl)
+        is_let = decl.keyword == "let"
+        data = (is_let ? @@declare_let : @@declare_var).run(decl)
         ident = data["ident"].as(AST::Identifier)
         ret = data["ret"]?.as(AST::Term?)
 
@@ -633,6 +654,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         field_func = Program::Function.new(field_cap, ident.dup, field_params, ret.dup, field_body)
         field_func.add_tag(:hygienic)
         field_func.add_tag(:field)
+        field_func.add_tag(:let) if is_let
         func = field_func
 
         getter_cap = AST::Identifier.new("box").from(data["keyword"])
@@ -650,6 +672,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         getter_body = AST::Group.new(":").from(ident)
         getter_body.terms << AST::FieldRead.new(ident.value).from(ident)
         getter_func = Program::Function.new(getter_cap, ident, nil, getter_ret, getter_body)
+        getter_func.add_tag(:let) if is_let
         @type.functions << getter_func
 
         setter_cap = AST::Identifier.new("ref").from(data["keyword"])
@@ -675,6 +698,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         setter_body.terms << setter_assign
         setter_body.terms << AST::FieldRead.new(ident.value).from(ident)
         setter_func = Program::Function.new(setter_cap, setter_ident, setter_params, setter_ret, setter_body)
+        setter_func.add_tag(:let) if is_let
         @type.functions << setter_func
 
         replace_cap = AST::Identifier.new("ref").from(data["keyword"])
@@ -705,6 +729,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         replace_body = AST::Group.new(":").from(ident)
         replace_body.terms << replace_assign
         replace_func = Program::Function.new(replace_cap, replace_ident, replace_params, replace_ret, replace_body)
+        replace_func.add_tag(:let) if is_let
         @type.functions << replace_func
       when "is"
         data = @@declare_is.run(decl)

@@ -14,7 +14,7 @@ It infers a local's type based on assignment:
 It infers a prop's type based on the prop initializer:
 
 ```mare
-  :prop x: "Hello, World!"
+  :var x: "Hello, World!"
   :fun test_x
     @x ::type=> String
 ```
@@ -105,10 +105,10 @@ It infers an integer literal based on an assignment:
 
 ---
 
-It infers an integer literal based on a prop type:
+It infers an integer literal based on a property type:
 
 ```mare
-  :prop x (U64 | None): 42
+  :var x (U64 | None): 42
   :fun test_x
     @x ::type=> (U64 | None)
 ```
@@ -309,7 +309,7 @@ It infers prop setters to return the alias of the assigned value:
 
 ```mare
 :class HasStringIso
-  :prop string_iso String'iso: String.new_iso
+  :var string_iso String'iso: String.new_iso
 ```
 ```mare
     wrapper_iso = HasStringIso.new

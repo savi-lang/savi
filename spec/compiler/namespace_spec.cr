@@ -38,7 +38,7 @@ describe Mare::Compiler::Namespace do
     source = Mare::Source.new_example <<-SOURCE
     :class Example
       :fun same_name: "This is a contentious function!"
-      :prop same_name: "This is a contentious property!"
+      :var same_name: "This is a contentious property!"
       :const same_name: "This is a contentious constant!"
     SOURCE
 
@@ -50,8 +50,8 @@ describe Mare::Compiler::Namespace do
 
     - a conflicting declaration is here:
       from (example):3:
-      :prop same_name: "This is a contentious property!"
-            ^~~~~~~~~
+      :var same_name: "This is a contentious property!"
+           ^~~~~~~~~
 
     - a conflicting declaration is here:
       from (example):4:

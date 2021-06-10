@@ -3,7 +3,7 @@
 
 :class val SpecRun(A Spec)
   :is SpecRunAny
-  :prop env Env
+  :let env Env
   :new (@env)
 
   // TODO: avoid this indirection
@@ -28,7 +28,7 @@
     )
 
 :actor SpecExampleRunner(A Spec)
-  :prop example ReflectionFeatureOfType(A)
+  :let example ReflectionFeatureOfType(A)
 
   :new (env, specs, @example)
     helper = TestHelper.new(env, specs, A.describes, @example.name)

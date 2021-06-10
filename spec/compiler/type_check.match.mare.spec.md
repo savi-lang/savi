@@ -87,7 +87,7 @@ It can also refine a type parameter within a choice body:
   :fun size USize
 
 :class Container(A)
-  :prop _value A
+  :let _value A
   :new (@_value)
   :fun ref value_size
     if (A <: Sizeable'val) @_value.size

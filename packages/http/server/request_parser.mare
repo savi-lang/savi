@@ -21,7 +21,7 @@
   :member _RequestAtEnd: 8
 
 :class RequestParser
-  :prop _state _RequestAt: _RequestAtStart
+  :var _state _RequestAt: _RequestAtStart
 
   :fun ref reset: @_state = _RequestAtStart
 

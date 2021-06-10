@@ -1,9 +1,9 @@
 :class val String
   :is Comparable(String'box)
 
-  :prop _size USize
-  :prop _space USize
-  :prop _ptr CPointer(U8)'ref
+  :var _size USize
+  :var _space USize
+  :var _ptr CPointer(U8)'ref
   :new ref from_cpointer(@_ptr, @_size, @_space)
   :new iso iso_from_cpointer(@_ptr, @_size, @_space) // TODO: remove this and use recover instead?
   :new val val_from_cpointer(@_ptr, @_size, @_space) // TODO: remove this and use recover instead?

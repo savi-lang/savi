@@ -10,7 +10,7 @@
     11
 
 :class Container(A)
-  :prop value A
+  :var value A
   :new (@value)
 
 :actor Main

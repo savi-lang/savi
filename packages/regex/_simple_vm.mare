@@ -7,10 +7,10 @@
 :: See this blog post for more information about the virtual machine approach:
 :: https://swtch.com/~rsc/regexp/regexp2.html
 :class _SimpleVM
-  :prop program Bytes'box
+  :let program Bytes'box
   :new (@program)
 
-  :prop did_match: False
+  :var did_match: False
   :fun ref reset: @did_match = False
 
   :: Return true if the regular expression program, when executed by this VM,

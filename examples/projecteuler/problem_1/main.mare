@@ -3,7 +3,7 @@
 :import "collections" (Count)
 
 :actor Counter
-  :prop count USize
+  :var count USize
 
   :new (@count = 0)
 

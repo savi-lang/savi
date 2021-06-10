@@ -33,13 +33,13 @@
 :: stream using the compact method to drop only chunks that are behind
 :: both the marker and cursor, releasing chunks that cannot be read anymore.
 :class ByteStreamChunkedReader
-  :prop _chunks Array(Bytes): []
-  :prop _chunk_index USize: 0
-  :prop _offset USize: 0
-  :prop _bytes_ahead USize: 0
-  :prop _mark_chunk_index USize: 0
-  :prop _mark_offset USize: 0
-  :prop _mark_bytes_ahead USize: 0
+  :let _chunks Array(Bytes): []
+  :var _chunk_index USize: 0
+  :var _offset USize: 0
+  :var _bytes_ahead USize: 0
+  :var _mark_chunk_index USize: 0
+  :var _mark_offset USize: 0
+  :var _mark_bytes_ahead USize: 0
 
   :: Reset this object back to an empty state so that it can be reused.
   :: All chunks held and all cursor and mark state will be dropped.

@@ -9,11 +9,11 @@ These types will be used throughout the following examples to demonstrate viewpo
   :new iso
 
 :class Outer
-  :prop inner_iso Inner'iso: Inner.new
-  :prop inner_ref Inner'ref: Inner.new
-  :prop inner_val Inner'val: Inner.new
-  :prop inner_box Inner'box: Inner.new
-  :prop inner_tag Inner'tag: Inner.new
+  :var inner_iso Inner'iso: Inner.new
+  :var inner_ref Inner'ref: Inner.new
+  :var inner_val Inner'val: Inner.new
+  :var inner_box Inner'box: Inner.new
+  :var inner_tag Inner'tag: Inner.new
   :new iso
 
   :fun inner: @inner_ref // convenience alias for the basic case of inner_ref
@@ -22,7 +22,7 @@ These types will be used throughout the following examples to demonstrate viewpo
 
 ---
 
-It reflects viewpoint adaptation in the return type of a prop getter:
+It reflects viewpoint adaptation in the return type of a property getter:
 
 ```mare
     outer_box Outer'box = Outer.new
@@ -170,7 +170,7 @@ It correctly applies viewpoint adaptation for array access via a box receiver:
 
 ```mare
 :class OuterArray
-  :prop array Array(Inner'ref)
+  :var array Array(Inner'ref)
   :new iso: @array = [Inner.new]
   :fun first!: @array[0]!
 ```

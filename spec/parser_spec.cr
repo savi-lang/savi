@@ -4,7 +4,7 @@ describe Mare::Parser do
   it "parses an example" do
     source = Mare::Source.new_example <<-SOURCE
     :class Example
-      :prop name String: "World"
+      :let name String: "World"
 
       :: Return a friendly greeting string for this instance.
       :fun greeting String
@@ -20,7 +20,7 @@ describe Mare::Parser do
     [:doc,
      [:declare, [[:ident, "class"], [:ident, "Example"]], [:group, ":"]],
      [:declare,
-      [[:ident, "prop"], [:ident, "name"], [:ident, "String"]],
+      [[:ident, "let"], [:ident, "name"], [:ident, "String"]],
       [:group, ":", [:string, "World", nil]]],
      [:declare,
       [[:ident, "fun"], [:ident, "greeting"], [:ident, "String"]],
@@ -279,7 +279,7 @@ describe Mare::Parser do
     [:doc,
      [:declare, [[:ident, "class"], [:ident, "Example"]], [:group, ":"]],
      [:declare,
-      [[:ident, "prop"], [:ident, "name"], [:ident, "String"]],
+      [[:ident, "var"], [:ident, "name"], [:ident, "String"]],
       [:group, ":", [:string, "World", nil]]],
      [:declare,
       [[:ident, "fun"],

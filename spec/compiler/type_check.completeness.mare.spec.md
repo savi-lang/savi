@@ -10,9 +10,9 @@ It complains when access to the self is shared while still incomplete:
     @y = 2
     @z = 3
 
-  :prop x U64
-  :prop y U64
-  :prop z U64
+  :var x U64
+  :var y U64
+  :var z U64
 
 :primitive AccessWhileIncomplete
   :fun data(any Any'box)
@@ -28,12 +28,12 @@ This usage of `@` shares field access to the object from a constructor before al
                 ^~~~~~~
 
 - this field didn't get initialized:
-  :prop y U64
-        ^
+  :var y U64
+       ^
 
 - this field didn't get initialized:
-  :prop z U64
-        ^
+  :var z U64
+       ^
 ```
 
 ---
@@ -47,9 +47,9 @@ It allows opaque sharing of the self while still incomplete and non-opaque shari
     @z = 3
     AccessAfterComplete.data(@)
 
-  :prop x U64
-  :prop y U64
-  :prop z U64
+  :var x U64
+  :var y U64
+  :var z U64
 
 :primitive AccessAfterComplete
   :fun data(any Any'box)

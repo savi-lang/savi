@@ -3,14 +3,14 @@
 :class val NetAddress
   :is Equatable(NetAddress)
 
-  :prop _family U16: 0
-  :prop _port   U16: 0 :: Port number in network byte order.
-  :prop _ipv4   U32: 0 :: Bits for an IPv4 address in network byte order.
-  :prop _ipv6a  U32: 0 :: Bits 0-32 of an IPv6 address in network byte order.
-  :prop _ipv6b  U32: 0 :: Bits 33-64 of an IPv6 address in network byte order.
-  :prop _ipv6c  U32: 0 :: Bits 65-96 of an IPv6 address in network byte order.
-  :prop _ipv6d  U32: 0 :: Bits 97-128 of an IPv6 address in network byte order.
-  :prop _scope  U32: 0 :: IPv6 scope (unicast, anycast, multicast, etc...).
+  :let _family U16: 0
+  :let _port   U16: 0 :: Port number in network byte order.
+  :let _ipv4   U32: 0 :: Bits for an IPv4 address in network byte order.
+  :let _ipv6a  U32: 0 :: Bits 0-32 of an IPv6 address in network byte order.
+  :let _ipv6b  U32: 0 :: Bits 33-64 of an IPv6 address in network byte order.
+  :let _ipv6c  U32: 0 :: Bits 65-96 of an IPv6 address in network byte order.
+  :let _ipv6d  U32: 0 :: Bits 97-128 of an IPv6 address in network byte order.
+  :let _scope  U32: 0 :: IPv6 scope (unicast, anycast, multicast, etc...).
 
   :new _for_fd(fd): LibPonyOS.pony_os_sockname(fd, @)
 

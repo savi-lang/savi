@@ -126,7 +126,7 @@ It can call the constructor of a type parameter:
   :new (number USize)
 
 :class ConstructableClass
-  :prop number USize
+  :var number USize
   :new (@number)
 
 :class ConstructingGeneric(A ConstructableTrait)

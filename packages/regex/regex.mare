@@ -1,5 +1,5 @@
 :class val Regex
-  :prop program Bytes
+  :let program Bytes
 
   :new val compile(regex String)
     pattern = _Parser.parse(regex)

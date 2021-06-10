@@ -4,7 +4,7 @@
 
 :class iso TCPSpecListenerNotify
   :is TCPListenerNotify
-  :prop env Env
+  :let env Env
   :new (@env)
 
   :fun ref listening(listen TCPListener'ref)
@@ -23,8 +23,8 @@
 
 :actor TCPSpecEchoer
   :is IOActor(IOAction)
-  :prop env Env
-  :prop io TCPConnectionEngine
+  :let env Env
+  :let io TCPConnectionEngine
   :new (@env, listen, ticket)
     @io = TCPConnectionEngine.accept(@, listen, --ticket)
     @env.err.print("[Echoer] Accepted")
@@ -48,8 +48,8 @@
 
 :actor TCPSpecEchoClient
   :is IOActor(IOAction)
-  :prop env Env
-  :prop io TCPConnectionEngine
+  :let env Env
+  :let io TCPConnectionEngine
   :new (@env, service)
     @io = TCPConnectionEngine.connect(@, "localhost", service)
 

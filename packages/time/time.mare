@@ -44,9 +44,9 @@
     @seconds(@_unix_epoch)
 
   :: The total number of seconds since `0001-01-01 00:00:00.0` UTC
-  :prop total_seconds U64
+  :var total_seconds U64
   :: The number of nanoseconds of the second
-  :prop nanosecond U32: 0
+  :var nanosecond U32: 0
 
   :: An internal-only direct constructor.
   :new val _new(@total_seconds, @nanosecond)

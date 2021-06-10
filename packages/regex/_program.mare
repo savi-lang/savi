@@ -25,7 +25,7 @@
   :member OpRecursiveZWA: 0xFF
 
 :class _ProgramWriter
-  :prop program: Bytes.new
+  :let program: Bytes.new
 
   :fun _cursor: @program.size.u32
 

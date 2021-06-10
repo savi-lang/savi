@@ -1,5 +1,5 @@
 :trait Spec
-  :prop test TestHelper
+  :let test TestHelper
   :fun env: @test.env
   :new (@test)
 
@@ -14,10 +14,10 @@
     @test.assert(success, pos)
 
 :class val TestHelper
-  :prop env Env
-  :prop specs Specs
-  :prop spec String
-  :prop example String
+  :let env Env
+  :let specs Specs
+  :let spec String
+  :let example String
   :new (@env, @specs, @spec, @example)
 
   :fun assert(success, pos) // TODO: avoid needing this alias

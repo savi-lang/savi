@@ -409,6 +409,7 @@ class Mare::Program
       :hygienic,
       :is,
       :it,
+      :let,
     ]
 
     def initialize(*args)

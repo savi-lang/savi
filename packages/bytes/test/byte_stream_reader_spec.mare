@@ -326,13 +326,13 @@
 // inserted into the byte stream of a ByteStreamReader, one chunk at a time.
 :class TestByteStreamSource
   // On creation, accept a ByteStreamReader to target.
-  :prop _target_read_stream ByteStreamReader
+  :let _target_read_stream ByteStreamReader
   :new (@_target_read_stream)
 
   // When a new chunk is accepted, add it to the list we hold and invoke
   // the target's receive_from! method, using us as the source, indirectly
   // invoking the emit_bytes_into! method back here in our own class.
-  :prop _chunks: Array(Bytes).new
+  :let _chunks: Array(Bytes).new
   :fun ref "<<"(chunk Bytes)
     @_chunks << chunk
     try @_target_read_stream.receive_from!(@)

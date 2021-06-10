@@ -24,7 +24,7 @@
     "Saturday"
   ]
 
-  :prop pattern String'box
+  :let pattern String'box
   :new (@pattern)
 
   :fun format(time Time'box, out String'iso = String.new_iso)

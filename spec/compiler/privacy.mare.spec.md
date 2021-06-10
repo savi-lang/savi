@@ -27,7 +27,7 @@ It won't crash on private calls within a type-conditional layer:
 
 ```mare
 :class Generic(A)
-  :prop _value A
+  :var _value A
   :new (@_value)
   :fun numeric_bit_width
     if (A <: Numeric) (@._value.bit_width)

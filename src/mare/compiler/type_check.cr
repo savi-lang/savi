@@ -356,6 +356,30 @@ class Mare::Compiler::TypeCheck
         problems unless problems.empty?
   end
 
+  def self.verify_let_assign_call_site(
+    ctx : Context,
+    call : Infer::FromCall,
+    call_func : Program::Function,
+    from_rf : ReifiedFunction
+  )
+    # Let fields can be assigned only in constructors, directly.
+    # We verify separately in the Completeness pass that within the constructor
+    # they are not reassigned after the constructed object has become complete.
+    if !from_rf.func(ctx).has_tag?(:constructor)
+      ctx.error_at call,
+        "A `let` property can only be assigned inside a constructor", [{
+          call_func.ident.pos,
+          "declare this property with `var` instead of `let` if reassignment is needed"
+        }]
+    elsif !call.lhs.is_a?(Infer::Self)
+      ctx.error_at call,
+        "A `let` property can only be assigned without indirection", [{
+          call_func.ident.pos,
+          "declare this property with `var` instead of `let` if indirection is needed"
+        }]
+    end
+  end
+
   class ForReifiedFunc < Mare::AST::Visitor
     getter reified : ReifiedFunction
     private getter refer_type : ReferType::Analysis
@@ -540,6 +564,11 @@ class Mare::Compiler::TypeCheck
 
         # Check the number of arguments.
         TypeCheck.verify_call_arg_count(ctx, info, call_func, problems)
+
+        # If this is a call site to a let field assignment, check it as such.
+        if call_func.has_tag?(:let) && call_func.ident.value.ends_with?("=")
+          TypeCheck.verify_let_assign_call_site(ctx, info, call_func, reified)
+        end
 
         # Check whether yield block presence matches the function's expectation.
         other_pre_infer = ctx.pre_infer[call_func_link]

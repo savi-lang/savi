@@ -42,7 +42,8 @@ module Mare::Compiler::Completeness
 
     branch_cache = {} of Tuple(Set(String), Program::Function::Link) => Branch
     fields = t.functions.select(&.has_tag?(:field))
-    branch = Branch.new(ctx, t, f, f_link, analysis, branch_cache, fields)
+    let_fields = fields.select(&.has_tag?(:let)).map(&.ident.value).to_set
+    branch = Branch.new(ctx, t, f, f_link, analysis, branch_cache, fields, let_fields)
 
     # First, visit the field initializers (for those fields that have them) as
     # sub branches to simulate them being run at the start of the constructor.
@@ -72,6 +73,7 @@ module Mare::Compiler::Completeness
     getter analysis : Analysis
     getter branch_cache : Hash(Tuple(Set(String), Program::Function::Link), Branch)
     getter all_fields : Array(Program::Function)
+    getter let_fields : Set(String)
     getter seen_fields : Set(String)
     getter call_crumbs : Array(Source::Pos)
     getter jumps : Jumps::Analysis
@@ -85,6 +87,7 @@ module Mare::Compiler::Completeness
       @analysis,
       @branch_cache,
       @all_fields,
+      @let_fields,
       @seen_fields = Set(String).new,
       @call_crumbs = Array(Source::Pos).new,
       @possibly_away = false,
@@ -96,8 +99,8 @@ module Mare::Compiler::Completeness
 
     def sub_branch(node : AST::Node)
       branch =
-        Branch.new(ctx, type, func, func_link, analysis, branch_cache, all_fields,
-          seen_fields.dup, call_crumbs.dup)
+        Branch.new(ctx, type, func, func_link, analysis, branch_cache,
+          all_fields, let_fields, seen_fields.dup, call_crumbs.dup)
       node.accept(ctx, branch)
       branch
     end
@@ -117,8 +120,9 @@ module Mare::Compiler::Completeness
       cache_key = {seen_fields, next_f_link}
       branch_cache.fetch cache_key do
         branch_cache[cache_key] = branch =
-          Branch.new(ctx, type, next_f, next_f_link, analysis, branch_cache, all_fields,
-            seen_fields.dup, call_crumbs.dup, possibly_away, @loop_stack)
+          Branch.new(ctx, type, next_f, next_f_link, analysis, branch_cache,
+            all_fields, let_fields, seen_fields.dup, call_crumbs.dup,
+            possibly_away, @loop_stack)
         branch.call_crumbs << call_crumb
         next_f.body.not_nil!.accept(ctx, branch)
         branch
@@ -189,6 +193,12 @@ module Mare::Compiler::Completeness
     end
 
     def touch(node : AST::FieldReplace)
+      if !seen_fields.includes?(node.value)
+        ctx.error_at node,
+          "This field may be read (via displacing assignment) " +
+          "before it is initialized by a constructor",
+            call_crumbs.reverse.map { |pos| {pos, "traced from a call here"} }
+      end
       seen_fields.add(node.value) unless @possibly_away ||\
         !@loop_stack.empty? || @jumps.away_possibly?(node)
     end
@@ -205,9 +215,6 @@ module Mare::Compiler::Completeness
       # We only care about looking at dot-relations (function calls).
       return unless node.op.value == "."
 
-      # We only care about further analysis if not all fields are initialized.
-      return unless seen_fields.size < all_fields.size
-
       # If the left side is definitely the self, we allow access even when
       # not all fields are initialized - we will follow the call and continue
       # our branching analysis of field initialization in that other function.
@@ -215,6 +222,29 @@ module Mare::Compiler::Completeness
       if lhs.is_a?(AST::Identifier) && lhs.value == "@"
         # Extract the function name from the right side.
         func_name = AST::Extract.call(node)[0].value
+
+        # If this is a direct call to a `let` property setter, complain
+        # if this object has already been fully initialized in all fields.
+        # All indirect calls to this setter/displacer will error elsewhere,
+        # where we prove that it is never called outside a constructor.
+        if call_crumbs.empty? && (
+          (
+            func_name.ends_with?("=") &&
+            let_fields.includes?(let_name = func_name[0...-1])
+          ) || (
+            func_name.ends_with?("<<=") &&
+            let_fields.includes?(let_name = func_name[0...-3])
+          )
+        ) && collect_unseen_fields.empty?
+          ctx.error_at node, "A `let` property cannot be reassigned " +
+            "after all fields have been initialized", [{
+              all_fields.find(&.ident.value.==(let_name)).not_nil!.ident.pos,
+              "declare this property with `var` instead of `let` if reassignment is needed"
+            }]
+        end
+
+        # We only care about further analysis if not all fields are initialized.
+        return unless seen_fields.size < all_fields.size
 
         # Follow the method call in a new branch, and collect any field writes
         # seen in that branch as if they had been seen in this branch.

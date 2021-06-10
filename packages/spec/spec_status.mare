@@ -1,22 +1,22 @@
 :import "collections" (OrderedMap, HashEq)
 
 :class SpecStatus
-  :prop examples: OrderedMap(String, SpecExampleStatus).new
-  :prop expected_examples USize: 0
-  :prop name String
-  :prop ended Bool: False
-  :prop reported Bool: False
+  :let examples: OrderedMap(String, SpecExampleStatus).new
+  :var expected_examples USize: 0
+  :let name String
+  :var ended Bool: False
+  :var reported Bool: False
   :new (@name)
 
 :class SpecExampleStatus
-  :prop events: Array(SpecEventAssert).new
-  :prop events_reported USize: 0
-  :prop name String
-  :prop ended Bool: False
-  :prop reported Bool: False
+  :let events: Array(SpecEventAssert).new
+  :var events_reported USize: 0
+  :let name String
+  :var ended Bool: False
+  :var reported Bool: False
   :new (@name)
 
 :class val SpecEventAssert
-  :prop success Bool
-  :prop pos SourceCodePosition
+  :let success Bool
+  :let pos SourceCodePosition
   :new (@success, @pos)

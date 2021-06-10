@@ -1,12 +1,12 @@
 :import "collections" (Count)
 
 :class JsonParser
-  :prop _offset USize: 0
-  :prop _offset_start USize: 0
+  :var _offset USize: 0
+  :var _offset_start USize: 0
 
-  :prop source String'box: ""
-  :prop last_number (I64 | F64): I64[0]
-  :prop last_string String: ""
+  :var source String'box: ""
+  :var last_number (I64 | F64): I64[0]
+  :var last_string String: ""
 
   :fun ref _set_defaults
     @_offset       = 0

@@ -48,20 +48,20 @@ The type of this expression doesn't meet the constraints imposed on it:
 It complains when the prop type doesn't match the initializer value:
 
 ```mare
-  :prop name String: 42
+  :var name String: 42
 ```
 ```error
 The type of this expression doesn't meet the constraints imposed on it:
-  :prop name String: 42
-                     ^~
+  :var name String: 42
+                    ^~
 
 - it is required here to be a subtype of String:
-  :prop name String: 42
-             ^~~~~~
+  :var name String: 42
+            ^~~~~~
 
 - but the type of the literal value was Numeric:
-  :prop name String: 42
-                     ^~
+  :var name String: 42
+                    ^~
 ```
 
 ---

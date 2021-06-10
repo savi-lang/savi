@@ -47,7 +47,7 @@
 :: efficient for the common case of single bytes in ASCII character classes.
 :class PatternByte
   :is Pattern
-  :prop byte U8
+  :let byte U8
   :new (@byte)
 
 :: Match any byte whose value is within the given range (inclusive).
@@ -55,17 +55,17 @@
 :: efficient for the common case of byte ranges in ASCII character classes.
 :class PatternByteRange
   :is Pattern
-  :prop low U8
-  :prop high U8
+  :let low U8
+  :let high U8
   :new (@low, @high)
 
 :: Match a specific UTF-8 character consisting of one to four bytes.
 :class PatternCharacter
   :is Pattern
-  :prop byte_1 U8
-  :prop byte_2 U8
-  :prop byte_3 U8
-  :prop byte_4 U8
+  :let byte_1 U8
+  :let byte_2 U8
+  :let byte_3 U8
+  :let byte_4 U8
   :new (@byte_1, @byte_2, @byte_3, @byte_4)
   :fun each_byte
     yield @byte_1
@@ -73,10 +73,19 @@
     if (@byte_3 != 0) (yield @byte_3)
     if (@byte_4 != 0) (yield @byte_4)
 
+:: Match any byte whose value is within the given range (inclusive).
+:: This cannot be used with multibyte UTF-8 codepoints, but it is nice and
+:: efficient for the common case of byte ranges in ASCII character classes.
+:class PatternByteRange
+  :is Pattern
+  :let low U8
+  :let high U8
+  :new (@low, @high)
+
 :: Match a sequence of concatenated patterns, one after the other.
 :class PatternSequence
   :is Pattern
-  :prop children Array(Pattern)
+  :let children Array(Pattern)
   :new (@children)
 
   :fun last!: @children.last!
@@ -96,26 +105,26 @@
 :: Match an optional (zero or one) occurrence of the child pattern.
 :class PatternOptional
   :is Pattern
-  :prop child Pattern
-  :prop is_non_greedy Bool
+  :let child Pattern
+  :let is_non_greedy Bool
   :new (@child, @is_non_greedy = False)
 
 :: Match zero or more repeated occurrences of the child pattern.
 :class PatternZeroOrMore
   :is Pattern
-  :prop child Pattern
-  :prop is_non_greedy Bool
+  :let child Pattern
+  :let is_non_greedy Bool
   :new (@child, @is_non_greedy = False)
 
 :: Match one or more repeated occurrences of the child pattern.
 :class PatternOneOrMore
   :is Pattern
-  :prop child Pattern
-  :prop is_non_greedy Bool
+  :let child Pattern
+  :let is_non_greedy Bool
   :new (@child, @is_non_greedy = False)
 
 :: Match exactly one of the given options represented by the children patterns.
 :class PatternChoice
   :is Pattern
-  :prop children Array(Pattern)
+  :let children Array(Pattern)
   :new (@children = [])

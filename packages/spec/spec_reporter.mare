@@ -9,7 +9,7 @@
 
 :class SpecReporterDots
   :is SpecReporter
-  :prop env Env
+  :let env Env
   :new (@env)
 
   :fun ref spec_ended(spec String)
@@ -31,7 +31,7 @@
 
 :class SpecReporterFull
   :is SpecReporter
-  :prop env Env
+  :let env Env
   :new (@env)
 
   :fun ref spec_began(spec String)
@@ -58,11 +58,11 @@
     )
 
 :class SpecReporterLinear
-  :prop env Env
-  :prop statuses: OrderedMap(String, SpecStatus).new
-  :prop inner SpecReporter
-  :prop current_spec: ""
-  :prop current_example: ""
+  :let env Env
+  :let statuses: OrderedMap(String, SpecStatus).new
+  :let inner SpecReporter
+  :var current_spec: ""
+  :var current_example: ""
   :new (@env, @statuses, @inner)
 
   :fun ref spec_began(spec String): @_changed

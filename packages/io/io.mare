@@ -37,20 +37,20 @@
   :is IOEngine(IOAction)
   :is ByteStreamSource
 
-  :prop _event CPointer(AsioEvent): AsioEvent.none
-  :prop _fd U32: -1
-  :prop _os_error: OSErrorNone
-  :prop _pending_connect_count U32: 0
-  :prop _has_closed Bool: False
-  :prop _is_readable Bool: False
-  :prop _is_writeable Bool: False
-  :prop _is_send_shutdown Bool: False
-  :prop _is_recv_shutdown Bool: False
+  :var _event CPointer(AsioEvent): AsioEvent.none
+  :var _fd U32: -1
+  :var _os_error: OSErrorNone
+  :var _pending_connect_count U32: 0
+  :var _has_closed Bool: False
+  :var _is_readable Bool: False
+  :var _is_writeable Bool: False
+  :var _is_send_shutdown Bool: False
+  :var _is_recv_shutdown Bool: False
 
   // TODO:
-  // :prop _pending_sent USize: 0
-  // :prop _pending_writev_total USize: 0
-  // :prop _pending_writev Array(CPointer(U8)): []
+  // :var _pending_sent USize: 0
+  // :var _pending_writev_total USize: 0
+  // :var _pending_writev Array(CPointer(U8)): []
 
   :fun is_open: @_event.is_not_null && @_has_closed.not
   :fun has_opened: @_event.is_not_null || @_has_closed
