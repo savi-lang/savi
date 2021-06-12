@@ -68,6 +68,7 @@ class Mare::Compiler::CodeGen
     def declare_local(ref : Refer::Local, t : Reach::Ref, storage : LLVM::Value)
       pos = ref.defn.pos
       name = ref.name
+
       declare_local_inner(pos, name, t, storage)
     end
 
@@ -151,17 +152,33 @@ class Mare::Compiler::CodeGen
       t : Reach::Ref,
       llvm_type : LLVM::Type,
     )
-      llvm_struct_type = llvm_type.element_type
-      reach_def = t.single_def!(ctx)
       ident = t.single!.defn(ctx).ident
       name = ident.value
-      pos = ident.pos
 
       # Create a temporary stand-in for this debug type, which is used to
       # prevent unwanted recursion if it (directly or indirectly) contains
       # this same debug type within one of its fields, which we visit below.
       tmp_debug_type = @di.create_replaceable_composite_type(nil, name, nil, 1, @llvm)
       @di_types.not_nil![t] = tmp_debug_type
+
+      # Create the debug type, as a struct pointer to the struct type.
+      debug_type = di_create_pointer_type(name,
+        di_create_struct_type(t, llvm_type.element_type)
+      )
+
+      # Finally, replace the temporary stand-in we created above and return.
+      @di.replace_temporary(tmp_debug_type, debug_type)
+      debug_type
+    end
+
+    def di_create_struct_type(
+      t : Reach::Ref,
+      llvm_type : LLVM::Type,
+    )
+      reach_def = t.single_def!(ctx)
+      ident = t.single!.defn(ctx).ident
+      name = ident.value
+      pos = ident.pos
 
       # First gather the debug type information for the type descriptor,
       # which is specific to the runtime we are using.
@@ -170,7 +187,7 @@ class Mare::Compiler::CodeGen
 
       # Now go gather the debug type information for all user-visible fields.
       reach_fields = reach_def.fields.dup
-      struct_element_types = llvm_struct_type.struct_element_types
+      struct_element_types = llvm_type.struct_element_types
       struct_element_types.each_with_index do |elem_llvm_type, index|
         # We skip over fields the user shouldn't know about,
         # like the type descriptor and the actor pad.
@@ -181,14 +198,8 @@ class Mare::Compiler::CodeGen
           {field_name, di_type(field_reach_ref, elem_llvm_type)}
       end
 
-      # Create the debug type, as a struct pointer with those element types.
-      debug_type = di_create_pointer_type(name,
-        di_create_struct_type(name, llvm_struct_type, di_member_info, pos),
-      )
-
-      # Finally, replace the temporary stand-in we created above and return.
-      @di.replace_temporary(tmp_debug_type, debug_type)
-      debug_type
+      # Create the debug type, as a struct type with those element types.
+      di_create_struct_type(name, llvm_type, di_member_info, pos)
     end
 
     # This function is for cases where we are generating some internal struct
@@ -272,9 +283,11 @@ class Mare::Compiler::CodeGen
               llvm_type.element_type,
             ),
           )
+        elsif t.llvm_use_type(ctx) == :struct_value
+          di_create_struct_type(t, llvm_type)
         elsif t.llvm_use_type(ctx) == :struct_ptr
           di_create_struct_pointer_type(t, llvm_type)
-        elsif t.llvm_use_type(ctx) == :object_ptr
+        elsif t.llvm_use_type(ctx) == :struct_ptr_opaque
           # TODO: Some more descriptive debug type?
           di_create_basic_type(t, llvm_type, LLVM::DwarfTypeEncoding::Address)
         else

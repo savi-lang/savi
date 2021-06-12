@@ -10,8 +10,6 @@
 :: Pretty much the only use cases for this type in other packages is to use it
 :: in conjunction with FFI functions, which also break memory safety.
 :class tag CPointer(A) // TODO: don't special-case in compiler as a faux-class
-  :new _this_pseudo_class_has_no_constructor // TODO: shouldn't need this hack?
-
   :: Create a null pointer. The pointer is a tag, which cannot be used to
   :: construct a String or Array, so it is safe to be a public method,
   :: though very limited in its general usefulness.

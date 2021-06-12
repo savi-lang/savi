@@ -38,13 +38,12 @@ class Mare::Compiler::CodeGen
         @gfuncs_by_sig_name[sig_name] = gfunc
       end
 
-      # If we're generating for a type that has no inherent descriptor,
+      # If we're generating for a simple value with no fields and no descriptor,
       # we are generating a struct_type for the boxed container that gets used
       # when that value has to be passed as an abstract reference with a desc.
       # In this case, there should be just a single field - the value itself.
-      if !type_def.has_desc?(g.ctx)
-        raise "a value type with no descriptor can't have fields" \
-          unless @fields.empty?
+      if type_def.is_simple_value?(g.ctx)
+        raise "a simple value type can't have fields" unless @fields.empty?
 
         @fields << {"VALUE", @type_def.as_ref}
       end

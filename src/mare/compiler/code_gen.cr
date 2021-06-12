@@ -266,9 +266,11 @@ class Mare::Compiler::CodeGen
     when :f64 then @f64
     when :ptr then llvm_type_of(ref.single_def!(ctx).cpointer_type_arg(ctx)).pointer
     when :isize then @isize
+    when :struct_value then
+      @gtypes[ctx.reach[ref.single!].llvm_name].struct_type
     when :struct_ptr then
       @gtypes[ctx.reach[ref.single!].llvm_name].struct_ptr
-    when :object_ptr then
+    when :struct_ptr_opaque then
       @obj_ptr
     else raise NotImplementedError.new(ref.llvm_use_type(ctx))
     end
@@ -285,9 +287,11 @@ class Mare::Compiler::CodeGen
     when :f64 then @f64
     when :ptr then llvm_type_of(ref.single_def!(ctx).cpointer_type_arg(ctx)).pointer
     when :isize then @isize
+    when :struct_value then
+      @gtypes[ctx.reach[ref.single!].llvm_name].struct_type
     when :struct_ptr then
       @gtypes[ctx.reach[ref.single!].llvm_name].struct_ptr
-    when :object_ptr then
+    when :struct_ptr_opaque then
       @obj_ptr
     else raise NotImplementedError.new(ref.llvm_mem_type(ctx))
     end
@@ -507,11 +511,17 @@ class Mare::Compiler::CodeGen
       param_types.unshift(gfunc.continuation_info.struct_type.pointer)
     end
     if gfunc.needs_receiver?
-      param_types.unshift(llvm_type_of(gtype))
+      receiver_type = llvm_type_of(gtype)
+      receiver_type = receiver_type.pointer if gfunc.pointer_indirect_receiver?(ctx)
+      param_types.unshift(receiver_type)
     end
 
     # Store the function declaration.
     gfunc.llvm_func = @mod.functions.add(gfunc.llvm_name, param_types, ret_type)
+
+    # We declare no additional virtual, send, or continue variants
+    # if this is a hygienic function.
+    return if gfunc.link.is_hygienic?
 
     # Choose the strategy for the function that goes in the virtual table.
     # The virtual table is used for calling functions indirectly, and always
@@ -541,6 +551,28 @@ class Mare::Compiler::CodeGen
           else
             @builder.ret result
           end
+
+          gen_func_end
+        end
+      elsif param_types.first == gtype.struct_type
+        # If the receiver parameter type is a struct value rather than pointer,
+        # then this is a value type, so we need its virtual function that uses
+        # an object-style pointer to dereference the pointer to use as a value.
+        vtable_name = "#{gfunc.llvm_name}.VIRTUAL"
+        vparam_types = param_types.dup
+        vparam_types.shift
+        vparam_types.unshift(gtype.struct_ptr)
+
+        @mod.functions.add vtable_name, vparam_types, ret_type do |fn|
+          next if gtype.type_def.is_abstract?(ctx)
+
+          gen_func_start(fn)
+
+          forward_args =
+            (vparam_types.size - 1).times.map { |i| fn.params[i + 1] }.to_a
+          forward_args.unshift(@builder.load(fn.params[0]))
+
+          @builder.ret @builder.call(gfunc.llvm_func, forward_args)
 
           gen_func_end
         end
@@ -1476,7 +1508,12 @@ class Mare::Compiler::CodeGen
     # If this is a constructor, the receiver must be allocated first.
     if gfunc.func.has_tag?(:constructor)
       raise "can't do a virtual call on a constructor" if needs_virtual_call
-      receiver = gen_alloc(lhs_gtype, relate, "#{lhs_gtype.type_def.llvm_name}.new")
+      receiver =
+        if lhs_gtype.type_def.has_allocation?(ctx)
+          gen_alloc(lhs_gtype, relate, "#{lhs_gtype.type_def.llvm_name}.new")
+        else
+          gen_alloca(lhs_gtype.struct_type, "#{lhs_gtype.type_def.llvm_name}.new")
+        end
     end
 
     # Prepend the continuation to the args list if necessary.
@@ -1522,7 +1559,8 @@ class Mare::Compiler::CodeGen
       # Do nothing - we already have the result value we need.
     when GenFunc::Constructor
       # The result is the receiver we sent over as an argument.
-      result = receiver if gfunc.func.has_tag?(:constructor)
+      result = receiver if gfunc.func.has_tag?(:constructor) # TODO: can this condition be removed? it should always be true, right?
+      result = @builder.load(result) if gfunc.pointer_indirect_receiver?(ctx)
     when GenFunc::Errorable
       # If this is an error-able function, check the error bit in the tuple.
       error_bit = @builder.extract_value(result, 1)
@@ -1691,7 +1729,11 @@ class Mare::Compiler::CodeGen
     cast_args = [] of LLVM::Value
     param_types.to_a.each_with_index do |param_type, index|
       arg = args[index]
-      if param_type
+
+      # Don't cast if the LLVM type already matches.
+      should_skip_cast = arg.type == func.type.element_type.params_types[index]
+
+      if param_type && !should_skip_cast
         arg_expr = arg_exprs[index].not_nil!
         arg_frame = arg_frames[index]
         cast_args << gen_assign_cast(arg, param_type, arg_expr, arg_frame)
@@ -1835,8 +1877,10 @@ class Mare::Compiler::CodeGen
   end
 
   def gen_identity_digest_of(term_expr)
-    term_type = type_of(term_expr)
-    value = gen_expr(term_expr)
+    gen_identity_digest_of(gen_expr(term_expr), type_of(term_expr), term_expr.pos)
+  end
+
+  def gen_identity_digest_of(value, reach_type, pos)
     name = "identity_digest_of.#{value.name}"
 
     case value.type.kind
@@ -1854,16 +1898,33 @@ class Mare::Compiler::CodeGen
         @builder.zext(value, @isize, name)
       end
     when LLVM::Type::Kind::Pointer
-      if llvm_type_of(term_type).kind == LLVM::Type::Kind::Pointer
+      if llvm_type_of(reach_type).kind == LLVM::Type::Kind::Pointer
         @builder.ptr_to_int(value, @isize, name)
       else
         # When the value is a pointer, but the type is not, the value is boxed.
         # Therefore, we must unwrap the boxed value and get its digest.
         # TODO: Implement this.
-        raise NotImplementedError.new("unboxing digest:\n#{term_expr.pos.show}")
+        raise NotImplementedError.new("unboxing digest:\n#{pos.show}")
+      end
+    when LLVM::Type::Kind::Struct
+      gtype = gtype_of(reach_type)
+      if value.type == gtype.struct_type
+        # For a struct, the identity digest of the composite is the total xor
+        # over the identity digest of each field that is within the struct.
+        result = @isize.const_int(0)
+        gtype.fields.each { |(field_name, field_type)|
+          index = gtype.field_index(field_name)
+          field_value = @builder.extract_value(value, index, "@.#{name}")
+          result = @builder.xor(result,
+            gen_identity_digest_of(field_value, field_type, pos)
+          )
+        }
+        result
+      else
+        raise NotImplementedError.new("this digest:\n#{pos.show}")
       end
     else
-      raise NotImplementedError.new("this digest:\n#{term_expr.pos.show}")
+      raise NotImplementedError.new("this digest:\n#{pos.show}")
     end
   end
 
@@ -1978,6 +2039,14 @@ class Mare::Compiler::CodeGen
     from_llvm_type = llvm_type_of(from_type)
     to_llvm_type = llvm_type_of(to_type)
 
+    # Sometimes we may need to implicitly cast struct pointer to struct value.
+    # We do that here by dereferencing the pointer.
+    if value.type != from_llvm_type \
+    && value.type.kind == LLVM::Type::Kind::Pointer \
+    && value.type.element_type == from_llvm_type
+      value = @builder.load(value)
+    end
+
     # We assert that the origin llvm type derived from type analysis is the
     # same as the actual type of the llvm value we are being asked to cast.
     raise "value type #{value.type} doesn't match #{from_llvm_type}:\n" +
@@ -2015,15 +2084,23 @@ class Mare::Compiler::CodeGen
     boxed
   end
 
-  def gen_unboxed(value, from_gtype)
+  def gen_unboxed(value, to_gtype)
     # First, cast the given object pointer to the correct boxed struct pointer.
-    struct_ptr = from_gtype.struct_ptr
+    struct_ptr = to_gtype.struct_ptr
     value = @builder.bit_cast(value, struct_ptr, "#{value.name}.BOXED")
 
     # Load the value itself into the value field of the boxed struct pointer.
-    index = from_gtype.struct_type.struct_element_types.size - 1
+    index = to_gtype.struct_type.struct_element_types.size - 1
     value_gep = @builder.struct_gep(value, index, "#{value.name}.VALUE")
     @builder.load(value_gep, "#{value.name}.VALUE.LOAD")
+  end
+
+  def gen_object_value_to_pointer(value, from_gtype, from_expr)
+    raise NotImplementedError.new("gen_object_value_to_pointer")
+  end
+
+  def gen_object_pointer_to_value(value, to_gtype)
+    raise NotImplementedError.new("gen_object_pointer_to_value")
   end
 
   def gen_expr(expr : AST::Node, const_only = false) : LLVM::Value
@@ -3350,11 +3427,23 @@ class Mare::Compiler::CodeGen
   def gen_field_gep(name, gtype = func_frame.gtype.not_nil!)
     raise "inconsistent frames" if @frames.size > 1
     object = func_frame.receiver_value
+
+    if object.type != gtype.struct_ptr
+      raise "current receiver is not a pointer to the expected gtype pointer: #{object.inspect}"
+    end
+
     @builder.struct_gep(object, gtype.field_index(name), "@.#{name}.GEP")
   end
 
   def gen_field_load(name, gtype = func_frame.gtype.not_nil!)
-    @builder.load(gen_field_gep(name, gtype), "@.#{name}")
+    raise "inconsistent frames" if @frames.size > 1
+    object = func_frame.receiver_value
+
+    if object.type == gtype.struct_type
+      @builder.extract_value(object, gtype.field_index(name), "@.#{name}")
+    else
+      @builder.load(gen_field_gep(name, gtype), "@.#{name}")
+    end
   end
 
   def gen_field_store(name, value)

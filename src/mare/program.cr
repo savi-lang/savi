@@ -204,9 +204,12 @@ class Mare::Program
       :enum,
       :hygienic,
       :ignores_cap,
-      :no_desc,
       :numeric,
+      :pass_by_value,
       :private,
+      :no_field_reassign,
+      :simple_value,
+      :singleton,
     ]
 
     def initialize(@cap, @ident, @params = nil)

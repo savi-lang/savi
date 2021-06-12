@@ -83,6 +83,8 @@ class Mare::Compiler::Verify
     def check_function(ctx, func, func_link)
       func_body = func.body
 
+      # TODO: check that a `no_field_reassign` type has no `var` fields.
+
       if func_body && jumps.any_error?(func_body)
         if func.has_tag?(:constructor) \
         && func_link.type.resolve(ctx).has_tag?(:actor)

@@ -63,6 +63,15 @@ class Mare::Compiler::CodeGen
       @needs_receiver
     end
 
+    def pointer_indirect_receiver?(ctx)
+      @needs_receiver \
+      && type_def.is_pass_by_value?(ctx) \
+      && (
+        func.has_tag?(:constructor) \
+        || (func.has_tag?(:let) && func.ident.value.ends_with?("=")) # TODO: less hacky as a special case somehow?
+      )
+    end
+
     def can_error?
       calling_convention.can_error?
     end
