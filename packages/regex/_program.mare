@@ -43,20 +43,20 @@
     @
 
   :fun ref _pattern(pattern Pattern)
-    case (
-    | pattern <: PatternAnyByte |
+    case pattern <: (
+    | PatternAnyByte |
       @_op(OpAnyByte)
 
-    | pattern <: PatternByte |
+    | PatternByte |
       @_op(OpByte)
       @_byte(pattern.byte)
 
-    | pattern <: PatternByteRange |
+    | PatternByteRange |
       @_op(OpByteRange)
       @_byte(pattern.low)
       @_byte(pattern.high)
 
-    | pattern <: PatternCharacter |
+    | PatternCharacter |
       pattern.each_byte -> (byte |
         if (byte < Op.min_op) (
           @_byte(byte)
@@ -66,10 +66,10 @@
         )
       )
 
-    | pattern <: PatternSequence |
+    | PatternSequence |
       pattern.children.each -> (child | @_pattern(child))
 
-    | pattern <: PatternOptional |
+    | PatternOptional |
       @_op(OpSplit)
       primary_addr = @_later_addr
       secondary_addr = @_later_addr
@@ -82,7 +82,7 @@
 
       try @_store_current_cursor_at!(absent_addr)
 
-    | pattern <: PatternZeroOrMore |
+    | PatternZeroOrMore |
       start_cursor = @_cursor
       @_op(OpSplit)
       primary_addr = @_later_addr
@@ -99,7 +99,7 @@
 
       try @_store_current_cursor_at!(absent_addr)
 
-    | pattern <: PatternOneOrMore |
+    | PatternOneOrMore |
       start_cursor = @_cursor
       @_pattern(pattern.child)
 
@@ -114,7 +114,7 @@
         try @_store_current_cursor_at!(after_addr)
       )
 
-    | pattern <: PatternChoice |
+    | PatternChoice |
       if (pattern.children.size == 2) (
         @_op(OpSplit)
         primary_addr = @_later_addr

@@ -39,12 +39,12 @@
   :fun ref react(event CPointer(AsioEvent), flags U32, arg U32) @
     :yields IOAction
     @io.react(event, flags, arg) -> (action |
-      case (
-      | action == IOActionClosed |
+      case action == (
+      | IOActionClosed |
         try @listen.as!(TCPListener)._conn_closed
 
       // TODO: complete writes, pending writes logic from Pony
-      // | action == IOActionWrite |
+      // | IOActionWrite |
       //   ...
       )
       yield action

@@ -29,41 +29,41 @@
     :yields RequestToken
     try (
       while (@_state != _RequestAtEnd) (
-        @_state = case (
-        | @_state == _RequestAtStart |
+        @_state = case @_state == (
+        | _RequestAtStart |
           _RequestAtMethod
-        | @_state == _RequestAtMethod |
+        | _RequestAtMethod |
           stream.advance_while! -> (byte | byte != ' ')
           yield RequestTokenMethod
           stream.advance!(1) // consume the space
           _RequestAtUri
-        | @_state == _RequestAtUri |
+        | _RequestAtUri |
           stream.advance_while! -> (byte | byte != ' ')
           yield RequestTokenUri
           stream.advance!(1) // consume the space
           _RequestAtVersionString
-        | @_state == _RequestAtVersionString |
+        | _RequestAtVersionString |
           stream.advance_while! -> (byte | byte != '\r')
           if (stream.bytes_ahead < 2) error! // ensure the LF byte is ready too
           yield RequestTokenVersionString
           stream.advance!(2) // consume the CRLF
           _RequestAtHeaderLineMaybe
-        | @_state == _RequestAtHeaderLineMaybe |
+        | _RequestAtHeaderLineMaybe |
           if (stream.peek_byte! == '\r' && stream.peek_byte!(1) == '\n') (
             stream.advance!(2)
             _RequestAtEnd
           |
             _RequestAtHeaderName
           )
-        | @_state == _RequestAtHeaderName |
+        | _RequestAtHeaderName |
           stream.advance_while! -> (byte | byte != ':')
           yield RequestTokenHeaderName
           stream.advance!(1) // consume the colon
           _RequestAtHeaderSpacing
-        | @_state == _RequestAtHeaderSpacing |
+        | _RequestAtHeaderSpacing |
           stream.advance_while! -> (byte | byte == ' ' || byte == '\t')
           _RequestAtHeaderValue
-        | @_state == _RequestAtHeaderValue |
+        | _RequestAtHeaderValue |
           stream.advance_while! -> (byte | byte != '\r')
           if (stream.bytes_ahead < 2) error! // ensure the LF byte is ready too
           yield RequestTokenHeaderValue

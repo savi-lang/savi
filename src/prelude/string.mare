@@ -438,34 +438,34 @@
 :primitive _UTF8Encoder
   :fun encode(value U32)
     :yields (USize, U8, U8, U8, U8)
-    case (
-    | value < 0x80 |
+    case value < (
+    | 0x80 |
       yield (1, value.u8, 0, 0, 0)
-    | value < 0x800 |
+    | 0x800 |
       yield (2
         value.bit_shr(6).bit_or(0xC0).u8
         value.bit_and(0x3F).bit_or(0x80).u8
         0
         0
       )
-    | value < 0xD800 |
+    | 0xD800 |
       yield (3
         value.bit_shr(12).bit_or(0xE0).u8
         value.bit_shr(6).bit_and(0x3F).bit_or(0x80).u8
         value.bit_and(0x3F).bit_or(0x80).u8
         0
       )
-    | value < 0xE000 |
+    | 0xE000 |
       // UTF-16 surrogate pairs are not allowed.
       yield (3, 0xEF, 0xBF, 0xBD, 0)
-    | value < 0x10000 |
+    | 0x10000 |
       yield (3
         value.bit_shr(12).bit_or(0xE0).u8
         value.bit_shr(6).bit_and(0x3F).bit_or(0x80).u8
         value.bit_and(0x3F).bit_or(0x80).u8
         0
       )
-    | value < 0x110000 |
+    | 0x110000 |
       yield (4
         value.bit_shr(18).bit_or(0xF0).u8
         value.bit_shr(12).bit_and(0x3F).bit_or(0x80).u8

@@ -10,22 +10,22 @@
     input.each_byte -> (byte |
       if is_in_escape_sequence (
         is_in_escape_sequence = False
-        pattern = case (
-        | byte == 'd' | pattern.concat(@_builtin_class_digit)
-        | byte == 'w' | pattern.concat(@_builtin_class_word)
+        pattern = case byte == (
+        | 'd' | pattern.concat(@_builtin_class_digit)
+        | 'w' | pattern.concat(@_builtin_class_word)
         |
           // TODO: proper UTF-8 support here
           char = PatternCharacter.new(byte, 0, 0, 0)
           pattern.concat(char)
         )
       |
-        pattern = case (
-        | byte == '\\' | is_in_escape_sequence = True, pattern
-        | byte == '.' | pattern.concat(PatternAnyByte.new) // TODO: proper UTF-8
-        | byte == '?' | pattern.with_question
-        | byte == '*' | pattern.with_star
-        | byte == '+' | pattern.with_plus
-        | byte == '|' | choice.children.push(pattern), pattern = PatternNone.new
+        pattern = case byte == (
+        | '\\' | is_in_escape_sequence = True, pattern
+        | '.'  | pattern.concat(PatternAnyByte.new) // TODO: proper UTF-8
+        | '?'  | pattern.with_question
+        | '*'  | pattern.with_star
+        | '+'  | pattern.with_plus
+        | '|'  | choice.children.push(pattern), pattern = PatternNone.new
         |
           // TODO: proper UTF-8 support here
           char = PatternCharacter.new(byte, 0, 0, 0)

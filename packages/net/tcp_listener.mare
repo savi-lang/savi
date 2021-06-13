@@ -77,10 +77,10 @@
         try (
           while (@_limit == 0 || @_count < @_limit) (
             conn_fd = LibPonyOS.pony_os_accept(@_event)
-            case (
-            | conn_fd ==  0 | error! // EWOULDBLOCK, don't try again
-            | conn_fd == -1 | None   // Some other error, so we can try again
-            |                 @_spawn(conn_fd)
+            case conn_fd == (
+            |  0 | error! // EWOULDBLOCK, don't try again
+            | -1 | None   // Some other error, so we can try again
+            |      @_spawn(conn_fd)
             )
           )
           @_paused = True

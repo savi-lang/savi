@@ -5,9 +5,9 @@
   :prop admin Bool: False
   :fun ref from_json!(read JsonReader)
     read.each_in_object! -> (key |
-      case (
-      | key == "name" | try (@name = read.string!)
-      | key == "admin" | try (@admin = read.bool!)
+      case key == (
+      | "name"  | try (@name = read.string!)
+      | "admin" | try (@admin = read.bool!)
       | read.unexpected_key
       )
     )
