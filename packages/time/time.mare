@@ -17,14 +17,14 @@
   :member Sunday: 7
 
   :fun non from_value(value U8)
-    case (
-      | value == 1 | Monday
-      | value == 2 | Tuesday
-      | value == 3 | Wednesday
-      | value == 4 | Thursday
-      | value == 5 | Friday
-      | value == 6 | Saturday
-      | value == 7 | Sunday
+    case value == (
+      | 1 | Monday
+      | 2 | Tuesday
+      | 3 | Wednesday
+      | 4 | Thursday
+      | 5 | Friday
+      | 6 | Saturday
+      | 7 | Sunday
       | NoDay
     )
 
@@ -207,19 +207,19 @@
 
   :: Returns the number of days in the given month of the given year.
   :fun non _days_in_month(month U8, year) U8
-    case (
-    | month ==  1 | 31 // January
-    | month ==  2 | if @_is_leap_year(year) (29 | 28) // Feb.
-    | month ==  3 | 31 // March
-    | month ==  4 | 30 // April
-    | month ==  5 | 31 // May
-    | month ==  6 | 30 // June
-    | month ==  7 | 31 // July
-    | month ==  8 | 31 // August
-    | month ==  9 | 30 // September
-    | month == 10 | 31 // October
-    | month == 11 | 30 // November
-    | month == 12 | 31 // December
+    case month == (
+    |  1 | 31 // January
+    |  2 | if @_is_leap_year(year) (29 | 28) // Feb.
+    |  3 | 31 // March
+    |  4 | 30 // April
+    |  5 | 31 // May
+    |  6 | 30 // June
+    |  7 | 31 // July
+    |  8 | 31 // August
+    |  9 | 30 // September
+    | 10 | 31 // October
+    | 11 | 30 // November
+    | 12 | 31 // December
     | 0 // months that don't exist have zero days
     )
 

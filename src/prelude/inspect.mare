@@ -25,14 +25,14 @@
     InspectLibC.puts(@[input].cstring)
 
   :fun into(output String'iso, input Any'box) String'iso // TODO: use `box` instead of `Any'box` // TODO: use something like Crystal IO instead of String?
-    case (
-    | input <: _InspectCustom | input.inspect_into(--output)
-    | input <: _InspectEnum | output << input.member_name, --output
-    | input <: U8'box    | @into(--output, input.u64) // TODO: unify into one integer clause?
-    | input <: U16'box   | @into(--output, input.u64) // TODO: unify into one integer clause?
-    | input <: U32'box   | @into(--output, input.u64) // TODO: unify into one integer clause?
-    | input <: USize'box | @into(--output, input.u64) // TODO: unify into one integer clause?
-    | input <: U64'box   |                            // TODO: unify into one integer clause?
+    case input <: (
+    | _InspectCustom | input.inspect_into(--output)
+    | _InspectEnum | output << input.member_name, --output
+    | U8'box    | @into(--output, input.u64) // TODO: unify into one integer clause?
+    | U16'box   | @into(--output, input.u64) // TODO: unify into one integer clause?
+    | U32'box   | @into(--output, input.u64) // TODO: unify into one integer clause?
+    | USize'box | @into(--output, input.u64) // TODO: unify into one integer clause?
+    | U64'box   |                            // TODO: unify into one integer clause?
       number = input.u64
       digits Array(U8) = []
       while (number > 0) (
@@ -42,22 +42,22 @@
       digits.reverse_each -> (digit | output.push_byte(digit), None) // TODO: None should not be needed here
       if (digits.size == 0) (output.push_byte('0'))
       --output
-    | input <: I8'box    | @into(--output, input.i64) // TODO: unify into one integer clause?
-    | input <: I16'box   | @into(--output, input.i64) // TODO: unify into one integer clause?
-    | input <: I32'box   | @into(--output, input.i64) // TODO: unify into one integer clause?
-    | input <: ISize'box | @into(--output, input.i64) // TODO: unify into one integer clause?
-    | input <: I64'box   |                            // TODO: unify into one integer clause?
+    | I8'box    | @into(--output, input.i64) // TODO: unify into one integer clause?
+    | I16'box   | @into(--output, input.i64) // TODO: unify into one integer clause?
+    | I32'box   | @into(--output, input.i64) // TODO: unify into one integer clause?
+    | ISize'box | @into(--output, input.i64) // TODO: unify into one integer clause?
+    | I64'box   |                            // TODO: unify into one integer clause?
       number = input.i64
       positive = if (number >= 0) (number | output.push_byte('-'), number.abs)
       @into(--output, positive.u64)
-    | input <: F32'box | @_inspect_float_into(--output, input.f64) // TODO: unify into one float clause?
-    | input <: F64'box | @_inspect_float_into(--output, input.f64) // TODO: unify into one float clause?
-    | input <: String'box |
+    | F32'box | @_inspect_float_into(--output, input.f64) // TODO: unify into one float clause?
+    | F64'box | @_inspect_float_into(--output, input.f64) // TODO: unify into one float clause?
+    | String'box |
       output.push_byte('"')
       output << input.clone // TODO: show some characters as escaped.
       output.push_byte('"')
       --output
-    | input <: _InspectEach |
+    | _InspectEach |
       output.push_byte('[')
       index USize = 0
       while (index < input.size) (

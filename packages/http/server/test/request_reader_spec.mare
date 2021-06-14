@@ -166,12 +166,12 @@
     if (finished_too_soon) (
       // If we finished too soon, there was either an error to show,
       // or the parser failed to consume all of the chunks before finishing.
-      case (
-      | saw_error == RequestErrorNone |
+      case saw_error == (
+      | RequestErrorNone |
         @env.err.write("\nexpected "), @env.err.write(Inspect[source_chunks])
         @env.err.print(" to parse fully, but it finished too soon")
         False
-      | saw_error == expected_error |
+      | expected_error |
         True
       |
         @env.err.write("\nexpected "), @env.err.write(Inspect[source_chunks])

@@ -260,6 +260,21 @@ Now let's look at an example of `case` used with the subtype check operator:
     )
 ```
 
+An alternative syntax for `case` is available when the variable and operator are the same in every conditional part:
+
+```mare
+:primitive Example
+  :fun thing_to_number(thing Any'box) I64
+    case thing <: (
+    | Numeric | thing.i64
+    | String  | try (thing.parse_i64! | -1)
+    | None    | 0
+    | -1
+    )
+```
+
+Note that a final part with no condition is also supported.
+
 #### Try
 
 A `try` macro has just one term: the block to execute with a landing pad to "catch" any errors it might raise.

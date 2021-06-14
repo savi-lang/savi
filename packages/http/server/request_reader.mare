@@ -59,8 +59,8 @@
 
   :fun ref read!(stream ByteStreamReader) Request'iso
     @_parser.parse!(stream) -> (token |
-      case (
-      | token == RequestTokenMethod |
+      case token == (
+      | RequestTokenMethod |
         try (
           @_request.method = @_supported_methods.find! -> (method |
             stream.is_token_equal_to(method)
@@ -69,14 +69,14 @@
           @_error = RequestErrorUnsupportedMethod
           error!
         )
-      | token == RequestTokenUri |
+      | RequestTokenUri |
         if (stream.token_byte_size <= @_max_uri_byte_size) (
           @_request.uri_string = stream.token_as_string
         |
           @_error = RequestErrorURITooLong
           error!
         )
-      | token == RequestTokenVersionString |
+      | RequestTokenVersionString |
         if stream.is_token_equal_to(b"HTTP/1.1") (
           // Version is okay - no action needed
           // TODO: Accept HTTP/1.0 and change `Connection` header behavior
@@ -84,7 +84,7 @@
           @_error = RequestErrorUnsupportedVersion
           error!
         )
-      | token == RequestTokenHeaderName |
+      | RequestTokenHeaderName |
         try (
           @_next_header = @_standard_headers.find! -> (name |
             stream.is_token_ascii_lowercase_equal_to(name)
@@ -96,7 +96,7 @@
         |
           "" // ignore all other header names
         ))
-      | token == RequestTokenHeaderValue |
+      | RequestTokenHeaderValue |
         case (
         // We can safely use `is` here because we have ensured that each
         // such next_header we may compare against here is the "stringtabbed"

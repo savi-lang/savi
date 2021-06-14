@@ -52,11 +52,11 @@
     keep_going = True
     while (keep_going && @_has_next) (
       peeked = @_peek_softly
-      case (
-      | peeked == ' '  | @_advance
-      | peeked == '\r' | @_advance
-      | peeked == '\t' | @_advance
-      | peeked == '\n' | @_advance
+      case peeked == (
+      | ' '  | @_advance
+      | '\r' | @_advance
+      | '\t' | @_advance
+      | '\n' | @_advance
       | keep_going = False
       )
     )
@@ -94,9 +94,9 @@
     @_skip_whitespace
     @_pre_token
     peeked = @_peek!
-    case (
-    | peeked == 't' | @_advance, @_eat!('r'), @_eat!('u'), @_eat!('e'),              True
-    | peeked == 'f' | @_advance, @_eat!('a'), @_eat!('l'), @_eat!('s'), @_eat!('e'), False
+    case peeked == (
+    | 't' | @_advance, @_eat!('r'), @_eat!('u'), @_eat!('e'),              True
+    | 'f' | @_advance, @_eat!('a'), @_eat!('l'), @_eat!('s'), @_eat!('e'), False
     | error!
     )
 
@@ -116,9 +116,9 @@
         @_skip_whitespace
         @_pre_token // prepare for possible array end token
         next = @_next!
-        case (
-        | next == ',' | @_skip_whitespace
-        | next == ']' | keep_going = False
+        case next == (
+        | ',' | @_skip_whitespace
+        | ']' | keep_going = False
         | @_rewind, error!
         )
       )
@@ -146,9 +146,9 @@
         @_skip_whitespace
         @_pre_token // prepare for possible array end token
         next = @_next!
-        case (
-        | next == ',' | @_skip_whitespace
-        | next == ']' | keep_going = False
+        case next == (
+        | ',' | @_skip_whitespace
+        | ']' | keep_going = False
         | @_rewind, error!
         )
       )
@@ -175,9 +175,9 @@
         @_skip_whitespace
         @_pre_token, yield JsonTokenPairPost
         next = @_next!
-        case (
-        | next == ',' | @_skip_whitespace
-        | next == '}' | keep_going = False
+        case next == (
+        | ',' | @_skip_whitespace
+        | '}' | keep_going = False
         | @_rewind, error!
         )
       )
@@ -208,9 +208,9 @@
 
         @_skip_whitespace
         next = @_next!
-        case (
-        | next == ',' | @_skip_whitespace
-        | next == '}' | keep_going = False
+        case next == (
+        | ',' | @_skip_whitespace
+        | '}' | keep_going = False
         | @_rewind, error!
         )
       )
@@ -241,9 +241,9 @@
       @_advance
       peeked = @_peek!
       exp_negative =
-        case (
-        | peeked == '+' | @_advance, False
-        | peeked == '-' | @_advance, True
+        case peeked == (
+        | '+' | @_advance, False
+        | '-' | @_advance, True
         | False
         )
       exp = @_read_number_digits!
@@ -283,9 +283,9 @@
     keep_going = True
     while keep_going (
       next = @_next!
-      case (
-      | next == '"'  | keep_going = False
-      | next == '\\' | buf = @_push_escape_seq!(buf)
+      case next == (
+      | '"'  | keep_going = False
+      | '\\' | buf = @_push_escape_seq!(buf)
       | buf.push_byte(next)
       )
     )
@@ -303,16 +303,16 @@
 
   :fun ref _push_escape_seq!(buf String'ref) String'ref
     next = @_next!
-    case (
-    | next == '"'  | buf.push_byte('"')
-    | next == '\\' | buf.push_byte('\\')
-    | next == '/'  | buf.push_byte('/')
-    | next == 'b'  | buf.push_byte(0x08)
-    | next == 't'  | buf.push_byte(0x09)
-    | next == 'n'  | buf.push_byte(0x0a)
-    | next == 'f'  | buf.push_byte(0x0c)
-    | next == 'r'  | buf.push_byte(0x0d)
-    | next == 'u'  | buf.push_utf8(@_read_unicode_seq!)
+    case next == (
+    | '"'  | buf.push_byte('"')
+    | '\\' | buf.push_byte('\\')
+    | '/'  | buf.push_byte('/')
+    | 'b'  | buf.push_byte(0x08)
+    | 't'  | buf.push_byte(0x09)
+    | 'n'  | buf.push_byte(0x0a)
+    | 'f'  | buf.push_byte(0x0c)
+    | 'r'  | buf.push_byte(0x0d)
+    | 'u'  | buf.push_utf8(@_read_unicode_seq!)
     | error!
     )
     --buf

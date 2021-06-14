@@ -75,8 +75,8 @@
       index = @_search(key)
       entry = @_array[index]!
 
-      case (
-      | entry <: _KV(K, V) | entry.value = --value
+      case entry <: (
+      | _KV(K, V) | entry.value = --value
       |
         @_array[index]! = _KV(K, V).new(--key, --value)
         @_size += 1
@@ -121,14 +121,14 @@
       @_array.each_with_index -> (entry, i |
         entry = @_array[idx]!
 
-        case (
-        | entry <: @->(_KV(K, V)) |
+        case entry <: (
+        | @->(_KV(K, V)) |
           if H.equal(key, entry.key) (
             result_idx = idx
             found = True
             error! // TODO: use early return instead of error!
           )
-        | entry <: _MapEmpty |
+        | _MapEmpty |
           if (idx_del > mask) (
             result_idx = idx
           |
@@ -136,7 +136,7 @@
           )
           found = False
           error!
-        | entry <: _MapDeleted |
+        | _MapDeleted |
           if (idx_del > mask) (
             idx_del = idx
           )

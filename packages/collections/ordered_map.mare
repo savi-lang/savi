@@ -116,8 +116,8 @@
       index = @_search(key)
       entry = @_array[index]!
 
-      case (
-      | entry <: @->(_KVBA(K, V)) |
+      case entry <: (
+      | @->(_KVBA(K, V)) |
         entry.value = --value
 
         // If this entry is not already the head, we will make it the new head.
@@ -176,14 +176,14 @@
       @_array.each_with_index -> (entry, i |
         entry = @_array[idx]!
 
-        case (
-        | entry <: @->(_KVBA(K, V)) |
+        case entry <: (
+        | @->(_KVBA(K, V)) |
           if H.equal(key, entry.key) (
             result_idx = idx
             found = True
             error! // TODO: use early return instead of error!
           )
-        | entry <: _MapEmpty |
+        | _MapEmpty |
           if (idx_del > mask) (
             result_idx = idx
           |
@@ -191,7 +191,7 @@
           )
           found = False
           error!
-        | entry <: _MapDeleted |
+        | _MapDeleted |
           if (idx_del > mask) (
             idx_del = idx
           )
