@@ -214,7 +214,7 @@ class Mare::Compiler::CodeGen::VeronaRT
 
   def di_runtime_member_info(debug : DebugInfo)
     # TODO: Expose runtime member info, like PonyRT does.
-    {} of Int32 => {String, LibLLVMExt::Metadata}
+    {} of Int32 => {String, LLVM::Type, LibLLVMExt::Metadata}
   end
 
   # This defines a global constant for the type descriptor of a type,
@@ -303,7 +303,7 @@ class Mare::Compiler::CodeGen::VeronaRT
 
     # All struct types start with the type descriptor (abbreviated "desc").
     # Even types with no desc have a singleton with a desc.
-    # The values without a desc do not use this struct_type at all anyway.
+    # The values without a desc do not use this fields struct at all anyway.
     elements << gtype.desc_type.pointer
 
     # Different runtime objects have a different sized opaque pad at the start
@@ -321,8 +321,8 @@ class Mare::Compiler::CodeGen::VeronaRT
       elements << @obj_pad
     end
 
-    # Each field of the type is an additional element in the struct type.
-    gtype.fields.each { |name, t| elements << g.llvm_mem_type_of(t) }
+    # The sub-struct containing the fields of the type is the last element.
+    elements << gtype.fields_struct_type
 
     # The struct was previously opaque with no body. We now fill it in here.
     gtype.struct_type.struct_set_body(elements)

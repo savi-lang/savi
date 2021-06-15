@@ -267,7 +267,7 @@ class Mare::Compiler::CodeGen
     when :ptr then llvm_type_of(ref.single_def!(ctx).cpointer_type_arg(ctx)).pointer
     when :isize then @isize
     when :struct_value then
-      @gtypes[ctx.reach[ref.single!].llvm_name].struct_type
+      @gtypes[ctx.reach[ref.single!].llvm_name].fields_struct_type
     when :struct_ptr then
       @gtypes[ctx.reach[ref.single!].llvm_name].struct_ptr
     when :struct_ptr_opaque then
@@ -288,7 +288,7 @@ class Mare::Compiler::CodeGen
     when :ptr then llvm_type_of(ref.single_def!(ctx).cpointer_type_arg(ctx)).pointer
     when :isize then @isize
     when :struct_value then
-      @gtypes[ctx.reach[ref.single!].llvm_name].struct_type
+      @gtypes[ctx.reach[ref.single!].llvm_name].fields_struct_type
     when :struct_ptr then
       @gtypes[ctx.reach[ref.single!].llvm_name].struct_ptr
     when :struct_ptr_opaque then
@@ -511,8 +511,12 @@ class Mare::Compiler::CodeGen
       param_types.unshift(gfunc.continuation_info.struct_type.pointer)
     end
     if gfunc.needs_receiver?
-      receiver_type = llvm_type_of(gtype)
-      receiver_type = receiver_type.pointer if gfunc.pointer_indirect_receiver?(ctx)
+      receiver_type =
+        if gfunc.boxed_fields_receiver?(ctx)
+          gtype.struct_ptr
+        else
+          llvm_type_of(gtype)
+        end
       param_types.unshift(receiver_type)
     end
 
@@ -554,7 +558,7 @@ class Mare::Compiler::CodeGen
 
           gen_func_end
         end
-      elsif param_types.first == gtype.struct_type
+      elsif param_types.first == gtype.fields_struct_type?
         # If the receiver parameter type is a struct value rather than pointer,
         # then this is a value type, so we need its virtual function that uses
         # an object-style pointer to dereference the pointer to use as a value.
@@ -570,7 +574,7 @@ class Mare::Compiler::CodeGen
 
           forward_args =
             (vparam_types.size - 1).times.map { |i| fn.params[i + 1] }.to_a
-          forward_args.unshift(@builder.load(fn.params[0]))
+          forward_args.unshift(gen_unboxed_fields(fn.params[0], gtype))
 
           @builder.ret @builder.call(gfunc.llvm_func, forward_args)
 
@@ -580,7 +584,7 @@ class Mare::Compiler::CodeGen
         # If the receiver parameter type doesn't match the struct pointer,
         # we assume it is a boxed machine value, so we need a wrapper function
         # that will unwrap the raw machine value to use as the receiver.
-        elem_types = gtype.struct_type.struct_element_types
+        elem_types = gtype.fields_struct_type.struct_element_types
         raise "expected the receiver type to be a raw machine value" \
           unless elem_types.last == param_types.first
 
@@ -596,7 +600,7 @@ class Mare::Compiler::CodeGen
 
           forward_args =
             (vparam_types.size - 1).times.map { |i| fn.params[i + 1] }.to_a
-          forward_args.unshift(gen_unboxed(fn.params[0], gtype))
+          forward_args.unshift(gen_unboxed_value(fn.params[0], gtype))
 
           @builder.ret @builder.call(gfunc.llvm_func, forward_args)
 
@@ -1512,7 +1516,7 @@ class Mare::Compiler::CodeGen
         if lhs_gtype.type_def.has_allocation?(ctx)
           gen_alloc(lhs_gtype, relate, "#{lhs_gtype.type_def.llvm_name}.new")
         else
-          gen_alloca(lhs_gtype.struct_type, "#{lhs_gtype.type_def.llvm_name}.new")
+          gen_alloc_alloca(lhs_gtype, "#{lhs_gtype.type_def.llvm_name}.new")
         end
     end
 
@@ -1560,7 +1564,7 @@ class Mare::Compiler::CodeGen
     when GenFunc::Constructor
       # The result is the receiver we sent over as an argument.
       result = receiver if gfunc.func.has_tag?(:constructor) # TODO: can this condition be removed? it should always be true, right?
-      result = @builder.load(result) if gfunc.pointer_indirect_receiver?(ctx)
+      result = gen_unboxed_fields(result, lhs_gtype) if gfunc.boxed_fields_receiver?(ctx)
     when GenFunc::Errorable
       # If this is an error-able function, check the error bit in the tuple.
       error_bit = @builder.extract_value(result, 1)
@@ -1908,13 +1912,12 @@ class Mare::Compiler::CodeGen
       end
     when LLVM::Type::Kind::Struct
       gtype = gtype_of(reach_type)
-      if value.type == gtype.struct_type
+      if value.type == gtype.fields_struct_type
         # For a struct, the identity digest of the composite is the total xor
         # over the identity digest of each field that is within the struct.
         result = @isize.const_int(0)
-        gtype.fields.each { |(field_name, field_type)|
-          index = gtype.field_index(field_name)
-          field_value = @builder.extract_value(value, index, "@.#{name}")
+        gtype.fields.each_with_index { |(field_name, field_type), index|
+          field_value = @builder.extract_value(value, index, "@.#{field_name}")
           result = @builder.xor(result,
             gen_identity_digest_of(field_value, field_type, pos)
           )
@@ -2043,8 +2046,9 @@ class Mare::Compiler::CodeGen
     # We do that here by dereferencing the pointer.
     if value.type != from_llvm_type \
     && value.type.kind == LLVM::Type::Kind::Pointer \
-    && value.type.element_type == from_llvm_type
-      value = @builder.load(value)
+    && value.type.element_type.kind == LLVM::Type::Kind::Struct \
+    && value.type.element_type.struct_element_types[-1] == from_llvm_type
+      value = gen_unboxed_fields(value, gtype_of(from_type))
     end
 
     # We assert that the origin llvm type derived from type analysis is the
@@ -2070,37 +2074,82 @@ class Mare::Compiler::CodeGen
     value
   end
 
-  def gen_boxed(value, from_gtype, from_expr)
+  def gen_boxed_value(value, gtype, from_expr)
     # Allocate a struct pointer to hold the type descriptor and value.
     # This also writes the type descriptor into it appropriate position.
-    boxed = gen_alloc(from_gtype, from_expr, "#{value.name}.BOXED")
+    boxed = gen_alloc(gtype, from_expr, "#{value.name}.BOXED")
 
-    # Write the value itself into the value field of the struct.
-    index = from_gtype.struct_type.struct_element_types.size - 1
-    value_gep = @builder.struct_gep(boxed, index, "#{value.name}.BOXED.VALUE")
-    @builder.store(value, value_gep)
+    # Write the value itself into the value field of the boxed struct pointer.
+    @builder.store(
+      value,
+      @builder.struct_gep(
+        @builder.struct_gep(
+          boxed,
+          gtype.fields_struct_index,
+          "#{value.name}.BOXED.FIELDS.GEP"
+        ),
+        0,
+        "#{value.name}.BOXED.VALUE.GEP"
+      )
+    )
 
-    # Return the struct pointer
+    # Return the boxed struct pointer.
     boxed
   end
 
-  def gen_unboxed(value, to_gtype)
-    # First, cast the given object pointer to the correct boxed struct pointer.
-    struct_ptr = to_gtype.struct_ptr
-    value = @builder.bit_cast(value, struct_ptr, "#{value.name}.BOXED")
-
-    # Load the value itself into the value field of the boxed struct pointer.
-    index = to_gtype.struct_type.struct_element_types.size - 1
-    value_gep = @builder.struct_gep(value, index, "#{value.name}.VALUE")
-    @builder.load(value_gep, "#{value.name}.VALUE.LOAD")
+  def gen_unboxed_value(boxed, gtype)
+    # Load the value itself from the value field of the boxed struct pointer.
+    @builder.load(
+      @builder.struct_gep(
+        @builder.struct_gep(
+          @builder.bit_cast(
+            boxed,
+            gtype.struct_ptr,
+            "#{boxed.name}.BOXED"
+          ),
+          gtype.fields_struct_index,
+          "#{boxed.name}.FIELDS.GEP"
+        ),
+        0,
+        "#{boxed.name}.VALUE.GEP"
+      ),
+      "#{boxed.name}.VALUE"
+    )
   end
 
-  def gen_object_value_to_pointer(value, from_gtype, from_expr)
-    raise NotImplementedError.new("gen_object_value_to_pointer")
+  def gen_boxed_fields(fields_value, gtype, from_expr)
+    # Allocate a struct pointer to hold the type descriptor and value.
+    # This also writes the type descriptor into it appropriate position.
+    boxed = gen_alloc(gtype, from_expr, "#{fields_value.name}.BOXED")
+
+    # Write the fields value into the fields struct of the boxed struct pointer.
+    @builder.store(
+      fields_value,
+      @builder.struct_gep(
+        boxed,
+        gtype.fields_struct_index,
+        "#{fields_value.name}.BOXED.FIELDS.GEP"
+      )
+    )
+
+    # Return the boxed struct pointer.
+    boxed
   end
 
-  def gen_object_pointer_to_value(value, to_gtype)
-    raise NotImplementedError.new("gen_object_pointer_to_value")
+  def gen_unboxed_fields(boxed, gtype)
+    # Load the fields value from the fields struct of the boxed struct pointer.
+    @builder.load(
+      @builder.struct_gep(
+        @builder.bit_cast(
+          boxed,
+          gtype.struct_ptr,
+          "#{boxed.name}.BOXED"
+        ),
+        gtype.fields_struct_index,
+        "#{boxed.name}.FIELDS.GEP"
+      ),
+      "#{boxed.name}.FIELDS"
+    )
   end
 
   def gen_expr(expr : AST::Node, const_only = false) : LLVM::Value
@@ -2561,12 +2610,14 @@ class Mare::Compiler::CodeGen
   def gen_const_for_gtype(gtype : GenType, values : Hash(String, LLVM::Value))
     pad_elements =
       gtype.struct_type
-        .struct_element_types[1...(-1*gtype.fields.size)]
+        .struct_element_types[1...-1]
         .map(&.null)
 
-    field_values = gtype.fields.map(&.first).map { |name| values[name] }
+    fields = gtype.fields_struct_type.const_struct(
+      gtype.fields.map(&.first).map { |name| values[name] }
+    )
 
-    gtype.struct_type.const_struct([gtype.desc] + pad_elements + field_values)
+    gtype.struct_type.const_struct([gtype.desc] + pad_elements + [fields])
   end
 
   def gen_global_const(*args)
@@ -3328,6 +3379,9 @@ class Mare::Compiler::CodeGen
 
   # This defines the LLVM struct type for objects of this type.
   def gen_struct_type(gtype)
+    field_types = gtype.fields.map { |name, t| llvm_mem_type_of(t) }
+    gtype.fields_struct_type.struct_set_body(field_types)
+
     @runtime.gen_struct_type(self, gtype)
   end
 
@@ -3340,14 +3394,16 @@ class Mare::Compiler::CodeGen
     global.linkage = LLVM::Linkage::LinkerPrivate
     global.global_constant = true
 
-    # For allocated types, we still generate a singleton for static use,
-    # but we need to populate the fields with something - we use zeros.
-    # We are relying on the reference capabilities part of the type system
-    # to prevent such singletons from ever having their fields dereferenced.
-    elements = gtype.struct_type.struct_element_types[1..-1].map(&.null)
-
     # The first element is always the type descriptor.
-    elements.unshift(gtype.desc)
+    elements = [gtype.desc]
+
+    # For allocated types, we still generate a singleton for static use, but
+    # we need to populate the fields and padding with something - we use zeros.
+    # We are relying on the reference capabilities part of the type system
+    # to prevent such singletons from ever having their padding dereferenced.
+    gtype.struct_type.struct_element_types[1..-1].map(&.null).each { |pad|
+      elements << pad
+    }
 
     global.initializer = gtype.struct_type.const_struct(elements)
     global
@@ -3357,6 +3413,14 @@ class Mare::Compiler::CodeGen
   # This is the first step before actually calling the constructor of it.
   def gen_alloc(gtype : GenType, from_expr : AST::Node, name : String)
     @runtime.gen_alloc(self, gtype, from_expr, name)
+  end
+
+  # This generates the code that stack-allocates an object of the given type.
+  # This is used before calling the constructor of value types.
+  def gen_alloc_alloca(gtype : GenType, name : String)
+    object = gen_alloca(gtype.struct_type, name)
+    gen_put_desc(object, gtype, name)
+    object
   end
 
   # This generates more generic code for allocating a given LLVM struct type,
@@ -3432,14 +3496,22 @@ class Mare::Compiler::CodeGen
       raise "current receiver is not a pointer to the expected gtype pointer: #{object.inspect}"
     end
 
-    @builder.struct_gep(object, gtype.field_index(name), "@.#{name}.GEP")
+    @builder.struct_gep(
+      @builder.struct_gep(
+        object,
+        gtype.fields_struct_index,
+        "@.FIELDS.GEP"
+      ),
+      gtype.field_index(name),
+      "@.#{name}.GEP"
+    )
   end
 
   def gen_field_load(name, gtype = func_frame.gtype.not_nil!)
     raise "inconsistent frames" if @frames.size > 1
     object = func_frame.receiver_value
 
-    if object.type == gtype.struct_type
+    if object.type == gtype.fields_struct_type
       @builder.extract_value(object, gtype.field_index(name), "@.#{name}")
     else
       @builder.load(gen_field_gep(name, gtype), "@.#{name}")

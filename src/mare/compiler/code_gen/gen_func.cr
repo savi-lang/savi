@@ -63,7 +63,7 @@ class Mare::Compiler::CodeGen
       @needs_receiver
     end
 
-    def pointer_indirect_receiver?(ctx)
+    def boxed_fields_receiver?(ctx)
       @needs_receiver \
       && type_def.is_pass_by_value?(ctx) \
       && (

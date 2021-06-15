@@ -140,15 +140,15 @@ class Mare::Compiler::CodeGen
       )
     end
 
-    @di_runtime_member_info : Hash(Int32, Tuple(String, LibLLVMExt::Metadata))?
+    @di_runtime_member_info : Hash(Int32, Tuple(String, LLVM::Type, LibLLVMExt::Metadata))?
     def di_runtime_member_info
       @di_runtime_member_info ||= begin
         @runtime.di_runtime_member_info(self)
-          .as(Hash(Int32, Tuple(String, LibLLVMExt::Metadata)))
+          .as(Hash(Int32, Tuple(String, LLVM::Type, LibLLVMExt::Metadata)))
       end
     end
 
-    def di_create_struct_pointer_type(
+    def di_create_object_struct_pointer_type(
       t : Reach::Ref,
       llvm_type : LLVM::Type,
     )
@@ -163,7 +163,7 @@ class Mare::Compiler::CodeGen
 
       # Create the debug type, as a struct pointer to the struct type.
       debug_type = di_create_pointer_type(name,
-        di_create_struct_type(t, llvm_type.element_type)
+        di_create_object_struct_type(t, llvm_type.element_type)
       )
 
       # Finally, replace the temporary stand-in we created above and return.
@@ -171,7 +171,32 @@ class Mare::Compiler::CodeGen
       debug_type
     end
 
-    def di_create_struct_type(
+    def di_create_object_struct_type(
+      t : Reach::Ref,
+      llvm_type : LLVM::Type,
+    )
+      ident = t.single!.defn(ctx).ident
+      name = ident.value
+      pos = ident.pos
+
+      # First gather the debug type information for the type descriptor,
+      # which is specific to the runtime we are using.
+      di_member_info = Hash(Int32, Tuple(String, LLVM::Type, LibLLVMExt::Metadata)).new
+      di_member_info.merge!(di_runtime_member_info)
+
+      # Now add in the debug type information for the user fields struct.
+      fields_struct_type = llvm_type.struct_element_types.last
+      di_member_info[llvm_type.struct_element_types.size - 1] = {
+        "FIELDS",
+        fields_struct_type,
+        di_create_fields_struct_type(t, fields_struct_type),
+      }
+
+      # Create the debug type, as a struct type with those element types.
+      di_create_struct_type(name, llvm_type, di_member_info, pos)
+    end
+
+    def di_create_fields_struct_type(
       t : Reach::Ref,
       llvm_type : LLVM::Type,
     )
@@ -180,26 +205,19 @@ class Mare::Compiler::CodeGen
       name = ident.value
       pos = ident.pos
 
-      # First gather the debug type information for the type descriptor,
-      # which is specific to the runtime we are using.
-      di_member_info = Hash(Int32, Tuple(String, LibLLVMExt::Metadata)).new
-      di_member_info.merge!(di_runtime_member_info)
-
-      # Now go gather the debug type information for all user-visible fields.
-      reach_fields = reach_def.fields.dup
-      struct_element_types = llvm_type.struct_element_types
-      struct_element_types.each_with_index do |elem_llvm_type, index|
-        # We skip over fields the user shouldn't know about,
-        # like the type descriptor and the actor pad.
-        next if index < (struct_element_types.size - reach_def.fields.size)
-
-        field_name, field_reach_ref = reach_fields.shift
-        di_member_info[index] =
-          {field_name, di_type(field_reach_ref, elem_llvm_type)}
+      # Gather the debug type information for all user fields.
+      di_member_info = Hash(Int32, Tuple(String, LLVM::Type, LibLLVMExt::Metadata)).new
+      llvm_type.struct_element_types.each_with_index do |field_llvm_type, index|
+        field_name, field_reach_ref = reach_def.fields[index]
+        di_member_info[index] = {
+          field_name,
+          field_llvm_type,
+          di_type(field_reach_ref, field_llvm_type),
+        }
       end
 
       # Create the debug type, as a struct type with those element types.
-      di_create_struct_type(name, llvm_type, di_member_info, pos)
+      di_create_struct_type("#{name}.FIELDS", llvm_type, di_member_info, pos)
     end
 
     # This function is for cases where we are generating some internal struct
@@ -207,7 +225,7 @@ class Mare::Compiler::CodeGen
     def di_create_struct_type(
       name : String,
       llvm_type : LLVM::Type,
-      member_infos : Hash(Int32, Tuple(String, LibLLVMExt::Metadata)),
+      member_infos : Hash(Int32, Tuple(String, LLVM::Type, LibLLVMExt::Metadata)),
       pos : Source::Pos? = nil
     )
       @di.create_struct_type(
@@ -220,9 +238,7 @@ class Mare::Compiler::CodeGen
         LLVM::DIFlags::Zero,
         nil,
         @di.get_or_create_type_array(
-          member_infos.map do |index, (member_name, member_di_type)|
-            member_llvm_type = llvm_type.struct_element_types[index]
-
+          member_infos.map do |index, (member_name, member_llvm_type, member_di_type)|
             @di.create_member_type(nil, member_name, nil, 1,
               @target_data.abi_size(member_llvm_type) * 8,
               @target_data.abi_alignment(member_llvm_type) * 8,
@@ -284,9 +300,9 @@ class Mare::Compiler::CodeGen
             ),
           )
         elsif t.llvm_use_type(ctx) == :struct_value
-          di_create_struct_type(t, llvm_type)
+          di_create_fields_struct_type(t, llvm_type)
         elsif t.llvm_use_type(ctx) == :struct_ptr
-          di_create_struct_pointer_type(t, llvm_type)
+          di_create_object_struct_pointer_type(t, llvm_type)
         elsif t.llvm_use_type(ctx) == :struct_ptr_opaque
           # TODO: Some more descriptive debug type?
           di_create_basic_type(t, llvm_type, LLVM::DwarfTypeEncoding::Address)

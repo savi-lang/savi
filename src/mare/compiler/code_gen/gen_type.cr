@@ -7,6 +7,7 @@ class Mare::Compiler::CodeGen
     getter vtable_size : Int32
     getter! desc_type : LLVM::Type
     getter! struct_type : LLVM::Type
+    getter! fields_struct_type : LLVM::Type
     getter! desc : LLVM::Value
     getter! singleton : LLVM::Value
 
@@ -51,6 +52,7 @@ class Mare::Compiler::CodeGen
       # Generate descriptor type and struct type.
       @desc_type = g.gen_desc_type(@type_def, @vtable_size)
       @struct_type = g.llvm.struct_create_named(@type_def.llvm_name).as(LLVM::Type)
+      @fields_struct_type = g.llvm.struct_create_named("#{@type_def.llvm_name}.FIELDS").as(LLVM::Type)
     end
 
     # Generate struct type bodies.
@@ -141,9 +143,12 @@ class Mare::Compiler::CodeGen
       struct_type.pointer
     end
 
+    def fields_struct_index
+      struct_type.struct_element_types.size - 1
+    end
+
     def field_index(name)
-      offset = struct_type.struct_element_types.size - @fields.size
-      @fields.index { |n, _| n == name }.not_nil! + offset
+      @fields.index { |n, _| n == name }.not_nil!
     end
 
     def each_gfunc

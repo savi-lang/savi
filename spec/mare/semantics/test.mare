@@ -19,9 +19,6 @@
 
 :actor Main
   :new (env)
-    struct = ContainerStruct(String).new("example")
-    Inspect.out(struct.value)
-
     test = MicroTest.new(env)
     test.print_line_break // TODO: move to MicroTest constructor and finalizer
 
