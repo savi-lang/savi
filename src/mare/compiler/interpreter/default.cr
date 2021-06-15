@@ -5,7 +5,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
   def finished(context)
   end
 
-  def keywords : Array(String); %w{import source alias actor class trait numeric enum primitive ffi} end
+  def keywords : Array(String); %w{import source alias actor class struct trait numeric enum primitive ffi} end
 
   @@declare_import = Witness.new([
     {
@@ -56,7 +56,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
     {
       "kind" => "keyword",
       "name" => "keyword",
-      "value" => "actor|class|trait|numeric|enum|primitive|ffi",
+      "value" => "actor|class|struct|trait|numeric|enum|primitive|ffi",
     },
     {
       "kind" => "keyword",
@@ -85,6 +85,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         case keyword.value
         when "actor"     then "tag"
         when "class"     then "ref"
+        when "struct"    then "ref"
         when "trait"     then "ref"
         when "numeric"   then "val"
         when "enum"      then "val"
@@ -123,20 +124,28 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
       t.type.add_tag(:allocated)
     when "class"
       t.type.add_tag(:allocated)
-      t.type.add_tag(:no_desc) if t.type.ident.value == "CPointer" # TODO: less hacky and special-cased for this
+      t.type.add_tag(:simple_value) if t.type.ident.value == "CPointer" # TODO: less hacky and special-cased for this
+    when "struct"
+      t.type.add_tag(:pass_by_value)
+      t.type.add_tag(:no_field_reassign)
     when "trait"
       t.type.add_tag(:abstract)
       t.type.add_tag(:allocated)
     when "numeric"
+      t.type.add_tag(:pass_by_value)
+      t.type.add_tag(:simple_value)
       t.type.add_tag(:numeric)
-      t.type.add_tag(:no_desc)
     when "enum"
+      t.type.add_tag(:pass_by_value)
+      t.type.add_tag(:simple_value)
       t.type.add_tag(:numeric)
-      t.type.add_tag(:no_desc)
       t.type.add_tag(:enum)
     when "primitive"
+      t.type.add_tag(:singleton)
       t.type.add_tag(:ignores_cap)
     when "ffi"
+      t.type.add_tag(:singleton)
+      t.type.add_tag(:ignores_cap)
       t.type.add_tag(:private)
     else
     end
@@ -539,10 +548,10 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
 
         data["cap"] ||=
           begin
-            if @type.has_tag?(:allocated) || @type.has_tag?(:no_desc)
-              AST::Identifier.new("box").from(data["keyword"])
-            else
+            if @type.has_tag?(:ignores_cap)
               AST::Identifier.new("non").from(data["keyword"])
+            else
+              AST::Identifier.new("box").from(data["keyword"])
             end
           end
 
@@ -595,8 +604,8 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
           decl.body,
         ).tap(&.add_tag(:async))
       when "new"
-        raise "stateless types can't have constructors" \
-          unless @type.has_tag?(:allocated) || @type.has_tag?(:abstract)
+        Error.at decl.head.first, "stateless types can't have constructors" \
+          if @type.has_tag?(:simple_value) || @type.has_tag?(:ignores_cap)
 
         data = @@declare_new.run(decl)
 
@@ -639,10 +648,15 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
           decl.body,
         ).tap(&.add_tag(:constant))
       when "let", "var"
-        raise "stateless types can't have properties" \
-          unless @type.has_tag?(:allocated) || @type.has_tag?(:abstract)
+        Error.at decl.head.first, "stateless types can't have properties" \
+          if @type.has_tag?(:simple_value) || @type.has_tag?(:ignores_cap)
 
         is_let = decl.keyword == "let"
+
+        Error.at decl.head.first,
+          "This type can't have any reassignable fields; use `let` here" \
+          if !is_let && @type.has_tag?(:no_field_reassign)
+
         data = (is_let ? @@declare_let : @@declare_var).run(decl)
         ident = data["ident"].as(AST::Identifier)
         ret = data["ret"]?.as(AST::Term?)

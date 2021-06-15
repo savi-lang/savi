@@ -38,8 +38,8 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       !is_abstract?(ctx)
     end
 
-    def is_value?
-      is_tuple? || (singular? && single!.has_tag?(:no_desc))
+    def is_simple_value?(ctx)
+      singular? && single_def!(ctx).is_simple_value?(ctx)
     end
 
     def singular?
@@ -106,14 +106,14 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     end
 
     def is_not_pointer?(ctx)
-      !([:object_ptr, :struct_ptr].includes?(llvm_use_type(ctx)))
+      !([:struct_ptr_opaque, :struct_ptr].includes?(llvm_use_type(ctx)))
     end
 
     def llvm_use_type(ctx) : Symbol
       if is_tuple?
         :tuple
       elsif !singular?
-        :object_ptr
+        :struct_ptr_opaque
       else
         defn = single!.defn(ctx)
         if defn.has_tag?(:numeric)
@@ -135,6 +135,8 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
             else raise NotImplementedError.new(defn.inspect)
             end
           end
+        elsif !defn.has_tag?(:allocated) && !defn.has_tag?(:singleton)
+          :struct_value
         else
           # TODO: don't special-case this in the compiler?
           case defn.ident.value
@@ -434,8 +436,12 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       .gsub("(", "[").gsub(")", "]") # LLDB doesn't handle parens very well...
     end
 
-    def has_desc?(ctx)
-      !@reified.defn(ctx).has_tag?(:no_desc)
+    def is_pass_by_value?(ctx)
+      @reified.defn(ctx).has_tag?(:pass_by_value)
+    end
+
+    def is_simple_value?(ctx)
+      @reified.defn(ctx).has_tag?(:simple_value)
     end
 
     def has_allocation?(ctx)
@@ -443,8 +449,7 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
     end
 
     def has_state?(ctx)
-      @reified.defn(ctx).has_tag?(:allocated) ||
-      @reified.defn(ctx).has_tag?(:numeric)
+      !@reified.defn(ctx).has_tag?(:ignores_cap)
     end
 
     def has_actor_pad?(ctx)

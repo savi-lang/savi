@@ -13,8 +13,15 @@
   :var value A
   :new (@value)
 
+:struct ContainerStruct(A)
+  :let value A
+  :new (@value)
+
 :actor Main
   :new (env)
+    struct = ContainerStruct(String).new("example")
+    Inspect.out(struct.value)
+
     test = MicroTest.new(env)
     test.print_line_break // TODO: move to MicroTest constructor and finalizer
 
@@ -185,6 +192,32 @@
     container_string = Container(String).new("original")
     test["<<= result 2"].pass = (container_string.value <<= "new") == "original"
     test["<<= effect 2"].pass = container_string.value == "new"
+
+    test["identity_digest_of string literal =="].pass =
+      (identity_digest_of "example") ==
+      (identity_digest_of "example")
+    test["identity_digest_of string literal !="].pass =
+      (identity_digest_of "example") !=
+      (identity_digest_of "differs")
+
+    class_instance_a = Container(String).new("example")
+    class_instance_b = Container(String).new("example")
+    test["identity_digest_of class !="].pass =
+      (identity_digest_of class_instance_a) !=
+      (identity_digest_of class_instance_b)
+    test["identity_digest_of class =="].pass =
+      (identity_digest_of class_instance_a) ==
+      (identity_digest_of class_instance_a)
+
+    struct_instance_a = ContainerStruct(String).new("example")
+    struct_instance_b = ContainerStruct(String).new("example")
+    struct_instance_c = ContainerStruct(String).new("differs")
+    test["identity_digest_of struct =="].pass =
+      (identity_digest_of struct_instance_a) ==
+      (identity_digest_of struct_instance_b)
+    test["identity_digest_of struct !="].pass =
+      (identity_digest_of struct_instance_a) !=
+      (identity_digest_of struct_instance_c)
 
     test.print_line_break // TODO: move to MicroTest constructor and finalizer
 

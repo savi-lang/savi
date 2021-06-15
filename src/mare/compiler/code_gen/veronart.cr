@@ -238,10 +238,10 @@ class Mare::Compiler::CodeGen::VeronaRT
     abi_size = g.abi_size_of(gtype.struct_type)
 
     trace_fn =
-      if type_def.has_desc?(g.ctx)
-        g.mod.functions.add("#{type_def.llvm_name}.TRACE".gsub(/\W/, "_"), @trace_fn)
-      else
+      if type_def.is_simple_value?(g.ctx)
         @trace_fn_ptr.null
+      else
+        g.mod.functions.add("#{type_def.llvm_name}.TRACE".gsub(/\W/, "_"), @trace_fn)
       end
 
     trace_possibly_iso_fn =
@@ -413,8 +413,9 @@ class Mare::Compiler::CodeGen::VeronaRT
     raise NotImplementedError.new(type_ref.show_type) unless type_ref.singular?
     type_def = type_ref.single_def!(g.ctx)
 
-    # We don't handle lifetime of non-allocated types or cpointers.
-    return :bare if !type_def.has_allocation?(g.ctx) || type_def.is_cpointer?(g.ctx)
+    # We don't handle lifetime of simple value types.
+    return :simple_value if type_def.is_simple_value?(g.ctx)
+    return :no_allocation if !type_def.has_allocation?(g.ctx)
 
     case type_ref.cap_only.cap_value
     when Infer::Cap::ISO then :iso
@@ -488,7 +489,7 @@ class Mare::Compiler::CodeGen::VeronaRT
       when Lifetime::PassAsArgument
         kind = cast_kind_of(g, g.type_of(expr), expr.pos)
         case kind
-        when :bare
+        when :simple_value, :no_allocation
           # Do nothing - we don't track lifetime of bare values.
         when :val
           # Don't acquire String'val - right now these are all compile-time
@@ -505,7 +506,7 @@ class Mare::Compiler::CodeGen::VeronaRT
       when Lifetime::ReleaseFromScope
         kind = cast_kind_of(g, g.type_of(info.local.defn), info.local.defn.pos)
         case kind
-        when :bare
+        when :simple_value, :no_allocation
           # Do nothing - we don't track lifetime of bare values.
         when :ref
           # We do nothing - ref objects are traced only from their iso root,

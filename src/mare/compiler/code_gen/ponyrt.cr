@@ -274,11 +274,17 @@ class Mare::Compiler::CodeGen::PonyRT
   end
 
   def cast_kind_of(g : CodeGen, type_ref : Reach::Ref, pos : Source::Pos) : Symbol
-    if type_ref.singular? \
-    && (type_ref.is_numeric?(g.ctx) || type_ref.single_def!(g.ctx).is_cpointer?(g.ctx))
-      :bare
+    if type_ref.singular?
+      type_def = type_ref.single_def!(g.ctx)
+      if type_def.is_simple_value?(g.ctx)
+        :simple_value
+      elsif type_def.is_pass_by_value?(g.ctx)
+        :object_value
+      else
+        :object_pointer
+      end
     else
-      :object
+      :object_pointer
     end
   end
 
@@ -292,14 +298,27 @@ class Mare::Compiler::CodeGen::PonyRT
     from_expr : AST::Node
    ) : LLVM::Value
     case {from_kind, to_kind}
-    when {:bare, :object}
-      # When going from a bare machine value to an object,
-      # we pack the value into a temporary object wrapper.
+
+    # When going from a bare machine value to an object,
+    # we pack the value into a temporary object wrapper.
+    when {:simple_value, :object_pointer}
       g.gen_boxed(value, g.gtype_of(from_type), from_expr)
-    when {:object, :bare}
-      # When going from an object to a bare machine value,
-      # we unpack the value from within its temporary object wrapper.
+
+    # When going from an object to a bare machine value,
+    # we unpack the value from within its temporary object wrapper.
+    when {:object_pointer, :simple_value}
       g.gen_unboxed(value, g.gtype_of(to_type))
+
+    # When going from an object value to an object pointer,
+    # allocate a pointer to copy the value, to carry a copy of it by reference.
+    when {:object_value, :object_pointer}
+      g.gen_object_value_to_pointer(value, g.gtype_of(from_type), from_expr)
+
+    # When going from an object to a bare machine value,
+    # deference the pointer and copy the value out of it.
+    when {:object_pointer, :object_value}
+      g.gen_object_pointer_to_value(value, g.gtype_of(to_type))
+
     else
       raise NotImplementedError.new({from_kind, to_kind})
     end
@@ -429,10 +448,10 @@ class Mare::Compiler::CodeGen::PonyRT
       end
 
     trace_fn =
-      if type_def.has_desc?(g.ctx) && gtype.fields.any?(&.last.trace_needed?(g.ctx))
-        g.mod.functions.add("#{type_def.llvm_name}.TRACE", @trace_fn)
-      else
+      if type_def.is_simple_value?(g.ctx) || !gtype.fields.any?(&.last.trace_needed?(g.ctx))
         @trace_fn_ptr.null
+      else
+        g.mod.functions.add("#{type_def.llvm_name}.TRACE", @trace_fn)
       end
 
     # Generate a bitmap of one or more integers in which each bit represents
@@ -990,9 +1009,9 @@ class Mare::Compiler::CodeGen::PonyRT
     elsif src_type.singular?
       src_type_def = src_type.single_def!(g.ctx)
 
-      # We can't trace it if it doesn't have a descriptor,
+      # We can't trace it if it's a simple value (with no type descriptor),
       # and we shouldn't trace it if it isn't runtime-allocated.
-      return unless src_type_def.has_desc?(g.ctx) && src_type_def.has_allocation?(g.ctx)
+      return if src_type_def.is_simple_value?(g.ctx) || !src_type_def.has_allocation?(g.ctx)
 
       # Generate code to check if this value is a subtype of this at runtime.
       is_subtype = g.gen_check_subtype_at_runtime(dst, src_type, true)
