@@ -38,6 +38,14 @@ We also have [a vim/nvim extension](./tooling/coc-nvim) as well.
 
 Finally, if you want to contribute to Mare, read on through the next section to learn about some of the basic development commands.
 
+## Contributing
+
+Looking for ways to help? [Here's a link that shows issue tickets filtered by those that should be ready to work on](https://github.com/jemc/mare/issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc+-label%3ABLOCKED+-label%3A%22complexity+4%3A+scary%22).
+
+You can also filter by complexity label to try to find something that's the right level of challenge and time commitment for you.
+
+If you're a new contributor looking for some guidance, please reach out to me (*Joe Eli McIlvain*) in a DM [in this chat room](https://ponylang.zulipchat.com/) to introduce yourself and even schedule pairing sessions where I can help you understand parts of the compiler or language that you're interested in learning more about.
+
 ## Developing
 
 To work on this project, you'll need `docker` and `make`. You may also want to have `lldb` for debugging.
