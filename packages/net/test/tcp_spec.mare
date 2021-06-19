@@ -37,7 +37,8 @@
         bytes val = @io.read_stream.extract_token
         @env.err.print("[Echoer] Received:")
         @env.err.print(bytes.as_string)
-        @io.write(bytes.clone)
+        @io.write_stream << bytes.clone // TODO: is clone still needed?
+        @io.flush // TODO: should we flush automatically on close below?
         @io.close
       )
     | IOActionClosed |
@@ -65,7 +66,8 @@
     case action == (
     | IOActionOpened |
       @env.err.print("[EchoClient] Connected")
-      @io.write(b"Hello, World!")
+      @io.write_stream << b"Hello, World!"
+      @io.flush
 
     | IOActionOpenFailed |
       @env.err.print("[EchoClient] Failed to connect:")

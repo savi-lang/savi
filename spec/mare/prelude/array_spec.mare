@@ -128,6 +128,20 @@
     @assert = ["foo", "bar", "baz"].includes("foo")
     @assert = ["foo", "bar", "baz"].includes("f").not
 
+  :it "replaces via a yield block the element at the given index, if it exists"
+    array Array(String) = ["foo", "bar", "baz"]
+
+    @assert = True == array.try_replace_at(1) -> (element |
+      @assert = element == "bar"
+      "BAR"
+    )
+    @assert = False == array.try_replace_at(3) -> (element |
+      @assert = False // assert that this block should never run
+      "NOPE"
+    )
+
+    @assert = array == ["foo", "BAR", "baz"]
+
   :it "returns True if the given element is pointer-identical to one in the array"
     opaque_1 = ArraySpecOpaqueObject.new
     opaque_2 = ArraySpecOpaqueObject.new

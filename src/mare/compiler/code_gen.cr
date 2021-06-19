@@ -808,7 +808,7 @@ class Mare::Compiler::CodeGen
 
     @builder.ret \
       case gfunc.func.ident.value
-      when "null", "_null"
+      when "_null", "null"
         llvm_type.null
       when "_alloc"
         llvm_func.add_attribute(LLVM::Attribute::NoAlias, LLVM::AttributeIndex::ReturnIndex)
@@ -822,7 +822,7 @@ class Mare::Compiler::CodeGen
         @runtime.gen_intrinsic_cpointer_realloc(self, params, llvm_type, elem_size_value)
       when "_unsafe"
         params[0]
-      when "_offset"
+      when "_offset", "offset"
         @builder.bit_cast(
           @builder.inbounds_gep(
             @builder.bit_cast(params[0], elem_llvm_type.pointer),

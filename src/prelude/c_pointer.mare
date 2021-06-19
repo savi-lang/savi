@@ -54,6 +54,18 @@
   :: that bounds into memory owned by other pointers.
   :fun box _offset(index USize) @'ref: compiler intrinsic
 
+  :: Get a pointer that points to a subset of this original pointer's memory,
+  :: starting at the given element index from the current pointer's address,
+  :: as a basic building block for operations that begin starting at an offset.
+  ::
+  :: Note that this is element index rather than byte offset, meaning that
+  :: the element type's memory size is taken into account in the calculation.
+  ::
+  :: A tag reference is returned because it wouldn't be safe to allow the caller
+  :: to dereference arbitrary memory from an unchecked index argument.
+  :: A caller in the prelude package can use the unsafe _offset variant instead.
+  :fun tag offset(index USize) @'tag: compiler intrinsic
+
   :: Return an alias of the element at the given index.
   ::
   :: The caller is expected to only do this for in-bounds indexes.

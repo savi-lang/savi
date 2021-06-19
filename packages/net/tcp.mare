@@ -1,5 +1,5 @@
 :import "os/error" // TODO: can this be removed?
-:import "bytes" (ByteStreamReader)
+:import "bytes" (ByteStreamReader, ByteStreamChunkedWriter)
 :import "io"
 
 :class TCPConnectionEngine
@@ -7,7 +7,8 @@
   :var io: IOCoreEngine.new
   :var listen (TCPListener | None): None
   :var connect_error OSError: OSErrorNone
-  :let read_stream ByteStreamReader: ByteStreamReader.new
+  :let read_stream: ByteStreamReader.new
+  :let write_stream: ByteStreamChunkedWriter.new
 
   :fun non connect(
     // TODO: TCPConnectionAuth, rather than ambient authority.
@@ -43,7 +44,7 @@
       | IOActionClosed |
         try @listen.as!(TCPListener)._conn_closed
 
-      // TODO: complete writes, pending writes logic from Pony
+      // TODO: windows complete writes, flush-after-mute (pending writes logic from Pony)
       // | IOActionWrite |
       //   ...
       )
@@ -55,11 +56,8 @@
     @io.close
     @
 
-  :: Write a single sequence of bytes.
-  :: WARNING: Data will be silently discarded if the socket isn't connected.
-  :fun ref write(data)
-    @io.write(data)
-    @
+  :fun ref flush
+    @write_stream.flush(@io)
 
   :fun ref pending_reads
     :yields USize for None

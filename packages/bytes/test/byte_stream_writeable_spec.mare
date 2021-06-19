@@ -1,0 +1,19 @@
+:import "spec"
+
+:class ByteStreamWriteableSpec
+  :is Spec
+  :const describes: "ByteStreamWriteable"
+
+  // Although intended to be an interface for more complex implementations,
+  // the fact that ByteStreamWriteable is compatible with a plain Bytes'ref
+  // is very convenient for testing code that uses a ByteStreamWriteable,
+  // because one can just inject a mutable Bytes instance and read it back out.
+  :it "is compatible as an interface with a plain Bytes'ref"
+    write_stream ByteStreamWriteable = Bytes.new
+    write_stream << b"Hello" << b", " << b"World" << b"!"
+
+    @assert = try (
+      write_stream.as!(Bytes'ref) == b"Hello, World!"
+    |
+      False
+    )

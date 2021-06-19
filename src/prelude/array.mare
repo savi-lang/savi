@@ -149,6 +149,18 @@
     )
     equal_so_far
 
+  :fun ref try_replace_at(index) Bool
+    :yields A for A
+    if (@size <= index) (
+      False
+    |
+      // TODO: one liner like this should compile okay, but doesn't:
+      // @_ptr._assign_at(index, yield @_ptr._get_at_no_alias(index))
+      new_value = yield @_ptr._get_at_no_alias(index)
+      @_ptr._assign_at(index, --new_value)
+      True
+    )
+
   :fun includes(expected A)
     is_found = False
     index USize = 0
@@ -162,13 +174,13 @@
     )
     is_found
 
-  :fun each(from USize = 0, to USize = USize.max_value)
+  :fun each(from USize = 0, to USize = USize.max_value, stride USize = 1)
     to = @_size.min(to)
     if (from < to) (
       index = from
       while (index < @_size.min(to)) (
         yield @_ptr._get_at(index)
-        index += 1
+        index += stride
       )
     )
     None
@@ -197,29 +209,40 @@
     )
     None
 
-  :fun each_until(from USize = 0, to USize = -1) // TODO USize.max_value
+  :fun each_until(from USize = 0, to = USize.max_value, stride USize = 1)
     :yields for Bool
     to = @_size.min(to)
     early_stop = False
-    if (from < to) (
-      index = from
-      while (index < @_size.min(to) && early_stop.not) (
-        early_stop = yield @_ptr._get_at(index)
-        index += 1
-      )
+    index = from
+    while (index < to && early_stop.not) (
+      early_stop = yield @_ptr._get_at(index)
+      index += stride
     )
     early_stop
 
-  :fun find!
+  :fun find_index!(from USize = 0, to = USize.max_value, stride USize = 1)
     :yields for Bool
-    index USize = 0
+    to = @_size.min(to)
+    index = from
+    early_stop = False
+    while (index < to && early_stop.not) (
+      element = @_ptr._get_at(index)
+      early_stop = yield element
+      index += stride // TODO: use early return to avoid later index subtraction
+    )
+    if early_stop (index - stride | error!)
+
+  :fun find!(from USize = 0, to = USize.max_value, stride USize = 1)
+    :yields for Bool
+    to = @_size.min(to)
+    index = from
     found ((@->A)'aliased | None) = None
     early_stop = False
-    while (index < @_size && early_stop.not) (
+    while (index < to && early_stop.not) (
       element = @_ptr._get_at(index)
       early_stop = yield element
       if early_stop (found = element) // TODO: use early return to avoid later type match
-      index += 1
+      index += stride
     )
     if early_stop (found.not!(None) | error!)
 
