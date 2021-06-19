@@ -8,7 +8,7 @@
 :: placed in memory in a platform-dependent order because Windows and POSIX
 :: expect their writev struct elements to be in an opposite order.
 :trait ByteStreamChunkedSink
-  :fun box is_writeable Bool
+  :fun box is_writable Bool
   :fun ref writev_windows!(data_pairs Array(CPointer(U8)), offset USize) None
   :fun ref writev_posix!(data_pairs Array(CPointer(U8)), offset USize) USize
   :fun non writev_posix_max_chunks USize
@@ -20,7 +20,7 @@
 :: but its up to the caller to determine when to flush, based on whatever
 :: performance tuning and/or heuristics deemed appropriate for the application.
 :class ByteStreamChunkedWriter
-  :is ByteStreamWriteable
+  :is ByteStreamWritable
 
   :let _data_pairs Array(CPointer(U8)): []
   :var _total_size USize: 0
@@ -61,12 +61,12 @@
   :: If all data was successfully flushed into the target, it returns True.
   :: Otherwise, some data was not written and this must be called again later.
   ::
-  :: If the given target is not in a writeable state when calling this method,
+  :: If the given target is not in a writable state when calling this method,
   :: then no data will be written and it was useless to make this call.
   :fun ref flush(target ByteStreamChunkedSink) Bool
     case (
     | @_total_size == 0       | True  // nothing left to flush
-    | target.is_writeable.not | False // can't flush right now
+    | target.is_writable.not | False // can't flush right now
     | Platform.windows        | @_flush_windows(target)
     |                           @_flush_posix(target)
     )

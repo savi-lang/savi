@@ -15,7 +15,7 @@
 
   :fun is_disposable(flags U32): flags == 0
   :fun is_readable(flags U32): flags.bit_and(@read) != 0
-  :fun is_writeable(flags U32): flags.bit_and(@write) != 0
+  :fun is_writable(flags U32): flags.bit_and(@write) != 0
   :fun is_oneshotable(flags U32): flags.bit_and(@oneshot) != 0
 
   :fun create(owner, fd, flags, nsec, noisy)
@@ -39,7 +39,7 @@
   :fun get_disposable(event)
     LibPonyAsioEvent.pony_asio_event_get_disposable(event)
 
-  :fun set_writeable(event, value)
+  :fun set_writable(event, value)
     LibPonyAsioEvent.pony_asio_event_set_writeable(event, value)
 
   :fun set_readable(event, value)

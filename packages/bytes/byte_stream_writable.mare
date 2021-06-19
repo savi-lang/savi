@@ -3,5 +3,5 @@
 ::
 :: The `<<` method is intended to return the same logical stream,
 :: so that invocations of this method can be easily chained together.
-:trait ByteStreamWriteable
+:trait ByteStreamWritable
   :fun ref "<<"(chunk Bytes'val) @

@@ -6,5 +6,5 @@
     Specs.run(env, [
       SpecRun(ByteStreamReaderSpec).new(env)
       SpecRun(ByteStreamChunkedReaderSpec).new(env)
-      SpecRun(ByteStreamWriteableSpec).new(env)
+      SpecRun(ByteStreamWritableSpec).new(env)
     ])

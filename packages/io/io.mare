@@ -44,7 +44,7 @@
   :var _pending_connect_count U32: 0
   :var _has_closed Bool: False
   :var _is_readable Bool: False
-  :var _is_writeable Bool: False
+  :var _is_writable Bool: False
   :var _is_send_shutdown Bool: False
   :var _is_recv_shutdown Bool: False
 
@@ -54,7 +54,7 @@
   :fun has_closed: @_has_closed
 
   :fun is_readable: @_is_readable
-  :fun is_writeable: @_is_writeable
+  :fun is_writable: @_is_writable
 
   :fun os_error: @_os_error
 
@@ -84,7 +84,7 @@
     @_fd = -1
     @_has_closed = True
     @_is_readable = False
-    @_is_writeable = False
+    @_is_writable = False
     @_is_send_shutdown = True
     @_is_recv_shutdown = True
 
@@ -141,7 +141,7 @@
     // Adopt the event.
     @_event = event
     @_fd = fd
-    @_is_writeable = True // TODO: Remove these lines?
+    @_is_writable = True // TODO: Remove these lines?
     @_is_readable = True // TODO: Remove these lines?
     @
 
@@ -163,7 +163,7 @@
       @_event_notify_continue(flags, arg) -> (action | yield action)
 
     // If this engine is waiting to open, try adopting this new event to open.
-    | @is_waiting_to_open && AsioEvent.is_writeable(flags) |
+    | @is_waiting_to_open && AsioEvent.is_writable(flags) |
       try (
         @_pending_connect_count -= 1
         @_adopt_event!(event)
@@ -189,8 +189,8 @@
   :: Handle incoming events for the event handle that we already own.
   :fun ref _event_notify_continue(flags U32, arg U32)
     :yields IOAction for None
-    if AsioEvent.is_writeable(flags) (
-      @_is_writeable = True
+    if AsioEvent.is_writable(flags) (
+      @_is_writable = True
       // TODO: complete writes, pending writes logic from Pony
       yield IOActionWrite
     )
@@ -257,9 +257,9 @@
       if Platform.windows.not (
         AsioEvent.unsubscribe(@_event)
         @_is_readable = False
-        @_is_writeable = False
+        @_is_writable = False
         AsioEvent.set_readable(@_event, False)
-        AsioEvent.set_writeable(@_event, False)
+        AsioEvent.set_writable(@_event, False)
       )
 
       LibPonyOs.pony_os_socket_close(@_fd)
