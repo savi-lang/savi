@@ -40,7 +40,12 @@
       @io.pending_reads -> (data |
         try (
           request = @reader.read!(@io.read_stream)
-          @io.write_stream << b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"
+
+          response = ResponseBuilder.new(@io.write_stream)
+          response.status_ok
+          response.header("Content-Length", "0")
+          response.finish
+
           @io.flush
         )
       )
