@@ -1,9 +1,14 @@
 :primitive _MapEmpty
 :primitive _MapDeleted
 
-:class _KV(K, V) // TODO: use a value type or tuple literal instead
-  :var key K
-  :var value V
+// We use struct here because it's more memory efficient - the _KV instances
+// are allocated inline within the contiguous buffer underlying the Array,
+// instead of being separately allocated and garbage-collected objects.
+// The memory usage is just the same as if we had an Array(K) and Array(V)
+// of the same element count, occupying contiguous interleaved memory.
+:struct _KV(K, V)
+  :let key K
+  :let value V
   :new (@key, @value)
 
 :alias MapIs(K, V): Map(K, V, HashIs(K))
@@ -76,7 +81,7 @@
       entry = @_array[index]!
 
       case entry <: (
-      | _KV(K, V) | entry.value = --value
+      | _KV(K, V) | @_array[index]! = _KV(K, V).new(--key, --value)
       |
         @_array[index]! = _KV(K, V).new(--key, --value)
         @_size += 1
