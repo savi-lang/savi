@@ -31,6 +31,7 @@ class Mare::Compiler
     when "refer_type"       then :refer_type
     when "populate"         then :populate
     when "lambda"           then :lambda
+    when "flow"             then :flow
     when "refer"            then :refer
     when "classify"         then :classify
     when "jumps"            then :jumps
@@ -71,6 +72,7 @@ class Mare::Compiler
       when :refer_type       then ctx.run(ctx.refer_type)
       when :populate         then ctx.run_copy_on_mutate(ctx.populate)
       when :lambda           then ctx.run_copy_on_mutate(Lambda)
+      when :flow             then ctx.run(ctx.flow)
       when :refer            then ctx.run(ctx.refer)
       when :classify         then ctx.run(ctx.classify)
       when :jumps            then ctx.run(ctx.jumps)
@@ -116,6 +118,7 @@ class Mare::Compiler
     when :refer_type then [:sugar, :macros, :namespace]
     when :populate then [:sugar, :macros, :refer_type]
     when :lambda then [:sugar, :macros]
+    when :flow then [:lambda, :sugar, :macros]
     when :classify then [:refer_type, :lambda, :sugar, :macros]
     when :jumps then [:classify]
     when :refer then [:lambda, :populate, :sugar, :jumps, :macros, :refer_type, :namespace]

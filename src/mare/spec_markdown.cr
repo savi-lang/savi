@@ -148,13 +148,30 @@ class Mare::SpecMarkdown
           AST::Gather.annotated_nodes(ctx, func.ast).each { |node|
             annotations = node.annotations.not_nil!
             string = annotations.map(&.value).join("\n")
-            match = string.match(/\s*(\w+)\s*=>\s*(.+)/m)
+            match = string.match(/\s*([\w.]+)\s*=>\s*(.+)/m)
             next unless match
 
             kind = match[1]
             expected = match[2]
 
             case kind
+            when "flow.block", "flow.exit_block"
+              expected_set = expected.split(/\s+OR\s+/)
+              actual =
+                case kind
+                when "flow.block" then ctx.flow[f_link][node].show
+                when "flow.exit_block" then ctx.flow[f_link].exit_block.show
+                else raise NotImplementedError.new(kind)
+                end
+
+              if !expected_set.includes?(actual)
+                describe_set = expected_set.join("' or '")
+                errors << {example, Error.build(annotations.first.pos,
+                  "This annotation expects a flow block of '#{describe_set}'", [
+                    {node.pos, "but it actually showed as '#{actual}'"},
+                  ]
+                )}
+              end
             when "type"
               rt = Compiler::Infer::ReifiedType.new(t_link)
               cap = f_link.resolve(ctx).cap.value

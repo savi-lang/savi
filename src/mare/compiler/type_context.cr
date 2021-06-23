@@ -11,6 +11,8 @@ require "./pass/analyze"
 # This pass keeps state at the per-type and per-function level.
 # This pass produces output state at the per-type and per-function level.
 #
+# TODO: Remove this pass or make it based on the Flow pass, because that pass
+# does much of the same work as this pass, though in a different way.
 module Mare::Compiler::TypeContext
   struct Layer
     @parent : StructRef(Layer)?
