@@ -14,6 +14,7 @@ class Mare::Compiler::Context
   getter inventory
   getter jumps
   getter lifetime
+  getter local
   getter namespace
   getter paint
   getter populate
@@ -54,6 +55,7 @@ class Mare::Compiler::Context
     @inventory = Inventory::Pass.new
     @jumps = Jumps::Pass.new
     @lifetime = Lifetime.new
+    @local = Local::Pass.new
     @namespace = Namespace.new
     @paint = Paint.new
     @populate = Populate.new

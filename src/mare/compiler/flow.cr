@@ -21,6 +21,18 @@ require "./pass/analyze"
 # This pass produces output state at the per-function level.
 #
 module Mare::Compiler::Flow
+  struct Location
+    getter block_index : Int32
+    getter sequence_number : Int32
+
+    def initialize(@block_index, @sequence_number)
+    end
+
+    def show
+      "(#{@block_index}, #{@sequence_number})"
+    end
+  end
+
   struct Block
     getter index : Int32
     getter containing_node : AST::Node
@@ -39,10 +51,23 @@ module Mare::Compiler::Flow
       !unreachable?
     end
 
+    def no_predecessors?; !any_predecessors?; end
+    def any_predecessors?
+      @pre.any? ||
+      @pre_true.any? ||
+      @pre_false.any?
+    end
+
     def any_predecessors_reachable?
       @pre.any?(&.reachable?) ||
       @pre_true.any?(&.reachable?) ||
       @pre_false.any?(&.reachable?)
+    end
+
+    def each_predecessor(&block : Block -> _)
+      @pre.each(&block)
+      @pre_true.each(&block)
+      @pre_false.each(&block)
     end
 
     # These functions are used for easily visualizing and testing.
@@ -83,21 +108,83 @@ module Mare::Compiler::Flow
   struct Analysis
     def initialize
       @blocks = [] of Block
-      @non_entry_nodes = {} of AST::Node => Int32
+      @locations = {} of AST::Node => Location
     end
 
-    def block_index(node : AST::Node) : Int32
-      @non_entry_nodes.fetch(node, 0)
+    def location_of?(node : AST::Node) : Location?
+      @locations[node]?
     end
-    def [](index : Int32) : Block
+    def block_at(index : Int32) : Block
       @blocks[index]
     end
-    def [](node : AST::Node) : Block
-      self[block_index(node)]
+    def block_at(node : AST::Node) : Block
+      block_at(@locations[node].block_index)
     end
 
-    def entry_block; @blocks[0]; end
-    def exit_block; @blocks[1]; end
+    ENTRY_BLOCK_INDEX = 0
+    EXIT_BLOCK_INDEX = 1
+    def entry_block; @blocks[ENTRY_BLOCK_INDEX]; end
+    def exit_block; @blocks[EXIT_BLOCK_INDEX]; end
+
+    def each_possible_order_of(
+      locations : Array(Location),
+      &yield_block : Array(Location) -> _
+    )
+      # Get each possible unique order of the blocks for these locations,
+      # then yield the list of locations with those in the same block
+      # ordered according to their sequence number, which is guaranteed to
+      # be in the correct relative order for locations in the same block
+      # (because within a block, execution has one possible sequential order).
+      query_indices = locations.map(&.block_index).uniq
+      all_possible_unique_orders_of_blocks(query_indices).each { |block_indices|
+        result = [] of Location
+        block_indices.each { |block_index|
+          block_locations = locations.select(&.block_index.==(block_index))
+          result.concat(block_locations.sort_by(&.sequence_number))
+        }
+        yield_block.call(result)
+      }
+    end
+
+    private def all_possible_unique_orders_of_blocks(query : Array(Int32))
+      result = [] of Array(Int32)
+      each_possible_order_of_blocks(query, exit_block) { |list| result << list }
+      result.uniq!
+    end
+
+    private def each_possible_order_of_blocks(
+      query : Array(Int32),
+      block : Block,
+      crumbs = [] of Int32,
+      &yield_block : Array(Int32) -> _
+    )
+      # If we've come into a block with no predecessors, we're done.
+      # We reverse and filter to the relevant block indices for our result.
+      if block.no_predecessors?
+        yield_block.call(crumbs
+          .reverse_each
+          .select { |index| query.includes?(index) }
+          .to_a
+        )
+        return
+      end
+
+      # Otherwise, we need to recurse to every possible predecessor block
+      # of the current block under consideration. We catch every possible flow.
+      block.each_predecessor { |pre_block|
+        # Skip this predecessor block if we've already seen it twice.
+        # This avoids us doing infinite loops when encountering cyclical flows,
+        # such as legitimately looping control flow structures.
+        # However, we must visit at least twice to get the effect of checking
+        # that it's safe to visit that block more than once in downstream logic.
+        next if crumbs.count(&.==(pre_block.index)) > 1
+
+        # Recurse into this function again with the new block and added crumb.
+        each_possible_order_of_blocks(
+          query, pre_block, crumbs + [pre_block.index], &yield_block
+        )
+      }
+    end
 
     protected def new_block(containing_node)
       block = Block.new(@blocks.size, containing_node)
@@ -106,9 +193,7 @@ module Mare::Compiler::Flow
     end
 
     protected def observe_node(node : AST::Node, block : Block)
-      block_index = block.index
-
-      @non_entry_nodes[node] = block.index unless block.index == 0
+      @locations[node] = Location.new(block.index, @locations.size)
     end
 
     protected def propagate_unreachable_statuses
@@ -211,8 +296,8 @@ module Mare::Compiler::Flow
         deep_visit_try(ctx, node)
         false # don't visit children naturally; we visited them just above
       when AST::Relate
-        deep_visit_relate(ctx, node)
-        false # don't visit children naturally; we visited them just above
+        visited = deep_visit_relate(ctx, node)
+        !visited # only visit children if we didn't visit them already
       else
         true # visit the children of all other node types as normal
       end
@@ -328,12 +413,12 @@ module Mare::Compiler::Flow
       @current_block = after_block
     end
 
-    def deep_visit_relate(ctx, node : AST::Relate)
-      return unless node.op.value == "."
+    def deep_visit_relate(ctx, node : AST::Relate) : Bool
+      return false unless node.op.value == "."
 
       # In this part of the visitor, we deal with yield blocks at call sites.
       ident, args, yield_params, yield_block_node = AST::Extract.call(node)
-      return unless yield_block_node
+      return false unless yield_block_node
 
       # Before doing anything else, we need to visit the children which were
       # deferred from being visited, but do not actually require from us any
@@ -374,6 +459,8 @@ module Mare::Compiler::Flow
       after_block.comes_after(yield_exit_block)
 
       @current_block = after_block
+
+      true
     end
 
     def visit_jump(ctx, node : AST::Jump)

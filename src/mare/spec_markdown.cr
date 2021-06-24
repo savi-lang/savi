@@ -159,7 +159,7 @@ class Mare::SpecMarkdown
               expected_set = expected.split(/\s+OR\s+/)
               actual =
                 case kind
-                when "flow.block" then ctx.flow[f_link][node].show
+                when "flow.block" then ctx.flow[f_link].block_at(node).show
                 when "flow.exit_block" then ctx.flow[f_link].exit_block.show
                 else raise NotImplementedError.new(kind)
                 end
@@ -168,6 +168,17 @@ class Mare::SpecMarkdown
                 describe_set = expected_set.join("' or '")
                 errors << {example, Error.build(annotations.first.pos,
                   "This annotation expects a flow block of '#{describe_set}'", [
+                    {node.pos, "but it actually showed as '#{actual}'"},
+                  ]
+                )}
+              end
+            when "local.use_site"
+              node = node.terms.last if node.is_a?(AST::Group)
+              actual = ctx.local[f_link][node]?.try(&.show)
+
+              if actual != expected
+                errors << {example, Error.build(annotations.first.pos,
+                  "This annotation expects a use site of '#{expected}'", [
                     {node.pos, "but it actually showed as '#{actual}'"},
                   ]
                 )}

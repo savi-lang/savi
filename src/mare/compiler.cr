@@ -34,6 +34,7 @@ class Mare::Compiler
     when "flow"             then :flow
     when "refer"            then :refer
     when "classify"         then :classify
+    when "local"           then :local
     when "jumps"            then :jumps
     when "consumes"         then :consumes
     when "inventory"        then :inventory
@@ -75,6 +76,7 @@ class Mare::Compiler
       when :flow             then ctx.run(ctx.flow)
       when :refer            then ctx.run(ctx.refer)
       when :classify         then ctx.run(ctx.classify)
+      when :local           then ctx.run(ctx.local)
       when :jumps            then ctx.run(ctx.jumps)
       when :consumes         then ctx.run(ctx.consumes)
       when :inventory        then ctx.run(ctx.inventory)
@@ -120,6 +122,7 @@ class Mare::Compiler
     when :lambda then [:sugar, :macros]
     when :flow then [:lambda, :sugar, :macros]
     when :classify then [:refer_type, :lambda, :sugar, :macros]
+    when :local then [:classify, :flow, :refer_type, :lambda, :sugar, :macros]
     when :jumps then [:classify]
     when :refer then [:lambda, :populate, :sugar, :jumps, :macros, :refer_type, :namespace]
     when :consumes then [:jumps, :refer]
