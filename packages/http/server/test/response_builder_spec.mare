@@ -5,21 +5,13 @@
   :const describes: "ResponseBuilder"
 
   :it "builds 1xx responses"
-    bytes = Bytes.new
-    ResponseBuilder
-      .new(bytes)
-      .status_continue
-      .finish
+    @assert = @build -> (builder |
+      builder.status_continue
+    ) == b"HTTP/1.1 100 Continue\r\n\r\n"
 
-    @assert = bytes == b"HTTP/1.1 100 Continue\r\n\r\n"
-
-    bytes = Bytes.new
-    ResponseBuilder
-      .new(bytes)
-      .status_switching_protocols
-      .finish
-
-    @assert = bytes == b"HTTP/1.1 101 Switching Protocols\r\n\r\n"
+    @assert = @build -> (builder |
+      builder.status_switching_protocols
+    ) == b"HTTP/1.1 101 Switching Protocols\r\n\r\n"
 
   // TODO: finish these test cases.
   :it "builds 2xx responses"
@@ -28,24 +20,31 @@
   :it "builds 5xx responses"
 
   :it "can add headers"
-    bytes = Bytes.new
-    ResponseBuilder
-      .new(bytes)
-      .status_ok
-      .header("Content-Length", "0")
-      .finish
-
-    @assert = bytes == b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"
+    @assert = @build -> (builder |
+      builder
+        .status_ok
+        .header("Content-Length", "0")
+    ) == b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"
 
   :it "can write a body"
-    bytes = Bytes.new
-    ResponseBuilder
-      .new(bytes)
-      .status_ok
-      .header("Content-Type", "text/plain; charset=utf-8")
-      .write("Hello, World!")
-      .finish
-
     expected = b"HTTP/1.1 200 OK\r\nContent-Type: text/plain; charset=utf-8\r\n\r\nHello, World!\r\n"
 
-    @assert = bytes == expected
+    @assert = @build -> (builder |
+      builder
+        .status_ok
+        .header("Content-Type", "text/plain; charset=utf-8")
+        .write("Hello, World!")
+    ) == expected
+
+  :fun build Bytes'ref
+    :yields ResponseBuilder
+
+    bytes = Bytes.new
+    builder = ResponseBuilder.new(bytes) 
+
+    yield builder
+
+    builder.finish
+
+    bytes
+
