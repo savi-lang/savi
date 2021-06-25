@@ -503,3 +503,11 @@
       ._assign_at(0, number)
     @_size += U64.byte_width.usize
     @
+
+  :fun non join(others Array(Bytes), separator Bytes'val) Bytes'ref
+    res = Bytes.new
+    others.each_with_index -> (other, index |
+      res << other
+      if (index != other.size - 1) (res << separator)
+    )
+    res

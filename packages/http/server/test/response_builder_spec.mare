@@ -7,11 +7,17 @@
   :it "builds 1xx responses"
     @assert = @build -> (builder |
       builder.status_continue
-    ) == b"HTTP/1.1 100 Continue\r\n\r\n"
+    ) == Bytes.join([
+      b"HTTP/1.1 100 Continue"
+      b""
+    ], b"\r\n")
 
     @assert = @build -> (builder |
       builder.status_switching_protocols
-    ) == b"HTTP/1.1 101 Switching Protocols\r\n\r\n"
+    ) == Bytes.join([
+      b"HTTP/1.1 101 Switching Protocols"
+      b""
+    ], b"\r\n")
 
   // TODO: finish these test cases.
   :it "builds 2xx responses"
@@ -24,17 +30,24 @@
       builder
         .status_ok
         .header("Content-Length", "0")
-    ) == b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"
+    ) == Bytes.join([
+      b"HTTP/1.1 200 OK"
+      b"Content-Length: 0"
+      b""
+    ], b"\r\n")
 
   :it "can write a body"
-    expected = b"HTTP/1.1 200 OK\r\nContent-Type: text/plain; charset=utf-8\r\n\r\nHello, World!\r\n"
-
     @assert = @build -> (builder |
       builder
         .status_ok
         .header("Content-Type", "text/plain; charset=utf-8")
         .write("Hello, World!")
-    ) == expected
+    ) == Bytes.join([
+      b"HTTP/1.1 200 OK"
+      b"Content-Type: text/plain; charset=utf-8"
+      b""
+      b"Hello, World!"
+    ], b"\r\n")
 
   :fun build Bytes'ref
     :yields ResponseBuilder
