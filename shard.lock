@@ -1,14 +1,14 @@
-version: 1.0
+version: 2.0
 shards:
   clim:
-    github: at-grandpa/clim
+    git: https://github.com/at-grandpa/clim.git
     version: 0.13.0
 
   lsp:
-    github: jemc/crystal-lsp
-    commit: c1850e4fac8144fc8b895747a74d5cc6714ed1e7
+    git: https://github.com/mneumann/crystal-lsp.git
+    version: 0.1.0+git.commit.5cc20ca3597496b7ef19d0aef56ed5ed5d30c82c
 
   pegmatite:
-    github: jemc/crystal-pegmatite
-    commit: 601363cb2ce9c57ccc70967eb270005950f2f7b0
+    git: https://github.com/jemc/crystal-pegmatite.git
+    version: 0.2.1+git.commit.601363cb2ce9c57ccc70967eb270005950f2f7b0
 
