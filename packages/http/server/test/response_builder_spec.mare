@@ -5,29 +5,21 @@
   :const describes: "ResponseBuilder"
 
   :it "builds 1xx responses"
-    builder = ResponseBuilder.new(Bytes.new)
-    builder.status_continue
+    bytes = Bytes.new
+    ResponseBuilder
+      .new(bytes)
+      .status_continue
+      .finish
 
-    // If we wanted to use `@assert = builder.finish == b"..."
-    // we would nead to teach ByteStreamWritable how to use the `==` function:
-    //
-    // :fun "=="(other Bytes'box) Bool: @ == other
-    //
-    // Instead I'm stealing this try block form the RequestParser spec.
-    @assert = try (
-      builder.finish.as!(Bytes'box) == b"HTTP/1.1 100 Continue\r\n\r\n"
-    |
-      False
-    )
+    @assert = bytes == b"HTTP/1.1 100 Continue\r\n\r\n"
 
-    builder = ResponseBuilder.new(Bytes.new)
-    builder.status_switching_protocols
+    bytes = Bytes.new
+    ResponseBuilder
+      .new(bytes)
+      .status_switching_protocols
+      .finish
 
-    @assert = try (
-      builder.finish.as!(Bytes'box) == b"HTTP/1.1 101 Switching Protocols\r\n\r\n"
-    |
-      False
-    )
+    @assert = bytes == b"HTTP/1.1 101 Switching Protocols\r\n\r\n"
 
   // TODO: finish these test cases.
   :it "builds 2xx responses"
@@ -36,31 +28,24 @@
   :it "builds 5xx responses"
 
   :it "can add headers"
-    builder = ResponseBuilder.new(Bytes.new)
-    builder.status_ok
+    bytes = Bytes.new
+    ResponseBuilder
+      .new(bytes)
+      .status_ok
+      .header("Content-Length", "0")
+      .finish
 
-    builder.header("Content-Length", "0")
-
-    @assert = try (
-      builder.finish.as!(Bytes'box) == b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"
-    |
-      False
-    )
+    @assert = bytes == b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"
 
   :it "can write a body"
-    builder = ResponseBuilder.new(Bytes.new)
-    builder.status_ok
+    bytes = Bytes.new
+    ResponseBuilder
+      .new(bytes)
+      .status_ok
+      .header("Content-Type", "text/plain; charset=utf-8")
+      .write("Hello, World!")
+      .finish
 
-    builder.header("Content-Type", "text/plain; charset=utf-8")
-    builder.write("Hello, World!")
-
-    // TODO: Writing the expected response like makes it is hard to read.
-    // `Array#join` would help, but doesn't exist. Maybe try some of the tricks
-    // in packages/http/server/test/request_reader_spec.mare
     expected = b"HTTP/1.1 200 OK\r\nContent-Type: text/plain; charset=utf-8\r\n\r\nHello, World!\r\n"
 
-    @assert = try (
-      builder.finish.as!(Bytes'box) == expected
-    |
-      False
-    )
+    @assert = bytes == expected

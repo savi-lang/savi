@@ -42,9 +42,11 @@
           request = @reader.read!(@io.read_stream)
 
           response = ResponseBuilder.new(@io.write_stream)
-          response.status_ok
-          response.header("Content-Length", "0")
-          response.finish
+
+          response
+            .status_ok
+            .header("Content-Length", "0")
+            .finish
 
           @io.flush
         )
