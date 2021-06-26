@@ -181,7 +181,7 @@ module Mare::Compiler::Flow
 
         # Recurse into this function again with the new block and added crumb.
         each_possible_order_of_blocks(
-          query, pre_block, crumbs + [pre_block.index], &yield_block
+          pre_block, crumbs + [pre_block.index], &yield_block
         )
       }
     end

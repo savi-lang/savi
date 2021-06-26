@@ -419,10 +419,6 @@ class Mare::Compiler::Reach < Mare::AST::Visitor
       @reified
     end
 
-    def refer(ctx)
-      ctx.refer[@reified.link]
-    end
-
     def link
       @reified.link
     end
