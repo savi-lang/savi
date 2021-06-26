@@ -448,10 +448,12 @@ module Mare::Compiler::Infer
             case rt
             when ReifiedTypeAlias
               rt_defn = rt_defn.as(Program::TypeAlias)
-              ctx.infer_edge.run_for_type_alias(ctx, rt_defn, rt.link)
+              rt_link = rt.link.as(Program::TypeAlias::Link)
+              ctx.infer_edge.run_for_type_alias(ctx, rt_defn, rt_link)
             when ReifiedType
               rt_defn = rt_defn.as(Program::Type)
-              ctx.infer_edge.run_for_type(ctx, rt_defn , rt.link)
+              rt_link = rt.link.as(Program::Type::Link)
+              ctx.infer_edge.run_for_type(ctx, rt_defn , rt_link)
             else raise NotImplementedError.new(rt.class)
             end
 
