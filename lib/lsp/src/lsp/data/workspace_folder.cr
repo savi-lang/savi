@@ -2,14 +2,16 @@ require "json"
 
 module LSP::Data
   struct WorkspaceFolder
-    JSON.mapping({
-      # The associated URI for this workspace folder.
-      uri: {type: URI, converter: JSONUtil::URIString},
+    include JSON::Serializable
 
-      # The name of the workspace folder. Defaults to the
-      # uri's basename.
-      name: String,
-    })
+    # The associated URI for this workspace folder.
+    @[JSON::Field(converter: LSP::JSONUtil::URIString)]
+    property uri : URI
+
+    # The name of the workspace folder. Defaults to the
+    # uri's basename.
+    property name : String
+
     def initialize
       @uri = URI.new
       @name = ""

@@ -19,15 +19,20 @@ module LSP::Data
   # it is still required that the client provides text document synchronization
   # (e.g. open, changed and close notifications).
   struct ClientCapabilities
-    JSON.mapping({
-      workspace: {type: WorkspaceClientCapabilities, default: WorkspaceClientCapabilities.new},
-      text_document: {type: TextDocumentClientCapabilities, default: TextDocumentClientCapabilities.new, key: "textDocument"},
-      experimental: {type: JSON::Any, default: JSON::Any.new({} of String => JSON::Any)},
-    })
+    include JSON::Serializable
+
+    property workspace : WorkspaceClientCapabilities = WorkspaceClientCapabilities.new
+
+    @[JSON::Field(key: "textDocument")]
+    property text_document : TextDocumentClientCapabilities = TextDocumentClientCapabilities.new
+
+    property experimental : JSON::Any = JSON::Any.new({} of String => JSON::Any)
+
     def initialize(
       @workspace = WorkspaceClientCapabilities.new,
       @text_document = TextDocumentClientCapabilities.new,
-      @experimental = JSON::Any.new({} of String => JSON::Any))
+      @experimental = JSON::Any.new({} of String => JSON::Any)
+    )
     end
   end
 end

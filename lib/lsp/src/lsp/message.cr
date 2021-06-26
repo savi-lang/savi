@@ -3,13 +3,17 @@ require "uri"
 
 module LSP::Message
   macro def_notification(method, has_params = true)
-    JSON.mapping({
-      method:  {type: String, converter: JSONUtil::SpecificString.new({{method}})},
-      jsonrpc: {type: String, converter: JSONUtil::SpecificString.new("2.0")},
-      {% if has_params %}
-      params:  Params,
-      {% end %}
-    })
+    include JSON::Serializable
+
+    @[JSON::Field(converter: LSP::JSONUtil::SpecificString.new({{method}}))]
+    property method : String
+
+    @[JSON::Field(converter: LSP::JSONUtil::SpecificString.new("2.0"))]
+    property jsonrpc : String
+
+    {% if has_params %}
+    property params : Params
+    {% end %}
 
     def initialize({% if has_params %} @params = Params.new {% end %})
       @method = {{method}}
@@ -20,14 +24,16 @@ module LSP::Message
   end
 
   macro def_request(method, has_params = true)
-    JSON.mapping({
-      method:  {type: String, converter: JSONUtil::SpecificString.new({{method}})},
-      jsonrpc: {type: String, converter: JSONUtil::SpecificString.new("2.0")},
-      id:      Int64 | String,
-      {% if has_params %}
-      params:  Params,
-      {% end %}
-    })
+    include JSON::Serializable
+
+    @[JSON::Field(converter: LSP::JSONUtil::SpecificString.new({{method}}))]
+    property method : String
+    @[JSON::Field(converter: LSP::JSONUtil::SpecificString.new("2.0"))]
+    property jsonrpc : String
+    property id : Int64 | String
+    {% if has_params %}
+    property params :  Params
+    {% end %}
 
     def initialize(@id{% if has_params %}, @params = Params.new {% end %})
       @method = {{method}}
@@ -74,13 +80,16 @@ module LSP::Message
   end
 
   macro def_response(request_class)
+    include JSON::Serializable
+
+    @[JSON::Field(ignore: true)]
     property request : {{request_class}}?
 
-    JSON.mapping({
-      jsonrpc: {type: String, converter: JSONUtil::SpecificString.new("2.0")},
-      id:      Int64 | String | Nil,
-      result:  {type: Result, emit_null: true},
-    })
+    @[JSON::Field(converter: LSP::JSONUtil::SpecificString.new("2.0"))]
+    property jsonrpc : String
+    property id : Int64 | String | Nil
+    @[JSON::Field(emit_null: true)]
+    property result : Result
 
     def initialize(@id, @result : Result = {{request_class}}.empty_result)
       @jsonrpc = "2.0"
@@ -90,13 +99,15 @@ module LSP::Message
   end
 
   macro def_error_response(request_class)
+    include JSON::Serializable
+
+    @[JSON::Field(ignore: true)]
     property request : {{request_class}}?
 
-    JSON.mapping({
-      jsonrpc: {type: String, converter: JSONUtil::SpecificString.new("2.0")},
-      id:      Int64 | String | Nil,
-      error:   Data::ResponseError(ErrorData)?,
-    })
+    @[JSON::Field(converter: LSP::JSONUtil::SpecificString.new("2.0"))]
+    property jsonrpc : String
+    property id : Int64 | String | Nil
+    property error : Data::ResponseError(ErrorData)?
 
     def initialize(@id, @error : Data::ResponseError(ErrorData))
       @jsonrpc = "2.0"
@@ -113,8 +124,8 @@ module LSP::Message
     parser.read_object do |key|
       case key
       when "method"; method = parser.read_string
-      when "id";     id     = parser.read?(Int64) || parser.read_string
-      when "error";  is_error = true; parser.skip
+      when "id"    ; id = parser.read?(Int64) || parser.read_string
+      when "error" ; is_error = true; parser.skip
       else           parser.skip
       end
     end
@@ -145,10 +156,8 @@ module LSP::Message
   end
 
   alias Any = AnyIn | AnyOut
-  alias AnyIn = \
-    AnyInNotification | AnyInRequest | AnyInResponse | AnyInErrorResponse
-  alias AnyOut = \
-    AnyOutNotification | AnyOutRequest | AnyOutResponse | AnyOutErrorResponse
+  alias AnyIn = AnyInNotification | AnyInRequest | AnyInResponse | AnyInErrorResponse
+  alias AnyOut = AnyOutNotification | AnyOutRequest | AnyOutResponse | AnyOutErrorResponse
 
   alias AnyMethod = AnyInMethod | AnyOutMethod
   alias AnyInMethod = AnyInNotification | AnyInRequest
@@ -156,61 +165,50 @@ module LSP::Message
 
   alias AnyRequest = AnyInRequest | AnyOutRequest
 
-  alias AnyInNotification =
-    Cancel |
-    Initialized |
-    Exit |
-    DidChangeConfiguration |
-    DidOpen |
-    DidChange |
-    WillSave |
-    DidSave |
-    DidClose
+  alias AnyInNotification = Cancel |
+                            Initialized |
+                            Exit |
+                            DidChangeConfiguration |
+                            DidOpen |
+                            DidChange |
+                            WillSave |
+                            DidSave |
+                            DidClose
 
-  alias AnyInRequest =
-    Initialize |
-    Shutdown |
-    Completion |
-    CompletionItemResolve |
-    Hover |
-    Definition |
-    SignatureHelp
+  alias AnyInRequest = Initialize |
+                       Shutdown |
+                       Completion |
+                       CompletionItemResolve |
+                       Hover |
+                       SignatureHelp
 
-  alias AnyInResponse =
-    GenericResponse |
-    ShowMessageRequest::Response
+  alias AnyInResponse = GenericResponse |
+                        ShowMessageRequest::Response
 
-  alias AnyInErrorResponse =
-    GenericErrorResponse |
-    ShowMessageRequest::ErrorResponse
+  alias AnyInErrorResponse = GenericErrorResponse |
+                             ShowMessageRequest::ErrorResponse
 
-  alias AnyOutNotification =
-    Cancel |
-    ShowMessage |
-    PublishDiagnostics
+  alias AnyOutNotification = Cancel |
+                             ShowMessage |
+                             PublishDiagnostics
 
-  alias AnyOutResponse =
-    GenericResponse |
-    Initialize::Response |
-    Shutdown::Response |
-    Completion::Response |
-    CompletionItemResolve::Response |
-    Hover::Response |
-    Definition::Response |
-    SignatureHelp::Response
+  alias AnyOutResponse = GenericResponse |
+                         Initialize::Response |
+                         Shutdown::Response |
+                         Completion::Response |
+                         CompletionItemResolve::Response |
+                         Hover::Response |
+                         SignatureHelp::Response
 
-  alias AnyOutErrorResponse =
-    GenericErrorResponse |
-    Initialize::ErrorResponse |
-    Shutdown::ErrorResponse |
-    Completion::ErrorResponse |
-    CompletionItemResolve::ErrorResponse |
-    Hover::ErrorResponse |
-    Definition::ErrorResponse |
-    SignatureHelp::ErrorResponse
+  alias AnyOutErrorResponse = GenericErrorResponse |
+                              Initialize::ErrorResponse |
+                              Shutdown::ErrorResponse |
+                              Completion::ErrorResponse |
+                              CompletionItemResolve::ErrorResponse |
+                              Hover::ErrorResponse |
+                              SignatureHelp::ErrorResponse
 
-  alias AnyOutRequest =
-    ShowMessageRequest
+  alias AnyOutRequest = ShowMessageRequest
 
   struct GenericResponse
     Message.def_response(Nil)
@@ -244,7 +242,9 @@ module LSP::Message
     Message.def_notification("$/cancelRequest")
 
     struct Params
-      JSON.mapping({id: Int64 | String})
+      include JSON::Serializable
+      property id : Int64 | String
+
       def initialize(@id = 0_i64); end
     end
   end
@@ -271,80 +271,74 @@ module LSP::Message
     Message.def_request("initialize")
 
     struct Params
-      JSON.mapping({
-        # The process Id of the parent process that started
-        # the server. Is null if the process has not been started by another process.
-        # If the parent process is not alive then the server should exit (see exit notification) its process.
-        process_id: {type: Int64?, key: "processId", emit_null: true},
+      include JSON::Serializable
 
-        # The rootPath of the workspace. Is null
-        # if no folder is open.
-        #
-        # @deprecated in favour of rootUri.
-        _root_path: {type: String?, key: "rootPath"},
+      # The process Id of the parent process that started
+      # the server. Is null if the process has not been started by another process.
+      # If the parent process is not alive then the server should exit (see exit notification) its process.
+      @[JSON::Field(key: "processId", emit_null: true)]
+      property process_id : Int64?
 
-        # The rootUri of the workspace. Is null if no
-        # folder is open. If both `rootPath` and `rootUri` are set
-        # `rootUri` wins.
-        root_uri: {
-          type: URI?,
-          key: "rootUri",
-          emit_null: true,
-          converter: JSONUtil::URIStringOrNil,
-        },
+      # The rootPath of the workspace. Is null
+      # if no folder is open.
+      #
+      # @deprecated in favour of rootUri.
+      @[JSON::Field(key: "rootPath")]
+      property _root_path : String?
 
-        # User provided initialization options.
-        options: {
-          type: JSON::Any?,
-          key: "initializationOptions",
-        },
+      # The rootUri of the workspace. Is null if no
+      # folder is open. If both `rootPath` and `rootUri` are set
+      # `rootUri` wins.
+      @[JSON::Field(key: "rootUri", emit_null: true, converter: LSP::JSONUtil::URIStringOrNil)]
+      property root_uri : URI?
 
-        # The capabilities provided by the client (editor or tool)
-        capabilities: Data::ClientCapabilities,
+      # User provided initialization options.
+      @[JSON::Field(key: "initializationOptions")]
+      property options : JSON::Any?
 
-        # The initial trace setting. If omitted trace is disabled ('off').
-        trace: {type: String, default: "off"},
+      # The capabilities provided by the client (editor or tool)
+      property capabilities : Data::ClientCapabilities
 
-        # The workspace folders configured in the client when the server starts.
-        # This property is only available if the client supports workspace folders.
-        # It can be `null` if the client supports workspace folders but none are
-        # configured.
-        #
-        # Since 3.6.0
-        workspace_folders: {
-          type: Array(Data::WorkspaceFolder),
-          default: [] of Data::WorkspaceFolder,
-          key: "workspaceFolders"
-        },
-      })
+      # The initial trace setting. If omitted trace is disabled ('off').
+      property trace : String = "off"
+
+      # The workspace folders configured in the client when the server starts.
+      # This property is only available if the client supports workspace folders.
+      # It can be `null` if the client supports workspace folders but none are
+      # configured.
+      #
+      # Since 3.6.0
+      @[JSON::Field(key: "workspaceFolders")]
+      property workspace_folders : Array(Data::WorkspaceFolder) = [] of Data::WorkspaceFolder
+
       def initialize(
         @process_id = nil,
         @root_uri = nil,
         @options = nil,
         @capabilities = Data::ClientCapabilities.new,
         @trace = "off",
-        @workspace_folders = [] of Data::WorkspaceFolder)
-
+        @workspace_folders = [] of Data::WorkspaceFolder
+      )
         @_root_path = nil
       end
     end
 
     struct Result
-      JSON.mapping({
-        capabilities: Data::ServerCapabilities,
-      })
+      include JSON::Serializable
+      property capabilities : Data::ServerCapabilities
+
       def initialize(@capabilities = Data::ServerCapabilities.new)
       end
     end
 
     struct ErrorData
-      JSON.mapping({
-        # Indicates whether the client execute the following retry logic:
-        # (1) show the message provided by the ResponseError to the user
-        # (2) user selects retry or cancel
-        # (3) if user selected retry the initialize method is sent again.
-        retry: Bool,
-      })
+      include JSON::Serializable
+      # Indicates whether the client execute the following retry logic:
+      # (1) show the message provided by the ResponseError to the user
+      # (2) user selects retry or cancel
+      # (3) if user selected retry the initialize method is sent again.
+      property retry : Bool
+
       def initialize(@retry = true)
       end
     end
@@ -368,7 +362,10 @@ module LSP::Message
 
     alias Result = Nil
     alias ErrorData = Nil
-    def self.empty_result; nil end
+
+    def self.empty_result
+      nil
+    end
   end
 
   # A notification to ask the server to exit its process.
@@ -384,10 +381,11 @@ module LSP::Message
     Message.def_notification("window/showMessage")
 
     struct Params
-      JSON.mapping({
-        type: Data::MessageType,
-        message: String,
-      })
+      include JSON::Serializable
+      @[JSON::Field(converter: Enum::ValueConverter(LSP::Data::MessageType))]
+      property type : Data::MessageType
+      property message : String
+
       def initialize(@type = Data::MessageType::Error, @message = "")
       end
     end
@@ -401,24 +399,26 @@ module LSP::Message
     Message.def_request("window/showMessageRequest")
 
     struct Params
-      JSON.mapping({
-        type: Data::MessageType,
-        message: String,
-        actions: {
-          type: Array(LSP::Data::MessageActionItem),
-          default: [] of LSP::Data::MessageActionItem,
-        },
-      })
+      include JSON::Serializable
+      @[JSON::Field(converter: Enum::ValueConverter(LSP::Data::MessageType))]
+      property type : Data::MessageType
+      property message : String
+      property actions : Array(LSP::Data::MessageActionItem) = [] of LSP::Data::MessageActionItem
+
       def initialize(
         @type = LSP::Data::MessageType::Log,
         @message = "",
-        @actions = [] of LSP::Data::MessageActionItem)
+        @actions = [] of LSP::Data::MessageActionItem
+      )
       end
     end
 
     alias Result = LSP::Data::MessageActionItem?
     alias ErrorData = Nil
-    def self.empty_result; nil end
+
+    def self.empty_result
+      nil
+    end
   end
 
   # The log message notification is sent from the server to the client to ask
@@ -427,10 +427,11 @@ module LSP::Message
     Message.def_notification("window/logMessage")
 
     struct Params
-      JSON.mapping({
-        type: Data::MessageType,
-        message: String,
-      })
+      include JSON::Serializable
+      @[JSON::Field(converter: Enum::ValueConverter(LSP::Data::MessageType))]
+      property type : Data::MessageType
+      property message : String
+
       def initialize(@type = Data::MessageType::Error, @message = "")
       end
     end
@@ -496,9 +497,9 @@ module LSP::Message
     Message.def_notification("workspace/didChangeConfiguration")
 
     struct Params
-      JSON.mapping({
-        settings: { type: JSON::Any },
-      })
+      include JSON::Serializable
+      property settings : JSON::Any
+
       def initialize(@settings = JSON::Any.new({} of String => JSON::Any))
       end
     end
@@ -583,10 +584,11 @@ module LSP::Message
     Message.def_notification("textDocument/didOpen")
 
     struct Params
-      JSON.mapping({
-        # The document that was opened.
-        text_document: {type: Data::TextDocumentItem, key: "textDocument"},
-      })
+      include JSON::Serializable
+      # The document that was opened.
+      @[JSON::Field(key: "textDocument")]
+      property text_document : Data::TextDocumentItem
+
       def initialize(@text_document = Data::TextDocumentItem.new)
       end
     end
@@ -599,27 +601,25 @@ module LSP::Message
     Message.def_notification("textDocument/didChange")
 
     struct Params
-      JSON.mapping({
-        # The document that did change. The version number points
-        # to the version after all provided content changes have
-        # been applied.
-        text_document: {
-          type: Data::TextDocumentVersionedIdentifier,
-          key: "textDocument"
-        },
+      include JSON::Serializable
 
-        # The actual content changes. The content changes describe single state
-        # changes to the document. So if there are two content changes
-        # c1 and c2 for a document in state S then c1 move the document
-        # to S' and c2 to S''.
-        content_changes: {
-          type: Array(Data::TextDocumentContentChangeEvent),
-          key: "contentChanges"
-        },
-      })
+      # The document that did change. The version number points
+      # to the version after all provided content changes have
+      # been applied.
+      @[JSON::Field(key: "textDocument")]
+      property text_document : Data::TextDocumentVersionedIdentifier
+
+      # The actual content changes. The content changes describe single state
+      # changes to the document. So if there are two content changes
+      # c1 and c2 for a document in state S then c1 move the document
+      # to S' and c2 to S''.
+      @[JSON::Field(key: "contentChanges")]
+      property content_changes : Array(Data::TextDocumentContentChangeEvent)
+
       def initialize(
         @text_document = Data::TextDocumentVersionedIdentifier.new,
-        @content_changes = [] of Data::TextDocumentContentChangeEvent)
+        @content_changes = [] of Data::TextDocumentContentChangeEvent
+      )
       end
     end
   end
@@ -630,19 +630,20 @@ module LSP::Message
     Message.def_notification("textDocument/willSave")
 
     struct Params
-      JSON.mapping({
-        # The document that will be saved.
-        text_document: {
-          type: Data::TextDocumentIdentifier,
-          key: "textDocument"
-        },
+      include JSON::Serializable
 
-        # Represents the reason why the document will be saved.
-        reason: Data::TextDocumentSaveReason,
-      })
+      # The document that will be saved.
+      @[JSON::Field(key: "textDocument")]
+      property text_document : Data::TextDocumentIdentifier
+
+      # Represents the reason why the document will be saved.
+      @[JSON::Field(converter: Enum::ValueConverter(LSP::Data::TextDocumentSaveReason))]
+      property reason : Data::TextDocumentSaveReason
+
       def initialize(
         @text_document = Data::TextDocumentIdentifier.new,
-        @reason = Data::TextDocumentSaveReason::Manual)
+        @reason = Data::TextDocumentSaveReason::Manual
+      )
       end
     end
   end
@@ -662,20 +663,20 @@ module LSP::Message
     Message.def_notification("textDocument/didSave")
 
     struct Params
-      JSON.mapping({
-        # The document that was saved.
-        text_document: {
-          type: Data::TextDocumentIdentifier,
-          key: "textDocument"
-        },
+      include JSON::Serializable
 
-        # Optional the content when saved. Depends on the includeText value
-        # when the save notification was requested.
-        text: String?,
-      })
+      # The document that was saved.
+      @[JSON::Field(key: "textDocument")]
+      property text_document : Data::TextDocumentIdentifier
+
+      # Optional the content when saved. Depends on the includeText value
+      # when the save notification was requested.
+      property text : String?
+
       def initialize(
         @text_document = Data::TextDocumentIdentifier.new,
-        @text = nil)
+        @text = nil
+      )
       end
     end
   end
@@ -694,13 +695,12 @@ module LSP::Message
     Message.def_notification("textDocument/didClose")
 
     struct Params
-      JSON.mapping({
-        # The document that was closed.
-        text_document: {
-          type: Data::TextDocumentIdentifier,
-          key: "textDocument"
-        },
-      })
+      include JSON::Serializable
+
+      # The document that was closed.
+      @[JSON::Field(key: "textDocument")]
+      property text_document : Data::TextDocumentIdentifier
+
       def initialize(@text_document = Data::TextDocumentIdentifier.new)
       end
     end
@@ -728,13 +728,15 @@ module LSP::Message
     Message.def_notification("textDocument/publishDiagnostics")
 
     struct Params
-      JSON.mapping({
-        # The URI for which diagnostic information is reported.
-        uri: {type: URI, converter: JSONUtil::URIString},
+      include JSON::Serializable
 
-        # An array of diagnostic information items.
-        diagnostics: Array(Data::Diagnostic),
-      })
+      # The URI for which diagnostic information is reported.
+      @[JSON::Field(converter: LSP::JSONUtil::URIString)]
+      property uri : URI
+
+      # An array of diagnostic information items.
+      property diagnostics : Array(Data::Diagnostic)
+
       def initialize(@uri = URI.new, @diagnostics = [] of Data::Diagnostic)
       end
     end
@@ -760,25 +762,25 @@ module LSP::Message
     Message.def_request("textDocument/completion")
 
     struct Params
-      JSON.mapping({
-        # The text document.
-        text_document: {
-          type: Data::TextDocumentIdentifier,
-          key: "textDocument",
-        },
+      include JSON::Serializable
 
-        # The position inside the text document.
-        position: Data::Position,
+      # The text document.
+      @[JSON::Field(key: "textDocument")]
+      property text_document : Data::TextDocumentIdentifier
 
-        # The completion context. This is only available if the client
-        # specifies to send this using
-        # `ClientCapabilities.textDocument.completion.contextSupport === true`
-        context: Data::CompletionContext?,
-      })
+      # The position inside the text document.
+      property position : Data::Position
+
+      # The completion context. This is only available if the client
+      # specifies to send this using
+      # `ClientCapabilities.textDocument.completion.contextSupport === true`
+      property context : Data::CompletionContext?
+
       def initialize(
         @text_document = Data::TextDocumentIdentifier.new,
         @position = Data::Position.new,
-        @context = nil)
+        @context = nil
+      )
       end
     end
 
@@ -798,66 +800,41 @@ module LSP::Message
 
   # The hover request is sent from the client to the server to request hover
   # information at a given text document position.
-  struct Definition
-    Message.def_request("textDocument/definition")
-
-    struct Params
-      JSON.mapping({
-        # The text document.
-        text_document: {
-          type: Data::TextDocumentIdentifier,
-          key: "textDocument",
-        },
-
-        # The position inside the text document.
-        position: Data::Position,
-      })
-      def initialize(
-        @text_document = Data::TextDocumentIdentifier.new,
-        @position = Data::Position.new)
-      end
-    end
-
-    alias Result = Data::Location
-
-    alias ErrorData = Nil
-  end
-
-  # The hover request is sent from the client to the server to request hover
-  # information at a given text document position.
   struct Hover
     Message.def_request("textDocument/hover")
 
     struct Params
-      JSON.mapping({
-        # The text document.
-        text_document: {
-          type: Data::TextDocumentIdentifier,
-          key: "textDocument",
-        },
+      include JSON::Serializable
 
-        # The position inside the text document.
-        position: Data::Position,
-      })
+      # The text document.
+      @[JSON::Field(key: "textDocument")]
+      property text_document : Data::TextDocumentIdentifier
+
+      # The position inside the text document.
+      property position : Data::Position
+
       def initialize(
         @text_document = Data::TextDocumentIdentifier.new,
-        @position = Data::Position.new)
+        @position = Data::Position.new
+      )
       end
     end
 
     # TODO: allow null result when nothing to show
     struct Result
-      JSON.mapping({
-        # The hover's content
-        contents: Data::MarkupContent,
+      include JSON::Serializable
 
-        # An optional range is a range inside a text document that is used
-        # to visualize a hover, e.g. by changing the background color.
-        range: Data::Range?,
-      })
+      # The hover's content
+      property contents : Data::MarkupContent
+
+      # An optional range is a range inside a text document that is used
+      # to visualize a hover, e.g. by changing the background color.
+      property range : Data::Range?
+
       def initialize(
         @contents = Data::MarkupContent.new,
-        @range = nil)
+        @range = nil
+      )
       end
     end
 
@@ -873,32 +850,36 @@ module LSP::Message
 
     # TODO: allow null result when nothing to show
     struct Result
-      JSON.mapping({
-        # One or more signatures.
-        signatures: Array(Data::SignatureInformation),
+      include JSON::Serializable
 
-        # The active signature. If omitted or the value lies outside the
-        # range of `signatures` the value defaults to zero or is ignored if
-        # `signatures.length === 0`. Whenever possible implementors should
-        # make an active decision about the active signature and shouldn't
-        # rely on a default value.
-        # In future version of the protocol this property might become
-        # mandatory to better express this.
-        active_signature: {type: Int64, default: 0_i64, key: "activeSignature"},
+      # One or more signatures.
+      property signatures : Array(Data::SignatureInformation)
 
-        # The active parameter of the active signature. If omitted or the value
-        # lies outside the range of `signatures[activeSignature].parameters`
-        # defaults to 0 if the active signature has parameters. If
-        # the active signature has no parameters it is ignored.
-        # In future version of the protocol this property might become
-        # mandatory to better express the active parameter if the
-        # active signature does have any.
-        active_parameter: {type: Int64, default: 0_i64, key: "activeParameter"},
-      })
+      # The active signature. If omitted or the value lies outside the
+      # range of `signatures` the value defaults to zero or is ignored if
+      # `signatures.length === 0`. Whenever possible implementors should
+      # make an active decision about the active signature and shouldn't
+      # rely on a default value.
+      # In future version of the protocol this property might become
+      # mandatory to better express this.
+      @[JSON::Field(key: "activeSignature")]
+      property active_signature : Int64 = 0_i64
+
+      # The active parameter of the active signature. If omitted or the value
+      # lies outside the range of `signatures[activeSignature].parameters`
+      # defaults to 0 if the active signature has parameters. If
+      # the active signature has no parameters it is ignored.
+      # In future version of the protocol this property might become
+      # mandatory to better express the active parameter if the
+      # active signature does have any.
+      @[JSON::Field(key: "activeParameter")]
+      property active_parameter : Int64 = 0_i64
+
       def initialize(
         @signatures = [] of Data::SignatureInformation,
         @active_signature = 0_i64,
-        @active_parameter = 0_i64)
+        @active_parameter = 0_i64
+      )
       end
     end
 

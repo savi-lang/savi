@@ -4,18 +4,22 @@ module LSP::Data
   # Contains additional information about the context in which a completion
   # request is triggered.
   struct CompletionContext
-    JSON.mapping({
-      # How the completion was triggered.
-      trigger_kind: {type: CompletionTriggerKind, key: "triggerKind"},
+    include JSON::Serializable
 
-      # The trigger character (a single character) that has trigger code
-      # complete. Is undefined if
-      # `triggerKind !== CompletionTriggerKind.TriggerCharacter`
-      trigger_character: {type: String?, key: "triggerCharacter"},
-    })
+    # How the completion was triggered.
+    @[JSON::Field(key: "triggerKind", converter: Enum::ValueConverter(LSP::Data::CompletionTriggerKind))]
+    property trigger_kind : CompletionTriggerKind
+
+    # The trigger character (a single character) that has trigger code
+    # complete. Is undefined if
+    # `triggerKind !== CompletionTriggerKind.TriggerCharacter`
+    @[JSON::Field(key: "triggerCharacter")]
+    property trigger_character : String?
+
     def initialize(
       @trigger_kind = CompletionTriggerKind::Invoked,
-      @trigger_character = nil)
+      @trigger_character = nil
+    )
     end
   end
 end

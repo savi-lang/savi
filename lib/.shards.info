@@ -1,0 +1,12 @@
+---
+version: 1.0
+shards:
+  pegmatite:
+    git: https://github.com/jemc/crystal-pegmatite.git
+    version: 0.2.1+git.commit.601363cb2ce9c57ccc70967eb270005950f2f7b0
+  lsp:
+    git: https://github.com/mneumann/crystal-lsp.git
+    version: 0.1.0+git.commit.5cc20ca3597496b7ef19d0aef56ed5ed5d30c82c
+  clim:
+    git: https://github.com/at-grandpa/clim.git
+    version: 0.13.0
