@@ -3,52 +3,42 @@ require "json"
 module LSP::Data
   # Workspace specific client capabilities.
   struct WorkspaceClientCapabilities
-    JSON.mapping({
-      # The client supports applying batch edits to the workspace by supporting
-      # the request 'workspace/applyEdit'
-      apply_edit: {type: Bool, default: false, key: "applyEdit"},
+    include JSON::Serializable
 
-      # Capabilities specific to `WorkspaceEdit`s
-      workspace_edit: {
-        type: WorkspaceEdit,
-        default: WorkspaceEdit.new,
-        key: "workspaceEdit",
-      },
+    # The client supports applying batch edits to the workspace by supporting
+    # the request 'workspace/applyEdit'
+    @[JSON::Field(key: "applyEdit")]
+    property apply_edit : Bool = false
 
-      # Capabilities specific to the `workspace/didChangeConfiguration` notification.
-      did_change_configuration: {
-        type: DynamicRegistration,
-        default: DynamicRegistration.new,
-        key: "didChangeConfiguration",
-      },
+    # Capabilities specific to `WorkspaceEdit`s
+    @[JSON::Field(key: "workspaceEdit")]
+    property workspace_edit : WorkspaceEdit = WorkspaceEdit.new
 
-      # Capabilities specific to the `workspace/didChangeWatchedFiles` notification.
-      did_change_watched_files: {
-        type: DynamicRegistration,
-        default: DynamicRegistration.new,
-        key: "didChangeWatchedFiles",
-      },
+    # Capabilities specific to the `workspace/didChangeConfiguration` notification.
+    @[JSON::Field(key: "didChangeConfiguration")]
+    property did_change_configuration : DynamicRegistration = DynamicRegistration.new
 
-      # Capabilities specific to the `workspace/symbol` request.
-      symbol: {type: WorkspaceSymbol, default: WorkspaceSymbol.new},
+    # Capabilities specific to the `workspace/didChangeWatchedFiles` notification.
+    @[JSON::Field(key: "didChangeWatchedFiles")]
+    property did_change_watched_files : DynamicRegistration = DynamicRegistration.new
 
-      # Capabilities specific to the `workspace/executeCommand` request.
-      execute_command: {
-        type: DynamicRegistration,
-        default: DynamicRegistration.new,
-        key: "executeCommand",
-      },
+    # Capabilities specific to the `workspace/symbol` request.
+    property symbol : WorkspaceSymbol = WorkspaceSymbol.new
 
-      # The client has support for workspace folders.
-      #
-      # Since 3.6.0
-      workspace_folders: {type: Bool, default: false, key: "workspaceFolders"},
+    # Capabilities specific to the `workspace/executeCommand` request.
+    @[JSON::Field(key: "executeCommand")]
+    property execute_command : DynamicRegistration = DynamicRegistration.new
 
-      # The client supports `workspace/configuration` requests.
-      #
-      # Since 3.6.0
-      configuration: {type: Bool, default: false},
-    })
+    # The client has support for workspace folders.
+    #
+    # Since 3.6.0
+    @[JSON::Field(key: "workspaceFolders")]
+    property workspace_folders : Bool = false
+
+    # The client supports `workspace/configuration` requests.
+    #
+    # Since 3.6.0
+    property configuration : Bool = false
 
     def initialize
       @apply_edit = false
@@ -62,26 +52,22 @@ module LSP::Data
     end
 
     struct WorkspaceEdit
-      JSON.mapping({
-        # The client supports versioned document changes in `WorkspaceEdit`s
-        document_changes: {type: Bool, default: false, key: "documentChanges"},
+      include JSON::Serializable
 
-        # The resource operations the client supports. Clients should at least
-        # support 'create', 'rename' and 'delete' files and folders.
-        resource_operations: {
-          type: Array(String),
-          default: [] of String,
-          key: "resourceOperations",
-        },
+      # The client supports versioned document changes in `WorkspaceEdit`s
+      @[JSON::Field(key: "documentChanges")]
+      property document_changes : Bool = false
 
-        # The failure handling strategy of a client if applying the workspace edit
-        # failes.
-        failure_handling: {
-          type: String,
-          default: "abort",
-          key: "failureHandling",
-        },
-      })
+      # The resource operations the client supports. Clients should at least
+      # support 'create', 'rename' and 'delete' files and folders.
+      @[JSON::Field(key: "resourceOperations")]
+      property resource_operations : Array(String) = [] of String
+
+      # The failure handling strategy of a client if applying the workspace edit
+      # failes.
+      @[JSON::Field(key: "failureHandling")]
+      property failure_handling : String = "abort"
+
       def initialize
         @document_changes = false
         @resource_operations = [] of String
@@ -90,21 +76,16 @@ module LSP::Data
     end
 
     struct WorkspaceSymbol
-      JSON.mapping({
-        # Symbol request supports dynamic registration.
-        dynamic_registration: {
-          type: Bool,
-          default: false,
-          key: "dynamicRegistration",
-        },
+      include JSON::Serializable
 
-        # Specific capabilities for the `SymbolKind` in the `workspace/symbol` request.
-        symbol_kind: {
-          type: SymbolKindSet,
-          default: SymbolKindSet.new,
-          key: "symbolKind",
-        },
-      })
+      # Symbol request supports dynamic registration.
+      @[JSON::Field(key: "dynamicRegistration")]
+      property dynamic_registration : Bool = false
+
+      # Specific capabilities for the `SymbolKind` in the `workspace/symbol` request.
+      @[JSON::Field(key: "symbolKind")]
+      property symbol_kind : SymbolKindSet = SymbolKindSet.new
+
       def initialize
         @dynamic_registration = false
         @symbol_kind = SymbolKindSet.new

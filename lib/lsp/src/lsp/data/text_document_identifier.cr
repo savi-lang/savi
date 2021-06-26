@@ -2,10 +2,12 @@ require "json"
 
 module LSP::Data
   struct TextDocumentIdentifier
-    JSON.mapping({
-      # The text document's URI.
-      uri: {type: URI, converter: JSONUtil::URIString},
-    })
+    include JSON::Serializable
+
+    # The text document's URI.
+    @[JSON::Field(converter: LSP::JSONUtil::URIString)]
+    property uri : URI
+
     def initialize(@uri = URI.new)
     end
   end

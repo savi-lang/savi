@@ -2,7 +2,7 @@
 # Dev stage: outputs an alpine image with everything needed for development.
 # (this image is used by the `make ready` command to create a dev environment)
 
-FROM alpine:3.12 as dev
+FROM alpine:3.14 as dev
 
 # Install build tools, Pony dependencies, LLVM libraries, and Crystal.
 RUN apk add --no-cache --update \
@@ -10,8 +10,8 @@ RUN apk add --no-cache --update \
     alpine-sdk coreutils linux-headers clang-dev lld \
     valgrind perl lldb \
     cmake \
-    libexecinfo-dev libressl-dev pcre2-dev \
-    llvm10-dev llvm10-static \
+    libexecinfo-dev libretls-dev pcre2-dev \
+    llvm11-dev llvm11-static \
     crystal shards
 
 ENV CC=clang
@@ -21,7 +21,7 @@ ENV CXX=clang++
 # so we must use the version of LLVM that was used to build the crystal binary.
 # This is just a sanity check to confirm that it was indeed built with the
 # version that we expected when we installed our packages in the layer above.
-RUN sh -c 'crystal --version | grep -C10 "LLVM: 10.0.0"'
+RUN sh -c 'crystal --version | grep -C10 "LLVM: 11.1.0"'
 
 # Build Crystal LLVM extension, which isn't distributed with the alpine package.
 RUN sh -c 'clang++ -v -c \
@@ -86,7 +86,7 @@ WORKDIR /opt/code
 # Build stage: outputs an alpine image that contains a working Mare compiler
 # (this image is used only as a precursor to the release stage)
 
-FROM alpine:3.12 as build
+FROM alpine:3.14 as build
 
 # Install build tools, Pony dependencies, LLVM libraries, and Crystal.
 # This line is kept intentionally the same as it was for the dev stage,
@@ -94,8 +94,8 @@ FROM alpine:3.12 as build
 RUN apk add --no-cache --update \
     alpine-sdk coreutils linux-headers clang-dev lld \
     valgrind perl \
-    libexecinfo-dev libressl-dev pcre2-dev \
-    llvm10-dev llvm10-static \
+    libexecinfo-dev libretls-dev pcre2-dev \
+    llvm11-dev llvm11-static \
     crystal shards
 
 # TODO: Don't bother with every possible libponyrt distribution format.
@@ -115,11 +115,11 @@ RUN make /tmp/bin/mare
 # Release stage: outputs a minimal alpine image with a working Mare compiler
 # (this image is made available on DockerHub for download)
 
-FROM alpine:3.12 as release
+FROM alpine:3.14 as release
 
 # Install runtime dependencies of the compiler.
 RUN apk add --no-cache --update \
-  llvm10-libs gc pcre gcc clang lld libgcc libevent musl-dev libexecinfo-dev
+  llvm11-libs gc pcre gcc clang lld libgcc libevent musl-dev libexecinfo-dev
 
 RUN mkdir /opt/code
 WORKDIR /opt/code

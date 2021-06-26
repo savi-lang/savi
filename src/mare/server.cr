@@ -112,62 +112,64 @@ class Mare::Server
     send_diagnostics(msg.params.text_document.uri.path.not_nil!)
   end
 
-  def handle(msg : LSP::Message::Definition)
-    pos = msg.params.position
-    text = @open_files[msg.params.text_document.uri]? || ""
-
-    raise NotImplementedError.new("not a file") \
-       if msg.params.text_document.uri.scheme != "file"
-
-    host_filename = msg.params.text_document.uri.path.not_nil!
-    filename = msg.params.text_document.uri.path.not_nil!
-
-    # If we're running in a docker container, or in some other remote
-    # environment, the host's source path may not match ours, and we
-    # can apply the needed transformation as specified in this ENV var.
-    filename = convert_path_to_local(filename)
-
-    dirname = File.dirname(filename)
-    sources = Compiler.get_library_sources(dirname)
-
-    source = sources.find { |s| s.path == filename }.not_nil!
-    source_pos = Source::Pos.point(source, pos.line.to_i32, pos.character.to_i32)
-
-    if @ctx.nil?
-      @ctx = Mare.compiler.compile(sources, :serve_lsp)
-    end
-    ctx = @ctx.not_nil!
-
-    begin
-      definition_pos = ctx.serve_definition[source_pos]
-    rescue
-    end
-
-    if definition_pos.is_a? Mare::Source::Pos
-      user_filepath = convert_path_to_host(definition_pos.source.path)
-
-      @wire.respond msg do |msg|
-        msg.result = LSP::Data::Location.new(
-          URI.new(path: user_filepath),
-          LSP::Data::Range.new(
-            LSP::Data::Position.new(
-              definition_pos.row.to_i64,
-              definition_pos.col.to_i64,
-            ),
-            LSP::Data::Position.new(
-              definition_pos.row.to_i64,
-              definition_pos.col.to_i64 + (definition_pos.finish - definition_pos.start),
-            ),
-          ),
-        )
-        msg
-      end
-    else
-      @wire.error_respond msg do |msg|
-        msg
-      end
-    end
-  end
+  # TODO: Uncomment this when the LSP package implements the Definition type:
+  #
+  # def handle(msg : LSP::Message::Definition)
+  #   pos = msg.params.position
+  #   text = @open_files[msg.params.text_document.uri]? || ""
+  #
+  #   raise NotImplementedError.new("not a file") \
+  #      if msg.params.text_document.uri.scheme != "file"
+  #
+  #   host_filename = msg.params.text_document.uri.path.not_nil!
+  #   filename = msg.params.text_document.uri.path.not_nil!
+  #
+  #   # If we're running in a docker container, or in some other remote
+  #   # environment, the host's source path may not match ours, and we
+  #   # can apply the needed transformation as specified in this ENV var.
+  #   filename = convert_path_to_local(filename)
+  #
+  #   dirname = File.dirname(filename)
+  #   sources = Compiler.get_library_sources(dirname)
+  #
+  #   source = sources.find { |s| s.path == filename }.not_nil!
+  #   source_pos = Source::Pos.point(source, pos.line.to_i32, pos.character.to_i32)
+  #
+  #   if @ctx.nil?
+  #     @ctx = Mare.compiler.compile(sources, :serve_lsp)
+  #   end
+  #   ctx = @ctx.not_nil!
+  #
+  #   begin
+  #     definition_pos = ctx.serve_definition[source_pos]
+  #   rescue
+  #   end
+  #
+  #   if definition_pos.is_a? Mare::Source::Pos
+  #     user_filepath = convert_path_to_host(definition_pos.source.path)
+  #
+  #     @wire.respond msg do |msg|
+  #       msg.result = LSP::Data::Location.new(
+  #         URI.new(path: user_filepath),
+  #         LSP::Data::Range.new(
+  #           LSP::Data::Position.new(
+  #             definition_pos.row.to_i64,
+  #             definition_pos.col.to_i64,
+  #           ),
+  #           LSP::Data::Position.new(
+  #             definition_pos.row.to_i64,
+  #             definition_pos.col.to_i64 + (definition_pos.finish - definition_pos.start),
+  #           ),
+  #         ),
+  #       )
+  #       msg
+  #     end
+  #   else
+  #     @wire.error_respond msg do |msg|
+  #       msg
+  #     end
+  #   end
+  # end
 
   def handle(msg : LSP::Message::Hover)
     pos = msg.params.position

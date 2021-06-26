@@ -12,11 +12,12 @@ dependencies:
   pegmatite:
     github: jemc/crystal-pegmatite
   lsp:
-    github: jemc/crystal-lsp
+    github: mneumann/crystal-lsp
+    branch: convert-to-json-serialize
   clim:
     github: at-grandpa/clim
     version: 0.13.0
 
-crystal: 0.26.1
+crystal: 1.0.0
 
 license: MPLv2

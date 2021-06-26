@@ -12,12 +12,12 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
       "kind" => "keyword",
       "name" => "keyword",
       "value" => "import",
-    },
+    } of String => String | Bool,
     {
       "kind" => "term",
       "name" => "path",
       "type" => "string",
-    },
+    } of String => String | Bool,
     {
       "kind" => "term",
       "name" => "params",
@@ -31,12 +31,12 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
       "kind" => "keyword",
       "name" => "keyword",
       "value" => "source",
-    },
+    } of String => String | Bool,
     {
       "kind" => "term",
       "name" => "path",
       "type" => "string",
-    },
+    } of String => String | Bool,
   ] of Hash(String, String | Bool))
 
   @@declare_alias = Witness.new([
@@ -44,12 +44,12 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
       "kind" => "keyword",
       "name" => "keyword",
       "value" => "alias",
-    },
+    } of String => String | Bool,
     {
       "kind" => "term",
       "name" => "ident_maybe_with_params",
       "type" => "ident|ident+params",
-    },
+    } of String => String | Bool,
   ] of Hash(String, String | Bool))
 
   @@declare_type = Witness.new([
@@ -57,18 +57,18 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
       "kind" => "keyword",
       "name" => "keyword",
       "value" => "actor|class|struct|trait|numeric|enum|primitive|ffi",
-    },
+    } of String => String | Bool,
     {
       "kind" => "keyword",
       "name" => "cap",
       "value" => "iso|val|ref|box|tag|non",
       "optional" => true,
-    },
+    } of String => String | Bool,
     {
       "kind" => "term",
       "name" => "ident_maybe_with_params",
       "type" => "ident|ident+params",
-    },
+    } of String => String | Bool,
   ] of Hash(String, String | Bool))
 
   def compile(context, decl)
@@ -365,7 +365,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         "kind" => "keyword",
         "name" => "keyword",
         "value" => "it",
-      },
+      } of String => String | Bool,
       {
         "kind" => "term",
         "name" => "name",
@@ -379,7 +379,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         "kind" => "keyword",
         "name" => "keyword",
         "value" => "fun",
-      },
+      } of String => String | Bool,
       {
         "kind" => "keyword",
         "name" => "cap",
@@ -405,7 +405,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         "kind" => "keyword",
         "name" => "keyword",
         "value" => "be",
-      },
+      } of String => String | Bool,
       { # This cap isn't actually allowed for a behaviour declaration;
         # it is only accepted here so that we can give a nicer error later.
         "kind" => "keyword",
@@ -426,7 +426,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         "kind" => "keyword",
         "name" => "keyword",
         "value" => "new",
-      },
+      } of String => String | Bool,
       {
         "kind" => "keyword",
         "name" => "cap",
@@ -448,7 +448,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         "kind" => "keyword",
         "name" => "keyword",
         "value" => "const",
-      },
+      } of String => String | Bool,
       {
         "kind" => "term",
         "name" => "ident",
@@ -468,7 +468,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         "kind" => "keyword",
         "name" => "keyword",
         "value" => "let",
-      },
+      } of String => String | Bool,
       {
         "kind" => "term",
         "name" => "ident",
@@ -488,7 +488,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         "kind" => "keyword",
         "name" => "keyword",
         "value" => "var",
-      },
+      } of String => String | Bool,
       {
         "kind" => "term",
         "name" => "ident",
@@ -508,12 +508,12 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         "kind" => "keyword",
         "name" => "keyword",
         "value" => "is",
-      },
+      } of String => String | Bool,
       {
         "kind" => "term",
         "name" => "trait",
         "type" => "type",
-      },
+      } of String => String | Bool,
     ] of Hash(String, String | Bool))
 
     @@declare_member = Witness.new([
@@ -521,12 +521,12 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         "kind" => "keyword",
         "name" => "keyword",
         "value" => "member",
-      },
+      } of String => String | Bool,
       {
         "kind" => "term",
         "name" => "ident",
         "type" => "ident",
-      },
+      } of String => String | Bool,
     ] of Hash(String, String | Bool))
 
     def compile(context, decl)
@@ -803,7 +803,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         "kind" => "keyword",
         "name" => "keyword",
         "value" => "yields",
-      },
+      } of String => String | Bool,
       {
         "kind" => "term",
         "name" => "out",

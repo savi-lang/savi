@@ -1676,7 +1676,7 @@ class Mare::Compiler::CodeGen
         again_arg_frames.unshift(nil)
       end
       @di.set_loc(relate.op)
-      @builder.call(continue_llvm_func, again_args)
+      @builder.call(LLVM::Function.from_value(continue_llvm_func), again_args)
 
       # Return to the "maybe block", to determine if we need to iterate again.
       @builder.br(maybe_block)
@@ -1753,7 +1753,7 @@ class Mare::Compiler::CodeGen
       cast_args[index] = @builder.bit_cast(arg, llvm_param_type, "#{arg}.CAST")
     end
 
-    @builder.call(func, cast_args)
+    @builder.call(LLVM::Function.from_value(func), cast_args)
   end
 
   def gen_eq(relate)

@@ -2,17 +2,19 @@ require "json"
 
 module LSP::Data
   struct ParameterInformation
-    JSON.mapping({
-      # The label of this parameter. Will be shown in the UI.
-      label: String,
+    include JSON::Serializable
 
-      # The human-readable doc-comment of this parameter.
-      # Will be shown in the UI but can be omitted.
-      documentation: String | MarkupContent | Nil,
-    })
+    # The label of this parameter. Will be shown in the UI.
+    property label : String
+
+    # The human-readable doc-comment of this parameter.
+    # Will be shown in the UI but can be omitted.
+    property documentation : String | MarkupContent | Nil
+
     def initialize(
       @label = "",
-      @documentation = nil)
+      @documentation = nil
+    )
     end
   end
 end
