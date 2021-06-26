@@ -20,9 +20,9 @@ describe LSP::Codec do
     # Compare the request JSON to the expected string representation.
     buf.to_s.should eq \
       "Content-Length: 145\r\n\r\n" \
-      "{\"method\":\"window/showMessageRequest\"," \
-        "\"jsonrpc\":\"2.0\",\"id\":\"#{id}\",\"params\":{" \
-          "\"type\":4,\"message\":\"\",\"actions\":[]}}\n"
+    "{\"method\":\"window/showMessageRequest\"," \
+    "\"jsonrpc\":\"2.0\",\"id\":\"#{id}\",\"params\":{" \
+    "\"type\":4,\"message\":\"\",\"actions\":[]}}\n"
 
     # Create and write the response.
     res = req.new_response
@@ -38,7 +38,7 @@ describe LSP::Codec do
     # Compare the response JSON to the expected string representation.
     buf.to_s.should eq \
       "Content-Length: 76\r\n\r\n" \
-      "{\"jsonrpc\":\"2.0\",\"id\":\"#{id}\",\"result\":null}\n"
+    "{\"jsonrpc\":\"2.0\",\"id\":\"#{id}\",\"result\":null}\n"
   end
 
   it "raises IO::EOFError when there are no bytes left to read" do

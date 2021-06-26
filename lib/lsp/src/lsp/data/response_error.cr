@@ -2,11 +2,11 @@ require "json"
 
 module LSP::Data
   struct ResponseError(D)
-    JSON.mapping({
-      code:    Code,
-      message: String,
-      data:    D?,
-    })
+    include JSON::Serializable
+
+    property code : Code
+    property message : String
+    property data : D?
 
     enum Code
       # Defined by JSON RPC.
@@ -25,9 +25,10 @@ module LSP::Data
     end
 
     def initialize(
-      @data    = nil,
+      @data = nil,
       @message = "(no error message specified)",
-      @code    = Code::InternalError)
+      @code = Code::InternalError
+    )
     end
   end
 end

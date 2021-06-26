@@ -106,7 +106,7 @@ module Mare::AST
   end
 
   class Document < Node
-    property list
+    property list : Array(Declare)
     property! source : Source
     def initialize(@list = [] of Declare)
     end
@@ -114,7 +114,7 @@ module Mare::AST
     def name; :doc end
     def to_a: Array(A)
       res = [name] of A
-      list.each { |x| res << x.to_a }
+      list.each { |x| res << x.to_a.as(A) }
       res
     end
     def children_accept(ctx : Compiler::Context, visitor : Visitor)
@@ -130,8 +130,8 @@ module Mare::AST
   end
 
   class Declare < Node
-    property head
-    property body
+    property head : Array(Term)
+    property body : Group
     def initialize(@head = [] of Term, @body = Group.new(":"))
     end
 
@@ -143,7 +143,7 @@ module Mare::AST
     def name; :declare end
     def to_a: Array(A)
       res = [name] of A
-      res << head.map(&.to_a)
+      res << head.map(&.to_a.as(A))
       res << body.to_a
       res
     end
@@ -191,7 +191,7 @@ module Mare::AST
     end
 
     def name; :fun end
-    def to_a; [
+    def to_a: Array(A); [
       cap.to_a,
       ident.to_a,
       params.try(&.to_a),
@@ -370,7 +370,7 @@ module Mare::AST
     end
 
     def name; :prefix end
-    def to_a; [name, op.to_a, term.to_a] of A end
+    def to_a: Array(A); [name, op.to_a, term.to_a] of A end
     def children_accept(ctx : Compiler::Context, visitor : Visitor)
       @op.accept(ctx, visitor)
       @term.accept(ctx, visitor)
@@ -403,7 +403,7 @@ module Mare::AST
     end
 
     def name; :qualify end
-    def to_a; [name, term.to_a, group.to_a] of A end
+    def to_a: Array(A); [name, term.to_a, group.to_a] of A end
     def children_accept(ctx : Compiler::Context, visitor : Visitor)
       @term.accept(ctx, visitor)
       @group.accept(ctx, visitor)
@@ -475,8 +475,8 @@ module Mare::AST
   # actual semantics of the node may not be known until a later Pass, where we
   # are able to take into account sugar and macro expansion to resolve them.
   class Group < Node
-    property style
-    property terms
+    property style : String
+    property terms : Array(Term)
     def initialize(@style : String, @terms = [] of Term)
     end
 
@@ -547,7 +547,7 @@ module Mare::AST
     end
 
     def name; :relate end
-    def to_a; [name, lhs.to_a, op.to_a, rhs.to_a] of A end
+    def to_a: Array(A); [name, lhs.to_a, op.to_a, rhs.to_a] of A end
     def children_accept(ctx : Compiler::Context, visitor : Visitor)
       @lhs.accept(ctx, visitor)
       @op.accept(ctx, visitor)
@@ -650,7 +650,7 @@ module Mare::AST
     def name; :choice end
     def to_a: Array(A)
       res = [name] of A
-      list.each { |cond, body| res << [cond.to_a, body.to_a] }
+      list.each { |cond, body| res << [cond.to_a, body.to_a] of A}
       res
     end
     def children_accept(ctx : Compiler::Context, visitor : Visitor)
@@ -791,7 +791,7 @@ module Mare::AST
     def name; :yield end
     def to_a: Array(A)
       res = [name] of A
-      res.concat(terms.map(&.to_a))
+      res.concat(terms.map(&.to_a.as(A)))
       res
     end
     def children_accept(ctx : Compiler::Context, visitor : Visitor)
