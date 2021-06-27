@@ -10,12 +10,14 @@
     ) == Bytes.join([
       b"HTTP/1.1 100 Continue"
       b""
+      b""
     ], b"\r\n")
 
     @assert = @build -> (builder |
       builder.status_switching_protocols
     ) == Bytes.join([
       b"HTTP/1.1 101 Switching Protocols"
+      b""
       b""
     ], b"\r\n")
 
@@ -34,6 +36,7 @@
       b"HTTP/1.1 200 OK"
       b"Content-Length: 0"
       b""
+      b""
     ], b"\r\n")
 
   :it "can write a body"
@@ -47,6 +50,7 @@
       b"Content-Type: text/plain; charset=utf-8"
       b""
       b"Hello, World!"
+      b""
     ], b"\r\n")
 
   :fun build Bytes'ref
