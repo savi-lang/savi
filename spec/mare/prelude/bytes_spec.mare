@@ -366,3 +366,14 @@
     // Trying to write to a space beyond the buffer size will raise an error.
     @assert = try (data.write_native_u32!(10, 0x12345678), False | True)
     @assert = try (data.write_native_u64!(6, 0xfedcba9876543210), False | True)
+
+  :it "joins an array of bytes"
+    @assert = Bytes.join([
+      b"foo"
+      b"bar"
+    ]) == b"foobar"
+
+    @assert = Bytes.join([
+      b"foo"
+      b"bar"
+    ], b" ") == b"foo bar"
