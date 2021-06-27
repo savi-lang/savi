@@ -83,20 +83,12 @@ module Mare::Parser
     prefixop = (char('~') | str("--")).named(:op)
     prefixed.define (prefixop >> atom).named(:prefix)
 
-    # Define what a capability looks like.
-    cap = (
-      str("iso") | str("val") | str("ref") |
-      str("box") | str("tag") | str("non") |
-      str("any") | str("alias") | str("send") | str("share") | str("read")
-    ).named(:ident)
-    capmod = str("aliased").named(:ident)
-
     # Define a compound to be a closely bound chain of atoms.
     opcap = char('\'').named(:op)
     opdot = char('.').named(:op)
     oparrow = (str("->")).named(:op)
     compound = (atom >> (
-      (opcap >> (capmod | cap)) | \
+      (opcap >> ident) | \
       (s >> oparrow >> s >> atom) | \
       (sn >> opdot >> sn >> atom) | \
       parens

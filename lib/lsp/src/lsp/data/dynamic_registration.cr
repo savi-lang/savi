@@ -2,14 +2,12 @@ require "json"
 
 module LSP::Data
   struct DynamicRegistration
-    JSON.mapping({
-      # The capability includes dynamic registration.
-      dynamic_registration: {
-        type: Bool,
-        default: false,
-        key: "dynamicRegistration"
-      },
-    })
+    include JSON::Serializable
+
+    # The capability includes dynamic registration.
+    @[JSON::Field(key: "dynamicRegistration")]
+    property dynamic_registration : Bool = false
+
     def initialize
       @dynamic_registration = false
     end

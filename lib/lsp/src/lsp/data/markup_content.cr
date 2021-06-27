@@ -24,13 +24,14 @@ module LSP::Data
   # *Please Note* that clients might sanitize the return markdown. A client could decide to
   # remove HTML from the markdown to avoid script execution.
   struct MarkupContent
-    JSON.mapping({
-      # The type of the Markup.
-      kind: String,
+    include JSON::Serializable
 
-      # The content itself.
-      value: String,
-    })
+    # The type of the Markup.
+    property kind : String
+
+    # The content itself.
+    property value : String
+
     def initialize(@kind = "plaintext", @value = "")
     end
   end

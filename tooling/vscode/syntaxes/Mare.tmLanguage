@@ -34,7 +34,7 @@
 			<key>comment</key>
 			<string>Capability Operator</string>
 			<key>match</key>
-			<string>\'(?=iso|val|ref|box|tag|non|any|alias|send|share|read|aliased)</string>
+			<string>\'(?=[_a-zA-Z0-9]+[^\'])</string>
 			<key>name</key>
 			<string>keyword.operator.capability.mare</string>
 		</dict>
