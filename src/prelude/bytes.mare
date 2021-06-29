@@ -98,13 +98,13 @@
     found Bool = False
     offset = start_offset
     other_first = other[0]! // cache here and error out if the other is empty
-    while (found.not && offset < @_size) (
+    while (!found && offset < @_size) (
       if (@_ptr._get_at(offset) == other_first) (
         found = (@_ptr._offset(offset)._compare(other._ptr, other._size) == 0)
       )
       offset = offset + 1
     )
-    if found.not error!
+    if !found error!
     offset - 1
 
   :: Returns true if the string is null-terminated and safe to pass to an FFI
@@ -233,7 +233,7 @@
     early_stop = False
     if (from < to) (
       index = from
-      while (index < @_size.min(to) && early_stop.not) (
+      while (index < @_size.min(to) && !early_stop) (
         early_stop = yield @_ptr._get_at(index)
         index += 1
       )
@@ -252,7 +252,7 @@
     :yields for Bool
     early_stop = False
     index USize = 0
-    while (index < @_size && early_stop.not) (
+    while (index < @_size && !early_stop) (
       early_stop = yield (@_ptr._get_at(index), index)
       index += 1
     )

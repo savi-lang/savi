@@ -269,6 +269,21 @@ class Mare::Compiler::Sugar < Mare::AST::CopyOnMutateVisitor
     raise Error.compiler_hole_at(node, exc)
   end
 
+  def visit(ctx, node : AST::Prefix)
+    case node.op.value
+    when "!"
+      visit(ctx,
+        AST::Relate.new(
+          AST::Identifier.new("False").from(node.op),
+          AST::Operator.new("==").from(node.op),
+          node.term,
+        ).from(node)
+      )
+    else
+      node
+    end
+  end
+
   def visit(ctx, node : AST::Relate)
     case node.op.value
     when ".", "'", " ", "<:", "!<:", "is", "DEFAULTPARAM"

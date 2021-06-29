@@ -74,25 +74,25 @@ module Mare::Parser
 
     # Define an atom to be a single term with no binary operators.
     parens = declare()
-    prefixed = declare()
     decl = declare()
     anystring = string | character | heredoc
-    atom = prefixed | parens | anystring | float | integer | ident
-
-    # Define a prefixed term to be preceded by a prefix operator.
-    prefixop = (char('~') | str("--")).named(:op)
-    prefixed.define (prefixop >> atom).named(:prefix)
+    atom = parens | anystring | float | integer | ident
 
     # Define a compound to be a closely bound chain of atoms.
     opcap = char('\'').named(:op)
     opdot = char('.').named(:op)
     oparrow = (str("->")).named(:op)
-    compound = (atom >> (
+    compound_without_prefix = (atom >> (
       (opcap >> ident) | \
       (s >> oparrow >> s >> atom) | \
       (sn >> opdot >> sn >> atom) | \
       parens
     ).repeat >> (s >> eol_annotation).maybe).named(:compound)
+
+    # A compound may be optionally preceded by a prefix operator.
+    prefixop = (str("--") | char('!') | char('~')).named(:op)
+    compound_with_prefix = (prefixop >> compound_without_prefix).named(:prefix)
+    compound = compound_with_prefix | compound_without_prefix
 
     # Define groups of operators, in order of precedence,
     # from most tightly binding to most loosely binding.

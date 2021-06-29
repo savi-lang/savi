@@ -96,13 +96,13 @@
     found Bool = False
     offset = start_offset
     other_first = other.byte_at!(0) // cache and error out if the other is empty
-    while (found.not && offset < @_size) (
+    while (!found && offset < @_size) (
       if (@_ptr._get_at(offset) == other_first) (
         found = (@_ptr._offset(offset)._compare(other._ptr, other._size) == 0)
       )
       offset = offset + 1
     )
-    if found.not error!
+    if !found error!
     offset - 1
 
   :: Returns true if the string is null-terminated and safe to pass to an FFI
@@ -222,7 +222,7 @@
     early_stop = False
     to = @_size.min(to)
     index = from
-    while (index < to && early_stop.not) (
+    while (index < to && !early_stop) (
       early_stop = yield @_ptr._get_at(index)
       index += stride
     )

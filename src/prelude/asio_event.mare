@@ -46,7 +46,7 @@
     LibPonyAsioEvent.pony_asio_event_set_readable(event, value)
 
   :fun unsubscribe_if_not_disposable(event CPointer(AsioEvent)) // TODO: should not need explicit type
-    if @get_disposable(event).not @unsubscribe(event)
+    if !@get_disposable(event) @unsubscribe(event)
     event
 
 :ffi LibPonyAsioEvent

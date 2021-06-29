@@ -225,11 +225,11 @@
     try ( // this should only fail when the map is empty, thus yielding nothing
       head = @_head.not!(None)
       entry = head.after!
-      while (entry isnt head && early_stop.not) (
+      while (entry isnt head && !early_stop) (
         early_stop = yield (entry.key, entry.value)
         entry = entry.after!
       )
-      if early_stop.not (
+      if !early_stop (
         early_stop = yield (entry.key, entry.value) // yield once more for the head
       )
     )

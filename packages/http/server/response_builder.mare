@@ -82,6 +82,6 @@
     // Only responses with no body must end with a new line.
     //
     // TODO: re-write this as !@has_body after we support it.
-    if (@_has_body.not) (@_res << b"\r\n")
+    if !@_has_body (@_res << b"\r\n")
 
     @_res

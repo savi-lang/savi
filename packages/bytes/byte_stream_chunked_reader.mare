@@ -120,10 +120,10 @@
     iter_chunk_index = @_mark_chunk_index
     iter_offset = @_mark_offset
     early_stop = False
-    while (early_stop.not && iter_chunk_index < @_chunk_index) (
+    while (!early_stop && iter_chunk_index < @_chunk_index) (
       try (
         chunk = @_chunks[iter_chunk_index]!
-        while (early_stop.not && iter_offset < chunk.size) (
+        while (!early_stop && iter_offset < chunk.size) (
           try (early_stop = yield chunk[iter_offset]!)
           iter_offset += 1
         )
@@ -133,7 +133,7 @@
     )
     try (
       chunk = @_chunks[iter_chunk_index]!
-      while (early_stop.not && iter_offset < @_offset) (
+      while (!early_stop && iter_offset < @_offset) (
         try (early_stop = yield chunk[iter_offset]!)
         iter_offset += 1
       )
@@ -158,7 +158,7 @@
     iter_chunk_index = @_mark_chunk_index
     iter_offset = @_mark_offset
     early_stop = False
-    while (early_stop.not && iter_chunk_index < @_chunk_index) (
+    while (!early_stop && iter_chunk_index < @_chunk_index) (
       try (
         chunk = @_chunks[iter_chunk_index]!
         early_stop = yield (chunk, iter_offset, chunk.size)
@@ -166,7 +166,7 @@
       iter_chunk_index += 1
       iter_offset = 0
     )
-    if early_stop.not (
+    if !early_stop (
       try (
         chunk = @_chunks[iter_chunk_index]!
         early_stop = yield (chunk, iter_offset, @_offset)

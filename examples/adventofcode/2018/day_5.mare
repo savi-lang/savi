@@ -12,7 +12,7 @@
   :fun result
     result = String.new
     @input.each_byte_with_index -> (byte, index |
-      if (@skips.has_key(index).not) (
+      if !@skips.has_key(index) (
         result.push_byte(byte)
       )
     )
@@ -31,7 +31,7 @@
     last_byte U8 = 0
     last_index USize = 0
     @input.each_byte_with_index -> (byte, index |
-      if (@skips.has_key(index).not) (
+      if !@skips.has_key(index) (
         no_reaction = True
 
         if (last_byte != 0) (

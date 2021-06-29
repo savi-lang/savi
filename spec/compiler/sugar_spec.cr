@@ -517,11 +517,11 @@ describe Mare::Compiler::Sugar do
     ctx.program.libraries.should eq ctx2.program.libraries
   end
 
-  it "transforms short-circuiting logical operators into choices" do
+  it "transforms short-circuiting logical operators and negations" do
     source = Mare::Source.new_example <<-SOURCE
     :class Example
       :fun logical
-        w && x || y && z
+        w && x || y && !z
     SOURCE
 
     ast = Mare::Parser.parse(source)
@@ -540,7 +540,7 @@ describe Mare::Compiler::Sugar do
             [:ident, "y"],
           ],
           [:op, "&&"],
-          [:ident, "z"],
+          [:prefix, [:op, "!"], [:ident, "z"]],
         ],
       ]],
     ]
@@ -562,7 +562,14 @@ describe Mare::Compiler::Sugar do
             ],
             [[:ident, "True"], [:ident, "y"]],
           ],
-          [:ident, "z"],
+          [:relate,
+            [:ident, "False"],
+            [:op, "."],
+            [:qualify,
+              [:ident, "=="],
+              [:group, "(", [:ident, "z"]],
+            ],
+          ],
         ],
         [[:ident, "True"], [:ident, "False"]],
       ],

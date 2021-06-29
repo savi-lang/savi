@@ -133,7 +133,7 @@
   :fun ref "last=!"(value A)
     @_ptr._assign_at(@size -! 1, --value)
 
-  :fun "!="(other): (@ == other).not // TODO: move this to the Equatable trait?
+  :fun "!="(other): (@ == other).is_false // TODO: move this to the Equatable trait?
   :fun "=="(other Array(A)'box)
     // TODO: optimize for cases when the elements can be pointer-compared by
     // value/identity instead of structural equality (e.g. Array(U8))
@@ -164,7 +164,7 @@
   :fun includes(expected A)
     is_found = False
     index USize = 0
-    while (is_found.not && index < @_size) (
+    while (!is_found && index < @_size) (
       is_found = if (A <: Equatable(A)'read) (
         @_ptr._get_at(index) == expected
       |
@@ -214,7 +214,7 @@
     to = @_size.min(to)
     early_stop = False
     index = from
-    while (index < to && early_stop.not) (
+    while (index < to && !early_stop) (
       early_stop = yield @_ptr._get_at(index)
       index += stride
     )
@@ -225,7 +225,7 @@
     to = @_size.min(to)
     index = from
     early_stop = False
-    while (index < to && early_stop.not) (
+    while (index < to && !early_stop) (
       element = @_ptr._get_at(index)
       early_stop = yield element
       index += stride // TODO: use early return to avoid later index subtraction
@@ -238,7 +238,7 @@
     index = from
     found ((@->A)'aliased | None) = None
     early_stop = False
-    while (index < to && early_stop.not) (
+    while (index < to && !early_stop) (
       element = @_ptr._get_at(index)
       early_stop = yield element
       if early_stop (found = element) // TODO: use early return to avoid later type match
