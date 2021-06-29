@@ -65,7 +65,8 @@
         @spec_ended(spec)
       )
 
-      @reporter.example_ended(spec, example)
+      skip = example_status.events.size == 0
+      @reporter.example_ended(spec, example, skip)
     |
       Specs._bug(@env, "example_ended before the example_began")
     )

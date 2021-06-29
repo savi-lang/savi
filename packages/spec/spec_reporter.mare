@@ -4,7 +4,7 @@
   :fun ref spec_began(spec String): None
   :fun ref spec_ended(spec String): None
   :fun ref example_began(spec String, example String): None
-  :fun ref example_ended(spec String, example String): None
+  :fun ref example_ended(spec String, example String, skip Bool): None
   :fun ref event(spec String, example String, event SpecEventAssert): None
 
 :class SpecReporterDots
@@ -44,8 +44,8 @@
     @env.err.write("  ")
     @env.err.write(example)
 
-  :fun ref example_ended(spec String, example String)
-    @env.err.print(" OK")
+  :fun ref example_ended(spec String, example String, skip Bool)
+    if (skip) (@env.err.print(" SKIP") | @env.err.print(" OK"))
 
   :fun ref event(spec String, example String, event SpecEventAssert)
     if event.success (
@@ -68,7 +68,7 @@
   :fun ref spec_began(spec String): @_changed
   :fun ref spec_ended(spec String): @_changed
   :fun ref example_began(spec String, example String): @_changed
-  :fun ref example_ended(spec String, example String): @_changed
+  :fun ref example_ended(spec String, example String, skip Bool): @_changed
   :fun ref event(spec String, example String, event SpecEventAssert): @_changed
 
   :fun ref _changed None // TODO: be able to infer return type for maybe-recursive functions
@@ -131,7 +131,8 @@
 
       // If the example has finished, but has not yet been reported, report now.
       if (example_status.ended && example_status.reported.not) (
-        @inner.example_ended(@current_spec, @current_example)
+        skip = example_status.events.size == 0
+        @inner.example_ended(@current_spec, @current_example, skip)
         example_status.reported = True
 
         // Since we've finished reporting this example, look to pick up another.
