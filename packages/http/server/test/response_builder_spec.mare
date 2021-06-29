@@ -1,0 +1,66 @@
+:import "spec"
+
+:class ResponseBuilderSpec
+  :is Spec
+  :const describes: "ResponseBuilder"
+
+  :it "builds 1xx responses"
+    @assert = @build -> (builder |
+      builder.status_continue
+    ) == Bytes.join([
+      b"HTTP/1.1 100 Continue"
+      b""
+      b""
+    ], b"\r\n")
+
+    @assert = @build -> (builder |
+      builder.status_switching_protocols
+    ) == Bytes.join([
+      b"HTTP/1.1 101 Switching Protocols"
+      b""
+      b""
+    ], b"\r\n")
+
+  // TODO: finish these test cases.
+  :it "builds 2xx responses"
+  :it "builds 3xx responses"
+  :it "builds 4xx responses"
+  :it "builds 5xx responses"
+
+  :it "can add headers"
+    @assert = @build -> (builder |
+      builder
+        .status_ok
+        .header("Content-Length", "0")
+    ) == Bytes.join([
+      b"HTTP/1.1 200 OK"
+      b"Content-Length: 0"
+      b""
+      b""
+    ], b"\r\n")
+
+  :it "can write a body"
+    @assert = @build -> (builder |
+      builder
+        .status_ok
+        .header("Content-Type", "text/plain; charset=utf-8")
+        .write("Hello, World!")
+    ) == Bytes.join([
+      b"HTTP/1.1 200 OK"
+      b"Content-Type: text/plain; charset=utf-8"
+      b""
+      b"Hello, World!"
+    ], b"\r\n")
+
+  :fun build Bytes'ref
+    :yields ResponseBuilder
+
+    bytes = Bytes.new
+    builder = ResponseBuilder.new(bytes) 
+
+    yield builder
+
+    builder.finish
+
+    bytes
+
