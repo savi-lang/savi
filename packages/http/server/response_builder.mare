@@ -2,7 +2,7 @@
 
 :class ResponseBuilder
   :let _res ByteStreamWritable
-  :var has_body: False
+  :var _has_body: False
 
   :new (target ByteStreamWritable)
     @_res = target
@@ -70,7 +70,7 @@
       @_res << b"\r\n"
 
       // If we actually write a body section `finish` will behave differently.
-      @has_body = True
+      @_has_body = True
 
       @_res << body.as_bytes
     )
@@ -81,7 +81,7 @@
   :fun ref finish
     // Only responses with no body must end with a new line.
     //
-    // TODO: re-write this as !@has_body once parsing error is fixed.
-    if (@has_body == False) (@_res << b"\r\n")
+    // TODO: re-write this as !@has_body after we support it.
+    if (@_has_body.not) (@_res << b"\r\n")
 
     @_res
