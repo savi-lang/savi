@@ -2,6 +2,7 @@
 
 :class ResponseBuilder
   :let _res ByteStreamWritable
+  :var has_body: False
 
   :new (target ByteStreamWritable)
     @_res = target
@@ -64,24 +65,23 @@
     @_res << name.as_bytes << b": " << value.as_bytes << b"\r\n", @
 
   :fun ref write(body String'val)
-    // Assumes headers section is already complete so it will start with an empty line.
-    @_res << b"\r\n"
+    if (body.size > 0) (
+      // Assumes headers section is already complete so it will start with an empty line.
+      @_res << b"\r\n"
 
-    @_res << body.as_bytes
+      // If we actually write a body section `finish` will behave differently.
+      @has_body = True
+
+      @_res << body.as_bytes
+    )
+
     @
 
-  // I think this next function is wrong per HTTP's definition when a body is present.
-  // We should only add the final empty line in cases where no message body is sent,
-  // like with the 204 No Content status, after all the headers.
-  //
-  // See https://stackoverflow.com/questions/13821263/should-newline-be-included-in-http-response-content-length
-  //
-  // This might be easier to deal with once we build the response from different
-  // fields instead of pilling everything into a single writable stream.
-  //
-  // Leaving the bug for now.
-  // TODO: fix above.
-  //
-  :: Wraps up the response with an empty line.
+  :: Wraps up the response with an empty line when it corresponds.
   :fun ref finish
-    @_res << b"\r\n"
+    // Only responses with no body must end with a new line.
+    //
+    // TODO: re-write this as !@has_body once parsing error is fixed.
+    if (@has_body == False) (@_res << b"\r\n")
+
+    @_res

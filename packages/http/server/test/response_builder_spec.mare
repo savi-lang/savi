@@ -50,7 +50,6 @@
       b"Content-Type: text/plain; charset=utf-8"
       b""
       b"Hello, World!"
-      b""
     ], b"\r\n")
 
   :fun build Bytes'ref
