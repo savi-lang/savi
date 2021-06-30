@@ -37,9 +37,6 @@ ENV PONYC_VERSION 0.35.1
 ENV PONYC_GIT_URL https://github.com/ponylang/ponyc
 RUN git clone -b ${PONYC_VERSION} --depth 1 ${PONYC_GIT_URL} /tmp/ponyc && \
     cd /tmp/ponyc && \
-    sed -i 's/void Main_/\/\/ void Main_/g' src/libponyrt/sched/start.c && \
-    sed -i 's/  Main_/  \/\/ Main_/g' src/libponyrt/sched/start.c && \
-    mkdir .mare_patches && \
     git apply /tmp/patches/* && \
     make runtime-bitcode=yes verbose=yes config=debug cross-libponyrt && \
     clang -shared -fpic -pthread -ldl -latomic -lexecinfo -o libponyrt.so build/native/build_debug/src/libponyrt/libponyrt.bc && \

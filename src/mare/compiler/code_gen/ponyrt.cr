@@ -1,18 +1,5 @@
 require "llvm"
 
-# This lib is necessary in order for us to link libponyrt with the mare binary,
-# which is necessary in order for us to make `mare eval {{CODE}}` work right.
-# If this dummy is not here, even if we include `--link-args=-lponyrt`
-# in the crystal invocation, some part of the toolchain won't believe that
-# we truly need to link the library and just leave it out of the `ldd` list.
-# If the library is left out, we won't be able to access the Pony runtime
-# functions from within out JIT-compiled `mare eval` execution.
-@[Link("ponyrt")]
-lib LibPonyRTDummy
-  fun pony_get_exitcode() : Int32*
-end
-LibPonyRTDummy.pony_get_exitcode()
-
 class Mare::Compiler::CodeGen::PonyRT
   # From libponyrt/pony.h
   # Padding for actor types.
@@ -552,6 +539,9 @@ class Mare::Compiler::CodeGen::PonyRT
   end
 
   def gen_main(g : CodeGen)
+    # In addition to the main function, we generate a runtime defaults function.
+    gen_runtime_defaults_func(g)
+
     # Declare the main function.
     main = g.mod.functions.add("main", [@i32, @pptr, @pptr], @i32)
     main.linkage = LLVM::Linkage::External
@@ -623,6 +613,19 @@ class Mare::Compiler::CodeGen::PonyRT
     g.gen_func_end
 
     main
+  end
+
+  def gen_runtime_defaults_func(g : CodeGen)
+    func_name = "Main_runtime_override_defaults_oo"
+    func = g.mod.functions.add(func_name, [@ptr], @void)
+    func.linkage = LLVM::Linkage::External
+
+    g.gen_func_start(func)
+
+    g.builder.ret
+    g.gen_func_end
+
+    func
   end
 
   # We don't hook into gen_expr post hook at all - simply return the value.

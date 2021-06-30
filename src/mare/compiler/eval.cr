@@ -1,7 +1,7 @@
 require "llvm"
 
 ##
-# The purpose of the Eval pass is to run the program using LLVM's JIT compiler.
+# The purpose of the Eval pass is to run the program built by the Binary pass.
 #
 # This pass does not mutate the Program topology.
 # This pass does not mutate the AST.
@@ -14,15 +14,9 @@ class Mare::Compiler::Eval
   getter! exitcode : Int32
 
   def run(ctx)
-    mod = ctx.code_gen.mod
-    llvm = ctx.code_gen.llvm
+    binary_path = "./#{ctx.options.binary_name}"
 
-    # TODO: Should this pass be responsible for generating the wrapper function?
-    jit_func = mod.functions["__mare_jit"]
-
-    # Run the function!
-    LLVM::JITCompiler.new mod do |jit|
-      @exitcode = jit.run_function(jit_func, llvm).to_i
-    end
+    res = Process.run("/usr/bin/env", [binary_path], output: STDOUT, error: STDERR)
+    @exitcode = res.exit_status
   end
 end
