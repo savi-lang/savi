@@ -8,6 +8,7 @@ class Mare::Compiler
     property print_perf
     property binary_name
     property target_pass : Symbol?
+    property target : Target?
 
     DEFAULT_BINARY_NAME = "main"
 
@@ -17,7 +18,8 @@ class Mare::Compiler
       @print_ir = false,
       @print_perf = false,
       @binary_name = DEFAULT_BINARY_NAME,
-      @target_pass = nil
+      @target_pass = nil,
+      @target = nil,
     )
     end
   end

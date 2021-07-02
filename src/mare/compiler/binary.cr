@@ -24,7 +24,14 @@ class Mare::Compiler::Binary
     machine = ctx.code_gen.target_machine
     mod = ctx.code_gen.mod
 
-    ponyrt_bc = LLVM::MemoryBuffer.from_file(PONYRT_BC_PATH)
+    target = ctx.options.target
+    ponyrt_bc_path = if target && target.freebsd?
+                       "/usr/local/lib/libponyrt.bc"
+                     else
+                       PONYRT_BC_PATH
+                     end
+
+    ponyrt_bc = LLVM::MemoryBuffer.from_file(ponyrt_bc_path)
     ponyrt = llvm.parse_bitcode(ponyrt_bc).as(LLVM::Module)
 
     # Link the pony runtime bitcode into the generated module.
@@ -35,10 +42,17 @@ class Mare::Compiler::Binary
 
     machine.emit_obj_to_file(mod, obj_filename)
 
-    link_args = %w{clang
-      -fuse-ld=lld -rdynamic -static -fpic -flto=thin
-      -lc -pthread -ldl -latomic
-    }
+    link_args = if target && target.freebsd?
+                  %w{clang
+                    -fuse-ld=lld -static -fpic -flto=thin
+                    -lc -pthread -ldl -lexecinfo -lelf
+                  }
+                else
+                  %w{clang
+                    -fuse-ld=lld -rdynamic -static -fpic -flto=thin
+                    -lc -pthread -ldl -latomic
+                  }
+                end
 
     link_args <<
       if ctx.options.release

@@ -16,6 +16,7 @@ module Mare
       option "--print-perf", desc: "Print compiler performance info", type: Bool, default: false
       option "-o NAME", "--output=NAME", desc: "Name of the output binary"
       option "-p NAME", "--pass=NAME", desc: "Name of the compiler pass to target"
+      option "--target=TARGET", desc: "Target triple"
       run do |opts, args|
         options = Mare::Compiler::CompilerOptions.new(
           release: opts.release,
@@ -25,6 +26,7 @@ module Mare
         )
         options.binary_name = opts.output.not_nil! if opts.output
         options.target_pass = Mare::Compiler.pass_symbol(opts.pass) if opts.pass
+        options.target = Mare::Compiler::Target.new(opts.target.not_nil!) if opts.target
         Cli.compile options, opts.backtrace
       end
       sub "server" do
