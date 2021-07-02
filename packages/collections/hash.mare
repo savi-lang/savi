@@ -16,4 +16,4 @@
 :: considering two values to be equal only if they have the same identity.
 :primitive HashIs(Q)
   :fun hash(x tag->Q) USize: (identity_digest_of x).hash
-  :fun equal(x tag->Q, y tag->Q) Bool: x is y
+  :fun equal(x tag->Q, y tag->Q) Bool: x === y

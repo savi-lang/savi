@@ -490,7 +490,7 @@ module Mare::Compiler::PreInfer
           @analysis.observe_extra_info(new_info)
         end
 
-      when "is"
+      when "===", "!=="
         # Just know that the result of this expression is a boolean.
         @analysis[node] = new_info = Infer::FixedPrelude.new(node.pos, layer(node), "Bool")
       when "<:", "!<:"

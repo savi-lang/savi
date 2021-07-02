@@ -1833,18 +1833,19 @@ class Mare::Compiler::CodeGen
     old_value
   end
 
-  def gen_check_identity_is(relate : AST::Relate)
+  def gen_check_identity_is(relate : AST::Relate, positive_check : Bool)
     lhs_type = type_of(relate.lhs)
     rhs_type = type_of(relate.rhs)
     lhs = gen_expr(relate.lhs)
     rhs = gen_expr(relate.rhs)
+    pred = positive_check ? LLVM::IntPredicate::EQ : LLVM::IntPredicate::NE
 
     if lhs.type.kind == LLVM::Type::Kind::Integer \
     && rhs.type.kind == LLVM::Type::Kind::Integer
       if lhs.type == rhs.type
         # Integers of the same type are compared by integer comparison.
         @builder.icmp(
-          LLVM::IntPredicate::EQ,
+          pred,
           lhs,
           rhs,
           "#{lhs.name}.is.#{rhs.name}",
@@ -1862,7 +1863,7 @@ class Mare::Compiler::CodeGen
       # Objects (not boxed machine words) of the same type are compared by
       # integer comparison of the pointer to the object.
       @builder.icmp(
-        LLVM::IntPredicate::EQ,
+        pred,
         @builder.bit_cast(lhs, @obj_ptr, "#{lhs.name}.CAST"),
         @builder.bit_cast(rhs, @obj_ptr, "#{rhs.name}.CAST"),
         "#{lhs.name}.is.#{rhs.name}",
@@ -2247,7 +2248,8 @@ class Mare::Compiler::CodeGen
       when "." then gen_dot(expr)
       when "=" then gen_eq(expr)
       when "<<=" then gen_displacing_eq(expr)
-      when "is" then gen_check_identity_is(expr)
+      when "===" then gen_check_identity_is(expr, true)
+      when "!==" then gen_check_identity_is(expr, false)
       when "<:" then gen_check_subtype(expr, true)
       when "!<:" then gen_check_subtype(expr, false)
       else raise NotImplementedError.new(expr.inspect)

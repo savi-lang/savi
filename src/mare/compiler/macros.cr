@@ -169,20 +169,6 @@ class Mare::Compiler::Macros < Mare::AST::CopyOnMutateVisitor
         "the local variable whose address is to be referenced",
       ])
       visit_address_of(node)
-    elsif Util.match_ident?(node, 1, "is")
-      Util.require_terms(node, [
-        "one of the two operands whose identity is to be compared",
-        nil,
-        "the other of the two operands whose identity is to be compared",
-      ])
-      visit_is(node)
-    elsif Util.match_ident?(node, 1, "isnt")
-      Util.require_terms(node, [
-        "one of the two operands whose identity is to be compared",
-        nil,
-        "the other of the two operands whose identity is to be compared",
-      ])
-      visit_isnt(node)
     else
       node
     end
@@ -495,34 +481,6 @@ class Mare::Compiler::Macros < Mare::AST::CopyOnMutateVisitor
 
     AST::Group.new("(", [
       AST::Prefix.new(op, term).from(node),
-    ] of AST::Term).from(node)
-  end
-
-  def visit_is(node : AST::Group)
-    lhs = node.terms[0]
-    orig = node.terms[1]
-    rhs = node.terms[2]
-
-    op = AST::Operator.new("is").from(orig)
-
-    AST::Group.new("(", [
-      AST::Relate.new(lhs, op, rhs).from(node),
-    ] of AST::Term).from(node)
-  end
-
-  def visit_isnt(node : AST::Group)
-    lhs = node.terms[0]
-    orig = node.terms[1]
-    rhs = node.terms[2]
-
-    op = AST::Operator.new("is").from(orig)
-
-    AST::Group.new("(", [
-      AST::Relate.new(
-        AST::Relate.new(lhs, op, rhs).from(node),
-        AST::Operator.new(".").from(node),
-        AST::Identifier.new("not").from(node),
-      ).from(node)
     ] of AST::Term).from(node)
   end
 end

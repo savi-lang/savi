@@ -101,22 +101,22 @@
         // We can safely use `is` here because we have ensured that each
         // such next_header we may compare against here is the "stringtabbed"
         // instance of it (i.e. each is a single static memory pointer address).
-        | @_next_header is "" | // do nothing; ignore this header
-        | @_next_header is "content-length" |
+        | @_next_header === "" | // do nothing; ignore this header
+        | @_next_header === "content-length" |
           try (
             @_request.content_length = stream.token_as_positive_integer!.usize
           |
             @_error = RequestErrorInvalidContentLength
             error!
           )
-        | @_next_header is "transfer-encoding" |
+        | @_next_header === "transfer-encoding" |
           if stream.is_token_ascii_lowercase_equal_to(b"chunked") (
             @_request.transfer_encoding = TransferEncodingChunked
           |
             @_error = RequestErrorUnsupportedTransferEncoding
             error!
           )
-        | @_next_header is "connection" |
+        | @_next_header === "connection" |
           case (
           | stream.is_token_ascii_lowercase_equal_to(b"close") |
             @_request.connection_header = ConnectionHeaderClose
