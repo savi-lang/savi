@@ -286,7 +286,7 @@ class Mare::Compiler::Sugar < Mare::AST::CopyOnMutateVisitor
 
   def visit(ctx, node : AST::Relate)
     case node.op.value
-    when ".", "'", " ", "<:", "!<:", "is", "DEFAULTPARAM"
+    when ".", "'", " ", "<:", "!<:", "===", "!==", "DEFAULTPARAM"
       node # skip these special-case operators
     when "->"
       # If a dot relation is within this (which doesn't happen in the parser,

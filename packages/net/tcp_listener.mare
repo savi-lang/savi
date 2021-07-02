@@ -59,7 +59,7 @@
   :: This is a special behaviour that hooks into the AsioEventNotify runtime,
   :: called whenever an event handle we're subscribed to receives an event.
   :be _event_notify(event CPointer(AsioEvent), flags U32, arg U32)
-    if (@_event is event) (
+    if (@_event === event) (
       if AsioEvent.is_readable(flags) (
         @_accept(arg)
       )

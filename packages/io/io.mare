@@ -153,13 +153,13 @@
     // unless it is the event that we own.
     | AsioEvent.is_disposable(flags) |
       AsioEvent.destroy(event)
-      if (@_event is event) (
+      if (@_event === event) (
         @_clear_state_after_final_dispose
         yield IOActionClosed
       )
 
     // If we own this event, continue by yielding any relevant actions.
-    | @_event is event |
+    | @_event === event |
       @_event_notify_continue(flags, arg) -> (action | yield action)
 
     // If this engine is waiting to open, try adopting this new event to open.
