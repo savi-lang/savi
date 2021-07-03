@@ -26,6 +26,7 @@ class Mare::Compiler
     case pass
     when "import"           then :import
     when "namespace"        then :namespace
+    when "reparse"          then :reparse
     when "macros"           then :macros
     when "sugar"            then :sugar
     when "refer_type"       then :refer_type
@@ -67,6 +68,7 @@ class Mare::Compiler
       case target
       when :import           then ctx.run_whole_program(ctx.import)
       when :namespace        then ctx.run_whole_program(ctx.namespace)
+      when :reparse          then ctx.run_copy_on_mutate(Reparse)
       when :macros           then ctx.run_copy_on_mutate(Macros)
       when :sugar            then ctx.run_copy_on_mutate(Sugar)
       when :refer_type       then ctx.run(ctx.refer_type)
@@ -113,14 +115,15 @@ class Mare::Compiler
     case target
     when :import then [] of Symbol
     when :namespace then [:import]
-    when :macros then [:namespace]
+    when :reparse then [:namespace]
+    when :macros then [:reparse]
     when :sugar then [:macros]
-    when :refer_type then [:sugar, :macros, :namespace]
-    when :populate then [:sugar, :macros, :refer_type]
-    when :lambda then [:sugar, :macros]
-    when :flow then [:lambda, :populate, :sugar, :macros]
-    when :classify then [:refer_type, :lambda, :populate, :sugar, :macros]
-    when :refer then [:classify, :lambda, :populate, :sugar, :macros, :refer_type]
+    when :refer_type then [:sugar, :macros, :reparse, :namespace]
+    when :populate then [:sugar, :macros, :reparse, :refer_type]
+    when :lambda then [:sugar, :macros, :reparse]
+    when :flow then [:lambda, :populate, :sugar, :macros, :reparse]
+    when :classify then [:refer_type, :lambda, :populate, :sugar, :macros, :reparse]
+    when :refer then [:classify, :lambda, :populate, :sugar, :macros, :reparse, :refer_type]
     when :local then [:refer, :flow]
     when :jumps then [:classify]
     when :inventory then [:refer]

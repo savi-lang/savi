@@ -17,7 +17,7 @@ describe Mare::Compiler::Macros do
         [:group, " ", [:ident, "foo"], [:ident, "String"]],
         [:relate,
           [:group, " ", [:ident, "bar"], [:ident, "SourceCodePosition"]],
-          [:op, "="],
+          [:op, "DEFAULTPARAM"],
           [:group, "(",
             [:prefix, [:op, "source_code_position_of_argument"], [:ident, "foo"]],
           ],

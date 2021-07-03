@@ -55,20 +55,6 @@ class Mare::Compiler::Sugar < Mare::AST::CopyOnMutateVisitor
     ret = f.ret
     body = f.body
 
-    # If any parameters contain assignments, convert them to defaults.
-    if body && params
-      params = params.dup if params.same?(f.params)
-      params.terms = params.terms.map do |param|
-        next param unless param.is_a?(AST::Relate) && param.op.value == "="
-
-        AST::Relate.new(
-          param.lhs,
-          AST::Operator.new("DEFAULTPARAM").from(param.op),
-          param.rhs,
-        ).from(param)
-      end
-    end
-
     # Sugar the parameter signature and return type.
     params = params.try(&.accept(ctx, self))
     ret = ret.try(&.accept(ctx, self))
@@ -162,48 +148,7 @@ class Mare::Compiler::Sugar < Mare::AST::CopyOnMutateVisitor
     f
   end
 
-  def visit(ctx, node : AST::Identifier)
-    if node.value == "@"
-      node
-    elsif node.value.char_at(0) == '@'
-      receiver_pos = node.pos.subset(0, node.pos.size - 1)
-      ident_pos = node.pos.subset(1, 0)
-      receiver = AST::Identifier.new("@").with_pos(receiver_pos)
-      ident = AST::Identifier.new(node.value[1..-1]).with_pos(ident_pos)
-      AST::Call.new(receiver, ident).from(node)
-    elsif node.pos.source.pony?
-      # PONY special case: uses the keyword `this` for the self value.
-      if node.value == "this"
-        AST::Identifier.new("@").from(node)
-      # PONY special case: uses the keyword `error` for the error statement.
-      elsif node.value == "error"
-        AST::Jump.new(AST::Identifier.new("None").from(node), AST::Jump::Kind::Error).from(node)
-      else
-        node
-      end
-    else
-      node
-    end
-  rescue exc : Exception
-    raise Error.compiler_hole_at(node, exc)
-  end
-
-  # PONY special case: many operators have different names in Pony.
-  def visit(ctx, node : AST::Operator)
-    return node unless node.pos.source.pony?
-
-    case node.value
-    when "consume" then AST::Operator.new("--").from(node)
-    when "and"     then AST::Operator.new("&&").from(node)
-    when "or"      then AST::Operator.new("||").from(node)
-    else node
-    end
-  rescue exc : Exception
-    raise Error.compiler_hole_at(node, exc)
-  end
-
   def visit(ctx, node : AST::Qualify)
-    # Transform square-brace qualifications into method calls
     square_bracket =
       case node.group.style
       when "[" then "[]"
@@ -211,49 +156,29 @@ class Mare::Compiler::Sugar < Mare::AST::CopyOnMutateVisitor
       else
         nil
       end
-    if square_bracket
-      # PONY special case: square brackets are type params in Pony
-      if node.pos.source.pony?
-        term = node.term
-        if term.is_a?(AST::Identifier) && term.value.match(/\A[A-Z]/)
-          return AST::Qualify.new(
-            term,
-            AST::Group.new("(", node.group.terms.dup).from(node.group)
-          ).from(node)
-        else
-          raise NotImplementedError.new(node.to_a.inspect)
-        end
-      end
+    return node unless square_bracket
 
-      return visit(ctx,
-        AST::Call.new(
-          node.term,
-          AST::Identifier.new(square_bracket).from(node.group),
-          AST::Group.new("(", node.group.terms.dup).from(node.group),
+    # PONY special case: square brackets are type params in Pony
+    if node.pos.source.pony?
+      term = node.term
+      if term.is_a?(AST::Identifier) && term.value.match(/\A[A-Z]/)
+        return AST::Qualify.new(
+          term,
+          AST::Group.new("(", node.group.terms.dup).from(node.group)
         ).from(node)
-      )
-    end
-
-    # If a call is the term of a qualify, move the qualification into call args.
-    if (call = node.term).is_a?(AST::Call)
-      args = node.group
-      annotations = node.annotations
-      node = AST::Call.new(
-        call.receiver,
-        call.ident,
-        args,
-      ).from(call)
-      node.annotations = annotations
-
-      # PONY special case: exclamation from args gets moved to the ident.
-      if node.pos.source.pony? && args.style == "(!"
-        new_ident_value = "#{node.ident.value}!"
-        node.ident = AST::Identifier.new(new_ident_value).from(node.ident)
-        args.style = "("
+      else
+        raise NotImplementedError.new(node.to_a.inspect)
       end
     end
 
-    node
+    # Transform square-brace qualifications into method calls
+    visit(ctx,
+      AST::Call.new(
+        node.term,
+        AST::Identifier.new(square_bracket).from(node.group),
+        AST::Group.new("(", node.group.terms.dup).from(node.group),
+      ).from(node)
+    )
   rescue exc : Exception
     raise Error.compiler_hole_at(node, exc)
   end
@@ -275,41 +200,8 @@ class Mare::Compiler::Sugar < Mare::AST::CopyOnMutateVisitor
 
   def visit(ctx, node : AST::Relate)
     case node.op.value
-    when "'", " ", "<:", "!<:", "===", "!==", "DEFAULTPARAM"
+    when "->", "'", " ", "<:", "!<:", "===", "!==", "DEFAULTPARAM"
       node # skip these special-case operators
-    when "."
-      visit(ctx,
-        AST::Call.new(node.lhs, node.rhs.as(AST::Identifier)).from(node)
-      )
-    when "->"
-      if (call = node.lhs).is_a?(AST::Call)
-        yield_params = nil
-        yield_block = nil
-        if (rhs = node.rhs).is_a?(AST::Group)
-          if rhs.style == "("
-            yield_block = rhs
-          elsif rhs.style == "|" && rhs.terms.size == 2
-            yield_params = rhs.terms.first.as(AST::Group)
-            yield_block = rhs.terms.last.as(AST::Group)
-          else
-            ctx.error_at node.rhs, "This is invalid syntax for a yield block"
-          end
-        else
-          ctx.error_at node.rhs, "This is invalid syntax for a yield block"
-        end
-
-        visit(ctx,
-          AST::Call.new(
-            call.receiver,
-            call.ident,
-            call.args,
-            yield_params,
-            yield_block,
-          ).from(node)
-        )
-      else
-        node
-      end
     when "+=", "-="
       op =
         case node.op.value
