@@ -1,0 +1,9 @@
+:import "../micro_test" (MicroTest)
+
+:primitive ReturnSpec
+  :fun run(test MicroTest)
+    test["return; with early return value"].pass =
+      U64[33] == _EarlyReturn.conditional(True)
+
+    test["return; with early return value"].pass =
+      U64[11] == _EarlyReturn.conditional(False)
