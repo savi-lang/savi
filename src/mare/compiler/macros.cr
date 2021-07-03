@@ -46,6 +46,11 @@ class Mare::Compiler::Macros < Mare::AST::CopyOnMutateVisitor
 
   getter func
   def initialize(@func : Program::Function)
+    @last_hygienic_local = 0
+  end
+
+  def next_local_name
+    "hygienic_macros_local.#{@last_hygienic_local += 1}"
   end
 
   def run(ctx)
@@ -189,6 +194,53 @@ class Mare::Compiler::Macros < Mare::AST::CopyOnMutateVisitor
       AST::Jump.new(AST::Identifier.new("None").from(node), AST::Jump::Kind::Next).from(node)
     else
       node
+    end
+  rescue exc : Exception
+    raise exc if exc.is_a?(Error) # TODO: ctx.errors multi-error capability
+    raise Error.compiler_hole_at(node, exc)
+  end
+
+  def visit(ctx, node : AST::Call)
+    case node.ident.value
+    when "as!", "not!"
+      call_args = node.args
+      Error.at node.ident,
+        "This call requires exactly one argument (the type to check)" \
+          unless call_args && call_args.terms.size == 1
+
+      local_name = next_local_name
+      type_arg = call_args.terms.first
+      op =
+        case node.ident.value
+        when "as!" then "<:"
+        when "not!" then "!<:"
+        else raise NotImplementedError.new(node.ident)
+        end
+
+      group = AST::Group.new("(").from(node)
+      group.terms << AST::Relate.new(
+        AST::Identifier.new(local_name).from(node.receiver),
+        AST::Operator.new("=").from(node.receiver),
+        node.receiver,
+      ).from(node.receiver)
+      group.terms << AST::Choice.new([
+        {
+          AST::Relate.new(
+            AST::Identifier.new(local_name).from(node.receiver),
+            AST::Operator.new(op).from(node.ident),
+            type_arg,
+          ).from(node.ident),
+          AST::Identifier.new(local_name).from(node.receiver),
+        },
+        {
+          AST::Identifier.new("True").from(node.ident),
+          AST::Jump.new(AST::Identifier.new("None").from(node), AST::Jump::Kind::Error).from(node.ident),
+        },
+      ] of {AST::Term, AST::Term}).from(node)
+
+      group
+    else
+      node # all other calls are passed through unchanged
     end
   rescue exc : Exception
     raise exc if exc.is_a?(Error) # TODO: ctx.errors multi-error capability

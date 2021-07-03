@@ -33,10 +33,6 @@ class Mare::Compiler::Sugar < Mare::AST::CopyOnMutateVisitor
         cached_or_run library, t, f do
           sugar = new
           f = sugar.run(ctx, f)
-
-          # Run pseudo-call transformation as a separate followup mini-pass,
-          # because some of the sugar transformations need to already be done.
-          PseudoCalls.run(ctx, f, sugar)
         end
       end
     end
@@ -267,71 +263,5 @@ class Mare::Compiler::Sugar < Mare::AST::CopyOnMutateVisitor
     end
   rescue exc : Exception
     raise Error.compiler_hole_at(node, exc)
-  end
-
-  # Handle pseudo-method sugar like `as!` and `not!` calls.
-  class PseudoCalls < Mare::AST::CopyOnMutateVisitor
-    def self.run(ctx : Context, f : Program::Function, sugar : Sugar)
-      ps = new(sugar)
-      params = f.params.try(&.accept(ctx, ps))
-      body = f.body.try(&.accept(ctx, ps))
-
-      f = f.dup
-      f.params = params
-      f.body = body
-      f
-    end
-
-    getter sugar : Sugar
-    def initialize(@sugar)
-    end
-
-    def visit(ctx, node : AST::Node)
-      return node unless node.is_a?(AST::Call)
-
-      case node.ident.value
-      when "as!", "not!"
-        call_args = node.args
-        Error.at node.ident,
-          "This call requires exactly one argument (the type to check)" \
-            unless call_args && call_args.terms.size == 1
-
-        local_name = sugar.next_local_name
-        type_arg = call_args.terms.first
-        op =
-          case node.ident.value
-          when "as!" then "<:"
-          when "not!" then "!<:"
-          else raise NotImplementedError.new(node.ident)
-          end
-
-        group = AST::Group.new("(").from(node)
-        group.terms << AST::Relate.new(
-          AST::Identifier.new(local_name).from(node.receiver),
-          AST::Operator.new("=").from(node.receiver),
-          node.receiver,
-        ).from(node.receiver)
-        group.terms << AST::Choice.new([
-          {
-            AST::Relate.new(
-              AST::Identifier.new(local_name).from(node.receiver),
-              AST::Operator.new(op).from(node.ident),
-              type_arg,
-            ).from(node.ident),
-            AST::Identifier.new(local_name).from(node.receiver),
-          },
-          {
-            AST::Identifier.new("True").from(node.ident),
-            AST::Jump.new(AST::Identifier.new("None").from(node), AST::Jump::Kind::Error).from(node.ident),
-          },
-        ] of {AST::Term, AST::Term}).from(node)
-
-        group
-      else
-        node # all other calls are passed through unchanged
-      end
-    rescue exc : Exception
-      raise Error.compiler_hole_at(node, exc)
-    end
   end
 end
