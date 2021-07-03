@@ -9,7 +9,7 @@ It marks the use sites of local variables.
   res_2 = (x <<= "new value") ::local.use_site=> x:RW:(0, 13)
   try (
     res_3 = x                 ::local.use_site=> x:R:(3, 18)
-    res_4 = --x               ::local.use_site=> x:C:(3, 24)
+    res_4 = (--x)             ::local.use_site=> x:C:(3, 24)
   )
 ```
 
@@ -20,7 +20,7 @@ It marks the use sites of the local-like "self" variable (@).
 ```mare
   :fun iso call
     @            ::local.use_site=> @:R:(0, 0)
-    result = --@ ::local.use_site=> @:C:(0, 5)
+    result = (--@) ::local.use_site=> @:C:(0, 5)
     --result
 ```
 
@@ -35,10 +35,10 @@ It marks the use sites of parameters.
     arg_3 String = "value" // can't easily annotate here unfortunately
   )
     try (
-      res_3 = arg_1   ::local.use_site=> arg_1:R:(3, 13)
-      res_4 = --arg_2 ::local.use_site=> arg_2:C:(3, 19)
+      res_3 = arg_1     ::local.use_site=> arg_1:R:(3, 13)
+      res_4 = (--arg_2) ::local.use_site=> arg_2:C:(3, 19)
     )
-    (arg_3 = "new value") ::local.use_site=> arg_3:W:(2, 28)
+    (arg_3 = "new value") ::local.use_site=> arg_3:W:(2, 29)
 ```
 
 ---
@@ -53,9 +53,9 @@ It marks the use sites of yield parameters.
   |
     try (
       res_3 = arg_1   ::local.use_site=> arg_1:R:(6, 15)
-      res_4 = --arg_2 ::local.use_site=> arg_2:C:(6, 21)
+      res_4 = (--arg_2) ::local.use_site=> arg_2:C:(6, 21)
     )
-    (arg_3 = "new value") ::local.use_site=> arg_3:W:(5, 30)
+    (arg_3 = "new value") ::local.use_site=> arg_3:W:(5, 31)
   )
 ```
 
