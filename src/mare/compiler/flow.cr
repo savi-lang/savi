@@ -283,7 +283,7 @@ module Mare::Compiler::Flow
 
       case node
       when AST::Jump then visit_jump(ctx, node)
-      when AST::Relate then visit_relate(ctx, node)
+      when AST::Call then visit_call(ctx, node)
       else nil
       end
 
@@ -305,8 +305,8 @@ module Mare::Compiler::Flow
       when AST::Try
         deep_visit_try(ctx, node)
         false # don't visit children naturally; we visited them just above
-      when AST::Relate
-        visited = deep_visit_relate(ctx, node)
+      when AST::Call
+        visited = deep_visit_call(ctx, node)
         !visited # only visit children if we didn't visit them already
       else
         true # visit the children of all other node types as normal
@@ -424,19 +424,18 @@ module Mare::Compiler::Flow
       @current_block = after_block
     end
 
-    def deep_visit_relate(ctx, node : AST::Relate) : Bool
-      return false unless node.op.value == "."
-
+    def deep_visit_call(ctx, node : AST::Call) : Bool
       # In this part of the visitor, we deal with yield blocks at call sites.
-      ident, args, yield_params, yield_block_node = AST::Extract.call(node)
+      yield_params = node.yield_params
+      yield_block_node = node.yield_block
       return false unless yield_block_node
 
       # Before doing anything else, we need to visit the children which were
       # deferred from being visited, but do not actually require from us any
       # special handling here. We visit them prior to the special handling.
-      node.lhs.accept(ctx, self)
-      ident.accept(ctx, self)
-      args.try(&.accept(ctx, self))
+      node.receiver.accept(ctx, self)
+      node.ident.accept(ctx, self)
+      node.args.try(&.accept(ctx, self))
 
       # Now we set up the control flow blocks we need to model the yield block.
       before_block = @current_block
@@ -513,11 +512,8 @@ module Mare::Compiler::Flow
       @current_block = unreachable_block
     end
 
-    def visit_relate(ctx, node : AST::Relate)
-      return unless node.op.value == "."
-
-      ident = AST::Extract.call(node).first
-      return unless ident.value.ends_with?("!")
+    def visit_call(ctx, node : AST::Call)
+      return unless node.ident.value.ends_with?("!")
 
       target_block = current_jump_target_for(AST::Jump::Kind::Error).not_nil!
       target_block.comes_after(@current_block)

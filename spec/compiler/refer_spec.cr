@@ -79,8 +79,8 @@ describe Mare::Compiler::Refer do
     refer = ctx.refer[func_link]
     body = func.body.not_nil!.terms
     example_1 = body[0].as(Mare::AST::Relate).lhs.as(Mare::AST::Identifier)
-    example_2 = body[1].as(Mare::AST::Relate).rhs.as(Mare::AST::Identifier)
-    example_3 = body[2].as(Mare::AST::Relate).rhs.as(Mare::AST::Identifier)
+    example_2 = body[1].as(Mare::AST::Call).ident
+    example_3 = body[2].as(Mare::AST::Call).ident
 
     refer[example_1].class.should eq Mare::Compiler::Refer::Local
     refer[example_2].class.should eq Mare::Compiler::Refer::Unresolved

@@ -211,17 +211,13 @@ module Mare::Compiler::Completeness
       @analysis.observe_self_reference(info, collect_unseen_fields)
     end
 
-    def touch(node : AST::Relate)
-      # We only care about looking at dot-relations (function calls).
-      return unless node.op.value == "."
-
-      # If the left side is definitely the self, we allow access even when
+    def touch(node : AST::Call)
+      # If the receiver is definitely the self, we allow access even when
       # not all fields are initialized - we will follow the call and continue
       # our branching analysis of field initialization in that other function.
-      lhs = node.lhs
-      if lhs.is_a?(AST::Identifier) && lhs.value == "@"
-        # Extract the function name from the right side.
-        func_name = AST::Extract.call(node)[0].value
+      receiver = node.receiver
+      if receiver.is_a?(AST::Identifier) && receiver.value == "@"
+        func_name = node.ident.value
 
         # If this is a direct call to a `let` property setter, complain
         # if this object has already been fully initialized in all fields.

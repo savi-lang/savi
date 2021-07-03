@@ -346,6 +346,64 @@ module Mare::Compiler::Jumps
       end
     end
 
+    def touch(node : AST::Call)
+      # A call is a maybe error if its identifier indicates it as such.
+      @analysis.maybe_error!(node) if @analysis.maybe_error?(node.ident)
+
+      receiver = node.receiver
+      args = node.args
+      yield_params = node.yield_params
+      yield_block = node.yield_block
+
+      if (@analysis.always_error?(receiver)) \
+      || (args && @analysis.always_error?(args)) \
+      || (yield_params && @analysis.always_error?(yield_params)) \
+      || (yield_block && @analysis.always_error?(yield_block))
+        # A call is an always error if any piece of it is.
+        @analysis.always_error!(node)
+      elsif (@analysis.maybe_error?(receiver)) \
+      || (args && @analysis.maybe_error?(args)) \
+      || (yield_params && @analysis.maybe_error?(yield_params)) \
+      || (yield_block && @analysis.maybe_error?(yield_block))
+        # Otherwise, it is a maybe error if any piece of it is.
+        @analysis.maybe_error!(node)
+      end
+
+      if (@analysis.always_return?(receiver)) \
+      || (args && @analysis.always_return?(args)) \
+      || (yield_params && @analysis.always_return?(yield_params)) \
+      || (yield_block && @analysis.always_return?(yield_block))
+        # A call is an always return if any piece of it is.
+        @analysis.always_return!(node)
+      elsif (@analysis.maybe_return?(receiver)) \
+      || (args && @analysis.maybe_return?(args)) \
+      || (yield_params && @analysis.maybe_return?(yield_params)) \
+      || (yield_block && @analysis.maybe_return?(yield_block))
+        # Otherwise, it is a maybe return if any piece of it is.
+        @analysis.maybe_return!(node)
+      end
+
+      if (@analysis.always_break?(receiver)) \
+      || (args && @analysis.always_break?(args))
+        # A call is an always break if any "outer" piece of it is.
+        @analysis.always_break!(node)
+      elsif (@analysis.maybe_break?(receiver)) \
+      || (args && @analysis.maybe_break?(args))
+        # Otherwise, it is a maybe break if any "outer" piece of it is.
+        @analysis.maybe_break!(node)
+      end
+
+      if (@analysis.always_next?(receiver)) \
+      || (args && @analysis.always_next?(args))
+        # A call is an always next if any "outer" piece of it is.
+        @analysis.always_next!(node)
+      elsif (@analysis.maybe_next?(receiver)) \
+      || (args && @analysis.maybe_next?(args))
+        # Otherwise, it is a maybe next if any "outer" piece of it is.
+        @analysis.maybe_next!(node)
+      end
+    end
+
     def touch(node : AST::Choice)
       # A choice is an always error only if all possible paths
       # through conds and bodies force us into an always error.

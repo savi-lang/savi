@@ -240,7 +240,6 @@ module Mare::Compiler::Local
         case node.op.value
         when "=" then false
         when "<<=" then true
-        when "." then return observe_call(ctx, node)
         else return
         end
 
@@ -286,6 +285,11 @@ module Mare::Compiler::Local
         if old_use_site.try(&.is_first_lexical_appearance)
     end
 
+    # Observing a call site entails observing any yield parameters.
+    def observe(ctx, node : AST::Call)
+      node.yield_params.try(&.terms.each { |param| observe_param(ctx, param) })
+    end
+
     # All other node types have no special logic.
     def observe(ctx, node)
     end
@@ -309,15 +313,6 @@ module Mare::Compiler::Local
       ))
       use_site.observe_is_first_lexical_appearance \
         if old_use_site.try(&.is_first_lexical_appearance)
-    end
-
-    # Observing a call site entails observing any yield parameters.
-    def observe_call(ctx, node)
-      ident, args, yield_params, yield_block = AST::Extract.call(node)
-
-      if yield_params
-        yield_params.terms.each { |param| observe_param(ctx, param) }
-      end
     end
 
     def each_possible_predecessor_of(use_site : UseSite, &yield_block : UseSite? -> _)

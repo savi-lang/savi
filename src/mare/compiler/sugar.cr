@@ -85,7 +85,7 @@ class Mare::Compiler::Sugar < Mare::AST::CopyOnMutateVisitor
         end
 
         # If the param is a dot relation, treat it as an assignable.
-        if param.is_a?(AST::Relate) && param.op.value == "."
+        if param.is_a?(AST::Call)
           new_name = "ASSIGNPARAM.#{index + 1}"
 
           # Replace the parameter with our new name as the identifier.
@@ -166,12 +166,11 @@ class Mare::Compiler::Sugar < Mare::AST::CopyOnMutateVisitor
     if node.value == "@"
       node
     elsif node.value.char_at(0) == '@'
-      lhs_pos = node.pos.subset(0, node.pos.size - 1)
-      rhs_pos = node.pos.subset(1, 0)
-      lhs = AST::Identifier.new("@").with_pos(lhs_pos)
-      dot = AST::Operator.new(".").with_pos(lhs_pos)
-      rhs = AST::Identifier.new(node.value[1..-1]).with_pos(rhs_pos)
-      AST::Relate.new(lhs, dot, rhs).from(node)
+      receiver_pos = node.pos.subset(0, node.pos.size - 1)
+      ident_pos = node.pos.subset(1, 0)
+      receiver = AST::Identifier.new("@").with_pos(receiver_pos)
+      ident = AST::Identifier.new(node.value[1..-1]).with_pos(ident_pos)
+      AST::Call.new(receiver, ident).from(node)
     elsif node.pos.source.pony?
       # PONY special case: uses the keyword `this` for the self value.
       if node.value == "this"
@@ -226,47 +225,35 @@ class Mare::Compiler::Sugar < Mare::AST::CopyOnMutateVisitor
         end
       end
 
-      lhs = node.term
-      node = AST::Qualify.new(
-        AST::Identifier.new(square_bracket).from(node.group),
-        AST::Group.new("(", node.group.terms.dup).from(node.group),
-      ).from(node)
-      dot = AST::Operator.new(".").from(node.group)
-      rhs = visit(ctx, node)
-      return AST::Relate.new(lhs, dot, rhs).from(node)
-    end
-
-    # If a dot relation is within a qualify, move the qualify into the
-    # right-hand-side of the dot (this cleans up the work of the parser).
-    new_top = nil
-    while (dot = node.term).is_a?(AST::Relate) && dot.op.value == "."
-      node = AST::Qualify.new(dot.rhs, node.group).from(node)
-      new_top ||= AST::Relate.new(
-        dot.lhs,
-        dot.op,
-        node,
-      ).from(dot)
-      new_top.annotations = node.annotations
-      node.annotations = nil
-    end
-
-    # PONY special case: non-square qualify exclamation gets moved to the ident.
-    if node.pos.source.pony? && node.group.style == "(!"
-      new_ident_value = "#{node.term.as(AST::Identifier).value}!"
-      new_ident = AST::Identifier.new(new_ident_value).from(node.term)
-      new_group = AST::Group.new("(", node.group.terms.dup).from(node.group)
-      if new_top
-        node.term = new_ident
-        node.group = new_group
-      else
-        node = AST::Qualify.new(
-          new_ident,
-          new_group,
+      return visit(ctx,
+        AST::Call.new(
+          node.term,
+          AST::Identifier.new(square_bracket).from(node.group),
+          AST::Group.new("(", node.group.terms.dup).from(node.group),
         ).from(node)
+      )
+    end
+
+    # If a call is the term of a qualify, move the qualification into call args.
+    if (call = node.term).is_a?(AST::Call)
+      args = node.group
+      annotations = node.annotations
+      node = AST::Call.new(
+        call.receiver,
+        call.ident,
+        args,
+      ).from(call)
+      node.annotations = annotations
+
+      # PONY special case: exclamation from args gets moved to the ident.
+      if node.pos.source.pony? && args.style == "(!"
+        new_ident_value = "#{node.ident.value}!"
+        node.ident = AST::Identifier.new(new_ident_value).from(node.ident)
+        args.style = "("
       end
     end
 
-    new_top || node
+    node
   rescue exc : Exception
     raise Error.compiler_hole_at(node, exc)
   end
@@ -288,22 +275,41 @@ class Mare::Compiler::Sugar < Mare::AST::CopyOnMutateVisitor
 
   def visit(ctx, node : AST::Relate)
     case node.op.value
-    when ".", "'", " ", "<:", "!<:", "===", "!==", "DEFAULTPARAM"
+    when "'", " ", "<:", "!<:", "===", "!==", "DEFAULTPARAM"
       node # skip these special-case operators
+    when "."
+      visit(ctx,
+        AST::Call.new(node.lhs, node.rhs.as(AST::Identifier)).from(node)
+      )
     when "->"
-      # If a dot relation is within this (which doesn't happen in the parser,
-      # but may happen artifically such as the `@identifier` sugar above),
-      # then always move the qualify into the right-hand-side of the dot.
-      new_top = nil
-      while (dot = node.lhs).is_a?(AST::Relate) && dot.op.value == "."
-        node = AST::Relate.new(dot.rhs, node.op, node.rhs).from(node)
-        new_top ||= AST::Relate.new(
-          dot.lhs,
-          dot.op,
-          node,
-        ).from(dot)
+      if (call = node.lhs).is_a?(AST::Call)
+        yield_params = nil
+        yield_block = nil
+        if (rhs = node.rhs).is_a?(AST::Group)
+          if rhs.style == "("
+            yield_block = rhs
+          elsif rhs.style == "|" && rhs.terms.size == 2
+            yield_params = rhs.terms.first.as(AST::Group)
+            yield_block = rhs.terms.last.as(AST::Group)
+          else
+            ctx.error_at node.rhs, "This is invalid syntax for a yield block"
+          end
+        else
+          ctx.error_at node.rhs, "This is invalid syntax for a yield block"
+        end
+
+        visit(ctx,
+          AST::Call.new(
+            call.receiver,
+            call.ident,
+            call.args,
+            yield_params,
+            yield_block,
+          ).from(node)
+        )
+      else
+        node
       end
-      new_top || node
     when "+=", "-="
       op =
         case node.op.value
@@ -327,47 +333,20 @@ class Mare::Compiler::Sugar < Mare::AST::CopyOnMutateVisitor
       )
     when "=", "<<="
       lhs = node.lhs
-      # If assigning to a ".identifier" relation, sugar as a "setter" method.
-      if lhs.is_a?(AST::Relate) \
-      && lhs.op.value == "." \
-      && lhs.rhs.is_a?(AST::Identifier)
-        base_name = lhs.rhs.as(AST::Identifier).value
+      # If assigning to a ".identifier" relation, sugar as a "setter" call.
+      if lhs.is_a?(AST::Call)
+        base_name = lhs.ident.value
         suffix = ""
         if base_name.ends_with?("!")
           base_name = base_name[0...-1]
           suffix = "!"
         end
         name = "#{base_name}#{node.op.value}#{suffix}"
-        ident = AST::Identifier.new(name).from(lhs.rhs)
-        args = AST::Group.new("(", [node.rhs]).from(node.rhs)
-        rhs = AST::Qualify.new(ident, args).from(node)
-        AST::Relate.new(lhs.lhs, lhs.op, rhs).from(node)
-      # If assigning to a ".[]" relation, sugar as an "element setter" method.
-      elsif lhs.is_a?(AST::Relate) \
-      && lhs.op.value == "." \
-      && lhs.rhs.is_a?(AST::Qualify) \
-      && lhs.rhs.as(AST::Qualify).term.is_a?(AST::Identifier) \
-      && lhs.rhs.as(AST::Qualify).term.as(AST::Identifier).value == "[]"
-        inner = lhs.rhs.as(AST::Qualify)
-        ident = AST::Identifier.new("[]#{node.op.value}").from(inner.term)
-        args = inner.group.dup
-        args.terms = args.terms.dup
-        args.terms << node.rhs
-        rhs = AST::Qualify.new(ident, args).from(node)
-        AST::Relate.new(lhs.lhs, lhs.op, rhs).from(node)
-      # If assigning to a ".[]!" relation, sugar as an "element setter" method.
-      elsif lhs.is_a?(AST::Relate) \
-      && lhs.op.value == "." \
-      && lhs.rhs.is_a?(AST::Qualify) \
-      && lhs.rhs.as(AST::Qualify).term.is_a?(AST::Identifier) \
-      && lhs.rhs.as(AST::Qualify).term.as(AST::Identifier).value == "[]!"
-        inner = lhs.rhs.as(AST::Qualify)
-        ident = AST::Identifier.new("[]#{node.op.value}!").from(inner.term)
-        args = inner.group.dup
-        args.terms = args.terms.dup
-        args.terms << node.rhs
-        rhs = AST::Qualify.new(ident, args).from(node)
-        AST::Relate.new(lhs.lhs, lhs.op, rhs).from(node)
+        ident = AST::Identifier.new(name).from(lhs.ident)
+        args_list = [node.rhs]
+        lhs.args.try { |lhs_args| args_list = lhs_args.terms + args_list }
+        args = AST::Group.new("(", args_list).from(node.rhs)
+        AST::Call.new(lhs.receiver, ident, args).from(node)
       else
         node
       end
@@ -391,10 +370,8 @@ class Mare::Compiler::Sugar < Mare::AST::CopyOnMutateVisitor
     else
       # Convert the operator relation into a single-argument method call.
       ident = AST::Identifier.new(node.op.value).from(node.op)
-      dot = AST::Operator.new(".").from(node.op)
       args = AST::Group.new("(", [node.rhs]).from(node.rhs)
-      rhs = AST::Qualify.new(ident, args).from(node)
-      AST::Relate.new(node.lhs, dot, rhs).from(node)
+      AST::Call.new(node.lhs, ident, args).from(node)
     end
   rescue exc : Exception
     raise Error.compiler_hole_at(node, exc)
@@ -418,47 +395,44 @@ class Mare::Compiler::Sugar < Mare::AST::CopyOnMutateVisitor
     end
 
     def visit(ctx, node : AST::Node)
-      return node unless node.is_a?(AST::Relate) && node.op.value == "."
+      return node unless node.is_a?(AST::Call)
 
-      call_ident, call_args, yield_params, yield_block = AST::Extract.call(node)
-
-      return node unless call_ident
-
-      case call_ident.value
+      case node.ident.value
       when "as!", "not!"
-        Error.at call_ident,
+        call_args = node.args
+        Error.at node.ident,
           "This call requires exactly one argument (the type to check)" \
             unless call_args && call_args.terms.size == 1
 
         local_name = sugar.next_local_name
         type_arg = call_args.terms.first
         op =
-          case call_ident.value
+          case node.ident.value
           when "as!" then "<:"
           when "not!" then "!<:"
-          else raise NotImplementedError.new(call_ident)
+          else raise NotImplementedError.new(node.ident)
           end
 
         group = AST::Group.new("(").from(node)
         group.terms << AST::Relate.new(
-          AST::Identifier.new(local_name).from(node.lhs),
-          AST::Operator.new("=").from(node.lhs),
-          node.lhs,
-        ).from(node.lhs)
+          AST::Identifier.new(local_name).from(node.receiver),
+          AST::Operator.new("=").from(node.receiver),
+          node.receiver,
+        ).from(node.receiver)
         group.terms << AST::Choice.new([
           {
             AST::Relate.new(
-              AST::Identifier.new(local_name).from(node.lhs),
-              AST::Operator.new(op).from(call_ident),
+              AST::Identifier.new(local_name).from(node.receiver),
+              AST::Operator.new(op).from(node.ident),
               type_arg,
-            ).from(call_ident),
-            AST::Identifier.new(local_name).from(node.lhs),
+            ).from(node.ident),
+            AST::Identifier.new(local_name).from(node.receiver),
           },
           {
-            AST::Identifier.new("True").from(call_ident),
-            AST::Jump.new(AST::Identifier.new("None").from(node), AST::Jump::Kind::Error).from(call_ident),
+            AST::Identifier.new("True").from(node.ident),
+            AST::Jump.new(AST::Identifier.new("None").from(node), AST::Jump::Kind::Error).from(node.ident),
           },
-        ] of {AST::Term, AST::Term}).from(node.op)
+        ] of {AST::Term, AST::Term}).from(node)
 
         group
       else

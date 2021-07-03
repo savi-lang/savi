@@ -106,13 +106,13 @@ class Mare::Compiler::Lifetime
         case node.op.value
         when "="
           touch_assign_local(node)
-        when "."
-          touch_call(node)
           # TODO: Handle more cases
         else
           nil
         end
       # TODO: Handle more cases
+      when AST::Call
+        touch_call(node)
       else
         nil
       end
@@ -157,9 +157,8 @@ class Mare::Compiler::Lifetime
       end
     end
 
-    def touch_call(node : AST::Relate)
-      _, args, _, _ = AST::Extract.call(node)
-      args.try(&.terms.each { |arg| touch_call_arg(arg) })
+    def touch_call(node : AST::Call)
+      node.args.try(&.terms.each { |arg| touch_call_arg(arg) })
     end
 
     def touch_call_arg(node : AST::Node)

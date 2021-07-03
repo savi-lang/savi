@@ -79,8 +79,8 @@ class Mare::Compiler::CodeGen
 
         # Then come the nested yielding call continuations.
         # These exist when there is a yield block within another yield block.
-        ctx.inventory[gfunc.link].each_yielding_call.each do |relate|
-          cont_type = g.resolve_yielding_call_cont_type(relate, gfunc)
+        ctx.inventory[gfunc.link].each_yielding_call.each do |call|
+          cont_type = g.resolve_yielding_call_cont_type(call, gfunc)
 
           # If this yielding function contains a recursive call to itself,
           # we won't know what struct size to allocate, and thus need to
@@ -92,8 +92,8 @@ class Mare::Compiler::CodeGen
           list << cont_type
         end
         # And the yielding call receivers that go with each continuation.
-        ctx.inventory[gfunc.link].each_yielding_call.each do |relate|
-          list << g.llvm_type_of(relate.lhs, gfunc)
+        ctx.inventory[gfunc.link].each_yielding_call.each do |call|
+          list << g.llvm_type_of(call.receiver, gfunc)
         end
 
         list
@@ -111,27 +111,23 @@ class Mare::Compiler::CodeGen
       builder.struct_gep(cont, index, "CONT.#{ref.name}.GEP")
     end
 
-    def struct_gep_for_yielding_call_cont(cont : LLVM::Value, relate : AST::Relate)
+    def struct_gep_for_yielding_call_cont(cont : LLVM::Value, call : AST::Call)
       index = 3
       index += ctx.inventory[gfunc.link].local_count
-      index += ctx.inventory[gfunc.link].each_yielding_call.index(relate).not_nil!
+      index += ctx.inventory[gfunc.link].each_yielding_call.index(call).not_nil!
 
-      member, _, _, _ = AST::Extract.call(relate)
-
-      gep = builder.struct_gep(cont, index, "CONT.#{member.value}.NESTED.CONT.GEP")
+      gep = builder.struct_gep(cont, index, "CONT.#{call.ident.value}.NESTED.CONT.GEP")
       gep = builder.load(gep, gep.name) if gep.type.element_type.kind == LLVM::Type::Kind::Pointer
       gep
     end
 
-    def struct_gep_for_yielding_call_receiver(cont : LLVM::Value, relate : AST::Relate)
+    def struct_gep_for_yielding_call_receiver(cont : LLVM::Value, call : AST::Call)
       index = 3
       index += ctx.inventory[gfunc.link].local_count
       index += ctx.inventory[gfunc.link].each_yielding_call.size
-      index += ctx.inventory[gfunc.link].each_yielding_call.index(relate).not_nil!
+      index += ctx.inventory[gfunc.link].each_yielding_call.index(call).not_nil!
 
-      member, _, _, _ = AST::Extract.call(relate)
-
-      builder.struct_gep(cont, index, "CONT.#{member.value}.NESTED.RECEIVER.GEP")
+      builder.struct_gep(cont, index, "CONT.#{call.ident.value}.NESTED.RECEIVER.GEP")
     end
 
     def each_struct_index_for_yielding_call_conts
@@ -276,9 +272,9 @@ class Mare::Compiler::CodeGen
 
       # Eagerly create struct geps for all yielding call continuations
       # and receivers that are nested in this yielding function func.
-      ctx.inventory[gfunc.link].each_yielding_call.each do |relate|
-        frame.yielding_call_conts[relate] = struct_gep_for_yielding_call_cont(cont, relate)
-        frame.yielding_call_receivers[relate] = struct_gep_for_yielding_call_receiver(cont, relate)
+      ctx.inventory[gfunc.link].each_yielding_call.each do |call|
+        frame.yielding_call_conts[call] = struct_gep_for_yielding_call_cont(cont, call)
+        frame.yielding_call_receivers[call] = struct_gep_for_yielding_call_receiver(cont, call)
       end
     end
 

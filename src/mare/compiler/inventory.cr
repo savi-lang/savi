@@ -55,7 +55,7 @@ module Mare::Compiler::Inventory
     def initialize
       @locals = [] of Refer::Local
       @yields = [] of AST::Yield
-      @yielding_calls = [] of AST::Relate
+      @yielding_calls = [] of AST::Call
     end
 
     protected def observe_local(x); @locals << x; end
@@ -89,12 +89,9 @@ module Mare::Compiler::Inventory
         end
       when AST::Yield
         @analysis.observe_yield(node)
-      when AST::Relate
-        if node.op.value == "."
-          ident, args, yield_params, yield_block = AST::Extract.call(node)
-          if yield_params || yield_block
-            @analysis.observe_yielding_call(node)
-          end
+      when AST::Call
+        if node.yield_params || node.yield_block
+          @analysis.observe_yielding_call(node)
         end
       else
       end

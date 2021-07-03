@@ -243,8 +243,8 @@ module Mare::Compiler::PreInfer
       # Don't visit the children of a type expression root node.
       return false if @classify.type_expr?(node)
 
-      # Don't visit children of a dot relation eagerly - wait for touch.
-      return false if node.is_a?(AST::Relate) && node.op.value == "."
+      # Don't visit children of Calls eagerly - wait for touch.
+      return false if node.is_a?(AST::Call)
 
       # Don't visit children of Choices eagerly - wait for touch.
       return false if node.is_a?(AST::Choice)
@@ -432,55 +432,6 @@ module Mare::Compiler::PreInfer
         else
           raise NotImplementedError.new(lhs)
         end
-      when "."
-        call_ident, call_args, yield_params, yield_block = AST::Extract.call(node)
-
-        # Visit the left hand side of the call first, to get its info.
-        # Note that we skipped it before with visit_children: false.
-        node.lhs.try(&.accept(ctx, self))
-        lhs_info = self[node.lhs]
-
-        @analysis[node] = call = Infer::FromCall.new(
-          call_ident.pos,
-          layer(node),
-          lhs_info,
-          call_ident.value,
-          call_args,
-          yield_params,
-          yield_block,
-          @classify.value_needed?(node),
-        )
-
-        @analysis[call_ident] = call
-
-        # Each arg needs a link back to the FromCall with an arg index.
-        call_args.try(&.accept(ctx, self))
-        if call_args
-          call_args.terms.each_with_index do |call_arg, index|
-            new_info = Infer::TowardCallParam.new(call_arg.pos, layer(node), call, index)
-            @analysis[call_arg].add_downstream(call_arg.pos, new_info)
-            @analysis.observe_extra_info(new_info)
-          end
-        end
-
-        # Each yield param needs a link back to the FromCall with a param index.
-        yield_params.try(&.accept(ctx, self))
-        if yield_params
-          yield_params.terms.each_with_index do |yield_param, index|
-            new_info = Infer::FromCallYieldOut.new(yield_param.pos, layer(node), call, index)
-            @analysis[yield_param].as(Infer::Local).assign(ctx, new_info, yield_param.pos)
-            @analysis.observe_extra_info(new_info)
-          end
-        end
-
-        # The yield block result info needs a link back to the FromCall as well.
-        yield_block.try(&.accept(ctx, self))
-        if yield_block
-          new_info = Infer::TowardCallYieldIn.new(yield_block.pos, layer(node), call)
-          @analysis[yield_block].add_downstream(yield_block.pos, new_info)
-          @analysis.observe_extra_info(new_info)
-        end
-
       when "===", "!=="
         # Just know that the result of this expression is a boolean.
         @analysis[node] = new_info = Infer::FixedPrelude.new(node.pos, layer(node), "Bool")
@@ -561,6 +512,58 @@ module Mare::Compiler::PreInfer
         @analysis[node] = Infer::RecoverUnsafe.new(node.pos, layer(node), @analysis[node.term])
       else
         raise NotImplementedError.new(node.op.value)
+      end
+    end
+
+    def touch(ctx : Context, node : AST::Call)
+      call_args = node.args
+      yield_params = node.yield_params
+      yield_block = node.yield_block
+
+      # Visit the receiver of the call first, to get its info.
+      # Note that we skipped it before with visit_children: false.
+      node.receiver.accept(ctx, self)
+      lhs_info = self[node.receiver]
+
+      @analysis[node] = call = Infer::FromCall.new(
+        node.ident.pos,
+        layer(node),
+        lhs_info,
+        node.ident.value,
+        call_args,
+        yield_params,
+        yield_block,
+        @classify.value_needed?(node),
+      )
+
+      @analysis[node.ident] = call
+
+      # Each arg needs a link back to the FromCall with an arg index.
+      if call_args
+        call_args.accept(ctx, self)
+        call_args.terms.each_with_index do |call_arg, index|
+          new_info = Infer::TowardCallParam.new(call_arg.pos, layer(node), call, index)
+          @analysis[call_arg].add_downstream(call_arg.pos, new_info)
+          @analysis.observe_extra_info(new_info)
+        end
+      end
+
+      # Each yield param needs a link back to the FromCall with a param index.
+      if yield_params
+        yield_params.accept(ctx, self)
+        yield_params.terms.each_with_index do |yield_param, index|
+          new_info = Infer::FromCallYieldOut.new(yield_param.pos, layer(node), call, index)
+          @analysis[yield_param].as(Infer::Local).assign(ctx, new_info, yield_param.pos)
+          @analysis.observe_extra_info(new_info)
+        end
+      end
+
+      # The yield block result info needs a link back to the FromCall as well.
+      if yield_block
+        yield_block.accept(ctx, self)
+        new_info = Infer::TowardCallYieldIn.new(yield_block.pos, layer(node), call)
+        @analysis[yield_block].add_downstream(yield_block.pos, new_info)
+        @analysis.observe_extra_info(new_info)
       end
     end
 

@@ -93,6 +93,12 @@ module Mare::AST
       changed = !new_child.same?(child)
       {new_child, changed}
     end
+    private def maybe_child_single_accept(ctx : Compiler::Context, child, visitor : CopyOnMutateVisitor)
+      return {nil, false} unless child
+      new_child = child.accept(ctx, visitor)
+      changed = !new_child.same?(child)
+      {new_child, changed}
+    end
     private def children_list_accept(ctx : Compiler::Context, list : T, visitor : CopyOnMutateVisitor) : {T, Bool} forall T
       changed = false
       new_list = list.map_cow(&.accept(ctx, visitor))
@@ -513,8 +519,9 @@ module Mare::AST
   #            ^~~~~~  (rhs)
   # ^~~~~~~~~~~~~~~~~~ (relate)
   #
-  # Another common example is method calls, which have `(op.value == ".")`,
-  # whose `rhs` may either be a Qualify (with args) or an Identifier (no args).
+  # Another common example is method calls prior to Sugar pass expansion,
+  # which have `(op.value == ".")`, and whose `rhs` may either be
+  # a Qualify (with args) or an Identifier (no args).
   #
   # Settings.read(content, true)
   # ^~~~~~~~                     (lhs)
@@ -624,6 +631,68 @@ module Mare::AST
       return self unless rhs_changed
       dup.tap do |node|
         node.rhs = new_rhs
+      end
+    end
+  end
+
+  # A Call node indicates a method call.
+  #
+  # This is an internal AST type which has no direct source code syntax,
+  # because such a construct is only created inside sugar and macro expansions.
+  class Call < Node
+    property receiver : Term
+    property ident : Identifier
+    property args : Group?
+    property yield_params : Group?
+    property yield_block : Group?
+    def initialize(
+      @receiver,
+      @ident,
+      @args = nil,
+      @yield_params = nil,
+      @yield_block = nil,
+    )
+    end
+
+    def span_pos
+      children = [receiver, ident] of AST::Node
+      args.try { |child| children << child }
+      yield_params.try { |child| children << child }
+      yield_block.try { |child| children << child }
+      pos.span(children.map(&.span_pos))
+    end
+
+    def name; :call end
+    def to_a: Array(A)
+      res = [name] of A
+      res << receiver.to_a
+      res << ident.to_a
+      res << args.try(&.to_a) if args || yield_params || yield_block
+      res << yield_params.try(&.to_a) if yield_params || yield_block
+      res << yield_block.try(&.to_a) if yield_block
+      res
+    end
+    def children_accept(ctx : Compiler::Context, visitor : Visitor)
+      receiver.accept(ctx, visitor)
+      ident.accept(ctx, visitor)
+      args.try(&.accept(ctx, visitor))
+      yield_params.try(&.accept(ctx, visitor))
+      yield_block.try(&.accept(ctx, visitor))
+    end
+    def children_accept(ctx : Compiler::Context, visitor : CopyOnMutateVisitor)
+      new_receiver, receiver_changed = child_single_accept(ctx, @receiver, visitor)
+      new_ident, ident_changed = child_single_accept(ctx, @ident, visitor)
+      new_args, args_changed = maybe_child_single_accept(ctx, @args, visitor)
+      new_yield_params, yield_params_changed = maybe_child_single_accept(ctx, @yield_params, visitor)
+      new_yield_block, yield_block_changed = maybe_child_single_accept(ctx, @yield_block, visitor)
+
+      return self unless receiver_changed || ident_changed || args_changed || yield_params_changed || yield_block_changed
+      dup.tap do |node|
+        node.receiver = new_receiver
+        node.ident = new_ident.as(Identifier)
+        node.args = new_args
+        node.yield_params = new_yield_params
+        node.yield_block = new_yield_block
       end
     end
   end

@@ -40,8 +40,8 @@ describe Mare::Compiler::ReferType do
     ref_Greeting = ctx1.refer_type[f_link_m][
       f_link_m.resolve(ctx2)
         .body.not_nil!
-        .terms.first.not_nil!.as(Mare::AST::Relate)
-        .lhs.as(Mare::AST::Identifier)
+        .terms.first.not_nil!.as(Mare::AST::Call)
+        .receiver.as(Mare::AST::Identifier)
     ]
     ref_Greeting.as(Mare::Compiler::Refer::Type).link.should eq t_link_g
   end

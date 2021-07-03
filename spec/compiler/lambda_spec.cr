@@ -23,11 +23,12 @@ describe Mare::Compiler::Lambda do
         .find_func!("call")
     lambda.params.should eq nil
     lambda.body.not_nil!.to_a.should eq [:group, ":",
-      [:relate,
-        [:relate, [:ident, "Fruit"], [:op, "."], [:qualify,
-          [:ident, "new"], [:group, "(", [:string, "apple", nil]]
-        ]],
-        [:op, "."],
+      [:call,
+        [:call,
+          [:ident, "Fruit"],
+          [:ident, "new"],
+          [:group, "(", [:string, "apple", nil]],
+        ],
         [:ident, "flavor"],
       ],
     ]
@@ -60,11 +61,12 @@ describe Mare::Compiler::Lambda do
       [:ident, "2"],
     ]
     lambda.body.not_nil!.to_a.should eq [:group, ":",
-      [:relate,
-        [:relate, [:ident, "Fruit"], [:op, "."], [:qualify,
-          [:ident, "new"], [:group, "(", [:ident, "1"], [:ident, "2"]]
-        ]],
-        [:op, "."],
+      [:call,
+        [:call,
+          [:ident, "Fruit"],
+          [:ident, "new"],
+          [:group, "(", [:ident, "1"], [:ident, "2"]]
+        ],
         [:ident, "flavor"],
       ],
     ]

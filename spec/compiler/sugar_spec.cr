@@ -73,15 +73,15 @@ describe Mare::Compiler::Sugar do
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "prop_assign")
     func.body.not_nil!.to_a.should eq [:group, ":",
-      [:relate,
+      [:call,
         [:ident, "x"],
-        [:op, "."],
-        [:qualify, [:ident, "y="], [:group, "(", [:ident, "z"]]],
+        [:ident, "y="],
+        [:group, "(", [:ident, "z"]],
       ],
-      [:relate,
+      [:call,
         [:ident, "x"],
-        [:op, "."],
-        [:qualify, [:ident, "y=!"], [:group, "(", [:ident, "z"]]],
+        [:ident, "y=!"],
+        [:group, "(", [:ident, "z"]],
       ],
     ]
 
@@ -120,27 +120,27 @@ describe Mare::Compiler::Sugar do
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "prop_assign")
     func.body.not_nil!.to_a.should eq [:group, ":",
-      [:relate,
+      [:call,
         [:ident, "x"],
-        [:op, "."],
-        [:qualify, [:ident, "y="], [:group, "(",
-          [:relate,
-            [:relate, [:ident, "x"], [:op, "."], [:ident, "y"]],
-            [:op, "."],
-            [:qualify, [:ident, "+"], [:group, "(", [:ident, "z"]]]
+        [:ident, "y="],
+        [:group, "(",
+          [:call,
+            [:call, [:ident, "x"], [:ident, "y"]],
+            [:ident, "+"],
+            [:group, "(", [:ident, "z"]],
           ],
-        ]],
+        ],
       ],
-      [:relate,
+      [:call,
         [:ident, "x"],
-        [:op, "."],
-        [:qualify, [:ident, "y="], [:group, "(",
-          [:relate,
-            [:relate, [:ident, "x"], [:op, "."], [:ident, "y"]],
-            [:op, "."],
-            [:qualify, [:ident, "-"], [:group, "(", [:ident, "z"]]]
+        [:ident, "y="],
+        [:group, "(",
+          [:call,
+            [:call, [:ident, "x"], [:ident, "y"]],
+            [:ident, "-"],
+            [:group, "(", [:ident, "z"]],
           ],
-        ]],
+        ],
       ],
     ]
 
@@ -170,10 +170,10 @@ describe Mare::Compiler::Sugar do
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "plus")
     func.body.not_nil!.to_a.should eq [:group, ":",
-      [:relate,
+      [:call,
         [:ident, "x"],
-        [:op, "."],
-        [:qualify, [:ident, "+"], [:group, "(", [:ident, "y"]]]
+        [:ident, "+"],
+        [:group, "(", [:ident, "y"]],
       ],
     ]
 
@@ -212,16 +212,16 @@ describe Mare::Compiler::Sugar do
     func = ctx.namespace.find_func!(ctx, source, "Example", "countdown")
     func.body.not_nil!.to_a.should eq [:group, ":",
       [:group, "(", [:loop,
-        [:group, "(", [:relate,
+        [:group, "(", [:call,
           [:ident, "x"],
-          [:op, "."],
-          [:qualify, [:ident, ">"], [:group, "(", [:integer, 0_u64]]]
+          [:ident, ">"],
+          [:group, "(", [:integer, 0_u64]],
         ]],
         [:group, "(", [:ident, "y"]],
-        [:group, "(", [:relate,
+        [:group, "(", [:call,
           [:ident, "x"],
-          [:op, "."],
-          [:qualify, [:ident, ">"], [:group, "(", [:integer, 0_u64]]]
+          [:ident, ">"],
+          [:group, "(", [:integer, 0_u64]],
         ]],
         [:ident, "None"]
       ]]
@@ -253,10 +253,9 @@ describe Mare::Compiler::Sugar do
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "square")
     func.body.not_nil!.to_a.should eq [:group, ":",
-      [:relate,
+      [:call,
         [:ident, "x"],
-        [:op, "."],
-        [:qualify, [:ident, "[]"], [:group, "(", [:ident, "y"]]]
+        [:ident, "[]"], [:group, "(", [:ident, "y"]]
       ],
     ]
 
@@ -319,40 +318,40 @@ describe Mare::Compiler::Sugar do
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "chained")
     func.body.not_nil!.to_a.should eq [:group, ":",
-      [:relate,
-        [:relate,
+      [:call,
+        [:call,
           [:ident, "x"],
-          [:op, "."],
-          [:qualify, [:ident, "call"], [:group, "(", [:ident, "y"]]],
+          [:ident, "call"],
+          [:group, "(", [:ident, "y"]],
         ],
-        [:op, "."],
-        [:qualify, [:ident, "call"], [:group, "(", [:ident, "z"]]],
+        [:ident, "call"],
+        [:group, "(", [:ident, "z"]],
       ],
-      [:relate,
-        [:relate,
+      [:call,
+        [:call,
           [:ident, "x"],
-          [:op, "."],
-          [:qualify, [:ident, "[]"], [:group, "(", [:ident, "y"]]],
+          [:ident, "[]"],
+          [:group, "(", [:ident, "y"]],
         ],
-        [:op, "."],
-        [:qualify, [:ident, "[]"], [:group, "(", [:ident, "z"]]],
+        [:ident, "[]"],
+        [:group, "(", [:ident, "z"]],
       ],
-      [:relate,
-        [:relate,
-          [:relate,
-            [:relate,
+      [:call,
+        [:call,
+          [:call,
+            [:call,
               [:ident, "x"],
-              [:op, "."],
-              [:qualify, [:ident, "call"], [:group, "(", [:ident, "y"]]],
+              [:ident, "call"],
+              [:group, "(", [:ident, "y"]],
             ],
-            [:op, "."],
-            [:qualify, [:ident, "[]"], [:group, "(", [:ident, "y"]]],
+            [:ident, "[]"],
+            [:group, "(", [:ident, "y"]],
           ],
-          [:op, "."],
-          [:qualify, [:ident, "call"], [:group, "(", [:ident, "z"]]],
+          [:ident, "call"],
+          [:group, "(", [:ident, "z"]],
         ],
-        [:op, "."],
-        [:qualify, [:ident, "[]"], [:group, "(", [:ident, "z"]]],
+        [:ident, "[]"],
+        [:group, "(", [:ident, "z"]],
       ],
     ]
 
@@ -386,10 +385,10 @@ describe Mare::Compiler::Sugar do
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "square")
     func.body.not_nil!.to_a.should eq [:group, ":",
-      [:relate,
+      [:call,
         [:ident, "x"],
-        [:op, "."],
-        [:qualify, [:ident, "[]="], [:group, "(", [:ident, "y"], [:ident, "z"]]]
+        [:ident, "[]="],
+        [:group, "(", [:ident, "y"], [:ident, "z"]],
       ],
     ]
 
@@ -404,6 +403,8 @@ describe Mare::Compiler::Sugar do
       :fun selfish
         @x
         @x(y)
+        @x -> (z, w | True)
+        @x(y) -> (True)
     SOURCE
 
     ast = Mare::Parser.parse(source)
@@ -413,6 +414,19 @@ describe Mare::Compiler::Sugar do
       [:declare, [[:ident, "fun"], [:ident, "selfish"]], [:group, ":",
         [:ident, "@x"],
         [:qualify, [:ident, "@x"], [:group, "(", [:ident, "y"]]],
+        [:relate,
+          [:ident, "@x"],
+          [:op, "->"],
+          [:group, "|",
+            [:group, "(", [:ident, "z"], [:ident, "w"]],
+            [:group, "(", [:ident, "True"]],
+          ],
+        ],
+        [:relate,
+          [:qualify, [:ident, "@x"], [:group, "(", [:ident, "y"]]],
+          [:op, "->"],
+          [:group, "(", [:ident, "True"]],
+        ],
       ]],
     ]
 
@@ -421,11 +435,21 @@ describe Mare::Compiler::Sugar do
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "selfish")
     func.body.not_nil!.to_a.should eq [:group, ":",
-      [:relate, [:ident, "@"], [:op, "."], [:ident, "x"]],
-      [:relate,
+      [:call, [:ident, "@"], [:ident, "x"]],
+      [:call, [:ident, "@"], [:ident, "x"], [:group, "(", [:ident, "y"]]],
+      [:call,
         [:ident, "@"],
-        [:op, "."],
-        [:qualify, [:ident, "x"], [:group, "(", [:ident, "y"]]],
+        [:ident, "x"],
+        nil,
+        [:group, "(", [:ident, "z"], [:ident, "w"]],
+        [:group, "(", [:ident, "True"]],
+      ],
+      [:call,
+        [:ident, "@"],
+        [:ident, "x"],
+        [:group, "(", [:ident, "y"]],
+        nil,
+        [:group, "(", [:ident, "True"]],
       ],
     ]
 
@@ -491,23 +515,22 @@ describe Mare::Compiler::Sugar do
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "param_assigns")
     func.body.not_nil!.to_a.should eq [:group, ":",
-      [:relate,
+      [:call,
         [:ident, "@"],
-        [:op, "."],
-        [:qualify, [:ident, "x="], [:group, "(",
+        [:ident, "x="],
+        [:group, "(",
           [:prefix, [:op, "--"], [:ident, "ASSIGNPARAM.1"]],
-        ]]
+        ],
       ],
-      [:relate,
-        [:relate, [:ident, "@"], [:op, "."], [:ident, "y"]],
-        [:op, "."],
-        [:qualify, [:ident, "z="], [:group, "(",
+      [:call,
+        [:call, [:ident, "@"], [:ident, "y"]],
+        [:ident, "z="],
+        [:group, "(",
           [:prefix, [:op, "--"], [:ident, "ASSIGNPARAM.2"]],
-        ]]
+        ],
       ],
-      [:relate,
-        [:relate, [:ident, "@"], [:op, "."], [:ident, "y"]],
-        [:op, "."],
+      [:call,
+        [:call, [:ident, "@"], [:ident, "y"]],
         [:ident, "after"]
       ],
     ]
@@ -562,13 +585,10 @@ describe Mare::Compiler::Sugar do
             ],
             [[:ident, "True"], [:ident, "y"]],
           ],
-          [:relate,
+          [:call,
             [:ident, "False"],
-            [:op, "."],
-            [:qualify,
-              [:ident, "=="],
-              [:group, "(", [:ident, "z"]],
-            ],
+            [:ident, "=="],
+            [:group, "(", [:ident, "z"]],
           ],
         ],
         [[:ident, "True"], [:ident, "False"]],
@@ -626,12 +646,12 @@ describe Mare::Compiler::Sugar do
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "type_cast")
     func.body.not_nil!.to_a.should eq [:group, ":",
-      [:relate,
+      [:call,
         [:group, "(",
           [:relate,
             [:ident, "hygienic_local.1"],
             [:op, "="],
-            [:relate, [:ident, "x"], [:op, "."], [:ident, "y"]]
+            [:call, [:ident, "x"], [:ident, "y"]]
           ],
           [:choice, [
             [:relate,
@@ -641,15 +661,14 @@ describe Mare::Compiler::Sugar do
             [[:ident, "True"], [:jump, "error", [:ident, "None"]]]
           ]
         ],
-        [:op, "."],
         [:ident, "z"]
       ],
-      [:relate,
+      [:call,
         [:group, "(",
           [:relate,
             [:ident, "hygienic_local.2"],
             [:op, "="],
-            [:relate, [:ident, "x"], [:op, "."], [:ident, "y"]]
+            [:call, [:ident, "x"], [:ident, "y"]]
           ],
           [:choice, [
             [:relate,
@@ -659,7 +678,6 @@ describe Mare::Compiler::Sugar do
             [[:ident, "True"], [:jump, "error", [:ident, "None"]]]
           ]
         ],
-        [:op, "."],
         [:ident, "z"]
       ],
     ]

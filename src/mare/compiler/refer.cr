@@ -124,20 +124,17 @@ module Mare::Compiler::Refer
       @analysis[node] = Field.new(node.value)
     end
 
-    # For a `.` relation, defer the normal visit order, so that we can
-    # visit the lhs, identifier, and args in the normal order, but
+    # For a call node, defer the normal visit order, so that we can
+    # visit the receiver, identifier, and args in the normal order, but
     # visit the yield params and yield block in a special sub-visitor.
-    def visit_children?(ctx, node : AST::Relate)
-      node.op.value != "."
+    def visit_children?(ctx, node : AST::Call)
+      false
     end
-    def touch(ctx, node : AST::Relate)
-      return if node.op.value != "."
-
-      node.lhs.accept(ctx, self)
-      ident, args, yield_params, yield_block = AST::Extract.call(node)
-      @analysis[ident] = Unresolved::INSTANCE
-      args.try(&.accept(ctx, self))
-      touch_yield_loop(ctx, yield_params, yield_block)
+    def touch(ctx, node : AST::Call)
+      node.receiver.accept(ctx, self)
+      @analysis[node.ident] = Unresolved::INSTANCE
+      node.args.try(&.accept(ctx, self))
+      touch_yield_loop(ctx, node.yield_params, node.yield_block)
     end
 
     # For a Group, pay attention to any styles that are relevant to us.

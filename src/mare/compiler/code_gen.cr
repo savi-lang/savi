@@ -43,8 +43,8 @@ class Mare::Compiler::CodeGen
 
     def initialize(@g : CodeGen, @llvm_func = nil, @gtype = nil, @gfunc = nil)
       @current_locals = {} of Refer::Local => LLVM::Value
-      @yielding_call_conts = {} of AST::Relate => LLVM::Value
-      @yielding_call_receivers = {} of AST::Relate => LLVM::Value
+      @yielding_call_conts = {} of AST::Call => LLVM::Value
+      @yielding_call_receivers = {} of AST::Call => LLVM::Value
     end
 
     def alloc_ctx?
@@ -1404,9 +1404,9 @@ class Mare::Compiler::CodeGen
     gen_func_end
   end
 
-  def resolve_call(relate : AST::Relate, in_gfunc : GenFunc? = nil)
-    member_ast, _, _, _ = AST::Extract.call(relate)
-    lhs_type = type_of(relate.lhs, in_gfunc)
+  def resolve_call(call : AST::Call, in_gfunc : GenFunc? = nil)
+    member_ast = call.ident
+    lhs_type = type_of(call.receiver, in_gfunc)
     member = member_ast.value
 
     if lhs_type.is_abstract?(ctx)
@@ -1418,7 +1418,7 @@ class Mare::Compiler::CodeGen
       reach_func : Reach::Func? = nil
       in_gfunc ||= func_frame.gfunc.not_nil!
       pre_infer = ctx.pre_infer[in_gfunc.reach_func.reified.link]
-      in_gfunc.infer.each_called_func_within(ctx, in_gfunc.reach_func.reified, pre_infer[relate]) { |info, called_rf|
+      in_gfunc.infer.each_called_func_within(ctx, in_gfunc.reach_func.reified, pre_infer[call]) { |info, called_rf|
         reach_func = ctx.reach.reach_func_for(called_rf)
       }
       reach_func = reach_func.not_nil!
@@ -1433,9 +1433,9 @@ class Mare::Compiler::CodeGen
     {lhs_gtype, call_gfunc}
   end
 
-  def resolve_yielding_call_cont_type(relate : AST::Relate, in_gfunc : GenFunc? = nil) : LLVM::Type
-    member_ast, _, _, _ = AST::Extract.call(relate)
-    lhs_type = type_of(relate.lhs, in_gfunc)
+  def resolve_yielding_call_cont_type(call : AST::Call, in_gfunc : GenFunc? = nil) : LLVM::Type
+    member_ast = call.ident
+    lhs_type = type_of(call.receiver, in_gfunc)
     member = member_ast.value
 
     lhs_call_defs = lhs_type.all_callable_concrete_defs_for(ctx, member)
@@ -1448,16 +1448,19 @@ class Mare::Compiler::CodeGen
     end
   end
 
-  def gen_dot(relate)
-    member_ast, args_ast, yield_params_ast, yield_block_ast = AST::Extract.call(relate)
+  def gen_dot(call : AST::Call) # TODO: rename as gen_call ?
+    member_ast = call.ident
+    args_ast = call.args
+    yield_params_ast = call.yield_params
+    yield_block_ast = call.yield_block
 
     member = member_ast.value
     arg_exprs = args_ast.try(&.terms.map(&.as(AST::Node?))) || [] of AST::Node?
     args = arg_exprs.map { |x| gen_expr(x.not_nil!).as(LLVM::Value) }
     arg_frames = arg_exprs.map { nil.as(Frame?) }
 
-    lhs_type = type_of(relate.lhs)
-    lhs_gtype, gfunc = resolve_call(relate)
+    lhs_type = type_of(call.receiver)
+    lhs_gtype, gfunc = resolve_call(call)
 
     # For any args we are missing, try to find and use a default param value.
     gfunc.func.params.try do |params|
@@ -1467,7 +1470,7 @@ class Mare::Compiler::CodeGen
         param_default = AST::Extract.param(param)[2]
 
         raise "missing arg #{args.size + 1} with no default param:"\
-          "\n#{relate.pos.show}" unless param_default
+          "\n#{call.pos.show}" unless param_default
 
         # Somewhat hacky unwrapping to aid the source_code_position_of_argument check below.
         param_default = param_default.terms.first \
@@ -1497,7 +1500,7 @@ class Mare::Compiler::CodeGen
 
     # Generate code for the receiver, whether we actually use it or not.
     # We trust LLVM optimizations to eliminate dead code when it does nothing.
-    receiver = gen_expr(relate.lhs)
+    receiver = gen_expr(call.receiver)
 
     # Determine if we need to use a virtual call and if we need the receiver.
     needs_virtual_call = lhs_type.is_abstract?(ctx)
@@ -1522,7 +1525,7 @@ class Mare::Compiler::CodeGen
       raise "can't do a virtual call on a constructor" if needs_virtual_call
       receiver =
         if lhs_gtype.type_def.has_allocation?(ctx)
-          gen_alloc(lhs_gtype, relate, "#{lhs_gtype.type_def.llvm_name}.new")
+          gen_alloc(lhs_gtype, call, "#{lhs_gtype.type_def.llvm_name}.new")
         else
           gen_alloc_alloca(lhs_gtype, "#{lhs_gtype.type_def.llvm_name}.new")
         end
@@ -1531,7 +1534,7 @@ class Mare::Compiler::CodeGen
     # Prepend the continuation to the args list if necessary.
     cont = nil
     if gfunc.needs_continuation?
-      cont = gen_yielding_call_cont_gep(relate, "#{gfunc.llvm_name}.CONT")
+      cont = gen_yielding_call_cont_gep(call, "#{gfunc.llvm_name}.CONT")
 
       # We need to cast the cont argument if this is a virtual call.
       if needs_virtual_call
@@ -1552,18 +1555,18 @@ class Mare::Compiler::CodeGen
       # The receiver must be stored in a gep if this is a yielding call,
       # since it isn't guaranteed to be in every continue path.
       if gfunc.needs_continuation?
-        receiver_gep = gen_yielding_call_receiver_gep(relate, "#{gfunc.llvm_name}.@")
+        receiver_gep = gen_yielding_call_receiver_gep(call, "#{gfunc.llvm_name}.@")
         @builder.store(receiver, receiver_gep)
       end
 
       args.unshift(receiver)
-      arg_exprs.unshift(relate.lhs)
+      arg_exprs.unshift(call.receiver)
       arg_frames.unshift(nil)
       use_receiver = true
     end
 
     # Call the LLVM function, or do a virtual call if necessary.
-    @di.set_loc(relate.op)
+    @di.set_loc(call.ident)
     result = gen_call(gfunc.reach_func.signature, llvm_func, args, arg_exprs, arg_frames, use_receiver, !cont.nil?)
 
     case gfunc.calling_convention
@@ -1586,7 +1589,7 @@ class Mare::Compiler::CodeGen
       @builder.position_at_end(error_block)
       # TODO: Should we try to avoid destructuring and restructuring the
       # tuple value here? Or does LLVM optimize it away so as to not matter?
-      gen_raise_error(@builder.extract_value(result, 0), relate)
+      gen_raise_error(@builder.extract_value(result, 0), call)
 
       @builder.position_at_end(after_block)
       result = @builder.extract_value(result, 0)
@@ -1622,7 +1625,7 @@ class Mare::Compiler::CodeGen
 
         @builder.position_at_end(error_block.not_nil!)
         # TODO: Allow an error value of something other than None.
-        gen_raise_error(gen_none, relate)
+        gen_raise_error(gen_none, call)
       end
 
       # Move our cursor to the yield block to start generating code there.
@@ -1683,7 +1686,7 @@ class Mare::Compiler::CodeGen
         again_arg_exprs.unshift(nil)
         again_arg_frames.unshift(nil)
       end
-      @di.set_loc(relate.op)
+      @di.set_loc(call.ident)
       @builder.call(LLVM::Function.from_value(continue_llvm_func), again_args)
 
       # Return to the "maybe block", to determine if we need to iterate again.
@@ -2257,7 +2260,6 @@ class Mare::Compiler::CodeGen
     when AST::Relate
       raise "#{expr.inspect} isn't a constant value" if const_only
       case expr.op.as(AST::Operator).value
-      when "." then gen_dot(expr)
       when "=" then gen_eq(expr)
       when "<<=" then gen_displacing_eq(expr)
       when "===" then gen_check_identity_is(expr, true)
@@ -2273,6 +2275,8 @@ class Mare::Compiler::CodeGen
       when "["      then gen_dynamic_array(expr)
       else raise NotImplementedError.new(expr.inspect)
       end
+    when AST::Call
+      gen_dot(expr)
     when AST::Choice
       raise "#{expr.inspect} isn't a constant value" if const_only
       gen_choice(expr)
@@ -3484,25 +3488,25 @@ class Mare::Compiler::CodeGen
     end
   end
 
-  def gen_yielding_call_cont_gep(relate, name)
+  def gen_yielding_call_cont_gep(call, name)
     gfunc = func_frame.gfunc.not_nil!
 
     # If this is a yielding function, we store nested conts in our own cont.
     # Otherwise, we store each in its own alloca, which we create at the entry.
     if gfunc.not_nil!.needs_continuation?
-      func_frame.yielding_call_conts[relate]
+      func_frame.yielding_call_conts[call]
     else
-      gen_alloca(resolve_yielding_call_cont_type(relate), name)
+      gen_alloca(resolve_yielding_call_cont_type(call), name)
     end
   end
 
-  def gen_yielding_call_receiver_gep(relate, name)
+  def gen_yielding_call_receiver_gep(call, name)
     gfunc = func_frame.gfunc.not_nil!
 
     if gfunc.not_nil!.needs_continuation?
-      func_frame.yielding_call_receivers[relate]
+      func_frame.yielding_call_receivers[call]
     else
-      gen_alloca(llvm_type_of(relate.lhs), name)
+      gen_alloca(llvm_type_of(call.receiver), name)
     end
   end
 

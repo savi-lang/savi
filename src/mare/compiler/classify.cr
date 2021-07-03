@@ -158,10 +158,6 @@ module Mare::Compiler::Classify
           type_expr_visit(ctx, t)
         end
       else
-        # We assume this qualify to be a function call with arguments.
-        # All of the arguments will have their value used, despite any earlier
-        # work we did of marking them all as unused due to being in a Group.
-        qualify.group.terms.each { |t| @analysis.recursive_value_needed!(t) }
       end
     end
 
@@ -169,24 +165,22 @@ module Mare::Compiler::Classify
       case relate.op.value
       when "<:", "!<:"
         type_expr_visit(ctx, relate.rhs)
-      when "."
-        # In a function call Relate, a value is not needed for the right side.
-        # A value is only needed for the left side and the overall access node.
-        relate_rhs = relate.rhs
-        @analysis.no_value!(relate_rhs)
-
-        # We also need to mark the pieces of the right-hand-side as appropriate.
-        if relate_rhs.is_a?(AST::Relate)
-          @analysis.no_value!(relate_rhs.lhs)
-          @analysis.no_value!(relate_rhs.rhs)
-        end
-        ident, args, yield_params, yield_block = AST::Extract.call(relate)
-        @analysis.no_value!(ident)
-        @analysis.no_value!(args) if args
-        @analysis.no_value!(yield_params) if yield_params
-        @analysis.value_needed!(yield_block) if yield_block
       else
       end
+    end
+
+    def touch(ctx, call : AST::Call)
+      @analysis.no_value!(call.ident)
+      call.args.try { |args|
+        @analysis.no_value!(args)
+        args.terms.each { |t| @analysis.recursive_value_needed!(t) }
+      }
+      call.yield_params.try { |yield_params|
+        @analysis.no_value!(yield_params)
+      }
+      call.yield_block.try { |yield_block|
+        @analysis.value_needed!(yield_block)
+      }
     end
 
     def touch(ctx, node : AST::Node)
