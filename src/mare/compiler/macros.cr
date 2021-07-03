@@ -38,7 +38,9 @@ class Mare::Compiler::Macros < Mare::AST::CopyOnMutateVisitor
         cached_or_run library, t, f do
           macros = new(f)
           macros.maybe_compiler_intrinsic
-          macros.run(ctx)
+          f = macros.run(ctx)
+
+          f = SimpleIdentifiers.run(ctx, f, macros)
         end
       end
     end
@@ -120,30 +122,30 @@ class Mare::Compiler::Macros < Mare::AST::CopyOnMutateVisitor
         "the value to be yielded out to the calling function",
       ])
       visit_yield(node)
-    elsif Util.match_jump?(node, 0, AST::Jump::Kind::Return)
+    elsif Util.match_ident?(node, 0, "return")
       Util.require_terms(node, [
         nil,
         "the value to return",
       ])
-      visit_jump(node)
-    elsif Util.match_jump?(node, 0, AST::Jump::Kind::Error)
+      visit_jump(node, AST::Jump::Kind::Return)
+    elsif Util.match_ident?(node, 0, "error!")
       Util.require_terms(node, [
         nil,
         "the error to raise",
       ])
-      visit_jump(node)
-    elsif Util.match_jump?(node, 0, AST::Jump::Kind::Break)
+      visit_jump(node, AST::Jump::Kind::Error)
+    elsif Util.match_ident?(node, 0, "break")
       Util.require_terms(node, [
         nil,
         "the value to break loop with",
       ])
-      visit_jump(node)
-    elsif Util.match_jump?(node, 0, AST::Jump::Kind::Next)
+      visit_jump(node, AST::Jump::Kind::Break)
+    elsif Util.match_ident?(node, 0, "next")
       Util.require_terms(node, [
         nil,
         "the value to continue the next loop iteration with",
       ])
-      visit_jump(node)
+      visit_jump(node, AST::Jump::Kind::Next)
     elsif Util.match_ident?(node, 0, "source_code_position_of_argument")
       Util.require_terms(node, [
         nil,
@@ -174,24 +176,6 @@ class Mare::Compiler::Macros < Mare::AST::CopyOnMutateVisitor
         "the local variable whose address is to be referenced",
       ])
       visit_address_of(node)
-    else
-      node
-    end
-  rescue exc : Exception
-    raise exc if exc.is_a?(Error) # TODO: ctx.errors multi-error capability
-    raise Error.compiler_hole_at(node, exc)
-  end
-
-  def visit(ctx, node : AST::Identifier)
-    case node.value
-    when "error!"
-      AST::Jump.new(AST::Identifier.new("None").from(node), AST::Jump::Kind::Error).from(node)
-    when "return"
-      AST::Jump.new(AST::Identifier.new("None").from(node), AST::Jump::Kind::Return).from(node)
-    when "break"
-      AST::Jump.new(AST::Identifier.new("None").from(node), AST::Jump::Kind::Break).from(node)
-    when "next"
-      AST::Jump.new(AST::Identifier.new("None").from(node), AST::Jump::Kind::Next).from(node)
     else
       node
     end
@@ -471,12 +455,12 @@ class Mare::Compiler::Macros < Mare::AST::CopyOnMutateVisitor
     ] of AST::Term).from(node)
   end
 
-  def visit_jump(node : AST::Group)
+  def visit_jump(node : AST::Group, kind : AST::Jump::Kind)
     orig = node.terms[0]
     term = node.terms[1]? || AST::Identifier.new("None").from(orig)
 
     AST::Group.new("(", [
-      AST::Jump.new(term, orig.as(AST::Jump).kind).from(orig)
+      AST::Jump.new(term, kind).from(orig)
     ] of AST::Term).from(node)
   end
 
@@ -550,5 +534,92 @@ class Mare::Compiler::Macros < Mare::AST::CopyOnMutateVisitor
     AST::Group.new("(", [
       AST::Prefix.new(op, term).from(node),
     ] of AST::Term).from(node)
+  end
+
+  # Handle simple identifier macros like `error!` and `return` with no value.
+  # We run these as a separate micro-pass so that we can ensure all other macros
+  # have already been expanded before attempting to expand any of these.
+  # Otherwise, these may interfere with expansion of multi-term forms
+  # that use the same identifier as a marker (for example, `return VALUE`).
+  class SimpleIdentifiers < Mare::AST::CopyOnMutateVisitor
+    def self.run(ctx : Context, f : Program::Function, macros : Macros)
+      visitor = new(macros)
+      params = f.params.try(&.accept(ctx, visitor))
+      body = f.body.try(&.accept(ctx, visitor))
+
+      f = f.dup
+      f.params = params
+      f.body = body
+      f
+    end
+
+    getter macros : Macros
+    def initialize(@macros)
+      @ignore_non_sequence_groups = [] of AST::Group
+      @is_valid_sequential_context_stack = [] of Bool
+    end
+
+    def is_valid_sequential_context?
+      @is_valid_sequential_context_stack[-2] == true
+    end
+
+    def pre_observe(ctx, node : AST::Node)
+      case node
+      when AST::Qualify
+        @ignore_non_sequence_groups << node.group
+      when AST::Call
+        node.args.try { |child| @ignore_non_sequence_groups << child }
+        node.yield_params.try { |child| @ignore_non_sequence_groups << child }
+      end
+
+      case node
+      when AST::Group
+        if @ignore_non_sequence_groups.includes?(node)
+          @ignore_non_sequence_groups.delete(node)
+          @is_valid_sequential_context_stack << false
+        elsif node.style != "(" && node.style != ":"
+          @is_valid_sequential_context_stack << false
+        else
+          @is_valid_sequential_context_stack << true
+        end
+      when AST::Choice, AST::Loop, AST::Try
+        @is_valid_sequential_context_stack << true
+      else
+        @is_valid_sequential_context_stack << false
+      end
+    end
+
+    def post_observe(ctx, node : AST::Node)
+      @is_valid_sequential_context_stack.pop
+    end
+
+    def visit_pre(ctx, node : AST::Node)
+      pre_observe(ctx, node)
+      node
+    end
+
+    def visit(ctx, node : AST::Node)
+      node = maybe_replace(ctx, node)
+      post_observe(ctx, node)
+      node
+    end
+
+    def maybe_replace(ctx, node : AST::Node)
+      return node unless node.is_a?(AST::Identifier)
+      return node unless is_valid_sequential_context?
+
+      case node.value
+      when "error!"
+        AST::Jump.new(AST::Identifier.new("None").from(node), AST::Jump::Kind::Error).from(node)
+      when "return"
+        AST::Jump.new(AST::Identifier.new("None").from(node), AST::Jump::Kind::Return).from(node)
+      when "break"
+        AST::Jump.new(AST::Identifier.new("None").from(node), AST::Jump::Kind::Break).from(node)
+      when "next"
+        AST::Jump.new(AST::Identifier.new("None").from(node), AST::Jump::Kind::Next).from(node)
+      else
+        node
+      end
+    end
   end
 end
