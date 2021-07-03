@@ -31,8 +31,8 @@ describe Mare::Compiler::ReferType do
     ref_Env = ctx1.refer_type[f_link_g][
       f_link_g.resolve(ctx2)
         .params.not_nil!
-        .terms.first.not_nil!.as(Mare::AST::Group)
-        .terms.last.not_nil!.as(Mare::AST::Identifier)
+        .terms.first.not_nil!.as(Mare::AST::Relate)
+        .rhs.not_nil!.as(Mare::AST::Identifier)
     ]
     ref_Env.as(Mare::Compiler::Refer::Type).link.name.should eq "Env"
 

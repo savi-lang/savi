@@ -24,9 +24,9 @@ class Mare::Program
       @imports = [] of Import
     end
 
-    def dup_init(new_types = nil)
-      @types = new_types || @types.dup
-      @aliases = @aliases.dup
+    def dup_init(new_types = nil, new_aliases = nil)
+      @types = (new_types || @types.dup).not_nil!
+      @aliases = (new_aliases || @aliases.dup).not_nil!
       @imports = @imports.dup
     end
 
@@ -49,7 +49,16 @@ class Mare::Program
       if new_types.same?(types)
         self
       else
-        dup(new_types)
+        dup(new_types, nil)
+      end
+    end
+
+    def aliases_map_cow(&block : TypeAlias -> TypeAlias)
+      new_aliases = aliases.map_cow(&block)
+      if new_aliases.same?(aliases)
+        self
+      else
+        dup(nil, new_aliases)
       end
     end
 

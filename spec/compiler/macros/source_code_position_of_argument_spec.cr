@@ -14,9 +14,13 @@ describe Mare::Compiler::Macros do
 
       func = ctx.namespace.find_func!(ctx, source, "Main", "new")
       func.params.not_nil!.to_a.should eq [:group, "(",
-        [:group, " ", [:ident, "foo"], [:ident, "String"]],
+        [:relate, [:ident, "foo"], [:op, "EXPLICITTYPE"], [:ident, "String"]],
         [:relate,
-          [:group, " ", [:ident, "bar"], [:ident, "SourceCodePosition"]],
+          [:relate,
+            [:ident, "bar"],
+            [:op, "EXPLICITTYPE"],
+            [:ident, "SourceCodePosition"],
+          ],
           [:op, "DEFAULTPARAM"],
           [:group, "(",
             [:prefix, [:op, "source_code_position_of_argument"], [:ident, "foo"]],

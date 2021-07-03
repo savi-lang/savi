@@ -35,10 +35,10 @@ It marks the use sites of parameters.
     arg_3 String = "value" // can't easily annotate here unfortunately
   )
     try (
-      res_3 = arg_1     ::local.use_site=> arg_1:R:(3, 13)
-      res_4 = (--arg_2) ::local.use_site=> arg_2:C:(3, 19)
+      res_3 = arg_1        ::local.use_site=> arg_1:R:(3, 15)
+      res_4 = (--arg_2)    ::local.use_site=> arg_2:C:(3, 21)
     )
-    (arg_3 = "new value") ::local.use_site=> arg_3:W:(2, 29)
+    (arg_3 = "new value")  ::local.use_site=> arg_3:W:(2, 31)
 ```
 
 ---
@@ -47,15 +47,15 @@ It marks the use sites of yield parameters.
 
 ```mare
   @yielding_call -> (
-    arg_1                  ::local.use_site=> arg_1:W:(3, 2)
-    arg_2 String           // can't easily annotate here unfortunately
-    arg_3 String = "value" // can't easily annotate here unfortunately
+    arg_1                 ::local.use_site=> arg_1:W:(3, 2)
+    arg_2                 ::local.use_site=> arg_2:W:(3, 3)
+    arg_3                 ::local.use_site=> arg_3:W:(3, 4)
   |
     try (
-      res_3 = arg_1   ::local.use_site=> arg_1:R:(6, 15)
-      res_4 = (--arg_2) ::local.use_site=> arg_2:C:(6, 21)
+      res_3 = arg_1       ::local.use_site=> arg_1:R:(6, 8)
+      res_4 = (--arg_2)   ::local.use_site=> arg_2:C:(6, 14)
     )
-    (arg_3 = "new value") ::local.use_site=> arg_3:W:(5, 31)
+    (arg_3 = "new value") ::local.use_site=> arg_3:W:(5, 24)
   )
 ```
 

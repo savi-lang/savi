@@ -693,9 +693,11 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         setter_ident = AST::Identifier.new("#{ident.value}=").from(ident)
         setter_param = AST::Identifier.new("value").from(ident)
         if !ret.nil?
-          pair = AST::Group.new(" ").from(setter_param)
-          pair.terms << setter_param
-          pair.terms << ret.dup
+          pair = AST::Relate.new(
+            setter_param,
+            AST::Operator.new("EXPLICITTYPE").from(setter_param),
+            ret.dup,
+          ).from(setter_param)
           setter_param = pair
         end
         setter_params = AST::Group.new("(").from(ident)
@@ -719,9 +721,11 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         replace_ident = AST::Identifier.new("#{ident.value}<<=").from(ident)
         replace_param = AST::Identifier.new("value").from(ident)
         if !ret.nil?
-          pair = AST::Group.new(" ").from(replace_param)
-          pair.terms << replace_param
-          pair.terms << ret.dup
+          pair = AST::Relate.new(
+            replace_param,
+            AST::Operator.new("EXPLICITTYPE").from(replace_param),
+            ret.dup,
+          ).from(replace_param)
           replace_param = pair
         end
         replace_params = AST::Group.new("(").from(ident)

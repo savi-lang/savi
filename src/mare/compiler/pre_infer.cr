@@ -372,28 +372,6 @@ module Mare::Compiler::PreInfer
       when "["
         @analysis[node] =
           Infer::ArrayLiteral.new(node.pos, layer(node), node.terms.map { |term| self[term] })
-      when " "
-        ref = @refer[node.terms[0]]?
-        if ref.is_a?(Refer::Local)
-          local_ident = @local_idents[ref]
-
-          local = self[local_ident]
-          case local
-          when Infer::Local, Infer::Param
-            info = self[node.terms[1]]
-            case info
-            when Infer::FixedTypeExpr, Infer::Self
-              info.stabilize = true
-              local.set_explicit(info)
-            else raise NotImplementedError.new(info)
-            end
-          else raise NotImplementedError.new(local)
-          end
-
-          @analysis.redirect(node, local_ident)
-        else
-          raise NotImplementedError.new(node.to_a)
-        end
       else raise NotImplementedError.new(node.style)
       end
     end
@@ -419,6 +397,28 @@ module Mare::Compiler::PreInfer
       case node.op.value
       when "->"
         # Do nothing here - we'll handle it in one of the parent nodes.
+      when "EXPLICITTYPE"
+        ref = @refer[node.lhs]?
+        if ref.is_a?(Refer::Local)
+          local_ident = @local_idents[ref]
+
+          local = self[local_ident]
+          case local
+          when Infer::Local, Infer::Param
+            info = self[node.rhs]
+            case info
+            when Infer::FixedTypeExpr, Infer::Self
+              info.stabilize = true
+              local.set_explicit(info)
+            else raise NotImplementedError.new(info)
+            end
+          else raise NotImplementedError.new(local)
+          end
+
+          @analysis.redirect(node, local_ident)
+        else
+          raise NotImplementedError.new(node.to_a)
+        end
       when "=", "<<=", "DEFAULTPARAM"
         lhs = self[node.lhs]
         lhs = lhs.info if lhs.is_a?(Infer::LocalRef)

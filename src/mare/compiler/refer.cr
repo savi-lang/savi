@@ -137,17 +137,6 @@ module Mare::Compiler::Refer
       touch_yield_loop(ctx, node.yield_params, node.yield_block)
     end
 
-    # For a Group, pay attention to any styles that are relevant to us.
-    def touch(ctx, node : AST::Group)
-      # If we have a whitespace-delimited group where the first term has info,
-      # apply that info to the whole group.
-      # For example, this applies to type parameters with constraints.
-      if node.style == " "
-        info = @analysis[node.terms.first]?
-        @analysis[node] = info if info
-      end
-    end
-
     def touch_yield_loop(ctx, params : AST::Group?, block : AST::Group?)
       return unless params || block
 
@@ -160,6 +149,13 @@ module Mare::Compiler::Refer
         @analysis.set_scope(params, branch) if params
         @analysis.set_scope(block, branch) if block
       }
+    end
+
+    def touch(ctx, node : AST::Relate)
+      if node.op.value == "EXPLICITTYPE"
+        info = @analysis[node.lhs]?
+        @analysis[node] = info if info
+      end
     end
 
     def touch(ctx, node : AST::Node)

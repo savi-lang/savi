@@ -134,14 +134,6 @@ module Mare::Compiler::Classify
         # In a sequence-style group, only the value of the final term is needed.
         group.terms[0...-1].each { |t| @analysis.recursive_value_not_needed!(t) }
         @analysis.value_needed!(group.terms.last) unless group.terms.empty?
-      when " "
-        if group.terms.size == 2
-          # Treat this as an explicit type qualification, such as in the case
-          # of a local assignment with an explicit type. The value isn't used.
-          type_expr_visit(ctx, group.terms[1])
-        else
-          raise NotImplementedError.new(group.to_a.inspect)
-        end
       else
       end
     end
@@ -163,7 +155,7 @@ module Mare::Compiler::Classify
 
     def touch(ctx, relate : AST::Relate)
       case relate.op.value
-      when "<:", "!<:"
+      when "<:", "!<:", "EXPLICITTYPE"
         type_expr_visit(ctx, relate.rhs)
       else
       end

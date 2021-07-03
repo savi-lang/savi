@@ -5,10 +5,8 @@ module Mare::AST::Extract
     AST::Term?}      # default parameter
     if node.is_a?(AST::Identifier)
       {node, nil, nil}
-    elsif node.is_a?(AST::Group) \
-    && node.style == " " \
-    && node.terms.size == 2
-      {node.terms[0].as(AST::Identifier), node.terms[1], nil}
+    elsif node.is_a?(AST::Relate) && node.op.value == "EXPLICITTYPE"
+      {node.lhs.as(AST::Identifier), node.rhs, nil}
     elsif node.is_a?(AST::Relate) \
     && (node.op.value == "DEFAULTPARAM" || node.op.value == "=")
       recurse = param(node.lhs)
@@ -28,19 +26,14 @@ module Mare::AST::Extract
     AST::Identifier, # identifier
     AST::Term?,      # bound
     AST::Term?}      # default
-    case node
-    when AST::Identifier
+    if node.is_a?(AST::Identifier)
       {node, nil, nil}
-    when AST::Group
-      raise NotImplementedError.new(node) \
-        unless node.terms.size == 2 && node.style == " "
-
-      {node.terms.first.as(AST::Identifier), node.terms.last.as(AST::Term), nil}
-    when AST::Relate
-      raise NotImplementedError.new(node) unless node.op.value == "="
-
-      ident, bound, _ = type_param(node.lhs)
-      {ident, bound, node.rhs.as(AST::Term)}
+    elsif node.is_a?(AST::Relate) && node.op.value == "EXPLICITTYPE"
+      {node.lhs.as(AST::Identifier), node.rhs, nil}
+    elsif node.is_a?(AST::Relate) \
+    && (node.op.value == "DEFAULTPARAM" || node.op.value == "=")
+      recurse = param(node.lhs)
+      {recurse[0], recurse[1], node.rhs}
     else
       raise NotImplementedError.new(node)
     end
