@@ -9,9 +9,9 @@
       while (i < 1) (i += 1, break 33 | 11)
     )
 
-    test["while; resulting in continue value"].pass = U64[33] == (
+    test["while; resulting in next value"].pass = U64[33] == (
       i = USize[0]
-      while (i < 1) (i += 1, continue 33 | 11)
+      while (i < 1) (i += 1, next 33 | 11)
     )
 
     test["while; not executing the break"].pass = U64[33] == (
@@ -24,20 +24,20 @@
       )
     )
 
-    test["while; not executing the continue"].pass = U64[33] == (
+    test["while; not executing the next"].pass = U64[33] == (
       i = USize[0]
       while (i < 1) (i += 1
-        if (zero > 1) (continue 22)
+        if (zero > 1) (next 22)
         33
       |
         11
       )
     )
 
-    test["while; not using the value of the continue"].pass = U64[33] == (
+    test["while; not using the value of the next"].pass = U64[33] == (
       i = USize[0]
       while (i < 2) (i += 1
-        if (i < 1) (continue 22)
+        if (i < 1) (next 22)
         33
       |
         11

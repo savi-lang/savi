@@ -320,8 +320,8 @@ module Mare::Compiler::PreInfer
         Infer::JumpReturn.new(node.pos, layer(node), term_info)
       when AST::Jump::Kind::Break
         Infer::JumpBreak.new(node.pos, layer(node), term_info)
-      when AST::Jump::Kind::Continue
-        Infer::JumpContinue.new(node.pos, layer(node), term_info)
+      when AST::Jump::Kind::Next
+        Infer::JumpNext.new(node.pos, layer(node), term_info)
       else
         raise ""
       end
@@ -636,13 +636,13 @@ module Mare::Compiler::PreInfer
           end
         ) || [] of Infer::JumpBreak,
         @jumps.catches[node]?.try(
-          &.select(&.kind.is_a? AST::Jump::Kind::Continue).map do |jump|
+          &.select(&.kind.is_a? AST::Jump::Kind::Next).map do |jump|
             inf = @analysis[jump]
-            raise NotImplementedError.new("Jump should be of 'continue' kind") \
-              unless inf.is_a? Infer::JumpContinue
-            inf.as Infer::JumpContinue
+            raise NotImplementedError.new("Jump should be of 'next' kind") \
+              unless inf.is_a? Infer::JumpNext
+            inf.as Infer::JumpNext
           end
-        ) || [] of Infer::JumpContinue,
+        ) || [] of Infer::JumpNext,
       )
     end
 

@@ -813,7 +813,7 @@ module Mare::AST
       Error
       Return
       Break
-      Continue
+      Next
     end
 
     property term : Term

@@ -69,8 +69,8 @@ module Mare::Compiler::Jumps
     protected def always_break!(node); set_flag(node, FLAG_ALWAYS_BREAK) end
     protected def maybe_break!(node); set_flag(node, FLAG_MAYBE_BREAK) end
 
-    protected def always_continue!(node); set_flag(node, FLAG_ALWAYS_CONTINUE) end
-    protected def maybe_continue!(node); set_flag(node, FLAG_MAYBE_CONTINUE) end
+    protected def always_next!(node); set_flag(node, FLAG_ALWAYS_CONTINUE) end
+    protected def maybe_next!(node); set_flag(node, FLAG_MAYBE_CONTINUE) end
 
     def always_error?(node); has_flag?(node, FLAG_ALWAYS_ERROR) end
     def maybe_error?(node); has_flag?(node, FLAG_MAYBE_ERROR) end
@@ -81,8 +81,8 @@ module Mare::Compiler::Jumps
     def always_break?(node); has_flag?(node, FLAG_ALWAYS_BREAK) end
     def maybe_break?(node); has_flag?(node, FLAG_MAYBE_BREAK) end
 
-    def always_continue?(node); has_flag?(node, FLAG_ALWAYS_CONTINUE) end
-    def maybe_continue?(node); has_flag?(node, FLAG_MAYBE_CONTINUE) end
+    def always_next?(node); has_flag?(node, FLAG_ALWAYS_CONTINUE) end
+    def maybe_next?(node); has_flag?(node, FLAG_MAYBE_CONTINUE) end
 
     def any_error?(node)
       has_flag?(node, (FLAG_ALWAYS_ERROR | FLAG_MAYBE_ERROR))
@@ -96,16 +96,16 @@ module Mare::Compiler::Jumps
       has_flag?(node, (FLAG_ALWAYS_BREAK | FLAG_MAYBE_BREAK))
     end
 
-    def any_continue?(node)
+    def any_next?(node)
       has_flag?(node, (FLAG_ALWAYS_CONTINUE | FLAG_MAYBE_CONTINUE))
     end
 
     def away?(node)
-      always_error?(node) || always_return?(node) || always_break?(node) || always_continue?(node)
+      always_error?(node) || always_return?(node) || always_break?(node) || always_next?(node)
     end
 
     def away_possibly?(node)
-      any_error?(node) || any_return?(node) || any_break?(node) || any_continue?(node)
+      any_error?(node) || any_return?(node) || any_break?(node) || any_next?(node)
     end
   end
 
@@ -152,12 +152,12 @@ module Mare::Compiler::Jumps
         try_node = @stack.reverse.find(&.is_a?(AST::Try))
 
         analysis.catch(try_node.not_nil!, node) if try_node
-      when JumpKind::Break, JumpKind::Continue
+      when JumpKind::Break, JumpKind::Next
         case node.kind
         when JumpKind::Break
           @analysis.always_break!(node)
-        when JumpKind::Continue
-          @analysis.always_continue!(node)
+        when JumpKind::Next
+          @analysis.always_next!(node)
         else
         end
 
@@ -201,12 +201,12 @@ module Mare::Compiler::Jumps
         @analysis.maybe_break!(node)
       end
 
-      if node.terms.any? { |t| @analysis.always_continue?(t) }
-        # A group is an always continue if any term in it is.
-        @analysis.always_continue!(node)
-      elsif node.terms.any? { |t| @analysis.maybe_continue?(t) }
-        # Otherwise, it is a maybe continue if any term in it is.
-        @analysis.maybe_continue!(node)
+      if node.terms.any? { |t| @analysis.always_next?(t) }
+        # A group is an always next if any term in it is.
+        @analysis.always_next!(node)
+      elsif node.terms.any? { |t| @analysis.maybe_next?(t) }
+        # Otherwise, it is a maybe next if any term in it is.
+        @analysis.maybe_next!(node)
       end
     end
 
@@ -235,12 +235,12 @@ module Mare::Compiler::Jumps
         @analysis.maybe_break!(node)
       end
 
-      if @analysis.always_continue?(node.term)
-        # A prefixed term is an always continue if its term is.
-        @analysis.always_continue!(node)
-      elsif @analysis.maybe_continue?(node.term)
-        # Otherwise, it is a maybe continue if its term is.
-        @analysis.maybe_continue!(node)
+      if @analysis.always_next?(node.term)
+        # A prefixed term is an always next if its term is.
+        @analysis.always_next!(node)
+      elsif @analysis.maybe_next?(node.term)
+        # Otherwise, it is a maybe next if its term is.
+        @analysis.maybe_next!(node)
       end
     end
 
@@ -269,12 +269,12 @@ module Mare::Compiler::Jumps
         @analysis.maybe_break!(node)
       end
 
-      if node.terms.any? { |term| @analysis.always_continue?(term) }
-        # A yield expression is an always continue if any of its terms are.
-        @analysis.always_continue!(node)
-      elsif node.terms.any? { |term| @analysis.maybe_continue?(term) }
-        # Otherwise, it is a maybe continue if any of its terms are.
-        @analysis.maybe_continue!(node)
+      if node.terms.any? { |term| @analysis.always_next?(term) }
+        # A yield expression is an always next if any of its terms are.
+        @analysis.always_next!(node)
+      elsif node.terms.any? { |term| @analysis.maybe_next?(term) }
+        # Otherwise, it is a maybe next if any of its terms are.
+        @analysis.maybe_next!(node)
       end
     end
 
@@ -303,12 +303,12 @@ module Mare::Compiler::Jumps
         @analysis.maybe_break!(node)
       end
 
-      if @analysis.always_continue?(node.term) || @analysis.always_continue?(node.group)
-        # A qualify is an always continue if either its term or group is.
-        @analysis.always_continue!(node)
-      elsif @analysis.maybe_continue?(node.term) || @analysis.maybe_continue?(node.group)
-        # Otherwise, it is a maybe continue if either its term or group is.
-        @analysis.maybe_continue!(node)
+      if @analysis.always_next?(node.term) || @analysis.always_next?(node.group)
+        # A qualify is an always next if either its term or group is.
+        @analysis.always_next!(node)
+      elsif @analysis.maybe_next?(node.term) || @analysis.maybe_next?(node.group)
+        # Otherwise, it is a maybe next if either its term or group is.
+        @analysis.maybe_next!(node)
       end
     end
 
@@ -337,12 +337,12 @@ module Mare::Compiler::Jumps
         @analysis.maybe_break!(node)
       end
 
-      if @analysis.always_continue?(node.lhs) || @analysis.always_continue?(node.rhs)
-        # A relation is an always continue if either its left or right side is.
-        @analysis.always_continue!(node)
-      elsif @analysis.maybe_continue?(node.lhs) || @analysis.maybe_continue?(node.rhs)
-        # Otherwise, it is a maybe continue if either its left or right side is.
-        @analysis.maybe_continue!(node)
+      if @analysis.always_next?(node.lhs) || @analysis.always_next?(node.rhs)
+        # A relation is an always next if either its left or right side is.
+        @analysis.always_next!(node)
+      elsif @analysis.maybe_next?(node.lhs) || @analysis.maybe_next?(node.rhs)
+        # Otherwise, it is a maybe next if either its left or right side is.
+        @analysis.maybe_next!(node)
       end
     end
 
@@ -407,24 +407,24 @@ module Mare::Compiler::Jumps
         @analysis.maybe_break!(node)
       end
 
-      # A choice is an always continue only if all possible paths
-      # through conds and bodies force us into an always continue.
+      # A choice is an always next only if all possible paths
+      # through conds and bodies force us into an always next.
       some_possible_happy_path =
         node.list.size.times.each do |index|
-          break false if @analysis.always_continue?(node.list[index][0])
-          break true unless @analysis.always_continue?(node.list[index][1])
+          break false if @analysis.always_next?(node.list[index][0])
+          break true unless @analysis.always_next?(node.list[index][1])
         end
 
-      # A choice is a maybe continue if any cond or body in it is a maybe continue.
-      some_possible_continue =
+      # A choice is a maybe next if any cond or body in it is a maybe next.
+      some_possible_next =
         node.list.any? do |cond, body|
-          @analysis.any_continue?(cond) || @analysis.any_continue?(body)
+          @analysis.any_next?(cond) || @analysis.any_next?(body)
         end
 
       if !some_possible_happy_path
-        @analysis.always_continue!(node)
-      elsif some_possible_continue
-        @analysis.maybe_continue!(node)
+        @analysis.always_next!(node)
+      elsif some_possible_next
+        @analysis.maybe_next!(node)
       end
     end
 
@@ -477,16 +477,16 @@ module Mare::Compiler::Jumps
         @analysis.maybe_break!(node)
       end
 
-      if @analysis.always_continue?(node.initial_cond)
-        # A loop is an always continue if either cond is an always continue,
-        # LOOP NOTE: we ignore any continue in the body - the loop catches it.
-        @analysis.always_continue!(node)
-      elsif @analysis.maybe_continue?(node.initial_cond) \
-      || @analysis.maybe_continue?(node.repeat_cond) \
-      || @analysis.any_continue?(node.else_body)
-        # A loop is a maybe continue if either cond or the else body may continue.
-        # LOOP NOTE: we ignore any continue in the body - the loop catches it.
-        @analysis.maybe_continue!(node)
+      if @analysis.always_next?(node.initial_cond)
+        # A loop is an always next if either cond is an always next,
+        # LOOP NOTE: we ignore any next in the body - the loop catches it.
+        @analysis.always_next!(node)
+      elsif @analysis.maybe_next?(node.initial_cond) \
+      || @analysis.maybe_next?(node.repeat_cond) \
+      || @analysis.any_next?(node.else_body)
+        # A loop is a maybe next if either cond or the else body may next.
+        # LOOP NOTE: we ignore any next in the body - the loop catches it.
+        @analysis.maybe_next!(node)
       end
     end
 
@@ -517,12 +517,12 @@ module Mare::Compiler::Jumps
         @analysis.maybe_break!(node)
       end
 
-      if @analysis.always_continue?(node.body) && @analysis.always_continue?(node.else_body)
-        # A try is an always continue if both the body and else are always continue.
-        @analysis.always_continue!(node)
-      elsif @analysis.any_continue?(node.else_body)
-        # A try is a maybe continue if the else body has some chance to continue.
-        @analysis.maybe_continue!(node)
+      if @analysis.always_next?(node.body) && @analysis.always_next?(node.else_body)
+        # A try is an always next if both the body and else are always next.
+        @analysis.always_next!(node)
+      elsif @analysis.any_next?(node.else_body)
+        # A try is a maybe next if the else body has some chance to next.
+        @analysis.maybe_next!(node)
       end
     end
 

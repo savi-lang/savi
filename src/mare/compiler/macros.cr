@@ -133,10 +133,10 @@ class Mare::Compiler::Macros < Mare::AST::CopyOnMutateVisitor
         "the value to break loop with",
       ])
       visit_jump(node)
-    elsif Util.match_jump?(node, 0, AST::Jump::Kind::Continue)
+    elsif Util.match_jump?(node, 0, AST::Jump::Kind::Next)
       Util.require_terms(node, [
         nil,
-        "the value to continue loop with",
+        "the value to continue the next loop iteration with",
       ])
       visit_jump(node)
     elsif Util.match_ident?(node, 0, "source_code_position_of_argument")
@@ -185,8 +185,8 @@ class Mare::Compiler::Macros < Mare::AST::CopyOnMutateVisitor
       AST::Jump.new(AST::Identifier.new("None").from(node), AST::Jump::Kind::Return).from(node)
     when "break"
       AST::Jump.new(AST::Identifier.new("None").from(node), AST::Jump::Kind::Break).from(node)
-    when "continue"
-      AST::Jump.new(AST::Identifier.new("None").from(node), AST::Jump::Kind::Continue).from(node)
+    when "next"
+      AST::Jump.new(AST::Identifier.new("None").from(node), AST::Jump::Kind::Next).from(node)
     else
       node
     end

@@ -47,15 +47,15 @@ A break can only be used inside a loop or yield block:
 
 ---
 
-It complains when a `continue` is not in a loop.
+It complains when a `next` is not in a loop.
 
 ```mare
-  continue "value"
+  next "value"
 ```
 ```error
-A continue can only be used inside a loop or yield block:
-  continue "value"
-  ^~~~~~~~
+A next can only be used inside a loop or yield block:
+  next "value"
+  ^~~~
 ```
 
 ---
@@ -150,10 +150,10 @@ It analyzes control flow for every kind of conditional jump in a `while`.
       break "value"
       @after_break ::flow.block=> 10U(9)
 
-    | @cond_continue ::flow.block=> 11(8F)
-    | @before_continue ::flow.block=> 12(11T)
-      continue "value"
-      @after_continue ::flow.block=> 13U(12)
+    | @cond_next ::flow.block=> 11(8F)
+    | @before_next ::flow.block=> 12(11T)
+      next "value"
+      @after_next ::flow.block=> 13U(12)
 
     | @cond_error ::flow.block=> 14(11F)
     | @before_error ::flow.block=> 15(14T)
@@ -192,10 +192,10 @@ It analyzes control flow for every kind of conditional jump in a yield block.
       break "value"
       @after_break ::flow.block=> 8U(7)
 
-    | @cond_continue ::flow.block=> 9(6F)
-    | @before_continue ::flow.block=> 10(9T)
-      continue "value"
-      @after_continue ::flow.block=> 11U(10)
+    | @cond_next ::flow.block=> 9(6F)
+    | @before_next ::flow.block=> 10(9T)
+      next "value"
+      @after_next ::flow.block=> 11U(10)
 
     | @cond_error ::flow.block=> 12(9F)
     | @before_error ::flow.block=> 13(12T)

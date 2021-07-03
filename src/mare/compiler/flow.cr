@@ -369,11 +369,11 @@ module Mare::Compiler::Flow
 
       # The loop body comes after the initial condition if it's true.
       # If we see a break jump in the body, it jumps to the after block.
-      # If we see a continue jump in the body, it jumps to the repeat condition.
+      # If we see a next jump in the body, it jumps to the repeat condition.
       start_of_body_block = body_block
       body_block.comes_after_if_true(initial_cond_block)
       with_jump_target(AST::Jump::Kind::Break, after_block) {
-        with_jump_target(AST::Jump::Kind::Continue, repeat_cond_block) {
+        with_jump_target(AST::Jump::Kind::Next, repeat_cond_block) {
           body_block = visit_deferred_child(ctx, node.body, body_block)
         }
       }
@@ -451,18 +451,18 @@ module Mare::Compiler::Flow
       # It's also possible that the yield block executes, in which case
       # it comes after the before block (with unknown function code in between).
       # We also set up jump targets so that `break` will jump to the after block
-      # and `continue` will jump to the exit of the yield block.
+      # and `next` will jump to the exit of the yield block.
       start_of_yield_block = yield_block
       yield_block.comes_after(before_block)
       with_jump_target(AST::Jump::Kind::Break, after_block) {
-        with_jump_target(AST::Jump::Kind::Continue, yield_exit_block) {
+        with_jump_target(AST::Jump::Kind::Next, yield_exit_block) {
           yield_block = visit_deferred_child(ctx, yield_params, yield_block) if yield_params
           yield_block = visit_deferred_child(ctx, yield_block_node, yield_block)
         }
       }
 
       # The exit of the yield block comes after the yield block itself,
-      # when reached naturally at the end of it rather than via `continue`.
+      # when reached naturally at the end of it rather than via `next`.
       yield_exit_block.comes_after(yield_block)
 
       # From the exit block, it is possible that we again run the yield block,
@@ -485,9 +485,9 @@ module Mare::Compiler::Flow
         when AST::Jump::Kind::Break
           ctx.error_at node,
             "A break can only be used inside a loop or yield block"
-        when AST::Jump::Kind::Continue
+        when AST::Jump::Kind::Next
           ctx.error_at node,
-            "A continue can only be used inside a loop or yield block"
+            "A next can only be used inside a loop or yield block"
         else
           raise NotImplementedError.new("No target for Jump::#{node.kind}")
         end

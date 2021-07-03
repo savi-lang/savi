@@ -717,8 +717,8 @@ module Mare::Compiler::Infer
     def error_jump_name; "break" end
   end
 
-  class JumpContinue < JumpError
-    def error_jump_name; "continue" end
+  class JumpNext < JumpError
+    def error_jump_name; "next" end
   end
 
   class Sequence < Info
@@ -808,13 +808,13 @@ module Mare::Compiler::Infer
 
   class Loop < Phi
     getter early_breaks : Array(JumpBreak)
-    getter early_continues : Array(JumpContinue)
+    getter early_nexts : Array(JumpNext)
 
-    def initialize(pos, layer_index, branches, fixed_bool, @early_breaks, @early_continues)
+    def initialize(pos, layer_index, branches, fixed_bool, @early_breaks, @early_nexts)
       super(pos, layer_index, branches, fixed_bool)
 
       early_breaks.each(&.term.add_downstream(@pos, self))
-      early_continues.each(&.term.add_downstream(@pos, self))
+      early_nexts.each(&.term.add_downstream(@pos, self))
     end
   end
 

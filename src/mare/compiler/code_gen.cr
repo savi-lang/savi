@@ -138,7 +138,7 @@ class Mare::Compiler::CodeGen
     @source_code_pos_globals = {} of Source::Pos => LLVM::Value
     @reflection_of_type_globals = {} of GenType => LLVM::Value
     @gtypes = {} of String => GenType
-    @loop_continue_stack = Array(Tuple(
+    @loop_next_stack = Array(Tuple(
       LLVM::BasicBlock, Array(LLVM::BasicBlock), Array(LLVM::Value), Reach::Ref,
     )).new
     @loop_break_stack = Array(Tuple(
@@ -2231,8 +2231,8 @@ class Mare::Compiler::CodeGen
         gen_return_value(gen_expr(expr.term), expr.term)
       when AST::Jump::Kind::Break
         gen_break_loop(gen_expr(expr.term), expr.term)
-      when AST::Jump::Kind::Continue
-        gen_continue_loop(gen_expr(expr.term), expr.term)
+      when AST::Jump::Kind::Next
+        gen_next(gen_expr(expr.term), expr.term)
       else
         raise NotImplementedError.new("for this kind of jump")
       end
@@ -3013,7 +3013,7 @@ class Mare::Compiler::CodeGen
 
     # check if we have any early continues to not to generate continue block
     pre_infer = ctx.pre_infer[func_frame.gfunc.not_nil!.link]
-    has_continues = !pre_infer[expr].as(Infer::Loop).early_continues.empty?
+    has_nexts = !pre_infer[expr].as(Infer::Loop).early_nexts.empty?
 
     # Prepare to capture state for the final phi.
     phi_blocks = [] of LLVM::BasicBlock
@@ -3021,16 +3021,16 @@ class Mare::Compiler::CodeGen
 
     # Create all of the instruction blocks we'll need for this loop.
     body_block = gen_block("body_loop")
-    continue_block = gen_block("continue_loop") if has_continues
+    next_block = gen_block("next_loop") if has_nexts
     else_block = gen_block("else_loop")
     post_block = gen_block("after_loop")
 
-    @loop_continue_stack << {
-      continue_block,
+    @loop_next_stack << {
+      next_block,
       [] of LLVM::BasicBlock,
       [] of LLVM::Value,
       phi_type.not_nil!,
-    } if continue_block
+    } if next_block
     @loop_break_stack << {
       post_block,
       [] of LLVM::BasicBlock,
@@ -3060,22 +3060,22 @@ class Mare::Compiler::CodeGen
       @builder.cond(cond_value, body_block, post_block)
     end
 
-    if continue_block
-      continue_stack_tuple = @loop_continue_stack.pop
-      raise "invalid post continue stack" \
-        unless continue_stack_tuple[0] == continue_block
+    if next_block
+      next_stack_tuple = @loop_next_stack.pop
+      raise "invalid post next stack" \
+        unless next_stack_tuple[0] == next_block
 
-      @builder.position_at_end(continue_block)
-      continue_value =
+      @builder.position_at_end(next_block)
+      next_value =
         @builder.phi(
           llvm_type_of(phi_type.not_nil!),
-          continue_stack_tuple[1],
-          continue_stack_tuple[2],
-          "continue_expression_value",
+          next_stack_tuple[1],
+          next_stack_tuple[2],
+          "next_expression_value",
         )
       cond_value = gen_as_cond(gen_expr(expr.repeat_cond))
       phi_blocks << @builder.insert_block
-      phi_values << continue_value
+      phi_values << next_value
       @builder.cond(cond_value, body_block, post_block)
     end
 
@@ -3215,10 +3215,10 @@ class Mare::Compiler::CodeGen
     end
   end
 
-  def gen_continue_loop(value : LLVM::Value, from_expr : AST::Node)
-    raise NotImplementedError.new("") if @loop_continue_stack.empty?
+  def gen_next(value : LLVM::Value, from_expr : AST::Node)
+    raise NotImplementedError.new("") if @loop_next_stack.empty?
 
-    continue_stack_tuple = @loop_continue_stack.last.not_nil!
+    continue_stack_tuple = @loop_next_stack.last.not_nil!
     typ = continue_stack_tuple[3]
     continue_stack_tuple[1] << @builder.insert_block
     continue_stack_tuple[2] << gen_assign_cast(value, typ, from_expr)
