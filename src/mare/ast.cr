@@ -50,6 +50,7 @@ module Mare::AST
 
     def from(other : Node)
       @pos = other.pos
+      @annotations = other.annotations
       self
     end
 

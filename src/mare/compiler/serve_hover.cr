@@ -51,8 +51,6 @@ class Mare::Compiler::ServeHover
       messages << "This refers to a field."
     when Refer::Local
       messages << "This is a local variable."
-    when Refer::LocalUnion
-      messages << "This is a local variable."
     when Refer::Type
       messages << "This is a type reference."
     when Refer::TypeAlias

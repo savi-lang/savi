@@ -2,17 +2,18 @@ class Mare::Compiler::Context
   getter program
   getter import
 
-  getter infer
-  getter infer_edge
   getter classify
   getter code_gen
   getter code_gen_verona
   getter completeness
-  getter consumes
   getter eval
+  getter flow
+  getter infer
+  getter infer_edge
   getter inventory
   getter jumps
   getter lifetime
+  getter local
   getter namespace
   getter paint
   getter populate
@@ -40,18 +41,19 @@ class Mare::Compiler::Context
     @program = Program.new
     @stack = [] of Interpreter
 
-    @infer = Infer::Pass.new
-    @infer_edge = Infer::PassEdge.new
     @classify = Classify::Pass.new
     @code_gen = CodeGen.new(CodeGen::PonyRT)
     @code_gen_verona = CodeGen.new(CodeGen::VeronaRT)
     @completeness = Completeness::Pass.new
-    @consumes = Consumes::Pass.new
     @eval = Eval.new
+    @flow = Flow::Pass.new
     @import = Import.new
+    @infer = Infer::Pass.new
+    @infer_edge = Infer::PassEdge.new
     @inventory = Inventory::Pass.new
     @jumps = Jumps::Pass.new
     @lifetime = Lifetime.new
+    @local = Local::Pass.new
     @namespace = Namespace.new
     @paint = Paint.new
     @populate = Populate.new

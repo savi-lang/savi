@@ -11,6 +11,8 @@ require "./pass/analyze"
 # This pass keeps state at the per-type and per-function level.
 # This pass produces output state at the per-type and per-function level.
 #
+# TODO: Remove this pass or make it based on the Flow pass, because that pass
+# does much of the same work as this pass, though in a different way.
 module Mare::Compiler::TypeContext
   struct Layer
     @parent : StructRef(Layer)?
@@ -78,9 +80,8 @@ module Mare::Compiler::TypeContext
 
   class Visitor < Mare::AST::Visitor
     getter analysis : Analysis
-    getter refer : Refer::Analysis
 
-    def initialize(func : Program::Function, @analysis, @refer)
+    def initialize(func : Program::Function, @analysis)
       @layer_stack = [Layer.new(func.ast)] # start with a root layer
       @analysis.observe_root_layer(current_layer)
     end
@@ -165,12 +166,10 @@ module Mare::Compiler::TypeContext
     end
 
     def analyze_func(ctx, f, f_link, t_analysis) : Analysis
-      refer = ctx.refer[f_link]
-      deps = refer
       prev = ctx.prev_ctx.try(&.type_context)
 
-      maybe_from_func_cache(ctx, prev, f, f_link, deps) do
-        visitor = Visitor.new(f, Analysis.new, refer)
+      maybe_from_func_cache(ctx, prev, f, f_link, true) do
+        visitor = Visitor.new(f, Analysis.new)
 
         f.params.try(&.accept(ctx, visitor))
         f.body.try(&.accept(ctx, visitor))

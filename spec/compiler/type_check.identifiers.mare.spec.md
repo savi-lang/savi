@@ -25,29 +25,3 @@ This type couldn't be resolved:
   :fun x BogusType: 42
          ^~~~~~~~~
 ```
-
----
-
-It complains when a local identifier wasn't declared:
-
-```mare
-    x = y
-```
-```error
-This identifier couldn't be resolved:
-    x = y
-        ^
-```
-
----
-
-It complains when a local identifier wasn't declared, even when unused:
-
-```mare
-    bogus
-```
-```error
-This identifier couldn't be resolved:
-    bogus
-    ^~~~~
-```

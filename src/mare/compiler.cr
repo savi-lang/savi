@@ -31,10 +31,11 @@ class Mare::Compiler
     when "refer_type"       then :refer_type
     when "populate"         then :populate
     when "lambda"           then :lambda
+    when "flow"             then :flow
     when "refer"            then :refer
     when "classify"         then :classify
+    when "local"            then :local
     when "jumps"            then :jumps
-    when "consumes"         then :consumes
     when "inventory"        then :inventory
     when "type_context"     then :type_context
     when "pre_infer"        then :pre_infer
@@ -71,10 +72,11 @@ class Mare::Compiler
       when :refer_type       then ctx.run(ctx.refer_type)
       when :populate         then ctx.run_copy_on_mutate(ctx.populate)
       when :lambda           then ctx.run_copy_on_mutate(Lambda)
+      when :flow             then ctx.run(ctx.flow)
       when :refer            then ctx.run(ctx.refer)
       when :classify         then ctx.run(ctx.classify)
+      when :local            then ctx.run(ctx.local)
       when :jumps            then ctx.run(ctx.jumps)
-      when :consumes         then ctx.run(ctx.consumes)
       when :inventory        then ctx.run(ctx.inventory)
       when :type_context     then ctx.run(ctx.type_context)
       when :pre_infer        then ctx.run(ctx.pre_infer)
@@ -116,31 +118,32 @@ class Mare::Compiler
     when :refer_type then [:sugar, :macros, :namespace]
     when :populate then [:sugar, :macros, :refer_type]
     when :lambda then [:sugar, :macros]
-    when :classify then [:refer_type, :lambda, :sugar, :macros]
+    when :flow then [:lambda, :populate, :sugar, :macros]
+    when :classify then [:refer_type, :lambda, :populate, :sugar, :macros]
+    when :refer then [:classify, :lambda, :populate, :sugar, :macros, :refer_type]
+    when :local then [:refer, :flow]
     when :jumps then [:classify]
-    when :refer then [:lambda, :populate, :sugar, :jumps, :macros, :refer_type, :namespace]
-    when :consumes then [:jumps, :refer]
     when :inventory then [:refer]
-    when :type_context then [:refer]
-    when :pre_infer then [:refer, :type_context, :inventory, :jumps, :classify, :lambda, :populate]
+    when :type_context then [:flow]
+    when :pre_infer then [:local, :refer, :type_context, :inventory, :jumps, :classify, :lambda, :populate]
     when :pre_subtyping then [:inventory, :lambda, :populate]
     when :infer_edge then [:pre_subtyping, :pre_infer, :classify, :refer_type]
     when :infer then [:infer_edge]
     when :completeness then [:jumps, :pre_infer]
     when :privacy then [:infer]
     when :verify then [:infer, :pre_infer, :inventory, :jumps]
-    when :reach then [:infer, :pre_subtyping, :refer, :namespace]
+    when :reach then [:infer, :pre_subtyping, :namespace]
     when :type_check then [:reach, :completeness, :infer, :pre_infer]
     when :paint then [:reach, :inventory]
-    when :codegen then [:paint, :verify, :reach, :completeness, :privacy, :type_check, :infer, :pre_infer, :inventory, :consumes, :jumps]
-    when :lifetime then [:reach, :refer, :classify]
-    when :codegen_verona then [:lifetime, :paint, :verify, :reach, :completeness, :privacy, :type_check, :infer, :pre_infer, :inventory, :consumes, :jumps]
+    when :codegen then [:paint, :verify, :reach, :completeness, :privacy, :type_check, :infer, :pre_infer, :inventory, :local, :jumps]
+    when :lifetime then [:reach, :local, :refer, :classify]
+    when :codegen_verona then [:lifetime, :paint, :verify, :reach, :completeness, :privacy, :type_check, :infer, :pre_infer, :inventory, :local, :jumps]
     when :binary then [:codegen]
     when :binary_verona then [:codegen_verona]
     when :eval then [:binary]
-    when :serve_errors then [:completeness, :privacy, :verify, :type_check, :consumes]
+    when :serve_errors then [:completeness, :privacy, :verify, :type_check, :local]
     when :serve_hover then [:refer, :type_check]
-    when :serve_definition then [:refer, :type_check]
+    when :serve_definition then [:refer, :type_check, :local]
     when :serve_lsp then [:serve_hover, :serve_definition]
     else raise NotImplementedError.new([:deps_of, target].inspect)
     end

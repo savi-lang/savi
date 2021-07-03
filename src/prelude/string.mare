@@ -123,14 +123,14 @@
   :: (that is, when the FFI function you are calling has a size argument).
 
   :fun cstring CPointer(U8)
-    if @is_null_terminated (
-      ret CPointer(U8)'tag = @_ptr // TODO: remove this type hint - it shouldn't be needed
-    |
-      ptr = @_ptr._alloc(@_size + 1)
-      @_ptr._copy_to(ptr._unsafe, @_size)
-      ptr._assign_at(@_size, 0)
-      ret CPointer(U8)'tag = ptr // TODO: remove this type hint - it shouldn't be needed
-    )
+    ret CPointer(U8)'tag = @_ptr
+    if @is_null_terminated (return ret)
+
+    ptr = @_ptr._alloc(@_size + 1)
+    @_ptr._copy_to(ptr._unsafe, @_size)
+    ptr._assign_at(@_size, 0)
+    ret = ptr // TODO: remove this type hint - it shouldn't be needed
+    ret
 
   :: Ensure enough capacity is allocated for the given space, in bytes.
   :: The size (number of actual bytes present in the string) does not change.

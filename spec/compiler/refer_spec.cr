@@ -26,93 +26,6 @@ describe Mare::Compiler::Refer do
     ctx1.refer[f_link_m].should eq ctx2.refer[f_link_m]
   end
 
-  it "fails to resolve a local when it was declared in another branch" do
-    source = Mare::Source.new_example <<-SOURCE
-    :actor Main
-      :new
-        if True (
-          x = "example"
-        |
-          x
-        )
-    SOURCE
-
-    ctx = Mare.compiler.compile([source], :refer)
-    ctx.errors.should be_empty
-
-    main = ctx.namespace.main_type!(ctx)
-    func = main.resolve(ctx).find_func!("new")
-    func_link = func.make_link(main)
-    refer = ctx.refer[func_link]
-    x = func
-      .body.not_nil!
-      .terms.first.as(Mare::AST::Group)
-      .terms.first.as(Mare::AST::Choice)
-      .list.last.last.as(Mare::AST::Group)
-      .terms.first
-
-    refer[x].class.should eq Mare::Compiler::Refer::Unresolved
-  end
-
-  it "resolves a local declared in all prior branches" do
-    source = Mare::Source.new_example <<-SOURCE
-    :actor Main
-      :new
-        if True (
-          if True (
-            x = "one"
-          |
-            x = "two"
-          )
-        |
-          x = "three"
-        )
-        x
-    SOURCE
-
-    ctx = Mare.compiler.compile([source], :refer)
-    ctx.errors.should be_empty
-
-    main = ctx.namespace.main_type!(ctx)
-    func = main.resolve(ctx).find_func!("new")
-    func_link = func.make_link(main)
-    refer = ctx.refer[func_link]
-    choice_outer = func
-      .body.not_nil!
-      .terms.first.as(Mare::AST::Group)
-      .terms.first.as(Mare::AST::Choice)
-
-    choice_inner = choice_outer
-      .list[0].last.as(Mare::AST::Group)
-      .terms.first.as(Mare::AST::Group)
-      .terms.first.as(Mare::AST::Choice)
-
-    x1 = choice_inner
-      .list[0].last.as(Mare::AST::Group)
-      .terms.first.as(Mare::AST::Relate)
-      .lhs.as(Mare::AST::Identifier)
-
-    x2 = choice_inner
-      .list[1].last.as(Mare::AST::Group)
-      .terms.first.as(Mare::AST::Relate)
-      .lhs.as(Mare::AST::Identifier)
-
-    x3 = choice_outer
-      .list[1].last.as(Mare::AST::Group)
-      .terms.first.as(Mare::AST::Relate)
-      .lhs.as(Mare::AST::Identifier)
-
-    x = func
-      .body.not_nil!
-      .terms[1].as(Mare::AST::Identifier)
-
-    refer[x].as(Mare::Compiler::Refer::LocalUnion).list.should eq [
-      refer[x1].as(Mare::Compiler::Refer::Local),
-      refer[x2].as(Mare::Compiler::Refer::Local),
-      refer[x3].as(Mare::Compiler::Refer::Local),
-    ]
-  end
-
   it "complains when trying to take address_of not local variable" do
     source = Mare::Source.new_example <<-SOURCE
     :actor Main
@@ -125,45 +38,6 @@ describe Mare::Compiler::Refer do
     from (example):3:
         t = address_of ""
                         ^
-    MSG
-
-    Mare.compiler.compile([source], :refer)
-      .errors.map(&.message).join("\n").should eq expected
-  end
-
-  it "complains when referencing a local declared in only some branches" do
-    source = Mare::Source.new_example <<-SOURCE
-    :actor Main
-      :new
-        if True (
-          if True (
-            // missing x
-          |
-            x = "two"
-          )
-        |
-          x = "three"
-        )
-        x
-    SOURCE
-
-    expected = <<-MSG
-    This variable can't be used here; it was assigned a value in some but not all branches:
-    from (example):12:
-        x
-        ^
-
-    - it was assigned here:
-      from (example):7:
-            x = "two"
-            ^
-
-    - it was assigned here:
-      from (example):10:
-          x = "three"
-          ^
-
-    - but there were other possible branches where it wasn't assigned
     MSG
 
     Mare.compiler.compile([source], :refer)

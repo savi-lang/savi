@@ -4,7 +4,7 @@
 # Basically, this lets us sort of pretend of have referential transparency
 # by wrapping a struct in a class that forwards all methods to the struct.
 class StructRef(T)
-  getter value : T
+  property value : T
 
   forward_missing_to @value
 

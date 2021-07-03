@@ -46,35 +46,35 @@ module Mare::Compiler::Refer
 
   class Visitor < Mare::AST::Visitor
     getter analysis
+    protected getter locals_sequence_number
 
     def initialize(
       @analysis : Analysis,
       @refer_type : ReferType::Analysis,
-      @jumps : Jumps::Analysis? = nil,
-      @parent_locals = {} of String => (Local | LocalUnion),
+      @classify : Classify::Analysis? = nil,
+      @parent_locals = {} of String => Local,
+      @locals_sequence_number = 0,
     )
-      @locals = {} of String => (Local | LocalUnion)
-      @sub_locals = {} of String => (Local | LocalUnion)
+      @locals = {} of String => Local
       @param_count = 0
     end
 
     def locals
-      @parent_locals.merge(@locals).merge(@sub_locals)
+      @parent_locals.merge(@locals)
     end
 
     def sub_branch(ctx, group : AST::Node?, init_locals = locals)
-      Visitor.new(@analysis, @refer_type, @jumps, init_locals).tap do |branch|
-        @analysis.set_scope(group, branch) if group.is_a?(AST::Group)
-        group.try(&.accept(ctx, branch))
-        @analysis = branch.analysis
+      Visitor.new(
+        @analysis,
+        @refer_type,
+        @classify,
+        init_locals,
+        @locals_sequence_number,
+      ).tap do |branch|
+        yield branch
+        @locals_sequence_number = branch.locals_sequence_number
       end
     end
-
-    # def visit_pre(ctx, node)
-    #   if node.is_a? AST::
-    #   end
-    #   node
-    # end
 
     # This visitor never replaces nodes, it just touches them and returns them.
     def visit(ctx, node)
@@ -87,32 +87,28 @@ module Mare::Compiler::Refer
 
     # For an Identifier, resolve it to any known local or type if possible.
     def touch(ctx, node : AST::Identifier)
-      name = node.value
-
-      # First, try to resolve as local, then as type, else it's unresolved.
-      is_sub_local = @sub_locals[name]?
-      info = locals[name]? || @refer_type[node]? || Unresolved::INSTANCE
-
-      # Raise an error if trying to use an "incomplete" union of locals.
-      if info.is_a?(LocalUnion) && (info.incomplete || !info.caught?)
-        extra = info.list.map do |local|
-          {local.as(Local).defn.pos, "it was assigned here"}
-        end
-        extra << {Source::Pos.none,
-          "but there were other possible branches where it wasn't assigned"}
-
-        Error.at node,
-          "This variable can't be used here;" \
-          " it was assigned a value in some but not all branches", extra
-      elsif is_sub_local && info.is_a?(Local) && !info.caught?
-        Error.at node,
-          "This variable can't be used here;" \
-          " it was assigned a value, but it can jump away before this usage"
+      # If we already know of a local variable or type with this name, use that.
+      info = locals[node.value]? || @refer_type[node]?
+      if info
+        @analysis[node] = info
+        return
       end
 
-      @analysis[node] = info
+      # We'd like to resolve this identifier as a local variable by default,
+      # but we can't do that if this is part of a type expression,
+      # or otherwise not part of a value expression.
+      # In those cases it is marked as unresolved.
+      classify = @classify
+      if !classify || classify.type_expr?(node) || classify.no_value?(node)
+        @analysis[node] = Unresolved::INSTANCE
+        return
+      end
+
+      # Now we know it's safe to call this a local variable.
+      create_local(node)
     end
 
+    # TODO: Move this to the verify pass.
     def touch(ctx, node : AST::Prefix)
       case node.op.value
       when "address_of"
@@ -128,26 +124,20 @@ module Mare::Compiler::Refer
       @analysis[node] = Field.new(node.value)
     end
 
-    # We conditionally visit the children of a `.` relation with this visitor;
-    # See the logic in the touch method below.
+    # For a `.` relation, defer the normal visit order, so that we can
+    # visit the lhs, identifier, and args in the normal order, but
+    # visit the yield params and yield block in a special sub-visitor.
     def visit_children?(ctx, node : AST::Relate)
-      !(node.op.value == ".")
+      node.op.value != "."
     end
-
-    # For a Relate, pay attention to any relations that are relevant to us.
     def touch(ctx, node : AST::Relate)
-      case node.op.value
-      when "="
-        info = @analysis[node.lhs]?
-        create_local(node.lhs) if info.nil? || info == Unresolved::INSTANCE
-      when "."
-        node.lhs.accept(ctx, self)
-        ident, args, yield_params, yield_block = AST::Extract.call(node)
-        @analysis[ident] = Unresolved::INSTANCE
-        args.try(&.accept(ctx, self))
-        touch_yield_loop(ctx, yield_params, yield_block)
-      else
-      end
+      return if node.op.value != "."
+
+      node.lhs.accept(ctx, self)
+      ident, args, yield_params, yield_block = AST::Extract.call(node)
+      @analysis[ident] = Unresolved::INSTANCE
+      args.try(&.accept(ctx, self))
+      touch_yield_loop(ctx, yield_params, yield_block)
     end
 
     # For a Group, pay attention to any styles that are relevant to us.
@@ -161,215 +151,42 @@ module Mare::Compiler::Refer
       end
     end
 
-    # For a Try, do away analysis
-    def touch(ctx, node : AST::Choice)
-      # Visit the body next. Locals from the cond are available in the body.
-      body_branch = sub_branch(ctx, body, cond_branch.locals.dup)
-
-      # Collect the list of new locals exposed in the body branch.
-      body_branch.locals.each do |name, local|
-        next if locals[name]?
-        (branch_locals[name] ||= Array(Local | LocalUnion).new) << local
-      end
-
-      # Expose the locals from the branches as LocalUnion instances.
-      # Those locals that were exposed in only some of the branches are to be
-      # marked as incomplete, so that we'll see an error if we try to use them.
-      branch_locals.each do |name, list|
-        info = LocalUnion.build(list)
-        info.incomplete = true if list.size < node.list.size
-        @sub_locals[name] = info
-      end
-    end
-
-    # We don't visit anything under a try with this visitor;
-    # we instead spawn new visitor instances in the touch method below.
-    def visit_children?(ctx, node : AST::Try)
-      false
-    end
-
-    # For a Try, do a branching analysis of the clauses contained within it.
-    def touch(ctx, node : AST::Try)
-      branch_locals = {} of String => Array(Local | LocalUnion)
-
-      body_branch = sub_branch(ctx, node.body)
-      else_branch = sub_branch(ctx, node.else_body)
-
-      else_branch.locals.each do |name, local|
-        next if locals[name]?
-        (branch_locals[name] ||= Array(Local | LocalUnion).new) << local
-      end
-
-      body_branch.locals.each do |name, local|
-        next if locals[name]?
-        locals = branch_locals[name]?
-        locals << local if locals
-      end
-
-      # Expose the locals from the branches as LocalUnion instances.
-      # Those locals that were exposed in only some of the branches are to be
-      # marked as incomplete, so that we'll see an error if we try to use them.
-      branch_locals.each do |name, list|
-        @sub_locals[name] = LocalUnion.build(list)
-      end
-    end
-
-    # We don't visit anything under a choice with this visitor;
-    # we instead spawn new visitor instances in the touch method below.
-    def visit_children?(ctx, node : AST::Choice)
-      false
-    end
-
-    # For a Choice, do a branching analysis of the clauses contained within it.
-    def touch(ctx, node : AST::Choice)
-      # Prepare to collect the list of new locals exposed in each branch.
-      branch_locals = {} of String => Array(Local | LocalUnion)
-
-      # Iterate over each clause, visiting both the cond and body of the clause.
-      node.list.each do |cond, body|
-        # Visit the cond first.
-        cond_branch = sub_branch(ctx, cond)
-
-        # Visit the body next. Locals from the cond are available in the body.
-        body_branch = sub_branch(ctx, body, cond_branch.locals.dup)
-
-        # Collect the list of new locals exposed in the body branch.
-        body_branch.locals.each do |name, local|
-          next if locals[name]?
-          (branch_locals[name] ||= Array(Local | LocalUnion).new) << local
-        end
-      end
-
-      # Expose the locals from the branches as LocalUnion instances.
-      # Those locals that were exposed in only some of the branches are to be
-      # marked as incomplete, so that we'll see an error if we try to use them.
-      branch_locals.each do |name, list|
-        info = LocalUnion.build(list)
-        info.incomplete = true if list.size < node.list.size
-        @sub_locals[name] = info
-      end
-    end
-
-    # We don't visit anything under a choice with this visitor;
-    # we instead spawn new visitor instances in the touch method below.
-    def visit_children?(ctx, node : AST::Loop)
-      false
-    end
-
-    # For a Loop, do a branching analysis of the clauses contained within it.
-    def touch(ctx, node : AST::Loop)
-      # Prepare to collect the list of new locals exposed in each branch.
-      branch_locals = {} of String => Array(Local | LocalUnion)
-
-      # Visit the initial loop cond.
-      initial_cond_branch = sub_branch(ctx, node.initial_cond)
-
-      # Now, visit the else body, if any.
-      node.else_body.try do |else_body|
-        else_branch = sub_branch(ctx, else_body)
-      end
-
-      # Now, visit the main body twice (nested) to simulate repeated execution.
-      # Visit the repeat condition twice (nested) as well.
-      body_branch = sub_branch(ctx, node.body)
-      repeat_cond_branch = body_branch.sub_branch(ctx, node.repeat_cond)
-      body_branch_2 = repeat_cond_branch.sub_branch(ctx, node.body, locals)
-      repeat_cond_branch2 = body_branch_2.sub_branch(ctx, node.repeat_cond)
-
-      # TODO: Is it possible/safe to collect locals from the body branches?
-    end
-
     def touch_yield_loop(ctx, params : AST::Group?, block : AST::Group?)
       return unless params || block
 
-      # Visit params and block twice (nested) to simulate repeated execution
-      sub_branch = sub_branch(ctx, params)
-      params.try(&.terms.each { |param| sub_branch.create_local(param) })
-      block.try(&.accept(ctx, sub_branch))
-      sub_branch2 = sub_branch.sub_branch(ctx, params, locals)
-      params.try(&.terms.each { |param| sub_branch2.create_local(param) })
-      block.try(&.accept(ctx, sub_branch2))
-      @analysis.set_scope(block, sub_branch) if block.is_a?(AST::Group)
+      # Visit params and block in a sub-scope.
+      sub_branch(ctx, params) { |branch|
+        params.try(&.terms.each { |param| branch.create_yield_param_local(param) })
+        params.try(&.accept(ctx, branch))
+        block.try(&.accept(ctx, branch))
+        @analysis = branch.analysis
+        @analysis.set_scope(params, branch) if params
+        @analysis.set_scope(block, branch) if block
+      }
     end
 
     def touch(ctx, node : AST::Node)
       # On all other nodes, do nothing.
     end
 
-    def create_local(node : AST::Identifier)
-      # This will be a new local, so if the identifier already matched an
-      # existing local, it would shadow that, which we don't currently allow.
-      info = @analysis[node]
-      if info.is_a?(Local)
-        Error.at node, "This variable shadows an existing variable", [
-          {info.defn, "the first definition was here"},
-        ]
-      end
-
-      caught = !@jumps.not_nil!.away_possibly?(node)
-
-      # Create the local entry, so later references to this name will see it.
-      local = Local.new(node.value, node, caught)
+    def create_local(node : AST::Identifier, param_idx : Int32? = nil)
+      local = Local.new(node.value, @locals_sequence_number += 1, param_idx)
       @locals[node.value] = local unless node.value == "_"
       @analysis[node] = local
     end
 
-    def create_local(node : AST::Node)
-      raise NotImplementedError.new(node.to_a) \
-        unless node.is_a?(AST::Group) && node.style == " " && node.terms.size == 2
+    def create_yield_param_local(node)
+      ident = AST::Extract.param(node).first
 
-      create_local(node.terms[0])
-      @analysis[node] = @analysis[node.terms[0]]
+      create_local(ident)
+      @analysis[node] = @analysis[ident] # TODO: can this be removed?
     end
 
-    def create_param_local(node : AST::Identifier)
-      case @analysis[node]
-      when Unresolved
-        # Treat this as a parameter with only an identifier and no type.
-        ident = node
+    def create_param_local(node)
+      ident = AST::Extract.param(node).first
 
-        local = Local.new(ident.value, ident, true, @param_count += 1)
-        @locals[ident.value] = local unless ident.value == "_"
-        @analysis[ident] = local
-      else
-        # Treat this as a parameter with only a type and no identifier.
-        # Do nothing other than increment the parameter count, because
-        # we don't want to overwrite the Type info for this node.
-        # We don't need to create a Local anyway, because there's no way to
-        # fetch the value of this parameter later (because it has no identifier).
-        @param_count += 1
-      end
-    end
-
-    def create_param_local(node : AST::Relate)
-      raise NotImplementedError.new(node.to_a) \
-        unless node.op.value == "DEFAULTPARAM"
-
-      create_param_local(node.lhs)
-
-      @analysis[node] = @analysis[node.lhs]
-    end
-
-    def create_param_local(node : AST::Qualify)
-      raise NotImplementedError.new(node.to_a) \
-        unless node.term.is_a?(AST::Identifier) && node.group.style == "("
-
-      create_param_local(node.term)
-
-      @analysis[node] = @analysis[node.term]
-    end
-
-    def create_param_local(node : AST::Node)
-      raise NotImplementedError.new(node.to_a) \
-        unless node.is_a?(AST::Group) && node.style == " " && node.terms.size == 2
-
-      ident = node.terms[0].as(AST::Identifier)
-
-      local = Local.new(ident.value, ident, true, @param_count += 1)
-      @locals[ident.value] = local unless ident.value == "_"
-      @analysis[ident] = local
-
-      @analysis[node] = @analysis[ident]
+      create_local(ident, @param_count += 1)
+      @analysis[node] = @analysis[ident] # TODO: can this be removed?
     end
   end
 
@@ -405,16 +222,16 @@ module Mare::Compiler::Refer
 
     def analyze_func(ctx, f, f_link, t_analysis) : Analysis
       refer_type = ctx.refer_type[f_link]
-      jumps = ctx.jumps[f_link]
-      deps = {refer_type, jumps}
+      classify = ctx.classify[f_link]
+      deps = {refer_type, classify}
       prev = ctx.prev_ctx.try(&.refer)
 
       maybe_from_func_cache(ctx, prev, f, f_link, deps) do
-        visitor = Visitor.new(Analysis.new, refer_type, jumps)
+        visitor = Visitor.new(Analysis.new, *deps)
 
         f.params.try(&.terms.each { |param|
-          param.accept(ctx, visitor)
           visitor.create_param_local(param)
+          param.accept(ctx, visitor)
         })
         f.ret.try(&.accept(ctx, visitor))
         f.body.try(&.accept(ctx, visitor))

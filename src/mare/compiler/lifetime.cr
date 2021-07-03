@@ -61,6 +61,10 @@ class Mare::Compiler::Lifetime
       @ctx.classify[@reach_func.reified.link]
     end
 
+    def local
+      @ctx.local[@reach_func.reified.link]
+    end
+
     def initialize(@ctx, @reach_def, @reach_func)
       @infos_by_node = Hash(AST::Node, Array(Info)).new
       @scopes = [] of Refer::Scope
@@ -122,38 +126,34 @@ class Mare::Compiler::Lifetime
       popped_scope = @scopes.pop
       raise "scope stack inconsistency" unless popped_scope == scope
 
-      popped_scope.locals.each do |local_name, local|
+      popped_scope.locals.each do |local_name, ref|
         # Take no action for variables that are also present in an outer scope.
         next if @scopes.any?(&.locals.has_key?(local_name))
 
         # Touch the local variable as it is falling out of scope and released.
-        case local
+        case ref
         when Refer::Local
-          touch_local_release(node, local)
-        when Refer::LocalUnion
-          local.list.each do |inner_local|
-            touch_local_release(node, inner_local)
-          end
+          touch_local_release(node, ref)
         else
-          raise NotImplementedError.new(local)
+          raise NotImplementedError.new(ref)
         end
       end
     end
 
-    def touch_local_release(node : AST::Node, local : Refer::Local)
-      insert(node, ReleaseFromScope.new(local))
+    def touch_local_release(node : AST::Node, ref : Refer::Local)
+      insert(node, ReleaseFromScope.new(ref))
     end
 
     def touch_assign_local(node : AST::Relate)
       node_lhs = node.lhs
 
       # We only deal in this function with assignments whose lhs is a Local.
-      local = refer[node_lhs]
-      return unless local.is_a?(Refer::Local)
+      ref = refer[node_lhs]
+      return unless ref.is_a?(Refer::Local)
 
       # When rebinding a var and not using the old value, we free/release it.
-      if !classify.value_needed?(node) && !local.is_defn_assign?(node)
-        insert(node.lhs, ReleaseFromScope.new(local))
+      if !classify.value_needed?(node) && !local[node].is_initial_site
+        insert(node.lhs, ReleaseFromScope.new(ref))
       end
     end
 

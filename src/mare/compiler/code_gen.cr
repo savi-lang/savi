@@ -67,6 +67,14 @@ class Mare::Compiler::CodeGen
       @g.ctx.jumps[@gfunc.as(GenFunc).link]
     end
 
+    def local
+      @g.ctx.local[@gfunc.as(GenFunc).link]
+    end
+
+    def any_defn_for_local(ref : Refer::Info)
+      local.any_initial_site_for(ref).node
+    end
+
     @entry_block : LLVM::BasicBlock?
     def entry_block
       @entry_block ||= llvm_func.basic_blocks.append("entry")
@@ -1760,7 +1768,12 @@ class Mare::Compiler::CodeGen
     ref = func_frame.refer[relate.lhs]
     value = gen_expr(relate.rhs).as(LLVM::Value)
     name = value.name
-    lhs_type = ref.is_a?(Refer::Local) ? type_of(ref.defn) : type_of(relate.lhs)
+    lhs_type =
+      if ref.is_a?(Refer::Local)
+        type_of(func_frame.any_defn_for_local(ref))
+      else
+        type_of(relate.lhs)
+      end
     lhs_llvm_type = llvm_type_of(lhs_type)
 
     cast_value = gen_assign_cast(value, lhs_type, relate.rhs)
@@ -1782,7 +1795,12 @@ class Mare::Compiler::CodeGen
     ref = func_frame.refer[relate.lhs]
     value = gen_expr(relate.rhs).as(LLVM::Value)
     name = value.name
-    lhs_type = ref.is_a?(Refer::Local) ? type_of(ref.defn) : type_of(relate.lhs)
+    lhs_type =
+      if ref.is_a?(Refer::Local)
+        type_of(func_frame.any_defn_for_local(ref))
+      else
+        type_of(relate.lhs)
+      end
     lhs_llvm_type = llvm_type_of(lhs_type)
 
     cast_value = gen_assign_cast(value, lhs_type, relate.rhs)
@@ -1798,7 +1816,7 @@ class Mare::Compiler::CodeGen
     displaced_value = gen_assign_cast(
       @builder.load(alloca, local_ref.as(Refer::Local).name),
       type_of(relate),
-      local_ref.defn,
+      func_frame.any_defn_for_local(local_ref),
     )
 
     @builder.store(cast_value, alloca)
@@ -2160,21 +2178,15 @@ class Mare::Compiler::CodeGen
     case expr
     when AST::Identifier
       ref = func_frame.refer[expr]
-      if ref.is_a?(Refer::Local) || ref.is_a?(Refer::LocalUnion)
-        local_ref =
-          if ref.is_a? Refer::LocalUnion
-            ref.list[0]
-          else
-            ref
-          end
-
+      if ref.is_a?(Refer::Local)
+        local_ref = ref
         raise "#{local_ref.inspect} isn't a constant value" if const_only
 
         alloca = func_frame.current_locals[local_ref]
         gen_assign_cast(
           @builder.load(alloca, local_ref.name),
           type_of(expr),
-          local_ref.defn,
+          func_frame.any_defn_for_local(ref),
         )
       elsif ref.is_a?(Refer::Type)
         enum_value = ref.with_value.try(&.resolve(ctx).value)
@@ -3267,7 +3279,7 @@ class Mare::Compiler::CodeGen
       cont = func_frame.continuation_value
       cont_local = @builder.bit_cast(
         gfunc.continuation_info.struct_gep_for_local(cont, ref),
-        llvm_type_of(ref.defn).pointer
+        llvm_type_of(func_frame.any_defn_for_local(ref)).pointer
       )
       local = frame.current_locals[ref]
       @builder.store(builder.load(local, "#{ref.name}.CURRENT"), cont_local)
@@ -3463,8 +3475,12 @@ class Mare::Compiler::CodeGen
   def gen_local_alloca(ref, llvm_type)
     func_frame.current_locals[ref] ||= begin
       gfunc = func_frame.gfunc.not_nil!
+      local_ident = func_frame.any_defn_for_local(ref)
+      local_type = type_of(local_ident)
       gen_alloca(llvm_type, ref.name)
-      .tap { |alloca| @di.declare_local(ref, type_of(ref.defn), alloca) }
+      .tap { |alloca|
+        @di.declare_local(local_ident.pos, ref.name, local_type, alloca)
+      }
     end
   end
 

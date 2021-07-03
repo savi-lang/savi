@@ -246,6 +246,8 @@ class Mare::Compiler::Sugar < Mare::AST::CopyOnMutateVisitor
         dot.op,
         node,
       ).from(dot)
+      new_top.annotations = node.annotations
+      node.annotations = nil
     end
 
     # PONY special case: non-square qualify exclamation gets moved to the ident.

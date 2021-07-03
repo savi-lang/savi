@@ -288,14 +288,8 @@ module Mare::Compiler::PreInfer
         @analysis[node] = Infer::FixedSingleton.new(node.pos, layer(node), node)
       when Refer::TypeParam
         @analysis[node] = Infer::FixedSingleton.new(node.pos, layer(node), node, ref)
-      when Refer::LocalUnion, Refer::Local
-        local_ref =
-          if ref.is_a? Refer::LocalUnion
-            ref.list[0]
-          else
-            ref
-          end
-
+      when Refer::Local
+        local_ref = ref
         local_ident = lookup_local_ident(local_ref)
         if local_ident
           local_info = @analysis[local_ident].as(Infer::DynamicInfo)
@@ -311,9 +305,6 @@ module Mare::Compiler::PreInfer
       when Refer::Unresolved
         # Leave the node as unresolved if this identifier is not a value.
         return if @classify.no_value?(node)
-
-        # Otherwise, record an error to show the user:
-        @analysis[node] = Infer::ErrorInfo.new(node, "This identifier couldn't be resolved")
       else
         raise NotImplementedError.new(ref)
       end
@@ -383,7 +374,7 @@ module Mare::Compiler::PreInfer
           Infer::ArrayLiteral.new(node.pos, layer(node), node.terms.map { |term| self[term] })
       when " "
         ref = @refer[node.terms[0]]?
-        if ref.is_a?(Refer::Local) && ref.defn == node.terms[0]
+        if ref.is_a?(Refer::Local)
           local_ident = @local_idents[ref]
 
           local = self[local_ident]

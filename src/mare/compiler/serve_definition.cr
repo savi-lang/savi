@@ -47,10 +47,7 @@ class Mare::Compiler::ServeDefinition
       case ref
       when Refer::Local
         # Show local variable definition site.
-        ref.defn.pos
-      when Refer::LocalUnion
-        # Show local variable definition site.
-        ref.list.first.defn.pos
+        ctx.local[f_link].any_initial_site_for(ref).pos
       else
         nil
       end

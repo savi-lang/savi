@@ -153,11 +153,9 @@ module Mare::Compiler::Classify
       case @refer_type[qualify.term.as AST::Identifier]? || Refer::Unresolved::INSTANCE
       when Refer::Type, Refer::TypeAlias, Refer::TypeParam
         # We assume this qualify to be type with type arguments.
-        # None of the arguments will have their value used,
-        # and they are all type expressions.
+        # All of the terms are type expressions.
         qualify.group.terms.each do |t|
-          @analysis.value_not_needed!(t)
-          @analysis.type_expr!(t)
+          type_expr_visit(ctx, t)
         end
       else
         # We assume this qualify to be a function call with arguments.
