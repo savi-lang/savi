@@ -6,7 +6,6 @@ class Mare::Compiler::Context
   getter code_gen
   getter code_gen_verona
   getter completeness
-  getter consumes
   getter eval
   getter flow
   getter infer
@@ -46,7 +45,6 @@ class Mare::Compiler::Context
     @code_gen = CodeGen.new(CodeGen::PonyRT)
     @code_gen_verona = CodeGen.new(CodeGen::VeronaRT)
     @completeness = Completeness::Pass.new
-    @consumes = Consumes::Pass.new
     @eval = Eval.new
     @flow = Flow::Pass.new
     @import = Import.new

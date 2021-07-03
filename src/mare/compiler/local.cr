@@ -21,74 +21,105 @@ require "./pass/analyze"
 # This pass produces output state at the per-function level.
 #
 module Mare::Compiler::Local
-  struct UseSite
-    getter pos : Source::Pos
-    getter local_name : String
+  class UseSite
+    getter node : AST::Identifier
+    getter ref : (Refer::Local | Refer::Self)
     getter flow_location : Flow::Location
     getter reads_existing_value : Bool = false
     getter writes_new_value : Bool = false
     getter consumes_existing_value : Bool = false
+    getter is_unreachable : Bool = false
+    getter is_first_lexical_appearance : Bool = false
 
-    def initialize(@pos, @local_name, @flow_location,
+    def pos; @node.pos; end
+
+    def initialize(@node, @ref, @flow_location,
       reads = false,
       writes = false,
-      consumes = false
+      consumes = false,
+      unreachable = false
     )
       @reads_existing_value = reads
       @writes_new_value = writes
       @consumes_existing_value = consumes
+      @is_unreachable = unreachable
 
-      @errors_without_prior_write = Set(Bool).new
-      @sometimes_after_writes = Set(UseSite).new
-      @errors_after_consumes = Set(UseSite).new
+      # This state will be populated later within the pass, after all use sites
+      # have been observed and can be related to one another in a graph.
+      @predecessors = Set(UseSite).new
+      @sometimes_no_predecessor = false
+    end
+
+    def is_initial_site
+      @sometimes_no_predecessor
     end
 
     def show
       "#{
-        @local_name
+        @ref.name
       }:#{
         @reads_existing_value ? "R" : ""
       }#{
         @writes_new_value ? "W" : ""
       }#{
         @consumes_existing_value ? "C" : ""
+      }#{
+        @is_unreachable ? "U" : ""
       }:#{
         @flow_location.show
       }"
     end
 
-    protected def observe_error_without_prior_write
-      @errors_without_prior_write.add(true)
+    protected def observe_is_first_lexical_appearance
+      @is_first_lexical_appearance = true
     end
-    protected def observe_sometimes_after_write(write_site : UseSite)
-      @sometimes_after_writes.add(write_site)
-    end
-    protected def observe_error_after_consume(consume_site : UseSite)
-      @errors_after_consumes.add(consume_site)
+
+    protected def observe_predecessor(other)
+      if other
+        @predecessors << other
+      else
+        @sometimes_no_predecessor = true
+      end
     end
 
     protected def emit_errors(ctx)
-      if @errors_without_prior_write.any?
-        message = if @sometimes_after_writes.any?
-          "This local variable isn't guaranteed to have a value yet"
-        else
-          "This local variable has no assigned value yet"
+      # Don't bother showing errors for unreachable use sites.
+      # They're likely to be based on inaccurate information anyway.
+      return if @is_unreachable
+
+      needs_value = (@reads_existing_value || @consumes_existing_value) && ref.name != "@"
+      if needs_value
+        # If nil is a predecessor, that means this is the first occurrence
+        # of the local variable along at least one flow path. In such a case,
+        # it has no value assigned to it yet, so it's not safe to read/consume.
+        if @sometimes_no_predecessor
+          predecessor_writes = @predecessors.select(&.writes_new_value)
+
+          message = if predecessor_writes.any?
+            "This local variable isn't guaranteed to have a value yet"
+          else
+            "This local variable has no assigned value yet"
+          end
+
+          ctx.error_at self, message, predecessor_writes.map { |write_site|
+            {write_site.pos, "this assignment is not guaranteed to precede that usage"}
+          }
         end
 
-        ctx.error_at self, message, @sometimes_after_writes.map { |write_site|
-          {write_site.pos, "this assignment is not guaranteed to precede that usage"}
-        }
-      end
+        # If a consume is a predecessor, this means that the value that was
+        # has been consumed, so on this flow path is not safe to read/consume.
+        predecessor_consumes = @predecessors.select(&.consumes_existing_value)
+        if needs_value && predecessor_consumes.any?
+          message = if @consumes_existing_value
+            "This local variable can't be consumed again"
+          else
+            "This local variable has no value anymore"
+          end
 
-      if @errors_after_consumes.any?
-        message = if @consumes_existing_value
-          "This local variable can't be consumed again"
-        else
-          "This local variable has no value anymore"
+          ctx.error_at self, message, predecessor_consumes.map { |consume_site|
+            {consume_site.pos, "it is consumed in a preceding place here"}
+          }
         end
-        ctx.error_at self, message, @errors_after_consumes.map { |consume_site|
-          {consume_site.pos, "it is consumed in a preceding place here"}
-        }
       end
     end
   end
@@ -96,48 +127,86 @@ module Mare::Compiler::Local
   struct Analysis
     def initialize
       @use_sites = {} of AST::Node => UseSite
-      @by_name_and_location = {} of String => Hash(Flow::Location, UseSite)
+      @by_ref_and_location = {} of Refer::Info => Hash(Int32, Array(UseSite))
     end
 
-    def []?(node : AST::Node)
-      @use_sites[node]?
-    end
+    def [](node : AST::Node); @use_sites[node]; end
+    def []?(node : AST::Node); @use_sites[node]?; end
 
     protected def each_use_site
       @use_sites.each_value
     end
 
-    protected def by_name_and_location
-      @by_name_and_location
+    protected def by_ref_and_location
+      @by_ref_and_location
     end
 
-    protected def expect_local_name(local_name : String)
-      @by_name_and_location[local_name] ||= {} of Flow::Location => UseSite
+    def each_use_site_for(ref)
+      @by_ref_and_location[ref].try(&.each_value { |block_use_sites|
+        block_use_sites.each { |use_site| yield use_site }
+      })
+    end
+
+    def each_initial_site_for(ref)
+      each_use_site_for(ref) { |use_site|
+        yield use_site if use_site.is_initial_site
+      }
+    end
+
+    def any_initial_site_for(ref)
+      each_initial_site_for(ref) { |use_site|
+        return use_site
+      }
+      raise "unreachable: unknown local"
     end
 
     protected def observe_use_site(node : AST::Node, use_site : UseSite)
       @use_sites[node] = use_site
-      (@by_name_and_location[use_site.local_name] ||=
-        {} of Flow::Location => UseSite)[use_site.flow_location] = use_site
+
+      block_index = use_site.flow_location.block_index
+      if @by_ref_and_location.has_key?(use_site.ref)
+        by_location = @by_ref_and_location[use_site.ref]
+        if by_location.has_key?(block_index)
+          block_use_sites = by_location[block_index]
+
+          # Do a sorted insert by sequence number within the block.
+          sequence_number = use_site.flow_location.sequence_number
+          insert_after_index = block_use_sites.rindex { |other|
+            sequence_number > other.flow_location.sequence_number
+          }
+          block_use_sites.insert(insert_after_index.try(&.+(1)) || 0, use_site)
+        else
+          by_location[block_index] = [use_site]
+        end
+      else
+        use_site.observe_is_first_lexical_appearance
+        @by_ref_and_location[use_site.ref] =
+          { use_site.flow_location.block_index => [use_site] }
+      end
+
       use_site
     end
 
     protected def remove_use_site_at(node : AST::Node)
       use_site = @use_sites.delete(node)
       return unless use_site
-      @by_name_and_location[use_site.local_name].delete(use_site.flow_location)
+
+      block_index = use_site.flow_location.block_index
+      by_location = @by_ref_and_location[use_site.ref]
+      block_use_sites = by_location[block_index]
+      block_use_sites.delete(use_site)
+      by_location.delete(block_index) if block_use_sites.empty?
+
       use_site
     end
   end
 
   class Visitor < Mare::AST::Visitor
     getter analysis : Analysis
-    getter refer_type : ReferType::Analysis
+    getter refer : Refer::Analysis
     getter flow : Flow::Analysis
-    getter classify : Classify::Analysis
 
-    def initialize(@analysis, @refer_type, @flow, @classify)
-      @analysis.expect_local_name("@") # prime us to see this special-case local
+    def initialize(@analysis, @refer, @flow)
     end
 
     def visit(ctx, node)
@@ -149,21 +218,20 @@ module Mare::Compiler::Local
 
     # Handle reading from a local variable.
     def observe(ctx, node : AST::Identifier)
-      # Don't observe an identifier that is a type identifier,
-      # unless it is one that we already have some local analysis for.
-      return if @refer_type[node]? && !@analysis.by_name_and_location.has_key?(node.value)
-
-      # Don't observe an identifier that is not part of a value expression,
-      # or that is part of a known type expression.
-      return if @classify.no_value?(node) || @classify.type_expr?(node)
+      ref = @refer[node]?
+      return unless ref.is_a?(Refer::Local) || ref.is_a?(Refer::Self)
 
       flow_location = @flow.location_of?(node)
+      return unless flow_location
+
+      is_unreachable = @flow.block_at(flow_location.block_index).unreachable?
       @analysis.observe_use_site(node, UseSite.new(
-        node.pos,
-        node.value,
+        node,
+        ref,
         flow_location,
         reads: true,
-      )) if flow_location
+        unreachable: is_unreachable,
+      ))
     end
 
     # Handle assigning to or displacing a local variable.
@@ -178,16 +246,22 @@ module Mare::Compiler::Local
 
       ident = AST::Extract.param(node.lhs).first
 
-      @analysis.remove_use_site_at(ident)
+      old_use_site = @analysis.remove_use_site_at(ident)
 
       flow_location = @flow.location_of?(node)
-      @analysis.observe_use_site(node, UseSite.new(
-        ident.pos,
-        ident.value,
+      return unless flow_location
+
+      is_unreachable = @flow.block_at(flow_location.block_index).unreachable?
+      use_site = @analysis.observe_use_site(node, UseSite.new(
+        ident,
+        refer[ident]?.as(Refer::Local | Refer::Self),
         flow_location,
         reads: reads,
         writes: true,
-      )) if flow_location
+        unreachable: is_unreachable,
+      ))
+      use_site.observe_is_first_lexical_appearance \
+        if old_use_site.try(&.is_first_lexical_appearance)
     end
 
     # Handle consuming a local variable.
@@ -195,15 +269,21 @@ module Mare::Compiler::Local
       ident = node.term
       return unless node.op.value == "--" && ident.is_a?(AST::Identifier)
 
-      @analysis.remove_use_site_at(ident)
+      old_use_site = @analysis.remove_use_site_at(ident)
 
       flow_location = @flow.location_of?(node)
-      @analysis.observe_use_site(node, UseSite.new(
-        ident.pos,
-        ident.value,
+      return unless flow_location
+
+      is_unreachable = @flow.block_at(flow_location.block_index).unreachable?
+      use_site = @analysis.observe_use_site(node, UseSite.new(
+        ident,
+        refer[ident]?.as(Refer::Local | Refer::Self),
         flow_location,
         consumes: true,
-      )) if flow_location
+        unreachable: is_unreachable,
+      ))
+      use_site.observe_is_first_lexical_appearance \
+        if old_use_site.try(&.is_first_lexical_appearance)
     end
 
     # All other node types have no special logic.
@@ -214,15 +294,21 @@ module Mare::Compiler::Local
     def observe_param(ctx, node)
       ident = AST::Extract.param(node).first
 
-      @analysis.remove_use_site_at(ident)
+      old_use_site = @analysis.remove_use_site_at(ident)
 
       flow_location = @flow.location_of?(node)
-      @analysis.observe_use_site(node, UseSite.new(
-        ident.pos,
-        ident.value,
+      return unless flow_location
+
+      is_unreachable = @flow.block_at(flow_location.block_index).unreachable?
+      use_site = @analysis.observe_use_site(node, UseSite.new(
+        ident,
+        refer[ident]?.as(Refer::Local | Refer::Self),
         flow_location,
         writes: true,
-      )) if flow_location
+        unreachable: is_unreachable,
+      ))
+      use_site.observe_is_first_lexical_appearance \
+        if old_use_site.try(&.is_first_lexical_appearance)
     end
 
     # Observing a call site entails observing any yield parameters.
@@ -234,46 +320,84 @@ module Mare::Compiler::Local
       end
     end
 
-    # Check reference integrity of all local variables, for all possible
-    # sequences of execution for their use sites.
-    def observe_reference_integrity(ctx)
-      @analysis.by_name_and_location.each { |local_name, by_location|
-        @flow.each_possible_order_of(by_location.keys) { |ordered_locations|
-          use_sites = ordered_locations.map { |loc| by_location[loc] }
-          observe_reference_integrity_of_order(ctx, use_sites)
-        }
+    def each_possible_predecessor_of(use_site : UseSite, &yield_block : UseSite? -> _)
+      block_index = use_site.flow_location.block_index
+      by_location = @analysis.by_ref_and_location[use_site.ref]
+      block_use_sites = by_location[block_index]
+
+      # If we have is a predecessor use site in the same block, yield it
+      # and then return - we're done, as this is the only direct predecessor.
+      saw_this_use_site = false
+      block_use_sites.reverse_each { |that_use_site|
+        if saw_this_use_site
+          yield_block.call(that_use_site)
+          return
+        elsif that_use_site == use_site
+          saw_this_use_site = true
+        end
       }
+
+      # If this is the first lexical appearance of the given local variable,
+      # we treat it as if it had no predecessors, as an optimization.
+      if use_site.is_first_lexical_appearance
+        yield_block.call(nil)
+        return
+      end
+
+      # Otherwise, we need to look at the blocks that precede this block,
+      # digging recursively through those blocks finding possible predecessors.
+      block = @flow.block_at(block_index)
+      each_possible_predecessor_recurse(use_site, by_location, block, [] of Int32, &yield_block)
+    end
+    def each_possible_predecessor_recurse(
+      orig_use_site,
+      by_location,
+      from_block : Flow::Block,
+      seen_cyclic_edges : Array(Int32),
+      &yield_block : UseSite? -> _
+    )
+      no_predecessors = true
+      from_block.each_predecessor { |block|
+        next if block.unreachable?
+
+        no_predecessors = false
+
+        # If this block has any use sites in it, the final one is our nearest.
+        # Yield it and then go to the next path without recursing further.
+        block_use_sites = by_location[block.index]?
+        if block_use_sites
+          yield_block.call(block_use_sites.last)
+          next
+        end
+
+        # If this is a cyclic edge block that we've already seen,
+        # we will gain no new information by recursing into it again.
+        if block.cyclic_edge?
+          next if seen_cyclic_edges.includes?(block.index)
+          seen_cyclic_edges << block.index
+        end
+
+        # Otherwise, we need to recurse into that block.
+        each_possible_predecessor_recurse(
+          orig_use_site,
+          by_location,
+          block,
+          seen_cyclic_edges,
+          &yield_block
+        )
+      }
+
+      # If we didn't have any predecessors, we need to yield nil,
+      # because we've reached an entry block that indicates a path
+      # with no predecessors to write the local we're trying to read.
+      yield_block.call(nil) if no_predecessors
     end
 
-    # Pretend to execute the given use sites in the given order,
-    # checking that reference integrity invariants are successfully preserved.
-    def observe_reference_integrity_of_order(ctx, use_sites)
-      observed_write_index : Int32? = nil
-      observed_consume_index : Int32? = nil
-
-      use_sites.each_with_index { |use_site, index|
-        if use_site.reads_existing_value || use_site.consumes_existing_value
-          if observed_consume_index
-            consume_site = use_sites[observed_consume_index]
-            use_site.observe_error_after_consume(consume_site)
-          end
-
-          if observed_write_index
-            write_site = use_sites[observed_write_index]
-            use_site.observe_sometimes_after_write(write_site)
-          else
-            use_site.observe_error_without_prior_write unless use_site.local_name == "@"
-          end
-        end
-
-        if use_site.consumes_existing_value
-          observed_consume_index = index
-        end
-
-        if use_site.writes_new_value
-          observed_write_index = index
-          observed_consume_index = nil
-        end
+    def observe_predecessors(ctx)
+      @analysis.each_use_site.each { |use_site|
+        each_possible_predecessor_of(use_site) { |other|
+          use_site.observe_predecessor(other)
+        }
       }
     end
 
@@ -293,20 +417,18 @@ module Mare::Compiler::Local
     end
 
     def analyze_func(ctx, f, f_link, t_analysis) : Analysis
-      refer_type = ctx.refer_type[f_link]
+      refer = ctx.refer[f_link]
       flow = ctx.flow[f_link]
-      classify = ctx.classify[f_link]
-      deps = {refer_type, flow, classify}
+      deps = {refer, flow}
       prev = ctx.prev_ctx.try(&.local)
 
       # TODO: Re-enable cache when it doesn't crash:
       # maybe_from_func_cache(ctx, prev, f, f_link, deps) do
         visitor = Visitor.new(Analysis.new, *deps)
-
         f.params.try(&.terms.each { |param| visitor.observe_param(ctx, param) })
         f.body.try(&.accept(ctx, visitor))
 
-        visitor.observe_reference_integrity(ctx)
+        visitor.observe_predecessors(ctx)
         visitor.emit_errors(ctx)
 
         visitor.analysis

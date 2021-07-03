@@ -36,16 +36,19 @@ module Mare::Compiler::Flow
   struct Block
     getter index : Int32
     getter containing_node : AST::Node
-    getter unreachable = StructRef(Bool).new(false)
 
     def initialize(@index, @containing_node)
       @pre = [] of Block
       @pre_true = [] of Block
       @pre_false = [] of Block
+      @flags = Set(Symbol).new
     end
 
+    def cyclic_edge?
+      @flags.includes?(:cyclic_edge)
+    end
     def unreachable?
-      @unreachable.value
+      @flags.includes?(:unreachable)
     end
     def reachable?
       !unreachable?
@@ -75,7 +78,11 @@ module Mare::Compiler::Flow
       "#{show_name}(#{show_predecessors})"
     end
     def show_name
-      "#{index}#{unreachable.value ? "U" : ""}"
+      "#{index}#{
+        cyclic_edge? ? "C" : ""
+      }#{
+        unreachable? ? "U" : ""
+      }"
     end
     def show_predecessors : String
       if index == 0
@@ -101,7 +108,10 @@ module Mare::Compiler::Flow
       @pre_false << block
     end
     protected def mark_as_unreachable
-      @unreachable.value = true
+      @flags << :unreachable
+    end
+    protected def mark_as_cyclic_edge
+      @flags << :cyclic_edge
     end
   end
 
@@ -376,6 +386,7 @@ module Mare::Compiler::Flow
       # Note that the body_block variable is not used here because it points
       # to the block used for the end of the body, which won't be the same as
       # the block that started the body if the body contains other control flow.
+      repeat_cond_block.mark_as_cyclic_edge
       start_of_body_block.comes_after_if_true(repeat_cond_block)
 
       # The else block comes after the initial condition if it's false.
@@ -423,6 +434,7 @@ module Mare::Compiler::Flow
       # Before doing anything else, we need to visit the children which were
       # deferred from being visited, but do not actually require from us any
       # special handling here. We visit them prior to the special handling.
+      node.lhs.accept(ctx, self)
       ident.accept(ctx, self)
       args.try(&.accept(ctx, self))
 
@@ -455,6 +467,7 @@ module Mare::Compiler::Flow
 
       # From the exit block, it is possible that we again run the yield block,
       # or we may be finished yielding, moving finally to the after block.
+      start_of_yield_block.mark_as_cyclic_edge
       start_of_yield_block.comes_after(yield_exit_block)
       after_block.comes_after(yield_exit_block)
 

@@ -47,15 +47,15 @@ It marks the use sites of yield parameters.
 
 ```mare
   @yielding_call -> (
-    arg_1                  ::local.use_site=> arg_1:W:(3, 1)
+    arg_1                  ::local.use_site=> arg_1:W:(3, 2)
     arg_2 String           // can't easily annotate here unfortunately
     arg_3 String = "value" // can't easily annotate here unfortunately
   |
     try (
-      res_3 = arg_1   ::local.use_site=> arg_1:R:(6, 14)
-      res_4 = --arg_2 ::local.use_site=> arg_2:C:(6, 20)
+      res_3 = arg_1   ::local.use_site=> arg_1:R:(6, 15)
+      res_4 = --arg_2 ::local.use_site=> arg_2:C:(6, 21)
     )
-    (arg_3 = "new value") ::local.use_site=> arg_3:W:(5, 29)
+    (arg_3 = "new value") ::local.use_site=> arg_3:W:(5, 30)
   )
 ```
 
@@ -64,8 +64,20 @@ It marks the use sites of yield parameters.
 It complains when trying to read a local variable prior to its first assignment.
 
 ```mare
-  x // NOT OKAY - prior to any assignment
+  x
+  x = "value"
+```
+```error
+This local variable has no assigned value yet:
+  x
+  ^
+```
 
+---
+
+It complains when trying to read a local variable without guarantee of assignment.
+
+```mare
   case (
   | @cond_1 | x = "one"
   | @cond_2 | x = "two"
@@ -78,11 +90,6 @@ It complains when trying to read a local variable prior to its first assignment.
   | x = "other"
   )
   x // okay - it was guaranteed to be assigned in one of the branches
-```
-```error
-This local variable has no assigned value yet:
-  x // NOT OKAY - prior to any assignment
-  ^
 ```
 ```error
 This local variable isn't guaranteed to have a value yet:
@@ -100,7 +107,7 @@ This local variable isn't guaranteed to have a value yet:
 
 ---
 
-It complains when trying to read or consume a local variable after a preceding consume.
+It complains when trying to read a local variable after a preceding consume.
 
 ```mare
   x = "value"
@@ -110,7 +117,6 @@ It complains when trying to read or consume a local variable after a preceding c
   | @cond_3 | @send("some other value")
   )
   @show(x)
-  @send(--x)
 ```
 ```error
 This local variable has no value anymore:
@@ -124,6 +130,20 @@ This local variable has no value anymore:
 - it is consumed in a preceding place here:
   | @cond_2 | @send(--x)
                       ^
+```
+
+---
+
+It complains when trying to consume a local variable after a preceding consume.
+
+```mare
+  x = "value"
+  case (
+  | @cond_1 | @send(--x)
+  | @cond_2 | @send(--x)
+  | @cond_3 | @send("some other value")
+  )
+  @send(--x)
 ```
 ```error
 This local variable can't be consumed again:

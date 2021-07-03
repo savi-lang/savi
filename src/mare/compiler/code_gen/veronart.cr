@@ -504,7 +504,8 @@ class Mare::Compiler::CodeGen::VeronaRT
           raise NotImplementedError.new("VeronaRT PassAsArgument #{kind}")
         end
       when Lifetime::ReleaseFromScope
-        kind = cast_kind_of(g, g.type_of(info.local.defn), info.local.defn.pos)
+        local_defn = g.func_frame.any_defn_for_local(info.local)
+        kind = cast_kind_of(g, g.type_of(local_defn), local_defn.pos)
         case kind
         when :simple_value, :no_allocation
           # Do nothing - we don't track lifetime of bare values.
@@ -515,7 +516,7 @@ class Mare::Compiler::CodeGen::VeronaRT
           # Don't release String'val - right now these are all compile-time
           # constant values instead of being runtime allocated.
           # TODO: find a way to have both compile-time and runtime String'val
-          no_release = g.gtype_of(info.local.defn) == g.gtypes["String"]
+          no_release = g.gtype_of(local_defn) == g.gtypes["String"]
 
           gen_val_release_from_scope(g,
             g.builder.load(

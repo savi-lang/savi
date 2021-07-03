@@ -73,7 +73,8 @@ class Mare::Compiler::CodeGen
 
         # Then come the local variables.
         ctx.inventory[gfunc.link].each_local.each do |ref|
-          list << g.llvm_mem_type_of(ref.defn, gfunc)
+          ref_defn = ctx.local[gfunc.link].any_initial_site_for(ref).node
+          list << g.llvm_mem_type_of(ref_defn, gfunc)
         end
 
         # Then come the nested yielding call continuations.
@@ -264,9 +265,10 @@ class Mare::Compiler::CodeGen
         # If this is a continue function resuming where we left off,
         # then we also need to restore the value of each local variable.
         if is_continue
+          ref_defn = ctx.local[gfunc.link].any_initial_site_for(ref).node
           cont_local = builder.bit_cast(
             gfunc.continuation_info.struct_gep_for_local(cont, ref),
-            g.llvm_type_of(ref.defn).pointer,
+            g.llvm_type_of(ref_defn).pointer,
           )
           builder.store(builder.load(cont_local, "#{ref.name}.RESTORED"), local)
         end

@@ -5,6 +5,7 @@ module Mare::Compiler::Refer
 
   struct Self
     INSTANCE = new
+    def name; "@" end
   end
 
   struct Field
@@ -16,64 +17,10 @@ module Mare::Compiler::Refer
 
   struct Local
     getter name : String
-    getter defn : AST::Node
-    getter param_idx : Int32?
-    @caught : Bool
+    getter sequence_number : Int32
+    getter param_idx : Int32? # TODO: Rename param_index
 
-    def initialize(@name, @defn, @caught, @param_idx = nil)
-    end
-
-    def catch
-      @caught = true
-    end
-
-    def caught?
-      @caught
-    end
-
-    def is_defn_assign?(node : AST::Relate)
-      node_lhs = node.lhs
-
-      node_lhs == self.defn || (
-        node_lhs.is_a?(AST::Group) &&
-        node_lhs.style == " " &&
-        node_lhs.terms.first == self.defn
-      )
-    end
-  end
-
-  struct LocalUnion
-    getter list : Array(Local)
-    property incomplete : Bool = false
-
-    def initialize(@list)
-    end
-
-    def caught?
-      @list.all?(&.caught?)
-    end
-
-    def catch
-      @list.each(&.catch)
-    end
-
-    def self.build(list)
-      any_incomplete = false
-
-      instance = new(list.flat_map do |elem|
-        case elem
-        when Local
-          elem
-        when LocalUnion
-          any_incomplete |= true if elem.incomplete
-          elem.list
-        else raise NotImplementedError.new(elem.inspect)
-        end
-      end)
-
-      instance.incomplete = any_incomplete
-
-      instance
+    def initialize(@name, @sequence_number, @param_idx = nil)
     end
   end
 
@@ -123,14 +70,11 @@ module Mare::Compiler::Refer
     end
   end
 
-  alias Info = (
-    Self | Local | LocalUnion | Field |
-    Type | TypeAlias | TypeParam |
-    # TODO ADD JUMP INFOS
-    Unresolved)
+  alias Info =
+    (Self | Local | Field | Type | TypeAlias | TypeParam | Unresolved)
 
   struct Scope
-    getter locals : Hash(String, (Local | LocalUnion))
+    getter locals : Hash(String, Local)
 
     def initialize(@locals)
     end

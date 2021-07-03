@@ -105,13 +105,13 @@ It analyzes control flow blocks for a `while`.
     // This condition expression is used as both initial condition (block 3),
     // and repeat condition (block 5), so we include both in the annotation,
     // and the test system verifies that one or the other is correct for each.
-    @cond ::flow.block=> 3(0) OR 5(4)
+    @cond ::flow.block=> 3(0) OR 5C(4)
   ) (
-    @body ::flow.block=> 4(3T | 5T)
+    @body ::flow.block=> 4(3T | 5CT)
   |
     @else ::flow.block=> 6(3F)
   )
-  @after ::flow.block=> 2(5F | 6)
+  @after ::flow.block=> 2(5CF | 6)
   @ ::flow.exit_block=> 1(2)
 ```
 
@@ -122,15 +122,15 @@ It analyzes control flow for an unconditional `break` in a `while`.
 ```mare
   @before ::flow.block=> 0(entry)
   while (
-    @cond ::flow.block=> 3(0) OR 5U(7U)
+    @cond ::flow.block=> 3(0) OR 5CU(7U)
   ) (
-    @before_break ::flow.block=> 4(3T | 5UT)
+    @before_break ::flow.block=> 4(3T | 5CUT)
     break "value"
     @after_break ::flow.block=> 7U(4)
   |
     @else ::flow.block=> 6(3F)
   )
-  @after ::flow.block=> 2(5UF | 4 | 6)
+  @after ::flow.block=> 2(5CUF | 4 | 6)
   @ ::flow.exit_block=> 1(2)
 ```
 
@@ -141,9 +141,9 @@ It analyzes control flow for every kind of conditional jump in a `while`.
 ```mare
   @before ::flow.block=> 0(entry)
   while (
-    @cond ::flow.block=> 3(0) OR 5(12 | 7)
+    @cond ::flow.block=> 3(0) OR 5C(12 | 7)
   ) (
-    @before_case ::flow.block=> 4(3T | 5T)
+    @before_case ::flow.block=> 4(3T | 5CT)
     case (
     | @cond_break ::flow.block=> 8(4)
     | @before_break ::flow.block=> 9(8T)
@@ -171,7 +171,7 @@ It analyzes control flow for every kind of conditional jump in a `while`.
   |
     @else ::flow.block=> 6(3F)
   )
-  @after ::flow.block=> 2(5F | 9 | 6)
+  @after ::flow.block=> 2(5CF | 9 | 6)
   @ ::flow.exit_block=> 1(15 | 18 | 2)
 ```
 
@@ -185,9 +185,9 @@ It analyzes control flow for every kind of conditional jump in a yield block.
     @arg_1 ::flow.block=> 0(entry)
     @arg_2 ::flow.block=> 0(entry)
   ) -> (
-    @before_case ::flow.block=> 3(0 | 4)
+    @before_case ::flow.block=> 3C(0 | 4)
     case (
-    | @cond_break ::flow.block=> 6(3)
+    | @cond_break ::flow.block=> 6(3C)
     | @before_break ::flow.block=> 7(6T)
       break "value"
       @after_break ::flow.block=> 8U(7)
@@ -280,4 +280,73 @@ It labels control flow for a `return` inside a `return` value expression, as sil
   )
   @after ::flow.block=> 3U(2U)
   @ ::flow.exit_block=> 1(0 | 2U | 3U)
+```
+
+---
+
+It labels control flow for a `try` with no error possibility within it, as silly as that may be.
+
+```mare
+  @before ::flow.block=> 0(entry)
+  try (
+    @body ::flow.block=> 3(0)
+  |
+    @catch ::flow.block=> 4U()
+  )
+  @after ::flow.block=> 2(3 | 4U)
+  @ ::flow.exit_block=> 1(2)
+```
+
+---
+
+It labels control flow for an error-raising method in the receiver expression of a yielding call.
+
+```mare
+  @before ::flow.block=> 0(entry)
+  try (
+    @body_before ::flow.block=> 3(0)
+    (
+      (
+        (
+          (
+            @array ::flow.block=> 3(0)
+          )[
+            @index ::flow.block=> 3(0)
+          ]!
+        ) ::flow.block=> 5(3)
+      ).each -> (
+        @body ::flow.block=> 7C(5 | 8)
+      )
+    ) ::flow.block=> 6(5 | 8)
+    @body_after ::flow.block=> 6(5 | 8)
+  |
+    @catch ::flow.block=> 4(3)
+  )
+  @after ::flow.block=> 2(6 | 4)
+  @ ::flow.exit_block=> 1(2)
+```
+
+---
+
+It labels control flow for a `while` with an `error!` in the body
+
+```mare
+  @before ::flow.block=> 0(entry)
+  try (
+    @before_while ::flow.block=> 3(0)
+    while (
+      @cond ::flow.block=> 6(3) OR 8CU(10U)
+    ) (
+      @before_error ::flow.block=> 7(6T | 8CUT)
+      error! ::flow.block=> 7(6T | 8CUT)
+      @after_error ::flow.block=> 10U(7)
+    |
+      @while_else ::flow.block=> 9(6F)
+    )
+    @after_while ::flow.block=> 5(8CUF | 9)
+  |
+    @try_else ::flow.block=> 4(7)
+  )
+  @after ::flow.block=> 2(5 | 4)
+  @ ::flow.exit_block=> 1(2)
 ```

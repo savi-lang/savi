@@ -65,10 +65,7 @@ class Mare::Compiler::CodeGen
       @builder.set_current_debug_location(0, 0, nil)
     end
 
-    def declare_local(ref : Refer::Local, t : Reach::Ref, storage : LLVM::Value)
-      pos = ref.defn.pos
-      name = ref.name
-
+    def declare_local(pos, name, t : Reach::Ref, storage : LLVM::Value)
       declare_local_inner(pos, name, t, storage)
     end
 
