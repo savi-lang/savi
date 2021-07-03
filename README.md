@@ -36,11 +36,11 @@ If you're a VS Code user, you may be interested to install our [language extensi
 
 We also have [a vim/nvim extension](./tooling/coc-nvim) as well.
 
-Finally, if you want to contribute to Mare, read on through the next section to learn about some of the basic development commands.
+Finally, if you want to contribute to Mare, read on through the next two sections for information on how to find work, as well some of the basic development commands.
 
 ## Contributing
 
-Looking for ways to help? [Here's a link that shows issue tickets filtered by those that should be ready to work on](https://github.com/jemc/mare/issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc+-label%3ABLOCKED+-label%3A%22complexity+4%3A+scary%22).
+Looking for ways to help? [Here's a link that shows issue tickets filtered by those that should be ready to work on](https://github.com/jemc/mare/issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc+-label%3ABLOCKED+-label%3A%22complexity+4%3A+scary%22+-label%3A%22needs+design%22).
 
 You can also filter by complexity label to try to find something that's the right level of challenge and time commitment for you.
 
