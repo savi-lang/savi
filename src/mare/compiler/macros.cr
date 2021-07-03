@@ -260,9 +260,10 @@ class Mare::Compiler::Macros < Mare::AST::CopyOnMutateVisitor
       lhs.style == " " &&
       Util.match_ident?(lhs, 0, "case")
 
-    Error.at lhs.terms[1],
-      "Expected this term to be an identifier" \
-        unless Util.match_ident?(lhs, 1)
+    term = lhs.terms[1]
+    Error.at term,
+      "Expected this term to be not be a parenthesized group" \
+        if term.is_a?(AST::Group) && (term.style == "(" || term.style == "|")
 
     group = node.rhs
     Error.at group,
@@ -376,10 +377,23 @@ class Mare::Compiler::Macros < Mare::AST::CopyOnMutateVisitor
   end
 
   def visit_case(node : AST::Relate)
-    ident = node.lhs.as(AST::Group).terms[1]
+    term = node.lhs.as(AST::Group).terms[1]
     op = node.op
     group = node.rhs.as(AST::Group)
     orig = group.terms[0]
+
+    # If the term is not a simple identifier, use a hygienic local to \
+    # hold the value resulting from the term so that we can refer to it
+    # multiple times without evaluating the term expression again.
+    if !term.is_a?(AST::Identifier)
+      local_name = next_local_name
+      local = AST::Identifier.new(local_name).from(term)
+      local_assign = AST::Relate.new(
+        local,
+        AST::Operator.new("=").from(term),
+        term,
+      ).from(term)
+    end
 
     # By construction, every term in a `|` group must be a `(` group.
     sections = group.terms.map(&.as(AST::Group))
@@ -389,13 +403,14 @@ class Mare::Compiler::Macros < Mare::AST::CopyOnMutateVisitor
     sections.shift if sections.first.terms.empty?
 
     # Add a condition and case body for each pair of sections we encounter.
-    # Clauses are constructed as a new Relate node using the top-level
-    # identifier and operation, plus the identifier in each even section.
+    # Clauses are constructed as a new Relate node using the hygienic local
+    # operation, plus the body in each even section.
     clauses = [] of {AST::Term, AST::Term}
     while sections.size >= 2
       cond = sections.shift
       body = sections.shift
-      relate = AST::Relate.new(ident, op, cond.terms[0]).from(cond)
+      lhs = (local || term).dup
+      relate = AST::Relate.new(lhs, op, cond.terms[0]).from(cond)
       clauses << {
         AST::Group.new("(", [relate] of AST::Term).from(cond),
         body
@@ -412,9 +427,10 @@ class Mare::Compiler::Macros < Mare::AST::CopyOnMutateVisitor
       sections.empty? ? AST::Identifier.new("None").from(orig) : sections.pop
     }
 
-    AST::Group.new("(", [
-      AST::Choice.new(clauses).from(node),
-    ] of AST::Term).from(node)
+    choice = AST::Choice.new(clauses).from(node)
+    AST::Group.new("(",
+      local_assign ? [local_assign, choice] : [choice] of AST::Node
+    ).from(node)
   end
 
   def visit_try(node : AST::Group)

@@ -29,8 +29,7 @@
     :yields RequestToken
     try (
       while (@_state != _RequestAtEnd) (
-        old_state = @_state
-        @_state = case old_state == (
+        @_state = case @_state == (
         | _RequestAtStart |
           _RequestAtMethod
         | _RequestAtMethod |

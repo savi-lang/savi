@@ -26,12 +26,16 @@ describe Mare::Compiler::Macros do
         [[:ident, "True"], [:ident, "None"]],
       ]]
     end
-    
-    it "allows the identifier and operator outside the group" do
+
+    it "allows the term and operator outside the group" do
       source = Mare::Source.new_example <<-SOURCE
       :actor Main
         :new
           case x == (
+          | 1 | "one"
+          | 2 | "two"
+          )
+          case SideEffects.call == (
           | 1 | "one"
           | 2 | "two"
           )
@@ -41,17 +45,49 @@ describe Mare::Compiler::Macros do
       ctx.errors.should be_empty
 
       func = ctx.namespace.find_func!(ctx, source, "Main", "new")
-      func.body.not_nil!.terms.first.to_a.should eq [:group, "(", [:choice,
-        [
-          [:group, "(", [:relate, [:ident, "x"], [:op, "=="], [:integer, 1]]],
-          [:group, "(", [:string, "one", nil]]
+      func.body.not_nil!.terms[0].to_a.should eq [:group, "(",
+        [:choice,
+          [
+            [:group, "(", [:relate, [:ident, "x"], [:op, "=="], [:integer, 1]]],
+            [:group, "(", [:string, "one", nil]]
+          ],
+          [
+            [:group, "(", [:relate, [:ident, "x"], [:op, "=="], [:integer, 2]]],
+            [:group, "(", [:string, "two", nil]]
+          ],
+          [[:ident, "True"], [:ident, "None"]],
+        ]
+      ]
+      func.body.not_nil!.terms[1].to_a.should eq [:group, "(",
+        [:relate,
+          [:ident, "hygienic_macros_local.1"],
+          [:op, "="],
+          [:call, [:ident, "SideEffects"], [:ident, "call"]],
         ],
-        [
-          [:group, "(", [:relate, [:ident, "x"], [:op, "=="], [:integer, 2]]],
-          [:group, "(", [:string, "two", nil]]
-        ],
-        [[:ident, "True"], [:ident, "None"]],
-      ]]
+        [:choice,
+          [
+            [:group, "(",
+              [:relate,
+                [:ident, "hygienic_macros_local.1"],
+                [:op, "=="],
+                [:integer, 1],
+              ],
+            ],
+            [:group, "(", [:string, "one", nil]]
+          ],
+          [
+            [:group, "(",
+              [:relate,
+                [:ident, "hygienic_macros_local.1"],
+                [:op, "=="],
+                [:integer, 2],
+              ],
+            ],
+            [:group, "(", [:string, "two", nil]]
+          ],
+          [[:ident, "True"], [:ident, "None"]],
+        ]
+      ]
     end
 
     it "with an odd number of sections treats the last one as an else clause" do

@@ -51,8 +51,7 @@
   :fun ref _skip_whitespace
     keep_going = True
     while (keep_going && @_has_next) (
-      peeked = @_peek_softly
-      case peeked == (
+      case @_peek_softly == (
       | ' '  | @_advance
       | '\r' | @_advance
       | '\t' | @_advance
@@ -93,8 +92,7 @@
   :fun ref _read_bool! Bool // exposed in the Reader class
     @_skip_whitespace
     @_pre_token
-    peeked = @_peek!
-    case peeked == (
+    case @_peek! == (
     | 't' | @_advance, @_eat!('r'), @_eat!('u'), @_eat!('e'),              True
     | 'f' | @_advance, @_eat!('a'), @_eat!('l'), @_eat!('s'), @_eat!('e'), False
     | error!
@@ -115,8 +113,7 @@
         @_parse_data! -> (token | yield token)
         @_skip_whitespace
         @_pre_token // prepare for possible array end token
-        next_char = @_next!
-        case next_char == (
+        case @_next! == (
         | ',' | @_skip_whitespace
         | ']' | keep_going = False
         | @_rewind, error!
@@ -145,8 +142,7 @@
 
         @_skip_whitespace
         @_pre_token // prepare for possible array end token
-        next_char = @_next!
-        case next_char == (
+        case @_next! == (
         | ',' | @_skip_whitespace
         | ']' | keep_going = False
         | @_rewind, error!
@@ -174,8 +170,7 @@
         @_parse_data! -> (token | yield token)
         @_skip_whitespace
         @_pre_token, yield JsonTokenPairPost
-        next_char = @_next!
-        case next_char == (
+        case @_next! == (
         | ',' | @_skip_whitespace
         | '}' | keep_going = False
         | @_rewind, error!
@@ -207,8 +202,7 @@
         // leaving us ready to parse the comma or end of object next.
 
         @_skip_whitespace
-        next_char = @_next!
-        case next_char == (
+        case @_next! == (
         | ',' | @_skip_whitespace
         | '}' | keep_going = False
         | @_rewind, error!
@@ -239,9 +233,8 @@
     has_exp = (peeked == 'e' || peeked == 'E')
     if has_exp (
       @_advance
-      peeked = @_peek!
       exp_negative =
-        case peeked == (
+        case @_peek! == (
         | '+' | @_advance, False
         | '-' | @_advance, True
         | False
@@ -302,8 +295,7 @@
     @last_string
 
   :fun ref _push_escape_seq!(buf String'ref) String'ref
-    next_char = @_next!
-    case next_char == (
+    case @_next! == (
     | '"'  | buf.push_byte('"')
     | '\\' | buf.push_byte('\\')
     | '/'  | buf.push_byte('/')

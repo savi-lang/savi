@@ -260,7 +260,7 @@ Now let's look at an example of `case` used with the subtype check operator:
     )
 ```
 
-An alternative syntax for `case` is available when the variable and operator are the same in every conditional part:
+An alternative syntax for `case` is available when the left-side expression and operator are the same in every conditional part:
 
 ```mare
 :primitive Example
