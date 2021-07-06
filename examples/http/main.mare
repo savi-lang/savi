@@ -35,8 +35,8 @@
     @io = TCPConnectionEngine.accept(@, listen, --ticket)
 
   :fun ref _io_react(action IOAction)
-    case (
-    | action == IOActionRead |
+    case action == (
+    | IOActionRead |
       @io.pending_reads -> (data |
         try (
           request = @reader.read!(@io.read_stream)
@@ -51,5 +51,7 @@
           @io.flush
         )
       )
+    | IOActionWrite |
+      @io.flush
     )
     @
