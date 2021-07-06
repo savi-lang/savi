@@ -13,10 +13,16 @@ require "llvm"
 # !! This pass has the side-effect of writing files to disk.
 #
 class Mare::Compiler::Binary
-  PONYRT_BC_PATH = "/usr/lib/libponyrt.bc"
+  PONYRT_BC_PATH = ENV.fetch("MARE_PONYRT_BC_PATH", "/usr/lib:/usr/local/lib")
 
   def self.run(ctx)
     new.run(ctx)
+  end
+
+  def find_libponyrt_bc(searchpath) : String?
+    searchpath.split(":", remove_empty: true)
+      .map { |path| File.join(path, "libponyrt.bc") }
+      .find { |path| File.exists?(path) }
   end
 
   def run(ctx)
@@ -25,11 +31,7 @@ class Mare::Compiler::Binary
     mod = ctx.code_gen.mod
 
     target = ctx.options.target
-    ponyrt_bc_path = if target && target.freebsd?
-                       "/usr/local/lib/libponyrt.bc"
-                     else
-                       PONYRT_BC_PATH
-                     end
+    ponyrt_bc_path = find_libponyrt_bc(PONYRT_BC_PATH) || raise "libponyrt.bc not found"
 
     ponyrt_bc = LLVM::MemoryBuffer.from_file(ponyrt_bc_path)
     ponyrt = llvm.parse_bitcode(ponyrt_bc).as(LLVM::Module)
