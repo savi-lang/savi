@@ -17,7 +17,7 @@ class Mare::Compiler
       @print_ir = false,
       @print_perf = false,
       @binary_name = DEFAULT_BINARY_NAME,
-      @target_pass = nil
+      @target_pass = nil,
     )
     end
   end

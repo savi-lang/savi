@@ -13,10 +13,16 @@ require "llvm"
 # !! This pass has the side-effect of writing files to disk.
 #
 class Mare::Compiler::Binary
-  PONYRT_BC_PATH = "/usr/lib/libponyrt.bc"
+  PONYRT_BC_PATH = ENV.fetch("MARE_PONYRT_BC_PATH", "/usr/lib:/usr/local/lib")
 
   def self.run(ctx)
     new.run(ctx)
+  end
+
+  def find_libponyrt_bc(searchpath) : String?
+    searchpath.split(":", remove_empty: true)
+      .map { |path| File.join(path, "libponyrt.bc") }
+      .find { |path| File.exists?(path) }
   end
 
   def run(ctx)
@@ -24,7 +30,10 @@ class Mare::Compiler::Binary
     machine = ctx.code_gen.target_machine
     mod = ctx.code_gen.mod
 
-    ponyrt_bc = LLVM::MemoryBuffer.from_file(PONYRT_BC_PATH)
+    target = Target.new(machine.triple)
+    ponyrt_bc_path = find_libponyrt_bc(PONYRT_BC_PATH) || raise "libponyrt.bc not found"
+
+    ponyrt_bc = LLVM::MemoryBuffer.from_file(ponyrt_bc_path)
     ponyrt = llvm.parse_bitcode(ponyrt_bc).as(LLVM::Module)
 
     # Link the pony runtime bitcode into the generated module.
@@ -35,10 +44,17 @@ class Mare::Compiler::Binary
 
     machine.emit_obj_to_file(mod, obj_filename)
 
-    link_args = %w{clang
-      -fuse-ld=lld -rdynamic -static -fpic -flto=thin
-      -lc -pthread -ldl -latomic
-    }
+    link_args = if target.freebsd?
+                  %w{clang
+                    -fuse-ld=lld -static -fpic -flto=thin
+                    -lc -pthread -ldl -lexecinfo -lelf
+                  }
+                else
+                  %w{clang
+                    -fuse-ld=lld -rdynamic -static -fpic -flto=thin
+                    -lc -pthread -ldl -latomic
+                  }
+                end
 
     link_args <<
       if ctx.options.release
