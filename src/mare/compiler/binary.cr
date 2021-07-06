@@ -30,7 +30,7 @@ class Mare::Compiler::Binary
     machine = ctx.code_gen.target_machine
     mod = ctx.code_gen.mod
 
-    target = ctx.options.target
+    target = Target.new(machine.triple)
     ponyrt_bc_path = find_libponyrt_bc(PONYRT_BC_PATH) || raise "libponyrt.bc not found"
 
     ponyrt_bc = LLVM::MemoryBuffer.from_file(ponyrt_bc_path)
@@ -44,7 +44,7 @@ class Mare::Compiler::Binary
 
     machine.emit_obj_to_file(mod, obj_filename)
 
-    link_args = if target && target.freebsd?
+    link_args = if target.freebsd?
                   %w{clang
                     -fuse-ld=lld -static -fpic -flto=thin
                     -lc -pthread -ldl -lexecinfo -lelf

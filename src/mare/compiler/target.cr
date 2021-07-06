@@ -1,9 +1,4 @@
-# TODO: Bring in "crystal/src/compiler/crystal/codegen/target.cr"
-class Mare::Compiler::Target
-  def initialize(@target_triple : String)
-  end
+require "compiler/crystal/codegen/target"
 
-  def freebsd?
-    @target_triple.downcase.split("-").any? { |part| part.starts_with?("freebsd") }
-  end
+class Mare::Compiler::Target < Crystal::Codegen::Target
 end
