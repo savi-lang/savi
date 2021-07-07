@@ -131,6 +131,13 @@ module Mare::Compiler::Flow
       block_at(@locations[node].block_index)
     end
 
+    # Convenience method for checking if the given node always jumps away,
+    # which is true if it is a literal jump, or if it is assigned
+    # to a flow block that is marked as unreachable.
+    def jumps_away?(node)
+      node.is_a?(AST::Jump) || block_at(node).unreachable?
+    end
+
     ENTRY_BLOCK_INDEX = 0
     EXIT_BLOCK_INDEX = 1
     def entry_block; @blocks[ENTRY_BLOCK_INDEX]; end

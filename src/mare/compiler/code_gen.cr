@@ -63,8 +63,8 @@ class Mare::Compiler::CodeGen
       @g.ctx.classify[@gfunc.as(GenFunc).link]
     end
 
-    def jumps
-      @g.ctx.jumps[@gfunc.as(GenFunc).link]
+    def flow
+      @g.ctx.flow[@gfunc.as(GenFunc).link]
     end
 
     def local
@@ -744,7 +744,7 @@ class Mare::Compiler::CodeGen
       end
 
     gfunc.calling_convention.gen_return(self, gfunc, last_value, last_expr) \
-      unless func_frame.jumps.away?(gfunc.func.body.not_nil!)
+      unless func_frame.flow.jumps_away?(gfunc.func.body.not_nil!)
 
     gen_func_end(gfunc)
   end
@@ -2936,7 +2936,7 @@ class Mare::Compiler::CodeGen
       @builder.cond(cond_value, case_block, next_block)
 
       @builder.position_at_end(case_block)
-      if meta_type_unconstrained?(fore[1]) && !func_frame.jumps.away?(fore[1])
+      if meta_type_unconstrained?(fore[1]) && !func_frame.flow.jumps_away?(fore[1])
         # We skip generating code for the case block if it is unreachable,
         # meaning that the cond was deemed at compile time to never be true.
         # This is marked by an unconstrained result MetaType, provided that
@@ -2947,7 +2947,7 @@ class Mare::Compiler::CodeGen
         # jumping to the post block using the `br` instruction, where we will
         # carry the value we just generated as one of the possible phi values.
         value = gen_expr(fore[1])
-        unless func_frame.jumps.away?(fore[1])
+        unless func_frame.flow.jumps_away?(fore[1])
           if func_frame.classify.value_needed?(expr)
             phi_type ||= type_of(expr)
             value = gen_assign_cast(value, phi_type.not_nil!, fore[1])
@@ -2973,7 +2973,7 @@ class Mare::Compiler::CodeGen
     @builder.br(case_block)
 
     @builder.position_at_end(case_block)
-    if meta_type_unconstrained?(expr.list.last[1]) && !func_frame.jumps.away?(expr.list.last[1])
+    if meta_type_unconstrained?(expr.list.last[1]) && !func_frame.flow.jumps_away?(expr.list.last[1])
       # We skip generating code for the case block if it is unreachable,
       # meaning that the cond was deemed at compile time to never be true.
       # This is marked by an unconstrained result MetaType, provided that
@@ -2983,7 +2983,7 @@ class Mare::Compiler::CodeGen
       # Generate code for the final case block using exactly the same strategy
       # that we used when we generated case blocks inside the loop above.
       value = gen_expr(expr.list.last[1])
-      unless func_frame.jumps.away?(expr.list.last[1])
+      unless func_frame.flow.jumps_away?(expr.list.last[1])
         if func_frame.classify.value_needed?(expr)
           phi_type ||= type_of(expr)
           value = gen_assign_cast(value, phi_type.not_nil!, expr.list.last[1])
@@ -2995,7 +2995,7 @@ class Mare::Compiler::CodeGen
     end
 
     # When we jump away, we can't generate the post block.
-    if func_frame.jumps.away?(expr)
+    if func_frame.flow.jumps_away?(expr)
       post_block.delete
       return gen_none
     end
@@ -3053,7 +3053,7 @@ class Mare::Compiler::CodeGen
     @builder.position_at_end(body_block)
     body_value = gen_expr(expr.body)
 
-    unless func_frame.jumps.away?(expr.body)
+    unless func_frame.flow.jumps_away?(expr.body)
       cond_value = gen_as_cond(gen_expr(expr.repeat_cond))
 
       if func_frame.classify.value_needed?(expr)
@@ -3091,7 +3091,7 @@ class Mare::Compiler::CodeGen
     # Then skip straight to the post block.
     @builder.position_at_end(else_block)
     else_value = gen_expr(expr.else_body)
-    unless func_frame.jumps.away?(expr.else_body)
+    unless func_frame.flow.jumps_away?(expr.else_body)
       if func_frame.classify.value_needed?(expr)
         else_value = gen_assign_cast(else_value, phi_type, expr.else_body)
         phi_blocks << @builder.insert_block
@@ -3101,7 +3101,7 @@ class Mare::Compiler::CodeGen
     end
 
     # When we jump away, we can't generate the post block.
-    if func_frame.jumps.away?(expr)
+    if func_frame.flow.jumps_away?(expr)
       post_block.delete
       return gen_none
     end
@@ -3140,7 +3140,7 @@ class Mare::Compiler::CodeGen
     # Then continue to the post block.
     @builder.position_at_end(body_block)
     body_value = gen_expr(expr.body)
-    unless func_frame.jumps.away?(expr.body)
+    unless func_frame.flow.jumps_away?(expr.body)
       phi_type ||= type_of(expr)
       body_value = gen_assign_cast(body_value, phi_type.not_nil!, expr.body)
       phi_blocks << @builder.insert_block
@@ -3169,7 +3169,7 @@ class Mare::Compiler::CodeGen
 
     # Generate the body code of the else clause, then proceed to the post block.
     else_value = gen_expr(expr.else_body)
-    unless func_frame.jumps.away?(expr.else_body)
+    unless func_frame.flow.jumps_away?(expr.else_body)
       phi_type ||= type_of(expr)
       else_value = gen_assign_cast(else_value, phi_type.not_nil!, expr.else_body)
       phi_blocks << @builder.insert_block
