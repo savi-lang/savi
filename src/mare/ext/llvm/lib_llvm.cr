@@ -1,5 +1,7 @@
 lib LibLLVM
+  fun clear_insertion_position = LLVMClearInsertionPosition(builder : BuilderRef)
   fun get_entry_basic_block = LLVMGetEntryBasicBlock(function : ValueRef) : BasicBlockRef
+  fun get_basic_block_terminator = LLVMGetBasicBlockTerminator(basic_block : BasicBlockRef) : ValueRef
   fun position_builder_before = LLVMPositionBuilderBefore(builder : BuilderRef, instruction : ValueRef)
   fun intptr_type_in_context = LLVMIntPtrTypeInContext(ContextRef, TargetDataRef) : TypeRef
   fun build_struct_gep = LLVMBuildStructGEP(builder : BuilderRef, pointer : ValueRef, index : UInt32, name : UInt8*) : ValueRef

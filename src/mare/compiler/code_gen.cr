@@ -221,6 +221,18 @@ class Mare::Compiler::CodeGen
     @frames.each.find { |f| f.llvm_func? }.not_nil!
   end
 
+  def finish_block
+    old_block = @builder.insert_block
+    if old_block
+      old_block.get_terminator || @builder.unreachable
+    end
+  end
+
+  def finish_block_and_move_to(new_block)
+    finish_block
+    @builder.position_at_end(new_block)
+  end
+
   def abi_size_of(llvm_type : LLVM::Type)
     @target_machine.data_layout.abi_size(llvm_type)
   end
@@ -403,7 +415,7 @@ class Mare::Compiler::CodeGen
 
     # Create a basic block to hold the implementation of the main function.
     bb = wrapper.basic_blocks.append("entry")
-    @builder.position_at_end bb
+    finish_block_and_move_to(bb)
 
     # Construct the following arguments to pass to the main function:
     # i32 argc = 0, i8** argv = ["marejit", NULL], i8** envp = [NULL]
@@ -429,7 +441,15 @@ class Mare::Compiler::CodeGen
     @di.func_start(gfunc, llvm_func) if gfunc
 
     # Start building from the entry block.
-    @builder.position_at_end(func_frame.entry_block)
+    finish_block_and_move_to(func_frame.entry_block)
+
+    # Add a start block after the entry block, which will be our first normal
+    # block, with the entry block being reserved for allocs and such.
+    # The entry block transitions directly into the start block,
+    # but we may come back and add to the entry block later.
+    start_block = gen_block("start")
+    @builder.br(start_block)
+    @builder.position_at_end(start_block)
 
     # We have some extra work to do here if this is a yielding function.
     if gfunc && gfunc.needs_continuation?
@@ -456,7 +476,7 @@ class Mare::Compiler::CodeGen
           gfunc.after_yield_blocks,
         )
         unused_entry_block = gen_block("unused_entry")
-        @builder.position_at_end(unused_entry_block)
+        finish_block_and_move_to(unused_entry_block)
         return
       end
     end
@@ -478,6 +498,8 @@ class Mare::Compiler::CodeGen
 
   def gen_func_end(gfunc = nil)
     @di.func_end if gfunc
+
+    finish_block
 
     raise "invalid try else stack" unless @try_else_stack.empty?
 
@@ -788,7 +810,7 @@ class Mare::Compiler::CodeGen
 
       # In the else block, make a landing pad to catch the pony-style error,
       # then return an error using our error calling convention.
-      @builder.position_at_end(else_block)
+      finish_block_and_move_to(else_block)
       @builder.landing_pad(
         @pony_error_landing_pad_type,
         @pony_error_personality_fn,
@@ -797,7 +819,7 @@ class Mare::Compiler::CodeGen
       gfunc.calling_convention.gen_error_return(self, gfunc, gen_none, nil)
 
       # In the then block, return the value using our error calling convention.
-      @builder.position_at_end(then_block)
+      finish_block_and_move_to(then_block)
       gfunc.calling_convention.gen_return(self, gfunc, value, nil)
     else
       raise NotImplementedError.new(gfunc.calling_convention)
@@ -1075,9 +1097,9 @@ class Mare::Compiler::CodeGen
           nonzero = @builder.icmp LLVM::IntPredicate::NE, params[1], zero,
             "#{params[1].name}.nonzero"
           @builder.cond(nonzero, nonzero_block, after_block)
-          blocks << @builder.insert_block
+          blocks << @builder.insert_block.not_nil!
           values << zero
-          @builder.position_at_end(nonzero_block)
+          finish_block_and_move_to(nonzero_block)
 
           # If signed, return zero if this operation would overflow.
           # This happens for exactly one case in each signed integer type.
@@ -1095,9 +1117,9 @@ class Mare::Compiler::CodeGen
             either_good = @builder.or(numer_good, denom_good, "nonoverflow")
 
             @builder.cond(either_good, nonoverflow_block.not_nil!, after_block)
-            blocks << @builder.insert_block
+            blocks << @builder.insert_block.not_nil!
             values << zero
-            @builder.position_at_end(nonoverflow_block.not_nil!)
+            finish_block_and_move_to(nonoverflow_block.not_nil!)
           end
 
           # Otherwise, compute the result.
@@ -1111,9 +1133,9 @@ class Mare::Compiler::CodeGen
             end
           result.name = "result"
           @builder.br(after_block)
-          blocks << @builder.insert_block
+          blocks << @builder.insert_block.not_nil!
           values << result
-          @builder.position_at_end(after_block)
+          finish_block_and_move_to(after_block)
 
           # Get the final result, which may be zero from one of the pre-checks.
           @builder.phi(llvm_type, blocks, values, "phidiv")
@@ -1305,10 +1327,10 @@ class Mare::Compiler::CodeGen
         is_overflow = @builder.extract_value(result, 1)
         @builder.cond(is_overflow, overflow_block, after_block)
 
-        @builder.position_at_end(overflow_block)
+        finish_block_and_move_to(overflow_block)
         gfunc.calling_convention.gen_error_return(self, gfunc, gen_none, nil)
 
-        @builder.position_at_end(after_block)
+        finish_block_and_move_to(after_block)
         result_value = @builder.extract_value(result, 0)
         gfunc.calling_convention.gen_return(self, gfunc, result_value, nil)
 
@@ -1586,12 +1608,12 @@ class Mare::Compiler::CodeGen
       is_error = @builder.icmp(LLVM::IntPredicate::EQ, error_bit, @i1_true)
       @builder.cond(is_error, error_block, after_block)
 
-      @builder.position_at_end(error_block)
+      finish_block_and_move_to(error_block)
       # TODO: Should we try to avoid destructuring and restructuring the
       # tuple value here? Or does LLVM optimize it away so as to not matter?
       gen_raise_error(@builder.extract_value(result, 0), call)
 
-      @builder.position_at_end(after_block)
+      finish_block_and_move_to(after_block)
       result = @builder.extract_value(result, 0)
     when GenFunc::Yielding, GenFunc::YieldingErrorable
       # We declare the alloca itself, as well as bit casted aliases.
@@ -1612,24 +1634,24 @@ class Mare::Compiler::CodeGen
       # continuing to be done, and therefore the yield block shouldn't be run.
       # If the function pointer is non-NULL, we go to the yield block.
       @builder.br(maybe_block)
-      @builder.position_at_end(maybe_block)
+      finish_block_and_move_to(maybe_block)
       is_finished = gfunc.continuation_info.check_is_finished(cont.not_nil!)
       @builder.cond(is_finished, check_error_block || after_block, yield_block)
 
       # If applicable, generate the code for checking error of the result,
       # as well as the code for raising the error if it was present.
       if check_error_block
-        @builder.position_at_end(check_error_block)
+        finish_block_and_move_to(check_error_block)
         is_error = gfunc.continuation_info.check_is_error(cont.not_nil!)
         @builder.cond(is_error, error_block.not_nil!, after_block)
 
-        @builder.position_at_end(error_block.not_nil!)
+        finish_block_and_move_to(error_block.not_nil!)
         # TODO: Allow an error value of something other than None.
         gen_raise_error(gen_none, call)
       end
 
       # Move our cursor to the yield block to start generating code there.
-      @builder.position_at_end(yield_block)
+      finish_block_and_move_to(yield_block)
 
       # If the yield block uses yield params, we treat them as locals,
       # which means they need a gep to be able to load them later.
@@ -1693,7 +1715,7 @@ class Mare::Compiler::CodeGen
       @builder.br(maybe_block)
 
       # Finally, finish with the "real" result of the call.
-      @builder.position_at_end(after_block)
+      finish_block_and_move_to(after_block)
       result = gfunc.continuation_info.get_final_return(cont.not_nil!)
     else
       raise NotImplementedError.new(gfunc.calling_convention)
@@ -2472,7 +2494,7 @@ class Mare::Compiler::CodeGen
 
     is_nan = @builder.and(exp_res, mant_res, "is_nan")
     @builder.cond(is_nan, nan, non_nan)
-    @builder.position_at_end(nan)
+    finish_block_and_move_to(nan)
 
     return non_nan
   end
@@ -2501,11 +2523,11 @@ class Mare::Compiler::CodeGen
     @builder.cond(is_overflow, overflow, test_underflow)
 
     # If it does overflow, return the maximum integer value.
-    @builder.position_at_end(overflow)
+    finish_block_and_move_to(overflow)
     @builder.ret(to_max)
 
     # Check if the floating-point value underflows the minimum integer value.
-    @builder.position_at_end(test_underflow)
+    finish_block_and_move_to(test_underflow)
     to_fmin =
       if is_signed
         @builder.si2fp(to_min, from_type)
@@ -2516,11 +2538,11 @@ class Mare::Compiler::CodeGen
     @builder.cond(is_underflow, underflow, normal)
 
     # If it does underflow, return the minimum integer value.
-    @builder.position_at_end(underflow)
+    finish_block_and_move_to(underflow)
     @builder.ret(to_min)
 
     # Otherwise, proceed with the conversion as normal.
-    @builder.position_at_end(normal)
+    finish_block_and_move_to(normal)
     if is_signed
       @builder.fp2si(value, to_type)
     else
@@ -2540,29 +2562,29 @@ class Mare::Compiler::CodeGen
     normal = gen_block("normal")
 
     # Check if the F64 value overflows the maximum F32 value.
-    @builder.position_at_end(test_overflow)
+    finish_block_and_move_to(test_overflow)
     f32_max = @llvm.const_bit_cast(@i32.const_int(0x7F7FFFFF), @f32)
     f32_max = @builder.fpext(f32_max, @f64, "f32_max")
     is_overflow = @builder.fcmp(LLVM::RealPredicate::OGT, value, f32_max)
     @builder.cond(is_overflow, overflow, test_underflow)
 
     # If it does overflow, return positive infinity.
-    @builder.position_at_end(overflow)
+    finish_block_and_move_to(overflow)
     @builder.ret(@llvm.const_bit_cast(@i32.const_int(0x7F800000), @f32))
 
     # Check if the F64 value underflows the minimum F32 value.
-    @builder.position_at_end(test_underflow)
+    finish_block_and_move_to(test_underflow)
     f32_min = @llvm.const_bit_cast(@i32.const_int(0xFF7FFFFF), @f32)
     f32_min = @builder.fpext(f32_min, @f64, "f32_min")
     is_underflow = @builder.fcmp(LLVM::RealPredicate::OLT, value, f32_min)
     @builder.cond(is_underflow, underflow, normal)
 
     # If it does underflow, return negative infinity.
-    @builder.position_at_end(underflow)
+    finish_block_and_move_to(underflow)
     @builder.ret(@llvm.const_bit_cast(@i32.const_int(0xFF800000), @f32))
 
     # Otherwise, proceed with the floating-point truncation as normal.
-    @builder.position_at_end(normal)
+    finish_block_and_move_to(normal)
     @builder.fptrunc(value, @f32)
   end
 
@@ -2571,7 +2593,7 @@ class Mare::Compiler::CodeGen
       value, @i32, 0x7F800000, 0x007FFFFF)
     @builder.ret(to_type.const_int(0))
 
-    @builder.position_at_end(test_overflow)
+    finish_block_and_move_to(test_overflow)
     to_min = @builder.not(to_type.const_int(0), "to_min.pre")
     to_max = @builder.lshr(to_min, to_type.const_int(1), "to_max")
     to_min = @builder.xor(to_max, to_min, "to_min")
@@ -2584,7 +2606,7 @@ class Mare::Compiler::CodeGen
       value, @i64, 0x7FF0000000000000, 0x000FFFFFFFFFFFFF)
     @builder.ret(to_type.const_int(0))
 
-    @builder.position_at_end(test_overflow)
+    finish_block_and_move_to(test_overflow)
     to_min = @builder.not(to_type.const_int(0), "to_min.pre")
     to_max = @builder.lshr(to_min, to_type.const_int(1), "to_max")
     to_min = @builder.xor(to_max, to_min, "to_min")
@@ -2597,7 +2619,7 @@ class Mare::Compiler::CodeGen
       value, @i32, 0x7F800000, 0x007FFFFF)
     @builder.ret(to_type.const_int(0))
 
-    @builder.position_at_end(test_overflow)
+    finish_block_and_move_to(test_overflow)
     to_min = to_type.const_int(0)
     to_max = @builder.not(to_min, "to_max")
     gen_numeric_conv_float_handle_overflow_saturate(
@@ -2609,7 +2631,7 @@ class Mare::Compiler::CodeGen
       value, @i64, 0x7FF0000000000000, 0x000FFFFFFFFFFFFF)
     @builder.ret(to_type.const_int(0))
 
-    @builder.position_at_end(test_overflow)
+    finish_block_and_move_to(test_overflow)
     to_min = to_type.const_int(0)
     to_max = @builder.not(to_min, "to_max")
     gen_numeric_conv_float_handle_overflow_saturate(
@@ -2793,7 +2815,9 @@ class Mare::Compiler::CodeGen
 
     # Create an intermediary function that strips the mutator_gtype receiver
     # from the arguments forwarded to the gfunc we actually want to call.
-    orig_block = @builder.insert_block
+    orig_block = @builder.insert_block.not_nil!
+    @builder.clear_insertion_position
+
     via_llvm_func =
       @mod.functions.add(
         "#{gfunc.llvm_name}.VIA.#{mutator_gtype.type_def.llvm_name}",
@@ -2806,7 +2830,7 @@ class Mare::Compiler::CodeGen
       end
 
     # Go back to the original block that we were at before making this function.
-    @builder.position_at_end(orig_block)
+    finish_block_and_move_to(orig_block)
 
     # Create a vtable that places our via function in the proper index.
     vtable = mutator_gtype.gen_vtable(self)
@@ -2935,7 +2959,7 @@ class Mare::Compiler::CodeGen
       next_block = case_and_cond_blocks.shift
       @builder.cond(cond_value, case_block, next_block)
 
-      @builder.position_at_end(case_block)
+      finish_block_and_move_to(case_block)
       if meta_type_unconstrained?(fore[1]) && !func_frame.flow.jumps_away?(fore[1])
         # We skip generating code for the case block if it is unreachable,
         # meaning that the cond was deemed at compile time to never be true.
@@ -2951,7 +2975,7 @@ class Mare::Compiler::CodeGen
           if func_frame.classify.value_needed?(expr)
             phi_type ||= type_of(expr)
             value = gen_assign_cast(value, phi_type.not_nil!, fore[1])
-            phi_blocks << @builder.insert_block
+            phi_blocks << @builder.insert_block.not_nil!
             phi_values << value
           end
           @builder.br(post_block)
@@ -2961,7 +2985,7 @@ class Mare::Compiler::CodeGen
       # Generate code for the next block, which is the condition to be
       # checked for truthiness in the next iteration of this loop
       # (or ignored if this is the final case, which must always be exhaustive).
-      @builder.position_at_end(next_block)
+      finish_block_and_move_to(next_block)
       cond_value = gen_expr(aft[0])
     end
 
@@ -2972,7 +2996,7 @@ class Mare::Compiler::CodeGen
     case_block = case_and_cond_blocks.shift
     @builder.br(case_block)
 
-    @builder.position_at_end(case_block)
+    finish_block_and_move_to(case_block)
     if meta_type_unconstrained?(expr.list.last[1]) && !func_frame.flow.jumps_away?(expr.list.last[1])
       # We skip generating code for the case block if it is unreachable,
       # meaning that the cond was deemed at compile time to never be true.
@@ -2987,7 +3011,7 @@ class Mare::Compiler::CodeGen
         if func_frame.classify.value_needed?(expr)
           phi_type ||= type_of(expr)
           value = gen_assign_cast(value, phi_type.not_nil!, expr.list.last[1])
-          phi_blocks << @builder.insert_block
+          phi_blocks << @builder.insert_block.not_nil!
           phi_values << value
         end
         @builder.br(post_block)
@@ -3002,7 +3026,7 @@ class Mare::Compiler::CodeGen
 
     # Here at the post block, we receive the value that was returned by one of
     # the cases above, using the LLVM mechanism called a "phi" instruction.
-    @builder.position_at_end(post_block)
+    finish_block_and_move_to(post_block)
     if func_frame.classify.value_needed?(expr)
       @builder.phi(llvm_type_of(phi_type.not_nil!), phi_blocks, phi_values, "phi_choice")
     else
@@ -3050,7 +3074,7 @@ class Mare::Compiler::CodeGen
     # In the body block, generate code to arrive at the body value,
     # and also generate the condition value code again.
     # If the cond is true, repeat the body block; otherwise, go to post block.
-    @builder.position_at_end(body_block)
+    finish_block_and_move_to(body_block)
     body_value = gen_expr(expr.body)
 
     unless func_frame.flow.jumps_away?(expr.body)
@@ -3058,7 +3082,7 @@ class Mare::Compiler::CodeGen
 
       if func_frame.classify.value_needed?(expr)
         body_value = gen_assign_cast(body_value, phi_type, expr.body)
-        phi_blocks << @builder.insert_block
+        phi_blocks << @builder.insert_block.not_nil!
         phi_values << body_value
       end
       @builder.cond(cond_value, body_block, post_block)
@@ -3069,7 +3093,7 @@ class Mare::Compiler::CodeGen
       raise "invalid post next stack" \
         unless next_stack_tuple[0] == next_block
 
-      @builder.position_at_end(next_block)
+      finish_block_and_move_to(next_block)
       next_value =
         @builder.phi(
           llvm_type_of(phi_type.not_nil!),
@@ -3078,7 +3102,7 @@ class Mare::Compiler::CodeGen
           "next_expression_value",
         )
       cond_value = gen_as_cond(gen_expr(expr.repeat_cond))
-      phi_blocks << @builder.insert_block
+      phi_blocks << @builder.insert_block.not_nil!
       phi_values << next_value
       @builder.cond(cond_value, body_block, post_block)
     end
@@ -3089,12 +3113,12 @@ class Mare::Compiler::CodeGen
 
     # In the body block, generate code to arrive at the else value,
     # Then skip straight to the post block.
-    @builder.position_at_end(else_block)
+    finish_block_and_move_to(else_block)
     else_value = gen_expr(expr.else_body)
     unless func_frame.flow.jumps_away?(expr.else_body)
       if func_frame.classify.value_needed?(expr)
         else_value = gen_assign_cast(else_value, phi_type, expr.else_body)
-        phi_blocks << @builder.insert_block
+        phi_blocks << @builder.insert_block.not_nil!
         phi_values << else_value
       end
       @builder.br(post_block)
@@ -3108,7 +3132,7 @@ class Mare::Compiler::CodeGen
 
     # Here at the post block, we receive the value that was returned by one of
     # the bodies above, using the LLVM mechanism called a "phi" instruction.
-    @builder.position_at_end(post_block)
+    finish_block_and_move_to(post_block)
     if func_frame.classify.value_needed?(expr)
       @builder.phi(
         llvm_type_of(phi_type),
@@ -3138,18 +3162,18 @@ class Mare::Compiler::CodeGen
 
     # Generate the body and get the resulting value, assuming no throw happened.
     # Then continue to the post block.
-    @builder.position_at_end(body_block)
+    finish_block_and_move_to(body_block)
     body_value = gen_expr(expr.body)
     unless func_frame.flow.jumps_away?(expr.body)
       phi_type ||= type_of(expr)
       body_value = gen_assign_cast(body_value, phi_type.not_nil!, expr.body)
-      phi_blocks << @builder.insert_block
+      phi_blocks << @builder.insert_block.not_nil!
       phi_values << body_value
       @builder.br(post_block)
     end
 
     # Now start generating the else clause (reached when a throw happened).
-    @builder.position_at_end(else_block)
+    finish_block_and_move_to(else_block)
 
     # TODO: Allow an error_phi_llvm_type of something other than None.
     error_phi_llvm_type = llvm_type_of(@gtypes["None"])
@@ -3172,7 +3196,7 @@ class Mare::Compiler::CodeGen
     unless func_frame.flow.jumps_away?(expr.else_body)
       phi_type ||= type_of(expr)
       else_value = gen_assign_cast(else_value, phi_type.not_nil!, expr.else_body)
-      phi_blocks << @builder.insert_block
+      phi_blocks << @builder.insert_block.not_nil!
       phi_values << else_value
       @builder.br(post_block)
     end
@@ -3186,7 +3210,7 @@ class Mare::Compiler::CodeGen
 
     # Here at the post block, we receive the value that was returned by one of
     # the bodies above, using the LLVM mechanism called a "phi" instruction.
-    @builder.position_at_end(post_block)
+    finish_block_and_move_to(post_block)
     @builder.phi(llvm_type_of(phi_type.not_nil!), phi_blocks, phi_values, "phi_try")
   end
 
@@ -3208,14 +3232,16 @@ class Mare::Compiler::CodeGen
     if @try_else_stack.empty?
       gfunc = func_frame.gfunc.not_nil!
       gfunc.calling_convention.gen_error_return(self, gfunc, error_value, from_expr)
+      .tap { finish_block_and_move_to(gen_block("unreachable_after_error_return")) }
     else
       # Store the state needed to catch the value in the try else block.
       else_stack_tuple = @try_else_stack.last
-      else_stack_tuple[1] << @builder.insert_block
+      else_stack_tuple[1] << @builder.insert_block.not_nil!
       else_stack_tuple[2] << error_value
 
       # Jump to the try else block.
       @builder.br(else_stack_tuple[0])
+      .tap { finish_block_and_move_to(gen_block("unreachable_after_error")) }
     end
   end
 
@@ -3224,7 +3250,7 @@ class Mare::Compiler::CodeGen
 
     continue_stack_tuple = @loop_next_stack.last.not_nil!
     typ = continue_stack_tuple[3]
-    continue_stack_tuple[1] << @builder.insert_block
+    continue_stack_tuple[1] << @builder.insert_block.not_nil!
     continue_stack_tuple[2] << gen_assign_cast(value, typ, from_expr)
 
     @builder.br(continue_stack_tuple[0])
@@ -3235,7 +3261,7 @@ class Mare::Compiler::CodeGen
 
     break_stack_tuple = @loop_break_stack.last.not_nil!
     typ = break_stack_tuple[3]
-    break_stack_tuple[1] << @builder.insert_block
+    break_stack_tuple[1] << @builder.insert_block.not_nil!
     break_stack_tuple[2] << gen_assign_cast(value, typ, from_expr)
 
     @builder.br(break_stack_tuple[0])
@@ -3298,7 +3324,7 @@ class Mare::Compiler::CodeGen
     # Note that this code block will be dead code (with "no predecessors")
     # in all but one of the continue functions that we generate - the one
     # continue function we grabbed above (which jumps to this block on entry).
-    @builder.position_at_end(after_block)
+    finish_block_and_move_to(after_block)
 
     # Finally, use the "yield in" value returned from the caller.
     # However, if we're not actually in a continuation function, then this
@@ -3356,7 +3382,7 @@ class Mare::Compiler::CodeGen
     # follow the first block, resulting in invalid IR ("does not dominate").
     # All blocks follow the entry block (it dominates all other blocks),
     # so this is a surefire safe place to do whatever it is we need to declare.
-    orig_block = @builder.insert_block
+    orig_block = @builder.insert_block.not_nil!
     entry_block = gen_frame.entry_block
 
     if entry_block.instructions.empty?

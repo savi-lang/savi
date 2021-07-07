@@ -13,6 +13,11 @@
       try (error! | 33)
     )
 
+    // This test just proves that codegen doesn't choke on unreachable code.
+    test["try error!; unreachable code after error"].pass = U64[33] == (
+      try (error!, totally = "unreachable" | 33)
+    )
+
     test["try: try error else error; with error"].pass = U64[33] == (
       try (try (error! | error!) | 33)
     )

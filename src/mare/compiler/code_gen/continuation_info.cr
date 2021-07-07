@@ -295,7 +295,7 @@ class Mare::Compiler::CodeGen
       )
 
       # None of the above yield indexes matched. This should never happen.
-      builder.position_at_end(invalid_block)
+      g.finish_block_and_move_to(invalid_block)
       builder.unreachable
     end
   end

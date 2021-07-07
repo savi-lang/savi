@@ -587,14 +587,14 @@ class Mare::Compiler::CodeGen::PonyRT
     g.builder.cond(start_success, post_block, start_fail_block)
 
     # On failure, just write a failure message then continue to the post_block.
-    g.builder.position_at_end(start_fail_block)
+    g.finish_block_and_move_to(start_fail_block)
     g.builder.call(g.mod.functions["puts"], [
       g.gen_cstring("Error: couldn't start the runtime!")
     ])
     g.builder.br(post_block)
 
     # On success (or after running the failure block), do the following:
-    g.builder.position_at_end(post_block)
+    g.finish_block_and_move_to(post_block)
 
     # TODO: Run primitive finalizers.
 
@@ -853,13 +853,13 @@ class Mare::Compiler::CodeGen::PonyRT
 
     # In the cond block, compare the index variable to the array size,
     # jumping to the body block if still within bounds; else, the post block.
-    g.builder.position_at_end(cond_block)
+    g.finish_block_and_move_to(cond_block)
     index = g.builder.load(index_alloca, "ARRAY.TRACE.LOOP.INDEX")
     continue = g.builder.icmp(LLVM::IntPredicate::ULT, index, array_size)
     g.builder.cond(continue, body_block, post_block)
 
     # In the body block, get the element for this index and trace it.
-    g.builder.position_at_end(body_block)
+    g.finish_block_and_move_to(body_block)
     elem =
       g.builder.load(
         g.builder.inbounds_gep(
@@ -879,7 +879,7 @@ class Mare::Compiler::CodeGen::PonyRT
     g.builder.br(cond_block)
 
     # Once done, move the builder to the post block for whatever code follows.
-    g.builder.position_at_end(post_block)
+    g.finish_block_and_move_to(post_block)
   end
 
   def gen_dispatch_impl(g : CodeGen, gtype : GenType)
@@ -910,7 +910,8 @@ class Mare::Compiler::CodeGen::PonyRT
 
     # Capture the current insert block so we can come back to it later,
     # after we jump around into each case block that we need to generate.
-    orig_block = g.builder.insert_block
+    orig_block = g.builder.insert_block.not_nil!
+    g.builder.clear_insertion_position
 
     # Generate the case block for each async function of this type,
     # mapped by the message id that corresponds to that function.
@@ -924,7 +925,7 @@ class Mare::Compiler::CodeGen::PonyRT
 
       # Create the block to execute when the message id matches.
       cases[id] = block = g.gen_block("DISPATCH.#{func_name}")
-      g.builder.position_at_end(block)
+      g.@builder.position_at_end(block)
 
       src_types = [] of Reach::Ref
       dst_types = [] of Reach::Ref
@@ -971,14 +972,13 @@ class Mare::Compiler::CodeGen::PonyRT
 
     # We rely on the typechecker to not let us call undefined async functions,
     # so the "else" case of this switch block is to be considered unreachable.
-    unreachable_block = g.gen_block("unreachable_block")
-    g.builder.position_at_end(unreachable_block)
     # TODO: LLVM infinite loop protection workaround (see gentype.c:503)
-    g.builder.unreachable
+    unreachable_block = g.gen_block("unreachable_block")
+    g.finish_block_and_move_to(unreachable_block)
 
     # Finally, return to the original block that we came from and create the
     # switch that maps onto all the case blocks that we just generated.
-    g.builder.position_at_end(orig_block)
+    g.finish_block_and_move_to(orig_block)
     g.builder.switch(msg_id, unreachable_block, cases)
 
     g.gen_func_end
@@ -1025,7 +1025,7 @@ class Mare::Compiler::CodeGen::PonyRT
       # In the block in which the value was proved to indeed be a subtype,
       # Determine the mutability kind to use, then construct a newly refined
       # destination type to trace for, recursing/delegating back to gen_trace.
-      g.builder.position_at_end(true_block)
+      g.finish_block_and_move_to(true_block)
       mutability = src_type.trace_mutability_of_nominal(g.ctx, dst_type)
       refined_dst_type =
         case mutability
@@ -1046,7 +1046,7 @@ class Mare::Compiler::CodeGen::PonyRT
       end
 
       # Carry on to the next elements, continuing from the false block.
-      g.builder.position_at_end(false_block)
+      g.finish_block_and_move_to(false_block)
     else
       raise NotImplementedError.new(src_type)
     end
@@ -1085,7 +1085,7 @@ class Mare::Compiler::CodeGen::PonyRT
       after_block = g.gen_block("after_dynamic_trace")
       gen_trace_dynamic(g, dst, src_type, dst_type, after_block)
       g.builder.br(after_block)
-      g.builder.position_at_end(after_block)
+      g.finish_block_and_move_to(after_block)
     when :tuple
       raise NotImplementedError.new("tuple") # TODO
     else

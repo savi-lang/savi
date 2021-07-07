@@ -1,4 +1,13 @@
 class LLVM::Builder
+  def clear_insertion_position
+    LibLLVM.clear_insertion_position(self)
+  end
+
+  def insert_block
+    ref = LibLLVM.get_insert_block(self)
+    BasicBlock.new(ref) if ref
+  end
+
   def position_before(instruction)
     LibLLVM.position_builder_before(self, instruction)
   end

@@ -87,7 +87,7 @@ class Mare::Compiler::CodeGen
       )
       expr = @di.create_expression(nil, 0)
 
-      @di.insert_declare_at_end(storage, info, expr, @builder.current_debug_location, @builder.insert_block)
+      @di.insert_declare_at_end(storage, info, expr, @builder.current_debug_location, @builder.insert_block.not_nil!)
     end
 
     def metadata(args)
