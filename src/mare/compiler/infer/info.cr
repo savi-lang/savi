@@ -1167,7 +1167,14 @@ module Mare::Compiler::Infer
     getter yield_block : AST::Group?
     getter ret_value_used : Bool
 
+    getter yield_block_breaks = [] of JumpBreak
+
     def initialize(@pos, @layer_index, @lhs, @member, @args, @yield_params, @yield_block, @ret_value_used)
+    end
+
+    protected def observe_break(jump : JumpBreak)
+      @yield_block_breaks << jump
+      jump.term.add_downstream(@pos, self)
     end
 
     def describe_kind : String; "return value" end
@@ -1278,9 +1285,16 @@ module Mare::Compiler::Infer
   class TowardCallYieldIn < DynamicInfo
     getter call : FromCall
 
+    getter yield_block_nexts = [] of JumpNext
+
     def describe_kind : String; "expected for the yield result" end
 
     def initialize(@pos, @layer_index, @call)
+    end
+
+    protected def observe_next(jump : JumpNext)
+      @yield_block_nexts << jump
+      jump.term.add_downstream(@pos, self)
     end
 
     def resolve_span!(ctx : Context, infer : Visitor) : Span

@@ -665,7 +665,7 @@ class Mare::Compiler::CodeGen
       # Declare the continue function to handle all continues.
       continue_param_types = [
         gfunc.continuation_info.struct_type.pointer,
-        gfunc.continuation_info.yield_in_type,
+        gfunc.continuation_info.yield_in_llvm_type,
       ]
       if gfunc.needs_receiver?
         continue_param_types.unshift(llvm_type_of(gtype))
@@ -678,7 +678,7 @@ class Mare::Compiler::CodeGen
       virtual_continue_param_types = [
         llvm_type_of(gtype),
         gfunc.continuation_info.struct_type.pointer,
-        gfunc.continuation_info.yield_in_type,
+        gfunc.continuation_info.yield_in_llvm_type,
       ]
       gfunc.virtual_continue_llvm_func =
         if virtual_continue_param_types == continue_param_types
@@ -1620,10 +1620,12 @@ class Mare::Compiler::CodeGen
       # Declare some code blocks in which we'll generate this pseudo-loop.
       maybe_block = gen_block("maybe_yield_block")
       yield_block = gen_block("yield_block")
+      continue_block = gen_block("continue_block")
       if gfunc.can_error?
         check_error_block = gen_block("check_error_block")
         error_block = gen_block("error_block")
       end
+      after_final_return_block = gen_block("after_final_return")
       after_block = gen_block("after_call")
 
       # We start at the "maybe block" right after the first call above.
@@ -1636,14 +1638,14 @@ class Mare::Compiler::CodeGen
       @builder.br(maybe_block)
       finish_block_and_move_to(maybe_block)
       is_finished = gfunc.continuation_info.check_is_finished(cont.not_nil!)
-      @builder.cond(is_finished, check_error_block || after_block, yield_block)
+      @builder.cond(is_finished, check_error_block || after_final_return_block, yield_block)
 
       # If applicable, generate the code for checking error of the result,
       # as well as the code for raising the error if it was present.
       if check_error_block
         finish_block_and_move_to(check_error_block)
         is_error = gfunc.continuation_info.check_is_error(cont.not_nil!)
-        @builder.cond(is_error, error_block.not_nil!, after_block)
+        @builder.cond(is_error, error_block.not_nil!, after_final_return_block)
 
         finish_block_and_move_to(error_block.not_nil!)
         # TODO: Allow an error value of something other than None.
@@ -1673,19 +1675,45 @@ class Mare::Compiler::CodeGen
         end
       end
 
-      # Now we generate the actual code for the yield block.
-      yield_in_expr = yield_block_ast.not_nil!
-      yield_in_value = gen_expr(yield_in_expr)
+      # Prepare an entry on the jump-catching stacks in case a break or next is
+      # encountered while generating code for the yield block body.
+      final_phi_type = type_of_unless_unsatisfiable(call) || @gtypes["None"].type_def.as_ref
+      yield_in_type = gfunc.continuation_info.yield_in_type
+      @loop_break_stack << {
+        after_block,
+        [] of LLVM::BasicBlock,
+        [] of LLVM::Value,
+        final_phi_type,
+      }
+      @loop_next_stack << {
+        continue_block,
+        [] of LLVM::BasicBlock,
+        [] of LLVM::Value,
+        yield_in_type,
+      }
 
+      # Now we generate the actual code for the yield block.
       # If None is the yield in value type expected, just generate None,
       # allowing us to ignore the actual result value of the yield block.
-      yield_in_type = gfunc.continuation_info.yield_in_type
-      if yield_in_type == @gtypes["None"].struct_type.pointer
-        yield_in_expr = nil
+      yield_in_value = gen_expr(yield_block_ast.not_nil!)
+      if llvm_type_of(yield_in_type) == @gtypes["None"].struct_type.pointer
         yield_in_value = gen_none
       end
+      yield_in_block = @builder.insert_block.not_nil!
+      @builder.br(continue_block)
 
-      # After the yield block, we call the continue function for this function.
+      # In the continue block we may need to use a phi node to catch values
+      # that were passed via next instead of the normal block result value.
+      finish_block_and_move_to(continue_block)
+      next_stack_tuple = @loop_next_stack.pop
+      raise "invalid next stack" unless next_stack_tuple[0] == continue_block
+      if next_stack_tuple[1].any?
+        phi_blocks = [yield_in_block] + next_stack_tuple[1]
+        phi_values = [yield_in_value] + next_stack_tuple[2]
+        yield_in_value = @builder.phi(llvm_type_of(yield_in_type), phi_blocks, phi_values, "phi_call_next")
+      end
+
+      # We're now ready to call the continue function for this function.
       # We pass the continuation data and yield_in_value back as the arguments.
       continue_llvm_func =
         if needs_virtual_call
@@ -1700,12 +1728,10 @@ class Mare::Compiler::CodeGen
           gfunc.continue_llvm_func.not_nil!
         end
       again_args = [(cont_cast || cont).not_nil!, yield_in_value]
-      again_arg_exprs = [nil, yield_in_expr]
       again_arg_frames = arg_exprs.map { nil.as(Frame?) }
       if use_receiver
         again_receiver = @builder.load(receiver_gep.not_nil!, "#{gfunc.llvm_name}.@")
         again_args.unshift(again_receiver)
-        again_arg_exprs.unshift(nil)
         again_arg_frames.unshift(nil)
       end
       @di.set_loc(call.ident)
@@ -1715,8 +1741,26 @@ class Mare::Compiler::CodeGen
       @builder.br(maybe_block)
 
       # Finally, finish with the "real" result of the call.
+      finish_block_and_move_to(after_final_return_block)
+      final_return_result = gfunc.continuation_info.get_final_return(cont.not_nil!)
+      @builder.br(after_block)
+
+      # Now generate code for the phi that follows the result, which is what
+      # joins up the value from multiple branches if we have any breaks present.
       finish_block_and_move_to(after_block)
-      result = gfunc.continuation_info.get_final_return(cont.not_nil!)
+      break_stack_tuple = @loop_break_stack.pop
+      raise "invalid break stack" unless break_stack_tuple[0] == after_block
+      result = if func_frame.classify.value_needed?(call)
+        if break_stack_tuple[1].empty?
+          final_return_result
+        else
+          phi_blocks = [after_final_return_block] + break_stack_tuple[1]
+          phi_values = [final_return_result] + break_stack_tuple[2]
+          @builder.phi(llvm_type_of(final_phi_type), phi_blocks, phi_values, "phi_call")
+        end
+      else
+        gen_none
+      end
     else
       raise NotImplementedError.new(gfunc.calling_convention)
     end
@@ -3217,6 +3261,7 @@ class Mare::Compiler::CodeGen
   def gen_return_value(value : LLVM::Value, from_expr : AST::Node)
     gfunc = func_frame.gfunc.not_nil!
     gfunc.calling_convention.gen_return(self, gfunc, value, from_expr)
+    .tap { finish_block_and_move_to(gen_block("unreachable_after_early_return")) }
   end
 
   def gen_raise_error(error_value : LLVM::Value, from_expr : AST::Node)
@@ -3246,18 +3291,19 @@ class Mare::Compiler::CodeGen
   end
 
   def gen_next(value : LLVM::Value, from_expr : AST::Node)
-    raise NotImplementedError.new("") if @loop_next_stack.empty?
+    raise NotImplementedError.new("inconsistent stack") if @loop_next_stack.empty?
 
-    continue_stack_tuple = @loop_next_stack.last.not_nil!
-    typ = continue_stack_tuple[3]
-    continue_stack_tuple[1] << @builder.insert_block.not_nil!
-    continue_stack_tuple[2] << gen_assign_cast(value, typ, from_expr)
+    next_stack_tuple = @loop_next_stack.last.not_nil!
+    typ = next_stack_tuple[3]
+    next_stack_tuple[1] << @builder.insert_block.not_nil!
+    next_stack_tuple[2] << gen_assign_cast(value, typ, from_expr)
 
-    @builder.br(continue_stack_tuple[0])
+    @builder.br(next_stack_tuple[0])
+    .tap { finish_block_and_move_to(gen_block("unreachable_after_next")) }
   end
 
   def gen_break_loop(value : LLVM::Value, from_expr : AST::Node)
-    raise NotImplementedError.new("") if @loop_break_stack.empty?
+    raise NotImplementedError.new("inconsistent stack") if @loop_break_stack.empty?
 
     break_stack_tuple = @loop_break_stack.last.not_nil!
     typ = break_stack_tuple[3]
@@ -3265,6 +3311,7 @@ class Mare::Compiler::CodeGen
     break_stack_tuple[2] << gen_assign_cast(value, typ, from_expr)
 
     @builder.br(break_stack_tuple[0])
+    .tap { finish_block_and_move_to(gen_block("unreachable_after_break")) }
   end
 
   def gen_yield(expr : AST::Yield)
@@ -3336,7 +3383,7 @@ class Mare::Compiler::CodeGen
       yield_in_param_index += 1 if gfunc.needs_receiver?
       func_frame.llvm_func.params[yield_in_param_index]
     else
-      gfunc.continuation_info.yield_in_type.undef
+      gfunc.continuation_info.yield_in_llvm_type.undef
     end
   end
 

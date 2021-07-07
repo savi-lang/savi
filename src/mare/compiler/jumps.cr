@@ -115,9 +115,7 @@ module Mare::Compiler::Jumps
 
     def initialize(@analysis, @classify, @function : AST::Function, @ctx : Context)
       @stack = [] of (AST::Loop | AST::Try)
-    end
-
-    def find_first_parent_of_type(node, type : AST::Node.class) : AST::Node?
+      @pre_stack = [] of (AST::Group)
     end
 
     # We don't deal with type expressions at all.
@@ -127,6 +125,17 @@ module Mare::Compiler::Jumps
 
     def visit_pre(ctx, node : (AST::Loop | AST::Try))
       @stack << node
+    end
+
+    def visit_pre(ctx, node : AST::Call)
+      node.yield_block.try { |yield_block| @pre_stack << yield_block }
+    end
+
+    def visit_pre(ctx, node : AST::Group)
+      if @pre_stack.includes?(node)
+        @pre_stack.delete(node)
+        @stack << node
+      end
     end
 
     # This visitor never replaces nodes, it just touches them and returns them.
@@ -161,7 +170,7 @@ module Mare::Compiler::Jumps
         else
         end
 
-        loop_node = @stack.reverse.find(&.is_a?(AST::Loop | AST::Yield))
+        loop_node = @stack.reverse.find(&.is_a?(AST::Loop | AST::Group))
 
         Error.at node,
           "Expected to be used in loops" unless loop_node

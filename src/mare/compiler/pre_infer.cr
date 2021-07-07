@@ -564,6 +564,16 @@ module Mare::Compiler::PreInfer
         new_info = Infer::TowardCallYieldIn.new(yield_block.pos, layer(node), call)
         @analysis[yield_block].add_downstream(yield_block.pos, new_info)
         @analysis.observe_extra_info(new_info)
+
+        # If there are next jumps caught by the yield block, they are observed
+        # by the info node representing the "toward yield in" value.
+        # If there are break jumps caught by the yield block, they are observed
+        # by the info node representing the final call result.
+        @jumps.catches[yield_block]?.try(&.each { |jump|
+          jump_info = @analysis[jump]
+          new_info.observe_next(jump_info) if jump_info.is_a?(Infer::JumpNext)
+          call.observe_break(jump_info) if jump_info.is_a?(Infer::JumpBreak)
+        })
       end
     end
 

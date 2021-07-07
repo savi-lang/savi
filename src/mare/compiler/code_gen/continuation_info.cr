@@ -12,7 +12,11 @@ class Mare::Compiler::CodeGen
 
     def yield_in_type
       mt = gfunc.reified.meta_type_of_yield_in(ctx, gfunc.infer).not_nil!
-      g.llvm_type_of(ctx.reach[mt])
+      ctx.reach[mt]
+    end
+
+    def yield_in_llvm_type
+      g.llvm_type_of(yield_in_type)
     end
 
     def self.virtual_struct_type(g, concrete_gfuncs)

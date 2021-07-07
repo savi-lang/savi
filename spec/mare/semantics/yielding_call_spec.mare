@@ -1,0 +1,56 @@
+:import "../micro_test" (MicroTest)
+
+:primitive Yielding
+  :fun call(count_remaining U64, array Array(String)) U64
+  :yields U64 for String
+    while (count_remaining > 0) (
+      array << yield count_remaining
+      count_remaining -= 1
+    )
+    array << "."
+    count_remaining
+
+:primitive YieldingCallSpec
+  :fun run(test MicroTest)
+    array Array(String) = []
+    total U64 = 0
+
+    test["yielding call; yielding zero times"].pass = (
+      total = 0, array = []
+      Yielding.call(0, array) -> (n | total += n, "never")
+      == 0 && total == 0 && array == ["."]
+    )
+
+    test["yielding call; yielding three times"].pass = (
+      total = 0, array = []
+      Yielding.call(3, array) -> (n | total += n, "yo")
+      == 0 && total == 6 && array == ["yo", "yo", "yo", "."]
+    )
+
+    test["yielding call; yielding twice, then disrupted by error"].pass = (
+      total = 0, array = []
+      try (
+        Yielding.call(3, array) -> (n | if (n == 1) error!, total += n, "yo")
+      |
+        U64[33]
+      )
+      == 33 && total == 5 && array == ["yo", "yo"]
+    )
+
+    test["yielding call; yielding twice, then disrupted by break"].pass = (
+      total = 0, array = []
+      Yielding.call(3, array) -> (n | if (n == 1) (break 33), total += n, "yo")
+      == 33 && total == 5 && array == ["yo", "yo"]
+    )
+
+    test["yielding call; yielding three times, not disrupted by break"].pass = (
+      total = 0, array = []
+      Yielding.call(3, array) -> (n | if (n == 0) (break 33), total += n, "yo")
+      == 0 && total == 6 && array == ["yo", "yo", "yo", "."]
+    )
+
+    test["yielding call; yielding three times, sometimes with next"].pass = (
+      total = 0, array = []
+      Yielding.call(3, array) -> (n | if (n != 3) (next "ho"), total += n, "yo")
+      == 0 && total == 3 && array == ["yo", "ho", "ho", "."]
+    )

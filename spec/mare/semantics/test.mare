@@ -1,10 +1,5 @@
 :import "../micro_test" (MicroTest)
 
-:primitive _EarlyReturn
-  :fun non conditional(early Bool) U64
-    if early (return 33)
-    11
-
 :class Container(A)
   :var value A
   :new (@value)
@@ -21,6 +16,7 @@
     TrySpec.run(test)
     WhileSpec.run(test)
     ReturnSpec.run(test)
+    YieldingCallSpec.run(test)
     ReflectionSpec.run(test)
     SourceCodeSpec.run(test)
     DisplacingAssignmentSpec.run(test)

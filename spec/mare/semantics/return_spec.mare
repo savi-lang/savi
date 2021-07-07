@@ -1,9 +1,18 @@
 :import "../micro_test" (MicroTest)
 
+:primitive _EarlyReturn
+  :fun non conditional(early Bool) U64
+    if early (
+      return 33
+      // Prove that codegen doesn't choke on unreachable code after return.
+      totally = "unreachable"
+    )
+    11
+
 :primitive ReturnSpec
   :fun run(test MicroTest)
     test["return; with early return value"].pass =
       U64[33] == _EarlyReturn.conditional(True)
 
-    test["return; with early return value"].pass =
+    test["return; without early return value"].pass =
       U64[11] == _EarlyReturn.conditional(False)
