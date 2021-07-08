@@ -117,34 +117,14 @@ class Mare::Compiler::Macros < Mare::AST::CopyOnMutateVisitor
       ])
       visit_try(node)
     elsif Util.match_ident?(node, 0, "yield")
-      Util.require_terms(node, [
-        nil,
-        "the value to be yielded out to the calling function",
-      ])
       visit_yield(node)
     elsif Util.match_ident?(node, 0, "return")
-      Util.require_terms(node, [
-        nil,
-        "the value to return",
-      ])
       visit_jump(node, AST::Jump::Kind::Return)
     elsif Util.match_ident?(node, 0, "error!")
-      Util.require_terms(node, [
-        nil,
-        "the error to raise",
-      ])
       visit_jump(node, AST::Jump::Kind::Error)
     elsif Util.match_ident?(node, 0, "break")
-      Util.require_terms(node, [
-        nil,
-        "the value to break loop with",
-      ])
       visit_jump(node, AST::Jump::Kind::Break)
     elsif Util.match_ident?(node, 0, "next")
-      Util.require_terms(node, [
-        nil,
-        "the value to continue the next loop iteration with",
-      ])
       visit_jump(node, AST::Jump::Kind::Next)
     elsif Util.match_ident?(node, 0, "source_code_position_of_argument")
       Util.require_terms(node, [
@@ -440,6 +420,32 @@ class Mare::Compiler::Macros < Mare::AST::CopyOnMutateVisitor
   end
 
   def visit_yield(node : AST::Group)
+    if Util.match_ident?(node, 2, "if")
+      Util.require_terms(node, [
+        nil,
+        "the value to be yielded out to the calling function",
+        nil,
+        "the condition that causes it to yield",
+      ])
+      visit_conditional_yield(node, cond: node.terms[3])
+    elsif Util.match_ident?(node, 2, "unless")
+      Util.require_terms(node, [
+        nil,
+        "the value to be yielded out to the calling function",
+        nil,
+        "the condition that prevents it from yielding",
+      ])
+      visit_conditional_yield(node, cond: node.terms[3], negate: true)
+    else
+      Util.require_terms(node, [
+        nil,
+        "the value to be yielded out to the calling function",
+      ])
+      visit_unconditional_yield(node)
+    end
+  end
+
+  def visit_unconditional_yield(node : AST::Group)
     orig = node.terms[0]
     term = node.terms[1]
 
@@ -455,12 +461,114 @@ class Mare::Compiler::Macros < Mare::AST::CopyOnMutateVisitor
     ] of AST::Term).from(node)
   end
 
-  def visit_jump(node : AST::Group, kind : AST::Jump::Kind)
+  def visit_conditional_yield(
+    node : AST::Group,
+    cond : AST::Term,
+    negate : Bool = false,
+  )
     orig = node.terms[0]
-    term = node.terms[1]? || AST::Identifier.new("None").from(orig)
+    term = node.terms[1]
+
+    terms =
+      if term.is_a?(AST::Group) && term.style == "("
+        term.terms
+      else
+        [term]
+      end
+
+    yield_node = AST::Yield.new(terms).from(orig)
+    none = AST::Identifier.new("None").from(node)
+
+    AST::Group.new("(", [
+      AST::Choice.new([
+        {cond,                                   negate ? none : yield_node},
+        {AST::Identifier.new("True").from(node), negate ? yield_node : none},
+      ]).from(orig),
+    ] of AST::Term).from(node)
+  end
+
+  def visit_jump(node : AST::Group, kind : AST::Jump::Kind)
+    ing_word, describe_action, describe_value =
+      case kind
+      when AST::Jump::Kind::Return
+        {"returning", "return early", "value to return"}
+      when AST::Jump::Kind::Error
+        {"raising", "raise an error", "error value to raise"}
+      when AST::Jump::Kind::Break
+        {"breaking", "break the iteration", "result value to break iteration with"}
+      when AST::Jump::Kind::Next
+        {"skipping", "skip to the next iteration", "value to finish this block with"}
+      else
+        raise NotImplementedError.new(kind)
+      end
+    describe_action_ing = describe_action.sub(/\w+/, ing_word)
+
+    if Util.match_ident?(node, 1, "if")
+      Util.require_terms(node, [
+        nil,
+        nil,
+        "the condition that causes it to #{describe_action}",
+      ])
+      visit_conditional_jump(node, kind, cond: node.terms[2])
+    elsif Util.match_ident?(node, 1, "unless")
+      Util.require_terms(node, [
+        nil,
+        nil,
+        "the condition that prevents it from #{describe_action_ing}",
+      ])
+      visit_conditional_jump(node, kind, cond: node.terms[2], negate: true)
+    elsif Util.match_ident?(node, 2, "if")
+      Util.require_terms(node, [
+        nil,
+        "the #{describe_value}",
+        nil,
+        "the condition that causes it to #{describe_action}",
+      ])
+      visit_conditional_jump(node, kind, term: node.terms[1], cond: node.terms[3])
+    elsif Util.match_ident?(node, 2, "unless")
+      Util.require_terms(node, [
+        nil,
+        "the #{describe_value}",
+        nil,
+        "the condition that prevents it from #{describe_action_ing}",
+      ])
+      visit_conditional_jump(node, kind, term: node.terms[1], cond: node.terms[3], negate: true)
+    else
+      Util.require_terms(node, [
+        nil,
+        "the #{describe_value}",
+      ])
+      visit_unconditional_jump(node, kind)
+    end
+  end
+
+  def visit_unconditional_jump(node : AST::Group, kind : AST::Jump::Kind)
+    orig = node.terms[0]
+    term = node.terms[1]
 
     AST::Group.new("(", [
       AST::Jump.new(term, kind).from(orig)
+    ] of AST::Term).from(node)
+  end
+
+  def visit_conditional_jump(
+    node : AST::Group,
+    kind : AST::Jump::Kind,
+    cond : AST::Term,
+    term : AST::Term? = nil,
+    negate : Bool = false,
+  )
+    orig = node.terms[0]
+    term ||= AST::Identifier.new("None").from(orig)
+
+    jump = AST::Jump.new(term, kind).from(orig)
+    none = AST::Identifier.new("None").from(node)
+
+    AST::Group.new("(", [
+      AST::Choice.new([
+        {cond,                                   negate ? none : jump},
+        {AST::Identifier.new("True").from(node), negate ? jump : none},
+      ]).from(orig),
     ] of AST::Term).from(node)
   end
 
