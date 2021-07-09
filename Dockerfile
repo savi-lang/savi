@@ -28,10 +28,6 @@ RUN sh -c 'clang++ -v -c \
   -o /usr/lib/crystal/core/llvm/ext/llvm_ext.o \
   /usr/lib/crystal/core/llvm/ext/llvm_ext.cc `llvm-config --cxxflags`'
 
-# Add Pony patches that we needto be able to build it correctly here.
-RUN mkdir /tmp/patches
-COPY ponypatches/* /tmp/patches/
-
 # Install Pony runtime bitcode.
 # TODO: Use specific tag for `PONYC_VERSION` instead of `main` at next release.
 # The commands we use below to build the bitcode currently only work on `main`.
@@ -43,7 +39,8 @@ ENV CC=clang
 ENV CXX=clang++
 RUN git clone -b ${PONYC_VERSION} --depth 1 ${PONYC_GIT_URL} /tmp/ponyc && \
     cd /tmp/ponyc && \
-    git apply /tmp/patches/* && \
+    sed -i 's/SO_RCVTIMEO/SO_RCVTIMEO_OLD/g' src/libponyrt/lang/socket.c && \
+    sed -i 's/SO_SNDTIMEO/SO_SNDTIMEO_OLD/g' src/libponyrt/lang/socket.c && \
     mkdir src/libponyrt/build && \
     cmake -S src/libponyrt -B src/libponyrt/build -DPONY_RUNTIME_BITCODE=true && \
     cmake --build src/libponyrt/build --target libponyrt_bc && \
