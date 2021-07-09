@@ -452,12 +452,43 @@
     @_space = offset
     --chopped
 
+  :: Read a U16 from the bytes at the given offset, with native byte order.
+  :: This is not suitable for protocols using a platform-independent byte order.
+  :: Raises an error if there aren't enough bytes at that offset to fill a U16.
+  :fun read_native_u16!(offset USize) U16
+    if ((offset + U16.byte_width.usize) > @_size) error!
+    CPointer(U16).from_usize(@_ptr._offset(offset).usize)._unsafe._get_at(0)
+
+  :: Read a U16 from the bytes at the given offset, with big endian byte order.
+  :: Raises an error if there aren't enough bytes at that offset to fill a U16.
+  :fun read_be_u16!(offset USize) U16
+    number = @read_native_u16!(offset)
+    if (Platform.big_endian) (number | number.swap_bytes)
+
+  :: Read a U16 from the bytes at the given offset, with little endian byte order.
+  :: Raises an error if there aren't enough bytes at that offset to fill a U16.
+  :fun read_le_u16!(offset USize) U16
+    number = @read_native_u16!(offset)
+    if (Platform.little_endian) (number | number.swap_bytes)
+
   :: Read a U32 from the bytes at the given offset, with native byte order.
   :: This is not suitable for protocols using a platform-independent byte order.
   :: Raises an error if there aren't enough bytes at that offset to fill a U32.
   :fun read_native_u32!(offset USize) U32
     if ((offset + U32.byte_width.usize) > @_size) error!
     CPointer(U32).from_usize(@_ptr._offset(offset).usize)._unsafe._get_at(0)
+
+  :: Read a U32 from the bytes at the given offset, with big endian byte order.
+  :: Raises an error if there aren't enough bytes at that offset to fill a U32.
+  :fun read_be_u32!(offset USize) U32
+    number = @read_native_u32!(offset)
+    if (Platform.big_endian) (number | number.swap_bytes)
+
+  :: Read a U32 from the bytes at the given offset, with little endian byte order.
+  :: Raises an error if there aren't enough bytes at that offset to fill a U32.
+  :fun read_le_u32!(offset USize) U32
+    number = @read_native_u32!(offset)
+    if (Platform.little_endian) (number | number.swap_bytes)
 
   :: Write a U32 as bytes starting at the given offset, in native byte order.
   :: This is not suitable for protocols using a platform-independent byte order.
@@ -484,6 +515,18 @@
   :fun read_native_u64!(offset USize) U64
     if ((offset + U64.byte_width.usize) > @_size) error!
     CPointer(U64).from_usize(@_ptr._offset(offset).usize)._unsafe._get_at(0)
+
+  :: Read a U64 from the bytes at the given offset, with big endian byte order.
+  :: Raises an error if there aren't enough bytes at that offset to fill a U64.
+  :fun read_be_u64!(offset USize) U64
+    number = @read_native_u64!(offset)
+    if (Platform.big_endian) (number | number.swap_bytes)
+
+  :: Read a U64 from the bytes at the given offset, with little endian byte order.
+  :: Raises an error if there aren't enough bytes at that offset to fill a U64.
+  :fun read_le_u64!(offset USize) U64
+    number = @read_native_u64!(offset)
+    if (Platform.little_endian) (number | number.swap_bytes)
 
   :: Write a U64 as bytes starting at the given offset, in native byte order.
   :: This is not suitable for protocols using a platform-independent byte order.

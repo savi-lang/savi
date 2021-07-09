@@ -923,6 +923,10 @@ class Mare::Compiler::CodeGen
         gen_bool(abi_size_of(@isize) == 4)
       when "lp64"
         gen_bool(abi_size_of(@isize) == 8)
+      when "big_endian"
+        gen_bool(@target_machine.data_layout.big_endian?)
+      when "little_endian"
+        gen_bool(@target_machine.data_layout.little_endian?)
       else
         raise NotImplementedError.new(gfunc.func.ident.value)
       end
@@ -1203,6 +1207,11 @@ class Mare::Compiler::CodeGen
         case bit_width_of(gtype)
         when 1, 8
           params[0]
+        when 16
+          op_func =
+            @mod.functions["llvm.bswap.i16"]? ||
+              @mod.functions.add("llvm.bswap.i16", [@i16], @i16)
+          @builder.call(op_func, [params[0]])
         when 32
           op_func =
             @mod.functions["llvm.bswap.i32"]? ||
