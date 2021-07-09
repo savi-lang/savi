@@ -28,21 +28,26 @@ RUN sh -c 'clang++ -v -c \
   -o /usr/lib/crystal/core/llvm/ext/llvm_ext.o \
   /usr/lib/crystal/core/llvm/ext/llvm_ext.cc `llvm-config --cxxflags`'
 
-# Add pony patches
+# Add Pony patches that we needto be able to build it correctly here.
 RUN mkdir /tmp/patches
 COPY ponypatches/* /tmp/patches/
 
-# Install Pony runtime (as shared library, static library, and bitcode).
-ENV PONYC_VERSION 0.35.1
+# Install Pony runtime bitcode.
+# TODO: Use specific tag for `PONYC_VERSION` instead of `main` at next release.
+# The commands we use below to build the bitcode currently only work on `main`.
+# Specifically we need this commit to be present in the release we use:
+# - https://github.com/ponylang/ponyc/commit/c043e9da809b4494783abb66365f5deea099e816
+ENV PONYC_VERSION main
 ENV PONYC_GIT_URL https://github.com/ponylang/ponyc
+ENV CC=clang
+ENV CXX=clang++
 RUN git clone -b ${PONYC_VERSION} --depth 1 ${PONYC_GIT_URL} /tmp/ponyc && \
     cd /tmp/ponyc && \
     git apply /tmp/patches/* && \
-    make runtime-bitcode=yes verbose=yes config=debug cross-libponyrt && \
-    clang -shared -fpic -pthread -ldl -latomic -lexecinfo -o libponyrt.so build/native/build_debug/src/libponyrt/libponyrt.bc && \
-    sudo mv libponyrt.so /usr/lib/ && \
-    sudo cp build/native/build_debug/src/libponyrt/libponyrt.bc /usr/lib/ && \
-    sudo cp build/native/build_debug/src/libponyrt/libponyrt.a /usr/lib/ && \
+    mkdir src/libponyrt/build && \
+    cmake -S src/libponyrt -B src/libponyrt/build -DPONY_RUNTIME_BITCODE=true && \
+    cmake --build src/libponyrt/build --target libponyrt_bc && \
+    sudo cp src/libponyrt/build/libponyrt.bc /usr/lib/ && \
     rm -rf /tmp/ponyc
 
 # Install Verona runtime (as shared library and static library).
@@ -95,8 +100,7 @@ RUN apk add --no-cache --update \
     llvm11-dev llvm11-static \
     crystal shards
 
-# TODO: Don't bother with every possible libponyrt distribution format.
-COPY --from=dev /usr/lib/libponyrt.* \
+COPY --from=dev /usr/lib/libponyrt.bc \
                 /usr/lib/
 COPY --from=dev /usr/lib/crystal/core/llvm/ext/llvm_ext.o \
                 /usr/lib/crystal/core/llvm/ext/
@@ -121,11 +125,7 @@ RUN apk add --no-cache --update \
 RUN mkdir /opt/code
 WORKDIR /opt/code
 
-# TODO: Don't bother with every possible libponyrt distribution format.
-COPY --from=dev /usr/lib/libponyrt.so \
-                /usr/lib/
-COPY --from=dev /usr/lib/libponyrt.a \
-                /usr/lib/libponyrt.bc \
+COPY --from=dev /usr/lib/libponyrt.bc \
                 /usr/lib/
 
 COPY src/prelude /opt/mare/src/prelude

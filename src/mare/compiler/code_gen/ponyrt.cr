@@ -126,7 +126,7 @@ class Mare::Compiler::CodeGen::PonyRT
       {"pony_ctx", [] of LLVM::Type, @ptr, [
         LLVM::Attribute::NoUnwind, LLVM::Attribute::ReadNone,
       ]},
-      {"pony_create", [@ptr, @desc_ptr], @obj_ptr, [
+      {"pony_create", [@ptr, @desc_ptr, @i1], @obj_ptr, [
         LLVM::Attribute::NoUnwind, LLVM::Attribute::InaccessibleMemOrArgMemOnly,
         {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::NoAlias},
         {LLVM::AttributeIndex::ReturnIndex, LLVM::Attribute::Dereferenceable, align_width + ACTOR_PAD_SIZE},
@@ -561,7 +561,7 @@ class Mare::Compiler::CodeGen::PonyRT
     g.func_frame.alloc_ctx = alloc_ctx
 
     # Create the main actor and become it.
-    main_actor = gen_alloc_actor(g, g.gtype_main, "main", true)
+    main_actor = gen_alloc_actor(g, g.gtype_main, nil, "main", become_now: true)
 
     # TODO: Create the Env from argc, argv, and envp.
     env = gen_alloc(g, g.gtypes["Env"], nil, "env")
@@ -635,10 +635,10 @@ class Mare::Compiler::CodeGen::PonyRT
 
   # This generates the code that allocates an object of the given type.
   # This is the first step before actually calling the constructor of it.
-  def gen_alloc(g : CodeGen, gtype : GenType, _from_expr, name : String)
+  def gen_alloc(g : CodeGen, gtype : GenType, from_expr : AST::Node?, name : String)
     object =
       if gtype.type_def.is_actor?(g.ctx)
-        gen_alloc_actor(g, gtype, name)
+        gen_alloc_actor(g, gtype, from_expr, name)
       else
         gen_alloc_struct(g, gtype.struct_type, name)
       end
@@ -671,10 +671,17 @@ class Mare::Compiler::CodeGen::PonyRT
 
   # This generates the special kind of allocation needed by actors,
   # invoked by the above function when the type being allocated is an actor.
-  def gen_alloc_actor(g : CodeGen, gtype : GenType, name, become_now = false)
+  def gen_alloc_actor(g : CodeGen, gtype : GenType, from_expr : AST::Node?, name, become_now = false)
+    # If it's statically known that the calling actor can't possibly capture a
+    # reference to the new actor, because the result value of the constructor
+    # call is discarded at the immediate syntax level, we can make certain
+    # optimizations related to the actor reference count and the cycle detector.
+    no_inc_rc = from_expr && g.func_frame.classify.value_not_needed?(from_expr)
+
     allocated = g.builder.call(g.mod.functions["pony_create"], [
       g.alloc_ctx,
       g.gen_get_desc_opaque(gtype),
+      @i1.const_int(no_inc_rc ? 1 : 0)
     ], "#{name}.OPAQUE")
 
     if become_now
