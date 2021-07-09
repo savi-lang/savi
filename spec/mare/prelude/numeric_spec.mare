@@ -255,6 +255,7 @@
     @assert = U8[18].invert         == 0b11101101
     @assert = U8[18].reverse_bits   == 0b01001000
     @assert = U8[18].swap_bytes     == 18
+    @assert = U16[0x1234].swap_bytes == 0x3412
     @assert = U32[66052].swap_bytes == 67240192
     @assert = U8[18].leading_zeros  == 3
     @assert = U8[18].trailing_zeros == 1

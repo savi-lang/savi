@@ -9,3 +9,6 @@
       (if Platform.ilp32 (1 | 0)) +
       (if Platform.lp64  (1 | 0)) +
       (if Platform.llp64 (1 | 0))
+
+  :it "is either big or little endian"
+    @assert = Platform.big_endian == !Platform.little_endian

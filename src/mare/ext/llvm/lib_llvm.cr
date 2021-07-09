@@ -20,4 +20,11 @@ lib LibLLVM
   fun const_shl = LLVMConstShl(lhs : ValueRef, rhs : ValueRef) : ValueRef
   fun build_is_null = LLVMBuildIsNull(builder : BuilderRef, value : ValueRef, name : UInt8*) : ValueRef
   fun build_is_not_null = LLVMBuildIsNotNull(builder : BuilderRef, value : ValueRef, name : UInt8*) : ValueRef
+
+  enum ByteOrdering
+    BigEndian
+    LittleEndian
+  end
+
+  fun byte_order = LLVMByteOrder(TargetDataRef) : ByteOrdering
 end
