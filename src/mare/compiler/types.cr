@@ -21,9 +21,9 @@ module Mare::Compiler::Types
 
       @by_node = {} of AST::Node => AlgebraicType
       @by_ref = {} of Refer::Info => AlgebraicType
-      @type_vars = [] of {TypeVariable, Source::Pos}
-      @bindings = Set({TypeVariable, AlgebraicType}).new
-      @assignments = Set({TypeVariable, AlgebraicType}).new
+      @type_vars = [] of TypeVariable
+      @bindings = Set({Source::Pos, TypeVariable, AlgebraicType}).new
+      @assignments = Set({Source::Pos, TypeVariable, AlgebraicType}).new
     end
 
     def [](info : Info); @by_node[info]; end
@@ -35,23 +35,24 @@ module Mare::Compiler::Types
 
     def show_type_variables_list
       String.build { |output|
-        @type_vars.each { |var, pos|
+        @type_vars.each { |var|
           output << "#{var.show}\n"
-          @bindings.select(&.first.==(var)).each { |_, rhs|
+          @bindings.select(&.[](1).==(var)).each { |pos, _, rhs|
             output << "  := #{rhs.show}\n"
+            output << "  #{pos.show.split("\n")[1..-1].join("\n  ")}\n"
           }
-          @assignments.select(&.first.==(var)).each { |_, rhs|
+          @assignments.select(&.[](1).==(var)).each { |pos, _, rhs|
             output << "  |= #{rhs.show}\n"
+            output << "  #{pos.show.split("\n")[1..-1].join("\n  ")}\n"
           }
-          output << "#{pos.show}\n"
           output << "\n"
         }
       }
     end
 
-    private def new_type_var(nickname, pos)
+    private def new_type_var(nickname)
       TypeVariable.new(nickname, @scope, @sequence_number += 1).tap { |var|
-        @type_vars << {var, pos}
+        @type_vars << var
       }
     end
 
@@ -66,10 +67,10 @@ module Mare::Compiler::Types
     end
 
     protected def init_func_self(cap : String, pos : Source::Pos)
-      @for_self = new_type_var("@", pos).tap { |var|
+      @for_self = new_type_var("@").tap { |var|
         self_type = @parent.not_nil!.value.for_self
         self_cap = new_cap_var("@") # TODO: add constraint for func cap
-        @bindings << {var, self_type.intersect(self_cap)}
+        @bindings << {pos, var, self_type.intersect(self_cap)}
       }.as(AlgebraicType)
     end
 
@@ -87,7 +88,7 @@ module Mare::Compiler::Types
     end
 
     protected def observe_local_reference(node, ref)
-      var = @by_ref[ref] ||= new_type_var(ref.name, node.pos)
+      var = @by_ref[ref] ||= new_type_var(ref.name)
       @by_node[node] = var.aliased
     end
 
@@ -99,10 +100,10 @@ module Mare::Compiler::Types
       var = @by_ref[ref].as(TypeVariable)
 
       explicit = AST::Extract.param(node.lhs)[1]
-      @bindings << {var, @by_node[explicit]} if explicit
+      @bindings << {explicit.pos, var, @by_node[explicit]} if explicit
 
       rhs = @by_node[node.rhs].stabilized
-      @assignments << {var, rhs}
+      @assignments << {node.pos, var, rhs}
 
       @by_node[node] = var.aliased
     end
