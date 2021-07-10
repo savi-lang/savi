@@ -13,7 +13,9 @@ require "./pass/analyze"
 module Mare::Compiler::Types
   struct Analysis
     protected getter scope : Program::Function::Link | Program::Type::Link | Program::TypeAlias::Link
+    protected getter parent : StructRef(Analysis)?
     protected getter! for_self : AlgebraicType
+    protected getter! type_param_vars : Array(TypeVariable)
 
     def initialize(@scope, parent : Analysis? = nil)
       @parent = parent ? StructRef(Analysis).new(parent) : nil
@@ -23,31 +25,63 @@ module Mare::Compiler::Types
       @by_ref = {} of Refer::Info => AlgebraicType
       @type_vars = [] of TypeVariable
       @bindings = Set({Source::Pos, TypeVariable, AlgebraicType}).new
+      @constraints = Set({Source::Pos, AlgebraicType, TypeVariable}).new
       @assignments = Set({Source::Pos, TypeVariable, AlgebraicType}).new
+      @assertions = Set({Source::Pos, AlgebraicType, AlgebraicType}).new
+      @from_call_returns = Set({Source::Pos, TypeVariable, AST::Call}).new
     end
 
-    def [](info : Info); @by_node[info]; end
-    def []?(info : Info); @by_node[info]?; end
+    def [](node : AST::Node); @by_node[node]; end
+    def []?(node : AST::Node); @by_node[node]?; end
 
-    protected def []=(info : Info, alg : AlgebraicType)
-      @by_node[info] = alg
+    protected def []=(node : AST::Node, alg : AlgebraicType)
+      @by_node[node] = alg
     end
 
     def show_type_variables_list
-      String.build { |output|
-        @type_vars.each { |var|
-          output << "#{var.show}\n"
-          @bindings.select(&.[](1).==(var)).each { |pos, _, rhs|
-            output << "  := #{rhs.show}\n"
-            output << "  #{pos.show.split("\n")[1..-1].join("\n  ")}\n"
-          }
-          @assignments.select(&.[](1).==(var)).each { |pos, _, rhs|
-            output << "  |= #{rhs.show}\n"
-            output << "  #{pos.show.split("\n")[1..-1].join("\n  ")}\n"
-          }
-          output << "\n"
+      String.build { |output| show_type_variables_list(output) }
+    end
+
+    def show_type_variables_list(output)
+      parent = @parent
+      if parent
+        parent.show_type_variables_list(output)
+        output << "~~~\n"
+      end
+
+      @type_vars.each_with_index { |var, index|
+        output << "\n" if index > 0
+        output << "#{var.show}\n"
+        @bindings.select(&.[](1).==(var)).each { |pos, _, explicit|
+          output << "  := #{explicit.show}\n"
+          output << "  #{pos.show.split("\n")[1..-1].join("\n  ")}\n"
+        }
+        @constraints.select(&.[](2).==(var)).each { |pos, sup, _|
+          output << "  <: #{sup.show}\n"
+          output << "  #{pos.show.split("\n")[1..-1].join("\n  ")}\n"
+        }
+        @assignments.select(&.[](1).==(var)).each { |pos, _, sub|
+          output << "  :> #{sub.show}\n"
+          output << "  #{pos.show.split("\n")[1..-1].join("\n  ")}\n"
+        }
+        @from_call_returns.select(&.[](1).==(var)).each { |pos, _, call|
+          receiver = @by_node[call.receiver]
+          output << "  :> #{
+            @by_node[call.receiver].show
+          }.#{
+            call.ident.value
+          }\n"
+          output << "  #{pos.show.split("\n")[1..-1].join("\n  ")}\n"
         }
       }
+      if @assertions.any?
+        output << "~~~\n"
+        @assertions.each_with_index { |(pos, lhs, rhs), index|
+          output << "\n" if index > 0
+          output << "  #{lhs.show} :> #{rhs.show}\n"
+          output << "  #{pos.show.split("\n")[1..-1].join("\n  ")}\n"
+        }
+      end
     end
 
     private def new_type_var(nickname)
@@ -60,10 +94,31 @@ module Mare::Compiler::Types
       CapVariable.new(nickname, @scope, @sequence_number += 1)
     end
 
-    protected def init_type_self(params : AST::Group?)
-      raise NotImplementedError.new("init_type_self with params") if params
+    protected def init_type_self(
+      params : Array({AST::Term, AlgebraicType?, AlgebraicType?})?
+    )
+      @type_param_vars = params.try(&.map { |param, _, _|
+        ident = AST::Extract.type_param(param).first
+        new_type_var(ident.value)
+      })
 
-      @for_self = NominalType.new(scope.as(Program::Type::Link))
+      params.try(&.each_with_index { |info, index|
+        param, explicit_type, default_type = info
+        ident, explicit, default = AST::Extract.type_param(param)
+        var = @type_param_vars.not_nil![index]
+
+        @by_node[param] = var
+        @by_node[ident] = var
+        @by_node[explicit] = explicit_type.not_nil! if explicit
+        @by_node[default] = default_type.not_nil! if default
+
+        @constraints << {explicit.pos, explicit_type.not_nil!, var} if explicit
+      })
+
+      @for_self = NominalType.new(
+        scope.as(Program::Type::Link),
+        @type_param_vars.try(&.map(&.as(AlgebraicType))),
+      )
     end
 
     protected def init_func_self(cap : String, pos : Source::Pos)
@@ -74,13 +129,16 @@ module Mare::Compiler::Types
       }.as(AlgebraicType)
     end
 
-    protected def observe_algebraic_type(node, algebraic_type : AlgebraicType)
-      @by_node[node] = algebraic_type
-    end
-
     protected def observe_prelude_type(ctx, node, name, cap)
       t_link = ctx.namespace.prelude_type(name)
       @by_node[node] = NominalType.new(t_link).intersect(NominalCap.new(cap))
+    end
+
+    protected def observe_assert_bool(ctx, node)
+      t_link = ctx.namespace.prelude_type("Bool")
+      bool = NominalType.new(t_link).intersect(NominalCap.new("val"))
+      rhs = @by_node[node]
+      @assertions << {node.pos, bool, rhs}
     end
 
     protected def observe_self_reference(node, ref)
@@ -90,10 +148,6 @@ module Mare::Compiler::Types
     protected def observe_local_reference(node, ref)
       var = @by_ref[ref] ||= new_type_var(ref.name)
       @by_node[node] = var.aliased
-    end
-
-    protected def observe_transitive(to_node, from_node)
-      @by_node[to_node] = @by_node[from_node]
     end
 
     protected def observe_assignment(node, ref)
@@ -106,6 +160,25 @@ module Mare::Compiler::Types
       @assignments << {node.pos, var, rhs}
 
       @by_node[node] = var.aliased
+    end
+
+    protected def observe_param(node, ref)
+      ident, explicit, default = AST::Extract.param(node)
+      var = @by_ref[ref].as(TypeVariable)
+
+      # Params differ from local variables in that their explicit type
+      # creates a constraint rather than a fully-equivalent binding.
+      @constraints << {explicit.pos, @by_node[explicit], var} if explicit
+
+      @assignments << {node.pos, var, @by_node[default].stabilized} if default
+
+      @by_node[node] = var.aliased
+    end
+
+    protected def observe_call(node)
+      var = new_type_var(node.ident.value)
+      @by_node[node] = var
+      @from_call_returns << {node.pos, var, node}
     end
   end
 
@@ -144,7 +217,16 @@ module Mare::Compiler::Types
       root_library = ctx.namespace.root_library(ctx).source_library
       return unless t.ident.pos.source.library == root_library
 
-      @analysis.init_type_self(t.params)
+      @analysis.init_type_self(
+        t.params.try(&.terms.map { |param|
+          ident, explicit, default = AST::Extract.type_param(param)
+          {
+            param,
+            explicit ? read_type_expr(ctx, explicit) : nil,
+            default ? read_type_expr(ctx, default) : nil,
+          }
+        })
+      )
     end
 
     def run_for_function(ctx : Context, f : Program::Function)
@@ -157,7 +239,7 @@ module Mare::Compiler::Types
 
       @analysis.init_func_self(f.cap.value, f.cap.pos)
 
-      f.params.try(&.accept(ctx, self))
+      f.params.try(&.terms.each { |param| visit_param_deeply(ctx, param) })
       f.body.try(&.accept(ctx, self))
     end
 
@@ -165,7 +247,7 @@ module Mare::Compiler::Types
       # Read type expressions using a different, top-down kind of approach.
       # This prevents the normal depth-first visit when false is returned.
       if !@classify || classify.type_expr?(node)
-        @analysis.observe_algebraic_type(node, read_type_expr(ctx, node))
+        @analysis[node] = read_type_expr(ctx, node)
         false
       else
         true
@@ -173,15 +255,36 @@ module Mare::Compiler::Types
     end
 
     def read_type_expr(ctx, node : AST::Identifier)
-      ref = @refer_type[node]
+      ref = @refer_type[node]?
 
       case ref
       when Refer::Type
         t = ref.link.resolve(ctx)
         NominalType.new(ref.link).intersect(NominalCap.new(t.cap.value))
+      when Refer::TypeParam
+        analysis = @analysis
+        while analysis.scope != ref.parent_link
+          analysis = analysis.parent.not_nil!.value
+        end
+        analysis.type_param_vars[ref.index]
       else
         raise NotImplementedError.new(ref.class)
       end
+    end
+
+    def read_type_expr(ctx, node : AST::Qualify)
+      raise NotImplementedError.new(node.to_a) unless node.group.style == "("
+
+      args = node.group.terms.map { |arg|
+        read_type_expr(ctx, arg).as(AlgebraicType)
+      }
+      Intersection.new(
+        read_type_expr(ctx, node.term).as(Intersection).members.map { |member|
+          next member unless member.is_a?(NominalType)
+
+          NominalType.new(member.link, args)
+        }.to_set
+      )
     end
 
     def read_type_expr(ctx, node)
@@ -197,6 +300,23 @@ module Mare::Compiler::Types
         @analysis.observe_self_reference(node, ref)
       when Refer::Local
         @analysis.observe_local_reference(node, ref)
+      when Refer::Type
+        if ref.with_value
+          # We allow it to be resolved as if it were a type expression,
+          # since this enum value literal will have the type of its referent.
+          t = ref.link.resolve(ctx)
+          @analysis[node] = NominalType.new(ref.link).intersect(
+            NominalCap.new(t.cap.value)
+          )
+        else
+          # A type reference whose value is used and is not itself a value
+          # must be marked non, rather than having the default cap for that type.
+          # This is used when we pass a type around as if it were a value,
+          # where that value is a stateless singleton able to call `:fun non`s.
+          @analysis[node] = NominalType.new(ref.link).intersect(
+            NominalCap.new("non")
+          )
+        end
       else
         raise NotImplementedError.new(ref.class)
       end
@@ -207,7 +327,14 @@ module Mare::Compiler::Types
     end
 
     def visit(ctx, node : AST::LiteralString)
-      @analysis.observe_prelude_type(ctx, node, "String", "val")
+      case node.prefix_ident.try(&.value)
+      when nil then @analysis.observe_prelude_type(ctx, node, "String", "val")
+      when "b" then @analysis.observe_prelude_type(ctx, node, "Bytes", "val")
+      else
+        ctx.error_at node.prefix_ident.not_nil!,
+          "This type of string literal is not known; please remove this prefix"
+        @analysis.observe_prelude_type(ctx, node, "String", "val")
+      end
     end
 
     def visit(ctx, node : AST::Group)
@@ -220,7 +347,7 @@ module Mare::Compiler::Types
         if node.terms.empty?
           @analysis.observe_prelude_type(ctx, node, "None", "non")
         else
-          @analysis.observe_transitive(node, node.terms.last)
+          @analysis[node] = @analysis[node.terms.last]
         end
       else raise NotImplementedError.new(node.style)
       end
@@ -229,7 +356,7 @@ module Mare::Compiler::Types
     def visit(ctx, node : AST::Relate)
       case node.op.value
       when "EXPLICITTYPE"
-        # Do nothing here - we'll handle it in the parent node.
+        # Do nothing here - we'll handle it in one of the parent nodes.
       when "="
         ident = AST::Extract.param(node.lhs).first
         ref = refer[ident].as(Refer::Local)
@@ -237,6 +364,29 @@ module Mare::Compiler::Types
       else
         raise NotImplementedError.new(node.op.value)
       end
+    end
+
+    def visit_param_deeply(ctx, node)
+      ident, explicit, default = AST::Extract.param(node)
+      ref = refer[ident].as(Refer::Local)
+
+      ident.accept(ctx, self)
+      explicit.try(&.accept(ctx, self))
+      default.try(&.accept(ctx, self))
+
+      @analysis.observe_param(node, ref)
+    end
+
+    def visit(ctx, node : AST::Choice)
+      node.list.each { |cond, body|
+        @analysis.observe_assert_bool(ctx, cond)
+      }
+      @analysis[node] =
+        Union.from(node.list.map { |cond, body| @analysis[body] })
+    end
+
+    def visit(ctx, node : AST::Call)
+      @analysis.observe_call(node)
     end
 
     def visit(ctx, node)
