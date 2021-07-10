@@ -28,6 +28,7 @@ class Mare::Compiler::Context
   getter subtyping
   getter type_check
   getter type_context
+  getter types
   getter verify
 
   getter options
@@ -68,6 +69,7 @@ class Mare::Compiler::Context
     @subtyping = SubtypingCache.new
     @type_check = TypeCheck.new
     @type_context = TypeContext::Pass.new
+    @types = Types::Pass.new
     @verify = Verify::Pass.new
 
     @link_libraries = Set(String).new

@@ -44,7 +44,7 @@ class Mare::SpecMarkdown
   # while bare text in between those code blocks has a "kind" of `nil`.
   def segments_groups
     main_body.split(/^---$/m).map(&\
-      .scan(/\s*(?:^```(\w+)\n(.*?)^```$\s*|(.+?)\s*(?=^---|\s*^```|\z))/m)
+      .scan(/\s*(?:^```([\w. ]+)\n(.*?)^```$\s*|(.+?)\s*(?=^---|\s*^```|\z))/m)
       .map { |match| match[3]?.try { |text| {nil, text} } || {match[1], match[2]} }
     )
   end
@@ -68,6 +68,8 @@ class Mare::SpecMarkdown
             example.code_blocks << content
           when "error"
             example.expected_errors << content
+          when /^types.type_variables_list (\w+)\.(\w+)$/
+            example.expected_type_variables_lists << {$~[1], $~[2], content}
           else
             raise NotImplementedError.new("compiler spec code block: #{kind}")
           end
@@ -91,6 +93,7 @@ class Mare::SpecMarkdown
     property comments = [] of String
     property code_blocks = [] of String
     property expected_errors = [] of String
+    property expected_type_variables_lists = [] of {String, String, String}
 
     def incomplete?
       code_blocks.empty?
@@ -124,6 +127,7 @@ class Mare::SpecMarkdown
     okay = true
     okay = false unless verify_annotations!(ctx)
     okay = false unless verify_errors!(ctx)
+    okay = false unless verify_other_blocks!(ctx)
     puts "# PASSED: #{@filename}" if okay
     okay
   end
@@ -220,6 +224,52 @@ class Mare::SpecMarkdown
     }
 
     false
+  end
+
+  def verify_other_blocks!(ctx : Compiler::Context) : Bool
+    library = ctx.program.libraries
+      .find { |library| library.source_library == @source_library }
+      .not_nil!
+
+    all_success = true
+
+    examples.each { |example|
+      example.expected_type_variables_lists.each { |t_name, f_name, expected|
+        type = library.types.find(&.ident.value.==(t_name))
+        func = type.try(&.find_func?(f_name))
+        unless func && type
+          puts "---"
+          puts
+          puts example.generated_comments_code
+          puts
+          puts "Missing type variable list function: #{t_name}.#{f_name}"
+          puts
+          all_success = false
+          next
+        end
+
+        f_link = func.make_link(type.make_link(library.make_link))
+        actual = ctx.types[f_link].show_type_variables_list
+
+        unless expected.strip == actual.strip
+          puts "---"
+          puts
+          puts example.generated_comments_code
+          puts
+          puts "Expected type variable list:"
+          puts
+          puts expected
+          puts
+          puts "but actually was:"
+          puts
+          puts actual
+          puts
+          all_success = false
+        end
+      }
+    }
+
+    all_success
   end
 
   def verify_errors!(ctx : Compiler::Context) : Bool

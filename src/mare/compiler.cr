@@ -41,6 +41,7 @@ class Mare::Compiler
     when "type_context"     then :type_context
     when "pre_infer"        then :pre_infer
     when "pre_subtyping"    then :pre_subtyping
+    when "types"            then :types
     when "infer_edge"       then :infer_edge
     when "infer"            then :infer
     when "completeness"     then :completeness
@@ -83,6 +84,7 @@ class Mare::Compiler
       when :type_context     then ctx.run(ctx.type_context)
       when :pre_infer        then ctx.run(ctx.pre_infer)
       when :pre_subtyping    then ctx.run(ctx.pre_subtyping)
+      when :types            then ctx.run(ctx.types)
       when :infer_edge       then ctx.run(ctx.infer_edge)
       when :infer            then ctx.run(ctx.infer)
       when :completeness     then ctx.run(ctx.completeness)
@@ -130,6 +132,7 @@ class Mare::Compiler
     when :type_context then [:flow]
     when :pre_infer then [:local, :refer, :type_context, :inventory, :jumps, :classify, :lambda, :populate]
     when :pre_subtyping then [:inventory, :lambda, :populate]
+    when :types then [:classify, :refer_type, :classify, :refer, :local]
     when :infer_edge then [:pre_subtyping, :pre_infer, :classify, :refer_type]
     when :infer then [:infer_edge]
     when :completeness then [:jumps, :pre_infer]
