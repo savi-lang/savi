@@ -94,18 +94,23 @@ module Mare::Compiler::Types
       CapVariable.new(nickname, @scope, @sequence_number += 1)
     end
 
-    protected def init_type_self(
-      params : Array({AST::Term, AlgebraicType?, AlgebraicType?})?
-    )
-      @type_param_vars = params.try(&.map { |param, _, _|
+    protected def init_type_self(ctx, visitor : Visitor, params : AST::Group?)
+      @type_param_vars = params.try(&.terms.map { |param|
         ident = AST::Extract.type_param(param).first
         new_type_var(ident.value)
       })
 
-      params.try(&.each_with_index { |info, index|
-        param, explicit_type, default_type = info
+      @for_self = NominalType.new(
+        scope.as(Program::Type::Link),
+        @type_param_vars.try(&.map(&.as(AlgebraicType))),
+      )
+
+      params.try(&.terms.each_with_index { |param, index|
         ident, explicit, default = AST::Extract.type_param(param)
         var = @type_param_vars.not_nil![index]
+
+        explicit_type = visitor.read_type_expr(ctx, explicit) if explicit
+        default_type = visitor.read_type_expr(ctx, default) if default
 
         @by_node[param] = var
         @by_node[ident] = var
@@ -114,11 +119,6 @@ module Mare::Compiler::Types
 
         @constraints << {explicit.pos, explicit_type.not_nil!, var} if explicit
       })
-
-      @for_self = NominalType.new(
-        scope.as(Program::Type::Link),
-        @type_param_vars.try(&.map(&.as(AlgebraicType))),
-      )
     end
 
     protected def init_func_self(cap : String, pos : Source::Pos)
@@ -131,12 +131,12 @@ module Mare::Compiler::Types
 
     protected def observe_prelude_type(ctx, node, name, cap)
       t_link = ctx.namespace.prelude_type(name)
-      @by_node[node] = NominalType.new(t_link).intersect(NominalCap.new(cap))
+      @by_node[node] = NominalType.new(t_link).intersect(cap)
     end
 
     protected def observe_assert_bool(ctx, node)
       t_link = ctx.namespace.prelude_type("Bool")
-      bool = NominalType.new(t_link).intersect(NominalCap.new("val"))
+      bool = NominalType.new(t_link).intersect(NominalCap::VAL)
       rhs = @by_node[node]
       @assertions << {node.pos, bool, rhs}
     end
@@ -210,23 +210,7 @@ module Mare::Compiler::Types
     end
 
     def run_for_type(ctx : Context, t : Program::Type)
-      # TODO: Allow running this pass for more than just the root library.
-      # We restrict this for now while we are building out the pass because
-      # we don't want to deal with all of the complicated forms in the prelude.
-      # We want to stick to the simple forms in the compiler pass specs for now.
-      root_library = ctx.namespace.root_library(ctx).source_library
-      return unless t.ident.pos.source.library == root_library
-
-      @analysis.init_type_self(
-        t.params.try(&.terms.map { |param|
-          ident, explicit, default = AST::Extract.type_param(param)
-          {
-            param,
-            explicit ? read_type_expr(ctx, explicit) : nil,
-            default ? read_type_expr(ctx, default) : nil,
-          }
-        })
-      )
+      @analysis.init_type_self(ctx, self, t.params)
     end
 
     def run_for_function(ctx : Context, f : Program::Function)
@@ -254,21 +238,72 @@ module Mare::Compiler::Types
       end
     end
 
+    def read_type_expr_cap(node : AST::Identifier)
+      case node.value
+
+      when "iso"   then NominalCap::ISO
+      when "val"   then NominalCap::VAL
+      when "ref"   then NominalCap::REF
+      when "box"   then NominalCap::BOX
+      when "tag"   then NominalCap::TAG
+      when "non"   then NominalCap::NON
+
+      when "any"   then NominalCap::ANY
+      when "alias" then NominalCap::ALIAS
+      when "send"  then NominalCap::SEND
+      when "share" then NominalCap::SHARE
+      when "read"  then NominalCap::READ
+
+      else nil
+      end
+    end
+
     def read_type_expr(ctx, node : AST::Identifier)
       ref = @refer_type[node]?
 
       case ref
       when Refer::Type
         t = ref.link.resolve(ctx)
-        NominalType.new(ref.link).intersect(NominalCap.new(t.cap.value))
+        NominalType.new(ref.link).intersect(read_type_expr_cap(t.cap).not_nil!)
       when Refer::TypeParam
         analysis = @analysis
         while analysis.scope != ref.parent_link
           analysis = analysis.parent.not_nil!.value
         end
         analysis.type_param_vars[ref.index]
+      when nil
+        cap = read_type_expr_cap(node)
+        if cap
+          cap
+        else
+          ctx.error_at node, "This type couldn't be resolved"
+          NominalCap::NON
+        end
       else
         raise NotImplementedError.new(ref.class)
+      end
+    end
+
+    def read_type_expr(ctx, node : AST::Relate)
+      lhs = read_type_expr(ctx, node.lhs)
+
+      case node.op.value
+      when "'"
+        cap_ident = node.rhs.as(AST::Identifier)
+        case cap_ident.value
+        when "aliased"
+          lhs.aliased
+        else
+          cap = read_type_expr_cap(cap_ident)
+          if cap
+            lhs.override_cap(cap)
+          else
+            ctx.error_at cap_ident, "This type couldn't be resolved"
+            lhs
+          end
+        end
+      else
+        raise NotImplementedError.new(node.op.value)
       end
     end
 
@@ -306,16 +341,14 @@ module Mare::Compiler::Types
           # since this enum value literal will have the type of its referent.
           t = ref.link.resolve(ctx)
           @analysis[node] = NominalType.new(ref.link).intersect(
-            NominalCap.new(t.cap.value)
+            read_type_expr_cap(t.cap).not_nil!
           )
         else
           # A type reference whose value is used and is not itself a value
           # must be marked non, rather than having the default cap for that type.
           # This is used when we pass a type around as if it were a value,
           # where that value is a stateless singleton able to call `:fun non`s.
-          @analysis[node] = NominalType.new(ref.link).intersect(
-            NominalCap.new("non")
-          )
+          @analysis[node] = NominalType.new(ref.link).intersect(NominalCap::NON)
         end
       else
         raise NotImplementedError.new(ref.class)
@@ -328,12 +361,14 @@ module Mare::Compiler::Types
 
     def visit(ctx, node : AST::LiteralString)
       case node.prefix_ident.try(&.value)
-      when nil then @analysis.observe_prelude_type(ctx, node, "String", "val")
-      when "b" then @analysis.observe_prelude_type(ctx, node, "Bytes", "val")
+      when nil
+        @analysis.observe_prelude_type(ctx, node, "String", NominalCap::VAL)
+      when "b"
+        @analysis.observe_prelude_type(ctx, node, "Bytes", NominalCap::VAL)
       else
         ctx.error_at node.prefix_ident.not_nil!,
           "This type of string literal is not known; please remove this prefix"
-        @analysis.observe_prelude_type(ctx, node, "String", "val")
+        @analysis.observe_prelude_type(ctx, node, "String", NominalCap::VAL)
       end
     end
 
@@ -345,7 +380,7 @@ module Mare::Compiler::Types
         # Do nothing here - we'll handle it in one of the parent nodes.
       when "(", ":"
         if node.terms.empty?
-          @analysis.observe_prelude_type(ctx, node, "None", "non")
+          @analysis.observe_prelude_type(ctx, node, "None", NominalCap::NON)
         else
           @analysis[node] = @analysis[node.terms.last]
         end

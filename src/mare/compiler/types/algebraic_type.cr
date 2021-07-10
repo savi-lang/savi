@@ -14,6 +14,8 @@ module Mare::Compiler::Types
       # TODO: Implement this method.
       self
     end
+
+    abstract def override_cap(cap : AlgebraicType)
   end
 
   abstract struct AlgebraicTypeSummand < AlgebraicType
@@ -48,15 +50,46 @@ module Mare::Compiler::Types
       args = @args
       args ? "#{@link.name}(#{args.map(&.show).join(", ")})" : @link.name
     end
+
+    def override_cap(cap : AlgebraicType)
+      intersect(cap)
+    end
   end
 
   struct NominalCap < AlgebraicTypeSimple
-    getter cap : String # TODO: probably an enum
+    enum Value : UInt8
+      ISO
+      ISO_ALIASED
+      REF
+      VAL
+      BOX
+      TAG
+      NON
+    end
+    getter cap : Value # TODO: probably an enum
     def initialize(@cap)
     end
 
+    ISO         = new(Value::ISO)
+    ISO_ALIASED = new(Value::ISO_ALIASED)
+    REF         = new(Value::REF)
+    VAL         = new(Value::VAL)
+    BOX         = new(Value::BOX)
+    TAG         = new(Value::TAG)
+    NON         = new(Value::NON)
+
+    ANY   = Union.new(Set(AlgebraicTypeSummand){ISO, REF, VAL, BOX, TAG, NON})
+    ALIAS = Union.new(Set(AlgebraicTypeSummand){REF, VAL, BOX, TAG, NON})
+    SEND  = Union.new(Set(AlgebraicTypeSummand){ISO, VAL, TAG, NON})
+    SHARE = Union.new(Set(AlgebraicTypeSummand){VAL, TAG, NON})
+    READ  = Union.new(Set(AlgebraicTypeSummand){REF, VAL, BOX})
+
     def show
-      @cap
+      @cap.to_s.downcase
+    end
+
+    def override_cap(other : AlgebraicType)
+      other
     end
   end
 
@@ -71,6 +104,10 @@ module Mare::Compiler::Types
       scope_sym = scope.is_a?(Program::Function::Link) ? "'" : "'^"
       "T'#{@nickname}#{scope_sym}#{@sequence_number}"
     end
+
+    def override_cap(cap : AlgebraicType)
+      raise NotImplementedError.new("override_cap for #{self.class}")
+    end
   end
 
   struct CapVariable < AlgebraicTypeSimple
@@ -84,11 +121,23 @@ module Mare::Compiler::Types
       scope_sym = scope.is_a?(Program::Function::Link) ? "'" : "'^"
       "K'#{@nickname}#{scope_sym}#{@sequence_number}"
     end
+
+    def override_cap(cap : AlgebraicType)
+      raise NotImplementedError.new("override_cap for #{self.class}")
+    end
   end
 
   struct Intersection < AlgebraicTypeSummand
     getter members : Set(AlgebraicTypeSimple)
     def initialize(@members)
+    end
+
+    def self.from(list)
+      result : AlgebraicType? = nil
+      list.each { |member|
+        result = result ? result.intersect(member) : member
+      }
+      result.not_nil!
     end
 
     def show
@@ -104,6 +153,10 @@ module Mare::Compiler::Types
       else
         other.intersect(self)
       end
+    end
+
+    def override_cap(cap : AlgebraicType)
+      Intersection.from(@members.map(&.override_cap(cap)))
     end
   end
 
@@ -125,7 +178,7 @@ module Mare::Compiler::Types
     end
 
     def intersect(other : AlgebraicType)
-      raise NotImplementedError.new("Union.intersect")
+      Union.from(@members.map(&.intersect(other)))
     end
 
     def unite(other : AlgebraicType)
@@ -137,6 +190,10 @@ module Mare::Compiler::Types
       else
         other.unite(self)
       end
+    end
+
+    def override_cap(cap : AlgebraicType)
+      Union.from(@members.map(&.override_cap(cap)))
     end
   end
 end
