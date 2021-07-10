@@ -7,6 +7,7 @@
       SpecRun(BoolSpec).new(env)
       SpecRun(CPointerSpec).new(env)
       SpecRun(InspectSpec).new(env)
+      SpecRun(IndexableSpec).new(env)
       SpecRun(NumericSpec).new(env)
       SpecRun(PlatformSpec).new(env)
       SpecRun(StringSpec).new(env)

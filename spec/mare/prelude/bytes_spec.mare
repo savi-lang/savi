@@ -239,66 +239,25 @@
   :it "pushes a new byte onto the end of the buffer"
     @assert = Bytes.new.push('o').push('k') == b"ok"
 
-  :it "yields each byte in the buffer"
-    bytes Array(U8) = []
-    b"foo".each -> (byte | bytes << byte)
-    @assert = bytes == ['f', 'o', 'o']
-
-  :it "yields each byte of a subslice of the buffer"
-    bytes Array(U8) = []
-    b"abcdef".each(1, 5) -> (byte | bytes << byte)
-    @assert = bytes == ['b', 'c', 'd', 'e']
-
-  :it "yields each byte, stopping early if the criteria is met"
-    bytes Array(U8) = []
-    early_stop = b"abcdef".each_until -> (byte | bytes << byte, byte == 'e')
-    @assert = bytes == ['a', 'b', 'c', 'd', 'e']
-    @assert = early_stop == True
-
-    bytes.clear
-    early_stop = b"abcdef".each_until -> (byte | bytes << byte, byte == 'z')
-    @assert = bytes == ['a', 'b', 'c', 'd', 'e', 'f']
-    @assert = early_stop == False
-
-  :it "yields each byte of a subslice, stopping early if the criteria is met"
-    bytes Array(U8) = []
-    early_stop = b"abcdef".each_until(1, 5) -> (byte | bytes << byte, byte=='d')
-    @assert = bytes == ['b', 'c', 'd']
-    @assert = early_stop == True
-
-    bytes.clear
-    early_stop = b"abcdef".each_until(1, 5) -> (byte | bytes << byte, byte == 'z')
-    @assert = bytes == ['b', 'c', 'd', 'e']
-    @assert = early_stop == False
-
   :it "yields each byte in the buffer, along with the index"
     bytes Array(U8) = []
     indices Array(USize) = []
-    b"yo".each_with_index -> (byte, index |
+    b"hello".each_with_index -> (byte, index |
       bytes << byte
       indices << index
     )
-    @assert = bytes == ['y', 'o']
-    @assert = indices == [0, 1]
+    @assert = bytes == ['h', 'e', 'l', 'l', 'o']
+    @assert = indices == [0, 1, 2, 3, 4]
 
-  :it "yields each byte with index, stopping early if the criteria is met"
+  :it "yields each byte in the buffer in reverse, along with the index"
     bytes Array(U8) = []
     indices Array(USize) = []
-    early_stop = b"abcdef".each_with_index_until -> (byte, index |
-      bytes << byte, indices << index, byte == 'e'
+    b"hello".reverse_each_with_index -> (byte, index |
+      bytes << byte
+      indices << index
     )
-    @assert = bytes == ['a', 'b', 'c', 'd', 'e']
-    @assert = indices == [0, 1, 2, 3, 4]
-    @assert = early_stop == True
-
-    bytes.clear
-    indices.clear
-    early_stop = b"abcdef".each_with_index_until -> (byte, index |
-      bytes << byte, indices << index, byte == 'z'
-    )
-    @assert = bytes == ['a', 'b', 'c', 'd', 'e', 'f']
-    @assert = indices == [0, 1, 2, 3, 4, 5]
-    @assert = early_stop == False
+    @assert = bytes == ['o', 'l', 'l', 'e', 'h']
+    @assert = indices == [4, 3, 2, 1, 0]
 
   :it "copies bytes from the given buffer onto the end of the byte string"
     @assert = (Bytes.new << b"foo" << b"" << b"bar") == b"foobar"

@@ -342,15 +342,15 @@ It complains when violating uniqueness into an array literal:
     array_4 Array(String'val) = [s4] // not okay
 ```
 ```error
-The type of this expression doesn't meet the constraints imposed on it:
+This aliasing violates uniqueness (did you forget to consume the variable?):
     array_4 Array(String'val) = [s4] // not okay
                                 ^~~~
 
-- it is required here to be a subtype of Array(String):
+- it is required here to be a subtype of String:
     array_4 Array(String'val) = [s4] // not okay
             ^~~~~~~~~~~~~~~~~
 
-- but the type of the array literal was Array(String'iso'aliased):
-    array_4 Array(String'val) = [s4] // not okay
-                                ^~~~
+- but the type of the local variable (when aliased) was String'iso'aliased:
+    s4 iso = String.new_iso
+       ^~~
 ```

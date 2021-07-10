@@ -1,0 +1,112 @@
+:trait box Indexable(A)
+  :fun "[]!"(index USize) (@->A)'aliased
+
+  //--
+
+  :fun each_with_index(
+    from USize = 0
+    to = USize.max_value
+    stride USize = 1
+  ) None
+    :yields ((@->A)'aliased, USize)
+
+  :fun each(
+    from USize = 0
+    to = USize.max_value
+    stride USize = 1
+  )
+    @each_with_index(from, to, stride) -> (value, index |
+      yield value
+    )
+
+  :fun each_until(
+    from USize = 0
+    to = USize.max_value
+    stride USize = 1
+  )
+    :yields for Bool // TODO: this type hint shouldn't be needed
+    @each(from, to, stride) -> (value |
+      return True if (yield value)
+    )
+    False
+
+  :fun each_with_index_until(
+    from USize = 0
+    to = USize.max_value
+    stride USize = 1
+  )
+    :yields for Bool // TODO: this type hint shouldn't be needed
+    @each_with_index(from, to, stride) -> (value, index |
+      return True if (yield (value, index))
+    )
+    False
+
+  :fun find!(
+    from USize = 0
+    to = USize.max_value
+    stride USize = 1
+  ) (@->A)'aliased
+    :yields for Bool // TODO: this type hint shouldn't be needed
+    @each(from, to, stride) -> (value |
+      return value if (yield value)
+    )
+    error!
+
+  :fun find_index!(
+    from USize = 0
+    to = USize.max_value
+    stride USize = 1
+  ) USize
+    :yields for Bool // TODO: this type hint shouldn't be needed
+    @each_with_index(from, to, stride) -> (value, index |
+      return index if (yield value)
+    )
+    error!
+
+  //--
+
+  :fun reverse_each_with_index(
+    from = USize.max_value
+    to USize = 0
+    stride USize = 1
+  ) None
+    :yields ((@->A)'aliased, USize)
+
+  :fun reverse_each(
+    from = USize.max_value
+    to USize = 0
+    stride USize = 1
+  )
+    @reverse_each_with_index(from, to, stride) -> (value, index |
+      yield value
+    )
+
+  //--
+
+  :fun select(
+    from USize = 0
+    to = USize.max_value
+    stride USize = 1
+  )
+    :yields for Bool // TODO: this type hint shouldn't be needed
+    // TODO: allow collecting into an externally supplied object?
+    // TODO: allow the caller to specify space?
+    new_array = Array((@->A)'aliased).new
+    @each(from, to, stride) -> (value |
+      if (yield value) (new_array << value)
+    )
+    new_array
+
+  :fun reject(
+    from USize = 0
+    to = USize.max_value
+    stride USize = 1
+  )
+    :yields for Bool // TODO: this type hint shouldn't be needed
+    // TODO: allow collecting into an externally supplied object?
+    // TODO: allow the caller to specify space?
+    new_array = Array((@->A)'aliased).new
+    @each(from, to, stride) -> (value |
+      if (yield value).is_false (new_array << value)
+    )
+    new_array

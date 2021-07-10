@@ -148,16 +148,6 @@
     @assert = [opaque_1].includes(opaque_1)
     @assert = [opaque_1].includes(opaque_2).not
 
-  :it "yields each element in the array"
-    array Array(String) = []
-    ["foo", "bar", "baz"].each -> (string | array << string)
-    @assert = array == ["foo", "bar", "baz"]
-
-  :it "yields each element of a subslice of the array"
-    array Array(String) = []
-    ["a", "b", "c", "d", "e", "f"].each(1, 5) -> (string | array << string)
-    @assert = array == ["b", "c", "d", "e"]
-
   :it "yields each element in the array, along with the index"
     array_a Array(String) = []
     array_b Array(USize) = []
@@ -167,11 +157,6 @@
     )
     @assert = array_a == ["foo", "bar", "baz"]
     @assert = array_b == [0, 1, 2]
-
-  :it "yields each element in the array, in reverse"
-    array Array(String) = []
-    ["foo", "bar", "baz"].reverse_each -> (string | array << string)
-    @assert = array == ["baz", "bar", "foo"]
 
   :it "yields each element in the array, in reverse, along with the index"
     array_a Array(String) = []
@@ -183,63 +168,6 @@
     @assert = array_b == [2, 1, 0]
     @assert =
       array_a == ["baz", "bar", "foo"]
-
-  :it "yields each element in the array, stopping early if the criteria is met"
-    array Array(String) = []
-    early_stop = ["foo", "bar", "baz"].each_until -> (string |
-      array << string
-      string == "bar"
-    )
-    @assert = early_stop == True
-    @assert = array == ["foo", "bar"]
-
-    array.clear
-    early_stop = ["foo", "bar", "baz"].each_until -> (string |
-      array << string
-      string == "bard"
-    )
-    @assert = early_stop == False
-    @assert = array == ["foo", "bar", "baz"]
-
-  :it "yields each element of a subslice, stopping early if the criteria is met"
-    array Array(String) = []
-    early_stop = ["a", "b", "c", "d", "e", "f"].each_until(1, 5) -> (string |
-      array << string
-      string == "d"
-    )
-    @assert = early_stop == True
-    @assert = array == ["b", "c", "d"]
-
-    array.clear
-    early_stop = ["a", "b", "c", "d", "e", "f"].each_until(1, 5) -> (string |
-      array << string
-      string == "z"
-    )
-    @assert = early_stop == False
-    @assert = array == ["b", "c", "d", "e"]
-
-  :it "finds the first element in the array that meets the criteria"
-    array Array(U8) = [11, 22, 33, 44, 36, 27, 18]
-    @assert = try (array.find! -> (num | num > 30) == 33 | False)
-    @assert = try (array.find! -> (num | num > 50), False | True)
-
-  :it "selects those elements in the array that meet the criteria"
-    array Array(U8) = [11, 22, 33, 44, 36, 27, 18]
-    selected = array.select -> (num | num < 30)
-    @assert = selected == [11, 22, 27, 18]
-
-  :it "rejects those elements in the array that do not meet the criteria"
-    array Array(U8) = [1, 2, 3, 4, 5]
-    odds = array.reject -> (num | num % 2 == 0)
-    @assert = odds == [1, 3, 5]
-
-  :it "rejects nothing from an empty array"
-    array Array(U8) = []
-    @assert = array.reject -> (num | num % 2 == 0) == array
-
-  :it "rejects nothing if criteria is always false"
-    array Array(U8) = [1, 2, 3]
-    @assert = array.reject -> (num | False) == array
 
   :it "sorts the elements in the array"
     array Array(U8) = [

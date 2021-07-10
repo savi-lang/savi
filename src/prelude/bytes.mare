@@ -1,5 +1,6 @@
 :class val Bytes
   :is Comparable(Bytes'box)
+  :is Indexable(U8)
 
   :var _size USize
   :var _space USize
@@ -216,47 +217,32 @@
     @_size += 1
     @
 
-  :fun each(from USize = 0, to = USize.max_value)
+  :fun each_with_index(
+    from USize = 0
+    to = USize.max_value
+    stride USize = 1
+  )
     to = @_size.min(to)
-    if (from < to) (
-      index = from
-      while (index < @_size.min(to)) (
-        yield @_ptr._get_at(index)
-        index += 1
-      )
+    index = from
+    while (index < to) (
+      yield (@_ptr._get_at(index), index)
+      index += stride
     )
     None
 
-  :fun each_until(from USize = 0, to = USize.max_value)
-    :yields for Bool
-    to = @_size.min(to)
-    early_stop = False
-    if (from < to) (
-      index = from
-      while (index < @_size.min(to) && !early_stop) (
-        early_stop = yield @_ptr._get_at(index)
-        index += 1
+  :fun reverse_each_with_index(
+    from = USize.max_value
+    to USize = 0
+    stride USize = 1
+  )
+    try (
+      index USize = @_size.min(from) -! 1
+      while (index >= to) (
+        yield (@_ptr._get_at(index), index)
+        index = index -! stride
       )
     )
-    early_stop
-
-  :fun each_with_index
-    index USize = 0
-    while (index < @_size) (
-      yield (@_ptr._get_at(index), index)
-      index = index + 1
-    )
-    @
-
-  :fun each_with_index_until
-    :yields for Bool
-    early_stop = False
-    index USize = 0
-    while (index < @_size && !early_stop) (
-      early_stop = yield (@_ptr._get_at(index), index)
-      index += 1
-    )
-    early_stop
+    None
 
   :fun ref "<<"(other Bytes'box)
     if (other._size > 0) (

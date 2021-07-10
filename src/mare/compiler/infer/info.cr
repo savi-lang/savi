@@ -1065,6 +1065,7 @@ module Mare::Compiler::Infer
       elem_spans = terms.map { |term| infer.resolve(ctx, term).as(Span) }
       elem_span = Span
         .reduce_combine_mts(elem_spans) { |accum, mt| accum.unite(mt) }
+        .try(&.transform_mt(&.stabilized))
 
       if ante_span
         if elem_span

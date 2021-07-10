@@ -212,7 +212,7 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
 
     # TODO: dedup these with the Witness mechanism.
     # TODO: be more specific (for example, `member` is only allowed for `enum`)
-    def keywords : Array(String); ["is", "let", "var", "fun", "be", "new", "const", "member", "it"] end
+    def keywords : Array(String); ["is", "copies", "let", "var", "fun", "be", "new", "const", "member", "it"] end
 
     def finished(context)
       # Numeric types need some basic metadata attached to know the native type.
@@ -516,6 +516,19 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
       } of String => String | Bool,
     ] of Hash(String, String | Bool))
 
+    @@declare_copies = Witness.new([
+      {
+        "kind" => "keyword",
+        "name" => "keyword",
+        "value" => "copies",
+      } of String => String | Bool,
+      {
+        "kind" => "term",
+        "name" => "trait",
+        "type" => "type",
+      } of String => String | Bool,
+    ] of Hash(String, String | Bool))
+
     @@declare_member = Witness.new([
       {
         "kind" => "keyword",
@@ -759,6 +772,16 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
           data["trait"].as(AST::Term),
           nil,
         ).tap(&.add_tag(:hygienic)).tap(&.add_tag(:is)).tap(&.add_tag(:copies))
+      when "copies"
+        data = @@declare_copies.run(decl)
+
+        func = Program::Function.new(
+          AST::Identifier.new("non").from(data["keyword"]),
+          decl.head.first.as(AST::Identifier),
+          nil,
+          data["trait"].as(AST::Term),
+          nil,
+        ).tap(&.add_tag(:hygienic)).tap(&.add_tag(:copies))
       when "member"
         raise "only enums can have members" unless @keyword == "enum"
 
