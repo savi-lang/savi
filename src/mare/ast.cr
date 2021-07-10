@@ -610,12 +610,12 @@ module Mare::AST
     end
   end
 
-  # A FieldReplace node indicates a new value displacing the old value
+  # A FieldDisplace node indicates a new value displacing the old value
   # that was within a particular field, returning the old value of the field.
   #
   # This is an internal AST type which has no corresponding source code syntax,
   # because field writes only happen inside of generated property displacers.
-  class FieldReplace < Node
+  class FieldDisplace < Node
     property value
     property rhs
     def initialize(@value : String, @rhs : Term)

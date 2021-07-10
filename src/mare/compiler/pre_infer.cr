@@ -387,7 +387,7 @@ module Mare::Compiler::PreInfer
       field.assign(ctx, @analysis[node.rhs], node.rhs.pos)
     end
 
-    def touch(ctx : Context, node : AST::FieldReplace)
+    def touch(ctx : Context, node : AST::FieldDisplace)
       field = Infer::Field.new(node.pos, layer(node), node.value)
       @analysis[node] = Infer::FieldExtract.new(field, Infer::Self.new(field.pos, layer(node)))
       field.assign(ctx, @analysis[node.rhs], node.rhs.pos)

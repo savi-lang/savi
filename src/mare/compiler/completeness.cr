@@ -192,7 +192,7 @@ module Mare::Compiler::Completeness
         !@loop_stack.empty? || @jumps.away_possibly?(node)
     end
 
-    def touch(node : AST::FieldReplace)
+    def touch(node : AST::FieldDisplace)
       if !seen_fields.includes?(node.value)
         ctx.error_at node,
           "This field may be read (via displacing assignment) " +

@@ -1914,7 +1914,7 @@ class Mare::Compiler::CodeGen
     value
   end
 
-  def gen_field_replace(node : AST::FieldReplace)
+  def gen_field_displace(node : AST::FieldDisplace)
     old_value = gen_field_load(node.value)
 
     value = gen_expr(node.rhs).as(LLVM::Value)
@@ -2318,8 +2318,8 @@ class Mare::Compiler::CodeGen
       gen_field_load(expr.value)
     when AST::FieldWrite
       gen_field_eq(expr)
-    when AST::FieldReplace
-      gen_field_replace(expr)
+    when AST::FieldDisplace
+      gen_field_displace(expr)
     when AST::LiteralString
       case expr.prefix_ident.try(&.value)
       when nil then gen_string(expr.value)

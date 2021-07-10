@@ -730,38 +730,38 @@ class Mare::Compiler::Interpreter::Default < Mare::Compiler::Interpreter
         setter_func.add_tag(:let) if is_let
         @type.functions << setter_func
 
-        replace_cap = AST::Identifier.new("ref").from(data["keyword"])
-        replace_ident = AST::Identifier.new("#{ident.value}<<=").from(ident)
-        replace_param = AST::Identifier.new("value").from(ident)
+        displace_cap = AST::Identifier.new("ref").from(data["keyword"])
+        displace_ident = AST::Identifier.new("#{ident.value}<<=").from(ident)
+        displace_param = AST::Identifier.new("value").from(ident)
         if !ret.nil?
           pair = AST::Relate.new(
-            replace_param,
-            AST::Operator.new("EXPLICITTYPE").from(replace_param),
+            displace_param,
+            AST::Operator.new("EXPLICITTYPE").from(displace_param),
             ret.dup,
-          ).from(replace_param)
-          replace_param = pair
+          ).from(displace_param)
+          displace_param = pair
         end
-        replace_params = AST::Group.new("(").from(ident)
-        replace_params.terms << replace_param
+        displace_params = AST::Group.new("(").from(ident)
+        displace_params.terms << displace_param
         if ret
-          replace_ret = AST::Relate.new(
-            AST::Identifier.new("@").from(replace_cap),
-            AST::Operator.new("->").from(replace_cap),
+          displace_ret = AST::Relate.new(
+            AST::Identifier.new("@").from(displace_cap),
+            AST::Operator.new("->").from(displace_cap),
             ret
           ).from(ret)
         end
-        replace_assign = AST::FieldReplace.new(
+        displace_assign = AST::FieldDisplace.new(
           ident.value,
           AST::Prefix.new(
             AST::Operator.new("--").from(ident),
             AST::Identifier.new("value").from(ident),
           ).from(ident)
         ).from(ident)
-        replace_body = AST::Group.new(":").from(ident)
-        replace_body.terms << replace_assign
-        replace_func = Program::Function.new(replace_cap, replace_ident, replace_params, replace_ret, replace_body)
-        replace_func.add_tag(:let) if is_let
-        @type.functions << replace_func
+        displace_body = AST::Group.new(":").from(ident)
+        displace_body.terms << displace_assign
+        displace_func = Program::Function.new(displace_cap, displace_ident, displace_params, displace_ret, displace_body)
+        displace_func.add_tag(:let) if is_let
+        @type.functions << displace_func
       when "is"
         data = @@declare_is.run(decl)
 
