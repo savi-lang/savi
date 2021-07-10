@@ -73,6 +73,10 @@ module Mare::Compiler::Types
       }.as(AlgebraicType)
     end
 
+    protected def observe_algebraic_type(node, algebraic_type : AlgebraicType)
+      @by_node[node] = algebraic_type
+    end
+
     protected def observe_prelude_type(ctx, node, name, cap)
       t_link = ctx.namespace.prelude_type(name)
       @by_node[node] = NominalType.new(t_link).intersect(NominalCap.new(cap))
@@ -93,8 +97,13 @@ module Mare::Compiler::Types
 
     protected def observe_assignment(node, ref)
       var = @by_ref[ref].as(TypeVariable)
+
+      explicit = AST::Extract.param(node.lhs)[1]
+      @bindings << {var, @by_node[explicit]} if explicit
+
       rhs = @by_node[node.rhs].stabilized
       @assignments << {var, rhs}
+
       @by_node[node] = var.aliased
     end
   end
@@ -151,10 +160,37 @@ module Mare::Compiler::Types
       f.body.try(&.accept(ctx, self))
     end
 
+    def visit_any?(ctx, node)
+      # Read type expressions using a different, top-down kind of approach.
+      # This prevents the normal depth-first visit when false is returned.
+      if !@classify || classify.type_expr?(node)
+        @analysis.observe_algebraic_type(node, read_type_expr(ctx, node))
+        false
+      else
+        true
+      end
+    end
+
+    def read_type_expr(ctx, node : AST::Identifier)
+      ref = @refer_type[node]
+
+      case ref
+      when Refer::Type
+        t = ref.link.resolve(ctx)
+        NominalType.new(ref.link).intersect(NominalCap.new(t.cap.value))
+      else
+        raise NotImplementedError.new(ref.class)
+      end
+    end
+
+    def read_type_expr(ctx, node)
+      raise NotImplementedError.new(node.class)
+    end
+
     def visit(ctx, node : AST::Identifier)
       return if classify.no_value?(node)
 
-      ref = refer[node]
+      ref = (@refer || @refer_type)[node]
       case ref
       when Refer::Self
         @analysis.observe_self_reference(node, ref)
@@ -191,6 +227,8 @@ module Mare::Compiler::Types
 
     def visit(ctx, node : AST::Relate)
       case node.op.value
+      when "EXPLICITTYPE"
+        # Do nothing here - we'll handle it in the parent node.
       when "="
         ident = AST::Extract.param(node.lhs).first
         ref = refer[ident].as(Refer::Local)
