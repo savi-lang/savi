@@ -185,16 +185,14 @@ module Mare::Compiler::Types
   class Visitor < AST::Visitor
     getter analysis
     private getter refer_type : ReferType::Analysis
-    private getter! classify : Classify::Analysis
-    private getter! refer : Refer::Analysis
-    private getter! local : Local::Analysis
+    private getter! classify : Classify::Analysis # only present within a func
+    private getter! refer : Refer::Analysis       # only present within a func
 
     def initialize(
       @analysis : Analysis,
       @refer_type,
       @classify = nil,
       @refer = nil,
-      @local = nil,
     )
     end
 
@@ -458,8 +456,7 @@ module Mare::Compiler::Types
       refer_type = ctx.refer_type[f_link]
       classify = ctx.classify[f_link]
       refer = ctx.refer[f_link]
-      local = ctx.local[f_link]
-      deps = {refer_type, classify, refer, local}
+      deps = {refer_type, classify, refer}
       prev = ctx.prev_ctx.try(&.types)
 
       maybe_from_func_cache(ctx, prev, f, f_link, deps) do

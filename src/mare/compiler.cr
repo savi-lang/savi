@@ -132,7 +132,7 @@ class Mare::Compiler
     when :type_context then [:flow]
     when :pre_infer then [:local, :refer, :type_context, :inventory, :jumps, :classify, :lambda, :populate]
     when :pre_subtyping then [:inventory, :lambda, :populate]
-    when :types then [:classify, :refer_type, :classify, :refer, :local]
+    when :types then [:refer, :classify, :refer_type]
     when :infer_edge then [:pre_subtyping, :pre_infer, :classify, :refer_type]
     when :infer then [:infer_edge]
     when :completeness then [:jumps, :pre_infer]
