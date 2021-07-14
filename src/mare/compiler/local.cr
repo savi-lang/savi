@@ -82,7 +82,7 @@ module Mare::Compiler::Local
       end
     end
 
-    protected def emit_errors(ctx)
+    protected def emit_errors(ctx, analysis)
       # Don't bother showing errors for unreachable use sites.
       # They're likely to be based on inaccurate information anyway.
       return if @is_unreachable
@@ -97,8 +97,10 @@ module Mare::Compiler::Local
 
           message = if predecessor_writes.any?
             "This local variable isn't guaranteed to have a value yet"
-          else
+          elsif analysis.by_ref_and_location[@ref].any?(&.last.any?(&.writes_new_value))
             "This local variable has no assigned value yet"
+          else
+            "The identifier '#{@node.value}' hasn't been defined yet"
           end
 
           ctx.error_at self, message, predecessor_writes.map { |write_site|
@@ -398,7 +400,7 @@ module Mare::Compiler::Local
 
     # Emit all errors gathered during previous analysis.
     def emit_errors(ctx)
-      @analysis.each_use_site.each(&.emit_errors(ctx))
+      @analysis.each_use_site.each(&.emit_errors(ctx, @analysis))
     end
   end
 

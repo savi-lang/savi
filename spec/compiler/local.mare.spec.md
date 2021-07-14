@@ -75,6 +75,19 @@ This local variable has no assigned value yet:
 
 ---
 
+It complains differently for an identifier for which there is no solid proof that it is a local variable at all.
+
+```mare
+  BOGUS
+```
+```error
+The identifier 'BOGUS' hasn't been defined yet:
+  BOGUS
+  ^~~~~
+```
+
+---
+
 It complains when trying to read a local variable without guarantee of assignment.
 
 ```mare
