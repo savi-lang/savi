@@ -1,26 +1,26 @@
-describe Mare::Compiler::Infer::MetaType do
+describe Savi::Compiler::Infer::MetaType do
   # For convenience, alias each capability here by name.
-  iso   = Mare::Compiler::Infer::MetaType::Capability::ISO
-  iso_a = Mare::Compiler::Infer::MetaType::Capability::ISO_ALIASED
-  ref   = Mare::Compiler::Infer::MetaType::Capability::REF
-  val   = Mare::Compiler::Infer::MetaType::Capability::VAL
-  box   = Mare::Compiler::Infer::MetaType::Capability::BOX
-  tag   = Mare::Compiler::Infer::MetaType::Capability::TAG
-  non   = Mare::Compiler::Infer::MetaType::Capability::NON
-  no    = Mare::Compiler::Infer::MetaType::Unsatisfiable::INSTANCE
+  iso   = Savi::Compiler::Infer::MetaType::Capability::ISO
+  iso_a = Savi::Compiler::Infer::MetaType::Capability::ISO_ALIASED
+  ref   = Savi::Compiler::Infer::MetaType::Capability::REF
+  val   = Savi::Compiler::Infer::MetaType::Capability::VAL
+  box   = Savi::Compiler::Infer::MetaType::Capability::BOX
+  tag   = Savi::Compiler::Infer::MetaType::Capability::TAG
+  non   = Savi::Compiler::Infer::MetaType::Capability::NON
+  no    = Savi::Compiler::Infer::MetaType::Unsatisfiable::INSTANCE
 
   it "implements logical operators that keep the expression in DNF form" do
-    library = Mare::Program::Library.new(
-      Mare::Source::Library.new("(example)")
+    library = Savi::Program::Library.new(
+      Savi::Source::Library.new("(example)")
     )
 
     new_type = ->(s : String, is_abstract : Bool) {
-      ref_ident = Mare::AST::Identifier.new("ref")
-      t = Mare::Program::Type.new(ref_ident, Mare::AST::Identifier.new(s))
+      ref_ident = Savi::AST::Identifier.new("ref")
+      t = Savi::Program::Type.new(ref_ident, Savi::AST::Identifier.new(s))
       t.add_tag(:abstract) if is_abstract
       library.types << t
-      m = Mare::Compiler::Infer::MetaType.new_nominal(
-        Mare::Compiler::Infer::ReifiedType.new(t.make_link(library))
+      m = Savi::Compiler::Infer::MetaType.new_nominal(
+        Savi::Compiler::Infer::ReifiedType.new(t.make_link(library))
       )
       m
     }

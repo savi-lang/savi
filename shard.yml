@@ -1,11 +1,11 @@
-name: mare
+name: savi
 version: 0.1.0
 
 authors:
   - Joe Eli McIlvain <joe.eli.mac@gmail.com>
 
 targets:
-  mare:
+  savi:
     main: main.cr
 
 dependencies:

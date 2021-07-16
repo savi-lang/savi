@@ -1,14 +1,14 @@
-describe Mare::Compiler::Eval do
+describe Savi::Compiler::Eval do
   it "complains if there is no Main actor defined in the root library" do
     content = <<-SOURCE
     :primitive Example
     SOURCE
 
-    source = Mare::Source.new(
+    source = Savi::Source.new(
       "/path/to/fake/example/library",
-      "example.mare",
+      "example.savi",
       content,
-      Mare::Source::Library.new("/path/to/fake/example/library"),
+      Savi::Source::Library.new("/path/to/fake/example/library"),
     )
 
     expected = <<-MSG
@@ -18,14 +18,14 @@ describe Mare::Compiler::Eval do
     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     MSG
 
-    Mare.compiler.compile([source], :eval)
+    Savi.compiler.compile([source], :eval)
       .errors.map(&.message).join("\n").should eq expected
   end
 
   it "evaluates the semantic tests" do
-    source_dir = File.join(__DIR__, "../mare/semantics")
+    source_dir = File.join(__DIR__, "../savi/semantics")
 
-    ctx = Mare.compiler.compile(source_dir, :eval)
+    ctx = Savi.compiler.compile(source_dir, :eval)
     ctx.errors.should be_empty
 
     no_test_failures = ctx.eval.exitcode == 0
@@ -33,9 +33,9 @@ describe Mare::Compiler::Eval do
   end
 
   it "evaluates the prelude tests" do
-    source_dir = File.join(__DIR__, "../mare/prelude")
+    source_dir = File.join(__DIR__, "../savi/prelude")
 
-    ctx = Mare.compiler.compile(source_dir, :eval)
+    ctx = Savi.compiler.compile(source_dir, :eval)
     ctx.errors.should be_empty
 
     no_test_failures = ctx.eval.exitcode == 0
@@ -45,7 +45,7 @@ describe Mare::Compiler::Eval do
   it "evaluates the collections package's tests" do
     source_dir = File.join(__DIR__, "../../packages/collections/test")
 
-    ctx = Mare.compiler.compile(source_dir, :eval)
+    ctx = Savi.compiler.compile(source_dir, :eval)
     ctx.errors.should be_empty
 
     no_test_failures = ctx.eval.exitcode == 0
@@ -55,7 +55,7 @@ describe Mare::Compiler::Eval do
   it "evaluates the time package's tests" do
     source_dir = File.join(__DIR__, "../../packages/time/test")
 
-    ctx = Mare.compiler.compile(source_dir, :eval)
+    ctx = Savi.compiler.compile(source_dir, :eval)
     ctx.errors.should be_empty
 
     no_test_failures = ctx.eval.exitcode == 0
@@ -65,7 +65,7 @@ describe Mare::Compiler::Eval do
   it "evaluates the json package's tests" do
     source_dir = File.join(__DIR__, "../../packages/json/test")
 
-    ctx = Mare.compiler.compile(source_dir, :eval)
+    ctx = Savi.compiler.compile(source_dir, :eval)
     ctx.errors.should be_empty
 
     no_test_failures = ctx.eval.exitcode == 0
@@ -75,7 +75,7 @@ describe Mare::Compiler::Eval do
   it "evaluates the net package's tests" do
     source_dir = File.join(__DIR__, "../../packages/net/test")
 
-    ctx = Mare.compiler.compile(source_dir, :eval)
+    ctx = Savi.compiler.compile(source_dir, :eval)
     ctx.errors.should be_empty
 
     no_test_failures = ctx.eval.exitcode == 0
@@ -85,7 +85,7 @@ describe Mare::Compiler::Eval do
   it "evaluates the bytes package's tests" do
     source_dir = File.join(__DIR__, "../../packages/bytes/test")
 
-    ctx = Mare.compiler.compile(source_dir, :eval)
+    ctx = Savi.compiler.compile(source_dir, :eval)
     ctx.errors.should be_empty
 
     no_test_failures = ctx.eval.exitcode == 0
@@ -95,7 +95,7 @@ describe Mare::Compiler::Eval do
   it "evaluates the http/server package's tests" do
     source_dir = File.join(__DIR__, "../../packages/http/server/test")
 
-    ctx = Mare.compiler.compile(source_dir, :eval)
+    ctx = Savi.compiler.compile(source_dir, :eval)
     ctx.errors.should be_empty
 
     no_test_failures = ctx.eval.exitcode == 0
@@ -105,7 +105,7 @@ describe Mare::Compiler::Eval do
   it "evaluates the regex package's tests" do
     source_dir = File.join(__DIR__, "../../packages/regex/test")
 
-    ctx = Mare.compiler.compile(source_dir, :eval)
+    ctx = Savi.compiler.compile(source_dir, :eval)
     ctx.errors.should be_empty
 
     no_test_failures = ctx.eval.exitcode == 0

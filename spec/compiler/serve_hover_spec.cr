@@ -1,16 +1,16 @@
-describe Mare::Compiler::ServeHover do
+describe Savi::Compiler::ServeHover do
   it "describes a local variable and its method" do
-    source = Mare::Source.new_example <<-SOURCE
+    source = Savi::Source.new_example <<-SOURCE
     :actor Main
       :new
         example = "Hello, World!"
         example.hash
     SOURCE
 
-    ctx = Mare.compiler.compile([source], :serve_hover)
+    ctx = Savi.compiler.compile([source], :serve_hover)
     ctx.errors.should be_empty
 
-    messages, pos = ctx.serve_hover[Mare::Source::Pos.point(source, 2, 5)]
+    messages, pos = ctx.serve_hover[Savi::Source::Pos.point(source, 2, 5)]
     pos.row.should eq 2
     pos.col.should eq 4
     pos.size.should eq "example".bytesize
@@ -19,7 +19,7 @@ describe Mare::Compiler::ServeHover do
       "It has an inferred type of: String",
     ]
 
-    messages, pos = ctx.serve_hover[Mare::Source::Pos.point(source, 3, 5)]
+    messages, pos = ctx.serve_hover[Savi::Source::Pos.point(source, 3, 5)]
     pos.row.should eq 3
     pos.col.should eq 4
     pos.size.should eq "example".bytesize
@@ -28,7 +28,7 @@ describe Mare::Compiler::ServeHover do
       "It has an inferred type of: String",
     ]
 
-    messages, pos = ctx.serve_hover[Mare::Source::Pos.point(source, 3, 13)]
+    messages, pos = ctx.serve_hover[Savi::Source::Pos.point(source, 3, 13)]
     pos.row.should eq 3
     pos.col.should eq 12
     pos.size.should eq "hash".bytesize
@@ -39,17 +39,17 @@ describe Mare::Compiler::ServeHover do
   end
 
   it "describes a self-call" do
-    source = Mare::Source.new_example <<-SOURCE
+    source = Savi::Source.new_example <<-SOURCE
     :actor Main
       :fun example U64: 0
       :new
         @example
     SOURCE
 
-    ctx = Mare.compiler.compile([source], :serve_hover)
+    ctx = Savi.compiler.compile([source], :serve_hover)
     ctx.errors.should be_empty
 
-    messages, pos = ctx.serve_hover[Mare::Source::Pos.point(source, 3, 6)]
+    messages, pos = ctx.serve_hover[Savi::Source::Pos.point(source, 3, 6)]
     pos.row.should eq 3
     pos.col.should eq 5
     pos.size.should eq "example".bytesize
@@ -60,7 +60,7 @@ describe Mare::Compiler::ServeHover do
   end
 
   it "describes an expression nested inside several layers of flow control" do
-    source = Mare::Source.new_example <<-SOURCE
+    source = Savi::Source.new_example <<-SOURCE
     :actor Main
       :fun example U64: 0
       :new
@@ -74,10 +74,10 @@ describe Mare::Compiler::ServeHover do
         )
     SOURCE
 
-    ctx = Mare.compiler.compile([source], :serve_hover)
+    ctx = Savi.compiler.compile([source], :serve_hover)
     ctx.errors.should be_empty
 
-    messages, pos = ctx.serve_hover[Mare::Source::Pos.point(source, 7, 9)]
+    messages, pos = ctx.serve_hover[Savi::Source::Pos.point(source, 7, 9)]
     pos.row.should eq 7
     pos.col.should eq 8
     pos.size.should eq "example".bytesize
@@ -88,7 +88,7 @@ describe Mare::Compiler::ServeHover do
   end
 
   it "describes type spans, even if not in a pretty way yet" do
-    source = Mare::Source.new_example <<-SOURCE
+    source = Savi::Source.new_example <<-SOURCE
     :actor Main
       :let buffer String'ref: String.new
       :fun buffer_size: @buffer.size
@@ -96,10 +96,10 @@ describe Mare::Compiler::ServeHover do
         @buffer_size
     SOURCE
 
-    ctx = Mare.compiler.compile([source], :serve_hover)
+    ctx = Savi.compiler.compile([source], :serve_hover)
     ctx.errors.should be_empty
 
-    messages, pos = ctx.serve_hover[Mare::Source::Pos.point(source, 2, 23)]
+    messages, pos = ctx.serve_hover[Savi::Source::Pos.point(source, 2, 23)]
     pos.row.should eq 2
     pos.col.should eq 21
     pos.size.should eq "buffer".bytesize

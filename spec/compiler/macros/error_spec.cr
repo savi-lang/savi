@@ -1,13 +1,13 @@
-describe Mare::Compiler::Macros do
+describe Savi::Compiler::Macros do
   describe "error!" do
     it "is transformed into a jump" do
-      source = Mare::Source.new_example <<-SOURCE
+      source = Savi::Source.new_example <<-SOURCE
       :primitive Errors
         :fun example!
           error!
       SOURCE
 
-      ctx = Mare.compiler.compile([source], :macros)
+      ctx = Savi.compiler.compile([source], :macros)
       ctx.errors.should be_empty
 
       func = ctx.namespace.find_func!(ctx, source, "Errors", "example!")
@@ -16,13 +16,13 @@ describe Mare::Compiler::Macros do
     end
 
     it "can be conditional with `if`" do
-      source = Mare::Source.new_example <<-SOURCE
+      source = Savi::Source.new_example <<-SOURCE
       :primitive Errors
         :fun example!(cond)
           error! if cond
       SOURCE
 
-      ctx = Mare.compiler.compile([source], :macros)
+      ctx = Savi.compiler.compile([source], :macros)
       ctx.errors.should be_empty
 
       func = ctx.namespace.find_func!(ctx, source, "Errors", "example!")
@@ -35,7 +35,7 @@ describe Mare::Compiler::Macros do
     end
 
     it "complains if there are extra terms after the `if` condition" do
-      source = Mare::Source.new_example <<-SOURCE
+      source = Savi::Source.new_example <<-SOURCE
       :primitive Errors
         :fun example!(cond)
           error! if cond what now
@@ -63,12 +63,12 @@ describe Mare::Compiler::Macros do
                               ^~~
       MSG
 
-      Mare.compiler.compile([source], :macros)
+      Savi.compiler.compile([source], :macros)
         .errors.map(&.message).join("\n").should eq expected
     end
 
     it "complains if there is no `if` condition term" do
-      source = Mare::Source.new_example <<-SOURCE
+      source = Savi::Source.new_example <<-SOURCE
       :primitive Errors
         :fun example!(cond)
           error! if
@@ -86,18 +86,18 @@ describe Mare::Compiler::Macros do
           ^~~~~~~~~
       MSG
 
-      Mare.compiler.compile([source], :macros)
+      Savi.compiler.compile([source], :macros)
         .errors.map(&.message).join("\n").should eq expected
     end
 
     it "can be conditional with `unless`" do
-      source = Mare::Source.new_example <<-SOURCE
+      source = Savi::Source.new_example <<-SOURCE
       :primitive Errors
         :fun example!(cond)
           error! unless cond
       SOURCE
 
-      ctx = Mare.compiler.compile([source], :macros)
+      ctx = Savi.compiler.compile([source], :macros)
       ctx.errors.should be_empty
 
       func = ctx.namespace.find_func!(ctx, source, "Errors", "example!")
@@ -110,7 +110,7 @@ describe Mare::Compiler::Macros do
     end
 
     it "complains if there are extra terms after the `unless` condition" do
-      source = Mare::Source.new_example <<-SOURCE
+      source = Savi::Source.new_example <<-SOURCE
       :primitive Errors
         :fun example!(cond)
           error! unless cond what now
@@ -138,12 +138,12 @@ describe Mare::Compiler::Macros do
                                   ^~~
       MSG
 
-      Mare.compiler.compile([source], :macros)
+      Savi.compiler.compile([source], :macros)
         .errors.map(&.message).join("\n").should eq expected
     end
 
     it "complains if there is no `unless` condition term" do
-      source = Mare::Source.new_example <<-SOURCE
+      source = Savi::Source.new_example <<-SOURCE
       :primitive Errors
         :fun example!(cond)
           error! unless
@@ -161,7 +161,7 @@ describe Mare::Compiler::Macros do
           ^~~~~~~~~~~~~
       MSG
 
-      Mare.compiler.compile([source], :macros)
+      Savi.compiler.compile([source], :macros)
         .errors.map(&.message).join("\n").should eq expected
     end
   end

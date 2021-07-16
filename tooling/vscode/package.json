@@ -1,9 +1,9 @@
 {
-	"name": "mare",
-	"displayName": "Mare Language",
-	"description": "Support for the Mare programming language.",
+	"name": "savi",
+	"displayName": "Savi Language",
+	"description": "Support for the Savi programming language.",
 	"version": "0.4.11",
-	"publisher": "mare-lang",
+	"publisher": "savi-lang",
 	"engines": {
 		"vscode": "^1.35.0"
 	},
@@ -12,7 +12,7 @@
 	],
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/jemc/mare"
+		"url": "https://github.com/savi-lang/savi"
 	},
 	"dependencies": {
 		"vscode-languageclient": "^4.3.0",
@@ -32,59 +32,59 @@
 		"watch": "tsc -watch -p ./"
 	},
 	"activationEvents": [
-		"onLanguage:mare"
+		"onLanguage:savi"
 	],
 	"contributes": {
 		"languages": [
 			{
-				"id": "mare",
+				"id": "savi",
 				"aliases": [
-					"Mare",
-					"mare"
+					"Savi",
+					"savi"
 				],
 				"extensions": [
-					".mare"
+					".savi"
 				],
 				"configuration": "./language-configuration.json"
 			}
 		],
 		"grammars": [
 			{
-				"language": "mare",
-				"scopeName": "source.mare",
-				"path": "./syntaxes/Mare.tmLanguage"
+				"language": "savi",
+				"scopeName": "source.savi",
+				"path": "./syntaxes/Savi.tmLanguage"
 			},
 			{
-				"scopeName": "markdown.mare.codeblock",
+				"scopeName": "markdown.savi.codeblock",
 				"path": "./syntaxes/codeblock.json",
 				"injectTo": [
 					"text.html.markdown"
 				],
 				"embeddedLanguages": {
-					"meta.embedded.block.mare": "mare"
+					"meta.embedded.block.savi": "savi"
 				}
 			}
 		],
 		"commands": [
 			{
-				"command": "mare.restart",
-				"title": "Restart the Mare Language Server",
-				"description": "Restart the Mare Language Server process",
-				"category": "Mare"
+				"command": "savi.restart",
+				"title": "Restart the Savi Language Server",
+				"description": "Restart the Savi Language Server process",
+				"category": "Savi"
 			},
 			{
-				"command": "mare.update",
-				"title": "Update the Mare Language Server",
-				"description": "Pull the latest Mare compiler image",
-				"category": "Mare"
+				"command": "savi.update",
+				"title": "Update the Savi Language Server",
+				"description": "Pull the latest Savi compiler image",
+				"category": "Savi"
 			}
 		],
 		"problemMatchers": [],
 		"configuration": {
 			"type": "object",
-			"title": "Mare configuration",
+			"title": "Savi configuration",
 			"properties": {
-				"mare-client.trace.server": {
+				"savi-client.trace.server": {
 					"type": "string",
 					"enum": [
 						"off",
@@ -92,7 +92,7 @@
 						"verbose"
 					],
 					"default": "off",
-					"description": "Trace the communication between VS Code and the Mare Language Server, for debugging purposes.",
+					"description": "Trace the communication between VS Code and the Savi Language Server, for debugging purposes.",
 					"scope": "window"
 				}
 			}
@@ -100,7 +100,7 @@
 	},
 	"__metadata": {
 		"id": "9bc1a4b3-e317-4a9d-a289-ae4a2aa4471b",
-		"publisherDisplayName": "mare-lang",
+		"publisherDisplayName": "savi-lang",
 		"publisherId": "2b952662-3ded-4c9b-996f-9d1725e09e24"
 	}
 }

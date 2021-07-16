@@ -1,12 +1,12 @@
-describe Mare::Compiler::Lambda do
+describe Savi::Compiler::Lambda do
   it "handles thunks (lambdas with no parameters)" do
-    source = Mare::Source.new_example <<-SOURCE
+    source = Savi::Source.new_example <<-SOURCE
     :class Example
       :fun thunk
         apple = ^(Fruit.new("apple").flavor)
     SOURCE
 
-    ctx = Mare.compiler.compile([source], :lambda)
+    ctx = Savi.compiler.compile([source], :lambda)
     ctx.errors.should be_empty
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "thunk")
@@ -35,13 +35,13 @@ describe Mare::Compiler::Lambda do
   end
 
   it "handles lambdas with parameters" do
-    source = Mare::Source.new_example <<-SOURCE
+    source = Savi::Source.new_example <<-SOURCE
     :class Example
       :fun lambdas
         apple = ^(Fruit.new(^1, ^2).flavor)
     SOURCE
 
-    ctx = Mare.compiler.compile([source], :lambda)
+    ctx = Savi.compiler.compile([source], :lambda)
     ctx.errors.should be_empty
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "lambdas")
@@ -73,7 +73,7 @@ describe Mare::Compiler::Lambda do
   end
 
   it "raises an error if a lambda parameter reference is outside a lambda" do
-    source = Mare::Source.new_example <<-SOURCE
+    source = Savi::Source.new_example <<-SOURCE
     :class Example
       :fun no_lambda
         apple = ^1
@@ -86,7 +86,7 @@ describe Mare::Compiler::Lambda do
                 ^~
     MSG
 
-    Mare.compiler.compile([source], :lambda)
+    Savi.compiler.compile([source], :lambda)
       .errors.map(&.message).join("\n").should eq expected
   end
 end

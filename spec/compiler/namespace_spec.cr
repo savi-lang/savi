@@ -1,19 +1,19 @@
-describe Mare::Compiler::Namespace do
+describe Savi::Compiler::Namespace do
   it "returns the same output state when compiled again with same sources" do
-    source = Mare::Source.new_example <<-SOURCE
+    source = Savi::Source.new_example <<-SOURCE
     :actor Main
       :new (env)
         env.out.print("Hello, World")
     SOURCE
 
-    ctx1 = Mare.compiler.compile([source], :namespace)
-    ctx2 = Mare.compiler.compile([source], :namespace)
+    ctx1 = Savi.compiler.compile([source], :namespace)
+    ctx2 = Savi.compiler.compile([source], :namespace)
 
     ctx1.namespace[source].should eq ctx2.namespace[source]
   end
 
   it "complains when a type has the same name as another" do
-    source = Mare::Source.new_example <<-SOURCE
+    source = Savi::Source.new_example <<-SOURCE
     :class Redundancy
     :actor Redundancy
     SOURCE
@@ -30,12 +30,12 @@ describe Mare::Compiler::Namespace do
            ^~~~~~~~~~
     MSG
 
-    Mare.compiler.compile([source], :namespace)
+    Savi.compiler.compile([source], :namespace)
       .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains when a function has the same name as another" do
-    source = Mare::Source.new_example <<-SOURCE
+    source = Savi::Source.new_example <<-SOURCE
     :class Example
       :fun same_name: "This is a contentious function!"
       :var same_name: "This is a contentious property!"
@@ -59,12 +59,12 @@ describe Mare::Compiler::Namespace do
              ^~~~~~~~~
     MSG
 
-    Mare.compiler.compile([source], :namespace)
+    Savi.compiler.compile([source], :namespace)
       .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains when a type has the same name as another" do
-    source = Mare::Source.new_example <<-SOURCE
+    source = Savi::Source.new_example <<-SOURCE
     :class String
     SOURCE
 
@@ -75,12 +75,12 @@ describe Mare::Compiler::Namespace do
            ^~~~~~
 
     - the built-in type is defined here:
-      from #{Mare::Compiler.prelude_library_path}/string.mare:1:
+      from #{Savi::Compiler.prelude_library_path}/string.savi:1:
     :class val String
                ^~~~~~
     MSG
 
-    Mare.compiler.compile([source], :namespace)
+    Savi.compiler.compile([source], :namespace)
       .errors.map(&.message).join("\n").should eq expected
   end
 
@@ -91,11 +91,11 @@ describe Mare::Compiler::Namespace do
   pending "complains when a type name ends with an exclamation"
 
   it "won't have conflicts with a private type in the prelude library" do
-    source = Mare::Source.new_example <<-SOURCE
+    source = Savi::Source.new_example <<-SOURCE
     :ffi LibPony // defined in the prelude, but private, so no conflict here
     SOURCE
 
-    Mare.compiler.compile([source], :namespace)
+    Savi.compiler.compile([source], :namespace)
   end
 
   # TODO: Figure out how to test these in our test suite - they need a library.

@@ -1,6 +1,6 @@
-describe Mare::Source::Pos do
+describe Savi::Source::Pos do
   it "builds from a source and offset" do
-    source = Mare::Source.new_example <<-SOURCE
+    source = Savi::Source.new_example <<-SOURCE
     :class Foo
       :let a A
       :new (@a)
@@ -10,7 +10,7 @@ describe Mare::Source::Pos do
     SOURCE
 
     # Point to the F character on line 1
-    pos = Mare::Source::Pos.point(source, 7)
+    pos = Savi::Source::Pos.point(source, 7)
 
     pos.start.should eq(7)
     pos.finish.should eq(7)
@@ -20,7 +20,7 @@ describe Mare::Source::Pos do
     pos.col.should eq(7)
 
     # Point to the @ character on line 3
-    pos = Mare::Source::Pos.point(source, 30)
+    pos = Savi::Source::Pos.point(source, 30)
 
     pos.start.should eq(30)
     pos.finish.should eq(30)
@@ -31,7 +31,7 @@ describe Mare::Source::Pos do
   end
 
   it "truncates the offset if it's out of bounds" do
-    source = Mare::Source.new_example <<-SOURCE
+    source = Savi::Source.new_example <<-SOURCE
     :class Foo
       :let a A
       :new (@a)
@@ -41,12 +41,12 @@ describe Mare::Source::Pos do
     SOURCE
 
     # Point to the last "\n" character on line 5
-    pos = Mare::Source::Pos.point(source, 89)
+    pos = Savi::Source::Pos.point(source, 89)
     pos.row.should eq(4)
     pos.col.should eq(33)
 
     # Safely point to the last character anyway
-    pos = Mare::Source::Pos.point(source, source.content.size + 10)
+    pos = Savi::Source::Pos.point(source, source.content.size + 10)
     pos.row.should eq(4)
     pos.col.should eq(33)
   end

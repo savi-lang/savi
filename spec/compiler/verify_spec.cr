@@ -1,14 +1,14 @@
-describe Mare::Compiler::Verify do
+describe Savi::Compiler::Verify do
   it "does not impose checks on the Main actor if it doesn't exist" do
-    source = Mare::Source.new_example <<-SOURCE
+    source = Savi::Source.new_example <<-SOURCE
     :primitive Example
     SOURCE
 
-    Mare.compiler.compile([source], :verify).errors.should be_empty
+    Savi.compiler.compile([source], :verify).errors.should be_empty
   end
 
   it "complains if the Main type is not an actor" do
-    source = Mare::Source.new_example <<-SOURCE
+    source = Savi::Source.new_example <<-SOURCE
     :class Main
       :new (env Env)
     SOURCE
@@ -20,12 +20,12 @@ describe Mare::Compiler::Verify do
            ^~~~
     MSG
 
-    Mare.compiler.compile([source], :verify)
+    Savi.compiler.compile([source], :verify)
       .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains if the Main actor has type parameters" do
-    source = Mare::Source.new_example <<-SOURCE
+    source = Savi::Source.new_example <<-SOURCE
     :actor Main(A)
       :new (env Env)
     SOURCE
@@ -37,12 +37,12 @@ describe Mare::Compiler::Verify do
                ^~~
     MSG
 
-    Mare.compiler.compile([source], :verify)
+    Savi.compiler.compile([source], :verify)
       .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains if the Main actor has no `new` constructor" do
-    source = Mare::Source.new_example <<-SOURCE
+    source = Savi::Source.new_example <<-SOURCE
     :actor Main
       :new wrong_name
     SOURCE
@@ -59,12 +59,12 @@ describe Mare::Compiler::Verify do
            ^~~~~~~~~~
     MSG
 
-    Mare.compiler.compile([source], :verify)
+    Savi.compiler.compile([source], :verify)
       .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains if the Main.new function is not a constructor" do
-    source = Mare::Source.new_example <<-SOURCE
+    source = Savi::Source.new_example <<-SOURCE
     :actor Main
       :fun new(env Env)
     SOURCE
@@ -76,12 +76,12 @@ describe Mare::Compiler::Verify do
            ^~~
     MSG
 
-    Mare.compiler.compile([source], :verify)
+    Savi.compiler.compile([source], :verify)
       .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains if the Main.new function has no parameters" do
-    source = Mare::Source.new_example <<-SOURCE
+    source = Savi::Source.new_example <<-SOURCE
     :actor Main
       :new
     SOURCE
@@ -93,17 +93,17 @@ describe Mare::Compiler::Verify do
        ^~~
 
     - it should accept exactly one parameter of type Env:
-      from /opt/code/src/prelude/env.mare:1:
+      from /opt/code/src/prelude/env.savi:1:
     :class val Env
                ^~~
     MSG
 
-    Mare.compiler.compile([source], :verify)
+    Savi.compiler.compile([source], :verify)
       .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains if the Main.new function has too many parameters" do
-    source = Mare::Source.new_example <<-SOURCE
+    source = Savi::Source.new_example <<-SOURCE
     :actor Main
       :new (env Env, bogus Env)
     SOURCE
@@ -115,17 +115,17 @@ describe Mare::Compiler::Verify do
            ^~~~~~~~~~~~~~~~~~~~
 
     - it should accept exactly one parameter of type Env:
-      from /opt/code/src/prelude/env.mare:1:
+      from /opt/code/src/prelude/env.savi:1:
     :class val Env
                ^~~
     MSG
 
-    Mare.compiler.compile([source], :verify)
+    Savi.compiler.compile([source], :verify)
       .errors.map(&.message).join("\n").should eq expected
   end
 
   it "complains if the Main.new function is of the wrong type" do
-    source = Mare::Source.new_example <<-SOURCE
+    source = Savi::Source.new_example <<-SOURCE
     :actor Main
       :new (env String)
     SOURCE
@@ -137,7 +137,7 @@ describe Mare::Compiler::Verify do
             ^~~~~~~~~~
 
     - it should accept a parameter of type Env:
-      from /opt/code/src/prelude/env.mare:1:
+      from /opt/code/src/prelude/env.savi:1:
     :class val Env
                ^~~
 
@@ -147,7 +147,7 @@ describe Mare::Compiler::Verify do
                 ^~~~~~
     MSG
 
-    Mare.compiler.compile([source], :verify)
+    Savi.compiler.compile([source], :verify)
       .errors.map(&.message).join("\n").should eq expected
   end
 end

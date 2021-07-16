@@ -1,13 +1,13 @@
-describe Mare::Compiler::Macros do
+describe Savi::Compiler::Macros do
   describe "yield" do
     it "is transformed into a yield" do
-      source = Mare::Source.new_example <<-SOURCE
+      source = Savi::Source.new_example <<-SOURCE
       :primitive Yields
         :fun example
           yield "value"
       SOURCE
 
-      ctx = Mare.compiler.compile([source], :macros)
+      ctx = Savi.compiler.compile([source], :macros)
       ctx.errors.should be_empty
 
       func = ctx.namespace.find_func!(ctx, source, "Yields", "example")
@@ -19,7 +19,7 @@ describe Mare::Compiler::Macros do
     end
 
     it "complains if there are more terms after the value" do
-      source = Mare::Source.new_example <<-SOURCE
+      source = Savi::Source.new_example <<-SOURCE
       :primitive Yields
         :fun example
           yield "value" what now
@@ -47,18 +47,18 @@ describe Mare::Compiler::Macros do
                              ^~~
       MSG
 
-      Mare.compiler.compile([source], :macros)
+      Savi.compiler.compile([source], :macros)
         .errors.map(&.message).join("\n").should eq expected
     end
 
     it "can be conditional with `if`" do
-      source = Mare::Source.new_example <<-SOURCE
+      source = Savi::Source.new_example <<-SOURCE
       :primitive Yields
         :fun example(cond)
           yield "value" if cond
       SOURCE
 
-      ctx = Mare.compiler.compile([source], :macros)
+      ctx = Savi.compiler.compile([source], :macros)
       ctx.errors.should be_empty
 
       func = ctx.namespace.find_func!(ctx, source, "Yields", "example")
@@ -71,7 +71,7 @@ describe Mare::Compiler::Macros do
     end
 
     it "complains if there are extra terms after the value and `if`" do
-      source = Mare::Source.new_example <<-SOURCE
+      source = Savi::Source.new_example <<-SOURCE
       :primitive Yields
         :fun example(cond)
           yield "value" if cond what now
@@ -104,12 +104,12 @@ describe Mare::Compiler::Macros do
                                      ^~~
       MSG
 
-      Mare.compiler.compile([source], :macros)
+      Savi.compiler.compile([source], :macros)
         .errors.map(&.message).join("\n").should eq expected
     end
 
     it "complains if there is no `if` condition term" do
-      source = Mare::Source.new_example <<-SOURCE
+      source = Savi::Source.new_example <<-SOURCE
       :primitive Yields
         :fun example(cond)
           yield "value" if
@@ -132,7 +132,7 @@ describe Mare::Compiler::Macros do
           ^~~~~~~~~~~~~~~~
       MSG
 
-      Mare.compiler.compile([source], :macros)
+      Savi.compiler.compile([source], :macros)
         .errors.map(&.message).join("\n").should eq expected
     end
   end

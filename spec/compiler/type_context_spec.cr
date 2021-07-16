@@ -1,6 +1,6 @@
-describe Mare::Compiler::TypeContext do
+describe Savi::Compiler::TypeContext do
   it "complains when the type identifier couldn't be resolved" do
-    source = Mare::Source.new_example <<-SOURCE
+    source = Savi::Source.new_example <<-SOURCE
     :actor Main
       :new
         Container(String).new("Hello").string
@@ -13,21 +13,21 @@ describe Mare::Compiler::TypeContext do
 
     SOURCE
 
-    ctx = Mare.compiler.compile([source], :type_context)
+    ctx = Savi.compiler.compile([source], :type_context)
     ctx.errors.should be_empty
 
-    t_link = ctx.namespace[source]["Container"].as(Mare::Program::Type::Link)
+    t_link = ctx.namespace[source]["Container"].as(Savi::Program::Type::Link)
     f_link = t_link.make_func_link_simple("string")
     func = f_link.resolve(ctx)
     type_context = ctx.type_context[f_link]
 
     choice = func
       .body.not_nil!
-      .terms.first.as(Mare::AST::Group)
-      .terms.first.as(Mare::AST::Choice)
+      .terms.first.as(Savi::AST::Group)
+      .terms.first.as(Savi::AST::Choice)
 
-    left_expr = choice.list[0].last.as(Mare::AST::Group).terms.first
-    right_expr = choice.list[1].last.as(Mare::AST::Group).terms.first
+    left_expr = choice.list[0].last.as(Savi::AST::Group).terms.first
+    right_expr = choice.list[1].last.as(Savi::AST::Group).terms.first
 
     type_context.layer_index(choice).should eq 0
     type_context[choice].should eq type_context[0]

@@ -1,0 +1,30 @@
+:ffi LibC
+  :fun printf(format CPointer(U8), arg1 CPointer(U8)) I32
+
+:class Greeting
+  :let message1 String
+  :let message2 String
+  :new iso (@message1, @message2)
+  :fun say
+    LibC.printf("%s\n".cstring, @message1.cstring)
+    LibC.printf("%s\n".cstring, @message2.cstring)
+
+:actor Greeter
+  :new (g Greeting'val)
+    greeting val = Greeting.new("unused", "unused")
+    greeting = Greeting.new(g.message1, g.message2)
+    greeting.say
+
+:actor Main
+  :new (env)
+    greeting val = Greeting.new("What goes", "up")
+    Greeter.new(greeting)
+
+    greeting     = Greeting.new("Must come", "down")
+    Greeter.new(greeting)
+
+    greeting     = Greeting.new("Savi can", "now")
+    Greeter.new(greeting)
+
+    greeting     = Greeting.new("Schedule a", "cown")
+    Greeter.new(greeting)

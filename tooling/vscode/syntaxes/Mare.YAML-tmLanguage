@@ -1,159 +1,159 @@
 # [PackageDev] target_format: plist, ext: tmLanguage
-name: Mare
-scopeName: source.mare
-fileTypes: [mare]
+name: Savi
+scopeName: source.savi
+fileTypes: [savi]
 uuid: 6d792077-696c-6465-7374-20647265616d
 patterns:
 
 - comment: Line Comment
-  name: comment.line.mare
+  name: comment.line.savi
   begin: \s*(//)
   end: ($)
 
 - comment: Doc Comment
-  name: comment.doc.mare
+  name: comment.doc.savi
   begin: \s*(::)
   end: ($)
 
 - comment: Capability Operator
-  name: meta.operator.capability.mare
+  name: meta.operator.capability.savi
   match: (\')(\w+)(?=[^\'])
   captures:
-    '1': {name: keyword.operator.capability.mare}
-    '2': {name: entity.name.identifier.mare}
+    '1': {name: keyword.operator.capability.savi}
+    '2': {name: entity.name.identifier.savi}
 
 - comment: Double-Quote String
-  name: string.quoted.double.mare
+  name: string.quoted.double.savi
   begin: (\w?")
   end: (")
   patterns:
-  - name: constant.character.escape.mare
+  - name: constant.character.escape.savi
     match: \\.
 
 - comment: Single-Char String
-  name: string.quoted.single.mare
+  name: string.quoted.single.savi
   begin: (')
   end: (')
   patterns:
-  - name: constant.character.escape.mare
+  - name: constant.character.escape.savi
     match: \\.
 
 - comment: Class (or other type)
-  name: meta.class.mare
+  name: meta.class.savi
   match: ([_A-Z]\w*)
   captures:
-    '1': {name: support.class.mare}
+    '1': {name: support.class.savi}
 
 - comment: Declare
-  name: meta.declare.mare
+  name: meta.declare.savi
   begin: ^\s*(:)(\w+)
   end: (:)|\n
   beginCaptures:
-    '1': {name: keyword.declare.mare}
-    '2': {name: keyword.declare.mare}
+    '1': {name: keyword.declare.savi}
+    '2': {name: keyword.declare.savi}
   endCaptures:
-    '1': {name: keyword.declare.mare}
+    '1': {name: keyword.declare.savi}
   patterns:
-  - name: entity.other.attribute-name.mare
+  - name: entity.other.attribute-name.savi
     match: \b[a-z_]\w*\b(?!\!)
   - include: $self
 
 - comment: Error-Raising Calls/Names
-  name: markup.deleted.mare
+  name: markup.deleted.savi
   match: ((\w+|\+|\-|\*)\!)
 
 - comment: Numeric Values
-  name: constant.numeric.mare
+  name: constant.numeric.savi
   match: \b\d([\d_]*(\.[\d_]+)?)\b
 
 - comment: Hex Numeric Values
-  name: constant.numeric.mare
+  name: constant.numeric.savi
   match: \b0x([0-9a-fA-F_]+)\b
 
 - comment: Binary Numeric Values
-  name: constant.numeric.mare
+  name: constant.numeric.savi
   match: \b0b([01_]+)\b
 
 - comment: Function Call (with braces)
-  name: entity.name.function.mare
+  name: entity.name.function.savi
   match: (\w+(?:\?|\!)?)(?=\()
 
 - comment: Function Call (with receiver)
-  name: support.function.mare
+  name: support.function.savi
   match: (?<=\.)(\w+(?:\?|\!)?)
 
 - comment: Function Call (with self receiver)
-  name: support.function.mare
+  name: support.function.savi
   match: (?<=@)(\w+(?:\?|\!)?)
 
 - comment: Parenthesis
-  name: meta.parens.mare
+  name: meta.parens.savi
   begin: (\()
   end: (\))
-  beginCaptures: {'1': {name: punctuation.section.paren.mare}}
-  endCaptures:   {'1': {name: punctuation.section.paren.mare}}
+  beginCaptures: {'1': {name: punctuation.section.paren.savi}}
+  endCaptures:   {'1': {name: punctuation.section.paren.savi}}
   patterns:
   - include: $self
 
 - comment: Brace
-  name: meta.braces.mare
+  name: meta.braces.savi
   begin: (\{)
   end: (\})
-  beginCaptures: {'1': {name: punctuation.section.brace.mare}}
-  endCaptures:   {'1': {name: punctuation.section.brace.mare}}
+  beginCaptures: {'1': {name: punctuation.section.brace.savi}}
+  endCaptures:   {'1': {name: punctuation.section.brace.savi}}
   patterns:
   - include: $self
 
 - comment: Bracket
-  name: meta.brackets.mare
+  name: meta.brackets.savi
   begin: (\[)
   end: (\])(\!)?
-  beginCaptures: {'1': {name: punctuation.section.bracket.mare}}
-  endCaptures:   {'1': {name: punctuation.section.bracket.mare}, '2': {name: markup.deleted.mare}}
+  beginCaptures: {'1': {name: punctuation.section.bracket.savi}}
+  endCaptures:   {'1': {name: punctuation.section.bracket.savi}, '2': {name: markup.deleted.savi}}
   patterns:
   - include: $self
 
 - comment: Bracket
-  name: meta.brackets.mare
+  name: meta.brackets.savi
   begin: (\[)
   end: (\])
-  beginCaptures: {'1': {name: punctuation.section.bracket.mare}}
-  endCaptures:   {'1': {name: punctuation.section.bracket.mare}}
+  beginCaptures: {'1': {name: punctuation.section.bracket.savi}}
+  endCaptures:   {'1': {name: punctuation.section.bracket.savi}}
   patterns:
   - include: $self
 
 - comment: Expression Separators
-  name: punctuation.separator.mare
+  name: punctuation.separator.savi
   match: (\,|\;|\:)
 
 - comment: Other "Punctuation"
-  name: punctuation.receiver.mare
+  name: punctuation.receiver.savi
   match: (@|\.)
 
 - comment: Piping Operators
-  name: keyword.operator.pipe.mare
+  name: keyword.operator.pipe.savi
   match: (\|\>)
 
 - comment: Branching Operators
-  name: keyword.operator.compound.mare
+  name: keyword.operator.compound.savi
   match: (\&\&|\|\||\?\?|\&\?|\|\?|\.\?)
 
 - comment: Comparison Operators
-  name: keyword.operator.comparison.mare
+  name: keyword.operator.comparison.savi
   match: (\<\=\>|\=\~|\=\=|\<\=|\>\=|\<|\>)
 
 - comment: Arithmetic Operators
-  name: keyword.operator.arithmetic.mare
+  name: keyword.operator.arithmetic.savi
   match: (\+|\-|\/|\*|\%)
 
 - comment: Assignment Operators
-  name: keyword.operator.assignment.mare
+  name: keyword.operator.assignment.savi
   match: (\=)
 
 - comment: Other Operators
-  name: keyword.operator.other.mare
+  name: keyword.operator.other.savi
   match: (\!|\<\<|\<|\&|\|)
 
 - comment: Identifiers
-  name: entity.name.identifier.mare
+  name: entity.name.identifier.savi
   match: \w+

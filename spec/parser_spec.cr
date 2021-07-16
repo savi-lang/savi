@@ -1,8 +1,8 @@
 require "./spec_helper"
 
-describe Mare::Parser do
+describe Savi::Parser do
   it "parses an example" do
-    source = Mare::Source.new_example <<-SOURCE
+    source = Savi::Source.new_example <<-SOURCE
     :class Example
       :let name String: "World"
 
@@ -14,7 +14,7 @@ describe Mare::Parser do
         c * 9 / 5 + 32.0
     SOURCE
 
-    ast = Mare::Parser.parse(source)
+    ast = Savi::Parser.parse(source)
 
     ast.to_a.pretty_inspect(74).should eq <<-AST
     [:doc,
@@ -49,7 +49,7 @@ describe Mare::Parser do
   end
 
   it "parses operators" do
-    source = Mare::Source.new_example <<-SOURCE
+    source = Savi::Source.new_example <<-SOURCE
     :describe operators
       :demo all // in order of precedence, from "weakest" to "strongest"
         y = x
@@ -67,7 +67,7 @@ describe Mare::Parser do
         ~x
     SOURCE
 
-    ast = Mare::Parser.parse(source)
+    ast = Savi::Parser.parse(source)
 
     # Can't use array literals here because Crystal is too slow to compile them.
     # See https://github.com/crystal-lang/crystal/issues/5792
@@ -175,7 +175,7 @@ describe Mare::Parser do
   end
 
   it "complains when a character literal has too many characters in it" do
-    source = Mare::Source.new_example <<-SOURCE
+    source = Savi::Source.new_example <<-SOURCE
     :actor Main
       :new
         x U64 = '..'
@@ -188,13 +188,13 @@ describe Mare::Parser do
                  ^~
     MSG
 
-    expect_raises Mare::Error, expected do
-      Mare::Parser.parse(source)
+    expect_raises Savi::Error, expected do
+      Savi::Parser.parse(source)
     end
   end
 
   it "handles nifty heredoc string literals" do
-    source = Mare::Source.new_example <<-SOURCE
+    source = Savi::Source.new_example <<-SOURCE
     :actor Main
       :new
         <<<FOO>>>
@@ -213,7 +213,7 @@ describe Mare::Parser do
         >>>
     SOURCE
 
-    ast = Mare::Parser.parse(source)
+    ast = Savi::Parser.parse(source)
 
     ast.to_a.should eq [:doc,
       [:declare, [[:ident, "actor"], [:ident, "Main"]], [:group, ":"]],
@@ -227,13 +227,13 @@ describe Mare::Parser do
   end
 
   it "correctly parses a negative integer literal in a single-line decl" do
-    source = Mare::Source.new_example <<-SOURCE
+    source = Savi::Source.new_example <<-SOURCE
     :primitive Example
       :const x U64: 1
       :const y U64: -1
     SOURCE
 
-    ast = Mare::Parser.parse(source)
+    ast = Savi::Parser.parse(source)
 
     # Can't use array literals here because Crystal is too slow to compile them.
     ast.to_a.pretty_inspect(74).should eq <<-AST
@@ -254,14 +254,14 @@ describe Mare::Parser do
       :const greeting String: "Hello, World!"
     SOURCE
 
-    ast1 = Mare::Parser.parse(Mare::Source.new_example(content))
-    ast2 = Mare::Parser.parse(Mare::Source.new_example(content))
+    ast1 = Savi::Parser.parse(Savi::Source.new_example(content))
+    ast2 = Savi::Parser.parse(Savi::Source.new_example(content))
 
     ast1.should be ast2
   end
 
   it "parses a Pony example" do
-    source = Mare::Source.new_pony_example <<-SOURCE
+    source = Savi::Source.new_pony_example <<-SOURCE
     class Example
       let name: String = "World"
 
@@ -273,7 +273,7 @@ describe Mare::Parser do
         c * 9 / 5 + 32.0
     SOURCE
 
-    ast = Mare::Parser.parse(source)
+    ast = Savi::Parser.parse(source)
 
     ast.to_a.pretty_inspect(74).should eq <<-AST
     [:doc,

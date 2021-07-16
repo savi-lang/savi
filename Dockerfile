@@ -82,7 +82,7 @@ RUN mkdir /opt/code
 WORKDIR /opt/code
 
 ##
-# Build stage: outputs an alpine image that contains a working Mare compiler
+# Build stage: outputs an alpine image that contains a working Savi compiler
 # (this image is used only as a precursor to the release stage)
 
 FROM alpine:3.14 as build
@@ -102,15 +102,15 @@ COPY --from=dev /usr/lib/libponyrt.bc \
 COPY --from=dev /usr/lib/crystal/core/llvm/ext/llvm_ext.o \
                 /usr/lib/crystal/core/llvm/ext/
 
-RUN mkdir /opt/mare
-WORKDIR /opt/mare
-COPY Makefile main.cr /opt/mare/
-COPY lib /opt/mare/lib
-COPY src /opt/mare/src
-RUN make /tmp/bin/mare
+RUN mkdir /opt/savi
+WORKDIR /opt/savi
+COPY Makefile main.cr /opt/savi/
+COPY lib /opt/savi/lib
+COPY src /opt/savi/src
+RUN make /tmp/bin/savi
 
 ##
-# Release stage: outputs a minimal alpine image with a working Mare compiler
+# Release stage: outputs a minimal alpine image with a working Savi compiler
 # (this image is made available on DockerHub for download)
 
 FROM alpine:3.14 as release
@@ -125,8 +125,8 @@ WORKDIR /opt/code
 COPY --from=dev /usr/lib/libponyrt.bc \
                 /usr/lib/
 
-COPY src/prelude /opt/mare/src/prelude
-COPY packages    /opt/mare/packages
-COPY --from=build /tmp/bin/mare /bin/mare
+COPY src/prelude /opt/savi/src/prelude
+COPY packages    /opt/savi/packages
+COPY --from=build /tmp/bin/savi /bin/savi
 
-ENTRYPOINT ["/bin/mare"]
+ENTRYPOINT ["/bin/savi"]

@@ -1,7 +1,7 @@
 {
-	"name": "coc-mare",
-	"displayName": "Mare Language Test",
-	"description": "Test Support for the Mare programming language for coc.nvim.",
+	"name": "coc-savi",
+	"displayName": "Savi Language Test",
+	"description": "Test Support for the Savi programming language for coc.nvim.",
 	"version": "0.0.17",
 	"publisher": "teggot",
 	"engines": {
@@ -9,7 +9,7 @@
 	},
 	"keywords": [
 		"coc.nvim",
-		"mare",
+		"savi",
 		"languageserver"
 	],
 	"categories": [
@@ -17,7 +17,7 @@
 	],
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/jemc/mare"
+		"url": "https://github.com/savi-lang/savi"
 	},
 	"devDependencies": {
 		"@chemzqm/tsconfig": "^0.0.3",
@@ -42,28 +42,28 @@
 		"prepare": "npx npm-run-all clean build"
 	},
 	"activationEvents": [
-		"onLanguage:mare"
+		"onLanguage:savi"
 	],
 	"contributes": {
 		"commands": [
 			{
-				"command": "mare.restart",
-				"title": "Restart the Mare Language Server",
-				"description": "Restart the Mare Language Server process",
-				"category": "Mare"
+				"command": "savi.restart",
+				"title": "Restart the Savi Language Server",
+				"description": "Restart the Savi Language Server process",
+				"category": "Savi"
 			},
 			{
-				"command": "mare.update",
-				"title": "Update the Mare Language Server",
-				"description": "Pull the latest Mare compiler image",
-				"category": "Mare"
+				"command": "savi.update",
+				"title": "Update the Savi Language Server",
+				"description": "Pull the latest Savi compiler image",
+				"category": "Savi"
 			}
 		],
 		"configuration": {
 			"type": "object",
-			"title": "Mare configuration",
+			"title": "Savi configuration",
 			"properties": {
-				"mare-client.trace.server": {
+				"savi-client.trace.server": {
 					"type": "string",
 					"enum": [
 						"off",
@@ -71,7 +71,7 @@
 						"verbose"
 					],
 					"default": "off",
-					"description": "Trace the communication between VS Code and the Mare Language Server, for debugging purposes.",
+					"description": "Trace the communication between VS Code and the Savi Language Server, for debugging purposes.",
 					"scope": "window"
 				}
 			}

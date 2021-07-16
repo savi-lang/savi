@@ -7,7 +7,7 @@ workflows:
   tooling-vscode-publish:
     jobs:
       - tooling-vscode-publish:
-          filters: { branches: { only: [master] } }
+          filters: { branches: { only: [main] } }
 
 jobs:
   build:

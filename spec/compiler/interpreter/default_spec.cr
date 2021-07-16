@@ -1,8 +1,8 @@
 require "../../spec_helper"
 
-describe Mare::Compiler::Interpreter::Default do
+describe Savi::Compiler::Interpreter::Default do
   it "complains when a capability is specified for a behaviour" do
-    source = Mare::Source.new_example <<-SOURCE
+    source = Savi::Source.new_example <<-SOURCE
     :actor Example
       :be ref example
         None
@@ -15,17 +15,17 @@ describe Mare::Compiler::Interpreter::Default do
           ^~~
     MSG
 
-    Mare.compiler.compile([source], :import)
+    Savi.compiler.compile([source], :import)
       .errors.map(&.message).join("\n").should eq expected
   end
 
   it "correctly handles an explicit union return type" do
-    source = Mare::Source.new_example <<-SOURCE
+    source = Savi::Source.new_example <<-SOURCE
     :trait Greeter
       :fun greeting (String | None)
     SOURCE
 
-    ctx = Mare.compiler.compile([source], :import)
+    ctx = Savi.compiler.compile([source], :import)
     ctx.errors.should be_empty
 
     greeter = ctx.program.types.first

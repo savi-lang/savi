@@ -6,5 +6,5 @@ type summary add TYPE --summary-string "${var.name._ptr} (id=${var.id})"
 type summary add TYPESTRING --summary-string "${var._ptr}"
 
 # Load custom python script commands.
-command script import ./tooling/lldb/mare_commands.py
-command script add -f mare_commands.get_command get
+command script import ./tooling/lldb/savi_commands.py
+command script add -f savi_commands.get_command get

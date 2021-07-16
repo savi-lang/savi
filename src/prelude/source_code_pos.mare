@@ -1,6 +1,0 @@
-:class val SourceCodePosition
-  // TODO: include more properties from the original Mare::Source::Pos?
-  :var string String: ""
-  :var filename String: ""
-  :var row USize: 0
-  :var col USize: 0

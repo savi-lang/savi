@@ -1,20 +1,20 @@
-# Introduction to Mare for Pony users
+# Introduction to Savi for Pony users
 
 ## Overview
 
-At it's heart, Mare has pretty much exactly the same semantics as Pony (with a few notable exceptions). On it's face, it can be rather different in syntax and style. This document describes some of the important changes in Mare compared to Pony, with the assumption that the reader is familiar with the syntax and semantics of Pony.
+At it's heart, Savi has pretty much exactly the same semantics as Pony (with a few notable exceptions). On it's face, it can be rather different in syntax and style. This document describes some of the important changes in Savi compared to Pony, with the assumption that the reader is familiar with the syntax and semantics of Pony.
 
-This document is a work in progress, and it may not always be pretty or polished while we work. That's okay! If you notice a significant difference in Mare compared to what you're used to in Pony, file an issue ticket or a PR to add information about that here. Even if it's just a stub of sentence fragments, it will be better than nothing, and we can iterate from there. We have plenty of time to polish this document over time while we work toward our goal of comprehensiveness.
+This document is a work in progress, and it may not always be pretty or polished while we work. That's okay! If you notice a significant difference in Savi compared to what you're used to in Pony, file an issue ticket or a PR to add information about that here. Even if it's just a stub of sentence fragments, it will be better than nothing, and we can iterate from there. We have plenty of time to polish this document over time while we work toward our goal of comprehensiveness.
 
 ## Syntax
 
 ### Declarations
 
-Like Pony, Mare has an "open" syntax for classes, functions, and other declarations. That is, such declarative entities do not require an "end" token in the syntax for the parser to know that they are finished - it can figure that out just by the fact that you've started the next class, function, or other declaration.
+Like Pony, Savi has an "open" syntax for classes, functions, and other declarations. That is, such declarative entities do not require an "end" token in the syntax for the parser to know that they are finished - it can figure that out just by the fact that you've started the next class, function, or other declaration.
 
-You can spot a Mare declaration whenever you notice that a line begins with an identifier prefixed with a colon. For example, this snippet declares a `class` called `Person` and a function (`fun`) called `greeting` within it:
+You can spot a Savi declaration whenever you notice that a line begins with an identifier prefixed with a colon. For example, this snippet declares a `class` called `Person` and a function (`fun`) called `greeting` within it:
 
-```mare
+```savi
 :class Person
   :fun greeting
     "Hello, World!"
@@ -22,14 +22,14 @@ You can spot a Mare declaration whenever you notice that a line begins with an i
 
 A declaration "head" is any such line beginning with a colon-prefixed identifier. That is, the "head" continues until the end of the line, at which point the "body" of the declaration begins. However, we can also choose to end the head early by using another colon to mark the end of the head, allowing us to put "body" code on the same line, as in the following equivalent example:
 
-```mare
+```savi
 :class Person
   :fun greeting: "Hello, World!"
 ```
 
 ### Functions
 
-Function calls and function declarations in Mare have a few differences from Pony:
+Function calls and function declarations in Savi have a few differences from Pony:
 
 - a function declaration doesn't require parenthesis if there are no parameters
 - function call doesn't require parenthesis if there are no arguments
@@ -38,13 +38,13 @@ Function calls and function declarations in Mare have a few differences from Pon
 
 ### Comments
 
-Like Pony, Mare has comments using the `//` syntax to mark the beginning of a comment, causing the parser to ignore all of the rest of the characters on that line.
+Like Pony, Savi has comments using the `//` syntax to mark the beginning of a comment, causing the parser to ignore all of the rest of the characters on that line.
 
-Additionally, Mare has "documentation comments", which instead use the `::` syntax to mark the beginning of such a comment, causing the parser to treat the rest of the characters on that line as a documentation string. This replaces the idiom of using triple-double-quote strings (`"""`) in Pony to add documentation to a type or a function.
+Additionally, Savi has "documentation comments", which instead use the `::` syntax to mark the beginning of such a comment, causing the parser to treat the rest of the characters on that line as a documentation string. This replaces the idiom of using triple-double-quote strings (`"""`) in Pony to add documentation to a type or a function.
 
 Unlike in Pony, the documentation comments for a type of function appear *above* the type or function declaration, rather than as the first expression below or "inside" of the declaration.
 
-```mare
+```savi
 :: This comment is stored as documentation for the Example type.
 :primitive Example
   :: This comment is stored as documentation for the greeting function.
@@ -62,26 +62,26 @@ Unlike in Pony, the documentation comments for a type of function appear *above*
 
 Creating a local variable is simply an assignment:
 
-```mare
+```savi
 greeting = "Hello, World!"
 ```
 
 There is no need to declare before the first assignment with `var` or `let` as required in Pony. As a result, there is also no distinction between `var` and `let` semantics for local variables - all local variables are reassignable:
 
-```mare
+```savi
 greeting = "Hello, World!"
 greeting = "Goodbye, Cruel World!"
 ```
 
 If you want to specify an explicit type rather than letting the compiler infer it from the first assignment, you can specify it by placing it directly after the variable name, separated only by whitespace:
 
-```mare
+```savi
 greeting String'val = "Hello, World!"
 ```
 
 If desired, you can also choose to specify only the capability, and let the rest of the type be inferred:
 
-```mare
+```savi
 greeting val = "Hello, World!"
 ```
 
@@ -89,7 +89,7 @@ greeting val = "Hello, World!"
 
 Just like in Pony, a type is declared with a capitalized identifier, and it is referenced simply by referring to the identifier.
 
-```mare
+```savi
 :class Person
   :fun greeting
     "Hello, World!"
@@ -99,9 +99,9 @@ Just like in Pony, a type is declared with a capitalized identifier, and it is r
     person.greeting
 ```
 
-Just like in Pony, each type has an implicit capability which is assumed when no explicit is named. Just like in Pony, the default implicit capability for a class is `ref`, so the above example is equivalent to the below example, in which the `ref` is explicitly stated as the parameter type instead of left to be implicit. Note that in Mare, a capability is appended to a type by placing a single-quote / "prime" symbol in between them, unlike in Pony (which separated them with only whitespace):
+Just like in Pony, each type has an implicit capability which is assumed when no explicit is named. Just like in Pony, the default implicit capability for a class is `ref`, so the above example is equivalent to the below example, in which the `ref` is explicitly stated as the parameter type instead of left to be implicit. Note that in Savi, a capability is appended to a type by placing a single-quote / "prime" symbol in between them, unlike in Pony (which separated them with only whitespace):
 
-```mare
+```savi
 :class Person
   :fun greeting
     "Hello, World!"
@@ -113,7 +113,7 @@ Just like in Pony, each type has an implicit capability which is assumed when no
 
 Just like in Pony, the implicit capability of the type can be selected by placing it as part of the type declaration. As mentioned above, for a class, the default is `ref`, so the following example is still totally equivalent to the two above examples:
 
-```mare
+```savi
 :class ref Person
   :fun greeting
     "Hello, World!"
@@ -125,21 +125,21 @@ Just like in Pony, the implicit capability of the type can be selected by placin
 
 ### Referring to the "Self" Object
 
-In Pony, the self object is referred to as `this`. However, in Mare it is referred to with the symbol `@`. So, the following example defines a function `Person.myself`, which returns the same self/receiver object that it was called upon:
+In Pony, the self object is referred to as `this`. However, in Savi it is referred to with the symbol `@`. So, the following example defines a function `Person.myself`, which returns the same self/receiver object that it was called upon:
 
-```mare
+```savi
 :class Person
   :fun myself
     @
 ```
 
-The reason for shortening this identifier as a special case is because it is used so much more often in Mare than it was in Pony. It's seen more often because Mare *requires an explicit receiver even for function calls on the self object*.
+The reason for shortening this identifier as a special case is because it is used so much more often in Savi than it was in Pony. It's seen more often because Savi *requires an explicit receiver even for function calls on the self object*.
 
-In Pony, a bare identifier could either refer to a local variable / parameter, or to a function / field on the current self object. As a result, those identifiers all shared the same namespace, and you could not name a variable / parameter with the same name as a function / field. Mare removes this restriction by requiring that all function calls on the self object be prefixed with a `@` symbol.
+In Pony, a bare identifier could either refer to a local variable / parameter, or to a function / field on the current self object. As a result, those identifiers all shared the same namespace, and you could not name a variable / parameter with the same name as a function / field. Savi removes this restriction by requiring that all function calls on the self object be prefixed with a `@` symbol.
 
 In other words, `@some_function` is syntax sugar for `@.some_function`, as demonstrated in the following example:
 
-```mare
+```savi
 :class Person
   :fun greet(thing): "Hello, " + thing + "!"
   :fun greet_the_world: @greet("World")
@@ -147,7 +147,7 @@ In other words, `@some_function` is syntax sugar for `@.some_function`, as demon
 
 ### Control Flow Macros
 
-In Mare, control flow constructs (things like blocks that conditionally evaluate, or loop, or catch errors) are implemented internally as macros rather than reserved keywords. That is, the word that defines the macro only acts as such when it's in the right syntactical context, but In the future it will be possible to configure user-defined macros, but at this time only built-in macros are possible.
+In Savi, control flow constructs (things like blocks that conditionally evaluate, or loop, or catch errors) are implemented internally as macros rather than reserved keywords. That is, the word that defines the macro only acts as such when it's in the right syntactical context, but In the future it will be possible to configure user-defined macros, but at this time only built-in macros are possible.
 
 Usually these macros take the form of a word followed by one or more terms separated by mandatory whitespace. Often, one of these terms ends up being a parenthesized expression, and sometimes that parenthesized block is further broken into sub-blocks by the pipe character (`|`). In general, the forms often look something like this:
 
@@ -170,7 +170,7 @@ An `if` macro has two terms:
     - the first half of the block executes if the condition is true
     - the second half of the block executes if the condition is false
 
-```mare
+```savi
 :actor Main
   :let env Env
 
@@ -219,7 +219,7 @@ The `case` macro is the preferred way to test many alternative conditions, and i
 
 Let's look at the same code sample from the `if` section above, rewritten to use `case`:
 
-```mare
+```savi
 :actor Main
   :let env Env
 
@@ -249,7 +249,7 @@ Let's look at the same code sample from the `if` section above, rewritten to use
 
 Now let's look at an example of `case` used with the subtype check operator:
 
-```mare
+```savi
 :primitive Example
   :fun thing_to_number(thing Any'box) I64
     case (
@@ -262,7 +262,7 @@ Now let's look at an example of `case` used with the subtype check operator:
 
 An alternative syntax for `case` is available when the left-side expression and operator are the same in every conditional part:
 
-```mare
+```savi
 :primitive Example
   :fun thing_to_number(thing Any'box) I64
     case thing <: (
@@ -281,7 +281,7 @@ A `try` macro has just one term: the block to execute with a landing pad to "cat
 
 If the term is a parenthesized expression split in half by the `|` character, then the second have of the block is the block to evaluate if the error was caught.
 
-```mare
+```savi
 :actor Main
   :new (env Env)
     str = "10231"
@@ -314,7 +314,7 @@ A `while` macro has two terms:
     - the first half of the block executes each time the condition is true
     - the second half of the block executes if the condition failed on the first time, meaning the other block never executed
 
-```mare
+```savi
 :actor Main
   :new (env Env)
     i USize = 0
@@ -340,7 +340,7 @@ When the parenthesized block is split by the `|` character, the first half of th
 
 In the standard library, this kind of function is often used for iteration, but it can be used in any other case where a function needs to pass values back and forth with the caller before the function finishes executing.
 
-```mare
+```savi
 :import "collections"
 
 :actor Main
@@ -356,9 +356,9 @@ In the standard library, this kind of function is often used for iteration, but 
 
 If you want to create such a function, you can use the :yields declaration to describe what it yields out and what it expects to receive back from the caller (or `None` if not specified), then use the `yield` macro with one term within the function body to suspend execution temporarily while the caller executes its embedded block.
 
-Note that the block is not a value that can be carried around - yielding cannot be asynchronous and must take place within the normal execution of the yielding function. However this restriction on the yielder gives benefits to the caller because it is efficient and it can be used to modify local variables in the scope of the caller, without many of the reference capability pitfalls that lambdas in Pony have. Mare will also have Pony-like lambdas, but these yield blocks are to be preferred for synchronous and immediate callbacks / inversion of control.
+Note that the block is not a value that can be carried around - yielding cannot be asynchronous and must take place within the normal execution of the yielding function. However this restriction on the yielder gives benefits to the caller because it is efficient and it can be used to modify local variables in the scope of the caller, without many of the reference capability pitfalls that lambdas in Pony have. Savi will also have Pony-like lambdas, but these yield blocks are to be preferred for synchronous and immediate callbacks / inversion of control.
 
-```mare
+```savi
 :primitive Blabber
   :const sentences Array(String)'val: [
     "Hello, nice to meet you!"
@@ -393,29 +393,29 @@ Note that the block is not a value that can be carried around - yielding cannot 
 
 ### Properties and Related Sugar
 
-In Mare, a property is roughly equivalent to a field in Pony. It can be declared with the `var` or `let` declarator. Similar to Pony, the `var` declarator will allow assigning a new value at any time, whereas fields declared with `let` cannot be reassigned once all fields have been assigned at least once in the constructor.
+In Savi, a property is roughly equivalent to a field in Pony. It can be declared with the `var` or `let` declarator. Similar to Pony, the `var` declarator will allow assigning a new value at any time, whereas fields declared with `let` cannot be reassigned once all fields have been assigned at least once in the constructor.
 
 This is a bit more lenient than Pony in that it allows you to potentially reassign `let` fields prior to the "completion" of all field assignments, since that is the point in the code at which the constructed instance is considered fully initialized and able to begin sharing itself externally. Once this externally-shareable point is reached, `let` fields are locked in place. Just as in Pony, `let` fields are not strictly immutable - the object pointed to by the field can potentially be internally mutated, but the field cannot be re-pointed to a new object. Where deep immutability of a field is desired, the `let` declarator can be paired with the `val` reference capability for the field type.
 
 Field declarators allow you to specify a type and an initial value, as shown below;
 
-```mare
+```savi
 :class Person
   :var name String: "Bob"
 ```
 
-Just like in Pony, if you don't specify an initial value, a value must be assigned in every constructor that exists on the type. Note that as mentioned in the previous section, Mare allows you to have a parameter with the same identifier, because the `@` prefix when referring to the property makes it unambiguous:
+Just like in Pony, if you don't specify an initial value, a value must be assigned in every constructor that exists on the type. Note that as mentioned in the previous section, Savi allows you to have a parameter with the same identifier, because the `@` prefix when referring to the property makes it unambiguous:
 
-```mare
+```savi
 :class Person
   :var name String
   :new (name)
     @name = name
 ```
 
-However, we can do even better here, using "parameter assignment sugar", which is new in Mare. Instead of specifying a name for the incoming parameter, we can specify any assignable expression in its place, and the parameter value will just be assigned to that expression instead of being given its own name. As a result, the following example is a more succinct way to express the same semantics as the previous example.
+However, we can do even better here, using "parameter assignment sugar", which is new in Savi. Instead of specifying a name for the incoming parameter, we can specify any assignable expression in its place, and the parameter value will just be assigned to that expression instead of being given its own name. As a result, the following example is a more succinct way to express the same semantics as the previous example.
 
-```mare
+```savi
 :class Person
   :var name String
   :new (@name)
@@ -423,16 +423,16 @@ However, we can do even better here, using "parameter assignment sugar", which i
 
 Note that parameter assignment sugar works on any function - not just a constructor. So we can also create functions that assign incoming values to properties in the same way:
 
-```mare
+```savi
 :class Person
   :var name String
   :new (@name)
   :fun ref change_name(@name)
 ```
 
-However, note that we don't need to define our own function for changing a property, because the `var` declarator automatically defines a "getter" and "setter" for the property. In this example, the "getter" is a function called `Person.name`, and the "setter" is a function called `Person.name=`. Mare has syntax sugar for calling a function that ends in `=`, and you can define your own such functions that work just the same way as property setter functions do, which makes it easy to write property-like implementations that fulfill the same structural interfaces as "real" properties:
+However, note that we don't need to define our own function for changing a property, because the `var` declarator automatically defines a "getter" and "setter" for the property. In this example, the "getter" is a function called `Person.name`, and the "setter" is a function called `Person.name=`. Savi has syntax sugar for calling a function that ends in `=`, and you can define your own such functions that work just the same way as property setter functions do, which makes it easy to write property-like implementations that fulfill the same structural interfaces as "real" properties:
 
-```mare
+```savi
 :class Wrapper
   :var inner Person
   :new (@inner)
@@ -442,9 +442,9 @@ However, note that we don't need to define our own function for changing a prope
 
 ### Operators / Function Sugar
 
-Just like in Pony, most major operators are really just function calls in disguise. However, unlike in Pony, where these functions have coded names for the operator that they represent, in Mare the function name is usually just the symbol itself, because function names can contain special symbols as long as they are declared with the name in quotes. For example, this snippet defines a class that represents a two-dimensional vector and defines functions for the "+", "-", and "==" operator sugar that implement vector addition, subtraction, and comparison, respectively:
+Just like in Pony, most major operators are really just function calls in disguise. However, unlike in Pony, where these functions have coded names for the operator that they represent, in Savi the function name is usually just the symbol itself, because function names can contain special symbols as long as they are declared with the name in quotes. For example, this snippet defines a class that represents a two-dimensional vector and defines functions for the "+", "-", and "==" operator sugar that implement vector addition, subtraction, and comparison, respectively:
 
-```mare
+```savi
 :class Vector
   :var x U64
   :var y U64
@@ -482,11 +482,11 @@ Note that the property access operators are a form of syntax sugar that allows y
 
 ### Type Checking at Runtime
 
-Pony has two ways of "casting" to a more specific type - `as` and `match`. In Mare, we have both of these options but they look a little different.
+Pony has two ways of "casting" to a more specific type - `as` and `match`. In Savi, we have both of these options but they look a little different.
 
 Just like in Pony, we use `as` for forcefully "casting" in a way that can raise an error. But rather than looking like a keyword, it looks like a method call, and it has the `!` symbol as part of its name, just like all other method calls that can raise an error:
 
-```mare
+```savi
 :trait Greeter
   :fun greeting(String | None)
 
@@ -497,7 +497,7 @@ Just like in Pony, we use `as` for forcefully "casting" in a way that can raise 
 
 You can also cast to check for exclusion of a type with `not!`:
 
-```mare
+```savi
 :trait Greeter
   :fun greeting(String | None)
 
@@ -508,7 +508,7 @@ You can also cast to check for exclusion of a type with `not!`:
 
 If you want to take some other fallback action rather than raising an error, you can use the subtype check operator (`<:`) or its opposite operator (`!<:`) to check the type of a local variable in the clause of an `if` block:
 
-```mare
+```savi
 :trait Greeter
   :fun greeting(String | None)
 
@@ -527,7 +527,7 @@ If you want to take some other fallback action rather than raising an error, you
 #### Generic types
 
 Generic types are have a bit different syntax
-```mare
+```savi
 :class Map (K, V, H HashFunction(K))
 
 :trait Comparable (A Comparable(A)'read)
@@ -543,10 +543,10 @@ Array(String) // it can be used as a restriction
 
 #### Generic functions
 
-Generic functions are not yet in Mare
+Generic functions are not yet in Savi
 
 Though we have a workaround
-```mare
+```savi
 :class A (B, C)
   // also you can mark it as non rcap to use as static method
   :fun foo(bar B) C
@@ -558,9 +558,9 @@ Though we have a workaround
 
 #### FFI Block
 
-While in Pony we use `@` to mark that we are calling a C function, in Mare we declare an `:ffi` type:
+While in Pony we use `@` to mark that we are calling a C function, in Savi we declare an `:ffi` type:
 
-```mare
+```savi
 :ffi LibC
   :fun printf(format CPointer(U8), arg1 CPointer(U8)) I32
 ```
@@ -569,8 +569,8 @@ In the example above you see that we are declearing plain functions. You need to
 
 #### Usage example
 
-In Mare, all FFI functions are namespaced by the `:ffi` type name you declared, so you can call them just like a method of a type is called:
-```mare
+In Savi, all FFI functions are namespaced by the `:ffi` type name you declared, so you can call them just like a method of a type is called:
+```savi
 :class Greeting
   :let message String
   :new iso (@message)
@@ -584,7 +584,7 @@ In Mare, all FFI functions are namespaced by the `:ffi` type name you declared, 
 
 ### A new reference capability
 
-Probably the most notable semantics change from Pony is the addition of a new reference capability in Mare: `non`. Let's quickly recap on the reference capabilities in Pony and show how `non` fits in:
+Probably the most notable semantics change from Pony is the addition of a new reference capability in Savi: `non`. Let's quickly recap on the reference capabilities in Pony and show how `non` fits in:
 
 - `iso`
   - conveys the address of a runtime-allocated object of a specific type
@@ -628,7 +628,7 @@ Probably the most notable semantics change from Pony is the addition of a new re
   - is sendable
   - appropriate for cases where you want to define and call functions on a type without allocating an instance of it at runtime (i.e. stateless "singleton" types, or stateless "class methods" defined on a stateful type)
 
-As you might expect from the description, primitives in Mare have a capability of `non` (rather than `val`, as they do in Pony). As a result, even stateful types can be used "like a primitive" by defining `non` functions on them - such functions can be called without an allocated instance of the type. This replaces the common pattern in Pony of defining a "utility primitive" alongside a stateful type (e.g. `primitive Promises` alongside `actor Promise` from the Pony standard libarary) - in Mare, all these functions can be within the same type without any inconvenience. Moreover, all types become first-class values, just like primitives.
+As you might expect from the description, primitives in Savi have a capability of `non` (rather than `val`, as they do in Pony). As a result, even stateful types can be used "like a primitive" by defining `non` functions on them - such functions can be called without an allocated instance of the type. This replaces the common pattern in Pony of defining a "utility primitive" alongside a stateful type (e.g. `primitive Promises` alongside `actor Promise` from the Pony standard libarary) - in Savi, all these functions can be within the same type without any inconvenience. Moreover, all types become first-class values, just like primitives.
 
 However, because it is safe, we allow typechecking of primitives capabilities to ignore capabilities, which smooths over certain issues with migrating Pony code where you were depending on primitives to be a subtype of `val` or `box`, as well as new patterns, such as dependency-injecting a primitive where a mutable type is expected. A primitive can have no field-accessing methods, so this is all safe and allowable.
 
@@ -638,12 +638,12 @@ However, because it is safe, we allow typechecking of primitives capabilities to
 
 ### More Type Inference
 
-Mare features more opportunities for type inference than Pony. The astute reader may have noticed many such examples in the code examples so far, in which we have not needed to provide types that are "obvious" to the compiler, for some definition of "obvious".
+Savi features more opportunities for type inference than Pony. The astute reader may have noticed many such examples in the code examples so far, in which we have not needed to provide types that are "obvious" to the compiler, for some definition of "obvious".
 
-As a major example of this, you may notice that most of our example functions have not specified parameter types or return types. In all of those cases, the types were inferrable by Mare, due to the parameter types being transitively understood by how those values were used as arguments to other calls in the function body, and the return types being transitively understood from the return types of other functions in the function body.
+As a major example of this, you may notice that most of our example functions have not specified parameter types or return types. In all of those cases, the types were inferrable by Savi, due to the parameter types being transitively understood by how those values were used as arguments to other calls in the function body, and the return types being transitively understood from the return types of other functions in the function body.
 
 The result is that it is largely up to the author of the code to decide if the type needs to be annotated, or if it will be obvious enough to the human readers of the code that it can be omitted.
 
-However, not all inferences are supportable. For example, if you try to call a function on an object, that receiver object must already have an inferred type by the point where the function is called - Mare will not try to guess what type you're calling the function on, or try to resolve it later. In such cases, you'll see a compiler error asking you to explicitly annotate the type because it could not be inferred.
+However, not all inferences are supportable. For example, if you try to call a function on an object, that receiver object must already have an inferred type by the point where the function is called - Savi will not try to guess what type you're calling the function on, or try to resolve it later. In such cases, you'll see a compiler error asking you to explicitly annotate the type because it could not be inferred.
 
 ### [TODO: More Conveniences Info...]

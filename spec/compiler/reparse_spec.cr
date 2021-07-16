@@ -1,12 +1,12 @@
-describe Mare::Compiler::Reparse do
+describe Savi::Compiler::Reparse do
   it "transforms a chained qualifications into chained method calls" do
-    source = Mare::Source.new_example <<-SOURCE
+    source = Savi::Source.new_example <<-SOURCE
     :class Example
       :fun chained
         x.call(y).call(z)
     SOURCE
 
-    ast = Mare::Parser.parse(source)
+    ast = Savi::Parser.parse(source)
 
     ast.to_a.should eq [:doc,
       [:declare, [[:ident, "class"], [:ident, "Example"]], [:group, ":"]],
@@ -25,7 +25,7 @@ describe Mare::Compiler::Reparse do
       ]],
     ]
 
-    ctx = Mare.compiler.compile([ast], Mare::Compiler::Context.new, :reparse)
+    ctx = Savi.compiler.compile([ast], Savi::Compiler::Context.new, :reparse)
     ctx.errors.should be_empty
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "chained")
@@ -42,12 +42,12 @@ describe Mare::Compiler::Reparse do
     ]
 
     # Compiling again should yield an equivalent program tree:
-    ctx2 = Mare.compiler.compile([source], :reparse)
+    ctx2 = Savi.compiler.compile([source], :reparse)
     ctx.program.libraries.should eq ctx2.program.libraries
   end
 
   it "transforms an @-prefixed identifier into a method call of @" do
-    source = Mare::Source.new_example <<-SOURCE
+    source = Savi::Source.new_example <<-SOURCE
     :class Example
       :fun selfish
         @x
@@ -56,7 +56,7 @@ describe Mare::Compiler::Reparse do
         @x(y) -> (True)
     SOURCE
 
-    ast = Mare::Parser.parse(source)
+    ast = Savi::Parser.parse(source)
 
     ast.to_a.should eq [:doc,
       [:declare, [[:ident, "class"], [:ident, "Example"]], [:group, ":"]],
@@ -79,7 +79,7 @@ describe Mare::Compiler::Reparse do
       ]],
     ]
 
-    ctx = Mare.compiler.compile([ast], Mare::Compiler::Context.new, :reparse)
+    ctx = Savi.compiler.compile([ast], Savi::Compiler::Context.new, :reparse)
     ctx.errors.should be_empty
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "selfish")
@@ -103,7 +103,7 @@ describe Mare::Compiler::Reparse do
     ]
 
     # Compiling again should yield an equivalent program tree:
-    ctx2 = Mare.compiler.compile([source], :reparse)
+    ctx2 = Savi.compiler.compile([source], :reparse)
     ctx.program.libraries.should eq ctx2.program.libraries
   end
 end

@@ -1,6 +1,6 @@
-describe Mare::Compiler::Sugar do
+describe Savi::Compiler::Sugar do
   it "inserts a None return value where it was left out" do
-    source = Mare::Source.new_example <<-SOURCE
+    source = Savi::Source.new_example <<-SOURCE
     :actor Example
       :fun return_none None
         "this isn't the return value"
@@ -9,7 +9,7 @@ describe Mare::Compiler::Sugar do
         "this isn't the return value"
     SOURCE
 
-    ast = Mare::Parser.parse(source)
+    ast = Savi::Parser.parse(source)
 
     ast.to_a.should eq [:doc,
       [:declare, [[:ident, "actor"], [:ident, "Example"]], [:group, ":"]],
@@ -22,7 +22,7 @@ describe Mare::Compiler::Sugar do
       ]]
     ]
 
-    ctx = Mare.compiler.compile([ast], Mare::Compiler::Context.new, :sugar)
+    ctx = Savi.compiler.compile([ast], Savi::Compiler::Context.new, :sugar)
     ctx.errors.should be_empty
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "return_none")
@@ -38,19 +38,19 @@ describe Mare::Compiler::Sugar do
     ]
 
     # Compiling again should yield an equivalent program tree:
-    ctx2 = Mare.compiler.compile([source], :sugar)
+    ctx2 = Savi.compiler.compile([source], :sugar)
     ctx.program.libraries.should eq ctx2.program.libraries
   end
 
   it "transforms a property assignment into a method call" do
-    source = Mare::Source.new_example <<-SOURCE
+    source = Savi::Source.new_example <<-SOURCE
     :class Example
       :fun prop_assign
         x.y = z
         x.y! = z
     SOURCE
 
-    ast = Mare::Parser.parse(source)
+    ast = Savi::Parser.parse(source)
 
     ast.to_a.should eq [:doc,
       [:declare, [[:ident, "class"], [:ident, "Example"]], [:group, ":"]],
@@ -68,7 +68,7 @@ describe Mare::Compiler::Sugar do
       ]],
     ]
 
-    ctx = Mare.compiler.compile([ast], Mare::Compiler::Context.new, :sugar)
+    ctx = Savi.compiler.compile([ast], Savi::Compiler::Context.new, :sugar)
     ctx.errors.should be_empty
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "prop_assign")
@@ -86,19 +86,19 @@ describe Mare::Compiler::Sugar do
     ]
 
     # Compiling again should yield an equivalent program tree:
-    ctx2 = Mare.compiler.compile([source], :sugar)
+    ctx2 = Savi.compiler.compile([source], :sugar)
     ctx.program.libraries.should eq ctx2.program.libraries
   end
 
   it "transforms property arithmetic-assignments into method calls" do
-    source = Mare::Source.new_example <<-SOURCE
+    source = Savi::Source.new_example <<-SOURCE
     :class Example
       :fun prop_assign
         x.y += z
         x.y -= z
     SOURCE
 
-    ast = Mare::Parser.parse(source)
+    ast = Savi::Parser.parse(source)
 
     ast.to_a.should eq [:doc,
       [:declare, [[:ident, "class"], [:ident, "Example"]], [:group, ":"]],
@@ -115,7 +115,7 @@ describe Mare::Compiler::Sugar do
       ]],
     ]
 
-    ctx = Mare.compiler.compile([ast], Mare::Compiler::Context.new, :sugar)
+    ctx = Savi.compiler.compile([ast], Savi::Compiler::Context.new, :sugar)
     ctx.errors.should be_empty
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "prop_assign")
@@ -145,18 +145,18 @@ describe Mare::Compiler::Sugar do
     ]
 
     # Compiling again should yield an equivalent program tree:
-    ctx2 = Mare.compiler.compile([source], :sugar)
+    ctx2 = Savi.compiler.compile([source], :sugar)
     ctx.program.libraries.should eq ctx2.program.libraries
   end
 
   it "transforms an operator into a method call" do
-    source = Mare::Source.new_example <<-SOURCE
+    source = Savi::Source.new_example <<-SOURCE
     :class Example
       :fun plus
         x + y
     SOURCE
 
-    ast = Mare::Parser.parse(source)
+    ast = Savi::Parser.parse(source)
 
     ast.to_a.should eq [:doc,
       [:declare, [[:ident, "class"], [:ident, "Example"]], [:group, ":"]],
@@ -165,7 +165,7 @@ describe Mare::Compiler::Sugar do
       ]],
     ]
 
-    ctx = Mare.compiler.compile([ast], Mare::Compiler::Context.new, :sugar)
+    ctx = Savi.compiler.compile([ast], Savi::Compiler::Context.new, :sugar)
     ctx.errors.should be_empty
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "plus")
@@ -178,12 +178,12 @@ describe Mare::Compiler::Sugar do
     ]
 
     # Compiling again should yield an equivalent program tree:
-    ctx2 = Mare.compiler.compile([source], :sugar)
+    ctx2 = Savi.compiler.compile([source], :sugar)
     ctx.program.libraries.should eq ctx2.program.libraries
   end
 
   it "transforms an operator into a method call (in a loop condition)" do
-    source = Mare::Source.new_example <<-SOURCE
+    source = Savi::Source.new_example <<-SOURCE
     :class Example
       :fun countdown
         while (x > 0) (
@@ -191,7 +191,7 @@ describe Mare::Compiler::Sugar do
         )
     SOURCE
 
-    ast = Mare::Parser.parse(source)
+    ast = Savi::Parser.parse(source)
 
     ast.to_a.should eq [:doc,
       [:declare, [[:ident, "class"], [:ident, "Example"]], [:group, ":"]],
@@ -206,7 +206,7 @@ describe Mare::Compiler::Sugar do
       ]],
     ]
 
-    ctx = Mare.compiler.compile([ast], Mare::Compiler::Context.new, :sugar)
+    ctx = Savi.compiler.compile([ast], Savi::Compiler::Context.new, :sugar)
     ctx.errors.should be_empty
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "countdown")
@@ -228,18 +228,18 @@ describe Mare::Compiler::Sugar do
     ]
 
     # Compiling again should yield an equivalent program tree:
-    ctx2 = Mare.compiler.compile([source], :sugar)
+    ctx2 = Savi.compiler.compile([source], :sugar)
     ctx.program.libraries.should eq ctx2.program.libraries
   end
 
   it "transforms a square brace qualification into a method call" do
-    source = Mare::Source.new_example <<-SOURCE
+    source = Savi::Source.new_example <<-SOURCE
     :class Example
       :fun square
         x[y]
     SOURCE
 
-    ast = Mare::Parser.parse(source)
+    ast = Savi::Parser.parse(source)
 
     ast.to_a.should eq [:doc,
       [:declare, [[:ident, "class"], [:ident, "Example"]], [:group, ":"]],
@@ -248,7 +248,7 @@ describe Mare::Compiler::Sugar do
       ]],
     ]
 
-    ctx = Mare.compiler.compile([ast], Mare::Compiler::Context.new, :sugar)
+    ctx = Savi.compiler.compile([ast], Savi::Compiler::Context.new, :sugar)
     ctx.errors.should be_empty
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "square")
@@ -260,12 +260,12 @@ describe Mare::Compiler::Sugar do
     ]
 
     # Compiling again should yield an equivalent program tree:
-    ctx2 = Mare.compiler.compile([source], :sugar)
+    ctx2 = Savi.compiler.compile([source], :sugar)
     ctx.program.libraries.should eq ctx2.program.libraries
   end
 
   it "transforms a chained qualifications into chained method calls" do
-    source = Mare::Source.new_example <<-SOURCE
+    source = Savi::Source.new_example <<-SOURCE
     :class Example
       :fun chained
         x.call(y).call(z)
@@ -273,7 +273,7 @@ describe Mare::Compiler::Sugar do
         x.call(y)[y].call(z)[z]
     SOURCE
 
-    ast = Mare::Parser.parse(source)
+    ast = Savi::Parser.parse(source)
 
     ast.to_a.should eq [:doc,
       [:declare, [[:ident, "class"], [:ident, "Example"]], [:group, ":"]],
@@ -313,7 +313,7 @@ describe Mare::Compiler::Sugar do
       ]],
     ]
 
-    ctx = Mare.compiler.compile([ast], Mare::Compiler::Context.new, :sugar)
+    ctx = Savi.compiler.compile([ast], Savi::Compiler::Context.new, :sugar)
     ctx.errors.should be_empty
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "chained")
@@ -356,18 +356,18 @@ describe Mare::Compiler::Sugar do
     ]
 
     # Compiling again should yield an equivalent program tree:
-    ctx2 = Mare.compiler.compile([source], :sugar)
+    ctx2 = Savi.compiler.compile([source], :sugar)
     ctx.program.libraries.should eq ctx2.program.libraries
   end
 
   it "transforms a square brace qualified assignment into a method call" do
-    source = Mare::Source.new_example <<-SOURCE
+    source = Savi::Source.new_example <<-SOURCE
     :class Example
       :fun square
         x[y] = z
     SOURCE
 
-    ast = Mare::Parser.parse(source)
+    ast = Savi::Parser.parse(source)
 
     ast.to_a.should eq [:doc,
       [:declare, [[:ident, "class"], [:ident, "Example"]], [:group, ":"]],
@@ -380,7 +380,7 @@ describe Mare::Compiler::Sugar do
       ]],
     ]
 
-    ctx = Mare.compiler.compile([ast], Mare::Compiler::Context.new, :sugar)
+    ctx = Savi.compiler.compile([ast], Savi::Compiler::Context.new, :sugar)
     ctx.errors.should be_empty
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "square")
@@ -393,18 +393,18 @@ describe Mare::Compiler::Sugar do
     ]
 
     # Compiling again should yield an equivalent program tree:
-    ctx2 = Mare.compiler.compile([source], :sugar)
+    ctx2 = Savi.compiler.compile([source], :sugar)
     ctx.program.libraries.should eq ctx2.program.libraries
   end
 
   it "adds a '@' statement to the end of a constructor body" do
-    source = Mare::Source.new_example <<-SOURCE
+    source = Savi::Source.new_example <<-SOURCE
     :class Example
       :new
         x = 1
     SOURCE
 
-    ast = Mare::Parser.parse(source)
+    ast = Savi::Parser.parse(source)
 
     ast.to_a.should eq [:doc,
       [:declare, [[:ident, "class"], [:ident, "Example"]], [:group, ":"]],
@@ -413,7 +413,7 @@ describe Mare::Compiler::Sugar do
       ]]
     ]
 
-    ctx = Mare.compiler.compile([ast], Mare::Compiler::Context.new, :sugar)
+    ctx = Savi.compiler.compile([ast], Savi::Compiler::Context.new, :sugar)
     ctx.errors.should be_empty
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "new")
@@ -423,18 +423,18 @@ describe Mare::Compiler::Sugar do
     ]
 
     # Compiling again should yield an equivalent program tree:
-    ctx2 = Mare.compiler.compile([source], :sugar)
+    ctx2 = Savi.compiler.compile([source], :sugar)
     ctx.program.libraries.should eq ctx2.program.libraries
   end
 
   it "transforms non-identifier parameters into assignment expressions" do
-    source = Mare::Source.new_example <<-SOURCE
+    source = Savi::Source.new_example <<-SOURCE
     :class Example
       :fun param_assigns(@x, @y.z)
         @y.after
     SOURCE
 
-    ast = Mare::Parser.parse(source)
+    ast = Savi::Parser.parse(source)
 
     ast.to_a.should eq [:doc,
       [:declare, [[:ident, "class"], [:ident, "Example"]], [:group, ":"]],
@@ -449,7 +449,7 @@ describe Mare::Compiler::Sugar do
       ]],
     ]
 
-    ctx = Mare.compiler.compile([ast], Mare::Compiler::Context.new, :sugar)
+    ctx = Savi.compiler.compile([ast], Savi::Compiler::Context.new, :sugar)
     ctx.errors.should be_empty
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "param_assigns")
@@ -475,18 +475,18 @@ describe Mare::Compiler::Sugar do
     ]
 
     # Compiling again should yield an equivalent program tree:
-    ctx2 = Mare.compiler.compile([source], :sugar)
+    ctx2 = Savi.compiler.compile([source], :sugar)
     ctx.program.libraries.should eq ctx2.program.libraries
   end
 
   it "transforms short-circuiting logical operators and negations" do
-    source = Mare::Source.new_example <<-SOURCE
+    source = Savi::Source.new_example <<-SOURCE
     :class Example
       :fun logical
         w && x || y && !z
     SOURCE
 
-    ast = Mare::Parser.parse(source)
+    ast = Savi::Parser.parse(source)
 
     ast.to_a.should eq [:doc,
       [:declare, [[:ident, "class"], [:ident, "Example"]], [:group, ":"]],
@@ -507,7 +507,7 @@ describe Mare::Compiler::Sugar do
       ]],
     ]
 
-    ctx = Mare.compiler.compile([ast], Mare::Compiler::Context.new, :sugar)
+    ctx = Savi.compiler.compile([ast], Savi::Compiler::Context.new, :sugar)
     ctx.errors.should be_empty
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "logical")
@@ -535,7 +535,7 @@ describe Mare::Compiler::Sugar do
     ]
 
     # Compiling again should yield an equivalent program tree:
-    ctx2 = Mare.compiler.compile([source], :sugar)
+    ctx2 = Savi.compiler.compile([source], :sugar)
     ctx.program.libraries.should eq ctx2.program.libraries
   end
 end

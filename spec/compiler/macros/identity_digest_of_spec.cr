@@ -1,13 +1,13 @@
-describe Mare::Compiler::Macros do
+describe Savi::Compiler::Macros do
   describe "identity_digest_of" do
     it "is transformed into a prefix" do
-      source = Mare::Source.new_example <<-SOURCE
+      source = Savi::Source.new_example <<-SOURCE
       :actor Main
         :new
           identity_digest_of @
       SOURCE
 
-      ctx = Mare.compiler.compile([source], :macros)
+      ctx = Savi.compiler.compile([source], :macros)
       ctx.errors.should be_empty
 
       func = ctx.namespace.find_func!(ctx, source, "Main", "new")
@@ -19,7 +19,7 @@ describe Mare::Compiler::Macros do
     end
 
     it "complains if there are too many terms" do
-      source = Mare::Source.new_example <<-SOURCE
+      source = Savi::Source.new_example <<-SOURCE
       :actor Main
         :new
           identity_digest_of @ @
@@ -42,7 +42,7 @@ describe Mare::Compiler::Macros do
                                ^
       MSG
 
-      Mare.compiler.compile([source], :macros)
+      Savi.compiler.compile([source], :macros)
         .errors.map(&.message).join("\n").should eq expected
     end
   end

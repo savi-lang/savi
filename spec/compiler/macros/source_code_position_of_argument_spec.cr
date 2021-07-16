@@ -1,7 +1,7 @@
-describe Mare::Compiler::Macros do
+describe Savi::Compiler::Macros do
   describe "source_code_position_of_argument" do
     it "is transformed into a prefix" do
-      source = Mare::Source.new_example <<-SOURCE
+      source = Savi::Source.new_example <<-SOURCE
       :actor Main
         :new (
           foo String
@@ -9,7 +9,7 @@ describe Mare::Compiler::Macros do
         )
       SOURCE
 
-      ctx = Mare.compiler.compile([source], :macros)
+      ctx = Savi.compiler.compile([source], :macros)
       ctx.errors.should be_empty
 
       func = ctx.namespace.find_func!(ctx, source, "Main", "new")
@@ -30,7 +30,7 @@ describe Mare::Compiler::Macros do
     end
 
     it "complains if there are too many terms" do
-      source = Mare::Source.new_example <<-SOURCE
+      source = Savi::Source.new_example <<-SOURCE
       :actor Main
         :new (
           foo String
@@ -55,12 +55,12 @@ describe Mare::Compiler::Macros do
                                                                         ^~~
       MSG
 
-      Mare.compiler.compile([source], :macros)
+      Savi.compiler.compile([source], :macros)
         .errors.map(&.message).join("\n").should eq expected
     end
 
     it "complains if the term isn't an identifier" do
-      source = Mare::Source.new_example <<-SOURCE
+      source = Savi::Source.new_example <<-SOURCE
       :actor Main
         :new (
           foo String
@@ -75,12 +75,12 @@ describe Mare::Compiler::Macros do
                                                                     ^~
       MSG
 
-      Mare.compiler.compile([source], :macros)
+      Savi.compiler.compile([source], :macros)
         .errors.map(&.message).join("\n").should eq expected
     end
 
     it "complains if the identifier isn't a parameter" do
-      source = Mare::Source.new_example <<-SOURCE
+      source = Savi::Source.new_example <<-SOURCE
       :actor Main
         :new (
           foo String
@@ -100,12 +100,12 @@ describe Mare::Compiler::Macros do
              ^···
       MSG
 
-      Mare.compiler.compile([source], :macros)
+      Savi.compiler.compile([source], :macros)
         .errors.map(&.message).join("\n").should eq expected
     end
 
     it "complains if the macro isn't used as the default arg of a parameter" do
-      source = Mare::Source.new_example <<-SOURCE
+      source = Savi::Source.new_example <<-SOURCE
       :actor Main
         :new (foo String)
           bar SourceCodePosition = source_code_position_of_argument foo
@@ -123,7 +123,7 @@ describe Mare::Compiler::Macros do
              ^~~~~~~~~~~~
       MSG
 
-      Mare.compiler.compile([source], :macros)
+      Savi.compiler.compile([source], :macros)
         .errors.map(&.message).join("\n").should eq expected
     end
   end

@@ -50,8 +50,8 @@
 ### Tooling features
 
 - [x] - Emit debugging metadata in compiled programs
-- [ ] - Docker image of the Mare compiler
-- [ ] - Distributable package for Linux with Mare compiler static binary
+- [ ] - Docker image of the Savi compiler
+- [ ] - Distributable package for Linux with Savi compiler static binary
 - [ ] - Sublime Text syntax highlighting support
 - [ ] - Language Server Protocol support
 - [ ] - Doctests support

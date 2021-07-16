@@ -4,10 +4,10 @@
 <dict>
 	<key>fileTypes</key>
 	<array>
-		<string>mare</string>
+		<string>savi</string>
 	</array>
 	<key>name</key>
-	<string>Mare</string>
+	<string>Savi</string>
 	<key>patterns</key>
 	<array>
 		<dict>
@@ -18,7 +18,7 @@
 			<key>end</key>
 			<string>($)</string>
 			<key>name</key>
-			<string>comment.line.mare</string>
+			<string>comment.line.savi</string>
 		</dict>
 		<dict>
 			<key>begin</key>
@@ -28,7 +28,7 @@
 			<key>end</key>
 			<string>($)</string>
 			<key>name</key>
-			<string>comment.doc.mare</string>
+			<string>comment.doc.savi</string>
 		</dict>
 		<dict>
 			<key>comment</key>
@@ -36,18 +36,18 @@
 			<key>match</key>
 			<string>(\')(\w+)(?=[^\'])</string>
 			<key>name</key>
-			<string>meta.operator.capability.mare</string>
+			<string>meta.operator.capability.savi</string>
 			<key>captures</key>
 			<dict>
 				<key>1</key>
 				<dict>
 					<key>name</key>
-					<string>keyword.operator.capability.mare</string>
+					<string>keyword.operator.capability.savi</string>
 				</dict>
 				<key>2</key>
 				<dict>
 					<key>name</key>
-					<string>entity.name.identifier.mare</string>
+					<string>entity.name.identifier.savi</string>
 				</dict>
 			</dict>
 		</dict>
@@ -59,14 +59,14 @@
 			<key>end</key>
 			<string>(")</string>
 			<key>name</key>
-			<string>string.quoted.double.mare</string>
+			<string>string.quoted.double.savi</string>
 			<key>patterns</key>
 			<array>
 				<dict>
 					<key>match</key>
 					<string>\\.</string>
 					<key>name</key>
-					<string>constant.character.escape.mare</string>
+					<string>constant.character.escape.savi</string>
 				</dict>
 			</array>
 		</dict>
@@ -78,14 +78,14 @@
 			<key>end</key>
 			<string>(')</string>
 			<key>name</key>
-			<string>string.quoted.single.mare</string>
+			<string>string.quoted.single.savi</string>
 			<key>patterns</key>
 			<array>
 				<dict>
 					<key>match</key>
 					<string>\\.</string>
 					<key>name</key>
-					<string>constant.character.escape.mare</string>
+					<string>constant.character.escape.savi</string>
 				</dict>
 			</array>
 		</dict>
@@ -95,7 +95,7 @@
 				<key>1</key>
 				<dict>
 					<key>name</key>
-					<string>support.class.mare</string>
+					<string>support.class.savi</string>
 				</dict>
 			</dict>
 			<key>comment</key>
@@ -103,7 +103,7 @@
 			<key>match</key>
 			<string>([_A-Z]\w*)</string>
 			<key>name</key>
-			<string>meta.class.mare</string>
+			<string>meta.class.savi</string>
 		</dict>
 		<dict>
 			<key>begin</key>
@@ -113,12 +113,12 @@
 				<key>1</key>
 				<dict>
 					<key>name</key>
-					<string>keyword.declare.mare</string>
+					<string>keyword.declare.savi</string>
 				</dict>
 				<key>2</key>
 				<dict>
 					<key>name</key>
-					<string>keyword.declare.mare</string>
+					<string>keyword.declare.savi</string>
 				</dict>
 			</dict>
 			<key>comment</key>
@@ -130,18 +130,18 @@
 				<key>1</key>
 				<dict>
 					<key>name</key>
-					<string>keyword.declare.mare</string>
+					<string>keyword.declare.savi</string>
 				</dict>
 			</dict>
 			<key>name</key>
-			<string>meta.declare.mare</string>
+			<string>meta.declare.savi</string>
 			<key>patterns</key>
 			<array>
 				<dict>
 					<key>match</key>
 					<string>\b[a-z_]\w*\b(?!\!)</string>
 					<key>name</key>
-					<string>entity.other.attribute-name.mare</string>
+					<string>entity.other.attribute-name.savi</string>
 				</dict>
 				<dict>
 					<key>include</key>
@@ -155,7 +155,7 @@
 			<key>match</key>
 			<string>((\w+|\+|\-|\*)\!)</string>
 			<key>name</key>
-			<string>markup.deleted.mare</string>
+			<string>markup.deleted.savi</string>
 		</dict>
 		<dict>
 			<key>comment</key>
@@ -163,7 +163,7 @@
 			<key>match</key>
 			<string>\b\d([\d_]*(\.[\d_]+)?)\b</string>
 			<key>name</key>
-			<string>constant.numeric.mare</string>
+			<string>constant.numeric.savi</string>
 		</dict>
 		<dict>
 			<key>comment</key>
@@ -171,7 +171,7 @@
 			<key>match</key>
 			<string>\b0x([0-9a-fA-F_]+)\b</string>
 			<key>name</key>
-			<string>constant.numeric.mare</string>
+			<string>constant.numeric.savi</string>
 		</dict>
 		<dict>
 			<key>comment</key>
@@ -179,7 +179,7 @@
 			<key>match</key>
 			<string>\b0b([01_]+)\b</string>
 			<key>name</key>
-			<string>constant.numeric.mare</string>
+			<string>constant.numeric.savi</string>
 		</dict>
 		<dict>
 			<key>comment</key>
@@ -187,7 +187,7 @@
 			<key>match</key>
 			<string>(\w+(?:\?|\!)?)(?=\()</string>
 			<key>name</key>
-			<string>entity.name.function.mare</string>
+			<string>entity.name.function.savi</string>
 		</dict>
 		<dict>
 			<key>comment</key>
@@ -195,7 +195,7 @@
 			<key>match</key>
 			<string>(?&lt;=\.)(\w+(?:\?|\!)?)</string>
 			<key>name</key>
-			<string>support.function.mare</string>
+			<string>support.function.savi</string>
 		</dict>
 		<dict>
 			<key>comment</key>
@@ -203,7 +203,7 @@
 			<key>match</key>
 			<string>(?&lt;=@)(\w+(?:\?|\!)?)</string>
 			<key>name</key>
-			<string>support.function.mare</string>
+			<string>support.function.savi</string>
 		</dict>
 		<dict>
 			<key>begin</key>
@@ -213,7 +213,7 @@
 				<key>1</key>
 				<dict>
 					<key>name</key>
-					<string>punctuation.section.paren.mare</string>
+					<string>punctuation.section.paren.savi</string>
 				</dict>
 			</dict>
 			<key>comment</key>
@@ -225,11 +225,11 @@
 				<key>1</key>
 				<dict>
 					<key>name</key>
-					<string>punctuation.section.paren.mare</string>
+					<string>punctuation.section.paren.savi</string>
 				</dict>
 			</dict>
 			<key>name</key>
-			<string>meta.parens.mare</string>
+			<string>meta.parens.savi</string>
 			<key>patterns</key>
 			<array>
 				<dict>
@@ -246,7 +246,7 @@
 				<key>1</key>
 				<dict>
 					<key>name</key>
-					<string>punctuation.section.brace.mare</string>
+					<string>punctuation.section.brace.savi</string>
 				</dict>
 			</dict>
 			<key>comment</key>
@@ -258,11 +258,11 @@
 				<key>1</key>
 				<dict>
 					<key>name</key>
-					<string>punctuation.section.brace.mare</string>
+					<string>punctuation.section.brace.savi</string>
 				</dict>
 			</dict>
 			<key>name</key>
-			<string>meta.braces.mare</string>
+			<string>meta.braces.savi</string>
 			<key>patterns</key>
 			<array>
 				<dict>
@@ -279,7 +279,7 @@
 				<key>1</key>
 				<dict>
 					<key>name</key>
-					<string>punctuation.section.bracket.mare</string>
+					<string>punctuation.section.bracket.savi</string>
 				</dict>
 			</dict>
 			<key>comment</key>
@@ -291,16 +291,16 @@
 				<key>1</key>
 				<dict>
 					<key>name</key>
-					<string>punctuation.section.bracket.mare</string>
+					<string>punctuation.section.bracket.savi</string>
 				</dict>
 				<key>2</key>
 				<dict>
 					<key>name</key>
-					<string>markup.deleted.mare</string>
+					<string>markup.deleted.savi</string>
 				</dict>
 			</dict>
 			<key>name</key>
-			<string>meta.brackets.mare</string>
+			<string>meta.brackets.savi</string>
 			<key>patterns</key>
 			<array>
 				<dict>
@@ -317,7 +317,7 @@
 				<key>1</key>
 				<dict>
 					<key>name</key>
-					<string>punctuation.section.bracket.mare</string>
+					<string>punctuation.section.bracket.savi</string>
 				</dict>
 			</dict>
 			<key>comment</key>
@@ -329,11 +329,11 @@
 				<key>1</key>
 				<dict>
 					<key>name</key>
-					<string>punctuation.section.bracket.mare</string>
+					<string>punctuation.section.bracket.savi</string>
 				</dict>
 			</dict>
 			<key>name</key>
-			<string>meta.brackets.mare</string>
+			<string>meta.brackets.savi</string>
 			<key>patterns</key>
 			<array>
 				<dict>
@@ -348,7 +348,7 @@
 			<key>match</key>
 			<string>(\,|\;|\:)</string>
 			<key>name</key>
-			<string>punctuation.separator.mare</string>
+			<string>punctuation.separator.savi</string>
 		</dict>
 		<dict>
 			<key>comment</key>
@@ -356,7 +356,7 @@
 			<key>match</key>
 			<string>(@|\.)</string>
 			<key>name</key>
-			<string>punctuation.receiver.mare</string>
+			<string>punctuation.receiver.savi</string>
 		</dict>
 		<dict>
 			<key>comment</key>
@@ -364,7 +364,7 @@
 			<key>match</key>
 			<string>(\|\&gt;)</string>
 			<key>name</key>
-			<string>keyword.operator.pipe.mare</string>
+			<string>keyword.operator.pipe.savi</string>
 		</dict>
 		<dict>
 			<key>comment</key>
@@ -372,7 +372,7 @@
 			<key>match</key>
 			<string>(\&amp;\&amp;|\|\||\?\?|\&amp;\?|\|\?|\.\?)</string>
 			<key>name</key>
-			<string>keyword.operator.compound.mare</string>
+			<string>keyword.operator.compound.savi</string>
 		</dict>
 		<dict>
 			<key>comment</key>
@@ -380,7 +380,7 @@
 			<key>match</key>
 			<string>(\&lt;\=\&gt;|\=\~|\=\=|\&lt;\=|\&gt;\=|\&lt;|\&gt;)</string>
 			<key>name</key>
-			<string>keyword.operator.comparison.mare</string>
+			<string>keyword.operator.comparison.savi</string>
 		</dict>
 		<dict>
 			<key>comment</key>
@@ -388,7 +388,7 @@
 			<key>match</key>
 			<string>(\+|\-|\/|\*|\%)</string>
 			<key>name</key>
-			<string>keyword.operator.arithmetic.mare</string>
+			<string>keyword.operator.arithmetic.savi</string>
 		</dict>
 		<dict>
 			<key>comment</key>
@@ -396,7 +396,7 @@
 			<key>match</key>
 			<string>(\=)</string>
 			<key>name</key>
-			<string>keyword.operator.assignment.mare</string>
+			<string>keyword.operator.assignment.savi</string>
 		</dict>
 		<dict>
 			<key>comment</key>
@@ -404,7 +404,7 @@
 			<key>match</key>
 			<string>(\!|\&lt;\&lt;|\&lt;|\&amp;|\|)</string>
 			<key>name</key>
-			<string>keyword.operator.other.mare</string>
+			<string>keyword.operator.other.savi</string>
 		</dict>
 		<dict>
 			<key>comment</key>
@@ -412,11 +412,11 @@
 			<key>match</key>
 			<string>\w+</string>
 			<key>name</key>
-			<string>entity.name.identifier.mare</string>
+			<string>entity.name.identifier.savi</string>
 		</dict>
 	</array>
 	<key>scopeName</key>
-	<string>source.mare</string>
+	<string>source.savi</string>
 	<key>uuid</key>
 	<string>6d792077-696c-6465-7374-20647265616d</string>
 </dict>

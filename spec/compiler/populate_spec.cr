@@ -1,6 +1,6 @@
-describe Mare::Compiler::Populate do
+describe Savi::Compiler::Populate do
   it "complains when a source type couldn't be resolved" do
-    source = Mare::Source.new_example <<-SOURCE
+    source = Savi::Source.new_example <<-SOURCE
     :actor Main
       :is Bogus
     SOURCE
@@ -12,7 +12,7 @@ describe Mare::Compiler::Populate do
           ^~~~~
     MSG
 
-    Mare.compiler.compile([source], :populate)
+    Savi.compiler.compile([source], :populate)
       .errors.map(&.message).join("\n").should eq expected
   end
 end

@@ -1,6 +1,6 @@
-describe Mare::Compiler::Refer do
+describe Savi::Compiler::Refer do
   it "returns the same output state when compiled again with same sources" do
-    source = Mare::Source.new_example <<-SOURCE
+    source = Savi::Source.new_example <<-SOURCE
     :primitive Greeting
       :fun greet(env Env):
         env.out.print("Hello, World")
@@ -10,13 +10,13 @@ describe Mare::Compiler::Refer do
         Greeting.greet(env)
     SOURCE
 
-    ctx1 = Mare.compiler.compile([source], :refer)
-    ctx2 = Mare.compiler.compile([source], :refer)
+    ctx1 = Savi.compiler.compile([source], :refer)
+    ctx2 = Savi.compiler.compile([source], :refer)
 
-    t_link_g = ctx1.namespace[source]["Greeting"].as(Mare::Program::Type::Link)
+    t_link_g = ctx1.namespace[source]["Greeting"].as(Savi::Program::Type::Link)
     f_link_g = t_link_g.make_func_link_simple("greet")
 
-    t_link_m = ctx1.namespace[source]["Main"].as(Mare::Program::Type::Link)
+    t_link_m = ctx1.namespace[source]["Main"].as(Savi::Program::Type::Link)
     f_link_m = t_link_m.make_func_link_simple("new")
 
     # Prove that the output states are the same.
@@ -27,7 +27,7 @@ describe Mare::Compiler::Refer do
   end
 
   it "complains when trying to take address_of not local variable" do
-    source = Mare::Source.new_example <<-SOURCE
+    source = Savi::Source.new_example <<-SOURCE
     :actor Main
       :new
         t = address_of ""
@@ -40,12 +40,12 @@ describe Mare::Compiler::Refer do
                         ^
     MSG
 
-    Mare.compiler.compile([source], :refer)
+    Savi.compiler.compile([source], :refer)
       .errors.map(&.message).join("\n").should eq expected
   end
 
   it "allows the use of branch-scoped variables to assign to outer ones" do
-    source = Mare::Source.new_example <<-SOURCE
+    source = Savi::Source.new_example <<-SOURCE
     :actor Main
       :new
         outer = ""
@@ -58,11 +58,11 @@ describe Mare::Compiler::Refer do
         )
     SOURCE
 
-    Mare.compiler.compile([source], :refer)
+    Savi.compiler.compile([source], :refer)
   end
 
   it "won't confuse method names as being occurrences of a local variable" do
-    source = Mare::Source.new_example <<-SOURCE
+    source = Savi::Source.new_example <<-SOURCE
     :actor Main
       :new (env Env)
         example = "example"
@@ -70,7 +70,7 @@ describe Mare::Compiler::Refer do
         env.example
     SOURCE
 
-    ctx = Mare.compiler.compile([source], :refer)
+    ctx = Savi.compiler.compile([source], :refer)
     ctx.errors.should be_empty
 
     main = ctx.namespace.main_type!(ctx)
@@ -78,13 +78,13 @@ describe Mare::Compiler::Refer do
     func_link = func.make_link(main)
     refer = ctx.refer[func_link]
     body = func.body.not_nil!.terms
-    example_1 = body[0].as(Mare::AST::Relate).lhs.as(Mare::AST::Identifier)
-    example_2 = body[1].as(Mare::AST::Call).ident
-    example_3 = body[2].as(Mare::AST::Call).ident
+    example_1 = body[0].as(Savi::AST::Relate).lhs.as(Savi::AST::Identifier)
+    example_2 = body[1].as(Savi::AST::Call).ident
+    example_3 = body[2].as(Savi::AST::Call).ident
 
-    refer[example_1].class.should eq Mare::Compiler::Refer::Local
-    refer[example_2].class.should eq Mare::Compiler::Refer::Unresolved
-    refer[example_3].class.should eq Mare::Compiler::Refer::Unresolved
+    refer[example_1].class.should eq Savi::Compiler::Refer::Local
+    refer[example_2].class.should eq Savi::Compiler::Refer::Unresolved
+    refer[example_3].class.should eq Savi::Compiler::Refer::Unresolved
   end
 
   pending "complains when a local variable name ends with an exclamation"
