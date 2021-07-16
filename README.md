@@ -1,25 +1,44 @@
-# Mare
+<img alt="Savi Logo" src="./assets/savi-logo-rect.png" width="454px" />
 
-<a href="https://openclipart.org/detail/191499/horse"><img alt="The ungui-angui-pede, a mascot for Mare" src="./assets/mascot.svg" width="100px" /></a>
+---
 
-[![CircleCI](https://circleci.com/gh/jemc/mare.svg?style=shield)](https://circleci.com/gh/jemc/mare) [![Docker](https://img.shields.io/docker/cloud/automated/jemc/mare.svg)](https://hub.docker.com/r/jemc/mare)
+**Savi** is a **fast** language for programmers
+  who are **passionate about their craft**.
 
-Mare is a reimagining of the [Pony](https://www.ponylang.io/) language.
+---
 
-The goal is to create a language with all the desirable features of Pony, while simultaneously being more approachable to newcomers and more extensible for power users.
+**Savi** will **change the way you think** about programming
+  and equip you with the skills and tools you need
+    to tackle **more ambitious** technical challenges,
+    and **have fun** doing it.
 
-It's an early work in progress, but it can already compile and run basic programs.
+---
 
-Check out the [feature roadmap](./ROADMAP.md) and [goals summary](./GOALS.md) for more information on where this project is headed.
+**Savi** is here to help you write blazing-fast,
+  **concurrent** software that is **memory-safe** and **data-race-free**.
+
+---
+
+## Background
+
+**Savi** is an actor-oriented programming language using the [Pony](https://www.ponylang.io/) runtime. Like Pony, **Savi** has a unique type system that enforces concurrency-safety and memory-safery properties at compile time.
+
+Like many other modern compiled languages, **Savi** uses [LLVM](https://llvm.org/) to compile to a wide variety of native targets.
+
+Our goal is to make **Savi** approachable and fun, as well as powerful and extensible.
+
+We are a small team of passionate volunteers working to bring this project to full fruition. If this vision sounds interesting to you, we'd love for you to [reach out in our chat](https://savi.zulipchat.com/) and get involved.
 
 ## Try It!
 
-There are a few ways you can try out Mare. All of them assume you have a working `docker` installation, so take a moment to take care of that first.
+[![Docker](https://img.shields.io/docker/cloud/automated/jemc/savi.svg)](https://hub.docker.com/r/jemc/savi)
+
+There are a few ways you can try out Savi. All of them assume you have a working `docker` installation, so take a moment to take care of that first.
 
 First, just to prove the basics, you can use the `eval` subcommand of the docker image to compile a program:
 
 ```sh
-docker run --rm jemc/mare eval 'env.out.print("Hello, World!")'
+docker run --rm jemc/savi eval 'env.out.print("Hello, World!")'
 # Prints "Hello, World!"
 ```
 
@@ -27,7 +46,7 @@ Beyond that, you can also use the docker image to compile a source code director
 
 ```sh
 # Compile the program.
-docker run --rm -v ${PATH_TO_YOUR_CODE}:/opt/code jemc/mare
+docker run --rm -v ${PATH_TO_YOUR_CODE}:/opt/code jemc/savi
 # Run the program.
 ${PATH_TO_YOUR_CODE}/main
 ```
@@ -36,15 +55,19 @@ If you're a VS Code user, you may be interested to install our [language extensi
 
 We also have [a vim/nvim extension](./tooling/coc-nvim) as well.
 
-Finally, if you want to contribute to Mare, read on through the next two sections for information on how to find work, as well some of the basic development commands.
+Finally, if you want to contribute to Savi, read on through the next two sections for information on how to find work, as well some of the basic development commands.
 
 ## Contributing
 
-Looking for ways to help? [Here's a link that shows issue tickets filtered by those that should be ready to work on](https://github.com/jemc/mare/issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc+-label%3ABLOCKED+-label%3A%22complexity+4%3A+scary%22+-label%3A%22needs+design%22).
+Looking for ways to help? [Here's a link that shows issue tickets filtered by those that should be ready to work on](https://github.com/savi-lang/savi/issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc+-label%3ABLOCKED+-label%3A%22complexity+4%3A+scary%22+-label%3A%22needs+design%22).
 
 You can also filter by complexity label to try to find something that's the right level of challenge and time commitment for you.
 
-If you're a new contributor looking for some guidance, please reach out to me (*Joe Eli McIlvain*) in a DM [in this chat room](https://ponylang.zulipchat.com/) to introduce yourself and even schedule pairing sessions where I can help you understand parts of the compiler or language that you're interested in learning more about.
+If you're a new contributor looking for some guidance, please reach out to us [in this chat room](https://savi.zulipchat.com/) to introduce yourself and even schedule pairing sessions where we can help you understand parts of the compiler or language that you're interested in learning more about.
+
+We think you'll find it exciting to join us at this stage of our work, where there is already enough working that you can get things done and produce a tangible result, but it's early enough that you can have a strong impact on the future of the language and the community.
+
+We are excited to welcome all contributors that bring a positive attitude, regardless of their level of experience. [Join us!](https://savi.zulipchat.com/)
 
 ## Developing
 
