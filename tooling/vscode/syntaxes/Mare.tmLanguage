@@ -34,13 +34,26 @@
 			<key>comment</key>
 			<string>Capability Operator</string>
 			<key>match</key>
-			<string>\'(?=[_a-zA-Z0-9]+[^\'])</string>
+			<string>(\')(\w+)(?=[^\'])</string>
 			<key>name</key>
-			<string>keyword.operator.capability.mare</string>
+			<string>meta.operator.capability.mare</string>
+			<key>captures</key>
+			<dict>
+				<key>1</key>
+				<dict>
+					<key>name</key>
+					<string>keyword.operator.capability.mare</string>
+				</dict>
+				<key>2</key>
+				<dict>
+					<key>name</key>
+					<string>entity.name.identifier.mare</string>
+				</dict>
+			</dict>
 		</dict>
 		<dict>
 			<key>begin</key>
-			<string>([_a-zA-Z0-9]?")</string>
+			<string>(\w?")</string>
 			<key>comment</key>
 			<string>Double-Quote String</string>
 			<key>end</key>
@@ -61,7 +74,7 @@
 			<key>begin</key>
 			<string>(')</string>
 			<key>comment</key>
-			<string>Single-Quote String</string>
+			<string>Single-Char String</string>
 			<key>end</key>
 			<string>(')</string>
 			<key>name</key>
@@ -88,7 +101,7 @@
 			<key>comment</key>
 			<string>Class (or other type)</string>
 			<key>match</key>
-			<string>(?:::)?([A-Z][_a-zA-Z0-9]*)</string>
+			<string>([_A-Z]\w*)</string>
 			<key>name</key>
 			<string>meta.class.mare</string>
 		</dict>
@@ -126,19 +139,13 @@
 			<array>
 				<dict>
 					<key>match</key>
-					<string>(\w+)(?=\()</string>
+					<string>\b[a-z_]\w*\b(?!\!)</string>
 					<key>name</key>
 					<string>entity.other.attribute-name.mare</string>
 				</dict>
 				<dict>
 					<key>include</key>
 					<string>$self</string>
-				</dict>
-				<dict>
-					<key>match</key>
-					<string>(\w+)</string>
-					<key>name</key>
-					<string>entity.other.attribute-name.mare</string>
 				</dict>
 			</array>
 		</dict>
@@ -162,7 +169,7 @@
 			<key>comment</key>
 			<string>Hex Numeric Values</string>
 			<key>match</key>
-			<string>\b0x([\h_]+)\b</string>
+			<string>\b0x([0-9a-fA-F_]+)\b</string>
 			<key>name</key>
 			<string>constant.numeric.mare</string>
 		</dict>
@@ -347,7 +354,7 @@
 			<key>comment</key>
 			<string>Other "Punctuation"</string>
 			<key>match</key>
-			<string>(@)</string>
+			<string>(@|\.)</string>
 			<key>name</key>
 			<string>punctuation.receiver.mare</string>
 		</dict>
@@ -398,6 +405,14 @@
 			<string>(\!|\&lt;\&lt;|\&lt;|\&amp;|\|)</string>
 			<key>name</key>
 			<string>keyword.operator.other.mare</string>
+		</dict>
+		<dict>
+			<key>comment</key>
+			<string>Identifiers</string>
+			<key>match</key>
+			<string>\w+</string>
+			<key>name</key>
+			<string>entity.name.identifier.mare</string>
 		</dict>
 	</array>
 	<key>scopeName</key>

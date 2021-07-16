@@ -16,18 +16,21 @@ patterns:
   end: ($)
 
 - comment: Capability Operator
-  name: keyword.operator.capability.mare
-  match: \'(?=[_a-zA-Z0-9]+[^\'])
+  name: meta.operator.capability.mare
+  match: (\')(\w+)(?=[^\'])
+  captures:
+    '1': {name: keyword.operator.capability.mare}
+    '2': {name: entity.name.identifier.mare}
 
 - comment: Double-Quote String
   name: string.quoted.double.mare
-  begin: ([_a-zA-Z0-9]?")
+  begin: (\w?")
   end: (")
   patterns:
   - name: constant.character.escape.mare
     match: \\.
 
-- comment: Single-Quote String
+- comment: Single-Char String
   name: string.quoted.single.mare
   begin: (')
   end: (')
@@ -37,7 +40,7 @@ patterns:
 
 - comment: Class (or other type)
   name: meta.class.mare
-  match: (?:::)?([A-Z][_a-zA-Z0-9]*)
+  match: ([_A-Z]\w*)
   captures:
     '1': {name: support.class.mare}
 
@@ -52,10 +55,8 @@ patterns:
     '1': {name: keyword.declare.mare}
   patterns:
   - name: entity.other.attribute-name.mare
-    match: (\w+)(?=\()
+    match: \b[a-z_]\w*\b(?!\!)
   - include: $self
-  - name: entity.other.attribute-name.mare
-    match: (\w+)
 
 - comment: Error-Raising Calls/Names
   name: markup.deleted.mare
@@ -67,7 +68,7 @@ patterns:
 
 - comment: Hex Numeric Values
   name: constant.numeric.mare
-  match: \b0x([\h_]+)\b
+  match: \b0x([0-9a-fA-F_]+)\b
 
 - comment: Binary Numeric Values
   name: constant.numeric.mare
@@ -127,7 +128,7 @@ patterns:
 
 - comment: Other "Punctuation"
   name: punctuation.receiver.mare
-  match: (@)
+  match: (@|\.)
 
 - comment: Piping Operators
   name: keyword.operator.pipe.mare
@@ -152,3 +153,7 @@ patterns:
 - comment: Other Operators
   name: keyword.operator.other.mare
   match: (\!|\<\<|\<|\&|\|)
+
+- comment: Identifiers
+  name: entity.name.identifier.mare
+  match: \w+
