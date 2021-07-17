@@ -1,7 +1,31 @@
+"""
+    pygments.lexers.savi
+    ~~~~~~~~~~~~~~~~~~~~
+
+    Lexer for Savi.
+
+    :copyright: Copyright 2006-2021 by the Pygments team, see AUTHORS.
+    :license: BSD, see LICENSE for details.
+"""
+
 from pygments.lexer import RegexLexer, bygroups
 from pygments.token import *
 
 __all__ = ['SaviLexer']
+
+# The canonical version of this file can be found in the following repository,
+# where it is kept in sync with any language changes, as well as the other
+# pygments-like lexers that are maintained for use with other tools:
+# - https://github.com/savi-lang/savi/blob/main/tooling/pygments/lexers/savi.py
+#
+# If you're changing this file in the pygments repository, please ensure that
+# any changes you make are also propagated to the official Savi repository,
+# in order to avoid accidental clobbering of your changes later when an update
+# from the Savi repository flows forward into the pygments repository.
+#
+# If you're changing this file in the Savi repository, please ensure that
+# any changes you make are also reflected in the other pygments-like lexers
+# (rouge, vscode, etc) so that all of the lexers can be kept cleanly in sync.
 
 class SaviLexer(RegexLexer):
   """
