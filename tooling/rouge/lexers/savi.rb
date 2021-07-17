@@ -1,18 +1,29 @@
 # -*- coding: utf-8 -*- #
 # frozen_string_literal: true
 
+# The canonical version of this file can be found in the following repository,
+# where it is kept in sync with any language changes, as well as the other
+# rouge-like lexers that are maintained for use with other tools:
+# - https://github.com/savi-lang/savi/blob/main/tooling/rouge/lexers/savi.rb
+#
+# If you're changing this file in the rouge repository, please ensure that
+# any changes you make are also propagated to the official Savi repository,
+# in order to avoid accidental clobbering of your changes later when an update
+# from the Savi repository flows forward into the rouge repository.
+#
+# If you're changing this file in the Savi repository, please ensure that
+# any changes you make are also reflected in the other rouge-like lexers
+# (pygments, vscode, etc) so that all of the lexers can be kept cleanly in sync.
+
 module Rouge
   module Lexers
     class Savi < RegexLexer
+      desc 'The Savi programming language (https://github.com/savi-lang/savi)'
       tag 'savi'
       filenames '*.savi'
-
-      state :whitespace do
-      end
+      mimetypes 'text/x-savi', 'application/x-savi'
 
       state :root do
-        mixin :whitespace
-
         # Line Comment
         rule %r{//.*?$}, Comment::Single
 
@@ -104,7 +115,7 @@ module Rouge
         rule %r{\b\w+\b}, Name
 
         # Whitespace
-        rule %r{[ \t\r]+}, Text
+        rule %r{\s+}, Text
       end
 
       # Declare (nested rules)
