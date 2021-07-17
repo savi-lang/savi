@@ -60,3 +60,62 @@ T'y'7
       y = if cond ("string" | b"bytes")
           ^~
 ```
+
+It analyzes the getter, setter, and displacement methods of a field.
+
+```savi
+:class ExampleField
+  :var field String
+```
+```types.type_variables_list ExampleField.field
+T'field'^1
+  :> T'value'3
+    :var field String
+         ^~~~~
+  :> T'value'3
+    :var field String
+         ^~~~~
+~~~
+T'@'1
+  := (ExampleField & K'@'2)
+    :var field String
+     ^~~
+```
+```types.type_variables_list ExampleField.field=
+T'field'^1
+  :> T'value'3
+    :var field String
+         ^~~~~
+  :> T'value'3
+    :var field String
+         ^~~~~
+~~~
+T'@'1
+  := (ExampleField & K'@'2)
+    :var field String
+     ^~~
+
+T'value'3
+  <: (String & val)
+    :var field String
+               ^~~~~~
+```
+```types.type_variables_list ExampleField.field<<=
+T'field'^1
+  :> T'value'3
+    :var field String
+         ^~~~~
+  :> T'value'3
+    :var field String
+         ^~~~~
+~~~
+T'@'1
+  := (ExampleField & K'@'2)
+    :var field String
+     ^~~
+
+T'value'3
+  <: (String & val)
+    :var field String
+               ^~~~~~
+```

@@ -240,7 +240,7 @@ module Savi::AST
   alias Term = Annotation | Identifier \
     | LiteralString | LiteralCharacter | LiteralInteger | LiteralFloat \
     | Operator | Prefix | Relate | Group \
-    | FieldRead | FieldWrite | Choice | Loop | Try
+    | FieldRead | FieldWrite | FieldDisplace | Choice | Loop | Try
 
   # Annotation is a comment attached to an expression, such as a doc string.
   # These are differentiated from true comments, which are discarded in the AST.

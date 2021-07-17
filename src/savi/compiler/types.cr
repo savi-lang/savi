@@ -16,6 +16,7 @@ module Savi::Compiler::Types
     protected getter parent : StructRef(Analysis)?
     protected getter! for_self : AlgebraicType
     protected getter! type_param_vars : Array(TypeVariable)
+    protected getter! field_type_vars : Hash(String, TypeVariable)
 
     def initialize(@scope, parent : Analysis? = nil)
       @parent = parent ? StructRef(Analysis).new(parent) : nil
@@ -121,6 +122,12 @@ module Savi::Compiler::Types
       })
     end
 
+    protected def init_type_fields(ctx, visitor : Visitor, fields : Array(Program::Function))
+      @field_type_vars = fields.map { |f|
+        {f.ident.value, new_type_var(f.ident.value)}
+      }.to_h
+    end
+
     protected def init_func_self(cap : String, pos : Source::Pos)
       @for_self = new_type_var("@").tap { |var|
         self_type = @parent.not_nil!.value.for_self
@@ -150,6 +157,11 @@ module Savi::Compiler::Types
       @by_node[node] = var.aliased
     end
 
+    protected def observe_local_consume(node, ref)
+      var = @by_ref[ref] ||= new_type_var(ref.name)
+      @by_node[node] = var
+    end
+
     protected def observe_assignment(node, ref)
       var = @by_ref[ref].as(TypeVariable)
 
@@ -173,6 +185,23 @@ module Savi::Compiler::Types
       @assignments << {node.pos, var, @by_node[default].stabilized} if default
 
       @by_node[node] = var.aliased
+    end
+
+    protected def observe_field_access(node)
+      parent = @parent.not_nil!.value
+      var = parent.field_type_vars[node.value]
+      case node
+      when AST::FieldRead
+        @by_node[node] = var.aliased
+      when AST::FieldWrite
+        @by_node[node] = var.aliased
+        @assignments        << {node.pos, var, @by_node[node.rhs]}
+        parent.@assignments << {node.pos, var, @by_node[node.rhs]}
+      when AST::FieldDisplace
+        @by_node[node] = var
+        @assignments        << {node.pos, var, @by_node[node.rhs]}
+        parent.@assignments << {node.pos, var, @by_node[node.rhs]}
+      end
     end
 
     protected def observe_call(node)
@@ -209,6 +238,7 @@ module Savi::Compiler::Types
 
     def run_for_type(ctx : Context, t : Program::Type)
       @analysis.init_type_self(ctx, self, t.params)
+      @analysis.init_type_fields(ctx, self, t.functions.select(&.has_tag?(:field)))
     end
 
     def run_for_function(ctx : Context, f : Program::Function)
@@ -353,10 +383,6 @@ module Savi::Compiler::Types
       end
     end
 
-    def visit(ctx, node : AST::Operator)
-      # Do nothing.
-    end
-
     def visit(ctx, node : AST::LiteralString)
       case node.prefix_ident.try(&.value)
       when nil
@@ -383,6 +409,20 @@ module Savi::Compiler::Types
           @analysis[node] = @analysis[node.terms.last]
         end
       else raise NotImplementedError.new(node.style)
+      end
+    end
+
+    def visit(ctx, node : AST::Operator)
+      # Do nothing.
+    end
+
+    def visit(ctx, node : AST::Prefix)
+      case node.op.value
+      when "--"
+        ref = refer[node.term].as(Refer::Local)
+        @analysis.observe_local_consume(node, ref)
+      else
+        raise NotImplementedError.new(node.op.value)
       end
     end
 
@@ -416,6 +456,10 @@ module Savi::Compiler::Types
       }
       @analysis[node] =
         Union.from(node.list.map { |cond, body| @analysis[body] })
+    end
+
+    def visit(ctx, node : AST::FieldRead | AST::FieldWrite | AST::FieldDisplace)
+      @analysis.observe_field_access(node)
     end
 
     def visit(ctx, node : AST::Call)
