@@ -13,7 +13,7 @@ require "llvm"
 # !! This pass has the side-effect of writing files to disk.
 #
 class Savi::Compiler::Binary
-  PONYRT_BC_PATH = ENV.fetch("MARE_PONYRT_BC_PATH", "/usr/lib:/usr/local/lib")
+  PONYRT_BC_PATH = ENV.fetch("SAVI_PONYRT_BC_PATH", "/usr/lib:/usr/local/lib")
 
   def self.run(ctx)
     new.run(ctx)

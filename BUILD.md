@@ -20,7 +20,7 @@ sudo cp build/release/libponyrt.bc /usr/local/lib
 ```
 
 We only need file `libponyrt.bc`. Either copy it to a system library location,
-or set `MARE_PONYRT_BC_PATH` to the directory where it can be found.
+or set `SAVI_PONYRT_BC_PATH` to the directory where it can be found.
 
 Then build `savi`:
 
