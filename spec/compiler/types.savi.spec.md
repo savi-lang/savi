@@ -38,12 +38,12 @@ T'x'5
   := (String & val)
       x String = a.describe
         ^~~~~~
-  :> T'describe'6
+  :> T'describe'6'stabilized
       x String = a.describe
       ^~~~~~~~~~~~~~~~~~~~~
 
 T'describe'6
-  :> T'a'3.describe
+  :> T'a'3'aliased.describe
       x String = a.describe
                  ^~~~~~~~~~
 
@@ -52,7 +52,7 @@ T'y'7
       y = if cond ("string" | b"bytes")
       ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ~~~
-  (Bool & val) :> T'cond'4
+  (Bool & val) :> T'cond'4'aliased
       y = if cond ("string" | b"bytes")
              ^~~~
 

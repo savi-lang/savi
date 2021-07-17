@@ -6,13 +6,11 @@ module Savi::Compiler::Types
     abstract def intersect(other : AlgebraicType)
 
     def aliased
-      # TODO: Implement this method.
-      self
+      raise NotImplementedError.new("aliased for #{self.class}")
     end
 
     def stabilized
-      # TODO: Implement this method.
-      self
+      raise NotImplementedError.new("stabilized for #{self.class}")
     end
 
     abstract def override_cap(cap : AlgebraicType)
@@ -29,14 +27,24 @@ module Savi::Compiler::Types
     end
   end
 
-  abstract struct AlgebraicTypeSimple < AlgebraicTypeSummand
+  abstract struct AlgebraicTypeFactor < AlgebraicTypeSummand
     def intersect(other : AlgebraicType)
       case other
-      when AlgebraicTypeSimple
-        Intersection.new(Set(AlgebraicTypeSimple){self, other})
+      when AlgebraicTypeFactor
+        Intersection.new(Set(AlgebraicTypeFactor){self, other})
       else
         other.intersect(self)
       end
+    end
+  end
+
+  abstract struct AlgebraicTypeSimple < AlgebraicTypeFactor
+    def aliased
+      Aliased.new(self)
+    end
+
+    def stabilized
+      Stabilized.new(self)
     end
   end
 
@@ -49,6 +57,14 @@ module Savi::Compiler::Types
     def show
       args = @args
       args ? "#{@link.name}(#{args.map(&.show).join(", ")})" : @link.name
+    end
+
+    def aliased
+      self # this type says nothing about capabilities, so it remains unchanged.
+    end
+
+    def stabilized
+      self # this type says nothing about capabilities, so it remains unchanged.
     end
 
     def override_cap(cap : AlgebraicType)
@@ -86,6 +102,21 @@ module Savi::Compiler::Types
 
     def show
       @cap.to_s.downcase
+    end
+
+    def aliased
+      case self
+      when ISO then ISO_ALIASED
+      when ISO_ALIASED then raise "unreachable: we should never alias an alias"
+      else self # all other caps alias as themselves
+      end
+    end
+
+    def stabilized
+      case self
+      when ISO_ALIASED then TAG # TODO: NON instead, for Verona compatibility
+      else self # all other caps stabilize as themselves
+      end
     end
 
     def override_cap(other : AlgebraicType)
@@ -127,8 +158,36 @@ module Savi::Compiler::Types
     end
   end
 
+  struct Aliased < AlgebraicTypeFactor
+    getter inner : AlgebraicTypeSimple
+    def initialize(@inner)
+    end
+
+    def show
+      "#{@inner.show}'aliased"
+    end
+
+    def override_cap(cap : AlgebraicType)
+      raise NotImplementedError.new("override_cap for #{self.class}")
+    end
+  end
+
+  struct Stabilized < AlgebraicTypeFactor
+    getter inner : AlgebraicTypeSimple
+    def initialize(@inner)
+    end
+
+    def show
+      "#{@inner.show}'stabilized"
+    end
+
+    def override_cap(cap : AlgebraicType)
+      raise NotImplementedError.new("override_cap for #{self.class}")
+    end
+  end
+
   struct Intersection < AlgebraicTypeSummand
-    getter members : Set(AlgebraicTypeSimple)
+    getter members : Set(AlgebraicTypeFactor)
     def initialize(@members)
     end
 
@@ -146,13 +205,21 @@ module Savi::Compiler::Types
 
     def intersect(other : AlgebraicType)
       case other
-      when AlgebraicTypeSimple
+      when AlgebraicTypeFactor
         Intersection.new(@members.dup.tap(&.add(other)))
       when Intersection
         Intersection.new(@members + other.members)
       else
         other.intersect(self)
       end
+    end
+
+    def aliased
+      Intersection.from(@members.map(&.aliased))
+    end
+
+    def stabilized
+      Intersection.from(@members.map(&.stabilized))
     end
 
     def override_cap(cap : AlgebraicType)
@@ -190,6 +257,14 @@ module Savi::Compiler::Types
       else
         other.unite(self)
       end
+    end
+
+    def aliased
+      Union.from(@members.map(&.aliased))
+    end
+
+    def stabilized
+      Union.from(@members.map(&.stabilized))
     end
 
     def override_cap(cap : AlgebraicType)
