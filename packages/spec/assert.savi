@@ -9,7 +9,7 @@
     test.specs.enqueue(assert)
 
 // TODO: traits don't yet generate a singleton object
-// so we keep `:class Assert` as our singleton for the macro's call
+// so we keep `:primitive Assert` as our singleton for the macro's call
 // and use Assert2 to sub-type `AssertCondition` and `AssertRelation`.
 //
 // We'll merge Assert and Assert2 once a `:trait` can be used as a singleton.
