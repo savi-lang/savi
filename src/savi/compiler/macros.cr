@@ -126,6 +126,12 @@ class Savi::Compiler::Macros < Savi::AST::CopyOnMutateVisitor
       visit_jump(node, AST::Jump::Kind::Break)
     elsif Util.match_ident?(node, 0, "next")
       visit_jump(node, AST::Jump::Kind::Next)
+    elsif Util.match_ident?(node, 0, "assert")
+      Util.require_terms(node, [
+        nil,
+        "the boolean expression to verify",
+      ])
+      visit_assert(node)
     elsif Util.match_ident?(node, 0, "source_code_position_of_argument")
       Util.require_terms(node, [
         nil,
@@ -570,6 +576,22 @@ class Savi::Compiler::Macros < Savi::AST::CopyOnMutateVisitor
         {AST::Identifier.new("True").from(node), negate ? jump : none},
       ]).from(orig),
     ] of AST::Term).from(node)
+  end
+
+  def visit_assert(node : AST::Group)
+    orig = node.terms[0]
+    expr = node.terms[1]
+
+    call = AST::Call.new(
+      AST::Identifier.new("Assert").from(orig),
+      AST::Identifier.new("condition").from(orig),
+      AST::Group.new("(", [
+        AST::Identifier.new("@").from(expr),
+        expr,
+      ] of AST::Term).from(expr)
+    ).from(orig)
+
+    AST::Group.new("(", [call] of AST::Term).from(node)
   end
 
   def visit_source_code_position_of_argument(node : AST::Group)

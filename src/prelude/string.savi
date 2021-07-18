@@ -432,6 +432,13 @@
       String.new_iso
     )
 
+  :fun non join(others Array(String), separator = "") String'iso
+    res = String.new_iso
+    others.each_with_index -> (other, index |
+      res << other
+      if (index != others.size - 1) (res << separator)
+    )
+    --res
 
 :: Encode the code point into UTF-8. It returns a tuple with the size of the
 :: encoded data and then the data.

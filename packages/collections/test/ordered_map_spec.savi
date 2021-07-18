@@ -10,18 +10,18 @@
     map = @new_map
     @assert = map.size == 0
     @assert = try (map["example"]!, False | True)
-    @assert = map.has_key("example").not
+    assert map.has_key("example").is_false
     @assert = (map["example"] = 99) == 99
     @assert = map.size == 1
     @assert = try (map["example"]! | U64[0]) == 99
-    @assert = map.has_key("example")
+    assert map.has_key("example")
     @assert = (map["example"] = 88) == 88
     @assert = map.size == 1
     @assert = try (map["example"]! | U64[0]) == 88
-    @assert = map.has_key("example")
+    assert map.has_key("example")
     @assert = map.delete("example") <: None
     @assert = try map["example"]! <: None
-    @assert = map.has_key("example").not
+    assert map.has_key("example").is_false
     @assert = map.size == 0
 
   :it "can be cleared, removing all keys and values"
@@ -58,14 +58,14 @@
     count = USize[0]
     key = ""
     found_it = map.each_until -> (k, v | count += 1, key = k, v == 22)
-    @assert = found_it
+    assert found_it
     @assert = count == 2
     @assert = key == "bar"
 
     count = USize[0]
     key = ""
     found_it = map.each_until -> (k, v | count += 1, key = k, v == 33)
-    @assert = found_it
+    assert found_it
     @assert = count == 3
     @assert = key == "baz"
 
@@ -74,4 +74,4 @@
     found_it = map.each_until -> (k, v | count += 1, key = k, v == 99)
     @assert = count == 3
     @assert = key == "baz"
-    @assert = found_it.not
+    assert found_it.is_false

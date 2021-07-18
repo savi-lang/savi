@@ -1,0 +1,35 @@
+:trait val Assert
+  :let spec String
+  :let example String
+  :let success Bool
+  :let pos SourceCodePosition
+
+  :new val (@spec, @example, @success, @pos)
+
+  :: The report function will print a specific failure message \
+  :: for the different kinds of assertions.
+  :fun report_failure(env Env) None
+
+  :fun non condition(
+    spec Spec
+    success Bool
+    pos SourceCodePosition = source_code_position_of_argument success
+  )
+    test = spec.test
+    assert = AssertCondition.new(test.spec, test.example, success, pos)
+    test.specs.enqueue(assert)
+
+:class val AssertCondition
+  :is Assert
+
+  :fun report_failure(env Env) None
+    line = Inspect[@pos.row + 1]
+
+    env.err.write("\n")
+    env.err.print(String.join([
+      "    Expected the following to be True:"
+      String.join(["    ", @pos.string, "\n"])
+      String.join(["    # ", @pos.filename, ":", line])
+    ], "\n"))
+
+    None

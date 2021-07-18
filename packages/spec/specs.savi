@@ -83,3 +83,24 @@
     |
       Specs._bug(@env, "assert before the example_began and/or spec_began")
     )
+
+  // TODO: This behavior is a copy of the `:be assert` above.
+  // I added it to keep `@assert =` working while implementing the `assert` macro.
+  // In the end we won't need both of them, after we clean up `@assert =`.
+  :be enqueue(assert Assert)
+    spec = assert.spec
+    example = assert.example
+    success = assert.success
+
+    // TODO: refactor to `SpecEventAssert.new(assert)`
+    event = SpecEventAssert.new(success, assert.pos, assert)
+
+    // If it was a failed assertion, mark the entire process as a failure.
+    if !success Specs._fail(@env)
+
+    try (
+      @statuses[spec]!.examples[example]!.events << event
+      @reporter.event(spec, example, event)
+    |
+      Specs._bug(@env, "assert before the example_began and/or spec_began")
+    )
