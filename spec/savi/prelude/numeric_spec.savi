@@ -26,32 +26,32 @@
     )
 
   :it "indicates whether the given numeric is signed or unsigned"
-    @assert = U8   .is_signed == False
-    @assert = U16  .is_signed == False
-    @assert = U32  .is_signed == False
-    @assert = U64  .is_signed == False
-    @assert = USize.is_signed == False
-    @assert = I8   .is_signed == True
-    @assert = I16  .is_signed == True
-    @assert = I32  .is_signed == True
-    @assert = I64  .is_signed == True
-    @assert = ISize.is_signed == True
-    @assert = F32  .is_signed == True
-    @assert = F64  .is_signed == True
+    assert U8   .is_signed.is_false
+    assert U16  .is_signed.is_false
+    assert U32  .is_signed.is_false
+    assert U64  .is_signed.is_false
+    assert USize.is_signed.is_false
+    assert I8   .is_signed
+    assert I16  .is_signed
+    assert I32  .is_signed
+    assert I64  .is_signed
+    assert ISize.is_signed
+    assert F32  .is_signed
+    assert F64  .is_signed
 
   :it "indicates whether the given numeric is a floating point or an integer"
-    @assert = U8   .is_floating_point == False
-    @assert = U16  .is_floating_point == False
-    @assert = U32  .is_floating_point == False
-    @assert = U64  .is_floating_point == False
-    @assert = USize.is_floating_point == False
-    @assert = I8   .is_floating_point == False
-    @assert = I16  .is_floating_point == False
-    @assert = I32  .is_floating_point == False
-    @assert = I64  .is_floating_point == False
-    @assert = ISize.is_floating_point == False
-    @assert = F32  .is_floating_point == True
-    @assert = F64  .is_floating_point == True
+    assert U8   .is_floating_point.is_false
+    assert U16  .is_floating_point.is_false
+    assert U32  .is_floating_point.is_false
+    assert U64  .is_floating_point.is_false
+    assert USize.is_floating_point.is_false
+    assert I8   .is_floating_point.is_false
+    assert I16  .is_floating_point.is_false
+    assert I32  .is_floating_point.is_false
+    assert I64  .is_floating_point.is_false
+    assert ISize.is_floating_point.is_false
+    assert F32  .is_floating_point
+    assert F64  .is_floating_point
 
   :it "exhibits wraparound behaviour for underflowing numeric literals"
     @assert = U8[-1]                    == 0xFF
@@ -86,7 +86,7 @@
     @assert = F64  .zero == 0
 
   :it "can report the max or minimum integer based on bit width and signedness"
-    @assert = Bool .max_value == True
+    assert Bool.max_value
     @assert = U8   .max_value == 0xFF
     @assert = U16  .max_value == 0xFFFF
     @assert = U32  .max_value == 0xFFFF_FFFF
@@ -103,7 +103,7 @@
       @assert = ISize.max_value == 0x7FFF_FFFF
     )
 
-    @assert = Bool .min_value == False
+    assert Bool.min_value.is_false
     @assert = U8   .min_value == 0
     @assert = U16  .min_value == 0
     @assert = U32  .min_value == 0
@@ -163,7 +163,7 @@
     @assert = F64.neg_infinity.i8 == -128
     @assert = F64[128].i8         == 127
     @assert = F64[-129].i8        == -128
-    @assert = F64.nan.f32.is_nan
+    assert F64.nan.f32.is_nan
     @assert = F64.max_value.f32   == F32.infinity
     @assert = F64.min_value.f32   == F32.neg_infinity
 
@@ -301,12 +301,12 @@
     @assert = F64.from_bits(0x400C_CCCC_CCCC_CCCD) == 3.6
     @assert = F32.nan.bits == 0x7FC0_0000
     @assert = F64.nan.bits == 0x7FF8_0000_0000_0000
-    @assert = F32.nan.is_nan
-    @assert = F64.nan.is_nan
-    @assert = F32[0].is_nan.is_false
-    @assert = F64[0].is_nan.is_false
-    @assert = (F32[0] / 0).is_nan
-    @assert = (F64[0] / 0).is_nan
+    assert F32.nan.is_nan
+    assert F64.nan.is_nan
+    assert F32[0].is_nan.is_false
+    assert F64[0].is_nan.is_false
+    assert (F32[0] / 0).is_nan
+    assert (F64[0] / 0).is_nan
     @assert = F32.infinity.bits == 0x7F80_0000
     @assert = F64.infinity.bits == 0x7FF0_0000_0000_0000
     @assert = F32.neg_infinity.bits == 0xFF80_0000
@@ -315,47 +315,47 @@
     @assert = F64.infinity == F64[1] / 0
     @assert = F32.neg_infinity == F32[-1] / 0
     @assert = F64.neg_infinity == F64[-1] / 0
-    @assert = F32.infinity.is_nan.is_false
-    @assert = F64.infinity.is_nan.is_false
-    @assert = F32.neg_infinity.is_nan.is_false
-    @assert = F64.neg_infinity.is_nan.is_false
-    @assert = F32.max_value.is_nan.is_false
-    @assert = F64.max_value.is_nan.is_false
-    @assert = F32.min_value.is_nan.is_false
-    @assert = F64.min_value.is_nan.is_false
-    @assert = F32.nan.is_infinite.is_false
-    @assert = F64.nan.is_infinite.is_false
-    @assert = F32.infinity.is_infinite
-    @assert = F64.infinity.is_infinite
-    @assert = F32.neg_infinity.is_infinite
-    @assert = F64.neg_infinity.is_infinite
-    @assert = F32.max_value.is_infinite.is_false
-    @assert = F64.max_value.is_infinite.is_false
-    @assert = F32.min_value.is_infinite.is_false
-    @assert = F64.min_value.is_infinite.is_false
-    @assert = F32.nan.is_finite.is_false
-    @assert = F64.nan.is_finite.is_false
-    @assert = F32.infinity.is_finite.is_false
-    @assert = F64.infinity.is_finite.is_false
-    @assert = F32.neg_infinity.is_finite.is_false
-    @assert = F64.neg_infinity.is_finite.is_false
-    @assert = F32.max_value.is_finite
-    @assert = F64.max_value.is_finite
-    @assert = F32.min_value.is_finite
-    @assert = F64.min_value.is_finite
-    @assert = F64.infinity.is_positive
-    @assert = F32.infinity.is_positive
-    @assert = F64.infinity.is_negative.is_false
-    @assert = F32.infinity.is_negative.is_false
-    @assert = F64.neg_infinity.is_positive.is_false
-    @assert = F32.neg_infinity.is_positive.is_false
-    @assert = F64.neg_infinity.is_negative
-    @assert = F32.neg_infinity.is_negative
-    @assert = F64[123.456].is_positive
-    @assert = F32[123.456].is_positive
-    @assert = F64[123.456].is_negative.is_false
-    @assert = F32[123.456].is_negative.is_false
-    @assert = F64[-123.456].is_positive.is_false
-    @assert = F32[-123.456].is_positive.is_false
-    @assert = F64[-123.456].is_negative
-    @assert = F32[-123.456].is_negative
+    assert F32.infinity.is_nan.is_false
+    assert F64.infinity.is_nan.is_false
+    assert F32.neg_infinity.is_nan.is_false
+    assert F64.neg_infinity.is_nan.is_false
+    assert F32.max_value.is_nan.is_false
+    assert F64.max_value.is_nan.is_false
+    assert F32.min_value.is_nan.is_false
+    assert F64.min_value.is_nan.is_false
+    assert F32.nan.is_infinite.is_false
+    assert F64.nan.is_infinite.is_false
+    assert F32.infinity.is_infinite
+    assert F64.infinity.is_infinite
+    assert F32.neg_infinity.is_infinite
+    assert F64.neg_infinity.is_infinite
+    assert F32.max_value.is_infinite.is_false
+    assert F64.max_value.is_infinite.is_false
+    assert F32.min_value.is_infinite.is_false
+    assert F64.min_value.is_infinite.is_false
+    assert F32.nan.is_finite.is_false
+    assert F64.nan.is_finite.is_false
+    assert F32.infinity.is_finite.is_false
+    assert F64.infinity.is_finite.is_false
+    assert F32.neg_infinity.is_finite.is_false
+    assert F64.neg_infinity.is_finite.is_false
+    assert F32.max_value.is_finite
+    assert F64.max_value.is_finite
+    assert F32.min_value.is_finite
+    assert F64.min_value.is_finite
+    assert F64.infinity.is_positive
+    assert F32.infinity.is_positive
+    assert F64.infinity.is_negative.is_false
+    assert F32.infinity.is_negative.is_false
+    assert F64.neg_infinity.is_positive.is_false
+    assert F32.neg_infinity.is_positive.is_false
+    assert F64.neg_infinity.is_negative
+    assert F32.neg_infinity.is_negative
+    assert F64[123.456].is_positive
+    assert F32[123.456].is_positive
+    assert F64[123.456].is_negative.is_false
+    assert F32[123.456].is_negative.is_false
+    assert F64[-123.456].is_positive.is_false
+    assert F32[-123.456].is_positive.is_false
+    assert F64[-123.456].is_negative
+    assert F32[-123.456].is_negative

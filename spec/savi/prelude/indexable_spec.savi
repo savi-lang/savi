@@ -51,7 +51,7 @@
       array << string
       string == "bar"
     )
-    @assert = early_stop == True
+    assert early_stop
     @assert = array == ["foo", "bar"]
 
     array.clear
@@ -59,7 +59,7 @@
       array << string
       string == "bard"
     )
-    @assert = early_stop == False
+    assert early_stop.is_false
     @assert = array == ["foo", "bar", "baz"]
 
   :it "yields each element of a subslice, stopping early if the criteria is met"
@@ -68,7 +68,7 @@
       array << string
       string == "d"
     )
-    @assert = early_stop == True
+    assert early_stop
     @assert = array == ["b", "c", "d"]
 
     array.clear
@@ -76,7 +76,7 @@
       array << string
       string == "z"
     )
-    @assert = early_stop == False
+    assert early_stop.is_false
     @assert = array == ["b", "c", "d", "e"]
 
   :it "finds the first element that meets the criteria"

@@ -13,23 +13,23 @@
     data = Array(None).new
     @assert = data.space == 0
     @assert = data.size == 0
-    @assert = data.cpointer.is_null
+    assert data.cpointer.is_null
 
   :it "allocates the next highest power of two containing the requested space"
     data = Array(None).new(12)
     @assert = data.space == 16
     @assert = data.size == 0
-    @assert = data.cpointer.is_not_null
+    assert data.cpointer.is_not_null
 
     data = Array(None).new(16)
     @assert = data.space == 16
     @assert = data.size == 0
-    @assert = data.cpointer.is_not_null
+    assert data.cpointer.is_not_null
 
     data = Array(None).new(17)
     @assert = data.space == 32
     @assert = data.size == 0
-    @assert = data.cpointer.is_not_null
+    assert data.cpointer.is_not_null
 
   :it "won't reallocate when reserving space within the current allocation"
     data = Array(None).new(12)
@@ -38,13 +38,13 @@
     data.reserve(16)
     @assert = data.space == 16
     @assert = data.size == 0
-    @assert = data.cpointer.is_not_null
+    assert data.cpointer.is_not_null
     @assert = data.cpointer.usize == orig_pointer_address
 
     data.reserve(0)
     @assert = data.space == 16
     @assert = data.size == 0
-    @assert = data.cpointer.is_not_null
+    assert data.cpointer.is_not_null
     @assert = data.cpointer.usize == orig_pointer_address
 
   :it "will reallocate when reserving space beyond the current allocation"
@@ -57,7 +57,7 @@
 
     @assert = data.space == 2048
     @assert = data.size == 0
-    @assert = data.cpointer.is_not_null
+    assert data.cpointer.is_not_null
     @assert = data.cpointer.usize != orig_pointer_address
 
   :it "pushes a new element onto the end of the array and reads them back out"
@@ -95,13 +95,13 @@
   :it "can be cleared to an empty size"
     array Array(U8) = [3, 6, 12]
     @assert = array.size == 3
-    @assert = array.is_empty.not
-    @assert = array.is_not_empty
+    assert array.is_empty.not
+    assert array.is_not_empty
 
     array.clear
     @assert = array.size == 0
-    @assert = array.is_empty
-    @assert = array.is_not_empty.not
+    assert array.is_empty
+    assert array.is_not_empty.not
     @assert = try (array[0]!, False | True)
 
   :it "compares equality for the elements in the array"
@@ -125,28 +125,28 @@
     @assert = array.clone.size == 0
 
   :it "returns True if the given element is equal to one already in the array"
-    @assert = ["foo", "bar", "baz"].includes("foo")
-    @assert = ["foo", "bar", "baz"].includes("f").not
+    assert ["foo", "bar", "baz"].includes("foo")
+    assert ["foo", "bar", "baz"].includes("f").is_false
 
   :it "replaces via a yield block the element at the given index, if it exists"
     array Array(String) = ["foo", "bar", "baz"]
 
-    @assert = True == array.try_replace_at(1) -> (element |
+    assert array.try_replace_at(1) -> (element |
       @assert = element == "bar"
       "BAR"
     )
-    @assert = False == array.try_replace_at(3) -> (element |
-      @assert = False // assert that this block should never run
+    assert array.try_replace_at(3) -> (element |
+      assert False // assert that this block should never run
       "NOPE"
-    )
+    ).is_false
 
     @assert = array == ["foo", "BAR", "baz"]
 
   :it "returns True if the given element is pointer-identical to one in the array"
     opaque_1 = ArraySpecOpaqueObject.new
     opaque_2 = ArraySpecOpaqueObject.new
-    @assert = [opaque_1].includes(opaque_1)
-    @assert = [opaque_1].includes(opaque_2).not
+    assert [opaque_1].includes(opaque_1)
+    assert [opaque_1].includes(opaque_2).is_false
 
   :it "yields each element in the array, along with the index"
     array_a Array(String) = []
