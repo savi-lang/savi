@@ -239,3 +239,14 @@
     @assert = codepoints == ['"', 'न', 'म', 'स', '्', 'त', 'े', '!', '"']
     @assert = indices    == [ 0,   1,   4,   7,  10,  13,  16,  19,  20]
     @assert = widths     == [ 1,   3,   3,   3,   3,   3,   3,   1,   1]
+  
+  :it "joins an array of strings"
+    @assert = String.join([
+      "foo"
+      "bar"
+    ]) == "foobar"
+
+    @assert = String.join([
+      "foo"
+      "bar"
+    ], " ") == "foo bar"
