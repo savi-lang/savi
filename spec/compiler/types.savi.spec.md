@@ -24,35 +24,40 @@ T'@'1
     :fun example(a A, cond Bool)
      ^~~
 
-T'a'3
+T'return'3
+  :> T'y'8'aliased
+      y = if cond ("string" | b"bytes")
+      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+T'a'4
   <: T'A'^1
     :fun example(a A, cond Bool)
                    ^
 
-T'cond'4
+T'cond'5
   <: (Bool & val)
     :fun example(a A, cond Bool)
                            ^~~~
 
-T'x'5
+T'x'6
   := (String & val)
       x String = a.describe
         ^~~~~~
-  :> T'describe'6'stabilized
+  :> T'describe'7'stabilized
       x String = a.describe
       ^~~~~~~~~~~~~~~~~~~~~
 
-T'describe'6
-  :> T'a'3'aliased.describe
+T'describe'7
+  :> T'a'4'aliased.describe
       x String = a.describe
                  ^~~~~~~~~~
 
-T'y'7
+T'y'8
   :> ((String & val) | (Bytes & val))
       y = if cond ("string" | b"bytes")
       ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ~~~
-  (Bool & val) :> T'cond'4'aliased
+  (Bool & val) :> T'cond'5'aliased
       y = if cond ("string" | b"bytes")
              ^~~~
 
@@ -60,6 +65,8 @@ T'y'7
       y = if cond ("string" | b"bytes")
           ^~
 ```
+
+---
 
 It analyzes the getter, setter, and displacement methods of a field.
 
@@ -69,10 +76,10 @@ It analyzes the getter, setter, and displacement methods of a field.
 ```
 ```types.type_variables_list ExampleField.field
 T'field'^1
-  :> T'value'3
+  :> T'value'4
     :var field String
          ^~~~~
-  :> T'value'3
+  :> T'value'4
     :var field String
          ^~~~~
 ~~~
@@ -80,13 +87,22 @@ T'@'1
   := (ExampleField & K'@'2)
     :var field String
      ^~~
+
+T'return'3
+  <: (String & T'@'1->val)
+    :var field String
+               ^~~~~~
+  :> T'field'^1'aliased
+    :var field String
+         ^~~~~
+
 ```
 ```types.type_variables_list ExampleField.field=
 T'field'^1
-  :> T'value'3
+  :> T'value'4
     :var field String
          ^~~~~
-  :> T'value'3
+  :> T'value'4
     :var field String
          ^~~~~
 ~~~
@@ -95,17 +111,26 @@ T'@'1
     :var field String
      ^~~
 
-T'value'3
+T'return'3
+  <: (String & T'@'1->val)
+    :var field String
+               ^~~~~~
+  :> T'field'^1'aliased
+    :var field String
+         ^~~~~
+
+T'value'4
   <: (String & val)
     :var field String
                ^~~~~~
+
 ```
 ```types.type_variables_list ExampleField.field<<=
 T'field'^1
-  :> T'value'3
+  :> T'value'4
     :var field String
          ^~~~~
-  :> T'value'3
+  :> T'value'4
     :var field String
          ^~~~~
 ~~~
@@ -114,8 +139,17 @@ T'@'1
     :var field String
      ^~~
 
-T'value'3
+T'return'3
+  <: (String & T'@'1->val)
+    :var field String
+               ^~~~~~
+  :> T'field'^1
+    :var field String
+         ^~~~~
+
+T'value'4
   <: (String & val)
     :var field String
                ^~~~~~
+
 ```

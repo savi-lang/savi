@@ -17,6 +17,7 @@ module Savi::Compiler::Types
     protected getter! for_self : AlgebraicType
     protected getter! type_param_vars : Array(TypeVariable)
     protected getter! field_type_vars : Hash(String, TypeVariable)
+    protected getter! return_var : TypeVariable
 
     def initialize(@scope, parent : Analysis? = nil)
       @parent = parent ? StructRef(Analysis).new(parent) : nil
@@ -136,6 +137,19 @@ module Savi::Compiler::Types
       }.as(AlgebraicType)
     end
 
+    protected def init_func_return_var(ctx, visitor : Visitor, ret : AST::Term?)
+      @return_var = var = new_type_var("return")
+
+      if ret
+        explicit_type = visitor.read_type_expr(ctx, ret)
+        @constraints << {ret.pos, explicit_type, var}
+      end
+    end
+
+    protected def observe_natural_return(node : AST::Group)
+      @assignments << {node.terms.last.pos, self.return_var, @by_node[node]}
+    end
+
     protected def observe_prelude_type(ctx, node, name, cap)
       t_link = ctx.namespace.prelude_type(name)
       @by_node[node] = NominalType.new(t_link).intersect(cap)
@@ -250,9 +264,12 @@ module Savi::Compiler::Types
       return unless f.ident.pos.source.library == root_library
 
       @analysis.init_func_self(f.cap.value, f.cap.pos)
+      @analysis.init_func_return_var(ctx, self, f.ret)
 
       f.params.try(&.terms.each { |param| visit_param_deeply(ctx, param) })
       f.body.try(&.accept(ctx, self))
+
+      f.body.try { |body| @analysis.observe_natural_return(body) }
     end
 
     def visit_any?(ctx, node)
@@ -290,6 +307,8 @@ module Savi::Compiler::Types
       ref = @refer_type[node]?
 
       case ref
+      when Refer::Self
+        @analysis.for_self
       when Refer::Type
         t = ref.link.resolve(ctx)
         NominalType.new(ref.link).intersect(read_type_expr_cap(t.cap).not_nil!)
@@ -313,10 +332,13 @@ module Savi::Compiler::Types
     end
 
     def read_type_expr(ctx, node : AST::Relate)
-      lhs = read_type_expr(ctx, node.lhs)
-
       case node.op.value
+      when "->"
+        lhs = read_type_expr(ctx, node.lhs)
+        rhs = read_type_expr(ctx, node.rhs)
+        rhs.viewed_from(lhs)
       when "'"
+        lhs = read_type_expr(ctx, node.lhs)
         cap_ident = node.rhs.as(AST::Identifier)
         case cap_ident.value
         when "aliased"

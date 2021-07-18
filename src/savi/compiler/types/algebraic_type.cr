@@ -14,6 +14,10 @@ module Savi::Compiler::Types
     end
 
     abstract def override_cap(cap : AlgebraicType)
+
+    def stabilized
+      raise NotImplementedError.new("stabilized for #{self.class}")
+    end
   end
 
   abstract struct AlgebraicTypeSummand < AlgebraicType
@@ -35,6 +39,10 @@ module Savi::Compiler::Types
       else
         other.intersect(self)
       end
+    end
+
+    def viewed_from(origin)
+      Viewpoint.new(origin, self)
     end
   end
 
@@ -69,6 +77,10 @@ module Savi::Compiler::Types
 
     def override_cap(cap : AlgebraicType)
       intersect(cap)
+    end
+
+    def viewed_from(origin)
+      self # this type says nothing about capabilities, so it remains unchanged.
     end
   end
 
@@ -158,6 +170,29 @@ module Savi::Compiler::Types
     end
   end
 
+  struct Viewpoint < AlgebraicTypeSimple
+    getter origin : StructRef(AlgebraicTypeSimple)
+    getter target : StructRef(AlgebraicTypeFactor)
+    def initialize(origin, target)
+      if origin.is_a?(Intersection)
+        origin = Intersection.from(
+          origin.members.reject(&.is_a?(NominalType))
+        )
+      end
+
+      @origin = StructRef(AlgebraicTypeSimple).new(origin.as(AlgebraicTypeSimple))
+      @target = StructRef(AlgebraicTypeFactor).new(target)
+    end
+
+    def show
+      "#{@origin.show}->#{@target.show}"
+    end
+
+    def override_cap(cap : AlgebraicType)
+      raise NotImplementedError.new("override_cap for #{self.class}")
+    end
+  end
+
   struct Aliased < AlgebraicTypeFactor
     getter inner : AlgebraicTypeSimple
     def initialize(@inner)
@@ -225,6 +260,10 @@ module Savi::Compiler::Types
     def override_cap(cap : AlgebraicType)
       Intersection.from(@members.map(&.override_cap(cap)))
     end
+
+    def viewed_from(origin)
+      Intersection.from(@members.map(&.viewed_from(origin)))
+    end
   end
 
   struct Union < AlgebraicType
@@ -269,6 +308,10 @@ module Savi::Compiler::Types
 
     def override_cap(cap : AlgebraicType)
       Union.from(@members.map(&.override_cap(cap)))
+    end
+
+    def viewed_from(origin)
+      Union.from(@members.map(&.viewed_from(origin)))
     end
   end
 end
