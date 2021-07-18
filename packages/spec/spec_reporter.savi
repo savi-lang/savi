@@ -48,14 +48,11 @@
     if (skip) (@env.err.print(" SKIP") | @env.err.print(" OK"))
 
   :fun ref event(spec String, example String, event SpecEventAssert)
-    // TODO: We shouldn't need this variable, but using `event.assert` in the `if` fails compilation.
-    assert = event.assert
-
     if event.success (
       @env.err.write(".")
     |
-      if (assert <: Assert) (
-        assert.report_failure(@env)
+      try (
+        event.assert.as!(Assert).report_failure(@env)
       |
         @env.err.write("\n")
         @env.err.write(Inspect[event.pos.row + 1])
