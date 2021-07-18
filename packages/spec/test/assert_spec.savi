@@ -15,6 +15,6 @@
     assert False.is_false
     assert \
       True
-    assert Foo.with_yield -> ( false |
+    assert Foo.with_yield -> (false |
       assert !false
     )
