@@ -95,13 +95,13 @@
   :it "can be cleared to an empty size"
     array Array(U8) = [3, 6, 12]
     @assert = array.size == 3
-    assert array.is_empty.not
+    assert array.is_empty.is_false
     assert array.is_not_empty
 
     array.clear
     @assert = array.size == 0
     assert array.is_empty
-    assert array.is_not_empty.not
+    assert array.is_not_empty.is_false
     @assert = try (array[0]!, False | True)
 
   :it "compares equality for the elements in the array"
