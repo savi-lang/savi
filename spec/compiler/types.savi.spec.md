@@ -153,3 +153,56 @@ T'value'4
                ^~~~~~
 
 ```
+
+---
+
+It analyzes an array literal, its elements, and its antecedent.
+
+```savi
+:primitive ArrayExample
+  :fun example
+    a Array(F64)'val = [1, 2.3]
+```
+```types.type_variables_list ArrayExample.example
+~~~
+T'@'1
+  := (ArrayExample & K'@'2)
+    :fun example
+     ^~~
+
+T'return'3
+  :> T'a'4'aliased
+      a Array(F64)'val = [1, 2.3]
+      ^~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+T'a'4
+  := (Array((F64 & val)) & val)
+      a Array(F64)'val = [1, 2.3]
+        ^~~~~~~~~~~~~~
+  :> T'array:group'7'stabilized
+      a Array(F64)'val = [1, 2.3]
+      ^~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+T'num:1'5
+  <: (Numeric & val)
+      a Array(F64)'val = [1, 2.3]
+                          ^
+
+T'float:2.3'6
+  <: ((F64 & val) | (F32 & val))
+      a Array(F64)'val = [1, 2.3]
+                             ^~~
+
+T'array:group'7
+  <: ((Array(T'array:elem'8) & iso) | (Array(T'array:elem'8) & val) | (Array(T'array:elem'8) & ref))
+      a Array(F64)'val = [1, 2.3]
+                         ^~~~~~~~
+
+T'array:elem'8
+  :> T'num:1'5
+      a Array(F64)'val = [1, 2.3]
+                         ^~~~~~~~
+  :> T'float:2.3'6
+      a Array(F64)'val = [1, 2.3]
+                         ^~~~~~~~
+```

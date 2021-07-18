@@ -150,9 +150,10 @@ module Savi::Compiler::Types
       @assignments << {node.terms.last.pos, self.return_var, @by_node[node]}
     end
 
-    protected def observe_prelude_type(ctx, node, name, cap)
-      t_link = ctx.namespace.prelude_type(name)
-      @by_node[node] = NominalType.new(t_link).intersect(cap)
+    protected def observe_constrained_literal(node, var_name, supertype)
+      var = new_type_var(var_name)
+      @by_node[node] = var
+      @constraints << {node.pos, supertype, var}
     end
 
     protected def observe_assert_bool(ctx, node)
@@ -223,6 +224,28 @@ module Savi::Compiler::Types
       @by_node[node] = var
       @from_call_returns << {node.pos, var, node}
     end
+
+    protected def observe_array_literal(ctx, node)
+      var = new_type_var("array:group")
+      elem_var = new_type_var("array:elem")
+
+      @by_node[node] = var
+
+      array_nominal = NominalType.new(
+        ctx.namespace.prelude_type("Array"),
+        [elem_var.as(AlgebraicType)]
+      )
+      array_type = array_nominal.intersect(
+        array_nominal.intersect(NominalCap::ISO)
+          .unite(array_nominal.intersect(NominalCap::VAL))
+          .unite(array_nominal.intersect(NominalCap::REF))
+      )
+      @constraints << {node.pos, array_type, var}
+
+      node.terms.each { |elem|
+        @assignments << {node.pos, elem_var, @by_node[elem]}
+      }
+    end
   end
 
   class Visitor < AST::Visitor
@@ -270,6 +293,11 @@ module Savi::Compiler::Types
       f.body.try(&.accept(ctx, self))
 
       f.body.try { |body| @analysis.observe_natural_return(body) }
+    end
+
+    def prelude_type(ctx, name, cap)
+      t_link = ctx.namespace.prelude_type(name)
+      NominalType.new(t_link).intersect(cap)
     end
 
     def visit_any?(ctx, node)
@@ -405,16 +433,33 @@ module Savi::Compiler::Types
       end
     end
 
+    def visit(ctx, node : AST::LiteralCharacter)
+      type = prelude_type(ctx, "Numeric", NominalCap::VAL)
+      @analysis.observe_constrained_literal(node, "char:#{node.value}", type)
+    end
+
+    def visit(ctx, node : AST::LiteralInteger)
+      type = prelude_type(ctx, "Numeric", NominalCap::VAL)
+      @analysis.observe_constrained_literal(node, "num:#{node.value}", type)
+    end
+
+    def visit(ctx, node : AST::LiteralFloat)
+      type = prelude_type(ctx, "F64", NominalCap::VAL).unite(
+        prelude_type(ctx, "F32", NominalCap::VAL)
+      )
+      @analysis.observe_constrained_literal(node, "float:#{node.value}", type)
+    end
+
     def visit(ctx, node : AST::LiteralString)
       case node.prefix_ident.try(&.value)
       when nil
-        @analysis.observe_prelude_type(ctx, node, "String", NominalCap::VAL)
+        @analysis[node] = prelude_type(ctx, "String", NominalCap::VAL)
       when "b"
-        @analysis.observe_prelude_type(ctx, node, "Bytes", NominalCap::VAL)
+        @analysis[node] = prelude_type(ctx, "Bytes", NominalCap::VAL)
       else
         ctx.error_at node.prefix_ident.not_nil!,
           "This type of string literal is not known; please remove this prefix"
-        @analysis.observe_prelude_type(ctx, node, "String", NominalCap::VAL)
+        @analysis[node] = prelude_type(ctx, "String", NominalCap::VAL)
       end
     end
 
@@ -424,9 +469,11 @@ module Savi::Compiler::Types
       case node.style
       when "|"
         # Do nothing here - we'll handle it in one of the parent nodes.
+      when "["
+        @analysis.observe_array_literal(ctx, node)
       when "(", ":"
         if node.terms.empty?
-          @analysis.observe_prelude_type(ctx, node, "None", NominalCap::NON)
+          @analysis[node] = prelude_type(ctx, "None", NominalCap::NON)
         else
           @analysis[node] = @analysis[node.terms.last]
         end
