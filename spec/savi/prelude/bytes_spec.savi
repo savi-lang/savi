@@ -8,23 +8,23 @@
     data = Bytes.new
     @assert = data.space == 0
     @assert = data.size == 0
-    @assert = data.cpointer.is_null
+    assert data.cpointer.is_null
 
   :it "allocates the next highest power of two containing the requested space"
     data = Bytes.new(12)
     @assert = data.space == 16
     @assert = data.size == 0
-    @assert = data.cpointer.is_not_null
+    assert data.cpointer.is_not_null
 
     data = Bytes.new(16)
     @assert = data.space == 16
     @assert = data.size == 0
-    @assert = data.cpointer.is_not_null
+    assert data.cpointer.is_not_null
 
     data = Bytes.new(17)
     @assert = data.space == 32
     @assert = data.size == 0
-    @assert = data.cpointer.is_not_null
+    assert data.cpointer.is_not_null
 
   :it "won't reallocate when reserving space within the current allocation"
     data = Bytes.new(12)
@@ -33,13 +33,13 @@
     data.reserve(16)
     @assert = data.space == 16
     @assert = data.size == 0
-    @assert = data.cpointer.is_not_null
+    assert data.cpointer.is_not_null
     @assert = data.cpointer.usize == orig_pointer_address
 
     data.reserve(0)
     @assert = data.space == 16
     @assert = data.size == 0
-    @assert = data.cpointer.is_not_null
+    assert data.cpointer.is_not_null
     @assert = data.cpointer.usize == orig_pointer_address
 
   :it "will reallocate when reserving space beyond the current allocation"
@@ -52,7 +52,7 @@
 
     @assert = data.space == 2048
     @assert = data.size == 0
-    @assert = data.cpointer.is_not_null
+    assert data.cpointer.is_not_null
     @assert = data.cpointer.usize != orig_pointer_address
 
   :it "can expand size to expose uninitialized bytes within the space available"
@@ -85,63 +85,63 @@
 
   :it "compares bytewise equality with another bytes string"
     @assert = (b"string" == b"string")
-    @assert = (b"string" == b"other").not
+    assert (b"string" == b"other").is_false
 
   :it "checks if it starts with a substring equal to the other bytes string"
-    @assert = b"foo".starts_with(b"foo")
-    @assert = b"foo".starts_with(b"food").not
-    @assert = b"food".starts_with(b"foo")
-    @assert = b"barfood".starts_with(b"foo").not
-    @assert = b"barfood".starts_with(b"barf")
-    @assert = b"barfood".starts_with(b"")
+    assert b"foo".starts_with(b"foo")
+    assert b"foo".starts_with(b"food").is_false
+    assert b"food".starts_with(b"foo")
+    assert b"barfood".starts_with(b"foo").is_false
+    assert b"barfood".starts_with(b"barf")
+    assert b"barfood".starts_with(b"")
 
   :it "checks if it ends with a substring equal to the other bytes string"
-    @assert = b"food".ends_with(b"foo").not
-    @assert = b"foo".ends_with(b"foo")
-    @assert = b"foo".ends_with(b"food").not
-    @assert = b"snafoo".ends_with(b"foo")
-    @assert = b"snafoozled".ends_with(b"foo").not
-    @assert = b"snafoozled".ends_with(b"")
+    assert b"food".ends_with(b"foo").is_false
+    assert b"foo".ends_with(b"foo")
+    assert b"foo".ends_with(b"food").is_false
+    assert b"snafoo".ends_with(b"foo")
+    assert b"snafoozled".ends_with(b"foo").is_false
+    assert b"snafoozled".ends_with(b"")
 
   :it "checks for a common slice with another bytes string at specific offsets"
-    @assert = b"foodbar".is_slice_equal(1, b"broodbard", 2, 6)
-    @assert = b"foodbar".is_slice_equal(1, b"broodbard", 2, 5)
-    @assert = b"foodbar".is_slice_equal(2, b"broodbard", 2, 5).not
-    @assert = b"foodbar".is_slice_equal(1, b"broodbard", 2, 7).not
-    @assert = b"foodbar".is_slice_equal(1, b"broodbard", 1, 6).not
-    @assert = b"foodbar".is_slice_equal(0, b"broodbard", 1, 6).not
-    @assert = b"broodbard".is_slice_equal(2, b"foodbar", 1, 6)
-    @assert = b"broodbard".is_slice_equal(2, b"foodbar", 1, 5)
-    @assert = b"broodbard".is_slice_equal(2, b"foodbar", 2, 5).not
-    @assert = b"broodbard".is_slice_equal(2, b"foodbar", 1, 7).not
-    @assert = b"broodbard".is_slice_equal(1, b"foodbar", 1, 6).not
-    @assert = b"broodbard".is_slice_equal(1, b"foodbar", 0, 6).not
+    assert b"foodbar".is_slice_equal(1, b"broodbard", 2, 6)
+    assert b"foodbar".is_slice_equal(1, b"broodbard", 2, 5)
+    assert b"foodbar".is_slice_equal(2, b"broodbard", 2, 5).is_false
+    assert b"foodbar".is_slice_equal(1, b"broodbard", 2, 7).is_false
+    assert b"foodbar".is_slice_equal(1, b"broodbard", 1, 6).is_false
+    assert b"foodbar".is_slice_equal(0, b"broodbard", 1, 6).is_false
+    assert b"broodbard".is_slice_equal(2, b"foodbar", 1, 6)
+    assert b"broodbard".is_slice_equal(2, b"foodbar", 1, 5)
+    assert b"broodbard".is_slice_equal(2, b"foodbar", 2, 5).is_false
+    assert b"broodbard".is_slice_equal(2, b"foodbar", 1, 7).is_false
+    assert b"broodbard".is_slice_equal(1, b"foodbar", 1, 6).is_false
+    assert b"broodbard".is_slice_equal(1, b"foodbar", 0, 6).is_false
 
   :it "checks for a common slice with another string at specific offsets"
-    @assert = b"foodbar".is_slice_equal(1, "broodbard", 2, 6)
-    @assert = b"foodbar".is_slice_equal(1, "broodbard", 2, 5)
-    @assert = b"foodbar".is_slice_equal(2, "broodbard", 2, 5).not
-    @assert = b"foodbar".is_slice_equal(1, "broodbard", 2, 7).not
-    @assert = b"foodbar".is_slice_equal(1, "broodbard", 1, 6).not
-    @assert = b"foodbar".is_slice_equal(0, "broodbard", 1, 6).not
-    @assert = b"broodbard".is_slice_equal(2, "foodbar", 1, 6)
-    @assert = b"broodbard".is_slice_equal(2, "foodbar", 1, 5)
-    @assert = b"broodbard".is_slice_equal(2, "foodbar", 2, 5).not
-    @assert = b"broodbard".is_slice_equal(2, "foodbar", 1, 7).not
-    @assert = b"broodbard".is_slice_equal(1, "foodbar", 1, 6).not
-    @assert = b"broodbard".is_slice_equal(1, "foodbar", 0, 6).not
+    assert b"foodbar".is_slice_equal(1, "broodbard", 2, 6)
+    assert b"foodbar".is_slice_equal(1, "broodbard", 2, 5)
+    assert b"foodbar".is_slice_equal(2, "broodbard", 2, 5).is_false
+    assert b"foodbar".is_slice_equal(1, "broodbard", 2, 7).is_false
+    assert b"foodbar".is_slice_equal(1, "broodbard", 1, 6).is_false
+    assert b"foodbar".is_slice_equal(0, "broodbard", 1, 6).is_false
+    assert b"broodbard".is_slice_equal(2, "foodbar", 1, 6)
+    assert b"broodbard".is_slice_equal(2, "foodbar", 1, 5)
+    assert b"broodbard".is_slice_equal(2, "foodbar", 2, 5).is_false
+    assert b"broodbard".is_slice_equal(2, "foodbar", 1, 7).is_false
+    assert b"broodbard".is_slice_equal(1, "foodbar", 1, 6).is_false
+    assert b"broodbard".is_slice_equal(1, "foodbar", 0, 6).is_false
 
   :it "checks if it is empty or not"
-    @assert = b"".is_empty
-    @assert = b"".is_not_empty.not
-    @assert = b"example".is_empty.not
-    @assert = b"example".is_not_empty
-    @assert = Bytes.new.is_empty
-    @assert = Bytes.new.is_not_empty.not
-    @assert = (Bytes.new << b"example").is_empty.not
-    @assert = (Bytes.new << b"example").is_not_empty
-    @assert = (Bytes.new << b"example").clear.is_empty
-    @assert = (Bytes.new << b"example").clear.is_not_empty.not
+    assert b"".is_empty
+    assert b"".is_not_empty.is_false
+    assert b"example".is_empty.is_false
+    assert b"example".is_not_empty
+    assert Bytes.new.is_empty
+    assert Bytes.new.is_not_empty.is_false
+    assert (Bytes.new << b"example").is_empty.is_false
+    assert (Bytes.new << b"example").is_not_empty
+    assert (Bytes.new << b"example").clear.is_empty
+    assert (Bytes.new << b"example").clear.is_not_empty.is_false
 
   :it "clones itself into a new bytes buffer"
     string Bytes = b"example"
@@ -152,10 +152,10 @@
     @assert = try (b"bar food foo".offset_of!(b"bard"), False | True)
     @assert = try (b"bar food foo".offset_of!(b"nope"), False | True)
     @assert = try (b"bar food foo".offset_of!(b""),     False | True)
-    @assert = b"bar food foo".includes(b"foo")
-    @assert = b"bar food foo".includes(b"bard").not
-    @assert = b"bar food foo".includes(b"nope").not
-    @assert = b"bar food foo".includes(b"").not
+    assert b"bar food foo".includes(b"foo")
+    assert b"bar food foo".includes(b"bard").is_false
+    assert b"bar food foo".includes(b"nope").is_false
+    assert b"bar food foo".includes(b"").is_false
 
   :it "hashes the bytes of the buffer"
     @assert = (b"string".hash == 0x4CF51F4A5B5CF110)
@@ -273,28 +273,28 @@
   :it "lexically compares the buffer with another buffer of the same length"
     @assert = b"examplE" < b"example"
     @assert = b"example" > b"examplE"
-    @assert = (b"example" < b"examplE").not
-    @assert = (b"examplE" > b"example").not
+    assert (b"example" < b"examplE").is_false
+    assert (b"examplE" > b"example").is_false
     @assert = b"examplE" <= b"example"
     @assert = b"example" >= b"examplE"
-    @assert = (b"example" <= b"examplE").not
-    @assert = (b"examplE" >= b"example").not
+    assert (b"example" <= b"examplE").is_false
+    assert (b"examplE" >= b"example").is_false
 
   :it "lexically compares the buffer with an identical buffer"
-    @assert = (b"example" < b"example").not
-    @assert = (b"example" > b"example").not
+    assert (b"example" < b"example").is_false
+    assert (b"example" > b"example").is_false
     @assert = b"example" <= b"example"
     @assert = b"example" >= b"example"
 
   :it "lexically compares with a nearly identical buffer of different length"
     @assert = b"example" < b"example!"
     @assert = b"example!" > b"example"
-    @assert = (b"example!" < b"example").not
-    @assert = (b"example" > b"example!").not
+    assert (b"example!" < b"example").is_false
+    assert (b"example" > b"example!").is_false
     @assert = b"example" <= b"example!"
     @assert = b"example!" >= b"example"
-    @assert = (b"example!" <= b"example").not
-    @assert = (b"example" >= b"example!").not
+    assert (b"example!" <= b"example").is_false
+    assert (b"example" >= b"example!").is_false
 
   :it "pushes, reads, and writes native integer types at specific offsets"
     data = Bytes.new

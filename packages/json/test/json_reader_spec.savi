@@ -31,7 +31,7 @@
       )
     )
 
-    @assert = read.errors.is_empty
+    assert read.errors.is_empty
 
     @assert = try (users[0]!.name == "Alice" | False)
     @assert = try (users[0]!.admin == True | False)

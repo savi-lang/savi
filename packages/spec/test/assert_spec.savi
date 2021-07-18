@@ -1,0 +1,20 @@
+:class Foo
+  :fun non true: True
+  :fun non with_yield Bool
+    yield False
+    True
+
+:class AssertSpec
+  :is Spec
+  :const describes: "Assert"
+
+  :it "conforms to the `assert EXPR` macro"
+    assert True
+    assert Foo.true
+    assert (True == Foo.true)
+    assert False.is_false
+    assert \
+      True
+    assert Foo.with_yield -> (false |
+      assert !false
+    )
