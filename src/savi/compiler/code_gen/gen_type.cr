@@ -74,6 +74,8 @@ class Savi::Compiler::CodeGen
       ptr = g.llvm.int8.pointer
       vtable = Array(LLVM::Value).new(@vtable_size, ptr.null)
       @gfuncs.each_value do |gfunc|
+        next if @type_def.is_abstract?(g.ctx) && (!gfunc.func.body || gfunc.func.cap.value != "non")
+
         next unless gfunc.vtable_index?
         vtable[gfunc.vtable_index] =
           g.llvm.const_bit_cast(gfunc.virtual_llvm_func.to_value, ptr)
@@ -86,36 +88,28 @@ class Savi::Compiler::CodeGen
     end
 
     # Generate the type descriptor global for this type.
-    # We skip this for abstract types (traits).
     def gen_desc(g : CodeGen)
-      return if @type_def.is_abstract?(g.ctx)
-
       @desc = g.gen_desc(self)
     end
 
     # Generate the initializer data for the type descriptor for this type.
-    # We skip this for abstract types (traits).
     def gen_desc_init(g : CodeGen)
-      return if @type_def.is_abstract?(g.ctx)
-
       @desc = g.gen_desc_init(self, gen_vtable(g))
     end
 
     # Generate the global singleton value for this type.
     # We skip this for abstract types (traits).
     def gen_singleton(g : CodeGen)
-      return if @type_def.is_abstract?(g.ctx)
-
       @singleton = g.gen_singleton(self)
     end
 
     # Generate function implementations.
     def gen_func_impls(g : CodeGen)
-      return if @type_def.is_abstract?(g.ctx)
-
       g.gen_desc_fn_impls(self)
 
       @gfuncs.each_value do |gfunc|
+        next if @type_def.is_abstract?(g.ctx) && (!gfunc.func.body || gfunc.func.cap.value != "non")
+
         g.gen_send_impl(self, gfunc) if gfunc.needs_send?
         g.gen_func_impl(self, gfunc, gfunc.llvm_func)
 

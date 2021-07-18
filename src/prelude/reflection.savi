@@ -28,4 +28,4 @@
     )
 
 :trait non ReflectionMutatorOfType(A)
-  :fun non call(a A) None
+  :fun non call(a A) None: None

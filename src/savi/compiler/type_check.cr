@@ -570,6 +570,19 @@ class Savi::Compiler::TypeCheck
           TypeCheck.verify_let_assign_call_site(ctx, info, call_func, reified)
         end
 
+        # Prove that we're not making an unsafe trait non call.
+        if call_func_link.type.is_abstract? \
+        && call_func.cap.value == "non" \
+        && call_func.body.nil? \
+        && call_mt.cap_only_inner == Infer::MetaType::Capability::NON
+          ctx.error_at info,
+            "This trait-defined `non` function can't be called directly", [
+            {call_func.ident.pos,
+              "it would be possible if the trait function " \
+              "had a default body defined"}
+          ]
+        end
+
         # Check whether yield block presence matches the function's expectation.
         other_pre_infer = ctx.pre_infer[call_func_link]
         func_does_yield = other_pre_infer.yield_out_infos.any?

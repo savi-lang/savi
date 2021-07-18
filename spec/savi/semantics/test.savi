@@ -21,5 +21,6 @@
     SourceCodeSpec.run(test)
     DisplacingAssignmentSpec.run(test)
     IdentitySpec.run(test)
+    TraitNonSpec.run(test)
 
     test.print_line_break // TODO: move to MicroTest constructor and finalizer

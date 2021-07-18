@@ -1,0 +1,22 @@
+:import "../micro_test" (MicroTest)
+
+:trait non TraitNon
+  :fun non example: "value"
+
+:primitive TraitNonDefault
+  :is TraitNon
+
+:primitive TraitNonOverride
+  :is TraitNon
+  :fun non example: "other value"
+
+:primitive TraitNonSpec
+  :fun run(test MicroTest)
+    test["fun non call on trait singleton"].pass =
+      TraitNon.example == "value"
+
+    test["trait-inherited fun non call on primitive"].pass =
+      TraitNonDefault.example == "value"
+
+    test["overriden fun non call on primitive"].pass =
+      TraitNonOverride.example == "other value"

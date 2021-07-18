@@ -572,7 +572,7 @@ class Savi::Compiler::CodeGen
         vparam_types.unshift(gtype.struct_ptr)
 
         @mod.functions.add vtable_name, vparam_types, ret_type do |fn|
-          next if gtype.type_def.is_abstract?(ctx)
+          next if gtype.type_def.is_abstract?(ctx) && (!gfunc.func.body || gfunc.func.cap.value != "non")
 
           gen_func_start(fn)
 
@@ -598,7 +598,7 @@ class Savi::Compiler::CodeGen
         vparam_types.unshift(gtype.struct_ptr)
 
         @mod.functions.add vtable_name, vparam_types, ret_type do |fn|
-          next if gtype.type_def.is_abstract?(ctx)
+          next if gtype.type_def.is_abstract?(ctx) && (!gfunc.func.body || gfunc.func.cap.value != "non")
 
           gen_func_start(fn)
 
@@ -624,7 +624,7 @@ class Savi::Compiler::CodeGen
         vparam_types.unshift(gtype.struct_ptr)
 
         @mod.functions.add vtable_name, vparam_types, ret_type do |fn|
-          next if gtype.type_def.is_abstract?(ctx)
+          next if gtype.type_def.is_abstract?(ctx) && (!gfunc.func.body || gfunc.func.cap.value != "non")
 
           gen_func_start(fn)
 
@@ -685,7 +685,7 @@ class Savi::Compiler::CodeGen
           gfunc.continue_llvm_func
         else
           @mod.functions.add "#{gfunc.llvm_name}.VIRTUAL.CONTINUE", virtual_continue_param_types, ret_type do |fn|
-            next if gtype.type_def.is_abstract?(ctx)
+            next if gtype.type_def.is_abstract?(ctx) && (!gfunc.func.body || gfunc.func.cap.value != "non")
 
             gen_func_start(fn)
 

@@ -364,3 +364,36 @@ A `let` property can only be assigned inside a constructor:
   :let x U64
        ^
 ```
+
+It complains when calling a `non` function with no body on a `non` reference to a trait:
+
+```savi
+  t_non TraitNon'non = TraitNonClass
+  t_ref TraitNon'ref = TraitNonClass.new
+
+  t_ref.not_non
+  t_ref.with_body
+  t_ref.no_body
+  t_non.with_body
+  t_non.no_body
+
+:trait TraitNon
+  :fun box not_non String
+  :fun non with_body String: "with_body"
+  :fun non no_body String
+
+:class TraitNonClass
+  :is TraitNon
+  :fun box not_non String: "not_non"
+  :fun non no_body String: "no_body"
+
+```
+```error
+This trait-defined `non` function can't be called directly:
+  t_non.no_body
+        ^~~~~~~
+
+- it would be possible if the trait function had a default body defined:
+  :fun non no_body String
+           ^~~~~~~
+```
