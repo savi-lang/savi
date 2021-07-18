@@ -29,13 +29,13 @@
   :is Assert2
 
   :fun report_failure(env Env) None
-    row = Inspect[@pos.row + 1]
+    line = Inspect[@pos.row + 1]
 
     env.err.write("\n")
     env.err.print(String.join([
       "    Expected the following to be True:"
       String.join(["    ", @pos.string, "\n"])
-      String.join(["    # ", @pos.filename, ":", row])
+      String.join(["    # ", @pos.filename, ":", line])
     ], "\n"))
 
     None
