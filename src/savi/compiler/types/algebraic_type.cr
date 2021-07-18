@@ -13,10 +13,12 @@ module Savi::Compiler::Types
       raise NotImplementedError.new("stabilized for #{self.class}")
     end
 
-    abstract def override_cap(cap : AlgebraicType)
+    def override_cap(cap : AlgebraicType)
+      raise NotImplementedError.new("override_cap for #{self.class}")
+    end
 
-    def stabilized
-      raise NotImplementedError.new("stabilized for #{self.class}")
+    def viewed_from(origin)
+      raise NotImplementedError.new("viewed_from for #{self.class}")
     end
   end
 
@@ -53,6 +55,39 @@ module Savi::Compiler::Types
 
     def stabilized
       Stabilized.new(self)
+    end
+  end
+
+  struct JumpsAway < AlgebraicType
+    getter pos : Source::Pos
+    def initialize(@pos)
+    end
+
+    def show
+      "(jumps away)"
+    end
+
+    def intersect(other : AlgebraicType)
+      # No matter what you intersect, the type is still just not there.
+      # It has jumped away without leaving anything to intersect with.
+      self
+    end
+
+    def unite(other : AlgebraicType)
+      # Whatever the other type is, we use it and abandon this lack of a type.
+      other
+    end
+
+    def aliased
+      self # doesn't change the nature of this lack of a type
+    end
+
+    def stabilized
+      self # doesn't change the nature of this lack of a type
+    end
+
+    def override_cap(cap : AlgebraicType)
+      self # doesn't change the nature of this lack of a type
     end
   end
 
@@ -148,8 +183,8 @@ module Savi::Compiler::Types
       "T'#{@nickname}#{scope_sym}#{@sequence_number}"
     end
 
-    def override_cap(cap : AlgebraicType)
-      raise NotImplementedError.new("override_cap for #{self.class}")
+    def override_cap(other : AlgebraicType)
+      OverrideCap.new(self, other)
     end
   end
 
@@ -187,9 +222,17 @@ module Savi::Compiler::Types
     def show
       "#{@origin.show}->#{@target.show}"
     end
+  end
 
-    def override_cap(cap : AlgebraicType)
-      raise NotImplementedError.new("override_cap for #{self.class}")
+  struct OverrideCap < AlgebraicTypeFactor
+    getter inner : AlgebraicTypeSimple
+    getter cap : StructRef(AlgebraicType)
+    def initialize(@inner, cap : AlgebraicType)
+      @cap = StructRef(AlgebraicType).new(cap)
+    end
+
+    def show
+      "#{@inner.show}'#{@cap.show}"
     end
   end
 
@@ -202,8 +245,14 @@ module Savi::Compiler::Types
       "#{@inner.show}'aliased"
     end
 
-    def override_cap(cap : AlgebraicType)
-      raise NotImplementedError.new("override_cap for #{self.class}")
+    def aliased
+      raise "unreachable: we should never alias an alias"
+    end
+
+    def stabilized
+      # If we stabilize an alias, only those caps with no uniqueness constraints
+      # can remain in play - if an iso'aliased is present, it drops away.
+      NoUnique.new(inner)
     end
   end
 
@@ -215,9 +264,15 @@ module Savi::Compiler::Types
     def show
       "#{@inner.show}'stabilized"
     end
+  end
 
-    def override_cap(cap : AlgebraicType)
-      raise NotImplementedError.new("override_cap for #{self.class}")
+  struct NoUnique < AlgebraicTypeFactor
+    getter inner : AlgebraicTypeSimple
+    def initialize(@inner)
+    end
+
+    def show
+      "#{@inner.show}'nounique"
     end
   end
 

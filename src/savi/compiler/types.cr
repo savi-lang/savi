@@ -18,6 +18,8 @@ module Savi::Compiler::Types
     protected getter! type_param_vars : Array(TypeVariable)
     protected getter! field_type_vars : Hash(String, TypeVariable)
     protected getter! return_var : TypeVariable
+    protected getter! yield_vars : Array(TypeVariable)
+    protected getter! yield_result_var : TypeVariable
 
     def initialize(@scope, parent : Analysis? = nil)
       @parent = parent ? StructRef(Analysis).new(parent) : nil
@@ -150,6 +152,25 @@ module Savi::Compiler::Types
       @assignments << {node.terms.last.pos, self.return_var, @by_node[node]}
     end
 
+    protected def observe_early_return(node : AST::Jump)
+      @assignments << {node.pos, self.return_var, @by_node[node.term]}
+    end
+
+    protected def observe_yield(node : AST::Yield)
+      vars = @yield_vars ||= [] of TypeVariable
+      node.terms.each_with_index { |term, index|
+        var = vars[index]? || begin
+          v = new_type_var("yield:#{index + 1}")
+          vars << v
+          v
+        end
+        @assignments << {node.pos, var, @by_node[term]}
+      }
+
+      result_var = @yield_result_var ||= new_type_var("yield:result")
+      @by_node[node] = result_var
+    end
+
     protected def observe_constrained_literal(node, var_name, supertype)
       var = new_type_var(var_name)
       @by_node[node] = var
@@ -279,13 +300,6 @@ module Savi::Compiler::Types
     end
 
     def run_for_function(ctx : Context, f : Program::Function)
-      # TODO: Allow running this pass for more than just the root library.
-      # We restrict this for now while we are building out the pass because
-      # we don't want to deal with all of the complicated forms in the prelude.
-      # We want to stick to the simple forms in the compiler pass specs for now.
-      root_library = ctx.namespace.root_library(ctx).source_library
-      return unless f.ident.pos.source.library == root_library
-
       @analysis.init_func_self(f.cap.value, f.cap.pos)
       @analysis.init_func_return_var(ctx, self, f.ret)
 
@@ -295,9 +309,9 @@ module Savi::Compiler::Types
       f.body.try { |body| @analysis.observe_natural_return(body) }
     end
 
-    def prelude_type(ctx, name, cap)
+    def prelude_type(ctx, name, cap, args = nil)
       t_link = ctx.namespace.prelude_type(name)
-      NominalType.new(t_link).intersect(cap)
+      NominalType.new(t_link, args).intersect(cap)
     end
 
     def visit_any?(ctx, node)
@@ -441,6 +455,12 @@ module Savi::Compiler::Types
           # where that value is a stateless singleton able to call `:fun non`s.
           @analysis[node] = NominalType.new(ref.link).intersect(NominalCap::NON)
         end
+      when Refer::TypeParam
+        analysis = @analysis
+        while analysis.scope != ref.parent_link
+          analysis = analysis.parent.not_nil!.value
+        end
+        analysis.type_param_vars[ref.index]
       else
         raise NotImplementedError.new(ref.class)
       end
@@ -498,6 +518,14 @@ module Savi::Compiler::Types
 
     def visit(ctx, node : AST::Prefix)
       case node.op.value
+      when "source_code_position_of_argument"
+        @analysis[node] = prelude_type(ctx, "SourceCodePosition", NominalCap::VAL)
+      when "reflection_of_type"
+        @analysis[node] = prelude_type(ctx, "ReflectionOfType", NominalCap::VAL, [@analysis[node.term]])
+      when "reflection_of_runtime_type_name"
+        @analysis[node] = prelude_type(ctx, "String", NominalCap::VAL)
+      when "identity_digest_of"
+        @analysis[node] = prelude_type(ctx, "USize", NominalCap::VAL)
       when "--"
         ref = refer[node.term].as(Refer::Local)
         @analysis.observe_local_consume(node, ref)
@@ -527,6 +555,9 @@ module Savi::Compiler::Types
       when "<:", "!<:"
         # TODO: refine the type in this scope
         @analysis[node] = prelude_type(ctx, "Bool", NominalCap::VAL)
+      when "===", "!=="
+        # Just know that the result of this expression is a boolean.
+        @analysis[node] = prelude_type(ctx, "Bool", NominalCap::VAL)
       when "="
         ident = AST::Extract.param(node.lhs).first
         ref = refer[ident].as(Refer::Local)
@@ -553,6 +584,35 @@ module Savi::Compiler::Types
       }
       @analysis[node] =
         Union.from(node.list.map { |cond, body| @analysis[body] })
+    end
+
+    def visit(ctx, node : AST::Loop)
+      @analysis.observe_assert_bool(ctx, node.initial_cond)
+      @analysis.observe_assert_bool(ctx, node.repeat_cond)
+      @analysis[node] =
+        @analysis[node.body].unite(@analysis[node.else_body])
+    end
+
+    def visit(ctx, node : AST::Try)
+      @analysis[node] =
+        @analysis[node.body].unite(@analysis[node.else_body])
+    end
+
+    def visit(ctx, node : AST::Jump)
+      case node.kind
+      when AST::Jump::Kind::Error
+        @analysis[node] = JumpsAway.new(node.pos)
+      when AST::Jump::Kind::Return
+        @analysis.observe_early_return(node)
+        @analysis[node] = JumpsAway.new(node.pos)
+      else
+        puts node.pos.show
+        raise NotImplementedError.new(node.kind)
+      end
+    end
+
+    def visit(ctx, node : AST::Yield)
+      @analysis.observe_yield(node)
     end
 
     def visit(ctx, node : AST::FieldRead | AST::FieldWrite | AST::FieldDisplace)
