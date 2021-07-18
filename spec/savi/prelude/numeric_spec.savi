@@ -86,7 +86,7 @@
     @assert = F64  .zero == 0
 
   :it "can report the max or minimum integer based on bit width and signedness"
-    assert Bool.max_value
+    assert Bool.max_value.is_true
     @assert = U8   .max_value == 0xFF
     @assert = U16  .max_value == 0xFFFF
     @assert = U32  .max_value == 0xFFFF_FFFF
