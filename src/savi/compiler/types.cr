@@ -28,6 +28,7 @@ module Savi::Compiler::Types
       @by_node = {} of AST::Node => AlgebraicType
       @by_ref = {} of Refer::Info => AlgebraicType
       @type_vars = [] of TypeVariable
+      @edge_type_vars = [] of TypeVariable
       @bindings = Set({Source::Pos, TypeVariable, AlgebraicType}).new
       @constraints = Set({Source::Pos, AlgebraicType, TypeVariable}).new
       @assignments = Set({Source::Pos, TypeVariable, AlgebraicType}).new
@@ -53,7 +54,7 @@ module Savi::Compiler::Types
         output << "~~~\n"
       end
 
-      @type_vars.each_with_index { |var, index|
+      (@edge_type_vars + @type_vars).each_with_index { |var, index|
         output << "\n" if index > 0
         output << "#{var.show}\n"
         @bindings.select(&.[](1).==(var)).each { |pos, _, explicit|
@@ -91,6 +92,12 @@ module Savi::Compiler::Types
     private def new_type_var(nickname)
       TypeVariable.new(nickname, @scope, @sequence_number += 1).tap { |var|
         @type_vars << var
+      }
+    end
+
+    private def new_edge_type_var(nickname)
+      TypeVariable.new(nickname, @scope, @sequence_number += 1).tap { |var|
+        @edge_type_vars << var
       }
     end
 
