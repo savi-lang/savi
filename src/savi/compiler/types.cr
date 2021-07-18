@@ -130,11 +130,11 @@ module Savi::Compiler::Types
     end
 
     protected def init_func_self(cap : String, pos : Source::Pos)
-      @for_self = new_type_var("@").tap { |var|
+      @for_self = (
         self_type = @parent.not_nil!.value.for_self
         self_cap = new_cap_var("@") # TODO: add constraint for func cap
-        @bindings << {pos, var, self_type.intersect(self_cap)}
-      }.as(AlgebraicType)
+        self_type.intersect(self_cap)
+      ).as(AlgebraicType)
     end
 
     protected def init_func_return_var(ctx, visitor : Visitor, ret : AST::Term?)
@@ -400,6 +400,19 @@ module Savi::Compiler::Types
       )
     end
 
+    def read_type_expr(ctx, node : AST::Group)
+      case node.style
+      when "("
+        raise NotImplementedError.new("multiple terms in type expr group") \
+          unless node.terms.size == 1
+        read_type_expr(ctx, node.terms.first)
+      when "|"
+        Union.from(node.terms.map { |term| read_type_expr(ctx, term) })
+      else
+        raise NotImplementedError.new(node.style)
+      end
+    end
+
     def read_type_expr(ctx, node)
       raise NotImplementedError.new(node.class)
     end
@@ -464,8 +477,6 @@ module Savi::Compiler::Types
     end
 
     def visit(ctx, node : AST::Group)
-      return if classify.value_not_needed?(node)
-
       case node.style
       when "|"
         # Do nothing here - we'll handle it in one of the parent nodes.
@@ -495,10 +506,27 @@ module Savi::Compiler::Types
       end
     end
 
+    def visit(ctx, node : AST::Qualify)
+      raise NotImplementedError.new(node.to_a) unless node.group.style == "("
+
+      args = node.group.terms.map { |arg_node| @analysis[arg_node] }
+
+      @analysis[node] = Intersection.new(
+        @analysis[node.term].as(Intersection).members.map { |member|
+          next member unless member.is_a?(NominalType)
+
+          NominalType.new(member.link, args)
+        }.to_set
+      )
+    end
+
     def visit(ctx, node : AST::Relate)
       case node.op.value
       when "EXPLICITTYPE"
         # Do nothing here - we'll handle it in one of the parent nodes.
+      when "<:", "!<:"
+        # TODO: refine the type in this scope
+        @analysis[node] = prelude_type(ctx, "Bool", NominalCap::VAL)
       when "="
         ident = AST::Extract.param(node.lhs).first
         ref = refer[ident].as(Refer::Local)

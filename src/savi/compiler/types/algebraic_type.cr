@@ -166,7 +166,7 @@ module Savi::Compiler::Types
     end
 
     def override_cap(cap : AlgebraicType)
-      raise NotImplementedError.new("override_cap for #{self.class}")
+      cap # overrides whatever cap was sitting behind this variable
     end
   end
 
