@@ -54,7 +54,7 @@
     if event.success (
       @env.err.write(".")
     |
-      if (assert <: Assert2) (
+      if (assert <: Assert) (
         assert.report_failure(@env)
       |
         @env.err.write("\n")

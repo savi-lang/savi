@@ -1,19 +1,4 @@
-:primitive Assert
-  :fun non condition(
-    spec Spec
-    success Bool
-    pos SourceCodePosition = source_code_position_of_argument success
-  )
-    test = spec.test
-    assert = AssertCondition.new(test.spec, test.example, success, pos)
-    test.specs.enqueue(assert)
-
-// TODO: traits don't yet generate a singleton object
-// so we keep `:primitive Assert` as our singleton for the macro's call
-// and use Assert2 to sub-type `AssertCondition` and `AssertRelation`.
-//
-// We'll merge Assert and Assert2 once a `:trait` can be used as a singleton.
-:trait val Assert2
+:trait val Assert
   :let spec String
   :let example String
   :let success Bool
@@ -25,8 +10,17 @@
   :: for the different kinds of assertions.
   :fun report_failure(env Env) None
 
+  :fun non condition(
+    spec Spec
+    success Bool
+    pos SourceCodePosition = source_code_position_of_argument success
+  )
+    test = spec.test
+    assert = AssertCondition.new(test.spec, test.example, success, pos)
+    test.specs.enqueue(assert)
+
 :class val AssertCondition
-  :is Assert2
+  :is Assert
 
   :fun report_failure(env Env) None
     line = Inspect[@pos.row + 1]
