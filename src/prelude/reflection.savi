@@ -19,9 +19,8 @@
   :let mutator (ReflectionMutatorOfType(A) | None): None
 
   :fun maybe_call_mutator(a A) Bool
-    mutator = @mutator // TODO: somehow avoid typecheck-aiding temporary variable
-    if (mutator <: ReflectionMutatorOfType(A)) (
-      mutator.call(--a)
+    try (
+      @mutator.not!(None).call(--a)
       True
     |
       False
