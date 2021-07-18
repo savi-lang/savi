@@ -1,0 +1,11 @@
+:class Foo
+  :fun non true: True
+
+:class AssertSpec
+  :is Spec
+  :const describes: "Assert"
+
+  :it "conforms to the assert macro"
+    assert True
+    assert Foo.true
+

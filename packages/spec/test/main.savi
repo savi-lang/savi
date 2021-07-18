@@ -1,0 +1,7 @@
+:source ".."
+
+:actor Main
+  :new (env)
+    Specs.run(env, [
+      SpecRun(AssertSpec).new(env)
+    ])
