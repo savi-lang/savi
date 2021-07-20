@@ -327,19 +327,7 @@
     @assert = try (data.write_native_u64!(6, 0xfedcba9876543210), False | True)
 
   :it "reads big and little endian integer types at specific offsets"
-    data = Bytes.new
-
-    data.push(0x01)
-    data.push(0x23)
-    data.push(0x45)
-    data.push(0x67)
-
-    data.push(0x89)
-    data.push(0xAB)
-    data.push(0xCD)
-    data.push(0xEF)
-
-    data.push(0x01)
+    data = Bytes.from_array([0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF, 0x01])
 
     @assert = try (data.read_be_u16!(0) == 0x0123 | False)
     @assert = try (data.read_be_u16!(1) == 0x2345 | False)
