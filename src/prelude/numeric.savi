@@ -74,6 +74,18 @@
   :fun val count_zeros U8: @invert.count_ones
   :fun val next_pow2 @: compiler intrinsic
 
+  :fun val native_to_be @
+    if (Platform.big_endian) (@ | @swap_bytes)
+
+  :fun val native_to_le @
+    if (Platform.little_endian) (@ | @swap_bytes)
+
+  :fun val be_to_native @
+    if (Platform.big_endian) (@ | @swap_bytes)
+
+  :fun val le_to_native @
+    if (Platform.little_endian) (@ | @swap_bytes)
+
   :fun hash USize
     if (USize.bit_width == 32) (
       x = @usize
