@@ -10,7 +10,7 @@
 
 from pygments.lexer import RegexLexer, bygroups, include
 from pygments.token import \
-  Text, Keyword, Name, String, Number, \
+  Whitespace, Keyword, Name, String, Number, \
   Operator, Punctuation, Comment, Generic, Error
 
 __all__ = ['SaviLexer']
@@ -59,8 +59,8 @@ class SaviLexer(RegexLexer):
       (r'([_A-Z]\w*)', Name.Class),
 
       # Declare
-      (r'^(\s*)(:)(\w+)',
-        bygroups(Text, Name.Tag, Name.Tag),
+      (r'^([ \t]*)(:)(\w+)',
+        bygroups(Whitespace, Name.Tag, Name.Tag),
         "decl"),
 
       # Error-Raising Calls/Names
@@ -76,13 +76,13 @@ class SaviLexer(RegexLexer):
       (r'\b0b([01_]+)\b', Number.Bin),
 
       # Function Call (with braces)
-      (r'(\w+(?:\?|\!)?)(?=\()', Name.Function),
+      (r'\w+(?=\()', Name.Function),
 
       # Function Call (with receiver)
-      (r'(?<=\.)(\w+(?:\?|\!)?)', Name.Function),
+      (r'(\.)(\s*)(\w+)', bygroups(Punctuation, Whitespace, Name.Function)),
 
       # Function Call (with self receiver)
-      (r'(?<=@)(\w+(?:\?|\!)?)', Name.Function),
+      (r'(@)(\w+)', bygroups(Punctuation, Name.Function)),
 
       # Parenthesis
       (r'\(', Punctuation, "root"),
@@ -122,14 +122,14 @@ class SaviLexer(RegexLexer):
       (r'\b\w+\b', Name),
 
       # Whitespace
-      (r'[ \t\r]+', Text),
+      (r'[ \t\r]+\n*|\n+', Whitespace),
     ],
 
     # Declare (nested rules)
     "decl": [
       (r'\b[a-z_]\w*\b(?!\!)', Keyword.Declaration),
       (r':', Punctuation, "#pop"),
-      (r'\n', Text, "#pop"),
+      (r'\n', Whitespace, "#pop"),
       include("root"),
     ],
 
