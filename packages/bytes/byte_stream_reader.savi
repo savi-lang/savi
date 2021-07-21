@@ -38,6 +38,7 @@
 :: stream using the compact method to drop only bytes that are behind
 :: both the marker and cursor, releasing bytes that cannot be read anymore.
 :class ByteStreamReader
+  :is BinaryReadable
   :let _data Bytes'ref
   :var _offset USize: 0
   :var _mark_offset USize: 0
@@ -243,3 +244,16 @@
     :yields U8 for Bool
     while (yield @_data[@_offset]!) (@_offset += 1)
     @
+
+  :fun read_byte!(offset USize) U8
+    @_data.read_byte!(@_mark_offset + offset)
+
+  :fun read_native_u16!(offset USize) U16
+    @_data.read_native_u16!(@_mark_offset + offset)
+
+  :fun read_native_u32!(offset USize) U32
+    @_data.read_native_u32!(@_mark_offset + offset)
+
+  :fun read_native_u64!(offset USize) U64
+    @_data.read_native_u64!(@_mark_offset + offset)
+

@@ -326,15 +326,15 @@
     @assert = try (data.write_native_u32!(10, 0x12345678), False | True)
     @assert = try (data.write_native_u64!(6, 0xfedcba9876543210), False | True)
 
-  :it "reads big and little endian integer types at specific offsets"
+  :it "reads integers in native, big and little endianness at specific offsets"
     data = Bytes.from_array([0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF, 0x01])
 
-    @assert = try (data.read_be_u16!(0) == 0x0123 | False)
-    @assert = try (data.read_be_u16!(1) == 0x2345 | False)
-    @assert = try (data.read_be_u32!(0) == 0x01234567 | False)
-    @assert = try (data.read_be_u32!(1) == 0x23456789 | False)
-    @assert = try (data.read_be_u64!(0) == 0x0123456789ABCDEF | False)
-    @assert = try (data.read_be_u64!(1) == 0x23456789ABCDEF01 | False)
+    @assert = try (data.read_native_u16!(0) == 0x2301 | False)
+    @assert = try (data.read_native_u16!(1) == 0x4523 | False)
+    @assert = try (data.read_native_u32!(0) == 0x67452301 | False)
+    @assert = try (data.read_native_u32!(1) == 0x89674523 | False)
+    @assert = try (data.read_native_u64!(0) == 0xEFCDAB8967452301 | False)
+    @assert = try (data.read_native_u64!(1) == 0x01EFCDAB89674523 | False)
 
     @assert = try (data.read_le_u16!(0) == 0x2301 | False)
     @assert = try (data.read_le_u16!(1) == 0x4523 | False)
@@ -342,6 +342,13 @@
     @assert = try (data.read_le_u32!(1) == 0x89674523 | False)
     @assert = try (data.read_le_u64!(0) == 0xEFCDAB8967452301 | False)
     @assert = try (data.read_le_u64!(1) == 0x01EFCDAB89674523 | False)
+
+    @assert = try (data.read_be_u16!(0) == 0x0123 | False)
+    @assert = try (data.read_be_u16!(1) == 0x2345 | False)
+    @assert = try (data.read_be_u32!(0) == 0x01234567 | False)
+    @assert = try (data.read_be_u32!(1) == 0x23456789 | False)
+    @assert = try (data.read_be_u64!(0) == 0x0123456789ABCDEF | False)
+    @assert = try (data.read_be_u64!(1) == 0x23456789ABCDEF01 | False)
 
   :it "joins an array of bytes"
     @assert = Bytes.join([

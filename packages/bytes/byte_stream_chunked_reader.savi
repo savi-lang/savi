@@ -33,6 +33,7 @@
 :: stream using the compact method to drop only chunks that are behind
 :: both the marker and cursor, releasing chunks that cannot be read anymore.
 :class ByteStreamChunkedReader
+  :is BinaryReadable
   :let _chunks Array(Bytes): []
   :var _chunk_index USize: 0
   :var _offset USize: 0
@@ -323,3 +324,41 @@
       )
     )
     @
+
+  :: Starting at `offset`, read the next `num_bytes` from the stream and
+  :: treat them as an unsigned integer in network byte order (big-endian).
+  :fun _read_be_uint!(offset USize, num_bytes USize) U64
+    value U64 = 0
+    pos USize = 0
+    end_offset USize = offset + num_bytes
+
+    @each_token_byte_until -> (byte |
+      if (pos >= offset && pos < end_offset) (
+        value = value.bit_shl(8).bit_or(byte.u64)
+      )
+      pos += 1
+      pos >= end_offset
+    )
+    if (pos == end_offset) (value | error!)
+
+  :fun read_byte!(offset USize) U8
+    @_read_be_uint!(offset, 1).u8
+
+  :fun read_be_u16!(offset USize) U16
+    @_read_be_uint!(offset, 2).u16
+
+  :fun read_be_u32!(offset USize) U32
+    @_read_be_uint!(offset, 4).u32
+
+  :fun read_be_u64!(offset USize) U64
+    @_read_be_uint!(offset, 8)
+
+  :fun read_native_u16!(offset USize) U16
+    @read_be_u16!(offset).be_to_native
+
+  :fun read_native_u32!(offset USize) U32
+    @read_be_u32!(offset).be_to_native
+
+  :fun read_native_u64!(offset USize) U64
+    @read_be_u64!(offset).be_to_native
+
