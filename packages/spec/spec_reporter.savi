@@ -52,7 +52,7 @@
       @env.err.write(".")
     |
       try (
-        event.assert.as!(Assert).report_failure(@env)
+        event.assert.as!(Assert).print_failure(@env)
       |
         @env.err.write("\n")
         @env.err.write(Inspect[event.pos.row + 1])

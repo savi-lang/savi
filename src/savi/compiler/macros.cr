@@ -217,33 +217,39 @@ class Savi::Compiler::Macros < Savi::AST::CopyOnMutateVisitor
     raise Error.compiler_hole_at(node, exc)
   end
 
-  # This clause picks up a special form of case which is inside a Relate node,
-  # where the Relate gets reshuffled into the case clauses.
+  # This clause picks up a special form of case and assert which are inside a Relate node,
+  # where the Relate gets reshuffled into the case/assert clauses.
+  #
   # We need it to be a visit_pre rather than a normal visit, because
   # if we visited the children first as we normally do, then it would try
-  # to expand the `case` macro inside the Relate before running this code,
-  # and fail because the inner `case` Group doesn't have the right terms.
+  # to expand the `case`or `assert` macro inside the Relate before running this code,
+  # and fail because the inner Group doesn't have the right terms.
   def visit_pre(ctx, node : AST::Relate)
     lhs = node.lhs
     return node unless \
       lhs.is_a?(AST::Group) &&
-      lhs.style == " " &&
-      Util.match_ident?(lhs, 0, "case")
+      lhs.style == " "
 
-    term = lhs.terms[1]
-    Error.at term,
-      "Expected this term to be not be a parenthesized group" \
-        if term.is_a?(AST::Group) && (term.style == "(" || term.style == "|")
+    if Util.match_ident?(lhs, 0, "case")
+      term = lhs.terms[1]
+      Error.at term,
+        "Expected this term to not be a parenthesized group" \
+          if term.is_a?(AST::Group) && (term.style == "(" || term.style == "|")
 
-    group = node.rhs
-    Error.at group,
-      "Expected this term to be a parenthesized group of cases to check,\n" \
-      "  partitioned into sections by `|`, in which each body section\n" \
-      "  is preceded by a condition section to be evaluated as a Bool,\n" \
-      "  with an optional else body section at the end" \
-        unless group.is_a?(AST::Group) && group.style == "|"
+      group = node.rhs
+      Error.at group,
+        "Expected this term to be a parenthesized group of cases to check,\n" \
+        "  partitioned into sections by `|`, in which each body section\n" \
+        "  is preceded by a condition section to be evaluated as a Bool,\n" \
+        "  with an optional else body section at the end" \
+          unless group.is_a?(AST::Group) && group.style == "|"
 
-    visit_case(node)
+      visit_case(node)
+    elsif Util.match_ident?(lhs, 0, "assert")
+      visit_assert(node)
+    else
+      node
+    end
   rescue exc : Exception
     raise exc if exc.is_a?(Error) # TODO: ctx.errors multi-error capability
     raise Error.compiler_hole_at(node, exc)
@@ -586,12 +592,66 @@ class Savi::Compiler::Macros < Savi::AST::CopyOnMutateVisitor
       AST::Identifier.new("Assert").from(orig),
       AST::Identifier.new("condition").from(orig),
       AST::Group.new("(", [
-        AST::Identifier.new("@").from(expr),
+        AST::Identifier.new("@").from(node),
         expr,
       ] of AST::Term).from(expr)
     ).from(orig)
 
     AST::Group.new("(", [call] of AST::Term).from(node)
+  end
+
+  def visit_assert(node : AST::Relate)
+    orig = node.lhs.as(AST::Group).terms[0]
+    lhs = node.lhs.as(AST::Group).terms[1]
+    op = node.op
+    rhs = node.rhs
+
+    # If the lhs or rhs are not a simple identifier, use a hygienic local to \
+    # hold the value resulting from the expression so that we can refer to it
+    # multiple times without evaluating the term expression again.
+    if !lhs.is_a?(AST::Identifier)
+      local_name = next_local_name
+      local_lhs = AST::Identifier.new(local_name).from(lhs)
+      local_lhs_assign = AST::Relate.new(
+        local_lhs,
+        AST::Operator.new("=").from(lhs),
+        lhs,
+      ).from(lhs)
+    end
+
+    if !rhs.is_a?(AST::Identifier)
+      local_name = next_local_name
+      local_rhs = AST::Identifier.new(local_name).from(rhs)
+      local_rhs_assign = AST::Relate.new(
+        local_rhs,
+        AST::Operator.new("=").from(rhs),
+        rhs,
+      ).from(rhs)
+    end
+
+    relate = AST::Relate.new(
+      (local_lhs ? local_lhs : lhs),
+      op,
+      (local_rhs ? local_rhs : rhs),
+    ).from(node)
+
+    call = AST::Call.new(
+      AST::Identifier.new("Assert").from(orig),
+      AST::Identifier.new("relation").from(orig),
+      AST::Group.new("(", [
+        AST::Identifier.new("@").from(node),
+        AST::LiteralString.new(op.value).from(op),
+        (local_lhs ? local_lhs : lhs),
+        (local_rhs ? local_rhs : rhs),
+        relate,
+      ] of AST::Term).from(orig)
+    ).from(orig)
+
+    terms = [] of AST::Term
+    terms << local_lhs_assign if local_lhs_assign
+    terms << local_rhs_assign if local_rhs_assign
+    terms << call
+    AST::Group.new("(", terms).from(node)
   end
 
   def visit_source_code_position_of_argument(node : AST::Group)
