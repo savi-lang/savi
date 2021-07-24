@@ -4,32 +4,83 @@
   :let success Bool
   :let pos SourceCodePosition
 
-  :new val (@spec, @example, @success, @pos)
-
-  :: The report function will print a specific failure message \
+  :: The print_failure function will print a specific failure message \
   :: for the different kinds of assertions.
-  :fun report_failure(env Env) None
+  :fun print_failure(env Env) None
 
   :fun non condition(
     spec Spec
     success Bool
-    pos SourceCodePosition = source_code_position_of_argument success
+    pos SourceCodePosition = source_code_position_of_argument spec
   )
     test = spec.test
     assert = AssertCondition.new(test.spec, test.example, success, pos)
     test.specs.enqueue(assert)
 
+  :fun non relation(
+    spec Spec
+    op String
+    lhs Any'box
+    rhs Any'box
+    success Bool
+    pos SourceCodePosition = source_code_position_of_argument spec
+  )
+    test = spec.test
+    assert = AssertRelation.new(
+      test.spec
+      test.example
+      success
+      pos
+      op
+      Inspect[lhs]
+      Inspect[rhs]
+    )
+    test.specs.enqueue(assert)
+
+  :fun file_and_line String
+    line = Inspect[@pos.row + 1]
+    @indent(4, String.join(["# ", @pos.filename, ":", line]))
+
+  :fun indent(times USize, msg String) String
+    String.join([" " * times, msg])
+
 :class val AssertCondition
   :is Assert
+  
+  :new val (@spec, @example, @success, @pos)
 
-  :fun report_failure(env Env) None
-    line = Inspect[@pos.row + 1]
-
-    env.err.write("\n")
+  :fun print_failure(env Env) None
     env.err.print(String.join([
-      "    Expected the following to be True:"
-      String.join(["    ", @pos.string, "\n"])
-      String.join(["    # ", @pos.filename, ":", line])
+      ""
+      @indent(4, String.join(["FAIL:", @pos.string], " "))
+      ""
+      @indent(4, "Expected to be True")
+      ""
+      @file_and_line
+    ], "\n"))
+
+    None
+
+:class val AssertRelation
+  :is Assert
+
+  :let op String
+  :let lhs String
+  :let rhs String
+
+  :new val (@spec, @example, @success, @pos, @op, @lhs, @rhs)
+
+  :fun print_failure(env Env) None
+    env.err.print(String.join([
+      ""
+      @indent(4, String.join(["FAIL:", @pos.string], " "))
+      ""
+      @indent(4, "Expected")
+      @indent(6, @lhs)
+      @indent(4, String.join(["to ", @op]))
+      @indent(6, @rhs)
+      ""
+      @file_and_line
     ], "\n"))
 
     None
