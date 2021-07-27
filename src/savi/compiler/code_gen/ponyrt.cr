@@ -554,7 +554,7 @@ class Savi::Compiler::CodeGen::PonyRT
 
     # Call pony_init, letting it optionally consume some of the CLI args,
     # giving us a new value for argc and a mutated argv array.
-    argc = g.builder.call(g.mod.functions["pony_init"], [@i32.const_int(1), argv], "argc")
+    argc = g.builder.call(g.mod.functions["pony_init"], [argc, argv], "argc")
 
     # Get the current alloc_ctx and hold on to it.
     alloc_ctx = gen_alloc_ctx_get(g)
@@ -563,11 +563,8 @@ class Savi::Compiler::CodeGen::PonyRT
     # Create the main actor and become it.
     main_actor = gen_alloc_actor(g, g.gtype_main, nil, "main", become_now: true)
 
-    # TODO: Create the Env from argc, argv, and envp.
     env = gen_alloc(g, g.gtypes["Env"], nil, "env")
-    g.builder.call(g.gtypes["Env"]["_create"].llvm_func, [env])
-    # TODO: g.builder.call(g.gtypes["Env"]["_create"].llvm_func,
-    #   [argc, g.builder.bit_cast(argv, @ptr), g.builder.bitcast(envp, @ptr)])
+    g.builder.call(g.gtypes["Env"]["_create"].llvm_func, [env, argc, argv, envp])
 
     # TODO: Run primitive initialisers using the main actor's heap.
 

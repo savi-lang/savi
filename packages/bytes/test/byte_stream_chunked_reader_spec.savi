@@ -268,3 +268,50 @@
     stream << b":" // only digits (0-9) are valid
     stream.advance_to_end
     @assert = try (stream.token_as_positive_integer!, False | True)
+
+  :it "reads byte at position"
+    stream = ByteStreamChunkedReader.new
+    stream << Bytes.from_array([0x01])
+    stream << Bytes.from_array([0x23, 0x45])
+    stream.advance_to_end
+
+    @assert = try (stream.read_byte!(0) == 0x01 | False)
+    @assert = try (stream.read_byte!(1) == 0x23 | False)
+    @assert = try (stream.read_byte!(2) == 0x45 | False)
+    @assert = try (stream.read_byte!(3), False | True)
+
+  :it "reads integers in native, big and little endianness at specific offsets"
+    stream = ByteStreamChunkedReader.new
+    // break the data up into multiple chunks to test reading integers across chunk boundaries
+    stream << b"garbage"
+    stream << Bytes.from_array([0x01])
+    stream << Bytes.from_array([0x23, 0x45])
+    stream << Bytes.from_array([0x67, 0x89, 0xAB])
+    stream << Bytes.from_array([0xCD])
+    stream << Bytes.from_array([0xEF, 0x01])
+
+    try (stream.advance!(7)) // drop "garbage"
+    stream.mark_here
+    stream.advance_to_end
+
+    @assert = try (stream.read_native_u16!(0) == 0x2301 | False)
+    @assert = try (stream.read_native_u16!(1) == 0x4523 | False)
+    @assert = try (stream.read_native_u32!(0) == 0x67452301 | False)
+    @assert = try (stream.read_native_u32!(1) == 0x89674523 | False)
+    @assert = try (stream.read_native_u64!(0) == 0xEFCDAB8967452301 | False)
+    @assert = try (stream.read_native_u64!(1) == 0x01EFCDAB89674523 | False)
+
+    @assert = try (stream.read_le_u16!(0) == 0x2301 | False)
+    @assert = try (stream.read_le_u16!(1) == 0x4523 | False)
+    @assert = try (stream.read_le_u32!(0) == 0x67452301 | False)
+    @assert = try (stream.read_le_u32!(1) == 0x89674523 | False)
+    @assert = try (stream.read_le_u64!(0) == 0xEFCDAB8967452301 | False)
+    @assert = try (stream.read_le_u64!(1) == 0x01EFCDAB89674523 | False)
+
+    @assert = try (stream.read_be_u16!(0) == 0x0123 | False)
+    @assert = try (stream.read_be_u16!(1) == 0x2345 | False)
+    @assert = try (stream.read_be_u32!(0) == 0x01234567 | False)
+    @assert = try (stream.read_be_u32!(1) == 0x23456789 | False)
+    @assert = try (stream.read_be_u64!(0) == 0x0123456789ABCDEF | False)
+    @assert = try (stream.read_be_u64!(1) == 0x23456789ABCDEF01 | False)
+

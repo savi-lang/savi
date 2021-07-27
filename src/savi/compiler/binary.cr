@@ -47,7 +47,7 @@ class Savi::Compiler::Binary
     link_args = if target.freebsd?
                   %w{clang
                     -fuse-ld=lld -static -fpic -flto=thin
-                    -lc -pthread -ldl -lexecinfo -lelf
+                    -lc -lm -pthread -ldl -lexecinfo -lelf
                   }
                 else
                   %w{clang

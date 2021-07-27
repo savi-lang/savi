@@ -18,3 +18,12 @@
     assert Foo.with_yield -> (false |
       assert !false
     )
+
+  :it "conforms to the `assert EXP1 <op> EXP2` macro"
+    assert True == True
+    assert Foo.true == True
+    assert True == Foo.true
+    assert True \
+      == True
+    assert Foo.with_yield -> (false |
+      assert !false) == Foo.true
