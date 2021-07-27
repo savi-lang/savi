@@ -13,7 +13,7 @@ This function call breaks privacy boundaries:
         ^~~~~~~
 
 - this is a private function from another library:
-  :new val _create
+  :new val _create(
            ^~~~~~~
 ```
 

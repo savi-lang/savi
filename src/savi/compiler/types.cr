@@ -609,6 +609,9 @@ module Savi::Compiler::Types
       case node.kind
       when AST::Jump::Kind::Error
         @analysis[node] = JumpsAway.new(node.pos)
+      when AST::Jump::Kind::Break
+        # TODO: link the term's value to the loop or yield block catching it
+        @analysis[node] = JumpsAway.new(node.pos)
       when AST::Jump::Kind::Return
         @analysis.observe_early_return(node)
         @analysis[node] = JumpsAway.new(node.pos)
