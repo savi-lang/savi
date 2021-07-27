@@ -5,7 +5,7 @@
   :const describes: "ResponseBuilder"
 
   :it "builds 1xx responses"
-    @assert = @build -> (builder |
+    assert @build -> (builder |
       builder.status_continue
     ) == Bytes.join([
       b"HTTP/1.1 100 Continue"
@@ -13,7 +13,7 @@
       b""
     ], b"\r\n")
 
-    @assert = @build -> (builder |
+    assert @build -> (builder |
       builder.status_switching_protocols
     ) == Bytes.join([
       b"HTTP/1.1 101 Switching Protocols"
@@ -28,7 +28,7 @@
   :it "builds 5xx responses"
 
   :it "can add headers"
-    @assert = @build -> (builder |
+    assert @build -> (builder |
       builder
         .status_ok
         .header("Content-Length", "0")
@@ -40,7 +40,7 @@
     ], b"\r\n")
 
   :it "can write a body"
-    @assert = @build -> (builder |
+    assert @build -> (builder |
       builder
         .status_ok
         .header("Content-Type", "text/plain; charset=utf-8")
