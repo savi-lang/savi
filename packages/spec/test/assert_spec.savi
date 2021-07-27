@@ -27,3 +27,9 @@
       == True
     assert Foo.with_yield -> (false |
       assert !false) == Foo.true
+
+  :it "honors iso"
+    assert "" == String.new_iso
+
+    foo = String.new_iso, foo << "foo"
+    assert "foo" == --foo
