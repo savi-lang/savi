@@ -237,6 +237,22 @@
     )
     @
 
+  :: Advances the marker position by `n` bytes.
+  ::
+  :: Raises an error if marker position would go beyond the cursor position.
+  :fun ref advance_mark!(n USize) None
+    error! if (@token_byte_size < n)
+    @_mark_offset += n
+
+  :fun ref read_bytes!(offset USize, n USize) Bytes'iso
+    bytes = Bytes.new_iso(n)
+    i = 0
+    while (i < n) (
+      bytes.push(@read_byte!(offset + i))
+      i += 1
+    )
+    --bytes
+
   :: Advance the cursor byte-by-byte for as long as the block yields True,
   :: stopping the cursor pointing at the byte for which it yielded False.
   :: Raises an error if the end of the byte stream is reached prior to that.
