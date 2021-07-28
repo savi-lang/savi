@@ -606,33 +606,36 @@ class Savi::Compiler::Macros < Savi::AST::CopyOnMutateVisitor
     op = node.op
     rhs = node.rhs
 
-    # If the lhs or rhs are not a simple identifier, use a hygienic local to \
-    # hold the value resulting from the expression so that we can refer to it
-    # multiple times without evaluating the term expression again.
-    if !lhs.is_a?(AST::Identifier)
-      local_name = next_local_name
-      local_lhs = AST::Identifier.new(local_name).from(lhs)
-      local_lhs_assign = AST::Relate.new(
-        local_lhs,
-        AST::Operator.new("=").from(lhs),
-        lhs,
-      ).from(lhs)
-    end
+    # Use a hygienic local to explicitly hold the expressions as box.
+    # This also helps to refer to them multiple times without evaluating them again.
+    local_lhs = AST::Identifier.new(next_local_name).from(lhs)
+    local_lhs_box = AST::Relate.new(
+      local_lhs,
+      AST::Operator.new("EXPLICITTYPE").from(lhs),
+      AST::Identifier.new("box").from(lhs),
+    ).from(lhs)
+    local_lhs_assign = AST::Relate.new(
+      local_lhs_box,
+      AST::Operator.new("=").from(lhs),
+      lhs,
+    ).from(lhs)
 
-    if !rhs.is_a?(AST::Identifier)
-      local_name = next_local_name
-      local_rhs = AST::Identifier.new(local_name).from(rhs)
-      local_rhs_assign = AST::Relate.new(
-        local_rhs,
-        AST::Operator.new("=").from(rhs),
-        rhs,
-      ).from(rhs)
-    end
+    local_rhs = AST::Identifier.new(next_local_name).from(rhs)
+    local_rhs_box = AST::Relate.new(
+      local_rhs,
+      AST::Operator.new("EXPLICITTYPE").from(rhs),
+      AST::Identifier.new("box").from(rhs),
+    ).from(rhs)
+    local_rhs_assign = AST::Relate.new(
+      local_rhs_box,
+      AST::Operator.new("=").from(rhs),
+      rhs,
+    ).from(rhs)
 
     relate = AST::Relate.new(
-      (local_lhs ? local_lhs : lhs),
+      local_lhs,
       op,
-      (local_rhs ? local_rhs : rhs),
+      local_rhs,
     ).from(node)
 
     call = AST::Call.new(
@@ -641,17 +644,17 @@ class Savi::Compiler::Macros < Savi::AST::CopyOnMutateVisitor
       AST::Group.new("(", [
         AST::Identifier.new("@").from(node),
         AST::LiteralString.new(op.value).from(op),
-        (local_lhs ? local_lhs : lhs),
-        (local_rhs ? local_rhs : rhs),
+        local_lhs,
+        local_rhs,
         relate,
       ] of AST::Term).from(orig)
     ).from(orig)
 
-    terms = [] of AST::Term
-    terms << local_lhs_assign if local_lhs_assign
-    terms << local_rhs_assign if local_rhs_assign
-    terms << call
-    AST::Group.new("(", terms).from(node)
+    AST::Group.new("(", [
+      local_lhs_assign,
+      local_rhs_assign,
+      call,
+    ] of AST::Term).from(node)
   end
 
   def visit_source_code_position_of_argument(node : AST::Group)
