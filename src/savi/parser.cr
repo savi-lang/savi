@@ -11,7 +11,6 @@ module Savi::Parser
     grammar =
       case source.language
       when :savi then Grammar
-      when :pony then GrammarPony
       else raise NotImplementedError.new("#{source.language} language parsing")
       end
 

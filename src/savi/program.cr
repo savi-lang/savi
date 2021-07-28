@@ -282,9 +282,8 @@ class Savi::Program
         .not_nil!
     end
 
-    # PONY special case - Pony calls the default constructor `create`...
     def find_default_constructor?
-      find_func?("new") || find_func?("create")
+      find_func?("new")
     end
     def find_default_constructor!; find_default_constructor?.not_nil! end
 

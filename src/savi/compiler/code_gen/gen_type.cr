@@ -149,9 +149,8 @@ class Savi::Compiler::CodeGen
       @gfuncs.each_value
     end
 
-    # PONY special case - Pony calls the default constructor `create`...
     def default_constructor
-      gfuncs["new"]? || gfuncs["create"]
+      gfuncs["new"]
     end
   end
 end

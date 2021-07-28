@@ -8,10 +8,6 @@ struct Savi::Source
   def initialize(@dirname, @filename, @content, @library, @language = :savi)
   end
 
-  def pony?
-    @language == :pony
-  end
-
   def path
     File.join(@dirname, @filename)
   end
@@ -21,10 +17,6 @@ struct Savi::Source
 
   def self.new_example(content)
     new("", "(example)", content, Library.new(""))
-  end
-
-  def self.new_pony_example(content)
-    new("", "(example)", content, Library.new(""), :pony)
   end
 end
 

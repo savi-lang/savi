@@ -17,11 +17,6 @@ class Savi::Compiler::Privacy
       # Only handle private calls (beginning with an underscore).
       return unless called_func_link.name.starts_with?("_")
 
-      # PONY temporary workaround: for now, we don't enforce privacy in Pony
-      # because we need to allow Pony's `builtin` to use our prelude library.
-      # Remove this when Savi's prelude is a superset of Pony's `builtin`.
-      return if pos.source.pony?
-
       # If the call site's library is the same as the function's library,
       # then there is no privacy issue and we can move on without error.
       next if pos.source.library.path == called_func_link.type.library.path

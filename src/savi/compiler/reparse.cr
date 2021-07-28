@@ -136,32 +136,8 @@ class Savi::Compiler::Reparse < Savi::AST::CopyOnMutateVisitor
       receiver = AST::Identifier.new("@").with_pos(receiver_pos)
       ident = AST::Identifier.new(node.value[1..-1]).with_pos(ident_pos)
       AST::Call.new(receiver, ident).from(node)
-    elsif node.pos.source.pony?
-      # PONY special case: uses the keyword `this` for the self value.
-      if node.value == "this"
-        AST::Identifier.new("@").from(node)
-      # PONY special case: uses the keyword `error` for the error statement.
-      elsif node.value == "error"
-        AST::Jump.new(AST::Identifier.new("None").from(node), AST::Jump::Kind::Error).from(node)
-      else
-        node
-      end
     else
       node
-    end
-  rescue exc : Exception
-    raise Error.compiler_hole_at(node, exc)
-  end
-
-  # PONY special case: many operators have different names in Pony.
-  def visit(ctx, node : AST::Operator)
-    return node unless node.pos.source.pony?
-
-    case node.value
-    when "consume" then AST::Operator.new("--").from(node)
-    when "and"     then AST::Operator.new("&&").from(node)
-    when "or"      then AST::Operator.new("||").from(node)
-    else node
     end
   rescue exc : Exception
     raise Error.compiler_hole_at(node, exc)
@@ -182,13 +158,6 @@ class Savi::Compiler::Reparse < Savi::AST::CopyOnMutateVisitor
       args,
     ).from(term)
     node.annotations = annotations
-
-    # PONY special case: exclamation from args gets moved to the ident.
-    if node.pos.source.pony? && args.style == "(!"
-      new_ident_value = "#{node.ident.value}!"
-      node.ident = AST::Identifier.new(new_ident_value).from(node.ident)
-      args.style = "("
-    end
 
     node
   rescue exc : Exception

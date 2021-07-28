@@ -154,19 +154,6 @@ class Savi::Compiler::Sugar < Savi::AST::CopyOnMutateVisitor
       end
     return node unless square_bracket
 
-    # PONY special case: square brackets are type params in Pony
-    if node.pos.source.pony?
-      term = node.term
-      if term.is_a?(AST::Identifier) && term.value.match(/\A[A-Z]/)
-        return AST::Qualify.new(
-          term,
-          AST::Group.new("(", node.group.terms.dup).from(node.group)
-        ).from(node)
-      else
-        raise NotImplementedError.new(node.to_a.inspect)
-      end
-    end
-
     # Transform square-brace qualifications into method calls
     visit(ctx,
       AST::Call.new(

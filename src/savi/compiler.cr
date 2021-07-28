@@ -190,20 +190,15 @@ class Savi::Compiler
     library ||= Source::Library.new(dirname)
 
     sources = Dir.entries(dirname).compact_map { |name|
-      language =
-        if name.ends_with?(".savi")
-          :savi
-        elsif name.ends_with?(".pony")
-          :pony
-        end
-      next unless language
+      next unless name.ends_with?(".savi")
+      language = :savi
 
       content = File.read(File.join(dirname, name))
       Source.new(dirname, name, content, library, language)
     } rescue [] of Source
 
     Error.at Source::Pos.show_library_path(library),
-      "No '.savi' or '.pony' source files found in this directory" \
+      "No '.savi' source files found in this directory" \
         if sources.empty?
 
     sources
