@@ -14,7 +14,7 @@ describe Savi::Compiler::Macros do
       func.body.not_nil!.terms.first.to_a.should eq [:group, "(", [:call,
         [:ident, "Assert"],
         [:ident, "condition"],
-        [:group, "(", 
+        [:group, "(",
           [:ident, "@"],
           [:ident, "True"],
         ]
@@ -27,29 +27,42 @@ describe Savi::Compiler::Macros do
       source = Savi::Source.new_example <<-SOURCE
       :actor Main
         :new
-          foo = "foo"
-          assert SideEffects.call != foo
+          assert SideEffects.call != "foo"
       SOURCE
 
       ctx = Savi.compiler.compile([source], :macros)
       ctx.errors.should be_empty
 
       func = ctx.namespace.find_func!(ctx, source, "Main", "new")
-      func.body.not_nil!.terms[1].to_a.should eq [:group, "(",
+      func.body.not_nil!.terms.first.to_a.should eq [:group, "(",
         [:relate,
-          [:ident, "hygienic_macros_local.1"],
+          [:relate,
+            [:ident, "hygienic_macros_local.1"],
+            [:op, "EXPLICITTYPE"],
+            [:ident, "box"]],
           [:op, "="],
           [:call, [:ident, "SideEffects"], [:ident, "call"]],
+        ],
+        [:relate,
+          [:relate,
+            [:ident, "hygienic_macros_local.2"],
+            [:op, "EXPLICITTYPE"],
+            [:ident, "box"]],
+          [:op, "="],
+          [:string, "foo", nil],
         ],
         [:call,
           [:ident, "Assert"],
           [:ident, "relation"],
-          [:group, "(", 
+          [:group, "(",
             [:ident, "@"],
             [:string, "!=", nil],
             [:ident, "hygienic_macros_local.1"],
-            [:ident, "foo"],
-            [:relate, [:ident, "hygienic_macros_local.1"], [:op, "!="], [:ident, "foo"]]
+            [:ident, "hygienic_macros_local.2"],
+            [:relate,
+              [:ident, "hygienic_macros_local.1"],
+              [:op, "!="],
+              [:ident, "hygienic_macros_local.2"]]
           ]
         ]
       ]

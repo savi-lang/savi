@@ -171,7 +171,13 @@
     @assert = ("Hey" * 0) == ""
 
   :it "splits the string at every occurrence of the given byte value"
-    @assert = "foo.bar.baz".split('.') == ["foo", "bar", "baz"]
+    assert "foo.bar.baz".split('.') == ["foo", "bar", "baz"]
+    assert "foo.".split('.') == ["foo"]
+    assert ".foo".split('.') == ["", "foo"]
+    assert ".foo.".split('.') == ["", "foo"]
+    assert ".foo..".split('.') == ["", "foo", ""]
+    assert "".split('.') == []
+    assert ".".split('.') == [""] // FIXME? different from Ruby: []
 
   :it "lexically compares the string with another string of the same length"
     @assert = "examplE" < "example"
@@ -250,3 +256,15 @@
       "foo"
       "bar"
     ], " ") == "foo bar"
+
+  :it "splits a string into a pair"
+    assert (try ("foo=bar".split2!('=').first  == "foo" | False))
+    assert (try ("foo=bar".split2!('=').second == "bar" | False))
+
+    assert (try ("foo=bar=baz".split2!('=').first  == "foo" | False))
+    assert (try ("foo=bar=baz".split2!('=').second == "bar=baz" | False))
+
+    assert (try ("foo=".split2!('=').first == "foo" | False))
+    assert (try ("foo=".split2!('=').second == "" | False))
+
+    assert (try ("foo".split2!('='), False | True))

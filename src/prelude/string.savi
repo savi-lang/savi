@@ -180,12 +180,7 @@
     finish = @_offset_to_index(to).min(@size)
 
     if (start < @_size && start < finish) (
-      size = finish - start
-      @val_from_cpointer(
-        @_ptr._offset(start)
-        size
-        size
-      )
+      @_slice(start, finish)
     |
       @val_from_cpointer(@_ptr._null, 0, 0)
     )
@@ -346,28 +341,35 @@
 
   :fun val each_split(split_byte U8) // TODO: a byte shouldn't be the only thing we can split by...
     :yields String
-    finish USize = 0
-    start = finish
-    while (finish < @_size) (
-      byte = @_ptr._get_at(finish)
-      if (byte == split_byte) (
-        yield @val_from_cpointer(
-          @_ptr._offset(start)
-          (finish - start)
-          @_space - start
-        )
-        finish = finish + 1
-        start = finish
+    start USize = 0
+    while (start < @_size) (
+      try (
+        split_pos = @_index_of!(split_byte, start)
+        yield @_slice(start, split_pos)
+        start = split_pos + 1
       |
-        finish = finish + 1
+        yield @_slice(start, @_size)
+        break
       )
     )
-    yield @val_from_cpointer(
-      @_ptr._offset(start)
-      (finish - start)
-      @_space - start
-    )
     @
+
+  :fun val split2!(split_byte U8) StringPair
+    pos = @_index_of!(split_byte)
+    StringPair.new(@_slice(0, pos), @_slice(pos + 1, @_size))
+
+  :: Returns the integer index of the first occurence of the given character `char`.
+  :fun val _index_of!(char U8, offset USize = 0) USize
+    idx = offset
+    while (idx < @_size) (
+      return idx if (@_ptr._get_at(idx) == char)
+      idx += 1
+    )
+    error!
+
+  :fun val _slice(start USize, finish USize)
+    size = finish - start
+    @val_from_cpointer(@_ptr._offset(start), size, size)
 
   :fun "<"(other String'box)
     min_size = @size.min(other.size)
@@ -439,6 +441,12 @@
       if (index != others.size - 1) (res << separator)
     )
     --res
+
+// TODO: Convert into `:struct`
+:class val StringPair
+  :let first String'val
+  :let second String'val
+  :new (@first, @second)
 
 :: Encode the code point into UTF-8. It returns a tuple with the size of the
 :: encoded data and then the data.
