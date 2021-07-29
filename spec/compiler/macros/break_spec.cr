@@ -136,7 +136,7 @@ describe Savi::Compiler::Macros do
       - this term is the result value to break iteration with:
         from (example):4:
             break "value" if cond what now
-                   ^~~~~
+                  ^~~~~~~
 
       - this term is the condition that causes it to break the iteration:
         from (example):4:
@@ -201,7 +201,7 @@ describe Savi::Compiler::Macros do
       - this term is the result value to break iteration with:
         from (example):4:
             break "value" if
-                   ^~~~~
+                  ^~~~~~~
 
       - expected a term: the condition that causes it to break the iteration:
         from (example):4:
@@ -304,7 +304,7 @@ describe Savi::Compiler::Macros do
       - this term is the result value to break iteration with:
         from (example):4:
             break "value" unless cond what now
-                   ^~~~~
+                  ^~~~~~~
 
       - this term is the condition that prevents it from breaking the iteration:
         from (example):4:
@@ -369,7 +369,7 @@ describe Savi::Compiler::Macros do
       - this term is the result value to break iteration with:
         from (example):4:
             break "value" unless
-                   ^~~~~
+                  ^~~~~~~
 
       - expected a term: the condition that prevents it from breaking the iteration:
         from (example):4:

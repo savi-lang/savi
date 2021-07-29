@@ -176,7 +176,7 @@
     assert ".foo".split('.') == ["", "foo"]
     assert ".foo.".split('.') == ["", "foo"]
     assert ".foo..".split('.') == ["", "foo", ""]
-    assert "".split('.') == []
+    assert "".split('.') == Array(String).new // TODO: empty array literal
     assert ".".split('.') == [""] // FIXME? different from Ruby: []
 
   :it "lexically compares the string with another string of the same length"

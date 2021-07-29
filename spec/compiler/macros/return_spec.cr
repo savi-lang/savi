@@ -106,7 +106,7 @@ describe Savi::Compiler::Macros do
       - this term is the value to return:
         from (example):3:
           return "value" if cond what now
-                  ^~~~~
+                 ^~~~~~~
 
       - this term is the condition that causes it to return early:
         from (example):3:
@@ -167,7 +167,7 @@ describe Savi::Compiler::Macros do
       - this term is the value to return:
         from (example):3:
           return "value" if
-                  ^~~~~
+                 ^~~~~~~
 
       - expected a term: the condition that causes it to return early:
         from (example):3:
@@ -254,7 +254,7 @@ describe Savi::Compiler::Macros do
       - this term is the value to return:
         from (example):3:
           return "value" unless cond what now
-                  ^~~~~
+                 ^~~~~~~
 
       - this term is the condition that prevents it from returning early:
         from (example):3:
@@ -315,7 +315,7 @@ describe Savi::Compiler::Macros do
       - this term is the value to return:
         from (example):3:
           return "value" unless
-                  ^~~~~
+                 ^~~~~~~
 
       - expected a term: the condition that prevents it from returning early:
         from (example):3:

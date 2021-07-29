@@ -137,7 +137,7 @@ module Savi::Parser::Builder
     # Otherwise, this is an inner string so we gather its slice directly.
     if child_string
       child_string.prefix_ident = child_ident
-      child_string
+      child_string.with_pos(state.pos(main))
     else
       value = state.slice_with_escapes(main)
       AST::LiteralString.new(value).with_pos(state.pos(main))

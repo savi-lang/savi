@@ -136,7 +136,7 @@ describe Savi::Compiler::Macros do
       - this term is the value to finish this block with:
         from (example):4:
             next "value" if cond what now
-                  ^~~~~
+                 ^~~~~~~
 
       - this term is the condition that causes it to skip to the next iteration:
         from (example):4:
@@ -201,7 +201,7 @@ describe Savi::Compiler::Macros do
       - this term is the value to finish this block with:
         from (example):4:
             next "value" if
-                  ^~~~~
+                 ^~~~~~~
 
       - expected a term: the condition that causes it to skip to the next iteration:
         from (example):4:
@@ -304,7 +304,7 @@ describe Savi::Compiler::Macros do
       - this term is the value to finish this block with:
         from (example):4:
             next "value" unless cond what now
-                  ^~~~~
+                 ^~~~~~~
 
       - this term is the condition that prevents it from skipping to the next iteration:
         from (example):4:
@@ -369,7 +369,7 @@ describe Savi::Compiler::Macros do
       - this term is the value to finish this block with:
         from (example):4:
             next "value" unless
-                  ^~~~~
+                 ^~~~~~~
 
       - expected a term: the condition that prevents it from skipping to the next iteration:
         from (example):4:

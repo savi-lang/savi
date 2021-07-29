@@ -34,7 +34,7 @@ describe Savi::Compiler::Macros do
       - this term is the value to be yielded out to the calling function:
         from (example):3:
           yield "value" what now
-                 ^~~~~
+                ^~~~~~~
 
       - this is an excessive term:
         from (example):3:
@@ -86,7 +86,7 @@ describe Savi::Compiler::Macros do
       - this term is the value to be yielded out to the calling function:
         from (example):3:
           yield "value" if cond what now
-                 ^~~~~
+                ^~~~~~~
 
       - this term is the condition that causes it to yield:
         from (example):3:
@@ -124,7 +124,7 @@ describe Savi::Compiler::Macros do
       - this term is the value to be yielded out to the calling function:
         from (example):3:
           yield "value" if
-                 ^~~~~
+                ^~~~~~~
 
       - expected a term: the condition that causes it to yield:
         from (example):3:

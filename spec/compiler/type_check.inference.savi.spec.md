@@ -319,7 +319,7 @@ It infers prop setters to return the alias of the assigned value:
 ```error
 The type of this expression doesn't meet the constraints imposed on it:
     returned_3 String'iso = wrapper_iso.string_iso = String.new_iso // not okay
-    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 - it is required here to be a subtype of String'iso:
     returned_3 String'iso = wrapper_iso.string_iso = String.new_iso // not okay

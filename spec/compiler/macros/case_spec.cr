@@ -163,7 +163,7 @@ describe Savi::Compiler::Macros do
       - this is an excessive term:
         from (example):3:
           case (x == 1) "one" (x == 2) "two"
-                         ^~~
+                        ^~~~~
 
       - this is an excessive term:
         from (example):3:
@@ -173,7 +173,7 @@ describe Savi::Compiler::Macros do
       - this is an excessive term:
         from (example):3:
           case (x == 1) "one" (x == 2) "two"
-                                        ^~~
+                                       ^~~~~
       MSG
 
       Savi.compiler.compile([source], :macros)

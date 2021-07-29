@@ -11,7 +11,7 @@ It complains when the function body doesn't match the return type:
 ```error
 The type of this expression doesn't meet the constraints imposed on it:
     "not a number at all"
-     ^~~~~~~~~~~~~~~~~~~
+    ^~~~~~~~~~~~~~~~~~~~~
 
 - it is required here to be a subtype of I32:
   :fun number I32
@@ -19,7 +19,7 @@ The type of this expression doesn't meet the constraints imposed on it:
 
 - but the type of the expression was String:
     "not a number at all"
-     ^~~~~~~~~~~~~~~~~~~
+    ^~~~~~~~~~~~~~~~~~~~~
 ```
 
 ---
@@ -103,7 +103,7 @@ The type of this expression doesn't meet the constraints imposed on it:
 
 - but the type of the expression was String:
     if "not a boolean" True
-        ^~~~~~~~~~~~~
+       ^~~~~~~~~~~~~~~
 ```
 
 ---
@@ -177,7 +177,7 @@ It complains when a different type is assigned on reassignment:
 ```error
 The type of this expression doesn't meet the constraints imposed on it:
     x = "a string"
-         ^~~~~~~~
+        ^~~~~~~~~~
 
 - it is required here to be a subtype of U64:
     x = U64[0]
@@ -185,7 +185,7 @@ The type of this expression doesn't meet the constraints imposed on it:
 
 - but the type of the expression was String:
     x = "a string"
-         ^~~~~~~~
+        ^~~~~~~~~~
 ```
 
 ---

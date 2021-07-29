@@ -48,6 +48,7 @@ module Savi::Parser
       str("\\b") | str("\\f") | str("\\n") | str("\\r") | str("\\t") |
       str("\b")  | str("\f")  | str("\n")  | str("\r")  | str("\t") |
       (str("\\u") >> digithex >> digithex >> digithex >> digithex) |
+      (str("\\x") >> digithex >> digithex) |
       str("\\").maybe >> (~char('"') >> ~char('\\') >> range(' ', 0x10FFFF_u32))
     string = (
       ident_letter.named(:ident).maybe >>
@@ -62,6 +63,7 @@ module Savi::Parser
       str("\\b") | str("\\f") | str("\\n") | str("\\r") | str("\\t") |
       str("\b")  | str("\f")  | str("\n")  | str("\r")  | str("\t") |
       (str("\\u") >> digithex >> digithex >> digithex >> digithex) |
+      (str("\\x") >> digithex >> digithex) |
       (~char('\'') >> ~char('\\') >> range(' ', 0x10FFFF_u32))
     character = char('\'') >> character_char.repeat.named(:char) >> char('\'')
 
@@ -111,16 +113,16 @@ module Savi::Parser
 
     # Construct the nested possible relations for each group of operators.
     tw = compound
-    t1 = (tw >> (opw >> s >> tw).repeat(1) >> s).named(:group_w) | tw
+    t1 = ((tw >> (opw >> s >> tw).repeat(1)).named(:group_w) >> s) | tw
     t2 = (t1 >> (sn >> op1 >> sn >> t1).repeat).named(:relate)
     t3 = (t2 >> (sn >> op2 >> sn >> t2).repeat).named(:relate)
     t4 = (t3 >> (sn >> op3 >> sn >> t3).repeat).named(:relate)
     te = (t4 >> (sn >> op4 >> sn >> t4).repeat).named(:relate)
-    t = (te >> (sn >> ope >> sn >> te >> s).repeat).named(:relate_r)
+    t = (te >> (sn >> ope >> sn >> te).repeat).named(:relate_r) >> s
 
     # Define what a comma/newline-separated sequence of terms looks like.
     term = decl | t
-    termsl = term >> s >> (char(',') >> sn >> term >> s).repeat
+    termsl = term >> s >> (char(',') >> sn >> term >> s).repeat >> (char(',') >> s).maybe
     terms = (termsl >> sn).repeat
 
     # Define groups that are pipe-partitioned sequences of terms.

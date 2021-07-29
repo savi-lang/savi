@@ -77,6 +77,23 @@ module Savi::Parser::Builder
             when 'n' then result << '\n'
             when 'r' then result << '\r'
             when 't' then result << '\t'
+            when 'x' then
+              byte_value = 0
+              2.times do
+                hex_char = reader.next_char
+                hex_value =
+                  if '0' <= hex_char <= '9'
+                    hex_char - '0'
+                  elsif 'a' <= hex_char <= 'f'
+                    10 + (hex_char - 'a')
+                  elsif 'A' <= hex_char <= 'F'
+                    10 + (hex_char - 'A')
+                  else
+                    raise "invalid escape hex character: #{hex_char}"
+                  end
+                byte_value = 16 * byte_value + hex_value
+              end
+              result.write Bytes[byte_value]
             when 'u' then
               codepoint = 0
               4.times do

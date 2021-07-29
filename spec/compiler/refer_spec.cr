@@ -37,7 +37,7 @@ describe Savi::Compiler::Refer do
     address_of can be applied only to variable:
     from (example):3:
         t = address_of ""
-                        ^
+                       ^~
     MSG
 
     Savi.compiler.compile([source], :refer)
