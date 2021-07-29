@@ -127,22 +127,22 @@ describe Savi::Compiler::Macros do
       - this section is the body to be executed on loop when the condition is true:
         from (example):3:
           while True (42 | 7 | what | now)
-                      ^~~
+                      ^~
 
       - this section is the body to be executed otherwise (the "else" case):
         from (example):3:
           while True (42 | 7 | what | now)
-                          ^~~
+                           ^
 
       - this is an excessive section:
         from (example):3:
           while True (42 | 7 | what | now)
-                              ^~~~~~
+                               ^~~~
 
       - this is an excessive section:
         from (example):3:
           while True (42 | 7 | what | now)
-                                     ^~~~
+                                      ^~~
       MSG
 
       Savi.compiler.compile([source], :macros)

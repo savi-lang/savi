@@ -57,6 +57,7 @@ class Savi::AST::Format < Savi::AST::Visitor
   end
 
   enum Rule
+    NoSpaceInsideBrackets
     NoTrailingCommas
     NoSpaceBeforeComma
     SpaceAfterComma
@@ -74,14 +75,72 @@ class Savi::AST::Format < Savi::AST::Visitor
   getter edits = [] of Edit
 
   def initialize
+    @parent_stack = [] of AST::Node
+  end
+
+  def parent
+    @parent_stack.last
   end
 
   def violates(rule, pos, replacement = "")
     @edits << Edit.new(rule, pos, replacement)
   end
 
-  def visit(ctx, group : AST::Group)
-    return if group.style == " " # no analysis for whitespace-style groups
+  def visit_pre(ctx, node : AST::Node)
+    @parent_stack << node
+  end
+
+  def visit(ctx, node : AST::Node)
+    @parent_stack.pop
+    observe(ctx, node)
+  end
+
+  def observe(ctx, group : AST::Group)
+    observe_group_brackets(ctx, group)
+    observe_group_commas(ctx, group)
+  end
+
+  def observe_group_brackets(ctx, group : AST::Group)
+    case group.style
+    when " ", ":" then
+      # No bracket analysis for these kinds of groups
+      return
+    when "("
+      # No bracket analysis for pipe-separated inner groups.
+      parent = parent()
+      return if parent.is_a?(AST::Group) && parent.style == "|"
+    end
+
+    # Check for unwanted space inside the opening bracket.
+    first_term_pos = group.terms.first?.try(&.pos)
+    if (
+      group.pos.single_line? ||
+      (
+        first_term_pos &&
+        group.pos.contains_on_first_line?(first_term_pos) &&
+        !first_term_pos.content.match(/\A\s*\n/)
+      )
+    ) && (
+      pos = group.pos.content_match_as_pos(/\A[\[({](\s+)/, 1)
+    )
+      violates Rule::NoSpaceInsideBrackets, pos
+    end
+
+    # Check for unwanted space inside the closing bracket.
+    last_term_pos = group.terms.last?.try(&.pos)
+    if (
+      last_term_pos &&
+      group.pos.contains_on_last_line?(last_term_pos) &&
+      !last_term_pos.content.match(/\n\s*\z/)
+    ) && (
+      pos = group.pos.content_match_as_pos(/(\s+)[\])}]\z/, 1)
+    )
+      violates Rule::NoSpaceInsideBrackets, pos
+    end
+  end
+
+  def observe_group_commas(ctx, group : AST::Group)
+    return if group.style == " " # no comma analysis for whitespace-style groups
 
     group.terms.each_with_index { |term, index|
       term_pos = term.span_pos
@@ -109,6 +168,6 @@ class Savi::AST::Format < Savi::AST::Visitor
   end
 
   # For all other nodes, we analyze nothing.
-  def visit(ctx, node)
+  def observe(ctx, node)
   end
 end

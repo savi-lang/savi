@@ -19,7 +19,7 @@
   :new (env)
     counter = Counter.new
 
-    Count.to(1000) -> ( number |
+    Count.to(1000) -> (number |
       if (@multiple_of_three_or_five(number)) (counter.increment(number))
     )
 

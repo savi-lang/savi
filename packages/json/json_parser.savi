@@ -193,7 +193,7 @@
       keep_going = True
       while keep_going (
         @_eat!('"'), @_rewind
-        @_parse_string!(True) -> (token | )
+        @_parse_string!(True) -> (token | None)
         @_skip_whitespace
         @_eat!(':')
 

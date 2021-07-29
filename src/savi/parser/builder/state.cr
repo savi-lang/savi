@@ -8,7 +8,7 @@ module Savi::Parser::Builder
       @row = 0
       @line_start = 0
       @line_finish =
-        ((@source.content.index("\n") || @source.content.bytesize) - 1).as(Int32)
+        (@source.content.byte_index('\n') || @source.content.bytesize).as(Int32)
     end
 
     private def content
@@ -17,14 +17,14 @@ module Savi::Parser::Builder
 
     private def next_line
       @row += 1
-      @line_start = @line_finish + 2
-      @line_finish = (content.index("\n", @line_start) || content.bytesize) - 1
+      @line_start = @line_finish + 1
+      @line_finish = (content.byte_index('\n', @line_start) || content.bytesize)
     end
 
     private def prev_line
       @row -= 1
-      @line_finish = @line_start - 2
-      @line_start = (content.rindex("\n", @line_finish) || -1) + 1
+      @line_finish = @line_start - 1
+      @line_start = (content.byte_rindex('\n', @line_finish) || -1) + 1
     end
 
     def pos(token : Pegmatite::Token) : Source::Pos
@@ -33,7 +33,7 @@ module Savi::Parser::Builder
       while start < @line_start
         prev_line
       end
-      while start > @line_finish + 1
+      while start > @line_finish
         next_line
       end
       if start < @line_start

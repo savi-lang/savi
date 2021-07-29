@@ -219,8 +219,24 @@ module Savi::Parser::Builder
       partitions << main[2] - 1
       positions = partitions.each_slice(2).to_a
       top_terms = terms_lists.zip(positions).map do |terms, pos|
-        pos = {:group, pos[0], pos[1]}
-        AST::Group.new(style, terms).with_pos(state.pos(pos)).as(AST::Node)
+        pos = state.pos({:group, pos[0], pos[1]})
+
+        # If the partition has any terms, use the span of its terms as its pos.
+        if terms.any?
+          first_pos = terms.first.pos
+          last_pos = terms.last.pos
+          pos = Source::Pos.new(
+            pos.source,
+            first_pos.start,
+            last_pos.finish,
+            first_pos.line_start,
+            first_pos.line_finish,
+            first_pos.row,
+            first_pos.col,
+          )
+        end
+
+        AST::Group.new(style, terms).with_pos(pos).as(AST::Node)
       end
       AST::Group.new("|", top_terms).with_pos(state.pos(main))
     end

@@ -42,13 +42,13 @@ compiler-spec.all: PHONY
 format-check: PHONY
 	docker exec -i savi-dev make format-check.inner
 format-check.inner: PHONY /tmp/bin/savi
-	echo && /tmp/bin/savi format --check
+	echo && /tmp/bin/savi format --check --backtrace
 
 # Fix formatting of *.savi source files.
 format: PHONY
 	docker exec -i savi-dev make format.inner
 format.inner: PHONY /tmp/bin/savi
-	echo && /tmp/bin/savi format
+	echo && /tmp/bin/savi format --backtrace
 
 # Evaluate a Hello World example.
 example-eval: PHONY

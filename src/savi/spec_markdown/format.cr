@@ -23,11 +23,11 @@ class Savi::SpecMarkdown::Format
           puts example.generated_comments_code
           puts
           puts "Expected formatting by rule #{format_rule} to produce:"
-          puts expected.bytesize
+          puts
           puts expected
           puts
           puts "but actually was:"
-          puts actual.bytesize
+          puts
           puts actual
           puts
         end

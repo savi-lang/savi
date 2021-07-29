@@ -71,22 +71,22 @@ describe Savi::Compiler::Macros do
       - this section is the body to attempt to execute fully:
         from (example):3:
           try (error! | True | what | now)
-               ^~~~~~~
+               ^~~~~~
 
       - this section is the body to be executed if the previous errored (the "else" case):
         from (example):3:
           try (error! | True | what | now)
-                       ^~~~~~
+                        ^~~~
 
       - this is an excessive section:
         from (example):3:
           try (error! | True | what | now)
-                              ^~~~~~
+                               ^~~~
 
       - this is an excessive section:
         from (example):3:
           try (error! | True | what | now)
-                                     ^~~~
+                                      ^~~
       MSG
 
       Savi.compiler.compile([source], :macros)

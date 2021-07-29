@@ -43,7 +43,7 @@ This function call doesn't meet subtyping requirements:
 
 - it has a yield block:
     Numbers.will_not_yield -> (i| i)
-                                 ^~
+                                  ^
 
 - but 'Numbers.will_not_yield' has no yields:
   :fun will_not_yield: None

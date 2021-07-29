@@ -50,11 +50,11 @@ struct Savi::Source::Pos
     while current_row < row
       current_row += 1
       line_start =
-        source.content.byte_index("\n", line_start).try(&.+(1)) \
+        source.content.byte_index('\n', line_start).try(&.+(1)) \
         || source.content.bytesize
     end
 
-    line_finish = source.content.byte_index("\n", line_start) || source.content.bytesize
+    line_finish = source.content.byte_index('\n', line_start) || source.content.bytesize
     start = line_start + col
 
     new(source, start, start, line_start, line_finish, row, col)
@@ -64,12 +64,12 @@ struct Savi::Source::Pos
     offset = source.content.bytesize - 1 if offset >= source.content.bytesize
 
     line_start = 0
-    line_finish = source.content.byte_index("\n") || source.content.bytesize
+    line_finish = source.content.byte_index('\n') || source.content.bytesize
     row = 0
 
     while line_finish < offset
       line_start = line_finish + 1
-      line_finish = source.content.byte_index("\n", line_start) || source.content.bytesize
+      line_finish = source.content.byte_index('\n', line_start) || source.content.bytesize
       row += 1
     end
 
@@ -87,7 +87,7 @@ struct Savi::Source::Pos
       new_row += 1
       new_line_start = index + 1
     end
-    new_line_finish = (source.content.byte_index("\n", new_line_start) || source.content.bytesize) - 1
+    new_line_finish = (source.content.byte_index('\n', new_line_start) || source.content.bytesize) - 1
     new_col = new_start - new_line_start
 
     new(
@@ -109,22 +109,38 @@ struct Savi::Source::Pos
   NONE = new(Source.none, 0, 0, 0, 0, 0, 0)
   def self.none; NONE end
 
-  def contains?(other : Source::Pos)
+  def size
+    finish - start
+  end
+
+  def single_line?
+    finish <= line_finish
+  end
+
+  def contains?(other : Source::Pos?)
+    return false unless other
     source == other.source &&
     start <= other.start &&
     finish >= other.finish
   end
 
-  def precedes_on_same_line?(other : Source::Pos)
-    source == other.source &&
-    (
-      source.content.byte_index("\n", finish) ==
-      source.content.byte_index("\n", other.start)
-    )
+  def contains_on_first_line?(other : Source::Pos?)
+    return false unless other && contains?(other)
+    other.start <= line_finish
   end
 
-  def size
-    finish - start
+  def contains_on_last_line?(other : Source::Pos?)
+    return false unless other && contains?(other)
+    source.content.byte_rindex('\n', finish) == source.content.byte_rindex('\n', other.finish)
+  end
+
+  def precedes_on_same_line?(other : Source::Pos?)
+    return false unless other
+    source == other.source &&
+    (
+      source.content.byte_index('\n', finish) ==
+      source.content.byte_index('\n', other.start)
+    )
   end
 
   def subset(trim_left, trim_right)
@@ -144,7 +160,7 @@ struct Savi::Source::Pos
       new_row += 1
       new_line_start = @line_start + index
     end
-    new_line_finish = (source.content.byte_index("\n", new_line_start) || source.content.bytesize) - 1
+    new_line_finish = (source.content.byte_index('\n', new_line_start) || source.content.bytesize)
     new_col = new_start - new_line_start
 
     self.class.new(
@@ -177,7 +193,7 @@ struct Savi::Source::Pos
         new_row += 1
         new_line_start = @line_start + index
       end
-      new_line_finish = (source.content.byte_index("\n", new_line_start) || source.content.bytesize) - 1
+      new_line_finish = (source.content.byte_index('\n', new_line_start) || source.content.bytesize)
       new_col = new_start - new_line_start
 
       self.class.new(
@@ -197,6 +213,17 @@ struct Savi::Source::Pos
     source.content.byte_slice(start, finish - start)
   end
 
+  def content_match_as_pos(pattern, match_index = 0)
+    match = pattern.match_at_byte_index(content, 0)
+    return unless match
+
+    Pos.index_range(
+      source,
+      start + match.byte_begin(match_index),
+      start + match.byte_end(match_index)
+    )
+  end
+
   def post_match_as_pos(pattern, match_index = 0)
     match = pattern.match_at_byte_index(source.content, finish)
     return unless match
@@ -214,7 +241,7 @@ struct Savi::Source::Pos
     twiddle_width -= 1
 
     tail = ""
-    max_width = [0, line_finish - line_start - col].max
+    max_width = [0, line_finish - line_start - col - 1].max
     if twiddle_width > max_width
       twiddle_width = max_width
       tail = "···"
@@ -222,7 +249,7 @@ struct Savi::Source::Pos
 
     [
       "from #{source.path}:#{row + 1}:",
-      source.content.byte_slice(line_start, line_finish - line_start + 1),
+      source.content.byte_slice(line_start, line_finish - line_start),
       (" " * col) + "^" + ("~" * twiddle_width) + tail,
     ].join("\n")
   end
