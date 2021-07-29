@@ -44,6 +44,12 @@ format-check: PHONY
 format-check.inner: PHONY /tmp/bin/savi
 	echo && /tmp/bin/savi format --check
 
+# Fix formatting of *.savi source files.
+format: PHONY
+	docker exec -i savi-dev make format.inner
+format.inner: PHONY /tmp/bin/savi
+	echo && /tmp/bin/savi format
+
 # Evaluate a Hello World example.
 example-eval: PHONY
 	docker exec -ti savi-dev make extra_args="$(extra_args)" example-eval.inner

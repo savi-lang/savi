@@ -198,7 +198,16 @@ module Savi
           sources.each { |source| AST::Format.check(ctx, Parser.parse(source)) }
           puts "Checked #{sources.size} files."
         else
-          raise NotImplementedError.new("format without --check")
+          edited_count = sources.count { |source|
+            edits = AST::Format.run(ctx, Parser.parse(source))
+            next if edits.empty?
+
+            puts "Fixing #{source.path}"
+            edited = AST::Format.apply_edits(source.entire_pos, edits)[0].source
+            File.write(source.path, edited.content)
+            true # indicating that the file was edited
+          }
+          puts "Fixed #{edited_count} of #{sources.size} files."
         end
 
         ctx.errors.any? ? finish_with_errors(ctx, backtrace) : 0

@@ -12,6 +12,10 @@ struct Savi::Source
     File.join(@dirname, @filename)
   end
 
+  def entire_pos
+    Source::Pos.index_range(self, 0, content.bytesize)
+  end
+
   NONE = new("", "(none)", "", Library::NONE)
   def self.none; NONE end
 
