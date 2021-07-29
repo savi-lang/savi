@@ -10,6 +10,7 @@ ready: PHONY Dockerfile
 
 # Run the full CI suite.
 ci: PHONY
+	make format-check
 	make compiler-spec.all
 	make test extra_args="$(extra_args)"
 	make example-run dir="examples/adventofcode/2018" extra_args="--backtrace"
@@ -36,6 +37,12 @@ compiler-spec.inner: PHONY /tmp/bin/savi
 	echo && /tmp/bin/savi compilerspec "$(target)" $(extra_args)
 compiler-spec.all: PHONY
 	find "spec/compiler" -name '*.savi.spec.md' | xargs -I '{}' sh -c 'make compiler-spec target="{}" extra_args="'$(extra_args)'" || exit 255'
+
+# Check formatting of *.savi source files.
+format-check: PHONY
+	docker exec -i savi-dev make format-check.inner
+format-check.inner: PHONY /tmp/bin/savi
+	echo && /tmp/bin/savi format --check
 
 # Evaluate a Hello World example.
 example-eval: PHONY

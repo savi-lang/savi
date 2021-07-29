@@ -116,6 +116,16 @@ module Savi
           Cli.compilerspec args.target, options
         end
       end
+      sub "format" do
+        desc "Format savi files in the current directory and all subdirectories"
+        usage "savi format [options]"
+        help short: "-h"
+        option "-c", "--check", desc: "Check for formatting issues without overwriting files", type: Bool, default: false
+        option "-b", "--backtrace", desc: "Show backtrace on error", type: Bool, default: false
+        run do |opts, args|
+          Cli.format(check_only: opts.check, backtrace: opts.backtrace)
+        end
+      end
     end
 
     def self._add_backtrace(backtrace = false)
@@ -163,8 +173,35 @@ module Savi
     def self.compilerspec(target, options)
       _add_backtrace true do
         spec = Savi::SpecMarkdown.new(target)
-        ctx = Savi.compiler.compile(spec.sources, spec.target_pass, options)
-        spec.verify!(ctx) ? 0 : 1
+        result =
+          case spec.target_pass
+          when :format
+            Savi::SpecMarkdown::Format.new(spec).verify!
+          else
+            ctx = Savi.compiler.compile(spec.sources, spec.target_pass, options)
+            spec.verify!(ctx)
+          end
+
+        result ? 0 : 1
+      end
+    end
+
+    def self.format(
+      check_only : Bool,
+      backtrace : Bool
+    )
+      _add_backtrace backtrace do
+        ctx = Compiler::Context.new
+        sources = Compiler.get_recursive_sources(Dir.current)
+
+        if check_only
+          sources.each { |source| AST::Format.check(ctx, Parser.parse(source)) }
+          puts "Checked #{sources.size} files."
+        else
+          raise NotImplementedError.new("format without --check")
+        end
+
+        ctx.errors.any? ? finish_with_errors(ctx, backtrace) : 0
       end
     end
 

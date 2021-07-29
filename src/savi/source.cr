@@ -32,12 +32,12 @@ end
 
 struct Savi::Source::Pos
   property source : Source
-  property start : Int32       # the character offset of the start of this token
-  property finish : Int32      # the character offset of the end of this token
-  property row : Int32         # the zero-based vertical position in the text
-  property col : Int32         # the zero-based horizontal position in the text
-  property line_start : Int32  # the character offset of the start of this line
-  property line_finish : Int32 # the character offset of the end of this line
+  property start : Int32       # the byte offset of the start of this token
+  property finish : Int32      # the byte offset of the end of this token
+  property row : Int32         # the zero-based vertical position of the start
+  property col : Int32         # the zero-based horizontal position of the start
+  property line_start : Int32  # the byte offset of the start of the first line
+  property line_finish : Int32 # the byte offset of the end of the first line
 
   def self.point(source : Source, row : Int32, col : Int32)
     current_row = 0
@@ -46,11 +46,11 @@ struct Savi::Source::Pos
     while current_row < row
       current_row += 1
       line_start =
-        source.content.index("\n", line_start).try(&.+(1)) \
+        source.content.byte_index("\n", line_start).try(&.+(1)) \
         || source.content.bytesize
     end
 
-    line_finish = source.content.index("\n", line_start) || source.content.bytesize
+    line_finish = source.content.byte_index("\n", line_start) || source.content.bytesize
     start = line_start + col
 
     new(source, start, start, line_start, line_finish, row, col)
@@ -60,12 +60,12 @@ struct Savi::Source::Pos
     offset = source.content.bytesize - 1 if offset >= source.content.bytesize
 
     line_start = 0
-    line_finish = source.content.index("\n") || source.content.bytesize
+    line_finish = source.content.byte_index("\n") || source.content.bytesize
     row = 0
 
     while line_finish < offset
       line_start = line_finish + 1
-      line_finish = source.content.index("\n", line_start) || source.content.bytesize
+      line_finish = source.content.byte_index("\n", line_start) || source.content.bytesize
       row += 1
     end
 
@@ -81,9 +81,9 @@ struct Savi::Source::Pos
     source.content.byte_slice(0, new_start).each_char.each_with_index do |char, index|
       next unless char == '\n'
       new_row += 1
-      new_line_start = index
+      new_line_start = index + 1
     end
-    new_line_finish = (source.content.index("\n", new_line_start) || source.content.bytesize) - 1
+    new_line_finish = (source.content.byte_index("\n", new_line_start) || source.content.bytesize) - 1
     new_col = new_start - new_line_start
 
     new(
@@ -111,6 +111,14 @@ struct Savi::Source::Pos
     finish >= other.finish
   end
 
+  def precedes_on_same_line?(other : Source::Pos)
+    source == other.source &&
+    (
+      source.content.byte_index("\n", finish) ==
+      source.content.byte_index("\n", other.start)
+    )
+  end
+
   def size
     finish - start
   end
@@ -132,7 +140,7 @@ struct Savi::Source::Pos
       new_row += 1
       new_line_start = @line_start + index
     end
-    new_line_finish = (source.content.index("\n", new_line_start) || source.content.bytesize) - 1
+    new_line_finish = (source.content.byte_index("\n", new_line_start) || source.content.bytesize) - 1
     new_col = new_start - new_line_start
 
     self.class.new(
@@ -165,7 +173,7 @@ struct Savi::Source::Pos
         new_row += 1
         new_line_start = @line_start + index
       end
-      new_line_finish = (source.content.index("\n", new_line_start) || source.content.bytesize) - 1
+      new_line_finish = (source.content.byte_index("\n", new_line_start) || source.content.bytesize) - 1
       new_col = new_start - new_line_start
 
       self.class.new(
@@ -183,6 +191,17 @@ struct Savi::Source::Pos
 
   def content
     source.content.byte_slice(start, finish - start)
+  end
+
+  def post_match_as_pos(pattern, match_index = 0)
+    match = pattern.match_at_byte_index(source.content, finish)
+    return unless match
+
+    Pos.index_range(
+      source,
+      match.byte_begin(match_index),
+      match.byte_end(match_index)
+    )
   end
 
   def show

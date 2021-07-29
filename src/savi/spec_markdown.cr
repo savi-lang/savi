@@ -68,6 +68,8 @@ class Savi::SpecMarkdown
             example.code_blocks << content
           when "error"
             example.expected_errors << content
+          when /^savi format.([\w<>=]+)$/
+            example.expected_format_results << {$~[1], content}
           when /^types.type_variables_list (\w+)\.([\w<>=]+)$/
             example.expected_type_variables_lists << {$~[1], $~[2], content}
           else
@@ -83,9 +85,15 @@ class Savi::SpecMarkdown
     .not_nil!
   end
 
-  def get_example_pos(example : Example)
-    start = compiled_content.index(example.generated_code).not_nil!
-    finish = start + example.generated_code.size
+  def self.get_example_pos(source : Source, example : Example)
+    start = source.content.byte_index(example.generated_code).not_nil!
+    finish = start + example.generated_code.bytesize
+    Source::Pos.index_range(source, start, finish)
+  end
+
+  def self.get_code_pos(source : Source, code_block : String)
+    start = source.content.byte_index(code_block).not_nil!
+    finish = start + code_block.bytesize
     Source::Pos.index_range(source, start, finish)
   end
 
@@ -93,6 +101,7 @@ class Savi::SpecMarkdown
     property comments = [] of String
     property code_blocks = [] of String
     property expected_errors = [] of String
+    property expected_format_results = [] of {String, String}
     property expected_type_variables_lists = [] of {String, String, String}
 
     def incomplete?
@@ -140,7 +149,7 @@ class Savi::SpecMarkdown
     errors = [] of {Example, Error}
 
     examples.compact_map { |example|
-      example_pos = get_example_pos(example)
+      example_pos = SpecMarkdown.get_example_pos(source, example)
 
       library.types.each { |type|
         next true unless example_pos.contains?(type.ident.pos)

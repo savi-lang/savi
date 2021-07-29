@@ -24,6 +24,7 @@ class Savi::Compiler
 
   def self.pass_symbol(pass)
     case pass
+    when "format"           then :format # (not a true compiler pass)
     when "import"           then :import
     when "namespace"        then :namespace
     when "reparse"          then :reparse
@@ -199,6 +200,22 @@ class Savi::Compiler
 
     Error.at Source::Pos.show_library_path(library),
       "No '.savi' source files found in this directory" \
+        if sources.empty?
+
+    sources
+  end
+
+  def self.get_recursive_sources(root_dirname, language = :savi)
+    sources = Dir.glob("#{root_dirname}/**/*.#{language.to_s}").map { |path|
+      name = File.basename(path)
+      dirname = File.dirname(path)
+      library = Source::Library.new(dirname)
+      content = File.read(File.join(dirname, name))
+      Source.new(dirname, name, content, library, language)
+    } rescue [] of Source
+
+    Error.at Source::Pos.show_library_path(Source::Library.new(root_dirname)),
+      "No '.#{language.to_s}' source files found recursively within this root" \
         if sources.empty?
 
     sources
