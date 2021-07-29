@@ -143,8 +143,8 @@ class Savi::AST::Format < Savi::AST::Visitor
     return if group.style == " " # no comma analysis for whitespace-style groups
 
     group.terms.each_with_index { |term, index|
-      term_pos = term.span_pos
-      next_term_pos = group.terms[index + 1]?.try(&.span_pos)
+      term_pos = term.pos
+      next_term_pos = group.terms[index + 1]?.try(&.pos)
 
       next_term_same_line =
         next_term_pos && term_pos.precedes_on_same_line?(next_term_pos)
