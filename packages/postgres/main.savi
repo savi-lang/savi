@@ -4,34 +4,7 @@
 
 :actor Main
   :new (env)
-    PostgresConnection.new(env, "127.0.0.1", "username", "database")
-
-:primitive MessageEncoder
-  :fun startup_message(user String'val, database String'val, protocol_version = U32[3].bit_shl(16)) Bytes'iso
-    msg = Bytes.new_iso
-    msg.push_native_u32(0) // message length placeholder
-    msg.push_native_u32(protocol_version.native_to_be)
-    msg << b"user"
-    msg.push(0)
-    msg << user.as_bytes
-    msg.push(0)
-    msg << b"database"
-    msg.push(0)
-    msg << database.as_bytes
-    msg.push(0)
-    msg.push(0)
-    try msg.write_native_u32!(0, msg.size.u32.native_to_be)
-    --msg
-
-  :fun query_message(query String'val) Bytes'iso
-    msg = Bytes.new_iso
-    msg.push('Q')
-    msg.push_native_u32(0) // message length placeholder
-    msg << query.as_bytes
-    msg.push(0)
-    try msg.write_native_u32!(1, (msg.size - 1).u32.native_to_be)
-    --msg
-
+    try PostgresConnection.new(env, "127.0.0.1", env.args[1]!, env.args[2]!)
 
 :actor PostgresConnection
   :is IOActor(IOAction)
@@ -65,7 +38,7 @@
     | IOActionRead |
       @io.pending_reads -> (bytes_available |
         try (
-          while (@_process_message!) ()
+          while @_process_message! ()
         |
           @env.err.print("FAILED")
           @io.close
@@ -83,7 +56,7 @@
   :: Returns False if it needs more data to process the next message.
   :fun ref _process_message! Bool
     // expect cursor and mark position to be the same 
-    if (@io.read_stream.token_byte_size > 0) (error!)
+    if (@io.read_stream.token_byte_size > 0) error!
 
     // XXX: We don't need this
     // Ensure that cursor and mark position are the same
@@ -206,7 +179,7 @@
 
   :fun ref _next_cstring! String
       bytes = Bytes.new_iso
-      while (True) (
+      while True (
         byte = @_next_byte!
         break if (byte == 0)
         bytes.push(byte)
