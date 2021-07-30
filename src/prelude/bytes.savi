@@ -320,7 +320,7 @@
       if (byte == split_byte) (
         yield @val_from_cpointer(
           @_ptr._offset(start)
-          (finish - start)
+          finish - start
           @_space - start
         )
         finish = finish + 1
@@ -331,7 +331,7 @@
     )
     yield @val_from_cpointer(
       @_ptr._offset(start)
-      (finish - start)
+      finish - start
       @_space - start
     )
     @

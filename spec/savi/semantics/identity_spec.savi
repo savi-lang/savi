@@ -3,27 +3,27 @@
 :primitive IdentitySpec
   :fun run(test MicroTest)
     test["identity_digest_of string literal =="].pass =
-      (identity_digest_of "example") ==
-      (identity_digest_of "example")
+      identity_digest_of "example" ==
+      identity_digest_of "example"
     test["identity_digest_of string literal !="].pass =
-      (identity_digest_of "example") !=
-      (identity_digest_of "differs")
+      identity_digest_of "example" !=
+      identity_digest_of "differs"
 
     class_instance_a = Container(String).new("example")
     class_instance_b = Container(String).new("example")
     test["identity_digest_of class !="].pass =
-      (identity_digest_of class_instance_a) !=
-      (identity_digest_of class_instance_b)
+      identity_digest_of class_instance_a !=
+      identity_digest_of class_instance_b
     test["identity_digest_of class =="].pass =
-      (identity_digest_of class_instance_a) ==
-      (identity_digest_of class_instance_a)
+      identity_digest_of class_instance_a ==
+      identity_digest_of class_instance_a
 
     struct_instance_a = ContainerStruct(String).new("example")
     struct_instance_b = ContainerStruct(String).new("example")
     struct_instance_c = ContainerStruct(String).new("differs")
     test["identity_digest_of struct =="].pass =
-      (identity_digest_of struct_instance_a) ==
-      (identity_digest_of struct_instance_b)
+      identity_digest_of struct_instance_a ==
+      identity_digest_of struct_instance_b
     test["identity_digest_of struct !="].pass =
-      (identity_digest_of struct_instance_a) !=
-      (identity_digest_of struct_instance_c)
+      identity_digest_of struct_instance_a !=
+      identity_digest_of struct_instance_c

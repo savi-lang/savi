@@ -290,7 +290,7 @@
     stream << Bytes.from_array([0xCD])
     stream << Bytes.from_array([0xEF, 0x01])
 
-    try (stream.advance!(7)) // drop "garbage"
+    try stream.advance!(7) // drop "garbage"
     stream.mark_here
     stream.advance_to_end
 

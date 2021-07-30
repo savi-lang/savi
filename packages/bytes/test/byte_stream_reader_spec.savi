@@ -327,7 +327,7 @@
     write_stream = TestByteStreamSource.new(stream)
     write_stream << b"garbage"
     write_stream << Bytes.from_array([0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF, 0x01])
-    try (stream.advance!(7)) // drop "garbage"
+    try stream.advance!(7) // drop "garbage"
     stream.mark_here
     stream.advance_to_end
 

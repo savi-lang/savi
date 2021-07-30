@@ -45,7 +45,7 @@
     @env.err.write(example)
 
   :fun ref example_ended(spec String, example String, skip Bool)
-    if (skip) (@env.err.print(" SKIP") | @env.err.print(" OK"))
+    if skip (@env.err.print(" SKIP") | @env.err.print(" OK"))
 
   :fun ref event(spec String, example String, event SpecEventAssert)
     if event.success (

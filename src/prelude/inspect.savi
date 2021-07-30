@@ -40,7 +40,7 @@
         u64 = u64 / 10
       )
       digits.reverse_each -> (digit | output.push_byte(digit), None) // TODO: None should not be needed here
-      if (digits.size == 0) (output.push_byte('0'))
+      if (digits.size == 0) output.push_byte('0')
       --output
     | I8'box    | @into(--output, input.i64) // TODO: unify into one integer clause?
     | I16'box   | @into(--output, input.i64) // TODO: unify into one integer clause?

@@ -16,7 +16,7 @@
   :: A summary of successes and failures will be printed to `env.out`.
   :: If there are one or more failures, `env.exit_code` will be set accordingly.
   :fun val run(specs Specs) None // TODO: fun box instead of fun val
-    type ReflectionOfType(A) = (reflection_of_type @_new_spec(specs))
+    type ReflectionOfType(A) = reflection_of_type @_new_spec(specs)
     features = type.features.select -> (feature |
       feature.tags.includes("it")
     )

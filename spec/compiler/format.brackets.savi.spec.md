@@ -40,3 +40,71 @@ Spaces should not be used just inside single-line bracket constructs.
       None
     )
 ```
+
+---
+
+Terms of a normal group should not be wrapped in unnecessary parens.
+
+```savi
+    (((@field)))
+    (@field, @other_field)
+    (@cond || @other_cond)
+    (cond = @cond, cond)
+    (size = 1)
+    (yield "value")
+    (((yield "value")))
+
+```
+```savi format.NoUnnecessaryParens
+    @field
+    @field, @other_field
+    @cond || @other_cond
+    cond = @cond, cond
+    size = 1
+    yield "value"
+    yield "value"
+```
+
+---
+
+Whitespace-grouped macros should not have unnecessary parens around their terms.
+
+```savi
+    if (@cond) (error!)
+
+    if (@cond) (
+      error!
+    ) // these multi-line parens are acceptable for readability
+
+    if (@size == 0) (yield False) // these are necessary in a whitespace group
+    if (((@size == 0))) (((yield False)))
+```
+```savi format.NoUnnecessaryParens
+    if @cond error!
+
+    if @cond (
+      error!
+    ) // these multi-line parens are acceptable for readability
+
+    if (@size == 0) (yield False) // these are necessary in a whitespace group
+    if (@size == 0) (yield False)
+```
+
+---
+
+Relation terms should not have unnecessary parens, except to disambiguate.
+
+```savi
+    x = (((y)))
+    x = (((y > 0)))
+    x = ((((((y))) > 0)))
+    x = (((y + 1) * 2) + 3)
+    x = (if (y > 0) (y + 1))
+```
+```savi format.NoUnnecessaryParens
+    x = y
+    x = (y > 0)
+    x = (y > 0)
+    x = (((y + 1) * 2) + 3)
+    x = if (y > 0) (y + 1)
+```

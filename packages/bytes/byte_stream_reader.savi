@@ -123,7 +123,7 @@
   :: That is, the bytes between the marker and the cursor.
   :fun each_token_byte None
     :yields U8 for None
-    @each_token_byte_until -> (byte | (yield byte), False)
+    @each_token_byte_until -> (byte | yield byte, False)
     None
 
   :: Yield each byte in the currently marked token until the block returns True.

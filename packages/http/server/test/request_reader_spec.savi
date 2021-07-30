@@ -163,7 +163,7 @@
       )
     )
 
-    if (finished_too_soon) (
+    if finished_too_soon (
       // If we finished too soon, there was either an error to show,
       // or the parser failed to consume all of the chunks before finishing.
       case saw_error == (

@@ -57,6 +57,7 @@ class Savi::AST::Format < Savi::AST::Visitor
   end
 
   enum Rule
+    NoUnnecessaryParens
     NoSpaceInsideBrackets
     NoTrailingCommas
     NoSpaceBeforeComma
@@ -98,6 +99,7 @@ class Savi::AST::Format < Savi::AST::Visitor
   def observe(ctx, group : AST::Group)
     observe_group_brackets(ctx, group)
     observe_group_commas(ctx, group)
+    observe_group_term_parens(ctx, group)
   end
 
   def observe_group_brackets(ctx, group : AST::Group)
@@ -164,6 +166,82 @@ class Savi::AST::Format < Savi::AST::Visitor
           violates Rule::NoTrailingCommas, pos
         end
       end
+    }
+  end
+
+  # Check for unnecessary parens within the terms of a Group.
+  def observe_group_term_parens(ctx, group : AST::Group)
+    return if group.style == "|" # don't look at pipe-separated groups groupings
+
+    group.terms.each { |term|
+      # Only consider a term that is a parens group.
+      next unless term.is_a?(AST::Group) && term.style == "("
+
+      if group.style == " "
+        # Parens for readability are acceptable when they are multi-line.
+        next unless term.pos.single_line?
+
+        # Parens are necessary when there is more than one term inside.
+        next unless term.terms.size == 1
+        term_term = term.terms.first
+
+        # Dig through nested parens if present.
+        while term_term.is_a?(AST::Group) \
+          && term_term.style == "(" \
+          && term_term.terms.size == 1
+          term_term = term_term.terms.first
+        end
+
+        # Parens are necessary to delineate one whitespace-group from another.
+        next if term_term.is_a?(AST::Group) && term_term.style == " "
+
+        # Parens are necessary to delineate a relate inside a whitespace-group.
+        next if term_term.is_a?(AST::Relate)
+      end
+
+      # If we get to this point, the parens are considered unnecessary.
+      pos = term.pos
+      violates Rule::NoUnnecessaryParens, pos.subset(0, pos.size - 1)
+      violates Rule::NoUnnecessaryParens, pos.subset(pos.size - 1, 0)
+    }
+  end
+
+  def observe(ctx, relate : AST::Relate)
+    observe_relate_term_parens(ctx, relate)
+  end
+
+  # Check for unnecessary parens within the terms of a Relate.
+  def observe_relate_term_parens(ctx, relate : AST::Relate)
+    return if relate.op.value == "." # don't look at dot-relations
+
+    [relate.lhs, relate.rhs].each { |term|
+      # Only consider a term that is a parens group.
+      next unless term.is_a?(AST::Group) && term.style == "("
+
+      # Parens for readability are acceptable when they are multi-line.
+      next unless term.pos.single_line?
+
+      # Parens are necessary when there is more than one term inside.
+      next unless term.terms.size == 1
+      term_term = term.terms.first
+
+      # Dig through nested parens if present.
+      while term_term.is_a?(AST::Group) \
+        && term_term.style == "(" \
+        && term_term.terms.size == 1
+        term_term = term_term.terms.first
+      end
+
+      # Parens for disambiguating precedence of another relate are acceptable.
+      next if term_term.is_a?(AST::Relate)
+
+      # Parens for disambiguating precedence of a qualify are acceptable.
+      next if term_term.is_a?(AST::Qualify)
+
+      # If we get to this point, the parens are considered unnecessary.
+      pos = term.pos
+      violates Rule::NoUnnecessaryParens, pos.subset(0, pos.size - 1)
+      violates Rule::NoUnnecessaryParens, pos.subset(pos.size - 1, 0)
     }
   end
 

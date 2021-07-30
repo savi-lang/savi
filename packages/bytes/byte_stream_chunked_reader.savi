@@ -110,7 +110,7 @@
   :: That is, the bytes between the marker and the cursor.
   :fun each_token_byte None
     :yields U8 for None
-    @each_token_byte_until -> (byte | (yield byte), False)
+    @each_token_byte_until -> (byte | yield byte, False)
     None
 
   :: Yield each byte in the currently marked token until the block returns True.
@@ -290,7 +290,7 @@
 
       // If the caller requested too many bytes, then we also raise an error
       // to indicate that more advancement is still needed to reach the goal.
-      if (too_many_n) error!
+      if too_many_n error!
     |
       // Iterate through each chunk, keeping track of how much of the
       // goal number of bytes remain to be consumed in the advancement.
