@@ -219,7 +219,7 @@ module Savi::Parser::Builder
       partitions << main[2] - 1
       positions = partitions.each_slice(2).to_a
       top_terms = terms_lists.zip(positions).map do |terms, pos|
-        pos = state.pos({:group, pos[0], pos[1]})
+        pos = state.pos({:group, pos[0], pos[0]})
 
         # If the partition has any terms, use the span of its terms as its pos.
         if terms.any?

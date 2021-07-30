@@ -27,7 +27,7 @@ class Savi::AST::Format < Savi::AST::Visitor
     # Gather the chunks to reconstruct the edited source.
     edits.group_by(&.pos.start).to_a.sort_by(&.first).each { |start, edits_group|
       edits_group.uniq.sort_by(&.pos.size).each { |edit|
-        next unless within.contains?(edit.pos)
+        next unless within.contains?(edit.pos) && start >= cursor
         used_edits << edit
 
         prior_content = source.content.byte_slice(cursor, start - cursor)
@@ -59,6 +59,7 @@ class Savi::AST::Format < Savi::AST::Visitor
   enum Rule
     NoUnnecessaryParens
     NoSpaceInsideBrackets
+    SpaceAroundPipeSeparator
     NoTrailingCommas
     NoSpaceBeforeComma
     SpaceAfterComma
@@ -115,11 +116,12 @@ class Savi::AST::Format < Savi::AST::Visitor
     end
 
     # Check for unwanted space inside the opening bracket.
-    first_term_pos = group.terms.first?.try(&.pos)
+    first_term = group.terms.first?
+    first_term_pos = first_term.try(&.pos)
     if (
       group.pos.single_line? ||
       (
-        first_term_pos &&
+        first_term_pos && first_term_pos.size > 0 &&
         group.pos.contains_on_first_line?(first_term_pos) &&
         !first_term_pos.content.match(/\A\s*\n/)
       )
@@ -130,15 +132,37 @@ class Savi::AST::Format < Savi::AST::Visitor
     end
 
     # Check for unwanted space inside the closing bracket.
-    last_term_pos = group.terms.last?.try(&.pos)
+    last_term = group.terms.last?
+    last_term_pos = last_term.try(&.pos)
     if (
-      last_term_pos &&
+      last_term_pos && last_term_pos.size > 0 &&
       group.pos.contains_on_last_line?(last_term_pos) &&
       !last_term_pos.content.match(/\n\s*\z/)
     ) && (
       pos = group.pos.content_match_as_pos(/(\s+)[\])}]\z/, 1)
     )
       violates Rule::NoSpaceInsideBrackets, pos
+    end
+
+    # Check for wanted space around the pipe separators.
+    if group.style == "|"
+      group.terms.each_with_index { |term, index|
+        next if term.is_a?(AST::Group) && term.terms.empty?
+
+        # Check for wanted space after a pipe separator.
+        if index > 0 && (
+          pos = term.pos.pre_match_as_pos(/\|()\z/, 1)
+        )
+          violates Rule::SpaceAroundPipeSeparator, pos, " "
+        end
+
+        # Check for wanted space before a pipe separator.
+        if index < group.terms.size - 1 && (
+          pos = term.pos.post_match_as_pos(/\G()\|/, 1)
+        )
+          violates Rule::SpaceAroundPipeSeparator, pos, " "
+        end
+      }
     end
   end
 

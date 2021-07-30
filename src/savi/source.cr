@@ -82,12 +82,12 @@ struct Savi::Source::Pos
     # TODO: dedup with similar logic in span and subset
     new_row = 0
     new_line_start = 0
-    source.content.byte_slice(0, new_start).each_char.each_with_index do |char, index|
-      next unless char == '\n'
+    source.content.byte_slice(0, new_start).each_byte.each_with_index do |char, index|
+      next unless char.chr == '\n'
       new_row += 1
       new_line_start = index + 1
     end
-    new_line_finish = (source.content.byte_index('\n', new_line_start) || source.content.bytesize) - 1
+    new_line_finish = (source.content.byte_index('\n', new_line_start) || source.content.bytesize)
     new_col = new_start - new_line_start
 
     new(
@@ -155,8 +155,8 @@ struct Savi::Source::Pos
     new_row = @row
     new_line_start = @line_start
 
-    content.byte_slice(0, trim_left).each_char.each_with_index do |char, index|
-      next unless char == '\n'
+    content.byte_slice(0, trim_left).each_byte.each_with_index do |char, index|
+      next unless char.chr == '\n'
       new_row += 1
       new_line_start = @line_start + index
     end
@@ -188,8 +188,8 @@ struct Savi::Source::Pos
       # TODO: dedup with similar logic in subset
       new_row = @row
       new_line_start = @line_start
-      source.content[0...new_start].each_char.each_with_index do |char, index|
-        next unless char == '\n'
+      source.content[0...new_start].each_byte.each_with_index do |char, index|
+        next unless char.chr == '\n'
         new_row += 1
         new_line_start = @line_start + index
       end
@@ -221,6 +221,17 @@ struct Savi::Source::Pos
       source,
       start + match.byte_begin(match_index),
       start + match.byte_end(match_index)
+    )
+  end
+
+  def pre_match_as_pos(pattern, match_index = 0)
+    match = pattern.match_at_byte_index(source.content.byte_slice(0, start), 0)
+    return unless match
+
+    Pos.index_range(
+      source,
+      match.byte_begin(match_index),
+      match.byte_end(match_index)
     )
   end
 

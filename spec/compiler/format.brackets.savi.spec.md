@@ -21,6 +21,8 @@ Spaces should not be used just inside single-line bracket constructs.
     |
       None
     )
+    case ( // the whitespace before this comment will not go away
+    | @value > 0 | True | False )
 ```
 ```savi format.NoSpaceInsideBrackets
     empty = []
@@ -39,6 +41,31 @@ Spaces should not be used just inside single-line bracket constructs.
     |
       None
     )
+    case ( // the whitespace before this comment will not go away
+    | @value > 0 | True | False)
+```
+
+---
+
+Spaces should be used around pipe separators.
+
+```savi
+    case (@value > 0|True|False)
+    case (@value > 0    |    True    |    False)
+    case (
+    |@value > 0|True
+    |False
+    )
+    case (|||)
+```
+```savi format.SpaceAroundPipeSeparator
+    case (@value > 0 | True | False)
+    case (@value > 0    |    True    |    False)
+    case (
+    | @value > 0 | True
+    | False
+    )
+    case (|||)
 ```
 
 ---
