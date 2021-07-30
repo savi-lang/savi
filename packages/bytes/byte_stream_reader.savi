@@ -62,16 +62,18 @@
   :: allowing buffers to be garbage collected even in the middle of a stream.
   ::
   :: If at the end of a stream it is more efficient to call clear instead.
-  // TODO: Implement the compact function
-  // :fun ref compact
-  //   // ...
-  //   @
+  :fun ref compact
+    garbage = @_data.chop_left(@_mark_offset)
+    @_offset -= @_mark_offset
+    @_mark_offset = 0
+    @
 
   :: Receive some bytes from the given source, extending the end of the stream.
   :: Returns the number of bytes that were received, as reported by the source.
   :: Raises an error if the source has become permanently closed off.
   :fun ref receive_from!(source ByteStreamSource)
-    if (@_data.space == 0) @_data.reserve(0x4000) // TODO: customizable reserve?
+    @compact
+    @_data.reserve(0x4000) // TODO: customizable reserve?
     source.emit_bytes_into!(@_data, @_data.size)
 
   :: Move the mark position to match the current cursor position.
