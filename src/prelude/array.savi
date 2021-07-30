@@ -224,7 +224,7 @@
   :: issue as obvious as possible while not penalizing proper usage.
 
   :fun ref sort_in_place
-    if @_sort_in_place(0, @size.isize - 1) (@ | @.clear)
+    if @_sort_in_place(0, @size.isize - 1) (@ | @clear)
 
   :fun ref _sort_in_place(lo_pivot ISize, hi_pivot ISize) Bool // TODO: should be actually private
     if (A <: Comparable(A)'read) (

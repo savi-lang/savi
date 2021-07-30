@@ -62,6 +62,7 @@ class Savi::AST::Format < Savi::AST::Visitor
     NoTrailingCommas
     NoSpaceBeforeComma
     SpaceAfterComma
+    NoExplicitSelfDot
   end
 
   struct Edit
@@ -207,7 +208,20 @@ class Savi::AST::Format < Savi::AST::Visitor
   end
 
   def observe(ctx, relate : AST::Relate)
+    observe_relate_dot(ctx, relate)
     observe_relate_term_parens(ctx, relate)
+  end
+
+  def observe_relate_dot(ctx, relate : AST::Relate)
+    return if relate.op.value != "." # only look at dot-relations
+    lhs = relate.lhs
+    rhs = relate.rhs
+
+    # Check for unwanted explicit "self dot".
+    if lhs.is_a?(AST::Identifier) && lhs.value == "@"
+      violates Rule::NoExplicitSelfDot,
+        Source::Pos.index_range(lhs.pos.source, lhs.pos.finish, rhs.pos.start)
+    end
   end
 
   # Check for unnecessary parens within the terms of a Relate.
