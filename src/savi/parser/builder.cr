@@ -15,7 +15,7 @@ module Savi::Parser::Builder
 
   private def self.build_doc(main, iter, state)
     assert_kind(main, :doc)
-    doc = AST::Document.new
+    doc = AST::Document.new.with_pos(state.source.entire_pos)
     decl : AST::Declare? = nil
     annotations = [] of AST::Annotation
 

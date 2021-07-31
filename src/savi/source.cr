@@ -143,6 +143,21 @@ struct Savi::Source::Pos
     )
   end
 
+  def starts_on_same_line?(other : Source::Pos?)
+    return false unless other
+    source == other.source &&
+    line_start == other.line_start
+  end
+
+  def finishes_on_same_line?(other : Source::Pos?)
+    return false unless other
+    source == other.source &&
+    (
+      source.content.byte_rindex('\n', finish) ==
+      source.content.byte_rindex('\n', other.finish)
+    )
+  end
+
   def subset(trim_left, trim_right)
     raise ArgumentError.new \
       "can't trim this much (#{trim_left}, #{trim_right}) of this:\n#{show}" \
@@ -213,6 +228,10 @@ struct Savi::Source::Pos
     source.content.byte_slice(start, finish - start)
   end
 
+  def next_byte?
+    source.content.byte_at?(finish).try(&.chr)
+  end
+
   def content_match_as_pos(pattern, match_index = 0)
     match = pattern.match_at_byte_index(content, 0)
     return unless match
@@ -244,6 +263,86 @@ struct Savi::Source::Pos
       match.byte_begin(match_index),
       match.byte_end(match_index)
     )
+  end
+
+  def get_indent
+    match = /\G(( +)(?=[^\s])|[ \t]+)/.match_at_byte_index(source.content, line_start)
+
+    includes_tab = false
+    new_finish = line_start
+    if match
+      if match.byte_end(2) >= 0
+        new_finish = match.byte_end(2)
+      else
+        new_finish = match.byte_end(0)
+        includes_tab = true
+      end
+    end
+
+    indent_pos = Pos.new(
+      @source, @line_start, new_finish,
+      @line_start, @line_finish,
+      @row, 0,
+    )
+    {indent_pos, includes_tab}
+  end
+
+  def get_prior_row_indent
+    new_line_finish = @line_start - 1
+    new_line_start = source.content.byte_rindex('\n', new_line_finish)
+    return {nil, false} unless new_line_start
+
+    new_line_start += 1
+    match = /\G(( +)(?=[^\s])|[ \t]+)/.match_at_byte_index(source.content, new_line_start)
+
+    includes_tab = false
+    new_finish = new_line_start
+    if match
+      if match.byte_end(2) >= 0
+        new_finish = match.byte_end(2)
+      else
+        new_finish = match.byte_end(0)
+        includes_tab = true
+      end
+    end
+
+    indent_pos = Pos.new(
+      @source, new_line_start, new_finish,
+      new_line_start, new_line_finish,
+      @row - 1, 0,
+    )
+    {indent_pos, includes_tab}
+  end
+
+  def get_finish_row_indent
+    new_row = @row
+    new_line_start = @line_start
+    new_line_finish = @line_finish
+    while new_line_finish < @finish
+      new_row += 1
+      new_line_start = new_line_finish + 1
+      new_line_finish = source.content.byte_index('\n', new_line_start) || source.content.bytesize
+    end
+
+    match = /\G(( +)(?=[^\s])|[ \t]+)/.match_at_byte_index(source.content, new_line_start)
+
+    includes_tab = false
+    new_finish = new_line_start
+    if match
+      if match.byte_end(2) >= 0
+        new_finish = match.byte_end(2)
+      else
+        new_finish = match.byte_end(0)
+        includes_tab = true
+      end
+    end
+
+    indent_pos = Pos.new(
+      @source, new_line_start, new_finish,
+      new_line_start, new_line_finish,
+      new_row, 0,
+    )
+    {indent_pos, includes_tab}
   end
 
   def show

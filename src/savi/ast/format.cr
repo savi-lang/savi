@@ -57,6 +57,7 @@ class Savi::AST::Format < Savi::AST::Visitor
   end
 
   enum Rule
+    Indentation
     NoUnnecessaryParens
     NoSpaceInsideBrackets
     SpaceAroundPipeSeparator
@@ -79,10 +80,60 @@ class Savi::AST::Format < Savi::AST::Visitor
 
   def initialize
     @parent_stack = [] of AST::Node
+    @indent_stack = [] of AST::Node
+    @next_indent_row = 0
   end
 
   def parent
     @parent_stack.last
+  end
+
+  def resolve_current_indent_level
+    @indent_stack.size # TODO: remove plus one when decls are handled
+  end
+
+  def maybe_push_indent(node)
+    # A single-line node never adds to the indentation level
+    return if node.pos.single_line?
+
+    # Only certain nodes add to the indentation level.
+    # Here we return early if this is not an indent-adding node.
+    case node
+    when AST::Relate
+      # All relate nodes can potentially add indentation
+    when AST::Group
+      # Whitespace-groups do not add indentation.
+      return if node.style == " "
+
+      # Sections of a pipe-partitioned group do not add indentation.
+      parent = parent()
+      return if node.style == "(" && parent.is_a?(AST::Group) && parent.style == "|"
+    end
+
+    # Indenters that span the same lines do not add additional indent levels.
+    top = @indent_stack.last?
+    return if top && (
+      top.pos.starts_on_same_line?(node.pos) &&
+      top.pos.finishes_on_same_line?(node.pos)
+    )
+
+    @indent_stack << node
+  end
+
+  def maybe_pop_indent(node)
+    # Only pop if this node matches the one on top of the stack.
+    return unless @indent_stack.last? == node
+
+    @indent_stack.pop
+
+    indent_pos, includes_tab = node.pos.get_finish_row_indent
+    orig_indent_pos = indent_pos
+    while indent_pos.row >= @next_indent_row
+      check_indent_here(indent_pos, includes_tab)
+      indent_pos, includes_tab = indent_pos.get_prior_row_indent
+      break unless indent_pos
+    end
+    @next_indent_row = orig_indent_pos.row + 1
   end
 
   def violates(rule, pos, replacement = "")
@@ -90,12 +141,56 @@ class Savi::AST::Format < Savi::AST::Visitor
   end
 
   def visit_pre(ctx, node : AST::Node)
+    check_indent(node)
+    maybe_push_indent(node)
     @parent_stack << node
   end
 
   def visit(ctx, node : AST::Node)
+    maybe_pop_indent(node)
     @parent_stack.pop
     observe(ctx, node)
+  end
+
+  def check_indent(node : AST::Node)
+    # Don't check indentation for source rows we've already checked.
+    # Also update tracking for the next row we intend to indent
+    return unless node.pos.row >= @next_indent_row
+
+    # Check indent for this row and any prior rows that havent' been done yet.
+    indent_pos, includes_tab = node.pos.get_indent
+    while indent_pos.row >= @next_indent_row
+      check_indent_here(indent_pos, includes_tab)
+      indent_pos, includes_tab = indent_pos.get_prior_row_indent
+      break unless indent_pos
+    end
+
+    # The next row we'll check is the one after this node's row.
+    @next_indent_row = node.pos.row + 1
+  end
+
+  def check_indent_here(indent_pos : Source::Pos, includes_tab : Bool)
+    # Determine the expected indent level for this row.
+    expected_level = resolve_current_indent_level
+
+    if expected_level > 0
+      case indent_pos.next_byte?
+      # As a special case, pipe separators are indented at the level of the
+      # parens of the outer group that contains them.
+      when '|'
+        expected_level -= 1
+      # For an empty line that contains only whitespace, use no indentation.
+      when '\n', '\r'
+        expected_level = 0
+      end
+    end
+
+    # If the indentation doesn't match the correct number of spaces
+    # (two times the expected indentation level) or contains tab characters,
+    # it violates the indentation rule for this line.
+    if includes_tab || indent_pos.size != expected_level * 2
+      violates Rule::Indentation, indent_pos, " " * (expected_level * 2)
+    end
   end
 
   def observe(ctx, group : AST::Group)
