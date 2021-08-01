@@ -1,0 +1,92 @@
+:import "collections" (Count)
+
+:primitive DataRowDecoder
+  :fun decode!(body Bytes'val)
+    :yields (Bytes'iso | None) for None
+    rd = _BytesReader.new(body)
+
+    num_columns = rd.next_be_u16!.usize
+
+    Count.to(num_columns) -> (|
+      len = rd.next_be_u32!.usize
+
+      if (len == 0xFFFF_FFFF) (
+        yield None
+      |
+        yield --rd.next_bytes!(len)
+      )
+    )
+
+    rd.expect_at_end!
+
+:class val RowDescription
+  :let name String
+  :let oid I32
+  :let attr_nr I16
+  :let type_oid I32
+  :let typlen I16
+  :let atttypmod I32
+  :let formatcode I16
+  :new val (@name, @oid, @attr_nr, @type_oid, @typlen, @atttypmod, @formatcode)
+
+:primitive RowDescriptionDecoder
+  :fun decode!(body Bytes'val)
+    :yields (RowDescription) for None
+    rd = _BytesReader.new(body)
+
+    num_fields = rd.next_be_u16!.usize
+
+    Count.to(num_fields) -> (|
+      yield RowDescription.new(
+        rd.next_cstring!
+        rd.next_be_u32!.i32
+        rd.next_be_u16!.i16
+        rd.next_be_u32!.i32
+        rd.next_be_u16!.i16
+        rd.next_be_u32!.i32
+        rd.next_be_u16!.i16
+      )
+    )
+
+    rd.expect_at_end!
+
+
+
+:class ref _BytesReader
+  :let _data Bytes'val
+  :var _offset USize: 0
+
+  :new (@_data)
+
+  :fun expect_at_end!
+    error! if (@_offset != @_data.size)
+
+  :fun ref next_byte! U8
+    value = @_data.read_byte!(@_offset)
+    @_offset += 1
+    value
+
+  :fun ref next_be_u16! U16
+    value = @_data.read_be_u16!(@_offset)
+    @_offset += 2
+    value
+
+  :fun ref next_be_u32! U32
+    value = @_data.read_be_u32!(@_offset)
+    @_offset += 4
+    value
+
+  :fun ref next_bytes!(len USize) Bytes'iso
+    value = @_data.read_bytes!(@_offset, len)
+    @_offset += len
+    --value
+
+  :fun ref next_cstring! String
+      bytes = Bytes.new_iso
+      while True (
+        byte = @next_byte!
+        break if (byte == 0)
+        bytes.push(byte)
+      )
+      String.from_bytes(--bytes)
+

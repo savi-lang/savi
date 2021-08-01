@@ -6,6 +6,11 @@
   :new (env)
     try PostgresConnection.new(env, "127.0.0.1", env.args[1]!, env.args[2]!)
 
+:class val Frame
+  :let type U8
+  :let body Bytes'val
+  :new (@type, @body)
+
 :actor PostgresConnection
   :is IOActor(IOAction)
   :let env Env
@@ -51,43 +56,12 @@
     )
     @
 
-  :: Processes a message at the current cursor position.
-  ::
-  :: Returns False if it needs more data to process the next message.
-  :fun ref _process_message! Bool
-    // expect cursor and mark position to be the same 
-    if (@io.read_stream.token_byte_size > 0) error!
+  :fun ref _report_error!(msg String'val)
+    @env.err.print(msg)
+    error!
 
-    // XXX: We don't need this
-    // Ensure that cursor and mark position are the same
-    @io.read_stream.mark_here
-
-    if (@io.read_stream.bytes_ahead < 5) (
-      // Not enough bytes in buffer
-      return False
-    )
-
-    @io.read_stream.advance!(5)
-    message_type = @io.read_stream.read_byte!(0)
-    message_length = @io.read_stream.read_be_u32!(1)
-
-    if (message_length < 4) (
-      @env.err.print("Invalid message length")
-      error!
-    )
-
-    body_length = message_length.usize - 4
-
-    if (@io.read_stream.bytes_ahead < body_length) (
-      @env.err.print("Not enough bytes ahead")
-      @io.read_stream.rewind_to_marker
-      return False
-    )
-
-    @io.read_stream.mark_here
-    @io.read_stream.advance!(body_length)
-
-    case message_type == (
+  :fun ref _handle_frame!(frame Frame)
+    case frame.type == (
     | 'E' | @env.err.print(">ErrorResponse")
     | 'N' | @env.err.print(">NoticeResponse")
     | 'G' | @env.err.print(">CopyInResponse")
@@ -104,39 +78,23 @@
       @env.err.print(">EmptyQueryResponse")
     | 'D' |
       @env.err.print(">DataRow")
-      n_cols = @_next_be_u16!
-      while (n_cols > 0) (
-        len = @_next_be_u32!
-        if (len == 0xFFFF_FFFF) (
-          @env.err.print("NULL")
-        |
-          bytes = @_next_bytes!(len.usize)
-          @env.err.print(Inspect[(--bytes).as_string])
+      try (
+        DataRowDecoder.decode!(frame.body) -> (column |
+          case column <: (
+            | None |
+            @env.err.print("NULL")
+            | Bytes'iso |
+            @env.err.print(Inspect[(--column).as_string])
+          )
         )
-        n_cols -= 1
-      )
-      if (@io.read_stream.token_byte_size > 0) (
-        error!
+      |
+        @env.err.print("Failed to decode DataRow")
       )
 
     | 'T' |
       @env.err.print(">RowDescription")
-      n_fields = @_next_be_u16!
-      while (n_fields > 0) (
-        field_name = @_next_cstring!
-        field_oid = @_next_be_u32!.i32
-        field_attr_nr = @_next_be_u16!.i16
-        field_type_oid = @_next_be_u32!.i32
-        field_typlen = @_next_be_u16!.i16
-        field_atttypmod = @_next_be_u32!.i32
-        field_formatcode = @_next_be_u16!.i16
-
-        @env.err.print(field_name)
-
-        n_fields -= 1
-      )
-      if (@io.read_stream.token_byte_size > 0) (
-        error!
+      RowDescriptionDecoder.decode!(frame.body) -> (row_description |
+        @env.err.print(Inspect[row_description])
       )
 
     | 'C' | @env.err.print(">CommandComplete")
@@ -148,42 +106,56 @@
       @env.err.print("-------------------------------")
       @env.err.print("Unknown message")
       @env.err.print("-------------------------------")
-      bytes = @_next_bytes!(body_length)
-      @env.err.print(Inspect[(--bytes).as_string])
+      @env.err.print(Inspect[(--frame.body).as_string])
       @io.close
     )
 
-    // 
+  :: Processes a message at the current cursor position.
+  ::
+  :: Returns False if it needs more data to process the next message.
+  :fun ref _process_message! Bool
+    frame = @_next_frame!
+    if (frame <: Frame) (
+      @_handle_frame!(frame)
+      True
+    |
+      False
+    )
+
+  :fun ref _next_frame! (Frame | None)
+    // expect cursor and mark position to be the same
+    if (@io.read_stream.token_byte_size > 0) error!
+
+    // XXX: We don't need this
+    // Ensure that cursor and mark position are the same
     @io.read_stream.mark_here
-    True
 
-  :fun ref _next_byte! U8
-      value = @io.read_stream.read_byte!(0)
-      @io.read_stream.advance_mark!(1)
-      value
+    if (@io.read_stream.bytes_ahead < 5) (
+      // Not enough bytes in buffer
+      return None
+    )
 
-  :fun ref _next_be_u16! U16
-      value = @io.read_stream.read_be_u16!(0)
-      @io.read_stream.advance_mark!(2)
-      value
+    @io.read_stream.advance!(5)
+    message_type = @io.read_stream.read_byte!(0)
+    message_length = @io.read_stream.read_be_u32!(1)
 
-  :fun ref _next_be_u32! U32
-      value = @io.read_stream.read_be_u32!(0)
-      @io.read_stream.advance_mark!(4)
-      value
+    if (message_length < 4) (
+      @_report_error!("Invalid frame length. Expected >= 4.")
+    )
 
-  :fun ref _next_bytes!(n USize) Bytes'iso
-      bytes = @io.read_stream.read_bytes!(0, n)
-      @io.read_stream.advance_mark!(n)
-      --bytes
+    body_size = message_length.usize - 4
 
-  :fun ref _next_cstring! String
-      bytes = Bytes.new_iso
-      while True (
-        byte = @_next_byte!
-        break if (byte == 0)
-        bytes.push(byte)
-      )
-      String.from_bytes(--bytes)
+    if (@io.read_stream.bytes_ahead < body_size) (
+      @env.err.print("Not enough bytes ahead")
+      @io.read_stream.rewind_to_marker
+      return None
+    )
 
+    @io.read_stream.mark_here
+    @io.read_stream.advance!(body_size)
+
+    body = --@io.read_stream.read_bytes!(0, body_size)
+    @io.read_stream.mark_here
+
+    --Frame.new(message_type, --body)
 
