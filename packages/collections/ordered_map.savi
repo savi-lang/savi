@@ -153,11 +153,13 @@
   :fun ref delete(key K)
     try (
       index = @_search(key)
-      entry = @_array[index]!.as!(@->(_KVBA(K, V))) // TODO: fix @-> parentheses
-      @_array[index]! = _MapDeleted // TODO: destructive read/pop instead of read then write
+      entry = @_array[index]! <<= _MapDeleted
+
       @_size -= 1
       @_head = if (@_size == 0) (None | @_head.as!(@->(_KVBA(K, V))).before!) // TODO: fix @-> parentheses
-      @_remove_entry_from_place(entry)
+      @_remove_entry_from_place(
+        entry.as!(@->(_KVBA(K, V))) // TODO: fix @-> parentheses
+      )
     )
     None
 
