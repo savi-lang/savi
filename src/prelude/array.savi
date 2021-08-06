@@ -101,6 +101,10 @@
     if (@size <= index) error!
     @_ptr._assign_at(index, --value)
 
+  :fun ref "[]<<=!"(index, value)
+    if (@size <= index) error!
+    @_ptr._displace_at(index, --value)
+
   :fun ref "<<"(value): @push(--value)
   :fun ref push(value)
     @reserve(@_size + 1)

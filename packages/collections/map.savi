@@ -1,9 +1,9 @@
 :module _MapEmpty
 :module _MapDeleted
 
-:class _KV(K, V) // TODO: use a value type or tuple literal instead
-  :var key K
-  :var value V
+:struct _KV(K, V)
+  :let key K
+  :let value V
   :new (@key, @value)
 
 :alias MapIs(K, V): Map(K, V, HashIs(K))
@@ -73,18 +73,15 @@
     value_alias V'aliased = value // TODO: remove the V'aliased explicit type?
     try (
       index = @_search(key)
-      entry = @_array[index]!
+      old_entry = @_array[index]! <<= _KV(K, V).new(--key, --value)
 
-      case entry <: (
-      | _KV(K, V) | entry.value = --value
-      |
-        @_array[index]! = _KV(K, V).new(--key, --value)
+      case old_entry <: (
+      | _MapDeleted |
         @_size += 1
-
-        if (entry <: _MapEmpty) (
-          if (@_size * 4 > @_array.size * 3) (
-            @_resize(@_array.size * 2)
-          )
+      | _MapEmpty |
+        @_size += 1
+        if (@_size * 4 > @_array.size * 3) (
+          @_resize(@_array.size * 2)
         )
       )
     )

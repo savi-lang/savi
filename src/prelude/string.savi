@@ -442,8 +442,7 @@
     )
     --res
 
-// TODO: Convert into `:struct`
-:class val StringPair
+:struct val StringPair
   :let first String'val
   :let second String'val
   :new (@first, @second)
