@@ -162,7 +162,11 @@ class Savi::Compiler::CodeGen
 
       def gen_error_return(g : CodeGen, gfunc : GenFunc, value : LLVM::Value, value_expr : AST::Node?)
         tuple = llvm_func_ret_type(g, gfunc).undef
-        tuple = g.builder.insert_value(tuple, value, 0)
+        # Doing insert_value for slot 0 fails here when the normal return value
+        # is a struct but the error value is not a struct.
+        # Or more broadly, whenever the two do not match in size.
+        # For now we do not implement this; we check for it and fail loudly.
+        raise NotImplementedError.new("error value") unless value == g.gen_none
         tuple = g.builder.insert_value(tuple, g.llvm.int1.const_int(1), 1)
         g.builder.ret(tuple)
       end
