@@ -566,7 +566,7 @@ class Savi::Compiler::CodeGen::PonyRT
     env = gen_alloc(g, g.gtypes["Env"], nil, "env")
     g.builder.call(g.gtypes["Env"]["_create"].llvm_func, [env, argc, argv, envp])
 
-    # TODO: Run primitive initialisers using the main actor's heap.
+    # TODO: Run module initialisers using the main actor's heap.
 
     # Send the env in a message to the main actor's constructor
     g.builder.call(g.gtype_main.default_constructor.send_llvm_func, [main_actor, env])
@@ -593,7 +593,7 @@ class Savi::Compiler::CodeGen::PonyRT
     # On success (or after running the failure block), do the following:
     g.finish_block_and_move_to(post_block)
 
-    # TODO: Run primitive finalizers.
+    # TODO: Run module finalizers.
 
     # Become nothing (stop being the main actor).
     g.builder.call(g.mod.functions["pony_become"], [

@@ -1,6 +1,6 @@
 :import "./pattern"
 
-:primitive _Parser
+:module _Parser
   :fun parse(input String) Pattern
     choice = PatternChoice.new
     pattern Pattern = PatternNone.new

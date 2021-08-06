@@ -5,7 +5,7 @@ pass: type_check
 This type will be used throughout the following examples to demonstrate calling with yield blocks:
 
 ```savi
-:primitive Numbers
+:module Numbers
   :fun will_not_yield: None
 
   :fun yield_99

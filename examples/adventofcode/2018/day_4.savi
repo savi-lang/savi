@@ -52,7 +52,7 @@
 
     @new(guard, event, time)
 
-:primitive Day4
+:module Day4
   :fun sleeps_data_from(env Env, input String)
     // Parse the lines of the input, keeping the current guard id in memory
     // so that we can assign it wherever it was omitted from the journal entry.

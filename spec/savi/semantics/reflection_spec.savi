@@ -1,6 +1,6 @@
 :import "../micro_test" (MicroTest)
 
-:primitive ReflectionSpec
+:module ReflectionSpec
   :fun run(test MicroTest)
     test["reflection_of_type.string String"].pass =
       (reflection_of_type "example").string == "String"

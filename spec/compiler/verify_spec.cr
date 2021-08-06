@@ -1,7 +1,7 @@
 describe Savi::Compiler::Verify do
   it "does not impose checks on the Main actor if it doesn't exist" do
     source = Savi::Source.new_example <<-SOURCE
-    :primitive Example
+    :module Example
     SOURCE
 
     Savi.compiler.compile([source], :verify).errors.should be_empty

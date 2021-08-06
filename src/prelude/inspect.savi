@@ -17,7 +17,7 @@
 
 // TODO: Move this out of prelude maybe? Does that make sense?
 // TODO: Make this into a trait with "implement for"/typeclass style polymorphism
-:primitive Inspect
+:module Inspect
   :fun "[]"(input Any'box) String'val // TODO: use `box` instead of `Any'box`
     @into(String.new_iso, input)
 

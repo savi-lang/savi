@@ -23,7 +23,7 @@ It complains when calling on types without that function:
 :class Barable
   :fun bar: "bar"
 
-:primitive Bazable
+:module Bazable
   :fun baz: "baz"
 ```
 ```savi
@@ -41,7 +41,7 @@ It complains when calling on types without that function:
 //            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 // - Bazable has no 'bar' function:
-// :primitive Bazable
+// :module Bazable
 //            ^~~~~~~
 
 // - maybe you meant to call the 'baz' function:
@@ -62,8 +62,8 @@ The 'bar' function can't be called on this receiver:
            ^~~
 
 - Bazable has no 'bar' function:
-:primitive Bazable
-           ^~~~~~~
+:module Bazable
+        ^~~~~~~
 
 - maybe you meant to call the 'baz' function:
   :fun baz: "baz"
@@ -75,7 +75,7 @@ The 'bar' function can't be called on this receiver:
 It suggests a similarly named function when found:
 
 ```savi
-:primitive SomeHFunctions
+:module SomeHFunctions
   :fun hey
   :fun hell
   :fun hello_world
@@ -89,8 +89,8 @@ The 'hello' function can't be called on this receiver:
                    ^~~~~
 
 - SomeHFunctions has no 'hello' function:
-:primitive SomeHFunctions
-           ^~~~~~~~~~~~~~
+:module SomeHFunctions
+        ^~~~~~~~~~~~~~
 
 - maybe you meant to call the 'hell' function:
   :fun hell
@@ -102,7 +102,7 @@ The 'hello' function can't be called on this receiver:
 It suggests a similarly named function (without '!') when found:
 
 ```savi
-:primitive HelloNotPartial
+:module HelloNotPartial
   :fun hello
 ```
 ```savi
@@ -114,8 +114,8 @@ The 'hello!' function can't be called on this receiver:
                     ^~~~~~
 
 - HelloNotPartial has no 'hello!' function:
-:primitive HelloNotPartial
-           ^~~~~~~~~~~~~~~
+:module HelloNotPartial
+        ^~~~~~~~~~~~~~~
 
 - maybe you meant to call 'hello' (without '!'):
   :fun hello
@@ -127,7 +127,7 @@ The 'hello!' function can't be called on this receiver:
 It suggests a similarly named function (with '!') when found:
 
 ```savi
-:primitive HelloPartial
+:module HelloPartial
   :fun hello!
 ```
 ```savi
@@ -139,8 +139,8 @@ The 'hello' function can't be called on this receiver:
                  ^~~~~
 
 - HelloPartial has no 'hello' function:
-:primitive HelloPartial
-           ^~~~~~~~~~~~
+:module HelloPartial
+        ^~~~~~~~~~~~
 
 - maybe you meant to call 'hello!' (with a '!'):
   :fun hello!

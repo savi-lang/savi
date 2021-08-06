@@ -1,7 +1,7 @@
 describe Savi::Compiler::Eval do
   it "complains if there is no Main actor defined in the root library" do
     content = <<-SOURCE
-    :primitive Example
+    :module Example
     SOURCE
 
     source = Savi::Source.new(

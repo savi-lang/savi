@@ -8,12 +8,12 @@
 
 :: A hashing strategy that hashes based on structural equality of the value,
 :: as implemented by the `hash` and `==` functions of the type.
-:primitive HashEq(Q Hashable(Q)'read)
+:module HashEq(Q Hashable(Q)'read)
   :fun hash(x box->(Q'aliased)) USize: x.hash
   :fun equal(x box->(Q'aliased), y box->(Q'aliased)) Bool: x == y
 
 :: A hashing strategy that hashes only the identity of the value,
 :: considering two values to be equal only if they have the same identity.
-:primitive HashIs(Q)
+:module HashIs(Q)
   :fun hash(x tag->Q) USize: (identity_digest_of x).hash
   :fun equal(x tag->Q, y tag->Q) Bool: x === y

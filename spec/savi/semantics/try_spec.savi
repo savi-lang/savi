@@ -1,11 +1,11 @@
 :import "../micro_test" (MicroTest)
 
-:primitive _Err
+:module _Err
   :fun non not_really!: None
   :fun non now!: @inner!
   :fun non inner!: error!
 
-:primitive TrySpec
+:module TrySpec
   :fun run(test MicroTest)
     zero = U64[0]
 

@@ -1,6 +1,6 @@
 :import "../micro_test" (MicroTest)
 
-:primitive WhileSpec
+:module WhileSpec
   :fun run(test MicroTest)
     zero = U64[0]
 

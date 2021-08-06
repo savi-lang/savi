@@ -228,7 +228,7 @@ describe Savi::Parser do
 
   it "correctly parses a negative integer literal in a single-line decl" do
     source = Savi::Source.new_example <<-SOURCE
-    :primitive Example
+    :module Example
       :const x U64: 1
       :const y U64: -1
     SOURCE
@@ -238,7 +238,7 @@ describe Savi::Parser do
     # Can't use array literals here because Crystal is too slow to compile them.
     ast.to_a.pretty_inspect(74).should eq <<-AST
     [:doc,
-     [:declare, [[:ident, "primitive"], [:ident, "Example"]], [:group, ":"]],
+     [:declare, [[:ident, "module"], [:ident, "Example"]], [:group, ":"]],
      [:declare,
       [[:ident, "const"], [:ident, "x"], [:ident, "U64"]],
       [:group, ":", [:integer, 1]]],
@@ -250,7 +250,7 @@ describe Savi::Parser do
 
   it "returns the same AST when called again with the same source content" do
     content = <<-SOURCE
-    :primitive Example
+    :module Example
       :const greeting String: "Hello, World!"
     SOURCE
 

@@ -2,7 +2,7 @@ describe Savi::Compiler::Macros do
   describe "error!" do
     it "is transformed into a jump" do
       source = Savi::Source.new_example <<-SOURCE
-      :primitive Errors
+      :module Errors
         :fun example!
           error!
       SOURCE
@@ -17,7 +17,7 @@ describe Savi::Compiler::Macros do
 
     it "can be conditional with `if`" do
       source = Savi::Source.new_example <<-SOURCE
-      :primitive Errors
+      :module Errors
         :fun example!(cond)
           error! if cond
       SOURCE
@@ -36,7 +36,7 @@ describe Savi::Compiler::Macros do
 
     it "complains if there are extra terms after the `if` condition" do
       source = Savi::Source.new_example <<-SOURCE
-      :primitive Errors
+      :module Errors
         :fun example!(cond)
           error! if cond what now
       SOURCE
@@ -69,7 +69,7 @@ describe Savi::Compiler::Macros do
 
     it "complains if there is no `if` condition term" do
       source = Savi::Source.new_example <<-SOURCE
-      :primitive Errors
+      :module Errors
         :fun example!(cond)
           error! if
       SOURCE
@@ -92,7 +92,7 @@ describe Savi::Compiler::Macros do
 
     it "can be conditional with `unless`" do
       source = Savi::Source.new_example <<-SOURCE
-      :primitive Errors
+      :module Errors
         :fun example!(cond)
           error! unless cond
       SOURCE
@@ -111,7 +111,7 @@ describe Savi::Compiler::Macros do
 
     it "complains if there are extra terms after the `unless` condition" do
       source = Savi::Source.new_example <<-SOURCE
-      :primitive Errors
+      :module Errors
         :fun example!(cond)
           error! unless cond what now
       SOURCE
@@ -144,7 +144,7 @@ describe Savi::Compiler::Macros do
 
     it "complains if there is no `unless` condition term" do
       source = Savi::Source.new_example <<-SOURCE
-      :primitive Errors
+      :module Errors
         :fun example!(cond)
           error! unless
       SOURCE

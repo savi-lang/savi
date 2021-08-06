@@ -37,7 +37,7 @@
   :member SettingsTypeMaxFrameSize:         0x5
   :member SettingsTypeMaxHeaderListSize:    0x6
 
-:primitive ProtocolLimits
+:module ProtocolLimits
   :const max_stream_id USize:   0x7FFFFFFF
   :const max_window_size USize: 0x7FFFFFFF
   :const max_frame_size USize:  0x00FFFFFF

@@ -1,6 +1,6 @@
 :import "../micro_test" (MicroTest)
 
-:primitive IdentitySpec
+:module IdentitySpec
   :fun run(test MicroTest)
     test["identity_digest_of string literal =="].pass =
       identity_digest_of "example" ==

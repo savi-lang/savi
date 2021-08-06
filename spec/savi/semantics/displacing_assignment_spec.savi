@@ -1,6 +1,6 @@
 :import "../micro_test" (MicroTest)
 
-:primitive DisplacingAssignmentSpec
+:module DisplacingAssignmentSpec
   :fun run(test MicroTest)
     displacable = "original"
     displaced = displacable <<= "new"

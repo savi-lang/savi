@@ -1,7 +1,7 @@
 describe Savi::Compiler::Refer do
   it "returns the same output state when compiled again with same sources" do
     source = Savi::Source.new_example <<-SOURCE
-    :primitive Greeting
+    :module Greeting
       :fun greet(env Env):
         env.out.print("Hello, World")
 
