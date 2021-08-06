@@ -17,6 +17,6 @@ class Savi::Compiler::Eval
     binary_path = "./#{ctx.options.binary_name}"
 
     res = Process.run("/usr/bin/env", [binary_path], output: STDOUT, error: STDERR)
-    @exitcode = res.exit_status
+    @exitcode = res.exit_code
   end
 end

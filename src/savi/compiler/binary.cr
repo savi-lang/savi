@@ -71,11 +71,11 @@ class Savi::Compiler::Binary
     link_args << "-o" << ctx.options.binary_name
 
     res = Process.run("/usr/bin/env", link_args, output: STDOUT, error: STDERR)
-    raise "linker failed" unless res.exit_status == 0
+    raise "linker failed" unless res.exit_code == 0
 
     if ctx.options.release
       res = Process.run("/usr/bin/env", ["strip", ctx.options.binary_name], output: STDOUT, error: STDERR)
-      raise "strip failed" unless res.exit_status == 0
+      raise "strip failed" unless res.exit_code == 0
     end
   ensure
     File.delete(obj_filename) if obj_filename
