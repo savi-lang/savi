@@ -1007,6 +1007,15 @@ class Savi::Compiler::CodeGen::PonyRT
     ])
   end
 
+  def gen_trace_tuple(g : CodeGen, dst, src_type)
+    src_gtype = g.gtype_of(src_type)
+
+    src_gtype.fields.each_with_index { |(name, field_type), index|
+      field = g.builder.extract_value(dst, index)
+      gen_trace(g, field, field, field_type, field_type)
+    }
+  end
+
   def gen_trace_dynamic(g : CodeGen, dst, src_type, dst_type, after_block)
     if src_type.is_union?
       src_type.union_children.each do |child_type|
@@ -1091,7 +1100,7 @@ class Savi::Compiler::CodeGen::PonyRT
       g.builder.br(after_block)
       g.finish_block_and_move_to(after_block)
     when :tuple
-      raise NotImplementedError.new("tuple") # TODO
+      gen_trace_tuple(g, dst, src_type)
     else
       raise NotImplementedError.new(trace_kind)
     end

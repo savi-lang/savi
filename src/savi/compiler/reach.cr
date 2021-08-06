@@ -193,8 +193,18 @@ class Savi::Compiler::Reach < Savi::AST::Visitor
 
     def trace_needed?(ctx, dst_type = self)
       trace_kind = trace_kind(ctx)
-      return false if trace_kind == :machine_word && dst_type.trace_kind(ctx) == :machine_word
-      raise NotImplementedError.new(trace_kind) if trace_kind == :tuple
+
+      if trace_kind == :machine_word \
+      && dst_type.trace_kind(ctx) == :machine_word
+        return false
+      end
+
+      if trace_kind == :tuple \
+      && dst_type.trace_kind(ctx) == :tuple \
+      && single_def!(ctx).fields.all?(&.last.trace_needed?(ctx).==(false))
+        return false
+      end
+
       true
     end
 
@@ -271,7 +281,8 @@ class Savi::Compiler::Reach < Savi::AST::Visitor
       elsif is_tuple?
         raise NotImplementedError.new(self)
       elsif singular?
-        if !single!.defn(ctx).is_concrete?
+        defn = single!.defn(ctx)
+        if !defn.is_concrete?
           case @meta_type.cap_only.inner
           when Infer::MetaType::Capability::NON then :non_unknown
           when Infer::MetaType::Capability::TAG then :tag_unknown
@@ -281,10 +292,12 @@ class Savi::Compiler::Reach < Savi::AST::Visitor
                Infer::MetaType::Capability::BOX then :mut_unknown
           else raise NotImplementedError.new(single!)
           end
-        elsif single!.defn(ctx).has_tag?(:numeric)
+        elsif defn.has_tag?(:numeric)
           :machine_word
-        elsif single!.defn(ctx).has_tag?(:actor)
+        elsif defn.has_tag?(:actor)
           :tag_known
+        elsif !defn.has_tag?(:allocated) && !defn.has_tag?(:singleton)
+          :tuple
         else
           case @meta_type.cap_only.inner
           when Infer::MetaType::Capability::NON then :non_known
