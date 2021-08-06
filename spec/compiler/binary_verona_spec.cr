@@ -1,5 +1,5 @@
 describe Savi::Compiler::BinaryVerona do
-  it "creates a simple binary leveraging the Verona runtime" do
+  pending "creates a simple binary leveraging the Verona runtime" do
     source_dir = File.join(__DIR__, "../../examples/verona")
 
     ctx = Savi.compiler.compile(source_dir, :binary_verona)
