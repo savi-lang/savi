@@ -8,7 +8,7 @@ It analyzes a simple system of types.
 :trait box _Describable
   :fun describe String
 
-:primitive Example1(A _Describable)
+:module Example1(A _Describable)
   :fun example(a A, cond Bool)
     x String = a.describe
     y = if cond ("string" | b"bytes")
@@ -16,8 +16,8 @@ It analyzes a simple system of types.
 ```types.type_variables_list Example1.example
 T'A'^1
   <: (_Describable & box)
-  :primitive Example1(A _Describable)
-                        ^~~~~~~~~~~~
+  :module Example1(A _Describable)
+                     ^~~~~~~~~~~~
 ~~~
 T'return'2
   :> T'y'7'aliased
@@ -136,7 +136,7 @@ T'value'3
 It analyzes an array literal, its elements, and its antecedent.
 
 ```savi
-:primitive ArrayExample
+:module ArrayExample
   :fun example
     a Array(F64)'val = [1, 2.3]
 ```

@@ -2,7 +2,7 @@ describe Savi::Compiler::Macros do
   describe "break" do
     it "is transformed into a jump" do
       source = Savi::Source.new_example <<-SOURCE
-      :primitive Breaks
+      :module Breaks
         :fun example
           while True (
             break
@@ -24,7 +24,7 @@ describe Savi::Compiler::Macros do
 
     it "can have an explicit value" do
       source = Savi::Source.new_example <<-SOURCE
-      :primitive Breaks
+      :module Breaks
         :fun example
           while True (
             break "value"
@@ -47,7 +47,7 @@ describe Savi::Compiler::Macros do
 
     it "can be conditional with `if`" do
       source = Savi::Source.new_example <<-SOURCE
-      :primitive Breaks
+      :module Breaks
         :fun example(cond_1, cond_2)
           while True (
             break if cond_1
@@ -85,7 +85,7 @@ describe Savi::Compiler::Macros do
 
     it "complains if there are extra terms after the `if` condition" do
       source = Savi::Source.new_example <<-SOURCE
-      :primitive Breaks
+      :module Breaks
         :fun example(cond)
           while True (
             break if cond what now
@@ -120,7 +120,7 @@ describe Savi::Compiler::Macros do
 
     it "complains if there are extra terms after the value and `if`" do
       source = Savi::Source.new_example <<-SOURCE
-      :primitive Breaks
+      :module Breaks
         :fun example(cond)
           while True (
             break "value" if cond what now
@@ -160,7 +160,7 @@ describe Savi::Compiler::Macros do
 
     it "complains if there is no `if` condition term" do
       source = Savi::Source.new_example <<-SOURCE
-      :primitive Breaks
+      :module Breaks
         :fun example(cond)
           while True (
             break if
@@ -185,7 +185,7 @@ describe Savi::Compiler::Macros do
 
     it "complains if there is a value but no `if` condition term" do
       source = Savi::Source.new_example <<-SOURCE
-      :primitive Breaks
+      :module Breaks
         :fun example(cond)
           while True (
             break "value" if
@@ -215,7 +215,7 @@ describe Savi::Compiler::Macros do
 
     it "can be conditional with `unless`" do
       source = Savi::Source.new_example <<-SOURCE
-      :primitive Breaks
+      :module Breaks
         :fun example(cond)
           while True (
             break unless cond
@@ -253,7 +253,7 @@ describe Savi::Compiler::Macros do
 
     it "complains if there are extra terms after the `unless` condition" do
       source = Savi::Source.new_example <<-SOURCE
-      :primitive Breaks
+      :module Breaks
         :fun example(cond)
           while True (
             break unless cond what now
@@ -288,7 +288,7 @@ describe Savi::Compiler::Macros do
 
     it "complains if there are extra terms after the value and `unless`" do
       source = Savi::Source.new_example <<-SOURCE
-      :primitive Breaks
+      :module Breaks
         :fun example(cond)
           while True (
             break "value" unless cond what now
@@ -328,7 +328,7 @@ describe Savi::Compiler::Macros do
 
     it "complains if there is no `unless` condition term" do
       source = Savi::Source.new_example <<-SOURCE
-      :primitive Breaks
+      :module Breaks
         :fun example(cond)
           while True (
             break unless
@@ -353,7 +353,7 @@ describe Savi::Compiler::Macros do
 
     it "complains if there is a value but no `unless` condition term" do
       source = Savi::Source.new_example <<-SOURCE
-      :primitive Breaks
+      :module Breaks
         :fun example(cond)
           while True (
             break "value" unless

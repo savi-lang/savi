@@ -148,22 +148,22 @@ It can supply a default type argument based on one of the other ones:
 :trait non ToStringFunction(A)
   :fun non to_string(a A) String
 
-:primitive ToStringDefault(A)
+:module ToStringDefault(A)
   :fun non to_string(a A): "(unknown)"
 
-:primitive GenericWithDefault(A share, B share, S ToStringFunction(A) = ToStringDefault(A))
-:primitive GenericWithBadDefault(A share, B share, S ToStringFunction(A) = None)
+:module GenericWithDefault(A share, B share, S ToStringFunction(A) = ToStringDefault(A))
+:module GenericWithBadDefault(A share, B share, S ToStringFunction(A) = None)
 ```
 ```error
 This type argument won't satisfy the type parameter bound:
-:primitive GenericWithBadDefault(A share, B share, S ToStringFunction(A) = None)
-                                                                           ^~~~
+:module GenericWithBadDefault(A share, B share, S ToStringFunction(A) = None)
+                                                                        ^~~~
 
 - the type parameter bound is ToStringFunction(U64):
-:primitive GenericWithBadDefault(A share, B share, S ToStringFunction(A) = None)
-                                                     ^~~~~~~~~~~~~~~~~~~
+:module GenericWithBadDefault(A share, B share, S ToStringFunction(A) = None)
+                                                  ^~~~~~~~~~~~~~~~~~~
 
 - the type argument is None:
-:primitive GenericWithBadDefault(A share, B share, S ToStringFunction(A) = None)
-                                                                           ^~~~
+:module GenericWithBadDefault(A share, B share, S ToStringFunction(A) = None)
+                                                                        ^~~~
 ```

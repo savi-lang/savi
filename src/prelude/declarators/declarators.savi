@@ -102,7 +102,7 @@
   :term name_and_params NameMaybeWithParams
 
 // TODO: Document this.
-:declarator primitive
+:declarator module
   :intrinsic
   :begins type
   :begins type_singleton

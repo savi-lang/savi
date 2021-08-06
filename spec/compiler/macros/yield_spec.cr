@@ -2,7 +2,7 @@ describe Savi::Compiler::Macros do
   describe "yield" do
     it "is transformed into a yield" do
       source = Savi::Source.new_example <<-SOURCE
-      :primitive Yields
+      :module Yields
         :fun example
           yield "value"
       SOURCE
@@ -20,7 +20,7 @@ describe Savi::Compiler::Macros do
 
     it "complains if there are more terms after the value" do
       source = Savi::Source.new_example <<-SOURCE
-      :primitive Yields
+      :module Yields
         :fun example
           yield "value" what now
       SOURCE
@@ -53,7 +53,7 @@ describe Savi::Compiler::Macros do
 
     it "can be conditional with `if`" do
       source = Savi::Source.new_example <<-SOURCE
-      :primitive Yields
+      :module Yields
         :fun example(cond)
           yield "value" if cond
       SOURCE
@@ -72,7 +72,7 @@ describe Savi::Compiler::Macros do
 
     it "complains if there are extra terms after the value and `if`" do
       source = Savi::Source.new_example <<-SOURCE
-      :primitive Yields
+      :module Yields
         :fun example(cond)
           yield "value" if cond what now
       SOURCE
@@ -110,7 +110,7 @@ describe Savi::Compiler::Macros do
 
     it "complains if there is no `if` condition term" do
       source = Savi::Source.new_example <<-SOURCE
-      :primitive Yields
+      :module Yields
         :fun example(cond)
           yield "value" if
       SOURCE

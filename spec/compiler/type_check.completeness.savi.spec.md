@@ -14,7 +14,7 @@ It complains when access to the self is shared while still incomplete:
   :var y U64
   :var z U64
 
-:primitive AccessWhileIncomplete
+:module AccessWhileIncomplete
   :fun data(any Any'box)
     any
 ```
@@ -51,11 +51,11 @@ It allows opaque sharing of the self while still incomplete and non-opaque shari
   :var y U64
   :var z U64
 
-:primitive AccessAfterComplete
+:module AccessAfterComplete
   :fun data(any Any'box)
     any
 
-:primitive TouchWhileIncomplete
+:module TouchWhileIncomplete
   :fun data(any Any'tag)
     any
 ```

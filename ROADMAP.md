@@ -1,7 +1,7 @@
 ### Features from Pony (and other basic language features)
 
 - [x] - FFI function calling
-- [x] - Stateless, non-allocated primitives with pure functions
+- [x] - Stateless, non-allocated modules with pure functions
 - [x] - Numeric machine word types
 - [x] - Stateful, allocated classes with constructors and methods
 - [x] - Properties (fields hidden behind getters/setters)

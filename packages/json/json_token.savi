@@ -15,17 +15,17 @@
   | JsonTokenArrayEnd
   )
 
-:primitive JsonTokenNull
-:primitive JsonTokenTrue
-:primitive JsonTokenFalse
-:primitive JsonTokenNumberPre
-:primitive JsonTokenNumber
-:primitive JsonTokenStringPre
-:primitive JsonTokenString
-:primitive JsonTokenKeyPre
-:primitive JsonTokenKey
-:primitive JsonTokenPairPost
-:primitive JsonTokenObjectStart
-:primitive JsonTokenObjectEnd
-:primitive JsonTokenArrayStart
-:primitive JsonTokenArrayEnd
+:module JsonTokenNull
+:module JsonTokenTrue
+:module JsonTokenFalse
+:module JsonTokenNumberPre
+:module JsonTokenNumber
+:module JsonTokenStringPre
+:module JsonTokenString
+:module JsonTokenKeyPre
+:module JsonTokenKey
+:module JsonTokenPairPost
+:module JsonTokenObjectStart
+:module JsonTokenObjectEnd
+:module JsonTokenArrayStart
+:module JsonTokenArrayEnd

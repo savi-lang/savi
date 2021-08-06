@@ -22,10 +22,10 @@
 // TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
 // OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-:: This primitive can be used collaboratively with the caller to decode UTF-8.
+:: This module can be used collaboratively with the caller to decode UTF-8.
 ::
 :: It uses a DFA (deterministic finite automaton) state machine, with the
-:: caller maintaining state on the calling side, so that the primitive itself
+:: caller maintaining state on the calling side, so that the module itself
 :: can be stateless, avoiding the need for it to be allocated.
 ::
 :: The general-purpose usage looks like this:
@@ -45,7 +45,7 @@
 ::
 :: See http://bjoern.hoehrmann.de/utf-8/decoder/dfa/ for details on the DFA.
 ::
-:primitive UTF8Decoding // TODO: make this private or rename the file
+:module UTF8Decoding // TODO: make this private or rename the file
   // See http://bjoern.hoehrmann.de/utf-8/decoder/dfa/ for details.
   :const _type_table_data Array(U8)'val: [
     0,   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 // 00..0f

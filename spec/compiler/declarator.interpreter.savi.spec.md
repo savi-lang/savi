@@ -37,7 +37,7 @@ There is no declarator named `inpork` known within this file scope:
 It complains when the declarator is not in the right context.
 
 ```savi
-:primitive Example
+:module Example
   :yields String for U64
 ```
 ```error
@@ -75,7 +75,7 @@ This declaration didn't match any known declarator:
 It complains when the declaration's terms are not accepted by the declarators.
 
 ```savi
-:primitive Example
+:module Example
   :fun call(message String) U64
     :yields "bogus"
 ```

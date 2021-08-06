@@ -752,7 +752,7 @@ module Savi::AST
   # the result of evaluating the `else_body` Term; otherwise, the result
   # of the final execution of the `body` Term will be used as the result value.
   # In simple cases, the `repeat_cond` is the same as the `initial_cond` and
-  # the `else_body` just returns a simple value of the `None` primitive.
+  # the `else_body` just returns a simple value of the `None` module.
   #
   # This is an internal AST type which has no corresponding source code syntax,
   # because such a construct is only created inside macro expansions.

@@ -1,6 +1,6 @@
 :import "spec"
 
-:primitive ArbitraryTestPrimitive
+:module ArbitraryTestModule
 
 :class InspectSpec
   :is Spec
@@ -45,9 +45,9 @@
   :it "inspects the number zero"
     @assert = Inspect[U8[0]] == "0"
 
-  :it "inspects a primitive with its type name"
+  :it "inspects a module with its type name"
     @assert = Inspect[None] == "None"
-    @assert = Inspect[ArbitraryTestPrimitive] == "ArbitraryTestPrimitive"
+    @assert = Inspect[ArbitraryTestModule] == "ArbitraryTestModule"
 
   :it "inspects strings"
     @assert = Inspect["example"] == "\"example\""

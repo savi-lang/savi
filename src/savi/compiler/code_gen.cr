@@ -2895,7 +2895,7 @@ class Savi::Compiler::CodeGen
     type_name_string_opaque =
       @builder.bit_cast(gen_string(mutator_gtype.type_def.llvm_name), @ptr)
 
-    # Generate a type descriptor, so this can masquerade as a real primitive.
+    # Generate a type descriptor, so this can masquerade as a real module.
     raise NotImplementedError.new("gen_reflection_mutator_of_type in Verona") \
       if @runtime.is_a?(VeronaRT)
     desc = gen_global_for_const(mutator_gtype.desc_type.const_struct [
@@ -3488,7 +3488,7 @@ class Savi::Compiler::CodeGen
   # This defines the global singleton stateless value associated with this type.
   # This value is invoked whenever you reference the type with as a `non`,
   # acting as a runtime representation of a type itself rather than an instance.
-  # For primitives, this is the only value you'll ever see.
+  # For modules, this is the only value you'll ever see.
   def gen_singleton(gtype)
     global = @mod.globals.add(gtype.struct_type, gtype.type_def.llvm_name)
     global.linkage = LLVM::Linkage::LinkerPrivate

@@ -1,7 +1,7 @@
 :trait tag AsioEventNotify
   :be _event_notify(event CPointer(AsioEvent), flags U32, arg U32)
 
-:primitive AsioEvent
+:module AsioEvent
   :fun none: CPointer(AsioEvent).null
 
   :const dispose            U32: 0

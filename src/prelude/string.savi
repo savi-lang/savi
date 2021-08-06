@@ -450,7 +450,7 @@
 
 :: Encode the code point into UTF-8. It returns a tuple with the size of the
 :: encoded data and then the data.
-:primitive _UTF8Encoder
+:module _UTF8Encoder
   :fun encode(value U32)
     :yields (USize, U8, U8, U8, U8)
     case value < (

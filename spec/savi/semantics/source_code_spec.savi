@@ -1,6 +1,6 @@
 :import "../micro_test" (MicroTest)
 
-:primitive SourceCodeSpec
+:module SourceCodeSpec
   :fun run(test MicroTest)
     zero = U64[0]
 

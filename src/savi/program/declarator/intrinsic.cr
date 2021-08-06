@@ -52,7 +52,7 @@ module Savi::Program::Intrinsic
           declare.body.not_nil!.terms.first,
         )
       when "actor", "class", "struct", "trait",
-           "numeric", "enum", "primitive", "ffi"
+           "numeric", "enum", "module", "ffi"
         name, params =
           AST::Extract.name_and_params(terms["name_and_params"].not_nil!)
 
@@ -89,7 +89,7 @@ module Savi::Program::Intrinsic
           type.add_tag(:simple_value)
           type.add_tag(:numeric)
           type.add_tag(:enum)
-        when "primitive"
+        when "module"
           type.add_tag(:singleton)
           type.add_tag(:ignores_cap)
         when "ffi"
@@ -420,7 +420,7 @@ module Savi::Program::Intrinsic
     when "fun", "be", "new"
       scope.current_type.functions << scope.current_function
       scope.current_function = nil
-    when "actor", "class", "struct", "primitive"
+    when "actor", "class", "struct", "module"
       scope.current_library.types << scope.current_type
       scope.current_type = nil
     when "numeric"

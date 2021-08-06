@@ -1,4 +1,4 @@
-:primitive Platform
+:module Platform
   :const ilp32 Bool: compiler intrinsic
   :const lp64 Bool: compiler intrinsic
   :const llp64 Bool: False // TODO: this is 65-but windows, instead of lp64

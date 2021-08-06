@@ -1,6 +1,6 @@
 :import "../micro_test" (MicroTest)
 
-:primitive Yielding
+:module Yielding
   :fun call(count_remaining U64, array Array(String)) U64
   :yields U64 for String
     while (count_remaining > 0) (
@@ -10,7 +10,7 @@
     array << "."
     count_remaining
 
-:primitive YieldingCallSpec
+:module YieldingCallSpec
   :fun run(test MicroTest)
     array Array(String) = []
     total U64 = 0

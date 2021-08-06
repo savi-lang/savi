@@ -120,7 +120,7 @@ It requires a sub-func to have the same number of params:
   :fun example2(a U64, b U64, c U64) None
   :fun example3(a U64, b U64, c U64) None
 
-:primitive ConcreteNot3Params
+:module ConcreteNot3Params
   :is Trait3Params
   :fun example1 None
   :fun example2(a U64, b U64) None
@@ -227,7 +227,7 @@ It requires a sub-func to have covariant return and contravariant params:
   :fun example3(a U64, b U64, c U64) None
   :fun example4(a Numeric, b Numeric, c Numeric) None
 
-:primitive ConcreteParamsReturn
+:module ConcreteParamsReturn
   :is TraitParamsReturn
   :fun example1 U64: 0
   :fun example2 Numeric: U64[0]
@@ -272,7 +272,7 @@ It won't show assignment errors if (even erroneously) asserted as a subtype:
 :trait non TraitExampleNone
   :fun example None
 
-:primitive ConcreteWithoutExampleNone
+:module ConcreteWithoutExampleNone
   :is TraitExampleNone
 ```
 ```savi

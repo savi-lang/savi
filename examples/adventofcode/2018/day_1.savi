@@ -1,7 +1,7 @@
 :import "spec"
 :import "collections"
 
-:primitive Day1
+:module Day1
   :fun a(env Env, input String)
     total I64 = 0
     input.each_split('\n') -> (line |

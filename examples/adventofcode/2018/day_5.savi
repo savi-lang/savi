@@ -73,7 +73,7 @@
     )
     @
 
-:primitive Day5
+:module Day5
   :fun a(input)
     Day5Polymer.new(input).reduce.size
 

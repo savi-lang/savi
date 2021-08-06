@@ -22,7 +22,7 @@
       dimensions[1]!             .parse_i64!.usize
     )
 
-:primitive Day3
+:module Day3
   :fun input_to_claims(env Env, input String)
     claims Array(Day3Claim) = [] // TODO: use split.map or map_split instead?
     input.each_split('\n') -> (line |

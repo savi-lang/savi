@@ -1,5 +1,5 @@
-:primitive _MapEmpty
-:primitive _MapDeleted
+:module _MapEmpty
+:module _MapDeleted
 
 :class _KV(K, V) // TODO: use a value type or tuple literal instead
   :var key K

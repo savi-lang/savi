@@ -17,7 +17,7 @@
   :fun pony_os_recv!(event CPointer(AsioEvent), buffer CPointer(U8), count USize) USize
   :fun pony_os_errno OSError
 
-:primitive _PonyOs
+:module _PonyOs
   :fun level_socket  I32: LibPonyOs.pony_os_sockopt_level(4138)
   :fun option_error  I32: LibPonyOs.pony_os_sockopt_option(827)
 

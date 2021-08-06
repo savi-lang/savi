@@ -46,14 +46,13 @@ Unlike in Pony, the documentation comments for a type of function appear *above*
 
 ```savi
 :: This comment is stored as documentation for the Example type.
-:primitive Example
+:module Example
   :: This comment is stored as documentation for the greeting function.
   :: Note that documentation comments can span multiple lines this way,
   :: and by convention they often include code examples like this:
   ::
   :: $ Example.greeting
   :: > "Hello, World!"
-
   :fun greeting
     "Hello, World!" // this is a line comment, discarded by the parser
 ```
@@ -250,7 +249,7 @@ Let's look at the same code sample from the `if` section above, rewritten to use
 Now let's look at an example of `case` used with the subtype check operator:
 
 ```savi
-:primitive Example
+:module Example
   :fun thing_to_number(thing Any'box) I64
     case (
     | thing <: Numeric | thing.i64
@@ -263,7 +262,7 @@ Now let's look at an example of `case` used with the subtype check operator:
 An alternative syntax for `case` is available when the left-side expression and operator are the same in every conditional part:
 
 ```savi
-:primitive Example
+:module Example
   :fun thing_to_number(thing Any'box) I64
     case thing <: (
     | Numeric | thing.i64
@@ -359,7 +358,7 @@ If you want to create such a function, you can use the :yields declaration to de
 Note that the block is not a value that can be carried around - yielding cannot be asynchronous and must take place within the normal execution of the yielding function. However this restriction on the yielder gives benefits to the caller because it is efficient and it can be used to modify local variables in the scope of the caller, without many of the reference capability pitfalls that lambdas in Pony have. Savi will also have Pony-like lambdas, but these yield blocks are to be preferred for synchronous and immediate callbacks / inversion of control.
 
 ```savi
-:primitive Blabber
+:module Blabber
   :const sentences Array(String)'val: [
     "Hello, nice to meet you!"
     "Are you enjoying this lovely day?"
@@ -628,9 +627,9 @@ Probably the most notable semantics change from Pony is the addition of a new re
   - is sendable
   - appropriate for cases where you want to define and call functions on a type without allocating an instance of it at runtime (i.e. stateless "singleton" types, or stateless "class methods" defined on a stateful type)
 
-As you might expect from the description, primitives in Savi have a capability of `non` (rather than `val`, as they do in Pony). As a result, even stateful types can be used "like a primitive" by defining `non` functions on them - such functions can be called without an allocated instance of the type. This replaces the common pattern in Pony of defining a "utility primitive" alongside a stateful type (e.g. `primitive Promises` alongside `actor Promise` from the Pony standard libarary) - in Savi, all these functions can be within the same type without any inconvenience. Moreover, all types become first-class values, just like primitives.
+As you might expect from the description, modules in Savi have a capability of `non` rather than `val`, as they do in Pony, where they are named "primitives. As a result, even stateful types can be used "like a module" by defining `non` functions on them - such functions can be called without an allocated instance of the type. This replaces the common pattern in Pony of defining a "utility primitive" alongside a stateful type (e.g. `primitive Promises` alongside `actor Promise` from the Pony standard libarary) - in Savi, all these functions can be within the same type without any inconvenience. Moreover, all types become first-class values, just like modules.
 
-However, because it is safe, we allow typechecking of primitives capabilities to ignore capabilities, which smooths over certain issues with migrating Pony code where you were depending on primitives to be a subtype of `val` or `box`, as well as new patterns, such as dependency-injecting a primitive where a mutable type is expected. A primitive can have no field-accessing methods, so this is all safe and allowable.
+However, because it is safe, we allow typechecking of modules capabilities to ignore capabilities, which smooths over certain issues with migrating Pony code where you were depending on modules to be a subtype of `val` or `box`, as well as new patterns, such as dependency-injecting a module where a mutable type is expected. A module can have no field-accessing methods, so this is all safe and allowable.
 
 ### [TODO: More Semantics Info...]
 
