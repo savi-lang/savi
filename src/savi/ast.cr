@@ -913,7 +913,6 @@ module Savi::AST
       dup.tap do |node|
         node.term = new_term
       end
-      self
     end
   end
 end

@@ -15,6 +15,36 @@ describe Savi::Compiler::Macros do
         [:jump, "return", [:ident, "None"]]
     end
 
+    it "it can be nested, as silly as that is" do
+      source = Savi::Source.new_example <<-SOURCE
+      :primitive Returns
+        :fun example
+          @
+          return (
+            @
+            return "value"
+            @
+          )
+          @
+      SOURCE
+
+      ctx = Savi.compiler.compile([source], :macros)
+      ctx.errors.should be_empty
+
+      func = ctx.namespace.find_func!(ctx, source, "Returns", "example")
+      func.body.not_nil!.to_a.should eq [:group, ":",
+        [:ident, "@"],
+        [:group, "(",
+          [:jump, "return", [:group, "(",
+            [:ident, "@"],
+            [:group, "(", [:jump, "return", [:string, "value", nil]]],
+            [:ident, "@"],
+          ]],
+        ],
+        [:ident, "@"],
+      ]
+    end
+
     it "can have an explicit value" do
       source = Savi::Source.new_example <<-SOURCE
       :primitive Returns

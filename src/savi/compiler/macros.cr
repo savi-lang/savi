@@ -82,7 +82,7 @@ class Savi::Compiler::Macros < Savi::AST::CopyOnMutateVisitor
     @func.add_tag(:compiler_intrinsic)
   end
 
-  def visit(ctx, node : AST::Group)
+  def visit_pre(ctx, node : AST::Group)
     # Handle only groups that are whitespace-delimited, as these are the only
     # groups that we may match and interpret as if they are macros.
     return node unless node.style == " "
@@ -170,7 +170,7 @@ class Savi::Compiler::Macros < Savi::AST::CopyOnMutateVisitor
     raise Error.compiler_hole_at(node, exc)
   end
 
-  def visit(ctx, node : AST::Call)
+  def visit_pre(ctx, node : AST::Call)
     case node.ident.value
     when "as!", "not!"
       call_args = node.args
@@ -219,11 +219,6 @@ class Savi::Compiler::Macros < Savi::AST::CopyOnMutateVisitor
 
   # This clause picks up a special form of case and assert which are inside a Relate node,
   # where the Relate gets reshuffled into the case/assert clauses.
-  #
-  # We need it to be a visit_pre rather than a normal visit, because
-  # if we visited the children first as we normally do, then it would try
-  # to expand the `case`or `assert` macro inside the Relate before running this code,
-  # and fail because the inner Group doesn't have the right terms.
   def visit_pre(ctx, node : AST::Relate)
     lhs = node.lhs
     return node unless \
