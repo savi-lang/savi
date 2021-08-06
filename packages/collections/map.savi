@@ -1,17 +1,12 @@
 :module _MapEmpty
 :module _MapDeleted
 
-:struct _KV(K, V)
-  :let key K
-  :let value V
-  :new (@key, @value)
-
 :alias MapIs(K, V): Map(K, V, HashIs(K))
 
 :class Map(K, V, H HashFunction(K) = HashEq(K))
   :is MapReadable(K, V)
   :var _size USize: 0
-  :var _array Array((_KV(K, V) | _MapEmpty | _MapDeleted))
+  :var _array Array((Pair(K, V) | _MapEmpty | _MapDeleted))
 
   :fun size: @_size
 
@@ -19,7 +14,7 @@
     @_init_array(((prealloc * 4) / 3).max(8).next_pow2)
 
   :fun ref _init_array(space USize)
-    @_array = Array((_KV(K, V) | _MapEmpty | _MapDeleted)).new(space)
+    @_array = Array((Pair(K, V) | _MapEmpty | _MapDeleted)).new(space)
     Count.to(space) -> (@_array << _MapEmpty)
 
   :fun ref _resize(space USize)
@@ -30,7 +25,7 @@
     @_init_array(space)
 
     old_array.each -> (entry |
-      if (entry <: _KV(K, V)) (
+      if (entry <: Pair(K, V)) (
         try (@_array[@_search(entry.key)]! = entry)
       )
     )
@@ -58,7 +53,7 @@
   :: > error! // this key no longer has an assigned value
   ::
   :fun "[]!"(key K)
-    @_array[@_search(key)]!.as!(@->(_KV(K, V))).value
+    @_array[@_search(key)]!.as!(@->(Pair(K, V))).value
 
   :: Assign the given value to the given key in the map.
   :: The previous value will be overwritten and discarded if present.
@@ -73,7 +68,7 @@
     value_alias V'aliased = value // TODO: remove the V'aliased explicit type?
     try (
       index = @_search(key)
-      old_entry = @_array[index]! <<= _KV(K, V).new(--key, --value)
+      old_entry = @_array[index]! <<= Pair(K, V).new(--key, --value)
 
       case old_entry <: (
       | _MapDeleted |
@@ -119,7 +114,7 @@
         entry = @_array[idx]!
 
         case entry <: (
-        | @->(_KV(K, V)) |
+        | @->(Pair(K, V)) |
           if H.equal(key, entry.key) (
             result_idx = idx
             found = True
@@ -148,7 +143,7 @@
   :: Yield each key and value in the map.
   :fun each
     @_array.each -> (entry |
-      if (entry <: @->(_KV(K, V))) (
+      if (entry <: @->(Pair(K, V))) (
         yield (entry.key, entry.value)
       )
     )
@@ -159,7 +154,7 @@
   :fun each_until
     :yields for Bool
     @_array.each_until -> (entry |
-      if (entry <: @->(_KV(K, V))) (
+      if (entry <: @->(Pair(K, V))) (
         yield (entry.key, entry.value)
       |
         False

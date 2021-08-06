@@ -354,9 +354,9 @@
     )
     @
 
-  :fun val split2!(split_byte U8) StringPair
+  :fun val split2!(split_byte U8) Pair(String)
     pos = @_index_of!(split_byte)
-    StringPair.new(@_slice(0, pos), @_slice(pos + 1, @_size))
+    Pair(String).new(@_slice(0, pos), @_slice(pos + 1, @_size))
 
   :: Returns the integer index of the first occurence of the given character `char`.
   :fun val _index_of!(char U8, offset USize = 0) USize
@@ -441,11 +441,6 @@
       if (index != others.size - 1) (res << separator)
     )
     --res
-
-:struct val StringPair
-  :let first String'val
-  :let second String'val
-  :new (@first, @second)
 
 :: Encode the code point into UTF-8. It returns a tuple with the size of the
 :: encoded data and then the data.
