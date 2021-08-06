@@ -73,9 +73,9 @@
     value_alias V'aliased = value // TODO: remove the V'aliased explicit type?
     try (
       index = @_search(key)
-      entry = @_array[index]! <<= _KV(K, V).new(--key, --value)
+      old_entry = @_array[index]! <<= _KV(K, V).new(--key, --value)
 
-      case entry <: (
+      case old_entry <: (
       | _MapDeleted |
         @_size += 1
       | _MapEmpty |
