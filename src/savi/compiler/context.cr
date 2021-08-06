@@ -40,7 +40,6 @@ class Savi::Compiler::Context
 
   def initialize(@options = CompilerOptions.new, @prev_ctx = nil)
     @program = Program.new
-    @stack = [] of Interpreter
 
     @classify = Classify::Pass.new
     @code_gen = CodeGen.new(CodeGen::PonyRT)
@@ -81,7 +80,6 @@ class Savi::Compiler::Context
     library
   rescue e : Error
     @errors << e
-    @stack.clear
     library || Program::Library.new(args.first)
   end
 
@@ -101,32 +99,14 @@ class Savi::Compiler::Context
 
   def compile_library_docs(library : Program::Library, docs : Array(AST::Document))
     docs.each do |doc|
-      @stack.unshift(Interpreter::Default.new(library))
-      doc.list.each { |decl| compile_decl(decl) }
-      @stack.reverse_each &.finished(self)
-      @stack.clear
+      Program::Declarator::Interpreter.run(self, doc, library)
     end
 
     library
   end
 
-  def compile_decl(decl : AST::Declare)
-    loop do
-      Error.at decl, "Unrecognized keyword: #{decl.keyword}" if @stack.size == 0
-      break if @stack.last.keywords.includes?(decl.keyword)
-      @stack.pop.finished(self)
-    end
-
-    @stack.last.compile(self, decl)
-  end
-
   def finish
     @errors.uniq!
-    @stack.clear
-  end
-
-  def push(compiler)
-    @stack.push(compiler)
   end
 
   def run(obj)

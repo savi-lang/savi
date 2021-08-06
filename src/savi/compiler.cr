@@ -260,14 +260,25 @@ class Savi::Compiler
   def compile(docs : Array(AST::Document), ctx : Context, target : Symbol = :eval)
     raise "No source documents given!" if docs.empty?
 
+    # First, load the standard declarators.
+    (
+      Compiler.get_library_sources(Compiler.prelude_declarators_meta_library_path) +
+      Compiler.get_library_sources(Compiler.prelude_declarators_library_path)
+    )
+      .map { |source| Parser.parse(source) }
+      .map { |doc| Program::Declarator::Interpreter.run(ctx, doc, nil) }
+
+    # Now compile the main library.
     ctx.compile_library(docs.first.source.library, docs)
 
+    # Next add the prelude, unless the main library happens to be the prelude.
     unless docs.first.source.library.path == Compiler.prelude_library_path
       prelude_sources = Compiler.get_library_sources(Compiler.prelude_library_path)
       prelude_docs = prelude_sources.map { |s| Parser.parse(s) }
       ctx.compile_library(prelude_sources.first.library, prelude_docs)
     end
 
+    # Now run compiler passes until the target pass is satisfied.
     satisfy(ctx, target)
 
     ctx
@@ -279,5 +290,21 @@ class Savi::Compiler
 
   def self.prelude_library_link
     Program::Library::Link.new(prelude_library_path)
+  end
+
+  def self.prelude_declarators_library_path
+    File.expand_path("../prelude/declarators", __DIR__)
+  end
+
+  def self.prelude_declarators_library_link
+    Program::Library::Link.new(prelude_declarators_library_path)
+  end
+
+  def self.prelude_declarators_meta_library_path
+    File.expand_path("../prelude/declarators/meta", __DIR__)
+  end
+
+  def self.prelude_declarators_meta_library_link
+    Program::Library::Link.new(prelude_declarators_meta_library_path)
   end
 end

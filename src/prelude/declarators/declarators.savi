@@ -1,0 +1,272 @@
+:: Import public types and declarators exposed by the library at the given path.
+::
+:: By default, Savi source files only have access to other types defined in the
+:: same library (that is, the same source directory), as well as those standard
+:: types exposed by the `prelude` library, which is always implicitly imported.
+:: To make use of types exposed by other libraries, they must be explicitly
+:: imported using an `:import` declaration.
+::
+:: Imported types are only reachable from the source files that import them,
+:: so you must import a library in each source file where the types exposed
+:: by that library are referenced by name.
+:declarator import
+  :intrinsic
+
+  :: The path to the library, relative to the source or standard library root.
+  :term path String
+
+  :: The list of type names to import from the library.
+  :: If not specified, all public types exposed by the library will be imported.
+  :term names NameList
+    :optional
+
+:: Load the source files in the given path as if they were part of this library.
+::
+:: Unlike an `:import` declaration, which imports public types from a library,
+:: the `:source` declaration causes the compiler to treat another path as if
+:: it were part of the same library.
+::
+:: This allows access to private types and private methods in the sourced path.
+::
+:: If the library in which the `:source` declaration appears is the main program
+:: then the files in the sourced path will also be treated as part of the
+:: main program, including running all compiler checks on code paths that are
+:: not referenced recursively from the Main actor. These checks are normally
+:: omitted for libraries that are not the main program, because parts of
+:: those libraries that are not used in the main program do not need to be
+:: checked to prove that the main program is safe.
+::
+:: The `:source` declaration is typically used from within a test suite,
+:: since it gives the ability to test private types and methods, and it ensures
+:: that even code paths which are not exercised in the tests will still be
+:: proved safe by the compiler or cause a compilation error in the test suite.
+:declarator source
+  :intrinsic
+
+  :: The path to the library, relative to the source file.
+  :term path String
+
+// TODO: Document this.
+:declarator class
+  :intrinsic
+  :begins type
+
+  :term cap enum (iso, val, ref, box, tag, non)
+    :default ref
+  :term name_and_params NameMaybeWithParams
+
+// TODO: Document this.
+:declarator struct
+  :intrinsic
+  :begins type
+
+  :term cap enum (iso, val, ref, box, tag, non)
+    :default ref
+  :term name_and_params NameMaybeWithParams
+
+// TODO: Document this.
+:declarator actor
+  :intrinsic
+  :begins type
+
+  :term cap enum (iso, val, ref, box, tag, non)
+    :default tag
+  :term name_and_params NameMaybeWithParams
+
+// TODO: Document this.
+:declarator trait
+  :intrinsic
+  :begins type
+
+  :term cap enum (iso, val, ref, box, tag, non)
+    :default ref
+  :term name_and_params NameMaybeWithParams
+
+// TODO: Document this.
+:declarator numeric
+  :intrinsic
+  :begins type
+
+  :term cap enum (iso, val, ref, box, tag, non)
+    :default val
+  :term name_and_params NameMaybeWithParams
+
+// TODO: Document this.
+:declarator enum
+  :intrinsic
+  :begins type
+  :begins type_enum
+
+  :term cap enum (iso, val, ref, box, tag, non)
+    :default val
+  :term name_and_params NameMaybeWithParams
+
+// TODO: Document this.
+:declarator primitive
+  :intrinsic
+  :begins type
+  :begins type_singleton
+
+  :term cap enum (iso, val, ref, box, tag, non)
+    :default non
+  :term name_and_params NameMaybeWithParams
+
+// TODO: Document this.
+:declarator ffi
+  :intrinsic
+  :begins type
+  :begins type_singleton
+
+  :term cap enum (iso, val, ref, box, tag, non)
+    :default non
+  :term name_and_params NameMaybeWithParams
+
+// TODO: Document this.
+:declarator alias
+  :intrinsic
+
+  :term name_and_params NameMaybeWithParams
+  :body required
+
+// TODO: Document this.
+:declarator it
+  :intrinsic // TODO: This should be declared in the spec package instead.
+  :context type
+
+  :term name String
+
+// TODO: Document this.
+:declarator fun
+  :intrinsic
+  :context type_singleton
+  :begins function
+
+  :term cap enum (non)
+    :default non
+  :term name_and_params NameMaybeWithParams
+  :term ret Type
+    :optional
+  :body optional
+
+// TODO: Document this.
+:declarator fun
+  :intrinsic
+  :context type
+  :begins function
+
+  :term cap enum (iso, val, ref, box, tag, non)
+    :default box
+  :term name_and_params NameMaybeWithParams
+  :term ret Type
+    :optional
+  :body optional
+
+// TODO: Document this.
+:declarator be
+  :intrinsic
+  :context type
+  :begins function
+
+  :term name_and_params NameMaybeWithParams
+  :body optional
+
+// TODO: Document this.
+:declarator new
+  :intrinsic
+  :context type
+  :begins function
+
+  :term cap enum (iso, val, ref, box, tag, non)
+    :optional // TODO: :default: @type.cap
+  :term name_and_params NameMaybeWithParams
+  :body optional
+
+// TODO: Document this.
+:declarator new
+  :intrinsic
+  :context type
+  :begins function
+
+  :term cap enum (iso, val, ref, box, tag, non)
+    :optional // TODO: :default: @type.cap
+  :term params Params
+    :optional
+  :body optional
+
+// TODO: Document this.
+:declarator yields
+  :intrinsic
+  :context function
+
+  :term out TypeOrTypeList
+  :keyword for
+  :term in Type
+
+// TODO: Document this.
+:declarator yields
+  :intrinsic
+  :context function
+
+  :keyword for
+  :term in Type
+
+// TODO: Document this.
+:declarator yields
+  :intrinsic
+  :context function
+
+  :term out TypeOrTypeList
+
+// TODO: Document this.
+:declarator const
+  :intrinsic
+  :context type
+
+  :term name Name
+  :term type Type
+    :optional
+  :body required
+
+// TODO: Document this.
+:declarator let
+  :intrinsic
+  :context type
+
+  :term name Name
+  :term type Type
+    :optional
+  :body optional
+
+// TODO: Document this.
+:declarator var
+  :intrinsic
+  :context type
+
+  :term name Name
+  :term type Type
+    :optional
+  :body optional
+
+// TODO: Document this.
+:declarator is
+  :intrinsic
+  :context type
+
+  :term trait Type
+    :optional
+
+// TODO: Document this.
+:declarator copies
+  :intrinsic
+  :context type
+
+  :term trait Type
+    :optional
+
+// TODO: Document this.
+:declarator member
+  :intrinsic
+  :context type_enum
+
+  :term name Name
+  :body required

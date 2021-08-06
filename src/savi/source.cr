@@ -174,6 +174,8 @@ struct Savi::Source::Pos
     new_start = @start
     new_finish = @finish
     others.each do |other|
+      next if other.source == Source.none
+
       raise ArgumentError.new "can't span positions from different sources" \
         unless other.source == source
 

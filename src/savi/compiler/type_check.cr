@@ -276,7 +276,7 @@ class Savi::Compiler::TypeCheck
       # If the receiver of the call is the self (the receiver of the caller),
       # then we can give an extra hint about changing its capability to match.
       if call.lhs.is_a?(Infer::Self)
-        problems << {calling_func.cap.pos, "this would be possible if the " \
+        problems << {calling_func.ident.pos, "this would be possible if the " \
           "calling function were declared as `:fun #{required_cap}`"}
       end
 

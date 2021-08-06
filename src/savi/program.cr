@@ -1,8 +1,10 @@
 class Savi::Program
   getter libraries
+  getter declarators # TODO: declarators should be scoped within a library
 
   def initialize
     @libraries = [] of Library
+    @declarators = [] of Declarator
   end
 
   # TODO: Remove these aliases and make passes work at the library level

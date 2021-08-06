@@ -189,7 +189,7 @@ This function call doesn't meet subtyping requirements:
 
 - this would be possible if the calling function were declared as `:fun ref`:
   :fun readonly: @mutate
-   ^~~
+       ^~~~~~~~
 ```
 ```error
 This function call doesn't meet subtyping requirements:
@@ -202,7 +202,7 @@ This function call doesn't meet subtyping requirements:
 
 - this would be possible if the calling function were declared as `:fun ref`:
   :fun readonly: @mutate
-   ^~~
+       ^~~~~~~~
 ```
 
 ---

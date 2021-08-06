@@ -28,7 +28,15 @@ class Savi::Compiler::Common::FindByPos < Savi::AST::Visitor
     f : Program::Function?,
     node : AST::Node,
   )
-    return unless node.span_pos.contains?(pos)
+    # TODO: Find another way to do this besides span_pos.
+    # The span_pos approach can be inaccurate in the case of ASTs that
+    # have been pieced together from pieces of code in various places,
+    # whether in different source files or the same source file.
+    # Probably need to fix up the way we generate source pos for the
+    # macros and sugar elements in those passes instead,
+    # so that span pos calculation will no longer be needed here,
+    # and we can just use the normal pos to zero in on the point.
+    return unless node.span_pos(pos.source).contains?(pos)
 
     t_link = t.try(&.make_link(library))
     f_link = f.try(&.make_link(t_link.not_nil!))
@@ -48,7 +56,7 @@ class Savi::Compiler::Common::FindByPos < Savi::AST::Visitor
   end
 
   def visit_any?(ctx : Context, node : AST::Node)
-    node.span_pos.contains?(@pos)
+    node.span_pos(@pos.source).contains?(@pos)
   end
 
   def visit(ctx : Context, node : AST::Node)

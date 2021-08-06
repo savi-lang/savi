@@ -54,7 +54,8 @@ module Savi::AST
       self
     end
 
-    def span_pos
+    def span_pos(source)
+      return Source::Pos.none unless pos.source == source
       pos
     end
 
@@ -185,15 +186,16 @@ module Savi::AST
       @pos = @ident.pos
     end
 
-    def span_pos
+    def span_pos(source)
+      return Source::Pos.none unless pos.source == source
       pos.span([
-        cap.span_pos,
-        ident.span_pos,
-        params.try(&.span_pos),
-        ret.try(&.span_pos),
-        body.try(&.span_pos),
-        yield_out.try(&.span_pos),
-        yield_in.try(&.span_pos),
+        cap.span_pos(source),
+        ident.span_pos(source),
+        params.try(&.span_pos(source)),
+        ret.try(&.span_pos(source)),
+        body.try(&.span_pos(source)),
+        yield_out.try(&.span_pos(source)),
+        yield_in.try(&.span_pos(source)),
       ].compact)
     end
 
@@ -372,8 +374,9 @@ module Savi::AST
     def initialize(@op : Operator, @term : Term)
     end
 
-    def span_pos
-      pos.span([op.span_pos, term.span_pos])
+    def span_pos(source)
+      return Source::Pos.none unless pos.source == source
+      pos.span([op.span_pos(source), term.span_pos(source)])
     end
 
     def name; :prefix end
@@ -405,8 +408,9 @@ module Savi::AST
     def initialize(@term : Term, @group : Group)
     end
 
-    def span_pos
-      pos.span([term.span_pos, group.span_pos])
+    def span_pos(source)
+      return Source::Pos.none unless pos.source == source
+      pos.span([term.span_pos(source), group.span_pos(source)])
     end
 
     def name; :qualify end
@@ -487,8 +491,9 @@ module Savi::AST
     def initialize(@style : String, @terms = [] of Term)
     end
 
-    def span_pos
-      pos.span(terms.map(&.span_pos))
+    def span_pos(source)
+      return Source::Pos.none unless pos.source == source
+      pos.span(terms.map(&.span_pos(source)))
     end
 
     def name; :group end
@@ -550,8 +555,9 @@ module Savi::AST
     def initialize(@lhs : Term, @op : Operator, @rhs : Term)
     end
 
-    def span_pos
-      pos.span([lhs.span_pos, op.span_pos, rhs.span_pos])
+    def span_pos(source)
+      return Source::Pos.none unless pos.source == source
+      pos.span([lhs.span_pos(source), op.span_pos(source), rhs.span_pos(source)])
     end
 
     def name; :relate end
@@ -654,12 +660,13 @@ module Savi::AST
     )
     end
 
-    def span_pos
+    def span_pos(source)
+      return Source::Pos.none unless pos.source == source
       children = [receiver, ident] of AST::Node
       args.try { |child| children << child }
       yield_params.try { |child| children << child }
       yield_block.try { |child| children << child }
-      pos.span(children.map(&.span_pos))
+      pos.span(children.map(&.span_pos(source)))
     end
 
     def name; :call end
@@ -713,8 +720,9 @@ module Savi::AST
     def initialize(@list : Array({Term, Term}))
     end
 
-    def span_pos
-      pos.span(list.map { |cond, body| cond.span_pos.span([body.span_pos]) })
+    def span_pos(source)
+      return Source::Pos.none unless pos.source == source
+      pos.span(list.map { |cond, body| cond.span_pos(source).span([body.span_pos(source)]) })
     end
 
     def name; :choice end
@@ -758,12 +766,13 @@ module Savi::AST
     def initialize(@initial_cond, @body, @repeat_cond, @else_body)
     end
 
-    def span_pos
+    def span_pos(source)
+      return Source::Pos.none unless pos.source == source
       pos.span([
-        initial_cond.span_pos,
-        body.span_pos,
-        repeat_cond.span_pos,
-        else_body.span_pos
+        initial_cond.span_pos(source),
+        body.span_pos(source),
+        repeat_cond.span_pos(source),
+        else_body.span_pos(source)
       ])
     end
 
@@ -811,8 +820,9 @@ module Savi::AST
     def initialize(@body, @else_body)
     end
 
-    def span_pos
-      pos.span([body.span_pos, else_body.span_pos])
+    def span_pos(source)
+      return Source::Pos.none unless pos.source == source
+      pos.span([body.span_pos(source), else_body.span_pos(source)])
     end
 
     def name; :try end
@@ -854,8 +864,9 @@ module Savi::AST
     def initialize(@terms)
     end
 
-    def span_pos
-      pos.span(terms.map(&.span_pos))
+    def span_pos(source)
+      return Source::Pos.none unless pos.source == source
+      pos.span(terms.map(&.span_pos(source)))
     end
 
     def name; :yield end
@@ -891,9 +902,10 @@ module Savi::AST
     def initialize(@term, @kind)
     end
 
-    def span_pos
+    def span_pos(source)
+      return Source::Pos.none unless pos.source == source
       pos.span([
-        @term.try(&.span_pos)
+        @term.try(&.span_pos(source))
       ].compact)
     end
 

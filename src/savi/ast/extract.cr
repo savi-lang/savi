@@ -1,4 +1,15 @@
 module Savi::AST::Extract
+  def self.name_and_params(node : AST::Term) : {AST::Identifier, AST::Group?}
+    case node
+    when AST::Identifier
+      {node, nil}
+    when AST::Qualify
+      {node.term.as(AST::Identifier), node.group}
+    else
+      raise NotImplementedError.new(node)
+    end
+  end
+
   def self.param(node : AST::Term) : {
     AST::Identifier, # identifier
     AST::Term?,      # explicit type
