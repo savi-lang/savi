@@ -17,7 +17,7 @@ ci: PHONY
 
 # Run the test suite.
 test: PHONY
-	docker exec -ti savi-dev make extra_args="$(extra_args)" test.inner
+	docker exec savi-dev make extra_args="$(extra_args)" test.inner
 /tmp/bin/spec: $(shell find lib -name '*.cr') $(shell find src -name '*.cr') $(shell find spec -name '*.cr')
 	mkdir -p /tmp/bin
 	crystal build --debug spec/all.cr -o $@
@@ -26,7 +26,7 @@ test.inner: PHONY /tmp/bin/spec
 
 # Run a narrow target within the test suite.
 test.narrow: PHONY
-	docker exec -ti savi-dev make target="$(target)" extra_args="$(extra_args)" test.narrow.inner
+	docker exec savi-dev make target="$(target)" extra_args="$(extra_args)" test.narrow.inner
 test.narrow.inner: PHONY
 	crystal spec spec/spec_helper.cr "$(target)" $(extra_args)
 
@@ -52,29 +52,29 @@ format.inner: PHONY /tmp/bin/savi
 
 # Evaluate a Hello World example.
 example-eval: PHONY
-	docker exec -ti savi-dev make extra_args="$(extra_args)" example-eval.inner
+	docker exec savi-dev make extra_args="$(extra_args)" example-eval.inner
 example-eval.inner: PHONY /tmp/bin/savi
 	echo && /tmp/bin/savi eval 'env.out.print("Hello, World!")'
 
 # Run the files in the given directory.
 example-run: PHONY
-	docker exec -ti savi-dev make dir="$(dir)" extra_args="$(extra_args)" example-run.inner
+	docker exec savi-dev make dir="$(dir)" extra_args="$(extra_args)" example-run.inner
 example-run.inner: PHONY /tmp/bin/savi
 	echo && cd "/opt/code/$(dir)" && /tmp/bin/savi run $(extra_args)
 
 # Compile the files in the given directory.
 example-compile: PHONY
-	docker exec -ti savi-dev make dir="$(dir)" extra_args="$(extra_args)" example-compile.inner
+	docker exec savi-dev make dir="$(dir)" extra_args="$(extra_args)" example-compile.inner
 example-compile.inner: PHONY /tmp/bin/savi
 	echo && cd "/opt/code/$(dir)" && /tmp/bin/savi $(extra_args)
 
 # Compile and run the savi binary in the given directory.
 example: example-compile
-	echo && docker exec -ti savi-dev "$(dir)/main" || true
+	echo && docker exec savi-dev "$(dir)/main" || true
 example-lldb: example-compile
 	echo && lldb -o run -- "$(dir)/main" # TODO: run this within docker when alpine supports lldb package outside of edge
 example-savi-callgrind: PHONY
-	docker exec -ti savi-dev make extra_args="$(extra_args)" example-savi-callgrind.inner
+	docker exec savi-dev make extra_args="$(extra_args)" example-savi-callgrind.inner
 /tmp/bin/savi: main.cr $(shell find lib -name '*.cr') $(shell find src -name '*.cr')
 	mkdir -p /tmp/bin
 	crystal build --debug main.cr --error-trace -o $@

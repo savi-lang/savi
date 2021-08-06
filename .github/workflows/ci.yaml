@@ -1,0 +1,14 @@
+name: Savi
+on: [push]
+jobs:
+  CI:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+
+      - name: Prepare Dependencies
+        run: make ready
+
+      - name: Full CI Suite
+        run: make ci

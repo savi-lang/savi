@@ -1,26 +1,13 @@
 version: 2.1
 
 workflows:
-  build:
-    jobs:
-      - build
   tooling-vscode-publish:
     jobs:
       - tooling-vscode-publish:
           filters: { branches: { only: [main] } }
 
+# TODO: Move this job to GitHub Actions:
 jobs:
-  build:
-    machine: true
-    steps:
-      - checkout
-      - run:
-          name: Build and run the development environment container.
-          command: make ready
-      - run:
-          name: Run the CI suite.
-          command: make ci
-
   tooling-vscode-publish:
     executor: node
     steps:
