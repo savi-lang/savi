@@ -46,7 +46,46 @@
   :: The path to the library, relative to the source file.
   :term path String
 
-// TODO: Document this.
+:: Declare a stateful object class, heap-allocated and passed by reference.
+::
+:: When its constructor is called, a `:class` is heap-allocated to create
+:: an object, which can be shared by reference (its pointer identity).
+::
+:: A `:class` can contain named fields, each of which has a defined type.
+:: A `:class` also has attached functions, each of which have access to the
+:: object at a particular level according to their receiver cap.
+::
+:: A `:fun ref` has full capability to read and write the object's fields.
+::
+:: A `:fun box` (or simply `:fun`, as it is the default receiver cap)
+:: has a *read-only* view of the object and its fields, and so is unable to
+:: reassign any field or mutate the internal content of the field.
+::
+:: A `:fun val` has an *immutable* view of the object, so it can only be
+:: called on a receiver which is proven to have become permanently immutable.
+::
+:: A `:fun iso` has *exclusive* read/write access to the object, so it can
+:: only be called on a receiver which the type system has proven to be isolated.
+::
+:: A `:fun non` has no access to the object at all, except for knowing its type,
+:: like static functions in other languages, or `:module` functions in Savi.
+::
+:: The constructor of a class also has a receiver cap, which indicates the
+:: cap that the final constructed object will have when the constructor is done.
+:: For example, a `:new ref` will return a mutable object and `:new val` will
+:: return an immutable object, but during construction both constructors
+:: will see the object as being mutable `ref` so that it can be initialized.
+::
+:: The class itself can be notated with a cap as well, which only serves to
+:: indicate what the implied cap is when that type is seen in source code.
+:: For example, `String` is declared as `:class val`, so everywhere you see
+:: the type `String`, it should be understood to indicate `String'val`.
+:: You will also see `String'ref` and `String'iso` around, but these must
+:: be notated explicitly because `val` is the implied default.
+:: The implied cap for the class also indicates what the default cap will be
+:: for a constructor. So if you saw `:new` on a `:class iso`, it should be
+:: understood implicitly to mean `:new iso` for its constructor, but you
+:: may also see `:new ref` or `:new val` on the same class.
 :declarator class
   :intrinsic
   :begins type
@@ -55,7 +94,37 @@
     :default ref
   :term name_and_params NameMaybeWithParams
 
-// TODO: Document this.
+:: Declare a data structure type, shallowly immutable and passed by value.
+::
+:: Like a `:class`, a `:struct` is a concrete type containing named fields
+:: and exposing functions which are stateful over the content of the fields,
+:: and those functions have a view of the fields dependent on the receiver cap.
+::
+:: Unlike a `:class`, which is always heap-allocated and has a stable identity,
+:: a `:struct` is stack-allocated wherever possible and without any identity
+:: apart from the actual values of its fields.
+::
+:: A `:struct` is shallowly immutable - it can only contain `:let` fields,
+:: which cannot be assigned new values after initial construction.
+:: This prevents confusion that might otherwise arise from the fact that
+:: passing by value could disrupt the continuity of mutation in unexpected ways.
+::
+:: Note that this is very different from the deep immutability afforded by the
+:: `val` cap. A `:struct` with cap `ref` can still have its fields mutated,
+:: just like a `:class` with cap ref. For deep immutability, use `val`.
+::
+:: So when should you use `:struct`? In certain circumstances it can be a
+:: performance improvement over a `:class` with otherwise identical definition.
+::
+:: In cases where it is possible to reliably stack-allocate, a `:struct`
+:: can potentially improve runtime performance by avoiding heap allocations.
+:: However, when a `:struct` gets subsumed into an abstract type (such as
+:: a trait or type union), a heap allocation is usually necessitated,
+:: and the benefit of stack allocation is lost. In fact, it may be even worse
+:: in cases where separate subsumptions keep happening to the same value,
+:: necessitating a new heap and separate allocation each time.
+:: There could also be performance issues with structs that have a very large
+:: number of fields, making it unwieldy for the processor to pass them by value.
 :declarator struct
   :intrinsic
   :begins type
@@ -64,7 +133,70 @@
     :default ref
   :term name_and_params NameMaybeWithParams
 
-// TODO: Document this.
+:: Declare a concurrent actor type, inaccessible except via message passing.
+::
+:: Actors are the unit of concurrency in Savi - without separate actors doing
+:: work separately from eachother, your program will not be parallelizable.
+::
+:: An actor instance is a bit like a thread with state attached, though they
+:: are not true threads, in that they are multiplexed onto a smaller number
+:: of system threads (typically the number of available processor cores).
+:: This concept is sometimes referred to as "green threads" among those who
+:: discuss programming language theory.
+::
+:: An actor instance is stateful, but it keeps its state totally isolated from
+:: other actors in the concurrent program. Each actor instance in a program
+:: has its own heap for fully parallel allocation and garbage collection.
+::
+:: Whenever an object is created, it is allocated in the context of some actor,
+:: which is understood by the runtime to be its owner. An reference of cap `iso`
+:: (and its entire object graph of fields, which are all isolated within it)
+:: may be transferred from one actor to a another, changing its ownership.
+:: An immutable reference of cap `val` may be shared among many actors
+:: concurrently, with their lifetime and garbage collection tracked
+:: by an internal distributed reference counting mechanism.
+:: All other objects are non-sendable across actor boundaries, and thus remain
+:: exclusively within the isolated heap of their originating and owning actor.
+:: With these rules in place and enforced by the type system, actors enjoy
+:: safe, fast concurrency without complicated reasoning or discipline required.
+::
+:: Because an actor instance is isolated from the rest of the program, it is
+:: seen externally with the `tag` cap, which is opaque and only divulges the
+:: address of the actor so that it can be sent messages to its inbox.
+:: No synchronous interaction with an actor's state is possible from outside it,
+:: because the type system enforces that only the opaque `tag` can be reached.
+:: Inside the actor, it sees itself as being a `ref`, capable of mutation.
+::
+:: To facilitate asynchronous communication, an actor exposes "behaviors",
+:: each of which is declared like a function, but with `:be` instead of `:fun`.
+::
+:: Calling a behavior uses the exact same syntax as calling a function,
+:: but this call is translated to an asynchronous message send to the actor's
+:: inbox, and the actor will process the message by running its behavior
+:: at some later time. The caller doesn't wait around for the behavior
+:: to finish, and it doesn't even wait for it to begin. Waiting of any kind
+:: is strongly discouraged in Savi at the language level, because it creates
+:: inefficient patterns of code that would be seductively easy to write,
+:: but quite difficult to untangle later when you want to improve performance.
+:: A Savi function can never block unless it calls a blocking C function via
+:: FFI, which is frowned upon where non-blocking C functions are available.
+::
+:: Because the caller doesn't wait for a response, a behavior is distinct
+:: from a function in that it is incapable of having a return value.
+:: Also, all call arguments must be sendable (`iso`, `val`, `tag`, `non`),
+:: in order to preserve the concurrency safety properties of the type system.
+::
+:: It was mentioned that each actor has its own parallel heap within which it
+:: allocates and later garbage-collects those objects which it allocated.
+:: So when does the actor itself get deallocated? It gets garbage-collected
+:: when it has been proven that it is no longer possible for it to receive
+:: more messages, because nothing in the program has a reference to it,
+:: (or because it is part of a cyclical graph that have references to eachother,
+:: but the graph is at quiescence and unattached to the rest of the program).
+:: This is silently done automatically by the runtime with no explicit
+:: awareness needed on the part of the programmer, though some programmers
+:: do choose to disable the cycle detector to eliminate overhead on programs
+:: that do not generate such cycles that need to be collected.
 :declarator actor
   :intrinsic
   :begins type
@@ -73,7 +205,40 @@
     :default tag
   :term name_and_params NameMaybeWithParams
 
-// TODO: Document this.
+:: Declare a structural trait, matching types which implement the interface.
+::
+:: Traits allow structural subtyping in a program. A `:trait` can be defined
+:: with function signatures that have no function body implemented, and the
+:: `:trait` type will be a supertype of any type that has functions that
+:: match those signatures.
+::
+:: Specifically, the return type of the subtype function must be a subtype
+:: of the return type in the supertype function (covariance).
+:: Inversely, the parameter types in the subtype function must be supertypes
+:: of the parameters in the supertype function (contravariance).
+:: If yielding is present, the yield in and yield out types have similar rules.
+:: If these constraints are met in the subtype for all functions in the trait,
+:: then the subtype relationship is considered to be valid, and an instance
+:: of the subtype can be given where the supertype (the `:trait`) is requested.
+::
+:: Any kind of type (`:class`, `:struct`, `:actor`, etc.) may match a `:trait`.
+:: It may be an explicit subtype of the `:trait` type (by declaring `:is`),
+:: or it may be implicit, just by matching all of the required functions.
+::
+:: When explicit, the compiler will enforce that all the requirements are met,
+:: at the point of the type definition. When implicit, the compiler won't
+:: enforce the rules until the trait in some code path attempts to subsume it.
+::
+:: An explicit subtype can also "inherit" fully implemented functions from a
+:: `:trait`. That is, the `:trait` may have functions with bodies that will
+:: be copied into the subtype instead of requiring it to implement them.
+:: The subtype may inherit these methods without change, or it can define
+:: different implementation bodies than the ones provided by the `:trait`.
+::
+:: Traits are the way to acheive something like the traditional object-oriented
+:: notion of inheritance among types for code reuse and substitutability.
+:: The key difference is that Savi doesn't allow the supertypes to be concrete.
+:: they can only be abstract types which cannot be instantiated in the program.
 :declarator trait
   :intrinsic
   :begins type
@@ -82,7 +247,29 @@
     :default ref
   :term name_and_params NameMaybeWithParams
 
-// TODO: Document this.
+:: Declare a numeric type, representing a fixed-size integer or floating-point.
+::
+:: Numeric types are not allocated and they may not have fields. They are
+:: represented as simple machine word values in the program.
+::
+:: A default bit width of 64 bits will be implied unless the `:numeric` type
+:: declares a `:const bit_width U8` constant that species a different value,
+:: defining the number of bits to use in the machine word representation,
+:: indirectly defining the domain of possible values that can be represented.
+::
+:: By default the `:numeric` type will be an integer unless the type declares
+:: `:const is_floating_point: True` to override the default integer assumption.
+::
+:: By default an integer `:numeric` type will be unsigned unless it declares
+:: `:const is_signed: True` to override the default unsigned assumption.
+::
+:: Only certain combinations of these settings are supported at this time,
+:: though the supported values may be expanded at a later time.
+::
+:: At this time, the primary purpose of defining a user-defined integer type
+:: would be to create a new type that has the same internal representation as
+:: one of the standard numeric types, but is distinct in the type system,
+:: such that the type system can prevent accidental wrong value assignments.
 :declarator numeric
   :intrinsic
   :begins type
@@ -91,7 +278,14 @@
     :default val
   :term name_and_params NameMaybeWithParams
 
-// TODO: Document this.
+:: Declare a numeric type with named enumerated values associated to it.
+::
+:: An `:enum` is declared in the same way as a `:numeric` type, but with the
+:: addition of declaring named `:member` values within it.
+::
+:: An `:enum` type directly corresponds to the concept of an enum in C.
+:: Each named `:member` has a numeric value associated with it, within the
+:: domain of values that are possible to express for that numeric type.
 :declarator enum
   :intrinsic
   :begins type
@@ -101,7 +295,31 @@
     :default val
   :term name_and_params NameMaybeWithParams
 
-// TODO: Document this.
+:: Declare a static singleton exposing only stateless functions.
+::
+:: A `:module` is just a collection of functions namespaced under a type name.
+::
+:: It represents a type only, rather than a runtime-allocated object instance.
+:: It has no fields and no associated object allocations.
+::
+:: It can only have `:fun non` functions associated with it. This is similar
+:: to the stateless functions found in functional programming languages
+:: or the static functions sometimes found in object-oriented languages.
+::
+:: Referencing the `:module` by name as a value gives you a reference with the
+:: `non` cap, meaning that it is a type only with no other capabilities.
+:: The `non` value is a pointer to the type definition in static program memory.
+::
+:: Every type has the ability to define `:fun non` functions associated with it,
+:: which act just like the functions on a `:module`, because the singleton
+:: `non` value of any type can be referenced just by naming the type.
+:: That is, a `:module` is just a type that can't do anything else beyond
+:: this basic level of referring to it as a type. It can never have any
+:: stronger cap than the `non` cap, so it can't do what other types can do.
+::
+:: Use a `:module` when you want to define some functions that don't need to
+:: be associated to any particular object as their receiver. Calling functions
+:: on a `:module` just uses the type itself (the `non` value) as the receiver.
 :declarator module
   :intrinsic
   :begins type
@@ -111,7 +329,16 @@
     :default non
   :term name_and_params NameMaybeWithParams
 
-// TODO: Document this.
+:: Declare a static singleton object exposing unsafe foreign functions (C-FFI).
+::
+:: An `:ffi` declaration is similar to a `:module` in that it cannot be
+:: instantiated, and it can only have `:fun non` functions.
+::
+:: However, rather than implementing functions with bodies, `:ffi` declarations
+:: are used for binding foreign functions, so they declare no function bodies.
+::
+:: Each function signature in an `:ffi` declaration should directly correspond
+:: to a function exposed by a foreign library which is linked to the program.
 :declarator ffi
   :intrinsic
   :begins type
