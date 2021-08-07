@@ -19,6 +19,10 @@ class Savi::Program::Declarator::Scope
     @context_stack = [] of Declarator
   end
 
+  def context_depth
+    @context_stack.size
+  end
+
   def push_context(declarator)
     @context_stack.push(declarator)
   end

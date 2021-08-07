@@ -1,4 +1,19 @@
 module Savi::Program::Declarator::Interpreter
+  struct Analysis
+    def initialize
+      @nonzero_declare_depths = {} of AST::Declare => Int32
+    end
+
+    def depth_of(declare : AST::Declare)
+      @nonzero_declare_depths[declare]? || 0
+    end
+
+    protected def observe_depth_of(declare : AST::Declare, depth : Int32)
+      return if depth == 0
+      @nonzero_declare_depths[declare] = depth
+    end
+  end
+
   def self.run(ctx : Compiler::Context, doc : AST::Document, library : Program::Library?)
     scope = Scope.new
     scope.current_library = library
@@ -77,6 +92,9 @@ module Savi::Program::Declarator::Interpreter
     until scope.has_top_context?(declarator.context.value)
       scope.pop_context.finish(ctx, scope, declarators)
     end
+
+    # Observe the depth of this declaration.
+    ctx.declarators.observe_depth_of(declare, scope.context_depth)
 
     # Finally, call run on the declarator to evaluate the declaration.
     declarator.run(ctx, scope, declare, terms)

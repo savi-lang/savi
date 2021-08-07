@@ -6,6 +6,7 @@ class Savi::Compiler::Context
   getter code_gen
   getter code_gen_verona
   getter completeness
+  getter declarators
   getter eval
   getter flow
   getter infer
@@ -45,6 +46,7 @@ class Savi::Compiler::Context
     @code_gen = CodeGen.new(CodeGen::PonyRT)
     @code_gen_verona = CodeGen.new(CodeGen::VeronaRT)
     @completeness = Completeness::Pass.new
+    @declarators = Program::Declarator::Interpreter::Analysis.new
     @eval = Eval.new
     @flow = Flow::Pass.new
     @import = Import.new
