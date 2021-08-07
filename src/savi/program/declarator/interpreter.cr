@@ -43,7 +43,6 @@ module Savi::Program::Declarator::Interpreter
       ctx.error_at declare,
         "This declaration didn't match any known declarator",
           with_right_name.flat_map { |declarator| [
-            # TODO: Get a proper Source::Pos for both hints.
             {declarator.name.pos, "This declarator didn't match"},
             {declarator.context.pos, "it can only be used within a " \
               + "`#{declarator.context.value}` context"},
