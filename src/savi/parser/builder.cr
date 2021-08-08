@@ -58,8 +58,7 @@ module Savi::Parser::Builder
     decl = AST::Declare.new.with_pos(state.pos(main))
 
     iter.while_next_is_child_of(main) do |child|
-      term = build_term(child, iter, state)
-      decl.head << term
+      decl.terms << build_term(child, iter, state)
     end
 
     decl

@@ -9,8 +9,8 @@ describe Savi::Compiler::Reparse do
     ast = Savi::Parser.parse(source)
 
     ast.to_a.should eq [:doc,
-      [:declare, [[:ident, "class"], [:ident, "Example"]]],
-      [:declare, [[:ident, "fun"], [:ident, "chained"]]],
+      [:declare, [:ident, "class"], [:ident, "Example"]],
+      [:declare, [:ident, "fun"], [:ident, "chained"]],
       [:group, ":",
         [:qualify,
           [:relate,
@@ -60,8 +60,8 @@ describe Savi::Compiler::Reparse do
     ast = Savi::Parser.parse(source)
 
     ast.to_a.should eq [:doc,
-      [:declare, [[:ident, "class"], [:ident, "Example"]]],
-      [:declare, [[:ident, "fun"], [:ident, "selfish"]]],
+      [:declare, [:ident, "class"], [:ident, "Example"]],
+      [:declare, [:ident, "fun"], [:ident, "selfish"]],
       [:group, ":",
         [:ident, "@x"],
         [:qualify, [:ident, "@x"], [:group, "(", [:ident, "y"]]],

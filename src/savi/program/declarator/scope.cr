@@ -75,7 +75,7 @@ class Savi::Program::Declarator::Scope
     return unless layer
 
     if layer.declarator.body_required && !layer.body_accepted_pos
-      ctx.error_at layer.declare.head.first.pos, "This declaration has no body",
+      ctx.error_at layer.declare.terms.first.pos, "This declaration has no body",
         [{layer.declarator.name.pos, "but this declarator requires a body"}]
       return nil
     end

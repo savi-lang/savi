@@ -161,10 +161,10 @@ module Savi::Program::Intrinsic
       when "it"
         name = terms["name"].as(AST::LiteralString)
         function = Program::Function.new(
-          AST::Identifier.new("ref").from(declare.head.first),
+          AST::Identifier.new("ref").from(declare.terms.first),
           AST::Identifier.new(name.value).from(name),
           nil,
-          AST::Identifier.new("None").from(declare.head.first),
+          AST::Identifier.new("None").from(declare.terms.first),
         ).tap(&.add_tag(:it))
 
         scope.current_type.functions << function
@@ -192,7 +192,7 @@ module Savi::Program::Intrinsic
           AST::Extract.name_and_params(terms["name_and_params"].not_nil!)
 
         scope.current_function = function = Program::Function.new(
-          AST::Identifier.new("ref").from(declare.head.first),
+          AST::Identifier.new("ref").from(declare.terms.first),
           name,
           params,
           AST::Identifier.new("None").from(name),
@@ -203,14 +203,14 @@ module Savi::Program::Intrinsic
         type = scope.current_type
 
         # TODO: Move this error to a later compiler pass?
-        Error.at declare.head.first, "stateless types can't have constructors" \
+        Error.at declare.terms.first, "stateless types can't have constructors" \
           if type.has_tag?(:simple_value) || type.has_tag?(:ignores_cap)
 
         if terms["name_and_params"]?
           name, params =
             AST::Extract.name_and_params(terms["name_and_params"].not_nil!)
         else
-          name = declare.head.first.dup.as(AST::Identifier)
+          name = declare.terms.first.dup.as(AST::Identifier)
           params = terms["params"]?.as(AST::Group?)
         end
 
@@ -227,7 +227,7 @@ module Savi::Program::Intrinsic
         scope.on_body { |body| function.body = body }
       when "const"
         function = Program::Function.new(
-          AST::Identifier.new("non").from(declare.head.first),
+          AST::Identifier.new("non").from(declare.terms.first),
           terms["name"].as(AST::Identifier),
           nil,
           terms["type"]?.as(AST::Term?),
@@ -240,17 +240,17 @@ module Savi::Program::Intrinsic
         type = scope.current_type
 
         # TODO: Move this error to a later compiler pass?
-        Error.at declare.head.first, "stateless types can't have properties" \
+        Error.at declare.terms.first, "stateless types can't have properties" \
           if type.has_tag?(:simple_value) || type.has_tag?(:ignores_cap)
 
         is_let = declarator.name.value == "let"
 
         # TODO: Move this error to a later compiler pass?
-        Error.at declare.head.first,
+        Error.at declare.terms.first,
           "This type can't have any reassignable fields; use `let` here" \
           if !is_let && type.has_tag?(:no_field_reassign)
 
-        keyword = declare.head.first
+        keyword = declare.terms.first
         ident = terms["name"].as(AST::Identifier)
         ret = terms["type"]?.as(AST::Term?)
 
@@ -344,16 +344,16 @@ module Savi::Program::Intrinsic
         type.functions << displace_func
       when "is"
         scope.current_type.functions << Program::Function.new(
-          AST::Identifier.new("non").from(declare.head.first),
-          declare.head.first.as(AST::Identifier),
+          AST::Identifier.new("non").from(declare.terms.first),
+          declare.terms.first.as(AST::Identifier),
           nil,
           terms["trait"].as(AST::Term),
           nil,
         ).tap(&.add_tag(:hygienic)).tap(&.add_tag(:is)).tap(&.add_tag(:copies))
       when "copies"
         scope.current_type.functions << Program::Function.new(
-          AST::Identifier.new("non").from(declare.head.first),
-          declare.head.first.as(AST::Identifier),
+          AST::Identifier.new("non").from(declare.terms.first),
+          declare.terms.first.as(AST::Identifier),
           nil,
           terms["trait"].as(AST::Term),
           nil,

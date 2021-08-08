@@ -18,10 +18,10 @@ describe Savi::Parser do
 
     ast.to_a.pretty_inspect(74).should eq <<-AST
     [:doc,
-     [:declare, [[:ident, "class"], [:ident, "Example"]]],
-     [:declare, [[:ident, "let"], [:ident, "name"], [:ident, "String"]]],
+     [:declare, [:ident, "class"], [:ident, "Example"]],
+     [:declare, [:ident, "let"], [:ident, "name"], [:ident, "String"]],
      [:group, ":", [:string, "World", nil]],
-     [:declare, [[:ident, "fun"], [:ident, "greeting"], [:ident, "String"]]],
+     [:declare, [:ident, "fun"], [:ident, "greeting"], [:ident, "String"]],
      [:group,
       ":",
       [:relate,
@@ -29,11 +29,11 @@ describe Savi::Parser do
        [:op, "+"],
        [:string, "!", nil]]],
      [:declare,
-      [[:ident, "fun"],
-       [:qualify,
-        [:ident, "degreesF"],
-        [:group, "(", [:group, " ", [:ident, "c"], [:ident, "F64"]]]],
-       [:ident, "F64"]]],
+      [:ident, "fun"],
+      [:qualify,
+       [:ident, "degreesF"],
+       [:group, "(", [:group, " ", [:ident, "c"], [:ident, "F64"]]]],
+      [:ident, "F64"]],
      [:group,
       ":",
       [:relate,
@@ -71,8 +71,8 @@ describe Savi::Parser do
     # See https://github.com/crystal-lang/crystal/issues/5792
     ast.to_a.pretty_inspect(74).should eq <<-AST
     [:doc,
-     [:declare, [[:ident, "describe"], [:ident, "operators"]]],
-     [:declare, [[:ident, "demo"], [:ident, "all"]]],
+     [:declare, [:ident, "describe"], [:ident, "operators"]],
+     [:declare, [:ident, "demo"], [:ident, "all"]],
      [:group,
       ":",
       [:relate,
@@ -139,7 +139,7 @@ describe Savi::Parser do
             " ",
             [:ident, "x"],
             [:relate, [:ident, "x"], [:op, "."], [:ident, "y"]]]]]]]]],
-     [:declare, [[:ident, "demo"], [:ident, "mixed"]]],
+     [:declare, [:ident, "demo"], [:ident, "mixed"]],
      [:group,
       ":",
       [:relate,
@@ -161,7 +161,7 @@ describe Savi::Parser do
          [:ident, "k"]],
         [:op, "<<"],
         [:ident, "l"]]]],
-     [:declare, [[:ident, "demo"], [:ident, "prefix"]]],
+     [:declare, [:ident, "demo"], [:ident, "prefix"]],
      [:group, ":", [:prefix, [:op, "~"], [:ident, "x"]]]]
     AST
   end
@@ -208,8 +208,8 @@ describe Savi::Parser do
     ast = Savi::Parser.parse(source)
 
     ast.to_a.should eq [:doc,
-      [:declare, [[:ident, "actor"], [:ident, "Main"]]],
-      [:declare, [[:ident, "new"]]],
+      [:declare, [:ident, "actor"], [:ident, "Main"]],
+      [:declare, [:ident, "new"]],
       [:group, ":",
         [:string, "FOO", nil],
         [:string, "FOO<<<BAR>>>BAZ", nil],
@@ -231,10 +231,10 @@ describe Savi::Parser do
     # Can't use array literals here because Crystal is too slow to compile them.
     ast.to_a.pretty_inspect(74).should eq <<-AST
     [:doc,
-     [:declare, [[:ident, "module"], [:ident, "Example"]]],
-     [:declare, [[:ident, "const"], [:ident, "x"], [:ident, "U64"]]],
+     [:declare, [:ident, "module"], [:ident, "Example"]],
+     [:declare, [:ident, "const"], [:ident, "x"], [:ident, "U64"]],
      [:group, ":", [:integer, 1]],
-     [:declare, [[:ident, "const"], [:ident, "y"], [:ident, "U64"]]],
+     [:declare, [:ident, "const"], [:ident, "y"], [:ident, "U64"]],
      [:group, ":", [:integer, -1]]]
     AST
   end

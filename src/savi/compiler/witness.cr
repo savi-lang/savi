@@ -8,7 +8,7 @@ class Savi::Witness
   # coercing and extracting terms into an output map to return to the caller.
   # If the declare statement doesn't match the plan, an error will be raised.
   def run(decl : AST::Declare)
-    list = decl.head
+    list = decl.terms
     list_index = 0
     plan_index = 0
 

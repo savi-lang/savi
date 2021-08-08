@@ -138,29 +138,29 @@ module Savi::AST
   end
 
   class Declare < Node
-    property head : Array(Term) # TODO: rename as `terms`
-    def initialize(@head = [] of Term)
+    property terms : Array(Term) # TODO: rename as `terms`
+    def initialize(@terms = [] of Term)
     end
 
     def name; :declare end
     def to_a: Array(A)
       res = [name] of A
-      res << head.map(&.to_a.as(A)) # TODO: no extra array layer in presentation
+      res.concat(terms.map(&.to_a.as(A)))
       res
     end
     def children_accept(ctx : Compiler::Context, visitor : Visitor)
-      @head.each(&.accept(ctx, visitor))
+      @terms.each(&.accept(ctx, visitor))
     end
     def children_accept(ctx : Compiler::Context, visitor : CopyOnMutateVisitor)
-      new_head, head_changed = children_list_accept(ctx, @head, visitor)
-      return self unless head_changed
+      new_terms, terms_changed = children_list_accept(ctx, @terms, visitor)
+      return self unless terms_changed
       dup.tap do |node|
-        node.head = new_head
+        node.terms = new_terms
       end
     end
 
     def keyword
-      head.first.as(Identifier).value
+      terms.first.as(Identifier).value
     end
   end
 

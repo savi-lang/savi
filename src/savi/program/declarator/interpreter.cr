@@ -38,7 +38,7 @@ module Savi::Program::Declarator::Interpreter
 
   def self.interpret(ctx, scope, declarators, declare : AST::Declare)
     # Filter for declarators that have the right name.
-    name = declare.head.first.as(AST::Identifier).value
+    name = declare.terms.first.as(AST::Identifier).value
     with_right_name = declarators.select(&.matches_name?(name))
     if with_right_name.empty?
       # Try to find a fuzzy name suggestion to help with a spelling mistake.
@@ -46,7 +46,7 @@ module Savi::Program::Declarator::Interpreter
         declarators.each { |declarator| finder.test(declarator.name.value) }
       }.best_match.try { |name_2| declarators.find(&.matches_name?(name_2)) }
 
-      ctx.error_at declare.head.first,
+      ctx.error_at declare.terms.first,
         "There is no declarator named `#{name}` known within this file scope", [
           if suggestion
             {suggestion.name.pos, "did you mean `:#{suggestion.name.value}`?"}
@@ -75,14 +75,14 @@ module Savi::Program::Declarator::Interpreter
     # Find a declarator whose terms are accepted by the term acceptors.
     terms : Hash(String, AST::Term?)? = nil
     declarator = with_right_context.find { |declarator|
-      terms = declarator.matches_head?(declare.head)
+      terms = declarator.matches_head?(declare.terms)
       true if terms
     }
     unless declarator && terms
       # Collect match errors for the declarators that failed above.
       errors = with_right_context.flat_map { |declarator|
         single_errors = [{declarator.name.pos, "This declarator didn't match"}]
-        declarator.matches_head?(declare.head, single_errors)
+        declarator.matches_head?(declare.terms, single_errors)
         single_errors
       }
 
