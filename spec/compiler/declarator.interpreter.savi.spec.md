@@ -120,3 +120,49 @@ These declaration terms didn't match any known declarator:
   :term out TypeOrTypeList
   ^~~~~~~~~~~~~~~~~~~~~~~~
 ```
+
+---
+
+It complains when a body is not within any declaration that accepts it.
+
+```savi
+:class NoBodyForMePlease
+  "here's a body for ya"
+```
+```error
+This body wasn't accepted by any open declaration:
+  "here's a body for ya"
+  ^~~~~~~~~~~~~~~~~~~~~~
+```
+
+---
+
+It complains when a body is given to a declaration that already accepted one.
+
+```savi
+  :fun one_body
+    "here's the one body; pretty standard stuff"
+
+  :fun one_body_with_yield
+    :yields String
+    "here's the one body, after a yield; that's okay"
+
+  :fun two_bodies
+    "here's the first of two bodies"
+    :yields String
+    "here's the second of two bodies; huh?"
+```
+```error
+This declaration already accepted a body here:
+    "here's the first of two bodies"
+    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- so it can't accept this additional body here:
+    "here's the second of two bodies; huh?"
+    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+```
+```error
+This body wasn't accepted by any open declaration:
+    "here's the second of two bodies; huh?"
+    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+```
