@@ -53,7 +53,7 @@ describe Savi::Compiler::ServeDefinition do
 
       :new new_iso
 
-      :fun test
+      :fun test: None
 
     :actor Main
       :new

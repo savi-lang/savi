@@ -101,11 +101,11 @@ class Savi::Program
   class TypeAlias
     property ident : AST::Identifier
     property params : AST::Group?
-    property target : AST::Term
+    property! target : AST::Term
 
     getter metadata
 
-    def initialize(@ident, @params, @target)
+    def initialize(@ident, @params)
       @metadata = Hash(Symbol, UInt64 | Bool).new
     end
 
@@ -153,9 +153,9 @@ class Savi::Program
   class TypeWithValue
     property ident : AST::Identifier
     property target : Type::Link
-    property value : UInt64
+    property! value : UInt64
 
-    def initialize(@ident, @target, @value)
+    def initialize(@ident, @target)
     end
 
     def inspect(io : IO)

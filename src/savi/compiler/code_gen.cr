@@ -752,10 +752,10 @@ class Savi::Compiler::CodeGen
     end
 
     # Now generate code for the expressions in the function body.
-    body = gfunc.func.body.not_nil!
+    body = gfunc.func.body
     last_expr = nil
     last_value =
-      if body.terms.empty?
+      if !body || body.terms.empty?
         gen_none
       elsif gfunc.func.has_tag?(:constant)
         last_expr = body.terms.last
@@ -766,7 +766,7 @@ class Savi::Compiler::CodeGen
       end
 
     gfunc.calling_convention.gen_return(self, gfunc, last_value, last_expr) \
-      unless func_frame.flow.jumps_away?(gfunc.func.body.not_nil!)
+      unless body && func_frame.flow.jumps_away?(body)
 
     gen_func_end(gfunc)
   end

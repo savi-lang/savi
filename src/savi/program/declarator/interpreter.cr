@@ -20,16 +20,23 @@ module Savi::Program::Declarator::Interpreter
     declarators = ctx.program.declarators
     declarators.concat(Bootstrap::BOOTSTRAP_DECLARATORS) if declarators.empty?
 
-    doc.list.each { |declare|
-      interpret(ctx, scope, declarators, declare)
+    doc.list.each { |item|
+      case item
+      when AST::Declare
+        interpret(ctx, scope, declarators, item)
+      when AST::Group
+        accept_body(ctx, scope, declarators, item)
+      else
+        raise NotImplementedError.new(item.class)
+      end
     }
 
-    while (declarator = scope.pop_context?)
+    while (declarator = scope.pop_declarator?(ctx))
       declarator.finish(ctx, scope, declarators)
     end
   end
 
-  def self.interpret(ctx, scope, declarators, declare)
+  def self.interpret(ctx, scope, declarators, declare : AST::Declare)
     # Filter for declarators that have the right name.
     name = declare.head.first.as(AST::Identifier).value
     with_right_name = declarators.select(&.matches_name?(name))
@@ -84,19 +91,39 @@ module Savi::Program::Declarator::Interpreter
       return
     end
 
-    # TODO: Check the body of the declare as well, and...
-    # deal with the messy stuff around :yields needing to give body to :fun
-
     # Now unwind the declaration hierarchy to reach the required context.
     # Call finish on each of the declarators we popped off the context stack.
     until scope.has_top_context?(declarator.context.value)
-      scope.pop_context.finish(ctx, scope, declarators)
+      scope.pop_declarator?(ctx).try(&.finish(ctx, scope, declarators))
     end
 
     # Observe the depth of this declaration.
-    ctx.declarators.observe_depth_of(declare, scope.context_depth)
+    ctx.declarators.observe_depth_of(declare, scope.declarator_depth)
+
+    # Push this declarator onto the scope stack.
+    scope.push_declarator(declare, declarator)
 
     # Finally, call run on the declarator to evaluate the declaration.
     declarator.run(ctx, scope, declare, terms)
+  end
+
+  def self.accept_body(ctx, scope, declarators, body : AST::Group)
+    loop do
+      # Get the declarator for the topmost open declaration.
+      declarator = scope.top_declarator?
+
+      # If there are no open declarations, this body doesn't go with anything.
+      unless declarator
+        ctx.error_at body, "This body wasn't accepted by any open declaration"
+        return
+      end
+
+      # If this body is accepted, return now.
+      return if scope.try_accept_body(ctx, body)
+
+      # Otherwise, finish this declarator and unwind the stack by one level,
+      # where we will try again to find an open declaration that allows a body.
+      scope.pop_declarator?(ctx).try(&.finish(ctx, scope, declarators))
+    end
   end
 end

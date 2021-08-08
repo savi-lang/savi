@@ -273,7 +273,7 @@ It complains when violating uniqueness into an argument:
     s2 iso = String.new_iso
     @example(s2) // not okay
 
-  :fun example(x String'val)
+  :fun example(x String'val): None
 ```
 ```error
 This aliasing violates uniqueness (did you forget to consume the variable?):
@@ -281,7 +281,7 @@ This aliasing violates uniqueness (did you forget to consume the variable?):
              ^~
 
 - it is required here to be a subtype of String:
-  :fun example(x String'val)
+  :fun example(x String'val): None
                  ^~~~~~~~~~
 
 - but the type of the local variable (when aliased) was String'iso'aliased:

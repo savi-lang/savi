@@ -17,28 +17,37 @@ module Savi::Parser::Builder
     assert_kind(main, :doc)
     doc = AST::Document.new
     decl : AST::Declare? = nil
+    body = AST::Group.new(":")
     annotations = [] of AST::Annotation
 
     iter.while_next_is_child_of(main) do |child|
       term = build_term(child, iter, state)
       case term
-      when AST::Declare then doc.list << (decl = term)
       when AST::Annotation then annotations << term
-      else
-        decl = decl.as(AST::Declare)
+      when AST::Declare
+        decl = term
 
         unless annotations.empty?
           decl.annotations = annotations
           annotations = [] of AST::Annotation
         end
 
-        decl.body.terms << term
-        if term.pos.finish > decl.body.pos.finish
-          new_pos = decl.body.pos
-          new_pos.finish = term.pos.finish
-          decl.body.with_pos(new_pos)
+        unless body.terms.empty?
+          body.with_pos(body.terms.first.pos.span([body.terms.last.pos]))
+          doc.list << body
+          body = AST::Group.new(":")
         end
+
+        doc.list << decl
+      else
+        body.terms << term
       end
+    end
+
+    unless body.terms.empty?
+      body.with_pos(body.terms.first.pos.span([body.terms.last.pos]))
+      doc.list << body
+      body = AST::Group.new(":")
     end
 
     doc

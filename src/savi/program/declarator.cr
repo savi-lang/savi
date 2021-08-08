@@ -124,8 +124,6 @@ class Savi::Program::Declarator
       unless intrinsic
 
     Intrinsic.run(ctx, scope, self, declare, terms)
-
-    scope.push_context(self) if @begins.any?
   end
 
   def finish(ctx, scope, declarators)

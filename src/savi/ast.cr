@@ -114,9 +114,9 @@ module Savi::AST
   end
 
   class Document < Node
-    property list : Array(Declare)
+    property list : Array(Node) # really, Array(Declare | Group), but Crystal fails with this kind of union of sibling types
     property! source : Source
-    def initialize(@list = [] of Declare)
+    def initialize(@list = [] of Node)
     end
 
     def name; :doc end
@@ -138,34 +138,24 @@ module Savi::AST
   end
 
   class Declare < Node
-    property head : Array(Term)
-    property body : Group
-    def initialize(@head = [] of Term, @body = Group.new(":"))
-    end
-
-    def with_pos(pos : Source::Pos)
-      @body.with_pos(pos)
-      super
+    property head : Array(Term) # TODO: rename as `terms`
+    def initialize(@head = [] of Term)
     end
 
     def name; :declare end
     def to_a: Array(A)
       res = [name] of A
-      res << head.map(&.to_a.as(A))
-      res << body.to_a
+      res << head.map(&.to_a.as(A)) # TODO: no extra array layer in presentation
       res
     end
     def children_accept(ctx : Compiler::Context, visitor : Visitor)
       @head.each(&.accept(ctx, visitor))
-      @body.accept(ctx, visitor)
     end
     def children_accept(ctx : Compiler::Context, visitor : CopyOnMutateVisitor)
       new_head, head_changed = children_list_accept(ctx, @head, visitor)
-      new_body, body_changed = child_single_accept(ctx, @body, visitor)
-      return self unless head_changed || body_changed
+      return self unless head_changed
       dup.tap do |node|
         node.head = new_head
-        node.body = new_body
       end
     end
 

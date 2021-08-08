@@ -9,8 +9,9 @@ describe Savi::Compiler::Reparse do
     ast = Savi::Parser.parse(source)
 
     ast.to_a.should eq [:doc,
-      [:declare, [[:ident, "class"], [:ident, "Example"]], [:group, ":"]],
-      [:declare, [[:ident, "fun"], [:ident, "chained"]], [:group, ":",
+      [:declare, [[:ident, "class"], [:ident, "Example"]]],
+      [:declare, [[:ident, "fun"], [:ident, "chained"]]],
+      [:group, ":",
         [:qualify,
           [:relate,
             [:qualify,
@@ -22,7 +23,7 @@ describe Savi::Compiler::Reparse do
           ],
           [:group, "(", [:ident, "z"]],
         ],
-      ]],
+      ],
     ]
 
     ctx = Savi.compiler.compile([ast], Savi::Compiler::Context.new, :reparse)
@@ -59,8 +60,9 @@ describe Savi::Compiler::Reparse do
     ast = Savi::Parser.parse(source)
 
     ast.to_a.should eq [:doc,
-      [:declare, [[:ident, "class"], [:ident, "Example"]], [:group, ":"]],
-      [:declare, [[:ident, "fun"], [:ident, "selfish"]], [:group, ":",
+      [:declare, [[:ident, "class"], [:ident, "Example"]]],
+      [:declare, [[:ident, "fun"], [:ident, "selfish"]]],
+      [:group, ":",
         [:ident, "@x"],
         [:qualify, [:ident, "@x"], [:group, "(", [:ident, "y"]]],
         [:relate,
@@ -76,7 +78,7 @@ describe Savi::Compiler::Reparse do
           [:op, "->"],
           [:group, "(", [:ident, "True"]],
         ],
-      ]],
+      ],
     ]
 
     ctx = Savi.compiler.compile([ast], Savi::Compiler::Context.new, :reparse)

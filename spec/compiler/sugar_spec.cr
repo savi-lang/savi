@@ -12,14 +12,11 @@ describe Savi::Compiler::Sugar do
     ast = Savi::Parser.parse(source)
 
     ast.to_a.should eq [:doc,
-      [:declare, [[:ident, "actor"], [:ident, "Example"]], [:group, ":"]],
-      [:declare,
-        [[:ident, "fun"], [:ident, "return_none"], [:ident, "None"]],
-        [:group, ":", [:string, "this isn't the return value", nil]],
-      ],
-      [:declare, [[:ident, "be"], [:ident, "behave"]], [:group, ":",
-        [:string, "this isn't the return value", nil],
-      ]]
+      [:declare, [[:ident, "actor"], [:ident, "Example"]]],
+      [:declare, [[:ident, "fun"], [:ident, "return_none"], [:ident, "None"]]],
+      [:group, ":", [:string, "this isn't the return value", nil]],
+      [:declare, [[:ident, "be"], [:ident, "behave"]]],
+      [:group, ":", [:string, "this isn't the return value", nil]],
     ]
 
     ctx = Savi.compiler.compile([ast], Savi::Compiler::Context.new, :sugar)
@@ -53,8 +50,9 @@ describe Savi::Compiler::Sugar do
     ast = Savi::Parser.parse(source)
 
     ast.to_a.should eq [:doc,
-      [:declare, [[:ident, "class"], [:ident, "Example"]], [:group, ":"]],
-      [:declare, [[:ident, "fun"], [:ident, "prop_assign"]], [:group, ":",
+      [:declare, [[:ident, "class"], [:ident, "Example"]]],
+      [:declare, [[:ident, "fun"], [:ident, "prop_assign"]]],
+      [:group, ":",
         [:relate,
           [:relate, [:ident, "x"], [:op, "."], [:ident, "y"]],
           [:op, "="],
@@ -65,7 +63,7 @@ describe Savi::Compiler::Sugar do
           [:op, "="],
           [:ident, "z"],
         ],
-      ]],
+      ],
     ]
 
     ctx = Savi.compiler.compile([ast], Savi::Compiler::Context.new, :sugar)
@@ -101,8 +99,9 @@ describe Savi::Compiler::Sugar do
     ast = Savi::Parser.parse(source)
 
     ast.to_a.should eq [:doc,
-      [:declare, [[:ident, "class"], [:ident, "Example"]], [:group, ":"]],
-      [:declare, [[:ident, "fun"], [:ident, "prop_assign"]], [:group, ":",
+      [:declare, [[:ident, "class"], [:ident, "Example"]]],
+      [:declare, [[:ident, "fun"], [:ident, "prop_assign"]]],
+      [:group, ":",
         [:relate,
           [:relate, [:ident, "x"], [:op, "."], [:ident, "y"]],
           [:op, "+="],
@@ -112,7 +111,7 @@ describe Savi::Compiler::Sugar do
           [:relate, [:ident, "x"], [:op, "."], [:ident, "y"]],
           [:op, "-="], [:ident, "z"],
         ],
-      ]],
+      ],
     ]
 
     ctx = Savi.compiler.compile([ast], Savi::Compiler::Context.new, :sugar)
@@ -159,10 +158,9 @@ describe Savi::Compiler::Sugar do
     ast = Savi::Parser.parse(source)
 
     ast.to_a.should eq [:doc,
-      [:declare, [[:ident, "class"], [:ident, "Example"]], [:group, ":"]],
-      [:declare, [[:ident, "fun"], [:ident, "plus"]], [:group, ":",
-        [:relate, [:ident, "x"], [:op, "+"], [:ident, "y"]],
-      ]],
+      [:declare, [[:ident, "class"], [:ident, "Example"]]],
+      [:declare, [[:ident, "fun"], [:ident, "plus"]]],
+      [:group, ":", [:relate, [:ident, "x"], [:op, "+"], [:ident, "y"]]],
     ]
 
     ctx = Savi.compiler.compile([ast], Savi::Compiler::Context.new, :sugar)
@@ -194,8 +192,9 @@ describe Savi::Compiler::Sugar do
     ast = Savi::Parser.parse(source)
 
     ast.to_a.should eq [:doc,
-      [:declare, [[:ident, "class"], [:ident, "Example"]], [:group, ":"]],
-      [:declare, [[:ident, "fun"], [:ident, "countdown"]], [:group, ":",
+      [:declare, [[:ident, "class"], [:ident, "Example"]]],
+      [:declare, [[:ident, "fun"], [:ident, "countdown"]]],
+      [:group, ":",
         [:group, " ",
           [:ident, "while"],
           [:group, "(",
@@ -203,7 +202,7 @@ describe Savi::Compiler::Sugar do
           ],
           [:group, "(", [:ident, "y"]],
         ],
-      ]],
+      ],
     ]
 
     ctx = Savi.compiler.compile([ast], Savi::Compiler::Context.new, :sugar)
@@ -242,10 +241,9 @@ describe Savi::Compiler::Sugar do
     ast = Savi::Parser.parse(source)
 
     ast.to_a.should eq [:doc,
-      [:declare, [[:ident, "class"], [:ident, "Example"]], [:group, ":"]],
-      [:declare, [[:ident, "fun"], [:ident, "square"]], [:group, ":",
-        [:qualify, [:ident, "x"], [:group, "[", [:ident, "y"]]],
-      ]],
+      [:declare, [[:ident, "class"], [:ident, "Example"]]],
+      [:declare, [[:ident, "fun"], [:ident, "square"]]],
+      [:group, ":", [:qualify, [:ident, "x"], [:group, "[", [:ident, "y"]]]],
     ]
 
     ctx = Savi.compiler.compile([ast], Savi::Compiler::Context.new, :sugar)
@@ -276,8 +274,9 @@ describe Savi::Compiler::Sugar do
     ast = Savi::Parser.parse(source)
 
     ast.to_a.should eq [:doc,
-      [:declare, [[:ident, "class"], [:ident, "Example"]], [:group, ":"]],
-      [:declare, [[:ident, "fun"], [:ident, "chained"]], [:group, ":",
+      [:declare, [[:ident, "class"], [:ident, "Example"]]],
+      [:declare, [[:ident, "fun"], [:ident, "chained"]]],
+      [:group, ":",
         [:qualify,
           [:relate,
             [:qualify,
@@ -310,7 +309,7 @@ describe Savi::Compiler::Sugar do
           ],
           [:group, "[", [:ident, "z"]],
         ],
-      ]],
+      ],
     ]
 
     ctx = Savi.compiler.compile([ast], Savi::Compiler::Context.new, :sugar)
@@ -370,14 +369,15 @@ describe Savi::Compiler::Sugar do
     ast = Savi::Parser.parse(source)
 
     ast.to_a.should eq [:doc,
-      [:declare, [[:ident, "class"], [:ident, "Example"]], [:group, ":"]],
-      [:declare, [[:ident, "fun"], [:ident, "square"]], [:group, ":",
+      [:declare, [[:ident, "class"], [:ident, "Example"]]],
+      [:declare, [[:ident, "fun"], [:ident, "square"]]],
+      [:group, ":",
         [:relate,
           [:qualify, [:ident, "x"], [:group, "[", [:ident, "y"]]],
           [:op, "="],
           [:ident, "z"]
         ],
-      ]],
+      ],
     ]
 
     ctx = Savi.compiler.compile([ast], Savi::Compiler::Context.new, :sugar)
@@ -407,10 +407,9 @@ describe Savi::Compiler::Sugar do
     ast = Savi::Parser.parse(source)
 
     ast.to_a.should eq [:doc,
-      [:declare, [[:ident, "class"], [:ident, "Example"]], [:group, ":"]],
-      [:declare, [[:ident, "new"]], [:group, ":",
-        [:relate, [:ident, "x"], [:op, "="], [:integer, 1_u64]]
-      ]]
+      [:declare, [[:ident, "class"], [:ident, "Example"]]],
+      [:declare, [[:ident, "new"]]],
+      [:group, ":", [:relate, [:ident, "x"], [:op, "="], [:integer, 1_u64]]],
     ]
 
     ctx = Savi.compiler.compile([ast], Savi::Compiler::Context.new, :sugar)
@@ -437,16 +436,15 @@ describe Savi::Compiler::Sugar do
     ast = Savi::Parser.parse(source)
 
     ast.to_a.should eq [:doc,
-      [:declare, [[:ident, "class"], [:ident, "Example"]], [:group, ":"]],
+      [:declare, [[:ident, "class"], [:ident, "Example"]]],
       [:declare, [[:ident, "fun"], [:qualify, [:ident, "param_assigns"],
           [:group, "(",
             [:ident, "@x"],
             [:relate, [:ident, "@y"], [:op, "."], [:ident, "z"]]
           ],
         ]],
-        [:group, ":",
-        [:relate, [:ident, "@y"], [:op, "."], [:ident, "after"]],
-      ]],
+      ],
+      [:group, ":", [:relate, [:ident, "@y"], [:op, "."], [:ident, "after"]]],
     ]
 
     ctx = Savi.compiler.compile([ast], Savi::Compiler::Context.new, :sugar)
@@ -489,8 +487,9 @@ describe Savi::Compiler::Sugar do
     ast = Savi::Parser.parse(source)
 
     ast.to_a.should eq [:doc,
-      [:declare, [[:ident, "class"], [:ident, "Example"]], [:group, ":"]],
-      [:declare, [[:ident, "fun"], [:ident, "logical"]], [:group, ":",
+      [:declare, [[:ident, "class"], [:ident, "Example"]]],
+      [:declare, [[:ident, "fun"], [:ident, "logical"]]],
+      [:group, ":",
         [:relate,
           [:relate,
             [:relate,
@@ -504,7 +503,7 @@ describe Savi::Compiler::Sugar do
           [:op, "&&"],
           [:prefix, [:op, "!"], [:ident, "z"]],
         ],
-      ]],
+      ],
     ]
 
     ctx = Savi.compiler.compile([ast], Savi::Compiler::Context.new, :sugar)
