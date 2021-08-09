@@ -136,7 +136,7 @@
 :: Declare a concurrent actor type, inaccessible except via message passing.
 ::
 :: Actors are the unit of concurrency in Savi - without separate actors doing
-:: work separately from eachother, your program will not be parallelizable.
+:: work separately from each other, your program will not be parallelizable.
 ::
 :: An actor instance is a bit like a thread with state attached, though they
 :: are not true threads, in that they are multiplexed onto a smaller number
@@ -191,7 +191,7 @@
 :: So when does the actor itself get deallocated? It gets garbage-collected
 :: when it has been proven that it is no longer possible for it to receive
 :: more messages, because nothing in the program has a reference to it,
-:: (or because it is part of a cyclical graph that have references to eachother,
+:: (or because it is part of a cyclical graph with references to each other,
 :: but the graph is at quiescence and unattached to the rest of the program).
 :: This is silently done automatically by the runtime with no explicit
 :: awareness needed on the part of the programmer, though some programmers
@@ -235,7 +235,7 @@
 :: The subtype may inherit these methods without change, or it can define
 :: different implementation bodies than the ones provided by the `:trait`.
 ::
-:: Traits are the way to acheive something like the traditional object-oriented
+:: Traits are the way to achieve something like the traditional object-oriented
 :: notion of inheritance among types for code reuse and substitutability.
 :: The key difference is that Savi doesn't allow the supertypes to be concrete.
 :: they can only be abstract types which cannot be instantiated in the program.
