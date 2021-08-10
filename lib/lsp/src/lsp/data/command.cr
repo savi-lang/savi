@@ -7,22 +7,20 @@ module LSP::Data
   # The protocol currently doesn't specify a set of well-known commands.
   # So executing a command requires some tool extension code.
   struct Command
-    include JSON::Serializable
+    JSON.mapping({
+      # Title of the command, like `save`.
+      title: String,
 
-    # Title of the command, like `save`.
-    property title : String
+      # The identifier of the actual command handler.
+      command: String,
 
-    # The identifier of the actual command handler.
-    property command : String
-
-    # Arguments that the command handler should be invoked with.
-    property arguments : Array(JSON::Any) = [] of JSON::Any
-
+      # Arguments that the command handler should be invoked with.
+      arguments: {type: Array(JSON::Any), default: [] of JSON::Any},
+    })
     def initialize(
       @title = "",
       @command = "",
-      @arguments = [] of JSON::Any
-    )
+      @arguments = [] of JSON::Any)
     end
   end
 end

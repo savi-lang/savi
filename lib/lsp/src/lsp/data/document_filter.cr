@@ -9,17 +9,16 @@ module LSP::Data
   #     { language: 'typescript', scheme: 'file' }
   #     { language: 'json', pattern: '**/package.json' }
   struct DocumentFilter
-    include JSON::Serializable
+    JSON.mapping({
+      # A language id, like `typescript`.
+      language: String?,
 
-    # A language id, like `typescript`.
-    property language : String?
+      # A Uri [scheme](#Uri.scheme), like `file` or `untitled`.
+      scheme: String?,
 
-    # A Uri [scheme](#Uri.scheme), like `file` or `untitled`.
-    property scheme : String?
-
-    # A glob pattern, like `*.{ts,js}`.
-    property pattern : String?
-
+      # A glob pattern, like `*.{ts,js}`.
+      pattern: String?,
+    })
     def initialize(@language = nil, @scheme = nil, @pattern = nil)
     end
   end

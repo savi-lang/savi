@@ -3,87 +3,75 @@ require "json"
 module LSP::Data
   # Text document specific client capabilities.
   struct TextDocumentClientCapabilities
-    include JSON::Serializable
+    JSON.mapping({
+      synchronization: {type: Synchronization, default: Synchronization.new},
 
-    property synchronization : Synchronization = Synchronization.new
+      # Capabilities specific to the `textDocument/completion`
+      completion: {type: Completion, default: Completion.new},
 
-    # Capabilities specific to the `textDocument/completion`
-    property completion : Completion = Completion.new
+      # Capabilities specific to the `textDocument/hover`
+      hover: {type: Hover, default: Hover.new},
 
-    # Capabilities specific to the `textDocument/hover`
-    property hover : Hover = Hover.new
+      # Capabilities specific to the `textDocument/signatureHelp`
+      signature_help: {type: SignatureHelp, default: SignatureHelp.new, key: "signatureHelp" },
 
-    # Capabilities specific to the `textDocument/signatureHelp`
-    @[JSON::Field(key: "signatureHelp")]
-    property signature_help : SignatureHelp = SignatureHelp.new
+      # Capabilities specific to the `textDocument/references`
+      references: {type: DynamicRegistration, default: DynamicRegistration.new},
 
-    # Capabilities specific to the `textDocument/references`
-    property references : DynamicRegistration = DynamicRegistration.new
+      # Capabilities specific to the `textDocument/documentHighlight`
+      document_highlight: {type: DynamicRegistration, default: DynamicRegistration.new, key: "documentHighlight"},
 
-    # Capabilities specific to the `textDocument/documentHighlight`
-    @[JSON::Field(key: "documentHighlight")]
-    property document_highlight : DynamicRegistration = DynamicRegistration.new
+      # Capabilities specific to the `textDocument/documentSymbol`
+      document_symbol: {type: DocumentSymbol, default: DocumentSymbol.new, key: "documentSymbol" },
 
-    # Capabilities specific to the `textDocument/documentSymbol`
-    @[JSON::Field(key: "documentSymbol")]
-    property document_symbol : DocumentSymbol = DocumentSymbol.new
+      # Capabilities specific to the `textDocument/formatting`
+      formatting: {type: DynamicRegistration, default: DynamicRegistration.new},
 
-    # Capabilities specific to the `textDocument/formatting`
-    property formatting : DynamicRegistration = DynamicRegistration.new
+      # Capabilities specific to the `textDocument/rangeFormatting`
+      range_formatting: {type: DynamicRegistration, default: DynamicRegistration.new, key: "rangeFormatting"},
 
-    # Capabilities specific to the `textDocument/rangeFormatting`
-    @[JSON::Field(key: "rangeFormatting")]
-    property range_formatting : DynamicRegistration = DynamicRegistration.new
+      # Capabilities specific to the `textDocument/onTypeFormatting`
+      on_type_formatting: {type: DynamicRegistration, default: DynamicRegistration.new, key: "onTypeFormatting"},
 
-    # Capabilities specific to the `textDocument/onTypeFormatting`
-    @[JSON::Field(key: "onTypeFormatting")]
-    property on_type_formatting : DynamicRegistration = DynamicRegistration.new
+      # Capabilities specific to the `textDocument/definition`
+      definition: {type: DynamicRegistration, default: DynamicRegistration.new},
 
-    # Capabilities specific to the `textDocument/definition`
-    property definition : DynamicRegistration = DynamicRegistration.new
+      # Capabilities specific to the `textDocument/typeDefinition`
+      #
+      # Since 3.6.0
+      type_definition: {type: DynamicRegistration, default: DynamicRegistration.new, key: "typeDefinition"},
 
-    # Capabilities specific to the `textDocument/typeDefinition`
-    #
-    # Since 3.6.0
-    @[JSON::Field(key: "typeDefinition")]
-    property type_definition : DynamicRegistration = DynamicRegistration.new
+      # Capabilities specific to the `textDocument/implementation`.
+      #
+      # Since 3.6.0
+      implementation: {type: DynamicRegistration, default: DynamicRegistration.new},
 
-    # Capabilities specific to the `textDocument/implementation`.
-    #
-    # Since 3.6.0
-    property implementation : DynamicRegistration = DynamicRegistration.new
+      # Capabilities specific to the `textDocument/codeAction`
+      code_action: {type: CodeAction, default: CodeAction.new, key: "codeAction" },
 
-    # Capabilities specific to the `textDocument/codeAction`
-    @[JSON::Field(key: "codeAction")]
-    property code_action : CodeAction = CodeAction.new
+      # Capabilities specific to the `textDocument/codeLens`
+      code_lens: {type: DynamicRegistration, default: DynamicRegistration.new, key: "codeLens"},
 
-    # Capabilities specific to the `textDocument/codeLens`
-    @[JSON::Field(key: "codeLens")]
-    property code_lens : DynamicRegistration = DynamicRegistration.new
+      # Capabilities specific to the `textDocument/documentLink`
+      document_link: {type: DynamicRegistration, default: DynamicRegistration.new, key: "documentLink"},
 
-    # Capabilities specific to the `textDocument/documentLink`
-    @[JSON::Field(key: "documentLink")]
-    property document_link : DynamicRegistration = DynamicRegistration.new
+      # Capabilities specific to the `textDocument/documentColor` and the
+      # `textDocument/colorPresentation` request.
+      #
+      # Since 3.6.0
+      color_provider: {type: DynamicRegistration, default: DynamicRegistration.new, key: "colorProvider"},
 
-    # Capabilities specific to the `textDocument/documentColor` and the
-    # `textDocument/colorPresentation` request.
-    #
-    # Since 3.6.0
-    @[JSON::Field(key: "colorProvider")]
-    property color_provider : DynamicRegistration = DynamicRegistration.new
+      # Capabilities specific to the `textDocument/rename`
+      rename: {type: Rename, default: Rename.new},
 
-    # Capabilities specific to the `textDocument/rename`
-    property rename : Rename = Rename.new
+      # Capabilities specific to `textDocument/publishDiagnostics`.
+      publish_diagnostics: {type: PublishDiagnostics, default: PublishDiagnostics.new, key: "publishDiagnostics" },
 
-    # Capabilities specific to `textDocument/publishDiagnostics`.
-    @[JSON::Field(key: "publishDiagnostics")]
-    property publish_diagnostics : PublishDiagnostics = PublishDiagnostics.new
-
-    # Capabilities specific to `textDocument/foldingRange` requests.
-    #
-    # Since 3.10.0
-    @[JSON::Field(key: "foldingRange")]
-    property folding_range : FoldingRange = FoldingRange.new
+      # Capabilities specific to `textDocument/foldingRange` requests.
+      #
+      # Since 3.10.0
+      folding_range: {type: FoldingRange, default: FoldingRange.new, key: "foldingRange"},
+    })
 
     def initialize
       @synchronization = Synchronization.new
@@ -109,26 +97,21 @@ module LSP::Data
     end
 
     struct Synchronization
-      include JSON::Serializable
+      JSON.mapping({
+        # Whether text document synchronization supports dynamic registration.
+        dynamic_registration: {type: Bool, default: false, key: "dynamicRegistration"},
 
-      # Whether text document synchronization supports dynamic registration.
-      @[JSON::Field(key: "dynamicRegistration")]
-      property dynamic_registration : Bool = false
+        # The client supports sending will save notifications.
+        will_save: {type: Bool, default: false, key: "willSave"},
 
-      # The client supports sending will save notifications.
-      @[JSON::Field(key: "willSave")]
-      property will_save : Bool = false
+        # The client supports sending a will save request and
+        # waits for a response providing text edits which will
+        # be applied to the document before it is saved.
+        will_save_wait_until: {type: Bool, default: false, key: "willSaveWaitUntil"},
 
-      # The client supports sending a will save request and
-      # waits for a response providing text edits which will
-      # be applied to the document before it is saved.
-      @[JSON::Field(key: "willSaveWaitUntil")]
-      property will_save_wait_until : Bool = false
-
-      # The client supports did save notifications.
-      @[JSON::Field(key: "didSave")]
-      property did_save : Bool = false
-
+        # The client supports did save notifications.
+        did_save: {type: Bool, default: false, key: "didSave"},
+      })
       def initialize
         @dynamic_registration = false
         @will_save = false
@@ -138,25 +121,20 @@ module LSP::Data
     end
 
     struct Completion
-      include JSON::Serializable
+      JSON.mapping({
+        # Whether completion supports dynamic registration.
+        dynamic_registration: {type: Bool, default: false, key: "dynamicRegistration"},
 
-      # Whether completion supports dynamic registration.
-      @[JSON::Field(key: "dynamicRegistration")]
-      property dynamic_registration : Bool = false
+        # The client supports the following `CompletionItem` specific
+        # capabilities.
+        completion_item: {type: CompletionItem, default: CompletionItem.new, key: "completionItem" },
 
-      # The client supports the following `CompletionItem` specific
-      # capabilities.
-      @[JSON::Field(key: "completionItem")]
-      property completion_item : CompletionItem = CompletionItem.new
+        completion_item_kind: {type: CompletionItemKindSet, default: CompletionItemKindSet.new, key: "completionItemKind"},
 
-      @[JSON::Field(key: "completionItemKind")]
-      property completion_item_kind : CompletionItemKindSet = CompletionItemKindSet.new
-
-      # The client supports to send additional context information for a
-      # `textDocument/completion` request.
-      @[JSON::Field(key: "contextSupport")]
-      property context_support : Bool = false
-
+        # The client supports to send additional context information for a
+        # `textDocument/completion` request.
+        context_support: {type: Bool, default: false, key: "contextSupport"},
+      })
       def initialize
         @dynamic_registration = false
         @completion_item = CompletionItem.new
@@ -166,34 +144,28 @@ module LSP::Data
     end
 
     struct CompletionItem
-      include JSON::Serializable
+      JSON.mapping({
+        # Client supports snippets as insert text.
+        #
+        # A snippet can define tab stops and placeholders with `$1`, `$2`
+        # and `${3:foo}`. `$0` defines the final tab stop, it defaults to
+        # the end of the snippet. Placeholders with equal identifiers are linked,
+        # that is typing in one will update others too.
+        snippet_support: {type: Bool, default: false, key: "snippetSupport"},
 
-      # Client supports snippets as insert text.
-      #
-      # A snippet can define tab stops and placeholders with `$1`, `$2`
-      # and `${3:foo}`. `$0` defines the final tab stop, it defaults to
-      # the end of the snippet. Placeholders with equal identifiers are linked,
-      # that is typing in one will update others too.
-      @[JSON::Field(key: "snippetSupport")]
-      property snippet_support : Bool = false
+        # Client supports commit characters on a completion item.
+        commit_characters_support: {type: Bool, default: false, key: "commitCharactersSupport"},
 
-      # Client supports commit characters on a completion item.
-      @[JSON::Field(key: "commitCharactersSupport")]
-      property commit_characters_support : Bool = false
+        # Client supports the follow content formats for the documentation
+        # property. The order describes the preferred format of the client.
+        documentation_format: {type: Array(String), default: [] of String, key: "documentationFormat"},
 
-      # Client supports the follow content formats for the documentation
-      # property. The order describes the preferred format of the client.
-      @[JSON::Field(key: "documentationFormat")]
-      property documentation_format : Array(String) = [] of String
+        # Client supports the deprecated property on a completion item.
+        deprecated_support: {type: Bool, default: false, key: "deprecatedSupport"},
 
-      # Client supports the deprecated property on a completion item.
-      @[JSON::Field(key: "deprecatedSupport")]
-      property deprecated_support : Bool = false
-
-      # Client supports the preselect property on a completion item.
-      @[JSON::Field(key: "preselectSupport")]
-      property preselect_support : Bool = false
-
+        # Client supports the preselect property on a completion item.
+        preselect_support: {type: Bool, default: false, key: "preselectSupport"},
+      })
       def initialize
         @snippet_support = false
         @commit_characters_support = false
@@ -204,17 +176,14 @@ module LSP::Data
     end
 
     struct Hover
-      include JSON::Serializable
+      JSON.mapping({
+        # Whether hover supports dynamic registration.
+        dynamic_registration: {type: Bool, default: false, key: "dynamicRegistration"},
 
-      # Whether hover supports dynamic registration.
-      @[JSON::Field(key: "dynamicRegistration")]
-      property dynamic_registration : Bool = false
-
-      # Client supports the follow content formats for the content
-      # property. The order describes the preferred format of the client.
-      @[JSON::Field(key: "contentFormat")]
-      property content_format : Array(String) = [] of String
-
+        # Client supports the follow content formats for the content
+        # property. The order describes the preferred format of the client.
+        content_format: {type: Array(String), default: [] of String, key: "contentFormat"},
+      })
       def initialize
         @dynamic_registration = false
         @content_format = [] of String
@@ -222,17 +191,14 @@ module LSP::Data
     end
 
     struct SignatureHelp
-      include JSON::Serializable
+      JSON.mapping({
+        # Whether signature help supports dynamic registration.
+        dynamic_registration: {type: Bool, default: false, key: "dynamicRegistration"},
 
-      # Whether signature help supports dynamic registration.
-      @[JSON::Field(key: "dynamicRegistration")]
-      property dynamic_registration : Bool = false
-
-      # The client supports the following `SignatureInformation`
-      # specific properties.
-      @[JSON::Field(key: "signatureInformation")]
-      property signature_information : SignatureInformation = SignatureInformation.new
-
+        # The client supports the following `SignatureInformation`
+        # specific properties.
+        signature_information: {type: SignatureInformation, default: SignatureInformation.new, key: "signatureInformation" },
+      })
       def initialize
         @dynamic_registration = false
         @signature_information = SignatureInformation.new
@@ -240,33 +206,27 @@ module LSP::Data
     end
 
     struct SignatureInformation
-      include JSON::Serializable
-
-      # Client supports the follow content formats for the documentation
-      # property. The order describes the preferred format of the client.
-      @[JSON::Field(key: "documentationFormat")]
-      property documentation_format : Array(String) = [] of String
-
+      JSON.mapping({
+        # Client supports the follow content formats for the documentation
+        # property. The order describes the preferred format of the client.
+        documentation_format: {type: Array(String), default: [] of String, key: "documentationFormat"},
+      })
       def initialize
         @documentation_format = [] of String
       end
     end
 
     struct DocumentSymbol
-      include JSON::Serializable
+      JSON.mapping({
+        # Whether document symbol supports dynamic registration.
+        dynamic_registration: {type: Bool, default: false, key: "dynamicRegistration"},
 
-      # Whether document symbol supports dynamic registration.
-      @[JSON::Field(key: "dynamicRegistration")]
-      property dynamic_registration : Bool = false
+        # Specific capabilities for the `SymbolKind`.
+        symbol_kind: {type: SymbolKindSet, default: SymbolKindSet.new, key: "symbolKind"},
 
-      # Specific capabilities for the `SymbolKind`.
-      @[JSON::Field(key: "symbolKind")]
-      property symbol_kind : SymbolKindSet = SymbolKindSet.new
-
-      # The client support hierarchical document symbols.
-      @[JSON::Field(key: "hierarchicalDocumentSymbolSupport")]
-      property hierarchical_document_symbol_support : Bool = false
-
+        # The client support hierarchical document symbols.
+        hierarchical_document_symbol_support: {type: Bool, default: false, key: "hierarchicalDocumentSymbolSupport"},
+      })
       def initialize
         @dynamic_registration = false
         @symbol_kind = SymbolKindSet.new
@@ -275,19 +235,16 @@ module LSP::Data
     end
 
     struct CodeAction
-      include JSON::Serializable
+      JSON.mapping({
+        # Whether code action supports dynamic registration.
+        dynamic_registration: {type: Bool, default: false, key: "dynamicRegistration"},
 
-      # Whether code action supports dynamic registration.
-      @[JSON::Field(key: "dynamicRegistration")]
-      property dynamic_registration : Bool = false
-
-      # The client support code action literals as a valid
-      # response of the `textDocument/codeAction` request.
-      #
-      # Since 3.8.0
-      @[JSON::Field(key: "codeActionLiteralSupport")]
-      property code_action_literal_support : CodeActionLiteralSupport = CodeActionLiteralSupport.new
-
+        # The client support code action literals as a valid
+        # response of the `textDocument/codeAction` request.
+        #
+        # Since 3.8.0
+        code_action_literal_support: {type: CodeActionLiteralSupport, default: CodeActionLiteralSupport.new, key: "codeActionLiteralSupport" },
+      })
       def initialize
         @dynamic_registration = false
         @code_action_literal_support = CodeActionLiteralSupport.new
@@ -295,30 +252,25 @@ module LSP::Data
     end
 
     struct CodeActionLiteralSupport
-      include JSON::Serializable
-
-      # The code action kind is support with the following value
-      # set.
-      @[JSON::Field(key: "codeActionKind")]
-      property code_action_kind : CodeActionKindSet = CodeActionKindSet.new
-
+      JSON.mapping({
+        # The code action kind is support with the following value
+        # set.
+        code_action_kind: {type: CodeActionKindSet, default: CodeActionKindSet.new, key: "codeActionKind"},
+      })
       def initialize
         @code_action_kind = CodeActionKindSet.new
       end
     end
 
     struct Rename
-      include JSON::Serializable
+      JSON.mapping({
+        # Whether rename supports dynamic registration.
+        dynamic_registration: {type: Bool, default: false, key: "dynamicRegistration"},
 
-      # Whether rename supports dynamic registration.
-      @[JSON::Field(key: "dynamicRegistration")]
-      property dynamic_registration : Bool = false
-
-      # Client supports testing for validity of rename operations
-      # before execution.
-      @[JSON::Field(key: "prepareSupport")]
-      property prepare_support : Bool = false
-
+        # Client supports testing for validity of rename operations
+        # before execution.
+        prepare_support: {type: Bool, default: false, key: "prepareSupport"},
+      })
       def initialize
         @dynamic_registration = false
         @prepare_support = false
@@ -326,34 +278,28 @@ module LSP::Data
     end
 
     struct PublishDiagnostics
-      include JSON::Serializable
-
-      # Whether the clients accepts diagnostics with related information.
-      @[JSON::Field(key: "relatedInformation")]
-      property related_information : Bool = false
-
+      JSON.mapping({
+        # Whether the clients accepts diagnostics with related information.
+        related_information: {type: Bool, default: false, key: "relatedInformation"},
+      })
       def initialize
         @related_information = false
       end
     end
 
     struct FoldingRange
-      include JSON::Serializable
-
-      # Whether implementation supports dynamic registration for folding range providers. If this is set to `true`
-      # the client supports the new `(FoldingRangeProviderOptions & TextDocumentRegistrationOptions & StaticRegistrationOptions)`
-      # return value for the corresponding server capability as well.
-      @[JSON::Field(key: "dynamicRegistration")]
-      property dynamic_registration : Bool = false
-      # The maximum number of folding ranges that the client prefers to receive per document. The value serves as a
-      # hint, servers are free to follow the limit.
-      @[JSON::Field(key: "rangeLimit")]
-      property range_limit : Int64 = 0_i64
-      # If set, the client signals that it only supports folding complete lines. If set, client will
-      # ignore specified `startCharacter` and `endCharacter` properties in a FoldingRange.
-      @[JSON::Field(key: "lineFoldingOnly")]
-      property line_folding_only : Bool = false
-
+      JSON.mapping({
+        # Whether implementation supports dynamic registration for folding range providers. If this is set to `true`
+        # the client supports the new `(FoldingRangeProviderOptions & TextDocumentRegistrationOptions & StaticRegistrationOptions)`
+        # return value for the corresponding server capability as well.
+        dynamic_registration: {type: Bool, default: false, key: "dynamicRegistration"},
+        # The maximum number of folding ranges that the client prefers to receive per document. The value serves as a
+        # hint, servers are free to follow the limit.
+        range_limit: {type: Int64, default: 0_i64, key: "rangeLimit"},
+        # If set, the client signals that it only supports folding complete lines. If set, client will
+        # ignore specified `startCharacter` and `endCharacter` properties in a FoldingRange.
+        line_folding_only: {type: Bool, default: false, key: "lineFoldingOnly"},
+      })
       def initialize
         @dynamic_registration = false
         @range_limit = 0

@@ -2,11 +2,10 @@ require "json"
 
 module LSP::Data
   struct MessageActionItem
-    include JSON::Serializable
-
-    # A short title like 'Retry', 'Open Log' etc.
-    property title : String
-
+    JSON.mapping({
+      # A short title like 'Retry', 'Open Log' etc.
+      title: String,
+    })
     def initialize(@title)
     end
   end

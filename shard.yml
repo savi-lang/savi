@@ -13,7 +13,6 @@ dependencies:
     github: jemc/crystal-pegmatite
   lsp:
     github: mneumann/crystal-lsp
-    branch: convert-to-json-serialize
   clim:
     github: at-grandpa/clim
     version: 0.13.0

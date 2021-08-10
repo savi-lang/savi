@@ -28,25 +28,25 @@ class LSP::Wire
     @incoming.receive
   end
 
-  def notify(m_class : M.class) : M forall M
+  def notify(m_class : M.class): M forall M
     msg : M = yield M.new
     LSP::Codec.write_message(@out, msg, @outstanding)
     msg
   end
 
-  def request(m_class : M.class) : M forall M
+  def request(m_class : M.class): M forall M
     msg : M = yield M.new(UUID.random.to_s)
     LSP::Codec.write_message(@out, msg, @outstanding)
     msg
   end
 
-  def respond(req : M) : M::Response forall M
+  def respond(req : M): M::Response forall M
     msg : M::Response = yield req.new_response
     LSP::Codec.write_message(@out, msg, @outstanding)
     msg
   end
 
-  def error_respond(req : M) : M::ErrorResponse forall M
+  def error_respond(req : M): M::ErrorResponse forall M
     msg : M::ErrorResponse = yield req.new_error_response
     LSP::Codec.write_message(@out, msg, @outstanding)
     msg

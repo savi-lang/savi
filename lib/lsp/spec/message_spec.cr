@@ -890,12 +890,12 @@ describe LSP::Message do
 
       msg.result.capabilities.type_definition_provider =
         LSP::Data::ServerCapabilities::StaticRegistrationOptions.new([
-          LSP::Data::DocumentFilter.new("crystal", "file", "*.cr"),
+          LSP::Data::DocumentFilter.new("crystal", "file", "*.cr")
         ], "reg")
 
       msg.result.capabilities.implementation_provider =
         LSP::Data::ServerCapabilities::StaticRegistrationOptions.new([
-          LSP::Data::DocumentFilter.new("crystal", "file", "*.cr"),
+          LSP::Data::DocumentFilter.new("crystal", "file", "*.cr")
         ], "reg")
 
       msg.result.capabilities.references_provider = true
@@ -935,12 +935,12 @@ describe LSP::Message do
 
       msg.result.capabilities.color_provider =
         LSP::Data::ServerCapabilities::StaticRegistrationOptions.new([
-          LSP::Data::DocumentFilter.new("crystal", "file", "*.cr"),
+          LSP::Data::DocumentFilter.new("crystal", "file", "*.cr")
         ], "reg")
 
       msg.result.capabilities.folding_range_provider =
         LSP::Data::ServerCapabilities::StaticRegistrationOptions.new([
-          LSP::Data::DocumentFilter.new("crystal", "file", "*.cr"),
+          LSP::Data::DocumentFilter.new("crystal", "file", "*.cr")
         ], "reg")
 
       msg.result.capabilities.execute_command_provider =
@@ -1169,15 +1169,15 @@ describe LSP::Message do
         diag.source = "crystal"
         diag.message = "Unused assignment to reference named 'foo'"
         diag.related_information <<
-          LSP::Data::Diagnostic::RelatedInformation.new.try do |info|
-            info.location.uri = URI.new("file", "/tmp/example/foo")
-            info.location.range.start.line = 5
-            info.location.range.start.character = 0
-            info.location.range.finish.line = 5
-            info.location.range.finish.character = 2
-            info.message = "End of scope is here"
-            info
-          end
+        LSP::Data::Diagnostic::RelatedInformation.new.try do |info|
+          info.location.uri = URI.new("file", "/tmp/example/foo")
+          info.location.range.start.line = 5
+          info.location.range.start.character = 0
+          info.location.range.finish.line = 5
+          info.location.range.finish.character = 2
+          info.message = "End of scope is here"
+          info
+        end
         diag
       end
 

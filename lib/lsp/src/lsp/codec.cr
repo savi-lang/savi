@@ -3,8 +3,7 @@ module LSP::Codec
   def self.write_message(
     io : IO,
     message : Message::Any,
-    outstanding = {} of (String | Int64) => Message::AnyRequest
-  )
+    outstanding = {} of (String | Int64) => Message::AnyRequest)
     if message.is_a?(Message::AnyRequest)
       outstanding[message.id] = message
     end
@@ -19,8 +18,7 @@ module LSP::Codec
   # Raises IO::EOFError when the IO is out of data to be read.
   def self.read_message(
     io : IO,
-    outstanding = {} of (String | Int64) => Message::AnyRequest
-  ) : Message::Any
+    outstanding = {} of (String | Int64) => Message::AnyRequest): Message::Any
     # Keep trying until we get a valid message.
     loop do
       # Read all headers, taking note of the content length.
