@@ -22,6 +22,14 @@ module LSP::Data
 
       # Defined by the protocol.
       RequestCancelled = -32800
+
+      def self.new(*args)
+        ::Enum::ValueConverter(Code).from_json(*args)
+      end
+
+      def to_json(*args)
+        ::Enum::ValueConverter(Code).to_json(self, *args)
+      end
     end
 
     def initialize(
