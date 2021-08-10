@@ -229,20 +229,22 @@ class Savi::Server
         case req.params.context.not_nil!.trigger_character
         when ":"
           # Proceed with a ":"-based completion if the line is otherwise empty.
+          # STDERR.puts text
+          # STDERR.puts pos.inspect
           line_text = text.split("\n")[pos.line]
           if line_text =~ /\A\s*:\s*\z/
             msg.result.items =
               ["class", "prop", "fun"].map do |label|
                 LSP::Data::CompletionItem.new.try do |item|
                   item.label = label
-                  item.kind = LSP::Data::CompletionItemKind::Method
+                  item.kind = LSP::Data::CompletionItemKind::Keyword
                   item.detail = "declare a #{label}"
                   item.documentation = LSP::Data::MarkupContent.new "markdown",
-                    "# TODO: Completion\n`#{pos.to_json}`\n```ruby\n#{text}\n```\n"
+                    "# TODO: Completion\n`#{pos.to_json}`\n```savi\n#{text}\n```\n"
 
                   if @use_snippet_completions
                     item.insert_text_format = LSP::Data::InsertTextFormat::Snippet
-                    new_text = "#{label}${1| , ref , val , iso , box , tag , non |}${2:Name}\n  $0"
+                    new_text = "#{label}${1| ref , val , iso , box , tag , non |}${2:Name}\n  $0"
                   else
                     new_text = "#{label} "
                   end
