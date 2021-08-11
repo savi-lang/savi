@@ -229,8 +229,10 @@ class Savi::Server
         case req.params.context.not_nil!.trigger_character
         when ":"
           # Proceed with a ":"-based completion if the line is otherwise empty.
-          # STDERR.puts text
-          # STDERR.puts pos.inspect
+          STDERR.puts text
+          STDERR.puts pos.inspect
+          STDERR.puts req.inspect
+          # STDERR.puts Savi::Parser.parse(Source.new("", "", text, Source::Library.new(""))).to_a.inspect
           line_text = text.split("\n")[pos.line]
           if line_text =~ /\A\s*:\s*\z/
             msg.result.items =

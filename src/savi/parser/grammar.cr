@@ -140,7 +140,7 @@ module Savi::Parser
 
     # Define what a declaration looks like.
     decl.define(
-      (char(':') >> ident >> (s >> compound).repeat >> s).named(:decl) >>
+      (char(':') >> ident.maybe >> (s >> compound).repeat >> s).named(:decl) >>
       (char(':') | ~~newline)
     )
 
