@@ -30,7 +30,7 @@ class Savi::Server
         host_path = pair[0]
         dest_path = pair[1]
 
-        Process.run("cp", [Compiler::STANDARD_LIBRARY_DIRNAME, dest_path, "-r"]).exit_code
+        Process.run("cp", [Savi.compiler.source_service.standard_library_dirname, dest_path, "-r"]).exit_code
         Process.run("cp", [Compiler.prelude_library_path, dest_path, "-r"]).exit_code
       end
     end
@@ -130,7 +130,7 @@ class Savi::Server
   #   filename = convert_path_to_local(filename)
   #
   #   dirname = File.dirname(filename)
-  #   sources = Compiler.get_library_sources(dirname)
+  #   sources = Savi.compiler.source_service.get_library_sources(dirname)
   #
   #   source = sources.find { |s| s.path == filename }.not_nil!
   #   source_pos = Source::Pos.point(source, pos.line.to_i32, pos.character.to_i32)
@@ -186,7 +186,7 @@ class Savi::Server
     filename = convert_path_to_local(filename)
 
     dirname = File.dirname(filename)
-    sources = Compiler.get_library_sources(dirname)
+    sources = Savi.compiler.source_service.get_library_sources(dirname)
 
     source = sources.find { |s| s.path == filename }.not_nil!
     source_pos = Source::Pos.point(source, pos.line.to_i32, pos.character.to_i32)
@@ -283,7 +283,7 @@ class Savi::Server
               tmp_fname = path.sub(host_path, Compiler.prelude_library_path)
               tmp_fname.sub("prelude/prelude", "prelude")
             else
-              path.sub(host_path, Compiler::STANDARD_LIBRARY_DIRNAME)
+              path.sub(host_path, Savi.compiler.source_service.standard_library_dirname)
             end
         end
       end
@@ -314,8 +314,8 @@ class Savi::Server
           path = path.sub(Compiler.prelude_library_path, File.join(host_path, "prelude"))
         end
 
-        if path.starts_with?(Compiler::STANDARD_LIBRARY_DIRNAME)
-          path = path.sub(Compiler::STANDARD_LIBRARY_DIRNAME, host_path)
+        if path.starts_with?(Savi.compiler.source_service.standard_library_dirname)
+          path = path.sub(Savi.compiler.source_service.standard_library_dirname, host_path)
         end
       end
     end
@@ -379,7 +379,7 @@ class Savi::Server
     filename = convert_path_to_local(filename)
 
     dirname = File.dirname(filename)
-    sources = Compiler.get_library_sources(dirname)
+    sources = Savi.compiler.source_service.get_library_sources(dirname)
 
     source_index = sources.index { |s| s.path == filename }
     if source_index

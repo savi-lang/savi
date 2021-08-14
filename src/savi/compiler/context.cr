@@ -1,4 +1,5 @@
 class Savi::Compiler::Context
+  getter compiler : Compiler
   getter program
   getter import
 
@@ -40,7 +41,7 @@ class Savi::Compiler::Context
 
   getter errors = [] of Error
 
-  def initialize(@options = CompilerOptions.new, @prev_ctx = nil)
+  def initialize(@compiler, @options = CompilerOptions.new, @prev_ctx = nil)
     @program = Program.new
 
     @classify = Classify::Pass.new

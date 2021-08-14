@@ -192,7 +192,7 @@ module Savi
     )
       _add_backtrace backtrace do
         errors = [] of Error
-        sources = Compiler.get_recursive_sources(Dir.current)
+        sources = Savi.compiler.source_service.get_recursive_sources(Dir.current)
 
         if check_only
           sources.group_by(&.library).each { |source_library, sources|

@@ -42,7 +42,7 @@ class Savi::Compiler::Import
         # and the relative path mentioned in the import statement itself,
         # get the absolute path for the library that is to be loaded.
         source = import.ident.pos.source
-        path = Compiler.resolve_library_dirname(
+        path = ctx.compiler.source_service.resolve_library_dirname(
           import.ident.value,
           source.dirname
         )
@@ -68,7 +68,7 @@ class Savi::Compiler::Import
       # and the relative path mentioned in the import statement itself,
       # get the absolute path for the library that is to be loaded.
       source = import.ident.pos.source
-      path = Compiler.resolve_library_dirname(
+      path = ctx.compiler.source_service.resolve_library_dirname(
         import.ident.value,
         source.dirname
       )
@@ -90,8 +90,8 @@ class Savi::Compiler::Import
     library = ctx.program.libraries.find(&.source_library.path.==(path))
     return library if library
 
-    # Otherwise, use the Compiler to load the library now.
-    library_sources = Compiler.get_library_sources(path)
+    # Otherwise, use the SourceService to load the library now.
+    library_sources = ctx.compiler.source_service.get_library_sources(path)
     library_docs = library_sources.map { |s| Parser.parse(s) }
     ctx.compile_library(library_sources.first.library, library_docs)
   end
@@ -99,8 +99,8 @@ class Savi::Compiler::Import
   # Load library sources from the given path, but copy them into this library.
   # This is used when :source instead of :import is used to load a library.
   def add_sources_from_library(ctx, path, into_library : Program::Library)
-    library_sources =
-      Compiler.get_library_sources(path, into_library.source_library)
+    library_sources = ctx.compiler.source_service
+      .get_library_sources(path, into_library.source_library)
     library_docs = library_sources.map { |s| Parser.parse(s) }
     ctx.compile_library_docs(into_library, library_docs)
   end
