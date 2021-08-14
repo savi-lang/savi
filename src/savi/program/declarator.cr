@@ -126,9 +126,9 @@ class Savi::Program::Declarator
     Intrinsic.run(ctx, scope, self, declare, terms)
   end
 
-  def finish(ctx, scope, declarators)
+  def finish(ctx, scope)
     raise NotImplementedError.new "custom declarators" unless intrinsic
 
-    Intrinsic.finish(ctx, scope, declarators, self)
+    Intrinsic.finish(ctx, scope, self)
   end
 end

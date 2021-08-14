@@ -9,6 +9,8 @@ class Savi::Program::Declarator::Scope
     end
   end
 
+  property include_bootstrap_declarators : Bool = false
+
   # TODO: These properties likely need to be more dynamic to allow
   # arbitrary custom declarators to create their own custom contexts,
   # which will have arbitrary names and be arbitrary interpreter objects.
@@ -24,6 +26,22 @@ class Savi::Program::Declarator::Scope
   setter current_function : Function?
   getter! current_members : Array(TypeWithValue)
   setter current_members : Array(TypeWithValue)?
+
+  def visible_declarators(ctx)
+    declarators = [] of Declarator
+
+    declarators.concat(Bootstrap::BOOTSTRAP_DECLARATORS) \
+      if include_bootstrap_declarators
+    ctx.program
+      .tap(&.meta_declarators.try { |l| declarators.concat(l.declarators) })
+      .tap(&.standard_declarators.try { |l| declarators.concat(l.declarators) })
+
+    # TODO: Declarators visible via import statements in this file
+
+    declarators.concat(current_library.declarators)
+
+    declarators
+  end
 
   def initialize
     @stack = [] of Layer

@@ -139,6 +139,7 @@ module Savi::AST
 
   class Declare < Node
     property terms : Array(Term) # TODO: rename as `terms`
+    property declare_depth = 0
     def initialize(@terms = [] of Term)
     end
 
@@ -478,6 +479,7 @@ module Savi::AST
   class Group < Node
     property style : String
     property terms : Array(Term)
+    property declare_depth = 0
     def initialize(@style : String, @terms = [] of Term)
     end
 

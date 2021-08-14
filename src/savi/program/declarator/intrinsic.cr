@@ -18,9 +18,7 @@ module Savi::Program::Intrinsic
     when "top"
       case declarator.name.value
       when "declarator_bootstrapping_complete"
-        ctx.program.declarators.reject! { |d|
-          Declarator::Bootstrap::BOOTSTRAP_DECLARATORS.includes?(d)
-        }
+        scope.include_bootstrap_declarators = false
       when "declarator"
         name = terms["name"].as(AST::Identifier)
         scope.current_declarator = Declarator.new(name)
@@ -405,12 +403,11 @@ module Savi::Program::Intrinsic
   def self.finish(
     ctx : Compiler::Context,
     scope : Declarator::Scope,
-    declarators : Array(Declarator),
     declarator : Declarator,
   )
     case declarator.name.value
     when "declarator"
-      declarators << scope.current_declarator
+      scope.current_library.declarators << scope.current_declarator
       scope.current_declarator = nil
     when "term"
       scope.current_declarator.terms << scope.current_declarator_term
@@ -422,14 +419,14 @@ module Savi::Program::Intrinsic
       scope.current_library.types << scope.current_type
       scope.current_type = nil
     when "numeric"
-      declare_numeric_copies(ctx, scope, declarators, declarator)
+      declare_numeric_copies(ctx, scope, declarator)
 
       scope.current_library.types << scope.current_type
       scope.current_type = nil
     when "enum"
-      declare_numeric_copies(ctx, scope, declarators, declarator)
-      declare_enum_member_name(ctx, scope, declarators, declarator)
-      declare_enum_from_u64(ctx, scope, declarators, declarator)
+      declare_numeric_copies(ctx, scope, declarator)
+      declare_enum_member_name(ctx, scope, declarator)
+      declare_enum_from_u64(ctx, scope, declarator)
 
       scope.current_library.types << scope.current_type
       scope.current_type = nil
@@ -462,7 +459,6 @@ module Savi::Program::Intrinsic
   def self.declare_numeric_copies(
     ctx : Compiler::Context,
     scope : Declarator::Scope,
-    declarators : Array(Declarator),
     declarator : Declarator,
   )
     type = scope.current_type
@@ -507,7 +503,6 @@ module Savi::Program::Intrinsic
   def self.declare_enum_member_name(
     ctx : Compiler::Context,
     scope : Declarator::Scope,
-    declarators : Array(Declarator),
     declarator : Declarator,
   )
     type = scope.current_type
@@ -552,7 +547,6 @@ module Savi::Program::Intrinsic
   def self.declare_enum_from_u64(
     ctx : Compiler::Context,
     scope : Declarator::Scope,
-    declarators : Array(Declarator),
     declarator : Declarator,
   )
     type = scope.current_type

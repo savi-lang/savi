@@ -34,6 +34,7 @@ class Savi::Compiler::Context
 
   getter options
   property prev_ctx : Context?
+  property! root_docs : Array(AST::Document)
 
   getter link_libraries
 
@@ -46,7 +47,6 @@ class Savi::Compiler::Context
     @code_gen = CodeGen.new(CodeGen::PonyRT)
     @code_gen_verona = CodeGen.new(CodeGen::VeronaRT)
     @completeness = Completeness::Pass.new
-    @declarators = Program::Declarator::Interpreter::Analysis.new
     @eval = Eval.new
     @flow = Flow::Pass.new
     @import = Import.new
@@ -76,6 +76,16 @@ class Savi::Compiler::Context
     @link_libraries = Set(String).new
   end
 
+  def root_library
+    @program.libraries[2]? || # after meta declarators and standard declarators
+    @program.libraries[1]? ||
+    @program.libraries[0]
+  end
+
+  def root_library_link
+    root_library.make_link
+  end
+
   def compile_library(*args)
     library = compile_library_inner(*args)
     @program.libraries << library
@@ -100,9 +110,7 @@ class Savi::Compiler::Context
   end
 
   def compile_library_docs(library : Program::Library, docs : Array(AST::Document))
-    docs.each do |doc|
-      Program::Declarator::Interpreter.run(self, doc, library)
-    end
+    Program::Declarator::Interpreter.run(self, library, docs)
 
     library
   end

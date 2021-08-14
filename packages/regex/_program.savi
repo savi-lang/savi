@@ -8,9 +8,10 @@
   // We reserve everything below the minimum opcode to match the specified byte.
   :fun non min_op U8: 0xF3
 
-  :member OpByte: 0xF3 // this could theoretically be used for any byte,
-                       // but we only use it for bytes from min_op and higher,
-                       // because all lower op codes indicate the byte itself.
+  // This could theoretically be used for any byte, but we only use it for
+  // bytes from min_op and higher; all lower op codes indicate the byte itself.
+  :member OpByte: 0xF3
+
   :member OpMatch: 0xF4
   :member OpRecursiveMatch: 0xF5 // For lookahead
   :member OpJump: 0xF6

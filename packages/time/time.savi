@@ -18,14 +18,14 @@
 
   :fun non from_value(value U8)
     case value == (
-      | 1 | Monday
-      | 2 | Tuesday
-      | 3 | Wednesday
-      | 4 | Thursday
-      | 5 | Friday
-      | 6 | Saturday
-      | 7 | Sunday
-      | NoDay
+    | 1 | Monday
+    | 2 | Tuesday
+    | 3 | Wednesday
+    | 4 | Thursday
+    | 5 | Friday
+    | 6 | Saturday
+    | 7 | Sunday
+    | NoDay
     )
 
 :class val Time
@@ -198,8 +198,8 @@
     day = total_days.u8 + 1
 
     year.u64
-    .bit_or(month.u64.bit_shl(32))
-    .bit_or(day.u64.bit_shl(40))
+      .bit_or(month.u64.bit_shl(32))
+      .bit_or(day.u64.bit_shl(40))
 
   :: Returns True if the given year is a leap year.
   :fun non _is_leap_year(year U32)

@@ -215,6 +215,10 @@ struct Savi::Source::Pos
     source.content.byte_slice(start, finish - start)
   end
 
+  def next_byte?(offset = 0)
+    source.content.byte_at?(finish + offset).try(&.chr)
+  end
+
   def content_match_as_pos(pattern, match_index = 0)
     match = pattern.match_at_byte_index(content, 0)
     return unless match
@@ -245,6 +249,54 @@ struct Savi::Source::Pos
       source,
       match.byte_begin(match_index),
       match.byte_end(match_index)
+    )
+  end
+
+  def get_indent
+    match = /\G[ \t]+/.match_at_byte_index(source.content, line_start)
+    new_finish = match ? match.byte_end(0) : line_start
+
+    Pos.new(
+      @source, @line_start, new_finish,
+      @line_start, @line_finish,
+      @row, 0,
+    )
+  end
+
+  def get_prior_row_indent
+    new_line_finish = @line_start - 1
+    new_line_start = source.content.byte_rindex('\n', new_line_finish)
+    return nil unless new_line_start
+
+    new_line_start += 1
+
+    match = /\G[ \t]+/.match_at_byte_index(source.content, new_line_start)
+    new_finish = match ? match.byte_end(0) : new_line_start
+
+    Pos.new(
+      @source, new_line_start, new_finish,
+      new_line_start, new_line_finish,
+      @row - 1, 0,
+    )
+  end
+
+  def get_finish_row_indent
+    new_row = @row
+    new_line_start = @line_start
+    new_line_finish = @line_finish
+    while new_line_finish < @finish
+      new_row += 1
+      new_line_start = new_line_finish + 1
+      new_line_finish = source.content.byte_index('\n', new_line_start) || source.content.bytesize
+    end
+
+    match = /\G[ \t]+/.match_at_byte_index(source.content, new_line_start)
+    new_finish = match ? match.byte_end(0) : new_line_start
+
+    Pos.new(
+      @source, new_line_start, new_finish,
+      new_line_start, new_line_finish,
+      new_row, 0,
     )
   end
 

@@ -80,6 +80,7 @@
         if stream.is_token_equal_to(b"HTTP/1.1") (
           // Version is okay - no action needed
           // TODO: Accept HTTP/1.0 and change `Connection` header behavior
+          None
         |
           @_error = RequestErrorUnsupportedVersion
           error!
@@ -89,13 +90,15 @@
           @_next_header = @_standard_headers.find! -> (name |
             stream.is_token_ascii_lowercase_equal_to(name)
           )
-        | try (
-          @_collect_headers.find! -> (name |
-            stream.is_token_ascii_lowercase_equal_to(name)
-          )
         |
-          "" // ignore all other header names
-        ))
+          try (
+            @_collect_headers.find! -> (name |
+              stream.is_token_ascii_lowercase_equal_to(name)
+            )
+          |
+            "" // ignore all other header names
+          )
+        )
       | RequestTokenHeaderValue |
         case (
         // We can safely use `is` here because we have ensured that each

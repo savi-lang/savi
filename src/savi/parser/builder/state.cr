@@ -4,6 +4,8 @@ module Savi::Parser::Builder
   # This State is used mainly for keeping track of line numbers and ranges,
   # so that we can better populate a Source::Pos with all the info it needs.
   class State
+    getter source
+
     def initialize(@source : Source)
       @row = 0
       @line_start = 0

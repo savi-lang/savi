@@ -24,7 +24,7 @@
     assert Foo.true == True
     assert True == Foo.true
     assert True \
-      == True
+    == True
     assert Foo.with_yield -> (false |
       assert !false) == Foo.true
 

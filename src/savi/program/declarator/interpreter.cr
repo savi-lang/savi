@@ -1,42 +1,30 @@
 module Savi::Program::Declarator::Interpreter
-  struct Analysis
-    def initialize
-      @nonzero_declare_depths = {} of AST::Declare => Int32
-    end
+  def self.run(ctx, library : Program::Library, docs : Array(AST::Document))
+    docs.each { |doc|
+      scope = Scope.new
+      scope.current_library = library
+      scope.include_bootstrap_declarators = !ctx.program.meta_declarators
 
-    def depth_of(declare : AST::Declare)
-      @nonzero_declare_depths[declare]? || 0
-    end
+      doc.list.each { |item|
+        case item
+        when AST::Declare
+          interpret(ctx, scope, item)
+        when AST::Group
+          accept_body(ctx, scope, item)
+        else
+          raise NotImplementedError.new(item.class)
+        end
+      }
 
-    protected def observe_depth_of(declare : AST::Declare, depth : Int32)
-      return if depth == 0
-      @nonzero_declare_depths[declare] = depth
-    end
-  end
-
-  def self.run(ctx : Compiler::Context, doc : AST::Document, library : Program::Library?)
-    scope = Scope.new
-    scope.current_library = library
-    declarators = ctx.program.declarators
-    declarators.concat(Bootstrap::BOOTSTRAP_DECLARATORS) if declarators.empty?
-
-    doc.list.each { |item|
-      case item
-      when AST::Declare
-        interpret(ctx, scope, declarators, item)
-      when AST::Group
-        accept_body(ctx, scope, declarators, item)
-      else
-        raise NotImplementedError.new(item.class)
+      while (declarator = scope.pop_declarator?(ctx))
+        declarator.finish(ctx, scope)
       end
     }
-
-    while (declarator = scope.pop_declarator?(ctx))
-      declarator.finish(ctx, scope, declarators)
-    end
   end
 
-  def self.interpret(ctx, scope, declarators, declare : AST::Declare)
+  def self.interpret(ctx, scope, declare : AST::Declare)
+    declarators = scope.visible_declarators(ctx)
+
     # Filter for declarators that have the right name.
     name = declare.terms.first.as(AST::Identifier).value
     with_right_name = declarators.select(&.matches_name?(name))
@@ -94,11 +82,11 @@ module Savi::Program::Declarator::Interpreter
     # Now unwind the declaration hierarchy to reach the required context.
     # Call finish on each of the declarators we popped off the context stack.
     until scope.has_top_context?(declarator.context.value)
-      scope.pop_declarator?(ctx).try(&.finish(ctx, scope, declarators))
+      scope.pop_declarator?(ctx).try(&.finish(ctx, scope))
     end
 
     # Observe the depth of this declaration.
-    ctx.declarators.observe_depth_of(declare, scope.declarator_depth)
+    declare.declare_depth = scope.declarator_depth
 
     # Push this declarator onto the scope stack.
     scope.push_declarator(declare, declarator)
@@ -107,7 +95,7 @@ module Savi::Program::Declarator::Interpreter
     declarator.run(ctx, scope, declare, terms)
   end
 
-  def self.accept_body(ctx, scope, declarators, body : AST::Group)
+  def self.accept_body(ctx, scope, body : AST::Group)
     loop do
       # Get the declarator for the topmost open declaration.
       declarator = scope.top_declarator?
@@ -119,11 +107,13 @@ module Savi::Program::Declarator::Interpreter
       end
 
       # If this body is accepted, return now.
-      return if scope.try_accept_body(ctx, body)
+      break if scope.try_accept_body(ctx, body)
 
       # Otherwise, finish this declarator and unwind the stack by one level,
       # where we will try again to find an open declaration that allows a body.
-      scope.pop_declarator?(ctx).try(&.finish(ctx, scope, declarators))
+      scope.pop_declarator?(ctx).try(&.finish(ctx, scope))
     end
+
+    body.declare_depth = scope.declarator_depth
   end
 end

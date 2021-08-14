@@ -247,6 +247,7 @@ class Savi::Compiler
       end
     end
 
+    ctx.root_docs = docs
     return ctx unless ctx.errors.empty?
 
     compile(docs, ctx, target)
@@ -260,13 +261,19 @@ class Savi::Compiler
   def compile(docs : Array(AST::Document), ctx : Context, target : Symbol = :eval)
     raise "No source documents given!" if docs.empty?
 
-    # First, load the standard declarators.
-    (
-      Compiler.get_library_sources(Compiler.prelude_declarators_meta_library_path) +
-      Compiler.get_library_sources(Compiler.prelude_declarators_library_path)
-    )
-      .map { |source| Parser.parse(source) }
-      .map { |doc| Program::Declarator::Interpreter.run(ctx, doc, nil) }
+    # First, load the meta declarators.
+    meta_declarators =
+      Compiler.get_library_sources(Compiler.meta_declarators_library_path)
+    ctx.program.meta_declarators =
+      ctx.compile_library(meta_declarators.first.library,
+        meta_declarators.map { |source| Parser.parse(source) })
+
+    # Then, load the standard declarators.
+    standard_declarators =
+      Compiler.get_library_sources(Compiler.standard_declarators_library_path)
+    ctx.program.standard_declarators =
+      ctx.compile_library(standard_declarators.first.library,
+        standard_declarators.map { |source| Parser.parse(source) })
 
     # Now compile the main library.
     ctx.compile_library(docs.first.source.library, docs)
@@ -292,19 +299,19 @@ class Savi::Compiler
     Program::Library::Link.new(prelude_library_path)
   end
 
-  def self.prelude_declarators_library_path
+  def self.standard_declarators_library_path
     File.expand_path("../prelude/declarators", __DIR__)
   end
 
-  def self.prelude_declarators_library_link
-    Program::Library::Link.new(prelude_declarators_library_path)
+  def self.standard_declarators_library_link
+    Program::Library::Link.new(standard_declarators_library_path)
   end
 
-  def self.prelude_declarators_meta_library_path
+  def self.meta_declarators_library_path
     File.expand_path("../prelude/declarators/meta", __DIR__)
   end
 
-  def self.prelude_declarators_meta_library_link
-    Program::Library::Link.new(prelude_declarators_meta_library_path)
+  def self.meta_declarators_library_link
+    Program::Library::Link.new(meta_declarators_library_path)
   end
 end

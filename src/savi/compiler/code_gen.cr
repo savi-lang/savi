@@ -197,7 +197,7 @@ class Savi::Compiler::CodeGen
     main_gtype = @gtypes["Main"]?
 
     unless main_gtype
-      root_source_library = ctx.namespace.root_library(ctx).source_library
+      root_source_library = ctx.root_library.source_library
       Error.at Source::Pos.show_library_path(root_source_library),
         "This is the root directory being compiled, but it has no Main actor"
     end
