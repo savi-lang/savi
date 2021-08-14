@@ -250,7 +250,7 @@ class Savi::Compiler
     ctx.root_docs = docs
     return ctx unless ctx.errors.empty?
 
-    compile(docs, ctx, target)
+    compile(ctx, docs, target)
   ensure
     # Save the previous context for the purposes of caching in the next one,
     # letting us quickly recompile any code that successfully compiled.
@@ -258,7 +258,7 @@ class Savi::Compiler
     @prev_ctx = ctx
   end
 
-  def compile(docs : Array(AST::Document), ctx : Context, target : Symbol = :eval)
+  private def compile(ctx : Context, docs : Array(AST::Document), target : Symbol)
     raise "No source documents given!" if docs.empty?
 
     # First, load the meta declarators.

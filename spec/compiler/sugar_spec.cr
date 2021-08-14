@@ -9,18 +9,16 @@ describe Savi::Compiler::Sugar do
         "this isn't the return value"
     SOURCE
 
-    ast = Savi::Parser.parse(source)
+    ctx = Savi.compiler.compile([source], :sugar)
+    ctx.errors.should be_empty
 
-    ast.to_a.should eq [:doc,
+    ctx.root_docs.first.to_a.should eq [:doc,
       [:declare, [:ident, "actor"], [:ident, "Example"]],
       [:declare, [:ident, "fun"], [:ident, "return_none"], [:ident, "None"]],
       [:group, ":", [:string, "this isn't the return value", nil]],
       [:declare, [:ident, "be"], [:ident, "behave"]],
       [:group, ":", [:string, "this isn't the return value", nil]],
     ]
-
-    ctx = Savi.compiler.compile([ast], Savi::Compiler::Context.new, :sugar)
-    ctx.errors.should be_empty
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "return_none")
     func.body.not_nil!.to_a.should eq [:group, ":",
@@ -47,9 +45,10 @@ describe Savi::Compiler::Sugar do
         x.y! = z
     SOURCE
 
-    ast = Savi::Parser.parse(source)
+    ctx = Savi.compiler.compile([source], :sugar)
+    ctx.errors.should be_empty
 
-    ast.to_a.should eq [:doc,
+    ctx.root_docs.first.to_a.should eq [:doc,
       [:declare, [:ident, "class"], [:ident, "Example"]],
       [:declare, [:ident, "fun"], [:ident, "prop_assign"]],
       [:group, ":",
@@ -65,9 +64,6 @@ describe Savi::Compiler::Sugar do
         ],
       ],
     ]
-
-    ctx = Savi.compiler.compile([ast], Savi::Compiler::Context.new, :sugar)
-    ctx.errors.should be_empty
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "prop_assign")
     func.body.not_nil!.to_a.should eq [:group, ":",
@@ -96,9 +92,10 @@ describe Savi::Compiler::Sugar do
         x.y -= z
     SOURCE
 
-    ast = Savi::Parser.parse(source)
+    ctx = Savi.compiler.compile([source], :sugar)
+    ctx.errors.should be_empty
 
-    ast.to_a.should eq [:doc,
+    ctx.root_docs.first.to_a.should eq [:doc,
       [:declare, [:ident, "class"], [:ident, "Example"]],
       [:declare, [:ident, "fun"], [:ident, "prop_assign"]],
       [:group, ":",
@@ -113,9 +110,6 @@ describe Savi::Compiler::Sugar do
         ],
       ],
     ]
-
-    ctx = Savi.compiler.compile([ast], Savi::Compiler::Context.new, :sugar)
-    ctx.errors.should be_empty
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "prop_assign")
     func.body.not_nil!.to_a.should eq [:group, ":",
@@ -155,16 +149,14 @@ describe Savi::Compiler::Sugar do
         x + y
     SOURCE
 
-    ast = Savi::Parser.parse(source)
+    ctx = Savi.compiler.compile([source], :sugar)
+    ctx.errors.should be_empty
 
-    ast.to_a.should eq [:doc,
+    ctx.root_docs.first.to_a.should eq [:doc,
       [:declare, [:ident, "class"], [:ident, "Example"]],
       [:declare, [:ident, "fun"], [:ident, "plus"]],
       [:group, ":", [:relate, [:ident, "x"], [:op, "+"], [:ident, "y"]]],
     ]
-
-    ctx = Savi.compiler.compile([ast], Savi::Compiler::Context.new, :sugar)
-    ctx.errors.should be_empty
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "plus")
     func.body.not_nil!.to_a.should eq [:group, ":",
@@ -189,9 +181,10 @@ describe Savi::Compiler::Sugar do
         )
     SOURCE
 
-    ast = Savi::Parser.parse(source)
+    ctx = Savi.compiler.compile([source], :sugar)
+    ctx.errors.should be_empty
 
-    ast.to_a.should eq [:doc,
+    ctx.root_docs.first.to_a.should eq [:doc,
       [:declare, [:ident, "class"], [:ident, "Example"]],
       [:declare, [:ident, "fun"], [:ident, "countdown"]],
       [:group, ":",
@@ -204,9 +197,6 @@ describe Savi::Compiler::Sugar do
         ],
       ],
     ]
-
-    ctx = Savi.compiler.compile([ast], Savi::Compiler::Context.new, :sugar)
-    ctx.errors.should be_empty
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "countdown")
     func.body.not_nil!.to_a.should eq [:group, ":",
@@ -238,16 +228,14 @@ describe Savi::Compiler::Sugar do
         x[y]
     SOURCE
 
-    ast = Savi::Parser.parse(source)
+    ctx = Savi.compiler.compile([source], :sugar)
+    ctx.errors.should be_empty
 
-    ast.to_a.should eq [:doc,
+    ctx.root_docs.first.to_a.should eq [:doc,
       [:declare, [:ident, "class"], [:ident, "Example"]],
       [:declare, [:ident, "fun"], [:ident, "square"]],
       [:group, ":", [:qualify, [:ident, "x"], [:group, "[", [:ident, "y"]]]],
     ]
-
-    ctx = Savi.compiler.compile([ast], Savi::Compiler::Context.new, :sugar)
-    ctx.errors.should be_empty
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "square")
     func.body.not_nil!.to_a.should eq [:group, ":",
@@ -271,9 +259,10 @@ describe Savi::Compiler::Sugar do
         x.call(y)[y].call(z)[z]
     SOURCE
 
-    ast = Savi::Parser.parse(source)
+    ctx = Savi.compiler.compile([source], :sugar)
+    ctx.errors.should be_empty
 
-    ast.to_a.should eq [:doc,
+    ctx.root_docs.first.to_a.should eq [:doc,
       [:declare, [:ident, "class"], [:ident, "Example"]],
       [:declare, [:ident, "fun"], [:ident, "chained"]],
       [:group, ":",
@@ -311,9 +300,6 @@ describe Savi::Compiler::Sugar do
         ],
       ],
     ]
-
-    ctx = Savi.compiler.compile([ast], Savi::Compiler::Context.new, :sugar)
-    ctx.errors.should be_empty
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "chained")
     func.body.not_nil!.to_a.should eq [:group, ":",
@@ -366,9 +352,10 @@ describe Savi::Compiler::Sugar do
         x[y] = z
     SOURCE
 
-    ast = Savi::Parser.parse(source)
+    ctx = Savi.compiler.compile([source], :sugar)
+    ctx.errors.should be_empty
 
-    ast.to_a.should eq [:doc,
+    ctx.root_docs.first.to_a.should eq [:doc,
       [:declare, [:ident, "class"], [:ident, "Example"]],
       [:declare, [:ident, "fun"], [:ident, "square"]],
       [:group, ":",
@@ -379,9 +366,6 @@ describe Savi::Compiler::Sugar do
         ],
       ],
     ]
-
-    ctx = Savi.compiler.compile([ast], Savi::Compiler::Context.new, :sugar)
-    ctx.errors.should be_empty
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "square")
     func.body.not_nil!.to_a.should eq [:group, ":",
@@ -404,16 +388,14 @@ describe Savi::Compiler::Sugar do
         x = 1
     SOURCE
 
-    ast = Savi::Parser.parse(source)
+    ctx = Savi.compiler.compile([source], :sugar)
+    ctx.errors.should be_empty
 
-    ast.to_a.should eq [:doc,
+    ctx.root_docs.first.to_a.should eq [:doc,
       [:declare, [:ident, "class"], [:ident, "Example"]],
       [:declare, [:ident, "new"]],
       [:group, ":", [:relate, [:ident, "x"], [:op, "="], [:integer, 1_u64]]],
     ]
-
-    ctx = Savi.compiler.compile([ast], Savi::Compiler::Context.new, :sugar)
-    ctx.errors.should be_empty
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "new")
     func.body.not_nil!.to_a.should eq [:group, ":",
@@ -433,9 +415,10 @@ describe Savi::Compiler::Sugar do
         @y.after
     SOURCE
 
-    ast = Savi::Parser.parse(source)
+    ctx = Savi.compiler.compile([source], :sugar)
+    ctx.errors.should be_empty
 
-    ast.to_a.should eq [:doc,
+    ctx.root_docs.first.to_a.should eq [:doc,
       [:declare, [:ident, "class"], [:ident, "Example"]],
       [:declare, [:ident, "fun"], [:qualify, [:ident, "param_assigns"],
           [:group, "(",
@@ -446,9 +429,6 @@ describe Savi::Compiler::Sugar do
       ],
       [:group, ":", [:relate, [:ident, "@y"], [:op, "."], [:ident, "after"]]],
     ]
-
-    ctx = Savi.compiler.compile([ast], Savi::Compiler::Context.new, :sugar)
-    ctx.errors.should be_empty
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "param_assigns")
     func.body.not_nil!.to_a.should eq [:group, ":",
@@ -484,9 +464,10 @@ describe Savi::Compiler::Sugar do
         w && x || y && !z
     SOURCE
 
-    ast = Savi::Parser.parse(source)
+    ctx = Savi.compiler.compile([source], :sugar)
+    ctx.errors.should be_empty
 
-    ast.to_a.should eq [:doc,
+    ctx.root_docs.first.to_a.should eq [:doc,
       [:declare, [:ident, "class"], [:ident, "Example"]],
       [:declare, [:ident, "fun"], [:ident, "logical"]],
       [:group, ":",
@@ -505,9 +486,6 @@ describe Savi::Compiler::Sugar do
         ],
       ],
     ]
-
-    ctx = Savi.compiler.compile([ast], Savi::Compiler::Context.new, :sugar)
-    ctx.errors.should be_empty
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "logical")
     func.body.not_nil!.to_a.should eq [:group, ":",

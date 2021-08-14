@@ -6,9 +6,10 @@ describe Savi::Compiler::Reparse do
         x.call(y).call(z)
     SOURCE
 
-    ast = Savi::Parser.parse(source)
+    ctx = Savi.compiler.compile([source], :reparse)
+    ctx.errors.should be_empty
 
-    ast.to_a.should eq [:doc,
+    ctx.root_docs.first.to_a.should eq [:doc,
       [:declare, [:ident, "class"], [:ident, "Example"]],
       [:declare, [:ident, "fun"], [:ident, "chained"]],
       [:group, ":",
@@ -25,9 +26,6 @@ describe Savi::Compiler::Reparse do
         ],
       ],
     ]
-
-    ctx = Savi.compiler.compile([ast], Savi::Compiler::Context.new, :reparse)
-    ctx.errors.should be_empty
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "chained")
     func.body.not_nil!.to_a.should eq [:group, ":",
@@ -57,9 +55,10 @@ describe Savi::Compiler::Reparse do
         @x(y) -> (True)
     SOURCE
 
-    ast = Savi::Parser.parse(source)
+    ctx = Savi.compiler.compile([source], :reparse)
+    ctx.errors.should be_empty
 
-    ast.to_a.should eq [:doc,
+    ctx.root_docs.first.to_a.should eq [:doc,
       [:declare, [:ident, "class"], [:ident, "Example"]],
       [:declare, [:ident, "fun"], [:ident, "selfish"]],
       [:group, ":",
@@ -80,9 +79,6 @@ describe Savi::Compiler::Reparse do
         ],
       ],
     ]
-
-    ctx = Savi.compiler.compile([ast], Savi::Compiler::Context.new, :reparse)
-    ctx.errors.should be_empty
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "selfish")
     func.body.not_nil!.to_a.should eq [:group, ":",
