@@ -8,7 +8,6 @@ class Savi::Server
     @stderr : IO = STDERR
   )
     @wire = LSP::Wire.new(@stdin, @stdout)
-    @open_files = {} of URI => String
     @compiled = false
     @ctx = nil.as Compiler::Context?
     @workspace = ""
@@ -86,7 +85,8 @@ class Savi::Server
   # When a text document is opened, store it in our local set.
   def handle(msg : LSP::Message::DidOpen)
     text = msg.params.text_document.text
-    @open_files[msg.params.text_document.uri] = text
+    path = msg.params.text_document.uri.path
+    Savi.compiler.source_service.set_source_override(path, text)
 
     send_diagnostics(msg.params.text_document.uri.path.not_nil!, text)
   end
@@ -94,7 +94,8 @@ class Savi::Server
   # When a text document is changed, update it in our local set.
   def handle(msg : LSP::Message::DidChange)
     text = msg.params.content_changes.last.text
-    @open_files[msg.params.text_document.uri] = text
+    path = msg.params.text_document.uri.path
+    Savi.compiler.source_service.set_source_override(path, text)
 
     @ctx = nil
     send_diagnostics(msg.params.text_document.uri.path.not_nil!, text)
@@ -102,7 +103,8 @@ class Savi::Server
 
   # When a text document is closed, remove it from our local set.
   def handle(msg : LSP::Message::DidClose)
-    @open_files.delete(msg.params.text_document.uri)
+    path = msg.params.text_document.uri.path
+    Savi.compiler.source_service.unset_source_override(path)
   end
 
   # When a text document is saved, do nothing.
@@ -116,11 +118,6 @@ class Savi::Server
   #
   # def handle(msg : LSP::Message::Definition)
   #   pos = msg.params.position
-  #   text = @open_files[msg.params.text_document.uri]? || ""
-  #
-  #   raise NotImplementedError.new("not a file") \
-  #      if msg.params.text_document.uri.scheme != "file"
-  #
   #   host_filename = msg.params.text_document.uri.path.not_nil!
   #   filename = msg.params.text_document.uri.path.not_nil!
   #
@@ -173,10 +170,7 @@ class Savi::Server
 
   def handle(msg : LSP::Message::Hover)
     pos = msg.params.position
-    text = @open_files[msg.params.text_document.uri]? || ""
-
-    raise NotImplementedError.new("not a file") \
-       if msg.params.text_document.uri.scheme != "file"
+    path = msg.params.text_document.uri.path
 
     filename = msg.params.text_document.uri.path.not_nil!
 
@@ -221,7 +215,9 @@ class Savi::Server
   # TODO: Proper completion support.
   def handle(req : LSP::Message::Completion)
     pos = req.params.position
-    text = @open_files[req.params.text_document.uri]? || ""
+    path = req.params.text_document.uri.path
+    source = Savi.compiler.source_service.get_source_at(path)
+    text = source.content
 
     @wire.respond req do |msg|
       case req.params.context.try(&.trigger_kind)

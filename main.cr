@@ -195,7 +195,7 @@ module Savi
         sources = Savi.compiler.source_service.get_recursive_sources(Dir.current)
 
         if check_only
-          sources.group_by(&.library).each { |source_library, sources|
+          sources.each { |source_library, sources|
             ctx = Savi.compiler.compile(sources, :import)
             AST::Format.check(ctx, ctx.root_library_link, ctx.root_docs)
             errors.concat(ctx.errors)
@@ -203,7 +203,7 @@ module Savi
           puts "Checked #{sources.size} files."
         else
           edited_count = 0
-          sources.group_by(&.library).each { |source_library, sources|
+          sources.each { |source_library, sources|
             ctx = Savi.compiler.compile(sources, :import)
             edits_by_doc =
               AST::Format.run(ctx, ctx.root_library_link, ctx.root_docs)
