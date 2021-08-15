@@ -31,9 +31,13 @@ class Savi::Server
     ).try(&.split2!(':'))
 
     # Copy standard library into the standard remap directory, if provided.
+    # Set that destination directory as being the canonical standard library,
+    # when the standard library is referenced during compilation.
     Savi.compiler.source_service.standard_directory_remap.try { |_, dest_path|
-      Process.run("cp", ["-r", Savi.compiler.source_service.standard_library_dirname, dest_path]).exit_code
-      Process.run("cp", ["-r", Compiler.prelude_library_path, dest_path]).exit_code
+      # TODO: handle process errors here, probably via a cleaner abstraction.
+      Process.run("cp", ["-r", Savi.compiler.source_service.standard_library_dirname, dest_path])
+      Process.run("cp", ["-r", Compiler.prelude_library_path, dest_path])
+      Savi.compiler.source_service.standard_library_dirname = dest_path
     }
 
     # Before we exit, say goodbye.
@@ -116,15 +120,7 @@ class Savi::Server
 
   def handle(msg : LSP::Message::Hover)
     pos = msg.params.position
-    path = msg.params.text_document.uri.path
-
     filename = msg.params.text_document.uri.path.not_nil!
-
-    # If we're running in a docker container, or in some other remote
-    # environment, the host's source path may not match ours, and we
-    # can apply the needed transformation as specified in this ENV var.
-    filename = convert_path_to_local(filename)
-
     dirname = File.dirname(filename)
     sources = Savi.compiler.source_service.get_library_sources(dirname)
 
@@ -212,36 +208,10 @@ class Savi::Server
     @stderr.puts msg.to_json
   end
 
-  def convert_path_to_local(path : String)
-    Savi.compiler.source_service.standard_directory_remap.try do |host_path, dest_path|
-      next unless path.starts_with?(host_path)
-      path = path.sub(host_path, Savi.compiler.source_service.standard_library_dirname)
-    end
-    Savi.compiler.source_service.main_directory_remap.try do |host_path, dest_path|
-      next unless path.starts_with?(host_path)
-      path = path.sub(host_path, dest_path)
-    end
-
-    path
-  end
-
-  def convert_path_to_host(path : String)
-    Savi.compiler.source_service.standard_directory_remap.try do |host_path, dest_path|
-      next unless path.starts_with?(Savi.compiler.source_service.standard_library_dirname)
-      path = path.sub(Savi.compiler.source_service.standard_library_dirname, host_path)
-    end
-    Savi.compiler.source_service.main_directory_remap.try do |host_path, dest_path|
-      next unless path.starts_with?(dest_path)
-      path = path.sub(dest_path, host_path)
-    end
-
-    path
-  end
-
   def build_diagnostic(err : Error)
     related_information = err.info.map do |info|
       location = LSP::Data::Location.new(
-        URI.new(path: convert_path_to_host(info[0].source.path)),
+        URI.new(path: info[0].source.path),
         LSP::Data::Range.new(
           LSP::Data::Position.new(
             info[0].row.to_i64,
@@ -280,8 +250,6 @@ class Savi::Server
   end
 
   def send_diagnostics(filename : String, content : String? = nil)
-    filename = convert_path_to_local(filename)
-
     dirname = File.dirname(filename)
     sources = Savi.compiler.source_service.get_library_sources(dirname)
 
@@ -300,7 +268,7 @@ class Savi::Server
     ctx = Savi.compiler.compile(sources, :serve_errors)
 
     @wire.notify(LSP::Message::PublishDiagnostics) do |msg|
-      msg.params.uri = URI.new(path: convert_path_to_host(filename))
+      msg.params.uri = URI.new(path: filename)
       msg.params.diagnostics = ctx.errors.map { |err| build_diagnostic(err) }
 
       msg
@@ -309,7 +277,7 @@ class Savi::Server
   # Catch an Error if it happens here at the top level.
   rescue err : Error
     @wire.notify(LSP::Message::PublishDiagnostics) do |msg|
-      msg.params.uri = URI.new(path: convert_path_to_host(filename.not_nil!))
+      msg.params.uri = URI.new(path: filename)
       msg.params.diagnostics = [build_diagnostic(err)]
 
       msg

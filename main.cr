@@ -212,7 +212,8 @@ module Savi
               source = doc.pos.source
               puts "Fixing #{source.path}"
               edited = AST::Format.apply_edits(source.entire_pos, edits)[0].source
-              File.write(source.path, edited.content)
+              Savi.compiler.source_service
+                .overwrite_source_at(source.path, edited.content)
               edited_count += 1
             }
 

@@ -1,6 +1,7 @@
 class Savi::Compiler::SourceService
   property standard_library_dirname =
     File.expand_path("../../../packages", __DIR__)
+
   property standard_directory_remap : {String, String}?
   property main_directory_remap : {String, String}?
 
@@ -43,23 +44,67 @@ class Savi::Compiler::SourceService
   def get_source_at(path)
     dirname = File.dirname(path)
     name = File.basename(path)
-    content = @source_overrides[dirname]?.try(&.[]?(name)) || File.read(path)
+    content = @source_overrides[dirname]?.try(&.[]?(name)) \
+      || File.read(to_internal_path(path))
     library = Source::Library.new(dirname)
 
     Source.new(dirname, name, content, library)
   end
 
+  # Write the given content to the source file at the given path.
+  # Note that these changes may not be visible if the real file is being
+  # shadowed by a source override (which this operation will not affect).
+  def overwrite_source_at(path, content)
+    File.write(to_internal_path(path), content)
+  end
+
+  # Convert the given path into an "internal path", which corresponds to a
+  # real path on the local filesystem, which sometimes may differ from the
+  # public-facing path that we use everywhere else during compilation.
+  private def to_internal_path(path)
+    @main_directory_remap.try do |prefix, internal_prefix|
+      next unless path.starts_with?(prefix)
+      return path.sub(prefix, internal_prefix)
+    end
+
+    @standard_directory_remap.try do |prefix, _|
+      next unless path.starts_with?(prefix)
+      return path.sub(prefix, @standard_library_dirname)
+    end
+
+    path
+  end
+
+  # Convert the given "internal path" into a public-facing path, which
+  # corresponds to the path that a user should see when we talk about this path,
+  # sometimes differing from the internal path that is on the real filesystem.
+  private def from_internal_path(path)
+    @main_directory_remap.try do |prefix, internal_prefix|
+      next unless path.starts_with?(internal_prefix)
+      return path.sub(internal_prefix, prefix)
+    end
+
+    @standard_directory_remap.try do |prefix, _|
+      next unless path.starts_with?(@standard_library_dirname)
+      return path.sub(@standard_library_dirname, prefix)
+    end
+
+    path
+  end
+
   # Check if the given directory exists, either in reality or in an override.
   private def dir_exists?(dirname)
-    Dir.exists?(dirname) || @source_overrides.has_key?(dirname)
+    internal_dirname = to_internal_path(dirname)
+    Dir.exists?(internal_dirname) || @source_overrides.has_key?(dirname)
   end
 
   # Yield the name and content of each Savi file in this dirname.
   private def each_savi_file_in(dirname)
     dir_source_overrides = @source_overrides[dirname]?
+    internal_dirname = to_internal_path(dirname)
 
     # Yield the real files and their content.
-    Dir.entries(dirname).each { |name|
+    Dir.entries(internal_dirname).each { |name|
       next unless name.ends_with?(".savi")
 
       # If this is a filename that has overridden content, omit it for now.
@@ -68,7 +113,7 @@ class Savi::Compiler::SourceService
 
       # Try to read the content from the file, or skip it if we fail for any
       # reason, such as filesystem issues or deletion race conditions.
-      content = File.read(File.join(dirname, name)) rescue nil
+      content = File.read(File.join(internal_dirname, name)) rescue nil
       next unless content
 
       yield ({name, content})
@@ -80,10 +125,13 @@ class Savi::Compiler::SourceService
 
   # Yield the dirname, name, content of each Savi file in each subdirectory.
   private def each_savi_file_in_recursive(root_dirname)
+    internal_root_dirname = to_internal_path(root_dirname)
+
     # Yield the real files and their content.
-    Dir.glob("#{root_dirname}/**/*.savi").each { |path|
-      name = File.basename(path)
-      dirname = File.dirname(path)
+    Dir.glob("#{internal_root_dirname}/**/*.savi").each { |internal_path|
+      name = File.basename(internal_path)
+      internal_dirname = File.dirname(internal_path)
+      dirname = from_internal_path(internal_dirname)
 
       # If this is a filename that has overridden content, omit it for now.
       # We will yield it later when yielding all the other overrides.
@@ -91,7 +139,7 @@ class Savi::Compiler::SourceService
 
       # Try to read the content from the file, or skip it if we fail for any
       # reason, such as filesystem issues or deletion race conditions.
-      content = File.read(path) rescue nil
+      content = File.read(internal_path) rescue nil
       next unless content
 
       yield ({dirname, name, content})
