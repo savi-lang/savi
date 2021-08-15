@@ -36,5 +36,13 @@ module LSP::Data
         String, Number, Boolean, Array,
       ]
     end
+
+    def self.new(*args)
+      ::Enum::ValueConverter(SymbolKind).from_json(*args)
+    end
+
+    def to_json(*args)
+      ::Enum::ValueConverter(SymbolKind).to_json(self, *args)
+    end
   end
 end

@@ -164,7 +164,7 @@ describe LSP::Message do
               "symbol": {
                 "dynamicRegistration": true,
                 "symbolKind": {
-                  "valueSet": ["Namespace"]
+                  "valueSet": [3]
                 }
               },
               "executeCommand": { "dynamicRegistration": true },
@@ -188,7 +188,7 @@ describe LSP::Message do
                   "preselectSupport": true
                 },
                 "completionItemKind": {
-                  "valueSet": ["Folder"]
+                  "valueSet": [19]
                 },
                 "contextSupport": true
               },
@@ -211,7 +211,7 @@ describe LSP::Message do
               "documentSymbol": {
                 "dynamicRegistration": true,
                 "symbolKind": {
-                  "valueSet": ["Namespace"]
+                  "valueSet": [3]
                 },
                 "hierarchicalDocumentSymbolSupport": true
               },

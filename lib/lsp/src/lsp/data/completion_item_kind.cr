@@ -35,5 +35,13 @@ module LSP::Data
         Snippet, Color, File, Reference,
       ]
     end
+
+    def self.new(*args)
+      ::Enum::ValueConverter(CompletionItemKind).from_json(*args)
+    end
+
+    def to_json(*args)
+      ::Enum::ValueConverter(CompletionItemKind).to_json(self, *args)
+    end
   end
 end
