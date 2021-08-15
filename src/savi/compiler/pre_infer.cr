@@ -225,7 +225,7 @@ module Savi::Compiler::PreInfer
     end
 
     def prelude_type(ctx : Context, name)
-      ctx.namespace.prelude_type(name)
+      ctx.namespace.prelude_type(ctx, name)
     end
 
     def lookup_local_ident(ref : Refer::Local)

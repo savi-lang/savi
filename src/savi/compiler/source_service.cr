@@ -1,5 +1,5 @@
 class Savi::Compiler::SourceService
-  property standard_library_dirname =
+  property standard_library_internal_path =
     File.expand_path("../../../packages", __DIR__)
 
   property standard_directory_remap : {String, String}?
@@ -7,6 +7,19 @@ class Savi::Compiler::SourceService
 
   def initialize
     @source_overrides = {} of String => Hash(String, String)
+  end
+
+  def standard_library_path
+    from_internal_path(standard_library_internal_path)
+  end
+  def prelude_library_path
+    File.join("#{standard_library_path}/prelude")
+  end
+  def standard_declarators_library_path
+    File.join("#{standard_library_path}/prelude/declarators")
+  end
+  def meta_declarators_library_path
+    File.join("#{standard_library_path}/prelude/declarators/meta")
   end
 
   # Add/update a source override, which causes the SourceService to pretend as
@@ -69,7 +82,7 @@ class Savi::Compiler::SourceService
 
     @standard_directory_remap.try do |prefix, _|
       next unless path.starts_with?(prefix)
-      return path.sub(prefix, @standard_library_dirname)
+      return path.sub(prefix, @standard_library_internal_path)
     end
 
     path
@@ -85,8 +98,8 @@ class Savi::Compiler::SourceService
     end
 
     @standard_directory_remap.try do |prefix, _|
-      next unless path.starts_with?(@standard_library_dirname)
-      return path.sub(@standard_library_dirname, prefix)
+      next unless path.starts_with?(@standard_library_internal_path)
+      return path.sub(@standard_library_internal_path, prefix)
     end
 
     path
@@ -162,7 +175,7 @@ class Savi::Compiler::SourceService
   # Then a standard library location will be attempted.
   # If both attempts fail, there is no hope of resolving the library.
   def resolve_library_dirname(libname : String, from_source : Source)
-    standard_dirname = File.expand_path(libname, standard_library_dirname)
+    standard_dirname = File.expand_path(libname, standard_library_path)
     relative_dirname = File.expand_path(libname, from_source.dirname)
 
     if relative_dirname && dir_exists?(relative_dirname)

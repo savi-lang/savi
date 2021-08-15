@@ -36,10 +36,13 @@ class Savi::Server
     Savi.compiler.source_service.standard_directory_remap.try { |_, dest_path|
       # TODO: handle process errors here, probably via a cleaner abstraction.
       Process.run("cp", ["-r",
-        File.join(Savi.compiler.source_service.standard_library_dirname, "."),
+        File.join(
+          Savi.compiler.source_service.standard_library_internal_path,
+          ".",
+        ),
         dest_path,
       ])
-      Savi.compiler.source_service.standard_library_dirname = dest_path
+      Savi.compiler.source_service.standard_library_internal_path = dest_path
     }
 
     # Before we exit, say goodbye.
