@@ -44,7 +44,7 @@ class Savi::Compiler::Import
         source = import.ident.pos.source
         path = ctx.compiler.source_service.resolve_library_dirname(
           import.ident.value,
-          source.dirname
+          from_source: source,
         )
 
         add_sources_from_library(ctx, path, library)
@@ -70,7 +70,7 @@ class Savi::Compiler::Import
       source = import.ident.pos.source
       path = ctx.compiler.source_service.resolve_library_dirname(
         import.ident.value,
-        source.dirname
+        from_source: source,
       )
 
       # Finally, load the library, then recursively run this pass on it.

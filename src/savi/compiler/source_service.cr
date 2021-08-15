@@ -107,15 +107,15 @@ class Savi::Compiler::SourceService
     }
   end
 
-  # Given a library name, optionally anchored to a given "from directory" name,
+  # Given a library name, optionally anchored to a given "from source",
   # try to resolve a directory that matches the library name.
   #
-  # First a relative location will be attempted if a "from directory" was given.
+  # First a relative location will be attempted starting from the "from source".
   # Then a standard library location will be attempted.
   # If both attempts fail, there is no hope of resolving the library.
-  def resolve_library_dirname(libname, from_dirname = nil)
+  def resolve_library_dirname(libname : String, from_source : Source)
     standard_dirname = File.expand_path(libname, standard_library_dirname)
-    relative_dirname = File.expand_path(libname, from_dirname) if from_dirname
+    relative_dirname = File.expand_path(libname, from_source.dirname)
 
     if relative_dirname && dir_exists?(relative_dirname)
       relative_dirname
@@ -123,7 +123,7 @@ class Savi::Compiler::SourceService
       standard_dirname
     else
       raise "Couldn't find a library directory named #{libname.inspect}" \
-        "#{" (relative to #{from_dirname.inspect})" if from_dirname}"
+        " (relative to #{from_source.dirname.inspect})"
     end
   end
 
