@@ -46,6 +46,10 @@ class Savi::Compiler::Import
           import.ident.value,
           from_source: source,
         )
+        unless path
+          ctx.error_at import.ident, "This library could not be resolved"
+          next false
+        end
 
         add_sources_from_library(ctx, path, library)
         next false # this is not a "true" import
@@ -72,6 +76,10 @@ class Savi::Compiler::Import
         import.ident.value,
         from_source: source,
       )
+      unless path
+        ctx.error_at import.ident, "This library could not be resolved"
+        next false
+      end
 
       # Finally, load the library, then recursively run this pass on it.
       loaded_library = ctx.compile_library_at_path(path)

@@ -169,9 +169,6 @@ class Savi::Compiler::SourceService
       relative_dirname
     elsif dir_exists?(standard_dirname)
       standard_dirname
-    else
-      raise "Couldn't find a library directory named #{libname.inspect}" \
-        " (relative to #{from_source.dirname.inspect})"
     end
   end
 
