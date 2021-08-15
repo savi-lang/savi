@@ -33,7 +33,7 @@ describe Savi::Compiler::Eval do
   end
 
   it "evaluates the prelude tests" do
-    source_dir = File.join(__DIR__, "../savi/prelude")
+    source_dir = File.join(__DIR__, "../../packages/prelude/test")
 
     ctx = Savi.compiler.compile(source_dir, :eval)
     ctx.errors.should be_empty

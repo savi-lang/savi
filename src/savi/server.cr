@@ -269,13 +269,7 @@ class Savi::Server
   def convert_path_to_local(path : String)
     Savi.compiler.source_service.standard_directory_remap.try do |host_path, dest_path|
       next unless path.starts_with?(host_path)
-      path =
-        if path.includes?("prelude")
-          tmp_fname = path.sub(host_path, Compiler.prelude_library_path)
-          tmp_fname.sub("prelude/prelude", "prelude")
-        else
-          path.sub(host_path, Savi.compiler.source_service.standard_library_dirname)
-        end
+      path = path.sub(host_path, Savi.compiler.source_service.standard_library_dirname)
     end
     Savi.compiler.source_service.main_directory_remap.try do |host_path, dest_path|
       next unless path.starts_with?(host_path)
@@ -287,13 +281,8 @@ class Savi::Server
 
   def convert_path_to_host(path : String)
     Savi.compiler.source_service.standard_directory_remap.try do |host_path, dest_path|
-      if path.starts_with?(Compiler.prelude_library_path)
-        path = path.sub(Compiler.prelude_library_path, File.join(host_path, "prelude"))
-      end
-
-      if path.starts_with?(Savi.compiler.source_service.standard_library_dirname)
-        path = path.sub(Savi.compiler.source_service.standard_library_dirname, host_path)
-      end
+      next unless path.starts_with?(Savi.compiler.source_service.standard_library_dirname)
+      path = path.sub(Savi.compiler.source_service.standard_library_dirname, host_path)
     end
     Savi.compiler.source_service.main_directory_remap.try do |host_path, dest_path|
       next unless path.starts_with?(dest_path)

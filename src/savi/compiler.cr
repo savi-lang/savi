@@ -237,7 +237,7 @@ class Savi::Compiler
   end
 
   def self.prelude_library_path
-    File.expand_path("../prelude", __DIR__)
+    File.expand_path("../../packages/prelude", __DIR__)
   end
 
   def self.prelude_library_link
@@ -245,7 +245,7 @@ class Savi::Compiler
   end
 
   def self.standard_declarators_library_path
-    File.expand_path("../prelude/declarators", __DIR__)
+    File.expand_path("../../packages/prelude/declarators", __DIR__)
   end
 
   def self.standard_declarators_library_link
@@ -253,7 +253,7 @@ class Savi::Compiler
   end
 
   def self.meta_declarators_library_path
-    File.expand_path("../prelude/declarators/meta", __DIR__)
+    File.expand_path("../../packages/prelude/declarators/meta", __DIR__)
   end
 
   def self.meta_declarators_library_link
