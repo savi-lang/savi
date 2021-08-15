@@ -74,7 +74,7 @@ class Savi::Compiler::Import
       )
 
       # Finally, load the library, then recursively run this pass on it.
-      loaded_library = load_library(ctx, path)
+      loaded_library = ctx.compile_library_at_path(path)
       @libraries_by_import[import] = loaded_library.make_link
 
       # Recursively run this pass on the loaded library.
@@ -83,17 +83,6 @@ class Savi::Compiler::Import
 
       true # retain this in the list as a "true" import
     end
-  end
-
-  def load_library(ctx, path) : Program::Library
-    # First, try to find an already loaded library that has this same path.
-    library = ctx.program.libraries.find(&.source_library.path.==(path))
-    return library if library
-
-    # Otherwise, use the SourceService to load the library now.
-    library_sources = ctx.compiler.source_service.get_library_sources(path)
-    library_docs = library_sources.map { |s| Parser.parse(s) }
-    ctx.compile_library(library_sources.first.library, library_docs)
   end
 
   # Load library sources from the given path, but copy them into this library.

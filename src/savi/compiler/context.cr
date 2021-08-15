@@ -87,6 +87,17 @@ class Savi::Compiler::Context
     root_library.make_link
   end
 
+  def compile_library_at_path(path)
+    # First, try to find an already loaded library that has this same path.
+    library = @program.libraries.find(&.source_library.path.==(path))
+    return library if library
+
+    # Otherwise go ahead and load the library.
+    sources = compiler.source_service.get_library_sources(path)
+    docs = sources.map { |source| Parser.parse(source) }
+    compile_library(sources.first.library, docs)
+  end
+
   def compile_library(*args)
     library = compile_library_inner(*args)
     @program.libraries << library
