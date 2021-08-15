@@ -1,6 +1,8 @@
 class Savi::Compiler::SourceService
   property standard_library_dirname =
     File.expand_path("../../../packages", __DIR__)
+  property standard_directory_remap : {String, String}?
+  property main_directory_remap : {String, String}?
 
   def initialize
     @source_overrides = {} of String => Hash(String, String)

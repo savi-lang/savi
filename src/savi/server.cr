@@ -10,7 +10,6 @@ class Savi::Server
     @wire = LSP::Wire.new(@stdin, @stdout)
     @compiled = false
     @ctx = nil.as Compiler::Context?
-    @workspace = ""
 
     @use_snippet_completions = false
   end
@@ -23,16 +22,19 @@ class Savi::Server
   def setup
     @stderr.puts("LSP Server is starting...")
 
-    ENV["STD_DIRECTORY_MAPPING"]?.try do |mapping|
-      mapping.split(":").each_slice 2 do |pair|
-        next unless pair.size == 2
-        host_path = pair[0]
-        dest_path = pair[1]
+    # TODO: Remove legacy env var names not prefixed by "SAVI_".
+    Savi.compiler.source_service.standard_directory_remap = (
+      ENV["SAVI_STANDARD_DIRECTORY_REMAP"]? || ENV["STD_DIRECTORY_MAPPING"]?
+    ).try(&.split2!(':'))
+    Savi.compiler.source_service.main_directory_remap = (
+      ENV["SAVI_MAIN_DIRECTORY_REMAP"]? || ENV["SOURCE_DIRECTORY_MAPPING"]?
+    ).try(&.split2!(':'))
 
-        Process.run("cp", [Savi.compiler.source_service.standard_library_dirname, dest_path, "-r"]).exit_code
-        Process.run("cp", [Compiler.prelude_library_path, dest_path, "-r"]).exit_code
-      end
-    end
+    # Copy standard library into the standard remap directory, if provided.
+    Savi.compiler.source_service.standard_directory_remap.try { |_, dest_path|
+      Process.run("cp", ["-r", Savi.compiler.source_service.standard_library_dirname, dest_path]).exit_code
+      Process.run("cp", ["-r", Compiler.prelude_library_path, dest_path]).exit_code
+    }
 
     # Before we exit, say goodbye.
     at_exit do
@@ -46,8 +48,6 @@ class Savi::Server
       msg.params.capabilities
         .text_document.completion
         .completion_item.snippet_support
-
-    @workspace = msg.params.workspace_folders[0].uri.path.not_nil!
 
     @wire.respond msg do |msg|
       msg.result.capabilities.text_document_sync.open_close = true
@@ -82,7 +82,7 @@ class Savi::Server
     Process.exit
   end
 
-  # When a text document is opened, store it in our local set.
+  # When a text document is opened, store it in our source overrides.
   def handle(msg : LSP::Message::DidOpen)
     text = msg.params.text_document.text
     path = msg.params.text_document.uri.path
@@ -91,7 +91,7 @@ class Savi::Server
     send_diagnostics(msg.params.text_document.uri.path.not_nil!, text)
   end
 
-  # When a text document is changed, update it in our local set.
+  # When a text document is changed, update it in our source overrides.
   def handle(msg : LSP::Message::DidChange)
     text = msg.params.content_changes.last.text
     path = msg.params.text_document.uri.path
@@ -101,7 +101,7 @@ class Savi::Server
     send_diagnostics(msg.params.text_document.uri.path.not_nil!, text)
   end
 
-  # When a text document is closed, remove it from our local set.
+  # When a text document is closed, remove it from our source overrides.
   def handle(msg : LSP::Message::DidClose)
     path = msg.params.text_document.uri.path
     Savi.compiler.source_service.unset_source_override(path)
@@ -267,64 +267,37 @@ class Savi::Server
   end
 
   def convert_path_to_local(path : String)
-    ENV["STD_DIRECTORY_MAPPING"]?.try do |mapping|
-      mapping.split(":").each_slice 2 do |pair|
-        next unless pair.size == 2
-        host_path = pair[0]
-        dest_path = pair[1]
-
-        if path.starts_with?(host_path)
-          path =
-            if path.includes?("prelude")
-              tmp_fname = path.sub(host_path, Compiler.prelude_library_path)
-              tmp_fname.sub("prelude/prelude", "prelude")
-            else
-              path.sub(host_path, Savi.compiler.source_service.standard_library_dirname)
-            end
+    Savi.compiler.source_service.standard_directory_remap.try do |host_path, dest_path|
+      next unless path.starts_with?(host_path)
+      path =
+        if path.includes?("prelude")
+          tmp_fname = path.sub(host_path, Compiler.prelude_library_path)
+          tmp_fname.sub("prelude/prelude", "prelude")
+        else
+          path.sub(host_path, Savi.compiler.source_service.standard_library_dirname)
         end
-      end
     end
-    ENV["SOURCE_DIRECTORY_MAPPING"]?.try do |mapping|
-      mapping.split(":").each_slice 2 do |pair|
-        next unless pair.size == 2
-        host_path = pair[0]
-        dest_path = pair[1]
-
-        if path.starts_with?(host_path)
-          path = path.sub(host_path, dest_path)
-        end
-      end
+    Savi.compiler.source_service.main_directory_remap.try do |host_path, dest_path|
+      next unless path.starts_with?(host_path)
+      path = path.sub(host_path, dest_path)
     end
 
     path
   end
 
   def convert_path_to_host(path : String)
-    ENV["STD_DIRECTORY_MAPPING"]?.try do |mapping|
-      mapping.split(":").each_slice 2 do |pair|
-        next unless pair.size == 2
-        host_path = pair[0]
-        dest_path = pair[1]
+    Savi.compiler.source_service.standard_directory_remap.try do |host_path, dest_path|
+      if path.starts_with?(Compiler.prelude_library_path)
+        path = path.sub(Compiler.prelude_library_path, File.join(host_path, "prelude"))
+      end
 
-        if path.starts_with?(Compiler.prelude_library_path)
-          path = path.sub(Compiler.prelude_library_path, File.join(host_path, "prelude"))
-        end
-
-        if path.starts_with?(Savi.compiler.source_service.standard_library_dirname)
-          path = path.sub(Savi.compiler.source_service.standard_library_dirname, host_path)
-        end
+      if path.starts_with?(Savi.compiler.source_service.standard_library_dirname)
+        path = path.sub(Savi.compiler.source_service.standard_library_dirname, host_path)
       end
     end
-    ENV["SOURCE_DIRECTORY_MAPPING"]?.try do |mapping|
-      mapping.split(":").each_slice 2 do |pair|
-        next unless pair.size == 2
-        host_path = pair[0]
-        dest_path = pair[1]
-
-        if path.starts_with?(dest_path)
-          path = path.sub(dest_path, host_path)
-        end
-      end
+    Savi.compiler.source_service.main_directory_remap.try do |host_path, dest_path|
+      next unless path.starts_with?(dest_path)
+      path = path.sub(dest_path, host_path)
     end
 
     path

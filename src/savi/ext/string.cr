@@ -18,4 +18,14 @@ class String
   def byte_rindex(char : Char, offset = bytesize)
     byte_rindex(char.ord, offset)
   end
+
+  # Convenience method to split on the given delimiter once, raising an error
+  # if the delimiter wasn't found, and otherwise returning as a tuple.
+  def split2!(separator : Char) : {String, String}
+    array = split(separator, 2, remove_empty: true)
+    raise ArgumentError.new \
+      "expected #{self.inspect} to be splittable by #{separator.inspect}" \
+        unless array.size == 2
+    {array[0], array[1]}
+  end
 end
