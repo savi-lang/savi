@@ -35,8 +35,10 @@ class Savi::Server
     # when the standard library is referenced during compilation.
     Savi.compiler.source_service.standard_directory_remap.try { |_, dest_path|
       # TODO: handle process errors here, probably via a cleaner abstraction.
-      Process.run("cp", ["-r", Savi.compiler.source_service.standard_library_dirname, dest_path])
-      Process.run("cp", ["-r", Compiler.prelude_library_path, dest_path])
+      Process.run("cp", ["-r",
+        File.join(Savi.compiler.source_service.standard_library_dirname, "."),
+        dest_path,
+      ])
       Savi.compiler.source_service.standard_library_dirname = dest_path
     }
 
