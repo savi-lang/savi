@@ -69,7 +69,7 @@ module LSP::Data
 
     # The server provides document range formatting.
     @[JSON::Field(key: "documentRangeFormattingProvider")]
-    property document_range_formatting_provider : Bool = false
+    property document_range_formatting_provider : Bool | WorkDoneProgressOptions = false
 
     # The server provides document formatting on typing.
     @[JSON::Field(key: "documentOnTypeFormattingProvider")]

@@ -6,7 +6,7 @@ shards:
 
   lsp:
     git: https://github.com/jemc/crystal-lsp.git
-    version: 0.1.0+git.commit.fbe009ea8dfc61457ed2acf0354b8a368bb2597a
+    version: 0.1.0+git.commit.3dee3e0a8596aa647860c3df191310843520b984
 
   pegmatite:
     git: https://github.com/jemc/crystal-pegmatite.git

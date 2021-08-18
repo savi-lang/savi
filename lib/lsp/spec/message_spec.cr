@@ -843,6 +843,104 @@ describe LSP::Message do
       msg.params.options["otherArbitraryString"].should eq "Hello, World!"
       msg.params.options["otherArbitraryInteger"].should eq 99_i64
     end
+
+    it "parses RangeFormatting" do
+      msg = LSP::Message.from_json <<-EOF
+      {
+        "method": "textDocument/rangeFormatting",
+        "jsonrpc": "2.0",
+        "id": "example",
+        "params": {
+          "textDocument": {
+            "uri": "file:///tmp/example/foo"
+          },
+          "range": {
+            "start": {
+              "line": 2,
+              "character": 5
+            },
+            "end": {
+              "line": 20,
+              "character": 50
+            }
+          },
+          "options": {
+            "tabSize": 4,
+            "insertSpaces": false,
+            "trimTrailingWhitespace": true,
+            "insertFinalNewline": true,
+            "trimFinalNewlines": true,
+            "otherArbitraryBool": true,
+            "otherArbitraryString": "Hello, World!",
+            "otherArbitraryInteger": 99
+          }
+        }
+      }
+      EOF
+
+      msg = msg.as LSP::Message::RangeFormatting
+      msg.id.should eq "example"
+      msg.params.text_document.uri.scheme.should eq "file"
+      msg.params.text_document.uri.path.should eq "/tmp/example/foo"
+      msg.params.range.start.line.should eq 2_i64
+      msg.params.range.start.character.should eq 5_i64
+      msg.params.range.finish.line.should eq 20_i64
+      msg.params.range.finish.character.should eq 50_i64
+      msg.params.options.tab_size.should eq 4_i64
+      msg.params.options.insert_spaces.should eq false
+      msg.params.options.trim_trailing_whitespace.should eq true
+      msg.params.options.insert_final_newline.should eq true
+      msg.params.options.trim_final_newlines.should eq true
+      msg.params.options["otherArbitraryBool"].should eq true
+      msg.params.options["otherArbitraryString"].should eq "Hello, World!"
+      msg.params.options["otherArbitraryInteger"].should eq 99_i64
+    end
+
+    it "parses OnTypeFormatting" do
+      msg = LSP::Message.from_json <<-EOF
+      {
+        "method": "textDocument/onTypeFormatting",
+        "jsonrpc": "2.0",
+        "id": "example",
+        "params": {
+          "textDocument": {
+            "uri": "file:///tmp/example/foo"
+          },
+          "position": {
+            "line": 20,
+            "character": 50
+          },
+          "ch": "}",
+          "options": {
+            "tabSize": 4,
+            "insertSpaces": false,
+            "trimTrailingWhitespace": true,
+            "insertFinalNewline": true,
+            "trimFinalNewlines": true,
+            "otherArbitraryBool": true,
+            "otherArbitraryString": "Hello, World!",
+            "otherArbitraryInteger": 99
+          }
+        }
+      }
+      EOF
+
+      msg = msg.as LSP::Message::OnTypeFormatting
+      msg.id.should eq "example"
+      msg.params.text_document.uri.scheme.should eq "file"
+      msg.params.text_document.uri.path.should eq "/tmp/example/foo"
+      msg.params.position.line.should eq 20_i64
+      msg.params.position.character.should eq 50_i64
+      msg.params.ch.should eq "}"
+      msg.params.options.tab_size.should eq 4_i64
+      msg.params.options.insert_spaces.should eq false
+      msg.params.options.trim_trailing_whitespace.should eq true
+      msg.params.options.insert_final_newline.should eq true
+      msg.params.options.trim_final_newlines.should eq true
+      msg.params.options["otherArbitraryBool"].should eq true
+      msg.params.options["otherArbitraryString"].should eq "Hello, World!"
+      msg.params.options["otherArbitraryInteger"].should eq 99_i64
+    end
   end
 
   describe "Any.to_json" do
@@ -957,7 +1055,8 @@ describe LSP::Message do
       msg.result.capabilities.document_formatting_provider =
         LSP::Data::ServerCapabilities::WorkDoneProgressOptions.new(true)
 
-      msg.result.capabilities.document_range_formatting_provider = true
+      msg.result.capabilities.document_range_formatting_provider =
+        LSP::Data::ServerCapabilities::WorkDoneProgressOptions.new(true)
 
       msg.result.capabilities.document_on_type_formatting_provider =
         LSP::Data::ServerCapabilities::DocumentOnTypeFormattingOptions.new(
@@ -1054,7 +1153,9 @@ describe LSP::Message do
             "documentFormattingProvider": {
               "workDoneProgress": true
             },
-            "documentRangeFormattingProvider": true,
+            "documentRangeFormattingProvider": {
+              "workDoneProgress": true
+            },
             "documentOnTypeFormattingProvider": {
               "firstTriggerCharacter": "}",
               "moreTriggerCharacter": [
@@ -1581,6 +1682,118 @@ describe LSP::Message do
 
     it "builds Formatting::Response" do
       req = LSP::Message::Formatting.new "example"
+      msg = req.new_response
+      msg.result = [
+        LSP::Data::TextEdit.new(
+          LSP::Data::Range.new(
+            LSP::Data::Position.new(0_i64, 0_i64),
+            LSP::Data::Position.new(0_i64, 3_i64),
+          ),
+          "foo",
+        ),
+        LSP::Data::TextEdit.new(
+          LSP::Data::Range.new(
+            LSP::Data::Position.new(1_i64, 0_i64),
+            LSP::Data::Position.new(1_i64, 3_i64),
+          ),
+          "bar",
+        ),
+      ]
+
+      msg.to_pretty_json.should eq <<-EOF
+      {
+        "jsonrpc": "2.0",
+        "id": "example",
+        "result": [
+          {
+            "range": {
+              "start": {
+                "line": 0,
+                "character": 0
+              },
+              "end": {
+                "line": 0,
+                "character": 3
+              }
+            },
+            "newText": "foo"
+          },
+          {
+            "range": {
+              "start": {
+                "line": 1,
+                "character": 0
+              },
+              "end": {
+                "line": 1,
+                "character": 3
+              }
+            },
+            "newText": "bar"
+          }
+        ]
+      }
+      EOF
+    end
+
+    it "builds RangeFormatting::Response" do
+      req = LSP::Message::RangeFormatting.new "example"
+      msg = req.new_response
+      msg.result = [
+        LSP::Data::TextEdit.new(
+          LSP::Data::Range.new(
+            LSP::Data::Position.new(0_i64, 0_i64),
+            LSP::Data::Position.new(0_i64, 3_i64),
+          ),
+          "foo",
+        ),
+        LSP::Data::TextEdit.new(
+          LSP::Data::Range.new(
+            LSP::Data::Position.new(1_i64, 0_i64),
+            LSP::Data::Position.new(1_i64, 3_i64),
+          ),
+          "bar",
+        ),
+      ]
+
+      msg.to_pretty_json.should eq <<-EOF
+      {
+        "jsonrpc": "2.0",
+        "id": "example",
+        "result": [
+          {
+            "range": {
+              "start": {
+                "line": 0,
+                "character": 0
+              },
+              "end": {
+                "line": 0,
+                "character": 3
+              }
+            },
+            "newText": "foo"
+          },
+          {
+            "range": {
+              "start": {
+                "line": 1,
+                "character": 0
+              },
+              "end": {
+                "line": 1,
+                "character": 3
+              }
+            },
+            "newText": "bar"
+          }
+        ]
+      }
+      EOF
+    end
+
+    it "builds OnTypeFormatting::Response" do
+      req = LSP::Message::OnTypeFormatting.new "example"
       msg = req.new_response
       msg.result = [
         LSP::Data::TextEdit.new(
