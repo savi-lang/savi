@@ -14,5 +14,13 @@ module LSP::Data
     # After that only incremental updates to the document are
     # send.
     Incremental = 2
+
+    def self.new(*args)
+      ::Enum::ValueConverter(TextDocumentSyncKind).from_json(*args)
+    end
+
+    def to_json(*args)
+      ::Enum::ValueConverter(TextDocumentSyncKind).to_json(self, *args)
+    end
   end
 end

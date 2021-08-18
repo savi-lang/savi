@@ -42,6 +42,14 @@ module LSP::Data
       Warning     = 2
       Information = 3
       Hint        = 4
+
+      def self.new(*args)
+        ::Enum::ValueConverter(Severity).from_json(*args)
+      end
+
+      def to_json(*args)
+        ::Enum::ValueConverter(Severity).to_json(self, *args)
+      end
     end
 
     # Represents a related message and source code location for a diagnostic.
