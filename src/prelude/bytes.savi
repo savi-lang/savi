@@ -245,6 +245,15 @@
     )
     None
 
+  :fun val read_bytes!(offset USize, n USize) Bytes'iso
+    bytes = Bytes.new_iso(n)
+    i = 0
+    while (i < n) (
+      bytes.push(@read_byte!(offset + i))
+      i += 1
+    )
+    --bytes
+
   :fun ref "<<"(other Bytes'box)
     if (other._size > 0) (
       new_size = @_size + other._size

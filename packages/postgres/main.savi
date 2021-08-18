@@ -1,0 +1,161 @@
+:import "io"
+:import "net"
+:import "os/error"
+
+:actor Main
+  :new (env)
+    try PostgresConnection.new(env, "127.0.0.1", env.args[1]!, env.args[2]!)
+
+:class val Frame
+  :let type U8
+  :let body Bytes'val
+  :new (@type, @body)
+
+:actor PostgresConnection
+  :is IOActor(IOAction)
+  :let env Env
+  :let io TCPConnectionEngine
+  :let user String
+  :let database String
+
+  :new (@env, host String, @user, @database)
+    @io = TCPConnectionEngine.connect(@, host, "5432")
+
+    if (@io.connect_error != OSErrorNone) (
+      @env.err.print("[PostgresConnection] Failed to connect:")
+      @env.err.print(@io.connect_error.name)
+    )
+  
+  :fun ref _io_react(action IOAction)
+    case action == (
+    | IOActionOpened |
+      @env.err.print("[PostgresConnection] Connected")
+      @io.write_stream << --MessageEncoder.startup_message(@user, @database)
+      @io.flush
+
+    | IOActionOpenFailed |
+      @env.err.print("[PostgresConnection] Failed to connect:")
+      @env.err.print(@io.connect_error.name)
+
+    | IOActionWrite |
+      @io.flush
+
+    | IOActionRead |
+      @io.pending_reads -> (bytes_available |
+        try (
+          while @_process_message! ()
+        |
+          @env.err.print("FAILED")
+          @io.close
+        )
+      )
+
+    | IOActionClosed |
+      @env.err.print("[PostgresConnection] Closed")
+      try @io.listen.as!(TCPListener).dispose
+    )
+    @
+
+  :fun ref _report_error!(msg String'val)
+    @env.err.print(msg)
+    error!
+
+  :fun ref _handle_frame!(frame Frame)
+    case frame.type == (
+    | 'E' | @env.err.print(">ErrorResponse")
+    | 'N' | @env.err.print(">NoticeResponse")
+    | 'G' | @env.err.print(">CopyInResponse")
+    | 'H' | @env.err.print(">CopyOutResponse")
+    | 'P' | @env.err.print(">Parse")
+    | '1' | @env.err.print(">ParseComplete")
+    | 'R' | @env.err.print(">Authentification")
+    | 'S' | @env.err.print(">ParameterStatus")
+    | 'Z' |
+      @env.err.print(">ReadyForQuery")
+      @io.write_stream << --MessageEncoder.query_message("select now(), random()")
+      @io.flush
+    | 'I' |
+      @env.err.print(">EmptyQueryResponse")
+    | 'D' |
+      @env.err.print(">DataRow")
+      try (
+        DataRowDecoder.decode!(frame.body) -> (column |
+          case column <: (
+            | None |
+            @env.err.print("NULL")
+            | Bytes'iso |
+            @env.err.print(Inspect[(--column).as_string])
+          )
+        )
+      |
+        @env.err.print("Failed to decode DataRow")
+      )
+
+    | 'T' |
+      @env.err.print(">RowDescription")
+      RowDescriptionDecoder.decode!(frame.body) -> (row_description |
+        @env.err.print(Inspect[row_description])
+      )
+
+    | 'C' | @env.err.print(">CommandComplete")
+    | 'K' | @env.err.print(">BackendKeyData")
+    | 'X' |
+      @env.err.print(">Terminate")
+      @io.close
+    |
+      @env.err.print("-------------------------------")
+      @env.err.print("Unknown message")
+      @env.err.print("-------------------------------")
+      @env.err.print(Inspect[(--frame.body).as_string])
+      @io.close
+    )
+
+  :: Processes a message at the current cursor position.
+  ::
+  :: Returns False if it needs more data to process the next message.
+  :fun ref _process_message! Bool
+    frame = @_next_frame!
+    if (frame <: Frame) (
+      @_handle_frame!(frame)
+      True
+    |
+      False
+    )
+
+  :fun ref _next_frame! (Frame | None)
+    // expect cursor and mark position to be the same
+    if (@io.read_stream.token_byte_size > 0) error!
+
+    // XXX: We don't need this
+    // Ensure that cursor and mark position are the same
+    @io.read_stream.mark_here
+
+    if (@io.read_stream.bytes_ahead < 5) (
+      // Not enough bytes in buffer
+      return None
+    )
+
+    @io.read_stream.advance!(5)
+    message_type = @io.read_stream.read_byte!(0)
+    message_length = @io.read_stream.read_be_u32!(1)
+
+    if (message_length < 4) (
+      @_report_error!("Invalid frame length. Expected >= 4.")
+    )
+
+    body_size = message_length.usize - 4
+
+    if (@io.read_stream.bytes_ahead < body_size) (
+      @env.err.print("Not enough bytes ahead")
+      @io.read_stream.rewind_to_marker
+      return None
+    )
+
+    @io.read_stream.mark_here
+    @io.read_stream.advance!(body_size)
+
+    body = --@io.read_stream.read_bytes!(0, body_size)
+    @io.read_stream.mark_here
+
+    --Frame.new(message_type, --body)
+
