@@ -1,3 +1,5 @@
+require "lsp" # only for conversion to/from LSP data types
+
 # This exception class is used to represent errors to be presented to the user,
 # with each error being associated to a particular SourcePos that caused it.
 class Savi::Error < Exception
@@ -39,6 +41,19 @@ class Savi::Error < Exception
       end
     }
     strings.join("\n").strip
+  end
+
+  def to_lsp_diagnostic
+    LSP::Data::Diagnostic.new(
+      range: pos.to_lsp_range,
+      message: message, # TODO: should this use the headline instead?
+      related_information: info.map { |info_pos, info_message|
+        LSP::Data::Diagnostic::RelatedInformation.new(
+          info_pos.to_lsp_location,
+          info_message,
+        )
+      }
+    )
   end
 
   # Raise an error built with the given information.

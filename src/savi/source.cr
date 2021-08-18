@@ -336,4 +336,16 @@ struct Savi::Source::Pos
       start.row, start.col
     )
   end
+
+  def to_lsp_range
+    # TODO: we actually need to convert the byte offsets to character offsets
+    LSP::Data::Range.new(
+      LSP::Data::Position.new(row.to_i64, col.to_i64),
+      LSP::Data::Position.new(row.to_i64, (col + size).to_i64), # TODO: account for spilling over into a new row
+    )
+  end
+
+  def to_lsp_location
+    LSP::Data::Location.new(URI.new(path: source.path), to_lsp_range)
+  end
 end
