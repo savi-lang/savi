@@ -6,7 +6,7 @@ module LSP::Data
     include JSON::Serializable
 
     # The range of the text document to be manipulated.
-    # To insert text into a document create a range where start === end.
+    # To insert netext into a document create a range where start === end.
     property range : Range
 
     # The string to be inserted.

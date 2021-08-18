@@ -180,7 +180,8 @@ module LSP::Message
                        Completion |
                        CompletionItemResolve |
                        Hover |
-                       SignatureHelp
+                       SignatureHelp |
+                       Formatting
 
   alias AnyInResponse = GenericResponse |
                         ShowMessageRequest::Response
@@ -198,7 +199,8 @@ module LSP::Message
                          Completion::Response |
                          CompletionItemResolve::Response |
                          Hover::Response |
-                         SignatureHelp::Response
+                         SignatureHelp::Response |
+                         Formatting::Response
 
   alias AnyOutErrorResponse = GenericErrorResponse |
                               Initialize::ErrorResponse |
@@ -206,7 +208,8 @@ module LSP::Message
                               Completion::ErrorResponse |
                               CompletionItemResolve::ErrorResponse |
                               Hover::ErrorResponse |
-                              SignatureHelp::ErrorResponse
+                              SignatureHelp::ErrorResponse |
+                              Formatting::ErrorResponse
 
   alias AnyOutRequest = ShowMessageRequest
 
@@ -986,7 +989,30 @@ module LSP::Message
 
   # The document formatting request is sent from the client to the server to
   # format a whole document.
-  # TODO: struct Formatting
+  struct Formatting
+    Message.def_request("textDocument/formatting")
+
+    struct Params
+      include JSON::Serializable
+
+      # The document to format.
+      @[JSON::Field(key: "textDocument")]
+      property text_document : Data::TextDocumentIdentifier
+
+      # The format options.
+      property options : Data::FormattingOptions
+
+      def initialize(
+        @text_document = Data::TextDocumentIdentifier.new,
+        @options = Data::FormattingOptions.new
+      )
+      end
+    end
+
+    alias Result = Array(Data::TextEdit)
+
+    alias ErrorData = Nil
+  end
 
   # The document range formatting request is sent from the client to the server
   # to format a given range in a document.
