@@ -295,7 +295,7 @@ module Savi::Compiler::Types
       # We restrict this for now while we are building out the pass because
       # we don't want to deal with all of the complicated forms in the prelude.
       # We want to stick to the simple forms in the compiler pass specs for now.
-      root_library = ctx.namespace.root_library(ctx).source_library
+      root_library = ctx.root_library.source_library
       return unless t.ident.pos.source.library == root_library
 
       raise NotImplementedError.new("run_for_type_alias")

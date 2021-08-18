@@ -46,7 +46,7 @@
 
 :class val AssertCondition
   :is Assert
-  
+
   :new val (@spec, @example, @success, @pos)
 
   :fun print_failure(env Env) None

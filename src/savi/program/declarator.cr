@@ -124,13 +124,11 @@ class Savi::Program::Declarator
       unless intrinsic
 
     Intrinsic.run(ctx, scope, self, declare, terms)
-
-    scope.push_context(self) if @begins.any?
   end
 
-  def finish(ctx, scope, declarators)
+  def finish(ctx, scope)
     raise NotImplementedError.new "custom declarators" unless intrinsic
 
-    Intrinsic.finish(ctx, scope, declarators, self)
+    Intrinsic.finish(ctx, scope, self)
   end
 end

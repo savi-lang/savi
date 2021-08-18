@@ -186,7 +186,7 @@ class Savi::Compiler::Verify
       # If this is the "root" library, check that it has a Main actor,
       # and that the Main actor meets all requirements we expect.
       Verify.check_main_actor(ctx, library) \
-        if library.make_link == ctx.namespace.root_library_link(ctx)
+        if library.make_link == ctx.root_library_link
 
       super(ctx, library)
     end

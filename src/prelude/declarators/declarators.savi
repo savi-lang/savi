@@ -361,6 +361,7 @@
   :context type
 
   :term name String
+  :body optional
 
 // TODO: Document this.
 :declarator fun
@@ -452,7 +453,7 @@
   :term name Name
   :term type Type
     :optional
-  :body required
+  :body optional
 
 // TODO: Document this.
 :declarator let

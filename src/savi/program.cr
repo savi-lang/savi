@@ -1,10 +1,10 @@
 class Savi::Program
   getter libraries
-  getter declarators # TODO: declarators should be scoped within a library
+  property meta_declarators : Library?
+  property standard_declarators : Library?
 
   def initialize
     @libraries = [] of Library
-    @declarators = [] of Declarator
   end
 
   # TODO: Remove these aliases and make passes work at the library level
@@ -17,6 +17,7 @@ class Savi::Program
     getter aliases
     getter enum_members
     getter imports
+    getter declarators
     getter source_library : Source::Library
 
     def initialize(@source_library)
@@ -24,12 +25,14 @@ class Savi::Program
       @aliases = [] of TypeAlias
       @enum_members = [] of TypeWithValue
       @imports = [] of Import
+      @declarators = [] of Declarator
     end
 
     def dup_init(new_types = nil, new_aliases = nil)
       @types = (new_types || @types.dup).not_nil!
       @aliases = (new_aliases || @aliases.dup).not_nil!
       @imports = @imports.dup
+      @declarators = @declarators.dup
     end
 
     def dup(*args)
@@ -43,6 +46,7 @@ class Savi::Program
       return false unless @aliases == other.aliases
       return false unless @enum_members == other.enum_members
       return false unless @imports == other.imports
+      return false unless @declarators == other.declarators
       true
     end
 
@@ -101,11 +105,11 @@ class Savi::Program
   class TypeAlias
     property ident : AST::Identifier
     property params : AST::Group?
-    property target : AST::Term
+    property! target : AST::Term
 
     getter metadata
 
-    def initialize(@ident, @params, @target)
+    def initialize(@ident, @params)
       @metadata = Hash(Symbol, UInt64 | Bool).new
     end
 
@@ -153,9 +157,9 @@ class Savi::Program
   class TypeWithValue
     property ident : AST::Identifier
     property target : Type::Link
-    property value : UInt64
+    property! value : UInt64
 
-    def initialize(@ident, @target, @value)
+    def initialize(@ident, @target)
     end
 
     def inspect(io : IO)

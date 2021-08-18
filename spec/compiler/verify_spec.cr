@@ -66,13 +66,13 @@ describe Savi::Compiler::Verify do
   it "complains if the Main.new function is not a constructor" do
     source = Savi::Source.new_example <<-SOURCE
     :actor Main
-      :fun new(env Env)
+      :fun new(env Env) None
     SOURCE
 
     expected = <<-MSG
     The Main.new function defined here must be a constructor:
     from (example):2:
-      :fun new(env Env)
+      :fun new(env Env) None
            ^~~
     MSG
 

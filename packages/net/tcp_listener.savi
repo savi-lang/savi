@@ -71,7 +71,7 @@
 
   :be _accept(ns U32 = 0)
     if Platform.windows (
-      // TODO
+      None // TODO
     |
       if @_closed.not (
         try (

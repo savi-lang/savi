@@ -15,30 +15,39 @@ module Savi::Parser::Builder
 
   private def self.build_doc(main, iter, state)
     assert_kind(main, :doc)
-    doc = AST::Document.new
+    doc = AST::Document.new.with_pos(state.source.entire_pos)
     decl : AST::Declare? = nil
+    body = AST::Group.new(":")
     annotations = [] of AST::Annotation
 
     iter.while_next_is_child_of(main) do |child|
       term = build_term(child, iter, state)
       case term
-      when AST::Declare then doc.list << (decl = term)
       when AST::Annotation then annotations << term
-      else
-        decl = decl.as(AST::Declare)
+      when AST::Declare
+        decl = term
 
         unless annotations.empty?
           decl.annotations = annotations
           annotations = [] of AST::Annotation
         end
 
-        decl.body.terms << term
-        if term.pos.finish > decl.body.pos.finish
-          new_pos = decl.body.pos
-          new_pos.finish = term.pos.finish
-          decl.body.with_pos(new_pos)
+        unless body.terms.empty?
+          body.with_pos(body.terms.first.pos.span([body.terms.last.pos]))
+          doc.list << body
+          body = AST::Group.new(":")
         end
+
+        doc.list << decl
+      else
+        body.terms << term
       end
+    end
+
+    unless body.terms.empty?
+      body.with_pos(body.terms.first.pos.span([body.terms.last.pos]))
+      doc.list << body
+      body = AST::Group.new(":")
     end
 
     doc
@@ -49,8 +58,7 @@ module Savi::Parser::Builder
     decl = AST::Declare.new.with_pos(state.pos(main))
 
     iter.while_next_is_child_of(main) do |child|
-      term = build_term(child, iter, state)
-      decl.head << term
+      decl.terms << build_term(child, iter, state)
     end
 
     decl
@@ -160,7 +168,9 @@ module Savi::Parser::Builder
     # Build a left-leaning tree of Relate nodes, each with a left-hand-side,
     # a right-hand-side, and an operator betwixt the two of those terms.
     terms[1..-1].each_slice(2).reduce(terms.first) do |lhs, (op, rhs)|
-      AST::Relate.new(lhs, op.as(AST::Operator), rhs).with_pos(state.pos(main))
+      AST::Relate.new(lhs, op.as(AST::Operator), rhs).with_pos(
+        lhs.pos.span([rhs.pos])
+      )
     end
   end
 
@@ -180,7 +190,9 @@ module Savi::Parser::Builder
     # Build a right-leaning tree of Relate nodes, each with a left-hand-side,
     # a right-hand-side, and an operator betwixt the two of those terms.
     terms[0...-1].reverse.each_slice(2).reduce(terms.last) do |rhs, (op, lhs)|
-      AST::Relate.new(lhs, op.as(AST::Operator), rhs).with_pos(state.pos(main))
+      AST::Relate.new(lhs, op.as(AST::Operator), rhs).with_pos(
+        lhs.pos.span([rhs.pos])
+      )
     end
   end
 
@@ -368,7 +380,9 @@ module Savi::Parser::Builder
       group = build_group(child, iter, state)
       group = group.as(AST::Group)
 
-      term = AST::Qualify.new(term, group).with_pos(state.pos(main))
+      term = AST::Qualify.new(term, group).with_pos(
+        term.pos.span([group.pos])
+      )
     end
 
     term
@@ -384,9 +398,13 @@ module Savi::Parser::Builder
       case op
       when AST::Operator
         rhs = build_term(iter.next_as_child_of(main), iter, state)
-        term = AST::Relate.new(term, op, rhs).with_pos(state.pos(main))
+        term = AST::Relate.new(term, op, rhs).with_pos(
+          term.pos.span([op.pos, rhs.pos])
+        )
       when AST::Group
-        term = AST::Qualify.new(term, op).with_pos(state.pos(main))
+        term = AST::Qualify.new(term, op).with_pos(
+          term.pos.span([op.pos])
+        )
       when AST::Annotation
         ann = op.as(AST::Annotation)
         (term.annotations ||= [] of AST::Annotation).not_nil! << ann

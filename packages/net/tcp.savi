@@ -44,9 +44,9 @@
       | IOActionClosed |
         try @listen.as!(TCPListener)._conn_closed
 
-      // TODO: windows complete writes, flush-after-mute (pending writes logic from Pony)
-      // | IOActionWrite |
-      //   ...
+        // TODO: windows complete writes, flush-after-mute (pending writes logic from Pony)
+        // | IOActionWrite |
+        //   ...
       )
       yield action
     )
@@ -62,7 +62,7 @@
   :fun ref pending_reads
     :yields USize for None
     if Platform.windows (
-      // TODO: @_windows_complete_reads(arg)
+      None // TODO: @_windows_complete_reads(arg)
     |
       @_pending_reads_unix -> (bytes_available | yield bytes_available)
     )

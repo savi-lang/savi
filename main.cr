@@ -195,17 +195,25 @@ module Savi
         sources = Compiler.get_recursive_sources(Dir.current)
 
         if check_only
-          sources.each { |source| AST::Format.check(ctx, Parser.parse(source)) }
+          sources.group_by(&.library).each { |source_library, sources|
+            ctx = Savi.compiler.compile(sources, :import)
+            AST::Format.check(ctx, ctx.root_library_link, ctx.root_docs)
+          }
           puts "Checked #{sources.size} files."
         else
-          edited_count = sources.count { |source|
-            edits = AST::Format.run(ctx, Parser.parse(source))
-            next if edits.empty?
+          edited_count = 0
+          sources.group_by(&.library).each { |source_library, sources|
+            ctx = Savi.compiler.compile(sources, :import)
+            edits_by_doc =
+              AST::Format.run(ctx, ctx.root_library_link, ctx.root_docs)
 
-            puts "Fixing #{source.path}"
-            edited = AST::Format.apply_edits(source.entire_pos, edits)[0].source
-            File.write(source.path, edited.content)
-            true # indicating that the file was edited
+            edits_by_doc.each { |doc, edits|
+              source = doc.pos.source
+              puts "Fixing #{source.path}"
+              edited = AST::Format.apply_edits(source.entire_pos, edits)[0].source
+              File.write(source.path, edited.content)
+              edited_count += 1
+            }
           }
           puts "Fixed #{edited_count} of #{sources.size} files."
         end

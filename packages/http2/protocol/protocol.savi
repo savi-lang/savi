@@ -49,11 +49,11 @@
   :var header_table_size U32:      0x1000
   :var enable_push:                True
 
-// Request pseudo-headers
-":method" // required
-":scheme" // required
-":authority" // optional - ommitted when in "origin form" or "asterisk form"
-":path" // required
+// // Request pseudo-headers
+// ":method" // required
+// ":scheme" // required
+// ":authority" // optional - ommitted when in "origin form" or "asterisk form"
+// ":path" // required
 
-// Response pseudo-headers
-":status"
+// // Response pseudo-headers
+// ":status"

@@ -76,9 +76,9 @@ It suggests a similarly named function when found:
 
 ```savi
 :module SomeHFunctions
-  :fun hey
-  :fun hell
-  :fun hello_world
+  :fun hey: None
+  :fun hell: None
+  :fun hello_world: None
 ```
 ```savi
     SomeHFunctions.hello
@@ -93,7 +93,7 @@ The 'hello' function can't be called on this receiver:
         ^~~~~~~~~~~~~~
 
 - maybe you meant to call the 'hell' function:
-  :fun hell
+  :fun hell: None
        ^~~~
 ```
 
@@ -103,7 +103,7 @@ It suggests a similarly named function (without '!') when found:
 
 ```savi
 :module HelloNotPartial
-  :fun hello
+  :fun hello: None
 ```
 ```savi
     HelloNotPartial.hello!
@@ -118,7 +118,7 @@ The 'hello!' function can't be called on this receiver:
         ^~~~~~~~~~~~~~~
 
 - maybe you meant to call 'hello' (without '!'):
-  :fun hello
+  :fun hello: None
        ^~~~~
 ```
 
@@ -128,7 +128,7 @@ It suggests a similarly named function (with '!') when found:
 
 ```savi
 :module HelloPartial
-  :fun hello!
+  :fun hello!: error!
 ```
 ```savi
     HelloPartial.hello
@@ -143,7 +143,7 @@ The 'hello' function can't be called on this receiver:
         ^~~~~~~~~~~~
 
 - maybe you meant to call 'hello!' (with a '!'):
-  :fun hello!
+  :fun hello!: error!
        ^~~~~~
 ```
 
@@ -153,7 +153,7 @@ It complains when calling with an insufficient receiver capability:
 
 ```savi
 :class FunRefMutate
-  :fun ref mutate
+  :fun ref mutate: None
 ```
 ```savi
     mutatable box = FunRefMutate.new
@@ -165,7 +165,7 @@ This function call doesn't meet subtyping requirements:
               ^~~~~~
 
 - the type FunRefMutate'box isn't a subtype of the required capability of 'ref':
-  :fun ref mutate
+  :fun ref mutate: None
        ^~~
 ```
 
@@ -274,7 +274,7 @@ It complains when calling a function with too many or too few arguments:
     @example(1, 2, 3, 4, 5)
     @example(1, 2, 3, 4, 5, U8[6])
 
-  :fun example(a U8, b U8, c U8, d U8 = 4, e U8 = 5)
+  :fun example(a U8, b U8, c U8, d U8 = 4, e U8 = 5): None
 ```
 ```error
 This function call doesn't meet subtyping requirements:
@@ -286,7 +286,7 @@ This function call doesn't meet subtyping requirements:
      ^~~~~~~
 
 - the function requires at least 3 arguments:
-  :fun example(a U8, b U8, c U8, d U8 = 4, e U8 = 5)
+  :fun example(a U8, b U8, c U8, d U8 = 4, e U8 = 5): None
               ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ```
 ```error
@@ -299,7 +299,7 @@ This function call doesn't meet subtyping requirements:
      ^~~~~~~
 
 - the function allows at most 5 arguments:
-  :fun example(a U8, b U8, c U8, d U8 = 4, e U8 = 5)
+  :fun example(a U8, b U8, c U8, d U8 = 4, e U8 = 5): None
               ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ```
 

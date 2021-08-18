@@ -18,9 +18,7 @@ module Savi::Program::Intrinsic
     when "top"
       case declarator.name.value
       when "declarator_bootstrapping_complete"
-        ctx.program.declarators.reject! { |d|
-          Declarator::Bootstrap::BOOTSTRAP_DECLARATORS.includes?(d)
-        }
+        scope.include_bootstrap_declarators = false
       when "declarator"
         name = terms["name"].as(AST::Identifier)
         scope.current_declarator = Declarator.new(name)
@@ -40,17 +38,19 @@ module Savi::Program::Intrinsic
         name, params =
           AST::Extract.name_and_params(terms["name_and_params"].not_nil!)
 
-        # TODO: Move this error to a later compiler pass?
-        Error.at name.pos, "This alias declaration needs a body "\
-          "containing a single type expression to indicate what it is an alias of" \
-            unless declare.body.is_a?(AST::Group) \
-              && declare.body.terms.size == 1 \
+        type_alias = Program::TypeAlias.new(name, params)
 
-        scope.current_library.aliases << Program::TypeAlias.new(
-          name,
-          params,
-          declare.body.not_nil!.terms.first,
-        )
+        scope.current_library.aliases << type_alias
+
+        scope.on_body { |body|
+          unless body.terms.size == 1
+            ctx.error_at body.pos,
+              "The target of an alias must be a single type expression"
+            next
+          end
+
+          type_alias.target = body.terms.first
+        }
       when "actor", "class", "struct", "trait",
            "numeric", "enum", "module", "ffi"
         name, params =
@@ -158,24 +158,28 @@ module Savi::Program::Intrinsic
       case declarator.name.value
       when "it"
         name = terms["name"].as(AST::LiteralString)
-        scope.current_type.functions << Program::Function.new(
-          AST::Identifier.new("ref").from(declare.head.first),
+        function = Program::Function.new(
+          AST::Identifier.new("ref").from(declare.terms.first),
           AST::Identifier.new(name.value).from(name),
           nil,
-          AST::Identifier.new("None").from(declare.head.first),
-          declare.body,
+          AST::Identifier.new("None").from(declare.terms.first),
         ).tap(&.add_tag(:it))
+
+        scope.current_type.functions << function
+
+        scope.on_body { |body| function.body = body }
       when "fun"
         name, params =
           AST::Extract.name_and_params(terms["name_and_params"].not_nil!)
 
-        scope.current_function = Program::Function.new(
+        scope.current_function = function = Program::Function.new(
           terms["cap"].as(AST::Identifier),
           name,
           params,
           terms["ret"]?.as(AST::Term?),
-          declare.body,
         )
+
+        scope.on_body { |body| function.body = body }
       when "be"
         # TODO: Move this error to a later compiler pass?
         type = scope.current_type
@@ -185,73 +189,78 @@ module Savi::Program::Intrinsic
         name, params =
           AST::Extract.name_and_params(terms["name_and_params"].not_nil!)
 
-        scope.current_function = Program::Function.new(
-          AST::Identifier.new("ref").from(declare.head.first),
+        scope.current_function = function = Program::Function.new(
+          AST::Identifier.new("ref").from(declare.terms.first),
           name,
           params,
           AST::Identifier.new("None").from(name),
-          declare.body,
         ).tap(&.add_tag(:async))
+
+        scope.on_body { |body| function.body = body }
       when "new"
         type = scope.current_type
 
         # TODO: Move this error to a later compiler pass?
-        Error.at declare.head.first, "stateless types can't have constructors" \
+        Error.at declare.terms.first, "stateless types can't have constructors" \
           if type.has_tag?(:simple_value) || type.has_tag?(:ignores_cap)
 
         if terms["name_and_params"]?
           name, params =
             AST::Extract.name_and_params(terms["name_and_params"].not_nil!)
         else
-          name = declare.head.first.dup.as(AST::Identifier)
+          name = declare.terms.first.dup.as(AST::Identifier)
           params = terms["params"]?.as(AST::Group?)
         end
 
-        scope.current_function = Program::Function.new(
+        scope.current_function = function = Program::Function.new(
           terms["cap"]?.as(AST::Identifier?) || type.cap.dup,
           name,
           params,
           AST::Identifier.new("@").from(name),
-          declare.body,
         ).tap do |f|
           f.add_tag(:constructor)
           f.add_tag(:async) if type.has_tag?(:actor)
         end
+
+        scope.on_body { |body| function.body = body }
       when "const"
-        scope.current_type.functions << Program::Function.new(
-          AST::Identifier.new("non").from(declare.head.first),
+        function = Program::Function.new(
+          AST::Identifier.new("non").from(declare.terms.first),
           terms["name"].as(AST::Identifier),
           nil,
           terms["type"]?.as(AST::Term?),
-          declare.body,
         ).tap(&.add_tag(:constant))
+
+        scope.current_type.functions << function
+
+        scope.on_body { |body| function.body = body }
       when "let", "var"
         type = scope.current_type
 
         # TODO: Move this error to a later compiler pass?
-        Error.at declare.head.first, "stateless types can't have properties" \
+        Error.at declare.terms.first, "stateless types can't have properties" \
           if type.has_tag?(:simple_value) || type.has_tag?(:ignores_cap)
 
         is_let = declarator.name.value == "let"
 
         # TODO: Move this error to a later compiler pass?
-        Error.at declare.head.first,
+        Error.at declare.terms.first,
           "This type can't have any reassignable fields; use `let` here" \
           if !is_let && type.has_tag?(:no_field_reassign)
 
-        keyword = declare.head.first
+        keyword = declare.terms.first
         ident = terms["name"].as(AST::Identifier)
         ret = terms["type"]?.as(AST::Term?)
 
         field_cap = AST::Identifier.new("box").from(keyword)
         field_params = AST::Group.new("(").from(ident)
-        field_body = declare.body
-        field_body = nil if declare.body.try { |group| group.terms.size == 0 }
-        field_func = Program::Function.new(field_cap, ident.dup, field_params, ret.dup, field_body)
+        field_func = Program::Function.new(field_cap, ident.dup, field_params, ret.dup)
         field_func.add_tag(:hygienic)
         field_func.add_tag(:field)
         field_func.add_tag(:let) if is_let
         type.functions << field_func
+
+        scope.on_body { |body| field_func.body = body }
 
         getter_cap = AST::Identifier.new("box").from(keyword)
         if ret
@@ -333,16 +342,16 @@ module Savi::Program::Intrinsic
         type.functions << displace_func
       when "is"
         scope.current_type.functions << Program::Function.new(
-          AST::Identifier.new("non").from(declare.head.first),
-          declare.head.first.as(AST::Identifier),
+          AST::Identifier.new("non").from(declare.terms.first),
+          declare.terms.first.as(AST::Identifier),
           nil,
           terms["trait"].as(AST::Term),
           nil,
         ).tap(&.add_tag(:hygienic)).tap(&.add_tag(:is)).tap(&.add_tag(:copies))
       when "copies"
         scope.current_type.functions << Program::Function.new(
-          AST::Identifier.new("non").from(declare.head.first),
-          declare.head.first.as(AST::Identifier),
+          AST::Identifier.new("non").from(declare.terms.first),
+          declare.terms.first.as(AST::Identifier),
           nil,
           terms["trait"].as(AST::Term),
           nil,
@@ -355,21 +364,21 @@ module Savi::Program::Intrinsic
     when "type_enum"
       case declarator.name.value
       when "member"
-        name = terms["name"].as(AST::Identifier)
-        body = declare.body
-
-        # TODO: Move this error to a later compiler pass?
-        raise "member value must be a single integer" \
-          unless body.is_a?(AST::Group) \
-            && body.terms.size == 1 \
-            && body.terms[0].is_a?(AST::LiteralInteger)
-        value = body.terms[0].as(AST::LiteralInteger).value.to_u64
-
         type_with_value = Program::TypeWithValue.new(
           terms["name"].as(AST::Identifier),
           scope.current_type.make_link(scope.current_library),
-          value,
         )
+
+        scope.on_body { |body|
+          unless body.terms.size == 1 && body.terms[0].is_a?(AST::LiteralInteger)
+            ctx.error_at body, "This member value must be a single integer"
+            next
+          end
+
+          type_with_value.value =
+            body.terms[0].as(AST::LiteralInteger).value.to_u64
+        }
+
         scope.current_members << type_with_value # TODO: remove this line
         scope.current_library.enum_members << type_with_value
       else
@@ -380,21 +389,8 @@ module Savi::Program::Intrinsic
     when "function"
       case declarator.name.value
       when "yields"
-        func = scope.current_function
-
-        # TODO: Make the interpreter do this automatically given that the
-        # yields declarator allows no body to attach to it.
-        if func.body
-          # If this yields declaration has code attached, add to the function.
-          func.body.not_nil!.terms.concat(declare.body.terms)
-          declare.body.terms.clear
-        else
-          func.body = AST::Group.new(declare.body.style, declare.body.terms.dup).from(declare.body)
-          declare.body.terms.clear
-        end
-
-        func.yield_out = terms["out"]?.as(AST::Term?)
-        func.yield_in  = terms["in"]?.as(AST::Term?)
+        scope.current_function.yield_out = terms["out"]?.as(AST::Term?)
+        scope.current_function.yield_in  = terms["in"]?.as(AST::Term?)
       else
         raise NotImplementedError.new(declarator.pretty_inspect)
       end
@@ -407,12 +403,11 @@ module Savi::Program::Intrinsic
   def self.finish(
     ctx : Compiler::Context,
     scope : Declarator::Scope,
-    declarators : Array(Declarator),
     declarator : Declarator,
   )
     case declarator.name.value
     when "declarator"
-      declarators << scope.current_declarator
+      scope.current_library.declarators << scope.current_declarator
       scope.current_declarator = nil
     when "term"
       scope.current_declarator.terms << scope.current_declarator_term
@@ -424,14 +419,14 @@ module Savi::Program::Intrinsic
       scope.current_library.types << scope.current_type
       scope.current_type = nil
     when "numeric"
-      declare_numeric_copies(ctx, scope, declarators, declarator)
+      declare_numeric_copies(ctx, scope, declarator)
 
       scope.current_library.types << scope.current_type
       scope.current_type = nil
     when "enum"
-      declare_numeric_copies(ctx, scope, declarators, declarator)
-      declare_enum_member_name(ctx, scope, declarators, declarator)
-      declare_enum_from_u64(ctx, scope, declarators, declarator)
+      declare_numeric_copies(ctx, scope, declarator)
+      declare_enum_member_name(ctx, scope, declarator)
+      declare_enum_from_u64(ctx, scope, declarator)
 
       scope.current_library.types << scope.current_type
       scope.current_type = nil
@@ -457,14 +452,13 @@ module Savi::Program::Intrinsic
       scope.current_library.types << scope.current_type
       scope.current_type = nil
     else
-      raise NotImplementedError.new(declarator.inspect)
+      nil
     end
   end
 
   def self.declare_numeric_copies(
     ctx : Compiler::Context,
     scope : Declarator::Scope,
-    declarators : Array(Declarator),
     declarator : Declarator,
   )
     type = scope.current_type
@@ -509,7 +503,6 @@ module Savi::Program::Intrinsic
   def self.declare_enum_member_name(
     ctx : Compiler::Context,
     scope : Declarator::Scope,
-    declarators : Array(Declarator),
     declarator : Declarator,
   )
     type = scope.current_type
@@ -554,7 +547,6 @@ module Savi::Program::Intrinsic
   def self.declare_enum_from_u64(
     ctx : Compiler::Context,
     scope : Declarator::Scope,
-    declarators : Array(Declarator),
     declarator : Declarator,
   )
     type = scope.current_type

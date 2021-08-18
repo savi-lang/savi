@@ -278,7 +278,8 @@
               lo += 1
             )
           )
-        scan += 1)
+          scan += 1
+        )
 
         // Re-expand to the true range now that we've finished scanning.
         lo -= 1

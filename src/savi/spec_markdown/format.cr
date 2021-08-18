@@ -1,13 +1,14 @@
 class Savi::SpecMarkdown::Format
   def initialize(orig : SpecMarkdown)
     @source = orig.source.as(Source)
-    @doc = Parser.parse(orig.source).as(AST::Document)
     @examples = orig.examples.as(Array(SpecMarkdown::Example))
   end
 
   def verify!
     any_failures = false
-    edits = AST::Format.run(Compiler::Context.new, @doc)
+    ctx = Savi.compiler.compile([@source], :import)
+    edits = AST::Format.run(ctx, ctx.root_library_link, ctx.root_docs)
+      .flat_map(&.last)
 
     @examples.each { |example|
       code_pos = SpecMarkdown.get_code_pos(@source, example.code_blocks.first)

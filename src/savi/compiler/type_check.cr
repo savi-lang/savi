@@ -33,7 +33,7 @@ class Savi::Compiler::TypeCheck
     # This is useful for developing libraries, taking checks beyond
     # just confirming safety of the example/test program being compiled,
     # to confirm that this library won't have compile errors in any program.
-    ctx.namespace.root_library(ctx).tap { |library|
+    ctx.root_library.tap { |library|
       library.types.each { |t|
         t_link = t.make_link(library)
         rts.concat(ctx.infer[t_link].type_partial_reifications.map(&.single!))

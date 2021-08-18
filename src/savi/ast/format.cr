@@ -1,15 +1,30 @@
 class Savi::AST::Format < Savi::AST::Visitor
   # Return a list of edits that should be applied to the given document.
-  def self.run(ctx, doc : AST::Document)
-    visitor = new
-    doc.accept(ctx, visitor)
-    visitor.edits
+  def self.run(
+    ctx : Compiler::Context,
+    library : Program::Library::Link,
+    docs : Array(AST::Document)
+  )
+    docs.compact_map { |doc|
+      visitor = new(library, doc)
+      doc.accept(ctx, visitor)
+      visitor.finalize
+      edits = visitor.edits
+      next if edits.empty?
+      {doc, edits}
+    }.to_h
   end
 
   # Emit errors to the context for any formatting issues in the given document.
-  def self.check(ctx, doc : AST::Document)
-    run(ctx, doc).each { |edit|
-      ctx.error_at edit.pos, "This code violates formatting rule #{edit.rule}"
+  def self.check(
+    ctx : Compiler::Context,
+    library : Program::Library::Link,
+    docs : Array(AST::Document)
+  )
+    run(ctx, library, docs).each { |doc, edits|
+      edits.each { |edit|
+        ctx.error_at edit.pos, "This code violates formatting rule #{edit.rule}"
+      }
     }
   end
 
@@ -57,6 +72,7 @@ class Savi::AST::Format < Savi::AST::Visitor
   end
 
   enum Rule
+    Indentation
     NoUnnecessaryParens
     NoSpaceInsideBrackets
     SpaceAroundPipeSeparator
@@ -77,8 +93,15 @@ class Savi::AST::Format < Savi::AST::Visitor
 
   getter edits = [] of Edit
 
-  def initialize
+  def initialize(library : Program::Library::Link, doc : AST::Document)
     @parent_stack = [] of AST::Node
+    @indent_state = IndentState.new(library, doc)
+  end
+
+  def finalize
+    @indent_state.each_indent_violation { |pos, replacement|
+      violates Rule::Indentation, pos, replacement
+    }
   end
 
   def parent
@@ -90,11 +113,13 @@ class Savi::AST::Format < Savi::AST::Visitor
   end
 
   def visit_pre(ctx, node : AST::Node)
+    @indent_state.visit_pre(ctx, self, node)
     @parent_stack << node
   end
 
   def visit(ctx, node : AST::Node)
     @parent_stack.pop
+    @indent_state.visit_post(ctx, self, node)
     observe(ctx, node)
   end
 
