@@ -1,3 +1,5 @@
+require "lsp" # only for conversion to/from LSP data types
+
 struct Savi::Source
   property dirname : String
   property filename : String
@@ -317,5 +319,21 @@ struct Savi::Source::Pos
       source.content.byte_slice(line_start, line_finish - line_start),
       (" " * col) + "^" + ("~" * twiddle_width) + tail,
     ].join("\n")
+  end
+
+  def self.from_lsp_position(source, position : LSP::Data::Position)
+    # TODO: we actually need to convert the character offset to a byte offset
+    point(source, position.line.to_i32, position.character.to_i32)
+  end
+
+  def self.from_lsp_range(source, range : LSP::Data::Range)
+    start = from_lsp_position(source, range.start)
+    finish = from_lsp_position(source, range.finish)
+
+    new(
+      source, start.start, finish.start,
+      start.line_start, start.line_finish,
+      start.row, start.col
+    )
   end
 end
