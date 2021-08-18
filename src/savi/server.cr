@@ -66,6 +66,7 @@ class Savi::Server
       msg.result.capabilities.definition_provider = true
       msg.result.capabilities.completion_provider =
         LSP::Data::ServerCapabilities::CompletionOptions.new(false, [":"])
+      msg.result.capabilities.document_formatting_provider = true
       msg
     end
   end
@@ -157,6 +158,38 @@ class Savi::Server
       end
       msg
     end
+  end
+
+  def handle(req : LSP::Message::Formatting)
+    filename = req.params.text_document.uri.path.not_nil!
+    dirname = File.dirname(filename)
+    sources = Savi.compiler.source_service.get_library_sources(dirname)
+
+    ctx = Savi.compiler.compile(sources, :import)
+    doc = ctx.root_docs.find(&.pos.source.path.==(filename)).not_nil!
+
+    edits = AST::Format.run(ctx, ctx.root_library_link, [doc]).flat_map(&.last)
+
+    @wire.respond(req) { |msg|
+      msg.result = edits.map { |edit|
+        LSP::Data::TextEdit.new(
+          LSP::Data::Range.new(
+            LSP::Data::Position.new(
+              edit.pos.row.to_i64,
+              edit.pos.col.to_i64,
+            ),
+            LSP::Data::Position.new(
+              edit.pos.row.to_i64,
+              edit.pos.col.to_i64 + (
+                edit.pos.finish - edit.pos.start
+              ),
+            ),
+          ),
+          new_text: edit.replacement,
+        )
+      }
+      msg
+    }
   end
 
   # TODO: Proper completion support.
