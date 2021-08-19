@@ -185,7 +185,7 @@ module Savi::Compiler::Types
     end
 
     protected def observe_assert_bool(ctx, node)
-      t_link = ctx.namespace.prelude_type("Bool")
+      t_link = ctx.namespace.prelude_type(ctx, "Bool")
       bool = NominalType.new(t_link).intersect(NominalCap::VAL)
       rhs = @by_node[node]
       @assertions << {node.pos, bool, rhs}
@@ -260,7 +260,7 @@ module Savi::Compiler::Types
       @by_node[node] = var
 
       array_nominal = NominalType.new(
-        ctx.namespace.prelude_type("Array"),
+        ctx.namespace.prelude_type(ctx, "Array"),
         [elem_var.as(AlgebraicType)]
       )
       array_type = array_nominal.intersect(
@@ -317,7 +317,7 @@ module Savi::Compiler::Types
     end
 
     def prelude_type(ctx, name, cap, args = nil)
-      t_link = ctx.namespace.prelude_type(name)
+      t_link = ctx.namespace.prelude_type(ctx, name)
       NominalType.new(t_link, args).intersect(cap)
     end
 

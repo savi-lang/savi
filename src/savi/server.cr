@@ -8,10 +8,8 @@ class Savi::Server
     @stderr : IO = STDERR
   )
     @wire = LSP::Wire.new(@stdin, @stdout)
-    @open_files = {} of URI => String
     @compiled = false
     @ctx = nil.as Compiler::Context?
-    @workspace = ""
 
     @use_snippet_completions = false
   end
@@ -24,16 +22,28 @@ class Savi::Server
   def setup
     @stderr.puts("LSP Server is starting...")
 
-    ENV["STD_DIRECTORY_MAPPING"]?.try do |mapping|
-      mapping.split(":").each_slice 2 do |pair|
-        next unless pair.size == 2
-        host_path = pair[0]
-        dest_path = pair[1]
+    # TODO: Remove legacy env var names not prefixed by "SAVI_".
+    Savi.compiler.source_service.standard_directory_remap = (
+      ENV["SAVI_STANDARD_DIRECTORY_REMAP"]? || ENV["STD_DIRECTORY_MAPPING"]?
+    ).try(&.split2!(':'))
+    Savi.compiler.source_service.main_directory_remap = (
+      ENV["SAVI_MAIN_DIRECTORY_REMAP"]? || ENV["SOURCE_DIRECTORY_MAPPING"]?
+    ).try(&.split2!(':'))
 
-        Process.run("cp", [Compiler::STANDARD_LIBRARY_DIRNAME, dest_path, "-r"]).exit_code
-        Process.run("cp", [Compiler.prelude_library_path, dest_path, "-r"]).exit_code
-      end
-    end
+    # Copy standard library into the standard remap directory, if provided.
+    # Set that destination directory as being the canonical standard library,
+    # when the standard library is referenced during compilation.
+    Savi.compiler.source_service.standard_directory_remap.try { |_, dest_path|
+      # TODO: handle process errors here, probably via a cleaner abstraction.
+      Process.run("cp", ["-r",
+        File.join(
+          Savi.compiler.source_service.standard_library_internal_path,
+          ".",
+        ),
+        dest_path,
+      ])
+      Savi.compiler.source_service.standard_library_internal_path = dest_path
+    }
 
     # Before we exit, say goodbye.
     at_exit do
@@ -47,8 +57,6 @@ class Savi::Server
       msg.params.capabilities
         .text_document.completion
         .completion_item.snippet_support
-
-    @workspace = msg.params.workspace_folders[0].uri.path.not_nil!
 
     @wire.respond msg do |msg|
       msg.result.capabilities.text_document_sync.open_close = true
@@ -83,26 +91,29 @@ class Savi::Server
     Process.exit
   end
 
-  # When a text document is opened, store it in our local set.
+  # When a text document is opened, store it in our source overrides.
   def handle(msg : LSP::Message::DidOpen)
     text = msg.params.text_document.text
-    @open_files[msg.params.text_document.uri] = text
+    path = msg.params.text_document.uri.path
+    Savi.compiler.source_service.set_source_override(path, text)
 
     send_diagnostics(msg.params.text_document.uri.path.not_nil!, text)
   end
 
-  # When a text document is changed, update it in our local set.
+  # When a text document is changed, update it in our source overrides.
   def handle(msg : LSP::Message::DidChange)
     text = msg.params.content_changes.last.text
-    @open_files[msg.params.text_document.uri] = text
+    path = msg.params.text_document.uri.path
+    Savi.compiler.source_service.set_source_override(path, text)
 
     @ctx = nil
     send_diagnostics(msg.params.text_document.uri.path.not_nil!, text)
   end
 
-  # When a text document is closed, remove it from our local set.
+  # When a text document is closed, remove it from our source overrides.
   def handle(msg : LSP::Message::DidClose)
-    @open_files.delete(msg.params.text_document.uri)
+    path = msg.params.text_document.uri.path
+    Savi.compiler.source_service.unset_source_override(path)
   end
 
   # When a text document is saved, do nothing.
@@ -112,81 +123,11 @@ class Savi::Server
     send_diagnostics(msg.params.text_document.uri.path.not_nil!)
   end
 
-  # TODO: Uncomment this when the LSP package implements the Definition type:
-  #
-  # def handle(msg : LSP::Message::Definition)
-  #   pos = msg.params.position
-  #   text = @open_files[msg.params.text_document.uri]? || ""
-  #
-  #   raise NotImplementedError.new("not a file") \
-  #      if msg.params.text_document.uri.scheme != "file"
-  #
-  #   host_filename = msg.params.text_document.uri.path.not_nil!
-  #   filename = msg.params.text_document.uri.path.not_nil!
-  #
-  #   # If we're running in a docker container, or in some other remote
-  #   # environment, the host's source path may not match ours, and we
-  #   # can apply the needed transformation as specified in this ENV var.
-  #   filename = convert_path_to_local(filename)
-  #
-  #   dirname = File.dirname(filename)
-  #   sources = Compiler.get_library_sources(dirname)
-  #
-  #   source = sources.find { |s| s.path == filename }.not_nil!
-  #   source_pos = Source::Pos.point(source, pos.line.to_i32, pos.character.to_i32)
-  #
-  #   if @ctx.nil?
-  #     @ctx = Savi.compiler.compile(sources, :serve_lsp)
-  #   end
-  #   ctx = @ctx.not_nil!
-  #
-  #   begin
-  #     definition_pos = ctx.serve_definition[source_pos]
-  #   rescue
-  #   end
-  #
-  #   if definition_pos.is_a? Savi::Source::Pos
-  #     user_filepath = convert_path_to_host(definition_pos.source.path)
-  #
-  #     @wire.respond msg do |msg|
-  #       msg.result = LSP::Data::Location.new(
-  #         URI.new(path: user_filepath),
-  #         LSP::Data::Range.new(
-  #           LSP::Data::Position.new(
-  #             definition_pos.row.to_i64,
-  #             definition_pos.col.to_i64,
-  #           ),
-  #           LSP::Data::Position.new(
-  #             definition_pos.row.to_i64,
-  #             definition_pos.col.to_i64 + (definition_pos.finish - definition_pos.start),
-  #           ),
-  #         ),
-  #       )
-  #       msg
-  #     end
-  #   else
-  #     @wire.error_respond msg do |msg|
-  #       msg
-  #     end
-  #   end
-  # end
-
   def handle(msg : LSP::Message::Hover)
     pos = msg.params.position
-    text = @open_files[msg.params.text_document.uri]? || ""
-
-    raise NotImplementedError.new("not a file") \
-       if msg.params.text_document.uri.scheme != "file"
-
     filename = msg.params.text_document.uri.path.not_nil!
-
-    # If we're running in a docker container, or in some other remote
-    # environment, the host's source path may not match ours, and we
-    # can apply the needed transformation as specified in this ENV var.
-    filename = convert_path_to_local(filename)
-
     dirname = File.dirname(filename)
-    sources = Compiler.get_library_sources(dirname)
+    sources = Savi.compiler.source_service.get_library_sources(dirname)
 
     source = sources.find { |s| s.path == filename }.not_nil!
     source_pos = Source::Pos.point(source, pos.line.to_i32, pos.character.to_i32)
@@ -221,7 +162,9 @@ class Savi::Server
   # TODO: Proper completion support.
   def handle(req : LSP::Message::Completion)
     pos = req.params.position
-    text = @open_files[req.params.text_document.uri]? || ""
+    path = req.params.text_document.uri.path
+    source = Savi.compiler.source_service.get_source_at(path)
+    text = source.content
 
     @wire.respond req do |msg|
       case req.params.context.try(&.trigger_kind)
@@ -270,74 +213,10 @@ class Savi::Server
     @stderr.puts msg.to_json
   end
 
-  def convert_path_to_local(path : String)
-    ENV["STD_DIRECTORY_MAPPING"]?.try do |mapping|
-      mapping.split(":").each_slice 2 do |pair|
-        next unless pair.size == 2
-        host_path = pair[0]
-        dest_path = pair[1]
-
-        if path.starts_with?(host_path)
-          path =
-            if path.includes?("prelude")
-              tmp_fname = path.sub(host_path, Compiler.prelude_library_path)
-              tmp_fname.sub("prelude/prelude", "prelude")
-            else
-              path.sub(host_path, Compiler::STANDARD_LIBRARY_DIRNAME)
-            end
-        end
-      end
-    end
-    ENV["SOURCE_DIRECTORY_MAPPING"]?.try do |mapping|
-      mapping.split(":").each_slice 2 do |pair|
-        next unless pair.size == 2
-        host_path = pair[0]
-        dest_path = pair[1]
-
-        if path.starts_with?(host_path)
-          path = path.sub(host_path, dest_path)
-        end
-      end
-    end
-
-    path
-  end
-
-  def convert_path_to_host(path : String)
-    ENV["STD_DIRECTORY_MAPPING"]?.try do |mapping|
-      mapping.split(":").each_slice 2 do |pair|
-        next unless pair.size == 2
-        host_path = pair[0]
-        dest_path = pair[1]
-
-        if path.starts_with?(Compiler.prelude_library_path)
-          path = path.sub(Compiler.prelude_library_path, File.join(host_path, "prelude"))
-        end
-
-        if path.starts_with?(Compiler::STANDARD_LIBRARY_DIRNAME)
-          path = path.sub(Compiler::STANDARD_LIBRARY_DIRNAME, host_path)
-        end
-      end
-    end
-    ENV["SOURCE_DIRECTORY_MAPPING"]?.try do |mapping|
-      mapping.split(":").each_slice 2 do |pair|
-        next unless pair.size == 2
-        host_path = pair[0]
-        dest_path = pair[1]
-
-        if path.starts_with?(dest_path)
-          path = path.sub(dest_path, host_path)
-        end
-      end
-    end
-
-    path
-  end
-
   def build_diagnostic(err : Error)
     related_information = err.info.map do |info|
       location = LSP::Data::Location.new(
-        URI.new(path: convert_path_to_host(info[0].source.path)),
+        URI.new(path: info[0].source.path),
         LSP::Data::Range.new(
           LSP::Data::Position.new(
             info[0].row.to_i64,
@@ -376,10 +255,8 @@ class Savi::Server
   end
 
   def send_diagnostics(filename : String, content : String? = nil)
-    filename = convert_path_to_local(filename)
-
     dirname = File.dirname(filename)
-    sources = Compiler.get_library_sources(dirname)
+    sources = Savi.compiler.source_service.get_library_sources(dirname)
 
     source_index = sources.index { |s| s.path == filename }
     if source_index
@@ -396,7 +273,7 @@ class Savi::Server
     ctx = Savi.compiler.compile(sources, :serve_errors)
 
     @wire.notify(LSP::Message::PublishDiagnostics) do |msg|
-      msg.params.uri = URI.new(path: convert_path_to_host(filename))
+      msg.params.uri = URI.new(path: filename)
       msg.params.diagnostics = ctx.errors.map { |err| build_diagnostic(err) }
 
       msg
@@ -405,7 +282,7 @@ class Savi::Server
   # Catch an Error if it happens here at the top level.
   rescue err : Error
     @wire.notify(LSP::Message::PublishDiagnostics) do |msg|
-      msg.params.uri = URI.new(path: convert_path_to_host(filename.not_nil!))
+      msg.params.uri = URI.new(path: filename)
       msg.params.diagnostics = [build_diagnostic(err)]
 
       msg

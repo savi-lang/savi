@@ -152,21 +152,21 @@ module Savi
     def self.compile(options, backtrace = false)
       _add_backtrace backtrace do
         ctx = Savi.compiler.compile(Dir.current, options.target_pass || :binary, options)
-        ctx.errors.any? ? finish_with_errors(ctx, backtrace) : 0
+        ctx.errors.any? ? finish_with_errors(ctx.errors, backtrace) : 0
       end
     end
 
     def self.run(options, backtrace = false)
       _add_backtrace backtrace do
         ctx = Savi.compiler.compile(Dir.current, options.target_pass || :eval, options)
-        ctx.errors.any? ? finish_with_errors(ctx, backtrace) : ctx.eval.exitcode
+        ctx.errors.any? ? finish_with_errors(ctx.errors, backtrace) : ctx.eval.exitcode
       end
     end
 
     def self.eval(code, options, backtrace = false)
       _add_backtrace backtrace do
         ctx = Savi.compiler.eval(code, options)
-        ctx.errors.any? ? finish_with_errors(ctx, backtrace) : ctx.eval.exitcode
+        ctx.errors.any? ? finish_with_errors(ctx.errors, backtrace) : ctx.eval.exitcode
       end
     end
 
@@ -191,18 +191,19 @@ module Savi
       backtrace : Bool
     )
       _add_backtrace backtrace do
-        ctx = Compiler::Context.new
-        sources = Compiler.get_recursive_sources(Dir.current)
+        errors = [] of Error
+        sources = Savi.compiler.source_service.get_recursive_sources(Dir.current)
 
         if check_only
-          sources.group_by(&.library).each { |source_library, sources|
+          sources.each { |source_library, sources|
             ctx = Savi.compiler.compile(sources, :import)
             AST::Format.check(ctx, ctx.root_library_link, ctx.root_docs)
+            errors.concat(ctx.errors)
           }
           puts "Checked #{sources.size} files."
         else
           edited_count = 0
-          sources.group_by(&.library).each { |source_library, sources|
+          sources.each { |source_library, sources|
             ctx = Savi.compiler.compile(sources, :import)
             edits_by_doc =
               AST::Format.run(ctx, ctx.root_library_link, ctx.root_docs)
@@ -211,21 +212,24 @@ module Savi
               source = doc.pos.source
               puts "Fixing #{source.path}"
               edited = AST::Format.apply_edits(source.entire_pos, edits)[0].source
-              File.write(source.path, edited.content)
+              Savi.compiler.source_service
+                .overwrite_source_at(source.path, edited.content)
               edited_count += 1
             }
+
+            errors.concat(ctx.errors)
           }
           puts "Fixed #{edited_count} of #{sources.size} files."
         end
 
-        ctx.errors.any? ? finish_with_errors(ctx, backtrace) : 0
+        errors.any? ? finish_with_errors(errors, backtrace) : 0
       end
     end
 
-    def self.finish_with_errors(ctx, backtrace = false) : Int32
+    def self.finish_with_errors(errors, backtrace = false) : Int32
       puts
-      puts "Compilation Error#{ctx.errors.size > 1 ? "s" : ""}:"
-      ctx.errors.each { |error|
+      puts "Compilation Error#{errors.size > 1 ? "s" : ""}:"
+      errors.each { |error|
         puts
         puts "---"
         puts

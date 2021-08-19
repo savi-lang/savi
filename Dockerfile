@@ -125,7 +125,6 @@ WORKDIR /opt/code
 COPY --from=dev /usr/lib/libponyrt.bc \
                 /usr/lib/
 
-COPY src/prelude /opt/savi/src/prelude
 COPY packages    /opt/savi/packages
 COPY --from=build /tmp/bin/savi /bin/savi
 

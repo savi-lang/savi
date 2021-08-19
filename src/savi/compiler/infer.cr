@@ -936,7 +936,7 @@ module Savi::Compiler::Infer
     end
 
     def prelude_reified_type(ctx : Context, name : String, args = [] of MetaType)
-      ReifiedType.new(ctx.namespace.prelude_type(name), args)
+      ReifiedType.new(ctx.namespace.prelude_type(ctx, name), args)
     end
 
     def prelude_type_span(ctx : Context, name : String)

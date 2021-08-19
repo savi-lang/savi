@@ -40,7 +40,7 @@ class Savi::Compiler::Verify
       "The Main.new function defined here must be a constructor" \
         unless new_f.not_nil!.has_tag?(:constructor)
 
-    env_link = ctx.namespace.prelude_type("Env")
+    env_link = ctx.namespace.prelude_type(ctx, "Env")
     env = env_link.resolve(ctx)
 
     if new_f.param_count < 1

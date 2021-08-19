@@ -1,6 +1,8 @@
 class Savi::Compiler
   INSTANCE = new
 
+  property source_service = SourceService.new
+
   class CompilerOptions
     property release
     property no_debug
@@ -172,55 +174,6 @@ class Savi::Compiler
     end
   end
 
-  STANDARD_LIBRARY_DIRNAME = File.expand_path("../../packages", __DIR__)
-  def self.resolve_library_dirname(libname, from_dirname = nil)
-    standard_dirname = File.expand_path(libname, STANDARD_LIBRARY_DIRNAME)
-    relative_dirname = File.expand_path(libname, from_dirname) if from_dirname
-
-    if relative_dirname && Dir.exists?(relative_dirname)
-      relative_dirname
-    elsif Dir.exists?(standard_dirname)
-      standard_dirname
-    else
-      raise "Couldn't find a library directory named #{libname.inspect}" \
-        "#{" (relative to #{from_dirname.inspect})" if from_dirname}"
-    end
-  end
-
-  def self.get_library_sources(dirname, library : Source::Library? = nil)
-    library ||= Source::Library.new(dirname)
-
-    sources = Dir.entries(dirname).compact_map { |name|
-      next unless name.ends_with?(".savi")
-      language = :savi
-
-      content = File.read(File.join(dirname, name))
-      Source.new(dirname, name, content, library, language)
-    } rescue [] of Source
-
-    Error.at Source::Pos.show_library_path(library),
-      "No '.savi' source files found in this directory" \
-        if sources.empty?
-
-    sources
-  end
-
-  def self.get_recursive_sources(root_dirname, language = :savi)
-    sources = Dir.glob("#{root_dirname}/**/*.#{language.to_s}").map { |path|
-      name = File.basename(path)
-      dirname = File.dirname(path)
-      library = Source::Library.new(dirname)
-      content = File.read(File.join(dirname, name))
-      Source.new(dirname, name, content, library, language)
-    } rescue [] of Source
-
-    Error.at Source::Pos.show_library_path(Source::Library.new(root_dirname)),
-      "No '.#{language.to_s}' source files found recursively within this root" \
-        if sources.empty?
-
-    sources
-  end
-
   def eval(string : String, options = CompilerOptions.new) : Context
     content = ":actor Main\n:new (env)\n#{string}"
     library = Savi::Source::Library.new("(eval)")
@@ -230,12 +183,12 @@ class Savi::Compiler
   end
 
   def compile(dirname : String, target : Symbol = :eval, options = CompilerOptions.new)
-    compile(Compiler.get_library_sources(dirname), target, options)
+    compile(source_service.get_library_sources(dirname), target, options)
   end
 
   @prev_ctx : Context?
   def compile(sources : Array(Source), target : Symbol = :eval, options = CompilerOptions.new)
-    ctx = Context.new(options, @prev_ctx)
+    ctx = Context.new(self, options, @prev_ctx)
 
     docs = sources.compact_map do |source|
       begin
@@ -250,7 +203,7 @@ class Savi::Compiler
     ctx.root_docs = docs
     return ctx unless ctx.errors.empty?
 
-    compile(docs, ctx, target)
+    compile(ctx, docs, target)
   ensure
     # Save the previous context for the purposes of caching in the next one,
     # letting us quickly recompile any code that successfully compiled.
@@ -258,60 +211,30 @@ class Savi::Compiler
     @prev_ctx = ctx
   end
 
-  def compile(docs : Array(AST::Document), ctx : Context, target : Symbol = :eval)
+  private def compile(ctx : Context, docs : Array(AST::Document), target : Symbol)
     raise "No source documents given!" if docs.empty?
 
     # First, load the meta declarators.
-    meta_declarators =
-      Compiler.get_library_sources(Compiler.meta_declarators_library_path)
-    ctx.program.meta_declarators =
-      ctx.compile_library(meta_declarators.first.library,
-        meta_declarators.map { |source| Parser.parse(source) })
+    ctx.program.meta_declarators = ctx.compile_library_at_path(
+      source_service.meta_declarators_library_path
+    )
 
     # Then, load the standard declarators.
-    standard_declarators =
-      Compiler.get_library_sources(Compiler.standard_declarators_library_path)
-    ctx.program.standard_declarators =
-      ctx.compile_library(standard_declarators.first.library,
-        standard_declarators.map { |source| Parser.parse(source) })
+    ctx.program.standard_declarators = ctx.compile_library_at_path(
+      source_service.standard_declarators_library_path
+    )
 
     # Now compile the main library.
     ctx.compile_library(docs.first.source.library, docs)
 
     # Next add the prelude, unless the main library happens to be the prelude.
-    unless docs.first.source.library.path == Compiler.prelude_library_path
-      prelude_sources = Compiler.get_library_sources(Compiler.prelude_library_path)
-      prelude_docs = prelude_sources.map { |s| Parser.parse(s) }
-      ctx.compile_library(prelude_sources.first.library, prelude_docs)
+    unless docs.first.source.library.path == source_service.prelude_library_path
+      ctx.compile_library_at_path(source_service.prelude_library_path)
     end
 
     # Now run compiler passes until the target pass is satisfied.
     satisfy(ctx, target)
 
     ctx
-  end
-
-  def self.prelude_library_path
-    File.expand_path("../prelude", __DIR__)
-  end
-
-  def self.prelude_library_link
-    Program::Library::Link.new(prelude_library_path)
-  end
-
-  def self.standard_declarators_library_path
-    File.expand_path("../prelude/declarators", __DIR__)
-  end
-
-  def self.standard_declarators_library_link
-    Program::Library::Link.new(standard_declarators_library_path)
-  end
-
-  def self.meta_declarators_library_path
-    File.expand_path("../prelude/declarators/meta", __DIR__)
-  end
-
-  def self.meta_declarators_library_link
-    Program::Library::Link.new(meta_declarators_library_path)
   end
 end

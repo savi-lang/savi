@@ -93,7 +93,7 @@ describe Savi::Compiler::Verify do
        ^~~
 
     - it should accept exactly one parameter of type Env:
-      from /opt/code/src/prelude/env.savi:1:
+      from #{Savi.compiler.source_service.prelude_library_path}/env.savi:1:
     :class val Env
                ^~~
     MSG
@@ -115,7 +115,7 @@ describe Savi::Compiler::Verify do
            ^~~~~~~~~~~~~~~~~~~~
 
     - it should accept exactly one parameter of type Env:
-      from /opt/code/src/prelude/env.savi:1:
+      from #{Savi.compiler.source_service.prelude_library_path}/env.savi:1:
     :class val Env
                ^~~
     MSG
@@ -137,7 +137,7 @@ describe Savi::Compiler::Verify do
             ^~~~~~~~~~
 
     - it should accept a parameter of type Env:
-      from /opt/code/src/prelude/env.savi:1:
+      from #{Savi.compiler.source_service.prelude_library_path}/env.savi:1:
     :class val Env
                ^~~
 

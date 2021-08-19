@@ -1,4 +1,5 @@
 class Savi::Compiler::Context
+  getter compiler : Compiler
   getter program
   getter import
 
@@ -40,7 +41,7 @@ class Savi::Compiler::Context
 
   getter errors = [] of Error
 
-  def initialize(@options = CompilerOptions.new, @prev_ctx = nil)
+  def initialize(@compiler, @options = CompilerOptions.new, @prev_ctx = nil)
     @program = Program.new
 
     @classify = Classify::Pass.new
@@ -84,6 +85,17 @@ class Savi::Compiler::Context
 
   def root_library_link
     root_library.make_link
+  end
+
+  def compile_library_at_path(path)
+    # First, try to find an already loaded library that has this same path.
+    library = @program.libraries.find(&.source_library.path.==(path))
+    return library if library
+
+    # Otherwise go ahead and load the library.
+    sources = compiler.source_service.get_library_sources(path)
+    docs = sources.map { |source| Parser.parse(source) }
+    compile_library(sources.first.library, docs)
   end
 
   def compile_library(*args)
