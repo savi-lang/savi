@@ -164,7 +164,7 @@ Theoretical "as if" modeling:
   - It's as if the block becomes an object (with ref cap: `val`)
   - the object has a single function corresponding to the block body
   - the captured variables are arguments to a `:new val` constructor
-  - within the block, the captured variables are fields, which may not be rebound because the block function is a `:fun val`.
+  - within the block, the captured variables are fields, which may not be rebound because the block function is a `:fun box`.
 
 Internal Implementation / Optimization:
   - when objectified, it is a heap-allocated object of an anonymous one-off type, behaving like the "as if" model, and using a virtual table for dispatch when called.
@@ -172,7 +172,42 @@ Internal Implementation / Optimization:
   - a second block that is tail-chained to it without accruing additional captures may be optimized to be another virtual method attached to the same runtime object
   - a second block that is tail-chained to it WITH additional captures accrued from the first block may get the same optimization if the first block is proved to be single-use (i.e. a non-objectified definition with lexical proof of not being multi-use) - the additional captures become fields which are set during the execution of the first block and proven to be ready when they are used in the second block
 
-## Kind F ("pure" lambda)
+## Kind F (read-only lambda)
+
+Call count:
+  - can be called zero or more times
+
+Inter-scope interaction:
+  - can capture variables from the outer scope
+  - CANNOT rebind captured variables in the inner scope
+  - CANNOT consume `iso` variables in the inner scope
+  - CANNOT affect variable bindings in the outer scope
+  - CANNOT raise an error into the outer scope
+  - CANNOT return early, exiting the outer scope
+
+Ref cap restrictions:
+  - can capture non-shareable values from the outer scope
+  - HOWEVER, all captured values are seen through a `box` lens - no mutation of them is possible
+  - can receive non-sendable yielded values
+  - can return a non-sendable yield result value
+
+Mobility:
+  - can cross an actor boundary
+  - can be objectified and stored away for later
+
+Theoretical "as if" modeling:
+  - It's as if the block becomes an object (with ref cap: `box`)
+  - the object has a single function corresponding to the block body
+  - the captured variables are arguments to a `:new box` constructor
+  - within the block, the captured variables are fields, which may not be rebound because the block function is a `:fun box`.
+
+Internal Implementation / Optimization:
+  - when objectified, it is a heap-allocated object of an anonymous one-off type, behaving like the "as if" model, and using a virtual table for dispatch when called.
+  - in some cases, virtual dispatch on the object may be possible to avoid by using automatic specialization optimizations in the late compiler stages.
+  - a second block that is tail-chained to it without accruing additional captures may be optimized to be another virtual method attached to the same runtime object
+  - a second block that is tail-chained to it WITH additional captures accrued from the first block may get the same optimization if the first block is proved to be single-use (i.e. a non-objectified definition with lexical proof of not being multi-use) - the additional captures become fields which are set during the execution of the first block and proven to be ready when they are used in the second block
+
+## Kind G ("pure" lambda)
 
 Call count:
   - can be called zero or more times
