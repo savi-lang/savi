@@ -29,11 +29,7 @@ module Savi::Compiler::Types
       @local_vars_by_ref = {} of Refer::Info => TypeVariable
       @type_vars = [] of TypeVariable
       @edge_type_vars = [] of TypeVariable
-      @bindings = Set({Source::Pos, TypeVariable, AlgebraicType}).new
-      @constraints = Set({Source::Pos, TypeVariable, AlgebraicType}).new
-      @assignments = Set({Source::Pos, TypeVariable, AlgebraicType}).new
       @assertions = Set({Source::Pos, AlgebraicType, AlgebraicType}).new
-      @from_call_returns = Set({Source::Pos, TypeVariable, AST::Call}).new
     end
 
     def [](node : AST::Node); @by_node[node]; end
@@ -56,32 +52,7 @@ module Savi::Compiler::Types
 
       (@edge_type_vars + @type_vars).each_with_index { |var, index|
         output << "\n" if index > 0
-        output << "#{var.show_name}\n"
-        @bindings.each { |pos, v, explicit|
-          next unless v == var
-          output << "  := #{explicit.show}\n"
-          output << "  #{pos.show.split("\n")[1..-1].join("\n  ")}\n"
-        }
-        @constraints.each { |pos, v, sup|
-          next unless v == var
-          output << "  <: #{sup.show}\n"
-          output << "  #{pos.show.split("\n")[1..-1].join("\n  ")}\n"
-        }
-        @assignments.each { |pos, v, sub|
-          next unless v == var
-          output << "  :> #{sub.show}\n"
-          output << "  #{pos.show.split("\n")[1..-1].join("\n  ")}\n"
-        }
-        @from_call_returns.each { |pos, v, call|
-          next unless v == var
-          receiver = @by_node[call.receiver]
-          output << "  :> #{
-            @by_node[call.receiver].show
-          }.#{
-            call.ident.value
-          }\n"
-          output << "  #{pos.show.split("\n")[1..-1].join("\n  ")}\n"
-        }
+        var.show_info(output)
       }
       if @assertions.any?
         output << "~~~\n"
@@ -111,30 +82,6 @@ module Savi::Compiler::Types
       )
     end
 
-    protected def observe_constraint_at(
-      pos : Source::Pos,
-      var : TypeVariable,
-      supertype : AlgebraicType,
-    )
-      @constraints << {pos, var, supertype}
-    end
-
-    protected def observe_binding_at(
-      pos : Source::Pos,
-      var : TypeVariable,
-      type : AlgebraicType,
-    )
-      @bindings << {pos, var, type}
-    end
-
-    protected def observe_assignment_at(
-      pos : Source::Pos,
-      var : TypeVariable,
-      subtype : AlgebraicType,
-    )
-      @assignments << {pos, var, subtype}
-    end
-
     protected def init_type_self(ctx, visitor : Visitor, params : AST::Group?)
       @type_param_vars = params.try(&.terms.map { |param|
         ident = AST::Extract.type_param(param).first
@@ -160,7 +107,7 @@ module Savi::Compiler::Types
         @by_node[explicit] = explicit_type.not_nil! if explicit
         @by_node[default] = default_type.not_nil! if default
 
-        observe_constraint_at(explicit.pos, var, explicit_type.not_nil!) if explicit
+        var.observe_constraint_at(explicit.pos, explicit_type.not_nil!) if explicit
       })
     end
 
@@ -183,16 +130,16 @@ module Savi::Compiler::Types
 
       if ret
         explicit_type = visitor.read_type_expr(ctx, ret)
-        observe_constraint_at(ret.pos, var, explicit_type)
+        var.observe_constraint_at(ret.pos, explicit_type)
       end
     end
 
     protected def observe_natural_return(node : AST::Group)
-      observe_assignment_at(node.terms.last.pos, self.return_var, @by_node[node])
+      self.return_var.observe_assignment_at(node.terms.last.pos, @by_node[node])
     end
 
     protected def observe_early_return(node : AST::Jump)
-      observe_assignment_at(node.pos, self.return_var, @by_node[node.term])
+      self.return_var.observe_assignment_at(node.pos, @by_node[node.term])
     end
 
     protected def observe_yield(node : AST::Yield)
@@ -203,7 +150,7 @@ module Savi::Compiler::Types
           vars << v
           v
         end
-        observe_assignment_at(node.pos, var, @by_node[term])
+        var.observe_assignment_at(node.pos, @by_node[term])
       }
 
       result_var = @yield_result_var ||= new_type_var("yield:result")
@@ -213,7 +160,7 @@ module Savi::Compiler::Types
     protected def observe_constrained_literal(node, var_name, supertype)
       var = new_type_var(var_name)
       @by_node[node] = TypeVariableRef.new(var)
-      observe_constraint_at(node.pos, var, supertype)
+      var.observe_constraint_at(node.pos, supertype)
     end
 
     protected def observe_assert_bool(ctx, node)
@@ -241,10 +188,10 @@ module Savi::Compiler::Types
       var = @local_vars_by_ref[ref]
 
       explicit = AST::Extract.param(node.lhs)[1]
-      observe_binding_at(explicit.pos, var, @by_node[explicit]) if explicit
+      var.observe_binding_at(explicit.pos, @by_node[explicit]) if explicit
 
       rhs = @by_node[node.rhs].stabilized
-      observe_assignment_at(node.pos, var, rhs)
+      var.observe_assignment_at(node.pos, rhs)
 
       @by_node[node] = TypeVariableRef.new(var).aliased
     end
@@ -255,9 +202,9 @@ module Savi::Compiler::Types
 
       # Params differ from local variables in that their explicit type
       # creates a constraint rather than a fully-equivalent binding.
-      observe_constraint_at(explicit.pos, var, @by_node[explicit]) if explicit
+      var.observe_constraint_at(explicit.pos, @by_node[explicit]) if explicit
 
-      observe_assignment_at(node.pos, var, @by_node[default].stabilized) if default
+      var.observe_assignment_at(node.pos, @by_node[default].stabilized) if default
 
       @by_node[node] = TypeVariableRef.new(var).aliased
     end
@@ -270,19 +217,17 @@ module Savi::Compiler::Types
         @by_node[node] = TypeVariableRef.new(var).aliased
       when AST::FieldWrite
         @by_node[node] = TypeVariableRef.new(var).aliased
-        @assignments        << {node.pos, var, @by_node[node.rhs]}
-        parent.observe_assignment_at(node.pos, var, @by_node[node.rhs])
+        var.observe_assignment_at(node.pos, @by_node[node.rhs])
       when AST::FieldDisplace
         @by_node[node] = TypeVariableRef.new(var)
-        @assignments        << {node.pos, var, @by_node[node.rhs]}
-        parent.observe_assignment_at(node.pos, var, @by_node[node.rhs])
+        var.observe_assignment_at(node.pos, @by_node[node.rhs])
       end
     end
 
     protected def observe_call(node)
       var = new_type_var(node.ident.value)
       @by_node[node] = TypeVariableRef.new(var)
-      @from_call_returns << {node.pos, var, node}
+      var.observe_from_call_return_at(node.pos, node, @by_node[node.receiver])
     end
 
     protected def observe_array_literal(ctx, node)
@@ -300,10 +245,10 @@ module Savi::Compiler::Types
           .unite(array_nominal.intersect(NominalCap::VAL))
           .unite(array_nominal.intersect(NominalCap::REF))
       )
-      observe_constraint_at(node.pos, var, array_type)
+      var.observe_constraint_at(node.pos, array_type)
 
       node.terms.each { |elem|
-        observe_assignment_at(node.pos, elem_var, @by_node[elem])
+        elem_var.observe_assignment_at(node.pos, @by_node[elem])
       }
     end
   end
