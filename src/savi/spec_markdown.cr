@@ -70,7 +70,7 @@ class Savi::SpecMarkdown
             example.expected_errors << content
           when /^savi format.([\w<>=]+)$/
             example.expected_format_results << {$~[1], content}
-          when /^types.type_variables_list (\w+)\.([\w<>=]+)$/
+          when /^types_graph (\w+)\.([\w<>=]+)$/
             example.expected_type_variables_lists << {$~[1], $~[2], content}
           else
             raise NotImplementedError.new("compiler spec code block: #{kind}")
@@ -258,7 +258,7 @@ class Savi::SpecMarkdown
         end
 
         f_link = func.make_link(type.make_link(library.make_link))
-        actual = ctx.types[f_link].show_type_variables_list
+        actual = ctx.types_graph[f_link].show_type_variables_list
 
         unless expected.strip == actual.strip
           puts "---"

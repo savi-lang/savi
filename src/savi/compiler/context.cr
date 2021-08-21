@@ -30,7 +30,7 @@ class Savi::Compiler::Context
   getter subtyping
   getter type_check
   getter type_context
-  getter types
+  getter types_graph
   getter verify
 
   getter options
@@ -71,7 +71,7 @@ class Savi::Compiler::Context
     @subtyping = SubtypingCache.new
     @type_check = TypeCheck.new
     @type_context = TypeContext::Pass.new
-    @types = Types::Pass.new
+    @types_graph = Types::Graph::Pass.new
     @verify = Verify::Pass.new
 
     @link_libraries = Set(String).new
