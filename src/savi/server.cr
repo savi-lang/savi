@@ -66,6 +66,12 @@ class Savi::Server
       msg.result.capabilities.definition_provider = true
       msg.result.capabilities.completion_provider =
         LSP::Data::ServerCapabilities::CompletionOptions.new(false, [":"])
+      msg.result.capabilities.document_formatting_provider = true
+      msg.result.capabilities.document_range_formatting_provider = true
+      msg.result.capabilities.document_on_type_formatting_provider =
+        LSP::Data::ServerCapabilities::DocumentOnTypeFormattingOptions.new(
+          "\n", ")", "]"
+        )
       msg
     end
   end
@@ -150,13 +156,71 @@ class Savi::Server
       msg.result.contents.kind = "plaintext"
       msg.result.contents.value = info.join("\n\n")
       if info_pos.is_a?(Savi::Source::Pos)
-        msg.result.range = LSP::Data::Range.new(
-          LSP::Data::Position.new(info_pos.row.to_i64, info_pos.col.to_i64),
-          LSP::Data::Position.new(info_pos.row.to_i64, info_pos.col.to_i64 + info_pos.size), # TODO: account for spilling over into a new row
-        )
+        msg.result.range = info_pos.to_lsp_range
       end
       msg
     end
+  end
+
+  def handle(req : LSP::Message::Formatting)
+    filename = req.params.text_document.uri.path.not_nil!
+    dirname = File.dirname(filename)
+    sources = Savi.compiler.source_service.get_library_sources(dirname)
+
+    ctx = Savi.compiler.compile(sources, :import)
+    doc = ctx.root_docs.find(&.pos.source.path.==(filename)).not_nil!
+
+    edits = AST::Format.run(ctx, ctx.root_library_link, [doc]).flat_map(&.last)
+
+    @wire.respond(req) { |msg|
+      msg.result = edits.map { |edit|
+        LSP::Data::TextEdit.new(
+          edit.pos.to_lsp_range,
+          edit.replacement,
+        )
+      }
+      msg
+    }
+  end
+
+  def handle(req : LSP::Message::RangeFormatting)
+    filename = req.params.text_document.uri.path.not_nil!
+    dirname = File.dirname(filename)
+    sources = Savi.compiler.source_service.get_library_sources(dirname)
+
+    ctx = Savi.compiler.compile(sources, :import)
+    doc = ctx.root_docs.find(&.pos.source.path.==(filename)).not_nil!
+
+    edits = AST::Format.run(ctx, ctx.root_library_link, [doc]).flat_map(&.last)
+
+    # Only select edits within the intended range.
+    range = Source::Pos.from_lsp_range(doc.pos.source, req.params.range)
+    edits.select! { |edit| range.contains?(edit.pos) }
+
+    @wire.respond(req) { |msg|
+      msg.result = edits.map { |edit|
+        LSP::Data::TextEdit.new(edit.pos.to_lsp_range, edit.replacement)
+      }
+      msg
+    }
+  end
+
+  def handle(req : LSP::Message::OnTypeFormatting)
+    filename = req.params.text_document.uri.path.not_nil!
+    dirname = File.dirname(filename)
+    sources = Savi.compiler.source_service.get_library_sources(dirname)
+
+    ctx = Savi.compiler.compile(sources, :import)
+    doc = ctx.root_docs.find(&.pos.source.path.==(filename)).not_nil!
+
+    edits = AST::Format.run(ctx, ctx.root_library_link, [doc]).flat_map(&.last)
+
+    @wire.respond(req) { |msg|
+      msg.result = edits.map { |edit|
+        LSP::Data::TextEdit.new(edit.pos.to_lsp_range, edit.replacement)
+      }
+      msg
+    }
   end
 
   # TODO: Proper completion support.
@@ -213,47 +277,6 @@ class Savi::Server
     @stderr.puts msg.to_json
   end
 
-  def build_diagnostic(err : Error)
-    related_information = err.info.map do |info|
-      location = LSP::Data::Location.new(
-        URI.new(path: info[0].source.path),
-        LSP::Data::Range.new(
-          LSP::Data::Position.new(
-            info[0].row.to_i64,
-            info[0].col.to_i64,
-          ),
-          LSP::Data::Position.new(
-            info[0].row.to_i64,
-            info[0].col.to_i64 + (
-              info[0].finish - info[0].start
-            ),
-          ),
-        ),
-      )
-      LSP::Data::Diagnostic::RelatedInformation.new(
-        location,
-        info[1]
-      )
-    end
-
-    LSP::Data::Diagnostic.new(
-      LSP::Data::Range.new(
-        LSP::Data::Position.new(
-          err.pos.row.to_i64,
-          err.pos.col.to_i64,
-        ),
-        LSP::Data::Position.new(
-          err.pos.row.to_i64,
-          err.pos.col.to_i64 + (
-            err.pos.finish - err.pos.start
-          ),
-        ),
-      ),
-      related_information: related_information,
-      message: err.message,
-    )
-  end
-
   def send_diagnostics(filename : String, content : String? = nil)
     dirname = File.dirname(filename)
     sources = Savi.compiler.source_service.get_library_sources(dirname)
@@ -274,7 +297,7 @@ class Savi::Server
 
     @wire.notify(LSP::Message::PublishDiagnostics) do |msg|
       msg.params.uri = URI.new(path: filename)
-      msg.params.diagnostics = ctx.errors.map { |err| build_diagnostic(err) }
+      msg.params.diagnostics = ctx.errors.map(&.to_lsp_diagnostic)
 
       msg
     end
@@ -283,7 +306,7 @@ class Savi::Server
   rescue err : Error
     @wire.notify(LSP::Message::PublishDiagnostics) do |msg|
       msg.params.uri = URI.new(path: filename)
-      msg.params.diagnostics = [build_diagnostic(err)]
+      msg.params.diagnostics = [err.to_lsp_diagnostic]
 
       msg
     end

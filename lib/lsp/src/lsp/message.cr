@@ -180,7 +180,10 @@ module LSP::Message
                        Completion |
                        CompletionItemResolve |
                        Hover |
-                       SignatureHelp
+                       SignatureHelp |
+                       Formatting |
+                       RangeFormatting |
+                       OnTypeFormatting
 
   alias AnyInResponse = GenericResponse |
                         ShowMessageRequest::Response
@@ -198,7 +201,10 @@ module LSP::Message
                          Completion::Response |
                          CompletionItemResolve::Response |
                          Hover::Response |
-                         SignatureHelp::Response
+                         SignatureHelp::Response |
+                         Formatting::Response |
+                         RangeFormatting::Response |
+                         OnTypeFormatting::Response
 
   alias AnyOutErrorResponse = GenericErrorResponse |
                               Initialize::ErrorResponse |
@@ -206,7 +212,10 @@ module LSP::Message
                               Completion::ErrorResponse |
                               CompletionItemResolve::ErrorResponse |
                               Hover::ErrorResponse |
-                              SignatureHelp::ErrorResponse
+                              SignatureHelp::ErrorResponse |
+                              Formatting::ErrorResponse |
+                              RangeFormatting::ErrorResponse |
+                              OnTypeFormatting::ErrorResponse
 
   alias AnyOutRequest = ShowMessageRequest
 
@@ -986,15 +995,96 @@ module LSP::Message
 
   # The document formatting request is sent from the client to the server to
   # format a whole document.
-  # TODO: struct Formatting
+  struct Formatting
+    Message.def_request("textDocument/formatting")
+
+    struct Params
+      include JSON::Serializable
+
+      # The document to format.
+      @[JSON::Field(key: "textDocument")]
+      property text_document : Data::TextDocumentIdentifier
+
+      # The format options.
+      property options : Data::FormattingOptions
+
+      def initialize(
+        @text_document = Data::TextDocumentIdentifier.new,
+        @options = Data::FormattingOptions.new
+      )
+      end
+    end
+
+    alias Result = Array(Data::TextEdit)
+
+    alias ErrorData = Nil
+  end
 
   # The document range formatting request is sent from the client to the server
   # to format a given range in a document.
-  # TODO: struct RangeFormatting
+  struct RangeFormatting
+    Message.def_request("textDocument/rangeFormatting")
+
+    struct Params
+      include JSON::Serializable
+
+      # The document to format.
+      @[JSON::Field(key: "textDocument")]
+      property text_document : Data::TextDocumentIdentifier
+
+      # The range to format.
+      property range : Data::Range
+
+      # The format options.
+      property options : Data::FormattingOptions
+
+      def initialize(
+        @text_document = Data::TextDocumentIdentifier.new,
+        @range = Data::Range.new,
+        @options = Data::FormattingOptions.new
+      )
+      end
+    end
+
+    alias Result = Array(Data::TextEdit)
+
+    alias ErrorData = Nil
+  end
 
   # The document on type formatting request is sent from the client to the
   # server to format parts of the document during typing.
-  # TODO: struct OnTypeFormatting
+  struct OnTypeFormatting
+    Message.def_request("textDocument/onTypeFormatting")
+
+    struct Params
+      include JSON::Serializable
+
+      # The text document.
+      @[JSON::Field(key: "textDocument")]
+      property text_document : Data::TextDocumentIdentifier
+
+      # The position inside the text document.
+      property position : Data::Position
+
+      # The character that has been typed.
+      property ch : String
+
+      # The format options.
+      property options : Data::FormattingOptions
+
+      def initialize(
+        @text_document = Data::TextDocumentIdentifier.new,
+        @position = Data::Position.new,
+        @ch = "",
+        @options = Data::FormattingOptions.new
+      )
+      end
+    end
+
+    alias Result = Array(Data::TextEdit)
+
+    alias ErrorData = Nil
+  end
 
   # The rename request is sent from the client to the server to perform a
   # workspace-wide rename of a symbol.

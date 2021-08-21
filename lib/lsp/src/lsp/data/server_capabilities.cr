@@ -65,11 +65,11 @@ module LSP::Data
 
     # The server provides document formatting.
     @[JSON::Field(key: "documentFormattingProvider")]
-    property document_formatting_provider : Bool = false
+    property document_formatting_provider : Bool | WorkDoneProgressOptions = false
 
     # The server provides document range formatting.
     @[JSON::Field(key: "documentRangeFormattingProvider")]
-    property document_range_formatting_provider : Bool = false
+    property document_range_formatting_provider : Bool | WorkDoneProgressOptions = false
 
     # The server provides document formatting on typing.
     @[JSON::Field(key: "documentOnTypeFormattingProvider")]
@@ -149,6 +149,17 @@ module LSP::Data
         @resolve_provider = false,
         @trigger_characters = [] of String
       )
+      end
+    end
+
+    struct WorkDoneProgressOptions
+      include JSON::Serializable
+
+      # The server provides support for workDoneProgress notifications.
+      @[JSON::Field(key: "workDoneProgress")]
+      property work_done_progress : Bool = false
+
+      def initialize(@work_done_progress = false)
       end
     end
 
