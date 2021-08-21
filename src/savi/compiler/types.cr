@@ -56,9 +56,9 @@ module Savi::Compiler::Types
       }
       if @assertions.any?
         output << "~~~\n"
-        @assertions.each_with_index { |(pos, lhs, rhs), index|
+        @assertions.each_with_index { |(pos, sub, sup), index|
           output << "\n" if index > 0
-          output << "  #{lhs.show} :> #{rhs.show}\n"
+          output << "  #{sub.show} <: #{sup.show}\n"
           output << "  #{pos.show.split("\n")[1..-1].join("\n  ")}\n"
         }
       end
@@ -166,8 +166,7 @@ module Savi::Compiler::Types
     protected def observe_assert_bool(ctx, node)
       t_link = ctx.namespace.prelude_type(ctx, "Bool")
       bool = NominalType.new(t_link).intersect(NominalCap::VAL)
-      rhs = @by_node[node]
-      @assertions << {node.pos, bool, rhs}
+      @assertions << {node.pos, @by_node[node], bool}
     end
 
     protected def observe_self_reference(node, ref)
@@ -225,9 +224,17 @@ module Savi::Compiler::Types
     end
 
     protected def observe_call(node)
+      receiver_type = @by_node[node.receiver]
+
+      node.args.try(&.terms.each_with_index { |term, index|
+        param_var = new_type_var("#{node.ident.value}(#{index})")
+        param_var.observe_toward_call_arg_at(node.pos, node, receiver_type, index)
+        param_var.observe_assignment_at(term.pos, @by_node[term])
+      })
+
       var = new_type_var(node.ident.value)
+      var.observe_from_call_return_at(node.pos, node, receiver_type)
       @by_node[node] = TypeVariableRef.new(var)
-      var.observe_from_call_return_at(node.pos, node, @by_node[node.receiver])
     end
 
     protected def observe_array_literal(ctx, node)

@@ -10,6 +10,7 @@ module Savi::Compiler::Types
       @constraints = Set({Source::Pos, AlgebraicType}).new
       @assignments = Set({Source::Pos, AlgebraicType}).new
       @from_call_returns = Set({Source::Pos, AST::Call, AlgebraicType}).new
+      @toward_call_args = Set({Source::Pos, AST::Call, AlgebraicType, Int32}).new
     end
 
     protected def observe_constraint_at(
@@ -41,6 +42,15 @@ module Savi::Compiler::Types
       @from_call_returns << {pos, call, receiver_type}
     end
 
+    protected def observe_toward_call_arg_at(
+      pos : Source::Pos,
+      call : AST::Call,
+      receiver_type : AlgebraicType,
+      arg_num : Int32,
+    )
+      @toward_call_args << {pos, call, receiver_type, arg_num}
+    end
+
     def show_name
       kind_sym = @is_cap_var ? 'K' : 'T'
       scope_sym = scope.is_a?(Program::Function::Link) ? "'" : "'^"
@@ -63,6 +73,10 @@ module Savi::Compiler::Types
       }
       @from_call_returns.each { |pos, call, receiver_type|
         output << "  :> #{receiver_type.show}.#{call.ident.value}\n"
+        output << "  #{pos.show.split("\n")[1..-1].join("\n  ")}\n"
+      }
+      @toward_call_args.each { |pos, call, receiver_type, num|
+        output << "  <: #{receiver_type.show}.#{call.ident.value}(#{num})\n"
         output << "  #{pos.show.split("\n")[1..-1].join("\n  ")}\n"
       }
     end

@@ -10,7 +10,7 @@ It analyzes a simple system of types.
 
 :module Example1(A _Describable)
   :fun example(a A, cond Bool)
-    x String = a.describe
+    x String = a.describe(80)
     y = if cond ("string" | b"bytes")
 ```
 ```types.type_variables_list Example1.example
@@ -20,7 +20,7 @@ T'A'^1
                      ^~~~~~~~~~~~
 ~~~
 T'return'2
-  :> T'y'7'aliased
+  :> T'y'9'aliased
       y = if cond ("string" | b"bytes")
       ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -36,27 +36,40 @@ T'cond'4
 
 T'x'5
   := (String & val)
-      x String = a.describe
+      x String = a.describe(80)
         ^~~~~~
-  :> T'describe'6'stabilized
-      x String = a.describe
-      ^~~~~~~~~~~~~~~~~~~~~
+  :> T'describe'8'stabilized
+      x String = a.describe(80)
+      ^~~~~~~~~~~~~~~~~~~~~~~~~
 
-T'describe'6
-  :> T'a'3'aliased.describe
-      x String = a.describe
+T'num:80'6
+  <: (Numeric & val)
+      x String = a.describe(80)
+                            ^~
+
+T'describe(0)'7
+  :> T'num:80'6
+      x String = a.describe(80)
+                            ^~
+  <: T'a'3'aliased.describe(0)
+      x String = a.describe(80)
                  ^~~~~~~~~~
 
-T'y'7
+T'describe'8
+  :> T'a'3'aliased.describe
+      x String = a.describe(80)
+                 ^~~~~~~~~~
+
+T'y'9
   :> ((String & val) | (Bytes & val))
       y = if cond ("string" | b"bytes")
       ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ~~~
-  (Bool & val) :> T'cond'4'aliased
+  T'cond'4'aliased <: (Bool & val)
       y = if cond ("string" | b"bytes")
              ^~~~
 
-  (Bool & val) :> (Bool & val)
+  (Bool & val) <: (Bool & val)
       y = if cond ("string" | b"bytes")
           ^~
 ```
