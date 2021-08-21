@@ -26,11 +26,11 @@ module Savi::Compiler::Types
       @sequence_number = 0u64
 
       @by_node = {} of AST::Node => AlgebraicType
-      @by_ref = {} of Refer::Info => AlgebraicType
+      @local_vars_by_ref = {} of Refer::Info => TypeVariable
       @type_vars = [] of TypeVariable
       @edge_type_vars = [] of TypeVariable
       @bindings = Set({Source::Pos, TypeVariable, AlgebraicType}).new
-      @constraints = Set({Source::Pos, AlgebraicType, TypeVariable}).new
+      @constraints = Set({Source::Pos, TypeVariable, AlgebraicType}).new
       @assignments = Set({Source::Pos, TypeVariable, AlgebraicType}).new
       @assertions = Set({Source::Pos, AlgebraicType, AlgebraicType}).new
       @from_call_returns = Set({Source::Pos, TypeVariable, AST::Call}).new
@@ -56,20 +56,24 @@ module Savi::Compiler::Types
 
       (@edge_type_vars + @type_vars).each_with_index { |var, index|
         output << "\n" if index > 0
-        output << "#{var.show}\n"
-        @bindings.select(&.[](1).==(var)).each { |pos, _, explicit|
+        output << "#{var.show_name}\n"
+        @bindings.each { |pos, v, explicit|
+          next unless v == var
           output << "  := #{explicit.show}\n"
           output << "  #{pos.show.split("\n")[1..-1].join("\n  ")}\n"
         }
-        @constraints.select(&.[](2).==(var)).each { |pos, sup, _|
+        @constraints.each { |pos, v, sup|
+          next unless v == var
           output << "  <: #{sup.show}\n"
           output << "  #{pos.show.split("\n")[1..-1].join("\n  ")}\n"
         }
-        @assignments.select(&.[](1).==(var)).each { |pos, _, sub|
+        @assignments.each { |pos, v, sub|
+          next unless v == var
           output << "  :> #{sub.show}\n"
           output << "  #{pos.show.split("\n")[1..-1].join("\n  ")}\n"
         }
-        @from_call_returns.select(&.[](1).==(var)).each { |pos, _, call|
+        @from_call_returns.each { |pos, v, call|
+          next unless v == var
           receiver = @by_node[call.receiver]
           output << "  :> #{
             @by_node[call.receiver].show
@@ -102,7 +106,33 @@ module Savi::Compiler::Types
     end
 
     private def new_cap_var(nickname)
-      CapVariable.new(nickname, @scope, @sequence_number += 1)
+      TypeVariable.new(nickname, @scope, @sequence_number += 1,
+        is_cap_var: true
+      )
+    end
+
+    protected def observe_constraint_at(
+      pos : Source::Pos,
+      var : TypeVariable,
+      supertype : AlgebraicType,
+    )
+      @constraints << {pos, var, supertype}
+    end
+
+    protected def observe_binding_at(
+      pos : Source::Pos,
+      var : TypeVariable,
+      type : AlgebraicType,
+    )
+      @bindings << {pos, var, type}
+    end
+
+    protected def observe_assignment_at(
+      pos : Source::Pos,
+      var : TypeVariable,
+      subtype : AlgebraicType,
+    )
+      @assignments << {pos, var, subtype}
     end
 
     protected def init_type_self(ctx, visitor : Visitor, params : AST::Group?)
@@ -113,7 +143,9 @@ module Savi::Compiler::Types
 
       @for_self = NominalType.new(
         scope.as(Program::Type::Link),
-        @type_param_vars.try(&.map(&.as(AlgebraicType))),
+        @type_param_vars.try(&.map { |var|
+          TypeVariableRef.new(var).as(AlgebraicType)
+        }),
       )
 
       params.try(&.terms.each_with_index { |param, index|
@@ -123,12 +155,12 @@ module Savi::Compiler::Types
         explicit_type = visitor.read_type_expr(ctx, explicit) if explicit
         default_type = visitor.read_type_expr(ctx, default) if default
 
-        @by_node[param] = var
-        @by_node[ident] = var
+        @by_node[param] = TypeVariableRef.new(var)
+        @by_node[ident] = TypeVariableRef.new(var)
         @by_node[explicit] = explicit_type.not_nil! if explicit
         @by_node[default] = default_type.not_nil! if default
 
-        @constraints << {explicit.pos, explicit_type.not_nil!, var} if explicit
+        observe_constraint_at(explicit.pos, var, explicit_type.not_nil!) if explicit
       })
     end
 
@@ -141,7 +173,7 @@ module Savi::Compiler::Types
     protected def init_func_self(cap : String, pos : Source::Pos)
       @for_self = (
         self_type = @parent.not_nil!.value.for_self
-        self_cap = new_cap_var("@") # TODO: add constraint for func cap
+        self_cap = TypeVariableRef.new(new_cap_var("@")) # TODO: add constraint for func cap
         self_type.intersect(self_cap)
       ).as(AlgebraicType)
     end
@@ -151,16 +183,16 @@ module Savi::Compiler::Types
 
       if ret
         explicit_type = visitor.read_type_expr(ctx, ret)
-        @constraints << {ret.pos, explicit_type, var}
+        observe_constraint_at(ret.pos, var, explicit_type)
       end
     end
 
     protected def observe_natural_return(node : AST::Group)
-      @assignments << {node.terms.last.pos, self.return_var, @by_node[node]}
+      observe_assignment_at(node.terms.last.pos, self.return_var, @by_node[node])
     end
 
     protected def observe_early_return(node : AST::Jump)
-      @assignments << {node.pos, self.return_var, @by_node[node.term]}
+      observe_assignment_at(node.pos, self.return_var, @by_node[node.term])
     end
 
     protected def observe_yield(node : AST::Yield)
@@ -171,17 +203,17 @@ module Savi::Compiler::Types
           vars << v
           v
         end
-        @assignments << {node.pos, var, @by_node[term]}
+        observe_assignment_at(node.pos, var, @by_node[term])
       }
 
       result_var = @yield_result_var ||= new_type_var("yield:result")
-      @by_node[node] = result_var
+      @by_node[node] = TypeVariableRef.new(result_var)
     end
 
     protected def observe_constrained_literal(node, var_name, supertype)
       var = new_type_var(var_name)
-      @by_node[node] = var
-      @constraints << {node.pos, supertype, var}
+      @by_node[node] = TypeVariableRef.new(var)
+      observe_constraint_at(node.pos, var, supertype)
     end
 
     protected def observe_assert_bool(ctx, node)
@@ -192,42 +224,42 @@ module Savi::Compiler::Types
     end
 
     protected def observe_self_reference(node, ref)
-      @by_node[node] = @by_ref[ref] ||= for_self
+      @by_node[node] = for_self
     end
 
     protected def observe_local_reference(node, ref)
-      var = @by_ref[ref] ||= new_type_var(ref.name)
-      @by_node[node] = var.aliased
+      var = @local_vars_by_ref[ref] ||= new_type_var(ref.name)
+      @by_node[node] = TypeVariableRef.new(var).aliased
     end
 
     protected def observe_local_consume(node, ref)
-      var = @by_ref[ref] ||= new_type_var(ref.name)
-      @by_node[node] = var
+      var = @local_vars_by_ref[ref] ||= new_type_var(ref.name)
+      @by_node[node] = TypeVariableRef.new(var)
     end
 
     protected def observe_assignment(node, ref)
-      var = @by_ref[ref].as(TypeVariable)
+      var = @local_vars_by_ref[ref]
 
       explicit = AST::Extract.param(node.lhs)[1]
-      @bindings << {explicit.pos, var, @by_node[explicit]} if explicit
+      observe_binding_at(explicit.pos, var, @by_node[explicit]) if explicit
 
       rhs = @by_node[node.rhs].stabilized
-      @assignments << {node.pos, var, rhs}
+      observe_assignment_at(node.pos, var, rhs)
 
-      @by_node[node] = var.aliased
+      @by_node[node] = TypeVariableRef.new(var).aliased
     end
 
     protected def observe_param(node, ref)
       ident, explicit, default = AST::Extract.param(node)
-      var = @by_ref[ref].as(TypeVariable)
+      var = @local_vars_by_ref[ref]
 
       # Params differ from local variables in that their explicit type
       # creates a constraint rather than a fully-equivalent binding.
-      @constraints << {explicit.pos, @by_node[explicit], var} if explicit
+      observe_constraint_at(explicit.pos, var, @by_node[explicit]) if explicit
 
-      @assignments << {node.pos, var, @by_node[default].stabilized} if default
+      observe_assignment_at(node.pos, var, @by_node[default].stabilized) if default
 
-      @by_node[node] = var.aliased
+      @by_node[node] = TypeVariableRef.new(var).aliased
     end
 
     protected def observe_field_access(node)
@@ -235,21 +267,21 @@ module Savi::Compiler::Types
       var = parent.field_type_vars[node.value]
       case node
       when AST::FieldRead
-        @by_node[node] = var.aliased
+        @by_node[node] = TypeVariableRef.new(var).aliased
       when AST::FieldWrite
-        @by_node[node] = var.aliased
+        @by_node[node] = TypeVariableRef.new(var).aliased
         @assignments        << {node.pos, var, @by_node[node.rhs]}
-        parent.@assignments << {node.pos, var, @by_node[node.rhs]}
+        parent.observe_assignment_at(node.pos, var, @by_node[node.rhs])
       when AST::FieldDisplace
-        @by_node[node] = var
+        @by_node[node] = TypeVariableRef.new(var)
         @assignments        << {node.pos, var, @by_node[node.rhs]}
-        parent.@assignments << {node.pos, var, @by_node[node.rhs]}
+        parent.observe_assignment_at(node.pos, var, @by_node[node.rhs])
       end
     end
 
     protected def observe_call(node)
       var = new_type_var(node.ident.value)
-      @by_node[node] = var
+      @by_node[node] = TypeVariableRef.new(var)
       @from_call_returns << {node.pos, var, node}
     end
 
@@ -257,21 +289,21 @@ module Savi::Compiler::Types
       var = new_type_var("array:group")
       elem_var = new_type_var("array:elem")
 
-      @by_node[node] = var
+      @by_node[node] = TypeVariableRef.new(var)
 
       array_nominal = NominalType.new(
         ctx.namespace.prelude_type(ctx, "Array"),
-        [elem_var.as(AlgebraicType)]
+        [TypeVariableRef.new(elem_var).as(AlgebraicType)]
       )
       array_type = array_nominal.intersect(
         array_nominal.intersect(NominalCap::ISO)
           .unite(array_nominal.intersect(NominalCap::VAL))
           .unite(array_nominal.intersect(NominalCap::REF))
       )
-      @constraints << {node.pos, array_type, var}
+      observe_constraint_at(node.pos, var, array_type)
 
       node.terms.each { |elem|
-        @assignments << {node.pos, elem_var, @by_node[elem]}
+        observe_assignment_at(node.pos, elem_var, @by_node[elem])
       }
     end
   end
@@ -366,7 +398,7 @@ module Savi::Compiler::Types
         while analysis.scope != ref.parent_link
           analysis = analysis.parent.not_nil!.value
         end
-        analysis.type_param_vars[ref.index]
+        TypeVariableRef.new(analysis.type_param_vars[ref.index])
       when nil
         cap = read_type_expr_cap(node)
         if cap

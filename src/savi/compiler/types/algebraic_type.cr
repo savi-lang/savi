@@ -171,37 +171,21 @@ module Savi::Compiler::Types
     end
   end
 
-  struct TypeVariable < AlgebraicTypeSimple
-    getter nickname : String
-    getter scope : Program::Function::Link | Program::Type::Link | Program::TypeAlias::Link
-    getter sequence_number : UInt64
-    def initialize(@nickname, @scope, @sequence_number)
+  struct TypeVariableRef < AlgebraicTypeSimple
+    getter var : TypeVariable
+    def initialize(@var)
     end
 
     def show
-      scope_sym = scope.is_a?(Program::Function::Link) ? "'" : "'^"
-      "T'#{@nickname}#{scope_sym}#{@sequence_number}"
-    end
-
-    def override_cap(other : AlgebraicType)
-      OverrideCap.new(self, other)
-    end
-  end
-
-  struct CapVariable < AlgebraicTypeSimple
-    getter nickname : String
-    getter scope : Program::Function::Link | Program::Type::Link | Program::TypeAlias::Link
-    getter sequence_number : UInt64
-    def initialize(@nickname, @scope, @sequence_number)
-    end
-
-    def show
-      scope_sym = scope.is_a?(Program::Function::Link) ? "'" : "'^"
-      "K'#{@nickname}#{scope_sym}#{@sequence_number}"
+      @var.show_name
     end
 
     def override_cap(cap : AlgebraicType)
-      cap # overrides whatever cap was sitting behind this variable
+      if @var.is_cap_var
+        cap # overrides whatever cap was sitting behind this variable
+      else
+        OverrideCap.new(self, cap)
+      end
     end
   end
 
