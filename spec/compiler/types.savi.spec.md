@@ -46,6 +46,9 @@ T'num:80'6
   <: (Numeric & val)
       x String = a.describe(80)
                             ^~
+  <: T'describe(0)'7
+      x String = a.describe(80)
+                            ^~
 
 T'describe(0)'7
   :> T'num:80'6
@@ -56,11 +59,17 @@ T'describe(0)'7
                  ^~~~~~~~~~
 
 T'describe'8
+  <: T'x'5'stabilized
+      x String = a.describe(80)
+      ^~~~~~~~~~~~~~~~~~~~~~~~~
   :> T'a'3'aliased.describe
       x String = a.describe(80)
                  ^~~~~~~~~~
 
 T'y'9
+  <: T'return'2
+      y = if cond ("string" | b"bytes")
+      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   :> ((String & val) | (Bytes & val))
       y = if cond ("string" | b"bytes")
       ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -84,6 +93,15 @@ It analyzes the getter, setter, and displacement methods of a field.
 ```
 ```types.type_variables_list ExampleField.field
 T'field'^1
+  <: T'return'2
+    :var field String
+         ^~~~~
+  <: T'return'2
+    :var field String
+         ^~~~~
+  <: T'return'2
+    :var field String
+         ^~~~~
   :> T'value'3
     :var field String
          ^~~~~
@@ -101,6 +119,15 @@ T'return'2
 ```
 ```types.type_variables_list ExampleField.field=
 T'field'^1
+  <: T'return'2
+    :var field String
+         ^~~~~
+  <: T'return'2
+    :var field String
+         ^~~~~
+  <: T'return'2
+    :var field String
+         ^~~~~
   :> T'value'3
     :var field String
          ^~~~~
@@ -120,9 +147,22 @@ T'value'3
   <: (String & val)
     :var field String
                ^~~~~~
+  <: T'field'^1
+    :var field String
+         ^~~~~
+
 ```
 ```types.type_variables_list ExampleField.field<<=
 T'field'^1
+  <: T'return'2
+    :var field String
+         ^~~~~
+  <: T'return'2
+    :var field String
+         ^~~~~
+  <: T'return'2
+    :var field String
+         ^~~~~
   :> T'value'3
     :var field String
          ^~~~~
@@ -142,6 +182,9 @@ T'value'3
   <: (String & val)
     :var field String
                ^~~~~~
+  <: T'field'^1
+    :var field String
+         ^~~~~
 ```
 
 ---
@@ -164,6 +207,9 @@ T'a'3
   := (Array((F64 & val)) & val)
       a Array(F64)'val = [1, 2.3]
         ^~~~~~~~~~~~~~
+  <: T'return'2
+      a Array(F64)'val = [1, 2.3]
+      ^~~~~~~~~~~~~~~~~~~~~~~~~~~
   :> T'array:group'6'stabilized
       a Array(F64)'val = [1, 2.3]
       ^~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -172,16 +218,25 @@ T'num:1'4
   <: (Numeric & val)
       a Array(F64)'val = [1, 2.3]
                           ^
+  <: T'array:elem'7
+      a Array(F64)'val = [1, 2.3]
+                         ^~~~~~~~
 
 T'float:2.3'5
   <: ((F64 & val) | (F32 & val))
       a Array(F64)'val = [1, 2.3]
                              ^~~
+  <: T'array:elem'7
+      a Array(F64)'val = [1, 2.3]
+                         ^~~~~~~~
 
 T'array:group'6
   <: ((Array(T'array:elem'7) & iso) | (Array(T'array:elem'7) & val) | (Array(T'array:elem'7) & ref))
       a Array(F64)'val = [1, 2.3]
                          ^~~~~~~~
+  <: T'a'3'stabilized
+      a Array(F64)'val = [1, 2.3]
+      ^~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 T'array:elem'7
   :> T'num:1'4

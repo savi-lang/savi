@@ -8,6 +8,7 @@ module Savi::Compiler::Types
     def initialize(@nickname, @scope, @sequence_number, @is_cap_var = false)
       @bindings = Set({Source::Pos, AlgebraicType}).new
       @constraints = Set({Source::Pos, AlgebraicType}).new
+      @suggested_supertypes = Set({Source::Pos, AlgebraicType}).new
       @assignments = Set({Source::Pos, AlgebraicType}).new
       @from_call_returns = Set({Source::Pos, AST::Call, AlgebraicType}).new
       @toward_call_args = Set({Source::Pos, AST::Call, AlgebraicType, Int32}).new
@@ -16,8 +17,17 @@ module Savi::Compiler::Types
     protected def observe_constraint_at(
       pos : Source::Pos,
       supertype : AlgebraicType,
+      maybe = false,
+      via_reciprocal = false,
     )
-      @constraints << {pos, supertype}
+      if maybe
+        @suggested_supertypes << {pos, supertype}
+      else
+        @constraints << {pos, supertype}
+      end
+
+      return if via_reciprocal
+      # TODO: observe_constraint_reciprocals?
     end
 
     protected def observe_binding_at(
@@ -30,8 +40,12 @@ module Savi::Compiler::Types
     protected def observe_assignment_at(
       pos : Source::Pos,
       subtype : AlgebraicType,
+      via_reciprocal = false,
     )
       @assignments << {pos, subtype}
+
+      return if via_reciprocal
+      subtype.observe_assignment_reciprocals(pos, TypeVariableRef.new(self))
     end
 
     protected def observe_from_call_return_at(
@@ -65,6 +79,10 @@ module Savi::Compiler::Types
       }
       @constraints.each { |pos, sup|
         output << "  <: #{sup.show}\n"
+        output << "  #{pos.show.split("\n")[1..-1].join("\n  ")}\n"
+      }
+      @suggested_supertypes.each { |pos, sup|
+        output << "  ?<: #{sup.show}\n"
         output << "  #{pos.show.split("\n")[1..-1].join("\n  ")}\n"
       }
       @assignments.each { |pos, sub|

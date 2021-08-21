@@ -20,6 +20,14 @@ module Savi::Compiler::Types
     def viewed_from(origin)
       raise NotImplementedError.new("viewed_from for #{self.class}")
     end
+
+    def observe_assignment_reciprocals(
+      pos : Source::Pos,
+      supertype : AlgebraicType,
+      maybe : Bool = false,
+    )
+      raise NotImplementedError.new("observe_assignment_reciprocals for #{self.class}: #{show}")
+    end
   end
 
   abstract struct AlgebraicTypeSummand < AlgebraicType
@@ -89,6 +97,15 @@ module Savi::Compiler::Types
     def override_cap(cap : AlgebraicType)
       self # doesn't change the nature of this lack of a type
     end
+
+    def observe_assignment_reciprocals(
+      pos : Source::Pos,
+      supertype : AlgebraicType,
+      maybe : Bool = false,
+    )
+      # Do nothing.
+      # Only a type variable can be modified by observations about it.
+    end
   end
 
   struct NominalType < AlgebraicTypeSimple
@@ -116,6 +133,15 @@ module Savi::Compiler::Types
 
     def viewed_from(origin)
       self # this type says nothing about capabilities, so it remains unchanged.
+    end
+
+    def observe_assignment_reciprocals(
+      pos : Source::Pos,
+      supertype : AlgebraicType,
+      maybe : Bool = false,
+    )
+      # Do nothing - the nominal type is fixed by other factors.
+      # Only a type variable can be modified by observations about it.
     end
   end
 
@@ -183,6 +209,15 @@ module Savi::Compiler::Types
     def override_cap(other : AlgebraicType)
       other
     end
+
+    def observe_assignment_reciprocals(
+      pos : Source::Pos,
+      supertype : AlgebraicType,
+      maybe : Bool = false,
+    )
+      # Do nothing - the nominal cap is fixed by other factors.
+      # Only a type variable can be modified by observations about it.
+    end
   end
 
   struct TypeVariableRef < AlgebraicTypeSimple
@@ -200,6 +235,18 @@ module Savi::Compiler::Types
       else
         OverrideCap.new(self, cap)
       end
+    end
+
+    def observe_assignment_reciprocals(
+      pos : Source::Pos,
+      supertype : AlgebraicType,
+      maybe : Bool = false,
+    )
+      # The reciprocal of an assignment (the subtype acting on supertype)
+      # is a constraint (the supertype acting on the subtype).
+      var.observe_constraint_at(
+        pos, supertype, maybe: maybe, via_reciprocal: true
+      )
     end
   end
 
@@ -252,6 +299,15 @@ module Savi::Compiler::Types
       # can remain in play - if an iso'aliased is present, it drops away.
       NoUnique.new(inner)
     end
+
+    def observe_assignment_reciprocals(
+      pos : Source::Pos,
+      supertype : AlgebraicType,
+      maybe : Bool = false,
+    )
+      # TODO: Should we do something other than discard the alias layer here?
+      inner.observe_assignment_reciprocals(pos, supertype, maybe)
+    end
   end
 
   struct Stabilized < AlgebraicTypeFactor
@@ -262,6 +318,16 @@ module Savi::Compiler::Types
     def show
       "#{@inner.show}'stabilized"
     end
+
+    def observe_assignment_reciprocals(
+      pos : Source::Pos,
+      supertype : AlgebraicType,
+      maybe : Bool = false,
+    )
+      # Assigning from stabilized subtype (right side) implies that the
+      # supertype (left side) must also be in the domain of stable capabilities.
+      inner.observe_assignment_reciprocals(pos, supertype.stabilized, maybe)
+    end
   end
 
   struct NoUnique < AlgebraicTypeFactor
@@ -271,6 +337,15 @@ module Savi::Compiler::Types
 
     def show
       "#{@inner.show}'nounique"
+    end
+
+    def observe_assignment_reciprocals(
+      pos : Source::Pos,
+      supertype : AlgebraicType,
+      maybe : Bool = false,
+    )
+      # TODO: Should we do something other than discard the alias layer here?
+      inner.observe_assignment_reciprocals(pos, supertype, maybe)
     end
   end
 
@@ -316,6 +391,16 @@ module Savi::Compiler::Types
 
     def viewed_from(origin)
       Intersection.from(@members.map(&.viewed_from(origin)))
+    end
+
+    def observe_assignment_reciprocals(
+      pos : Source::Pos,
+      supertype : AlgebraicType,
+      maybe : Bool = false,
+    )
+      # Each member of the intersection subtype (right side) MAY observe the
+      # constraints of the supertype (left side) as a suggestion.
+      @members.each(&.observe_assignment_reciprocals(pos, supertype, maybe: true))
     end
   end
 
@@ -365,6 +450,16 @@ module Savi::Compiler::Types
 
     def viewed_from(origin)
       Union.from(@members.map(&.viewed_from(origin)))
+    end
+
+    def observe_assignment_reciprocals(
+      pos : Source::Pos,
+      supertype : AlgebraicType,
+      maybe : Bool = false,
+    )
+      # Every member of the union subtype (right side) must observe the
+      # constraints of the supertype (left side) it is being assigned to.
+      @members.each(&.observe_assignment_reciprocals(pos, supertype, maybe))
     end
   end
 end
