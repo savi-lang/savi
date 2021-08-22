@@ -21,6 +21,18 @@ module Savi::Compiler::Types
       raise NotImplementedError.new("viewed_from for #{self.class}")
     end
 
+    def trace_as_constraint(cursor : Cursor)
+      raise NotImplementedError.new("trace_as_constraint for #{self.class}: #{show}")
+    end
+
+    def trace_as_assignment(cursor : Cursor)
+      raise NotImplementedError.new("trace_as_assignment for #{self.class}: #{show}")
+    end
+
+    def trace_call_return_as_assignment(cursor : Cursor, call : AST::Call)
+      raise NotImplementedError.new("trace_call_return_as_assignment for #{self.class}: #{show}")
+    end
+
     def observe_assignment_reciprocals(
       pos : Source::Pos,
       supertype : AlgebraicType,
@@ -237,6 +249,14 @@ module Savi::Compiler::Types
       end
     end
 
+    def trace_as_constraint(cursor : Cursor)
+      var.trace_as_constraint(cursor)
+    end
+
+    def trace_as_assignment(cursor : Cursor)
+      var.trace_as_assignment(cursor)
+    end
+
     def observe_assignment_reciprocals(
       pos : Source::Pos,
       supertype : AlgebraicType,
@@ -298,6 +318,10 @@ module Savi::Compiler::Types
       # If we stabilize an alias, only those caps with no uniqueness constraints
       # can remain in play - if an iso'aliased is present, it drops away.
       NoUnique.new(inner)
+    end
+
+    def trace_as_assignment(cursor : Cursor)
+      cursor.trace_as_assignment_with_transform(inner, &.aliased)
     end
 
     def observe_assignment_reciprocals(
@@ -391,6 +415,26 @@ module Savi::Compiler::Types
 
     def viewed_from(origin)
       Intersection.from(@members.map(&.viewed_from(origin)))
+    end
+
+    def trace_as_assignment(cursor : Cursor)
+      raise NotImplementedError.new("trace_as_assignment for #{self.class}: #{show}") \
+        unless @members.size == 2 \
+          && @members.any?(&.is_a?(NominalType)) \
+          && @members.any?(&.is_a?(NominalCap))
+
+      cursor.add_fact_at_current_pos(self)
+    end
+
+    def trace_call_return_as_assignment(cursor : Cursor, call : AST::Call)
+      raise NotImplementedError.new("trace_as_assignment for #{self.class}: #{show}") \
+        unless @members.size == 2 \
+          && (nominal_type = @members.find(&.as?(NominalType))) \
+          && (nominal_cap = @members.find(&.as?(NominalCap)))
+
+      cursor.trace_call_return_as_assignment(
+        call, nominal_type.as(NominalType), nominal_cap.as(NominalCap)
+      )
     end
 
     def observe_assignment_reciprocals(

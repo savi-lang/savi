@@ -93,6 +93,9 @@ It analyzes the getter, setter, and displacement methods of a field.
 ```
 ```types_graph ExampleField.field
 T'field'^1
+  := (String & val)
+    :var field String
+               ^~~~~~
   <: T'return'2
     :var field String
          ^~~~~
@@ -119,6 +122,9 @@ T'return'2
 ```
 ```types_graph ExampleField.field=
 T'field'^1
+  := (String & val)
+    :var field String
+               ^~~~~~
   <: T'return'2
     :var field String
          ^~~~~
@@ -154,6 +160,9 @@ T'value'3
 ```
 ```types_graph ExampleField.field<<=
 T'field'^1
+  := (String & val)
+    :var field String
+               ^~~~~~
   <: T'return'2
     :var field String
          ^~~~~

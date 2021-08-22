@@ -1,12 +1,15 @@
 module Savi::Compiler::Types
   class TypeVariable
+    alias Scope = Program::Function::Link | Program::Type::Link | Program::TypeAlias::Link
     getter nickname : String
-    getter scope : Program::Function::Link | Program::Type::Link | Program::TypeAlias::Link
+    getter scope : Scope
     getter sequence_number : UInt64
     property is_cap_var : Bool
+    property eager_constraint_summary : AlgebraicType?
+
+    @binding : {Source::Pos, AlgebraicType}?
 
     def initialize(@nickname, @scope, @sequence_number, @is_cap_var = false)
-      @bindings = Set({Source::Pos, AlgebraicType}).new
       @constraints = Set({Source::Pos, AlgebraicType}).new
       @suggested_supertypes = Set({Source::Pos, AlgebraicType}).new
       @assignments = Set({Source::Pos, AlgebraicType}).new
@@ -34,7 +37,9 @@ module Savi::Compiler::Types
       pos : Source::Pos,
       type : AlgebraicType,
     )
-      @bindings << {pos, type}
+      raise "this type variable already has a binding" if @binding
+      @binding = {pos, type}
+      @eager_constraint_summary = type
     end
 
     protected def observe_assignment_at(
@@ -73,7 +78,7 @@ module Savi::Compiler::Types
 
     def show_info(output)
       output << "#{self.show_name}\n"
-      @bindings.each { |pos, explicit|
+      @binding.try { |pos, explicit|
         output << "  := #{explicit.show}\n"
         output << "  #{pos.show.split("\n")[1..-1].join("\n  ")}\n"
       }
@@ -96,6 +101,90 @@ module Savi::Compiler::Types
       @toward_call_args.each { |pos, call, receiver_type, num|
         output << "  <: #{receiver_type.show}.#{call.ident.value}(#{num})\n"
         output << "  #{pos.show.split("\n")[1..-1].join("\n  ")}\n"
+      }
+    end
+
+    def trace_as_constraint(cursor : Cursor)
+      if @binding
+        pos, type = @binding.not_nil!
+        cursor.current_pos = pos
+        type.trace_as_constraint(cursor)
+        return
+      end
+      if @eager_constraint_summary
+        type = @eager_constraint_summary.not_nil! # TODO: add a pos as well?
+        type.trace_as_constraint(cursor)
+        return
+      end
+
+      @constraints.each { |pos, supertype|
+        cursor.current_pos = pos
+        supertype.trace_as_constraint(cursor)
+      }
+      # TODO: also trace suggested_supertypes?
+      # TODO: also trace toward_call_args?
+    end
+
+    def trace_as_assignment(cursor : Cursor)
+      if @binding
+        pos, type = @binding.not_nil!
+        cursor.current_pos = pos
+        type.trace_as_assignment(cursor)
+        return
+      end
+
+      @assignments.each { |pos, subtype|
+        cursor.current_pos = pos
+        subtype.trace_as_assignment(cursor)
+      }
+      @from_call_returns.each { |pos, call, receiver|
+        cursor.trace_call_return_as_assignment(pos, call, receiver)
+      }
+    end
+
+    def calculate_assignment_summary(analysis : Analysis, cursor : Cursor)
+      analysis.calculate_assignment_summary(self) {
+        next @binding.not_nil!.last if @binding
+
+        if @assignments.any?
+          @assignments.each { |pos, sub|
+            cursor.current_pos = pos
+            sub.trace_as_assignment(cursor)
+          }
+        end
+
+        union_type = nil
+        cursor.each_fact { |pos, type|
+          if union_type
+            union_type = union_type.unite(type)
+          else
+            union_type = type
+          end
+        }
+
+        union_type.not_nil! # TODO: nice error for having no assignment facts
+      }
+    end
+
+    def calculate_constraint_summary(analysis : Analysis, cursor : Cursor)
+      analysis.calculate_constraint_summary(self) {
+        next @binding.not_nil!.last if @binding
+        next @eager_constraint_summary.not_nil! if @eager_constraint_summary
+
+        if @constraints.any?
+          @constraints.each { |pos, sup| sup.trace_as_constraint(cursor) }
+        end
+
+        intersect_type = nil
+        cursor.each_fact { |pos, type|
+          if intersect_type
+            intersect_type = intersect_type.intersect(type)
+          else
+            intersect_type = type
+          end
+        }
+
+        intersect_type.not_nil! # TODO: nice error for having no assignment facts
       }
     end
   end

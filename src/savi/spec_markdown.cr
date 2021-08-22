@@ -71,7 +71,9 @@ class Savi::SpecMarkdown
           when /^savi format.([\w<>=]+)$/
             example.expected_format_results << {$~[1], content}
           when /^types_graph (\w+)\.([\w<>=]+)$/
-            example.expected_type_variables_lists << {$~[1], $~[2], content}
+            example.expected_types_graph << {$~[1], $~[2], content}
+          when /^types.return (\w+)\.([\w<>=]+)$/
+            example.expected_return_types << {$~[1], $~[2], content}
           else
             raise NotImplementedError.new("compiler spec code block: #{kind}")
           end
@@ -102,7 +104,8 @@ class Savi::SpecMarkdown
     property code_blocks = [] of String
     property expected_errors = [] of String
     property expected_format_results = [] of {String, String}
-    property expected_type_variables_lists = [] of {String, String, String}
+    property expected_types_graph = [] of {String, String, String}
+    property expected_return_types = [] of {String, String, String}
 
     def incomplete?
       code_blocks.empty?
@@ -243,7 +246,7 @@ class Savi::SpecMarkdown
     all_success = true
 
     examples.each { |example|
-      example.expected_type_variables_lists.each { |t_name, f_name, expected|
+      example.expected_types_graph.each { |t_name, f_name, expected|
         type = library.types.find(&.ident.value.==(t_name))
         func = type.try(&.find_func?(f_name))
         unless func && type
@@ -251,7 +254,7 @@ class Savi::SpecMarkdown
           puts
           puts example.generated_comments_code
           puts
-          puts "Missing type variable list function: #{t_name}.#{f_name}"
+          puts "Missing types graph function: #{t_name}.#{f_name}"
           puts
           all_success = false
           next
@@ -265,7 +268,42 @@ class Savi::SpecMarkdown
           puts
           puts example.generated_comments_code
           puts
-          puts "Expected type variable list:"
+          puts "Expected types graph:"
+          puts
+          puts expected
+          puts
+          puts "but actually was:"
+          puts
+          puts actual
+          puts
+          all_success = false
+        end
+      }
+
+      example.expected_return_types.each { |t_name, f_name, expected|
+        type = library.types.find(&.ident.value.==(t_name))
+        func = type.try(&.find_func?(f_name))
+        unless func && type
+          puts "---"
+          puts
+          puts example.generated_comments_code
+          puts
+          puts "Missing return type function: #{t_name}.#{f_name}"
+          puts
+          all_success = false
+          next
+        end
+
+        f_link = func.make_link(type.make_link(library.make_link))
+        return_var = ctx.types_graph[f_link].return_var
+        actual = ctx.types[f_link][return_var].show
+
+        unless expected.strip == actual.strip
+          puts "---"
+          puts
+          puts example.generated_comments_code
+          puts
+          puts "Expected return type:"
           puts
           puts expected
           puts

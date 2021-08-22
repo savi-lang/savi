@@ -4,22 +4,17 @@ require "../pass/analyze"
 # WIP: This pass is intended to be a future replacement for the Infer pass,
 # but it is still a work in progress and isn't in the main compile path yet.
 #
-# This pass does not mutate the Program topology.
-# This pass does not mutate the AST.
-# This pass may raise a compilation error.
-# This pass keeps state at the per-type and per-function level.
-# This pass produces output state at the per-type and per-function level.
-#
 module Savi::Compiler::Types::Graph
   struct Analysis
-    protected getter scope : Program::Function::Link | Program::Type::Link | Program::TypeAlias::Link
-    protected getter parent : StructRef(Analysis)?
-    protected getter! for_self : AlgebraicType
-    protected getter! type_param_vars : Array(TypeVariable)
-    protected getter! field_type_vars : Hash(String, TypeVariable)
-    protected getter! return_var : TypeVariable
-    protected getter! yield_vars : Array(TypeVariable)
-    protected getter! yield_result_var : TypeVariable
+    getter scope : TypeVariable::Scope
+    getter parent : StructRef(Analysis)?
+    getter! for_self : AlgebraicType
+    getter! type_param_vars : Array(TypeVariable)
+    getter! field_type_vars : Hash(String, TypeVariable)
+    getter! param_vars : Array(TypeVariable)
+    getter! return_var : TypeVariable
+    getter! yield_vars : Array(TypeVariable)
+    getter! yield_result_var : TypeVariable
 
     def initialize(@scope, parent : Analysis? = nil)
       @parent = parent ? StructRef(Analysis).new(parent) : nil
@@ -123,6 +118,8 @@ module Savi::Compiler::Types::Graph
         self_cap = TypeVariableRef.new(new_cap_var("@")) # TODO: add constraint for func cap
         self_type.intersect(self_cap)
       ).as(AlgebraicType)
+
+      @param_vars = [] of TypeVariable
     end
 
     protected def init_func_return_var(ctx, visitor : Visitor, ret : AST::Term?)
@@ -132,6 +129,18 @@ module Savi::Compiler::Types::Graph
         explicit_type = visitor.read_type_expr(ctx, ret)
         var.observe_constraint_at(ret.pos, explicit_type)
       end
+    end
+
+    protected def init_constructor_return_var(
+      visitor : Visitor,
+      cap_ident : AST::Identifier,
+    )
+      @return_var = var = new_type_var("return")
+
+      constructed_type = @parent.not_nil!.value.for_self.intersect(
+        visitor.read_type_expr_cap(cap_ident).not_nil!
+      )
+      var.observe_binding_at(cap_ident.pos, constructed_type)
     end
 
     protected def observe_natural_return(node : AST::Group)
@@ -198,10 +207,16 @@ module Savi::Compiler::Types::Graph
     protected def observe_param(node, ref)
       ident, explicit, default = AST::Extract.param(node)
       var = @local_vars_by_ref[ref]
+      param_vars << var
 
-      # Params differ from local variables in that their explicit type
-      # creates a constraint rather than a fully-equivalent binding.
-      var.observe_constraint_at(explicit.pos, @by_node[explicit]) if explicit
+      if explicit
+        # Params differ from local variables in that their explicit type
+        # creates a constraint rather than a fully-equivalent binding.
+        var.observe_constraint_at(explicit.pos, @by_node[explicit])
+
+        # However, they do set up the explicit type as being the summary.
+        var.eager_constraint_summary = @by_node[explicit]
+      end
 
       var.observe_assignment_at(node.pos, @by_node[default].stabilized) if default
 
@@ -221,6 +236,17 @@ module Savi::Compiler::Types::Graph
         @by_node[node] = TypeVariableRef.new(var)
         var.observe_assignment_at(node.pos, @by_node[node.rhs])
       end
+    end
+
+    protected def observe_field_func(ctx, visitor, f : Program::Function)
+      var = @parent.not_nil!.field_type_vars[f.ident.value]
+
+      f.ret.try { |ret|
+        var.observe_binding_at(ret.pos, visitor.read_type_expr(ctx, ret))
+      }
+      f.body.try { |body|
+        var.observe_assignment_at(body.pos, @by_node[body])
+      }
     end
 
     protected def observe_call(node)
@@ -292,12 +318,20 @@ module Savi::Compiler::Types::Graph
 
     def run_for_function(ctx : Context, f : Program::Function)
       @analysis.init_func_self(f.cap.value, f.cap.pos)
-      @analysis.init_func_return_var(ctx, self, f.ret)
+      if f.has_tag?(:constructor)
+        @analysis.init_constructor_return_var(self, f.cap)
+      else
+        @analysis.init_func_return_var(ctx, self, f.ret)
+      end
 
       f.params.try(&.terms.each { |param| visit_param_deeply(ctx, param) })
       f.body.try(&.accept(ctx, self))
 
-      f.body.try { |body| @analysis.observe_natural_return(body) }
+      unless f.has_tag?(:constructor)
+        f.body.try { |body| @analysis.observe_natural_return(body) }
+      end
+
+      analysis.observe_field_func(ctx, self, f) if f.has_tag?(:field)
     end
 
     def prelude_type(ctx, name, cap, args = nil)
