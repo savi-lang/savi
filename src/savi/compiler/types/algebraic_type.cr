@@ -131,6 +131,17 @@ module Savi::Compiler::Types
       args ? "#{@link.name}(#{args.map(&.show).join(", ")})" : @link.name
     end
 
+    def intersect(other : AlgebraicType)
+      case other
+      when NominalCap
+        IntersectionBasic.new(self, other)
+      when AlgebraicTypeFactor
+        Intersection.new(Set(AlgebraicTypeFactor){self, other})
+      else
+        other.intersect(self)
+      end
+    end
+
     def aliased
       self # this type says nothing about capabilities, so it remains unchanged.
     end
@@ -200,6 +211,17 @@ module Savi::Compiler::Types
           }
           str << "}"
         }
+      end
+    end
+
+    def intersect(other : AlgebraicType)
+      case other
+      when NominalType
+        IntersectionBasic.new(other, self)
+      when AlgebraicTypeFactor
+        Intersection.new(Set(AlgebraicTypeFactor){other, self})
+      else
+        other.intersect(self)
       end
     end
 
@@ -278,6 +300,8 @@ module Savi::Compiler::Types
         origin = Intersection.from(
           origin.members.reject(&.is_a?(NominalType))
         )
+      elsif origin.is_a?(IntersectionBasic)
+        origin = origin.nominal_cap
       end
 
       @origin = StructRef(AlgebraicTypeSimple).new(origin.as(AlgebraicTypeSimple))
@@ -373,6 +397,94 @@ module Savi::Compiler::Types
     end
   end
 
+  # IntersectionBasic is a special case optimization of Intersection for the
+  # very common case of intersecting a NominalType with a NominalCap.
+  # We are able to represent them without an extra Set allocation,
+  # and several operations are made more direct and efficient.
+  # We also show the type to the user in a streamlined way, using the
+  # standard `Type'cap` designation (or `Type` when it matches the default cap).
+  struct IntersectionBasic < AlgebraicTypeSummand
+    getter nominal_type : NominalType
+    getter nominal_cap : NominalCap
+    def initialize(@nominal_type, @nominal_cap)
+    end
+
+    def show
+      "#{@nominal_type.show}'#{@nominal_cap.show}"
+    end
+
+    def intersect(other : AlgebraicType)
+      case other
+      when AlgebraicTypeFactor
+        return self if other == @nominal_type || other == @nominal_cap
+
+        Intersection.new(Set(AlgebraicTypeFactor){
+          @nominal_type.as(AlgebraicTypeFactor),
+          other,
+          @nominal_cap.as(AlgebraicTypeFactor),
+        })
+      when IntersectionBasic
+        return self if other == self
+
+        Intersection.new(Set(AlgebraicTypeFactor){
+          @nominal_type.as(AlgebraicTypeFactor),
+          other.nominal_type.as(AlgebraicTypeFactor),
+          @nominal_cap.as(AlgebraicTypeFactor),
+          other.nominal_cap.as(AlgebraicTypeFactor),
+        })
+      when Intersection
+        Intersection.new(
+          other.members.dup
+            .tap(&.add(@nominal_type))
+            .tap(&.add(@nominal_cap))
+        )
+      else
+        other.intersect(self)
+      end
+    end
+
+    def aliased
+      # Only the NominalCap is affected.
+      IntersectionBasic.new(@nominal_type, @nominal_cap.aliased)
+    end
+
+    def stabilized
+      # Only the NominalCap is affected.
+      IntersectionBasic.new(@nominal_type, @nominal_cap.stabilized)
+    end
+
+    def override_cap(cap : AlgebraicType)
+      # The NominalCap is replaced.
+      if cap.is_a?(NominalCap)
+        IntersectionBasic.new(@nominal_type, cap)
+      else
+        @nominal_type.intersect(cap)
+      end
+    end
+
+    def viewed_from(origin)
+      # Only the NominalCap is affected and the result may not be basic anymore.
+      @nominal_type.intersect(@nominal_cap.viewed_from(origin))
+    end
+
+    def trace_as_assignment(cursor : Cursor)
+      cursor.add_fact_at_current_pos(self)
+    end
+
+    def trace_call_return_as_assignment(cursor : Cursor, call : AST::Call)
+      cursor.trace_call_return_as_assignment(call, @nominal_type, @nominal_cap)
+    end
+
+    def observe_assignment_reciprocals(
+      pos : Source::Pos,
+      supertype : AlgebraicType,
+      maybe : Bool = false,
+    )
+      # Neither NominalType nor NominalCap cares about receiving inference hints
+      # because their type is not variable and thus not in need of inference.
+    end
+  end
+
   struct Intersection < AlgebraicTypeSummand
     getter members : Set(AlgebraicTypeFactor)
     def initialize(@members)
@@ -394,6 +506,12 @@ module Savi::Compiler::Types
       case other
       when AlgebraicTypeFactor
         Intersection.new(@members.dup.tap(&.add(other)))
+      when IntersectionBasic
+        Intersection.new(
+          @members.dup
+            .tap(&.add(other.nominal_type))
+            .tap(&.add(other.nominal_cap))
+        )
       when Intersection
         Intersection.new(@members + other.members)
       else

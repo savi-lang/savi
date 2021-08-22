@@ -430,12 +430,10 @@ module Savi::Compiler::Types::Graph
       args = node.group.terms.map { |arg|
         read_type_expr(ctx, arg).as(AlgebraicType)
       }
-      Intersection.new(
-        read_type_expr(ctx, node.term).as(Intersection).members.map { |member|
-          next member unless member.is_a?(NominalType)
-
-          NominalType.new(member.link, args)
-        }.to_set
+      base = read_type_expr(ctx, node.term).as(IntersectionBasic)
+      IntersectionBasic.new(
+        NominalType.new(base.nominal_type.link, args),
+        base.nominal_cap,
       )
     end
 
@@ -564,12 +562,10 @@ module Savi::Compiler::Types::Graph
 
       args = node.group.terms.map { |arg_node| @analysis[arg_node] }
 
-      @analysis[node] = Intersection.new(
-        @analysis[node.term].as(Intersection).members.map { |member|
-          next member unless member.is_a?(NominalType)
-
-          NominalType.new(member.link, args)
-        }.to_set
+      base = @analysis[node.term].as(IntersectionBasic)
+      @analysis[node] = IntersectionBasic.new(
+        NominalType.new(base.nominal_type.link, args),
+        base.nominal_cap,
       )
     end
 

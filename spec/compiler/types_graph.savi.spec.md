@@ -15,7 +15,7 @@ It analyzes a simple system of types.
 ```
 ```types_graph Example1.example
 T'A'^1
-  <: (_Describable & box)
+  <: _Describable'box
   :module Example1(A _Describable)
                      ^~~~~~~~~~~~
 ~~~
@@ -30,12 +30,12 @@ T'a'3
                    ^
 
 T'cond'4
-  <: (Bool & val)
+  <: Bool'val
     :fun example(a A, cond Bool)
                            ^~~~
 
 T'x'5
-  := (String & val)
+  := String'val
       x String = a.describe(80)
         ^~~~~~
   :> T'describe'8'stabilized
@@ -43,7 +43,7 @@ T'x'5
       ^~~~~~~~~~~~~~~~~~~~~~~~~
 
 T'num:80'6
-  <: (Numeric & val)
+  <: Numeric'val
       x String = a.describe(80)
                             ^~
   <: T'describe(0)'7
@@ -70,15 +70,15 @@ T'y'9
   <: T'return'2
       y = if cond ("string" | b"bytes")
       ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  :> ((String & val) | (Bytes & val))
+  :> (String'val | Bytes'val)
       y = if cond ("string" | b"bytes")
       ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ~~~
-  T'cond'4'aliased <: (Bool & val)
+  T'cond'4'aliased <: Bool'val
       y = if cond ("string" | b"bytes")
              ^~~~
 
-  (Bool & val) <: (Bool & val)
+  Bool'val <: Bool'val
       y = if cond ("string" | b"bytes")
           ^~
 ```
@@ -93,7 +93,7 @@ It analyzes the getter, setter, and displacement methods of a field.
 ```
 ```types_graph ExampleField.field
 T'field'^1
-  := (String & val)
+  := String'val
     :var field String
                ^~~~~~
   <: T'return'2
@@ -122,7 +122,7 @@ T'return'2
 ```
 ```types_graph ExampleField.field=
 T'field'^1
-  := (String & val)
+  := String'val
     :var field String
                ^~~~~~
   <: T'return'2
@@ -150,17 +150,16 @@ T'return'2
          ^~~~~
 
 T'value'3
-  <: (String & val)
+  <: String'val
     :var field String
                ^~~~~~
   <: T'field'^1
     :var field String
          ^~~~~
-
 ```
 ```types_graph ExampleField.field<<=
 T'field'^1
-  := (String & val)
+  := String'val
     :var field String
                ^~~~~~
   <: T'return'2
@@ -188,7 +187,7 @@ T'return'2
          ^~~~~
 
 T'value'3
-  <: (String & val)
+  <: String'val
     :var field String
                ^~~~~~
   <: T'field'^1
@@ -213,7 +212,7 @@ T'return'2
       ^~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 T'a'3
-  := (Array((F64 & val)) & val)
+  := Array(F64'val)'val
       a Array(F64)'val = [1, 2.3]
         ^~~~~~~~~~~~~~
   <: T'return'2
@@ -224,7 +223,7 @@ T'a'3
       ^~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 T'num:1'4
-  <: (Numeric & val)
+  <: Numeric'val
       a Array(F64)'val = [1, 2.3]
                           ^
   <: T'array:elem'7
@@ -232,7 +231,7 @@ T'num:1'4
                          ^~~~~~~~
 
 T'float:2.3'5
-  <: ((F64 & val) | (F32 & val))
+  <: (F64'val | F32'val)
       a Array(F64)'val = [1, 2.3]
                              ^~~
   <: T'array:elem'7
@@ -240,7 +239,7 @@ T'float:2.3'5
                          ^~~~~~~~
 
 T'array:group'6
-  <: ((Array(T'array:elem'7) & iso) | (Array(T'array:elem'7) & val) | (Array(T'array:elem'7) & ref))
+  <: (Array(T'array:elem'7)'iso | Array(T'array:elem'7)'val | Array(T'array:elem'7)'ref)
       a Array(F64)'val = [1, 2.3]
                          ^~~~~~~~
   <: T'a'3'stabilized
