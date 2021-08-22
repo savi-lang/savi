@@ -122,12 +122,17 @@ module Savi::Compiler::Types::Graph
       @param_vars = [] of TypeVariable
     end
 
-    protected def init_func_return_var(ctx, visitor : Visitor, ret : AST::Term?)
+    protected def init_func_return_var(ctx, visitor : Visitor, f : Program::Function)
       @return_var = var = new_type_var("return")
 
+      ret = f.ret
       if ret
         explicit_type = visitor.read_type_expr(ctx, ret)
-        var.observe_constraint_at(ret.pos, explicit_type)
+        if f.body
+          var.observe_constraint_at(ret.pos, explicit_type)
+        else
+          var.observe_binding_at(ret.pos, explicit_type)
+        end
       end
     end
 
@@ -321,7 +326,7 @@ module Savi::Compiler::Types::Graph
       if f.has_tag?(:constructor)
         @analysis.init_constructor_return_var(self, f.cap)
       else
-        @analysis.init_func_return_var(ctx, self, f.ret)
+        @analysis.init_func_return_var(ctx, self, f)
       end
 
       f.params.try(&.terms.each { |param| visit_param_deeply(ctx, param) })
