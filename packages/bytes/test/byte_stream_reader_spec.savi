@@ -260,20 +260,20 @@
 
     // Compare the entire stream.
     stream.advance_to_end
-    assert stream.is_token_equal_to("helloworld")
-    assert stream.is_token_equal_to("helloworldz").is_false
-    assert stream.is_token_equal_to("helloworl").is_false
-    assert stream.is_token_equal_to("helloWorld").is_false
+    assert: stream.is_token_equal_to("helloworld")
+    assert: stream.is_token_equal_to("helloworldz").is_false
+    assert: stream.is_token_equal_to("helloworl").is_false
+    assert: stream.is_token_equal_to("helloWorld").is_false
 
     // Compare a subset of the stream.
     stream.rewind_to_marker
     @assert = try (stream.advance!(2), True | False)
     stream.mark_here
     @assert = try (stream.advance!(6), True | False)
-    assert stream.is_token_equal_to("llowor")
-    assert stream.is_token_equal_to("lloworl").is_false
-    assert stream.is_token_equal_to("llowo").is_false
-    assert stream.is_token_equal_to("lloWor").is_false
+    assert: stream.is_token_equal_to("llowor")
+    assert: stream.is_token_equal_to("lloworl").is_false
+    assert: stream.is_token_equal_to("llowo").is_false
+    assert: stream.is_token_equal_to("lloWor").is_false
 
   :it "compares an ASCII-lowercased token for equivalence to a given string"
     stream = ByteStreamReader.new
@@ -284,20 +284,20 @@
 
     // Compare the entire stream.
     stream.advance_to_end
-    assert stream.is_token_ascii_lowercase_equal_to("helloworld")
-    assert stream.is_token_ascii_lowercase_equal_to("helloworldz").is_false
-    assert stream.is_token_ascii_lowercase_equal_to("helloworl").is_false
-    assert stream.is_token_ascii_lowercase_equal_to("helloWorld").is_false
+    assert: stream.is_token_ascii_lowercase_equal_to("helloworld")
+    assert: stream.is_token_ascii_lowercase_equal_to("helloworldz").is_false
+    assert: stream.is_token_ascii_lowercase_equal_to("helloworl").is_false
+    assert: stream.is_token_ascii_lowercase_equal_to("helloWorld").is_false
 
     // Compare a subset of the stream.
     stream.rewind_to_marker
     @assert = try (stream.advance!(2), True | False)
     stream.mark_here
     @assert = try (stream.advance!(6), True | False)
-    assert stream.is_token_ascii_lowercase_equal_to("llowor")
-    assert stream.is_token_ascii_lowercase_equal_to("lloworl").is_false
-    assert stream.is_token_ascii_lowercase_equal_to("llowo").is_false
-    assert stream.is_token_ascii_lowercase_equal_to("lloWor").is_false
+    assert: stream.is_token_ascii_lowercase_equal_to("llowor")
+    assert: stream.is_token_ascii_lowercase_equal_to("lloworl").is_false
+    assert: stream.is_token_ascii_lowercase_equal_to("llowo").is_false
+    assert: stream.is_token_ascii_lowercase_equal_to("lloWor").is_false
 
   :it "parses a token as a positive integer in decimal notation"
     stream = ByteStreamReader.new

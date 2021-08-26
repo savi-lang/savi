@@ -8,18 +8,18 @@
   :is Spec
   :const describes: "Assert"
 
-  :it "conforms to the `assert EXPR` macro"
-    assert True
-    assert Foo.true
-    assert (True == Foo.true)
-    assert False.is_false
-    assert \
+  :it "conforms to the `assert: EXPR` macro"
+    assert: True
+    assert: Foo.true
+    assert: (True == Foo.true)
+    assert: False.is_false
+    assert: \
       True
-    assert Foo.with_yield -> (false |
-      assert !false
+    assert: Foo.with_yield -> (false |
+      assert: !false
     )
 
-  :it "conforms to the `assert EXP1 <op> EXP2` macro"
+  :it "conforms to the `assert: EXP1 <op> EXP2` macro"
     assert True == True
     assert Foo.true == True
     assert True == Foo.true
@@ -29,7 +29,7 @@
       assert !false) == Foo.true
 
   :it "honors iso"
-    assert "" == String.new_iso
+    assert: "" == String.new_iso
 
     foo = String.new_iso, foo << "foo"
-    assert "foo" == --foo
+    assert: "foo" == --foo
