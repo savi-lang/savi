@@ -193,7 +193,7 @@ The type of this expression doesn't meet the constraints imposed on it:
 It complains when assigning with an insufficient right-hand capability:
 
 ```savi
-    s_ref ref = String.new
+    s_ref ref = String.new_iso
     s_iso String'iso = s_ref
 ```
 ```error
@@ -206,7 +206,7 @@ The type of this expression doesn't meet the constraints imposed on it:
           ^~~~~~~~~~
 
 - but the type of the local variable was String'ref:
-    s_ref ref = String.new
+    s_ref ref = String.new_iso
           ^~~
 ```
 ```error
@@ -219,7 +219,7 @@ The type of this expression doesn't meet the constraints imposed on it:
           ^~~~~~~~~~
 
 - but the type of the local variable was String'ref:
-    s_ref ref = String.new
+    s_ref ref = String.new_iso
           ^~~
 ```
 
@@ -239,7 +239,7 @@ This aliasing violates uniqueness (did you forget to consume the variable?):
     s_val     = s_iso          // not okay
                 ^~~~~
 
-- it is required here to be a subtype of val:
+- it is required here to be a subtype of String:
     s_val val = String.new_iso // okay
           ^~~
 
@@ -303,7 +303,7 @@ This aliasing violates uniqueness (did you forget to consume the variable?):
     s2 iso = s // not okay
              ^
 
-- it is required here to be a subtype of iso:
+- it is required here to be a subtype of String'iso:
     s2 iso = s // not okay
        ^~~
 
@@ -316,7 +316,7 @@ This aliasing violates uniqueness (did you forget to consume the variable?):
     s3 iso = s // not okay
              ^
 
-- it is required here to be a subtype of iso:
+- it is required here to be a subtype of String'iso:
     s3 iso = s // not okay
        ^~~
 
