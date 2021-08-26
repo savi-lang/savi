@@ -258,13 +258,13 @@
     ], " ") == "foo bar"
 
   :it "splits a string into a pair"
-    assert: (try ("foo=bar".split2!('=').first  == "foo" | False))
-    assert: (try ("foo=bar".split2!('=').second == "bar" | False))
+    assert: try ("foo=bar".split2!('=').first  == "foo" | False)
+    assert: try ("foo=bar".split2!('=').second == "bar" | False)
 
-    assert: (try ("foo=bar=baz".split2!('=').first  == "foo" | False))
-    assert: (try ("foo=bar=baz".split2!('=').second == "bar=baz" | False))
+    assert: try ("foo=bar=baz".split2!('=').first  == "foo" | False)
+    assert: try ("foo=bar=baz".split2!('=').second == "bar=baz" | False)
 
-    assert: (try ("foo=".split2!('=').first == "foo" | False))
-    assert: (try ("foo=".split2!('=').second == "" | False))
+    assert: try ("foo=".split2!('=').first == "foo" | False)
+    assert: try ("foo=".split2!('=').second == "" | False)
 
-    assert: (try ("foo".split2!('='), False | True))
+    assert: try ("foo".split2!('='), False | True)
