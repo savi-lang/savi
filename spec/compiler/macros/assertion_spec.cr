@@ -4,7 +4,7 @@ describe Savi::Compiler::Macros do
       source = Savi::Source.new_example <<-SOURCE
       :actor Main
         :new
-          assert True
+          assert: True
       SOURCE
 
       ctx = Savi.compiler.compile([source], :macros)
@@ -27,7 +27,7 @@ describe Savi::Compiler::Macros do
       source = Savi::Source.new_example <<-SOURCE
       :actor Main
         :new
-          assert SideEffects.call != "foo"
+          assert: SideEffects.call != "foo"
       SOURCE
 
       ctx = Savi.compiler.compile([source], :macros)

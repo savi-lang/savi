@@ -126,12 +126,6 @@ class Savi::Compiler::Macros < Savi::AST::CopyOnMutateVisitor
       visit_jump(node, AST::Jump::Kind::Break)
     elsif Util.match_ident?(node, 0, "next")
       visit_jump(node, AST::Jump::Kind::Next)
-    elsif Util.match_ident?(node, 0, "assert")
-      Util.require_terms(node, [
-        nil,
-        "the boolean expression to verify",
-      ])
-      visit_assert(node)
     elsif Util.match_ident?(node, 0, "source_code_position_of_argument")
       Util.require_terms(node, [
         nil,
@@ -217,15 +211,10 @@ class Savi::Compiler::Macros < Savi::AST::CopyOnMutateVisitor
     raise Error.compiler_hole_at(node, exc)
   end
 
-  # This clause picks up a special form of case and assert which are inside a Relate node,
-  # where the Relate gets reshuffled into the case/assert clauses.
   def visit_pre(ctx, node : AST::Relate)
     lhs = node.lhs
-    return node unless \
-      lhs.is_a?(AST::Group) &&
-      lhs.style == " "
 
-    if Util.match_ident?(lhs, 0, "case")
+    if lhs.is_a?(AST::Group) && lhs.style == " " && Util.match_ident?(lhs, 0, "case")
       term = lhs.terms[1]
       Error.at term,
         "Expected this term to not be a parenthesized group" \
@@ -240,8 +229,8 @@ class Savi::Compiler::Macros < Savi::AST::CopyOnMutateVisitor
           unless group.is_a?(AST::Group) && group.style == "|"
 
       visit_case(node)
-    elsif Util.match_ident?(lhs, 0, "assert")
-      visit_assert(node)
+    elsif lhs.is_a?(AST::Identifier) && lhs.value == "assert" && node.op.value == ":"
+      visit_assert(node, node.rhs)
     else
       node
     end
@@ -579,27 +568,24 @@ class Savi::Compiler::Macros < Savi::AST::CopyOnMutateVisitor
     ] of AST::Term).from(node)
   end
 
-  def visit_assert(node : AST::Group)
-    orig = node.terms[0]
-    expr = node.terms[1]
-
-    call = AST::Call.new(
-      AST::Identifier.new("Assert").from(orig),
-      AST::Identifier.new("condition").from(orig),
-      AST::Group.new("(", [
-        AST::Identifier.new("@").from(node),
-        expr,
-      ] of AST::Term).from(expr)
-    ).from(orig)
-
-    AST::Group.new("(", [call] of AST::Term).from(node)
-  end
-
-  def visit_assert(node : AST::Relate)
-    orig = node.lhs.as(AST::Group).terms[0]
-    lhs = node.lhs.as(AST::Group).terms[1]
-    op = node.op
-    rhs = node.rhs
+  # The `visit_assert` methods compiles different forms of the `assert` macro.
+  # The expression to evaluate is the `rhs` of the `assert: expr` Relate node.
+  #
+  # When the expression itself contains operators it will compile into `Assert.relation`.
+  #
+  # assert: True == True
+  # assert: foo || bar && baz
+  #
+  # When the expression is any other kind of node it will compile into a `Assert.condition`.
+  #
+  # assert: True
+  # assert: Something.foo
+  #
+  def visit_assert(node : AST::Relate, expr : AST::Relate)
+    orig = node.lhs.as(AST::Identifier)
+    lhs = expr.lhs
+    op = expr.op
+    rhs = expr.rhs
 
     # Use a hygienic local to explicitly hold the expressions as box.
     # This also helps to refer to them multiple times without evaluating them again.
@@ -631,7 +617,7 @@ class Savi::Compiler::Macros < Savi::AST::CopyOnMutateVisitor
       local_lhs,
       op,
       local_rhs,
-    ).from(node)
+    ).from(expr)
 
     call = AST::Call.new(
       AST::Identifier.new("Assert").from(orig),
@@ -642,7 +628,7 @@ class Savi::Compiler::Macros < Savi::AST::CopyOnMutateVisitor
         local_lhs,
         local_rhs,
         relate,
-      ] of AST::Term).from(orig)
+      ] of AST::Term).from(expr)
     ).from(orig)
 
     AST::Group.new("(", [
@@ -650,6 +636,21 @@ class Savi::Compiler::Macros < Savi::AST::CopyOnMutateVisitor
       local_rhs_assign,
       call,
     ] of AST::Term).from(node)
+  end
+
+  def visit_assert(node : AST::Relate, expr : AST::Node)
+    orig = node.lhs.as(AST::Identifier)
+
+    call = AST::Call.new(
+      AST::Identifier.new("Assert").from(orig),
+      AST::Identifier.new("condition").from(orig),
+      AST::Group.new("(", [
+        AST::Identifier.new("@").from(node),
+        expr,
+      ] of AST::Term).from(expr)
+    ).from(orig)
+
+    AST::Group.new("(", [call] of AST::Term).from(node)
   end
 
   def visit_source_code_position_of_argument(node : AST::Group)
