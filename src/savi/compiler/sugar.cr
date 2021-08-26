@@ -183,7 +183,7 @@ class Savi::Compiler::Sugar < Savi::AST::CopyOnMutateVisitor
 
   def visit(ctx, node : AST::Relate)
     case node.op.value
-    when "->", "'", " ", "<:", "!<:", "===", "!==", "DEFAULTPARAM", "EXPLICITTYPE"
+    when "->", "'", " ", ":", "<:", "!<:", "===", "!==", "DEFAULTPARAM", "EXPLICITTYPE"
       node # skip these special-case operators
     when "+=", "-="
       op =

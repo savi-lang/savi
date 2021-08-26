@@ -13,18 +13,18 @@
     map = @new_map
     @assert = map.size == 0
     @assert = try (map["example"]!, False | True)
-    assert map.has_key("example").is_false
+    assert: map.has_key("example").is_false
     @assert = (map["example"] = 99) == 99
     @assert = map.size == 1
     @assert = try (map["example"]! | U64[0]) == 99
-    assert map.has_key("example")
+    assert: map.has_key("example")
     @assert = (map["example"] = 88) == 88
     @assert = map.size == 1
     @assert = try (map["example"]! | U64[0]) == 88
-    assert map.has_key("example")
+    assert: map.has_key("example")
     @assert = map.delete("example") <: None
     @assert = try map["example"]! <: None
-    assert map.has_key("example").is_false
+    assert: map.has_key("example").is_false
     @assert = map.size == 0
 
   :it "stores values at actor keys by identity"
@@ -70,14 +70,14 @@
 
     this_key = ""
     found_it = map.each_until -> (key, value | this_key = key, value == 22)
-    assert found_it
+    assert: found_it
     @assert = this_key == "bar"
 
     this_key = ""
     found_it = map.each_until -> (key, value | this_key = key, value == 33)
-    assert found_it
+    assert: found_it
     @assert = this_key == "baz"
 
     this_key = ""
     found_it = map.each_until -> (key, value | this_key = key, value == 99)
-    assert found_it.is_false
+    assert: found_it.is_false

@@ -78,13 +78,13 @@
   :const describes: "Day2"
 
   :it "passes the A test cases"
-    assert Day2.has_duo("abcdef").is_false, assert Day2.has_trio("abcdef").is_false
-    assert Day2.has_duo("bababc"),          assert Day2.has_trio("bababc")
-    assert Day2.has_duo("abbcde"),          assert Day2.has_trio("abbcde").is_false
-    assert Day2.has_duo("abcccd").is_false, assert Day2.has_trio("abcccd")
-    assert Day2.has_duo("aabcdd"),          assert Day2.has_trio("aabcdd").is_false
-    assert Day2.has_duo("abcdee"),          assert Day2.has_trio("abcdee").is_false
-    assert Day2.has_duo("ababab").is_false, assert Day2.has_trio("ababab")
+    assert: Day2.has_duo("abcdef").is_false, assert: Day2.has_trio("abcdef").is_false
+    assert: Day2.has_duo("bababc"),          assert: Day2.has_trio("bababc")
+    assert: Day2.has_duo("abbcde"),          assert: Day2.has_trio("abbcde").is_false
+    assert: Day2.has_duo("abcccd").is_false, assert: Day2.has_trio("abcccd")
+    assert: Day2.has_duo("aabcdd"),          assert: Day2.has_trio("aabcdd").is_false
+    assert: Day2.has_duo("abcdee"),          assert: Day2.has_trio("abcdee").is_false
+    assert: Day2.has_duo("ababab").is_false, assert: Day2.has_trio("ababab")
 
     input = <<<
       abcdef

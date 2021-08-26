@@ -8,23 +8,23 @@
     data = String.new
     @assert = data.space == 0
     @assert = data.size == 0
-    assert data.cpointer.is_null
+    assert: data.cpointer.is_null
 
   :it "allocates the next highest power of two containing the requested space"
     data = String.new(12)
     @assert = data.space == 16
     @assert = data.size == 0
-    assert data.cpointer.is_not_null
+    assert: data.cpointer.is_not_null
 
     data = String.new(16)
     @assert = data.space == 16
     @assert = data.size == 0
-    assert data.cpointer.is_not_null
+    assert: data.cpointer.is_not_null
 
     data = String.new(17)
     @assert = data.space == 32
     @assert = data.size == 0
-    assert data.cpointer.is_not_null
+    assert: data.cpointer.is_not_null
 
   :it "won't reallocate when reserving space within the current allocation"
     data = String.new(12)
@@ -33,13 +33,13 @@
     data.reserve(16)
     @assert = data.space == 16
     @assert = data.size == 0
-    assert data.cpointer.is_not_null
+    assert: data.cpointer.is_not_null
     @assert = data.cpointer.usize == orig_pointer_address
 
     data.reserve(0)
     @assert = data.space == 16
     @assert = data.size == 0
-    assert data.cpointer.is_not_null
+    assert: data.cpointer.is_not_null
     @assert = data.cpointer.usize == orig_pointer_address
 
   :it "will reallocate when reserving space beyond the current allocation"
@@ -52,7 +52,7 @@
 
     @assert = data.space == 2048
     @assert = data.size == 0
-    assert data.cpointer.is_not_null
+    assert: data.cpointer.is_not_null
     @assert = data.cpointer.usize != orig_pointer_address
 
   :it "converts to and from an array of bytes"
@@ -65,47 +65,47 @@
 
   :it "compares bytewise equality with another string"
     @assert = ("string" == "string")
-    assert ("string" == "other").is_false
+    assert: ("string" == "other").is_false
 
   :it "checks if it starts with a substring equal to the other string"
-    assert "foo".starts_with("foo")
-    assert "foo".starts_with("food").is_false
-    assert "food".starts_with("foo")
-    assert "barfood".starts_with("foo").is_false
-    assert "barfood".starts_with("barf")
-    assert "barfood".starts_with("")
+    assert: "foo".starts_with("foo")
+    assert: "foo".starts_with("food").is_false
+    assert: "food".starts_with("foo")
+    assert: "barfood".starts_with("foo").is_false
+    assert: "barfood".starts_with("barf")
+    assert: "barfood".starts_with("")
 
   :it "checks if it ends with a substring equal to the other string"
-    assert "food".ends_with("foo").is_false
-    assert "foo".ends_with("foo")
-    assert "foo".ends_with("food").is_false
-    assert "snafoo".ends_with("foo")
-    assert "snafoozled".ends_with("foo").is_false
-    assert "snafoozled".ends_with("")
+    assert: "food".ends_with("foo").is_false
+    assert: "foo".ends_with("foo")
+    assert: "foo".ends_with("food").is_false
+    assert: "snafoo".ends_with("foo")
+    assert: "snafoozled".ends_with("foo").is_false
+    assert: "snafoozled".ends_with("")
 
   :it "checks if it has a common bytes with another string at specific offsets"
-    assert "foodbar".is_byte_slice_equal(1, b"broodbard", 2, 6)
-    assert "foodbar".is_byte_slice_equal(1, b"broodbard", 2, 5)
-    assert "foodbar".is_byte_slice_equal(2, b"broodbard", 2, 5).is_false
-    assert "foodbar".is_byte_slice_equal(1, b"broodbard", 2, 7).is_false
-    assert "foodbar".is_byte_slice_equal(1, b"broodbard", 1, 6).is_false
-    assert "foodbar".is_byte_slice_equal(0, b"broodbard", 1, 6).is_false
-    assert "broodbard".is_byte_slice_equal(2, b"foodbar", 1, 6)
-    assert "broodbard".is_byte_slice_equal(2, b"foodbar", 1, 5)
-    assert "broodbard".is_byte_slice_equal(2, b"foodbar", 2, 5).is_false
-    assert "broodbard".is_byte_slice_equal(2, b"foodbar", 1, 7).is_false
-    assert "broodbard".is_byte_slice_equal(1, b"foodbar", 1, 6).is_false
-    assert "broodbard".is_byte_slice_equal(1, b"foodbar", 0, 6).is_false
+    assert: "foodbar".is_byte_slice_equal(1, b"broodbard", 2, 6)
+    assert: "foodbar".is_byte_slice_equal(1, b"broodbard", 2, 5)
+    assert: "foodbar".is_byte_slice_equal(2, b"broodbard", 2, 5).is_false
+    assert: "foodbar".is_byte_slice_equal(1, b"broodbard", 2, 7).is_false
+    assert: "foodbar".is_byte_slice_equal(1, b"broodbard", 1, 6).is_false
+    assert: "foodbar".is_byte_slice_equal(0, b"broodbard", 1, 6).is_false
+    assert: "broodbard".is_byte_slice_equal(2, b"foodbar", 1, 6)
+    assert: "broodbard".is_byte_slice_equal(2, b"foodbar", 1, 5)
+    assert: "broodbard".is_byte_slice_equal(2, b"foodbar", 2, 5).is_false
+    assert: "broodbard".is_byte_slice_equal(2, b"foodbar", 1, 7).is_false
+    assert: "broodbard".is_byte_slice_equal(1, b"foodbar", 1, 6).is_false
+    assert: "broodbard".is_byte_slice_equal(1, b"foodbar", 0, 6).is_false
 
   :it "checks if it is an empty string or not"
-    assert "".is_empty
-    assert "".is_not_empty.is_false
-    assert "example".is_empty.is_false
-    assert "example".is_not_empty
-    assert String.new.is_empty
-    assert String.new.is_not_empty.is_false
-    assert (String.new << "example").is_empty.is_false
-    assert (String.new << "example").is_not_empty
+    assert: "".is_empty
+    assert: "".is_not_empty.is_false
+    assert: "example".is_empty.is_false
+    assert: "example".is_not_empty
+    assert: String.new.is_empty
+    assert: String.new.is_not_empty.is_false
+    assert: (String.new << "example").is_empty.is_false
+    assert: (String.new << "example").is_not_empty
 
   :it "clones itself into a new string"
     string String = "example"
@@ -116,10 +116,10 @@
     @assert = try ("bar food foo".offset_of!("bard"), False | True)
     @assert = try ("bar food foo".offset_of!("nope"), False | True)
     @assert = try ("bar food foo".offset_of!(""),     False | True)
-    assert "bar food foo".includes("foo")
-    assert "bar food foo".includes("bard").is_false
-    assert "bar food foo".includes("nope").is_false
-    assert "bar food foo".includes("").is_false
+    assert: "bar food foo".includes("foo")
+    assert: "bar food foo".includes("bard").is_false
+    assert: "bar food foo".includes("nope").is_false
+    assert: "bar food foo".includes("").is_false
 
   :it "hashes the bytes of the string"
     @assert = ("string".hash == 0x4CF51F4A5B5CF110)
@@ -171,39 +171,39 @@
     @assert = ("Hey" * 0) == ""
 
   :it "splits the string at every occurrence of the given byte value"
-    assert "foo.bar.baz".split('.') == ["foo", "bar", "baz"]
-    assert "foo.".split('.') == ["foo"]
-    assert ".foo".split('.') == ["", "foo"]
-    assert ".foo.".split('.') == ["", "foo"]
-    assert ".foo..".split('.') == ["", "foo", ""]
-    assert "".split('.') == Array(String).new // TODO: empty array literal
-    assert ".".split('.') == [""] // FIXME? different from Ruby: []
+    assert: "foo.bar.baz".split('.') == ["foo", "bar", "baz"]
+    assert: "foo.".split('.') == ["foo"]
+    assert: ".foo".split('.') == ["", "foo"]
+    assert: ".foo.".split('.') == ["", "foo"]
+    assert: ".foo..".split('.') == ["", "foo", ""]
+    assert: "".split('.') == Array(String).new // TODO: empty array literal
+    assert: ".".split('.') == [""] // FIXME? different from Ruby: []
 
   :it "lexically compares the string with another string of the same length"
     @assert = "examplE" < "example"
     @assert = "example" > "examplE"
-    assert ("example" < "examplE").is_false
-    assert ("examplE" > "example").is_false
+    assert: ("example" < "examplE").is_false
+    assert: ("examplE" > "example").is_false
     @assert = "examplE" <= "example"
     @assert = "example" >= "examplE"
-    assert ("example" <= "examplE").is_false
-    assert ("examplE" >= "example").is_false
+    assert: ("example" <= "examplE").is_false
+    assert: ("examplE" >= "example").is_false
 
   :it "lexically compares the string with an identical string"
-    assert ("example" < "example").is_false
-    assert ("example" > "example").is_false
+    assert: ("example" < "example").is_false
+    assert: ("example" > "example").is_false
     @assert = "example" <= "example"
     @assert = "example" >= "example"
 
   :it "lexically compares with a nearly identical string of different length"
     @assert = "example" < "example!"
     @assert = "example!" > "example"
-    assert ("example!" < "example").is_false
-    assert ("example" > "example!").is_false
+    assert: ("example!" < "example").is_false
+    assert: ("example" > "example!").is_false
     @assert = "example" <= "example!"
     @assert = "example!" >= "example"
-    assert ("example!" <= "example").is_false
-    assert ("example" >= "example!").is_false
+    assert: ("example!" <= "example").is_false
+    assert: ("example" >= "example!").is_false
 
   :it "parses an integer from the string decimal representation"
     @assert = try ("36".parse_i64!  == 36  | False)
@@ -258,13 +258,13 @@
     ], " ") == "foo bar"
 
   :it "splits a string into a pair"
-    assert (try ("foo=bar".split2!('=').first  == "foo" | False))
-    assert (try ("foo=bar".split2!('=').second == "bar" | False))
+    assert: try ("foo=bar".split2!('=').first  == "foo" | False)
+    assert: try ("foo=bar".split2!('=').second == "bar" | False)
 
-    assert (try ("foo=bar=baz".split2!('=').first  == "foo" | False))
-    assert (try ("foo=bar=baz".split2!('=').second == "bar=baz" | False))
+    assert: try ("foo=bar=baz".split2!('=').first  == "foo" | False)
+    assert: try ("foo=bar=baz".split2!('=').second == "bar=baz" | False)
 
-    assert (try ("foo=".split2!('=').first == "foo" | False))
-    assert (try ("foo=".split2!('=').second == "" | False))
+    assert: try ("foo=".split2!('=').first == "foo" | False)
+    assert: try ("foo=".split2!('=').second == "" | False)
 
-    assert (try ("foo".split2!('='), False | True))
+    assert: try ("foo".split2!('='), False | True)

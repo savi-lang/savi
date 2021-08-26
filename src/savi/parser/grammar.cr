@@ -110,6 +110,7 @@ module Savi::Parser
             str("=~")).named(:op)
     op4 = (str("&&") | str("||")).named(:op)
     ope = (str("+=") | str("-=") | str("<<=") | char('=')).named(:op)
+    ope_colon = char(':').named(:op)
 
     # Construct the nested possible relations for each group of operators.
     tw = compound
@@ -118,7 +119,13 @@ module Savi::Parser
     t3 = (t2 >> (sn >> op2 >> sn >> t2).repeat).named(:relate)
     t4 = (t3 >> (sn >> op3 >> sn >> t3).repeat).named(:relate)
     te = (t4 >> (sn >> op4 >> sn >> t4).repeat).named(:relate)
-    t = (te >> (sn >> ope >> sn >> te).repeat).named(:relate_r) >> s
+    t = (
+      te >> (
+        # Newlines cannot precede the colon form of `ope`,
+        # but any other `ope` can be preceded by a newline.
+        s >> (ope_colon | (sn >> ope)) >> sn >> te
+      ).repeat
+    ).named(:relate_r) >> s
 
     # Define what a comma/newline-separated sequence of terms looks like.
     term = decl | t
