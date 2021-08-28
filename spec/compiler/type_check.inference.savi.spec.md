@@ -139,6 +139,24 @@ It infers an integer literal within the else body of an if statement:
 
 ---
 
+It infers an integer through a variable with no explicit type:
+
+```savi
+    x = 99 ::type=> U64
+    U64[99] == x
+```
+
+---
+
+It infers an integer through a variable with only a cap as its explicit type:
+
+```savi
+    x box = 99 ::type=> U64
+    U64[99] == x
+```
+
+---
+
 It complains when a literal couldn't be resolved to a single type:
 
 ```savi
@@ -294,7 +312,7 @@ The type of this expression doesn't meet the constraints imposed on it:
     array_val val = [x_ref] // not okay
                     ^~~~~~~
 
-- it is required here to be a subtype of val:
+- it is required here to be a subtype of Array(String'ref)'val:
     array_val val = [x_ref] // not okay
               ^~~
 

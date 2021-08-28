@@ -204,6 +204,13 @@ module Savi::Compiler::Infer
       !!@explicit
     end
 
+    def explicit_is_type_expr_cap? : Bool
+      explicit = @explicit
+      return false unless explicit.is_a?(FixedTypeExpr)
+
+      Infer.is_type_expr_cap?(explicit.node)
+    end
+
     def set_explicit(explicit : Info)
       raise "already set_explicit" if @explicit
       raise "shouldn't have an upstream yet" unless @upstreams.empty?
@@ -213,8 +220,8 @@ module Savi::Compiler::Infer
     end
 
     def as_conduit? : Conduit?
-      # If we have an explicit type, we are not a conduit.
-      return nil if @explicit
+      # If we have an explicit type that is not just a cap, we aren't a conduit.
+      return nil if @explicit && !explicit_is_type_expr_cap?
 
       # Only do conduit for Local variables, not any other NamedInfo.
       # TODO: Can/should we remove this limitation somehow,
@@ -286,7 +293,7 @@ module Savi::Compiler::Infer
     end
 
     def after_add_downstream(use_pos : Source::Pos, info : Info)
-      return if @explicit
+      return if @explicit && !explicit_is_type_expr_cap?
 
       @upstreams.each do |upstream, upstream_pos|
         upstream.add_downstream(use_pos, info)
@@ -301,7 +308,7 @@ module Savi::Compiler::Infer
     def assign(ctx : Context, upstream : Info, upstream_pos : Source::Pos)
       @upstreams << {upstream, upstream_pos}
 
-      if @explicit
+      if @explicit && !explicit_is_type_expr_cap?
         upstream.add_downstream(upstream_pos, @explicit.not_nil!)
       else
         upstream.add_downstream(upstream_pos, self)

@@ -293,22 +293,25 @@ module Savi::Compiler::Infer
     end
   end
 
+  def self.is_type_expr_cap?(node : AST::Node) : Bool
+    node.is_a?(AST::Identifier) && !type_expr_cap(node).nil?
+  end
+  def self.type_expr_cap(node : AST::Identifier) : MetaType::Capability?
+    case node.value
+    when "iso", "val", "ref", "box", "tag", "non"
+      MetaType::Capability.new(Cap.from_string(node.value))
+    when "any", "alias", "send", "share", "read"
+      MetaType::Capability.new_generic(node.value)
+    else
+      nil
+    end
+  end
+
   abstract class TypeExprEvaluator
     abstract def t_link : (Program::Type::Link | Program::TypeAlias::Link)
 
     abstract def refer_type_for(node : AST::Node) : Refer::Info?
     abstract def self_type_expr_span(ctx : Context, cap_only = false) : Span
-
-    def type_expr_cap(node : AST::Identifier) : MetaType::Capability?
-      case node.value
-      when "iso", "val", "ref", "box", "tag", "non"
-        MetaType::Capability.new(Cap.from_string(node.value))
-      when "any", "alias", "send", "share", "read"
-        MetaType::Capability.new_generic(node.value)
-      else
-        nil
-      end
-    end
 
     # An identifier type expression must refer to a type.
     def type_expr_span(ctx : Context, node : AST::Identifier, cap_only = false) : Span
@@ -327,7 +330,7 @@ module Savi::Compiler::Infer
           ? Span.simple(MetaType.unconstrained) \
           : lookup_type_param_partial_reified_span(ctx, TypeParam.new(ref))
       when nil
-        cap = type_expr_cap(node)
+        cap = Infer.type_expr_cap(node)
         if cap
           Span.simple(MetaType.new(cap))
         else
@@ -348,7 +351,7 @@ module Savi::Compiler::Infer
             lhs_mt.aliased
           end
         else
-          cap = type_expr_cap(cap_ident)
+          cap = Infer.type_expr_cap(cap_ident)
           if cap
             type_expr_span(ctx, node.lhs, cap_only).transform_mt do |lhs_mt|
               lhs_mt.override_cap(cap.not_nil!)
