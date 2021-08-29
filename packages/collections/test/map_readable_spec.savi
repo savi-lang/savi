@@ -25,14 +25,14 @@
     copy = @new_mutable_map
     map.each_key -> (key | try (copy[key] = map[key]!))
 
-    @assert = copy.size == 3
-    @assert = try (copy["foo"]! | U64[0]) == 11
-    @assert = try (copy["bar"]! | U64[0]) == 22
-    @assert = try (copy["baz"]! | U64[0]) == 33
+    assert: copy.size == 3
+    assert: try (copy["foo"]! | U64[0]) == 11
+    assert: try (copy["bar"]! | U64[0]) == 22
+    assert: try (copy["baz"]! | U64[0]) == 33
 
     total_value = U64[0]
     map.each_value -> (value | total_value += value)
-    @assert = total_value == 66
+    assert: total_value == 66
 
   :it "yields each key and each value (separately) until the criteria is met"
     map = @build_map -> (map |
@@ -44,12 +44,12 @@
     this_key = ""
     found_it = map.each_key_until -> (key | this_key = key, key.ends_with("o"))
     assert: found_it
-    @assert = this_key == "foo"
+    assert: this_key == "foo"
 
     this_key = ""
     found_it = map.each_key_until -> (key | this_key = key, key.ends_with("z"))
     assert: found_it
-    @assert = this_key == "baz"
+    assert: this_key == "baz"
 
     this_key = ""
     found_it = map.each_key_until -> (key | this_key = key, key.ends_with("x"))

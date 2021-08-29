@@ -33,12 +33,12 @@
 
     assert: read.errors.is_empty
 
-    @assert = try (users[0]!.name == "Alice" | False)
-    @assert = try (users[0]!.admin == True | False)
-    @assert = try (users[1]!.name == "Bob" | False)
-    @assert = try (users[1]!.admin == False | False)
-    @assert = try (users[2]!.name == "Cyril" | False)
-    @assert = try (users[2]!.admin == False | False)
+    assert: try (users[0]!.name == "Alice" | False)
+    assert: try (users[0]!.admin == True | False)
+    assert: try (users[1]!.name == "Bob" | False)
+    assert: try (users[1]!.admin == False | False)
+    assert: try (users[2]!.name == "Cyril" | False)
+    assert: try (users[2]!.admin == False | False)
 
   :it "can report nice errors when the data doesn't match expectations"
     read = JsonReader.new(<<<[
@@ -55,7 +55,7 @@
       )
     )
 
-    @assert = Inspect[read.errors].trim(0, -1) == <<<
+    assert: Inspect[read.errors].trim(0, -1) == <<<
       - unexpected key encountered at path: $[0]["bogus"]
       - expected to read a string value at path: $[1]["name"]
       - expected to read a boolean value at path: $[2]["admin"]
@@ -63,9 +63,9 @@
     >>>
 
     // Note that the valid data still made it into our data structures!
-    @assert = try (users[0]!.name == "Alice" | False)
-    @assert = try (users[0]!.admin == True | False)
-    @assert = try (users[1]!.name == "" | False)
-    @assert = try (users[1]!.admin == False | False)
-    @assert = try (users[2]!.name == "Cyril" | False)
-    @assert = try (users[2]!.admin == False | False)
+    assert: try (users[0]!.name == "Alice" | False)
+    assert: try (users[0]!.admin == True | False)
+    assert: try (users[1]!.name == "" | False)
+    assert: try (users[1]!.admin == False | False)
+    assert: try (users[2]!.name == "Cyril" | False)
+    assert: try (users[2]!.admin == False | False)

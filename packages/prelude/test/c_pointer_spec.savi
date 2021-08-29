@@ -5,8 +5,8 @@
   :const describes: "CPointer"
 
   :it "converts to and from USize"
-    @assert = CPointer(U8).null.usize == 0
-    @assert = CPointer(U8).from_usize(0xdeadbeef).usize == 0xdeadbeef
+    assert: CPointer(U8).null.usize == 0
+    assert: CPointer(U8).from_usize(0xdeadbeef).usize == 0xdeadbeef
 
   :it "tests if it is a null pointer or not"
     assert: CPointer(U8).null.is_null

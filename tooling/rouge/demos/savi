@@ -14,4 +14,4 @@
   :const two U64'val: 0x02
 
   :it "adds two twos"
-    @assert = @two + '\x02' == 4
+    assert: @two + '\x02' == 4

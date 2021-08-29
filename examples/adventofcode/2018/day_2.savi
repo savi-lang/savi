@@ -95,10 +95,10 @@
       abcdee
       ababab
     >>>
-    @assert = Day2.a(input) == 12
+    assert: Day2.a(input) == 12
 
   :it "solves the A puzzle"
-    @assert = Day2.a(@puzzle_input) == 8296
+    assert: Day2.a(@puzzle_input) == 8296
 
   :it "passes the B test case"
     input = <<<
@@ -110,10 +110,10 @@
       axcye
       wvxyz
     >>>
-    @assert = Day2.b(input) == "fgij"
+    assert: Day2.b(input) == "fgij"
 
   :it "solves the B puzzle"
-    @assert = Day2.b(@puzzle_input) == "pazvmqbftrbeosiecxlghkwud"
+    assert: Day2.b(@puzzle_input) == "pazvmqbftrbeosiecxlghkwud"
 
   :const puzzle_input
     <<<

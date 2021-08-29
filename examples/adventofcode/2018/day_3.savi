@@ -102,13 +102,13 @@
   :const describes: "Day3"
 
   :it "rightly parses a claim string"
-    @assert = try (
+    assert: try (
       claim = Day3Claim.parse!("#123 @ 3,2: 5x4")
-      @assert = claim.id     == "123"
-      @assert = claim.left   == 3
-      @assert = claim.top    == 2
-      @assert = claim.width  == 5
-      @assert = claim.height == 4
+      assert: claim.id     == "123"
+      assert: claim.left   == 3
+      assert: claim.top    == 2
+      assert: claim.width  == 5
+      assert: claim.height == 4
       True
     |
       False
@@ -120,10 +120,10 @@
       #2 @ 3,1: 4x4
       #3 @ 5,5: 2x2
     >>>
-    @assert = Day3.a(@env, input) == 4
+    assert: Day3.a(@env, input) == 4
 
   :it "solves the A puzzle"
-    @assert = Day3.a(@env, @puzzle_input) == 118322
+    assert: Day3.a(@env, @puzzle_input) == 118322
 
   :it "passes the B test case"
     claims = input = <<<
@@ -131,10 +131,10 @@
       #2 @ 3,1: 4x4
       #3 @ 5,5: 2x2
     >>>
-    @assert = Day3.b(@env, input) == "3"
+    assert: Day3.b(@env, input) == "3"
 
   :it "solves the B puzzle"
-    @assert = Day3.b(@env, @puzzle_input) == "1178"
+    assert: Day3.b(@env, @puzzle_input) == "1178"
 
   :const puzzle_input
     <<<
