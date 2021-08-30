@@ -180,47 +180,47 @@
   :const describes: "Day4"
 
   :it "rightly parses journal entry strings"
-    @assert = try (
+    assert: try (
       entry = Day4Entry.parse!("[1518-11-01 23:58] Guard #99 begins shift")
-      @assert = entry.guard       == "99"
-      @assert = entry.event       == Day4EventBegin
-      @assert = entry.time.year   == 1518
-      @assert = entry.time.month  == 11
-      @assert = entry.time.day    == 1
-      @assert = entry.time.hour   == 23
-      @assert = entry.time.minute == 58
-      @assert = entry.minute_id   == -2
-      @assert = entry.night_id    == 1102
+      assert: entry.guard       == "99"
+      assert: entry.event       == Day4EventBegin
+      assert: entry.time.year   == 1518
+      assert: entry.time.month  == 11
+      assert: entry.time.day    == 1
+      assert: entry.time.hour   == 23
+      assert: entry.time.minute == 58
+      assert: entry.minute_id   == -2
+      assert: entry.night_id    == 1102
       True
     |
       False
     )
-    @assert = try (
+    assert: try (
       entry = Day4Entry.parse!("[1518-11-02 00:40] falls asleep")
-      @assert = entry.guard       == ""
-      @assert = entry.event       == Day4EventSleep
-      @assert = entry.time.year   == 1518
-      @assert = entry.time.month  == 11
-      @assert = entry.time.day    == 2
-      @assert = entry.time.hour   == 0
-      @assert = entry.time.minute == 40
-      @assert = entry.minute_id   == 40
-      @assert = entry.night_id    == 1102
+      assert: entry.guard       == ""
+      assert: entry.event       == Day4EventSleep
+      assert: entry.time.year   == 1518
+      assert: entry.time.month  == 11
+      assert: entry.time.day    == 2
+      assert: entry.time.hour   == 0
+      assert: entry.time.minute == 40
+      assert: entry.minute_id   == 40
+      assert: entry.night_id    == 1102
       True
     |
       False
     )
-    @assert = try (
+    assert: try (
       entry = Day4Entry.parse!("[1518-11-02 00:50] wakes up")
-      @assert = entry.guard       == ""
-      @assert = entry.event       == Day4EventAwake
-      @assert = entry.time.year   == 1518
-      @assert = entry.time.month  == 11
-      @assert = entry.time.day    == 2
-      @assert = entry.time.hour   == 0
-      @assert = entry.time.minute == 50
-      @assert = entry.minute_id   == 50
-      @assert = entry.night_id    == 1102
+      assert: entry.guard       == ""
+      assert: entry.event       == Day4EventAwake
+      assert: entry.time.year   == 1518
+      assert: entry.time.month  == 11
+      assert: entry.time.day    == 2
+      assert: entry.time.hour   == 0
+      assert: entry.time.minute == 50
+      assert: entry.minute_id   == 50
+      assert: entry.night_id    == 1102
       True
     |
       False
@@ -246,14 +246,14 @@
       [1518-11-05 00:45] falls asleep
       [1518-11-05 00:55] wakes up
     >>>
-    @assert = Day4.a(@env, input) == 240
-    @assert = Day4.b(@env, input) == 4455
+    assert: Day4.a(@env, input) == 240
+    assert: Day4.b(@env, input) == 4455
 
   :it "solves the A puzzle"
-    @assert = Day4.a(@env, @puzzle_input) == 104764
+    assert: Day4.a(@env, @puzzle_input) == 104764
 
   :it "solves the B puzzle"
-    @assert = Day4.b(@env, @puzzle_input) == 128617
+    assert: Day4.b(@env, @puzzle_input) == 128617
 
   :const puzzle_input
     <<<

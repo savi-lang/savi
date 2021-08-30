@@ -12,6 +12,6 @@
       count_sum = count_sum + i
     )
 
-    @assert = count_return == 5
-    @assert = count == 5
-    @assert = count_sum == 10
+    assert: count_return == 5
+    assert: count == 5
+    assert: count_sum == 10
