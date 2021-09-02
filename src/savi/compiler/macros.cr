@@ -652,8 +652,7 @@ class Savi::Compiler::Macros < Savi::AST::CopyOnMutateVisitor
     op = expr.op
     rhs = expr.rhs
     
-    # Use a hygienic local to explicitly hold the expressions as box.
-    # This also helps to refer to them multiple times without evaluating them again.
+    # Use a hygienic local to refer to it multiple times without evaluating again.
     local_lhs_name = AST::Identifier.new(next_local_name).from(lhs) 
     local_lhs = AST::Relate.new(
       local_lhs_name,
