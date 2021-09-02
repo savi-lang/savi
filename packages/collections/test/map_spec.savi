@@ -23,7 +23,7 @@
     assert: try (map["example"]! | U64[0]) == 88
     assert: map.has_key("example")
     assert: map.delete("example") <: None
-    @assert = try map["example"]! <: None
+    assert: try map["example"]! <: None
     assert: map.has_key("example").is_false
     assert: map.size == 0
 
