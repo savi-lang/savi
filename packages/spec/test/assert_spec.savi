@@ -24,7 +24,7 @@
     assert: Foo.true == True
     assert: True == Foo.true
     assert: True \
-    == True
+      == True
     assert: Foo.with_yield -> (false |
       assert: !false) == Foo.true
 
@@ -34,8 +34,8 @@
     assert: @maybe_string1 !<: String
     assert: @maybe_string2 <: String
     assert: [@maybe_string1] <: Array((String | None))
-    // TODO: we need to implement <: for union types
-    // assert: True <: (String | Bool)
+  // TODO: we need to implement <: for union types
+  // assert: True <: (String | Bool)
 
   :it "honors iso"
     assert: "" == String.new_iso

@@ -113,7 +113,7 @@
   :let rhs String
 
   :new val (@spec, @example, @success, @pos, @op, @lhs, @rhs)
-  
+
   :fun print_failure(env Env) None
     expectation = if (@op == "<:") ("to be a subtype of" | "not to be a subtype of")
 
