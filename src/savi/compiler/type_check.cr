@@ -530,7 +530,9 @@ class Savi::Compiler::TypeCheck
     end
     def type_check_pre(ctx : Context, info : Infer::TypeConditionForLocal, mt : MetaType) : Bool
       lhs_info = @pre_infer[info.refine]
-      lhs_info = lhs_info.info if lhs_info.is_a?(Infer::LocalRef)
+      while lhs_info.is_a?(Infer::LocalRef)
+        lhs_info = lhs_info.info
+      end
       rhs_info = info.refine_type
       lhs_mt = resolve(ctx, lhs_info)
       rhs_mt = resolve(ctx, rhs_info)

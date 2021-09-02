@@ -576,6 +576,9 @@ class Savi::Compiler::Macros < Savi::AST::CopyOnMutateVisitor
   # assert: True == True
   # assert: foo || bar && baz
   #
+  # When the relation uses the `<:` and `!<:` operator the assert is compiled into a special
+  # `Assert.type_relation` method.
+  #
   # When the expression is any other kind of node it will compile into a `Assert.condition`.
   #
   # assert: True
@@ -586,6 +589,11 @@ class Savi::Compiler::Macros < Savi::AST::CopyOnMutateVisitor
     lhs = expr.lhs
     op = expr.op
     rhs = expr.rhs
+    
+    # For the case where `rhs` is not a value expression, but rather a type expression:
+    # `String`, `Array(String)` or `(String | None)`, we will compile into the
+    # `Assert.type_relation` call.
+    return visit_assert_type_relation(node, expr) if op.value == "<:" || op.value == "!<:"
 
     # Use a hygienic local to explicitly hold the expressions as box.
     # This also helps to refer to them multiple times without evaluating them again.
@@ -634,6 +642,53 @@ class Savi::Compiler::Macros < Savi::AST::CopyOnMutateVisitor
     AST::Group.new("(", [
       local_lhs_assign,
       local_rhs_assign,
+      call,
+    ] of AST::Term).from(node)
+  end
+
+  def visit_assert_type_relation(node : AST::Relate, expr : AST::Relate)
+    orig = node.lhs.as(AST::Identifier)
+    lhs = expr.lhs
+    op = expr.op
+    rhs = expr.rhs
+    
+    # Use a hygienic local to refer to it multiple times without evaluating again.
+    local_lhs_name = AST::Identifier.new(next_local_name).from(lhs) 
+    local_lhs = AST::Relate.new(
+      local_lhs_name,
+      AST::Operator.new("=").from(lhs),
+      lhs,
+    ).from(lhs)
+
+    local_relate_name = AST::Identifier.new(next_local_name).from(expr)
+    local_relate = AST::Relate.new(
+      local_relate_name,
+      AST::Operator.new("=").from(expr),
+      AST::Relate.new(
+        local_lhs_name,
+        op,
+        rhs,
+      ).from(expr)
+    ).from(expr)
+
+    call = AST::Call.new(
+      AST::Identifier.new("Assert").from(orig),
+      AST::Identifier.new("type_relation").from(orig),
+      AST::Group.new("(", [
+        AST::Identifier.new("@").from(node),
+        AST::LiteralString.new(op.value).from(op),
+        AST::Prefix.new(
+          AST::Operator.new("--").from(expr),
+          local_lhs_name
+        ).from(lhs),
+        AST::LiteralString.new(rhs.pos.content).from(rhs),
+        local_relate_name,
+      ] of AST::Term).from(expr)
+    ).from(orig)
+
+    AST::Group.new("(", [
+      local_lhs,
+      local_relate,
       call,
     ] of AST::Term).from(node)
   end
