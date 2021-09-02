@@ -37,6 +37,26 @@
     )
     test.specs.enqueue(assert)
 
+  :fun non type_relation(
+    spec Spec
+    op String
+    lhs Any'box
+    rhs String
+    success Bool
+    pos SourceCodePosition = source_code_position_of_argument spec
+  )
+    test = spec.test
+    assert = AssertTypeRelation.new(
+      test.spec
+      test.example
+      success
+      pos
+      op
+      Inspect[lhs]
+      rhs
+    )
+    test.specs.enqueue(assert)
+
   :fun file_and_line String
     line = Inspect[@pos.row + 1]
     @indent(4, String.join(["# ", @pos.filename, ":", line]))
@@ -79,6 +99,34 @@
       @indent(6, @lhs)
       @indent(4, String.join(["to ", @op]))
       @indent(6, @rhs)
+      ""
+      @file_and_line
+    ], "\n"))
+
+    None
+
+:class val AssertTypeRelation
+  :is Assert
+
+  :let op String
+  :let lhs String
+  :let rhs String
+
+  :new val (@spec, @example, @success, @pos, @op, @lhs, @rhs)
+  
+  :fun print_failure(env Env) None
+    expectation = if (@op == "<:") ("to be a subtype of" | "not to be a subtype of")
+
+    env.err.print(String.join([
+      ""
+      @indent(4, String.join(["FAIL:", @pos.string], " "))
+      ""
+      @indent(4, String.join([
+        "Expected"
+        @lhs
+        expectation
+        @rhs
+      ], " "))
       ""
       @file_and_line
     ], "\n"))
