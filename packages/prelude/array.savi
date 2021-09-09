@@ -113,20 +113,19 @@
     @
 
   :fun ref pop! A
-    if (@size < 1) error!
-    @_size -= 1
+    @_size = @_size -! 1
     @_ptr._get_at_no_alias(@_size)
 
   :: Return the first element in the array.
   :: Raises an error if the array is empty.
   :fun first! @->(A'aliased)
-    if (@size == 0) error!
+    error! if (@size == 0)
     @_ptr._get_at(0)
 
   :: Assign the given value to replace the first element in the array.
   :: Raises an error if the array is empty.
   :fun ref "first=!"(value A)
-    if (@size == 0) error!
+    error! if (@size == 0)
     @_ptr._assign_at(0, --value)
 
   :: Return the last element in the array.
