@@ -296,7 +296,7 @@
       False // return false if the elements are not Comparable
     )
 
-  :fun ref "swap!"(index_1, index_2)
+  :fun ref swap!(index_1, index_2)
     error! if (@size <= index_1)
     error! if (@size <= index_2)
     @_ptr_swap(index_1, index_2)
