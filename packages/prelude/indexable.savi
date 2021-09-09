@@ -41,6 +41,28 @@
     )
     False
 
+  :fun has_any(
+    from USize = 0
+    to = USize.max_value
+    stride USize = 1
+  ) Bool
+    :yields for Bool // TODO: this type hint shouldn't be needed
+    @each(from, to, stride) -> (value |
+      return True if (yield value)
+    )
+    False
+
+  :fun has_all(
+    from USize = 0
+    to = USize.max_value
+    stride USize = 1
+  ) Bool
+    :yields for Bool // TODO: this type hint shouldn't be needed
+    @each(from, to, stride) -> (value |
+      return False unless (yield value)
+    )
+    True
+
   :fun find!(
     from USize = 0
     to = USize.max_value
