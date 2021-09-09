@@ -187,6 +187,21 @@
     assert:
       array_a == ["baz", "bar", "foo"]
 
+  :it "swaps the elements in the array if both indices are in range"
+    array = ["foo", "bar", "baz"]
+
+    assert: try (array.swap!(1, 2), True | False)
+    assert: array == ["foo", "baz", "bar"]
+
+    assert: try (array.swap!(2, 0), True | False)
+    assert: array == ["bar", "baz", "foo"]
+
+    assert: try (array.swap!(1, 3), False | True)
+    assert: array == ["bar", "baz", "foo"] // no change, due to the error
+
+    assert: try (array.swap!(3, 0), False | True)
+    assert: array == ["bar", "baz", "foo"] // no change, due to the error
+
   :it "sorts the elements in the array"
     array Array(U8) = [
       13, 25, 7, 36, 30, 11, 29, 8, 5, 15, 21, 24

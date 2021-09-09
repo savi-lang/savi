@@ -253,7 +253,7 @@
           case (
           // When we scan a value less than our pivot, swap the value downward.
           | scan_value < lo_pivot_value |
-            @_swap(scan.usize, lo.usize) // TODO: these swap operations can be optimized by leveraging earlier pointer reads, though it will be more verbose
+            @_ptr_swap(scan.usize, lo.usize) // TODO: these swap operations can be optimized by leveraging earlier pointer reads, though it will be more verbose
             lo += 1
 
           // When we scan a value greater than our pivot, swap the value upward.
@@ -264,14 +264,14 @@
             )
 
             // Swap the scanned value upward.
-            @_swap(scan.usize, hi.usize) // TODO: these swap operations can be optimized by leveraging earlier pointer reads, though it will be more verbose
+            @_ptr_swap(scan.usize, hi.usize) // TODO: these swap operations can be optimized by leveraging earlier pointer reads, though it will be more verbose
             hi -= 1
 
             // Possibly swap the just-swapped value downward if it needs to be.
             // Note that `scan_value` here is the previous `hi` value.
             scan_value = @_ptr._get_at(scan.usize)
             if (scan_value < lo_pivot_value) (
-              @_swap(scan.usize, lo.usize) // TODO: these swap operations can be optimized by leveraging earlier pointer reads, though it will be more verbose
+              @_ptr_swap(scan.usize, lo.usize) // TODO: these swap operations can be optimized by leveraging earlier pointer reads, though it will be more verbose
               lo += 1
             )
           )
@@ -283,8 +283,8 @@
         hi += 1
 
         // Swap the pivots to their final positions.
-        @_swap(lo_pivot.usize, lo.usize) // TODO: these swap operations can be optimized by leveraging earlier pointer reads, though it will be more verbose
-        @_swap(hi_pivot.usize, hi.usize) // TODO: these swap operations can be optimized by leveraging earlier pointer reads, though it will be more verbose
+        @_ptr_swap(lo_pivot.usize, lo.usize) // TODO: these swap operations can be optimized by leveraging earlier pointer reads, though it will be more verbose
+        @_ptr_swap(hi_pivot.usize, hi.usize) // TODO: these swap operations can be optimized by leveraging earlier pointer reads, though it will be more verbose
 
         // Recursively sort the three sub-ranges left inside this range.
         @_sort_in_place(lo_pivot, lo - 1)
@@ -296,8 +296,14 @@
       False // return false if the elements are not Comparable
     )
 
-  :fun ref _swap(a USize, b USize)
-    a_elem = @_ptr._get_at_no_alias(a)
-    b_elem = @_ptr._get_at_no_alias(b)
-    @_ptr._assign_at(a, --b_elem)
-    @_ptr._assign_at(b, --a_elem)
+  :fun ref "swap!"(index_1, index_2)
+    error! if (@size <= index_1)
+    error! if (@size <= index_2)
+    @_ptr_swap(index_1, index_2)
+
+  :fun ref _ptr_swap(index_1 USize, index_2 USize)
+    value_1 = @_ptr._get_at_no_alias(index_1)
+    value_2 = @_ptr._get_at_no_alias(index_2)
+    @_ptr._assign_at(index_1, --value_2)
+    @_ptr._assign_at(index_2, --value_1)
+    None
