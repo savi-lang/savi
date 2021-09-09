@@ -155,17 +155,15 @@
     )
     equal_so_far
 
-  :fun ref try_replace_at(index) Bool
+  :fun ref replace_at!(index)
     :yields A for A
-    if (@size <= index) (
-      False
-    |
-      // TODO: one liner like this should compile okay, but doesn't:
-      // @_ptr._assign_at(index, yield @_ptr._get_at_no_alias(index))
-      new_value = yield @_ptr._get_at_no_alias(index)
-      @_ptr._assign_at(index, --new_value)
-      True
-    )
+    error! if (@size <= index)
+
+    new_value = yield @_ptr._get_at_no_alias(index)
+    new_value_alias = new_value
+    @_ptr._assign_at(index, --new_value)
+
+    new_value_alias
 
   :fun each_with_index(
     from USize = 0

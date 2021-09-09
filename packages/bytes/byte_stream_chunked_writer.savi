@@ -168,11 +168,15 @@
       if (further_bytes_sent > 0) (
         lingering_data_ptr_index = lingering_size_ptr_index +
           if Platform.windows (1 | -1)
-        @_data_pairs.try_replace_at(lingering_data_ptr_index) -> (data_ptr |
-          data_ptr.offset(further_bytes_sent)
+        try (
+          @_data_pairs.replace_at!(lingering_data_ptr_index) -> (data_ptr |
+            data_ptr.offset(further_bytes_sent)
+          )
         )
-        @_data_pairs.try_replace_at(lingering_size_ptr_index) -> (size_ptr |
-          CPointer(U8).from_usize(size_ptr.usize - further_bytes_sent)
+        try (
+          @_data_pairs.replace_at!(lingering_size_ptr_index) -> (size_ptr |
+            CPointer(U8).from_usize(size_ptr.usize - further_bytes_sent)
+          )
         )
       )
 

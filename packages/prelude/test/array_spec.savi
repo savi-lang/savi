@@ -139,14 +139,24 @@
   :it "replaces via a yield block the element at the given index, if it exists"
     array Array(String) = ["foo", "bar", "baz"]
 
-    assert: array.try_replace_at(1) -> (element |
-      assert: element == "bar"
-      "BAR"
+    assert: try (
+      array.replace_at!(1) -> (element |
+        assert: element == "bar"
+        "BAR"
+      )
+      True
+    |
+      False
     )
-    assert: array.try_replace_at(3) -> (element |
-      assert: False // assert: that this block should never run
-      "NOPE"
-    ).is_false
+    assert: try (
+      array.replace_at!(3) -> (element |
+        assert: False // assert: that this block should never run
+        "NOPE"
+      )
+      False
+    |
+      True
+    )
 
     assert: array == ["foo", "BAR", "baz"]
 
