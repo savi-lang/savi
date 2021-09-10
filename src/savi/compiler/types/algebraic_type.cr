@@ -120,35 +120,49 @@ module Savi::Compiler::Types
   end
 
   struct NominalCap < AlgebraicTypeSimple
-    enum Value : UInt8
-      ISO
-      ISO_ALIASED
-      REF
-      VAL
-      BOX
-      TAG
-      NON
-    end
-    getter cap : Value # TODO: probably an enum
+    getter cap : Cap::Value
     def initialize(@cap)
     end
 
-    ISO         = new(Value::ISO)
-    ISO_ALIASED = new(Value::ISO_ALIASED)
-    REF         = new(Value::REF)
-    VAL         = new(Value::VAL)
-    BOX         = new(Value::BOX)
-    TAG         = new(Value::TAG)
-    NON         = new(Value::NON)
+    ISO         = new(Cap::ISO)
+    ISO_ALIASED = new(Cap::ISO_ALIASED)
+    REF         = new(Cap::REF)
+    VAL         = new(Cap::VAL)
+    BOX         = new(Cap::BOX)
+    TAG         = new(Cap::TAG)
+    NON         = new(Cap::NON)
 
-    ANY   = Union.new(Set(AlgebraicTypeSummand){ISO, REF, VAL, BOX, TAG, NON})
-    ALIAS = Union.new(Set(AlgebraicTypeSummand){REF, VAL, BOX, TAG, NON})
-    SEND  = Union.new(Set(AlgebraicTypeSummand){ISO, VAL, TAG, NON})
-    SHARE = Union.new(Set(AlgebraicTypeSummand){VAL, TAG, NON})
-    READ  = Union.new(Set(AlgebraicTypeSummand){REF, VAL, BOX})
+    ANY   = new(Cap::ISO | Cap::REF | Cap::VAL | Cap::BOX | Cap::TAG | Cap::NON)
+    ALIAS = new(Cap::REF | Cap::VAL | Cap::BOX | Cap::TAG | Cap::NON)
+    SEND  = new(Cap::ISO | Cap::VAL | Cap::TAG | Cap::NON)
+    SHARE = new(Cap::VAL | Cap::TAG | Cap::NON)
+    READ  = new(Cap::REF | Cap::VAL | Cap::BOX)
 
     def show
-      @cap.to_s.downcase
+      case self
+      when ISO         then "iso"
+      when ISO_ALIASED then "iso'aliased"
+      when REF         then "ref"
+      when VAL         then "val"
+      when BOX         then "box"
+      when TAG         then "tag"
+      when NON         then "non"
+      when ANY         then "any"
+      when ALIAS       then "alias"
+      when SEND        then "send"
+      when SHARE       then "share"
+      when READ        then "read"
+      else
+        String.build { |str|
+          str << "{"
+          Cap::Logic::BITS.each { |name, bits|
+            next unless (@cap & bits) != 0
+            str << "|" unless str.empty?
+            str << name
+          }
+          str << "}"
+        }
+      end
     end
 
     def aliased
