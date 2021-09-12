@@ -322,11 +322,7 @@ module Savi::Program::Intrinsic
         displace_params = AST::Group.new("(").from(ident)
         displace_params.terms << displace_param
         if ret
-          displace_ret = AST::Relate.new(
-            AST::Identifier.new("@").from(displace_cap),
-            AST::Operator.new("->").from(displace_cap),
-            ret
-          ).from(ret)
+          displace_ret = ret.dup
         end
         displace_assign = AST::FieldDisplace.new(
           ident.value,

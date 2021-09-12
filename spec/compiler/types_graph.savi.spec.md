@@ -179,7 +179,7 @@ T'field'^1
          ^~~~~
 ~~~
 T'return'2
-  <: (String & K'@'1->val)
+  <: String'val
     :var field String
                ^~~~~~
   :> T'field'^1
