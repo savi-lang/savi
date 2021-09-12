@@ -13,9 +13,9 @@
     success Bool
     pos SourceCodePosition = source_code_position_of_argument spec
   )
-    test = spec.test
-    assert = AssertCondition.new(test.spec, test.example, success, pos)
-    test.specs.enqueue(assert)
+    ctx = spec.ctx
+    assert = AssertCondition.new(ctx.spec, ctx.example, success, pos)
+    ctx.specs.enqueue(assert)
 
   :fun non relation(
     spec Spec
@@ -25,17 +25,17 @@
     success Bool
     pos SourceCodePosition = source_code_position_of_argument spec
   )
-    test = spec.test
+    ctx = spec.ctx
     assert = AssertRelation.new(
-      test.spec
-      test.example
+      ctx.spec
+      ctx.example
       success
       pos
       op
       Inspect[lhs]
       Inspect[rhs]
     )
-    test.specs.enqueue(assert)
+    ctx.specs.enqueue(assert)
 
   :fun non type_relation(
     spec Spec
@@ -45,17 +45,17 @@
     success Bool
     pos SourceCodePosition = source_code_position_of_argument spec
   )
-    test = spec.test
+    ctx = spec.ctx
     assert = AssertTypeRelation.new(
-      test.spec
-      test.example
+      ctx.spec
+      ctx.example
       success
       pos
       op
       Inspect[lhs]
       rhs
     )
-    test.specs.enqueue(assert)
+    ctx.specs.enqueue(assert)
 
   :fun file_and_line String
     line = Inspect[@pos.row + 1]

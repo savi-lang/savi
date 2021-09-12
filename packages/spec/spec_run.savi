@@ -8,7 +8,7 @@
 
   // TODO: avoid this indirection
   :fun _new_spec(specs) A
-    A.new(TestHelper.new(@env, specs, A.describes, ""))
+    A.new(TestContext.new(@env, specs, A.describes, ""))
 
   :: Run all spec features for the Spec type indicated by the type argument,
   :: using the given Env to construct an instance of that Spec type.
@@ -31,7 +31,7 @@
   :let example ReflectionFeatureOfType(A)
 
   :new (env, specs, @example)
-    helper = TestHelper.new(env, specs, A.describes, @example.name)
+    helper = TestContext.new(env, specs, A.describes, @example.name)
     spec = A.new(helper)
 
     specs.example_began(A.describes, @example.name)
