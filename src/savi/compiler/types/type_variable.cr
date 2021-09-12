@@ -77,6 +77,9 @@ module Savi::Compiler::Types
       "#{kind_sym}'#{@nickname}#{scope_sym}#{@sequence_number}"
     end
 
+    def show_info
+      String.build { |output| show_info(output) }
+    end
     def show_info(output)
       output << "#{self.show_name}\n"
       @binding.try { |pos, explicit|
@@ -139,6 +142,7 @@ module Savi::Compiler::Types
         subtype.trace_as_assignment(cursor)
       }
       @from_call_returns.each { |pos, call, receiver|
+        cursor.current_pos = pos
         cursor.trace_call_return_as_assignment(pos, call, receiver)
       }
 

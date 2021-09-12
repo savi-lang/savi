@@ -132,20 +132,33 @@ module Savi::Compiler::Types
       call : AST::Call,
       receiver : AlgebraicType,
     )
-      @current_pos = pos
-      offset = current_facts_offset
-      receiver.trace_call_return_as_assignment(self, call)
+      pre_offset = current_facts_offset
+      receiver.trace_as_assignment(self)
+      receiver_union = consume_facts_as_union_since(pre_offset)
+      return unless receiver_union
+      receiver_union.trace_call_return_as_assignment(self, call)
     end
 
-    def trace_call_return_as_assignment(
+    def trace_call_return_as_assignment_with_transform(
+      call : AST::Call,
+      receiver : AlgebraicType,
+    )
+      pre_offset = current_facts_offset
+      receiver.trace_call_return_as_assignment(self, call)
+      transform_facts_since(pre_offset) { |pos, inner|
+        {pos, yield inner}
+      }
+    end
+
+    def trace_nominal_call_return_as_assignment(
       call : AST::Call,
       nominal_type : NominalType,
       nominal_cap : NominalCap,
     )
       raise NotImplementedError.new(nominal_type.show) if nominal_type.args
 
-      @pass.trace_call_return_as_assignment(
-        @ctx, self, nominal_type.link, call.ident
+      @pass.trace_nominal_call_return_as_assignment(
+        @ctx, self, nominal_type, nominal_cap, call.ident
       )
     end
   end
@@ -206,13 +219,28 @@ module Savi::Compiler::Types
       }
     end
 
-    def trace_call_return_as_assignment(ctx, cursor, t_link, f_ident)
+    def trace_nominal_call_return_as_assignment(
+      ctx, cursor, nominal_type, nominal_cap, f_ident,
+    )
+      t_link = nominal_type.link
       t = t_link.resolve(ctx)
       f = t.find_func?(f_ident.value)
       raise "function not found" unless f # TODO: nice error
       f_link = f.make_link(t_link)
       types_graph = ctx.types_graph[f_link]
-      types_graph.return_var.trace_as_assignment(cursor)
+
+      if f.cap.value == "box"
+        # When calling a box function, we bind the specific receiver cap.
+        cursor.trace_as_assignment_with_transform(types_graph.return_var) { |type|
+          type.bind_variables({
+            types_graph.receiver_cap_var => nominal_cap
+          }).first
+        }
+      else
+        # All other functions already have a known concrete cap,
+        # so we don't need to waste CPU cycles trying to bind variables.
+        types_graph.return_var.trace_as_assignment(cursor)
+      end
     end
   end
 end

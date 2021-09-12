@@ -21,6 +21,10 @@ module Savi::Compiler::Types
       raise NotImplementedError.new("viewed_from for #{self.class}")
     end
 
+    def bind_variables(mapping : Hash(TypeVariable, AlgebraicType)) : {AlgebraicType, Bool}
+      raise NotImplementedError.new("bind_variables for #{self.class}")
+    end
+
     def trace_as_constraint(cursor : Cursor)
       raise NotImplementedError.new("trace_as_constraint for #{self.class}: #{show}")
     end
@@ -158,6 +162,10 @@ module Savi::Compiler::Types
       self # this type says nothing about capabilities, so it remains unchanged.
     end
 
+    def bind_variables(mapping : Hash(TypeVariable, AlgebraicType)) : {AlgebraicType, Bool}
+      {self, false} # This is not a variable, so there is no effect.
+    end
+
     def observe_assignment_reciprocals(
       pos : Source::Pos,
       supertype : AlgebraicType,
@@ -273,6 +281,10 @@ module Savi::Compiler::Types
       end
     end
 
+    def bind_variables(mapping : Hash(TypeVariable, AlgebraicType)) : {AlgebraicType, Bool}
+      {self, false} # This is not a variable, so there is no effect.
+    end
+
     def trace_as_constraint(cursor : Cursor)
       # TODO: Is there a source position we can use here?
       # TODO: Should we use the "narrow" bound when generic?
@@ -310,6 +322,11 @@ module Savi::Compiler::Types
       else
         OverrideCap.new(self, cap)
       end
+    end
+
+    def bind_variables(mapping : Hash(TypeVariable, AlgebraicType)) : {AlgebraicType, Bool}
+      binding = mapping[@var]?
+      binding ? {binding, true} : {self, false}
     end
 
     def trace_as_constraint(cursor : Cursor)
@@ -351,6 +368,15 @@ module Savi::Compiler::Types
 
     def show
       "#{@origin.show}->#{@field.show}"
+    end
+
+    def bind_variables(mapping : Hash(TypeVariable, AlgebraicType)) : {AlgebraicType, Bool}
+      new_origin, origin_changed = origin.value.bind_variables(mapping)
+      new_field, field_changed = field.value.bind_variables(mapping)
+
+      return {self, false} unless origin_changed || field_changed
+
+      {new_field.viewed_from(new_origin), true}
     end
 
     def trace_as_assignment(cursor : Cursor)
@@ -450,6 +476,10 @@ module Savi::Compiler::Types
 
     def trace_as_assignment(cursor : Cursor)
       cursor.trace_as_assignment_with_transform(inner, &.aliased)
+    end
+
+    def trace_call_return_as_assignment(cursor : Cursor, call : AST::Call)
+      cursor.trace_call_return_as_assignment_with_transform(call, inner, &.aliased)
     end
 
     def observe_assignment_reciprocals(
@@ -571,12 +601,17 @@ module Savi::Compiler::Types
       @nominal_type.intersect(@nominal_cap.viewed_from(origin))
     end
 
+    def bind_variables(mapping : Hash(TypeVariable, AlgebraicType)) : {AlgebraicType, Bool}
+      # Neither NominalCap nor NominalType are variables, so there is no effect.
+      {self, false}
+    end
+
     def trace_as_assignment(cursor : Cursor)
       cursor.add_fact_at_current_pos(self)
     end
 
     def trace_call_return_as_assignment(cursor : Cursor, call : AST::Call)
-      cursor.trace_call_return_as_assignment(call, @nominal_type, @nominal_cap)
+      cursor.trace_nominal_call_return_as_assignment(call, @nominal_type, @nominal_cap)
     end
 
     def observe_assignment_reciprocals(
@@ -639,6 +674,19 @@ module Savi::Compiler::Types
       Intersection.from(@members.map(&.viewed_from(origin)))
     end
 
+    def bind_variables(mapping : Hash(TypeVariable, AlgebraicType)) : {AlgebraicType, Bool}
+      any_is_changed = false
+      new_members = @members.map { |member|
+        new_member, is_changed = member.bind_variables(mapping)
+        any_is_changed ||= is_changed
+        new_member.as(AlgebraicType)
+      }
+      {
+        any_is_changed ? Intersection.from(new_members) : self,
+        any_is_changed
+      }
+    end
+
     def trace_as_assignment(cursor : Cursor)
       raise NotImplementedError.new("trace_as_assignment for #{self.class}: #{show}") \
         unless @members.size == 2 \
@@ -654,7 +702,7 @@ module Savi::Compiler::Types
           && (nominal_type = @members.find(&.as?(NominalType))) \
           && (nominal_cap = @members.find(&.as?(NominalCap)))
 
-      cursor.trace_call_return_as_assignment(
+      cursor.trace_nominal_call_return_as_assignment(
         call, nominal_type.as(NominalType), nominal_cap.as(NominalCap)
       )
     end
