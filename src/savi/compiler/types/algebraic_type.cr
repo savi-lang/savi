@@ -187,6 +187,25 @@ module Savi::Compiler::Types
     SHARE = new(Cap::VAL | Cap::TAG | Cap::NON)
     READ  = new(Cap::REF | Cap::VAL | Cap::BOX)
 
+    def self.from_string(string : String) : NominalCap
+      case string
+      when "iso"         then ISO
+      when "iso'aliased" then ISO_ALIASED
+      when "ref"         then REF
+      when "val"         then VAL
+      when "box"         then BOX
+      when "tag"         then TAG
+      when "non"         then NON
+      when "any"         then ANY
+      when "alias"       then ALIAS
+      when "send"        then SEND
+      when "share"       then SHARE
+      when "read"        then READ
+      else
+        raise NotImplementedError.new("#{self}.from_string(#{string.inspect})")
+      end
+    end
+
     def show
       case self
       when ISO         then "iso"
@@ -244,6 +263,28 @@ module Savi::Compiler::Types
       other
     end
 
+    def viewed_from(origin)
+      if origin.is_a?(NominalCap)
+        NominalCap.new(
+          Cap::Logic.get_adapted_by_origin_and_field(origin.cap, cap)
+        )
+      else
+        Viewpoint.new(origin, self)
+      end
+    end
+
+    def trace_as_constraint(cursor : Cursor)
+      # TODO: Is there a source position we can use here?
+      # TODO: Should we use the "narrow" bound when generic?
+      cursor.add_fact(Source::Pos.none, self)
+    end
+
+    def trace_as_assignment(cursor : Cursor)
+      # TODO: Is there a source position we can use here?
+      # TODO: Should we use the "wider" bound when generic?
+      cursor.add_fact(Source::Pos.none, self)
+    end
+
     def observe_assignment_reciprocals(
       pos : Source::Pos,
       supertype : AlgebraicType,
@@ -294,8 +335,8 @@ module Savi::Compiler::Types
 
   struct Viewpoint < AlgebraicTypeSimple
     getter origin : StructRef(AlgebraicTypeSimple)
-    getter target : StructRef(AlgebraicTypeFactor)
-    def initialize(origin, target)
+    getter field : StructRef(AlgebraicTypeFactor)
+    def initialize(origin, field)
       if origin.is_a?(Intersection)
         origin = Intersection.from(
           origin.members.reject(&.is_a?(NominalType))
@@ -305,11 +346,74 @@ module Savi::Compiler::Types
       end
 
       @origin = StructRef(AlgebraicTypeSimple).new(origin.as(AlgebraicTypeSimple))
-      @target = StructRef(AlgebraicTypeFactor).new(target)
+      @field = StructRef(AlgebraicTypeFactor).new(field)
     end
 
     def show
-      "#{@origin.show}->#{@target.show}"
+      "#{@origin.show}->#{@field.show}"
+    end
+
+    def trace_as_assignment(cursor : Cursor)
+      cursor.trace_as_assignment_with_two_step_transform(
+        @origin.value,
+        @field.value,
+      ) { |origin_facts_union, field_fact|
+        field_fact.viewed_from(origin_facts_union)
+      }
+    end
+
+    def observe_assignment_reciprocals(
+      pos : Source::Pos,
+      supertype : AlgebraicType,
+      maybe : Bool = false,
+    )
+      # The origin and field types of the viewpoint subtype (right side)
+      # must each observe a constraint based on the supertype (left side)
+      # and the other term in the three-term relationship.
+      @field.value.observe_assignment_reciprocals(
+        pos,
+        ViewableAs.new(supertype, origin: @origin.value),
+        maybe: maybe,
+      )
+      @origin.value.observe_assignment_reciprocals(
+        pos,
+        OriginOfViewpoint.new(@field.value, adapted: supertype),
+        maybe: maybe,
+      )
+    end
+  end
+
+  struct ViewableAs < AlgebraicTypeSimple
+    getter adapted : StructRef(AlgebraicTypeFactor)
+    getter origin : StructRef(AlgebraicTypeSimple)
+    def initialize(adapted, origin)
+      if origin.is_a?(Intersection)
+        origin = Intersection.from(
+          origin.members.reject(&.is_a?(NominalType))
+        )
+      elsif origin.is_a?(IntersectionBasic)
+        origin = origin.nominal_cap
+      end
+
+      @adapted = StructRef(AlgebraicTypeFactor).new(adapted)
+      @origin = StructRef(AlgebraicTypeSimple).new(origin.as(AlgebraicTypeSimple))
+    end
+
+    def show
+      "(viewable_as #{@adapted.show} via #{@origin.show})"
+    end
+  end
+
+  struct OriginOfViewpoint < AlgebraicTypeSimple
+    getter field : StructRef(AlgebraicTypeFactor)
+    getter adapted : StructRef(AlgebraicTypeFactor)
+    def initialize(field, adapted)
+      @field = StructRef(AlgebraicTypeFactor).new(field)
+      @adapted = StructRef(AlgebraicTypeFactor).new(adapted)
+    end
+
+    def show
+      "(origin_of_viewpoint #{@field.show} into #{@adapted.show})"
     end
   end
 

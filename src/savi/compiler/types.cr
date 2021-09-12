@@ -90,11 +90,40 @@ module Savi::Compiler::Types
       }
     end
 
+    private def consume_facts_as_union_since(offset)
+      facts_union : AlgebraicType? = nil
+      while current_facts_offset > offset
+        if facts_union
+          facts_union = facts_union.unite(@facts.pop.last)
+        else
+          facts_union = @facts.pop.last
+        end
+      end
+      facts_union
+    end
+
     def trace_as_assignment_with_transform(type)
       pre_offset = current_facts_offset
       type.trace_as_assignment(self)
       transform_facts_since(pre_offset) { |pos, inner|
         {pos, yield inner}
+      }
+    end
+
+    def trace_as_assignment_with_two_step_transform(type_1, type_2)
+      pre_offset = current_facts_offset
+
+      # Trace type_1 and consume its facts as a union.
+      type_1.trace_as_assignment(self)
+      type_1_facts_union = consume_facts_as_union_since(pre_offset)
+
+      # If type_1 emitted no facts, don't even both tracing type_2.
+      return unless type_1_facts_union
+
+      # Trace type_2 and transform it using the facts union from type_1.
+      type_2.trace_as_assignment(self)
+      transform_facts_since(pre_offset) { |pos, inner|
+        {pos, yield type_1_facts_union, inner}
       }
     end
 

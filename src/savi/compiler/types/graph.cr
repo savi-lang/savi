@@ -113,11 +113,22 @@ module Savi::Compiler::Types::Graph
     end
 
     protected def init_func_self(cap : String, pos : Source::Pos)
-      @for_self = (
+      @for_self = begin
         self_type = @parent.not_nil!.value.for_self
         self_cap = TypeVariableRef.new(new_cap_var("@")) # TODO: add constraint for func cap
+        self_cap.var.is_input_var = true
+
+        # If it's a `:fun box`, we interpret it as a type variable constrained
+        # to be one of the caps in the set called `read` (`ref`, `val`, `box`).
+        # Otherwise, we bind it directly to the concrete cap that was given.
+        if cap == "box"
+          self_cap.var.observe_constraint_at(pos, NominalCap::READ)
+        else
+          self_cap.var.observe_binding_at(pos, NominalCap.from_string(cap))
+        end
+
         self_type.intersect(self_cap)
-      ).as(AlgebraicType)
+      end.as(AlgebraicType)
 
       @param_vars = [] of TypeVariable
     end
@@ -212,6 +223,7 @@ module Savi::Compiler::Types::Graph
     protected def observe_param(node, ref)
       ident, explicit, default = AST::Extract.param(node)
       var = @local_vars_by_ref[ref]
+      var.is_input_var = true
       param_vars << var
 
       if explicit
@@ -233,7 +245,7 @@ module Savi::Compiler::Types::Graph
       var = parent.field_type_vars[node.value]
       case node
       when AST::FieldRead
-        @by_node[node] = TypeVariableRef.new(var).aliased
+        @by_node[node] = TypeVariableRef.new(var).aliased.viewed_from(@for_self)
       when AST::FieldWrite
         @by_node[node] = TypeVariableRef.new(var).aliased
         var.observe_assignment_at(node.pos, @by_node[node.rhs])

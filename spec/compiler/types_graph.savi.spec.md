@@ -96,10 +96,10 @@ T'field'^1
   := String'val
     :var field String
                ^~~~~~
-  <: T'return'2
+  <: (viewable_as T'return'2 via K'@'1)
     :var field String
          ^~~~~
-  <: T'return'2
+  <: (viewable_as T'return'2 via K'@'1)
     :var field String
          ^~~~~
   <: T'return'2
@@ -116,7 +116,7 @@ T'return'2
   <: (String & K'@'1->val)
     :var field String
                ^~~~~~
-  :> T'field'^1'aliased
+  :> K'@'1->T'field'^1'aliased
     :var field String
          ^~~~~
 ```
@@ -125,10 +125,10 @@ T'field'^1
   := String'val
     :var field String
                ^~~~~~
-  <: T'return'2
+  <: (viewable_as T'return'2 via K'@'1)
     :var field String
          ^~~~~
-  <: T'return'2
+  <: (viewable_as T'return'2 via K'@'1)
     :var field String
          ^~~~~
   <: T'return'2
@@ -145,7 +145,7 @@ T'return'2
   <: (String & K'@'1->val)
     :var field String
                ^~~~~~
-  :> T'field'^1'aliased
+  :> K'@'1->T'field'^1'aliased
     :var field String
          ^~~~~
 
@@ -162,10 +162,10 @@ T'field'^1
   := String'val
     :var field String
                ^~~~~~
-  <: T'return'2
+  <: (viewable_as T'return'2 via K'@'1)
     :var field String
          ^~~~~
-  <: T'return'2
+  <: (viewable_as T'return'2 via K'@'1)
     :var field String
          ^~~~~
   <: T'return'2

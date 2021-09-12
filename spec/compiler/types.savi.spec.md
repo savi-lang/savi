@@ -9,7 +9,7 @@ TODO
   :let field: String.new_iso
 ```
 ```types.return ExampleField.field
-String'iso'aliased
+(String & K'@'1->iso'aliased)
 ```
 ```types.return ExampleField.field=
 String'iso'aliased

@@ -5,6 +5,7 @@ module Savi::Compiler::Types
     getter scope : Scope
     getter sequence_number : UInt64
     property is_cap_var : Bool
+    property is_input_var : Bool = false
     property eager_constraint_summary : AlgebraicType?
 
     @binding : {Source::Pos, AlgebraicType}?
@@ -140,6 +141,12 @@ module Savi::Compiler::Types
       @from_call_returns.each { |pos, call, receiver|
         cursor.trace_call_return_as_assignment(pos, call, receiver)
       }
+
+      # TODO: What condition is most appropriate here?
+      if is_input_var && is_cap_var
+        # TODO: Is there a source pos we can use here?
+        cursor.add_fact(Source::Pos.none, TypeVariableRef.new(self))
+      end
     end
 
     def calculate_assignment_summary(analysis : Analysis, cursor : Cursor)
