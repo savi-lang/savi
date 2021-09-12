@@ -2,7 +2,7 @@
 pass: types
 ---
 
-TODO
+It determines the return type of field getter/setter/displacer functions.
 
 ```savi
 :class ExampleField
