@@ -173,6 +173,8 @@ module Savi::Compiler::Types
           end
         }
 
+        puts show_info unless union_type
+
         union_type.not_nil! # TODO: nice error for having no assignment facts
       }
     end

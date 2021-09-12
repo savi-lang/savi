@@ -697,6 +697,10 @@ module Savi::Compiler::Types
     end
 
     def trace_call_return_as_assignment(cursor : Cursor, call : AST::Call)
+      puts
+      puts
+      puts cursor.current_pos.show
+      puts call.pos.show
       raise NotImplementedError.new("trace_as_assignment for #{self.class}: #{show}") \
         unless @members.size == 2 \
           && (nominal_type = @members.find(&.as?(NominalType))) \

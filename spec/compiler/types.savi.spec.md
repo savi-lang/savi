@@ -43,3 +43,16 @@ String'val
 ```types.return GetExampleIsoField.via_box
 String'tag
 ```
+
+TODO
+
+```savi
+:module SetExampleIsoField
+  :fun call(new_value)
+    example ExampleIsoField'ref = ExampleIsoField.new
+    example.field = --new_value
+    None
+```
+```types.params[0] SetExampleIsoField.call
+String'iso
+```
