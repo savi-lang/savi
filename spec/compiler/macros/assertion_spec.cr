@@ -26,8 +26,12 @@ describe Savi::Compiler::Macros do
           [:group, "(",
             [:call,
               [:ident, "Assert"],
-              [:ident, "unexpected_error"],
-              [:group, "(", [:ident, "@"]],
+              [:ident, "has_error"],
+              [:group, "(",
+                [:ident, "@"],
+                [:ident, "True"],
+                [:ident, "False"],
+              ],
             ],
           ],
         ],
@@ -84,8 +88,12 @@ describe Savi::Compiler::Macros do
           [:group, "(",
             [:call,
               [:ident, "Assert"],
-              [:ident, "unexpected_error"],
-              [:group, "(", [:ident, "@"]],
+              [:ident, "has_error"],
+              [:group, "(",
+                [:ident, "@"],
+                [:ident, "True"],
+                [:ident, "False"],
+              ],
             ],
           ],
         ],
@@ -137,8 +145,12 @@ describe Savi::Compiler::Macros do
           [:group, "(",
             [:call,
               [:ident, "Assert"],
-              [:ident, "unexpected_error"],
-              [:group, "(", [:ident, "@"]],
+              [:ident, "has_error"],
+              [:group, "(",
+                [:ident, "@"],
+                [:ident, "True"],
+                [:ident, "False"],
+              ],
             ],
           ],
         ],
@@ -175,11 +187,85 @@ describe Savi::Compiler::Macros do
           [:group, "(",
             [:call,
               [:ident, "Assert"],
-              [:ident, "unexpected_error"],
-              [:group, "(", [:ident, "@"]],
+              [:ident, "has_error"],
+              [:group, "(",
+                [:ident, "@"],
+                [:ident, "True"],
+                [:ident, "False"],
+              ],
             ],
           ],
         ],
+      ]
+    end
+  end
+
+  describe "assert no_error: EXP" do
+    it "is transformed into Assert.has_error" do
+      source = Savi::Source.new_example <<-SOURCE
+      :actor Main
+        :new
+          assert no_error: Something.dangerous!
+      SOURCE
+
+      ctx = Savi.compiler.compile([source], :macros)
+      ctx.errors.should be_empty
+
+      func = ctx.namespace.find_func!(ctx, source, "Main", "new")
+      func.body.not_nil!.terms.first.to_a.should eq [:group, "(",
+        [:call,
+          [:ident, "Assert"],
+          [:ident, "has_error"],
+          [:group, "(",
+            [:ident, "@"],
+            [:try,
+              [:group, "(",
+                [:call,
+                  [:ident, "Something"],
+                  [:ident, "dangerous!"],
+                ],
+                [:ident, "False"],
+              ],
+              [:group, "(", [:ident, "True"]],
+            ],
+            [:ident, "False"],
+          ],
+        ]
+      ]
+    end
+  end
+
+  describe "assert error: EXP" do
+    it "is transformed into Assert.has_error" do
+      source = Savi::Source.new_example <<-SOURCE
+      :actor Main
+        :new
+          assert error: Something.dangerous!
+      SOURCE
+
+      ctx = Savi.compiler.compile([source], :macros)
+      ctx.errors.should be_empty
+
+      func = ctx.namespace.find_func!(ctx, source, "Main", "new")
+      func.body.not_nil!.terms.first.to_a.should eq [:group, "(",
+        [:call,
+          [:ident, "Assert"],
+          [:ident, "has_error"],
+          [:group, "(",
+            [:ident, "@"],
+            [:try,
+              [:group, "(",
+                [:call,
+                  [:ident, "Something"],
+                  [:ident, "dangerous!"],
+                ],
+                [:ident, "False"],
+              ],
+              [:group, "(", [:ident, "True"]],
+            ],
+            [:ident, "True"],
+          ],
+        ]
       ]
     end
   end
