@@ -235,20 +235,20 @@
     assert: F32[-3.6].negate == 3.6
 
   :it "implements overflow/underflow-checked arithmetic for integers"
-    assert: try (U32.max_value - 1 +! 2, False | True)
-    assert: try (U32.max_value - 1 +! 1 == U32.max_value | False)
-    assert: try (I32.max_value - 1 +! 2, False | True)
-    assert: try (I32.max_value - 1 +! 1 == I32.max_value | False)
+    assert error: U32.max_value - 1 +! 2
+    assert: U32.max_value - 1 +! 1 == U32.max_value
+    assert error: I32.max_value - 1 +! 2
+    assert: I32.max_value - 1 +! 1 == I32.max_value
 
-    assert: try (U32.min_value + 1 -! 2, False | True)
-    assert: try (U32.min_value + 1 -! 1 == U32.min_value | False)
-    assert: try (I32.min_value + 1 -! 2, False | True)
-    assert: try (I32.min_value + 1 -! 1 == I32.min_value | False)
+    assert error: U32.min_value + 1 -! 2
+    assert: U32.min_value + 1 -! 1 == U32.min_value
+    assert error: I32.min_value + 1 -! 2
+    assert: I32.min_value + 1 -! 1 == I32.min_value
 
-    assert: try (U32[0x4000_0000] *! 4, False | True)
-    assert: try (U32[0x4000_0000] *! 3 == U32[0x4000_0000] * 3 | False)
-    assert: try (I32[0x2000_0000] *! 4, False | True)
-    assert: try (I32[0x2000_0000] *! 3 == I32[0x2000_0000] * 3 | False)
+    assert error: U32[0x4000_0000] *! 4
+    assert: U32[0x4000_0000] *! 3 == U32[0x4000_0000] * 3
+    assert error: I32[0x2000_0000] *! 4
+    assert: I32[0x2000_0000] *! 3 == I32[0x2000_0000] * 3
 
   :it "implements bitwise analysis and manipulation for integers"
     assert: U8[18]                == 0b00010010
