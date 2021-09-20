@@ -1,6 +1,5 @@
 // https://projecteuler.net/problem=1
 //
-:import "collections" (Count)
 
 :actor Counter
   :var count USize
@@ -19,7 +18,7 @@
   :new (env)
     counter = Counter.new
 
-    Count.to(1000) -> (number |
+    USize[1000].times -> (number |
       if @multiple_of_three_or_five(number) counter.increment(number)
     )
 

@@ -46,8 +46,8 @@
       )
 
       // Place the claims on the cloth.
-      Count.to(claim.height) -> (i | i += claim.top
-        Count.to(claim.width) -> (j | j += claim.left
+      claim.height.times -> (i | i += claim.top
+        claim.width.times -> (j | j += claim.left
           try (
             row = cloth[i]!
             row[j]! = row[j]! + 1 // TODO: += operator
@@ -80,8 +80,8 @@
     found_ids Array(String) = []
     claims.each -> (claim |
       try (
-        Count.to(claim.height) -> (i | i += claim.top
-          Count.to(claim.width) -> (j | j += claim.left
+        claim.height.times -> (i | i += claim.top
+          claim.width.times -> (j | j += claim.left
             // If this cell in the cloth has overlap, error out of the loops.
             if (cloth[i]![j]! > 1) error!
           )

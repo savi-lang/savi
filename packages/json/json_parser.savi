@@ -1,5 +1,3 @@
-:import "collections" (Count)
-
 :class JsonParser
   :var _offset USize: 0
   :var _offset_start USize: 0
@@ -337,7 +335,7 @@
   :fun ref _read_unicode_value! U32
     value U32 = 0
 
-    Count.to(4) -> (
+    U32[4].times -> (
       b = @_next!
       digit =
         case (

@@ -111,6 +111,18 @@
     x = x + x.bit_shl(31)
     x
 
+    :: Yields control to the given block `self`-times passing in numbers
+    :: from 0 to `self - 1`.
+    :: For example, `U32[3].times` will yield 0, 1, and 2.
+    :fun val times @
+      :yields @
+      i = @zero
+      while (i < @) (
+        yield i
+        i += 1
+      )
+      @
+
 :trait val Float32Methods
   :fun non from_bits(bits U32) @'val: compiler intrinsic
   :fun val bits U32: compiler intrinsic

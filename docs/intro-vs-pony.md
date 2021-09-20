@@ -344,7 +344,7 @@ In the standard library, this kind of function is often used for iteration, but 
 
 :actor Main
   :new (env Env)
-    count = Count.to(10) -> ( i |
+    count = USize[10].times -> ( i |
       env.out.print(Inspect[i]) // will print 0 through 9 in order
     )
     env.out.print(Inspect[count]) // will print 10

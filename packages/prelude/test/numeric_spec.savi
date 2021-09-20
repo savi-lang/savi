@@ -418,3 +418,27 @@
       assert: u64.be_to_native == u64
       assert: u64.le_to_native == u64_swapped
     )
+
+  :it "iterates zero times given zero or negative number"
+    count = USize[0]
+    U32[0].times -> (_i |
+      count += 1
+    )
+    assert: count == 0
+
+    I32[-1].times -> (_i |
+      count += 1
+    )
+    assert: count == 0
+
+  :it "iterates n times, starting with 0, excluding the given number itself"
+    count = USize[0]
+    count_sum = USize[0]
+    count_return = USize[5].times -> (i |
+      count = count + 1
+      count_sum = count_sum + i
+    )
+
+    assert: count_return == 5
+    assert: count == 5
+    assert: count_sum == 10
