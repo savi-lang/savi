@@ -12,8 +12,4 @@
     write_stream ByteStreamWritable = Bytes.new
     write_stream << b"Hello" << b", " << b"World" << b"!"
 
-    assert: try (
-      write_stream.as!(Bytes'ref) == b"Hello, World!"
-    |
-      False
-    )
+    assert: write_stream.as!(Bytes'ref) == b"Hello, World!"
