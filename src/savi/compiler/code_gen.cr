@@ -3231,27 +3231,34 @@ class Savi::Compiler::CodeGen
     # TODO: Allow an error_phi_llvm_type of something other than None.
     error_phi_llvm_type = llvm_type_of(@gtypes["None"])
 
-    # Catch the thrown error value, by getting the blocks and values from the
-    # try_else_stack and using the LLVM mechanism called a "phi" instruction.
     else_stack_tuple = @try_else_stack.pop
     raise "invalid try else stack" unless else_stack_tuple[0] == else_block
-    error_value = @builder.phi(
-      error_phi_llvm_type,
-      else_stack_tuple[1],
-      else_stack_tuple[2],
-      "phi_else_try",
-    )
+    if else_stack_tuple[1].empty?
+      # If the else stack tuple has empty predecessors, this is a try block
+      # that has no possibility of ever throwing an error.
+      # So we mark the else block as being unreachable, and skip generating it.
+      @builder.unreachable
+    else
+      # Catch the thrown error value, by getting the blocks and values from the
+      # try_else_stack and using the LLVM mechanism called a "phi" instruction.
+      error_value = @builder.phi(
+        error_phi_llvm_type,
+        else_stack_tuple[1],
+        else_stack_tuple[2],
+        "phi_else_try",
+      )
 
-    # TODO: allow the else block to reference the error value as a local.
+      # TODO: allow the else block to reference the error value as a local.
 
-    # Generate the body code of the else clause, then proceed to the post block.
-    else_value = gen_expr(expr.else_body)
-    unless func_frame.flow.jumps_away?(expr.else_body)
-      phi_type ||= type_of(expr)
-      else_value = gen_assign_cast(else_value, phi_type.not_nil!, expr.else_body)
-      phi_blocks << @builder.insert_block.not_nil!
-      phi_values << else_value
-      @builder.br(post_block)
+      # Generate the body code of the else clause, then proceed to the post block.
+      else_value = gen_expr(expr.else_body)
+      unless func_frame.flow.jumps_away?(expr.else_body)
+        phi_type ||= type_of(expr)
+        else_value = gen_assign_cast(else_value, phi_type.not_nil!, expr.else_body)
+        phi_blocks << @builder.insert_block.not_nil!
+        phi_values << else_value
+        @builder.br(post_block)
+      end
     end
 
     # We can't have a phi with no predecessors, so we don't generate it, and
