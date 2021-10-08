@@ -11,14 +11,41 @@ describe Savi::Compiler::Macros do
       ctx.errors.should be_empty
 
       func = ctx.namespace.find_func!(ctx, source, "Main", "new")
-      func.body.not_nil!.terms.first.to_a.should eq [:group, "(", [:call,
-        [:ident, "Assert"],
-        [:ident, "condition"],
-        [:group, "(",
-          [:ident, "@"],
-          [:ident, "True"],
+      func.body.not_nil!.terms.first.to_a.should eq [:group, "(", 
+        [:relate,
+          [:ident, "hygienic_macros_local.1"],
+          [:op, "="],
+          [:ident, "False"],
+        ],
+        [:relate,
+          [:relate,
+            [:ident, "hygienic_macros_local.2"],
+            [:op, "EXPLICITTYPE"],
+            [:ident, "Bool"],
+          ],
+          [:op, "="],
+          [:try,
+            [:group, "(", [:ident, "True"]],
+            [:group, "(",
+              [:relate,
+                [:ident, "hygienic_macros_local.1"],
+                [:op, "="],
+                [:ident, "True"],
+              ],
+              [:ident, "False"],
+            ]
+          ],
+        ],
+        [:call,
+          [:ident, "Assert"],
+          [:ident, "condition"],
+          [:group, "(",
+            [:ident, "@"],
+            [:ident, "hygienic_macros_local.1"],
+            [:ident, "hygienic_macros_local.2"],
+          ]
         ]
-      ]]
+      ]
     end
   end
 

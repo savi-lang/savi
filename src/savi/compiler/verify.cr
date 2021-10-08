@@ -138,6 +138,8 @@ class Savi::Compiler::Verify
 
     # Verify that each try block has at least one possible error case.
     def touch(ctx, node : AST::Try)
+      return if node.allow_non_partial_body
+
       unless node.body.try { |body| jumps.any_error?(body) }
         ctx.error_at node, "This try block is unnecessary", [
           {node.body, "the body has no possible error cases to catch"}
