@@ -21,7 +21,7 @@
 
 ## Background
 
-**Savi** is an actor-oriented programming language using the [Pony](https://www.ponylang.io/) runtime. Like Pony, **Savi** has a unique type system that enforces concurrency-safety and memory-safery properties at compile time.
+**Savi** is an actor-oriented programming language using the [Pony](https://www.ponylang.io/) runtime. Like Pony, **Savi** has a unique type system that enforces concurrency-safety and memory-safety properties at compile time.
 
 Like many other modern compiled languages, **Savi** uses [LLVM](https://llvm.org/) to compile to a wide variety of native targets.
 
