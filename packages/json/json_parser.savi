@@ -275,11 +275,11 @@
     buf = String.new // TODO: don't allocate here - let the caller construct the string from escape tokens if/when they choose
     keep_going = True
     while keep_going (
-      next = @_next!
-      case next == (
+      byte = @_next!
+      case byte == (
       | '"'  | keep_going = False
       | '\\' | buf = @_push_escape_seq!(buf)
-      | buf.push_byte(next)
+      | buf.push_byte(byte)
       )
     )
     @last_string = buf.clone // TODO: skip clone here by skipping allocating in the first place - see above TODO comment

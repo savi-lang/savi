@@ -15,6 +15,24 @@ describe Savi::Compiler::Macros do
         [:jump, "error", [:ident, "None"]]
     end
 
+    it "can be used as an argument" do
+      source = Savi::Source.new_example <<-SOURCE
+      :module Errors
+        :fun example!(cond)
+          Some.method(error!)
+      SOURCE
+
+      ctx = Savi.compiler.compile([source], :macros)
+      ctx.errors.should be_empty
+
+      func = ctx.namespace.find_func!(ctx, source, "Errors", "example!")
+      func.body.not_nil!.terms.first.to_a.should eq [:call,
+        [:ident, "Some"],
+        [:ident, "method"],
+        [:group, "(", [:jump, "error", [:ident, "None"]]],
+      ]
+    end
+
     it "can be conditional with `if`" do
       source = Savi::Source.new_example <<-SOURCE
       :module Errors

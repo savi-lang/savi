@@ -589,7 +589,7 @@ class Savi::Compiler::Macros < Savi::AST::CopyOnMutateVisitor
     lhs = expr.lhs
     op = expr.op
     rhs = expr.rhs
-    
+
     # For the case where `rhs` is not a value expression, but rather a type expression:
     # `String`, `Array(String)` or `(String | None)`, we will compile into the
     # `Assert.type_relation` call.
@@ -651,9 +651,9 @@ class Savi::Compiler::Macros < Savi::AST::CopyOnMutateVisitor
     lhs = expr.lhs
     op = expr.op
     rhs = expr.rhs
-    
+
     # Use a hygienic local to refer to it multiple times without evaluating again.
-    local_lhs_name = AST::Identifier.new(next_local_name).from(lhs) 
+    local_lhs_name = AST::Identifier.new(next_local_name).from(lhs)
     local_lhs = AST::Relate.new(
       local_lhs_name,
       AST::Operator.new("=").from(lhs),
@@ -856,7 +856,6 @@ class Savi::Compiler::Macros < Savi::AST::CopyOnMutateVisitor
       when AST::Qualify
         @ignore_non_sequence_groups << node.group
       when AST::Call
-        node.args.try { |child| @ignore_non_sequence_groups << child }
         node.yield_params.try { |child| @ignore_non_sequence_groups << child }
       end
 
