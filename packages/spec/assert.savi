@@ -10,7 +10,6 @@
 
   :fun non condition(
     spec Spec
-    has_error Bool
     success Bool
     pos SourceCodePosition = source_code_position_of_argument spec
   )
@@ -18,8 +17,7 @@
     assert = AssertCondition.new(
       ctx.spec
       ctx.example
-      has_error
-      !has_error && success
+      success
       pos
     )
     ctx.specs.enqueue(assert)
@@ -64,6 +62,16 @@
     )
     ctx.specs.enqueue(assert)
 
+  :fun non unexpected_error(spec Spec, pos SourceCodePosition = source_code_position_of_argument spec)
+    ctx = spec.ctx
+    assert = UnexpectedError.new(
+      ctx.spec
+      ctx.example
+      False
+      pos
+    )
+    ctx.specs.enqueue(assert)
+
   :fun file_and_line String
     line = Inspect[@pos.row + 1]
     @indent(4, String.join(["# ", @pos.filename, ":", line]))
@@ -74,21 +82,14 @@
 :class val AssertCondition
   :is Assert
 
-  // TODO: move to trait after all Assert classes implement this.
-  :let has_error Bool
-
-  :new val (@spec, @example, @has_error, @success, @pos)
+  :new val (@spec, @example, @success, @pos)
 
   :fun print_failure(env Env) None
     env.err.print(String.join([
       ""
       @indent(4, String.join(["FAIL:", @pos.string], " "))
       ""
-      @indent(4, if @has_error (
-        "Not expected to raise an error"
-      |
-        "Expected to be True"
-      ))
+      @indent(4, "Expected to be True")
       ""
       @file_and_line
     ], "\n"))
@@ -141,6 +142,23 @@
         expectation
         @rhs
       ], " "))
+      ""
+      @file_and_line
+    ], "\n"))
+
+    None
+
+:class val UnexpectedError
+  :is Assert
+
+  :new val (@spec, @example, @success, @pos)
+
+  :fun print_failure(env Env) None
+    env.err.print(String.join([
+      ""
+      @indent(4, String.join(["FAIL:", @pos.string], " "))
+      ""
+      @indent(4, "Unexpected error ocurred")
       ""
       @file_and_line
     ], "\n"))

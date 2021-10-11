@@ -696,60 +696,38 @@ class Savi::Compiler::Macros < Savi::AST::CopyOnMutateVisitor
   def visit_assert(node : AST::Relate, expr : AST::Node)
     orig = node.lhs.as(AST::Identifier)
 
-    # The following hygienic locals are rewriting the code to
+    # We're re-writing the code to wrap it all with try
     #
-    # local_has_error = False
-    # local_try Bool = try (
-    #   expr
+    # try (
+    #   Assert.condition(@, expr)
     # |
-    #   local_has_error = True
-    #   False
+    #   Assert.unexpected_error(@)
     # )
     #
-    local_has_error_name = AST::Identifier.new(next_local_name).from(orig) 
-    local_has_error = AST::Relate.new(
-      local_has_error_name,
-      AST::Operator.new("=").from(orig),
-      AST::Identifier.new("False").from(orig),
-    ).from(orig)
-
-    local_try_name = AST::Identifier.new(next_local_name).from(orig)
-    local_try = AST::Relate.new(
-      AST::Relate.new(
-        local_try_name,
-        AST::Operator.new("EXPLICITTYPE").from(orig),
-        AST::Identifier.new("Bool").from(orig),
-      ).from(orig),
-      AST::Operator.new("=").from(orig),
-      AST::Try.new(
-        AST::Group.new("(", [expr] of AST::Term).from(orig),
-        AST::Group.new("(", [
-          AST::Relate.new(
-            local_has_error_name,
-            AST::Operator.new("=").from(orig),
-            AST::Identifier.new("True").from(orig),
-          ).from(orig),
-          AST::Identifier.new("False").from(orig),
-        ] of AST::Term).from(orig),
-        allow_non_partial_body: true,
-      ).from(orig)
-    ).from(orig)
-
-    call = AST::Call.new(
-      AST::Identifier.new("Assert").from(orig),
-      AST::Identifier.new("condition").from(orig),
+    try = AST::Try.new(
       AST::Group.new("(", [
-        AST::Identifier.new("@").from(node),
-        local_has_error_name,
-        local_try_name,
-      ] of AST::Term).from(expr)
-    ).from(orig)
+        AST::Call.new(
+          AST::Identifier.new("Assert").from(expr),
+          AST::Identifier.new("condition").from(expr),
+          AST::Group.new("(", [
+            AST::Identifier.new("@").from(node),
+            expr,
+          ] of AST::Term).from(expr)
+        ).from(expr),
+      ] of AST::Term).from(orig),
+      AST::Group.new("(", [
+        AST::Call.new(
+          AST::Identifier.new("Assert").from(expr),
+          AST::Identifier.new("unexpected_error").from(expr),
+          AST::Group.new("(", [
+            AST::Identifier.new("@").from(node),
+          ] of AST::Term).from(expr)
+        ).from(expr),
+      ] of AST::Term).from(orig),
+      allow_non_partial_body: true,
+    ).from(node)
 
-    AST::Group.new("(", [
-      local_has_error,
-      local_try,
-      call,
-    ] of AST::Term).from(node)
+    AST::Group.new("(", [try] of AST::Term).from(node)
   end
 
   def visit_source_code_position_of_argument(node : AST::Group)
