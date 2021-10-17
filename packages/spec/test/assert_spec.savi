@@ -3,6 +3,7 @@
   :fun non with_yield Bool
     yield False
     True
+  :fun non fail! Bool: error!, True
 
 :class AssertSpec
   :is Spec
