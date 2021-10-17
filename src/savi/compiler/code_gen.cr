@@ -2061,6 +2061,24 @@ class Savi::Compiler::CodeGen
       result = lhs_meta_type.satisfies_bound?(ctx, rhs_meta_type)
       result = !result if !positive_check
       gen_bool(result)
+    elsif type_of(relate.lhs).is_concrete?(ctx)
+      # If the left side is an expression, but is statically known to have
+      # a particular concrete type, we can resolve this check without looking
+      # at the type descriptor. And indeed, it may have no type descriptor
+      # if it is a bare value such as a struct or machine word type.
+      #
+      # This is the same code as the above, except we must first generate
+      # code to execute the expression, in case it has any side effects.
+      # But we discard the result value and just check the inferred types.
+      gen_expr(relate.lhs)
+
+      gfunc = func_frame.gfunc.not_nil!
+      lhs_meta_type = gfunc.reified.meta_type_of(ctx, relate.lhs, gfunc.infer).not_nil!
+      rhs_meta_type = gfunc.reified.meta_type_of(ctx, relate.rhs, gfunc.infer).not_nil!
+
+      result = lhs_meta_type.satisfies_bound?(ctx, rhs_meta_type)
+      result = !result if !positive_check
+      gen_bool(result)
     else
       # Otherwise, we generate code that checks the type descriptor of the
       # left-hand side against the compile-time type of the right-hand side.
