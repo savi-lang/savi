@@ -639,11 +639,25 @@ class Savi::Compiler::Macros < Savi::AST::CopyOnMutateVisitor
       ] of AST::Term).from(expr)
     ).from(orig)
 
-    AST::Group.new("(", [
-      local_lhs_assign,
-      local_rhs_assign,
-      call,
-    ] of AST::Term).from(node)
+    try = AST::Try.new(
+      AST::Group.new("(", [
+        local_lhs_assign,
+        local_rhs_assign,
+        call,
+      ] of AST::Term).from(orig),
+      AST::Group.new("(", [
+        AST::Call.new(
+          AST::Identifier.new("Assert").from(expr),
+          AST::Identifier.new("unexpected_error").from(expr),
+          AST::Group.new("(", [
+            AST::Identifier.new("@").from(node),
+          ] of AST::Term).from(expr)
+        ).from(expr),
+      ] of AST::Term).from(orig),
+      allow_non_partial_body: true,
+    ).from(node)
+
+    AST::Group.new("(", [try] of AST::Term).from(node)
   end
 
   def visit_assert_type_relation(node : AST::Relate, expr : AST::Relate)
@@ -685,12 +699,26 @@ class Savi::Compiler::Macros < Savi::AST::CopyOnMutateVisitor
         local_relate_name,
       ] of AST::Term).from(expr)
     ).from(orig)
+    
+    try = AST::Try.new(
+      AST::Group.new("(", [
+        local_lhs,
+        local_relate,
+        call,
+      ] of AST::Term).from(orig),
+      AST::Group.new("(", [
+        AST::Call.new(
+          AST::Identifier.new("Assert").from(expr),
+          AST::Identifier.new("unexpected_error").from(expr),
+          AST::Group.new("(", [
+            AST::Identifier.new("@").from(node),
+          ] of AST::Term).from(expr)
+        ).from(expr),
+      ] of AST::Term).from(orig),
+      allow_non_partial_body: true,
+    ).from(node)
 
-    AST::Group.new("(", [
-      local_lhs,
-      local_relate,
-      call,
-    ] of AST::Term).from(node)
+    AST::Group.new("(", [try] of AST::Term).from(node)
   end
 
   def visit_assert(node : AST::Relate, expr : AST::Node)
