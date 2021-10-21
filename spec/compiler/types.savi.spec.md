@@ -9,10 +9,10 @@ It determines the return type of field getter/setter/displacer functions.
   :let field: String.new_iso
 ```
 ```types.return ExampleIsoField.field
-(String & K'@'1->iso'aliased)
+(String & K'@'1->ref')
 ```
 ```types.return ExampleIsoField.field=
-String'iso'aliased
+String'ref'
 ```
 ```types.return ExampleIsoField.field<<=
 String'iso
@@ -35,11 +35,11 @@ It determines the return type of field getter via a concrete receiver cap.
     example.field
 ```
 ```types.return GetExampleIsoField.via_ref
-String'iso'aliased
+String'ref'
 ```
 ```types.return GetExampleIsoField.via_val
 String'val
 ```
 ```types.return GetExampleIsoField.via_box
-String'tag
+String'box'
 ```

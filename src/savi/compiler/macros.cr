@@ -231,6 +231,18 @@ class Savi::Compiler::Macros < Savi::AST::CopyOnMutateVisitor
       visit_case(node)
     elsif lhs.is_a?(AST::Identifier) && lhs.value == "assert" && node.op.value == ":"
       visit_assert(node, node.rhs)
+    elsif node.op.value == ":" && 
+          lhs.is_a?(AST::Group) &&
+          lhs.style == " " &&
+          Util.match_ident?(lhs, 0, "assert") &&
+          Util.match_ident?(lhs, 1, "no_error")
+      visit_assert_no_error(node, node.rhs)
+    elsif node.op.value == ":" && 
+          lhs.is_a?(AST::Group) &&
+          lhs.style == " " &&
+          Util.match_ident?(lhs, 0, "assert") &&
+          Util.match_ident?(lhs, 1, "error")
+      visit_assert_error(node, node.rhs)
     else
       node
     end
@@ -589,7 +601,7 @@ class Savi::Compiler::Macros < Savi::AST::CopyOnMutateVisitor
     lhs = expr.lhs
     op = expr.op
     rhs = expr.rhs
-    
+
     # For the case where `rhs` is not a value expression, but rather a type expression:
     # `String`, `Array(String)` or `(String | None)`, we will compile into the
     # `Assert.type_relation` call.
@@ -639,11 +651,27 @@ class Savi::Compiler::Macros < Savi::AST::CopyOnMutateVisitor
       ] of AST::Term).from(expr)
     ).from(orig)
 
-    AST::Group.new("(", [
-      local_lhs_assign,
-      local_rhs_assign,
-      call,
-    ] of AST::Term).from(node)
+    try = AST::Try.new(
+      AST::Group.new("(", [
+        local_lhs_assign,
+        local_rhs_assign,
+        call,
+      ] of AST::Term).from(orig),
+      AST::Group.new("(", [
+        AST::Call.new(
+          AST::Identifier.new("Assert").from(expr),
+          AST::Identifier.new("has_error").from(expr),
+          AST::Group.new("(", [
+            AST::Identifier.new("@").from(node),
+            AST::Identifier.new("True").from(node),
+            AST::Identifier.new("False").from(node),
+          ] of AST::Term).from(expr)
+        ).from(expr),
+      ] of AST::Term).from(orig),
+      allow_non_partial_body: true,
+    ).from(node)
+
+    AST::Group.new("(", [try] of AST::Term).from(node)
   end
 
   def visit_assert_type_relation(node : AST::Relate, expr : AST::Relate)
@@ -651,9 +679,9 @@ class Savi::Compiler::Macros < Savi::AST::CopyOnMutateVisitor
     lhs = expr.lhs
     op = expr.op
     rhs = expr.rhs
-    
+
     # Use a hygienic local to refer to it multiple times without evaluating again.
-    local_lhs_name = AST::Identifier.new(next_local_name).from(lhs) 
+    local_lhs_name = AST::Identifier.new(next_local_name).from(lhs)
     local_lhs = AST::Relate.new(
       local_lhs_name,
       AST::Operator.new("=").from(lhs),
@@ -685,23 +713,103 @@ class Savi::Compiler::Macros < Savi::AST::CopyOnMutateVisitor
         local_relate_name,
       ] of AST::Term).from(expr)
     ).from(orig)
+    
+    try = AST::Try.new(
+      AST::Group.new("(", [
+        local_lhs,
+        local_relate,
+        call,
+      ] of AST::Term).from(orig),
+      AST::Group.new("(", [
+        AST::Call.new(
+          AST::Identifier.new("Assert").from(expr),
+          AST::Identifier.new("has_error").from(expr),
+          AST::Group.new("(", [
+            AST::Identifier.new("@").from(node),
+            AST::Identifier.new("True").from(node),
+            AST::Identifier.new("False").from(node),
+          ] of AST::Term).from(expr)
+        ).from(expr),
+      ] of AST::Term).from(orig),
+      allow_non_partial_body: true,
+    ).from(node)
 
-    AST::Group.new("(", [
-      local_lhs,
-      local_relate,
-      call,
-    ] of AST::Term).from(node)
+    AST::Group.new("(", [try] of AST::Term).from(node)
   end
 
   def visit_assert(node : AST::Relate, expr : AST::Node)
     orig = node.lhs.as(AST::Identifier)
 
+    # We're re-writing the code to wrap it all with try
+    #
+    # try (
+    #   Assert.condition(@, expr)
+    # |
+    #   Assert.has_error(@, True, False) // Booleans mean "has error" and "expected error?"
+    # )
+    #
+    try = AST::Try.new(
+      AST::Group.new("(", [
+        AST::Call.new(
+          AST::Identifier.new("Assert").from(expr),
+          AST::Identifier.new("condition").from(expr),
+          AST::Group.new("(", [
+            AST::Identifier.new("@").from(node),
+            expr,
+          ] of AST::Term).from(expr)
+        ).from(expr),
+      ] of AST::Term).from(orig),
+      AST::Group.new("(", [
+        AST::Call.new(
+          AST::Identifier.new("Assert").from(expr),
+          AST::Identifier.new("has_error").from(expr),
+          AST::Group.new("(", [
+            AST::Identifier.new("@").from(node),
+            AST::Identifier.new("True").from(node),
+            AST::Identifier.new("False").from(node),
+          ] of AST::Term).from(expr)
+        ).from(expr),
+      ] of AST::Term).from(orig),
+      allow_non_partial_body: true,
+    ).from(node)
+
+    AST::Group.new("(", [try] of AST::Term).from(node)
+  end
+
+  def visit_assert_no_error(node : AST::Relate, expr : AST::Node)
+    build_assert_has_error(node, expr, false)
+  end
+
+  def visit_assert_error(node : AST::Relate, expr : AST::Node)
+    build_assert_has_error(node, expr, true)
+  end
+
+  def build_assert_has_error(node : AST::Relate, expr : AST::Node, expects_error : Bool)
+    orig = node.lhs.as(AST::Group)
+
+    try = AST::Try.new(
+      AST::Group.new("(", [
+        expr,
+        AST::Identifier.new("False").from(expr),
+      ] of AST::Term).from(expr),
+      AST::Group.new("(", [
+        AST::Identifier.new("True").from(expr)
+      ] of AST::Term).from(expr)
+    ).from(expr)
+
+    expects_error = if expects_error
+      AST::Identifier.new("True").from(node)
+    else
+      AST::Identifier.new("False").from(node)
+    end
+
     call = AST::Call.new(
       AST::Identifier.new("Assert").from(orig),
-      AST::Identifier.new("condition").from(orig),
+      AST::Identifier.new("has_error").from(orig),
       AST::Group.new("(", [
         AST::Identifier.new("@").from(node),
-        expr,
+        try,
+        expects_error,
       ] of AST::Term).from(expr)
     ).from(orig)
 
@@ -812,7 +920,6 @@ class Savi::Compiler::Macros < Savi::AST::CopyOnMutateVisitor
       when AST::Qualify
         @ignore_non_sequence_groups << node.group
       when AST::Call
-        node.args.try { |child| @ignore_non_sequence_groups << child }
         node.yield_params.try { |child| @ignore_non_sequence_groups << child }
       end
 

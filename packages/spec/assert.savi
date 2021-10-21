@@ -13,9 +13,14 @@
     success Bool
     pos SourceCodePosition = source_code_position_of_argument spec
   )
-    test = spec.test
-    assert = AssertCondition.new(test.spec, test.example, success, pos)
-    test.specs.enqueue(assert)
+    ctx = spec.ctx
+    assert = AssertCondition.new(
+      ctx.spec
+      ctx.example
+      success
+      pos
+    )
+    ctx.specs.enqueue(assert)
 
   :fun non relation(
     spec Spec
@@ -25,17 +30,17 @@
     success Bool
     pos SourceCodePosition = source_code_position_of_argument spec
   )
-    test = spec.test
+    ctx = spec.ctx
     assert = AssertRelation.new(
-      test.spec
-      test.example
+      ctx.spec
+      ctx.example
       success
       pos
       op
       Inspect[lhs]
       Inspect[rhs]
     )
-    test.specs.enqueue(assert)
+    ctx.specs.enqueue(assert)
 
   :fun non type_relation(
     spec Spec
@@ -45,17 +50,33 @@
     success Bool
     pos SourceCodePosition = source_code_position_of_argument spec
   )
-    test = spec.test
+    ctx = spec.ctx
     assert = AssertTypeRelation.new(
-      test.spec
-      test.example
+      ctx.spec
+      ctx.example
       success
       pos
       op
       Inspect[lhs]
       rhs
     )
-    test.specs.enqueue(assert)
+    ctx.specs.enqueue(assert)
+
+  :fun non has_error(
+    spec Spec
+    has_error Bool
+    expects_error Bool
+    pos SourceCodePosition = source_code_position_of_argument spec
+  )
+    ctx = spec.ctx
+    assert = AssertHasError.new(
+      ctx.spec
+      ctx.example
+      if expects_error (has_error | !has_error)
+      pos
+      expects_error
+    )
+    ctx.specs.enqueue(assert)
 
   :fun file_and_line String
     line = Inspect[@pos.row + 1]
@@ -127,6 +148,31 @@
         expectation
         @rhs
       ], " "))
+      ""
+      @file_and_line
+    ], "\n"))
+
+    None
+
+:class val AssertHasError
+  :is Assert
+
+  :let expects_error Bool
+
+  :new val (@spec, @example, @success, @pos, @expects_error)
+
+  :fun print_failure(env Env) None
+    expectation = if @expects_error (
+      "Expected to raise an error"
+    |
+      "Not expected to raise an error"
+    )
+
+    env.err.print(String.join([
+      ""
+      @indent(4, String.join(["FAIL:", @pos.string], " "))
+      ""
+      @indent(4, expectation)
       ""
       @file_and_line
     ], "\n"))

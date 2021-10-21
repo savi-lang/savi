@@ -2061,6 +2061,24 @@ class Savi::Compiler::CodeGen
       result = lhs_meta_type.satisfies_bound?(ctx, rhs_meta_type)
       result = !result if !positive_check
       gen_bool(result)
+    elsif type_of(relate.lhs).is_concrete?(ctx)
+      # If the left side is an expression, but is statically known to have
+      # a particular concrete type, we can resolve this check without looking
+      # at the type descriptor. And indeed, it may have no type descriptor
+      # if it is a bare value such as a struct or machine word type.
+      #
+      # This is the same code as the above, except we must first generate
+      # code to execute the expression, in case it has any side effects.
+      # But we discard the result value and just check the inferred types.
+      gen_expr(relate.lhs)
+
+      gfunc = func_frame.gfunc.not_nil!
+      lhs_meta_type = gfunc.reified.meta_type_of(ctx, relate.lhs, gfunc.infer).not_nil!
+      rhs_meta_type = gfunc.reified.meta_type_of(ctx, relate.rhs, gfunc.infer).not_nil!
+
+      result = lhs_meta_type.satisfies_bound?(ctx, rhs_meta_type)
+      result = !result if !positive_check
+      gen_bool(result)
     else
       # Otherwise, we generate code that checks the type descriptor of the
       # left-hand side against the compile-time type of the right-hand side.
@@ -3231,27 +3249,34 @@ class Savi::Compiler::CodeGen
     # TODO: Allow an error_phi_llvm_type of something other than None.
     error_phi_llvm_type = llvm_type_of(@gtypes["None"])
 
-    # Catch the thrown error value, by getting the blocks and values from the
-    # try_else_stack and using the LLVM mechanism called a "phi" instruction.
     else_stack_tuple = @try_else_stack.pop
     raise "invalid try else stack" unless else_stack_tuple[0] == else_block
-    error_value = @builder.phi(
-      error_phi_llvm_type,
-      else_stack_tuple[1],
-      else_stack_tuple[2],
-      "phi_else_try",
-    )
+    if else_stack_tuple[1].empty?
+      # If the else stack tuple has empty predecessors, this is a try block
+      # that has no possibility of ever throwing an error.
+      # So we mark the else block as being unreachable, and skip generating it.
+      @builder.unreachable
+    else
+      # Catch the thrown error value, by getting the blocks and values from the
+      # try_else_stack and using the LLVM mechanism called a "phi" instruction.
+      error_value = @builder.phi(
+        error_phi_llvm_type,
+        else_stack_tuple[1],
+        else_stack_tuple[2],
+        "phi_else_try",
+      )
 
-    # TODO: allow the else block to reference the error value as a local.
+      # TODO: allow the else block to reference the error value as a local.
 
-    # Generate the body code of the else clause, then proceed to the post block.
-    else_value = gen_expr(expr.else_body)
-    unless func_frame.flow.jumps_away?(expr.else_body)
-      phi_type ||= type_of(expr)
-      else_value = gen_assign_cast(else_value, phi_type.not_nil!, expr.else_body)
-      phi_blocks << @builder.insert_block.not_nil!
-      phi_values << else_value
-      @builder.br(post_block)
+      # Generate the body code of the else clause, then proceed to the post block.
+      else_value = gen_expr(expr.else_body)
+      unless func_frame.flow.jumps_away?(expr.else_body)
+        phi_type ||= type_of(expr)
+        else_value = gen_assign_cast(else_value, phi_type.not_nil!, expr.else_body)
+        phi_blocks << @builder.insert_block.not_nil!
+        phi_values << else_value
+        @builder.br(post_block)
+      end
     end
 
     # We can't have a phi with no predecessors, so we don't generate it, and

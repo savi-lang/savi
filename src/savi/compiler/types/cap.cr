@@ -1,17 +1,78 @@
 module Savi::Compiler::Types::Cap
   alias Value = UInt8
 
-  # Each cap is represented as one of the bits in a byte.
-  # We have fewer than 8 caps, so not all of the bits are in use.
-  ISO = 1u8 << 6
-  ILS = 1u8 << 5 # we refer to `iso'aliased` as `ILS` here for short
-  REF = 1u8 << 4
-  VAL = 1u8 << 3
-  BOX = 1u8 << 2
-  TAG = 1u8 << 1
-  NON = 1u8 << 0
+  # Each cap is represented as a bitset of five fundamental elements,
+  # with each element having an associated semantic meaning.
+  BIT_ADDR  = 1u8 << 0 # the reference allows knowing the memory address
+  BIT_READ  = 1u8 << 1 # the reference allows reading from the object's memory
+  BIT_WRITE = 1u8 << 2 # the reference allows writing to the object's memory
+  BIT_HELD  = 1u8 << 3 # the reference holds the object firmly (not borrowed)
+  BIT_ROOT  = 1u8 << 4 # the reference has maximum-level access to that object
+  BITS_ALL_UNION = BIT_ROOT | BIT_HELD | BIT_WRITE | BIT_READ | BIT_ADDR
 
-  ISO_ALIASED = ILS
+  # From these five bits we form a lattice of the useful combinations of them,
+  # forming the caps that users can refer to in type expression syntax.
+  #
+  # In our constants, we use BOX_P and REF_P to refer to `box'` and ref'`,
+  # respectively. The "prime" character `'` cannot be used, so we use _P here.
+  #
+  # The most powerful cap `iso` contains all permission bits, so in type theory
+  # it is considered to be the "bottom cap", as it is a subtype of all caps.
+  # That is, it is the most specific type and has the most features,
+  # so no other cap can be used where an `iso` is expected.
+  #
+  # Similarly, the weakest cap `non` is considered the "top cap",
+  # because it has no bits/features in it that are not also in the other caps,
+  # making all other caps subtypes of it (and making it the top supertype).
+  #
+  # The lattice looks like this, portrayed as a graph with subtypes being below,
+  # with `non` as the "top cap" and `iso` as the "bottom cap" in the lattice.
+  #
+  #     non             (top cap: widest, fewest features, weakest)
+  #      |
+  #      |
+  #     tag
+  #      |
+  #      |
+  #     box'
+  #    /   \            (lines show subtyping relationships, with the
+  #   /     \            subtype shown below its immediate supertype)
+  # ref'    box
+  #   \    /   \
+  #    \  /     \
+  #     ref     val
+  #       \     /
+  #        \   /
+  #         iso         (bottom cap: narrowest, most features, strongest)
+  NON   = 0_u8
+  TAG   = NON   + BIT_ADDR  # from NON, also know the address
+  BOX_P = TAG   + BIT_READ  # from TAG, also allow reading
+  REF_P = BOX_P + BIT_WRITE # from BOX_P, also allow writing
+  BOX   = BOX_P + BIT_HELD  # from BOX_P, also hold it firmly
+  REF   = REF_P + BIT_HELD  # from REF_P, also hold it firmly
+  VAL   = BOX   + BIT_ROOT  # from BOX, max perm (no one else can write)
+  ISO   = REF   + BIT_ROOT  # from REF, max perm (no one else can read or write)
+  #
+  # Subtyping is transitive, so if there is a downward path from one cap
+  # to another, then those two caps have a subtyping relationship.
+  # For example, `val` is a subtype of `non` via the path leading through
+  # the intermediate caps `box` and `box'`.
+  #
+  # Caps that are side by side (like `ref` and `val`) have no direct subtyping
+  # relationship to one another, but they have a common "upper bound" (`box`),
+  # being the nearest cap which they are both subtypes of, and they have a
+  # common "lower bound" (`iso`): the nearest cap that is a subtype of both.
+  #
+  # For caps that do have a direct subtyping relationship, the subtype itself
+  # would be the lower bound and the supertype would be the upper bound.
+  #
+  # The concepts of upper and lower bounds come into play when dealing with
+  # "covariant" type positions (like receiving a return value from a call) vs
+  # "contravariant" type positions (like providing an argument to a call).
+  # When receiving a value of a certain type, code that uses that value must
+  # treat it as its the widest possible type (the upper bound), but when
+  # required to provide a value of a certain type, code that provides it
+  # must meet the most narrow of the requirements (the lower bound).
 
   module Logic
     # A convenience method used to easily execute the following self. methods
@@ -21,84 +82,137 @@ module Savi::Compiler::Types::Cap
       with self yield
     end
 
-    # We store the caps in a map to reach them by name or iterate in order.
-    BITS = {
-      iso: ISO,
-      ils: ILS,
-      ref: REF,
-      val: VAL,
-      box: BOX,
-      tag: TAG,
-      non: NON,
+    # We store the caps in a map to reach by name or iterate in order.
+    CAPS = {
+      iso:   ISO,
+      val:   VAL,
+      ref:   REF,
+      box:   BOX,
+      ref_p: REF_P,
+      box_p: BOX_P,
+      tag:   TAG,
+      non:   NON,
     }
 
-    # Prepare a UInt8 mask that represents all possible bits we use.
-    UNION_ALL_BITS = (1u8 << BITS.size) - 1
-
-    # Wrap/unwrap a pair of cap values to/from a single packed integer.
-    # This is used to construct/deconstruct the index to a 2D truth table.
-    def self.wrap_pair(hi_bits : UInt8, lo_bits : UInt8) : UInt16
-      ((UNION_ALL_BITS & lo_bits).to_u16) |
-      ((UNION_ALL_BITS & hi_bits).to_u16 << BITS.size)
-    end
-    def self.unwrap_pair(pair_bits : UInt16) : {UInt8, UInt8}
-      lo_bits = UNION_ALL_BITS & pair_bits
-      hi_bits = UNION_ALL_BITS & (pair_bits >> BITS.size)
-      {hi_bits, lo_bits}
-    end
-
-    # Prepare a UInt16 mask that represents all possible bits for two caps,
-    # which is used as the lookup index mask for 2D truth tables.
-    UNION_ALL_BITS_PAIR = wrap_pair(UNION_ALL_BITS, UNION_ALL_BITS)
-
-    # Prepare a matrix-form table which represents the viewpoint adaptation rules.
-    VIEWPOINTS_MATRIX = [
-    #  ISO  ILS  REF  VAL  BOX  TAG  NON
-      [ISO, ISO, ISO, VAL, VAL, TAG, NON], # viewed from ISO
-      [ISO, ILS, ILS, VAL, TAG, TAG, NON], # viewed from ILS
-      [ISO, ILS, REF, VAL, BOX, TAG, NON], # viewed from REF
-      [VAL, VAL, VAL, VAL, VAL, TAG, NON], # viewed from VAL
-      [VAL, TAG, BOX, VAL, BOX, TAG, NON], # viewed from BOX
-      [NON, NON, NON, NON, NON, NON, NON], # viewed from TAG
-      [NON, NON, NON, NON, NON, NON, NON], # viewed from NON
-    ]
-
-    # Convert them into three flat-indexed truth tables, with each possible pair
-    # of inputs having a table that can be used to get the third term.
-    GET_ADAPTED_BY_ORIGIN_AND_FIELD = Array(UInt8).new(UNION_ALL_BITS_PAIR + 1, 0)
-    GET_FIELD_BY_ORIGIN_AND_ADAPTED = Array(UInt8).new(UNION_ALL_BITS_PAIR + 1, 0)
-    GET_ORIGIN_BY_FIELD_AND_ADAPTED = Array(UInt8).new(UNION_ALL_BITS_PAIR + 1, 0)
-    (0_u16..UNION_ALL_BITS_PAIR).map { |pair_bits|
-      origin_bits, field_bits = unwrap_pair(pair_bits)
-      adapted_bits : UInt8 = 0
-
-      BITS.values.each_with_index { |origin_mask, origin_index|
-        next unless (origin_mask & origin_bits) != 0
-
-        BITS.values.each_with_index { |field_mask, field_index|
-          next unless (field_mask & field_bits) != 0
-
-          adapted_bits |= VIEWPOINTS_MATRIX[origin_index][field_index]
+    # Convenience functions for checking invariants against all possible caps;
+    def self.for_all; CAPS.each_value { |k| yield k }; end
+    def self.for_all_2
+      for_all { |k1|
+        for_all { |k2|
+          yield k1, k2
         }
       }
-
-      origin_and_field_bits = wrap_pair(origin_bits, field_bits)
-      origin_and_adapted_bits = wrap_pair(origin_bits, adapted_bits)
-      field_and_adapted_bits = wrap_pair(field_bits, adapted_bits)
-
-      GET_ADAPTED_BY_ORIGIN_AND_FIELD[origin_and_field_bits] |= adapted_bits
-      GET_FIELD_BY_ORIGIN_AND_ADAPTED[origin_and_adapted_bits] |= field_bits
-      GET_ORIGIN_BY_FIELD_AND_ADAPTED[field_and_adapted_bits] |= origin_bits
-    }
-
-    def self.get_adapted_by_origin_and_field(origin, field)
-      GET_ADAPTED_BY_ORIGIN_AND_FIELD[wrap_pair(origin, field)]
     end
-    def self.get_field_by_origin_and_adapted(origin, adapted)
-      GET_FIELD_BY_ORIGIN_AND_ADAPTED[wrap_pair(origin, adapted)]
+    def self.for_all_3
+      for_all { |k1|
+        for_all { |k2|
+          for_all { |k3|
+            yield k1, k2, k3
+          }
+        }
+      }
     end
-    def self.get_origin_by_field_and_adapted(field, adapted)
-      GET_ORIGIN_BY_FIELD_AND_ADAPTED[wrap_pair(field, adapted)]
+
+    # Convenience functions for checking bits of a cap value.
+    def self.bit_addr?(k : Value); k & BIT_ADDR != 0; end
+    def self.bit_read?(k : Value); k & BIT_READ != 0; end
+    def self.bit_write?(k : Value); k & BIT_WRITE != 0; end
+    def self.bit_held?(k : Value); k & BIT_HELD != 0; end
+    def self.bit_root?(k : Value); k & BIT_ROOT != 0; end
+
+    def self.is_subtype?(sub : Value, supr : Value)
+      # If the desired subtyping relationship is true,
+      # then sub must be the lower bound of the two.
+      lower_bound(sub, supr) == sub
+    end
+
+    def self.is_supertype?(supr : Value, sub : Value)
+      # If the desired subtyping relationship is true,
+      # then supr must be the upper bound of the two.
+      upper_bound(supr, sub) == supr
+    end
+
+    def self.lower_bound(k1 : Value, k2 : Value)
+      # The lower bound must have all features of both `k1` and `k2`,
+      # hence it is the bitwise union their feature bits.
+      k1 | k2
+    end
+
+    def self.upper_bound(k1 : Value, k2 : Value)
+      # The upper bound must have no features that aren't in both `k1` and `k2`,
+      # hence it is the bitwise intersection their feature bits.
+      k1 & k2
+    end
+
+    def self.aliased(k : Value)
+      # The alias of iso is ref'. All other caps alias as themselves.
+      k == ISO ? REF_P : k
+    end
+
+    def self.viewpoint(k1 : Value, k2 : Value)
+      # For purposes of this function we treat the operator as commutative,
+      # though one additional wrinkle is that `tag` is not symmetrical -
+      # `tag` fields may be read as `tag` from any readable type, but it should
+      # not be possible to get readable fields as `tag` from a `tag` origin.
+      # We cover that small wrinkle with its own dedicated check in the
+      # type-checking pass, but in practice it is not an issue when all getter
+      # methods are defined by the compiler as having the `box` capability
+      # (and are thus not callable with a `tag` receiver).
+      #
+      # Thus we can cleanly treat this operation as commutative here,
+      # without worrying about the order of the arguments `k1` and `k2`.
+      # Prepare a matrix-form table which represents the viewpoint adaptation rules.
+      #
+      #                 iso   val   ref   box   ref'  box'  tag   non
+      #               +------------------------------------------------+
+      # origin: iso   | iso   val   iso   val   iso   val   tag   non  |
+      # origin: val   | val   val   val   val   val   val   tag   non  |
+      # origin: ref   | iso   val   ref   box   ref'  box'  tag   non  |
+      # origin: box   | val   val   box   box   box'  box'  tag   non  |
+      # origin: ref'  | iso   val   ref'  box'  ref'  box'  tag   non  |
+      # origin: box'  | val   val   box'  box'  box'  box'  tag   non  |
+      # origin: tag   | tag   tag   tag   tag   tag   tag   tag   non  |
+      # origin: non   | non   non   non   non   non   non   non   non  |
+
+      # Unless both inputs have the `addr` bit, we must return `non` (no `addr`)
+      return NON unless bit_addr?(k1) && bit_addr?(k2)
+
+      # Unless both inputs have the `read` bit, we must return `tag` (no `read`)
+      return TAG unless bit_read?(k1) && bit_read?(k2)
+
+      # If we have `addr` and `read` bits, we must at least be `box'`,
+      # which is the uppermost cap in the lattice below `non` and `tag`,
+      # and the last descending cap that is a supertype of all other caps.
+      result = BOX_P
+
+      # If both inputs have the `write` bit, so does the result.
+      result |= BIT_WRITE if bit_write?(k1) && bit_write?(k2)
+
+      # If both inputs have the `held` bit, so does the result.
+      result |= BIT_HELD if bit_held?(k1) && bit_held?(k2)
+
+      # If *EITHER* has the `root` bit, the result has both `root` and `held`.
+      result |= BIT_ROOT | BIT_HELD if bit_root?(k1) || bit_root?(k2)
+
+      result
+    end
+
+    # Return the weakest cap that can be "split" into the two given caps.
+    # If the two given caps cannot simultaneously coexist in the same scope,
+    # then this function returns nil as an indication of the error.
+    def self.simult?(k1 : Value?, k2 : Value?) : Value?
+      return nil unless k1 && k2
+
+      if k1 == VAL || k2 == VAL
+        return nil if bit_write?(k1 ^ k2)
+        return VAL
+      end
+
+      upper_bound = upper_bound(k1, k2)
+      lower_bound = lower_bound(k1, k2)
+      return nil if bit_root?(lower_bound) && bit_held?(upper_bound)
+
+      lower_bound
     end
   end
 end

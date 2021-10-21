@@ -19,7 +19,7 @@
     assert: stream.token_as_string == ""
 
     // Advance the cursor partway through the stream, leaving a token marked.
-    assert: try (stream.advance!(4), True | False)
+    assert no_error: stream.advance!(4)
     assert: stream.bytes_ahead == 1
     assert: stream.bytes_ahead_of_marker == 5
     assert: stream.token_byte_size == 4
@@ -27,7 +27,7 @@
 
     // Try to advance further and fail partway through,
     // leaving the cursor pointing to the end of the stream.
-    assert: try (stream.advance!(4), False | True)
+    assert error: stream.advance!(4)
     assert: stream.bytes_ahead == 0
     assert: stream.bytes_ahead_of_marker == 5
     assert: stream.token_byte_size == 5
@@ -49,7 +49,7 @@
     assert: stream.token_as_string == ""
 
     // Advance the cursor and then move the marker forward by 3 bytes.
-    assert: try (stream.advance!(3), True | False)
+    assert no_error: stream.advance!(3)
     stream.mark_here
     assert: stream.bytes_ahead == 12
     assert: stream.bytes_ahead_of_marker == 12
@@ -57,23 +57,23 @@
     assert: stream.token_as_string == ""
 
     // Advance the cursor by one byte then peek ahead of the cursor position.
-    assert: try (stream.advance!(1), True | False)
-    assert: try (stream.peek_byte! == 'o' | False)
-    assert: try (stream.peek_byte!(1) == 'w' | False)
-    assert: try (stream.peek_byte!(2) == 'o' | False)
-    assert: try (stream.peek_byte!(3) == 'r' | False)
-    assert: try (stream.peek_byte!(4) == 'l' | False)
-    assert: try (stream.peek_byte!(5) == 'd' | False)
-    assert: try (stream.peek_byte!(6) == 'l' | False)
-    assert: try (stream.peek_byte!(7) == 'i' | False)
-    assert: try (stream.peek_byte!(8) == 'n' | False)
-    assert: try (stream.peek_byte!(9) == 'g' | False)
-    assert: try (stream.peek_byte!(10) == 's' | False)
-    assert: try (stream.peek_byte!(11), False | True)
+    assert no_error: stream.advance!(1)
+    assert: stream.peek_byte! == 'o'
+    assert: stream.peek_byte!(1) == 'w'
+    assert: stream.peek_byte!(2) == 'o'
+    assert: stream.peek_byte!(3) == 'r'
+    assert: stream.peek_byte!(4) == 'l'
+    assert: stream.peek_byte!(5) == 'd'
+    assert: stream.peek_byte!(6) == 'l'
+    assert: stream.peek_byte!(7) == 'i'
+    assert: stream.peek_byte!(8) == 'n'
+    assert: stream.peek_byte!(9) == 'g'
+    assert: stream.peek_byte!(10) == 's'
+    assert error: stream.peek_byte!(11)
 
     // Rewind then advance the cursor across the first chunk boundary.
     stream.rewind_to_marker
-    assert: try (stream.advance!(3), True | False)
+    assert no_error: stream.advance!(3)
     assert: stream.bytes_ahead == 9
     assert: stream.bytes_ahead_of_marker == 12
     assert: stream.token_byte_size == 3
@@ -81,7 +81,7 @@
 
     // Rewind then advance the cursor across both chunk boundaries.
     stream.rewind_to_marker
-    assert: try (stream.advance!(10), True | False)
+    assert no_error: stream.advance!(10)
     assert: stream.bytes_ahead == 2
     assert: stream.bytes_ahead_of_marker == 12
     assert: stream.token_byte_size == 10
@@ -89,7 +89,7 @@
 
     // Rewind then advance the cursor to the end exactly without error.
     stream.rewind_to_marker
-    assert: try (stream.advance!(12), True | False)
+    assert no_error: stream.advance!(12)
     assert: stream.bytes_ahead == 0
     assert: stream.bytes_ahead_of_marker == 12
     assert: stream.token_byte_size == 12
@@ -97,7 +97,7 @@
 
     // Rewind then try to advance the cursor past the end, raising an error.
     stream.rewind_to_marker
-    assert: try (stream.advance!(13), False | True)
+    assert error: stream.advance!(13)
     assert: stream.bytes_ahead == 0
     assert: stream.bytes_ahead_of_marker == 12
     assert: stream.token_byte_size == 12
@@ -113,12 +113,7 @@
 
     // Rewind and advance across the first chunk boundary using a condition.
     stream.rewind_to_marker
-    assert: try (
-      stream.advance_while! -> (byte | byte != 'r')
-      True
-    |
-      False
-    )
+    assert no_error: stream.advance_while! -> (byte | byte != 'r')
     assert: stream.bytes_ahead == 8
     assert: stream.bytes_ahead_of_marker == 12
     assert: stream.token_byte_size == 4
@@ -126,12 +121,7 @@
 
     // Rewind and advance across both chunk boundaries using a condition.
     stream.rewind_to_marker
-    assert: try (
-      stream.advance_while! -> (byte | byte != 'n')
-      True
-    |
-      False
-    )
+    assert no_error: stream.advance_while! -> (byte | byte != 'n')
     assert: stream.bytes_ahead == 3
     assert: stream.bytes_ahead_of_marker == 12
     assert: stream.token_byte_size == 9
@@ -139,12 +129,7 @@
 
     // Rewind and advance with a condition that reaches the end (for an error).
     stream.rewind_to_marker
-    assert: try (
-      stream.advance_while! -> (byte | byte >= 'a')
-      False
-    |
-      True
-    )
+    assert error: stream.advance_while! -> (byte | byte >= 'a')
     assert: stream.bytes_ahead == 0
     assert: stream.bytes_ahead_of_marker == 12
     assert: stream.token_byte_size == 12
@@ -173,9 +158,9 @@
 
     // Collect a subset of the stream.
     stream.rewind_to_marker
-    assert: try (stream.advance!(2), True | False)
+    assert no_error: stream.advance!(2)
     stream.mark_here
-    assert: try (stream.advance!(6), True | False)
+    assert no_error: stream.advance!(6)
     stream.each_token_byte -> (byte | collected << byte)
     assert: collected == ['l', 'l', 'o', 'w', 'o', 'r']
     collected.clear
@@ -216,9 +201,9 @@
 
     // Compare a subset of the stream.
     stream.rewind_to_marker
-    assert: try (stream.advance!(2), True | False)
+    assert no_error: stream.advance!(2)
     stream.mark_here
-    assert: try (stream.advance!(6), True | False)
+    assert no_error: stream.advance!(6)
     assert: stream.is_token_equal_to("llowor")
     assert: stream.is_token_equal_to("lloworl").is_false
     assert: stream.is_token_equal_to("llowo").is_false
@@ -239,9 +224,9 @@
 
     // Compare a subset of the stream.
     stream.rewind_to_marker
-    assert: try (stream.advance!(2), True | False)
+    assert no_error: stream.advance!(2)
     stream.mark_here
-    assert: try (stream.advance!(6), True | False)
+    assert no_error: stream.advance!(6)
     assert: stream.is_token_ascii_lowercase_equal_to("llowor")
     assert: stream.is_token_ascii_lowercase_equal_to("lloworl").is_false
     assert: stream.is_token_ascii_lowercase_equal_to("llowo").is_false
@@ -255,19 +240,19 @@
 
     // Parse the entire stream as an integer.
     stream.advance_to_end
-    assert: try (stream.token_as_positive_integer! | 0) == 1928374650
+    assert: stream.token_as_positive_integer! == 1928374650
 
     // Parse a subset of the stream as an integer.
     stream.rewind_to_marker
-    assert: try (stream.advance!(2), True | False)
+    assert no_error: stream.advance!(2)
     stream.mark_here
-    assert: try (stream.advance!(6), True | False)
-    assert: try (stream.token_as_positive_integer! | 0) == 283746
+    assert no_error: stream.advance!(6)
+    assert: stream.token_as_positive_integer! == 283746
 
     // Add an invalid character to the stream and get an error.
     stream << b":" // only digits (0-9) are valid
     stream.advance_to_end
-    assert: try (stream.token_as_positive_integer!, False | True)
+    assert error: stream.token_as_positive_integer!
 
   :it "reads byte at position"
     stream = ByteStreamChunkedReader.new
@@ -275,10 +260,10 @@
     stream << Bytes.from_array([0x23, 0x45])
     stream.advance_to_end
 
-    assert: try (stream.read_byte!(0) == 0x01 | False)
-    assert: try (stream.read_byte!(1) == 0x23 | False)
-    assert: try (stream.read_byte!(2) == 0x45 | False)
-    assert: try (stream.read_byte!(3), False | True)
+    assert: stream.read_byte!(0) == 0x01
+    assert: stream.read_byte!(1) == 0x23
+    assert: stream.read_byte!(2) == 0x45
+    assert error: stream.read_byte!(3)
 
   :it "reads integers in native, big and little endianness at specific offsets"
     stream = ByteStreamChunkedReader.new
@@ -294,24 +279,24 @@
     stream.mark_here
     stream.advance_to_end
 
-    assert: try (stream.read_native_u16!(0) == 0x2301 | False)
-    assert: try (stream.read_native_u16!(1) == 0x4523 | False)
-    assert: try (stream.read_native_u32!(0) == 0x67452301 | False)
-    assert: try (stream.read_native_u32!(1) == 0x89674523 | False)
-    assert: try (stream.read_native_u64!(0) == 0xEFCDAB8967452301 | False)
-    assert: try (stream.read_native_u64!(1) == 0x01EFCDAB89674523 | False)
+    assert: stream.read_native_u16!(0) == 0x2301
+    assert: stream.read_native_u16!(1) == 0x4523
+    assert: stream.read_native_u32!(0) == 0x67452301
+    assert: stream.read_native_u32!(1) == 0x89674523
+    assert: stream.read_native_u64!(0) == 0xEFCDAB8967452301
+    assert: stream.read_native_u64!(1) == 0x01EFCDAB89674523
 
-    assert: try (stream.read_le_u16!(0) == 0x2301 | False)
-    assert: try (stream.read_le_u16!(1) == 0x4523 | False)
-    assert: try (stream.read_le_u32!(0) == 0x67452301 | False)
-    assert: try (stream.read_le_u32!(1) == 0x89674523 | False)
-    assert: try (stream.read_le_u64!(0) == 0xEFCDAB8967452301 | False)
-    assert: try (stream.read_le_u64!(1) == 0x01EFCDAB89674523 | False)
+    assert: stream.read_le_u16!(0) == 0x2301
+    assert: stream.read_le_u16!(1) == 0x4523
+    assert: stream.read_le_u32!(0) == 0x67452301
+    assert: stream.read_le_u32!(1) == 0x89674523
+    assert: stream.read_le_u64!(0) == 0xEFCDAB8967452301
+    assert: stream.read_le_u64!(1) == 0x01EFCDAB89674523
 
-    assert: try (stream.read_be_u16!(0) == 0x0123 | False)
-    assert: try (stream.read_be_u16!(1) == 0x2345 | False)
-    assert: try (stream.read_be_u32!(0) == 0x01234567 | False)
-    assert: try (stream.read_be_u32!(1) == 0x23456789 | False)
-    assert: try (stream.read_be_u64!(0) == 0x0123456789ABCDEF | False)
-    assert: try (stream.read_be_u64!(1) == 0x23456789ABCDEF01 | False)
+    assert: stream.read_be_u16!(0) == 0x0123
+    assert: stream.read_be_u16!(1) == 0x2345
+    assert: stream.read_be_u32!(0) == 0x01234567
+    assert: stream.read_be_u32!(1) == 0x23456789
+    assert: stream.read_be_u64!(0) == 0x0123456789ABCDEF
+    assert: stream.read_be_u64!(1) == 0x23456789ABCDEF01
 

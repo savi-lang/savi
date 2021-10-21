@@ -809,7 +809,8 @@ module Savi::AST
   class Try < Node
     property body : Term
     property else_body : Term
-    def initialize(@body, @else_body)
+    property allow_non_partial_body : Bool
+    def initialize(@body, @else_body, @allow_non_partial_body = false)
     end
 
     def span_pos(source)

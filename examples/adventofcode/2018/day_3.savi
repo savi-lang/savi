@@ -102,16 +102,13 @@
   :const describes: "Day3"
 
   :it "rightly parses a claim string"
-    assert: try (
+    assert no_error: (
       claim = Day3Claim.parse!("#123 @ 3,2: 5x4")
       assert: claim.id     == "123"
       assert: claim.left   == 3
       assert: claim.top    == 2
       assert: claim.width  == 5
       assert: claim.height == 4
-      True
-    |
-      False
     )
 
   :it "passes the A test case"

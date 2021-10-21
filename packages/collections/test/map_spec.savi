@@ -12,18 +12,18 @@
   :it "stores and removes values at a given key"
     map = @new_map
     assert: map.size == 0
-    assert: try (map["example"]!, False | True)
+    assert error: map["example"]!
     assert: map.has_key("example").is_false
     assert: (map["example"] = 99) == 99
     assert: map.size == 1
-    assert: try (map["example"]! | U64[0]) == 99
+    assert: map["example"]! == 99
     assert: map.has_key("example")
     assert: (map["example"] = 88) == 88
     assert: map.size == 1
-    assert: try (map["example"]! | U64[0]) == 88
+    assert: map["example"]! == 88
     assert: map.has_key("example")
     assert: map.delete("example") <: None
-    assert: try map["example"]! <: None
+    assert error: map["example"]!
     assert: map.has_key("example").is_false
     assert: map.size == 0
 
@@ -35,9 +35,9 @@
     map[foo] = 11
     map[bar] = 22
     map[baz] = 33
-    assert: try (map[foo]! == 11 | False)
-    assert: try (map[bar]! == 22 | False)
-    assert: try (map[baz]! == 33 | False)
+    assert: map[foo]! == 11
+    assert: map[bar]! == 22
+    assert: map[baz]! == 33
 
   :it "can be cleared, removing all keys and values"
     map = @new_map
@@ -58,9 +58,9 @@
     map.each -> (key, value | copy[key] = value)
 
     assert: copy.size == 3
-    assert: try (copy["foo"]! | U64[0]) == 11
-    assert: try (copy["bar"]! | U64[0]) == 22
-    assert: try (copy["baz"]! | U64[0]) == 33
+    assert: copy["foo"]! == 11
+    assert: copy["bar"]! == 22
+    assert: copy["baz"]! == 33
 
   :it "yields each key and value until the criteria is met"
     map = @new_map

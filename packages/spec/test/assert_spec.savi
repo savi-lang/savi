@@ -1,8 +1,15 @@
-:class Foo
+:import "collections" (Map)
+
+:module Foo
   :fun non true: True
   :fun non with_yield Bool
     yield False
     True
+  :fun non fail! Bool: error!, True
+
+:module Something
+  :fun non dangerous!: "not really"
+  :fun non break!: error!
 
 :class AssertSpec
   :is Spec
@@ -42,3 +49,16 @@
 
     foo = String.new_iso, foo << "foo"
     assert: "foo" == --foo
+
+  :it "conforms to the `assert no_error: EXP` macro"
+    map = Map(String, U64).new, map["example"] = 1
+    assert no_error: map["example"]!
+    assert no_error: map["example"]! == 1
+
+    assert no_error: Something.dangerous!
+
+  :it "conforms to the `assert error: EXP` macro"
+    map = Map(String, U64).new
+    assert error: map["example"]!
+
+    assert error: Something.break!

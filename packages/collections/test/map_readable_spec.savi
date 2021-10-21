@@ -26,9 +26,9 @@
     map.each_key -> (key | try (copy[key] = map[key]!))
 
     assert: copy.size == 3
-    assert: try (copy["foo"]! | U64[0]) == 11
-    assert: try (copy["bar"]! | U64[0]) == 22
-    assert: try (copy["baz"]! | U64[0]) == 33
+    assert: copy["foo"]! == 11
+    assert: copy["bar"]! == 22
+    assert: copy["baz"]! == 33
 
     total_value = U64[0]
     map.each_value -> (value | total_value += value)
