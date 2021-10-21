@@ -124,58 +124,41 @@ module Savi::Compiler::Types
     def initialize(@cap)
     end
 
-    ISO         = new(Cap::ISO)
-    ISO_ALIASED = new(Cap::ISO_ALIASED)
-    REF         = new(Cap::REF)
-    VAL         = new(Cap::VAL)
-    BOX         = new(Cap::BOX)
-    TAG         = new(Cap::TAG)
-    NON         = new(Cap::NON)
-
-    ANY   = new(Cap::ISO | Cap::REF | Cap::VAL | Cap::BOX | Cap::TAG | Cap::NON)
-    ALIAS = new(Cap::REF | Cap::VAL | Cap::BOX | Cap::TAG | Cap::NON)
-    SEND  = new(Cap::ISO | Cap::VAL | Cap::TAG | Cap::NON)
-    SHARE = new(Cap::VAL | Cap::TAG | Cap::NON)
-    READ  = new(Cap::REF | Cap::VAL | Cap::BOX)
+    ISO   = new(Cap::ISO)
+    VAL   = new(Cap::VAL)
+    REF   = new(Cap::REF)
+    BOX   = new(Cap::BOX)
+    REF_P = new(Cap::REF_P)
+    BOX_P = new(Cap::BOX_P)
+    TAG   = new(Cap::TAG)
+    NON   = new(Cap::NON)
 
     def show
       case self
-      when ISO         then "iso"
-      when ISO_ALIASED then "iso'aliased"
-      when REF         then "ref"
-      when VAL         then "val"
-      when BOX         then "box"
-      when TAG         then "tag"
-      when NON         then "non"
-      when ANY         then "any"
-      when ALIAS       then "alias"
-      when SEND        then "send"
-      when SHARE       then "share"
-      when READ        then "read"
+      when ISO   then "iso"
+      when VAL   then "val"
+      when REF   then "ref"
+      when BOX   then "box"
+      when REF_P then "ref'"
+      when BOX_P then "box'"
+      when TAG   then "tag"
+      when NON   then "non"
       else
-        String.build { |str|
-          str << "{"
-          Cap::Logic::BITS.each { |name, bits|
-            next unless (@cap & bits) != 0
-            str << "|" unless str.empty?
-            str << name
-          }
-          str << "}"
-        }
+        raise NotImplementedError.new(@cap)
       end
     end
 
     def aliased
       case self
-      when ISO then ISO_ALIASED
-      when ISO_ALIASED then raise "unreachable: we should never alias an alias"
+      when ISO then REF_P
+      when REF_P then raise "unreachable: we should never alias an alias"
       else self # all other caps alias as themselves
       end
     end
 
     def stabilized
       case self
-      when ISO_ALIASED then TAG # TODO: NON instead, for Verona compatibility
+      when REF_P then TAG # TODO: NON instead, for Verona compatibility
       else self # all other caps stabilize as themselves
       end
     end

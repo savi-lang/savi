@@ -312,18 +312,18 @@ module Savi::Compiler::Types
     def read_type_expr_cap(node : AST::Identifier)
       case node.value
 
-      when "iso"   then NominalCap::ISO
-      when "val"   then NominalCap::VAL
-      when "ref"   then NominalCap::REF
-      when "box"   then NominalCap::BOX
-      when "tag"   then NominalCap::TAG
-      when "non"   then NominalCap::NON
+      when "iso" then NominalCap::ISO
+      when "val" then NominalCap::VAL
+      when "ref" then NominalCap::REF
+      when "box" then NominalCap::BOX
+      when "tag" then NominalCap::TAG
+      when "non" then NominalCap::NON
 
-      when "any"   then NominalCap::ANY
-      when "alias" then NominalCap::ALIAS
-      when "send"  then NominalCap::SEND
-      when "share" then NominalCap::SHARE
-      when "read"  then NominalCap::READ
+      when "any"   then Union.from([NominalCap::ISO, NominalCap::VAL, NominalCap::REF, NominalCap::BOX, NominalCap::TAG, NominalCap::NON])
+      when "alias" then Union.from([NominalCap::VAL, NominalCap::REF, NominalCap::BOX, NominalCap::TAG, NominalCap::NON])
+      when "send"  then Union.from([NominalCap::ISO, NominalCap::VAL, NominalCap::TAG, NominalCap::NON])
+      when "share" then Union.from([NominalCap::VAL, NominalCap::TAG, NominalCap::NON])
+      when "read"  then Union.from([NominalCap::VAL, NominalCap::REF, NominalCap::BOX])
 
       else nil
       end
