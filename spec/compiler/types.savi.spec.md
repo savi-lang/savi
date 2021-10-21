@@ -18,6 +18,8 @@ String'ref'
 String'iso
 ```
 
+---
+
 It determines the return type of field getter via a concrete receiver cap.
 
 ```savi
