@@ -63,12 +63,12 @@
   :it "pushes new bits onto the end of the array and reads them back out"
     // Bool values can be given in numeric form (0/1), or named (True/False).
     bits = BitArray.new << 0 << 1 << True << False
-    assert: try (bits[0]! == 0 | False)
-    assert: try (bits[1]! == 1 | False)
-    assert: try (bits[2]! == 1 | False)
-    assert: try (bits[3]! == 0 | False)
-    assert: try (bits[3]! = 1, True | False)
-    assert: try (bits[1]! == 1 | False)
+    assert: bits[0]! == 0
+    assert: bits[1]! == 1
+    assert: bits[2]! == 1
+    assert: bits[3]! == 0
+    assert no_error: bits[3]! = 1
+    assert: bits[1]! == 1
 
   :it "can be converted to immutable Bytes"
     bits val = BitArray.new_iso
@@ -90,26 +90,26 @@
       << 0 << 1 << 1 << 1 << 1 << 1 << 0 << 1
 
     bytes = bits.as_bytes
-    assert: try (bytes.read_native_u64!(0) == 0xDEADBEEFBAADF00D | False)
-    assert: try (bytes.read_native_u64!(8) == 0xBEEF5AFAAAADD00D | False)
+    assert: bytes.read_native_u64!(0) == 0xDEADBEEFBAADF00D
+    assert: bytes.read_native_u64!(8) == 0xBEEF5AFAAAADD00D
 
   :it "allows bit access only within the existing bounds of the array"
     bits = BitArray.new << 0 << 1 << 1
-    assert: try (bits[3]!, False | True)
-    assert: try (bits[3]! = 1, False | True)
+    assert error: bits[3]!
+    assert error: bits[3]! = 1
 
   :it "supports element displacing assignment"
     bits = BitArray.new << 0 << 1 << 1
 
-    assert: try ((bits[0]! <<= 1) == 0 | False)
-    assert: try ((bits[1]! <<= 0) == 1 | False)
-    assert: try ((bits[2]! <<= 1) == 1 | False)
-    assert: try (bits[3]! <<= 0, False | True)
+    assert: (bits[0]! <<= 1) == 0
+    assert: (bits[1]! <<= 0) == 1
+    assert: (bits[2]! <<= 1) == 1
+    assert error: bits[3]! <<= 0
 
-    assert: try (bits[0]! == 1 | False)
-    assert: try (bits[1]! == 0 | False)
-    assert: try (bits[2]! == 1 | False)
-    assert: try (bits[3]!, False | True)
+    assert: bits[0]! == 1
+    assert: bits[1]! == 0
+    assert: bits[2]! == 1
+    assert error: bits[3]!
 
   :it "can be cleared to an empty size"
     bits = BitArray.new << 0 << 1 << 1
@@ -121,7 +121,7 @@
     assert: bits.size == 0
     assert: bits.is_empty
     assert: bits.is_not_empty.is_false
-    assert: try (bits[0]!, False | True)
+    assert error: bits[0]!
 
   :it "yields each bit in the array, along with the index"
     bits = BitArray.new << 0 << 1 << 1
@@ -148,44 +148,44 @@
   :it "swaps the bits in the array if both indices are in range"
     bits = BitArray.new << 0 << 1 << 0
 
-    assert: try (bits.swap!(1, 2), True | False)
-    assert: try (bits[0]! == 0 | False)
-    assert: try (bits[1]! == 0 | False)
-    assert: try (bits[2]! == 1 | False)
+    assert no_error: bits.swap!(1, 2)
+    assert: bits[0]! == 0
+    assert: bits[1]! == 0
+    assert: bits[2]! == 1
 
-    assert: try (bits.swap!(2, 0), True | False)
-    assert: try (bits[0]! == 1 | False)
-    assert: try (bits[1]! == 0 | False)
-    assert: try (bits[2]! == 0 | False)
+    assert no_error: bits.swap!(2, 0)
+    assert: bits[0]! == 1
+    assert: bits[1]! == 0
+    assert: bits[2]! == 0
 
-    assert: try (bits.swap!(1, 3), False | True)
-    assert: try (bits[0]! == 1 | False) // no change, due to the error
-    assert: try (bits[1]! == 0 | False) // no change, due to the error
-    assert: try (bits[2]! == 0 | False) // no change, due to the error
+    assert error: bits.swap!(1, 3)
+    assert: bits[0]! == 1 // no change, due to the error
+    assert: bits[1]! == 0 // no change, due to the error
+    assert: bits[2]! == 0 // no change, due to the error
 
-    assert: try (bits.swap!(3, 0), False | True)
-    assert: try (bits[0]! == 1 | False) // no change, due to the error
-    assert: try (bits[1]! == 0 | False) // no change, due to the error
-    assert: try (bits[2]! == 0 | False) // no change, due to the error
+    assert error: bits.swap!(3, 0)
+    assert: bits[0]! == 1 // no change, due to the error
+    assert: bits[1]! == 0 // no change, due to the error
+    assert: bits[2]! == 0 // no change, due to the error
 
   :it "deletes a bit without shifting by moving the last bit into its place"
     bits = BitArray.new << 0 << 1 << 0 << 0 << 1
 
-    assert: try (bits.delete_by_moving_last!(2), True | False)
-    assert: try (bits[0]! == 0 | False)
-    assert: try (bits[1]! == 1 | False)
-    assert: try (bits[2]! == 1 | False)
-    assert: try (bits[3]! == 0 | False)
-    assert: try (bits[4]!, False | True)
+    assert no_error: bits.delete_by_moving_last!(2)
+    assert: bits[0]! == 0
+    assert: bits[1]! == 1
+    assert: bits[2]! == 1
+    assert: bits[3]! == 0
+    assert error: bits[4]!
 
-    assert: try (bits.delete_by_moving_last!(1), True | False)
-    assert: try (bits[0]! == 0 | False)
-    assert: try (bits[1]! == 0 | False)
-    assert: try (bits[2]! == 1 | False)
-    assert: try (bits[3]!, False | True)
+    assert no_error: bits.delete_by_moving_last!(1)
+    assert: bits[0]! == 0
+    assert: bits[1]! == 0
+    assert: bits[2]! == 1
+    assert error: bits[3]!
 
-    assert: try (bits.delete_by_moving_last!(3), False | True)
-    assert: try (bits[0]! == 0 | False) // no change, due to the error
-    assert: try (bits[1]! == 0 | False) // no change, due to the error
-    assert: try (bits[2]! == 1 | False) // no change, due to the error
-    assert: try (bits[3]!, False | True) // no change, due to the error
+    assert error: bits.delete_by_moving_last!(3)
+    assert: bits[0]! == 0 // no change, due to the error
+    assert: bits[1]! == 0 // no change, due to the error
+    assert: bits[2]! == 1 // no change, due to the error
+    assert error: bits[3]!    // no change, due to the error

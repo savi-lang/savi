@@ -13,6 +13,6 @@
     assert: False.not      == True
 
   :it "can be converted from a U64"
-    assert: try (Bool.from_u64!(U64[0]) == False | False)
-    assert: try (Bool.from_u64!(U64[1]) == True  | False)
-    assert: try (Bool.from_u64!(U64[2]), False   | True)
+    assert: Bool.from_u64!(U64[0]) == False
+    assert: Bool.from_u64!(U64[1]) == True
+    assert error: Bool.from_u64!(U64[2])

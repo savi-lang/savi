@@ -231,6 +231,18 @@ class Savi::Compiler::Macros < Savi::AST::CopyOnMutateVisitor
       visit_case(node)
     elsif lhs.is_a?(AST::Identifier) && lhs.value == "assert" && node.op.value == ":"
       visit_assert(node, node.rhs)
+    elsif node.op.value == ":" && 
+          lhs.is_a?(AST::Group) &&
+          lhs.style == " " &&
+          Util.match_ident?(lhs, 0, "assert") &&
+          Util.match_ident?(lhs, 1, "no_error")
+      visit_assert_no_error(node, node.rhs)
+    elsif node.op.value == ":" && 
+          lhs.is_a?(AST::Group) &&
+          lhs.style == " " &&
+          Util.match_ident?(lhs, 0, "assert") &&
+          Util.match_ident?(lhs, 1, "error")
+      visit_assert_error(node, node.rhs)
     else
       node
     end
@@ -648,9 +660,11 @@ class Savi::Compiler::Macros < Savi::AST::CopyOnMutateVisitor
       AST::Group.new("(", [
         AST::Call.new(
           AST::Identifier.new("Assert").from(expr),
-          AST::Identifier.new("unexpected_error").from(expr),
+          AST::Identifier.new("has_error").from(expr),
           AST::Group.new("(", [
             AST::Identifier.new("@").from(node),
+            AST::Identifier.new("True").from(node),
+            AST::Identifier.new("False").from(node),
           ] of AST::Term).from(expr)
         ).from(expr),
       ] of AST::Term).from(orig),
@@ -709,9 +723,11 @@ class Savi::Compiler::Macros < Savi::AST::CopyOnMutateVisitor
       AST::Group.new("(", [
         AST::Call.new(
           AST::Identifier.new("Assert").from(expr),
-          AST::Identifier.new("unexpected_error").from(expr),
+          AST::Identifier.new("has_error").from(expr),
           AST::Group.new("(", [
             AST::Identifier.new("@").from(node),
+            AST::Identifier.new("True").from(node),
+            AST::Identifier.new("False").from(node),
           ] of AST::Term).from(expr)
         ).from(expr),
       ] of AST::Term).from(orig),
@@ -729,7 +745,7 @@ class Savi::Compiler::Macros < Savi::AST::CopyOnMutateVisitor
     # try (
     #   Assert.condition(@, expr)
     # |
-    #   Assert.unexpected_error(@)
+    #   Assert.has_error(@, True, False) // Booleans mean "has error" and "expected error?"
     # )
     #
     try = AST::Try.new(
@@ -746,9 +762,11 @@ class Savi::Compiler::Macros < Savi::AST::CopyOnMutateVisitor
       AST::Group.new("(", [
         AST::Call.new(
           AST::Identifier.new("Assert").from(expr),
-          AST::Identifier.new("unexpected_error").from(expr),
+          AST::Identifier.new("has_error").from(expr),
           AST::Group.new("(", [
             AST::Identifier.new("@").from(node),
+            AST::Identifier.new("True").from(node),
+            AST::Identifier.new("False").from(node),
           ] of AST::Term).from(expr)
         ).from(expr),
       ] of AST::Term).from(orig),
@@ -756,6 +774,46 @@ class Savi::Compiler::Macros < Savi::AST::CopyOnMutateVisitor
     ).from(node)
 
     AST::Group.new("(", [try] of AST::Term).from(node)
+  end
+
+  def visit_assert_no_error(node : AST::Relate, expr : AST::Node)
+    build_assert_has_error(node, expr, false)
+  end
+
+  def visit_assert_error(node : AST::Relate, expr : AST::Node)
+    build_assert_has_error(node, expr, true)
+  end
+
+  def build_assert_has_error(node : AST::Relate, expr : AST::Node, expects_error : Bool)
+    orig = node.lhs.as(AST::Group)
+
+    try = AST::Try.new(
+      AST::Group.new("(", [
+        expr,
+        AST::Identifier.new("False").from(expr),
+      ] of AST::Term).from(expr),
+      AST::Group.new("(", [
+        AST::Identifier.new("True").from(expr)
+      ] of AST::Term).from(expr)
+    ).from(expr)
+
+    expects_error = if expects_error
+      AST::Identifier.new("True").from(node)
+    else
+      AST::Identifier.new("False").from(node)
+    end
+
+    call = AST::Call.new(
+      AST::Identifier.new("Assert").from(orig),
+      AST::Identifier.new("has_error").from(orig),
+      AST::Group.new("(", [
+        AST::Identifier.new("@").from(node),
+        try,
+        expects_error,
+      ] of AST::Term).from(expr)
+    ).from(orig)
+
+    AST::Group.new("(", [call] of AST::Term).from(node)
   end
 
   def visit_source_code_position_of_argument(node : AST::Group)

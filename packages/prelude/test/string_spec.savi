@@ -112,10 +112,10 @@
     assert: string.clone == "example"
 
   :it "finds the index of another substring within it"
-    assert: try ("bar food foo".offset_of!("foo") == 4 | False)
-    assert: try ("bar food foo".offset_of!("bard"), False | True)
-    assert: try ("bar food foo".offset_of!("nope"), False | True)
-    assert: try ("bar food foo".offset_of!(""),     False | True)
+    assert: "bar food foo".offset_of!("foo") == 4
+    assert error: "bar food foo".offset_of!("bard")
+    assert error: "bar food foo".offset_of!("nope")
+    assert error: "bar food foo".offset_of!("")
     assert: "bar food foo".includes("foo")
     assert: "bar food foo".includes("bard").is_false
     assert: "bar food foo".includes("nope").is_false
@@ -125,8 +125,8 @@
     assert: ("string".hash == 0x4CF51F4A5B5CF110)
 
   :it "returns the byte at the given byte offset"
-    assert: try ("example"[3]! == 'm' | False)
-    assert: try ("example"[7]!, False | True)
+    assert: "example"[3]! == 'm'
+    assert error: "example"[7]!
 
   :it "trims bytes off the start and end of the string"
     assert: "example".trim(2)      == "ample"
@@ -206,32 +206,32 @@
     assert: ("example" >= "example!").is_false
 
   :it "parses an integer from the string decimal representation"
-    assert: try ("36".parse_i64!  == 36  | False)
-    assert: try ("+36".parse_i64! == 36  | False)
-    assert: try ("-36".parse_i64! == -36 | False)
-    assert: try ("36bad".parse_i64!, False | True)
+    assert: "36".parse_i64!  == 36
+    assert: "+36".parse_i64! == 36
+    assert: "-36".parse_i64! == -36
+    assert error: "36bad".parse_i64!
 
   :it "returns the unicode codepoint found at the given offset, if valid"
     string = "नमस्ते"
-    assert: try (string.char_at!(0) == 'न' | False) // valid
-    assert: try (string.char_at!(1) == '�' | False) // invalid
-    assert: try (string.char_at!(2) == '�' | False) // invalid
-    assert: try (string.char_at!(3) == 'म' | False) // valid
-    assert: try (string.char_at!(4) == '�' | False) // invalid
-    assert: try (string.char_at!(5) == '�' | False) // invalid
-    assert: try (string.char_at!(6) == 'स' | False) // valid
-    assert: try (string.char_at!(7) == '�' | False) // invalid
-    assert: try (string.char_at!(8) == '�' | False) // invalid
-    assert: try (string.char_at!(9) == '्' | False) // valid (diacritic)
-    assert: try (string.char_at!(10) == '�' | False) // invalid
-    assert: try (string.char_at!(11) == '�' | False) // invalid
-    assert: try (string.char_at!(12) == 'त' | False) // valid
-    assert: try (string.char_at!(13) == '�' | False) // invalid
-    assert: try (string.char_at!(14) == '�' | False) // invalid
-    assert: try (string.char_at!(15) == 'े' | False) // valid (diacritic)
-    assert: try (string.char_at!(16) == '�' | False) // invalid
-    assert: try (string.char_at!(17) == '�' | False) // invalid
-    assert: try (string.char_at!(18), False | True) // out of bounds
+    assert: string.char_at!(0) == 'न' // valid
+    assert: string.char_at!(1) == '�' // invalid
+    assert: string.char_at!(2) == '�' // invalid
+    assert: string.char_at!(3) == 'म' // valid
+    assert: string.char_at!(4) == '�' // invalid
+    assert: string.char_at!(5) == '�' // invalid
+    assert: string.char_at!(6) == 'स' // valid
+    assert: string.char_at!(7) == '�' // invalid
+    assert: string.char_at!(8) == '�' // invalid
+    assert: string.char_at!(9) == '्' // valid (diacritic)
+    assert: string.char_at!(10) == '�' // invalid
+    assert: string.char_at!(11) == '�' // invalid
+    assert: string.char_at!(12) == 'त' // valid
+    assert: string.char_at!(13) == '�' // invalid
+    assert: string.char_at!(14) == '�' // invalid
+    assert: string.char_at!(15) == 'े' // valid (diacritic)
+    assert: string.char_at!(16) == '�' // invalid
+    assert: string.char_at!(17) == '�' // invalid
+    assert error: string.char_at!(18) // out of bounds
 
   :it "iterates over unicode codepoints with starting indices and byte widths"
     codepoints Array(U32) = []
@@ -258,13 +258,13 @@
     ], " ") == "foo bar"
 
   :it "splits a string into a pair"
-    assert: try ("foo=bar".split2!('=').first  == "foo" | False)
-    assert: try ("foo=bar".split2!('=').second == "bar" | False)
+    assert: "foo=bar".split2!('=').first  == "foo"
+    assert: "foo=bar".split2!('=').second == "bar"
 
-    assert: try ("foo=bar=baz".split2!('=').first  == "foo" | False)
-    assert: try ("foo=bar=baz".split2!('=').second == "bar=baz" | False)
+    assert: "foo=bar=baz".split2!('=').first  == "foo"
+    assert: "foo=bar=baz".split2!('=').second == "bar=baz"
 
-    assert: try ("foo=".split2!('=').first == "foo" | False)
-    assert: try ("foo=".split2!('=').second == "" | False)
+    assert: "foo=".split2!('=').first == "foo"
+    assert: "foo=".split2!('=').second == ""
 
-    assert: try ("foo".split2!('='), False | True)
+    assert error: "foo".split2!('=')

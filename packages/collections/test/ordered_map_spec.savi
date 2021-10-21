@@ -9,18 +9,18 @@
   :it "stores and removes values at a given key"
     map = @new_map
     assert: map.size == 0
-    assert: try (map["example"]!, False | True)
+    assert error: map["example"]!
     assert: map.has_key("example").is_false
     assert: (map["example"] = 99) == 99
     assert: map.size == 1
-    assert: try (map["example"]! | U64[0]) == 99
+    assert: map["example"]! == 99
     assert: map.has_key("example")
     assert: (map["example"] = 88) == 88
     assert: map.size == 1
-    assert: try (map["example"]! | U64[0]) == 88
+    assert: map["example"]! == 88
     assert: map.has_key("example")
     assert: map.delete("example") <: None
-    assert: try map["example"]! <: None
+    assert error: map["example"]!
     assert: map.has_key("example").is_false
     assert: map.size == 0
 

@@ -91,8 +91,8 @@
 
   :it "finds the first element that meets the criteria"
     array Array(U8) = [11, 22, 33, 44, 36, 27, 18]
-    assert: try (array.find! -> (num | num > 30) == 33 | False)
-    assert: try (array.find! -> (num | num > 50), False | True)
+    assert: array.find! -> (num | num > 30) == 33
+    assert error: array.find! -> (num | num > 50)
 
   :it "selects those elements that meet the criteria"
     array Array(U8) = [11, 22, 33, 44, 36, 27, 18]

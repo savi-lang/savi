@@ -148,10 +148,10 @@
     assert: string.clone == b"example"
 
   :it "finds the index of another substring within it"
-    assert: try (b"bar food foo".offset_of!(b"foo") == 4 | False)
-    assert: try (b"bar food foo".offset_of!(b"bard"), False | True)
-    assert: try (b"bar food foo".offset_of!(b"nope"), False | True)
-    assert: try (b"bar food foo".offset_of!(b""),     False | True)
+    assert: b"bar food foo".offset_of!(b"foo") == 4
+    assert error: b"bar food foo".offset_of!(b"bard")
+    assert error: b"bar food foo".offset_of!(b"nope")
+    assert error: b"bar food foo".offset_of!(b"")
     assert: b"bar food foo".includes(b"foo")
     assert: b"bar food foo".includes(b"bard").is_false
     assert: b"bar food foo".includes(b"nope").is_false
@@ -161,8 +161,8 @@
     assert: (b"string".hash == 0x4CF51F4A5B5CF110)
 
   :it "returns the byte at the given byte offset"
-    assert: try (b"example"[3]! == 'm' | False)
-    assert: try (b"example"[7]!, False | True)
+    assert: b"example"[3]! == 'm'
+    assert error: b"example"[7]!
 
   :it "trims bytes off the start and end of the byte string"
     assert: b"example".trim(2)      == b"ample"
@@ -306,49 +306,49 @@
     assert: data.size == 13
 
     // Read the values from the appropriate offsets.
-    assert: try (data[0]! == 0xfe | False)
-    assert: try (data.read_native_u32!(1) == 0x12345678 | False)
-    assert: try (data.read_native_u64!(5) == 0xfedcba9876543210 | False)
+    assert: data[0]! == 0xfe
+    assert: data.read_native_u32!(1) == 0x12345678
+    assert: data.read_native_u64!(5) == 0xfedcba9876543210
 
     // Reading from an offset too close to the end will raise an error.
-    assert: try (data.read_native_u32!(10), False | True)
-    assert: try (data.read_native_u64!(6), False | True)
+    assert error: data.read_native_u32!(10)
+    assert error: data.read_native_u64!(6)
 
     // Now write the values into different offsets (and read them back).
-    assert: try (data.write_native_u64!(1, 0xfedcba9876543210), True | False)
-    assert: try (data.write_native_u32!(9, 0x12345678), True | False)
+    assert no_error: data.write_native_u64!(1, 0xfedcba9876543210)
+    assert no_error: data.write_native_u32!(9, 0x12345678)
     assert: data.size == 13
-    assert: try (data[0]! == 0xfe | False)
-    assert: try (data.read_native_u64!(1) == 0xfedcba9876543210 | False)
-    assert: try (data.read_native_u32!(9) == 0x12345678 | False)
+    assert: data[0]! == 0xfe
+    assert: data.read_native_u64!(1) == 0xfedcba9876543210
+    assert: data.read_native_u32!(9) == 0x12345678
 
     // Trying to write to a space beyond the buffer size will raise an error.
-    assert: try (data.write_native_u32!(10, 0x12345678), False | True)
-    assert: try (data.write_native_u64!(6, 0xfedcba9876543210), False | True)
+    assert error: data.write_native_u32!(10, 0x12345678)
+    assert error: data.write_native_u64!(6, 0xfedcba9876543210)
 
   :it "reads integers in native, big and little endianness at specific offsets"
     data = Bytes.from_array([0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF, 0x01])
 
-    assert: try (data.read_native_u16!(0) == 0x2301 | False)
-    assert: try (data.read_native_u16!(1) == 0x4523 | False)
-    assert: try (data.read_native_u32!(0) == 0x67452301 | False)
-    assert: try (data.read_native_u32!(1) == 0x89674523 | False)
-    assert: try (data.read_native_u64!(0) == 0xEFCDAB8967452301 | False)
-    assert: try (data.read_native_u64!(1) == 0x01EFCDAB89674523 | False)
+    assert: data.read_native_u16!(0) == 0x2301
+    assert: data.read_native_u16!(1) == 0x4523
+    assert: data.read_native_u32!(0) == 0x67452301
+    assert: data.read_native_u32!(1) == 0x89674523
+    assert: data.read_native_u64!(0) == 0xEFCDAB8967452301
+    assert: data.read_native_u64!(1) == 0x01EFCDAB89674523
 
-    assert: try (data.read_le_u16!(0) == 0x2301 | False)
-    assert: try (data.read_le_u16!(1) == 0x4523 | False)
-    assert: try (data.read_le_u32!(0) == 0x67452301 | False)
-    assert: try (data.read_le_u32!(1) == 0x89674523 | False)
-    assert: try (data.read_le_u64!(0) == 0xEFCDAB8967452301 | False)
-    assert: try (data.read_le_u64!(1) == 0x01EFCDAB89674523 | False)
+    assert: data.read_le_u16!(0) == 0x2301
+    assert: data.read_le_u16!(1) == 0x4523
+    assert: data.read_le_u32!(0) == 0x67452301
+    assert: data.read_le_u32!(1) == 0x89674523
+    assert: data.read_le_u64!(0) == 0xEFCDAB8967452301
+    assert: data.read_le_u64!(1) == 0x01EFCDAB89674523
 
-    assert: try (data.read_be_u16!(0) == 0x0123 | False)
-    assert: try (data.read_be_u16!(1) == 0x2345 | False)
-    assert: try (data.read_be_u32!(0) == 0x01234567 | False)
-    assert: try (data.read_be_u32!(1) == 0x23456789 | False)
-    assert: try (data.read_be_u64!(0) == 0x0123456789ABCDEF | False)
-    assert: try (data.read_be_u64!(1) == 0x23456789ABCDEF01 | False)
+    assert: data.read_be_u16!(0) == 0x0123
+    assert: data.read_be_u16!(1) == 0x2345
+    assert: data.read_be_u32!(0) == 0x01234567
+    assert: data.read_be_u32!(1) == 0x23456789
+    assert: data.read_be_u64!(0) == 0x0123456789ABCDEF
+    assert: data.read_be_u64!(1) == 0x23456789ABCDEF01
 
   :it "joins an array of bytes"
     assert: Bytes.join([
