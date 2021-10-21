@@ -196,5 +196,23 @@ module Savi::Compiler::Types::Cap
 
       result
     end
+
+    # Return the weakest cap that can be "split" into the two given caps.
+    # If the two given caps cannot simultaneously coexist in the same scope,
+    # then this function returns nil as an indication of the error.
+    def self.simult?(k1 : Value?, k2 : Value?) : Value?
+      return nil unless k1 && k2
+
+      if k1 == VAL || k2 == VAL
+        return nil if bit_write?(k1 ^ k2)
+        return VAL
+      end
+
+      upper_bound = upper_bound(k1, k2)
+      lower_bound = lower_bound(k1, k2)
+      return nil if bit_root?(lower_bound) && bit_held?(upper_bound)
+
+      lower_bound
+    end
   end
 end

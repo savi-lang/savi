@@ -402,6 +402,82 @@ describe Savi::Compiler::Types::Cap do
     }
   end
 
+  it "identifies the weakest cap which can be split simultaneously into them" do
+    Savi::Compiler::Types::Cap::Logic.access {
+      simult?(iso,   iso).should eq nil
+      simult?(val,   iso).should eq nil
+      simult?(ref,   iso).should eq nil
+      simult?(box,   iso).should eq nil
+      simult?(ref_p, iso).should eq iso
+      simult?(box_p, iso).should eq iso
+      simult?(tag,   iso).should eq iso
+      simult?(non,   iso).should eq iso
+
+      simult?(iso,   val).should eq nil
+      simult?(val,   val).should eq val
+      simult?(ref,   val).should eq nil
+      simult?(box,   val).should eq val
+      simult?(ref_p, val).should eq nil
+      simult?(box_p, val).should eq val
+      simult?(tag,   val).should eq val
+      simult?(non,   val).should eq val
+
+      simult?(iso,   ref).should eq nil
+      simult?(val,   ref).should eq nil
+      simult?(ref,   ref).should eq ref
+      simult?(box,   ref).should eq ref
+      simult?(ref_p, ref).should eq ref
+      simult?(box_p, ref).should eq ref
+      simult?(tag,   ref).should eq ref
+      simult?(non,   ref).should eq ref
+
+      simult?(iso,   box).should eq nil
+      simult?(val,   box).should eq val
+      simult?(ref,   box).should eq ref
+      simult?(box,   box).should eq box
+      simult?(ref_p, box).should eq ref
+      simult?(box_p, box).should eq box
+      simult?(tag,   box).should eq box
+      simult?(non,   box).should eq box
+
+      simult?(iso,   ref_p).should eq iso
+      simult?(val,   ref_p).should eq nil
+      simult?(ref,   ref_p).should eq ref
+      simult?(box,   ref_p).should eq ref
+      simult?(ref_p, ref_p).should eq ref_p
+      simult?(box_p, ref_p).should eq ref_p
+      simult?(tag,   ref_p).should eq ref_p
+      simult?(non,   ref_p).should eq ref_p
+
+      simult?(iso,   box_p).should eq iso
+      simult?(val,   box_p).should eq val
+      simult?(ref,   box_p).should eq ref
+      simult?(box,   box_p).should eq box
+      simult?(ref_p, box_p).should eq ref_p
+      simult?(box_p, box_p).should eq box_p
+      simult?(tag,   box_p).should eq box_p
+      simult?(non,   box_p).should eq box_p
+
+      simult?(iso,   tag).should eq iso
+      simult?(val,   tag).should eq val
+      simult?(ref,   tag).should eq ref
+      simult?(box,   tag).should eq box
+      simult?(ref_p, tag).should eq ref_p
+      simult?(box_p, tag).should eq box_p
+      simult?(tag,   tag).should eq tag
+      simult?(non,   tag).should eq tag
+
+      simult?(iso,   non).should eq iso
+      simult?(val,   non).should eq val
+      simult?(ref,   non).should eq ref
+      simult?(box,   non).should eq box
+      simult?(ref_p, non).should eq ref_p
+      simult?(box_p, non).should eq box_p
+      simult?(tag,   non).should eq tag
+      simult?(non,   non).should eq non
+    }
+  end
+
   it "allows unions and intersections to be distributed through viewpoint" do
     Savi::Compiler::Types::Cap::Logic.access {
       for_all_3 { |k1, k2, k3|
