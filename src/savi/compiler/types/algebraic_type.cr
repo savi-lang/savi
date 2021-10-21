@@ -151,14 +151,14 @@ module Savi::Compiler::Types
     def aliased
       case self
       when ISO then REF_P
-      when REF_P then raise "unreachable: we should never alias an alias"
+      when REF_P, BOX_P then raise "unreachable: we should never alias an alias"
       else self # all other caps alias as themselves
       end
     end
 
     def stabilized
       case self
-      when REF_P then TAG # TODO: NON instead, for Verona compatibility
+      when REF_P, BOX_P then TAG # TODO: NON instead, for Verona compatibility
       else self # all other caps stabilize as themselves
       end
     end
