@@ -408,8 +408,8 @@ describe Savi::Compiler::Types::Cap do
       simult?(val,   iso).should eq nil
       simult?(ref,   iso).should eq nil
       simult?(box,   iso).should eq nil
-      simult?(ref_p, iso).should eq iso
-      simult?(box_p, iso).should eq iso
+      simult?(ref_p, iso).should eq nil
+      simult?(box_p, iso).should eq nil
       simult?(tag,   iso).should eq iso
       simult?(non,   iso).should eq iso
 
@@ -440,21 +440,21 @@ describe Savi::Compiler::Types::Cap do
       simult?(tag,   box).should eq box
       simult?(non,   box).should eq box
 
-      simult?(iso,   ref_p).should eq iso
+      simult?(iso,   ref_p).should eq nil
       simult?(val,   ref_p).should eq nil
       simult?(ref,   ref_p).should eq ref
       simult?(box,   ref_p).should eq ref
-      simult?(ref_p, ref_p).should eq ref_p
-      simult?(box_p, ref_p).should eq ref_p
+      simult?(ref_p, ref_p).should eq ref
+      simult?(box_p, ref_p).should eq ref
       simult?(tag,   ref_p).should eq ref_p
       simult?(non,   ref_p).should eq ref_p
 
-      simult?(iso,   box_p).should eq iso
+      simult?(iso,   box_p).should eq nil
       simult?(val,   box_p).should eq val
       simult?(ref,   box_p).should eq ref
       simult?(box,   box_p).should eq box
-      simult?(ref_p, box_p).should eq ref_p
-      simult?(box_p, box_p).should eq box_p
+      simult?(ref_p, box_p).should eq ref
+      simult?(box_p, box_p).should eq box
       simult?(tag,   box_p).should eq box_p
       simult?(non,   box_p).should eq box_p
 
@@ -478,7 +478,173 @@ describe Savi::Compiler::Types::Cap do
     }
   end
 
-  it "allows unions and intersections to be distributed through viewpoint" do
+  it "identifies the sequ" do
+    Savi::Compiler::Types::Cap::Logic.access {
+      sequ?(iso,   iso).should eq nil
+      sequ?(val,   iso).should eq nil
+      sequ?(ref,   iso).should eq nil
+      sequ?(box,   iso).should eq nil
+      sequ?(ref_p, iso).should eq iso
+      sequ?(box_p, iso).should eq iso
+      sequ?(tag,   iso).should eq iso
+      sequ?(non,   iso).should eq iso
+
+      sequ?(iso,   val).should eq nil
+      sequ?(val,   val).should eq val
+      sequ?(ref,   val).should eq nil
+      sequ?(box,   val).should eq val
+      sequ?(ref_p, val).should eq iso
+      sequ?(box_p, val).should eq val
+      sequ?(tag,   val).should eq val
+      sequ?(non,   val).should eq val
+
+      sequ?(iso,   ref).should eq nil
+      sequ?(val,   ref).should eq nil
+      sequ?(ref,   ref).should eq ref
+      sequ?(box,   ref).should eq ref
+      sequ?(ref_p, ref).should eq ref
+      sequ?(box_p, ref).should eq ref
+      sequ?(tag,   ref).should eq ref
+      sequ?(non,   ref).should eq ref
+
+      sequ?(iso,   box).should eq nil
+      sequ?(val,   box).should eq val
+      sequ?(ref,   box).should eq ref
+      sequ?(box,   box).should eq box
+      sequ?(ref_p, box).should eq ref
+      sequ?(box_p, box).should eq box
+      sequ?(tag,   box).should eq box
+      sequ?(non,   box).should eq box
+
+      sequ?(iso,   ref_p).should eq nil
+      sequ?(val,   ref_p).should eq nil
+      sequ?(ref,   ref_p).should eq ref
+      sequ?(box,   ref_p).should eq ref
+      sequ?(ref_p, ref_p).should eq ref_p
+      sequ?(box_p, ref_p).should eq ref_p
+      sequ?(tag,   ref_p).should eq ref_p
+      sequ?(non,   ref_p).should eq ref_p
+
+      sequ?(iso,   box_p).should eq nil
+      sequ?(val,   box_p).should eq val
+      sequ?(ref,   box_p).should eq ref
+      sequ?(box,   box_p).should eq box
+      sequ?(ref_p, box_p).should eq ref_p
+      sequ?(box_p, box_p).should eq box_p
+      sequ?(tag,   box_p).should eq box_p
+      sequ?(non,   box_p).should eq box_p
+
+      sequ?(iso,   tag).should eq iso
+      sequ?(val,   tag).should eq val
+      sequ?(ref,   tag).should eq ref
+      sequ?(box,   tag).should eq box
+      sequ?(ref_p, tag).should eq ref_p
+      sequ?(box_p, tag).should eq box_p
+      sequ?(tag,   tag).should eq tag
+      sequ?(non,   tag).should eq tag
+
+      sequ?(iso,   non).should eq iso
+      sequ?(val,   non).should eq val
+      sequ?(ref,   non).should eq ref
+      sequ?(box,   non).should eq box
+      sequ?(ref_p, non).should eq ref_p
+      sequ?(box_p, non).should eq box_p
+      sequ?(tag,   non).should eq tag
+      sequ?(non,   non).should eq non
+    }
+  end
+
+  it "gives reflexive upper and lower bounds" do
+    Savi::Compiler::Types::Cap::Logic.access {
+      for_all { |k|
+        upper_bound(k, k).should eq k
+        lower_bound(k, k).should eq k
+      }
+    }
+  end
+
+  it "gives commutative upper and lower bounds" do
+    Savi::Compiler::Types::Cap::Logic.access {
+      for_all_2 { |k1, k2|
+        upper_bound(k1, k2).should eq upper_bound(k2, k1)
+        lower_bound(k1, k2).should eq lower_bound(k2, k1)
+      }
+    }
+  end
+
+  it "gives commutative simult relation" do
+    Savi::Compiler::Types::Cap::Logic.access {
+      for_all_2 { |k1, k2|
+        simult?(k1, k2).should eq simult?(k2, k1)
+      }
+    }
+  end
+
+  it "preserves lattice properties in upper and lower bounds" do
+    Savi::Compiler::Types::Cap::Logic.access {
+      for_all_2 { |k1, k2|
+        upper_bound(k1, lower_bound(k1, k2)).should eq k1
+        lower_bound(k1, upper_bound(k1, k2)).should eq k1
+      }
+    }
+  end
+
+  it "preserves affine properties simult and sequ relations" do
+    Savi::Compiler::Types::Cap::Logic.access {
+      for_all_2 { |k1, k2|
+        simult?(k1, k2).try { |simult_k1_k2|
+          is_subtype?(simult_k1_k2, k1).should eq true
+        }
+
+        sequ?(k1, k2).try { |sequ_k1_k2|
+          is_subtype?(sequ_k1_k2, k1)
+          is_subtype?(sequ_k1_k2, k2)
+        }
+      }
+    }
+  end
+
+  # TODO: "Times absorbs" property from alloy
+
+  it "preserves relative strength of simult and sequ" do
+    Savi::Compiler::Types::Cap::Logic.access {
+      for_all_2 { |k1, k2|
+        sequ?(k1, k2).try { |sequ_k1_k2|
+          simult?(k1, k2).try { |simult_k1_k2|
+            # Simultaneous composition is at least as powerful as sequential.
+            is_subtype?(simult_k1_k2, sequ_k1_k2).should eq true
+          }
+          # Sequential composition is at least as powerful as upper bound.
+          is_subtype?(sequ_k1_k2, upper_bound(k1, k2)).should eq true
+        }
+      }
+    }
+  end
+
+  it "preserves associativity in upper and lower bounds" do
+    Savi::Compiler::Types::Cap::Logic.access {
+      for_all_3 { |k1, k2, k3|
+        upper_bound(k1, upper_bound(k2, k3)).should eq(
+          upper_bound(upper_bound(k1, k2), k3)
+        )
+        lower_bound(k1, lower_bound(k2, k3)).should eq(
+          lower_bound(lower_bound(k1, k2), k3)
+        )
+      }
+    }
+  end
+
+  it "preserves associativity in simult relations" do
+    Savi::Compiler::Types::Cap::Logic.access {
+      for_all_3 { |k1, k2, k3|
+        simult?(k1, simult?(k2, k3)).should eq(
+          simult?(simult?(k1, k2), k3)
+        )
+      }
+    }
+  end
+
+  it "preserves distributing upper and lower bounds through a viewpoint" do
     Savi::Compiler::Types::Cap::Logic.access {
       for_all_3 { |k1, k2, k3|
         viewpoint(upper_bound(k1, k2), k3).should eq(
@@ -492,6 +658,35 @@ describe Savi::Compiler::Types::Cap do
         )
         viewpoint(k1, lower_bound(k2, k3)).should eq(
           lower_bound(viewpoint(k1, k2), viewpoint(k1, k3))
+        )
+      }
+    }
+  end
+
+  it "preserves covariance in both arguments of sequ relation" do
+    Savi::Compiler::Types::Cap::Logic.access {
+      for_all_3 { |k1, k2, k3|
+        sequ?(k1, k3).try { |sequ_k1_k3|
+          sequ?(k2, k3).try { |sequ_k2_k3|
+            if is_subtype?(k1, k2)
+              is_subtype?(sequ_k1_k3, sequ_k2_k3).should eq true
+            end
+          }
+          sequ?(k1, k2).try { |sequ_k1_k2|
+            if is_subtype?(k2, k3)
+              is_subtype?(sequ_k1_k2, sequ_k1_k3).should eq true
+            end
+          }
+        }
+      }
+    }
+  end
+
+  it "preserves distributive lattice properties" do
+    Savi::Compiler::Types::Cap::Logic.access {
+      for_all_3 { |k1, k2, k3|
+        lower_bound(k1, upper_bound(k2, k3)).should eq (
+          upper_bound(lower_bound(k1, k2), lower_bound(k1, k3))
         )
       }
     }

@@ -210,9 +210,34 @@ module Savi::Compiler::Types::Cap
 
       upper_bound = upper_bound(k1, k2)
       lower_bound = lower_bound(k1, k2)
-      return nil if bit_root?(lower_bound) && bit_held?(upper_bound)
+      return nil if bit_root?(lower_bound) && bit_read?(upper_bound)
+
+      lower_bound |= BIT_HELD if bit_read?(upper_bound)
 
       lower_bound
+    end
+
+    # Return the weakest cap that can be temporarily aliased as the given
+    # "during_alias" cap, then be recovered to be used as the given "post_alias"
+    # cap after the "during_alias" cap has gone out of scope.
+    def self.sequ?(during_alias : Value?, post_alias : Value?) : Value?
+      return nil unless during_alias && post_alias
+
+      if during_alias == VAL
+        return nil if bit_write?(post_alias)
+        return VAL
+      end
+
+      if post_alias == VAL
+        return ISO if during_alias == REF_P
+        return nil if bit_write?(during_alias)
+        return VAL
+      end
+
+      return nil if during_alias == ISO && bit_read?(post_alias)
+      return nil if post_alias == ISO && bit_held?(during_alias)
+
+      lower_bound(during_alias, post_alias)
     end
   end
 end
