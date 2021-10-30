@@ -147,7 +147,7 @@ module Savi::Compiler::Types
       }
 
       # TODO: What condition is most appropriate here?
-      if is_input_var && is_cap_var
+      if is_input_var
         # TODO: Is there a source pos we can use here?
         cursor.add_fact(Source::Pos.none, TypeVariableRef.new(self))
       end
@@ -157,12 +157,14 @@ module Savi::Compiler::Types
       analysis.calculate_assignment_summary(self) {
         next @binding.not_nil!.last if @binding
 
-        if @assignments.any?
-          @assignments.each { |pos, sub|
-            cursor.current_pos = pos
-            sub.trace_as_assignment(cursor)
-          }
-        end
+        @assignments.each { |pos, sub|
+          cursor.current_pos = pos
+          sub.trace_as_assignment(cursor)
+        }
+        @from_call_returns.each { |pos, call, receiver|
+          cursor.current_pos = pos
+          cursor.trace_call_return_as_assignment(pos, call, receiver)
+        }
 
         union_type = nil
         cursor.each_fact { |pos, type|

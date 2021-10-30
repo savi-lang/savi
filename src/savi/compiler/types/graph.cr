@@ -81,7 +81,9 @@ module Savi::Compiler::Types::Graph
     protected def init_type_self(ctx, visitor : Visitor, params : AST::Group?)
       @type_param_vars = params.try(&.terms.map { |param|
         ident = AST::Extract.type_param(param).first
-        new_type_var(ident.value)
+        var = new_type_var(ident.value)
+        var.is_input_var = true
+        var
       })
 
       @for_self = NominalType.new(
@@ -226,7 +228,6 @@ module Savi::Compiler::Types::Graph
     protected def observe_param(node, ref)
       ident, explicit, default = AST::Extract.param(node)
       var = @local_vars_by_ref[ref]
-      var.is_input_var = true
       param_vars << var
 
       if explicit
@@ -503,7 +504,9 @@ module Savi::Compiler::Types::Graph
         while analysis.scope != ref.parent_link
           analysis = analysis.parent.not_nil!.value
         end
-        analysis.type_param_vars[ref.index]
+        @analysis[node] = TypeVariableRef.new(
+          analysis.type_param_vars[ref.index]
+        )
       else
         raise NotImplementedError.new(ref.class)
       end

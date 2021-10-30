@@ -102,6 +102,18 @@ module Savi::Compiler::Types
       facts_union
     end
 
+    private def consume_facts_as_intersection_since(offset)
+      facts_intersection : AlgebraicType? = nil
+      while current_facts_offset > offset
+        if facts_intersection
+          facts_intersection = facts_intersection.intersect(@facts.pop.last)
+        else
+          facts_intersection = @facts.pop.last
+        end
+      end
+      facts_intersection
+    end
+
     def trace_as_assignment_with_transform(type)
       pre_offset = current_facts_offset
       type.trace_as_assignment(self)
@@ -139,6 +151,18 @@ module Savi::Compiler::Types
       receiver_union.trace_call_return_as_assignment(self, call)
     end
 
+    def trace_var_upper_bound_call_return_as_assignment(
+      pos : Source::Pos,
+      call : AST::Call,
+      var : TypeVariable,
+    )
+      pre_offset = current_facts_offset
+      var.trace_as_constraint(self)
+      receiver_intersection = consume_facts_as_intersection_since(pre_offset)
+      return unless receiver_intersection
+      receiver_intersection.trace_call_return_as_assignment(self, call)
+    end
+
     def trace_call_return_as_assignment_with_transform(
       call : AST::Call,
       receiver : AlgebraicType,
@@ -155,8 +179,6 @@ module Savi::Compiler::Types
       nominal_type : NominalType,
       nominal_cap : NominalCap,
     )
-      raise NotImplementedError.new(nominal_type.show) if nominal_type.args
-
       @pass.trace_nominal_call_return_as_assignment(
         @ctx, self, nominal_type, nominal_cap, call.ident
       )
@@ -228,19 +250,32 @@ module Savi::Compiler::Types
       raise "function not found" unless f # TODO: nice error
       f_link = f.make_link(t_link)
       types_graph = ctx.types_graph[f_link]
+      types_graph_parent = types_graph.parent.not_nil!
 
-      if f.cap.value == "box"
-        # When calling a box function, we bind the specific receiver cap.
-        cursor.trace_as_assignment_with_transform(types_graph.return_var) { |type|
-          type.bind_variables({
-            types_graph.receiver_cap_var => nominal_cap
-          }).first
-        }
-      else
-        # All other functions already have a known concrete cap,
-        # so we don't need to waste CPU cycles trying to bind variables.
+      # Take a fast path if we don't need to bind any variables.
+      if f.cap.value != "box" && !nominal_type.args
         types_graph.return_var.trace_as_assignment(cursor)
       end
+
+      bind_variables = {} of TypeVariable => AlgebraicType
+
+      # When calling a box function, we bind the specific receiver cap.
+      if f.cap.value == "box"
+        bind_variables[types_graph.receiver_cap_var] = nominal_cap
+      end
+
+      # If the nominal type has type parameters, bind them.
+      nominal_type_args = nominal_type.args
+      if nominal_type_args
+        types_graph_parent.type_param_vars.each_with_index { |var, index|
+          bind_variables[var] = nominal_type_args[index]
+        }
+      end
+
+      # Trace with the specified bindings.
+      cursor.trace_as_assignment_with_transform(types_graph.return_var) { |type|
+        type.bind_variables(bind_variables).first
+      }
     end
   end
 end

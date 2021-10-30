@@ -45,3 +45,27 @@ String'val
 ```types.return GetExampleIsoField.via_box
 String'box'
 ```
+
+---
+
+TODO: It substitutes the type argument for the type parameter in a generic.
+
+Note that this doesn't actually work as desired yet - it should return String'ref and Bytes'ref, respectively.
+
+```savi
+:trait NewableThing
+  :new ref
+
+:module NewSomething(A NewableThing'non)
+  :fun call: A.new
+
+:module UseNewSomething
+  :fun string: NewSomething(String'non).call
+  :fun bytes: NewSomething(Bytes'non).call
+```
+```types.return UseNewSomething.string
+NewableThing'ref
+```
+```types.return UseNewSomething.bytes
+NewableThing'ref
+```

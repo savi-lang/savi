@@ -37,6 +37,10 @@ module Savi::Compiler::Types
       raise NotImplementedError.new("trace_call_return_as_assignment for #{self.class}: #{show}")
     end
 
+    def is_assignment_based_on_input_var? : Bool
+      raise NotImplementedError.new("trace_call_return_as_assignment for #{self.class}: #{show}")
+    end
+
     def observe_assignment_reciprocals(
       pos : Source::Pos,
       supertype : AlgebraicType,
@@ -314,6 +318,10 @@ module Savi::Compiler::Types
       var.trace_as_assignment(cursor)
     end
 
+    def trace_call_return_as_assignment(cursor : Cursor, call : AST::Call)
+      cursor.trace_var_upper_bound_call_return_as_assignment(call.pos, call, var)
+    end
+
     def observe_assignment_reciprocals(
       pos : Source::Pos,
       supertype : AlgebraicType,
@@ -451,6 +459,15 @@ module Savi::Compiler::Types
       NoUnique.new(inner)
     end
 
+    def bind_variables(mapping : Hash(TypeVariable, AlgebraicType)) : {AlgebraicType, Bool}
+      new_inner, is_changed = inner.bind_variables(mapping)
+      if is_changed
+        return {new_inner.aliased, true}
+      else
+        return {self, false}
+      end
+    end
+
     def trace_as_assignment(cursor : Cursor)
       cursor.trace_as_assignment_with_transform(inner, &.aliased)
     end
@@ -583,6 +600,10 @@ module Savi::Compiler::Types
       {self, false}
     end
 
+    def trace_as_constraint(cursor : Cursor)
+      cursor.add_fact_at_current_pos(self)
+    end
+
     def trace_as_assignment(cursor : Cursor)
       cursor.add_fact_at_current_pos(self)
     end
@@ -615,7 +636,11 @@ module Savi::Compiler::Types
     end
 
     def show
-      "(#{@members.map(&.show).join(" & ")})"
+      case @members.size
+      when 0 then raise NotImplementedError.new("algebraic top type")
+      when 1 then @members.first.show
+      else "(#{@members.map(&.show).join(" & ")})"
+      end
     end
 
     def intersect(other : AlgebraicType)
@@ -709,7 +734,11 @@ module Savi::Compiler::Types
     end
 
     def show
-      "(#{@members.map(&.show).join(" | ")})"
+      case @members.size
+      when 0 then raise NotImplementedError.new("algebraic bottom type")
+      when 1 then @members.first.show
+      else "(#{@members.map(&.show).join(" | ")})"
+      end
     end
 
     def intersect(other : AlgebraicType)

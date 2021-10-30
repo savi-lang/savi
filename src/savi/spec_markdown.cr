@@ -74,6 +74,8 @@ class Savi::SpecMarkdown
             example.expected_types_graph << {$~[1], $~[2], content}
           when /^types.return (\w+)\.([\w<>=]+)$/
             example.expected_return_types << {$~[1], $~[2], content}
+          when /^types.params\[(\d+)\] (\w+)\.([\w<>=]+)$/
+            example.expected_param_types << {$~[2], $~[3], $~[1].to_i, content}
           else
             raise NotImplementedError.new("compiler spec code block: #{kind}")
           end
@@ -106,6 +108,7 @@ class Savi::SpecMarkdown
     property expected_format_results = [] of {String, String}
     property expected_types_graph = [] of {String, String, String}
     property expected_return_types = [] of {String, String, String}
+    property expected_param_types = [] of {String, String, Int32, String}
 
     def incomplete?
       code_blocks.empty?
@@ -304,6 +307,41 @@ class Savi::SpecMarkdown
           puts example.generated_comments_code
           puts
           puts "Expected return type:"
+          puts
+          puts expected
+          puts
+          puts "but actually was:"
+          puts
+          puts actual
+          puts
+          all_success = false
+        end
+      }
+
+      example.expected_param_types.each { |t_name, f_name, param_index, expected|
+        type = library.types.find(&.ident.value.==(t_name))
+        func = type.try(&.find_func?(f_name))
+        unless func && type
+          puts "---"
+          puts
+          puts example.generated_comments_code
+          puts
+          puts "Missing param type function: #{t_name}.#{f_name}"
+          puts
+          all_success = false
+          next
+        end
+
+        f_link = func.make_link(type.make_link(library.make_link))
+        param_var = ctx.types_graph[f_link].param_vars[param_index]
+        actual = ctx.types[f_link][param_var].show
+
+        unless expected.strip == actual.strip
+          puts "---"
+          puts
+          puts example.generated_comments_code
+          puts
+          puts "Expected params[#{param_index}] type:"
           puts
           puts expected
           puts
