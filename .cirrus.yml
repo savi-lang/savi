@@ -77,7 +77,7 @@ task:
     - mkdir -p out/bin
     - crystal --version
     - clang++ -v -c -o ${CRYSTAL_SRC_PATH}/llvm/ext/llvm_ext.o ${CRYSTAL_SRC_PATH}/llvm/ext/llvm_ext.cc `llvm-config --cxxflags`
-    - crystal build --release main.cr --error-trace -o out/bin/savi
+    - crystal build --static --release main.cr --error-trace -o out/bin/savi
 
   copy_packages_script:
     - mkdir -p out
