@@ -71,7 +71,7 @@ task:
 
   download_runtime_script:
     - mkdir -p out/lib
-    - curl --fail "${RUNTIME_RELEASE_URL}/${TRIPLE}-libponyrt.bc" --output out/lib/libsavi_runtime.bc
+    - curl -L --fail "${RUNTIME_RELEASE_URL}/${TRIPLE}-libponyrt.bc" --output out/lib/libsavi_runtime.bc
 
   build_script:
     - mkdir -p out/bin
