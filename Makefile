@@ -1,3 +1,5 @@
+ROOT=$(abspath $(dir $(lastword $(MAKEFILE_LIST))))
+
 PHONY:
 
 # Prepare a docker container that has everything needed for development.
@@ -18,11 +20,10 @@ ci: PHONY
 # Run the test suite.
 test: PHONY
 	docker exec savi-dev make extra_args="$(extra_args)" test.inner
-/tmp/bin/spec: $(shell find lib -name '*.cr') $(shell find src -name '*.cr') $(shell find spec -name '*.cr')
-	mkdir -p /tmp/bin
+bin/spec: $(shell find lib -name '*.cr') $(shell find src -name '*.cr') $(shell find spec -name '*.cr')
 	crystal build --debug spec/all.cr -o $@
-test.inner: PHONY /tmp/bin/spec
-	echo && /tmp/bin/spec $(extra_args)
+test.inner: PHONY bin/spec
+	echo && bin/spec $(extra_args)
 
 # Run a narrow target within the test suite.
 test.narrow: PHONY
@@ -33,40 +34,40 @@ test.narrow.inner: PHONY
 # Run the given compiler-spec target.
 compiler-spec: PHONY
 	docker exec -i savi-dev make target="$(target)" extra_args="$(extra_args)" compiler-spec.inner
-compiler-spec.inner: PHONY /tmp/bin/savi
-	echo && /tmp/bin/savi compilerspec "$(target)" $(extra_args)
+compiler-spec.inner: PHONY bin/savi
+	echo && $(ROOT)/bin/savi compilerspec "$(target)" $(extra_args)
 compiler-spec.all: PHONY
 	find "spec/compiler" -name '*.savi.spec.md' | xargs -I '{}' sh -c 'make compiler-spec target="{}" extra_args="'$(extra_args)'" || exit 255'
 
 # Check formatting of *.savi source files.
 format-check: PHONY
 	docker exec -i savi-dev make format-check.inner
-format-check.inner: PHONY /tmp/bin/savi
-	echo && /tmp/bin/savi format --check --backtrace
+format-check.inner: PHONY bin/savi
+	echo && $(ROOT)/bin/savi format --check --backtrace
 
 # Fix formatting of *.savi source files.
 format: PHONY
 	docker exec -i savi-dev make format.inner
-format.inner: PHONY /tmp/bin/savi
-	echo && /tmp/bin/savi format --backtrace
+format.inner: PHONY bin/savi
+	echo && $(ROOT)/bin/savi format --backtrace
 
 # Evaluate a Hello World example.
 example-eval: PHONY
 	docker exec savi-dev make extra_args="$(extra_args)" example-eval.inner
-example-eval.inner: PHONY /tmp/bin/savi
-	echo && /tmp/bin/savi eval 'env.out.print("Hello, World!")'
+example-eval.inner: PHONY bin/savi
+	echo && $(ROOT)/bin/savi eval 'env.out.print("Hello, World!")'
 
 # Run the files in the given directory.
 example-run: PHONY
 	docker exec savi-dev make dir="$(dir)" extra_args="$(extra_args)" example-run.inner
-example-run.inner: PHONY /tmp/bin/savi
-	echo && cd "/opt/code/$(dir)" && /tmp/bin/savi run $(extra_args)
+example-run.inner: PHONY bin/savi
+	echo && cd "/opt/code/$(dir)" && $(ROOT)/bin/savi run $(extra_args)
 
 # Compile the files in the given directory.
 example-compile: PHONY
 	docker exec savi-dev make dir="$(dir)" extra_args="$(extra_args)" example-compile.inner
-example-compile.inner: PHONY /tmp/bin/savi
-	echo && cd "/opt/code/$(dir)" && /tmp/bin/savi $(extra_args)
+example-compile.inner: PHONY bin/savi
+	echo && cd "/opt/code/$(dir)" && $(ROOT)/bin/savi $(extra_args)
 
 # Compile and run the savi binary in the given directory.
 example: example-compile
@@ -75,10 +76,9 @@ example-lldb: example-compile
 	echo && lldb -o run -- "$(dir)/main" # TODO: run this within docker when alpine supports lldb package outside of edge
 example-savi-callgrind: PHONY
 	docker exec savi-dev make extra_args="$(extra_args)" example-savi-callgrind.inner
-/tmp/bin/savi: main.cr $(shell find lib -name '*.cr') $(shell find src -name '*.cr')
-	mkdir -p /tmp/bin
+bin/savi: main.cr $(shell find lib -name '*.cr') $(shell find src -name '*.cr')
 	crystal build --debug main.cr --error-trace -o $@
-/tmp/callgrind.out: /tmp/bin/savi
+/tmp/callgrind.out: bin/savi
 	echo && cd example && valgrind --tool=callgrind --callgrind-out-file=$@ $<
 example-savi-callgrind.inner: /tmp/callgrind.out PHONY
 	/usr/bin/callgrind_annotate $< | less

@@ -1,6 +1,6 @@
 class Savi::Compiler::SourceService
   property standard_library_internal_path =
-    File.expand_path("../../../packages", __DIR__)
+    File.expand_path("../../packages", Process.executable_path.not_nil!)
 
   property standard_directory_remap : {String, String}?
   property main_directory_remap : {String, String}?

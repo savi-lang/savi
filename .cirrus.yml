@@ -1,0 +1,99 @@
+# We use Cirrus CI to create release builds for a handful of platforms.
+#
+# This task pulls a version of the runtime bitcode (see RUNTIME_RELEASE_URL),
+# builds the Savi compiler, and then packages it all up in a tar.gz file
+# to be attached to the release in GitHub, for easy download and use.
+
+task:
+  # Don't bother running anything at all when this isn't a release tag.
+  # This line can be commented out for testing the build process in a PR.
+  only_if: $CIRRUS_RELEASE != ''
+
+  environment:
+    GITHUB_API_TOKEN: ENCRYPTED[5f9b960dd53fb09b34bcb26f7f8a926071f0177e0ec814e7d122db0e2184d3e913ec78d5748e27664c0fef66fde950fe]
+    RUNTIME_RELEASE_URL: https://github.com/savi-lang/runtime-bitcode/releases/download/20211101
+    CC: clang
+    CXX: clang++
+
+  matrix:
+    - name: x86_64-unknown-linux-gnu
+      container:
+        image: ubuntu:21.04
+      environment:
+        TRIPLE: x86_64-unknown-linux-gnu
+        DEPS_INSTALL_PRE: apt-get update
+        DEPS_INSTALL: apt-get install -y --no-install-recommends apt-transport-https ca-certificates curl clang llvm-dev
+        CRYSTAL_INSTALL: curl -fsSL https://crystal-lang.org/install.sh | bash
+        CRYSTAL_SRC_PATH: /usr/share/crystal/src
+        DEBIAN_FRONTEND: noninteractive
+
+    - name: x86_64-unknown-linux-musl
+      environment:
+        TRIPLE: x86_64-unknown-linux-musl
+        DEPS_INSTALL: apk add --no-cache --update alpine-sdk coreutils bash curl linux-headers clang-dev llvm11-dev crystal shards && ln -s /usr/lib/llvm11/bin/llvm-config /usr/bin/llvm-config
+        CRYSTAL_INSTALL: echo "Crystal was already installed above."
+        CRYSTAL_SRC_PATH: /usr/lib/crystal/core
+      container:
+        image: alpine:edge # TODO: use alpine:3.15 or newest stable release when available
+
+    # TODO: Enable FreeBSD after getting it working:
+    # - name: x86_64-unknown-freebsd
+    #   environment:
+    #     TRIPLE: x86_64-unknown-freebsd
+    #     DEPS_INSTALL_PRE: echo 'FreeBSD:{url:"pkg+http://pkg.FreeBSD.org/${ABI}/latest"}' > /usr/local/etc/pkg/repos/FreeBSD.conf && pkg update
+    #     DEPS_INSTALL: pkg install -y libunwind bash curl llvm-devel && ln -s /usr/local/bin/llvm-config-devel /usr/bin/llvm-config
+    #     CRYSTAL_INSTALL: pkg install -y crystal shards
+    #     CRYSTAL_SRC_PATH: /usr/local/lib/crystal
+    #   freebsd_instance:
+    #     image: freebsd-13-0-release-amd64
+
+    - name: x86_64-apple-macosx
+      environment:
+        TRIPLE: x86_64-apple-macosx
+        DEPS_INSTALL_PRE: brew update --preinstall && brew install llvm && brew link llvm --force
+        DEPS_INSTALL: ln -s /usr/local/opt/llvm/bin/llvm-link /usr/local/bin/llvm-link && ln -s /usr/local/opt/llvm/bin/llvm-config /usr/local/bin/llvm-config
+        CRYSTAL_INSTALL: brew install crystal && ln -s $(ls -d /usr/local/Cellar/crystal/*/src | tail -n 1) /tmp/crystal-src
+        CRYSTAL_SRC_PATH: /tmp/crystal-src
+        SDKROOT: /Applications/Xcode-12.5.0.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk
+      macos_instance:
+        image: big-sur-xcode-12.5
+
+    # TODO: arm64-apple-macos
+
+  os_info_script:
+    - uname
+    - uname -m
+    - uname -a
+
+  deps_script:
+    - sh -c "${DEPS_INSTALL_PRE:-echo}" && sh -c "${DEPS_INSTALL:-echo}"
+    - sh -c "${CRYSTAL_INSTALL:-echo}"
+
+  download_runtime_script:
+    - mkdir -p out/lib
+    - curl --fail "${RUNTIME_RELEASE_URL}/${TRIPLE}-libponyrt.bc" --output out/lib/libsavi_runtime.bc
+
+  build_script:
+    - mkdir -p out/bin
+    - crystal --version
+    - clang++ -v -c -o ${CRYSTAL_SRC_PATH}/llvm/ext/llvm_ext.o ${CRYSTAL_SRC_PATH}/llvm/ext/llvm_ext.cc `llvm-config --cxxflags`
+    - crystal build --release main.cr --error-trace -o out/bin/savi
+
+  copy_packages_script:
+    - mkdir -p out
+    - cp -r packages out/packages
+
+  archive_script:
+    - tar -czvf /tmp/savi.tar.gz -C out .
+
+  publish_if_release_script:
+    - >-
+      sh -c '
+        test -z "${CIRRUS_RELEASE}" || \
+          curl -v --fail -X POST \
+            -H "Authorization: token ${GITHUB_API_TOKEN}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            -H "Content-Type: application/octet-stream" \
+            --data-binary @/tmp/savi.tar.gz \
+            "https://uploads.github.com/repos/$CIRRUS_REPO_FULL_NAME/releases/$CIRRUS_RELEASE/assets?name=${TRIPLE}-savi.tar.gz" \
+      '

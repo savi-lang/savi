@@ -4,7 +4,7 @@ class Savi::Compiler::CodeGen
     LANGUAGE_ID = 0x000c # pretend to be C
 
     property! ctx : Context
-    private getter! di_func : LibLLVMExt::Metadata
+    private getter! di_func : LibLLVM::MetadataRef
 
     def initialize(
       @llvm : LLVM::Context,
@@ -107,7 +107,7 @@ class Savi::Compiler::CodeGen
     end
 
     def di_file(source : Source)
-      di_files = (@di_files ||= {} of String => LibLLVMExt::Metadata)
+      di_files = (@di_files ||= {} of String => LibLLVM::MetadataRef)
       di_files[source.path] ||=
         @di.create_file(File.basename(source.path), File.dirname(source.path))
     end
@@ -127,7 +127,7 @@ class Savi::Compiler::CodeGen
 
     def di_create_pointer_type(
       name : String,
-      element_di_type : LibLLVMExt::Metadata,
+      element_di_type : LibLLVM::MetadataRef,
     )
       @di.create_pointer_type(
         element_di_type,
@@ -137,11 +137,11 @@ class Savi::Compiler::CodeGen
       )
     end
 
-    @di_runtime_member_info : Hash(Int32, Tuple(String, LLVM::Type, LibLLVMExt::Metadata))?
+    @di_runtime_member_info : Hash(Int32, Tuple(String, LLVM::Type, LibLLVM::MetadataRef))?
     def di_runtime_member_info
       @di_runtime_member_info ||= begin
         @runtime.di_runtime_member_info(self)
-          .as(Hash(Int32, Tuple(String, LLVM::Type, LibLLVMExt::Metadata)))
+          .as(Hash(Int32, Tuple(String, LLVM::Type, LibLLVM::MetadataRef)))
       end
     end
 
@@ -155,7 +155,7 @@ class Savi::Compiler::CodeGen
       # Create a temporary stand-in for this debug type, which is used to
       # prevent unwanted recursion if it (directly or indirectly) contains
       # this same debug type within one of its fields, which we visit below.
-      tmp_debug_type = @di.create_replaceable_composite_type(nil, name, nil, 1, @llvm)
+      tmp_debug_type = @di.create_replaceable_composite_type(nil, name, nil, 1)
       @di_types.not_nil![t] = tmp_debug_type
 
       # Create the debug type, as a struct pointer to the struct type.
@@ -178,7 +178,7 @@ class Savi::Compiler::CodeGen
 
       # First gather the debug type information for the type descriptor,
       # which is specific to the runtime we are using.
-      di_member_info = Hash(Int32, Tuple(String, LLVM::Type, LibLLVMExt::Metadata)).new
+      di_member_info = Hash(Int32, Tuple(String, LLVM::Type, LibLLVM::MetadataRef)).new
       di_member_info.merge!(di_runtime_member_info)
 
       # Now add in the debug type information for the user fields struct.
@@ -203,7 +203,7 @@ class Savi::Compiler::CodeGen
       pos = ident.pos
 
       # Gather the debug type information for all user fields.
-      di_member_info = Hash(Int32, Tuple(String, LLVM::Type, LibLLVMExt::Metadata)).new
+      di_member_info = Hash(Int32, Tuple(String, LLVM::Type, LibLLVM::MetadataRef)).new
       llvm_type.struct_element_types.each_with_index do |field_llvm_type, index|
         field_name, field_reach_ref = reach_def.fields[index]
         di_member_info[index] = {
@@ -222,7 +222,7 @@ class Savi::Compiler::CodeGen
     def di_create_struct_type(
       name : String,
       llvm_type : LLVM::Type,
-      member_infos : Hash(Int32, Tuple(String, LLVM::Type, LibLLVMExt::Metadata)),
+      member_infos : Hash(Int32, Tuple(String, LLVM::Type, LibLLVM::MetadataRef)),
       pos : Source::Pos? = nil
     )
       @di.create_struct_type(
@@ -278,7 +278,7 @@ class Savi::Compiler::CodeGen
     end
 
     def di_type(t : Reach::Ref, llvm_type : LLVM::Type)
-      di_types = (@di_types ||= {} of Reach::Ref => LibLLVMExt::Metadata)
+      di_types = (@di_types ||= {} of Reach::Ref => LibLLVM::MetadataRef)
       di_types[t] ||=
         if t.is_enum?(ctx)
           di_create_enum_type(t, llvm_type)
@@ -309,7 +309,7 @@ class Savi::Compiler::CodeGen
     end
 
     # TODO: build a real type description here.
-    def di_func_type(gfunc : GenFunc, file : LibLLVMExt::Metadata)
+    def di_func_type(gfunc : GenFunc, file : LibLLVM::MetadataRef)
       # This is just a stub that pretends there is just one int parameter.
       int = @di.create_basic_type("int", 32, 32, LLVM::DwarfTypeEncoding::Signed)
       param_types = @di.get_or_create_type_array([int])

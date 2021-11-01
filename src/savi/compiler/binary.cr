@@ -13,15 +13,19 @@ require "llvm"
 # !! This pass has the side-effect of writing files to disk.
 #
 class Savi::Compiler::Binary
-  PONYRT_BC_PATH = ENV.fetch("SAVI_PONYRT_BC_PATH", "/usr/lib:/usr/local/lib")
+  RUNTIME_BC_PATH = ENV.fetch("SAVI_RUNTIME_BC_PATH", [
+    File.expand_path("../../lib", Process.executable_path.not_nil!),
+    "/usr/lib",
+    "/usr/local/lib",
+  ].join(":"))
 
   def self.run(ctx)
     new.run(ctx)
   end
 
-  def find_libponyrt_bc(searchpath) : String?
+  def find_runtime_bc(searchpath) : String?
     searchpath.split(":", remove_empty: true)
-      .map { |path| File.join(path, "libponyrt.bc") }
+      .map { |path| File.join(path, "libsavi_runtime.bc") }
       .find { |path| File.exists?(path) }
   end
 
@@ -31,7 +35,7 @@ class Savi::Compiler::Binary
     mod = ctx.code_gen.mod
 
     target = Target.new(machine.triple)
-    ponyrt_bc_path = find_libponyrt_bc(PONYRT_BC_PATH) || raise "libponyrt.bc not found"
+    ponyrt_bc_path = find_runtime_bc(RUNTIME_BC_PATH) || raise "libsavi_runtime.bc not found"
 
     ponyrt_bc = LLVM::MemoryBuffer.from_file(ponyrt_bc_path)
     ponyrt = llvm.parse_bitcode(ponyrt_bc).as(LLVM::Module)
