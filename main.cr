@@ -139,9 +139,9 @@ module Savi
           exit 1
         rescue e
           message = if e.message
-            "Savi compiler error occured with message \"#{e.message}\". Consider submitting new issue."
+            "Savi compiler error occured with message \"#{e.message}\". Consider submitting an issue ticket."
           else
-            "Unknown Savi compiler error occured. Consider submitting new issue."
+            "Unknown Savi compiler error occured. Consider submitting an issue ticket."
           end
           STDERR.puts message
           exit 1

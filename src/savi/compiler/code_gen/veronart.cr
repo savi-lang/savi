@@ -214,7 +214,7 @@ class Savi::Compiler::CodeGen::VeronaRT
 
   def di_runtime_member_info(debug : DebugInfo)
     # TODO: Expose runtime member info, like PonyRT does.
-    {} of Int32 => {String, LLVM::Type, LibLLVMExt::Metadata}
+    {} of Int32 => {String, LLVM::Type, LibLLVM::MetadataRef}
   end
 
   # This defines a global constant for the type descriptor of a type,

@@ -16,11 +16,11 @@ export CMAKE_CXX_FLAGS=-I/usr/local/include
 gmake libs
 gmake configure lto=yes runtime-bitcode=yes
 gmake build
-sudo cp build/release/libponyrt.bc /usr/local/lib
+sudo cp build/release/libponyrt.bc /usr/local/lib/libsavi_runtime.bc
 ```
 
-We only need file `libponyrt.bc`. Either copy it to a system library location,
-or set `SAVI_PONYRT_BC_PATH` to the directory where it can be found.
+We only need `libsavi_runtime.bc`. Either copy it to a system library location,
+or set `SAVI_RUNTIME_BC_PATH` to the directory where it can be found.
 
 Then build `savi`:
 
