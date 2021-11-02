@@ -143,7 +143,7 @@ task:
     # as portable as possible across different distros/circumstances
     # (not requiring shared libraries to be installed with particular names).
     - >-
-      clang -v /tmp/savi.o /tmp/llvm_ext-opt.bc \
+      clang -v -o out/bin/savi /tmp/savi.o /tmp/llvm_ext-opt.bc \
         ${CRYSTAL_STATIC_LIBS} \
         -lstdc++ \
         `llvm-config --libfiles --link-static` \
