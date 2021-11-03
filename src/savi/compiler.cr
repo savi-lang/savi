@@ -56,9 +56,10 @@ class Savi::Compiler
     when "paint"            then :paint
     when "codegen"          then :codegen
     when "lifetime"         then :lifetime
-    when "codegen_verona"   then :codegen_verona
-    when "eval"             then :eval
+    when "binary_object"    then :binary_object
     when "binary"           then :binary
+    when "eval"             then :eval
+    when "codegen_verona"   then :codegen_verona
     when "binary_verona"    then :binary_verona
     when "serve_errors"     then :serve_errors
     when "serve_hover"      then :serve_hover
@@ -100,9 +101,10 @@ class Savi::Compiler
       when :paint            then ctx.run_whole_program(ctx.paint)
       when :codegen          then ctx.run_whole_program(ctx.code_gen)
       when :lifetime         then ctx.run_whole_program(ctx.lifetime)
-      when :codegen_verona   then ctx.run_whole_program(ctx.code_gen_verona)
-      when :eval             then ctx.run_whole_program(ctx.eval)
+      when :binary_object    then ctx.run_whole_program(BinaryObject)
       when :binary           then ctx.run_whole_program(Binary)
+      when :eval             then ctx.run_whole_program(ctx.eval)
+      when :codegen_verona   then ctx.run_whole_program(ctx.code_gen_verona)
       when :binary_verona    then ctx.run_whole_program(BinaryVerona)
       when :serve_errors     then nil # we only care that the dependencies have run, to generate compile errors
       when :serve_hover      then ctx.run_whole_program(ctx.serve_hover)
@@ -149,10 +151,11 @@ class Savi::Compiler
     when :paint then [:reach, :inventory]
     when :codegen then [:paint, :verify, :reach, :completeness, :privacy, :type_check, :infer, :pre_infer, :inventory, :local, :flow]
     when :lifetime then [:reach, :local, :refer, :classify]
-    when :codegen_verona then [:lifetime, :paint, :verify, :reach, :completeness, :privacy, :type_check, :infer, :pre_infer, :inventory, :local, :flow]
+    when :binary_object then [:codegen]
     when :binary then [:codegen]
-    when :binary_verona then [:codegen_verona]
     when :eval then [:binary]
+    when :codegen_verona then [:lifetime, :paint, :verify, :reach, :completeness, :privacy, :type_check, :infer, :pre_infer, :inventory, :local, :flow]
+    when :binary_verona then [:codegen_verona]
     when :serve_errors then [:completeness, :privacy, :verify, :type_check, :local]
     when :serve_hover then [:refer, :type_check]
     when :serve_definition then [:refer, :type_check, :local]

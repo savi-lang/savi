@@ -13,41 +13,17 @@ require "llvm"
 # !! This pass has the side-effect of writing files to disk.
 #
 class Savi::Compiler::Binary
-  RUNTIME_BC_PATH = ENV.fetch("SAVI_RUNTIME_BC_PATH", [
-    File.expand_path("../../lib", Process.executable_path.not_nil!),
-    "/usr/lib",
-    "/usr/local/lib",
-  ].join(":"))
-
   def self.run(ctx)
     new.run(ctx)
   end
 
-  def find_runtime_bc(searchpath) : String?
-    searchpath.split(":", remove_empty: true)
-      .map { |path| File.join(path, "libsavi_runtime.bc") }
-      .find { |path| File.exists?(path) }
-  end
-
   def run(ctx)
-    llvm = ctx.code_gen.llvm
-    machine = ctx.code_gen.target_machine
-    mod = ctx.code_gen.mod
+    # Compile a temporary binary object file, that we will remove after we
+    # use it in the linker invocation to create the final binary.
+    obj_filename = File.tempname(".savi.user.program") + ".o"
+    BinaryObject.run(ctx, obj_filename)
 
-    target = Target.new(machine.triple)
-    ponyrt_bc_path = find_runtime_bc(RUNTIME_BC_PATH) || raise "libsavi_runtime.bc not found"
-
-    ponyrt_bc = LLVM::MemoryBuffer.from_file(ponyrt_bc_path)
-    ponyrt = llvm.parse_bitcode(ponyrt_bc).as(LLVM::Module)
-
-    # Link the pony runtime bitcode into the generated module.
-    LibLLVM.link_modules(mod.to_unsafe, ponyrt.to_unsafe)
-
-    bin_filename = File.tempname(".savi.user.program")
-    obj_filename = "#{bin_filename}.o"
-
-    machine.emit_obj_to_file(mod, obj_filename)
-
+    target = Target.new(ctx.code_gen.target_machine.triple)
     link_args = if target.freebsd?
                   %w{clang
                     -fuse-ld=lld -static -fpic -flto=thin
