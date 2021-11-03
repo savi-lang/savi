@@ -124,8 +124,9 @@ task:
     # doesn't try to eagerly link our object file into a binary.
     # We want to control the linking process in a custom way ourselves.
     - >-
-      crystal build main.cr -o /tmp/savi --stats --error-trace --release \
-        --cross-compile --target=${TRIPLE}
+      env SAVI_VERSION=${CIRRUS_RELEASE:-unknown} \
+        crystal build main.cr -o /tmp/savi --stats --error-trace --release \
+          --cross-compile --target=${TRIPLE}
 
     # Whittle down the Crystal LLVM extensions to remove what we don't use,
     # mainly because every function we don't use needlessly adds to our usage

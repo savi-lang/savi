@@ -2,7 +2,7 @@ require "./savi/ext/**"
 require "./savi/**"
 
 module Savi
-  VERSION = "0.0.1"
+  VERSION = {{ env("SAVI_VERSION") || "unknown" }}
 
   def self.compiler
     Compiler::INSTANCE
