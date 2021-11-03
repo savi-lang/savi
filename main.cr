@@ -7,7 +7,7 @@ module Savi
     main do
       desc "Savi compiler."
       usage "savi [sub_command]. Default sub_command in build"
-      version "savi version: 0.0.1", short: "-v"
+      version "savi version: #{Savi::VERSION}", short: "-v"
       help short: "-h"
       option "-b", "--backtrace", desc: "Show backtrace on error", type: Bool, default: false
       option "-r", "--release", desc: "Compile in release mode", type: Bool, default: false
