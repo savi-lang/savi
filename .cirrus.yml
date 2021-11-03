@@ -124,7 +124,7 @@ task:
     # doesn't try to eagerly link our object file into a binary.
     # We want to control the linking process in a custom way ourselves.
     - >-
-      env SAVI_VERSION=${CIRRUS_RELEASE:-unknown} \
+      env SAVI_VERSION=${CIRRUS_TAG:-unknown} \
         crystal build main.cr -o /tmp/savi --stats --error-trace --release \
           --cross-compile --target=${TRIPLE}
 
