@@ -23,30 +23,36 @@ class Savi::Compiler::Binary
     obj_filename = File.tempname(".savi.user.program") + ".o"
     BinaryObject.run(ctx, obj_filename)
 
+    # Use clang to orchestrate the linking process (clang will call the linker
+    # for us with appropriate arguments based on the args we have given it).
+    # For all platforms, we enable position-independent-code and
+    # thin link time optimization as defaults.
+    link_args = %w{clang -fpic -flto=thin}
+
+    # We also use clang for optimizations, when compiling in release mode.
+    link_args << (ctx.options.release ? "-O3" : "-O0")
+
+    # Based on the target, choose which libraries to explicitly link.
+    # On some platforms, some of the relevant libraries we need are implicit.
     target = Target.new(ctx.code_gen.target_machine.triple)
-    link_args = if target.freebsd?
-                  %w{clang
-                    -fuse-ld=lld -static -fpic -flto=thin
-                    -lc -lm -pthread -ldl -lexecinfo -lelf
-                  }
-                else
-                  %w{clang
-                    -fuse-ld=lld -rdynamic -static -fpic -flto=thin
-                    -lc -pthread -ldl -latomic
-                  }
-                end
-
-    link_args <<
-      if ctx.options.release
-        "-O3"
+    link_args.concat(
+      if target.linux?
+        %w{-ldl -pthread -lc -latomic}
+      elsif target.freebsd?
+        %w{-ldl -pthread -lc -lm -lexecinfo -lelf}
+      elsif target.macos?
+        %w{}
       else
-        "-O0"
+        raise NotImplementedError.new(target)
       end
+    )
 
+    # Link any additional libraries requested by the user program.
     ctx.link_libraries.each do |x|
       link_args << "-l" + x
     end
 
+    # Finally, specify the input object file and the output filename.
     link_args << obj_filename
     link_args << "-o" << ctx.options.binary_name
 
