@@ -16,46 +16,46 @@ task:
     CXX: clang++
 
   matrix:
-    - name: x86_64-unknown-linux-gnu
-      container:
-        image: ubuntu:21.04
-      environment:
-        TRIPLE: x86_64-unknown-linux-gnu
-        DEPS_INSTALL: "\
-          apt-get update && \
-          apt-get install -y --no-install-recommends \
-            apt-transport-https ca-certificates curl clang \
-            llvm-dev libgc-dev libevent-dev libpcre3-dev && \
-          curl -fsSL https://crystal-lang.org/install.sh | bash"
-        CRYSTAL_SRC_PATH: /usr/share/crystal/src
-        CRYSTAL_STATIC_LIBS: "\
-          /usr/lib/x86_64-linux-gnu/libgc.a \
-          /usr/lib/x86_64-linux-gnu/libevent.a \
-          /usr/lib/x86_64-linux-gnu/libpcre.a"
-        # Without this next environment var, apt-get will try to ask us
-        # interactive questions, to which we will be unable to respond...
-        DEBIAN_FRONTEND: noninteractive
+    # - name: x86_64-unknown-linux-gnu
+    #   container:
+    #     image: ubuntu:21.04
+    #   environment:
+    #     TRIPLE: x86_64-unknown-linux-gnu
+    #     DEPS_INSTALL: "\
+    #       apt-get update && \
+    #       apt-get install -y --no-install-recommends \
+    #         apt-transport-https ca-certificates curl clang \
+    #         llvm-dev libgc-dev libevent-dev libpcre3-dev && \
+    #       curl -fsSL https://crystal-lang.org/install.sh | bash"
+    #     CRYSTAL_SRC_PATH: /usr/share/crystal/src
+    #     CRYSTAL_STATIC_LIBS: "\
+    #       /usr/lib/x86_64-linux-gnu/libgc.a \
+    #       /usr/lib/x86_64-linux-gnu/libevent.a \
+    #       /usr/lib/x86_64-linux-gnu/libpcre.a"
+    #     # Without this next environment var, apt-get will try to ask us
+    #     # interactive questions, to which we will be unable to respond...
+    #     DEBIAN_FRONTEND: noninteractive
 
-    - name: x86_64-unknown-linux-musl
-      environment:
-        TRIPLE: x86_64-unknown-linux-musl
-        DEPS_INSTALL: "\
-          apk add --no-cache --update \
-            alpine-sdk coreutils gcc g++ lld bash curl linux-headers clang-dev \
-            llvm12-dev llvm12-static pcre-dev libevent-static gc-dev \
-            zlib-static libxml2-dev \
-            crystal shards"
-        CRYSTAL_SRC_PATH: /usr/lib/crystal/core
-        CRYSTAL_STATIC_LIBS: "\
-          /usr/lib/libgc.a \
-          /usr/lib/libevent.a \
-          /usr/lib/libpcre.a"
-        # For some reason clang++ is missing some c++ headers unless we
-        # explicitly mention them in this environment variable here.
-        CPLUS_INCLUDE_PATH: /usr/include/c++/10.3.1:/usr/include/c++/10.3.1/x86_64-alpine-linux-musl
-        LIBRARY_PATH: /usr/lib/gcc/x86_64-alpine-linux-musl/10.3.1
-      container:
-        image: alpine:edge # TODO: use alpine:3.15 or newest stable release when available
+    # - name: x86_64-unknown-linux-musl
+    #   environment:
+    #     TRIPLE: x86_64-unknown-linux-musl
+    #     DEPS_INSTALL: "\
+    #       apk add --no-cache --update \
+    #         alpine-sdk coreutils gcc g++ lld bash curl linux-headers clang-dev \
+    #         llvm12-dev llvm12-static pcre-dev libevent-static gc-dev \
+    #         zlib-static libxml2-dev \
+    #         crystal shards"
+    #     CRYSTAL_SRC_PATH: /usr/lib/crystal/core
+    #     CRYSTAL_STATIC_LIBS: "\
+    #       /usr/lib/libgc.a \
+    #       /usr/lib/libevent.a \
+    #       /usr/lib/libpcre.a"
+    #     # For some reason clang++ is missing some c++ headers unless we
+    #     # explicitly mention them in this environment variable here.
+    #     CPLUS_INCLUDE_PATH: /usr/include/c++/10.3.1:/usr/include/c++/10.3.1/x86_64-alpine-linux-musl
+    #     LIBRARY_PATH: /usr/lib/gcc/x86_64-alpine-linux-musl/10.3.1
+    #   container:
+    #     image: alpine:edge # TODO: use alpine:3.15 or newest stable release when available
 
     # # TODO: Enable FreeBSD after getting it working:
     # - name: x86_64-unknown-freebsd
@@ -72,19 +72,38 @@ task:
     #   freebsd_instance:
     #     image: freebsd-13-0-release-amd64
 
-    - name: x86_64-apple-macosx
+    # - name: x86_64-apple-macosx
+    #   environment:
+    #     TRIPLE: x86_64-apple-macosx
+    #     DEPS_INSTALL: "\
+    #       brew update --preinstall && brew install llvm libiconv crystal"
+    #     CRYSTAL_SRC_PATH: /usr/local/opt/crystal/src
+    #     CRYSTAL_STATIC_LIBS: "\
+    #       /usr/local/lib/libgc.a \
+    #       /usr/local/lib/libevent.a \
+    #       /usr/local/lib/libpcre.a \
+    #       -liconv" # (this last one is not static - couldn't get static to work)
+    #     # Ensure that installed LLVM and clang binaries overshadow system ones.
+    #     PATH: /usr/local/opt/llvm/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
+    #     # Set up the SDKROOT path specific to the present XCode version.
+    #     # TODO: Figure out how to make this not dependent on the XCode version?
+    #     SDKROOT: /Applications/Xcode-12.5.0.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk
+    #   macos_instance:
+    #     image: big-sur-xcode-12.5
+
+    - name: arm64-apple-macosx
       environment:
-        TRIPLE: x86_64-apple-macosx
+        TRIPLE: arm64-apple-macosx
         DEPS_INSTALL: "\
-          brew update --preinstall && brew install llvm libiconv crystal"
+          brew update --preinstall && brew install llvm crystal"
         CRYSTAL_SRC_PATH: /usr/local/opt/crystal/src
         CRYSTAL_STATIC_LIBS: "\
           /usr/local/lib/libgc.a \
           /usr/local/lib/libevent.a \
           /usr/local/lib/libpcre.a \
           -liconv" # (this last one is not static - couldn't get static to work)
-        # Ensure that installed LLVM and clang binaries overshadow system ones.
-        PATH: /usr/local/opt/llvm/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
+        # Since we're cross compiling, we need to build LLVM from source.
+        LLVM_SOURCE_URL: https://github.com/llvm/llvm-project/releases/download/llvmorg-12.0.1/llvm-project-12.0.1.src.tar.xz
         # Set up the SDKROOT path specific to the present XCode version.
         # TODO: Figure out how to make this not dependent on the XCode version?
         SDKROOT: /Applications/Xcode-12.5.0.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk
@@ -97,6 +116,20 @@ task:
     - uname
     - uname -m
     - uname -a
+
+  llvm_cache:
+    folder: build_llvm
+    fingerprint_script: echo "${LLVM_SOURCE_URL} ${TRIPLE}"
+    populate_script: "
+      curl -L --fail "${LLVM_SOURCE_URL}" --output /tmp/llvm.tar.xz && \
+      mkdir -p build_llvm && cd build_llvm && \
+      tar -xvf /tmp/llvm.tar.xz --strip-components=1 && \
+      mkdir -p build && cd build && \
+      cmake .. && \
+      echo && \
+      echo DONE"
+  upload_caches:
+    - llvm
 
   deps_script:
     - echo "${DEPS_INSTALL}"
