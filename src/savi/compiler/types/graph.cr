@@ -12,7 +12,7 @@ module Savi::Compiler::Types::Graph
     getter! type_param_vars : Array(TypeVariable)
     getter! field_type_vars : Hash(String, TypeVariable)
     getter! param_vars : Array(TypeVariable)
-    getter! receiver_cap_var : TypeVariable
+    getter! receiver_var : TypeVariable
     getter! return_var : TypeVariable
     getter! yield_vars : Array(TypeVariable)
     getter! yield_result_var : TypeVariable
@@ -115,24 +115,28 @@ module Savi::Compiler::Types::Graph
       }.to_h
     end
 
-    protected def init_func_self(cap : String, pos : Source::Pos)
+    protected def init_func_self(cap_string : String, pos : Source::Pos)
       @for_self = begin
-        @receiver_cap_var = self_cap = new_cap_var("@")
-        self_cap.is_input_var = true
+        @receiver_var = self_var = new_type_var("@")
+        self_var.is_input_var = true
+
+        self_nominal = @parent.not_nil!.value.for_self
 
         # If it's a `:fun box`, we interpret it as a type variable constrained
         # to be one of the caps in the set called `read` (`ref`, `val`, `box`).
         # Otherwise, we bind it directly to the concrete cap that was given.
-        if cap == "box"
-          self_cap.observe_constraint_at(pos,
+        if cap_string == "box"
+          self_var.observe_constraint_at(pos,
             Union.from([NominalCap::VAL, NominalCap::REF, NominalCap::BOX])
+              .intersect(self_nominal)
           )
         else
-          self_cap.observe_binding_at(pos, NominalCap.from_string(cap))
+          self_var.observe_binding_at(pos,
+            NominalCap.from_string(cap_string).intersect(self_nominal)
+          )
         end
 
-        self_type = @parent.not_nil!.value.for_self
-        self_type.intersect(TypeVariableRef.new(self_cap))
+        TypeVariableRef.new(self_var)
       end.as(AlgebraicType)
 
       @param_vars = [] of TypeVariable
@@ -158,9 +162,8 @@ module Savi::Compiler::Types::Graph
     )
       @return_var = var = new_type_var("return")
 
-      constructed_type = @parent.not_nil!.value.for_self.intersect(
-        visitor.read_type_expr_cap(cap_ident).not_nil!
-      )
+      constructed_type = TypeVariableRef.new(@receiver_var.not_nil!)
+        .override_cap(visitor.read_type_expr_cap(cap_ident).not_nil!)
       var.observe_binding_at(cap_ident.pos, constructed_type)
     end
 

@@ -9,10 +9,10 @@ It determines the return type of field getter/setter/displacer functions.
   :let field: String.new_iso
 ```
 ```types.return ExampleIsoField.field
-(String & K'@'1->ref')
+(String & T'@'1->ref')
 ```
 ```types.return ExampleIsoField.field=
-String'ref'
+(String & (T'@'1 & ref)->ref')
 ```
 ```types.return ExampleIsoField.field<<=
 String'iso
@@ -48,9 +48,7 @@ String'box'
 
 ---
 
-TODO: It substitutes the type argument for the type parameter in a generic.
-
-Note that this doesn't actually work as desired yet - it should return String'ref and Bytes'ref, respectively.
+It substitutes the type argument for the type parameter in a generic.
 
 ```savi
 :trait NewableThing
@@ -63,9 +61,12 @@ Note that this doesn't actually work as desired yet - it should return String're
   :fun string: NewSomething(String'non).call
   :fun bytes: NewSomething(Bytes'non).call
 ```
+```types.return NewableThing.new
+(NewableThing & T'@'1'ref & ref)
+```
 ```types.return UseNewSomething.string
-NewableThing'ref
+(String & NewableThing & ref)
 ```
 ```types.return UseNewSomething.bytes
-NewableThing'ref
+(Bytes & NewableThing & ref)
 ```

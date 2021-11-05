@@ -85,8 +85,9 @@ module Savi::Compiler::Types
     end
 
     private def transform_facts_since(offset)
-      @facts.map_with_index!(offset) { |fact, index|
-        (yield fact).as({Source::Pos, AlgebraicType})
+      range = (offset...current_facts_offset)
+      range.each { |index|
+        @facts[index] = yield @facts[index]
       }
     end
 
@@ -139,16 +140,27 @@ module Savi::Compiler::Types
       }
     end
 
-    def trace_call_return_as_assignment(
-      pos : Source::Pos,
+    # TODO: This logic doesn't look quite right, even if it's working for
+    # the test case we currently have. Let's think this through fully.
+    def trace_intersection_call_return_as_assignment(
       call : AST::Call,
-      receiver : AlgebraicType,
+      receiver : Intersection,
     )
       pre_offset = current_facts_offset
-      receiver.trace_as_assignment(self)
-      receiver_union = consume_facts_as_union_since(pre_offset)
-      return unless receiver_union
-      receiver_union.trace_call_return_as_assignment(self, call)
+      receiver.members.each { |member|
+        trace_as_assignment_with_transform(member) { |assign|
+          next TopType.new unless assign.is_a?(NominalType)
+
+          sub_pre_offset = current_facts_offset
+          trace_nominal_call_return_as_assignment(call, receiver, assign)
+          consume_facts_as_union_since(sub_pre_offset).not_nil!.tap { |ret|
+            raise "didn't expect multiple facts; confirm union assumption: #{ret.show}" \
+              if ret.is_a?(Union)
+          }
+        }
+      }
+      result = consume_facts_as_intersection_since(pre_offset).not_nil!
+      add_fact(call.pos, result)
     end
 
     def trace_var_upper_bound_call_return_as_assignment(
@@ -157,8 +169,9 @@ module Savi::Compiler::Types
       var : TypeVariable,
     )
       pre_offset = current_facts_offset
-      var.trace_as_constraint(self)
+      var.trace_as_constraint(self, exclude_itself: true)
       receiver_intersection = consume_facts_as_intersection_since(pre_offset)
+
       return unless receiver_intersection
       receiver_intersection.trace_call_return_as_assignment(self, call)
     end
@@ -174,13 +187,28 @@ module Savi::Compiler::Types
       }
     end
 
+    def trace_call_return_as_assignment_with_receiver_transform(
+      call : AST::Call,
+      receiver : AlgebraicType,
+    )
+      pre_offset = current_facts_offset
+      receiver.trace_as_constraint(self)
+      transform_facts_since(pre_offset) { |pos, inner|
+        {pos, yield inner}
+      }
+      receiver_intersection = consume_facts_as_intersection_since(pre_offset)
+
+      return unless receiver_intersection
+      receiver_intersection.trace_call_return_as_assignment(self, call)
+    end
+
     def trace_nominal_call_return_as_assignment(
       call : AST::Call,
+      full_summand_type : AlgebraicTypeSummand,
       nominal_type : NominalType,
-      nominal_cap : NominalCap,
     )
       @pass.trace_nominal_call_return_as_assignment(
-        @ctx, self, nominal_type, nominal_cap, call.ident
+        @ctx, self, full_summand_type, nominal_type, call.ident
       )
     end
   end
@@ -242,7 +270,7 @@ module Savi::Compiler::Types
     end
 
     def trace_nominal_call_return_as_assignment(
-      ctx, cursor, nominal_type, nominal_cap, f_ident,
+      ctx, cursor, full_summand_type, nominal_type, f_ident,
     )
       t_link = nominal_type.link
       t = t_link.resolve(ctx)
@@ -252,17 +280,10 @@ module Savi::Compiler::Types
       types_graph = ctx.types_graph[f_link]
       types_graph_parent = types_graph.parent.not_nil!
 
-      # Take a fast path if we don't need to bind any variables.
-      if f.cap.value != "box" && !nominal_type.args
-        types_graph.return_var.trace_as_assignment(cursor)
-      end
-
       bind_variables = {} of TypeVariable => AlgebraicType
 
-      # When calling a box function, we bind the specific receiver cap.
-      if f.cap.value == "box"
-        bind_variables[types_graph.receiver_cap_var] = nominal_cap
-      end
+      # Always bind the receiver type variable to match the call-site receiver.
+      bind_variables[types_graph.receiver_var] = full_summand_type
 
       # If the nominal type has type parameters, bind them.
       nominal_type_args = nominal_type.args

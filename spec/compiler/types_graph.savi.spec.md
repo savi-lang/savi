@@ -19,6 +19,11 @@ T'A'^1
   :module Example1(A _Describable)
                      ^~~~~~~~~~~~
 ~~~
+T'@'1
+  := Example1(T'A'^1)'non
+      :default non
+               ^~~
+
 T'return'2
   :> T'y'9'aliased
       y = if cond ("string" | b"bytes")
@@ -96,10 +101,10 @@ T'field'^1
   := String'val
     :var field String
                ^~~~~~
-  <: (viewable_as T'return'2 via K'@'1)
+  <: (viewable_as T'return'2 via T'@'1)
     :var field String
          ^~~~~
-  <: (viewable_as T'return'2 via K'@'1)
+  <: (viewable_as T'return'2 via T'@'1)
     :var field String
          ^~~~~
   <: T'return'2
@@ -112,11 +117,19 @@ T'field'^1
     :var field String
          ^~~~~
 ~~~
+T'@'1
+  <: (ExampleField'val | ExampleField'ref | ExampleField'box)
+    :var field String
+     ^~~
+  <: (origin_of_viewpoint T'field'^1'aliased into T'return'2)
+    :var field String
+         ^~~~~
+
 T'return'2
-  <: (String & K'@'1->val)
+  <: (String & T'@'1->val)
     :var field String
                ^~~~~~
-  :> K'@'1->T'field'^1'aliased
+  :> T'@'1->T'field'^1'aliased
     :var field String
          ^~~~~
 ```
@@ -125,10 +138,10 @@ T'field'^1
   := String'val
     :var field String
                ^~~~~~
-  <: (viewable_as T'return'2 via K'@'1)
+  <: (viewable_as T'return'2 via T'@'1)
     :var field String
          ^~~~~
-  <: (viewable_as T'return'2 via K'@'1)
+  <: (viewable_as T'return'2 via T'@'1)
     :var field String
          ^~~~~
   <: T'return'2
@@ -141,11 +154,19 @@ T'field'^1
     :var field String
          ^~~~~
 ~~~
+T'@'1
+  := ExampleField'ref
+    :var field String
+     ^~~
+  <: (origin_of_viewpoint T'field'^1'aliased into T'return'2)
+    :var field String
+         ^~~~~
+
 T'return'2
-  <: (String & K'@'1->val)
+  <: (String & T'@'1->val)
     :var field String
                ^~~~~~
-  :> K'@'1->T'field'^1'aliased
+  :> T'@'1->T'field'^1'aliased
     :var field String
          ^~~~~
 
@@ -162,10 +183,10 @@ T'field'^1
   := String'val
     :var field String
                ^~~~~~
-  <: (viewable_as T'return'2 via K'@'1)
+  <: (viewable_as T'return'2 via T'@'1)
     :var field String
          ^~~~~
-  <: (viewable_as T'return'2 via K'@'1)
+  <: (viewable_as T'return'2 via T'@'1)
     :var field String
          ^~~~~
   <: T'return'2
@@ -178,6 +199,11 @@ T'field'^1
     :var field String
          ^~~~~
 ~~~
+T'@'1
+  := ExampleField'ref
+    :var field String
+     ^~~
+
 T'return'2
   <: String'val
     :var field String
@@ -206,6 +232,11 @@ It analyzes an array literal, its elements, and its antecedent.
 ```
 ```types_graph ArrayExample.example
 ~~~
+T'@'1
+  := ArrayExample'non
+      :default non
+               ^~~
+
 T'return'2
   :> T'a'3'aliased
       a Array(F64)'val = [1, 2.3]

@@ -54,7 +54,8 @@ module Savi::Compiler::Types
     def unite(other : AlgebraicType)
       case other
       when AlgebraicTypeSummand
-        Union.new(Set(AlgebraicTypeSummand){self, other})
+        set = Set(AlgebraicTypeSummand){self, other}
+        set.size > 1 ? Union.new(set) : self
       else
         other.unite(self)
       end
@@ -65,7 +66,8 @@ module Savi::Compiler::Types
     def intersect(other : AlgebraicType)
       case other
       when AlgebraicTypeFactor
-        Intersection.new(Set(AlgebraicTypeFactor){self, other})
+        set = Set(AlgebraicTypeFactor){self, other}
+        set.size > 1 ? Intersection.new(set) : self
       else
         other.intersect(self)
       end
@@ -86,6 +88,99 @@ module Savi::Compiler::Types
     end
   end
 
+  struct TopType < AlgebraicType
+    def initialize
+    end
+
+    def show
+      "⊤"
+    end
+
+    def intersect(other : AlgebraicType)
+      # Whatever the other type is, we use it to drop down from this top type.
+      other
+    end
+
+    def unite(other : AlgebraicType)
+      # No matter what you unite, it cannot increase the possible values
+      # in the union, so the result is still the top type.
+      self
+    end
+
+    def aliased
+      self # TODO: Should this remove the possibility of unique caps?
+    end
+
+    def stabilized
+      self # TODO: Should this remove the possibility of unstable caps?
+    end
+
+    def override_cap(cap : AlgebraicType)
+      cap # refines to limit the scope to a single cap
+    end
+
+    def bind_variables(mapping : Hash(TypeVariable, AlgebraicType)) : {AlgebraicType, Bool}
+      {self, false}
+    end
+
+    def observe_assignment_reciprocals(
+      pos : Source::Pos,
+      supertype : AlgebraicType,
+      maybe : Bool = false,
+    )
+      # Do nothing.
+      # Only a type variable can be modified by observations about it.
+    end
+  end
+
+  struct BottomType < AlgebraicType
+    def initialize
+    end
+
+    def show
+      "⊥"
+    end
+
+    def intersect(other : AlgebraicType)
+      # No matter what you intersect, the type is still just not there.
+      # It has jumped away without leaving anything to intersect with.
+      self
+    end
+
+    def unite(other : AlgebraicType)
+      # Whatever the other type is, we use it and abandon this lack of a type.
+      other
+    end
+
+    def aliased
+      self # doesn't change the nature of this lack of a type
+    end
+
+    def stabilized
+      self # doesn't change the nature of this lack of a type
+    end
+
+    def override_cap(cap : AlgebraicType)
+      self # doesn't change the nature of this lack of a type
+    end
+
+    def bind_variables(mapping : Hash(TypeVariable, AlgebraicType)) : {AlgebraicType, Bool}
+      {self, false}
+    end
+
+    def observe_assignment_reciprocals(
+      pos : Source::Pos,
+      supertype : AlgebraicType,
+      maybe : Bool = false,
+    )
+      # Do nothing.
+      # Only a type variable can be modified by observations about it.
+    end
+  end
+
+  # TODO: Is this always just the same semantics as bottom type?
+  # Even if it is, do we want to preserve the distinction so as to print
+  # ore informative error messages (containing a source position in them).
   struct JumpsAway < AlgebraicType
     getter pos : Source::Pos
     def initialize(@pos)
@@ -164,6 +259,14 @@ module Savi::Compiler::Types
 
     def viewed_from(origin)
       self # this type says nothing about capabilities, so it remains unchanged.
+    end
+
+    def trace_as_constraint(cursor : Cursor)
+      cursor.add_fact_at_current_pos(self)
+    end
+
+    def trace_as_assignment(cursor : Cursor)
+      cursor.add_fact_at_current_pos(self)
     end
 
     def bind_variables(mapping : Hash(TypeVariable, AlgebraicType)) : {AlgebraicType, Bool}
@@ -257,6 +360,8 @@ module Savi::Compiler::Types
     def viewed_from(origin)
       if origin.is_a?(NominalCap)
         NominalCap.new(Cap::Logic.viewpoint(origin.cap, cap))
+      elsif origin.is_a?(IntersectionBasic)
+        NominalCap.new(Cap::Logic.viewpoint(origin.nominal_cap.cap, cap))
       else
         Viewpoint.new(origin, self)
       end
@@ -336,7 +441,7 @@ module Savi::Compiler::Types
   end
 
   struct Viewpoint < AlgebraicTypeSimple
-    getter origin : StructRef(AlgebraicTypeSimple)
+    getter origin : StructRef(AlgebraicType)
     getter field : StructRef(AlgebraicTypeFactor)
     def initialize(origin, field)
       if origin.is_a?(Intersection)
@@ -347,7 +452,8 @@ module Savi::Compiler::Types
         origin = origin.nominal_cap
       end
 
-      @origin = StructRef(AlgebraicTypeSimple).new(origin.as(AlgebraicTypeSimple))
+
+      @origin = StructRef(AlgebraicType).new(origin.as(AlgebraicType))
       @field = StructRef(AlgebraicTypeFactor).new(field)
     end
 
@@ -438,6 +544,29 @@ module Savi::Compiler::Types
     def show
       "#{@inner.show}'#{@cap.show}"
     end
+
+    def override_cap(cap : AlgebraicType)
+      OverrideCap.new(@inner, cap)
+    end
+
+    def bind_variables(mapping : Hash(TypeVariable, AlgebraicType)) : {AlgebraicType, Bool}
+      any_is_changed = false
+
+      new_inner, is_changed = @inner.bind_variables(mapping)
+      any_is_changed ||= is_changed
+
+      new_cap, is_changed = @cap.value.bind_variables(mapping)
+      any_is_changed ||= is_changed
+
+      {
+        any_is_changed ? new_inner.override_cap(new_cap) : self,
+        any_is_changed
+      }
+    end
+
+    def trace_as_assignment(cursor : Cursor)
+      cursor.trace_as_assignment_with_transform(@inner, &.override_cap(@cap.value))
+    end
   end
 
   struct Aliased < AlgebraicTypeFactor
@@ -473,7 +602,7 @@ module Savi::Compiler::Types
     end
 
     def trace_call_return_as_assignment(cursor : Cursor, call : AST::Call)
-      cursor.trace_call_return_as_assignment_with_transform(call, inner, &.aliased)
+      cursor.trace_call_return_as_assignment_with_receiver_transform(call, inner, &.aliased)
     end
 
     def observe_assignment_reciprocals(
@@ -609,7 +738,7 @@ module Savi::Compiler::Types
     end
 
     def trace_call_return_as_assignment(cursor : Cursor, call : AST::Call)
-      cursor.trace_nominal_call_return_as_assignment(call, @nominal_type, @nominal_cap)
+      cursor.trace_nominal_call_return_as_assignment(call, self, @nominal_type)
     end
 
     def observe_assignment_reciprocals(
@@ -625,6 +754,7 @@ module Savi::Compiler::Types
   struct Intersection < AlgebraicTypeSummand
     getter members : Set(AlgebraicTypeFactor)
     def initialize(@members)
+      raise "an intersection must have at least 2 members" if @members.size < 2
     end
 
     def self.from(list)
@@ -690,23 +820,27 @@ module Savi::Compiler::Types
     end
 
     def trace_as_assignment(cursor : Cursor)
-      raise NotImplementedError.new("trace_as_assignment for #{self.class}: #{show}") \
-        unless @members.size == 2 \
-          && @members.any?(&.is_a?(NominalType)) \
-          && @members.any?(&.is_a?(NominalCap))
+      # raise NotImplementedError.new("trace_as_assignment for #{self.class}: #{show}") \
+      #   unless @members.size == 2 \
+      #     && @members.any?(&.is_a?(NominalType)) \
+      #     && @members.any?(&.is_a?(NominalCap))
 
+      # TODO: Do we need to actually trace into the intersection?
       cursor.add_fact_at_current_pos(self)
     end
 
     def trace_call_return_as_assignment(cursor : Cursor, call : AST::Call)
-      raise NotImplementedError.new("trace_as_assignment for #{self.class}: #{show}") \
-        unless @members.size == 2 \
-          && (nominal_type = @members.find(&.as?(NominalType))) \
-          && (nominal_cap = @members.find(&.as?(NominalCap)))
-
-      cursor.trace_nominal_call_return_as_assignment(
-        call, nominal_type.as(NominalType), nominal_cap.as(NominalCap)
-      )
+      if @members.size == 2 \
+        && (nominal_type = @members.find(&.as?(NominalType))) \
+        && (nominal_cap = @members.find(&.as?(NominalCap)))
+        # Fast path for basic intersections.
+        # TODO: Why aren't these cases getting instantied as IntersectionBasic?
+        cursor.trace_nominal_call_return_as_assignment(
+          call, self, nominal_type.as(NominalType)
+        )
+      else
+        cursor.trace_intersection_call_return_as_assignment(call, self)
+      end
     end
 
     def observe_assignment_reciprocals(
@@ -723,6 +857,7 @@ module Savi::Compiler::Types
   struct Union < AlgebraicType
     getter members : Set(AlgebraicTypeSummand)
     def initialize(@members)
+      raise "a union must have at least 2 members" if @members.size < 2
     end
 
     def self.from(list)
@@ -730,7 +865,7 @@ module Savi::Compiler::Types
       list.each { |member|
         result = result ? result.unite(member) : member
       }
-      result.not_nil!
+      result || BottomType.new
     end
 
     def show
@@ -770,6 +905,10 @@ module Savi::Compiler::Types
 
     def viewed_from(origin)
       Union.from(@members.map(&.viewed_from(origin)))
+    end
+
+    def trace_as_assignment(cursor : Cursor)
+      @members.each(&.trace_as_assignment(cursor))
     end
 
     def observe_assignment_reciprocals(

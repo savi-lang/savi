@@ -108,7 +108,11 @@ module Savi::Compiler::Types
       }
     end
 
-    def trace_as_constraint(cursor : Cursor)
+    def trace_as_constraint(cursor : Cursor, exclude_itself = false)
+      if is_input_var && exclude_itself
+        cursor.add_fact_at_current_pos(TypeVariableRef.new(self))
+      end
+
       if @binding
         pos, type = @binding.not_nil!
         cursor.current_pos = pos
@@ -133,21 +137,36 @@ module Savi::Compiler::Types
       if @binding
         pos, type = @binding.not_nil!
         cursor.current_pos = pos
+        type = type.intersect(TypeVariableRef.new(self)) if is_input_var
         type.trace_as_assignment(cursor)
         return
       end
 
+      did_trace_something = false
+
       @assignments.each { |pos, subtype|
         cursor.current_pos = pos
+        subtype = subtype.intersect(TypeVariableRef.new(self)) if is_input_var
         subtype.trace_as_assignment(cursor)
+        did_trace_something = true
       }
+
       @from_call_returns.each { |pos, call, receiver|
         cursor.current_pos = pos
-        cursor.trace_call_return_as_assignment(pos, call, receiver)
+        if is_input_var
+          cursor.trace_call_return_as_assignment_with_transform(
+            call,
+            receiver,
+            &.intersect(TypeVariableRef.new(self))
+          )
+        else
+          receiver.trace_call_return_as_assignment(cursor, call)
+        end
+        did_trace_something = true
       }
 
       # TODO: What condition is most appropriate here?
-      if is_input_var
+      if is_input_var && !did_trace_something
         # TODO: Is there a source pos we can use here?
         cursor.add_fact(Source::Pos.none, TypeVariableRef.new(self))
       end
@@ -155,16 +174,7 @@ module Savi::Compiler::Types
 
     def calculate_assignment_summary(analysis : Analysis, cursor : Cursor)
       analysis.calculate_assignment_summary(self) {
-        next @binding.not_nil!.last if @binding
-
-        @assignments.each { |pos, sub|
-          cursor.current_pos = pos
-          sub.trace_as_assignment(cursor)
-        }
-        @from_call_returns.each { |pos, call, receiver|
-          cursor.current_pos = pos
-          cursor.trace_call_return_as_assignment(pos, call, receiver)
-        }
+        trace_as_assignment(cursor)
 
         union_type = nil
         cursor.each_fact { |pos, type|
@@ -175,18 +185,17 @@ module Savi::Compiler::Types
           end
         }
 
+        if union_type.nil? && is_input_var
+          union_type = TypeVariableRef.new(self)
+        end
+
         union_type.not_nil! # TODO: nice error for having no assignment facts
       }
     end
 
     def calculate_constraint_summary(analysis : Analysis, cursor : Cursor)
       analysis.calculate_constraint_summary(self) {
-        next @binding.not_nil!.last if @binding
-        next @eager_constraint_summary.not_nil! if @eager_constraint_summary
-
-        if @constraints.any?
-          @constraints.each { |pos, sup| sup.trace_as_constraint(cursor) }
-        end
+        trace_as_constraint(cursor)
 
         intersect_type = nil
         cursor.each_fact { |pos, type|
