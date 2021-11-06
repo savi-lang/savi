@@ -13,6 +13,8 @@ dependencies:
     github: jemc/crystal-pegmatite
   lsp:
     github: jemc/crystal-lsp
+  clang:
+    github: crystal-lang/clang.cr
   clim:
     github: at-grandpa/clim
     version: 0.13.0

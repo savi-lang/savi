@@ -68,6 +68,8 @@ class Savi::SpecMarkdown
             example.code_blocks << content
           when "error"
             example.expected_errors << content
+          when "c ffigen"
+            example.expected_ffigen << content
           when /^savi format.([\w<>=]+)$/
             example.expected_format_results << {$~[1], content}
           when /^types_graph (\w+)\.([\w<>=]+)$/
@@ -105,6 +107,7 @@ class Savi::SpecMarkdown
     property comments = [] of String
     property code_blocks = [] of String
     property expected_errors = [] of String
+    property expected_ffigen = [] of String
     property expected_format_results = [] of {String, String}
     property expected_types_graph = [] of {String, String, String}
     property expected_return_types = [] of {String, String, String}
@@ -249,6 +252,33 @@ class Savi::SpecMarkdown
     all_success = true
 
     examples.each { |example|
+      if example.expected_ffigen.any?
+        begin
+          file_content = example.expected_ffigen.join("\n\n")
+          file = File.tempfile("ffigen_example", ".h", &.print(file_content))
+          expected = example.code_blocks.join("\n\n")
+          actual = String.build { |io| FFIGen.new(file.path).emit(io) }
+
+          unless expected.strip == actual.strip
+            puts "---"
+            puts
+            puts example.generated_comments_code
+            puts
+            puts "Expected FFI-generated code:"
+            puts
+            puts expected
+            puts
+            puts "but actually was:"
+            puts
+            puts actual
+            puts
+            all_success = false
+          end
+        ensure
+          file.delete if file
+        end
+      end
+
       example.expected_types_graph.each { |t_name, f_name, expected|
         type = library.types.find(&.ident.value.==(t_name))
         func = type.try(&.find_func?(f_name))

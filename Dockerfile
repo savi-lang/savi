@@ -12,7 +12,7 @@ RUN apk add --no-cache --update \
     valgrind perl lldb \
     cmake \
     libexecinfo-dev libretls-dev pcre2-dev \
-    llvm12-dev llvm12-static \
+    llvm12-dev llvm12-static clang-static \
     crystal shards
 
 ENV CC=clang
