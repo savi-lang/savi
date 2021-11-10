@@ -126,6 +126,16 @@ module Savi
           Cli.format(check_only: opts.check, backtrace: opts.backtrace)
         end
       end
+      sub "ffigen" do
+        desc "Generate savi code with FFI bindings for the given header file"
+        usage "savi ffigen [header]"
+        help short: "-h"
+        argument "header", type: String, required: true, desc: "header file to parse"
+        option "-b", "--backtrace", desc: "Show backtrace on error", type: Bool, default: false
+        run do |opts, args|
+          Cli.ffigen(header: args.header, backtrace: opts.backtrace)
+        end
+      end
     end
 
     def self._add_backtrace(backtrace = false)
@@ -223,6 +233,15 @@ module Savi
         end
 
         errors.any? ? finish_with_errors(errors, backtrace) : 0
+      end
+    end
+
+    def self.ffigen(header : String, backtrace : Bool)
+      _add_backtrace backtrace do
+        gen = Savi::FFIGen.new(header)
+        puts String.build { |io| gen.emit(io) }
+
+        0
       end
     end
 

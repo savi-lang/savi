@@ -51,6 +51,12 @@ format: PHONY
 format.inner: PHONY bin/savi
 	echo && $(ROOT)/bin/savi format --backtrace
 
+# Generate FFI code.
+ffigen: PHONY
+	docker exec -i savi-dev make header="$(header)" ffigen.inner
+ffigen.inner: PHONY bin/savi
+	echo && $(ROOT)/bin/savi ffigen "$(header)" --backtrace
+
 # Evaluate a Hello World example.
 example-eval: PHONY
 	docker exec savi-dev make extra_args="$(extra_args)" example-eval.inner
@@ -87,3 +93,20 @@ example-savi-callgrind.inner: /tmp/callgrind.out PHONY
 vscode: PHONY
 	docker build . --tag jemc/savi
 	cd tooling/vscode && npm run-script compile || npm install
+
+##
+# LLVM-related targets
+#
+# These targets allow us to download LLVM static libraries to use for building.
+
+LLVM_STATIC_RELEASE_URL=https://github.com/savi-lang/llvm-static/releases/download/20211110
+
+LLVM_PLATFORM=$(shell ./platform.sh)
+
+lib/llvm-static:
+	rm -rf $@-in-progress
+	mkdir -p $@-in-progress
+	cd $@-in-progress && curl -L --fail -sS \
+		"${LLVM_STATIC_RELEASE_URL}/${LLVM_PLATFORM}-llvm-static.tar.gz" \
+	| tar -xzvf -
+	mv $@-in-progress $@

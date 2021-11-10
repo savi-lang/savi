@@ -10,3 +10,6 @@ shards:
   clim:
     git: https://github.com/at-grandpa/clim.git
     version: 0.13.0
+  clang:
+    git: https://github.com/crystal-lang/clang.cr.git
+    version: 0.3.0

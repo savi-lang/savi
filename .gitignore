@@ -2,3 +2,4 @@
 *.dwarf
 main
 .crystal-version
+lib/llvm*

@@ -24,8 +24,8 @@ task:
         DEPS_INSTALL: "\
           apt-get update && \
           apt-get install -y --no-install-recommends \
-            apt-transport-https ca-certificates curl clang \
-            llvm-dev libgc-dev libevent-dev libpcre3-dev && \
+            apt-transport-https ca-certificates curl clang make cmake python3 \
+            libgc-dev libevent-dev libpcre3-dev && \
           curl -fsSL https://crystal-lang.org/install.sh | bash"
         CRYSTAL_SRC_PATH: /usr/share/crystal/src
         CRYSTAL_STATIC_LIBS: "\
@@ -41,9 +41,9 @@ task:
         TRIPLE: x86_64-unknown-linux-musl
         DEPS_INSTALL: "\
           apk add --no-cache --update \
-            alpine-sdk coreutils gcc g++ lld bash curl linux-headers clang-dev \
-            llvm12-dev llvm12-static pcre-dev libevent-static gc-dev \
-            zlib-static libxml2-dev \
+            bash curl \
+            alpine-sdk coreutils gcc g++ lld xz make cmake linux-headers \
+            clang-dev llvm12-dev pcre-dev libevent-static gc-dev \
             crystal shards"
         CRYSTAL_SRC_PATH: /usr/lib/crystal/core
         CRYSTAL_STATIC_LIBS: "\
@@ -76,17 +76,14 @@ task:
       environment:
         TRIPLE: x86_64-apple-macosx
         DEPS_INSTALL: "\
-          brew update --preinstall && brew install llvm libiconv crystal"
+          brew update --preinstall && brew install libiconv crystal"
         CRYSTAL_SRC_PATH: /usr/local/opt/crystal/src
         CRYSTAL_STATIC_LIBS: "\
           /usr/local/lib/libgc.a \
           /usr/local/lib/libevent.a \
           /usr/local/lib/libpcre.a \
           -liconv" # (this last one is not static - couldn't get static to work)
-        # Ensure that installed LLVM and clang binaries overshadow system ones.
-        PATH: /usr/local/opt/llvm/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
         # Set up the SDKROOT path specific to the present XCode version.
-        # TODO: Figure out how to make this not dependent on the XCode version?
         SDKROOT: /Applications/Xcode-12.5.0.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk
       macos_instance:
         image: big-sur-xcode-12.5
@@ -106,49 +103,44 @@ task:
     - mkdir -p out/lib
     - curl -L --fail "${RUNTIME_RELEASE_URL}/${TRIPLE}-libponyrt.bc" --output out/lib/libsavi_runtime.bc
 
+  download_llvm_static_script:
+    - make lib/llvm-static
+
   build_script:
     - mkdir -p out/bin
 
-    - crystal --version
-    - llvm-config --version
     - clang --version
+    - crystal --version
+    - lib/llvm-static/bin/llvm-config --version
 
-    # Build the Crystal LLVM extensions, emitting as bitcode so we can optimize.
+    # Build the Crystal LLVM extensions, as a native object file.
     - >-
-      clang++ -v -emit-llvm -c `llvm-config --cxxflags` \
+      clang++ -v -emit-llvm -c `lib/llvm-static/bin/llvm-config --cxxflags` \
         ${CRYSTAL_SRC_PATH}/llvm/ext/llvm_ext.cc \
-        -o ${CRYSTAL_SRC_PATH}/llvm/ext/llvm_ext.bc
+        -o /tmp/llvm_ext.bc
 
     # Build the Savi compiler as an object file, for the given target triple.
     # Even if we're not cross compiling, we tell Crystal we are so that it
     # doesn't try to eagerly link our object file into a binary.
     # We want to control the linking process in a custom way ourselves.
     - >-
-      env SAVI_VERSION=${CIRRUS_TAG:-unknown} \
+      env \
+        SAVI_VERSION=${CIRRUS_TAG:-unknown} \
+        LLVM_CONFIG=lib/llvm-static/bin/llvm-config \
         crystal build main.cr -o /tmp/savi --stats --error-trace --release \
           --cross-compile --target=${TRIPLE}
-
-    # Whittle down the Crystal LLVM extensions to remove what we don't use,
-    # mainly because every function we don't use needlessly adds to our usage
-    # surface of LLVM, making it more likely to break across LLVM versions.
-    - echo `strings /tmp/savi.o | grep LLVMExt | tr '\n' ','`
-    - >-
-      opt -globaldce -O2 \
-        -internalize \
-        -internalize-public-api-list="LLVMExtBuildCall2,LLVMExtBuildInvoke2,LLVMExtDIBuilderCreateAutoVariable,LLVMExtDIBuilderCreateBasicType,LLVMExtDIBuilderCreateCompileUnit,LLVMExtDIBuilderCreateEnumerationType,LLVMExtDIBuilderCreateEnumerator,LLVMExtDIBuilderCreateExpression,LLVMExtDIBuilderCreateFile,LLVMExtDIBuilderCreateFunction,LLVMExtDIBuilderCreateMemberType,LLVMExtDIBuilderCreatePointerType,LLVMExtDIBuilderCreateReplaceableCompositeType,LLVMExtDIBuilderCreateStructType,LLVMExtDIBuilderCreateSubroutineType,LLVMExtDIBuilderFinalize,LLVMExtDIBuilderGetOrCreateArray,LLVMExtDIBuilderGetOrCreateTypeArray,LLVMExtDIBuilderInsertDeclareAtEnd,LLVMExtDIBuilderReplaceTemporary,LLVMExtNewDIBuilder,LLVMExtNormalizeTargetTriple,LLVMExtSetCurrentDebugLocation," \
-        < ${CRYSTAL_SRC_PATH}/llvm/ext/llvm_ext.bc \
-        > /tmp/llvm_ext-opt.bc
 
     # Finally, link all the pieces together, including static libraries
     # for the main Crystal-runtime dependencies, to make the compiler
     # as portable as possible across different distros/circumstances
     # (not requiring shared libraries to be installed with particular names).
     - >-
-      clang -v -o out/bin/savi /tmp/savi.o /tmp/llvm_ext-opt.bc \
+      clang -v -o out/bin/savi -flto=thin -fPIC /tmp/savi.o /tmp/llvm_ext.bc \
         ${CRYSTAL_STATIC_LIBS} \
         -lstdc++ \
-        `llvm-config --libfiles --link-static` \
-        `llvm-config --system-libs --link-static`
+        `sh -c 'ls lib/llvm-static/lib/libclang*.a'` \
+        `lib/llvm-static/bin/llvm-config --libfiles --link-static` \
+        `lib/llvm-static/bin/llvm-config --system-libs --link-static`
 
   copy_packages_script:
     - mkdir -p out

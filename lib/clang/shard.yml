@@ -1,0 +1,14 @@
+name: clang
+version: 0.3.0
+
+authors:
+  - Julien Portalier <julien@portalier.com>
+
+description: |
+  Bindings for libclang
+
+targets:
+  c2cr:
+    main: samples/c2cr.cr
+
+license: Apache-2.0
