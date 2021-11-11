@@ -31,25 +31,27 @@ We are a small team of passionate volunteers working to bring this project to fu
 
 ## Try It!
 
-[![Docker](https://img.shields.io/docker/cloud/automated/jemc/savi.svg)](https://hub.docker.com/r/jemc/savi)
-
-There are a few ways you can try out Savi. All of them assume you have a working `docker` installation, so take a moment to take care of that first.
-
-First, just to prove the basics, you can use the `eval` subcommand of the docker image to compile a program:
+The easiest way to try Savi is to use [asdf version manager](https://asdf-vm.com/), which allows you to install and manage versions for a variety of languages/runtimes, including Savi. After [installing asdf](https://asdf-vm.com/guide/getting-started.html#_1-install-dependencies), run the following commands to get Savi up and running:
 
 ```sh
-docker run --rm jemc/savi eval 'env.out.print("Hello, World!")'
-# Prints "Hello, World!"
+# Add the Savi plugin to asdf.
+asdf plugin add savi https://github.com/savi-lang/asdf-savi.git
+
+# Download and install the latest version of Savi.
+asdf install savi latest
+
+# Select the latest version of Savi as the one to use globally in your shell.
+asdf global savi latest
+
+# Prove the installation with a simple program.
+savi eval 'env.out.print("Savi is installed!")'
 ```
 
-Beyond that, you can also use the docker image to compile a source code directory by mounting the directory into the container, like so:
+Once Savi is installed, you can enter any directory with Savi source code and run the `savi` command there to compile the program, resulting in an executable binary named `main` that you can use to run the program.
 
-```sh
-# Compile the program.
-docker run --rm -v ${PATH_TO_YOUR_CODE}:/opt/code jemc/savi
-# Run the program.
-${PATH_TO_YOUR_CODE}/main
-```
+Alternatively, you can invoke `savi run` to both compile and immediately run the program.
+
+Invoke `savi --help` to learn about more available commands.
 
 If you're a VS Code user, you may be interested to install our [language extension for that editor](./tooling/vscode), which includes both syntax highlighting and some Intellisense features via using the docker image as an LSP server.
 
@@ -71,11 +73,9 @@ We are excited to welcome all contributors that bring a positive attitude, regar
 
 ## Developing
 
-To work on this project, you'll need `docker` and `make`. You may also want to have `lldb` for debugging.
+To work on this project and build the Savi compiler from source, you'll need `make`, `clang`, and `crystal` installed. You may also want to have `lldb` for debugging.
 
-To get started, clone the project to your development machine, then run one of the following commands within the project working directory:
-
-- Run `make ready` to prepare a docker container that has everything needed for development activities. Do this before running any of the other following commands:
+To get started, clone the project to your development machine, then run one of the following commands within the project working directory, or consult the `Makefile` for more available commands. Note that the first time you run one of these commands it will take longer, as it will need to download some static dependencies and build the compiler for the first time.
 
 - Run `make test` to run the test suite.
 

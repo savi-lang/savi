@@ -1,5 +1,4 @@
-/bin/
-*.dwarf
 main
-.crystal-version
-lib/llvm*
+/.make-var-cache
+/build
+/lib/libsavi_runtime.bc
