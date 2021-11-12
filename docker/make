@@ -1,5 +1,17 @@
 #!/usr/bin/env sh
 
+# This script is a thin Docker wrapper around the existing `make` targets.
+#
+# To run one of those targets in a development container (such as `make test`),
+# you would replace with `docker/make` (such as `docker/make test`).
+#
+# But first, you must run `docker/make ready` to prepare the container.
+#
+# The special `ready` pseudo-target is handled directly here,
+# but all other targets are forwarded to `make` inside the container,
+# with a build directory override so tha docker-based build files won't
+# conflict with the build files being generated separately on the host.
+
 if [ "${@}" = "ready" ]; then
   docker build --target dev --tag savi-dev .
 	docker rm -f savi-dev || echo "the savi-dev container wasn't running"
