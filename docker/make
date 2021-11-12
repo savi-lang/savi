@@ -1,0 +1,10 @@
+#!/usr/bin/env sh
+
+if [ "${@}" = "ready" ]; then
+  docker build --target dev --tag savi-dev .
+	docker rm -f savi-dev || echo "the savi-dev container wasn't running"
+	docker run --name savi-dev -v `pwd`:/opt/code -d --rm --memory 4g -p 8080 savi-dev tail -f /dev/null
+	echo "the savi-dev container is ready!"
+else
+  docker exec savi-dev make BUILD=build-in-docker ${@}
+fi

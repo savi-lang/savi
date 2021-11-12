@@ -10,24 +10,11 @@ RUN apk add --no-cache --update \
     sudo \
     alpine-sdk coreutils linux-headers clang-dev lld \
     valgrind perl lldb \
-    cmake \
-    libexecinfo-dev libretls-dev pcre2-dev \
-    llvm12-dev llvm12-static clang-static \
+    libexecinfo-dev libretls-dev pcre2-dev llvm12-dev \
     crystal shards
 
 ENV CC=clang
 ENV CXX=clang++
-
-# Build Crystal LLVM extension, which isn't distributed with the alpine package.
-RUN sh -c 'clang++ -v -c \
-  -o /usr/lib/crystal/core/llvm/ext/llvm_ext.o \
-  /usr/lib/crystal/core/llvm/ext/llvm_ext.cc `llvm-config --cxxflags`'
-
-# Install runtime bitcode.
-ENV RUNTIME_RELEASE_URL https://github.com/savi-lang/runtime-bitcode/releases/download/20211101
-RUN wget "${RUNTIME_RELEASE_URL}/x86_64-unknown-linux-musl-libponyrt.bc" \
-      -O /tmp/libsavi_runtime.bc && \
-    sudo mv /tmp/libsavi_runtime.bc /usr/lib/
 
 # Create a basic working directory to use for code.
 RUN mkdir /opt/code

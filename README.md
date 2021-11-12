@@ -84,3 +84,5 @@ To get started, clone the project to your development machine, then run one of t
 - Run `make example-run dir="/opt/code/examples/adventofcode/2018` to compile and run from the sources in `./examples/adventofcode/2018` directory (or similarly for any other example code directory).
 
 - Run `make example-lldb` to do the same as above, but run inside `lldb` to allow you to breakpoint and step through code.
+
+Alternatively, you can develop within the confines of a docker container, so that no development dependencies are needed other than `docker` itself. To do so, first run `docker/make ready` to run up a development container, then use `docker/make` instead of `make` to run any of the commands mentioned above (for example, `docker/make test`), which will run that command inside of the development container.

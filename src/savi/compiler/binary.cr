@@ -37,7 +37,7 @@ class Savi::Compiler::Binary
     target = Target.new(ctx.code_gen.target_machine.triple)
     link_args.concat(
       if target.linux?
-        %w{-ldl -pthread -lc -lm -latomic}
+        %w{-ldl -pthread -lc -lm -lexecinfo -latomic}
       elsif target.freebsd?
         %w{-ldl -pthread -lc -lm -lexecinfo -lelf}
       elsif target.macos?

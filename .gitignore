@@ -1,4 +1,5 @@
 main
 /.make-var-cache
 /build
+/build-in-docker
 /lib/libsavi_runtime.bc
