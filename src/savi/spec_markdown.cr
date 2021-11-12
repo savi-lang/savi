@@ -72,12 +72,12 @@ class Savi::SpecMarkdown
             example.expected_ffigen << content
           when /^savi format.([\w<>=]+)$/
             example.expected_format_results << {$~[1], content}
-          when /^types_graph (\w+)\.([\w<>=]+)$/
-            example.expected_types_graph << {$~[1], $~[2], content}
-          when /^types.return (\w+)\.([\w<>=]+)$/
-            example.expected_return_types << {$~[1], $~[2], content}
-          when /^types.params\[(\d+)\] (\w+)\.([\w<>=]+)$/
-            example.expected_param_types << {$~[2], $~[3], $~[1].to_i, content}
+          when /^xtypes_graph (\w+)\.([\w<>=]+)$/
+            example.expected_xtypes_graph << {$~[1], $~[2], content}
+          when /^xtypes.return (\w+)\.([\w<>=]+)$/
+            example.expected_return_xtypes << {$~[1], $~[2], content}
+          when /^xtypes.params\[(\d+)\] (\w+)\.([\w<>=]+)$/
+            example.expected_param_xtypes << {$~[2], $~[3], $~[1].to_i, content}
           else
             raise NotImplementedError.new("compiler spec code block: #{kind}")
           end
@@ -109,9 +109,9 @@ class Savi::SpecMarkdown
     property expected_errors = [] of String
     property expected_ffigen = [] of String
     property expected_format_results = [] of {String, String}
-    property expected_types_graph = [] of {String, String, String}
-    property expected_return_types = [] of {String, String, String}
-    property expected_param_types = [] of {String, String, Int32, String}
+    property expected_xtypes_graph = [] of {String, String, String}
+    property expected_return_xtypes = [] of {String, String, String}
+    property expected_param_xtypes = [] of {String, String, Int32, String}
 
     def incomplete?
       code_blocks.empty?
@@ -279,7 +279,7 @@ class Savi::SpecMarkdown
         end
       end
 
-      example.expected_types_graph.each { |t_name, f_name, expected|
+      example.expected_xtypes_graph.each { |t_name, f_name, expected|
         type = library.types.find(&.ident.value.==(t_name))
         func = type.try(&.find_func?(f_name))
         unless func && type
@@ -294,7 +294,7 @@ class Savi::SpecMarkdown
         end
 
         f_link = func.make_link(type.make_link(library.make_link))
-        actual = ctx.types_graph[f_link].show_type_variables_list
+        actual = ctx.xtypes_graph[f_link].show_type_variables_list
 
         unless expected.strip == actual.strip
           puts "---"
@@ -313,7 +313,7 @@ class Savi::SpecMarkdown
         end
       }
 
-      example.expected_return_types.each { |t_name, f_name, expected|
+      example.expected_return_xtypes.each { |t_name, f_name, expected|
         type = library.types.find(&.ident.value.==(t_name))
         func = type.try(&.find_func?(f_name))
         unless func && type
@@ -328,8 +328,8 @@ class Savi::SpecMarkdown
         end
 
         f_link = func.make_link(type.make_link(library.make_link))
-        return_var = ctx.types_graph[f_link].return_var
-        actual = ctx.types[f_link][return_var].show
+        return_var = ctx.xtypes_graph[f_link].return_var
+        actual = ctx.xtypes[f_link][return_var].show
 
         unless expected.strip == actual.strip
           puts "---"
@@ -348,7 +348,7 @@ class Savi::SpecMarkdown
         end
       }
 
-      example.expected_param_types.each { |t_name, f_name, param_index, expected|
+      example.expected_param_xtypes.each { |t_name, f_name, param_index, expected|
         type = library.types.find(&.ident.value.==(t_name))
         func = type.try(&.find_func?(f_name))
         unless func && type
@@ -363,8 +363,8 @@ class Savi::SpecMarkdown
         end
 
         f_link = func.make_link(type.make_link(library.make_link))
-        param_var = ctx.types_graph[f_link].param_vars[param_index]
-        actual = ctx.types[f_link][param_var].show
+        param_var = ctx.xtypes_graph[f_link].param_vars[param_index]
+        actual = ctx.xtypes[f_link][param_var].show
 
         unless expected.strip == actual.strip
           puts "---"

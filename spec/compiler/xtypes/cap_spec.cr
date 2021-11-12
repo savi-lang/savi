@@ -1,16 +1,16 @@
-describe Savi::Compiler::Types::Cap do
+describe Savi::Compiler::XTypes::Cap do
   # For convenience, alias each capability here by name.
-  iso   = Savi::Compiler::Types::Cap::ISO
-  val   = Savi::Compiler::Types::Cap::VAL
-  ref   = Savi::Compiler::Types::Cap::REF
-  box   = Savi::Compiler::Types::Cap::BOX
-  ref_p = Savi::Compiler::Types::Cap::REF_P
-  box_p = Savi::Compiler::Types::Cap::BOX_P
-  tag   = Savi::Compiler::Types::Cap::TAG
-  non   = Savi::Compiler::Types::Cap::NON
+  iso   = Savi::Compiler::XTypes::Cap::ISO
+  val   = Savi::Compiler::XTypes::Cap::VAL
+  ref   = Savi::Compiler::XTypes::Cap::REF
+  box   = Savi::Compiler::XTypes::Cap::BOX
+  ref_p = Savi::Compiler::XTypes::Cap::REF_P
+  box_p = Savi::Compiler::XTypes::Cap::BOX_P
+  tag   = Savi::Compiler::XTypes::Cap::TAG
+  non   = Savi::Compiler::XTypes::Cap::NON
 
   it "correctly identifies subtype relationships" do
-    Savi::Compiler::Types::Cap::Logic.access {
+    Savi::Compiler::XTypes::Cap::Logic.access {
       is_subtype?(iso,   iso).should eq true
       is_subtype?(val,   iso).should eq false
       is_subtype?(ref,   iso).should eq false
@@ -86,7 +86,7 @@ describe Savi::Compiler::Types::Cap do
   end
 
   it "correctly identifies supertype relationships" do
-    Savi::Compiler::Types::Cap::Logic.access {
+    Savi::Compiler::XTypes::Cap::Logic.access {
       is_supertype?(iso,   iso).should eq true
       is_supertype?(val,   iso).should eq true
       is_supertype?(ref,   iso).should eq true
@@ -162,7 +162,7 @@ describe Savi::Compiler::Types::Cap do
   end
 
   it "correctly identifies the lower bound of two caps" do
-    Savi::Compiler::Types::Cap::Logic.access {
+    Savi::Compiler::XTypes::Cap::Logic.access {
       lower_bound(iso,   iso).should eq iso
       lower_bound(val,   iso).should eq iso
       lower_bound(ref,   iso).should eq iso
@@ -238,7 +238,7 @@ describe Savi::Compiler::Types::Cap do
   end
 
   it "correctly identifies the upper bound of two caps" do
-    Savi::Compiler::Types::Cap::Logic.access {
+    Savi::Compiler::XTypes::Cap::Logic.access {
       upper_bound(iso,   iso).should eq iso
       upper_bound(val,   iso).should eq val
       upper_bound(ref,   iso).should eq ref
@@ -314,7 +314,7 @@ describe Savi::Compiler::Types::Cap do
   end
 
   it "correctly identifies the alias of a cap" do
-    Savi::Compiler::Types::Cap::Logic.access {
+    Savi::Compiler::XTypes::Cap::Logic.access {
       aliased(iso).should eq ref_p
       aliased(val).should eq val
       aliased(ref).should eq ref
@@ -327,7 +327,7 @@ describe Savi::Compiler::Types::Cap do
   end
 
   it "correctly identifies the viewpoint adaptation of a pair of caps" do
-    Savi::Compiler::Types::Cap::Logic.access {
+    Savi::Compiler::XTypes::Cap::Logic.access {
       viewpoint(iso,   iso).should eq iso
       viewpoint(val,   iso).should eq val
       viewpoint(ref,   iso).should eq iso
@@ -403,7 +403,7 @@ describe Savi::Compiler::Types::Cap do
   end
 
   it "identifies the weakest cap which can be split simultaneously into them" do
-    Savi::Compiler::Types::Cap::Logic.access {
+    Savi::Compiler::XTypes::Cap::Logic.access {
       simult?(iso,   iso).should eq nil
       simult?(val,   iso).should eq nil
       simult?(ref,   iso).should eq nil
@@ -479,7 +479,7 @@ describe Savi::Compiler::Types::Cap do
   end
 
   it "identifies the sequ" do
-    Savi::Compiler::Types::Cap::Logic.access {
+    Savi::Compiler::XTypes::Cap::Logic.access {
       sequ?(iso,   iso).should eq nil
       sequ?(val,   iso).should eq nil
       sequ?(ref,   iso).should eq nil
@@ -555,7 +555,7 @@ describe Savi::Compiler::Types::Cap do
   end
 
   it "gives reflexive upper and lower bounds" do
-    Savi::Compiler::Types::Cap::Logic.access {
+    Savi::Compiler::XTypes::Cap::Logic.access {
       for_all { |k|
         upper_bound(k, k).should eq k
         lower_bound(k, k).should eq k
@@ -564,7 +564,7 @@ describe Savi::Compiler::Types::Cap do
   end
 
   it "gives commutative upper and lower bounds" do
-    Savi::Compiler::Types::Cap::Logic.access {
+    Savi::Compiler::XTypes::Cap::Logic.access {
       for_all_2 { |k1, k2|
         upper_bound(k1, k2).should eq upper_bound(k2, k1)
         lower_bound(k1, k2).should eq lower_bound(k2, k1)
@@ -573,7 +573,7 @@ describe Savi::Compiler::Types::Cap do
   end
 
   it "gives commutative simult relation" do
-    Savi::Compiler::Types::Cap::Logic.access {
+    Savi::Compiler::XTypes::Cap::Logic.access {
       for_all_2 { |k1, k2|
         simult?(k1, k2).should eq simult?(k2, k1)
       }
@@ -581,7 +581,7 @@ describe Savi::Compiler::Types::Cap do
   end
 
   it "preserves lattice properties in upper and lower bounds" do
-    Savi::Compiler::Types::Cap::Logic.access {
+    Savi::Compiler::XTypes::Cap::Logic.access {
       for_all_2 { |k1, k2|
         upper_bound(k1, lower_bound(k1, k2)).should eq k1
         lower_bound(k1, upper_bound(k1, k2)).should eq k1
@@ -590,7 +590,7 @@ describe Savi::Compiler::Types::Cap do
   end
 
   it "preserves affine properties simult and sequ relations" do
-    Savi::Compiler::Types::Cap::Logic.access {
+    Savi::Compiler::XTypes::Cap::Logic.access {
       for_all_2 { |k1, k2|
         simult?(k1, k2).try { |simult_k1_k2|
           is_subtype?(simult_k1_k2, k1).should eq true
@@ -607,7 +607,7 @@ describe Savi::Compiler::Types::Cap do
   # TODO: "Times absorbs" property from alloy
 
   it "preserves relative strength of simult and sequ" do
-    Savi::Compiler::Types::Cap::Logic.access {
+    Savi::Compiler::XTypes::Cap::Logic.access {
       for_all_2 { |k1, k2|
         sequ?(k1, k2).try { |sequ_k1_k2|
           simult?(k1, k2).try { |simult_k1_k2|
@@ -622,7 +622,7 @@ describe Savi::Compiler::Types::Cap do
   end
 
   it "preserves associativity in upper and lower bounds" do
-    Savi::Compiler::Types::Cap::Logic.access {
+    Savi::Compiler::XTypes::Cap::Logic.access {
       for_all_3 { |k1, k2, k3|
         upper_bound(k1, upper_bound(k2, k3)).should eq(
           upper_bound(upper_bound(k1, k2), k3)
@@ -635,7 +635,7 @@ describe Savi::Compiler::Types::Cap do
   end
 
   it "preserves associativity in simult relations" do
-    Savi::Compiler::Types::Cap::Logic.access {
+    Savi::Compiler::XTypes::Cap::Logic.access {
       for_all_3 { |k1, k2, k3|
         simult?(k1, simult?(k2, k3)).should eq(
           simult?(simult?(k1, k2), k3)
@@ -645,7 +645,7 @@ describe Savi::Compiler::Types::Cap do
   end
 
   it "preserves distributing upper and lower bounds through a viewpoint" do
-    Savi::Compiler::Types::Cap::Logic.access {
+    Savi::Compiler::XTypes::Cap::Logic.access {
       for_all_3 { |k1, k2, k3|
         viewpoint(upper_bound(k1, k2), k3).should eq(
           upper_bound(viewpoint(k1, k3), viewpoint(k2, k3))
@@ -664,7 +664,7 @@ describe Savi::Compiler::Types::Cap do
   end
 
   it "preserves covariance in both arguments of sequ relation" do
-    Savi::Compiler::Types::Cap::Logic.access {
+    Savi::Compiler::XTypes::Cap::Logic.access {
       for_all_3 { |k1, k2, k3|
         sequ?(k1, k3).try { |sequ_k1_k3|
           sequ?(k2, k3).try { |sequ_k2_k3|
@@ -683,7 +683,7 @@ describe Savi::Compiler::Types::Cap do
   end
 
   it "preserves distributive lattice properties" do
-    Savi::Compiler::Types::Cap::Logic.access {
+    Savi::Compiler::XTypes::Cap::Logic.access {
       for_all_3 { |k1, k2, k3|
         lower_bound(k1, upper_bound(k2, k3)).should eq (
           upper_bound(lower_bound(k1, k2), lower_bound(k1, k3))

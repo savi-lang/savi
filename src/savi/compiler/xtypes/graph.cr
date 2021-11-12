@@ -4,7 +4,10 @@ require "../pass/analyze"
 # WIP: This pass is intended to be a future replacement for the Infer pass,
 # but it is still a work in progress and isn't in the main compile path yet.
 #
-module Savi::Compiler::Types::Graph
+# Also, experimentation is under way with a different approach to this pass.
+# This pass has been named XTypes and the Types pass is for new experimentation.
+#
+module Savi::Compiler::XTypes::Graph
   struct Analysis
     getter scope : TypeVariable::Scope
     getter parent : StructRef(Analysis)?
@@ -679,7 +682,7 @@ module Savi::Compiler::Types::Graph
     def analyze_type_alias(ctx, t, t_link) : Analysis
       refer_type = ctx.refer_type[t_link]
       deps = {refer_type}
-      prev = ctx.prev_ctx.try(&.types_graph)
+      prev = ctx.prev_ctx.try(&.xtypes_graph)
 
       maybe_from_type_alias_cache(ctx, prev, t, t_link, deps) do
         Visitor.new(Analysis.new(t_link), *deps)
@@ -691,7 +694,7 @@ module Savi::Compiler::Types::Graph
     def analyze_type(ctx, t, t_link) : Analysis
       refer_type = ctx.refer_type[t_link]
       deps = {refer_type}
-      prev = ctx.prev_ctx.try(&.types_graph)
+      prev = ctx.prev_ctx.try(&.xtypes_graph)
 
       maybe_from_type_cache(ctx, prev, t, t_link, deps) do
         Visitor.new(Analysis.new(t_link), *deps)
@@ -705,7 +708,7 @@ module Savi::Compiler::Types::Graph
       classify = ctx.classify[f_link]
       refer = ctx.refer[f_link]
       deps = {refer_type, classify, refer}
-      prev = ctx.prev_ctx.try(&.types_graph)
+      prev = ctx.prev_ctx.try(&.xtypes_graph)
 
       maybe_from_func_cache(ctx, prev, f, f_link, deps) do
         Visitor.new(Analysis.new(f_link, t_analysis), *deps)

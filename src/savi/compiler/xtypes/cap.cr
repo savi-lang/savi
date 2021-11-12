@@ -1,4 +1,4 @@
-module Savi::Compiler::Types::Cap
+module Savi::Compiler::XTypes::Cap
   alias Value = UInt8
 
   # Each cap is represented as a bitset of five fundamental elements,

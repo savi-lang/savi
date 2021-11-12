@@ -1,4 +1,4 @@
-module Savi::Compiler::Types
+module Savi::Compiler::XTypes
   abstract struct AlgebraicType
     def inspect; show; end
     abstract def show

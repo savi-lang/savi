@@ -1,4 +1,4 @@
-module Savi::Compiler::Types
+module Savi::Compiler::XTypes
   class TypeVariable
     alias Scope = Program::Function::Link | Program::Type::Link | Program::TypeAlias::Link
     getter nickname : String

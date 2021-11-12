@@ -2,7 +2,10 @@
 # WIP: This pass is intended to be a future replacement for the Infer pass,
 # but it is still a work in progress and isn't in the main compile path yet.
 #
-module Savi::Compiler::Types
+# Also, experimentation is under way with a different approach to this pass.
+# This pass has been named XTypes and the Types pass is for new experimentation.
+#
+module Savi::Compiler::XTypes
   struct Analysis
     @scope : TypeVariable::Scope
 
@@ -209,10 +212,10 @@ module Savi::Compiler::Types
         l_link = l.make_link
         l.types.each { |t|
           t_link = t.make_link(l_link)
-          types_graph = ctx.types_graph[t_link]
+          xtypes_graph = ctx.xtypes_graph[t_link]
           analysis = Analysis.new(t_link)
 
-          types_graph.field_type_vars.each { |name, var|
+          xtypes_graph.field_type_vars.each { |name, var|
             resolved = var.calculate_assignment_summary(analysis, cursor.start)
             analysis.set_resolved(var, resolved)
           }
@@ -229,10 +232,10 @@ module Savi::Compiler::Types
           t_link = t.make_link(l_link)
           t.functions.each { |f|
             f_link = f.make_link(t_link)
-            types_graph = ctx.types_graph[f_link]
+            xtypes_graph = ctx.xtypes_graph[f_link]
             analysis = @f_analyses[f_link] = Analysis.new(f_link)
 
-            types_graph.return_var.tap { |var|
+            xtypes_graph.return_var.tap { |var|
               resolved = var.calculate_assignment_summary(analysis, cursor.start)
               analysis.set_resolved(var, resolved)
             }
@@ -249,31 +252,31 @@ module Savi::Compiler::Types
       f = t.find_func?(f_ident.value)
       raise "function not found" unless f # TODO: nice error
       f_link = f.make_link(t_link)
-      types_graph = ctx.types_graph[f_link]
-      types_graph_parent = types_graph.parent.not_nil!
+      xtypes_graph = ctx.xtypes_graph[f_link]
+      xtypes_graph_parent = xtypes_graph.parent.not_nil!
 
       # Take a fast path if we don't need to bind any variables.
       if f.cap.value != "box" && !nominal_type.args
-        types_graph.return_var.trace_as_assignment(cursor)
+        xtypes_graph.return_var.trace_as_assignment(cursor)
       end
 
       bind_variables = {} of TypeVariable => AlgebraicType
 
       # When calling a box function, we bind the specific receiver cap.
       if f.cap.value == "box"
-        bind_variables[types_graph.receiver_cap_var] = nominal_cap
+        bind_variables[xtypes_graph.receiver_cap_var] = nominal_cap
       end
 
       # If the nominal type has type parameters, bind them.
       nominal_type_args = nominal_type.args
       if nominal_type_args
-        types_graph_parent.type_param_vars.each_with_index { |var, index|
+        xtypes_graph_parent.type_param_vars.each_with_index { |var, index|
           bind_variables[var] = nominal_type_args[index]
         }
       end
 
       # Trace with the specified bindings.
-      cursor.trace_as_assignment_with_transform(types_graph.return_var) { |type|
+      cursor.trace_as_assignment_with_transform(xtypes_graph.return_var) { |type|
         type.bind_variables(bind_variables).first
       }
     end

@@ -1,5 +1,5 @@
 ---
-pass: types_graph
+pass: xtypes_graph
 ---
 
 It analyzes a simple system of types.
@@ -13,7 +13,7 @@ It analyzes a simple system of types.
     x String = a.describe(80)
     y = if cond ("string" | b"bytes")
 ```
-```types_graph Example1.example
+```xtypes_graph Example1.example
 T'A'^1
   <: _Describable'box
   :module Example1(A _Describable)
@@ -91,7 +91,7 @@ It analyzes the getter, setter, and displacement methods of a field.
 :class ExampleField
   :var field String
 ```
-```types_graph ExampleField.field
+```xtypes_graph ExampleField.field
 T'field'^1
   := String'val
     :var field String
@@ -120,7 +120,7 @@ T'return'2
     :var field String
          ^~~~~
 ```
-```types_graph ExampleField.field=
+```xtypes_graph ExampleField.field=
 T'field'^1
   := String'val
     :var field String
@@ -157,7 +157,7 @@ T'value'3
     :var field String
          ^~~~~
 ```
-```types_graph ExampleField.field<<=
+```xtypes_graph ExampleField.field<<=
 T'field'^1
   := String'val
     :var field String
@@ -204,7 +204,7 @@ It analyzes an array literal, its elements, and its antecedent.
   :fun example
     a Array(F64)'val = [1, 2.3]
 ```
-```types_graph ArrayExample.example
+```xtypes_graph ArrayExample.example
 ~~~
 T'return'2
   :> T'a'3'aliased
