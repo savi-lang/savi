@@ -37,7 +37,7 @@ class Savi::Compiler::Binary
     target = Target.new(ctx.code_gen.target_machine.triple)
     link_args.concat(
       if target.linux?
-        %w{-ldl -pthread -lc -latomic}
+        %w{-ldl -pthread -lc -lm -latomic}
       elsif target.freebsd?
         %w{-ldl -pthread -lc -lm -lexecinfo -lelf}
       elsif target.macos?
@@ -64,6 +64,6 @@ class Savi::Compiler::Binary
       raise "strip failed" unless res.exit_code == 0
     end
   ensure
-    File.delete(obj_filename) if obj_filename
+    File.delete(obj_filename) if obj_filename && File.exists?(obj_filename)
   end
 end
