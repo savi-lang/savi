@@ -9,14 +9,6 @@ BUILD?=build
 SAVI=$(BUILD)/savi-$(config)
 SPEC=$(BUILD)/savi-spec
 
-# Prepare a docker container that has everything needed for development.
-# It runs in the background indefinitely, waiting for `docker exec` commands.
-ready: PHONY Dockerfile
-	docker build --target dev --tag savi-dev .
-	docker rm -f savi-dev || echo "the savi-dev container wasn't running"
-	docker run --name savi-dev -v $(shell pwd):/opt/code -d --rm --memory 4g -p 8080 savi-dev tail -f /dev/null
-	@echo "the savi-dev container is ready!"
-
 # Run the full CI suite.
 ci: PHONY
 	make format-check
