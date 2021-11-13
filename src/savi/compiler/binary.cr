@@ -63,7 +63,7 @@ class Savi::Compiler::Binary
     res = Process.run("/usr/bin/env", link_args, output: STDOUT, error: STDERR)
     raise "linker failed" unless res.exit_code == 0
 
-    if ctx.options.release
+    if ctx.options.no_debug
       res = Process.run("/usr/bin/env", ["strip", ctx.options.binary_name], output: STDOUT, error: STDERR)
       raise "strip failed" unless res.exit_code == 0
     end
