@@ -11,6 +11,8 @@ module Savi::Compiler::Types
     end
 
     abstract def instantiated : TypeSimple
+
+    abstract def collect_vars_deeply(vars : Array(TypeVariable))
   end
 
   # TODO: Polymorphic types (not inheriting from TypeSimple)
@@ -31,6 +33,10 @@ module Savi::Compiler::Types
     end
 
     INSTANCE = TypeTop.new
+
+    def collect_vars_deeply(vars : Array(TypeVariable))
+      # (no variables to collect)
+    end
   end
 
   struct TypeBottom < TypeSimple
@@ -43,6 +49,10 @@ module Savi::Compiler::Types
     end
 
     INSTANCE = TypeBottom.new
+
+    def collect_vars_deeply(vars : Array(TypeVariable))
+      # (no variables to collect)
+    end
   end
 
   struct TypeVariable < TypeSimple
@@ -58,6 +68,10 @@ module Savi::Compiler::Types
       io << @nickname
       io << (scope.is_a?(Program::Function::Link) ? "'" : "'^")
       @sequence_number.inspect(io)
+    end
+
+    def collect_vars_deeply(vars : Array(TypeVariable))
+      vars << self
     end
   end
 
@@ -76,6 +90,10 @@ module Savi::Compiler::Types
       io << "("
       args.each(&.show(io))
       io << ")"
+    end
+
+    def collect_vars_deeply(vars : Array(TypeVariable))
+      args.try(&.each(&.collect_vars_deeply(vars)))
     end
   end
 
@@ -99,6 +117,10 @@ module Savi::Compiler::Types
         member.show(io)
       }
       io << ")"
+    end
+
+    def collect_vars_deeply(vars : Array(TypeVariable))
+      members.each(&.collect_vars_deeply(vars))
     end
   end
 end

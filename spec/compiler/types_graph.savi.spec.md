@@ -41,6 +41,9 @@ It analyzes a simple system of types.
   <: Bool
     :fun example(a A, cond Bool)
                            ^~~~
+  <: Bool
+      y = if cond ("string" | b"bytes")
+             ^~~~
 
 α'x'5
   <: String
@@ -59,11 +62,21 @@ It analyzes a simple system of types.
                             ^~
 
 α'describe(0)'7
+  goes to param index 0 of this call:
+      x String = a.describe(80)
+                 ^~~~~~~~~~
+  will be further constrained after resolving:
+    - α'a'3
 
 α'describe'8
+  comes from the result of this call:
+      x String = a.describe(80)
+                 ^~~~~~~~~~
   <: α'x'5
       x String = a.describe(80)
       ^~~~~~~~~~~~~~~~~~~~~~~~~
+  will be further constrained after resolving:
+    - α'a'3
 
 α'y'9
   <: α'return'2
@@ -86,14 +99,6 @@ It analyzes a simple system of types.
   :> Bytes
       y = if cond ("string" | b"bytes")
                               ^~~~~~~~
-~~~
-  α'cond'4 <: Bool
-      y = if cond ("string" | b"bytes")
-             ^~~~
-
-  Bool <: Bool
-      y = if cond ("string" | b"bytes")
-          ^~
 ```
 
 ---

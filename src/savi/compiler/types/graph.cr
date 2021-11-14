@@ -24,11 +24,13 @@ module Savi::Compiler::Types::Graph
       @by_node = {} of AST::Node => TypeSimple
       @local_vars_by_ref = {} of Refer::Info => TypeVariable
       @type_vars = [] of TypeVariable
-      @edge_type_vars = [] of TypeVariable
-      @assertions = Set({Source::Pos, TypeSimple, TypeSimple}).new
 
       @var_lower_bounds = [] of Array({Source::Pos, TypeSimple})
       @var_upper_bounds = [] of Array({Source::Pos, TypeSimple})
+      @var_resolution_dependencies = [] of Array(TypeVariable)
+      @var_resolution_dependents = [] of Array(TypeVariable)
+      @var_call_associations = [] of AST::Call?
+      @var_param_associations = [] of Int32
     end
 
     def [](node : AST::Node); @by_node[node]; end
@@ -45,7 +47,7 @@ module Savi::Compiler::Types::Graph
       when parent.try(&.value.scope)
         parent.not_nil!.value.lower_bounds_of(var)
       else
-        raise NotImplementedError.new("lower bounds lookup in other scope")
+        raise NotImplementedError.new("can't reach properties of foreign vars")
       end
     end
 
@@ -56,8 +58,68 @@ module Savi::Compiler::Types::Graph
       when parent.try(&.value.scope)
         parent.not_nil!.value.upper_bounds_of(var)
       else
-        raise NotImplementedError.new("upper bounds lookup in other scope")
+        raise NotImplementedError.new("can't reach properties of foreign vars")
       end
+    end
+
+    def resolution_dependencies_of(var : TypeVariable)
+      case var.scope
+      when @scope
+        @var_resolution_dependencies[var.sequence_number - 1]
+      when parent.try(&.value.scope)
+        parent.not_nil!.value.resolution_dependencies_of(var)
+      else
+        raise NotImplementedError.new("can't reach properties of foreign vars")
+      end
+    end
+
+    def resolution_dependents_of(var : TypeVariable)
+      case var.scope
+      when @scope
+        @var_resolution_dependents[var.sequence_number - 1]
+      when parent.try(&.value.scope)
+        parent.not_nil!.value.resolution_dependents_of(var)
+      else
+        raise NotImplementedError.new("can't reach properties of foreign vars")
+      end
+    end
+
+    def call_association_of(var : TypeVariable)
+      case var.scope
+      when @scope
+        @var_call_associations[var.sequence_number - 1]
+      when parent.try(&.value.scope)
+        parent.not_nil!.value.call_association_of(var)
+      else
+        raise NotImplementedError.new("can't reach properties of foreign vars")
+      end
+    end
+
+    def param_association_of(var : TypeVariable)
+      case var.scope
+      when @scope
+        @var_param_associations[var.sequence_number - 1]
+      when parent.try(&.value.scope)
+        parent.not_nil!.value.param_association_of(var)
+      else
+        raise NotImplementedError.new("can't reach properties of foreign vars")
+      end
+    end
+
+    protected def new_type_var(
+      nickname : String,
+      for_call : AST::Call? = nil,
+      for_param : Int32 = -1,
+    )
+      TypeVariable.new(nickname, @scope, @sequence_number += 1).tap { |var|
+        @type_vars << var
+        @var_lower_bounds << [] of {Source::Pos, TypeSimple}
+        @var_upper_bounds << [] of {Source::Pos, TypeSimple}
+        @var_resolution_dependencies << [] of TypeVariable
+        @var_resolution_dependents << [] of TypeVariable
+        @var_call_associations << for_call
+        @var_param_associations << for_param
+      }
     end
 
     def show_type_variables_list
@@ -71,10 +133,25 @@ module Savi::Compiler::Types::Graph
         output << "~~~\n"
       end
 
-      (@edge_type_vars + @type_vars).each_with_index { |var, index|
+      @type_vars.each_with_index { |var, index|
         output << "\n" if index > 0
         var.show(output)
         output << "\n"
+
+        call = call_association_of(var)
+        if call
+          param_index = param_association_of(var)
+          if param_index == -1
+            output << "  comes from the result of this call:\n  "
+            output << call.pos.show.split("\n")[1..-1].join("\n  ")
+            output << "\n"
+          else
+            output << "  goes to param index #{param_index} of this call:\n  "
+            output << call.pos.show.split("\n")[1..-1].join("\n  ")
+            output << "\n"
+          end
+        end
+
         upper_bounds_of(var).each { |pos, sup|
           output << "  <: "
           sup.show(output)
@@ -91,22 +168,16 @@ module Savi::Compiler::Types::Graph
           output << pos.show.split("\n")[1..-1].join("\n  ")
           output << "\n"
         }
-      }
-      if @assertions.any?
-        output << "~~~\n"
-        @assertions.each_with_index { |(pos, sub, sup), index|
-          output << "\n" if index > 0
-          output << "  #{sub.show} <: #{sup.show}\n"
-          output << "  #{pos.show.split("\n")[1..-1].join("\n  ")}\n"
-        }
-      end
-    end
 
-    protected def new_type_var(nickname)
-      TypeVariable.new(nickname, @scope, @sequence_number += 1).tap { |var|
-        @type_vars << var
-        @var_lower_bounds << [] of {Source::Pos, TypeSimple}
-        @var_upper_bounds << [] of {Source::Pos, TypeSimple}
+        dependencies = resolution_dependencies_of(var)
+        if dependencies.any?
+          output << "  will be further constrained after resolving:\n"
+          dependencies.each { |other_var|
+            output << "    - "
+            other_var.show(output)
+            output << "\n"
+          }
+        end
       }
     end
 
@@ -208,9 +279,8 @@ module Savi::Compiler::Types::Graph
     end
 
     protected def observe_assert_bool(ctx, node)
-      t_link = ctx.namespace.prelude_type(ctx, "Bool")
-      bool = TypeNominal.new(t_link)
-      @assertions << {node.pos, @by_node[node], bool}
+      bool = TypeNominal.new(ctx.namespace.prelude_type(ctx, "Bool"))
+      constrain(node.pos, @by_node[node], bool)
     end
 
     protected def observe_self_reference(node, ref)
@@ -281,18 +351,34 @@ module Savi::Compiler::Types::Graph
       }
     end
 
-    protected def observe_call(node)
-      receiver_type = @by_node[node.receiver]
+    protected def observe_resolution_dependency(dependent, prerequisite)
+      resolution_dependencies_of(dependent) << prerequisite
+      resolution_dependents_of(prerequisite) << dependent
+    end
 
-      node.args.try(&.terms.each_with_index { |term, index|
-        param_var = new_type_var("#{node.ident.value}(#{index})")
-        # TODO: param_var.observe_toward_call_arg_at(node.pos, node, receiver_type, index)
+    protected def observe_call(call : AST::Call)
+      receiver_type = @by_node[call.receiver]
+
+      receiver_type_vars = [] of TypeVariable
+      receiver_type.collect_vars_deeply(receiver_type_vars)
+
+      call.args.try(&.terms.each_with_index { |term, index|
+        param_var = new_type_var("#{call.ident.value}(#{index})", call, index)
+
+        receiver_type_vars.each { |v|
+          observe_resolution_dependency(param_var, v)
+        }
+
         constrain(term.pos, @by_node[term], param_var)
       })
 
-      var = new_type_var(node.ident.value)
-      # TODO: var.observe_from_call_return_at(node.pos, node, receiver_type)
-      @by_node[node] = var
+      result_var = new_type_var(call.ident.value, call)
+
+      receiver_type_vars.each { |v|
+        observe_resolution_dependency(result_var, v)
+      }
+
+      @by_node[call] = result_var
     end
 
     protected def observe_array_literal(ctx, node)
