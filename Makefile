@@ -210,7 +210,7 @@ $(BUILD)/savi-spec.o: spec/all.cr $(LLVM_PATH) $(shell find src lib spec -name '
 # This variant of the target compiles in release mode.
 $(BUILD)/savi-release: $(BUILD)/savi-release.o $(BUILD)/llvm_ext.bc lib/libsavi_runtime.bc
 	mkdir -p `dirname $@`
-	clang -O0 -o $@ -flto=thin -fPIC $^ ${CRYSTAL_RT_LIBS} -lstdc++ \
+	clang -O3 -o $@ -flto=thin -fPIC $^ ${CRYSTAL_RT_LIBS} -lstdc++ \
 		`sh -c 'ls $(LLVM_PATH)/lib/libclang*.a'` \
 		`$(LLVM_CONFIG) --libfiles --link-static` \
 		`$(LLVM_CONFIG) --system-libs --link-static`
@@ -220,7 +220,7 @@ $(BUILD)/savi-release: $(BUILD)/savi-release.o $(BUILD)/llvm_ext.bc lib/libsavi_
 # This variant of the target compiles in debug mode.
 $(BUILD)/savi-debug: $(BUILD)/savi-debug.o $(BUILD)/llvm_ext.bc lib/libsavi_runtime.bc
 	mkdir -p `dirname $@`
-	clang -O3 -o $@ -flto=thin -fPIC $^ ${CRYSTAL_RT_LIBS} -lstdc++ \
+	clang -O0 -o $@ -flto=thin -fPIC $^ ${CRYSTAL_RT_LIBS} -lstdc++ \
 		`sh -c 'ls $(LLVM_PATH)/lib/libclang*.a'` \
 		`$(LLVM_CONFIG) --libfiles --link-static` \
 		`$(LLVM_CONFIG) --system-libs --link-static`
