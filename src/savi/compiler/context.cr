@@ -32,6 +32,7 @@ class Savi::Compiler::Context
   getter type_context
   getter xtypes
   getter xtypes_graph
+  getter types_graph
   getter verify
 
   getter options
@@ -74,6 +75,7 @@ class Savi::Compiler::Context
     @type_context = TypeContext::Pass.new
     @xtypes = XTypes::Pass.new
     @xtypes_graph = XTypes::Graph::Pass.new
+    @types_graph = Types::Graph::Pass.new
     @verify = Verify::Pass.new
 
     @link_libraries = Set(String).new

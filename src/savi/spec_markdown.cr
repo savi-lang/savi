@@ -72,6 +72,8 @@ class Savi::SpecMarkdown
             example.expected_ffigen << content
           when /^savi format.([\w<>=]+)$/
             example.expected_format_results << {$~[1], content}
+          when /^types_graph (\w+)\.([\w<>=]+)$/
+            example.expected_types_graph << {$~[1], $~[2], content}
           when /^xtypes_graph (\w+)\.([\w<>=]+)$/
             example.expected_xtypes_graph << {$~[1], $~[2], content}
           when /^xtypes.return (\w+)\.([\w<>=]+)$/
@@ -109,6 +111,7 @@ class Savi::SpecMarkdown
     property expected_errors = [] of String
     property expected_ffigen = [] of String
     property expected_format_results = [] of {String, String}
+    property expected_types_graph = [] of {String, String, String}
     property expected_xtypes_graph = [] of {String, String, String}
     property expected_return_xtypes = [] of {String, String, String}
     property expected_param_xtypes = [] of {String, String, Int32, String}
@@ -278,6 +281,40 @@ class Savi::SpecMarkdown
           file.delete if file
         end
       end
+
+      example.expected_types_graph.each { |t_name, f_name, expected|
+        type = library.types.find(&.ident.value.==(t_name))
+        func = type.try(&.find_func?(f_name))
+        unless func && type
+          puts "---"
+          puts
+          puts example.generated_comments_code
+          puts
+          puts "Missing types graph function: #{t_name}.#{f_name}"
+          puts
+          all_success = false
+          next
+        end
+
+        f_link = func.make_link(type.make_link(library.make_link))
+        actual = ctx.types_graph[f_link].show_type_variables_list
+
+        unless expected.strip == actual.strip
+          puts "---"
+          puts
+          puts example.generated_comments_code
+          puts
+          puts "Expected types graph:"
+          puts
+          puts expected
+          puts
+          puts "but actually was:"
+          puts
+          puts actual
+          puts
+          all_success = false
+        end
+      }
 
       example.expected_xtypes_graph.each { |t_name, f_name, expected|
         type = library.types.find(&.ident.value.==(t_name))
