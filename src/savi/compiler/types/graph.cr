@@ -7,7 +7,7 @@ require "../pass/analyze"
 module Savi::Compiler::Types::Graph
   struct Analysis
     getter scope : TypeVariable::Scope
-    getter parent : StructRef(Analysis)?
+    getter for_type : StructRef(Analysis)?
     getter! for_self : TypeSimple
     getter! type_param_vars : Array(TypeVariable)
     getter! field_type_vars : Hash(String, TypeVariable)
@@ -17,8 +17,8 @@ module Savi::Compiler::Types::Graph
     getter! yield_vars : Array(TypeVariable)
     getter! yield_result_var : TypeVariable
 
-    def initialize(@scope, parent : Analysis? = nil)
-      @parent = parent ? StructRef(Analysis).new(parent) : nil
+    def initialize(@scope, for_type : Analysis? = nil)
+      @for_type = for_type ? StructRef(Analysis).new(for_type) : nil
       @sequence_number = 0
 
       @by_node = {} of AST::Node => TypeSimple
@@ -44,8 +44,8 @@ module Savi::Compiler::Types::Graph
       case var.scope
       when @scope
         @var_lower_bounds[var.sequence_number - 1]
-      when parent.try(&.value.scope)
-        parent.not_nil!.value.lower_bounds_of(var)
+      when for_type.try(&.value.scope)
+        for_type.not_nil!.value.lower_bounds_of(var)
       else
         raise NotImplementedError.new("can't reach properties of foreign vars")
       end
@@ -55,8 +55,8 @@ module Savi::Compiler::Types::Graph
       case var.scope
       when @scope
         @var_upper_bounds[var.sequence_number - 1]
-      when parent.try(&.value.scope)
-        parent.not_nil!.value.upper_bounds_of(var)
+      when for_type.try(&.value.scope)
+        for_type.not_nil!.value.upper_bounds_of(var)
       else
         raise NotImplementedError.new("can't reach properties of foreign vars")
       end
@@ -66,8 +66,8 @@ module Savi::Compiler::Types::Graph
       case var.scope
       when @scope
         @var_resolution_dependencies[var.sequence_number - 1]
-      when parent.try(&.value.scope)
-        parent.not_nil!.value.resolution_dependencies_of(var)
+      when for_type.try(&.value.scope)
+        for_type.not_nil!.value.resolution_dependencies_of(var)
       else
         raise NotImplementedError.new("can't reach properties of foreign vars")
       end
@@ -77,8 +77,8 @@ module Savi::Compiler::Types::Graph
       case var.scope
       when @scope
         @var_resolution_dependents[var.sequence_number - 1]
-      when parent.try(&.value.scope)
-        parent.not_nil!.value.resolution_dependents_of(var)
+      when for_type.try(&.value.scope)
+        for_type.not_nil!.value.resolution_dependents_of(var)
       else
         raise NotImplementedError.new("can't reach properties of foreign vars")
       end
@@ -88,8 +88,8 @@ module Savi::Compiler::Types::Graph
       case var.scope
       when @scope
         @var_call_associations[var.sequence_number - 1]
-      when parent.try(&.value.scope)
-        parent.not_nil!.value.call_association_of(var)
+      when for_type.try(&.value.scope)
+        for_type.not_nil!.value.call_association_of(var)
       else
         raise NotImplementedError.new("can't reach properties of foreign vars")
       end
@@ -99,8 +99,8 @@ module Savi::Compiler::Types::Graph
       case var.scope
       when @scope
         @var_param_associations[var.sequence_number - 1]
-      when parent.try(&.value.scope)
-        parent.not_nil!.value.param_association_of(var)
+      when for_type.try(&.value.scope)
+        for_type.not_nil!.value.param_association_of(var)
       else
         raise NotImplementedError.new("can't reach properties of foreign vars")
       end
@@ -127,9 +127,9 @@ module Savi::Compiler::Types::Graph
     end
 
     def show_type_variables_list(output)
-      parent = @parent
-      if parent
-        parent.show_type_variables_list(output)
+      for_type = @for_type
+      if for_type
+        for_type.show_type_variables_list(output)
         output << "~~~\n"
       end
 
@@ -219,7 +219,7 @@ module Savi::Compiler::Types::Graph
     protected def init_func_self(pos : Source::Pos)
       @for_self = begin
         @receiver_var = var = new_type_var("@")
-        constrain(pos, var, @parent.not_nil!.value.for_self)
+        constrain(pos, var, @for_type.not_nil!.value.for_self)
         var
       end.as(TypeSimple)
 
@@ -245,7 +245,7 @@ module Savi::Compiler::Types::Graph
       pos : Source::Pos,
     )
       @return_var = var = new_type_var("return")
-      constrain(pos, var, @parent.not_nil!.value.for_self)
+      constrain(pos, var, @for_type.not_nil!.value.for_self)
       var
     end
 
@@ -326,8 +326,8 @@ module Savi::Compiler::Types::Graph
     end
 
     protected def observe_field_access(node)
-      parent = @parent.not_nil!.value
-      var = parent.field_type_vars[node.value]
+      for_type = @for_type.not_nil!.value
+      var = for_type.field_type_vars[node.value]
       case node
       when AST::FieldRead
         @by_node[node] = var
@@ -341,7 +341,7 @@ module Savi::Compiler::Types::Graph
     end
 
     protected def observe_field_func(ctx, visitor, f : Program::Function)
-      var = @parent.not_nil!.field_type_vars[f.ident.value]
+      var = @for_type.not_nil!.field_type_vars[f.ident.value]
 
       f.ret.try { |ret|
         constrain_upper_and_lower(ret.pos, var, visitor.read_type_expr(ctx, ret))
@@ -555,7 +555,7 @@ module Savi::Compiler::Types::Graph
       when Refer::TypeParam
         analysis = @analysis
         while analysis.scope != ref.parent_link
-          analysis = analysis.parent.not_nil!.value
+          analysis = analysis.for_type.not_nil!.value
         end
         analysis.type_param_vars[ref.index]
       when nil
@@ -634,7 +634,7 @@ module Savi::Compiler::Types::Graph
       when Refer::TypeParam
         analysis = @analysis
         while analysis.scope != ref.parent_link
-          analysis = analysis.parent.not_nil!.value
+          analysis = analysis.for_type.not_nil!.value
         end
         @analysis[node] = analysis.type_param_vars[ref.index]
       else
