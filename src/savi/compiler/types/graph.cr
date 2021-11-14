@@ -19,13 +19,16 @@ module Savi::Compiler::Types::Graph
 
     def initialize(@scope, parent : Analysis? = nil)
       @parent = parent ? StructRef(Analysis).new(parent) : nil
-      @sequence_number = 0u64
+      @sequence_number = 0
 
       @by_node = {} of AST::Node => TypeSimple
       @local_vars_by_ref = {} of Refer::Info => TypeVariable
       @type_vars = [] of TypeVariable
       @edge_type_vars = [] of TypeVariable
       @assertions = Set({Source::Pos, TypeSimple, TypeSimple}).new
+
+      @var_lower_bounds = [] of Array({Source::Pos, TypeSimple})
+      @var_upper_bounds = [] of Array({Source::Pos, TypeSimple})
     end
 
     def [](node : AST::Node); @by_node[node]; end
@@ -33,6 +36,28 @@ module Savi::Compiler::Types::Graph
 
     protected def []=(node : AST::Node, t : TypeSimple)
       @by_node[node] = t
+    end
+
+    protected def lower_bounds_of(var : TypeVariable)
+      case var.scope
+      when @scope
+        @var_lower_bounds[var.sequence_number - 1]
+      when parent.try(&.value.scope)
+        parent.not_nil!.value.lower_bounds_of(var)
+      else
+        raise NotImplementedError.new("lower bounds lookup in other scope")
+      end
+    end
+
+    protected def upper_bounds_of(var : TypeVariable)
+      case var.scope
+      when @scope
+        @var_upper_bounds[var.sequence_number - 1]
+      when parent.try(&.value.scope)
+        parent.not_nil!.value.upper_bounds_of(var)
+      else
+        raise NotImplementedError.new("upper bounds lookup in other scope")
+      end
     end
 
     def show_type_variables_list
@@ -48,7 +73,24 @@ module Savi::Compiler::Types::Graph
 
       (@edge_type_vars + @type_vars).each_with_index { |var, index|
         output << "\n" if index > 0
-        var.show_info(output)
+        var.show(output)
+        output << "\n"
+        upper_bounds_of(var).each { |pos, sup|
+          output << "  <: "
+          sup.show(output)
+          output << "\n"
+          output << "  "
+          output << pos.show.split("\n")[1..-1].join("\n  ")
+          output << "\n"
+        }
+        lower_bounds_of(var).each { |pos, sub|
+          output << "  :> "
+          sub.show(output)
+          output << "\n"
+          output << "  "
+          output << pos.show.split("\n")[1..-1].join("\n  ")
+          output << "\n"
+        }
       }
       if @assertions.any?
         output << "~~~\n"
@@ -63,6 +105,8 @@ module Savi::Compiler::Types::Graph
     protected def new_type_var(nickname)
       TypeVariable.new(nickname, @scope, @sequence_number += 1).tap { |var|
         @type_vars << var
+        @var_lower_bounds << [] of {Source::Pos, TypeSimple}
+        @var_upper_bounds << [] of {Source::Pos, TypeSimple}
       }
     end
 
@@ -311,13 +355,13 @@ module Savi::Compiler::Types::Graph
       if sub.is_a?(TypeVariable) && sup.level <= sub.level
         # If the subtype is a variable at or above the level of the supertype,
         # collect the supertype into the bounds of the subtype variable.
-        sub.upper_bounds << {pos, sup}
-        sub.lower_bounds.try(&.each { |b| constrain(b.first, b.last, sup, seen_vars) })
+        upper_bounds_of(sub) << {pos, sup}
+        lower_bounds_of(sub).each { |b| constrain(b.first, b.last, sup, seen_vars) }
       elsif sup.is_a?(TypeVariable) && sub.level <= sup.level
         # If the supertype is a variable at or above the level of the subtype,
         # collect the subtype into the bounds of the supertype variable.
-        sup.lower_bounds << {pos, sub}
-        sup.upper_bounds.try(&.each { |b| constrain(b.first, sub, b.last, seen_vars) })
+        lower_bounds_of(sup) << {pos, sub}
+        upper_bounds_of(sup).each { |b| constrain(b.first, sub, b.last, seen_vars) }
       elsif sub.is_a?(TypeVariable)
         raise NotImplementedError.new("constrain sub variable across levels")
       elsif sup.is_a?(TypeVariable)
