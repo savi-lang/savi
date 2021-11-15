@@ -125,8 +125,7 @@ module Savi::Compiler::Types::Graph
     def show_type_variables_list
       String.build { |output| show_type_variables_list(output) }
     end
-
-    def show_type_variables_list(output)
+    def show_type_variables_list(output : IO)
       for_type = @for_type
       if for_type
         for_type.show_type_variables_list(output)
@@ -135,50 +134,57 @@ module Savi::Compiler::Types::Graph
 
       @type_vars.each_with_index { |var, index|
         output << "\n" if index > 0
-        var.show(output)
-        output << "\n"
-
-        call = call_association_of(var)
-        if call
-          param_index = param_association_of(var)
-          if param_index == -1
-            output << "  comes from the result of this call:\n  "
-            output << call.pos.show.split("\n")[1..-1].join("\n  ")
-            output << "\n"
-          else
-            output << "  goes to param index #{param_index} of this call:\n  "
-            output << call.pos.show.split("\n")[1..-1].join("\n  ")
-            output << "\n"
-          end
-        end
-
-        upper_bounds_of(var).each { |pos, sup|
-          output << "  <: "
-          sup.show(output)
-          output << "\n"
-          output << "  "
-          output << pos.show.split("\n")[1..-1].join("\n  ")
-          output << "\n"
-        }
-        lower_bounds_of(var).each { |pos, sub|
-          output << "  :> "
-          sub.show(output)
-          output << "\n"
-          output << "  "
-          output << pos.show.split("\n")[1..-1].join("\n  ")
-          output << "\n"
-        }
-
-        dependencies = resolution_dependencies_of(var)
-        if dependencies.any?
-          output << "  will be further constrained after resolving:\n"
-          dependencies.each { |other_var|
-            output << "    - "
-            other_var.show(output)
-            output << "\n"
-          }
-        end
+        show_type_variable(output, var)
       }
+    end
+
+    def show_type_variable(var : TypeVariable)
+      String.build { |output| show_type_variable(output, var) }
+    end
+    def show_type_variable(output, var : TypeVariable)
+      var.show(output)
+      output << "\n"
+
+      call = call_association_of(var)
+      if call
+        param_index = param_association_of(var)
+        if param_index == -1
+          output << "  comes from the result of this call:\n  "
+          output << call.pos.show.split("\n")[1..-1].join("\n  ")
+          output << "\n"
+        else
+          output << "  goes to param index #{param_index} of this call:\n  "
+          output << call.pos.show.split("\n")[1..-1].join("\n  ")
+          output << "\n"
+        end
+      end
+
+      upper_bounds_of(var).each { |pos, sup|
+        output << "  <: "
+        sup.show(output)
+        output << "\n"
+        output << "  "
+        output << pos.show.split("\n")[1..-1].join("\n  ")
+        output << "\n"
+      }
+      lower_bounds_of(var).each { |pos, sub|
+        output << "  :> "
+        sub.show(output)
+        output << "\n"
+        output << "  "
+        output << pos.show.split("\n")[1..-1].join("\n  ")
+        output << "\n"
+      }
+
+      dependencies = resolution_dependencies_of(var)
+      if dependencies.any?
+        output << "  will be further constrained after resolving:\n"
+        dependencies.each { |other_var|
+          output << "    - "
+          other_var.show(output)
+          output << "\n"
+        }
+      end
     end
 
     protected def init_type_self(ctx, visitor : Visitor, params : AST::Group?)
@@ -244,9 +250,7 @@ module Savi::Compiler::Types::Graph
       visitor : Visitor,
       pos : Source::Pos,
     )
-      @return_var = var = new_type_var("return")
-      constrain(pos, var, @for_type.not_nil!.value.for_self)
-      var
+      @return_var = @receiver_var
     end
 
     protected def observe_natural_return(node : AST::Group)

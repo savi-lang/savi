@@ -45,6 +45,7 @@ class Savi::Compiler
     when "pre_infer"        then :pre_infer
     when "pre_subtyping"    then :pre_subtyping
     when "types_graph"      then :types_graph
+    when "types_edge"       then :types_edge
     when "xtypes_graph"     then :xtypes_graph
     when "xtypes"           then :xtypes
     when "infer_edge"       then :infer_edge
@@ -91,6 +92,7 @@ class Savi::Compiler
       when :pre_infer        then ctx.run(ctx.pre_infer)
       when :pre_subtyping    then ctx.run(ctx.pre_subtyping)
       when :types_graph      then ctx.run(ctx.types_graph)
+      when :types_edge       then ctx.run(ctx.types_edge)
       when :xtypes_graph     then ctx.run(ctx.xtypes_graph)
       when :xtypes           then ctx.run_whole_program(ctx.xtypes)
       when :infer_edge       then ctx.run(ctx.infer_edge)
@@ -142,6 +144,7 @@ class Savi::Compiler
     when :pre_infer then [:local, :refer, :type_context, :inventory, :jumps, :classify, :lambda, :populate]
     when :pre_subtyping then [:inventory, :lambda, :populate]
     when :types_graph then [:refer, :classify, :refer_type]
+    when :types_edge then [:types_graph]
     when :xtypes_graph then [:refer, :classify, :refer_type]
     when :xtypes then [:xtypes_graph]
     when :infer_edge then [:pre_subtyping, :pre_infer, :classify, :refer_type]

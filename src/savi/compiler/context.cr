@@ -30,10 +30,11 @@ class Savi::Compiler::Context
   getter subtyping
   getter type_check
   getter type_context
-  getter xtypes
-  getter xtypes_graph
+  getter types_edge
   getter types_graph
   getter verify
+  getter xtypes
+  getter xtypes_graph
 
   getter options
   property prev_ctx : Context?
@@ -73,10 +74,11 @@ class Savi::Compiler::Context
     @subtyping = SubtypingCache.new
     @type_check = TypeCheck.new
     @type_context = TypeContext::Pass.new
-    @xtypes = XTypes::Pass.new
-    @xtypes_graph = XTypes::Graph::Pass.new
+    @types_edge = Types::Edge::Pass.new
     @types_graph = Types::Graph::Pass.new
     @verify = Verify::Pass.new
+    @xtypes = XTypes::Pass.new
+    @xtypes_graph = XTypes::Graph::Pass.new
 
     @link_libraries = Set(String).new
   end
