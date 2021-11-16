@@ -52,6 +52,9 @@ It analyzes a simple system of types.
   :> String
       x String = a.describe(80)
         ^~~~~~
+  :> α'describe'8
+      x String = a.describe(80)
+      ^~~~~~~~~~~~~~~~~~~~~~~~~
 
 α'num:80'6
   <: Numeric
@@ -72,9 +75,9 @@ It analyzes a simple system of types.
   comes from the result of this call:
       x String = a.describe(80)
                  ^~~~~~~~~~
-  <: α'x'5
+  <: String
       x String = a.describe(80)
-      ^~~~~~~~~~~~~~~~~~~~~~~~~
+        ^~~~~~
   will be further constrained after resolving:
     - α'a'3
 

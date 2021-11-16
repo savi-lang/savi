@@ -40,7 +40,7 @@ module Savi::Compiler::Types::Graph
       @by_node[node] = t
     end
 
-    protected def lower_bounds_of(var : TypeVariable)
+    def lower_bounds_of(var : TypeVariable)
       case var.scope
       when @scope
         @var_lower_bounds[var.sequence_number - 1]
@@ -51,7 +51,7 @@ module Savi::Compiler::Types::Graph
       end
     end
 
-    protected def upper_bounds_of(var : TypeVariable)
+    def upper_bounds_of(var : TypeVariable)
       case var.scope
       when @scope
         @var_upper_bounds[var.sequence_number - 1]
@@ -368,6 +368,7 @@ module Savi::Compiler::Types::Graph
 
       call.args.try(&.terms.each_with_index { |term, index|
         param_var = new_type_var("#{call.ident.value}(#{index})", call, index)
+        param_var.is_inner_edge = true
 
         receiver_type_vars.each { |v|
           observe_resolution_dependency(param_var, v)
@@ -377,6 +378,7 @@ module Savi::Compiler::Types::Graph
       })
 
       result_var = new_type_var(call.ident.value, call)
+      result_var.is_inner_edge = true
 
       receiver_type_vars.each { |v|
         observe_resolution_dependency(result_var, v)
@@ -442,14 +444,22 @@ module Savi::Compiler::Types::Graph
       #   constrain(sup.param, sub.param)
       # elsif sub.is_a?(TypeRecord) && sup.is_a?(TypeRecord)
       #   raise NotImplementedError.new("constrain TypeRecord")
-      if sub.is_a?(TypeVariable) && sup.level <= sub.level
-        # If the subtype is a variable at or above the level of the supertype,
-        # collect the supertype into the bounds of the subtype variable.
+      if sub.is_a?(TypeVariable) && sup.is_a?(TypeVariable) \
+      && sub.level == sup.level && sub.is_inner_edge
+        # If both sides are type variables at the same level,
+        # but the subtype is an "inner edge" site (with deferred resolution),
+        # prefer putting constraints in the supertype as a special case.
+        lower_bounds_of(sup) << {pos, sub}
+        upper_bounds_of(sup).each { |b| constrain(b.first, sub, b.last, seen_vars) }
+      elsif sub.is_a?(TypeVariable) && sup.level <= sub.level
+        # Otherwise, if the subtype is a type variable,
+        # prefer putting constraints in the subtype,
+        # as long as the subtype is at or above the "level" of the supertype.
         upper_bounds_of(sub) << {pos, sup}
         lower_bounds_of(sub).each { |b| constrain(b.first, b.last, sup, seen_vars) }
       elsif sup.is_a?(TypeVariable) && sub.level <= sup.level
-        # If the supertype is a variable at or above the level of the subtype,
-        # collect the subtype into the bounds of the supertype variable.
+        # Otherwise, try putting constraints in the supertype,
+        # as long as the supertype is at or above the "level" of the subtype.
         lower_bounds_of(sup) << {pos, sub}
         upper_bounds_of(sup).each { |b| constrain(b.first, sub, b.last, seen_vars) }
       elsif sub.is_a?(TypeVariable)

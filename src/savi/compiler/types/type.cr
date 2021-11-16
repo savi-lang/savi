@@ -60,6 +60,7 @@ module Savi::Compiler::Types
     getter nickname : String
     getter scope : Scope
     getter sequence_number : Int32
+    property is_inner_edge = false
     def initialize(@nickname, @scope, @sequence_number)
     end
 
