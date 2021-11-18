@@ -21,6 +21,7 @@ class Savi::Compiler::Context
   getter populate
   getter pre_infer
   getter pre_subtyping
+  getter pre_t_infer
   getter privacy
   getter reach
   getter refer
@@ -28,6 +29,10 @@ class Savi::Compiler::Context
   getter serve_definition
   getter serve_hover
   getter subtyping
+  getter t_infer
+  getter t_infer_edge
+  getter t_subtyping
+  getter t_type_check
   getter type_check
   getter type_context
   getter types_edge
@@ -65,6 +70,7 @@ class Savi::Compiler::Context
     @populate = Populate.new
     @pre_infer = PreInfer::Pass.new
     @pre_subtyping = PreSubtyping::Pass.new
+    @pre_t_infer = PreTInfer::Pass.new
     @privacy = Privacy::Pass.new
     @reach = Reach.new
     @refer = Refer::Pass.new
@@ -72,6 +78,10 @@ class Savi::Compiler::Context
     @serve_definition = ServeDefinition.new
     @serve_hover = ServeHover.new
     @subtyping = SubtypingCache.new
+    @t_infer = TInfer::Pass.new
+    @t_infer_edge = TInfer::PassEdge.new
+    @t_subtyping = TSubtypingCache.new
+    @t_type_check = TTypeCheck.new
     @type_check = TypeCheck.new
     @type_context = TypeContext::Pass.new
     @types_edge = Types::Edge::Pass.new

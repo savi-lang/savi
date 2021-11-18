@@ -229,6 +229,21 @@ class Savi::SpecMarkdown
                   ]
                 )}
               end
+            when "t_type"
+              rt = Compiler::TInfer::ReifiedType.new(t_link)
+              cap = f_link.resolve(ctx).cap.value
+              rf = Compiler::TInfer::ReifiedFunction.new(rt, f_link,
+                Compiler::TInfer::MetaType.new(rt, cap)
+              )
+              actual = rf.meta_type_of(ctx, node).try(&.show_type) rescue nil
+
+              if actual != expected
+                errors << {example, Error.build(annotations.first.pos,
+                  "This annotation expects a type of '#{expected}'", [
+                    {node.pos, "but it actually had a type of '#{actual}'"},
+                  ]
+                )}
+              end
             else
               errors << {example, Error.build(annotations.first.pos,
                 "Compiler spec annotation '#{kind}' not known")}
