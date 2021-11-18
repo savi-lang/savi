@@ -47,6 +47,9 @@ module Savi::Compiler::Types::Graph
       when for_type.try(&.value.scope)
         for_type.not_nil!.value.lower_bounds_of(var)
       else
+        puts var.scope
+        puts @scope
+        puts for_type.try(&.value.scope)
         raise NotImplementedError.new("can't reach properties of foreign vars")
       end
     end
@@ -96,14 +99,15 @@ module Savi::Compiler::Types::Graph
     end
 
     def param_association_of(var : TypeVariable)
-      case var.scope
+      raw = case var.scope
       when @scope
         @var_param_associations[var.sequence_number - 1]
       when for_type.try(&.value.scope)
         for_type.not_nil!.value.param_association_of(var)
       else
         raise NotImplementedError.new("can't reach properties of foreign vars")
-      end
+      end.not_nil!
+      raw >= 0 ? raw : nil
     end
 
     protected def new_type_var(
@@ -148,12 +152,12 @@ module Savi::Compiler::Types::Graph
       call = call_association_of(var)
       if call
         param_index = param_association_of(var)
-        if param_index == -1
-          output << "  comes from the result of this call:\n  "
+        if param_index
+          output << "  goes to param index #{param_index} of this call:\n  "
           output << call.pos.show.split("\n")[1..-1].join("\n  ")
           output << "\n"
         else
-          output << "  goes to param index #{param_index} of this call:\n  "
+          output << "  comes from the result of this call:\n  "
           output << call.pos.show.split("\n")[1..-1].join("\n  ")
           output << "\n"
         end
