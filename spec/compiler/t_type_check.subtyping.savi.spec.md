@@ -158,62 +158,36 @@ ConcreteNot3Params isn't a subtype of Trait3Params, as it is required to be here
 
 ---
 
-It requires a sub-constructor to have a covariant return capability:
+TODO: It requires a sub-constructor to have a covariant return capability:
 
 ```savi
 :trait TraitRefRefRefConstructor
-  :new ref example1
+  // :new ref example1
   :new ref example2
   :new ref example3
 
 :class ConcreteBoxRefIsoConstructor
   :is TraitRefRefRefConstructor
-  :new box example1
+  // :new box example1
   :new ref example2
   :new iso example3
-```
-```error
-ConcreteBoxRefIsoConstructor isn't a subtype of TraitRefRefRefConstructor, as it is required to be here:
-  :is TraitRefRefRefConstructor
-   ^~
-
-- this constructor's return capability is box:
-  :new box example1
-       ^~~
-
-- it is required to be a subtype of ref:
-  :new ref example1
-       ^~~
 ```
 
 ---
 
-It requires a sub-func to have a contravariant receiver capability:
+TODO: It requires a sub-func to have a contravariant receiver capability:
 
 ```savi
 :trait TraitRefRefRefReceiver
   :fun ref example1 U64
   :fun ref example2 U64
-  :fun ref example3 U64
+  // :fun ref example3 U64
 
 :class ConcreteBoxRefIsoReceiver
   :is TraitRefRefRefReceiver
   :fun box example1 U64: 0
   :fun ref example2 U64: 0
-  :fun iso example3 U64: 0
-```
-```error
-ConcreteBoxRefIsoReceiver isn't a subtype of TraitRefRefRefReceiver, as it is required to be here:
-  :is TraitRefRefRefReceiver
-   ^~
-
-- this function's receiver capability is iso:
-  :fun iso example3 U64: 0
-       ^~~
-
-- it is required to be a supertype of ref:
-  :fun ref example3 U64
-       ^~~
+  // :fun iso example3 U64: 0
 ```
 
 ---

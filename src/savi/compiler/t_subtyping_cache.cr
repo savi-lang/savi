@@ -216,29 +216,7 @@ class Savi::Compiler::TSubtypingCache
 
         this_func = this.defn(ctx).find_func?(that_func.ident.value)
         if this_func
-          that_cap = MetaType::Capability.new_maybe_generic(that_func.cap.value)
-          this_cap = MetaType::Capability.new_maybe_generic(this_func.cap.value)
-
-          # For "simple" capabilities, just use them to check the function.
-          if that_cap.value.is_a?(TInfer::Cap) && this_cap.value.is_a?(TInfer::Cap)
-            check_func(ctx, that, that_func, this_func, that_cap, this_cap, errors)
-          else
-            # If either capability is a generic cap, they must be equivalent.
-            # TODO: May need to revisit this requirement later and loosen it?
-            if that_cap != this_cap
-              errors << {this_func.cap.pos,
-                "this function's receiver capability is #{this_cap.inspect}"}
-              errors << {that_func.cap.pos,
-                "it is required to be equivalent to #{that_cap.inspect}"}
-            else
-              # Now that we know they both use the same generic cap,
-              # we can compare each reification of that generic cap.
-              that_cap.each_cap.each do |cap|
-                cap_mti = MetaType::Capability.new(cap)
-                check_func(ctx, that, that_func, this_func, cap_mti, cap_mti, errors)
-              end
-            end
-          end
+          check_func(ctx, that, that_func, this_func, errors)
         else
           # The structural comparison fails if a required method is missing.
           errors << {that_func.ident.pos,
@@ -249,7 +227,7 @@ class Savi::Compiler::TSubtypingCache
       errors.empty?
     end
 
-    private def check_func(ctx, that, that_func, this_func, that_cap, this_cap, errors)
+    private def check_func(ctx, that, that_func, this_func, errors)
       # Just asserting; we expect find_func? to prevent this.
       raise "found hygienic function" if this_func.has_tag?(:hygienic)
 
@@ -305,25 +283,6 @@ class Savi::Compiler::TSubtypingCache
         errors << {(that_func.params || that_func.ident).pos,
           "the supertype has #{that_func.param_count} parameters"}
         return false
-      end
-
-      # Check the receiver capability.
-      if this_func.has_tag?(:constructor)
-        # Covariant receiver rcap for constructors.
-        unless this_cap.subtype_of?(that_cap)
-          errors << {this_func.cap.pos,
-            "this constructor's return capability is #{this_cap.inspect}"}
-          errors << {that_func.cap.pos,
-            "it is required to be a subtype of #{that_cap.inspect}"}
-        end
-      else
-        # Contravariant receiver rcap for normal functions.
-        unless that_cap.subtype_of?(this_cap)
-          errors << {this_func.cap.pos,
-            "this function's receiver capability is #{this_cap.inspect}"}
-          errors << {that_func.cap.pos,
-            "it is required to be a supertype of #{that_cap.inspect}"}
-        end
       end
 
       # Covariant return type.

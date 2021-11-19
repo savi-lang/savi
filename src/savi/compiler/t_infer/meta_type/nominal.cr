@@ -4,11 +4,6 @@ struct Savi::Compiler::TInfer::MetaType::Nominal
   def initialize(@defn)
   end
 
-  def ignores_cap?
-    defn = @defn
-    defn.is_a?(ReifiedType) && defn.link.ignores_cap?
-  end
-
   def lazy?
     defn = @defn
     defn.is_a?(ReifiedTypeAlias)
@@ -139,13 +134,6 @@ struct Savi::Compiler::TInfer::MetaType::Nominal
     other
   end
 
-  def intersect(other : Capability)
-    # As a small optimization, we can drop the cap here if we know it's ignored.
-    return self if ignores_cap?
-
-    Intersection.new(other, [self].to_set)
-  end
-
   def intersect(other : Nominal)
     raise NotImplementedError.new("simplify first to remove aliases") if defn.is_a?(ReifiedTypeAlias)
 
@@ -157,7 +145,7 @@ struct Savi::Compiler::TInfer::MetaType::Nominal
       if is_non_alias_and_concrete? && other.is_non_alias_and_concrete?
 
     # Otherwise, this is a new intersection of the two types.
-    Intersection.new(nil, [self, other].to_set)
+    Intersection.new([self, other].to_set)
   end
 
   def intersect(other : (AntiNominal | Intersection | Union))
@@ -172,16 +160,12 @@ struct Savi::Compiler::TInfer::MetaType::Nominal
     self
   end
 
-  def unite(other : Capability)
-    Union.new([other].to_set, [self].to_set)
-  end
-
   def unite(other : Nominal)
     # No change if the two nominal types are identical.
     return self if defn == other.defn
 
     # Otherwise, this is a new union of the two types.
-    Union.new(nil, [self, other].to_set)
+    Union.new([self, other].to_set)
   end
 
   def unite(other : (AntiNominal | Intersection | Union))
@@ -213,7 +197,7 @@ struct Savi::Compiler::TInfer::MetaType::Nominal
     )
   end
 
-  def substitute_type_params_retaining_cap(
+  def substitute_type_params(
     type_params : Array(TypeParam),
     type_args : Array(MetaType)
   ) : Inner
@@ -224,13 +208,13 @@ struct Savi::Compiler::TInfer::MetaType::Nominal
       index ? type_args[index].inner : self
     when ReifiedType
       args = defn.args.map do |arg|
-        arg.substitute_type_params_retaining_cap(type_params, type_args).as(MetaType)
+        arg.substitute_type_params(type_params, type_args).as(MetaType)
       end
 
       Nominal.new(ReifiedType.new(defn.link, args))
     when ReifiedTypeAlias
       args = defn.args.map do |arg|
-        arg.substitute_type_params_retaining_cap(type_params, type_args).as(MetaType)
+        arg.substitute_type_params(type_params, type_args).as(MetaType)
       end
 
       Nominal.new(ReifiedTypeAlias.new(defn.link, args))
@@ -247,51 +231,6 @@ struct Savi::Compiler::TInfer::MetaType::Nominal
   def substitute_each_type_alias_in_first_layer(&block : ReifiedTypeAlias -> MetaType) : Inner
     defn = defn()
     defn.is_a?(ReifiedTypeAlias) ? block.call(defn).inner : self
-  end
-
-  def is_sendable?
-    raise NotImplementedError.new("simplify first to remove aliases") if defn.is_a?(ReifiedTypeAlias)
-
-    # A nominal that ignores capabilities is always sendable.
-    return true if ignores_cap?
-
-    # An nominal is never itself sendable -
-    # it specifies a single nominal, and says nothing about capabilities.
-    false
-  end
-
-  def safe_to_match_as?(ctx : Context, other) : Bool?
-    raise NotImplementedError.new("simplify first to remove aliases") if defn.is_a?(ReifiedTypeAlias)
-
-    supertype_of?(ctx, other) ? true : nil
-  end
-
-  def viewed_from(origin)
-    raise NotImplementedError.new("simplify first to remove aliases") if defn.is_a?(ReifiedTypeAlias)
-
-    # A nominal that ignores capabilities also ignores viewpoint adaptation.
-    return self if ignores_cap?
-
-    raise NotImplementedError.new("#{origin.inspect}->#{self.inspect}")
-  end
-
-  def subtype_of?(ctx : Context, other : Capability) : Bool
-    raise NotImplementedError.new("simplify first to remove aliases") if defn.is_a?(ReifiedTypeAlias)
-
-    # A nominal that ignores capabilities can be a subtype of any capability.
-    return true if ignores_cap?
-
-    # Otherwise, a nominal can never be a subtype of any capability -
-    # it specifies a single nominal, and says nothing about capabilities.
-    false
-  end
-
-  def supertype_of?(ctx : Context, other : Capability) : Bool
-    raise NotImplementedError.new("simplify first to remove aliases") if defn.is_a?(ReifiedTypeAlias)
-
-    # A nominal can never be a supertype of any capability -
-    # it specifies a single nominal, and says nothing about capabilities.
-    false
   end
 
   def subtype_of?(ctx : Context, other : Nominal) : Bool
@@ -336,13 +275,6 @@ struct Savi::Compiler::TInfer::MetaType::Nominal
     other.subtype_of?(ctx, self) # delegate to the other class via symmetry
   end
 
-  def satisfies_bound?(ctx : Context, bound : Capability) : Bool
-    # A nominal that ignores capabilities can satisfy any capability.
-    return true if ignores_cap?
-
-    raise NotImplementedError.new("#{self} satisfies_bound? #{bound}")
-  end
-
   def satisfies_bound?(ctx : Context, bound : Nominal) : Bool
     subtype_of?(ctx, bound)
   end
@@ -352,9 +284,6 @@ struct Savi::Compiler::TInfer::MetaType::Nominal
   end
 
   def satisfies_bound?(ctx : Context, bound : Intersection) : Bool
-    # If the bound has a cap, then we can't satisfy it unless we can ignore it.
-    return false if bound.cap && !ignores_cap?
-
     # If the bound has terms, then we must satisfy each term.
     bound.terms.try do |bound_terms|
       bound_terms.each do |bound_term|

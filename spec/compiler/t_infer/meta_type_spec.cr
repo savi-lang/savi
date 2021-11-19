@@ -1,14 +1,4 @@
 describe Savi::Compiler::TInfer::MetaType do
-  # For convenience, alias each capability here by name.
-  iso   = Savi::Compiler::TInfer::MetaType::Capability::ISO
-  iso_a = Savi::Compiler::TInfer::MetaType::Capability::ISO_ALIASED
-  ref   = Savi::Compiler::TInfer::MetaType::Capability::REF
-  val   = Savi::Compiler::TInfer::MetaType::Capability::VAL
-  box   = Savi::Compiler::TInfer::MetaType::Capability::BOX
-  tag   = Savi::Compiler::TInfer::MetaType::Capability::TAG
-  non   = Savi::Compiler::TInfer::MetaType::Capability::NON
-  no    = Savi::Compiler::TInfer::MetaType::Unsatisfiable::INSTANCE
-
   it "implements logical operators that keep the expression in DNF form" do
     library = Savi::Program::Library.new(
       Savi::Source::Library.new("(example)")
@@ -152,47 +142,5 @@ describe Savi::Compiler::TInfer::MetaType do
       " (A1 & A2 & -C1 & -C2 & -A3 & -C4) |"\
       " (A1 & A2 & -C1 & -C2 & -C3 & -A4) |"\
       " (A1 & A2 & -C1 & -C2 & -C3 & -C4))"
-  end
-
-  it "implements the correct truth table for viewpoint adaptation" do
-    # See comments in the Capability#viewed_from function for more information.
-
-    columns =  {iso,   iso_a, ref,   val,   box,   tag,   non}
-    rows = {
-      iso   => {iso,   iso,   iso,   val,   val,   tag,   non},
-      iso_a => {iso,   iso_a, iso_a, val,   tag,   tag,   non},
-      ref   => {iso,   iso_a, ref,   val,   box,   tag,   non},
-      val   => {val,   val,   val,   val,   val,   tag,   non},
-      box   => {val,   tag,   box,   val,   box,   tag,   non},
-      tag   => {non,   non,   non,   non,   non,   non,   non},
-      non   => {non,   non,   non,   non,   non,   non,   non},
-    }
-
-    rows.each do |origin, results|
-      columns.zip(results).each do |column, result|
-        actual = column.viewed_from(origin)
-        {origin, column, actual}.should eq({origin, column, result})
-      end
-    end
-  end
-
-  it "correctly intersects capabilities" do
-    columns =  {iso,   iso_a, ref,   val,   box,   tag,   non}
-    rows = {
-      iso   => {iso,   iso,   iso,   iso,   iso,   iso,   iso},
-      iso_a => {iso,   iso_a, no,    no,    no,    iso_a, iso_a},
-      ref   => {iso,   no,    ref,   no,    ref,   ref,   ref},
-      val   => {iso,   no,    no,    val,   val,   val,   val},
-      box   => {iso,   no,    ref,   val,   box,   box,   box},
-      tag   => {iso,   iso_a, ref,   val,   box,   tag,   tag},
-      non   => {iso,   iso_a, ref,   val,   box,   tag,   non},
-    }
-
-    rows.each do |left, results|
-      columns.zip(results).each do |right, result|
-        actual = left.intersect(right)
-        {left, right, actual}.should eq({left, right, result})
-      end
-    end
   end
 end

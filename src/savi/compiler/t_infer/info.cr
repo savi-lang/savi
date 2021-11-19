@@ -1171,7 +1171,7 @@ module Savi::Compiler::TInfer
 
       receiver_span.combine_mt_to_span(lhs_span) { |call_receiver_mt, lhs_mt|
         union_member_spans = call_receiver_mt.map_each_union_member { |union_member_mt|
-          intersection_term_spans = union_member_mt.map_each_intersection_term_and_or_cap { |term_mt|
+          intersection_term_spans = union_member_mt.map_each_intersection_term { |term_mt|
             call_mt = union_member_mt
             call_defn = term_mt.single!
             call_func = call_defn.defn(ctx).find_func!(@member)
@@ -1213,7 +1213,7 @@ module Savi::Compiler::TInfer
     def resolve_span!(ctx : Context, infer : Visitor) : Span
       @call.resolve_receiver_span(ctx, infer).transform_mt_to_span { |call_receiver_mt|
         union_member_spans = call_receiver_mt.map_each_union_member { |union_member_mt|
-          intersection_term_spans = union_member_mt.map_each_intersection_term_and_or_cap { |term_mt|
+          intersection_term_spans = union_member_mt.map_each_intersection_term { |term_mt|
             call_defn = term_mt.single!
             call_func = call_defn.defn(ctx).find_func!(@call.member)
             call_link = call_func.make_link(call_defn.link)
@@ -1260,7 +1260,7 @@ module Savi::Compiler::TInfer
 
       @call.resolve_receiver_span(ctx, infer).transform_mt_to_span { |call_receiver_mt|
         union_member_spans = call_receiver_mt.map_each_union_member { |union_member_mt|
-          intersection_term_spans = union_member_mt.map_each_intersection_term_and_or_cap { |term_mt|
+          intersection_term_spans = union_member_mt.map_each_intersection_term { |term_mt|
             call_defn = term_mt.single!
             call_func = call_defn.defn(ctx).find_func!(@call.member)
             call_link = call_func.make_link(call_defn.link)
@@ -1326,7 +1326,7 @@ module Savi::Compiler::TInfer
     def resolve_span!(ctx : Context, infer : Visitor) : Span
       @call.resolve_receiver_span(ctx, infer).transform_mt_to_span { |call_receiver_mt|
         union_member_spans = call_receiver_mt.map_each_union_member { |union_member_mt|
-          intersection_term_spans = union_member_mt.map_each_intersection_term_and_or_cap { |term_mt|
+          intersection_term_spans = union_member_mt.map_each_intersection_term { |term_mt|
             call_defn = term_mt.single!
             call_func = call_defn.defn(ctx).find_func!(@call.member)
             call_link = call_func.make_link(call_defn.link)

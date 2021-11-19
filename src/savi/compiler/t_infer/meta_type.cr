@@ -19,12 +19,11 @@ struct Savi::Compiler::TInfer::MetaType
   struct Intersection; end # A type intersection - a logical "AND".
   struct AntiNominal;  end # A type negation - a logical "NOT".
   struct Nominal;      end # A named type, either abstract or concrete.
-  struct Capability;   end # A reference capability.
   class Unsatisfiable; end # It's impossible to find a type that fulfills this.
   class Unconstrained; end # All types fulfill this - totally unconstrained.
 
   alias Inner = (
-    Union | Intersection | AntiNominal | Nominal | Capability |
+    Union | Intersection | AntiNominal | Nominal |
     Unsatisfiable | Unconstrained)
 
   getter inner : Inner
@@ -84,14 +83,12 @@ struct Savi::Compiler::TInfer::MetaType
     MetaType.new(inner.with_additional_type_arg!(arg))
   end
 
-  def substitute_type_params_retaining_cap(
+  def substitute_type_params(
     type_params : Array(TypeParam),
     type_args : Array(MetaType)
   ) : MetaType
     return self if type_params.empty?
-    MetaType.new(
-      inner.substitute_type_params_retaining_cap(type_params, type_args)
-    )
+    MetaType.new(inner.substitute_type_params(type_params, type_args))
   end
 
   def each_type_alias_in_first_layer(&block : ReifiedTypeAlias -> _)
@@ -110,10 +107,6 @@ struct Savi::Compiler::TInfer::MetaType
     true
   end
 
-  def is_sendable? : Bool
-    inner.is_sendable?
-  end
-
   # A partial reify type param is a type param intersected with a capability.
   def is_partial_reify_of_type_param?(param : TypeParam) : Bool
     inner = inner()
@@ -123,32 +116,6 @@ struct Savi::Compiler::TInfer::MetaType
     return false unless inner.terms.try(&.size) == 1
     return false unless inner.terms.try(&.first.try(&.defn.==(param)))
     true
-  end
-
-  # Returns true if it is safe to refine the type of self to other at runtime.
-  # Returns false if doing so would violate capabilities.
-  # Returns nil if doing so would be impossible even if we ignored capabilities.
-  # TODO: This function isn't actually used by match types - it's only used for
-  # Pony runtime trace characteristics, and we're not fully sure it's correct.
-  # Needs auditing for correctness in that context, and potential renaming.
-  def safe_to_match_as?(ctx : Context, other : MetaType) : Bool?
-    inner.safe_to_match_as?(ctx, other.inner)
-  end
-
-  def viewed_from(origin : MetaType)
-    origin_inner = origin.inner
-    case origin_inner
-    when Capability
-      MetaType.new(inner.viewed_from(origin_inner))
-    when Intersection
-      MetaType.new(inner.viewed_from(origin_inner.cap.not_nil!)) # TODO: convert to_generic
-    else
-      raise NotImplementedError.new("#{origin_inner.inspect}->#{inner.inspect}")
-    end
-  end
-
-  def cap_only?
-    @inner.is_a?(Capability)
   end
 
   def type_param_only?
@@ -286,11 +253,10 @@ struct Savi::Compiler::TInfer::MetaType
     end)
 
     # Otherwise, return as a new intersection.
-    Intersection.build(inner.cap, new_terms.try(&.to_set), new_anti_terms.try(&.to_set))
+    Intersection.build(new_terms.try(&.to_set), new_anti_terms.try(&.to_set))
   end
 
   private def self.simplify_union(ctx : Context, inner : Union)
-    caps = Set(Capability).new
     terms = Set(Nominal).new
     anti_terms = Set(AntiNominal).new
     intersects = Set(Intersection).new
@@ -298,7 +264,6 @@ struct Savi::Compiler::TInfer::MetaType
     # Just copy the terms and anti-terms without working with them.
     # TODO: are there any simplifications we can/should apply here?
     # TODO: consider some that are in symmetry with those for intersections.
-    caps.concat(inner.caps.not_nil!) if inner.caps
     terms.concat(inner.terms.not_nil!) if inner.terms
     anti_terms.concat(inner.anti_terms.not_nil!) if inner.anti_terms
 
@@ -314,7 +279,7 @@ struct Savi::Compiler::TInfer::MetaType
       end
     end if inner.intersects
 
-    Union.build(caps.to_set, terms.to_set, anti_terms.to_set, intersects.to_set)
+    Union.build(terms.to_set, anti_terms.to_set, intersects.to_set)
   end
 
   private def self.simplify_nominal(ctx : Context, inner : Nominal)
@@ -346,38 +311,12 @@ struct Savi::Compiler::TInfer::MetaType
     @inner.each_reachable_defn(ctx)
   end
 
-  def each_reachable_defn_with_cap(ctx : Context) : Array({ReifiedType, Capability})
-    results = [] of {ReifiedType, Capability}
-
-    inner = @inner
-    intersects =
-      case inner
-      when Intersection; [inner]
-      when Union; inner.intersects
-      else return results
-      end
-
-    intersects.not_nil!.each do |intersect|
-      cap = intersect.cap
-      next unless cap
-
-      intersect.each_reachable_defn(ctx).each do |defn|
-        results << {defn, cap}
-      end
-    end
-
-    results
-  end
-
   def map_each_union_member(&block : MetaType -> T) forall T
     results = [] of T
 
     inner = @inner
     case inner
     when Union
-      inner.caps.try(&.each { |cap|
-        results << yield MetaType.new(cap)
-      })
       inner.terms.try(&.each { |term|
         results << yield MetaType.new(term)
       })
@@ -389,14 +328,13 @@ struct Savi::Compiler::TInfer::MetaType
       })
     when Intersection; results << yield MetaType.new(inner)
     when Nominal;      results << yield MetaType.new(inner)
-    when Capability;   results << yield MetaType.new(inner)
     else NotImplementedError.new("map_each_union_member for #{inner.inspect}")
     end
 
     results
   end
 
-  def map_each_intersection_term_and_or_cap(&block : MetaType -> T) forall T
+  def map_each_intersection_term(&block : MetaType -> T) forall T
     results = [] of T
 
     inner = @inner
@@ -404,13 +342,9 @@ struct Savi::Compiler::TInfer::MetaType
     when Union
       raise "wrap a call to map_each_union_member around this method first"
     when Intersection
-      cap = MetaType.new(inner.cap || Unconstrained.instance)
-      inner.terms.try(&.each { |term|
-        results << yield MetaType.new(term).intersect(cap)
-      })
+      inner.terms.try(&.each { |term| results << yield MetaType.new(term) })
     when Nominal; results << yield MetaType.new(inner)
-    when Capability; results << yield MetaType.new(inner)
-    else NotImplementedError.new("each_intersection_term_and_or_cap for #{inner.inspect}")
+    else NotImplementedError.new("each_intersection_term for #{inner.inspect}")
     end
 
     results
@@ -442,9 +376,5 @@ struct Savi::Compiler::TInfer::MetaType
 
   def show_type
     @inner.inspect
-  end
-
-  def cap_value
-    @inner.as(Capability).value
   end
 end

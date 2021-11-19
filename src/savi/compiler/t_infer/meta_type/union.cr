@@ -1,19 +1,16 @@
 struct Savi::Compiler::TInfer::MetaType::Union
-  getter caps : Set(Capability)?
   getter terms : Set(Nominal)?
   getter anti_terms : Set(AntiNominal)?
   getter intersects : Set(Intersection)?
 
-  def initialize(@caps = nil, @terms = nil, @anti_terms = nil, @intersects = nil)
+  def initialize(@terms = nil, @anti_terms = nil, @intersects = nil)
     count = 0
-    count += caps.try(&.size) || 0
     count += terms.try(&.size) || 0
     count += anti_terms.try(&.size) || 0
     count += intersects.try(&.size) || 0
 
     raise "too few terms: #{inspect}" if count <= 1
 
-    raise "empty caps" if caps && caps.try(&.empty?)
     raise "empty terms" if terms && terms.try(&.empty?)
     raise "empty anti_terms" if anti_terms && anti_terms.try(&.empty?)
     raise "empty intersects" if intersects && intersects.try(&.empty?)
@@ -21,7 +18,6 @@ struct Savi::Compiler::TInfer::MetaType::Union
 
   def all_terms
     all_terms = [] of Inner
-    caps.try(&.each { |cap| all_terms << cap })
     terms.try(&.each { |term| all_terms << term })
     anti_terms.try(&.each { |anti_term| all_terms << anti_term })
     intersects.try(&.each { |intersect| all_terms << intersect })
@@ -32,27 +28,24 @@ struct Savi::Compiler::TInfer::MetaType::Union
   # aren't enough terms, anti-terms, and intersections to build a real Union.
   # Returns Unsatisfiable if no terms or anti-terms are supplied.
   def self.build(
-    caps : Set(Capability)? = nil,
     terms : Set(Nominal)? = nil,
     anti_terms : Set(AntiNominal)? = nil,
     intersects : Set(Intersection)? = nil,
   ) : Inner
     count = 0
-    count += caps.try(&.size) || 0
     count += terms.try(&.size) || 0
     count += anti_terms.try(&.size) || 0
     count += intersects.try(&.size) || 0
 
     case count
     when 0 then Unsatisfiable.instance
-    when 1 then caps.try(&.first?) || terms.try(&.first?) ||
-                anti_terms.try(&.first?) || intersects.not_nil!.first
+    when 1 then terms.try(&.first?) || anti_terms.try(&.first?) || \
+                intersects.not_nil!.first
     else
-      caps = nil if caps && caps.empty?
       terms = nil if terms && terms.empty?
       anti_terms = nil if anti_terms && anti_terms.empty?
       intersects = nil if intersects && intersects.empty?
-      new(caps, terms, anti_terms, intersects)
+      new(terms, anti_terms, intersects)
     end
   end
 
@@ -74,11 +67,6 @@ struct Savi::Compiler::TInfer::MetaType::Union
       io << " | " unless first; first = false
       term.inspect(io)
     end if terms
-
-    caps.not_nil!.each do |cap|
-      io << " | " unless first; first = false
-      cap.inspect(io)
-    end if caps
 
     io << ")"
   end
@@ -165,11 +153,6 @@ struct Savi::Compiler::TInfer::MetaType::Union
     # De Morgan's Law:
     # The negation of a union is the intersection of negations of its terms.
     result = nil
-    caps.not_nil!.each do |cap|
-      cap = cap.negate
-      result = result ? result.intersect(cap) : cap
-      return result if result.is_a?(Unsatisfiable)
-    end if caps
     terms.not_nil!.each do |term|
       term = term.negate
       result = result ? result.intersect(term) : term
@@ -198,15 +181,11 @@ struct Savi::Compiler::TInfer::MetaType::Union
   end
 
   def intersect(
-    other : (Capability | Nominal | AntiNominal | Intersection | Union)
+    other : (Nominal | AntiNominal | Intersection | Union)
   )
     # Intersect the other with each term that we contain in the union,
     # discarding any results that come back as Unsatisfiable intersections.
     results = [] of Inner
-    caps.not_nil!.each do |cap|
-      result = other.intersect(cap)
-      results << result unless result.is_a?(Unsatisfiable)
-    end if caps
     terms.not_nil!.each do |term|
       result = other.intersect(term)
       results << result unless result.is_a?(Unsatisfiable)
@@ -234,20 +213,6 @@ struct Savi::Compiler::TInfer::MetaType::Union
     self
   end
 
-  def unite(other : Capability)
-    # No change if we've already united with this cap.
-    return self if caps && caps.not_nil!.includes?(other)
-
-    # Otherwise, create a new union that adds this type.
-    new_caps =
-      if caps
-        caps.not_nil!.dup.add(other)
-      else
-        [other].to_set
-      end
-    Union.new(new_caps, terms, anti_terms, intersects)
-  end
-
   def unite(other : Nominal)
     # No change if we've already united with this type.
     return self if terms && terms.not_nil!.includes?(other)
@@ -263,7 +228,7 @@ struct Savi::Compiler::TInfer::MetaType::Union
       else
         [other].to_set
       end
-    Union.new(caps, new_terms, anti_terms, intersects)
+    Union.new(new_terms, anti_terms, intersects)
   end
 
   def unite(other : AntiNominal)
@@ -286,7 +251,7 @@ struct Savi::Compiler::TInfer::MetaType::Union
       else
         [other].to_set
       end
-    Union.new(caps, terms, new_anti_terms, intersects)
+    Union.new(terms, new_anti_terms, intersects)
   end
 
   def unite(other : Intersection)
@@ -300,17 +265,13 @@ struct Savi::Compiler::TInfer::MetaType::Union
       else
         [other].to_set
       end
-    Union.new(caps, terms, anti_terms, new_intersects)
+    Union.new(terms, anti_terms, new_intersects)
   end
 
   def unite(other : Union)
     # Intersect each individual term of other into this running union.
     # If the result becomes Unconstrained, return so immediately.
     result : Inner = self
-    other.caps.not_nil!.each do |term|
-      result = result.unite(term)
-      return result if result.is_a?(Unconstrained)
-    end if other.caps
     other.terms.not_nil!.each do |term|
       result = result.unite(term)
       return result if result.is_a?(Unconstrained)
@@ -347,33 +308,27 @@ struct Savi::Compiler::TInfer::MetaType::Union
     raise NotImplementedError.new("#{self} with_additional_type_arg!")
   end
 
-  def substitute_type_params_retaining_cap(
+  def substitute_type_params(
     type_params : Array(TypeParam),
     type_args : Array(MetaType)
   ) : Inner
     result = Unsatisfiable.instance
 
-    caps.try(&.each { |cap|
-      result = result.unite(
-        cap.substitute_type_params_retaining_cap(type_params, type_args)
-      )
-    })
-
     terms.try(&.each { |term|
       result = result.unite(
-        term.substitute_type_params_retaining_cap(type_params, type_args)
+        term.substitute_type_params(type_params, type_args)
       )
     })
 
     anti_terms.try(&.each { |anti_term|
       result = result.unite(
-        anti_term.substitute_type_params_retaining_cap(type_params, type_args)
+        anti_term.substitute_type_params(type_params, type_args)
       )
     })
 
     intersects.try(&.each { |intersect|
       result = result.unite(
-        intersect.substitute_type_params_retaining_cap(type_params, type_args)
+        intersect.substitute_type_params(type_params, type_args)
       )
     })
 
@@ -388,10 +343,6 @@ struct Savi::Compiler::TInfer::MetaType::Union
 
   def substitute_each_type_alias_in_first_layer(&block : ReifiedTypeAlias -> MetaType) : Inner
     result = Unsatisfiable.instance
-
-    caps.try(&.each { |cap|
-      result = result.unite(cap.substitute_each_type_alias_in_first_layer(&block))
-    })
 
     terms.try(&.each { |term|
       result = result.unite(term.substitute_each_type_alias_in_first_layer(&block))
@@ -408,58 +359,20 @@ struct Savi::Compiler::TInfer::MetaType::Union
     result
   end
 
-  def is_sendable?
-    (!caps || caps.not_nil!.all?(&.is_sendable?)) &&
-    (!terms || terms.not_nil!.all?(&.is_sendable?)) &&
-    (!anti_terms || anti_terms.not_nil!.all?(&.is_sendable?)) &&
-    (!intersects || intersects.not_nil!.all?(&.is_sendable?)) &&
-    true
-  end
-
-  def safe_to_match_as?(ctx : Context, other) : Bool?
-    all_terms.each do |term|
-      case term.safe_to_match_as?(ctx, other)
-      when true  then return true
-      when false then return false
-      when nil   then next
-      end
-    end
-    nil
-  end
-
-  def viewed_from(origin)
-    raise NotImplementedError.new("#{origin.inspect}->#{self.inspect}") \
-      if anti_terms
-
-    result = Unsatisfiable::INSTANCE
-    caps.not_nil!.each do |cap|
-      result = result.unite(cap.viewed_from(origin))
-    end if caps
-    terms.not_nil!.each do |term|
-      result = result.unite(term.viewed_from(origin))
-    end if terms
-    intersects.not_nil!.each do |intersect|
-      result = result.unite(intersect.viewed_from(origin))
-    end if intersects
-    result
-  end
-
-  def subtype_of?(ctx : Context, other : (Capability | Nominal | AntiNominal | Intersection)) : Bool
+  def subtype_of?(ctx : Context, other : (Nominal | AntiNominal | Intersection)) : Bool
     # This union is a subtype of the other if and only if
     # all terms in the union are subtypes of that other.
     result = true
-    result &&= caps.not_nil!.all?(&.subtype_of?(ctx, other)) if caps
     result &&= terms.not_nil!.all?(&.subtype_of?(ctx, other)) if terms
     result &&= anti_terms.not_nil!.all?(&.subtype_of?(ctx, other)) if anti_terms
     result &&= intersects.not_nil!.all?(&.subtype_of?(ctx, other)) if intersects
     result
   end
 
-  def supertype_of?(ctx : Context, other : (Capability | Nominal | AntiNominal | Intersection)) : Bool
+  def supertype_of?(ctx : Context, other : (Nominal | AntiNominal | Intersection)) : Bool
     # This union is a supertype of the given other if and only if
     # any term in the union qualifies as a supertype of that other.
     result = false
-    result ||= caps.not_nil!.any?(&.supertype_of?(ctx, other)) if caps
     result ||= terms.not_nil!.any?(&.supertype_of?(ctx, other)) if terms
     result ||= anti_terms.not_nil!.any?(&.supertype_of?(ctx, other)) if anti_terms
     result ||= intersects.not_nil!.any?(&.supertype_of?(ctx, other)) if intersects
@@ -470,7 +383,6 @@ struct Savi::Compiler::TInfer::MetaType::Union
     # This union is a subtype of the given other union if and only if
     # all terms in the union are subtypes of that other.
     result = true
-    result &&= caps.not_nil!.all?(&.subtype_of?(ctx, other)) if caps
     result &&= terms.not_nil!.all?(&.subtype_of?(ctx, other)) if terms
     result &&= anti_terms.not_nil!.all?(&.subtype_of?(ctx, other)) if anti_terms
     result &&= intersects.not_nil!.all?(&.subtype_of?(ctx, other)) if intersects
@@ -493,7 +405,6 @@ struct Savi::Compiler::TInfer::MetaType::Union
     # This union satisfies the given bound if and only if
     # all terms in the union satisfy the bound.
     result = true
-    result &&= caps.not_nil!.all?(&.satisfies_bound?(ctx, bound)) if caps
     result &&= terms.not_nil!.all?(&.satisfies_bound?(ctx, bound)) if terms
     result &&= anti_terms.not_nil!.all?(&.satisfies_bound?(ctx, bound)) if anti_terms
     result &&= intersects.not_nil!.all?(&.satisfies_bound?(ctx, bound)) if intersects

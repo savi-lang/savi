@@ -70,7 +70,7 @@ module Savi::Compiler::TInfer
         span = span.deciding_partial_reify_index(0)
       end
 
-      span.transform_mt(&.substitute_type_params_retaining_cap(type_params, args))
+      span.transform_mt(&.substitute_type_params(type_params, args))
     end
   end
 
@@ -86,20 +86,14 @@ module Savi::Compiler::TInfer
         span = span.deciding_partial_reify_index(0)
       end
 
-      span.transform_mt(&.substitute_type_params_retaining_cap(type_params, args))
+      span.transform_mt(&.substitute_type_params(type_params, args))
     end
   end
 
   struct FuncAnalysis < Analysis
     getter! pre_infer : PreTInfer::Analysis
     protected setter pre_infer
-
-    getter! func_partial_reification_sets : Hash(Cap, Hash(Array(Cap), Int32))
-    protected setter func_partial_reification_sets
-
-    getter! func_partial_reification_sets_size : Int32
-    protected setter func_partial_reification_sets_size
-
+    
     getter! func_partial_reifications : Array(MetaType)
     protected setter func_partial_reifications
 
@@ -213,7 +207,7 @@ module Savi::Compiler::TInfer
       # Fast path for the case of no type arguments present.
       return span if args.empty?
 
-      span.transform_mt(&.substitute_type_params_retaining_cap(type_params, args))
+      span.transform_mt(&.substitute_type_params(type_params, args))
     end
   end
 
@@ -377,7 +371,7 @@ module Savi::Compiler::TInfer
             orig_mt = mt
             while true
               rt = mt.single_rt_or_rta!
-              mt = mt.substitute_type_params_retaining_cap(infer.type_params, rt.args)
+              mt = mt.substitute_type_params(infer.type_params, rt.args)
               break if mt == orig_mt
               orig_mt = mt
             end
@@ -649,7 +643,7 @@ module Savi::Compiler::TInfer
           refine_span = resolve(ctx, cond_info.refine_type)
 
           span.combine_mt(refine_span) { |mt, refine_mt|
-            mt.substitute_type_params_retaining_cap([type_param], [
+            mt.substitute_type_params([type_param], [
               MetaType.new_type_param(type_param).intersect(refine_mt)
             ])
           }

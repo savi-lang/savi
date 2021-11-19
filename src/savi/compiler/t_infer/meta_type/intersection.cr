@@ -1,10 +1,9 @@
 struct Savi::Compiler::TInfer::MetaType::Intersection
-  getter cap : Capability?
   getter terms : Set(Nominal)?
   getter anti_terms : Set(AntiNominal)?
 
-  def initialize(@cap = nil, @terms = nil, @anti_terms = nil)
-    count = cap ? 1 : 0
+  def initialize(@terms = nil, @anti_terms = nil)
+    count = 0
     count += terms.try(&.size) || 0
     count += anti_terms.try(&.size) || 0
 
@@ -14,40 +13,29 @@ struct Savi::Compiler::TInfer::MetaType::Intersection
     raise "empty anti_terms" if anti_terms && anti_terms.try(&.empty?)
   end
 
-  def ignores_cap?
-    terms.try(&.any?(&.ignores_cap?))
-  end
-
   # This function works like .new, but it accounts for cases where there
   # aren't enough terms and anti-terms to build a real Intersection.
   # Returns Unconstrained if no terms or anti-terms are supplied.
   def self.build(
-    cap : Capability? = nil,
     terms : Set(Nominal)? = nil,
     anti_terms : Set(AntiNominal)? = nil,
   ) : Inner
-    count = cap ? 1 : 0
+    count = 0
     count += terms.try(&.size) || 0
     count += anti_terms.try(&.size) || 0
 
     case count
     when 0 then Unconstrained.instance
     when 1
-      cap || terms.try(&.first?) || anti_terms.not_nil!.first
+      terms.try(&.first?) || anti_terms.not_nil!.first
     else
       terms = nil if terms && terms.empty?
       anti_terms = nil if anti_terms && anti_terms.empty?
-      new(cap, terms, anti_terms)
+      new(terms, anti_terms)
     end
   end
 
   def inspect(io : IO)
-    # If this intersection is just a term and capability, print abbreviated.
-    if cap && terms.try(&.size) == 1 && anti_terms.nil?
-      terms.not_nil!.first.inspect(io)
-      return
-    end
-
     first = true
     io << "("
 
@@ -78,7 +66,7 @@ struct Savi::Compiler::TInfer::MetaType::Intersection
     infer : Visitor?,
     name : String
   ) : Span
-    span = Span.simple(MetaType.new(cap || Unconstrained.instance))
+    span = Span.simple(MetaType.new(Unconstrained.instance))
 
     terms.try { |terms|
       term_spans = terms.map(&.gather_call_receiver_span(ctx, pos, infer, name))
@@ -109,6 +97,7 @@ struct Savi::Compiler::TInfer::MetaType::Intersection
           # Replace the inner term with an inner of this intersection.
           # This will be used for subtype checking later, and we want to
           # make sure that our cap will be taken into account, if any.
+          # TODO: Can this be removed now that we are ignoring caps?
           list << {MetaType.new(self), defn, func}
         end
       end
@@ -145,13 +134,12 @@ struct Savi::Compiler::TInfer::MetaType::Intersection
     # De Morgan's Law:
     # The negation of an intersection is the union of negations of its terms.
 
-    new_cap = cap.try(&.negate)
     new_terms = anti_terms.try(&.map(&.negate).to_set) || Set(Nominal).new
     new_anti_terms = terms.try(&.map(&.negate).to_set) || Set(AntiNominal).new
     new_terms = nil if new_terms.empty?
     new_anti_terms = nil if new_anti_terms.empty?
 
-    Union.new(new_cap, new_terms, new_anti_terms)
+    Union.new(new_terms, new_anti_terms)
   end
 
   def intersect(other : Unconstrained)
@@ -160,17 +148,6 @@ struct Savi::Compiler::TInfer::MetaType::Intersection
 
   def intersect(other : Unsatisfiable)
     other
-  end
-
-  def intersect(other : Capability)
-    # As a small optimization, we can ignore this if any of our terms does.
-    return self if ignores_cap?
-
-    new_cap = cap.try(&.intersect(other)) || other
-    return self if new_cap == cap
-    return new_cap if new_cap.is_a?(Unsatisfiable)
-
-    Intersection.new(new_cap, terms, anti_terms)
   end
 
   def intersect(other : Nominal)
@@ -192,7 +169,7 @@ struct Savi::Compiler::TInfer::MetaType::Intersection
       else
         [other].to_set
       end
-    Intersection.new(cap, new_terms, anti_terms)
+    Intersection.new(new_terms, anti_terms)
   end
 
   def intersect(other : AntiNominal)
@@ -210,17 +187,13 @@ struct Savi::Compiler::TInfer::MetaType::Intersection
       else
         [other].to_set
       end
-    Intersection.new(cap, terms, new_anti_terms)
+    Intersection.new(terms, new_anti_terms)
   end
 
   def intersect(other : Intersection)
     # Intersect each individual term of other into this running intersection.
     # If the result becomes Unsatisfiable, return so immediately.
     result = self
-    other.cap.try do |cap|
-      result = result.intersect(cap)
-      return result if result.is_a?(Unsatisfiable)
-    end
     other.terms.not_nil!.each do |term|
       result = result.intersect(term)
       return result if result.is_a?(Unsatisfiable)
@@ -246,22 +219,18 @@ struct Savi::Compiler::TInfer::MetaType::Intersection
     self
   end
 
-  def unite(other : Capability)
-    Union.new([other].to_set, nil, nil, [self].to_set)
-  end
-
   def unite(other : Nominal)
-    Union.new(nil, [other].to_set, nil, [self].to_set)
+    Union.new([other].to_set, nil, [self].to_set)
   end
 
   def unite(other : AntiNominal)
-    Union.new(nil, nil, [other].to_set, [self].to_set)
+    Union.new(nil, [other].to_set, [self].to_set)
   end
 
   def unite(other : Intersection)
     return self if self == other
 
-    Union.new(nil, nil, nil, [self, other].to_set)
+    Union.new(nil, nil, [self, other].to_set)
   end
 
   def unite(other : Union)
@@ -287,24 +256,24 @@ struct Savi::Compiler::TInfer::MetaType::Intersection
       unless terms && terms.size == 1 && anti_terms.nil?
 
     new_terms = terms.map(&.with_additional_type_arg!(arg)).to_set
-    Intersection.new(cap, new_terms, anti_terms)
+    Intersection.new(new_terms, anti_terms)
   end
 
-  def substitute_type_params_retaining_cap(
+  def substitute_type_params(
     type_params : Array(TypeParam),
     type_args : Array(MetaType)
   ) : Inner
-    result = cap || Unconstrained.instance
+    result = Unconstrained.instance
 
     terms.try(&.each { |term|
       result = result.intersect(
-        term.substitute_type_params_retaining_cap(type_params, type_args)
+        term.substitute_type_params(type_params, type_args)
       )
     })
 
     anti_terms.try(&.each { |anti_term|
       result = result.intersect(
-        anti_term.substitute_type_params_retaining_cap(type_params, type_args)
+        anti_term.substitute_type_params(type_params, type_args)
       )
     })
 
@@ -317,7 +286,7 @@ struct Savi::Compiler::TInfer::MetaType::Intersection
   end
 
   def substitute_each_type_alias_in_first_layer(&block : ReifiedTypeAlias -> MetaType) : Inner
-    result = cap || Unconstrained.instance
+    result = Unconstrained.instance
 
     terms.try(&.each { |term|
       result = result.intersect(term.substitute_each_type_alias_in_first_layer(&block))
@@ -330,50 +299,7 @@ struct Savi::Compiler::TInfer::MetaType::Intersection
     result
   end
 
-  def is_sendable?
-    cap.try(&.is_sendable?) || ignores_cap? || false
-  end
-
-  def safe_to_match_as?(ctx : Context, other) : Bool?
-    terms.try(&.each { |term|
-      return nil unless term.supertype_of?(ctx, other)
-    })
-    anti_terms.try(&.each { |anti_term|
-      return nil unless anti_term.supertype_of?(ctx, other)
-    })
-    cap.try { |cap|
-      return false unless cap.supertype_of?(ctx, other)
-    }
-    true
-  end
-
-  def viewed_from(origin)
-    raise NotImplementedError.new("#{origin.inspect}->(nil cap)") unless cap
-
-    Intersection.new(Capability::NON, terms, anti_terms)
-      .intersect(cap.not_nil!.viewed_from(origin))
-  end
-
-  def subtype_of?(ctx : Context, other : Capability) : Bool
-    # This intersection is a subtype of the given capability if and only if
-    # it has a capability as part of the intersection, and that capability
-    # is a subtype of the given capability.
-    cap.try(&.subtype_of?(ctx, other)) || ignores_cap? || false
-  end
-
-  def supertype_of?(ctx : Context, other : Capability) : Bool
-    # If we have terms or anti-terms, we can't possibly be a supertype of other,
-    # because a capability can never be a subtype of a nominal or anti-nominal.
-    return false if terms || anti_terms
-
-    raise NotImplementedError.new([self, :supertype_of?, other].inspect)
-  end
-
   def subtype_of?(ctx : Context, other : Nominal) : Bool
-    # Note that no matter if we have a capability restriction or not,
-    # it doesn't factor into us considering whether we're a subtype of
-    # the given nominal or not - a nominal says nothing about capabilities.
-
     # We don't handle anti-terms here yet. Error if they are present.
     raise NotImplementedError.new("intersection subtyping with anti terms") \
       if anti_terms
@@ -401,10 +327,6 @@ struct Savi::Compiler::TInfer::MetaType::Intersection
   end
 
   def supertype_of?(ctx : Context, other : Nominal) : Bool
-    # If we have a capability restriction, we can't possibly be a supertype of
-    # other, because a nominal says nothing about capabilities.
-    return false if cap && !other.ignores_cap?
-
     # We don't handle anti-terms here yet. Error if they are present.
     raise NotImplementedError.new("intersection supertyping with anti terms") \
       if anti_terms
@@ -427,12 +349,6 @@ struct Savi::Compiler::TInfer::MetaType::Intersection
 
   def subtype_of?(ctx : Context, other : Intersection) : Bool
     return true if self == other
-
-    # Firstly, our cap must be a subtype of the other cap (if present).
-    return false if other.cap && (
-      !cap ||
-      !cap.not_nil!.subtype_of?(ctx, other.cap.not_nil!)
-    ) && !ignores_cap?
 
     # We don't handle anti-terms here yet. Error if they are present.
     raise NotImplementedError.new("intersection subtyping with anti terms") \
@@ -478,15 +394,8 @@ struct Savi::Compiler::TInfer::MetaType::Intersection
     other.subtype_of?(ctx, self) # delegate to the other class via symmetry
   end
 
-  def satisfies_bound?(ctx : Context, bound : Capability) : Bool
-    # This intersection satisfies the given capability bound if and only if
-    # it has a capability as part of the intersection, and that capability
-    # satisfies the given capability bound.
-    cap.try(&.satisfies_bound?(ctx, bound)) || false
-  end
-
   def satisfies_bound?(ctx : Context, bound : Nominal) : Bool
-    # This intersection satisfies the given capability bound if and only if
+    # This intersection satisfies the given nominal bound if and only if
     # it has at least one term that satisfies the given nominal bound.
     terms.try do |terms|
       terms.each do |term|
@@ -497,11 +406,6 @@ struct Savi::Compiler::TInfer::MetaType::Intersection
   end
 
   def satisfies_bound?(ctx : Context, bound : Intersection) : Bool
-    # If the bound has a cap, then we must have a cap that satisfies it.
-    bound.cap.try do |bound_cap|
-      return false unless cap.try(&.satisfies_bound?(ctx, bound_cap))
-    end unless ignores_cap?
-
     # If the bound has terms, then we must satisfy each term.
     bound.terms.try do |bound_terms|
       bound_terms.each do |bound_term|

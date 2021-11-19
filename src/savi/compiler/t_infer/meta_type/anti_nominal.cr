@@ -52,16 +52,12 @@ struct Savi::Compiler::TInfer::MetaType::AntiNominal
     other
   end
 
-  def intersect(other : Capability)
-    Intersection.new(other, nil, [self].to_set)
-  end
-
   def intersect(other : Nominal)
     # Unsatisfiable if the nominal and anti-nominal types are identical.
     return Unsatisfiable.instance if defn == other.defn
 
     # Otherwise, this is a new intersection of the two types.
-    Intersection.new(nil, [other].to_set, [self].to_set)
+    Intersection.new([other].to_set, [self].to_set)
   end
 
   def intersect(other : AntiNominal)
@@ -69,7 +65,7 @@ struct Savi::Compiler::TInfer::MetaType::AntiNominal
     return self if defn == other.defn
 
     # Otherwise, this is a new intersection of the two types.
-    Intersection.new(nil, nil, [self, other].to_set)
+    Intersection.new(nil, [self, other].to_set)
   end
 
   def intersect(other : (Intersection | Union))
@@ -84,16 +80,12 @@ struct Savi::Compiler::TInfer::MetaType::AntiNominal
     self
   end
 
-  def unite(other : Capability)
-    Union.new([other].to_set, nil, [self].to_set)
-  end
-
   def unite(other : Nominal)
     # Unconstrained if the nominal and anti-nominal types are identical.
     return Unconstrained.instance if defn == other.defn
 
     # Otherwise, this is a new union of the two types.
-    Union.new(nil, [other].to_set, [self].to_set)
+    Union.new([other].to_set, [self].to_set)
   end
 
   def unite(other : AntiNominal)
@@ -104,7 +96,7 @@ struct Savi::Compiler::TInfer::MetaType::AntiNominal
     return Unconstrained.instance if is_concrete? && other.is_concrete?
 
     # Otherwise, this is a new union of the two types.
-    Union.new(nil, nil, [self, other].to_set)
+    Union.new(nil, [self, other].to_set)
   end
 
   def unite(other : (Intersection | Union))
@@ -124,7 +116,7 @@ struct Savi::Compiler::TInfer::MetaType::AntiNominal
     raise NotImplementedError.new("#{self} with_additional_type_arg!")
   end
 
-  def substitute_type_params_retaining_cap(
+  def substitute_type_params(
     type_params : Array(TypeParam),
     type_args : Array(MetaType)
   ) : Inner
@@ -135,13 +127,13 @@ struct Savi::Compiler::TInfer::MetaType::AntiNominal
       index ? type_args[index].strip_cap.inner.negate : self
     when ReifiedType
       args = defn.args.map do |arg|
-        arg.substitute_type_params_retaining_cap(type_params, type_args).as(MetaType)
+        arg.substitute_type_params(type_params, type_args).as(MetaType)
       end
 
       AntiNominal.new(ReifiedType.new(defn.link, args))
     when ReifiedTypeAlias
       args = defn.args.map do |arg|
-        arg.substitute_type_params_retaining_cap(type_params, type_args).as(MetaType)
+        arg.substitute_type_params(type_params, type_args).as(MetaType)
       end
 
       AntiNominal.new(ReifiedTypeAlias.new(defn.link, args))
@@ -157,32 +149,6 @@ struct Savi::Compiler::TInfer::MetaType::AntiNominal
   def substitute_each_type_alias_in_first_layer(&block : ReifiedTypeAlias -> MetaType) : Inner
     defn = defn()
     defn.is_a?(ReifiedTypeAlias) ? block.call(defn).inner.negate : self
-  end
-
-  def is_sendable?
-    # An anti-nominal is never itself sendable -
-    # it excludes a single nominal, and says nothing about capabilities.
-    false
-  end
-
-  def safe_to_match_as?(ctx : Context, other) : Bool?
-    raise NotImplementedError.new("#{self.inspect} safe_to_match_as?")
-  end
-
-  def viewed_from(origin)
-    raise NotImplementedError.new("#{origin.inspect}->#{self.inspect}")
-  end
-
-  def subtype_of?(ctx : Context, other : Capability) : Bool
-    # An anti-nominal can never be a subtype of any capability -
-    # it excludes a single nominal, and says nothing about capabilities.
-    false
-  end
-
-  def supertype_of?(ctx : Context, other : Capability) : Bool
-    # An anti-nominal can never be a supertype of any capability -
-    # it excludes a single nominal, and says nothing about capabilities.
-    false
   end
 
   def subtype_of?(ctx : Context, other : Nominal) : Bool

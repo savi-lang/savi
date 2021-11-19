@@ -10,7 +10,6 @@ class Savi::Compiler::TTypeCheck
   alias ReifiedTypeAlias = TInfer::ReifiedTypeAlias
   alias ReifiedType = TInfer::ReifiedType
   alias ReifiedFunction = TInfer::ReifiedFunction
-  alias Cap = TInfer::Cap
   alias Info = TInfer::Info
 
   def initialize

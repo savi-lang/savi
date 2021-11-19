@@ -62,7 +62,7 @@ class Savi::Compiler::TInfer::MetaType::Unsatisfiable
     raise NotImplementedError.new("#{self} with_additional_type_arg!")
   end
 
-  def substitute_type_params_retaining_cap(
+  def substitute_type_params(
     type_params : Array(TypeParam),
     type_args : Array(MetaType)
   ) : Inner
@@ -75,20 +75,6 @@ class Savi::Compiler::TInfer::MetaType::Unsatisfiable
 
   def substitute_each_type_alias_in_first_layer(&block : ReifiedTypeAlias -> MetaType) : Inner
     self # to type aliases are present to be substituted
-  end
-
-  def is_sendable?
-    # Unsatisfiable is never sendable - it cannot exist at all.
-    # TODO: is this right? it seems so, but breaks symmetry with Unconstrained.
-    false
-  end
-
-  def safe_to_match_as?(ctx : Context, other) : Bool?
-    raise NotImplementedError.new("#{self.inspect} safe_to_match_as?")
-  end
-
-  def viewed_from(origin)
-    raise NotImplementedError.new("#{origin.inspect}->#{self.inspect}")
   end
 
   def subtype_of?(ctx : Context, other : Inner) : Bool
