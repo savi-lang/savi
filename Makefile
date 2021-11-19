@@ -21,7 +21,7 @@ test: PHONY $(SPEC)
 	echo && $(SPEC) $(extra_args)
 
 # Run a narrow target within the test suite.
-test.narrow: PHONY
+test.narrow: PHONY $(SPEC)
 	echo && $(SPEC) -v -e "$(target)"
 
 # Run the given compiler-spec target.
