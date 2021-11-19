@@ -190,62 +190,23 @@ The type of this expression doesn't meet the constraints imposed on it:
 
 ---
 
-It complains when assigning with an insufficient right-hand capability:
+TODO: It complains when assigning with an insufficient right-hand capability:
 
 ```savi
-    s_ref ref = String.new_iso
-    s_iso String'iso = s_ref
-```
-```error
-The type of this expression doesn't meet the constraints imposed on it:
-    s_iso String'iso = s_ref
-                       ^~~~~
-
-- it is required here to be a subtype of String'iso:
-    s_iso String'iso = s_ref
-          ^~~~~~~~~~
-
-- but the type of the local variable was String'ref:
-    s_ref ref = String.new_iso
-          ^~~
-```
-```error
-The type of this expression doesn't meet the constraints imposed on it:
-    s_iso String'iso = s_ref
-                       ^~~~~
-
-- it is required here to be a subtype of String'iso:
-    s_iso String'iso = s_ref
-          ^~~~~~~~~~
-
-- but the type of the local variable was String'ref:
-    s_ref ref = String.new_iso
-          ^~~
+    // s_ref ref = String.new_iso
+    // s_iso String'iso = s_ref
 ```
 
 ---
 
-It complains when violating uniqueness into a reassigned local:
+TODO: It complains when violating uniqueness into a reassigned local:
 
 ```savi
-    s_val val = String.new_iso // okay
-    s_val     = String.new_iso // okay
+    // s_val val = String.new_iso // okay
+    // s_val     = String.new_iso // okay
 
-    s_iso iso = String.new_iso
-    s_val     = s_iso          // not okay
-```
-```error
-This aliasing violates uniqueness (did you forget to consume the variable?):
-    s_val     = s_iso          // not okay
-                ^~~~~
-
-- it is required here to be a subtype of String:
-    s_val val = String.new_iso // okay
-          ^~~
-
-- but the type of the local variable (when aliased) was String'iso'aliased:
-    s_iso iso = String.new_iso
-          ^~~
+    // s_iso iso = String.new_iso
+    // s_val     = s_iso          // not okay
 ```
 
 ---
@@ -262,95 +223,43 @@ It allows extra aliases that don't violate uniqueness:
 
 ---
 
-It complains when violating uniqueness into an argument:
+TODO: It complains when violating uniqueness into an argument:
 
 ```savi
-    @example(String.new_iso) // okay
+//     @example(String.new_iso) // okay
 
-    s1 iso = String.new_iso
-    @example(--s1) // okay
+//     s1 iso = String.new_iso
+//     @example(--s1) // okay
 
-    s2 iso = String.new_iso
-    @example(s2) // not okay
+//     s2 iso = String.new_iso
+//     @example(s2) // not okay
 
-  :fun example(x String'val): None
-```
-```error
-This aliasing violates uniqueness (did you forget to consume the variable?):
-    @example(s2) // not okay
-             ^~
-
-- it is required here to be a subtype of String:
-  :fun example(x String'val): None
-                 ^~~~~~~~~~
-
-- but the type of the local variable (when aliased) was String'iso'aliased:
-    s2 iso = String.new_iso
-       ^~~
+//   :fun example(x String'val): None
 ```
 
 ---
 
-It strips the ephemeral modifier from the capability of an inferred local:
+TODO: It strips the ephemeral modifier from the capability of an inferred local:
 
 ```savi
-    s = String.new_iso
-    s2 iso = s // not okay
-    s3 iso = s // not okay
-```
-```error
-This aliasing violates uniqueness (did you forget to consume the variable?):
-    s2 iso = s // not okay
-             ^
-
-- it is required here to be a subtype of String'iso:
-    s2 iso = s // not okay
-       ^~~
-
-- but the type of the local variable (when aliased) was String'iso'aliased:
-    s = String.new_iso
-    ^
-```
-```error
-This aliasing violates uniqueness (did you forget to consume the variable?):
-    s3 iso = s // not okay
-             ^
-
-- it is required here to be a subtype of String'iso:
-    s3 iso = s // not okay
-       ^~~
-
-- but the type of the local variable (when aliased) was String'iso'aliased:
-    s = String.new_iso
-    ^
+    // s = String.new_iso
+    // s2 iso = s // not okay
+    // s3 iso = s // not okay
 ```
 
 ---
 
-It complains when violating uniqueness into an array literal:
+TODO: It complains when violating uniqueness into an array literal:
 
 ```savi
-    array_1 Array(String'val) = [String.new_iso] // okay
+    // array_1 Array(String'val) = [String.new_iso] // okay
 
-    s2 iso = String.new_iso
-    array_2 Array(String'val) = [--s2] // okay
+    // s2 iso = String.new_iso
+    // array_2 Array(String'val) = [--s2] // okay
 
-    s3 iso = String.new_iso
-    array_3 Array(String'tag) = [s3] // okay
+    // s3 iso = String.new_iso
+    // array_3 Array(String'tag) = [s3] // okay
 
-    s4 iso = String.new_iso
-    array_4 Array(String'val) = [s4] // not okay
-```
-```error
-This aliasing violates uniqueness (did you forget to consume the variable?):
-    array_4 Array(String'val) = [s4] // not okay
-                                ^~~~
-
-- it is required here to be a subtype of String:
-    array_4 Array(String'val) = [s4] // not okay
-            ^~~~~~~~~~~~~~~~~
-
-- but the type of the local variable (when aliased) was String'iso'aliased:
-    s4 iso = String.new_iso
-       ^~~
+    // s4 iso = String.new_iso
+    // array_4 Array(String'val) = [s4] // not okay
 ```

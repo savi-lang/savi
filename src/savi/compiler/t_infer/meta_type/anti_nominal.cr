@@ -9,7 +9,6 @@ struct Savi::Compiler::TInfer::MetaType::AntiNominal
   def inspect(io : IO)
     io << "-"
     io << defn.link.name
-    io << "'any"
   end
 
   def each_reachable_defn(ctx : Context) : Array(ReifiedType)

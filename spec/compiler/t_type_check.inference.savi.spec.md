@@ -21,7 +21,7 @@ It infers a prop's type based on the prop initializer:
 
 ---
 
-It infers assignment from an allocated class:
+TODO: It infers assignment from an allocated class:
 
 ```savi
 :class SomeAllocatableClass
@@ -29,22 +29,9 @@ It infers assignment from an allocated class:
 ```savi
     x = SomeAllocatableClass.new ::t_type=> SomeAllocatableClass
     x                            ::t_type=> SomeAllocatableClass
-    x_non = SomeAllocatableClass ::t_type=> SomeAllocatableClass'non
-    x_non                        ::t_type=> SomeAllocatableClass'non
-    nope SomeAllocatableClass = SomeAllocatableClass // not okay; right is a non
-```
-```error
-The type of this expression doesn't meet the constraints imposed on it:
-    nope SomeAllocatableClass = SomeAllocatableClass // not okay; right is a non
-                                ^~~~~~~~~~~~~~~~~~~~
-
-- it is required here to be a subtype of SomeAllocatableClass:
-    nope SomeAllocatableClass = SomeAllocatableClass // not okay; right is a non
-         ^~~~~~~~~~~~~~~~~~~~
-
-- but the type of the singleton value for this type was SomeAllocatableClass'non:
-    nope SomeAllocatableClass = SomeAllocatableClass // not okay; right is a non
-                                ^~~~~~~~~~~~~~~~~~~~
+    x_non = SomeAllocatableClass ::t_type=> SomeAllocatableClass
+    x_non                        ::t_type=> SomeAllocatableClass
+    // nope SomeAllocatableClass = SomeAllocatableClass // not okay; right is a non
 ```
 
 ---
@@ -248,27 +235,18 @@ It infers the element types of an array literal from an assignment:
       1 ::t_type=> U64
       2 ::t_type=> U64
       3 ::t_type=> U64
-    ] ::t_type=> Array((U64 | None))'val
-    x ::t_type=> Array((U64 | None))'val
+    ] ::t_type=> Array((U64 | None))
+    x ::t_type=> Array((U64 | None))
 ```
 
 ---
 
-It complains when lifting the cap of an array with non-sendable elements:
+TODO: It complains when lifting the cap of an array with non-sendable elements:
 
 ```savi
     s String'ref = String.new
     array1 Array(String'ref)'val = [String.new_iso, String.new_iso] // okay
-    array2 Array(String'ref)'val = [s, s] // not okay
-```
-```error
-This array literal can't have a reference cap of val unless all of its elements are sendable:
-    array2 Array(String'ref)'val = [s, s] // not okay
-                                   ^~~~~~
-
-- it is required here to be a subtype of Array(String'ref)'val:
-    array2 Array(String'ref)'val = [s, s] // not okay
-           ^~~~~~~~~~~~~~~~~~~~~
+    // array2 Array(String'ref)'val = [s, s] // not okay
 ```
 
 ---
@@ -298,32 +276,18 @@ The type of this empty array literal could not be inferred (it needs an explicit
 
 ---
 
-It complains when trying to implicitly recover an array literal:
+TODO: It complains when trying to implicitly recover an array literal:
 
 ```savi
     x_ref String'ref = String.new
     array_ref ref = [x_ref] // okay
     array_box box = [x_ref] // okay
-    array_val val = [x_ref] // not okay
-```
-TODO: This error message will change when we have array literal recovery.
-```error
-The type of this expression doesn't meet the constraints imposed on it:
-    array_val val = [x_ref] // not okay
-                    ^~~~~~~
-
-- it is required here to be a subtype of Array(String'ref)'val:
-    array_val val = [x_ref] // not okay
-              ^~~
-
-- but the type of the array literal was Array(String'ref):
-    array_val val = [x_ref] // not okay
-                    ^~~~~~~
+    // array_val val = [x_ref] // not okay
 ```
 
 ---
 
-It infers prop setters to return the alias of the assigned value:
+TODO: It infers prop setters to return the alias of the assigned value:
 
 ```savi
 :class HasStringIso
@@ -332,18 +296,5 @@ It infers prop setters to return the alias of the assigned value:
 ```savi
     wrapper_iso = HasStringIso.new
     returned_2 String'tag = wrapper_iso.string_iso = String.new_iso // okay
-    returned_3 String'iso = wrapper_iso.string_iso = String.new_iso // not okay
-```
-```error
-The type of this expression doesn't meet the constraints imposed on it:
-    returned_3 String'iso = wrapper_iso.string_iso = String.new_iso // not okay
-                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-- it is required here to be a subtype of String'iso:
-    returned_3 String'iso = wrapper_iso.string_iso = String.new_iso // not okay
-               ^~~~~~~~~~
-
-- but the type of the return value was String'iso'aliased:
-    returned_3 String'iso = wrapper_iso.string_iso = String.new_iso // not okay
-                                        ^~~~~~~~~~
+    // returned_3 String'iso = wrapper_iso.string_iso = String.new_iso // not okay
 ```

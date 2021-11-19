@@ -35,19 +35,19 @@ describe Savi::Compiler::TInfer::MetaType do
     a4 = new_type.call("A4", true)
 
     # Negation of a nominal.
-    (-a1).inner.inspect.should eq "-A1'any"
+    (-a1).inner.inspect.should eq "-A1"
 
     # Negation of an anti-nominal.
-    (-(-a1)).inner.inspect.should eq "A1'any"
+    (-(-a1)).inner.inspect.should eq "A1"
 
     # Intersection of nominals.
-    (a1 & a2 & a3).inner.inspect.should eq "(A1'any & A2'any & A3'any)"
+    (a1 & a2 & a3).inner.inspect.should eq "(A1 & A2 & A3)"
 
     # Intersection of identical nominals.
-    (a1 & a1 & a1).inner.inspect.should eq "A1'any"
+    (a1 & a1 & a1).inner.inspect.should eq "A1"
 
     # Intersection of mixed non-identical and identical nominals.
-    (a1 & a2 & a1).inner.inspect.should eq "(A1'any & A2'any)"
+    (a1 & a2 & a1).inner.inspect.should eq "(A1 & A2)"
 
     # Intersection of concrete nominals.
     (c1 & c2 & c3).inner.inspect.should eq "<unsatisfiable>"
@@ -57,19 +57,19 @@ describe Savi::Compiler::TInfer::MetaType do
 
     # Intersection of some abstract nominals and a single concrete nominal.
     (a1 & a2 & c1 & a3).inner.inspect.should eq \
-      "(A1'any & A2'any & C1'any & A3'any)"
+      "(A1 & A2 & C1 & A3)"
 
     # Intersection of concrete anti-nominals.
     (-c1 & -c2 & -c3).inner.inspect.should eq \
-      "(-C1'any & -C2'any & -C3'any)"
+      "(-C1 & -C2 & -C3)"
 
     # Intersection of some abstract and some concrete anti-nominals.
     (-a1 & -a2 & -c1 & -c2).inner.inspect.should eq \
-      "(-A1'any & -A2'any & -C1'any & -C2'any)"
+      "(-A1 & -A2 & -C1 & -C2)"
 
     # Intersection of some abstract and a single concrete anti-nominal.
     (-a1 & -a2 & -c1 & -a3).inner.inspect.should eq \
-      "(-A1'any & -A2'any & -C1'any & -A3'any)"
+      "(-A1 & -A2 & -C1 & -A3)"
 
     # Intersection of a nominal and its anti-nominal.
     (a1 & -a1).inner.inspect.should eq "<unsatisfiable>"
@@ -78,24 +78,24 @@ describe Savi::Compiler::TInfer::MetaType do
     (a1 & a2 & a3 & -a1).inner.inspect.should eq "<unsatisfiable>"
 
     # Union of nominals.
-    (a1 | a2 | a3).inner.inspect.should eq "(A1'any | A2'any | A3'any)"
+    (a1 | a2 | a3).inner.inspect.should eq "(A1 | A2 | A3)"
 
     # Union of identical nominals.
-    (a1 | a1 | a1).inner.inspect.should eq "A1'any"
+    (a1 | a1 | a1).inner.inspect.should eq "A1"
 
     # Union of mixed non-identical and identical nominals.
-    (a1 | a2 | a1).inner.inspect.should eq "(A1'any | A2'any)"
+    (a1 | a2 | a1).inner.inspect.should eq "(A1 | A2)"
 
     # Union of concrete nominals.
-    (c1 | c2 | c3).inner.inspect.should eq "(C1'any | C2'any | C3'any)"
+    (c1 | c2 | c3).inner.inspect.should eq "(C1 | C2 | C3)"
 
     # Union of some abstract and some concrete nominals.
     (a1 | a2 | c1 | c2).inner.inspect.should eq \
-      "(A1'any | A2'any | C1'any | C2'any)"
+      "(A1 | A2 | C1 | C2)"
 
     # Union of some abstract and a single concrete nominal.
     (a1 | a2 | c1 | a3).inner.inspect.should eq \
-      "(A1'any | A2'any | C1'any | A3'any)"
+      "(A1 | A2 | C1 | A3)"
 
     # Union of concrete anti-nominals.
     (-c1 | -c2 | -c3).inner.inspect.should eq "<unconstrained>"
@@ -105,7 +105,7 @@ describe Savi::Compiler::TInfer::MetaType do
 
     # Union of some abstract and a single concrete anti-nominal.
     (-a1 | -a2 | -c1 | -a3).inner.inspect.should eq \
-      "(-A1'any | -A2'any | -C1'any | -A3'any)"
+      "(-A1 | -A2 | -C1 | -A3)"
 
     # Union of a nominal and its anti-nominal.
     (a1 | -a1).inner.inspect.should eq "<unconstrained>"
@@ -115,43 +115,43 @@ describe Savi::Compiler::TInfer::MetaType do
 
     # Union of nominals, anti-nominals, and intersections.
     (c1 | c2 | -a1 | -a2 | (a3 & c3) | (a4 & c4)).inner.inspect.should eq \
-      "((A3'any & C3'any) | (A4'any & C4'any) |" \
-      " -A1'any | -A2'any | C1'any | C2'any)"
+      "((A3 & C3) | (A4 & C4) |" \
+      " -A1 | -A2 | C1 | C2)"
 
     # Intersection of intersections.
     ((a1 & a2) & (a3 & a4)).inner.inspect.should eq \
-      "(A1'any & A2'any & A3'any & A4'any)"
+      "(A1 & A2 & A3 & A4)"
 
     # Union of unions.
     ((c1 | -a1 | (a3 & c3)) | (c2 | -a2 | (a4 & c4))).inner.inspect.should eq \
-      "((A3'any & C3'any) | (A4'any & C4'any) |" \
-      " -A1'any | -A2'any | C1'any | C2'any)" \
+      "((A3 & C3) | (A4 & C4) |" \
+      " -A1 | -A2 | C1 | C2)" \
 
     # Intersection of two simple unions.
     ((a1 | a2) & (a3 | a4)).inner.inspect.should eq \
-      "((A1'any & A3'any) | (A1'any & A4'any) |" \
-      " (A2'any & A3'any) | (A2'any & A4'any))"
+      "((A1 & A3) | (A1 & A4) |" \
+      " (A2 & A3) | (A2 & A4))"
 
     # Intersection of two complex unions.
     ((c1 | -a1 | (a3 & c3)) & (c2 | -a2 | (a4 & c4))).inner.inspect.should eq \
-      "((C2'any & -A1'any) | (-A1'any & -A2'any) |" \
-      " (A4'any & C4'any & -A1'any) | (C1'any & -A2'any) |" \
-      " (A3'any & C3'any & -A2'any))"
+      "((C2 & -A1) | (-A1 & -A2) |" \
+      " (A4 & C4 & -A1) | (C1 & -A2) |" \
+      " (A3 & C3 & -A2))"
 
     # Negation of an intersection.
     (-(a1 & -a2 & a3 & -a4)).inner.inspect.should eq \
-      "(-A1'any | -A3'any | A2'any | A4'any)"
+      "(-A1 | -A3 | A2 | A4)"
 
     # Negation of a union.
     (-(a1 | -a2 | a3 | -a4)).inner.inspect.should eq \
-      "(A2'any & A4'any & -A1'any & -A3'any)"
+      "(A2 & A4 & -A1 & -A3)"
 
     # Negation of a complex union.
     (-(c1 | c2 | -a1 | -a2 | (a3 & c3) | (a4 & c4))).inner.inspect.should eq \
-      "((A1'any & A2'any & -C1'any & -C2'any & -A3'any & -A4'any) |"\
-      " (A1'any & A2'any & -C1'any & -C2'any & -A3'any & -C4'any) |"\
-      " (A1'any & A2'any & -C1'any & -C2'any & -C3'any & -A4'any) |"\
-      " (A1'any & A2'any & -C1'any & -C2'any & -C3'any & -C4'any))"
+      "((A1 & A2 & -C1 & -C2 & -A3 & -A4) |"\
+      " (A1 & A2 & -C1 & -C2 & -A3 & -C4) |"\
+      " (A1 & A2 & -C1 & -C2 & -C3 & -A4) |"\
+      " (A1 & A2 & -C1 & -C2 & -C3 & -C4))"
   end
 
   it "implements the correct truth table for viewpoint adaptation" do

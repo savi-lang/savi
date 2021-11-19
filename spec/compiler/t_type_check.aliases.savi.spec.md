@@ -13,7 +13,7 @@ It allows type aliases to pass along type parameters:
 :alias GenericAlias(C, D String'read): GenericClass(C, D)
 ```
 ```savi
-    a = GenericAlias(U64, String'ref).new ::t_type=> GenericClass(U64, String'ref)
+    a = GenericAlias(U64, String'ref).new ::t_type=> GenericClass(U64, String)
 ```
 
 ---
@@ -30,10 +30,10 @@ It handles type-parameter-recursive type aliases:
       99
       [
         "Wow"
-        [1, 2, 3] ::t_type=> Array(MyData)'val
-      ]           ::t_type=> Array(MyData)'val
-    ]             ::t_type=> Array(MyData)'val
-    data ::t_type=> (String | U64 | Array(MyData)'val)
+        [1, 2, 3] ::t_type=> Array(MyData)
+      ]           ::t_type=> Array(MyData)
+    ]             ::t_type=> Array(MyData)
+    data ::t_type=> (String | U64 | Array(MyData))
 ```
 
 ---

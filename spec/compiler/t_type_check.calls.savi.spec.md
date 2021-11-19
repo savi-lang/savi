@@ -149,7 +149,7 @@ The 'hello' function can't be called on this receiver:
 
 ---
 
-It complains when calling with an insufficient receiver capability:
+TODO: It complains when calling with an insufficient receiver capability:
 
 ```savi
 :class FunRefMutate
@@ -157,57 +157,22 @@ It complains when calling with an insufficient receiver capability:
 ```
 ```savi
     mutatable box = FunRefMutate.new
-    mutatable.mutate
-```
-```error
-This function call doesn't meet subtyping requirements:
-    mutatable.mutate
-              ^~~~~~
-
-- the type FunRefMutate'box isn't a subtype of the required capability of 'ref':
-  :fun ref mutate: None
-       ^~~
+    // mutatable.mutate
 ```
 
 ---
 
-It complains with an extra hint when using insufficient capability of @:
+TODO: It complains with an extra hint when using insufficient capability of @:
 
 ```savi
 :class FunRefMutateFunReadOnly
   :fun ref mutate: None
-  :fun readonly: @mutate
-```
-```error
-This function call doesn't meet subtyping requirements:
-  :fun readonly: @mutate
-                  ^~~~~~
-
-- the type FunRefMutateFunReadOnly'box isn't a subtype of the required capability of 'ref':
-  :fun ref mutate: None
-       ^~~
-
-- this would be possible if the calling function were declared as `:fun ref`:
-  :fun readonly: @mutate
-       ^~~~~~~~
-```
-```error
-This function call doesn't meet subtyping requirements:
-  :fun readonly: @mutate
-                  ^~~~~~
-
-- the type FunRefMutateFunReadOnly'val isn't a subtype of the required capability of 'ref':
-  :fun ref mutate: None
-       ^~~
-
-- this would be possible if the calling function were declared as `:fun ref`:
-  :fun readonly: @mutate
-       ^~~~~~~~
+  // :fun readonly: @mutate
 ```
 
 ---
 
-It complains on auto-recovery for a val method receiver:
+TODO: It complains on auto-recovery for a val method receiver:
 
 ```savi
 :class FunValImmutableString
@@ -217,25 +182,12 @@ It complains on auto-recovery for a val method receiver:
 ```
 ```savi
     wrapper FunValImmutableString'iso = FunValImmutableString.new
-    string String'val = wrapper.immutable_string
-```
-```error
-This function call doesn't meet subtyping requirements:
-    string String'val = wrapper.immutable_string
-                                ^~~~~~~~~~~~~~~~
-
-- the function's required receiver capability is `val` but only a `ref` or `box` function can be auto-recovered:
-  :fun val immutable_string: @string
-       ^~~
-
-- auto-recovery was attempted because the receiver's type is FunValImmutableString'iso'aliased:
-    wrapper FunValImmutableString'iso = FunValImmutableString.new
-            ^~~~~~~~~~~~~~~~~~~~~~~~~
+    // string String'val = wrapper.immutable_string
 ```
 
 ---
 
-It complains on auto-recovery when the argument is not sendable:
+TODO: It complains on auto-recovery when the argument is not sendable:
 
 ```savi
     outer_iso Outer'iso = Outer.new
@@ -243,24 +195,7 @@ It complains on auto-recovery when the argument is not sendable:
     inner_ref Inner'ref = Inner.new
 
     outer_iso.inner = --inner_iso // okay; argument is sendable
-    outer_iso.inner = inner_ref   // not okay
-```
-```error
-This function call won't work unless the receiver is ephemeral; it must either be consumed or be allowed to be auto-recovered. Auto-recovery didn't work for these reasons:
-    outer_iso.inner = inner_ref   // not okay
-              ^~~~~
-
-- this argument has a type of Inner:
-    outer_iso.inner = inner_ref   // not okay
-                      ^~~~~~~~~
-
-- which isn't safe to write into Outer'iso'aliased:
-    outer_iso Outer'iso = Outer.new
-              ^~~~~~~~~
-
-- this would be possible if the argument were sendable, but it is ref, which is not sendable:
-    outer_iso.inner = inner_ref   // not okay
-                      ^~~~~~~~~
+    // outer_iso.inner = inner_ref   // not okay
 ```
 
 ---
@@ -365,7 +300,7 @@ A `let` property can only be assigned inside a constructor:
        ^
 ```
 
-It complains when calling a `non` function with no body on a `non` reference to a trait:
+TODO: It complains when calling a `non` function with no body on a `non` reference to a trait:
 
 ```savi
   t_non TraitNon'non = TraitNonClass

@@ -2,6 +2,10 @@
 pass: t_type_check
 ---
 
+TODO: These tests pretty much all should be ported to the cap-aware pass instead.
+
+---
+
 These types will be used throughout the following examples to demonstrate viewpoint adaptation:
 
 ```savi
@@ -22,7 +26,7 @@ These types will be used throughout the following examples to demonstrate viewpo
 
 ---
 
-It reflects viewpoint adaptation in the return type of a property getter:
+TODO: It reflects viewpoint adaptation in the return type of a property getter:
 
 ```savi
     outer_box Outer'box = Outer.new
@@ -31,25 +35,12 @@ It reflects viewpoint adaptation in the return type of a property getter:
     inner_box1 Inner'box = outer_ref.inner // okay
     inner_ref1 Inner'ref = outer_ref.inner // okay
     inner_box2 Inner'box = outer_box.inner // okay
-    inner_ref2 Inner'ref = outer_box.inner // not okay
-```
-```error
-The type of this expression doesn't meet the constraints imposed on it:
-    inner_ref2 Inner'ref = outer_box.inner // not okay
-                           ^~~~~~~~~~~~~~~
-
-- it is required here to be a subtype of Inner:
-    inner_ref2 Inner'ref = outer_box.inner // not okay
-               ^~~~~~~~~
-
-- but the type of the return value was Inner'box:
-    inner_ref2 Inner'ref = outer_box.inner // not okay
-                                     ^~~~~
+    // inner_ref2 Inner'ref = outer_box.inner // not okay
 ```
 
 ---
 
-It respects explicit viewpoint adaptation notation in the return type:
+TODO: It respects explicit viewpoint adaptation notation in the return type:
 
 ```savi
     outer_box Outer'box = Outer.new
@@ -58,20 +49,7 @@ It respects explicit viewpoint adaptation notation in the return type:
     inner_box1 Inner'box = outer_ref.get_inner // okay
     inner_ref1 Inner'ref = outer_ref.get_inner // okay
     inner_box2 Inner'box = outer_box.get_inner // okay
-    inner_ref2 Inner'ref = outer_box.get_inner // not okay
-```
-```error
-The type of this expression doesn't meet the constraints imposed on it:
-    inner_ref2 Inner'ref = outer_box.get_inner // not okay
-                           ^~~~~~~~~~~~~~~~~~~
-
-- it is required here to be a subtype of Inner:
-    inner_ref2 Inner'ref = outer_box.get_inner // not okay
-               ^~~~~~~~~
-
-- but the type of the return value was Inner'box:
-    inner_ref2 Inner'ref = outer_box.get_inner // not okay
-                                     ^~~~~~~~~
+    // inner_ref2 Inner'ref = outer_box.get_inner // not okay
 ```
 
 ---
@@ -83,7 +61,7 @@ It treats box functions as being implicitly specialized on receiver cap:
     outer_ref.get_inner ::t_type=> Inner
 
     outer_val Outer'val = Outer.new
-    outer_val.get_inner ::t_type=> Inner'val
+    outer_val.get_inner ::t_type=> Inner
 ```
 
 ---
@@ -96,42 +74,42 @@ It correctly applies viewpoint adaptation for property getters:
     outer_val Outer'val = Outer.new
     outer_box Outer'box = Outer.new
 
-    Outer.new ::t_type=> Outer'iso
+    Outer.new ::t_type=> Outer
 
     // Viewed from iso ephemeral:
-    Outer.new.inner_iso ::t_type=> Inner'iso
-    Outer.new.inner_ref ::t_type=> Inner'iso
-    Outer.new.inner_val ::t_type=> Inner'val
-    Outer.new.inner_box ::t_type=> Inner'val
-    Outer.new.inner_tag ::t_type=> Inner'tag
+    Outer.new.inner_iso ::t_type=> Inner
+    Outer.new.inner_ref ::t_type=> Inner
+    Outer.new.inner_val ::t_type=> Inner
+    Outer.new.inner_box ::t_type=> Inner
+    Outer.new.inner_tag ::t_type=> Inner
 
     // Viewed from iso:
-    outer_iso.inner_iso ::t_type=> Inner'iso'aliased
-    outer_iso.inner_ref ::t_type=> Inner'iso'aliased
-    outer_iso.inner_val ::t_type=> Inner'val
-    outer_iso.inner_box ::t_type=> Inner'tag
-    outer_iso.inner_tag ::t_type=> Inner'tag
+    outer_iso.inner_iso ::t_type=> Inner
+    outer_iso.inner_ref ::t_type=> Inner
+    outer_iso.inner_val ::t_type=> Inner
+    outer_iso.inner_box ::t_type=> Inner
+    outer_iso.inner_tag ::t_type=> Inner
 
     // Viewed from ref:
-    outer_ref.inner_iso ::t_type=> Inner'iso'aliased
+    outer_ref.inner_iso ::t_type=> Inner
     outer_ref.inner_ref ::t_type=> Inner
-    outer_ref.inner_val ::t_type=> Inner'val
-    outer_ref.inner_box ::t_type=> Inner'box
-    outer_ref.inner_tag ::t_type=> Inner'tag
+    outer_ref.inner_val ::t_type=> Inner
+    outer_ref.inner_box ::t_type=> Inner
+    outer_ref.inner_tag ::t_type=> Inner
 
     // Viewed from val:
-    outer_val.inner_iso ::t_type=> Inner'val
-    outer_val.inner_ref ::t_type=> Inner'val
-    outer_val.inner_val ::t_type=> Inner'val
-    outer_val.inner_box ::t_type=> Inner'val
-    outer_val.inner_tag ::t_type=> Inner'tag
+    outer_val.inner_iso ::t_type=> Inner
+    outer_val.inner_ref ::t_type=> Inner
+    outer_val.inner_val ::t_type=> Inner
+    outer_val.inner_box ::t_type=> Inner
+    outer_val.inner_tag ::t_type=> Inner
 
     // Viewed from box:
-    outer_box.inner_iso ::t_type=> Inner'tag
-    outer_box.inner_ref ::t_type=> Inner'box
-    outer_box.inner_val ::t_type=> Inner'val
-    outer_box.inner_box ::t_type=> Inner'box
-    outer_box.inner_tag ::t_type=> Inner'tag
+    outer_box.inner_iso ::t_type=> Inner
+    outer_box.inner_ref ::t_type=> Inner
+    outer_box.inner_val ::t_type=> Inner
+    outer_box.inner_box ::t_type=> Inner
+    outer_box.inner_tag ::t_type=> Inner
 ```
 
 ---
@@ -143,25 +121,25 @@ It correctly applies viewpoint adaptation for property displacing assignment:
     outer_ref Outer'ref = Outer.new
 
     // Extracted from iso ephemeral:
-    (Outer.new.inner_iso <<= Inner.new) ::t_type=> Inner'iso
-    (Outer.new.inner_ref <<= Inner.new) ::t_type=> Inner'iso
-    (Outer.new.inner_val <<= Inner.new) ::t_type=> Inner'val
-    (Outer.new.inner_box <<= Inner.new) ::t_type=> Inner'val
-    (Outer.new.inner_tag <<= Inner.new) ::t_type=> Inner'tag
+    (Outer.new.inner_iso <<= Inner.new) ::t_type=> Inner
+    (Outer.new.inner_ref <<= Inner.new) ::t_type=> Inner
+    (Outer.new.inner_val <<= Inner.new) ::t_type=> Inner
+    (Outer.new.inner_box <<= Inner.new) ::t_type=> Inner
+    (Outer.new.inner_tag <<= Inner.new) ::t_type=> Inner
 
     // Extracted from iso:
-    (outer_iso.inner_iso <<= Inner.new) ::t_type=> Inner'iso
-    (outer_iso.inner_ref <<= Inner.new) ::t_type=> Inner'iso'aliased
-    (outer_iso.inner_val <<= Inner.new) ::t_type=> Inner'val
-    (outer_iso.inner_box <<= Inner.new) ::t_type=> Inner'tag
-    (outer_iso.inner_tag <<= Inner.new) ::t_type=> Inner'tag
+    (outer_iso.inner_iso <<= Inner.new) ::t_type=> Inner
+    (outer_iso.inner_ref <<= Inner.new) ::t_type=> Inner
+    (outer_iso.inner_val <<= Inner.new) ::t_type=> Inner
+    (outer_iso.inner_box <<= Inner.new) ::t_type=> Inner
+    (outer_iso.inner_tag <<= Inner.new) ::t_type=> Inner
 
     // Extracted from ref:
-    (outer_ref.inner_iso <<= Inner.new) ::t_type=> Inner'iso
+    (outer_ref.inner_iso <<= Inner.new) ::t_type=> Inner
     (outer_ref.inner_ref <<= Inner.new) ::t_type=> Inner
-    (outer_ref.inner_val <<= Inner.new) ::t_type=> Inner'val
-    (outer_ref.inner_box <<= Inner.new) ::t_type=> Inner'box
-    (outer_ref.inner_tag <<= Inner.new) ::t_type=> Inner'tag
+    (outer_ref.inner_val <<= Inner.new) ::t_type=> Inner
+    (outer_ref.inner_box <<= Inner.new) ::t_type=> Inner
+    (outer_ref.inner_tag <<= Inner.new) ::t_type=> Inner
 ```
 
 ---
@@ -180,8 +158,8 @@ It correctly applies viewpoint adaptation for array access via a box receiver:
     outer_val OuterArray'val = OuterArray.new
 
     try (
-      outer_box.first! ::t_type=> Inner'box
+      outer_box.first! ::t_type=> Inner
       outer_ref.first! ::t_type=> Inner
-      outer_val.first! ::t_type=> Inner'val
+      outer_val.first! ::t_type=> Inner
     )
 ```

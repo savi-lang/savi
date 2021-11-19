@@ -15,25 +15,6 @@ struct Savi::Compiler::TInfer::MetaType::Nominal
   end
 
   def inspect(io : IO)
-    inspect_without_cap(io)
-
-    io << "'any" unless lazy? || ignores_cap?
-  end
-
-  def inspect_with_cap(io : IO, cap : Capability)
-    inspect_without_cap(io)
-
-    # If the cap is the same as the default cap, we omit it for brevity.
-    # Otherwise, we'll print it here with the same syntax that the programmer
-    # can use to specify it explicitly.
-    defn = defn()
-    unless defn.is_a?(ReifiedType) && cap.value == Cap.from_string(defn.link.cap)
-      io << "'"
-      cap.inspect(io)
-    end
-  end
-
-  def inspect_without_cap(io : IO)
     defn = defn()
     case defn
     when ReifiedType, ReifiedTypeAlias

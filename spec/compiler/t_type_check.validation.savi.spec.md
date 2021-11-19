@@ -2,50 +2,24 @@
 pass: t_type_check
 ---
 
-It complains if some params of an elevated constructor are not sendable:
+TODO: It complains if some params of an elevated constructor are not sendable:
 
 ```savi
-  :new val bad_constructor(a String'ref, b String'val, c String'box)
-```
-```error
-A constructor with elevated capability must only have sendable parameters:
-  :new val bad_constructor(a String'ref, b String'val, c String'box)
-       ^~~
-
-- this parameter type (String'ref) is not sendable:
-  :new val bad_constructor(a String'ref, b String'val, c String'box)
-                           ^~~~~~~~~~~~
-
-- this parameter type (String'box) is not sendable:
-  :new val bad_constructor(a String'ref, b String'val, c String'box)
-                                                       ^~~~~~~~~~~~
+  // :new val bad_constructor(a String'ref, b String'val, c String'box)
 ```
 
 ---
 
-It complains if some params of an asynchronous function are not sendable:
+TODO: It complains if some params of an asynchronous function are not sendable:
 
 ```savi
-:actor BadActor
-  :be bad_behavior(a String'ref, b String'val, c String'box)
-```
-```error
-An asynchronous function must only have sendable parameters:
-  :be bad_behavior(a String'ref, b String'val, c String'box)
-   ^~
-
-- this parameter type (String'ref) is not sendable:
-  :be bad_behavior(a String'ref, b String'val, c String'box)
-                   ^~~~~~~~~~~~
-
-- this parameter type (String'box) is not sendable:
-  :be bad_behavior(a String'ref, b String'val, c String'box)
-                                               ^~~~~~~~~~~~
+// :actor BadActor
+//   :be bad_behavior(a String'ref, b String'val, c String'box)
 ```
 
 ---
 
-It complains when a constant isn't of one of the supported types:
+TODO: It complains when a constant isn't of one of the supported types:
 
 ```savi
   :const i8 I8: 1
@@ -58,14 +32,5 @@ It complains when a constant isn't of one of the supported types:
   :const array_f32 Array(F32)'val: [3.3]
   :const array_string Array(String)'val: ["Hello", "World"]
   :const array_bytes Array(Bytes)'val: [b"Hello", b"World"]
-  :const array_ref_string Array(String)'ref: ["Hello", "World"] // NOT VAL
-```
-```error
-The type of a constant may only be String, Bytes, a numeric type, or an immutable Array of one of these:
-  :const array_ref_string Array(String)'ref: ["Hello", "World"] // NOT VAL
-         ^~~~~~~~~~~~~~~~
-
-- but the type is Array(String):
-  :const array_ref_string Array(String)'ref: ["Hello", "World"] // NOT VAL
-                          ^~~~~~~~~~~~~~~~~
+  // :const array_ref_string Array(String)'ref: ["Hello", "World"] // NOT VAL
 ```

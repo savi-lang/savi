@@ -39,7 +39,7 @@ This type check will never match:
     if (x <: Numeric) x.u8
         ^~~~~~~~~~~~
 
-- the runtime match type, ignoring capabilities, is Numeric'any:
+- the runtime match type, ignoring capabilities, is Numeric:
     if (x <: Numeric) x.u8
              ^~~~~~~
 
@@ -50,32 +50,16 @@ This type check will never match:
 
 ---
 
-It complains when a check would require runtime knowledge of capabilities:
+TODO: It complains when a check would require runtime knowledge of capabilities:
 
 ```savi
     @example("example")
 
   :fun example(x (String'val | String'ref))
-    if (x <: String'ref) (
-      x << "..."
-    )
-```
-```error
-This type check could violate capabilities:
-    if (x <: String'ref) (
-        ^~~~~~~~~~~~~~~
-
-- the runtime match type, ignoring capabilities, is String'any:
-    if (x <: String'ref) (
-             ^~~~~~~~~~
-
-- if it successfully matches, the type will be (String | String'ref):
-  :fun example(x (String'val | String'ref))
-                 ^~~~~~~~~~~~~~~~~~~~~~~~~
-
-- which is not a subtype of String'ref:
-    if (x <: String'ref) (
-             ^~~~~~~~~~
+    None
+    // if (x <: String'ref) (
+    //   x << "..."
+    // )
 ```
 
 ---

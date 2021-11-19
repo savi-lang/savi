@@ -44,7 +44,7 @@ struct Savi::Compiler::TInfer::MetaType::Intersection
   def inspect(io : IO)
     # If this intersection is just a term and capability, print abbreviated.
     if cap && terms.try(&.size) == 1 && anti_terms.nil?
-      terms.not_nil!.first.inspect_with_cap(io, cap.not_nil!)
+      terms.not_nil!.first.inspect(io)
       return
     end
 
@@ -60,11 +60,6 @@ struct Savi::Compiler::TInfer::MetaType::Intersection
       io << " & " unless first; first = false
       anti_term.inspect(io)
     end if anti_terms
-
-    cap.try do |cap|
-      io << " & " unless first; first = false
-      cap.inspect(io)
-    end
 
     io << ")"
   end
