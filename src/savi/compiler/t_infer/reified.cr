@@ -141,9 +141,7 @@ module Savi::Compiler::TInfer
 
     def corresponding_partial_reification(ctx)
       params = ctx.t_infer[link].type_params
-      ReifiedType.new(link, params.zip(args).map { |param, arg|
-        MetaType.new_type_param(param).intersect(arg.cap_only)
-      })
+      ReifiedType.new(link, params.map { |tp| MetaType.new_type_param(tp) })
     end
 
     def is_complete?(ctx)
@@ -217,17 +215,13 @@ module Savi::Compiler::TInfer
     # - unique within a given type
     # - identical for equivalent/compatible reified functions in different types
     def name
-      name = "'#{receiver_cap.inner.inspect}.#{link.name}"
+      name = "#{link.name}"
       name += ".#{link.hygienic_id}" if link.hygienic_id
       name
     end
 
     def show_full_name
       @type.show_type + name
-    end
-
-    def receiver_cap
-      receiver.cap_only
     end
 
     def meta_type_of(
@@ -237,10 +231,8 @@ module Savi::Compiler::TInfer
     ) : MetaType?
       return unless span
 
-      cap = self.receiver_cap.cap_only_inner.value.as(Cap)
-
       infer.deciding_reify_of(span,
-        @type.args, cap, func(ctx).has_tag?(:constructor)
+        @type.args, func(ctx).has_tag?(:constructor)
       ).final_mt!(ctx)
     end
 

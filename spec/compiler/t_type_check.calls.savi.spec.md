@@ -61,13 +61,9 @@ The 'bar' function can't be called on this receiver:
     object.bar
            ^~~
 
-- Bazable has no 'bar' function:
-:module Bazable
-        ^~~~~~~
-
-- maybe you meant to call the 'baz' function:
-  :fun baz: "baz"
-       ^~~
+- Fooable has no 'bar' function:
+:trait Fooable
+       ^~~~~~~
 ```
 
 ---
@@ -310,7 +306,7 @@ TODO: It complains when calling a `non` function with no body on a `non` referen
   t_ref.with_body
   t_ref.no_body
   t_non.with_body
-  t_non.no_body
+  // t_non.no_body
 
 :trait TraitNon
   :fun box not_non String
@@ -322,13 +318,4 @@ TODO: It complains when calling a `non` function with no body on a `non` referen
   :fun box not_non String: "not_non"
   :fun non no_body String: "no_body"
 
-```
-```error
-This trait-defined `non` function can't be called directly:
-  t_non.no_body
-        ^~~~~~~
-
-- it would be possible if the trait function had a default body defined:
-  :fun non no_body String
-           ^~~~~~~
 ```

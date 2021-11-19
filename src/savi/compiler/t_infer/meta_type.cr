@@ -32,13 +32,12 @@ struct Savi::Compiler::TInfer::MetaType
   def initialize(@inner)
   end
 
-  def initialize(defn : ReifiedType, cap : String? = nil)
-    cap ||= defn.link.cap
-    @inner = Nominal.new(defn).intersect(Capability.new(Cap.from_string(cap)))
+  def initialize(defn : ReifiedType)
+    @inner = Nominal.new(defn)
   end
 
-  def initialize(defn : ReifiedType, cap : Cap)
-    @inner = Nominal.new(defn).intersect(Capability.new(cap))
+  def initialize(defn : ReifiedType)
+    @inner = Nominal.new(defn)
   end
 
   def initialize(defn : ReifiedTypeAlias)
@@ -75,115 +74,6 @@ struct Savi::Compiler::TInfer::MetaType
 
   def self.unconstrained
     MetaType.new(Unconstrained.instance)
-  end
-
-  def self.cap(cap : Cap)
-    MetaType.new(Capability.new(cap))
-  end
-
-  def self.cap(name : String)
-    MetaType.new(Capability.new(Cap.from_string(name)))
-  end
-
-  def cap(cap : Cap)
-    MetaType.new(@inner.intersect(Capability.new(cap)))
-  end
-
-  def cap(name : String)
-    MetaType.new(@inner.intersect(Capability.new(Cap.from_string(name))))
-  end
-
-  def cap_only_inner
-    inner = @inner
-    case inner
-    when Capability; inner
-    when Nominal; Capability::NON if inner.ignores_cap?
-    when Intersection
-      inner.cap || (inner.ignores_cap? ? Capability::NON : nil)
-    when Union
-      caps = Set(Capability).new
-      inner.caps.try(&.each { |cap| caps << cap })
-      inner.intersects.try(&.each { |intersect|
-        cap = intersect.cap
-        caps << cap if cap
-      })
-      caps.size == 1 && caps.first
-    else
-      nil
-    end.as(Capability)
-  end
-
-  def cap_only
-    MetaType.new(cap_only_inner)
-  end
-
-  def override_cap(cap : Cap)
-    override_cap(Capability.new(cap))
-  end
-
-  def override_cap(name : String)
-    override_cap(Capability.new(Cap.from_string(name)))
-  end
-
-  def override_cap(meta_type : MetaType)
-    override_cap(meta_type.inner.as(Capability))
-  end
-
-  def override_cap(cap : Capability)
-    inner = @inner
-    MetaType.new(
-      case inner
-      when Capability
-        cap
-      when Nominal
-        inner.intersect(cap)
-      when Intersection
-        Intersection.new(cap, inner.terms, inner.anti_terms)
-      when Unsatisfiable
-        Unsatisfiable.instance
-      when Unconstrained
-        cap
-      when Union
-        result = Unsatisfiable.instance
-        inner.caps.try(&.each {
-          result = result.unite(cap)
-        })
-        inner.terms.try(&.each { |term|
-          result = result.unite(term.intersect(cap))
-        })
-        inner.anti_terms.try(&.each { |anti_term|
-          result = result.unite(anti_term.intersect(cap))
-        })
-        inner.intersects.try(&.each { |intersect|
-          result = result.unite(
-            Intersection.new(cap, intersect.terms, intersect.anti_terms)
-          )
-        })
-        result
-      else
-        raise NotImplementedError.new(inner.inspect)
-      end
-    )
-  end
-
-  def aliased
-    MetaType.new(inner.aliased)
-  end
-
-  def consumed
-    MetaType.new(inner.consumed)
-  end
-
-  def stabilized
-    MetaType.new(inner.stabilized)
-  end
-
-  def strip_cap
-    MetaType.new(inner.strip_cap)
-  end
-
-  def partial_reifications
-    inner.partial_reifications.map { |i| MetaType.new(i) }
   end
 
   def type_params : Set(TypeParam)

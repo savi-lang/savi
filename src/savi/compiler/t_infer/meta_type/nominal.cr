@@ -188,38 +188,6 @@ struct Savi::Compiler::TInfer::MetaType::Nominal
     other.unite(self) # delegate to the "higher" class via commutativity
   end
 
-  def aliased
-    raise NotImplementedError.new("simplify first to remove aliases") if defn.is_a?(ReifiedTypeAlias)
-
-    self # no effect
-  end
-
-  def consumed
-    raise NotImplementedError.new("simplify first to remove aliases") if defn.is_a?(ReifiedTypeAlias)
-
-    self # no effect
-  end
-
-  def stabilized
-    # TODO: Should we use this error?
-    # raise NotImplementedError.new("simplify first to remove aliases") if defn.is_a?(ReifiedTypeAlias)
-
-    self # no effect
-  end
-
-  def strip_cap
-    raise NotImplementedError.new("simplify first to remove aliases") if defn.is_a?(ReifiedTypeAlias)
-
-    self # no effect
-  end
-
-  def partial_reifications
-    raise NotImplementedError.new("simplify first to remove aliases") if defn.is_a?(ReifiedTypeAlias)
-
-    # Intersect with every possible non-ephemeral cap.
-    Capability::ALL_NON_EPH.map(&.intersect(self)).to_set
-  end
-
   def type_params
     defn = defn()
     case defn
@@ -253,7 +221,7 @@ struct Savi::Compiler::TInfer::MetaType::Nominal
     case defn
     when TypeParam
       index = type_params.index(defn)
-      index ? type_args[index].strip_cap.inner : self
+      index ? type_args[index].inner : self
     when ReifiedType
       args = defn.args.map do |arg|
         arg.substitute_type_params_retaining_cap(type_params, type_args).as(MetaType)

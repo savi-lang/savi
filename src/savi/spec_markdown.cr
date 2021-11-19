@@ -231,9 +231,8 @@ class Savi::SpecMarkdown
               end
             when "t_type"
               rt = Compiler::TInfer::ReifiedType.new(t_link)
-              cap = f_link.resolve(ctx).cap.value
               rf = Compiler::TInfer::ReifiedFunction.new(rt, f_link,
-                Compiler::TInfer::MetaType.new(rt, cap)
+                Compiler::TInfer::MetaType.new(rt)
               )
               actual = rf.meta_type_of(ctx, node).try(&.show_type) rescue nil
 

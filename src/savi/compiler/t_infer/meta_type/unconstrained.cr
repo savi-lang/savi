@@ -54,27 +54,6 @@ class Savi::Compiler::TInfer::MetaType::Unconstrained
     self
   end
 
-  def aliased
-    self # no effect
-  end
-
-  def consumed
-    self # no effect
-  end
-
-  def stabilized
-    self # no effect
-  end
-
-  def strip_cap
-    self # no effect
-  end
-
-  def partial_reifications
-    # Return every possible non-ephemeral cap.
-    Capability::ALL_NON_EPH.to_set
-  end
-
   def type_params
     Set(TypeParam).new # no type params are present
   end

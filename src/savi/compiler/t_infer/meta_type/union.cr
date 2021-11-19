@@ -327,56 +327,6 @@ struct Savi::Compiler::TInfer::MetaType::Union
     result
   end
 
-  def aliased
-    Union.build(
-      (caps.not_nil!.map(&.aliased).to_set if caps),
-      terms,
-      anti_terms,
-      (intersects.not_nil!.map(&.aliased).to_set if intersects),
-    )
-  end
-
-  def consumed
-    Union.build(
-      (caps.not_nil!.map(&.consumed).to_set if caps),
-      terms,
-      anti_terms,
-      (intersects.not_nil!.map(&.consumed).to_set if intersects),
-    )
-  end
-
-  def stabilized
-    Union.build(
-      (caps.not_nil!.map(&.stabilized).to_set if caps),
-      terms,
-      anti_terms,
-      (intersects.not_nil!.map(&.stabilized).to_set if intersects),
-    )
-  end
-
-  def strip_cap
-    result = Unsatisfiable::INSTANCE
-
-    terms.not_nil!.each do |term|
-      result = result.unite(term)
-    end if terms
-    anti_terms.not_nil!.each do |anti_term|
-      result = result.unite(anti_term)
-    end if anti_terms
-    intersects.not_nil!.each do |intersect|
-      result = result.unite(intersect.strip_cap)
-    end if intersects
-
-    result
-  end
-
-  def partial_reifications
-    # Intersect with every possible non-ephemeral cap.
-    Capability::ALL_NON_EPH.map(&.intersect(self))
-    .reject(&.is_a?(Unsatisfiable))
-    .to_set
-  end
-
   def type_params
     result = Set(TypeParam).new
 

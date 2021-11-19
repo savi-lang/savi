@@ -239,27 +239,7 @@ module Savi::Compiler::TInfer
 
       span =
       if explicit
-        explicit_span = infer.resolve(ctx, explicit)
-
-        if !explicit_span.any_mt?(&.cap_only?)
-          # If we have an explicit type that is more than just a cap, return it.
-          explicit_span
-        elsif !@upstreams.empty?
-          # If there are upstreams, use the explicit cap applied to the type of
-          # each span entry of the upstreams, which becomes the canonical span.
-          # TODO: use all upstreams if we can avoid infinite recursion
-          upstream_span = infer.resolve(ctx, @upstreams.first.first)
-          upstream_span.combine_mt(explicit_span) { |upstream_mt, cap_mt|
-            upstream_mt.strip_cap.intersect(cap_mt)
-          }
-        else
-          # If we have no upstreams and an explicit cap, return a span with
-          # the empty trait called `Any` intersected with that cap.
-          explicit_span.transform_mt do |explicit_mt|
-            any = MetaType.new_nominal(infer.prelude_reified_type(ctx, "Any"))
-            any.intersect(explicit_mt)
-          end
-        end
+        infer.resolve(ctx, explicit)
       elsif !@upstreams.empty? && (upstream_span = resolve_upstream_span(ctx, infer))
         # If we only have upstreams to go on, return the first upstream span.
         # TODO: use all upstreams if we can avoid infinite recursion
@@ -276,11 +256,7 @@ module Savi::Compiler::TInfer
           "This #{described_kind} needs an explicit type; it could not be inferred"
       end
 
-      if is_a?(FuncBody)
-        span # do not stabilize the return type of a function body
-      else
-        span.transform_mt(&.stabilized)
-      end
+      span
     end
 
     def tethers(querent : Info) : Array(Tether)
@@ -383,19 +359,16 @@ module Savi::Compiler::TInfer
 
   class FixedTypeExpr < FixedInfo
     getter node : AST::Node
-    property stabilize : Bool
 
     def describe_kind : String; "type expression" end
 
     def initialize(@pos, @layer_index, @node)
-      @stabilize = false
     end
 
     def resolve_span!(ctx : Context, infer : Visitor) : Span
       infer.unwrap_lazy_parts_of_type_expr_span(ctx,
         infer.type_expr_span(ctx, @node)
       )
-      .transform_mt { |mt| stabilize ? mt.stabilized : mt }
     end
   end
 
@@ -434,34 +407,30 @@ module Savi::Compiler::TInfer
         && infer.classify.further_qualified?(@node)
 
       infer.unwrap_lazy_parts_of_type_expr_span(ctx,
-        infer.type_expr_span(ctx, @node).transform_mt(&.override_cap(TInfer::Cap::NON))
+        infer.type_expr_span(ctx, @node)
       )
     end
   end
 
   class Self < FixedInfo
-    property stabilize : Bool
-
     def describe_kind : String; "receiver value" end
 
     def initialize(@pos, @layer_index)
-      @stabilize = false
     end
 
     def resolve_span!(ctx : Context, infer : Visitor) : Span
       infer.self_type_expr_span(ctx)
-      .transform_mt { |mt| stabilize ? mt.stabilized : mt }
     end
   end
 
   class FromConstructor < FixedInfo
     def describe_kind : String; "constructed object" end
 
-    def initialize(@pos, @layer_index, @cap : String)
+    def initialize(@pos, @layer_index)
     end
 
     def resolve_span!(ctx : Context, infer : Visitor) : Span
-      infer.self_with_specified_cap(ctx, @cap)
+      infer.self_type_expr_span(ctx)
     end
   end
 
@@ -579,7 +548,7 @@ module Savi::Compiler::TInfer
     end
 
     def as_conduit? : Conduit?
-      Conduit.aliased(@info)
+      Conduit.direct(@info)
     end
   end
 
@@ -633,8 +602,7 @@ module Savi::Compiler::TInfer
         end.not_nil!
 
         call_link = call_func.make_link(call_defn.link)
-        infer.depends_on_call_ret_span(ctx, call_defn, call_func, call_link,
-            call_mt.cap_only_inner.value.as(Cap))
+        infer.depends_on_call_ret_span(ctx, call_defn, call_func, call_link)
       end
     rescue error : Error
       Span.new(Span::ErrorPropagate.new(error))
@@ -663,9 +631,9 @@ module Savi::Compiler::TInfer
     end
 
     def resolve_span!(ctx : Context, infer : Visitor) : Span
-      origin_span = infer.resolve(ctx, @origin)
-      field_span = infer.resolve(ctx, @field)
-      origin_span.combine_mt(field_span) { |o, f| f.viewed_from(o).aliased }
+      # We ignore the origin and its cap viewpoint, and ignore aliasing,
+      # using only the field span for the result.
+      infer.resolve(ctx, @field)
     end
   end
 
@@ -681,9 +649,9 @@ module Savi::Compiler::TInfer
     end
 
     def resolve_span!(ctx : Context, infer : Visitor) : Span
-      origin_span = infer.resolve(ctx, @origin)
-      field_span = infer.resolve(ctx, @field)
-      origin_span.combine_mt(field_span) { |o, f| f.viewed_from(o) }
+      # We ignore the origin and its cap viewpoint, and ignore aliasing,
+      # using only the field span for the result.
+      infer.resolve(ctx, @field)
     end
   end
 
@@ -902,7 +870,7 @@ module Savi::Compiler::TInfer
     def resolve_span!(ctx : Context, infer : Visitor) : Span
       infer.resolve(ctx, @refine)
       .combine_mt(infer.resolve(ctx, @refine_type)) { |lhs_mt, rhs_mt|
-        rhs_mt = rhs_mt.strip_cap.negate if !@positive_check
+        rhs_mt = rhs_mt.negate if !@positive_check
         lhs_mt.intersect(rhs_mt)
       }
     end
@@ -919,7 +887,7 @@ module Savi::Compiler::TInfer
     def as_conduit? : Conduit?
       local = local()
       local = local.info if local.is_a?(LocalRef)
-      Conduit.consumed(local)
+      Conduit.direct(local)
     end
 
     def add_downstream(use_pos : Source::Pos, info : Info)
@@ -954,10 +922,6 @@ module Savi::Compiler::TInfer
       Tether.chain(@body, querent)
     end
 
-    def tether_upward_transform_span(ctx : Context, infer : Visitor, span : Span) : Span
-      span.transform_mt(&.strip_cap)
-    end
-
     def add_peer_hint(peer : Info)
       @body.add_peer_hint(peer)
     end
@@ -985,7 +949,7 @@ module Savi::Compiler::TInfer
     end
 
     def as_conduit? : Conduit?
-      Conduit.aliased(@lhs)
+      Conduit.direct(@lhs)
     end
   end
 
@@ -1053,7 +1017,7 @@ module Savi::Compiler::TInfer
             next unless rt
 
             if rt.link.name == "Array" && rt.args.size == 1
-              MetaType.new_nominal(rt).intersect(union_member_mt.cap_only)
+              MetaType.new_nominal(rt)
             end
           }.compact
           ante_mts.empty? ? MetaType.unconstrained : MetaType.new_union(ante_mts)
@@ -1063,16 +1027,11 @@ module Savi::Compiler::TInfer
     end
 
     def resolve_span!(ctx : Context, infer : Visitor) : Span
-      # By default, an array literal has a cap of `ref`.
-      # TODO: span should allow ref, val, or iso cap possibilities.
-      array_cap = MetaType::Capability::REF
-
       ante_span = possible_antecedents_span(ctx, infer)
 
       elem_spans = terms.map { |term| infer.resolve(ctx, term).as(Span) }
       elem_span = Span
         .reduce_combine_mts(elem_spans) { |accum, mt| accum.unite(mt) }
-        .try(&.transform_mt(&.stabilized))
 
       if ante_span
         if elem_span
@@ -1082,7 +1041,7 @@ module Savi::Compiler::TInfer
             # we can get the element MetaType from the ReifiedType's type args.
             ante_elem_mt = ante_mt.single!.args[0]
             fallback_rt = infer.prelude_reified_type(ctx, "Array", [elem_mt])
-            fallback_mt = MetaType.new(fallback_rt).intersect(MetaType.cap("ref"))
+            fallback_mt = MetaType.new(fallback_rt)
 
             # We may need to unwrap lazy elements from this inner layer.
             ante_elem_mt = infer
@@ -1106,7 +1065,7 @@ module Savi::Compiler::TInfer
         if elem_span
           array_span = elem_span.transform_mt { |elem_mt|
             rt = infer.prelude_reified_type(ctx, "Array", [elem_mt])
-            MetaType.new(rt, Cap::REF)
+            MetaType.new(rt)
           }
         else
           Span.error(pos, "The type of this empty array literal " \
@@ -1116,10 +1075,7 @@ module Savi::Compiler::TInfer
 
       # Take note of the function calls implied (used later for reachability).
       .tap { |array_span|
-        infer.analysis.called_func_spans[self] = {
-          array_span.transform_mt(&.override_cap(Cap::REF)), # always use ref
-          ["new", "<<"]
-        }
+        infer.analysis.called_func_spans[self] = {array_span, ["new", "<<"]}
       }
     end
   end
@@ -1224,17 +1180,11 @@ module Savi::Compiler::TInfer
             # If this is a constructor, we know what the result type will be
             # without needing to actually depend on the other analysis' span.
             if call_func.has_tag?(:constructor)
-              new_mt = call_mt
-                .intersect(lhs_mt)
-                .strip_cap
-                .intersect(MetaType.cap(call_func.cap.value))
-
-              next Span.simple(new_mt)
+              next Span.simple(call_mt.intersect(lhs_mt))
             end
 
             infer
-              .depends_on_call_ret_span(ctx, call_defn, call_func, call_link,
-                call_mt.cap_only_inner.value.as(Cap))
+              .depends_on_call_ret_span(ctx, call_defn, call_func, call_link)
           }
           Span.reduce_combine_mts(intersection_term_spans) { |accum, mt| accum.intersect(mt) }.not_nil!
         }
@@ -1268,9 +1218,9 @@ module Savi::Compiler::TInfer
             call_func = call_defn.defn(ctx).find_func!(@call.member)
             call_link = call_func.make_link(call_defn.link)
 
-            raw_ret_span = infer
-              .depends_on_call_yield_out_span(ctx, call_defn, call_func, call_link,
-                term_mt.cap_only_inner.value.as(Cap), @index)
+            raw_ret_span = infer.depends_on_call_yield_out_span(
+              ctx, call_defn, call_func, call_link, @index
+            )
 
             unless raw_ret_span
               call_name = "#{call_defn.defn(ctx).ident.value}.#{@call.member}"
@@ -1315,9 +1265,9 @@ module Savi::Compiler::TInfer
             call_func = call_defn.defn(ctx).find_func!(@call.member)
             call_link = call_func.make_link(call_defn.link)
 
-            raw_ret_span = infer
-              .depends_on_call_yield_in_span(ctx, call_defn, call_func, call_link,
-                term_mt.cap_only_inner.value.as(Cap))
+            raw_ret_span = infer.depends_on_call_yield_in_span(
+              ctx, call_defn, call_func, call_link
+            )
 
             next Span.simple(MetaType.unconstrained) unless raw_ret_span
 
@@ -1381,9 +1331,9 @@ module Savi::Compiler::TInfer
             call_func = call_defn.defn(ctx).find_func!(@call.member)
             call_link = call_func.make_link(call_defn.link)
 
-            param_span = infer
-              .depends_on_call_param_span(ctx, call_defn, call_func, call_link,
-                term_mt.cap_only_inner.value.as(Cap), @index)
+            param_span = infer.depends_on_call_param_span(
+              ctx, call_defn, call_func, call_link, @index
+            )
 
             next Span.simple(MetaType.unconstrained) unless param_span
 

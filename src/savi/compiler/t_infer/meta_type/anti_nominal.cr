@@ -111,27 +111,6 @@ struct Savi::Compiler::TInfer::MetaType::AntiNominal
     other.unite(self) # delegate to the "higher" class via commutativity
   end
 
-  def aliased
-    self # no effect
-  end
-
-  def consumed
-    self # no effect
-  end
-
-  def stabilized
-    self # no effect
-  end
-
-  def strip_cap
-    self # no effect
-  end
-
-  def partial_reifications
-    # Intersect with every possible non-ephemeral cap.
-    Capability::ALL_NON_EPH.map(&.intersect(self)).to_set
-  end
-
   def type_params
     defn = defn()
     if defn.is_a?(TypeParam)

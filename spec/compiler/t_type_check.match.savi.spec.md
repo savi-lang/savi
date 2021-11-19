@@ -18,7 +18,7 @@ It allows assigning from a parameter with its refined type:
 ```savi
     @refine("example")
 
-  :fun refine(x val)
+  :fun refine(x Any'val)
     if (x <: String) (
       y String = x
     )

@@ -309,64 +309,6 @@ struct Savi::Compiler::TInfer::MetaType::Capability
     raise NotImplementedError.new("#{self} satisfies_bound? #{bound}")
   end
 
-  def aliased : Capability
-    value = value()
-    raise "unsupported cap: #{self}" unless value.is_a?(Cap)
-
-    case value
-    # The alias of an ISO is the aliased counterpart of it.
-    when Cap::ISO then ISO_ALIASED
-    else self
-    end
-  end
-
-  def consumed : Capability
-    value = value()
-    raise "unsupported cap: #{self}" unless value.is_a?(Cap)
-
-    case value
-    # The consumption of an ISO_ALIASED is the non-aliased counterpart of it.
-    when Cap::ISO_ALIASED then ISO
-    else self
-    end
-  end
-
-  def stabilized : Capability
-    value = value()
-    case value
-    when Cap
-      case value
-      # The stable form of an ISO_ALIASED or ISO_ALIASED is the degradation of it that can only do
-      # the things not explicitly denied by the uniqueness constraints of them.
-      # That is, the alias of ISO (read+write unique) cannot read nor write (TAG).
-      when Cap::ISO_ALIASED then Capability.new(Cap::TAG)
-      else self
-      end
-    when Set(Cap)
-      Capability.new(value.to_a.map { |cap|
-        case cap
-        when Cap::ISO_ALIASED then Cap::TAG
-        else cap
-        end
-      }.to_set)
-    else raise NotImplementedError.new("#{self} stabilized")
-    end
-  end
-
-  def strip_cap
-    # Stripping a cap out of itself leaves the type totally unconstrained.
-    Unconstrained.instance
-  end
-
-  def partial_reifications : Set(Cap)
-    value = value()
-    case value
-    when Cap then [self].to_set
-    when Set(Cap) then value
-    else raise NotImplementedError.new("partial_reifications of #{self}")
-    end
-  end
-
   def type_params
     Set(TypeParam).new # no type params are ever referenced by a cap
   end

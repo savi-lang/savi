@@ -52,12 +52,7 @@ class Savi::Compiler::TTypeCheck
     # Now do the main type checking pass in each ReifiedType.
     rts.each do |rt|
       rt.defn(ctx).functions.each do |f|
-        f_link = f.make_link(rt.link)
-        f_cap_value = f.cap.value
-        f_cap_value = "read" if f_cap_value == "box" # TODO: figure out if we can remove this Pony-originating semantic hack
-        MetaType::Capability.new_maybe_generic(f_cap_value).each_cap.each do |f_cap|
-          for_rf(ctx, rt, f_link, MetaType.cap(f_cap)).run(ctx)
-        end
+        for_rf(ctx, rt, f.make_link(rt.link)).run(ctx)
       end
     end
 
@@ -88,9 +83,8 @@ class Savi::Compiler::TTypeCheck
     ctx : Context,
     rt : ReifiedType,
     f : Program::Function::Link,
-    cap : MetaType,
   ) : ForReifiedFunc
-    mt = MetaType.new(rt).override_cap(cap)
+    mt = MetaType.new(rt)
     rf = ReifiedFunction.new(rt, f, mt)
     @map[rf] ||= (
       refer_type = ctx.refer_type[f]
@@ -151,19 +145,6 @@ class Savi::Compiler::TTypeCheck
 
       arg = arg.simplify(ctx)
 
-      arg_cap = arg.cap_only_inner.value.as(Cap)
-      cap_set = infer.type_param_bound_cap_sets[index]
-      unless cap_set.includes?(arg_cap)
-        bound_pos = type_param_extracts[index][1].not_nil!.pos
-        cap_set_string = "{" + cap_set.map(&.string).join(", ") + "}"
-        ctx.error_at arg_node,
-          "This type argument won't satisfy the type parameter bound", [
-            {bound_pos, "the allowed caps are #{cap_set_string}"},
-            {arg_node.pos, "the type argument cap is #{arg_cap.string}"},
-          ]
-        next
-      end
-
       param_bound = rt.meta_type_of_type_param_bound(ctx, index, infer)
       next unless param_bound
 
@@ -189,114 +170,19 @@ class Savi::Compiler::TTypeCheck
   )
     # This is what we'll get for lhs after testing for rhs type at runtime
     # because at runtime, capabilities do not exist - we only check defns.
-    isect_mt = lhs_mt.intersect(rhs_mt.strip_cap).simplify(ctx)
+    isect_mt = lhs_mt.intersect(rhs_mt).simplify(ctx)
 
     # If the intersection comes up empty, the type check will never match.
     if isect_mt.unsatisfiable?
       ctx.error_at pos, "This type check will never match", [
         {rhs_pos,
           "the runtime match type, ignoring capabilities, " \
-          "is #{rhs_mt.strip_cap.show_type}"},
+          "is #{rhs_mt.show_type}"},
         {lhs_pos,
           "which does not intersect at all with #{lhs_mt.show_type}"},
       ]
       return
     end
-
-    # If the intersection isn't a subtype of the right hand side, then we know
-    # the type descriptors can match but the capabilities would be unsafe.
-    if !isect_mt.subtype_of?(ctx, rhs_mt)
-      ctx.error_at pos,
-        "This type check could violate capabilities", [
-          {rhs_pos,
-            "the runtime match type, ignoring capabilities, " \
-            "is #{rhs_mt.strip_cap.show_type}"},
-          {lhs_pos,
-            "if it successfully matches, " \
-            "the type will be #{isect_mt.show_type}"},
-          {rhs_pos, "which is not a subtype of #{rhs_mt.show_type}"},
-        ]
-      return
-    end
-  end
-
-  def self.verify_call_receiver_cap(ctx : Context, call : TInfer::FromCall, calling_func, call_mt, call_func, problems)
-    call_cap_mt = call_mt.cap_only
-    autorecover_needed = false
-
-    call_func_cap = MetaType::Capability.new_maybe_generic(call_func.cap.value)
-    call_func_cap_mt = MetaType.new(call_func_cap)
-
-    # The required capability is the receiver capability of the function,
-    # unless it is an asynchronous function, in which case it is tag.
-    required_cap = call_func_cap
-    required_cap = MetaType::Capability.new(Cap::TAG) \
-      if call_func.has_tag?(:async) && !call_func.has_tag?(:constructor)
-
-    receiver_okay =
-      if required_cap.value.is_a?(Cap)
-        call_cap_mt.subtype_of?(ctx, MetaType.new(required_cap))
-      else
-        call_cap_mt.satisfies_bound?(ctx, MetaType.new(required_cap))
-      end
-
-    # Enforce the capability restriction of the receiver.
-    if receiver_okay
-      # For box functions only, we reify with the actual cap on the caller side.
-      # Or rather, we use "ref", "box", or "val", depending on the caller cap.
-      # For all other functions, we just use the cap from the func definition.
-      reify_cap =
-        if required_cap.value == Cap::BOX
-          case call_cap_mt.inner.as(MetaType::Capability).value
-          when Cap::ISO, Cap::ISO_ALIASED, Cap::REF then MetaType.cap(Cap::REF)
-          when Cap::VAL then MetaType.cap(Cap::VAL)
-          else MetaType.cap(Cap::BOX)
-          end
-        # TODO: This shouldn't be a special case - any generic cap should be accepted.
-        elsif required_cap.value.is_a?(Set(MetaType::Capability))
-          call_cap_mt
-        else
-          call_func_cap_mt
-        end
-    elsif call_func.has_tag?(:constructor)
-      # Constructor calls ignore cap of the original receiver.
-      reify_cap = call_func_cap_mt
-    elsif call_cap_mt.consumed.subtype_of?(ctx, MetaType.new(required_cap))
-      # We failed, but we may be able to use auto-recovery.
-      # Take note of this and we'll finish the auto-recovery checks later.
-      autorecover_needed = true
-      # For auto-recovered calls, always use the cap of the func definition.
-      reify_cap = call_func_cap_mt
-    else
-      # We failed entirely; note the problem and carry on.
-      problems << {call_func.cap.pos,
-        "the type #{call_mt.inner.inspect} isn't a subtype of the " \
-        "required capability of '#{required_cap}'"}
-
-      # If the receiver of the call is the self (the receiver of the caller),
-      # then we can give an extra hint about changing its capability to match.
-      if call.lhs.is_a?(TInfer::Self)
-        problems << {calling_func.ident.pos, "this would be possible if the " \
-          "calling function were declared as `:fun #{required_cap}`"}
-      end
-
-      # We already failed subtyping for the receiver cap, but pretend
-      # for now that we didn't for the sake of further checks.
-      reify_cap = call_func_cap_mt
-    end
-
-    if autorecover_needed \
-    && required_cap.value != Cap::REF && required_cap.value != Cap::BOX
-      problems << {call_func.cap.pos,
-        "the function's required receiver capability is `#{required_cap}` " \
-        "but only a `ref` or `box` function can be auto-recovered"}
-
-      problems << {call.lhs.pos,
-        "auto-recovery was attempted because the receiver's type is " \
-        "#{call_mt.inner.inspect}"}
-    end
-
-    {reify_cap, autorecover_needed}
   end
 
   def self.verify_call_arg_count(ctx : Context, call : TInfer::FromCall, call_func, problems)
@@ -318,42 +204,6 @@ class Savi::Compiler::TTypeCheck
       problems << {call.pos, "the call site has too few arguments"}
       problems << {params_pos, "the function requires at least #{min_text}"}
     end
-  end
-
-  def self.verify_call_autorecover(
-    ctx : Context,
-    type_check : TTypeCheck::ForReifiedFunc,
-    call : TInfer::FromCall,
-    call_mt : MetaType,
-  )
-    problems = [] of {Source::Pos, String}
-
-    # Each argument of an autorecovered call must follow "safe to write" rule,
-    # as if they were potentially being written as fields into that object.
-    call.args.try(&.terms.each { |arg|
-      arg_mt = type_check.resolve(ctx, type_check.pre_infer[arg])
-      next unless arg_mt
-
-      if !arg_mt.cap_only_inner.is_safe_to_write_to?(call_mt.cap_only_inner)
-        problems << {arg.pos,
-          "this argument has a type of #{arg_mt.show_type}"}
-        problems << {call.lhs.pos,
-          "which isn't safe to write into #{call_mt.show_type}"}
-
-        # In practice, in the absence of the `trn` capability, this is identical
-        # with a requirement that the argument be sendable, so we use that as
-        # our hint for resolving the issue, as it is likely to be more helpful.
-        problems << {arg.pos,
-          "this would be possible if the argument were sendable, " +
-          "but it is #{arg_mt.cap_only.show_type}, which is not sendable"}
-      end
-    })
-
-    ctx.error_at call,
-      "This function call won't work unless the receiver is ephemeral; " \
-      "it must either be consumed or be allowed to be auto-recovered. "\
-      "Auto-recovery didn't work for these reasons",
-        problems unless problems.empty?
   end
 
   def self.verify_let_assign_call_site(
@@ -428,45 +278,6 @@ class Savi::Compiler::TTypeCheck
       true
     end
 
-    # Check completeness of self references inside a constructor.
-    def type_check_pre(ctx : Context, info : TInfer::Self, mt : MetaType) : Bool
-      return true # TODO
-
-      # # If this is a complete self, no additional checks are required.
-      # unseen_fields = completeness.unseen_fields_for(info)
-      # return true unless unseen_fields
-
-      # This represents the self type as opaque, with no field access.
-      # We'll use this to guarantee that no usage of the current self object
-      # will require  any access to the fields of the object.
-      tag_self = mt.override_cap(Cap::TAG)
-      total_constraint = info.total_downstream_constraint(ctx, self)
-      return true if tag_self.within_constraints?(ctx, [total_constraint])
-
-      # If even the non-tag self isn't within constraints, return true here
-      # and let the later type_check code catch this problem.
-      return true if !mt.within_constraints?(ctx, [total_constraint])
-
-      # Walk through each constraint imposed on the self, and raise an error
-      # for each one that is not satisfiable by a tag self.
-      info.list_downstream_constraints(ctx, self).each do |pos, constraint|
-        # If tag will meet the constraint, then this use of the self is okay.
-        next if tag_self.within_constraints?(ctx, [constraint])
-
-        # Otherwise, we must raise an error.
-        ctx.error_at info.pos,
-          "This usage of `@` shares field access to the object" \
-          " from a constructor before all fields are initialized", [
-            {pos,
-              "if this constraint were specified as `tag` or lower" \
-              " it would not grant field access"}
-          ] + unseen_fields.map { |ident|
-            {ident.pos, "this field didn't get initialized"}
-          }
-      end
-      false
-    end
-
     # Sometimes print a special case error message for Literal values.
     def type_check_pre(ctx : Context, info : TInfer::Literal, mt : MetaType) : Bool
       # If we've resolved to a single concrete type already, move forward.
@@ -496,23 +307,6 @@ class Savi::Compiler::TTypeCheck
         "This literal value couldn't be inferred as a single concrete type",
         error_info
       false
-    end
-
-    # Sometimes print a special case error message for ArrayLiteral values.
-    def type_check_pre(ctx : Context, info : TInfer::ArrayLiteral, mt : MetaType) : Bool
-      # If the array cap is not ref or "lesser", we must recover to the
-      # higher capability, meaning all element expressions must be sendable.
-      array_cap = mt.cap_only_inner
-      unless array_cap.supertype_of?(MetaType::Capability::REF)
-        term_mts = info.terms.compact_map { |term| resolve(ctx, term) }
-        unless term_mts.all?(&.is_sendable?)
-          ctx.error_at info.pos, "This array literal can't have a reference cap of " \
-            "#{array_cap.inspect} unless all of its elements are sendable",
-              info.describe_downstream_constraints(ctx, self)
-        end
-      end
-
-      true
     end
 
     # Check runtime match safety for TypeCondition expressions.
@@ -562,29 +356,12 @@ class Savi::Compiler::TTypeCheck
         next unless call_func
         call_func_link = call_func.make_link(call_defn.link)
 
-        # Determine the correct capability to reify, checking for cap errors.
-        reify_cap, autorecover_needed =
-          TTypeCheck.verify_call_receiver_cap(ctx, info, @func, call_mt, call_func, problems)
-
         # Check the number of arguments.
         TTypeCheck.verify_call_arg_count(ctx, info, call_func, problems)
 
         # If this is a call site to a let field assignment, check it as such.
         if call_func.has_tag?(:let) && call_func.ident.value.ends_with?("=")
           TTypeCheck.verify_let_assign_call_site(ctx, info, call_func, reified)
-        end
-
-        # Prove that we're not making an unsafe trait non call.
-        if call_func_link.type.is_abstract? \
-        && call_func.cap.value == "non" \
-        && call_func.body.nil? \
-        && call_mt.cap_only_inner == TInfer::MetaType::Capability::NON
-          ctx.error_at info,
-            "This trait-defined `non` function can't be called directly", [
-            {call_func.ident.pos,
-              "it would be possible if the trait function " \
-              "had a default body defined"}
-          ]
         end
 
         # Check whether yield block presence matches the function's expectation.
@@ -600,13 +377,6 @@ class Savi::Compiler::TTypeCheck
             "it has no yield block but " \
               "'#{call_defn.defn(ctx).ident.value}.#{info.member}' does yield"
           }
-        end
-
-        # Check if auto-recovery of the receiver is possible.
-        if autorecover_needed
-          receiver = MetaType.new(call_defn, reify_cap.cap_only_inner.value.as(Cap))
-          other_rf = ReifiedFunction.new(call_defn, call_func_link, receiver)
-          TTypeCheck.verify_call_autorecover(ctx, self, info, call_mt)
         end
       end
       ctx.error_at info,
@@ -635,33 +405,17 @@ class Savi::Compiler::TTypeCheck
       # focus on the more meaningful errors that are present in the output.
       return if meta_type.unconstrained? && total_constraint.unconstrained?
 
-      # Print a special error if this is an issue with local variable aliasing.
-      if (info.is_a?(TInfer::Local) || info.is_a?(TInfer::LocalRef)) \
-      && meta_type.consumed.within_constraints?(ctx, [total_constraint])
-        extra = info.describe_downstream_constraints(ctx, self)
-        extra << {info.pos,
-          "but the type of the #{info.described_kind} " \
-          "(when aliased) was #{meta_type.show_type}"
-        }
-        this_would_be_possible_if = info.this_would_be_possible_if
-        extra << this_would_be_possible_if if this_would_be_possible_if
+      # TODO: print a different error message when the downstream constraints are
+      # internally conflicting, even before adding this meta_type into the mix.
+      extra = info.describe_downstream_constraints(ctx, self)
+      extra << {info.pos,
+        "but the type of the #{info.described_kind} was #{meta_type.show_type}"}
+      this_would_be_possible_if = info.this_would_be_possible_if
+      extra << this_would_be_possible_if if this_would_be_possible_if
 
-        ctx.error_at info.downstream_use_pos, "This aliasing violates " \
-          "uniqueness (did you forget to consume the variable?)",
+      ctx.error_at info.downstream_use_pos, "The type of this expression " \
+        "doesn't meet the constraints imposed on it",
           extra
-      else
-        # TODO: print a different error message when the downstream constraints are
-        # internally conflicting, even before adding this meta_type into the mix.
-        extra = info.describe_downstream_constraints(ctx, self)
-        extra << {info.pos,
-          "but the type of the #{info.described_kind} was #{meta_type.show_type}"}
-        this_would_be_possible_if = info.this_would_be_possible_if
-        extra << this_would_be_possible_if if this_would_be_possible_if
-
-        ctx.error_at info.downstream_use_pos, "The type of this expression " \
-          "doesn't meet the constraints imposed on it",
-            extra
-      end
     end
 
     # For all other info types we do nothing.
@@ -679,16 +433,14 @@ class Savi::Compiler::TTypeCheck
 
         ret_mt = @resolved_infos[@pre_infer[ret]]
         ret_rt = ret_mt.single?.try(&.defn)
-        is_val = ret_mt.cap_only.inner == MetaType::Capability::VAL
-        unless is_val && ret_rt.is_a?(ReifiedType) && ret_rt.link.is_concrete? && (
+        unless ret_rt.is_a?(ReifiedType) && ret_rt.link.is_concrete? && (
           ret_rt.not_nil!.link.name == "String" ||
           ret_rt.not_nil!.link.name == "Bytes" ||
           ret_mt.subtype_of?(ctx, numeric_mt) ||
           (ret_rt.not_nil!.link.name == "Array" && begin
             elem_mt = ret_rt.args.first
             elem_rt = elem_mt.single?.try(&.defn)
-            elem_is_val = elem_mt.cap_only.inner == MetaType::Capability::VAL
-            is_val && elem_rt.is_a?(ReifiedType) && elem_rt.link.is_concrete? && (
+            elem_rt.is_a?(ReifiedType) && elem_rt.link.is_concrete? && (
               elem_rt.not_nil!.link.name == "String" ||
               elem_rt.not_nil!.link.name == "Bytes" ||
               elem_mt.subtype_of?(ctx, numeric_mt)
@@ -699,37 +451,6 @@ class Savi::Compiler::TTypeCheck
             "Bytes, a numeric type, or an immutable Array of one of these", [
               {@func.ret || @func.body || ret, "but the type is #{ret_mt.show_type}"}
             ]
-        end
-      end
-
-      # Parameters must be sendable when the function is asynchronous,
-      # or when it is a constructor with elevated capability.
-      require_sendable =
-        if @func.has_tag?(:async)
-          "An asynchronous function"
-        elsif @func.has_tag?(:constructor) \
-        && !resolve(ctx, @pre_infer[ret]).not_nil!.subtype_of?(ctx, MetaType.cap(Cap::REF))
-          "A constructor with elevated capability"
-        end
-      if require_sendable
-        @func.params.try do |params|
-
-          errs = [] of {Source::Pos, String}
-          params.terms.each do |param|
-            param_mt = resolve(ctx, @pre_infer[param]).not_nil!
-
-            unless param_mt.is_sendable?
-              # TODO: Remove this hacky special case.
-              next if param_mt.show_type.starts_with? "CPointer"
-
-              errs << {param.pos,
-                "this parameter type (#{param_mt.show_type}) is not sendable"}
-            end
-          end
-
-          ctx.error_at @func.cap.pos,
-            "#{require_sendable} must only have sendable parameters", errs \
-              unless errs.empty?
         end
       end
 

@@ -78,27 +78,14 @@ This type needs to be qualified with type arguments:
 
 ---
 
-It complains when a type argument doesn't satisfy the bound:
+TODO: It complains when a type argument doesn't satisfy the bound:
 
 ```savi
 :class GenericSendable(P1 String'send)
 ```
 ```savi
-    GenericSendable(String'ref)
+    // GenericSendable(String'ref)
     GenericSendable(Bool'val)
-```
-```error
-This type argument won't satisfy the type parameter bound:
-    GenericSendable(String'ref)
-                    ^~~~~~~~~~
-
-- the allowed caps are {iso, val, tag, non}:
-:class GenericSendable(P1 String'send)
-                          ^~~~~~~~~~~
-
-- the type argument cap is ref:
-    GenericSendable(String'ref)
-                    ^~~~~~~~~~
 ```
 ```error
 This type argument won't satisfy the type parameter bound:

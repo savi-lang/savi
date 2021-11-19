@@ -51,12 +51,6 @@ module Savi::Compiler::TInfer
     getter! type_params : Array(TypeParam)
     protected setter type_params
 
-    getter! type_param_bound_cap_sets : Array(Array(Cap))
-    protected setter type_param_bound_cap_sets
-
-    getter! type_partial_reification_sets : Hash(Array(Cap), Int32)
-    protected setter type_partial_reification_sets
-
     getter! type_partial_reifications : Array(MetaType)
     protected setter type_partial_reifications
 
@@ -73,29 +67,10 @@ module Savi::Compiler::TInfer
       return span if args.empty?
 
       if span.inner.is_a?(Span::ByReifyCap)
-        arg_caps = args.map(&.cap_only_inner.value.as(Cap))
-        partial_reify_index = type_partial_reification_sets[arg_caps]
-        span = span.deciding_partial_reify_index(partial_reify_index.not_nil!)
+        span = span.deciding_partial_reify_index(0)
       end
 
       span.transform_mt(&.substitute_type_params_retaining_cap(type_params, args))
-    end
-
-    def deciding_cap_of_some_front_args(span : Span, args : Array(MetaType)) : Span
-      # Fast path for the case of no type arguments present.
-      return span if args.empty? || !span.inner.is_a?(Span::ByReifyCap)
-
-      arg_caps = args.map(&.cap_only_inner.value.as(Cap))
-
-      target_bits = BitArray.new(type_partial_reification_sets.size)
-
-      type_partial_reification_sets.each { |param_caps, index|
-        next unless arg_caps == param_caps[0...arg_caps.size]
-        target_bits[index] = true
-      }
-      raise "incompatible caps: #{arg_caps}" if !target_bits.any?
-
-      span.narrowing_partial_reify_indices(target_bits, mark_unsatisfiable: false)
     end
   end
 
@@ -108,29 +83,10 @@ module Savi::Compiler::TInfer
       return span if args.empty?
 
       if span.inner.is_a?(Span::ByReifyCap)
-        arg_caps = args.map(&.cap_only_inner.value.as(Cap))
-        partial_reify_index = type_partial_reification_sets[arg_caps]
-        span = span.deciding_partial_reify_index(partial_reify_index.not_nil!)
+        span = span.deciding_partial_reify_index(0)
       end
 
       span.transform_mt(&.substitute_type_params_retaining_cap(type_params, args))
-    end
-
-    def deciding_cap_of_some_front_args(span : Span, args : Array(MetaType)) : Span
-      # Fast path for the case of no type arguments present.
-      return span if args.empty? || !span.inner.is_a?(Span::ByReifyCap)
-
-      arg_caps = args.map(&.cap_only_inner.value.as(Cap))
-
-      target_bits = BitArray.new(type_partial_reification_sets.size)
-
-      type_partial_reification_sets.each { |param_caps, index|
-        next unless arg_caps == param_caps[0...arg_caps.size]
-        target_bits[index] = true
-      }
-      raise "incompatible caps: #{arg_caps}" if !target_bits.any?
-
-      span.narrowing_partial_reify_indices(target_bits, mark_unsatisfiable: false)
     end
   end
 
@@ -248,24 +204,10 @@ module Savi::Compiler::TInfer
     def deciding_reify_of(
       span : Span,
       args : Array(MetaType),
-      call_cap : Cap,
       is_constructor : Bool
     ) : Span
-      orig_span = span
       if span.inner.is_a?(Span::ByReifyCap)
-        partial_reify_index = begin
-          type_partial_reification_sets =
-            func_partial_reification_sets[call_cap]? ||
-            func_partial_reification_sets.find { |(func_cap, _)|
-              MetaType::Capability.new(call_cap).subtype_of?(MetaType::Capability.new(func_cap)) ||
-              call_cap == Cap::ISO_ALIASED || # TODO: better way to handle auto recovery
-              is_constructor # TODO: better way to do this?
-            }.not_nil!.last
-          arg_caps = args.map(&.cap_only_inner.value.as(Cap))
-          type_partial_reification_sets[arg_caps]
-        end
-
-        span = span.deciding_partial_reify_index(partial_reify_index)
+        span = span.deciding_partial_reify_index(0)
       end
 
       # Fast path for the case of no type arguments present.
@@ -273,37 +215,17 @@ module Savi::Compiler::TInfer
 
       span.transform_mt(&.substitute_type_params_retaining_cap(type_params, args))
     end
-
-    def narrowing_type_param_cap(
-      span : Span,
-      type_param : TypeParam,
-      caps : Array(Cap),
-    ) : Span
-      return span unless span.inner.is_a?(Span::ByReifyCap)
-
-      target_bits = BitArray.new(func_partial_reification_sets_size)
-
-      func_partial_reification_sets.values.each(&.each { |param_caps, index|
-        next unless caps.includes?(param_caps[type_param.ref.index])
-        target_bits[index] = true
-      })
-      raise "incompatible caps: #{caps}" if !target_bits.any?
-
-      span.narrowing_partial_reify_indices(target_bits)
-    end
   end
 
   def self.is_type_expr_cap?(node : AST::Node) : Bool
-    node.is_a?(AST::Identifier) && !type_expr_cap(node).nil?
-  end
-  def self.type_expr_cap(node : AST::Identifier) : MetaType::Capability?
+    return false unless node.is_a?(AST::Identifier)
+
     case node.value
-    when "iso", "val", "ref", "box", "tag", "non"
-      MetaType::Capability.new(Cap.from_string(node.value))
-    when "any", "alias", "send", "share", "read"
-      MetaType::Capability.new_generic(node.value)
+    when "iso", "val", "ref", "box", "tag", "non",
+         "any", "alias", "send", "share", "read"
+      true
     else
-      nil
+      false
     end
   end
 
@@ -311,28 +233,25 @@ module Savi::Compiler::TInfer
     abstract def t_link : (Program::Type::Link | Program::TypeAlias::Link)
 
     abstract def refer_type_for(node : AST::Node) : Refer::Info?
-    abstract def self_type_expr_span(ctx : Context, cap_only = false) : Span
+    abstract def self_type_expr_span(ctx : Context) : Span
 
     # An identifier type expression must refer to a type.
-    def type_expr_span(ctx : Context, node : AST::Identifier, cap_only = false) : Span
+    def type_expr_span(ctx : Context, node : AST::Identifier) : Span
       ref = refer_type_for(node)
       case ref
       when Refer::Self
-        self_type_expr_span(ctx, cap_only)
+        self_type_expr_span(ctx)
       when Refer::Type
         span = Span.simple(MetaType.new(ReifiedType.new(ref.link)))
-        cap_only ? span.transform_mt(&.cap_only) : span
       when Refer::TypeAlias
         span = Span.simple(MetaType.new_alias(ReifiedTypeAlias.new(ref.link_alias)))
-        cap_only ? span.transform_mt(&.cap_only) : span
       when Refer::TypeParam
-        cap_only \
-          ? Span.simple(MetaType.unconstrained) \
-          : lookup_type_param_partial_reified_span(ctx, TypeParam.new(ref))
+        lookup_type_param_partial_reified_span(ctx, TypeParam.new(ref))
       when nil
-        cap = TInfer.type_expr_cap(node)
-        if cap
-          Span.simple(MetaType.new(cap))
+        if TInfer.is_type_expr_cap?(node)
+          # When ignoring caps, a bare cap translates to the type Any.
+          rt = ReifiedType.new(ctx.namespace.prelude_type(ctx, "Any"))
+          Span.simple(MetaType.new(rt))
         else
           Span.error node, "This type couldn't be resolved"
         end
@@ -342,28 +261,13 @@ module Savi::Compiler::TInfer
     end
 
     # An relate type expression must be an explicit capability qualifier.
-    def type_expr_span(ctx : Context, node : AST::Relate, cap_only = false) : Span
+    def type_expr_span(ctx : Context, node : AST::Relate) : Span
       if node.op.value == "'"
-        cap_ident = node.rhs.as(AST::Identifier)
-        case cap_ident.value
-        when "aliased"
-          type_expr_span(ctx, node.lhs, cap_only).transform_mt do |lhs_mt|
-            lhs_mt.aliased
-          end
-        else
-          cap = TInfer.type_expr_cap(cap_ident)
-          if cap
-            type_expr_span(ctx, node.lhs, cap_only).transform_mt do |lhs_mt|
-              lhs_mt.override_cap(cap.not_nil!)
-            end
-          else
-            Span.error cap_ident, "This type couldn't be resolved"
-          end
-        end
+        # We ignore the cap here and only pay attention to the left side.
+        type_expr_span(ctx, node.lhs)
       elsif node.op.value == "->"
-        lhs = type_expr_span(ctx, node.lhs, cap_only).transform_mt(&.cap_only)
-        rhs = type_expr_span(ctx, node.rhs, cap_only)
-        lhs.combine_mt(rhs) { |lhs_mt, rhs_mt| rhs_mt.viewed_from(lhs_mt) }
+        # We ignoe the viewpoint here and only pay attention to the right side.
+        type_expr_span(ctx, node.rhs)
       else
         raise NotImplementedError.new(node.to_a.inspect)
       end
@@ -371,28 +275,27 @@ module Savi::Compiler::TInfer
 
     # A "|" group must be a union of type expressions, and a "(" group is
     # considered to be just be a single parenthesized type expression (for now).
-    def type_expr_span(ctx : Context, node : AST::Group, cap_only = false) : Span
+    def type_expr_span(ctx : Context, node : AST::Group) : Span
       if node.style == "|"
         spans = node.terms
           .select { |t| t.is_a?(AST::Group) && t.terms.size > 0 }
-          .map { |t| type_expr_span(ctx, t, cap_only).as(Span) }
+          .map { |t| type_expr_span(ctx, t).as(Span) }
 
         raise NotImplementedError.new("empty union") if spans.empty?
 
         Span.reduce_combine_mts(spans) { |accum, mt| accum.unite(mt) }.not_nil!
       elsif node.style == "(" && node.terms.size == 1
-        type_expr_span(ctx, node.terms.first, cap_only)
+        type_expr_span(ctx, node.terms.first)
       else
         raise NotImplementedError.new(node.to_a.inspect)
       end
     end
 
     # A "(" qualify is used to add type arguments to a type.
-    def type_expr_span(ctx : Context, node : AST::Qualify, cap_only = false) : Span
+    def type_expr_span(ctx : Context, node : AST::Qualify) : Span
       raise NotImplementedError.new(node.to_a) unless node.group.style == "("
 
-      target_span = type_expr_span(ctx, node.term, cap_only)
-      return target_span if cap_only
+      target_span = type_expr_span(ctx, node.term)
 
       arg_asts = node.group.terms
       arg_spans = arg_asts.map do |t|
@@ -401,7 +304,7 @@ module Savi::Compiler::TInfer
 
       any_rt_has_wrong_number_of_type_args = false
       span = target_span.reduce_combine_mts(arg_spans) { |target_mt, arg_mt|
-        mt = target_mt.with_additional_type_arg!(arg_mt.stabilized)
+        mt = target_mt.with_additional_type_arg!(arg_mt)
         rt = mt.single_rt_or_rta!
 
         # If we've reached the final reduce call for the last explicit arg,
@@ -466,18 +369,10 @@ module Savi::Compiler::TInfer
           default_spans = infer
             .type_param_default_spans[explicit_args_count..-1]
             .map(&.not_nil!)
-            .map { |default_span|
-              # TODO: The ceremony to calling this identical method is silly:
-              case infer
-              when TInfer::TypeAnalysis;      infer.deciding_cap_of_some_front_args(default_span, rt.args)
-              when TInfer::TypeAliasAnalysis; infer.deciding_cap_of_some_front_args(default_span, rt.args)
-              else raise NotImplementedError.new(infer.class)
-              end
-            }
 
           # Finally, combine spans to add default args to the qualified type.
           Span.simple(target_mt).reduce_combine_mts(default_spans) { |target_mt, arg_mt|
-            target_mt.with_additional_type_arg!(arg_mt.stabilized)
+            target_mt.with_additional_type_arg!(arg_mt)
           }.transform_mt { |mt|
             orig_mt = mt
             while true
@@ -493,7 +388,7 @@ module Savi::Compiler::TInfer
     end
 
     # All other AST nodes are unsupported as type expressions.
-    def type_expr_span(ctx : Context, node : AST::Node, cap_only = false) : Span
+    def type_expr_span(ctx : Context, node : AST::Node) : Span
       raise NotImplementedError.new(node.to_a)
     end
 
@@ -503,20 +398,9 @@ module Savi::Compiler::TInfer
 
       ref = type_param.ref
       raise "lookup on wrong visitor" unless ref.parent_link == t_link
-      type_expr_span(ctx, ref.bound).combine_mt(
-        lookup_type_param_partial_reified_span(ctx, type_param)
-      ) { |bound_mt, cap_mt| bound_mt.override_cap(cap_mt.cap_only_inner) }
+      type_expr_span(ctx, ref.bound)
 
       .tap { @currently_looking_up_param_bounds.delete(type_param) }
-    end
-    def lookup_type_param_bound_cap(ctx : Context, type_param : TypeParam) : MetaType
-      type_expr_span(ctx, type_param.ref.bound, cap_only: true).terminal!
-    end
-    def lookup_type_param_bound_cap_set(ctx : Context, type_param : TypeParam) : Array(Cap)
-      lookup_type_param_bound_cap(ctx, type_param)
-        .cap_only_inner
-        .each_cap
-        .to_a
     end
 
     def lookup_type_param_partial_reified_span(ctx : Context, type_param : TypeParam)
@@ -543,26 +427,11 @@ module Savi::Compiler::TInfer
           TypeParam.new(ref.as(Refer::TypeParam))
         }) || [] of TypeParam
 
-      @analysis.type_param_bound_cap_sets = @analysis.type_params.map { |type_param|
-        lookup_type_param_bound_cap_set(ctx, type_param)
-      }
-      @analysis.type_partial_reification_sets =
-        @analysis.type_param_bound_cap_sets.reduce([[] of Cap]) { |accum, caps|
-          accum.flat_map { |preceding|
-            caps.map { |cap| preceding + [cap] }
-          }
-        }.each_with_index.to_h
-
       @analysis.type_partial_reifications = begin
         t_link = @link
-        @analysis.type_partial_reification_sets.keys.map { |type_param_caps|
-          args = @analysis.type_params
-            .zip(type_param_caps)
-            .map { |type_param, type_param_cap|
-              MetaType.new_type_param(type_param).cap(type_param_cap)
-            }
-          MetaType.new_nominal(ReifiedType.new(t_link, args))
-        }
+        args = @analysis.type_params.map { |tp| MetaType.new_type_param(tp) }
+        # TODO: Refactor this to not be an array.
+        [MetaType.new_nominal(ReifiedType.new(t_link, args))]
       end
 
       @analysis.type_param_bound_spans = @analysis.type_params.map { |type_param|
@@ -585,13 +454,13 @@ module Savi::Compiler::TInfer
       @refer_type[node]?
     end
 
-    def self_type_expr_span(ctx : Context, cap_only = false) : Span
+    def self_type_expr_span(ctx : Context) : Span
       self_span = (
         @self_span ||=
           Span.for_partial_reify(@analysis.type_partial_reifications).as(Span)
       ).not_nil!
 
-      cap_only ? self_span.transform_mt(&.cap_only) : self_span
+      self_span
     end
   end
 
@@ -614,26 +483,11 @@ module Savi::Compiler::TInfer
           TypeParam.new(ref.as(Refer::TypeParam))
         }) || [] of TypeParam
 
-      @analysis.type_param_bound_cap_sets = @analysis.type_params.map { |type_param|
-        lookup_type_param_bound_cap_set(ctx, type_param)
-      }
-      @analysis.type_partial_reification_sets =
-        @analysis.type_param_bound_cap_sets.reduce([[] of Cap]) { |accum, caps|
-          accum.flat_map { |preceding|
-            caps.map { |cap| preceding + [cap] }
-          }
-        }.each_with_index.to_h
-
       @analysis.type_partial_reifications = begin
         t_link = @link
-        @analysis.type_partial_reification_sets.keys.map { |type_param_caps|
-          args = @analysis.type_params
-            .zip(type_param_caps)
-            .map { |type_param, type_param_cap|
-              MetaType.new_type_param(type_param).cap(type_param_cap)
-            }
-          MetaType.new_alias(ReifiedTypeAlias.new(t_link, args))
-        }
+        args = @analysis.type_params.map { |tp| MetaType.new_type_param(tp) }
+        # TODO: Refactor this to not be an array.
+        [MetaType.new_alias(ReifiedTypeAlias.new(t_link, args))]
       end
 
       @analysis.type_param_bound_spans = @analysis.type_params.map { |type_param|
@@ -678,13 +532,13 @@ module Savi::Compiler::TInfer
       @refer_type[node]?
     end
 
-    def self_type_expr_span(ctx : Context, cap_only = false) : Span
+    def self_type_expr_span(ctx : Context) : Span
       self_span = (
         @self_span ||=
           Span.for_partial_reify(@analysis.type_partial_reifications).as(Span)
       ).not_nil!
 
-      cap_only ? self_span.transform_mt(&.cap_only) : self_span
+      self_span
     end
 
     def lookup_type_param_partial_reified_span(ctx : Context, type_param : TypeParam)
@@ -721,39 +575,12 @@ module Savi::Compiler::TInfer
 
     def init_analysis
       @analysis.type_params = @t_analysis.type_params
-      @analysis.type_param_bound_cap_sets = @t_analysis.type_param_bound_cap_sets
-      @analysis.type_partial_reification_sets = @t_analysis.type_partial_reification_sets
-
-      @analysis.func_partial_reification_sets = begin
-        f_cap_string = @func.cap.value
-        f_cap_string = "ref" if @func.has_tag?(:constructor)
-        f_cap_string = "read" if f_cap_string == "box" # TODO: figure out if we can remove this Pony-originating semantic hack
-        next_index: Int32 = 0
-        MetaType::Capability.new_maybe_generic(f_cap_string).each_cap.map { |f_cap|
-          {
-            f_cap,
-            @analysis.type_partial_reification_sets.keys.map { |type_param_caps|
-              index = next_index
-              next_index += 1
-              {type_param_caps, index}
-            }.to_h
-          }
-        }.to_h
-        .tap { @analysis.func_partial_reification_sets_size = next_index }
-      end
 
       @analysis.func_partial_reifications = begin
         t_link = @link.type
-        @analysis.func_partial_reification_sets.flat_map { |f_cap, type_sets|
-          type_sets.keys.map { |type_param_caps|
-            args = @analysis.type_params
-              .zip(type_param_caps)
-              .map { |type_param, type_param_cap|
-                MetaType.new_type_param(type_param).cap(type_param_cap)
-              }
-            MetaType.new_nominal(ReifiedType.new(t_link, args)).cap(f_cap)
-          }
-        }
+        args = @analysis.type_params.map { |tp| MetaType.new_type_param(tp) }
+        # TODO: Refactor this to not be an array.
+        [MetaType.new_nominal(ReifiedType.new(t_link, args))]
       end
 
       @analysis.pre_infer = @pre_infer
@@ -820,18 +647,10 @@ module Savi::Compiler::TInfer
         when TypeParamCondition
           type_param = TypeParam.new(cond_info.refine)
           refine_span = resolve(ctx, cond_info.refine_type)
-          refine_cap_mt =
-            MetaType.new_union(refine_span.all_terminal_meta_types.map(&.cap_only))
-          raise NotImplementedError.new("varying caps in a refined span") unless refine_cap_mt.cap_only?
-
-          refine_caps = refine_cap_mt.cap_only_inner.each_cap.to_a
-
-          span = @analysis.narrowing_type_param_cap(span, type_param, refine_caps)
-          refine_span = @analysis.narrowing_type_param_cap(refine_span, type_param, refine_caps)
 
           span.combine_mt(refine_span) { |mt, refine_mt|
             mt.substitute_type_params_retaining_cap([type_param], [
-              MetaType.new_type_param(type_param).intersect(refine_mt.strip_cap)
+              MetaType.new_type_param(type_param).intersect(refine_mt)
             ])
           }
         # TODO: also handle other conditions?
@@ -844,37 +663,28 @@ module Savi::Compiler::TInfer
       @refer_type[node]? || refer_type_parent[node]?
     end
 
-    def self_type_expr_span(ctx : Context, cap_only = false) : Span
+    def self_type_expr_span(ctx : Context) : Span
       self_span = (
         @self_span ||=
           Span.for_partial_reify(@analysis.func_partial_reifications).as(Span)
       ).not_nil!
 
-      cap_only ? self_span.transform_mt(&.cap_only) : self_span
+      self_span
     end
 
-    def self_with_specified_cap(ctx : Context, cap : String)
-      self_type_expr_span(ctx).transform_mt(&.override_cap(MetaType.cap(cap)))
-    end
-
-    def depends_on_call_ret_span(ctx, other_rt, other_f, other_f_link, call_cap : Cap)
+    def depends_on_call_ret_span(ctx, other_rt, other_f, other_f_link)
       # TODO: Track dependencies and invalidate cache based on those.
       other_pre = ctx.pre_t_infer[other_f_link]
       other_analysis = ctx.t_infer_edge.run_for_func(ctx, other_f, other_f_link)
       raw_span = other_analysis.direct_span(other_pre[other_f.ident])
 
       span = other_analysis.deciding_reify_of(raw_span,
-        other_rt.args, call_cap, other_f.has_tag?(:constructor))
-
-      # Recovered calls get viewpoint adaptation on the return value.
-      if (call_cap == Cap::ISO || call_cap == Cap::ISO_ALIASED)
-        span = span.transform_mt(&.viewed_from(MetaType.cap(call_cap)))
-      end
+        other_rt.args, other_f.has_tag?(:constructor))
 
       span
     end
 
-    def depends_on_call_param_span(ctx, other_rt, other_f, other_f_link, call_cap : Cap, index)
+    def depends_on_call_param_span(ctx, other_rt, other_f, other_f_link, index)
       param = AST::Extract.params(other_f.params)[index]?
       return unless param
 
@@ -884,10 +694,10 @@ module Savi::Compiler::TInfer
       raw_span = other_analysis.direct_span(other_pre[param.first])
 
       other_analysis.deciding_reify_of(raw_span,
-        other_rt.args, call_cap, other_f.has_tag?(:constructor))
+        other_rt.args, other_f.has_tag?(:constructor))
     end
 
-    def depends_on_call_yield_in_span(ctx, other_rt, other_f, other_f_link, call_cap : Cap)
+    def depends_on_call_yield_in_span(ctx, other_rt, other_f, other_f_link)
       # TODO: Track dependencies and invalidate cache based on those.
       other_pre = ctx.pre_t_infer[other_f_link]
       yield_in_info = other_pre.yield_in_info
@@ -896,10 +706,10 @@ module Savi::Compiler::TInfer
       raw_span = other_analysis.direct_span(yield_in_info)
 
       other_analysis.deciding_reify_of(raw_span,
-        other_rt.args, call_cap, other_f.has_tag?(:constructor))
+        other_rt.args, other_f.has_tag?(:constructor))
     end
 
-    def depends_on_call_yield_out_span(ctx, other_rt, other_f, other_f_link, call_cap : Cap, index)
+    def depends_on_call_yield_out_span(ctx, other_rt, other_f, other_f_link, index)
       # TODO: Track dependencies and invalidate cache based on those.
       other_pre = ctx.pre_t_infer[other_f_link]
       yield_out_info = other_pre.yield_out_infos[index]?
@@ -908,7 +718,7 @@ module Savi::Compiler::TInfer
       raw_span = other_analysis.direct_span(yield_out_info)
 
       other_analysis.deciding_reify_of(raw_span,
-        other_rt.args, call_cap, other_f.has_tag?(:constructor))
+        other_rt.args, other_f.has_tag?(:constructor))
     end
 
     def run_edge(ctx : Context)

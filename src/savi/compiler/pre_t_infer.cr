@@ -145,14 +145,16 @@ module Savi::Compiler::PreTInfer
       )
 
       # Take note of the return type constraint if given.
-      # For constructors, this is the self type and listed receiver cap.
+      # For constructors, this is the self type.
       if func.has_tag?(:constructor)
         self[ret].as(TInfer::FuncBody).set_explicit(
-          TInfer::FromConstructor.new(func.cap.not_nil!.pos, 0, func.cap.not_nil!.value)
+          TInfer::FromConstructor.new(func.cap.not_nil!.pos, 0)
         )
       elsif func_ret
         func_ret.accept(ctx, self)
-        self[ret].as(TInfer::FuncBody).set_explicit(@analysis[func_ret])
+        if !TInfer.is_type_expr_cap?(func_ret)
+          self[ret].as(TInfer::FuncBody).set_explicit(@analysis[func_ret])
+        end
       elsif func_body && @jumps.always_error?(func_body)
         none = TInfer::FixedPrelude.new(ret.pos, 0, "None")
         self[ret].as(TInfer::FuncBody).set_explicit(none)
@@ -182,12 +184,16 @@ module Savi::Compiler::PreTInfer
           # We have a function signature for multiple yield out arg types.
           yield_out.terms.each_with_index do |yield_out_arg, index|
             yield_out_arg.accept(ctx, self)
-            @analysis.yield_out_infos[index].set_explicit(@analysis[yield_out_arg])
+            if !TInfer.is_type_expr_cap?(yield_out_arg)
+              @analysis.yield_out_infos[index].set_explicit(@analysis[yield_out_arg])
+            end
           end
         else
           # We have a function signature for just one yield out arg type.
           yield_out.accept(ctx, self)
-          @analysis.yield_out_infos.first.set_explicit(@analysis[yield_out])
+          if !TInfer.is_type_expr_cap?(yield_out)
+            @analysis.yield_out_infos.first.set_explicit(@analysis[yield_out])
+          end
         end
       end
 
@@ -195,7 +201,9 @@ module Savi::Compiler::PreTInfer
       yield_in = func.yield_in
       if yield_in
         yield_in.accept(ctx, self)
-        @analysis.yield_in_info.set_explicit(@analysis[yield_in])
+        if !TInfer.is_type_expr_cap?(yield_in)
+          @analysis.yield_in_info.set_explicit(@analysis[yield_in])
+        end
       else
         fixed = TInfer::FixedPrelude.new(@analysis.yield_in_info.pos, 0, "None")
         @analysis.yield_in_info.set_explicit(fixed)
@@ -274,14 +282,8 @@ module Savi::Compiler::PreTInfer
       case ref
       when Refer::Type
         if ref.with_value
-          # We allow it to be resolved as if it were a type expression,
-          # since this enum value literal will have the type of its referent.
           @analysis[node] = TInfer::FixedEnumValue.new(node.pos, layer(node), node)
         else
-          # A type reference whose value is used and is not itself a value
-          # must be marked non, rather than having the default cap for that type.
-          # This is used when we pass a type around as if it were a value,
-          # where that value is a stateless singleton able to call `:fun non`s.
           @analysis[node] = TInfer::FixedSingleton.new(node.pos, layer(node), node)
         end
       when Refer::TypeAlias
@@ -343,21 +345,21 @@ module Savi::Compiler::PreTInfer
     # A literal character could be any integer or floating-point machine type.
     def touch(ctx : Context, node : AST::LiteralCharacter)
       t_link = prelude_type(ctx, "Numeric")
-      mt = TInfer::MetaType.new(TInfer::ReifiedType.new(t_link), TInfer::Cap::VAL)
+      mt = TInfer::MetaType.new(TInfer::ReifiedType.new(t_link))
       @analysis[node] = TInfer::Literal.new(node.pos, layer(node), mt)
     end
 
     # A literal integer could be any integer or floating-point machine type.
     def touch(ctx : Context, node : AST::LiteralInteger)
       t_link = prelude_type(ctx, "Numeric")
-      mt = TInfer::MetaType.new(TInfer::ReifiedType.new(t_link), TInfer::Cap::VAL)
+      mt = TInfer::MetaType.new(TInfer::ReifiedType.new(t_link))
       @analysis[node] = TInfer::Literal.new(node.pos, layer(node), mt)
     end
 
     # A literal float could be any floating-point machine type.
     def touch(ctx : Context, node : AST::LiteralFloat)
       t_links = [prelude_type(ctx, "F32"), prelude_type(ctx, "F64")]
-      mts = t_links.map { |t_link| TInfer::MetaType.new(TInfer::ReifiedType.new(t_link), TInfer::Cap::VAL) }
+      mts = t_links.map { |t_link| TInfer::MetaType.new(TInfer::ReifiedType.new(t_link)) }
       mt = TInfer::MetaType.new_union(mts)
       @analysis[node] = TInfer::Literal.new(node.pos, layer(node), mt)
     end
@@ -406,11 +408,12 @@ module Savi::Compiler::PreTInfer
           case local
           when TInfer::Local, TInfer::Param
             info = self[node.rhs]
-            case info
-            when TInfer::FixedTypeExpr, TInfer::Self
-              info.stabilize = true
-              local.set_explicit(info)
-            else raise NotImplementedError.new(info)
+            if !TInfer.is_type_expr_cap?(node.rhs)
+              case info
+              when TInfer::FixedTypeExpr, TInfer::Self
+                local.set_explicit(info)
+              else raise NotImplementedError.new(info)
+              end
             end
           else raise NotImplementedError.new(local)
           end
@@ -442,8 +445,6 @@ module Savi::Compiler::PreTInfer
         rhs_info = self[node.rhs]
         Error.at node.rhs, "expected this to have a fixed type at compile time" \
           unless rhs_info.is_a?(TInfer::FixedTypeExpr)
-
-        rhs_info.stabilize = true
 
         # If the left-hand side is the name of a local variable...
         if lhs_info.is_a?(TInfer::LocalRef) || lhs_info.is_a?(TInfer::Local) || lhs_info.is_a?(TInfer::Param)
@@ -697,7 +698,9 @@ module Savi::Compiler::PreTInfer
       case info
       when TInfer::FixedTypeExpr
         param = TInfer::Param.new(node.pos, layer(node))
-        param.set_explicit(info)
+        if !TInfer.is_type_expr_cap?(node)
+          param.set_explicit(info)
+        end
         @analysis[node] = param # assign new info
       else
         raise NotImplementedError.new([node, info].inspect)

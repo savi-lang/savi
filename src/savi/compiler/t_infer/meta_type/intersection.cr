@@ -268,53 +268,6 @@ struct Savi::Compiler::TInfer::MetaType::Intersection
     other.unite(self) # delegate to the "higher" class via commutativity
   end
 
-  def aliased
-    Intersection.new(cap.try(&.aliased), terms, anti_terms)
-  end
-
-  def consumed
-    Intersection.new(cap.try(&.consumed), terms, anti_terms)
-  end
-
-  def stabilized
-    Intersection.new(cap.try(&.stabilized), terms, anti_terms)
-  end
-
-  def strip_cap
-    Intersection.build(nil, terms, anti_terms)
-  end
-
-  def partial_reifications
-    result = Set(MetaType::Inner).new
-
-    cap = cap()
-    if cap
-      cap_value = cap.value
-      case cap_value
-      when Cap
-        # If this intersection already has a single capability, it can't be
-        # split into any further capability possibilities, so just return it.
-        result.add(self)
-      when Set(Cap)
-        # If this intersection already has a set of capabilities,
-        # intersect with each capability in the set.
-        cap_value.each do |new_cap|
-          new_cap_mti = Capability.new(new_cap)
-          result.add(Intersection.build(new_cap_mti, terms, anti_terms))
-        end
-      else
-        raise NotImplementedError.new(cap)
-      end
-    else
-      # Otherwise, we need to intersect with every possible non-ephemeral cap.
-      Capability::ALL_NON_EPH.each do |new_cap|
-        Intersection.build(new_cap, terms, anti_terms)
-      end
-    end
-
-    result
-  end
-
   def type_params
     result = Set(TypeParam).new
 
