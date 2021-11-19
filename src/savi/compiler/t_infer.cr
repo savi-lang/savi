@@ -66,10 +66,6 @@ module Savi::Compiler::TInfer
       # Fast path for the case of no type arguments present.
       return span if args.empty?
 
-      if span.inner.is_a?(Span::ByReifyCap)
-        span = span.deciding_partial_reify_index(0)
-      end
-
       span.transform_mt(&.substitute_type_params(type_params, args))
     end
   end
@@ -81,10 +77,6 @@ module Savi::Compiler::TInfer
     def deciding_reify_of(span : Span, args : Array(MetaType)) : Span
       # Fast path for the case of no type arguments present.
       return span if args.empty?
-
-      if span.inner.is_a?(Span::ByReifyCap)
-        span = span.deciding_partial_reify_index(0)
-      end
 
       span.transform_mt(&.substitute_type_params(type_params, args))
     end
@@ -197,10 +189,6 @@ module Savi::Compiler::TInfer
       args : Array(MetaType),
       is_constructor : Bool
     ) : Span
-      if span.inner.is_a?(Span::ByReifyCap)
-        span = span.deciding_partial_reify_index(0)
-      end
-
       # Fast path for the case of no type arguments present.
       return span if args.empty?
 

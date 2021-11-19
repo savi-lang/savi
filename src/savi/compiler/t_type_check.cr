@@ -21,13 +21,6 @@ class Savi::Compiler::TTypeCheck
     # as well as partially reified types for those with type params.
     rts = [] of ReifiedType
 
-    # TODO:
-    # # Based on reachability analysis, type check any types used in the program.
-    # # This will prove safety of the program.
-    # ctx.reach.each_type_def.each { |reach_def|
-    #   rts << reach_def.reified.corresponding_partial_reification(ctx)
-    # }
-
     # From the root library, type check every possible partial reification
     # of every type within that library (or pulled in using :source).
     # This is useful for developing libraries, taking checks beyond

@@ -107,17 +107,6 @@ struct Savi::Compiler::TInfer::MetaType
     true
   end
 
-  # A partial reify type param is a type param intersected with a capability.
-  def is_partial_reify_of_type_param?(param : TypeParam) : Bool
-    inner = inner()
-    return false unless inner.is_a?(Intersection)
-    return false unless inner.cap
-    return false unless inner.anti_terms == nil
-    return false unless inner.terms.try(&.size) == 1
-    return false unless inner.terms.try(&.first.try(&.defn.==(param)))
-    true
-  end
-
   def type_param_only?
     inner = @inner
     inner.is_a?(Nominal) && inner.defn.is_a?(TypeParam)

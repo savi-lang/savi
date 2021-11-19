@@ -132,16 +132,11 @@ module Savi::Compiler::TInfer
       0 != params_count(ctx)
     end
 
-    def is_partial_reify?(ctx)
+    def is_before_reify?(ctx)
       params = ctx.t_infer[link].type_params
       params.size == args.size && params.zip(args).all? { |param, arg|
-        arg.is_partial_reify_of_type_param?(param)
+        arg.inner = MetaType::Nominal.new(param)
       }
-    end
-
-    def corresponding_partial_reification(ctx)
-      params = ctx.t_infer[link].type_params
-      ReifiedType.new(link, params.map { |tp| MetaType.new_type_param(tp) })
     end
 
     def is_complete?(ctx)

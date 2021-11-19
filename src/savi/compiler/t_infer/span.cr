@@ -12,14 +12,6 @@ module Savi::Compiler::TInfer
 
     def self.simple(mt : MetaType); new(Terminal.new(mt)); end
 
-    def self.for_partial_reify(mts : Array(MetaType))
-      new(ByReifyCap.build(mts.map_with_index { |mt, index|
-        bits = BitArray.new(mts.size)
-        bits[index] = true
-        {bits, Terminal.new(mt).as(Inner)}
-      }))
-    end
-
     def self.simple_with_fallback(
       default_mt : MetaType,
       evaluate_mt : MetaType,
@@ -104,14 +96,6 @@ module Savi::Compiler::TInfer
       end
     end
 
-    def deciding_partial_reify_index(index : Int) : Span
-      Span.new(inner.deciding_partial_reify_index(index))
-    end
-
-    def narrowing_partial_reify_indices(target_bits : BitArray, mark_unsatisfiable = true) : Span
-      Span.new(inner.narrowing_partial_reify_indices(target_bits, mark_unsatisfiable))
-    end
-
     def maybe_fallback_based_on_mt_simplify(options : Array({Symbol, Span}))
       Span.new(inner.maybe_fallback_based_on_mt_simplify(
         options.map { |(cond, span)| {cond, span.inner} }
@@ -145,8 +129,6 @@ module Savi::Compiler::TInfer
       abstract def transform_mt(&block : MetaType -> MetaType) : Inner
       abstract def transform_mt_to_span(&block : MetaType -> Span) : Inner
       abstract def combine_mt_to_span(other : Inner, &block : (MetaType, MetaType) -> Span) : Inner
-      abstract def deciding_partial_reify_index(index : Int) : Inner
-      abstract def narrowing_partial_reify_indices(target_bits : BitArray, mark_unsatisfiable : Bool) : Inner
       abstract def maybe_fallback_based_on_mt_simplify(options : Array({Symbol, Inner})) : Inner
       abstract def final_mt_simplify(ctx : Context) : Inner
     end
@@ -197,186 +179,12 @@ module Savi::Compiler::TInfer
         end
       end
 
-      def deciding_partial_reify_index(index : Int) : Inner
-        self
-      end
-
-      def narrowing_partial_reify_indices(target_bits : BitArray, mark_unsatisfiable : Bool) : Inner
-        self
-      end
-
       def maybe_fallback_based_on_mt_simplify(options : Array({Symbol, Inner})) : Inner
         Fallback.build(self, @meta_type, options)
       end
 
       def final_mt_simplify(ctx : Context) : Inner
         Terminal.new(meta_type.simplify(ctx))
-      end
-    end
-
-    struct ByReifyCap < Inner
-      getter mapping : Array({BitArray, (Fallback | Terminal | ErrorPropagate)})
-
-      def initialize(@mapping)
-      end
-
-      def pretty_print(format : PrettyPrint)
-        format.group {
-          format.surround("{", " }", left_break: " ", right_break: nil) {
-            @mapping.each_with_index { |pair, index|
-              bits, inner = pair
-
-              format.breakable ", " if index != 0
-
-              bits.pretty_print(format)
-              format.text " => "
-              format.nest {
-                inner.pretty_print(format)
-              }
-            }
-          }
-        }
-      end
-
-      def self.build(mapping : Array({BitArray, Inner})) : Inner
-        raise NotImplementedError.new "empty ByReifyCap!" if mapping.empty?
-
-        first_inner = mapping.first.not_nil!.last
-        return first_inner if mapping.all?(&.last.==(first_inner))
-
-        # Collapse identical inners together by uniting their bit sets.
-        mapping = mapping.group_by(&.last).map { |inner, list|
-          if list.size == 1
-            list.first.not_nil!
-          else
-            bits : BitArray = list.map(&.first)
-              .reduce(nil) { |accum, bits| accum ? (accum | bits) : bits }
-              .not_nil!
-            {bits, inner}
-          end
-        }
-
-        case mapping.size
-        when 1; mapping.first.not_nil!.last
-        else new(mapping)
-        end
-      end
-
-      def any_error? : Bool
-        @mapping.any?(&.last.any_error?)
-      end
-
-      def total_error : Error?
-        raise NotImplementedError.new("ByReifyCap#total_error")
-      end
-
-      def all_terminal_meta_types : Array(MetaType)
-        @mapping.flat_map(&.last.all_terminal_meta_types)
-      end
-
-      def any_mt?(&block : MetaType -> Bool) : Bool
-        @mapping.any?(&.last.any_mt?(&block))
-      end
-
-      def each_mt(&block : MetaType -> Nil) : Nil
-        @mapping.each(&.last.each_mt(&block))
-      end
-
-      def transform_mt(&block : MetaType -> MetaType) : Inner
-        ByReifyCap.build(@mapping.map { |bits, inner| {bits, inner.transform_mt(&block) } })
-      end
-
-      def transform_mt_to_span(&block : MetaType -> Span) : Inner
-        ByReifyCap.build(@mapping.flat_map { |bits, inner|
-          new_inner = inner.transform_mt_to_span(&block)
-          case new_inner
-          when ErrorPropagate
-            {bits, new_inner}
-          when Terminal
-            {bits, new_inner}
-          when ByReifyCap
-            new_inner.mapping.compact_map { |other_bits, inner_inner|
-              intersection_bits = bits.intersection?(other_bits)
-              {intersection_bits, inner_inner} if intersection_bits
-            }
-          else raise NotImplementedError.new(new_inner.pretty_inspect)
-          end
-        })
-      end
-
-      def combine_mt_to_span(other : Inner, &block : (MetaType, MetaType) -> Span) : Inner
-        new_mapping =
-          if other.is_a?(ByReifyCap) \
-          && other.mapping.size == @mapping.size \
-          && other.mapping.map(&.first) == @mapping.map(&.first)
-            # This is a special case we can optimize - if both are mappings
-            # that have the same bit sets in the same order,
-            # we can combine them pairwise instead of combinatorily.
-            @mapping.zip(other.mapping).map { |(bits, inner), (_, other_inner)|
-              {bits, inner.combine_mt_to_span(other_inner, &block).as(Inner)}
-            }
-          else
-            @mapping.flat_map { |bits, inner|
-              narrowed_other = if other.is_a?(ByReifyCap)
-                # If other has a mapping we need to only consider those cases
-                # where the other bit set overlaps with this particular bit set
-                # of ours. We want to avoid invalid combinations that yield
-                # a result we wouldn't use, and we want to avoid redundant
-                # combinations of the same pair that we would collapse later.
-                # So we collapse them here earlier before combining.
-                ByReifyCap.build(other.mapping.compact_map { |other_bits, inner_inner|
-                  intersection_bits = bits.intersection?(other_bits)
-                  {intersection_bits, inner_inner} if intersection_bits
-                })
-              else
-                other
-              end
-              # Here we do the combining.
-              {bits, inner.combine_mt_to_span(narrowed_other, &block).as(Inner)}
-            }
-          end
-
-        # Here we collapse the output to its canonical/minimal form.
-        # In particular we must account for the case where a ByReifyCap was
-        # the result, and in such case we must flatten it into our level.
-        ByReifyCap.build(new_mapping.flat_map { |bits, new_inner|
-          case new_inner
-          when ByReifyCap
-            new_inner.mapping.compact_map { |other_bits, inner_inner|
-              intersection_bits = bits.intersection?(other_bits)
-              {intersection_bits, inner_inner} if intersection_bits
-            }
-          else
-            {bits, new_inner.as(Inner)}
-          end
-        })
-      end
-
-      def deciding_partial_reify_index(index : Int) : Inner
-        @mapping.find(&.first.[](index)).not_nil!.last
-      end
-
-      def narrowing_partial_reify_indices(target_bits : BitArray, mark_unsatisfiable : Bool) : Inner
-        ByReifyCap.build(@mapping.compact_map { |bits, inner|
-          intersection_bits = target_bits.intersection?(bits)
-          if intersection_bits
-            {intersection_bits, inner}
-          else
-            {bits, Terminal.new(MetaType.unsatisfiable)} if mark_unsatisfiable
-          end
-        })
-      end
-
-      def maybe_fallback_based_on_mt_simplify(options : Array({Symbol, Inner})) : Inner
-        ByReifyCap.build(@mapping.map { |bits, inner|
-          {bits, inner.maybe_fallback_based_on_mt_simplify(options)}
-        })
-      end
-
-      def final_mt_simplify(ctx : Context) : Inner
-        ByReifyCap.build(@mapping.map { |bits, inner|
-          {bits, inner.final_mt_simplify(ctx)}
-        })
       end
     end
 
@@ -499,14 +307,6 @@ module Savi::Compiler::TInfer
         end
       end
 
-      def deciding_partial_reify_index(index : Int) : Inner
-        self
-      end
-
-      def narrowing_partial_reify_indices(target_bits : BitArray, mark_unsatisfiable : Bool) : Inner
-        self
-      end
-
       def maybe_fallback_based_on_mt_simplify(other_options : Array({Symbol, Inner})) : Inner
         Fallback.build(
           @default.value.maybe_fallback_based_on_mt_simplify(other_options),
@@ -571,14 +371,6 @@ module Savi::Compiler::TInfer
       end
 
       def combine_mt_to_span(other : Inner, &block : (MetaType, MetaType) -> Span) : Inner
-        self
-      end
-
-      def deciding_partial_reify_index(index : Int) : Inner
-        self
-      end
-
-      def narrowing_partial_reify_indices(target_bits : BitArray, mark_unsatisfiable : Bool) : Inner
         self
       end
 
