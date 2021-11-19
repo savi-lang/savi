@@ -73,7 +73,7 @@ We are excited to welcome all contributors that bring a positive attitude, regar
 
 ## Developing
 
-To work on this project and build the Savi compiler from source, you'll need `make`, `clang`, and `crystal` installed. You may also want to have `lldb` for debugging.
+To work on this project and build the Savi compiler from source, you'll need `make`, `clang`, and `crystal` installed (look at `shard.yml` to see the correct version of Crystal that is officially supported). You may also want to have `lldb` for debugging.
 
 To get started, clone the project to your development machine, then run one of the following commands within the project working directory, or consult the `Makefile` for more available commands. Note that the first time you run one of these commands it will take longer, as it will need to download some static dependencies and build the compiler for the first time.
 

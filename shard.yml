@@ -19,6 +19,6 @@ dependencies:
     github: at-grandpa/clim
     version: 0.13.0
 
-crystal: 1.0.0
+crystal: 1.2.1
 
 license: MPLv2
