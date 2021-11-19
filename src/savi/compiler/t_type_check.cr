@@ -33,6 +33,15 @@ class Savi::Compiler::TTypeCheck
       }
     }
 
+    # TODO: Use reachability analysis to make this only check reachable types
+    # that are outside of the root library, as the old TypeCheck pass did.
+    ctx.program.libraries.each { |library|
+      library.types.each { |t|
+        t_link = t.make_link(library)
+        rts << ctx.t_infer[t_link].type_before_reification.single!
+      }
+    }
+
     # Remove redundant entries in the list of types to check.
     rts.uniq!
 
