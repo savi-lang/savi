@@ -51,8 +51,8 @@ module Savi::Compiler::TInfer
     getter! type_params : Array(TypeParam)
     protected setter type_params
 
-    getter! type_partial_reifications : Array(MetaType)
-    protected setter type_partial_reifications
+    getter! type_before_reification : MetaType
+    protected setter type_before_reification
 
     getter! type_param_bound_spans : Array(Span)
     protected setter type_param_bound_spans
@@ -93,9 +93,6 @@ module Savi::Compiler::TInfer
   struct FuncAnalysis < Analysis
     getter! pre_infer : PreTInfer::Analysis
     protected setter pre_infer
-    
-    getter! func_partial_reifications : Array(MetaType)
-    protected setter func_partial_reifications
 
     getter! param_spans : Array(Span)
     protected setter param_spans
@@ -421,11 +418,11 @@ module Savi::Compiler::TInfer
           TypeParam.new(ref.as(Refer::TypeParam))
         }) || [] of TypeParam
 
-      @analysis.type_partial_reifications = begin
+      @analysis.type_before_reification = begin
         t_link = @link
         args = @analysis.type_params.map { |tp| MetaType.new_type_param(tp) }
         # TODO: Refactor this to not be an array.
-        [MetaType.new_nominal(ReifiedType.new(t_link, args))]
+        MetaType.new_nominal(ReifiedType.new(t_link, args))
       end
 
       @analysis.type_param_bound_spans = @analysis.type_params.map { |type_param|
@@ -450,8 +447,7 @@ module Savi::Compiler::TInfer
 
     def self_type_expr_span(ctx : Context) : Span
       self_span = (
-        @self_span ||=
-          Span.for_partial_reify(@analysis.type_partial_reifications).as(Span)
+        @self_span ||= Span.simple(@analysis.type_before_reification).as(Span)
       ).not_nil!
 
       self_span
@@ -477,11 +473,11 @@ module Savi::Compiler::TInfer
           TypeParam.new(ref.as(Refer::TypeParam))
         }) || [] of TypeParam
 
-      @analysis.type_partial_reifications = begin
+      @analysis.type_before_reification = begin
         t_link = @link
         args = @analysis.type_params.map { |tp| MetaType.new_type_param(tp) }
         # TODO: Refactor this to not be an array.
-        [MetaType.new_alias(ReifiedTypeAlias.new(t_link, args))]
+        MetaType.new_alias(ReifiedTypeAlias.new(t_link, args))
       end
 
       @analysis.type_param_bound_spans = @analysis.type_params.map { |type_param|
@@ -528,8 +524,7 @@ module Savi::Compiler::TInfer
 
     def self_type_expr_span(ctx : Context) : Span
       self_span = (
-        @self_span ||=
-          Span.for_partial_reify(@analysis.type_partial_reifications).as(Span)
+        @self_span ||= Span.simple(@analysis.type_before_reification).as(Span)
       ).not_nil!
 
       self_span
@@ -569,14 +564,7 @@ module Savi::Compiler::TInfer
 
     def init_analysis
       @analysis.type_params = @t_analysis.type_params
-
-      @analysis.func_partial_reifications = begin
-        t_link = @link.type
-        args = @analysis.type_params.map { |tp| MetaType.new_type_param(tp) }
-        # TODO: Refactor this to not be an array.
-        [MetaType.new_nominal(ReifiedType.new(t_link, args))]
-      end
-
+      @analysis.type_before_reification = @t_analysis.type_before_reification
       @analysis.pre_infer = @pre_infer
 
       self
@@ -659,8 +647,7 @@ module Savi::Compiler::TInfer
 
     def self_type_expr_span(ctx : Context) : Span
       self_span = (
-        @self_span ||=
-          Span.for_partial_reify(@analysis.func_partial_reifications).as(Span)
+        @self_span ||= Span.simple(@analysis.type_before_reification).as(Span)
       ).not_nil!
 
       self_span

@@ -36,7 +36,7 @@ class Savi::Compiler::TTypeCheck
     ctx.root_library.tap { |library|
       library.types.each { |t|
         t_link = t.make_link(library)
-        rts.concat(ctx.t_infer[t_link].type_partial_reifications.map(&.single!))
+        rts << ctx.t_infer[t_link].type_before_reification.single!
       }
     }
 
