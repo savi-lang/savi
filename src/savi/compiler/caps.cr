@@ -240,7 +240,7 @@ module Savi::Compiler::Caps
       if explicit
         # Params differ from local variables in that their explicit type
         # creates a constraint rather than a fully-equivalent binding.
-        constrain(explicit.pos, var, @by_node[explicit])
+        constrain(explicit.pos, @by_node[explicit], var)
       end
 
       constrain(node.pos, @by_node[default], var) if default

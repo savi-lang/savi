@@ -23,11 +23,11 @@ K:return:2
 
 K:cond:3
   <: val
-    :fun example(cond Bool'val)
-                      ^~~~~~~~
-  <: val
       if cond ("foo" | String)
          ^~~~
+  :> val
+    :fun example(cond Bool'val)
+                      ^~~~~~~~
 
 K:choice:result:4
   <: K:return:2
