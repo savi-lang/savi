@@ -3,6 +3,7 @@ class Savi::Compiler::Context
   getter program
   getter import
 
+  getter caps
   getter classify
   getter code_gen
   getter code_gen_verona
@@ -52,6 +53,7 @@ class Savi::Compiler::Context
   def initialize(@compiler, @options = CompilerOptions.new, @prev_ctx = nil)
     @program = Program.new
 
+    @caps = Caps::Pass.new
     @classify = Classify::Pass.new
     @code_gen = CodeGen.new(CodeGen::PonyRT)
     @code_gen_verona = CodeGen.new(CodeGen::VeronaRT)
