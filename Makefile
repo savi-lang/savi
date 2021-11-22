@@ -16,6 +16,10 @@ ci: PHONY
 	make test extra_args="$(extra_args)"
 	make example-run dir="examples/adventofcode/2018" extra_args="--backtrace"
 
+# Remove temporary/generated files.
+clean: PHONY
+	rm -rf $(BUILD) .make-var-cache lib/libsavi_runtime.bc
+
 # Run the test suite.
 test: PHONY $(SPEC)
 	echo && $(SPEC) $(extra_args)
