@@ -19,6 +19,9 @@ module Savi::Compiler::Caps
     def instantiated : CapSimple
       self
     end
+
+    # TODO: Should this method also be required for non-CapSimple CapNodes?
+    abstract def viewed_from(origin : CapSimple) : CapSimple
   end
 
   enum RegionLiteral
@@ -66,11 +69,28 @@ module Savi::Compiler::Caps
     def show(io : IO)
       io << "iso"
     end
+
+    def viewed_from(origin : CapSimple) : CapSimple
+      case origin
+      when CapNon, CapTag then CapNon.new
+      when CapIso, CapRef then CapIso.new
+      when CapVal, CapBox then CapVal.new
+      else CapViewpoint.new(origin, self)
+      end
+    end
   end
 
   struct CapVal < CapLiteral
     def show(io : IO)
       io << "val"
+    end
+
+    def viewed_from(origin : CapSimple) : CapSimple
+      case origin
+      when CapNon, CapTag then CapNon.new
+      when CapLiteral     then CapVal.new
+      else CapViewpoint.new(origin, self)
+      end
     end
   end
 
@@ -79,6 +99,15 @@ module Savi::Compiler::Caps
       io << "ref"
       io << "'" if region.top?
     end
+
+    def viewed_from(origin : CapSimple) : CapSimple
+      case origin
+      when CapNon, CapTag then CapNon.new
+      when CapIso, CapVal then origin
+      when CapRef, CapBox then join(origin)
+      else CapViewpoint.new(origin, self)
+      end
+    end
   end
 
   struct CapBox < CapLiteralWithRegionLiteral
@@ -86,17 +115,38 @@ module Savi::Compiler::Caps
       io << "box"
       io << "'" if region.top?
     end
+
+    def viewed_from(origin : CapSimple) : CapSimple
+      case origin
+      when CapNon, CapTag then CapNon.new
+      when CapIso, CapVal then CapVal.new
+      when CapRef, CapBox then join(origin)
+      else CapViewpoint.new(origin, self)
+      end
+    end
   end
 
   struct CapTag < CapLiteral
     def show(io : IO)
       io << "tag"
     end
+
+    def viewed_from(origin : CapSimple) : CapSimple
+      case origin
+      when CapNon, CapTag then CapNon.new
+      when CapLiteral     then self
+      else CapViewpoint.new(origin, self)
+      end
+    end
   end
 
   struct CapNon < CapLiteral
     def show(io : IO)
       io << "non"
+    end
+
+    def viewed_from(origin : CapSimple) : CapSimple
+      self
     end
   end
 
@@ -113,6 +163,29 @@ module Savi::Compiler::Caps
       io << @nickname
       io << (scope.is_a?(Program::Function::Link) ? ":" : "::")
       @sequence_number.inspect(io)
+    end
+
+    def viewed_from(origin : CapSimple) : CapSimple
+      CapViewpoint.new(origin, self)
+    end
+  end
+
+  struct CapViewpoint < CapSimple
+    getter origin : StructRef(CapSimple)
+    getter field : StructRef(CapSimple)
+    def initialize(origin, field)
+      @origin = StructRef(CapSimple).new(origin)
+      @field = StructRef(CapSimple).new(field)
+    end
+
+    def show(io : IO)
+      origin.show(io)
+      io << "->"
+      field.show(io)
+    end
+
+    def viewed_from(origin : CapSimple) : CapSimple
+      CapViewpoint.new(origin, self)
     end
   end
 
