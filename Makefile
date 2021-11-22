@@ -85,7 +85,7 @@ define MAKE_VAR_CACHE
 .make-var-cache/$1: PHONY
 	@mkdir -p .make-var-cache
 	@if [ '$(shell cat .make-var-cache/$1 2> /dev/null)' = '$($1)' ]; then echo; else \
-		/bin/echo -n $($1) > .make-var-cache/$1; fi
+		/usr/bin/env echo -n $($1) > .make-var-cache/$1; fi
 
 endef
 
