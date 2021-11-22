@@ -247,14 +247,14 @@ module Savi::Compiler::Caps
 
       case node
       when AST::FieldRead
-        constrain(receiver_var, CapLiteral.boxp)
+        constrain(node.pos, receiver_var, CapLiteral.boxp)
         @by_node[node] = var.aliased.viewed_from(receiver_var)
       when AST::FieldWrite
-        constrain(receiver_var, CapLiteral.refp)
+        constrain(node.pos, receiver_var, CapLiteral.refp)
         @by_node[node] = var.aliased.viewed_from(receiver_var)
         # TODO: constrain upper bounds for node.rhs writing into the field
       when AST::FieldDisplace
-        constrain(receiver_var, CapLiteral.refp)
+        constrain(node.pos, receiver_var, CapLiteral.refp)
         @by_node[node] = var.viewed_from(receiver_var)
         # TODO: constrain upper bounds for node.rhs writing into the field
       end
