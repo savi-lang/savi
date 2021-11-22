@@ -354,7 +354,7 @@ class Savi::SpecMarkdown
         end
 
         f_link = func.make_link(type.make_link(library.make_link))
-        actual = ctx.caps[f_link].show_cap_variables_list
+        actual = ctx.caps.for_f_link(ctx, f_link).analysis.show_cap_variables_list
 
         unless expected.strip == actual.strip
           puts "---"

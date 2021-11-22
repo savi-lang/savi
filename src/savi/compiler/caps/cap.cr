@@ -21,6 +21,17 @@ module Savi::Compiler::Caps
     end
 
     # TODO: Should this method also be required for non-CapSimple CapNodes?
+    abstract def collapse_with_mapping(
+      analysis : Analysis,
+      new_analysis : Analysis,
+      polarity : Bool,
+      var_mapping : Hash(CapVariable, CapSimple)
+    ) : CapSimple
+
+    # TODO: Should this method also be required for non-CapSimple CapNodes?
+    abstract def aliased : CapSimple
+
+    # TODO: Should this method also be required for non-CapSimple CapNodes?
     abstract def viewed_from(origin : CapSimple) : CapSimple
   end
 
@@ -48,6 +59,24 @@ module Savi::Compiler::Caps
     def self.val; CapVal.new; end
     def self.tag; CapTag.new; end
     def self.non; CapNon.new; end
+
+    def collapse_with_mapping(
+      analysis : Analysis,
+      new_analysis : Analysis,
+      polarity : Bool,
+      var_mapping : Hash(CapVariable, CapSimple)
+    ) : CapSimple
+      self # no variables to substitute, and no further collapse possible
+    end
+
+    def aliased : CapSimple
+      raise NotImplementedError.new("#{show} aliased") if is_a?(CapIso)
+      self
+    end
+
+    def join(other : CapLiteral)
+      raise NotImplementedError.new("#{show} \/ #{other.show}")
+    end
 
     def top?
       self.is_a?(CapNon)
@@ -165,6 +194,66 @@ module Savi::Compiler::Caps
       @sequence_number.inspect(io)
     end
 
+    def collapse_with_mapping(
+      analysis : Analysis,
+      new_analysis : Analysis,
+      polarity : Bool,
+      var_mapping : Hash(CapVariable, CapSimple)
+    ) : CapSimple
+      mapped = var_mapping[self]?
+      return mapped if mapped
+
+      new_var = new_analysis.new_cap_var(self.nickname)
+      var_mapping[self] = new_var
+
+      if polarity
+        analysis.lower_bounds_of(self).each { |pos, bound|
+          mapped_bound = bound.collapse_with_mapping(analysis, new_analysis, polarity, var_mapping)
+          new_analysis.constrain(pos, mapped_bound, new_var)
+        }
+      else
+        analysis.upper_bounds_of(self).each { |pos, bound|
+          mapped_bound = bound.collapse_with_mapping(analysis, new_analysis, polarity, var_mapping)
+          new_analysis.constrain(pos, new_var, mapped_bound)
+        }
+      end
+
+      new_var
+    end
+
+    def aliased : CapSimple
+      CapAliased.new(self)
+    end
+
+    def viewed_from(origin : CapSimple) : CapSimple
+      CapViewpoint.new(origin, self)
+    end
+  end
+
+  struct CapAliased < CapSimple
+    getter inner : StructRef(CapSimple)
+    def initialize(inner)
+      @inner = StructRef(CapSimple).new(inner)
+    end
+
+    def show(io : IO)
+      inner.show(io)
+      io << "'aliased"
+    end
+
+    def collapse_with_mapping(
+      analysis : Analysis,
+      new_analysis : Analysis,
+      polarity : Bool,
+      var_mapping : Hash(CapVariable, CapSimple)
+    ) : CapSimple
+      inner.collapse_with_mapping(analysis, new_analysis, polarity, var_mapping).aliased
+    end
+
+    def aliased : CapSimple
+      raise NotImplementedError.new("#{show} aliased")
+    end
+
     def viewed_from(origin : CapSimple) : CapSimple
       CapViewpoint.new(origin, self)
     end
@@ -182,6 +271,22 @@ module Savi::Compiler::Caps
       origin.show(io)
       io << "->"
       field.show(io)
+    end
+
+    def collapse_with_mapping(
+      analysis : Analysis,
+      new_analysis : Analysis,
+      polarity : Bool,
+      var_mapping : Hash(CapVariable, CapSimple)
+    ) : CapSimple
+      field.collapse_with_mapping(analysis, new_analysis, polarity, var_mapping)
+        .viewed_from(
+          origin.collapse_with_mapping(analysis, new_analysis, polarity, var_mapping)
+        )
+    end
+
+    def aliased : CapSimple
+      CapAliased.new(self)
     end
 
     def viewed_from(origin : CapSimple) : CapSimple

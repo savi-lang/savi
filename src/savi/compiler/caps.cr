@@ -6,9 +6,9 @@ require "./caps/**"
 # but it is still a work in progress and isn't in the main compile path yet.
 #
 module Savi::Compiler::Caps
-  struct Analysis
+  class Analysis
+    getter rf : TInfer::ReifiedFunction
     getter scope : CapVariable::Scope
-    getter for_type : StructRef(Analysis)?
 
     getter! for_self : CapVariable
     getter! field_vars : Hash(String, CapVariable)
@@ -17,9 +17,9 @@ module Savi::Compiler::Caps
     getter! param_vars : Array(CapVariable)
     getter! return_var : CapVariable
 
-    def initialize(@scope, for_type : Analysis? = nil)
-      @for_type = for_type ? StructRef(Analysis).new(for_type) : nil
+    def initialize(@rf)
       @sequence_number = 0
+      @scope = rf.link
 
       @by_node = {} of AST::Node => CapSimple
       @local_vars_by_ref = {} of Refer::Info => CapVariable
@@ -36,12 +36,43 @@ module Savi::Compiler::Caps
       @by_node[node] = t
     end
 
+    def constrain_caller_vars(
+      caller_analysis : Analysis,
+      caller_receiver : CapSimple,
+      caller_result_var : CapVariable,
+      caller_arg_vars : Array(CapVariable)? = nil,
+    )
+      # Create a mapping of internal variables to external variables,
+      # so that we can translate internal constraints into the caller's view.
+      # For example, if the return value has a lower bound of one of the params,
+      # we want to constrain the caller's result value with the lower bound
+      # of the corresponding caller's arg cap variable.
+      var_mapping = {
+        receiver_var => caller_receiver,
+        return_var => caller_result_var,
+      }
+      caller_arg_vars.try(&.each_with_index { |caller_arg_var, index|
+        # TODO: Handle case of out-of-bounds caller arg index?
+        var_mapping[param_vars[index]] = caller_arg_var
+      })
+
+      # Now, copy constraints, applying the variable mapping to each bound,
+      # discarding any non-mapped variables that are present in the bound.
+      lower_bounds_of(return_var).each { |pos, bound|
+        mapped_bound = bound.collapse_with_mapping(self, caller_analysis, true, var_mapping)
+        caller_analysis.constrain(pos, mapped_bound, caller_result_var)
+      }
+      upper_bounds_of(receiver_var).each { |pos, bound|
+        mapped_bound = bound.collapse_with_mapping(self, caller_analysis, false, var_mapping)
+        caller_analysis.constrain(pos, caller_receiver, mapped_bound)
+      }
+      # TODO: copy constraints to the caller_arg_vars
+    end
+
     def lower_bounds_of(var : CapVariable)
       case var.scope
       when @scope
         @var_lower_bounds[var.sequence_number - 1]
-      when for_type.try(&.value.scope)
-        for_type.not_nil!.value.lower_bounds_of(var)
       else
         raise NotImplementedError.new("can't reach properties of foreign vars")
       end
@@ -51,8 +82,6 @@ module Savi::Compiler::Caps
       case var.scope
       when @scope
         @var_upper_bounds[var.sequence_number - 1]
-      when for_type.try(&.value.scope)
-        for_type.not_nil!.value.upper_bounds_of(var)
       else
         raise NotImplementedError.new("can't reach properties of foreign vars")
       end
@@ -70,12 +99,6 @@ module Savi::Compiler::Caps
       String.build { |output| show_cap_variables_list(output) }
     end
     def show_cap_variables_list(output : IO)
-      for_type = @for_type
-      if for_type
-        for_type.show_cap_variables_list(output)
-        output << "~~~\n"
-      end
-
       @vars.each_with_index { |var, index|
         output << "\n" if index > 0
         show_cap_variable(output, var)
@@ -105,37 +128,6 @@ module Savi::Compiler::Caps
         output << pos.show.split("\n")[1..-1].join("\n  ")
         output << "\n"
       }
-    end
-
-    protected def init_type_self(ctx, visitor : Visitor, params : AST::Group?)
-      @type_param_vars = params.try(&.terms.map { |param|
-        ident = AST::Extract.type_param(param).first
-        var = new_cap_var(ident.value)
-        raise NotImplementedError.new("type parameter cap inference")
-        var
-      })
-
-      params.try(&.terms.each_with_index { |param, index|
-        ident, explicit, default = AST::Extract.type_param(param)
-        var = type_param_vars[index]
-
-        explicit_cap = visitor.read_cap_expr(ctx, explicit) if explicit
-        default_cap = visitor.read_cap_expr(ctx, default) if default
-
-        @by_node[param] = var
-        @by_node[ident] = var
-        @by_node[explicit] = explicit_cap if explicit && explicit_cap
-        @by_node[default] = default_cap if default && default_cap
-
-        constrain(explicit.pos, var, explicit_cap.not_nil!) if explicit
-      })
-    end
-
-    protected def init_type_fields(ctx, visitor : Visitor, fields : Array(Program::Function))
-      # TODO: A CapVariable for each field.
-      # @field_vars = fields.map { |f|
-      #   {f.ident.value, new_cap_var(f.ident.value)}
-      # }.to_h
     end
 
     protected def init_func_self(cap_node : AST::Identifier)
@@ -248,47 +240,39 @@ module Savi::Compiler::Caps
       @by_node[node] = var
     end
 
-    protected def observe_field_access(node)
-      for_type = @for_type.not_nil!.value
-      var = for_type.field_vars[node.value]
+    protected def observe_field_access(node, field_visitor)
+      var = new_cap_var(node.value)
+
+      field_visitor.analysis.constrain_caller_vars(self, receiver_var, var)
+
       case node
       when AST::FieldRead
-        @by_node[node] = var
+        @by_node[node] = var.aliased.viewed_from(receiver_var)
       when AST::FieldWrite
-        @by_node[node] = var
-        constrain(node.pos, @by_node[node.rhs], var)
+        @by_node[node] = var.aliased
+        # TODO: constrain upper bounds for node.rhs writing into the field
       when AST::FieldDisplace
         @by_node[node] = var
-        constrain(node.pos, @by_node[node.rhs], var)
+        # TODO: constrain upper bounds for node.rhs writing into the field
       end
     end
 
-    protected def observe_field_func(ctx, visitor, f : Program::Function)
-      var = @for_type.not_nil!.field_vars[f.ident.value]
-
-      f.ret.try { |ret|
-        explicit_cap = visitor.read_cap_expr(ctx, ret)
-        constrain_upper_and_lower(ret.pos, var, explicit_cap) if explicit_cap
-      }
-      f.body.try { |body|
-        constrain(body.pos, @by_node[body], var)
-      }
-    end
-
-    protected def observe_call(call : AST::Call)
+    protected def observe_call(call : AST::Call, f_visitor : Visitor)
       receiver_cap = @by_node[call.receiver]
 
-      # TODO: Use receiver type to recurse to analyzing a different function -
-      # the function or functions being called here, to get the caps
-      # of their param vars and return vars.
-
-      call.args.try(&.terms.each_with_index { |term, index|
+      arg_vars = call.args.try(&.terms.each_with_index.map { |term, index|
         param_var = new_cap_var("#{call.ident.value}(#{index})")
 
         constrain(term.pos, @by_node[term], param_var)
-      })
+
+        param_var
+      }.to_a)
 
       result_var = new_cap_var(call.ident.value)
+
+      f_visitor.analysis.constrain_caller_vars(
+        self, receiver_cap, result_var, arg_vars
+      )
 
       @by_node[call] = result_var
     end
@@ -368,41 +352,20 @@ module Savi::Compiler::Caps
 
   class Visitor < AST::Visitor
     getter analysis
-    private getter infer : Infer::Analysis
     private getter refer_type : ReferType::Analysis
     private getter! refer : Refer::Analysis
-    private getter! classify : Classify::Analysis # only present within a func
+    private getter! classify : Classify::Analysis
+    private getter! pre_infer : PreTInfer::Analysis
+    private getter! infer : TInfer::Analysis
 
     def initialize(
       @analysis : Analysis,
-      @infer,
       @refer_type,
       @refer = nil,
       @classify = nil,
+      @pre_infer = nil,
+      @infer = nil,
     )
-    end
-
-    def run_for_type_alias(ctx : Context, t : Program::TypeAlias)
-      # TODO: Allow running this pass for more than just the root library.
-      # We restrict this for now while we are building out the pass because
-      # we don't want to deal with all of the complicated forms in the prelude.
-      # We want to stick to the simple forms in the compiler pass specs for now.
-      root_library = ctx.root_library.source_library
-      return unless t.ident.pos.source.library == root_library
-
-      raise NotImplementedError.new("run_for_type_alias")
-    end
-
-    def run_for_type(ctx : Context, t : Program::Type)
-      # TODO: Allow running this pass for more than just the root library.
-      # We restrict this for now while we are building out the pass because
-      # we don't want to deal with all of the complicated forms in the prelude.
-      # We want to stick to the simple forms in the compiler pass specs for now.
-      root_library = ctx.root_library.source_library
-      return unless t.ident.pos.source.library == root_library
-
-      @analysis.init_type_self(ctx, self, t.params)
-      @analysis.init_type_fields(ctx, self, t.functions.select(&.has_tag?(:field)))
     end
 
     def run_for_function(ctx : Context, f : Program::Function)
@@ -426,8 +389,6 @@ module Savi::Compiler::Caps
       unless f.has_tag?(:constructor)
         f.body.try { |body| @analysis.observe_natural_return(body) }
       end
-
-      analysis.observe_field_func(ctx, self, f) if f.has_tag?(:field)
     end
 
     def visit_any?(ctx, node)
@@ -452,11 +413,7 @@ module Savi::Compiler::Caps
         # A nominal type tells us nothing about capabilities.
         nil
       when Refer::TypeParam
-        analysis = @analysis
-        while analysis.scope != ref.parent_link
-          analysis = analysis.for_type.not_nil!.value
-        end
-        analysis.type_param_vars[ref.index]
+        raise NotImplementedError.new("type params in cap inference pass")
       when nil
         cap = CapLiteral.from(node.value) rescue nil
         ctx.error_at node, "This type couldn't be resolved" unless cap
@@ -469,7 +426,9 @@ module Savi::Compiler::Caps
     def read_cap_expr(ctx, node : AST::Relate)
       case node.op.value
       when "->"
-        raise NotImplementedError.new("viewpoints in cap inference pass")
+        read_cap_expr(ctx, node.rhs).try(
+          &.viewed_from(read_cap_expr(ctx, node.lhs).not_nil!)
+        )
       when "'"
         # Nominal types are ignored - just keep the right-hand-side.
         # TODO: Handle region names affixed to caps with this same operator.
@@ -528,11 +487,7 @@ module Savi::Compiler::Caps
           @analysis[node] = CapLiteral.non
         end
       when Refer::TypeParam
-        analysis = @analysis
-        while analysis.scope != ref.parent_link
-          analysis = analysis.for_type.not_nil!.value
-        end
-        @analysis[node] = analysis.type_param_vars[ref.index]
+        raise NotImplementedError.new("type params in cap inference pass")
       else
         raise NotImplementedError.new(ref.class)
       end
@@ -584,7 +539,8 @@ module Savi::Compiler::Caps
         # These special intrinsics all return an immutable value.
         @analysis[node] = CapLiteral.val
       when "--"
-        raise NotImplementedError.new("consume in cap inference pass")
+        # TODO: Get rid of consume from the language once cap inference is good.
+        @analysis[node] = @analysis[node.term]
       else
         raise NotImplementedError.new(node.op.value)
       end
@@ -680,11 +636,30 @@ module Savi::Compiler::Caps
     end
 
     def visit(ctx, node : AST::FieldRead | AST::FieldWrite | AST::FieldDisplace)
-      @analysis.observe_field_access(node)
+      # Find the corresponding field function and run its visitor,
+      # so that we can get the cap of the field.
+      field_func_link =
+        @analysis.rf.type.link.resolve(ctx).functions
+          .select(&.has_tag?(:field))
+          .find(&.ident.value.==(node.value))
+          .not_nil!
+          .make_link(@analysis.rf.type.link)
+      field_visitor = ctx.caps.for_rf(ctx, @analysis.rf.type, field_func_link)
+
+      @analysis.observe_field_access(node, field_visitor)
     end
 
     def visit(ctx, node : AST::Call)
-      @analysis.observe_call(node)
+      # TODO: Support non-terminal Spans and non-single MetaTypes.
+      receiver_rt = infer[pre_infer[node.receiver]].terminal!.single!
+
+      f_link = receiver_rt.link
+        .resolve(ctx)
+        .find_func!(node.ident.value)
+        .make_link(receiver_rt.link)
+      f_visitor = ctx.caps.for_rf(ctx, receiver_rt, f_link)
+
+      @analysis.observe_call(node, f_visitor)
     end
 
     def visit(ctx, node)
@@ -692,46 +667,57 @@ module Savi::Compiler::Caps
     end
   end
 
-  class Pass < Compiler::Pass::Analyze(Analysis, Analysis, Analysis)
-    def analyze_type_alias(ctx, t, t_link) : Analysis
-      infer = ctx.infer[t_link]
-      refer_type = ctx.refer_type[t_link]
-      deps = {infer, refer_type}
-      prev = ctx.prev_ctx.try(&.caps)
-
-      maybe_from_type_alias_cache(ctx, prev, t, t_link, deps) do
-        Visitor.new(Analysis.new(t_link), *deps)
-          .tap(&.run_for_type_alias(ctx, t))
-          .analysis
-      end
+  class Pass
+    def initialize
+      @map = {} of TInfer::ReifiedFunction => Visitor
     end
 
-    def analyze_type(ctx, t, t_link) : Analysis
-      infer = ctx.infer[t_link]
-      refer_type = ctx.refer_type[t_link]
-      deps = {infer, refer_type}
-      prev = ctx.prev_ctx.try(&.caps)
+    def run(ctx)
+      rts = [] of TInfer::ReifiedType
 
-      maybe_from_type_cache(ctx, prev, t, t_link, deps) do
-        Visitor.new(Analysis.new(t_link), *deps)
-          .tap(&.run_for_type(ctx, t))
-          .analysis
-      end
+      # Collect the non-reified types for every type in the root library.
+      ctx.root_library.tap { |library|
+        library.types.each { |t|
+          t_link = t.make_link(library)
+
+          rts << ctx.t_infer[t_link].type_before_reification.single!
+        }
+      }
+
+      # TODO: Collect all (reachable?) types - not just the root library.
+
+      # Run for every function in each of the collected types.
+      rts.each { |rt|
+        rt.defn(ctx).functions.each { |f|
+          for_rf(ctx, rt, f.make_link(rt.link))
+        }
+      }
     end
 
-    def analyze_func(ctx, f, f_link, t_analysis) : Analysis
-      infer = ctx.infer[f_link]
-      refer_type = ctx.refer_type[f_link]
-      refer = ctx.refer[f_link]
-      classify = ctx.classify[f_link]
-      deps = {infer, refer_type, refer, classify}
-      prev = ctx.prev_ctx.try(&.caps)
+    # This is only used in tests.
+    def for_f_link(ctx, f_link : Program::Function::Link)
+      rt = ctx.t_infer[f_link.type].type_before_reification.single!
+      for_rf(ctx, rt, f_link)
+    end
 
-      maybe_from_func_cache(ctx, prev, f, f_link, deps) do
-        Visitor.new(Analysis.new(f_link, t_analysis), *deps)
-          .tap(&.run_for_function(ctx, f))
-          .analysis
-      end
+    def for_rf(
+      ctx : Context,
+      rt : TInfer::ReifiedType,
+      f_link : Program::Function::Link,
+    ) : Visitor
+      mt = TInfer::MetaType.new(rt)
+      rf = TInfer::ReifiedFunction.new(rt, f_link, mt)
+      @map[rf] ||= (
+        # TODO: Recursion check first!
+        refer_type = ctx.refer_type[f_link]
+        refer = ctx.refer[f_link]
+        classify = ctx.classify[f_link]
+        pre_infer = ctx.pre_t_infer[f_link]
+        infer = ctx.t_infer[f_link]
+        Visitor
+          .new(Analysis.new(rf), refer_type, refer, classify, pre_infer, infer)
+          .tap(&.run_for_function(ctx, f_link.resolve(ctx)))
+      )
     end
   end
 end

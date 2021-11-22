@@ -51,9 +51,9 @@ class Savi::Compiler
     when "xtypes"           then :xtypes
     when "t_infer_edge"     then :t_infer_edge
     when "t_infer"          then :t_infer
+    when "caps"             then :caps
     when "infer_edge"       then :infer_edge
     when "infer"            then :infer
-    when "caps"             then :caps
     when "completeness"     then :completeness
     when "privacy"          then :privacy
     when "verify"           then :verify
@@ -103,9 +103,9 @@ class Savi::Compiler
       when :xtypes           then ctx.run_whole_program(ctx.xtypes)
       when :t_infer_edge     then ctx.run(ctx.t_infer_edge)
       when :t_infer          then ctx.run(ctx.t_infer)
+      when :caps             then ctx.run_whole_program(ctx.caps)
       when :infer_edge       then ctx.run(ctx.infer_edge)
       when :infer            then ctx.run(ctx.infer)
-      when :caps             then ctx.run(ctx.caps)
       when :completeness     then ctx.run(ctx.completeness)
       when :privacy          then ctx.run(ctx.privacy)
       when :verify           then ctx.run(ctx.verify)
@@ -160,9 +160,9 @@ class Savi::Compiler
     when :xtypes then [:xtypes_graph]
     when :t_infer_edge then [:pre_subtyping, :pre_t_infer, :classify, :refer_type]
     when :t_infer then [:t_infer_edge]
+    when :caps then [:t_infer]
     when :infer_edge then [:pre_subtyping, :pre_infer, :classify, :refer_type]
     when :infer then [:infer_edge]
-    when :caps then [:infer]
     when :completeness then [:jumps, :pre_infer]
     when :privacy then [:infer]
     when :verify then [:infer, :pre_infer, :inventory, :jumps]
