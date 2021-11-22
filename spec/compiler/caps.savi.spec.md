@@ -21,6 +21,9 @@ K:@:1
   <: box
     :let default_message: "foo"
      ^~~
+  <: box'
+    :let default_message: "foo"
+         ^~~~~~~~~~~~~~~
 
 K:return:2
   :> K:@:1->K:default_message:5'aliased
