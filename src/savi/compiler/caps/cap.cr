@@ -57,6 +57,10 @@ module Savi::Compiler::Caps
 
     def self.iso; CapIso.new; end
     def self.val; CapVal.new; end
+    def self.box; CapBox.new(RegionLiteral::Current); end
+    def self.boxp; CapBox.new(RegionLiteral::Top); end
+    def self.ref; CapBox.new(RegionLiteral::Current); end
+    def self.refp; CapRef.new(RegionLiteral::Top); end
     def self.tag; CapTag.new; end
     def self.non; CapNon.new; end
 
