@@ -251,11 +251,11 @@ module Savi::Compiler::Caps
         @by_node[node] = var.aliased.viewed_from(receiver_var)
       when AST::FieldWrite
         constrain(receiver_var, CapLiteral.refp)
-        @by_node[node] = var.aliased
+        @by_node[node] = var.aliased.viewed_from(receiver_var)
         # TODO: constrain upper bounds for node.rhs writing into the field
       when AST::FieldDisplace
         constrain(receiver_var, CapLiteral.refp)
-        @by_node[node] = var
+        @by_node[node] = var.viewed_from(receiver_var)
         # TODO: constrain upper bounds for node.rhs writing into the field
       end
     end
