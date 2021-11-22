@@ -6,6 +6,7 @@
     with import nixpkgs { system = "x86_64-linux"; };
     let
       stdenv = clang9Stdenv; 
+      # An FHS environment is the easiest way to use the static LLVM for now
       fhsenv = buildFHSUserEnv.override { stdenv = stdenv; } {
         name = "savi-fhs";
         targetPkgs = pkgs: with pkgs; [
