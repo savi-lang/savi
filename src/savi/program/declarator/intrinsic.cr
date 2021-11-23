@@ -366,13 +366,18 @@ module Savi::Program::Intrinsic
         )
 
         scope.on_body { |body|
-          unless body.terms.size == 1 && body.terms[0].is_a?(AST::LiteralInteger)
-            ctx.error_at body, "This member value must be a single integer"
-            next
-          end
+          term = body.terms[0]?
+          term = nil unless body.terms.size == 1
 
-          type_with_value.value =
-            body.terms[0].as(AST::LiteralInteger).value.to_u64
+          # TODO: Figure out why Crystal needs the `as` coercions here.
+          # I would have thought they'd be handled by the `is_a?` above them.
+          if term.is_a?(AST::LiteralInteger)
+            type_with_value.value = term.as(AST::LiteralInteger).value.to_u64
+          elsif term.is_a?(AST::LiteralCharacter)
+            type_with_value.value = term.as(AST::LiteralCharacter).value.to_u64
+          else
+            ctx.error_at body, "This member value must be a single integer"
+          end
         }
 
         scope.current_members << type_with_value # TODO: remove this line
