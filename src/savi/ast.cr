@@ -139,9 +139,10 @@ module Savi::AST
 
   class Declare < Node
     property terms : Array(Term)
-    property children = [] of Declare
+    property nested = [] of Declare
     property body : Group? = nil
     property declare_depth = 0
+    property declarator : Program::Declarator? = nil
     def initialize(@terms = [] of Term)
     end
 
@@ -149,23 +150,23 @@ module Savi::AST
     def to_a: Array(A)
       res = [name] of A
       res.concat(terms.map(&.to_a.as(A)))
-      res.concat(children.map(&.to_a.as(A)))
+      res.concat(nested.map(&.to_a.as(A)))
       body.try { |body| res.push(body.to_a.as(A)) }
       res
     end
     def children_accept(ctx : Compiler::Context, visitor : Visitor)
       @terms.each(&.accept(ctx, visitor))
-      @children.each(&.accept(ctx, visitor))
+      @nested.each(&.accept(ctx, visitor))
       @body.try(&.accept(ctx, visitor))
     end
     def children_accept(ctx : Compiler::Context, visitor : CopyOnMutateVisitor)
       new_terms, terms_changed = children_list_accept(ctx, @terms, visitor)
-      new_children, children_changed = children_list_accept(ctx, @children, visitor)
+      new_nested, nested_changed = children_list_accept(ctx, @nested, visitor)
       new_body, body_changed = maybe_child_single_accept(ctx, @body, visitor)
-      return self unless terms_changed || children_changed || body_changed
+      return self unless terms_changed || nested_changed || body_changed
       dup.tap do |node|
         node.terms = new_terms
-        node.children = new_children
+        node.nested = new_nested
         node.body = new_body
       end
     end

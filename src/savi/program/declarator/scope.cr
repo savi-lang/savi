@@ -2,7 +2,7 @@ class Savi::Program::Declarator::Scope
   class Layer
     property declare : AST::Declare
     property declarator : Declarator
-    property body_acceptor : Proc(AST::Group, Nil)?
+    property body_handler : Proc(AST::Group, Nil)?
 
     def initialize(@declare, @declarator)
     end
@@ -55,19 +55,16 @@ class Savi::Program::Declarator::Scope
   end
 
   def on_body(&block : AST::Group -> _)
-    @stack.last.body_acceptor = block
+    @stack.last.body_handler = block
+  end
+
+  def current_body_handler
+    @stack.last.body_handler
   end
 
   def try_accept_body(ctx, body : AST::Group)
     layer = @stack.last
     return false unless layer.declarator.body_allowed
-
-    body_acceptor = layer.body_acceptor
-    unless body_acceptor
-      ctx.error_at layer.declarator.name,
-        "This declarator allows a body, but defined no body acceptor"
-      return false
-    end
 
     already_accepted_body = layer.declare.body
     if already_accepted_body
@@ -78,7 +75,6 @@ class Savi::Program::Declarator::Scope
       return false
     end
 
-    body_acceptor.call(body)
     layer.declare.body = body
 
     true
@@ -88,17 +84,12 @@ class Savi::Program::Declarator::Scope
     @stack.push(Layer.new(declare, declarator))
   end
 
-  def pop_declarator?(ctx)
-    layer = @stack.pop?
-    return unless layer
+  def pop_layer?
+    @stack.pop?
+  end
 
-    if layer.declarator.body_required && !layer.declare.body
-      ctx.error_at layer.declare.terms.first.pos, "This declaration has no body",
-        [{layer.declarator.name.pos, "but this declarator requires a body"}]
-      return nil
-    end
-
-    layer.declarator
+  def pop_declarator?
+    layer.try(&.declarator)
   end
 
   def top_declare?
