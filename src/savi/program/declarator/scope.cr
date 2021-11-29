@@ -3,7 +3,6 @@ class Savi::Program::Declarator::Scope
     property declare : AST::Declare
     property declarator : Declarator
     property body_acceptor : Proc(AST::Group, Nil)?
-    property body_accepted_pos : Source::Pos?
 
     def initialize(@declare, @declarator)
     end
@@ -70,8 +69,9 @@ class Savi::Program::Declarator::Scope
       return false
     end
 
-    if layer.body_accepted_pos
-      ctx.error_at layer.body_accepted_pos.not_nil!,
+    already_accepted_body = layer.declare.body
+    if already_accepted_body
+      ctx.error_at already_accepted_body.pos,
         "This declaration already accepted a body here", [
           {body.pos, "so it can't accept this additional body here"}
         ]
@@ -79,7 +79,7 @@ class Savi::Program::Declarator::Scope
     end
 
     body_acceptor.call(body)
-    layer.body_accepted_pos = body.pos
+    layer.declare.body = body
 
     true
   end
@@ -92,13 +92,17 @@ class Savi::Program::Declarator::Scope
     layer = @stack.pop?
     return unless layer
 
-    if layer.declarator.body_required && !layer.body_accepted_pos
+    if layer.declarator.body_required && !layer.declare.body
       ctx.error_at layer.declare.terms.first.pos, "This declaration has no body",
         [{layer.declarator.name.pos, "but this declarator requires a body"}]
       return nil
     end
 
     layer.declarator
+  end
+
+  def top_declare?
+    @stack.last?.try(&.declare)
   end
 
   def top_declarator?

@@ -5,12 +5,22 @@ module Savi::Program::Declarator::Interpreter
       scope.current_library = library
       scope.include_bootstrap_declarators = !ctx.program.meta_declarators
 
-      doc.list.each { |item|
+      # Iterate over the list of declarations/bodies in the document,
+      # building the declarations into a tree instead of a flat list.
+      # This means we remove items from the list which are not top-level
+      # and nest each declaration and body inside the nearest that accepts it.
+      # After this, the document will list the top-level declarations,
+      # and the rest of the declarations and bodies will be nested inside.
+      doc.list.select! { |item|
         case item
         when AST::Declare
           interpret(ctx, scope, item)
+          # Keep it in the top-level doc only if it is at a depth of zero.
+          item.declare_depth == 0
         when AST::Group
           accept_body(ctx, scope, item)
+          # Never keep a body in the top-level doc - it belongs to a declare.
+          false
         else
           raise NotImplementedError.new(item.class)
         end
@@ -87,6 +97,9 @@ module Savi::Program::Declarator::Interpreter
 
     # Observe the depth of this declaration.
     declare.declare_depth = scope.declarator_depth
+
+    # Add this declaration as a child of the one that contains it (if any)
+    scope.top_declare?.try(&.children.push(declare))
 
     # Push this declarator onto the scope stack.
     scope.push_declarator(declare, declarator)

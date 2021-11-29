@@ -13,11 +13,14 @@ describe Savi::Compiler::Sugar do
     ctx.errors.should be_empty
 
     ctx.root_docs.first.to_a.should eq [:doc,
-      [:declare, [:ident, "actor"], [:ident, "Example"]],
-      [:declare, [:ident, "fun"], [:ident, "return_none"], [:ident, "None"]],
-      [:group, ":", [:string, "this isn't the return value", nil]],
-      [:declare, [:ident, "be"], [:ident, "behave"]],
-      [:group, ":", [:string, "this isn't the return value", nil]],
+      [:declare, [:ident, "actor"], [:ident, "Example"],
+        [:declare, [:ident, "fun"], [:ident, "return_none"], [:ident, "None"],
+          [:group, ":", [:string, "this isn't the return value", nil]],
+        ],
+        [:declare, [:ident, "be"], [:ident, "behave"],
+          [:group, ":", [:string, "this isn't the return value", nil]],
+        ],
+      ],
     ]
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "return_none")
@@ -49,18 +52,20 @@ describe Savi::Compiler::Sugar do
     ctx.errors.should be_empty
 
     ctx.root_docs.first.to_a.should eq [:doc,
-      [:declare, [:ident, "class"], [:ident, "Example"]],
-      [:declare, [:ident, "fun"], [:ident, "prop_assign"]],
-      [:group, ":",
-        [:relate,
-          [:relate, [:ident, "x"], [:op, "."], [:ident, "y"]],
-          [:op, "="],
-          [:ident, "z"],
-        ],
-        [:relate,
-          [:relate, [:ident, "x"], [:op, "."], [:ident, "y!"]],
-          [:op, "="],
-          [:ident, "z"],
+      [:declare, [:ident, "class"], [:ident, "Example"],
+        [:declare, [:ident, "fun"], [:ident, "prop_assign"],
+          [:group, ":",
+            [:relate,
+              [:relate, [:ident, "x"], [:op, "."], [:ident, "y"]],
+              [:op, "="],
+              [:ident, "z"],
+            ],
+            [:relate,
+              [:relate, [:ident, "x"], [:op, "."], [:ident, "y!"]],
+              [:op, "="],
+              [:ident, "z"],
+            ],
+          ],
         ],
       ],
     ]
@@ -96,17 +101,19 @@ describe Savi::Compiler::Sugar do
     ctx.errors.should be_empty
 
     ctx.root_docs.first.to_a.should eq [:doc,
-      [:declare, [:ident, "class"], [:ident, "Example"]],
-      [:declare, [:ident, "fun"], [:ident, "prop_assign"]],
-      [:group, ":",
-        [:relate,
-          [:relate, [:ident, "x"], [:op, "."], [:ident, "y"]],
-          [:op, "+="],
-          [:ident, "z"],
-        ],
-        [:relate,
-          [:relate, [:ident, "x"], [:op, "."], [:ident, "y"]],
-          [:op, "-="], [:ident, "z"],
+      [:declare, [:ident, "class"], [:ident, "Example"],
+        [:declare, [:ident, "fun"], [:ident, "prop_assign"],
+          [:group, ":",
+            [:relate,
+              [:relate, [:ident, "x"], [:op, "."], [:ident, "y"]],
+              [:op, "+="],
+              [:ident, "z"],
+            ],
+            [:relate,
+              [:relate, [:ident, "x"], [:op, "."], [:ident, "y"]],
+              [:op, "-="], [:ident, "z"],
+            ],
+          ],
         ],
       ],
     ]
@@ -153,9 +160,11 @@ describe Savi::Compiler::Sugar do
     ctx.errors.should be_empty
 
     ctx.root_docs.first.to_a.should eq [:doc,
-      [:declare, [:ident, "class"], [:ident, "Example"]],
-      [:declare, [:ident, "fun"], [:ident, "plus"]],
-      [:group, ":", [:relate, [:ident, "x"], [:op, "+"], [:ident, "y"]]],
+      [:declare, [:ident, "class"], [:ident, "Example"],
+        [:declare, [:ident, "fun"], [:ident, "plus"],
+          [:group, ":", [:relate, [:ident, "x"], [:op, "+"], [:ident, "y"]]],
+        ],
+      ],
     ]
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "plus")
@@ -185,15 +194,17 @@ describe Savi::Compiler::Sugar do
     ctx.errors.should be_empty
 
     ctx.root_docs.first.to_a.should eq [:doc,
-      [:declare, [:ident, "class"], [:ident, "Example"]],
-      [:declare, [:ident, "fun"], [:ident, "countdown"]],
-      [:group, ":",
-        [:group, " ",
-          [:ident, "while"],
-          [:group, "(",
-            [:relate, [:ident, "x"], [:op, ">"], [:integer, 0_u64]]
+      [:declare, [:ident, "class"], [:ident, "Example"],
+        [:declare, [:ident, "fun"], [:ident, "countdown"],
+          [:group, ":",
+            [:group, " ",
+              [:ident, "while"],
+              [:group, "(",
+                [:relate, [:ident, "x"], [:op, ">"], [:integer, 0_u64]]
+              ],
+              [:group, "(", [:ident, "y"]],
+            ],
           ],
-          [:group, "(", [:ident, "y"]],
         ],
       ],
     ]
@@ -232,9 +243,11 @@ describe Savi::Compiler::Sugar do
     ctx.errors.should be_empty
 
     ctx.root_docs.first.to_a.should eq [:doc,
-      [:declare, [:ident, "class"], [:ident, "Example"]],
-      [:declare, [:ident, "fun"], [:ident, "square"]],
-      [:group, ":", [:qualify, [:ident, "x"], [:group, "[", [:ident, "y"]]]],
+      [:declare, [:ident, "class"], [:ident, "Example"],
+        [:declare, [:ident, "fun"], [:ident, "square"],
+          [:group, ":", [:qualify, [:ident, "x"], [:group, "[", [:ident, "y"]]]],
+        ],
+      ],
     ]
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "square")
@@ -263,40 +276,42 @@ describe Savi::Compiler::Sugar do
     ctx.errors.should be_empty
 
     ctx.root_docs.first.to_a.should eq [:doc,
-      [:declare, [:ident, "class"], [:ident, "Example"]],
-      [:declare, [:ident, "fun"], [:ident, "chained"]],
-      [:group, ":",
-        [:qualify,
-          [:relate,
+      [:declare, [:ident, "class"], [:ident, "Example"],
+        [:declare, [:ident, "fun"], [:ident, "chained"],
+          [:group, ":",
             [:qualify,
-              [:relate, [:ident, "x"], [:op, "."], [:ident, "call"]],
-              [:group, "(", [:ident, "y"]],
-            ],
-            [:op, "."],
-            [:ident, "call"],
-          ],
-          [:group, "(", [:ident, "z"]],
-        ],
-        [:qualify,
-          [:qualify, [:ident, "x"], [:group, "[", [:ident, "y"]]],
-          [:group, "[", [:ident, "z"]]
-        ],
-        [:qualify,
-          [:qualify,
-            [:relate,
-              [:qualify,
+              [:relate,
                 [:qualify,
                   [:relate, [:ident, "x"], [:op, "."], [:ident, "call"]],
                   [:group, "(", [:ident, "y"]],
                 ],
-                [:group, "[", [:ident, "y"]],
+                [:op, "."],
+                [:ident, "call"],
               ],
-              [:op, "."],
-              [:ident, "call"],
+              [:group, "(", [:ident, "z"]],
             ],
-            [:group, "(", [:ident, "z"]],
+            [:qualify,
+              [:qualify, [:ident, "x"], [:group, "[", [:ident, "y"]]],
+              [:group, "[", [:ident, "z"]]
+            ],
+            [:qualify,
+              [:qualify,
+                [:relate,
+                  [:qualify,
+                    [:qualify,
+                      [:relate, [:ident, "x"], [:op, "."], [:ident, "call"]],
+                      [:group, "(", [:ident, "y"]],
+                    ],
+                    [:group, "[", [:ident, "y"]],
+                  ],
+                  [:op, "."],
+                  [:ident, "call"],
+                ],
+                [:group, "(", [:ident, "z"]],
+              ],
+              [:group, "[", [:ident, "z"]],
+            ],
           ],
-          [:group, "[", [:ident, "z"]],
         ],
       ],
     ]
@@ -356,13 +371,15 @@ describe Savi::Compiler::Sugar do
     ctx.errors.should be_empty
 
     ctx.root_docs.first.to_a.should eq [:doc,
-      [:declare, [:ident, "class"], [:ident, "Example"]],
-      [:declare, [:ident, "fun"], [:ident, "square"]],
-      [:group, ":",
-        [:relate,
-          [:qualify, [:ident, "x"], [:group, "[", [:ident, "y"]]],
-          [:op, "="],
-          [:ident, "z"]
+      [:declare, [:ident, "class"], [:ident, "Example"],
+        [:declare, [:ident, "fun"], [:ident, "square"],
+          [:group, ":",
+            [:relate,
+              [:qualify, [:ident, "x"], [:group, "[", [:ident, "y"]]],
+              [:op, "="],
+              [:ident, "z"]
+            ],
+          ],
         ],
       ],
     ]
@@ -392,9 +409,11 @@ describe Savi::Compiler::Sugar do
     ctx.errors.should be_empty
 
     ctx.root_docs.first.to_a.should eq [:doc,
-      [:declare, [:ident, "class"], [:ident, "Example"]],
-      [:declare, [:ident, "new"]],
-      [:group, ":", [:relate, [:ident, "x"], [:op, "="], [:integer, 1_u64]]],
+      [:declare, [:ident, "class"], [:ident, "Example"],
+        [:declare, [:ident, "new"],
+          [:group, ":", [:relate, [:ident, "x"], [:op, "="], [:integer, 1_u64]]],
+        ],
+      ],
     ]
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "new")
@@ -419,15 +438,17 @@ describe Savi::Compiler::Sugar do
     ctx.errors.should be_empty
 
     ctx.root_docs.first.to_a.should eq [:doc,
-      [:declare, [:ident, "class"], [:ident, "Example"]],
-      [:declare, [:ident, "fun"], [:qualify, [:ident, "param_assigns"],
-          [:group, "(",
-            [:ident, "@x"],
-            [:relate, [:ident, "@y"], [:op, "."], [:ident, "z"]]
+      [:declare, [:ident, "class"], [:ident, "Example"],
+        [:declare, [:ident, "fun"],
+          [:qualify, [:ident, "param_assigns"],
+            [:group, "(",
+              [:ident, "@x"],
+              [:relate, [:ident, "@y"], [:op, "."], [:ident, "z"]]
+            ],
           ],
+          [:group, ":", [:relate, [:ident, "@y"], [:op, "."], [:ident, "after"]]],
         ],
       ],
-      [:group, ":", [:relate, [:ident, "@y"], [:op, "."], [:ident, "after"]]],
     ]
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "param_assigns")
@@ -468,21 +489,23 @@ describe Savi::Compiler::Sugar do
     ctx.errors.should be_empty
 
     ctx.root_docs.first.to_a.should eq [:doc,
-      [:declare, [:ident, "class"], [:ident, "Example"]],
-      [:declare, [:ident, "fun"], [:ident, "logical"]],
-      [:group, ":",
-        [:relate,
-          [:relate,
+      [:declare, [:ident, "class"], [:ident, "Example"],
+        [:declare, [:ident, "fun"], [:ident, "logical"],
+          [:group, ":",
             [:relate,
-              [:ident, "w"],
+              [:relate,
+                [:relate,
+                  [:ident, "w"],
+                  [:op, "&&"],
+                  [:ident, "x"],
+                ],
+                [:op, "||"],
+                [:ident, "y"],
+              ],
               [:op, "&&"],
-              [:ident, "x"],
+              [:prefix, [:op, "!"], [:ident, "z"]],
             ],
-            [:op, "||"],
-            [:ident, "y"],
           ],
-          [:op, "&&"],
-          [:prefix, [:op, "!"], [:ident, "z"]],
         ],
       ],
     ]
