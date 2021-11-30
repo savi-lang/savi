@@ -36,31 +36,31 @@
         run_threads.each_until -> (address |
           program_byte = @program[address]!
           case (
-          // For OpAnyByte, consume the byte of input regardless of what it is,
+          // For _OpAnyByte, consume the byte of input regardless of what it is,
           // then continue with the next byte of the program.
-          | OpAnyByte.u8 == program_byte |
+          | _OpAnyByte.u8 == program_byte |
             @_continue!(next_threads, address +! 1)
 
-          // For OpByteRange, we read the next two bytes in the program,
+          // For _OpByteRange, we read the next two bytes in the program,
           // continuing only if the input byte is within that range.
-          | OpByteRange.u8 == program_byte |
+          | _OpByteRange.u8 == program_byte |
             low = @program[address +! 1]!
             high = @program[address +! 2]!
             if (input_byte >= low && input_byte <= high) (
               @_continue!(next_threads, address +! 3)
             )
 
-          // For OpByte, we read the next byte in the bytecode program,
+          // For _OpByte, we read the next byte in the bytecode program,
           // and compare it to the input byte to see if it fails to match.
-          | OpByte.u8 == program_byte |
+          | _OpByte.u8 == program_byte |
             if (input_byte == @program[address +! 1]!) (
               @_continue!(next_threads, address +! 2)
             )
 
           // If the program byte is below the op code range, then it is
-          // an implied OpByte op code with that byte as the expected byte,
+          // an implied _OpByte op code with that byte as the expected byte,
           // so we compare it against the input byte same as we did above.
-          | Op.min_op > program_byte |
+          | _Op.min_op > program_byte |
             if (input_byte == program_byte) (
               @_continue!(next_threads, address +! 1)
             )
@@ -97,19 +97,19 @@
     // that are ready to consume input in the main input-consuming loop.
     program_byte = @program[address]!
     case (
-    // OpJump jumps to the given address by enqueuing that address.
-    | OpJump.u8 == program_byte |
+    // _OpJump jumps to the given address by enqueuing that address.
+    | _OpJump.u8 == program_byte |
       @_continue!(threads, @program.read_native_u32!(address +! 1).usize)
 
-    // OpSplit jumps to the both of the given addresses simultaneously
+    // _OpSplit jumps to the both of the given addresses simultaneously
     // by enqueuing them both as threads with the given priority order.
-    | OpSplit.u8 == program_byte |
+    | _OpSplit.u8 == program_byte |
       @_continue!(threads, @program.read_native_u32!(address +! 1).usize)
       @_continue!(threads, @program.read_native_u32!(address +! 5).usize)
 
-    // OpSplitMany jumps to the all of the given addresses simultaneously
+    // _OpSplitMany jumps to the all of the given addresses simultaneously
     // by enqueuing them all as threads with the given priority order.
-    | OpSplitMany.u8 == program_byte |
+    | _OpSplitMany.u8 == program_byte |
       next_address = address +! 1
       keep_going = True
       while keep_going (
@@ -123,9 +123,9 @@
         )
       )
 
-    // If this is an OpMatch, we've completed a full match.
+    // If this is an _OpMatch, we've completed a full match.
     // There is no need to continue the program in such a case.
-    | OpMatch.u8 == program_byte |
+    | _OpMatch.u8 == program_byte |
       @did_match = True
 
     // If it's an opcode we don't handle here, we put the address on the

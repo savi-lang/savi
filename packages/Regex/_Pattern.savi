@@ -9,59 +9,59 @@
 :: semantically equivalent, though sometimes they are relied upon to implement
 :: different semantics in ways that make it easier to build the tree without
 :: recourse to as many special cases on the parser side.
-:trait Pattern
-  :fun non none: PatternNone.new
+:trait _Pattern
+  :fun non none: _PatternNone.new
 
-  :fun ref concat(other) Pattern
-    PatternSequence.new([@, other])
+  :fun ref concat(other) _Pattern
+    _PatternSequence.new([@, other])
 
-  :fun ref with_question Pattern
-    PatternOptional.new(@)
+  :fun ref with_question _Pattern
+    _PatternOptional.new(@)
 
-  :fun ref with_star Pattern
-    PatternZeroOrMore.new(@)
+  :fun ref with_star _Pattern
+    _PatternZeroOrMore.new(@)
 
-  :fun ref with_plus Pattern
-    PatternOneOrMore.new(@)
+  :fun ref with_plus _Pattern
+    _PatternOneOrMore.new(@)
 
 :: A placeholder that is used in constructing patterns, which has no effect.
 :: It's effectively a zero-width match that asserts nothing about the input,
 :: and when compiled to a program it generates no program instructions at all.
-:class PatternNone
-  :is Pattern
+:class _PatternNone
+  :is _Pattern
 
   // These overrides make it behave as this pattern isn't really there,
   // collapsing trees which would mean nothing for a "none" pattern.
-  :fun ref concat(other Pattern): other
+  :fun ref concat(other _Pattern): other
   :fun ref with_question: @
   :fun ref with_star: @
   :fun ref with_plus: @
 
 :: Match any byte.
 // TODO: Replace this with something UTF-8-aware.
-:class PatternAnyByte
-  :is Pattern
+:class _PatternAnyByte
+  :is _Pattern
 
 :: Match a specific byte.
 :: This cannot be used with multibyte UTF-8 codepoints, but it is nice and
 :: efficient for the common case of single bytes in ASCII character classes.
-:class PatternByte
-  :is Pattern
+:class _PatternByte
+  :is _Pattern
   :let byte U8
   :new (@byte)
 
 :: Match any byte whose value is within the given range (inclusive).
 :: This cannot be used with multibyte UTF-8 codepoints, but it is nice and
 :: efficient for the common case of byte ranges in ASCII character classes.
-:class PatternByteRange
-  :is Pattern
+:class _PatternByteRange
+  :is _Pattern
   :let low U8
   :let high U8
   :new (@low, @high)
 
 :: Match a specific UTF-8 character consisting of one to four bytes.
-:class PatternCharacter
-  :is Pattern
+:class _PatternCharacter
+  :is _Pattern
   :let byte_1 U8
   :let byte_2 U8
   :let byte_3 U8
@@ -74,9 +74,9 @@
     if (@byte_4 != 0) (yield @byte_4)
 
 :: Match a sequence of concatenated patterns, one after the other.
-:class PatternSequence
-  :is Pattern
-  :let children Array(Pattern)
+:class _PatternSequence
+  :is _Pattern
+  :let children Array(_Pattern)
   :new (@children)
 
   :fun last!: @children.last!
@@ -94,28 +94,28 @@
   :fun ref with_plus:     try (@last! = @last!.with_plus,     @ | @none)
 
 :: Match an optional (zero or one) occurrence of the child pattern.
-:class PatternOptional
-  :is Pattern
-  :let child Pattern
+:class _PatternOptional
+  :is _Pattern
+  :let child _Pattern
   :let is_non_greedy Bool
   :new (@child, @is_non_greedy = False)
 
 :: Match zero or more repeated occurrences of the child pattern.
-:class PatternZeroOrMore
-  :is Pattern
-  :let child Pattern
+:class _PatternZeroOrMore
+  :is _Pattern
+  :let child _Pattern
   :let is_non_greedy Bool
   :new (@child, @is_non_greedy = False)
 
 :: Match one or more repeated occurrences of the child pattern.
-:class PatternOneOrMore
-  :is Pattern
-  :let child Pattern
+:class _PatternOneOrMore
+  :is _Pattern
+  :let child _Pattern
   :let is_non_greedy Bool
   :new (@child, @is_non_greedy = False)
 
 :: Match exactly one of the given options represented by the children patterns.
-:class PatternChoice
-  :is Pattern
-  :let children Array(Pattern)
+:class _PatternChoice
+  :is _Pattern
+  :let children Array(_Pattern)
   :new (@children = [])

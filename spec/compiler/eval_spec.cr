@@ -52,7 +52,7 @@ describe Savi::Compiler::Eval do
     no_test_failures.should eq true
   end
 
-  it "evaluates the time package's tests" do
+  it "evaluates the Time package's tests" do
     source_dir = File.join(__DIR__, "../../packages/Time/test")
 
     ctx = Savi.compiler.compile(source_dir, :eval)
@@ -102,8 +102,8 @@ describe Savi::Compiler::Eval do
     no_test_failures.should eq true
   end
 
-  it "evaluates the regex package's tests" do
-    source_dir = File.join(__DIR__, "../../packages/regex/test")
+  it "evaluates the Regex package's tests" do
+    source_dir = File.join(__DIR__, "../../packages/Regex/test")
 
     ctx = Savi.compiler.compile(source_dir, :eval)
     ctx.errors.should be_empty

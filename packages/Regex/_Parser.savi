@@ -1,9 +1,7 @@
-:import "./pattern"
-
 :module _Parser
-  :fun parse(input String) Pattern
-    choice = PatternChoice.new
-    pattern Pattern = PatternNone.new
+  :fun parse(input String) _Pattern
+    choice = _PatternChoice.new
+    pattern _Pattern = _PatternNone.new
 
     is_in_escape_sequence = False
 
@@ -15,20 +13,20 @@
         | 'w' | pattern.concat(@_builtin_class_word)
         |
           // TODO: proper UTF-8 support here
-          char = PatternCharacter.new(byte, 0, 0, 0)
+          char = _PatternCharacter.new(byte, 0, 0, 0)
           pattern.concat(char)
         )
       |
         pattern = case byte == (
         | '\\' | is_in_escape_sequence = True, pattern
-        | '.'  | pattern.concat(PatternAnyByte.new) // TODO: proper UTF-8
+        | '.'  | pattern.concat(_PatternAnyByte.new) // TODO: proper UTF-8
         | '?'  | pattern.with_question
         | '*'  | pattern.with_star
         | '+'  | pattern.with_plus
-        | '|'  | choice.children.push(pattern), pattern = PatternNone.new
+        | '|'  | choice.children.push(pattern), pattern = _PatternNone.new
         |
           // TODO: proper UTF-8 support here
-          char = PatternCharacter.new(byte, 0, 0, 0)
+          char = _PatternCharacter.new(byte, 0, 0, 0)
           pattern.concat(char)
         )
       )
@@ -42,13 +40,13 @@
     )
 
   :fun non _builtin_class_digit
-    PatternByteRange.new('0', '9')
+    _PatternByteRange.new('0', '9')
 
   :fun non _builtin_class_word
-    PatternChoice.new([
-      PatternByteRange.new('a', 'z')
-      PatternByteRange.new('A', 'Z')
-      PatternByteRange.new('0', '9')
-      PatternByte.new('_')
+    _PatternChoice.new([
+      _PatternByteRange.new('a', 'z')
+      _PatternByteRange.new('A', 'Z')
+      _PatternByteRange.new('0', '9')
+      _PatternByte.new('_')
     ])
 
