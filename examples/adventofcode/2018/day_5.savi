@@ -1,5 +1,5 @@
 :import "spec"
-:import "time"
+:import "Time"
 :import "collections"
 
 :class Day5Polymer
