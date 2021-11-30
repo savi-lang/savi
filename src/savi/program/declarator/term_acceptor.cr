@@ -73,6 +73,12 @@ abstract class Savi::Program::Declarator::TermAcceptor
           term
         when AST::LiteralString
           AST::Identifier.new(term.value).from(term)
+        when AST::Relate
+          if term.op.value == "." &&
+            (lhs = try_accept(term.lhs, type).as(AST::Identifier)) &&
+            (rhs = try_accept(term.rhs, type).as(AST::Identifier))
+            AST::Identifier.new("#{lhs.value}.#{rhs.value}").from(term)
+          end
         end
       when "Type"
         term if (

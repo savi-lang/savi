@@ -14,7 +14,7 @@ The following types are used in some but not all of the examples below:
 
 ---
 
-It complains when calling on types without that function:
+It complains when calling on types without that member:
 
 ```savi
 :trait Fooable
@@ -32,7 +32,7 @@ It complains when calling on types without that function:
 ```
 ```savi
 // TODO: Show this more complete version of the error:
-// The 'bar' function can't be called on this local variable:
+// The 'bar' member can't be reached on this local variable:
 //     object.bar
 //            ^~~
 
@@ -40,11 +40,11 @@ It complains when calling on types without that function:
 //     object (Fooable | Barable | Bazable) = Barable.new
 //            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-// - Bazable has no 'bar' function:
+// - Bazable has no 'bar' member:
 // :module Bazable
 //            ^~~~~~~
 
-// - maybe you meant to call the 'baz' function:
+// - maybe you meant to use the 'baz' member:
 //   :fun baz: "baz"
 //        ^~~
 
@@ -52,20 +52,20 @@ It complains when calling on types without that function:
 //     object (Fooable | Barable | Bazable) = Barable.new
 //            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-// - Fooable has no 'bar' function:
+// - Fooable has no 'bar' member:
 // :trait Fooable
 //        ^~~~~~~
 ```
 ```error
-The 'bar' function can't be called on this receiver:
+The 'bar' member can't be reached on this receiver:
     object.bar
            ^~~
 
-- Bazable has no 'bar' function:
+- Bazable has no 'bar' member:
 :module Bazable
         ^~~~~~~
 
-- maybe you meant to call the 'baz' function:
+- maybe you meant to use the 'baz' member:
   :fun baz: "baz"
        ^~~
 ```
@@ -84,15 +84,15 @@ It suggests a similarly named function when found:
     SomeHFunctions.hello
 ```
 ```error
-The 'hello' function can't be called on this receiver:
+The 'hello' member can't be reached on this receiver:
     SomeHFunctions.hello
                    ^~~~~
 
-- SomeHFunctions has no 'hello' function:
+- SomeHFunctions has no 'hello' member:
 :module SomeHFunctions
         ^~~~~~~~~~~~~~
 
-- maybe you meant to call the 'hell' function:
+- maybe you meant to use the 'hell' member:
   :fun hell: None
        ^~~~
 ```
@@ -109,15 +109,15 @@ It suggests a similarly named function (without '!') when found:
     HelloNotPartial.hello!
 ```
 ```error
-The 'hello!' function can't be called on this receiver:
+The 'hello!' member can't be reached on this receiver:
     HelloNotPartial.hello!
                     ^~~~~~
 
-- HelloNotPartial has no 'hello!' function:
+- HelloNotPartial has no 'hello!' member:
 :module HelloNotPartial
         ^~~~~~~~~~~~~~~
 
-- maybe you meant to call 'hello' (without '!'):
+- maybe you meant to use 'hello' (without '!'):
   :fun hello: None
        ^~~~~
 ```
@@ -134,15 +134,15 @@ It suggests a similarly named function (with '!') when found:
     HelloPartial.hello
 ```
 ```error
-The 'hello' function can't be called on this receiver:
+The 'hello' member can't be reached on this receiver:
     HelloPartial.hello
                  ^~~~~
 
-- HelloPartial has no 'hello' function:
+- HelloPartial has no 'hello' member:
 :module HelloPartial
         ^~~~~~~~~~~~
 
-- maybe you meant to call 'hello!' (with a '!'):
+- maybe you meant to use 'hello!' (with a '!'):
   :fun hello!: error!
        ^~~~~~
 ```

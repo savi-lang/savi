@@ -2,7 +2,7 @@
 
 :class TimeFormatterSpec
   :is Spec
-  :const describes: "TimeFormatter"
+  :const describes: "Time.Formatter"
 
   :it "can correctly format time"
     t = Time.utc(2014, 1, 2, 3, 4, 5, 6000000)

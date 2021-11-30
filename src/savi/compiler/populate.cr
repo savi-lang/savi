@@ -4,6 +4,7 @@
 # copied from the source type. In the most common case, this is caused by
 # an "is" annotation on a type denoting an inheritance relationship.
 # The Populate pass also creates missing methods, like the default constructor.
+# It also creates the namespace-associated methods for namespaced types.
 #
 # This pass uses copy-on-mutate patterns to "mutate" the Program topology.
 # This pass does not mutate ASTs, but copies whole functions to other types.
@@ -24,6 +25,50 @@ class Savi::Compiler::Populate
     library.types_map_cow do |dest|
       orig_functions = dest.functions
       dest_link = dest.make_link(library)
+
+      # Create the namespace-associated methods for namespaced types.
+      # Note that these can only come from other types in the same library,
+      # as we do not (currently?) allow extending third-party namespaces.
+      library.types.each do |t|
+        # Only consider types where t is nested within the dest type.
+        next unless t.ident.value.includes?(".")
+        next unless t.ident.value.starts_with?("#{dest.ident.value}.")
+
+        # Only consider types where t is nested exactly one level beneath.
+        nested_ident_value = t.ident.value[(dest.ident.value.size + 1)..-1]
+        next if nested_ident_value.includes?(".")
+
+        # Complain if the dest type already has a function with this name.
+        conflict_func = dest.find_func?(nested_ident_value)
+        if conflict_func
+          ctx.error_at conflict_func.ident,
+            "This conflicts with the name of a nested type", [
+              {t.ident.pos, "the nested type is defined here"}
+            ]
+          next
+        end
+
+        # Create a new function that returns the nested type by full identifier.
+        f = Program::Function.new(
+          AST::Identifier.new("non").from(t.ident),
+          AST::Identifier.new(nested_ident_value).from(t.ident),
+          nil,
+          nil,
+          AST::Group.new(":").from(t.ident).tap { |body|
+            body.terms << AST::Identifier.new(t.ident.value).from(t.ident)
+          },
+        )
+
+        # We also need to run the missing ReferType pass for this new function.
+        ctx.refer_type.run_for_func(ctx, f, f.make_link(dest_link))
+
+        # Add the new function, duping the orig functions list if needed.
+        if dest.functions.same?(orig_functions)
+          dest = dest.dup
+          raise "didn't dup functions!" if dest.functions.same?(orig_functions)
+        end
+        dest.functions << f
+      end
 
       # Copy functions into the type from other sources.
       orig_functions.each do |f|

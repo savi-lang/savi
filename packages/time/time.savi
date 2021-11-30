@@ -6,7 +6,7 @@
 :: with an additional 32-bit integer to specify nanoseconds within the second.
 
 
-:enum DayOfWeek
+:enum Time.DayOfWeek
   :member NoDay: 0
   :member Monday: 1
   :member Tuesday: 2
@@ -315,7 +315,7 @@
         // which can be determined by the day of week of January 1.
         // The year has 53 weeks if Januar 1 is on a Friday or the year was a leap
         // year and January 1 is on a Saturday.
-        jan1_day_of_week = DayOfWeek.from_value(((day_of_week.u64 - day_year + 1) % 7).u8)
+        jan1_day_of_week = Time.DayOfWeek.from_value(((day_of_week.u64 - day_year + 1) % 7).u8)
 
         if ((jan1_day_of_week == Friday) || (jan1_day_of_week == Saturday && @_is_leap_year(year.u32))) (
           week_number = 53
@@ -353,10 +353,10 @@
 
   :fun day_of_week
     days U64 = (@total_seconds / @_seconds_per_day)
-    DayOfWeek.from_value((days % 7 + 1).u8)
+    Time.DayOfWeek.from_value((days % 7 + 1).u8)
 
   :fun to_s
     @format("%m/%d/%y")
 
   :fun format(pattern String'box) String'val
-    TimeFormatter.new(pattern).format(@)
+    Time.Formatter.new(pattern).format(@)
