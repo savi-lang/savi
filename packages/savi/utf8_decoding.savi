@@ -96,7 +96,7 @@
     1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 // (unused)
   ]
 
-  // Since we're in the prelude package, we can cheat a bit here and do
+  // Since we're in the core Savi package, we can cheat a bit here and do
   // direct pointer indexing for a performance improvement, knowing that
   // both tables have a size of 256, so direct indexing with a U8 index
   // will not be able to cause any memory safety issues.

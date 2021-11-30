@@ -63,7 +63,7 @@
   ::
   :: A tag reference is returned because it wouldn't be safe to allow the caller
   :: to dereference arbitrary memory from an unchecked index argument.
-  :: A caller in the prelude package can use the unsafe _offset variant instead.
+  :: A caller in the savi package can use the unsafe _offset variant instead.
   :fun tag offset(index USize) @'tag: compiler intrinsic
 
   :: Return an alias of the element at the given index.

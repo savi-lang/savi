@@ -13,7 +13,7 @@
 #
 class Savi::Compiler::Macros < Savi::AST::CopyOnMutateVisitor
   # TODO: This class should interpret macro declarations by the user and treat
-  # those the same as macro declarations in the prelude, with both getting
+  # those the same as macro declarations in core Savi, with both getting
   # executed here dynamically instead of declared here statically.
 
   # TODO: Clean up, consolidate, and improve this caching mechanism.
@@ -231,13 +231,13 @@ class Savi::Compiler::Macros < Savi::AST::CopyOnMutateVisitor
       visit_case(node)
     elsif lhs.is_a?(AST::Identifier) && lhs.value == "assert" && node.op.value == ":"
       visit_assert(node, node.rhs)
-    elsif node.op.value == ":" && 
+    elsif node.op.value == ":" &&
           lhs.is_a?(AST::Group) &&
           lhs.style == " " &&
           Util.match_ident?(lhs, 0, "assert") &&
           Util.match_ident?(lhs, 1, "no_error")
       visit_assert_no_error(node, node.rhs)
-    elsif node.op.value == ":" && 
+    elsif node.op.value == ":" &&
           lhs.is_a?(AST::Group) &&
           lhs.style == " " &&
           Util.match_ident?(lhs, 0, "assert") &&
@@ -713,7 +713,7 @@ class Savi::Compiler::Macros < Savi::AST::CopyOnMutateVisitor
         local_relate_name,
       ] of AST::Term).from(expr)
     ).from(orig)
-    
+
     try = AST::Try.new(
       AST::Group.new("(", [
         local_lhs,

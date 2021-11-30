@@ -53,9 +53,9 @@ class Savi::Compiler::Namespace
       end
     end
 
-    # Every source file implicitly has access to all prelude types.
+    # Every source file implicitly has access to all core Savi types.
     @source_analyses.each do |source, source_analysis|
-      add_prelude_types_to_source(ctx, source, source_analysis)
+      add_core_savi_types_to_source(ctx, source, source_analysis)
     end
 
     # Every source file implicitly has access to all types in the same library.
@@ -85,14 +85,14 @@ class Savi::Compiler::Namespace
     @source_analyses[source]
   end
 
-  def prelude_library_link(ctx)
-    Program::Library::Link.new(ctx.compiler.source_service.prelude_library_path)
+  def core_savi_library_link(ctx)
+    Program::Library::Link.new(ctx.compiler.source_service.core_savi_library_path)
   end
 
-  # When given a String name, try to find the type in the prelude library.
+  # When given a String name, try to find the type in the core_savi library.
   # This is a way to resolve a builtin type by name without more context.
-  def prelude_type(ctx, name : String) : Program::Type::Link
-    @types_by_library[prelude_library_link(ctx)][name].as(Program::Type::Link)
+  def core_savi_type(ctx, name : String) : Program::Type::Link
+    @types_by_library[core_savi_library_link(ctx)][name].as(Program::Type::Link)
   end
 
   # TODO: Remove this method?
@@ -144,11 +144,10 @@ class Savi::Compiler::Namespace
     source_analysis.types[name] = new_type.make_link(library)
   end
 
-  private def add_prelude_types_to_source(ctx, source, source_analysis)
-    # Skip adding prelude types to source files in the prelude library.
-    return if source.library.path == ctx.compiler.source_service.prelude_library_path
+  private def add_core_savi_types_to_source(ctx, source, source_analysis)
+    return if source.library.path == ctx.compiler.source_service.core_savi_library_path
 
-    @types_by_library[prelude_library_link(ctx)].each do |name, new_type_link|
+    @types_by_library[core_savi_library_link(ctx)].each do |name, new_type_link|
       new_type = new_type_link.resolve(ctx)
       next if new_type.has_tag?(:private)
 

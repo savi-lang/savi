@@ -15,7 +15,7 @@
 :trait box _InspectCustom
   :fun inspect_into(output String'iso) String'iso
 
-// TODO: Move this out of prelude maybe? Does that make sense?
+// TODO: Move this out of savi maybe? Does that make sense?
 // TODO: Make this into a trait with "implement for"/typeclass style polymorphism
 :module Inspect
   :fun "[]"(input Any'box) String'val // TODO: use `box` instead of `Any'box`

@@ -75,7 +75,7 @@ describe Savi::Compiler::Namespace do
            ^~~~~~
 
     - the built-in type is defined here:
-      from #{Savi.compiler.source_service.prelude_library_path}/string.savi:1:
+      from #{Savi.compiler.source_service.core_savi_library_path}/string.savi:1:
     :class val String
                ^~~~~~
     MSG
@@ -90,9 +90,9 @@ describe Savi::Compiler::Namespace do
   pending "complains when an explicitly imported type conflicts with another"
   pending "complains when a type name ends with an exclamation"
 
-  it "won't have conflicts with a private type in the prelude library" do
+  it "won't have conflicts with a private type in the core Savi library" do
     source = Savi::Source.new_example <<-SOURCE
-    :ffi LibPony // defined in the prelude, but private, so no conflict here
+    :ffi LibPony // defined in core Savi, but private, so no conflict here
     SOURCE
 
     Savi.compiler.compile([source], :namespace)

@@ -256,7 +256,7 @@ module Savi::Compiler::Infer
           # If we have no upstreams and an explicit cap, return a span with
           # the empty trait called `Any` intersected with that cap.
           explicit_span.transform_mt do |explicit_mt|
-            any = MetaType.new_nominal(infer.prelude_reified_type(ctx, "Any"))
+            any = MetaType.new_nominal(infer.core_savi_reified_type(ctx, "Any"))
             any.intersect(explicit_mt)
           end
         end
@@ -377,7 +377,7 @@ module Savi::Compiler::Infer
     end
 
     def resolve_span!(ctx : Context, infer : Visitor) : Span
-      infer.prelude_type_span(ctx, @name)
+      infer.core_savi_type_span(ctx, @name)
     end
   end
 
@@ -486,7 +486,7 @@ module Savi::Compiler::Infer
       # Take note of this reflection.
       infer.analysis.reflections.add(self)
 
-      infer.prelude_type_span(ctx, "ReflectionOfType")
+      infer.core_savi_type_span(ctx, "ReflectionOfType")
         .combine_mt(infer.resolve(ctx, @reflect_type)) { |target_mt, arg_mt|
           MetaType.new(ReifiedType.new(target_mt.single!.link, [arg_mt]))
         }
@@ -840,7 +840,7 @@ module Savi::Compiler::Infer
     end
 
     def resolve_span!(ctx : Context, infer : Visitor) : Span
-      infer.prelude_type_span(ctx, "Bool")
+      infer.core_savi_type_span(ctx, "Bool")
     end
   end
 
@@ -855,7 +855,7 @@ module Savi::Compiler::Infer
     end
 
     def resolve_span!(ctx : Context, infer : Visitor) : Span
-      infer.prelude_type_span(ctx, "Bool")
+      infer.core_savi_type_span(ctx, "Bool")
     end
   end
 
@@ -870,7 +870,7 @@ module Savi::Compiler::Infer
     end
 
     def resolve_span!(ctx : Context, infer : Visitor) : Span
-      infer.prelude_type_span(ctx, "Bool")
+      infer.core_savi_type_span(ctx, "Bool")
     end
   end
 
@@ -885,7 +885,7 @@ module Savi::Compiler::Infer
     end
 
     def resolve_span!(ctx : Context, infer : Visitor) : Span
-      infer.prelude_type_span(ctx, "Bool")
+      infer.core_savi_type_span(ctx, "Bool")
     end
   end
 
@@ -1081,7 +1081,7 @@ module Savi::Compiler::Infer
             # a cap intersected with an Array ReifiedType, so we know that
             # we can get the element MetaType from the ReifiedType's type args.
             ante_elem_mt = ante_mt.single!.args[0]
-            fallback_rt = infer.prelude_reified_type(ctx, "Array", [elem_mt])
+            fallback_rt = infer.core_savi_reified_type(ctx, "Array", [elem_mt])
             fallback_mt = MetaType.new(fallback_rt).intersect(MetaType.cap("ref"))
 
             # We may need to unwrap lazy elements from this inner layer.
@@ -1105,7 +1105,7 @@ module Savi::Compiler::Infer
       else
         if elem_span
           array_span = elem_span.transform_mt { |elem_mt|
-            rt = infer.prelude_reified_type(ctx, "Array", [elem_mt])
+            rt = infer.core_savi_reified_type(ctx, "Array", [elem_mt])
             MetaType.new(rt, Cap::REF)
           }
         else
@@ -1306,7 +1306,7 @@ module Savi::Compiler::Infer
     end
 
     def resolve_span!(ctx : Context, infer : Visitor) : Span
-      none = MetaType.new(infer.prelude_reified_type(ctx, "None"))
+      none = MetaType.new(infer.core_savi_reified_type(ctx, "None"))
 
       @call.resolve_receiver_span(ctx, infer).transform_mt_to_span { |call_receiver_mt|
         union_member_spans = call_receiver_mt.map_each_union_member { |union_member_mt|

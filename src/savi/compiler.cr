@@ -251,9 +251,9 @@ class Savi::Compiler
     # Now compile the main library.
     ctx.compile_library(docs.first.source.library, docs)
 
-    # Next add the prelude, unless the main library happens to be the prelude.
-    unless docs.first.source.library.path == source_service.prelude_library_path
-      ctx.compile_library_at_path(source_service.prelude_library_path)
+    # Next add the core Savi, unless the main library happens to be the same.
+    unless docs.first.source.library.path == source_service.core_savi_library_path
+      ctx.compile_library_at_path(source_service.core_savi_library_path)
     end
 
     # Now run compiler passes until the target pass is satisfied.

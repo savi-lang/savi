@@ -2,7 +2,7 @@
 ::
 :: By default, Savi source files only have access to other types defined in the
 :: same library (that is, the same source directory), as well as those standard
-:: types exposed by the `prelude` library, which is always implicitly imported.
+:: types exposed by the core Savi library, which is always implicitly imported.
 :: To make use of types exposed by other libraries, they must be explicitly
 :: imported using an `:import` declaration.
 ::

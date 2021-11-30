@@ -23,7 +23,7 @@ module Savi::Compiler::Types::Edge
     def run_for_type_alias(ctx : Context, t : Program::TypeAlias)
       # TODO: Allow running this pass for more than just the root library.
       # We restrict this for now while we are building out the pass because
-      # we don't want to deal with all of the complicated forms in the prelude.
+      # we don't want to deal with all of the complicated forms in Savi core.
       # We want to stick to the simple forms in the compiler pass specs for now.
       root_library = ctx.root_library.source_library
       return unless t.ident.pos.source.library == root_library
@@ -41,7 +41,7 @@ module Savi::Compiler::Types::Edge
 
       # TODO: Allow running this pass for more than just the root library.
       # We restrict this for now while we are building out the pass because
-      # we don't want to deal with all of the complicated forms in the prelude.
+      # we don't want to deal with all of the complicated forms in Savi core.
       # We want to stick to the simple forms in the compiler pass specs for now.
       root_library = ctx.root_library.source_library
       return unless f.ident.pos.source.library == root_library

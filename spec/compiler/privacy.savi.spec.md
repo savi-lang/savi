@@ -2,7 +2,7 @@
 pass: privacy
 ---
 
-It complains when calling a private method on a prelude type:
+It complains when calling a private method on a core Savi library type:
 
 ```savi
     Env._create

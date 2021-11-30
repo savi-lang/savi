@@ -32,8 +32,8 @@ describe Savi::Compiler::Eval do
     no_test_failures.should eq true
   end
 
-  it "evaluates the prelude tests" do
-    source_dir = File.join(__DIR__, "../../packages/prelude/test")
+  it "evaluates the savi tests" do
+    source_dir = File.join(__DIR__, "../../packages/savi/test")
 
     ctx = Savi.compiler.compile(source_dir, :eval)
     ctx.errors.should be_empty
