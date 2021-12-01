@@ -1,6 +1,6 @@
-:class JsonReader
-  :let _parser: JsonParser.new
-  :let errors: JsonReaderErrors.new
+:class JSON.Reader
+  :let _parser: JSON.Parser.new
+  :let errors: JSON.ReaderErrors.new
   :new (source)
     @_parser.source = source
 
@@ -53,9 +53,9 @@
       error!
     )
 
-:class JsonReaderErrors
-  :let _path: JsonPath.new
-  :let _list Array(JsonReaderError): []
+:class JSON.ReaderErrors
+  :let _path: JSON.Path.new
+  :let _list Array(JSON.ReaderError): []
 
   :fun is_empty: @_list.is_empty
   :fun inspect_into(out String'iso) String'iso
@@ -71,24 +71,24 @@
   :fun ref finish_scope: @_path.pop
 
   :fun ref unexpected_key_here
-    @_list << JsonReaderErrorUnexpectedKeyHere.new(@_path.clone)
+    @_list << JSON.ReaderErrorUnexpectedKeyHere.new(@_path.clone)
   :fun ref expected_here(what)
-    @_list << JsonReaderErrorExpectedHere.new(@_path.clone, what)
+    @_list << JSON.ReaderErrorExpectedHere.new(@_path.clone, what)
 
-:trait JsonReaderError
+:trait JSON.ReaderError
   :fun inspect_into(out String'iso) String'iso
 
-:class JsonReaderErrorUnexpectedKeyHere
-  :is JsonReaderError
-  :let path JsonPath'val
+:class JSON.ReaderErrorUnexpectedKeyHere
+  :is JSON.ReaderError
+  :let path JSON.Path'val
   :new (@path)
   :fun inspect_into(out String'iso) String'iso
     out << "unexpected key encountered at path: "
     @path.inspect_into(--out)
 
-:class JsonReaderErrorExpectedHere
-  :is JsonReaderError
-  :let path JsonPath'val
+:class JSON.ReaderErrorExpectedHere
+  :is JSON.ReaderError
+  :let path JSON.Path'val
   :let what String
   :new (@path, @what)
   :fun inspect_into(out String'iso) String'iso

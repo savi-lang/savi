@@ -3,7 +3,7 @@
 :class _JsonReaderSpecUser
   :var name String: ""
   :var admin Bool: False
-  :fun ref from_json!(read JsonReader)
+  :fun ref from_json!(read JSON.Reader)
     read.each_in_object! -> (key |
       case key == (
       | "name"  | try (@name = read.string!)
@@ -15,10 +15,10 @@
 
 :class JsonReaderSpec
   :is Spec
-  :const describes: "JsonReader"
+  :const describes: "JSON.Reader"
 
   :it "can fill objects with data read from JSON"
-    read = JsonReader.new(<<<[
+    read = JSON.Reader.new(<<<[
       { "name": "Alice", "admin": true },
       { "name": "Bob" },
       { "name": "Cyril", "admin": false }
@@ -41,7 +41,7 @@
     assert: users[2]!.admin == False
 
   :it "can report nice errors when the data doesn't match expectations"
-    read = JsonReader.new(<<<[
+    read = JSON.Reader.new(<<<[
       { "bogus": true, "name": "Alice", "admin": true },
       { "name": true },
       { "name": "Cyril", "admin": "huh?" },

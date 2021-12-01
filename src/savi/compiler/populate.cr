@@ -22,6 +22,7 @@ class Savi::Compiler::Populate
   end
 
   def run(ctx, library)
+    # Now iterate over each type and possibly add missing functions to it.
     library.types_map_cow do |dest|
       orig_functions = dest.functions
       dest_link = dest.make_link(library)
@@ -175,16 +176,11 @@ class Savi::Compiler::Populate
   end
 
   def maybe_add_namespace_function_for(ctx, t, dest, library, orig_functions) : Program::Type
-    # Only consider types where t is nested within the dest type.
-    return dest unless t.ident.value.includes?(".")
-    return dest unless t.ident.value.starts_with?("#{dest.ident.value}.")
-
-    # Only consider types where t is nested exactly one level beneath.
-    nested_ident_value = t.ident.value[(dest.ident.value.size + 1)..-1]
-    return dest if nested_ident_value.includes?(".")
+    nested_ident = t.ident.immediately_nested_within?(dest.ident)
+    return dest unless nested_ident
 
     # Complain if the dest type already has a function with this name.
-    conflict_func = dest.find_func?(nested_ident_value)
+    conflict_func = dest.find_func?(nested_ident.value)
     if conflict_func
       ctx.error_at conflict_func.ident,
         "This conflicts with the name of a nested type", [
@@ -196,7 +192,7 @@ class Savi::Compiler::Populate
     # Create a new function that returns the nested type by full identifier.
     f = Program::Function.new(
       AST::Identifier.new("non").from(t.ident),
-      AST::Identifier.new(nested_ident_value).from(t.ident),
+      nested_ident,
       nil,
       nil,
       AST::Group.new(":").from(t.ident).tap { |body|

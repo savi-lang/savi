@@ -62,8 +62,8 @@ describe Savi::Compiler::Eval do
     no_test_failures.should eq true
   end
 
-  it "evaluates the json package's tests" do
-    source_dir = File.join(__DIR__, "../../packages/json/test")
+  it "evaluates the JSON package's tests" do
+    source_dir = File.join(__DIR__, "../../packages/JSON/test")
 
     ctx = Savi.compiler.compile(source_dir, :eval)
     ctx.errors.should be_empty

@@ -1,4 +1,4 @@
-:class JsonPath
+:class JSON.Path
   :var segments Array((String | USize)): []
   :new (@segments = [])
   :new iso new_iso(s Array((String | USize))'iso = []): @segments = --s

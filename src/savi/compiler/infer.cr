@@ -313,9 +313,7 @@ module Savi::Compiler::Infer
     abstract def refer_type_for(node : AST::Node) : Refer::Info?
     abstract def self_type_expr_span(ctx : Context, cap_only = false) : Span
 
-    # An identifier type expression must refer to a type.
-    def type_expr_span(ctx : Context, node : AST::Identifier, cap_only = false) : Span
-      ref = refer_type_for(node)
+    def type_expr_span_for_ref(ctx : Context, ref : Refer::Info, cap_only = false)
       case ref
       when Refer::Self
         self_type_expr_span(ctx, cap_only)
@@ -329,19 +327,37 @@ module Savi::Compiler::Infer
         cap_only \
           ? Span.simple(MetaType.unconstrained) \
           : lookup_type_param_partial_reified_span(ctx, TypeParam.new(ref))
-      when nil
+      else
+        raise NotImplementedError.new(ref.inspect)
+      end
+    end
+
+    # An identifier type expression must refer to a type.
+    def type_expr_span(ctx : Context, node : AST::Identifier, cap_only = false) : Span
+      ref = refer_type_for(node)
+      if ref
+        type_expr_span_for_ref(ctx, ref, cap_only)
+      else
         cap = Infer.type_expr_cap(node)
         if cap
           Span.simple(MetaType.new(cap))
         else
           Span.error node, "This type couldn't be resolved"
         end
-      else
-        raise NotImplementedError.new(ref.inspect)
       end
     end
 
-    # An relate type expression must be an explicit capability qualifier.
+    # A call in a type expression may possibly a nested/namespaced type name.
+    def type_expr_span(ctx : Context, node : AST::Call, cap_only = false) : Span
+      if (ref = refer_type_for(node))
+        type_expr_span_for_ref(ctx, ref, cap_only)
+      else
+        raise NotImplementedError.new(node.to_a.inspect)
+      end
+    end
+
+    # A relate type expression must be an explicit capability qualifier,
+    # a viewpoint adaptation, or possibly a nested/namespaced type name.
     def type_expr_span(ctx : Context, node : AST::Relate, cap_only = false) : Span
       if node.op.value == "'"
         cap_ident = node.rhs.as(AST::Identifier)
@@ -364,6 +380,8 @@ module Savi::Compiler::Infer
         lhs = type_expr_span(ctx, node.lhs, cap_only).transform_mt(&.cap_only)
         rhs = type_expr_span(ctx, node.rhs, cap_only)
         lhs.combine_mt(rhs) { |lhs_mt, rhs_mt| rhs_mt.viewed_from(lhs_mt) }
+      elsif (ref = refer_type_for(node))
+        type_expr_span_for_ref(ctx, ref, cap_only)
       else
         raise NotImplementedError.new(node.to_a.inspect)
       end
