@@ -1,6 +1,6 @@
 :import "io"
 :import "net"
-:import "http/server"
+:import "HTTPServer"
 
 :actor Main
   :new (env)

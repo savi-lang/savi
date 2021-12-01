@@ -1,12 +1,12 @@
 :import "bytes" (ByteStreamReader)
 
-:enum RequestToken
+:enum HTTPServer.RequestParser.Token
   :const bit_width U8: 8 // TODO: the compiler should choose the smallest valid bit width by default if not explicitly specified
-  :member RequestTokenMethod: 0
-  :member RequestTokenUri: 1
-  :member RequestTokenVersionString: 2
-  :member RequestTokenHeaderName: 3
-  :member RequestTokenHeaderValue: 4
+  :member HTTPServer.RequestParser.Token.Method: 0
+  :member HTTPServer.RequestParser.Token.Uri: 1
+  :member HTTPServer.RequestParser.Token.VersionString: 2
+  :member HTTPServer.RequestParser.Token.HeaderName: 3
+  :member HTTPServer.RequestParser.Token.HeaderValue: 4
 
 :enum _RequestAt
   :const bit_width U8: 8 // TODO: the compiler should choose the smallest valid bit width by default if not explicitly specified
@@ -20,13 +20,13 @@
   :member _RequestAtHeaderValue: 7
   :member _RequestAtEnd: 8
 
-:class RequestParser
+:class HTTPServer.RequestParser
   :var _state _RequestAt: _RequestAtStart
 
   :fun ref reset: @_state = _RequestAtStart
 
   :fun ref parse!(stream ByteStreamReader)
-    :yields RequestToken
+    :yields HTTPServer.RequestParser.Token
     try (
       while (@_state != _RequestAtEnd) (
         @_state = case @_state == (
@@ -34,18 +34,18 @@
           _RequestAtMethod
         | _RequestAtMethod |
           stream.advance_while! -> (byte | byte != ' ')
-          yield RequestTokenMethod
+          yield HTTPServer.RequestParser.Token.Method
           stream.advance!(1) // consume the space
           _RequestAtUri
         | _RequestAtUri |
           stream.advance_while! -> (byte | byte != ' ')
-          yield RequestTokenUri
+          yield HTTPServer.RequestParser.Token.Uri
           stream.advance!(1) // consume the space
           _RequestAtVersionString
         | _RequestAtVersionString |
           stream.advance_while! -> (byte | byte != '\r')
           if (stream.bytes_ahead < 2) error! // ensure the LF byte is ready too
-          yield RequestTokenVersionString
+          yield HTTPServer.RequestParser.Token.VersionString
           stream.advance!(2) // consume the CRLF
           _RequestAtHeaderLineMaybe
         | _RequestAtHeaderLineMaybe |
@@ -57,7 +57,7 @@
           )
         | _RequestAtHeaderName |
           stream.advance_while! -> (byte | byte != ':')
-          yield RequestTokenHeaderName
+          yield HTTPServer.RequestParser.Token.HeaderName
           stream.advance!(1) // consume the colon
           _RequestAtHeaderSpacing
         | _RequestAtHeaderSpacing |
@@ -66,7 +66,7 @@
         | _RequestAtHeaderValue |
           stream.advance_while! -> (byte | byte != '\r')
           if (stream.bytes_ahead < 2) error! // ensure the LF byte is ready too
-          yield RequestTokenHeaderValue
+          yield HTTPServer.RequestParser.Token.HeaderValue
           stream.advance!(2) // consume the CRLF
           _RequestAtHeaderLineMaybe
         |

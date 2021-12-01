@@ -2,7 +2,7 @@
 
 :class ResponseBuilderSpec
   :is Spec
-  :const describes: "ResponseBuilder"
+  :const describes: "HTTPServer.ResponseBuilder"
 
   :it "builds 1xx responses"
     assert: @build -> (builder |
@@ -53,10 +53,10 @@
     ], b"\r\n")
 
   :fun build Bytes'ref
-    :yields ResponseBuilder
+    :yields HTTPServer.ResponseBuilder
 
     bytes = Bytes.new
-    builder = ResponseBuilder.new(bytes) 
+    builder = HTTPServer.ResponseBuilder.new(bytes)
 
     yield builder
 

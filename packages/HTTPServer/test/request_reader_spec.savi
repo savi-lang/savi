@@ -3,15 +3,15 @@
 
 :class RequestReaderSpec
   :is Spec
-  :const describes: "RequestReader"
+  :const describes: "HTTPServer.RequestReader"
 
   :it "parses the head of an HTTP request"
     assert: @example(["GET * HTTP/1.1\r\n\r\n"]) -> (req |
       assert: req.method == "GET"
       assert: req.uri_string == "*"
       assert: req.content_length == 0
-      assert: req.transfer_encoding == TransferEncodingIdentity
-      assert: req.connection_header == ConnectionHeaderKeepAlive
+      assert: req.transfer_encoding == HTTPServer.Request.TransferEncoding.Identity
+      assert: req.connection_header == HTTPServer.Request.ConnectionHeader.KeepAlive
     )
 
     assert: @example([
@@ -23,8 +23,8 @@
       assert: req.method == "POST"
       assert: req.uri_string == "/api/v1/entities"
       assert: req.content_length == 123
-      assert: req.transfer_encoding == TransferEncodingIdentity
-      assert: req.connection_header == ConnectionHeaderClose
+      assert: req.transfer_encoding == HTTPServer.Request.TransferEncoding.Identity
+      assert: req.connection_header == HTTPServer.Request.ConnectionHeader.Close
     )
 
     assert: @example([
@@ -35,47 +35,47 @@
       assert: req.method == "POST"
       assert: req.uri_string == "/api/v1/upload"
       assert: req.content_length == 0
-      assert: req.transfer_encoding == TransferEncodingChunked
-      assert: req.connection_header == ConnectionHeaderKeepAlive
+      assert: req.transfer_encoding == HTTPServer.Request.TransferEncoding.Chunked
+      assert: req.connection_header == HTTPServer.Request.ConnectionHeader.KeepAlive
     )
 
   :it "complains when the request has an unsupported method"
     assert: @example_error(
       ["GIMME * HTTP/1.1\r\n\r\n"]
-      RequestErrorUnsupportedMethod
+      HTTPServer.Request.Error.UnsupportedMethod
     )
 
   :it "complains when the request has a URI that is too long"
     uri_too_long = "_" * 8193 // just a whole lotta underscores
     assert: @example_error(
       ["GET ", uri_too_long, " HTTP/1.1\r\n\r\n"]
-      RequestErrorURITooLong
+      HTTPServer.Request.Error.URITooLong
     )
 
   :it "complains when the request has an unsupported HTTP version"
     assert: @example_error(
       ["GET * HTTP/9.9\r\n\r\n"]
-      RequestErrorUnsupportedVersion
+      HTTPServer.Request.Error.UnsupportedVersion
     )
 
   :it "complains when the request has an unsupported Transfer-Encoding header"
     assert: @example_error(
       ["GET * HTTP/1.1\r\nTransfer-Encoding: bogus\r\n\r\n"]
-      RequestErrorUnsupportedTransferEncoding
+      HTTPServer.Request.Error.UnsupportedTransferEncoding
     )
 
   :it "complains when the request has an unsupported Connection header"
     assert: @example_error(
       ["GET * HTTP/1.1\r\nConnection: bogus\r\n\r\n"]
-      RequestErrorUnsupportedConnectionHeader
+      HTTPServer.Request.Error.UnsupportedConnectionHeader
     )
 
   :: Parse the given source_chunks into a request and yield it to the caller.
   :: Returns True if everything went smoothly.
   :: Returns False and prints a message if something unexpected happened.
   :fun example(source_chunks Array(String)) Bool
-    :yields Request
-    reader = RequestReader.new
+    :yields HTTPServer.Request
+    reader = HTTPServer.RequestReader.new
     stream = ByteStreamReader.new
     write_stream = TestByteStreamSource.new(stream)
 
@@ -84,7 +84,7 @@
     // Obviously this would be a bad choice in a real application,
     // but here we want to test the most pathological possible case.
     finished_too_soon = False
-    saw_error = RequestErrorNone
+    saw_error = HTTPServer.Request.Error.None
     source_chunks.each -> (source_chunk |
       source_chunk.each_byte -> (byte |
         if finished_too_soon.not (
@@ -94,7 +94,7 @@
           |
             // Check to see if there is an error present.
             // If so, store it and mark as having finished too soon.
-            if (reader.last_error != RequestErrorNone) (
+            if (reader.last_error != HTTPServer.Request.Error.None) (
               saw_error = reader.last_error
               finished_too_soon = True
             )
@@ -108,7 +108,7 @@
       // If we finished too soon, there was either an error to show,
       // or the parser failed to consume all of the chunks before finishing.
       @env.err.write("\nexpected "), @env.err.write(Inspect[source_chunks])
-      if (saw_error == RequestErrorNone) (
+      if (saw_error == HTTPServer.Request.Error.None) (
         @env.err.print(" to parse fully, but it finished too soon")
       |
         @env.err.write(" to not have an error, but it had error: ")
@@ -132,9 +132,9 @@
   :: Returns False and prints a message if something unexpected happened.
   :fun example_error(
     source_chunks Array(String)
-    expected_error RequestError
+    expected_error HTTPServer.Request.Error
   ) Bool
-    reader = RequestReader.new
+    reader = HTTPServer.RequestReader.new
     stream = ByteStreamReader.new
     write_stream = TestByteStreamSource.new(stream)
 
@@ -143,7 +143,7 @@
     // Obviously this would be a bad choice in a real application,
     // but here we want to test the most pathological possible case.
     finished_too_soon = False
-    saw_error = RequestErrorNone
+    saw_error = HTTPServer.Request.Error.None
     source_chunks.each -> (source_chunk |
       source_chunk.each_byte -> (byte |
         if finished_too_soon.not (
@@ -153,7 +153,7 @@
           |
             // Check to see if there is an error present.
             // If so, store it and mark as having finished too soon.
-            if (reader.last_error != RequestErrorNone) (
+            if (reader.last_error != HTTPServer.Request.Error.None) (
               saw_error = reader.last_error
               finished_too_soon = True
             )
@@ -167,7 +167,7 @@
       // If we finished too soon, there was either an error to show,
       // or the parser failed to consume all of the chunks before finishing.
       case saw_error == (
-      | RequestErrorNone |
+      | HTTPServer.Request.Error.None |
         @env.err.write("\nexpected "), @env.err.write(Inspect[source_chunks])
         @env.err.print(" to parse fully, but it finished too soon")
         False
