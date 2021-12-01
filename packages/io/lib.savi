@@ -1,4 +1,4 @@
-:import "os/error"
+:import "OSError"
 
 :ffi LibC
   :fun getsockopt(
@@ -41,5 +41,5 @@
 
       // Convert the 4-byte array to the equivalent 32-bit OSError value.
       // TODO: Should OSError enum provide a from_u32! method?
-      try (OSError.from_u64!(option.read_native_u32!(0).u64) | EINVAL)
+      try (OSError.from_u64!(option.read_native_u32!(0).u64) | OSError.EINVAL)
     )

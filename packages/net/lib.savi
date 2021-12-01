@@ -1,4 +1,4 @@
-:import "os/error"
+:import "OSError"
 
 :ffi LibC
   :fun ntohs(network_short U16) U16

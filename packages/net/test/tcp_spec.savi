@@ -1,6 +1,6 @@
 :import "spec"
 :import "io"
-:import "os/error" // TODO: remove?
+:import "OSError" // TODO: remove?
 
 :class iso TCPSpecListenerNotify
   :is TCPListenerNotify
@@ -57,7 +57,7 @@
     // TODO: Can we make this trigger _io_react with IOActionOpenFailed
     // automatically via the same mechanism we will use for queuing later
     // pending reads, instead of checking for this error case here?
-    if (@io.connect_error != OSErrorNone) (
+    if (@io.connect_error != OSError.None) (
       @env.err.print("[EchoClient] Failed to connect:")
       @env.err.print(@io.connect_error.name)
     )

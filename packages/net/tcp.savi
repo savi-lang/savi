@@ -1,4 +1,4 @@
-:import "os/error" // TODO: can this be removed?
+:import "OSError" // TODO: can this be removed?
 :import "bytes" (ByteStreamReader, ByteStreamChunkedWriter)
 :import "io"
 
@@ -6,7 +6,7 @@
   :is IOEngine(IOAction)
   :var io: IOCoreEngine.new
   :var listen (TCPListener | None): None
-  :var connect_error OSError: OSErrorNone
+  :var connect_error OSError: OSError.None
   :let read_stream: ByteStreamReader.new
   :let write_stream: ByteStreamChunkedWriter.new
 
@@ -21,7 +21,7 @@
       @_new_with_io(IOCoreEngine.new_tcp_connect!(actor, host, service, from))
     |
       invalid = @_new_with_io(IOCoreEngine.new)
-      invalid.connect_error = EINVAL
+      invalid.connect_error = OSError.EINVAL
       invalid
     )
 

@@ -1,4 +1,4 @@
-:import "os/error"
+:import "OSError"
 :import "bytes" (ByteStreamSource, ByteStreamChunkedSink)
 
 // TODO: Move everything in this file to a separate "io" package,
@@ -40,7 +40,7 @@
 
   :var _event CPointer(AsioEvent): AsioEvent.none
   :var _fd U32: -1
-  :var _os_error: OSErrorNone
+  :var _os_error: OSError.None
   :var _pending_connect_count U32: 0
   :var _has_closed Bool: False
   :var _is_readable Bool: False
@@ -131,7 +131,7 @@
     os_error = _PonyOs.check_os_error(fd)
 
     // Check if the above system call failed. If so, we bail out here.
-    if (os_error != OSErrorNone) (
+    if (os_error != OSError.None) (
       AsioEvent.unsubscribe(event)
       LibPonyOs.pony_os_socket_close(fd)
       @_os_error = os_error

@@ -1,4 +1,4 @@
-:import "os/error"
+:import "OSError"
 :import "io"
 
 :trait TCPListenerNotify
@@ -15,7 +15,7 @@
 
 :actor TCPListener
   :let notify TCPListenerNotify
-  :var listen_error OSError: OSErrorNone
+  :var listen_error OSError: OSError.None
 
   :var _fd U32: -1
   :var _event CPointer(AsioEvent): CPointer(AsioEvent).null
