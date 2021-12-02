@@ -1,4 +1,4 @@
-:import "bytes" (ByteStreamReader)
+:import "ByteStream" (ByteStream.Reader)
 
 :class val HTTPServer.Request
   :new iso
@@ -57,7 +57,7 @@
 
   :fun last_error: @_error
 
-  :fun ref read!(stream ByteStreamReader) HTTPServer.Request'iso
+  :fun ref read!(stream ByteStream.Reader) HTTPServer.Request'iso
     @_parser.parse!(stream) -> (token |
       case token == (
       | HTTPServer.RequestParser.Token.Method |

@@ -1,10 +1,10 @@
-:import "bytes" (ByteStreamWritable)
+:import "ByteStream" (ByteStream.Writable)
 
 :class HTTPServer.ResponseBuilder
-  :let _res ByteStreamWritable
+  :let _res ByteStream.Writable
   :var _has_body: False
 
-  :new (target ByteStreamWritable)
+  :new (target ByteStream.Writable)
     @_res = target
     @_res << b"HTTP/1.1 " // TODO: I don't like inserting the version here, but carry on...
 

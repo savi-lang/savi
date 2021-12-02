@@ -1,26 +1,11 @@
-
-:: This trait is meant to create a common interface that can receive chunks
-:: from a ByteStreamChunkedWriter. It is currently designed to only be really
-:: usable with an FFI-using I/O sink, since it gives opaque data pointers.
-::
-:: TODO: Refactor to use an Array(BytesSlice) instead of Array(CPointer(U8)),
-:: where BytesSlice is a new struct type that has a pointer and a size field,
-:: placed in memory in a platform-dependent order because Windows and POSIX
-:: expect their writev struct elements to be in an opposite order.
-:trait ByteStreamChunkedSink
-  :fun box is_writable Bool
-  :fun ref writev_windows!(data_pairs Array(CPointer(U8)), offset USize) None
-  :fun ref writev_posix!(data_pairs Array(CPointer(U8)), offset USize) USize
-  :fun non writev_posix_max_chunks USize
-
 :: This class provides a way to buffer writes to a data sink, in the form of
 :: chunks that arrive one at a time, then get flushed all together to the sink.
 ::
 :: This batched writing pattern amortizes the cost of writing to the sink.
 :: but its up to the caller to determine when to flush, based on whatever
 :: performance tuning and/or heuristics deemed appropriate for the application.
-:class ByteStreamChunkedWriter
-  :is ByteStreamWritable
+:class ByteStream.ChunkedWriter
+  :is ByteStream.Writable
 
   :let _data_pairs Array(CPointer(U8)): []
   :var _total_size USize: 0
@@ -63,7 +48,7 @@
   ::
   :: If the given target is not in a writable state when calling this method,
   :: then no data will be written and it was useless to make this call.
-  :fun ref flush(target ByteStreamChunkedSink) Bool
+  :fun ref flush(target ByteStream.ChunkedSink) Bool
     case (
     | @_total_size == 0       | True  // nothing left to flush
     | target.is_writable.not | False // can't flush right now
@@ -71,7 +56,7 @@
     |                           @_flush_posix(target)
     )
 
-  :fun ref _flush_posix(target ByteStreamChunkedSink) Bool
+  :fun ref _flush_posix(target ByteStream.ChunkedSink) Bool
     writev_max_chunks = target.writev_posix_max_chunks
     num_to_send USize = 0
     bytes_to_send USize = 0
@@ -99,7 +84,7 @@
       False
     )
 
-  :fun ref _flush_windows(target ByteStreamChunkedSink) Bool
+  :fun ref _flush_windows(target ByteStream.ChunkedSink) Bool
     try (
       target.writev_windows!(@_data_pairs, @_windows_unacknowledged_chunks * 2)
       @_windows_unacknowledged_chunks += @_data_pairs.size / 2 // TODO: remove cancelled-out *2/2 ?

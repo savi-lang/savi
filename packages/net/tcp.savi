@@ -1,5 +1,5 @@
 :import "OSError" // TODO: can this be removed?
-:import "bytes" (ByteStreamReader, ByteStreamChunkedWriter)
+:import "ByteStream" (ByteStream.Reader, ByteStream.ChunkedWriter)
 :import "IO"
 
 :class TCPConnectionEngine
@@ -7,8 +7,8 @@
   :var io: IO.CoreEngine.new
   :var listen (TCPListener | None): None
   :var connect_error OSError: OSError.None
-  :let read_stream: ByteStreamReader.new
-  :let write_stream: ByteStreamChunkedWriter.new
+  :let read_stream: ByteStream.Reader.new
+  :let write_stream: ByteStream.ChunkedWriter.new
 
   :fun non connect(
     // TODO: TCPConnectionAuth, rather than ambient authority.

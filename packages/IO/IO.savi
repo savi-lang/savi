@@ -1,5 +1,5 @@
 :import "OSError"
-:import "bytes" (ByteStreamSource, ByteStreamChunkedSink)
+:import "ByteStream" (ByteStream.Source, ByteStream.ChunkedSink)
 
 // TODO: Move everything in this file to a separate "IO" package,
 // once the interface is settled and deemed to be safe for non-FFI users.
@@ -35,8 +35,8 @@
 
 :class IO.CoreEngine
   :is IO.Engine(IO.Action)
-  :is ByteStreamSource
-  :is ByteStreamChunkedSink
+  :is ByteStream.Source
+  :is ByteStream.ChunkedSink
 
   :var _event CPointer(AsioEvent): AsioEvent.none
   :var _fd U32: -1

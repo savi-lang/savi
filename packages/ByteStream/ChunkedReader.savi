@@ -32,7 +32,7 @@
 :: Alternatively, garbage collection can happen in the midst of an ongoing
 :: stream using the compact method to drop only chunks that are behind
 :: both the marker and cursor, releasing chunks that cannot be read anymore.
-:class ByteStreamChunkedReader
+:class ByteStream.ChunkedReader
   :is BinaryReadable
   :let _chunks Array(Bytes): []
   :var _chunk_index USize: 0
@@ -361,4 +361,3 @@
 
   :fun read_native_u64!(offset USize) U64
     @read_be_u64!(offset).be_to_native
-

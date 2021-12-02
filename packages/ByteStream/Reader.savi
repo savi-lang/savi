@@ -1,20 +1,10 @@
-:: This trait is meant to create a common interface that can be used to get
-:: bytes into a ByteStreamReader, including compatibility with efficient
-:: patterns that write directly into a buffer from an I/O or network stack.
-:trait ByteStreamSource
-  :: Emit zero or more bytes into the given buffer starting at the given offset,
-  :: possibly expanding the size of the buffer if that turns out to be needed.
-  :: Returns the number of bytes that were written.
-  :: Raises an error if the source has become permanently closed off.
-  :fun ref emit_bytes_into!(buffer Bytes'ref, offset USize) USize
-
 :: This class provides convenience methods for reading data from a stream of
 :: bytes that presents itself in the form of a byte buffer that extends
 :: "to the right" over time (such as data coming from the network),
 :: while reading logic follows along and chops off pieces "from the left"
 :: side of the byte buffer after they have been successfully read.
 ::
-:: This is distinguished from ByteStreamChunkedReader, which accepts data
+:: This is distinguished from ByteStream.ChunkedReader, which accepts data
 :: in discrete chunks that arrive independently.
 ::
 :: While reading, a "cursor" and a "marker" position are maintained,
@@ -37,7 +27,7 @@
 :: Alternatively, garbage collection can happen in the midst of an ongoing
 :: stream using the compact method to drop only bytes that are behind
 :: both the marker and cursor, releasing bytes that cannot be read anymore.
-:class ByteStreamReader
+:class ByteStream.Reader
   :is BinaryReadable
   :let _data Bytes'ref
   :var _offset USize: 0
@@ -70,7 +60,7 @@
   :: Receive some bytes from the given source, extending the end of the stream.
   :: Returns the number of bytes that were received, as reported by the source.
   :: Raises an error if the source has become permanently closed off.
-  :fun ref receive_from!(source ByteStreamSource)
+  :fun ref receive_from!(source ByteStream.Source)
     if (@_data.space == 0) @_data.reserve(0x4000) // TODO: customizable reserve?
     source.emit_bytes_into!(@_data, @_data.size)
 
@@ -100,13 +90,13 @@
   :: Get the space available in the underlying allocation ahead of the cursor.
   :: This is equivalent to the number of available bytes ahead of the cursor
   :: plus the number of further bytes that can be received from a
-  :: ByteStreamSource prior to forcing a reallocation of the underlying buffer.
+  :: ByteStream.Source prior to forcing a reallocation of the underlying buffer.
   :fun space_ahead: @_data.space - @_offset
 
   :: Get the space available in the underlying allocation ahead of the marker.
   :: This is equivalent to the number of available bytes ahead of the marker
   :: plus the number of further bytes that can be received from a
-  :: ByteStreamSource prior to forcing a reallocation of the underlying buffer.
+  :: ByteStream.Source prior to forcing a reallocation of the underlying buffer.
   :fun space_ahead_of_marker: @_data.space - @_mark_offset
 
   :: Reserve additional space in the underlying byte buffer, which forces a
@@ -137,13 +127,13 @@
   :: along with the start and end offset of the chunk that are within the token.
   :: This is used internally for chunk-wise comparison and copying operations.
   :fun _each_token_slice None
-    :yields for None // TODO: unify Bytes cap with ByteStreamChunkedReader signature?
+    :yields for None // TODO: unify Bytes cap with ByteStream.ChunkedReader signature?
     yield (@_data, @_mark_offset, @_offset)
 
   :: Same as the each_token_byte function, but allows the yield block to return
   :: True to stop iteration early, and in such a case the function returns True.
   :fun _each_token_slice_until Bool
-    :yields for Bool // TODO: unify Bytes cap with ByteStreamChunkedReader signature?
+    :yields for Bool // TODO: unify Bytes cap with ByteStream.ChunkedReader signature?
     yield (@_data, @_mark_offset, @_offset)
 
   :: Return True if the bytes in the currently marked token are equivalent
@@ -256,4 +246,3 @@
 
   :fun read_native_u64!(offset USize) U64
     @_data.read_native_u64!(@_mark_offset + offset)
-
