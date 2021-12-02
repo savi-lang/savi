@@ -1,4 +1,4 @@
-:import "spec"
+:import "Spec"
 
 :: A dummy class for use with identity-based equality testing.
 :class IndexableSpecOpaqueObject

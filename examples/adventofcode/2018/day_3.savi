@@ -1,4 +1,4 @@
-:import "spec"
+:import "Spec"
 
 :class Day3Claim
   :let id String

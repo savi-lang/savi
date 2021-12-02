@@ -1,9 +1,9 @@
-:import "spec"
+:import "Spec"
 :source ".."
 
 :actor Main
   :new (env)
-    Specs.run(env, [
-      SpecRun(JsonParserSpec).new(env)
-      SpecRun(JsonReaderSpec).new(env)
+    Spec.Process.run(env, [
+      Spec.Run(JsonParserSpec).new(env)
+      Spec.Run(JsonReaderSpec).new(env)
     ])

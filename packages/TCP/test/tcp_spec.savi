@@ -1,4 +1,4 @@
-:import "spec"
+:import "Spec"
 :import "IO"
 :import "OSError" // TODO: remove?
 

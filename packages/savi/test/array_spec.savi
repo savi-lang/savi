@@ -1,4 +1,4 @@
-:import "spec"
+:import "Spec"
 
 :: A dummy class for use with identity-based equality testing.
 :class ArraySpecOpaqueObject
@@ -90,12 +90,12 @@
 
   :it "gives convenient access to the first and last elements, if existent"
     array Array(U8) = [3, 6, 12]
-    assert: array.first! == 3 
-    assert: array.last! == 12 
+    assert: array.first! == 3
+    assert: array.last! == 12
     assert no_error: array.first! = 4
     assert no_error: array.last! = 11
-    assert: array.first! == 4 
-    assert: array.last! == 11 
+    assert: array.first! == 4
+    assert: array.last! == 11
     array.clear
     assert error: array.first!
     assert error: array.last!

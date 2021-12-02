@@ -583,15 +583,15 @@ class Savi::Compiler::Macros < Savi::AST::CopyOnMutateVisitor
   # The `visit_assert` methods compiles different forms of the `assert` macro.
   # The expression to evaluate is the `rhs` of the `assert: expr` Relate node.
   #
-  # When the expression itself contains operators it will compile into `Assert.relation`.
+  # When the expression itself contains operators it will compile into `Spec.Assert.relation`.
   #
   # assert: True == True
   # assert: foo || bar && baz
   #
   # When the relation uses the `<:` and `!<:` operator the assert is compiled into a special
-  # `Assert.type_relation` method.
+  # `Spec.Assert.type_relation` method.
   #
-  # When the expression is any other kind of node it will compile into a `Assert.condition`.
+  # When the expression is any other kind of node it will compile into a `Spec.Assert.condition`.
   #
   # assert: True
   # assert: Something.foo
@@ -604,7 +604,7 @@ class Savi::Compiler::Macros < Savi::AST::CopyOnMutateVisitor
 
     # For the case where `rhs` is not a value expression, but rather a type expression:
     # `String`, `Array(String)` or `(String | None)`, we will compile into the
-    # `Assert.type_relation` call.
+    # `Spec.Assert.type_relation` call.
     return visit_assert_type_relation(node, expr) if op.value == "<:" || op.value == "!<:"
 
     # Use a hygienic local to explicitly hold the expressions as box.
@@ -640,7 +640,7 @@ class Savi::Compiler::Macros < Savi::AST::CopyOnMutateVisitor
     ).from(expr)
 
     call = AST::Call.new(
-      AST::Identifier.new("Assert").from(orig),
+      AST::Identifier.new("Spec.Assert").from(orig),
       AST::Identifier.new("relation").from(orig),
       AST::Group.new("(", [
         AST::Identifier.new("@").from(node),
@@ -659,7 +659,7 @@ class Savi::Compiler::Macros < Savi::AST::CopyOnMutateVisitor
       ] of AST::Term).from(orig),
       AST::Group.new("(", [
         AST::Call.new(
-          AST::Identifier.new("Assert").from(expr),
+          AST::Identifier.new("Spec.Assert").from(expr),
           AST::Identifier.new("has_error").from(expr),
           AST::Group.new("(", [
             AST::Identifier.new("@").from(node),
@@ -700,7 +700,7 @@ class Savi::Compiler::Macros < Savi::AST::CopyOnMutateVisitor
     ).from(expr)
 
     call = AST::Call.new(
-      AST::Identifier.new("Assert").from(orig),
+      AST::Identifier.new("Spec.Assert").from(orig),
       AST::Identifier.new("type_relation").from(orig),
       AST::Group.new("(", [
         AST::Identifier.new("@").from(node),
@@ -722,7 +722,7 @@ class Savi::Compiler::Macros < Savi::AST::CopyOnMutateVisitor
       ] of AST::Term).from(orig),
       AST::Group.new("(", [
         AST::Call.new(
-          AST::Identifier.new("Assert").from(expr),
+          AST::Identifier.new("Spec.Assert").from(expr),
           AST::Identifier.new("has_error").from(expr),
           AST::Group.new("(", [
             AST::Identifier.new("@").from(node),
@@ -743,15 +743,15 @@ class Savi::Compiler::Macros < Savi::AST::CopyOnMutateVisitor
     # We're re-writing the code to wrap it all with try
     #
     # try (
-    #   Assert.condition(@, expr)
+    #   Spec.Assert.condition(@, expr)
     # |
-    #   Assert.has_error(@, True, False) // Booleans mean "has error" and "expected error?"
+    #   Spec.Assert.has_error(@, True, False) // Booleans mean "has error" and "expected error?"
     # )
     #
     try = AST::Try.new(
       AST::Group.new("(", [
         AST::Call.new(
-          AST::Identifier.new("Assert").from(expr),
+          AST::Identifier.new("Spec.Assert").from(expr),
           AST::Identifier.new("condition").from(expr),
           AST::Group.new("(", [
             AST::Identifier.new("@").from(node),
@@ -761,7 +761,7 @@ class Savi::Compiler::Macros < Savi::AST::CopyOnMutateVisitor
       ] of AST::Term).from(orig),
       AST::Group.new("(", [
         AST::Call.new(
-          AST::Identifier.new("Assert").from(expr),
+          AST::Identifier.new("Spec.Assert").from(expr),
           AST::Identifier.new("has_error").from(expr),
           AST::Group.new("(", [
             AST::Identifier.new("@").from(node),
@@ -804,7 +804,7 @@ class Savi::Compiler::Macros < Savi::AST::CopyOnMutateVisitor
     end
 
     call = AST::Call.new(
-      AST::Identifier.new("Assert").from(orig),
+      AST::Identifier.new("Spec.Assert").from(orig),
       AST::Identifier.new("has_error").from(orig),
       AST::Group.new("(", [
         AST::Identifier.new("@").from(node),

@@ -13,7 +13,7 @@
 
 :class AssertSpec
   :is Spec
-  :const describes: "Assert"
+  :const describes: "Spec.Assert"
 
   :it "conforms to the `assert: EXPR` macro"
     assert: True

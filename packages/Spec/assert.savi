@@ -1,4 +1,4 @@
-:trait val Assert
+:trait val Spec.Assert
   :let spec String
   :let example String
   :let success Bool
@@ -14,13 +14,13 @@
     pos SourceCodePosition = source_code_position_of_argument spec
   )
     ctx = spec.ctx
-    assert = AssertCondition.new(
+    assert = Spec.Assert.Condition.new(
       ctx.spec
       ctx.example
       success
       pos
     )
-    ctx.specs.enqueue(assert)
+    ctx.process.enqueue(assert)
 
   :fun non relation(
     spec Spec
@@ -31,7 +31,7 @@
     pos SourceCodePosition = source_code_position_of_argument spec
   )
     ctx = spec.ctx
-    assert = AssertRelation.new(
+    assert = Spec.Assert.Relation.new(
       ctx.spec
       ctx.example
       success
@@ -40,7 +40,7 @@
       Inspect[lhs]
       Inspect[rhs]
     )
-    ctx.specs.enqueue(assert)
+    ctx.process.enqueue(assert)
 
   :fun non type_relation(
     spec Spec
@@ -51,7 +51,7 @@
     pos SourceCodePosition = source_code_position_of_argument spec
   )
     ctx = spec.ctx
-    assert = AssertTypeRelation.new(
+    assert = Spec.Assert.TypeRelation.new(
       ctx.spec
       ctx.example
       success
@@ -60,7 +60,7 @@
       Inspect[lhs]
       rhs
     )
-    ctx.specs.enqueue(assert)
+    ctx.process.enqueue(assert)
 
   :fun non has_error(
     spec Spec
@@ -69,14 +69,14 @@
     pos SourceCodePosition = source_code_position_of_argument spec
   )
     ctx = spec.ctx
-    assert = AssertHasError.new(
+    assert = Spec.Assert.HasError.new(
       ctx.spec
       ctx.example
       if expects_error (has_error | !has_error)
       pos
       expects_error
     )
-    ctx.specs.enqueue(assert)
+    ctx.process.enqueue(assert)
 
   :fun file_and_line String
     line = Inspect[@pos.row + 1]
@@ -85,8 +85,8 @@
   :fun indent(times USize, msg String) String
     String.join([" " * times, msg])
 
-:class val AssertCondition
-  :is Assert
+:class val Spec.Assert.Condition
+  :is Spec.Assert
 
   :new val (@spec, @example, @success, @pos)
 
@@ -102,8 +102,8 @@
 
     None
 
-:class val AssertRelation
-  :is Assert
+:class val Spec.Assert.Relation
+  :is Spec.Assert
 
   :let op String
   :let lhs String
@@ -126,8 +126,8 @@
 
     None
 
-:class val AssertTypeRelation
-  :is Assert
+:class val Spec.Assert.TypeRelation
+  :is Spec.Assert
 
   :let op String
   :let lhs String
@@ -154,8 +154,8 @@
 
     None
 
-:class val AssertHasError
-  :is Assert
+:class val Spec.Assert.HasError
+  :is Spec.Assert
 
   :let expects_error Bool
 

@@ -1,10 +1,10 @@
-:import "spec"
+:import "Spec"
 :source ".."
 
 :actor Main
   :new (env)
-    Specs.run(env, [
-      SpecRun(ByteStreamReaderSpec).new(env)
-      SpecRun(ByteStreamChunkedReaderSpec).new(env)
-      SpecRun(ByteStreamWritableSpec).new(env)
+    Spec.Process.run(env, [
+      Spec.Run(ByteStreamReaderSpec).new(env)
+      Spec.Run(ByteStreamChunkedReaderSpec).new(env)
+      Spec.Run(ByteStreamWritableSpec).new(env)
     ])

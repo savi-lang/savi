@@ -1,4 +1,4 @@
-:import "spec"
+:import "Spec"
 
 :class CPointerSpec
   :is Spec

@@ -1,8 +1,7 @@
-:import "Spec"
 :source ".."
 
 :actor Main
   :new (env)
     Spec.Process.run(env, [
-      Spec.Run(RegexSpec).new(env)
+      Spec.Run(AssertSpec).new(env)
     ])

@@ -1,14 +1,14 @@
 :import "Map" (Map.Ordered)
 
-:trait SpecReporter
+:trait Spec.Reporter
   :fun ref spec_began(spec String): None
   :fun ref spec_ended(spec String): None
   :fun ref example_began(spec String, example String): None
   :fun ref example_ended(spec String, example String, skip Bool): None
-  :fun ref event(spec String, example String, event SpecEventAssert): None
+  :fun ref event(spec String, example String, event Spec.Event): None
 
-:class SpecReporterDots
-  :is SpecReporter
+:class Spec.Reporter.Dots
+  :is Spec.Reporter
   :let env Env
   :new (@env)
 
@@ -18,7 +18,7 @@
   :fun ref example_began(spec String, example String)
     @env.err.write(" ")
 
-  :fun ref event(spec String, example String, event SpecEventAssert)
+  :fun ref event(spec String, example String, event Spec.Event)
     if event.success (
       @env.err.write(".")
     |
@@ -29,8 +29,8 @@
       @env.err.write("  X "), @env.err.print(event.pos.string)
     )
 
-:class SpecReporterFull
-  :is SpecReporter
+:class Spec.Reporter.Full
+  :is Spec.Reporter
   :let env Env
   :new (@env)
 
@@ -47,12 +47,12 @@
   :fun ref example_ended(spec String, example String, skip Bool)
     if skip (@env.err.print(" SKIP") | @env.err.print(" OK"))
 
-  :fun ref event(spec String, example String, event SpecEventAssert)
+  :fun ref event(spec String, example String, event Spec.Event)
     if event.success (
       @env.err.write(".")
     |
       try (
-        event.assert.as!(Assert).print_failure(@env)
+        event.assert.as!(Spec.Assert).print_failure(@env)
       |
         @env.err.write("\n")
         @env.err.write(Inspect[event.pos.row + 1])
@@ -61,10 +61,10 @@
       )
     )
 
-:class SpecReporterLinear
+:class Spec.Reporter.Linear
   :let env Env
-  :let statuses: Map.Ordered(String, SpecStatus).new
-  :let inner SpecReporter
+  :let statuses: Map.Ordered(String, Spec.Status).new
+  :let inner Spec.Reporter
   :var current_spec: ""
   :var current_example: ""
   :new (@env, @statuses, @inner)
@@ -73,7 +73,7 @@
   :fun ref spec_ended(spec String): @_changed
   :fun ref example_began(spec String, example String): @_changed
   :fun ref example_ended(spec String, example String, skip Bool): @_changed
-  :fun ref event(spec String, example String, event SpecEventAssert): @_changed
+  :fun ref event(spec String, example String, event Spec.Event): @_changed
 
   :fun ref _changed None // TODO: be able to infer return type for maybe-recursive functions
     // If no spec and example are selected for linear reporting, pick them now.
@@ -115,7 +115,7 @@
         )
       )
     |
-      Specs._bug(@env, "no status for current_spec")
+      _Log.bug(@env, "no status for current_spec")
       False
     )
 
@@ -145,7 +145,7 @@
         if @_choose_next_example @_report_examples_from_current
       )
     |
-      Specs._bug(@env, "no status for current_example")
+      _Log.bug(@env, "no status for current_example")
     )
 
   :fun ref _report_specs_from_current None // TODO: be able to infer return type for maybe-recursive functions
@@ -168,5 +168,5 @@
         if @_choose_next_spec @_report_specs_from_current
       )
     |
-      Specs._bug(@env, "no status for current_spec")
+      _Log.bug(@env, "no status for current_spec")
     )

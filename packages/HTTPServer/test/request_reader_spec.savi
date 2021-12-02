@@ -1,4 +1,4 @@
-:import "spec"
+:import "Spec"
 :import "ByteStream" (ByteStream.Reader, ByteStream.Source)
 
 :class RequestReaderSpec

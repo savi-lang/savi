@@ -1,17 +1,17 @@
-:import "spec"
+:import "Spec"
 
 :actor Main
   :new (env)
-    Specs.run(env, [
-      SpecRun(ArraySpec).new(env)
-      SpecRun(BitArraySpec).new(env)
-      SpecRun(BoolSpec).new(env)
-      SpecRun(BytesSpec).new(env)
-      SpecRun(CountSpec).new(env)
-      SpecRun(CPointerSpec).new(env)
-      SpecRun(IndexableSpec).new(env)
-      SpecRun(InspectSpec).new(env)
-      SpecRun(NumericSpec).new(env)
-      SpecRun(PlatformSpec).new(env)
-      SpecRun(StringSpec).new(env)
+    Spec.Process.run(env, [
+      Spec.Run(ArraySpec).new(env)
+      Spec.Run(BitArraySpec).new(env)
+      Spec.Run(BoolSpec).new(env)
+      Spec.Run(BytesSpec).new(env)
+      Spec.Run(CountSpec).new(env)
+      Spec.Run(CPointerSpec).new(env)
+      Spec.Run(IndexableSpec).new(env)
+      Spec.Run(InspectSpec).new(env)
+      Spec.Run(NumericSpec).new(env)
+      Spec.Run(PlatformSpec).new(env)
+      Spec.Run(StringSpec).new(env)
     ])

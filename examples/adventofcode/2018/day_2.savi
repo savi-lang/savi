@@ -1,4 +1,4 @@
-:import "spec"
+:import "Spec"
 :import "Map"
 
 :module Day2

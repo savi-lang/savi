@@ -1,15 +1,8 @@
 :trait Spec
-  :let ctx TestContext
+  :let ctx Spec.Context
   :fun env: @ctx.env
   :new (@ctx)
 
   :: When implementing the Spec trait, include a definition for this constant
   :: indicating what entity the tests are describing the specification for.
   :const describes String
-
-:class val TestContext
-  :let env Env
-  :let specs Specs
-  :let spec String
-  :let example String
-  :new (@env, @specs, @spec, @example)

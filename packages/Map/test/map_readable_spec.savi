@@ -1,4 +1,4 @@
-:import "spec"
+:import "Spec"
 
 :class MapReadableSpec
   :is Spec

@@ -1,4 +1,4 @@
-:import "spec"
+:import "Spec"
 
 :class ByteStreamWritableSpec
   :is Spec

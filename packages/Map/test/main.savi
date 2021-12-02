@@ -1,10 +1,10 @@
-:import "spec"
+:import "Spec"
 :source ".."
 
 :actor Main
   :new (env)
-    Specs.run(env, [
-      SpecRun(MapSpec).new(env)
-      SpecRun(OrderedMapSpec).new(env)
-      SpecRun(MapReadableSpec).new(env)
+    Spec.Process.run(env, [
+      Spec.Run(MapSpec).new(env)
+      Spec.Run(OrderedMapSpec).new(env)
+      Spec.Run(MapReadableSpec).new(env)
     ])
