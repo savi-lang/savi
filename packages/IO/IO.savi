@@ -1,28 +1,28 @@
 :import "OSError"
 :import "bytes" (ByteStreamSource, ByteStreamChunkedSink)
 
-// TODO: Move everything in this file to a separate "io" package,
+// TODO: Move everything in this file to a separate "IO" package,
 // once the interface is settled and deemed to be safe for non-FFI users.
-// TODO: Also move the AsioEvent type into the "io" package too,
+// TODO: Also move the AsioEvent type into the "IO" package too,
 // and rename it to a private name so that it is not accessible on its own,
-// and can only be utilized via this IOCoreEngine abstraction.
+// and can only be utilized via this IO.CoreEngine abstraction.
 // Though maybe that presents problems for the _event_notify interface?
 // For that matter, maybe allowing flags and arg there to be non-opaque is bad.
 
-:enum IOAction
+:enum IO.Action
   :const bit_width U8: 8
-  :member IOActionOpened: 1
-  :member IOActionOpenFailed: 2
-  :member IOActionRead: 3
-  :member IOActionWrite: 4
-  :member IOActionClosed: 5
+  :member IO.Action.Opened: 1
+  :member IO.Action.OpenFailed: 2
+  :member IO.Action.Read: 3
+  :member IO.Action.Write: 4
+  :member IO.Action.Closed: 5
 
-:trait IOEngine(ActionType val)
+:trait IO.Engine(ActionType val)
   :fun ref react(event CPointer(AsioEvent), flags U32, arg U32) @
     :yields ActionType for None
 
-:trait tag IOActor(ActionType val)
-  :fun io @->(IOEngine(ActionType)) // TODO: somehow private... allow the trait to use this, but make it private to other callers?
+:trait tag IO.Actor(ActionType val)
+  :fun io @->(IO.Engine(ActionType)) // TODO: somehow private... allow the trait to use this, but make it private to other callers?
   :fun ref _io_react(action ActionType) @
 
   :: This is a special behaviour that hooks into the AsioEventNotify runtime,
@@ -33,8 +33,8 @@
   :be _event_notify(event CPointer(AsioEvent), flags U32, arg U32)
     @io.react(event, flags, arg) -> (action | @_io_react(action))
 
-:class IOCoreEngine
-  :is IOEngine(IOAction)
+:class IO.CoreEngine
+  :is IO.Engine(IO.Action)
   :is ByteStreamSource
   :is ByteStreamChunkedSink
 
@@ -146,7 +146,7 @@
     @
 
   :fun ref react(event CPointer(AsioEvent), flags U32, arg U32) @
-    :yields IOAction for None
+    :yields IO.Action for None
     case (
     // First, if this is a disposable event handle, just dispose of it.
     // We won't yield any actions back to the caller about this,
@@ -155,7 +155,7 @@
       AsioEvent.destroy(event)
       if (@_event === event) (
         @_clear_state_after_final_dispose
-        yield IOActionClosed
+        yield IO.Action.Closed
       )
 
     // If we own this event, continue by yielding any relevant actions.
@@ -167,14 +167,14 @@
       try (
         @_pending_connect_count -= 1
         @_adopt_event!(event)
-        yield IOActionOpened
+        yield IO.Action.Opened
         @_event_notify_continue(flags, arg) -> (action | yield action)
       |
         // If there are no more pending connections, our last one has failed
         // and we have no choice but to admit final failure.
         if (@_pending_connect_count == 0) (
           @_clear_state_after_final_dispose
-          yield IOActionOpenFailed
+          yield IO.Action.OpenFailed
         )
       )
 
@@ -188,15 +188,15 @@
 
   :: Handle incoming events for the event handle that we already own.
   :fun ref _event_notify_continue(flags U32, arg U32)
-    :yields IOAction for None
+    :yields IO.Action for None
     if AsioEvent.is_writable(flags) (
       @_is_writable = True
       // TODO: complete writes, pending writes logic from Pony
-      yield IOActionWrite
+      yield IO.Action.Write
     )
     if AsioEvent.is_readable(flags) (
       @_is_readable = True
-      yield IOActionRead
+      yield IO.Action.Read
     )
     if @_has_closed @_close
     None
@@ -232,7 +232,7 @@
     )
 
     // On windows, hard_close doesn't unsubscribe the socket, because we want
-    // to wait for all outstanding IOCP operations to be completed or cancelled.
+    // to wait for all outstanding IO.CP operations to be completed or cancelled.
     // So, we finish up here in a later call to this function by unsubscribing,
     // after the socket is no longer readable and we have no pending writes.
     if (

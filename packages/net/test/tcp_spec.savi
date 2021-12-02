@@ -1,5 +1,5 @@
 :import "spec"
-:import "io"
+:import "IO"
 :import "OSError" // TODO: remove?
 
 :class iso TCPSpecListenerNotify
@@ -22,16 +22,16 @@
     TCPSpecEchoer.new(@env, listen, --ticket)
 
 :actor TCPSpecEchoer
-  :is IOActor(IOAction)
+  :is IO.Actor(IO.Action)
   :let env Env
   :let io TCPConnectionEngine
   :new (@env, listen, ticket)
     @io = TCPConnectionEngine.accept(@, listen, --ticket)
     @env.err.print("[Echoer] Accepted")
 
-  :fun ref _io_react(action IOAction)
+  :fun ref _io_react(action IO.Action)
     case action == (
-    | IOActionRead |
+    | IO.Action.Read |
       @io.pending_reads -> (bytes_available |
         @io.read_stream.advance_to_end
         bytes val = @io.read_stream.extract_token
@@ -41,20 +41,20 @@
         @io.flush // TODO: should we flush automatically on close below?
         @io.close
       )
-    | IOActionClosed |
+    | IO.Action.Closed |
       @env.err.print("[Echoer] Closed")
       try @io.listen.as!(TCPListener).dispose
     )
     @
 
 :actor TCPSpecEchoClient
-  :is IOActor(IOAction)
+  :is IO.Actor(IO.Action)
   :let env Env
   :let io TCPConnectionEngine
   :new (@env, service)
     @io = TCPConnectionEngine.connect(@, "localhost", service)
 
-    // TODO: Can we make this trigger _io_react with IOActionOpenFailed
+    // TODO: Can we make this trigger _io_react with IO.Action.OpenFailed
     // automatically via the same mechanism we will use for queuing later
     // pending reads, instead of checking for this error case here?
     if (@io.connect_error != OSError.None) (
@@ -62,18 +62,18 @@
       @env.err.print(@io.connect_error.name)
     )
 
-  :fun ref _io_react(action IOAction)
+  :fun ref _io_react(action IO.Action)
     case action == (
-    | IOActionOpened |
+    | IO.Action.Opened |
       @env.err.print("[EchoClient] Connected")
       @io.write_stream << b"Hello, World!"
       @io.flush
 
-    | IOActionOpenFailed |
+    | IO.Action.OpenFailed |
       @env.err.print("[EchoClient] Failed to connect:")
       @env.err.print(@io.connect_error.name)
 
-    | IOActionRead |
+    | IO.Action.Read |
       @io.pending_reads -> (bytes_available |
         if (bytes_available >= b"Hello, World!".size) (
           @io.read_stream.advance_to_end
@@ -83,7 +83,7 @@
         )
       )
 
-    | IOActionClosed |
+    | IO.Action.Closed |
       @env.err.print("[EchoClient] Closed")
       try @io.listen.as!(TCPListener).dispose
     )

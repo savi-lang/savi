@@ -1,4 +1,4 @@
-:import "io"
+:import "IO"
 :import "net"
 :import "HTTPServer"
 
@@ -26,7 +26,7 @@
     HTTPConnection.new(@env, listen, --ticket)
 
 :actor HTTPConnection
-  :is IOActor(IOAction)
+  :is IO.Actor(IO.Action)
   :let env Env
   :let io TCPConnectionEngine
   :let reader: RequestReader.new
@@ -34,9 +34,9 @@
   :new (@env, listen, ticket)
     @io = TCPConnectionEngine.accept(@, listen, --ticket)
 
-  :fun ref _io_react(action IOAction)
+  :fun ref _io_react(action IO.Action)
     case action == (
-    | IOActionRead |
+    | IO.Action.Read |
       @io.pending_reads -> (data |
         try (
           request = @reader.read!(@io.read_stream)
@@ -51,7 +51,7 @@
           @io.flush
         )
       )
-    | IOActionWrite |
+    | IO.Action.Write |
       @io.flush
     )
     @

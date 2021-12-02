@@ -175,6 +175,7 @@ class Savi::Compiler::Populate
     new_functions
   end
 
+  # TODO: Move this complaining a different pass (the verify pass?)
   def maybe_add_namespace_function_for(ctx, t, dest, library, orig_functions) : Program::Type
     nested_ident = t.ident.immediately_nested_within?(dest.ident)
     return dest unless nested_ident
@@ -189,27 +190,27 @@ class Savi::Compiler::Populate
       return dest
     end
 
-    # Create a new function that returns the nested type by full identifier.
-    f = Program::Function.new(
-      AST::Identifier.new("non").from(t.ident),
-      nested_ident,
-      nil,
-      nil,
-      AST::Group.new(":").from(t.ident).tap { |body|
-        body.terms << AST::Identifier.new(t.ident.value).from(t.ident)
-      },
-    )
+    # # Create a new function that returns the nested type by full identifier.
+    # f = Program::Function.new(
+    #   AST::Identifier.new("non").from(t.ident),
+    #   nested_ident,
+    #   nil,
+    #   nil,
+    #   AST::Group.new(":").from(t.ident).tap { |body|
+    #     body.terms << AST::Identifier.new(t.ident.value).from(t.ident)
+    #   },
+    # )
 
-    # We also need to run the missing ReferType pass for this new function.
-    dest_link = dest.make_link(library)
-    ctx.refer_type.run_for_func(ctx, f, f.make_link(dest_link))
+    # # We also need to run the missing ReferType pass for this new function.
+    # dest_link = dest.make_link(library)
+    # ctx.refer_type.run_for_func(ctx, f, f.make_link(dest_link))
 
-    # Add the new function, duping the orig functions list if needed.
-    if dest.functions.same?(orig_functions)
-      dest = dest.dup
-      raise "didn't dup functions!" if dest.functions.same?(orig_functions)
-    end
-    dest.functions << f
+    # # Add the new function, duping the orig functions list if needed.
+    # if dest.functions.same?(orig_functions)
+    #   dest = dest.dup
+    #   raise "didn't dup functions!" if dest.functions.same?(orig_functions)
+    # end
+    # dest.functions << f
 
     dest
   end

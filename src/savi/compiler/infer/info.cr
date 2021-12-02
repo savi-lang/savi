@@ -424,7 +424,7 @@ module Savi::Compiler::Infer
     end
 
     def resolve_span!(ctx : Context, infer : Visitor) : Span
-      # If this node is further qualified, we don't want to both resolving it,
+      # If this node is further qualified, we don't want to bother resolving it,
       # and doing so would trigger errors during type argument validation,
       # because the type arguments haven't been applied yet; they will be
       # applied in a different FixedSingleton that wraps this one in range.
