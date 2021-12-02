@@ -1,4 +1,4 @@
-module Savi::Compiler::Constraints
+module Savi::Compiler::Caps
   # An unsolved constraint which can't be eliminated into
   # a simple upper or lower bound constraint
   abstract struct Constraint
