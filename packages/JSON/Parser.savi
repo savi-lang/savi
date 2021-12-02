@@ -1,5 +1,3 @@
-:import "collections" (Count)
-
 :class JSON.Parser
   :var _offset USize: 0
   :var _offset_start USize: 0

@@ -1,5 +1,4 @@
 :import "spec"
-:import "collections"
 
 :class Day3Claim
   :let id String

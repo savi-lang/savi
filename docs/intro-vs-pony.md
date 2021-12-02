@@ -340,8 +340,6 @@ When the parenthesized block is split by the `|` character, the first half of th
 In the standard library, this kind of function is often used for iteration, but it can be used in any other case where a function needs to pass values back and forth with the caller before the function finishes executing.
 
 ```savi
-:import "collections"
-
 :actor Main
   :new (env Env)
     count = Count.to(10) -> ( i |

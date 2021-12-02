@@ -7,6 +7,7 @@
       SpecRun(BitArraySpec).new(env)
       SpecRun(BoolSpec).new(env)
       SpecRun(BytesSpec).new(env)
+      SpecRun(CountSpec).new(env)
       SpecRun(CPointerSpec).new(env)
       SpecRun(IndexableSpec).new(env)
       SpecRun(InspectSpec).new(env)
