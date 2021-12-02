@@ -31,6 +31,16 @@ module Savi::Compiler::Caps
     # TODO: Should this method also be required for non-CapSimple CapNodes?
     abstract def aliased : CapSimple
 
+    # True if this capability is known to arbitrarily aliasable
+    # False does not necessarily mean that this cannot later be known to be aliasable
+    # (even when concrete, a non-aliasable cap can be a subtype of a concrete one)
+    #
+    # Aliasable caps are closed under supertypes, all upper-bounds of an aliasable
+    # cap are aliasable
+    def aliasable : Bool
+        raise NotImplementedError.new("#{show}.aliasable")
+    end
+
     # TODO: Should this method also be required for non-CapSimple CapNodes?
     abstract def viewed_from(origin : CapSimple) : CapSimple
   end
