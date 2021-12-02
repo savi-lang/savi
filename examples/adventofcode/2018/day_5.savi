@@ -1,5 +1,6 @@
 :import "spec"
 :import "Time"
+:import "Map"
 
 :class Day5Polymer
   :let input String'box

@@ -1,10 +1,10 @@
 :module _MapEmpty
 :module _MapDeleted
 
-:alias MapIs(K, V): Map(K, V, HashIs(K))
+:alias Map.ByIdentity(K, V): Map(K, V, _HashByIdentity(K))
 
-:class Map(K, V, H HashFunction(K) = HashEq(K))
-  :is MapReadable(K, V)
+:class Map(K, V, H _HashFunction(K) = _HashEq(K))
+  :is Map.Readable(K, V)
   :var _size USize: 0
   :var _array Array((Pair(K, V) | _MapEmpty | _MapDeleted))
 

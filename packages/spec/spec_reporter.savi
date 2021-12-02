@@ -1,4 +1,4 @@
-:import "collections" (OrderedMap, HashEq)
+:import "Map" (Map.Ordered)
 
 :trait SpecReporter
   :fun ref spec_began(spec String): None
@@ -63,7 +63,7 @@
 
 :class SpecReporterLinear
   :let env Env
-  :let statuses: OrderedMap(String, SpecStatus).new
+  :let statuses: Map.Ordered(String, SpecStatus).new
   :let inner SpecReporter
   :var current_spec: ""
   :var current_example: ""

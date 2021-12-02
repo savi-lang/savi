@@ -2,9 +2,9 @@
 
 :class OrderedMapSpec
   :is Spec
-  :const describes: "OrderedMap"
+  :const describes: "Map.Ordered"
 
-  :fun new_map: OrderedMap(String, U64).new
+  :fun new_map: Map.Ordered(String, U64).new
 
   :it "stores and removes values at a given key"
     map = @new_map

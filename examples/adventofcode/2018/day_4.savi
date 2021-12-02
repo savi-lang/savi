@@ -1,6 +1,6 @@
 :import "spec"
 :import "Time"
-:import "collections"
+:import "Map"
 
 :enum Day4Event
   :const bit_width U8: 8 // TODO infer this from the number of members instead

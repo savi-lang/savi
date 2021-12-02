@@ -4,7 +4,7 @@
 ::
 :: Additional convenience methods are also included, so that any implementation
 :: of the interface can get them "for free" by inheriting the trait.
-:trait box MapReadable(K, V)
+:trait box Map.Readable(K, V)
   :fun size USize
   :fun has_key(key K) Bool
   :fun "[]!"(key K) @->(V'aliased)

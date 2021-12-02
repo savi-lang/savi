@@ -1,7 +1,7 @@
-:import "collections" (OrderedMap, HashEq)
+:import "Map" (Map.Ordered)
 
 :class SpecStatus
-  :let examples: OrderedMap(String, SpecExampleStatus).new
+  :let examples: Map.Ordered(String, SpecExampleStatus).new
   :var expected_examples USize: 0
   :let name String
   :var ended Bool: False

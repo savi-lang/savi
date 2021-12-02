@@ -1,5 +1,5 @@
 :import "spec"
-:import "collections"
+:import "Map"
 
 :module Day1
   :fun a(env Env, input String)

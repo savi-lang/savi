@@ -2,15 +2,15 @@
 
 :class MapReadableSpec
   :is Spec
-  :const describes: "MapReadable"
+  :const describes: "Map.Readable"
 
   :fun new_mutable_map: Map(String, U64).new
 
   :: Create a mutable map, yield it to the caller for initialization,
-  :: then return it as read-only using the MapReadable trait as the type.
+  :: then return it as read-only using the Map.Readable trait as the type.
   :: This ensures that we are testing based only on the trait's methods,
   :: while still giving us a temporary time of mutability to initialize it.
-  :fun build_map MapReadable(String, U64)
+  :fun build_map Map.Readable(String, U64)
     map = @new_mutable_map
     yield map
     map

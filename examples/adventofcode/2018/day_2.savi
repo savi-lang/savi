@@ -1,5 +1,5 @@
 :import "spec"
-:import "collections"
+:import "Map"
 
 :module Day2
   :fun has_duo(line): @has_target_count(line, 2)

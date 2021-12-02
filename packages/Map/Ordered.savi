@@ -11,14 +11,14 @@
   :fun before!: @_before.not!(None)
   :fun after!: @_after.not!(None)
 
-:: OrderedMap is an alternative to the Map class that incurs more overhead cost
+:: Map.Ordered is an alternative to the Map class that incurs more overhead cost
 :: but preserves the order of key/value pair insertion when iterating.
 ::
 :: The basic implementation of the hash map is the same, but each entry in the
 :: hash map is also part of a doubly-linked circular list, with the "head" of
 :: the circular list being the most recently inserted entry in the hash map.
-:class OrderedMap(K, V, H HashFunction(K) = HashEq(K))
-  :is MapReadable(K, V)
+:class Map.Ordered(K, V, H _HashFunction(K) = _HashEq(K))
+  :is Map.Readable(K, V)
 
   :var _size USize: 0
   :var _array Array((_KVBA(K, V) | _MapEmpty | _MapDeleted))
@@ -90,7 +90,7 @@
   :: Return the value assigned to the given key, if present.
   :: Raises an error if the key is not present.
   ::
-  :: $ map = OrderedMap(String, U64).new
+  :: $ map = Map.Ordered(String, U64).new
   :: $ map["example"]!
   :: > error! // this key hasn't been assigned a value yet
   :: $ map["example"] = 99, map["example"]!
@@ -104,7 +104,7 @@
   :: Assign the given value to the given key in the map.
   :: The previous value will be overwritten and discarded if present.
   ::
-  :: $ map = OrderedMap(String, U64).new
+  :: $ map = Map.Ordered(String, U64).new
   :: $ map["example"] = 99, map["example"]!
   :: > 99
   :: $ map["example"] = 33, map["example"]!
@@ -143,7 +143,7 @@
 
   :: Discard the value assigned to the given key.
   ::
-  :: $ map = OrderedMap(String, U64).new
+  :: $ map = Map.Ordered(String, U64).new
   :: $ map["example"] = 99, map["example"]!
   :: > 99
   :: $ map.delete("example"), map["example"]!

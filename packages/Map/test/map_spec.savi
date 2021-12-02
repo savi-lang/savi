@@ -7,7 +7,7 @@
   :const describes: "Map"
 
   :fun new_map: Map(String, U64).new
-  :fun new_actor_map: MapIs(MapSpecActor, U64).new
+  :fun new_actor_map: Map.ByIdentity(MapSpecActor, U64).new
 
   :it "stores and removes values at a given key"
     map = @new_map
