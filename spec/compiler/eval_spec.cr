@@ -73,7 +73,7 @@ describe Savi::Compiler::Eval do
   end
 
   it "evaluates the net package's tests" do
-    source_dir = File.join(__DIR__, "../../packages/net/test")
+    source_dir = File.join(__DIR__, "../../packages/TCP/test")
 
     ctx = Savi.compiler.compile(source_dir, :eval)
     ctx.errors.should be_empty

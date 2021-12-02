@@ -1,7 +1,7 @@
 
 
-:class val NetAddress
-  :is Equatable(NetAddress)
+:class val _NetAddress
+  :is Equatable(_NetAddress)
 
   :let _family U16: 0
   :let _port   U16: 0 :: Port number in network byte order.
@@ -12,18 +12,18 @@
   :let _ipv6d  U32: 0 :: Bits 97-128 of an IPv6 address in network byte order.
   :let _scope  U32: 0 :: IPv6 scope (unicast, anycast, multicast, etc...).
 
-  :new _for_fd(fd): LibPonyOS.pony_os_sockname(fd, @)
+  :new _for_fd(fd): _LibPonyOS.pony_os_sockname(fd, @)
 
-  :fun is_ipv4: LibPonyOS.pony_os_ipv4(@)
-  :fun is_ipv6: LibPonyOS.pony_os_ipv6(@)
+  :fun is_ipv4: _LibPonyOS.pony_os_ipv4(@)
+  :fun is_ipv6: _LibPonyOS.pony_os_ipv6(@)
 
-  :fun port:      LibC.ntohs(@_port)  // (converted to host byte order)
-  :fun scope:     LibC.ntohl(@_scope) // (converted to host byte order)
-  :fun ipv4_addr: LibC.ntohl(@_ipv4) // (converted to host byte order)
+  :fun port:      _LibC.ntohs(@_port)  // (converted to host byte order)
+  :fun scope:     _LibC.ntohl(@_scope) // (converted to host byte order)
+  :fun ipv4_addr: _LibC.ntohl(@_ipv4) // (converted to host byte order)
   // TODO: ipv6_addr (needs tuple return value)
   // TODO: family (needs Platform.big_endian)
 
-  :fun "=="(other NetAddress'box)
+  :fun "=="(other _NetAddress'box)
     @_family == other._family
     && @_port == other._port
     && (

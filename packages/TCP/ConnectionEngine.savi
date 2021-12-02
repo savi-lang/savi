@@ -2,10 +2,10 @@
 :import "ByteStream" (ByteStream.Reader, ByteStream.ChunkedWriter)
 :import "IO"
 
-:class TCPConnectionEngine
+:class TCP.ConnectionEngine
   :is IO.Engine(IO.Action)
   :var io: IO.CoreEngine.new
-  :var listen (TCPListener | None): None
+  :var listen (TCP.Listener | None): None
   :var connect_error OSError: OSError.None
   :let read_stream: ByteStream.Reader.new
   :let write_stream: ByteStream.ChunkedWriter.new
@@ -27,8 +27,8 @@
 
   :fun non accept(
     actor AsioEventNotify
-    listen TCPListener
-    ticket TCPAcceptTicket
+    listen TCP.Listener
+    ticket TCP.Listener.AcceptTicket
   )
     io = IO.CoreEngine.new_from_fd_rw(actor, ticket._fd)
     new = @_new_with_io(io)
@@ -42,7 +42,7 @@
     @io.react(event, flags, arg) -> (action |
       case action == (
       | IO.Action.Closed |
-        try @listen.as!(TCPListener)._conn_closed
+        try @listen.as!(TCP.Listener)._conn_closed
 
         // TODO: windows complete writes, flush-after-mute (pending writes logic from Pony)
         // | IO.Action.Write |

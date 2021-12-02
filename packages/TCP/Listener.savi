@@ -1,20 +1,23 @@
 :import "OSError"
 :import "IO"
 
-:trait TCPListenerNotify
-  :fun ref listening(listen TCPListener'ref): None
-  :fun ref not_listening(listen TCPListener'ref) None
-  :fun ref closed(listen TCPListener'ref): None
-  :fun ref connected!(listen TCPListener'ref, ticket TCPAcceptTicket) IO.Actor(IO.Action)
+:trait TCP.Listener.Notify
+  :fun ref listening(listen TCP.Listener'ref): None
+  :fun ref not_listening(listen TCP.Listener'ref) None
+  :fun ref closed(listen TCP.Listener'ref): None
+  :fun ref connected!(
+    listen TCP.Listener'ref
+    ticket TCP.Listener.AcceptTicket
+  ) IO.Actor(IO.Action)
 
 // TODO: Is there another way to protect the fd by making it non-forgeable,
 // while avoiding the overhead of an allocation and pointer indirection?
-:class iso TCPAcceptTicket
+:class iso TCP.Listener.AcceptTicket
   :var _fd U32
   :new iso _new(@_fd)
 
-:actor TCPListener
-  :let notify TCPListenerNotify
+:actor TCP.Listener
+  :let notify TCP.Listener.Notify
   :var listen_error OSError: OSError.None
 
   :var _fd U32: -1
@@ -29,11 +32,11 @@
   :var _closed Bool: False
   :var _paused Bool: False
 
-  :fun local_address: NetAddress._for_fd(@_fd)
+  :fun local_port: _NetAddress._for_fd(@_fd).port
 
   :new (
-    // TODO: TCPListenerAuth, rather than ambient authority.
-    notify TCPListenerNotify'iso
+    // TODO: TCP.Listener.Auth, rather than ambient authority.
+    notify TCP.Listener.Notify'iso
     host String = ""
     service String = "0"
     @_limit = 0
@@ -41,17 +44,17 @@
     @_yield_after_reading = 16384
     @_yield_after_writing = 16384
   )
-    new_notify TCPListenerNotify'ref = --notify // TODO: should not be needed
+    new_notify TCP.Listener.Notify'ref = --notify // TODO: should not be needed
     @notify = new_notify
 
-    event = LibPonyOS.pony_os_listen_tcp(@, host.cstring, service.cstring)
+    event = _LibPonyOS.pony_os_listen_tcp(@, host.cstring, service.cstring)
     if event.is_not_null (
       @_event = event
       @_fd = AsioEvent.fd(@_event)
-      error = LibPonyOS.pony_os_errno
+      error = _LibPonyOS.pony_os_errno
       new_notify.listening(@)
     |
-      @listen_error = LibPonyOS.pony_os_errno
+      @listen_error = _LibPonyOS.pony_os_errno
       @_closed = True
       new_notify.not_listening(@)
     )
@@ -76,7 +79,7 @@
       if @_closed.not (
         try (
           while (@_limit == 0 || @_count < @_limit) (
-            conn_fd = LibPonyOS.pony_os_accept(@_event)
+            conn_fd = _LibPonyOS.pony_os_accept(@_event)
             case conn_fd == (
             |  0 | error! // EWOULDBLOCK, don't try again
             | -1 | None   // Some other error, so we can try again
@@ -90,10 +93,10 @@
 
   :fun ref _spawn(fd U32)
     try (
-      @notify.connected!(@, TCPAcceptTicket._new(fd))
+      @notify.connected!(@, TCP.Listener.AcceptTicket._new(fd))
       @_count += 1
     |
-      LibPonyOS.pony_os_socket_close(fd)
+      _LibPonyOS.pony_os_socket_close(fd)
     )
 
   :be _conn_closed
@@ -112,7 +115,7 @@
       // When not on windows, unsubscribe immediately here instead of later.
       if Platform.windows.not AsioEvent.unsubscribe(@_event)
 
-      LibPonyOS.pony_os_socket_close(@_fd)
+      _LibPonyOS.pony_os_socket_close(@_fd)
       @_fd = -1
 
       @notify.closed(@)
