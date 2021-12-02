@@ -86,12 +86,26 @@ class Savi::Compiler::Reparse < Savi::AST::CopyOnMutateVisitor
       t_deps = {t_namespace}
 
       ta_cached_or_run library, t, t_deps do
+        t = new(*t_deps).run_for_type_alias_target(ctx, t)
         t = new(*t_deps).run_for_type_params(ctx, t)
       end
     end
   end
 
   def initialize(@namespace : Namespace::SourceAnalysis)
+  end
+
+  def run_for_type_alias_target(ctx, t)
+    target = t.target
+    return t unless target
+
+    orig_target = target
+    target = target.accept(ctx, self)
+    return t if target.same?(orig_target)
+
+    t = t.dup
+    t.target = target
+    t
   end
 
   def run_for_type_params(ctx, t)

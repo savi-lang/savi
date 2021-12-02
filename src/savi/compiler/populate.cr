@@ -4,7 +4,6 @@
 # copied from the source type. In the most common case, this is caused by
 # an "is" annotation on a type denoting an inheritance relationship.
 # The Populate pass also creates missing methods, like the default constructor.
-# It also creates the namespace-associated methods for namespaced types.
 #
 # This pass uses copy-on-mutate patterns to "mutate" the Program topology.
 # This pass does not mutate ASTs, but copies whole functions to other types.
@@ -22,20 +21,9 @@ class Savi::Compiler::Populate
   end
 
   def run(ctx, library)
-    # Now iterate over each type and possibly add missing functions to it.
     library.types_map_cow do |dest|
       orig_functions = dest.functions
       dest_link = dest.make_link(library)
-
-      # Create the namespace-associated methods for namespaced types.
-      # Note that these can only come from other types in the same library,
-      # as we do not (currently?) allow extending third-party namespaces.
-      library.types.each { |t|
-        dest = maybe_add_namespace_function_for(ctx, t, dest, library, orig_functions)
-      }
-      library.enum_members.each { |t|
-        dest = maybe_add_namespace_function_for(ctx, t, dest, library, orig_functions)
-      }
 
       # Copy functions into the type from other sources.
       orig_functions.each do |f|
@@ -173,45 +161,5 @@ class Savi::Compiler::Populate
     end
 
     new_functions
-  end
-
-  # TODO: Move this complaining a different pass (the verify pass?)
-  def maybe_add_namespace_function_for(ctx, t, dest, library, orig_functions) : Program::Type
-    nested_ident = t.ident.immediately_nested_within?(dest.ident)
-    return dest unless nested_ident
-
-    # Complain if the dest type already has a function with this name.
-    conflict_func = dest.find_func?(nested_ident.value)
-    if conflict_func
-      ctx.error_at conflict_func.ident,
-        "This conflicts with the name of a nested type", [
-          {t.ident.pos, "the nested type is defined here"}
-        ]
-      return dest
-    end
-
-    # # Create a new function that returns the nested type by full identifier.
-    # f = Program::Function.new(
-    #   AST::Identifier.new("non").from(t.ident),
-    #   nested_ident,
-    #   nil,
-    #   nil,
-    #   AST::Group.new(":").from(t.ident).tap { |body|
-    #     body.terms << AST::Identifier.new(t.ident.value).from(t.ident)
-    #   },
-    # )
-
-    # # We also need to run the missing ReferType pass for this new function.
-    # dest_link = dest.make_link(library)
-    # ctx.refer_type.run_for_func(ctx, f, f.make_link(dest_link))
-
-    # # Add the new function, duping the orig functions list if needed.
-    # if dest.functions.same?(orig_functions)
-    #   dest = dest.dup
-    #   raise "didn't dup functions!" if dest.functions.same?(orig_functions)
-    # end
-    # dest.functions << f
-
-    dest
   end
 end

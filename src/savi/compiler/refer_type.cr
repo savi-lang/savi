@@ -20,21 +20,21 @@ module Savi::Compiler::ReferType
 
     def initialize(parent : Analysis? = nil)
       @parent = StructRef(Analysis).new(parent) if parent
-      @infos = {} of AST::Node => Refer::Info
+      @infos = {} of AST::Identifier => Refer::Info
       @params = {} of String => Refer::TypeParam
       @redirects = {} of Refer::Info => Refer::Info
     end
 
-    protected def observe_info(node : AST::Node, info : Refer::Info)
-      @infos[node] = redirect_for?(info) || info
+    protected def observe_ident(ident : AST::Identifier, info : Refer::Info)
+      @infos[ident] = redirect_for?(info) || info
     end
 
-    def [](node : AST::Node) : Refer::Info
-      @infos[node]
+    def [](ident : AST::Identifier) : Refer::Info
+      @infos[ident]
     end
 
-    def []?(node : AST::Node) : Refer::Info?
-      @infos[node]?
+    def []?(ident : AST::Identifier) : Refer::Info?
+      @infos[ident]?
     end
 
     protected def observe_type_param(param : Refer::TypeParam)
@@ -68,11 +68,7 @@ module Savi::Compiler::ReferType
       found = @analysis.type_param_for?(node.value)
       return found if found
 
-      find_type_in_namespace?(ctx, node.value)
-    end
-
-    def find_type_in_namespace?(ctx, name : String)
-      found = @namespace[name]?
+      found = namespace[node.value]?
       case found
       when Program::Type::Link
         Refer::Type.new(found)
@@ -87,7 +83,7 @@ module Savi::Compiler::ReferType
 
     # This visitor never replaces nodes, it just touches them and returns them.
     def visit(ctx, node)
-      touch(ctx, node)
+      touch(ctx, node) if node.is_a?(AST::Identifier)
       node
     rescue exc : Exception
       raise Error.compiler_hole_at(node, exc)
@@ -97,40 +93,7 @@ module Savi::Compiler::ReferType
     # Otherwise, leave it missing from our infos map.
     def touch(ctx, node : AST::Identifier)
       info = find_type?(ctx, node)
-      @analysis.observe_info(node, info) if info
-    end
-
-    # For a Relate node, if it is a dot where the left side refers to a type,
-    # then it may possibly be the name of a nested/namespaced type.
-    def touch(ctx, node : AST::Relate)
-      return unless node.op.value == "."
-
-      lhs_info = @analysis[node.lhs]?
-      return unless lhs_info.is_a?(Refer::Type)
-
-      rhs = node.rhs
-      return unless rhs.is_a?(AST::Identifier)
-
-      info = find_type_in_namespace?(ctx, "#{lhs_info.link.name}.#{rhs.value}")
-      @analysis.observe_info(node, info) if info
-    end
-
-    # For a Call node, if we can tell that the left side refers to a type,
-    # then it may possibly be the name of a nested/namespaced type.
-    def touch(ctx, node : AST::Call)
-      return if node.args || node.yield_params || node.yield_block
-
-      lhs_info = @analysis[node.receiver]?
-      return unless lhs_info.is_a?(Refer::Type)
-
-      rhs = node.ident
-
-      info = find_type_in_namespace?(ctx, "#{lhs_info.link.name}.#{rhs.value}")
-      @analysis.observe_info(node, info) if info
-    end
-
-    # For all other AST node types, do nothing.
-    def touch(ctx, node : AST::Node)
+      @analysis.observe_ident(node, info) if info
     end
   end
 
