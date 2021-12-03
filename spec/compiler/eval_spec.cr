@@ -82,7 +82,7 @@ describe Savi::Compiler::Eval do
     no_test_failures.should eq true
   end
 
-  it "evaluates the net package's tests" do
+  it "evaluates the TCP package's tests" do
     source_dir = File.join(__DIR__, "../../packages/TCP/test")
 
     ctx = Savi.compiler.compile(source_dir, :eval)
@@ -92,7 +92,7 @@ describe Savi::Compiler::Eval do
     no_test_failures.should eq true
   end
 
-  it "evaluates the bytes package's tests" do
+  it "evaluates the ByteStream package's tests" do
     source_dir = File.join(__DIR__, "../../packages/ByteStream/test")
 
     ctx = Savi.compiler.compile(source_dir, :eval)
