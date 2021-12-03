@@ -595,15 +595,15 @@ class Savi::Compiler::Reach < Savi::AST::Visitor
 
     # Reach extra functions and types that are used by the runtime,
     # even if they are not used/reached by the user-written program.
-    env_rt = Infer::ReifiedType.new(ctx.namespace.prelude_type(ctx, "Env"))
+    env_rt = Infer::ReifiedType.new(ctx.namespace.core_savi_type(ctx, "Env"))
     env_f_link = env_rt.defn(ctx).find_func!("_create").make_link(env_rt.link)
     env_rf = Infer::ReifiedFunction.new(env_rt, env_f_link, Infer::MetaType.new(env_rt, "val"))
     handle_func(ctx, env_rf)
-    notify_rt = Infer::ReifiedType.new(ctx.namespace.prelude_type(ctx, "AsioEventNotify"))
+    notify_rt = Infer::ReifiedType.new(ctx.namespace.core_savi_type(ctx, "AsioEventNotify"))
     notify_f_link = notify_rt.defn(ctx).find_func!("_event_notify").make_link(notify_rt.link)
     notify_rf = Infer::ReifiedFunction.new(notify_rt, notify_f_link, Infer::MetaType.new(notify_rt, Infer::Cap::REF))
     handle_func(ctx, notify_rf)
-    string_rt = Infer::ReifiedType.new(ctx.namespace.prelude_type(ctx, "String"))
+    string_rt = Infer::ReifiedType.new(ctx.namespace.core_savi_type(ctx, "String"))
     handle_type_def(ctx, string_rt)
 
     # Run our "sympathetic resonance" mini-pass until there are no new funcs.

@@ -938,12 +938,12 @@ module Savi::Compiler::Infer
       func.ident
     end
 
-    def prelude_reified_type(ctx : Context, name : String, args = [] of MetaType)
-      ReifiedType.new(ctx.namespace.prelude_type(ctx, name), args)
+    def core_savi_reified_type(ctx : Context, name : String, args = [] of MetaType)
+      ReifiedType.new(ctx.namespace.core_savi_type(ctx, name), args)
     end
 
-    def prelude_type_span(ctx : Context, name : String)
-      Span.simple(MetaType.new(prelude_reified_type(ctx, name)))
+    def core_savi_type_span(ctx : Context, name : String)
+      Span.simple(MetaType.new(core_savi_reified_type(ctx, name)))
     end
   end
 

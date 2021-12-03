@@ -1,0 +1,9 @@
+:: This trait is meant to create a common interface that can be used to get
+:: bytes into a ByteStream.Reader, including compatibility with efficient
+:: patterns that write directly into a buffer from an I/O or network stack.
+:trait ByteStream.Source
+  :: Emit zero or more bytes into the given buffer starting at the given offset,
+  :: possibly expanding the size of the buffer if that turns out to be needed.
+  :: Returns the number of bytes that were written.
+  :: Raises an error if the source has become permanently closed off.
+  :fun ref emit_bytes_into!(buffer Bytes'ref, offset USize) USize

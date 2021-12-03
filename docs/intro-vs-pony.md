@@ -340,8 +340,6 @@ When the parenthesized block is split by the `|` character, the first half of th
 In the standard library, this kind of function is often used for iteration, but it can be used in any other case where a function needs to pass values back and forth with the caller before the function finishes executing.
 
 ```savi
-:import "collections"
-
 :actor Main
   :new (env Env)
     count = Count.to(10) -> ( i |
@@ -525,33 +523,24 @@ If you want to take some other fallback action rather than raising an error, you
 
 #### Generic types
 
-Generic types are have a bit different syntax
+Generic types have a slightly different syntax.
 ```savi
-:class Map (K, V, H HashFunction(K))
+:class Map (K, V, H _HashFunction(K))
 
 :trait Comparable (A Comparable(A)'read)
 ```
-Here you can see that we are using parenthesis instead of square brackets. Also we specify the restrictions as we are specifying types of variables/parameters.
+Here you can see that we are using parenthesis instead of square brackets. Also we specify the restrictions using the same syntax used to specify the types of variables/parameters.
 
-To use this type you need to specify types in parenthesis
+To use this type you need to specify type arguments in parenthesis:
 ```
 Map(String, I32).new // we instantiate new Map
 U64[0] // here we cast a numeric type to the U64 type
 Array(String) // it can be used as a restriction
 ```
 
-#### Generic functions
+#### TODO: Generic functions
 
-Generic functions are not yet in Savi
-
-Though we have a workaround
-```savi
-:class A (B, C)
-  // also you can mark it as non rcap to use as static method
-  :fun foo(bar B) C
-```
-
-##### [TODO: Generic functions info...]
+Generic functions are not yet in Savi. See [this ticket](https://github.com/savi-lang/savi/issues/169) for more info.
 
 ### C-FFI
 
@@ -564,7 +553,7 @@ While in Pony we use `@` to mark that we are calling a C function, in Savi we de
   :fun printf(format CPointer(U8), arg1 CPointer(U8)) I32
 ```
 
-In the example above you see that we are declearing plain functions. You need to specify all types, just like in Pony. All FFI functions have the `non` reference capability.
+In the example above you see that we are declaring plain functions. You need to specify all types, just like in Pony. All FFI functions have the `non` reference capability.
 
 #### Usage example
 

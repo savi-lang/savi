@@ -1,0 +1,363 @@
+:: This class provides convenience methods for reading data from a stream of
+:: bytes that presents itself in chunks, such as data coming from the network.
+::
+:: This is distinguished from ByteStreamReader, which accepts data
+:: into a single flat byte buffer whose size is mutable over time.
+::
+:: A chunk can be appended at any time, and once a chunk has been absorbed
+:: it becomes a seamless part of the stream of bytes interface exposed by
+:: this class, so that reading code on the call side can be written without
+:: worrying about chunk boundaries, but the internal implementation can be
+:: as efficient and optimized as possible for how the reads will be done.
+:: That said, the layout of chunks will still impact performance,
+:: so it's better to try to avoid chunk boundaries when possible,
+:: especially in the middle of a token.
+::
+:: While reading, a "cursor" and a "marker" position are maintained,
+:: with the former indicating the fully advanced position in the stream
+:: and the latter indicating an earlier position in the stream that can
+:: be used as the start of a token for tokenization, as well as for rewind.
+:: Once both the cursor and marker have passed by a part of the stream,
+:: it is not possible to read those bytes anymore, by design.
+::
+:: A variety of convenience methods for reading and comparing the bytes of
+:: a token are provided, with a token being defined as the sequence of bytes
+:: between the marker (marking the start of the token) and the cursor
+:: (indicating the end of the token). Once a token has been read, the caller
+:: can advance the cursor forward and/or move the marker to the cursor position
+:: as needed to continue parsing the stream and set up the next token to read.
+::
+:: When finished, the reader instance can be cleared to allow garbage collection
+:: of the appended chunks, then it can be used again for the next stream.
+:: Alternatively, garbage collection can happen in the midst of an ongoing
+:: stream using the compact method to drop only chunks that are behind
+:: both the marker and cursor, releasing chunks that cannot be read anymore.
+:class ByteStream.ChunkedReader
+  :is BinaryReadable
+  :let _chunks Array(Bytes): []
+  :var _chunk_index USize: 0
+  :var _offset USize: 0
+  :var _bytes_ahead USize: 0
+  :var _mark_chunk_index USize: 0
+  :var _mark_offset USize: 0
+  :var _mark_bytes_ahead USize: 0
+
+  :: Reset this object back to an empty state so that it can be reused.
+  :: All chunks held and all cursor and mark state will be dropped.
+  ::
+  :: If the cursor and marker were already at the end of the stream,
+  :: there will be no change in visible behavior from the caller side,
+  :: but it's still important to call this method to allow garbage collection.
+  :fun ref clear
+    @_chunks.clear
+    @_chunk_index = 0
+    @_offset = 0
+    @_bytes_ahead = 0
+    @_mark_chunk_index = 0
+    @_mark_offset = 0
+    @_mark_bytes_ahead = 0
+    @
+
+  :: Drop any chunks that have been passed by both the marker and cursor,
+  :: allowing chunks to be garbage collected even in the middle of a stream.
+  ::
+  :: If at the end of a stream it is more efficient to call clear instead.
+  // TODO: Implement the compact function
+  // :fun ref compact
+  //   // ...
+  //   @
+
+  :: Add another chunk to the list of chunks to read from.
+  :: This is often used when another packet arrives from the source stream.
+  :fun ref "<<"(chunk Bytes)
+    @_chunks << chunk
+    @_bytes_ahead += chunk.size
+    @_mark_bytes_ahead += chunk.size
+    @
+
+  :: Move the mark position to match the current cursor position.
+  :: This is often used to mark the start of a token in a token stream,
+  :: and to set a place to rewind back to in case of an interrupted stream.
+  :fun ref mark_here
+    @_mark_chunk_index = @_chunk_index
+    @_mark_offset = @_offset
+    @_mark_bytes_ahead = @_bytes_ahead
+    @
+
+  :: Move the cursor back to match the last marker position.
+  :: This is often used to reset the stream to a known place when interrupted,
+  :: so that when the next chunk is available it can be resumed from there.
+  :fun ref rewind_to_marker
+    @_chunk_index = @_mark_chunk_index
+    @_offset = @_mark_offset
+    @_bytes_ahead = @_mark_bytes_ahead
+    @
+
+  :: Get the number of bytes available in the stream ahead of the cursor.
+  :: This the the number of bytes that can be peeked or advanced past.
+  :: Attempting to go past that point in the stream will raise an error.
+  :fun bytes_ahead: @_bytes_ahead
+
+  :: Get the number of bytes available in the stream ahead of the marker.
+  :: This will always be equal to or greater than those ahead of the cursor.
+  :fun bytes_ahead_of_marker: @_mark_bytes_ahead
+
+  :: Get the number of bytes in the currently marked token.
+  :: That is, the number of bytes between the marker and the cursor.
+  :fun token_byte_size: @_mark_bytes_ahead - @_bytes_ahead
+
+  :: Yield each byte in the currently marked token.
+  :: That is, the bytes between the marker and the cursor.
+  :fun each_token_byte None
+    :yields U8 for None
+    @each_token_byte_until -> (byte | yield byte, False)
+    None
+
+  :: Yield each byte in the currently marked token until the block returns True.
+  :: Returns True if the block stopped iteration early by returning True.
+  :: Otherwise returns False, indicating that iteration fully completed.
+  :fun each_token_byte_until Bool
+    :yields U8 for Bool
+    iter_chunk_index = @_mark_chunk_index
+    iter_offset = @_mark_offset
+    early_stop = False
+    while (!early_stop && iter_chunk_index < @_chunk_index) (
+      try (
+        chunk = @_chunks[iter_chunk_index]!
+        while (!early_stop && iter_offset < chunk.size) (
+          try (early_stop = yield chunk[iter_offset]!)
+          iter_offset += 1
+        )
+      )
+      iter_chunk_index += 1
+      iter_offset = 0
+    )
+    try (
+      chunk = @_chunks[iter_chunk_index]!
+      while (!early_stop && iter_offset < @_offset) (
+        try (early_stop = yield chunk[iter_offset]!)
+        iter_offset += 1
+      )
+    )
+    early_stop
+
+  :: For the bytes in the currently marked token, yield each associated chunk,
+  :: along with the start and end offset of the chunk that are within the token.
+  :: This is used internally for chunk-wise comparison and copying operations.
+  :fun _each_token_slice None
+    :yields (Bytes, USize, USize) for None
+    @_each_token_slice_until -> (chunk, start, end |
+      yield (chunk, start, end)
+      False // continue iteration
+    )
+    None
+
+  :: Same as the each_token_byte function, but allows the yield block to return
+  :: True to stop iteration early, and in such a case the function returns True.
+  :fun _each_token_slice_until Bool
+    :yields (Bytes, USize, USize) for Bool
+    iter_chunk_index = @_mark_chunk_index
+    iter_offset = @_mark_offset
+    early_stop = False
+    while (!early_stop && iter_chunk_index < @_chunk_index) (
+      try (
+        chunk = @_chunks[iter_chunk_index]!
+        early_stop = yield (chunk, iter_offset, chunk.size)
+      )
+      iter_chunk_index += 1
+      iter_offset = 0
+    )
+    if !early_stop (
+      try (
+        chunk = @_chunks[iter_chunk_index]!
+        early_stop = yield (chunk, iter_offset, @_offset)
+      )
+    )
+    early_stop
+
+  :: Return True if the bytes in the currently marked token are equivalent
+  :: to the bytes referenced by the given string.
+  :fun is_token_equal_to(other (Bytes'box | String'box))
+    @token_byte_size == other.size && (
+      other_start USize = 0
+      unequal = @_each_token_slice_until -> (chunk, start, end |
+        slice_size = end - start
+
+        unequal_slice = chunk
+          .is_slice_equal(start, other, other_start, slice_size)
+          .not
+
+        other_start += slice_size
+        unequal_slice
+      )
+      unequal.invert
+    )
+
+  :: Return True if the bytes in the currently marked token, after lowercasing
+  :: any encountered ASCII letters (A-Z) are equivalent to the given string.
+  :: That is, the given string should be supplied as already being lowercase.
+  :fun is_token_ascii_lowercase_equal_to(other (Bytes'box | String'box))
+    @token_byte_size == other.size && (
+      index USize = 0
+      unequal = @each_token_byte_until -> (byte |
+        lower_byte = if (byte >= 'A' && byte <= 'Z') (byte - 'A' + 'a' | byte)
+        unequal_byte = try (lower_byte != other.byte_at!(index) | True)
+        index += 1
+        unequal_byte
+      )
+      unequal.invert
+    )
+
+  :: Return the portion of the stream between the marker and the cursor, as an
+  :: immutable String. If the portion happened to be within a single chunk,
+  :: the returned String will share the underlying buffer instead of copying.
+  :: Otherwise a new String buffer is assembled by copying from multiple chunks.
+  :fun token_as_string String
+    if (@_mark_chunk_index == @_chunk_index) (
+      // If the token begins and ends in the same chunk, we can avoid copying
+      // by returning a String that uses a subset of the same underlying buffer.
+      try (
+        String.from_bytes(@_chunks[@_chunk_index]!)
+          .trim(@_mark_offset.isize, @_offset.isize)
+      |
+        // Failed to get the chunk. This can happen when the cursor and marker
+        // are both pointing to the end of the byte stream.
+        // In such a case, an empty string is the correct result.
+        ""
+      )
+    |
+      // Otherwise we must copy slices from separate chunks.
+      // TODO: explicit variable type should not be needed in this line:
+      string String'iso = String.new_iso(@token_byte_size)
+      @_each_token_slice -> (chunk, start, end |
+        chunk_string = String.from_bytes(chunk)
+        string.concat_byte_slice(chunk_string, start.isize, end.isize)
+        None // TODO: this explicit None should not be needed
+      )
+      --string
+    )
+
+  :: Return the portion of the stream between the marker and the cursor,
+  :: parsed as a positive integer written with sequential decimal digits (0-9).
+  :: If other (non-digit) bytes are encountered, an error is raised.
+  :fun token_as_positive_integer! U64
+    value U64 = 0
+    error = False
+    @each_token_byte_until -> (byte |
+      if (byte >= '0' && byte <= '9') (
+        value = value * 10 + (byte - '0').u64
+        False // continue iterating
+      |
+        error = True // TODO: should we just raise an error here directly?
+        True // stop iteration
+      )
+    )
+    if error error!
+    value
+
+  :: Return the byte value that is N bytes ahead, without moving the cursor.
+  :: Raises an error if there are not enough bytes to do so.
+  :fun peek_byte!(n USize = 0) U8
+    peek_chunk_index = @_chunk_index
+    peek_offset = @_offset
+    remaining_n = n
+    current_chunk_remaining_count = @_chunks[peek_chunk_index]!.size - @_offset
+    while (remaining_n >= current_chunk_remaining_count) (
+      remaining_n -= current_chunk_remaining_count
+      peek_chunk_index += 1
+      peek_offset = 0
+      current_chunk_remaining_count = @_chunks[peek_chunk_index]!.size
+    )
+    peek_offset += remaining_n
+    @_chunks[peek_chunk_index]![peek_offset]!
+
+  :: Advance the cursor forward to the end of the byte stream.
+  :fun ref advance_to_end
+    @_chunk_index = @_chunks.size
+    @_offset = 0
+    @_bytes_ahead = 0
+
+  :: Advance the cursor forward in the byte stream by N total bytes.
+  :: Raises an error if there are not enough bytes to do so, leaving the cursor
+  :: pointing to the next future byte that will arrive in the byte stream.
+  :fun ref advance!(n USize)
+    if (n >= @_bytes_ahead) (
+      too_many_n = n > @_bytes_ahead
+
+      // If we know this count will take us to the end of the stream,
+      // we can skip the extra work of iterating over chunks and jump there.
+      @advance_to_end
+
+      // If the caller requested too many bytes, then we also raise an error
+      // to indicate that more advancement is still needed to reach the goal.
+      if too_many_n error!
+    |
+      // Iterate through each chunk, keeping track of how much of the
+      // goal number of bytes remain to be consumed in the advancement.
+      remaining_n = n
+      current_chunk_remaining_count = @_chunks[@_chunk_index]!.size - @_offset
+      while (remaining_n > current_chunk_remaining_count) (
+        remaining_n -= current_chunk_remaining_count
+        @_chunk_index += 1
+        @_offset = 0
+        @_bytes_ahead -= current_chunk_remaining_count
+        current_chunk_remaining_count = @_chunks[@_chunk_index]!.size
+      )
+      @_offset += remaining_n
+      @_bytes_ahead -= remaining_n
+      @
+    )
+
+  :: Advance the cursor byte-by-byte for as long as the block yields True,
+  :: stopping the cursor pointing at the byte for which it yielded False.
+  :: Raises an error if the end of the byte stream is reached prior to that.
+  :fun ref advance_while!
+    :yields U8 for Bool
+    chunk = @_chunks[@_chunk_index]!
+    while (yield chunk[@_offset]!) (
+      @_offset += 1
+      @_bytes_ahead -= 1
+      if (@_offset == chunk.size) (
+        @_chunk_index += 1
+        @_offset = 0
+        chunk = @_chunks[@_chunk_index]!
+      )
+    )
+    @
+
+  :: Starting at `offset`, read the next `num_bytes` from the stream and
+  :: treat them as an unsigned integer in network byte order (big-endian).
+  :fun _read_be_uint!(offset USize, num_bytes USize) U64
+    value U64 = 0
+    pos USize = 0
+    end_offset USize = offset + num_bytes
+
+    @each_token_byte_until -> (byte |
+      if (pos >= offset && pos < end_offset) (
+        value = value.bit_shl(8).bit_or(byte.u64)
+      )
+      pos += 1
+      pos >= end_offset
+    )
+    if (pos == end_offset) (value | error!)
+
+  :fun read_byte!(offset USize) U8
+    @_read_be_uint!(offset, 1).u8
+
+  :fun read_be_u16!(offset USize) U16
+    @_read_be_uint!(offset, 2).u16
+
+  :fun read_be_u32!(offset USize) U32
+    @_read_be_uint!(offset, 4).u32
+
+  :fun read_be_u64!(offset USize) U64
+    @_read_be_uint!(offset, 8)
+
+  :fun read_native_u16!(offset USize) U16
+    @read_be_u16!(offset).be_to_native
+
+  :fun read_native_u32!(offset USize) U32
+    @read_be_u32!(offset).be_to_native
+
+  :fun read_native_u64!(offset USize) U64
+    @read_be_u64!(offset).be_to_native

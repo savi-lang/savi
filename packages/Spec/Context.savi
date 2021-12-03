@@ -1,0 +1,6 @@
+:class val Spec.Context
+  :let env Env
+  :let process Spec.Process
+  :let spec String
+  :let example String
+  :new (@env, @process, @spec, @example)

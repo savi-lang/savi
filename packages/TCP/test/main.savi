@@ -1,0 +1,8 @@
+:import "Spec"
+:source ".."
+
+:actor Main
+  :new (env)
+    Spec.Process.run(env, [
+      Spec.Run(TCPSpec).new(env)
+    ])

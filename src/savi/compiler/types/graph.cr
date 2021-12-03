@@ -283,7 +283,7 @@ module Savi::Compiler::Types::Graph
     end
 
     protected def observe_assert_bool(ctx, node)
-      bool = TypeNominal.new(ctx.namespace.prelude_type(ctx, "Bool"))
+      bool = TypeNominal.new(ctx.namespace.core_savi_type(ctx, "Bool"))
       constrain(node.pos, @by_node[node], bool)
     end
 
@@ -394,7 +394,7 @@ module Savi::Compiler::Types::Graph
       @by_node[node] = var
 
       array_type = TypeNominal.new(
-        ctx.namespace.prelude_type(ctx, "Array"),
+        ctx.namespace.core_savi_type(ctx, "Array"),
         [elem_var.as(TypeSimple)]
       )
       constrain(node.pos, var, array_type)
@@ -491,7 +491,7 @@ module Savi::Compiler::Types::Graph
     def run_for_type_alias(ctx : Context, t : Program::TypeAlias)
       # TODO: Allow running this pass for more than just the root library.
       # We restrict this for now while we are building out the pass because
-      # we don't want to deal with all of the complicated forms in the prelude.
+      # we don't want to deal with all of the complicated forms in Savi core.
       # We want to stick to the simple forms in the compiler pass specs for now.
       root_library = ctx.root_library.source_library
       return unless t.ident.pos.source.library == root_library
@@ -522,8 +522,8 @@ module Savi::Compiler::Types::Graph
       analysis.observe_field_func(ctx, self, f) if f.has_tag?(:field)
     end
 
-    def prelude_type(ctx, name, args = nil)
-      t_link = ctx.namespace.prelude_type(ctx, name)
+    def core_savi_type(ctx, name, args = nil)
+      t_link = ctx.namespace.core_savi_type(ctx, name)
       TypeNominal.new(t_link, args)
     end
 
@@ -657,19 +657,19 @@ module Savi::Compiler::Types::Graph
     end
 
     def visit(ctx, node : AST::LiteralCharacter)
-      type = prelude_type(ctx, "Numeric")
+      type = core_savi_type(ctx, "Numeric")
       @analysis.observe_constrained_literal(node, "char:#{node.value}", type)
     end
 
     def visit(ctx, node : AST::LiteralInteger)
-      type = prelude_type(ctx, "Numeric")
+      type = core_savi_type(ctx, "Numeric")
       @analysis.observe_constrained_literal(node, "num:#{node.value}", type)
     end
 
     def visit(ctx, node : AST::LiteralFloat)
       type = TypeUnion.new([
-        prelude_type(ctx, "F64").as(TypeSimple),
-        prelude_type(ctx, "F32").as(TypeSimple),
+        core_savi_type(ctx, "F64").as(TypeSimple),
+        core_savi_type(ctx, "F32").as(TypeSimple),
       ])
       @analysis.observe_constrained_literal(node, "float:#{node.value}", type)
     end
@@ -677,13 +677,13 @@ module Savi::Compiler::Types::Graph
     def visit(ctx, node : AST::LiteralString)
       case node.prefix_ident.try(&.value)
       when nil
-        @analysis[node] = prelude_type(ctx, "String")
+        @analysis[node] = core_savi_type(ctx, "String")
       when "b"
-        @analysis[node] = prelude_type(ctx, "Bytes")
+        @analysis[node] = core_savi_type(ctx, "Bytes")
       else
         ctx.error_at node.prefix_ident.not_nil!,
           "This type of string literal is not known; please remove this prefix"
-        @analysis[node] = prelude_type(ctx, "String")
+        @analysis[node] = core_savi_type(ctx, "String")
       end
     end
 
@@ -695,7 +695,7 @@ module Savi::Compiler::Types::Graph
         @analysis.observe_array_literal(ctx, node)
       when "(", ":"
         if node.terms.empty?
-          @analysis[node] = prelude_type(ctx, "None")
+          @analysis[node] = core_savi_type(ctx, "None")
         else
           @analysis[node] = @analysis[node.terms.last]
         end
@@ -710,13 +710,13 @@ module Savi::Compiler::Types::Graph
     def visit(ctx, node : AST::Prefix)
       case node.op.value
       when "source_code_position_of_argument"
-        @analysis[node] = prelude_type(ctx, "SourceCodePosition")
+        @analysis[node] = core_savi_type(ctx, "SourceCodePosition")
       when "reflection_of_type"
-        @analysis[node] = prelude_type(ctx, "ReflectionOfType", [@analysis[node.term]])
+        @analysis[node] = core_savi_type(ctx, "ReflectionOfType", [@analysis[node.term]])
       when "reflection_of_runtime_type_name"
-        @analysis[node] = prelude_type(ctx, "String")
+        @analysis[node] = core_savi_type(ctx, "String")
       when "identity_digest_of"
-        @analysis[node] = prelude_type(ctx, "USize")
+        @analysis[node] = core_savi_type(ctx, "USize")
       when "--"
         ref = refer[node.term].as(Refer::Local)
         @analysis.observe_local_consume(node, ref)
@@ -740,10 +740,10 @@ module Savi::Compiler::Types::Graph
         # Do nothing here - we'll handle it in one of the parent nodes.
       when "<:", "!<:"
         # TODO: refine the type in this scope
-        @analysis[node] = prelude_type(ctx, "Bool")
+        @analysis[node] = core_savi_type(ctx, "Bool")
       when "===", "!=="
         # Just know that the result of this expression is a boolean.
-        @analysis[node] = prelude_type(ctx, "Bool")
+        @analysis[node] = core_savi_type(ctx, "Bool")
       when "="
         ident = AST::Extract.param(node.lhs).first
         ref = refer[ident].as(Refer::Local)

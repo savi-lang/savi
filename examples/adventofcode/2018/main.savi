@@ -1,11 +1,11 @@
-:import "spec"
+:import "Spec"
 
 :actor Main
   :new (env)
-    Specs.run(env, [
-      SpecRun(Day1Spec).new(env)
-      SpecRun(Day2Spec).new(env)
-      SpecRun(Day3Spec).new(env)
-      SpecRun(Day4Spec).new(env)
-      SpecRun(Day5Spec).new(env)
+    Spec.Process.run(env, [
+      Spec.Run(Day1Spec).new(env)
+      Spec.Run(Day2Spec).new(env)
+      Spec.Run(Day3Spec).new(env)
+      Spec.Run(Day4Spec).new(env)
+      Spec.Run(Day5Spec).new(env)
     ])

@@ -1,0 +1,248 @@
+:: This class provides convenience methods for reading data from a stream of
+:: bytes that presents itself in the form of a byte buffer that extends
+:: "to the right" over time (such as data coming from the network),
+:: while reading logic follows along and chops off pieces "from the left"
+:: side of the byte buffer after they have been successfully read.
+::
+:: This is distinguished from ByteStream.ChunkedReader, which accepts data
+:: in discrete chunks that arrive independently.
+::
+:: While reading, a "cursor" and a "marker" position are maintained,
+:: with the former indicating the fully advanced position in the stream
+:: and the latter indicating an earlier position in the stream that can
+:: be used as the start of a token for tokenization, as well as for rewind.
+:: Once both the cursor and marker have passed by a part of the stream,
+:: it is not possible to read those bytes anymore, by design.
+:: This allows bytes to pass out of scope and be eventually garbage collected.
+::
+:: A variety of convenience methods for reading and comparing the bytes of
+:: a token are provided, with a token being defined as the sequence of bytes
+:: between the marker (marking the start of the token) and the cursor
+:: (indicating the end of the token). Once a token has been read, the caller
+:: can advance the cursor forward and/or move the marker to the cursor position
+:: as needed to continue parsing the stream and set up the next token to read.
+::
+:: When finished, the reader instance can be cleared to allow garbage collection
+:: of the appended data, then it can be used again for the next stream.
+:: Alternatively, garbage collection can happen in the midst of an ongoing
+:: stream using the compact method to drop only bytes that are behind
+:: both the marker and cursor, releasing bytes that cannot be read anymore.
+:class ByteStream.Reader
+  :is BinaryReadable
+  :let _data Bytes'ref
+  :var _offset USize: 0
+  :var _mark_offset USize: 0
+
+  :new (space USize = 0x4000)
+    @_data = Bytes.new(space)
+
+  :: Reset this object back to an empty state so that it can be reused.
+  :: All data held and all cursor and mark state will be dropped.
+  ::
+  :: If the cursor and marker were already at the end of the stream,
+  :: there will be no change in visible behavior from the caller side,
+  :: but it's still important to call this method to allow garbage collection.
+  :fun ref clear
+    @_data.clear
+    @_offset = 0
+    @_mark_offset = 0
+    @
+
+  :: Drop any bytes that have been passed by both the marker and cursor,
+  :: allowing buffers to be garbage collected even in the middle of a stream.
+  ::
+  :: If at the end of a stream it is more efficient to call clear instead.
+  // TODO: Implement the compact function
+  // :fun ref compact
+  //   // ...
+  //   @
+
+  :: Receive some bytes from the given source, extending the end of the stream.
+  :: Returns the number of bytes that were received, as reported by the source.
+  :: Raises an error if the source has become permanently closed off.
+  :fun ref receive_from!(source ByteStream.Source)
+    if (@_data.space == 0) @_data.reserve(0x4000) // TODO: customizable reserve?
+    source.emit_bytes_into!(@_data, @_data.size)
+
+  :: Move the mark position to match the current cursor position.
+  :: This is often used to mark the start of a token in a token stream,
+  :: and to set a place to rewind back to in case of an interrupted stream.
+  :fun ref mark_here
+    @_mark_offset = @_offset
+    @
+
+  :: Move the cursor back to match the last marker position.
+  :: This is often used to reset the stream to a known place when interrupted,
+  :: so that when the next chunk is available it can be resumed from there.
+  :fun ref rewind_to_marker
+    @_offset = @_mark_offset
+    @
+
+  :: Get the number of bytes available in the stream ahead of the cursor.
+  :: This the the number of bytes that can be peeked or advanced past.
+  :: Attempting to go past that point in the stream will raise an error.
+  :fun bytes_ahead: @_data.size - @_offset
+
+  :: Get the number of bytes available in the stream ahead of the marker.
+  :: This will always be equal to or greater than those ahead of the cursor.
+  :fun bytes_ahead_of_marker: @_data.size - @_mark_offset
+
+  :: Get the space available in the underlying allocation ahead of the cursor.
+  :: This is equivalent to the number of available bytes ahead of the cursor
+  :: plus the number of further bytes that can be received from a
+  :: ByteStream.Source prior to forcing a reallocation of the underlying buffer.
+  :fun space_ahead: @_data.space - @_offset
+
+  :: Get the space available in the underlying allocation ahead of the marker.
+  :: This is equivalent to the number of available bytes ahead of the marker
+  :: plus the number of further bytes that can be received from a
+  :: ByteStream.Source prior to forcing a reallocation of the underlying buffer.
+  :fun space_ahead_of_marker: @_data.space - @_mark_offset
+
+  :: Reserve additional space in the underlying byte buffer, which forces a
+  :: reallocation now, but sets a minimum number of bytes that the buffer
+  :: can receive in the future without forcing a reallocation.
+  :fun ref reserve_additional(space USize)
+    @_data.reserve(@_data.space + space)
+
+  :: Get the number of bytes in the currently marked token.
+  :: That is, the number of bytes between the marker and the cursor.
+  :fun token_byte_size: @_offset - @_mark_offset
+
+  :: Yield each byte in the currently marked token.
+  :: That is, the bytes between the marker and the cursor.
+  :fun each_token_byte None
+    :yields U8 for None
+    @each_token_byte_until -> (byte | yield byte, False)
+    None
+
+  :: Yield each byte in the currently marked token until the block returns True.
+  :: Returns True if the block stopped iteration early by returning True.
+  :: Otherwise returns False, indicating that iteration fully completed.
+  :fun each_token_byte_until Bool
+    :yields U8 for Bool
+    @_data.each_until(@_mark_offset, @_offset) -> (byte | yield byte)
+
+  :: For the bytes in the currently marked token, yield each associated chunk,
+  :: along with the start and end offset of the chunk that are within the token.
+  :: This is used internally for chunk-wise comparison and copying operations.
+  :fun _each_token_slice None
+    :yields for None // TODO: unify Bytes cap with ByteStream.ChunkedReader signature?
+    yield (@_data, @_mark_offset, @_offset)
+
+  :: Same as the each_token_byte function, but allows the yield block to return
+  :: True to stop iteration early, and in such a case the function returns True.
+  :fun _each_token_slice_until Bool
+    :yields for Bool // TODO: unify Bytes cap with ByteStream.ChunkedReader signature?
+    yield (@_data, @_mark_offset, @_offset)
+
+  :: Return True if the bytes in the currently marked token are equivalent
+  :: to the bytes referenced by the given string.
+  :fun is_token_equal_to(other (Bytes'box | String'box))
+    @token_byte_size == other.size && (
+      other_start USize = 0
+      unequal = @_each_token_slice_until -> (chunk, start, end |
+        slice_size = end - start
+
+        unequal_slice = chunk
+          .is_slice_equal(start, other, other_start, slice_size)
+          .not
+
+        other_start += slice_size
+        unequal_slice
+      )
+      unequal.invert
+    )
+
+  :: Return True if the bytes in the currently marked token, after lowercasing
+  :: any encountered ASCII letters (A-Z) are equivalent to the given string.
+  :: That is, the given string should be supplied as already being lowercase.
+  :fun is_token_ascii_lowercase_equal_to(other (Bytes'box | String'box))
+    @token_byte_size == other.size && (
+      index USize = 0
+      unequal = @each_token_byte_until -> (byte |
+        lower_byte = if (byte >= 'A' && byte <= 'Z') (byte - 'A' + 'a' | byte)
+        unequal_byte = try (lower_byte != other.byte_at!(index) | True)
+        index += 1
+        unequal_byte
+      )
+      unequal.invert
+    )
+
+  :: Return the portion of the stream between the marker and the cursor,
+  :: as isolated Bytes, advancing the marker past the token so that it may
+  :: never be read again, which allows the returned Bytes to avoid a copy.
+  :fun ref extract_token Bytes'iso
+    extracted = @_data.chop_left(@_offset)
+    extracted.truncate_left(@_mark_offset)
+    @_offset = 0
+    @_mark_offset = 0
+    --extracted
+
+  :: Return the portion of the stream between the marker and the cursor,
+  :: as an immutable String.
+  :fun token_as_string String
+    :: TODO: Don't copy, or at least do a more efficient copy.
+    // TODO: explicit variable type should not be needed in this line:
+    string String'iso = String.new_iso(@token_byte_size)
+    @each_token_byte -> (byte | string.push_byte(byte))
+    --string
+
+  :: Return the portion of the stream between the marker and the cursor,
+  :: parsed as a positive integer written with sequential decimal digits (0-9).
+  :: If other (non-digit) bytes are encountered, an error is raised.
+  :fun token_as_positive_integer! U64
+    value U64 = 0
+    error = False
+    @each_token_byte_until -> (byte |
+      if (byte >= '0' && byte <= '9') (
+        value = value * 10 + (byte - '0').u64
+        False // continue iterating
+      |
+        error = True // TODO: should we just raise an error here directly?
+        True // stop iteration
+      )
+    )
+    if error error!
+    value
+
+  :: Return the byte value that is N bytes ahead, without moving the cursor.
+  :: Raises an error if there are not enough bytes to do so.
+  :fun peek_byte!(n USize = 0) U8
+    @_data[@_offset + n]!
+
+  :: Advance the cursor forward to the end of the byte stream.
+  :fun ref advance_to_end
+    @_offset = @_data.size
+    @
+
+  :: Advance the cursor forward in the byte stream by N total bytes.
+  :: Raises an error if there are not enough bytes to do so, leaving the cursor
+  :: pointing to the next future byte that will arrive in the byte stream.
+  :fun ref advance!(n USize)
+    @_offset += n
+    if (@_offset > @_data.size) (
+      @_offset = @_data.size
+      error!
+    )
+    @
+
+  :: Advance the cursor byte-by-byte for as long as the block yields True,
+  :: stopping the cursor pointing at the byte for which it yielded False.
+  :: Raises an error if the end of the byte stream is reached prior to that.
+  :fun ref advance_while!
+    :yields U8 for Bool
+    while (yield @_data[@_offset]!) (@_offset += 1)
+    @
+
+  :fun read_byte!(offset USize) U8
+    @_data.read_byte!(@_mark_offset + offset)
+
+  :fun read_native_u16!(offset USize) U16
+    @_data.read_native_u16!(@_mark_offset + offset)
+
+  :fun read_native_u32!(offset USize) U32
+    @_data.read_native_u32!(@_mark_offset + offset)
+
+  :fun read_native_u64!(offset USize) U64
+    @_data.read_native_u64!(@_mark_offset + offset)

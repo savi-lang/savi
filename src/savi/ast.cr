@@ -275,6 +275,21 @@ module Savi::AST
     end
     def name; :ident end
     def to_a: Array(A); [name, value] of A end
+
+    # If this identifier is immediately dot-nested within the given outer
+    # identifier, then return the nested portion as a new identifier.
+    def immediately_nested_within?(outer : AST::Identifier) : AST::Identifier?
+      # Only consider further if nested within the outer type.
+      return unless value.includes?(".")
+      return unless value.starts_with?("#{outer.value}.")
+
+      # Only consider further if nested exactly one level beneath.
+      nested_ident_value = value[(outer.value.size + 1)..-1]
+      return if nested_ident_value.includes?(".")
+
+      # Return the nested portion as an identifier.
+      AST::Identifier.new(nested_ident_value).from(self)
+    end
   end
 
   # A LiteralString is a value surrounded by double-quotes in source code,

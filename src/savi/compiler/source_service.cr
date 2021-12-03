@@ -12,14 +12,14 @@ class Savi::Compiler::SourceService
   def standard_library_path
     from_internal_path(standard_library_internal_path)
   end
-  def prelude_library_path
-    File.join("#{standard_library_path}/prelude")
+  def core_savi_library_path
+    File.join("#{standard_library_path}/savi")
   end
   def standard_declarators_library_path
-    File.join("#{standard_library_path}/prelude/declarators")
+    File.join("#{standard_library_path}/savi/declarators")
   end
   def meta_declarators_library_path
-    File.join("#{standard_library_path}/prelude/declarators/meta")
+    File.join("#{standard_library_path}/savi/declarators/meta")
   end
 
   # Add/update a source override, which causes the SourceService to pretend as

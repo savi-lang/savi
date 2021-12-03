@@ -1,0 +1,10 @@
+:module _Log
+  :: Mark the entire process as a failure.
+  :fun fail(env Env)
+    env.exit_code = 1
+
+  :: Print a bug message and mark the entire process as a failure.
+  :fun bug(env Env, text)
+    env.err.write("You've encountered a bug in the spec library: ")
+    env.err.print(text)
+    @fail(env)

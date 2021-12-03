@@ -28,6 +28,7 @@ class Savi::Compiler
     case pass
     when "format"           then :format # (not a true compiler pass)
     when "import"           then :import
+    when "populate_types"   then :populate_types
     when "namespace"        then :namespace
     when "reparse"          then :reparse
     when "macros"           then :macros
@@ -79,6 +80,7 @@ class Savi::Compiler
     time = Time.measure do
       case target
       when :import           then ctx.run_whole_program(ctx.import)
+      when :populate_types   then ctx.run_copy_on_mutate(ctx.populate_types)
       when :namespace        then ctx.run_whole_program(ctx.namespace)
       when :reparse          then ctx.run_copy_on_mutate(Reparse)
       when :macros           then ctx.run_copy_on_mutate(Macros)
@@ -135,11 +137,12 @@ class Savi::Compiler
   def deps_of(target : Symbol) : Array(Symbol)
     case target
     when :import then [] of Symbol
-    when :namespace then [:import]
+    when :populate_types then [:import]
+    when :namespace then [:populate_types, :import]
     when :reparse then [:namespace]
     when :macros then [:reparse]
     when :sugar then [:macros]
-    when :refer_type then [:sugar, :macros, :reparse, :namespace]
+    when :refer_type then [:sugar, :macros, :reparse, :namespace, :populate_types]
     when :populate then [:sugar, :macros, :reparse, :refer_type]
     when :lambda then [:sugar, :macros, :reparse]
     when :flow then [:lambda, :populate, :sugar, :macros, :reparse]
@@ -251,9 +254,9 @@ class Savi::Compiler
     # Now compile the main library.
     ctx.compile_library(docs.first.source.library, docs)
 
-    # Next add the prelude, unless the main library happens to be the prelude.
-    unless docs.first.source.library.path == source_service.prelude_library_path
-      ctx.compile_library_at_path(source_service.prelude_library_path)
+    # Next add the core Savi, unless the main library happens to be the same.
+    unless docs.first.source.library.path == source_service.core_savi_library_path
+      ctx.compile_library_at_path(source_service.core_savi_library_path)
     end
 
     # Now run compiler passes until the target pass is satisfied.

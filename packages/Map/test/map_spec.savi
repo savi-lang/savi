@@ -1,0 +1,83 @@
+:import "Spec"
+
+:actor MapSpecActor
+
+:class MapSpec
+  :is Spec
+  :const describes: "Map"
+
+  :fun new_map: Map(String, U64).new
+  :fun new_actor_map: Map.ByIdentity(MapSpecActor, U64).new
+
+  :it "stores and removes values at a given key"
+    map = @new_map
+    assert: map.size == 0
+    assert error: map["example"]!
+    assert: map.has_key("example").is_false
+    assert: (map["example"] = 99) == 99
+    assert: map.size == 1
+    assert: map["example"]! == 99
+    assert: map.has_key("example")
+    assert: (map["example"] = 88) == 88
+    assert: map.size == 1
+    assert: map["example"]! == 88
+    assert: map.has_key("example")
+    assert: map.delete("example") <: None
+    assert error: map["example"]!
+    assert: map.has_key("example").is_false
+    assert: map.size == 0
+
+  :it "stores values at actor keys by identity"
+    foo = MapSpecActor.new
+    bar = MapSpecActor.new
+    baz = MapSpecActor.new
+    map = @new_actor_map
+    map[foo] = 11
+    map[bar] = 22
+    map[baz] = 33
+    assert: map[foo]! == 11
+    assert: map[bar]! == 22
+    assert: map[baz]! == 33
+
+  :it "can be cleared, removing all keys and values"
+    map = @new_map
+    map["foo"] = 11
+    map["bar"] = 22
+    map["baz"] = 33
+
+    assert: map.size == 3, map.clear
+    assert: map.size == 0
+
+  :it "yields each key and value"
+    map = @new_map
+    map["foo"] = 11
+    map["bar"] = 22
+    map["baz"] = 33
+
+    copy = @new_map
+    map.each -> (key, value | copy[key] = value)
+
+    assert: copy.size == 3
+    assert: copy["foo"]! == 11
+    assert: copy["bar"]! == 22
+    assert: copy["baz"]! == 33
+
+  :it "yields each key and value until the criteria is met"
+    map = @new_map
+    map["foo"] = 11
+    map["bar"] = 22
+    map["baz"] = 33
+
+    this_key = ""
+    found_it = map.each_until -> (key, value | this_key = key, value == 22)
+    assert: found_it
+    assert: this_key == "bar"
+
+    this_key = ""
+    found_it = map.each_until -> (key, value | this_key = key, value == 33)
+    assert: found_it
+    assert: this_key == "baz"
+
+    this_key = ""
+    found_it = map.each_until -> (key, value | this_key = key, value == 99)
+    assert: found_it.is_false

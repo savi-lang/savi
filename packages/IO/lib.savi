@@ -1,0 +1,45 @@
+:import "OSError"
+
+:ffi LibC
+  :fun getsockopt(
+    fd U32, level I32, option I32
+    out_value CPointer(U8), out_length CPointer(USize)
+  ) I32
+
+:ffi LibPonyOs
+  :fun pony_os_sockopt_level(level I32) I32
+  :fun pony_os_sockopt_option(option I32) I32
+  :fun pony_os_connect_tcp(owner AsioEventNotify, host CPointer(U8), service CPointer(U8), from CPointer(U8), asio_flags U32) U32
+  :fun pony_os_socket_close(fd U32) None
+  :fun pony_os_socket_shutdown(fd U32) None
+  :fun pony_os_writev_max USize
+  :fun pony_os_writev!(event CPointer(AsioEvent), iov CPointer(CPointer(U8)), count USize) USize
+  :fun pony_os_recv!(event CPointer(AsioEvent), buffer CPointer(U8), count USize) USize
+  :fun pony_os_errno OSError
+
+:module _PonyOs
+  :fun level_socket  I32: LibPonyOs.pony_os_sockopt_level(4138)
+  :fun option_error  I32: LibPonyOs.pony_os_sockopt_option(827)
+
+  :fun check_os_error(fd U32) OSError
+    option_max_size USize = 4
+    option_size = [option_max_size] // TODO: use ffi_address_of instead?
+    option = Bytes.new(option_max_size)
+    result = LibC.getsockopt(
+      fd, @level_socket, @option_error, option.cpointer, option_size.cpointer
+    )
+
+    if (result != 0) (
+      // Nonzero result indicates that the getsockopt call itself failed.
+      // So we fetch errno, which holds the OSError for the failed call.
+      LibPonyOs.pony_os_errno
+    |
+      // Use the option_size value from the getsockopt call to trim the size
+      // of the option result, as demanded by the getsockopt convention.
+      options_size_value = try (option_size[0]! | 0)
+      option.resize_possibly_including_uninitialized_memory(options_size_value)
+
+      // Convert the 4-byte array to the equivalent 32-bit OSError value.
+      // TODO: Should OSError enum provide a from_u32! method?
+      try (OSError.from_u64!(option.read_native_u32!(0).u64) | OSError.EINVAL)
+    )

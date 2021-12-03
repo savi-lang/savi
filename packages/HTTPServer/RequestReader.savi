@@ -1,0 +1,140 @@
+:import "ByteStream" (ByteStream.Reader)
+
+:class val HTTPServer.Request
+  :new iso
+  :var method String: ""
+  :var uri_string String: ""
+  :var content_length USize: 0
+  :var transfer_encoding: HTTPServer.Request.TransferEncoding.Identity
+  :var connection_header: HTTPServer.Request.ConnectionHeader.KeepAlive // TODO: default to Close for HTTP/1.0
+
+:enum HTTPServer.Request.TransferEncoding
+  :const bit_width U8: 1
+  :member HTTPServer.Request.TransferEncoding.Identity: 0
+  :member HTTPServer.Request.TransferEncoding.Chunked: 1
+
+:enum HTTPServer.Request.ConnectionHeader
+  :const bit_width U8: 1
+  :member HTTPServer.Request.ConnectionHeader.Close: 0
+  :member HTTPServer.Request.ConnectionHeader.KeepAlive: 1
+
+:enum HTTPServer.Request.Error // TODO: compile error when multiple members same value?
+  :const bit_width U8: 8
+  // TODO: Enums with short member names using a Swift-like leading dot syntax
+  :member HTTPServer.Request.Error.None: 0
+  :member HTTPServer.Request.Error.UnsupportedMethod: 1
+  :member HTTPServer.Request.Error.URITooLong: 2
+  :member HTTPServer.Request.Error.UnsupportedVersion: 3
+  :member HTTPServer.Request.Error.UnsupportedTransferEncoding: 4
+  :member HTTPServer.Request.Error.UnsupportedConnectionHeader: 5
+  :member HTTPServer.Request.Error.InvalidContentLength: 6
+
+:class HTTPServer.RequestReader
+  // These headers have a special meaning for an action we need to take here.
+  // NOTE: They need to be specified in lowercase, both here and elsewhere.
+  // However, we accept them on the wire in a case-insensitive way.
+  :const _standard_headers Array(String)'val
+    ["content-length", "transfer-encoding", "connection"]
+
+  // TODO: Make these constants be properties of a shared config object instead.
+  :const _max_uri_byte_size USize: 8192
+  :const _supported_methods Array(String)'val
+    ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+  :const _collect_headers Array(String)'val: []
+
+  :let _parser: HTTPServer.RequestParser.new
+  :var _request: HTTPServer.Request.new
+  :var _next_header String: ""
+  :var _error: HTTPServer.Request.Error.None
+
+  :fun ref _reset_state_and_pop_request HTTPServer.Request'iso
+    @_parser.reset
+    @_next_header = ""
+    @_error = HTTPServer.Request.Error.None
+
+    // Pop the current request by displacing it with a new one
+    @_request <<= HTTPServer.Request.new
+
+  :fun last_error: @_error
+
+  :fun ref read!(stream ByteStream.Reader) HTTPServer.Request'iso
+    @_parser.parse!(stream) -> (token |
+      case token == (
+      | HTTPServer.RequestParser.Token.Method |
+        try (
+          @_request.method = @_supported_methods.find! -> (method |
+            stream.is_token_equal_to(method)
+          )
+        |
+          @_error = HTTPServer.Request.Error.UnsupportedMethod
+          error!
+        )
+      | HTTPServer.RequestParser.Token.Uri |
+        if (stream.token_byte_size <= @_max_uri_byte_size) (
+          @_request.uri_string = stream.token_as_string
+        |
+          @_error = HTTPServer.Request.Error.URITooLong
+          error!
+        )
+      | HTTPServer.RequestParser.Token.VersionString |
+        if stream.is_token_equal_to(b"HTTP/1.1") (
+          // Version is okay - no action needed
+          // TODO: Accept HTTP/1.0 and change `Connection` header behavior
+          None
+        |
+          @_error = HTTPServer.Request.Error.UnsupportedVersion
+          error!
+        )
+      | HTTPServer.RequestParser.Token.HeaderName |
+        try (
+          @_next_header = @_standard_headers.find! -> (name |
+            stream.is_token_ascii_lowercase_equal_to(name)
+          )
+        |
+          try (
+            @_collect_headers.find! -> (name |
+              stream.is_token_ascii_lowercase_equal_to(name)
+            )
+          |
+            "" // ignore all other header names
+          )
+        )
+      | HTTPServer.RequestParser.Token.HeaderValue |
+        case (
+        // We can safely use `is` here because we have ensured that each
+        // such next_header we may compare against here is the "stringtabbed"
+        // instance of it (i.e. each is a single static memory pointer address).
+        | @_next_header === "" | // do nothing; ignore this header
+        | @_next_header === "content-length" |
+          try (
+            @_request.content_length = stream.token_as_positive_integer!.usize
+          |
+            @_error = HTTPServer.Request.Error.InvalidContentLength
+            error!
+          )
+        | @_next_header === "transfer-encoding" |
+          if stream.is_token_ascii_lowercase_equal_to(b"chunked") (
+            @_request.transfer_encoding = HTTPServer.Request.TransferEncoding.Chunked
+          |
+            @_error = HTTPServer.Request.Error.UnsupportedTransferEncoding
+            error!
+          )
+        | @_next_header === "connection" |
+          case (
+          | stream.is_token_ascii_lowercase_equal_to(b"close") |
+            @_request.connection_header = HTTPServer.Request.ConnectionHeader.Close
+          | stream.is_token_ascii_lowercase_equal_to(b"keep-alive") |
+            @_request.connection_header = HTTPServer.Request.ConnectionHeader.KeepAlive
+          |
+            @_error = HTTPServer.Request.Error.UnsupportedConnectionHeader
+            error!
+          )
+        |
+          // TODO: collect this header
+        )
+      | None // TODO: exhaustive match
+      )
+    )
+
+    // We're finished parsing and building the request!
+    @_reset_state_and_pop_request

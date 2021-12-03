@@ -19,6 +19,7 @@ class Savi::Compiler::Context
   getter namespace
   getter paint
   getter populate
+  getter populate_types
   getter pre_infer
   getter pre_subtyping
   getter pre_t_infer
@@ -68,6 +69,7 @@ class Savi::Compiler::Context
     @namespace = Namespace.new
     @paint = Paint.new
     @populate = Populate.new
+    @populate_types = PopulateTypes.new
     @pre_infer = PreInfer::Pass.new
     @pre_subtyping = PreSubtyping::Pass.new
     @pre_t_infer = PreTInfer::Pass.new

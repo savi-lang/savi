@@ -32,8 +32,8 @@ describe Savi::Compiler::Eval do
     no_test_failures.should eq true
   end
 
-  it "evaluates the prelude tests" do
-    source_dir = File.join(__DIR__, "../../packages/prelude/test")
+  it "evaluates the savi tests" do
+    source_dir = File.join(__DIR__, "../../packages/savi/test")
 
     ctx = Savi.compiler.compile(source_dir, :eval)
     ctx.errors.should be_empty
@@ -42,8 +42,8 @@ describe Savi::Compiler::Eval do
     no_test_failures.should eq true
   end
 
-  it "evaluates the collections package's tests" do
-    source_dir = File.join(__DIR__, "../../packages/collections/test")
+  it "evaluates the Spec package's tests" do
+    source_dir = File.join(__DIR__, "../../packages/Spec/test")
 
     ctx = Savi.compiler.compile(source_dir, :eval)
     ctx.errors.should be_empty
@@ -52,8 +52,8 @@ describe Savi::Compiler::Eval do
     no_test_failures.should eq true
   end
 
-  it "evaluates the time package's tests" do
-    source_dir = File.join(__DIR__, "../../packages/time/test")
+  it "evaluates the Map package's tests" do
+    source_dir = File.join(__DIR__, "../../packages/Map/test")
 
     ctx = Savi.compiler.compile(source_dir, :eval)
     ctx.errors.should be_empty
@@ -62,8 +62,18 @@ describe Savi::Compiler::Eval do
     no_test_failures.should eq true
   end
 
-  it "evaluates the json package's tests" do
-    source_dir = File.join(__DIR__, "../../packages/json/test")
+  it "evaluates the Time package's tests" do
+    source_dir = File.join(__DIR__, "../../packages/Time/test")
+
+    ctx = Savi.compiler.compile(source_dir, :eval)
+    ctx.errors.should be_empty
+
+    no_test_failures = ctx.eval.exitcode == 0
+    no_test_failures.should eq true
+  end
+
+  it "evaluates the JSON package's tests" do
+    source_dir = File.join(__DIR__, "../../packages/JSON/test")
 
     ctx = Savi.compiler.compile(source_dir, :eval)
     ctx.errors.should be_empty
@@ -73,7 +83,7 @@ describe Savi::Compiler::Eval do
   end
 
   it "evaluates the net package's tests" do
-    source_dir = File.join(__DIR__, "../../packages/net/test")
+    source_dir = File.join(__DIR__, "../../packages/TCP/test")
 
     ctx = Savi.compiler.compile(source_dir, :eval)
     ctx.errors.should be_empty
@@ -83,7 +93,7 @@ describe Savi::Compiler::Eval do
   end
 
   it "evaluates the bytes package's tests" do
-    source_dir = File.join(__DIR__, "../../packages/bytes/test")
+    source_dir = File.join(__DIR__, "../../packages/ByteStream/test")
 
     ctx = Savi.compiler.compile(source_dir, :eval)
     ctx.errors.should be_empty
@@ -92,8 +102,8 @@ describe Savi::Compiler::Eval do
     no_test_failures.should eq true
   end
 
-  it "evaluates the http/server package's tests" do
-    source_dir = File.join(__DIR__, "../../packages/http/server/test")
+  it "evaluates the HTTPServer package's tests" do
+    source_dir = File.join(__DIR__, "../../packages/HTTPServer/test")
 
     ctx = Savi.compiler.compile(source_dir, :eval)
     ctx.errors.should be_empty
@@ -102,8 +112,8 @@ describe Savi::Compiler::Eval do
     no_test_failures.should eq true
   end
 
-  it "evaluates the regex package's tests" do
-    source_dir = File.join(__DIR__, "../../packages/regex/test")
+  it "evaluates the Regex package's tests" do
+    source_dir = File.join(__DIR__, "../../packages/Regex/test")
 
     ctx = Savi.compiler.compile(source_dir, :eval)
     ctx.errors.should be_empty

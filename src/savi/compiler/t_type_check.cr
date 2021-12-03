@@ -429,7 +429,7 @@ class Savi::Compiler::TTypeCheck
 
       # Return types of constant "functions" are very restrictive.
       if @func.has_tag?(:constant)
-        numeric_rt = ReifiedType.new(ctx.namespace.prelude_type(ctx, "Numeric"))
+        numeric_rt = ReifiedType.new(ctx.namespace.core_savi_type(ctx, "Numeric"))
         numeric_mt = MetaType.new_nominal(numeric_rt)
 
         ret_mt = @resolved_infos[@pre_infer[ret]]

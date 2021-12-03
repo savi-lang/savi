@@ -229,7 +229,7 @@ module Savi::Compiler::TInfer
       when nil
         if TInfer.is_type_expr_cap?(node)
           # When ignoring caps, a bare cap translates to the type Any.
-          rt = ReifiedType.new(ctx.namespace.prelude_type(ctx, "Any"))
+          rt = ReifiedType.new(ctx.namespace.core_savi_type(ctx, "Any"))
           Span.simple(MetaType.new(rt))
         else
           Span.error node, "This type couldn't be resolved"
@@ -717,12 +717,12 @@ module Savi::Compiler::TInfer
       func.ident
     end
 
-    def prelude_reified_type(ctx : Context, name : String, args = [] of MetaType)
-      ReifiedType.new(ctx.namespace.prelude_type(ctx, name), args)
+    def core_savi_reified_type(ctx : Context, name : String, args = [] of MetaType)
+      ReifiedType.new(ctx.namespace.core_savi_type(ctx, name), args)
     end
 
-    def prelude_type_span(ctx : Context, name : String)
-      Span.simple(MetaType.new(prelude_reified_type(ctx, name)))
+    def core_savi_type_span(ctx : Context, name : String)
+      Span.simple(MetaType.new(core_savi_reified_type(ctx, name)))
     end
   end
 
