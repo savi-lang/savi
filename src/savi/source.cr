@@ -26,14 +26,21 @@ struct Savi::Source
   end
 end
 
+# TODO: Rename as Source::Package after getting rid of the old concept.
 struct Savi::Source::Library
   property path : String
+  property name : String? # TODO: make mandatory
 
-  def initialize(@path)
+  def initialize(@path, @name = nil)
   end
 
   NONE = new("")
   def self.none; NONE end
+
+  def self.for_manifest(manifest : Packaging::Manifest)
+    library_path = manifest.name.pos.source.dirname
+    Source::Library.new(library_path, manifest.name.value)
+  end
 end
 
 struct Savi::Source::Pos
@@ -97,6 +104,11 @@ struct Savi::Source::Pos
       new_line_start, new_line_finish,
       new_row, new_col
     )
+  end
+
+  def self.show_source_path(source : Source)
+    source = Source.new(library.path, "", library.path, library, :path)
+    new(source, 0, library.path.bytesize, 0, library.path.bytesize, 0, 0)
   end
 
   def self.show_library_path(library : Library)

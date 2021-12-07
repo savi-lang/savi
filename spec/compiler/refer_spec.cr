@@ -10,8 +10,8 @@ describe Savi::Compiler::Refer do
         Greeting.greet(env)
     SOURCE
 
-    ctx1 = Savi.compiler.compile([source], :refer)
-    ctx2 = Savi.compiler.compile([source], :refer)
+    ctx1 = Savi.compiler.test_compile([source], :refer)
+    ctx2 = Savi.compiler.test_compile([source], :refer)
 
     t_link_g = ctx1.namespace[source]["Greeting"].as(Savi::Program::Type::Link)
     f_link_g = t_link_g.make_func_link_simple("greet")
@@ -40,7 +40,7 @@ describe Savi::Compiler::Refer do
                        ^~
     MSG
 
-    Savi.compiler.compile([source], :refer)
+    Savi.compiler.test_compile([source], :refer)
       .errors.map(&.message).join("\n").should eq expected
   end
 
@@ -58,7 +58,7 @@ describe Savi::Compiler::Refer do
         )
     SOURCE
 
-    Savi.compiler.compile([source], :refer)
+    Savi.compiler.test_compile([source], :refer)
   end
 
   it "won't confuse method names as being occurrences of a local variable" do
@@ -70,7 +70,7 @@ describe Savi::Compiler::Refer do
         env.example
     SOURCE
 
-    ctx = Savi.compiler.compile([source], :refer)
+    ctx = Savi.compiler.test_compile([source], :refer)
     ctx.errors.should be_empty
 
     main = ctx.namespace.main_type!(ctx)

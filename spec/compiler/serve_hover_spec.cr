@@ -7,7 +7,7 @@ describe Savi::Compiler::ServeHover do
         example.hash
     SOURCE
 
-    ctx = Savi.compiler.compile([source], :serve_hover)
+    ctx = Savi.compiler.test_compile([source], :serve_hover)
     ctx.errors.should be_empty
 
     messages, pos = ctx.serve_hover[Savi::Source::Pos.point(source, 2, 5)]
@@ -46,7 +46,7 @@ describe Savi::Compiler::ServeHover do
         @example
     SOURCE
 
-    ctx = Savi.compiler.compile([source], :serve_hover)
+    ctx = Savi.compiler.test_compile([source], :serve_hover)
     ctx.errors.should be_empty
 
     messages, pos = ctx.serve_hover[Savi::Source::Pos.point(source, 3, 6)]
@@ -74,7 +74,7 @@ describe Savi::Compiler::ServeHover do
         )
     SOURCE
 
-    ctx = Savi.compiler.compile([source], :serve_hover)
+    ctx = Savi.compiler.test_compile([source], :serve_hover)
     ctx.errors.should be_empty
 
     messages, pos = ctx.serve_hover[Savi::Source::Pos.point(source, 7, 9)]
@@ -96,7 +96,7 @@ describe Savi::Compiler::ServeHover do
         @buffer_size
     SOURCE
 
-    ctx = Savi.compiler.compile([source], :serve_hover)
+    ctx = Savi.compiler.test_compile([source], :serve_hover)
     ctx.errors.should be_empty
 
     messages, pos = ctx.serve_hover[Savi::Source::Pos.point(source, 2, 23)]

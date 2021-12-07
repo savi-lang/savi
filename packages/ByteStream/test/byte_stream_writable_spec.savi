@@ -1,5 +1,3 @@
-:import "Spec"
-
 :class ByteStreamWritableSpec
   :is Spec
   :const describes: "ByteStream.Writable"

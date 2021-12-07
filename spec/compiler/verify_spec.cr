@@ -4,7 +4,7 @@ describe Savi::Compiler::Verify do
     :module Example
     SOURCE
 
-    Savi.compiler.compile([source], :verify).errors.should be_empty
+    Savi.compiler.test_compile([source], :verify).errors.should be_empty
   end
 
   it "complains if the Main type is not an actor" do
@@ -20,7 +20,7 @@ describe Savi::Compiler::Verify do
            ^~~~
     MSG
 
-    Savi.compiler.compile([source], :verify)
+    Savi.compiler.test_compile([source], :verify)
       .errors.map(&.message).join("\n").should eq expected
   end
 
@@ -37,7 +37,7 @@ describe Savi::Compiler::Verify do
                ^~~
     MSG
 
-    Savi.compiler.compile([source], :verify)
+    Savi.compiler.test_compile([source], :verify)
       .errors.map(&.message).join("\n").should eq expected
   end
 
@@ -59,7 +59,7 @@ describe Savi::Compiler::Verify do
            ^~~~~~~~~~
     MSG
 
-    Savi.compiler.compile([source], :verify)
+    Savi.compiler.test_compile([source], :verify)
       .errors.map(&.message).join("\n").should eq expected
   end
 
@@ -76,7 +76,7 @@ describe Savi::Compiler::Verify do
            ^~~
     MSG
 
-    Savi.compiler.compile([source], :verify)
+    Savi.compiler.test_compile([source], :verify)
       .errors.map(&.message).join("\n").should eq expected
   end
 
@@ -98,7 +98,7 @@ describe Savi::Compiler::Verify do
                ^~~
     MSG
 
-    Savi.compiler.compile([source], :verify)
+    Savi.compiler.test_compile([source], :verify)
       .errors.map(&.message).join("\n").should eq expected
   end
 
@@ -120,7 +120,7 @@ describe Savi::Compiler::Verify do
                ^~~
     MSG
 
-    Savi.compiler.compile([source], :verify)
+    Savi.compiler.test_compile([source], :verify)
       .errors.map(&.message).join("\n").should eq expected
   end
 
@@ -147,7 +147,7 @@ describe Savi::Compiler::Verify do
                 ^~~~~~
     MSG
 
-    Savi.compiler.compile([source], :verify)
+    Savi.compiler.test_compile([source], :verify)
       .errors.map(&.message).join("\n").should eq expected
   end
 end

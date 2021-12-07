@@ -1,5 +1,3 @@
-:import "ByteStream" (ByteStream.Reader)
-
 :class val HTTPServer.Request
   :new iso
   :var method String: ""

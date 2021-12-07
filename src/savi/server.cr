@@ -166,8 +166,10 @@ class Savi::Server
     filename = req.params.text_document.uri.path.not_nil!
     dirname = File.dirname(filename)
     sources = Savi.compiler.source_service.get_library_sources(dirname)
+    options = Savi::Compiler::CompilerOptions.new
+    options.skip_manifest = true
 
-    ctx = Savi.compiler.compile(sources, :import)
+    ctx = Savi.compiler.compile(sources, :manifests, options)
     doc = ctx.root_docs.find(&.pos.source.path.==(filename)).not_nil!
 
     edits = AST::Format.run(ctx, ctx.root_library_link, [doc]).flat_map(&.last)
@@ -187,8 +189,10 @@ class Savi::Server
     filename = req.params.text_document.uri.path.not_nil!
     dirname = File.dirname(filename)
     sources = Savi.compiler.source_service.get_library_sources(dirname)
+    options = Savi::Compiler::CompilerOptions.new
+    options.skip_manifest = true
 
-    ctx = Savi.compiler.compile(sources, :import)
+    ctx = Savi.compiler.compile(sources, :manifests, options)
     doc = ctx.root_docs.find(&.pos.source.path.==(filename)).not_nil!
 
     edits = AST::Format.run(ctx, ctx.root_library_link, [doc]).flat_map(&.last)
@@ -209,8 +213,10 @@ class Savi::Server
     filename = req.params.text_document.uri.path.not_nil!
     dirname = File.dirname(filename)
     sources = Savi.compiler.source_service.get_library_sources(dirname)
+    options = Savi::Compiler::CompilerOptions.new
+    options.skip_manifest = true
 
-    ctx = Savi.compiler.compile(sources, :import)
+    ctx = Savi.compiler.compile(sources, :manifests, options)
     doc = ctx.root_docs.find(&.pos.source.path.==(filename)).not_nil!
 
     edits = AST::Format.run(ctx, ctx.root_library_link, [doc]).flat_map(&.last)

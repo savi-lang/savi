@@ -22,6 +22,10 @@ module Savi::Program::Intrinsic
       when "declarator"
         name = terms["name"].as(AST::Identifier)
         scope.current_declarator = Declarator.new(name)
+      when "manifest"
+        name = terms["name"].as(AST::Identifier)
+        kind = terms["kind"].as(AST::Identifier)
+        scope.current_manifest = Packaging::Manifest.new(name, kind)
       when "import"
         scope.current_library.imports << Import.new(
           terms["path"].as(AST::LiteralString),
@@ -149,6 +153,47 @@ module Savi::Program::Intrinsic
       when "default"
         term = terms["term"].not_nil!
         scope.current_declarator_term.default = term
+      else
+        raise NotImplementedError.new(declarator.pretty_inspect)
+      end
+
+    # Declarations within a manifest definition.
+    when "manifest"
+      case declarator.name.value
+      when "copies"
+        name = terms["name"].as(AST::Identifier)
+        scope.current_manifest.copies_names << name
+      when "sources"
+        path = terms["path"].as(AST::LiteralString)
+        scope.current_manifest.sources_paths << path
+      when "dependency"
+        name = terms["name"].as(AST::Identifier)
+        version = terms["version"].as(AST::LiteralString)
+        scope.current_manifest_dependency = dep =
+          Packaging::Dependency.new(name, version)
+        scope.current_manifest.dependencies << dep
+      when "transitive"
+        name = terms["name"].as(AST::Identifier)
+        version = terms["version"].as(AST::LiteralString)
+        scope.current_manifest_dependency = dep =
+          Packaging::Dependency.new(name, version, transitive: true)
+        scope.current_manifest.dependencies << dep
+      else
+        raise NotImplementedError.new(declarator.pretty_inspect)
+      end
+
+    # Declarations within a manifest dependency definition.
+    when "manifest_dependency"
+      case declarator.name.value
+      when "from"
+        location = terms["location"].as(AST::Identifier)
+        scope.current_manifest_dependency.location_nodes << location
+      when "lock"
+        revision = terms["revision"].as(AST::Identifier)
+        scope.current_manifest_dependency.revision_nodes << revision
+      when "depends"
+        name = terms["name"].as(AST::Identifier)
+        scope.current_manifest_dependency.depends_on_nodes << name
       else
         raise NotImplementedError.new(declarator.pretty_inspect)
       end
@@ -407,6 +452,11 @@ module Savi::Program::Intrinsic
     declarator : Declarator,
   )
     case declarator.name.value
+    when "manifest"
+      ctx.program.manifests << scope.current_manifest
+      scope.current_manifest = nil
+    when "manifest_dependency"
+      scope.current_manifest_dependency = nil
     when "declarator"
       scope.current_library.declarators << scope.current_declarator
       scope.current_declarator = nil

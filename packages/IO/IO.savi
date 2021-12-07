@@ -1,6 +1,3 @@
-:import "OSError"
-:import "ByteStream" (ByteStream.Source, ByteStream.ChunkedSink)
-
 // TODO: Move everything in this file to a separate "IO" package,
 // once the interface is settled and deemed to be safe for non-FFI users.
 // TODO: Also move the AsioEvent type into the "IO" package too,

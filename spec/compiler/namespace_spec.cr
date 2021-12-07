@@ -6,8 +6,8 @@ describe Savi::Compiler::Namespace do
         env.out.print("Hello, World")
     SOURCE
 
-    ctx1 = Savi.compiler.compile([source], :namespace)
-    ctx2 = Savi.compiler.compile([source], :namespace)
+    ctx1 = Savi.compiler.test_compile([source], :namespace)
+    ctx2 = Savi.compiler.test_compile([source], :namespace)
 
     ctx1.namespace[source].should eq ctx2.namespace[source]
   end
@@ -30,7 +30,7 @@ describe Savi::Compiler::Namespace do
            ^~~~~~~~~~
     MSG
 
-    Savi.compiler.compile([source], :namespace)
+    Savi.compiler.test_compile([source], :namespace)
       .errors.map(&.message).join("\n").should eq expected
   end
 
@@ -59,7 +59,7 @@ describe Savi::Compiler::Namespace do
              ^~~~~~~~~
     MSG
 
-    Savi.compiler.compile([source], :namespace)
+    Savi.compiler.test_compile([source], :namespace)
       .errors.map(&.message).join("\n").should eq expected
   end
 
@@ -80,7 +80,7 @@ describe Savi::Compiler::Namespace do
                ^~~~~~
     MSG
 
-    Savi.compiler.compile([source], :namespace)
+    Savi.compiler.test_compile([source], :namespace)
       .errors.map(&.message).join("\n").should eq expected
   end
 
@@ -95,7 +95,7 @@ describe Savi::Compiler::Namespace do
     :ffi LibPony // defined in core Savi, but private, so no conflict here
     SOURCE
 
-    Savi.compiler.compile([source], :namespace)
+    Savi.compiler.test_compile([source], :namespace)
   end
 
   # TODO: Figure out how to test these in our test suite - they need a library.

@@ -1,10 +1,10 @@
 class Savi::Program
-  getter libraries
+  getter libraries = [] of Library
+  getter manifests = [] of Packaging::Manifest
   property meta_declarators : Library?
   property standard_declarators : Library?
 
   def initialize
-    @libraries = [] of Library
   end
 
   # TODO: Remove these aliases and make passes work at the library level
@@ -69,15 +69,17 @@ class Savi::Program
     end
 
     def make_link
-      Link.new(source_library.path)
+      Link.new(source_library.path, source_library.name)
     end
 
     struct Link
       getter path : String
-      def initialize(@path)
+      getter name : String?
+      def initialize(@path, @name)
       end
       def resolve(ctx : Compiler::Context)
-        ctx.program.libraries.find(&.source_library.path.==(@path)).not_nil!
+        source_library = Source::Library.new(@path, @name)
+        ctx.program.libraries.find(&.source_library.==(source_library)).not_nil!
       end
       def show
         path

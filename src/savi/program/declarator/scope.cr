@@ -25,6 +25,10 @@ class Savi::Program::Declarator::Scope
   setter current_function : Function?
   getter! current_members : Array(TypeWithValue)
   setter current_members : Array(TypeWithValue)?
+  getter! current_manifest : Packaging::Manifest
+  setter current_manifest : Packaging::Manifest?
+  getter! current_manifest_dependency : Packaging::Dependency
+  setter current_manifest_dependency : Packaging::Dependency?
 
   def visible_declarators(ctx)
     declarators = [] of Declarator

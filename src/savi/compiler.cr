@@ -9,6 +9,8 @@ class Savi::Compiler
     property print_ir
     property print_perf
     property binary_name
+    property skip_manifest
+    property manifest_name : String?
     property target_pass : Symbol?
 
     DEFAULT_BINARY_NAME = "main"
@@ -18,7 +20,9 @@ class Savi::Compiler
       @no_debug = false,
       @print_ir = false,
       @print_perf = false,
+      @skip_manifest = false,
       @binary_name = DEFAULT_BINARY_NAME,
+      @manifest_name = nil,
       @target_pass = nil,
     )
     end
@@ -27,7 +31,8 @@ class Savi::Compiler
   def self.pass_symbol(pass)
     case pass
     when "format"           then :format # (not a true compiler pass)
-    when "import"           then :import
+    when "manifests"        then :manifests
+    when "load"             then :load
     when "populate_types"   then :populate_types
     when "namespace"        then :namespace
     when "reparse"          then :reparse
@@ -79,7 +84,8 @@ class Savi::Compiler
   def execute(ctx, target : Symbol)
     time = Time.measure do
       case target
-      when :import           then ctx.run_whole_program(ctx.import)
+      when :manifests        then ctx.run_whole_program(ctx.manifests)
+      when :load             then ctx.run_whole_program(ctx.load)
       when :populate_types   then ctx.run_copy_on_mutate(ctx.populate_types)
       when :namespace        then ctx.run_whole_program(ctx.namespace)
       when :reparse          then ctx.run_copy_on_mutate(Reparse)
@@ -136,9 +142,10 @@ class Savi::Compiler
   # passes like :classify and :refer instead of marking a dependency.
   def deps_of(target : Symbol) : Array(Symbol)
     case target
-    when :import then [] of Symbol
-    when :populate_types then [:import]
-    when :namespace then [:populate_types, :import]
+    when :manifests then [] of Symbol
+    when :load then [:manifests]
+    when :populate_types then [:load]
+    when :namespace then [:populate_types, :load]
     when :reparse then [:namespace]
     when :macros then [:reparse]
     when :sugar then [:macros]
@@ -207,6 +214,11 @@ class Savi::Compiler
     source = Savi::Source.new("", "(eval)", content, library)
 
     Savi.compiler.compile([source], :eval, options)
+  end
+
+  def test_compile(sources : Array(Source), target : Symbol, options = CompilerOptions.new)
+    options.skip_manifest = true
+    compile(sources, target, options)
   end
 
   def compile(dirname : String, target : Symbol = :eval, options = CompilerOptions.new)

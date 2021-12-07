@@ -17,6 +17,7 @@ module Savi
       option "--no-debug", desc: "Compile without debug info", type: Bool, default: false
       option "--print-ir", desc: "Print generated LLVM IR", type: Bool, default: false
       option "--print-perf", desc: "Print compiler performance info", type: Bool, default: false
+      option "-C", "--cd=DIR", desc: "Change the working directory"
       option "-o NAME", "--output=NAME", desc: "Name of the output binary"
       option "-p NAME", "--pass=NAME", desc: "Name of the compiler pass to target"
       run do |opts, args|
@@ -28,6 +29,7 @@ module Savi
         )
         options.binary_name = opts.output.not_nil! if opts.output
         options.target_pass = Savi::Compiler.pass_symbol(opts.pass) if opts.pass
+        Dir.cd(opts.cd.not_nil!) if opts.cd
         Cli.compile options, opts.backtrace
       end
       sub "server" do
@@ -50,6 +52,7 @@ module Savi
         option "--no-debug", desc: "Compile without debug info", type: Bool, default: false
         option "--print-ir", desc: "Print generated LLVM IR", type: Bool, default: false
         option "--print-perf", desc: "Print compiler performance info", type: Bool, default: false
+        option "-C", "--cd=DIR", desc: "Change the working directory"
         run do |opts, args|
           options = Savi::Compiler::CompilerOptions.new(
             release: opts.release,
@@ -57,19 +60,22 @@ module Savi
             print_ir: opts.print_ir,
             print_perf: opts.print_perf,
           )
+          Dir.cd(opts.cd.not_nil!) if opts.cd
           Cli.eval args.code, options, opts.backtrace
         end
       end
       sub "run" do
         alias_name "r"
         desc "build and run code"
-        usage "savi run [options]"
+        usage "savi run [name] [options]"
         help short: "-h"
+        argument "name", type: String, required: false, desc: "Name of the manifest to compile"
         option "-b", "--backtrace", desc: "Show backtrace on error", type: Bool, default: false
         option "-r", "--release", desc: "Compile in release mode", type: Bool, default: false
         option "--no-debug", desc: "Compile without debug info", type: Bool, default: false
         option "--print-ir", desc: "Print generated LLVM IR", type: Bool, default: false
         option "--print-perf", desc: "Print compiler performance info", type: Bool, default: false
+        option "-C", "--cd=DIR", desc: "Change the working directory"
         option "-p NAME", "--pass=NAME", desc: "Name of the compiler pass to target"
         run do |opts, args|
           options = Savi::Compiler::CompilerOptions.new(
@@ -79,20 +85,24 @@ module Savi
             print_perf: opts.print_perf,
           )
           options.target_pass = Savi::Compiler.pass_symbol(opts.pass) if opts.pass
+          options.manifest_name = args.name.not_nil! if args.name
+          Dir.cd(opts.cd.not_nil!) if opts.cd
           Cli.run options, opts.backtrace
         end
       end
       sub "build" do
         alias_name "b"
         desc "build code"
-        usage "savi build [options]"
+        usage "savi build [name] [options]"
         help short: "-h"
+        argument "name", type: String, required: false, desc: "Name of the manifest to compile"
         option "-b", "--backtrace", desc: "Show backtrace on error", type: Bool, default: false
         option "-r", "--release", desc: "Compile in release mode", type: Bool, default: false
         option "-o NAME", "--output=NAME", desc: "Name of the output binary"
         option "--no-debug", desc: "Compile without debug info", type: Bool, default: false
         option "--print-ir", desc: "Print generated LLVM IR", type: Bool, default: false
         option "--print-perf", desc: "Print compiler performance info", type: Bool, default: false
+        option "-C", "--cd=DIR", desc: "Change the working directory"
         run do |opts, args|
           options = Savi::Compiler::CompilerOptions.new(
             release: opts.release,
@@ -100,23 +110,26 @@ module Savi
             print_ir: opts.print_ir,
             print_perf: opts.print_perf,
           )
-          if opts.output
-            options.binary_name = opts.output.not_nil!
-          end
+          options.binary_name = opts.output.not_nil! if opts.output
+          options.manifest_name = args.name.not_nil! if args.name
+          Dir.cd(opts.cd.not_nil!) if opts.cd
           Cli.compile options, opts.backtrace
         end
       end
       sub "compilerspec" do
         desc "run compiler specs"
-        usage "savi compilerspec [target] [options]"
+        usage "savi compilerspec [file] [options]"
         help short: "-h"
-        argument "target", type: String, required: true, desc: "savi.spec.md file to run"
+        argument "file", type: String, required: true, desc: "savi.spec.md file to run"
+        option "-b", "--backtrace", desc: "Show backtrace on error", type: Bool, default: true
         option "--print-perf", desc: "Print compiler performance info", type: Bool, default: false
+        option "-C", "--cd=DIR", desc: "Change the working directory"
         run do |opts, args|
           options = Savi::Compiler::CompilerOptions.new(
             print_perf: opts.print_perf,
           )
-          Cli.compilerspec args.target, options
+          Dir.cd(opts.cd.not_nil!) if opts.cd
+          Cli.compilerspec(args.file, options, backtrace: opts.backtrace)
         end
       end
       sub "format" do
@@ -125,7 +138,9 @@ module Savi
         help short: "-h"
         option "-c", "--check", desc: "Check for formatting issues without overwriting files", type: Bool, default: false
         option "-b", "--backtrace", desc: "Show backtrace on error", type: Bool, default: false
+        option "-C", "--cd=DIR", desc: "Change the working directory"
         run do |opts, args|
+          Dir.cd(opts.cd.not_nil!) if opts.cd
           Cli.format(check_only: opts.check, backtrace: opts.backtrace)
         end
       end
@@ -135,7 +150,9 @@ module Savi
         help short: "-h"
         argument "header", type: String, required: true, desc: "header file to parse"
         option "-b", "--backtrace", desc: "Show backtrace on error", type: Bool, default: false
+        option "-C", "--cd=DIR", desc: "Change the working directory"
         run do |opts, args|
+          Dir.cd(opts.cd.not_nil!) if opts.cd
           Cli.ffigen(header: args.header, backtrace: opts.backtrace)
         end
       end
@@ -183,14 +200,15 @@ module Savi
       end
     end
 
-    def self.compilerspec(target, options)
-      _add_backtrace true do
+    def self.compilerspec(target, options, backtrace)
+      _add_backtrace backtrace do
         spec = Savi::SpecMarkdown.new(target)
         result =
           case spec.target_pass
           when :format
             Savi::SpecMarkdown::Format.new(spec).verify!
           else
+            options.skip_manifest = true
             ctx = Savi.compiler.compile(spec.sources, spec.target_pass, options)
             spec.verify!(ctx)
           end
@@ -206,10 +224,12 @@ module Savi
       _add_backtrace backtrace do
         errors = [] of Error
         sources = Savi.compiler.source_service.get_recursive_sources(Dir.current)
+        options = Savi::Compiler::CompilerOptions.new
+        options.skip_manifest = true
 
         if check_only
           sources.each { |source_library, sources|
-            ctx = Savi.compiler.compile(sources, :import)
+            ctx = Savi.compiler.compile(sources, :manifests, options)
             AST::Format.check(ctx, ctx.root_library_link, ctx.root_docs)
             errors.concat(ctx.errors)
           }
@@ -217,7 +237,7 @@ module Savi
         else
           edited_count = 0
           sources.each { |source_library, sources|
-            ctx = Savi.compiler.compile(sources, :import)
+            ctx = Savi.compiler.compile(sources, :manifests, options)
             edits_by_doc =
               AST::Format.run(ctx, ctx.root_library_link, ctx.root_docs)
 

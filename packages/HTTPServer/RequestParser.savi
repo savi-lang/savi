@@ -1,5 +1,3 @@
-:import "ByteStream" (ByteStream.Reader)
-
 :enum HTTPServer.RequestParser.Token
   :const bit_width U8: 8 // TODO: the compiler should choose the smallest valid bit width by default if not explicitly specified
   :member HTTPServer.RequestParser.Token.Method: 0

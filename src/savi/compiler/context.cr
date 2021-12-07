@@ -1,7 +1,6 @@
 class Savi::Compiler::Context
   getter compiler : Compiler
   getter program
-  getter import
 
   getter classify
   getter code_gen
@@ -15,7 +14,9 @@ class Savi::Compiler::Context
   getter inventory
   getter jumps
   getter lifetime
+  getter load
   getter local
+  getter manifests
   getter namespace
   getter paint
   getter populate
@@ -59,13 +60,14 @@ class Savi::Compiler::Context
     @completeness = Completeness::Pass.new
     @eval = Eval.new
     @flow = Flow::Pass.new
-    @import = Import.new
     @infer = Infer::Pass.new
     @infer_edge = Infer::PassEdge.new
     @inventory = Inventory::Pass.new
     @jumps = Jumps::Pass.new
     @lifetime = Lifetime.new
+    @load = Load.new
     @local = Local::Pass.new
+    @manifests = Manifests.new
     @namespace = Namespace.new
     @paint = Paint.new
     @populate = Populate.new
@@ -96,9 +98,17 @@ class Savi::Compiler::Context
   end
 
   def root_library
-    @program.libraries[2]? || # after meta declarators and standard declarators
-    @program.libraries[1]? ||
-    @program.libraries[0]
+    # If we have already identified a root manifest, get the associated library.
+    root_manifest = @manifests.root
+    if root_manifest
+      source_library = Source::Library.for_manifest(root_manifest)
+      root = @program.libraries.find(&.source_library.==(source_library))
+      return root if root
+    end
+
+    @program.libraries[2]? || # initial manifest probe
+    @program.libraries[1]? || # standard declarators
+    @program.libraries[0]     # meta declarators
   end
 
   def root_library_link
@@ -112,6 +122,22 @@ class Savi::Compiler::Context
 
     # Otherwise go ahead and load the library.
     sources = compiler.source_service.get_library_sources(path)
+    docs = sources.map { |source| Parser.parse(source) }
+    compile_library(sources.first.library, docs)
+  end
+
+  def compile_manifests_at_path(path)
+    # Skip if we've already compiled at least one manifest at this same path.
+    return if @program.manifests.any?(&.name.pos.source.library.path.==(path))
+
+    # Otherwise go ahead and load the manifests.
+    sources = compiler.source_service.get_library_sources(path)
+    docs = sources.map { |source| Parser.parse(source) }
+    compile_library(sources.first.library, docs)
+  end
+
+  def compile_package(manifest : Packaging::Manifest)
+    sources = compiler.source_service.get_sources_for_manifest(self, manifest)
     docs = sources.map { |source| Parser.parse(source) }
     compile_library(sources.first.library, docs)
   end

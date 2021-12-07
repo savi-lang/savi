@@ -576,6 +576,7 @@ class Savi::Compiler::TypeCheck
         if call_func_link.type.is_abstract? \
         && call_func.cap.value == "non" \
         && call_func.body.nil? \
+        && !call_func.has_tag?(:compiler_intrinsic) \
         && call_mt.cap_only_inner == Infer::MetaType::Capability::NON
           ctx.error_at info,
             "This trait-defined `non` function can't be called directly", [

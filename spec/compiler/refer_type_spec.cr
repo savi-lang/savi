@@ -10,8 +10,8 @@ describe Savi::Compiler::ReferType do
         Greeting.greet(env)
     SOURCE
 
-    ctx1 = Savi.compiler.compile([source], :refer_type)
-    ctx2 = Savi.compiler.compile([source], :refer_type)
+    ctx1 = Savi.compiler.test_compile([source], :refer_type)
+    ctx2 = Savi.compiler.test_compile([source], :refer_type)
     ctx1.errors.should be_empty
     ctx2.errors.should be_empty
 

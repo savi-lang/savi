@@ -9,7 +9,7 @@ describe Savi::Compiler::Sugar do
         "this isn't the return value"
     SOURCE
 
-    ctx = Savi.compiler.compile([source], :sugar)
+    ctx = Savi.compiler.test_compile([source], :sugar)
     ctx.errors.should be_empty
 
     ctx.root_docs.first.to_a.should eq [:doc,
@@ -36,7 +36,7 @@ describe Savi::Compiler::Sugar do
     ]
 
     # Compiling again should yield an equivalent program tree:
-    ctx2 = Savi.compiler.compile([source], :sugar)
+    ctx2 = Savi.compiler.test_compile([source], :sugar)
     ctx.program.libraries.should eq ctx2.program.libraries
   end
 
@@ -48,7 +48,7 @@ describe Savi::Compiler::Sugar do
         x.y! = z
     SOURCE
 
-    ctx = Savi.compiler.compile([source], :sugar)
+    ctx = Savi.compiler.test_compile([source], :sugar)
     ctx.errors.should be_empty
 
     ctx.root_docs.first.to_a.should eq [:doc,
@@ -85,7 +85,7 @@ describe Savi::Compiler::Sugar do
     ]
 
     # Compiling again should yield an equivalent program tree:
-    ctx2 = Savi.compiler.compile([source], :sugar)
+    ctx2 = Savi.compiler.test_compile([source], :sugar)
     ctx.program.libraries.should eq ctx2.program.libraries
   end
 
@@ -97,7 +97,7 @@ describe Savi::Compiler::Sugar do
         x.y -= z
     SOURCE
 
-    ctx = Savi.compiler.compile([source], :sugar)
+    ctx = Savi.compiler.test_compile([source], :sugar)
     ctx.errors.should be_empty
 
     ctx.root_docs.first.to_a.should eq [:doc,
@@ -145,7 +145,7 @@ describe Savi::Compiler::Sugar do
     ]
 
     # Compiling again should yield an equivalent program tree:
-    ctx2 = Savi.compiler.compile([source], :sugar)
+    ctx2 = Savi.compiler.test_compile([source], :sugar)
     ctx.program.libraries.should eq ctx2.program.libraries
   end
 
@@ -156,7 +156,7 @@ describe Savi::Compiler::Sugar do
         x + y
     SOURCE
 
-    ctx = Savi.compiler.compile([source], :sugar)
+    ctx = Savi.compiler.test_compile([source], :sugar)
     ctx.errors.should be_empty
 
     ctx.root_docs.first.to_a.should eq [:doc,
@@ -177,7 +177,7 @@ describe Savi::Compiler::Sugar do
     ]
 
     # Compiling again should yield an equivalent program tree:
-    ctx2 = Savi.compiler.compile([source], :sugar)
+    ctx2 = Savi.compiler.test_compile([source], :sugar)
     ctx.program.libraries.should eq ctx2.program.libraries
   end
 
@@ -190,7 +190,7 @@ describe Savi::Compiler::Sugar do
         )
     SOURCE
 
-    ctx = Savi.compiler.compile([source], :sugar)
+    ctx = Savi.compiler.test_compile([source], :sugar)
     ctx.errors.should be_empty
 
     ctx.root_docs.first.to_a.should eq [:doc,
@@ -228,7 +228,7 @@ describe Savi::Compiler::Sugar do
     ]
 
     # Compiling again should yield an equivalent program tree:
-    ctx2 = Savi.compiler.compile([source], :sugar)
+    ctx2 = Savi.compiler.test_compile([source], :sugar)
     ctx.program.libraries.should eq ctx2.program.libraries
   end
 
@@ -239,7 +239,7 @@ describe Savi::Compiler::Sugar do
         x[y]
     SOURCE
 
-    ctx = Savi.compiler.compile([source], :sugar)
+    ctx = Savi.compiler.test_compile([source], :sugar)
     ctx.errors.should be_empty
 
     ctx.root_docs.first.to_a.should eq [:doc,
@@ -259,7 +259,7 @@ describe Savi::Compiler::Sugar do
     ]
 
     # Compiling again should yield an equivalent program tree:
-    ctx2 = Savi.compiler.compile([source], :sugar)
+    ctx2 = Savi.compiler.test_compile([source], :sugar)
     ctx.program.libraries.should eq ctx2.program.libraries
   end
 
@@ -272,7 +272,7 @@ describe Savi::Compiler::Sugar do
         x.call(y)[y].call(z)[z]
     SOURCE
 
-    ctx = Savi.compiler.compile([source], :sugar)
+    ctx = Savi.compiler.test_compile([source], :sugar)
     ctx.errors.should be_empty
 
     ctx.root_docs.first.to_a.should eq [:doc,
@@ -356,7 +356,7 @@ describe Savi::Compiler::Sugar do
     ]
 
     # Compiling again should yield an equivalent program tree:
-    ctx2 = Savi.compiler.compile([source], :sugar)
+    ctx2 = Savi.compiler.test_compile([source], :sugar)
     ctx.program.libraries.should eq ctx2.program.libraries
   end
 
@@ -367,7 +367,7 @@ describe Savi::Compiler::Sugar do
         x[y] = z
     SOURCE
 
-    ctx = Savi.compiler.compile([source], :sugar)
+    ctx = Savi.compiler.test_compile([source], :sugar)
     ctx.errors.should be_empty
 
     ctx.root_docs.first.to_a.should eq [:doc,
@@ -394,7 +394,7 @@ describe Savi::Compiler::Sugar do
     ]
 
     # Compiling again should yield an equivalent program tree:
-    ctx2 = Savi.compiler.compile([source], :sugar)
+    ctx2 = Savi.compiler.test_compile([source], :sugar)
     ctx.program.libraries.should eq ctx2.program.libraries
   end
 
@@ -405,7 +405,7 @@ describe Savi::Compiler::Sugar do
         x = 1
     SOURCE
 
-    ctx = Savi.compiler.compile([source], :sugar)
+    ctx = Savi.compiler.test_compile([source], :sugar)
     ctx.errors.should be_empty
 
     ctx.root_docs.first.to_a.should eq [:doc,
@@ -423,7 +423,7 @@ describe Savi::Compiler::Sugar do
     ]
 
     # Compiling again should yield an equivalent program tree:
-    ctx2 = Savi.compiler.compile([source], :sugar)
+    ctx2 = Savi.compiler.test_compile([source], :sugar)
     ctx.program.libraries.should eq ctx2.program.libraries
   end
 
@@ -434,7 +434,7 @@ describe Savi::Compiler::Sugar do
         @y.after
     SOURCE
 
-    ctx = Savi.compiler.compile([source], :sugar)
+    ctx = Savi.compiler.test_compile([source], :sugar)
     ctx.errors.should be_empty
 
     ctx.root_docs.first.to_a.should eq [:doc,
@@ -474,7 +474,7 @@ describe Savi::Compiler::Sugar do
     ]
 
     # Compiling again should yield an equivalent program tree:
-    ctx2 = Savi.compiler.compile([source], :sugar)
+    ctx2 = Savi.compiler.test_compile([source], :sugar)
     ctx.program.libraries.should eq ctx2.program.libraries
   end
 
@@ -485,7 +485,7 @@ describe Savi::Compiler::Sugar do
         w && x || y && !z
     SOURCE
 
-    ctx = Savi.compiler.compile([source], :sugar)
+    ctx = Savi.compiler.test_compile([source], :sugar)
     ctx.errors.should be_empty
 
     ctx.root_docs.first.to_a.should eq [:doc,
@@ -535,7 +535,7 @@ describe Savi::Compiler::Sugar do
     ]
 
     # Compiling again should yield an equivalent program tree:
-    ctx2 = Savi.compiler.compile([source], :sugar)
+    ctx2 = Savi.compiler.test_compile([source], :sugar)
     ctx.program.libraries.should eq ctx2.program.libraries
   end
 end

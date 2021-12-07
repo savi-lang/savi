@@ -1,5 +1,3 @@
-:import "Spec"
-
 :class ByteStreamChunkedReaderSpec
   :is Spec
   :const describes: "ByteStream.ChunkedReader"

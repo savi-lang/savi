@@ -1,0 +1,17 @@
+:module ReflectionSpec
+  :fun run(test MicroTest)
+    test["reflection_of_type.string String"].pass =
+      (reflection_of_type "example").string == "String"
+    test["reflection_of_type.string String'ref"].pass =
+      (reflection_of_type String.new).string == "String'ref"
+    test["reflection_of_type.string Array(U8)"].pass =
+      (reflection_of_type Array(U8).new).string == "Array(U8)"
+
+    test["reflection_of_runtime_type_name U64"].pass =
+      reflection_of_runtime_type_name U64[0] == "U64"
+    string_or_none (String'ref | None) = None
+    test["reflection_of_runtime_type_name None"].pass =
+      reflection_of_runtime_type_name string_or_none == "None"
+    string_or_none = String.new
+    test["reflection_of_runtime_type_name String"].pass =
+      reflection_of_runtime_type_name string_or_none == "String"

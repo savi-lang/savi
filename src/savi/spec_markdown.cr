@@ -4,7 +4,7 @@ class Savi::SpecMarkdown
 
   def initialize(path : String)
     @filename = File.basename(path)
-    @source_library = Source::Library.new("(compiler-spec)")
+    @source_library = Source::Library.new("(compiler-spec)", "main")
     @raw_content = File.read(path)
   end
 

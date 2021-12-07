@@ -1,0 +1,15 @@
+:actor Main
+  :new (env)
+    Spec.Process.run(env, [
+      Spec.Run(ArraySpec).new(env)
+      Spec.Run(BitArraySpec).new(env)
+      Spec.Run(BoolSpec).new(env)
+      Spec.Run(BytesSpec).new(env)
+      Spec.Run(CountSpec).new(env)
+      Spec.Run(CPointerSpec).new(env)
+      Spec.Run(IndexableSpec).new(env)
+      Spec.Run(InspectSpec).new(env)
+      Spec.Run(NumericSpec).new(env)
+      Spec.Run(PlatformSpec).new(env)
+      Spec.Run(StringSpec).new(env)
+    ])

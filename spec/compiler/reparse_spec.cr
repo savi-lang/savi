@@ -6,7 +6,7 @@ describe Savi::Compiler::Reparse do
         x.call(y).call(z)
     SOURCE
 
-    ctx = Savi.compiler.compile([source], :reparse)
+    ctx = Savi.compiler.test_compile([source], :reparse)
     ctx.errors.should be_empty
 
     ctx.root_docs.first.to_a.should eq [:doc,
@@ -43,7 +43,7 @@ describe Savi::Compiler::Reparse do
     ]
 
     # Compiling again should yield an equivalent program tree:
-    ctx2 = Savi.compiler.compile([source], :reparse)
+    ctx2 = Savi.compiler.test_compile([source], :reparse)
     ctx.program.libraries.should eq ctx2.program.libraries
   end
 
@@ -57,7 +57,7 @@ describe Savi::Compiler::Reparse do
         @x(y) -> (True)
     SOURCE
 
-    ctx = Savi.compiler.compile([source], :reparse)
+    ctx = Savi.compiler.test_compile([source], :reparse)
     ctx.errors.should be_empty
 
     ctx.root_docs.first.to_a.should eq [:doc,
@@ -105,7 +105,7 @@ describe Savi::Compiler::Reparse do
     ]
 
     # Compiling again should yield an equivalent program tree:
-    ctx2 = Savi.compiler.compile([source], :reparse)
+    ctx2 = Savi.compiler.test_compile([source], :reparse)
     ctx.program.libraries.should eq ctx2.program.libraries
   end
 end

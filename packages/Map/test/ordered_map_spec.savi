@@ -1,5 +1,3 @@
-:import "Spec"
-
 :class OrderedMapSpec
   :is Spec
   :const describes: "Map.Ordered"

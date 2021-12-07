@@ -1,5 +1,3 @@
-:import "Spec"
-
 :class MapReadableSpec
   :is Spec
   :const describes: "Map.Readable"

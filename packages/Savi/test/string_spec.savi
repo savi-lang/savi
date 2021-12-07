@@ -1,0 +1,268 @@
+:class StringSpec
+  :is Spec
+  :const describes: "String"
+
+  :it "starts with zero space and a null pointer by default"
+    data = String.new
+    assert: data.space == 0
+    assert: data.size == 0
+    assert: data.cpointer.is_null
+
+  :it "allocates the next highest power of two containing the requested space"
+    data = String.new(12)
+    assert: data.space == 16
+    assert: data.size == 0
+    assert: data.cpointer.is_not_null
+
+    data = String.new(16)
+    assert: data.space == 16
+    assert: data.size == 0
+    assert: data.cpointer.is_not_null
+
+    data = String.new(17)
+    assert: data.space == 32
+    assert: data.size == 0
+    assert: data.cpointer.is_not_null
+
+  :it "won't reallocate when reserving space within the current allocation"
+    data = String.new(12)
+    orig_pointer_address = data.cpointer.usize
+
+    data.reserve(16)
+    assert: data.space == 16
+    assert: data.size == 0
+    assert: data.cpointer.is_not_null
+    assert: data.cpointer.usize == orig_pointer_address
+
+    data.reserve(0)
+    assert: data.space == 16
+    assert: data.size == 0
+    assert: data.cpointer.is_not_null
+    assert: data.cpointer.usize == orig_pointer_address
+
+  :it "will reallocate when reserving space beyond the current allocation"
+    data = String.new(12)
+    orig_pointer_address = data.cpointer.usize
+
+    // Go to a much larger size in a different allocator pool,
+    // to ensure that we actually get a new pointer address.
+    data.reserve(2040)
+
+    assert: data.space == 2048
+    assert: data.size == 0
+    assert: data.cpointer.is_not_null
+    assert: data.cpointer.usize != orig_pointer_address
+
+  :it "converts to and from an array of bytes"
+    assert: "string".as_array == ['s', 't', 'r', 'i', 'n', 'g']
+    assert: String.from_array("string".as_array) == "string"
+
+  :it "converts to and from a byte string"
+    assert: "string".as_bytes == b"string"
+    assert: String.from_bytes(b"string") == "string"
+
+  :it "compares bytewise equality with another string"
+    assert: ("string" == "string")
+    assert: ("string" == "other").is_false
+
+  :it "checks if it starts with a substring equal to the other string"
+    assert: "foo".starts_with("foo")
+    assert: "foo".starts_with("food").is_false
+    assert: "food".starts_with("foo")
+    assert: "barfood".starts_with("foo").is_false
+    assert: "barfood".starts_with("barf")
+    assert: "barfood".starts_with("")
+
+  :it "checks if it ends with a substring equal to the other string"
+    assert: "food".ends_with("foo").is_false
+    assert: "foo".ends_with("foo")
+    assert: "foo".ends_with("food").is_false
+    assert: "snafoo".ends_with("foo")
+    assert: "snafoozled".ends_with("foo").is_false
+    assert: "snafoozled".ends_with("")
+
+  :it "checks if it has a common bytes with another string at specific offsets"
+    assert: "foodbar".is_byte_slice_equal(1, b"broodbard", 2, 6)
+    assert: "foodbar".is_byte_slice_equal(1, b"broodbard", 2, 5)
+    assert: "foodbar".is_byte_slice_equal(2, b"broodbard", 2, 5).is_false
+    assert: "foodbar".is_byte_slice_equal(1, b"broodbard", 2, 7).is_false
+    assert: "foodbar".is_byte_slice_equal(1, b"broodbard", 1, 6).is_false
+    assert: "foodbar".is_byte_slice_equal(0, b"broodbard", 1, 6).is_false
+    assert: "broodbard".is_byte_slice_equal(2, b"foodbar", 1, 6)
+    assert: "broodbard".is_byte_slice_equal(2, b"foodbar", 1, 5)
+    assert: "broodbard".is_byte_slice_equal(2, b"foodbar", 2, 5).is_false
+    assert: "broodbard".is_byte_slice_equal(2, b"foodbar", 1, 7).is_false
+    assert: "broodbard".is_byte_slice_equal(1, b"foodbar", 1, 6).is_false
+    assert: "broodbard".is_byte_slice_equal(1, b"foodbar", 0, 6).is_false
+
+  :it "checks if it is an empty string or not"
+    assert: "".is_empty
+    assert: "".is_not_empty.is_false
+    assert: "example".is_empty.is_false
+    assert: "example".is_not_empty
+    assert: String.new.is_empty
+    assert: String.new.is_not_empty.is_false
+    assert: (String.new << "example").is_empty.is_false
+    assert: (String.new << "example").is_not_empty
+
+  :it "clones itself into a new string"
+    string String = "example"
+    assert: string.clone == "example"
+
+  :it "finds the index of another substring within it"
+    assert: "bar food foo".offset_of!("foo") == 4
+    assert error: "bar food foo".offset_of!("bard")
+    assert error: "bar food foo".offset_of!("nope")
+    assert error: "bar food foo".offset_of!("")
+    assert: "bar food foo".includes("foo")
+    assert: "bar food foo".includes("bard").is_false
+    assert: "bar food foo".includes("nope").is_false
+    assert: "bar food foo".includes("").is_false
+
+  :it "hashes the bytes of the string"
+    assert: ("string".hash == 0x4CF51F4A5B5CF110)
+
+  :it "returns the byte at the given byte offset"
+    assert: "example"[3]! == 'm'
+    assert error: "example"[7]!
+
+  :it "trims bytes off the start and end of the string"
+    assert: "example".trim(2)      == "ample"
+    assert: "example".trim(3,  -2) == "mp"
+    assert: "example".trim(7)      == ""
+    assert: "example".trim(5,   4) == ""
+    assert: "example".trim(-5, -2) == "amp"
+    assert: "example".trim(-5,  5) == "amp"
+
+  :it "trims a mutable string in place with the same semantics"
+    assert: "example".clone.trim_in_place(2)      == "ample"
+    assert: "example".clone.trim_in_place(3,  -2) == "mp"
+    assert: "example".clone.trim_in_place(7)      == ""
+    assert: "example".clone.trim_in_place(5,   4) == ""
+    assert: "example".clone.trim_in_place(-5, -2) == "amp"
+    assert: "example".clone.trim_in_place(-5,  5) == "amp"
+
+  :it "pushes a new byte onto the end of the string"
+    assert: String.new.push_byte('o').push_byte('k') == "ok"
+
+  :it "yields each byte in the string"
+    string Array(U8) = []
+    "foo".each_byte -> (byte | string << byte)
+    assert: string == ['f', 'o', 'o']
+
+  :it "yields each byte in the string, along with the index"
+    string_a Array(U8) = []
+    string_b Array(USize) = []
+    "yo".each_byte_with_index -> (byte, index |
+      string_a << byte
+      string_b << index
+    )
+    assert: string_a == ['y', 'o']
+    assert: string_b == [0, 1]
+
+  :it "copies bytes from the given string onto the end of the string"
+    assert: (String.new << "foo" << "" << "bar") == "foobar"
+
+  :it "creates a multiplicit copy of the string"
+    assert: ("Hey" * 3) == "HeyHeyHey"
+    assert: ("Hey" * 1) == "Hey"
+    assert: ("Hey" * 0) == ""
+
+  :it "splits the string at every occurrence of the given byte value"
+    assert: "foo.bar.baz".split('.') == ["foo", "bar", "baz"]
+    assert: "foo.".split('.') == ["foo"]
+    assert: ".foo".split('.') == ["", "foo"]
+    assert: ".foo.".split('.') == ["", "foo"]
+    assert: ".foo..".split('.') == ["", "foo", ""]
+    assert: "".split('.') == Array(String).new // TODO: empty array literal
+    assert: ".".split('.') == [""] // FIXME? different from Ruby: []
+
+  :it "lexically compares the string with another string of the same length"
+    assert: "examplE" < "example"
+    assert: "example" > "examplE"
+    assert: ("example" < "examplE").is_false
+    assert: ("examplE" > "example").is_false
+    assert: "examplE" <= "example"
+    assert: "example" >= "examplE"
+    assert: ("example" <= "examplE").is_false
+    assert: ("examplE" >= "example").is_false
+
+  :it "lexically compares the string with an identical string"
+    assert: ("example" < "example").is_false
+    assert: ("example" > "example").is_false
+    assert: "example" <= "example"
+    assert: "example" >= "example"
+
+  :it "lexically compares with a nearly identical string of different length"
+    assert: "example" < "example!"
+    assert: "example!" > "example"
+    assert: ("example!" < "example").is_false
+    assert: ("example" > "example!").is_false
+    assert: "example" <= "example!"
+    assert: "example!" >= "example"
+    assert: ("example!" <= "example").is_false
+    assert: ("example" >= "example!").is_false
+
+  :it "parses an integer from the string decimal representation"
+    assert: "36".parse_i64!  == 36
+    assert: "+36".parse_i64! == 36
+    assert: "-36".parse_i64! == -36
+    assert error: "36bad".parse_i64!
+
+  :it "returns the unicode codepoint found at the given offset, if valid"
+    string = "नमस्ते"
+    assert: string.char_at!(0) == 'न' // valid
+    assert: string.char_at!(1) == '�' // invalid
+    assert: string.char_at!(2) == '�' // invalid
+    assert: string.char_at!(3) == 'म' // valid
+    assert: string.char_at!(4) == '�' // invalid
+    assert: string.char_at!(5) == '�' // invalid
+    assert: string.char_at!(6) == 'स' // valid
+    assert: string.char_at!(7) == '�' // invalid
+    assert: string.char_at!(8) == '�' // invalid
+    assert: string.char_at!(9) == '्' // valid (diacritic)
+    assert: string.char_at!(10) == '�' // invalid
+    assert: string.char_at!(11) == '�' // invalid
+    assert: string.char_at!(12) == 'त' // valid
+    assert: string.char_at!(13) == '�' // invalid
+    assert: string.char_at!(14) == '�' // invalid
+    assert: string.char_at!(15) == 'े' // valid (diacritic)
+    assert: string.char_at!(16) == '�' // invalid
+    assert: string.char_at!(17) == '�' // invalid
+    assert error: string.char_at!(18) // out of bounds
+
+  :it "iterates over unicode codepoints with starting indices and byte widths"
+    codepoints Array(U32) = []
+    indices Array(USize) = []
+    widths Array(USize) = []
+    "\"नमस्ते!\"".each_char_with_index_and_width -> (codepoint, index, width |
+      codepoints << codepoint
+      indices << index
+      widths << width
+    )
+    assert: codepoints == ['"', 'न', 'म', 'स', '्', 'त', 'े', '!', '"']
+    assert: indices    == [0,    1,   4,   7,  10,  13,  16,  19,  20]
+    assert: widths     == [1,    3,   3,   3,   3,   3,   3,   1,   1]
+
+  :it "joins an array of strings"
+    assert: String.join([
+      "foo"
+      "bar"
+    ]) == "foobar"
+
+    assert: String.join([
+      "foo"
+      "bar"
+    ], " ") == "foo bar"
+
+  :it "splits a string into a pair"
+    assert: "foo=bar".split2!('=').first  == "foo"
+    assert: "foo=bar".split2!('=').second == "bar"
+
+    assert: "foo=bar=baz".split2!('=').first  == "foo"
+    assert: "foo=bar=baz".split2!('=').second == "bar=baz"
+
+    assert: "foo=".split2!('=').first == "foo"
+    assert: "foo=".split2!('=').second == ""
+
+    assert error: "foo".split2!('=')

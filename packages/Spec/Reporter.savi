@@ -1,5 +1,3 @@
-:import "Map" (Map.Ordered)
-
 :trait Spec.Reporter
   :fun ref spec_began(spec String): None
   :fun ref spec_ended(spec String): None

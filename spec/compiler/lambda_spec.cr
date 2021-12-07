@@ -6,7 +6,7 @@ describe Savi::Compiler::Lambda do
         apple = ^(Fruit.new("apple").flavor)
     SOURCE
 
-    ctx = Savi.compiler.compile([source], :lambda)
+    ctx = Savi.compiler.test_compile([source], :lambda)
     ctx.errors.should be_empty
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "thunk")
@@ -41,7 +41,7 @@ describe Savi::Compiler::Lambda do
         apple = ^(Fruit.new(^1, ^2).flavor)
     SOURCE
 
-    ctx = Savi.compiler.compile([source], :lambda)
+    ctx = Savi.compiler.test_compile([source], :lambda)
     ctx.errors.should be_empty
 
     func = ctx.namespace.find_func!(ctx, source, "Example", "lambdas")
@@ -86,7 +86,7 @@ describe Savi::Compiler::Lambda do
                 ^~
     MSG
 
-    Savi.compiler.compile([source], :lambda)
+    Savi.compiler.test_compile([source], :lambda)
       .errors.map(&.message).join("\n").should eq expected
   end
 end

@@ -24,6 +24,9 @@ class Savi::Compiler::Namespace
   end
 
   def initialize
+    @types_by_package_name = Hash(String, Hash(String,
+      Program::Type::Link | Program::TypeAlias::Link | Program::TypeWithValue::Link
+    )).new
     @types_by_library = Hash(Program::Library::Link, Hash(String,
       Program::Type::Link | Program::TypeAlias::Link | Program::TypeWithValue::Link
     )).new
@@ -62,13 +65,19 @@ class Savi::Compiler::Namespace
     ctx.program.libraries.each do |library|
       @source_analyses.each do |source, source_analysis|
         next unless source.library == library.source_library
+
         source_analysis.types.merge!(@types_by_library[library.make_link])
       end
     end
 
-    # Every source file has access to all explicitly imported types.
-    ctx.program.libraries.flat_map(&.imports).each do |import|
-      add_imported_types_to_source(ctx, import)
+    # Every source file has access to types loaded via its package manifest.
+    unless ctx.options.skip_manifest
+      @source_analyses.each { |source, source_analysis|
+        manifest = ctx.manifests.manifests_by_name[source.library.name]? || \
+          ctx.manifests.root.not_nil!
+
+        add_dependencies_to_source(ctx, source, source_analysis, manifest)
+      }
     end
   end
 
@@ -86,7 +95,7 @@ class Savi::Compiler::Namespace
   end
 
   def core_savi_library_link(ctx)
-    Program::Library::Link.new(ctx.compiler.source_service.core_savi_library_path)
+    Program::Library::Link.new(ctx.compiler.source_service.core_savi_library_path, nil)
   end
 
   # When given a String name, try to find the type in the core_savi library.
@@ -116,6 +125,12 @@ class Savi::Compiler::Namespace
   private def add_type_to_library(ctx, new_type, library)
     name = new_type.ident.value
 
+    package_name = library.source_library.name
+    if package_name
+      package_types = @types_by_package_name[package_name] ||= Hash(String,
+        Program::Type::Link | Program::TypeAlias::Link | Program::TypeWithValue::Link
+      ).new
+    end
     types = @types_by_library[library.make_link] ||= Hash(String,
       Program::Type::Link | Program::TypeAlias::Link | Program::TypeWithValue::Link
     ).new
@@ -129,6 +144,7 @@ class Savi::Compiler::Namespace
         ]
     end
 
+    package_types[name] = new_type.make_link(library) if package_types
     types[name] = new_type.make_link(library)
   end
 
@@ -161,6 +177,27 @@ class Savi::Compiler::Namespace
 
       source_analysis.types[name] = new_type_link
     end
+  end
+
+  private def add_dependencies_to_source(ctx, source, source_analysis, manifest)
+    manifest.dependencies.each { |dep|
+      next if dep.transitive?
+
+      @types_by_package_name[dep.name.value].each { |name, new_type_link|
+        new_type = new_type_link.resolve(ctx)
+        next if new_type.has_tag?(:private)
+
+        already_type = source_analysis.types[name]?.try(&.resolve(ctx))
+        if already_type
+          Error.at already_type.ident.pos,
+            "This type's name conflicts with a type defined in another package", [
+              {new_type.ident.pos, "the imported type is defined here"},
+            ]
+        end
+
+        source_analysis.types[name] = new_type_link
+      }
+    }
   end
 
   private def add_imported_types_to_source(ctx, import)

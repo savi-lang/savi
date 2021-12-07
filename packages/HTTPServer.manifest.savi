@@ -1,0 +1,11 @@
+:manifest lib HTTPServer
+  :sources "HTTPServer/*.savi"
+
+  :dependency ByteStream "TODO: specify version"
+
+:manifest "spec-HTTPServer"
+  :copies HTTPServer
+  :sources "HTTPServer/test/*.savi"
+
+  :dependency Spec "TODO: specify version"
+  :transitive dependency Map "TODO: specify version"
