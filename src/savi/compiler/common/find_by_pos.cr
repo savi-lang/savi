@@ -4,14 +4,14 @@ class Savi::Compiler::Common::FindByPos < Savi::AST::Visitor
   # When found, returns the instance of this class with the reverse_path filled.
   # When not found, returns nil.
   def self.find(ctx : Context, pos : Source::Pos)
-    ctx.program.libraries.each do |library|
-      library.types.each do |t|
+    ctx.program.packages.each do |package|
+      package.types.each do |t|
         next unless t.ident.pos.source == pos.source
 
         t.functions.each do |f|
           next unless f.ident.pos.source == pos.source
 
-          found = find_within(ctx, pos, library, t, f, f.ast)
+          found = find_within(ctx, pos, package, t, f, f.ast)
           return found if found
         end
       end
@@ -23,7 +23,7 @@ class Savi::Compiler::Common::FindByPos < Savi::AST::Visitor
   def self.find_within(
     ctx : Context,
     pos : Source::Pos,
-    library : Program::Library,
+    package : Program::Package,
     t : Program::Type?,
     f : Program::Function?,
     node : AST::Node,
@@ -38,7 +38,7 @@ class Savi::Compiler::Common::FindByPos < Savi::AST::Visitor
     # and we can just use the normal pos to zero in on the point.
     return unless node.span_pos(pos.source).contains?(pos)
 
-    t_link = t.try(&.make_link(library))
+    t_link = t.try(&.make_link(package))
     f_link = f.try(&.make_link(t_link.not_nil!))
 
     visitor = new(pos, t_link, f_link)

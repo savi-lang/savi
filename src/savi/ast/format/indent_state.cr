@@ -30,8 +30,8 @@ class Savi::AST::Format::IndentState
     end
   end
 
-  def initialize(library : Program::Library::Link, doc : AST::Document)
-    @library = library
+  def initialize(package : Program::Package::Link, doc : AST::Document)
+    @package = package
     @indent_stack = [Layer.new(nil, doc, 0)]
     @current_declare_indent = 0
     @next_indent_row = 0

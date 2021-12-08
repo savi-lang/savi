@@ -228,18 +228,18 @@ module Savi
         options.skip_manifest = true
 
         if check_only
-          sources.each { |source_library, sources|
+          sources.each { |source_package, sources|
             ctx = Savi.compiler.compile(sources, :manifests, options)
-            AST::Format.check(ctx, ctx.root_library_link, ctx.root_docs)
+            AST::Format.check(ctx, ctx.root_package_link, ctx.root_docs)
             errors.concat(ctx.errors)
           }
           puts "Checked #{sources.size} files."
         else
           edited_count = 0
-          sources.each { |source_library, sources|
+          sources.each { |source_package, sources|
             ctx = Savi.compiler.compile(sources, :manifests, options)
             edits_by_doc =
-              AST::Format.run(ctx, ctx.root_library_link, ctx.root_docs)
+              AST::Format.run(ctx, ctx.root_package_link, ctx.root_docs)
 
             edits_by_doc.each { |doc, edits|
               source = doc.pos.source

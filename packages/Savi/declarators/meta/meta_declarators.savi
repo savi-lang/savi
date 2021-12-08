@@ -35,7 +35,7 @@
 
 :: Define a new kind of declaration that can be made in Savi source code.
 ::
-:: Any library can define new custom declarators, which can be used for
+:: Any package can define new custom declarators, which can be used for
 :: domain-specific languages, reducing repetition, or general meta-programming.
 ::
 :: Declarations in Savi source code are evaluated by an interpreter that
@@ -61,7 +61,7 @@
 ::
 :: Once all requirements are satisfied, the declaration has found a matching
 :: declarator, and the declarator evaluates the declaration to generate some
-:: effect on the library's scope, such as generating new types or methods in it.
+:: effect on the package's scope, such as generating new types or methods in it.
 :declarator declarator
   :intrinsic
   :begins declarator

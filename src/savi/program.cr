@@ -1,26 +1,26 @@
 class Savi::Program
-  getter libraries = [] of Library
+  getter packages = [] of Package
   getter manifests = [] of Packaging::Manifest
-  property meta_declarators : Library?
-  property standard_declarators : Library?
+  property meta_declarators : Package?
+  property standard_declarators : Package?
 
   def initialize
   end
 
-  # TODO: Remove these aliases and make passes work at the library level
-  def imports; libraries.flat_map(&.imports) end
-  def types;   libraries.flat_map(&.types)   end
-  def aliases; libraries.flat_map(&.aliases) end
+  # TODO: Remove these aliases and make passes work at the package level
+  def imports; packages.flat_map(&.imports) end
+  def types;   packages.flat_map(&.types)   end
+  def aliases; packages.flat_map(&.aliases) end
 
-  class Library
+  class Package
     getter types : Array(Type)
     getter aliases
     getter enum_members
     getter imports
     getter declarators
-    getter source_library : Source::Library
+    getter source_package : Source::Package
 
-    def initialize(@source_library)
+    def initialize(@source_package)
       @types = [] of Type
       @aliases = [] of TypeAlias
       @enum_members = [] of TypeWithValue
@@ -40,8 +40,8 @@ class Savi::Program
     end
 
     def ==(other)
-      return false unless other.is_a?(Library)
-      return false unless @source_library == other.source_library
+      return false unless other.is_a?(Package)
+      return false unless @source_package == other.source_package
       return false unless @types == other.types
       return false unless @aliases == other.aliases
       return false unless @enum_members == other.enum_members
@@ -69,7 +69,7 @@ class Savi::Program
     end
 
     def make_link
-      Link.new(source_library.path, source_library.name)
+      Link.new(source_package.path, source_package.name)
     end
 
     struct Link
@@ -78,8 +78,8 @@ class Savi::Program
       def initialize(@path, @name)
       end
       def resolve(ctx : Compiler::Context)
-        source_library = Source::Library.new(@path, @name)
-        ctx.program.libraries.find(&.source_library.==(source_library)).not_nil!
+        source_package = Source::Package.new(@path, @name)
+        ctx.program.packages.find(&.source_package.==(source_package)).not_nil!
       end
       def show
         path
@@ -135,23 +135,23 @@ class Savi::Program
       false # not implemented
     end
 
-    def make_link(library : Library)
-      make_link(library.make_link)
+    def make_link(package : Package)
+      make_link(package.make_link)
     end
-    def make_link(library : Library::Link)
-      Link.new(library, ident.value)
+    def make_link(package : Package::Link)
+      Link.new(package, ident.value)
     end
 
     struct Link
-      getter library : Library::Link
+      getter package : Package::Link
       getter name : String
-      def initialize(@library, @name)
+      def initialize(@package, @name)
       end
       def resolve(ctx : Compiler::Context)
-        @library.resolve(ctx).aliases.find(&.ident.value.==(@name)).not_nil!
+        @package.resolve(ctx).aliases.find(&.ident.value.==(@name)).not_nil!
       end
       def show
-        "#{library.show} #{name}"
+        "#{package.show} #{name}"
       end
     end
   end
@@ -184,23 +184,23 @@ class Savi::Program
       false # not implemented
     end
 
-    def make_link(library : Library)
-      make_link(library.make_link)
+    def make_link(package : Package)
+      make_link(package.make_link)
     end
-    def make_link(library : Library::Link)
-      Link.new(library, ident.value)
+    def make_link(package : Package::Link)
+      Link.new(package, ident.value)
     end
 
     struct Link
-      getter library : Library::Link
+      getter package : Package::Link
       getter name : String
-      def initialize(@library, @name)
+      def initialize(@package, @name)
       end
       def resolve(ctx : Compiler::Context)
-        @library.resolve(ctx).enum_members.find(&.ident.value.==(@name)).not_nil!
+        @package.resolve(ctx).enum_members.find(&.ident.value.==(@name)).not_nil!
       end
       def show
-        "#{library.show} #{name}"
+        "#{package.show} #{name}"
       end
     end
   end
@@ -367,15 +367,15 @@ class Savi::Program
       term.is_a?(AST::Identifier) && term.value == "True"
     end
 
-    def make_link(library : Library)
-      make_link(library.make_link)
+    def make_link(package : Package)
+      make_link(package.make_link)
     end
-    def make_link(library : Library::Link)
-      Link.new(library, ident.value, cap.value, is_concrete?, ignores_cap?)
+    def make_link(package : Package::Link)
+      Link.new(package, ident.value, cap.value, is_concrete?, ignores_cap?)
     end
 
     struct Link
-      getter library : Library::Link
+      getter package : Package::Link
       getter name : String
       getter cap : String # TODO: remove this? need to refactor MetaType.new and MetaType#inspect
       getter concrete : Bool # TODO: remove this? need to refactor MetaType#is_concrete?
@@ -383,17 +383,17 @@ class Savi::Program
       def is_concrete?; concrete; end
       def is_abstract?; !concrete; end
       def ignores_cap?; ignores_cap; end
-      def initialize(@library, @name, @cap, @concrete, @ignores_cap)
+      def initialize(@package, @name, @cap, @concrete, @ignores_cap)
       end
       def resolve(ctx : Compiler::Context)
-        @library.resolve(ctx).types.find(&.ident.value.==(@name)).not_nil!
+        @package.resolve(ctx).types.find(&.ident.value.==(@name)).not_nil!
       end
       # This should be used only in testing.
       def make_func_link_simple(name : String)
         Function::Link.new(self, name, nil)
       end
       def show
-        "#{library.show} #{name}"
+        "#{package.show} #{name}"
       end
     end
   end
@@ -497,8 +497,8 @@ class Savi::Program
       params.try { |group| group.terms.size } || 0
     end
 
-    def make_link(library_or_link, type : Type)
-      make_link(type.make_link(library_or_link))
+    def make_link(package_or_link, type : Type)
+      make_link(type.make_link(package_or_link))
     end
     def make_link(type : Type::Link)
       hygienic_id = hash if has_tag?(:hygienic)

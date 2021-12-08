@@ -44,7 +44,7 @@ describe Savi::Compiler::Reparse do
 
     # Compiling again should yield an equivalent program tree:
     ctx2 = Savi.compiler.test_compile([source], :reparse)
-    ctx.program.libraries.should eq ctx2.program.libraries
+    ctx.program.packages.should eq ctx2.program.packages
   end
 
   it "transforms an @-prefixed identifier into a method call of @" do
@@ -106,6 +106,6 @@ describe Savi::Compiler::Reparse do
 
     # Compiling again should yield an equivalent program tree:
     ctx2 = Savi.compiler.test_compile([source], :reparse)
-    ctx.program.libraries.should eq ctx2.program.libraries
+    ctx.program.packages.should eq ctx2.program.packages
   end
 end

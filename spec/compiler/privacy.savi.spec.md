@@ -2,7 +2,7 @@
 pass: privacy
 ---
 
-It complains when calling a private method on a core Savi library type:
+It complains when calling a private method on a core Savi package type:
 
 ```savi
     Env._create
@@ -12,14 +12,14 @@ This function call breaks privacy boundaries:
     Env._create
         ^~~~~~~
 
-- this is a private function from another library:
+- this is a private function from another package:
   :new val _create(
            ^~~~~~~
 ```
 
 ---
 
-TODO: It won't allow an interface in the local library to circumvent
+TODO: It won't allow an interface in the local package to circumvent
 
 ---
 

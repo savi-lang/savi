@@ -28,14 +28,14 @@ class Savi::Compiler::Lambda < Savi::AST::CopyOnMutateVisitor
     end
   end
 
-  def self.run(ctx, library)
-    orig_library = library
+  def self.run(ctx, package)
+    orig_package = package
     new_types = [] of Program::Type
 
     loop do
-      library = library.types_map_cow do |t|
+      package = package.types_map_cow do |t|
         t.functions_map_cow do |f|
-          cached_or_run library, t, f do
+          cached_or_run package, t, f do
             visitor = new(t, f)
             f = visitor.run(ctx)
             new_types.concat(visitor.new_types)
@@ -46,16 +46,16 @@ class Savi::Compiler::Lambda < Savi::AST::CopyOnMutateVisitor
 
       break if new_types.empty?
 
-      library = library.dup if library == orig_library
+      package = package.dup if package == orig_package
       new_types.each do |lambda_type|
-        library.types << lambda_type
-        ctx.namespace.add_lambda_type_later(ctx, lambda_type, library)
+        package.types << lambda_type
+        ctx.namespace.add_lambda_type_later(ctx, lambda_type, package)
       end
 
       new_types.clear
     end
 
-    library
+    package
   end
 
   getter new_types

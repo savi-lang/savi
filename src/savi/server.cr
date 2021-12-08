@@ -30,19 +30,19 @@ class Savi::Server
       ENV["SAVI_MAIN_DIRECTORY_REMAP"]? || ENV["SOURCE_DIRECTORY_MAPPING"]?
     ).try(&.split2!(':'))
 
-    # Copy standard library into the standard remap directory, if provided.
-    # Set that destination directory as being the canonical standard library,
-    # when the standard library is referenced during compilation.
+    # Copy standard package into the standard remap directory, if provided.
+    # Set that destination directory as being the canonical standard package,
+    # when the standard package is referenced during compilation.
     Savi.compiler.source_service.standard_directory_remap.try { |_, dest_path|
       # TODO: handle process errors here, probably via a cleaner abstraction.
       Process.run("cp", ["-r",
         File.join(
-          Savi.compiler.source_service.standard_library_internal_path,
+          Savi.compiler.source_service.standard_package_internal_path,
           ".",
         ),
         dest_path,
       ])
-      Savi.compiler.source_service.standard_library_internal_path = dest_path
+      Savi.compiler.source_service.standard_package_internal_path = dest_path
     }
 
     # Before we exit, say goodbye.
@@ -133,7 +133,7 @@ class Savi::Server
     pos = msg.params.position
     filename = msg.params.text_document.uri.path.not_nil!
     dirname = File.dirname(filename)
-    sources = Savi.compiler.source_service.get_library_sources(dirname)
+    sources = Savi.compiler.source_service.get_package_sources(dirname)
 
     source = sources.find { |s| s.path == filename }.not_nil!
     source_pos = Source::Pos.point(source, pos.line.to_i32, pos.character.to_i32)
@@ -165,14 +165,14 @@ class Savi::Server
   def handle(req : LSP::Message::Formatting)
     filename = req.params.text_document.uri.path.not_nil!
     dirname = File.dirname(filename)
-    sources = Savi.compiler.source_service.get_library_sources(dirname)
+    sources = Savi.compiler.source_service.get_package_sources(dirname)
     options = Savi::Compiler::CompilerOptions.new
     options.skip_manifest = true
 
     ctx = Savi.compiler.compile(sources, :manifests, options)
     doc = ctx.root_docs.find(&.pos.source.path.==(filename)).not_nil!
 
-    edits = AST::Format.run(ctx, ctx.root_library_link, [doc]).flat_map(&.last)
+    edits = AST::Format.run(ctx, ctx.root_package_link, [doc]).flat_map(&.last)
 
     @wire.respond(req) { |msg|
       msg.result = edits.map { |edit|
@@ -188,14 +188,14 @@ class Savi::Server
   def handle(req : LSP::Message::RangeFormatting)
     filename = req.params.text_document.uri.path.not_nil!
     dirname = File.dirname(filename)
-    sources = Savi.compiler.source_service.get_library_sources(dirname)
+    sources = Savi.compiler.source_service.get_package_sources(dirname)
     options = Savi::Compiler::CompilerOptions.new
     options.skip_manifest = true
 
     ctx = Savi.compiler.compile(sources, :manifests, options)
     doc = ctx.root_docs.find(&.pos.source.path.==(filename)).not_nil!
 
-    edits = AST::Format.run(ctx, ctx.root_library_link, [doc]).flat_map(&.last)
+    edits = AST::Format.run(ctx, ctx.root_package_link, [doc]).flat_map(&.last)
 
     # Only select edits within the intended range.
     range = Source::Pos.from_lsp_range(doc.pos.source, req.params.range)
@@ -212,14 +212,14 @@ class Savi::Server
   def handle(req : LSP::Message::OnTypeFormatting)
     filename = req.params.text_document.uri.path.not_nil!
     dirname = File.dirname(filename)
-    sources = Savi.compiler.source_service.get_library_sources(dirname)
+    sources = Savi.compiler.source_service.get_package_sources(dirname)
     options = Savi::Compiler::CompilerOptions.new
     options.skip_manifest = true
 
     ctx = Savi.compiler.compile(sources, :manifests, options)
     doc = ctx.root_docs.find(&.pos.source.path.==(filename)).not_nil!
 
-    edits = AST::Format.run(ctx, ctx.root_library_link, [doc]).flat_map(&.last)
+    edits = AST::Format.run(ctx, ctx.root_package_link, [doc]).flat_map(&.last)
 
     @wire.respond(req) { |msg|
       msg.result = edits.map { |edit|
@@ -285,7 +285,7 @@ class Savi::Server
 
   def send_diagnostics(filename : String, content : String? = nil)
     dirname = File.dirname(filename)
-    sources = Savi.compiler.source_service.get_library_sources(dirname)
+    sources = Savi.compiler.source_service.get_package_sources(dirname)
 
     source_index = sources.index { |s| s.path == filename }
     if source_index

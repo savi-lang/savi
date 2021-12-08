@@ -210,8 +210,8 @@ class Savi::Compiler
 
   def eval(string : String, options = CompilerOptions.new) : Context
     content = ":actor Main\n:new (env)\n#{string}"
-    library = Savi::Source::Library.new("(eval)")
-    source = Savi::Source.new("", "(eval)", content, library)
+    package = Savi::Source::Package.new("(eval)")
+    source = Savi::Source.new("", "(eval)", content, package)
 
     Savi.compiler.compile([source], :eval, options)
   end
@@ -222,7 +222,7 @@ class Savi::Compiler
   end
 
   def compile(dirname : String, target : Symbol = :eval, options = CompilerOptions.new)
-    compile(source_service.get_library_sources(dirname), target, options)
+    compile(source_service.get_package_sources(dirname), target, options)
   end
 
   @prev_ctx : Context?
@@ -254,21 +254,21 @@ class Savi::Compiler
     raise "No source documents given!" if docs.empty?
 
     # First, load the meta declarators.
-    ctx.program.meta_declarators = ctx.compile_library_at_path(
-      source_service.meta_declarators_library_path
+    ctx.program.meta_declarators = ctx.compile_package_at_path(
+      source_service.meta_declarators_package_path
     )
 
     # Then, load the standard declarators.
-    ctx.program.standard_declarators = ctx.compile_library_at_path(
-      source_service.standard_declarators_library_path
+    ctx.program.standard_declarators = ctx.compile_package_at_path(
+      source_service.standard_declarators_package_path
     )
 
-    # Now compile the main library.
-    ctx.compile_library(docs.first.source.library, docs)
+    # Now compile the main package.
+    ctx.compile_package(docs.first.source.package, docs)
 
-    # Next add the core Savi, unless the main library happens to be the same.
-    unless docs.first.source.library.path == source_service.core_savi_library_path
-      ctx.compile_library_at_path(source_service.core_savi_library_path)
+    # Next add the core Savi, unless the main package happens to be the same.
+    unless docs.first.source.package.path == source_service.core_savi_package_path
+      ctx.compile_package_at_path(source_service.core_savi_package_path)
     end
 
     # Now run compiler passes until the target pass is satisfied.

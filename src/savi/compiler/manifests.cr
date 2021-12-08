@@ -54,7 +54,7 @@ class Savi::Compiler::Manifests
     # There must be at least one manifest.
     manifests = ctx.program.manifests
     if manifests.empty?
-      ctx.error_at Source::Pos.show_library_path(ctx.root_library.source_library),
+      ctx.error_at Source::Pos.show_package_path(ctx.root_package.source_package),
         "No manifests found in the 'manifest.savi' files in this directory"
       return
     end
@@ -75,7 +75,7 @@ class Savi::Compiler::Manifests
 
     # If there is more than one main manifest, complain.
     if mains.size > 1
-      ctx.error_at Source::Pos.show_library_path(ctx.root_library.source_library),
+      ctx.error_at Source::Pos.show_package_path(ctx.root_package.source_package),
         "There can't be more than one main manifest in this directory; " \
         "please mark some of these as `:manifest lib` or `:manifest bin`",
         mains.map { |m| {m.name.pos, "this is a main manifest"} }
@@ -87,7 +87,7 @@ class Savi::Compiler::Manifests
     return libs.first if libs.size == 1
 
     # We have no more ways to select an appropriate root manifest; complain.
-    ctx.error_at Source::Pos.show_library_path(ctx.root_library.source_library),
+    ctx.error_at Source::Pos.show_package_path(ctx.root_package.source_package),
       "There is more than one manifest and it isn't clear which to use; " \
       "please specify one explicitly by name",
       manifests.map { |m| {m.name.pos, "this is an available manifest"} }
@@ -100,8 +100,8 @@ class Savi::Compiler::Manifests
 
     # Compile all manifests at the path where the dep is to be found.
     # TODO: actually use the given path from the dep information.
-    # Currently, this assumes all dependencies come from the standard library.
-    dep_path = ctx.compiler.source_service.standard_library_path
+    # Currently, this assumes all dependencies come from the standard package.
+    dep_path = ctx.compiler.source_service.standard_package_path
     ctx.compile_manifests_at_path(dep_path)
 
     # Limit the manifests we look at to just the set of newly added ones.
@@ -150,7 +150,7 @@ class Savi::Compiler::Manifests
     return manifest if manifest
 
     name_pos = manifest_name.is_a?(String) \
-      ? Source::Pos.show_library_path(ctx.root_library.source_library) \
+      ? Source::Pos.show_package_path(ctx.root_package.source_package) \
       : manifest_name.pos
 
     # If we didn't find it, complain.

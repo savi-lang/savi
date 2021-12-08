@@ -20,10 +20,10 @@ class Savi::Compiler::Populate
     @default_constructors = {} of UInt64 => Program::Function
   end
 
-  def run(ctx, library)
-    library.types_map_cow do |dest|
+  def run(ctx, package)
+    package.types_map_cow do |dest|
       orig_functions = dest.functions
-      dest_link = dest.make_link(library)
+      dest_link = dest.make_link(package)
 
       # Copy functions into the type from other sources.
       orig_functions.each do |f|

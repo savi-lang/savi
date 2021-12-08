@@ -1,8 +1,8 @@
 module Savi::Program::Declarator::Interpreter
-  def self.run(ctx, library : Program::Library, docs : Array(AST::Document))
+  def self.run(ctx, package : Program::Package, docs : Array(AST::Document))
     docs.each { |doc|
       scope = Scope.new
-      scope.current_library = library
+      scope.current_package = package
       scope.include_bootstrap_declarators = !ctx.program.meta_declarators
 
       # Iterate over the list of declarations/bodies in the document,
@@ -50,7 +50,7 @@ module Savi::Program::Declarator::Interpreter
           if suggestion
             {suggestion.name.pos, "did you mean `:#{suggestion.name.value}`?"}
           else
-            {Source::Pos.none, "did you forget to import a library?"}
+            {Source::Pos.none, "did you forget to add a package dependency?"}
           end
         ]
       return

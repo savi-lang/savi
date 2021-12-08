@@ -27,24 +27,24 @@ module Savi::Program::Intrinsic
         kind = terms["kind"].as(AST::Identifier)
         scope.current_manifest = Packaging::Manifest.new(name, kind)
       when "import"
-        scope.current_library.imports << Import.new(
+        scope.current_package.imports << Import.new(
           terms["path"].as(AST::LiteralString),
           terms["names"]?.as(AST::Group?),
         )
-        # TODO: Also pull in the library's declarators in some way.
+        # TODO: Also pull in the package's declarators in some way.
       when "source"
-        scope.current_library.imports << Program::Import.new(
+        scope.current_package.imports << Program::Import.new(
           terms["path"].as(AST::LiteralString),
           copy_sources: true
         )
-        # TODO: Also pull in the library's declarators in some way.
+        # TODO: Also pull in the package's declarators in some way.
       when "alias"
         name, params =
           AST::Extract.name_and_params(terms["name_and_params"].not_nil!)
 
         type_alias = Program::TypeAlias.new(name, params)
 
-        scope.current_library.aliases << type_alias
+        scope.current_package.aliases << type_alias
 
         scope.on_body { |body|
           unless body.terms.size == 1
@@ -407,7 +407,7 @@ module Savi::Program::Intrinsic
       when "member"
         type_with_value = Program::TypeWithValue.new(
           terms["name"].as(AST::Identifier),
-          scope.current_type.make_link(scope.current_library),
+          scope.current_type.make_link(scope.current_package),
         )
 
         scope.on_body { |body|
@@ -426,7 +426,7 @@ module Savi::Program::Intrinsic
         }
 
         scope.current_members << type_with_value # TODO: remove this line
-        scope.current_library.enum_members << type_with_value
+        scope.current_package.enum_members << type_with_value
       else
         raise NotImplementedError.new(declarator.pretty_inspect)
       end
@@ -458,7 +458,7 @@ module Savi::Program::Intrinsic
     when "manifest_dependency"
       scope.current_manifest_dependency = nil
     when "declarator"
-      scope.current_library.declarators << scope.current_declarator
+      scope.current_package.declarators << scope.current_declarator
       scope.current_declarator = nil
     when "term"
       scope.current_declarator.terms << scope.current_declarator_term
@@ -467,19 +467,19 @@ module Savi::Program::Intrinsic
       scope.current_type.functions << scope.current_function
       scope.current_function = nil
     when "actor", "class", "struct", "module"
-      scope.current_library.types << scope.current_type
+      scope.current_package.types << scope.current_type
       scope.current_type = nil
     when "numeric"
       declare_numeric_copies(ctx, scope, declarator)
 
-      scope.current_library.types << scope.current_type
+      scope.current_package.types << scope.current_type
       scope.current_type = nil
     when "enum"
       declare_numeric_copies(ctx, scope, declarator)
       declare_enum_member_name(ctx, scope, declarator)
       declare_enum_from_u64(ctx, scope, declarator)
 
-      scope.current_library.types << scope.current_type
+      scope.current_package.types << scope.current_type
       scope.current_type = nil
       scope.current_members = nil
     when "trait"
@@ -488,7 +488,7 @@ module Savi::Program::Intrinsic
         f.body = nil if f.body.try(&.terms).try(&.empty?)
       }
 
-      scope.current_library.types << scope.current_type
+      scope.current_package.types << scope.current_type
       scope.current_type = nil
     when "ffi"
       # An FFI type's functions should be tagged as "ffi" and body removed.
@@ -500,7 +500,7 @@ module Savi::Program::Intrinsic
         f.body = nil
       }
 
-      scope.current_library.types << scope.current_type
+      scope.current_package.types << scope.current_type
       scope.current_type = nil
     else
       nil

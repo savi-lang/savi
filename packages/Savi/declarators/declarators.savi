@@ -290,7 +290,7 @@
 :: are used for binding foreign functions, so they declare no function bodies.
 ::
 :: Each function signature in an `:ffi` declaration should directly correspond
-:: to a function exposed by a foreign library which is linked to the program.
+:: to a function exposed by a foreign package which is linked to the program.
 :declarator ffi
   :intrinsic
   :begins type

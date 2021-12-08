@@ -1,7 +1,7 @@
 ##
 # The purpose of the PopulateTypes pass is to create missing types,
 # such as types implied by namespace-nested types whose outer type
-# does not yet exist in the library.
+# does not yet exist in the package.
 #
 # This pass uses copy-on-mutate patterns to "mutate" the Program topology.
 # This pass does not mutate ASTs, but creates new types.
@@ -13,15 +13,15 @@ class Savi::Compiler::PopulateTypes
   def initialize
   end
 
-  def run(ctx, library)
-    # If this library has any types whose identifier is nested under a type that
+  def run(ctx, package)
+    # If this package has any types whose identifier is nested under a type that
     # does not actually exist yet, create a module to act as the namespace type.
     missing_namespace_modules = [] of AST::Identifier
-    library.types.each { |t|
-      maybe_note_missing_namespace_module_for(ctx, t.ident, library, missing_namespace_modules)
+    package.types.each { |t|
+      maybe_note_missing_namespace_module_for(ctx, t.ident, package, missing_namespace_modules)
     }
-    library.enum_members.each { |t|
-      maybe_note_missing_namespace_module_for(ctx, t.ident, library, missing_namespace_modules)
+    package.enum_members.each { |t|
+      maybe_note_missing_namespace_module_for(ctx, t.ident, package, missing_namespace_modules)
     }
     new_namespace_modules = missing_namespace_modules.map { |ident|
       Program::Type.new(
@@ -33,25 +33,25 @@ class Savi::Compiler::PopulateTypes
       }
     }
 
-    return library if new_namespace_modules.empty?
+    return package if new_namespace_modules.empty?
 
-    orig_types = library.types
-    library = library.dup
-    raise "didn't dup types!" if library.types.same?(orig_types)
-    library.types.concat(new_namespace_modules)
+    orig_types = package.types
+    package = package.dup
+    raise "didn't dup types!" if package.types.same?(orig_types)
+    package.types.concat(new_namespace_modules)
 
-    library
+    package
   end
 
-  def maybe_note_missing_namespace_module_for(ctx, ident, library, missing_namespace_modules)
+  def maybe_note_missing_namespace_module_for(ctx, ident, package, missing_namespace_modules)
     # If it's not a nested identifier at all, stop here.
     return unless ident.value.includes?(".")
 
     # If it's already accounted for as an existing type, stop here.
-    return if library.types.any? { |outer|
+    return if package.types.any? { |outer|
       ident.immediately_nested_within?(outer.ident)
     }
-    return if library.enum_members.any? { |outer|
+    return if package.enum_members.any? { |outer|
       ident.immediately_nested_within?(outer.ident)
     }
 
@@ -63,6 +63,6 @@ class Savi::Compiler::PopulateTypes
     missing_namespace_modules << new_ident
 
     # And also recurse in case we need to also create additional nest levels.
-    maybe_note_missing_namespace_module_for(ctx, new_ident, library, missing_namespace_modules)
+    maybe_note_missing_namespace_module_for(ctx, new_ident, package, missing_namespace_modules)
   end
 end

@@ -12,7 +12,7 @@ There is no declarator named `bogus` known within this file scope:
 :bogus bogus
  ^~~~~
 
-- did you forget to import a library?
+- did you forget to add a package dependency?
 ```
 
 ---

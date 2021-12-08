@@ -208,7 +208,7 @@ module Savi::Compiler::XTypes
     def run_for_types(ctx : Context)
       cursor = Cursor.new(ctx, self)
 
-      ctx.program.libraries.each { |l|
+      ctx.program.packages.each { |l|
         l_link = l.make_link
         l.types.each { |t|
           t_link = t.make_link(l_link)
@@ -226,7 +226,7 @@ module Savi::Compiler::XTypes
     def run_for_func_edges(ctx : Context)
       cursor = Cursor.new(ctx, self)
 
-      ctx.program.libraries[2].tap { |l| # TODO: all libraries
+      ctx.program.packages[2].tap { |l| # TODO: all packages
         l_link = l.make_link
         l.types.each { |t|
           t_link = t.make_link(l_link)

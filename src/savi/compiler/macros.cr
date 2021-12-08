@@ -32,10 +32,10 @@ class Savi::Compiler::Macros < Savi::AST::CopyOnMutateVisitor
     end
   end
 
-  def self.run(ctx, library)
-    library.types_map_cow do |t|
+  def self.run(ctx, package)
+    package.types_map_cow do |t|
       t.functions_map_cow do |f|
-        cached_or_run library, t, f do
+        cached_or_run package, t, f do
           macros = new(f)
           macros.maybe_compiler_intrinsic
           f = macros.run(ctx)

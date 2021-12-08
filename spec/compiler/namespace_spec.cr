@@ -19,7 +19,7 @@ describe Savi::Compiler::Namespace do
     SOURCE
 
     expected = <<-MSG
-    This type conflicts with another declared type in the same library:
+    This type conflicts with another declared type in the same package:
     from (example):2:
     :actor Redundancy
            ^~~~~~~~~~
@@ -75,7 +75,7 @@ describe Savi::Compiler::Namespace do
            ^~~~~~
 
     - the built-in type is defined here:
-      from #{Savi.compiler.source_service.core_savi_library_path}/string.savi:1:
+      from #{Savi.compiler.source_service.core_savi_package_path}/string.savi:1:
     :class val String
                ^~~~~~
     MSG
@@ -84,13 +84,13 @@ describe Savi::Compiler::Namespace do
       .errors.map(&.message).join("\n").should eq expected
   end
 
-  # TODO: Figure out how to test these in our test suite - they need a library.
+  # TODO: Figure out how to test these in our test suite - they need a package.
   pending "complains when a bulk-imported type conflicts with another"
   pending "complains when an explicitly imported type conflicts with another"
   pending "complains when an explicitly imported type conflicts with another"
   pending "complains when a type name ends with an exclamation"
 
-  it "won't have conflicts with a private type in the core Savi library" do
+  it "won't have conflicts with a private type in the core Savi package" do
     source = Savi::Source.new_example <<-SOURCE
     :ffi LibPony // defined in core Savi, but private, so no conflict here
     SOURCE
@@ -98,7 +98,7 @@ describe Savi::Compiler::Namespace do
     Savi.compiler.test_compile([source], :namespace)
   end
 
-  # TODO: Figure out how to test these in our test suite - they need a library.
-  pending "won't have conflicts with a private type in an imported library"
+  # TODO: Figure out how to test these in our test suite - they need a package.
+  pending "won't have conflicts with a private type in an imported package"
   pending "complains when trying to explicitly import a private type"
 end

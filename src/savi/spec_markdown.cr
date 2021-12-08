@@ -1,16 +1,16 @@
 class Savi::SpecMarkdown
   getter filename : String
-  getter source_library : Source::Library
+  getter source_package : Source::Package
 
   def initialize(path : String)
     @filename = File.basename(path)
-    @source_library = Source::Library.new("(compiler-spec)", "main")
+    @source_package = Source::Package.new("(compiler-spec)", "main")
     @raw_content = File.read(path)
   end
 
   def sources; [source]; end
   def source
-    Source.new(@source_library.path, @filename, compiled_content, @source_library)
+    Source.new(@source_package.path, @filename, compiled_content, @source_package)
   end
 
   @compiled_content : String?
@@ -160,8 +160,8 @@ class Savi::SpecMarkdown
   end
 
   def verify_annotations!(ctx : Compiler::Context) : Bool
-    library = ctx.program.libraries
-      .find { |library| library.source_library == @source_library }
+    package = ctx.program.packages
+      .find { |package| package.source_package == @source_package }
       .not_nil!
 
     errors = [] of {Example, Error}
@@ -169,9 +169,9 @@ class Savi::SpecMarkdown
     examples.compact_map { |example|
       example_pos = SpecMarkdown.get_example_pos(source, example)
 
-      library.types.each { |type|
+      package.types.each { |type|
         next true unless example_pos.contains?(type.ident.pos)
-        t_link = type.make_link(library)
+        t_link = type.make_link(package)
 
         type.functions.each { |func|
           f_link = func.make_link(t_link)
@@ -268,8 +268,8 @@ class Savi::SpecMarkdown
   end
 
   def verify_other_blocks!(ctx : Compiler::Context) : Bool
-    library = ctx.program.libraries
-      .find { |library| library.source_library == @source_library }
+    package = ctx.program.packages
+      .find { |package| package.source_package == @source_package }
       .not_nil!
 
     all_success = true
@@ -303,7 +303,7 @@ class Savi::SpecMarkdown
       end
 
       example.expected_types_graph.each { |t_name, f_name, expected|
-        type = library.types.find(&.ident.value.==(t_name))
+        type = package.types.find(&.ident.value.==(t_name))
         func = type.try(&.find_func?(f_name))
         unless func && type
           puts "---"
@@ -316,7 +316,7 @@ class Savi::SpecMarkdown
           next
         end
 
-        f_link = func.make_link(type.make_link(library.make_link))
+        f_link = func.make_link(type.make_link(package.make_link))
         actual = ctx.types_graph[f_link].show_type_variables_list
 
         unless expected.strip == actual.strip
@@ -337,7 +337,7 @@ class Savi::SpecMarkdown
       }
 
       example.expected_return_types.each { |t_name, f_name, expected|
-        type = library.types.find(&.ident.value.==(t_name))
+        type = package.types.find(&.ident.value.==(t_name))
         func = type.try(&.find_func?(f_name))
         unless func && type
           puts "---"
@@ -350,7 +350,7 @@ class Savi::SpecMarkdown
           next
         end
 
-        f_link = func.make_link(type.make_link(library.make_link))
+        f_link = func.make_link(type.make_link(package.make_link))
         actual = ctx.types_edge[f_link].resolved_return_lower_bound.show
 
         unless expected.strip == actual.strip
@@ -371,7 +371,7 @@ class Savi::SpecMarkdown
       }
 
       example.expected_param_types.each { |t_name, f_name, param_index, expected|
-        type = library.types.find(&.ident.value.==(t_name))
+        type = package.types.find(&.ident.value.==(t_name))
         func = type.try(&.find_func?(f_name))
         unless func && type
           puts "---"
@@ -384,7 +384,7 @@ class Savi::SpecMarkdown
           next
         end
 
-        f_link = func.make_link(type.make_link(library.make_link))
+        f_link = func.make_link(type.make_link(package.make_link))
         actual = ctx.types_edge[f_link]
           .resolved_params_upper_bound[param_index]
           .show
@@ -407,7 +407,7 @@ class Savi::SpecMarkdown
       }
 
       example.expected_xtypes_graph.each { |t_name, f_name, expected|
-        type = library.types.find(&.ident.value.==(t_name))
+        type = package.types.find(&.ident.value.==(t_name))
         func = type.try(&.find_func?(f_name))
         unless func && type
           puts "---"
@@ -420,7 +420,7 @@ class Savi::SpecMarkdown
           next
         end
 
-        f_link = func.make_link(type.make_link(library.make_link))
+        f_link = func.make_link(type.make_link(package.make_link))
         actual = ctx.xtypes_graph[f_link].show_type_variables_list
 
         unless expected.strip == actual.strip
@@ -441,7 +441,7 @@ class Savi::SpecMarkdown
       }
 
       example.expected_return_xtypes.each { |t_name, f_name, expected|
-        type = library.types.find(&.ident.value.==(t_name))
+        type = package.types.find(&.ident.value.==(t_name))
         func = type.try(&.find_func?(f_name))
         unless func && type
           puts "---"
@@ -454,7 +454,7 @@ class Savi::SpecMarkdown
           next
         end
 
-        f_link = func.make_link(type.make_link(library.make_link))
+        f_link = func.make_link(type.make_link(package.make_link))
         return_var = ctx.xtypes_graph[f_link].return_var
         actual = ctx.xtypes[f_link][return_var].show
 
@@ -476,7 +476,7 @@ class Savi::SpecMarkdown
       }
 
       example.expected_param_xtypes.each { |t_name, f_name, param_index, expected|
-        type = library.types.find(&.ident.value.==(t_name))
+        type = package.types.find(&.ident.value.==(t_name))
         func = type.try(&.find_func?(f_name))
         unless func && type
           puts "---"
@@ -489,7 +489,7 @@ class Savi::SpecMarkdown
           next
         end
 
-        f_link = func.make_link(type.make_link(library.make_link))
+        f_link = func.make_link(type.make_link(package.make_link))
         param_var = ctx.xtypes_graph[f_link].param_vars[param_index]
         actual = ctx.xtypes[f_link][param_var].show
 

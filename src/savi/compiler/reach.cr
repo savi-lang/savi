@@ -520,7 +520,7 @@ class Savi::Compiler::Reach < Savi::AST::Visitor
 
     def find_enum_members(ctx)
       t_link = @reified.link
-      t_link.library.resolve(ctx).enum_members.select(&.target.==(t_link))
+      t_link.package.resolve(ctx).enum_members.select(&.target.==(t_link))
     end
 
     def as_ref(cap = nil) : Ref

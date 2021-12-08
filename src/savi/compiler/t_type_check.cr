@@ -21,23 +21,23 @@ class Savi::Compiler::TTypeCheck
     # as well as partially reified types for those with type params.
     rts = [] of ReifiedType
 
-    # From the root library, type check every possible partial reification
-    # of every type within that library (or pulled in using :source).
+    # From the root package, type check every possible partial reification
+    # of every type within that package (or pulled in using :source).
     # This is useful for developing libraries, taking checks beyond
     # just confirming safety of the example/test program being compiled,
-    # to confirm that this library won't have compile errors in any program.
-    ctx.root_library.tap { |library|
-      library.types.each { |t|
-        t_link = t.make_link(library)
+    # to confirm that this package won't have compile errors in any program.
+    ctx.root_package.tap { |package|
+      package.types.each { |t|
+        t_link = t.make_link(package)
         rts << ctx.t_infer[t_link].type_before_reification.single!
       }
     }
 
     # TODO: Use reachability analysis to make this only check reachable types
-    # that are outside of the root library, as the old TypeCheck pass did.
-    ctx.program.libraries.each { |library|
-      library.types.each { |t|
-        t_link = t.make_link(library)
+    # that are outside of the root package, as the old TypeCheck pass did.
+    ctx.program.packages.each { |package|
+      package.types.each { |t|
+        t_link = t.make_link(package)
         rts << ctx.t_infer[t_link].type_before_reification.single!
       }
     }

@@ -97,78 +97,78 @@ class Savi::Compiler::Context
     @link_libraries = Set(String).new
   end
 
-  def root_library
-    # If we have already identified a root manifest, get the associated library.
+  def root_package
+    # If we have already identified a root manifest, get the associated package.
     root_manifest = @manifests.root
     if root_manifest
-      source_library = Source::Library.for_manifest(root_manifest)
-      root = @program.libraries.find(&.source_library.==(source_library))
+      source_package = Source::Package.for_manifest(root_manifest)
+      root = @program.packages.find(&.source_package.==(source_package))
       return root if root
     end
 
-    @program.libraries[2]? || # initial manifest probe
-    @program.libraries[1]? || # standard declarators
-    @program.libraries[0]     # meta declarators
+    @program.packages[2]? || # initial manifest probe
+    @program.packages[1]? || # standard declarators
+    @program.packages[0]     # meta declarators
   end
 
-  def root_library_link
-    root_library.make_link
+  def root_package_link
+    root_package.make_link
   end
 
-  def compile_library_at_path(path)
-    # First, try to find an already loaded library that has this same path.
-    library = @program.libraries.find(&.source_library.path.==(path))
-    return library if library
+  def compile_package_at_path(path)
+    # First, try to find an already loaded package that has this same path.
+    package = @program.packages.find(&.source_package.path.==(path))
+    return package if package
 
-    # Otherwise go ahead and load the library.
-    sources = compiler.source_service.get_library_sources(path)
+    # Otherwise go ahead and load the package.
+    sources = compiler.source_service.get_package_sources(path)
     docs = sources.map { |source| Parser.parse(source) }
-    compile_library(sources.first.library, docs)
+    compile_package(sources.first.package, docs)
   end
 
   def compile_manifests_at_path(path)
     # Skip if we've already compiled at least one manifest at this same path.
-    return if @program.manifests.any?(&.name.pos.source.library.path.==(path))
+    return if @program.manifests.any?(&.name.pos.source.package.path.==(path))
 
     # Otherwise go ahead and load the manifests.
-    sources = compiler.source_service.get_library_sources(path)
+    sources = compiler.source_service.get_package_sources(path)
     docs = sources.map { |source| Parser.parse(source) }
-    compile_library(sources.first.library, docs)
+    compile_package(sources.first.package, docs)
   end
 
   def compile_package(manifest : Packaging::Manifest)
     sources = compiler.source_service.get_sources_for_manifest(self, manifest)
     docs = sources.map { |source| Parser.parse(source) }
-    compile_library(sources.first.library, docs)
+    compile_package(sources.first.package, docs)
   end
 
-  def compile_library(*args)
-    library = compile_library_inner(*args)
-    @program.libraries << library
-    library
+  def compile_package(*args)
+    package = compile_package_inner(*args)
+    @program.packages << package
+    package
   rescue e : Error
     @errors << e
-    library || Program::Library.new(args.first)
+    package || Program::Package.new(args.first)
   end
 
-  @@cache = {} of String => {Array(AST::Document), Program::Library}
-  def compile_library_inner(source_library : Source::Library, docs : Array(AST::Document))
-    if (cache_result = @@cache[source_library.path]?; cache_result)
-      cached_docs, cached_library = cache_result
-      return cached_library if cached_docs == docs
+  @@cache = {} of String => {Array(AST::Document), Program::Package}
+  def compile_package_inner(source_package : Source::Package, docs : Array(AST::Document))
+    if (cache_result = @@cache[source_package.path]?; cache_result)
+      cached_docs, cached_package = cache_result
+      return cached_package if cached_docs == docs
     end
 
-    compile_library_docs(Program::Library.new(source_library), docs)
+    compile_package_docs(Program::Package.new(source_package), docs)
 
     .tap do |result|
-      @@cache[source_library.path] = {docs, result}
+      @@cache[source_package.path] = {docs, result}
     end
   end
 
-  def compile_library_docs(library : Program::Library, docs : Array(AST::Document))
-    Program::Declarator::Interpreter.run(self, library, docs)
+  def compile_package_docs(package : Program::Package, docs : Array(AST::Document))
+    Program::Declarator::Interpreter.run(self, package, docs)
 
-    library
+    package
   end
 
   def finish
@@ -178,8 +178,8 @@ class Savi::Compiler::Context
   def run(obj)
     return false if @errors.any?
 
-    @program.libraries.each do |library|
-      obj.run(self, library)
+    @program.packages.each do |package|
+      obj.run(self, package)
     end
     finish
 
@@ -193,8 +193,8 @@ class Savi::Compiler::Context
   def run_copy_on_mutate(obj)
     return false if @errors.any?
 
-    @program.libraries.map! do |library|
-      obj.run(self, library)
+    @program.packages.map! do |package|
+      obj.run(self, package)
     end
     finish
 
