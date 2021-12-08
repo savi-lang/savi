@@ -19,7 +19,7 @@ class Savi::Compiler::Privacy
 
       # If the call site's package is the same as the function's package,
       # then there is no privacy issue and we can move on without error.
-      next if pos.source.package.path == called_func_link.type.package.path
+      next if pos.source.package == called_func_link.type.package.source_package
 
       # Otherwise we raise it as an error.
       Error.at pos, "This function call breaks privacy boundaries", [{

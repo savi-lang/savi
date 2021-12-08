@@ -77,6 +77,9 @@ class Savi::Program
       getter name : String?
       def initialize(@path, @name)
       end
+      def source_package
+        Source::Package.new(@path, @name)
+      end
       def resolve(ctx : Compiler::Context)
         source_package = Source::Package.new(@path, @name)
         ctx.program.packages.find(&.source_package.==(source_package)).not_nil!
