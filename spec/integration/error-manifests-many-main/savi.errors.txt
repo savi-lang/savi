@@ -16,6 +16,6 @@ There can't be more than one main manifest in this directory; please mark some o
           ^~~~~~~~~~~
 
 - this is a main manifest:
-  from ./manifest.savi:7:
+  from ./manifest.savi:10:
 :manifest "package-d"
           ^~~~~~~~~~~

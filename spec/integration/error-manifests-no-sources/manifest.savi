@@ -1,0 +1,9 @@
+:manifest lib ExampleNoSources
+
+:manifest bin "example-no-sources"
+
+:manifest lib ExampleWithSources
+  :sources "*.savi"
+
+:manifest bin "example-with-sources"
+  :sources "*.savi"

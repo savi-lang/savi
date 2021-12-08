@@ -1,11 +1,17 @@
 :manifest "package-a"
+  :sources "*.savi"
 
 :manifest lib "package-b"
+  :sources "*.savi"
 
 :manifest bin "package-c"
+  :sources "*.savi"
 
 :manifest "package-d"
+  :sources "*.savi"
 
 :manifest lib "package-e"
+  :sources "*.savi"
 
 :manifest bin "package-f"
+  :sources "*.savi"

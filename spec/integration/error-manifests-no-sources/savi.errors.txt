@@ -1,0 +1,26 @@
+
+Compilation Error:
+
+---
+
+There is more than one manifest and it isn't clear which to use; please specify one explicitly by name
+
+- this is an available manifest:
+  from ./manifest.savi:1:
+:manifest lib ExampleNoSources
+              ^~~~~~~~~~~~~~~~
+
+- this is an available manifest:
+  from ./manifest.savi:3:
+:manifest bin "example-no-sources"
+              ^~~~~~~~~~~~~~~~~~~~
+
+- this is an available manifest:
+  from ./manifest.savi:5:
+:manifest lib ExampleWithSources
+              ^~~~~~~~~~~~~~~~~~
+
+- this is an available manifest:
+  from ./manifest.savi:8:
+:manifest bin "example-with-sources"
+              ^~~~~~~~~~~~~~~~~~~~~~
