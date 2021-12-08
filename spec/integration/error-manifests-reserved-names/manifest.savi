@@ -1,0 +1,11 @@
+:manifest bin Savi // NOT OKAY
+  :sources "*.savi"
+
+:manifest bin Savi.Thing // NOT OKAY
+  :sources "*.savi"
+
+:manifest bin Saviour // okay
+  :sources "*.savi"
+
+:manifest "savi" // okay
+  :sources "*.savi"
