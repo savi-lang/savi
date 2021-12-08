@@ -224,7 +224,14 @@ class Savi::Compiler
   end
 
   def compile(dirname : String, target : Symbol = :eval, options = Compiler::Options.new)
-    compile(source_service.get_directory_sources(dirname), target, options)
+    sources =
+      if options.skip_manifest
+        source_service.get_directory_sources(dirname)
+      else
+        source_service.get_manifest_sources_at_or_above(dirname)
+      end
+
+    compile(sources, target, options)
   end
 
   @prev_ctx : Context?

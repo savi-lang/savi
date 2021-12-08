@@ -12,7 +12,7 @@ cd -- "$(dirname -- "$0")"
 # Start running integation tests.
 echo "Running integration tests..."
 echo
-for subdir in $(find ./ -maxdepth 1 -mindepth 1 -type d); do
+for subdir in $(find ./ -maxdepth 1 -mindepth 1 -type d | sort --ignore-case); do
   # If this subdirectory has an expected errors file, use that test approach.
   if [ -f "$subdir/savi.errors.txt" ]; then
     actual=$(cd $subdir && "$SAVI" --backtrace 2>&1 || true)

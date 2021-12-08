@@ -1,0 +1,3 @@
+// This is a real manifest, but the filename isn't matching the pattern
+// "*.manifest.savi" or "manifest.savi", so it won't be found as a manifest.
+:manifest "not-in-a-manifest-dot-savi-file"

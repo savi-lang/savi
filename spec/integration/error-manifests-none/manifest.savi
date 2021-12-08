@@ -1,0 +1,3 @@
+// This file is named as a manifest file, but it doesn't contain a manifest.
+// It only contains a class, which will be ignored during manifest probe.
+:class NotAManifest

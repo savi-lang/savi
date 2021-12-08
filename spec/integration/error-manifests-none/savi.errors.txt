@@ -1,0 +1,6 @@
+
+Compilation Error:
+
+---
+
+No manifests found in the 'manifest.savi' files in this directory

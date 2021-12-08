@@ -219,23 +219,6 @@ class Savi::Compiler::SourceService
     }
   end
 
-  # Given a package name, optionally anchored to a given "from source",
-  # try to resolve a directory that matches the package name.
-  #
-  # First a relative location will be attempted starting from the "from source".
-  # Then a standard package location will be attempted.
-  # If both attempts fail, there is no hope of resolving the package.
-  def resolve_package_dirname(libname : String, from_source : Source)
-    standard_dirname = File.expand_path(libname, standard_package_path)
-    relative_dirname = File.expand_path(libname, from_source.dirname)
-
-    if relative_dirname && dir_exists?(relative_dirname)
-      relative_dirname
-    elsif dir_exists?(standard_dirname)
-      standard_dirname
-    end
-  end
-
   # Given a directory name, load source objects for all the source files in it.
   def get_directory_sources(dirname, package : Source::Package? = nil)
     package ||= Source::Package.new(dirname)
