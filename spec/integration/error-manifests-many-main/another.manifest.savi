@@ -1,0 +1,5 @@
+:manifest "package-g"
+
+:manifest lib "package-h"
+
+:manifest bin "package-i"

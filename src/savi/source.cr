@@ -105,16 +105,6 @@ struct Savi::Source::Pos
     )
   end
 
-  def self.show_source_path(source : Source)
-    source = Source.new(package.path, "", package.path, package, :path)
-    new(source, 0, package.path.bytesize, 0, package.path.bytesize, 0, 0)
-  end
-
-  def self.show_package_path(package : Package)
-    source = Source.new(package.path, "", package.path, package, :path)
-    new(source, 0, package.path.bytesize, 0, package.path.bytesize, 0, 0)
-  end
-
   def initialize(
     @source, @start, @finish, @line_start, @line_finish, @row, @col
   )
@@ -325,8 +315,10 @@ struct Savi::Source::Pos
       tail = "···"
     end
 
+    relative_path = source.path.sub(Dir.current, ".")
+
     [
-      "from #{source.path}:#{row + 1}:",
+      "from #{relative_path}:#{row + 1}:",
       source.content.byte_slice(line_start, line_finish - line_start),
       (" " * col) + "^" + ("~" * twiddle_width) + tail,
     ].join("\n")

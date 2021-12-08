@@ -245,8 +245,8 @@ class Savi::Compiler::SourceService
       sources << Source.new(dirname, name, content, package)
     }
 
-    Error.at Source::Pos.show_package_path(package),
-      "No '.savi' source files found in this directory" \
+    Error.at Source::Pos.none,
+      "No '.savi' source files found in this directory:\n#{dirname}" \
         if sources.empty?
 
     # Sort the sources by case-insensitive name, so that they always get loaded
@@ -272,8 +272,8 @@ class Savi::Compiler::SourceService
       break unless try_dirname.starts_with?(Dir.current)
     end
 
-    Error.at Source::Pos.show_package_path(Source::Package.new(dirname)),
-      "No 'manifest.savi' source files found at or above this directory" \
+    Error.at Source::Pos.none,
+      "No 'manifest.savi' source files found at or above this directory:\n#{dirname}" \
         if sources.empty?
 
     # Sort the sources by case-insensitive name, so that they always get loaded
@@ -327,8 +327,9 @@ class Savi::Compiler::SourceService
         << Source.new(dirname, name, content, package)
     }
 
-    Error.at Source::Pos.show_package_path(Source::Package.new(root_dirname)),
-      "No '.savi' source files found recursively within this root" \
+    Error.at Source::Pos.none,
+      "No '.savi' source files found recursively within this directory: " \
+      "#{root_dirname}" \
         if sources.empty?
 
     # Sort the sources by case-insensitive name, so that they always get loaded

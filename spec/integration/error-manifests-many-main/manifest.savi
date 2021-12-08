@@ -1,0 +1,11 @@
+:manifest "package-a"
+
+:manifest lib "package-b"
+
+:manifest bin "package-c"
+
+:manifest "package-d"
+
+:manifest lib "package-e"
+
+:manifest bin "package-f"

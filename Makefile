@@ -20,7 +20,7 @@ clean: PHONY
 	rm -rf $(BUILD) .make-var-cache lib/libsavi_runtime.bc
 
 # Run the full test suite.
-spec.all: PHONY spec.compiler.all spec.language spec.package.all spec.unit.all
+spec.all: PHONY spec.compiler.all spec.language spec.package.all spec.unit.all spec.integration.all
 
 # Run the specs that are written in markdown (mostly compiler pass tests).
 # Run the given compiler-spec target (or all targets).
@@ -29,13 +29,6 @@ spec.compiler: PHONY $(SAVI)
 spec.compiler.all: PHONY $(SAVI)
 	find "spec/compiler" -name '*.savi.spec.md' | sort | xargs -I'{}' sh -c \
 		'echo && $(SAVI) compilerspec {} $(extra_args) || exit 255'
-
-# Run the specs that are written in Crystal (mostly compiler unit tests),
-# narrowing to those with the given name (or all of them).
-spec.unit: PHONY $(SPEC)
-	echo && $(SPEC) -v -e "$(name)"
-spec.unit.all: PHONY $(SPEC)
-	echo && $(SPEC)
 
 # Run the specs for the basic language semantics.
 spec.language: PHONY $(SAVI)
@@ -47,6 +40,17 @@ spec.package: PHONY $(SAVI)
 spec.package.all: PHONY $(SAVI)
 	find packages -name 'test' | cut -d/ -f2 | sort | xargs -I'{}' sh -c \
 		"echo && $(SAVI) run --cd packages "spec-{}" $(extra_args) || exit 255"
+
+# Run the specs that are written in Crystal (mostly compiler unit tests),
+# narrowing to those with the given name (or all of them).
+spec.unit: PHONY $(SPEC)
+	echo && $(SPEC) -v -e "$(name)"
+spec.unit.all: PHONY $(SPEC)
+	echo && $(SPEC)
+
+# Run the integration tests, which invoke the compiler in a real directory.
+spec.integration.all: PHONY $(SAVI)
+	echo && spec/integration/run-all.sh $(SAVI)
 
 # Check formatting of *.savi source files.
 format.check: PHONY $(SAVI)

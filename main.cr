@@ -277,7 +277,6 @@ module Savi
         puts
         puts error.message(backtrace)
       }
-      puts
       1 # exit code reflects the fact that compilation errors occurred
     end
   end

@@ -21,7 +21,12 @@ class Savi::Error < Exception
   end
 
   def message(show_compiler_hole_details = false)
-    strings = ["#{headline}:\n#{pos.show}\n"]
+    strings =
+      if pos == Source::Pos.none
+        ["#{headline}\n"]
+      else
+        ["#{headline}:\n#{pos.show}\n"]
+      end
     info.each do |info_pos, info_msg|
       if info_pos == Source::Pos.none
         strings << "- #{info_msg}"

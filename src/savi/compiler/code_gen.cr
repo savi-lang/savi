@@ -197,9 +197,7 @@ class Savi::Compiler::CodeGen
     main_gtype = @gtypes["Main"]?
 
     unless main_gtype
-      root_source_package = ctx.root_package.source_package
-      Error.at Source::Pos.show_package_path(root_source_package),
-        "This is the root directory being compiled, but it has no Main actor"
+      Error.at Source::Pos.none, "This package has no Main actor"
     end
 
     main_gtype.not_nil!

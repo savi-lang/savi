@@ -1,0 +1,21 @@
+
+Compilation Error:
+
+---
+
+There can't be more than one main manifest in this directory; please mark some of these as `:manifest lib` or `:manifest bin`
+
+- this is a main manifest:
+  from ./another.manifest.savi:1:
+:manifest "package-g"
+          ^~~~~~~~~~~
+
+- this is a main manifest:
+  from ./manifest.savi:1:
+:manifest "package-a"
+          ^~~~~~~~~~~
+
+- this is a main manifest:
+  from ./manifest.savi:7:
+:manifest "package-d"
+          ^~~~~~~~~~~
