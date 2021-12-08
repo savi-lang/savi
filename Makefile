@@ -80,9 +80,8 @@ example: example-compile
 example-lldb: example-compile
 	echo && lldb -o run -- "$(dir)/main"
 
-# Compile the language server image and vscode extension.
-vscode: PHONY
-	docker build . --tag jemc/savi
+# Compile the vscode extension.
+vscode: PHONY $(SAVI)
 	cd tooling/vscode && npm run-script compile || npm install
 
 ##

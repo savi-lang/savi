@@ -129,35 +129,37 @@ class Savi::Server
     send_diagnostics(msg.params.text_document.uri.path.not_nil!)
   end
 
+  # TODO: Get Hover working again, in the presence of package manifests.
   def handle(msg : LSP::Message::Hover)
     pos = msg.params.position
     filename = msg.params.text_document.uri.path.not_nil!
     dirname = File.dirname(filename)
-    sources = Savi.compiler.source_service.get_directory_sources(dirname)
+    sources = Savi.compiler.source_service.get_manifest_sources_at_or_above(dirname)
+    options = Compiler::CompilerOptions.new
 
-    source = sources.find { |s| s.path == filename }.not_nil!
-    source_pos = Source::Pos.point(source, pos.line.to_i32, pos.character.to_i32)
+    # source = sources.find { |s| s.path == filename }.not_nil!
+    # source_pos = Source::Pos.point(source, pos.line.to_i32, pos.character.to_i32)
 
     info = [] of String
-    begin
-      if @ctx.nil?
-        @ctx = Savi.compiler.compile(sources, :serve_lsp)
-      end
-      ctx = @ctx.not_nil!
+    # begin
+    #   if @ctx.nil?
+    #     @ctx = Savi.compiler.compile(sources, :serve_lsp, options)
+    #   end
+    #   ctx = @ctx.not_nil!
 
-      info, info_pos =
-        ctx.serve_hover[source_pos]
-    rescue
-    end
+    #   info, info_pos =
+    #     ctx.serve_hover[source_pos]
+    # rescue
+    # end
 
     info << "(no hover information)" if info.empty?
 
     @wire.respond msg do |msg|
       msg.result.contents.kind = "plaintext"
       msg.result.contents.value = info.join("\n\n")
-      if info_pos.is_a?(Savi::Source::Pos)
-        msg.result.range = info_pos.to_lsp_range
-      end
+      # if info_pos.is_a?(Savi::Source::Pos)
+      #   msg.result.range = info_pos.to_lsp_range
+      # end
       msg
     end
   end
@@ -169,7 +171,7 @@ class Savi::Server
     options = Savi::Compiler::CompilerOptions.new
     options.skip_manifest = true
 
-    ctx = Savi.compiler.compile(sources, :manifests, options)
+    ctx = Savi.compiler.compile(sources, :format, options)
     doc = ctx.root_docs.find(&.pos.source.path.==(filename)).not_nil!
 
     edits = AST::Format.run(ctx, ctx.root_package_link, [doc]).flat_map(&.last)
@@ -192,7 +194,7 @@ class Savi::Server
     options = Savi::Compiler::CompilerOptions.new
     options.skip_manifest = true
 
-    ctx = Savi.compiler.compile(sources, :manifests, options)
+    ctx = Savi.compiler.compile(sources, :format, options)
     doc = ctx.root_docs.find(&.pos.source.path.==(filename)).not_nil!
 
     edits = AST::Format.run(ctx, ctx.root_package_link, [doc]).flat_map(&.last)
@@ -216,7 +218,7 @@ class Savi::Server
     options = Savi::Compiler::CompilerOptions.new
     options.skip_manifest = true
 
-    ctx = Savi.compiler.compile(sources, :manifests, options)
+    ctx = Savi.compiler.compile(sources, :format, options)
     doc = ctx.root_docs.find(&.pos.source.path.==(filename)).not_nil!
 
     edits = AST::Format.run(ctx, ctx.root_package_link, [doc]).flat_map(&.last)
@@ -285,21 +287,10 @@ class Savi::Server
 
   def send_diagnostics(filename : String, content : String? = nil)
     dirname = File.dirname(filename)
-    sources = Savi.compiler.source_service.get_directory_sources(dirname)
+    sources = Savi.compiler.source_service.get_manifest_sources_at_or_above(dirname)
+    options = Compiler::CompilerOptions.new
 
-    source_index = sources.index { |s| s.path == filename }
-    if source_index
-      if content
-        source = sources[source_index]
-        source.content = content
-        sources[source_index] = source
-      else
-        content = sources[source_index].content
-        source = sources[source_index]
-      end
-    end
-
-    ctx = Savi.compiler.compile(sources, :serve_errors)
+    ctx = Savi.compiler.compile(sources, :serve_errors, options)
 
     @wire.notify(LSP::Message::PublishDiagnostics) do |msg|
       msg.params.uri = URI.new(path: filename)

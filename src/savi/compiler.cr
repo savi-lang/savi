@@ -84,6 +84,7 @@ class Savi::Compiler
   def execute(ctx, target : Symbol)
     time = Time.measure do
       case target
+      when :format           then nil # (not a true compiler pass)
       when :manifests        then ctx.run_whole_program(ctx.manifests)
       when :load             then ctx.run_whole_program(ctx.load)
       when :populate_types   then ctx.run_copy_on_mutate(ctx.populate_types)
@@ -142,6 +143,7 @@ class Savi::Compiler
   # passes like :classify and :refer instead of marking a dependency.
   def deps_of(target : Symbol) : Array(Symbol)
     case target
+    when :format then [] of Symbol # (not a true compiler pass)
     when :manifests then [] of Symbol
     when :load then [:manifests]
     when :populate_types then [:load]

@@ -136,6 +136,35 @@ class Savi::Compiler::SourceService
     dir_source_overrides.try(&.each { |name, content| yield ({name, content}) })
   end
 
+  # Yield the name and content of each Savi manifest file in this dirname.
+  private def each_manifest_savi_file_in(dirname)
+    dir_source_overrides = @source_overrides[dirname]?
+    internal_dirname = to_internal_path(dirname)
+
+    # Yield the real files and their content.
+    Dir.entries(internal_dirname).each { |name|
+      next unless name == "manifest.savi" || name.ends_with?(".manifest.savi")
+
+      # If this is a filename that has overridden content, omit it for now.
+      # We will yield it later when yielding all the other overrides.
+      next if dir_source_overrides.try(&.has_key?(name))
+
+      # Try to read the content from the file, or skip it if we fail for any
+      # reason, such as filesystem issues or deletion race conditions.
+      content = File.read(File.join(internal_dirname, name)) rescue nil
+      next unless content
+
+      yield ({name, content})
+    }
+
+    # Now yield the fake files implied by the source overrides for this dirname.
+    dir_source_overrides.try(&.each { |name, content|
+      next unless name == "manifest.savi" || name.ends_with?(".manifest.savi")
+
+      yield ({name, content})
+    })
+  end
+
   # Yield the name and content of each Savi file in this glob pattern.
   private def each_savi_file_in_glob(glob)
     internal_glob = to_internal_path(glob)
@@ -218,6 +247,33 @@ class Savi::Compiler::SourceService
 
     Error.at Source::Pos.show_package_path(package),
       "No '.savi' source files found in this directory" \
+        if sources.empty?
+
+    # Sort the sources by case-insensitive name, so that they always get loaded
+    # in a repeatable order regardless of platform implementation details, or
+    # the possible presence of source overrides shadowing some of the files.
+    sources.sort_by!(&.filename.downcase)
+
+    sources
+  end
+
+  # Given a directory name, load source objects for all the source files in it.
+  def get_manifest_sources_at_or_above(dirname)
+    try_dirname = dirname
+    sources = [] of Source
+    while sources.empty?
+      package = Source::Package.new(try_dirname)
+
+      each_manifest_savi_file_in(try_dirname) { |name, content|
+        sources << Source.new(try_dirname, name, content, package)
+      }
+
+      try_dirname = File.expand_path("..", dirname)
+      break unless try_dirname.starts_with?(Dir.current)
+    end
+
+    Error.at Source::Pos.show_package_path(Source::Package.new(dirname)),
+      "No 'manifest.savi' source files found at or above this directory" \
         if sources.empty?
 
     # Sort the sources by case-insensitive name, so that they always get loaded
