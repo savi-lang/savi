@@ -1,5 +1,3 @@
-:import "Spec"
-
 :class ResponseBuilderSpec
   :is Spec
   :const describes: "HTTPServer.ResponseBuilder"

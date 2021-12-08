@@ -1,7 +1,7 @@
 ##
 # The purpose of the Privacy pass is to enforce the function privacy boundary.
 # Functions whose identifier starts with an underscore are considered private,
-# and can only be called from within the same library where they were defined.
+# and can only be called from within the same package where they were defined.
 #
 # This pass does not mutate the Program topology.
 # This pass does not mutate the AST.
@@ -17,14 +17,14 @@ class Savi::Compiler::Privacy
       # Only handle private calls (beginning with an underscore).
       return unless called_func_link.name.starts_with?("_")
 
-      # If the call site's library is the same as the function's library,
+      # If the call site's package is the same as the function's package,
       # then there is no privacy issue and we can move on without error.
-      next if pos.source.library.path == called_func_link.type.library.path
+      next if pos.source.package == called_func_link.type.package.source_package
 
       # Otherwise we raise it as an error.
       Error.at pos, "This function call breaks privacy boundaries", [{
         called_func_link.resolve(ctx).ident.pos,
-        "this is a private function from another library"
+        "this is a private function from another package"
       }]
     }
   end

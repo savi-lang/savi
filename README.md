@@ -77,9 +77,9 @@ To work on this project and build the Savi compiler from source, you'll need `ma
 
 To get started, clone the project to your development machine, then run one of the following commands within the project working directory, or consult the `Makefile` for more available commands. Note that the first time you run one of these commands it will take longer, as it will need to download some static dependencies and build the compiler for the first time.
 
-- Run `make test` to run the test suite.
+- Run `make spec.all` to run the full test suite, or refer the Makefile for information about runnning more specific sets of specs.
 
-- Run `make format-check` to check `*.savi` source files for formatting rule violations, or `make format` to fix them automatically.
+- Run `make format.check` to check `*.savi` source files for formatting rule violations, or `make format` to fix them automatically.
 
 - Run `make example-run dir="/opt/code/examples/adventofcode/2018` to compile and run from the sources in `./examples/adventofcode/2018` directory (or similarly for any other example code directory).
 

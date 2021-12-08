@@ -1,5 +1,3 @@
-:import "OSError"
-
 :ffi LibC
   :fun getsockopt(
     fd U32, level I32, option I32

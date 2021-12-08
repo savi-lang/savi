@@ -1,0 +1,5 @@
+:manifest lib IO
+  :sources "IO/*.savi"
+
+  :dependency ByteStream "TODO: specify version"
+  :dependency OSError "TODO: specify version"

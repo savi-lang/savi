@@ -1,5 +1,5 @@
 ---
-pass: import
+pass: load
 ---
 
 It generates C bindings for a basic function.

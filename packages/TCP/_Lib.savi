@@ -1,5 +1,3 @@
-:import "OSError"
-
 :ffi _LibC
   :fun ntohs(network_short U16) U16
   :fun ntohl(network_long U32) U32

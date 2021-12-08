@@ -1,5 +1,3 @@
-:import "Spec"
-
 :class _JsonReaderSpecUser
   :var name String: ""
   :var admin Bool: False

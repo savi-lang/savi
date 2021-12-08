@@ -7,7 +7,7 @@
 # This pass does not mutate the AST.
 # This pass may raise a compilation error.
 # This pass keeps state at the program level.
-# This pass produces output state at the source and source library level.
+# This pass produces output state at the source and source package level.
 #
 class Savi::Compiler::Namespace
   struct SourceAnalysis
@@ -24,7 +24,7 @@ class Savi::Compiler::Namespace
   end
 
   def initialize
-    @types_by_library = Hash(Program::Library::Link, Hash(String,
+    @types_by_package_name = Hash(String, Hash(String,
       Program::Type::Link | Program::TypeAlias::Link | Program::TypeWithValue::Link
     )).new
     @source_analyses = Hash(Source, SourceAnalysis).new
@@ -32,24 +32,24 @@ class Savi::Compiler::Namespace
 
   def main_type!(ctx); main_type?(ctx).not_nil! end
   def main_type?(ctx): Program::Type::Link?
-    @types_by_library[ctx.root_library_link]["Main"]?.as(Program::Type::Link?)
+    @types_by_package_name[ctx.root_package_link.name]["Main"]?.as(Program::Type::Link?)
   end
 
   def run(ctx)
-    # Take note of the library and source file in which each type occurs.
-    ctx.program.libraries.each do |library|
-      library.types.each do |t|
-        check_conflicting_functions(ctx, t, t.make_link(library))
-        add_type_to_library(ctx, t, library)
-        add_type_to_source(t, library)
+    # Take note of the package and source file in which each type occurs.
+    ctx.program.packages.each do |package|
+      package.types.each do |t|
+        check_conflicting_functions(ctx, t, t.make_link(package))
+        add_type_to_package(ctx, t, package)
+        add_type_to_source(t, package)
       end
-      library.aliases.each do |t|
-        add_type_to_library(ctx, t, library)
-        add_type_to_source(t, library)
+      package.aliases.each do |t|
+        add_type_to_package(ctx, t, package)
+        add_type_to_source(t, package)
       end
-      library.enum_members.each do |t|
-        add_type_to_library(ctx, t, library)
-        add_type_to_source(t, library)
+      package.enum_members.each do |t|
+        add_type_to_package(ctx, t, package)
+        add_type_to_source(t, package)
       end
     end
 
@@ -58,25 +58,34 @@ class Savi::Compiler::Namespace
       add_core_savi_types_to_source(ctx, source, source_analysis)
     end
 
-    # Every source file implicitly has access to all types in the same library.
-    ctx.program.libraries.each do |library|
+    # Every source file implicitly has access to all types in the same package.
+    ctx.program.packages.each do |package|
       @source_analyses.each do |source, source_analysis|
-        next unless source.library == library.source_library
-        source_analysis.types.merge!(@types_by_library[library.make_link])
+        next unless source.package == package.source_package
+
+        types_map = @types_by_package_name[package.name]?
+        next unless types_map
+
+        source_analysis.types.merge!(types_map)
       end
     end
 
-    # Every source file has access to all explicitly imported types.
-    ctx.program.libraries.flat_map(&.imports).each do |import|
-      add_imported_types_to_source(ctx, import)
+    # Every source file has access to types loaded via its package manifest.
+    unless ctx.options.skip_manifest
+      @source_analyses.each { |source, source_analysis|
+        manifest = ctx.manifests.manifests_by_name[source.package.name]? || \
+          ctx.manifests.root.not_nil!
+
+        add_dependencies_to_source(ctx, source, source_analysis, manifest)
+      }
     end
   end
 
   # TODO: Can this be less hacky? It feels wrong to alter this state later.
-  def add_lambda_type_later(ctx : Context, new_type : Program::Type, library : Program::Library)
-    check_conflicting_functions(ctx, new_type, new_type.make_link(library))
-    add_type_to_library(ctx, new_type, library)
-    add_type_to_source(new_type, library)
+  def add_lambda_type_later(ctx : Context, new_type : Program::Type, package : Program::Package)
+    check_conflicting_functions(ctx, new_type, new_type.make_link(package))
+    add_type_to_package(ctx, new_type, package)
+    add_type_to_source(new_type, package)
   end
 
   # When given a Source, return the set of analysis for that source.
@@ -85,14 +94,10 @@ class Savi::Compiler::Namespace
     @source_analyses[source]
   end
 
-  def core_savi_library_link(ctx)
-    Program::Library::Link.new(ctx.compiler.source_service.core_savi_library_path)
-  end
-
-  # When given a String name, try to find the type in the core_savi library.
+  # When given a String name, try to find the type in the core_savi package.
   # This is a way to resolve a builtin type by name without more context.
   def core_savi_type(ctx, name : String) : Program::Type::Link
-    @types_by_library[core_savi_library_link(ctx)][name].as(Program::Type::Link)
+    @types_by_package_name["Savi"][name].as(Program::Type::Link)
   end
 
   # TODO: Remove this method?
@@ -113,10 +118,13 @@ class Savi::Compiler::Namespace
     end
   end
 
-  private def add_type_to_library(ctx, new_type, library)
+  private def add_type_to_package(ctx, new_type, package)
     name = new_type.ident.value
 
-    types = @types_by_library[library.make_link] ||= Hash(String,
+    package_name = package.source_package.name
+    return unless package_name
+
+    types = @types_by_package_name[package_name] ||= Hash(String,
       Program::Type::Link | Program::TypeAlias::Link | Program::TypeWithValue::Link
     ).new
 
@@ -124,30 +132,30 @@ class Savi::Compiler::Namespace
     if already_type_link
       already_type = already_type_link.resolve(ctx)
       Error.at new_type.ident.pos,
-        "This type conflicts with another declared type in the same library", [
+        "This type conflicts with another declared type in the same package", [
           {already_type.ident.pos, "the other type with the same name is here"}
         ]
     end
 
-    types[name] = new_type.make_link(library)
+    types[name] = new_type.make_link(package)
   end
 
-  private def add_type_to_source(new_type, library)
+  private def add_type_to_source(new_type, package)
     source = new_type.ident.pos.source
     name = new_type.ident.value
 
     source_analysis = @source_analyses[source] ||= SourceAnalysis.new(source)
 
-    raise "should have been prevented by add_type_to_library" \
+    raise "should have been prevented by add_type_to_package" \
       if source_analysis.types[name]?
 
-    source_analysis.types[name] = new_type.make_link(library)
+    source_analysis.types[name] = new_type.make_link(package)
   end
 
   private def add_core_savi_types_to_source(ctx, source, source_analysis)
-    return if source.library.path == ctx.compiler.source_service.core_savi_library_path
+    return if source.package.path == ctx.compiler.source_service.core_savi_package_path
 
-    @types_by_library[core_savi_library_link(ctx)].each do |name, new_type_link|
+    @types_by_package_name["Savi"].each do |name, new_type_link|
       new_type = new_type_link.resolve(ctx)
       next if new_type.has_tag?(:private)
 
@@ -163,55 +171,24 @@ class Savi::Compiler::Namespace
     end
   end
 
-  private def add_imported_types_to_source(ctx, import)
-    source = import.ident.pos.source
-    importable_types = @types_by_library[ctx.import[import]]
+  private def add_dependencies_to_source(ctx, source, source_analysis, manifest)
+    manifest.dependencies.each { |dep|
+      next if dep.transitive?
 
-    # Determine the list of types to be imported.
-    imported_types = [] of Tuple(Source::Pos,
-      Program::Type::Link | Program::TypeAlias::Link | Program::TypeWithValue::Link
-    )
-    if import.names
-      import.names.not_nil!.terms.map do |ident|
-        raise NotImplementedError.new(ident) unless ident.is_a?(AST::Identifier)
-
-        new_type_link = importable_types[ident.value]?
-        Error.at ident, "This type doesn't exist within the imported library" \
-          unless new_type_link
-
-        new_type = new_type_link.resolve(ctx)
-        Error.at ident, "This type is private and cannot be imported" \
-          if new_type.has_tag?(:private)
-
-        imported_types << {ident.pos, new_type_link}
-      end
-    else
-      importable_types.values.each do |new_type_link|
+      @types_by_package_name[dep.name.value].each { |name, new_type_link|
         new_type = new_type_link.resolve(ctx)
         next if new_type.has_tag?(:private)
 
-        imported_types << {import.ident.pos, new_type_link}
-      end
-    end
+        already_type = source_analysis.types[name]?.try(&.resolve(ctx))
+        if already_type
+          Error.at already_type.ident.pos,
+            "This type's name conflicts with a type defined in another package", [
+              {new_type.ident.pos, "the imported type is defined here"},
+            ]
+        end
 
-    source_analysis = @source_analyses[source] ||= SourceAnalysis.new(source)
-
-    # Import those types into the source, raising an error upon any conflict.
-    imported_types.each do |import_pos, new_type_link|
-      new_type = new_type_link.resolve(ctx)
-
-      already_type_link = source_analysis.types[new_type.ident.value]?
-      if already_type_link
-        already_type = already_type_link.resolve(ctx)
-        Error.at import_pos,
-          "A type imported here conflicts with another " \
-          "type already in this source file", [
-            {new_type.ident.pos, "the imported type is here"},
-            {already_type.ident.pos, "the other type with the same name is here"},
-          ]
-      end
-
-      source_analysis.types[new_type.ident.value] = new_type_link
-    end
+        source_analysis.types[name] = new_type_link
+      }
+    }
   end
 end

@@ -1,5 +1,3 @@
-:import "Map" (Map)
-
 :module Foo
   :fun non true: True
   :fun non with_yield Bool

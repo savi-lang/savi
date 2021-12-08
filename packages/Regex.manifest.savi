@@ -1,0 +1,9 @@
+:manifest lib Regex
+  :sources "Regex/*.savi"
+
+:manifest bin "spec-Regex"
+  :copies Regex
+  :sources "Regex/test/*.savi"
+
+  :dependency Spec "TODO: specify version"
+  :transitive dependency Map "TODO: specify version"

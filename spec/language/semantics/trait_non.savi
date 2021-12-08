@@ -1,0 +1,20 @@
+:trait non TraitNon
+  :fun non example: "value"
+
+:module TraitNonDefault
+  :is TraitNon
+
+:module TraitNonOverride
+  :is TraitNon
+  :fun non example: "other value"
+
+:module TraitNonSpec
+  :fun run(test MicroTest)
+    test["fun non call on trait singleton"].pass =
+      TraitNon.example == "value"
+
+    test["trait-inherited fun non call on module"].pass =
+      TraitNonDefault.example == "value"
+
+    test["overriden fun non call on module"].pass =
+      TraitNonOverride.example == "other value"

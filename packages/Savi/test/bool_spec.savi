@@ -1,0 +1,16 @@
+:class BoolSpec
+  :is Spec
+  :const describes: "Bool"
+
+  :it "has some trivial convenience methods for readability's sake"
+    assert: True.is_true   == True
+    assert: False.is_true  == False
+    assert: True.is_false  == False
+    assert: False.is_false == True
+    assert: True.not       == False
+    assert: False.not      == True
+
+  :it "can be converted from a U64"
+    assert: Bool.from_u64!(U64[0]) == False
+    assert: Bool.from_u64!(U64[1]) == True
+    assert error: Bool.from_u64!(U64[2])

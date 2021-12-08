@@ -15,8 +15,7 @@
 		"url": "https://github.com/savi-lang/savi"
 	},
 	"dependencies": {
-		"vscode-languageclient": "^4.3.0",
-		"tmp": "0.2.1"
+		"vscode-languageclient": "^4.3.0"
 	},
 	"devDependencies": {
 		"@types/node": "~10.1.0",
@@ -70,12 +69,6 @@
 				"command": "savi.restart",
 				"title": "Restart the Savi Language Server",
 				"description": "Restart the Savi Language Server process",
-				"category": "Savi"
-			},
-			{
-				"command": "savi.update",
-				"title": "Update the Savi Language Server",
-				"description": "Pull the latest Savi compiler image",
 				"category": "Savi"
 			}
 		],

@@ -1,7 +1,3 @@
-:import "Spec"
-:import "IO"
-:import "OSError" // TODO: remove?
-
 :class iso TCPSpecListenerNotify
   :is TCP.Listener.Notify
   :let env Env

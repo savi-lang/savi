@@ -1,6 +1,3 @@
-:import "Spec"
-:source ".."
-
 :actor Main
   :new (env)
     Spec.Process.run(env, [

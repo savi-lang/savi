@@ -1,0 +1,9 @@
+:manifest lib Time
+  :sources "Time/*.savi"
+
+:manifest bin "spec-Time"
+  :copies Time
+  :sources "Time/test/*.savi"
+
+  :dependency Spec "TODO: specify version"
+  :transitive dependency Map "TODO: specify version"

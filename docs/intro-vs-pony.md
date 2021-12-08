@@ -337,7 +337,7 @@ Some functions can interrupt themselves in the middle of their execution to pass
 
 When the parenthesized block is split by the `|` character, the first half of the block describes the "parameters" of the block (the values that the function "yields out"), and the result value of the block is what gets passed back to the caller.
 
-In the standard library, this kind of function is often used for iteration, but it can be used in any other case where a function needs to pass values back and forth with the caller before the function finishes executing.
+In Savi, this kind of function is often used for iteration, but it can be used in any other case where a function needs to pass values back and forth with the caller before the function finishes executing.
 
 ```savi
 :actor Main

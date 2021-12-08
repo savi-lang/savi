@@ -1,5 +1,3 @@
-:import "Map" (Map.Ordered)
-
 :actor Spec.Process
   :let env Env
   :let reporter Spec.Reporter

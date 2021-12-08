@@ -1,5 +1,3 @@
-:import "Spec"
-
 :class TimeFormatterSpec
   :is Spec
   :const describes: "Time.Formatter"

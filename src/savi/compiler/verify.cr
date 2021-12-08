@@ -10,7 +10,7 @@
 # This pass produces no output state.
 #
 class Savi::Compiler::Verify
-  def self.check_main_actor(ctx, library)
+  def self.check_main_actor(ctx, package)
     main_link = ctx.namespace.main_type?(ctx)
     main = main_link.try(&.resolve(ctx))
 
@@ -184,13 +184,13 @@ class Savi::Compiler::Verify
   end
 
   class Pass < Compiler::Pass::Analyze(Nil, Nil, Nil)
-    def run(ctx, library)
-      # If this is the "root" library, check that it has a Main actor,
+    def run(ctx, package)
+      # If this is the "root" package, check that it has a Main actor,
       # and that the Main actor meets all requirements we expect.
-      Verify.check_main_actor(ctx, library) \
-        if library.make_link == ctx.root_library_link
+      Verify.check_main_actor(ctx, package) \
+        if package.make_link == ctx.root_package_link
 
-      super(ctx, library)
+      super(ctx, package)
     end
 
     def analyze_type_alias(ctx, t, t_link) : Nil

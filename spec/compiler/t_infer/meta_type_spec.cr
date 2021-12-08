@@ -1,16 +1,16 @@
 describe Savi::Compiler::TInfer::MetaType do
   it "implements logical operators that keep the expression in DNF form" do
-    library = Savi::Program::Library.new(
-      Savi::Source::Library.new("(example)")
+    package = Savi::Program::Package.new(
+      Savi::Source::Package.new("(example)")
     )
 
     new_type = ->(s : String, is_abstract : Bool) {
       ref_ident = Savi::AST::Identifier.new("ref")
       t = Savi::Program::Type.new(ref_ident, Savi::AST::Identifier.new(s))
       t.add_tag(:abstract) if is_abstract
-      library.types << t
+      package.types << t
       m = Savi::Compiler::TInfer::MetaType.new_nominal(
-        Savi::Compiler::TInfer::ReifiedType.new(t.make_link(library))
+        Savi::Compiler::TInfer::ReifiedType.new(t.make_link(package))
       )
       m
     }

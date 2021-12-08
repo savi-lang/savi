@@ -13,7 +13,7 @@ describe Savi::Compiler::TypeContext do
 
     SOURCE
 
-    ctx = Savi.compiler.compile([source], :type_context)
+    ctx = Savi.compiler.test_compile([source], :type_context)
     ctx.errors.should be_empty
 
     t_link = ctx.namespace[source]["Container"].as(Savi::Program::Type::Link)

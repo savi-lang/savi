@@ -1,0 +1,12 @@
+:module SourceCodeSpec
+  :fun run(test MicroTest)
+    zero = U64[0]
+
+    test["source_code_position_of_argument string"].pass =
+      @source_code_position_of_argument_string(zero == 0) == "zero == 0"
+
+  :fun source_code_position_of_argument_string(
+    arg Bool
+    pos SourceCodePosition = source_code_position_of_argument arg
+  )
+    pos.string

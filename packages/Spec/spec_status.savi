@@ -1,5 +1,3 @@
-:import "Map" (Map.Ordered)
-
 :class Spec.Status
   :let examples: Map.Ordered(String, Spec.Status.ForExample).new
   :var expected_examples USize: 0

@@ -1,5 +1,3 @@
-:import "Spec"
-
 :class JsonParserSpec
   :is Spec
   :const describes: "JSON.Parser"

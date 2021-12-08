@@ -11,31 +11,45 @@ SPEC=$(BUILD)/savi-spec
 
 # Run the full CI suite.
 ci: PHONY
-	make format-check
-	make compiler-spec.all
-	make test extra_args="$(extra_args)"
-	make example-run dir="examples/adventofcode/2018" extra_args="--backtrace"
+	make format.check
+	make spec.all extra_args="--backtrace $(extra_args)"
+	make example-run dir="examples/adventofcode/2018" extra_args="--backtrace $(extra_args)"
 
 # Remove temporary/generated files.
 clean: PHONY
 	rm -rf $(BUILD) .make-var-cache lib/libsavi_runtime.bc
 
-# Run the test suite.
-test: PHONY $(SPEC)
-	echo && $(SPEC) $(extra_args)
+# Run the full test suite.
+spec.all: PHONY spec.compiler.all spec.language spec.package.all spec.unit.all
 
-# Run a narrow target within the test suite.
-test.narrow: PHONY $(SPEC)
-	echo && $(SPEC) -v -e "$(target)"
+# Run the specs that are written in markdown (mostly compiler pass tests).
+# Run the given compiler-spec target (or all targets).
+spec.compiler: PHONY $(SAVI)
+	echo && $(SAVI) compilerspec "spec/compiler/$(name).savi.spec.md" $(extra_args)
+spec.compiler.all: PHONY $(SAVI)
+	find "spec/compiler" -name '*.savi.spec.md' | sort | xargs -I'{}' sh -c \
+		'echo && $(SAVI) compilerspec {} $(extra_args) || exit 255'
 
-# Run the given compiler-spec target.
-compiler-spec: PHONY $(SAVI)
-	echo && $(SAVI) compilerspec "$(target)" $(extra_args)
-compiler-spec.all: PHONY
-	find "spec/compiler" -name '*.savi.spec.md' | xargs -I '{}' sh -c 'make compiler-spec target="{}" extra_args="'$(extra_args)'" || exit 255'
+# Run the specs that are written in Crystal (mostly compiler unit tests),
+# narrowing to those with the given name (or all of them).
+spec.unit: PHONY $(SPEC)
+	echo && $(SPEC) -v -e "$(name)"
+spec.unit.all: PHONY $(SPEC)
+	echo && $(SPEC)
+
+# Run the specs for the basic language semantics.
+spec.language: PHONY $(SAVI)
+	echo && $(SAVI) run --cd spec/language $(extra_args)
+
+# Run the specs for the given package (or all packages).
+spec.package: PHONY $(SAVI)
+	echo && $(SAVI) run --cd packages "spec-$(name)" $(extra_args)
+spec.package.all: PHONY $(SAVI)
+	find packages -name 'test' | cut -d/ -f2 | sort | xargs -I'{}' sh -c \
+		"echo && $(SAVI) run --cd packages "spec-{}" $(extra_args) || exit 255"
 
 # Check formatting of *.savi source files.
-format-check: PHONY $(SAVI)
+format.check: PHONY $(SAVI)
 	echo && $(SAVI) format --check --backtrace
 
 # Fix formatting of *.savi source files.
@@ -66,9 +80,8 @@ example: example-compile
 example-lldb: example-compile
 	echo && lldb -o run -- "$(dir)/main"
 
-# Compile the language server image and vscode extension.
-vscode: PHONY
-	docker build . --tag jemc/savi
+# Compile the vscode extension.
+vscode: PHONY $(SAVI)
 	cd tooling/vscode && npm run-script compile || npm install
 
 ##

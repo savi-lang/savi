@@ -32,9 +32,7 @@
 		"webpack": "^4.34.0",
 		"webpack-cli": "^3.3.4"
 	},
-	"dependencies": {
-		"tmp": "0.2.1"
-    },
+	"dependencies": {},
 	"main": "lib/index.js",
 	"scripts": {
 		"clean": "rimraf lib",
@@ -50,12 +48,6 @@
 				"command": "savi.restart",
 				"title": "Restart the Savi Language Server",
 				"description": "Restart the Savi Language Server process",
-				"category": "Savi"
-			},
-			{
-				"command": "savi.update",
-				"title": "Update the Savi Language Server",
-				"description": "Pull the latest Savi compiler image",
 				"category": "Savi"
 			}
 		],

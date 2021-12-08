@@ -13,8 +13,8 @@ class Savi::Program::Declarator::Scope
   # TODO: These properties likely need to be more dynamic to allow
   # arbitrary custom declarators to create their own custom contexts,
   # which will have arbitrary names and be arbitrary interpreter objects.
-  getter! current_library : Library
-  setter current_library : Library?
+  getter! current_package : Package
+  setter current_package : Package?
   getter! current_declarator : Declarator
   setter current_declarator : Declarator?
   getter! current_declarator_term : Declarator::TermAcceptor
@@ -25,6 +25,10 @@ class Savi::Program::Declarator::Scope
   setter current_function : Function?
   getter! current_members : Array(TypeWithValue)
   setter current_members : Array(TypeWithValue)?
+  getter! current_manifest : Packaging::Manifest
+  setter current_manifest : Packaging::Manifest?
+  getter! current_manifest_dependency : Packaging::Dependency
+  setter current_manifest_dependency : Packaging::Dependency?
 
   def visible_declarators(ctx)
     declarators = [] of Declarator
@@ -35,9 +39,8 @@ class Savi::Program::Declarator::Scope
       .tap(&.meta_declarators.try { |l| declarators.concat(l.declarators) })
       .tap(&.standard_declarators.try { |l| declarators.concat(l.declarators) })
 
-    # TODO: Declarators visible via import statements in this file
-
-    declarators.concat(current_library.declarators)
+    # TODO: Declarators visible via package dependencies in the manifest
+    declarators.concat(current_package.declarators)
 
     declarators
   end

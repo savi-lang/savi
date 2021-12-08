@@ -4,7 +4,7 @@ describe Savi::Compiler::Verify do
     :module Example
     SOURCE
 
-    Savi.compiler.compile([source], :verify).errors.should be_empty
+    Savi.compiler.test_compile([source], :verify).errors.should be_empty
   end
 
   it "complains if the Main type is not an actor" do
@@ -20,7 +20,7 @@ describe Savi::Compiler::Verify do
            ^~~~
     MSG
 
-    Savi.compiler.compile([source], :verify)
+    Savi.compiler.test_compile([source], :verify)
       .errors.map(&.message).join("\n").should eq expected
   end
 
@@ -37,7 +37,7 @@ describe Savi::Compiler::Verify do
                ^~~
     MSG
 
-    Savi.compiler.compile([source], :verify)
+    Savi.compiler.test_compile([source], :verify)
       .errors.map(&.message).join("\n").should eq expected
   end
 
@@ -59,7 +59,7 @@ describe Savi::Compiler::Verify do
            ^~~~~~~~~~
     MSG
 
-    Savi.compiler.compile([source], :verify)
+    Savi.compiler.test_compile([source], :verify)
       .errors.map(&.message).join("\n").should eq expected
   end
 
@@ -76,7 +76,7 @@ describe Savi::Compiler::Verify do
            ^~~
     MSG
 
-    Savi.compiler.compile([source], :verify)
+    Savi.compiler.test_compile([source], :verify)
       .errors.map(&.message).join("\n").should eq expected
   end
 
@@ -93,12 +93,12 @@ describe Savi::Compiler::Verify do
        ^~~
 
     - it should accept exactly one parameter of type Env:
-      from #{Savi.compiler.source_service.core_savi_library_path}/env.savi:1:
+      from #{Savi.compiler.source_service.core_savi_package_path}/env.savi:1:
     :class val Env
                ^~~
     MSG
 
-    Savi.compiler.compile([source], :verify)
+    Savi.compiler.test_compile([source], :verify)
       .errors.map(&.message).join("\n").should eq expected
   end
 
@@ -115,12 +115,12 @@ describe Savi::Compiler::Verify do
            ^~~~~~~~~~~~~~~~~~~~
 
     - it should accept exactly one parameter of type Env:
-      from #{Savi.compiler.source_service.core_savi_library_path}/env.savi:1:
+      from #{Savi.compiler.source_service.core_savi_package_path}/env.savi:1:
     :class val Env
                ^~~
     MSG
 
-    Savi.compiler.compile([source], :verify)
+    Savi.compiler.test_compile([source], :verify)
       .errors.map(&.message).join("\n").should eq expected
   end
 
@@ -137,7 +137,7 @@ describe Savi::Compiler::Verify do
             ^~~~~~~~~~
 
     - it should accept a parameter of type Env:
-      from #{Savi.compiler.source_service.core_savi_library_path}/env.savi:1:
+      from #{Savi.compiler.source_service.core_savi_package_path}/env.savi:1:
     :class val Env
                ^~~
 
@@ -147,7 +147,7 @@ describe Savi::Compiler::Verify do
                 ^~~~~~
     MSG
 
-    Savi.compiler.compile([source], :verify)
+    Savi.compiler.test_compile([source], :verify)
       .errors.map(&.message).join("\n").should eq expected
   end
 end

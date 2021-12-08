@@ -1,6 +1,3 @@
-:import "OSError"
-:import "IO"
-
 :trait TCP.Listener.Notify
   :fun ref listening(listen TCP.Listener'ref): None
   :fun ref not_listening(listen TCP.Listener'ref) None

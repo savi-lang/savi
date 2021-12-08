@@ -9,7 +9,7 @@ describe Savi::Compiler::Sugar do
         "this isn't the return value"
     SOURCE
 
-    ctx = Savi.compiler.compile([source], :sugar)
+    ctx = Savi.compiler.test_compile([source], :sugar)
     ctx.errors.should be_empty
 
     ctx.root_docs.first.to_a.should eq [:doc,
@@ -36,8 +36,8 @@ describe Savi::Compiler::Sugar do
     ]
 
     # Compiling again should yield an equivalent program tree:
-    ctx2 = Savi.compiler.compile([source], :sugar)
-    ctx.program.libraries.should eq ctx2.program.libraries
+    ctx2 = Savi.compiler.test_compile([source], :sugar)
+    ctx.program.packages.should eq ctx2.program.packages
   end
 
   it "transforms a property assignment into a method call" do
@@ -48,7 +48,7 @@ describe Savi::Compiler::Sugar do
         x.y! = z
     SOURCE
 
-    ctx = Savi.compiler.compile([source], :sugar)
+    ctx = Savi.compiler.test_compile([source], :sugar)
     ctx.errors.should be_empty
 
     ctx.root_docs.first.to_a.should eq [:doc,
@@ -85,8 +85,8 @@ describe Savi::Compiler::Sugar do
     ]
 
     # Compiling again should yield an equivalent program tree:
-    ctx2 = Savi.compiler.compile([source], :sugar)
-    ctx.program.libraries.should eq ctx2.program.libraries
+    ctx2 = Savi.compiler.test_compile([source], :sugar)
+    ctx.program.packages.should eq ctx2.program.packages
   end
 
   it "transforms property arithmetic-assignments into method calls" do
@@ -97,7 +97,7 @@ describe Savi::Compiler::Sugar do
         x.y -= z
     SOURCE
 
-    ctx = Savi.compiler.compile([source], :sugar)
+    ctx = Savi.compiler.test_compile([source], :sugar)
     ctx.errors.should be_empty
 
     ctx.root_docs.first.to_a.should eq [:doc,
@@ -145,8 +145,8 @@ describe Savi::Compiler::Sugar do
     ]
 
     # Compiling again should yield an equivalent program tree:
-    ctx2 = Savi.compiler.compile([source], :sugar)
-    ctx.program.libraries.should eq ctx2.program.libraries
+    ctx2 = Savi.compiler.test_compile([source], :sugar)
+    ctx.program.packages.should eq ctx2.program.packages
   end
 
   it "transforms an operator into a method call" do
@@ -156,7 +156,7 @@ describe Savi::Compiler::Sugar do
         x + y
     SOURCE
 
-    ctx = Savi.compiler.compile([source], :sugar)
+    ctx = Savi.compiler.test_compile([source], :sugar)
     ctx.errors.should be_empty
 
     ctx.root_docs.first.to_a.should eq [:doc,
@@ -177,8 +177,8 @@ describe Savi::Compiler::Sugar do
     ]
 
     # Compiling again should yield an equivalent program tree:
-    ctx2 = Savi.compiler.compile([source], :sugar)
-    ctx.program.libraries.should eq ctx2.program.libraries
+    ctx2 = Savi.compiler.test_compile([source], :sugar)
+    ctx.program.packages.should eq ctx2.program.packages
   end
 
   it "transforms an operator into a method call (in a loop condition)" do
@@ -190,7 +190,7 @@ describe Savi::Compiler::Sugar do
         )
     SOURCE
 
-    ctx = Savi.compiler.compile([source], :sugar)
+    ctx = Savi.compiler.test_compile([source], :sugar)
     ctx.errors.should be_empty
 
     ctx.root_docs.first.to_a.should eq [:doc,
@@ -228,8 +228,8 @@ describe Savi::Compiler::Sugar do
     ]
 
     # Compiling again should yield an equivalent program tree:
-    ctx2 = Savi.compiler.compile([source], :sugar)
-    ctx.program.libraries.should eq ctx2.program.libraries
+    ctx2 = Savi.compiler.test_compile([source], :sugar)
+    ctx.program.packages.should eq ctx2.program.packages
   end
 
   it "transforms a square brace qualification into a method call" do
@@ -239,7 +239,7 @@ describe Savi::Compiler::Sugar do
         x[y]
     SOURCE
 
-    ctx = Savi.compiler.compile([source], :sugar)
+    ctx = Savi.compiler.test_compile([source], :sugar)
     ctx.errors.should be_empty
 
     ctx.root_docs.first.to_a.should eq [:doc,
@@ -259,8 +259,8 @@ describe Savi::Compiler::Sugar do
     ]
 
     # Compiling again should yield an equivalent program tree:
-    ctx2 = Savi.compiler.compile([source], :sugar)
-    ctx.program.libraries.should eq ctx2.program.libraries
+    ctx2 = Savi.compiler.test_compile([source], :sugar)
+    ctx.program.packages.should eq ctx2.program.packages
   end
 
   it "transforms a chained qualifications into chained method calls" do
@@ -272,7 +272,7 @@ describe Savi::Compiler::Sugar do
         x.call(y)[y].call(z)[z]
     SOURCE
 
-    ctx = Savi.compiler.compile([source], :sugar)
+    ctx = Savi.compiler.test_compile([source], :sugar)
     ctx.errors.should be_empty
 
     ctx.root_docs.first.to_a.should eq [:doc,
@@ -356,8 +356,8 @@ describe Savi::Compiler::Sugar do
     ]
 
     # Compiling again should yield an equivalent program tree:
-    ctx2 = Savi.compiler.compile([source], :sugar)
-    ctx.program.libraries.should eq ctx2.program.libraries
+    ctx2 = Savi.compiler.test_compile([source], :sugar)
+    ctx.program.packages.should eq ctx2.program.packages
   end
 
   it "transforms a square brace qualified assignment into a method call" do
@@ -367,7 +367,7 @@ describe Savi::Compiler::Sugar do
         x[y] = z
     SOURCE
 
-    ctx = Savi.compiler.compile([source], :sugar)
+    ctx = Savi.compiler.test_compile([source], :sugar)
     ctx.errors.should be_empty
 
     ctx.root_docs.first.to_a.should eq [:doc,
@@ -394,8 +394,8 @@ describe Savi::Compiler::Sugar do
     ]
 
     # Compiling again should yield an equivalent program tree:
-    ctx2 = Savi.compiler.compile([source], :sugar)
-    ctx.program.libraries.should eq ctx2.program.libraries
+    ctx2 = Savi.compiler.test_compile([source], :sugar)
+    ctx.program.packages.should eq ctx2.program.packages
   end
 
   it "adds a '@' statement to the end of a constructor body" do
@@ -405,7 +405,7 @@ describe Savi::Compiler::Sugar do
         x = 1
     SOURCE
 
-    ctx = Savi.compiler.compile([source], :sugar)
+    ctx = Savi.compiler.test_compile([source], :sugar)
     ctx.errors.should be_empty
 
     ctx.root_docs.first.to_a.should eq [:doc,
@@ -423,8 +423,8 @@ describe Savi::Compiler::Sugar do
     ]
 
     # Compiling again should yield an equivalent program tree:
-    ctx2 = Savi.compiler.compile([source], :sugar)
-    ctx.program.libraries.should eq ctx2.program.libraries
+    ctx2 = Savi.compiler.test_compile([source], :sugar)
+    ctx.program.packages.should eq ctx2.program.packages
   end
 
   it "transforms non-identifier parameters into assignment expressions" do
@@ -434,7 +434,7 @@ describe Savi::Compiler::Sugar do
         @y.after
     SOURCE
 
-    ctx = Savi.compiler.compile([source], :sugar)
+    ctx = Savi.compiler.test_compile([source], :sugar)
     ctx.errors.should be_empty
 
     ctx.root_docs.first.to_a.should eq [:doc,
@@ -474,8 +474,8 @@ describe Savi::Compiler::Sugar do
     ]
 
     # Compiling again should yield an equivalent program tree:
-    ctx2 = Savi.compiler.compile([source], :sugar)
-    ctx.program.libraries.should eq ctx2.program.libraries
+    ctx2 = Savi.compiler.test_compile([source], :sugar)
+    ctx.program.packages.should eq ctx2.program.packages
   end
 
   it "transforms short-circuiting logical operators and negations" do
@@ -485,7 +485,7 @@ describe Savi::Compiler::Sugar do
         w && x || y && !z
     SOURCE
 
-    ctx = Savi.compiler.compile([source], :sugar)
+    ctx = Savi.compiler.test_compile([source], :sugar)
     ctx.errors.should be_empty
 
     ctx.root_docs.first.to_a.should eq [:doc,
@@ -535,7 +535,7 @@ describe Savi::Compiler::Sugar do
     ]
 
     # Compiling again should yield an equivalent program tree:
-    ctx2 = Savi.compiler.compile([source], :sugar)
-    ctx.program.libraries.should eq ctx2.program.libraries
+    ctx2 = Savi.compiler.test_compile([source], :sugar)
+    ctx.program.packages.should eq ctx2.program.packages
   end
 end

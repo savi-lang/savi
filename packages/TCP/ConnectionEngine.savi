@@ -1,7 +1,3 @@
-:import "OSError" // TODO: can this be removed?
-:import "ByteStream" (ByteStream.Reader, ByteStream.ChunkedWriter)
-:import "IO"
-
 :class TCP.ConnectionEngine
   :is IO.Engine(IO.Action)
   :var io: IO.CoreEngine.new

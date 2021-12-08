@@ -1,5 +1,3 @@
-:import "ByteStream" (ByteStream.Writable)
-
 :class HTTPServer.ResponseBuilder
   :let _res ByteStream.Writable
   :var _has_body: False

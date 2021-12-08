@@ -7,7 +7,7 @@ describe Savi::Compiler::Macros do
           reflection_of_type @
       SOURCE
 
-      ctx = Savi.compiler.compile([source], :macros)
+      ctx = Savi.compiler.test_compile([source], :macros)
       ctx.errors.should be_empty
 
       func = ctx.namespace.find_func!(ctx, source, "Main", "new")
@@ -42,7 +42,7 @@ describe Savi::Compiler::Macros do
                                ^
       MSG
 
-      Savi.compiler.compile([source], :macros)
+      Savi.compiler.test_compile([source], :macros)
         .errors.map(&.message).join("\n").should eq expected
     end
   end

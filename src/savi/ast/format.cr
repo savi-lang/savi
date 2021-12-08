@@ -2,11 +2,11 @@ class Savi::AST::Format < Savi::AST::Visitor
   # Return a list of edits that should be applied to the given document.
   def self.run(
     ctx : Compiler::Context,
-    library : Program::Library::Link,
+    package : Program::Package::Link,
     docs : Array(AST::Document)
   )
     docs.compact_map { |doc|
-      visitor = new(library, doc)
+      visitor = new(package, doc)
       doc.accept(ctx, visitor)
       visitor.finalize
       edits = visitor.edits
@@ -18,10 +18,10 @@ class Savi::AST::Format < Savi::AST::Visitor
   # Emit errors to the context for any formatting issues in the given document.
   def self.check(
     ctx : Compiler::Context,
-    library : Program::Library::Link,
+    package : Program::Package::Link,
     docs : Array(AST::Document)
   )
-    run(ctx, library, docs).each { |doc, edits|
+    run(ctx, package, docs).each { |doc, edits|
       edits.each { |edit|
         ctx.error_at edit.pos, "This code violates formatting rule #{edit.rule}"
       }
@@ -62,7 +62,7 @@ class Savi::AST::Format < Savi::AST::Visitor
         source.dirname,
         source.filename,
         chunks.join, # new content
-        source.library,
+        source.package,
         source.language,
       ),
       within.start,
@@ -93,9 +93,9 @@ class Savi::AST::Format < Savi::AST::Visitor
 
   getter edits = [] of Edit
 
-  def initialize(library : Program::Library::Link, doc : AST::Document)
+  def initialize(package : Program::Package::Link, doc : AST::Document)
     @parent_stack = [] of AST::Node
-    @indent_state = IndentState.new(library, doc)
+    @indent_state = IndentState.new(package, doc)
   end
 
   def finalize

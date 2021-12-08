@@ -7,4 +7,5 @@ This extension adds various Intellisense features for the Savi Programming Langu
 ## Prerequisites
 
 This extension doesn't provide savi language support to vim yet, so you need to install [savi-vim](https://github.com/teggotic/vim-savi)
-This extension uses [Docker](https://docs.docker.com/install/) to run the Savi language server in the background, so you'll need to have a working installation of Docker and the ability to `docker run` as a non-root user.
+
+This extension uses the `savi` binary to run the Savi language server in the background, so you'll need to have a working installation of Savi (see main README), with the intended `savi` binary in your `PATH`.

@@ -4,10 +4,10 @@ struct Savi::Source
   property dirname : String
   property filename : String
   property content : String
-  property library : Library
+  property package : Package
   property language : Symbol
 
-  def initialize(@dirname, @filename, @content, @library, @language = :savi)
+  def initialize(@dirname, @filename, @content, @package, @language = :savi)
   end
 
   def path
@@ -18,22 +18,28 @@ struct Savi::Source
     Source::Pos.index_range(self, 0, content.bytesize)
   end
 
-  NONE = new("", "(none)", "", Library::NONE)
+  NONE = new("", "(none)", "", Package::NONE)
   def self.none; NONE end
 
   def self.new_example(content)
-    new("", "(example)", content, Library.new(""))
+    new("", "(example)", content, Package.new("", "(example)"))
   end
 end
 
-struct Savi::Source::Library
+struct Savi::Source::Package
   property path : String
+  property name : String?
 
-  def initialize(@path)
+  def initialize(@path, @name = nil)
   end
 
   NONE = new("")
   def self.none; NONE end
+
+  def self.for_manifest(manifest : Packaging::Manifest)
+    package_path = manifest.name.pos.source.dirname
+    Source::Package.new(package_path, manifest.name.value)
+  end
 end
 
 struct Savi::Source::Pos
@@ -99,9 +105,14 @@ struct Savi::Source::Pos
     )
   end
 
-  def self.show_library_path(library : Library)
-    source = Source.new(library.path, "", library.path, library, :path)
-    new(source, 0, library.path.bytesize, 0, library.path.bytesize, 0, 0)
+  def self.show_source_path(source : Source)
+    source = Source.new(package.path, "", package.path, package, :path)
+    new(source, 0, package.path.bytesize, 0, package.path.bytesize, 0, 0)
+  end
+
+  def self.show_package_path(package : Package)
+    source = Source.new(package.path, "", package.path, package, :path)
+    new(source, 0, package.path.bytesize, 0, package.path.bytesize, 0, 0)
   end
 
   def initialize(

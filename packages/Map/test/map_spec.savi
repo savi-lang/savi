@@ -1,5 +1,3 @@
-:import "Spec"
-
 :actor MapSpecActor
 
 :class MapSpec

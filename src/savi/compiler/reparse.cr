@@ -62,12 +62,12 @@ class Savi::Compiler::Reparse < Savi::AST::CopyOnMutateVisitor
     end
   end
 
-  def self.run(ctx, library)
-    library = library.types_map_cow do |t|
+  def self.run(ctx, package)
+    package = package.types_map_cow do |t|
       t_namespace = ctx.namespace[t.ident.pos.source]
       t_deps = {t_namespace}
 
-      t = t_cached_or_run library, t, t_deps do
+      t = t_cached_or_run package, t, t_deps do
         t = new(*t_deps).run_for_type_params(ctx, t)
       end
 
@@ -75,17 +75,17 @@ class Savi::Compiler::Reparse < Savi::AST::CopyOnMutateVisitor
         f_namespace = ctx.namespace[f.ident.pos.source]
         f_deps = {f_namespace}
 
-        cached_or_run library, t, f, f_deps do
+        cached_or_run package, t, f, f_deps do
           f = new(*f_deps).run(ctx, f)
         end
       end
     end
 
-    library = library.aliases_map_cow do |t|
+    package = package.aliases_map_cow do |t|
       t_namespace = ctx.namespace[t.ident.pos.source]
       t_deps = {t_namespace}
 
-      ta_cached_or_run library, t, t_deps do
+      ta_cached_or_run package, t, t_deps do
         t = new(*t_deps).run_for_type_alias_target(ctx, t)
         t = new(*t_deps).run_for_type_params(ctx, t)
       end

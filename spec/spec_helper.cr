@@ -10,7 +10,7 @@ module Spec::Methods
       File.dirname(path),
       File.basename(path),
       content,
-      Savi::Source::Library.new(File.dirname(path)),
+      Savi::Source::Package.new(File.dirname(path)),
     )
   end
 end
