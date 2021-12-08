@@ -65,7 +65,7 @@ class Savi::Compiler::BinaryVerona
   end
 
   def self.run_last_compiled_program
-    res = Process.run("/usr/bin/env", ["./" + Compiler::CompilerOptions::DEFAULT_BINARY_NAME], output: STDOUT, error: STDERR)
+    res = Process.run("/usr/bin/env", ["./" + Compiler::Options::DEFAULT_BINARY_NAME], output: STDOUT, error: STDERR)
     res.exit_code
   end
 end

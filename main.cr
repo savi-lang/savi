@@ -21,7 +21,7 @@ module Savi
       option "-o NAME", "--output=NAME", desc: "Name of the output binary"
       option "-p NAME", "--pass=NAME", desc: "Name of the compiler pass to target"
       run do |opts, args|
-        options = Savi::Compiler::CompilerOptions.new(
+        options = Savi::Compiler::Options.new(
           release: opts.release,
           no_debug: opts.no_debug,
           print_ir: opts.print_ir,
@@ -54,7 +54,7 @@ module Savi
         option "--print-perf", desc: "Print compiler performance info", type: Bool, default: false
         option "-C", "--cd=DIR", desc: "Change the working directory"
         run do |opts, args|
-          options = Savi::Compiler::CompilerOptions.new(
+          options = Savi::Compiler::Options.new(
             release: opts.release,
             no_debug: opts.no_debug,
             print_ir: opts.print_ir,
@@ -78,7 +78,7 @@ module Savi
         option "-C", "--cd=DIR", desc: "Change the working directory"
         option "-p NAME", "--pass=NAME", desc: "Name of the compiler pass to target"
         run do |opts, args|
-          options = Savi::Compiler::CompilerOptions.new(
+          options = Savi::Compiler::Options.new(
             release: opts.release,
             no_debug: opts.no_debug,
             print_ir: opts.print_ir,
@@ -104,7 +104,7 @@ module Savi
         option "--print-perf", desc: "Print compiler performance info", type: Bool, default: false
         option "-C", "--cd=DIR", desc: "Change the working directory"
         run do |opts, args|
-          options = Savi::Compiler::CompilerOptions.new(
+          options = Savi::Compiler::Options.new(
             release: opts.release,
             no_debug: opts.no_debug,
             print_ir: opts.print_ir,
@@ -125,7 +125,7 @@ module Savi
         option "--print-perf", desc: "Print compiler performance info", type: Bool, default: false
         option "-C", "--cd=DIR", desc: "Change the working directory"
         run do |opts, args|
-          options = Savi::Compiler::CompilerOptions.new(
+          options = Savi::Compiler::Options.new(
             print_perf: opts.print_perf,
           )
           Dir.cd(opts.cd.not_nil!) if opts.cd
@@ -224,7 +224,7 @@ module Savi
       _add_backtrace backtrace do
         errors = [] of Error
         sources = Savi.compiler.source_service.get_recursive_sources(Dir.current)
-        options = Savi::Compiler::CompilerOptions.new
+        options = Savi::Compiler::Options.new
         options.skip_manifest = true
 
         if check_only

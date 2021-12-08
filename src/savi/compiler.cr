@@ -3,7 +3,7 @@ class Savi::Compiler
 
   property source_service = SourceService.new
 
-  class CompilerOptions
+  class Options
     property release
     property no_debug
     property print_ir
@@ -210,7 +210,7 @@ class Savi::Compiler
     end
   end
 
-  def eval(string : String, options = CompilerOptions.new) : Context
+  def eval(string : String, options = Compiler::Options.new) : Context
     content = ":actor Main\n:new (env)\n#{string}"
     package = Savi::Source::Package.new("(eval)")
     source = Savi::Source.new("", "(eval)", content, package)
@@ -218,17 +218,17 @@ class Savi::Compiler
     Savi.compiler.compile([source], :eval, options)
   end
 
-  def test_compile(sources : Array(Source), target : Symbol, options = CompilerOptions.new)
+  def test_compile(sources : Array(Source), target : Symbol, options = Compiler::Options.new)
     options.skip_manifest = true
     compile(sources, target, options)
   end
 
-  def compile(dirname : String, target : Symbol = :eval, options = CompilerOptions.new)
+  def compile(dirname : String, target : Symbol = :eval, options = Compiler::Options.new)
     compile(source_service.get_directory_sources(dirname), target, options)
   end
 
   @prev_ctx : Context?
-  def compile(sources : Array(Source), target : Symbol = :eval, options = CompilerOptions.new)
+  def compile(sources : Array(Source), target : Symbol = :eval, options = Compiler::Options.new)
     ctx = Context.new(self, options, @prev_ctx)
 
     docs = sources.compact_map do |source|

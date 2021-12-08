@@ -45,7 +45,7 @@ class Savi::Compiler::Context
 
   getter link_libraries = Set(String).new
 
-  getter options : CompilerOptions
+  getter options : Compiler::Options
   property prev_ctx : Context?
   property! root_docs : Array(AST::Document)
 
@@ -53,7 +53,7 @@ class Savi::Compiler::Context
 
   getter errors = [] of Error
 
-  def initialize(@compiler, @options = CompilerOptions.new, @prev_ctx = nil)
+  def initialize(@compiler, @options = Compiler::Options.new, @prev_ctx = nil)
   end
 
   def root_package

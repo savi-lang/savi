@@ -135,7 +135,7 @@ class Savi::Server
     filename = msg.params.text_document.uri.path.not_nil!
     dirname = File.dirname(filename)
     sources = Savi.compiler.source_service.get_manifest_sources_at_or_above(dirname)
-    options = Compiler::CompilerOptions.new
+    options = Compiler::Options.new
 
     # source = sources.find { |s| s.path == filename }.not_nil!
     # source_pos = Source::Pos.point(source, pos.line.to_i32, pos.character.to_i32)
@@ -168,7 +168,7 @@ class Savi::Server
     filename = req.params.text_document.uri.path.not_nil!
     dirname = File.dirname(filename)
     sources = Savi.compiler.source_service.get_directory_sources(dirname)
-    options = Savi::Compiler::CompilerOptions.new
+    options = Savi::Compiler::Options.new
     options.skip_manifest = true
 
     ctx = Savi.compiler.compile(sources, :format, options)
@@ -191,7 +191,7 @@ class Savi::Server
     filename = req.params.text_document.uri.path.not_nil!
     dirname = File.dirname(filename)
     sources = Savi.compiler.source_service.get_directory_sources(dirname)
-    options = Savi::Compiler::CompilerOptions.new
+    options = Savi::Compiler::Options.new
     options.skip_manifest = true
 
     ctx = Savi.compiler.compile(sources, :format, options)
@@ -215,7 +215,7 @@ class Savi::Server
     filename = req.params.text_document.uri.path.not_nil!
     dirname = File.dirname(filename)
     sources = Savi.compiler.source_service.get_directory_sources(dirname)
-    options = Savi::Compiler::CompilerOptions.new
+    options = Savi::Compiler::Options.new
     options.skip_manifest = true
 
     ctx = Savi.compiler.compile(sources, :format, options)
@@ -288,7 +288,7 @@ class Savi::Server
   def send_diagnostics(filename : String, content : String? = nil)
     dirname = File.dirname(filename)
     sources = Savi.compiler.source_service.get_manifest_sources_at_or_above(dirname)
-    options = Compiler::CompilerOptions.new
+    options = Compiler::Options.new
 
     ctx = Savi.compiler.compile(sources, :serve_errors, options)
 

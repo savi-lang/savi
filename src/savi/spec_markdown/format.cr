@@ -6,7 +6,7 @@ class Savi::SpecMarkdown::Format
 
   def verify!
     any_failures = false
-    options = Compiler::CompilerOptions.new
+    options = Compiler::Options.new
     options.skip_manifest = true
     ctx = Savi.compiler.compile([@source], :manifests, options)
     edits = AST::Format.run(ctx, ctx.root_package_link, ctx.root_docs)
