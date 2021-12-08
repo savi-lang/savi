@@ -115,13 +115,23 @@ class Savi::Compiler::Context
     root_package.make_link
   end
 
+  def compile_bootstrap_package(path, name) : Program::Package
+    source_package = Source::Package.new(path, name)
+    package = @program.packages.find(&.source_package.==(source_package))
+    return package if package
+
+    sources = compiler.source_service.get_directory_sources(path, source_package)
+    docs = sources.map { |source| Parser.parse(source) }
+    compile_package(source_package, docs)
+  end
+
   def compile_package_at_path(path)
     # First, try to find an already loaded package that has this same path.
     package = @program.packages.find(&.source_package.path.==(path))
     return package if package
 
     # Otherwise go ahead and load the package.
-    sources = compiler.source_service.get_package_sources(path)
+    sources = compiler.source_service.get_directory_sources(path)
     docs = sources.map { |source| Parser.parse(source) }
     compile_package(sources.first.package, docs)
   end
@@ -131,7 +141,7 @@ class Savi::Compiler::Context
     return if @program.manifests.any?(&.name.pos.source.package.path.==(path))
 
     # Otherwise go ahead and load the manifests.
-    sources = compiler.source_service.get_package_sources(path)
+    sources = compiler.source_service.get_directory_sources(path)
     docs = sources.map { |source| Parser.parse(source) }
     compile_package(sources.first.package, docs)
   end

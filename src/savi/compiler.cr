@@ -222,7 +222,7 @@ class Savi::Compiler
   end
 
   def compile(dirname : String, target : Symbol = :eval, options = CompilerOptions.new)
-    compile(source_service.get_package_sources(dirname), target, options)
+    compile(source_service.get_directory_sources(dirname), target, options)
   end
 
   @prev_ctx : Context?
@@ -254,13 +254,15 @@ class Savi::Compiler
     raise "No source documents given!" if docs.empty?
 
     # First, load the meta declarators.
-    ctx.program.meta_declarators = ctx.compile_package_at_path(
-      source_service.meta_declarators_package_path
+    ctx.program.meta_declarators = ctx.compile_bootstrap_package(
+      source_service.meta_declarators_package_path,
+      "Savi.declarators.meta",
     )
 
     # Then, load the standard declarators.
-    ctx.program.standard_declarators = ctx.compile_package_at_path(
-      source_service.standard_declarators_package_path
+    ctx.program.standard_declarators = ctx.compile_bootstrap_package(
+      source_service.standard_declarators_package_path,
+      "Savi.declarators",
     )
 
     # Now compile the main package.
@@ -268,7 +270,10 @@ class Savi::Compiler
 
     # Next add the core Savi, unless the main package happens to be the same.
     unless docs.first.source.package.path == source_service.core_savi_package_path
-      ctx.compile_package_at_path(source_service.core_savi_package_path)
+      ctx.compile_bootstrap_package(
+        source_service.core_savi_package_path,
+        "Savi",
+      )
     end
 
     # Now run compiler passes until the target pass is satisfied.

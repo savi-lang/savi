@@ -60,7 +60,7 @@ class Savi::Compiler::Manifests
     end
 
     # No two manifests can have the same name.
-    return if !check_unique_manifest_names(ctx, manifests)
+    return if !check_manifest_names(ctx, manifests)
 
     # If the user gave a specific manifest name, handle it here.
     manifest_name = ctx.options.manifest_name
@@ -107,8 +107,8 @@ class Savi::Compiler::Manifests
     # Limit the manifests we look at to just the set of newly added ones.
     manifests = manifests[orig_manifests_size..-1]
 
-    # No two manifests can have the same name.
-    return if !check_unique_manifest_names(ctx, manifests)
+    # Ensure manifest names are acceptable (or fail early).
+    return if !check_manifest_names(ctx, manifests)
 
     # Get the manifest specified by the dep name (or fail to do so).
     manifest = get_specific_manifest(ctx, manifests, dep.name)
@@ -128,7 +128,14 @@ class Savi::Compiler::Manifests
     @manifests_by_name[dep.name.value] = manifest
   end
 
-  private def check_unique_manifest_names(ctx, manifests)
+  private def check_manifest_names(ctx, manifests)
+    manifests.each { |manifest|
+      name = manifest.name
+      next unless name.value == "Savi" || name.value.starts_with?("Savi.")
+
+      ctx.error_at name, "This name is reserved for core Savi packages"
+    }
+
     names = manifests.map(&.name.value)
     return true if names.uniq.size == names.size
 

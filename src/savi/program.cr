@@ -28,6 +28,10 @@ class Savi::Program
       @declarators = [] of Declarator
     end
 
+    def name
+      source_package.name
+    end
+
     def dup_init(new_types = nil, new_aliases = nil)
       @types = (new_types || @types.dup).not_nil!
       @aliases = (new_aliases || @aliases.dup).not_nil!

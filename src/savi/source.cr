@@ -22,14 +22,13 @@ struct Savi::Source
   def self.none; NONE end
 
   def self.new_example(content)
-    new("", "(example)", content, Package.new(""))
+    new("", "(example)", content, Package.new("", "(example)"))
   end
 end
 
-# TODO: Rename as Source::Package after getting rid of the old concept.
 struct Savi::Source::Package
   property path : String
-  property name : String? # TODO: make mandatory
+  property name : String?
 
   def initialize(@path, @name = nil)
   end

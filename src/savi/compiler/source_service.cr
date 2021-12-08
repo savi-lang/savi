@@ -208,7 +208,7 @@ class Savi::Compiler::SourceService
   end
 
   # Given a directory name, load source objects for all the source files in it.
-  def get_package_sources(dirname, package : Source::Package? = nil)
+  def get_directory_sources(dirname, package : Source::Package? = nil)
     package ||= Source::Package.new(dirname)
 
     sources = [] of Source

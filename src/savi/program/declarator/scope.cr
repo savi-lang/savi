@@ -39,8 +39,7 @@ class Savi::Program::Declarator::Scope
       .tap(&.meta_declarators.try { |l| declarators.concat(l.declarators) })
       .tap(&.standard_declarators.try { |l| declarators.concat(l.declarators) })
 
-    # TODO: Declarators visible via import statements in this file
-
+    # TODO: Declarators visible via package dependencies in the manifest
     declarators.concat(current_package.declarators)
 
     declarators

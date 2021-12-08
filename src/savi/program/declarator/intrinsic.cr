@@ -17,8 +17,6 @@ module Savi::Program::Intrinsic
     # Declarations at the top level.
     when "top"
       case declarator.name.value
-      when "declarator_bootstrapping_complete"
-        scope.include_bootstrap_declarators = false
       when "declarator"
         name = terms["name"].as(AST::Identifier)
         scope.current_declarator = Declarator.new(name)

@@ -21,14 +21,6 @@
 // the declarator system, so those which are not needed for bootstrapping
 // will not have an identical bootstrapping counterpart in the compiler.
 //
-// To separate the bootstrap-using declarations from the rest which are
-// declared using the "real" fundamental meta-declarators, we use the
-// `:declarator_bootstrapping_complete` declaration in the middle of this file,
-// leveraging a special bootstrap-only declarator that instructs the
-// bootstrap system to disassemble itself and remove all bootstrap declarators.
-// So, after that point, only declarators defined above that line can be used;
-// and then the list of available declarators grows as more are defined.
-//
 // Now, without further ado, here are the declarators for declaring declarators:
 //
 // ---
@@ -200,14 +192,6 @@
     Params         :: a parenthesized group of function parameter designations
     NameMaybeWithParams :: a Name, optionally qualified by a Params group
   )
-
-// This marks the end of the phase where we needed to have in place
-// the bootstrap declarators, so they get removed from circulation here.
-// They have been replaced by the "real" declarators that were declared above.
-// This special `declarator_bootstrapping_complete` declarator will be removed
-// without replacement - it is effectively a single-use declarator because
-// it removes itself along with all the other bootstrap declarators.
-:declarator_bootstrapping_complete
 
 :: Mark this declaration term acceptor as being optional.
 ::

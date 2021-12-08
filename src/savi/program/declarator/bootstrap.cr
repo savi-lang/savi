@@ -49,12 +49,5 @@ module Savi::Program::Declarator::Bootstrap
         TermAcceptor::Typed.new(Source::Pos.none, "type", "Term"),
       ] of TermAcceptor,
     ),
-
-    # This special declarator marks the point at which the bootstrapping phase
-    # should disassemble itself, removing all bootstrap declarators from play.
-    Declarator.new_bootstrap(
-      "declarator_bootstrapping_complete",
-      intrinsic: true,
-    ),
   ]
 end

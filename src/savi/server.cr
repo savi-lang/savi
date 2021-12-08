@@ -133,7 +133,7 @@ class Savi::Server
     pos = msg.params.position
     filename = msg.params.text_document.uri.path.not_nil!
     dirname = File.dirname(filename)
-    sources = Savi.compiler.source_service.get_package_sources(dirname)
+    sources = Savi.compiler.source_service.get_directory_sources(dirname)
 
     source = sources.find { |s| s.path == filename }.not_nil!
     source_pos = Source::Pos.point(source, pos.line.to_i32, pos.character.to_i32)
@@ -165,7 +165,7 @@ class Savi::Server
   def handle(req : LSP::Message::Formatting)
     filename = req.params.text_document.uri.path.not_nil!
     dirname = File.dirname(filename)
-    sources = Savi.compiler.source_service.get_package_sources(dirname)
+    sources = Savi.compiler.source_service.get_directory_sources(dirname)
     options = Savi::Compiler::CompilerOptions.new
     options.skip_manifest = true
 
@@ -188,7 +188,7 @@ class Savi::Server
   def handle(req : LSP::Message::RangeFormatting)
     filename = req.params.text_document.uri.path.not_nil!
     dirname = File.dirname(filename)
-    sources = Savi.compiler.source_service.get_package_sources(dirname)
+    sources = Savi.compiler.source_service.get_directory_sources(dirname)
     options = Savi::Compiler::CompilerOptions.new
     options.skip_manifest = true
 
@@ -212,7 +212,7 @@ class Savi::Server
   def handle(req : LSP::Message::OnTypeFormatting)
     filename = req.params.text_document.uri.path.not_nil!
     dirname = File.dirname(filename)
-    sources = Savi.compiler.source_service.get_package_sources(dirname)
+    sources = Savi.compiler.source_service.get_directory_sources(dirname)
     options = Savi::Compiler::CompilerOptions.new
     options.skip_manifest = true
 
@@ -285,7 +285,7 @@ class Savi::Server
 
   def send_diagnostics(filename : String, content : String? = nil)
     dirname = File.dirname(filename)
-    sources = Savi.compiler.source_service.get_package_sources(dirname)
+    sources = Savi.compiler.source_service.get_directory_sources(dirname)
 
     source_index = sources.index { |s| s.path == filename }
     if source_index
