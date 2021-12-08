@@ -5,12 +5,12 @@ Compilation Errors:
 
 This name is reserved for core Savi packages:
 from ./manifest.savi:1:
-:manifest bin Savi // NOT OKAY
+:manifest lib Savi // NOT OKAY
               ^~~~
 
 ---
 
 This name is reserved for core Savi packages:
 from ./manifest.savi:4:
-:manifest bin Savi.Thing // NOT OKAY
+:manifest lib Savi.Thing // NOT OKAY
               ^~~~~~~~~~
