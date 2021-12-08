@@ -140,8 +140,10 @@ class Savi::Compiler::Manifests
     return true if names.uniq.size == names.size
 
     manifests.group_by(&.name.value).each { |name, dups|
-      m = dups.pop
-      ctx.error_at m.name, "This manifest needs a unique name",
+      last = dups.pop
+      next unless dups.any?
+
+      ctx.error_at last.name, "This manifest needs a unique name",
         dups.map { |other| {other.name.pos, "a conflicting one is here"} }
     }
     return false
