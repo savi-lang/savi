@@ -1,7 +1,7 @@
 :manifest lib Map
   :sources "Map/*.savi"
 
-:manifest "spec-Map"
+:manifest bin "spec-Map"
   :copies Map
   :sources "Map/test/*.savi"
 

@@ -5,7 +5,7 @@
   :dependency IO "TODO: specify version"
   :dependency OSError "TODO: specify version"
 
-:manifest "spec-TCP"
+:manifest bin "spec-TCP"
   :copies TCP
   :sources "TCP/test/*.savi"
 

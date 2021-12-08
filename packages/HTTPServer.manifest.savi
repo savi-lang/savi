@@ -3,7 +3,7 @@
 
   :dependency ByteStream "TODO: specify version"
 
-:manifest "spec-HTTPServer"
+:manifest bin "spec-HTTPServer"
   :copies HTTPServer
   :sources "HTTPServer/test/*.savi"
 

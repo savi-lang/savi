@@ -1,7 +1,7 @@
 :manifest lib Time
   :sources "Time/*.savi"
 
-:manifest "spec-Time"
+:manifest bin "spec-Time"
   :copies Time
   :sources "Time/test/*.savi"
 

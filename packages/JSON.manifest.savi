@@ -1,7 +1,7 @@
 :manifest lib JSON
   :sources "JSON/*.savi"
 
-:manifest "spec-JSON"
+:manifest bin "spec-JSON"
   :copies JSON
   :sources "JSON/test/*.savi"
 

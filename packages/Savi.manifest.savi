@@ -1,4 +1,4 @@
-:manifest "spec-Savi"
+:manifest bin "spec-Savi"
   :sources "Savi/test/*.savi"
 
   :dependency Spec "TODO: specify version"

@@ -1,7 +1,7 @@
 :manifest lib ByteStream
   :sources "ByteStream/*.savi"
 
-:manifest "spec-ByteStream"
+:manifest bin "spec-ByteStream"
   :copies ByteStream
   :sources "ByteStream/test/*.savi"
 

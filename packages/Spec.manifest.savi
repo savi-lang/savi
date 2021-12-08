@@ -3,6 +3,6 @@
 
   :dependency Map "TODO: specify version"
 
-:manifest "spec-Spec"
+:manifest bin "spec-Spec"
   :copies Spec
   :sources "Spec/test/*.savi"

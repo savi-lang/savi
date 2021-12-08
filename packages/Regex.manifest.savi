@@ -1,7 +1,7 @@
 :manifest lib Regex
   :sources "Regex/*.savi"
 
-:manifest "spec-Regex"
+:manifest bin "spec-Regex"
   :copies Regex
   :sources "Regex/test/*.savi"
 
