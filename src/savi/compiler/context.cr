@@ -1,49 +1,51 @@
 class Savi::Compiler::Context
   getter compiler : Compiler
-  getter program
 
-  getter classify
-  getter code_gen
-  getter code_gen_verona
-  getter completeness
-  getter declarators
-  getter eval
-  getter flow
-  getter infer
-  getter infer_edge
-  getter inventory
-  getter jumps
-  getter lifetime
-  getter load
-  getter local
-  getter manifests
-  getter namespace
-  getter paint
-  getter populate
-  getter populate_types
-  getter pre_infer
-  getter pre_subtyping
-  getter pre_t_infer
-  getter privacy
-  getter reach
-  getter refer
-  getter refer_type
-  getter serve_definition
-  getter serve_hover
-  getter subtyping
-  getter t_infer
-  getter t_infer_edge
-  getter t_subtyping
-  getter t_type_check
-  getter type_check
-  getter type_context
-  getter types_edge
-  getter types_graph
-  getter verify
-  getter xtypes
-  getter xtypes_graph
+  getter program = Program.new
 
-  getter options
+  getter classify = Classify::Pass.new
+  getter code_gen = CodeGen.new(CodeGen::PonyRT)
+  getter code_gen_verona = CodeGen.new(CodeGen::VeronaRT)
+  getter completeness = Completeness::Pass.new
+  getter eval = Eval.new
+  getter flow = Flow::Pass.new
+  getter infer = Infer::Pass.new
+  getter infer_edge = Infer::PassEdge.new
+  getter inventory = Inventory::Pass.new
+  getter jumps = Jumps::Pass.new
+  getter lifetime = Lifetime.new
+  getter load = Load.new
+  getter local = Local::Pass.new
+  getter manifests = Manifests.new
+  getter namespace = Namespace.new
+  getter paint = Paint.new
+  getter populate = Populate.new
+  getter populate_types = PopulateTypes.new
+  getter pre_infer = PreInfer::Pass.new
+  getter pre_subtyping = PreSubtyping::Pass.new
+  getter pre_t_infer = PreTInfer::Pass.new
+  getter privacy = Privacy::Pass.new
+  getter reach = Reach.new
+  getter refer = Refer::Pass.new
+  getter refer_type = ReferType::Pass.new
+  getter serve_definition = ServeDefinition.new
+  getter serve_hover = ServeHover.new
+  getter subtyping = SubtypingCache.new
+  getter t_infer = TInfer::Pass.new
+  getter t_infer_edge = TInfer::PassEdge.new
+  getter t_subtyping = TSubtypingCache.new
+  getter t_type_check = TTypeCheck.new
+  getter type_check = TypeCheck.new
+  getter type_context = TypeContext::Pass.new
+  getter types_edge = Types::Edge::Pass.new
+  getter types_graph = Types::Graph::Pass.new
+  getter verify = Verify::Pass.new
+  getter xtypes = XTypes::Pass.new
+  getter xtypes_graph = XTypes::Graph::Pass.new
+
+  getter link_libraries = Set(String).new
+
+  getter options : CompilerOptions
   property prev_ctx : Context?
   property! root_docs : Array(AST::Document)
 
@@ -52,49 +54,6 @@ class Savi::Compiler::Context
   getter errors = [] of Error
 
   def initialize(@compiler, @options = CompilerOptions.new, @prev_ctx = nil)
-    @program = Program.new
-
-    @classify = Classify::Pass.new
-    @code_gen = CodeGen.new(CodeGen::PonyRT)
-    @code_gen_verona = CodeGen.new(CodeGen::VeronaRT)
-    @completeness = Completeness::Pass.new
-    @eval = Eval.new
-    @flow = Flow::Pass.new
-    @infer = Infer::Pass.new
-    @infer_edge = Infer::PassEdge.new
-    @inventory = Inventory::Pass.new
-    @jumps = Jumps::Pass.new
-    @lifetime = Lifetime.new
-    @load = Load.new
-    @local = Local::Pass.new
-    @manifests = Manifests.new
-    @namespace = Namespace.new
-    @paint = Paint.new
-    @populate = Populate.new
-    @populate_types = PopulateTypes.new
-    @pre_infer = PreInfer::Pass.new
-    @pre_subtyping = PreSubtyping::Pass.new
-    @pre_t_infer = PreTInfer::Pass.new
-    @privacy = Privacy::Pass.new
-    @reach = Reach.new
-    @refer = Refer::Pass.new
-    @refer_type = ReferType::Pass.new
-    @serve_definition = ServeDefinition.new
-    @serve_hover = ServeHover.new
-    @subtyping = SubtypingCache.new
-    @t_infer = TInfer::Pass.new
-    @t_infer_edge = TInfer::PassEdge.new
-    @t_subtyping = TSubtypingCache.new
-    @t_type_check = TTypeCheck.new
-    @type_check = TypeCheck.new
-    @type_context = TypeContext::Pass.new
-    @types_edge = Types::Edge::Pass.new
-    @types_graph = Types::Graph::Pass.new
-    @verify = Verify::Pass.new
-    @xtypes = XTypes::Pass.new
-    @xtypes_graph = XTypes::Graph::Pass.new
-
-    @link_libraries = Set(String).new
   end
 
   def root_package
