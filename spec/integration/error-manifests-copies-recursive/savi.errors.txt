@@ -1,0 +1,24 @@
+
+Compilation Error:
+
+---
+
+A copies declaration cannot be self-recursive:
+from ./manifest.savi:3:
+  :copies Thing3 // -> 3 -> 2 -> 1 -> ...
+          ^~~~~~
+
+- it recursed from here:
+  from ./manifest.savi:26:
+  :copies Thing3 // -> 3 -> 2 -> 1 -> 3 -> ...
+          ^~~~~~
+
+- it recursed from here:
+  from ./manifest.savi:11:
+  :copies Thing2 // -> 2 -> 1 -> 3 -> ...
+          ^~~~~~
+
+- it recursed from here:
+  from ./manifest.savi:7:
+  :copies Thing1 // -> 1 -> 3 -> 2 -> ...
+          ^~~~~~
