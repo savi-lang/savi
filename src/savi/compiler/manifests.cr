@@ -54,7 +54,7 @@ class Savi::Compiler::Manifests
     # There must be at least one manifest.
     manifests = ctx.program.manifests
     if manifests.empty?
-      ctx.error_at Source::Pos.show_package_path(ctx.root_package.source_package),
+      ctx.error_at Source::Pos.none,
         "No manifests found in the 'manifest.savi' files in this directory"
       return
     end
@@ -75,7 +75,7 @@ class Savi::Compiler::Manifests
 
     # If there is more than one main manifest, complain.
     if mains.size > 1
-      ctx.error_at Source::Pos.show_package_path(ctx.root_package.source_package),
+      ctx.error_at Source::Pos.none,
         "There can't be more than one main manifest in this directory; " \
         "please mark some of these as `:manifest lib` or `:manifest bin`",
         mains.map { |m| {m.name.pos, "this is a main manifest"} }
@@ -87,7 +87,7 @@ class Savi::Compiler::Manifests
     return libs.first if libs.size == 1
 
     # We have no more ways to select an appropriate root manifest; complain.
-    ctx.error_at Source::Pos.show_package_path(ctx.root_package.source_package),
+    ctx.error_at Source::Pos.none,
       "There is more than one manifest and it isn't clear which to use; " \
       "please specify one explicitly by name",
       manifests.map { |m| {m.name.pos, "this is an available manifest"} }
@@ -140,8 +140,10 @@ class Savi::Compiler::Manifests
     return true if names.uniq.size == names.size
 
     manifests.group_by(&.name.value).each { |name, dups|
-      m = dups.pop
-      ctx.error_at m.name, "This manifest needs a unique name",
+      last = dups.pop
+      next unless dups.any?
+
+      ctx.error_at last.name, "This manifest needs a unique name",
         dups.map { |other| {other.name.pos, "a conflicting one is here"} }
     }
     return false
@@ -157,7 +159,7 @@ class Savi::Compiler::Manifests
     return manifest if manifest
 
     name_pos = manifest_name.is_a?(String) \
-      ? Source::Pos.show_package_path(ctx.root_package.source_package) \
+      ? Source::Pos.none \
       : manifest_name.pos
 
     # If we didn't find it, complain.
@@ -187,8 +189,20 @@ class Savi::Compiler::Manifests
       # Find the specified manifest in the same directory (or fail and abort).
       next_from_manifest = manifests.find(&.name.value.==(copies_name.value))
       unless next_from_manifest
-        ctx.error_at copies_name,
-          "There's no manifest named `#{copies_name.value}` in this directory"
+        # If we failed to find an identical matching name, try to find a
+        # similar name, so we can print a more helpful error message.
+        similar_name =
+          maybe_find_similar_manifest(copies_name.value, manifests).try(&.name)
+        if similar_name
+          ctx.error_at copies_name,
+            "There's no manifest named `#{copies_name.value}` in this directory",
+            [{similar_name.pos, "maybe you meant `#{similar_name.value}`"}]
+        else
+          ctx.error_at copies_name,
+            "There's no manifest named `#{copies_name.value}` in this directory"
+        end
+
+        # Don't try to do anything else with this `:copies` declaration.
         next
       end
 
@@ -208,6 +222,14 @@ class Savi::Compiler::Manifests
         next_from_manifest,
         seen_names + [copies_name],
       )
+    }
+  end
+
+  private def maybe_find_similar_manifest(name, manifests)
+    finder = Levenshtein::Finder.new(name)
+    manifests.each { |f| finder.test(f.name.value) }
+    finder.best_match.try { |other_name|
+      manifests.find(&.name.value.==(other_name))
     }
   end
 end

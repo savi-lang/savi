@@ -1,0 +1,31 @@
+
+Compilation Errors:
+
+---
+
+This manifest needs a unique name:
+from ./manifest.savi:12:
+:manifest lib Thing2
+              ^~~~~~
+
+- a conflicting one is here:
+  from ./manifest.savi:4:
+:manifest lib Thing2
+              ^~~~~~
+
+---
+
+This manifest needs a unique name:
+from ./manifest.savi:20:
+:manifest lib Thing3
+              ^~~~~~
+
+- a conflicting one is here:
+  from ./manifest.savi:7:
+:manifest lib Thing3
+              ^~~~~~
+
+- a conflicting one is here:
+  from ./manifest.savi:15:
+:manifest lib Thing3
+              ^~~~~~

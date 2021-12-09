@@ -219,23 +219,6 @@ class Savi::Compiler::SourceService
     }
   end
 
-  # Given a package name, optionally anchored to a given "from source",
-  # try to resolve a directory that matches the package name.
-  #
-  # First a relative location will be attempted starting from the "from source".
-  # Then a standard package location will be attempted.
-  # If both attempts fail, there is no hope of resolving the package.
-  def resolve_package_dirname(libname : String, from_source : Source)
-    standard_dirname = File.expand_path(libname, standard_package_path)
-    relative_dirname = File.expand_path(libname, from_source.dirname)
-
-    if relative_dirname && dir_exists?(relative_dirname)
-      relative_dirname
-    elsif dir_exists?(standard_dirname)
-      standard_dirname
-    end
-  end
-
   # Given a directory name, load source objects for all the source files in it.
   def get_directory_sources(dirname, package : Source::Package? = nil)
     package ||= Source::Package.new(dirname)
@@ -245,8 +228,8 @@ class Savi::Compiler::SourceService
       sources << Source.new(dirname, name, content, package)
     }
 
-    Error.at Source::Pos.show_package_path(package),
-      "No '.savi' source files found in this directory" \
+    Error.at Source::Pos.none,
+      "No '.savi' source files found in this directory:\n#{dirname}" \
         if sources.empty?
 
     # Sort the sources by case-insensitive name, so that they always get loaded
@@ -272,8 +255,8 @@ class Savi::Compiler::SourceService
       break unless try_dirname.starts_with?(Dir.current)
     end
 
-    Error.at Source::Pos.show_package_path(Source::Package.new(dirname)),
-      "No 'manifest.savi' source files found at or above this directory" \
+    Error.at Source::Pos.none,
+      "No 'manifest.savi' source files found at or above this directory:\n#{dirname}" \
         if sources.empty?
 
     # Sort the sources by case-insensitive name, so that they always get loaded
@@ -327,8 +310,9 @@ class Savi::Compiler::SourceService
         << Source.new(dirname, name, content, package)
     }
 
-    Error.at Source::Pos.show_package_path(Source::Package.new(root_dirname)),
-      "No '.savi' source files found recursively within this root" \
+    Error.at Source::Pos.none,
+      "No '.savi' source files found recursively within this directory: " \
+      "#{root_dirname}" \
         if sources.empty?
 
     # Sort the sources by case-insensitive name, so that they always get loaded

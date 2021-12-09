@@ -1,0 +1,36 @@
+
+Compilation Error:
+
+---
+
+There is more than one manifest and it isn't clear which to use; please specify one explicitly by name
+
+- this is an available manifest:
+  from ./another.manifest.savi:1:
+:manifest lib "package-e"
+              ^~~~~~~~~~~
+
+- this is an available manifest:
+  from ./another.manifest.savi:4:
+:manifest bin "package-f"
+              ^~~~~~~~~~~
+
+- this is an available manifest:
+  from ./manifest.savi:1:
+:manifest lib "package-a"
+              ^~~~~~~~~~~
+
+- this is an available manifest:
+  from ./manifest.savi:4:
+:manifest bin "package-b"
+              ^~~~~~~~~~~
+
+- this is an available manifest:
+  from ./manifest.savi:7:
+:manifest lib "package-c"
+              ^~~~~~~~~~~
+
+- this is an available manifest:
+  from ./manifest.savi:10:
+:manifest bin "package-d"
+              ^~~~~~~~~~~

@@ -1,0 +1,28 @@
+
+Compilation Errors:
+
+---
+
+There's no manifest named `Food` in this directory:
+from ./manifest.savi:6:
+  :copies Food // mispelled `Foo`
+          ^~~~
+
+- maybe you meant `Foo`:
+  from ./manifest.savi:1:
+:manifest lib Foo
+              ^~~
+
+---
+
+There's no manifest named `TotallyBogusName` in this directory:
+from ./manifest.savi:10:
+  :copies TotallyBogusName // no similar name exists
+          ^~~~~~~~~~~~~~~~
+
+---
+
+There's no manifest named `Spec` in this directory:
+from ./manifest.savi:14:
+  :copies Spec // can't copy from foreign manifests - even standard library
+          ^~~~

@@ -1,0 +1,21 @@
+:manifest lib Thing1
+  :sources "*.savi"
+
+:manifest lib Thing2
+  :sources "*.savi"
+
+:manifest lib Thing3
+  :sources "*.savi"
+
+// DEJA VU
+
+:manifest lib Thing2
+  :sources "*.savi"
+
+:manifest lib Thing3
+  :sources "*.savi"
+
+// DEJA VU ALL OVER AGAIN
+
+:manifest lib Thing3
+  :sources "*.savi"

@@ -1,0 +1,20 @@
+:manifest lib Foo
+  :sources "*.savi"
+
+:manifest lib Bar
+  :sources "*.savi"
+  :copies Food // mispelled `Foo`
+
+:manifest lib Baz
+  :sources "*.savi"
+  :copies TotallyBogusName // no similar name exists
+
+:manifest lib Speccy
+  :sources "*.savi"
+  :copies Spec // can't copy from foreign manifests - even standard library
+
+:manifest "main"
+  :copies Foo
+  :copies Bar
+  :copies Baz
+  :copies Speccy
