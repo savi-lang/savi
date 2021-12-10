@@ -8,12 +8,9 @@ class Savi::Compiler
     property no_debug
     property print_ir
     property print_perf
-    property binary_name
     property skip_manifest
     property manifest_name : String?
     property target_pass : Symbol?
-
-    DEFAULT_BINARY_NAME = "main"
 
     def initialize(
       @release = false,
@@ -21,7 +18,6 @@ class Savi::Compiler
       @print_ir = false,
       @print_perf = false,
       @skip_manifest = false,
-      @binary_name = DEFAULT_BINARY_NAME,
       @manifest_name = nil,
       @target_pass = nil,
     )

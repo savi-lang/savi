@@ -18,7 +18,6 @@ module Savi
       option "--print-ir", desc: "Print generated LLVM IR", type: Bool, default: false
       option "--print-perf", desc: "Print compiler performance info", type: Bool, default: false
       option "-C", "--cd=DIR", desc: "Change the working directory"
-      option "-o NAME", "--output=NAME", desc: "Name of the output binary"
       option "-p NAME", "--pass=NAME", desc: "Name of the compiler pass to target"
       run do |opts, args|
         options = Savi::Compiler::Options.new(
@@ -27,7 +26,6 @@ module Savi
           print_ir: opts.print_ir,
           print_perf: opts.print_perf,
         )
-        options.binary_name = opts.output.not_nil! if opts.output
         options.target_pass = Savi::Compiler.pass_symbol(opts.pass) if opts.pass
         Dir.cd(opts.cd.not_nil!) if opts.cd
         Cli.compile options, opts.backtrace
@@ -98,7 +96,6 @@ module Savi
         argument "name", type: String, required: false, desc: "Name of the manifest to compile"
         option "-b", "--backtrace", desc: "Show backtrace on error", type: Bool, default: false
         option "-r", "--release", desc: "Compile in release mode", type: Bool, default: false
-        option "-o NAME", "--output=NAME", desc: "Name of the output binary"
         option "--no-debug", desc: "Compile without debug info", type: Bool, default: false
         option "--print-ir", desc: "Print generated LLVM IR", type: Bool, default: false
         option "--print-perf", desc: "Print compiler performance info", type: Bool, default: false
@@ -110,7 +107,6 @@ module Savi
             print_ir: opts.print_ir,
             print_perf: opts.print_perf,
           )
-          options.binary_name = opts.output.not_nil! if opts.output
           options.manifest_name = args.name.not_nil! if args.name
           Dir.cd(opts.cd.not_nil!) if opts.cd
           Cli.compile options, opts.backtrace
