@@ -1,0 +1,7 @@
+:class DefaultSpec
+  :is Spec
+  :const describes: "DeterministicRandom.Default"
+
+  :it "is xoroshiro128++"
+    random = DeterministicRandom.Default.new(0)
+    assert: random <: DeterministicRandom.Xoroshiro128
