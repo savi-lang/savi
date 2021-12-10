@@ -1,11 +1,11 @@
 :manifest lib DeterministicRandom
-  :sources "DeterministicRandom/*.savi"
+  :sources "src/DeterministicRandom/**/*.savi"
 
   :dependency Random "TODO: specify version"
 
 :manifest bin "spec-DeterministicRandom"
   :copies DeterministicRandom
-  :sources "DeterministicRandom/test/*.savi"
+  :sources "spec/DeterministicRandom/**/*.savi"
 
   :dependency Spec "TODO: specify version"
   :transitive dependency Map "TODO: specify version"

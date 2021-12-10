@@ -1,0 +1,6 @@
+:actor Main
+  :new (env)
+    Spec.Process.run(env, [
+      Spec.Run(HTTPServer.RequestReader.Spec).new(env)
+      Spec.Run(HTTPServer.ResponseBuilder.Spec).new(env)
+    ])

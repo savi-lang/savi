@@ -38,7 +38,7 @@ spec.language: PHONY $(SAVI)
 spec.package: PHONY $(SAVI)
 	echo && $(SAVI) run --cd packages "spec-$(name)" $(extra_args)
 spec.package.all: PHONY $(SAVI)
-	find packages -name 'test' | cut -d/ -f2 | sort | xargs -I'{}' sh -c \
+	find packages/spec -mindepth 1 -maxdepth 1 | cut -d/ -f3 | sort | xargs -I'{}' sh -c \
 		"echo && $(SAVI) run --cd packages "spec-{}" $(extra_args) || exit 255"
 
 # Run the specs that are written in Crystal (mostly compiler unit tests),

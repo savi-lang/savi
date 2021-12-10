@@ -54,6 +54,9 @@ class Savi::Compiler::PopulateTypes
     return if package.enum_members.any? { |outer|
       ident.immediately_nested_within?(outer.ident)
     }
+    return if package.aliases.any? { |outer|
+      ident.immediately_nested_within?(outer.ident)
+    }
 
     # If it's already in the list of missing namespace modules, stop here.
     new_ident = AST::Identifier.new(ident.value.sub(/\.\w+\z/, "")).from(ident)

@@ -1,6 +1,0 @@
-:actor Main
-  :new (env)
-    Spec.Process.run(env, [
-      Spec.Run(RequestReaderSpec).new(env)
-      Spec.Run(ResponseBuilderSpec).new(env)
-    ])

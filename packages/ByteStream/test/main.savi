@@ -1,7 +1,0 @@
-:actor Main
-  :new (env)
-    Spec.Process.run(env, [
-      Spec.Run(ByteStreamReaderSpec).new(env)
-      Spec.Run(ByteStreamChunkedReaderSpec).new(env)
-      Spec.Run(ByteStreamWritableSpec).new(env)
-    ])

@@ -1,0 +1,422 @@
+:class Savi.Numeric.Spec
+  :is Spec
+  :const describes: "Numeric"
+
+  :it "returns a fixed bit width for most numeric types"
+    assert: U8 .bit_width == 8
+    assert: U16.bit_width == 16
+    assert: U32.bit_width == 32
+    assert: U64.bit_width == 64
+    assert: I8 .bit_width == 8
+    assert: I16.bit_width == 16
+    assert: I32.bit_width == 32
+    assert: I64.bit_width == 64
+    assert: F32.bit_width == 32
+    assert: F64.bit_width == 64
+
+  :it "returns a platform-dependent bit width for USize and ISize"
+    if Platform.lp64 (
+      assert: USize.bit_width == 64
+      assert: ISize.bit_width == 64
+    |
+      assert: USize.bit_width == 32
+      assert: ISize.bit_width == 32
+    )
+
+  :it "indicates whether the given numeric is signed or unsigned"
+    assert: U8   .is_signed.is_false
+    assert: U16  .is_signed.is_false
+    assert: U32  .is_signed.is_false
+    assert: U64  .is_signed.is_false
+    assert: USize.is_signed.is_false
+    assert: I8   .is_signed
+    assert: I16  .is_signed
+    assert: I32  .is_signed
+    assert: I64  .is_signed
+    assert: ISize.is_signed
+    assert: F32  .is_signed
+    assert: F64  .is_signed
+
+  :it "indicates whether the given numeric is a floating point or an integer"
+    assert: U8   .is_floating_point.is_false
+    assert: U16  .is_floating_point.is_false
+    assert: U32  .is_floating_point.is_false
+    assert: U64  .is_floating_point.is_false
+    assert: USize.is_floating_point.is_false
+    assert: I8   .is_floating_point.is_false
+    assert: I16  .is_floating_point.is_false
+    assert: I32  .is_floating_point.is_false
+    assert: I64  .is_floating_point.is_false
+    assert: ISize.is_floating_point.is_false
+    assert: F32  .is_floating_point
+    assert: F64  .is_floating_point
+
+  :it "exhibits wraparound behaviour for underflowing numeric literals"
+    assert: U8[-1]                    == 0xFF
+    assert: U16[-1]                   == 0xFFFF
+    assert: U32[-1]                   == 0xFFFF_FFFF
+    assert: U64[-1]                   == 0xFFFF_FFFF_FFFF_FFFF
+    assert: I8[-128]                  == 128
+    assert: I16[-32768]               == 32768
+    assert: I32[-2147483648]          == 2147483648
+    assert: I64[-9223372036854775808] == 9223372036854775808
+
+    if Platform.lp64 (
+      assert: USize[-1]                   == 0xFFFF_FFFF_FFFF_FFFF
+      assert: ISize[-9223372036854775808] == 9223372036854775808
+    |
+      assert: USize[-1]          == 0xFFFF_FFFF
+      assert: ISize[-2147483648] == 2147483648
+    )
+
+  :it "has a convenience alias for the number zero"
+    assert: U8   .zero == 0
+    assert: U16  .zero == 0
+    assert: U32  .zero == 0
+    assert: U64  .zero == 0
+    assert: USize.zero == 0
+    assert: I8   .zero == 0
+    assert: I16  .zero == 0
+    assert: I32  .zero == 0
+    assert: I64  .zero == 0
+    assert: ISize.zero == 0
+    assert: F32  .zero == 0
+    assert: F64  .zero == 0
+
+  :it "can report the max or minimum integer based on bit width and signedness"
+    assert: Bool.max_value.is_true
+    assert: U8   .max_value == 0xFF
+    assert: U16  .max_value == 0xFFFF
+    assert: U32  .max_value == 0xFFFF_FFFF
+    assert: U64  .max_value == 0xFFFF_FFFF_FFFF_FFFF
+    assert: I8   .max_value == 0x7F
+    assert: I16  .max_value == 0x7FFF
+    assert: I32  .max_value == 0x7FFF_FFFF
+    assert: I64  .max_value == 0x7FFF_FFFF_FFFF_FFFF
+    if Platform.lp64 (
+      assert: USize.max_value == 0xFFFF_FFFF_FFFF_FFFF
+      assert: ISize.max_value == 0x7FFF_FFFF_FFFF_FFFF
+    |
+      assert: USize.max_value == 0xFFFF_FFFF
+      assert: ISize.max_value == 0x7FFF_FFFF
+    )
+
+    assert: Bool.min_value.is_false
+    assert: U8   .min_value == 0
+    assert: U16  .min_value == 0
+    assert: U32  .min_value == 0
+    assert: U64  .min_value == 0
+    assert: I8   .min_value == 0x80
+    assert: I16  .min_value == 0x8000
+    assert: I32  .min_value == 0x8000_0000
+    assert: I64  .min_value == 0x8000_0000_0000_0000
+    if Platform.lp64 (
+      assert: USize.min_value == 0
+      assert: ISize.min_value == 0x8000_0000_0000_0000
+    |
+      assert: USize.min_value == 0
+      assert: ISize.min_value == 0x8000_0000
+    )
+
+  :it "converts between different integer types"
+    assert: U32[36].u8    == 36
+    assert: U32[36].u16   == 36
+    assert: U32[36].u32   == 36
+    assert: U32[36].u64   == 36
+    assert: U32[36].usize == 36
+    assert: U32[36].i8    == 36
+    assert: U32[36].i16   == 36
+    assert: U32[36].i32   == 36
+    assert: U32[36].i64   == 36
+    assert: U32[36].isize == 36
+    assert: U32[36].f32   == 36
+    assert: U32[36].f64   == 36
+
+  :it "converts from floating point to other numeric types"
+    assert: F32[36].u32 == 36
+    assert: F64[36].u32 == 36
+    assert: F32[36].i32 == 36
+    assert: F64[36].i32 == 36
+    assert: F32[36].f64 == 36
+    assert: F64[36].f32 == 36
+
+  :it "handles edge cases for conversions from floating point"
+    assert: F32.nan.u8          == 0
+    assert: F32.infinity.u8     == 255
+    assert: F32.neg_infinity.u8 == 0
+    assert: F32[256].u8         == 255
+    assert: F32[-1].u8          == 0
+    assert: F64.nan.u8          == 0
+    assert: F64.infinity.u8     == 255
+    assert: F64.neg_infinity.u8 == 0
+    assert: F64[256].u8         == 255
+    assert: F64[-1].u8          == 0
+    assert: F32.nan.i8          == 0
+    assert: F32.infinity.i8     == 127
+    assert: F32.neg_infinity.i8 == -128
+    assert: F32[128].i8         == 127
+    assert: F32[-129].i8        == -128
+    assert: F64.nan.i8          == 0
+    assert: F64.infinity.i8     == 127
+    assert: F64.neg_infinity.i8 == -128
+    assert: F64[128].i8         == 127
+    assert: F64[-129].i8        == -128
+    assert: F64.nan.f32.is_nan
+    assert: F64.max_value.f32   == F32.infinity
+    assert: F64.min_value.f32   == F32.neg_infinity
+
+  :it "compares numbers to one another"
+    assert: U32[12] == 12
+    assert: I32[12] == 12
+    assert: F32[12] == 12
+    assert: U32[12] != 36
+    assert: I32[12] != 36
+    assert: F32[12] != 36
+    assert: U32[12] <  36
+    assert: I32[12] <  36
+    assert: F32[12] <  36
+    assert: U32[12] <= 12
+    assert: I32[12] <= 12
+    assert: F32[12] <= 12
+    assert: U32[36] >  12
+    assert: I32[36] >  12
+    assert: F32[36] >  12
+    assert: U32[36] >= 36
+    assert: I32[36] >= 36
+    assert: F32[36] >= 36
+    assert: I32[-30] < 6
+    assert: I32[6] > -30
+
+  :it "applies arithmetic operations"
+    assert: U32[6]  + 30  == 36
+    assert: I32[-6] + 30  == 24
+    assert: F32[3]  + 0.6 == 3.6
+    assert: U32[30] - 6   == 24
+    assert: I32[30] - -6  == 36
+    assert: F32[3]  - 0.6 == 2.4
+    assert: U32[12] * 3   == 36
+    assert: I32[12] * 3   == 36
+    assert: F32[12] * 0.1 == 1.2
+    assert: U32[36] / 10  == 3
+    assert: I32[36] / 10  == 3
+    assert: F32[36] / 10  == 3.6
+    assert: U32[36] % 10  == 6
+    assert: I32[36] % 10  == 6
+    assert: F32[36] % 10  == 6
+    assert: U32[36] / 0 == 0
+    assert: I32[36] / 0 == 0
+    assert: U32[36] % 0 == 0
+    assert: I32[36] % 0 == 0
+    assert: I8[-128] / -1 == 0
+    assert: I8[-128] / -1 == 0
+
+  :it "finds the minimum or maximum value between the two compared values"
+    assert: U32[6].min(30) == 6
+    assert: U32[30].min(6) == 6
+    assert: U32[30].max(6) == 30
+    assert: U32[6].max(30) == 30
+
+  :it "finds the absolute value"
+    assert: U32[36]  .abs == 36
+    assert: U32[-36] .abs == -36 // -36 is an underflow literal when unsigned
+    assert: I32[36]  .abs == 36
+    assert: I32[-36] .abs == 36
+    assert: F32[3.6] .abs == 3.6
+    assert: F32[-3.6].abs == 3.6
+
+  :it "negates the value"
+    assert: U32[36]  .negate == -36
+    assert: U32[-36] .negate == 36
+    assert: I32[36]  .negate == -36
+    assert: I32[-36] .negate == 36
+    assert: F32[3.6] .negate == -3.6
+    assert: F32[-3.6].negate == 3.6
+
+  :it "implements overflow/underflow-checked arithmetic for integers"
+    assert error: U32.max_value - 1 +! 2
+    assert: U32.max_value - 1 +! 1 == U32.max_value
+    assert error: I32.max_value - 1 +! 2
+    assert: I32.max_value - 1 +! 1 == I32.max_value
+
+    assert error: U32.min_value + 1 -! 2
+    assert: U32.min_value + 1 -! 1 == U32.min_value
+    assert error: I32.min_value + 1 -! 2
+    assert: I32.min_value + 1 -! 1 == I32.min_value
+
+    assert error: U32[0x4000_0000] *! 4
+    assert: U32[0x4000_0000] *! 3 == U32[0x4000_0000] * 3
+    assert error: I32[0x2000_0000] *! 4
+    assert: I32[0x2000_0000] *! 3 == I32[0x2000_0000] * 3
+
+  :it "implements bitwise analysis and manipulation for integers"
+    assert: U8[18]                == 0b00010010
+    assert: U8[18].invert         == 0b11101101
+    assert: U8[18].reverse_bits   == 0b01001000
+    assert: U8[18].swap_bytes     == 18
+    assert: U16[0x1234].swap_bytes == 0x3412
+    assert: U32[66052].swap_bytes == 67240192
+    assert: U8[18].leading_zeros  == 3
+    assert: U8[18].trailing_zeros == 1
+    assert: U8[18].count_ones     == 2
+    assert: U8[18].count_zeros    == 6
+    assert: U8[0].next_pow2       == 1
+    assert: U8[2].next_pow2       == 2
+    assert: U8[17].next_pow2      == 32
+    assert: U8[127].next_pow2     == 128
+    assert: U8[128].next_pow2     == 128
+    assert: U8[129].next_pow2     == 0
+    assert: U16[0b1110010110001010].bit_shl(5)  == 0b1011000101000000
+    assert: U16[0b1110010110001010].bit_rotl(5) == 0b1011000101011100
+    assert: U16[0b1110010110001010].bit_shr(5)  == 0b0000011100101100
+    assert: U16[0b1110010110001010].bit_rotr(5) == 0b0101011100101100
+
+  :it "implements logarithms and exponents for floating points"
+    assert: F64[1].log == 0
+    assert: F32[1].log == 0
+    assert: F64[2.718281828459045].log == 1
+    assert: F32[2.718282].log == 1
+    assert: F64[1000000000].log10 == 9
+    assert: F32[1000000000].log10 == 9
+    assert: F64[0.0000000001].log10 == -10
+    assert: F32[0.0000000001].log10 == -10
+    assert: F64[1024].log2 == 10
+    assert: F32[1024].log2 == 10
+    assert: F64[0.0625].log2 == -4
+    assert: F32[0.0625].log2 == -4
+    assert: F64[2].pow(-4) == 0.0625
+    assert: F32[2].pow(-4) == 0.0625
+    assert: F64[2].pow(10) == 1024
+    assert: F32[2].pow(10) == 1024
+    assert: F64[10].pow(-10) == 0.0000000001
+    assert: F32[10].pow(-10) == 0.0000000001
+    assert: F64[10].pow(9) == 1000000000
+    assert: F32[10].pow(9) == 1000000000
+
+  :it "hashes the value of the integer"
+    assert: U64[24].hash   == 11168194413345819337 // TODO: fix this test for 32-bit platforms
+    assert: U64[24].hash64 == 11168194413345819337
+
+  :it "implements bitwise analysis and special values for floating points"
+    assert: F32[3.6].bits == 0x4066_6666
+    assert: F64[3.6].bits == 0x400C_CCCC_CCCC_CCCD
+    assert: F32.from_bits(0x4066_6666)           == 3.6
+    assert: F64.from_bits(0x400C_CCCC_CCCC_CCCD) == 3.6
+    assert: F32.nan.bits == 0x7FC0_0000
+    assert: F64.nan.bits == 0x7FF8_0000_0000_0000
+    assert: F32.nan.is_nan
+    assert: F64.nan.is_nan
+    assert: F32[0].is_nan.is_false
+    assert: F64[0].is_nan.is_false
+    assert: (F32[0] / 0).is_nan
+    assert: (F64[0] / 0).is_nan
+    assert: F32.infinity.bits == 0x7F80_0000
+    assert: F64.infinity.bits == 0x7FF0_0000_0000_0000
+    assert: F32.neg_infinity.bits == 0xFF80_0000
+    assert: F64.neg_infinity.bits == 0xFFF0_0000_0000_0000
+    assert: F32.infinity == F32[1] / 0
+    assert: F64.infinity == F64[1] / 0
+    assert: F32.neg_infinity == F32[-1] / 0
+    assert: F64.neg_infinity == F64[-1] / 0
+    assert: F32.infinity.is_nan.is_false
+    assert: F64.infinity.is_nan.is_false
+    assert: F32.neg_infinity.is_nan.is_false
+    assert: F64.neg_infinity.is_nan.is_false
+    assert: F32.max_value.is_nan.is_false
+    assert: F64.max_value.is_nan.is_false
+    assert: F32.min_value.is_nan.is_false
+    assert: F64.min_value.is_nan.is_false
+    assert: F32.nan.is_infinite.is_false
+    assert: F64.nan.is_infinite.is_false
+    assert: F32.infinity.is_infinite
+    assert: F64.infinity.is_infinite
+    assert: F32.neg_infinity.is_infinite
+    assert: F64.neg_infinity.is_infinite
+    assert: F32.max_value.is_infinite.is_false
+    assert: F64.max_value.is_infinite.is_false
+    assert: F32.min_value.is_infinite.is_false
+    assert: F64.min_value.is_infinite.is_false
+    assert: F32.nan.is_finite.is_false
+    assert: F64.nan.is_finite.is_false
+    assert: F32.infinity.is_finite.is_false
+    assert: F64.infinity.is_finite.is_false
+    assert: F32.neg_infinity.is_finite.is_false
+    assert: F64.neg_infinity.is_finite.is_false
+    assert: F32.max_value.is_finite
+    assert: F64.max_value.is_finite
+    assert: F32.min_value.is_finite
+    assert: F64.min_value.is_finite
+    assert: F64.infinity.is_positive
+    assert: F32.infinity.is_positive
+    assert: F64.infinity.is_negative.is_false
+    assert: F32.infinity.is_negative.is_false
+    assert: F64.neg_infinity.is_positive.is_false
+    assert: F32.neg_infinity.is_positive.is_false
+    assert: F64.neg_infinity.is_negative
+    assert: F32.neg_infinity.is_negative
+    assert: F64[123.456].is_positive
+    assert: F32[123.456].is_positive
+    assert: F64[123.456].is_negative.is_false
+    assert: F32[123.456].is_negative.is_false
+    assert: F64[-123.456].is_positive.is_false
+    assert: F32[-123.456].is_positive.is_false
+    assert: F64[-123.456].is_negative
+    assert: F32[-123.456].is_negative
+
+  :it "converts U8 integers from native to big/little endianness and vice versa"
+    u8 = U8[0x12]
+
+    assert: u8.native_to_be == u8
+    assert: u8.be_to_native == u8
+    assert: u8.native_to_le == u8
+    assert: u8.le_to_native == u8
+
+  :it "converts U16 integers from native to big/little endianness and vice versa"
+    u16 = U16[0x1234]
+    u16_swapped = U16[0x3412]
+
+    if (Platform.little_endian) (
+      assert: u16.native_to_be == u16_swapped
+      assert: u16.native_to_le == u16
+      assert: u16.be_to_native == u16_swapped
+      assert: u16.le_to_native == u16
+    )
+    if (Platform.big_endian) (
+      assert: u16.native_to_be == u16
+      assert: u16.native_to_le == u16_swapped
+      assert: u16.be_to_native == u16
+      assert: u16.le_to_native == u16_swapped
+    )
+
+  :it "converts U32 integers from native to big/little endianness and vice versa"
+    u32 = U32[0x1234_5678]
+    u32_swapped = U32[0x7856_3412]
+
+    if (Platform.little_endian) (
+      assert: u32.native_to_be == u32_swapped
+      assert: u32.native_to_le == u32
+      assert: u32.be_to_native == u32_swapped
+      assert: u32.le_to_native == u32
+    )
+    if (Platform.big_endian) (
+      assert: u32.native_to_be == u32
+      assert: u32.native_to_le == u32_swapped
+      assert: u32.be_to_native == u32
+      assert: u32.le_to_native == u32_swapped
+    )
+
+  :it "converts U64 integers from native to big/little endianness and vice versa"
+    u64 = U64[0x1234_5678_9ABC_DEF0]
+    u64_swapped = U64[0xF0DE_BC9A_7856_3412]
+
+    if (Platform.little_endian) (
+      assert: u64.native_to_be == u64_swapped
+      assert: u64.native_to_le == u64
+      assert: u64.be_to_native == u64_swapped
+      assert: u64.le_to_native == u64
+    )
+    if (Platform.big_endian) (
+      assert: u64.native_to_be == u64
+      assert: u64.native_to_le == u64_swapped
+      assert: u64.be_to_native == u64
+      assert: u64.le_to_native == u64_swapped
+    )

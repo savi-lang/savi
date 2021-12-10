@@ -1,6 +1,0 @@
-:actor Main
-  :new (env)
-    Spec.Process.run(env, [
-      Spec.Run(TimeSpec).new(env)
-      Spec.Run(TimeFormatterSpec).new(env)
-    ])

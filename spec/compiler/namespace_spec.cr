@@ -75,7 +75,7 @@ describe Savi::Compiler::Namespace do
            ^~~~~~
 
     - the built-in type is defined here:
-      from ./packages/Savi/string.savi:1:
+      from ./packages/src/Savi/String.savi:1:
     :class val String
                ^~~~~~
     MSG

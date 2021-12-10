@@ -13,13 +13,13 @@ class Savi::Compiler::SourceService
     from_internal_path(standard_package_internal_path)
   end
   def core_savi_package_path
-    File.join("#{standard_package_path}/Savi")
+    File.join("#{standard_package_path}/src/Savi")
   end
   def standard_declarators_package_path
-    File.join("#{standard_package_path}/Savi/declarators")
+    File.join("#{standard_package_path}/src/Savi/declarators")
   end
   def meta_declarators_package_path
-    File.join("#{standard_package_path}/Savi/declarators/meta")
+    File.join("#{standard_package_path}/src/Savi/declarators/meta")
   end
 
   # Add/update a source override, which causes the SourceService to pretend as
