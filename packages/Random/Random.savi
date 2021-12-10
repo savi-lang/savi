@@ -1,0 +1,31 @@
+// TODO: Document.
+:trait Random
+  // Each random generator is expected to supply an implementation to generate
+  // a pseudo-random 64-bit number, and other value types are derived from this.
+  :fun ref u64 U64
+
+  // Unsigned integers are derived by bit-shifting down from the original U64.
+  // However, some implementations may override these with different approaches.
+  //
+  // We intentionally cascade each method into the next, so that if for example,
+  // the `u32` method is overridden with another approach, then all
+  // smaller-width values will derive from `u32` instead of `u64`.
+  //
+  // In the normal case, with no overrides, we trust LLVM to inline and combine
+  // the bit shift operations to remove unnecessary bit shift instructions.
+  :fun ref u32 U32: @u64.bit_shr(32).u32
+  :fun ref u16 U16: @u32.bit_shr(16).u16
+  :fun ref u8 U8: @u16.bit_shr(8).u8
+
+  // Signed integers are derived by generating as unsigned, then converting.
+  :fun ref i64 I64: @u64.i64
+  :fun ref i32 I32: @u32.i32
+  :fun ref i16 I16: @u16.i16
+  :fun ref i8 I8: @u8.i8
+
+  // Floating-point numbers are similarly derived by converting unsigned ones.
+  :fun ref f64 F64: F64.from_bits(@u64)
+  :fun ref f32 F32: F32.from_bits(@u32)
+
+  // Boolean values are derived from the most significant bit of the value.
+  :fun ref bool Bool: @u8 >= 0x80

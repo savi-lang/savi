@@ -1,0 +1,21 @@
+:: A deterministic pseudo-random number generator with 64 bits of state.
+::
+:: It is expected to be seeded with a 64-bit seed, but alternatively,
+:: a 128-bit seed can be used, resulting in the bits being XOR-combined.
+:trait _State64
+  :is DeterministicRandom
+  :is Random // TODO: this should not be necessary - copies should be transitive
+
+  // TODO: this should not be necessary - unimplemented methods should be copied
+  :fun ref u64 U64
+
+  :var _state U64
+
+  :fun ref seed_64(seed)
+    @_state = seed
+    @
+
+  :fun ref seed_128(seed_a U64, seed_b U64)
+    @_state = seed_a.bit_xor(seed_b)
+    @
+

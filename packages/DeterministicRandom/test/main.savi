@@ -1,0 +1,7 @@
+:actor Main
+  :new (env)
+    Spec.Process.run(env, [
+      Spec.Run(SplitMix64Spec).new(env)
+      Spec.Run(Xoroshiro128Spec).new(env)
+      Spec.Run(Xoroshiro128NarrowSpec).new(env)
+    ])
