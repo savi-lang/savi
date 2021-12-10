@@ -74,6 +74,20 @@
   :fun val count_zeros U8: @invert.count_ones
   :fun val next_pow2 @: compiler intrinsic
 
+  :: Rotate the given number of bits to the "left" (toward most significant).
+  :: Bits that are shifted off the left side are copied to the right side.
+  :fun val bit_rotl(bits U8) @
+    @bit_shl(bits).bit_or(
+      @bit_shr(@bit_width - bits)
+    )
+
+  :: Rotate the given number of bits to the "right" (toward least significant).
+  :: Bits that are shifted off the right side are copied to the left side.
+  :fun val bit_rotr(bits U8) @
+    @bit_shr(bits).bit_or(
+      @bit_shl(@bit_width - bits)
+    )
+
   :fun val native_to_be @
     if (Platform.big_endian) (@ | @swap_bytes)
 
