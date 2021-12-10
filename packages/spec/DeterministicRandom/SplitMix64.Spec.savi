@@ -1,0 +1,74 @@
+:class DeterministicRandom.SplitMix64.Spec
+  :is Spec
+  :const describes: "DeterministicRandom.SplitMix64"
+
+  :it "generates deterministic 64-bit values, given a specific seed"
+    random = DeterministicRandom.SplitMix64.new(0x14821d7fa0a048bd)
+    assert: random.u64 == 0x1b8cfae92bc829e2
+    assert: random.u64 == 0x295883a20d7e72f3
+    assert: random.u64 == 0xbb823b1f6575a666
+    assert: random.u64 == 0x75cca1d6ff12fb6b
+    assert: random.u64 == 0xd222424fdbfb2a67
+    assert: random.u64 == 0xed37247313d27ae7
+    assert: random.u64 == 0xe3734ceb6a213c07
+    assert: random.u64 == 0xb6df3de5ca769094
+    assert: random.u64 == 0x967669b9ee16dbb4
+    assert: random.u64 == 0xed3d03f1e062a6b2
+    assert: random.u64 == 0x2e4e109e9d8690dc
+    assert: random.u64 == 0x8650a0c62e7b9f80
+    assert: random.u64 == 0x9a344a11932e236b
+    assert: random.u64 == 0x6d6341825fbdb66a
+    assert: random.u64 == 0x4f3b46397517114d
+    assert: random.u64 == 0x6c3e095edaa0384a
+
+  :it "can be re-seeded to cut over to another location in the state space"
+    random = DeterministicRandom.SplitMix64.new(0)
+    assert: random.u64 == 0xe220a8397b1dcdaf
+
+    // Re-seed with the same seed that was used for the previous test,
+    // and show that the same sequence of 16 values is produced.
+    random.seed(0x14821d7fa0a048bd)
+    assert: random.u64 == 0x1b8cfae92bc829e2
+    assert: random.u64 == 0x295883a20d7e72f3
+    assert: random.u64 == 0xbb823b1f6575a666
+    assert: random.u64 == 0x75cca1d6ff12fb6b
+    assert: random.u64 == 0xd222424fdbfb2a67
+    assert: random.u64 == 0xed37247313d27ae7
+    assert: random.u64 == 0xe3734ceb6a213c07
+    assert: random.u64 == 0xb6df3de5ca769094
+    assert: random.u64 == 0x967669b9ee16dbb4
+    assert: random.u64 == 0xed3d03f1e062a6b2
+    assert: random.u64 == 0x2e4e109e9d8690dc
+    assert: random.u64 == 0x8650a0c62e7b9f80
+    assert: random.u64 == 0x9a344a11932e236b
+    assert: random.u64 == 0x6d6341825fbdb66a
+    assert: random.u64 == 0x4f3b46397517114d
+    assert: random.u64 == 0x6c3e095edaa0384a
+
+  :it "generates deterministic 32-bit values, given a specific seed"
+    // Note that these are not the same as the 64-bit numbers produced,
+    // because we did override the default implementation of `u32` with a
+    // more efficient implementation that has comparable statistical properties,
+    // but different values used for the bitwise operations.
+    random = DeterministicRandom.SplitMix64.new(0x14821d7fa0a048bd)
+    assert: random.u32 == 0xea8d51ee
+    assert: random.u32 == 0x822d8e5f
+    assert: random.u32 == 0x65d86e30
+    assert: random.u32 == 0x19b87778
+    assert: random.u32 == 0x4494a4f6
+    assert: random.u32 == 0x237d2cd9
+    assert: random.u32 == 0xc17d6171
+    assert: random.u32 == 0x93df09c0
+
+    // However, if we switch back to 64-bit, the remaining numbers will be
+    // the same as if we had taken that number of steps using `u64`.
+    // That is, the following numbers are the same as the 2nd half of
+    // the numbers in the prior tests that used 64-bit generated values.
+    assert: random.u64 == 0x967669b9ee16dbb4
+    assert: random.u64 == 0xed3d03f1e062a6b2
+    assert: random.u64 == 0x2e4e109e9d8690dc
+    assert: random.u64 == 0x8650a0c62e7b9f80
+    assert: random.u64 == 0x9a344a11932e236b
+    assert: random.u64 == 0x6d6341825fbdb66a
+    assert: random.u64 == 0x4f3b46397517114d
+    assert: random.u64 == 0x6c3e095edaa0384a

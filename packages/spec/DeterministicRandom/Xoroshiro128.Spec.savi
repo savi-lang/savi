@@ -1,0 +1,59 @@
+:class DeterministicRandom.Xoroshiro128.Spec
+  :is Spec
+  :const describes: "DeterministicRandom.Xoroshiro128"
+
+  :it "generates deterministic 64-bit values, given a specific seed"
+    random = DeterministicRandom.Xoroshiro128.new_128(
+      0x1b8cfae92bc829e2
+      0x295883a20d7e72f3
+    )
+    assert: random.u64 == 0x18a36d766572b3ac
+    assert: random.u64 == 0x450a217c59700240
+    assert: random.u64 == 0xb13dc42144d9c9fc
+    assert: random.u64 == 0x754d398b886b93c8
+    assert: random.u64 == 0xaf03cafb91299b8f
+    assert: random.u64 == 0x9fe2f3b72dce67c6
+    assert: random.u64 == 0x723154da022be1ed
+    assert: random.u64 == 0x86111eedc159a09f
+    assert: random.u64 == 0x9b5e3455466b6b78
+    assert: random.u64 == 0x214580c7e541f79b
+    assert: random.u64 == 0x63dc4aa3efed499e
+    assert: random.u64 == 0xf3da89aca0e115e6
+    assert: random.u64 == 0x7c832eee0d90cc9d
+    assert: random.u64 == 0x6c1198ed285d2002
+    assert: random.u64 == 0x7489127f8c390cce
+    assert: random.u64 == 0xacc5fa85532a442c
+
+  :it "can be re-seeded to cut over to another location in the state space"
+    random = DeterministicRandom.Xoroshiro128.new_128(1, 2)
+    assert: random.u64 == 0x0000000000060001
+
+    // Re-seed with the same seed that was used for the previous test,
+    // and show that the same sequence of 16 values is produced.
+    random.seed_128(
+      0x1b8cfae92bc829e2
+      0x295883a20d7e72f3
+    )
+    assert: random.u64 == 0x18a36d766572b3ac
+    assert: random.u64 == 0x450a217c59700240
+    assert: random.u64 == 0xb13dc42144d9c9fc
+    assert: random.u64 == 0x754d398b886b93c8
+    assert: random.u64 == 0xaf03cafb91299b8f
+    assert: random.u64 == 0x9fe2f3b72dce67c6
+    assert: random.u64 == 0x723154da022be1ed
+    assert: random.u64 == 0x86111eedc159a09f
+    assert: random.u64 == 0x9b5e3455466b6b78
+    assert: random.u64 == 0x214580c7e541f79b
+    assert: random.u64 == 0x63dc4aa3efed499e
+    assert: random.u64 == 0xf3da89aca0e115e6
+    assert: random.u64 == 0x7c832eee0d90cc9d
+    assert: random.u64 == 0x6c1198ed285d2002
+    assert: random.u64 == 0x7489127f8c390cce
+    assert: random.u64 == 0xacc5fa85532a442c
+
+  :it "prevents the mistake of seeding with an all-zero seed"
+    random = DeterministicRandom.Xoroshiro128.new_128(0, 0)
+    // Without special action to prevent, this would produce all zeroes.
+    assert: random.u64 == 0x6f68e1e7e2646ee1
+    assert: random.u64 == 0xbf971b7f454094ad
+    assert: random.u64 == 0x48f2de556f30de38

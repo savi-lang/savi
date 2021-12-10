@@ -1,9 +1,9 @@
 :manifest lib JSON
-  :sources "JSON/*.savi"
+  :sources "src/JSON/**/*.savi"
 
 :manifest bin "spec-JSON"
   :copies JSON
-  :sources "JSON/test/*.savi"
+  :sources "spec/JSON/**/*.savi"
 
   :dependency Spec "TODO: specify version"
   :transitive dependency Map "TODO: specify version"

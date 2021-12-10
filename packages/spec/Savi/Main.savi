@@ -1,0 +1,15 @@
+:actor Main
+  :new (env)
+    Spec.Process.run(env, [
+      Spec.Run(Savi.Array.Spec).new(env)
+      Spec.Run(Savi.BitArray.Spec).new(env)
+      Spec.Run(Savi.Bool.Spec).new(env)
+      Spec.Run(Savi.Bytes.Spec).new(env)
+      Spec.Run(Savi.Count.Spec).new(env)
+      Spec.Run(Savi.CPointer.Spec).new(env)
+      Spec.Run(Savi.Indexable.Spec).new(env)
+      Spec.Run(Savi.Inspect.Spec).new(env)
+      Spec.Run(Savi.Numeric.Spec).new(env)
+      Spec.Run(Savi.Platform.Spec).new(env)
+      Spec.Run(Savi.String.Spec).new(env)
+    ])

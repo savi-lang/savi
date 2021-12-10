@@ -1,0 +1,8 @@
+:actor Main
+  :new (env)
+    Spec.Process.run(env, [
+      Spec.Run(DeterministicRandom.Default.Spec).new(env)
+      Spec.Run(DeterministicRandom.SplitMix64.Spec).new(env)
+      Spec.Run(DeterministicRandom.Xoroshiro128.Spec).new(env)
+      Spec.Run(DeterministicRandom.Xoroshiro128.Narrow.Spec).new(env)
+    ])

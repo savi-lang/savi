@@ -1,0 +1,278 @@
+:class JSON.Parser.Spec
+  :is Spec
+  :const describes: "JSON.Parser"
+
+  :it "parses keywords"
+    assert: @example("null", <<<
+      [JSON.TokenNull, 0, 4, 0, 0.0, ""]
+    >>>)
+    assert: @example("true", <<<
+      [JSON.TokenTrue, 0, 4, 0, 0.0, ""]
+    >>>)
+    assert: @example("false", <<<
+      [JSON.TokenFalse, 0, 5, 0, 0.0, ""]
+    >>>)
+    assert: @example(" \t\nnull\n\t ", <<<
+      [JSON.TokenNull, 3, 7, 0, 0.0, ""]
+    >>>)
+
+    assert: @example_error("nugget",    "nu")
+    assert: @example_error("truth",     "tru")
+    assert: @example_error("falsehood", "false")
+    assert: @example_error("bogus",     "")
+
+  :it "parses numbers"
+    assert: @example("123", <<<
+      [JSON.TokenNumberPre, 0, 0, 0, 0.0, ""]
+      [JSON.TokenNumber, 0, 3, 123, 0.0, ""]
+    >>>)
+    assert: @example("-123", <<<
+      [JSON.TokenNumberPre, 0, 0, 0, 0.0, ""]
+      [JSON.TokenNumber, 0, 4, -123, 0.0, ""]
+    >>>)
+    assert: @example("123.456", <<<
+      [JSON.TokenNumberPre, 0, 0, 0, 0.0, ""]
+      [JSON.TokenNumber, 0, 7, 0, 123.456, ""]
+    >>>)
+    assert: @example("-123.456", <<<
+      [JSON.TokenNumberPre, 0, 0, 0, 0.0, ""]
+      [JSON.TokenNumber, 0, 8, 0, -123.456, ""]
+    >>>)
+    assert: @example("123e2", <<<
+      [JSON.TokenNumberPre, 0, 0, 0, 0.0, ""]
+      [JSON.TokenNumber, 0, 5, 0, 12300, ""]
+    >>>)
+    assert: @example("-123e-2", <<<
+      [JSON.TokenNumberPre, 0, 0, 0, 0.0, ""]
+      [JSON.TokenNumber, 0, 7, 0, -1.23, ""]
+    >>>)
+    assert: @example("-123.456e2", <<<
+      [JSON.TokenNumberPre, 0, 0, 0, 0.0, ""]
+      [JSON.TokenNumber, 0, 10, 0, -12345.6, ""]
+    >>>)
+    assert: @example("-123.4e-2", <<<
+      [JSON.TokenNumberPre, 0, 0, 0, 0.0, ""]
+      [JSON.TokenNumber, 0, 9, 0, -1.234, ""]
+    >>>)
+
+    assert: @example_error("---",             "-")
+    assert: @example_error("123456789ABCDEF", "123456789")
+    assert: @example_error("0x0",             "0")
+    assert: @example_error("123...",          "123.")
+    assert: @example_error("123.",            "123.")
+    assert: @example_error("127.0.0.1",       "127.0")
+    assert: @example_error("5eed",            "5e")
+    assert: @example_error("5e---",           "5e-")
+    assert: @example_error("5e",              "5e")
+    assert: @example_error("1.2e3.4",         "1.2e3")
+    assert: @example_error(" 1 2 3 ",         " 1 ")
+
+  :it "parses strings"
+    assert: @example(<<<"apple">>>, <<<
+      [JSON.TokenStringPre, 1, 1, 0, 0.0, ""]
+      [JSON.TokenString, 1, 6, 0, 0.0, "apple"]
+    >>>)
+    assert: @example("                    \"apple\"   ", <<<
+      [JSON.TokenStringPre, 21, 21, 0, 0.0, ""]
+      [JSON.TokenString, 21, 26, 0, 0.0, "apple"]
+    >>>)
+    assert: @example("                    \"\"   ", <<<
+      [JSON.TokenStringPre, 21, 21, 0, 0.0, ""]
+      [JSON.TokenString, 21, 21, 0, 0.0, ""]
+    >>>)
+
+    assert: @example_error(" \" ",                       " \" ")
+    assert: @example_error(" \"apple",                   " \"apple")
+    assert: @example_error(" \"\\\"",                    " \"\\\"")
+    assert: @example_error(" \"\\urge\" ",               " \"\\u")
+    assert: @example_error(" \"\\u123\" ",               " \"\\u123")
+    assert: @example_error(" \"\\ud800\\n\" ",           " \"\\ud800\\")
+    assert: @example_error(" \"apple \\ud800 banana\" ", " \"apple \\ud800")
+    assert: @example_error(" \"\\ud800\\ud800\" ",       " \"\\ud800\\u")
+
+  :it "parses arrays"
+    assert: @example("[]", <<<
+      [JSON.TokenArrayStart, 0, 1, 0, 0.0, ""]
+      [JSON.TokenArrayEnd, 1, 2, 0, 0.0, ""]
+    >>>)
+    assert: @example("  [  ]  ", <<<
+      [JSON.TokenArrayStart, 2, 3, 0, 0.0, ""]
+      [JSON.TokenArrayEnd, 5, 6, 0, 0.0, ""]
+    >>>)
+    assert: @example("[1,2,3]", <<<
+      [JSON.TokenArrayStart, 0, 1, 0, 0.0, ""]
+      [JSON.TokenNumberPre, 1, 1, 0, 0.0, ""]
+      [JSON.TokenNumber, 1, 2, 1, 0.0, ""]
+      [JSON.TokenNumberPre, 3, 3, 1, 0.0, ""]
+      [JSON.TokenNumber, 3, 4, 2, 0.0, ""]
+      [JSON.TokenNumberPre, 5, 5, 2, 0.0, ""]
+      [JSON.TokenNumber, 5, 6, 3, 0.0, ""]
+      [JSON.TokenArrayEnd, 6, 7, 3, 0.0, ""]
+    >>>)
+    assert: @example("  [  1  ,  2  ,  3  ]  ", <<<
+      [JSON.TokenArrayStart, 2, 3, 0, 0.0, ""]
+      [JSON.TokenNumberPre, 5, 5, 0, 0.0, ""]
+      [JSON.TokenNumber, 5, 6, 1, 0.0, ""]
+      [JSON.TokenNumberPre, 11, 11, 1, 0.0, ""]
+      [JSON.TokenNumber, 11, 12, 2, 0.0, ""]
+      [JSON.TokenNumberPre, 17, 17, 2, 0.0, ""]
+      [JSON.TokenNumber, 17, 18, 3, 0.0, ""]
+      [JSON.TokenArrayEnd, 20, 21, 3, 0.0, ""]
+    >>>)
+    assert: @example("[[[true]]]", <<<
+      [JSON.TokenArrayStart, 0, 1, 0, 0.0, ""]
+      [JSON.TokenArrayStart, 1, 2, 0, 0.0, ""]
+      [JSON.TokenArrayStart, 2, 3, 0, 0.0, ""]
+      [JSON.TokenTrue, 3, 7, 0, 0.0, ""]
+      [JSON.TokenArrayEnd, 7, 8, 0, 0.0, ""]
+      [JSON.TokenArrayEnd, 8, 9, 0, 0.0, ""]
+      [JSON.TokenArrayEnd, 9, 10, 0, 0.0, ""]
+    >>>)
+
+    assert: @example_error("]]]",                   "")
+    assert: @example_error("[[[",                   "[[[")
+    assert: @example_error("[1,,,]",                "[1,")
+    assert: @example_error("[1,2,3}",               "[1,2,3")
+    assert: @example_error(<<<["fruit":"apple"]>>>, <<<["fruit">>>)
+
+  :it "parses objects"
+    assert: @example("{}", <<<
+      [JSON.TokenObjectStart, 0, 1, 0, 0.0, ""]
+      [JSON.TokenObjectEnd, 1, 2, 0, 0.0, ""]
+    >>>)
+    assert: @example("  {  }  ", <<<
+      [JSON.TokenObjectStart, 2, 3, 0, 0.0, ""]
+      [JSON.TokenObjectEnd, 5, 6, 0, 0.0, ""]
+    >>>)
+    assert: @example(<<<{"fruit":"apple","edible":true}>>>, <<<
+      [JSON.TokenObjectStart, 0, 1, 0, 0.0, ""]
+      [JSON.TokenKeyPre, 2, 2, 0, 0.0, ""]
+      [JSON.TokenKey, 2, 7, 0, 0.0, "fruit"]
+      [JSON.TokenStringPre, 10, 10, 0, 0.0, "fruit"]
+      [JSON.TokenString, 10, 15, 0, 0.0, "apple"]
+      [JSON.TokenPairPost, 16, 16, 0, 0.0, "apple"]
+      [JSON.TokenKeyPre, 18, 18, 0, 0.0, "apple"]
+      [JSON.TokenKey, 18, 24, 0, 0.0, "edible"]
+      [JSON.TokenTrue, 26, 30, 0, 0.0, "edible"]
+      [JSON.TokenPairPost, 30, 30, 0, 0.0, "edible"]
+      [JSON.TokenObjectEnd, 30, 31, 0, 0.0, "edible"]
+    >>>)
+    assert: @example(<<<  {  "a"  :  1  ,  "b"  :  2  }  >>>, <<<
+      [JSON.TokenObjectStart, 2, 3, 0, 0.0, ""]
+      [JSON.TokenKeyPre, 6, 6, 0, 0.0, ""]
+      [JSON.TokenKey, 6, 7, 0, 0.0, "a"]
+      [JSON.TokenNumberPre, 13, 13, 0, 0.0, "a"]
+      [JSON.TokenNumber, 13, 14, 1, 0.0, "a"]
+      [JSON.TokenPairPost, 16, 16, 1, 0.0, "a"]
+      [JSON.TokenKeyPre, 20, 20, 1, 0.0, "a"]
+      [JSON.TokenKey, 20, 21, 1, 0.0, "b"]
+      [JSON.TokenNumberPre, 27, 27, 1, 0.0, "b"]
+      [JSON.TokenNumber, 27, 28, 2, 0.0, "b"]
+      [JSON.TokenPairPost, 30, 30, 2, 0.0, "b"]
+      [JSON.TokenObjectEnd, 30, 31, 2, 0.0, "b"]
+    >>>)
+    assert: @example(<<<{"t":[{"e":[{"s":[{"t":[]}]}]}]}>>>, <<<
+      [JSON.TokenObjectStart, 0, 1, 0, 0.0, ""]
+      [JSON.TokenKeyPre, 2, 2, 0, 0.0, ""]
+      [JSON.TokenKey, 2, 3, 0, 0.0, "t"]
+      [JSON.TokenArrayStart, 5, 6, 0, 0.0, "t"]
+      [JSON.TokenObjectStart, 6, 7, 0, 0.0, "t"]
+      [JSON.TokenKeyPre, 8, 8, 0, 0.0, "t"]
+      [JSON.TokenKey, 8, 9, 0, 0.0, "e"]
+      [JSON.TokenArrayStart, 11, 12, 0, 0.0, "e"]
+      [JSON.TokenObjectStart, 12, 13, 0, 0.0, "e"]
+      [JSON.TokenKeyPre, 14, 14, 0, 0.0, "e"]
+      [JSON.TokenKey, 14, 15, 0, 0.0, "s"]
+      [JSON.TokenArrayStart, 17, 18, 0, 0.0, "s"]
+      [JSON.TokenObjectStart, 18, 19, 0, 0.0, "s"]
+      [JSON.TokenKeyPre, 20, 20, 0, 0.0, "s"]
+      [JSON.TokenKey, 20, 21, 0, 0.0, "t"]
+      [JSON.TokenArrayStart, 23, 24, 0, 0.0, "t"]
+      [JSON.TokenArrayEnd, 24, 25, 0, 0.0, "t"]
+      [JSON.TokenPairPost, 25, 25, 0, 0.0, "t"]
+      [JSON.TokenObjectEnd, 25, 26, 0, 0.0, "t"]
+      [JSON.TokenArrayEnd, 26, 27, 0, 0.0, "t"]
+      [JSON.TokenPairPost, 27, 27, 0, 0.0, "t"]
+      [JSON.TokenObjectEnd, 27, 28, 0, 0.0, "t"]
+      [JSON.TokenArrayEnd, 28, 29, 0, 0.0, "t"]
+      [JSON.TokenPairPost, 29, 29, 0, 0.0, "t"]
+      [JSON.TokenObjectEnd, 29, 30, 0, 0.0, "t"]
+      [JSON.TokenArrayEnd, 30, 31, 0, 0.0, "t"]
+      [JSON.TokenPairPost, 31, 31, 0, 0.0, "t"]
+      [JSON.TokenObjectEnd, 31, 32, 0, 0.0, "t"]
+    >>>)
+
+    assert: @example_error("}}}",                    "")
+    assert: @example_error("{{{",                    "{")
+    assert: @example_error(<<<{"a":1,,,"b":2}>>>,    <<<{"a":1,>>>)
+    assert: @example_error(<<<{"a":{"b":>>>,         <<<{"a":{"b":>>>)
+    assert: @example_error(<<<{"a":1,"b":2]>>>,      <<<{"a":1,"b":2>>>)
+    assert: @example_error(<<<{"apple","edible"}>>>, <<<{"apple">>>)
+
+  :fun example(source String, expected String) Bool
+    collector = _TestJsonParserCollector.new
+    parser = JSON.Parser.new
+    try (
+      parser.parse!(source) -> (token | collector.collect(parser, token))
+      actual = Inspect[collector]
+      if (actual == expected) (
+        True
+      |
+        @env.err.print("\n")
+        @env.err.write("expected "), @env.err.write(Inspect[source])
+        @env.err.print(" to parse as:"), @env.err.print(expected)
+        @env.err.print("but actually parsed as:"), @env.err.print(actual)
+        False
+      )
+    |
+      @env.err.write("\nexpected "), @env.err.write(Inspect[source])
+      @env.err.print(" to parse, but it failed to parse")
+      False
+    )
+
+  :fun example_error(source String, valid_part String) Bool
+    parser = JSON.Parser.new
+    try (
+      parser.parse!(source) -> (token | None)
+      @env.err.write("\nexpected error parsing ")
+      @env.err.write(Inspect[source])
+      @env.err.print(" but it parsed successfully")
+      False
+    |
+      actual = source.trim(0, parser.token_end.isize)
+      if (valid_part == actual) (
+        True
+      |
+        @env.err.write("\nexpected the valid part of ")
+        @env.err.print(Inspect[source])
+        @env.err.write("to equal:   ")
+        @env.err.print(Inspect[valid_part])
+        @env.err.write("but it was: ")
+        @env.err.print(Inspect[actual])
+        False
+      )
+    )
+
+:class _TestJsonParserCollector
+  :let tokens Array(Array(
+    (JSON.Token | USize | USize | I64 | F64 | String | None)
+  )): []
+
+  :fun inspect_into(out String'iso) String'iso
+    @tokens.each -> (item |
+      out = Inspect.into(--out, item)
+      out.push_byte('\n')
+      None // TODO: this None shouldn't be needed
+    )
+    out.trim_in_place(0, -1) // remove the final newline
+    --out
+
+  :fun ref collect(parser JSON.Parser, token JSON.Token) None
+    @tokens << [
+      token
+      parser.token_start
+      parser.token_end
+      try (parser.last_number.as!(I64) | 0)
+      try (parser.last_number.as!(F64) | 0)
+      parser.last_string
+    ]

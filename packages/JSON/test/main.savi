@@ -1,6 +1,0 @@
-:actor Main
-  :new (env)
-    Spec.Process.run(env, [
-      Spec.Run(JsonParserSpec).new(env)
-      Spec.Run(JsonReaderSpec).new(env)
-    ])
