@@ -2310,6 +2310,8 @@ class Savi::Compiler::CodeGen
         else
           gtype_of(expr).singleton
         end
+      elsif ref.is_a?(Refer::TypeAlias)
+        gtype_of(expr).singleton
       elsif ref.is_a?(Refer::Self)
         raise "#{ref.inspect} isn't a constant value" if const_only
         func_frame.receiver_value
