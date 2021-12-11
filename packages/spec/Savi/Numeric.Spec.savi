@@ -362,6 +362,17 @@
     assert: F64[-123.456].is_negative
     assert: F32[-123.456].is_negative
 
+  :it "knows the bit widths used in the representation of floating-point values"
+    // We have significand bits, exponent bits, and 1 sign bit.
+    assert: F32.sig_bit_width + F32.exp_bit_width + 1 == F32.bit_width
+    assert: F64.sig_bit_width + F64.exp_bit_width + 1 == F64.bit_width
+
+  :it "knows floating-point units of least precision just above and below 1.0"
+    assert: F32.epsilon      == F32[2].pow(F32.sig_bit_width.f32.negate)
+    assert: F32.half_epsilon == F32[2].pow(F32.sig_bit_width.f32.negate - 1)
+    assert: F64.epsilon      == F64[2].pow(F64.sig_bit_width.f64.negate)
+    assert: F64.half_epsilon == F64[2].pow(F64.sig_bit_width.f64.negate - 1)
+
   :it "converts U8 integers from native to big/little endianness and vice versa"
     u8 = U8[0x12]
 

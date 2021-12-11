@@ -129,11 +129,28 @@
   :fun non from_bits(bits U32) @'val: compiler intrinsic
   :fun val bits U32: compiler intrinsic
 
+  // TODO: These should be :const (should they be capitalized)?
   :fun non nan:          @from_bits(0x7FC0_0000)
   :fun non infinity:     @from_bits(0x7F80_0000)
   :fun non neg_infinity: @from_bits(0xFF80_0000)
   :fun non max_value:    @from_bits(0x7F7F_FFFF)
   :fun non min_value:    @from_bits(0xFF7F_FFFF)
+
+  :: The number of bits representing the exponent.
+  :fun non exp_bit_width U8: 8
+
+  :: The number of bits representing the significand (a.k.a. mantissa).
+  :: Note that this does not include the implicit/hidden leading bit,
+  :: because that implicit bit is not actually in the memory representation.
+  :fun non sig_bit_width U8: 23
+
+  :: The difference between 1.0 and the next larger representable number.
+  :: This is the unit of least precision in the semi-open range [1.0, 2.0).
+  :fun non epsilon: @from_bits(0x3400_0000) // 2 ** -23
+
+  :: The difference between 1.0 and the next smaller representable number.
+  :: This is the unit of least precision in the semi-open range [0.5, 1.0).
+  :fun non half_epsilon: @from_bits(0x33800000) // 2 ** -24
 
   :fun val log @: compiler intrinsic
   :fun val log2 @: compiler intrinsic
@@ -161,11 +178,28 @@
   :fun non from_bits(bits U64) @'val: compiler intrinsic
   :fun val bits U64: compiler intrinsic
 
+  // TODO: These should be :const (should they be capitalized)?
   :fun non nan:          @from_bits(0x7FF8_0000_0000_0000)
   :fun non infinity:     @from_bits(0x7FF0_0000_0000_0000)
   :fun non neg_infinity: @from_bits(0xFFF0_0000_0000_0000)
   :fun non max_value:    @from_bits(0x7FEF_FFFF_FFFF_FFFF)
   :fun non min_value:    @from_bits(0xFFEF_FFFF_FFFF_FFFF)
+
+  :: The number of bits representing the exponent.
+  :fun non exp_bit_width U8: 11
+
+  :: The number of bits representing the significand (a.k.a. mantissa).
+  :: Note that this does not include the implicit/hidden leading bit,
+  :: because that implicit bit is not actually in the memory representation.
+  :fun non sig_bit_width U8: 52
+
+  :: The difference between 1.0 and the next larger representable number.
+  :: This is the unit of least precision in the semi-open range [1.0, 2.0).
+  :fun non epsilon: @from_bits(0x3cb0000000000000) // 2 ** -52
+
+  :: The difference between 1.0 and the next smaller representable number.
+  :: This is the unit of least precision in the semi-open range [0.5, 1.0).
+  :fun non half_epsilon: @from_bits(0x3ca0000000000000) // 2 ** -53
 
   :fun val log @: compiler intrinsic
   :fun val log2 @: compiler intrinsic
