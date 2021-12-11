@@ -175,7 +175,9 @@ class Savi::Compiler::Namespace
     manifest.dependencies.each { |dep|
       next if dep.transitive?
 
-      @types_by_package_name[dep.name.value].each { |name, new_type_link|
+      dep_manifest = ctx.manifests.manifests_by_name[dep.name.value]
+
+      @types_by_package_name[dep_manifest.name.value].each { |name, new_type_link|
         new_type = new_type_link.resolve(ctx)
         next if new_type.has_tag?(:private)
 

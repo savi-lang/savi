@@ -15,6 +15,12 @@ class Savi::Compiler::Load
   def run(ctx)
     return if ctx.options.skip_manifest
 
-    ctx.manifests.manifests_by_name.each_value { |m| ctx.compile_package(m) }
+    loaded = Set(Packaging::Manifest).new
+    ctx.manifests.manifests_by_name.each_value { |manifest|
+      next if loaded.includes?(manifest)
+      loaded.add(manifest)
+
+      ctx.compile_package(manifest)
+    }
   end
 end
