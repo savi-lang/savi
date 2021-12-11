@@ -14,9 +14,9 @@ class Savi::Compiler::Eval
   getter! exitcode : Int32
 
   def run(ctx)
-    binary_path = "./#{ctx.options.binary_name}"
+    bin_path = ctx.manifests.root.not_nil!.bin_path
 
-    res = Process.run("/usr/bin/env", [binary_path], output: STDOUT, error: STDERR)
+    res = Process.run("/usr/bin/env", [bin_path], output: STDOUT, error: STDERR)
     @exitcode = res.exit_code
   end
 end

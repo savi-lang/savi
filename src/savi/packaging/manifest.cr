@@ -8,6 +8,10 @@ struct Savi::Packaging::Manifest
   def initialize(@name, @kind)
   end
 
+  def bin_path
+    File.join(name.pos.source.dirname, "bin", name.value)
+  end
+
   def is_main?
     @kind.value == "main"
   end

@@ -18,10 +18,11 @@ class Savi::Compiler::Binary
   end
 
   def run(ctx)
+    bin_path = ctx.manifests.root.not_nil!.bin_path
+
     # Compile a temporary binary object file, that we will remove after we
     # use it in the linker invocation to create the final binary.
-    obj_filename = File.tempname(".savi.user.program") + ".o"
-    BinaryObject.run(ctx, obj_filename)
+    obj_path = BinaryObject.run(ctx)
 
     # Use clang to orchestrate the linking process (clang will call the linker
     # for us with appropriate arguments based on the args we have given it).
@@ -57,17 +58,17 @@ class Savi::Compiler::Binary
     end
 
     # Finally, specify the input object file and the output filename.
-    link_args << obj_filename
-    link_args << "-o" << ctx.options.binary_name
+    link_args << obj_path
+    link_args << "-o" << bin_path
 
     res = Process.run("/usr/bin/env", link_args, output: STDOUT, error: STDERR)
     raise "linker failed" unless res.exit_code == 0
 
     if ctx.options.no_debug
-      res = Process.run("/usr/bin/env", ["strip", ctx.options.binary_name], output: STDOUT, error: STDERR)
+      res = Process.run("/usr/bin/env", ["strip", bin_path], output: STDOUT, error: STDERR)
       raise "strip failed" unless res.exit_code == 0
     end
   ensure
-    File.delete(obj_filename) if obj_filename && File.exists?(obj_filename)
+    File.delete(obj_path) if obj_path && File.exists?(obj_path)
   end
 end

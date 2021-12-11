@@ -13,7 +13,7 @@ SPEC=$(BUILD)/savi-spec
 ci: PHONY
 	make format.check
 	make spec.all extra_args="--backtrace $(extra_args)"
-	make example-run dir="examples/adventofcode/2018" extra_args="--backtrace $(extra_args)"
+	make example dir="examples/adventofcode/2018" extra_args="--backtrace $(extra_args)"
 
 # Remove temporary/generated files.
 clean: PHONY
@@ -40,6 +40,11 @@ spec.package: PHONY $(SAVI)
 spec.package.all: PHONY $(SAVI)
 	find packages/spec -mindepth 1 -maxdepth 1 | cut -d/ -f3 | sort | xargs -I'{}' sh -c \
 		"echo && $(SAVI) run --cd packages "spec-{}" $(extra_args) || exit 255"
+
+# Run the specs for the given package in lldb for debugging.
+spec.package.lldb: PHONY $(SAVI)
+	echo && $(SAVI) build --cd packages "spec-$(name)" $(extra_args) && \
+		lldb -o run -- "packages/bin/spec-$(name)"
 
 # Run the specs that are written in Crystal (mostly compiler unit tests),
 # narrowing to those with the given name (or all of them).
@@ -68,21 +73,13 @@ ffigen: PHONY $(SAVI)
 example-eval: PHONY $(SAVI)
 	echo && $(SAVI) eval 'env.out.print("Hello, World!")'
 
-# Run the files in the given directory.
-example-run: PHONY $(SAVI)
-	echo && cd "$(dir)" && $(shell pwd)/$(SAVI) run $(extra_args)
+# Compile and run the user program binary in the given directory.
+example: PHONY $(SAVI)
+	echo && $(SAVI) --cd "$(dir)" run $(extra_args)
 
 # Compile the files in the given directory.
 example-compile: PHONY $(SAVI)
-	echo && cd "$(dir)" && $(shell pwd)/$(SAVI) $(extra_args)
-
-# Compile and run the user program binary in the given directory.
-example: example-compile
-	echo && "$(dir)/main"
-
-# Compile and run the user program binary in the given directory under LLDB.
-example-lldb: example-compile
-	echo && lldb -o run -- "$(dir)/main"
+	echo && $(SAVI) --cd "$(dir)" $(extra_args)
 
 # Compile the vscode extension.
 vscode: PHONY $(SAVI)
