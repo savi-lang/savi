@@ -7,3 +7,5 @@
 
   :dependency Spec "TODO: specify version"
   :transitive dependency Map "TODO: specify version"
+
+  :dependency DeterministicRandom "TODO: specify version"

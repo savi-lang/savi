@@ -43,3 +43,17 @@
     assert: random.f64 == F64.from_bits(0x0123456789abcdef)
     assert: random.f32 == F32.from_bits(0xf7e6d5c4)
     assert: random.bool == True
+
+  :it "generates 64-bit fractional values between 0 and 1, averaging around 0.5"
+    random = DeterministicRandom.Xoroshiro128.new_128(1, 2)
+    count USize = 0x1_0000
+    total F64 = 0
+    Count.to(count) -> (i | total += random.frac_64)
+    assert: (total / count.f64) == 0.49999695846019471
+
+  :it "generates 32-bit fractional values between 0 and 1, averaging around 0.5"
+    random = DeterministicRandom.Xoroshiro128.new_128(1, 2)
+    count USize = 0x1_0000
+    total F32 = 0
+    Count.to(count) -> (i | total += random.frac_32)
+    assert: (total / count.f32) == 0.49999812245368958
