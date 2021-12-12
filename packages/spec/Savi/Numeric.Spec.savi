@@ -270,6 +270,12 @@
     assert: U16[0b1110010110001010].bit_shr(5)  == 0b0000011100101100
     assert: U16[0b1110010110001010].bit_rotr(5) == 0b0101011100101100
 
+  :it "implements special multiplication without overflow by returning a pair"
+    product = U8[99].wide_multiply(200)
+    assert: product.head == 0x4d
+    assert: product.tail == 0x58
+    assert: product.head.u16.bit_shl(8) + product.tail.u16 == U16[99] * 200
+
   :it "implements logarithms and exponents for floating points"
     assert: F64[1].log == 0
     assert: F32[1].log == 0

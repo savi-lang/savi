@@ -118,6 +118,7 @@ class Savi::Compiler::CodeGen
     @i32_ptr  = @llvm.int32.pointer.as(LLVM::Type)
     @i32_0    = @llvm.int32.const_int(0).as(LLVM::Value)
     @i64      = @llvm.int64.as(LLVM::Type)
+    @i128     = @llvm.int128.as(LLVM::Type)
     @isize    = @llvm.intptr(@target_machine.data_layout).as(LLVM::Type)
     @f32      = @llvm.float.as(LLVM::Type)
     @f64      = @llvm.double.as(LLVM::Type)
@@ -1424,6 +1425,40 @@ class Savi::Compiler::CodeGen
         else
           @builder.zext(res, llvm_type_of(gtype))
         end
+      when "wide_multiply"
+        raise "wide_multiply float" if gtype.type_def.is_floating_point_numeric?(ctx)
+
+        narrow_type, wide_type =
+          case bit_width_of(gtype)
+          when 1 then {@i1, @i8}
+          when 8 then {@i8, @i16}
+          when 16 then {@i16, @i32}
+          when 32 then {@i32, @i64}
+          when 64 then {@i64, @i128}
+          else raise NotImplementedError.new(bit_width_of(gtype))
+          end
+
+        # Get the product of multiplying the two operands in the wide type,
+        # catching all significant bits without overflow.
+        wide = @builder.mul(
+          @builder.zext(params[0], wide_type),
+          @builder.zext(params[1], wide_type),
+        )
+
+        # Obtain the most significant half via shift right of the narrow width.
+        wide_msb = @builder.lshr(wide,
+          wide_type.const_int(bit_width_of(narrow_type))
+        )
+
+        # Convert the two halves back to the narrow type.
+        narrow_msb = @builder.trunc(wide_msb, narrow_type)
+        narrow_lsb = @builder.trunc(wide, narrow_type)
+
+        # Return the two halves as a pair.
+        narrow_pair = gfunc.llvm_func.return_type.undef
+        narrow_pair = @builder.insert_value(narrow_pair, narrow_msb, 0)
+        narrow_pair = @builder.insert_value(narrow_pair, narrow_lsb, 1)
+        narrow_pair
       else
         raise NotImplementedError.new(gfunc.func.ident.inspect)
       end
