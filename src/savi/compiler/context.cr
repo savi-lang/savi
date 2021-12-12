@@ -7,7 +7,7 @@ class Savi::Compiler::Context
   getter code_gen = CodeGen.new(CodeGen::PonyRT)
   getter code_gen_verona = CodeGen.new(CodeGen::VeronaRT)
   getter completeness = Completeness::Pass.new
-  getter eval = Eval.new
+  getter run = Run.new
   getter flow = Flow::Pass.new
   getter infer = Infer::Pass.new
   getter infer_edge = Infer::PassEdge.new

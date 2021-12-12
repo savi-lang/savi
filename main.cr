@@ -185,8 +185,8 @@ module Savi
 
     def self.run(options, backtrace = false)
       _add_backtrace backtrace do
-        ctx = Savi.compiler.compile(Dir.current, options.target_pass || :eval, options)
-        ctx.errors.any? ? finish_with_errors(ctx.errors, backtrace) : ctx.eval.exitcode
+        ctx = Savi.compiler.compile(Dir.current, options.target_pass || :run, options)
+        ctx.errors.any? ? finish_with_errors(ctx.errors, backtrace) : ctx.run.exitcode
       end
     end
 
@@ -202,8 +202,8 @@ module Savi
           "#{dirname}/src/main.savi",
           ":actor Main\n:new (env)\n#{code}"
         )
-        ctx = Savi.compiler.compile(dirname, :eval, options)
-        ctx.errors.any? ? finish_with_errors(ctx.errors, backtrace) : ctx.eval.exitcode
+        ctx = Savi.compiler.compile(dirname, :run, options)
+        ctx.errors.any? ? finish_with_errors(ctx.errors, backtrace) : ctx.run.exitcode
       end
     end
 

@@ -66,7 +66,7 @@ class Savi::Compiler
     when "lifetime"         then :lifetime
     when "binary_object"    then :binary_object
     when "binary"           then :binary
-    when "eval"             then :eval
+    when "run"              then :run
     when "codegen_verona"   then :codegen_verona
     when "binary_verona"    then :binary_verona
     when "serve_errors"     then :serve_errors
@@ -120,7 +120,7 @@ class Savi::Compiler
       when :lifetime         then ctx.run_whole_program(ctx.lifetime)
       when :binary_object    then ctx.run_whole_program(BinaryObject)
       when :binary           then ctx.run_whole_program(Binary)
-      when :eval             then ctx.run_whole_program(ctx.eval)
+      when :run              then ctx.run_whole_program(ctx.run)
       when :codegen_verona   then ctx.run_whole_program(ctx.code_gen_verona)
       when :binary_verona    then ctx.run_whole_program(BinaryVerona)
       when :serve_errors     then nil # we only care that the dependencies have run, to generate compile errors
@@ -179,7 +179,7 @@ class Savi::Compiler
     when :lifetime then [:reach, :local, :refer, :classify]
     when :binary_object then [:codegen]
     when :binary then [:codegen]
-    when :eval then [:binary]
+    when :run then [:binary]
     when :codegen_verona then [:lifetime, :paint, :verify, :reach, :completeness, :privacy, :type_check, :infer, :pre_infer, :inventory, :local, :flow]
     when :binary_verona then [:codegen_verona]
     when :serve_errors then [:completeness, :privacy, :verify, :type_check, :local]
@@ -211,7 +211,7 @@ class Savi::Compiler
     compile(sources, target, options)
   end
 
-  def compile(dirname : String, target : Symbol = :eval, options = Compiler::Options.new)
+  def compile(dirname : String, target : Symbol = :run, options = Compiler::Options.new)
     sources =
       if options.skip_manifest
         source_service.get_directory_sources(dirname)
@@ -223,7 +223,7 @@ class Savi::Compiler
   end
 
   @prev_ctx : Context?
-  def compile(sources : Array(Source), target : Symbol = :eval, options = Compiler::Options.new)
+  def compile(sources : Array(Source), target : Symbol = :run, options = Compiler::Options.new)
     ctx = Context.new(self, options, @prev_ctx)
 
     docs = sources.compact_map do |source|
