@@ -53,7 +53,7 @@
 
   :it "prevents the mistake of seeding with an all-zero seed"
     random = DeterministicRandom.Xoroshiro128.Narrow.new_128(0, 0)
-    // Without special action to prevent, this would produce all zeroes.
+    // Without special action to prevent, this would produce all zeros.
     assert: random.u64 == 0x509946a41cd733a3
     assert: random.u64 == 0xd805fcac6824536e
     assert: random.u64 == 0xdadc02f3e3cf7be3

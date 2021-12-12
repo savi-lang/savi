@@ -156,7 +156,7 @@
 
   :: Print the time data for human inspection (the format is subject to change).
   :fun inspect_into(output String'iso)
-    // TODO: Properly pad numbers with zeroes for a constant string width.
+    // TODO: Properly pad numbers with zeros for a constant string width.
     output = Inspect.into(--output, @year),       output.push_byte('-')
     output = Inspect.into(--output, @month),      output.push_byte('-')
     output = Inspect.into(--output, @day),        output.push_byte(' ')
