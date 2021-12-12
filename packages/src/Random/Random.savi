@@ -65,3 +65,105 @@
   :: To generate in a range that includes 0 but excludes 1, see frac_64.
   :fun ref frac_64_nonzero F64
     @frac_64 + F64.half_epsilon
+
+  :: Return a random U64 below the given limit - in the range [0, limit).
+  ::
+  :: The results will be slightly biased (some numbers have one more sample
+  :: in the pool than others), but the bias is very slight if the limit is
+  :: much smaller than the maximum representable U64 value, and the bias is
+  :: eliminated entirely if the given limit is a power of 2.
+  ::
+  :: If you need fully unbiased results, use the `unbiased_u64_less_than`
+  :: method instead, which discards all samples from the biased zone.
+  :fun ref u64_less_than(limit U64) U64
+    @u64.wide_multiply(limit).head
+
+  :: Return a random U32 below the given limit - in the range [0, limit).
+  ::
+  :: The results will be slightly biased (some numbers have one more sample
+  :: in the pool than others), but the bias is very slight if the limit is
+  :: much smaller than the maximum representable U32 value, and the bias is
+  :: eliminated entirely if the given limit is a power of 2.
+  ::
+  :: If you need fully unbiased results, use the `unbiased_u32_less_than`
+  :: method instead, which discards all samples from the biased zone.
+  :fun ref u32_less_than(limit U32) U32
+    @u32.wide_multiply(limit).head
+
+  :: Return an unbiased random U64 below the given limit, discarding the rare
+  :: cases where we get a result from a biased zone of the output.
+  ::
+  :: This ensures that every integer in the range has an equal probability
+  :: of occurring (at least, assuming a perfectly fair underlying generator).
+  :: However, performance can degrade slightly due to discarding and retrying.
+  ::
+  :: To keep maximum performance at the cost of some possibility of bias,
+  :: use the `u64_less_than` method instead, which never discards results.
+  :fun ref unbiased_u64_less_than(limit U64) U64
+    // See https://arxiv.org/pdf/1805.10941.pdf
+    random = @
+    product = random.u64.wide_multiply(limit)
+    // Reject and try again if the tail happens to be in the zone of bias.
+    // The loop will continue generating new numbers until we get a good sample.
+    if (product.tail < limit) (
+      threshold = limit.negate % limit
+      while (product.tail < threshold) (
+        product = random.u64.wide_multiply(limit)
+      )
+    )
+    product.head
+
+  :: Return an unbiased random U32 below the given limit, discarding the rare
+  :: cases where we get a result from a biased zone of the output.
+  ::
+  :: This ensures that every integer in the range has an equal probability
+  :: of occurring (at least, assuming a perfectly fair underlying generator).
+  :: However, performance can degrade slightly due to discarding and retrying.
+  ::
+  :: To keep maximum performance at the cost of some possibility of bias,
+  :: use the `u32_less_than` method instead, which never discards results.
+  :fun ref unbiased_u32_less_than(limit U32) U32
+    // See https://arxiv.org/pdf/1805.10941.pdf
+    random = @
+    product = random.u32.wide_multiply(limit)
+    // Reject and try again if the tail happens to be in the zone of bias.
+    // The loop will continue generating new numbers until we get a good sample.
+    if (product.tail < limit) (
+      threshold = limit.negate % limit
+      while (product.tail < threshold) (
+        product = random.u32.wide_multiply(limit)
+      )
+    )
+    product.head
+
+  :: Return a random USize below the given limit - in the range [0, limit).
+  ::
+  :: The results will be slightly biased (some numbers have one more sample
+  :: in the pool than others), but the bias is very slight if the limit is
+  :: much smaller than the maximum representable U32 value, and the bias is
+  :: eliminated entirely if the given limit is a power of 2.
+  ::
+  :: If you need fully unbiased results, use the `unbiased_u32_less_than`
+  :: method instead, which discards all samples from the biased zone.
+  :fun ref usize_less_than(limit USize)
+    if (USize.bit_width == 32) (
+      @u32_less_than(limit.u32).usize
+    |
+      @u64_less_than(limit.u64).usize
+    )
+
+  :: Return an unbiased random USize below the given limit, discarding the rare
+  :: cases where we get a result from a biased zone of the output.
+  ::
+  :: This ensures that every integer in the range has an equal probability
+  :: of occurring (at least, assuming a perfectly fair underlying generator).
+  :: However, performance can degrade slightly due to discarding and retrying.
+  ::
+  :: To keep maximum performance at the cost of some possibility of bias,
+  :: use the `uSize_less_than` method instead, which never discards results.
+  :fun ref unbiased_usize_less_than(limit USize) USize
+    if (USize.bit_width == 32) (
+      @unbiased_u32_less_than(limit.u32).usize
+    |
+      @unbiased_u64_less_than(limit.u64).usize
+    )
