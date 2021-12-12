@@ -58,7 +58,7 @@
     assert: soon > now
 
   :it "can be inspected"
-    // TODO: Properly pad numbers with zeroes for a constant string width.
+    // TODO: Properly pad numbers with zeros for a constant string width.
     assert:
       Inspect[Time.utc(2036, 10, 7, 20, 36, 10, 777)]
       == "2036-10-7 20:36:10'777"

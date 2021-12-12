@@ -57,3 +57,31 @@
     total F32 = 0
     Count.to(count) -> (i | total += random.frac_32)
     assert: (total / count.f32) == 0.49999812245368958
+
+  :it "generates U64s below a given limit 52, averaging around 25.5"
+    random = DeterministicRandom.Xoroshiro128.new_128(1, 2)
+    count USize = 0x10_0000
+    total U64 = 0
+    Count.to(count) -> (i | total += random.u64_less_than(52))
+    assert: (total.f64 / count.f64) == 25.514418601989746
+
+  :it "generates U32s below a given limit 52, averaging around 25.5"
+    random = DeterministicRandom.Xoroshiro128.new_128(1, 2)
+    count USize = 0x10_0000
+    total U32 = 0
+    Count.to(count) -> (i | total += random.u32_less_than(52))
+    assert: (total.f32 / count.f32) == 25.514419555664062
+
+  :it "generates unbiased U64s below a given limit 52, discarding bias"
+    random = DeterministicRandom.Xoroshiro128.new_128(1, 2)
+    count USize = 0x10_0000
+    total U64 = 0
+    Count.to(count) -> (i | total += random.unbiased_u64_less_than(52))
+    assert: (total.f64 / count.f64) == 25.514418601989746
+
+  :it "generates unbiased U32s below a given limit 52, discarding bias"
+    random = DeterministicRandom.Xoroshiro128.new_128(1, 2)
+    count USize = 0x10_0000
+    total U32 = 0
+    Count.to(count) -> (i | total += random.unbiased_u32_less_than(52))
+    assert: (total.f32 / count.f32) == 25.514451980590820
