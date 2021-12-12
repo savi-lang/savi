@@ -206,14 +206,6 @@ class Savi::Compiler
     end
   end
 
-  def eval(string : String, options = Compiler::Options.new) : Context
-    content = ":actor Main\n:new (env)\n#{string}"
-    package = Savi::Source::Package.new("(eval)")
-    source = Savi::Source.new("", "(eval)", content, package)
-
-    Savi.compiler.compile([source], :eval, options)
-  end
-
   def test_compile(sources : Array(Source), target : Symbol, options = Compiler::Options.new)
     options.skip_manifest = true
     compile(sources, target, options)
