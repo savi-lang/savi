@@ -1,7 +1,7 @@
 require "llvm"
 
 ##
-# The purpose of the Eval pass is to run the program built by the Binary pass.
+# The purpose of the Run pass is to run the program built by the Binary pass.
 #
 # This pass does not mutate the Program topology.
 # This pass does not mutate the AST.
@@ -10,7 +10,7 @@ require "llvm"
 # This pass produces output state at the program level (the exit code).
 # !! This pass has the side-effect of executing the program.
 #
-class Savi::Compiler::Eval
+class Savi::Compiler::Run
   getter! exitcode : Int32
 
   def run(ctx)

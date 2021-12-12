@@ -14,6 +14,7 @@ ci: PHONY
 	make format.check
 	make spec.all extra_args="--backtrace $(extra_args)"
 	make example dir="examples/adventofcode/2018" extra_args="--backtrace $(extra_args)"
+	make example-eval
 
 # Remove temporary/generated files.
 clean: PHONY
@@ -71,7 +72,7 @@ ffigen: PHONY $(SAVI)
 
 # Evaluate a Hello World example.
 example-eval: PHONY $(SAVI)
-	echo && $(SAVI) eval 'env.out.print("Hello, World!")'
+	echo && $(SAVI) eval 'env.out.print("Hello, World!")' --backtrace
 
 # Compile and run the user program binary in the given directory.
 example: PHONY $(SAVI)

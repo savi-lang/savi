@@ -155,7 +155,7 @@ class Savi::Compiler::SourceService
       next unless content
 
       yield ({name, content})
-    }
+    } if Dir.exists?(internal_dirname)
 
     # Now yield the fake files implied by the source overrides for this dirname.
     dir_source_overrides.try(&.each { |name, content|
@@ -184,6 +184,16 @@ class Savi::Compiler::SourceService
         content = File.read(name) rescue nil
         yield ({name, content}) if content
       end
+    }
+
+    # Now yield any source overrides that match the given glob.
+    @source_overrides.each { |dirname, dir_source_overrides|
+      dir_source_overrides.each { |name, content|
+        full_path = File.join(dirname, name)
+        next unless File.match?(glob, full_path)
+
+        yield ({full_path, content})
+      }
     }
   end
 

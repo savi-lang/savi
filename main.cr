@@ -1,6 +1,7 @@
 require "./src/savi"
 
 require "clim"
+require "random"
 
 module Savi
   class Cli < Clim
@@ -184,15 +185,25 @@ module Savi
 
     def self.run(options, backtrace = false)
       _add_backtrace backtrace do
-        ctx = Savi.compiler.compile(Dir.current, options.target_pass || :eval, options)
-        ctx.errors.any? ? finish_with_errors(ctx.errors, backtrace) : ctx.eval.exitcode
+        ctx = Savi.compiler.compile(Dir.current, options.target_pass || :run, options)
+        ctx.errors.any? ? finish_with_errors(ctx.errors, backtrace) : ctx.run.exitcode
       end
     end
 
     def self.eval(code, options, backtrace = false)
       _add_backtrace backtrace do
-        ctx = Savi.compiler.eval(code, options)
-        ctx.errors.any? ? finish_with_errors(ctx.errors, backtrace) : ctx.eval.exitcode
+        dirname = "/tmp/savi-eval-#{Random::Secure.hex}"
+        Dir.mkdir_p(dirname)
+        Savi.compiler.source_service.set_source_override(
+          "#{dirname}/manifest.savi",
+          ":manifest eval\n:sources \"src/main.savi\""
+        )
+        Savi.compiler.source_service.set_source_override(
+          "#{dirname}/src/main.savi",
+          ":actor Main\n:new (env)\n#{code}"
+        )
+        ctx = Savi.compiler.compile(dirname, :run, options)
+        ctx.errors.any? ? finish_with_errors(ctx.errors, backtrace) : ctx.run.exitcode
       end
     end
 
