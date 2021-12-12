@@ -22,11 +22,15 @@ class Savi::Compiler::Manifests
     # Select the appropriate root manifest (or fail to do so).
     @root = manifest = select_root_manifest(ctx)
     return unless manifest
-    manifests_by_name[manifest.name.value] = manifest
 
     # If this manifest copies from other manifests, bring the data from those
     # copied manifests into the root manifest now, to fully extrapolate it.
     execute_copies_for_manifest(ctx, ctx.program.manifests, manifest)
+
+    # For each name provided by the root manifest, track it.
+    manifest.provides_names.each { |provides_name|
+      @manifests_by_name[provides_name.value] = manifest
+    }
 
     # Resolve all the dependency manifests.
     manifest.dependencies.each { |dep|
@@ -126,6 +130,11 @@ class Savi::Compiler::Manifests
 
     # If we've gotten to this point, we're ready to store the manifest by name.
     @manifests_by_name[dep.name.value] = manifest
+
+    # We also store it by each of the names that it is said to provide.
+    manifest.provides_names.each { |provides_name|
+      @manifests_by_name[provides_name.value] = manifest
+    }
   end
 
   private def check_manifest_names(ctx, manifests)
@@ -206,7 +215,10 @@ class Savi::Compiler::Manifests
         next
       end
 
-      # Copy sources paths and dependencies.
+      # Copy provides names, sources paths, and dependencies.
+      next_from_manifest.provides_names.reverse_each { |path|
+        to_manifest.provides_names.unshift(path)
+      }
       next_from_manifest.sources_paths.reverse_each { |path|
         to_manifest.sources_paths.unshift(path)
       }

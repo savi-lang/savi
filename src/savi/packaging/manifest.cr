@@ -2,6 +2,7 @@ struct Savi::Packaging::Manifest
   getter name : AST::Identifier
   getter kind : AST::Identifier
   getter copies_names = [] of AST::Identifier
+  getter provides_names = [] of AST::Identifier
   getter sources_paths = [] of AST::LiteralString
   getter dependencies = [] of Dependency
 

@@ -28,4 +28,40 @@
   :fun ref f32 F32: F32.from_bits(@u32)
 
   // Boolean values are derived from the most significant bit of the value.
-  :fun ref bool Bool: @u8 >= 0x80
+  :fun ref bool Bool: @u8.bit_and(0x80) != 0
+
+  :: Return a random 32-bit fraction - an F32 in the range [0, 1).
+  ::
+  :: The possible values will be uniformly spaced at one half-epsilon apart,
+  :: because half-epsilon is the largest unit of least precision below 1.0.
+  ::
+  :: To generate in a range that includes 1 but excludes 0, see frac_32_nonzero.
+  :fun ref frac_32 F32
+    @u32.bit_shr(F32.exp_bit_width).f32 * F32.half_epsilon
+
+  :: Return a random 32-bit nonzero fraction - an F32 in the range (0, 1].
+  ::
+  :: The possible values will be uniformly spaced at one half-epsilon apart,
+  :: because half-epsilon is the largest unit of least precision below 1.0.
+  ::
+  :: To generate in a range that includes 0 but excludes 1, see frac_32.
+  :fun ref frac_32_nonzero F32
+    @frac_32 + F32.half_epsilon
+
+  :: Return a random 64-bit fraction - an F64 in the range [0, 1).
+  ::
+  :: The possible values will be uniformly spaced at one half-epsilon apart,
+  :: because half-epsilon is the largest unit of least precision below 1.0.
+  ::
+  :: To generate in a range that includes 1 but excludes 0, see frac_64_nonzero.
+  :fun ref frac_64 F64
+    @u64.bit_shr(F64.exp_bit_width).f64 * F64.half_epsilon
+
+  :: Return a random 64-bit nonzero fraction - an F64 in the range (0, 1].
+  ::
+  :: The possible values will be uniformly spaced at one half-epsilon apart,
+  :: because half-epsilon is the largest unit of least precision below 1.0.
+  ::
+  :: To generate in a range that includes 0 but excludes 1, see frac_64.
+  :fun ref frac_64_nonzero F64
+    @frac_64 + F64.half_epsilon

@@ -23,7 +23,11 @@ module Savi::Program::Intrinsic
       when "manifest"
         name = terms["name"].as(AST::Identifier)
         kind = terms["kind"].as(AST::Identifier)
-        scope.current_manifest = Packaging::Manifest.new(name, kind)
+
+        scope.current_manifest = manifest = Packaging::Manifest.new(name, kind)
+
+        # Every manifest automatically "provides" its main name.
+        manifest.provides_names << name
       when "import"
         scope.current_package.imports << Import.new(
           terms["path"].as(AST::LiteralString),
