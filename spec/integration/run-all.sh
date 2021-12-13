@@ -12,40 +12,8 @@ cd -- "$(dirname -- "$0")"
 # Start running integation tests.
 echo "Running integration tests..."
 echo
-for subdir in $(find ./ -maxdepth 1 -mindepth 1 -type d | sort --ignore-case); do
-  # If this subdirectory has an expected errors file, use that test approach.
-  if [ -f "$subdir/savi.errors.txt" ]; then
-    actual=$(cd $subdir && "$SAVI" --backtrace 2>&1 || true)
-    expected=$(cat $subdir/savi.errors.txt)
-    if [ "$actual" = "$expected" ]; then
-      echo "✓    $subdir"
-    else
-      did_fail="X"
-      echo "---"
-      echo "---"
-      echo
-      echo "FAIL $subdir"
-      echo
-      echo "---"
-      echo
-      echo "EXPECTED $expected"
-      echo
-      echo "---"
-      echo
-      echo "ACTUAL $actual"
-      echo
-      echo "---"
-      echo "---"
-    fi
-
-  # Otherwise, we have no test approaches left that can be tried.
-  else
-    did_fail="X"
-    echo "FAIL $subdir"
-    echo "     (missing files needed for integration testing)"
-    echo "     (please add a savi.errors.txt file to that directory)"
-  fi
-  echo
+for subdir in $(find ./ -maxdepth 1 -mindepth 1 -type d | cut -b 3- | sort --ignore-case); do
+  ./run-one.sh $subdir $SAVI || did_fail="X"
 done
 
 # If any test failed, report overall failure here.
