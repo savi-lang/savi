@@ -1,4 +1,5 @@
 struct Savi::Packaging::Dependency
+  getter ast : AST::Declare
   getter name : AST::Identifier
   getter version_node : AST::LiteralString
   getter version_major : Int32
@@ -9,7 +10,7 @@ struct Savi::Packaging::Dependency
   getter revision_nodes = [] of AST::Identifier
   getter depends_on_nodes = [] of AST::Identifier
 
-  def initialize(@name, @version_node, @transitive = false)
+  def initialize(@ast, @name, @version_node, @transitive = false)
     @version_major = 0 # TODO
     @version_minor = 0 # TODO
     @version_patch = 0 # TODO

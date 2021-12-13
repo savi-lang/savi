@@ -37,10 +37,25 @@ class Savi::Compiler::Manifests
       compile_and_resolve_dep_manifest(ctx, dep)
     }
 
-    basic_manifest_checks(ctx)
+    # Prove that all transitive dependencies are accounted for.
+    manifest.dependencies.each { |dep|
+      @manifests_by_name[dep.name.value].dependencies.each { |dep_dep|
+        next if @manifests_by_name[dep_dep.name.value]?
 
-    # TODO: Prove that all needed transitive dependencies are as they should be
-    # in the root manifest.
+        ctx.error_at manifest.name,
+          "A transitive dependency is missing from this manifest", [
+            {dep_dep.name.pos, "this transitive dependency needs to be added"},
+            {dep.name.pos, "it is required by this existing dependency"},
+          ], [
+            {manifest.append_pos, [
+              "\n",
+              "  :transitive dependency #{dep_dep.name.value} #{dep_dep.version_node.value.inspect}"
+            ].join("\n")}
+          ]
+      }
+    }
+
+    basic_manifest_checks(ctx)
   end
 
   private def basic_manifest_checks(ctx)

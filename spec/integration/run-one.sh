@@ -24,13 +24,11 @@ if ! [ -d $subdir ]; then
   exit 2
 fi
 
-# If this subdirectory has an expected errors file, use that testing strategy.
-if [ -f "$subdir/savi.errors.txt" ]; then
+# Test that the output of running the compiler matches the expected errors.
+test_error_output() {
   actual=$(cd $subdir && "$SAVI" --backtrace 2>&1 || true)
   expected=$(cat $subdir/savi.errors.txt)
-  if [ "$actual" = "$expected" ]; then
-    echo "✓    $subdir"
-  else
+  if [ "$actual" != "$expected" ]; then
     echo "---"
     echo "---"
     echo
@@ -46,8 +44,68 @@ if [ -f "$subdir/savi.errors.txt" ]; then
     echo
     echo "---"
     echo "---"
+    return 1
+  fi
+}
+
+# Test that the content of the given files matches the expected "after" content.
+test_fixed_files_content() {
+  for filename in $(find "$subdir/savi.fix.after.dir" | cut -d/ -f 3-); do
+    actual=$(cat "$subdir/$filename")
+    expected=$(cat "$subdir/savi.fix.after.dir/$filename")
+    if [ "$actual" != "$expected" ]; then
+      echo "---"
+      echo "---"
+      echo
+      echo "FAIL $subdir"
+      echo
+      echo "---"
+      echo
+      echo "EXPECTED $filename:"
+      echo "$expected"
+      echo
+      echo "---"
+      echo
+      echo "ACTUAL $filename:"
+      echo "$actual"
+      echo
+      echo "---"
+      echo "---"
+      return 1
+    fi
+  done
+}
+
+# If this subdirectory has auto-fix information, use that testing strategy.
+if [ -d "$subdir/savi.fix.before.dir" ] \
+&& [ -d "$subdir/savi.fix.after.dir" ] \
+&& [ -f "$subdir/savi.errors.txt" ]; then
+  cp -r "$subdir/savi.fix.before.dir/"* $subdir/
+  cleanup_files=$(ls "$subdir/savi.fix.before.dir/"* | cut -d/ -f -1,3-)
+
+  if ! test_error_output; then
+    rm -rf ${cleanup_files}
     exit 1
   fi
+
+  if ! "$SAVI" --cd "$subdir" --backtrace --fix; then
+    echo "FAIL $subdir"
+    echo "     (savi command failed to execute)"
+    rm -rf ${cleanup_files}
+    exit 1
+  fi
+
+  if ! test_fixed_files_content; then
+    rm -rf ${cleanup_files}
+    exit 1
+  fi
+
+  rm -rf ${cleanup_files}
+  ls "$subdir"
+
+# If this subdirectory has an expected errors file, use that testing strategy.
+elif [ -f "$subdir/savi.errors.txt" ]; then
+  test_error_output
 
 ## NOTE: When adding new testing strategy, also add a description to the
 ##       integration testing documentation in `spec/integration/README.md`
@@ -56,7 +114,9 @@ if [ -f "$subdir/savi.errors.txt" ]; then
 else
   echo "FAIL $subdir"
   echo "     (missing files needed for integration testing)"
-  echo "     (please add a savi.errors.txt file to that directory)"
+  echo "     (see spec/integration/README.md for more info)"
   exit 2
 fi
+
+echo "✓    $subdir"
 echo

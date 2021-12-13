@@ -15,6 +15,7 @@ module Savi
       help short: "-h"
       option "-b", "--backtrace", desc: "Show backtrace on error", type: Bool, default: false
       option "-r", "--release", desc: "Compile in release mode", type: Bool, default: false
+      option "--fix", desc: "Auto-fix compile errors where possible", type: Bool, default: false
       option "--no-debug", desc: "Compile without debug info", type: Bool, default: false
       option "--print-ir", desc: "Print generated LLVM IR", type: Bool, default: false
       option "--print-perf", desc: "Print compiler performance info", type: Bool, default: false
@@ -27,6 +28,7 @@ module Savi
           print_ir: opts.print_ir,
           print_perf: opts.print_perf,
         )
+        options.auto_fix = true if opts.fix
         options.target_pass = Savi::Compiler.pass_symbol(opts.pass) if opts.pass
         Dir.cd(opts.cd.not_nil!) if opts.cd
         Cli.compile options, opts.backtrace
@@ -48,6 +50,7 @@ module Savi
         argument "code", type: String, required: true, desc: "code to evaluate"
         option "-b", "--backtrace", desc: "Show backtrace on error", type: Bool, default: false
         option "-r", "--release", desc: "Compile in release mode", type: Bool, default: false
+        option "--fix", desc: "Auto-fix compile errors where possible", type: Bool, default: false
         option "--no-debug", desc: "Compile without debug info", type: Bool, default: false
         option "--print-ir", desc: "Print generated LLVM IR", type: Bool, default: false
         option "--print-perf", desc: "Print compiler performance info", type: Bool, default: false
@@ -59,6 +62,7 @@ module Savi
             print_ir: opts.print_ir,
             print_perf: opts.print_perf,
           )
+          options.auto_fix = true if opts.fix
           Dir.cd(opts.cd.not_nil!) if opts.cd
           Cli.eval args.code, options, opts.backtrace
         end
@@ -71,6 +75,7 @@ module Savi
         argument "name", type: String, required: false, desc: "Name of the manifest to compile"
         option "-b", "--backtrace", desc: "Show backtrace on error", type: Bool, default: false
         option "-r", "--release", desc: "Compile in release mode", type: Bool, default: false
+        option "--fix", desc: "Auto-fix compile errors where possible", type: Bool, default: false
         option "--no-debug", desc: "Compile without debug info", type: Bool, default: false
         option "--print-ir", desc: "Print generated LLVM IR", type: Bool, default: false
         option "--print-perf", desc: "Print compiler performance info", type: Bool, default: false
@@ -83,6 +88,7 @@ module Savi
             print_ir: opts.print_ir,
             print_perf: opts.print_perf,
           )
+          options.auto_fix = true if opts.fix
           options.target_pass = Savi::Compiler.pass_symbol(opts.pass) if opts.pass
           options.manifest_name = args.name.not_nil! if args.name
           Dir.cd(opts.cd.not_nil!) if opts.cd
@@ -97,6 +103,7 @@ module Savi
         argument "name", type: String, required: false, desc: "Name of the manifest to compile"
         option "-b", "--backtrace", desc: "Show backtrace on error", type: Bool, default: false
         option "-r", "--release", desc: "Compile in release mode", type: Bool, default: false
+        option "--fix", desc: "Auto-fix compile errors where possible", type: Bool, default: false
         option "--no-debug", desc: "Compile without debug info", type: Bool, default: false
         option "--print-ir", desc: "Print generated LLVM IR", type: Bool, default: false
         option "--print-perf", desc: "Print compiler performance info", type: Bool, default: false
@@ -108,6 +115,7 @@ module Savi
             print_ir: opts.print_ir,
             print_perf: opts.print_perf,
           )
+          options.auto_fix = true if opts.fix
           options.manifest_name = args.name.not_nil! if args.name
           Dir.cd(opts.cd.not_nil!) if opts.cd
           Cli.compile options, opts.backtrace
@@ -251,7 +259,8 @@ module Savi
             edits_by_doc.each { |doc, edits|
               source = doc.pos.source
               puts "Fixing #{source.path}"
-              edited = AST::Format.apply_edits(source.entire_pos, edits)[0].source
+              edited = source.entire_pos
+                .apply_edits(edits.map { |edit| {edit.pos, edit.replacement} })[0].source
               Savi.compiler.source_service
                 .overwrite_source_at(source.path, edited.content)
               edited_count += 1

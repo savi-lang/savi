@@ -146,6 +146,15 @@ module Savi::AST
     def initialize(@terms = [] of Term)
     end
 
+    def span_pos(source)
+      return Source::Pos.none unless pos.source == source
+      pos.span(
+        terms.map(&.span_pos(source)) +
+        nested.map(&.span_pos(source)) +
+        [body.try(&.span_pos(source))].compact
+      )
+    end
+
     def name; :declare end
     def to_a: Array(A)
       res = [name] of A
