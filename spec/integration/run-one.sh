@@ -24,7 +24,7 @@ if ! [ -d $subdir ]; then
   exit 2
 fi
 
-# If this subdirectory has an expected errors file, use that test approach.
+# If this subdirectory has an expected errors file, use that testing strategy.
 if [ -f "$subdir/savi.errors.txt" ]; then
   actual=$(cd $subdir && "$SAVI" --backtrace 2>&1 || true)
   expected=$(cat $subdir/savi.errors.txt)
@@ -48,6 +48,9 @@ if [ -f "$subdir/savi.errors.txt" ]; then
     echo "---"
     exit 1
   fi
+
+## NOTE: When adding new testing strategy, also add a description to the
+##       integration testing documentation in `spec/integration/README.md`
 
 # Otherwise, we have no test approaches left that can be tried.
 else
