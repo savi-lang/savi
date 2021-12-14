@@ -25,4 +25,4 @@
 // Given the exclusions in the manifest resolving correctly, we expect
 // only the following conflicts, and no more:
 // - Alex (x2)
-// - Bob (x3) (note that src/exclude-extra.savi is not actually excluded)
+// - Bob (x3) (note that src2/exclude-extra.savi is not actually excluded)

@@ -39,15 +39,18 @@ class Savi::Compiler::Namespace
     # Take note of the package and source file in which each type occurs.
     ctx.program.packages.each do |package|
       package.types.each do |t|
+        check_valid_name(ctx, t)
         check_conflicting_functions(ctx, t, t.make_link(package))
         add_type_to_package(ctx, t, package)
         add_type_to_source(t, package)
       end
       package.aliases.each do |t|
+        check_valid_name(ctx, t)
         add_type_to_package(ctx, t, package)
         add_type_to_source(t, package)
       end
       package.enum_members.each do |t|
+        check_valid_name(ctx, t)
         add_type_to_package(ctx, t, package)
         add_type_to_source(t, package)
       end
@@ -104,6 +107,12 @@ class Savi::Compiler::Namespace
   # This is only for use in testing.
   def find_func!(ctx, source, type_name, func_name)
     self[source][type_name].as(Program::Type::Link).resolve(ctx).find_func!(func_name)
+  end
+
+  private def check_valid_name(ctx, t)
+    if t.ident.value.includes?("!")
+      ctx.error_at t.ident, "A type name cannot contain an exclamation point"
+    end
   end
 
   private def check_conflicting_functions(ctx, t, t_link : Program::Type::Link)
