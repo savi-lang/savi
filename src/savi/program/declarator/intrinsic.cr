@@ -29,18 +29,6 @@ module Savi::Program::Intrinsic
 
         # Every manifest automatically "provides" its main name.
         manifest.provides_names << name
-      when "import"
-        scope.current_package.imports << Import.new(
-          terms["path"].as(AST::LiteralString),
-          terms["names"]?.as(AST::Group?),
-        )
-        # TODO: Also pull in the package's declarators in some way.
-      when "source"
-        scope.current_package.imports << Program::Import.new(
-          terms["path"].as(AST::LiteralString),
-          copy_sources: true
-        )
-        # TODO: Also pull in the package's declarators in some way.
       when "alias"
         name, params =
           AST::Extract.name_and_params(terms["name_and_params"].not_nil!)

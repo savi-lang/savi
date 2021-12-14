@@ -8,7 +8,6 @@ class Savi::Program
   end
 
   # TODO: Remove these aliases and make passes work at the package level
-  def imports; packages.flat_map(&.imports) end
   def types;   packages.flat_map(&.types)   end
   def aliases; packages.flat_map(&.aliases) end
 
@@ -25,7 +24,6 @@ class Savi::Program
       @types = [] of Type
       @aliases = [] of TypeAlias
       @enum_members = [] of TypeWithValue
-      @imports = [] of Import
       @declarators = [] of Declarator
     end
 
@@ -36,7 +34,6 @@ class Savi::Program
     def dup_init(new_types = nil, new_aliases = nil)
       @types = (new_types || @types.dup).not_nil!
       @aliases = (new_aliases || @aliases.dup).not_nil!
-      @imports = @imports.dup
       @declarators = @declarators.dup
     end
 
@@ -50,7 +47,6 @@ class Savi::Program
       return false unless @types == other.types
       return false unless @aliases == other.aliases
       return false unless @enum_members == other.enum_members
-      return false unless @imports == other.imports
       return false unless @declarators == other.declarators
       true
     end
@@ -92,23 +88,6 @@ class Savi::Program
       def show
         path
       end
-    end
-  end
-
-  class Import
-    property ident : AST::LiteralString
-    property names : AST::Group?
-    property copy_sources : Bool
-
-    def initialize(@ident, @names = nil, @copy_sources = false)
-    end
-
-    def ==(other)
-      return false unless other.is_a?(Import)
-      return false unless @ident == other.ident
-      return false unless @names == other.names
-      return false unless @copy_sources == other.copy_sources
-      true
     end
   end
 
