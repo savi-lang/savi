@@ -281,12 +281,17 @@ class Savi::Compiler::SourceService
   def get_sources_for_manifest(ctx, manifest : Packaging::Manifest)
     package = Source::Package.for_manifest(manifest)
 
-    manifest.sources_paths.flat_map { |sources_path|
+    manifest.sources_paths.flat_map { |sources_path, exclusions|
       sources = [] of Source
       absolute_glob = File.join(package.path, sources_path.value)
+      exclusion_paths = exclusions.map { |e| File.join(package.path, e.value) }
 
       prior_source_size = sources.size
       each_savi_file_in_glob(absolute_glob) { |name, content|
+        # Skip this source file if it is excluded.
+        next if exclusion_paths.any? { |e| File.match?(e, name) }
+
+        # Otherwise add it to the list.
         dirname = File.dirname(name)
         basename = File.basename(name)
         sources << Source.new(dirname, basename, content, package)

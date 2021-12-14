@@ -4,7 +4,7 @@ struct Savi::Packaging::Manifest
   getter kind : AST::Identifier
   getter copies_names = [] of AST::Identifier
   getter provides_names = [] of AST::Identifier
-  getter sources_paths = [] of AST::LiteralString
+  getter sources_paths = [] of {AST::LiteralString, Array(AST::LiteralString)}
   getter dependencies = [] of Dependency
 
   def initialize(@ast, @name, @kind)
