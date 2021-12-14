@@ -234,8 +234,8 @@ class Savi::Compiler::Manifests
       next_from_manifest.provides_names.reverse_each { |path|
         to_manifest.provides_names.unshift(path)
       }
-      next_from_manifest.sources_paths.reverse_each { |path|
-        to_manifest.sources_paths.unshift(path)
+      next_from_manifest.sources_paths.reverse_each { |pair|
+        to_manifest.sources_paths.unshift(pair)
       }
       next_from_manifest.dependencies.reverse_each { |path|
         to_manifest.dependencies.unshift(path)

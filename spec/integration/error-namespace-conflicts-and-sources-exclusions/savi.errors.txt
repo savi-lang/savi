@@ -1,0 +1,38 @@
+
+Compilation Errors:
+
+---
+
+This type conflicts with another declared type in the same package:
+from ./src2/exclude-extra.savi:1:
+:module Bob
+        ^~~
+
+- the other type with the same name is here:
+  from ./src/include-b.savi:1:
+:module Bob
+        ^~~
+
+---
+
+This type conflicts with another declared type in the same package:
+from ./src2/include-a.savi:2:
+:module Alex
+        ^~~~
+
+- the other type with the same name is here:
+  from ./src/include-a.savi:2:
+:module Alex
+        ^~~~
+
+---
+
+This type conflicts with another declared type in the same package:
+from ./src2/include-b.savi:1:
+:module Bob
+        ^~~
+
+- the other type with the same name is here:
+  from ./src/include-b.savi:1:
+:module Bob
+        ^~~

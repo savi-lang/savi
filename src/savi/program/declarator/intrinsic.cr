@@ -168,7 +168,7 @@ module Savi::Program::Intrinsic
         scope.current_manifest.copies_names << name
       when "sources"
         path = terms["path"].as(AST::LiteralString)
-        scope.current_manifest.sources_paths << path
+        scope.current_manifest.sources_paths << {path, [] of AST::LiteralString}
       when "dependency"
         name = terms["name"].as(AST::Identifier)
         version = terms["version"].as(AST::LiteralString)
@@ -181,6 +181,16 @@ module Savi::Program::Intrinsic
         scope.current_manifest_dependency = dep =
           Packaging::Dependency.new(declare, name, version, transitive: true)
         scope.current_manifest.dependencies << dep
+      else
+        raise NotImplementedError.new(declarator.pretty_inspect)
+      end
+
+    # Declarations within a manifest sources definition.
+    when "manifest_sources"
+      case declarator.name.value
+      when "excluding"
+        path = terms["path"].as(AST::LiteralString)
+        scope.current_manifest.sources_paths.last.last << path
       else
         raise NotImplementedError.new(declarator.pretty_inspect)
       end

@@ -112,7 +112,7 @@ class Savi::Compiler::Namespace
       next if fs.size <= 1
 
       f_first = fs.shift
-      Error.at f_first.ident.pos,
+      ctx.error_at f_first.ident.pos,
         "This name conflicts with others declared in the same type",
         fs.map { |f| {f.ident.pos, "a conflicting declaration is here"} }
     end
@@ -131,10 +131,11 @@ class Savi::Compiler::Namespace
     already_type_link = types[name]?
     if already_type_link
       already_type = already_type_link.resolve(ctx)
-      Error.at new_type.ident.pos,
+      ctx.error_at new_type.ident.pos,
         "This type conflicts with another declared type in the same package", [
           {already_type.ident.pos, "the other type with the same name is here"}
         ]
+      return
     end
 
     types[name] = new_type.make_link(package)
@@ -145,9 +146,6 @@ class Savi::Compiler::Namespace
     name = new_type.ident.value
 
     source_analysis = @source_analyses[source] ||= SourceAnalysis.new(source)
-
-    raise "should have been prevented by add_type_to_package" \
-      if source_analysis.types[name]?
 
     source_analysis.types[name] = new_type.make_link(package)
   end
@@ -161,10 +159,11 @@ class Savi::Compiler::Namespace
 
       already_type = source_analysis.types[name]?.try(&.resolve(ctx))
       if already_type
-        Error.at already_type.ident.pos,
+        ctx.error_at already_type.ident.pos,
           "This type's name conflicts with a mandatory built-in type", [
             {new_type.ident.pos, "the built-in type is defined here"},
           ]
+        next
       end
 
       source_analysis.types[name] = new_type_link
@@ -183,10 +182,11 @@ class Savi::Compiler::Namespace
 
         already_type = source_analysis.types[name]?.try(&.resolve(ctx))
         if already_type
-          Error.at already_type.ident.pos,
+          ctx.error_at already_type.ident.pos,
             "This type's name conflicts with a type defined in another package", [
               {new_type.ident.pos, "the imported type is defined here"},
             ]
+          next
         end
 
         source_analysis.types[name] = new_type_link

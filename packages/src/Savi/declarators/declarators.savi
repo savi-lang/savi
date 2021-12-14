@@ -471,6 +471,14 @@
 :declarator sources
   :intrinsic
   :context manifest
+  :begins manifest_sources
+
+  :term path String
+
+// TODO: Document this.
+:declarator excluding
+  :intrinsic
+  :context manifest_sources
 
   :term path String
 
