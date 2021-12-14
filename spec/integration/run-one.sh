@@ -101,7 +101,6 @@ if [ -d "$subdir/savi.fix.before.dir" ] \
   fi
 
   rm -rf ${cleanup_files}
-  ls "$subdir"
 
 # If this subdirectory has an expected errors file, use that testing strategy.
 elif [ -f "$subdir/savi.errors.txt" ]; then
