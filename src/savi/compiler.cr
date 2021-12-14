@@ -9,6 +9,7 @@ class Savi::Compiler
     property print_ir
     property print_perf
     property skip_manifest
+    property auto_fix = false
     property manifest_name : String?
     property target_pass : Symbol?
 
@@ -204,6 +205,7 @@ class Savi::Compiler
     all_deps.sort_by(&.last.size).map(&.first).each do |target|
       execute(ctx, target)
     end
+    ctx
   end
 
   def test_compile(sources : Array(Source), target : Symbol, options = Compiler::Options.new)
@@ -212,14 +214,29 @@ class Savi::Compiler
   end
 
   def compile(dirname : String, target : Symbol = :run, options = Compiler::Options.new)
-    sources =
-      if options.skip_manifest
-        source_service.get_directory_sources(dirname)
-      else
-        source_service.get_manifest_sources_at_or_above(dirname)
-      end
+    loop {
+      sources =
+        if options.skip_manifest
+          source_service.get_directory_sources(dirname)
+        else
+          source_service.get_manifest_sources_at_or_above(dirname)
+        end
 
-    compile(sources, target, options)
+      ctx = compile(sources, target, options)
+
+      # Return now unless we have the potential to auto-fix some errors.
+      return ctx unless options.auto_fix && ctx.errors.any?(&.fix_edits.any?)
+
+      # Try to fix the errors by modifying some source files.
+      fix_edits_by_source = ctx.errors.flat_map(&.fix_edits).group_by(&.first.source)
+      fix_edits_by_source.each { |source, fix_edits|
+        new_pos, used_edits = source.entire_pos.apply_edits(fix_edits)
+        source_service.overwrite_source_at(source.path, new_pos.content)
+      }
+
+      # Repeat the loop to try compiling again with the auto-fixed sources.
+      # TODO: How can we detect this is failing, and we're in an infinite loop?
+    }
   end
 
   @prev_ctx : Context?
@@ -275,7 +292,5 @@ class Savi::Compiler
 
     # Now run compiler passes until the target pass is satisfied.
     satisfy(ctx, target)
-
-    ctx
   end
 end

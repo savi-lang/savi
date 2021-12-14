@@ -18,6 +18,7 @@ class Savi::Program
     getter enum_members
     getter imports
     getter declarators
+    getter manifests_declared = [] of Packaging::Manifest
     getter source_package : Source::Package
 
     def initialize(@source_package)

@@ -28,49 +28,6 @@ class Savi::AST::Format < Savi::AST::Visitor
     }
   end
 
-  # Apply a list of edits to the source content within the given position,
-  # ignoring any edits that fall outside the range of that position.
-  # A new source position is returned, pointing to the same region within
-  # the a new source that holds the edited content.
-  def self.apply_edits(within : Source::Pos, edits : Array(Edit))
-    source = within.source
-    used_edits = [] of Edit
-    chunks = [] of String
-    size_delta = 0
-    cursor = 0
-
-    # Gather the chunks to reconstruct the edited source.
-    edits.group_by(&.pos.start).to_a.sort_by(&.first).each { |start, edits_group|
-      edits_group.uniq.sort_by(&.pos.size).each { |edit|
-        next unless within.contains?(edit.pos) && start >= cursor
-        used_edits << edit
-
-        prior_content = source.content.byte_slice(cursor, start - cursor)
-        chunks << prior_content unless prior_content.empty?
-        chunks << edit.replacement unless edit.replacement.empty?
-
-        size_delta += edit.replacement.bytesize - edit.pos.size
-
-        cursor = edit.pos.finish
-      }
-    }
-    chunks << source.content.byte_slice(cursor, source.content.bytesize - cursor)
-
-    # Return a new source position within a new source that has edited content.
-    new_pos = Source::Pos.index_range(
-      Source.new(
-        source.dirname,
-        source.filename,
-        chunks.join, # new content
-        source.package,
-        source.language,
-      ),
-      within.start,
-      within.finish + size_delta,
-    )
-    {new_pos, used_edits}
-  end
-
   enum Rule
     Indentation
     NoUnnecessaryParens

@@ -1,0 +1,59 @@
+
+Compilation Errors:
+
+---
+
+A transitive dependency is missing from this manifest:
+from ./manifest.savi:1:
+:manifest "example"
+          ^~~~~~~~~
+
+- this transitive dependency needs to be added:
+  from ../../../packages/TCP.manifest.savi:4:
+  :dependency ByteStream "TODO: specify version"
+              ^~~~~~~~~~
+
+- it is required by this existing dependency:
+  from ./manifest.savi:4:
+  :dependency TCP "TODO: specify version"
+              ^~~
+
+- run again with --fix to auto-fix this issue.
+
+---
+
+A transitive dependency is missing from this manifest:
+from ./manifest.savi:1:
+:manifest "example"
+          ^~~~~~~~~
+
+- this transitive dependency needs to be added:
+  from ../../../packages/TCP.manifest.savi:5:
+  :dependency IO "TODO: specify version"
+              ^~
+
+- it is required by this existing dependency:
+  from ./manifest.savi:4:
+  :dependency TCP "TODO: specify version"
+              ^~~
+
+- run again with --fix to auto-fix this issue.
+
+---
+
+A transitive dependency is missing from this manifest:
+from ./manifest.savi:1:
+:manifest "example"
+          ^~~~~~~~~
+
+- this transitive dependency needs to be added:
+  from ../../../packages/TCP.manifest.savi:6:
+  :dependency OSError "TODO: specify version"
+              ^~~~~~~
+
+- it is required by this existing dependency:
+  from ./manifest.savi:4:
+  :dependency TCP "TODO: specify version"
+              ^~~
+
+- run again with --fix to auto-fix this issue.

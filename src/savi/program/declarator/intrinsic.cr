@@ -24,7 +24,8 @@ module Savi::Program::Intrinsic
         name = terms["name"].as(AST::Identifier)
         kind = terms["kind"].as(AST::Identifier)
 
-        scope.current_manifest = manifest = Packaging::Manifest.new(name, kind)
+        scope.current_manifest = manifest =
+          Packaging::Manifest.new(declare, name, kind)
 
         # Every manifest automatically "provides" its main name.
         manifest.provides_names << name
@@ -172,13 +173,13 @@ module Savi::Program::Intrinsic
         name = terms["name"].as(AST::Identifier)
         version = terms["version"].as(AST::LiteralString)
         scope.current_manifest_dependency = dep =
-          Packaging::Dependency.new(name, version)
+          Packaging::Dependency.new(declare, name, version)
         scope.current_manifest.dependencies << dep
       when "transitive"
         name = terms["name"].as(AST::Identifier)
         version = terms["version"].as(AST::LiteralString)
         scope.current_manifest_dependency = dep =
-          Packaging::Dependency.new(name, version, transitive: true)
+          Packaging::Dependency.new(declare, name, version, transitive: true)
         scope.current_manifest.dependencies << dep
       else
         raise NotImplementedError.new(declarator.pretty_inspect)
@@ -455,7 +456,7 @@ module Savi::Program::Intrinsic
   )
     case declarator.name.value
     when "manifest"
-      ctx.program.manifests << scope.current_manifest
+      scope.current_package.manifests_declared << scope.current_manifest
       scope.current_manifest = nil
     when "manifest_dependency"
       scope.current_manifest_dependency = nil

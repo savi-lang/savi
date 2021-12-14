@@ -1,4 +1,5 @@
 struct Savi::Packaging::Manifest
+  getter ast : AST::Declare
   getter name : AST::Identifier
   getter kind : AST::Identifier
   getter copies_names = [] of AST::Identifier
@@ -6,7 +7,7 @@ struct Savi::Packaging::Manifest
   getter sources_paths = [] of AST::LiteralString
   getter dependencies = [] of Dependency
 
-  def initialize(@name, @kind)
+  def initialize(@ast, @name, @kind)
   end
 
   def bin_path
@@ -27,5 +28,9 @@ struct Savi::Packaging::Manifest
 
   def is_whole_program?
     !is_lib?
+  end
+
+  def append_pos
+    ast.span_pos(ast.pos.source).next_line_start_as_pos
   end
 end

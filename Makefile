@@ -55,6 +55,8 @@ spec.unit.all: PHONY $(SPEC)
 	echo && $(SPEC)
 
 # Run the integration tests, which invoke the compiler in a real directory.
+spec.integration: PHONY $(SAVI)
+	echo && spec/integration/run-one.sh "$(name)" $(SAVI)
 spec.integration.all: PHONY $(SAVI)
 	echo && spec/integration/run-all.sh $(SAVI)
 

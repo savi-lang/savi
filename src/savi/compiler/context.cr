@@ -91,7 +91,8 @@ class Savi::Compiler::Context
     # Otherwise go ahead and load the manifests.
     sources = compiler.source_service.get_manifest_sources_at_or_above(path)
     docs = sources.map { |source| Parser.parse(source) }
-    compile_package(sources.first.package, docs)
+    package = compile_package(sources.first.package, docs)
+    self
   end
 
   def compile_package(manifest : Packaging::Manifest)
@@ -103,6 +104,9 @@ class Savi::Compiler::Context
   def compile_package(*args)
     package = compile_package_inner(*args)
     @program.packages << package
+    package.manifests_declared.each { |manifest|
+      @program.manifests << manifest
+    }
     package
   rescue e : Error
     @errors << e
