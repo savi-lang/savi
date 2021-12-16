@@ -1,5 +1,5 @@
 ---
-pass: import
+pass: load
 ---
 
 It complains when the declaration name is totally unknown.
@@ -12,7 +12,7 @@ There is no declarator named `bogus` known within this file scope:
 :bogus bogus
  ^~~~~
 
-- did you forget to import a library?
+- did you forget to add a package dependency?
 ```
 
 ---
@@ -20,16 +20,16 @@ There is no declarator named `bogus` known within this file scope:
 It offers a spelling correction when the name is slightly wrong.
 
 ```savi
-:inpork bogus
+:classy bogus
 ```
 ```error
-There is no declarator named `inpork` known within this file scope:
-:inpork bogus
+There is no declarator named `classy` known within this file scope:
+:classy bogus
  ^~~~~~
 
-- did you mean `:import`?:
-:declarator import
-            ^~~~~~
+- did you mean `:class`?:
+:declarator class
+            ^~~~~
 ```
 
 ---

@@ -1,0 +1,96 @@
+:actor Spec.Process
+  :let env Env
+  :let reporter Spec.Reporter
+  :var spec_count USize
+  :let statuses: Map.Ordered(String, Spec.Status).new
+
+  :new (@env, @spec_count)
+    @reporter = Spec.Reporter.Linear.new(@env, @statuses, Spec.Reporter.Full.new(@env))
+
+  :fun non run(env, runners Array(Spec.Run.Any)) // TODO: shouldn't need this indirection
+    process = @new(env, runners.size)
+    runners.each -> (runner | runner.run(process))
+
+  :be spec_began(spec String, expected_examples USize)
+    // TODO: complain if spec is empty or duplicate
+    status = Spec.Status.new(spec)
+    status.expected_examples = expected_examples
+    @statuses[spec] = status
+    @reporter.spec_began(spec)
+
+  :fun ref spec_ended(spec String)
+    try (
+      status = @statuses[spec]!
+      status.ended = True
+      status.examples.each -> (example, example_status |
+        if (example_status.ended.not) (
+          _Log.bug(@env, "spec_ended before all of its examples ended")
+        )
+      )
+      @reporter.spec_ended(spec)
+    |
+      _Log.bug(@env, "spec_ended before the spec_began")
+    )
+
+  :be example_began(spec String, example String):
+    // TODO: complain if example is empty or duplicate
+    try (
+      @statuses[spec]!.examples[example] = Spec.Status.ForExample.new(example)
+      @reporter.example_began(spec, example)
+    |
+      _Log.bug(@env, "example_began before the spec_began")
+    )
+
+  :be example_close(spec String, example String): @example_ended(spec, example)
+  :fun ref example_ended(spec String, example String)
+    try (
+      status = @statuses[spec]!
+      example_status = status.examples[example]!
+      example_status.ended = True
+
+      if (
+        status.examples.size >= status.expected_examples
+        && status.examples.has_all -> (_, es | es.ended)
+      ) (
+        @spec_ended(spec)
+      )
+
+      skip = example_status.events.size == 0
+      @reporter.example_ended(spec, example, skip)
+    |
+      _Log.bug(@env, "example_ended before the example_began")
+    )
+
+  :be assert(spec String, example String, success Bool, pos SourceCodePosition)
+    event = Spec.Event.new(success, pos)
+
+    // If it was a failed assertion, mark the entire process as a failure.
+    if success.not _Log.fail(@env)
+
+    try (
+      @statuses[spec]!.examples[example]!.events << event
+      @reporter.event(spec, example, event)
+    |
+      _Log.bug(@env, "assert before the example_began and/or spec_began")
+    )
+
+  // TODO: This behavior is a copy of the `:be assert` above.
+  // I added it to keep `@assert =` working while implementing the `assert` macro.
+  // In the end we won't need both of them, after we clean up `@assert =`.
+  :be enqueue(assert Spec.Assert)
+    spec = assert.spec
+    example = assert.example
+    success = assert.success
+
+    // TODO: refactor to `Spec.Event.new(assert)`
+    event = Spec.Event.new(success, assert.pos, assert)
+
+    // If it was a failed assertion, mark the entire process as a failure.
+    if !success _Log.fail(@env)
+
+    try (
+      @statuses[spec]!.examples[example]!.events << event
+      @reporter.event(spec, example, event)
+    |
+      _Log.bug(@env, "assert before the example_began and/or spec_began")
+    )

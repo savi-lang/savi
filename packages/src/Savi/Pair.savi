@@ -1,0 +1,15 @@
+:struct Pair(A, B = A)
+  :let first A
+  :let second B
+  :new (@first, @second)
+
+  // Convenience alias for referring to the second element as the last element.
+  :fun last: @second
+
+  // Convenience aliases for when this is used as a key/value pair.
+  :fun key: @first
+  :fun value: @second
+
+  // Convenience aliases for when this is used as a head/tail pair.
+  :fun head: @first
+  :fun tail: @second

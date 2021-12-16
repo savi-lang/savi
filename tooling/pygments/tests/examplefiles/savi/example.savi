@@ -1,9 +1,7 @@
-:import "spec"
-
 :actor Main
   :new (env)
-    Specs.run(env, [
-      SpecRun(AdditionSpec).new(env)
+    Spec.Process.run(env, [
+      Spec.Run(AdditionSpec).new(env)
     ])
 
 :class AdditionSpec

@@ -1,0 +1,170 @@
+:trait Spec.Reporter
+  :fun ref spec_began(spec String): None
+  :fun ref spec_ended(spec String): None
+  :fun ref example_began(spec String, example String): None
+  :fun ref example_ended(spec String, example String, skip Bool): None
+  :fun ref event(spec String, example String, event Spec.Event): None
+
+:class Spec.Reporter.Dots
+  :is Spec.Reporter
+  :let env Env
+  :new (@env)
+
+  :fun ref spec_ended(spec String)
+    @env.err.write(";")
+
+  :fun ref example_began(spec String, example String)
+    @env.err.write(" ")
+
+  :fun ref event(spec String, example String, event Spec.Event)
+    if event.success (
+      @env.err.write(".")
+    |
+      @env.err.write("\nFAIL: ")
+      @env.err.write(spec)
+      @env.err.write(" ")
+      @env.err.print(example)
+      @env.err.write("  X "), @env.err.print(event.pos.string)
+    )
+
+:class Spec.Reporter.Full
+  :is Spec.Reporter
+  :let env Env
+  :new (@env)
+
+  :fun ref spec_began(spec String)
+    @env.err.print(spec)
+
+  :fun ref spec_ended(spec String)
+    @env.err.print("") // just a newline
+
+  :fun ref example_began(spec String, example String)
+    @env.err.write("  ")
+    @env.err.write(example)
+
+  :fun ref example_ended(spec String, example String, skip Bool)
+    if skip (@env.err.print(" SKIP") | @env.err.print(" OK"))
+
+  :fun ref event(spec String, example String, event Spec.Event)
+    if event.success (
+      @env.err.write(".")
+    |
+      try (
+        event.assert.as!(Spec.Assert).print_failure(@env)
+      |
+        @env.err.write("\n")
+        @env.err.write(Inspect[event.pos.row + 1])
+        @env.err.write(": FAIL: ")
+        @env.err.print(event.pos.string)
+      )
+    )
+
+:class Spec.Reporter.Linear
+  :let env Env
+  :let statuses: Map.Ordered(String, Spec.Status).new
+  :let inner Spec.Reporter
+  :var current_spec: ""
+  :var current_example: ""
+  :new (@env, @statuses, @inner)
+
+  :fun ref spec_began(spec String): @_changed
+  :fun ref spec_ended(spec String): @_changed
+  :fun ref example_began(spec String, example String): @_changed
+  :fun ref example_ended(spec String, example String, skip Bool): @_changed
+  :fun ref event(spec String, example String, event Spec.Event): @_changed
+
+  :fun ref _changed None // TODO: be able to infer return type for maybe-recursive functions
+    // If no spec and example are selected for linear reporting, pick them now.
+    if @current_spec   .is_empty @_choose_next_spec
+    if @current_example.is_empty @_choose_next_example
+
+    // Now report on the selected example and spec. This has to be done in this
+    // order, since examples in the spec need to be reported before reporting
+    // the end of the spec. Both of these functions are potentially recursive,
+    // in the event that the example or spec is finished and we need to pick
+    // new ones to continue reporting more about changes to the statuses.
+    if @current_example.is_not_empty @_report_examples_from_current
+    if @current_spec   .is_not_empty @_report_specs_from_current
+
+  :fun ref _choose_next_spec Bool
+    // Find the name of the first spec whose status is not yet reported.
+    @statuses.each_until -> (spec, status |
+      if (status.reported.not) (
+        @current_spec = spec
+        @current_example = ""
+        @inner.spec_began(@current_spec)
+        True
+      |
+        False
+      )
+    )
+
+  :fun ref _choose_next_example Bool
+    // Find the name of the first example in this spec that is not yet reported.
+    try (
+      status = @statuses[@current_spec]!
+      status.examples.each_until -> (example, example_status |
+        if (example_status.reported.not) (
+          @current_example = example
+          @inner.example_began(@current_spec, @current_example)
+          True
+        |
+          False
+        )
+      )
+    |
+      _Log.bug(@env, "no status for current_spec")
+      False
+    )
+
+  :fun ref _report_examples_from_current None // TODO: be able to infer return type for maybe-recursive functions
+    try (
+      example_status = @statuses[@current_spec]!.examples[@current_example]!
+
+      // Any events that have arrived for this example, but have not yet
+      // been reported should be reported now, tracking how many we've done.
+      while (example_status.events_reported < example_status.events.size) (
+        try (
+          event = example_status.events[example_status.events_reported]!
+          @inner.event(@current_spec, @current_example, event)
+        )
+        example_status.events_reported += 1
+      )
+
+      // If the example has finished, but has not yet been reported, report now.
+      if (example_status.ended && example_status.reported.not) (
+        skip = example_status.events.size == 0
+        @inner.example_ended(@current_spec, @current_example, skip)
+        example_status.reported = True
+
+        // Since we've finished reporting this example, look to pick up another.
+        // We'll recurse into this function as many times as we can,
+        // reporting as many consecutive examples for this spec as are complete.
+        if @_choose_next_example @_report_examples_from_current
+      )
+    |
+      _Log.bug(@env, "no status for current_example")
+    )
+
+  :fun ref _report_specs_from_current None // TODO: be able to infer return type for maybe-recursive functions
+    try (
+      status = @statuses[@current_spec]!
+
+      // If the spec is finished, but we haven't reported, report it now.
+      if (status.ended && status.reported.not) (
+        // Try to find an example not yet reported, and report it.
+        // This call will recurse until all examples in the spec are reported.
+        if @_choose_next_example @_report_examples_from_current
+
+        // Now that all examples are reported, report the end of the spec.
+        @inner.spec_ended(@current_spec)
+        status.reported = True
+
+        // Since we've finished reporting this spec, look to pick up another.
+        // We'll recurse into this function as many times as we can,
+        // reporting as many consecutive specs as are complete.
+        if @_choose_next_spec @_report_specs_from_current
+      )
+    |
+      _Log.bug(@env, "no status for current_spec")
+    )

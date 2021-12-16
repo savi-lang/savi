@@ -1,0 +1,129 @@
+:class _ProgramWriter
+  :let program: Bytes.new
+
+  :fun _cursor: @program.size.u32
+
+  :fun ref _op(op _Op): @program.push(op.u8)
+  :fun ref _byte(byte U8): @program.push(byte)
+  :fun ref _u32(value U32): @program.push_native_u32(value)
+  :fun ref _addr(addr U32): @program.push_native_u32(addr)
+  :fun ref _later_addr: cursor = @_cursor, @_addr(-1), cursor
+  :fun ref _store_current_cursor_at!(store_addr U32)
+    @program.write_native_u32!(store_addr.usize, @_cursor)
+
+  :fun ref compile(pattern _Pattern)
+    @_pattern(pattern)
+    @_op(_OpMatch)
+    @
+
+  :fun ref _pattern(pattern _Pattern)
+    case pattern <: (
+    | _PatternAnyByte |
+      @_op(_OpAnyByte)
+
+    | _PatternByte |
+      @_op(_OpByte)
+      @_byte(pattern.byte)
+
+    | _PatternByteRange |
+      @_op(_OpByteRange)
+      @_byte(pattern.low)
+      @_byte(pattern.high)
+
+    | _PatternCharacter |
+      pattern.each_byte -> (byte |
+        if (byte < _Op.min_op) (
+          @_byte(byte)
+        |
+          @_op(_OpByte)
+          @_byte(byte)
+        )
+      )
+
+    | _PatternSequence |
+      pattern.children.each -> (child | @_pattern(child))
+
+    | _PatternOptional |
+      @_op(_OpSplit)
+      primary_addr = @_later_addr
+      secondary_addr = @_later_addr
+
+      present_addr = if pattern.is_non_greedy (secondary_addr | primary_addr)
+      absent_addr = if pattern.is_non_greedy (primary_addr | secondary_addr)
+
+      try @_store_current_cursor_at!(present_addr)
+      @_pattern(pattern.child)
+
+      try @_store_current_cursor_at!(absent_addr)
+
+    | _PatternZeroOrMore |
+      start_cursor = @_cursor
+      @_op(_OpSplit)
+      primary_addr = @_later_addr
+      secondary_addr = @_later_addr
+
+      present_addr = if pattern.is_non_greedy (secondary_addr | primary_addr)
+      absent_addr = if pattern.is_non_greedy (primary_addr | secondary_addr)
+
+      try @_store_current_cursor_at!(present_addr)
+      @_pattern(pattern.child)
+
+      @_op(_OpJump)
+      @_addr(start_cursor)
+
+      try @_store_current_cursor_at!(absent_addr)
+
+    | _PatternOneOrMore |
+      start_cursor = @_cursor
+      @_pattern(pattern.child)
+
+      @_op(_OpSplit)
+      if pattern.is_non_greedy (
+        after_addr = @_later_addr
+        @_addr(start_cursor)
+        try @_store_current_cursor_at!(after_addr)
+      |
+        @_addr(start_cursor)
+        after_addr = @_later_addr
+        try @_store_current_cursor_at!(after_addr)
+      )
+
+    | _PatternChoice |
+      if (pattern.children.size == 2) (
+        @_op(_OpSplit)
+        primary_addr = @_later_addr
+        secondary_addr = @_later_addr
+
+        try @_store_current_cursor_at!(primary_addr)
+        try @_pattern(pattern.children[0]!)
+
+        @_op(_OpJump)
+        after_addr = @_later_addr
+
+        try @_store_current_cursor_at!(secondary_addr)
+        try @_pattern(pattern.children[1]!)
+
+        try @_store_current_cursor_at!(after_addr)
+      |
+        @_op(_OpSplitMany)
+        branch_addrs Array(U32) = []
+        pattern.children.each -> (child | branch_addrs << @_later_addr)
+        @_addr(0) // branch list terminator
+
+        after_addrs Array(U32) = []
+        pattern.children.each_with_index -> (child, index |
+          if (index > 0) (
+            @_op(_OpJump)
+            after_addrs << @_later_addr
+          )
+          try @_store_current_cursor_at!(branch_addrs[index]!)
+          @_pattern(child)
+        )
+
+        after_addrs.each -> (after_addr |
+          try @_store_current_cursor_at!(after_addr)
+        )
+      )
+    )
+
+    @

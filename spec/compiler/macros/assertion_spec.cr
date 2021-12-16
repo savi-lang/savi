@@ -7,7 +7,7 @@ describe Savi::Compiler::Macros do
           assert: True
       SOURCE
 
-      ctx = Savi.compiler.compile([source], :macros)
+      ctx = Savi.compiler.test_compile([source], :macros)
       ctx.errors.should be_empty
 
       func = ctx.namespace.find_func!(ctx, source, "Main", "new")
@@ -15,7 +15,7 @@ describe Savi::Compiler::Macros do
         [:try,
           [:group, "(",
             [:call,
-              [:ident, "Assert"],
+              [:ident, "Spec.Assert"],
               [:ident, "condition"],
               [:group, "(",
                 [:ident, "@"],
@@ -25,7 +25,7 @@ describe Savi::Compiler::Macros do
           ],
           [:group, "(",
             [:call,
-              [:ident, "Assert"],
+              [:ident, "Spec.Assert"],
               [:ident, "has_error"],
               [:group, "(",
                 [:ident, "@"],
@@ -47,7 +47,7 @@ describe Savi::Compiler::Macros do
           assert: SideEffects.call != "foo"
       SOURCE
 
-      ctx = Savi.compiler.compile([source], :macros)
+      ctx = Savi.compiler.test_compile([source], :macros)
       ctx.errors.should be_empty
 
       func = ctx.namespace.find_func!(ctx, source, "Main", "new")
@@ -71,7 +71,7 @@ describe Savi::Compiler::Macros do
               [:string, "foo", nil],
             ],
             [:call,
-              [:ident, "Assert"],
+              [:ident, "Spec.Assert"],
               [:ident, "relation"],
               [:group, "(",
                 [:ident, "@"],
@@ -87,7 +87,7 @@ describe Savi::Compiler::Macros do
           ],
           [:group, "(",
             [:call,
-              [:ident, "Assert"],
+              [:ident, "Spec.Assert"],
               [:ident, "has_error"],
               [:group, "(",
                 [:ident, "@"],
@@ -108,7 +108,7 @@ describe Savi::Compiler::Macros do
           assert: True !<: String
       SOURCE
 
-      ctx = Savi.compiler.compile([source], :macros)
+      ctx = Savi.compiler.test_compile([source], :macros)
       ctx.errors.should be_empty
 
       func = ctx.namespace.find_func!(ctx, source, "Main", "new")
@@ -131,7 +131,7 @@ describe Savi::Compiler::Macros do
               ],
             ],
             [:call,
-              [:ident, "Assert"],
+              [:ident, "Spec.Assert"],
               [:ident, "type_relation"],
               [:group, "(",
                 [:ident, "@"],
@@ -144,7 +144,7 @@ describe Savi::Compiler::Macros do
           ],
           [:group, "(",
             [:call,
-              [:ident, "Assert"],
+              [:ident, "Spec.Assert"],
               [:ident, "has_error"],
               [:group, "(",
                 [:ident, "@"],
@@ -173,7 +173,7 @@ describe Savi::Compiler::Macros do
               ],
             ],
             [:call,
-              [:ident, "Assert"],
+              [:ident, "Spec.Assert"],
               [:ident, "type_relation"],
               [:group, "(",
                 [:ident, "@"],
@@ -186,7 +186,7 @@ describe Savi::Compiler::Macros do
           ],
           [:group, "(",
             [:call,
-              [:ident, "Assert"],
+              [:ident, "Spec.Assert"],
               [:ident, "has_error"],
               [:group, "(",
                 [:ident, "@"],
@@ -208,13 +208,13 @@ describe Savi::Compiler::Macros do
           assert no_error: Something.dangerous!
       SOURCE
 
-      ctx = Savi.compiler.compile([source], :macros)
+      ctx = Savi.compiler.test_compile([source], :macros)
       ctx.errors.should be_empty
 
       func = ctx.namespace.find_func!(ctx, source, "Main", "new")
       func.body.not_nil!.terms.first.to_a.should eq [:group, "(",
         [:call,
-          [:ident, "Assert"],
+          [:ident, "Spec.Assert"],
           [:ident, "has_error"],
           [:group, "(",
             [:ident, "@"],
@@ -243,13 +243,13 @@ describe Savi::Compiler::Macros do
           assert error: Something.dangerous!
       SOURCE
 
-      ctx = Savi.compiler.compile([source], :macros)
+      ctx = Savi.compiler.test_compile([source], :macros)
       ctx.errors.should be_empty
 
       func = ctx.namespace.find_func!(ctx, source, "Main", "new")
       func.body.not_nil!.terms.first.to_a.should eq [:group, "(",
         [:call,
-          [:ident, "Assert"],
+          [:ident, "Spec.Assert"],
           [:ident, "has_error"],
           [:group, "(",
             [:ident, "@"],

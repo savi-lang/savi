@@ -232,8 +232,8 @@ module Savi::Compiler::PreTInfer
       nil
     end
 
-    def prelude_type(ctx : Context, name)
-      ctx.namespace.prelude_type(ctx, name)
+    def core_savi_type(ctx : Context, name)
+      ctx.namespace.core_savi_type(ctx, name)
     end
 
     def lookup_local_ident(ref : Refer::Local)
@@ -344,21 +344,21 @@ module Savi::Compiler::PreTInfer
 
     # A literal character could be any integer or floating-point machine type.
     def touch(ctx : Context, node : AST::LiteralCharacter)
-      t_link = prelude_type(ctx, "Numeric")
+      t_link = core_savi_type(ctx, "Numeric")
       mt = TInfer::MetaType.new(TInfer::ReifiedType.new(t_link))
       @analysis[node] = TInfer::Literal.new(node.pos, layer(node), mt)
     end
 
     # A literal integer could be any integer or floating-point machine type.
     def touch(ctx : Context, node : AST::LiteralInteger)
-      t_link = prelude_type(ctx, "Numeric")
+      t_link = core_savi_type(ctx, "Numeric")
       mt = TInfer::MetaType.new(TInfer::ReifiedType.new(t_link))
       @analysis[node] = TInfer::Literal.new(node.pos, layer(node), mt)
     end
 
     # A literal float could be any floating-point machine type.
     def touch(ctx : Context, node : AST::LiteralFloat)
-      t_links = [prelude_type(ctx, "F32"), prelude_type(ctx, "F64")]
+      t_links = [core_savi_type(ctx, "F32"), core_savi_type(ctx, "F64")]
       mts = t_links.map { |t_link| TInfer::MetaType.new(TInfer::ReifiedType.new(t_link)) }
       mt = TInfer::MetaType.new_union(mts)
       @analysis[node] = TInfer::Literal.new(node.pos, layer(node), mt)

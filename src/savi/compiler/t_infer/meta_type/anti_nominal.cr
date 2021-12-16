@@ -22,8 +22,8 @@ struct Savi::Compiler::TInfer::MetaType::AntiNominal
     name : String
   ) : Span
     Span.error(pos,
-      "The '#{name}' function can't be called on this receiver", [
-        {pos, "the type #{self.inspect} has no types defining that function"}
+      "The '#{name}' member can't be reached on this receiver", [
+        {pos, "the type #{self.inspect} has no types defining that member"}
       ]
     )
   end

@@ -8,7 +8,7 @@ describe Savi::Compiler::ServeDefinition do
         example = A.new
     SOURCE
 
-    ctx = Savi.compiler.compile([source], :serve_definition)
+    ctx = Savi.compiler.test_compile([source], :serve_definition)
     ctx.errors.should be_empty
 
     pos = ctx.serve_definition[Savi::Source::Pos.point(source, 4, 14)].not_nil!
@@ -27,7 +27,7 @@ describe Savi::Compiler::ServeDefinition do
         example2 = example1 * 1
     SOURCE
 
-    ctx = Savi.compiler.compile([source], :serve_definition)
+    ctx = Savi.compiler.test_compile([source], :serve_definition)
     ctx.errors.should be_empty
 
     pos = ctx.serve_definition[Savi::Source::Pos.point(source, 3, 21)].not_nil!
@@ -62,7 +62,7 @@ describe Savi::Compiler::ServeDefinition do
         example2 = example1.test
     SOURCE
 
-    ctx = Savi.compiler.compile([source], :serve_definition)
+    ctx = Savi.compiler.test_compile([source], :serve_definition)
     ctx.errors.should be_empty
 
     pos = ctx.serve_definition[Savi::Source::Pos.point(source, 9, 18)].not_nil!

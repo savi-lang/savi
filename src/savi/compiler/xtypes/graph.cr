@@ -197,7 +197,7 @@ module Savi::Compiler::XTypes::Graph
     end
 
     protected def observe_assert_bool(ctx, node)
-      t_link = ctx.namespace.prelude_type(ctx, "Bool")
+      t_link = ctx.namespace.core_savi_type(ctx, "Bool")
       bool = NominalType.new(t_link).intersect(NominalCap::VAL)
       @assertions << {node.pos, @by_node[node], bool}
     end
@@ -294,7 +294,7 @@ module Savi::Compiler::XTypes::Graph
       @by_node[node] = TypeVariableRef.new(var)
 
       array_nominal = NominalType.new(
-        ctx.namespace.prelude_type(ctx, "Array"),
+        ctx.namespace.core_savi_type(ctx, "Array"),
         [TypeVariableRef.new(elem_var).as(AlgebraicType)]
       )
       array_type = array_nominal.intersect(
@@ -325,12 +325,12 @@ module Savi::Compiler::XTypes::Graph
     end
 
     def run_for_type_alias(ctx : Context, t : Program::TypeAlias)
-      # TODO: Allow running this pass for more than just the root library.
+      # TODO: Allow running this pass for more than just the root package.
       # We restrict this for now while we are building out the pass because
-      # we don't want to deal with all of the complicated forms in the prelude.
+      # we don't want to deal with all of the complicated forms in Savi core.
       # We want to stick to the simple forms in the compiler pass specs for now.
-      root_library = ctx.root_library.source_library
-      return unless t.ident.pos.source.library == root_library
+      root_package = ctx.root_package.source_package
+      return unless t.ident.pos.source.package == root_package
 
       raise NotImplementedError.new("run_for_type_alias")
     end
@@ -358,8 +358,8 @@ module Savi::Compiler::XTypes::Graph
       analysis.observe_field_func(ctx, self, f) if f.has_tag?(:field)
     end
 
-    def prelude_type(ctx, name, cap, args = nil)
-      t_link = ctx.namespace.prelude_type(ctx, name)
+    def core_savi_type(ctx, name, cap, args = nil)
+      t_link = ctx.namespace.core_savi_type(ctx, name)
       NominalType.new(t_link, args).intersect(cap)
     end
 
@@ -516,18 +516,18 @@ module Savi::Compiler::XTypes::Graph
     end
 
     def visit(ctx, node : AST::LiteralCharacter)
-      type = prelude_type(ctx, "Numeric", NominalCap::VAL)
+      type = core_savi_type(ctx, "Numeric", NominalCap::VAL)
       @analysis.observe_constrained_literal(node, "char:#{node.value}", type)
     end
 
     def visit(ctx, node : AST::LiteralInteger)
-      type = prelude_type(ctx, "Numeric", NominalCap::VAL)
+      type = core_savi_type(ctx, "Numeric", NominalCap::VAL)
       @analysis.observe_constrained_literal(node, "num:#{node.value}", type)
     end
 
     def visit(ctx, node : AST::LiteralFloat)
-      type = prelude_type(ctx, "F64", NominalCap::VAL).unite(
-        prelude_type(ctx, "F32", NominalCap::VAL)
+      type = core_savi_type(ctx, "F64", NominalCap::VAL).unite(
+        core_savi_type(ctx, "F32", NominalCap::VAL)
       )
       @analysis.observe_constrained_literal(node, "float:#{node.value}", type)
     end
@@ -535,13 +535,13 @@ module Savi::Compiler::XTypes::Graph
     def visit(ctx, node : AST::LiteralString)
       case node.prefix_ident.try(&.value)
       when nil
-        @analysis[node] = prelude_type(ctx, "String", NominalCap::VAL)
+        @analysis[node] = core_savi_type(ctx, "String", NominalCap::VAL)
       when "b"
-        @analysis[node] = prelude_type(ctx, "Bytes", NominalCap::VAL)
+        @analysis[node] = core_savi_type(ctx, "Bytes", NominalCap::VAL)
       else
         ctx.error_at node.prefix_ident.not_nil!,
           "This type of string literal is not known; please remove this prefix"
-        @analysis[node] = prelude_type(ctx, "String", NominalCap::VAL)
+        @analysis[node] = core_savi_type(ctx, "String", NominalCap::VAL)
       end
     end
 
@@ -553,7 +553,7 @@ module Savi::Compiler::XTypes::Graph
         @analysis.observe_array_literal(ctx, node)
       when "(", ":"
         if node.terms.empty?
-          @analysis[node] = prelude_type(ctx, "None", NominalCap::NON)
+          @analysis[node] = core_savi_type(ctx, "None", NominalCap::NON)
         else
           @analysis[node] = @analysis[node.terms.last]
         end
@@ -568,13 +568,13 @@ module Savi::Compiler::XTypes::Graph
     def visit(ctx, node : AST::Prefix)
       case node.op.value
       when "source_code_position_of_argument"
-        @analysis[node] = prelude_type(ctx, "SourceCodePosition", NominalCap::VAL)
+        @analysis[node] = core_savi_type(ctx, "SourceCodePosition", NominalCap::VAL)
       when "reflection_of_type"
-        @analysis[node] = prelude_type(ctx, "ReflectionOfType", NominalCap::VAL, [@analysis[node.term]])
+        @analysis[node] = core_savi_type(ctx, "ReflectionOfType", NominalCap::VAL, [@analysis[node.term]])
       when "reflection_of_runtime_type_name"
-        @analysis[node] = prelude_type(ctx, "String", NominalCap::VAL)
+        @analysis[node] = core_savi_type(ctx, "String", NominalCap::VAL)
       when "identity_digest_of"
-        @analysis[node] = prelude_type(ctx, "USize", NominalCap::VAL)
+        @analysis[node] = core_savi_type(ctx, "USize", NominalCap::VAL)
       when "--"
         ref = refer[node.term].as(Refer::Local)
         @analysis.observe_local_consume(node, ref)
@@ -601,10 +601,10 @@ module Savi::Compiler::XTypes::Graph
         # Do nothing here - we'll handle it in one of the parent nodes.
       when "<:", "!<:"
         # TODO: refine the type in this scope
-        @analysis[node] = prelude_type(ctx, "Bool", NominalCap::VAL)
+        @analysis[node] = core_savi_type(ctx, "Bool", NominalCap::VAL)
       when "===", "!=="
         # Just know that the result of this expression is a boolean.
-        @analysis[node] = prelude_type(ctx, "Bool", NominalCap::VAL)
+        @analysis[node] = core_savi_type(ctx, "Bool", NominalCap::VAL)
       when "="
         ident = AST::Extract.param(node.lhs).first
         ref = refer[ident].as(Refer::Local)

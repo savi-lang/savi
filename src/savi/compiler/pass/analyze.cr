@@ -22,15 +22,15 @@ abstract class Savi::Compiler::Pass::Analyze(TypeAliasAnalysis, TypeAnalysis, Fu
   def [](f_link : Program::Function::Link); @for_func[f_link] end
   def []?(f_link : Program::Function::Link); @for_func[f_link]? end
 
-  def run(ctx : Context, library : Program::Library)
-    # Run for each of the type aliases in the library.
-    library.aliases.each do |t|
-      run_for_type_alias(ctx, t, t.make_link(library))
+  def run(ctx : Context, package : Program::Package)
+    # Run for each of the type aliases in the package.
+    package.aliases.each do |t|
+      run_for_type_alias(ctx, t, t.make_link(package))
     end
 
-    # Run for each of the types in the library.
-    library.types.each do |t|
-      t_analysis = run_for_type(ctx, t, t_link = t.make_link(library))
+    # Run for each of the types in the package.
+    package.types.each do |t|
+      t_analysis = run_for_type(ctx, t, t_link = t.make_link(package))
 
       # Run for each of the functions in the type.
       t.functions.each do |f|

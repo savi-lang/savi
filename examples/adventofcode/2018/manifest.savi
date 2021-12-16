@@ -1,0 +1,6 @@
+:manifest "adventofcode-2018"
+  :sources "src/*.savi"
+
+  :dependency Spec "TODO: specify version"
+  :dependency Map "TODO: specify version"
+  :dependency Time "TODO: specify version"

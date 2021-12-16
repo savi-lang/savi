@@ -10,8 +10,8 @@ describe Savi::Compiler::ReferType do
         Greeting.greet(env)
     SOURCE
 
-    ctx1 = Savi.compiler.compile([source], :refer_type)
-    ctx2 = Savi.compiler.compile([source], :refer_type)
+    ctx1 = Savi.compiler.test_compile([source], :refer_type)
+    ctx2 = Savi.compiler.test_compile([source], :refer_type)
     ctx1.errors.should be_empty
     ctx2.errors.should be_empty
 
@@ -27,7 +27,7 @@ describe Savi::Compiler::ReferType do
     ctx1.refer_type[t_link_m].should eq ctx2.refer_type[t_link_m]
     ctx1.refer_type[f_link_m].should eq ctx2.refer_type[f_link_m]
 
-    # Prove that we resolved Env from the prelude library.
+    # Prove that we resolved Env from the core Savi package.
     ref_Env = ctx1.refer_type[f_link_g][
       f_link_g.resolve(ctx2)
         .params.not_nil!

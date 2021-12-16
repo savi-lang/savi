@@ -1,8 +1,0 @@
-:import "spec"
-:source ".."
-
-:actor Main
-  :new (env)
-    Specs.run(env, [
-      SpecRun(TCPSpec).new(env)
-    ])

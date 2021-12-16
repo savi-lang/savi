@@ -1,0 +1,109 @@
+:module _Err
+  :fun non not_really!: None
+  :fun non now!: @inner!
+  :fun non inner!: error!
+
+:module TrySpec
+  :fun run(test MicroTest)
+    zero = U64[0]
+
+    test["try error; with error"].pass = U64[33] == (
+      try (error! | 33)
+    )
+
+    // This test just proves that codegen doesn't choke on unreachable code.
+    test["try error!; unreachable code after error"].pass = U64[33] == (
+      try (error!, totally = "unreachable" | 33)
+    )
+
+    test["try: try error else error; with error"].pass = U64[33] == (
+      try (try (error! | error!) | 33)
+    )
+
+    test["try: if error; without error"].pass = U64[33] == (
+      try (
+        if (zero > 1) (error! | 33)
+      |
+        11
+      )
+    )
+
+    test["try: if error; with error"].pass = U64[33] == (
+      try (
+        if (zero < 1) (error! | 11)
+      |
+        33
+      )
+    )
+
+    test["try: if else error; without error"].pass = U64[33] == (
+      try (
+        if (zero < 1) (33 | error!)
+      |
+        11
+      )
+    )
+
+    test["try: if else error; with error"].pass = U64[33] == (
+      try (
+        if (zero > 1) (11 | error!)
+      |
+        33
+      )
+    )
+
+    test["try: if error else error; with error"].pass = U64[33] == (
+      try (
+        if (zero < 1) (error! | error!)
+      |
+        33
+      )
+    )
+
+    test["try: while error; without error"].pass = U64[33] == (
+      try (
+        while (zero > 1) (error! | 33)
+      |
+        11
+      )
+    )
+
+    test["try: while error; with error"].pass = U64[33] == (
+      try (
+        while (zero < 1) (error! | 11)
+      |
+        33
+      )
+    )
+
+    test["try: while else error; without error"].pass = U64[33] == (
+      try (
+        while (zero < 1) (zero = zero + 1, 33 | error!)
+      |
+        11
+      )
+    )
+
+    test["try: while else error; with error"].pass = U64[33] == (
+      try (
+        while (zero > 1) (11 | error!)
+      |
+        33
+      )
+    )
+
+    test["try: while error else error; with error"].pass = U64[33] == (
+      try (
+        while (zero < 1) (error! | error!)
+      |
+        33
+      )
+    )
+
+    test["try call error; with error"].pass = U64[33] == (
+      try (_Err.now!, 11 | 33)
+    )
+
+    test["try call error; without error"].pass = U64[33] == (
+      try (_Err.not_really!, 33 | 11)
+    )

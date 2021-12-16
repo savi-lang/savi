@@ -7,7 +7,7 @@ describe Savi::Compiler::Macros do
           return
       SOURCE
 
-      ctx = Savi.compiler.compile([source], :macros)
+      ctx = Savi.compiler.test_compile([source], :macros)
       ctx.errors.should be_empty
 
       func = ctx.namespace.find_func!(ctx, source, "Returns", "example")
@@ -28,7 +28,7 @@ describe Savi::Compiler::Macros do
           @
       SOURCE
 
-      ctx = Savi.compiler.compile([source], :macros)
+      ctx = Savi.compiler.test_compile([source], :macros)
       ctx.errors.should be_empty
 
       func = ctx.namespace.find_func!(ctx, source, "Returns", "example")
@@ -52,7 +52,7 @@ describe Savi::Compiler::Macros do
           return "value"
       SOURCE
 
-      ctx = Savi.compiler.compile([source], :macros)
+      ctx = Savi.compiler.test_compile([source], :macros)
       ctx.errors.should be_empty
 
       func = ctx.namespace.find_func!(ctx, source, "Returns", "example")
@@ -69,7 +69,7 @@ describe Savi::Compiler::Macros do
           return "value" if cond_2
       SOURCE
 
-      ctx = Savi.compiler.compile([source], :macros)
+      ctx = Savi.compiler.test_compile([source], :macros)
       ctx.errors.should be_empty
 
       func = ctx.namespace.find_func!(ctx, source, "Returns", "example")
@@ -116,7 +116,7 @@ describe Savi::Compiler::Macros do
                               ^~~
       MSG
 
-      Savi.compiler.compile([source], :macros)
+      Savi.compiler.test_compile([source], :macros)
         .errors.map(&.message).join("\n").should eq expected
     end
 
@@ -154,7 +154,7 @@ describe Savi::Compiler::Macros do
                                       ^~~
       MSG
 
-      Savi.compiler.compile([source], :macros)
+      Savi.compiler.test_compile([source], :macros)
         .errors.map(&.message).join("\n").should eq expected
     end
 
@@ -177,7 +177,7 @@ describe Savi::Compiler::Macros do
           ^~~~~~~~~
       MSG
 
-      Savi.compiler.compile([source], :macros)
+      Savi.compiler.test_compile([source], :macros)
         .errors.map(&.message).join("\n").should eq expected
     end
 
@@ -205,7 +205,7 @@ describe Savi::Compiler::Macros do
           ^~~~~~~~~~~~~~~~~
       MSG
 
-      Savi.compiler.compile([source], :macros)
+      Savi.compiler.test_compile([source], :macros)
         .errors.map(&.message).join("\n").should eq expected
     end
 
@@ -217,7 +217,7 @@ describe Savi::Compiler::Macros do
           return "value" unless cond
       SOURCE
 
-      ctx = Savi.compiler.compile([source], :macros)
+      ctx = Savi.compiler.test_compile([source], :macros)
       ctx.errors.should be_empty
 
       func = ctx.namespace.find_func!(ctx, source, "Returns", "example")
@@ -264,7 +264,7 @@ describe Savi::Compiler::Macros do
                                   ^~~
       MSG
 
-      Savi.compiler.compile([source], :macros)
+      Savi.compiler.test_compile([source], :macros)
         .errors.map(&.message).join("\n").should eq expected
     end
 
@@ -302,7 +302,7 @@ describe Savi::Compiler::Macros do
                                           ^~~
       MSG
 
-      Savi.compiler.compile([source], :macros)
+      Savi.compiler.test_compile([source], :macros)
         .errors.map(&.message).join("\n").should eq expected
     end
 
@@ -325,7 +325,7 @@ describe Savi::Compiler::Macros do
           ^~~~~~~~~~~~~
       MSG
 
-      Savi.compiler.compile([source], :macros)
+      Savi.compiler.test_compile([source], :macros)
         .errors.map(&.message).join("\n").should eq expected
     end
 
@@ -353,7 +353,7 @@ describe Savi::Compiler::Macros do
           ^~~~~~~~~~~~~~~~~~~~~
       MSG
 
-      Savi.compiler.compile([source], :macros)
+      Savi.compiler.test_compile([source], :macros)
         .errors.map(&.message).join("\n").should eq expected
     end
   end

@@ -1,0 +1,56 @@
+:module _InspectableTestModule
+
+:class Savi.Inspect.Spec
+  :is Spec
+  :const describes: "Inspect"
+
+  :it "inspects booleans"
+    assert: Inspect[True]  == "True"
+    assert: Inspect[False] == "False"
+
+  :it "inspects unsigned integers"
+    assert: Inspect[U8[36]]    == "36"
+    assert: Inspect[U32[36]]   == "36"
+    assert: Inspect[U64[36]]   == "36"
+    assert: Inspect[USize[36]] == "36"
+
+  :it "inspects signed integers"
+    assert: Inspect[I8[36]]    == "36"
+    assert: Inspect[I32[36]]   == "36"
+    assert: Inspect[I64[36]]   == "36"
+    assert: Inspect[ISize[36]] == "36"
+
+  :it "inspects negative signed integers"
+    assert: Inspect[I8[-36]]    == "-36"
+    assert: Inspect[I32[-36]]   == "-36"
+    assert: Inspect[I64[-36]]   == "-36"
+    assert: Inspect[ISize[-36]] == "-36"
+
+  :it "inspects floating points"
+    assert: Inspect[F64[0.0625]]      == "0.0625"
+    assert: Inspect[F32[0.0625]]      == "0.0625"
+    assert: Inspect[F64[-0.0625]]     == "-0.0625"
+    assert: Inspect[F32[-0.0625]]     == "-0.0625"
+    assert: Inspect[F64[0]]           == "0.0"
+    assert: Inspect[F32[0]]           == "0.0"
+    assert: Inspect[F64.infinity]     == "Infinity"
+    assert: Inspect[F32.infinity]     == "Infinity"
+    assert: Inspect[F64.neg_infinity] == "-Infinity"
+    assert: Inspect[F32.neg_infinity] == "-Infinity"
+    assert: Inspect[F64.nan]          == "NaN"
+    assert: Inspect[F32.nan]          == "NaN"
+
+  :it "inspects the number zero"
+    assert: Inspect[U8[0]] == "0"
+
+  :it "inspects a module with its type name"
+    assert: Inspect[None] == "None"
+    assert: Inspect[_InspectableTestModule] == "_InspectableTestModule"
+
+  :it "inspects strings"
+    assert: Inspect["example"] == "\"example\""
+    assert: Inspect[String.new] == "\"\""
+
+  :it "inspects arrays"
+    assert: Inspect[["foo", "bar", "baz"]] == "[\"foo\", \"bar\", \"baz\"]"
+    assert: Inspect[[U8[10], U8[5], U8[6], U8[5]]] == "[10, 5, 6, 5]"

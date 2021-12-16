@@ -1,0 +1,8 @@
+:manifest lib Spec
+  :sources "src/Spec/**/*.savi"
+
+  :dependency Map "TODO: specify version"
+
+:manifest bin "spec-Spec"
+  :copies Spec
+  :sources "spec/Spec/**/*.savi"

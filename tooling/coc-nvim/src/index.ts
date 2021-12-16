@@ -29,8 +29,6 @@ export async function deactivate() {
   return Promise.all([...clients.values()].map((ws) => ws.stop()));
 }
 
-import * as tmp from "tmp";
-
 function didOpenTextDocument(document: TextDocument, ctx: ExtensionContext) {
   // Ignore text documents whose language isn't Savi.
   if (document.languageId !== "savi") return;
@@ -107,14 +105,6 @@ class SaviClient {
     );
 
     this.disposables.push(
-      commands.registerCommand("savi.update", async () => {
-        this.updateImage();
-        await this.stop();
-        return this.start(ctx);
-      })
-    );
-
-    this.disposables.push(
       commands.registerCommand("savi.restart", async () => {
         await this.stop();
         return this.start(ctx);
@@ -135,27 +125,7 @@ class SaviClient {
     const cwd = Uri.parse(this.folder.uri).fsPath;
     const env = { ...process.env };
 
-    const tmpDir = tmp.dirSync().name;
-
-    let serverProcess = child_process.spawn(
-      "docker",
-      [
-        "run",
-        "-i",
-        "--rm",
-        "-v",
-        `${cwd}:/opt/code`,
-        "-v",
-        `${tmpDir}:/opt/host_std`,
-        "-e",
-        `SAVI_MAIN_DIRECTORY_REMAP=${cwd}:/opt/code`,
-        "-e",
-        `SAVI_STANDARD_DIRECTORY_REMAP=${tmpDir}:/opt/host_std`,
-        "jemc/savi",
-        "server",
-      ],
-      { env, cwd }
-    );
+    let serverProcess = child_process.spawn("savi", ["server"], { env, cwd });
 
     serverProcess.on("error", (err: { code?: string; message: string }) => {
       workspace.showMessage(
@@ -164,47 +134,5 @@ class SaviClient {
     });
 
     return serverProcess;
-  }
-
-  private async updateImage() {
-    const cwd = Uri.parse(this.folder.uri).fsPath;
-    const env = { ...process.env };
-
-    let updateProcess = child_process.spawn("docker", ["pull", "jemc/savi"], {
-      env,
-      cwd,
-    });
-
-    const channel = workspace.createOutputChannel("Savi Updater");
-    workspace.showMessage(
-      "Pulling latest image for the Savi Language Server",
-      "more"
-    );
-    channel.show();
-
-    updateProcess.on("error", (err: { code?: string; message: string }) => {
-      workspace.showMessage(
-        `Failed to update Savi Language Server: \`${err.message}\``,
-        "error"
-      );
-    });
-
-    updateProcess.on("exit", (code) => {
-      if (code == 0) {
-        workspace.showMessage(
-          "Finished pulling latest image for the Savi Language Server",
-          "more"
-        );
-        channel.dispose();
-      } else {
-        workspace.showMessage("Failed to update Savi Language Server", "error");
-      }
-    });
-
-    updateProcess.stdout.on("data", (chunk) => {
-      channel.append(chunk.toString());
-    });
-
-    return updateProcess;
   }
 }

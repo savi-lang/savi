@@ -1,0 +1,51 @@
+:: This trait declares the interface for a readable mapping of K to V elements.
+:: In theory, this interface could be implemented by any mutable or immutable
+:: implementations of a map as an abstract data type.
+::
+:: Additional convenience methods are also included, so that any implementation
+:: of the interface can get them "for free" by inheriting the trait.
+:trait box Map.Readable(K, V)
+  :fun size USize
+  :fun has_key(key K) Bool
+  :fun "[]!"(key K) @->(V'aliased)
+
+  :: Yield each key and value in the map.
+  :fun each None
+    :yields (@->(K'aliased), @->(V'aliased)) for None
+
+  :: Yield each key and value in the map, stopping iteration if the yield block
+  :: returns True. Returns True if iteration was stopped early; else, False.
+  :fun each_until Bool
+    :yields (@->(K'aliased), @->(V'aliased)) for Bool
+
+  :: Yield each key in the map.
+  :fun each_key
+    @each -> (k, v | yield k)
+
+  :: Yield each value in the map.
+  :fun each_value
+    @each -> (k, v | yield v)
+
+  :: Yield each key in the map, stopping iteration if the yield block
+  :: returns True. Returns True if iteration was stopped early; else, False.
+  :fun each_key_until
+    :yields for Bool
+    @each_until -> (k, v | yield k)
+
+  :: Yield each value in the map, stopping iteration if the yield block
+  :: returns True. Returns True if iteration was stopped early; else, False.
+  :fun each_value_until
+    :yields for Bool
+    @each_until -> (k, v | yield v)
+
+  :: Return True after finding a key/value pair for which the yield block
+  :: returns True, defaulting to False if no such key/value pair is found.
+  :fun has_any // TODO: define as simple alias of each_until?
+    :yields for Bool
+    @each_until -> (k, v | yield (k, v))
+
+  :: Return False after finding a key/value pair for which the yield block
+  :: returns False, defaulting to True if no such key/value pair is found.
+  :fun has_all
+    :yields for Bool
+    @each_until -> (k, v | (yield (k, v)).not).not

@@ -1,9 +1,0 @@
-:import "spec"
-:source ".."
-
-:actor Main
-  :new (env)
-    Specs.run(env, [
-      SpecRun(RequestReaderSpec).new(env)
-      SpecRun(ResponseBuilderSpec).new(env)
-    ])

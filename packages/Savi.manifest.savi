@@ -1,0 +1,5 @@
+:manifest bin "spec-Savi"
+  :sources "spec/Savi/**/*.savi"
+
+  :dependency Spec "TODO: specify version"
+  :transitive dependency Map "TODO: specify version"

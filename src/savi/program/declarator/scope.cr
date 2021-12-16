@@ -2,8 +2,7 @@ class Savi::Program::Declarator::Scope
   class Layer
     property declare : AST::Declare
     property declarator : Declarator
-    property body_acceptor : Proc(AST::Group, Nil)?
-    property body_accepted_pos : Source::Pos?
+    property body_handler : Proc(AST::Group, Nil)?
 
     def initialize(@declare, @declarator)
     end
@@ -14,8 +13,8 @@ class Savi::Program::Declarator::Scope
   # TODO: These properties likely need to be more dynamic to allow
   # arbitrary custom declarators to create their own custom contexts,
   # which will have arbitrary names and be arbitrary interpreter objects.
-  getter! current_library : Library
-  setter current_library : Library?
+  getter! current_package : Package
+  setter current_package : Package?
   getter! current_declarator : Declarator
   setter current_declarator : Declarator?
   getter! current_declarator_term : Declarator::TermAcceptor
@@ -26,6 +25,10 @@ class Savi::Program::Declarator::Scope
   setter current_function : Function?
   getter! current_members : Array(TypeWithValue)
   setter current_members : Array(TypeWithValue)?
+  getter! current_manifest : Packaging::Manifest
+  setter current_manifest : Packaging::Manifest?
+  getter! current_manifest_dependency : Packaging::Dependency
+  setter current_manifest_dependency : Packaging::Dependency?
 
   def visible_declarators(ctx)
     declarators = [] of Declarator
@@ -36,9 +39,8 @@ class Savi::Program::Declarator::Scope
       .tap(&.meta_declarators.try { |l| declarators.concat(l.declarators) })
       .tap(&.standard_declarators.try { |l| declarators.concat(l.declarators) })
 
-    # TODO: Declarators visible via import statements in this file
-
-    declarators.concat(current_library.declarators)
+    # TODO: Declarators visible via package dependencies in the manifest
+    declarators.concat(current_package.declarators)
 
     declarators
   end
@@ -56,30 +58,27 @@ class Savi::Program::Declarator::Scope
   end
 
   def on_body(&block : AST::Group -> _)
-    @stack.last.body_acceptor = block
+    @stack.last.body_handler = block
+  end
+
+  def current_body_handler
+    @stack.last.body_handler
   end
 
   def try_accept_body(ctx, body : AST::Group)
     layer = @stack.last
     return false unless layer.declarator.body_allowed
 
-    body_acceptor = layer.body_acceptor
-    unless body_acceptor
-      ctx.error_at layer.declarator.name,
-        "This declarator allows a body, but defined no body acceptor"
-      return false
-    end
-
-    if layer.body_accepted_pos
-      ctx.error_at layer.body_accepted_pos.not_nil!,
+    already_accepted_body = layer.declare.body
+    if already_accepted_body
+      ctx.error_at already_accepted_body.pos,
         "This declaration already accepted a body here", [
           {body.pos, "so it can't accept this additional body here"}
         ]
       return false
     end
 
-    body_acceptor.call(body)
-    layer.body_accepted_pos = body.pos
+    layer.declare.body = body
 
     true
   end
@@ -88,17 +87,16 @@ class Savi::Program::Declarator::Scope
     @stack.push(Layer.new(declare, declarator))
   end
 
-  def pop_declarator?(ctx)
-    layer = @stack.pop?
-    return unless layer
+  def pop_layer?
+    @stack.pop?
+  end
 
-    if layer.declarator.body_required && !layer.body_accepted_pos
-      ctx.error_at layer.declare.terms.first.pos, "This declaration has no body",
-        [{layer.declarator.name.pos, "but this declarator requires a body"}]
-      return nil
-    end
+  def pop_declarator?
+    layer.try(&.declarator)
+  end
 
-    layer.declarator
+  def top_declare?
+    @stack.last?.try(&.declare)
   end
 
   def top_declarator?

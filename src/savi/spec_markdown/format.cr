@@ -6,14 +6,18 @@ class Savi::SpecMarkdown::Format
 
   def verify!
     any_failures = false
-    ctx = Savi.compiler.compile([@source], :import)
-    edits = AST::Format.run(ctx, ctx.root_library_link, ctx.root_docs)
+    options = Compiler::Options.new
+    options.skip_manifest = true
+    ctx = Savi.compiler.compile([@source], :manifests, options)
+    edits = AST::Format.run(ctx, ctx.root_package_link, ctx.root_docs)
       .flat_map(&.last)
 
     @examples.each { |example|
       code_pos = SpecMarkdown.get_code_pos(@source, example.code_blocks.first)
       example.expected_format_results.each { |format_rule, expected|
-        actual_pos, actual_edits = AST::Format.apply_edits(code_pos, edits)
+        actual_pos, actual_edits = code_pos.apply_edits(
+          edits.map { |e| {e.pos, e.replacement} }
+        )
 
         actual = actual_pos.content
         unless actual.sub(/\n+\z/, "") == expected.sub(/\n+\z/, "")
@@ -33,7 +37,9 @@ class Savi::SpecMarkdown::Format
           puts
         end
 
-        extra_edits = actual_edits.reject(&.rule.to_s.==(format_rule))
+        extra_edits = edits.reject(&.rule.to_s.==(format_rule)).select { |edit|
+          actual_edits.includes?({edit.pos, edit.replacement})
+        }
         unless extra_edits.empty?
           any_failures = true
 

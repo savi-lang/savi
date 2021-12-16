@@ -372,12 +372,12 @@ module Savi::Compiler::Caps
     end
 
     def run_for_function(ctx : Context, f : Program::Function)
-      # TODO: Allow running this pass for more than just the root library.
+      # TODO: Allow running this pass for more than just the root package.
       # We restrict this for now while we are building out the pass because
       # we don't want to deal with all of the complicated forms in the prelude.
       # We want to stick to the simple forms in the compiler pass specs for now.
-      root_library = ctx.root_library.source_library
-      return unless f.ident.pos.source.library == root_library
+      root_package = ctx.root_package.source_package
+      return unless f.ident.pos.source.package == root_package
 
       @analysis.init_func_self(f.cap)
       if f.has_tag?(:constructor)
@@ -678,16 +678,16 @@ module Savi::Compiler::Caps
     def run(ctx)
       rts = [] of TInfer::ReifiedType
 
-      # Collect the non-reified types for every type in the root library.
-      ctx.root_library.tap { |library|
-        library.types.each { |t|
-          t_link = t.make_link(library)
+      # Collect the non-reified types for every type in the root package.
+      ctx.root_package.tap { |package|
+        package.types.each { |t|
+          t_link = t.make_link(package)
 
           rts << ctx.t_infer[t_link].type_before_reification.single!
         }
       }
 
-      # TODO: Collect all (reachable?) types - not just the root library.
+      # TODO: Collect all (reachable?) types - not just the root package.
 
       # Run for every function in each of the collected types.
       rts.each { |rt|

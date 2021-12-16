@@ -1,4 +1,5 @@
 require "file"
+require "file_utils"
 require "llvm"
 
 ##
@@ -27,7 +28,7 @@ class Savi::Compiler::BinaryObject
       .find { |path| File.exists?(path) }
   end
 
-  def self.run(ctx, obj_filename = nil)
+  def self.run(ctx)
     llvm = ctx.code_gen.llvm
     machine = ctx.code_gen.target_machine
     mod = ctx.code_gen.mod
@@ -42,8 +43,12 @@ class Savi::Compiler::BinaryObject
     # Link the pony runtime bitcode into the generated module.
     LibLLVM.link_modules(mod.to_unsafe, ponyrt.to_unsafe)
 
-    obj_filename ||= "#{ctx.options.binary_name}.o"
+    obj_path = "#{ctx.manifests.root.not_nil!.bin_path}.o"
 
-    machine.emit_obj_to_file(mod, obj_filename)
+    FileUtils.mkdir_p(File.dirname(obj_path))
+
+    machine.emit_obj_to_file(mod, obj_path)
+
+    obj_path
   end
 end

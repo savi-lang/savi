@@ -1,5 +1,5 @@
 class Savi::Compiler::SourceService
-  property standard_library_internal_path =
+  property standard_package_internal_path =
     File.expand_path("../../packages", Process.executable_path.not_nil!)
 
   property standard_directory_remap : {String, String}?
@@ -9,17 +9,17 @@ class Savi::Compiler::SourceService
     @source_overrides = {} of String => Hash(String, String)
   end
 
-  def standard_library_path
-    from_internal_path(standard_library_internal_path)
+  def standard_package_path
+    from_internal_path(standard_package_internal_path)
   end
-  def prelude_library_path
-    File.join("#{standard_library_path}/prelude")
+  def core_savi_package_path
+    File.join("#{standard_package_path}/src/Savi")
   end
-  def standard_declarators_library_path
-    File.join("#{standard_library_path}/prelude/declarators")
+  def standard_declarators_package_path
+    File.join("#{standard_package_path}/src/Savi/declarators")
   end
-  def meta_declarators_library_path
-    File.join("#{standard_library_path}/prelude/declarators/meta")
+  def meta_declarators_package_path
+    File.join("#{standard_package_path}/src/Savi/declarators/meta")
   end
 
   # Add/update a source override, which causes the SourceService to pretend as
@@ -29,7 +29,7 @@ class Savi::Compiler::SourceService
   # overriding the real content of the file for as long as the override exists.
   # If there is no such file at that path, the source override makes the system
   # pretend as if there is a file there, so it will show up in that directory
-  # if and when the directory is compiled as a library in the program.
+  # if and when the directory is compiled as a package in the program.
   #
   # This is used by editor-interactive systems like the language server,
   # allowing the content in the text editor that has opened the given file
@@ -59,9 +59,9 @@ class Savi::Compiler::SourceService
     name = File.basename(path)
     content = @source_overrides[dirname]?.try(&.[]?(name)) \
       || File.read(to_internal_path(path))
-    library = Source::Library.new(dirname)
+    package = Source::Package.new(dirname)
 
-    Source.new(dirname, name, content, library)
+    Source.new(dirname, name, content, package)
   end
 
   # Write the given content to the source file at the given path.
@@ -82,7 +82,7 @@ class Savi::Compiler::SourceService
 
     @standard_directory_remap.try do |prefix, _|
       next unless path.starts_with?(prefix)
-      return path.sub(prefix, @standard_library_internal_path)
+      return path.sub(prefix, @standard_package_internal_path)
     end
 
     path
@@ -98,8 +98,8 @@ class Savi::Compiler::SourceService
     end
 
     @standard_directory_remap.try do |prefix, _|
-      next unless path.starts_with?(@standard_library_internal_path)
-      return path.sub(@standard_library_internal_path, prefix)
+      next unless path.starts_with?(@standard_package_internal_path)
+      return path.sub(@standard_package_internal_path, prefix)
     end
 
     path
@@ -136,6 +136,67 @@ class Savi::Compiler::SourceService
     dir_source_overrides.try(&.each { |name, content| yield ({name, content}) })
   end
 
+  # Yield the name and content of each Savi manifest file in this dirname.
+  private def each_manifest_savi_file_in(dirname)
+    dir_source_overrides = @source_overrides[dirname]?
+    internal_dirname = to_internal_path(dirname)
+
+    # Yield the real files and their content.
+    Dir.entries(internal_dirname).each { |name|
+      next unless name == "manifest.savi" || name.ends_with?(".manifest.savi")
+
+      # If this is a filename that has overridden content, omit it for now.
+      # We will yield it later when yielding all the other overrides.
+      next if dir_source_overrides.try(&.has_key?(name))
+
+      # Try to read the content from the file, or skip it if we fail for any
+      # reason, such as filesystem issues or deletion race conditions.
+      content = File.read(File.join(internal_dirname, name)) rescue nil
+      next unless content
+
+      yield ({name, content})
+    } if Dir.exists?(internal_dirname)
+
+    # Now yield the fake files implied by the source overrides for this dirname.
+    dir_source_overrides.try(&.each { |name, content|
+      next unless name == "manifest.savi" || name.ends_with?(".manifest.savi")
+
+      yield ({name, content})
+    })
+  end
+
+  # Yield the name and content of each Savi file in this glob pattern.
+  private def each_savi_file_in_glob(glob)
+    internal_glob = to_internal_path(glob)
+
+    # Yield the glob-matched files and their content.
+    Dir.glob(internal_glob).each { |name|
+      next unless name.ends_with?(".savi")
+
+      # If this is a filename that has overridden content, omit it for now.
+      # We will yield it later when yielding all the other overrides.
+      if (dir_overrides = @source_overrides[File.dirname(name)]?) \
+      && (override = dir_overrides[File.basename(name)]?)
+        yield ({name, override})
+      else
+        # Try to read the content from the file, or skip it if we fail for any
+        # reason, such as filesystem issues or deletion race conditions.
+        content = File.read(name) rescue nil
+        yield ({name, content}) if content
+      end
+    }
+
+    # Now yield any source overrides that match the given glob.
+    @source_overrides.each { |dirname, dir_source_overrides|
+      dir_source_overrides.each { |name, content|
+        full_path = File.join(dirname, name)
+        next unless File.match?(glob, full_path)
+
+        yield ({full_path, content})
+      }
+    }
+  end
+
   # Yield the dirname, name, content of each Savi file in each subdirectory.
   private def each_savi_file_in_recursive(root_dirname)
     internal_root_dirname = to_internal_path(root_dirname)
@@ -168,34 +229,17 @@ class Savi::Compiler::SourceService
     }
   end
 
-  # Given a library name, optionally anchored to a given "from source",
-  # try to resolve a directory that matches the library name.
-  #
-  # First a relative location will be attempted starting from the "from source".
-  # Then a standard library location will be attempted.
-  # If both attempts fail, there is no hope of resolving the library.
-  def resolve_library_dirname(libname : String, from_source : Source)
-    standard_dirname = File.expand_path(libname, standard_library_path)
-    relative_dirname = File.expand_path(libname, from_source.dirname)
-
-    if relative_dirname && dir_exists?(relative_dirname)
-      relative_dirname
-    elsif dir_exists?(standard_dirname)
-      standard_dirname
-    end
-  end
-
   # Given a directory name, load source objects for all the source files in it.
-  def get_library_sources(dirname, library : Source::Library? = nil)
-    library ||= Source::Library.new(dirname)
+  def get_directory_sources(dirname, package : Source::Package? = nil)
+    package ||= Source::Package.new(dirname)
 
     sources = [] of Source
     each_savi_file_in(dirname) { |name, content|
-      sources << Source.new(dirname, name, content, library)
+      sources << Source.new(dirname, name, content, package)
     }
 
-    Error.at Source::Pos.show_library_path(library),
-      "No '.savi' source files found in this directory" \
+    Error.at Source::Pos.none,
+      "No '.savi' source files found in this directory:\n#{dirname}" \
         if sources.empty?
 
     # Sort the sources by case-insensitive name, so that they always get loaded
@@ -206,19 +250,84 @@ class Savi::Compiler::SourceService
     sources
   end
 
-  # Given a directory name, load source objects for all the source files in
-  # each subdirectory of that root directory, grouped by source library.
-  def get_recursive_sources(root_dirname, language = :savi)
-    sources = {} of Source::Library => Array(Source)
-    each_savi_file_in_recursive(root_dirname) { |dirname, name, content|
-      library = Source::Library.new(dirname)
+  # Given a directory name, load source objects for all the source files in it.
+  def get_manifest_sources_at_or_above(dirname)
+    try_dirname = dirname
+    sources = [] of Source
+    while sources.empty?
+      package = Source::Package.new(try_dirname)
 
-      (sources[library] ||= [] of Source) \
-        << Source.new(dirname, name, content, library)
+      each_manifest_savi_file_in(try_dirname) { |name, content|
+        sources << Source.new(try_dirname, name, content, package)
+      }
+
+      try_dirname = File.expand_path("..", dirname)
+      break unless try_dirname.starts_with?(Dir.current)
+    end
+
+    Error.at Source::Pos.none,
+      "No 'manifest.savi' source files found at or above this directory:\n#{dirname}" \
+        if sources.empty?
+
+    # Sort the sources by case-insensitive name, so that they always get loaded
+    # in a repeatable order regardless of platform implementation details, or
+    # the possible presence of source overrides shadowing some of the files.
+    sources.sort_by!(&.filename.downcase)
+
+    sources
+  end
+
+  # Given a manifest, load source objects for all the source files in its paths.
+  def get_sources_for_manifest(ctx, manifest : Packaging::Manifest)
+    package = Source::Package.for_manifest(manifest)
+
+    manifest.sources_paths.flat_map { |sources_path, exclusions|
+      sources = [] of Source
+      absolute_glob = File.join(package.path, sources_path.value)
+      exclusion_paths = exclusions.map { |e| File.join(package.path, e.value) }
+
+      prior_source_size = sources.size
+      each_savi_file_in_glob(absolute_glob) { |name, content|
+        # Skip this source file if it is excluded.
+        next if exclusion_paths.any? { |e| File.match?(e, name) }
+
+        # Otherwise add it to the list.
+        dirname = File.dirname(name)
+        basename = File.basename(name)
+        sources << Source.new(dirname, basename, content, package)
+      }
+
+      ctx.error_at sources_path,
+        "No '.savi' source files found in #{absolute_glob.inspect}" \
+          if sources.empty?
+
+      # Sort the sources by case-insensitive name, so that they always get loaded
+      # in a repeatable order regardless of platform implementation details, or
+      # the possible presence of source overrides shadowing some of the files.
+      #
+      # Note that we sort each group (from each glob) separately,
+      # and concatenate them in order of the globs declaration order, so that
+      # the declaration order can be meaningful if desired.
+      sources.sort_by!(&.filename.downcase)
+
+      sources
+    }
+  end
+
+  # Given a directory name, load source objects for all the source files in
+  # each subdirectory of that root directory, grouped by source package.
+  def get_recursive_sources(root_dirname, language = :savi)
+    sources = {} of Source::Package => Array(Source)
+    each_savi_file_in_recursive(root_dirname) { |dirname, name, content|
+      package = Source::Package.new(dirname)
+
+      (sources[package] ||= [] of Source) \
+        << Source.new(dirname, name, content, package)
     }
 
-    Error.at Source::Pos.show_library_path(Source::Library.new(root_dirname)),
-      "No '.savi' source files found recursively within this root" \
+    Error.at Source::Pos.none,
+      "No '.savi' source files found recursively within this directory: " \
+      "#{root_dirname}" \
         if sources.empty?
 
     # Sort the sources by case-insensitive name, so that they always get loaded

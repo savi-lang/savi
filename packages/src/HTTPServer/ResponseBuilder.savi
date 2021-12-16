@@ -1,0 +1,85 @@
+:class HTTPServer.ResponseBuilder
+  :let _res ByteStream.Writable
+  :var _has_body: False
+
+  :new (target ByteStream.Writable)
+    @_res = target
+    @_res << b"HTTP/1.1 " // TODO: I don't like inserting the version here, but carry on...
+
+  // HTTP/1.1 response status list from RFC2616
+  // https://datatracker.ietf.org/doc/html/rfc2616#section-6.1.1
+  //
+  // 1xx Informational
+  :fun ref status_continue:            @_res << b"100 Continue\r\n", @
+  :fun ref status_switching_protocols: @_res << b"101 Switching Protocols\r\n", @
+
+  // 2xx Success
+  :fun ref status_ok:              @_res << b"200 OK\r\n", @
+  :fun ref status_created:         @_res << b"201 Created\r\n", @
+  :fun ref status_accepted:        @_res << b"202 Accepted\r\n", @
+  :fun ref status_non_authoritative_information: @_res << b"203 Non-Authoritative Information\r\n", @
+  :fun ref status_no_content:      @_res << b"204 No Content\r\n", @
+  :fun ref status_reset_content:   @_res << b"205 Reset Content\r\n", @
+  :fun ref status_partial_content: @_res << b"206 Partial Content\r\n", @
+
+  // 3xx Redirection
+  :fun ref status_multiple_choices:   @_res << b"300 Multiple Choices\r\n", @
+  :fun ref status_moved_permanently:  @_res << b"301 Moved Permanently\r\n", @
+  :fun ref status_found:              @_res << b"302 Found\r\n", @
+  :fun ref status_see_other:          @_res << b"303 See Other\r\n", @
+  :fun ref status_not_modified:       @_res << b"304 Not Modified\r\n", @
+  :fun ref status_use_proxy:          @_res << b"305 Use Proxy\r\n", @
+  :fun ref status_temporary_redirect: @_res << b"307 Temporary Redirect\r\n", @
+
+  // 4xx Client Error
+  :fun ref status_bad_request:            @_res << b"400 Bad Request\r\n", @
+  :fun ref status_unauthorized:           @_res << b"401 Unauthorized\r\n", @
+  :fun ref status_payment_required:       @_res << b"402 Payment Required\r\n", @
+  :fun ref status_forbidden:              @_res << b"403 Forbidden\r\n", @
+  :fun ref status_not_found:              @_res << b"404 Not Found\r\n", @
+  :fun ref status_method_not_allowed:     @_res << b"405 Method Not Allowed\r\n", @
+  :fun ref status_not_acceptable:         @_res << b"406 Not Acceptable\r\n", @
+  :fun ref status_proxy_authentication_required: @_res << b"407 Proxy Authentication Required\r\n", @
+  :fun ref status_request_timeout:        @_res << b"408 Request Time-out\r\n", @
+  :fun ref status_conflict:               @_res << b"409 Conflict\r\n", @
+  :fun ref status_gone:                   @_res << b"410 Gone\r\n", @
+  :fun ref status_length_required:        @_res << b"411 Length Required\r\n", @
+  :fun ref status_precondition_failed:    @_res << b"412 Precondition Failed\r\n", @
+  :fun ref status_entity_too_large:       @_res << b"413 Request Entity Too Large\r\n", @
+  :fun ref status_uri_too_large:          @_res << b"414 Request-URI Too Large\r\n", @
+  :fun ref status_unsupported_media_type: @_res << b"415 Unsupported Media Type\r\n", @
+  :fun ref status_range_not_satisfiable:  @_res << b"416 Requested range not satisfiable\r\n", @
+  :fun ref status_expectation_failed:     @_res << b"417 Expectation Failed\r\n", @
+
+  // 5xx Server Error
+  :fun ref status_internal_server_error: @_res << b"500 Internal Server Error\r\n", @
+  :fun ref status_not_implemented:       @_res << b"501 Not Implemented\r\n", @
+  :fun ref status_bad_gateway:           @_res << b"502 Bad Gateway\r\n", @
+  :fun ref status_service_unavailable:   @_res << b"503 Service Unavailable\r\n", @
+  :fun ref status_gateway_timeout:       @_res << b"504 Gateway Time-out\r\n", @
+  :fun ref status_version_not_supported: @_res << b"505 HTTP Version not supported\r\n", @
+
+  :fun ref header(name String'val, value String'val)
+    @_res << name.as_bytes << b": " << value.as_bytes << b"\r\n", @
+
+  :fun ref write(body String'val)
+    if (body.size > 0) (
+      // Assumes headers section is already complete so it will start with an empty line.
+      @_res << b"\r\n"
+
+      // If we actually write a body section `finish` will behave differently.
+      @_has_body = True
+
+      @_res << body.as_bytes
+    )
+
+    @
+
+  :: Wraps up the response with an empty line when it corresponds.
+  :fun ref finish
+    // Only responses with no body must end with a new line.
+    //
+    // TODO: re-write this as !@has_body after we support it.
+    if !@_has_body (@_res << b"\r\n")
+
+    @_res

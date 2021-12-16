@@ -1,0 +1,2 @@
+:manifest lib OSError
+  :sources "src/OSError/**/*.savi"

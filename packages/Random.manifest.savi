@@ -1,0 +1,11 @@
+:manifest lib Random
+  :sources "src/Random/**/*.savi"
+
+:manifest bin "spec-Random"
+  :copies Random
+  :sources "spec/Random/**/*.savi"
+
+  :dependency Spec "TODO: specify version"
+  :transitive dependency Map "TODO: specify version"
+
+  :dependency DeterministicRandom "TODO: specify version"

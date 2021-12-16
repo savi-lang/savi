@@ -27,10 +27,10 @@ class Savi::Compiler::Sugar < Savi::AST::CopyOnMutateVisitor
     end
   end
 
-  def self.run(ctx, library)
-    library.types_map_cow do |t|
+  def self.run(ctx, package)
+    package.types_map_cow do |t|
       t.functions_map_cow do |f|
-        cached_or_run library, t, f do
+        cached_or_run package, t, f do
           sugar = new
           f = sugar.run(ctx, f)
         end

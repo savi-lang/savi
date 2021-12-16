@@ -1,0 +1,238 @@
+:class _KVBA(K, V)
+  :var key K
+  :var value V
+  :new (@key, @value)
+
+  // TODO: some kind of declare sugar for this common pattern
+  :var _before (_KVBA(K, V) | None): None
+  :var _after (_KVBA(K, V) | None): None
+  :fun ref "before="(entry): @_before = entry
+  :fun ref "after="(entry): @_after = entry
+  :fun before!: @_before.not!(None)
+  :fun after!: @_after.not!(None)
+
+:: Map.Ordered is an alternative to the Map class that incurs more overhead cost
+:: but preserves the order of key/value pair insertion when iterating.
+::
+:: The basic implementation of the hash map is the same, but each entry in the
+:: hash map is also part of a doubly-linked circular list, with the "head" of
+:: the circular list being the most recently inserted entry in the hash map.
+:class Map.Ordered(K, V, H _HashFunction(K) = _HashEq(K))
+  :is Map.Readable(K, V)
+
+  :var _size USize: 0
+  :var _array Array((_KVBA(K, V) | _MapEmpty | _MapDeleted))
+  :var _head (_KVBA(K, V) | None): None
+
+  :fun size: @_size
+
+  :new (prealloc USize = 6)
+    @_init_array(((prealloc * 4) / 3).max(8).next_pow2)
+
+  :fun ref _init_array(space USize)
+    @_array = Array((_KVBA(K, V) | _MapEmpty | _MapDeleted)).new(space)
+    Count.to(space) -> (@_array << _MapEmpty)
+
+  :fun ref _resize(space USize)
+    space = space.max(@_size) // only grow the array - never shrink it
+    old_array = @_array
+
+    // TODO: would we get any perf benefit from resizing the array instead?
+    @_init_array(space)
+
+    old_array.each -> (entry |
+      if (entry <: @->(_KVBA(K, V))) (
+        try (@_array[@_search(entry.key)]! = entry)
+      )
+    )
+    @
+
+  :: Remove all keys and values from the map.
+  :fun ref clear
+    @_size = 0
+    @_head = None
+    @_init_array(8) // the default prealloc of 6 corresponds to an array of 8
+    @
+
+  :fun ref _remove_entry_from_place(entry _KVBA(K, V))
+    try ( // this should never fail - _KVBA instances are always initialized
+      // Join the entries before and after together to eachother,
+      // effectively removing this entry from that point in the circle.
+      entry.before!.after = entry.after!
+      entry.after!.before = entry.before!
+    )
+
+  :fun ref _place_entry_as_head(entry _KVBA(K, V))
+    head = @_head
+    if (head <: _KVBA(K, V)) (
+      try ( // this should never fail - _KVBA instances are always initialized
+        // Link this entry to come before the one after the current head.
+        head.after!.before = entry, entry.after = head.after!
+
+        // Link this entry to come after the current head.
+        head.after = entry, entry.before = head
+      )
+
+      // This entry now is known to be the new head.
+      @_head = entry
+    |
+      // There is no current head, so we can simply assign this one as it.
+      // We also need to make it point to itself as a self-contained circle.
+      entry.before = entry
+      entry.after = entry
+      @_head = entry
+    )
+
+  :: Return True if the given key is present.
+  :fun has_key(key K)
+    try (@[--key]!, True | False)
+
+  :: Return the value assigned to the given key, if present.
+  :: Raises an error if the key is not present.
+  ::
+  :: $ map = Map.Ordered(String, U64).new
+  :: $ map["example"]!
+  :: > error! // this key hasn't been assigned a value yet
+  :: $ map["example"] = 99, map["example"]!
+  :: > 99
+  :: $ map.delete("example"), map["example"]!
+  :: > error! // this key no longer has an assigned value
+  ::
+  :fun "[]!"(key K)
+    @_array[@_search(key)]!.as!(@->(_KVBA(K, V))).value // TODO: fix @-> parentheses
+
+  :: Assign the given value to the given key in the map.
+  :: The previous value will be overwritten and discarded if present.
+  ::
+  :: $ map = Map.Ordered(String, U64).new
+  :: $ map["example"] = 99, map["example"]!
+  :: > 99
+  :: $ map["example"] = 33, map["example"]!
+  :: > 33
+  ::
+  :fun ref "[]="(key K, value V)
+    value_alias V'aliased = value // TODO: remove the V'aliased explicit type?
+    try (
+      index = @_search(key)
+      entry = @_array[index]!
+
+      case entry <: (
+      | @->(_KVBA(K, V)) |
+        entry.value = --value
+
+        // If this entry is not already the head, we will make it the new head.
+        if (entry !== @_head) (
+          @_remove_entry_from_place(entry)
+          @_place_entry_as_head(entry)
+        )
+      |
+        new_entry = _KVBA(K, V).new(--key, --value)
+        @_place_entry_as_head(new_entry)
+
+        @_array[index]! = new_entry
+        @_size += 1
+
+        if (entry <: _MapEmpty) (
+          if (@_size * 4 > @_array.size * 3) (
+            @_resize(@_array.size * 2)
+          )
+        )
+      )
+    )
+    value_alias
+
+  :: Discard the value assigned to the given key.
+  ::
+  :: $ map = Map.Ordered(String, U64).new
+  :: $ map["example"] = 99, map["example"]!
+  :: > 99
+  :: $ map.delete("example"), map["example"]!
+  :: > error! // this key no longer has an assigned value
+  :: $ map.delete("example") // deleting it again has no effect
+  ::
+  :fun ref delete(key K)
+    try (
+      index = @_search(key)
+      entry = @_array[index]! <<= _MapDeleted
+
+      @_size -= 1
+      @_head = if (@_size == 0) (None | @_head.as!(@->(_KVBA(K, V))).before!) // TODO: fix @-> parentheses
+      @_remove_entry_from_place(
+        entry.as!(@->(_KVBA(K, V))) // TODO: fix @-> parentheses
+      )
+    )
+    None
+
+  :: Given a key, find the internal index associated with the hash of that key.
+  :fun _search(key)
+    hash = H.hash(key).usize()
+
+    idx_del = @_array.size
+    mask = idx_del - 1
+    idx = hash.bit_and(mask)
+
+    result_idx = idx_del
+    found = False
+
+    try (
+      @_array.each_with_index -> (entry, i |
+        entry = @_array[idx]!
+
+        case entry <: (
+        | @->(_KVBA(K, V)) |
+          if H.equal(key, entry.key) (
+            result_idx = idx
+            found = True
+            error! // TODO: use early return instead of error!
+          )
+        | _MapEmpty |
+          if (idx_del > mask) (
+            result_idx = idx
+          |
+            result_idx = idx_del
+          )
+          found = False
+          error!
+        | _MapDeleted |
+          if (idx_del > mask) (
+            idx_del = idx
+          )
+        )
+
+        idx = (hash + ((i + (i * i)) / 2)).bit_and(mask)
+      )
+    )
+
+    result_idx // TODO: also return `found`
+
+  :: Yield each key and value in the map, in the order in they were inserted,
+  :: with the oldest key/value pairs appearing first, ending with the newest.
+  :fun each
+    try ( // this should only fail when the map is empty, thus yielding nothing
+      head = @_head.not!(None)
+      entry = head.after!
+      while (entry !== head) (
+        yield (entry.key, entry.value)
+        entry = entry.after!
+      )
+      yield (entry.key, entry.value) // yield once more for the head
+    )
+    None
+
+  :: Yield each key and value in the map, in the order in they were inserted,
+  :: with the oldest key/value pairs appearing first, ending with the newest.
+  :fun each_until
+    :yields for Bool
+    early_stop = False
+    try ( // this should only fail when the map is empty, thus yielding nothing
+      head = @_head.not!(None)
+      entry = head.after!
+      while (entry !== head && !early_stop) (
+        early_stop = yield (entry.key, entry.value)
+        entry = entry.after!
+      )
+      if !early_stop (
+        early_stop = yield (entry.key, entry.value) // yield once more for the head
+      )
+    )
+    early_stop

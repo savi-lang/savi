@@ -1,0 +1,351 @@
+:class JSON.Parser
+  :var _offset USize: 0
+  :var _offset_start USize: 0
+
+  :var source String'box: ""
+  :var last_number (I64 | F64): I64[0]
+  :var last_string String: ""
+
+  :fun ref _set_defaults
+    @_offset       = 0
+    @_offset_start = 0
+    @last_number   = I64[0]
+    @last_string   = ""
+
+  :fun ref parse!(@source)
+    :yields JSON.Token for None
+    @_set_defaults
+    if @_detect_empty.not (
+      @_parse_data! -> (token | yield token)
+      @_verify_final!
+    )
+
+  :fun token_start: @_offset_start
+  :fun token_end: @_offset
+
+  // :fun describe_error String
+  //   if (@_offset < @source.size) (
+  //     "invalid JSON at byte offset: "          + @_offset.string
+  //   |
+  //     "unfinished JSON; stream ends at byte: " + @source.size.string
+  //   )
+
+  :fun ref _has_next Bool: @_offset < @source.size
+
+  :fun ref _next! U8: b = @_peek!, @_advance, b
+
+  :fun _peek! U8: @source.byte_at!(@_offset)
+
+  :fun _peek_softly U8: try (@source.byte_at!(@_offset) | ' ')
+
+  :fun ref _eat!(b U8): if (b != @source.byte_at!(@_offset)) error!, @_advance
+
+  :fun ref _advance(n USize = 1): @_offset += n
+
+  :fun ref _rewind(n USize = 1): @_offset -= n
+
+  :fun ref _pre_token: @_offset_start = @_offset
+
+  :fun ref _skip_whitespace
+    keep_going = True
+    while (keep_going && @_has_next) (
+      case @_peek_softly == (
+      | ' '  | @_advance
+      | '\r' | @_advance
+      | '\t' | @_advance
+      | '\n' | @_advance
+      | keep_going = False
+      )
+    )
+
+  :fun ref _detect_empty Bool
+    @_skip_whitespace
+    @_has_next.not
+
+  :fun ref _verify_final!
+    @_skip_whitespace
+    if @_has_next error!
+
+  :fun ref _parse_data!
+    :yields JSON.Token for None
+    @_skip_whitespace
+    @_pre_token
+    peeked = @_peek!
+    case (
+    | peeked == 'n' | @_advance, @_eat!('u'), @_eat!('l'), @_eat!('l'),              yield JSON.TokenNull
+    | peeked == 't' | @_advance, @_eat!('r'), @_eat!('u'), @_eat!('e'),              yield JSON.TokenTrue
+    | peeked == 'f' | @_advance, @_eat!('a'), @_eat!('l'), @_eat!('s'), @_eat!('e'), yield JSON.TokenFalse
+    | peeked == '"' | @_parse_string! -> (token | yield token)
+    | peeked == '{' | @_parse_object! -> (token | yield token)
+    | peeked == '[' | @_parse_array! -> (token | yield token)
+    | peeked == '-' | @_parse_number! -> (token | yield token)
+    | (peeked >= '0') && (peeked <= '9') | @_parse_number! -> (token | yield token)
+    | error!
+    )
+    None
+
+  :fun ref skip_value None
+    try @_parse_data! -> (token | None)
+
+  :fun ref _read_bool! Bool // exposed in the Reader class
+    @_skip_whitespace
+    @_pre_token
+    case @_peek! == (
+    | 't' | @_advance, @_eat!('r'), @_eat!('u'), @_eat!('e'),              True
+    | 'f' | @_advance, @_eat!('a'), @_eat!('l'), @_eat!('s'), @_eat!('e'), False
+    | error!
+    )
+
+  :fun ref _parse_array!
+    :yields JSON.Token for None
+    @_advance // past the opening bracket
+    yield JSON.TokenArrayStart
+    @_skip_whitespace
+
+    if (@_peek! == ']') (
+      @_pre_token
+      @_advance
+    |
+      keep_going = True
+      while keep_going (
+        @_parse_data! -> (token | yield token)
+        @_skip_whitespace
+        @_pre_token // prepare for possible array end token
+        case @_next! == (
+        | ',' | @_skip_whitespace
+        | ']' | keep_going = False
+        | @_rewind, error!
+        )
+      )
+    )
+    yield JSON.TokenArrayEnd
+
+  :fun ref _read_each_in_array! // exposed in the Reader class
+    :yields USize for None
+    @_skip_whitespace
+    @_eat!('[')
+    @_skip_whitespace
+    index = 0
+
+    if (@_peek! == ']') (
+      @_pre_token
+      @_advance
+    |
+      keep_going = True
+      while keep_going (
+        yield index
+        index += 1
+        // Expect that the caller has handled reading the value at this index,
+        // leaving us ready to parse the comma or end of object next.
+
+        @_skip_whitespace
+        @_pre_token // prepare for possible array end token
+        case @_next! == (
+        | ',' | @_skip_whitespace
+        | ']' | keep_going = False
+        | @_rewind, error!
+        )
+      )
+    )
+    None
+
+  :fun ref _parse_object!
+    :yields JSON.Token for None
+    @_advance // past the opening bracket
+    yield JSON.TokenObjectStart
+    @_skip_whitespace
+    if (@_peek! == '}') (
+      @_pre_token
+      @_advance
+    |
+      keep_going = True
+      while keep_going (
+        @_eat!('"'), @_rewind
+        @_parse_string!(True) -> (token | yield token)
+
+        @_skip_whitespace
+        @_eat!(':')
+        @_parse_data! -> (token | yield token)
+        @_skip_whitespace
+        @_pre_token, yield JSON.TokenPairPost
+        case @_next! == (
+        | ',' | @_skip_whitespace
+        | '}' | keep_going = False
+        | @_rewind, error!
+        )
+      )
+    )
+
+    yield JSON.TokenObjectEnd
+
+  :fun ref _read_each_in_object! // exposed in the Reader class
+    :yields String for None
+    @_skip_whitespace
+    @_eat!('{')
+    @_skip_whitespace
+
+    if (@_peek! == '}') (
+      @_pre_token
+      @_advance
+    |
+      keep_going = True
+      while keep_going (
+        @_eat!('"'), @_rewind
+        @_parse_string!(True) -> (token | None)
+        @_skip_whitespace
+        @_eat!(':')
+
+        yield @last_string
+        // Expect that the caller has handled reading the value for this key,
+        // leaving us ready to parse the comma or end of object next.
+
+        @_skip_whitespace
+        case @_next! == (
+        | ',' | @_skip_whitespace
+        | '}' | keep_going = False
+        | @_rewind, error!
+        )
+      )
+    )
+
+  :fun ref _parse_number!
+    :yields JSON.Token for None
+    yield JSON.TokenNumberPre
+    @last_number = @_read_number!
+    yield JSON.TokenNumber
+
+  :fun ref _read_number! (I64 | F64)
+    sign I64 = if (@_peek_softly == '-') (@_advance, -1 | 1)
+
+    integer = @_read_number_digits!
+
+    dot F64 = 0
+    has_dot = (@_peek_softly == '.')
+    if has_dot (
+      @_advance
+      dot = @_read_number_digits_as_fractional!
+    )
+
+    exp I64 = 0
+    peeked = @_peek_softly
+    has_exp = (peeked == 'e' || peeked == 'E')
+    if has_exp (
+      @_advance
+      exp_negative =
+        case @_peek! == (
+        | '+' | @_advance, False
+        | '-' | @_advance, True
+        | False
+        )
+      exp = @_read_number_digits!
+      if exp_negative (exp = exp.negate)
+    )
+
+    if (has_dot || has_exp) (
+      sign.f64 * (integer.f64 + dot) * F64[10].pow(exp.f64)
+    |
+      sign * integer
+    )
+
+  :fun ref _read_number_digits_as_fractional! F64
+    orig_offset = @_offset
+    integer = @_read_number_digits!
+    integer.f64 / F64[10].pow((@_offset - orig_offset).f64)
+
+  :fun ref _read_number_digits! I64
+    value I64 = 0
+    byte = @_peek!
+    while @_is_number_digit(byte) (
+      value = (value * 10) + (byte - '0').i64
+      @_advance
+      byte = @_peek_softly
+    )
+    value
+
+  :fun non _is_number_digit(b U8) Bool: (b >= '0') && (b <= '9')
+
+  :fun ref _parse_string!(is_key Bool = False)
+    :yields JSON.Token for None
+    @_advance // past the opening quote
+    @_pre_token
+    yield (if is_key (JSON.TokenKeyPre | JSON.TokenStringPre))
+
+    buf = String.new // TODO: don't allocate here - let the caller construct the string from escape tokens if/when they choose
+    keep_going = True
+    while keep_going (
+      byte = @_next!
+      case byte == (
+      | '"'  | keep_going = False
+      | '\\' | buf = @_push_escape_seq!(buf)
+      | buf.push_byte(byte)
+      )
+    )
+    @last_string = buf.clone // TODO: skip clone here by skipping allocating in the first place - see above TODO comment
+
+    @_rewind
+    yield (if is_key (JSON.TokenKey | JSON.TokenString))
+    @_advance
+
+  :fun ref _read_string! String // exposed in the Reader class
+    @_skip_whitespace
+    @_eat!('"'), @_rewind
+    @_parse_string! -> (token | None)
+    @last_string
+
+  :fun ref _push_escape_seq!(buf String'ref) String'ref
+    case @_next! == (
+    | '"'  | buf.push_byte('"')
+    | '\\' | buf.push_byte('\\')
+    | '/'  | buf.push_byte('/')
+    | 'b'  | buf.push_byte(0x08)
+    | 't'  | buf.push_byte(0x09)
+    | 'n'  | buf.push_byte(0x0a)
+    | 'f'  | buf.push_byte(0x0c)
+    | 'r'  | buf.push_byte(0x0d)
+    | 'u'  | buf.push_utf8(@_read_unicode_seq!)
+    | error!
+    )
+    --buf
+
+  :fun ref _read_unicode_seq! U32
+    // We've already read the initial "\u" bytes, so start reading the digits.
+    value = @_read_unicode_value!
+
+    if ((value < 0xD800) || (value >= 0xE000)) (
+      // If the value we read is a valid single UTF-16 value, return it now.
+      value
+    |
+      // Otherwise, it is half of a surrogate pair, so we expect another half,
+      // in another unicode escape sequence immediately following this one.
+      @_eat!('\\'), @_eat!('u')
+      value_2 = @_read_unicode_value!
+
+      if ((value < 0xDC00) && (value_2 >= 0xDC00) && (value_2 < 0xE000)) (
+        // If the two values make a valid pair, return the combined value.
+        U32[0x10000]
+        + value.bit_and(0x3FF).bit_shl(10)
+        + value_2.bit_and(0x3FF)
+      |
+        // The two are an invalid pair. Backtrack to show the error position.
+        @_rewind(4)
+        error!
+      )
+    )
+
+  :fun ref _read_unicode_value! U32
+    value U32 = 0
+
+    Count.to(4) -> (
+      b = @_next!
+      digit =
+        case (
+        | (b >= '0') && (b <= '9') | b - '0'
+        | (b >= 'a') && (b <= 'f') | (b - 'a') + 10
+        | (b >= 'A') && (b <= 'F') | (b - 'A') + 10
+        | @_rewind, error!
+        )
+
+      value = (value * 16) + digit.u32
+    )
+
+    value

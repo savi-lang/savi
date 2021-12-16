@@ -21,12 +21,12 @@ module Savi::Compiler::Types::Edge
     end
 
     def run_for_type_alias(ctx : Context, t : Program::TypeAlias)
-      # TODO: Allow running this pass for more than just the root library.
+      # TODO: Allow running this pass for more than just the root package.
       # We restrict this for now while we are building out the pass because
-      # we don't want to deal with all of the complicated forms in the prelude.
+      # we don't want to deal with all of the complicated forms in Savi core.
       # We want to stick to the simple forms in the compiler pass specs for now.
-      root_library = ctx.root_library.source_library
-      return unless t.ident.pos.source.library == root_library
+      root_package = ctx.root_package.source_package
+      return unless t.ident.pos.source.package == root_package
 
       raise NotImplementedError.new("run_for_type_alias")
     end
@@ -39,12 +39,12 @@ module Savi::Compiler::Types::Edge
       # TODO
       return
 
-      # TODO: Allow running this pass for more than just the root library.
+      # TODO: Allow running this pass for more than just the root package.
       # We restrict this for now while we are building out the pass because
-      # we don't want to deal with all of the complicated forms in the prelude.
+      # we don't want to deal with all of the complicated forms in Savi core.
       # We want to stick to the simple forms in the compiler pass specs for now.
-      root_library = ctx.root_library.source_library
-      return unless f.ident.pos.source.library == root_library
+      root_package = ctx.root_package.source_package
+      return unless f.ident.pos.source.package == root_package
 
       # TODO: Sometimes we have a more specific receiver than the owning type.
       var_bindings = {} of TypeVariable => TypeSimple

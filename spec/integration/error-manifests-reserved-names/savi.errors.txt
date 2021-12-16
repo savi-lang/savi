@@ -1,0 +1,16 @@
+
+Compilation Errors:
+
+---
+
+This name is reserved for core Savi packages:
+from ./manifest.savi:1:
+:manifest lib Savi // NOT OKAY
+              ^~~~
+
+---
+
+This name is reserved for core Savi packages:
+from ./manifest.savi:4:
+:manifest lib Savi.Thing // NOT OKAY
+              ^~~~~~~~~~

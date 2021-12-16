@@ -73,32 +73,32 @@ struct Savi::Compiler::Infer::MetaType::Nominal
         Span.simple(MetaType.new_nominal(defn))
       else
         hints = [{defn_defn.ident.pos,
-          "#{defn_defn.ident.value} has no '#{name}' function"}]
+          "#{defn_defn.ident.value} has no '#{name}' member"}]
 
         found_similar = false
         if name.ends_with?("!")
           defn_defn.find_func?(name[0...-1]).try do |similar|
             found_similar = true
             hints << {similar.ident.pos,
-              "maybe you meant to call '#{similar.ident.value}' (without '!')"}
+              "maybe you meant to use '#{similar.ident.value}' (without '!')"}
           end
         else
           defn_defn.find_func?("#{name}!").try do |similar|
             found_similar = true
             hints << {similar.ident.pos,
-              "maybe you meant to call '#{similar.ident.value}' (with a '!')"}
+              "maybe you meant to use '#{similar.ident.value}' (with a '!')"}
           end
         end
 
         unless found_similar
           similar = defn_defn.find_similar_function(name)
           hints << {similar.ident.pos,
-            "maybe you meant to call the '#{similar.ident.value}' function"} \
+            "maybe you meant to use the '#{similar.ident.value}' member"} \
               if similar
         end
 
         Span.error(pos,
-          "The '#{name}' function can't be called on this receiver", hints
+          "The '#{name}' member can't be reached on this receiver", hints
         )
       end
     when TypeParam

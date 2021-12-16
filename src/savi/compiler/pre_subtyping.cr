@@ -89,7 +89,7 @@ module Savi::Compiler::PreSubtyping
 
     # Get each type in the program, its link, and its inventory.
     def get_all_types(ctx)
-      ctx.program.libraries.flat_map do |l|
+      ctx.program.packages.flat_map do |l|
         l_link = l.make_link
         l.types.map do |t|
           t_link = t.make_link(l_link)

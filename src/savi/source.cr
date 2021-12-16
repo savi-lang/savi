@@ -4,10 +4,10 @@ struct Savi::Source
   property dirname : String
   property filename : String
   property content : String
-  property library : Library
+  property package : Package
   property language : Symbol
 
-  def initialize(@dirname, @filename, @content, @library, @language = :savi)
+  def initialize(@dirname, @filename, @content, @package, @language = :savi)
   end
 
   def path
@@ -18,22 +18,28 @@ struct Savi::Source
     Source::Pos.index_range(self, 0, content.bytesize)
   end
 
-  NONE = new("", "(none)", "", Library::NONE)
+  NONE = new("", "(none)", "", Package::NONE)
   def self.none; NONE end
 
   def self.new_example(content)
-    new("", "(example)", content, Library.new(""))
+    new("", "(example)", content, Package.new("", "(example)"))
   end
 end
 
-struct Savi::Source::Library
+struct Savi::Source::Package
   property path : String
+  property name : String?
 
-  def initialize(@path)
+  def initialize(@path, @name = nil)
   end
 
   NONE = new("")
   def self.none; NONE end
+
+  def self.for_manifest(manifest : Packaging::Manifest)
+    package_path = manifest.name.pos.source.dirname
+    Source::Package.new(package_path, manifest.name.value)
+  end
 end
 
 struct Savi::Source::Pos
@@ -97,11 +103,6 @@ struct Savi::Source::Pos
       new_line_start, new_line_finish,
       new_row, new_col
     )
-  end
-
-  def self.show_library_path(library : Library)
-    source = Source.new(library.path, "", library.path, library, :path)
-    new(source, 0, library.path.bytesize, 0, library.path.bytesize, 0, 0)
   end
 
   def initialize(
@@ -254,6 +255,11 @@ struct Savi::Source::Pos
     )
   end
 
+  def next_line_start_as_pos
+    index = source.content.byte_index('\n', finish) || source.content.bytesize
+    Pos.point(source, index)
+  end
+
   def get_indent
     match = /\G[ \t]+/.match_at_byte_index(source.content, line_start)
     new_finish = match ? match.byte_end(0) : line_start
@@ -314,8 +320,13 @@ struct Savi::Source::Pos
       tail = "···"
     end
 
+    relative_path = File.make_relative_path(
+      from_path: Dir.current,
+      to_path: source.path,
+    )
+
     [
-      "from #{source.path}:#{row + 1}:",
+      "from #{relative_path}:#{row + 1}:",
       source.content.byte_slice(line_start, line_finish - line_start),
       (" " * col) + "^" + ("~" * twiddle_width) + tail,
     ].join("\n")
@@ -347,5 +358,50 @@ struct Savi::Source::Pos
 
   def to_lsp_location
     LSP::Data::Location.new(URI.new(path: source.path), to_lsp_range)
+  end
+
+  # Apply a list of edits to the source content within the current position,
+  # ignoring any edits that fall outside the range of this position.
+  # A new source position is returned, pointing to the same region within
+  # the a new source that holds the edited content.
+  def apply_edits(edits : Array({Source::Pos, String}))
+    within = self
+    source = @source
+    used_edits = [] of {Source::Pos, String}
+    chunks = [] of String
+    size_delta = 0
+    cursor = 0
+
+    # Gather the chunks to reconstruct the edited source.
+    edits.group_by(&.first.start).to_a.sort_by(&.first).each { |start, edits_group|
+      edits_group.uniq.sort_by(&.first.size).each { |edit|
+        edit_pos, replacement = edit
+        next unless within.contains?(edit_pos) && start >= cursor
+        used_edits << edit
+
+        prior_content = source.content.byte_slice(cursor, start - cursor)
+        chunks << prior_content unless prior_content.empty?
+        chunks << replacement unless replacement.empty?
+
+        size_delta += replacement.bytesize - edit_pos.size
+
+        cursor = edit_pos.finish
+      }
+    }
+    chunks << source.content.byte_slice(cursor, source.content.bytesize - cursor)
+
+    # Return a new source position within a new source that has edited content.
+    new_pos = Source::Pos.index_range(
+      Source.new(
+        source.dirname,
+        source.filename,
+        chunks.join, # new content
+        source.package,
+        source.language,
+      ),
+      within.start,
+      within.finish + size_delta,
+    )
+    {new_pos, used_edits}
   end
 end

@@ -1,0 +1,14 @@
+:manifest lib Savi // NOT OKAY
+  :sources "*.savi"
+
+:manifest lib Savi.Thing // NOT OKAY
+  :sources "*.savi"
+
+:manifest lib Saviour // okay - no dot after `Savi`
+  :sources "*.savi"
+
+:manifest lib Thing.Savi // okay - `Savi` is not first
+  :sources "*.savi"
+
+:manifest "savi" // okay - `savi` is lowercase
+  :sources "*.savi"

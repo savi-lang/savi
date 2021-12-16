@@ -12,7 +12,7 @@ describe Savi::Compiler::Populate do
           ^~~~~
     MSG
 
-    Savi.compiler.compile([source], :populate)
+    Savi.compiler.test_compile([source], :populate)
       .errors.map(&.message).join("\n").should eq expected
   end
 end

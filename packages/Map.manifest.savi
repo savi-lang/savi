@@ -1,0 +1,9 @@
+:manifest lib Map
+  :sources "src/Map/**/*.savi"
+
+:manifest bin "spec-Map"
+  :copies Map
+  :sources "spec/Map/**/*.savi"
+
+  :dependency Spec "TODO: specify version"
+  :transitive dependency Map "TODO: specify version"

@@ -8,7 +8,8 @@ class Savi::Error < Exception
   protected setter cause
   getter pos : Source::Pos
   getter headline : String
-  getter info : Array(Info)
+  getter info = [] of {Source::Pos, String}
+  getter fix_edits = [] of {Source::Pos, String}
 
   def initialize(@pos, @headline)
     @info = [] of {Source::Pos, String}
@@ -21,13 +22,21 @@ class Savi::Error < Exception
   end
 
   def message(show_compiler_hole_details = false)
-    strings = ["#{headline}:\n#{pos.show}\n"]
+    strings =
+      if pos == Source::Pos.none
+        ["#{headline}\n"]
+      else
+        ["#{headline}:\n#{pos.show}\n"]
+      end
     info.each do |info_pos, info_msg|
       if info_pos == Source::Pos.none
         strings << "- #{info_msg}"
       else
         strings << "- #{info_msg}:\n  #{info_pos.show}\n"
       end
+    end
+    if fix_edits.any?
+      strings << "- run again with --fix to auto-fix this issue."
     end
     # If a causing exception is present, this indicates a compiler hole.
     cause.try { |cause|
@@ -67,13 +76,18 @@ class Savi::Error < Exception
 
   # Raise an error for the given source position, with the given message,
   # along with extra details taken from the following array of tuples.
-  def self.build(any, msg : String, info); build(any.pos, msg, info) end
-  def self.build(pos : Source::Pos, msg : String, info)
+  def self.build(any, msg : String, info, fix_edits = nil)
+    build(any.pos, msg, info, fix_edits)
+  end
+  def self.build(pos : Source::Pos, msg : String, info, fix_edits = nil)
     new(pos, msg).tap do |err|
       info.each do |info_any, info_msg|
         info_pos = info_any.is_a?(Source::Pos) ? info_any : info_any.pos
         err.info << {info_pos, info_msg}
       end
+      fix_edits.try(&.each { |fix_edit|
+        err.fix_edits << fix_edit
+      })
     end
   end
 

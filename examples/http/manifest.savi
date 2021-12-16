@@ -1,0 +1,8 @@
+:manifest "http-example"
+  :sources "src/*.savi"
+
+  :dependency HTTPServer "TODO: specify version"
+  :dependency TCP "TODO: specify version"
+  :dependency IO "TODO: specify version"
+  :transitive dependency ByteStream "TODO: specify version"
+  :transitive dependency OSError "TODO: specify version"

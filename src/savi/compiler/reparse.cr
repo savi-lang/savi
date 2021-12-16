@@ -2,6 +2,13 @@
 # The purpose of the Reparse pass is to clean up the work of the parser,
 # such as rebalancing ASTs or converting them to more specific forms.
 #
+# For example, this pass converts dot-relations into function calls,
+# a more specific AST form that is useful to handle as a single unit later.
+#
+# This pass also converts each dot-relation for a known nested type name
+# into single identifier that represents the full type name, so that later
+# passes do not need to deal with nested type names as if they were calls.
+#
 # This pass uses copy-on-mutate patterns to "mutate" the Program topology.
 # This pass uses copy-on-mutate patterns to "mutate" the AST.
 # This pass may raise compilation errors.
@@ -11,9 +18,9 @@
 class Savi::Compiler::Reparse < Savi::AST::CopyOnMutateVisitor
   # TODO: Clean up, consolidate, and improve this caching mechanism.
   @@cache = {} of Program::Function::Link => {UInt64, Program::Function}
-  def self.cached_or_run(l, t, f : Program::Function) : Program::Function
+  def self.cached_or_run(l, t, f : Program::Function, deps) : Program::Function
     f_link = f.make_link(t.make_link(l.make_link))
-    input_hash = f.hash
+    input_hash = {f, deps}.hash
     cache_result = @@cache[f_link]?
     cached_hash, cached_func = cache_result if cache_result
     return cached_func if cached_func && cached_hash == input_hash
@@ -26,9 +33,9 @@ class Savi::Compiler::Reparse < Savi::AST::CopyOnMutateVisitor
   end
 
   @@t_cache = {} of Program::Type::Link => {UInt64, Program::Type}
-  def self.t_cached_or_run(l, t : Program::Type) : Program::Type
+  def self.t_cached_or_run(l, t : Program::Type, deps) : Program::Type
     t_link = t.make_link(l.make_link)
-    input_hash = t.hash
+    input_hash = {t, deps}.hash
     t_cache_result = @@t_cache[t_link]?
     t_cached_hash, t_cached_type = t_cache_result if t_cache_result
     return t_cached_type if t_cached_type && t_cached_hash == input_hash
@@ -41,9 +48,9 @@ class Savi::Compiler::Reparse < Savi::AST::CopyOnMutateVisitor
   end
 
   @@ta_cache = {} of Program::TypeAlias::Link => {UInt64, Program::TypeAlias}
-  def self.ta_cached_or_run(l, t : Program::TypeAlias) : Program::TypeAlias
+  def self.ta_cached_or_run(l, t : Program::TypeAlias, deps) : Program::TypeAlias
     t_link = t.make_link(l.make_link)
-    input_hash = t.hash
+    input_hash = {t, deps}.hash
     ta_cache_result = @@ta_cache[t_link]?
     ta_cached_hash, ta_cached_type = ta_cache_result if ta_cache_result
     return ta_cached_type if ta_cached_type && ta_cached_hash == input_hash
@@ -55,26 +62,50 @@ class Savi::Compiler::Reparse < Savi::AST::CopyOnMutateVisitor
     end
   end
 
-  def self.run(ctx, library)
-    visitor = new
+  def self.run(ctx, package)
+    package = package.types_map_cow do |t|
+      t_namespace = ctx.namespace[t.ident.pos.source]
+      t_deps = {t_namespace}
 
-    library = library.types_map_cow do |t|
-      t = t_cached_or_run library, t do
-        t = visitor.run_for_type_params(ctx, t)
+      t = t_cached_or_run package, t, t_deps do
+        t = new(*t_deps).run_for_type_params(ctx, t)
       end
 
       t.functions_map_cow do |f|
-        cached_or_run library, t, f do
-          f = visitor.run(ctx, f)
+        f_namespace = ctx.namespace[f.ident.pos.source]
+        f_deps = {f_namespace}
+
+        cached_or_run package, t, f, f_deps do
+          f = new(*f_deps).run(ctx, f)
         end
       end
     end
 
-    library = library.aliases_map_cow do |t|
-      ta_cached_or_run library, t do
-        t = visitor.run_for_type_params(ctx, t)
+    package = package.aliases_map_cow do |t|
+      t_namespace = ctx.namespace[t.ident.pos.source]
+      t_deps = {t_namespace}
+
+      ta_cached_or_run package, t, t_deps do
+        t = new(*t_deps).run_for_type_alias_target(ctx, t)
+        t = new(*t_deps).run_for_type_params(ctx, t)
       end
     end
+  end
+
+  def initialize(@namespace : Namespace::SourceAnalysis)
+  end
+
+  def run_for_type_alias_target(ctx, t)
+    target = t.target
+    return t unless target
+
+    orig_target = target
+    target = target.accept(ctx, self)
+    return t if target.same?(orig_target)
+
+    t = t.dup
+    t.target = target
+    t
   end
 
   def run_for_type_params(ctx, t)
@@ -169,6 +200,12 @@ class Savi::Compiler::Reparse < Savi::AST::CopyOnMutateVisitor
     when "="
       visit_local_or_param_defn(ctx, node)
     when "."
+      # Sometimes a dot relation can be converted into a nested type identifier.
+      nested_ident = maybe_dot_relation_to_nested_type_ident(ctx, node)
+      return nested_ident if nested_ident
+
+      # Otherwise, it becomes a "call" node indicating a function call,
+      # with the left side as the receiver and the right side as the name.
       visit(ctx,
         AST::Call.new(node.lhs, node.rhs.as(AST::Identifier)).from(node)
       )
@@ -204,6 +241,36 @@ class Savi::Compiler::Reparse < Savi::AST::CopyOnMutateVisitor
     end
   rescue exc : Exception
     raise Error.compiler_hole_at(node, exc)
+  end
+
+  def maybe_dot_relation_to_nested_type_ident(ctx, node : AST::Relate) : AST::Identifier?
+    # See if it is possible to see this as a dot relation of identifiers,
+    # digging through the layers to get the fully concatenated identifier.
+    ident_value = maybe_nested_ident_value(node)
+    return unless ident_value
+
+    # If this nested identifier value exists as a type name in the namespace
+    # for this source file, then convert this dot relation into an identifier.
+    AST::Identifier.new(ident_value).from(node) if @namespace[ident_value]?
+  end
+
+  def maybe_nested_ident_value(node : AST::Node) : String?
+    # If we're already looking at an identifier, return its value now.
+    return node.value if node.is_a?(AST::Identifier?)
+
+    # Otherwise, we'll only proceed if it is a dot relation.
+    return unless node.is_a?(AST::Relate) && node.op.value == "."
+
+    # And the right side must be an identifier.
+    rhs = node.rhs
+    return unless rhs.is_a?(AST::Identifier)
+
+    # And the left side must be a possible nested identifier.
+    lhs_value = maybe_nested_ident_value(node.lhs)
+    return unless lhs_value
+
+    # Concatenate the two sides like a nested identifier.
+    "#{lhs_value}.#{rhs.value}"
   end
 
   def visit_local_or_param_defn(ctx, node)

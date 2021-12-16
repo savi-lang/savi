@@ -1,0 +1,9 @@
+:manifest lib JSON
+  :sources "src/JSON/**/*.savi"
+
+:manifest bin "spec-JSON"
+  :copies JSON
+  :sources "spec/JSON/**/*.savi"
+
+  :dependency Spec "TODO: specify version"
+  :transitive dependency Map "TODO: specify version"

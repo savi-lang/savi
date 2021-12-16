@@ -73,28 +73,68 @@ abstract class Savi::Program::Declarator::TermAcceptor
           term
         when AST::LiteralString
           AST::Identifier.new(term.value).from(term)
+        when AST::Relate
+          if term.op.value == "." &&
+            (lhs = try_accept(term.lhs, type).as(AST::Identifier)) &&
+            (rhs = try_accept(term.rhs, type).as(AST::Identifier))
+            AST::Identifier.new("#{lhs.value}.#{rhs.value}").from(term)
+          end
         end
       when "Type"
-        term if (
-          case term
-          when AST::Identifier
-            true
-          when AST::Qualify
-            try_accept(term.term, type) &&
-            term.group.terms.all? { |term2| try_accept(term2, type) }
-          when AST::Relate
-            ["'", "->"].includes?(term.op.value) &&
-            try_accept(term.lhs, type) &&
-            try_accept(term.rhs, type)
-          when AST::Group
-            (
-              (term.style == "(" && term.terms.size == 1) ||
-              (term.style == "|")
-            ) &&
-            term.terms.all? { |term2| try_accept(term2, type) }
-          else false
+        case term
+        when AST::Identifier
+          term
+        when AST::Qualify
+          if (
+            (term_term = try_accept(term.term, type)) &&
+            (group_terms = term.group.terms.map { |term2| try_accept(term2.not_nil!, type) }).all?
+          )
+            if term_term != term.term || group_terms != term.group.terms
+              AST::Qualify.new(
+                term_term,
+                AST::Group.new(
+                  term.group.style,
+                  group_terms.not_nil!.map(&.as(AST::Term)),
+                ).from(term.group),
+              ).from(term)
+            else
+              term
+            end
           end
-        )
+        when AST::Relate
+          if (
+            ["'", "->"].includes?(term.op.value) &&
+            (lhs = try_accept(term.lhs, type)) &&
+            (rhs = try_accept(term.rhs, type))
+          )
+            if lhs != term.lhs || rhs != term.rhs
+              AST::Relate.new(lhs, term.op, rhs).from(term)
+            else
+              term
+            end
+          else
+            try_accept(term, "Name")
+          end
+        when AST::Group
+          if (
+            (term.style == "(" && term.terms.size == 1) ||
+            (term.style == "|")
+          )
+            group_terms = term.terms.map { |term2| try_accept(term2.not_nil!, type).as(AST::Term?) }
+            if group_terms && group_terms.all?
+              if group_terms != term.terms
+                AST::Group.new(
+                  term.style,
+                  group_terms.not_nil!.map(&.as(AST::Term)),
+                ).from(term)
+              else
+                term
+              end
+            end
+          end
+        else
+          nil
+        end
       when "NameList"
         if term.is_a?(AST::Group) && term.style == "("
           group = AST::Group.new("(").from(term)

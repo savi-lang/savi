@@ -1,0 +1,28 @@
+:manifest "example"
+  :sources "src/*.savi"
+    :excluding "src/exclude-*.savi"
+  :sources "src2/*.savi"
+    :excluding "src2/exclude-a.savi"
+    :excluding "src2/exclude-b.savi"
+    :excluding "src/include-*.savi" // (this will have no effect, because it is
+//                                  // nested in a :sources declaration
+//                                  // which includes `src2` but not the `src`
+//                                  // directory, and it can only limit
+//                                  // the inclusion from that set - not others)
+
+// For convenience of reasoning, here's a summary of the types in each file:
+//
+// src/
+// include-a exclude-a include-b exclude-b exclude-extra
+// Alice     Andre     Bob       Bob       Alice
+// Alex      Alex      Bernice   Bill      Andre
+//
+// src2/
+// include-a exclude-a include-b exclude-b exclude-extra
+// Andre     Alice     Bob       Bobby     Bob
+// Alex      Alex      Bill      Bill      Bobby
+//
+// Given the exclusions in the manifest resolving correctly, we expect
+// only the following conflicts, and no more:
+// - Alex (x2)
+// - Bob (x3) (note that src2/exclude-extra.savi is not actually excluded)

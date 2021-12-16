@@ -1,48 +1,52 @@
 class Savi::Compiler::Context
   getter compiler : Compiler
-  getter program
-  getter import
 
-  getter caps
-  getter classify
-  getter code_gen
-  getter code_gen_verona
-  getter completeness
-  getter declarators
-  getter eval
-  getter flow
-  getter infer
-  getter infer_edge
-  getter inventory
-  getter jumps
-  getter lifetime
-  getter local
-  getter namespace
-  getter paint
-  getter populate
-  getter pre_infer
-  getter pre_subtyping
-  getter pre_t_infer
-  getter privacy
-  getter reach
-  getter refer
-  getter refer_type
-  getter serve_definition
-  getter serve_hover
-  getter subtyping
-  getter t_infer
-  getter t_infer_edge
-  getter t_subtyping
-  getter t_type_check
-  getter type_check
-  getter type_context
-  getter types_edge
-  getter types_graph
-  getter verify
-  getter xtypes
-  getter xtypes_graph
+  getter program = Program.new
 
-  getter options
+  getter caps = Caps::Pass.new
+  getter classify = Classify::Pass.new
+  getter code_gen = CodeGen.new(CodeGen::PonyRT)
+  getter code_gen_verona = CodeGen.new(CodeGen::VeronaRT)
+  getter completeness = Completeness::Pass.new
+  getter run = Run.new
+  getter flow = Flow::Pass.new
+  getter infer = Infer::Pass.new
+  getter infer_edge = Infer::PassEdge.new
+  getter inventory = Inventory::Pass.new
+  getter jumps = Jumps::Pass.new
+  getter lifetime = Lifetime.new
+  getter load = Load.new
+  getter local = Local::Pass.new
+  getter manifests = Manifests.new
+  getter namespace = Namespace.new
+  getter paint = Paint.new
+  getter populate = Populate.new
+  getter populate_types = PopulateTypes.new
+  getter pre_infer = PreInfer::Pass.new
+  getter pre_subtyping = PreSubtyping::Pass.new
+  getter pre_t_infer = PreTInfer::Pass.new
+  getter privacy = Privacy::Pass.new
+  getter reach = Reach.new
+  getter refer = Refer::Pass.new
+  getter refer_type = ReferType::Pass.new
+  getter serve_definition = ServeDefinition.new
+  getter serve_hover = ServeHover.new
+  getter subtyping = SubtypingCache.new
+  getter t_infer = TInfer::Pass.new
+  getter t_infer_edge = TInfer::PassEdge.new
+  getter t_subtyping = TSubtypingCache.new
+  getter t_type_check = TTypeCheck.new
+  getter type_check = TypeCheck.new
+  getter type_context = TypeContext::Pass.new
+  getter types_edge = Types::Edge::Pass.new
+  getter types_graph = Types::Graph::Pass.new
+  getter verify = Verify::Pass.new
+  getter xtypes = XTypes::Pass.new
+  getter xtypes_graph = XTypes::Graph::Pass.new
+
+  getter link_libraries = Set(String).new
+
+  getter options : Compiler::Options
   property prev_ctx : Context?
   property! root_docs : Array(AST::Document)
 
@@ -50,99 +54,84 @@ class Savi::Compiler::Context
 
   getter errors = [] of Error
 
-  def initialize(@compiler, @options = CompilerOptions.new, @prev_ctx = nil)
-    @program = Program.new
-
-    @caps = Caps::Pass.new
-    @classify = Classify::Pass.new
-    @code_gen = CodeGen.new(CodeGen::PonyRT)
-    @code_gen_verona = CodeGen.new(CodeGen::VeronaRT)
-    @completeness = Completeness::Pass.new
-    @eval = Eval.new
-    @flow = Flow::Pass.new
-    @import = Import.new
-    @infer = Infer::Pass.new
-    @infer_edge = Infer::PassEdge.new
-    @inventory = Inventory::Pass.new
-    @jumps = Jumps::Pass.new
-    @lifetime = Lifetime.new
-    @local = Local::Pass.new
-    @namespace = Namespace.new
-    @paint = Paint.new
-    @populate = Populate.new
-    @pre_infer = PreInfer::Pass.new
-    @pre_subtyping = PreSubtyping::Pass.new
-    @pre_t_infer = PreTInfer::Pass.new
-    @privacy = Privacy::Pass.new
-    @reach = Reach.new
-    @refer = Refer::Pass.new
-    @refer_type = ReferType::Pass.new
-    @serve_definition = ServeDefinition.new
-    @serve_hover = ServeHover.new
-    @subtyping = SubtypingCache.new
-    @t_infer = TInfer::Pass.new
-    @t_infer_edge = TInfer::PassEdge.new
-    @t_subtyping = TSubtypingCache.new
-    @t_type_check = TTypeCheck.new
-    @type_check = TypeCheck.new
-    @type_context = TypeContext::Pass.new
-    @types_edge = Types::Edge::Pass.new
-    @types_graph = Types::Graph::Pass.new
-    @verify = Verify::Pass.new
-    @xtypes = XTypes::Pass.new
-    @xtypes_graph = XTypes::Graph::Pass.new
-
-    @link_libraries = Set(String).new
+  def initialize(@compiler, @options = Compiler::Options.new, @prev_ctx = nil)
   end
 
-  def root_library
-    @program.libraries[2]? || # after meta declarators and standard declarators
-    @program.libraries[1]? ||
-    @program.libraries[0]
+  def root_package
+    # If we have already identified a root manifest, get the associated package.
+    root_manifest = @manifests.root
+    if root_manifest
+      source_package = Source::Package.for_manifest(root_manifest)
+      root = @program.packages.find(&.source_package.==(source_package))
+      return root if root
+    end
+
+    @program.packages[2]? || # initial manifest probe
+    @program.packages[1]? || # standard declarators
+    @program.packages[0]     # meta declarators
   end
 
-  def root_library_link
-    root_library.make_link
+  def root_package_link
+    root_package.make_link
   end
 
-  def compile_library_at_path(path)
-    # First, try to find an already loaded library that has this same path.
-    library = @program.libraries.find(&.source_library.path.==(path))
-    return library if library
+  def compile_bootstrap_package(path, name) : Program::Package
+    source_package = Source::Package.new(path, name)
+    package = @program.packages.find(&.source_package.==(source_package))
+    return package if package
 
-    # Otherwise go ahead and load the library.
-    sources = compiler.source_service.get_library_sources(path)
+    sources = compiler.source_service.get_directory_sources(path, source_package)
     docs = sources.map { |source| Parser.parse(source) }
-    compile_library(sources.first.library, docs)
+    compile_package(source_package, docs)
   end
 
-  def compile_library(*args)
-    library = compile_library_inner(*args)
-    @program.libraries << library
-    library
+  def compile_manifests_at_path(path)
+    # Skip if we've already compiled at least one manifest at this same path.
+    return if @program.manifests.any?(&.name.pos.source.package.path.==(path))
+
+    # Otherwise go ahead and load the manifests.
+    sources = compiler.source_service.get_manifest_sources_at_or_above(path)
+    docs = sources.map { |source| Parser.parse(source) }
+    package = compile_package(sources.first.package, docs)
+    self
+  end
+
+  def compile_package(manifest : Packaging::Manifest)
+    sources = compiler.source_service.get_sources_for_manifest(self, manifest)
+    docs = sources.map { |source| Parser.parse(source) }
+    compile_package(sources.first.package, docs)
+  end
+
+  def compile_package(*args)
+    package = compile_package_inner(*args)
+    @program.packages << package
+    package.manifests_declared.each { |manifest|
+      @program.manifests << manifest
+    }
+    package
   rescue e : Error
     @errors << e
-    library || Program::Library.new(args.first)
+    package || Program::Package.new(args.first)
   end
 
-  @@cache = {} of String => {Array(AST::Document), Program::Library}
-  def compile_library_inner(source_library : Source::Library, docs : Array(AST::Document))
-    if (cache_result = @@cache[source_library.path]?; cache_result)
-      cached_docs, cached_library = cache_result
-      return cached_library if cached_docs == docs
+  @@cache = {} of String => {Array(AST::Document), Program::Package}
+  def compile_package_inner(source_package : Source::Package, docs : Array(AST::Document))
+    if (cache_result = @@cache[source_package.path]?; cache_result)
+      cached_docs, cached_package = cache_result
+      return cached_package if cached_docs == docs
     end
 
-    compile_library_docs(Program::Library.new(source_library), docs)
+    compile_package_docs(Program::Package.new(source_package), docs)
 
     .tap do |result|
-      @@cache[source_library.path] = {docs, result}
+      @@cache[source_package.path] = {docs, result}
     end
   end
 
-  def compile_library_docs(library : Program::Library, docs : Array(AST::Document))
-    Program::Declarator::Interpreter.run(self, library, docs)
+  def compile_package_docs(package : Program::Package, docs : Array(AST::Document))
+    Program::Declarator::Interpreter.run(self, package, docs)
 
-    library
+    package
   end
 
   def finish
@@ -152,8 +141,8 @@ class Savi::Compiler::Context
   def run(obj)
     return false if @errors.any?
 
-    @program.libraries.each do |library|
-      obj.run(self, library)
+    @program.packages.each do |package|
+      obj.run(self, package)
     end
     finish
 
@@ -167,8 +156,8 @@ class Savi::Compiler::Context
   def run_copy_on_mutate(obj)
     return false if @errors.any?
 
-    @program.libraries.map! do |library|
-      obj.run(self, library)
+    @program.packages.map! do |package|
+      obj.run(self, package)
     end
     finish
 

@@ -3,22 +3,23 @@ class Savi::Compiler
 
   property source_service = SourceService.new
 
-  class CompilerOptions
+  class Options
     property release
     property no_debug
     property print_ir
     property print_perf
-    property binary_name
+    property skip_manifest
+    property auto_fix = false
+    property manifest_name : String?
     property target_pass : Symbol?
-
-    DEFAULT_BINARY_NAME = "main"
 
     def initialize(
       @release = false,
       @no_debug = false,
       @print_ir = false,
       @print_perf = false,
-      @binary_name = DEFAULT_BINARY_NAME,
+      @skip_manifest = false,
+      @manifest_name = nil,
       @target_pass = nil,
     )
     end
@@ -27,7 +28,9 @@ class Savi::Compiler
   def self.pass_symbol(pass)
     case pass
     when "format"           then :format # (not a true compiler pass)
-    when "import"           then :import
+    when "manifests"        then :manifests
+    when "load"             then :load
+    when "populate_types"   then :populate_types
     when "namespace"        then :namespace
     when "reparse"          then :reparse
     when "macros"           then :macros
@@ -65,7 +68,7 @@ class Savi::Compiler
     when "lifetime"         then :lifetime
     when "binary_object"    then :binary_object
     when "binary"           then :binary
-    when "eval"             then :eval
+    when "run"              then :run
     when "codegen_verona"   then :codegen_verona
     when "binary_verona"    then :binary_verona
     when "serve_errors"     then :serve_errors
@@ -79,7 +82,10 @@ class Savi::Compiler
   def execute(ctx, target : Symbol)
     time = Time.measure do
       case target
-      when :import           then ctx.run_whole_program(ctx.import)
+      when :format           then nil # (not a true compiler pass)
+      when :manifests        then ctx.run_whole_program(ctx.manifests)
+      when :load             then ctx.run_whole_program(ctx.load)
+      when :populate_types   then ctx.run_copy_on_mutate(ctx.populate_types)
       when :namespace        then ctx.run_whole_program(ctx.namespace)
       when :reparse          then ctx.run_copy_on_mutate(Reparse)
       when :macros           then ctx.run_copy_on_mutate(Macros)
@@ -117,7 +123,7 @@ class Savi::Compiler
       when :lifetime         then ctx.run_whole_program(ctx.lifetime)
       when :binary_object    then ctx.run_whole_program(BinaryObject)
       when :binary           then ctx.run_whole_program(Binary)
-      when :eval             then ctx.run_whole_program(ctx.eval)
+      when :run              then ctx.run_whole_program(ctx.run)
       when :codegen_verona   then ctx.run_whole_program(ctx.code_gen_verona)
       when :binary_verona    then ctx.run_whole_program(BinaryVerona)
       when :serve_errors     then nil # we only care that the dependencies have run, to generate compile errors
@@ -136,12 +142,15 @@ class Savi::Compiler
   # passes like :classify and :refer instead of marking a dependency.
   def deps_of(target : Symbol) : Array(Symbol)
     case target
-    when :import then [] of Symbol
-    when :namespace then [:import]
+    when :format then [] of Symbol # (not a true compiler pass)
+    when :manifests then [] of Symbol
+    when :load then [:manifests]
+    when :populate_types then [:load]
+    when :namespace then [:populate_types, :load]
     when :reparse then [:namespace]
     when :macros then [:reparse]
     when :sugar then [:macros]
-    when :refer_type then [:sugar, :macros, :reparse, :namespace]
+    when :refer_type then [:sugar, :macros, :reparse, :namespace, :populate_types]
     when :populate then [:sugar, :macros, :reparse, :refer_type]
     when :lambda then [:sugar, :macros, :reparse]
     when :flow then [:lambda, :populate, :sugar, :macros, :reparse]
@@ -174,7 +183,7 @@ class Savi::Compiler
     when :lifetime then [:reach, :local, :refer, :classify]
     when :binary_object then [:codegen]
     when :binary then [:codegen]
-    when :eval then [:binary]
+    when :run then [:binary]
     when :codegen_verona then [:lifetime, :paint, :verify, :reach, :completeness, :privacy, :type_check, :infer, :pre_infer, :inventory, :local, :flow]
     when :binary_verona then [:codegen_verona]
     when :serve_errors then [:completeness, :privacy, :verify, :type_check, :local]
@@ -199,22 +208,42 @@ class Savi::Compiler
     all_deps.sort_by(&.last.size).map(&.first).each do |target|
       execute(ctx, target)
     end
+    ctx
   end
 
-  def eval(string : String, options = CompilerOptions.new) : Context
-    content = ":actor Main\n:new (env)\n#{string}"
-    library = Savi::Source::Library.new("(eval)")
-    source = Savi::Source.new("", "(eval)", content, library)
-
-    Savi.compiler.compile([source], :eval, options)
+  def test_compile(sources : Array(Source), target : Symbol, options = Compiler::Options.new)
+    options.skip_manifest = true
+    compile(sources, target, options)
   end
 
-  def compile(dirname : String, target : Symbol = :eval, options = CompilerOptions.new)
-    compile(source_service.get_library_sources(dirname), target, options)
+  def compile(dirname : String, target : Symbol = :run, options = Compiler::Options.new)
+    loop {
+      sources =
+        if options.skip_manifest
+          source_service.get_directory_sources(dirname)
+        else
+          source_service.get_manifest_sources_at_or_above(dirname)
+        end
+
+      ctx = compile(sources, target, options)
+
+      # Return now unless we have the potential to auto-fix some errors.
+      return ctx unless options.auto_fix && ctx.errors.any?(&.fix_edits.any?)
+
+      # Try to fix the errors by modifying some source files.
+      fix_edits_by_source = ctx.errors.flat_map(&.fix_edits).group_by(&.first.source)
+      fix_edits_by_source.each { |source, fix_edits|
+        new_pos, used_edits = source.entire_pos.apply_edits(fix_edits)
+        source_service.overwrite_source_at(source.path, new_pos.content)
+      }
+
+      # Repeat the loop to try compiling again with the auto-fixed sources.
+      # TODO: How can we detect this is failing, and we're in an infinite loop?
+    }
   end
 
   @prev_ctx : Context?
-  def compile(sources : Array(Source), target : Symbol = :eval, options = CompilerOptions.new)
+  def compile(sources : Array(Source), target : Symbol = :run, options = Compiler::Options.new)
     ctx = Context.new(self, options, @prev_ctx)
 
     docs = sources.compact_map do |source|
@@ -242,26 +271,29 @@ class Savi::Compiler
     raise "No source documents given!" if docs.empty?
 
     # First, load the meta declarators.
-    ctx.program.meta_declarators = ctx.compile_library_at_path(
-      source_service.meta_declarators_library_path
+    ctx.program.meta_declarators = ctx.compile_bootstrap_package(
+      source_service.meta_declarators_package_path,
+      "Savi.declarators.meta",
     )
 
     # Then, load the standard declarators.
-    ctx.program.standard_declarators = ctx.compile_library_at_path(
-      source_service.standard_declarators_library_path
+    ctx.program.standard_declarators = ctx.compile_bootstrap_package(
+      source_service.standard_declarators_package_path,
+      "Savi.declarators",
     )
 
-    # Now compile the main library.
-    ctx.compile_library(docs.first.source.library, docs)
+    # Now compile the main package.
+    ctx.compile_package(docs.first.source.package, docs)
 
-    # Next add the prelude, unless the main library happens to be the prelude.
-    unless docs.first.source.library.path == source_service.prelude_library_path
-      ctx.compile_library_at_path(source_service.prelude_library_path)
+    # Next add the core Savi, unless the main package happens to be the same.
+    unless docs.first.source.package.path == source_service.core_savi_package_path
+      ctx.compile_bootstrap_package(
+        source_service.core_savi_package_path,
+        "Savi",
+      )
     end
 
     # Now run compiler passes until the target pass is satisfied.
     satisfy(ctx, target)
-
-    ctx
   end
 end

@@ -1,0 +1,10 @@
+:module DisplacingAssignmentSpec
+  :fun run(test MicroTest)
+    displacable = "original"
+    displaced = displacable <<= "new"
+    test["<<= result"].pass = displaced == "original"
+    test["<<= effect"].pass = displacable == "new"
+
+    container_string = Container(String).new("original")
+    test["<<= result 2"].pass = (container_string.value <<= "new") == "original"
+    test["<<= effect 2"].pass = container_string.value == "new"

@@ -1,8 +1,0 @@
-:struct Pair(A, B = A)
-  :let first A
-  :let second B
-  :new (@first, @second)
-
-  // Convenience aliases for when this is used as a key/value pair.
-  :fun key: @first
-  :fun value: @second

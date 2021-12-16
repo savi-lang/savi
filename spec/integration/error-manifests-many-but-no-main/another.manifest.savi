@@ -1,0 +1,5 @@
+:manifest lib "package-e"
+  :sources "*.savi"
+
+:manifest bin "package-f"
+  :sources "*.savi"

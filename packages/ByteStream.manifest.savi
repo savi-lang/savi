@@ -1,0 +1,9 @@
+:manifest lib ByteStream
+  :sources "src/ByteStream/**/*.savi"
+
+:manifest bin "spec-ByteStream"
+  :copies ByteStream
+  :sources "spec/ByteStream/**/*.savi"
+
+  :dependency Spec "TODO: specify version"
+  :transitive dependency Map "TODO: specify version"

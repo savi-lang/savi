@@ -1,0 +1,31 @@
+:: A deterministic pseudo-random number generator with 128 bits of state.
+:trait _State128
+  :is DeterministicRandom
+  :is Random // TODO: this should not be necessary - copies should be transitive
+
+  // TODO: this should not be necessary - unimplemented methods should be copied
+  :fun ref u64 U64
+
+  :var _state_a U64
+  :var _state_b U64
+
+  :fun ref seed_128(seed_a, seed_b)
+    // Otherwise, use the given seed as normal.
+    @_state_a = seed_a
+    @_state_b = seed_b
+
+    // If a low-quality seed was given, use the seed_64 approach to
+    // spice it up with some scrambled bits, to getter a better seed.
+    case (
+    | seed_a == 0 | @seed_64(seed_b)
+    | seed_b == 0 | @seed_64(seed_a)
+    )
+
+    @
+
+  // When a 64-bit seed is provided to a 128-bit generator,
+  // use SplitMix64 to produce a full seed from the given half-seed.
+  :fun ref seed_64(seed)
+    seeder = DeterministicRandom.SplitMix64.new_64(seed)
+    @seed_128(seeder.u64, seeder.u64)
+    @

@@ -11,31 +11,57 @@ SPEC=$(BUILD)/savi-spec
 
 # Run the full CI suite.
 ci: PHONY
-	make format-check
-	make compiler-spec.all
-	make test extra_args="$(extra_args)"
-	make example-run dir="examples/adventofcode/2018" extra_args="--backtrace"
+	make format.check
+	make spec.all extra_args="--backtrace $(extra_args)"
+	make example dir="examples/adventofcode/2018" extra_args="--backtrace $(extra_args)"
+	make example-eval
 
 # Remove temporary/generated files.
 clean: PHONY
 	rm -rf $(BUILD) .make-var-cache lib/libsavi_runtime.bc
 
-# Run the test suite.
-test: PHONY $(SPEC)
-	echo && $(SPEC) $(extra_args)
+# Run the full test suite.
+spec.all: PHONY spec.compiler.all spec.language spec.package.all spec.unit.all spec.integration.all
 
-# Run a narrow target within the test suite.
-test.narrow: PHONY $(SPEC)
-	echo && $(SPEC) -v -e "$(target)"
+# Run the specs that are written in markdown (mostly compiler pass tests).
+# Run the given compiler-spec target (or all targets).
+spec.compiler: PHONY $(SAVI)
+	echo && $(SAVI) compilerspec "spec/compiler/$(name).savi.spec.md" $(extra_args)
+spec.compiler.all: PHONY $(SAVI)
+	find "spec/compiler" -name '*.savi.spec.md' | sort | xargs -I'{}' sh -c \
+		'echo && $(SAVI) compilerspec {} $(extra_args) || exit 255'
 
-# Run the given compiler-spec target.
-compiler-spec: PHONY $(SAVI)
-	echo && $(SAVI) compilerspec "$(target)" $(extra_args)
-compiler-spec.all: PHONY
-	find "spec/compiler" -name '*.savi.spec.md' | xargs -I '{}' sh -c 'make compiler-spec target="{}" extra_args="'$(extra_args)'" || exit 255'
+# Run the specs for the basic language semantics.
+spec.language: PHONY $(SAVI)
+	echo && $(SAVI) run --cd spec/language $(extra_args)
+
+# Run the specs for the given package (or all packages).
+spec.package: PHONY $(SAVI)
+	echo && $(SAVI) run --cd packages "spec-$(name)" $(extra_args)
+spec.package.all: PHONY $(SAVI)
+	find packages/spec -mindepth 1 -maxdepth 1 | cut -d/ -f3 | sort | xargs -I'{}' sh -c \
+		"echo && $(SAVI) run --cd packages "spec-{}" $(extra_args) || exit 255"
+
+# Run the specs for the given package in lldb for debugging.
+spec.package.lldb: PHONY $(SAVI)
+	echo && $(SAVI) build --cd packages "spec-$(name)" $(extra_args) && \
+		lldb -o run -- "packages/bin/spec-$(name)"
+
+# Run the specs that are written in Crystal (mostly compiler unit tests),
+# narrowing to those with the given name (or all of them).
+spec.unit: PHONY $(SPEC)
+	echo && $(SPEC) -v -e "$(name)"
+spec.unit.all: PHONY $(SPEC)
+	echo && $(SPEC)
+
+# Run the integration tests, which invoke the compiler in a real directory.
+spec.integration: PHONY $(SAVI)
+	echo && spec/integration/run-one.sh "$(name)" $(SAVI)
+spec.integration.all: PHONY $(SAVI)
+	echo && spec/integration/run-all.sh $(SAVI)
 
 # Check formatting of *.savi source files.
-format-check: PHONY $(SAVI)
+format.check: PHONY $(SAVI)
 	echo && $(SAVI) format --check --backtrace
 
 # Fix formatting of *.savi source files.
@@ -48,27 +74,18 @@ ffigen: PHONY $(SAVI)
 
 # Evaluate a Hello World example.
 example-eval: PHONY $(SAVI)
-	echo && $(SAVI) eval 'env.out.print("Hello, World!")'
+	echo && $(SAVI) eval 'env.out.print("Hello, World!")' --backtrace
 
-# Run the files in the given directory.
-example-run: PHONY $(SAVI)
-	echo && cd "$(dir)" && $(shell pwd)/$(SAVI) run $(extra_args)
+# Compile and run the user program binary in the given directory.
+example: PHONY $(SAVI)
+	echo && $(SAVI) --cd "$(dir)" run $(extra_args)
 
 # Compile the files in the given directory.
 example-compile: PHONY $(SAVI)
-	echo && cd "$(dir)" && $(shell pwd)/$(SAVI) $(extra_args)
+	echo && $(SAVI) --cd "$(dir)" $(extra_args)
 
-# Compile and run the user program binary in the given directory.
-example: example-compile
-	echo && "$(dir)/main"
-
-# Compile and run the user program binary in the given directory under LLDB.
-example-lldb: example-compile
-	echo && lldb -o run -- "$(dir)/main"
-
-# Compile the language server image and vscode extension.
-vscode: PHONY
-	docker build . --tag jemc/savi
+# Compile the vscode extension.
+vscode: PHONY $(SAVI)
 	cd tooling/vscode && npm run-script compile || npm install
 
 ##

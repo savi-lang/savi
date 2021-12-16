@@ -138,25 +138,45 @@ module Savi::AST
   end
 
   class Declare < Node
-    property terms : Array(Term) # TODO: rename as `terms`
+    property terms : Array(Term)
+    property nested = [] of Declare
+    property body : Group? = nil
     property declare_depth = 0
+    property declarator : Program::Declarator? = nil
     def initialize(@terms = [] of Term)
+    end
+
+    def span_pos(source)
+      return Source::Pos.none unless pos.source == source
+      pos.span(
+        terms.map(&.span_pos(source)) +
+        nested.map(&.span_pos(source)) +
+        [body.try(&.span_pos(source))].compact
+      )
     end
 
     def name; :declare end
     def to_a: Array(A)
       res = [name] of A
       res.concat(terms.map(&.to_a.as(A)))
+      res.concat(nested.map(&.to_a.as(A)))
+      body.try { |body| res.push(body.to_a.as(A)) }
       res
     end
     def children_accept(ctx : Compiler::Context, visitor : Visitor)
       @terms.each(&.accept(ctx, visitor))
+      @nested.each(&.accept(ctx, visitor))
+      @body.try(&.accept(ctx, visitor))
     end
     def children_accept(ctx : Compiler::Context, visitor : CopyOnMutateVisitor)
       new_terms, terms_changed = children_list_accept(ctx, @terms, visitor)
-      return self unless terms_changed
+      new_nested, nested_changed = children_list_accept(ctx, @nested, visitor)
+      new_body, body_changed = maybe_child_single_accept(ctx, @body, visitor)
+      return self unless terms_changed || nested_changed || body_changed
       dup.tap do |node|
         node.terms = new_terms
+        node.nested = new_nested
+        node.body = new_body
       end
     end
 
@@ -264,6 +284,21 @@ module Savi::AST
     end
     def name; :ident end
     def to_a: Array(A); [name, value] of A end
+
+    # If this identifier is immediately dot-nested within the given outer
+    # identifier, then return the nested portion as a new identifier.
+    def immediately_nested_within?(outer : AST::Identifier) : AST::Identifier?
+      # Only consider further if nested within the outer type.
+      return unless value.includes?(".")
+      return unless value.starts_with?("#{outer.value}.")
+
+      # Only consider further if nested exactly one level beneath.
+      nested_ident_value = value[(outer.value.size + 1)..-1]
+      return if nested_ident_value.includes?(".")
+
+      # Return the nested portion as an identifier.
+      AST::Identifier.new(nested_ident_value).from(self)
+    end
   end
 
   # A LiteralString is a value surrounded by double-quotes in source code,

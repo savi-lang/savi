@@ -1,0 +1,17 @@
+:class JSON.Path
+  :var segments Array((String | USize)): []
+  :new (@segments = [])
+  :new iso new_iso(s Array((String | USize))'iso = []): @segments = --s
+  :fun ref push(segment): @segments.push(segment)
+  :fun ref pop!: @segments.pop!
+  :fun ref pop: try @pop!
+  :fun ref clone iso: @new_iso(@segments.clone)
+  :fun inspect_into(out String'iso) String'iso
+    out.push_byte('$')
+    @segments.each -> (segment |
+      out.push_byte('[')
+      out = Inspect.into(--out, segment)
+      out.push_byte(']')
+      None // TODO: this None should not be needed
+    )
+    --out

@@ -1,0 +1,25 @@
+:enum _Op
+  :const bit_width U8: 8
+
+  :fun non from!(byte U8): @from_u64!(byte.u64)
+
+  // We reserve everything below the minimum opcode to match the specified byte.
+  :fun non min_op U8: 0xF3
+
+  // This could theoretically be used for any byte, but we only use it for
+  // bytes from min_op and higher; all lower op codes indicate the byte itself.
+  :member _OpByte: 0xF3
+
+  :member _OpMatch: 0xF4
+  :member _OpRecursiveMatch: 0xF5 // For lookahead
+  :member _OpJump: 0xF6
+  :member _OpSplit: 0xF7
+  :member _OpSplitMany: 0xF8
+  :member _OpAnyByte: 0xF9
+  :member _OpByteRange: 0xFA
+  :member _OpSaveStart: 0xFB
+  :member _OpSaveFinish: 0xFC
+  :member _OpBackrefCompare: 0xFD
+  :member _OpInlineZWA: 0xFE
+  :member _OpRecursiveZWA: 0xFF
+

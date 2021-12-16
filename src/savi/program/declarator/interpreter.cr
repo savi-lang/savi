@@ -1,28 +1,39 @@
 module Savi::Program::Declarator::Interpreter
-  def self.run(ctx, library : Program::Library, docs : Array(AST::Document))
+  def self.run(ctx, package : Program::Package, docs : Array(AST::Document))
     docs.each { |doc|
       scope = Scope.new
-      scope.current_library = library
+      scope.current_package = package
       scope.include_bootstrap_declarators = !ctx.program.meta_declarators
 
-      doc.list.each { |item|
+      # Iterate over the list of declarations/bodies in the document,
+      # building the declarations into a tree instead of a flat list.
+      # This means we remove items from the list which are not top-level
+      # and nest each declaration and body inside the nearest that accepts it.
+      # After this, the document will list the top-level declarations,
+      # and the rest of the declarations and bodies will be nested inside.
+      doc.list.select! { |item|
         case item
         when AST::Declare
-          interpret(ctx, scope, item)
+          accept_declare(ctx, scope, item)
+          # Keep it in the top-level doc only if it is at a depth of zero.
+          item.declare_depth == 0
         when AST::Group
           accept_body(ctx, scope, item)
+          # Never keep a body in the top-level doc - it belongs to a declare.
+          false
         else
           raise NotImplementedError.new(item.class)
         end
       }
 
-      while (declarator = scope.pop_declarator?(ctx))
-        declarator.finish(ctx, scope)
+      # Finish popping any open scopes.
+      until scope.stack_empty?
+        pop_during_accept(ctx, scope)
       end
     }
   end
 
-  def self.interpret(ctx, scope, declare : AST::Declare)
+  def self.accept_declare(ctx, scope, declare : AST::Declare)
     declarators = scope.visible_declarators(ctx)
 
     # Filter for declarators that have the right name.
@@ -39,7 +50,7 @@ module Savi::Program::Declarator::Interpreter
           if suggestion
             {suggestion.name.pos, "did you mean `:#{suggestion.name.value}`?"}
           else
-            {Source::Pos.none, "did you forget to import a library?"}
+            {Source::Pos.none, "did you forget to add a package dependency?"}
           end
         ]
       return
@@ -80,19 +91,20 @@ module Savi::Program::Declarator::Interpreter
     end
 
     # Now unwind the declaration hierarchy to reach the required context.
-    # Call finish on each of the declarators we popped off the context stack.
     until scope.has_top_context?(declarator.context.value)
-      scope.pop_declarator?(ctx).try(&.finish(ctx, scope))
+      pop_during_accept(ctx, scope)
     end
 
-    # Observe the depth of this declaration.
+    # Observe the depth of this declaration and the chosen declarator.
+    # These get stored in the AST of the declaration.
     declare.declare_depth = scope.declarator_depth
+    declare.declarator = declarator
+
+    # Nest this declaration inside the one that contains it (if any).
+    scope.top_declare?.try(&.nested.push(declare))
 
     # Push this declarator onto the scope stack.
     scope.push_declarator(declare, declarator)
-
-    # Finally, call run on the declarator to evaluate the declaration.
-    declarator.run(ctx, scope, declare, terms)
   end
 
   def self.accept_body(ctx, scope, body : AST::Group)
@@ -109,11 +121,60 @@ module Savi::Program::Declarator::Interpreter
       # If this body is accepted, return now.
       break if scope.try_accept_body(ctx, body)
 
-      # Otherwise, finish this declarator and unwind the stack by one level,
-      # where we will try again to find an open declaration that allows a body.
-      scope.pop_declarator?(ctx).try(&.finish(ctx, scope))
+      # Otherwise, unwind the stack by one level, where we will try again
+      # to find an open declaration that allows a body.
+      pop_during_accept(ctx, scope)
     end
 
     body.declare_depth = scope.declarator_depth
+  end
+
+  def self.pop_during_accept(ctx, scope)
+    scope.pop_layer?.try { |layer|
+      # Check the body presence if required.
+      if layer.declarator.body_required && !layer.declare.body
+        ctx.error_at layer.declare.terms.first.pos, "This declaration has no body",
+          [{layer.declarator.name.pos, "but this declarator requires a body"}]
+        return nil
+      end
+
+      # Interpret the declaration if this is a top-level one (empty stack).
+      if scope.stack_empty?
+        interpret(ctx, scope, layer.declare, layer.declarator)
+      end
+    }
+  end
+
+  def self.interpret(ctx, scope, declare, declarator)
+    # Push this declarator onto the scope stack.
+    scope.push_declarator(declare, declarator)
+
+    # TODO: Avoid extra cost of matching terms again here?
+    terms = declarator.matches_head?(declare.terms).not_nil!
+
+    # Run the initial action for this declaration.
+    declarator.run(ctx, scope, declare, terms)
+
+    # Handle the body, if present.
+    body = declare.body
+    if body
+      body_handler = scope.current_body_handler
+      if body_handler
+        body_handler.call(body)
+      else
+        ctx.error_at declarator.name,
+          "This declarator allows a body, but defined no body handler"
+        return
+      end
+    end
+
+    # Interpret all of the nested declarations.
+    declare.nested.each { |inner|
+      interpret(ctx, scope, inner, inner.declarator.not_nil!)
+    }
+
+    # Pop from scope and finish interpreting the outer declaration.
+    scope.pop_layer?
+    declarator.finish(ctx, scope)
   end
 end

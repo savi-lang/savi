@@ -6,23 +6,25 @@ describe Savi::Compiler::Reparse do
         x.call(y).call(z)
     SOURCE
 
-    ctx = Savi.compiler.compile([source], :reparse)
+    ctx = Savi.compiler.test_compile([source], :reparse)
     ctx.errors.should be_empty
 
     ctx.root_docs.first.to_a.should eq [:doc,
-      [:declare, [:ident, "class"], [:ident, "Example"]],
-      [:declare, [:ident, "fun"], [:ident, "chained"]],
-      [:group, ":",
-        [:qualify,
-          [:relate,
+      [:declare, [:ident, "class"], [:ident, "Example"],
+        [:declare, [:ident, "fun"], [:ident, "chained"],
+          [:group, ":",
             [:qualify,
-              [:relate, [:ident, "x"], [:op, "."], [:ident, "call"]],
-              [:group, "(", [:ident, "y"]],
+              [:relate,
+                [:qualify,
+                  [:relate, [:ident, "x"], [:op, "."], [:ident, "call"]],
+                  [:group, "(", [:ident, "y"]],
+                ],
+                [:op, "."],
+                [:ident, "call"],
+              ],
+              [:group, "(", [:ident, "z"]],
             ],
-            [:op, "."],
-            [:ident, "call"],
           ],
-          [:group, "(", [:ident, "z"]],
         ],
       ],
     ]
@@ -41,8 +43,8 @@ describe Savi::Compiler::Reparse do
     ]
 
     # Compiling again should yield an equivalent program tree:
-    ctx2 = Savi.compiler.compile([source], :reparse)
-    ctx.program.libraries.should eq ctx2.program.libraries
+    ctx2 = Savi.compiler.test_compile([source], :reparse)
+    ctx.program.packages.should eq ctx2.program.packages
   end
 
   it "transforms an @-prefixed identifier into a method call of @" do
@@ -55,27 +57,29 @@ describe Savi::Compiler::Reparse do
         @x(y) -> (True)
     SOURCE
 
-    ctx = Savi.compiler.compile([source], :reparse)
+    ctx = Savi.compiler.test_compile([source], :reparse)
     ctx.errors.should be_empty
 
     ctx.root_docs.first.to_a.should eq [:doc,
-      [:declare, [:ident, "class"], [:ident, "Example"]],
-      [:declare, [:ident, "fun"], [:ident, "selfish"]],
-      [:group, ":",
-        [:ident, "@x"],
-        [:qualify, [:ident, "@x"], [:group, "(", [:ident, "y"]]],
-        [:relate,
-          [:ident, "@x"],
-          [:op, "->"],
-          [:group, "|",
-            [:group, "(", [:ident, "z"], [:ident, "w"]],
-            [:group, "(", [:ident, "True"]],
+      [:declare, [:ident, "class"], [:ident, "Example"],
+        [:declare, [:ident, "fun"], [:ident, "selfish"],
+          [:group, ":",
+            [:ident, "@x"],
+            [:qualify, [:ident, "@x"], [:group, "(", [:ident, "y"]]],
+            [:relate,
+              [:ident, "@x"],
+              [:op, "->"],
+              [:group, "|",
+                [:group, "(", [:ident, "z"], [:ident, "w"]],
+                [:group, "(", [:ident, "True"]],
+              ],
+            ],
+            [:relate,
+              [:qualify, [:ident, "@x"], [:group, "(", [:ident, "y"]]],
+              [:op, "->"],
+              [:group, "(", [:ident, "True"]],
+            ],
           ],
-        ],
-        [:relate,
-          [:qualify, [:ident, "@x"], [:group, "(", [:ident, "y"]]],
-          [:op, "->"],
-          [:group, "(", [:ident, "True"]],
         ],
       ],
     ]
@@ -101,7 +105,7 @@ describe Savi::Compiler::Reparse do
     ]
 
     # Compiling again should yield an equivalent program tree:
-    ctx2 = Savi.compiler.compile([source], :reparse)
-    ctx.program.libraries.should eq ctx2.program.libraries
+    ctx2 = Savi.compiler.test_compile([source], :reparse)
+    ctx.program.packages.should eq ctx2.program.packages
   end
 end

@@ -38,7 +38,7 @@
 '\n'          Text
 
 '      '      Text
-'SpecRun'     Name.Class
+'Spec.Run'     Name.Class
 '('           Punctuation
 'AdditionSpec' Name.Class
 ')'           Punctuation
