@@ -119,7 +119,7 @@ LLVM_PLATFORM?=$(shell ./platform.sh)
 
 # Specify where to download our pre-built LLVM/clang static libraries from.
 # This needs to get bumped explicitly here when we do a new LLVM build.
-LLVM_STATIC_RELEASE_URL?=https://github.com/savi-lang/llvm-static/releases/download/20211111
+LLVM_STATIC_RELEASE_URL?=https://github.com/savi-lang/llvm-static/releases/download/20211223
 $(eval $(call MAKE_VAR_CACHE,LLVM_STATIC_RELEASE_URL))
 
 # Specify where to download our pre-built LLVM/clang static libraries from.
