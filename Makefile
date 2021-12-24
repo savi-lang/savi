@@ -9,12 +9,15 @@ BUILD?=build
 SAVI=$(BUILD)/savi-$(config)
 SPEC=$(BUILD)/savi-spec
 
+CLANGXX?=clang++
+CLANG?=clang
+
 # Run the full CI suite.
 ci: PHONY
-	make format.check
-	make spec.all extra_args="--backtrace $(extra_args)"
-	make example dir="examples/adventofcode/2018" extra_args="--backtrace $(extra_args)"
-	make example-eval
+	${MAKE} format.check
+	${MAKE} spec.all extra_args="--backtrace $(extra_args)"
+	${MAKE} example dir="examples/adventofcode/2018" extra_args="--backtrace $(extra_args)"
+	${MAKE} example-eval
 
 # Remove temporary/generated files.
 clean: PHONY
@@ -184,7 +187,7 @@ $(BUILD)/llvm-static: .make-var-cache/LLVM_STATIC_RELEASE_URL
 # This bitcode needs to get linked into our Savi compiler executable.
 $(BUILD)/llvm_ext.bc: $(LLVM_PATH)
 	mkdir -p `dirname $@`
-	clang++ -v -emit-llvm -c `$(LLVM_CONFIG) --cxxflags` \
+	${CLANGXX} -v -emit-llvm -c `$(LLVM_CONFIG) --cxxflags` \
 		$(CRYSTAL_PATH)/llvm/ext/llvm_ext.cc \
 		-o $@
 
@@ -231,7 +234,7 @@ $(BUILD)/savi-spec.o: spec/all.cr $(LLVM_PATH) $(shell find src lib spec -name '
 # This variant of the target compiles in release mode.
 $(BUILD)/savi-release: $(BUILD)/savi-release.o $(BUILD)/llvm_ext.bc lib/libsavi_runtime.bc
 	mkdir -p `dirname $@`
-	clang -O3 -o $@ -flto=thin -fPIC $^ ${CRYSTAL_RT_LIBS} -lstdc++ \
+	${CLANG} -O3 -o $@ -flto=thin -fPIC $^ ${CRYSTAL_RT_LIBS} -lstdc++ \
 		`sh -c 'ls $(LLVM_PATH)/lib/libclang*.a'` \
 		`$(LLVM_CONFIG) --libfiles --link-static` \
 		`$(LLVM_CONFIG) --system-libs --link-static`
@@ -241,7 +244,7 @@ $(BUILD)/savi-release: $(BUILD)/savi-release.o $(BUILD)/llvm_ext.bc lib/libsavi_
 # This variant of the target compiles in debug mode.
 $(BUILD)/savi-debug: $(BUILD)/savi-debug.o $(BUILD)/llvm_ext.bc lib/libsavi_runtime.bc
 	mkdir -p `dirname $@`
-	clang -O0 -o $@ -flto=thin -fPIC $^ ${CRYSTAL_RT_LIBS} -lstdc++ \
+	${CLANG} -O0 -o $@ -flto=thin -fPIC $^ ${CRYSTAL_RT_LIBS} -lstdc++ \
 		`sh -c 'ls $(LLVM_PATH)/lib/libclang*.a'` \
 		`$(LLVM_CONFIG) --libfiles --link-static` \
 		`$(LLVM_CONFIG) --system-libs --link-static`
@@ -251,7 +254,7 @@ $(BUILD)/savi-debug: $(BUILD)/savi-debug.o $(BUILD)/llvm_ext.bc lib/libsavi_runt
 # This variant of the target will be used when running tests.
 $(BUILD)/savi-spec: $(BUILD)/savi-spec.o $(BUILD)/llvm_ext.bc lib/libsavi_runtime.bc
 	mkdir -p `dirname $@`
-	clang -O0 -o $@ -flto=thin -fPIC $^ ${CRYSTAL_RT_LIBS} -lstdc++ \
+	${CLANG} -O0 -o $@ -flto=thin -fPIC $^ ${CRYSTAL_RT_LIBS} -lstdc++ \
 		`sh -c 'ls $(LLVM_PATH)/lib/libclang*.a'` \
 		`$(LLVM_CONFIG) --libfiles --link-static` \
 		`$(LLVM_CONFIG) --system-libs --link-static`
