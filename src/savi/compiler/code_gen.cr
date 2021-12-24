@@ -94,7 +94,9 @@ class Savi::Compiler::CodeGen
 
   def initialize(runtime : PonyRT.class | VeronaRT.class = PonyRT)
     LLVM.init_x86
-    @target_triple = LLVM.default_target_triple
+    LLVM.init_aarch64
+    LLVM.init_arm
+    @target_triple = LLVM.configured_default_target_triple.as(String)
     @target = LLVM::Target.from_triple(@target_triple)
     @target_machine = @target.create_target_machine(@target_triple).as(LLVM::TargetMachine)
     @llvm = LLVM::Context.new
