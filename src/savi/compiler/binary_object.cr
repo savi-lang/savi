@@ -32,23 +32,74 @@ class Savi::Compiler::BinaryObject
     llvm = ctx.code_gen.llvm
     machine = ctx.code_gen.target_machine
     mod = ctx.code_gen.mod
-
     target = Target.new(machine.triple)
-    ponyrt_bc_path = find_runtime_bc(RUNTIME_BC_PATH) \
-      || raise "libsavi_runtime.bc not found"
 
-    ponyrt_bc = LLVM::MemoryBuffer.from_file(ponyrt_bc_path)
-    ponyrt = llvm.parse_bitcode(ponyrt_bc).as(LLVM::Module)
+    # Load the runtime from a bitcode.
+    runtime_bc_path = find_runtime_bc(RUNTIME_BC_PATH) \
+      || raise "libsavi_runtime.bc not found"
+    runtime_bc = LLVM::MemoryBuffer.from_file(runtime_bc_path)
+    runtime = llvm.parse_bitcode(runtime_bc).as(LLVM::Module)
 
     # Link the pony runtime bitcode into the generated module.
-    LibLLVM.link_modules(mod.to_unsafe, ponyrt.to_unsafe)
+    LibLLVM.link_modules(mod.to_unsafe, runtime.to_unsafe)
 
+    # Maybe optimize the generated LLVM code.
+    optimize(mod) if ctx.options.release
+
+    # Emit as a binary object file.
     obj_path = "#{ctx.manifests.root.not_nil!.bin_path}.o"
-
     FileUtils.mkdir_p(File.dirname(obj_path))
-
     machine.emit_obj_to_file(mod, obj_path)
 
     obj_path
+  end
+
+  private def self.optimize(mod)
+    # pp :OPTIMIZING
+
+    # puts
+    # puts
+    # puts
+    # puts
+    # puts
+    # puts
+    # mod.dump
+
+    pass_registry = LLVM::PassRegistry.instance
+    pass_registry.initialize_all
+
+    pass_manager_builder = LLVM::PassManagerBuilder.new.tap { |b|
+      b.opt_level = 3
+      b.size_level = 0
+      b.use_inliner_with_threshold = 275
+    }
+
+    fun_pass_manager = mod.new_function_pass_manager.tap { |m|
+      pass_manager_builder.populate(m)
+    }
+
+    mod_pass_manager = LLVM::ModulePassManager.new.tap { |m|
+      pass_manager_builder.populate(m)
+    }
+
+    fun_pass_manager.run mod
+    mod_pass_manager.run mod
+
+    # puts
+    # puts
+    # puts
+    # puts
+    # puts
+    # puts
+    # mod.dump
+    # puts
+    # puts
+    # puts
+    # puts
+    # puts
+    # puts
+    # puts
+
+    # pp :OPTIMIZING_DONE
   end
 end
