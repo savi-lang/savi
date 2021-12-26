@@ -109,6 +109,10 @@ task:
     - mkdir -p out
     - cp -r packages out/packages
 
+  copy_runtime_script:
+    - mkdir -p out/lib
+    - cp lib/libsavi_runtime.bc out/lib/
+
   archive_script:
     - tar -czvf /tmp/savi.tar.gz -C out .
 
