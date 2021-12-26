@@ -33,6 +33,9 @@ task:
             bash curl \
             alpine-sdk coreutils gcc g++ clang make linux-headers llvm12-dev \
             pcre-dev libevent-static gc-dev crystal shards"
+        # For some reason clang doesn't like it if we omit the "alpine" vendor
+        # in the triple, where we'd otherwise use `x86_64-unknown-linux-musl`.
+        MAKE_EXTRA_ARGS: CLANG_TARGET_PLATFORM=x86_64-alpine-linux-musl
         # For some reason clang++ is missing some c++ headers unless we
         # explicitly mention them in this environment variable here.
         CPLUS_INCLUDE_PATH: /usr/include/c++/10.3.1:/usr/include/c++/10.3.1/x86_64-alpine-linux-musl
@@ -62,7 +65,31 @@ task:
       macos_instance:
         image: big-sur-xcode-12.5
 
-    # TODO: arm64-apple-macos
+    - name: arm64-apple-macosx
+      environment:
+        TRIPLE: arm64-apple-macosx
+        # Download arm64 versions of the libraries needed by Crystal runtime.
+        DEPS_INSTALL: "
+          brew update --preinstall && brew install crystal && \
+          mkdir /tmp/arm64 && \
+          brew fetch --bottle-tag=arm64_big_sur libgc && \
+          brew fetch --bottle-tag=arm64_big_sur libevent && \
+          brew fetch --bottle-tag=arm64_big_sur pcre && \
+          tar -xvf `brew --cache --bottle-tag=arm64_big_sur libgc` -C /tmp/arm64 --strip-components=2 && \
+          tar -xvf `brew --cache --bottle-tag=arm64_big_sur libevent` -C /tmp/arm64 --strip-components=2 && \
+          tar -xvf `brew --cache --bottle-tag=arm64_big_sur pcre` -C /tmp/arm64 --strip-components=2 && \
+          ls /tmp/arm64/lib"
+        # Tell make to use those arm64 versions we downloaded above.
+        MAKE_EXTRA_ARGS: " \
+          TARGET_PLATFORM=arm64-apple-macosx \
+          LLVM_STATIC_PLATFORM=x86_64-apple-macosx \
+          LIB_GC=/tmp/arm64/lib/libgc.a \
+          LIB_EVENT=/tmp/arm64/lib/libevent.a  \
+          LIB_PCRE=/tmp/arm64/lib/libpcre.a"
+        # Set up the SDKROOT path specific to the present XCode version.
+        SDKROOT: /Applications/Xcode-12.5.0.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk
+      macos_instance:
+        image: big-sur-xcode-12.5
 
   os_info_script:
     - uname
@@ -75,7 +102,7 @@ task:
 
   build_script:
     - mkdir -p out/bin
-    - make build/savi-release SAVI_VERSION=${CIRRUS_TAG:-unknown}
+    - make build/savi-release SAVI_VERSION=${CIRRUS_TAG:-unknown} ${MAKE_EXTRA_ARGS}
     - mv build/savi-release out/bin/savi
 
   copy_packages_script:

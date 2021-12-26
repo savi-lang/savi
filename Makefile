@@ -118,7 +118,9 @@ SAVI_VERSION?=unknown
 
 # Use an external shell script to detect the platform.
 # Currently the platform representation takes the form of an LLVM "triple".
-LLVM_PLATFORM?=$(shell ./platform.sh)
+LLVM_STATIC_PLATFORM?=$(shell ./platform.sh llvm-static)
+TARGET_PLATFORM?=$(shell ./platform.sh host)
+CLANG_TARGET_PLATFORM?=$(TARGET_PLATFORM)
 
 # Specify where to download our pre-built LLVM/clang static libraries from.
 # This needs to get bumped explicitly here when we do a new LLVM build.
@@ -139,17 +141,18 @@ LLVM_CONFIG?=$(LLVM_PATH)/bin/llvm-config
 # Find the libraries we need to link against.
 # We look first for a static library path, or fallback to specifying it as -l
 # which will cause the linker to locate it as a dyanmic library.
-LIB_GC?=$(shell find /usr -name libgc.a 2> /dev/null | head -n 1 | grep . || echo -lgc)
-LIB_EVENT?=$(shell find /usr -name libevent.a 2> /dev/null | head -n 1 | grep . || echo -levent)
-LIB_PCRE?=$(shell find /usr -name libpcre.a 2> /dev/null | head -n 1 | grep . || echo -lpcre)
+LIB_GC?=$(shell find /usr /opt -name libgc.a 2> /dev/null | head -n 1 | grep . || echo -lgc)
+LIB_EVENT?=$(shell find /usr /opt -name libevent.a 2> /dev/null | head -n 1 | grep . || echo -levent)
+LIB_PCRE?=$(shell find /usr /opt -name libpcre.a 2> /dev/null | head -n 1 | grep . || echo -lpcre)
 
 # Collect the list of libraries to link against (depending on the platform).
 # These are the libraries used by the Crystal runtime.
+CRYSTAL_RT_LIBS+=-lstdc++
 CRYSTAL_RT_LIBS+=$(LIB_GC)
 CRYSTAL_RT_LIBS+=$(LIB_EVENT)
 CRYSTAL_RT_LIBS+=$(LIB_PCRE)
-ifneq (,$(findstring macos,$(LLVM_PLATFORM)))
-	CRYSTAL_RT_LIBS+="-liconv"
+ifneq (,$(findstring macos,$(TARGET_PLATFORM)))
+	CRYSTAL_RT_LIBS+=-liconv
 endif
 
 # This is the path to the Crystal standard library source code,
@@ -163,7 +166,7 @@ CRYSTAL_PATH?=$(shell env $(shell crystal env) printenv CRYSTAL_PATH | rev | cut
 lib/libsavi_runtime.bc: .make-var-cache/RUNTIME_BITCODE_RELEASE_URL
 	rm -f $@.tmp
 	curl -L --fail -sS \
-		"${RUNTIME_BITCODE_RELEASE_URL}/${LLVM_PLATFORM}-libponyrt.bc" \
+		"${RUNTIME_BITCODE_RELEASE_URL}/${TARGET_PLATFORM}-libponyrt.bc" \
 	> $@.tmp
 	rm -f $@
 	mv $@.tmp $@
@@ -177,7 +180,7 @@ $(BUILD)/llvm-static: .make-var-cache/LLVM_STATIC_RELEASE_URL
 	rm -rf $@-tmp
 	mkdir -p $@-tmp
 	cd $@-tmp && curl -L --fail -sS \
-		"${LLVM_STATIC_RELEASE_URL}/${LLVM_PLATFORM}-llvm-static.tar.gz" \
+		"${LLVM_STATIC_RELEASE_URL}/${LLVM_STATIC_PLATFORM}-llvm-static.tar.gz" \
 	| tar -xzvf -
 	rm -rf $@
 	mv $@-tmp $@
@@ -188,6 +191,7 @@ $(BUILD)/llvm-static: .make-var-cache/LLVM_STATIC_RELEASE_URL
 $(BUILD)/llvm_ext.bc: $(LLVM_PATH)
 	mkdir -p `dirname $@`
 	${CLANGXX} -v -emit-llvm -c `$(LLVM_CONFIG) --cxxflags` \
+		-target $(CLANG_TARGET_PLATFORM) \
 		$(CRYSTAL_PATH)/llvm/ext/llvm_ext.cc \
 		-o $@
 
@@ -201,8 +205,9 @@ $(BUILD)/savi-release.o: main.cr $(LLVM_PATH) $(shell find src lib -name '*.cr')
 		SAVI_VERSION=$(SAVI_VERSION) \
 		SAVI_LLVM_VERSION=`$(LLVM_CONFIG) --version` \
 		LLVM_CONFIG=$(LLVM_CONFIG) \
+		LLVM_DEFAULT_TARGET=$(TARGET_PLATFORM) \
 		crystal build $< -o $(shell echo $@ | rev | cut -f 2- -d '.' | rev) \
-			--release --stats --error-trace --cross-compile --target=$(LLVM_PLATFORM)
+			--release --stats --error-trace --cross-compile --target $(TARGET_PLATFORM)
 
 # Build the Savi compiler object file, based on the Crystal source code.
 # We trick the Crystal compiler into thinking we are cross-compiling,
@@ -214,8 +219,9 @@ $(BUILD)/savi-debug.o: main.cr $(LLVM_PATH) $(shell find src lib -name '*.cr')
 		SAVI_VERSION=$(SAVI_VERSION) \
 		SAVI_LLVM_VERSION=`$(LLVM_CONFIG) --version` \
 		LLVM_CONFIG=$(LLVM_CONFIG) \
+		LLVM_DEFAULT_TARGET=$(TARGET_PLATFORM) \
 		crystal build $< -o $(shell echo $@ | rev | cut -f 2- -d '.' | rev) \
-			--debug --stats --error-trace --cross-compile --target=$(LLVM_PLATFORM)
+			--debug --stats --error-trace --cross-compile --target $(TARGET_PLATFORM)
 
 # Build the Savi specs object file, based on the Crystal source code.
 # We trick the Crystal compiler into thinking we are cross-compiling,
@@ -227,34 +233,36 @@ $(BUILD)/savi-spec.o: spec/all.cr $(LLVM_PATH) $(shell find src lib spec -name '
 		SAVI_VERSION=$(SAVI_VERSION) \
 		SAVI_LLVM_VERSION=`$(LLVM_CONFIG) --version` \
 		LLVM_CONFIG=$(LLVM_CONFIG) \
+		LLVM_DEFAULT_TARGET=$(TARGET_PLATFORM) \
 		crystal build $< -o $(shell echo $@ | rev | cut -f 2- -d '.' | rev) \
-			--debug --stats --error-trace --cross-compile --target=$(LLVM_PLATFORM)
+			--debug --stats --error-trace --cross-compile --target $(TARGET_PLATFORM)
 
 # Build the Savi compiler executable, by linking the above targets together.
 # This variant of the target compiles in release mode.
 $(BUILD)/savi-release: $(BUILD)/savi-release.o $(BUILD)/llvm_ext.bc lib/libsavi_runtime.bc
 	mkdir -p `dirname $@`
-	${CLANG} -O3 -o $@ -flto=thin -fPIC $^ ${CRYSTAL_RT_LIBS} -lstdc++ \
+	${CLANG} -O3 -o $@ -flto=thin -fPIC $^ ${CRYSTAL_RT_LIBS} \
+		-target $(CLANG_TARGET_PLATFORM) \
 		`sh -c 'ls $(LLVM_PATH)/lib/libclang*.a'` \
 		`$(LLVM_CONFIG) --libfiles --link-static` \
 		`$(LLVM_CONFIG) --system-libs --link-static`
-	$@ --version
 
 # Build the Savi compiler executable, by linking the above targets together.
 # This variant of the target compiles in debug mode.
 $(BUILD)/savi-debug: $(BUILD)/savi-debug.o $(BUILD)/llvm_ext.bc lib/libsavi_runtime.bc
 	mkdir -p `dirname $@`
-	${CLANG} -O0 -o $@ -flto=thin -fPIC $^ ${CRYSTAL_RT_LIBS} -lstdc++ \
+	${CLANG} -O0 -o $@ -flto=thin -fPIC $^ ${CRYSTAL_RT_LIBS} \
+		-target $(CLANG_TARGET_PLATFORM) \
 		`sh -c 'ls $(LLVM_PATH)/lib/libclang*.a'` \
 		`$(LLVM_CONFIG) --libfiles --link-static` \
 		`$(LLVM_CONFIG) --system-libs --link-static`
-	$@ --version
 
 # Build the Savi specs executable, by linking the above targets together.
 # This variant of the target will be used when running tests.
 $(BUILD)/savi-spec: $(BUILD)/savi-spec.o $(BUILD)/llvm_ext.bc lib/libsavi_runtime.bc
 	mkdir -p `dirname $@`
-	${CLANG} -O0 -o $@ -flto=thin -fPIC $^ ${CRYSTAL_RT_LIBS} -lstdc++ \
+	${CLANG} -O0 -o $@ -flto=thin -fPIC $^ ${CRYSTAL_RT_LIBS} \
+		-target $(CLANG_TARGET_PLATFORM) \
 		`sh -c 'ls $(LLVM_PATH)/lib/libclang*.a'` \
 		`$(LLVM_CONFIG) --libfiles --link-static` \
 		`$(LLVM_CONFIG) --system-libs --link-static`
