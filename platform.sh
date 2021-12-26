@@ -24,7 +24,7 @@ if uname | grep -iq 'Linux'; then
     fail "On Linux, the only arch currently supported is: x86_64"
   fi
 elif uname | grep -iq 'FreeBSD'; then
-  if uname -m | grep -iq 'x86_64'; then
+  if uname -m | grep -iq 'amd64'; then
     echo 'x86_64-unknown-freebsd'
   else
     fail "On FreeBSD, the only arch currently supported is: x86_64"
