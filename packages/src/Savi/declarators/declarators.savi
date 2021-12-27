@@ -293,8 +293,7 @@
 :: to a function exposed by a foreign package which is linked to the program.
 :declarator ffi
   :intrinsic
-  :begins type
-  :begins type_singleton
+  :begins ffi
 
   :term cap enum (iso, val, ref, box, tag, non)
     :default non
@@ -340,6 +339,20 @@
   :term ret Type
     :optional
   :body optional
+
+// TODO: Document this.
+:declarator fun
+  :intrinsic
+  :context ffi
+  :begins function
+
+  :term cap enum (non)
+    :default non
+  :term variadic enum (variadic)
+    :optional
+  :term name_and_params NameMaybeWithParams
+  :term ret Type
+    :optional
 
 // TODO: Document this.
 :declarator be

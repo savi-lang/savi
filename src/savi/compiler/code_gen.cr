@@ -777,17 +777,18 @@ class Savi::Compiler::CodeGen
       llvm_type_of(param, gfunc)
     }) || [] of LLVM::Type
     ret = llvm_type_of(gfunc.func.ret.not_nil!, gfunc)
+    is_variadic = gfunc.func.has_tag?(:variadic)
 
     ffi_link_name = gfunc.func.metadata[:ffi_link_name].as(String)
 
     # Prevent double-declaring for common FFI functions already known to us.
     llvm_ffi_func = @mod.functions[ffi_link_name]?
     if llvm_ffi_func
-      # TODO: verify that parameter types and return type are compatible
+      # TODO: verify that types and variadic-ness are compatible.
       return @mod.functions[ffi_link_name]
     end
 
-    @mod.functions.add(ffi_link_name, params, ret)
+    @mod.functions.add(ffi_link_name, params, ret, is_variadic)
   end
 
   def gen_ffi_impl(gtype, gfunc, llvm_func)
@@ -798,35 +799,43 @@ class Savi::Compiler::CodeGen
     param_count = llvm_func.params.size
     args = param_count.times.map { |i| llvm_func.params[i] }.to_a
 
+    value = gen_ffi_call(gfunc, args)
+
+    gen_return_value(value, nil)
+
+    gen_func_end(gfunc)
+  end
+
+  def gen_ffi_call(gfunc, args)
+    llvm_ffi_func = gen_ffi_decl(gfunc)
+
     case gfunc.calling_convention
     when GenFunc::Simple
       value = @builder.call llvm_ffi_func, args
       value = gen_none if llvm_ffi_func.return_type == @void
-      @builder.ret(value)
+      value
     when GenFunc::Errorable
       then_block = gen_block("invoke_then")
       else_block = gen_block("invoke_else")
       value = @builder.invoke llvm_ffi_func, args, then_block, else_block
       value = gen_none if llvm_ffi_func.return_type == @void
 
-      # In the else block, make a landing pad to catch the pony-style error,
-      # then return an error using our error calling convention.
+      # In the else block, make a landing pad to catch the Pony-style error,
+      # then raise the value "None" it as a Savi-style error.
       finish_block_and_move_to(else_block)
       @builder.landing_pad(
         @pony_error_landing_pad_type,
         @pony_error_personality_fn,
         [] of LLVM::Value,
       )
-      gfunc.calling_convention.gen_error_return(self, gfunc, gen_none, nil)
+      gen_raise_error(gen_none, nil)
 
-      # In the then block, return the value using our error calling convention.
+      # In the then block, return the result value.
       finish_block_and_move_to(then_block)
-      gfunc.calling_convention.gen_return(self, gfunc, value, nil)
+      value
     else
       raise NotImplementedError.new(gfunc.calling_convention)
     end
-
-    gen_func_end(gfunc)
   end
 
   def gen_intrinsic_cpointer(gtype, gfunc, llvm_func)
@@ -1633,7 +1642,19 @@ class Savi::Compiler::CodeGen
 
     # Call the LLVM function, or do a virtual call if necessary.
     @di.set_loc(call.ident)
-    result = gen_call(gfunc.reach_func.signature, llvm_func, args, arg_exprs, arg_frames, use_receiver, !cont.nil?)
+    result = gen_call(
+      gfunc.reach_func.signature,
+      llvm_func,
+      args,
+      arg_exprs,
+      arg_frames,
+      gfunc.func.has_tag?(:ffi) ? gfunc : nil,
+      use_receiver,
+      !cont.nil?,
+    )
+
+    # If this was an FFI call, skip calling-convention-specific handling.
+    return result if gfunc.func.has_tag?(:ffi)
 
     case gfunc.calling_convention
     when GenFunc::Simple
@@ -1841,6 +1862,7 @@ class Savi::Compiler::CodeGen
     args : Array(LLVM::Value),
     arg_exprs : Array(AST::Node?),
     arg_frames : Array(Frame?),
+    is_ffi_gfunc : GenFunc?,
     use_receiver : Bool,
     use_cont : Bool,
   )
@@ -1872,6 +1894,21 @@ class Savi::Compiler::CodeGen
       llvm_param_type = func.type.element_type.params_types[index]
       next if arg.type == llvm_param_type
       cast_args[index] = @builder.bit_cast(arg, llvm_param_type, "#{arg}.CAST")
+    end
+
+    # Handle the special case of calling an FFI function. We need to call it
+    # directly instead of using the indirection of the normal gfunc.llvm_func
+    # that wraps it, since there is not a reliable way to transmit varargs via
+    # that wrapper function (the only way is to use thunk and musttail attrs,
+    # but the musttail attr is unnecessarily restrictive for what we need).
+    if is_ffi_gfunc
+      # For variadic FFI functions, we may have more args than params,
+      # but the cast args we have collected are mapped to the known params.
+      # So here we add the remaining (not cast) args to the cast args array.
+      while args.size > cast_args.size
+        cast_args << args[cast_args.size]
+      end
+      return gen_ffi_call(is_ffi_gfunc, cast_args)
     end
 
     @builder.call(LLVM::Function.from_value(func), cast_args)
@@ -3329,13 +3366,13 @@ class Savi::Compiler::CodeGen
     @builder.phi(llvm_type_of(phi_type.not_nil!), phi_blocks, phi_values, "phi_try")
   end
 
-  def gen_return_value(value : LLVM::Value, from_expr : AST::Node)
+  def gen_return_value(value : LLVM::Value, from_expr : AST::Node?)
     gfunc = func_frame.gfunc.not_nil!
     gfunc.calling_convention.gen_return(self, gfunc, value, from_expr)
     .tap { finish_block_and_move_to(gen_block("unreachable_after_early_return")) }
   end
 
-  def gen_raise_error(error_value : LLVM::Value, from_expr : AST::Node)
+  def gen_raise_error(error_value : LLVM::Value, from_expr : AST::Node?)
     raise "inconsistent frames" if @frames.size > 1
 
     # error_value now is generated properly from the error! argument

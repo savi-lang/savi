@@ -416,6 +416,7 @@ class Savi::Program
       :is,
       :it,
       :let,
+      :variadic,
     ]
 
     def initialize(*args)
