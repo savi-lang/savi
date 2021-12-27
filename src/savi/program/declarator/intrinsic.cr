@@ -200,7 +200,7 @@ module Savi::Program::Intrinsic
       end
 
     # Declarations within a type definition.
-    when "type", "type_singleton"
+    when "type", "type_singleton", "ffi"
       case declarator.name.value
       when "it"
         name = terms["name"].as(AST::LiteralString)
@@ -224,6 +224,8 @@ module Savi::Program::Intrinsic
           params,
           terms["ret"]?.as(AST::Term?),
         )
+
+        function.add_tag(:variadic) if terms["variadic"]?
 
         scope.on_body { |body| function.body = body }
       when "be"

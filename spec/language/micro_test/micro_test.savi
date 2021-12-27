@@ -1,5 +1,5 @@
 :ffi LibC
-  :fun printf(format CPointer(U8), arg1 CPointer(U8)) I32
+  :fun variadic printf(format CPointer(U8)) I32
 
 :class MicroTest
   :var env Env

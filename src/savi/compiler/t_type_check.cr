@@ -194,7 +194,7 @@ class Savi::Compiler::TTypeCheck
     min = AST::Extract.params(call_func.params).count { |(ident, type, default)| !default }
     func_pos = call_func.ident.pos
 
-    if arg_count > max
+    if arg_count > max && !call_func.has_tag?(:variadic)
       max_text = "#{max} #{max == 1 ? "argument" : "arguments"}"
       params_pos = call_func.params.try(&.pos) || call_func.ident.pos
       problems << {call.pos, "the call site has too many arguments"}

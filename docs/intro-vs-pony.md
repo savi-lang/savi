@@ -550,10 +550,19 @@ While in Pony we use `@` to mark that we are calling a C function, in Savi we de
 
 ```savi
 :ffi LibC
-  :fun printf(format CPointer(U8), arg1 CPointer(U8)) I32
+  :fun puts(string CPointer(U8)) I32
 ```
 
 In the example above you see that we are declaring plain functions. You need to specify all types, just like in Pony. All FFI functions have the `non` reference capability.
+
+To use a variadic function from C (one which can accept additional arguments that have no specific type requirements), add the word `variadic` to the declaration:
+
+```savi
+:ffi LibC
+  :fun variadic printf(format CPointer(U8)) I32
+```
+
+Note that on some platforms, variadic functions use a different calling convention from non-variadic functions, so be sure to always mark FFI functions correctly - the Savi compiler can't prevent you from getting this wrong.
 
 #### Usage example
 
