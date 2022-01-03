@@ -2,8 +2,7 @@
 # Dev stage: outputs an alpine image with everything needed for development.
 # (this image is used by the `make ready` command to create a dev environment)
 
-# TODO: Don't use alpine:edge - use alpine:3.15 when it's available
-FROM alpine:edge as dev
+FROM alpine:3.15 as dev
 
 # Install build tools, Pony dependencies, LLVM libraries, and Crystal.
 RUN apk add --no-cache --update \
@@ -24,8 +23,7 @@ WORKDIR /opt/code
 # Build stage: outputs an alpine image that contains a working Savi compiler
 # (this image is used only as a precursor to the release stage)
 
-# TODO: Don't use alpine:edge - use alpine:3.15 when it's available
-FROM alpine:edge as build
+FROM alpine:3.15 as build
 
 # Install build tools, Pony dependencies, LLVM libraries, and Crystal.
 # This line is kept intentionally the same as it was for the dev stage,
@@ -53,8 +51,7 @@ RUN make bin/savi
 # Release stage: outputs a minimal alpine image with a working Savi compiler
 # (this image is made available on DockerHub for download)
 
-# TODO: Don't use alpine:edge - use alpine:3.15 when it's available
-FROM alpine:edge as release
+FROM alpine:3.15 as release
 
 # Install runtime dependencies of the compiler.
 RUN apk add --no-cache --update \
