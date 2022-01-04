@@ -11,5 +11,6 @@
 // That is, parts of the LLVM API are only exposed in C++ but not the C wrapper,
 // so if we want to use them, we need to wrap them ourselves here.
 
+#include "./LLVMLinkForSavi.cc"
 #include "./LLVMOptimizeForSavi.cc"
 #include "./LLVMRemapDIDirectoryForSavi.cc"

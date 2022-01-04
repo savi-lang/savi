@@ -18,17 +18,56 @@ class Savi::Compiler::Binary
   end
 
   def run(ctx)
+    target = Target.new(ctx.code_gen.target_machine.triple)
     bin_path = ctx.manifests.root.not_nil!.bin_path
 
     # Compile a temporary binary object file, that we will remove after we
     # use it in the linker invocation to create the final binary.
     obj_path = BinaryObject.run(ctx)
 
+    if target.macos?
+      link_for_macosx(ctx, target, obj_path, bin_path)
+    else
+      link_generic(ctx, target, obj_path, bin_path)
+    end
+
+    # If requested, strip debugging symbols from the binary.
+    if ctx.options.no_debug
+      res = Process.run("/usr/bin/env", ["strip", bin_path], output: STDOUT, error: STDERR)
+      raise "strip failed" unless res.exit_code == 0
+    end
+  ensure
+    # Remove the temporary object file to clean up after ourselves a bit.
+    File.delete(obj_path) if obj_path && File.exists?(obj_path)
+  end
+
+  def link_for_macosx(ctx, target, obj_path, bin_path)
+    link_args = %w{lld -execute}
+
+    link_args << "-no_pie" unless target.arm64?
+    link_args << "-arch" << (target.arm64? ? "arm64" : "x86_64")
+
+    link_args << "-o" << bin_path
+    link_args << obj_path
+
+    link_args << "-L/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib"
+    link_args << "-lSystem"
+
+    link_args << "-lto_library" << "lib/libLTO.dylib"
+
+    link_res = LibLLVM.link_for_savi_directly(
+      "mach_o",
+      link_args.size, link_args.map(&.to_unsafe)
+    )
+    raise "failed to link" unless link_res
+  end
+
+  def link_generic(ctx, target, obj_path, bin_path)
     # Use clang to orchestrate the linking process (clang will call the linker
     # for us with appropriate arguments based on the args we have given it).
     # For all platforms, we enable position-independent-code and
-    # thin link time optimization as defaults.
-    link_args = %w{clang -fpic -flto=thin}
+    # thin link time optimization. We will use embedded lld as the linker.
+    link_args = %w{clang -fpic -flto=thin -fuse-ld=lld}
 
     # We also use clang for optimizations, when compiling in release mode.
     # Note that we already optimized the program in the BinaryObject pass,
@@ -40,7 +79,6 @@ class Savi::Compiler::Binary
 
     # Based on the target, choose which libraries to explicitly link.
     # On some platforms, some of the relevant libraries we need are implicit.
-    target = Target.new(ctx.code_gen.target_machine.triple)
     link_args.concat(
       if target.linux?
         if target.musl?
@@ -57,6 +95,18 @@ class Savi::Compiler::Binary
       end
     )
 
+    # Based on the target, choose the linker flavor to use.
+    link_flavor =
+      if target.linux?
+        "elf"
+      elsif target.freebsd?
+        "elf"
+      elsif target.macos?
+        "mach_o"
+      else
+        raise NotImplementedError.new(target)
+      end
+
     # Link any additional libraries requested by the user program.
     ctx.link_libraries.each do |x|
       link_args << "-l" + x
@@ -66,14 +116,14 @@ class Savi::Compiler::Binary
     link_args << obj_path
     link_args << "-o" << bin_path
 
-    res = Process.run("/usr/bin/env", link_args, output: STDOUT, error: STDERR)
-    raise "linker failed" unless res.exit_code == 0
-
-    if ctx.options.no_debug
-      res = Process.run("/usr/bin/env", ["strip", bin_path], output: STDOUT, error: STDERR)
-      raise "strip failed" unless res.exit_code == 0
-    end
-  ensure
-    File.delete(obj_path) if obj_path && File.exists?(obj_path)
+    # Use a linker to turn make an executable binary from the object file.
+    # We use an embedded linker, passing the given link args to embedded clang,
+    # which will determine the right args to use for the embedded lld linker.
+    link_res = LibLLVM.link_for_savi(
+      link_flavor,
+      ctx.code_gen.target_machine.triple,
+      link_args.size, link_args.map(&.to_unsafe)
+    )
+    raise "failed to link" unless link_res
   end
 end
