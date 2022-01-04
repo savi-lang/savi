@@ -124,12 +124,12 @@ CLANG_TARGET_PLATFORM?=$(TARGET_PLATFORM)
 
 # Specify where to download our pre-built LLVM/clang static libraries from.
 # This needs to get bumped explicitly here when we do a new LLVM build.
-LLVM_STATIC_RELEASE_URL?=https://github.com/savi-lang/llvm-static/releases/download/20211223
+LLVM_STATIC_RELEASE_URL?=https://github.com/savi-lang/llvm-static/releases/download/20220103
 $(eval $(call MAKE_VAR_CACHE,LLVM_STATIC_RELEASE_URL))
 
 # Specify where to download our pre-built LLVM/clang static libraries from.
 # This needs to get bumped explicitly here when we do a new LLVM build.
-RUNTIME_BITCODE_RELEASE_URL?=https://github.com/savi-lang/runtime-bitcode/releases/download/20211101
+RUNTIME_BITCODE_RELEASE_URL?=https://github.com/savi-lang/runtime-bitcode/releases/download/20220103
 $(eval $(call MAKE_VAR_CACHE,RUNTIME_BITCODE_RELEASE_URL))
 
 # This is the path where we look for the LLVM pre-built static libraries to be,
@@ -159,17 +159,19 @@ endif
 # including the LLVM extensions C++ file we need to build and link.
 CRYSTAL_PATH?=$(shell env $(shell crystal env) printenv CRYSTAL_PATH | rev | cut -d ':' -f 1 | rev)
 
-# Download the static LLVM/clang libraries we have built separately.
-# See github.com/savi-lang/llvm-static for more info.
-# This target will be unused if someone overrides the LLVM_PATH variable
-# to point to an LLVM installation they obtained by some other means.
+# Download the runtime bitcode library we have built separately.
+# See github.com/savi-lang/runtime-bitcode for more info.
 lib/libsavi_runtime.bc: .make-var-cache/RUNTIME_BITCODE_RELEASE_URL
-	rm -f $@.tmp
-	curl -L --fail -sS \
-		"${RUNTIME_BITCODE_RELEASE_URL}/${TARGET_PLATFORM}-libponyrt.bc" \
-	> $@.tmp
-	rm -f $@
-	mv $@.tmp $@
+	rm -rf lib/libsavi_runtime-tmp
+	mkdir -p lib/libsavi_runtime-tmp
+	cd lib/libsavi_runtime-tmp && curl -L --fail -sS \
+		"${RUNTIME_BITCODE_RELEASE_URL}/${TARGET_PLATFORM}-libsavi_runtime.tar.gz" \
+	| tar -xzvf -
+	rm -f lib/libsavi_runtime.bc
+	mv lib/libsavi_runtime-tmp/libsavi_runtime.bc lib/libsavi_runtime.bc
+	rm -rf lib/libsavi_runtime
+	mv lib/libsavi_runtime-tmp/libsavi_runtime lib/libsavi_runtime
+	rm -rf lib/libsavi_runtime-tmp
 	touch $@
 
 # Download the static LLVM/clang libraries we have built separately.
