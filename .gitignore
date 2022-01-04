@@ -2,4 +2,4 @@ bin
 /.make-var-cache
 /build
 /build-in-docker
-/lib/libsavi_runtime.bc
+/lib/libsavi_runtime*

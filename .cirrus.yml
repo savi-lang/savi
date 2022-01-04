@@ -41,7 +41,7 @@ task:
         CPLUS_INCLUDE_PATH: /usr/include/c++/10.3.1:/usr/include/c++/10.3.1/x86_64-alpine-linux-musl
         LIBRARY_PATH: /usr/lib/gcc/x86_64-alpine-linux-musl/10.3.1
       container:
-        image: alpine:edge # TODO: use alpine:3.15 or newest stable release when available
+        image: alpine:3.15
 
     # # TODO: Enable FreeBSD after getting it working:
     # - name: x86_64-unknown-freebsd
