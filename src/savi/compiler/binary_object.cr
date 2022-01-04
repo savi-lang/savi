@@ -16,8 +16,10 @@ require "llvm"
 # !! This pass has the side-effect of writing files to disk.
 #
 class Savi::Compiler::BinaryObject
+  DEFAULT_RUNTIME_PATH = File.expand_path("../../lib", Process.executable_path.not_nil!)
+
   RUNTIME_BC_PATH = ENV.fetch("SAVI_RUNTIME_BC_PATH", [
-    File.expand_path("../../lib", Process.executable_path.not_nil!),
+    DEFAULT_RUNTIME_PATH,
     "/usr/lib",
     "/usr/local/lib",
   ].join(":"))
@@ -33,20 +35,28 @@ class Savi::Compiler::BinaryObject
     machine = ctx.code_gen.target_machine
     mod = ctx.code_gen.mod
 
-    target = Target.new(machine.triple)
-    ponyrt_bc_path = find_runtime_bc(RUNTIME_BC_PATH) \
+    # Obtain the Savi runtime as an LLVM module from bitcode somewhere on disk.
+    runtime_bc_path = find_runtime_bc(RUNTIME_BC_PATH) \
       || raise "libsavi_runtime.bc not found"
+    runtime_bc = LLVM::MemoryBuffer.from_file(runtime_bc_path)
+    runtime = llvm.parse_bitcode(runtime_bc).as(LLVM::Module)
 
-    ponyrt_bc = LLVM::MemoryBuffer.from_file(ponyrt_bc_path)
-    ponyrt = llvm.parse_bitcode(ponyrt_bc).as(LLVM::Module)
+    # Remap the directory in debug info to point to the bundled runtime source.
+    LibLLVM.remap_di_directory_for_savi(runtime,
+      "libsavi_runtime",
+      File.join(BinaryObject::DEFAULT_RUNTIME_PATH, "libsavi_runtime")
+    )
 
-    # Link the pony runtime bitcode into the generated module.
-    LibLLVM.link_modules(mod.to_unsafe, ponyrt.to_unsafe)
+    # Link the runtime bitcode module into the generated application module.
+    LibLLVM.link_modules(mod.to_unsafe, runtime.to_unsafe)
 
+    # Now run LLVM passes, doing full optimization if in release mode.
+    # Otherwise we will only run a minimal set of passes.
+    LibLLVM.optimize_for_savi(mod.to_unsafe, ctx.options.release)
+
+    # Write the program to disk as a binary object file.
     obj_path = "#{ctx.manifests.root.not_nil!.bin_path}.o"
-
     FileUtils.mkdir_p(File.dirname(obj_path))
-
     machine.emit_obj_to_file(mod, obj_path)
 
     obj_path

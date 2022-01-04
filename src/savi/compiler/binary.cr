@@ -31,7 +31,12 @@ class Savi::Compiler::Binary
     link_args = %w{clang -fpic -flto=thin}
 
     # We also use clang for optimizations, when compiling in release mode.
+    # Note that we already optimized the program in the BinaryObject pass,
+    # but this gives us the opportunity to run link-time optimizations if any.
     link_args << (ctx.options.release ? "-O3" : "-O0")
+
+    # Unless debugging info has been disabled, include it here.
+    link_args << "-g" unless ctx.options.no_debug
 
     # Based on the target, choose which libraries to explicitly link.
     # On some platforms, some of the relevant libraries we need are implicit.

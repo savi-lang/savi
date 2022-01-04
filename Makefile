@@ -197,6 +197,15 @@ $(BUILD)/llvm_ext.bc: $(LLVM_PATH)
 		$(CRYSTAL_PATH)/llvm/ext/llvm_ext.cc \
 		-o $@
 
+# Build the extra Savi LLVM extensions as LLVM bitcode.
+# This bitcode needs to get linked into our Savi compiler executable.
+$(BUILD)/llvm_ext_for_savi.bc: $(LLVM_PATH) src/savi/ext/llvm/for_savi/main.cc
+	mkdir -p `dirname $@`
+	${CLANGXX} -v -emit-llvm -c `$(LLVM_CONFIG) --cxxflags` \
+		-target $(CLANG_TARGET_PLATFORM) \
+		src/savi/ext/llvm/for_savi/main.cc \
+		-o $@
+
 # Build the Savi compiler object file, based on the Crystal source code.
 # We trick the Crystal compiler into thinking we are cross-compiling,
 # so that it won't try to run the linker for us - we want to run it ourselves.
@@ -241,10 +250,10 @@ $(BUILD)/savi-spec.o: spec/all.cr $(LLVM_PATH) $(shell find src lib spec -name '
 
 # Build the Savi compiler executable, by linking the above targets together.
 # This variant of the target compiles in release mode.
-$(BUILD)/savi-release: $(BUILD)/savi-release.o $(BUILD)/llvm_ext.bc lib/libsavi_runtime.bc
+$(BUILD)/savi-release: $(BUILD)/savi-release.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ext_for_savi.bc lib/libsavi_runtime.bc
 	mkdir -p `dirname $@`
 	${CLANG} -O3 -o $@ -flto=thin -fPIC \
-		$(BUILD)/savi-release.o $(BUILD)/llvm_ext.bc \
+		$(BUILD)/savi-release.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ext_for_savi.bc \
 		 ${CRYSTAL_RT_LIBS} \
 		-target $(CLANG_TARGET_PLATFORM) \
 		`sh -c 'ls $(LLVM_PATH)/lib/libclang*.a'` \
@@ -253,10 +262,10 @@ $(BUILD)/savi-release: $(BUILD)/savi-release.o $(BUILD)/llvm_ext.bc lib/libsavi_
 
 # Build the Savi compiler executable, by linking the above targets together.
 # This variant of the target compiles in debug mode.
-$(BUILD)/savi-debug: $(BUILD)/savi-debug.o $(BUILD)/llvm_ext.bc lib/libsavi_runtime.bc
+$(BUILD)/savi-debug: $(BUILD)/savi-debug.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ext_for_savi.bc lib/libsavi_runtime.bc
 	mkdir -p `dirname $@`
 	${CLANG} -O0 -o $@ -flto=thin -fPIC \
-		$(BUILD)/savi-debug.o $(BUILD)/llvm_ext.bc \
+		$(BUILD)/savi-debug.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ext_for_savi.bc \
 		 ${CRYSTAL_RT_LIBS} \
 		-target $(CLANG_TARGET_PLATFORM) \
 		`sh -c 'ls $(LLVM_PATH)/lib/libclang*.a'` \
@@ -265,10 +274,10 @@ $(BUILD)/savi-debug: $(BUILD)/savi-debug.o $(BUILD)/llvm_ext.bc lib/libsavi_runt
 
 # Build the Savi specs executable, by linking the above targets together.
 # This variant of the target will be used when running tests.
-$(BUILD)/savi-spec: $(BUILD)/savi-spec.o $(BUILD)/llvm_ext.bc lib/libsavi_runtime.bc
+$(BUILD)/savi-spec: $(BUILD)/savi-spec.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ext_for_savi.bc lib/libsavi_runtime.bc
 	mkdir -p `dirname $@`
 	${CLANG} -O0 -o $@ -flto=thin -fPIC \
-		$(BUILD)/savi-spec.o $(BUILD)/llvm_ext.bc \
+		$(BUILD)/savi-spec.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ext_for_savi.bc \
 		 ${CRYSTAL_RT_LIBS} \
 		-target $(CLANG_TARGET_PLATFORM) \
 		`sh -c 'ls $(LLVM_PATH)/lib/libclang*.a'` \

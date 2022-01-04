@@ -27,4 +27,11 @@ lib LibLLVM
   end
 
   fun byte_order = LLVMByteOrder(TargetDataRef) : ByteOrdering
+
+  ##
+  # Extra functions defined just for Savi go here:
+  #
+
+  fun optimize_for_savi = LLVMOptimizeForSavi(mod : ModuleRef, wants_full_optimization : Bool)
+  fun remap_di_directory_for_savi = LLVMRemapDIDirectoryForSavi(mod : ModuleRef, before_dir : UInt8*, after_dir : UInt8*)
 end
