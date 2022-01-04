@@ -20,8 +20,14 @@ if uname | grep -iq 'Linux'; then
     else
       fail "On Linux, the supported libc variants are: gnu, musl"
     fi
+  elif uname -m | grep -iq 'aarch64'; then
+    if ldd --version 2>&1 | grep -iq musl; then
+      echo 'arm64-unknown-linux-musl'
+    else
+      fail "On arm64 Linux, the only supported libc variant is: musl"
+    fi
   else
-    fail "On Linux, the only arch currently supported is: x86_64"
+    fail "On Linux, the only arches currently supported are: x86_64, arm64"
   fi
 elif uname | grep -iq 'FreeBSD'; then
   if uname -m | grep -iq 'amd64'; then

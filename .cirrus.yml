@@ -36,11 +36,22 @@ task:
         # For some reason clang doesn't like it if we omit the "alpine" vendor
         # in the triple, where we'd otherwise use `x86_64-unknown-linux-musl`.
         MAKE_EXTRA_ARGS: CLANG_TARGET_PLATFORM=x86_64-alpine-linux-musl
-        # For some reason clang++ is missing some c++ headers unless we
-        # explicitly mention them in this environment variable here.
-        CPLUS_INCLUDE_PATH: /usr/include/c++/10.3.1:/usr/include/c++/10.3.1/x86_64-alpine-linux-musl
-        LIBRARY_PATH: /usr/lib/gcc/x86_64-alpine-linux-musl/10.3.1
       container:
+        image: alpine:3.15
+
+    - name: arm64-unknown-linux-musl
+      environment:
+        TRIPLE: arm64-unknown-linux-musl
+        DEPS_INSTALL: "\
+          apk add --no-cache --update \
+            bash curl \
+            alpine-sdk coreutils gcc g++ clang make linux-headers llvm12-dev \
+            pcre-dev libevent-static gc-dev crystal shards"
+        # For some reason clang doesn't like it if we omit the "alpine" vendor
+        # in the triple, where we'd otherwise use `arm64-unknown-linux-musl`.
+        # We also need to use `aarch64` instead of `arm64` here...
+        MAKE_EXTRA_ARGS: CLANG_TARGET_PLATFORM=aarch64-alpine-linux-musl
+      arm_container:
         image: alpine:3.15
 
     # # TODO: Enable FreeBSD after getting it working:
