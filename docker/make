@@ -20,5 +20,9 @@ if test "$*" = "ready"; then
 	docker run --name savi-dev -v `pwd`:/opt/code -d --rm --memory 4g -p 8080 savi-dev tail -f /dev/null
 	echo "the savi-dev container is ready!"
 else
-  docker exec savi-dev make BUILD=build-in-docker "${@}"
+  # For some reason clang doesn't like it if we omit the "alpine" vendor
+  # in the triple, where we'd otherwise use `[ARCH]-unknown-linux-musl`.
+  platform=$(docker exec savi-dev ./platform.sh | sed s/unknown/alpine/)
+
+  docker exec savi-dev make BUILD=build-in-docker CLANG_TARGET_PLATFORM=$platform "${@}"
 fi

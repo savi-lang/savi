@@ -15,10 +15,6 @@ RUN apk add --no-cache --update \
 ENV CC=clang
 ENV CXX=clang++
 
-# For some reason clang doesn't like it if we omit the "alpine" vendor
-# in the triple, where we'd otherwise use `x86_64-unknown-linux-musl`.
-ENV CLANG_TARGET_PLATFORM x86_64-alpine-linux-musl
-
 # Create a basic working directory to use for code.
 RUN mkdir /opt/code
 WORKDIR /opt/code
@@ -41,10 +37,6 @@ RUN apk add --no-cache --update \
 
 ENV CC=clang
 ENV CXX=clang++
-
-# For some reason clang doesn't like it if we omit the "alpine" vendor
-# in the triple, where we'd otherwise use `x86_64-unknown-linux-musl`.
-ENV CLANG_TARGET_PLATFORM x86_64-alpine-linux-musl
 
 COPY --from=dev /usr/lib/libponyrt.bc \
                 /usr/lib/
