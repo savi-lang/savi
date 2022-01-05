@@ -1,5 +1,6 @@
 bin
 /.make-var-cache
+/.make-var-cache-in-docker
 /build
 /build-in-docker
 /lib/libsavi_runtime*
