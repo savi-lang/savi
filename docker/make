@@ -25,5 +25,9 @@ else
   # We also need to use `aarch64` instead of `arm64` here, if it applies...
   platform=$(docker exec savi-dev ./platform.sh | sed s/unknown/alpine/ | sed s/arm64/aarch64/)
 
-  docker exec savi-dev make BUILD=build-in-docker CLANG_TARGET_PLATFORM=$platform "${@}"
+  docker exec savi-dev make \
+    BUILD=build-in-docker \
+    MAKE_VAR_CACHE=.make-var-cache-in-docker \
+    CLANG_TARGET_PLATFORM=$platform \
+    "${@}"
 fi

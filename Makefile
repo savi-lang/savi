@@ -4,6 +4,7 @@ config?=debug
 
 # Allow overriding the build dir (for example in Docker-based invocations).
 BUILD?=build
+MAKE_VAR_CACHE?=.make-var-cache
 
 # Some convenience variables that set up the paths for the built Savi binaries.
 SAVI=$(BUILD)/savi-$(config)
@@ -21,7 +22,7 @@ ci: PHONY
 
 # Remove temporary/generated files.
 clean: PHONY
-	rm -rf $(BUILD) .make-var-cache lib/libsavi_runtime.bc
+	rm -rf $(BUILD) $(MAKE_VAR_CACHE) lib/libsavi_runtime.bc
 
 # Run the full test suite.
 spec.all: PHONY spec.compiler.all spec.language spec.package.all spec.unit.all spec.integration.all
@@ -100,12 +101,12 @@ vscode: PHONY $(SAVI)
 # of a variable to invalidate a target file when it changes.
 # This lets us force make to rebuild things when that variable changes.
 # See https://stackoverflow.com/a/26147844
-define MAKE_VAR_CACHE
+define MAKE_VAR_CACHE_FOR
 
-.make-var-cache/$1: PHONY
-	@mkdir -p .make-var-cache
-	@if [ '$(shell cat .make-var-cache/$1 2> /dev/null)' = '$($1)' ]; then echo; else \
-		/usr/bin/env echo -n $($1) > .make-var-cache/$1; fi
+$(MAKE_VAR_CACHE)/$1: PHONY
+	@mkdir -p $(MAKE_VAR_CACHE)
+	@if [ '$(shell cat $(MAKE_VAR_CACHE)/$1 2> /dev/null)' = '$($1)' ]; then echo; else \
+		/usr/bin/env echo -n $($1) > $(MAKE_VAR_CACHE)/$1; fi
 
 endef
 
@@ -125,12 +126,12 @@ CLANG_TARGET_PLATFORM?=$(TARGET_PLATFORM)
 # Specify where to download our pre-built LLVM/clang static libraries from.
 # This needs to get bumped explicitly here when we do a new LLVM build.
 LLVM_STATIC_RELEASE_URL?=https://github.com/savi-lang/llvm-static/releases/download/20220104b
-$(eval $(call MAKE_VAR_CACHE,LLVM_STATIC_RELEASE_URL))
+$(eval $(call MAKE_VAR_CACHE_FOR,LLVM_STATIC_RELEASE_URL))
 
 # Specify where to download our pre-built LLVM/clang static libraries from.
 # This needs to get bumped explicitly here when we do a new LLVM build.
 RUNTIME_BITCODE_RELEASE_URL?=https://github.com/savi-lang/runtime-bitcode/releases/download/20220103
-$(eval $(call MAKE_VAR_CACHE,RUNTIME_BITCODE_RELEASE_URL))
+$(eval $(call MAKE_VAR_CACHE_FOR,RUNTIME_BITCODE_RELEASE_URL))
 
 # This is the path where we look for the LLVM pre-built static libraries to be,
 # including the llvm-config utility used to print information about them.
@@ -161,7 +162,7 @@ CRYSTAL_PATH?=$(shell env $(shell crystal env) printenv CRYSTAL_PATH | rev | cut
 
 # Download the runtime bitcode library we have built separately.
 # See github.com/savi-lang/runtime-bitcode for more info.
-lib/libsavi_runtime.bc: .make-var-cache/RUNTIME_BITCODE_RELEASE_URL
+lib/libsavi_runtime.bc: $(MAKE_VAR_CACHE)/RUNTIME_BITCODE_RELEASE_URL
 	rm -rf lib/libsavi_runtime-tmp
 	mkdir -p lib/libsavi_runtime-tmp
 	cd lib/libsavi_runtime-tmp && curl -L --fail -sS \
@@ -178,7 +179,7 @@ lib/libsavi_runtime.bc: .make-var-cache/RUNTIME_BITCODE_RELEASE_URL
 # See github.com/savi-lang/llvm-static for more info.
 # This target will be unused if someone overrides the LLVM_PATH variable
 # to point to an LLVM installation they obtained by some other means.
-$(BUILD)/llvm-static: .make-var-cache/LLVM_STATIC_RELEASE_URL
+$(BUILD)/llvm-static: $(MAKE_VAR_CACHE)/LLVM_STATIC_RELEASE_URL
 	rm -rf $@-tmp
 	mkdir -p $@-tmp
 	cd $@-tmp && curl -L --fail -sS \
