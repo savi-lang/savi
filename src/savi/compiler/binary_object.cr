@@ -51,9 +51,9 @@ class Savi::Compiler::BinaryObject
       end
     elsif target.macos?
       if target.x86_64?
-        return "x86_64-apple-macos"
+        return "x86_64-apple-macosx"
       elsif target.arm64?
-        return "arm64-apple-macos"
+        return "arm64-apple-macosx"
       end
     end
 
