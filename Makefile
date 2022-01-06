@@ -20,9 +20,9 @@ ci: PHONY
 	${MAKE} example dir="examples/adventofcode/2018" extra_args="--backtrace $(extra_args)"
 	${MAKE} example-eval
 
-# Remove temporary/generated files.
+# Remove temporary/generated/downloaded files.
 clean: PHONY
-	rm -rf $(BUILD) $(MAKE_VAR_CACHE) lib/libsavi_runtime.bc
+	rm -rf $(BUILD) $(MAKE_VAR_CACHE) lib/libsavi_runtime
 
 # Run the full test suite.
 spec.all: PHONY spec.compiler.all spec.language spec.package.all spec.unit.all spec.integration.all
@@ -130,7 +130,7 @@ $(eval $(call MAKE_VAR_CACHE_FOR,LLVM_STATIC_RELEASE_URL))
 
 # Specify where to download our pre-built LLVM/clang static libraries from.
 # This needs to get bumped explicitly here when we do a new LLVM build.
-RUNTIME_BITCODE_RELEASE_URL?=https://github.com/savi-lang/runtime-bitcode/releases/download/20220103
+RUNTIME_BITCODE_RELEASE_URL?=https://github.com/savi-lang/runtime-bitcode/releases/download/20220105b
 $(eval $(call MAKE_VAR_CACHE_FOR,RUNTIME_BITCODE_RELEASE_URL))
 
 # This is the path where we look for the LLVM pre-built static libraries to be,
@@ -162,17 +162,14 @@ CRYSTAL_PATH?=$(shell env $(shell crystal env) printenv CRYSTAL_PATH | rev | cut
 
 # Download the runtime bitcode library we have built separately.
 # See github.com/savi-lang/runtime-bitcode for more info.
-lib/libsavi_runtime.bc: $(MAKE_VAR_CACHE)/RUNTIME_BITCODE_RELEASE_URL
-	rm -rf lib/libsavi_runtime-tmp
-	mkdir -p lib/libsavi_runtime-tmp
-	cd lib/libsavi_runtime-tmp && curl -L --fail -sS \
-		"${RUNTIME_BITCODE_RELEASE_URL}/${TARGET_PLATFORM}-libsavi_runtime.tar.gz" \
+lib/libsavi_runtime: $(MAKE_VAR_CACHE)/RUNTIME_BITCODE_RELEASE_URL
+	rm -rf $@-tmp
+	mkdir -p $@-tmp
+	cd $@-tmp && curl -L --fail -sS \
+		"${RUNTIME_BITCODE_RELEASE_URL}/libsavi_runtime.tar.gz" \
 	| tar -xzvf -
-	rm -f lib/libsavi_runtime.bc
-	mv lib/libsavi_runtime-tmp/libsavi_runtime.bc lib/libsavi_runtime.bc
-	rm -rf lib/libsavi_runtime
-	mv lib/libsavi_runtime-tmp/libsavi_runtime lib/libsavi_runtime
-	rm -rf lib/libsavi_runtime-tmp
+	rm -rf $@
+	mv $@-tmp $@
 	touch $@
 
 # Download the static LLVM/clang libraries we have built separately.
@@ -251,7 +248,7 @@ $(BUILD)/savi-spec.o: spec/all.cr $(LLVM_PATH) $(shell find src lib spec -name '
 
 # Build the Savi compiler executable, by linking the above targets together.
 # This variant of the target compiles in release mode.
-$(BUILD)/savi-release: $(BUILD)/savi-release.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ext_for_savi.bc lib/libsavi_runtime.bc
+$(BUILD)/savi-release: $(BUILD)/savi-release.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ext_for_savi.bc lib/libsavi_runtime
 	mkdir -p `dirname $@`
 	${CLANG} -O3 -o $@ -flto=thin -fPIC \
 		$(BUILD)/savi-release.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ext_for_savi.bc \
@@ -263,7 +260,7 @@ $(BUILD)/savi-release: $(BUILD)/savi-release.o $(BUILD)/llvm_ext.bc $(BUILD)/llv
 
 # Build the Savi compiler executable, by linking the above targets together.
 # This variant of the target compiles in debug mode.
-$(BUILD)/savi-debug: $(BUILD)/savi-debug.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ext_for_savi.bc lib/libsavi_runtime.bc
+$(BUILD)/savi-debug: $(BUILD)/savi-debug.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ext_for_savi.bc lib/libsavi_runtime
 	mkdir -p `dirname $@`
 	${CLANG} -O0 -o $@ -flto=thin -fPIC \
 		$(BUILD)/savi-debug.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ext_for_savi.bc \
@@ -275,7 +272,7 @@ $(BUILD)/savi-debug: $(BUILD)/savi-debug.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ex
 
 # Build the Savi specs executable, by linking the above targets together.
 # This variant of the target will be used when running tests.
-$(BUILD)/savi-spec: $(BUILD)/savi-spec.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ext_for_savi.bc lib/libsavi_runtime.bc
+$(BUILD)/savi-spec: $(BUILD)/savi-spec.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ext_for_savi.bc lib/libsavi_runtime
 	mkdir -p `dirname $@`
 	${CLANG} -O0 -o $@ -flto=thin -fPIC \
 		$(BUILD)/savi-spec.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ext_for_savi.bc \

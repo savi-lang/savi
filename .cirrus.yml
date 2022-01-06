@@ -122,7 +122,7 @@ task:
 
   copy_runtime_script:
     - mkdir -p out/lib
-    - cp lib/libsavi_runtime.bc out/lib/
+    - cp -r lib/libsavi_runtime out/lib/libsavi_runtime
 
   archive_script:
     - tar -czvf /tmp/savi.tar.gz -C out .

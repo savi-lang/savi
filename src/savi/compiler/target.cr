@@ -6,4 +6,12 @@ class Savi::Compiler::Target < Crystal::Codegen::Target
   def musl?
     linux? && `ldd --version 2>&1`.starts_with?("musl")
   end
+
+  def arm64?
+    architecture == "aarch64"
+  end
+
+  def x86_64?
+    architecture == "x86_64"
+  end
 end

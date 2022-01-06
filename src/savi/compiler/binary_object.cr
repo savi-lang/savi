@@ -16,35 +16,64 @@ require "llvm"
 # !! This pass has the side-effect of writing files to disk.
 #
 class Savi::Compiler::BinaryObject
-  DEFAULT_RUNTIME_PATH = File.expand_path("../../lib", Process.executable_path.not_nil!)
+  DEFAULT_RUNTIME_PATH = File.expand_path(
+    "../../lib/libsavi_runtime",
+    Process.executable_path.not_nil!
+  )
 
-  RUNTIME_BC_PATH = ENV.fetch("SAVI_RUNTIME_BC_PATH", [
-    DEFAULT_RUNTIME_PATH,
-    "/usr/lib",
-    "/usr/local/lib",
-  ].join(":"))
+  def self.runtime_bc_path(target) : String
+    path = File.join(
+      DEFAULT_RUNTIME_PATH,
+      "libsavi_runtime-#{runtime_bc_triple(target)}.bc"
+    )
 
-  def self.find_runtime_bc(searchpath) : String?
-    searchpath.split(":", remove_empty: true)
-      .map { |path| File.join(path, "libsavi_runtime.bc") }
-      .find { |path| File.exists?(path) }
+    raise "no runtime bitcode found at path: #{path}" unless File.exists?(path)
+
+    path
+  end
+
+  def self.runtime_bc_triple(target) : String
+    if target.linux?
+      if target.musl?
+        if target.x86_64?
+          return "x86_64-unknown-linux-musl"
+        elsif target.arm64?
+          return "arm64-unknown-linux-musl"
+        end
+      else
+        if target.x86_64?
+          return "x86_64-unknown-linux-gnu"
+        end
+      end
+    elsif target.freebsd?
+      if target.x86_64?
+        return "x86_64-unknown-freebsd"
+      end
+    elsif target.macos?
+      if target.x86_64?
+        return "x86_64-apple-macos"
+      elsif target.arm64?
+        return "arm64-apple-macos"
+      end
+    end
+
+    raise NotImplementedError.new(target.inspect)
   end
 
   def self.run(ctx)
     llvm = ctx.code_gen.llvm
     machine = ctx.code_gen.target_machine
+    target = Target.new(machine.triple)
     mod = ctx.code_gen.mod
 
-    # Obtain the Savi runtime as an LLVM module from bitcode somewhere on disk.
-    runtime_bc_path = find_runtime_bc(RUNTIME_BC_PATH) \
-      || raise "libsavi_runtime.bc not found"
-    runtime_bc = LLVM::MemoryBuffer.from_file(runtime_bc_path)
+    # Obtain the Savi runtime as an LLVM module from the right bitcode on disk.
+    runtime_bc = LLVM::MemoryBuffer.from_file(runtime_bc_path(target))
     runtime = llvm.parse_bitcode(runtime_bc).as(LLVM::Module)
 
     # Remap the directory in debug info to point to the bundled runtime source.
     LibLLVM.remap_di_directory_for_savi(runtime,
       "libsavi_runtime",
-      File.join(BinaryObject::DEFAULT_RUNTIME_PATH, "libsavi_runtime")
+      File.join(BinaryObject::DEFAULT_RUNTIME_PATH, "src")
     )
 
     # Link the runtime bitcode module into the generated application module.
