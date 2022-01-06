@@ -70,18 +70,25 @@ task:
     - name: x86_64-apple-macosx
       environment:
         TRIPLE: x86_64-apple-macosx
-        DEPS_INSTALL: brew update --preinstall && brew install libiconv crystal
+        DEPS_INSTALL: brew update --preinstall && brew install libiconv crystal && brew cleanup
         # Set up the SDKROOT path specific to the present XCode version.
         SDKROOT: /Applications/Xcode-12.5.0.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk
+        HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK: "1" # optimizes brew install
       macos_instance:
         image: big-sur-xcode-12.5
+      # Caching some homebrew directories helps save some of the otherwise huge
+      # amount of time that it takes to update brew from the CI base image.
+      brew_cache:
+        folder: "$HOME/Library/Caches/Homebrew"
+      brew_usr_local_cache:
+        folder: "/usr/local/Homebrew"
 
     - name: arm64-apple-macosx
       environment:
         TRIPLE: arm64-apple-macosx
         # Download arm64 versions of the libraries needed by Crystal runtime.
         DEPS_INSTALL: "
-          brew update --preinstall && brew install crystal && \
+          brew update --preinstall && brew install crystal && brew cleanup && \
           mkdir /tmp/arm64 && \
           brew fetch --bottle-tag=arm64_big_sur libgc && \
           brew fetch --bottle-tag=arm64_big_sur libevent && \
@@ -99,8 +106,15 @@ task:
           LIB_PCRE=/tmp/arm64/lib/libpcre.a"
         # Set up the SDKROOT path specific to the present XCode version.
         SDKROOT: /Applications/Xcode-12.5.0.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk
+        HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK: "1" # optimizes brew install
       macos_instance:
         image: big-sur-xcode-12.5
+      # Caching some homebrew directories helps save some of the otherwise huge
+      # amount of time that it takes to update brew from the CI base image.
+      brew_cache:
+        folder: "$HOME/Library/Caches/Homebrew"
+      brew_usr_local_cache:
+        folder: "/usr/local/Homebrew"
 
   os_info_script:
     - uname
