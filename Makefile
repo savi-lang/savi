@@ -125,7 +125,7 @@ CLANG_TARGET_PLATFORM?=$(TARGET_PLATFORM)
 
 # Specify where to download our pre-built LLVM/clang static libraries from.
 # This needs to get bumped explicitly here when we do a new LLVM build.
-LLVM_STATIC_RELEASE_URL?=https://github.com/savi-lang/llvm-static/releases/download/20220104b
+LLVM_STATIC_RELEASE_URL?=https://github.com/savi-lang/llvm-static/releases/download/20220106
 $(eval $(call MAKE_VAR_CACHE_FOR,LLVM_STATIC_RELEASE_URL))
 
 # Specify where to download our pre-built LLVM/clang static libraries from.
@@ -271,6 +271,7 @@ $(BUILD)/savi-debug: $(BUILD)/savi-debug.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ex
 		`sh -c 'ls $(LLVM_PATH)/lib/liblld*.a'` \
 		`$(LLVM_CONFIG) --libfiles --link-static` \
 		`$(LLVM_CONFIG) --system-libs --link-static`
+	if uname | grep -iq 'Darwin'; then dsymutil $@; fi
 
 # Build the Savi specs executable, by linking the above targets together.
 # This variant of the target will be used when running tests.
@@ -284,3 +285,4 @@ $(BUILD)/savi-spec: $(BUILD)/savi-spec.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ext_
 		`sh -c 'ls $(LLVM_PATH)/lib/liblld*.a'` \
 		`$(LLVM_CONFIG) --libfiles --link-static` \
 		`$(LLVM_CONFIG) --system-libs --link-static`
+	if uname | grep -iq 'Darwin'; then dsymutil $@; fi

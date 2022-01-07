@@ -21,12 +21,17 @@ bool LLVMLinkForSaviDirectly(
 ) {
   std::vector<const char *> Args(ArgV, ArgV + ArgC);
 
+    for (auto it = Args.begin(); it != Args.end(); ++it) {
+      errs() << *it << "\n";
+    }
+
+
   // Invoke the linker.
   bool LinkResult = false;
   if (0 == strcmp(Flavor, "elf")) {
     LinkResult = lld::elf::link(Args, false, outs(), errs());
   } else if (0 == strcmp(Flavor, "mach_o")) {
-    LinkResult = lld::mach_o::link(Args, false, outs(), errs());
+    LinkResult = lld::macho::link(Args, false, outs(), errs());
   } else if (0 == strcmp(Flavor, "mingw")) {
     LinkResult = lld::mingw::link(Args, false, outs(), errs());
   } else if (0 == strcmp(Flavor, "coff")) {
@@ -39,9 +44,9 @@ bool LLVMLinkForSaviDirectly(
 
   // Show a helpful error message on failure.
   if (!LinkResult) {
-    errs() << "Failed to link with lld, using these args:";
+    errs() << "Failed to link with lld, using these args:" << "\n";
     for (auto it = Args.begin(); it != Args.end(); ++it) {
-      errs() << *it;
+      errs() << *it << "\n";
     }
   }
 
