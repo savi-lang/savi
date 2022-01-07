@@ -32,7 +32,7 @@ task:
           apk add --no-cache --update \
             bash curl \
             alpine-sdk coreutils gcc g++ clang make linux-headers llvm12-dev \
-            pcre-dev libevent-static gc-dev crystal shards"
+            pcre-dev libevent-static gc-dev crystal shards libexecinfo-dev"
         # For some reason clang doesn't like it if we omit the "alpine" vendor
         # in the triple, where we'd otherwise use `x86_64-unknown-linux-musl`.
         MAKE_EXTRA_ARGS: CLANG_TARGET_PLATFORM=x86_64-alpine-linux-musl
@@ -46,7 +46,7 @@ task:
           apk add --no-cache --update \
             bash curl \
             alpine-sdk coreutils gcc g++ clang make linux-headers llvm12-dev \
-            pcre-dev libevent-static gc-dev crystal shards"
+            pcre-dev libevent-static gc-dev crystal shards libexecinfo-dev"
         # For some reason clang doesn't like it if we omit the "alpine" vendor
         # in the triple, where we'd otherwise use `arm64-unknown-linux-musl`.
         # We also need to use `aarch64` instead of `arm64` here...
@@ -86,6 +86,7 @@ task:
     - name: arm64-apple-macosx
       environment:
         TRIPLE: arm64-apple-macosx
+        IS_CROSS_COMPILE: "1"
         # Download arm64 versions of the libraries needed by Crystal runtime.
         DEPS_INSTALL: "
           brew update --preinstall && brew install crystal && brew cleanup && \
@@ -137,6 +138,9 @@ task:
   copy_runtime_script:
     - mkdir -p out/lib
     - cp -r lib/libsavi_runtime out/lib/libsavi_runtime
+
+  smoke_test_unless_cross_compile_script:
+    - test -n "${IS_CROSS_COMPILE}" || out/bin/savi eval --backtrace --print-perf 'env.out.print("No smoke!")'
 
   archive_script:
     - tar -czvf /tmp/savi.tar.gz -C out .
