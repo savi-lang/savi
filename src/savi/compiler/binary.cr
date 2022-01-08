@@ -83,15 +83,11 @@ class Savi::Compiler::Binary
     link_args << "-platform_version" << "macos" << sdk_version << sdk_version
 
     # Finally, specify the input object file and the output filename.
-    link_args << "-o" << bin_path
     link_args << obj_path
+    link_args << "-o" << bin_path
 
     # Invoke the linker, using the MachO flavor.
-    link_res = LibLLVM.link_for_savi_directly(
-      "mach_o",
-      link_args.size, link_args.map(&.to_unsafe)
-    )
-    raise "failed to link" unless link_res
+    invoke_linker("mach_o", link_args)
   end
 
   # Link an ELF executable for a Linux or FreeBSD target.
@@ -141,15 +137,11 @@ class Savi::Compiler::Binary
     link_args << "-lexecinfo" if target.musl? || target.freebsd?
 
     # Finally, specify the input object file and the output filename.
-    link_args << "-o" << bin_path
     link_args << obj_path
+    link_args << "-o" << bin_path
 
     # Invoke the linker, using the ELF flavor.
-    link_res = LibLLVM.link_for_savi_directly(
-      "elf",
-      link_args.size, link_args.map(&.to_unsafe)
-    )
-    raise "failed to link" unless link_res
+    invoke_linker("elf", link_args)
   end
 
   # Get the path to the dynamic linker library for a Linux or FreeBSD target.
@@ -238,5 +230,24 @@ class Savi::Compiler::Binary
     }
 
     raise "failed to find #{file_name}"
+  end
+
+  def invoke_linker(flavor, link_args)
+    link_res = LibLLVM.link_for_savi(
+      flavor,
+      link_args.size, link_args.map(&.to_unsafe),
+      out out_ptr, out out_size,
+    )
+
+    # Print the output errors/warnings/info, if any.
+    if out_size > 0
+      output = String.new(out_ptr, out_size)
+      STDERR.puts(output)
+    end
+
+    # Ensure the output data pointer, which was a fresh allocation, is freed.
+    LibC.free(out_ptr)
+
+    raise "failed to link" unless link_res
   end
 end

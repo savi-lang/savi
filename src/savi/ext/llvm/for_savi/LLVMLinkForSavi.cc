@@ -13,92 +13,66 @@
 
 using namespace llvm;
 
+// A substitutable subclass of raw_ostream that captures its input to a string.
+class CaptureOStream : public llvm::raw_ostream {
+public:
+  std::string Data;
+
+  CaptureOStream() : raw_ostream(/*unbuffered=*/true), Data() {}
+
+  void write_impl(const char *Ptr, size_t Size) override {
+    Data.append(Ptr, Size);
+  }
+
+  uint64_t current_pos() const override { return Data.size(); }
+};
+
 extern "C" {
 
-bool LLVMLinkForSaviDirectly(
+bool LLVMLinkForSavi(
   const char* Flavor,
-  int ArgC, const char **ArgV
+  int ArgC, const char **ArgV,
+  const char** OutPtr, int* OutSize
 ) {
   std::vector<const char *> Args(ArgV, ArgV + ArgC);
 
-    for (auto it = Args.begin(); it != Args.end(); ++it) {
-      errs() << *it << "\n";
-    }
-
+  // Create an output stream that captures the stdout/stderr info to a string.
+  CaptureOStream Output;
 
   // Invoke the linker.
   bool LinkResult = false;
   if (0 == strcmp(Flavor, "elf")) {
-    LinkResult = lld::elf::link(Args, false, outs(), errs());
+    LinkResult = lld::elf::link(Args, false, Output, Output);
   } else if (0 == strcmp(Flavor, "mach_o")) {
-    LinkResult = lld::macho::link(Args, false, outs(), errs());
+    LinkResult = lld::macho::link(Args, false, Output, Output);
   } else if (0 == strcmp(Flavor, "mingw")) {
-    LinkResult = lld::mingw::link(Args, false, outs(), errs());
+    LinkResult = lld::mingw::link(Args, false, Output, Output);
   } else if (0 == strcmp(Flavor, "coff")) {
-    LinkResult = lld::coff::link(Args, false, outs(), errs());
+    LinkResult = lld::coff::link(Args, false, Output, Output);
   } else if (0 == strcmp(Flavor, "wasm")) {
-    LinkResult = lld::wasm::link(Args, false, outs(), errs());
+    LinkResult = lld::wasm::link(Args, false, Output, Output);
   } else {
-    errs() << "Unsupported lld link flavor: " << Flavor;
+    Output << "Unsupported lld link flavor: " << Flavor;
   }
 
   // Show a helpful error message on failure.
   if (!LinkResult) {
-    errs() << "Failed to link with lld, using these args:" << "\n";
+    Output << "Failed to link with lld, using these args:" << "\n";
     for (auto it = Args.begin(); it != Args.end(); ++it) {
-      errs() << *it << "\n";
+      Output << *it << "\n";
     }
+  }
+
+  // Give the printed output back to the caller, in a fresh allocation.
+  // The caller will be responsible for freeing the allocation.
+  if (OutSize) *OutSize = Output.Data.size();
+  if (OutPtr) {
+    auto FreshCopy = (char*)malloc(Output.Data.size());
+    strncpy(FreshCopy, Output.Data.data(), Output.Data.size());
+    *OutPtr = FreshCopy;
   }
 
   return LinkResult;
-}
-
-bool LLVMLinkForSavi(
-  const char* Flavor,
-  const char* Target,
-  int ArgC, const char **ArgV
-) {
-  // The arguments list for clang was given in a C-like FFI-friendly way, but
-  // here we construct the C++-friendly equivalent of that args list.
-  std::vector<const char *> Args(ArgV, ArgV + ArgC);
-
-  // Create a libclang driver and compilation, using the given target and args.
-  auto Diags = new clang::DiagnosticIDs();
-  auto DiagOpts = new clang::DiagnosticOptions();
-  auto DiagClient = new clang::TextDiagnosticPrinter(llvm::errs(), DiagOpts);
-  clang::DiagnosticsEngine DiagEngine(Diags, DiagOpts, DiagClient);
-  clang::driver::Driver Driver("clang", Target, DiagEngine);
-  clang::driver::Compilation *Compilation = Driver.BuildCompilation(Args);
-
-  // Iterate over the list of jobs in the compilation, expecting in practice
-  // that this will only be a single job for linking, and that we can fulfill
-  // the linking job using the embedded lld instead of an external linker.
-  for (
-    auto it = Compilation->getJobs().begin();
-    it != Compilation->getJobs().end();
-    ++it
-  ) {
-    // Ensure that the only job we're doing is linking, since we want to
-    // avoid executing external shell commands, and only use embedded lld.
-    if (it->getSource().getKind() != clang::driver::Action::LinkJobClass) {
-      errs() << "Expected libclang to only need to link, but got this job:";
-      it->Print(errs(), "\n", false);
-      return false;
-    }
-
-    // Get the list of args that libclang says we should pass to the linker.
-    auto LinkArgs = it->getArguments();
-
-    // The lld library expects the first link argument to be the program name,
-    // so we need to insert an extra "argument" here to fill that space.
-    LinkArgs.insert(LinkArgs.begin(), "lld");
-
-    // Invoke the linker, failing if the linker failed.
-    if (!LLVMLinkForSaviDirectly(Flavor, LinkArgs.size(), LinkArgs.data()))
-      return false;
-  }
-
-  return true;
 }
 
 }
