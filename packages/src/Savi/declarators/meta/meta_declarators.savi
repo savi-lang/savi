@@ -235,3 +235,8 @@
     required :: a body must be provided as part of the declaration
     optional :: a body may be provided as part of the declaration
   )
+
+:: Mark this declarator as able to accept any terms after its name.
+:declarator any_terms
+  :intrinsic
+  :context declarator

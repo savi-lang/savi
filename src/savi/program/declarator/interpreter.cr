@@ -72,7 +72,7 @@ module Savi::Program::Declarator::Interpreter
     end
 
     # Find a declarator whose terms are accepted by the term acceptors.
-    terms : Hash(String, AST::Term?)? = nil
+    terms : Tuple(Hash(String, AST::Term?), Array(AST::Term))? = nil
     declarator = with_right_context.find { |declarator|
       terms = declarator.matches_head?(declare.terms)
       true if terms

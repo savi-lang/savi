@@ -10,8 +10,10 @@ module Savi::Program::Intrinsic
     scope : Declarator::Scope,
     declarator : Declarator,
     declare : AST::Declare,
-    terms : Hash(String, AST::Term?),
+    terms : Tuple(Hash(String, AST::Term?), Array(AST::Term)),
   )
+    terms, loose_terms = terms
+
     case declarator.context.value
 
     # Declarations at the top level.
@@ -132,6 +134,8 @@ module Savi::Program::Intrinsic
           else
             raise NotImplementedError.new(declarator.pretty_inspect)
           end
+      when "any_terms"
+        scope.current_declarator.any_terms = true
       else
         raise NotImplementedError.new(declarator.pretty_inspect)
       end

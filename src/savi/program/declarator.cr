@@ -6,6 +6,7 @@ class Savi::Program::Declarator
   property terms : Array(Declarator::TermAcceptor)
   property body_allowed : Bool
   property body_required : Bool
+  property any_terms : Bool
 
   def initialize(
     @name,
@@ -15,6 +16,7 @@ class Savi::Program::Declarator
     @terms = [] of Declarator::TermAcceptor,
     @body_allowed = false,
     @body_required = false,
+    @any_terms = false,
   )
   end
 
@@ -33,6 +35,7 @@ class Savi::Program::Declarator
     terms = [] of Declarator::TermAcceptor,
     body_allowed = false,
     body_required = false,
+    any_terms = false,
   )
     new(
       name: AST::Identifier.new(name).with_pos(Source::Pos.none),
@@ -52,6 +55,7 @@ class Savi::Program::Declarator
   def matches_head?(head, errors : Array(Error::Info)? = nil)
     accepted_terms = {} of String => AST::Term?
     acceptor_index = 0
+    loose_terms = [] of AST::Term
 
     # Each term in the head must be accepted for us to have a match overall.
     head.each_with_index { |term, index|
@@ -68,7 +72,18 @@ class Savi::Program::Declarator
         was_accepted = false
         until was_accepted
           acceptor = @terms[acceptor_index]?
-          return unless acceptor
+
+          # If the declarator allows any terms and we've ran out of acceptors
+          # to test we just collect all remaining terms.
+          unless acceptor
+            if @any_terms
+              loose_terms = head[index..-1]
+
+              break
+            else
+              return
+            end
+          end
 
           # Gather info about what terms would be acceptable, for error info.
           if accept_info
@@ -116,7 +131,7 @@ class Savi::Program::Declarator
       acceptor_index += 1
     end
 
-    accepted_terms
+    return accepted_terms, loose_terms
   end
 
   def run(ctx, scope, declare, terms)
