@@ -242,7 +242,17 @@ class Savi::Compiler::Binary
     # Print the output errors/warnings/info, if any.
     if out_size > 0
       output = String.new(out_ptr, out_size)
-      STDERR.puts(output)
+
+      # Filter the output to remove unnecessary warnings we don't want to see.
+      output_lines = output.split("\n").reject(&.empty?)
+        # MacOS likes to warn if you make your apps compatible with older
+        # versions of their SDK, even though this is explicitly supported,
+        # as long as your application isn't relying on new features of the SDK.
+        # We expect this warning to always be present, because we deliberately
+        # specify the oldest supported version, so we don't want to see it.
+        .reject(&.matches?(/which is newer than target minimum/))
+
+      output_lines.each { |line| STDERR.puts(line) }
     end
 
     # Ensure the output data pointer, which was a fresh allocation, is freed.
