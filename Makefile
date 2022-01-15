@@ -120,16 +120,6 @@ LLVM_STATIC_PLATFORM?=$(shell ./platform.sh llvm-static)
 TARGET_PLATFORM?=$(shell ./platform.sh host)
 CLANG_TARGET_PLATFORM?=$(TARGET_PLATFORM)
 
-# Based on the platform, we may need to pass extra flags to clang.
-# Particularly, on MacOS, we need to specify the SDK include and lib dirs.
-CLANG_EXTRA_FLAGS?=
-ifneq (,$(findstring macos,$(TARGET_PLATFORM)))
-	CLANG_EXTRA_FLAGS+=-I/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include
-	CLANG_EXTRA_FLAGS+=-L/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib
-# TODO: we shouldn't have to rely on system clang for this - our own vendored clang should include C stdlib headers.
-	CLANG_EXTRA_FLAGS+=-I$(shell find /Library/Developer/CommandLineTools/usr/lib/clang -name include | head -n 1)
-endif
-
 # Specify where to download our pre-built LLVM/clang static libraries from.
 # This needs to get bumped explicitly here when we do a new LLVM build.
 LLVM_STATIC_RELEASE_URL?=https://github.com/savi-lang/llvm-static/releases/download/20220112
@@ -198,7 +188,7 @@ $(BUILD)/llvm-static: $(MAKE_VAR_CACHE)/LLVM_STATIC_RELEASE_URL
 $(BUILD)/llvm_ext.bc: $(LLVM_PATH)
 	mkdir -p `dirname $@`
 	$(LLVM_PATH)/bin/clang -v -emit-llvm -g -c `$(LLVM_CONFIG) --cxxflags` \
-		-target $(CLANG_TARGET_PLATFORM) $(CLANG_EXTRA_FLAGS) \
+		-target $(CLANG_TARGET_PLATFORM) \
 		$(CRYSTAL_PATH)/llvm/ext/llvm_ext.cc \
 		-o $@
 
@@ -207,7 +197,7 @@ $(BUILD)/llvm_ext.bc: $(LLVM_PATH)
 $(BUILD)/llvm_ext_for_savi.bc: $(LLVM_PATH) $(shell find src/savi/ext/llvm/for_savi -name '*.cc')
 	mkdir -p `dirname $@`
 	$(LLVM_PATH)/bin/clang -v -emit-llvm -g -c `$(LLVM_CONFIG) --cxxflags` \
-		-target $(CLANG_TARGET_PLATFORM) $(CLANG_EXTRA_FLAGS) \
+		-target $(CLANG_TARGET_PLATFORM) \
 		src/savi/ext/llvm/for_savi/main.cc \
 		-o $@
 
@@ -261,7 +251,7 @@ $(BUILD)/savi-release: $(BUILD)/savi-release.o $(BUILD)/llvm_ext.bc $(BUILD)/llv
 		-B$(LLVM_PATH)/bin -fuse-ld=lld \
 		$(BUILD)/savi-release.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ext_for_savi.bc \
 		 ${CRYSTAL_RT_LIBS} \
-		-target $(CLANG_TARGET_PLATFORM) $(CLANG_EXTRA_FLAGS) \
+		-target $(CLANG_TARGET_PLATFORM) \
 		`sh -c 'ls $(LLVM_PATH)/lib/libclang*.a'` \
 		`sh -c 'ls $(LLVM_PATH)/lib/liblld*.a'` \
 		`$(LLVM_CONFIG) --libfiles --link-static` \
@@ -275,7 +265,7 @@ $(BUILD)/savi-debug: $(BUILD)/savi-debug.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ex
 		-B$(LLVM_PATH)/bin -fuse-ld=lld \
 		$(BUILD)/savi-debug.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ext_for_savi.bc \
 		 ${CRYSTAL_RT_LIBS} \
-		-target $(CLANG_TARGET_PLATFORM) $(CLANG_EXTRA_FLAGS) \
+		-target $(CLANG_TARGET_PLATFORM) \
 		`sh -c 'ls $(LLVM_PATH)/lib/libclang*.a'` \
 		`sh -c 'ls $(LLVM_PATH)/lib/liblld*.a'` \
 		`$(LLVM_CONFIG) --libfiles --link-static` \
@@ -290,7 +280,7 @@ $(BUILD)/savi-spec: $(BUILD)/savi-spec.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ext_
 		-B$(LLVM_PATH)/bin -fuse-ld=lld \
 		$(BUILD)/savi-spec.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ext_for_savi.bc \
 		 ${CRYSTAL_RT_LIBS} \
-		-target $(CLANG_TARGET_PLATFORM) $(CLANG_EXTRA_FLAGS) \
+		-target $(CLANG_TARGET_PLATFORM) \
 		`sh -c 'ls $(LLVM_PATH)/lib/libclang*.a'` \
 		`sh -c 'ls $(LLVM_PATH)/lib/liblld*.a'` \
 		`$(LLVM_CONFIG) --libfiles --link-static` \
