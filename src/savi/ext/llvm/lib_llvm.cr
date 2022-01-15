@@ -32,6 +32,7 @@ lib LibLLVM
   # Extra functions defined just for Savi go here:
   #
 
+  fun link_for_savi = LLVMLinkForSavi(flavor : UInt8*, argc : Int32, argv : UInt8**, out_ptr : UInt8**, out_size : Int32*) : Bool
   fun optimize_for_savi = LLVMOptimizeForSavi(mod : ModuleRef, wants_full_optimization : Bool)
   fun remap_di_directory_for_savi = LLVMRemapDIDirectoryForSavi(mod : ModuleRef, before_dir : UInt8*, after_dir : UInt8*)
 end

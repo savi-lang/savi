@@ -30,8 +30,8 @@ task:
         TRIPLE: x86_64-unknown-linux-musl
         DEPS_INSTALL: "\
           apk add --no-cache --update \
-            bash curl \
-            alpine-sdk coreutils gcc g++ clang make linux-headers llvm12-dev \
+            bash curl alpine-sdk coreutils \
+            gcc g++ clang make linux-headers llvm12-dev zlib-static \
             pcre-dev libevent-static gc-dev crystal shards libexecinfo-dev"
         # For some reason clang doesn't like it if we omit the "alpine" vendor
         # in the triple, where we'd otherwise use `x86_64-unknown-linux-musl`.
@@ -44,8 +44,8 @@ task:
         TRIPLE: arm64-unknown-linux-musl
         DEPS_INSTALL: "\
           apk add --no-cache --update \
-            bash curl \
-            alpine-sdk coreutils gcc g++ clang make linux-headers llvm12-dev \
+            bash curl alpine-sdk coreutils \
+            gcc g++ clang make linux-headers llvm12-dev zlib-static \
             pcre-dev libevent-static gc-dev crystal shards libexecinfo-dev"
         # For some reason clang doesn't like it if we omit the "alpine" vendor
         # in the triple, where we'd otherwise use `arm64-unknown-linux-musl`.

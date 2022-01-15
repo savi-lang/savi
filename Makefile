@@ -125,7 +125,7 @@ CLANG_TARGET_PLATFORM?=$(TARGET_PLATFORM)
 
 # Specify where to download our pre-built LLVM/clang static libraries from.
 # This needs to get bumped explicitly here when we do a new LLVM build.
-LLVM_STATIC_RELEASE_URL?=https://github.com/savi-lang/llvm-static/releases/download/20220104b
+LLVM_STATIC_RELEASE_URL?=https://github.com/savi-lang/llvm-static/releases/download/20220112
 $(eval $(call MAKE_VAR_CACHE_FOR,LLVM_STATIC_RELEASE_URL))
 
 # Specify where to download our pre-built LLVM/clang static libraries from.
@@ -190,16 +190,16 @@ $(BUILD)/llvm-static: $(MAKE_VAR_CACHE)/LLVM_STATIC_RELEASE_URL
 # This bitcode needs to get linked into our Savi compiler executable.
 $(BUILD)/llvm_ext.bc: $(LLVM_PATH)
 	mkdir -p `dirname $@`
-	${CLANGXX} -v -emit-llvm -c `$(LLVM_CONFIG) --cxxflags` \
+	${CLANGXX} -v -emit-llvm -g -c `$(LLVM_CONFIG) --cxxflags` \
 		-target $(CLANG_TARGET_PLATFORM) \
 		$(CRYSTAL_PATH)/llvm/ext/llvm_ext.cc \
 		-o $@
 
 # Build the extra Savi LLVM extensions as LLVM bitcode.
 # This bitcode needs to get linked into our Savi compiler executable.
-$(BUILD)/llvm_ext_for_savi.bc: $(LLVM_PATH) src/savi/ext/llvm/for_savi/main.cc
+$(BUILD)/llvm_ext_for_savi.bc: $(LLVM_PATH) $(shell find src/savi/ext/llvm/for_savi -name '*.cc')
 	mkdir -p `dirname $@`
-	${CLANGXX} -v -emit-llvm -c `$(LLVM_CONFIG) --cxxflags` \
+	${CLANGXX} -v -emit-llvm -g -c `$(LLVM_CONFIG) --cxxflags` \
 		-target $(CLANG_TARGET_PLATFORM) \
 		src/savi/ext/llvm/for_savi/main.cc \
 		-o $@
@@ -255,6 +255,7 @@ $(BUILD)/savi-release: $(BUILD)/savi-release.o $(BUILD)/llvm_ext.bc $(BUILD)/llv
 		 ${CRYSTAL_RT_LIBS} \
 		-target $(CLANG_TARGET_PLATFORM) \
 		`sh -c 'ls $(LLVM_PATH)/lib/libclang*.a'` \
+		`sh -c 'ls $(LLVM_PATH)/lib/liblld*.a'` \
 		`$(LLVM_CONFIG) --libfiles --link-static` \
 		`$(LLVM_CONFIG) --system-libs --link-static`
 
@@ -267,8 +268,10 @@ $(BUILD)/savi-debug: $(BUILD)/savi-debug.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ex
 		 ${CRYSTAL_RT_LIBS} \
 		-target $(CLANG_TARGET_PLATFORM) \
 		`sh -c 'ls $(LLVM_PATH)/lib/libclang*.a'` \
+		`sh -c 'ls $(LLVM_PATH)/lib/liblld*.a'` \
 		`$(LLVM_CONFIG) --libfiles --link-static` \
 		`$(LLVM_CONFIG) --system-libs --link-static`
+	if uname | grep -iq 'Darwin'; then dsymutil $@; fi
 
 # Build the Savi specs executable, by linking the above targets together.
 # This variant of the target will be used when running tests.
@@ -279,5 +282,7 @@ $(BUILD)/savi-spec: $(BUILD)/savi-spec.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ext_
 		 ${CRYSTAL_RT_LIBS} \
 		-target $(CLANG_TARGET_PLATFORM) \
 		`sh -c 'ls $(LLVM_PATH)/lib/libclang*.a'` \
+		`sh -c 'ls $(LLVM_PATH)/lib/liblld*.a'` \
 		`$(LLVM_CONFIG) --libfiles --link-static` \
 		`$(LLVM_CONFIG) --system-libs --link-static`
+	if uname | grep -iq 'Darwin'; then dsymutil $@; fi
