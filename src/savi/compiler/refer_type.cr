@@ -17,12 +17,14 @@ require "./pass/analyze"
 module Savi::Compiler::ReferType
   struct Analysis
     @parent : StructRef(Analysis)?
+    protected getter cache_deps_additional_namespaces : Hash(Source, Namespace::Analysis)
 
     def initialize(parent : Analysis? = nil)
       @parent = StructRef(Analysis).new(parent) if parent
       @infos = {} of AST::Identifier => Refer::Info
       @params = {} of String => Refer::TypeParam
       @redirects = {} of Refer::Info => Refer::Info
+      @cache_deps_additional_namespaces = {} of Source => Namespace::Analysis
     end
 
     protected def observe_ident(ident : AST::Identifier, info : Refer::Info)
@@ -58,7 +60,7 @@ module Savi::Compiler::ReferType
 
   class Visitor < Savi::AST::Visitor
     getter analysis : Analysis
-    getter namespace : Namespace::SourceAnalysis
+    getter namespace : Namespace::Analysis
     def initialize(@analysis, @namespace)
     end
 
@@ -68,7 +70,23 @@ module Savi::Compiler::ReferType
       found = @analysis.type_param_for?(node.value)
       return found if found
 
-      found = namespace[node.value]?
+      if node.pos.source == namespace.source
+        found = namespace[node.value]?
+      else
+        # If the identifier comes from a foreign source file, we need to use
+        # the distinct namespace analysis associated with that source file.
+        foreign_namespace = ctx.namespace[node.pos.source]?
+        if foreign_namespace
+          found = foreign_namespace[node.value]?
+          # If found in a foreign namespace analysis, we need to accure that
+          # analysis as a cache-invalidating dependency.
+          if found
+            analysis.cache_deps_additional_namespaces[node.pos.source] =
+              foreign_namespace
+          end
+        end
+      end
+
       case found
       when Program::Type::Link
         Refer::Type.new(found)
@@ -118,9 +136,15 @@ module Savi::Compiler::ReferType
 
     def analyze_type_alias(ctx, t, t_link) : Analysis
       namespace = ctx.namespace[t.ident.pos.source]
-      deps = namespace
       prev = ctx.prev_ctx.try(&.refer_type)
 
+      prev_namespaces = prev.try(&.[]?(t_link)
+        .try(&.cache_deps_additional_namespaces
+          .keys.map { |source| ctx.namespace[source] }
+        )
+      )
+
+      deps = {namespace, prev_namespaces}
       maybe_from_type_alias_cache(ctx, prev, t, t_link, deps) do
         t_analysis = Analysis.new
         observe_type_params(ctx, t, t_link, t_analysis)
@@ -134,15 +158,27 @@ module Savi::Compiler::ReferType
         # (this is the part that is unique to a TypeAlias vs a Type).
         t.target.accept(ctx, visitor)
 
+        # Take the new set of cache dep additional namespaces into account.
+        new_namespaces = visitor.analysis
+          .cache_deps_additional_namespaces.values
+        new_deps = {namespace, new_namespaces}
+        set_type_alias_cache_deps(t, t_link, new_deps)
+
         visitor.analysis
       end
     end
 
     def analyze_type(ctx, t, t_link) : Analysis
       namespace = ctx.namespace[t.ident.pos.source]
-      deps = namespace
       prev = ctx.prev_ctx.try(&.refer_type)
 
+      prev_namespaces = prev.try(&.[]?(t_link)
+        .try(&.cache_deps_additional_namespaces
+          .keys.map { |source| ctx.namespace[source] }
+        )
+      )
+
+      deps = {namespace, prev_namespaces}
       maybe_from_type_cache(ctx, prev, t, t_link, deps) do
         t_analysis = Analysis.new
         observe_type_params(ctx, t, t_link, t_analysis)
@@ -152,20 +188,38 @@ module Savi::Compiler::ReferType
         t.ident.accept(ctx, visitor)
         t.params.try(&.accept(ctx, visitor))
 
+        # Take the new set of cache dep additional namespaces into account.
+        new_namespaces = visitor.analysis
+          .cache_deps_additional_namespaces.values
+        new_deps = {namespace, new_namespaces}
+        set_type_cache_deps(t, t_link, new_deps)
+
         visitor.analysis
       end
     end
 
     def analyze_func(ctx, f, f_link, t_analysis) : Analysis
       namespace = ctx.namespace[f.ident.pos.source]
-      deps = namespace
       prev = ctx.prev_ctx.try(&.refer_type)
 
+      prev_namespaces = prev.try(&.[]?(f_link)
+        .try(&.cache_deps_additional_namespaces
+          .keys.map { |source| ctx.namespace[source] }
+        )
+      )
+
+      deps = {namespace, prev_namespaces}
       maybe_from_func_cache(ctx, prev, f, f_link, deps) do
         f_analysis = Analysis.new(t_analysis)
         visitor = Visitor.new(f_analysis, namespace)
 
         f.ast.accept(ctx, visitor)
+
+        # Take the new set of cache dep additional namespaces into account.
+        new_namespaces = visitor.analysis
+          .cache_deps_additional_namespaces.values
+        new_deps = {namespace, new_namespaces}
+        set_func_cache_deps(f, f_link, new_deps)
 
         visitor.analysis
       end

@@ -18,12 +18,14 @@
 class Savi::Compiler::Reparse < Savi::AST::CopyOnMutateVisitor
   # TODO: Clean up, consolidate, and improve this caching mechanism.
   @@cache = {} of Program::Function::Link => {UInt64, Program::Function}
-  def self.cached_or_run(l, t, f : Program::Function, deps) : Program::Function
+  def self.cached_or_run(ctx, l, t, f : Program::Function, deps) : Program::Function
     f_link = f.make_link(t.make_link(l.make_link))
     input_hash = {f, deps}.hash
     cache_result = @@cache[f_link]?
     cached_hash, cached_func = cache_result if cache_result
     return cached_func if cached_func && cached_hash == input_hash
+
+    puts "    RERUN . #{self.class} #{f_link.show}" if cache_result && ctx.options.print_perf
 
     yield
 
@@ -33,12 +35,14 @@ class Savi::Compiler::Reparse < Savi::AST::CopyOnMutateVisitor
   end
 
   @@t_cache = {} of Program::Type::Link => {UInt64, Program::Type}
-  def self.t_cached_or_run(l, t : Program::Type, deps) : Program::Type
+  def self.t_cached_or_run(ctx, l, t : Program::Type, deps) : Program::Type
     t_link = t.make_link(l.make_link)
     input_hash = {t, deps}.hash
     t_cache_result = @@t_cache[t_link]?
     t_cached_hash, t_cached_type = t_cache_result if t_cache_result
     return t_cached_type if t_cached_type && t_cached_hash == input_hash
+
+    puts "    RERUN . #{self.class} #{t_link.show}" if t_cache_result && ctx.options.print_perf
 
     yield
 
@@ -48,12 +52,14 @@ class Savi::Compiler::Reparse < Savi::AST::CopyOnMutateVisitor
   end
 
   @@ta_cache = {} of Program::TypeAlias::Link => {UInt64, Program::TypeAlias}
-  def self.ta_cached_or_run(l, t : Program::TypeAlias, deps) : Program::TypeAlias
+  def self.ta_cached_or_run(ctx, l, t : Program::TypeAlias, deps) : Program::TypeAlias
     t_link = t.make_link(l.make_link)
     input_hash = {t, deps}.hash
     ta_cache_result = @@ta_cache[t_link]?
     ta_cached_hash, ta_cached_type = ta_cache_result if ta_cache_result
     return ta_cached_type if ta_cached_type && ta_cached_hash == input_hash
+
+    puts "    RERUN . #{self.class} #{t_link.show}" if ta_cache_result && ctx.options.print_perf
 
     yield
 
@@ -67,7 +73,7 @@ class Savi::Compiler::Reparse < Savi::AST::CopyOnMutateVisitor
       t_namespace = ctx.namespace[t.ident.pos.source]
       t_deps = {t_namespace}
 
-      t = t_cached_or_run package, t, t_deps do
+      t = t_cached_or_run ctx, package, t, t_deps do
         t = new(*t_deps).run_for_type_params(ctx, t)
       end
 
@@ -75,7 +81,7 @@ class Savi::Compiler::Reparse < Savi::AST::CopyOnMutateVisitor
         f_namespace = ctx.namespace[f.ident.pos.source]
         f_deps = {f_namespace}
 
-        cached_or_run package, t, f, f_deps do
+        cached_or_run ctx, package, t, f, f_deps do
           f = new(*f_deps).run(ctx, f)
         end
       end
@@ -85,14 +91,14 @@ class Savi::Compiler::Reparse < Savi::AST::CopyOnMutateVisitor
       t_namespace = ctx.namespace[t.ident.pos.source]
       t_deps = {t_namespace}
 
-      ta_cached_or_run package, t, t_deps do
+      ta_cached_or_run ctx, package, t, t_deps do
         t = new(*t_deps).run_for_type_alias_target(ctx, t)
         t = new(*t_deps).run_for_type_params(ctx, t)
       end
     end
   end
 
-  def initialize(@namespace : Namespace::SourceAnalysis)
+  def initialize(@namespace : Namespace::Analysis)
   end
 
   def run_for_type_alias_target(ctx, t)

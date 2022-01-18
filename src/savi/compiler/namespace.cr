@@ -10,10 +10,11 @@
 # This pass produces output state at the source and source package level.
 #
 class Savi::Compiler::Namespace
-  struct SourceAnalysis
+  struct Analysis
+    getter source : Source
     protected getter types
 
-    def initialize(@source : Source)
+    def initialize(@source)
       @types = {} of String => (
         Program::Type::Link | Program::TypeAlias::Link | Program::TypeWithValue::Link \
       )
@@ -27,7 +28,7 @@ class Savi::Compiler::Namespace
     @types_by_package_name = Hash(String, Hash(String,
       Program::Type::Link | Program::TypeAlias::Link | Program::TypeWithValue::Link
     )).new
-    @source_analyses = Hash(Source, SourceAnalysis).new
+    @source_analyses = Hash(Source, Analysis).new
   end
 
   def main_type!(ctx); main_type?(ctx).not_nil! end
@@ -92,9 +93,11 @@ class Savi::Compiler::Namespace
   end
 
   # When given a Source, return the set of analysis for that source.
-  # TODO: Get rid of other forms of [] here in favor of this one.
-  def [](source : Source) : SourceAnalysis
+  def [](source : Source) : Analysis
     @source_analyses[source]
+  end
+  def []?(source : Source) : Analysis?
+    @source_analyses[source]?
   end
 
   # When given a String name, try to find the type in the core_savi package.
@@ -154,7 +157,7 @@ class Savi::Compiler::Namespace
     source = new_type.ident.pos.source
     name = new_type.ident.value
 
-    source_analysis = @source_analyses[source] ||= SourceAnalysis.new(source)
+    source_analysis = @source_analyses[source] ||= Analysis.new(source)
 
     source_analysis.types[name] = new_type.make_link(package)
   end

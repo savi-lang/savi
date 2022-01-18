@@ -153,6 +153,18 @@ abstract class Savi::Compiler::Pass::Analyze(TypeAliasAnalysis, TypeAnalysis, Fu
     end
   end
 
+  # If the set of cache dependencies may change during analysis, use these
+  # methods to override the cached hash used for invalidation in future runs.
+  private def set_type_alias_cache_deps(t, t_link, deps)
+    cache_info_for_alias[t_link] = {t, deps}.hash
+  end
+  private def set_type_cache_deps(t, t_link, deps)
+    cache_info_for_type[t_link] = {t, deps}.hash
+  end
+  private def set_func_cache_deps(f, f_link, deps)
+    cache_info_for_func[f_link] = {f, deps}.hash
+  end
+
   # Required hook to make the pass create an analysis for the given type alias.
   abstract def analyze_type_alias(
     ctx : Context,

@@ -33,10 +33,10 @@ class Savi::Compiler
     when "populate_types"   then :populate_types
     when "namespace"        then :namespace
     when "reparse"          then :reparse
+    when "populate"         then :populate
     when "macros"           then :macros
     when "sugar"            then :sugar
     when "refer_type"       then :refer_type
-    when "populate"         then :populate
     when "lambda"           then :lambda
     when "flow"             then :flow
     when "refer"            then :refer
@@ -87,10 +87,10 @@ class Savi::Compiler
       when :populate_types   then ctx.run_copy_on_mutate(ctx.populate_types)
       when :namespace        then ctx.run_whole_program(ctx.namespace)
       when :reparse          then ctx.run_copy_on_mutate(Reparse)
+      when :populate         then ctx.run_copy_on_mutate(ctx.populate)
       when :macros           then ctx.run_copy_on_mutate(Macros)
       when :sugar            then ctx.run_copy_on_mutate(Sugar)
       when :refer_type       then ctx.run(ctx.refer_type)
-      when :populate         then ctx.run_copy_on_mutate(ctx.populate)
       when :lambda           then ctx.run_copy_on_mutate(Lambda)
       when :flow             then ctx.run(ctx.flow)
       when :refer            then ctx.run(ctx.refer)
@@ -146,10 +146,10 @@ class Savi::Compiler
     when :populate_types then [:load]
     when :namespace then [:populate_types, :load]
     when :reparse then [:namespace]
-    when :macros then [:reparse]
+    when :populate then [:reparse, :namespace]
+    when :macros then [:populate]
     when :sugar then [:macros]
     when :refer_type then [:sugar, :macros, :reparse, :namespace, :populate_types]
-    when :populate then [:sugar, :macros, :reparse, :refer_type]
     when :lambda then [:sugar, :macros, :reparse]
     when :flow then [:lambda, :populate, :sugar, :macros, :reparse]
     when :classify then [:refer_type, :lambda, :populate, :sugar, :macros, :reparse]
