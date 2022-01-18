@@ -38,38 +38,36 @@ class Savi::Compiler::Populate
         ret = f.ret
         case ret
         when AST::Identifier
-          source = ctx.refer_type[dest_copies_link][ret]?
-          Error.at ret, "This type couldn't be resolved" unless source
-          source = source.as(Refer::Type) # TODO: handle cases of Refer::TypeAlias or Refer::TypeParam
-          source_defn = source.defn(ctx)
+          source_ident = ret
+          source_link = ctx.namespace[source_ident.pos.source][source_ident.value]?
+          Error.at ret, "This type couldn't be resolved" unless source_link
+          source_link = source_link.as(Program::Type::Link) # TODO: handle cases of Program::TypeAlias::Link or type param
+          source_defn = source_link.resolve(ctx)
         when AST::Qualify
-          source = ctx.refer_type[dest_copies_link][ret.term.as(AST::Identifier)]?
-          Error.at ret, "This type couldn't be resolved" unless source
-          source = source.as(Refer::Type) # TODO: handle cases of Refer::TypeAlias or Refer::TypeParam
+          source_ident = ret.term.as(AST::Identifier)
+          source_link = ctx.namespace[source_ident.pos.source][source_ident.value]?
+          Error.at ret, "This type couldn't be resolved" unless source_link
+          source_link = source_link.as(Program::Type::Link) # TODO: handle cases of Program::TypeAlias::Link or type param
+          source_defn = source_link.resolve(ctx)
 
-          # We need to build an intercessor redirect mapping the refer_type
-          # analysis that will take place on the new functions that will be
+          # We need to build a mapping of type argument ASTs for each type param
+          # which will be used to transform the new functions that will be
           # copied from the source type to the dest type. This is necessary
           # because the source type may contain references to type parameters
           # that were supplied by type arguments within the dest type's source.
           # So we build a mapping that will replace instances of the type param.
-          new_refer_type_analysis = ReferType::Analysis.new(ctx.refer_type[source.link])
-          source_defn = source.defn(ctx)
+          type_params_mapping = {} of String => AST::Node
           source_defn_params_size = source_defn.params.try(&.terms.size) || 0
           [source_defn_params_size, ret.group.terms.size].min.times do |index|
-            # Get the Refer info of the type parameter identifier.
+            # Get the identifier of the type parameter to be replaced.
             type_param_ast = source_defn.params.not_nil!.terms[index]
-            type_param_ident = AST::Extract.type_param(type_param_ast)[0]
-            type_param_ref = ctx.refer_type[source.link][type_param_ident]
+            type_param_name = AST::Extract.type_param(type_param_ast)[0].value
 
-            # Get the Refer info of the type argument's type name identifier.
+            # Get the AST of the type argument to replace it with.
             replacement_ast = ret.group.terms[index]
-            replacement_ident = AST::Extract.type_arg(replacement_ast)[0]
-            replacement_ref = ctx.refer_type[dest_copies_link][replacement_ident]
 
-            # Introduce the mapping for this redirect into the analysis struct
-            # that we will use as an intercessor.
-            new_refer_type_analysis.redirect(type_param_ref, replacement_ref)
+            # Record it into the mapping.
+            type_params_mapping[type_param_name] = replacement_ast
           end
         else
           raise NotImplementedError.new(ret)
@@ -81,19 +79,13 @@ class Savi::Compiler::Populate
             dest = dest.dup
             raise "didn't dup functions!" if dest.functions.same?(orig_functions)
           end
-          dest.functions.concat(new_functions)
-        end
 
-        # Run the missing refer_type pass on the new functions on the dest type.
-        # Use the special intercessor redirect mapping we created earlier,
-        # in the case that type params were used; otherwise it will be nil.
-        new_functions.each do |f|
-          ctx.refer_type.run_for_func(
-            ctx,
-            f,
-            f.make_link(dest_link),
-            new_refer_type_analysis,
-          )
+          visitor = ReplaceIdentifiersVisitor.new(type_params_mapping) if type_params_mapping
+          new_functions.each { |new_function|
+            new_function_link = new_function.make_link(dest_link)
+            new_function = visitor.run(ctx, new_function_link, new_function) if visitor
+            dest.functions << new_function
+          }
         end
       end
 
@@ -101,7 +93,7 @@ class Savi::Compiler::Populate
       if dest.has_tag?(:allocated) && !dest.has_tag?(:abstract) \
       && !dest.functions.any? { |f| f.has_tag?(:constructor) }
         # Create the default constructor function, unless we have one cached.
-        f = ctx.prev_ctx.try(&.populate.default_constructors[dest.head_hash]?) || begin
+        f = ctx.prev_ctx.try(&.populate.default_constructors[dest.ident.pos.hash]?) || begin
           Program::Function.new(
             AST::Identifier.new("ref").from(dest.ident),
             AST::Identifier.new("new").from(dest.ident),
@@ -115,19 +107,13 @@ class Savi::Compiler::Populate
             f.add_tag(:async) if dest.has_tag?(:actor)
           end
         end
-        default_constructors[dest.head_hash] = f
+        default_constructors[dest.ident.pos.hash] = f
 
         if dest.functions.same?(orig_functions)
           dest = dest.dup
           raise "didn't dup functions!" if dest.functions.same?(orig_functions)
         end
         dest.functions << f
-
-        # Run the missing ReferType pass for this new function.
-        # TODO: Make the compiler automatically run missing passes that are
-        # required by a subsequent pass - this should be invoked automatically
-        # by the next pass that "needs" the analysis to be available.
-        ctx.refer_type.run_for_func(ctx, f, f.make_link(dest_link))
       end
 
       dest
@@ -150,7 +136,9 @@ class Savi::Compiler::Populate
         next if f.has_tag?(:hygienic)
 
         # We don't copy functions that have no implementation.
-        next if f.body.nil? && !f.has_tag?(:compiler_intrinsic)
+        next if f.body.nil? \
+          && !f.has_tag?(:compiler_intrinsic) \
+          && !f.has_tag?(:constructor)
 
         # We won't copy a function if the dest already has one of the same name.
         next if dest.find_func?(f.ident.value)
@@ -161,5 +149,54 @@ class Savi::Compiler::Populate
     end
 
     new_functions
+  end
+
+  # A simple visitor that can replace specific identifiers with other AST forms.
+  # We use this to rewrite type parameter references with their type args.
+  class ReplaceIdentifiersVisitor < Savi::AST::CopyOnMutateVisitor
+    @mapping : Hash(String, AST::Node)
+    def initialize(@mapping)
+    end
+
+    # TODO: Clean up, consolidate, and improve this caching mechanism.
+    @@cache = {} of Program::Function::Link => {UInt64, Program::Function}
+    def self.cached_or_run(ctx, f_link, f, mapping) : Program::Function
+      input_hash = {f, mapping}.hash
+      cache_result = @@cache[f_link]?
+      cached_hash, cached_func = cache_result if cache_result
+      return cached_func if cached_func && cached_hash == input_hash
+
+      puts "    RERUN . #{self.class} #{f_link.show}" if cache_result && ctx.options.print_perf
+
+      yield
+
+      .tap do |result|
+        @@cache[f_link] = {input_hash, result}
+      end
+    end
+
+    def run(ctx : Context, f_link : Program::Function::Link, f : Program::Function)
+      self.class.cached_or_run(ctx, f_link, f, @mapping) {
+        visitor = self
+        params = f.params.try(&.accept(ctx, visitor))
+        ret = f.ret.try(&.accept(ctx, visitor))
+        body = f.body.try(&.accept(ctx, visitor))
+
+        f = f.dup
+        f.params = params
+        f.ret = ret
+        f.body = body
+        f
+      }
+    end
+
+    def visit(ctx, node : AST::Node)
+      return node unless node.is_a?(AST::Identifier)
+
+      replacement = @mapping[node.value]?
+      return node unless replacement
+
+      replacement
+    end
   end
 end

@@ -18,12 +18,14 @@ class Savi::Compiler::Macros < Savi::AST::CopyOnMutateVisitor
 
   # TODO: Clean up, consolidate, and improve this caching mechanism.
   @@cache = {} of Program::Function::Link => {UInt64, Program::Function}
-  def self.cached_or_run(l, t, f) : Program::Function
+  def self.cached_or_run(ctx, l, t, f) : Program::Function
     f_link = f.make_link(t.make_link(l.make_link))
     input_hash = f.hash
     cache_result = @@cache[f_link]?
     cached_hash, cached_func = cache_result if cache_result
     return cached_func if cached_func && cached_hash == input_hash
+
+    puts "    RERUN . #{self.class} #{f_link.show}" if cache_result && ctx.options.print_perf
 
     yield
 
@@ -35,7 +37,7 @@ class Savi::Compiler::Macros < Savi::AST::CopyOnMutateVisitor
   def self.run(ctx, package)
     package.types_map_cow do |t|
       t.functions_map_cow do |f|
-        cached_or_run package, t, f do
+        cached_or_run ctx, package, t, f do
           macros = new(f)
           macros.maybe_compiler_intrinsic
           f = macros.run(ctx)
