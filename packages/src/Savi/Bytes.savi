@@ -258,6 +258,10 @@
     )
     @
 
+  :: An alias for `<<` that works better with method chaining.
+  :fun ref push_bytes(other Bytes'box)
+    @ << other
+
   :fun ref concat_byte_slice(
     other Bytes'box
     from ISize = 0
