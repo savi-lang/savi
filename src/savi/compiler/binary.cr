@@ -133,7 +133,8 @@ class Savi::Compiler::Binary
 
     # Link the libraries that we always need.
     link_args << "-lgcc" << "-lgcc_s"
-    link_args << "-lc" << "-ldl" << "-lpthread" << "-latomic" << "-lm"
+    link_args << "-lc" << "-ldl" << "-lpthread" << "-lm"
+    link_args << "-latomic" unless target.freebsd?
     link_args << "-lexecinfo" if target.musl? || target.freebsd?
 
     # Finally, specify the input object file and the output filename.

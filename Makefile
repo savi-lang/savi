@@ -139,16 +139,24 @@ $(eval $(call MAKE_VAR_CACHE_FOR,RUNTIME_BITCODE_RELEASE_URL))
 LLVM_PATH?=$(BUILD)/llvm-static
 LLVM_CONFIG?=$(LLVM_PATH)/bin/llvm-config
 
+# Determine which flavor of the C++ standard library to link against.
+# We choose libstdc++ on Linux, and libc++ on FreeBSD and MacOS.
+ifneq (,$(findstring linux,$(TARGET_PLATFORM)))
+	LIB_CXX_KIND?=stdc++
+else
+	LIB_CXX_KIND?=c++
+endif
+
 # Find the libraries we need to link against.
 # We look first for a static library path, or fallback to specifying it as -l
-# which will cause the linker to locate it as a dyanmic library.
+# which will cause the linker to locate it as a dynamic library.
 LIB_GC?=$(shell find /usr /opt -name libgc.a 2> /dev/null | head -n 1 | grep . || echo -lgc)
 LIB_EVENT?=$(shell find /usr /opt -name libevent.a 2> /dev/null | head -n 1 | grep . || echo -levent)
 LIB_PCRE?=$(shell find /usr /opt -name libpcre.a 2> /dev/null | head -n 1 | grep . || echo -lpcre)
 
 # Collect the list of libraries to link against (depending on the platform).
 # These are the libraries used by the Crystal runtime.
-CRYSTAL_RT_LIBS+=-lstdc++
+CRYSTAL_RT_LIBS+=-l$(LIB_CXX_KIND)
 CRYSTAL_RT_LIBS+=$(LIB_GC)
 CRYSTAL_RT_LIBS+=$(LIB_EVENT)
 CRYSTAL_RT_LIBS+=$(LIB_PCRE)
@@ -190,7 +198,9 @@ $(BUILD)/llvm-static: $(MAKE_VAR_CACHE)/LLVM_STATIC_RELEASE_URL
 # This bitcode needs to get linked into our Savi compiler executable.
 $(BUILD)/llvm_ext.bc: $(LLVM_PATH)
 	mkdir -p `dirname $@`
-	${CLANGXX} -v -emit-llvm -g -c `$(LLVM_CONFIG) --cxxflags` \
+	${CLANGXX} -v -emit-llvm -g \
+		-c `$(LLVM_CONFIG) --cxxflags` \
+		-stdlib=lib$(LIB_CXX_KIND) \
 		-target $(CLANG_TARGET_PLATFORM) \
 		$(CRYSTAL_PATH)/llvm/ext/llvm_ext.cc \
 		-o $@
@@ -199,7 +209,9 @@ $(BUILD)/llvm_ext.bc: $(LLVM_PATH)
 # This bitcode needs to get linked into our Savi compiler executable.
 $(BUILD)/llvm_ext_for_savi.bc: $(LLVM_PATH) $(shell find src/savi/ext/llvm/for_savi -name '*.cc')
 	mkdir -p `dirname $@`
-	${CLANGXX} -v -emit-llvm -g -c `$(LLVM_CONFIG) --cxxflags` \
+	${CLANGXX} -v -emit-llvm -g \
+		-c `$(LLVM_CONFIG) --cxxflags` \
+		-stdlib=lib$(LIB_CXX_KIND) \
 		-target $(CLANG_TARGET_PLATFORM) \
 		src/savi/ext/llvm/for_savi/main.cc \
 		-o $@
