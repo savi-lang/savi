@@ -1,7 +1,5 @@
 // TODO: Document.
 :class DeterministicRandom.SplitMix64
-  :is Random // TODO: this should not be necessary - copies should be transitive
-  :is DeterministicRandom // TODO: this should not be necessary - copies should be transitive
   :is _State64
 
   :: Each step of the generator, the state steps forward by a constant amount.

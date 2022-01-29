@@ -21,58 +21,15 @@ class Savi::Compiler::Populate
   end
 
   def run(ctx, package)
-    package.types_map_cow do |dest|
-      orig_functions = dest.functions
+    package.types_map_cow do |t|
+      # Determine which source types to copy from.
+      copy_sources = gather_copy_sources(ctx, t)
+
+      # Copy functions into the type from the copy sources.
+      dest = t
       dest_link = dest.make_link(package)
-
-      # Copy functions into the type from other sources.
-      orig_functions.each do |f|
-        # Only look at functions that have the "copies" tag.
-        # Often these "functions" are actually "is" annotations.
-        next unless f.has_tag?(:copies)
-
-        dest_copies_link = f.make_link(dest_link)
-
-        # Find the type associated with the "return value" of the "function"
-        # and copy the functions from it that we need.
-        ret = f.ret
-        case ret
-        when AST::Identifier
-          source_ident = ret
-          source_link = ctx.namespace[source_ident.pos.source][source_ident.value]?
-          Error.at ret, "This type couldn't be resolved" unless source_link
-          source_link = source_link.as(Program::Type::Link) # TODO: handle cases of Program::TypeAlias::Link or type param
-          source_defn = source_link.resolve(ctx)
-        when AST::Qualify
-          source_ident = ret.term.as(AST::Identifier)
-          source_link = ctx.namespace[source_ident.pos.source][source_ident.value]?
-          Error.at ret, "This type couldn't be resolved" unless source_link
-          source_link = source_link.as(Program::Type::Link) # TODO: handle cases of Program::TypeAlias::Link or type param
-          source_defn = source_link.resolve(ctx)
-
-          # We need to build a mapping of type argument ASTs for each type param
-          # which will be used to transform the new functions that will be
-          # copied from the source type to the dest type. This is necessary
-          # because the source type may contain references to type parameters
-          # that were supplied by type arguments within the dest type's source.
-          # So we build a mapping that will replace instances of the type param.
-          type_params_mapping = {} of String => AST::Node
-          source_defn_params_size = source_defn.params.try(&.terms.size) || 0
-          [source_defn_params_size, ret.group.terms.size].min.times do |index|
-            # Get the identifier of the type parameter to be replaced.
-            type_param_ast = source_defn.params.not_nil!.terms[index]
-            type_param_name = AST::Extract.type_param(type_param_ast)[0].value
-
-            # Get the AST of the type argument to replace it with.
-            replacement_ast = ret.group.terms[index]
-
-            # Record it into the mapping.
-            type_params_mapping[type_param_name] = replacement_ast
-          end
-        else
-          raise NotImplementedError.new(ret)
-        end
-
+      orig_functions = dest.functions
+      copy_sources.each do |source_defn, visitor|
         new_functions = copy_from(ctx, source_defn, dest)
         if new_functions.any?
           if dest.functions.same?(orig_functions)
@@ -80,10 +37,12 @@ class Savi::Compiler::Populate
             raise "didn't dup functions!" if dest.functions.same?(orig_functions)
           end
 
-          visitor = ReplaceIdentifiersVisitor.new(type_params_mapping) if type_params_mapping
-          new_functions.each { |new_function|
+          new_functions.each { |orig_new_function|
+            new_function = orig_new_function
+
             new_function_link = new_function.make_link(dest_link)
             new_function = visitor.run(ctx, new_function_link, new_function) if visitor
+
             dest.functions << new_function
           }
         end
@@ -118,6 +77,69 @@ class Savi::Compiler::Populate
 
       dest
     end
+  end
+
+  def gather_copy_sources(
+    ctx,
+    t : Program::Type,
+    list = [] of {Program::Type, ReplaceIdentifiersVisitor?},
+    visitor_recursive : ReplaceIdentifiersVisitor? = nil,
+  )
+    t.functions.each do |f|
+      # Only look at functions that have the "copies" tag.
+      # Often these "functions" are actually "is" annotations.
+      next unless f.has_tag?(:copies)
+
+      # Find the source type associated with the "return value" of the "function",
+      # as well as any type param mappings, based on Qualify type arguments.
+      ret = f.ret
+      ret = ret.accept(ctx, visitor_recursive) if ret && visitor_recursive
+      case ret
+      when AST::Identifier
+        source_ident = ret
+        source_link = ctx.namespace[source_ident.pos.source][source_ident.value]?
+        Error.at ret, "This type couldn't be resolved" unless source_link
+        source_link = source_link.as(Program::Type::Link) # TODO: handle cases of Program::TypeAlias::Link or type param
+        source_defn = source_link.resolve(ctx)
+      when AST::Qualify
+        source_ident = ret.term.as(AST::Identifier)
+        source_link = ctx.namespace[source_ident.pos.source][source_ident.value]?
+        Error.at ret, "This type couldn't be resolved" unless source_link
+        source_link = source_link.as(Program::Type::Link) # TODO: handle cases of Program::TypeAlias::Link or type param
+        source_defn = source_link.resolve(ctx)
+
+        # We need to build a mapping of type argument ASTs for each type param
+        # which will be used to transform the new functions that will be
+        # copied from the source type to the dest type. This is necessary
+        # because the source type may contain references to type parameters
+        # that were supplied by type arguments within the dest type's source.
+        # So we build a mapping that will replace instances of the type param.
+        type_params_mapping = {} of String => AST::Node
+        source_defn_params_size = source_defn.params.try(&.terms.size) || 0
+        [source_defn_params_size, ret.group.terms.size].min.times do |index|
+          # Get the identifier of the type parameter to be replaced.
+          type_param_ast = source_defn.params.not_nil!.terms[index]
+          type_param_name = AST::Extract.type_param(type_param_ast)[0].value
+
+          # Get the AST of the type argument to replace it with.
+          replacement_ast = ret.group.terms[index]
+
+          # Record it into the mapping.
+          type_params_mapping[type_param_name] = replacement_ast
+        end
+        visitor = ReplaceIdentifiersVisitor.new(type_params_mapping)
+      else
+        raise NotImplementedError.new(ret)
+      end
+
+      # First gather transitive copy sources recursively.
+      gather_copy_sources(ctx, source_defn, list, visitor)
+
+      # Then gather this copy source itself.
+      list << {source_defn, visitor}
+    end
+
+    return list
   end
 
   # For each concrete function in the given source, copy it to the destination
