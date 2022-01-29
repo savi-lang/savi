@@ -15,8 +15,6 @@
 :: use Xoroshiro128.Narrow instead, which implements the xoroshiro128+ variant,
 :: being optimized for high performance across that smaller number of bits (53).
 :class DeterministicRandom.Xoroshiro128
-  :is Random // TODO: this should not be necessary - copies should be transitive
-  :is DeterministicRandom // TODO: this should not be necessary - copies should be transitive
   :is _State128
 
   // Written in 2019 by David Blackman and Sebastiano Vigna (vigna@acm.org)
@@ -61,8 +59,6 @@
 ::
 :: For all-purpose 64-bit generation, use the main Xoroshiro128 type instead.
 :class DeterministicRandom.Xoroshiro128.Narrow
-  :is Random // TODO: this should not be necessary - copies should be transitive
-  :is DeterministicRandom // TODO: this should not be necessary - copies should be transitive
   :is _State128
 
   // Written in 2016-2018 by David Blackman and Sebastiano Vigna (vigna@acm.org)

@@ -5,9 +5,6 @@
 :trait DeterministicRandom
   :is Random
 
-  // TODO: this should not be necessary - unimplemented methods should be copied
-  :fun ref u64 U64
-
   :new (seed): @seed_64(seed)
   :new new_64(seed U64): @seed_64(seed)
   :new new_128(seed_a U64, seed_b U64): @seed_128(seed_a, seed_b)
