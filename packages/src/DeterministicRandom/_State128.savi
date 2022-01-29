@@ -3,9 +3,6 @@
   :is DeterministicRandom
   :is Random // TODO: this should not be necessary - copies should be transitive
 
-  // TODO: this should not be necessary - unimplemented methods should be copied
-  :fun ref u64 U64
-
   :var _state_a U64
   :var _state_b U64
 

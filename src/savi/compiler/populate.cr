@@ -135,10 +135,13 @@ class Savi::Compiler::Populate
         # We ignore hygienic functions entirely.
         next if f.has_tag?(:hygienic)
 
-        # We don't copy functions that have no implementation.
+        # We don't copy functions that have no implementation,
+        # unless the destination type is also an abstract type (in which case
+        # it just transfers the burden on to the final concrete type)
         next if f.body.nil? \
           && !f.has_tag?(:compiler_intrinsic) \
-          && !f.has_tag?(:constructor)
+          && !f.has_tag?(:constructor) \
+          && !dest.has_tag?(:abstract)
 
         # We won't copy a function if the dest already has one of the same name.
         next if dest.find_func?(f.ident.value)
