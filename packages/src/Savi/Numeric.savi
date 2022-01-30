@@ -1,10 +1,203 @@
-:trait val Numeric
+:: A type that can be used as a numeric type, usually having been declared
+:: with a `:numeric` type declaration, corresponding to a bounded range of
+:: real numbers, being represented as either integer or floating-point values
+:: with a fixed bit-width representation.
+::
+:: The standard floating-point types are `F32` and `F64`, with the "F" prefix
+:: indicating "floating-point", and the 32 or 64 indicating the bit width.
+::
+:: The standard integer types have similar names, such as `U8` or `I32`, with
+:: an "I" prefix indicating "integer", or "U" indicating "unsigned integer".
+::
+:: Beyond the standard numeric types, user-defined custom numeric types can
+:: be declared with the `:numeric` declaration, but such types will always
+:: have the same bit-width and machine representation as one of the standard
+:: types, making this option useful mainly in the case of wanting to define.
+::
+:: For standard numeric types, the type parameter T is the same as the `@` type,
+:: but this less restrictive definition allows more exotic types to conform,
+:: and also makes the trait play nicely as a generic constraint, wherever
+:: "F-bounded polymorphism" is needed to ensure both subtyping and supertyping.
+::
+:: You don't really need to understand the details of the preceding statements.
+:: All you really need to know is that you can write generic code that takes
+:: a given type T as a type parameter, if you use `Numeric(T)'val` as the
+:: constraint for the type parameter, such as in this example:
+::
+:: > :module Adder(T Numeric(T)'val)
+:: >   :fun add(number_1 T, number_2 T) T
+:: >     number_1 + number_2
+::
+:: Basically, it helps to guarantee that T is a type which is numeric and can
+:: be used with other arguments of type T and to produce results of type T.
+:trait val Numeric(T Numeric(T)'val)
+  :is Numeric.Representable
+  :is Numeric.Convertible
+  :is Numeric.Bounded(T)
+  :is Numeric.Arithmetic(T)
+  :is Numeric.Comparable(T)
+
+:: A type which conveys information about the machine-level representation
+:: of a numeric type, including both the width and the kind of representation.
+:trait val Numeric.Representable
+  :: The number of bits that are used to represent values of this numeric type.
+  :: The number of distinct representable values is thus 2 to the width's power.
+  :const bit_width U8
+
+  :: The number of bytes that are used to represent values of this numeric type.
+  :: This is derived trivially from the `bit_width` constant.
+  :fun non byte_width: @bit_width / 8
+
+  :: When true, values are signed, represented using "two's complement",
+  ::
+  :: allowing both negative and positive values (and zero) to be represented.
+  :: When false, values are unsigned, allowing only positive numbers (and zero).
+  ::
+  :: This constant has meaning only for integer types, not floating-point types.
+  :const is_signed Bool
+
+  :: When true, values are floating-point numbers rather than integers,
+  :: allowing the representation of fractional values, as well as values
+  :: which are very great in magnitude (though with loss of precision).
+  ::
+  :: Floating-point types follow the typical IEEE 754 standard in their
+  :: representation and operational semantics.
+  :const is_floating_point Bool
+
+:: A type that can be converted to one of the standard numeric types.
+:trait val Numeric.Convertible
+  :fun u8 U8
+  :fun u16 U16
+  :fun u32 U32
+  :fun u64 U64
+  :fun usize USize
+  :fun i8 I8
+  :fun i16 I16
+  :fun i32 I32
+  :fun i64 I64
+  :fun isize ISize
+  :fun f32 F32
+  :fun f64 F64
+
+:: A type that can return minimum, maximum, and zero numeric values.
+:trait val Numeric.Bounded(T Numeric(T)'val)
+  :: The zero value for this type.
+  :fun non zero T
+
+  :: The minimum representable numeric value for this type.
+  ::
+  :: For unsigned integer types, it is zero.
+  :: For signed integer types, it is the greatest-magnitude negative number.
+  :: For floating-point types, it is negative infinity.
+  :fun non min_value T
+
+  :: The maximum representable numeric value for this type.
+  ::
+  :: For integer types, it is the greatest-magnitude positive number.
+  :: For floating-point types, it is positive infinity.
+  :fun non max_value T
+
+:: A type which can do arithmetic operations of the given type T,
+:: each operation producing a result of that same type T.
+::
+:: Please note that due to limitations of the efficient machine-level
+:: representations of numeric value, some of these operations may produce
+:: results which deviate from the expected values in pure arithmetic theory.
+::
+:: That is, all of these methods are guaranteed not to raise errors, and they
+:: have well-defined documented semantics, but they may not return the values
+:: that you expected (unless you read the documentation and understand it).
+::
+:: Take special care to read and understand the behavior of each operation,
+:: and for integer types, understand when it may be appropriate to use one of
+:: the error-raising methods from the `Integer.SafeArithmetic` trait instead.
+:trait val Numeric.Arithmetic(T Numeric(T)'val)
+  :: Add this value to another value, resulting in a sum value.
+  ::
+  :: For integer types, if this operation overflows the maximum representable
+  :: value, the result is defined to use wrap-around semantics.
+  :: Use the `+!` method instead if raising an error on overflow is desired.
+  :fun val "+"(other T) T
+
+  :: Subtract another value from this value, resulting in a difference value.
+  ::
+  :: For integer types, if this operation underflows the minimum representable
+  :: value, the result is defined to use wrap-around semantics.
+  :: Use the `-!` method instead if raising an error on underflow is desired.
+  :fun val "-"(other T) T
+
+  :: Multiply this value with another value, resulting in a product value.
+  ::
+  :: For integer types, if this operation overflows past the maximum or minimum
+  :: representable values, the result is defined to use wrap-around semantics.
+  :: Use the `*!` method instead if raising an error on overflow is desired.
+  :fun val "*"(other T) T
+
+  :: Divide this value by another value, resulting in a quotient value.
+  ::
+  :: For integer types, this operation uses floored division, meaning that
+  :: the result will be the nearest integer that is less than or equal to
+  :: the true quotient, with some "remainder" value left unaccounted for.
+  :: If the remainder value is desired, use the `%` method to get that value,
+  :: or use the `wide_divide` method to get both the quotient and remainder.
+  ::
+  :: For integer types, if this operation results in an undefined quotient
+  :: (i.e. if the divisor is zero), the result is defined to be zero,
+  :: because integer representations have no value for "NaN", as floats do.
+  :: This is contrary to many other programming languages, wherein an integer
+  :: divide by zero results in an exception or panic that unwinds the program.
+  :: Use the `/!` method instead if raising an error for this case is desired.
+  :fun val "/"(other T) T
+
+  :: Get the "remainder" value of the floored division of this value by another.
+  :: That is, this method gives the number from the dividend that was
+  :: unaccounted for in what would be the integer-truncated quotient value.
+  :fun val "%"(other T) T
+
+:: A numeric type which is comparable to other instances of the same type,
+:: and can have its sign tested to determine whether it is positive or negative.
+:trait Numeric.Comparable(T Numeric(T)'val)
+  :is Comparable(T)
+
+  :: Return whichever value is the minimum of this value and the other value.
+  :fun val min(other T) T
+
+  :: Return whichever value is the maximum of this value and the other value.
+  :fun val max(other T) T
+
+  :: Return the result of subtracting this value from zero, which will usually
+  :: return a negative value of the same magnitude as the original positive,
+  :: or return a positive value of the same magnitude as the original negative.
+  ::
+  :: However, for unsigned integer types (which have no negative values), the
+  :: result will always be positive, using wrap-around underflow subtraction.
+  :: For example, the negation of one would be the same value as `max_value`.
+  ::
+  :: Similarly, for signed integer types (which have a greatest positive value
+  :: whose magnitude is greater than the greatest negative value), the `negate`
+  :: of the `max_value` will be `zero`, and vice versa.
+  :fun val negate T
+
+  :: Return a positive value of the same magnitude as this value.
+  :fun val abs T
+
+:: This trait isn't meant to be used externally. It's just a base implementation
+:: of methods to be copied into every new type declared as `:numeric`.
+:trait val Numeric.BaseImplementation // TODO: don't use :trait for this... `common`?
+  :: Return the given numeric value.
+  ::
+  :: This method exists only to aid in type inference of numeric literal values.
+  :: For example, the expression `U32[99]` passes the numeric value 99 to the
+  :: `[]` method of the `U32` type as a way of explicitly notating the type
+  :: of the numeric value, which would otherwise be unknown to the compiler.
+  :fun non "[]"(value @'val) @'val: value
+
+  :is Numeric.Representable
   :const bit_width U8: 64
   :const is_signed Bool: False
   :const is_floating_point Bool: False
-  // TODO: arithmetic method traits with type parameters on Numeric[A] type
 
-  :fun non byte_width: @bit_width / 8
+  :is Numeric.Convertible
   :fun u8 U8: compiler intrinsic
   :fun u16 U16: compiler intrinsic
   :fun u32 U32: compiler intrinsic
@@ -18,257 +211,112 @@
   :fun f32 F32: compiler intrinsic
   :fun f64 F64: compiler intrinsic
 
-:trait val NumericMethods // TODO: don't use :trait for this... `common`?
-  :const bit_width U8
-  :const is_signed Bool
-  :const is_floating_point Bool
+  :is Numeric.Bounded(@)
+  // The implementation for `Numeric.Bounded` is intentionally omitted here,
+  // and left to be implemented in `Integer.BaseImplementation`,
+  // `FloatingPoint.BaseImplementation32`, and
+  // `FloatingPoint.BaseImplementation64`.
 
-  :fun non "[]"(value @'val) @'val: value
-  :fun non zero @'val: compiler intrinsic
-
-  :fun "=="(other @'box) Bool: compiler intrinsic
-  :fun "!="(other @'box) Bool: compiler intrinsic
-  :fun "<"(other @'box) Bool: compiler intrinsic
-  :fun "<="(other @'box) Bool: compiler intrinsic
-  :fun ">"(other @'box) Bool: compiler intrinsic
-  :fun ">="(other @'box) Bool: compiler intrinsic
-
+  :is Numeric.Arithmetic(@)
   :fun val "+"(other @) @: compiler intrinsic
   :fun val "-"(other @) @: compiler intrinsic
   :fun val "*"(other @) @: compiler intrinsic
   :fun val "/"(other @) @: compiler intrinsic
   :fun val "%"(other @) @: compiler intrinsic
 
+  :is Numeric.Comparable(@)
+  :fun "=="(other @'box) Bool: compiler intrinsic
+  :fun "!="(other @'box) Bool: compiler intrinsic
+  :fun "<"(other @'box) Bool: compiler intrinsic
+  :fun "<="(other @'box) Bool: compiler intrinsic
+  :fun ">"(other @'box) Bool: compiler intrinsic
+  :fun ">="(other @'box) Bool: compiler intrinsic
   :fun val negate: @zero - @
   :fun val min(other @) @: if (@ < other) (@ | other)
   :fun val max(other @) @: if (@ > other) (@ | other)
   :fun val abs: if (@is_signed && @ < @zero) (@zero - @ | @)
 
-:trait val IntegerMethods // TODO: don't use :trait for this... `common`?
-  :const bit_width U8 // TODO: dedup with Numeric
-  :const is_signed Bool // TODO: dedup with Numeric
-  :fun u64 U64: compiler intrinsic // TODO: dedup with Numeric
-  :fun usize USize: compiler intrinsic // TODO: dedup with Numeric
-
-  :fun non min_value @'val: compiler intrinsic
-  :fun non max_value @'val: compiler intrinsic
-
-  // These arithmetic methods raise an error in case of overflow/underflow.
-  // This can potentially be more efficient in some cases than comparing
-  // the two operands first prior to applying the arithmetic operation.
-  :fun val "+!"(other @) @: compiler intrinsic
-  :fun val "-!"(other @) @: compiler intrinsic
-  :fun val "*!"(other @) @: compiler intrinsic
-
-  :fun val bit_and(other @) @: compiler intrinsic
-  :fun val bit_or(other @) @: compiler intrinsic
-  :fun val bit_xor(other @) @: compiler intrinsic
-  :fun val bit_shl(bits U8) @: compiler intrinsic
-  :fun val bit_shr(bits U8) @: compiler intrinsic
-  :fun val invert @: compiler intrinsic
-  :fun val reverse_bits @: compiler intrinsic
-  :fun val swap_bytes @: compiler intrinsic
-  :fun val leading_zeros U8: compiler intrinsic
-  :fun val trailing_zeros U8: compiler intrinsic
-  :fun val count_ones U8: compiler intrinsic
-  :fun val count_zeros U8: @invert.count_ones
-  :fun val next_pow2 @: compiler intrinsic
-
-  :: Multiply avoiding overflow, returning a pair where the first element is
-  :: the most significant bits, and the second is the least significant bits
-  :: (which is the same modulo max size minus one value that would be returned
-  :: from the overflow semantics of normal integer multiplication)
-  :fun val wide_multiply(other @) Pair(@, @): compiler intrinsic
-
-  :: Rotate the given number of bits to the "left" (toward most significant).
-  :: Bits that are shifted off the left side are copied to the right side.
-  :fun val bit_rotl(bits U8) @
-    @bit_shl(bits).bit_or(
-      @bit_shr(@bit_width - bits)
-    )
-
-  :: Rotate the given number of bits to the "right" (toward least significant).
-  :: Bits that are shifted off the right side are copied to the left side.
-  :fun val bit_rotr(bits U8) @
-    @bit_shr(bits).bit_or(
-      @bit_shl(@bit_width - bits)
-    )
-
-  :fun val native_to_be @
-    if (Platform.big_endian) (@ | @swap_bytes)
-
-  :fun val native_to_le @
-    if (Platform.little_endian) (@ | @swap_bytes)
-
-  :fun val be_to_native @
-    if (Platform.big_endian) (@ | @swap_bytes)
-
-  :fun val le_to_native @
-    if (Platform.little_endian) (@ | @swap_bytes)
-
-  :fun hash USize
-    if (USize.bit_width == 32) (
-      x = @usize
-      x = x.invert + x.bit_shl(15)
-      x = x.bit_xor(x.bit_shr(12))
-      x = x + x.bit_shl(2)
-      x = x.bit_xor(x.bit_shr(4))
-      x = (x + x.bit_shl(3)) + x.bit_shl(11)
-      x = x.bit_xor(x.bit_shr(16))
-      x
-    |
-      @hash64.usize
-    )
-
-  :fun hash64 U64
-    x = @u64
-    x = x.invert + x.bit_shl(21)
-    x = x.bit_xor(x.bit_shr(24))
-    x = (x + x.bit_shl(3)) + x.bit_shl(8)
-    x = x.bit_xor(x.bit_shr(14))
-    x = (x + x.bit_shl(2)) + x.bit_shl(4)
-    x = x.bit_xor(x.bit_shr(28))
-    x = x + x.bit_shl(31)
-    x
-
-:trait val Float32Methods
-  :fun non from_bits(bits U32) @'val: compiler intrinsic
-  :fun val bits U32: compiler intrinsic
-
-  // TODO: These should be :const (should they be capitalized)?
-  :fun non nan:          @from_bits(0x7FC0_0000)
-  :fun non infinity:     @from_bits(0x7F80_0000)
-  :fun non neg_infinity: @from_bits(0xFF80_0000)
-  :fun non max_value:    @from_bits(0x7F7F_FFFF)
-  :fun non min_value:    @from_bits(0xFF7F_FFFF)
-
-  :: The number of bits representing the exponent.
-  :fun non exp_bit_width U8: 8
-
-  :: The number of bits representing the significand (a.k.a. mantissa).
-  :: Note that this does not include the implicit/hidden leading bit,
-  :: because that implicit bit is not actually in the memory representation.
-  :fun non sig_bit_width U8: 23
-
-  :: The difference between 1.0 and the next larger representable number.
-  :: This is the unit of least precision in the semi-open range [1.0, 2.0).
-  :fun non epsilon: @from_bits(0x3400_0000) // 2 ** -23
-
-  :: The difference between 1.0 and the next smaller representable number.
-  :: This is the unit of least precision in the semi-open range [0.5, 1.0).
-  :fun non half_epsilon: @from_bits(0x33800000) // 2 ** -24
-
-  :fun val log @: compiler intrinsic
-  :fun val log2 @: compiler intrinsic
-  :fun val log10 @: compiler intrinsic
-  :fun val pow(exp @) @: compiler intrinsic
-
-  :fun val is_positive: @bits.bit_and(0x8000_0000) == 0 // sign bit
-  :fun val is_negative: @bits.bit_and(0x8000_0000) != 0 // sign bit
-
-  // Return true if the number is NaN.
-  :fun val is_nan
-    @bits.bit_and(0x7F80_0000) == 0x7F80_0000 && // exponent
-    @bits.bit_and(0x007F_FFFF) != 0              // mantissa
-
-  // Return true if the number is positive or negative infinity.
-  :fun val is_infinite
-    @bits.bit_and(0x7F80_0000) == 0x7F80_0000 && // exponent
-    @bits.bit_and(0x007F_FFFF) == 0              // mantissa
-
-  // Return true if the number is neither NaN nor positive or negative infinity.
-  :fun val is_finite
-    @bits.bit_and(0x7F80_0000) != 0x7F80_0000 // exponent
-
-:trait val Float64Methods
-  :fun non from_bits(bits U64) @'val: compiler intrinsic
-  :fun val bits U64: compiler intrinsic
-
-  // TODO: These should be :const (should they be capitalized)?
-  :fun non nan:          @from_bits(0x7FF8_0000_0000_0000)
-  :fun non infinity:     @from_bits(0x7FF0_0000_0000_0000)
-  :fun non neg_infinity: @from_bits(0xFFF0_0000_0000_0000)
-  :fun non max_value:    @from_bits(0x7FEF_FFFF_FFFF_FFFF)
-  :fun non min_value:    @from_bits(0xFFEF_FFFF_FFFF_FFFF)
-
-  :: The number of bits representing the exponent.
-  :fun non exp_bit_width U8: 11
-
-  :: The number of bits representing the significand (a.k.a. mantissa).
-  :: Note that this does not include the implicit/hidden leading bit,
-  :: because that implicit bit is not actually in the memory representation.
-  :fun non sig_bit_width U8: 52
-
-  :: The difference between 1.0 and the next larger representable number.
-  :: This is the unit of least precision in the semi-open range [1.0, 2.0).
-  :fun non epsilon: @from_bits(0x3cb0000000000000) // 2 ** -52
-
-  :: The difference between 1.0 and the next smaller representable number.
-  :: This is the unit of least precision in the semi-open range [0.5, 1.0).
-  :fun non half_epsilon: @from_bits(0x3ca0000000000000) // 2 ** -53
-
-  :fun val log @: compiler intrinsic
-  :fun val log2 @: compiler intrinsic
-  :fun val log10 @: compiler intrinsic
-  :fun val pow(y @) @: compiler intrinsic
-
-  :fun val is_positive: @bits.bit_and(0x8000_0000_0000_0000) == 0 // sign bit
-  :fun val is_negative: @bits.bit_and(0x8000_0000_0000_0000) != 0 // sign bit
-
-  // Return true if the number is NaN.
-  :fun val is_nan
-    @bits.bit_and(0x7FF0_0000_0000_0000) == 0x7FF0_0000_0000_0000 && // exponent
-    @bits.bit_and(0x000F_FFFF_FFFF_FFFF) != 0                        // mantissa
-
-  // Return true if the number is positive or negative infinity.
-  :fun val is_infinite
-    @bits.bit_and(0x7FF0_0000_0000_0000) == 0x7FF0_0000_0000_0000 && // exponent
-    @bits.bit_and(0x000F_FFFF_FFFF_FFFF) == 0                        // mantissa
-
-  // Return true if the number is neither NaN nor positive or negative infinity.
-  :fun val is_finite
-    @bits.bit_and(0x7FF0_0000_0000_0000) != 0x7FF0_0000_0000_0000 // exponent
-
+:: The standard 8-bit unsigned integer numeric type.
+:: This type is often used to represent a byte.
 :numeric U8
   :const bit_width U8: 8
 
+:: The standard 16-bit unsigned integer numeric type.
 :numeric U16
   :const bit_width U8: 16
 
+:: The standard 32-bit unsigned integer numeric type.
 :numeric U32
   :const bit_width U8: 32
 
+:: The standard 64-bit unsigned integer numeric type.
 :numeric U64
   :const bit_width U8: 64
 
+:: The standard platform-specific unsigned "size" numeric type.
+:: This type is often used for counting and indexing collections.
+::
+:: Specifically, it refers to the size of the platform's pointer address space.
+:: It is the same size as `U64` on 64-bit platforms, and `U32` on 32-bit.
+::
+:: However, please note that on some platforms, there is a distinction between
+:: the size of a pointer's address space and the size of a pointer itself.
+:: For example, on the CHERI platform, the address space is 64-bit, but the
+:: size of a pointer is 128-bit, since the pointer contains extra information
+:: that is not just encoding the location in the address space.
+:: On such a platform, `USize` is 64-bit - the size of the address space.
+::
+:: To put it another way, `USize` is equivalent to the `size_t` type in C,
+:: but it is not guaranteed to be equivalent to the `uintptr_t` type in C.
 :numeric USize
   :const bit_width U8: compiler intrinsic
 
+:: The standard 8-bit signed integer numeric type.
 :numeric I8
   :const bit_width U8: 8
   :const is_signed: True
 
+:: The standard 16-bit signed integer numeric type.
 :numeric I16
   :const bit_width U8: 16
   :const is_signed: True
 
+:: The standard 32-bit signed integer numeric type.
 :numeric I32
   :const bit_width U8: 32
   :const is_signed: True
 
+:: The standard 64-bit signed integer numeric type.
 :numeric I64
   :const bit_width U8: 64
   :const is_signed: True
 
+:: The standard platform-specific signed "size" numeric type.
+:: This is the signed type corresponding to the unsigned type `USize`.
+::
+:: Specifically, it refers to the size of the platform's pointer address space.
+:: It is the same size as `I64` on 64-bit platforms, and `I32` on 32-bit.
+::
+:: However, please note that on some platforms, there is a distinction between
+:: the size of a pointer's address space and the size of a pointer itself.
+:: For example, on the CHERI platform, the address space is 64-bit, but the
+:: size of a pointer is 128-bit, since the pointer contains extra information
+:: that is not just encoding the location in the address space.
+:: On such a platform, `ISize` is 64-bit - the size of the address space.
+::
+:: To put it another way, `ISize` is equivalent to the `ssize_t` type in C,
+:: but it is not guaranteed to be equivalent to the `intptr_t` type in C.
 :numeric ISize
   :const bit_width U8: compiler intrinsic
   :const is_signed: True
 
+:: The standard 32-bit floating-point numeric type.
 :numeric F32
   :const bit_width U8: 32
   :const is_signed: True
   :const is_floating_point: True
 
+:: The standard 64-bit floating-point numeric type.
 :numeric F64
   :const bit_width U8: 64
   :const is_signed: True

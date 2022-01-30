@@ -196,46 +196,46 @@ It requires a sub-func to have covariant return and contravariant params:
 
 ```savi
 :trait non TraitParamsReturn
-  :fun example1 Numeric
+  :fun example1 Any
   :fun example2 U64
   :fun example3(a U64, b U64, c U64) None
-  :fun example4(a Numeric, b Numeric, c Numeric) None
+  :fun example4(a Any, b Any, c Any) None
 
 :module ConcreteParamsReturn
   :is TraitParamsReturn
   :fun example1 U64: 0
-  :fun example2 Numeric: U64[0]
-  :fun example3(a Numeric, b U64, c Numeric) None:
-  :fun example4(a U64, b Numeric, c U64) None:
+  :fun example2 Any: U64[0]
+  :fun example3(a Any, b U64, c Any) None:
+  :fun example4(a U64, b Any, c U64) None:
 ```
 ```error
 ConcreteParamsReturn isn't a subtype of TraitParamsReturn, as it is required to be here:
   :is TraitParamsReturn
    ^~
 
-- this function's return type is Numeric:
-  :fun example2 Numeric: U64[0]
-                ^~~~~~~
+- this function's return type is Any:
+  :fun example2 Any: U64[0]
+                ^~~
 
 - it is required to be a subtype of U64:
   :fun example2 U64
                 ^~~
 
 - this parameter type is U64:
-  :fun example4(a U64, b Numeric, c U64) None:
+  :fun example4(a U64, b Any, c U64) None:
                 ^~~~~
 
-- it is required to be a supertype of Numeric:
-  :fun example4(a Numeric, b Numeric, c Numeric) None
-                ^~~~~~~~~
+- it is required to be a supertype of Any:
+  :fun example4(a Any, b Any, c Any) None
+                ^~~~~
 
 - this parameter type is U64:
-  :fun example4(a U64, b Numeric, c U64) None:
-                                  ^~~~~
+  :fun example4(a U64, b Any, c U64) None:
+                              ^~~~~
 
-- it is required to be a supertype of Numeric:
-  :fun example4(a Numeric, b Numeric, c Numeric) None
-                                      ^~~~~~~~~
+- it is required to be a supertype of Any:
+  :fun example4(a Any, b Any, c Any) None
+                              ^~~~~
 ```
 
 ---
@@ -271,12 +271,12 @@ It can use type parameters as type arguments in the subtype assertion:
   :fun convert(input A) B
 
 // This class is a valid subtype of the trait as it asserts itself to be.
-:class ConcreteConvertToString(C Numeric'read)
+:class ConcreteConvertToString(C Numeric(C)'read)
   :is TraitConvertAToB(C, String)
   :fun convert(input C): "Pretend this is a string representation of C"
 
 // This class is not. It has the type arguments backwards in its assertion.
-:class ConcreteConvertToStringBackwards(C Numeric'val)
+:class ConcreteConvertToStringBackwards(C Numeric(C)'val)
   :is TraitConvertAToB(String, C)
   :fun convert(input C): "This one has the trait arguments backwards"
 ```

@@ -38,7 +38,7 @@ The type of this expression doesn't meet the constraints imposed on it:
     name String = 42
          ^~~~~~
 
-- but the type of the literal value was Numeric:
+- but the type of the literal value was Numeric.Convertible:
     name String = 42
                   ^~
 ```
@@ -59,7 +59,7 @@ The type of this expression doesn't meet the constraints imposed on it:
   :var name String: 42
             ^~~~~~
 
-- but the type of the literal value was Numeric:
+- but the type of the literal value was Numeric.Convertible:
   :var name String: 42
                     ^~
 ```

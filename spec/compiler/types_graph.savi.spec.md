@@ -57,7 +57,7 @@ It analyzes a simple system of types.
       ^~~~~~~~~~~~~~~~~~~~~~~~~
 
 α'num:80'6
-  <: Numeric
+  <: Numeric.Convertible
       x String = a.describe(80)
                             ^~
   <: α'describe(0)'7
@@ -255,7 +255,7 @@ It analyzes an array literal, its elements, and its antecedent.
         ^~~~~~~~~~~~~~
 
 α'num:1'4
-  <: Numeric
+  <: Numeric.Convertible
       a Array(F64)'val = [1, 2.3]
                           ^
   <: α'array:elem'7

@@ -1,0 +1,93 @@
+:trait val Integer(T Integer(T)'val)
+  :is Numeric(T) // TODO: Other Integer sub-traits
+
+:trait val Integer.BaseImplementation // TODO: don't use :trait for this... `common`?
+  :const bit_width U8 // TODO: dedup with Numeric.Convertible
+  :const is_signed Bool // TODO: dedup with Numeric.Convertible
+  :fun u64 U64: compiler intrinsic // TODO: dedup with Numeric.Convertible
+  :fun usize USize: compiler intrinsic // TODO: dedup with Numeric.Convertible
+
+  :is Numeric.Bounded(@)
+  :fun non zero @'val: compiler intrinsic
+  :fun non min_value @'val: compiler intrinsic
+  :fun non max_value @'val: compiler intrinsic
+
+  // These arithmetic methods raise an error in case of overflow/underflow.
+  // This can potentially be more efficient in some cases than comparing
+  // the two operands first prior to applying the arithmetic operation.
+  :fun val "+!"(other @) @: compiler intrinsic
+  :fun val "-!"(other @) @: compiler intrinsic
+  :fun val "*!"(other @) @: compiler intrinsic
+
+  :fun val bit_and(other @) @: compiler intrinsic
+  :fun val bit_or(other @) @: compiler intrinsic
+  :fun val bit_xor(other @) @: compiler intrinsic
+  :fun val bit_shl(bits U8) @: compiler intrinsic
+  :fun val bit_shr(bits U8) @: compiler intrinsic
+  :fun val invert @: compiler intrinsic
+  :fun val reverse_bits @: compiler intrinsic
+  :fun val swap_bytes @: compiler intrinsic
+  :fun val leading_zeros U8: compiler intrinsic
+  :fun val trailing_zeros U8: compiler intrinsic
+  :fun val count_ones U8: compiler intrinsic
+  :fun val count_zeros U8: @invert.count_ones
+  :fun val next_pow2 @: compiler intrinsic
+
+  :: Multiply avoiding overflow, returning a pair where the first element is
+  :: the most significant bits, and the second is the least significant bits
+  :: (which is the same modulo max size minus one value that would be returned
+  :: from the overflow semantics of normal integer multiplication)
+  :fun val wide_multiply(other @) Pair(@, @): compiler intrinsic
+
+  // :fun val wide_divide(other @) Pair(@, @): TODO
+
+  :: Rotate the given number of bits to the "left" (toward most significant).
+  :: Bits that are shifted off the left side are copied to the right side.
+  :fun val bit_rotl(bits U8) @
+    @bit_shl(bits).bit_or(
+      @bit_shr(@bit_width - bits)
+    )
+
+  :: Rotate the given number of bits to the "right" (toward least significant).
+  :: Bits that are shifted off the right side are copied to the left side.
+  :fun val bit_rotr(bits U8) @
+    @bit_shr(bits).bit_or(
+      @bit_shl(@bit_width - bits)
+    )
+
+  :fun val native_to_be @
+    if (Platform.big_endian) (@ | @swap_bytes)
+
+  :fun val native_to_le @
+    if (Platform.little_endian) (@ | @swap_bytes)
+
+  :fun val be_to_native @
+    if (Platform.big_endian) (@ | @swap_bytes)
+
+  :fun val le_to_native @
+    if (Platform.little_endian) (@ | @swap_bytes)
+
+  :fun hash USize
+    if (USize.bit_width == 32) (
+      x = @usize
+      x = x.invert + x.bit_shl(15)
+      x = x.bit_xor(x.bit_shr(12))
+      x = x + x.bit_shl(2)
+      x = x.bit_xor(x.bit_shr(4))
+      x = (x + x.bit_shl(3)) + x.bit_shl(11)
+      x = x.bit_xor(x.bit_shr(16))
+      x
+    |
+      @hash64.usize
+    )
+
+  :fun hash64 U64
+    x = @u64
+    x = x.invert + x.bit_shl(21)
+    x = x.bit_xor(x.bit_shr(24))
+    x = (x + x.bit_shl(3)) + x.bit_shl(8)
+    x = x.bit_xor(x.bit_shr(14))
+    x = (x + x.bit_shl(2)) + x.bit_shl(4)
+    x = x.bit_xor(x.bit_shr(28))
+    x = x + x.bit_shl(31)
+    x

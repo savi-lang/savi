@@ -516,12 +516,12 @@ module Savi::Compiler::XTypes::Graph
     end
 
     def visit(ctx, node : AST::LiteralCharacter)
-      type = core_savi_type(ctx, "Numeric", NominalCap::VAL)
+      type = core_savi_type(ctx, "Numeric.Convertible", NominalCap::VAL)
       @analysis.observe_constrained_literal(node, "char:#{node.value}", type)
     end
 
     def visit(ctx, node : AST::LiteralInteger)
-      type = core_savi_type(ctx, "Numeric", NominalCap::VAL)
+      type = core_savi_type(ctx, "Numeric.Convertible", NominalCap::VAL)
       @analysis.observe_constrained_literal(node, "num:#{node.value}", type)
     end
 

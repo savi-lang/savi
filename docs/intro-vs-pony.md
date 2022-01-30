@@ -252,9 +252,9 @@ Now let's look at an example of `case` used with the subtype check operator:
 :module Example
   :fun thing_to_number(thing Any'box) I64
     case (
-    | thing <: Numeric | thing.i64
-    | thing <: String  | try (thing.parse_i64! | -1)
-    | thing <: None    | 0
+    | thing <: Numeric.Convertible | thing.i64
+    | thing <: String              | try (thing.parse_i64! | -1)
+    | thing <: None                | 0
     | -1
     )
 ```
@@ -265,9 +265,9 @@ An alternative syntax for `case` is available when the left-side expression and 
 :module Example
   :fun thing_to_number(thing Any'box) I64
     case thing <: (
-    | Numeric | thing.i64
-    | String  | try (thing.parse_i64! | -1)
-    | None    | 0
+    | Numeric.Convertible | thing.i64
+    | String              | try (thing.parse_i64! | -1)
+    | None                | 0
     | -1
     )
 ```
