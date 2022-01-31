@@ -78,7 +78,7 @@
     )
 
   :fun non _inspect_float_into(out String'iso, value F64) String'iso
-    if value.is_negative (
+    if (value < 0) (
       out.push_byte('-')
       value = value.negate
     )

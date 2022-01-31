@@ -1,3 +1,7 @@
+:: A type that can be used as an integer numeric type, signed or unsigned,
+:: usually having been declared with a `:numeric` type declaration.
+::
+:: This is a subtype of the more general `Numeric` trait.
 :trait val Integer(T Integer(T)'val)
   :is Numeric(T) // TODO: Other Integer sub-traits
 

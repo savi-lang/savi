@@ -351,22 +351,22 @@
     assert: F64.max_value.is_finite
     assert: F32.min_value.is_finite
     assert: F64.min_value.is_finite
-    assert: F64.infinity.is_positive
-    assert: F32.infinity.is_positive
-    assert: F64.infinity.is_negative.is_false
-    assert: F32.infinity.is_negative.is_false
-    assert: F64.neg_infinity.is_positive.is_false
-    assert: F32.neg_infinity.is_positive.is_false
-    assert: F64.neg_infinity.is_negative
-    assert: F32.neg_infinity.is_negative
-    assert: F64[123.456].is_positive
-    assert: F32[123.456].is_positive
-    assert: F64[123.456].is_negative.is_false
-    assert: F32[123.456].is_negative.is_false
-    assert: F64[-123.456].is_positive.is_false
-    assert: F32[-123.456].is_positive.is_false
-    assert: F64[-123.456].is_negative
-    assert: F32[-123.456].is_negative
+    assert: F64.infinity > F64.zero
+    assert: F32.infinity > F32.zero
+    assert: F64.zero < F64.infinity
+    assert: F32.zero < F32.infinity
+    assert: F64.zero > F64.neg_infinity
+    assert: F32.zero > F32.neg_infinity
+    assert: F64.neg_infinity < F64.zero
+    assert: F32.neg_infinity < F32.zero
+    assert: F64[123.456] > F64.zero
+    assert: F32[123.456] > F32.zero
+    assert: F64.zero < F64[123.456]
+    assert: F32.zero < F32[123.456]
+    assert: F64.zero > F64[-123.456]
+    assert: F32.zero > F32[-123.456]
+    assert: F64[-123.456] < F64.zero
+    assert: F32[-123.456] < F32.zero
 
   :it "knows the bit widths used in the representation of floating-point values"
     // We have significand bits, exponent bits, and 1 sign bit.

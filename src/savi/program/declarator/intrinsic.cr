@@ -541,8 +541,29 @@ module Savi::Program::Intrinsic
     copy_func.add_tag(:copies)
     type.functions << copy_func
 
+    # Add "is" for the trait of this specific flavor of numeric.
+    trait2_name =
+      if !type.const_bool_true?("is_floating_point")
+        "Integer"
+      else
+        "FloatingPoint"
+      end
+    trait2_cap = AST::Identifier.new("non").from(type.ident)
+    trait2_is = AST::Identifier.new("is").from(type.ident)
+    trait2_ret = AST::Qualify.new(
+      AST::Identifier.new("Numeric").from(type.ident),
+      AST::Group.new("(", [
+        AST::Identifier.new("@").from(type.ident)
+      ] of AST::Node).from(type.ident)
+    ).from(type.ident)
+    trait2_func = Program::Function.new(trait2_cap, trait2_is, nil, trait2_ret, nil)
+    trait2_func.add_tag(:hygienic)
+    trait2_func.add_tag(:is)
+    trait2_func.add_tag(:copies)
+    type.functions << trait2_func
+
     # Also copy the base implementation for this specific flavor of numeric.
-    spec_name =
+    copy2_name =
       if !type.const_bool_true?("is_floating_point")
         "Integer.BaseImplementation"
       elsif type.const_u64_eq?("bit_width", 32)
@@ -550,13 +571,13 @@ module Savi::Program::Intrinsic
       else
         "FloatingPoint.BaseImplementation64"
       end
-    spec_cap = AST::Identifier.new("non").from(type.ident)
-    spec_is = AST::Identifier.new("copies").from(type.ident)
-    spec_ret = AST::Identifier.new(spec_name).from(type.ident)
-    spec_func = Program::Function.new(spec_cap, spec_is, nil, spec_ret, nil)
-    spec_func.add_tag(:hygienic)
-    spec_func.add_tag(:copies)
-    type.functions << spec_func
+    copy2_cap = AST::Identifier.new("non").from(type.ident)
+    copy2_is = AST::Identifier.new("copies").from(type.ident)
+    copy2_ret = AST::Identifier.new(copy2_name).from(type.ident)
+    copy2_func = Program::Function.new(copy2_cap, copy2_is, nil, copy2_ret, nil)
+    copy2_func.add_tag(:hygienic)
+    copy2_func.add_tag(:copies)
+    type.functions << copy2_func
   end
 
   def self.declare_enum_member_name(
