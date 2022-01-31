@@ -1,102 +1,157 @@
+:: A type that can be used as a floating-point numeric type, usually having
+:: been declared with a `:numeric` type declaration.
+::
+:: This is a subtype of the more general `Numeric` trait.
 :trait val FloatingPoint(T FloatingPoint(T)'val)
-  :is Numeric(T) // TODO: Other FloatingPoint sub-traits
+  :is Numeric(T)
+  :is FloatingPoint.Representable
+  :is FloatingPoint.Bounded(T)
+  :is FloatingPoint.Arithmetic(T)
+  :is FloatingPoint.Comparable(T)
 
+:: A type which conveys information about the machine-level representation
+:: of a floating-point numeric type, including the standard information
+:: about general numeric types, as well as floating-point-specific information.
+:trait val FloatingPoint.Representable
+  :is Numeric.Representable
+
+  :: The number of bits representing the exponent.
+  :: Note that total `bit_width` will be `exp_bit_width` + `sig_bit_width` + 1.
+  :fun non exp_bit_width U8
+
+  :: The number of bits representing the significand (a.k.a. mantissa).
+  :: Note that total `bit_width` will be `exp_bit_width` + `sig_bit_width` + 1.
+  ::
+  :: The significand does not include the implicit/hidden leading bit,
+  :: because that implicit bit is not actually in the memory representation.
+  :fun non sig_bit_width U8
+
+:: A type that can return certain special edge-case floating-point values.
+:trait val FloatingPoint.Bounded(T FloatingPoint(T)'val)
+  :is Numeric.Bounded(T)
+
+  :: Return a value signifying positive infinity.
+  :fun non infinity T
+
+  :: Return a value signifying negative infinity.
+  :fun non neg_infinity T
+
+  :: Return a value signifying NaN (i.e. "not a number").
+  ::
+  :: Note that the floating-point representation allows for multiple distinct
+  :: values that all signify NaN, but are not equal to one another,
+  :: so the correct way to check for NaN is to use the `is_nan` method,
+  :: rather than to check equivalence with the value returned by this method.
+  :fun non nan T
+
+  :: The difference between 1.0 and the next larger representable number.
+  :: This is the unit of least precision in the semi-open range [1.0, 2.0).
+  :fun non epsilon T
+
+  :: The difference between 1.0 and the next smaller representable number.
+  :: This is the unit of least precision in the semi-open range [0.5, 1.0).
+  :fun non half_epsilon T
+
+:: A type which can do floating-point arithmetic operations of the given type T,
+:: each operation producing a result of that same type T.
+:trait val FloatingPoint.Arithmetic(T FloatingPoint(T)'val)
+  :is Numeric.Arithmetic(T)
+
+  :: Get the natural logarithm of this value.
+  :: That is, the logarithm using the transcendental constant "e" as the base.
+  :fun val log T
+
+  :: Get the base-2 logarithm of this value.
+  :fun val log2 T
+
+  :: Get the base-10 logarithm of this value.
+  :fun val log10 T
+
+  :: Exponentiate this value with the given exponent value (the given "power").
+  :fun val pow(exp T) T
+
+:: A floating-point type which is comparable to other values of the same type,
+:: and can be checked to see if it is or is not one of the special values.
+:trait val FloatingPoint.Comparable(T FloatingPoint(T)'val)
+  :is Numeric.Comparable(T)
+
+  :: Return true if the value signifies NaN.
+  :fun val is_nan Bool
+
+  :: Return true if the value is positive or negative infinity.
+  :fun val is_infinite Bool
+
+  :: Return true if the value is neither NaN nor positive or negative infinity.
+  :fun val is_finite Bool
+
+:: This trait isn't meant to be used externally. It's just a base implementation
+:: of methods to be copied into every new floating-point 32-bit `:numeric` type.
 :trait val FloatingPoint.BaseImplementation32 // TODO: don't use :trait for this... `common`?
   :fun non from_bits(bits U32) @'val: compiler intrinsic
   :fun val bits U32: compiler intrinsic
 
-  :is Numeric.Bounded(@)
+  :is FloatingPoint.Representable
+  :fun non exp_bit_width U8: 8
+  :fun non sig_bit_width U8: 23
+
+  :is FloatingPoint.Bounded(@)
   :fun non zero:         @from_bits(0)
   :fun non max_value:    @from_bits(0x7F7F_FFFF)
   :fun non min_value:    @from_bits(0xFF7F_FFFF)
   :fun non infinity:     @from_bits(0x7F80_0000)
   :fun non neg_infinity: @from_bits(0xFF80_0000)
   :fun non nan:          @from_bits(0x7FC0_0000)
+  :fun non epsilon:      @from_bits(0x3400_0000) // 2 ** -23
+  :fun non half_epsilon: @from_bits(0x3380_0000) // 2 ** -24
 
-  :: The number of bits representing the exponent.
-  :fun non exp_bit_width U8: 8
-
-  :: The number of bits representing the significand (a.k.a. mantissa).
-  :: Note that this does not include the implicit/hidden leading bit,
-  :: because that implicit bit is not actually in the memory representation.
-  :fun non sig_bit_width U8: 23
-
-  :: The difference between 1.0 and the next larger representable number.
-  :: This is the unit of least precision in the semi-open range [1.0, 2.0).
-  :fun non epsilon: @from_bits(0x3400_0000) // 2 ** -23
-
-  :: The difference between 1.0 and the next smaller representable number.
-  :: This is the unit of least precision in the semi-open range [0.5, 1.0).
-  :fun non half_epsilon: @from_bits(0x33800000) // 2 ** -24
-
+  :is FloatingPoint.Arithmetic(@)
   :fun val log @: compiler intrinsic
   :fun val log2 @: compiler intrinsic
   :fun val log10 @: compiler intrinsic
-  :fun val pow(exp @) @: compiler intrinsic
+  :fun val pow(y @) @: compiler intrinsic
 
-  :fun val is_positive: @bits.bit_and(0x8000_0000) == 0 // sign bit
-  :fun val is_negative: @bits.bit_and(0x8000_0000) != 0 // sign bit
-
-  // Return true if the number is NaN.
+  :is FloatingPoint.Comparable(@)
   :fun val is_nan
     @bits.bit_and(0x7F80_0000) == 0x7F80_0000 && // exponent
     @bits.bit_and(0x007F_FFFF) != 0              // mantissa
-
-  // Return true if the number is positive or negative infinity.
   :fun val is_infinite
     @bits.bit_and(0x7F80_0000) == 0x7F80_0000 && // exponent
     @bits.bit_and(0x007F_FFFF) == 0              // mantissa
-
-  // Return true if the number is neither NaN nor positive or negative infinity.
   :fun val is_finite
     @bits.bit_and(0x7F80_0000) != 0x7F80_0000 // exponent
 
+:: This trait isn't meant to be used externally. It's just a base implementation
+:: of methods to be copied into every new floating-point 64-bit `:numeric` type.
 :trait val FloatingPoint.BaseImplementation64 // TODO: don't use :trait for this... `common`?
   :fun non from_bits(bits U64) @'val: compiler intrinsic
   :fun val bits U64: compiler intrinsic
 
-  :is Numeric.Bounded(@)
+  :is FloatingPoint.Representable
+  :fun non exp_bit_width U8: 11
+  :fun non sig_bit_width U8: 52
+
+  :is FloatingPoint.Bounded(@)
   :fun non zero:         @from_bits(0)
   :fun non max_value:    @from_bits(0x7FEF_FFFF_FFFF_FFFF)
   :fun non min_value:    @from_bits(0xFFEF_FFFF_FFFF_FFFF)
   :fun non infinity:     @from_bits(0x7FF0_0000_0000_0000)
   :fun non neg_infinity: @from_bits(0xFFF0_0000_0000_0000)
   :fun non nan:          @from_bits(0x7FF8_0000_0000_0000)
+  :fun non epsilon:      @from_bits(0x3CB0_0000_0000_0000) // 2 ** -52
+  :fun non half_epsilon: @from_bits(0x3CA0_0000_0000_0000) // 2 ** -53
 
-  :: The number of bits representing the exponent.
-  :fun non exp_bit_width U8: 11
-
-  :: The number of bits representing the significand (a.k.a. mantissa).
-  :: Note that this does not include the implicit/hidden leading bit,
-  :: because that implicit bit is not actually in the memory representation.
-  :fun non sig_bit_width U8: 52
-
-  :: The difference between 1.0 and the next larger representable number.
-  :: This is the unit of least precision in the semi-open range [1.0, 2.0).
-  :fun non epsilon: @from_bits(0x3cb0000000000000) // 2 ** -52
-
-  :: The difference between 1.0 and the next smaller representable number.
-  :: This is the unit of least precision in the semi-open range [0.5, 1.0).
-  :fun non half_epsilon: @from_bits(0x3ca0000000000000) // 2 ** -53
-
+  :is FloatingPoint.Arithmetic(@)
   :fun val log @: compiler intrinsic
   :fun val log2 @: compiler intrinsic
   :fun val log10 @: compiler intrinsic
   :fun val pow(y @) @: compiler intrinsic
 
-  :fun val is_positive: @bits.bit_and(0x8000_0000_0000_0000) == 0 // sign bit
-  :fun val is_negative: @bits.bit_and(0x8000_0000_0000_0000) != 0 // sign bit
-
-  // Return true if the number is NaN.
+  :is FloatingPoint.Comparable(@)
   :fun val is_nan
     @bits.bit_and(0x7FF0_0000_0000_0000) == 0x7FF0_0000_0000_0000 && // exponent
     @bits.bit_and(0x000F_FFFF_FFFF_FFFF) != 0                        // mantissa
-
-  // Return true if the number is positive or negative infinity.
   :fun val is_infinite
     @bits.bit_and(0x7FF0_0000_0000_0000) == 0x7FF0_0000_0000_0000 && // exponent
     @bits.bit_and(0x000F_FFFF_FFFF_FFFF) == 0                        // mantissa
-
-  // Return true if the number is neither NaN nor positive or negative infinity.
   :fun val is_finite
     @bits.bit_and(0x7FF0_0000_0000_0000) != 0x7FF0_0000_0000_0000 // exponent
