@@ -32,16 +32,16 @@ It complains when the match type isn't a subtype of the original:
     @refine("example")
 
   :fun refine(x String)
-    if (x <: Numeric) x.u8
+    if (x <: Numeric.Convertible) x.u8
 ```
 ```error
 This type check will never match:
-    if (x <: Numeric) x.u8
-        ^~~~~~~~~~~~
+    if (x <: Numeric.Convertible) x.u8
+        ^~~~~~~~~~~~~~~~~~~~~~~~
 
-- the runtime match type, ignoring capabilities, is Numeric:
-    if (x <: Numeric) x.u8
-             ^~~~~~~
+- the runtime match type, ignoring capabilities, is Numeric.Convertible:
+    if (x <: Numeric.Convertible) x.u8
+             ^~~~~~~~~~~~~~~~~~~
 
 - which does not intersect at all with String:
   :fun refine(x String)

@@ -43,7 +43,7 @@ T'x'5
       ^~~~~~~~~~~~~~~~~~~~~~~~~
 
 T'num:80'6
-  <: Numeric'val
+  <: Numeric.Convertible'val
       x String = a.describe(80)
                             ^~
   <: T'describe(0)'7
@@ -223,7 +223,7 @@ T'a'3
       ^~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 T'num:1'4
-  <: Numeric'val
+  <: Numeric.Convertible'val
       a Array(F64)'val = [1, 2.3]
                           ^
   <: T'array:elem'7

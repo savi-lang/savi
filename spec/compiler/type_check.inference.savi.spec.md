@@ -171,7 +171,7 @@ This literal value couldn't be inferred as a single concrete type:
     x (F64 | U64) = 42
       ^~~~~~~~~~~
 
-- and the literal itself has an intrinsic type of Numeric:
+- and the literal itself has an intrinsic type of Numeric.Convertible:
     x (F64 | U64) = 42
                     ^~
 
@@ -190,7 +190,7 @@ This literal value couldn't be inferred as a single concrete type:
     x = 42.u64
         ^~
 
-- and the literal itself has an intrinsic type of Numeric:
+- and the literal itself has an intrinsic type of Numeric.Convertible:
     x = 42.u64
         ^~
 
@@ -222,7 +222,7 @@ This literal value couldn't be inferred as a single concrete type:
     | string.size > 90 | I64[88]
                             ^~~~
 
-- and the literal itself has an intrinsic type of Numeric:
+- and the literal itself has an intrinsic type of Numeric.Convertible:
     | 0
       ^
 

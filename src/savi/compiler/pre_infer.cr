@@ -342,14 +342,14 @@ module Savi::Compiler::PreInfer
 
     # A literal character could be any integer or floating-point machine type.
     def touch(ctx : Context, node : AST::LiteralCharacter)
-      t_link = core_savi_type(ctx, "Numeric")
+      t_link = core_savi_type(ctx, "Numeric.Convertible")
       mt = Infer::MetaType.new(Infer::ReifiedType.new(t_link), Infer::Cap::VAL)
       @analysis[node] = Infer::Literal.new(node.pos, layer(node), mt)
     end
 
     # A literal integer could be any integer or floating-point machine type.
     def touch(ctx : Context, node : AST::LiteralInteger)
-      t_link = core_savi_type(ctx, "Numeric")
+      t_link = core_savi_type(ctx, "Numeric.Convertible")
       mt = Infer::MetaType.new(Infer::ReifiedType.new(t_link), Infer::Cap::VAL)
       @analysis[node] = Infer::Literal.new(node.pos, layer(node), mt)
     end

@@ -1,0 +1,102 @@
+:trait val FloatingPoint(T FloatingPoint(T)'val)
+  :is Numeric(T) // TODO: Other FloatingPoint sub-traits
+
+:trait val FloatingPoint.BaseImplementation32 // TODO: don't use :trait for this... `common`?
+  :fun non from_bits(bits U32) @'val: compiler intrinsic
+  :fun val bits U32: compiler intrinsic
+
+  :is Numeric.Bounded(@)
+  :fun non zero:         @from_bits(0)
+  :fun non max_value:    @from_bits(0x7F7F_FFFF)
+  :fun non min_value:    @from_bits(0xFF7F_FFFF)
+  :fun non infinity:     @from_bits(0x7F80_0000)
+  :fun non neg_infinity: @from_bits(0xFF80_0000)
+  :fun non nan:          @from_bits(0x7FC0_0000)
+
+  :: The number of bits representing the exponent.
+  :fun non exp_bit_width U8: 8
+
+  :: The number of bits representing the significand (a.k.a. mantissa).
+  :: Note that this does not include the implicit/hidden leading bit,
+  :: because that implicit bit is not actually in the memory representation.
+  :fun non sig_bit_width U8: 23
+
+  :: The difference between 1.0 and the next larger representable number.
+  :: This is the unit of least precision in the semi-open range [1.0, 2.0).
+  :fun non epsilon: @from_bits(0x3400_0000) // 2 ** -23
+
+  :: The difference between 1.0 and the next smaller representable number.
+  :: This is the unit of least precision in the semi-open range [0.5, 1.0).
+  :fun non half_epsilon: @from_bits(0x33800000) // 2 ** -24
+
+  :fun val log @: compiler intrinsic
+  :fun val log2 @: compiler intrinsic
+  :fun val log10 @: compiler intrinsic
+  :fun val pow(exp @) @: compiler intrinsic
+
+  :fun val is_positive: @bits.bit_and(0x8000_0000) == 0 // sign bit
+  :fun val is_negative: @bits.bit_and(0x8000_0000) != 0 // sign bit
+
+  // Return true if the number is NaN.
+  :fun val is_nan
+    @bits.bit_and(0x7F80_0000) == 0x7F80_0000 && // exponent
+    @bits.bit_and(0x007F_FFFF) != 0              // mantissa
+
+  // Return true if the number is positive or negative infinity.
+  :fun val is_infinite
+    @bits.bit_and(0x7F80_0000) == 0x7F80_0000 && // exponent
+    @bits.bit_and(0x007F_FFFF) == 0              // mantissa
+
+  // Return true if the number is neither NaN nor positive or negative infinity.
+  :fun val is_finite
+    @bits.bit_and(0x7F80_0000) != 0x7F80_0000 // exponent
+
+:trait val FloatingPoint.BaseImplementation64 // TODO: don't use :trait for this... `common`?
+  :fun non from_bits(bits U64) @'val: compiler intrinsic
+  :fun val bits U64: compiler intrinsic
+
+  :is Numeric.Bounded(@)
+  :fun non zero:         @from_bits(0)
+  :fun non max_value:    @from_bits(0x7FEF_FFFF_FFFF_FFFF)
+  :fun non min_value:    @from_bits(0xFFEF_FFFF_FFFF_FFFF)
+  :fun non infinity:     @from_bits(0x7FF0_0000_0000_0000)
+  :fun non neg_infinity: @from_bits(0xFFF0_0000_0000_0000)
+  :fun non nan:          @from_bits(0x7FF8_0000_0000_0000)
+
+  :: The number of bits representing the exponent.
+  :fun non exp_bit_width U8: 11
+
+  :: The number of bits representing the significand (a.k.a. mantissa).
+  :: Note that this does not include the implicit/hidden leading bit,
+  :: because that implicit bit is not actually in the memory representation.
+  :fun non sig_bit_width U8: 52
+
+  :: The difference between 1.0 and the next larger representable number.
+  :: This is the unit of least precision in the semi-open range [1.0, 2.0).
+  :fun non epsilon: @from_bits(0x3cb0000000000000) // 2 ** -52
+
+  :: The difference between 1.0 and the next smaller representable number.
+  :: This is the unit of least precision in the semi-open range [0.5, 1.0).
+  :fun non half_epsilon: @from_bits(0x3ca0000000000000) // 2 ** -53
+
+  :fun val log @: compiler intrinsic
+  :fun val log2 @: compiler intrinsic
+  :fun val log10 @: compiler intrinsic
+  :fun val pow(y @) @: compiler intrinsic
+
+  :fun val is_positive: @bits.bit_and(0x8000_0000_0000_0000) == 0 // sign bit
+  :fun val is_negative: @bits.bit_and(0x8000_0000_0000_0000) != 0 // sign bit
+
+  // Return true if the number is NaN.
+  :fun val is_nan
+    @bits.bit_and(0x7FF0_0000_0000_0000) == 0x7FF0_0000_0000_0000 && // exponent
+    @bits.bit_and(0x000F_FFFF_FFFF_FFFF) != 0                        // mantissa
+
+  // Return true if the number is positive or negative infinity.
+  :fun val is_infinite
+    @bits.bit_and(0x7FF0_0000_0000_0000) == 0x7FF0_0000_0000_0000 && // exponent
+    @bits.bit_and(0x000F_FFFF_FFFF_FFFF) == 0                        // mantissa
+
+  // Return true if the number is neither NaN nor positive or negative infinity.
+  :fun val is_finite
+    @bits.bit_and(0x7FF0_0000_0000_0000) != 0x7FF0_0000_0000_0000 // exponent

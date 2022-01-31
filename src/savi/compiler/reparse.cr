@@ -120,6 +120,7 @@ class Savi::Compiler::Reparse < Savi::AST::CopyOnMutateVisitor
 
     params = params.dup
     params.terms = params.terms.map do |param|
+      param = param.accept(ctx, self)
       visit_local_or_param_defn(ctx, param)
     end
 

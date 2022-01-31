@@ -517,33 +517,38 @@ module Savi::Program::Intrinsic
   )
     type = scope.current_type
 
-    # Add "is Numeric" to the type definition so to absorb the trait.
+    # Add "is Numeric(@)" to the type definition as well.
     trait_cap = AST::Identifier.new("non").from(type.ident)
     trait_is = AST::Identifier.new("is").from(type.ident)
-    trait_ret = AST::Identifier.new("Numeric").from(type.ident)
+    trait_ret = AST::Qualify.new(
+      AST::Identifier.new("Numeric").from(type.ident),
+      AST::Group.new("(", [
+        AST::Identifier.new("@").from(type.ident)
+      ] of AST::Node).from(type.ident)
+    ).from(type.ident)
     trait_func = Program::Function.new(trait_cap, trait_is, nil, trait_ret, nil)
     trait_func.add_tag(:hygienic)
     trait_func.add_tag(:is)
     trait_func.add_tag(:copies)
     type.functions << trait_func
 
-    # Add "copies NumericMethods" to the type definition as well.
+    # Add "copies Numeric.BaseImplementation" so to absorb the numeric base.
     copy_cap = AST::Identifier.new("non").from(type.ident)
     copy_is = AST::Identifier.new("copies").from(type.ident)
-    copy_ret = AST::Identifier.new("NumericMethods").from(type.ident)
+    copy_ret = AST::Identifier.new("Numeric.BaseImplementation").from(type.ident)
     copy_func = Program::Function.new(copy_cap, copy_is, nil, copy_ret, nil)
     copy_func.add_tag(:hygienic)
     copy_func.add_tag(:copies)
     type.functions << copy_func
 
-    # Also copy IntegerMethods, Float32Methods, or Float64Methods.
+    # Also copy the base implementation for this specific flavor of numeric.
     spec_name =
       if !type.const_bool_true?("is_floating_point")
-        "IntegerMethods"
+        "Integer.BaseImplementation"
       elsif type.const_u64_eq?("bit_width", 32)
-        "Float32Methods"
+        "FloatingPoint.BaseImplementation32"
       else
-        "Float64Methods"
+        "FloatingPoint.BaseImplementation64"
       end
     spec_cap = AST::Identifier.new("non").from(type.ident)
     spec_is = AST::Identifier.new("copies").from(type.ident)
