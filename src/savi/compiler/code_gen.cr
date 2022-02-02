@@ -1234,8 +1234,8 @@ class Savi::Compiler::CodeGen
           @builder.call(op_func, [params[0]])
         else raise NotImplementedError.new(bit_width_of(gtype))
         end
-      when "leading_zeros"
-        raise "leading_zeros float" if gtype.type_def.is_floating_point_numeric?(ctx)
+      when "leading_zero_bits"
+        raise "leading_zero_bits float" if gtype.type_def.is_floating_point_numeric?(ctx)
         op_func =
           case bit_width_of(gtype)
           when 1
@@ -1257,8 +1257,8 @@ class Savi::Compiler::CodeGen
           end
         gen_numeric_conv gtype, @gtypes["U8"],
           @builder.call(op_func, [params[0], @i1_false])
-      when "trailing_zeros"
-        raise "trailing_zeros float" if gtype.type_def.is_floating_point_numeric?(ctx)
+      when "trailing_zero_bits"
+        raise "trailing_zero_bits float" if gtype.type_def.is_floating_point_numeric?(ctx)
         op_func =
           case bit_width_of(gtype)
           when 1
@@ -1280,8 +1280,8 @@ class Savi::Compiler::CodeGen
           end
         gen_numeric_conv gtype, @gtypes["U8"],
           @builder.call(op_func, [params[0], @i1_false])
-      when "count_ones"
-        raise "count_ones float" if gtype.type_def.is_floating_point_numeric?(ctx)
+      when "total_one_bits"
+        raise "total_one_bits float" if gtype.type_def.is_floating_point_numeric?(ctx)
         op_func =
           case bit_width_of(gtype)
           when 1
