@@ -193,7 +193,7 @@ $(BUILD)/fswatch: $(MAKE_VAR_CACHE)/FSWATCH_RELEASE_URL
 # Build the static library for the fswatch library sourece code to build it.
 LIB_FSWATCH?=$(BUILD)/fswatch/libfswatch/src/libfswatch/.libs/libfswatch.a
 $(LIB_FSWATCH): $(BUILD)/fswatch
-	cd $^ && ./configure && make
+	cd $^ && env CFLAGS="-target $(CLANG_TARGET_PLATFORM)" ./configure && make
 
 # Download the runtime bitcode library we have built separately.
 # See github.com/savi-lang/runtime-bitcode for more info.
