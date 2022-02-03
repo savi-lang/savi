@@ -144,76 +144,48 @@ It infers an integer through a variable with only a cap as its explicit type:
 
 ---
 
-It complains when a literal couldn't be resolved to a single type:
+It treats non-inferred integer literals as I32:
 
 ```savi
-    x (F64 | U64) = 42
-```
-```error
-This literal value couldn't be inferred as a single concrete type:
-    x (F64 | U64) = 42
-                    ^~
-
-- it is required here to be a subtype of (F64 | U64):
-    x (F64 | U64) = 42
-      ^~~~~~~~~~~
-
-- and the literal itself has an intrinsic type of Numeric.Convertible:
-    x (F64 | U64) = 42
-                    ^~
-
-- Please wrap an explicit numeric type around the literal (for example: U64[42])
+    x = (
+      42 ::t_type=> I32
+    ).u64 ::t_type=> U64
 ```
 
 ---
 
-It complains when literal couldn't resolve even when calling u64 method:
+It treats non-inferred integer literals as F64:
 
 ```savi
-    x = 42.u64
-```
-```error
-This literal value couldn't be inferred as a single concrete type:
-    x = 42.u64
-        ^~
-
-- and the literal itself has an intrinsic type of Numeric.Convertible:
-    x = 42.u64
-        ^~
-
-- Please wrap an explicit numeric type around the literal (for example: U64[42])
+    x = (
+      42.0 ::t_type=> F64
+    ).u64 ::t_type=> U64
 ```
 
 ---
 
-It complains when literal couldn't resolve and had conflicting hints:
+It infers a literal through peer hints:
+
+```savi
+    string = "Hello, World"
+    case (
+    | string.size < 10 | U64[99]
+    | string.size > 90 | U64[88]
+    | 0 ::t_type=> U64
+    ) ::t_type=> U64
+```
+
+---
+
+It ignores peer hints when more than one might apply:
 
 ```savi
     string = "Hello, World"
     case (
     | string.size < 10 | U64[99]
     | string.size > 90 | I64[88]
-    | 0
-    )
-```
-```error
-This literal value couldn't be inferred as a single concrete type:
-    | 0
-      ^
-
-- it is suggested here that it might be a U64:
-    | string.size < 10 | U64[99]
-                            ^~~~
-
-- it is suggested here that it might be a I64:
-    | string.size > 90 | I64[88]
-                            ^~~~
-
-- and the literal itself has an intrinsic type of Numeric.Convertible:
-    | 0
-      ^
-
-- Please wrap an explicit numeric type around the literal (for example: U64[0])
+    | 0 ::t_type=> I32
+    ) ::t_type=> (U64 | I64 | I32)
 ```
 
 ---

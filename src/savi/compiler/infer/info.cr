@@ -498,7 +498,7 @@ module Savi::Compiler::Infer
 
     def describe_kind : String; "literal value" end
 
-    def initialize(@pos, @layer_index, @possible : MetaType)
+    def initialize(@pos, @layer_index, @possible : MetaType, @fallback : MetaType)
       @peer_hints = [] of Info
     end
 
@@ -506,8 +506,17 @@ module Savi::Compiler::Infer
       @peer_hints << peer
     end
 
+    def widest_mt
+      @possible
+    end
+
+    def fallback_mt
+      @fallback
+    end
+
     def resolve_span!(ctx : Context, infer : Visitor) : Span
       simple_span = Span.simple(@possible)
+      fallback_span = Span.simple(@fallback)
 
       # Look at downstream tether constraints to try to resolve the literal
       # to a more specific type than the simple "possible" type indicated by it.
@@ -541,11 +550,11 @@ module Savi::Compiler::Infer
             }
             .maybe_fallback_based_on_mt_simplify([
               # If, with peer hints, we are still not a single concrete type,
-              # there's nothing more to try, so we return the simple type.
-              {:mt_non_singular_concrete, simple_span}
+              # there's nothing more to try, so we use the fallback type.
+              {:mt_non_singular_concrete, fallback_span}
             ])
           else
-            simple_span
+            fallback_span
           end
         }
       ])
