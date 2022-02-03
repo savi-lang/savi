@@ -224,8 +224,9 @@ module Savi::Compiler::PreInfer
       nil
     end
 
-    def core_savi_type(ctx : Context, name)
-      ctx.namespace.core_savi_type(ctx, name)
+    def core_savi_mt(ctx : Context, name, cap)
+      t_link = ctx.namespace.core_savi_type(ctx, name)
+      Infer::MetaType.new(Infer::ReifiedType.new(t_link), cap)
     end
 
     def lookup_local_ident(ref : Refer::Local)
@@ -341,25 +342,31 @@ module Savi::Compiler::PreInfer
     end
 
     # A literal character could be any integer or floating-point machine type.
+    # If no type can be clearly inferred, we fall back to an I32 assumption.
     def touch(ctx : Context, node : AST::LiteralCharacter)
-      t_link = core_savi_type(ctx, "Numeric.Convertible")
-      mt = Infer::MetaType.new(Infer::ReifiedType.new(t_link), Infer::Cap::VAL)
-      @analysis[node] = Infer::Literal.new(node.pos, layer(node), mt)
+      possible = core_savi_mt(ctx, "Numeric.Convertible", Infer::Cap::VAL)
+      fallback = core_savi_mt(ctx, "I32", Infer::Cap::VAL)
+      @analysis[node] = Infer::Literal.new(node.pos, layer(node), possible, fallback)
     end
 
     # A literal integer could be any integer or floating-point machine type.
+    # If no type can be clearly inferred, we fall back to an I32 assumption.
     def touch(ctx : Context, node : AST::LiteralInteger)
-      t_link = core_savi_type(ctx, "Numeric.Convertible")
-      mt = Infer::MetaType.new(Infer::ReifiedType.new(t_link), Infer::Cap::VAL)
-      @analysis[node] = Infer::Literal.new(node.pos, layer(node), mt)
+      possible = core_savi_mt(ctx, "Numeric.Convertible", Infer::Cap::VAL)
+      fallback = core_savi_mt(ctx, "I32", Infer::Cap::VAL)
+      @analysis[node] = Infer::Literal.new(node.pos, layer(node), possible, fallback)
     end
 
     # A literal float could be any floating-point machine type.
+    # If no type can be clearly inferred, we fall back to an F64 assumption.
     def touch(ctx : Context, node : AST::LiteralFloat)
-      t_links = [core_savi_type(ctx, "F32"), core_savi_type(ctx, "F64")]
-      mts = t_links.map { |t_link| Infer::MetaType.new(Infer::ReifiedType.new(t_link), Infer::Cap::VAL) }
-      mt = Infer::MetaType.new_union(mts)
-      @analysis[node] = Infer::Literal.new(node.pos, layer(node), mt)
+      # TODO: Allow inferring custom-declared floating-point types as well.
+      possible = Infer::MetaType.new_union([
+        core_savi_mt(ctx, "F32", Infer::Cap::VAL),
+        core_savi_mt(ctx, "F64", Infer::Cap::VAL),
+      ])
+      fallback = core_savi_mt(ctx, "F64", Infer::Cap::VAL)
+      @analysis[node] = Infer::Literal.new(node.pos, layer(node), possible, fallback)
     end
 
     def touch(ctx : Context, node : AST::Group)

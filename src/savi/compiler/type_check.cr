@@ -467,13 +467,16 @@ class Savi::Compiler::TypeCheck
 
     # Sometimes print a special case error message for Literal values.
     def type_check_pre(ctx : Context, info : Infer::Literal, mt : MetaType) : Bool
-      # If we've resolved to a single concrete type already, move forward.
-      return true if mt.singular? && mt.single!.link.is_concrete?
+      downstream_mt = info.total_downstream_constraint(ctx, self)
 
-      # If we can't be satisfiably intersected with the downstream constraints,
-      # move forward and let the standard type checker error happen.
-      constrained_mt = mt.intersect(info.total_downstream_constraint(ctx, self))
-      return true if constrained_mt.simplify(ctx).unsatisfiable?
+      # If the widest type is not satisfiable with downstream constraints,
+      # fail early here to show the standard type checker error.
+      return true if info.widest_mt.intersect(downstream_mt).simplify(ctx).unsatisfiable?
+
+      # If the constrained type is singular and concrete, move forward
+      # expecting no errors to need to be shown for this type.
+      constrained_mt = mt.intersect(downstream_mt).simplify(ctx)
+      return true if constrained_mt.singular? && constrained_mt.single!.link.is_concrete?
 
       # Otherwise, print a Literal-specific error that includes peer hints,
       # as well as a call to action to use an explicit numeric type.
@@ -484,7 +487,10 @@ class Savi::Compiler::TypeCheck
       }
       error_info.concat(info.describe_downstream_constraints(ctx, self))
       error_info.push({info.pos,
-        "and the literal itself has an intrinsic type of #{mt.show_type}"
+        "the literal could be any subtype of #{info.widest_mt.show_type}"
+      })
+      error_info.push({info.pos,
+        "but the fallback type for this kind of literal would be #{info.fallback_mt.show_type}"
       })
       error_info.push({Source::Pos.none,
         "Please wrap an explicit numeric type around the literal " \

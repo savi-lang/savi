@@ -232,8 +232,9 @@ module Savi::Compiler::PreTInfer
       nil
     end
 
-    def core_savi_type(ctx : Context, name)
-      ctx.namespace.core_savi_type(ctx, name)
+    def core_savi_mt(ctx : Context, name)
+      t_link = ctx.namespace.core_savi_type(ctx, name)
+      TInfer::MetaType.new(TInfer::ReifiedType.new(t_link))
     end
 
     def lookup_local_ident(ref : Refer::Local)
@@ -343,25 +344,31 @@ module Savi::Compiler::PreTInfer
     end
 
     # A literal character could be any integer or floating-point machine type.
+    # If no type can be clearly inferred, we fall back to an I32 assumption.
     def touch(ctx : Context, node : AST::LiteralCharacter)
-      t_link = core_savi_type(ctx, "Numeric.Convertible")
-      mt = TInfer::MetaType.new(TInfer::ReifiedType.new(t_link))
-      @analysis[node] = TInfer::Literal.new(node.pos, layer(node), mt)
+      possible = core_savi_mt(ctx, "Numeric.Convertible")
+      fallback = core_savi_mt(ctx, "I32")
+      @analysis[node] = TInfer::Literal.new(node.pos, layer(node), possible, fallback)
     end
 
     # A literal integer could be any integer or floating-point machine type.
+    # If no type can be clearly inferred, we fall back to an I32 assumption.
     def touch(ctx : Context, node : AST::LiteralInteger)
-      t_link = core_savi_type(ctx, "Numeric.Convertible")
-      mt = TInfer::MetaType.new(TInfer::ReifiedType.new(t_link))
-      @analysis[node] = TInfer::Literal.new(node.pos, layer(node), mt)
+      possible = core_savi_mt(ctx, "Numeric.Convertible")
+      fallback = core_savi_mt(ctx, "I32")
+      @analysis[node] = TInfer::Literal.new(node.pos, layer(node), possible, fallback)
     end
 
     # A literal float could be any floating-point machine type.
+    # If no type can be clearly inferred, we fall back to an F64 assumption.
     def touch(ctx : Context, node : AST::LiteralFloat)
-      t_links = [core_savi_type(ctx, "F32"), core_savi_type(ctx, "F64")]
-      mts = t_links.map { |t_link| TInfer::MetaType.new(TInfer::ReifiedType.new(t_link)) }
-      mt = TInfer::MetaType.new_union(mts)
-      @analysis[node] = TInfer::Literal.new(node.pos, layer(node), mt)
+      # TODO: Allow inferring custom-declared floating-point types as well.
+      possible = TInfer::MetaType.new_union([
+        core_savi_mt(ctx, "F32"),
+        core_savi_mt(ctx, "F64"),
+      ])
+      fallback = core_savi_mt(ctx, "F64")
+      @analysis[node] = TInfer::Literal.new(node.pos, layer(node), possible, fallback)
     end
 
     def touch(ctx : Context, node : AST::Group)
