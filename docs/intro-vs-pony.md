@@ -342,10 +342,9 @@ In Savi, this kind of function is often used for iteration, but it can be used i
 ```savi
 :actor Main
   :new (env Env)
-    count = Count.to(10) -> ( i |
+    10.times -> (i |
       env.out.print(Inspect[i]) // will print 0 through 9 in order
     )
-    env.out.print(Inspect[count]) // will print 10
 
     // This will print "three", "two", and "one":
     ["one", "two", "three"].reverse_each -> (string | env.out.print(string))

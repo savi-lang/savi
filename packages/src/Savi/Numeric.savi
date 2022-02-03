@@ -81,8 +81,11 @@
 
 :: A type that can return minimum, maximum, and zero numeric values.
 :trait val Numeric.Bounded(T Numeric(T)'val)
-  :: The zero value for this type.
+  :: The zero value for this type (the additive identity value).
   :fun non zero T
+
+  :: The one value for this type (the multiplicative identity value).
+  :fun non one T
 
   :: The minimum representable numeric value for this type.
   ::

@@ -607,7 +607,12 @@ class Savi::Compiler::CodeGen
             (vparam_types.size - 1).times.map { |i| fn.params[i + 1] }.to_a
           forward_args.unshift(gen_unboxed_fields(fn.params[0], gtype))
 
-          @builder.ret @builder.call(gfunc.llvm_func, forward_args)
+          result = @builder.call(gfunc.llvm_func, forward_args)
+          if ret_type == @void
+            @builder.ret
+          else
+            @builder.ret result
+          end
 
           gen_func_end
         end
@@ -633,7 +638,12 @@ class Savi::Compiler::CodeGen
             (vparam_types.size - 1).times.map { |i| fn.params[i + 1] }.to_a
           forward_args.unshift(gen_unboxed_value(fn.params[0], gtype))
 
-          @builder.ret @builder.call(gfunc.llvm_func, forward_args)
+          result = @builder.call(gfunc.llvm_func, forward_args)
+          if ret_type == @void
+            @builder.ret
+          else
+            @builder.ret result
+          end
 
           gen_func_end
         end
@@ -970,6 +980,16 @@ class Savi::Compiler::CodeGen
           end
         else
           llvm_type_of(gtype).const_int(0)
+        end
+      when "one"
+        if gtype.type_def.is_floating_point_numeric?(ctx)
+          case bit_width_of(gtype)
+          when 32 then llvm_type_of(gtype).const_float(1)
+          when 64 then llvm_type_of(gtype).const_double(1)
+          else raise NotImplementedError.new(bit_width_of(gtype))
+          end
+        else
+          llvm_type_of(gtype).const_int(1)
         end
       when "min_value"
         if gtype.type_def.is_floating_point_numeric?(ctx)

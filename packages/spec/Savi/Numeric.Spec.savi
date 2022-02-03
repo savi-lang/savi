@@ -83,6 +83,20 @@
     assert: F32  .zero == 0
     assert: F64  .zero == 0
 
+  :it "has a convenience alias for the number one"
+    assert: U8   .one == 1
+    assert: U16  .one == 1
+    assert: U32  .one == 1
+    assert: U64  .one == 1
+    assert: USize.one == 1
+    assert: I8   .one == 1
+    assert: I16  .one == 1
+    assert: I32  .one == 1
+    assert: I64  .one == 1
+    assert: ISize.one == 1
+    assert: F32  .one == 1
+    assert: F64  .one == 1
+
   :it "can report the max or minimum integer based on bit width and signedness"
     assert: Bool.max_value.is_true
     assert: U8   .max_value == 0xFF
@@ -275,6 +289,18 @@
     assert: product.head == 0x4d
     assert: product.tail == 0x58
     assert: product.head.u16.bit_shl(8) + product.tail.u16 == U16[99] * 200
+
+  :it "can count up to the given number, starting with 0, excluding itself"
+    count = 0
+    count_sum = 0
+    count_return = 5.times -> (i |
+      count = count + 1
+      count_sum = count_sum + i
+    )
+
+    assert: count_return == 5
+    assert: count == 5
+    assert: count_sum == 10
 
   :it "implements logarithms and exponents for floating points"
     assert: F64[1].log == 0

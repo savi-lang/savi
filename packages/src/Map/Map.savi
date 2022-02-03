@@ -15,7 +15,7 @@
 
   :fun ref _init_array(space USize)
     @_array = Array((Pair(K, V) | _MapEmpty | _MapDeleted)).new(space)
-    Count.to(space) -> (@_array << _MapEmpty)
+    space.times -> (@_array << _MapEmpty)
 
   :fun ref _resize(space USize)
     space = space.max(@_size) // only grow the array - never shrink it
