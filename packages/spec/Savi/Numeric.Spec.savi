@@ -249,22 +249,22 @@
     assert: I32[0x2000_0000] *! 3 == I32[0x2000_0000] * 3
 
   :it "implements bitwise analysis and manipulation for integers"
-    assert: U8[18]                == 0b00010010
-    assert: U8[18].invert         == 0b11101101
-    assert: U8[18].reverse_bits   == 0b01001000
-    assert: U8[18].swap_bytes     == 18
-    assert: U16[0x1234].swap_bytes == 0x3412
-    assert: U32[66052].swap_bytes == 67240192
-    assert: U8[18].leading_zeros  == 3
-    assert: U8[18].trailing_zeros == 1
-    assert: U8[18].count_ones     == 2
-    assert: U8[18].count_zeros    == 6
-    assert: U8[0].next_pow2       == 1
-    assert: U8[2].next_pow2       == 2
-    assert: U8[17].next_pow2      == 32
-    assert: U8[127].next_pow2     == 128
-    assert: U8[128].next_pow2     == 128
-    assert: U8[129].next_pow2     == 0
+    assert: U8[18]                    == 0b00010010
+    assert: U8[18].invert             == 0b11101101
+    assert: U8[18].reverse_bits       == 0b01001000
+    assert: U8[18].swap_bytes         == 18
+    assert: U16[0x1234].swap_bytes    == 0x3412
+    assert: U32[66052].swap_bytes     == 67240192
+    assert: U8[18].leading_zero_bits  == 3
+    assert: U8[18].trailing_zero_bits == 1
+    assert: U8[18].total_one_bits     == 2
+    assert: U8[18].total_zero_bits    == 6
+    assert: U8[0].next_pow2           == 1
+    assert: U8[2].next_pow2           == 2
+    assert: U8[17].next_pow2          == 32
+    assert: U8[127].next_pow2         == 128
+    assert: U8[128].next_pow2         == 128
+    assert: U8[129].next_pow2         == 0
     assert: U16[0b1110010110001010].bit_shl(5)  == 0b1011000101000000
     assert: U16[0b1110010110001010].bit_rotl(5) == 0b1011000101011100
     assert: U16[0b1110010110001010].bit_shr(5)  == 0b0000011100101100
@@ -367,6 +367,12 @@
     assert: F32.zero > F32[-123.456]
     assert: F64[-123.456] < F64.zero
     assert: F32[-123.456] < F32.zero
+
+  :it "knows the bit widths used in the representation of integer values"
+    assert: I32.mag_bit_width == 31
+    assert: U32.mag_bit_width == 32
+    assert: I64.mag_bit_width == 63
+    assert: U64.mag_bit_width == 64
 
   :it "knows the bit widths used in the representation of floating-point values"
     // We have significand bits, exponent bits, and 1 sign bit.

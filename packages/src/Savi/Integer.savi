@@ -3,74 +3,259 @@
 ::
 :: This is a subtype of the more general `Numeric` trait.
 :trait val Integer(T Integer(T)'val)
-  :is Numeric(T) // TODO: Other Integer sub-traits
+  :is Numeric(T)
+  :is Integer.Representable
+  :is Integer.Arithmetic(T)
+  :is Integer.SafeArithmetic(T)
+  :is Integer.WideArithmetic(T)
+  :is Integer.BitwiseArithmetic(T)
 
+:: A type which conveys information about the machine-level representation
+:: of an integer numeric type, including the standard information about
+:: general numeric types, as well as integer-specific information.
+:trait val Integer.Representable
+  :is Numeric.Representable
+
+  :: The number of bits representing the magnitude.
+  :: For unsigned integers, this is the entire `bit_width`.
+  :: For signed integers, this is one less than the `bit_width`.
+  :fun non mag_bit_width U8
+
+:: A type which can do arithmetic operations of the given integer type T,
+:: each operation producing a result of that same type T.
+::
+:: This trait extends the methods available in genal `Numeric.Arithmetic`
+:: to add more methods, which are integer-specific.
+:trait val Integer.Arithmetic(T Integer(T)'val)
+  :is Numeric.Arithmetic(T)
+
+  :: Get the next power of 2 that is greater than or equal to this value.
+  ::
+  :: This is often used in allocation algorithms that expect to use
+  :: powers of two for the allocation sizes.
+  :fun val next_pow2 T: compiler intrinsic
+
+:: A type which can do "safe" arithmetic operations of the given integer type T,
+:: each operation producing a result of that same type T, or raising an error.
+::
+:: A "safe" operation is one that raises an error in situations where the
+:: corresponding `Numeric.Arithmetic` method would produce a result that
+:: deviates from the normal mathematical theory for that operation, such as
+:: in the case of overflow/underflow of the type's bounds or division by zero.
+::
+:: Using these operations may be slightly more costly, and forces the caller
+:: to explicitly deal with the error case using normal error raising flow.
+:: But it is idiomatic to prefer using these "safe" operations at call sites
+:: where handling the error case is important, rather than checking
+:: for safety pre-conditions using other means at the call site.
+:trait val Integer.SafeArithmetic(T Integer(T)'val)
+  // TODO: :fun val "/!"(other T) T
+
+  :: Add this value to another value, resulting in a sum value.
+  :: Raises an error if the proper result would overflow the `max_value`.
+  :: Use the `+` method instead if wrap-around overflow semantics are desired.
+  :fun val "+!"(other T) T
+
+  :: Subtract another value from this value, resulting in a difference value.
+  :: Raises an error if the proper result would underflow the `max_value`.
+  :: Use the `-` method instead if wrap-around underflow semantics are desired.
+  :fun val "-!"(other T) T
+
+  :: Multiply this value with another value, resulting in a product value.
+  :: Raises an error if the proper result would overflow or underflow.
+  :: Use the `*` method instead if wrap-around overflow semantics are desired.
+  :fun val "*!"(other T) T
+
+:: A type which can do "wide" arithmetic operations of the given integer type T,
+:: allowing integer arithmetic that is guaranteed to neither lose information
+:: nor abort the operation by raising an error.
+::
+:: These operations are meant to sometimes replace the use of those in
+:: `Integer.Arithmetic` when it is desired to not lose information.
+:: Or alternatively, they replace `Integer.SafeArithmetic` when it is desired
+:: to successfully complete operations without error even when they overflow.
+:trait val Integer.WideArithmetic(T Integer(T)'val)
+  // TODO: :fun val wide_add(other T) Pair(Bool, T)
+  // TODO: :fun val wide_subtract(other T) Pair(Bool, T)
+  // TODO: :fun val wide_divide(other T) Pair(T, T)
+
+  :: Multiply avoiding overflow, returning a pair where the first element is
+  :: the most significant bits, and the second is the least significant bits
+  :: (which is the same modulo max size minus one value that would be returned
+  :: from the wrap-around overflow semantics of normal integer multiplication).
+  :fun val wide_multiply(other T) Pair(T, T)
+
+:: A type which can do bitwise arithmetic operations of the given type T,
+:: each operation producing a result of that same type T (or sometimes
+:: accepting or producing `U8` specifically when counting a number of bits).
+:trait val Integer.BitwiseArithmetic(T Integer(T)'val)
+  :: Invert the value, producing a value whose every bit is the inverse of the
+  :: bit that was in the corresponding position in the original value.
+  :fun val invert T
+
+  :: Combine, using a bitwise "and", this value and the other value.
+  ::
+  :: The result's bits will be set to one in positions where both
+  :: values had a one bit, and will be set to zero in all other positions.
+  :fun val bit_and(other T) T
+
+  :: Combine, using a bitwise "or", this value and the other value.
+  ::
+  :: The result's bits will be set to one in positions where either or both
+  :: values had a one bit, and will be set to zero in all other positions.
+  :fun val bit_or(other T) T
+
+  :: Combine, using a bitwise "exclusive or", this value and the other value.
+  ::
+  :: The result's bits will be set to one in positions where just one of the two
+  :: values had a one bit, and will be set to zero in all other positions.
+  :fun val bit_xor(other T) T
+
+  :: Do a bitwise "shift left" on this value by the given number of bits.
+  ::
+  :: Each bit will move the given number of bit positions "leftward".
+  :: That is, each bit will become "more significant" than it was, with the
+  :: highest bits shifting out of the bounds of the `bit_width` to disappear,
+  :: and the lowest bits being filled by zeroes in the empty space left behind.
+  ::
+  :: Because each bit represents a successive power of two, this operation is
+  :: equivalent to multiplying the value by 2 the given number of times.
+  :fun val bit_shl(bits U8) T
+
+  :: Do a bitwise "shift right" on this value by the given number of bits.
+  ::
+  :: Each bit will move the given number of bit positions "rightward".
+  :: That is, each bit will become "less significant" than it was, with the
+  :: lowest bits shifting out of the bounds of the `bit_width` to disappear,
+  :: and the highest bits being filled by zeroes in the empty space left behind.
+  ::
+  :: Because each bit represents a successive power of two, this operation is
+  :: equivalent to dividing the value by 2 the given number of times.
+  :fun val bit_shr(bits U8) T
+
+  :: Do a bitwise "rotate left" on this value by the given number of bits.
+  ::
+  :: Each bit will move the given number of bit positions "leftward".
+  :: That is, each bit will become "more significant" than it was, with the
+  :: highest bits shifting out of the bounds of the `bit_width` and wrapping
+  :: around into the space left behind by the movement of the lowest bits.
+  ::
+  :: Unlike `bit_shl`, this operation does not lose information from the bits,
+  :: because the bits shifted off the left side appear again on the right side.
+  :fun val bit_rotl(bits U8) T
+
+  :: Do a bitwise "rotate right" on this value by the given number of bits.
+  ::
+  :: Each bit will move the given number of bit positions "rightward".
+  :: That is, each bit will become "less significant" than it was, with the
+  :: lowest bits shifting out of the bounds of the `bit_width` and wrapping
+  :: around into the space left behind by the movement of the highest bits.
+  ::
+  :: Unlike `bit_shr`, this operation does not lose information from the bits,
+  :: because the bits shifted off the right side appear again on the left side.
+  :fun val bit_rotr(bits U8) T
+
+  :: Count consecutive zero bits, starting with the most significant bit,
+  :: until the first one bit is reached (or until the end of the bit sequence).
+  :fun val leading_zero_bits U8
+
+  :: Count consecutive zero bits, starting with the least significant bit,
+  :: until the first one bit is reached (or until the end of the bit sequence).
+  :fun val trailing_zero_bits U8
+
+  :: Count the total number of one bits in the value's bitwise representation.
+  :fun val total_one_bits U8
+
+  :: Count the total number of zero bits in the value's bitwise representation.
+  :fun val total_zero_bits U8: @invert.total_one_bits
+
+  :: Reverse the order of the bits in the value, producing a new value in which
+  :: the most significant bits have become least significant, and vice versa.
+  :fun val reverse_bits T
+
+  :: Reverse the order of the bytes in the value, but keeping the internal
+  :: order of bits within each byte intact.
+  ::
+  :: This is commonly used for converting big-endian values to little-endian,
+  :: or vice versa. That is, if you have a value in its native-endian format
+  :: for your platform, you can use this method to convert it to the opposite
+  :: sequence of bytes, for encoding to/from another plaform's expectations.
+  :: To do so conditionally based on the current plafrom, you can make use
+  :: of the `native_to_be`, `native_to_le`, `be_to_native`, and `le_to_native`
+  :: convenience functions which are intended for this purpose.
+  :fun val swap_bytes T
+
+  :: Convert the native-endian representation of a value to big-endian.
+  :: If the platform is natively big-endian, the value will return unchanged.
+  :: If the platform is natively little-endian, the byte order will be swapped.
+  :fun val native_to_be T
+
+  :: Convert the native-endian representation of a value to little-endian.
+  :: If the platform is natively little-endian, the value will return unchanged.
+  :: If the platform is natively big-endian, the byte order will be swapped.
+  :fun val native_to_le T
+
+  :: Convert the big-endian representation of a value to the native-endian.
+  :: If the platform is natively big-endian, the value will return unchanged.
+  :: If the platform is natively little-endian, the byte order will be swapped.
+  :fun val be_to_native T
+
+  :: Convert the little-endian representation of a value to the native-endian.
+  :: If the platform is natively little-endian, the value will return unchanged.
+  :: If the platform is natively big-endian, the byte order will be swapped.
+  :fun val le_to_native T
+
+:: This trait isn't meant to be used externally. It's just a base implementation
+:: of methods to be copied into every new integer `:numeric` type.
 :trait val Integer.BaseImplementation // TODO: don't use :trait for this... `common`?
-  :const bit_width U8 // TODO: dedup with Numeric.Convertible
-  :const is_signed Bool // TODO: dedup with Numeric.Convertible
-  :fun u64 U64: compiler intrinsic // TODO: dedup with Numeric.Convertible
-  :fun usize USize: compiler intrinsic // TODO: dedup with Numeric.Convertible
+  :is Integer.Representable
+  :fun non mag_bit_width U8
+    if @is_signed (@bit_width - 1 | @bit_width)
+
+  :is Numeric.Convertible
 
   :is Numeric.Bounded(@)
   :fun non zero @'val: compiler intrinsic
   :fun non min_value @'val: compiler intrinsic
   :fun non max_value @'val: compiler intrinsic
 
-  // These arithmetic methods raise an error in case of overflow/underflow.
-  // This can potentially be more efficient in some cases than comparing
-  // the two operands first prior to applying the arithmetic operation.
+  :is Integer.Arithmetic(@)
+  :fun val next_pow2 @: compiler intrinsic
+
+  :is Integer.SafeArithmetic(@)
   :fun val "+!"(other @) @: compiler intrinsic
   :fun val "-!"(other @) @: compiler intrinsic
   :fun val "*!"(other @) @: compiler intrinsic
 
+  :is Integer.WideArithmetic(@)
+  :fun val wide_multiply(other @) Pair(@, @): compiler intrinsic
+
+  :is Integer.BitwiseArithmetic(@)
+  :fun val invert @: compiler intrinsic
   :fun val bit_and(other @) @: compiler intrinsic
   :fun val bit_or(other @) @: compiler intrinsic
   :fun val bit_xor(other @) @: compiler intrinsic
   :fun val bit_shl(bits U8) @: compiler intrinsic
   :fun val bit_shr(bits U8) @: compiler intrinsic
-  :fun val invert @: compiler intrinsic
-  :fun val reverse_bits @: compiler intrinsic
-  :fun val swap_bytes @: compiler intrinsic
-  :fun val leading_zeros U8: compiler intrinsic
-  :fun val trailing_zeros U8: compiler intrinsic
-  :fun val count_ones U8: compiler intrinsic
-  :fun val count_zeros U8: @invert.count_ones
-  :fun val next_pow2 @: compiler intrinsic
-
-  :: Multiply avoiding overflow, returning a pair where the first element is
-  :: the most significant bits, and the second is the least significant bits
-  :: (which is the same modulo max size minus one value that would be returned
-  :: from the overflow semantics of normal integer multiplication)
-  :fun val wide_multiply(other @) Pair(@, @): compiler intrinsic
-
-  // :fun val wide_divide(other @) Pair(@, @): TODO
-
-  :: Rotate the given number of bits to the "left" (toward most significant).
-  :: Bits that are shifted off the left side are copied to the right side.
   :fun val bit_rotl(bits U8) @
     @bit_shl(bits).bit_or(
       @bit_shr(@bit_width - bits)
     )
-
-  :: Rotate the given number of bits to the "right" (toward least significant).
-  :: Bits that are shifted off the right side are copied to the left side.
   :fun val bit_rotr(bits U8) @
     @bit_shr(bits).bit_or(
       @bit_shl(@bit_width - bits)
     )
+  :fun val leading_zero_bits U8: compiler intrinsic
+  :fun val trailing_zero_bits U8: compiler intrinsic
+  :fun val total_one_bits U8: compiler intrinsic
+  :fun val reverse_bits @: compiler intrinsic
+  :fun val swap_bytes @: compiler intrinsic
+  :fun val native_to_be @: if Platform.big_endian (@ | @swap_bytes)
+  :fun val native_to_le @: if Platform.little_endian (@ | @swap_bytes)
+  :fun val be_to_native @: if Platform.big_endian (@ | @swap_bytes)
+  :fun val le_to_native @: if Platform.little_endian (@ | @swap_bytes)
 
-  :fun val native_to_be @
-    if (Platform.big_endian) (@ | @swap_bytes)
-
-  :fun val native_to_le @
-    if (Platform.little_endian) (@ | @swap_bytes)
-
-  :fun val be_to_native @
-    if (Platform.big_endian) (@ | @swap_bytes)
-
-  :fun val le_to_native @
-    if (Platform.little_endian) (@ | @swap_bytes)
-
+  // TODO: explicit conformance to a particular trait for `hash`
   :fun hash USize
     if (USize.bit_width == 32) (
       x = @usize
@@ -85,6 +270,7 @@
       @hash64.usize
     )
 
+  // TODO: explicit conformance to a particular trait for `hash64`
   :fun hash64 U64
     x = @u64
     x = x.invert + x.bit_shl(21)
