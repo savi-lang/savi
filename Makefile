@@ -146,6 +146,11 @@ $(eval $(call MAKE_VAR_CACHE_FOR,RUNTIME_BITCODE_RELEASE_URL))
 LLVM_PATH?=$(BUILD)/llvm-static
 LLVM_CONFIG?=$(LLVM_PATH)/bin/llvm-config
 
+# Specify where to download the fswatch release source tarball from.
+# This needs to get bumped explicitly here to update to a different version.
+FSWATCH_RELEASE_URL?=https://github.com/emcrisostomo/fswatch/releases/download/1.16.0/fswatch-1.16.0.tar.gz
+$(eval $(call MAKE_VAR_CACHE_FOR,FSWATCH_RELEASE_URL))
+
 # Determine which flavor of the C++ standard library to link against.
 # We choose libstdc++ on Linux, and libc++ on FreeBSD and MacOS.
 ifneq (,$(findstring linux,$(TARGET_PLATFORM)))
@@ -174,6 +179,21 @@ endif
 # This is the path to the Crystal standard library source code,
 # including the LLVM extensions C++ file we need to build and link.
 CRYSTAL_PATH?=$(shell env $(shell crystal env) printenv CRYSTAL_PATH | rev | cut -d ':' -f 1 | rev)
+
+# Download the fswatch library sourece code to build it.
+$(BUILD)/fswatch: $(MAKE_VAR_CACHE)/FSWATCH_RELEASE_URL
+	rm -rf $@-tmp
+	mkdir -p $@-tmp
+	cd $@-tmp && curl -L --fail -sS "${FSWATCH_RELEASE_URL}" \
+	| tar --strip-components=1 -xzvf -
+	rm -rf $@
+	mv $@-tmp $@
+	touch $@
+
+# Build the static library for the fswatch library sourece code to build it.
+LIB_FSWATCH?=$(BUILD)/fswatch/libfswatch/src/libfswatch/.libs/libfswatch.a
+$(LIB_FSWATCH): $(BUILD)/fswatch
+	cd $^ && ./configure && make
 
 # Download the runtime bitcode library we have built separately.
 # See github.com/savi-lang/runtime-bitcode for more info.
@@ -267,11 +287,11 @@ $(BUILD)/savi-spec.o: spec/all.cr $(LLVM_PATH) $(shell find src lib spec -name '
 
 # Build the Savi compiler executable, by linking the above targets together.
 # This variant of the target compiles in release mode.
-$(BUILD)/savi-release: $(BUILD)/savi-release.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ext_for_savi.bc lib/libsavi_runtime
+$(BUILD)/savi-release: $(BUILD)/savi-release.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ext_for_savi.bc lib/libsavi_runtime $(LIB_FSWATCH)
 	mkdir -p `dirname $@`
 	${CLANG} -O3 -o $@ -flto=thin -fPIC \
 		$(BUILD)/savi-release.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ext_for_savi.bc \
-		 ${CRYSTAL_RT_LIBS} \
+		 ${CRYSTAL_RT_LIBS} $(LIB_FSWATCH) \
 		-target $(CLANG_TARGET_PLATFORM) \
 		`sh -c 'ls $(LLVM_PATH)/lib/libclang*.a'` \
 		`sh -c 'ls $(LLVM_PATH)/lib/liblld*.a'` \
@@ -280,11 +300,11 @@ $(BUILD)/savi-release: $(BUILD)/savi-release.o $(BUILD)/llvm_ext.bc $(BUILD)/llv
 
 # Build the Savi compiler executable, by linking the above targets together.
 # This variant of the target compiles in debug mode.
-$(BUILD)/savi-debug: $(BUILD)/savi-debug.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ext_for_savi.bc lib/libsavi_runtime
+$(BUILD)/savi-debug: $(BUILD)/savi-debug.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ext_for_savi.bc lib/libsavi_runtime $(LIB_FSWATCH)
 	mkdir -p `dirname $@`
 	${CLANG} -O0 -o $@ -flto=thin -fPIC \
 		$(BUILD)/savi-debug.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ext_for_savi.bc \
-		 ${CRYSTAL_RT_LIBS} \
+		 ${CRYSTAL_RT_LIBS} $(LIB_FSWATCH) \
 		-target $(CLANG_TARGET_PLATFORM) \
 		`sh -c 'ls $(LLVM_PATH)/lib/libclang*.a'` \
 		`sh -c 'ls $(LLVM_PATH)/lib/liblld*.a'` \
@@ -294,11 +314,11 @@ $(BUILD)/savi-debug: $(BUILD)/savi-debug.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ex
 
 # Build the Savi specs executable, by linking the above targets together.
 # This variant of the target will be used when running tests.
-$(BUILD)/savi-spec: $(BUILD)/savi-spec.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ext_for_savi.bc lib/libsavi_runtime
+$(BUILD)/savi-spec: $(BUILD)/savi-spec.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ext_for_savi.bc lib/libsavi_runtime $(LIB_FSWATCH)
 	mkdir -p `dirname $@`
 	${CLANG} -O0 -o $@ -flto=thin -fPIC \
 		$(BUILD)/savi-spec.o $(BUILD)/llvm_ext.bc $(BUILD)/llvm_ext_for_savi.bc \
-		 ${CRYSTAL_RT_LIBS} \
+		 ${CRYSTAL_RT_LIBS} $(LIB_FSWATCH) \
 		-target $(CLANG_TARGET_PLATFORM) \
 		`sh -c 'ls $(LLVM_PATH)/lib/libclang*.a'` \
 		`sh -c 'ls $(LLVM_PATH)/lib/liblld*.a'` \

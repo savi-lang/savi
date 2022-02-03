@@ -13,3 +13,6 @@ shards:
   clang:
     git: https://github.com/crystal-lang/clang.cr.git
     version: 0.3.0
+  fswatch:
+    git: https://github.com/bcardiff/crystal-fswatch.git
+    version: 0.1.0+git.commit.04aca8703e22fb0ed3d7a39316a49bc0e30eefba

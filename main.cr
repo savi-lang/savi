@@ -1,8 +1,9 @@
 require "./src/savi"
 
-require "clim"
 require "random"
 require "file_utils"
+require "clim"
+require "fswatch"
 
 module Savi
   class Cli < Clim

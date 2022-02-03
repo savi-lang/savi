@@ -18,6 +18,8 @@ dependencies:
   clim:
     github: at-grandpa/clim
     version: 0.13.0
+  fswatch:
+    github: bcardiff/crystal-fswatch
 
 crystal: 1.2.1
 
