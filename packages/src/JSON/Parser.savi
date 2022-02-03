@@ -335,7 +335,7 @@
   :fun ref _read_unicode_value! U32
     value U32 = 0
 
-    Count.to(4) -> (
+    4.times -> (
       b = @_next!
       digit =
         case (

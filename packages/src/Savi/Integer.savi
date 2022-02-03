@@ -9,6 +9,7 @@
   :is Integer.SafeArithmetic(T)
   :is Integer.WideArithmetic(T)
   :is Integer.BitwiseArithmetic(T)
+  :is Integer.Countable(T)
 
 :: A type which conveys information about the machine-level representation
 :: of an integer numeric type, including the standard information about
@@ -205,6 +206,16 @@
   :: If the platform is natively big-endian, the byte order will be swapped.
   :fun val le_to_native T
 
+:: A type which can be counted, using the given type T.
+:trait val Integer.Countable(T Integer(T)'val)
+  :is Numeric.Representable
+
+  :: Yield each successive integer that is less than the given limit.
+  :: For example, `3.times` will yield 0, 1, and 2, effectively
+  :: running the given yield block 3 times.
+  :fun val times T
+    :yields T for None
+
 :: This trait isn't meant to be used externally. It's just a base implementation
 :: of methods to be copied into every new integer `:numeric` type.
 :trait val Integer.BaseImplementation // TODO: don't use :trait for this... `common`?
@@ -214,8 +225,11 @@
 
   :is Numeric.Convertible
 
+  :is Numeric.Comparable(@)
+
   :is Numeric.Bounded(@)
   :fun non zero @'val: compiler intrinsic
+  :fun non one @'val: compiler intrinsic
   :fun non min_value @'val: compiler intrinsic
   :fun non max_value @'val: compiler intrinsic
 
@@ -254,6 +268,15 @@
   :fun val native_to_le @: if Platform.little_endian (@ | @swap_bytes)
   :fun val be_to_native @: if Platform.big_endian (@ | @swap_bytes)
   :fun val le_to_native @: if Platform.little_endian (@ | @swap_bytes)
+
+  :is Integer.Countable(@)
+  :fun val times
+    i = @zero
+    while (i < @) (
+      yield i
+      i = i + @one
+    )
+    @
 
   // TODO: explicit conformance to a particular trait for `hash`
   :fun hash USize

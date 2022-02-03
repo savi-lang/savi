@@ -95,7 +95,8 @@
   :fun non sig_bit_width U8: 23
 
   :is FloatingPoint.Bounded(@)
-  :fun non zero:         @from_bits(0)
+  :fun non zero @'val:   compiler intrinsic
+  :fun non one @'val:    compiler intrinsic
   :fun non max_value:    @from_bits(0x7F7F_FFFF)
   :fun non min_value:    @from_bits(0xFF7F_FFFF)
   :fun non infinity:     @from_bits(0x7F80_0000)
@@ -131,7 +132,8 @@
   :fun non sig_bit_width U8: 52
 
   :is FloatingPoint.Bounded(@)
-  :fun non zero:         @from_bits(0)
+  :fun non zero @'val:   compiler intrinsic
+  :fun non one @'val:    compiler intrinsic
   :fun non max_value:    @from_bits(0x7FEF_FFFF_FFFF_FFFF)
   :fun non min_value:    @from_bits(0xFFEF_FFFF_FFFF_FFFF)
   :fun non infinity:     @from_bits(0x7FF0_0000_0000_0000)

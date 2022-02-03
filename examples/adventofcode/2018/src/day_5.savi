@@ -80,8 +80,8 @@
     // Now, try removing each of the 26 ASCII letters in turn, finding the
     // smallest possible size that can be produced after a subsequent reduction.
     smallest_size = input.size
-    Count.to(26) -> (number |
-      letter_byte = number.u8 + 'a'
+    U8[26].times -> (number |
+      letter_byte = number + 'a'
       this_size = Day5Polymer.new(input).remove_all(letter_byte).reduce.size
       if (this_size < smallest_size) (smallest_size = this_size)
     )
