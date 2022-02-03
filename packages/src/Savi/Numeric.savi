@@ -66,17 +66,319 @@
 
 :: A type that can be converted to one of the standard numeric types.
 :trait val Numeric.Convertible
+  :: Convert this value to a corresponding `U8` value.
+  ::
+  :: If converting from an integer type with a range that extends beyond that
+  :: of the `U8` type, any out-of-range values will be truncated. That is,
+  :: they will overflow with wrap-around semantics.
+  :: Use `u8!` instead if raising an error overflow/underflow is desired.
+  ::
+  :: If converting from a floating-point type, the result will be the nearest
+  :: `U8` integer (rounding toward zero). If the floating-point value is
+  :: beyond the bounds of the `max_value` and `min_value` of `U8`, the
+  :: result value will be either the `max_value` or `min_value`, respectively.
+  :: If the floating-point value is NaN, the result value will be zero.
+  :: Use `u8!` instead if raising an error for these cases is desired.
   :fun u8 U8
+
+  :: Convert this value to a corresponding `U8` value, or error on overflow.
+  ::
+  :: If converting from an integer type with a range that extends beyond that
+  :: of the `U8` type, any out-of-range values will raise an error.
+  :: Use `u8` instead if wrap-around semantics for overflow are desired.
+  ::
+  :: If converting from a floating-point type, the result will be the nearest
+  :: `U8` integer (rounding toward zero). If the floating-point value is
+  :: beyond the bounds of the `max_value` and `min_value` of `U8`, or if the
+  :: floating-point value is NaN, an error will be raised.
+  :: Use `u8` instead if silently handling those edge cases is desired.
+  :fun u8! U8
+
+  :: Convert this value to a corresponding `U16` value.
+  ::
+  :: If converting from an integer type with a range that extends beyond that
+  :: of the `U16` type, any out-of-range values will be truncated. That is,
+  :: they will overflow with wrap-around semantics.
+  :: Use `u16!` instead if raising an error overflow/underflow is desired.
+  ::
+  :: If converting from a floating-point type, the result will be the nearest
+  :: `U16` integer (rounding toward zero). If the floating-point value is
+  :: beyond the bounds of the `max_value` and `min_value` of `U16`, the
+  :: result value will be either the `max_value` or `min_value`, respectively.
+  :: If the floating-point value is NaN, the result value will be zero.
+  :: Use `u16!` instead if raising an error for these cases is desired.
   :fun u16 U16
+
+  :: Convert this value to a corresponding `U16` value, or error on overflow.
+  ::
+  :: If converting from an integer type with a range that extends beyond that
+  :: of the `U16` type, any out-of-range values will raise an error.
+  :: Use `u16` instead if wrap-around semantics for overflow are desired.
+  ::
+  :: If converting from a floating-point type, the result will be the nearest
+  :: `U16` integer (rounding toward zero). If the floating-point value is
+  :: beyond the bounds of the `max_value` and `min_value` of `U16`, or if the
+  :: floating-point value is NaN, an error will be raised.
+  :: Use `u16` instead if silently handling those edge cases is desired.
+  :fun u16! U16
+
+  :: Convert this value to a corresponding `U32` value.
+  ::
+  :: If converting from an integer type with a range that extends beyond that
+  :: of the `U32` type, any out-of-range values will be truncated. That is,
+  :: they will overflow with wrap-around semantics.
+  :: Use `u32!` instead if raising an error overflow/underflow is desired.
+  ::
+  :: If converting from a floating-point type, the result will be the nearest
+  :: `U32` integer (rounding toward zero). If the floating-point value is
+  :: beyond the bounds of the `max_value` and `min_value` of `U32`, the
+  :: result value will be either the `max_value` or `min_value`, respectively.
+  :: If the floating-point value is NaN, the result value will be zero.
+  :: Use `u32!` instead if raising an error for these cases is desired.
   :fun u32 U32
+
+  :: Convert this value to a corresponding `U32` value, or error on overflow.
+  ::
+  :: If converting from an integer type with a range that extends beyond that
+  :: of the `U32` type, any out-of-range values will raise an error.
+  :: Use `u32` instead if wrap-around semantics for overflow are desired.
+  ::
+  :: If converting from a floating-point type, the result will be the nearest
+  :: `U32` integer (rounding toward zero). If the floating-point value is
+  :: beyond the bounds of the `max_value` and `min_value` of `U32`, or if the
+  :: floating-point value is NaN, an error will be raised.
+  :: Use `u32` instead if silently handling those edge cases is desired.
+  :fun u32! U32
+
+  :: Convert this value to a corresponding `U64` value.
+  ::
+  :: If converting from an integer type with a range that extends beyond that
+  :: of the `U64` type, any out-of-range values will be truncated. That is,
+  :: they will overflow with wrap-around semantics.
+  :: Use `u64!` instead if raising an error overflow/underflow is desired.
+  ::
+  :: If converting from a floating-point type, the result will be the nearest
+  :: `U64` integer (rounding toward zero). If the floating-point value is
+  :: beyond the bounds of the `max_value` and `min_value` of `U64`, the
+  :: result value will be either the `max_value` or `min_value`, respectively.
+  :: If the floating-point value is NaN, the result value will be zero.
+  :: Use `u64!` instead if raising an error for these cases is desired.
   :fun u64 U64
+
+  :: Convert this value to a corresponding `U64` value, or error on overflow.
+  ::
+  :: If converting from an integer type with a range that extends beyond that
+  :: of the `U64` type, any out-of-range values will raise an error.
+  :: Use `u64` instead if wrap-around semantics for overflow are desired.
+  ::
+  :: If converting from a floating-point type, the result will be the nearest
+  :: `U64` integer (rounding toward zero). If the floating-point value is
+  :: beyond the bounds of the `max_value` and `min_value` of `U64`, or if the
+  :: floating-point value is NaN, an error will be raised.
+  :: Use `u64` instead if silently handling those edge cases is desired.
+  :fun u64! U64
+
+  :: Convert this value to a corresponding `USize` value.
+  ::
+  :: If converting from an integer type with a range that extends beyond that
+  :: of the `USize` type, any out-of-range values will be truncated. That is,
+  :: they will overflow with wrap-around semantics.
+  :: Use `usize!` instead if raising an error overflow/underflow is desired.
+  ::
+  :: If converting from a floating-point type, the result will be the nearest
+  :: `USize` integer (rounding toward zero). If the floating-point value is
+  :: beyond the bounds of the `max_value` and `min_value` of `USize`, the
+  :: result value will be either the `max_value` or `min_value`, respectively.
+  :: If the floating-point value is NaN, the result value will be zero.
+  :: Use `usize!` instead if raising an error for these cases is desired.
   :fun usize USize
+
+  :: Convert this value to a corresponding `USize` value, or error on overflow.
+  ::
+  :: If converting from an integer type with a range that extends beyond that
+  :: of the `USize` type, any out-of-range values will raise an error.
+  :: Use `usize` instead if wrap-around semantics for overflow are desired.
+  ::
+  :: If converting from a floating-point type, the result will be the nearest
+  :: `USize` integer (rounding toward zero). If the floating-point value is
+  :: beyond the bounds of the `max_value` and `min_value` of `USize`, or if the
+  :: floating-point value is NaN, an error will be raised.
+  :: Use `usize` instead if silently handling those edge cases is desired.
+  :fun usize! USize
+
+  :: Convert this value to a corresponding `I8` value.
+  ::
+  :: If converting from an integer type with a range that extends beyond that
+  :: of the `I8` type, any out-of-range values will be truncated. That is,
+  :: they will overflow with wrap-around semantics.
+  :: Use `i8!` instead if raising an error overflow/underflow is desired.
+  ::
+  :: If converting from a floating-point type, the result will be the nearest
+  :: `I8` integer (rounding toward zero). If the floating-point value is
+  :: beyond the bounds of the `max_value` and `min_value` of `I8`, the
+  :: result value will be either the `max_value` or `min_value`, respectively.
+  :: If the floating-point value is NaN, the result value will be zero.
+  :: Use `i8!` instead if raising an error for these cases is desired.
   :fun i8 I8
+
+  :: Convert this value to a corresponding `I8` value, or error on overflow.
+  ::
+  :: If converting from an integer type with a range that extends beyond that
+  :: of the `I8` type, any out-of-range values will raise an error.
+  :: Use `i8` instead if wrap-around semantics for overflow are desired.
+  ::
+  :: If converting from a floating-point type, the result will be the nearest
+  :: `I8` integer (rounding toward zero). If the floating-point value is
+  :: beyond the bounds of the `max_value` and `min_value` of `I8`, or if the
+  :: floating-point value is NaN, an error will be raised.
+  :: Use `i8` instead if silently handling those edge cases is desired.
+  :fun i8! I8
+
+  :: Convert this value to a corresponding `I16` value.
+  ::
+  :: If converting from an integer type with a range that extends beyond that
+  :: of the `I16` type, any out-of-range values will be truncated. That is,
+  :: they will overflow with wrap-around semantics.
+  :: Use `i16!` instead if raising an error overflow/underflow is desired.
+  ::
+  :: If converting from a floating-point type, the result will be the nearest
+  :: `I16` integer (rounding toward zero). If the floating-point value is
+  :: beyond the bounds of the `max_value` and `min_value` of `I16`, the
+  :: result value will be either the `max_value` or `min_value`, respectively.
+  :: If the floating-point value is NaN, the result value will be zero.
+  :: Use `i16!` instead if raising an error for these cases is desired.
   :fun i16 I16
+
+  :: Convert this value to a corresponding `I16` value, or error on overflow.
+  ::
+  :: If converting from an integer type with a range that extends beyond that
+  :: of the `I16` type, any out-of-range values will raise an error.
+  :: Use `i16` instead if wrap-around semantics for overflow are desired.
+  ::
+  :: If converting from a floating-point type, the result will be the nearest
+  :: `I16` integer (rounding toward zero). If the floating-point value is
+  :: beyond the bounds of the `max_value` and `min_value` of `I16`, or if the
+  :: floating-point value is NaN, an error will be raised.
+  :: Use `i16` instead if silently handling those edge cases is desired.
+  :fun i16! I16
+
+  :: Convert this value to a corresponding `I32` value.
+  ::
+  :: If converting from an integer type with a range that extends beyond that
+  :: of the `I32` type, any out-of-range values will be truncated. That is,
+  :: they will overflow with wrap-around semantics.
+  :: Use `i32!` instead if raising an error overflow/underflow is desired.
+  ::
+  :: If converting from a floating-point type, the result will be the nearest
+  :: `I32` integer (rounding toward zero). If the floating-point value is
+  :: beyond the bounds of the `max_value` and `min_value` of `I32`, the
+  :: result value will be either the `max_value` or `min_value`, respectively.
+  :: If the floating-point value is NaN, the result value will be zero.
+  :: Use `i32!` instead if raising an error for these cases is desired.
   :fun i32 I32
+
+  :: Convert this value to a corresponding `I32` value, or error on overflow.
+  ::
+  :: If converting from an integer type with a range that extends beyond that
+  :: of the `I32` type, any out-of-range values will raise an error.
+  :: Use `i32` instead if wrap-around semantics for overflow are desired.
+  ::
+  :: If converting from a floating-point type, the result will be the nearest
+  :: `I32` integer (rounding toward zero). If the floating-point value is
+  :: beyond the bounds of the `max_value` and `min_value` of `I32`, or if the
+  :: floating-point value is NaN, an error will be raised.
+  :: Use `i32` instead if silently handling those edge cases is desired.
+  :fun i32! I32
+
+  :: Convert this value to a corresponding `I64` value.
+  ::
+  :: If converting from an integer type with a range that extends beyond that
+  :: of the `I64` type, any out-of-range values will be truncated. That is,
+  :: they will overflow with wrap-around semantics.
+  :: Use `i64!` instead if raising an error overflow/underflow is desired.
+  ::
+  :: If converting from a floating-point type, the result will be the nearest
+  :: `I64` integer (rounding toward zero). If the floating-point value is
+  :: beyond the bounds of the `max_value` and `min_value` of `I64`, the
+  :: result value will be either the `max_value` or `min_value`, respectively.
+  :: If the floating-point value is NaN, the result value will be zero.
+  :: Use `i64!` instead if raising an error for these cases is desired.
   :fun i64 I64
+
+  :: Convert this value to a corresponding `I64` value, or error on overflow.
+  ::
+  :: If converting from an integer type with a range that extends beyond that
+  :: of the `I64` type, any out-of-range values will raise an error.
+  :: Use `i64` instead if wrap-around semantics for overflow are desired.
+  ::
+  :: If converting from a floating-point type, the result will be the nearest
+  :: `I64` integer (rounding toward zero). If the floating-point value is
+  :: beyond the bounds of the `max_value` and `min_value` of `I64`, or if the
+  :: floating-point value is NaN, an error will be raised.
+  :: Use `i64` instead if silently handling those edge cases is desired.
+  :fun i64! I64
+
+  :: Convert this value to a corresponding `ISize` value.
+  ::
+  :: If converting from an integer type with a range that extends beyond that
+  :: of the `ISize` type, any out-of-range values will be truncated. That is,
+  :: they will overflow with wrap-around semantics.
+  :: Use `isize!` instead if raising an error overflow/underflow is desired.
+  ::
+  :: If converting from a floating-point type, the result will be the nearest
+  :: `ISize` integer (rounding toward zero). If the floating-point value is
+  :: beyond the bounds of the `max_value` and `min_value` of `ISize`, the
+  :: result value will be either the `max_value` or `min_value`, respectively.
+  :: If the floating-point value is NaN, the result value will be zero.
+  :: Use `isize!` instead if raising an error for these cases is desired.
   :fun isize ISize
+
+  :: Convert this value to a corresponding `ISize` value, or error on overflow.
+  ::
+  :: If converting from an integer type with a range that extends beyond that
+  :: of the `ISize` type, any out-of-range values will raise an error.
+  :: Use `isize` instead if wrap-around semantics for overflow are desired.
+  ::
+  :: If converting from a floating-point type, the result will be the nearest
+  :: `ISize` integer (rounding toward zero). If the floating-point value is
+  :: beyond the bounds of the `max_value` and `min_value` of `ISize`, or if the
+  :: floating-point value is NaN, an error will be raised.
+  :: Use `isize` instead if silently handling those edge cases is desired.
+  :fun isize! ISize
+
+  :: Convert this value to a corresponding `F32` value.
+  ::
+  :: If converting from an integer type or a wider floating-point type,
+  :: the result will be the nearest representable `F32` number, which may
+  :: not be exactly the same number. That is, there may be a loss in precision.
+  ::
+  :: If converting from a wider floating-point type (such as `F64`),
+  :: values which are too great in magnitude to represent in `F32` will be
+  :: converted to positive or negative infinity, depending on the original sign.
+  :: If raising an error on overflow is desired instead, use the `f32!` method.
   :fun f32 F32
+
+  :: Convert this value to a corresponding `F32` value, or error on overflow.
+  ::
+  :: If converting from an integer type or a wider floating-point type,
+  :: the result will be the nearest representable `F32` number, which may
+  :: not be exactly the same number. That is, there may be a loss in precision.
+  ::
+  :: If converting from a wider floating-point type (such as `F64`),
+  :: values which are too great in magnitude to represent in `F32` will
+  :: raise an error, forcing the caller to handle that case explicitly.
+  :: If silently coercing to positive or negative infinity on overflow/underflow
+  :: is desired instead, use the `f32` method, which cannot raise an error.
+  :fun f32! F32
+
+  :: Convert this value to a corresponding `F64` value.
+  ::
+  :: If converting from an integer type that is 32 bits wide or wider,
+  :: the result will be the nearest representable `F64` number, which may
+  :: not be exactly the same number. That is, there may be a loss in precision.
+  ::
+  :: Note that there is no `f64!` method because there doesn't currently exist
+  :: any numeric type in the language whose conversion to `F64` could overflow.
   :fun f64 F64
 
 :: A type that can return minimum, maximum, and zero numeric values.
@@ -202,17 +504,29 @@
 
   :is Numeric.Convertible
   :fun u8 U8: compiler intrinsic
+  :fun u8! U8: compiler intrinsic
   :fun u16 U16: compiler intrinsic
+  :fun u16! U16: compiler intrinsic
   :fun u32 U32: compiler intrinsic
+  :fun u32! U32: compiler intrinsic
   :fun u64 U64: compiler intrinsic
+  :fun u64! U64: compiler intrinsic
   :fun usize USize: compiler intrinsic
+  :fun usize! USize: compiler intrinsic
   :fun i8 I8: compiler intrinsic
+  :fun i8! I8: compiler intrinsic
   :fun i16 I16: compiler intrinsic
+  :fun i16! I16: compiler intrinsic
   :fun i32 I32: compiler intrinsic
+  :fun i32! I32: compiler intrinsic
   :fun i64 I64: compiler intrinsic
+  :fun i64! I64: compiler intrinsic
   :fun isize ISize: compiler intrinsic
+  :fun isize! ISize: compiler intrinsic
   :fun f32 F32: compiler intrinsic
+  :fun f32! F32: compiler intrinsic
   :fun f64 F64: compiler intrinsic
+  :fun f64! F64: compiler intrinsic
 
   :is Numeric.Bounded(@)
   // The implementation for `Numeric.Bounded` is intentionally omitted here,
