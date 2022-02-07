@@ -25,7 +25,7 @@ class Savi::Compiler::Reparse < Savi::AST::CopyOnMutateVisitor
     cached_hash, cached_func = cache_result if cache_result
     return cached_func if cached_func && cached_hash == input_hash
 
-    puts "    RERUN . #{self.class} #{f_link.show}" if cache_result && ctx.options.print_perf
+    puts "    RERUN . #{self} #{f_link.show}" if cache_result && ctx.options.print_perf
 
     yield
 
@@ -42,7 +42,7 @@ class Savi::Compiler::Reparse < Savi::AST::CopyOnMutateVisitor
     t_cached_hash, t_cached_type = t_cache_result if t_cache_result
     return t_cached_type if t_cached_type && t_cached_hash == input_hash
 
-    puts "    RERUN . #{self.class} #{t_link.show}" if t_cache_result && ctx.options.print_perf
+    puts "    RERUN . #{self} #{t_link.show}" if t_cache_result && ctx.options.print_perf
 
     yield
 
@@ -59,7 +59,7 @@ class Savi::Compiler::Reparse < Savi::AST::CopyOnMutateVisitor
     ta_cached_hash, ta_cached_type = ta_cache_result if ta_cache_result
     return ta_cached_type if ta_cached_type && ta_cached_hash == input_hash
 
-    puts "    RERUN . #{self.class} #{t_link.show}" if ta_cache_result && ctx.options.print_perf
+    puts "    RERUN . #{self} #{t_link.show}" if ta_cache_result && ctx.options.print_perf
 
     yield
 

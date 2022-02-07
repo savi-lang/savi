@@ -261,7 +261,7 @@ class Savi::Compiler
 
     docs = sources.compact_map do |source|
       begin
-        Parser.parse(source)
+        Parser.parse(ctx, source)
       rescue err : Pegmatite::Pattern::MatchError
         pos = Source::Pos.point(source, err.offset)
         ctx.errors << Error.build(pos, "The source code syntax is invalid near here")
