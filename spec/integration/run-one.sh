@@ -76,6 +76,30 @@ test_fixed_files_content() {
   done
 }
 
+# Test that the output of running the compiler matches the expected errors.
+test_run_output() {
+  actual=$(env SAVI="$SAVI" sh -c "cd $subdir && ./savi.run.test.sh")
+  expected=$(cat $subdir/savi.run.output.txt)
+  if [ "$actual" != "$expected" ]; then
+    echo "---"
+    echo "---"
+    echo
+    echo "FAIL $subdir"
+    echo
+    echo "---"
+    echo
+    echo "EXPECTED $expected"
+    echo
+    echo "---"
+    echo
+    echo "ACTUAL $actual"
+    echo
+    echo "---"
+    echo "---"
+    return 1
+  fi
+}
+
 # If this subdirectory has auto-fix information, use that testing strategy.
 if [ -d "$subdir/savi.fix.before.dir" ] \
 && [ -d "$subdir/savi.fix.after.dir" ] \
@@ -105,6 +129,11 @@ if [ -d "$subdir/savi.fix.before.dir" ] \
 # If this subdirectory has an expected errors file, use that testing strategy.
 elif [ -f "$subdir/savi.errors.txt" ]; then
   test_error_output
+
+# If this subdirectory has a script and expected output file, use that strategy.
+elif [ -f "$subdir/savi.run.test.sh" ] \
+  && [ -f "$subdir/savi.run.output.txt" ]; then
+  test_run_output
 
 ## NOTE: When adding new testing strategy, also add a description to the
 ##       integration testing documentation in `spec/integration/README.md`

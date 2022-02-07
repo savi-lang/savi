@@ -18,9 +18,15 @@
   :fun ref react(event CPointer(AsioEvent), flags U32, arg U32) @
     :yields ActionType for None
 
+  :fun ref deferred_actions @
+    :yields ActionType for None
+
 :trait tag IO.Actor(ActionType val)
   :fun io @->(IO.Engine(ActionType)) // TODO: somehow private... allow the trait to use this, but make it private to other callers?
   :fun ref _io_react(action ActionType) @
+
+  :be io_deferred_actions // TODO: somehow private...
+    @io.deferred_actions -> (action | @_io_react(action))
 
   :: This is a special behaviour that hooks into the AsioEventNotify runtime,
   :: called whenever an event handle we're subscribed to receives an event.
@@ -57,6 +63,7 @@
 
   :new
 
+  // TODO: Make private or move to another package:
   :new new_tcp_connect!(
     actor AsioEventNotify
     host String
@@ -71,10 +78,16 @@
     if (connect_count == 0) error!
     @_pending_connect_count = connect_count
 
+  // TODO: Make private or move to another package:
   :new new_from_fd_rw(actor AsioEventNotify, @_fd)
     asio_flags =
       if Platform.windows (AsioEvent.read_write | AsioEvent.read_write_oneshot)
     @_event = AsioEvent.create(actor, @_fd, asio_flags, 0, True)
+
+  // TODO: Make private or move to another package:
+  :new new_from_fd_r(actor AsioEventNotify, @_fd)
+    asio_flags = AsioEvent.read
+    @_event = AsioEvent.create(actor, @_fd, AsioEvent.read, 0, True)
 
   :fun ref _clear_state_after_final_dispose
     @_event = AsioEvent.none
@@ -140,6 +153,11 @@
     @_fd = fd
     @_is_writable = True // TODO: Remove these lines?
     @_is_readable = True // TODO: Remove these lines?
+    @
+
+  :fun ref deferred_actions
+    :yields IO.Action for None
+    // TODO
     @
 
   :fun ref react(event CPointer(AsioEvent), flags U32, arg U32) @

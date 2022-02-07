@@ -444,6 +444,10 @@ struct Savi::Compiler::Infer::MetaType::Intersection
     # multiple terms to work with here.
     return false if terms.size == 1
 
+    # If the other term was a concrete type, we have failed the test.
+    # No type is a subtype of a concrete type except itself.
+    return false if other.is_concrete?
+
     # However we have not yet implemented this logic.
     # TODO: we may have to do something subtle here when dealing with
     # subtyping of intersections of traits, where multiple traits
