@@ -1,0 +1,18 @@
+:actor Main
+  :new (env)
+    ExampleStdIn.new(env)
+
+:actor ExampleStdIn
+  :is StdIn.Actor
+  :let env Env
+  :let io StdIn.Engine
+  :new (@env)
+    @io = StdIn.Engine.new(@)
+    StdIn.Ticket.get(@env.root.ticket_issuer, @)
+
+  :fun ref _io_react(action IO.Action)
+    @env.out.print(Inspect[action])
+    if (action == IO.Action.Read) (
+      @env.out.write(@io.read_stream.advance_to_end.extract_token.as_string)
+    )
+    @

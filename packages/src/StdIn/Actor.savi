@@ -1,0 +1,8 @@
+// TODO: Documentation
+:trait StdIn.Actor
+  :is IO.Actor(IO.Action)
+
+  :is Env.Root.TicketIssuer.Recipient(StdIn.Ticket)
+
+  :fun io @->(StdIn.Engine)
+  :be accept_ticket(ticket (StdIn.Ticket | None)): @io.run(--ticket)
