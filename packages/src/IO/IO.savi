@@ -39,7 +39,9 @@
 :class IO.CoreEngine
   :is IO.Engine(IO.Action)
   :is ByteStream.Source
-  :is ByteStream.ChunkedSink
+
+  :copies _WriteBuffer
+  :is ByteStream.Sink
 
   :var _event CPointer(AsioEvent): AsioEvent.none
   :var _fd U32: -1
@@ -47,7 +49,7 @@
   :var _pending_connect_count U32: 0
   :var _has_closed Bool: False
   :var _is_readable Bool: False
-  :var _is_writable Bool: False
+
   :var _is_send_shutdown Bool: False
   :var _is_recv_shutdown Bool: False
 
@@ -57,7 +59,6 @@
   :fun has_closed: @_has_closed
 
   :fun is_readable: @_is_readable
-  :fun is_writable: @_is_writable
 
   :fun os_error: @_os_error
 
@@ -97,16 +98,6 @@
     @_is_writable = False
     @_is_send_shutdown = True
     @_is_recv_shutdown = True
-
-  // TODO: Why is the offset parameter not being used here?
-  :fun ref writev_windows!(chunks Array(Bytes.Slice), offset USize) None
-    LibPonyOs.pony_os_writev!(@_event, chunks.cpointer, chunks.size)
-
-  // TODO: Why is the offset parameter not being used here?
-  :fun ref writev_posix!(chunks Array(Bytes.Slice), offset USize) USize
-    LibPonyOs.pony_os_writev!(@_event, chunks.cpointer, chunks.size)
-
-  :fun non writev_posix_max_chunks USize: LibPonyOs.pony_os_writev_max
 
   :: Receive bytes into the given read buffer, starting at the given offset.
   :: Raises an error and initiates a hard close if the socket was closed

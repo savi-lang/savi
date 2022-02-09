@@ -1,0 +1,16 @@
+:: This trait is meant to create a common interface that can receive chunks
+:: from a `ByteStream.Writer`.
+:trait ByteStream.Sink
+  :: Add a chunk of bytes to the buffer.
+  ::
+  :: It won't actually get written until the `write_flush` method is called.
+  :fun ref write_bytes(chunk Bytes'val) @
+
+  :: Try to write all buffered data.
+  ::
+  :: If all data was successfully flushed into the target, it returns True.
+  :: Otherwise, some data was not written and this must be called again later.
+  ::
+  :: If the given target is not in a writable state when calling this method,
+  :: then no data will be written and it was useless to make this call.
+  :fun ref write_flush Bool

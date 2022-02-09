@@ -1,8 +1,0 @@
-:: This trait is meant to create a common interface that can receive chunks
-:: from a ByteStream.ChunkedWriter. It takes an `Array(Bytes.Slice)`, which
-:: is ABI-compatible with the `writev` system call, without restructuring.
-:trait ByteStream.ChunkedSink
-  :fun box is_writable Bool
-  :fun ref writev_windows!(chunks Array(Bytes.Slice), offset USize) None
-  :fun ref writev_posix!(chunks Array(Bytes.Slice), offset USize) USize
-  :fun non writev_posix_max_chunks USize

@@ -1,0 +1,131 @@
+:trait _WriteBuffer
+  :is ByteStream.Sink
+
+  :fun _event @->(CPointer(AsioEvent))
+
+  :let _write_chunks Array(Bytes.Slice): []
+  :var _write_total_size USize: 0
+  :var _write_windows_unacknowledged_chunks USize: 0
+  :var _write_windows_unacknowledged_total_size USize: 0
+
+  :var _is_writable Bool: False
+  :fun is_writable: @_is_writable
+
+  :fun ref write_bytes(chunk Bytes'val): @write_slice(chunk.as_slice)
+  :fun ref write_slice(chunk Bytes.Slice'val)
+    @_write_chunks << chunk
+    @_write_total_size += chunk.size
+    @
+
+  :fun ref write_flush Bool
+    case (
+    | @_write_total_size == 0 | True  // nothing left to flush
+    | !@_is_writable          | False // can't flush right now
+    | Platform.windows        | @_write_flush_windows
+    |                           @_write_flush_posix
+    )
+
+  :fun ref _write_flush_posix Bool
+    writev_max_chunks = LibPonyOs.pony_os_writev_max
+    num_to_send USize = 0
+    bytes_to_send USize = 0
+
+    try (
+      while (@_write_total_size > 0) (
+        if (@_write_chunks.size < writev_max_chunks) (
+          num_to_send = @_write_chunks.size
+          bytes_to_send = @_write_total_size
+        |
+          num_to_send = writev_max_chunks
+          // TODO: This could be done with an equivalent reduce
+          bytes_to_send = 0
+          @_write_chunks.each(0, num_to_send) -> (chunk |
+            bytes_to_send += chunk.size
+          )
+        )
+
+        bytes_written = LibPonyOs.pony_os_writev!(
+          @_event
+          @_write_chunks.cpointer
+          num_to_send
+        )
+        @_manage_chunks(bytes_written, bytes_to_send, num_to_send)
+      )
+      True
+    |
+      False
+    )
+
+  :fun ref _write_flush_windows Bool
+    try (
+      LibPonyOs.pony_os_writev!(
+        @_event
+        @_write_chunks.cpointer
+        @_write_windows_unacknowledged_chunks
+      )
+      @_write_windows_unacknowledged_chunks += @_write_chunks.size
+      @_write_windows_unacknowledged_total_size = @_write_total_size
+      True
+    |
+      False
+    )
+
+  :fun ref _write_acknowledge_windows(bytes_written USize)
+    @_manage_chunks(
+      bytes_written
+      @_write_windows_unacknowledged_total_size
+      @_write_windows_unacknowledged_chunks
+    )
+    @
+
+  :fun ref _manage_chunks(
+    bytes_sent USize
+    bytes_to_send USize
+    num_to_send USize
+  )
+    @_write_total_size -= bytes_sent
+    if (bytes_sent == bytes_to_send) (
+      // Fast path for the case of having sent all bytes we wanted to send.
+      // We can simply trim the intended number of chunks.
+      @_write_chunks.trim_in_place(num_to_send)
+    |
+      // Otherwise, we need to iterate through the pending writev chunks,
+      // Clearing away those that are already sent, but keeping the rest.
+
+      // Find the index of the first chunk size pointer that was not fully sent,
+      // and also get a count of how many bytes worth of size were sent in it.
+      further_bytes_sent = bytes_sent
+      lingering_chunk_index = try (
+        @_write_chunks.find_index! -> (chunk |
+          try (
+            further_bytes_sent = further_bytes_sent -! chunk.size
+            False
+          |
+            True
+          )
+        )
+      |
+        // We don't expect this to ever be reached, because that would imply
+        // that all of the bytes in _data_pairs were already sent.
+        // But if that were true, we wouldn't even have taken this slow path
+        // of counting bytes in chunks - we would have used the fast path.
+        // So in the error case of this being reached, we still behave correctly
+        // by just using an index beyond the end of the array size,
+        // which will cause us to trim away everything in the array.
+        further_bytes_sent = 0
+        @_write_chunks.size
+      )
+
+      // If the lingering chunk was only partially sent, we need to trim it.
+      if (further_bytes_sent > 0) (
+        try (
+          @_write_chunks.replace_at!(lingering_chunk_index) -> (chunk |
+            chunk.trim(further_bytes_sent)
+          )
+        )
+      )
+
+      // Trim the left side of the array to remove the fully sent bytes.
+      @_write_chunks.trim_in_place(lingering_chunk_index)
+    )
+    @
