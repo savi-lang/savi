@@ -42,6 +42,15 @@
   :: The caller is expected to only do this for memory they know that they own.
   :fun tag _unsafe @'ref: compiler intrinsic
 
+  :: Allow unsafely converting from a opaque capability to an immutable one,
+  :: which is required for the internals of this package, but obviously
+  :: not suitable for capability safety in general programs.
+  ::
+  :: The caller is expected to only do this for memory they know that they
+  :: can guarantee will never be mutated in the future, at least until all
+  :: references to that region of memory have been garbage-collected.
+  :fun tag _unsafe_val @'val: compiler intrinsic
+
   :: Get a pointer that points to a subset of this original pointer's memory,
   :: starting at the given element index from the current pointer's address,
   :: as a basic building block for operations that begin starting at an offset.

@@ -98,11 +98,13 @@
     @_is_send_shutdown = True
     @_is_recv_shutdown = True
 
-  :fun ref writev_windows!(data_pairs Array(CPointer(U8)), offset USize) None
-    LibPonyOs.pony_os_writev!(@_event, data_pairs.cpointer, data_pairs.size / 2)
+  // TODO: Why is the offset parameter not being used here?
+  :fun ref writev_windows!(chunks Array(Bytes.Slice), offset USize) None
+    LibPonyOs.pony_os_writev!(@_event, chunks.cpointer, chunks.size)
 
-  :fun ref writev_posix!(data_pairs Array(CPointer(U8)), offset USize) USize
-    LibPonyOs.pony_os_writev!(@_event, data_pairs.cpointer, data_pairs.size / 2)
+  // TODO: Why is the offset parameter not being used here?
+  :fun ref writev_posix!(chunks Array(Bytes.Slice), offset USize) USize
+    LibPonyOs.pony_os_writev!(@_event, chunks.cpointer, chunks.size)
 
   :fun non writev_posix_max_chunks USize: LibPonyOs.pony_os_writev_max
 

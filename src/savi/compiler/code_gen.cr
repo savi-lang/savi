@@ -870,7 +870,7 @@ class Savi::Compiler::CodeGen
         llvm_func.add_attribute(LLVM::Attribute::DereferenceableOrNull, LLVM::AttributeIndex::ReturnIndex, elem_size_value)
         llvm_func.add_attribute(LLVM::Attribute::Alignment, LLVM::AttributeIndex::ReturnIndex, PonyRT::HEAP_MIN)
         @runtime.gen_intrinsic_cpointer_realloc(self, params, llvm_type, elem_size_value)
-      when "_unsafe"
+      when "_unsafe", "_unsafe_val"
         params[0]
       when "_offset", "offset"
         @builder.bit_cast(
