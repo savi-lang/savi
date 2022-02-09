@@ -58,8 +58,8 @@
     @io.close
     @
 
-  :fun ref flush
-    @write_stream.flush
+  :fun ref flush!
+    @write_stream.flush!
 
   :fun ref pending_reads
     :yields USize for None
