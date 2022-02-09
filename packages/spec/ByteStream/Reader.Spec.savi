@@ -4,7 +4,7 @@
 
   :it "starts with a large amount of space available, or whatever was specified"
     assert: ByteStream.Reader.new.space_ahead == 0x4000
-    // assert: ByteStream.Reader.new(0x8000).space_ahead == 0x8000
+    assert: ByteStream.Reader.new(0x8000).space_ahead == 0x8000
     assert: ByteStream.Reader.new(0x2000).space_ahead == 0x2000
 
   :it "can accept chunks, advance, and read tokens"
