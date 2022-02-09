@@ -10,6 +10,9 @@
   :let target ByteStream.Sink
   :new (@target)
 
+  :new to_reader(reader ByteStream.Reader)
+    @target = ByteStream.Sink.ToReader.new(reader)
+
   :: Add a chunk of bytes to the stream.
   ::
   :: It won't actually get written until the `flush` method is called.

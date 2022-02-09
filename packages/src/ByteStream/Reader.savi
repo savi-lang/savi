@@ -62,7 +62,7 @@
   :: Raises an error if the source has become permanently closed off.
   :fun ref receive_from!(source ByteStream.Source)
     if (@_data.space == 0) @_data.reserve(0x4000) // TODO: customizable reserve?
-    source.emit_bytes_into!(@_data, @_data.size)
+    source.emit_bytes_into!(@_data)
 
   :: Move the mark position to match the current cursor position.
   :: This is often used to mark the start of a token in a token stream,
@@ -101,9 +101,9 @@
 
   :: Reserve additional space in the underlying byte buffer, which forces a
   :: reallocation now, but sets a minimum number of bytes that the buffer
-  :: can receive in the future without forcing a reallocation.
-  :fun ref reserve_additional(space USize)
-    @_data.reserve(@_data.space + space)
+  :: can receive beyond the current size without forcing a reallocation.
+  :fun ref reserve_additional(additional_space USize)
+    @_data.reserve(@_data.size + additional_space)
 
   :: Get the number of bytes in the currently marked token.
   :: That is, the number of bytes between the marker and the cursor.

@@ -99,18 +99,18 @@
     @_is_send_shutdown = True
     @_is_recv_shutdown = True
 
-  :: Receive bytes into the given read buffer, starting at the given offset.
+  :: Receive bytes into the given read buffer, starting at the buffer's end.
   :: Raises an error and initiates a hard close if the socket was closed
   :: on the other side of the connection.
-  :fun ref emit_bytes_into!(read_buffer Bytes'ref, offset USize) USize
+  :fun ref emit_bytes_into!(read_buffer Bytes'ref) USize
     try (
-      // TODO: Safety checking on offset value, maybe using checked subtraction?
+      orig_size = read_buffer.size
       bytes_read = LibPonyOs.pony_os_recv!(
         @_event
-        read_buffer.cpointer(offset)
-        read_buffer.space - offset
+        read_buffer.cpointer(orig_size)
+        read_buffer.space - orig_size
       )
-      new_size = offset + bytes_read
+      new_size = orig_size + bytes_read
       read_buffer.resize_possibly_including_uninitialized_memory(new_size)
 
       // If we read zero bytes, we know that further reading would block,
