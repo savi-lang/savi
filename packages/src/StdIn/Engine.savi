@@ -133,22 +133,23 @@
 
     did_read
 
-  :: Receive bytes into the given read buffer, starting at the given offset.
-  :fun ref emit_bytes_into!(read_buffer Bytes'ref, offset USize) USize
+  :: Receive bytes into the given read buffer, starting at the buffer's end.
+  :fun ref emit_bytes_into!(read_buffer Bytes'ref) USize
     // Raise an error if there is no space left in the buffer.
-    if (offset >= read_buffer.space) error!
+    orig_size = read_buffer.size
+    if (orig_size == read_buffer.space) error!
 
     // Read into the buffer.
     bytes_read = LibPony.pony_os_stdin_read(
-      read_buffer.cpointer(offset)
-      read_buffer.space - offset
+      read_buffer.cpointer(orig_size)
+      read_buffer.space - orig_size
     )
 
     // Raise an error if there was nothing available to read right now.
     if (bytes_read == -1) error!
 
     // Update the size of the buffer with the newly filled bytes.
-    new_size = offset + bytes_read
+    new_size = orig_size + bytes_read
     read_buffer.resize_possibly_including_uninitialized_memory(new_size)
 
     // Return the number of bytes that were read into the buffer.

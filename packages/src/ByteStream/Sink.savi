@@ -16,4 +16,48 @@
   :: If False, some data was not written and this must be called again later.
   :: This includes the case where flushing is not currently possible at all,
   :: wherein False is returned without trying to flush anything.
+  :fun ref write_flush Bool // TODO: Raise an error instead of returning Bool
+
+:: This class is an implementation of `ByteStream.Sink` which emits into
+:: a given `ByteStream.Reader`, acting as the `ByteStream.Source` for it.
+:: This is often useful for testing protocol reading and writing in test suites.
+::
+:: The `write_bytes` call writes to a local chunk buffer, which gets flushed
+:: into the `ByteStream.Reader` when the `write_flush` method is called.
+::
+:: Note that this approach will incur costs for copying the chunks, because the
+:: underlying data model of `ByteStream.Reader` is a single contiguous buffer.
+:: Given that testing is the primary use case for synchronously connecting a
+:: `ByteStream.Writer` to a `ByteStream.Reader`, this copying cost is
+:: considered mostly unimportant.
+:class ByteStream.Sink.ToReader
+  :is ByteStream.Sink
+  :is ByteStream.Source
+
+  :let reader ByteStream.Reader
+  :let _chunks Array(Bytes): []
+  :var _total_size USize: 0
+  :new (@reader)
+
+  :fun ref write_bytes(bytes Bytes'val)
+    @_chunks << bytes
+    @_total_size += bytes.size
+    @
+
   :fun ref write_flush Bool
+    @reader.reserve_additional(@_total_size)
+    try (
+      @reader.receive_from!(@)
+      True
+    |
+      False
+    )
+
+  :fun ref emit_bytes_into!(buffer Bytes'ref) USize
+    @_chunks.each -> (chunk | buffer << chunk)
+    bytes_read = @_total_size
+
+    @_chunks.clear
+    @_total_size = 0
+
+    bytes_read
