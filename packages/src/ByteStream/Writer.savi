@@ -8,6 +8,7 @@
   :is ByteStream.Writable
 
   :let target ByteStream.Sink
+  :var _current_chunk: Bytes.new_iso
   :new (@target)
 
   :new to_reader(reader ByteStream.Reader)
@@ -17,14 +18,22 @@
   ::
   :: It won't actually get written until the `flush` method is called.
   :fun ref "<<"(chunk Bytes'val)
-    @target.write_bytes(chunk)
+    if (chunk.size <= 64) (
+      // If the chunk fits on a 64-bit cache line, we consider it more cheap to
+      // copy it into the current chunk than to save it as a separate chunk.
+      @_current_chunk << chunk
+    |
+      // Otherwise, we close out the current chunk and then write the new chunk.
+      @_finish_current_chunk
+      @target.write_bytes(chunk)
+    )
     @
 
   :: Add a single byte to the stream.
   ::
   :: It won't actually get written until the `flush` method is called.
   :fun ref push(byte U8)
-    @target.write_bytes(Bytes.new_iso.push(byte)) // TODO: more efficient
+    @_current_chunk.push(byte)
     @
 
   :: Try to write all data that is currently buffered to the `target` sink.
@@ -37,5 +46,17 @@
   :: amount of successful data transfer already - all that is known is that
   :: some amount of data still remains in the internal buffer to be transferred.
   :fun ref flush! @
+    @_finish_current_chunk
     @target.write_flush!
+    @
+
+  :fun ref _finish_current_chunk
+    if @_current_chunk.is_not_empty @target.write_bytes(
+      // Pass along the chunk and allocate a new "current chunk" with the
+      // same amount of space as old "current chunk", making the assumption
+      // that the typical amount written per chunk will be fairly stable,
+      // but without us knowing what that typical amount is ahead of time.
+      // TODO: Should this behavior be configurable?
+      @_current_chunk <<= Bytes.new_iso(@_current_chunk.space)
+    )
     @
