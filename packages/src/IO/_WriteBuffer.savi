@@ -1,9 +1,26 @@
+:struct val _WriteChunk
+  // TODO: Platform-specific field order - on Windows writev, size comes first.
+  :let cpointer CPointer(U8)
+  :let size USize
+  :new val from_cpointer(@cpointer, @size)
+  :new val from_bytes(bytes Bytes)
+    @cpointer = bytes.cpointer
+    @size = bytes.size
+
+  :fun val trim_left(from USize)
+    try (
+      size = @size -! from
+      @from_cpointer(@cpointer.offset(from), size)
+    |
+      @from_cpointer(@cpointer.null, 0)
+    )
+
 :trait _WriteBuffer
   :is ByteStream.Sink
 
   :fun _event @->(CPointer(AsioEvent))
 
-  :let _write_chunks Array(Bytes.Slice): []
+  :let _write_chunks Array(_WriteChunk): []
   :var _write_total_size USize: 0
   :var _write_windows_unacknowledged_chunks USize: 0
   :var _write_windows_unacknowledged_total_size USize: 0
@@ -11,8 +28,8 @@
   :var _is_writable Bool: False
   :fun is_writable: @_is_writable
 
-  :fun ref write_bytes(chunk Bytes'val): @write_slice(chunk.as_slice)
-  :fun ref write_slice(chunk Bytes.Slice'val)
+  :fun ref write_bytes(bytes Bytes'val)
+    chunk = _WriteChunk.from_bytes(bytes)
     @_write_chunks << chunk
     @_write_total_size += chunk.size
     @
@@ -120,7 +137,7 @@
       if (further_bytes_sent > 0) (
         try (
           @_write_chunks.replace_at!(lingering_chunk_index) -> (chunk |
-            chunk.trim(further_bytes_sent)
+            chunk.trim_left(further_bytes_sent)
           )
         )
       )
