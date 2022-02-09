@@ -1,13 +1,8 @@
 :: This trait is meant to create a common interface that can receive chunks
-:: from a ByteStream.ChunkedWriter. It is currently designed to only be really
-:: usable with an FFI-using I/O sink, since it gives opaque data pointers.
-::
-:: TODO: Refactor to use an Array(BytesSlice) instead of Array(CPointer(U8)),
-:: where BytesSlice is a new struct type that has a pointer and a size field,
-:: placed in memory in a platform-dependent order because Windows and POSIX
-:: expect their writev struct elements to be in an opposite order.
+:: from a ByteStream.ChunkedWriter. It takes an `Array(Bytes.Slice)`, which
+:: is ABI-compatible with the `writev` system call, without restructuring.
 :trait ByteStream.ChunkedSink
   :fun box is_writable Bool
-  :fun ref writev_windows!(data_pairs Array(CPointer(U8)), offset USize) None
-  :fun ref writev_posix!(data_pairs Array(CPointer(U8)), offset USize) USize
+  :fun ref writev_windows!(chunks Array(Bytes.Slice), offset USize) None
+  :fun ref writev_posix!(chunks Array(Bytes.Slice), offset USize) USize
   :fun non writev_posix_max_chunks USize

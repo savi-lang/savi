@@ -1,0 +1,32 @@
+// TODO: Documentation
+//
+// TODO: Many more methods, duplicating most of the Bytes methods,
+// apart from the mutating ones, obviously.
+:struct val Bytes.Slice
+  // TODO: Platform-specific field order - on Windows writev, size comes first.
+  //
+  // As ugly as it would be, we can probably just hard-code this special case
+  // in the code gen pass of the compiler if we can't come up with a clean
+  // language feature for this that serves other use cases beyond this one.
+  //
+  // It's unfortunate that the implementation of libc writev affects us here
+  // but on the other hand, it wouldn't make sense to duplicate the otherwise
+  // identical purpose in another type that differed only in field order.
+  // Also, field order has no other impact on Savi semantics apart from FFI
+  // interaction, so at least the platform-dependent ordering won't have an
+  // impact outside of the limited scope of how it interacts with FFI.
+  :let _ptr CPointer(U8)'val
+  :let _size USize
+  :new val from_cpointer(@_ptr, @_size)
+
+  :fun size: @_size
+
+  :fun val trim(from USize = 0, to = USize.max_value)
+    try (
+      finish = to.max(@_size)
+      size = finish -! from
+      @from_cpointer(@_ptr._offset(from)._unsafe_val, size)
+    |
+      @from_cpointer(@_ptr._null._unsafe_val, 0)
+    )
+

@@ -7,7 +7,7 @@
 :class ByteStream.ChunkedWriter
   :is ByteStream.Writable
 
-  :let _data_pairs Array(CPointer(U8)): []
+  :let _chunks Array(Bytes.Slice): []
   :var _total_size USize: 0
   :var _windows_unacknowledged_chunks USize: 0
   :var _windows_unacknowledged_total_size USize: 0
@@ -16,29 +16,8 @@
   ::
   :: It won't actually get written until the flush method is called.
   :fun ref "<<"(chunk Bytes'val)
-    // In @_data_pairs, we hold on to the data chunk pointer, as well as a
-    // fake pointer representing the size of the data chunk to be written,
-    // because a writev system call always interleaves both.
-    //
-    // The reason we convert the size into a fake pointer is so that
-    // we can still have a homogenous element type for the writev array,
-    // and because we can't drop the real pointer to a USize since that
-    // would remove it from garbage collector tracing, possibly allowing
-    // it to be deallocated between behaviors, despite still being "held".
-    //
-    // Windows wants them in the opposite order from what POSIX wants,
-    // so we deal with that here and everywhere else we use the _data_pairs.
-    if Platform.windows (
-      @_data_pairs << CPointer(U8).from_usize(chunk.size)
-      @_data_pairs << chunk.cpointer
-    |
-      @_data_pairs << chunk.cpointer
-      @_data_pairs << CPointer(U8).from_usize(chunk.size)
-    )
-
-    // Also track the total size of all chunks.
+    @_chunks << chunk.as_slice
     @_total_size += chunk.size
-
     @
 
   :: Try to write all buffered data to the given target.
@@ -50,10 +29,10 @@
   :: then no data will be written and it was useless to make this call.
   :fun ref flush(target ByteStream.ChunkedSink) Bool
     case (
-    | @_total_size == 0       | True  // nothing left to flush
+    | @_total_size == 0      | True  // nothing left to flush
     | target.is_writable.not | False // can't flush right now
-    | Platform.windows        | @_flush_windows(target)
-    |                           @_flush_posix(target)
+    | Platform.windows       | @_flush_windows(target)
+    |                          @_flush_posix(target)
     )
 
   :fun ref _flush_posix(target ByteStream.ChunkedSink) Bool
@@ -63,21 +42,20 @@
 
     try (
       while (@_total_size > 0) (
-        total_pairs = @_data_pairs.size / 2
-        if (total_pairs < writev_max_chunks) (
-          num_to_send = total_pairs
+        if (@_chunks.size < writev_max_chunks) (
+          num_to_send = @_chunks.size
           bytes_to_send = @_total_size
         |
           num_to_send = writev_max_chunks
           // TODO: This could be done with an equivalent reduce
           bytes_to_send = 0
-          @_data_pairs.each(1, num_to_send * 2, 2) -> (size_ptr |
-            bytes_to_send += size_ptr.usize
+          @_chunks.each(0, num_to_send) -> (chunk |
+            bytes_to_send += chunk.size
           )
         )
 
-        bytes_written = target.writev_posix!(@_data_pairs, num_to_send)
-        @_manage_data_pairs(bytes_written, bytes_to_send, num_to_send)
+        bytes_written = target.writev_posix!(@_chunks, num_to_send)
+        @_manage_chunks(bytes_written, bytes_to_send, num_to_send)
       )
       True
     |
@@ -86,8 +64,8 @@
 
   :fun ref _flush_windows(target ByteStream.ChunkedSink) Bool
     try (
-      target.writev_windows!(@_data_pairs, @_windows_unacknowledged_chunks * 2)
-      @_windows_unacknowledged_chunks += @_data_pairs.size / 2 // TODO: remove cancelled-out *2/2 ?
+      target.writev_windows!(@_chunks, @_windows_unacknowledged_chunks)
+      @_windows_unacknowledged_chunks += @_chunks.size
       @_windows_unacknowledged_total_size = @_total_size
       True
     |
@@ -95,14 +73,14 @@
     )
 
   :fun ref acknowledge_writes_windows(bytes_written USize)
-    @_manage_data_pairs(
+    @_manage_chunks(
       bytes_written
       @_windows_unacknowledged_total_size
       @_windows_unacknowledged_chunks
     )
     @
 
-  :fun ref _manage_data_pairs(
+  :fun ref _manage_chunks(
     bytes_sent USize
     bytes_to_send USize
     num_to_send USize
@@ -111,27 +89,18 @@
     if (bytes_sent == bytes_to_send) (
       // Fast path for the case of having sent all bytes we wanted to send.
       // We can simply trim the intended number of chunks.
-      @_data_pairs.trim_in_place(num_to_send * 2)
+      @_chunks.trim_in_place(num_to_send)
     |
-      // Otherwise, we need to iterate through the pending_writev pairs,
+      // Otherwise, we need to iterate through the pending writev chunks,
       // Clearing away those that are already sent, but keeping the rest.
-
-      // The packing of data pointers and corresponding sizes (fake pointers)
-      // is platform-dependent, because the writev call works differently.
-      first_size_ptr_index = if Platform.windows (0 | 1)
 
       // Find the index of the first chunk size pointer that was not fully sent,
       // and also get a count of how many bytes worth of size were sent in it.
       further_bytes_sent = bytes_sent
-      lingering_size_ptr_index = try (
-        @_data_pairs.find_index!(
-          first_size_ptr_index
-          USize.max_value
-          2
-        ) -> (chunk_size_ptr |
-          chunk_size = chunk_size_ptr.usize
+      lingering_chunk_index = try (
+        @_chunks.find_index! -> (chunk |
           try (
-            further_bytes_sent = further_bytes_sent -! chunk_size
+            further_bytes_sent = further_bytes_sent -! chunk.size
             False
           |
             True
@@ -146,28 +115,20 @@
         // by just using an index beyond the end of the array size,
         // which will cause us to trim away everything in the array.
         further_bytes_sent = 0
-        @_data_pairs.size + first_size_ptr_index
+        @_chunks.size
       )
 
       // If the lingering chunk was only partially sent, we need to trim it.
       if (further_bytes_sent > 0) (
-        lingering_data_ptr_index = lingering_size_ptr_index +
-          if Platform.windows (1 | -1)
         try (
-          @_data_pairs.replace_at!(lingering_data_ptr_index) -> (data_ptr |
-            data_ptr.offset(further_bytes_sent)
-          )
-        )
-        try (
-          @_data_pairs.replace_at!(lingering_size_ptr_index) -> (size_ptr |
-            CPointer(U8).from_usize(size_ptr.usize - further_bytes_sent)
+          @_chunks.replace_at!(lingering_chunk_index) -> (chunk |
+            chunk.trim(further_bytes_sent)
           )
         )
       )
 
       // Trim the left side of the array to remove the fully sent bytes.
-      trim_index = lingering_size_ptr_index - first_size_ptr_index
-      @_data_pairs.trim_in_place(trim_index)
+      @_chunks.trim_in_place(lingering_chunk_index)
     )
     @
 
