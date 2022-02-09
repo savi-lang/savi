@@ -1,0 +1,21 @@
+:class ByteStream.Writer.Spec
+  :is Spec
+  :const describes: "ByteStream.Writer"
+
+  :it "writes chunks of bytes and individual bytes"
+    read = ByteStream.Reader.new
+    write = ByteStream.Writer.to_reader(read)
+
+    // Write some data.
+    write << b"Hello"
+    write.push(',').push(' ')
+    write << b"World"
+    write.push('!')
+
+    // Nothing is actually written until flush.
+    assert: read.bytes_ahead == 0
+    assert no_error: write.flush!
+    assert: read.bytes_ahead == 13
+
+    // After flush, now the data can be read.
+    assert: read.extract_all == b"Hello, World!"

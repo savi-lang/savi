@@ -20,6 +20,13 @@
     @target.write_bytes(chunk)
     @
 
+  :: Add a single byte to the stream.
+  ::
+  :: It won't actually get written until the `flush` method is called.
+  :fun ref push(byte U8)
+    @target.write_bytes(Bytes.new_iso.push(byte)) // TODO: more efficient
+    @
+
   :: Try to write all data that is currently buffered to the `target` sink.
   ::
   :: Raises an error if there is still some data buffered that could not yet be

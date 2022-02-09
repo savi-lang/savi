@@ -5,3 +5,4 @@
 :: so that invocations of this method can be easily chained together.
 :trait ByteStream.Writable
   :fun ref "<<"(chunk Bytes'val) @
+  :fun ref push(byte U8) @

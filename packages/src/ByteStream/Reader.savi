@@ -179,6 +179,12 @@
     @_mark_offset = 0
     --extracted
 
+  :: Advance to the end of the stream, extracting everything after the marker
+  :: as isolated Bytes, advancing the marker to the end so that it may
+  :: never be read again, which allows the returned Bytes to avoid a copy.
+  :fun ref extract_all
+    @advance_to_end.extract_token // TODO: more efficient than chop-truncate?
+
   :: Return the portion of the stream between the marker and the cursor,
   :: as an immutable String.
   :fun token_as_string String
