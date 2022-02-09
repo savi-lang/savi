@@ -21,7 +21,7 @@
 
     // Add a chunk so that those bytes are available for reading.
     write_stream << b"hello"
-    write_stream.flush
+    assert no_error: write_stream.flush!
     assert: stream.bytes_ahead == 5
     assert: stream.bytes_ahead_of_marker == 5
     assert: stream.space_ahead == initial_space
@@ -60,7 +60,7 @@
     // Add some more chunks.
     write_stream << b"world"
     write_stream << b"lings"
-    write_stream.flush
+    assert no_error: write_stream.flush!
     assert: stream.bytes_ahead == 15
     assert: stream.bytes_ahead_of_marker == 15
     assert: stream.space_ahead == initial_space
@@ -182,7 +182,7 @@
     write_stream << b"hel"
     write_stream << b"lowo"
     write_stream << b"rld"
-    write_stream.flush
+    assert no_error: write_stream.flush!
 
     try stream.advance!(2).mark_here.advance!(6)
 
@@ -197,7 +197,7 @@
     write_stream << b"hel"
     write_stream << b"lowo"
     write_stream << b"rld"
-    write_stream.flush
+    assert no_error: write_stream.flush!
 
     collected Array(U8) = []
 
@@ -222,7 +222,7 @@
     write_stream << b"hel"
     write_stream << b"lowo"
     write_stream << b"rld"
-    write_stream.flush
+    assert no_error: write_stream.flush!
 
     collected Array(U8) = []
 
@@ -245,7 +245,7 @@
     write_stream << b"hel"
     write_stream << b"lowo"
     write_stream << b"rld"
-    write_stream.flush
+    assert no_error: write_stream.flush!
 
     // Compare the entire stream.
     stream.advance_to_end
@@ -270,7 +270,7 @@
     write_stream << b"HeL"
     write_stream << b"LoWo"
     write_stream << b"RlD"
-    write_stream.flush
+    assert no_error: write_stream.flush!
 
     // Compare the entire stream.
     stream.advance_to_end
@@ -295,7 +295,7 @@
     write_stream << b"192"
     write_stream << b"8374"
     write_stream << b"650"
-    write_stream.flush
+    assert no_error: write_stream.flush!
 
     // Parse the entire stream as an integer.
     stream.advance_to_end
@@ -310,7 +310,7 @@
 
     // Add an invalid character to the stream and get an error.
     write_stream << b":" // only digits (0-9) are valid
-    write_stream.flush
+    assert no_error: write_stream.flush!
     stream.advance_to_end
     assert error: stream.token_as_positive_integer!
 
@@ -319,7 +319,7 @@
     write_stream = ByteStream.Writer.to_reader(stream)
     write_stream << b"garbage"
     write_stream << Bytes.from_array([0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF, 0x01])
-    write_stream.flush
+    assert no_error: write_stream.flush!
     try stream.advance!(7) // drop "garbage"
     stream.mark_here
     stream.advance_to_end

@@ -34,58 +34,50 @@
     @_write_total_size += chunk.size
     @
 
-  :fun ref write_flush Bool
+  :fun ref write_flush! @
     case (
-    | @_write_total_size == 0 | True  // nothing left to flush
-    | !@_is_writable          | False // can't flush right now
-    | Platform.windows        | @_write_flush_windows
-    |                           @_write_flush_posix
+    | @_write_total_size == 0 | @      // nothing left to flush
+    | !@_is_writable          | error! // can't flush right now
+    | Platform.windows        | @_write_flush_windows!
+    |                           @_write_flush_posix!
     )
 
-  :fun ref _write_flush_posix Bool
+  :fun ref _write_flush_posix!
     writev_max_chunks = LibPonyOs.pony_os_writev_max
     num_to_send USize = 0
     bytes_to_send USize = 0
 
-    try (
-      while (@_write_total_size > 0) (
-        if (@_write_chunks.size < writev_max_chunks) (
-          num_to_send = @_write_chunks.size
-          bytes_to_send = @_write_total_size
-        |
-          num_to_send = writev_max_chunks
-          // TODO: This could be done with an equivalent reduce
-          bytes_to_send = 0
-          @_write_chunks.each(0, num_to_send) -> (chunk |
-            bytes_to_send += chunk.size
-          )
+    while (@_write_total_size > 0) (
+      if (@_write_chunks.size < writev_max_chunks) (
+        num_to_send = @_write_chunks.size
+        bytes_to_send = @_write_total_size
+      |
+        num_to_send = writev_max_chunks
+        // TODO: This could be done with an equivalent reduce
+        bytes_to_send = 0
+        @_write_chunks.each(0, num_to_send) -> (chunk |
+          bytes_to_send += chunk.size
         )
-
-        bytes_written = LibPonyOs.pony_os_writev!(
-          @_event
-          @_write_chunks.cpointer
-          num_to_send
-        )
-        @_manage_chunks(bytes_written, bytes_to_send, num_to_send)
       )
-      True
-    |
-      False
-    )
 
-  :fun ref _write_flush_windows Bool
-    try (
-      LibPonyOs.pony_os_writev!(
+      bytes_written = LibPonyOs.pony_os_writev!(
         @_event
         @_write_chunks.cpointer
-        @_write_windows_unacknowledged_chunks
+        num_to_send
       )
-      @_write_windows_unacknowledged_chunks += @_write_chunks.size
-      @_write_windows_unacknowledged_total_size = @_write_total_size
-      True
-    |
-      False
+      @_manage_chunks(bytes_written, bytes_to_send, num_to_send)
     )
+    @
+
+  :fun ref _write_flush_windows!
+    LibPonyOs.pony_os_writev!(
+      @_event
+      @_write_chunks.cpointer
+      @_write_windows_unacknowledged_chunks
+    )
+    @_write_windows_unacknowledged_chunks += @_write_chunks.size
+    @_write_windows_unacknowledged_total_size = @_write_total_size
+    @
 
   :fun ref _write_acknowledge_windows(bytes_written USize)
     @_manage_chunks(

@@ -34,7 +34,7 @@
         @env.err.print("[Echoer] Received:")
         @env.err.print(bytes.as_string)
         @io.write_stream << bytes.clone // TODO: is clone still needed?
-        @io.flush // TODO: should we flush automatically on close below?
+        try @io.flush! // TODO: should we flush automatically on close below?
         @io.close
       )
     | IO.Action.Closed |
@@ -63,7 +63,7 @@
     | IO.Action.Opened |
       @env.err.print("[EchoClient] Connected")
       @io.write_stream << b"Hello, World!"
-      @io.flush
+      try @io.flush!
 
     | IO.Action.OpenFailed |
       @env.err.print("[EchoClient] Failed to connect:")

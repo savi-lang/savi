@@ -44,10 +44,10 @@
             .header("Content-Length", "0")
             .finish
 
-          @io.flush
+          try @io.flush!
         )
       )
     | IO.Action.Write |
-      @io.flush
+      try @io.flush!
     )
     @

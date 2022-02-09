@@ -22,10 +22,13 @@
 
   :: Try to write all data that is currently buffered to the `target` sink.
   ::
-  :: If all data was successfully flushed in the target, it returns True.
-  :: Otherwise, some data was not written and this must be called again later.
+  :: Raises an error if there is still some data buffered that could not yet be
+  :: flushed, either because the underlying sink was not in a writable state,
+  :: or because it wasn't prepared to accept the full amount yet.
   ::
-  :: If the target is not in a writable state when calling this method,
-  :: then no data will be written and it was useless to make this call.
-  :fun ref flush Bool
-    @target.write_flush
+  :: However, note that even if an error is raised, there may have been some
+  :: amount of successful data transfer already - all that is known is that
+  :: some amount of data still remains in the internal buffer to be transferred.
+  :fun ref flush! @
+    @target.write_flush!
+    @
