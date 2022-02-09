@@ -11,7 +11,7 @@
   :fun pony_os_socket_close(fd U32) None
   :fun pony_os_socket_shutdown(fd U32) None
   :fun pony_os_writev_max USize
-  :fun pony_os_writev!(event CPointer(AsioEvent), iov CPointer(Bytes.Slice), count USize) USize
+  :fun pony_os_writev!(event CPointer(AsioEvent), iov CPointer(_WriteChunk), count USize) USize
   :fun pony_os_recv!(event CPointer(AsioEvent), buffer CPointer(U8), count USize) USize
   :fun pony_os_errno OSError
 

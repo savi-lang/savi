@@ -44,7 +44,6 @@
     @_space = data.space
     @_ptr = data.cpointer._unsafe
 
-  :fun val as_slice: Bytes.Slice.from_cpointer(@_ptr, @_size)
   :fun val as_array: Array(U8).val_from_cpointer(@_ptr._unsafe, @_size, @_space)
   :fun val as_string: String.from_bytes(@)
 
