@@ -1,10 +1,10 @@
 :class TCP.ConnectionEngine
   :is IO.Engine(IO.Action)
-  :var io: IO.CoreEngine.new
+  :var io IO.CoreEngine
   :var listen (TCP.Listener | None): None
   :var connect_error OSError: OSError.None
   :let read_stream: ByteStream.Reader.new
-  :let write_stream: ByteStream.ChunkedWriter.new
+  :let write_stream ByteStream.Writer
 
   :fun non connect(
     // TODO: TCPConnectionAuth, rather than ambient authority.
@@ -32,6 +32,7 @@
     new
 
   :new _new_with_io(@io)
+    @write_stream = ByteStream.Writer.new(@io)
 
   :fun ref deferred_actions
     :yields IO.Action for None
@@ -58,7 +59,7 @@
     @
 
   :fun ref flush
-    @write_stream.flush(@io)
+    @write_stream.flush
 
   :fun ref pending_reads
     :yields USize for None
