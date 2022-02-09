@@ -1,0 +1,7 @@
+#!/usr/bin/env sh
+
+echo "Hello, World!"
+
+while read LINE; do
+   echo ${LINE}    # do something with it here
+done

@@ -1,0 +1,189 @@
+:class ProtoBuf.Wire.Writer.Spec
+  :is Spec
+  :const describes: "ProtoBuf.Wire.Writer"
+
+  :it "writes U8 values as base-128 varints according to the spec"
+    assert: @write -> (write |
+      write.u8_as_varint(1)
+    ) == b"\x01"
+
+    assert: @write -> (write |
+      write.u8_as_varint(0x7F)
+    ) == b"\x7F"
+
+    assert: @write -> (write |
+      write.u8_as_varint(0x80)
+    ) == b"\x80\x01"
+
+    assert: @write -> (write |
+      write.u8_as_varint(0xFF)
+    ) == b"\xFF\x01"
+
+  :it "writes U16 values as base-128 varints according to the spec"
+    assert: @write -> (write |
+      write.u16_as_varint(1)
+    ) == b"\x01"
+
+    assert: @write -> (write |
+      write.u16_as_varint(0x7F)
+    ) == b"\x7F"
+
+    assert: @write -> (write |
+      write.u16_as_varint(0x80)
+    ) == b"\x80\x01"
+
+    assert: @write -> (write |
+      write.u16_as_varint(300) // example from the spec docs
+    ) == b"\xAC\x02"
+
+    assert: @write -> (write |
+      write.u16_as_varint(0x3FFF)
+    ) == b"\xFF\x7F"
+
+    assert: @write -> (write |
+      write.u16_as_varint(0x4000)
+    ) == b"\x80\x80\x01"
+
+    assert: @write -> (write |
+      write.u16_as_varint(0xFFFF)
+    ) == b"\xFF\xFF\x03"
+
+  :it "writes U32 values as base-128 varints according to the spec"
+    assert: @write -> (write |
+      write.u32_as_varint(1)
+    ) == b"\x01"
+
+    assert: @write -> (write |
+      write.u32_as_varint(0x7F)
+    ) == b"\x7F"
+
+    assert: @write -> (write |
+      write.u32_as_varint(0x80)
+    ) == b"\x80\x01"
+
+    assert: @write -> (write |
+      write.u32_as_varint(300) // example from the spec docs
+    ) == b"\xAC\x02"
+
+    assert: @write -> (write |
+      write.u32_as_varint(0x3FFF)
+    ) == b"\xFF\x7F"
+
+    assert: @write -> (write |
+      write.u32_as_varint(0x4000)
+    ) == b"\x80\x80\x01"
+
+    assert: @write -> (write |
+      write.u32_as_varint(0x1F_FFFF)
+    ) == b"\xFF\xFF\x7F"
+
+    assert: @write -> (write |
+      write.u32_as_varint(0x20_0000)
+    ) == b"\x80\x80\x80\x01"
+
+    assert: @write -> (write |
+      write.u32_as_varint(0x0FFF_FFFF)
+    ) == b"\xFF\xFF\xFF\x7F"
+
+    assert: @write -> (write |
+      write.u32_as_varint(0x1000_0000)
+    ) == b"\x80\x80\x80\x80\x01"
+
+    assert: @write -> (write |
+      write.u32_as_varint(0xFFFF_FFFF)
+    ) == b"\xFF\xFF\xFF\xFF\x0F"
+
+  :it "writes U64 values as base-128 varints according to the spec"
+    assert: @write -> (write |
+      write.u64_as_varint(1)
+    ) == b"\x01"
+
+    assert: @write -> (write |
+      write.u64_as_varint(0x7F)
+    ) == b"\x7F"
+
+    assert: @write -> (write |
+      write.u64_as_varint(0x80)
+    ) == b"\x80\x01"
+
+    assert: @write -> (write |
+      write.u64_as_varint(300) // example from the spec docs
+    ) == b"\xAC\x02"
+
+    assert: @write -> (write |
+      write.u64_as_varint(0x3FFF)
+    ) == b"\xFF\x7F"
+
+    assert: @write -> (write |
+      write.u64_as_varint(0x4000)
+    ) == b"\x80\x80\x01"
+
+    assert: @write -> (write |
+      write.u64_as_varint(0x1F_FFFF)
+    ) == b"\xFF\xFF\x7F"
+
+    assert: @write -> (write |
+      write.u64_as_varint(0x20_0000)
+    ) == b"\x80\x80\x80\x01"
+
+    assert: @write -> (write |
+      write.u64_as_varint(0x0FFF_FFFF)
+    ) == b"\xFF\xFF\xFF\x7F"
+
+    assert: @write -> (write |
+      write.u64_as_varint(0x1000_0000)
+    ) == b"\x80\x80\x80\x80\x01"
+
+    assert: @write -> (write |
+      write.u64_as_varint(0x07_FFFF_FFFF)
+    ) == b"\xFF\xFF\xFF\xFF\x7F"
+
+    assert: @write -> (write |
+      write.u64_as_varint(0x08_0000_0000)
+    ) == b"\x80\x80\x80\x80\x80\x01"
+
+    assert: @write -> (write |
+      write.u64_as_varint(0x03FF_FFFF_FFFF)
+    ) == b"\xFF\xFF\xFF\xFF\xFF\x7F"
+
+    assert: @write -> (write |
+      write.u64_as_varint(0x0400_0000_0000)
+    ) == b"\x80\x80\x80\x80\x80\x80\x01"
+
+    assert: @write -> (write |
+      write.u64_as_varint(0x01_FFFF_FFFF_FFFF)
+    ) == b"\xFF\xFF\xFF\xFF\xFF\xFF\x7F"
+
+    assert: @write -> (write |
+      write.u64_as_varint(0x02_0000_0000_0000)
+    ) == b"\x80\x80\x80\x80\x80\x80\x80\x01"
+
+    assert: @write -> (write |
+      write.u64_as_varint(0xFF_FFFF_FFFF_FFFF)
+    ) == b"\xFF\xFF\xFF\xFF\xFF\xFF\xFF\x7F"
+
+    assert: @write -> (write |
+      write.u64_as_varint(0x0100_0000_0000_0000)
+    ) == b"\x80\x80\x80\x80\x80\x80\x80\x80\x01"
+
+    assert: @write -> (write |
+      write.u64_as_varint(0x7FFF_FFFF_FFFF_FFFF)
+    ) == b"\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\x7F"
+
+    assert: @write -> (write |
+      write.u64_as_varint(0x8000_0000_0000_0000)
+    ) == b"\x80\x80\x80\x80\x80\x80\x80\x80\x80\x01"
+
+    assert: @write -> (write |
+      write.u64_as_varint(0xFFFF_FFFF_FFFF_FFFF)
+    ) == b"\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\x01"
+
+  :fun non write
+    :yields ProtoBuf.Wire.Writer
+
+    bytes = Bytes.new
+    builder = ProtoBuf.Wire.Writer.new(bytes)
+
+    yield builder
+
+    bytes

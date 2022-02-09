@@ -1,0 +1,34 @@
+:actor Main
+  :new (env)
+    ExampleStdIn.new(env)
+
+:actor ExampleStdIn
+  :is StdIn.Actor
+  :let env Env
+  :let io StdIn.Engine
+  :new (@env)
+    @io = StdIn.Engine.new(@)
+    StdIn.Ticket.get(@env.root.ticket_issuer, @)
+
+  :fun ref _io_react(action IO.Action)
+    if (action == IO.Action.Closed) (
+      read = ProtoBuf.Reader.new(@io.read_stream)
+      req = ProtoBuf.Compiler.CodeGeneratorRequest.new
+      try (
+        req.from_proto!(read)
+
+        @env.err.print("DONE READING")
+      |
+        @env.err.print("FAILED READING")
+      )
+
+      @env.err.print(Inspect[req.file_to_generate])
+      @env.err.print(Inspect[req.proto_file])
+      req.proto_file.each -> (proto_file |
+        @env.err.write("name: "), @env.err.print(Inspect[proto_file.name])
+        @env.err.write("package: "), @env.err.print(Inspect[proto_file.package])
+        @env.err.write("dependency: "), @env.err.print(Inspect[proto_file.dependency])
+      )
+
+    )
+    @

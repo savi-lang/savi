@@ -1,0 +1,142 @@
+:struct ProtoBuf.Wire.Writer
+  :let _out Bytes'ref // TODO: Use ByteStream.Writable instead, and expand that interface
+  :new (@_out)
+
+  :: Write the given `U8`, encoded as a ProtoBuf varint.
+  :: It will be encoded as 1-2 bytes, depending on the value.
+  :fun ref u8_as_varint(value U8)
+    case value <= (
+    | 0x7F |
+      @_out.push(value)
+    |
+      @_out.reserve_additional(2)
+        .push(value)
+        .push(0x01)
+    )
+
+  :: Write the given `U16`, encoded as a ProtoBuf varint.
+  :: It will be encoded as 1-3 bytes, depending on the value.
+  :fun ref u16_as_varint(value U16)
+    case value <= (
+    | 0x007F |
+      @_out.push(value.u8)
+    | 0x3FFF |
+      @_out.reserve_additional(2)
+        .push(value.u8.bit_or(0x80))
+        .push(value.bit_shr(7).u8)
+    |
+      @_out.reserve_additional(3)
+        .push(value.u8.bit_or(0x80))
+        .push(value.bit_shr(7).u8.bit_or(0x80))
+        .push(value.bit_shr(14).u8)
+    )
+
+  :: Write the given `U32`, encoded as a ProtoBuf varint.
+  :: It will be encoded as 1-5 bytes, depending on the value.
+  :fun ref u32_as_varint(value U32)
+    case value <= (
+    | 0x0000_007F |
+      @_out.push(value.u8)
+    | 0x0000_3FFF |
+      @_out.reserve_additional(2)
+        .push(value.u8.bit_or(0x80))
+        .push(value.bit_shr(7).u8)
+    | 0x001F_FFFF |
+      @_out.reserve_additional(3)
+        .push(value.u8.bit_or(0x80))
+        .push(value.bit_shr(7).u8.bit_or(0x80))
+        .push(value.bit_shr(14).u8)
+    | 0x0FFF_FFFF |
+      @_out.reserve_additional(4)
+        .push(value.u8.bit_or(0x80))
+        .push(value.bit_shr(7).u8.bit_or(0x80))
+        .push(value.bit_shr(14).u8.bit_or(0x80))
+        .push(value.bit_shr(21).u8)
+    |
+      @_out.reserve_additional(5)
+        .push(value.u8.bit_or(0x80))
+        .push(value.bit_shr(7).u8.bit_or(0x80))
+        .push(value.bit_shr(14).u8.bit_or(0x80))
+        .push(value.bit_shr(21).u8.bit_or(0x80))
+        .push(value.bit_shr(28).u8)
+    )
+
+  :: Write the given `U64`, encoded as a ProtoBuf varint.
+  :: It will be encoded as 1-10 bytes, depending on the value.
+  :fun ref u64_as_varint(value U64)
+    case value <= (
+    | 0x0000_0000_0000_007F |
+      @_out.push(value.u8)
+    | 0x0000_0000_0000_3FFF |
+      @_out.reserve_additional(2)
+        .push(value.u8.bit_or(0x80))
+        .push(value.bit_shr(7).u8)
+    | 0x0000_0000_001F_FFFF |
+      @_out.reserve_additional(3)
+        .push(value.u8.bit_or(0x80))
+        .push(value.bit_shr(7).u8.bit_or(0x80))
+        .push(value.bit_shr(14).u8)
+    | 0x0000_0000_0FFF_FFFF |
+      @_out.reserve_additional(4)
+        .push(value.u8.bit_or(0x80))
+        .push(value.bit_shr(7).u8.bit_or(0x80))
+        .push(value.bit_shr(14).u8.bit_or(0x80))
+        .push(value.bit_shr(21).u8)
+    | 0x0000_0007_FFFF_FFFF |
+      @_out.reserve_additional(5)
+        .push(value.u8.bit_or(0x80))
+        .push(value.bit_shr(7).u8.bit_or(0x80))
+        .push(value.bit_shr(14).u8.bit_or(0x80))
+        .push(value.bit_shr(21).u8.bit_or(0x80))
+        .push(value.bit_shr(28).u8)
+    | 0x0000_03FF_FFFF_FFFF |
+      @_out.reserve_additional(6)
+        .push(value.u8.bit_or(0x80))
+        .push(value.bit_shr(7).u8.bit_or(0x80))
+        .push(value.bit_shr(14).u8.bit_or(0x80))
+        .push(value.bit_shr(21).u8.bit_or(0x80))
+        .push(value.bit_shr(28).u8.bit_or(0x80))
+        .push(value.bit_shr(35).u8)
+    | 0x0001_FFFF_FFFF_FFFF |
+      @_out.reserve_additional(7)
+        .push(value.u8.bit_or(0x80))
+        .push(value.bit_shr(7).u8.bit_or(0x80))
+        .push(value.bit_shr(14).u8.bit_or(0x80))
+        .push(value.bit_shr(21).u8.bit_or(0x80))
+        .push(value.bit_shr(28).u8.bit_or(0x80))
+        .push(value.bit_shr(35).u8.bit_or(0x80))
+        .push(value.bit_shr(42).u8)
+    | 0x00FF_FFFF_FFFF_FFFF |
+      @_out.reserve_additional(8)
+        .push(value.u8.bit_or(0x80))
+        .push(value.bit_shr(7).u8.bit_or(0x80))
+        .push(value.bit_shr(14).u8.bit_or(0x80))
+        .push(value.bit_shr(21).u8.bit_or(0x80))
+        .push(value.bit_shr(28).u8.bit_or(0x80))
+        .push(value.bit_shr(35).u8.bit_or(0x80))
+        .push(value.bit_shr(42).u8.bit_or(0x80))
+        .push(value.bit_shr(49).u8)
+    | 0x7FFF_FFFF_FFFF_FFFF |
+      @_out.reserve_additional(9)
+        .push(value.u8.bit_or(0x80))
+        .push(value.bit_shr(7).u8.bit_or(0x80))
+        .push(value.bit_shr(14).u8.bit_or(0x80))
+        .push(value.bit_shr(21).u8.bit_or(0x80))
+        .push(value.bit_shr(28).u8.bit_or(0x80))
+        .push(value.bit_shr(35).u8.bit_or(0x80))
+        .push(value.bit_shr(42).u8.bit_or(0x80))
+        .push(value.bit_shr(49).u8.bit_or(0x80))
+        .push(value.bit_shr(56).u8)
+    |
+      @_out.reserve_additional(10)
+        .push(value.u8.bit_or(0x80))
+        .push(value.bit_shr(7).u8.bit_or(0x80))
+        .push(value.bit_shr(14).u8.bit_or(0x80))
+        .push(value.bit_shr(21).u8.bit_or(0x80))
+        .push(value.bit_shr(28).u8.bit_or(0x80))
+        .push(value.bit_shr(35).u8.bit_or(0x80))
+        .push(value.bit_shr(42).u8.bit_or(0x80))
+        .push(value.bit_shr(49).u8.bit_or(0x80))
+        .push(value.bit_shr(56).u8.bit_or(0x80))
+        .push(0x01)
+    )

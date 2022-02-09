@@ -1,0 +1,39 @@
+:class _ReaderExampleClass
+  :var name String: ""
+  :var admin Bool: False
+  :fun ref from_json!(read ProtoBuf.Reader)
+    read.each_in_object! -> (key |
+      case key == (
+      | 0b0001010 | try (@name = read.string!)
+      | 0b0010000 | try (@admin = read.bool!)
+      | read.unexpected_key
+      )
+    )
+    @
+
+:class ProtoBuf.Reader.Spec
+  :is Spec
+  :const describes: "ProtoBuf.Reader"
+
+  :it "can fill an shallow object with simple fields"
+    user = _ReaderExampleClass.new
+
+    assert: @write -> (write |
+      write.u8_as_varint(1)
+    ) == b"\x01"
+
+    assert: @write -> (write |
+      write.u8_as_varint(0x7F)
+    ) == b"\x7F"
+
+    assert: @write -> (write |
+      write.u8_as_varint(0x80)
+    ) == b"\x80\x01"
+
+    assert: @write -> (write |
+      write.u8_as_varint(0xFF)
+    ) == b"\xFF\x01"
+
+  :fun non create_reader
+    stream =
+    read = ProtoBuf.Reader.new(Byte)

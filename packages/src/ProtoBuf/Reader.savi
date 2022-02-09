@@ -1,0 +1,154 @@
+:class ProtoBuf.Reader
+  :var _depth USize: 0
+  :let _parser ProtoBuf.Parser
+  :new (stream)
+    @_parser = ProtoBuf.Parser.new(stream)
+
+
+  :fun ref unknown_field(key U64)
+    // The kind of field is indicated by the lowest three bits of the key.
+    kind = key.u8.bit_and(0b111)
+
+    // Skip the field's value, based on knowing the kind of encoding it uses.
+    try (
+      case kind == (
+      | 0 | @_parser.skip_varint!
+      | 1 | @_parser.skip_64bit!
+      | 2 | @_parser.skip_length_delimited!
+      // TODO: 3: "start group"
+      // TODO: 4: "end group"
+      | 5 | @_parser.skip_32bit!
+      |
+        Inspect.out("invalid key kind:")
+        Inspect.out(kind)
+        Inspect.out("from key:")
+        Inspect.out(key)
+        error!
+      )
+    )
+
+    // TODO: Track symbolically rather than using Inspect.out
+    // Inspect.out("unknown_field with key:")
+    // Inspect.out(key)
+    @ // TODO
+
+  :fun ref each_in_object!
+    @_depth += 1
+    if (@_depth == 1) (
+      @each_in_top_object! -> (key | yield key)
+      @_depth -= 1
+      return
+    )
+
+    size = @_parser.read_varint_as_u64!.usize!
+    finish_line = size + @_parser.stream.bytes_behind
+    Inspect.out("size:")
+    Inspect.out(size)
+    Inspect.out("finish line:")
+    Inspect.out(finish_line)
+
+    while (Inspect.out(@_parser.stream.bytes_behind), @_parser.stream.bytes_behind < finish_line) (
+      key = @_parser.read_varint_as_u64!
+      // Inspect.out(key)
+      yield key
+    )
+
+    @_depth -= 1
+    @
+
+  :fun ref each_in_top_object!
+    while @_parser.has_bytes_ahead (
+      yield @_parser.read_varint_as_u64!
+    )
+    @
+
+  :fun ref uint64! U64
+    value = @_parser.read_varint_as_u64!
+    @_parser.stream.mark_here
+    value
+
+  :fun ref int32! I32
+    value = @_parser.read_varint_as_u64!.i32!
+    @_parser.stream.mark_here
+    value
+
+  :fun ref bool! Bool
+    value = @_parser.read_varint_as_u64! > 0
+    @_parser.stream.mark_here
+    value
+
+  :fun ref string! String
+    size = @_parser.read_varint_as_u64!.usize!
+    error! if (@_parser.stream.bytes_ahead < size)
+
+    @_parser.stream
+      .mark_here
+      .advance!(size)
+      .extract_token.as_string
+
+// TODO: Put the following in its own file:
+// TODO: Rename as `ProtoBuf.Wire.Reader`, in line with `ProtoBuf.Wire.Writer`?
+// Or keep in sync with JSON library by keeping as `ProtoBuf.Parser`, and
+// rename `ProtoBuf.Wire.Writer` to something else instead?
+:struct ProtoBuf.Parser
+  :let stream ByteStream.Reader
+  :new (@stream)
+
+  :fun has_bytes_ahead: @stream.bytes_ahead > 0
+
+  :: Read a base-128-varint-encoded integer value from the byte stream.
+  ::
+  :: If successful, the value is returned and the cursor is moved forward.
+  ::
+  :: If the end of the varint was not encountered, or if there were too many
+  :: bytes in the encoding for it to possibly fit in a `U64`-width value,
+  :: an error will be raised and the stream cursor will rewind to the marker.
+  :fun ref read_varint_as_u64! U64
+    count U8 = 0
+    value U64 = 0
+    try (
+      @stream.advance_while! -> (byte |
+        // A U64 value will be always encoded as no more than 10 bytes.
+        // We keep track of the byte count here, and if it grows beyond
+        // that number of bytes, we raise an error eagerly.
+        count += 1
+        error! if (count > 10)
+
+        // Shift the current value by 7 bits and add in 7 bits of the new byte.
+        value = value.bit_shl(7).bit_or(byte.bit_and(0x7F).u64)
+
+        // Keep advancing as long as the byte we just read isn't the final byte.
+        // A final byte uses only the lower 7 bits, with the top bit clear.
+        byte > 0x7F
+      )
+      @stream.advance!(1)
+    |
+      // If we failed for any reason, rewind the cursor to the marker position.
+      @stream.rewind_to_marker
+      error!
+    )
+    value
+
+  :fun ref skip_varint!
+    @stream.advance_while! -> (byte |
+      // Keep advancing as long as the byte we just read isn't the final byte.
+      // A final byte uses only the lower 7 bits, with the top bit clear.
+      byte > 0x7F
+    )
+    @stream.advance!(1)
+
+  :fun ref skip_64bit!
+    @stream.advance!(4)
+
+  :fun ref skip_32bit!
+    @stream.advance!(2)
+
+  :fun ref skip_length_delimited!
+    size = @read_varint_as_u64!.usize!
+    @stream.advance!(size)
+
+
+
+
+
+

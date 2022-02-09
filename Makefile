@@ -82,7 +82,7 @@ example-eval: PHONY $(SAVI)
 
 # Compile and run the user program binary in the given directory.
 example: PHONY $(SAVI)
-	echo && $(SAVI) --cd "$(dir)" run $(extra_args)
+	echo && $(SAVI) run --cd "$(dir)" $(extra_args)
 
 # Compile the files in the given directory.
 example-compile: PHONY $(SAVI)

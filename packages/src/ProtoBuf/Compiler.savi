@@ -1,0 +1,72 @@
+
+///
+// from `google.protobuf.compiler` package:
+
+:class ProtoBuf.Compiler.Version
+  :var major (I32 | None): None
+  :var minor (I32 | None): None
+  :var patch (I32 | None): None
+  :var suffix (String | None): None
+
+  :fun ref from_proto!(read ProtoBuf.Reader)
+    read.each_in_object! -> (key |
+      case key == (
+      | 0b0001000 | try (@major = read.int32!)
+      | 0b0010000 | try (@minor = read.int32!)
+      | 0b0011000 | try (@patch = read.int32!)
+      | 0b0100010 | try (@suffix = read.string!)
+      | read.unknown_field(key)
+      )
+    )
+    @
+
+:class ProtoBuf.Compiler.CodeGeneratorRequest
+  :var file_to_generate Array(String): [] // TODO: embed
+  :var parameter (String | None): None
+  :var version (ProtoBuf.Compiler.Version | None): None
+  :var proto_file Array(ProtoBuf.Meta.FileDescriptorProto): [] // TODO: embed
+
+  :fun ref from_proto!(read ProtoBuf.Reader)
+    read.each_in_object! -> (key |
+      case key == (
+      | 0b0001010 | try (@file_to_generate << read.string!)
+      | 0b0010010 | try (@parameter = read.string!)
+      // | 0b0011010 | try (@version = ProtoBuf.Compiler.Version.new.from_proto!(read))
+      | 0b1111010 | try (@proto_file << ProtoBuf.Meta.FileDescriptorProto.new.from_proto!(read))
+      | read.unknown_field(key)
+      )
+    )
+    @
+
+:class ProtoBuf.Compiler.CodeGeneratorResponse
+  :var error (String | None): None
+  :var supported_features (U64 | None): None
+  :var file Array(ProtoBuf.Compiler.CodeGeneratorResponse.File): []
+
+  :fun ref from_proto!(read ProtoBuf.Reader)
+    read.each_in_object! -> (key |
+      case key == (
+      | 0b0001010 | try (@error = read.string!)
+      | 0b0010000 | try (@supported_features = read.uint64!)
+      | 0b1111010 | try (@file << ProtoBuf.Compiler.CodeGeneratorResponse.File.new.from_proto!(read))
+      | read.unknown_field(key)
+      )
+    )
+    @
+
+:class ProtoBuf.Compiler.CodeGeneratorResponse.File
+  :var name (String | None): None
+  :var insertion_point (String | None): None
+  :var content (String | None): None
+  // :var generated_code_info (GeneratedCodeInfo | None) : None
+
+  :fun ref from_proto!(read ProtoBuf.Reader)
+    read.each_in_object! -> (key |
+      case key == (
+      | 0b0001010 | try (@name = read.string!)
+      | 0b0010010 | try (@insertion_point = read.string!)
+      | 0b1111010 | try (@content = read.string!)
+      | read.unknown_field(key)
+      )
+    )
+    @

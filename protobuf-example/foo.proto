@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+service FooService {
+  rpc GetFoo (GetFooRequest) returns (GetFooResponse);
+}message GetFooRequest {
+  string id = 1;
+}message GetFooResponse {
+  string fooName = 1;
+  int64 fooValue = 2;
+}

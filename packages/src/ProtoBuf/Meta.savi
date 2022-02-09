@@ -1,0 +1,274 @@
+
+///
+// from `google.protobuf` package:
+
+// TODO: ProtoBuf.Meta.FileDescriptorSet
+
+:class ProtoBuf.Meta.FileDescriptorProto
+  :var name (String | None): None
+  :var package (String | None): None
+  :var dependency Array(String): [] // TODO: embed
+  :var message_type Array(ProtoBuf.Meta.DescriptorProto): [] // TODO: embed
+  :var enum_type Array(ProtoBuf.Meta.EnumDescriptorProto): [] // TODO: embed
+  :var service Array(ProtoBuf.Meta.ServiceDescriptorProto): [] // TODO: embed
+  :var extension Array(ProtoBuf.Meta.FieldDescriptorProto): [] // TODO: embed
+  // TODO: :var options (ProtoBuf.Meta.FileOptions | None): None
+  // TODO: :var source_code_info (ProtoBuf.Meta.SourceCodeInfo | None): None
+  :var public_dependency Array(I32): [] // TODO: embed
+  :var weak_dependency Array(I32): [] // TODO: embed
+  :var syntax (String | None): None
+
+  :fun ref from_proto!(read ProtoBuf.Reader)
+    Inspect.out("FileDescriptorProto")
+    read.each_in_object! -> (key |
+      case key == (
+      | 0b0001010 | try (@name = read.string!)
+      | 0b0010010 | try (@package = read.string!)
+      | 0b0011010 | try (@dependency << read.string!)
+      | 0b0100010 | try (@message_type << ProtoBuf.Meta.DescriptorProto.new.from_proto!(read))
+      | 0b0101010 | try (@enum_type << ProtoBuf.Meta.EnumDescriptorProto.new.from_proto!(read))
+      | 0b0110010 | try (@service << ProtoBuf.Meta.ServiceDescriptorProto.new.from_proto!(read))
+      | 0b0111010 | try (@extension << ProtoBuf.Meta.FieldDescriptorProto.new.from_proto!(read))
+      // TODO: | 0b1000010 | try (@options = ProtoBuf.Meta.FileOptions.new.from_proto!(read))
+      // TODO: | 0b1001010 | try (@source_code_info = ProtoBuf.Meta.SourceCodeInfo.new.from_proto!(read))
+      | 0b1010000 | try (@public_dependency << read.int32!)
+      | 0b1011000 | try (@weak_dependency << read.int32!)
+      | 0b1100010 | try (@syntax = read.string!)
+      | read.unknown_field(key)
+      )
+    )
+    @
+
+:class ProtoBuf.Meta.DescriptorProto
+  :var name (String | None): None
+  :var field Array(ProtoBuf.Meta.FieldDescriptorProto): [] // TODO: embed
+  :var nested_type Array(ProtoBuf.Meta.DescriptorProto): [] // TODO: embed
+  :var enum_type Array(ProtoBuf.Meta.EnumDescriptorProto): [] // TODO: embed
+  :var extension_range Array(ProtoBuf.Meta.DescriptorProto.ExtensionRange): [] // TODO: embed
+  :var extension Array(ProtoBuf.Meta.FieldDescriptorProto): [] // TODO: embed
+  // TODO: :var options (ProtoBuf.Meta.MessageOptions | None): None
+  :var oneof_decl Array(ProtoBuf.Meta.OneofDescriptorProto): [] // TODO: embed
+  :var reserved_range Array(ProtoBuf.Meta.DescriptorProto.ReservedRange): [] // TODO: embed
+  :var reserved_name Array(String): [] // TODO: embed
+
+  :fun ref from_proto!(read ProtoBuf.Reader)
+    read.each_in_object! -> (key |
+      case key == (
+      | 0b00001010 | try (@name = read.string!)
+      | 0b00010010 | try (@field << ProtoBuf.Meta.FieldDescriptorProto.new.from_proto!(read))
+      | 0b00011010 | try (@nested_type << ProtoBuf.Meta.DescriptorProto.new.from_proto!(read))
+      | 0b00100010 | try (@enum_type << ProtoBuf.Meta.EnumDescriptorProto.new.from_proto!(read))
+      | 0b00101010 | try (@extension_range << ProtoBuf.Meta.DescriptorProto.ExtensionRange.new.from_proto!(read))
+      | 0b00110010 | try (@extension << ProtoBuf.Meta.FieldDescriptorProto.new.from_proto!(read))
+      // TODO: | 0b00111010 | try (@options = ProtoBuf.Meta.MessageOptions.new.from_proto!(read))
+      | 0b01000010 | try (@oneof_decl << ProtoBuf.Meta.OneofDescriptorProto.new.from_proto!(read))
+      | 0b01001010 | try (@reserved_range << ProtoBuf.Meta.DescriptorProto.ReservedRange.new.from_proto!(read))
+      | 0b01010010 | try (@reserved_name << read.string!)
+      | read.unknown_field(key)
+      )
+    )
+    @
+
+:class ProtoBuf.Meta.DescriptorProto.ExtensionRange
+  :var start (I32 | None): None
+  :var end (I32 | None): None
+  :var options (ProtoBuf.Meta.ExtensionRangeOptions | None): None
+
+  :fun ref from_proto!(read ProtoBuf.Reader)
+    read.each_in_object! -> (key |
+      case key == (
+      | 0b00001000 | try (@start = read.int32!)
+      | 0b00010000 | try (@end = read.int32!)
+      | 0b00011010 | try (@options = ProtoBuf.Meta.ExtensionRangeOptions.new.from_proto!(read))
+      | read.unknown_field(key)
+      )
+    )
+    @
+
+:class ProtoBuf.Meta.DescriptorProto.ReservedRange
+  :var start (I32 | None): None
+  :var end (I32 | None): None
+
+  :fun ref from_proto!(read ProtoBuf.Reader)
+    read.each_in_object! -> (key |
+      case key == (
+      | 0b00001000 | try (@start = read.int32!)
+      | 0b00010000 | try (@end = read.int32!)
+      | read.unknown_field(key)
+      )
+    )
+    @
+
+:class ProtoBuf.Meta.ExtensionRangeOptions
+  // TODO: :var uninterpreted_option Array(ProtoBuf.Meta.UninterpretedOption): []
+  // TODO: extensions 1000 to max
+
+  :fun ref from_proto!(read ProtoBuf.Reader)
+    read.each_in_object! -> (key |
+      case key == (
+      // TODO: | 0b00011111_00111010 | try (@uninterpreted_option << ProtoBuf.Meta.UninterpretedOption.new.from_proto!(read))
+      | read.unknown_field(key)
+      )
+    )
+    @
+
+:class ProtoBuf.Meta.FieldDescriptorProto
+  :var name (String | None): None
+  :var extendee (String | None): None
+  :var number (I32 | None): None
+  :var label (ProtoBuf.Meta.FieldDescriptorProto.Label | None): None
+  :var type (ProtoBuf.Meta.FieldDescriptorProto.Type | None): None
+  :var type_name (String | None): None
+  :var default_value (String | None): None
+  // TODO: :var options (ProtoBuf.Meta.FieldOptions | None): None
+  :var oneof_index (I32 | None): None
+  :var json_name (String | None): None
+  :var proto3_optional (Bool | None): None
+
+  :fun ref from_proto!(read ProtoBuf.Reader)
+    read.each_in_object! -> (key |
+      case key == (
+      | 0b00001010 | try (@name = read.string!)
+      | 0b00010010 | try (@extendee = read.string!)
+      | 0b00011000 | try (@number = read.int32!)
+      | 0b00100000 | try (@label = ProtoBuf.Meta.FieldDescriptorProto.Label.from_u64!(read.uint64!))
+      | 0b00101000 | try (@type = ProtoBuf.Meta.FieldDescriptorProto.Type.from_u64!(read.uint64!))
+      | 0b00110010 | try (@type_name = read.string!)
+      | 0b00111010 | try (@default_value = read.string!)
+      // TODO: | 0b01000010 | try (@options = ProtoBuf.Meta.FieldOptions.new.from_proto!(read))
+      | 0b01001000 | try (@oneof_index = read.int32!)
+      | 0b01010010 | try (@json_name = read.string!)
+      | 0b10001000 | try (@proto3_optional = read.bool!)
+      | read.unknown_field(key)
+      )
+    )
+    @
+
+:enum ProtoBuf.Meta.FieldDescriptorProto.Label
+  :const bit_width U8: 8
+  :member ProtoBuf.Meta.FieldDescriptorProto.Label.LABEL_OPTIONAL: 1
+  :member ProtoBuf.Meta.FieldDescriptorProto.Label.LABEL_REQUIRED: 2
+  :member ProtoBuf.Meta.FieldDescriptorProto.Label.LABEL_REPEATED: 3
+
+:enum ProtoBuf.Meta.FieldDescriptorProto.Type
+  :const bit_width U8: 8
+  :member ProtoBuf.Meta.FieldDescriptorProto.Type.TYPE_DOUBLE: 1
+  :member ProtoBuf.Meta.FieldDescriptorProto.Type.TYPE_FLOAT: 2
+  :member ProtoBuf.Meta.FieldDescriptorProto.Type.TYPE_INT64: 3
+  :member ProtoBuf.Meta.FieldDescriptorProto.Type.TYPE_UINT64: 4
+  :member ProtoBuf.Meta.FieldDescriptorProto.Type.TYPE_INT32: 5
+  :member ProtoBuf.Meta.FieldDescriptorProto.Type.TYPE_FIXED64: 6
+  :member ProtoBuf.Meta.FieldDescriptorProto.Type.TYPE_FIXED32: 7
+  :member ProtoBuf.Meta.FieldDescriptorProto.Type.TYPE_BOOL: 8
+  :member ProtoBuf.Meta.FieldDescriptorProto.Type.TYPE_STRING: 9
+  :member ProtoBuf.Meta.FieldDescriptorProto.Type.TYPE_GROUP: 10
+  :member ProtoBuf.Meta.FieldDescriptorProto.Type.TYPE_MESSAGE: 11
+  :member ProtoBuf.Meta.FieldDescriptorProto.Type.TYPE_BYTES: 12
+  :member ProtoBuf.Meta.FieldDescriptorProto.Type.TYPE_UINT32: 13
+  :member ProtoBuf.Meta.FieldDescriptorProto.Type.TYPE_ENUM: 14
+  :member ProtoBuf.Meta.FieldDescriptorProto.Type.TYPE_SFIXED32: 15
+  :member ProtoBuf.Meta.FieldDescriptorProto.Type.TYPE_SFIXED64: 16
+  :member ProtoBuf.Meta.FieldDescriptorProto.Type.TYPE_SINT32: 17
+  :member ProtoBuf.Meta.FieldDescriptorProto.Type.TYPE_SINT64: 18
+
+:class ProtoBuf.Meta.OneofDescriptorProto
+  :var name (String | None): None
+  // TODO: :var options (ProtoBuf.Meta.OneofOptions | None): None
+
+  :fun ref from_proto!(read ProtoBuf.Reader)
+    read.each_in_object! -> (key |
+      case key == (
+      | 0b00001010 | try (@name = read.string!)
+      // TODO: | 0b00010010 | try (@options = ProtoBuf.Meta.OneofOptions.new.from_proto!(read))
+      | read.unknown_field(key)
+      )
+    )
+    @
+
+:class ProtoBuf.Meta.EnumDescriptorProto
+  :var name (String | None): None
+  :var value Array(ProtoBuf.Meta.EnumValueDescriptorProto): [] // TODO: embed
+  // TODO: :var options (ProtoBuf.Meta.EnumOptions | None): None
+  :var reserved_range Array(ProtoBuf.Meta.EnumDescriptorProto.EnumReservedRange): [] // TODO: embed
+  :var reserved_name Array(String): [] // TODO: embed
+
+  :fun ref from_proto!(read ProtoBuf.Reader)
+    read.each_in_object! -> (key |
+      case key == (
+      | 0b00001010 | try (@name = read.string!)
+      | 0b00010010 | try (@value << ProtoBuf.Meta.EnumValueDescriptorProto.new.from_proto!(read))
+      // TODO: | 0b00011010 | try (@options = ProtoBuf.Meta.EnumOptions.new.from_proto!(read))
+      | 0b00100010 | try (@reserved_range << ProtoBuf.Meta.EnumDescriptorProto.EnumReservedRange.new.from_proto!(read))
+      | 0b00101010 | try (@reserved_name << read.string!)
+      | read.unknown_field(key)
+      )
+    )
+    @
+
+:class ProtoBuf.Meta.EnumDescriptorProto.EnumReservedRange
+  :var start (I32 | None): None
+  :var end (I32 | None): None
+
+  :fun ref from_proto!(read ProtoBuf.Reader)
+    read.each_in_object! -> (key |
+      case key == (
+      | 0b00001000 | try (@start = read.int32!)
+      | 0b00010000 | try (@end = read.int32!)
+      | read.unknown_field(key)
+      )
+    )
+    @
+
+:class ProtoBuf.Meta.EnumValueDescriptorProto
+  :var name (String | None): None
+  :var number (I32 | None): None
+  // TODO: :var options (ProtoBuf.Meta.EnumValueOptions | None): None
+
+  :fun ref from_proto!(read ProtoBuf.Reader)
+    read.each_in_object! -> (key |
+      case key == (
+      | 0b00001010 | try (@name = read.string!)
+      | 0b00010000 | try (@number = read.int32!)
+      // TODO: | 0b00011010 | try (@options = ProtoBuf.Meta.EnumValueOptions.new.from_proto!(read))
+      | read.unknown_field(key)
+      )
+    )
+    @
+
+:class ProtoBuf.Meta.ServiceDescriptorProto
+  :var name (String | None): None
+  :var method Array(ProtoBuf.Meta.MethodDescriptorProto): [] // TODO: embed
+  // TODO: :var options (ProtoBuf.Meta.ServiceOptions | None): None
+
+  :fun ref from_proto!(read ProtoBuf.Reader)
+    read.each_in_object! -> (key |
+      case key == (
+      | 0b00001010 | try (@name = read.string!)
+      | 0b00010010 | try (@method << ProtoBuf.Meta.MethodDescriptorProto.new.from_proto!(read))
+      // TODO: | 0b00011010 | try (@options = ProtoBuf.Meta.ServiceOptions.new.from_proto!(read))
+      | read.unknown_field(key)
+      )
+    )
+    @
+
+:class ProtoBuf.Meta.MethodDescriptorProto
+  :var name (String | None): None
+  :var input_type (String | None): None
+  :var output_type (String | None): None
+  // TODO: :var options (ProtoBuf.Meta.MethodOptions | None): None
+  :var client_streaming (Bool | None): None
+  :var server_streaming (Bool | None): None
+
+  :fun ref from_proto!(read ProtoBuf.Reader)
+    read.each_in_object! -> (key |
+      case key == (
+      | 0b00001010 | try (@name = read.string!)
+      | 0b00010010 | try (@input_type = read.string!)
+      | 0b00011010 | try (@output_type = read.string!)
+      // TODO: | 0b00100010 | try (@options = ProtoBuf.Meta.MethodOptions.new.from_proto!(read))
+      | 0b00101000 | try (@client_streaming = read.bool!)
+      | 0b00110000 | try (@server_streaming = read.bool!)
+      | read.unknown_field(key)
+      )
+    )
+    @

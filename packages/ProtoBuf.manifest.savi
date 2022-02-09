@@ -1,0 +1,11 @@
+:manifest lib ProtoBuf
+  :sources "src/ProtoBuf/**/*.savi"
+
+  :dependency ByteStream "TODO: specify version"
+
+:manifest bin "spec-ProtoBuf"
+  :copies ProtoBuf
+  :sources "spec/ProtoBuf/**/*.savi"
+
+  :dependency Spec "TODO: specify version"
+  :transitive dependency Map "TODO: specify version"

@@ -1,0 +1,8 @@
+:manifest "protoc-gen-savi"
+  :sources "src/*.savi"
+
+  :dependency ProtoBuf "TODO: specify version"
+  :dependency StdIn "TODO: specify version"
+  :dependency IO "TODO: specify version"
+  :transitive dependency ByteStream "TODO: specify version"
+  :transitive dependency OSError "TODO: specify version"
