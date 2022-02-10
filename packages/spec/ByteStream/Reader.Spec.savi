@@ -16,6 +16,8 @@
     assert: stream.bytes_ahead_of_marker == 0
     assert: stream.space_ahead == initial_space
     assert: stream.space_ahead_of_marker == initial_space
+    assert: stream.bytes_behind == 0
+    assert: stream.bytes_behind_marker == 0
     assert: stream.token_byte_size == 0
     assert: stream.token_as_string == ""
 
@@ -26,6 +28,8 @@
     assert: stream.bytes_ahead_of_marker == 5
     assert: stream.space_ahead == initial_space
     assert: stream.space_ahead_of_marker == initial_space
+    assert: stream.bytes_behind == 0
+    assert: stream.bytes_behind_marker == 0
     assert: stream.token_byte_size == 0
     assert: stream.token_as_string == ""
 
@@ -35,6 +39,8 @@
     assert: stream.bytes_ahead_of_marker == 5
     assert: stream.space_ahead == initial_space - 4
     assert: stream.space_ahead_of_marker == initial_space
+    assert: stream.bytes_behind == 4
+    assert: stream.bytes_behind_marker == 0
     assert: stream.token_byte_size == 4
     assert: stream.token_as_string == "hell"
 
@@ -45,6 +51,8 @@
     assert: stream.bytes_ahead_of_marker == 5
     assert: stream.space_ahead == initial_space - 5
     assert: stream.space_ahead_of_marker == initial_space
+    assert: stream.bytes_behind == 5
+    assert: stream.bytes_behind_marker == 0
     assert: stream.token_byte_size == 5
     assert: stream.token_as_string == "hello"
 
@@ -54,6 +62,8 @@
     assert: stream.bytes_ahead_of_marker == 5
     assert: stream.space_ahead == initial_space
     assert: stream.space_ahead_of_marker == initial_space
+    assert: stream.bytes_behind == 0
+    assert: stream.bytes_behind_marker == 0
     assert: stream.token_byte_size == 0
     assert: stream.token_as_string == ""
 
@@ -65,6 +75,8 @@
     assert: stream.bytes_ahead_of_marker == 15
     assert: stream.space_ahead == initial_space
     assert: stream.space_ahead_of_marker == initial_space
+    assert: stream.bytes_behind == 0
+    assert: stream.bytes_behind_marker == 0
     assert: stream.token_byte_size == 0
     assert: stream.token_as_string == ""
 
@@ -75,6 +87,8 @@
     assert: stream.bytes_ahead_of_marker == 12
     assert: stream.space_ahead == initial_space - 3
     assert: stream.space_ahead_of_marker == initial_space - 3
+    assert: stream.bytes_behind == 3
+    assert: stream.bytes_behind_marker == 3
     assert: stream.token_byte_size == 0
     assert: stream.token_as_string == ""
 
@@ -100,6 +114,8 @@
     assert: stream.bytes_ahead_of_marker == 12
     assert: stream.space_ahead == initial_space - 6
     assert: stream.space_ahead_of_marker == initial_space - 3
+    assert: stream.bytes_behind == 6
+    assert: stream.bytes_behind_marker == 3
     assert: stream.token_byte_size == 3
     assert: stream.token_as_string == "low"
 
@@ -110,6 +126,8 @@
     assert: stream.bytes_ahead_of_marker == 12
     assert: stream.space_ahead == initial_space - 13
     assert: stream.space_ahead_of_marker == initial_space - 3
+    assert: stream.bytes_behind == 13
+    assert: stream.bytes_behind_marker == 3
     assert: stream.token_byte_size == 10
     assert: stream.token_as_string == "loworldlin"
 
@@ -120,6 +138,8 @@
     assert: stream.bytes_ahead_of_marker == 12
     assert: stream.space_ahead == initial_space - 15
     assert: stream.space_ahead_of_marker == initial_space - 3
+    assert: stream.bytes_behind == 15
+    assert: stream.bytes_behind_marker == 3
     assert: stream.token_byte_size == 12
     assert: stream.token_as_string == "loworldlings"
 
@@ -130,6 +150,8 @@
     assert: stream.bytes_ahead_of_marker == 12
     assert: stream.space_ahead == initial_space - 15
     assert: stream.space_ahead_of_marker == initial_space - 3
+    assert: stream.bytes_behind == 15
+    assert: stream.bytes_behind_marker == 3
     assert: stream.token_byte_size == 12
     assert: stream.token_as_string == "loworldlings"
 
@@ -140,6 +162,8 @@
     assert: stream.bytes_ahead_of_marker == 12
     assert: stream.space_ahead == initial_space - 15
     assert: stream.space_ahead_of_marker == initial_space - 3
+    assert: stream.bytes_behind == 15
+    assert: stream.bytes_behind_marker == 3
     assert: stream.token_byte_size == 12
     assert: stream.token_as_string == "loworldlings"
 
@@ -150,6 +174,8 @@
     assert: stream.bytes_ahead_of_marker == 12
     assert: stream.space_ahead == initial_space - 7
     assert: stream.space_ahead_of_marker == initial_space - 3
+    assert: stream.bytes_behind == 7
+    assert: stream.bytes_behind_marker == 3
     assert: stream.token_byte_size == 4
     assert: stream.token_as_string == "lowo"
 
@@ -190,6 +216,8 @@
     assert: --extracted == b"llowor"
     assert: stream.bytes_ahead == 2
     assert: stream.bytes_ahead_of_marker == 2
+    assert: stream.bytes_behind == 8
+    assert: stream.bytes_behind_marker == 8
 
   :it "yields each byte of a token"
     stream = ByteStream.Reader.new
