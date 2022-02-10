@@ -143,6 +143,12 @@
     if (@_space < space) @_ptr_reallocate(space)
     @
 
+  :: Ensure enough capacity is allocated for the given added space, in bytes.
+  :: The size (number of actual bytes present in the string) does not change.
+  :: This is equivalent to calling `reserve` with the same number plus the size.
+  :fun ref reserve_additional(additional_space USize)
+    @reserve(@_size + additional_space)
+
   :: Expand to the given size, filling the added space with unitialized memory.
   :: The given size will be silently truncated to the maximum space available
   :: within the current allocation if it is greater than the available space.

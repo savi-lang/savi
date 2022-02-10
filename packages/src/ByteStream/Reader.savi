@@ -102,8 +102,10 @@
   :: Reserve additional space in the underlying byte buffer, which forces a
   :: reallocation now, but sets a minimum number of bytes that the buffer
   :: can receive beyond the current size without forcing a reallocation.
-  :fun ref reserve_additional(additional_space USize)
-    @_data.reserve(@_data.size + additional_space)
+  ::
+  :: See `Bytes.reserve_additional` for more information.
+  :fun ref reserve_additional(additional_space)
+    @_data.reserve_additional(additional_space)
 
   :: Get the number of bytes in the currently marked token.
   :: That is, the number of bytes between the marker and the cursor.
