@@ -32,6 +32,7 @@
   :let _data Bytes'ref
   :var _offset USize: 0
   :var _mark_offset USize: 0
+  :var _lost_offset USize: 0
 
   :new (space USize = 0x4000)
     @_data = Bytes.new(space)
@@ -46,6 +47,7 @@
     @_data.clear
     @_offset = 0
     @_mark_offset = 0
+    @_lost_offset = 0
     @
 
   :: Drop any bytes that have been passed by both the marker and cursor,
@@ -99,11 +101,21 @@
   :: ByteStream.Source prior to forcing a reallocation of the underlying buffer.
   :fun space_ahead_of_marker: @_data.space - @_mark_offset
 
+  :: Get the total number of bytes that the cursor has advanced since the
+  :: very start of the byte stream, including bytes no longer held in buffer.
+  :fun bytes_behind: @_offset + @_lost_offset
+
+  :: Get the total number of bytes that the marker has advanced since the
+  :: very start of the byte stream, including bytes no longer held in buffer.
+  :fun bytes_behind_marker: @_mark_offset + @_lost_offset
+
   :: Reserve additional space in the underlying byte buffer, which forces a
   :: reallocation now, but sets a minimum number of bytes that the buffer
   :: can receive beyond the current size without forcing a reallocation.
-  :fun ref reserve_additional(additional_space USize)
-    @_data.reserve(@_data.size + additional_space)
+  ::
+  :: See `Bytes.reserve_additional` for more information.
+  :fun ref reserve_additional(additional_space)
+    @_data.reserve_additional(additional_space)
 
   :: Get the number of bytes in the currently marked token.
   :: That is, the number of bytes between the marker and the cursor.
@@ -175,9 +187,16 @@
   :fun ref extract_token Bytes'iso
     extracted = @_data.chop_left(@_offset)
     extracted.truncate_left(@_mark_offset)
-    @_offset = 0
+    @_lost_offset += @_offset
     @_mark_offset = 0
+    @_offset = 0
     --extracted
+
+  :: Advance to the end of the stream, extracting everything after the marker
+  :: as isolated Bytes, advancing the marker to the end so that it may
+  :: never be read again, which allows the returned Bytes to avoid a copy.
+  :fun ref extract_all
+    @advance_to_end.extract_token // TODO: more efficient than chop-truncate?
 
   :: Return the portion of the stream between the marker and the cursor,
   :: as an immutable String.

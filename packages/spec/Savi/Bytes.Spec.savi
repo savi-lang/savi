@@ -53,6 +53,12 @@
     assert: data.cpointer.is_not_null
     assert: data.cpointer.usize != orig_pointer_address
 
+  :it "reserves additional space beyond the current size"
+    data = b"0123456789012345678901234567890123456789" // 40 bytes
+    assert: data.clone.reserve(32)           .space == 64
+    assert: data.clone.reserve_additional(32).space == 128
+    assert: data.clone.reserve_additional(24).space == 64
+
   :it "can expand size to expose uninitialized bytes within the space available"
     data = Bytes.new(12)
     assert: data.space == 16
