@@ -23,9 +23,9 @@ module Pegmatite
     end
 
     def _match(source, offset, state) : MatchResult
-      last_delim = state.dynamic_matches.select { |delim|
+      last_delim = state.dynamic_matches.reverse_each.find { |delim|
         delim[0] == @label
-      }.last
+      }
 
       if !last_delim
         return {0, self}
@@ -39,7 +39,7 @@ module Pegmatite
       i = 0
       while i < delim_size
         return {0, self} \
-          if delim_val.unsafe_byte_at(i) != source.unsafe_byte_at(offset + i)
+           if delim_val.to_unsafe[i] != source.to_unsafe[offset + i]
         i += 1
       end
 

@@ -4,7 +4,7 @@ module Pegmatite
   #
   # When the child pattern eventually fails to match, fail overall if the
   # minimum number of occurrences has not yet been met.
-  # Otherwise, succeed overall, consuming all bytes from the occurences that
+  # Otherwise, succeed overall, consuming all bytes from the occurrences that
   # succeeded (not consuming any bytes from the final failing occurrence).
   # Like Pattern::Optional, this pattern will never fail if @min is zero.
   class Pattern::Repeat < Pattern

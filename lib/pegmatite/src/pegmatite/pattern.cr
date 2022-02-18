@@ -43,8 +43,7 @@ abstract class Pegmatite::Pattern
     getter offset : Int32
 
     def initialize(source, fail : {Int32, Pattern})
-      @offset, pattern = fail
-      description = pattern.description
+      @offset, _ = fail
 
       line_start = (source.rindex("\n", [@offset - 1, 0].max) || -1) + 1
       line_finish = (source.index("\n", @offset) || source.size)

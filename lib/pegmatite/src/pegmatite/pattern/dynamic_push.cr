@@ -27,7 +27,7 @@ module Pegmatite
       length, result = @child.match(source, offset, state)
       return {length, result} if !result.is_a?(MatchOK)
 
-      val = source[offset...(offset+length)]
+      val = source[offset...(offset + length)]
 
       state.dynamic_matches.push({@label, val})
 

@@ -8,7 +8,9 @@ module Pegmatite
     end
 
     # Override this DSL operator to accrue into the existing choice.
-    def |(other); Pattern::Choice.new(@children.dup.push(other)) end
+    def |(other)
+      Pattern::Choice.new(@children.dup.push(other))
+    end
 
     def inspect(io)
       io << "("
@@ -29,7 +31,7 @@ module Pegmatite
       when 1 then @children[0].description
       when 2 then "either #{@children.map(&.description).join(" or ")}"
       else        "either #{@children[0...-1].map(&.description).join(", ")}" \
-                  " or #{@children[-1].description}"
+           " or #{@children[-1].description}"
       end
     end
 

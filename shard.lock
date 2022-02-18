@@ -14,5 +14,5 @@ shards:
 
   pegmatite:
     git: https://github.com/jemc/crystal-pegmatite.git
-    version: 0.2.1+git.commit.601363cb2ce9c57ccc70967eb270005950f2f7b0
+    version: 0.2.3+git.commit.59b3afb296e79a0eea1a7d35db1d093cfc03f420
 

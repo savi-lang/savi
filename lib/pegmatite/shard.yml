@@ -1,9 +1,13 @@
 name: pegmatite
-version: 0.2.1
+version: 0.2.3
 
 authors:
   - Joe Eli McIlvain <joe.eli.mac@gmail.com>
 
 crystal: '>= 0.35.1'
+
+development_dependencies:
+  ameba:
+    github: crystal-ameba/ameba
 
 license: MPLv2

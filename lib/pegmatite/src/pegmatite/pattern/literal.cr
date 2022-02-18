@@ -28,7 +28,7 @@ module Pegmatite
       i = 0
       while i < @size
         return {0, self} \
-          if @string.unsafe_byte_at(i) != source.unsafe_byte_at(offset + i)
+           if @string.to_unsafe[i] != source.to_unsafe[offset + i]
         i += 1
       end
 

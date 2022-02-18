@@ -29,7 +29,7 @@ module Pegmatite
 
       last_delim = state.dynamic_matches.last
 
-      val = source[offset...(offset+length)]
+      val = source[offset...(offset + length)]
 
       if last_delim[0] != @label || last_delim[1] != val
         state.observe_fail(offset + length, @child)

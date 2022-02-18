@@ -8,7 +8,9 @@ module Pegmatite
     end
 
     # Override this DSL operator to accrue into the existing sequence.
-    def >>(other); Pattern::Sequence.new(@children.dup.push(other)) end
+    def >>(other)
+      Pattern::Sequence.new(@children.dup.push(other))
+    end
 
     def inspect(io)
       io << "("
@@ -29,7 +31,7 @@ module Pegmatite
       when 1 then @children[0].description
       when 2 then "first #{@children.map(&.description).join(" then ")}"
       else        "first #{@children[0...-1].map(&.description).join(", ")}" \
-                  " then #{@children[-1].description}"
+           " then #{@children[-1].description}"
       end
     end
 
