@@ -11,11 +11,11 @@ module Pegmatite
     pattern : Pattern,
     source : String,
     offset = 0,
-    io : IO? = nil,
+    io : IO? = nil
   ) : Array(Token)
     state = Pattern::MatchState.new
     state.trace = true if io
-    length, result = pattern.match(source, offset, state)
+    _, result = pattern.match(source, offset, state)
 
     # If an IO is passed, print traces of all parsing activity.
     if io

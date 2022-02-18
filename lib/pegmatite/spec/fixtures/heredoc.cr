@@ -10,18 +10,18 @@ Fixtures::HeredocGrammar = Pegmatite::DSL.define do
   digits = digit.repeat(1)
   int =
     (char('-') >> digit19 >> digits) |
-    (char('-') >> digit) |
-    (digit19 >> digits) |
-    digit
+      (char('-') >> digit) |
+      (digit19 >> digits) |
+      digit
   number = int.named(:number)
 
   # Define what a string looks like.
   hex = digit | range('a', 'f') | range('A', 'F')
   string_char =
     str("\\\"") | str("\\\\") | str("\\|") |
-    str("\\b") | str("\\f") | str("\\n") | str("\\r") | str("\\t") |
-    (str("\\u") >> hex >> hex >> hex >> hex) |
-    (~char('"') >> ~char('\\') >> range(' ', 0x10FFFF_u32))
+      str("\\b") | str("\\f") | str("\\n") | str("\\r") | str("\\t") |
+      (str("\\u") >> hex >> hex >> hex >> hex) |
+      (~char('"') >> ~char('\\') >> range(' ', 0x10FFFF_u32))
   string = char('"') >> string_char.repeat.named(:string) >> char('"')
 
   identifier = (
@@ -38,9 +38,9 @@ Fixtures::HeredocGrammar = Pegmatite::DSL.define do
   # Define what constitutes a value.
   value =
     str("null").named(:null) |
-    str("true").named(:true) |
-    str("false").named(:false) |
-    number | heredoc | string
+      str("true").named(:true) |
+      str("false").named(:false) |
+      number | heredoc | string
 
   attribute =
     (identifier >> s >> char('=') >> s >> value >> s >> newline).named(:attribute)

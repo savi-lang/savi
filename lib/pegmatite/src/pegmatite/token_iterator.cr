@@ -7,7 +7,7 @@
 # TokenIterator is aware of this relationship and can be used to easily
 # traverse them, given a little discipline on the part of the caller.
 # In particular, the caller must commit to consuming tokens in a depth-first
-# traversal pattern in order for child relationships to be propery observed.
+# traversal pattern in order for child relationships to be properly observed.
 #
 # See spec/fixtures/json.cr for a real-world example of using TokenIterator.
 class Pegmatite::TokenIterator
@@ -16,19 +16,19 @@ class Pegmatite::TokenIterator
 
   # Return the next token without consuming it.
   # Returns nil if the end of the token stream has been reached.
-  def peek: Token?
+  def peek : Token?
     @tokens[@offset]?
   end
 
   # Consume the next token and return it.
   # Raises IndexError if the end of the token stream has been reached.
-  def next: Token
+  def next : Token
     @tokens[@offset].tap { @offset += 1 }
   end
 
   # Return the next token without consuming it, if it is a child of parent.
   # Returns nil if isn't a child, or if at the end of the token stream.
-  def peek_as_child_of(parent : Token): Token?
+  def peek_as_child_of(parent : Token) : Token?
     child = @tokens[@offset]?
 
     child if child.is_a?(Token) && child[2] <= parent[2]
@@ -36,11 +36,11 @@ class Pegmatite::TokenIterator
 
   # Consume the next token if it is a child of parent and return it.
   # Raises IndexError if isn't a child, or if at the end of the token stream.
-  def next_as_child_of(parent : Token): Token
+  def next_as_child_of(parent : Token) : Token
     child = @tokens[@offset]
 
     raise IndexError.new("#{@offset} is not a child of #{parent}: #{child}") \
-      if child[2] > parent[2]
+       if child[2] > parent[2]
 
     @offset += 1
     child
@@ -51,7 +51,7 @@ class Pegmatite::TokenIterator
     child = peek_as_child_of(parent)
 
     raise IndexError.new("#{@offset} is a child of #{parent}: #{child}") \
-      if child
+       if child
   end
 
   # For each next token that is a child of the given parent, yield it.

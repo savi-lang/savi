@@ -2,7 +2,7 @@ require "json"
 
 Fixtures::JSONGrammar = Pegmatite::DSL.define do
   # Forward-declare `array` and `object` to refer to them before defining them.
-  array  = declare
+  array = declare
   object = declare
 
   # Define what optional whitespace looks like.
@@ -18,9 +18,9 @@ Fixtures::JSONGrammar = Pegmatite::DSL.define do
   digits = digit.repeat(1)
   int =
     (char('-') >> digit19 >> digits) |
-    (char('-') >> digit) |
-    (digit19 >> digits) |
-    digit
+      (char('-') >> digit) |
+      (digit19 >> digits) |
+      digit
   frac = char('.') >> digits
   exp = (char('e') | char('E')) >> (char('+') | char('-')).maybe >> digits
   number = (int >> frac.maybe >> exp.maybe).named(:number)
@@ -29,17 +29,17 @@ Fixtures::JSONGrammar = Pegmatite::DSL.define do
   hex = digit | range('a', 'f') | range('A', 'F')
   string_char =
     str("\\\"") | str("\\\\") | str("\\|") |
-    str("\\b") | str("\\f") | str("\\n") | str("\\r") | str("\\t") |
-    (str("\\u") >> hex >> hex >> hex >> hex) |
-    (~char('"') >> ~char('\\') >> range(' ', 0x10FFFF_u32))
+      str("\\b") | str("\\f") | str("\\n") | str("\\r") | str("\\t") |
+      (str("\\u") >> hex >> hex >> hex >> hex) |
+      (~char('"') >> ~char('\\') >> range(' ', 0x10FFFF_u32))
   string = char('"') >> string_char.repeat.named(:string) >> char('"')
 
   # Define what constitutes a value.
   value =
     str("null").named(:null) |
-    str("true").named(:true) |
-    str("false").named(:false) |
-    number | string | array | object
+      str("true").named(:true) |
+      str("false").named(:false) |
+      number | string | array | object
 
   # Define what an array is, in terms of zero or more values.
   values = value ^ (char(',') ^ value).repeat
@@ -68,14 +68,14 @@ module Fixtures::JSONBuilder
     # Build the value from the given main token and possibly further recursion.
     value =
       case kind
-      when :null then JSON::Any.new(nil)
-      when :true then JSON::Any.new(true)
-      when :false then JSON::Any.new(false)
-      when :string then JSON::Any.new(source[start...finish])
-      when :number then JSON::Any.new(source[start...finish].to_i64)
-      when :array then build_array(main, iter, source)
+      when :null   then JSON::Any.new(nil)
+      when :true   then JSON::Any.new(true)
+      when :false  then JSON::Any.new(false)
+      when :string then JSON::Any.new(source.byte_slice(start, finish - start))
+      when :number then JSON::Any.new(source.byte_slice(start, finish - start).to_i64)
+      when :array  then build_array(main, iter, source)
       when :object then build_object(main, iter, source)
-      else raise NotImplementedError.new(kind)
+      else              raise NotImplementedError.new(kind)
       end
 
     # Assert that we have consumed all child tokens.

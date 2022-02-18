@@ -14,12 +14,13 @@ module Pegmatite
     #
     # TODO: Use Crystal's Char::Reader abstraction for Pegmatite,
     # which would potentially obviate the need for this logic to be here.
+    # ameba:disable Metrics/CyclomaticComplexity
     def self.utf8_at(source, offset) : {UInt32, Int32, Bool}
       err = {0xFFFD_u32, 1, false}
 
       # Get the first byte in the character.
       return err if source.bytesize <= offset
-      c = source.unsafe_byte_at(offset).to_u32
+      c = source.to_unsafe[offset].to_u32
 
       if c < 0x80_u32
         # This is a one-byte character.
@@ -30,7 +31,7 @@ module Pegmatite
       elsif c < 0xE0_u32
         # This is a two-byte character.
         return err if source.bytesize <= offset + 1
-        c2 = source.unsafe_byte_at(offset + 1).to_u32
+        c2 = source.to_unsafe[offset + 1].to_u32
 
         # Make sure the next byte is a continuation byte.
         return err if (c2 & 0xC0_u32) != 0x80_u32
@@ -40,8 +41,8 @@ module Pegmatite
       elsif c < 0xF0_u32
         # This is a three-byte character.
         return err if source.bytesize <= offset + 2
-        c2 = source.unsafe_byte_at(offset + 1).to_u32
-        c3 = source.unsafe_byte_at(offset + 2).to_u32
+        c2 = source.to_unsafe[offset + 1].to_u32
+        c3 = source.to_unsafe[offset + 2].to_u32
 
         # Make sure the next bytes are continuation bytes.
         return err if (c2 & 0xC0_u32) != 0x80_u32
@@ -55,9 +56,9 @@ module Pegmatite
       elsif c < 0xF5_u32
         # This is a four-byte character.
         return err if source.bytesize <= offset + 3
-        c2 = source.unsafe_byte_at(offset + 1).to_u32
-        c3 = source.unsafe_byte_at(offset + 2).to_u32
-        c4 = source.unsafe_byte_at(offset + 3).to_u32
+        c2 = source.to_unsafe[offset + 1].to_u32
+        c3 = source.to_unsafe[offset + 2].to_u32
+        c4 = source.to_unsafe[offset + 3].to_u32
 
         # Make sure the next bytes are continuation bytes.
         return err if (c2 & 0xC0_u32) != 0x80_u32
@@ -71,7 +72,7 @@ module Pegmatite
         return err if (c == 0xF4_u32) && (c2 >= 0x90_u32)
 
         # Return the four-byte character.
-        {((c2 << 18) + (c2 << 12) + (c3 << 6) + c4) - 0x3C82080_u32, 4, true}
+        {((c << 18) + (c2 << 12) + (c3 << 6) + c4) - 0x3C82080_u32, 4, true}
       else
         # The result would not be <= 0x10FFFF.
         err
@@ -91,7 +92,7 @@ module Pegmatite
     end
 
     def _match(source, offset, state) : MatchResult
-      c, length, is_valid = Pattern::UnicodeAny.utf8_at(source, offset)
+      _, length, is_valid = Pattern::UnicodeAny.utf8_at(source, offset)
 
       # Fail if a valid UTF-8 character couldn't be parsed.
       return {0, self} if !is_valid
