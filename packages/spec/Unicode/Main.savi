@@ -1,0 +1,5 @@
+:actor Main
+  :new (env)
+    Spec.Process.run(env, [
+      Spec.Run(Unicode.Spec).new(env)
+    ])

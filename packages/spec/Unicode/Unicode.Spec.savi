@@ -1,0 +1,826 @@
+:class Unicode.Spec
+  :is Spec
+  :const describes: "Unicode"
+
+  :it "converts a codepoint to lowercase or uppercase if possible"
+    // Note: the following two websites are useful when working on these tests:
+    // Search by pasted character: https://www.compart.com/en/unicode
+    // View codepoints as a table: https://unicode-table.com/en/
+
+    // 0x00...0x80 : ASCII / Basic Latin
+    assert error: Unicode.codepoint_to_lowercase!('@')
+    assert error: Unicode.codepoint_to_uppercase!('@')
+    assert:       Unicode.codepoint_to_lowercase!('A') == 'a'
+    assert error: Unicode.codepoint_to_uppercase!('A')
+    assert:       Unicode.codepoint_to_lowercase!('Z') == 'z'
+    assert error: Unicode.codepoint_to_uppercase!('Z')
+    assert error: Unicode.codepoint_to_lowercase!('[')
+    assert error: Unicode.codepoint_to_uppercase!('[')
+    assert error: Unicode.codepoint_to_lowercase!('`')
+    assert error: Unicode.codepoint_to_uppercase!('`')
+    assert error: Unicode.codepoint_to_lowercase!('a')
+    assert:       Unicode.codepoint_to_uppercase!('a') == 'A'
+    assert error: Unicode.codepoint_to_lowercase!('z')
+    assert:       Unicode.codepoint_to_uppercase!('z') == 'Z'
+    assert error: Unicode.codepoint_to_lowercase!('{')
+    assert error: Unicode.codepoint_to_uppercase!('{')
+
+    // 0x00xx : Latin-1 Supplement
+    assert error: Unicode.codepoint_to_lowercase!('¿')
+    assert error: Unicode.codepoint_to_uppercase!('¿')
+    assert:       Unicode.codepoint_to_lowercase!('À') == 'à'
+    assert error: Unicode.codepoint_to_uppercase!('À')
+    assert:       Unicode.codepoint_to_lowercase!('Ö') == 'ö'
+    assert error: Unicode.codepoint_to_uppercase!('Ö')
+    assert error: Unicode.codepoint_to_lowercase!('×')
+    assert error: Unicode.codepoint_to_uppercase!('×')
+    assert:       Unicode.codepoint_to_lowercase!('Ø') == 'ø'
+    assert error: Unicode.codepoint_to_uppercase!('Ø')
+    assert:       Unicode.codepoint_to_lowercase!('Þ') == 'þ'
+    assert error: Unicode.codepoint_to_uppercase!('Þ')
+    assert error: Unicode.codepoint_to_lowercase!('ß')
+    assert error: Unicode.codepoint_to_uppercase!('ß')
+    assert error: Unicode.codepoint_to_lowercase!('à')
+    assert:       Unicode.codepoint_to_uppercase!('à') == 'À'
+    assert error: Unicode.codepoint_to_lowercase!('ö')
+    assert:       Unicode.codepoint_to_uppercase!('ö') == 'Ö'
+    assert error: Unicode.codepoint_to_lowercase!('÷')
+    assert error: Unicode.codepoint_to_uppercase!('÷')
+    assert error: Unicode.codepoint_to_lowercase!('ø')
+    assert:       Unicode.codepoint_to_uppercase!('ø') == 'Ø'
+    assert error: Unicode.codepoint_to_lowercase!('þ')
+    assert:       Unicode.codepoint_to_uppercase!('þ') == 'Þ'
+    assert error: Unicode.codepoint_to_lowercase!('ÿ')
+    assert:       Unicode.codepoint_to_uppercase!('ÿ') == 'Ÿ'
+
+    // 0x01xx : Latin Extended-A and (part of) Extended-B
+    // 0x02xx : (part of) Latin Extended-B
+    assert:       Unicode.codepoint_to_lowercase!('Ā') == 'ā'
+    assert:       Unicode.codepoint_to_uppercase!('ā') == 'Ā'
+    assert:       Unicode.codepoint_to_lowercase!('Į') == 'į'
+    assert:       Unicode.codepoint_to_uppercase!('į') == 'Į'
+    assert error: Unicode.codepoint_to_lowercase!('İ')
+    assert error: Unicode.codepoint_to_uppercase!('İ')
+    assert:       Unicode.codepoint_to_uppercase!('ı') == 'I' // uses ASCII 'I' uppercase
+    assert:       Unicode.codepoint_to_lowercase!('Ĳ') == 'ĳ'
+    assert:       Unicode.codepoint_to_uppercase!('ĳ') == 'Ĳ'
+    assert:       Unicode.codepoint_to_lowercase!('Ķ') == 'ķ'
+    assert:       Unicode.codepoint_to_uppercase!('ķ') == 'Ķ'
+    assert error: Unicode.codepoint_to_lowercase!('ĸ')
+    assert error: Unicode.codepoint_to_uppercase!('ĸ')
+    assert:       Unicode.codepoint_to_lowercase!('Ĺ') == 'ĺ'
+    assert:       Unicode.codepoint_to_uppercase!('ĺ') == 'Ĺ'
+    assert:       Unicode.codepoint_to_lowercase!('Ň') == 'ň'
+    assert:       Unicode.codepoint_to_uppercase!('ň') == 'Ň'
+    assert error: Unicode.codepoint_to_lowercase!('ŉ')
+    assert error: Unicode.codepoint_to_uppercase!('ŉ')
+    assert:       Unicode.codepoint_to_lowercase!('Ŋ') == 'ŋ'
+    assert:       Unicode.codepoint_to_uppercase!('ŋ') == 'Ŋ'
+    assert:       Unicode.codepoint_to_lowercase!('Ŷ') == 'ŷ'
+    assert:       Unicode.codepoint_to_uppercase!('ŷ') == 'Ŷ'
+    assert:       Unicode.codepoint_to_lowercase!('Ÿ') == 'ÿ'
+    assert:       Unicode.codepoint_to_uppercase!('ÿ') == 'Ÿ'
+    assert:       Unicode.codepoint_to_lowercase!('Ź') == 'ź'
+    assert:       Unicode.codepoint_to_uppercase!('ź') == 'Ź'
+    assert:       Unicode.codepoint_to_lowercase!('Ž') == 'ž'
+    assert:       Unicode.codepoint_to_uppercase!('ž') == 'Ž'
+    assert error: Unicode.codepoint_to_lowercase!('ſ')
+    assert error: Unicode.codepoint_to_uppercase!('ſ')
+    assert:       Unicode.codepoint_to_lowercase!('Ɓ') == 'ɓ'
+    assert:       Unicode.codepoint_to_uppercase!('ɓ') == 'Ɓ'
+    assert:       Unicode.codepoint_to_lowercase!('Ƃ') == 'ƃ'
+    assert:       Unicode.codepoint_to_uppercase!('ƃ') == 'Ƃ'
+    assert:       Unicode.codepoint_to_lowercase!('Ɔ') == 'ɔ'
+    assert:       Unicode.codepoint_to_uppercase!('ɔ') == 'Ɔ'
+    assert:       Unicode.codepoint_to_lowercase!('Ƈ') == 'ƈ'
+    assert:       Unicode.codepoint_to_uppercase!('ƈ') == 'Ƈ'
+    assert error: Unicode.codepoint_to_lowercase!('Ɖ')
+    assert error: Unicode.codepoint_to_uppercase!('Ɖ')
+    assert:       Unicode.codepoint_to_lowercase!('Ɗ') == 'ɗ'
+    assert:       Unicode.codepoint_to_uppercase!('ɗ') == 'Ɗ'
+    assert:       Unicode.codepoint_to_lowercase!('Ƌ') == 'ƌ'
+    assert:       Unicode.codepoint_to_uppercase!('ƌ') == 'Ƌ'
+    assert error: Unicode.codepoint_to_lowercase!('ƍ')
+    assert error: Unicode.codepoint_to_uppercase!('ƍ')
+    assert:       Unicode.codepoint_to_lowercase!('Ǝ') == 'ɘ'
+    assert:       Unicode.codepoint_to_uppercase!('ɘ') == 'Ǝ'
+    assert:       Unicode.codepoint_to_lowercase!('Ə') == 'ə'
+    assert:       Unicode.codepoint_to_uppercase!('ə') == 'Ə'
+    assert:       Unicode.codepoint_to_lowercase!('Ɛ') == 'ɛ'
+    assert:       Unicode.codepoint_to_uppercase!('ɛ') == 'Ɛ'
+    assert:       Unicode.codepoint_to_lowercase!('Ƒ') == 'ƒ'
+    assert:       Unicode.codepoint_to_uppercase!('ƒ') == 'Ƒ'
+    assert:       Unicode.codepoint_to_lowercase!('Ɠ') == 'ɠ'
+    assert:       Unicode.codepoint_to_uppercase!('ɠ') == 'Ɠ'
+    assert:       Unicode.codepoint_to_lowercase!('Ɣ') == 'ɣ'
+    assert:       Unicode.codepoint_to_uppercase!('ɣ') == 'Ɣ'
+    assert:       Unicode.codepoint_to_lowercase!('Ɩ') == 'ɩ'
+    assert:       Unicode.codepoint_to_uppercase!('ɩ') == 'Ɩ'
+    assert:       Unicode.codepoint_to_lowercase!('Ɨ') == 'ɨ'
+    assert:       Unicode.codepoint_to_uppercase!('ɨ') == 'Ɨ'
+    assert:       Unicode.codepoint_to_lowercase!('Ƙ') == 'ƙ'
+    assert:       Unicode.codepoint_to_uppercase!('ƙ') == 'Ƙ'
+    assert error: Unicode.codepoint_to_uppercase!('ƛ')
+    assert error: Unicode.codepoint_to_lowercase!('ƛ')
+    assert:       Unicode.codepoint_to_lowercase!('Ɯ') == 'ɯ'
+    assert:       Unicode.codepoint_to_uppercase!('ɯ') == 'Ɯ'
+    assert:       Unicode.codepoint_to_lowercase!('Ɲ') == 'ɲ'
+    assert:       Unicode.codepoint_to_uppercase!('ɲ') == 'Ɲ'
+    assert:       Unicode.codepoint_to_lowercase!('Ƞ') == 'ƞ'
+    assert:       Unicode.codepoint_to_uppercase!('ƞ') == 'Ƞ'
+    assert:       Unicode.codepoint_to_lowercase!('Ɵ') == 'ɵ'
+    assert:       Unicode.codepoint_to_uppercase!('ɵ') == 'Ɵ'
+    assert:       Unicode.codepoint_to_lowercase!('Ơ') == 'ơ'
+    assert:       Unicode.codepoint_to_uppercase!('ơ') == 'Ơ'
+    assert:       Unicode.codepoint_to_lowercase!('Ƥ') == 'ƥ'
+    assert:       Unicode.codepoint_to_uppercase!('ƥ') == 'Ƥ'
+    assert:       Unicode.codepoint_to_lowercase!('Ʀ') == 'ʀ'
+    assert:       Unicode.codepoint_to_uppercase!('ʀ') == 'Ʀ'
+    assert:       Unicode.codepoint_to_lowercase!('Ƨ') == 'ƨ'
+    assert:       Unicode.codepoint_to_uppercase!('ƨ') == 'Ƨ'
+    assert:       Unicode.codepoint_to_lowercase!('Ʃ') == 'ʃ'
+    assert:       Unicode.codepoint_to_uppercase!('ʃ') == 'Ʃ'
+    assert error: Unicode.codepoint_to_uppercase!('ƪ')
+    assert error: Unicode.codepoint_to_lowercase!('ƪ')
+    assert error: Unicode.codepoint_to_uppercase!('ƫ')
+    assert error: Unicode.codepoint_to_lowercase!('ƫ')
+    assert:       Unicode.codepoint_to_lowercase!('Ƭ') == 'ƭ'
+    assert:       Unicode.codepoint_to_uppercase!('ƭ') == 'Ƭ'
+    assert:       Unicode.codepoint_to_lowercase!('Ʈ') == 'ʈ'
+    assert:       Unicode.codepoint_to_uppercase!('ʈ') == 'Ʈ'
+    assert:       Unicode.codepoint_to_lowercase!('Ư') == 'ư'
+    assert:       Unicode.codepoint_to_uppercase!('ư') == 'Ư'
+    assert:       Unicode.codepoint_to_lowercase!('Ʊ') == 'ʊ'
+    assert:       Unicode.codepoint_to_uppercase!('ʊ') == 'Ʊ'
+    assert:       Unicode.codepoint_to_lowercase!('Ʋ') == 'ʋ'
+    assert:       Unicode.codepoint_to_uppercase!('ʋ') == 'Ʋ'
+    assert:       Unicode.codepoint_to_lowercase!('Ƴ') == 'ƴ'
+    assert:       Unicode.codepoint_to_uppercase!('ƴ') == 'Ƴ'
+    assert:       Unicode.codepoint_to_lowercase!('Ƶ') == 'ƶ'
+    assert:       Unicode.codepoint_to_uppercase!('ƶ') == 'Ƶ'
+    assert:       Unicode.codepoint_to_lowercase!('Ʒ') == 'ʒ'
+    assert:       Unicode.codepoint_to_uppercase!('ʒ') == 'Ʒ'
+    assert:       Unicode.codepoint_to_lowercase!('Ƹ') == 'ƹ'
+    assert:       Unicode.codepoint_to_uppercase!('ƹ') == 'Ƹ'
+    assert error: Unicode.codepoint_to_uppercase!('ƺ')
+    assert error: Unicode.codepoint_to_lowercase!('ƺ')
+    assert error: Unicode.codepoint_to_uppercase!('ƻ')
+    assert error: Unicode.codepoint_to_lowercase!('ƻ')
+    assert:       Unicode.codepoint_to_lowercase!('Ƽ') == 'ƽ'
+    assert:       Unicode.codepoint_to_uppercase!('ƽ') == 'Ƽ'
+    assert error: Unicode.codepoint_to_uppercase!('ƾ')
+    assert error: Unicode.codepoint_to_lowercase!('ƾ')
+    assert:       Unicode.codepoint_to_lowercase!('Ƿ') == 'ƿ'
+    assert:       Unicode.codepoint_to_uppercase!('ƿ') == 'Ƿ'
+    assert error: Unicode.codepoint_to_uppercase!('ǀ')
+    assert error: Unicode.codepoint_to_lowercase!('ǀ')
+    assert error: Unicode.codepoint_to_uppercase!('ǃ')
+    assert error: Unicode.codepoint_to_lowercase!('ǃ')
+    assert:       Unicode.codepoint_to_lowercase!('Ǆ') == 'ǆ'
+    assert:       Unicode.codepoint_to_uppercase!('ǆ') == 'Ǆ'
+    assert error: Unicode.codepoint_to_uppercase!('ǅ')
+    assert error: Unicode.codepoint_to_lowercase!('ǅ')
+    assert:       Unicode.codepoint_to_lowercase!('Ǉ') == 'ǉ'
+    assert:       Unicode.codepoint_to_uppercase!('ǉ') == 'Ǉ'
+    assert error: Unicode.codepoint_to_uppercase!('ǈ')
+    assert error: Unicode.codepoint_to_lowercase!('ǈ')
+    assert:       Unicode.codepoint_to_lowercase!('Ǌ') == 'ǌ'
+    assert:       Unicode.codepoint_to_uppercase!('ǌ') == 'Ǌ'
+    assert error: Unicode.codepoint_to_uppercase!('ǋ')
+    assert error: Unicode.codepoint_to_lowercase!('ǋ')
+    assert:       Unicode.codepoint_to_lowercase!('Ǎ') == 'ǎ'
+    assert:       Unicode.codepoint_to_uppercase!('ǎ') == 'Ǎ'
+    assert:       Unicode.codepoint_to_lowercase!('Ǜ') == 'ǜ'
+    assert:       Unicode.codepoint_to_uppercase!('ǜ') == 'Ǜ'
+    assert error: Unicode.codepoint_to_uppercase!('ǝ')
+    assert error: Unicode.codepoint_to_lowercase!('ǝ')
+    assert:       Unicode.codepoint_to_lowercase!('Ǟ') == 'ǟ'
+    assert:       Unicode.codepoint_to_uppercase!('ǟ') == 'Ǟ'
+    assert:       Unicode.codepoint_to_lowercase!('Ǯ') == 'ǯ'
+    assert:       Unicode.codepoint_to_uppercase!('ǯ') == 'Ǯ'
+    assert error: Unicode.codepoint_to_uppercase!('ǰ')
+    assert error: Unicode.codepoint_to_lowercase!('ǰ')
+    assert:       Unicode.codepoint_to_lowercase!('Ǳ') == 'ǳ'
+    assert:       Unicode.codepoint_to_uppercase!('ǳ') == 'Ǳ'
+    assert error: Unicode.codepoint_to_uppercase!('ǲ')
+    assert error: Unicode.codepoint_to_lowercase!('ǲ')
+    assert:       Unicode.codepoint_to_lowercase!('Ǵ') == 'ǵ'
+    assert:       Unicode.codepoint_to_uppercase!('ǵ') == 'Ǵ'
+    assert:       Unicode.codepoint_to_lowercase!('Ƕ') == 'ƕ'
+    assert:       Unicode.codepoint_to_uppercase!('ƕ') == 'Ƕ'
+    assert:       Unicode.codepoint_to_lowercase!('Ǹ') == 'ǹ'
+    assert:       Unicode.codepoint_to_uppercase!('ǹ') == 'Ǹ'
+    assert:       Unicode.codepoint_to_lowercase!('Ȗ') == 'ȗ'
+    assert:       Unicode.codepoint_to_uppercase!('ȗ') == 'Ȗ'
+    assert:       Unicode.codepoint_to_lowercase!('Ș') == 'ș'
+    assert:       Unicode.codepoint_to_uppercase!('ș') == 'Ș'
+    assert:       Unicode.codepoint_to_lowercase!('Ȟ') == 'ȟ'
+    assert:       Unicode.codepoint_to_uppercase!('ȟ') == 'Ȟ'
+    assert error: Unicode.codepoint_to_uppercase!('ȡ')
+    assert error: Unicode.codepoint_to_lowercase!('ȡ')
+    assert:       Unicode.codepoint_to_lowercase!('Ȣ') == 'ȣ'
+    assert:       Unicode.codepoint_to_uppercase!('ȣ') == 'Ȣ'
+    assert:       Unicode.codepoint_to_lowercase!('Ȯ') == 'ȯ'
+    assert:       Unicode.codepoint_to_uppercase!('ȯ') == 'Ȯ'
+    assert:       Unicode.codepoint_to_lowercase!('Ȳ') == 'ȳ'
+    assert:       Unicode.codepoint_to_uppercase!('ȳ') == 'Ȳ'
+    assert error: Unicode.codepoint_to_uppercase!('ȴ')
+    assert error: Unicode.codepoint_to_lowercase!('ȴ')
+    assert error: Unicode.codepoint_to_uppercase!('ȹ')
+    assert error: Unicode.codepoint_to_lowercase!('ȹ')
+    assert:       Unicode.codepoint_to_lowercase!('Ⱥ') == 'ⱥ'
+    assert:       Unicode.codepoint_to_uppercase!('ⱥ') == 'Ⱥ'
+    assert:       Unicode.codepoint_to_lowercase!('Ȼ') == 'ȼ'
+    assert:       Unicode.codepoint_to_uppercase!('ȼ') == 'Ȼ'
+    assert:       Unicode.codepoint_to_lowercase!('Ƚ') == 'ƚ'
+    assert:       Unicode.codepoint_to_uppercase!('ƚ') == 'Ƚ'
+    assert:       Unicode.codepoint_to_lowercase!('Ⱦ') == 'ⱦ'
+    assert:       Unicode.codepoint_to_uppercase!('ⱦ') == 'Ⱦ'
+    assert:       Unicode.codepoint_to_lowercase!('Ȿ') == 'ȿ'
+    assert:       Unicode.codepoint_to_uppercase!('ȿ') == 'Ȿ'
+    assert:       Unicode.codepoint_to_lowercase!('Ɀ') == 'ɀ'
+    assert:       Unicode.codepoint_to_uppercase!('ɀ') == 'Ɀ'
+    assert:       Unicode.codepoint_to_lowercase!('Ɂ') == 'ɂ'
+    assert:       Unicode.codepoint_to_uppercase!('ɂ') == 'Ɂ'
+    assert:       Unicode.codepoint_to_lowercase!('Ƀ') == 'ƀ'
+    assert:       Unicode.codepoint_to_uppercase!('ƀ') == 'Ƀ'
+    assert:       Unicode.codepoint_to_lowercase!('Ʉ') == 'ʉ'
+    assert:       Unicode.codepoint_to_uppercase!('ʉ') == 'Ʉ'
+    assert:       Unicode.codepoint_to_lowercase!('Ʌ') == 'ʌ'
+    assert:       Unicode.codepoint_to_uppercase!('ʌ') == 'Ʌ'
+    assert:       Unicode.codepoint_to_lowercase!('Ɇ') == 'ɇ'
+    assert:       Unicode.codepoint_to_uppercase!('ɇ') == 'Ɇ'
+    assert:       Unicode.codepoint_to_lowercase!('Ɏ') == 'ɏ'
+    assert:       Unicode.codepoint_to_uppercase!('ɏ') == 'Ɏ'
+    assert:       Unicode.codepoint_to_lowercase!('Ɐ') == 'ɐ'
+    assert:       Unicode.codepoint_to_uppercase!('ɐ') == 'Ɐ'
+    assert:       Unicode.codepoint_to_lowercase!('Ɑ') == 'ɑ'
+    assert:       Unicode.codepoint_to_uppercase!('ɑ') == 'Ɑ'
+    assert:       Unicode.codepoint_to_lowercase!('Ɒ') == 'ɒ'
+    assert:       Unicode.codepoint_to_uppercase!('ɒ') == 'Ɒ'
+    assert error: Unicode.codepoint_to_lowercase!('ɕ')
+    assert error: Unicode.codepoint_to_uppercase!('ɕ')
+    assert:       Unicode.codepoint_to_lowercase!('Ɜ') == 'ɜ'
+    assert:       Unicode.codepoint_to_uppercase!('ɜ') == 'Ɜ'
+    assert:       Unicode.codepoint_to_lowercase!('Ɡ') == 'ɡ'
+    assert:       Unicode.codepoint_to_uppercase!('ɡ') == 'Ɡ'
+    assert:       Unicode.codepoint_to_lowercase!('Ɥ') == 'ɥ'
+    assert:       Unicode.codepoint_to_uppercase!('ɥ') == 'Ɥ'
+    assert:       Unicode.codepoint_to_lowercase!('Ɦ') == 'ɦ'
+    assert:       Unicode.codepoint_to_uppercase!('ɦ') == 'Ɦ'
+    assert:       Unicode.codepoint_to_lowercase!('Ɪ') == 'ɪ'
+    assert:       Unicode.codepoint_to_uppercase!('ɪ') == 'Ɪ'
+    assert:       Unicode.codepoint_to_lowercase!('Ɫ') == 'ɫ'
+    assert:       Unicode.codepoint_to_uppercase!('ɫ') == 'Ɫ'
+    assert:       Unicode.codepoint_to_lowercase!('Ɬ') == 'ɬ'
+    assert:       Unicode.codepoint_to_uppercase!('ɬ') == 'Ɬ'
+    assert:       Unicode.codepoint_to_lowercase!('Ɱ') == 'ɱ'
+    assert:       Unicode.codepoint_to_uppercase!('ɱ') == 'Ɱ'
+    assert:       Unicode.codepoint_to_lowercase!('Ɽ') == 'ɽ'
+    assert:       Unicode.codepoint_to_uppercase!('ɽ') == 'Ɽ'
+    assert error: Unicode.codepoint_to_lowercase!('ʁ')
+    assert error: Unicode.codepoint_to_uppercase!('ʁ')
+    assert:       Unicode.codepoint_to_lowercase!('Ʂ') == 'ʂ'
+    assert:       Unicode.codepoint_to_uppercase!('ʂ') == 'Ʂ'
+    assert error: Unicode.codepoint_to_lowercase!('ʄ')
+    assert error: Unicode.codepoint_to_uppercase!('ʄ')
+    assert error: Unicode.codepoint_to_lowercase!('ʅ')
+    assert error: Unicode.codepoint_to_uppercase!('ʅ')
+    assert error: Unicode.codepoint_to_lowercase!('ʆ')
+    assert error: Unicode.codepoint_to_uppercase!('ʆ')
+    assert:       Unicode.codepoint_to_lowercase!('Ʇ') == 'ʇ'
+    assert:       Unicode.codepoint_to_uppercase!('ʇ') == 'Ʇ'
+    assert error: Unicode.codepoint_to_lowercase!('ʍ')
+    assert error: Unicode.codepoint_to_uppercase!('ʍ')
+    assert error: Unicode.codepoint_to_lowercase!('ʎ')
+    assert error: Unicode.codepoint_to_uppercase!('ʎ')
+    assert error: Unicode.codepoint_to_lowercase!('ʏ')
+    assert error: Unicode.codepoint_to_uppercase!('ʏ')
+    assert error: Unicode.codepoint_to_lowercase!('ʐ')
+    assert error: Unicode.codepoint_to_uppercase!('ʐ')
+    assert error: Unicode.codepoint_to_lowercase!('ʑ')
+    assert error: Unicode.codepoint_to_uppercase!('ʑ')
+    assert error: Unicode.codepoint_to_lowercase!('ʓ')
+    assert error: Unicode.codepoint_to_uppercase!('ʓ')
+    assert error: Unicode.codepoint_to_lowercase!('ʔ')
+    assert error: Unicode.codepoint_to_uppercase!('ʔ')
+    assert error: Unicode.codepoint_to_lowercase!('ʕ')
+    assert error: Unicode.codepoint_to_uppercase!('ʕ')
+    assert error: Unicode.codepoint_to_lowercase!('ʖ')
+    assert error: Unicode.codepoint_to_uppercase!('ʖ')
+    assert error: Unicode.codepoint_to_lowercase!('ʗ')
+    assert error: Unicode.codepoint_to_uppercase!('ʗ')
+    assert error: Unicode.codepoint_to_lowercase!('ʘ')
+    assert error: Unicode.codepoint_to_uppercase!('ʘ')
+    assert error: Unicode.codepoint_to_lowercase!('ʙ')
+    assert error: Unicode.codepoint_to_uppercase!('ʙ')
+    assert error: Unicode.codepoint_to_lowercase!('ʚ')
+    assert error: Unicode.codepoint_to_uppercase!('ʚ')
+    assert error: Unicode.codepoint_to_lowercase!('ʜ')
+    assert error: Unicode.codepoint_to_uppercase!('ʜ')
+    assert:       Unicode.codepoint_to_lowercase!('Ʝ') == 'ʝ'
+    assert:       Unicode.codepoint_to_uppercase!('ʝ') == 'Ʝ'
+    assert:       Unicode.codepoint_to_lowercase!('Ʞ') == 'ʞ'
+    assert:       Unicode.codepoint_to_uppercase!('ʞ') == 'Ʞ'
+    assert error: Unicode.codepoint_to_lowercase!('ʟ')
+    assert error: Unicode.codepoint_to_uppercase!('ʟ')
+    assert error: Unicode.codepoint_to_lowercase!('ʠ')
+    assert error: Unicode.codepoint_to_uppercase!('ʠ')
+    assert error: Unicode.codepoint_to_lowercase!('ʯ')
+    assert error: Unicode.codepoint_to_uppercase!('ʯ')
+
+    // 0x03xx : Greek and Coptic
+    assert:       Unicode.codepoint_to_lowercase!('Ͱ') == 'ͱ'
+    assert:       Unicode.codepoint_to_uppercase!('ͱ') == 'Ͱ'
+    assert:       Unicode.codepoint_to_lowercase!('Ͳ') == 'ͳ'
+    assert:       Unicode.codepoint_to_uppercase!('ͳ') == 'Ͳ'
+    assert error: Unicode.codepoint_to_lowercase!('ʹ')
+    assert error: Unicode.codepoint_to_uppercase!('ʹ')
+    assert error: Unicode.codepoint_to_lowercase!('͵')
+    assert error: Unicode.codepoint_to_uppercase!('͵')
+    assert:       Unicode.codepoint_to_lowercase!('Ͷ') == 'ͷ'
+    assert:       Unicode.codepoint_to_uppercase!('ͷ') == 'Ͷ'
+    assert error: Unicode.codepoint_to_lowercase!('ͺ')
+    assert error: Unicode.codepoint_to_uppercase!('ͺ')
+    assert:       Unicode.codepoint_to_lowercase!('Ͻ') == 'ͻ'
+    assert:       Unicode.codepoint_to_uppercase!('ͻ') == 'Ͻ'
+    assert:       Unicode.codepoint_to_lowercase!('Ͼ') == 'ͼ'
+    assert:       Unicode.codepoint_to_uppercase!('ͼ') == 'Ͼ'
+    assert:       Unicode.codepoint_to_lowercase!('Ͽ') == 'ͽ'
+    assert:       Unicode.codepoint_to_uppercase!('ͽ') == 'Ͽ'
+    assert:       Unicode.codepoint_to_lowercase!('Ά') == 'ά'
+    assert:       Unicode.codepoint_to_uppercase!('ά') == 'Ά'
+    assert error: Unicode.codepoint_to_lowercase!('·')
+    assert error: Unicode.codepoint_to_uppercase!('·')
+    assert:       Unicode.codepoint_to_lowercase!('Έ') == 'έ'
+    assert:       Unicode.codepoint_to_uppercase!('έ') == 'Έ'
+    assert:       Unicode.codepoint_to_lowercase!('Ή') == 'ή'
+    assert:       Unicode.codepoint_to_uppercase!('ή') == 'Ή'
+    assert:       Unicode.codepoint_to_lowercase!('Ί') == 'ί'
+    assert:       Unicode.codepoint_to_uppercase!('ί') == 'Ί'
+    assert:       Unicode.codepoint_to_lowercase!('Ό') == 'ό'
+    assert:       Unicode.codepoint_to_uppercase!('ό') == 'Ό'
+    assert:       Unicode.codepoint_to_lowercase!('Ύ') == 'ύ'
+    assert:       Unicode.codepoint_to_uppercase!('ύ') == 'Ύ'
+    assert:       Unicode.codepoint_to_lowercase!('Ώ') == 'ώ'
+    assert:       Unicode.codepoint_to_uppercase!('ώ') == 'Ώ'
+    assert:       Unicode.codepoint_to_uppercase!('ΐ') == 'Ι' // uses main Iota uppercase
+    assert:       Unicode.codepoint_to_lowercase!('Α') == 'α'
+    assert:       Unicode.codepoint_to_uppercase!('α') == 'Α'
+    assert:       Unicode.codepoint_to_uppercase!('ς') == 'Σ' // uses main Sigma uppercase
+    assert:       Unicode.codepoint_to_lowercase!('Ω') == 'ω'
+    assert:       Unicode.codepoint_to_uppercase!('ω') == 'Ω'
+    assert:       Unicode.codepoint_to_lowercase!('Ϋ') == 'ϋ'
+    assert:       Unicode.codepoint_to_uppercase!('ϋ') == 'Ϋ'
+    assert:       Unicode.codepoint_to_uppercase!('ΰ') == 'Υ' // uses main Upsilon uppercase
+    assert:       Unicode.codepoint_to_lowercase!('Ϗ') == 'ϗ'
+    assert:       Unicode.codepoint_to_uppercase!('ϗ') == 'Ϗ'
+    assert:       Unicode.codepoint_to_uppercase!('ϐ') == 'Β' // uses main Beta uppercase
+    assert:       Unicode.codepoint_to_uppercase!('ϑ') == 'Θ' // uses main Theta uppercase
+    assert:       Unicode.codepoint_to_uppercase!('ϕ') == 'Φ' // uses main Phi uppercase
+    assert:       Unicode.codepoint_to_lowercase!('Ϙ') == 'ϙ'
+    assert:       Unicode.codepoint_to_uppercase!('ϙ') == 'Ϙ'
+    assert:       Unicode.codepoint_to_lowercase!('Ϡ') == 'ϡ'
+    assert:       Unicode.codepoint_to_uppercase!('ϡ') == 'Ϡ'
+    assert:       Unicode.codepoint_to_lowercase!('Ϣ') == 'ϣ'
+    assert:       Unicode.codepoint_to_uppercase!('ϣ') == 'Ϣ'
+    assert:       Unicode.codepoint_to_lowercase!('Ϯ') == 'ϯ'
+    assert:       Unicode.codepoint_to_uppercase!('ϯ') == 'Ϯ'
+    assert:       Unicode.codepoint_to_uppercase!('ϰ') == 'Κ' // uses main Kappa uppercase
+    assert:       Unicode.codepoint_to_uppercase!('ϱ') == 'Ρ' // uses main Rho uppercase
+    assert:       Unicode.codepoint_to_lowercase!('Ϲ') == 'ϲ'
+    assert:       Unicode.codepoint_to_uppercase!('ϲ') == 'Ϲ'
+    assert:       Unicode.codepoint_to_uppercase!('ϳ') == 'Ϳ' // uses main Jot uppercase
+    assert:       Unicode.codepoint_to_lowercase!('ϴ') == 'θ' // uses main Theta lowercase
+    assert:       Unicode.codepoint_to_uppercase!('ϵ') == 'Ε' // uses main Epsilon uppercase
+    assert error: Unicode.codepoint_to_lowercase!('϶')
+    assert error: Unicode.codepoint_to_uppercase!('϶')
+    assert:       Unicode.codepoint_to_lowercase!('Ϸ') == 'ϸ'
+    assert:       Unicode.codepoint_to_uppercase!('ϸ') == 'Ϸ'
+    assert:       Unicode.codepoint_to_lowercase!('Ϻ') == 'ϻ'
+    assert:       Unicode.codepoint_to_uppercase!('ϻ') == 'Ϻ'
+    assert error: Unicode.codepoint_to_lowercase!('ϼ')
+    assert error: Unicode.codepoint_to_uppercase!('ϼ')
+
+    // 0x05xx : Cyrillic Supplement and Armenian
+    assert:       Unicode.codepoint_to_lowercase!('Ѐ') == 'ѐ'
+    assert:       Unicode.codepoint_to_uppercase!('ѐ') == 'Ѐ'
+    assert:       Unicode.codepoint_to_lowercase!('Џ') == 'џ'
+    assert:       Unicode.codepoint_to_uppercase!('џ') == 'Џ'
+    assert:       Unicode.codepoint_to_lowercase!('А') == 'а'
+    assert:       Unicode.codepoint_to_uppercase!('а') == 'А'
+    assert:       Unicode.codepoint_to_lowercase!('Я') == 'я'
+    assert:       Unicode.codepoint_to_uppercase!('я') == 'Я'
+    assert:       Unicode.codepoint_to_lowercase!('Ѡ') == 'ѡ'
+    assert:       Unicode.codepoint_to_uppercase!('ѡ') == 'Ѡ'
+    assert error: Unicode.codepoint_to_lowercase!('҂')
+    assert error: Unicode.codepoint_to_uppercase!('҂')
+    assert:       Unicode.codepoint_to_lowercase!('Ҋ') == 'ҋ'
+    assert:       Unicode.codepoint_to_uppercase!('ҋ') == 'Ҋ'
+    assert:       Unicode.codepoint_to_lowercase!('Ҿ') == 'ҿ'
+    assert:       Unicode.codepoint_to_uppercase!('ҿ') == 'Ҿ'
+    assert:       Unicode.codepoint_to_lowercase!('Ӏ') == 'ӏ'
+    assert:       Unicode.codepoint_to_uppercase!('ӏ') == 'Ӏ'
+    assert:       Unicode.codepoint_to_lowercase!('Ӂ') == 'ӂ'
+    assert:       Unicode.codepoint_to_uppercase!('ӂ') == 'Ӂ'
+    assert:       Unicode.codepoint_to_lowercase!('Ӎ') == 'ӎ'
+    assert:       Unicode.codepoint_to_uppercase!('ӎ') == 'Ӎ'
+    assert:       Unicode.codepoint_to_lowercase!('Ӑ') == 'ӑ'
+    assert:       Unicode.codepoint_to_uppercase!('ӑ') == 'Ӑ'
+    assert:       Unicode.codepoint_to_lowercase!('Ӿ') == 'ӿ'
+    assert:       Unicode.codepoint_to_uppercase!('ӿ') == 'Ӿ'
+    assert:       Unicode.codepoint_to_lowercase!('Ԁ') == 'ԁ'
+    assert:       Unicode.codepoint_to_uppercase!('ԁ') == 'Ԁ'
+    assert:       Unicode.codepoint_to_lowercase!('Ԯ') == 'ԯ'
+    assert:       Unicode.codepoint_to_uppercase!('ԯ') == 'Ԯ'
+    assert:       Unicode.codepoint_to_lowercase!('Ա') == 'ա'
+    assert:       Unicode.codepoint_to_uppercase!('ա') == 'Ա'
+    assert:       Unicode.codepoint_to_lowercase!('Ֆ') == 'ֆ'
+    assert:       Unicode.codepoint_to_uppercase!('ֆ') == 'Ֆ'
+    assert error: Unicode.codepoint_to_lowercase!('՟')
+    assert error: Unicode.codepoint_to_uppercase!('՟')
+    assert error: Unicode.codepoint_to_lowercase!('ՠ')
+    assert error: Unicode.codepoint_to_uppercase!('ՠ')
+    assert error: Unicode.codepoint_to_lowercase!('և')
+    assert error: Unicode.codepoint_to_uppercase!('և')
+    assert error: Unicode.codepoint_to_lowercase!('ֈ')
+    assert error: Unicode.codepoint_to_uppercase!('ֈ')
+    assert error: Unicode.codepoint_to_lowercase!('֏')
+    assert error: Unicode.codepoint_to_uppercase!('֏')
+
+    // 0x10xx : Georgian
+    assert:       Unicode.codepoint_to_lowercase!('Ⴀ') == 'ა'
+    assert:       Unicode.codepoint_to_uppercase!('ა') == 'Ⴀ'
+    assert:       Unicode.codepoint_to_lowercase!('Ⴥ') == 'ჵ'
+    assert:       Unicode.codepoint_to_uppercase!('ჵ') == 'Ⴥ'
+    assert:       Unicode.codepoint_to_lowercase!('Ⴥ') == 'ჵ'
+    assert:       Unicode.codepoint_to_uppercase!('ჵ') == 'Ⴥ'
+    assert error: Unicode.codepoint_to_lowercase!('ჶ')
+    assert error: Unicode.codepoint_to_uppercase!('ჶ')
+    assert:       Unicode.codepoint_to_lowercase!('Ⴧ') == 'ჷ'
+    assert:       Unicode.codepoint_to_uppercase!('ჷ') == 'Ⴧ'
+    assert error: Unicode.codepoint_to_lowercase!('ჸ')
+    assert error: Unicode.codepoint_to_uppercase!('ჸ')
+    assert:       Unicode.codepoint_to_lowercase!('Ⴭ') == 'ჽ'
+    assert:       Unicode.codepoint_to_uppercase!('ჽ') == 'Ⴭ'
+    assert error: Unicode.codepoint_to_lowercase!('ჾ')
+    assert error: Unicode.codepoint_to_uppercase!('ჾ')
+    assert error: Unicode.codepoint_to_lowercase!('ჿ')
+    assert error: Unicode.codepoint_to_uppercase!('ჿ')
+
+    // 0x13xx : Cherokee
+    assert:       Unicode.codepoint_to_lowercase!('Ꭰ') == 'ꭰ'
+    assert:       Unicode.codepoint_to_uppercase!('ꭰ') == 'Ꭰ'
+    assert:       Unicode.codepoint_to_lowercase!('Ꮿ') == 'ꮿ'
+    assert:       Unicode.codepoint_to_uppercase!('ꮿ') == 'Ꮿ'
+    assert:       Unicode.codepoint_to_lowercase!('Ᏸ') == 'ᏸ'
+    assert:       Unicode.codepoint_to_uppercase!('ᏸ') == 'Ᏸ'
+    assert:       Unicode.codepoint_to_lowercase!('Ᏽ') == 'ᏽ'
+    assert:       Unicode.codepoint_to_uppercase!('ᏽ') == 'Ᏽ'
+
+    // 0x1Cxx : Cyrillic Extended-C and Georgian Extended
+    assert:       Unicode.codepoint_to_uppercase!('ᲀ') == 'В' // uses main uppercase
+    assert:       Unicode.codepoint_to_uppercase!('ᲁ') == 'Д' // uses main uppercase
+    assert:       Unicode.codepoint_to_uppercase!('ᲂ') == 'О' // uses main uppercase
+    assert:       Unicode.codepoint_to_uppercase!('ᲃ') == 'С' // uses main uppercase
+    assert:       Unicode.codepoint_to_uppercase!('ᲄ') == 'Т' // uses main uppercase
+    assert:       Unicode.codepoint_to_uppercase!('ᲅ') == 'Т' // uses main uppercase
+    assert:       Unicode.codepoint_to_uppercase!('ᲆ') == 'Ъ' // uses main uppercase
+    assert:       Unicode.codepoint_to_uppercase!('ᲇ') == 'Ѣ' // uses main uppercase
+    assert:       Unicode.codepoint_to_uppercase!('ᲈ') == 'Ꙋ' // uses main uppercase
+    assert:       Unicode.codepoint_to_lowercase!('Ა') == 'ა' // uses main lowercase
+    assert:       Unicode.codepoint_to_lowercase!('Ჺ') == 'ჺ' // uses main lowercase
+    assert:       Unicode.codepoint_to_lowercase!('Ჽ') == 'ჽ' // uses main lowercase
+    assert:       Unicode.codepoint_to_lowercase!('Ჿ') == 'ჿ' // uses main lowercase
+    assert error: Unicode.codepoint_to_lowercase!('᳀')
+    assert error: Unicode.codepoint_to_uppercase!('᳀')
+
+    // 0x1Fxx : Greek Extended
+    assert:       Unicode.codepoint_to_lowercase!('Ἀ') == 'ἀ'
+    assert:       Unicode.codepoint_to_uppercase!('ἀ') == 'Ἀ'
+    assert:       Unicode.codepoint_to_lowercase!('Ἇ') == 'ἇ'
+    assert:       Unicode.codepoint_to_uppercase!('ἇ') == 'Ἇ'
+    assert:       Unicode.codepoint_to_lowercase!('Ἐ') == 'ἐ'
+    assert:       Unicode.codepoint_to_uppercase!('ἐ') == 'Ἐ'
+    assert:       Unicode.codepoint_to_lowercase!('Ἕ') == 'ἕ'
+    assert:       Unicode.codepoint_to_uppercase!('ἕ') == 'Ἕ'
+    assert:       Unicode.codepoint_to_lowercase!('Ἠ') == 'ἠ'
+    assert:       Unicode.codepoint_to_uppercase!('ἠ') == 'Ἠ'
+    assert:       Unicode.codepoint_to_lowercase!('Ἧ') == 'ἧ'
+    assert:       Unicode.codepoint_to_uppercase!('ἧ') == 'Ἧ'
+    assert:       Unicode.codepoint_to_lowercase!('Ἰ') == 'ἰ'
+    assert:       Unicode.codepoint_to_uppercase!('ἰ') == 'Ἰ'
+    assert:       Unicode.codepoint_to_lowercase!('Ἷ') == 'ἷ'
+    assert:       Unicode.codepoint_to_uppercase!('ἷ') == 'Ἷ'
+    assert:       Unicode.codepoint_to_lowercase!('Ὀ') == 'ὀ'
+    assert:       Unicode.codepoint_to_uppercase!('ὀ') == 'Ὀ'
+    assert:       Unicode.codepoint_to_lowercase!('Ὅ') == 'ὅ'
+    assert:       Unicode.codepoint_to_uppercase!('ὅ') == 'Ὅ'
+    assert error: Unicode.codepoint_to_lowercase!('ὐ')
+    assert error: Unicode.codepoint_to_uppercase!('ὐ')
+    assert:       Unicode.codepoint_to_lowercase!('Ὑ') == 'ὑ'
+    assert:       Unicode.codepoint_to_uppercase!('ὑ') == 'Ὑ'
+    assert error: Unicode.codepoint_to_lowercase!('ὖ')
+    assert error: Unicode.codepoint_to_uppercase!('ὖ')
+    assert:       Unicode.codepoint_to_lowercase!('Ὗ') == 'ὗ'
+    assert:       Unicode.codepoint_to_uppercase!('ὗ') == 'Ὗ'
+    assert:       Unicode.codepoint_to_lowercase!('Ὠ') == 'ὠ'
+    assert:       Unicode.codepoint_to_uppercase!('ὠ') == 'Ὠ'
+    assert:       Unicode.codepoint_to_lowercase!('Ὧ') == 'ὧ'
+    assert:       Unicode.codepoint_to_uppercase!('ὧ') == 'Ὧ'
+    assert error: Unicode.codepoint_to_lowercase!('ὰ')
+    assert error: Unicode.codepoint_to_uppercase!('ὰ')
+    assert error: Unicode.codepoint_to_lowercase!('ὼ')
+    assert error: Unicode.codepoint_to_uppercase!('ὼ')
+    assert:       Unicode.codepoint_to_lowercase!('ᾈ') == 'ᾀ'
+    assert:       Unicode.codepoint_to_uppercase!('ᾀ') == 'ᾈ'
+    assert:       Unicode.codepoint_to_lowercase!('ᾏ') == 'ᾇ'
+    assert:       Unicode.codepoint_to_uppercase!('ᾇ') == 'ᾏ'
+    assert:       Unicode.codepoint_to_lowercase!('ᾘ') == 'ᾐ'
+    assert:       Unicode.codepoint_to_uppercase!('ᾐ') == 'ᾘ'
+    assert:       Unicode.codepoint_to_lowercase!('ᾟ') == 'ᾗ'
+    assert:       Unicode.codepoint_to_uppercase!('ᾗ') == 'ᾟ'
+    assert:       Unicode.codepoint_to_lowercase!('ᾨ') == 'ᾠ'
+    assert:       Unicode.codepoint_to_uppercase!('ᾠ') == 'ᾨ'
+    assert:       Unicode.codepoint_to_lowercase!('ᾯ') == 'ᾧ'
+    assert:       Unicode.codepoint_to_uppercase!('ᾧ') == 'ᾯ'
+    assert:       Unicode.codepoint_to_lowercase!('Ᾰ') == 'ᾰ'
+    assert:       Unicode.codepoint_to_uppercase!('ᾰ') == 'Ᾰ'
+    assert:       Unicode.codepoint_to_lowercase!('ᾼ') == 'ᾴ'
+    assert:       Unicode.codepoint_to_uppercase!('ᾴ') == 'ᾼ'
+    assert error: Unicode.codepoint_to_lowercase!('ᾶ')
+    assert error: Unicode.codepoint_to_uppercase!('ᾶ')
+    assert error: Unicode.codepoint_to_lowercase!('ᾷ')
+    assert error: Unicode.codepoint_to_uppercase!('ᾷ')
+    assert error: Unicode.codepoint_to_lowercase!('᾽')
+    assert error: Unicode.codepoint_to_uppercase!('᾽')
+    assert error: Unicode.codepoint_to_lowercase!('῁')
+    assert error: Unicode.codepoint_to_uppercase!('῁')
+    assert:       Unicode.codepoint_to_lowercase!('Ὴ') == 'ῂ'
+    assert:       Unicode.codepoint_to_uppercase!('ῂ') == 'Ὴ'
+    assert:       Unicode.codepoint_to_lowercase!('ῌ') == 'ῄ'
+    assert:       Unicode.codepoint_to_uppercase!('ῄ') == 'ῌ'
+    assert error: Unicode.codepoint_to_lowercase!('ῆ')
+    assert error: Unicode.codepoint_to_uppercase!('ῆ')
+    assert error: Unicode.codepoint_to_lowercase!('ῇ')
+    assert error: Unicode.codepoint_to_uppercase!('ῇ')
+    assert error: Unicode.codepoint_to_lowercase!('῍')
+    assert error: Unicode.codepoint_to_uppercase!('῍')
+    assert error: Unicode.codepoint_to_lowercase!('῏')
+    assert error: Unicode.codepoint_to_uppercase!('῏')
+    assert:       Unicode.codepoint_to_lowercase!('Ῐ') == 'ῐ'
+    assert:       Unicode.codepoint_to_uppercase!('ῐ') == 'Ῐ'
+    assert:       Unicode.codepoint_to_lowercase!('Ί') == 'ΐ'
+    assert:       Unicode.codepoint_to_uppercase!('ΐ') == 'Ί'
+    assert error: Unicode.codepoint_to_lowercase!('ῖ')
+    assert error: Unicode.codepoint_to_uppercase!('ῖ')
+    assert error: Unicode.codepoint_to_lowercase!('ῗ')
+    assert error: Unicode.codepoint_to_uppercase!('ῗ')
+    assert error: Unicode.codepoint_to_lowercase!('῝')
+    assert error: Unicode.codepoint_to_uppercase!('῝')
+    assert error: Unicode.codepoint_to_lowercase!('῟')
+    assert error: Unicode.codepoint_to_uppercase!('῟')
+    assert:       Unicode.codepoint_to_lowercase!('Ῠ') == 'ῠ'
+    assert:       Unicode.codepoint_to_uppercase!('ῠ') == 'Ῠ'
+    assert:       Unicode.codepoint_to_lowercase!('Ῡ') == 'ῡ'
+    assert:       Unicode.codepoint_to_uppercase!('ῡ') == 'Ῡ'
+    assert:       Unicode.codepoint_to_lowercase!('Ῥ') == 'ῥ'
+    assert:       Unicode.codepoint_to_uppercase!('ῥ') == 'Ῥ'
+    assert error: Unicode.codepoint_to_lowercase!('῭')
+    assert error: Unicode.codepoint_to_uppercase!('῭')
+    assert error: Unicode.codepoint_to_lowercase!('`')
+    assert error: Unicode.codepoint_to_uppercase!('`')
+
+    // 0x24xx : Enclosed Alphanumerics
+    assert:       Unicode.codepoint_to_lowercase!('Ⓐ') == 'ⓐ'
+    assert:       Unicode.codepoint_to_uppercase!('ⓐ') == 'Ⓐ'
+    assert:       Unicode.codepoint_to_lowercase!('Ⓩ') == 'ⓩ'
+    assert:       Unicode.codepoint_to_uppercase!('ⓩ') == 'Ⓩ'
+    assert error: Unicode.codepoint_to_lowercase!('⓪')
+    assert error: Unicode.codepoint_to_uppercase!('⓪')
+
+    // 0x2Cxx : Glagolitic, Latin Extended-C, and Coptic
+    assert:       Unicode.codepoint_to_lowercase!('Ⰰ') == 'ⰰ'
+    assert:       Unicode.codepoint_to_uppercase!('ⰰ') == 'Ⰰ'
+    assert:       Unicode.codepoint_to_lowercase!('Ⱞ') == 'ⱞ'
+    assert:       Unicode.codepoint_to_uppercase!('ⱞ') == 'Ⱞ'
+    assert:       Unicode.codepoint_to_lowercase!('Ⱡ') == 'ⱡ'
+    assert:       Unicode.codepoint_to_uppercase!('ⱡ') == 'Ⱡ'
+    assert:       Unicode.codepoint_to_lowercase!('Ɫ') == 'ɫ'
+    assert:       Unicode.codepoint_to_uppercase!('ɫ') == 'Ɫ'
+    assert:       Unicode.codepoint_to_lowercase!('Ᵽ') == 'ᵽ'
+    assert:       Unicode.codepoint_to_uppercase!('ᵽ') == 'Ᵽ'
+    assert:       Unicode.codepoint_to_lowercase!('Ɽ') == 'ɽ'
+    assert:       Unicode.codepoint_to_uppercase!('ɽ') == 'Ɽ'
+    assert:       Unicode.codepoint_to_lowercase!('Ⱥ') == 'ⱥ'
+    assert:       Unicode.codepoint_to_uppercase!('ⱥ') == 'Ⱥ'
+    assert:       Unicode.codepoint_to_lowercase!('Ⱦ') == 'ⱦ'
+    assert:       Unicode.codepoint_to_uppercase!('ⱦ') == 'Ⱦ'
+    assert:       Unicode.codepoint_to_lowercase!('Ⱨ') == 'ⱨ'
+    assert:       Unicode.codepoint_to_uppercase!('ⱨ') == 'Ⱨ'
+    assert:       Unicode.codepoint_to_lowercase!('Ⱬ') == 'ⱬ'
+    assert:       Unicode.codepoint_to_uppercase!('ⱬ') == 'Ⱬ'
+    assert:       Unicode.codepoint_to_lowercase!('Ɑ') == 'ɑ'
+    assert:       Unicode.codepoint_to_uppercase!('ɑ') == 'Ɑ'
+    assert:       Unicode.codepoint_to_lowercase!('Ɱ') == 'ɱ'
+    assert:       Unicode.codepoint_to_uppercase!('ɱ') == 'Ɱ'
+    assert:       Unicode.codepoint_to_lowercase!('Ɐ') == 'ɐ'
+    assert:       Unicode.codepoint_to_uppercase!('ɐ') == 'Ɐ'
+    assert:       Unicode.codepoint_to_lowercase!('Ɒ') == 'ɒ'
+    assert:       Unicode.codepoint_to_uppercase!('ɒ') == 'Ɒ'
+    assert error: Unicode.codepoint_to_lowercase!('ⱱ')
+    assert error: Unicode.codepoint_to_uppercase!('ⱱ')
+    assert:       Unicode.codepoint_to_lowercase!('Ⱳ') == 'ⱳ'
+    assert:       Unicode.codepoint_to_uppercase!('ⱳ') == 'Ⱳ'
+    assert error: Unicode.codepoint_to_lowercase!('ⱴ')
+    assert error: Unicode.codepoint_to_uppercase!('ⱴ')
+    assert:       Unicode.codepoint_to_lowercase!('Ⱶ') == 'ⱶ'
+    assert:       Unicode.codepoint_to_uppercase!('ⱶ') == 'Ⱶ'
+    assert error: Unicode.codepoint_to_lowercase!('ⱷ')
+    assert error: Unicode.codepoint_to_uppercase!('ⱷ')
+    assert error: Unicode.codepoint_to_lowercase!('ⱼ')
+    assert error: Unicode.codepoint_to_uppercase!('ⱼ')
+    assert:       Unicode.codepoint_to_lowercase!('Ȿ') == 'ȿ'
+    assert:       Unicode.codepoint_to_uppercase!('ȿ') == 'Ȿ'
+    assert:       Unicode.codepoint_to_lowercase!('Ɀ') == 'ɀ'
+    assert:       Unicode.codepoint_to_uppercase!('ɀ') == 'Ɀ'
+    assert:       Unicode.codepoint_to_lowercase!('Ⲁ') == 'ⲁ'
+    assert:       Unicode.codepoint_to_uppercase!('ⲁ') == 'Ⲁ'
+    assert:       Unicode.codepoint_to_lowercase!('Ⳣ') == 'ⳣ'
+    assert:       Unicode.codepoint_to_uppercase!('ⳣ') == 'Ⳣ'
+    assert error: Unicode.codepoint_to_lowercase!('ⳤ')
+    assert error: Unicode.codepoint_to_uppercase!('ⳤ')
+    assert error: Unicode.codepoint_to_lowercase!('⳪')
+    assert error: Unicode.codepoint_to_uppercase!('⳪')
+    assert:       Unicode.codepoint_to_lowercase!('Ⳬ') == 'ⳬ'
+    assert:       Unicode.codepoint_to_uppercase!('ⳬ') == 'Ⳬ'
+    assert:       Unicode.codepoint_to_lowercase!('Ⳮ') == 'ⳮ'
+    assert:       Unicode.codepoint_to_uppercase!('ⳮ') == 'Ⳮ'
+    assert:       Unicode.codepoint_to_lowercase!('Ⳳ') == 'ⳳ'
+    assert:       Unicode.codepoint_to_uppercase!('ⳳ') == 'Ⳳ'
+
+    // 0x2Dxx : Georgian Supplement
+    assert:       Unicode.codepoint_to_uppercase!('ⴀ') == 'Ⴀ' // uses main uppercase
+    assert:       Unicode.codepoint_to_uppercase!('ⴥ') == 'Ⴥ' // uses main uppercase
+    assert:       Unicode.codepoint_to_uppercase!('ⴧ') == 'Ⴧ' // uses main uppercase
+    assert:       Unicode.codepoint_to_uppercase!('ⴭ') == 'Ⴭ' // uses main uppercase
+
+    // 0xA6xx : Cyrillic Extended-C
+    assert:       Unicode.codepoint_to_lowercase!('Ꙁ') == 'ꙁ'
+    assert:       Unicode.codepoint_to_uppercase!('ꙁ') == 'Ꙁ'
+    assert:       Unicode.codepoint_to_lowercase!('Ꙭ') == 'ꙭ'
+    assert:       Unicode.codepoint_to_uppercase!('ꙭ') == 'Ꙭ'
+    assert error: Unicode.codepoint_to_lowercase!('ꙮ')
+    assert error: Unicode.codepoint_to_uppercase!('ꙮ')
+    assert:       Unicode.codepoint_to_lowercase!('Ꚁ') == 'ꚁ'
+    assert:       Unicode.codepoint_to_uppercase!('ꚁ') == 'Ꚁ'
+    assert:       Unicode.codepoint_to_lowercase!('Ꚛ') == 'ꚛ'
+    assert:       Unicode.codepoint_to_uppercase!('ꚛ') == 'Ꚛ'
+    assert error: Unicode.codepoint_to_lowercase!('ꚜ')
+    assert error: Unicode.codepoint_to_uppercase!('ꚜ')
+
+    // 0xA7xx : Latin Extended-D
+    assert:       Unicode.codepoint_to_lowercase!('Ꜣ') == 'ꜣ'
+    assert:       Unicode.codepoint_to_uppercase!('ꜣ') == 'Ꜣ'
+    assert:       Unicode.codepoint_to_lowercase!('Ꜯ') == 'ꜯ'
+    assert:       Unicode.codepoint_to_uppercase!('ꜯ') == 'Ꜯ'
+    assert:       Unicode.codepoint_to_lowercase!('Ꜳ') == 'ꜳ'
+    assert:       Unicode.codepoint_to_uppercase!('ꜳ') == 'Ꜳ'
+    assert:       Unicode.codepoint_to_lowercase!('Ꝯ') == 'ꝯ'
+    assert:       Unicode.codepoint_to_uppercase!('ꝯ') == 'Ꝯ'
+    assert error: Unicode.codepoint_to_lowercase!('ꝱ')
+    assert error: Unicode.codepoint_to_uppercase!('ꝱ')
+    assert error: Unicode.codepoint_to_lowercase!('ꝸ')
+    assert error: Unicode.codepoint_to_uppercase!('ꝸ')
+    assert:       Unicode.codepoint_to_lowercase!('Ꝺ') == 'ꝺ'
+    assert:       Unicode.codepoint_to_uppercase!('ꝺ') == 'Ꝺ'
+    assert:       Unicode.codepoint_to_lowercase!('Ꝼ') == 'ꝼ'
+    assert:       Unicode.codepoint_to_uppercase!('ꝼ') == 'Ꝼ'
+    assert:       Unicode.codepoint_to_lowercase!('Ᵹ') == 'ᵹ'
+    assert:       Unicode.codepoint_to_uppercase!('ᵹ') == 'Ᵹ'
+    assert:       Unicode.codepoint_to_lowercase!('Ꝿ') == 'ꝿ'
+    assert:       Unicode.codepoint_to_uppercase!('ꝿ') == 'Ꝿ'
+    assert:       Unicode.codepoint_to_lowercase!('Ꞇ') == 'ꞇ'
+    assert:       Unicode.codepoint_to_uppercase!('ꞇ') == 'Ꞇ'
+    assert:       Unicode.codepoint_to_lowercase!('Ꞌ') == 'ꞌ'
+    assert:       Unicode.codepoint_to_uppercase!('ꞌ') == 'Ꞌ'
+    assert:       Unicode.codepoint_to_lowercase!('Ɥ') == 'ɥ'
+    assert:       Unicode.codepoint_to_uppercase!('ɥ') == 'Ɥ'
+    assert error: Unicode.codepoint_to_lowercase!('ꞎ')
+    assert error: Unicode.codepoint_to_uppercase!('ꞎ')
+    assert error: Unicode.codepoint_to_lowercase!('ꞏ')
+    assert error: Unicode.codepoint_to_uppercase!('ꞏ')
+    assert:       Unicode.codepoint_to_lowercase!('Ꞑ') == 'ꞑ'
+    assert:       Unicode.codepoint_to_uppercase!('ꞑ') == 'Ꞑ'
+    assert:       Unicode.codepoint_to_lowercase!('Ꞓ') == 'ꞓ'
+    assert:       Unicode.codepoint_to_uppercase!('ꞓ') == 'Ꞓ'
+    assert:       Unicode.codepoint_to_lowercase!('Ꞔ') == 'ꞔ'
+    assert:       Unicode.codepoint_to_uppercase!('ꞔ') == 'Ꞔ'
+    assert error: Unicode.codepoint_to_lowercase!('ꞕ')
+    assert error: Unicode.codepoint_to_uppercase!('ꞕ')
+    assert:       Unicode.codepoint_to_lowercase!('Ꞗ') == 'ꞗ'
+    assert:       Unicode.codepoint_to_uppercase!('ꞗ') == 'Ꞗ'
+    assert:       Unicode.codepoint_to_lowercase!('Ꞩ') == 'ꞩ'
+    assert:       Unicode.codepoint_to_uppercase!('ꞩ') == 'Ꞩ'
+    assert:       Unicode.codepoint_to_lowercase!('Ɦ') == 'ɦ'
+    assert:       Unicode.codepoint_to_uppercase!('ɦ') == 'Ɦ'
+    assert:       Unicode.codepoint_to_lowercase!('Ɜ') == 'ɜ'
+    assert:       Unicode.codepoint_to_uppercase!('ɜ') == 'Ɜ'
+    assert:       Unicode.codepoint_to_lowercase!('Ɡ') == 'ɡ'
+    assert:       Unicode.codepoint_to_uppercase!('ɡ') == 'Ɡ'
+    assert:       Unicode.codepoint_to_lowercase!('Ɬ') == 'ɬ'
+    assert:       Unicode.codepoint_to_uppercase!('ɬ') == 'Ɬ'
+    assert:       Unicode.codepoint_to_lowercase!('Ɪ') == 'ɪ'
+    assert:       Unicode.codepoint_to_uppercase!('ɪ') == 'Ɪ'
+    assert:       Unicode.codepoint_to_lowercase!('Ʞ') == 'ʞ'
+    assert:       Unicode.codepoint_to_uppercase!('ʞ') == 'Ʞ'
+    assert:       Unicode.codepoint_to_lowercase!('Ʇ') == 'ʇ'
+    assert:       Unicode.codepoint_to_uppercase!('ʇ') == 'Ʇ'
+    assert:       Unicode.codepoint_to_lowercase!('Ʝ') == 'ʝ'
+    assert:       Unicode.codepoint_to_uppercase!('ʝ') == 'Ʝ'
+    assert:       Unicode.codepoint_to_lowercase!('Ꭓ') == 'ꭓ'
+    assert:       Unicode.codepoint_to_uppercase!('ꭓ') == 'Ꭓ'
+    assert:       Unicode.codepoint_to_lowercase!('Ꞵ') == 'ꞵ'
+    assert:       Unicode.codepoint_to_uppercase!('ꞵ') == 'Ꞵ'
+    assert:       Unicode.codepoint_to_lowercase!('Ꞿ') == 'ꞿ'
+    assert:       Unicode.codepoint_to_uppercase!('ꞿ') == 'Ꞿ'
+    assert:       Unicode.codepoint_to_lowercase!('Ꟃ') == 'ꟃ'
+    assert:       Unicode.codepoint_to_uppercase!('ꟃ') == 'Ꟃ'
+    assert:       Unicode.codepoint_to_lowercase!('Ʂ') == 'ʂ'
+    assert:       Unicode.codepoint_to_uppercase!('ʂ') == 'Ʂ'
+    assert:       Unicode.codepoint_to_lowercase!('Ᶎ') == 'ᶎ'
+    assert:       Unicode.codepoint_to_uppercase!('ᶎ') == 'Ᶎ'
+    assert:       Unicode.codepoint_to_lowercase!('Ꟈ') == 'ꟈ'
+    assert:       Unicode.codepoint_to_uppercase!('ꟈ') == 'Ꟈ'
+    assert:       Unicode.codepoint_to_lowercase!('Ꟊ') == 'ꟊ'
+    assert:       Unicode.codepoint_to_uppercase!('ꟊ') == 'Ꟊ'
+    assert:       Unicode.codepoint_to_lowercase!('Ꟶ') == 'ꟶ'
+    assert:       Unicode.codepoint_to_uppercase!('ꟶ') == 'Ꟶ'
+    assert error: Unicode.codepoint_to_lowercase!('ꟷ')
+    assert error: Unicode.codepoint_to_uppercase!('ꟷ')
+    assert error: Unicode.codepoint_to_lowercase!('ꟿ')
+    assert error: Unicode.codepoint_to_uppercase!('ꟿ')
+
+    // 0xABxx : Latin Extended-E and Cherokee
+    assert:       Unicode.codepoint_to_lowercase!('Ꭓ') == 'ꭓ'
+    assert:       Unicode.codepoint_to_uppercase!('ꭓ') == 'Ꭓ'
+    assert:       Unicode.codepoint_to_lowercase!('Ꭰ') == 'ꭰ'
+    assert:       Unicode.codepoint_to_uppercase!('ꭰ') == 'Ꭰ'
+    assert:       Unicode.codepoint_to_lowercase!('Ꮿ') == 'ꮿ'
+    assert:       Unicode.codepoint_to_uppercase!('ꮿ') == 'Ꮿ'
+
+    // 0xFFxx : Halfwidth and Fullwidth Forms
+    assert error: Unicode.codepoint_to_lowercase!('＠')
+    assert error: Unicode.codepoint_to_uppercase!('＠')
+    assert:       Unicode.codepoint_to_lowercase!('Ａ') == 'ａ'
+    assert:       Unicode.codepoint_to_uppercase!('ａ') == 'Ａ'
+    assert:       Unicode.codepoint_to_lowercase!('Ｚ') == 'ｚ'
+    assert:       Unicode.codepoint_to_uppercase!('ｚ') == 'Ｚ'
+    assert error: Unicode.codepoint_to_lowercase!('［')
+    assert error: Unicode.codepoint_to_uppercase!('［')
+    assert error: Unicode.codepoint_to_lowercase!('｀')
+    assert error: Unicode.codepoint_to_uppercase!('｀')
+    assert error: Unicode.codepoint_to_lowercase!('｛')
+    assert error: Unicode.codepoint_to_uppercase!('｛')
+
+    // 0x104xx : Deseret and Osage
+    assert:       Unicode.codepoint_to_lowercase!('𐐀') == '𐐨'
+    assert:       Unicode.codepoint_to_uppercase!('𐐨') == '𐐀'
+    assert:       Unicode.codepoint_to_lowercase!('𐐧') == '𐑏'
+    assert:       Unicode.codepoint_to_uppercase!('𐑏') == '𐐧'
+    assert:       Unicode.codepoint_to_lowercase!('𐒰') == '𐓘'
+    assert:       Unicode.codepoint_to_uppercase!('𐓘') == '𐒰'
+    assert:       Unicode.codepoint_to_lowercase!('𐓓') == '𐓻'
+    assert:       Unicode.codepoint_to_uppercase!('𐓻') == '𐓓'
+
+    // 0x10Cxx : Old Hungarian
+    assert:       Unicode.codepoint_to_lowercase!('𐲀') == '𐳀'
+    assert:       Unicode.codepoint_to_uppercase!('𐳀') == '𐲀'
+    assert:       Unicode.codepoint_to_lowercase!('𐲲') == '𐳲'
+    assert:       Unicode.codepoint_to_uppercase!('𐳲') == '𐲲'
+    assert error: Unicode.codepoint_to_lowercase!('𐳺')
+    assert error: Unicode.codepoint_to_uppercase!('𐳺')
+
+    // 0x118xx : Warang Citi
+    assert:       Unicode.codepoint_to_lowercase!('𑢠') == '𑣀'
+    assert:       Unicode.codepoint_to_uppercase!('𑣀') == '𑢠'
+    assert:       Unicode.codepoint_to_lowercase!('𑢿') == '𑣟'
+    assert:       Unicode.codepoint_to_uppercase!('𑣟') == '𑢿'
+    assert error: Unicode.codepoint_to_lowercase!('𑣠')
+    assert error: Unicode.codepoint_to_uppercase!('𑣠')
+
+    // 0x16Exx : Medefaidrin
+    assert:       Unicode.codepoint_to_lowercase!('𖹀') == '𖹠'
+    assert:       Unicode.codepoint_to_uppercase!('𖹠') == '𖹀'
+    assert:       Unicode.codepoint_to_lowercase!('𖹟') == '𖹿'
+    assert:       Unicode.codepoint_to_uppercase!('𖹿') == '𖹟'
+    assert error: Unicode.codepoint_to_lowercase!('𖺀')
+    assert error: Unicode.codepoint_to_uppercase!('𖺀')
+
+    // 0x1E9xx : Adlam
+    assert:       Unicode.codepoint_to_lowercase!('𞤀') == '𞤢'
+    assert:       Unicode.codepoint_to_uppercase!('𞤢') == '𞤀'
+    assert:       Unicode.codepoint_to_lowercase!('𞤡') == '𞥃'
+    assert:       Unicode.codepoint_to_uppercase!('𞥃') == '𞤡'
+    assert error: Unicode.codepoint_to_lowercase!('𞥐')
+    assert error: Unicode.codepoint_to_uppercase!('𞥐')
