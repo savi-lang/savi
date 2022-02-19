@@ -352,6 +352,12 @@
     assert: U8[18].swap_bytes         == 18
     assert: U16[0x1234].swap_bytes    == 0x3412
     assert: U32[66052].swap_bytes     == 67240192
+    assert: U8[18].is_even
+    assert: !U8[18].is_odd
+    assert: !U8[17].is_even
+    assert: U8[17].is_odd
+    assert: U8[0].is_even
+    assert: !U8[0].is_odd
     assert: U8[18].leading_zero_bits  == 3
     assert: U8[18].trailing_zero_bits == 1
     assert: U8[18].total_one_bits     == 2

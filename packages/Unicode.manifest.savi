@@ -1,0 +1,9 @@
+:manifest lib Unicode
+  :sources "src/Unicode/**/*.savi"
+
+:manifest bin "spec-Unicode"
+  :copies Unicode
+  :sources "spec/Unicode/**/*.savi"
+
+  :dependency Spec "TODO: specify version"
+  :transitive dependency Map "TODO: specify version"

@@ -156,6 +156,12 @@
   :: because the bits shifted off the right side appear again on the left side.
   :fun val bit_rotr(bits U8) T
 
+  :: Return true if the value is even (its least significant bit is unset).
+  :fun val is_even Bool
+
+  :: Return true if the value is odd (its least significant bit is set).
+  :fun val is_odd Bool
+
   :: Count consecutive zero bits, starting with the most significant bit,
   :: until the first one bit is reached (or until the end of the bit sequence).
   :fun val leading_zero_bits U8
@@ -259,6 +265,8 @@
     @bit_shr(bits).bit_or(
       @bit_shl(@bit_width - bits)
     )
+  :fun val is_even Bool: @bit_and(@one) == @zero
+  :fun val is_odd Bool: @bit_and(@one) == @one
   :fun val leading_zero_bits U8: compiler intrinsic
   :fun val trailing_zero_bits U8: compiler intrinsic
   :fun val total_one_bits U8: compiler intrinsic
